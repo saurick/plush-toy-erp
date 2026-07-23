@@ -301,7 +301,7 @@ pnpm smoke:processing-contract-real-login
 - 管理员登录
 - 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色客户配置包预检页、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
 - 未登录访问桌面后台的重定向
-- 桌面工作台和任务看板，包括待我处理、阻塞 / 逾期风险队列、协同任务筛选、任务详情抽屉、阻塞 / 退回原因面板、催办，以及基于 `complete_task_action` / `block_task_action` / `reject_task_action` 的任务动作
+- 桌面工作台和任务看板，包括待我处理、阻塞 / 逾期风险队列、协同任务筛选、任务详情抽屉、阻塞 / 退回原因面板、催办、受控转交，以及基于 `complete_task_action` / `block_task_action` / `reject_task_action / reassign_task` 的任务动作
 - 桌面业务看板和模板打印中心
 - 当前正式业务页连续回归，包括客户档案、供应商档案、销售订单 V1 页面、采购订单日期筛选和出货单日期筛选（桌面 / 窄屏）
 - 当前正式业务页表格、筛选、列顺序账号偏好、弹窗布局和协同入口
@@ -332,7 +332,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 当前规则：
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- 桌面侧栏在权限过滤后附加 `使用帮助 / 岗位使用帮助`；该入口属于登录态壳层能力，不恢复 `erp.help_center.read` 或其他旧权限别名。客户配置可用 `desktopMenu.presentation = 'role_guided'` 依次显示“看板中心”、“常用工作”和“更多功能”：看板仅按最终页面权限固定在最前，岗位帮助固定折叠到更多功能；系统推荐通常选择 3 个岗位高频业务，财务推荐应付、应收、发票、对账 4 个。权限管理的“页面与导航”可为业务岗位选择系统推荐，或从最终可进入页面中自定义并排序 1–5 个常用入口；角色保存的 `navigation_mode / primary_menu_paths` 只控制位置，不改变页面权限、操作权限、客户投影或直接路由。
+- 桌面侧栏在权限过滤后附加 `使用帮助 / 岗位使用帮助`；该入口属于登录态壳层能力，不恢复 `erp.help_center.read` 或其他旧权限别名。客户配置可用 `desktopMenu.presentation = 'role_guided'` 依次显示“看板中心”、“常用工作”和“更多功能”：看板仅按最终页面权限固定在最前，岗位帮助固定折叠到更多功能；系统推荐通常选择 3 个岗位高频业务，财务推荐应付、应收、发票、对账 4 个。权限管理“可用功能”消费后端 `menu_options` 与 `effective_role_access`：每个业务分组先显示菜单是否出现、缺少的入口功能和当前岗位导航位置；桌面按业务分类提供吸顶直达和已选 / 总数，手机使用“跳到功能分类”下拉，保留“只看已选”用于复核，不提供低频全文搜索。未保存 `permission_keys` 只做客户有效范围预览，不持久化。主办理页面明确且入口唯一时会补齐该入口，但不会开启其他关联页面；关闭单一入口会移除仅在该页使用的操作，跨页面能力不自动删除。“页面与导航”可为业务岗位选择系统推荐，或从最终可进入页面中自定义并排序 1–5 个常用入口；角色保存的 `navigation_mode / primary_menu_paths` 只控制位置，不改变页面权限、操作权限、客户投影或直接路由。
 - `/erp/help-center` 根据当前有效岗位选择 `src/erp/config/roleHelpContent.mjs` 中的内容，多岗位账号可切换，单岗位账号不显示切换器，常用入口继续与当前可见菜单取交集。每岗帮助统一展示正常案例、完成标准、异常处理、退回对象和操作注意事项；未知岗位使用安全通用帮助。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径不再注册运行时路由、重定向或权限别名。
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
@@ -409,7 +409,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 - 桌面后台继续只保留一个入口
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
-- 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code
+- 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code。权限清单按后端 `module_name` 展示“物料清单（BOM）/ 客户退货 / 生产执行 / 敏感字段”等业务分类，不在前端重复维护模块翻译；仅对未知或缺失分类合并显示一个“未分类功能”，避免多个技术模块同时冒充“其他功能”。分类导航只负责页内定位，不改变勾选结果或权限真源
 - 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、生产排程、生产异常、出货放行、出库管理和财务业务已分别接入正式 V1、Workflow V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、事务内聚合新建草稿、只读查看明细、显式提交放行、确认出货和已出货取消冲正。品质岗位可在提交放行前从 `DRAFT` 出货单按产品规格、仓库和批次发起出货前成品检验；一旦存在检验，未完成合格 / 让步判定时后端会阻止提交，提交成功后也不再允许补建检验。提交返回必须通过前端对任务编号、任务组、来源、责任岗位、状态、来源合同和意图摘要的完整校验，结构不可信时不冒充成功。没有发起检验仍按当前可选检验策略提交；创建检验不会启动 Workflow。放行任务完成只表示允许仓库执行，`SHIPPED` 才是真实出货事实。草稿逐行追加已退出，避免重复提交和多行半保存。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。生产排程、生产异常和出货放行由 Workflow V1 协同页承接读取、完成、阻塞和催办；任务分别由生产订单下达、返工事实过账和出货单显式提交放行生成，页面不提供通用新建入口。三类保留任务组和确定性任务编号不能由普通任务创建、流程节点或客户流程配置占用。任务终态只更新协同投影；来源随后关闭、取消或真实出货时，页面读取的来源投影可继续显示 `closed / cancelled / shipped`，但不改写任务处理结论。三者不读取或写入旧 `business_records`，也不提供删除、回收站、业务数据导出或生产 / 出货 / 库存 / 财务领域事实写入主路径。旧预览壳页、旧通用业务页、旧业务模块路由和旧入口退出页已删除。
 - 正式业务页的“相关单据”支持连续往返。每一跳都以目标页拥有的数值 ID 或来源类型 + 来源 ID 重新建立精确筛选，业务单号只用于筛选框回显，不参与精确请求。目标关系只有一条可确定记录时自动选中并回显目标单号，用户编辑或清空筛选后退出关联上下文；存在多条取消历史且无法唯一确定时不臆选。
 - 生产订单页的“工序办理”已接固定 `PLUSH_SEW_HAND_V1` v1：布料加工正常流整单外发且首道不可拆，只有裁片检验 `PASS` 转入车缝后才可按产品数量拆批；车缝和手工按“先车缝、后手工”分别选择本厂或外发。内部完成使用“车间移交 / WIP 转移”，外发完成返回才使用“外发回仓”。首道外发只允许选择逐条精确覆盖显式 `FABRIC_PROCESSING` 冻结材料需求的 MATERIAL 合同行，并在开始前核对已过账委外发料；FABRIC 返工再次外发改用新的 PRODUCT 合同行。生产、品质、业务和 PMC 分别按 WIP 执行、分段质检、包材业务确认和只读跟进权限进入对应入口，业务岗位可凭 `production.wip.read` 打开生产订单页，但新建、编辑、发布、关闭、取消和引用选项仍只认 PMC 计划权限。
@@ -420,6 +420,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 岗位任务端本地和生产环境统一走 `5175` 的 `/m/<role>/tasks`；不再保留按角色拆端口入口，也不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
 - 岗位任务页读取真实 workflow API，采用有意组合的移动主路径：保留 v1 的待办 / 已办 / 提醒 / 我的列表、主筛选、服务端游标分页 / 分批展开和任务卡片；选中任务后进入 v2 独立全屏查看、处理和可信结果回执，结束后恢复原列表的筛选、已加载分页、滚动位置和焦点。`todo / risk / history` 仍是各自服务端查询视图，不在前端拼成第二套任务真源。完成 / 阻塞 / 退回分别走 `complete_task_action` / `block_task_action` / `reject_task_action`，均由服务端按当前管理员和任务责任推导角色。桌面任务看板、Workflow V1 页面、业务协同 Drawer 和岗位任务端提交前预检已消费 `explainWorkflowActionAccess` / `explainWorkflowTaskAssignment` 的后端只读原因；移动端不再回写 `business_records` 状态，附件上传和 Workflow done 都不代表业务 Fact 已生效
+- 桌面 `/erp/task-board` 的任务详情抽屉通过 `get_task_assignment_options` 获取服务端筛选后的接收人，并以 `reassign_task` 提交接收人或岗位池、当前 version、幂等键和必填原因；前端不从管理员列表自行拼候选人。当前默认只有老板角色和 super admin 能看到转交动作，但 super admin 不会因全权限自动成为业务岗位接收人；PMC 仍只读监督。转交成功后抽屉关闭并刷新服务端任务投影，只改变个人归属，不改变任务状态或业务事实。`/m/<role>/tasks` 当前仍只提供既有完成 / 阻塞 / 退回 / 催办动作，不把桌面转交入口误写成岗位任务端已接能力
 - 正式完成 / 阻塞 / 退回 / 催办入口为一次用户 intent 冻结业务参数、`expected_version` 和安全 UUID `idempotency_key`；HTTPS 优先使用 `crypto.randomUUID()`，内网 HTTP 浏览器使用 `crypto.getRandomValues()` 生成 RFC 4122 v4 key，不允许退回 `Math.random()`。只有新 intent 执行 explain 预检；HTTP 408、网络中断、5xx 或结构不合法的 success response 都保留原 attempt、抽屉、原因、证据和同一 key，原样读取 / 重放 receipt，不刷新列表也不把未知结果误报为失败。后端在每次请求仍重新校验登录、RBAC、客户 scope、任务可见性和 receipt，前端跳过重复 explain 不构成授权绕过
 - Dashboard、Workflow V1 页面、岗位任务端、采购订单与委外订单协同入口共用 task 级同步 in-flight guard：同一 task 的首个动作在任何 await 前取得 lease，完成 / 阻塞 / 退回 / 催办跨动作双击不会发出第二个请求，`finally` 只释放本次持有的 lease。Go 与 JS 已共同消费 `scripts/qa/workflow-task-mutation-intent-v1.vectors.json`，锁住 mixed evidence 类型 / 顺序、raw whitespace key、mobile 精确重复 key 和 changed-intent relations；Node 24.14 定向 util + mobile + purchase / outsourcing guard 为 33/33，联合 Workflow API / caller 为 62/62，受影响 ESLint 0 error。该结果不代表 final full/strict/L1 或目标环境证据已经完成
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮

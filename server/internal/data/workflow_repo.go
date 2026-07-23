@@ -9,11 +9,18 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/adminuserrole"
+	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
 
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
 )
 
@@ -685,6 +692,297 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 	}
 	tx = nil
 	return resultTask, nil
+}
+
+func (r *workflowRepo) ReassignWorkflowTask(
+	ctx context.Context,
+	in *biz.WorkflowTaskAssignment,
+	actorID int,
+	actorRoleKey string,
+) (*biz.WorkflowTask, error) {
+	if in == nil ||
+		in.ID <= 0 ||
+		in.ExpectedVersion <= 0 ||
+		actorID <= 0 ||
+		!workflowTaskMutationIdentityValid(in.CommandKey, in.IdempotencyKey, in.IntentHash) {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	if replayed, found, err := resolveWorkflowTaskMutationInTx(
+		ctx,
+		tx,
+		in.ID,
+		in.IdempotencyKey,
+		in.IntentHash,
+		in.CommandKey,
+		actorID,
+	); err != nil || found {
+		return replayed, err
+	}
+
+	if in.TargetAssigneeID != nil {
+		if err := r.validateWorkflowAssignmentTargetInTx(ctx, tx, in); err != nil {
+			return nil, err
+		}
+	}
+
+	current, err := tx.WorkflowTask.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrWorkflowTaskNotFound
+		}
+		return nil, err
+	}
+	expectedVersion := in.ExpectedVersion
+	if current.Version != expectedVersion {
+		return nil, workflowTaskMutationConflict(current.TaskStatusKey)
+	}
+	if biz.IsTerminalWorkflowTaskStatus(current.TaskStatusKey) {
+		return nil, biz.ErrWorkflowTaskSettled
+	}
+	if biz.NormalizeRoleKey(current.OwnerRoleKey) !=
+		biz.NormalizeRoleKey(in.RequiredOwnerRoleKey) {
+		return nil, biz.ErrWorkflowAssigneeIneligible
+	}
+	if workflowTaskAssignmentMatchesEnt(current, in) {
+		return nil, biz.ErrWorkflowTaskAssignmentNoop
+	}
+
+	predicates := []predicate.WorkflowTask{
+		workflowtask.IDEQ(in.ID),
+		workflowtask.VersionEQ(expectedVersion),
+		workflowtask.TaskStatusKeyEQ(current.TaskStatusKey),
+		workflowtask.TaskStatusKeyNotIn("done", "rejected"),
+	}
+	if current.AssigneeID == nil {
+		predicates = append(predicates, workflowtask.AssigneeIDIsNil())
+	} else {
+		predicates = append(predicates, workflowtask.AssigneeIDEQ(*current.AssigneeID))
+	}
+	update := tx.WorkflowTask.Update().
+		Where(predicates...).
+		AddVersion(1).
+		SetUpdatedBy(actorID)
+	if in.TargetAssigneeID == nil {
+		update.ClearAssigneeID()
+	} else {
+		update.SetAssigneeID(*in.TargetAssigneeID)
+	}
+	updatedCount, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if updatedCount == 0 {
+		if replayed, found, replayErr := resolveWorkflowTaskMutationInTx(
+			ctx,
+			tx,
+			in.ID,
+			in.IdempotencyKey,
+			in.IntentHash,
+			in.CommandKey,
+			actorID,
+		); replayErr != nil || found {
+			return replayed, replayErr
+		}
+		latest, getErr := tx.WorkflowTask.Get(ctx, in.ID)
+		if getErr != nil {
+			if ent.IsNotFound(getErr) {
+				return nil, biz.ErrWorkflowTaskNotFound
+			}
+			return nil, getErr
+		}
+		return nil, workflowTaskMutationConflict(latest.TaskStatusKey)
+	}
+	row, err := tx.WorkflowTask.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrWorkflowTaskNotFound
+		}
+		return nil, err
+	}
+
+	resultTask := entWorkflowTaskToBiz(row)
+	eventType := "reassigned"
+	if in.ReleaseToPool {
+		eventType = "unassigned"
+	}
+	eventPayload := map[string]any{
+		"action":               eventType,
+		"release_to_pool":      in.ReleaseToPool,
+		"previous_assignee_id": nullableWorkflowAssigneeID(current.AssigneeID),
+		"target_assignee_id":   nullableWorkflowAssigneeID(in.TargetAssigneeID),
+	}
+	eventBuilder := tx.WorkflowTaskEvent.Create().
+		SetTaskID(row.ID).
+		SetTaskVersion(row.Version).
+		SetEventType(eventType).
+		SetFromStatusKey(current.TaskStatusKey).
+		SetToStatusKey(current.TaskStatusKey).
+		SetReason(in.Reason).
+		SetPayload(eventPayload).
+		SetActorID(actorID)
+	if actorRoleKey = biz.NormalizeRoleKey(actorRoleKey); actorRoleKey != "" {
+		eventBuilder.SetActorRoleKey(actorRoleKey)
+	}
+	mutationResult, resultErr := workflowTaskMutationResultMap(resultTask)
+	if resultErr != nil {
+		return nil, resultErr
+	}
+	eventBuilder.
+		SetCommandKey(strings.TrimSpace(in.CommandKey)).
+		SetIdempotencyKey(strings.TrimSpace(in.IdempotencyKey)).
+		SetIntentHash(strings.TrimSpace(in.IntentHash)).
+		SetMutationResult(mutationResult)
+	if _, err := eventBuilder.Save(ctx); err != nil {
+		return nil, err
+	}
+	if in.AuditEvent != nil {
+		if err := createRuntimeAuditEventInTx(ctx, tx, in.AuditEvent); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return resultTask, nil
+}
+
+func (r *workflowRepo) validateWorkflowAssignmentTargetInTx(
+	ctx context.Context,
+	tx *ent.Tx,
+	in *biz.WorkflowTaskAssignment,
+) error {
+	if tx == nil || in == nil || in.TargetAssigneeID == nil || *in.TargetAssigneeID <= 0 {
+		return biz.ErrBadParam
+	}
+	targetID := *in.TargetAssigneeID
+	adminQuery := tx.AdminUser.Query().Where(adminuser.ID(targetID))
+	if r.data.sqlDialect == dialect.Postgres {
+		adminQuery = adminQuery.Where(func(selector *entsql.Selector) {
+			selector.ForUpdate()
+		})
+	}
+	target, err := adminQuery.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrWorkflowAssigneeIneligible
+		}
+		return err
+	}
+	if target.Disabled || target.RevokedAt != nil {
+		return biz.ErrWorkflowAssigneeIneligible
+	}
+
+	assignmentQuery := tx.AdminUserRole.Query().
+		Where(adminuserrole.AdminUserID(targetID))
+	if r.data.sqlDialect == dialect.Postgres {
+		assignmentQuery = assignmentQuery.Where(func(selector *entsql.Selector) {
+			selector.ForUpdate()
+		})
+	}
+	assignments, err := assignmentQuery.All(ctx)
+	if err != nil {
+		return err
+	}
+	roleIDs := make([]int, 0, len(assignments))
+	for _, assignment := range assignments {
+		roleIDs = append(roleIDs, assignment.RoleID)
+	}
+	if len(roleIDs) == 0 {
+		return biz.ErrWorkflowAssigneeIneligible
+	}
+	roleQuery := tx.Role.Query().
+		Where(role.IDIn(roleIDs...), role.Disabled(false)).
+		Order(role.ByID())
+	if r.data.sqlDialect == dialect.Postgres {
+		roleQuery = roleQuery.Where(func(selector *entsql.Selector) {
+			selector.ForUpdate()
+		})
+	}
+	roles, err := roleQuery.All(ctx)
+	if err != nil {
+		return err
+	}
+	requiredOwnerRoleKey := biz.NormalizeRoleKey(in.RequiredOwnerRoleKey)
+	ownerRoleIDs := make([]int, 0, 1)
+	for _, item := range roles {
+		if biz.NormalizeRoleKey(item.RoleKey) == requiredOwnerRoleKey {
+			ownerRoleIDs = append(ownerRoleIDs, item.ID)
+		}
+	}
+	if len(ownerRoleIDs) == 0 {
+		return biz.ErrWorkflowAssigneeIneligible
+	}
+	if target.IsSuperAdmin {
+		return nil
+	}
+
+	rolePermissionQuery := tx.RolePermission.Query().
+		Where(rolepermission.RoleIDIn(ownerRoleIDs...))
+	if r.data.sqlDialect == dialect.Postgres {
+		rolePermissionQuery = rolePermissionQuery.Where(func(selector *entsql.Selector) {
+			selector.ForUpdate()
+		})
+	}
+	rolePermissions, err := rolePermissionQuery.All(ctx)
+	if err != nil {
+		return err
+	}
+	permissionIDs := make([]int, 0, len(rolePermissions))
+	for _, item := range rolePermissions {
+		permissionIDs = append(permissionIDs, item.PermissionID)
+	}
+	if len(permissionIDs) == 0 {
+		return biz.ErrWorkflowAssigneeIneligible
+	}
+	permissionQuery := tx.Permission.Query().
+		Where(permission.IDIn(permissionIDs...))
+	if r.data.sqlDialect == dialect.Postgres {
+		permissionQuery = permissionQuery.Where(func(selector *entsql.Selector) {
+			selector.ForUpdate()
+		})
+	}
+	permissions, err := permissionQuery.All(ctx)
+	if err != nil {
+		return err
+	}
+	effective := make(map[string]struct{}, len(permissions))
+	for _, item := range permissions {
+		effective[strings.TrimSpace(item.PermissionKey)] = struct{}{}
+	}
+	for _, required := range biz.NormalizePermissionKeys(in.RequiredPermissionKeys) {
+		if _, ok := effective[required]; !ok {
+			return biz.ErrWorkflowAssigneeIneligible
+		}
+	}
+	return nil
+}
+
+func workflowTaskAssignmentMatchesEnt(
+	current *ent.WorkflowTask,
+	in *biz.WorkflowTaskAssignment,
+) bool {
+	if current == nil || in == nil {
+		return false
+	}
+	if in.ReleaseToPool {
+		return current.AssigneeID == nil
+	}
+	return current.AssigneeID != nil &&
+		in.TargetAssigneeID != nil &&
+		*current.AssigneeID == *in.TargetAssigneeID
+}
+
+func nullableWorkflowAssigneeID(value *int) any {
+	if value == nil {
+		return nil
+	}
+	return *value
 }
 
 func resolveWorkflowTaskMutationInTx(

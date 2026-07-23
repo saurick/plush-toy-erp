@@ -11,6 +11,8 @@ var (
 	ErrWorkflowTaskExists         = errors.New("workflow task already exists")
 	ErrWorkflowTaskSettled        = errors.New("workflow task already settled")
 	ErrWorkflowTaskConflict       = errors.New("workflow task version conflict")
+	ErrWorkflowTaskAssignmentNoop = errors.New("workflow task assignment is unchanged")
+	ErrWorkflowAssigneeIneligible = errors.New("workflow task assignee is ineligible")
 	ErrWorkflowTaskBoardStatus    = errors.New("workflow task board contains unsupported status")
 	ErrWorkflowBusinessStateFound = errors.New("workflow business state already exists")
 )
@@ -184,6 +186,24 @@ type WorkflowTaskUrge struct {
 	Action          string
 	Reason          string
 	Payload         map[string]any
+}
+
+type WorkflowTaskAssignment struct {
+	ID                     int
+	ExpectedVersion        int
+	CommandKey             string
+	IdempotencyKey         string
+	IntentHash             string
+	TargetAssigneeID       *int
+	ReleaseToPool          bool
+	Reason                 string
+	RequiredOwnerRoleKey   string
+	RequiredPermissionKeys []string
+	AuditEvent             *RuntimeAuditEventCreate
+}
+
+type WorkflowTaskAssignmentRepo interface {
+	ReassignWorkflowTask(ctx context.Context, in *WorkflowTaskAssignment, actorID int, actorRoleKey string) (*WorkflowTask, error)
 }
 
 type WorkflowBusinessState struct {

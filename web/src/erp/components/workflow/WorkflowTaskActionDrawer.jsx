@@ -10,6 +10,7 @@ import {
   Button,
   Drawer,
   Input,
+  Select,
   Space,
   Tag,
   Timeline,
@@ -73,6 +74,12 @@ export const TASK_ACTION_META = Object.freeze({
     successMessage: '催办已记录',
     requireReason: true,
   },
+  assign: {
+    title: '转交任务',
+    buttonLabel: '确认转交',
+    successMessage: '任务已转交',
+    requireReason: true,
+  },
 })
 
 export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
@@ -107,6 +114,8 @@ const EVENT_LABELS = Object.freeze({
   urge_task: '已催办',
   urge_role: '已催办岗位',
   urge_assignee: '已催办处理人',
+  reassigned: '已转交处理人',
+  unassigned: '已退回负责岗位共同待办',
 })
 
 function getApprovalEventLabel(event = {}) {
@@ -149,6 +158,7 @@ const TASK_ACTION_DESCRIPTIONS = Object.freeze({
   reject: '信息或处理结果不符合要求，退回上一责任方补充。',
   resume: '阻塞事项已经解决，恢复为可继续办理。',
   urge: '提醒当前负责人尽快处理，不代替对方完成任务。',
+  assign: '转给同一负责岗位的其他人员，或暂不指定个人并退回该岗位共同待办。',
 })
 
 export function getTaskActionDescription(actionMode = '') {
@@ -167,6 +177,9 @@ export function getTaskActionDescription(actionMode = '') {
   if (actionMode === 'urge') {
     return '请写清催办接收人和需要补齐的事项，便于对方了解原因。'
   }
+  if (actionMode === 'assign') {
+    return '请选择同一负责岗位的合格在职人员；如果暂时不确定由谁接手，可退回该岗位共同待办。这一步只改处理人，不会把任务标为完成，也不会直接办理对应业务。'
+  }
   return '先选择处理方式；任务详情只用于核对，不会直接生成或修改业务记录。'
 }
 
@@ -176,6 +189,7 @@ function getTaskActionTone(actionMode = '') {
   if (actionMode === 'reject') return 'danger'
   if (actionMode === 'resume') return 'success'
   if (actionMode === 'urge') return 'warning'
+  if (actionMode === 'assign') return 'warning'
   return 'neutral'
 }
 
@@ -187,8 +201,11 @@ export default function WorkflowTaskActionDrawer({
   actionAvailabilityLoading = false,
   allowedActionModes = [],
   readonlyReason = '',
+  assignmentAccess = {},
+  assignmentTarget,
   onActionModeChange,
   onActionReasonChange,
+  onAssignmentTargetChange,
   onClose,
   onOpenEntry,
   onSubmit,
@@ -220,13 +237,39 @@ export default function WorkflowTaskActionDrawer({
   const visibleActionModes = allowedActionModes.filter(
     (mode) => TASK_ACTION_META[mode]
   )
+  const assignmentOptions = [
+    ...(assignmentAccess.can_return_to_pool
+      ? [
+          {
+            value: 'pool',
+            label: ownerRoleLabel
+              ? `暂不指定个人，退回共同待办（负责岗位：${ownerRoleLabel}）`
+              : '暂不指定个人，退回负责岗位共同待办',
+          },
+        ]
+      : []),
+    ...(Array.isArray(assignmentAccess.candidates)
+      ? assignmentAccess.candidates.map((candidate) => ({
+          value: candidate.admin_id,
+          label: `${candidate.username} · ${candidate.role_label || ownerRoleLabel}`,
+        }))
+      : []),
+  ]
+  const assignmentTargetValid =
+    actionMode !== 'assign' ||
+    assignmentOptions.some((option) => option.value === assignmentTarget)
+  const assignmentTargetLabel =
+    assignmentOptions.find((option) => option.value === assignmentTarget)
+      ?.label || ''
   const hasVisibleActionSelection = visibleActionModes.includes(actionMode)
-  const canConfirm = isWorkflowTaskActionReady({
-    actionMode,
-    actionReason,
-    allowedActionModes,
-    requireReason: Boolean(actionMeta?.requireReason),
-  })
+  const canConfirm =
+    assignmentTargetValid &&
+    isWorkflowTaskActionReady({
+      actionMode,
+      actionReason,
+      allowedActionModes,
+      requireReason: Boolean(actionMeta?.requireReason),
+    })
   const stepAvailability = React.useMemo(
     () =>
       getWorkflowTaskActionStepAvailability({
@@ -479,6 +522,13 @@ export default function WorkflowTaskActionDrawer({
                 <strong>{ownerRoleLabel || '-'}</strong>
               </div>
               <div>
+                <span>当前处理人</span>
+                <strong>
+                  {assignmentAccess.current_assignee?.username ||
+                    (task.assignee_id ? '已指定处理人' : '负责岗位共同待办')}
+                </strong>
+              </div>
+              <div>
                 <span>到期时间</span>
                 <strong>{getWorkflowTaskDueLabel(task)}</strong>
               </div>
@@ -557,7 +607,7 @@ export default function WorkflowTaskActionDrawer({
               <AlertOutlined aria-hidden="true" />
               <span>
                 <strong>处理范围：</strong>
-                完成、阻塞、解除阻塞、退回和催办只更新当前任务；库存、出货、应收、开票和付款仍需进入对应业务页面处理。
+                完成、阻塞、解除阻塞、退回、催办和转交只更新当前任务；转交只改变指定处理人，库存、出货、应收、开票和付款仍需进入对应业务页面处理。
               </span>
             </div>
           </section>
@@ -731,6 +781,53 @@ export default function WorkflowTaskActionDrawer({
                   <Paragraph className="erp-task-action-drawer__action-copy">
                     {getTaskActionDescription(actionMode)}
                   </Paragraph>
+                  {actionMode === 'assign' ? (
+                    <div className="erp-task-action-drawer__assignment">
+                      <label htmlFor="erp-task-assignment-target">
+                        转交去向
+                      </label>
+                      <Select
+                        id="erp-task-assignment-target"
+                        value={assignmentTarget}
+                        options={assignmentOptions}
+                        showSearch
+                        optionFilterProp="label"
+                        disabled={
+                          actionSaving ||
+                          !canSubmitAction ||
+                          assignmentAccess.loading
+                        }
+                        placeholder={
+                          assignmentAccess.loading
+                            ? '正在加载可选接收人'
+                            : '选择接收人，或退回负责岗位共同待办'
+                        }
+                        notFoundContent={
+                          assignmentAccess.stale
+                            ? '任务信息已更新，请刷新任务列表'
+                            : assignmentAccess.failed
+                            ? '转交信息加载失败，请关闭后重试'
+                            : '当前没有符合条件的接收人'
+                        }
+                        onChange={(value) => onAssignmentTargetChange?.(value)}
+                      />
+                      {assignmentAccess.stale ? (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          message="任务信息已更新"
+                          description="请刷新任务列表后重新打开当前任务，系统不会使用旧版本的转交候选人。"
+                        />
+                      ) : assignmentAccess.failed ? (
+                        <Alert
+                          type="warning"
+                          showIcon
+                          message="转交信息加载失败"
+                          description="其他任务操作不受影响；关闭抽屉后可重新加载转交候选人。"
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
                   {!canSubmitAction ? (
                     <Alert
                       type="warning"
@@ -751,7 +848,9 @@ export default function WorkflowTaskActionDrawer({
                       placeholder={
                         approvalTask && actionMode === 'complete'
                           ? '填写审批意见和判断依据'
-                          : '填写原因、影响范围、需要谁协助'
+                          : actionMode === 'assign'
+                            ? '填写请假、人员调整等转交原因'
+                            : '填写原因、影响范围、需要谁协助'
                       }
                       onChange={(event) =>
                         onActionReasonChange?.(event.target.value)
@@ -798,12 +897,37 @@ export default function WorkflowTaskActionDrawer({
                       <dd>{actionReason.trim()}</dd>
                     </div>
                   ) : null}
+                  {actionMode === 'assign' ? (
+                    <>
+                      <div>
+                        <dt>当前处理人</dt>
+                        <dd>
+                          {assignmentAccess.current_assignee?.username ||
+                            (task.assignee_id
+                              ? '已指定处理人'
+                              : '负责岗位共同待办')}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>转交去向</dt>
+                        <dd>{assignmentTargetLabel}</dd>
+                      </div>
+                    </>
+                  ) : null}
                 </dl>
                 <Alert
                   type={actionTone === 'danger' ? 'warning' : 'info'}
                   showIcon
-                  message="确认后只更新当前任务"
-                  description="库存、出货、应收、开票和付款仍需进入对应业务页面办理。"
+                  message={
+                    actionMode === 'assign'
+                      ? '确认后只改变任务归属'
+                      : '确认后只更新当前任务'
+                  }
+                  description={
+                    actionMode === 'assign'
+                      ? '任务状态保持不变，也不会代替接收人完成库存、出货、财务等业务办理。'
+                      : '库存、出货、应收、开票和付款仍需进入对应业务页面办理。'
+                  }
                 />
               </div>
             ) : null}

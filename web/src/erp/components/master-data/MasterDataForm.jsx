@@ -255,6 +255,7 @@ export function MasterDataFormFields({
   processNameOptions = [],
   processCategoryOptions = [],
   supplierProcessOptions = [],
+  canEditSupplierProcesses = true,
   supplierTypeOptions = [],
   customerPaymentConditionOptions = [],
   onCustomerPaymentMethodChange,
@@ -569,6 +570,7 @@ export function MasterDataFormFields({
           >
             <Select
               allowClear
+              disabled={!canEditSupplierProcesses}
               mode="multiple"
               options={supplierProcessOptions}
               optionFilterProp="label"

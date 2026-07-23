@@ -74,6 +74,10 @@ import {
   unixToDateInput,
 } from '../utils/productionOrderModel.mjs'
 import {
+  productionReferenceSnapshotOptions,
+  resolveProductionOrderDetailAccess,
+} from '../utils/productionOrderPermissionAccess.mjs'
+import {
   PRODUCTION_WIP_ROUTE_CODE,
   partitionProductionCompletionItems,
   productionWipCompletionEligibility,
@@ -297,10 +301,38 @@ export default function V1ProductionOrdersPage() {
     adminProfile,
     'production.wip.read'
   )
-  const canRead =
-    hasActionPermission(adminProfile, 'pmc.plan.read') || canReadProductionWip
-  const canCreate = hasActionPermission(adminProfile, 'pmc.plan.create')
-  const canUpdate = hasActionPermission(adminProfile, 'pmc.plan.update')
+  const canReadProductionPlan = hasActionPermission(
+    adminProfile,
+    'pmc.plan.read'
+  )
+  const canRead = canReadProductionPlan || canReadProductionWip
+  const canCreate =
+    canReadProductionPlan &&
+    hasActionPermission(adminProfile, 'pmc.plan.create')
+  const canUpdate =
+    canReadProductionPlan &&
+    hasActionPermission(adminProfile, 'pmc.plan.update')
+  const canReadSalesOrderReferences =
+    canReadProductionPlan &&
+    hasActionPermission(adminProfile, 'sales_order.read') &&
+    hasActionPermission(adminProfile, 'sales_order_item.read')
+  const canReadBOMReferences =
+    canReadProductionPlan &&
+    hasActionPermission(adminProfile, 'bom.read')
+  const productionReferenceAccess = useMemo(
+    () => ({
+      product: canReadProductionPlan,
+      product_sku: canReadProductionPlan,
+      unit: canReadProductionPlan,
+      sales_order_item: canReadSalesOrderReferences,
+      active_bom: canReadBOMReferences,
+    }),
+    [
+      canReadBOMReferences,
+      canReadProductionPlan,
+      canReadSalesOrderReferences,
+    ]
+  )
   const canCreateCompletion = hasActionPermission(
     adminProfile,
     'production.completion.create'
@@ -430,13 +462,22 @@ export default function V1ProductionOrdersPage() {
   }, [reasonAction, reasonForm])
 
   const loadHistoricalOptions = useCallback(async (items, options = {}) => {
+    const snapshotOptions = productionReferenceSnapshotOptions(items)
+    if (options.mode === 'view') {
+      setOptionsByType(snapshotOptions)
+      return
+    }
     const definitions = [
       ['product', 'product_id'],
       ['product_sku', 'product_sku_id'],
       ['unit', 'unit_id'],
       ['sales_order_item', 'sales_order_item_id'],
       ['active_bom', 'bom_header_id'],
-    ]
+    ].filter(([type]) => productionReferenceAccess[type] === true)
+    if (definitions.length === 0) {
+      setOptionsByType(snapshotOptions)
+      return
+    }
     const pairs = await Promise.all(
       definitions.map(async ([type, key]) => {
         const ids = optionIDs(items, key)
@@ -449,8 +490,11 @@ export default function V1ProductionOrdersPage() {
         return [type, data.options]
       })
     )
-    setOptionsByType(Object.fromEntries(pairs))
-  }, [])
+    setOptionsByType({
+      ...snapshotOptions,
+      ...Object.fromEntries(pairs),
+    })
+  }, [productionReferenceAccess])
 
   const productionItemsPreview = useBusinessRowItemsPreview({
     records: orders,
@@ -542,7 +586,19 @@ export default function V1ProductionOrdersPage() {
     setDetailLoading(true)
     try {
       const nextAggregate = await getProductionOrder(record.id)
-      await loadHistoricalOptions(nextAggregate.items)
+      const detailAccess = resolveProductionOrderDetailAccess({
+        requestedMode: mode,
+        items: nextAggregate.items,
+        referenceAccess: productionReferenceAccess,
+      })
+      if (detailAccess.mode !== mode) {
+        message.info(
+          `订单关联的${detailAccess.unreadableSources.join('、')}不在当前账号读取范围内，已按只读方式打开`
+        )
+      }
+      await loadHistoricalOptions(nextAggregate.items, {
+        mode: detailAccess.mode,
+      })
       productionItemsPreview.prime(nextAggregate.order, {
         items: nextAggregate.items,
         total: nextAggregate.items.length,
@@ -550,7 +606,7 @@ export default function V1ProductionOrdersPage() {
       setAggregate(nextAggregate)
       setSelected(nextAggregate.order)
       setFormValues(aggregateToForm(nextAggregate))
-      setFormMode(mode)
+      setFormMode(detailAccess.mode)
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载生产订单详情'))
     } finally {
@@ -1530,6 +1586,7 @@ export default function V1ProductionOrdersPage() {
         mode={formMode}
         loading={mutationLoading}
         optionsByType={optionsByType}
+        referenceAccess={productionReferenceAccess}
         order={aggregate?.order}
         materialRequirementsState={aggregate?.materialRequirementsState}
         materialRequirements={aggregate?.materialRequirements}

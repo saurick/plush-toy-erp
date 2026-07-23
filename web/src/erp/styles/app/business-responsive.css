@@ -800,10 +800,30 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-permission-checklist-toolbar,
   .erp-permission-checklist__header,
   .erp-permission-checklist__actions {
     align-items: stretch;
+  }
+
+  .erp-permission-category-nav {
+    top: 8px;
+    padding: 10px;
+  }
+
+  .erp-permission-category-nav__head {
+    align-items: flex-start;
+  }
+
+  .erp-permission-category-nav__desktop {
+    display: none;
+  }
+
+  .erp-permission-category-nav__mobile {
+    display: block;
+  }
+
+  .erp-permission-checklist__section {
+    scroll-margin-top: 148px;
   }
 
   .erp-permission-checklist-filter,
@@ -816,6 +836,10 @@
   }
 
   .erp-permission-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-permission-menu-results__grid {
     grid-template-columns: 1fr;
   }
 

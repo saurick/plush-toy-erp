@@ -181,6 +181,29 @@ const (
 	PermissionClassDebug        PermissionClass = "debug"
 )
 
+var builtinPermissionModuleNames = map[string]string{
+	"system":          "系统管理",
+	"customer_config": "客户配置",
+	"process_runtime": "异常流程恢复",
+	"erp":             "工作台与通用工具",
+	"field":           "敏感字段",
+	"masterdata":      "基础资料",
+	"bom":             "物料清单（BOM）",
+	"sales_order":     "销售订单",
+	"workflow":        "任务协同",
+	"purchase":        "采购",
+	"outsourcing":     "委外",
+	"warehouse":       "仓储",
+	"shipment":        "出货",
+	"sales_return":    "客户退货",
+	"quality":         "品质",
+	"finance":         "财务",
+	"production":      "生产执行",
+	"pmc":             "生产计划",
+	"mobile":          "手机待办",
+	"debug":           "调试工具",
+}
+
 type RoleType string
 
 const (
@@ -321,7 +344,7 @@ var builtinPermissions = withBuiltinPermissionMetadata([]PermissionDefinition{
 	{Key: PermissionWorkflowTaskSupervise, Name: "监督跨岗位协同任务", Description: "只读查看其他责任岗位的协同任务；不授予代办、转派或完成权限。", Module: "workflow", Action: "supervise", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskCreate, Name: "创建协同任务", Module: "workflow", Action: "create", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskUpdate, Name: "更新协同任务", Module: "workflow", Action: "update", Resource: "task", Builtin: true},
-	{Key: PermissionWorkflowTaskAssign, Name: "指派协同任务", Module: "workflow", Action: "assign", Resource: "task", Builtin: true},
+	{Key: PermissionWorkflowTaskAssign, Name: "转交协同任务", Description: "将未结束的协同任务转给同一负责岗位的合格人员，或取消个人指派并退回岗位待办池。", Module: "workflow", Action: "assign", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskApprove, Name: "审批协同任务", Module: "workflow", Action: "approve", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskReject, Name: "驳回协同任务", Module: "workflow", Action: "reject", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskComplete, Name: "完成协同任务", Module: "workflow", Action: "complete", Resource: "task", Builtin: true},
@@ -424,7 +447,7 @@ func withBuiltinPermissionMetadata(items []PermissionDefinition) []PermissionDef
 			item.Class = PermissionClassDebug
 			item.Assignable = false
 			item.NonProductionOnly = true
-		case item.Module == "system" || item.Module == "customer_config":
+		case item.Module == "system" || item.Module == "customer_config" || item.Module == "process_runtime":
 			item.Class = PermissionClassControlPlane
 			item.Assignable = false
 		default:
@@ -451,6 +474,11 @@ func BuiltinPermissions() []PermissionDefinition {
 
 func AllPermissionDefinitions() []PermissionDefinition {
 	return BuiltinPermissions()
+}
+
+func PermissionModuleName(moduleKey string) (string, bool) {
+	name, ok := builtinPermissionModuleNames[strings.TrimSpace(moduleKey)]
+	return name, ok
 }
 
 func PermissionDefinitionByKey(permissionKey string) (PermissionDefinition, bool) {
@@ -682,7 +710,7 @@ func BuiltinRoles() []RoleDefinition {
 		PermissionPMCRiskRead,
 	}
 	roles := []RoleDefinition{
-		{Key: BossRoleKey, Name: "老板 / 管理层", Description: "查看全局业务、审批和报表，不默认包含高危 debug 清空权限。", Builtin: true, SortOrder: 10, Permissions: append(readPermissions, PermissionFieldPartyPrivateRead, PermissionFieldSalesCommercialRead, PermissionFieldProcurementCommercialRead, PermissionFieldFinanceSettlementRead, PermissionProductionFactRead, PermissionWorkflowTaskSupervise, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskApprove, PermissionWorkflowTaskReject, PermissionPurchaseOrderApprove, PermissionSalesReturnApprove, PermissionSalesReturnCancel, PermissionMobileBossAccess)},
+		{Key: BossRoleKey, Name: "老板 / 管理层", Description: "查看全局业务、审批和报表，不默认包含高危 debug 清空权限。", Builtin: true, SortOrder: 10, Permissions: append(readPermissions, PermissionFieldPartyPrivateRead, PermissionFieldSalesCommercialRead, PermissionFieldProcurementCommercialRead, PermissionFieldFinanceSettlementRead, PermissionProductionFactRead, PermissionWorkflowTaskSupervise, PermissionWorkflowTaskAssign, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskApprove, PermissionWorkflowTaskReject, PermissionPurchaseOrderApprove, PermissionSalesReturnApprove, PermissionSalesReturnCancel, PermissionMobileBossAccess)},
 		{Key: SalesRoleKey, Name: "业务", Description: "客户、订单、出运跟进，任务处理仍受销售 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 20, Permissions: []string{PermissionERPWorkbenchRead, PermissionERPPrintTemplateRead, PermissionFieldPartyPrivateRead, PermissionFieldSalesCommercialRead, PermissionCustomerRead, PermissionCustomerCreate, PermissionCustomerUpdate, PermissionCustomerDisable, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductCreate, PermissionProductUpdate, PermissionProductDisable, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, PermissionBOMRead, PermissionContactRead, PermissionContactCreate, PermissionContactUpdate, PermissionContactDisable, PermissionContactSetPrimary, PermissionSalesOrderRead, PermissionSalesOrderCreate, PermissionSalesOrderUpdate, PermissionSalesOrderSubmit, PermissionSalesOrderActivate, PermissionSalesOrderClose, PermissionSalesOrderCancel, PermissionSalesOrderItemRead, PermissionWarehouseInventoryRead, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionShipmentRead, PermissionShipmentCreate, PermissionSalesReturnRead, PermissionSalesReturnCreate, PermissionProductionWIPRead, PermissionPackagingMaterialConfirm, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionMobileSalesAccess}},
 		{Key: PurchaseRoleKey, Name: "采购", Description: "采购、收货、退货相关入口，任务处理仍受采购 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 30, Permissions: []string{PermissionERPWorkbenchRead, PermissionERPPrintTemplateRead, PermissionFieldPartyPrivateRead, PermissionFieldProcurementCommercialRead, PermissionSupplierRead, PermissionSupplierCreate, PermissionSupplierUpdate, PermissionSupplierDisable, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionMaterialDisable, PermissionProductSKURead, PermissionBOMRead, PermissionContactRead, PermissionContactCreate, PermissionContactUpdate, PermissionContactDisable, PermissionContactSetPrimary, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionOutsourcingOrderRead, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm, PermissionOutsourcingFactRead, PermissionOutsourcingReturnReceiptCreate, PermissionPurchaseReceiptRead, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentRead, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnRead, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInventoryRead, PermissionMobilePurchaseAccess}},
 		{Key: WarehouseRoleKey, Name: "仓库", Description: "库存、入库、出库、盘点相关入口，任务处理仍受仓库 责任岗位和当前处理人 约束。", Builtin: true, SortOrder: 40, Permissions: []string{PermissionERPWorkbenchRead, PermissionCustomerRead, PermissionSupplierRead, PermissionMaterialRead, PermissionProcessRead, PermissionProductRead, PermissionProductSKURead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionPurchaseReceiptRead, PermissionPurchaseReceiptAdjustmentRead, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnRead, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionOutsourcingFactRead, PermissionOutsourcingMaterialIssueCreate, PermissionOutsourcingReturnReceiptCreate, PermissionOutsourcingFactPost, PermissionOutsourcingFactCancel, PermissionWarehouseInventoryRead, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionWarehouseOutboundRead, PermissionWarehouseOutboundConfirm, PermissionWarehouseAdjustmentCreate, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionShipmentRead, PermissionShipmentCreate, PermissionShipmentShip, PermissionShipmentCancel, PermissionSalesReturnRead, PermissionSalesReturnReceive, PermissionMobileWarehouseAccess}},
@@ -813,10 +841,10 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "inventory", Label: "库存台账", Path: "/erp/warehouse/inventory", RequiredAny: []string{PermissionWarehouseInventoryRead}},
 	{Key: "processing-contracts", Label: "委外订单", Path: "/erp/purchase/processing-contracts", RequiredAny: []string{PermissionOutsourcingOrderRead}},
 	{Key: "production-orders", Label: "生产订单", Path: "/erp/production/orders", RequiredAny: []string{PermissionPMCPlanRead, PermissionProductionWIPRead}},
-	{Key: "production-scheduling", Label: "生产排程", Path: "/erp/production/scheduling", RequiredAny: []string{PermissionPMCPlanRead}},
-	{Key: "production-progress", Label: "生产进度", Path: "/erp/production/progress", RequiredAny: []string{PermissionPMCPlanRead}},
-	{Key: "production-exceptions", Label: "生产异常", Path: "/erp/production/exceptions", RequiredAny: []string{PermissionPMCRiskRead, PermissionQualityInspectionRead}},
-	{Key: "shipping-release", Label: "出货放行", Path: "/erp/warehouse/shipping-release", RequiredAny: []string{PermissionWarehouseOutboundRead, PermissionFinanceReceivableRead, PermissionSalesOrderRead}},
+	{Key: "production-scheduling", Label: "生产排程", Path: "/erp/production/scheduling", RequiredAny: []string{PermissionPMCPlanRead}, RequiredAll: []string{PermissionWorkflowTaskRead}},
+	{Key: "production-progress", Label: "生产进度", Path: "/erp/production/progress", RequiredAny: []string{PermissionProductionFactRead}},
+	{Key: "production-exceptions", Label: "生产异常", Path: "/erp/production/exceptions", RequiredAny: []string{PermissionWorkflowTaskRead, PermissionPMCRiskRead, PermissionProductionFactRead, PermissionQualityExceptionHandle}},
+	{Key: "shipping-release", Label: "出货放行", Path: "/erp/warehouse/shipping-release", RequiredAny: []string{PermissionWarehouseOutboundRead, PermissionFinanceReceivableRead, PermissionSalesOrderRead}, RequiredAll: []string{PermissionWorkflowTaskRead}},
 	{Key: "outbound", Label: "出库管理", Path: "/erp/warehouse/outbound", RequiredAny: []string{PermissionWarehouseOutboundRead}},
 	{Key: "shipments", Label: "出货单", Path: "/erp/warehouse/shipments", RequiredAny: []string{PermissionShipmentRead}},
 	{Key: "sales-returns", Label: "客户退货", Path: "/erp/sales/customer-returns", RequiredAny: []string{PermissionSalesReturnRead}},

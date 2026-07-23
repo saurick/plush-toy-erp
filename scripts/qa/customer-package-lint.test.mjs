@@ -63,6 +63,49 @@ test("customer-package-lint: page contracts may declare an any-capability gate",
   );
 });
 
+test("customer-package-lint: production progress requires the fact read used by its initial list", () => {
+  validateCatalog(customerPackageCatalog);
+  const productionProgress = customerPackageCatalog.pages.find(
+    (page) => page.key === "production-progress",
+  );
+  assert.deepEqual(productionProgress.requiredCapabilityKeys, [
+    "production.fact.read",
+  ]);
+  assert.deepEqual(productionProgress.requiredAnyCapabilityKeys || [], []);
+});
+
+test("customer-package-lint: workflow-only scheduling requires its real task list read", () => {
+  validateCatalog(customerPackageCatalog);
+  const productionScheduling = customerPackageCatalog.pages.find(
+    (page) => page.key === "production-scheduling",
+  );
+  assert.deepEqual(productionScheduling.requiredCapabilityKeys, [
+    "pmc.plan.read",
+    "workflow.task.read",
+  ]);
+  assert.deepEqual(productionScheduling.requiredAnyCapabilityKeys || [], []);
+});
+
+test("customer-package-lint: production exception page and decision reads stay least-privilege aligned", () => {
+  validateCatalog(customerPackageCatalog);
+  const productionExceptions = customerPackageCatalog.pages.find(
+    (page) => page.key === "production-exceptions",
+  );
+  assert.deepEqual(productionExceptions.requiredCapabilityKeys, []);
+  assert.deepEqual(productionExceptions.requiredAnyCapabilityKeys, [
+    "workflow.task.read",
+    "pmc.risk.read",
+    "production.fact.read",
+    "quality.exception.handle",
+  ]);
+  assert.equal(
+    productionExceptions.requiredAnyCapabilityKeys.includes(
+      "quality.inspection.read",
+    ),
+    false,
+  );
+});
+
 test("customer-package-lint: demo package proves customer package validation is not yoyoosun-only", () => {
   validateCatalog(customerPackageCatalog);
   validatePackage(demoCustomerPackage);

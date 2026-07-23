@@ -13,6 +13,20 @@ const modal = readFileSync(
   ),
   'utf8'
 )
+const columns = readFileSync(
+  new URL(
+    '../components/sales-orders/salesOrderColumns.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+
+test('planned delivery date header keeps enough width for one line', () => {
+  assert.match(
+    columns,
+    /title: '计划交付日期',[\s\S]*?dataIndex: 'planned_delivery_date',[\s\S]*?effectiveFieldKey: 'expected_ship_date',[\s\S]*?width: 150,/u
+  )
+})
 
 test('active sales orders expose a permission-bound reservation action', () => {
   assert.match(page, /'stock\.reservation\.create'/u)

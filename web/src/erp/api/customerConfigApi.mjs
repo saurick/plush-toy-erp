@@ -77,10 +77,90 @@ export async function executeSalesOrderAcceptanceSubmit(params = {}) {
 
 function requirePositiveSalesOrderID(params = {}) {
   const id = Number(params.sales_order_id || params.id || 0)
-  if (!Number.isFinite(id) || id <= 0) {
+  if (!Number.isSafeInteger(id) || id <= 0) {
     throw new Error('缺少销售订单，无法启动接单流程')
   }
   return id
+}
+
+const PROCESS_RESULT_INVALID_MESSAGE = '销售订单提交结果无法确认，请刷新后重试'
+
+function requireSalesOrderAcceptanceStart(data, salesOrderID) {
+  const instance = data?.process_instance
+  const node = data?.started_node
+  const nodes = data?.nodes
+  const validInstance =
+    Number.isSafeInteger(instance?.id) &&
+    instance.id > 0 &&
+    instance.process_key === 'sales_order_acceptance' &&
+    instance.business_ref_type === 'sales_order' &&
+    instance.business_ref_id === salesOrderID &&
+    instance.status === 'active'
+  const validNode =
+    Number.isSafeInteger(node?.id) &&
+    node.id > 0 &&
+    Number.isSafeInteger(node?.version) &&
+    node.version > 0 &&
+    node.process_instance_id === instance?.id &&
+    node.node_key === 'submit_sales_order' &&
+    node.node_type === 'domain_command' &&
+    (node.status === 'active' || node.status === 'completed')
+  const matchingNode = Array.isArray(nodes)
+    ? nodes.find(
+        (item) =>
+          item?.id === node?.id &&
+          item.process_instance_id === instance?.id &&
+          item.node_key === node?.node_key &&
+          item.node_type === node?.node_type &&
+          item.status === node?.status &&
+          item.version === node?.version
+      )
+    : null
+  if (
+    !validInstance ||
+    !validNode ||
+    !matchingNode ||
+    node.outcome === 'domain_command.compensated'
+  ) {
+    throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
+  }
+  if (
+    node.status === 'completed' &&
+    node.outcome !== 'sales_order.submitted'
+  ) {
+    throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
+  }
+  return { instance, node }
+}
+
+function requireSalesOrderAcceptanceExecution(data, expected) {
+  const node = data?.completed_node
+  const nodes = data?.nodes
+  const matchingNode = Array.isArray(nodes)
+    ? nodes.find(
+        (item) =>
+          item?.id === node?.id &&
+          item.process_instance_id === expected.instanceID &&
+          item.node_key === 'submit_sales_order' &&
+          item.node_type === 'domain_command' &&
+          item.status === 'completed' &&
+          item.version === node?.version
+      )
+    : null
+  if (
+    !node ||
+    node.id !== expected.nodeID ||
+    node.process_instance_id !== expected.instanceID ||
+    node.node_key !== 'submit_sales_order' ||
+    node.node_type !== 'domain_command' ||
+    node.status !== 'completed' ||
+    node.outcome !== 'sales_order.submitted' ||
+    node.version !== expected.version + 1 ||
+    !matchingNode
+  ) {
+    throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
+  }
+  return node
 }
 
 export async function submitSalesOrderAcceptanceProcess(params = {}) {
@@ -100,10 +180,10 @@ export async function submitSalesOrderAcceptanceProcess(params = {}) {
     startPayload.customer_key = params.customer_key
   }
   const startData = await startSalesOrderAcceptanceProcess(startPayload)
-  const processInstance = startData?.process_instance || null
-  const startedNode = startData?.started_node || null
-  if (!processInstance?.id || !startedNode?.id || !startedNode?.version) {
-    throw new Error('接单流程启动结果缺少流程节点')
+  const { instance: processInstance, node: startedNode } =
+    requireSalesOrderAcceptanceStart(startData, salesOrderID)
+  if (startedNode.status === 'completed') {
+    return startData
   }
   const executeData = await executeSalesOrderAcceptanceSubmit({
     customer_key: startPayload.customer_key,
@@ -112,6 +192,11 @@ export async function submitSalesOrderAcceptanceProcess(params = {}) {
     expected_version: startedNode.version,
     sales_order_id: salesOrderID,
     idempotency_key: `${baseIdempotencyKey}/submit`,
+  })
+  requireSalesOrderAcceptanceExecution(executeData, {
+    instanceID: processInstance.id,
+    nodeID: startedNode.id,
+    version: startedNode.version,
   })
   return {
     ...executeData,

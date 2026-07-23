@@ -982,6 +982,53 @@ func TestAdminManageUsecase_SetRolePermissionsRejectsUnknownPermission(t *testin
 	}
 }
 
+func TestAdminManageUsecase_GetRoleForAccessPreviewIsValidatedAndReadOnly(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+	before := append([]string(nil), repo.roleByKey(FinanceRoleKey).Permissions...)
+
+	preview, err := uc.GetRoleForAccessPreview(ctx, FinanceRoleKey, []string{
+		PermissionFinanceReceivableConfirm,
+		PermissionFinanceReceivableRead,
+		PermissionFinanceReceivableRead,
+	})
+	if err != nil {
+		t.Fatalf("GetRoleForAccessPreview() error = %v", err)
+	}
+	if !slices.Equal(preview.Permissions, []string{
+		PermissionFinanceReceivableRead,
+		PermissionFinanceReceivableConfirm,
+	}) {
+		t.Fatalf("preview permissions = %#v", preview.Permissions)
+	}
+	if got := repo.roleByKey(FinanceRoleKey).Permissions; !slices.Equal(got, before) {
+		t.Fatalf("preview mutated stored role: got %#v want %#v", got, before)
+	}
+	if len(repo.auditEvents) != 0 {
+		t.Fatalf("preview wrote audit events: %#v", repo.auditEvents)
+	}
+
+	for _, permissionKey := range []string{PermissionSystemUserRead, PermissionProcessRuntimeRecover} {
+		if _, err := uc.GetRoleForAccessPreview(
+			ctx,
+			FinanceRoleKey,
+			[]string{permissionKey},
+		); !errors.Is(err, ErrPermissionNotDelegable) {
+			t.Fatalf("control-plane preview error for %s = %v, want ErrPermissionNotDelegable", permissionKey, err)
+		}
+	}
+	if _, err := uc.GetRoleForAccessPreview(
+		ctx,
+		AdminRoleKey,
+		[]string{PermissionFinanceReceivableRead},
+	); !errors.Is(err, ErrSystemRoleImmutable) {
+		t.Fatalf("system role preview error = %v, want ErrSystemRoleImmutable", err)
+	}
+}
+
 func TestAdminManageUsecase_SetRolesRejectsSelfEscalationAndSystemRoles(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "operator"}
@@ -1123,8 +1170,10 @@ func TestAdminManageUsecase_SetRolePermissionsEnforcesRoleBoundaryAndVersion(t *
 		t.Fatalf("system role mutation error = %v, want ErrSystemRoleImmutable", err)
 	}
 	warehouseRole := repo.roleByKey(WarehouseRoleKey)
-	if _, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionSystemUserRead}, warehouseRole.Version); !errors.Is(err, ErrPermissionNotDelegable) {
-		t.Fatalf("control-plane permission delegation error = %v, want ErrPermissionNotDelegable", err)
+	for _, permissionKey := range []string{PermissionSystemUserRead, PermissionProcessRuntimeRecover} {
+		if _, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{permissionKey}, warehouseRole.Version); !errors.Is(err, ErrPermissionNotDelegable) {
+			t.Fatalf("control-plane permission delegation error for %s = %v, want ErrPermissionNotDelegable", permissionKey, err)
+		}
 	}
 	if _, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionWarehouseInventoryRead}, warehouseRole.Version+1); !errors.Is(err, ErrRoleVersionConflict) {
 		t.Fatalf("stale role version error = %v, want ErrRoleVersionConflict", err)

@@ -107,18 +107,39 @@ import {
 
 export default function V1MasterDataPage({ type }) {
   const isProductCatalogPage = type === 'product_skus'
-  const [productCatalogTabType, setProductCatalogTabType] = useState('products')
-  const [productCatalogType, setProductCatalogType] = useState('products')
-  const [, startProductCatalogTransition] = useTransition()
-  const effectiveType = isProductCatalogPage ? productCatalogType : type
-  const config =
-    MASTER_DATA_PAGE_CONFIG[effectiveType] || MASTER_DATA_PAGE_CONFIG.customers
-  const isProcessDictionaryPage = effectiveType === 'processes'
   const outletContext = useOutletContext()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const canReadProducts = hasActionPermission(adminProfile, 'product.read')
+  const canReadProductSKUs = hasActionPermission(
+    adminProfile,
+    'product_sku.read'
+  )
+  const canReadMaterials = hasActionPermission(adminProfile, 'material.read')
+  const canReadProcesses = hasActionPermission(adminProfile, 'process.read')
+  const canReadContacts = hasActionPermission(adminProfile, 'contact.read')
+  const initialProductCatalogType = canReadProducts
+    ? 'products'
+    : 'product_skus'
+  const [productCatalogType, setProductCatalogType] = useState(
+    initialProductCatalogType
+  )
+  const [, startProductCatalogTransition] = useTransition()
+  const authorizedProductCatalogType =
+    (productCatalogType === 'products' && canReadProducts) ||
+    (productCatalogType === 'product_skus' && canReadProductSKUs)
+      ? productCatalogType
+      : canReadProducts
+        ? 'products'
+        : 'product_skus'
+  const effectiveType = isProductCatalogPage
+    ? authorizedProductCatalogType
+    : type
+  const config =
+    MASTER_DATA_PAGE_CONFIG[effectiveType] || MASTER_DATA_PAGE_CONFIG.customers
+  const isProcessDictionaryPage = effectiveType === 'processes'
   const [loading, setLoading] = useState(false)
   const [contactLoading, setContactLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
@@ -148,8 +169,24 @@ export default function V1MasterDataPage({ type }) {
   const supportsContacts = Boolean(config.ownerType)
   const entityLabel = config.entityLabel || '主体'
 
-  const canCreate = hasActionPermission(adminProfile, config.permissions.create)
-  const canUpdate = hasActionPermission(adminProfile, config.permissions.update)
+  const canReadCurrentRecord = hasActionPermission(
+    adminProfile,
+    config.permissions.read
+  )
+  const canMaintainReferences =
+    effectiveType === 'products'
+      ? canReadMaterials
+      : effectiveType === 'product_skus'
+        ? canReadMaterials && canReadProducts
+        : true
+  const canCreate =
+    canReadCurrentRecord &&
+    canMaintainReferences &&
+    hasActionPermission(adminProfile, config.permissions.create)
+  const canUpdate =
+    canReadCurrentRecord &&
+    canMaintainReferences &&
+    hasActionPermission(adminProfile, config.permissions.update)
   const canDisable = hasActionPermission(
     adminProfile,
     config.permissions.disable
@@ -167,7 +204,10 @@ export default function V1MasterDataPage({ type }) {
     config.permissions.contactDisable
   )
   const canSyncContacts =
-    canCreateContact && canUpdateContact && canDisableContact
+    canReadContacts &&
+    canCreateContact &&
+    canUpdateContact &&
+    canDisableContact
   const showContactForm =
     supportsContacts && canSyncContacts && Boolean(config.saveWithContacts)
   const productOptions = useMemo(
@@ -312,7 +352,7 @@ export default function V1MasterDataPage({ type }) {
   const loadContacts = useCallback(
     async (record) => {
       const request = beginLatestRequest('contacts')
-      if (!supportsContacts || !record?.id) {
+      if (!supportsContacts || !canReadContacts || !record?.id) {
         if (request.isCurrent()) {
           setContacts([])
         }
@@ -351,12 +391,12 @@ export default function V1MasterDataPage({ type }) {
         }
       }
     },
-    [beginLatestRequest, config.ownerType, supportsContacts]
+    [beginLatestRequest, canReadContacts, config.ownerType, supportsContacts]
   )
 
   const loadUnits = useCallback(async () => {
     const request = beginLatestRequest('units')
-    if (!needsUnitDictionary(effectiveType)) {
+    if (!needsUnitDictionary(effectiveType) || !canReadMaterials) {
       if (request.isCurrent()) {
         setUnits([])
       }
@@ -385,11 +425,11 @@ export default function V1MasterDataPage({ type }) {
         request.finish()
       }
     }
-  }, [beginLatestRequest, effectiveType])
+  }, [beginLatestRequest, canReadMaterials, effectiveType])
 
   const loadProductReferences = useCallback(async () => {
     const request = beginLatestRequest('productReferences')
-    if (effectiveType !== 'product_skus') {
+    if (effectiveType !== 'product_skus' || !canReadProducts) {
       if (request.isCurrent()) {
         setProductReferences([])
       }
@@ -420,11 +460,11 @@ export default function V1MasterDataPage({ type }) {
         request.finish()
       }
     }
-  }, [beginLatestRequest, effectiveType])
+  }, [beginLatestRequest, canReadProducts, effectiveType])
 
   const loadProcessReferences = useCallback(async () => {
     const request = beginLatestRequest('processReferences')
-    if (effectiveType !== 'suppliers') {
+    if (effectiveType !== 'suppliers' || !canReadProcesses) {
       if (request.isCurrent()) {
         setProcessReferences([])
       }
@@ -455,10 +495,19 @@ export default function V1MasterDataPage({ type }) {
         request.finish()
       }
     }
-  }, [beginLatestRequest, effectiveType])
+  }, [beginLatestRequest, canReadProcesses, effectiveType])
 
   const loadRecords = useCallback(async () => {
     const request = beginLatestRequest('records')
+    if (!canReadCurrentRecord) {
+      if (request.isCurrent()) {
+        setRecords([])
+        setTotal(0)
+        setSelectedRecord(null)
+      }
+      request.finish()
+      return true
+    }
     setLoading(true)
     try {
       const result = await config.list(
@@ -494,7 +543,14 @@ export default function V1MasterDataPage({ type }) {
         request.finish()
       }
     }
-  }, [activeOnly, beginLatestRequest, config, keyword, pagination])
+  }, [
+    activeOnly,
+    beginLatestRequest,
+    canReadCurrentRecord,
+    config,
+    keyword,
+    pagination,
+  ])
 
   const refreshCurrentData = useCallback(async () => {
     const [recordsOK, unitsOK, productReferencesOK, processReferencesOK] =
@@ -556,12 +612,17 @@ export default function V1MasterDataPage({ type }) {
 
   const handleProductCatalogTabChange = useCallback(
     (nextType) => {
-      setProductCatalogTabType(nextType)
+      if (
+        (nextType === 'products' && !canReadProducts) ||
+        (nextType === 'product_skus' && !canReadProductSKUs)
+      ) {
+        return
+      }
       startProductCatalogTransition(() => {
         setProductCatalogType(nextType)
       })
     },
-    [startProductCatalogTransition]
+    [canReadProductSKUs, canReadProducts, startProductCatalogTransition]
   )
 
   const openCreateRecord = () => {
@@ -849,11 +910,16 @@ export default function V1MasterDataPage({ type }) {
     [records]
   )
   const productCatalogTabItems = useMemo(
-    () => [
-      { key: 'products', label: '产品基础信息', children: null },
-      { key: 'product_skus', label: '产品规格', children: null },
-    ],
-    []
+    () =>
+      [
+        canReadProducts
+          ? { key: 'products', label: '产品基础信息', children: null }
+          : null,
+        canReadProductSKUs
+          ? { key: 'product_skus', label: '产品规格', children: null }
+          : null,
+      ].filter(Boolean),
+    [canReadProductSKUs, canReadProducts]
   )
   const selectedRecordDisplayText = useMemo(() => {
     if (!selectedRecord) return `请先选择一个${entityLabel}`
@@ -1018,7 +1084,7 @@ export default function V1MasterDataPage({ type }) {
           isProductCatalogPage ? (
             <Tabs
               aria-label="产品档案视图"
-              activeKey={productCatalogTabType}
+              activeKey={effectiveType}
               onChange={handleProductCatalogTabChange}
               items={productCatalogTabItems}
             />
@@ -1093,6 +1159,7 @@ export default function V1MasterDataPage({ type }) {
             processNameOptions={processNameOptions}
             processCategoryOptions={processCategoryOptions}
             supplierProcessOptions={supplierProcessOptions}
+            canEditSupplierProcesses={canReadProcesses}
             supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
             customerPaymentConditionOptions={customerPaymentConditionOptions}
             onCustomerPaymentMethodChange={applyCustomerPaymentMethod}

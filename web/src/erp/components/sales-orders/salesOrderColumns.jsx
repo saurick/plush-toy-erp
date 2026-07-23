@@ -126,7 +126,7 @@ export function buildSalesOrderColumns() {
       exportTitle: '计划交付日期',
       dataIndex: 'planned_delivery_date',
       effectiveFieldKey: 'expected_ship_date',
-      width: 120,
+      width: 150,
       sorter: (a, b) =>
         compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),
       render: formatUnixDate,

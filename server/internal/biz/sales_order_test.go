@@ -356,7 +356,7 @@ func TestSalesOrderAcceptanceProcessSubmitCreatesBossApprovalAndPmcReview(t *tes
 		},
 	}
 	workflowRepo := &recordingWorkflowRepo{}
-	processRuntimeUC := NewProcessRuntimeUsecase(
+	processRuntimeUC := NewProcessRuntimeUsecaseForWire(
 		processRepo,
 		workflowRepo,
 		&salesOrderAcceptanceProcessOwnerResolver{},

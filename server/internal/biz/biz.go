@@ -7,6 +7,7 @@ var ProviderSet = wire.NewSet(
 	NewAdminAuthUsecase,
 	NewAdminManageUsecaseForWire,
 	NewWorkflowUsecase,
+	wire.Bind(new(ProcessRuntimeOwnerRoleResolver), new(*CustomerConfigUsecase)),
 	NewProcessRuntimeUsecaseForWire,
 	NewDebugUsecase,
 	NewMasterDataUsecase,
@@ -20,6 +21,6 @@ var ProviderSet = wire.NewSet(
 	NewCustomerConfigUsecase,
 )
 
-func NewProcessRuntimeUsecaseForWire(repo ProcessRuntimeRepo, workflowRepo WorkflowRepo) *ProcessRuntimeUsecase {
-	return NewProcessRuntimeUsecase(repo, workflowRepo)
+func NewProcessRuntimeUsecaseForWire(repo ProcessRuntimeRepo, workflowRepo WorkflowRepo, ownerResolver ProcessRuntimeOwnerRoleResolver) *ProcessRuntimeUsecase {
+	return NewProcessRuntimeUsecase(repo, workflowRepo, ownerResolver)
 }

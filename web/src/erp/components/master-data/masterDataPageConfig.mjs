@@ -53,6 +53,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     saveWithContacts: saveCustomerWithContacts,
     setActive: setCustomerActive,
     permissions: {
+      read: 'customer.read',
       create: 'customer.create',
       update: 'customer.update',
       disable: 'customer.disable',
@@ -78,6 +79,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     saveWithContacts: saveSupplierWithContacts,
     setActive: setSupplierActive,
     permissions: {
+      read: 'supplier.read',
       create: 'supplier.create',
       update: 'supplier.update',
       disable: 'supplier.disable',
@@ -100,6 +102,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     update: updateMaterial,
     setActive: setMaterialActive,
     permissions: {
+      read: 'material.read',
       create: 'material.create',
       update: 'material.update',
       disable: 'material.disable',
@@ -119,6 +122,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     update: updateProcess,
     setActive: setProcessActive,
     permissions: {
+      read: 'process.read',
       create: 'process.create',
       update: 'process.update',
       disable: 'process.disable',
@@ -144,6 +148,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     update: updateProduct,
     setActive: setProductActive,
     permissions: {
+      read: 'product.read',
       create: 'product.create',
       update: 'product.update',
       disable: 'product.disable',
@@ -164,6 +169,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     update: updateProductSKU,
     setActive: setProductSKUActive,
     permissions: {
+      read: 'product_sku.read',
       create: 'product_sku.create',
       update: 'product_sku.update',
       disable: 'product_sku.disable',

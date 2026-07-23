@@ -7,6 +7,15 @@ const source = readFileSync(
   fileURLToPath(new URL('./WorkflowBusinessModulePage.jsx', import.meta.url)),
   'utf8'
 )
+const productionExceptionPanel = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
 
 test('workflow business page consumes the dashboard source keyword without mutating business data', () => {
   assert.match(source, /useSearchParams/u)
@@ -60,4 +69,34 @@ test('workflow business page resets page filters and recovers an emptied tail pa
     source,
     /setDueTo\(value\)[\s\S]{0,120}resetBusinessPaginationCurrent\(setPagination\)/u
   )
+})
+
+test('workflow business pages guard their initial task list with workflow task read', () => {
+  assert.match(
+    source,
+    /hasActionPermission\(\s*adminProfile,\s*'workflow\.task\.read'\s*\)/u
+  )
+  assert.match(
+    source,
+    /if \(!config \|\| !canReadWorkflowTasks\) \{[\s\S]*setTasks\(\[\]\)[\s\S]*return false/u
+  )
+})
+
+test('production exception decision reads expose only real decision-list permissions', () => {
+  for (const permission of [
+    'pmc.risk.read',
+    'production.fact.read',
+    'quality.exception.handle',
+  ]) {
+    assert.match(
+      productionExceptionPanel,
+      new RegExp(`['"]${permission.replaceAll('.', '\\.')}['"]`, 'u')
+    )
+  }
+  assert.doesNotMatch(productionExceptionPanel, /quality\.inspection\.read/u)
+  assert.match(
+    productionExceptionPanel,
+    /if \(!canRead\) \{\s*setRows\(\[\]\)\s*return \[\]\s*\}[\s\S]*listProductionExceptions/u
+  )
+  assert.match(productionExceptionPanel, /if \(!canRead\) return null/u)
 })

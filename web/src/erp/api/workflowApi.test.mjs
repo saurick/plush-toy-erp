@@ -61,6 +61,7 @@ function validTask(overrides = {}) {
     last_urged_by_role_key: 'pmc',
     escalated_at: null,
     escalate_target_role_key: null,
+    assignee_id: 8,
     ...overrides,
   }
 }
@@ -123,6 +124,17 @@ const mutationCases = [
         surface_key: 'desktop_task_board',
         entry_path: '/erp/dashboard',
       },
+    },
+  },
+  {
+    exportName: 'reassignWorkflowTask',
+    method: 'reassign_task',
+    params: {
+      task_id: 42,
+      expected_version: 7,
+      idempotency_key: 'workflow-assign-42',
+      assignee_id: 8,
+      reason: '原处理人请假',
     },
   },
 ]
@@ -339,10 +351,7 @@ test('workflowApi: role task view rejects invalid queries before RPC', async () 
     { view_key: 'todo', role_key: 'pmc', limit: 50, cursor: '' },
     { view_key: 'todo', role_key: 'pmc', limit: 50, offset: 0 },
   ]) {
-    await assert.rejects(
-      api.listWorkflowRoleTasks(params),
-      /任务查询条件有误/u
-    )
+    await assert.rejects(api.listWorkflowRoleTasks(params), /任务查询条件有误/u)
   }
   assert.equal(calls.length, 0)
 })
@@ -417,9 +426,17 @@ test('workflowApi: all public task mutations validate params before RPC', async 
       reject_task_action: 'rejected',
       resume_task_action: 'ready',
       urge_task: 'ready',
+      reassign_task: 'ready',
     }
     return {
-      data: { task: validTask({ task_status_key: statusByMethod[method] }) },
+      data: {
+        task: validTask({
+          task_status_key: statusByMethod[method],
+          ...(method === 'reassign_task'
+            ? { assignee_id: params.assignee_id }
+            : {}),
+        }),
+      },
     }
   })
 
@@ -479,6 +496,7 @@ test('workflowApi: every public task mutation rejects malformed successful respo
     reject_task_action: 'rejected',
     resume_task_action: 'ready',
     urge_task: 'ready',
+    reassign_task: 'ready',
   }
   for (const entry of mutationCases) {
     for (const task of [
@@ -490,9 +508,11 @@ test('workflowApi: every public task mutation rejects malformed successful respo
         task_status_key:
           entry.method === 'urge_task'
             ? 'done'
-            : entry.method === 'resume_task_action'
-              ? 'blocked'
-              : 'ready',
+            : entry.method === 'reassign_task'
+              ? 'done'
+              : entry.method === 'resume_task_action'
+                ? 'blocked'
+                : 'ready',
       }),
     ]) {
       response = { data: { task } }
@@ -603,6 +623,128 @@ test('workflowApi: every public task mutation rejects malformed successful respo
       })
     ).version,
     2
+  )
+})
+
+test('workflowApi: assignment options expose only the strict task-scoped projection', async () => {
+  const calls = []
+  let response = {
+    data: {
+      assignment: {
+        task_id: 42,
+        task_version: 7,
+        task_status_key: 'ready',
+        owner_role_key: 'quality',
+        owner_role_label: '品质',
+        can_reassign: true,
+        can_return_to_pool: true,
+        reason_code: 'allowed',
+        reason: '可以转交',
+        current_assignee: { admin_id: 7, username: 'quality_primary' },
+        candidates: [
+          {
+            admin_id: 8,
+            username: 'quality_backup',
+            role_keys: ['quality'],
+            role_label: '品质',
+          },
+        ],
+      },
+    },
+  }
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    return response
+  })
+  const assignment = await api.getWorkflowTaskAssignmentOptions({
+    task_id: 42,
+  })
+  assert.equal(assignment.candidates[0].username, 'quality_backup')
+  assert.deepEqual(calls, [
+    { method: 'get_task_assignment_options', params: { task_id: 42 } },
+  ])
+
+  const callCount = calls.length
+  await assert.rejects(
+    api.getWorkflowTaskAssignmentOptions({ task_id: 42, limit: 10 }),
+    /任务转交参数无效/u
+  )
+  assert.equal(calls.length, callCount)
+
+  for (const malformed of [
+    null,
+    { ...response.data.assignment, task_id: 43 },
+    { ...response.data.assignment, candidates: [{ admin_id: 8 }] },
+    {
+      ...response.data.assignment,
+      candidates: [
+        response.data.assignment.candidates[0],
+        response.data.assignment.candidates[0],
+      ],
+    },
+  ]) {
+    response = { data: { assignment: malformed } }
+    await assert.rejects(
+      api.getWorkflowTaskAssignmentOptions({ task_id: 42 }),
+      (error) => error.isInvalidResponse === true
+    )
+  }
+})
+
+test('workflowApi: assignment requires an explicit target and verifies returned ownership', async () => {
+  let response = {
+    data: {
+      task: validTask({
+        version: 8,
+        task_status_key: 'blocked',
+        assignee_id: 8,
+      }),
+    },
+  }
+  const api = await loadWorkflowApi(async () => response)
+  const { params } = mutationCases.find(
+    (entry) => entry.method === 'reassign_task'
+  )
+  assert.equal((await api.reassignWorkflowTask(params)).assignee_id, 8)
+  await assert.rejects(
+    api.reassignWorkflowTask({ ...params, assignee_id: undefined }),
+    /页面已更新/u
+  )
+  await assert.rejects(
+    api.reassignWorkflowTask({ ...params, assignee_id: 0 }),
+    /页面已更新/u
+  )
+
+  response = {
+    data: {
+      task: validTask({
+        version: 8,
+        task_status_key: 'ready',
+        assignee_id: 0,
+      }),
+    },
+  }
+  assert.equal(
+    (
+      await api.reassignWorkflowTask({
+        ...params,
+        assignee_id: null,
+      })
+    ).assignee_id,
+    0
+  )
+  response = {
+    data: {
+      task: validTask({
+        version: 9,
+        task_status_key: 'ready',
+        assignee_id: 8,
+      }),
+    },
+  }
+  await assert.rejects(
+    api.reassignWorkflowTask(params),
+    (error) => error.isInvalidResponse === true
   )
 })
 

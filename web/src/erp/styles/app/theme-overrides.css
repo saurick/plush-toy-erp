@@ -746,12 +746,6 @@
   background: var(--erp-surface-bg-soft);
 }
 
-[data-erp-theme='dark'] .ant-tag {
-  border-color: var(--erp-border);
-  background: var(--erp-surface-bg-soft);
-  color: var(--erp-text);
-}
-
 [data-erp-theme='dark'] .ant-badge .ant-badge-status-text,
 [data-erp-theme='dark'] .ant-progress-text,
 [data-erp-theme='dark'] .ant-pagination,
@@ -965,11 +959,31 @@
 [data-erp-theme='dark'] .erp-role-capability-overview,
 [data-erp-theme='dark'] .erp-role-capability-card,
 [data-erp-theme='dark'] .erp-role-policy-boundary__grid > div,
-[data-erp-theme='dark'] .erp-permission-checklist-toolbar,
+[data-erp-theme='dark'] .erp-permission-category-nav,
+[data-erp-theme='dark'] .erp-permission-menu-results,
+[data-erp-theme='dark'] .erp-permission-menu-result,
 [data-erp-theme='dark'] .erp-permission-checklist__section {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
   color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-permission-category-nav {
+  border-color: #3d6248;
+  border-top-color: var(--erp-primary);
+  background: linear-gradient(180deg, #18271d, #111a15);
+  box-shadow:
+    0 18px 32px -20px rgb(0 0 0 / 86%),
+    0 5px 14px rgb(0 0 0 / 34%);
+}
+
+[data-erp-theme='dark'] .erp-permission-category-nav__label {
+  color: var(--erp-primary-strong);
+}
+
+[data-erp-theme='dark'] .erp-permission-category-nav__label::before {
+  background: var(--erp-primary);
+  box-shadow: 0 0 0 3px rgb(74 222 128 / 12%);
 }
 
 [data-erp-theme='dark']
@@ -981,6 +995,34 @@
 }
 
 [data-erp-theme='dark'] .erp-role-capability-card--enabled {
+  border-color: #315f43;
+  background: #10271a;
+}
+
+[data-erp-theme='dark'] .erp-permission-category-nav__item {
+  border-color: #34473b;
+  background: #17231c;
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-permission-category-nav__item:hover {
+  border-color: #4c805d;
+  background: #183223;
+  color: #a7f3c1;
+}
+
+[data-erp-theme='dark'] .erp-permission-category-nav__item--active {
+  border-color: #4c9a65;
+  background: #153a24;
+  color: #bbf7d0;
+}
+
+[data-erp-theme='dark'] .erp-permission-category-nav__count {
+  background: #26372d;
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-permission-menu-result--visible {
   border-color: #315f43;
   background: #10271a;
 }

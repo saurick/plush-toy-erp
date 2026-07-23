@@ -28,7 +28,6 @@ import {
   ADMIN_ACCOUNT_STATUS,
   ADMIN_STATUS_FILTERS,
   filterAdminRecords,
-  filterPermissionGroups,
   getAdminAccountStatus,
 } from '../utils/permissionCenterSearch.mjs'
 import {
@@ -36,7 +35,10 @@ import {
   optionalMainlandMobilePhoneRule,
 } from '../utils/contactValidation.mjs'
 import { adminPasswordPolicyRule } from '../utils/adminPasswordPolicy.mjs'
-import { getPermissionModuleTitle } from '../utils/permissionModuleLabels.mjs'
+import {
+  getPermissionModuleTitle,
+  UNCLASSIFIED_PERMISSION_MODULE_TITLE,
+} from '../utils/permissionModuleLabels.mjs'
 import {
   buildAssignableRoleOptions,
   filterAssignableBusinessPermissions,
@@ -48,6 +50,16 @@ import {
   isSameAdminAccount,
   normalizePermissionUsage,
 } from '../utils/permissionCenterAccess.mjs'
+import {
+  buildLocalPermissionDraftAccess,
+  getMenuPlacementMap,
+  getMenuPlacementOrderMap,
+  getMissingMenuPermissionKeys,
+  getPermissionMenuLinks,
+  menuRequirementsSatisfied,
+  normalizePermissionMenuOptions,
+  reconcilePermissionSelection,
+} from '../utils/permissionMenuProjection.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
 import {
   getAuthenticatedNavigationSections,
@@ -392,7 +404,7 @@ function hasPermission(admin = {}, permissionKey = '') {
   return normalizeStringList(admin?.permissions || []).includes(permissionKey)
 }
 
-function buildPermissionGroups(permissions = []) {
+function buildPermissionGroups(permissions = [], menuOptions = []) {
   const groups = new Map()
   const sourcePermissions = Array.isArray(permissions) ? permissions : []
   sourcePermissions.forEach((permission) => {
@@ -400,17 +412,25 @@ function buildPermissionGroups(permissions = []) {
     if (!permissionKey) {
       return
     }
-    const moduleKey = String(permission.module || 'other').trim() || 'other'
+    const rawModuleKey =
+      String(permission.module || 'unclassified').trim() || 'unclassified'
+    const moduleTitle = getPermissionModuleTitle(permission.module_name)
+    const moduleKey =
+      moduleTitle === UNCLASSIFIED_PERMISSION_MODULE_TITLE
+        ? 'unclassified'
+        : rawModuleKey
     const group = groups.get(moduleKey) || {
       key: moduleKey,
-      title: getPermissionModuleTitle(moduleKey),
+      title: moduleTitle,
       items: [],
     }
     group.items.push({
       key: permissionKey,
       label: getPermissionVisibleName(permission),
       description: permission.description || '',
+      action: String(permission.action || '').trim(),
       usage: normalizePermissionUsage(permission.usage || {}),
+      menuLinks: getPermissionMenuLinks(permission, menuOptions),
     })
     groups.set(moduleKey, group)
   })
@@ -420,7 +440,7 @@ function buildPermissionGroups(permissions = []) {
   }))
 }
 
-function buildPermissionDetailMap(permissions = []) {
+function buildPermissionDetailMap(permissions = [], menuOptions = []) {
   const detailMap = new Map()
   const sourcePermissions = Array.isArray(permissions) ? permissions : []
   sourcePermissions.forEach((permission) => {
@@ -435,6 +455,7 @@ function buildPermissionDetailMap(permissions = []) {
       action: String(permission.action || '').trim(),
       resource: String(permission.resource || '').trim(),
       usage: normalizePermissionUsage(permission.usage || {}),
+      menuLinks: getPermissionMenuLinks(permission, menuOptions),
     })
   })
   return detailMap
@@ -543,15 +564,19 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
   }))
   const effectiveCount = pages.filter((item) => item?.effective === true).length
   const sourceLabel =
-    access?.source === 'active_customer_config_revision'
-      ? '当前客户已启用版本'
-      : access?.source === 'control_plane_rbac'
-        ? '系统管理权限'
-        : access?.source === 'builtin_rbac_fallback'
-          ? '产品默认权限预览'
-          : access?.source === 'role_disabled'
-            ? '岗位已停用'
-            : '缺少当前客户启用版本'
+    access?.source === 'local_permission_draft'
+      ? '岗位菜单草稿'
+      : access?.is_preview === true
+        ? '未保存岗位草稿'
+        : access?.source === 'active_customer_config_revision'
+          ? '当前客户已启用版本'
+          : access?.source === 'control_plane_rbac'
+            ? '系统管理权限'
+            : access?.source === 'builtin_rbac_fallback'
+              ? '产品默认权限预览'
+              : access?.source === 'role_disabled'
+                ? '岗位已停用'
+                : '缺少当前客户启用版本'
 
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -560,9 +585,11 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
         showIcon
         message={`${sourceLabel}：${effectiveCount} 个最终可进入页面`}
         description={
-          access?.config_revision
-            ? `当前设置版本：${access.config_revision}。可进入只表示具备页面入口，页面内每项操作仍会单独校验。`
-            : '这里不会把岗位基础权限或未保存的勾选冒充为客户最终权限。'
+          access?.is_preview === true && access?.config_revision
+            ? `已按公司当前设置版本 ${access.config_revision} 核对；这是未保存草稿，保存后才生效。页面内每项操作仍会单独校验。`
+            : access?.config_revision
+              ? `当前设置版本：${access.config_revision}。可进入只表示具备页面入口，页面内每项操作仍会单独校验。`
+              : '这里不会把岗位基础权限或未保存的勾选冒充为客户最终权限。'
         }
       />
       <Table
@@ -632,7 +659,7 @@ function NavigationPlacementOverview({
         type="info"
         showIcon
         message="正在读取已保存的导航位置"
-        description="读取完成后再按该岗位的最终页面权限生成预览。"
+        description="读取完成后再按该岗位当前草稿的页面权限生成预览。"
       />
     )
   }
@@ -643,7 +670,7 @@ function NavigationPlacementOverview({
         type="warning"
         showIcon
         message="暂不能生成岗位导航预览"
-        description="需要先有可确认的客户最终页面权限；产品默认权限或未保存勾选不会被当作实际导航。"
+        description="需要先核对公司当前启用范围；未完成核对的草稿只会显示岗位权限预计结果。"
       />
     )
   }
@@ -706,7 +733,7 @@ function NavigationPlacementOverview({
           type="warning"
           showIcon
           message="当前显示尚未保存的布局草稿"
-          description="常用入口和顺序会立即预览；未保存的功能权限仍要保存并重新读取最终权限后才会进入导航。"
+          description="功能权限、常用入口和顺序都会立即预览；保存岗位设置后才会对相关账号生效。"
         />
       ) : null}
       <div className="erp-role-navigation-preview__grid">
@@ -904,31 +931,376 @@ function summarizeRolePermissions(
   }
 }
 
+function getPermissionLabel(permissionDetailMap, permissionKey) {
+  return (
+    permissionDetailMap.get(String(permissionKey || '').trim())?.label ||
+    '对应页面入口功能'
+  )
+}
+
+function describeMenuEntryRequirement(menu, permissionDetailMap) {
+  const requiredAnyLabels = (menu?.requiredAny || []).map((permissionKey) =>
+    getPermissionLabel(permissionDetailMap, permissionKey)
+  )
+  const requiredAllLabels = (menu?.requiredAll || []).map((permissionKey) =>
+    getPermissionLabel(permissionDetailMap, permissionKey)
+  )
+  if (requiredAnyLabels.length > 0 && requiredAllLabels.length > 0) {
+    return `页面入口：${requiredAnyLabels.join(' 或 ')}，并且 ${requiredAllLabels.join('、')}`
+  }
+  if (requiredAnyLabels.length > 0) {
+    return `页面入口：${requiredAnyLabels.join(' 或 ')}`
+  }
+  if (requiredAllLabels.length > 0) {
+    return `页面入口：${requiredAllLabels.join('、')}`
+  }
+  return '页面入口：登录后可进入'
+}
+
+function describeMissingMenuRequirements(
+  menu,
+  permissionKeys,
+  permissionDetailMap
+) {
+  const { missingAny, missingAll } = getMissingMenuPermissionKeys(
+    menu,
+    permissionKeys
+  )
+  const descriptions = []
+  if (missingAny.length > 0) {
+    descriptions.push(
+      `还需${missingAny.length > 1 ? '任选' : '勾选'}“${missingAny
+        .map((permissionKey) =>
+          getPermissionLabel(permissionDetailMap, permissionKey)
+        )
+        .join('”或“')}”`
+    )
+  }
+  if (missingAll.length > 0) {
+    descriptions.push(
+      `还需勾选“${missingAll
+        .map((permissionKey) =>
+          getPermissionLabel(permissionDetailMap, permissionKey)
+        )
+        .join('”“')}”`
+    )
+  }
+  return descriptions.join('；')
+}
+
+function getPermissionOptionImpact(item = {}) {
+  const primaryMenu = item.menuLinks?.[0]
+  if (!primaryMenu) {
+    return (
+      item.usage?.defaultActionLabel ||
+      item.usage?.pages?.[0]?.actionLabel ||
+      '业务功能'
+    )
+  }
+  const entryPermissionKeys = [
+    ...(primaryMenu.requiredAny || []),
+    ...(primaryMenu.requiredAll || []),
+  ]
+  const otherPageLabels = [
+    ...new Set(
+      (item.menuLinks || [])
+        .slice(1)
+        .map((menu) => menu.label)
+        .filter(Boolean)
+    ),
+  ]
+  const secondaryImpact =
+    otherPageLabels.length > 0 ? `；另影响${otherPageLabels.join('、')}` : ''
+  if (entryPermissionKeys.includes(item.key)) {
+    return `页面入口 · 决定“${primaryMenu.label}”是否显示${secondaryImpact}`
+  }
+  if (!['access', 'read'].includes(String(item.action || '').trim())) {
+    const entryCanBeCompleted =
+      (primaryMenu.requiredAny || []).length <= 1 &&
+      entryPermissionKeys.length > 0
+    return `页内操作 · ${primaryMenu.label}（${
+      entryCanBeCompleted
+        ? '主页面入口可自动补齐'
+        : '请按上方菜单结果配置入口'
+    }）${secondaryImpact}`
+  }
+  return `${item.usage?.defaultActionLabel || '页面功能'} · ${primaryMenu.label}${secondaryImpact}`
+}
+
+function PermissionMenuOutcomeGrid({
+  menuKeys = [],
+  menuOptions = [],
+  permissionKeys = [],
+  permissionDetailMap = new Map(),
+  access = null,
+  accessEstimated = false,
+  placementByPath = new Map(),
+  placementOrderByPath = new Map(),
+  loading = false,
+}) {
+  const menuKeySet = new Set(menuKeys)
+  const menus = menuOptions.filter((menu) => menuKeySet.has(menu.key))
+  if (menus.length === 0) {
+    return null
+  }
+  const accessPageByKey = new Map(
+    (Array.isArray(access?.pages) ? access.pages : []).map((page) => [
+      String(page?.key || '').trim(),
+      page,
+    ])
+  )
+  const isLocalDraft = access?.source === 'local_permission_draft'
+  const isDraft = access?.is_preview === true
+  const isEstimated = accessEstimated && isLocalDraft
+  const menuRows = menus
+    .map((menu, originalIndex) => {
+      const localGranted = menuRequirementsSatisfied(menu, permissionKeys)
+      const accessPage = accessPageByKey.get(menu.key)
+      const effective =
+        localGranted &&
+        (accessPage ? accessPage.effective === true : localGranted)
+      const placement = effective
+        ? placementByPath.get(menu.path) || '已授权页面'
+        : ''
+      return {
+        menu,
+        originalIndex,
+        localGranted,
+        accessPage,
+        effective,
+        placement,
+      }
+    })
+    .sort((left, right) => {
+      if (left.effective !== right.effective) {
+        return left.effective ? -1 : 1
+      }
+      const leftOrder = placementOrderByPath.get(left.menu.path)
+      const rightOrder = placementOrderByPath.get(right.menu.path)
+      const normalizedLeftOrder = Number.isInteger(leftOrder)
+        ? leftOrder
+        : Number.MAX_SAFE_INTEGER
+      const normalizedRightOrder = Number.isInteger(rightOrder)
+        ? rightOrder
+        : Number.MAX_SAFE_INTEGER
+      return (
+        normalizedLeftOrder - normalizedRightOrder ||
+        left.originalIndex - right.originalIndex
+      )
+    })
+
+  return (
+    <div
+      aria-busy={loading}
+      className="erp-permission-menu-results"
+      data-preview-state={
+        isEstimated ? 'estimated' : isDraft ? 'draft' : 'saved'
+      }
+    >
+      <div className="erp-permission-menu-results__head">
+        <Text strong>勾选后的菜单结果</Text>
+        <Text type="secondary">
+          {isEstimated
+            ? '岗位权限预计'
+            : isDraft
+              ? '未保存草稿预览'
+              : '当前已保存结果'}
+        </Text>
+      </div>
+      <div className="erp-permission-menu-results__grid">
+        {menuRows.map(({ menu, accessPage, effective, placement }) => {
+          const missingDescription = describeMissingMenuRequirements(
+            menu,
+            permissionKeys,
+            permissionDetailMap
+          )
+          const backendReason = Array.isArray(accessPage?.reasons)
+            ? accessPage.reasons
+                .map((reason) => String(reason?.label || '').trim())
+                .filter(Boolean)
+                .join('；')
+            : ''
+          const resultDescription = effective
+            ? placement === '常用工作'
+              ? '保存后直接出现在常用工作'
+              : placement === '更多功能'
+                ? '保存后收在更多功能'
+                : '保存后可从岗位导航进入'
+            : missingDescription ||
+              backendReason ||
+              '公司当前设置未开放这个页面'
+
+          return (
+            <div
+              className={`erp-permission-menu-result${
+                effective ? ' erp-permission-menu-result--visible' : ''
+              }`}
+              data-menu-key={menu.key}
+              key={menu.key}
+            >
+              <div className="erp-permission-menu-result__title">
+                <Text strong>{menu.label}</Text>
+                <Tag
+                  className="erp-permission-menu-result__status"
+                  color={effective ? 'green' : undefined}
+                >
+                  {effective
+                    ? isEstimated
+                      ? '预计显示'
+                      : isDraft
+                        ? '草稿会显示'
+                        : '当前显示'
+                    : isEstimated
+                      ? '预计不显示'
+                      : isDraft
+                        ? '草稿不显示'
+                        : '不显示'}
+                </Tag>
+                {placement ? (
+                  <Tag color={placement === '常用工作' ? 'blue' : undefined}>
+                    {placement}
+                  </Tag>
+                ) : null}
+              </div>
+              <Text type="secondary">
+                {describeMenuEntryRequirement(menu, permissionDetailMap)}
+              </Text>
+              <Text
+                className="erp-permission-menu-result__outcome"
+                type={effective ? undefined : 'secondary'}
+              >
+                {resultDescription}
+              </Text>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function PermissionChecklist({
   groups,
+  menuOptions = [],
+  access = null,
+  accessEstimated = false,
+  accessLoading = false,
+  placementByPath = new Map(),
+  placementOrderByPath = new Map(),
+  permissionDetailMap = new Map(),
   value = [],
   onChange,
   disabled = false,
 }) {
-  const [keyword, setKeyword] = useState('')
   const [showSelectedOnly, setShowSelectedOnly] = useState(false)
+  const [activeGroupKey, setActiveGroupKey] = useState('')
+  const sectionNodesRef = useRef(new Map())
+  const navigationLockUntilRef = useRef(0)
   const normalizedValue = useMemo(() => normalizeStringList(value), [value])
   const selectedKeySet = useMemo(
     () => new Set(normalizedValue),
     [normalizedValue]
   )
   const visibleGroups = useMemo(() => {
-    const filteredGroups = filterPermissionGroups(groups, keyword)
     if (!showSelectedOnly) {
-      return filteredGroups
+      return groups
     }
-    return filteredGroups
+    return groups
       .map((section) => ({
         ...section,
         items: section.items.filter((item) => selectedKeySet.has(item.key)),
       }))
       .filter((section) => section.items.length > 0)
-  }, [groups, keyword, selectedKeySet, showSelectedOnly])
+  }, [groups, selectedKeySet, showSelectedOnly])
+  const categoryItems = useMemo(
+    () =>
+      visibleGroups.map((section) => {
+        const originalSection =
+          groups.find((item) => item.key === section.key) || section
+        const permissionKeys = originalSection.items.map((item) => item.key)
+        return {
+          key: section.key,
+          title: section.title,
+          selectedCount: permissionKeys.filter((item) =>
+            selectedKeySet.has(item)
+          ).length,
+          total: permissionKeys.length,
+        }
+      }),
+    [groups, selectedKeySet, visibleGroups]
+  )
+
+  useEffect(() => {
+    const visibleKeys = new Set(categoryItems.map((item) => item.key))
+    setActiveGroupKey((current) =>
+      visibleKeys.has(current) ? current : categoryItems[0]?.key || ''
+    )
+  }, [categoryItems])
+
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      typeof window.IntersectionObserver !== 'function'
+    ) {
+      return undefined
+    }
+    const visibleEntries = new Map()
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const key = String(entry.target?.dataset?.permissionModule || '')
+          if (!key) return
+          if (entry.isIntersecting) {
+            visibleEntries.set(key, entry)
+          } else {
+            visibleEntries.delete(key)
+          }
+        })
+        if (Date.now() < navigationLockUntilRef.current) {
+          return
+        }
+        const nextEntry = [...visibleEntries.values()].sort(
+          (left, right) =>
+            Math.abs(left.boundingClientRect.top - 24) -
+              Math.abs(right.boundingClientRect.top - 24) ||
+            left.boundingClientRect.left - right.boundingClientRect.left
+        )[0]
+        const nextKey = String(
+          nextEntry?.target?.dataset?.permissionModule || ''
+        )
+        if (nextKey) {
+          setActiveGroupKey((current) =>
+            current === nextKey ? current : nextKey
+          )
+        }
+      },
+      {
+        root: null,
+        rootMargin: '-320px 0px -25% 0px',
+        threshold: [0, 0.01],
+      }
+    )
+    categoryItems.forEach((item) => {
+      const node = sectionNodesRef.current.get(item.key)
+      if (node) observer.observe(node)
+    })
+    return () => observer.disconnect()
+  }, [categoryItems])
+
+  const jumpToGroup = useCallback((groupKey) => {
+    const normalizedKey = String(groupKey || '').trim()
+    const target = sectionNodesRef.current.get(normalizedKey)
+    if (!target) return
+    navigationLockUntilRef.current = Date.now() + 700
+    setActiveGroupKey(normalizedKey)
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    target.scrollIntoView({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      block: 'start',
+    })
+  }, [])
 
   const handleSectionChange = (sectionKeys, nextSectionValues) => {
     const next = [
@@ -940,23 +1312,67 @@ function PermissionChecklist({
 
   return (
     <div className="erp-permission-checklist-shell">
-      <div className="erp-permission-checklist-toolbar">
-        <Input
-          allowClear
-          className="erp-permission-checklist-search"
-          value={keyword}
-          placeholder="搜索功能名称或业务分类"
-          onChange={(event) => setKeyword(event.target.value)}
-        />
-        <label className="erp-permission-checklist-filter">
-          <Switch
-            size="small"
-            checked={showSelectedOnly}
-            onChange={setShowSelectedOnly}
-          />
-          <span>只看已选</span>
-        </label>
-      </div>
+      <nav
+        className="erp-permission-category-nav"
+        aria-label="功能分类导航"
+      >
+        <div className="erp-permission-category-nav__head">
+          <span className="erp-permission-category-nav__title">
+            <Text strong className="erp-permission-category-nav__label">
+              功能分类
+            </Text>
+            <Text type="secondary">点击分类直达对应分组</Text>
+          </span>
+          <label className="erp-permission-checklist-filter">
+            <Switch
+              size="small"
+              checked={showSelectedOnly}
+              onChange={setShowSelectedOnly}
+            />
+            <span>只看已选</span>
+          </label>
+        </div>
+        {categoryItems.length > 0 ? (
+          <>
+            <div className="erp-permission-category-nav__desktop">
+              {categoryItems.map((item) => {
+                const active = activeGroupKey === item.key
+                return (
+                  <button
+                    type="button"
+                    className={`erp-permission-category-nav__item${
+                      active
+                        ? ' erp-permission-category-nav__item--active'
+                        : ''
+                    }`}
+                    aria-current={active ? 'location' : undefined}
+                    key={item.key}
+                    onClick={() => jumpToGroup(item.key)}
+                  >
+                    <span>{item.title}</span>
+                    <span className="erp-permission-category-nav__count">
+                      {item.selectedCount}/{item.total}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="erp-permission-category-nav__mobile">
+              <Select
+                aria-label="跳到功能分类"
+                value={activeGroupKey || undefined}
+                options={categoryItems.map((item) => ({
+                  value: item.key,
+                  label: `${item.title} ${item.selectedCount}/${item.total}`,
+                }))}
+                onChange={jumpToGroup}
+                placeholder="跳到功能分类"
+                style={{ width: '100%' }}
+              />
+            </div>
+          </>
+        ) : null}
+      </nav>
       <div className="erp-permission-checklist">
         {visibleGroups.map((section) => {
           const originalSection =
@@ -971,21 +1387,36 @@ function PermissionChecklist({
           const selectedOriginalKeys = normalizedValue.filter((item) =>
             originalSectionKeys.includes(item)
           )
-          const hasKeyword = Boolean(String(keyword || '').trim())
           const allOriginalSelected =
             originalSectionKeys.length > 0 &&
             originalSectionKeys.every((item) => selectedKeySet.has(item))
+          const sectionMenuKeySet = new Set(
+            section.items
+              .map((item) => item.menuLinks?.[0]?.key)
+              .filter(Boolean)
+          )
+          const sectionMenuKeys = menuOptions
+            .map((menu) => menu.key)
+            .filter((menuKey) => sectionMenuKeySet.has(menuKey))
 
           return (
             <section
               className="erp-permission-checklist__section"
+              data-permission-module={section.key}
               key={section.key}
+              ref={(node) => {
+                if (node) {
+                  sectionNodesRef.current.set(section.key, node)
+                } else {
+                  sectionNodesRef.current.delete(section.key)
+                }
+              }}
             >
               <div className="erp-permission-checklist__header">
                 <span className="erp-permission-checklist__title">
                   <Text strong>{section.title}</Text>
                   <Text type="secondary">
-                    {hasKeyword || showSelectedOnly
+                    {showSelectedOnly
                       ? `显示 ${section.items.length}/${originalSection.items.length}，已选 ${selectedOriginalKeys.length}`
                       : `${selectedOriginalKeys.length}/${originalSection.items.length}`}
                   </Text>
@@ -1014,6 +1445,17 @@ function PermissionChecklist({
                   </Button>
                 </span>
               </div>
+              <PermissionMenuOutcomeGrid
+                menuKeys={sectionMenuKeys}
+                menuOptions={menuOptions}
+                permissionKeys={normalizedValue}
+                permissionDetailMap={permissionDetailMap}
+                access={access}
+                accessEstimated={accessEstimated}
+                placementByPath={placementByPath}
+                placementOrderByPath={placementOrderByPath}
+                loading={accessLoading}
+              />
               <Checkbox.Group
                 options={section.items.map((item) => ({
                   label: (
@@ -1022,18 +1464,7 @@ function PermissionChecklist({
                         {item.label}
                       </span>
                       <span className="erp-permission-option__impact">
-                        {item.usage?.defaultActionLabel ||
-                          item.usage?.pages?.[0]?.actionLabel ||
-                          '业务功能'}
-                        {item.usage?.pages?.length > 0
-                          ? ` · ${[
-                              ...new Set(
-                                item.usage.pages
-                                  .map((page) => page.pageLabel)
-                                  .filter(Boolean)
-                              ),
-                            ].join('、')}`
-                          : ''}
+                        {getPermissionOptionImpact(item)}
                       </span>
                     </span>
                   ),
@@ -1054,7 +1485,7 @@ function PermissionChecklist({
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
-            showSelectedOnly ? '当前筛选下没有已选功能' : '没有匹配的功能'
+            showSelectedOnly ? '当前岗位暂无已选功能' : '暂无可配置功能'
           }
         />
       ) : null}
@@ -1082,11 +1513,18 @@ export default function PermissionCenterPage() {
   const [admins, setAdmins] = useState([])
   const [roles, setRoles] = useState([])
   const [permissions, setPermissions] = useState([])
+  const [permissionMenuOptions, setPermissionMenuOptions] = useState([])
   const [warehouseScopeOptions, setWarehouseScopeOptions] = useState([])
   const [effectiveRoleAccess, setEffectiveRoleAccess] = useState(null)
   const effectiveRoleAccessRequestRef = useRef(0)
   const [effectiveRoleAccessLoading, setEffectiveRoleAccessLoading] =
     useState(false)
+  const [permissionDraftAccess, setPermissionDraftAccess] = useState(null)
+  const permissionDraftAccessRequestRef = useRef(0)
+  const [permissionDraftAccessLoading, setPermissionDraftAccessLoading] =
+    useState(false)
+  const [permissionDraftAccessError, setPermissionDraftAccessError] =
+    useState('')
   const [adminSearchKeyword, setAdminSearchKeyword] = useState('')
   const [adminStatusFilter, setAdminStatusFilter] = useState(
     ADMIN_STATUS_FILTERS.ALL
@@ -1148,13 +1586,22 @@ export default function PermissionCenterPage() {
     () => new Set(assignablePermissions.map(getPermissionKey)),
     [assignablePermissions]
   )
+  const normalizedPermissionMenus = useMemo(
+    () => normalizePermissionMenuOptions(permissionMenuOptions),
+    [permissionMenuOptions]
+  )
   const permissionGroups = useMemo(
-    () => buildPermissionGroups(assignablePermissions),
-    [assignablePermissions]
+    () =>
+      buildPermissionGroups(assignablePermissions, normalizedPermissionMenus),
+    [assignablePermissions, normalizedPermissionMenus]
   )
   const permissionDetailMap = useMemo(
-    () => buildPermissionDetailMap(assignablePermissions),
-    [assignablePermissions]
+    () =>
+      buildPermissionDetailMap(
+        assignablePermissions,
+        normalizedPermissionMenus
+      ),
+    [assignablePermissions, normalizedPermissionMenus]
   )
   const selectedRole = useMemo(
     () => roles.find((role) => getRoleKey(role) === selectedRoleKey) || null,
@@ -1170,6 +1617,10 @@ export default function PermissionCenterPage() {
   const rolePermissionsDirty =
     buildPermissionSignature(selectedRolePermissionKeys) !==
     buildPermissionSignature(selectedRoleSavedPermissionKeys)
+  const selectedRolePermissionSignature = useMemo(
+    () => buildPermissionSignature(selectedRolePermissionKeys),
+    [selectedRolePermissionKeys]
+  )
   const selectedRoleSavedNavigation = useMemo(
     () => normalizeRoleNavigationSettings(selectedRole || {}),
     [selectedRole]
@@ -1201,6 +1652,10 @@ export default function PermissionCenterPage() {
   const roleDataScopeInvalid =
     selectedWarehouseScopeMode === 'ASSIGNED' &&
     selectedWarehouseScopeIDs.length === 0
+  const canReadEffectiveRoleAccess =
+    hasPermission(currentAdmin, READ_ROLE_PERMISSION) &&
+    hasPermission(currentAdmin, READ_PERMISSION_PERMISSION) &&
+    hasPermission(currentAdmin, READ_CUSTOMER_CONFIG_PERMISSION)
   const warehouseScopeSelectOptions = useMemo(
     () =>
       warehouseScopeOptions
@@ -1211,33 +1666,57 @@ export default function PermissionCenterPage() {
         .filter((option) => option.value > 0),
     [warehouseScopeOptions]
   )
+  const localPermissionDraftAccess = useMemo(
+    () =>
+      buildLocalPermissionDraftAccess({
+        menuOptions: normalizedPermissionMenus,
+        permissionKeys: selectedRolePermissionKeys,
+        roleKey: selectedRoleKey,
+      }),
+    [normalizedPermissionMenus, selectedRoleKey, selectedRolePermissionKeys]
+  )
+  const matchingPermissionDraftAccess =
+    permissionDraftAccess?.roleKey === selectedRoleKey &&
+    permissionDraftAccess?.signature === selectedRolePermissionSignature
+      ? permissionDraftAccess.access
+      : null
+  const roleAccessForCurrentDraft = rolePermissionsDirty
+    ? matchingPermissionDraftAccess || localPermissionDraftAccess
+    : effectiveRoleAccess
+  const roleAccessForCurrentDraftLoading = rolePermissionsDirty
+    ? permissionDraftAccessLoading && !matchingPermissionDraftAccess
+    : effectiveRoleAccessLoading
+  const roleAccessForCurrentDraftEstimated =
+    rolePermissionsDirty &&
+    roleAccessForCurrentDraft?.source === 'local_permission_draft' &&
+    (!canReadEffectiveRoleAccess || Boolean(permissionDraftAccessError))
   const effectiveRoleNavigationPathSet = useMemo(
-    () => getEffectiveRoleNavigationPathSet(effectiveRoleAccess),
-    [effectiveRoleAccess]
+    () => getEffectiveRoleNavigationPathSet(roleAccessForCurrentDraft),
+    [roleAccessForCurrentDraft]
   )
   const roleNavigationOptions = useMemo(
     () =>
       buildRoleNavigationOptions(
-        effectiveRoleAccess,
+        roleAccessForCurrentDraft,
         selectedRolePrimaryMenuPaths
       ),
-    [effectiveRoleAccess, selectedRolePrimaryMenuPaths]
+    [roleAccessForCurrentDraft, selectedRolePrimaryMenuPaths]
   )
   const unavailableRoleNavigationPaths = useMemo(
     () =>
-      effectiveRoleAccess?.is_final === true
+      roleAccessForCurrentDraft?.is_final === true
         ? selectedRolePrimaryMenuPaths.filter(
             (path) => !effectiveRoleNavigationPathSet.has(path)
           )
         : [],
     [
-      effectiveRoleAccess?.is_final,
+      roleAccessForCurrentDraft?.is_final,
       effectiveRoleNavigationPathSet,
       selectedRolePrimaryMenuPaths,
     ]
   )
   const recommendedRolePrimaryMenuPaths = useMemo(() => {
-    if (effectiveRoleAccess?.is_final !== true || !selectedRoleKey) {
+    if (roleAccessForCurrentDraft?.is_final !== true || !selectedRoleKey) {
       return []
     }
     return buildRoleGuidedNavigationPreview({
@@ -1245,11 +1724,38 @@ export default function PermissionCenterPage() {
         ...getNavigationSections(),
         ...getAuthenticatedNavigationSections(),
       ],
-      effectiveAccess: effectiveRoleAccess,
+      effectiveAccess: roleAccessForCurrentDraft,
       roleKey: selectedRoleKey,
       navigationMode: ROLE_NAVIGATION_MODES.RECOMMENDED,
     }).primaryItems.map((item) => item.path)
-  }, [effectiveRoleAccess, selectedRoleKey])
+  }, [roleAccessForCurrentDraft, selectedRoleKey])
+  const roleNavigationPlacement = useMemo(
+    () =>
+      buildRoleGuidedNavigationPreview({
+        navigationSections: [
+          ...getNavigationSections(),
+          ...getAuthenticatedNavigationSections(),
+        ],
+        effectiveAccess: roleAccessForCurrentDraft,
+        roleKey: selectedRoleKey,
+        navigationMode: selectedRoleNavigationMode,
+        primaryMenuPaths: selectedRolePrimaryMenuPaths,
+      }),
+    [
+      roleAccessForCurrentDraft,
+      selectedRoleKey,
+      selectedRoleNavigationMode,
+      selectedRolePrimaryMenuPaths,
+    ]
+  )
+  const permissionMenuPlacementByPath = useMemo(
+    () => getMenuPlacementMap(roleNavigationPlacement),
+    [roleNavigationPlacement]
+  )
+  const permissionMenuPlacementOrderByPath = useMemo(
+    () => getMenuPlacementOrderMap(roleNavigationPlacement),
+    [roleNavigationPlacement]
+  )
   const roleNavigationInvalid =
     roleNavigationDirty &&
     selectedRoleNavigationMode === ROLE_NAVIGATION_MODES.CUSTOM &&
@@ -1343,9 +1849,6 @@ export default function PermissionCenterPage() {
   const canReadRoleTemplates =
     hasPermission(currentAdmin, READ_ROLE_PERMISSION) &&
     hasPermission(currentAdmin, READ_PERMISSION_PERMISSION)
-  const canReadEffectiveRoleAccess =
-    canReadRoleTemplates &&
-    hasPermission(currentAdmin, READ_CUSTOMER_CONFIG_PERMISSION)
   const canCreateUsers = hasPermission(currentAdmin, CREATE_USER_PERMISSION)
   const canManageUsers = hasPermission(currentAdmin, UPDATE_USER_PERMISSION)
   const canAssignUserRoles = hasPermission(
@@ -1419,6 +1922,13 @@ export default function PermissionCenterPage() {
           ? optionsResult.data.permissions
           : []
       )
+      setPermissionMenuOptions(
+        Array.isArray(optionsResult?.data?.menus)
+          ? optionsResult.data.menus
+          : Array.isArray(optionsResult?.data?.menu_options)
+            ? optionsResult.data.menu_options
+            : []
+      )
       setWarehouseScopeOptions(
         Array.isArray(optionsResult?.data?.warehouse_scope_options)
           ? optionsResult.data.warehouse_scope_options
@@ -1466,6 +1976,58 @@ export default function PermissionCenterPage() {
       }
     },
     [adminRpc, canReadEffectiveRoleAccess]
+  )
+
+  const changeSelectedRolePermissions = useCallback(
+    (requestedPermissionKeys = []) => {
+      const result = reconcilePermissionSelection({
+        previousKeys: selectedRolePermissionKeys,
+        requestedKeys: requestedPermissionKeys,
+        permissions: assignablePermissions,
+        menuOptions: normalizedPermissionMenus,
+      })
+      setSelectedRolePermissionKeys(result.permissionKeys)
+
+      const menuByKey = new Map(
+        normalizedPermissionMenus.map((menu) => [menu.key, menu])
+      )
+      const autoAddedLabels = result.autoAdded.map((item) => {
+        const menuLabel = menuByKey.get(item.menuKey)?.label || '对应页面'
+        const permissionLabel = getPermissionLabel(
+          permissionDetailMap,
+          item.permissionKey
+        )
+        return `“${menuLabel}”入口（${permissionLabel}）`
+      })
+      const autoRemovedLabels = result.autoRemoved.map((item) => {
+        const menuLabel = menuByKey.get(item.menuKey)?.label || '对应页面'
+        const permissionLabel = getPermissionLabel(
+          permissionDetailMap,
+          item.permissionKey
+        )
+        return `“${menuLabel}”操作（${permissionLabel}）`
+      })
+      const notices = []
+      if (autoAddedLabels.length > 0) {
+        notices.push(
+          `为避免有操作却进不了页面，已同时开启${autoAddedLabels.join('、')}`
+        )
+      }
+      if (autoRemovedLabels.length > 0) {
+        notices.push(
+          `关闭页面入口后，已同时取消仅在该页使用的${autoRemovedLabels.join('、')}`
+        )
+      }
+      if (notices.length > 0) {
+        message.info(notices.join('；'))
+      }
+    },
+    [
+      assignablePermissions,
+      normalizedPermissionMenus,
+      permissionDetailMap,
+      selectedRolePermissionKeys,
+    ]
   )
 
   const selectRoleTemplate = (roleKey) => {
@@ -1585,6 +2147,65 @@ export default function PermissionCenterPage() {
   useEffect(() => {
     loadEffectiveRoleAccess(selectedRoleKey)
   }, [loadEffectiveRoleAccess, selectedRoleKey])
+
+  useEffect(() => {
+    const requestID = permissionDraftAccessRequestRef.current + 1
+    permissionDraftAccessRequestRef.current = requestID
+    setPermissionDraftAccessError('')
+    if (
+      !rolePermissionsDirty ||
+      !selectedRoleKey ||
+      !canReadEffectiveRoleAccess
+    ) {
+      setPermissionDraftAccessLoading(false)
+      if (!rolePermissionsDirty) {
+        setPermissionDraftAccess(null)
+      }
+      return undefined
+    }
+
+    setPermissionDraftAccessLoading(true)
+    const signature = selectedRolePermissionSignature
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await adminRpc.call('effective_role_access', {
+          role_key: selectedRoleKey,
+          permission_keys: normalizeStringList(selectedRolePermissionKeys),
+        })
+        if (permissionDraftAccessRequestRef.current === requestID) {
+          setPermissionDraftAccess({
+            roleKey: selectedRoleKey,
+            signature,
+            access: result?.data?.effective_access || null,
+          })
+        }
+      } catch (err) {
+        if (permissionDraftAccessRequestRef.current === requestID) {
+          setPermissionDraftAccessError(
+            getActionErrorMessage(err, '核对岗位菜单草稿')
+          )
+        }
+      } finally {
+        if (permissionDraftAccessRequestRef.current === requestID) {
+          setPermissionDraftAccessLoading(false)
+        }
+      }
+    }, 180)
+
+    return () => {
+      window.clearTimeout(timer)
+      if (permissionDraftAccessRequestRef.current === requestID) {
+        permissionDraftAccessRequestRef.current += 1
+      }
+    }
+  }, [
+    adminRpc,
+    canReadEffectiveRoleAccess,
+    rolePermissionsDirty,
+    selectedRoleKey,
+    selectedRolePermissionKeys,
+    selectedRolePermissionSignature,
+  ])
 
   useEffect(() => {
     const totalPages = Math.max(
@@ -2493,24 +3114,47 @@ export default function PermissionCenterPage() {
                       <div className="erp-role-policy-tab-content">
                         <div className="erp-permission-checklist-heading">
                           <div>
-                            <Text strong>选择这个岗位可以使用的功能</Text>
+                            <Text strong>先看菜单结果，再选择页内操作</Text>
                             <Paragraph type="secondary">
-                              按业务名称勾选。查看、创建、修改、审核等操作分别控制；勾选某项操作不会自动获得该页面的其他操作。
+                              每组顶部直接显示页面会不会出现，以及进入常用工作还是更多功能。查看类功能控制页面入口；主办理页面明确且入口唯一时，会自动补齐入口。
                             </Paragraph>
                           </div>
                           <Tag color="blue">
                             已选 {selectedRolePermissionSummary.total} 项
                           </Tag>
                         </div>
+                        <Alert
+                          type="info"
+                          showIcon
+                          message="菜单入口和页内操作分开控制"
+                          description="例如“查看应收”决定有没有“应收管理”菜单，“确认应收”只决定进入页面后能否办理。当前勾选会先预览，保存岗位设置后才正式生效。"
+                        />
+                        {permissionDraftAccessError ? (
+                          <Alert
+                            type="warning"
+                            showIcon
+                            message="公司当前启用范围暂时核对失败"
+                            description={`${permissionDraftAccessError}。页面结果暂按岗位权限预计，保存前请重试。`}
+                          />
+                        ) : null}
                         <PermissionChecklist
                           groups={permissionGroups}
+                          menuOptions={normalizedPermissionMenus}
+                          access={roleAccessForCurrentDraft}
+                          accessEstimated={roleAccessForCurrentDraftEstimated}
+                          accessLoading={roleAccessForCurrentDraftLoading}
+                          placementByPath={permissionMenuPlacementByPath}
+                          placementOrderByPath={
+                            permissionMenuPlacementOrderByPath
+                          }
+                          permissionDetailMap={permissionDetailMap}
                           value={selectedRolePermissionKeys}
                           disabled={
                             !canManageRolePermissions ||
                             !selectedRoleKey ||
                             selectedRoleReadOnly
                           }
-                          onChange={setSelectedRolePermissionKeys}
+                          onChange={changeSelectedRolePermissions}
                         />
                       </div>
                     ),
@@ -2555,8 +3199,8 @@ export default function PermissionCenterPage() {
                         style={{ width: '100%' }}
                       >
                         <EffectiveRoleAccessOverview
-                          access={effectiveRoleAccess}
-                          loading={effectiveRoleAccessLoading}
+                          access={roleAccessForCurrentDraft}
+                          loading={roleAccessForCurrentDraftLoading}
                         />
                         <RoleNavigationEditor
                           mode={selectedRoleNavigationMode}
@@ -2566,7 +3210,7 @@ export default function PermissionCenterPage() {
                           disabled={
                             !canManageRolePermissions ||
                             selectedRoleReadOnly ||
-                            effectiveRoleAccess?.is_final !== true
+                            roleAccessForCurrentDraft?.is_final !== true
                           }
                           onModeChange={(nextMode) => {
                             setSelectedRoleNavigationMode(nextMode)
@@ -2589,12 +3233,12 @@ export default function PermissionCenterPage() {
                           }
                         />
                         <NavigationPlacementOverview
-                          access={effectiveRoleAccess}
+                          access={roleAccessForCurrentDraft}
                           roleKey={selectedRoleKey}
                           navigationMode={selectedRoleNavigationMode}
                           primaryMenuPaths={selectedRolePrimaryMenuPaths}
                           dirty={roleConfigurationDirty}
-                          loading={effectiveRoleAccessLoading}
+                          loading={roleAccessForCurrentDraftLoading}
                         />
                         <div>
                           <Text strong>当前勾选的功能影响</Text>

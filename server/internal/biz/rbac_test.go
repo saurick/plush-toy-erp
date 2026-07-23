@@ -426,6 +426,70 @@ func TestAdminMenuRequirementsDistinguishAnyAndAll(t *testing.T) {
 			t.Fatal("production fact read alone must not expose production orders")
 		}
 	})
+
+	t.Run("production progress requires its exact fact read permission", func(t *testing.T) {
+		planMenus := AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionPMCPlanRead}})
+		if adminMenusContainKey(planMenus, "production-progress") {
+			t.Fatal("plan read alone must not expose a page whose initial list requires production fact read")
+		}
+
+		factMenus := AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionProductionFactRead}})
+		if !adminMenusContainKey(factMenus, "production-progress") {
+			t.Fatal("production fact read must expose production progress")
+		}
+	})
+
+	t.Run("production scheduling requires plan context and workflow task read", func(t *testing.T) {
+		for _, permissions := range [][]string{
+			{PermissionPMCPlanRead},
+			{PermissionWorkflowTaskRead},
+		} {
+			if adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: permissions}), "production-scheduling") {
+				t.Fatalf("partial permissions %#v must not expose a page whose initial list requires both capabilities", permissions)
+			}
+		}
+		permissions := []string{PermissionPMCPlanRead, PermissionWorkflowTaskRead}
+		if !adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: permissions}), "production-scheduling") {
+			t.Fatalf("permissions %#v must expose production scheduling", permissions)
+		}
+	})
+
+	t.Run("production exception page accepts each real task or decision read entry", func(t *testing.T) {
+		for _, permission := range []string{
+			PermissionWorkflowTaskRead,
+			PermissionPMCRiskRead,
+			PermissionProductionFactRead,
+			PermissionQualityExceptionHandle,
+		} {
+			menus := AdminVisibleMenus(&AdminUser{Permissions: []string{permission}})
+			if !adminMenusContainKey(menus, "production-exceptions") {
+				t.Fatalf("permission %q must expose the matching production exception surface", permission)
+			}
+		}
+		if adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionQualityInspectionRead}}), "production-exceptions") {
+			t.Fatal("quality inspection read alone must not expose a page that has no matching inspection list")
+		}
+	})
+
+	t.Run("shipping release requires workflow task read and one business context", func(t *testing.T) {
+		businessReads := []string{
+			PermissionWarehouseOutboundRead,
+			PermissionFinanceReceivableRead,
+			PermissionSalesOrderRead,
+		}
+		if adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionWorkflowTaskRead}}), "shipping-release") {
+			t.Fatal("workflow task read alone must not expose shipping release without a business context")
+		}
+		for _, permission := range businessReads {
+			if adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: []string{permission}}), "shipping-release") {
+				t.Fatalf("business context %q alone must not expose a page whose initial list requires workflow task read", permission)
+			}
+			permissions := []string{PermissionWorkflowTaskRead, permission}
+			if !adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: permissions}), "shipping-release") {
+				t.Fatalf("permissions %#v must expose shipping release", permissions)
+			}
+		}
+	})
 }
 
 func adminMenusContainKey(menus []AdminMenu, key string) bool {
@@ -569,13 +633,33 @@ func TestPermissionDefinitionsSeparateDelegableAndControlPlaneCapabilities(t *te
 	if !ok || business.Class != PermissionClassBusiness || !business.Assignable || business.NonProductionOnly {
 		t.Fatalf("unexpected business permission metadata: %#v ok=%t", business, ok)
 	}
-	controlPlane, ok := PermissionDefinitionByKey(PermissionSystemUserRead)
-	if !ok || controlPlane.Class != PermissionClassControlPlane || controlPlane.Assignable || controlPlane.NonProductionOnly {
-		t.Fatalf("unexpected control-plane permission metadata: %#v ok=%t", controlPlane, ok)
+	for _, permissionKey := range []string{PermissionSystemUserRead, PermissionProcessRuntimeRecover} {
+		controlPlane, found := PermissionDefinitionByKey(permissionKey)
+		if !found || controlPlane.Class != PermissionClassControlPlane || controlPlane.Assignable || controlPlane.NonProductionOnly {
+			t.Fatalf("unexpected control-plane permission metadata for %s: %#v ok=%t", permissionKey, controlPlane, found)
+		}
 	}
 	debug, ok := PermissionDefinitionByKey(PermissionDebugBusinessClear)
 	if !ok || debug.Class != PermissionClassDebug || debug.Assignable || !debug.NonProductionOnly {
 		t.Fatalf("unexpected debug permission metadata: %#v ok=%t", debug, ok)
+	}
+}
+
+func TestBuiltinPermissionModulesHaveBusinessFacingNames(t *testing.T) {
+	seen := map[string]string{}
+	for _, permission := range AllPermissionDefinitions() {
+		moduleName, ok := PermissionModuleName(permission.Module)
+		if !ok || strings.TrimSpace(moduleName) == "" {
+			t.Errorf("permission %s module %q has no business-facing name", permission.Key, permission.Module)
+			continue
+		}
+		if moduleName == permission.Module {
+			t.Errorf("permission %s exposes technical module name %q", permission.Key, moduleName)
+		}
+		if previousModule, exists := seen[moduleName]; exists && previousModule != permission.Module {
+			t.Errorf("modules %q and %q share business-facing name %q", previousModule, permission.Module, moduleName)
+		}
+		seen[moduleName] = permission.Module
 	}
 }
 

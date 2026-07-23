@@ -1,21 +1,26 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getPermissionModuleTitle } from './permissionModuleLabels.mjs'
+import {
+  getPermissionModuleTitle,
+  UNCLASSIFIED_PERMISSION_MODULE_TITLE,
+} from './permissionModuleLabels.mjs'
 
-test('permissionModuleLabels: 内置权限模块只显示岗位可理解的中文名称', () => {
-  assert.equal(getPermissionModuleTitle('business'), '业务看板')
-  assert.equal(getPermissionModuleTitle('debug'), '其他功能')
-  assert.equal(getPermissionModuleTitle('masterdata'), '基础资料')
-  assert.equal(getPermissionModuleTitle('mobile'), '手机待办')
-  assert.equal(getPermissionModuleTitle('outsourcing'), '委外')
-  assert.equal(getPermissionModuleTitle('shipment'), '出货')
-  assert.equal(getPermissionModuleTitle('system'), '系统管理')
-  assert.doesNotMatch(getPermissionModuleTitle('workflow'), /\(|workflow/u)
+test('permissionModuleLabels: 展示后端给出的岗位语言分类名', () => {
+  assert.equal(getPermissionModuleTitle('工作台与通用工具'), '工作台与通用工具')
+  assert.equal(getPermissionModuleTitle('物料清单（BOM）'), '物料清单（BOM）')
+  assert.equal(getPermissionModuleTitle('客户退货'), '客户退货')
+  assert.equal(getPermissionModuleTitle('生产执行'), '生产执行')
 })
 
-test('permissionModuleLabels: 空模块归入其他，未知模块不展示 raw key', () => {
-  assert.equal(getPermissionModuleTitle(''), '其他功能')
-  assert.equal(getPermissionModuleTitle('custom_module'), '其他功能')
-  assert.equal(getPermissionModuleTitle('unknown.future.module'), '其他功能')
+test('permissionModuleLabels: 缺失或技术模块名合并为一个未分类分组', () => {
+  assert.equal(getPermissionModuleTitle(''), UNCLASSIFIED_PERMISSION_MODULE_TITLE)
+  assert.equal(
+    getPermissionModuleTitle('custom_module'),
+    UNCLASSIFIED_PERMISSION_MODULE_TITLE
+  )
+  assert.equal(
+    getPermissionModuleTitle('unknown.future.module'),
+    UNCLASSIFIED_PERMISSION_MODULE_TITLE
+  )
 })

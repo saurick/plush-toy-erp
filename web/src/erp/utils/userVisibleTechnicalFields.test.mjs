@@ -611,7 +611,6 @@ test('权限中心权限名称不把 permission key 当用户可见 fallback', (
   assert.doesNotMatch(content, /搜索权限码/u)
   assert.doesNotMatch(content, /搜索管理员账号、手机号、角色或权限码/u)
   assert.doesNotMatch(content, /角色名称可按岗位调整，职责权限保持统一/u)
-  assert.match(content, /搜索功能名称或业务分类/u)
   assert.match(
     content,
     /const ASSIGN_USER_ROLE_PERMISSION = 'system\.user\.role\.assign'/u
@@ -632,6 +631,20 @@ test('权限中心权限名称不把 permission key 当用户可见 fallback', (
     content,
     /role_keys: canManageUsers\s*\?\s*normalizeStringList/u
   )
+})
+
+test('权限中心用分类直达和只看已选替代低频功能搜索', () => {
+  const content = readFileSync(
+    join(rootDir, 'pages/PermissionCenterPage.jsx'),
+    'utf8'
+  )
+
+  assert.match(content, /aria-label="功能分类导航"/u)
+  assert.match(content, /aria-label="跳到功能分类"/u)
+  assert.match(content, /点击分类直达对应分组/u)
+  assert.match(content, /只看已选/u)
+  assert.doesNotMatch(content, /搜索功能名称或业务分类/u)
+  assert.doesNotMatch(content, /filterPermissionGroups/u)
 })
 
 test('权限中心功能影响只展示业务页面、区域、动作和限制', () => {
@@ -939,7 +952,10 @@ test('库存台账按真实 SKU grain 查询并区分未分规格库存', () => 
   assert.match(content, /listProductSKUs/u)
   assert.match(content, /dataIndex:\s*'product_sku_id'/u)
   assert.match(content, /return '未分规格'/u)
-  assert.match(content, /disabled=\{subjectType !== 'PRODUCT'\}/u)
+  assert.match(
+    content,
+    /disabled=\{\s*subjectType !== 'PRODUCT' \|\| !canReadProductSKUs\s*\}/u
+  )
   assert.match(
     content,
     /listProductSKUs\(\s*\{\s*limit:\s*500\s*\}/u,
@@ -1612,15 +1628,21 @@ test('菜单权限标签 helper 不把未知 path 或 role key 当可见 fallbac
   )
 })
 
-test('权限中心模块标签不把未知 module key 当可见 fallback', () => {
+test('权限中心模块分类消费后端岗位名称且不把 module key 当可见 fallback', () => {
   const content = readFileSync(
     join(rootDir, 'utils/permissionModuleLabels.mjs'),
     'utf8'
   )
+  const pageContent = readFileSync(
+    join(rootDir, 'pages/PermissionCenterPage.jsx'),
+    'utf8'
+  )
 
-  assert.match(content, /return label \|\| '其他功能'/u)
-  assert.doesNotMatch(content, /\$\{normalizedKey\}/u)
-  assert.doesNotMatch(content, /:\s*normalizedKey/u)
+  assert.match(content, /UNCLASSIFIED_PERMISSION_MODULE_TITLE/u)
+  assert.match(pageContent, /getPermissionModuleTitle\(permission\.module_name\)/u)
+  assert.doesNotMatch(pageContent, /getPermissionModuleTitle\(moduleKey\)/u)
+  assert.doesNotMatch(content, /\$\{normalizedName\}/u)
+  assert.doesNotMatch(content, /:\s*normalizedName/u)
 })
 
 test('Workflow 动作模式不把未知 action key 当可提交或可见 fallback', () => {

@@ -990,7 +990,7 @@ export default function ERPLayout() {
   const displayUsername =
     adminProfile?.username || tokenAdmin?.username || 'admin'
   const noVisibleMenus = permissionGovernedVisibleSections.length === 0
-  const shouldBlockOutlet = noVisibleMenus && currentPageShouldRedirect
+  const shouldBlockOutlet = currentPageShouldRedirect
   const shouldGuardProductCoreBusinessData =
     shouldGuardCustomerBusinessPageRuntime({
       effectiveSessionDiagnostic,
@@ -1138,8 +1138,14 @@ export default function ERPLayout() {
               <Alert
                 type="warning"
                 showIcon
-                message="当前账号暂无可用页面"
-                description="请确认当前账号已设置正确的岗位和可用页面。若刷新后仍无入口，请联系管理员。"
+                message={
+                  noVisibleMenus ? '当前账号暂无可用页面' : '当前页面不可用'
+                }
+                description={
+                  noVisibleMenus
+                    ? '请确认当前账号已设置正确的岗位和可用页面。若刷新后仍无入口，请联系管理员。'
+                    : '正在返回当前账号可用的页面。'
+                }
               />
             ) : shouldGuardProductCoreBusinessData ? (
               <ProductCoreCapabilityReview currentEntry={currentEntry} />

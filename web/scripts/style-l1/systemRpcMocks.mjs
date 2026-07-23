@@ -5,6 +5,7 @@ export async function installSystemRpcMocks(page, context) {
   const {
     adminProfile,
     salesRole,
+    financeRole,
     adminRole,
     mockMenus,
     mockPermissions,
@@ -14,6 +15,13 @@ export async function installSystemRpcMocks(page, context) {
     createMockAdminToken,
     nowUnix,
   } = context
+  const roleByKey = new Map(
+    [salesRole, financeRole, adminRole]
+      .filter(Boolean)
+      .map((role) => [role.role_key, role])
+  )
+  const roleForParams = (params = {}) =>
+    roleByKey.get(String(params?.role_key || '').trim()) || salesRole
 
   const assistantAdmin = {
     id: 2,
@@ -76,36 +84,37 @@ export async function installSystemRpcMocks(page, context) {
           released_task_count: 1,
         }
         break
-      case 'set_role_permissions':
-        salesRole.version += 1
-        salesRole.permissions = Array.isArray(params.permission_keys)
+      case 'set_role_permissions': {
+        const role = roleForParams(params)
+        role.version += 1
+        role.permissions = Array.isArray(params.permission_keys)
           ? params.permission_keys
-          : salesRole.permissions
-        data = {
-          role: {
-            ...salesRole,
-            role_key: params.role_key || salesRole.role_key,
-          },
-        }
+          : role.permissions
+        data = { role: { ...role } }
         break
-      case 'set_role_data_scopes':
-        salesRole.version += 1
-        salesRole.data_scopes = Array.isArray(params.data_scopes)
+      }
+      case 'set_role_data_scopes': {
+        const role = roleForParams(params)
+        role.version += 1
+        role.data_scopes = Array.isArray(params.data_scopes)
           ? params.data_scopes
-          : salesRole.data_scopes
-        data = { role: { ...salesRole } }
+          : role.data_scopes
+        data = { role: { ...role } }
         break
-      case 'set_role_navigation':
-        salesRole.version += 1
-        salesRole.navigation_mode =
+      }
+      case 'set_role_navigation': {
+        const role = roleForParams(params)
+        role.version += 1
+        role.navigation_mode =
           params.mode === 'custom' ? 'custom' : 'recommended'
-        salesRole.primary_menu_paths =
-          salesRole.navigation_mode === 'custom' &&
+        role.primary_menu_paths =
+          role.navigation_mode === 'custom' &&
           Array.isArray(params.primary_menu_paths)
             ? params.primary_menu_paths
             : []
-        data = { role: { ...salesRole } }
+        data = { role: { ...role } }
         break
+      }
       case 'set_erp_column_order': {
         const moduleKey = String(params?.module_key || '').trim()
         const order = Array.isArray(params?.order)
@@ -132,10 +141,10 @@ export async function installSystemRpcMocks(page, context) {
       case 'rbac_options':
       case 'menu_options':
         data = {
-          roles: [salesRole, adminRole],
+          roles: [salesRole, financeRole, adminRole].filter(Boolean),
           permissions: mockPermissions,
           menus: mockMenus,
-          role_options: [salesRole, adminRole],
+          role_options: [salesRole, financeRole, adminRole].filter(Boolean),
           permission_options: mockPermissions,
           menu_options: mockMenus,
           warehouse_scope_options: [
@@ -144,66 +153,61 @@ export async function installSystemRpcMocks(page, context) {
           ],
         }
         break
-      case 'effective_role_access':
+      case 'effective_role_access': {
+        const role = roleForParams(params)
+        const permissionKeys = Array.isArray(params.permission_keys)
+          ? params.permission_keys
+              .map((permissionKey) => String(permissionKey || '').trim())
+              .filter(Boolean)
+          : role.permissions
+        const selectedPermissionKeys = new Set(permissionKeys)
         data = {
           effective_access: {
-            role_key: params.role_key || salesRole.role_key,
+            role_key: role.role_key,
             source: 'active_customer_config_revision',
             is_final: true,
+            is_preview: Array.isArray(params.permission_keys),
             config_revision: 'style-l1-active-revision',
-            pages: [
-              {
-                key: 'global-dashboard',
-                label: '工作台',
-                path: '/erp/dashboard',
-                rbac_granted: true,
-                effective: true,
-                reasons: [],
-              },
-              {
-                key: 'task-board',
-                label: '任务看板',
-                path: '/erp/task-board',
-                rbac_granted: true,
-                effective: true,
-                reasons: [],
-              },
-              {
-                key: 'customers',
-                label: '客户档案',
-                path: '/erp/master/partners/customers',
-                rbac_granted: true,
-                effective: true,
-                reasons: [],
-              },
-              {
-                key: 'sales-orders',
-                label: '销售订单',
-                path: '/erp/sales/project-orders/sales-orders',
-                rbac_granted: true,
-                effective: true,
-                reasons: [],
-              },
-              {
-                key: 'inventory',
-                label: '库存台账',
-                path: '/erp/warehouse/inventory',
-                rbac_granted: true,
-                effective: true,
-                reasons: [],
-              },
-              {
-                key: 'business-dashboard',
-                label: '业务看板',
-                path: '/erp/business-dashboard',
-                rbac_granted: false,
-                effective: false,
-                reasons: [{ label: '岗位基础权限未授予' }],
-              },
-            ],
+            pages: mockMenus.map((menu) => {
+              const requiredAny = Array.isArray(menu.required_any)
+                ? menu.required_any
+                : []
+              const requiredAll = Array.isArray(menu.required_all)
+                ? menu.required_all
+                : []
+              const anySatisfied =
+                requiredAny.length === 0 ||
+                requiredAny.some((permissionKey) =>
+                  selectedPermissionKeys.has(permissionKey)
+                )
+              const allSatisfied = requiredAll.every((permissionKey) =>
+                selectedPermissionKeys.has(permissionKey)
+              )
+              const granted = anySatisfied && allSatisfied
+              return {
+                key: menu.key,
+                label: menu.label,
+                path: menu.path,
+                required_any: requiredAny,
+                required_all: requiredAll,
+                missing_any: anySatisfied
+                  ? []
+                  : requiredAny.filter(
+                      (permissionKey) =>
+                        !selectedPermissionKeys.has(permissionKey)
+                    ),
+                missing_all: requiredAll.filter(
+                  (permissionKey) => !selectedPermissionKeys.has(permissionKey)
+                ),
+                rbac_granted: granted,
+                effective: granted,
+                reasons: granted ? [] : [{ label: '岗位基础权限未授予' }],
+              }
+            }),
           },
         }
         break
+      }
       case 'audit_logs':
         data = {
           total: 2,
@@ -254,6 +258,12 @@ export async function installSystemRpcMocks(page, context) {
               route.request(),
               '__style_l1_admin_list_delay'
             )
+          : method === 'effective_role_access' &&
+              Array.isArray(params.permission_keys)
+            ? resolveDelayFromReferer(
+                route.request(),
+                '__style_l1_permission_draft_delay'
+              )
           : 0
 
     if (responseDelayMs > 0) {

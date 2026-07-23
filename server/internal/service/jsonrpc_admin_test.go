@@ -953,14 +953,17 @@ func TestJsonrpcDispatcher_AdminRBACOptionsExposeRoleAndPermissionMetadata(t *te
 	}
 
 	permissions := data["permission_options"].([]any)
-	for _, permissionKey := range []string{biz.PermissionSystemUserRoleAssign, biz.PermissionSystemRolePermissionManage} {
+	for _, permissionKey := range []string{biz.PermissionSystemUserRoleAssign, biz.PermissionSystemRolePermissionManage, biz.PermissionProcessRuntimeRecover} {
 		permission := find(permissions, "permission_key", permissionKey)
 		if permission["class"] != string(biz.PermissionClassControlPlane) || permission["assignable"] != false {
 			t.Fatalf("control-plane permission metadata for %s = %#v", permissionKey, permission)
 		}
 	}
 	businessPermission := find(permissions, "permission_key", biz.PermissionWarehouseInventoryRead)
-	if businessPermission["class"] != string(biz.PermissionClassBusiness) || businessPermission["assignable"] != true || businessPermission["non_production_only"] != false {
+	if businessPermission["class"] != string(biz.PermissionClassBusiness) ||
+		businessPermission["assignable"] != true ||
+		businessPermission["non_production_only"] != false ||
+		businessPermission["module_name"] != "仓储" {
 		t.Fatalf("business permission metadata = %#v", businessPermission)
 	}
 	debugPermission := find(permissions, "permission_key", biz.PermissionDebugSeed)
@@ -993,6 +996,119 @@ func TestJsonrpcDispatcher_AdminRBACOptionsRequireRoleAndPermissionRead(t *testi
 				t.Fatalf("single read permission exposed complete RBAC options: result=%#v err=%v", result, err)
 			}
 		})
+	}
+}
+
+func TestJsonrpcDispatcher_AdminEffectiveRoleAccessPreviewsPermissionDraftWithoutSaving(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "")
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID:           1,
+		Username:     "root",
+		IsSuperAdmin: true,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:      repo,
+		adminManageUC:    biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
+	}
+	ctx := biz.NewContextWithClaims(
+		context.Background(),
+		&biz.AuthClaims{UserID: 1, Username: "root", Role: biz.RoleAdmin},
+	)
+
+	previewReceivables := func(permissionKeys ...string) map[string]any {
+		t.Helper()
+		rawPermissionKeys := make([]any, 0, len(permissionKeys))
+		for _, permissionKey := range permissionKeys {
+			rawPermissionKeys = append(rawPermissionKeys, permissionKey)
+		}
+		params, _ := structpb.NewStruct(map[string]any{
+			"role_key":        biz.FinanceRoleKey,
+			"permission_keys": rawPermissionKeys,
+		})
+		_, result, err := dispatcher.handleAdmin(ctx, "effective_role_access", "1", params)
+		if err != nil || result.Code != errcode.OK.Code {
+			t.Fatalf("effective_role_access preview = %#v err=%v", result, err)
+		}
+		access := result.Data.AsMap()["effective_access"].(map[string]any)
+		if access["is_preview"] != true {
+			t.Fatalf("preview marker = %#v", access["is_preview"])
+		}
+		for _, rawPage := range access["pages"].([]any) {
+			page := rawPage.(map[string]any)
+			if page["key"] == "receivables" {
+				return page
+			}
+		}
+		t.Fatal("receivables page missing from access explanation")
+		return nil
+	}
+
+	confirmOnly := previewReceivables(biz.PermissionFinanceReceivableConfirm)
+	if confirmOnly["rbac_granted"] != false {
+		t.Fatalf("confirm-only receivables decision = %#v", confirmOnly)
+	}
+	withEntry := previewReceivables(
+		biz.PermissionFinanceReceivableConfirm,
+		biz.PermissionFinanceReceivableRead,
+	)
+	if withEntry["rbac_granted"] != true {
+		t.Fatalf("receivables entry decision = %#v", withEntry)
+	}
+	if repo.lastRolePermissionsChange != nil {
+		t.Fatalf("preview persisted role permissions: %#v", repo.lastRolePermissionsChange)
+	}
+
+	invalidParams, _ := structpb.NewStruct(map[string]any{
+		"role_key":        biz.FinanceRoleKey,
+		"permission_keys": []any{float64(1)},
+	})
+	_, invalid, err := dispatcher.handleAdmin(ctx, "effective_role_access", "3", invalidParams)
+	if err != nil || invalid.Code != errcode.InvalidParam.Code {
+		t.Fatalf("non-string preview permission = %#v err=%v", invalid, err)
+	}
+
+	unknownParams, _ := structpb.NewStruct(map[string]any{
+		"role_key":        biz.FinanceRoleKey,
+		"permission_keys": []any{"finance.receivable.unsupported"},
+	})
+	_, unknown, err := dispatcher.handleAdmin(ctx, "effective_role_access", "4", unknownParams)
+	if err != nil || unknown.Code != errcode.InvalidParam.Code {
+		t.Fatalf("unknown preview permission = %#v err=%v", unknown, err)
+	}
+
+	repo.admins[2] = &biz.AdminUser{
+		ID:       2,
+		Username: "rbac-reader",
+		Permissions: []string{
+			biz.PermissionSystemRoleRead,
+			biz.PermissionSystemPermissionRead,
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	deniedCtx := biz.NewContextWithClaims(
+		context.Background(),
+		&biz.AuthClaims{UserID: 2, Username: "rbac-reader", Role: biz.RoleAdmin},
+	)
+	deniedParams, _ := structpb.NewStruct(map[string]any{
+		"role_key":        biz.FinanceRoleKey,
+		"permission_keys": []any{biz.PermissionFinanceReceivableRead},
+	})
+	_, denied, err := dispatcher.handleAdmin(
+		deniedCtx,
+		"effective_role_access",
+		"5",
+		deniedParams,
+	)
+	if err != nil || denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("preview without customer config read = %#v err=%v", denied, err)
 	}
 }
 

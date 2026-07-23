@@ -161,11 +161,14 @@ func cacheEffectiveAdminPermissions(cache *adminPermissionCache, permissions []s
 
 func customerConfigEntitlementApplies(permissionKey string) bool {
 	permissionKey = strings.TrimSpace(permissionKey)
-	return permissionKey != "" &&
-		!strings.HasPrefix(permissionKey, "system.") &&
-		!strings.HasPrefix(permissionKey, "customer_config.") &&
-		!strings.HasPrefix(permissionKey, "debug.") &&
-		permissionKey != biz.PermissionERPBusinessChainDebugRead
+	if permissionKey == "" {
+		return false
+	}
+	definition, ok := biz.PermissionDefinitionByKey(permissionKey)
+	if !ok {
+		return true
+	}
+	return definition.Class == biz.PermissionClassBusiness
 }
 
 func (d *jsonrpcDispatcher) RequireAdminPermission(ctx context.Context, permissionKey string) *v1.JsonrpcResult {
@@ -389,16 +392,19 @@ func permissionOptionsToAny(items []biz.AdminPermission) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
 		if definition, ok := biz.PermissionDefinitionByKey(item.Key); ok {
+			item.Module = definition.Module
 			item.Class = definition.Class
 			item.Assignable = definition.Assignable
 			item.NonProductionOnly = definition.NonProductionOnly
 		}
+		moduleName, _ := biz.PermissionModuleName(item.Module)
 		out = append(out, map[string]any{
 			"id":                  item.ID,
 			"permission_key":      item.Key,
 			"name":                item.Name,
 			"description":         item.Description,
 			"module":              item.Module,
+			"module_name":         moduleName,
 			"action":              item.Action,
 			"resource":            item.Resource,
 			"builtin":             item.Builtin,

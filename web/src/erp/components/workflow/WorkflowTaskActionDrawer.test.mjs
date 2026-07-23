@@ -72,3 +72,25 @@ test('task action drawer loads the canonical approval trajectory and uses approv
   assert.match(source, /getWorkflowTaskActionMeta\(task, actionMode\)/u)
   assert.match(source, /approvalTask \? '审批办理' : '任务处理'/u)
 })
+
+test('task transfer is an explicit scoped action with person and pool destinations', () => {
+  assert.match(source, /assign:\s*\{[\s\S]*title: '转交任务'/u)
+  assert.match(source, /assignmentAccess = \{\}/u)
+  assert.match(source, /onAssignmentTargetChange/u)
+  assert.match(source, /id="erp-task-assignment-target"/u)
+  assert.match(source, /暂不指定个人，退回共同待办/u)
+  assert.match(source, /负责岗位：\$\{ownerRoleLabel\}/u)
+  assert.match(source, /暂不指定个人，退回负责岗位共同待办/u)
+  assert.doesNotMatch(source, /取消个人指派，回到/u)
+  assert.doesNotMatch(source, /待办池（状态不变）/u)
+  assert.doesNotMatch(source, /岗位待办池/u)
+  assert.match(source, /assignmentTargetValid/u)
+  assert.match(
+    source,
+    /如果暂时不确定由谁接手，可退回该岗位共同待办/u
+  )
+  assert.match(source, /assignmentAccess\.stale/u)
+  assert.match(source, /任务信息已更新，请刷新任务列表/u)
+  assert.match(source, /不会使用旧版本的转交候选人/u)
+  assert.match(source, /确认后只改变任务归属/u)
+})

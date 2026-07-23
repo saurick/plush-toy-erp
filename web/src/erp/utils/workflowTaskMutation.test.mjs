@@ -359,6 +359,68 @@ test('workflow task mutation keys and urge actions fail closed', () => {
   }
 })
 
+test('workflow task assignment requires an explicit person or pool target', () => {
+  const base = {
+    task_id: 42,
+    expected_version: 7,
+    idempotency_key: 'workflow-assign-42',
+    reason: '  原处理人请假  ',
+  }
+  const assigned = requireWorkflowTaskMutationParams(
+    'assign',
+    { ...base, assignee_id: 8 },
+    { requireIdempotencyKey: true }
+  )
+  assert.equal(assigned.assignee_id, 8)
+  assert.equal(assigned.reason, '原处理人请假')
+  const pooled = requireWorkflowTaskMutationParams(
+    'assign',
+    { ...base, assignee_id: null },
+    { requireIdempotencyKey: true }
+  )
+  assert.equal(pooled.assignee_id, null)
+
+  for (const invalid of [
+    base,
+    { ...base, assignee_id: undefined },
+    { ...base, assignee_id: 0 },
+    { ...base, assignee_id: '8' },
+    { ...base, assignee_id: 8, reason: '   ' },
+    { ...base, assignee_id: 8, action_key: 'assign' },
+    { ...base, assignee_id: 8, action: 'assign' },
+    { ...base, assignee_id: 8, payload: {} },
+  ]) {
+    assert.throws(
+      () =>
+        requireWorkflowTaskMutationParams('assign', invalid, {
+          requireIdempotencyKey: true,
+        }),
+      /页面已更新/u
+    )
+  }
+
+  assert.notEqual(
+    workflowTaskMutationSignature('assign', {
+      ...base,
+      assignee_id: 8,
+    }),
+    workflowTaskMutationSignature('assign', {
+      ...base,
+      assignee_id: 9,
+    })
+  )
+  assert.notEqual(
+    workflowTaskMutationSignature('assign', {
+      ...base,
+      assignee_id: 8,
+    }),
+    workflowTaskMutationSignature('assign', {
+      ...base,
+      assignee_id: null,
+    })
+  )
+})
+
 test('workflow task resume requires the versioned action contract and an unblock reason', () => {
   const base = {
     task_id: 42,

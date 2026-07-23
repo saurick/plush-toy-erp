@@ -1955,6 +1955,72 @@ export async function installFactRpcMocks(page, context) {
     reject_task_action: 'reject',
     resume_task_action: 'resume',
     urge_task: 'urge',
+    reassign_task: 'assign',
+  }
+  const workflowRoleLabels = {
+    boss: '老板 / 管理层',
+    sales: '业务',
+    purchase: '采购',
+    production: '车间',
+    warehouse: '仓库',
+    quality: '品质',
+    finance: '财务',
+    pmc: '生产计划',
+    engineering: '工程',
+  }
+  const workflowAssignmentCandidatesForTask = (task) => {
+    if (!task) return []
+    const ownerRoleKey = String(task.owner_role_key || '').trim()
+    const requiredCompletionPermission = workflowMockActionDecision({
+      actionKey: 'complete',
+      adminProfile,
+      effectiveSession,
+      task,
+    }).requiredPermission
+    const requiredPermissions = new Set([
+      'workflow.task.read',
+      'workflow.task.update',
+      requiredCompletionPermission,
+    ])
+    const configuredCandidates = Array.isArray(
+      context.workflowAssignmentCandidates
+    )
+      ? context.workflowAssignmentCandidates
+      : [
+          {
+            admin_id: 70_000 + (Number(task.id || 0) % 10_000),
+            username: `${ownerRoleKey || 'role'}-backup`,
+            role_keys: [ownerRoleKey],
+            permissions: [...requiredPermissions],
+          },
+        ]
+    return configuredCandidates
+      .filter((candidate) => {
+        const candidatePermissions = new Set(
+          Array.isArray(candidate?.permissions) ? candidate.permissions : []
+        )
+        return (
+          candidate?.disabled !== true &&
+          Number.isSafeInteger(candidate?.admin_id) &&
+          candidate.admin_id > 0 &&
+          candidate.admin_id !== Number(task.assignee_id || 0) &&
+          Array.isArray(candidate?.role_keys) &&
+          candidate.role_keys.includes(ownerRoleKey) &&
+          [...requiredPermissions].every((permissionKey) =>
+            candidatePermissions.has(permissionKey)
+          )
+        )
+      })
+      .map((candidate) => ({
+        admin_id: candidate.admin_id,
+        username: String(candidate.username || '').trim(),
+        role_keys: [...candidate.role_keys],
+        role_label:
+          String(candidate.role_label || '').trim() ||
+          workflowRoleLabels[ownerRoleKey] ||
+          ownerRoleKey,
+      }))
+      .filter((candidate) => candidate.username)
   }
   const resolveWorkflowMutationRequest = (method, params = {}) => {
     const operation = workflowMutationOperationByMethod[method] || ''
@@ -2424,6 +2490,120 @@ export async function installFactRpcMocks(page, context) {
         }
         workflowTasks.unshift(task)
         data = { task }
+        break
+      }
+      case 'get_task_assignment_options': {
+        if (
+          !params ||
+          Object.keys(params).some((key) => key !== 'task_id') ||
+          !Number.isSafeInteger(params.task_id) ||
+          params.task_id <= 0
+        ) {
+          fail('任务转交参数无效')
+          break
+        }
+        const task = workflowTasks.find((item) => item.id === params.task_id)
+        if (
+          !task ||
+          !workflowMockCanViewTask(adminProfile, effectiveSession, task)
+        ) {
+          fail('当前账号无权查看该协同任务')
+          break
+        }
+        const permissionAllowed = workflowMockPermissionAllowed(
+          adminProfile,
+          effectiveSession,
+          'workflow.task.assign'
+        )
+        const terminal = isTerminalTask(task)
+        const canReassign = permissionAllowed && !terminal
+        const reasonCode = terminal
+          ? 'terminal_task'
+          : permissionAllowed
+            ? 'allowed'
+            : 'missing_permission'
+        const reason = terminal
+          ? '该任务已结束，不能再转交。'
+          : permissionAllowed
+            ? '可转给同一负责岗位的合格在职人员，或退回岗位待办池。'
+            : '当前账号没有任务转交权限。'
+        data = {
+          assignment: {
+            task_id: task.id,
+            task_version: task.version,
+            task_status_key: task.task_status_key,
+            owner_role_key: task.owner_role_key,
+            owner_role_label:
+              workflowRoleLabels[task.owner_role_key] || task.owner_role_key,
+            can_reassign: canReassign,
+            can_return_to_pool:
+              canReassign && Number(task.assignee_id || 0) > 0,
+            reason_code: reasonCode,
+            reason,
+            candidates: canReassign
+              ? workflowAssignmentCandidatesForTask(task)
+              : [],
+            current_assignee:
+              Number(task.assignee_id || 0) > 0
+                ? {
+                    admin_id: Number(task.assignee_id),
+                    username: '当前处理人',
+                  }
+                : null,
+            assignment_boundary: 'only_assignee_changes',
+          },
+        }
+        break
+      }
+      case 'reassign_task': {
+        const request = resolveWorkflowMutationRequest(method, params)
+        if (request.errorCode) {
+          fail(request.errorMessage, request.errorCode)
+        } else if (
+          !workflowMockPermissionAllowed(
+            adminProfile,
+            effectiveSession,
+            'workflow.task.assign'
+          ) ||
+          !workflowMockCanViewTask(adminProfile, effectiveSession, request.task)
+        ) {
+          fail('当前账号无权查看或转交该任务')
+        } else if (request.receipt.task) {
+          data = { task: request.receipt.task }
+        } else if (isTerminalTask(request.task)) {
+          fail('任务已结束，不能再转交')
+        } else if (
+          request.mutationParams.expected_version !== request.task.version
+        ) {
+          fail('任务已被其他人更新，请刷新后重试')
+        } else {
+          const { mutationParams, receipt, task } = request
+          const currentAssigneeID = Number(task.assignee_id || 0)
+          const candidates = workflowAssignmentCandidatesForTask(task)
+          const targetAllowed =
+            mutationParams.assignee_id === null ||
+            candidates.some(
+              (candidate) => candidate.admin_id === mutationParams.assignee_id
+            )
+          if (!targetAllowed) {
+            fail('所选接收人已不符合任务岗位或权限要求')
+          } else if (
+            (mutationParams.assignee_id === null && currentAssigneeID === 0) ||
+            (mutationParams.assignee_id !== null &&
+              currentAssigneeID === mutationParams.assignee_id)
+          ) {
+            fail('任务已处于所选归属，无需重复转交')
+          } else {
+            task.assignee_id = mutationParams.assignee_id
+            task.updated_at = nowUnix()
+            task.version += 1
+            workflowMutationReceipts.set(receipt.receiptKey, {
+              intent: receipt.intent,
+              task: cloneWorkflowTask(task),
+            })
+            data = { task }
+          }
+        }
         break
       }
       case 'complete_task_action':

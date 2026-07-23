@@ -151,10 +151,22 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownAdminParams(pm, "role_key"); res != nil {
+		if res := rejectUnknownAdminParams(pm, "role_key", "permission_keys"); res != nil {
 			return id, res, nil
 		}
-		role, err := d.adminManageUC.GetRoleForAccessExplanation(ctx, getString(pm, "role_key"))
+		roleKey := getString(pm, "role_key")
+		_, previewRequested := pm["permission_keys"]
+		var role *biz.AdminRole
+		var err error
+		if previewRequested {
+			permissionKeys, ok := getStrictStringSlice(pm, "permission_keys", true)
+			if !ok {
+				return id, invalidAdminParamResult(), nil
+			}
+			role, err = d.adminManageUC.GetRoleForAccessPreview(ctx, roleKey, permissionKeys)
+		} else {
+			role, err = d.adminManageUC.GetRoleForAccessExplanation(ctx, roleKey)
+		}
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -171,11 +183,13 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
+		effectiveAccess := roleEffectiveAccessExplanationToMap(explanation)
+		effectiveAccess["is_preview"] = previewRequested
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
-				"effective_access": roleEffectiveAccessExplanationToMap(explanation),
+				"effective_access": effectiveAccess,
 			}),
 		}, nil
 

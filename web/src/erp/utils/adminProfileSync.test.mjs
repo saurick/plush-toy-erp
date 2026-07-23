@@ -194,6 +194,25 @@ test('ERPLayout: 客户构建在有效会话完成前不渲染产品核心页面
   )
 })
 
+test('ERPLayout: 无权直达页在跳转前不挂载业务 Outlet', () => {
+  const source = readERPLayoutSource()
+  const guardIndex = source.indexOf('{shouldBlockOutlet ?')
+  const outletIndex = source.indexOf('<Outlet context={outletContext} />')
+
+  assert.match(source, /const shouldBlockOutlet = currentPageShouldRedirect/u)
+  assert.doesNotMatch(
+    source,
+    /const shouldBlockOutlet = noVisibleMenus && currentPageShouldRedirect/u
+  )
+  assert(guardIndex >= 0, 'layout must render an unauthorized-route guard')
+  assert(
+    outletIndex > guardIndex,
+    'unauthorized-route guard must wrap Outlet before a page can issue RPC reads'
+  )
+  assert.match(source, /当前页面不可用/u)
+  assert.match(source, /正在返回当前账号可用的页面/u)
+})
+
 test('adminProfileSync: 当前管理员会话不可用时要求重新登录', () => {
   for (const code of [
     RpcErrorCode.HTTP_UNAUTHORIZED,

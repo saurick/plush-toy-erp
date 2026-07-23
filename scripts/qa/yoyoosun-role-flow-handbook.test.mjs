@@ -162,12 +162,12 @@ test("yoyoosun role handbook lists the exact tracked role profiles", () => {
       (total, role) => total + role.capabilityKeys.length,
       0,
     ),
-    281,
+    282,
   );
   assert.equal(
     new Set(yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.capabilityKeys))
       .size,
-    119,
+    120,
   );
   assert.equal(registeredPermissionKeys.size, 161);
   assert.deepEqual(

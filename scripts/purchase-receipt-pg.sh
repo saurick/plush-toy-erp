@@ -786,12 +786,19 @@ VALUES
   (910004, 'boss', 'QA legacy dashboard boss', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
   (910005, 'pmc', 'QA legacy dashboard PMC', '', true, 'business_default', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 INSERT INTO permissions (id, permission_key, name, description, module, action, resource, builtin, created_at, updated_at)
-VALUES (910001, 'erp.dashboard.read', 'QA legacy shared dashboard', '', 'erp', 'read', 'dashboard', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+VALUES
+  (910001, 'erp.dashboard.read', 'QA legacy shared dashboard', '', 'erp', 'read', 'dashboard', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (910002, 'process_runtime.recover', 'QA legacy process recovery', '', 'process_runtime', 'recover', 'domain_command', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 INSERT INTO role_permissions (role_id, permission_id, created_at)
 VALUES
   (910003, 910001, CURRENT_TIMESTAMP),
   (910004, 910001, CURRENT_TIMESTAMP),
-  (910005, 910001, CURRENT_TIMESTAMP);
+  (910005, 910001, CURRENT_TIMESTAMP),
+  (910001, 910002, CURRENT_TIMESTAMP),
+  (910002, 910002, CURRENT_TIMESTAMP),
+  (910003, 910002, CURRENT_TIMESTAMP),
+  (910004, 910002, CURRENT_TIMESTAMP),
+  (910005, 910002, CURRENT_TIMESTAMP);
 SQL
 
   atlas migrate apply \
@@ -810,10 +817,10 @@ SQL
   fi
   dashboard_permission_readback="$(
     populated_psql -Atq -c \
-      "SELECT (SELECT count(*) FROM permissions WHERE permission_key = 'erp.dashboard.read')::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'erp.workbench.read' AND rp.role_id IN (910003, 910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'erp.business_dashboard.read' AND rp.role_id IN (910003, 910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'workflow.task.supervise' AND rp.role_id IN (910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'production.fact.read' AND rp.role_id = 910004)::text || '|' || (SELECT string_agg(role_key || ':' || version::text, ',' ORDER BY role_key) FROM roles WHERE id IN (910003, 910004, 910005))"
+      "SELECT (SELECT count(*) FROM permissions WHERE permission_key = 'erp.dashboard.read')::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'erp.workbench.read' AND rp.role_id IN (910003, 910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'erp.business_dashboard.read' AND rp.role_id IN (910003, 910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'workflow.task.supervise' AND rp.role_id IN (910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'production.fact.read' AND rp.role_id = 910004)::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'workflow.task.assign' AND rp.role_id = 910004)::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id WHERE p.permission_key = 'process_runtime.recover' AND rp.role_id IN (910001, 910002, 910003, 910004, 910005))::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id JOIN roles r ON r.id = rp.role_id WHERE p.permission_key = 'process_runtime.recover' AND r.role_type = 'system')::text || '|' || (SELECT count(*) FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id JOIN roles r ON r.id = rp.role_id WHERE p.permission_key = 'process_runtime.recover' AND r.role_type <> 'system')::text || '|' || (SELECT string_agg(role_key || ':' || version::text, ',' ORDER BY role_key) FROM roles WHERE id IN (910001, 910002, 910003, 910004, 910005))"
   )"
-  if [[ "$dashboard_permission_readback" != '0|3|2|2|1|boss:5,pmc:4,qa_custom:2' ]]; then
-    echo "ERROR: dashboard and supervision permission migration mismatch: ${dashboard_permission_readback:-empty}" >&2
+  if [[ "$dashboard_permission_readback" != '0|3|2|2|1|1|1|1|0|admin:1,boss:6,pmc:5,qa_business_default:2,qa_custom:3' ]]; then
+    echo "ERROR: dashboard, assignment and control-plane permission migration mismatch: ${dashboard_permission_readback:-empty}" >&2
     exit 1
   fi
   migration_status_counts="$(

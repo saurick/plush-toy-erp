@@ -13,6 +13,7 @@ const WORKFLOW_TASK_MUTATION_OPERATIONS = new Set([
   'reject',
   'resume',
   'urge',
+  'assign',
 ])
 
 const WORKFLOW_TASK_URGE_ACTIONS = new Set([
@@ -40,6 +41,14 @@ const WORKFLOW_TASK_URGE_MUTATION_KEYS = new Set([
   'expected_version',
   'idempotency_key',
   'payload',
+  'reason',
+  'task_id',
+])
+
+const WORKFLOW_TASK_ASSIGNMENT_MUTATION_KEYS = new Set([
+  'assignee_id',
+  'expected_version',
+  'idempotency_key',
   'reason',
   'task_id',
 ])
@@ -121,7 +130,9 @@ export function requireWorkflowTaskMutationParams(
   const allowedKeys =
     normalizedOperation === 'urge'
       ? WORKFLOW_TASK_URGE_MUTATION_KEYS
-      : WORKFLOW_TASK_STATUS_MUTATION_KEYS
+      : normalizedOperation === 'assign'
+        ? WORKFLOW_TASK_ASSIGNMENT_MUTATION_KEYS
+        : WORKFLOW_TASK_STATUS_MUTATION_KEYS
   for (const key of Object.keys(params)) {
     if (!allowedKeys.has(key)) throw workflowTaskMutationInvalid()
   }
@@ -130,12 +141,29 @@ export function requireWorkflowTaskMutationParams(
     ...params,
     task_id: params.task_id,
     expected_version: params.expected_version,
-    payload: requireWorkflowTaskActionPayload(
+  }
+  if (normalizedOperation === 'assign') {
+    if (
+      !Object.hasOwn(params, 'assignee_id') ||
+      (params.assignee_id !== null && !positiveSafeInteger(params.assignee_id))
+    ) {
+      throw workflowTaskMutationInvalid()
+    }
+    normalized.assignee_id = params.assignee_id
+  } else {
+    normalized.payload = requireWorkflowTaskActionPayload(
       normalizedOperation,
       params.payload
-    ),
+    )
   }
-  if (normalizedOperation === 'urge') {
+  if (normalizedOperation === 'assign') {
+    if (
+      Object.hasOwn(params, 'action') ||
+      Object.hasOwn(params, 'action_key')
+    ) {
+      throw workflowTaskMutationInvalid()
+    }
+  } else if (normalizedOperation === 'urge') {
     if (Object.hasOwn(params, 'action_key')) {
       throw workflowTaskMutationInvalid()
     }
@@ -159,7 +187,9 @@ export function requireWorkflowTaskMutationParams(
   }
   const normalizedReason = String(params.reason || '').trim()
   if (
-    ['block', 'reject', 'resume', 'urge'].includes(normalizedOperation) &&
+    ['block', 'reject', 'resume', 'urge', 'assign'].includes(
+      normalizedOperation
+    ) &&
     !normalizedReason
   ) {
     throw workflowTaskMutationInvalid()
@@ -170,7 +200,7 @@ export function requireWorkflowTaskMutationParams(
     delete normalized.reason
   }
 
-  if (normalizedOperation !== 'urge') {
+  if (normalizedOperation !== 'urge' && normalizedOperation !== 'assign') {
     if (
       Object.hasOwn(params, 'break_glass') &&
       typeof params.break_glass !== 'boolean'
@@ -251,6 +281,10 @@ export function workflowTaskMutationSignature(operation, params) {
           : String(operation || '').trim(),
       reason: String(normalizedParams.reason || '').trim(),
       payload: semanticPayload(normalizedParams.payload || {}),
+      assignee_id:
+        String(operation || '').trim() === 'assign'
+          ? normalizedParams.assignee_id
+          : undefined,
       break_glass: Boolean(normalizedParams.break_glass),
       break_glass_reason: String(
         normalizedParams.break_glass_reason || ''

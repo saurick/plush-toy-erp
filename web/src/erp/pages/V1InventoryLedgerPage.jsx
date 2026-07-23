@@ -395,6 +395,16 @@ export default function V1InventoryLedgerPage() {
     adminProfile,
     'warehouse.adjustment.create'
   )
+  const canReadInventory = hasActionPermission(
+    adminProfile,
+    'warehouse.inventory.read'
+  )
+  const canReadMaterials = hasActionPermission(adminProfile, 'material.read')
+  const canReadProducts = hasActionPermission(adminProfile, 'product.read')
+  const canReadProductSKUs = hasActionPermission(
+    adminProfile,
+    'product_sku.read'
+  )
   const canOpenRelatedPath = useCallback(
     (path) =>
       canOpenRelatedDocumentPath({
@@ -476,6 +486,15 @@ export default function V1InventoryLedgerPage() {
 
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
+    if (!canReadInventory) {
+      if (request.isCurrent()) {
+        setRows([])
+        setTotal(0)
+        setSelectedRow(null)
+      }
+      request.finish()
+      return
+    }
     setLoading(true)
     try {
       const commonParams = compactParams({
@@ -559,6 +578,7 @@ export default function V1InventoryLedgerPage() {
   }, [
     activeView,
     beginLatestRequest,
+    canReadInventory,
     dateFilterEnd,
     dateFilterStart,
     keyword,
@@ -674,21 +694,33 @@ export default function V1InventoryLedgerPage() {
         warehouseResult,
         lotResult,
       ] = await Promise.all([
-        listMaterials(
-          { limit: 500, active_only: true },
-          { signal: request.signal }
-        ),
-        listProducts(
-          { limit: 500, active_only: true },
-          { signal: request.signal }
-        ),
-        listProductSKUs({ limit: 500 }, { signal: request.signal }),
-        listUnits({ limit: 500 }, { signal: request.signal }),
-        listWarehouses(
-          { limit: 500, active_only: true },
-          { signal: request.signal }
-        ),
-        listInventoryLots({ limit: 500 }, { signal: request.signal }),
+        canReadMaterials
+          ? listMaterials(
+              { limit: 500, active_only: true },
+              { signal: request.signal }
+            )
+          : Promise.resolve({ materials: [] }),
+        canReadProducts
+          ? listProducts(
+              { limit: 500, active_only: true },
+              { signal: request.signal }
+            )
+          : Promise.resolve({ products: [] }),
+        canReadProductSKUs
+          ? listProductSKUs({ limit: 500 }, { signal: request.signal })
+          : Promise.resolve({ product_skus: [] }),
+        canReadMaterials
+          ? listUnits({ limit: 500 }, { signal: request.signal })
+          : Promise.resolve({ units: [] }),
+        canReadInventory
+          ? listWarehouses(
+              { limit: 500, active_only: true },
+              { signal: request.signal }
+            )
+          : Promise.resolve({ warehouses: [] }),
+        canReadInventory
+          ? listInventoryLots({ limit: 500 }, { signal: request.signal })
+          : Promise.resolve({ inventory_lots: [] }),
       ])
       if (!request.isCurrent()) {
         return
@@ -729,7 +761,13 @@ export default function V1InventoryLedgerPage() {
         request.finish()
       }
     }
-  }, [beginLatestRequest])
+  }, [
+    beginLatestRequest,
+    canReadInventory,
+    canReadMaterials,
+    canReadProductSKUs,
+    canReadProducts,
+  ])
 
   useEffect(() => {
     loadReferenceOptions()
@@ -766,6 +804,16 @@ export default function V1InventoryLedgerPage() {
     }
     return []
   }, [materialOptions, productOptions, subjectType])
+  const subjectTypeOptions = useMemo(
+    () =>
+      SUBJECT_TYPE_OPTIONS.filter(
+        (option) =>
+          !option.value ||
+          (option.value === 'MATERIAL' && canReadMaterials) ||
+          (option.value === 'PRODUCT' && canReadProducts)
+      ),
+    [canReadMaterials, canReadProducts]
+  )
   const warehouseOptions = useMemo(
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
@@ -1397,7 +1445,7 @@ export default function V1InventoryLedgerPage() {
             <SelectFilter
               className="erp-business-filter-control--status"
               value={subjectType}
-              options={SUBJECT_TYPE_OPTIONS}
+              options={subjectTypeOptions}
               onChange={(nextType) => {
                 setSubjectType(nextType || '')
                 setSubjectID('')
@@ -1432,7 +1480,9 @@ export default function V1InventoryLedgerPage() {
               placeholder={
                 subjectType === 'PRODUCT' ? '全部产品规格' : '仅成品可选规格'
               }
-              disabled={subjectType !== 'PRODUCT'}
+              disabled={
+                subjectType !== 'PRODUCT' || !canReadProductSKUs
+              }
               showSearch
               optionFilterProp="label"
               onChange={(nextID) => {

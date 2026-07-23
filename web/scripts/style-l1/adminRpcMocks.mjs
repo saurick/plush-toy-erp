@@ -16,6 +16,68 @@ const mockPdfBuffer = Buffer.from(
   'utf8'
 )
 
+const mockMenuPermissionRequirements = Object.freeze({
+  'global-dashboard': ['erp.workbench.read'],
+  'task-board': ['workflow.task.read'],
+  'business-dashboard': ['erp.business_dashboard.read'],
+  customers: ['customer.read'],
+  'sales-orders': ['sales_order.read'],
+  'sales-returns': ['sales_return.read'],
+  'material-bom': ['bom.read'],
+  'production-orders': ['production.wip.read'],
+  inventory: ['warehouse.inventory.read'],
+  'shipping-release': [
+    'warehouse.outbound.read',
+    'finance.receivable.read',
+    'sales_order.read',
+  ],
+  reconciliation: ['finance.reconciliation.read'],
+  payables: ['finance.payable.read'],
+  receivables: ['finance.receivable.read'],
+  invoices: ['finance.invoice.read'],
+  'finance-payments': ['finance.payment.read'],
+})
+
+const mockPermissionModuleNames = Object.freeze({
+  system: '系统管理',
+  customer_config: '客户配置',
+  process_runtime: '异常流程恢复',
+  erp: '工作台与通用工具',
+  field: '敏感字段',
+  masterdata: '基础资料',
+  bom: '物料清单（BOM）',
+  sales_order: '销售订单',
+  workflow: '任务协同',
+  warehouse: '仓储',
+  sales_return: '客户退货',
+  finance: '财务',
+  production: '生产执行',
+  mobile: '手机待办',
+})
+
+const mockControlPlanePermissionModules = new Set([
+  'system',
+  'customer_config',
+  'process_runtime',
+])
+
+const mockPermissionUsageMenuKeys = Object.freeze({
+  'finance.receivable.confirm': ['receivables'],
+  'finance.receivable.read': ['receivables', 'shipping-release'],
+  'sales_order.read': ['sales-orders', 'shipping-release'],
+})
+
+const mockPermissionUsageControlTypes = Object.freeze({
+  'finance.receivable.read': {
+    receivables: 'page',
+    'shipping-release': 'section',
+  },
+  'sales_order.read': {
+    'sales-orders': 'page',
+    'shipping-release': 'section',
+  },
+})
+
 function buildWorkflowMockEffectiveSession(session, adminProfile) {
   if (!session || typeof session !== 'object') return null
   const roles = Array.isArray(session.roles)
@@ -62,7 +124,10 @@ export async function installAdminRpcMocks(
       key: item.key || item.path,
       label: item.label,
       path: item.path,
-      required_any: item.required_any || [],
+      required_any:
+        mockMenuPermissionRequirements[item.key || item.path] ||
+        item.required_any ||
+        ['style.mock.unassigned'],
       required_all: item.required_all || [],
     }))
     .filter((item) => item.path)
@@ -107,6 +172,11 @@ export async function installAdminRpcMocks(
       permission_key: 'customer_config.read',
       name: '查看客户配置',
       module: 'customer_config',
+    },
+    {
+      permission_key: 'process_runtime.recover',
+      name: '恢复异常流程运行实例',
+      module: 'process_runtime',
     },
     {
       permission_key: 'field.party_private.read',
@@ -173,19 +243,137 @@ export async function installAdminRpcMocks(
       name: '进入岗位任务页面',
       module: 'mobile',
     },
+    {
+      permission_key: 'customer.read',
+      name: '查看客户档案',
+      module: 'masterdata',
+    },
+    {
+      permission_key: 'sales_order.read',
+      name: '查看销售订单',
+      module: 'sales_order',
+    },
+    {
+      permission_key: 'sales_return.read',
+      name: '查看客户退货',
+      module: 'sales_return',
+    },
+    {
+      permission_key: 'bom.read',
+      name: '查看 BOM',
+      module: 'bom',
+    },
+    {
+      permission_key: 'production.wip.read',
+      name: '查看生产工序流转',
+      module: 'production',
+    },
+    {
+      permission_key: 'warehouse.inventory.read',
+      name: '查看库存',
+      module: 'warehouse',
+    },
+    {
+      permission_key: 'finance.credit_note.create',
+      name: '创建财务红冲',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.credit_note.reverse',
+      name: '撤销财务红冲',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.invoice.confirm',
+      name: '确认发票',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.invoice.read',
+      name: '查看发票',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.payable.confirm',
+      name: '确认应付',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.payable.read',
+      name: '查看应付',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.payment.create',
+      name: '登记收付款',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.payment.post',
+      name: '确认并核销收付款',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.payment.read',
+      name: '查看收付款',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.payment.reverse',
+      name: '冲销收付款',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.receivable.confirm',
+      name: '确认应收',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.receivable.read',
+      name: '查看应收',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.reconciliation.confirm',
+      name: '处理对账',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.reconciliation.read',
+      name: '查看对账',
+      module: 'finance',
+    },
+    {
+      permission_key: 'finance.report.read',
+      name: '查看财务报表',
+      module: 'finance',
+    },
   ].map((item) => {
     const parts = item.permission_key.split('.')
     const action = parts.at(-1)
     const readKey = [...parts.slice(0, -1), 'read'].join('.')
-    const menus = mockMenus
-      .filter((menu) =>
-        [...(menu.required_any || []), ...(menu.required_all || [])].some(
-          (key) => key === item.permission_key || key === readKey
+    const configuredMenuKeys =
+      mockPermissionUsageMenuKeys[item.permission_key] || null
+    const menus = (configuredMenuKeys
+      ? configuredMenuKeys
+          .map((menuKey) => mockMenus.find((menu) => menu.key === menuKey))
+          .filter(Boolean)
+      : mockMenus.filter((menu) =>
+          [...(menu.required_any || []), ...(menu.required_all || [])].some(
+            (key) => key === item.permission_key || key === readKey
+          )
         )
-      )
-      .map(({ key, label, path }) => ({ key, label, path }))
+    )
+      .map(({ key, label, path, required_any, required_all }) => ({
+        key,
+        label,
+        path,
+        required_any,
+        required_all,
+      }))
+    const isControlPlane = mockControlPlanePermissionModules.has(item.module)
     const conditions = [
-      item.module === 'system'
+      isControlPlane
         ? '仍受超级管理员保护、禁止自我停用或注销等安全规则限制'
         : item.module === 'mobile'
           ? '进入后仍只显示当前岗位或指定给本人的任务'
@@ -193,8 +381,11 @@ export async function installAdminRpcMocks(
     ]
     return {
       ...item,
-      permission_class: item.module === 'system' ? 'control_plane' : 'business',
-      assignable: item.module !== 'system',
+      module_name: mockPermissionModuleNames[item.module] || '',
+      action,
+      resource: parts.slice(0, -1).join('.'),
+      permission_class: isControlPlane ? 'control_plane' : 'business',
+      assignable: !isControlPlane,
       usage: {
         pages: menus.map((menu) => ({
           key: menu.key,
@@ -205,15 +396,16 @@ export async function installAdminRpcMocks(
           control_key: `${menu.key}-${item.permission_key}`,
           control_name: item.name,
           control_type:
-            action === 'read' || action === 'access'
+            mockPermissionUsageControlTypes[item.permission_key]?.[menu.key] ||
+            (action === 'read' || action === 'access'
               ? 'page'
               : action === 'create'
                 ? 'form'
-                : 'button',
+                : 'button'),
           effect: '显示并允许执行',
           backend_methods: [],
-          required_any: [item.permission_key],
-          required_all: [],
+          required_any: menu.required_any,
+          required_all: menu.required_all,
           conditions,
         })),
         backend_only: menus.length === 0,
@@ -244,6 +436,31 @@ export async function installAdminRpcMocks(
       'field.sales_commercial.read',
       'workflow.task.read',
       'mobile.sales.access',
+      'customer.read',
+      'sales_order.read',
+      'warehouse.inventory.read',
+    ],
+    data_scopes: [
+      { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
+    ],
+  }
+  const financeRole = {
+    role_key: 'finance',
+    name: '财务',
+    description: '应收、应付、发票、对账、收付款和财务报表',
+    builtin: true,
+    role_type: 'business_default',
+    version: 1,
+    assignable_by_current_admin: true,
+    permissions_editable_by_current_admin: true,
+    disabled: false,
+    sort_order: 60,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
+    permissions: [
+      'finance.receivable.confirm',
+      'finance.reconciliation.confirm',
+      'finance.reconciliation.read',
     ],
     data_scopes: [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
@@ -315,6 +532,7 @@ export async function installAdminRpcMocks(
       adminProfile
     ),
     salesRole,
+    financeRole,
     adminRole,
     mockMenus,
     mockPermissions,

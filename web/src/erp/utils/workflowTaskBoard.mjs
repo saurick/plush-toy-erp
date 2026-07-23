@@ -136,6 +136,11 @@ const TASK_STATUS_META = Object.freeze({
   done: { label: '已完成', color: 'green' },
 })
 
+const TASK_DUE_RISK_META = Object.freeze({
+  overdue: { key: 'overdue', label: '逾期', color: 'red' },
+  due_soon: { key: 'due_soon', label: '即将到期', color: 'orange' },
+})
+
 const BUSINESS_STATUS_VISIBLE_LABEL_OVERRIDES = Object.freeze({
   'IQC 待检': '来料检验（IQC）待处理',
   入库协同已完成: '入库跟进已完成',
@@ -274,6 +279,14 @@ export function getWorkflowTaskStatusMeta(task = {}) {
       color: 'default',
     }
   )
+}
+
+export function getWorkflowTaskStatusRiskTags(task = {}, nowMs = Date.now()) {
+  const statusMeta = getWorkflowTaskStatusMeta(task)
+  const tags = [{ key: 'status', ...statusMeta }]
+  const dueRiskMeta = TASK_DUE_RISK_META[getWorkflowTaskDueStatus(task, nowMs)]
+  if (dueRiskMeta) tags.push(dueRiskMeta)
+  return tags
 }
 
 export function getWorkflowTaskReason(task = {}) {

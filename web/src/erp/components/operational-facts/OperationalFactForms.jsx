@@ -72,6 +72,7 @@ export const FINANCE_INVOICE_CATEGORY_LABELS = Object.freeze(
 )
 
 export const ACTION_PERMISSIONS = Object.freeze({
+  productionRead: ['production.fact.read'],
   productionPost: ['production.fact.post'],
   productionCancel: ['production.fact.cancel'],
   outsourcingRead: ['outsourcing.fact.read'],

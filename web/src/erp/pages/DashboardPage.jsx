@@ -37,11 +37,13 @@ import {
   completeWorkflowTaskAction,
   getWorkflowTaskBoard,
   listAllWorkflowRoleTasks,
+  reassignWorkflowTask,
   rejectWorkflowTaskAction,
   resumeWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
+import useWorkflowTaskAssignmentAccess from '../hooks/useWorkflowTaskAssignmentAccess.js'
 import {
   formatWorkflowTaskSource,
   getWorkflowTaskSourceTypeLabel,
@@ -77,6 +79,7 @@ import {
   getWorkflowTaskReasonMeta,
   getWorkflowTaskReadonlyReason,
   getWorkflowTaskStatusMeta,
+  getWorkflowTaskStatusRiskTags,
   hasActiveWorkflowTaskBoardFilters,
   readWorkflowTaskBoardFiltersFromSearch,
   resolveWorkflowTaskBoardResponseState,
@@ -526,6 +529,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [selectedTaskBoardTaskId, setSelectedTaskBoardTaskId] = useState('')
   const [actionMode, setActionMode] = useState('')
   const [actionReason, setActionReason] = useState('')
+  const [assignmentTarget, setAssignmentTarget] = useState()
   const [actionSaving, setActionSaving] = useState(false)
   const selectedTaskRef = useRef(selectedTask)
   selectedTaskRef.current = selectedTask
@@ -966,6 +970,18 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     task: selectedTask,
     enabled: Boolean(selectedTask),
   })
+  const assignmentAccess = useWorkflowTaskAssignmentAccess({
+    adminProfile,
+    task: selectedTask,
+    enabled: Boolean(selectedTask),
+  })
+  const actionDrawerAllowedModes = useMemo(
+    () =>
+      assignmentAccess.can_reassign
+        ? [...actionDrawerAccess.allowedModes, 'assign']
+        : actionDrawerAccess.allowedModes,
+    [actionDrawerAccess.allowedModes, assignmentAccess.can_reassign]
+  )
 
   useEffect(() => {
     if (workbenchQueuePage === activeWorkbenchQueuePage) return
@@ -1084,6 +1100,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setSelectedTask(task)
     setActionMode(nextMode)
     setActionReason(nextMode === 'block' ? getWorkflowTaskReason(task) : '')
+    setAssignmentTarget(undefined)
   }
 
   const closeTaskDrawer = () => {
@@ -1091,6 +1108,12 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setSelectedTask(null)
     setActionMode('')
     setActionReason('')
+    setAssignmentTarget(undefined)
+  }
+
+  const changeTaskActionMode = (nextMode) => {
+    setActionMode(nextMode)
+    setAssignmentTarget(undefined)
   }
 
   const submitTaskAction = async () => {
@@ -1101,6 +1124,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     const actionModeSnapshot = actionMode
     const actionMetaSnapshot = actionMeta
     const actionAccessSnapshot = actionDrawerAccess
+    const assignmentAccessSnapshot = assignmentAccess
+    const assignmentTargetSnapshot = assignmentTarget
     const reason = actionReason.trim()
     if (actionMetaSnapshot.requireReason && !reason) {
       message.warning(`${actionMetaSnapshot.title}需要填写原因`)
@@ -1109,35 +1134,47 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     const scope = `${taskSnapshot.id}:${actionModeSnapshot}`
     const operation = actionModeSnapshot
     const mutate =
-      actionModeSnapshot === 'urge'
-        ? urgeWorkflowTask
-        : actionModeSnapshot === 'complete'
-          ? completeWorkflowTaskAction
-          : actionModeSnapshot === 'block'
-            ? blockWorkflowTaskAction
-            : actionModeSnapshot === 'reject'
-              ? rejectWorkflowTaskAction
-              : resumeWorkflowTaskAction
+      actionModeSnapshot === 'assign'
+        ? reassignWorkflowTask
+        : actionModeSnapshot === 'urge'
+          ? urgeWorkflowTask
+          : actionModeSnapshot === 'complete'
+            ? completeWorkflowTaskAction
+            : actionModeSnapshot === 'block'
+              ? blockWorkflowTaskAction
+              : actionModeSnapshot === 'reject'
+                ? rejectWorkflowTaskAction
+                : resumeWorkflowTaskAction
     const params =
-      actionModeSnapshot === 'urge'
+      actionModeSnapshot === 'assign'
         ? {
             task_id: taskSnapshot.id,
             expected_version: taskSnapshot.version,
-            action: 'urge_task',
+            assignee_id:
+              assignmentTargetSnapshot === 'pool'
+                ? null
+                : assignmentTargetSnapshot,
             reason,
-            payload: {
-              surface_key: 'desktop_task_board',
-            },
           }
-        : {
-            task_id: taskSnapshot.id,
-            expected_version: taskSnapshot.version,
-            action_key: actionModeSnapshot,
-            reason,
-            payload: {
-              surface_key: 'desktop_task_board',
-            },
-          }
+        : actionModeSnapshot === 'urge'
+          ? {
+              task_id: taskSnapshot.id,
+              expected_version: taskSnapshot.version,
+              action: 'urge_task',
+              reason,
+              payload: {
+                surface_key: 'desktop_task_board',
+              },
+            }
+          : {
+              task_id: taskSnapshot.id,
+              expected_version: taskSnapshot.version,
+              action_key: actionModeSnapshot,
+              reason,
+              payload: {
+                surface_key: 'desktop_task_board',
+              },
+            }
     const inFlightLease = mutationInFlightRef.current.acquire(
       `task:${taskSnapshot.id}`
     )
@@ -1150,6 +1187,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       setSelectedTask(null)
       setActionMode('')
       setActionReason('')
+      setAssignmentTarget(undefined)
       return true
     }
     try {
@@ -1162,6 +1200,34 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           if (isTerminalWorkflowTask(taskSnapshot)) {
             message.warning('已结束任务不能继续处理')
             return false
+          }
+          if (
+            actionModeSnapshot === 'assign' &&
+            assignmentAccessSnapshot.loading
+          ) {
+            message.warning('正在确认可转交人员，请稍后再提交')
+            return false
+          }
+          if (actionModeSnapshot === 'assign') {
+            const targetAllowed =
+              assignmentTargetSnapshot === 'pool'
+                ? assignmentAccessSnapshot.can_return_to_pool
+                : assignmentAccessSnapshot.candidates.some(
+                    (candidate) =>
+                      candidate.admin_id === assignmentTargetSnapshot
+                  )
+            if (
+              assignmentAccessSnapshot.failed ||
+              assignmentAccessSnapshot.stale ||
+              !assignmentAccessSnapshot.can_reassign ||
+              !targetAllowed
+            ) {
+              message.warning(
+                assignmentAccessSnapshot.reason || '转交去向已失效，请重新选择'
+              )
+              return false
+            }
+            return true
           }
           if (actionAccessSnapshot.loading) {
             message.warning('正在确认这项操作是否可用，请稍后再提交')
@@ -1221,20 +1287,25 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     {
       title: '状态 / 风险',
       key: 'task_priority',
-      width: 88,
+      width: 132,
       render: (_, record) => {
-        const dueStatus = getWorkflowTaskDueStatus(record)
-        const statusMeta = getWorkflowTaskStatusMeta(record)
-        const color =
-          dueStatus === 'overdue'
-            ? 'red'
-            : dueStatus === 'due_soon'
-              ? 'orange'
-              : statusMeta.color
         return (
-          <Tag color={color}>
-            {dueStatus === 'overdue' ? '逾期' : statusMeta.label}
-          </Tag>
+          <Space
+            className="erp-workbench-task-status-risk"
+            size={[4, 4]}
+            style={{ width: '100%' }}
+            wrap
+          >
+            {getWorkflowTaskStatusRiskTags(record).map((tag) => (
+              <Tag
+                key={tag.key}
+                color={tag.color}
+                style={{ marginInlineEnd: 0 }}
+              >
+                {tag.label}
+              </Tag>
+            ))}
+          </Space>
         )
       },
     },
@@ -1844,15 +1915,18 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           actionDrawerAccess.loading ||
           actionDrawerAccess.source === 'fallback_checking'
         }
-        allowedActionModes={actionDrawerAccess.allowedModes}
+        allowedActionModes={actionDrawerAllowedModes}
         readonlyReason={
           actionDrawerAccess.loading
             ? '正在确认您是否可以处理当前任务。'
             : actionDrawerAccess.readonlyReason ||
               getTaskReadonlyNotice(selectedTask)
         }
-        onActionModeChange={setActionMode}
+        assignmentAccess={assignmentAccess}
+        assignmentTarget={assignmentTarget}
+        onActionModeChange={changeTaskActionMode}
         onActionReasonChange={setActionReason}
+        onAssignmentTargetChange={setAssignmentTarget}
         onClose={closeTaskDrawer}
         onOpenEntry={openTaskEntry}
         onSubmit={submitTaskAction}

@@ -273,6 +273,8 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			return id, d.mapWorkflowError(ctx, err), nil
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": workflowTaskEventsToAny(events)})}, nil
+	case "get_task_assignment_options":
+		return d.handleWorkflowTaskAssignmentOptions(ctx, id, pm)
 	case "create_task":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskCreate); res != nil {
 			return id, res, nil
@@ -447,6 +449,8 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			Message: "任务催办已记录",
 			Data:    newDataStruct(map[string]any{"task": workflowTaskToMap(task)}),
 		}, nil
+	case "reassign_task":
+		return d.handleWorkflowTaskReassignment(ctx, id, pm, actorID)
 	case "explain_action_access":
 		return d.handleWorkflowTaskActionExplain(ctx, id, pm)
 	case "explain_task_assignment":
@@ -628,6 +632,16 @@ func validateWorkflowTaskWritePublicParams(method string, pm map[string]any) *v1
 			"action",
 			"reason",
 			"payload",
+		)
+	case "reassign_task":
+		return rejectUnknownWorkflowTaskParams(
+			pm,
+			method,
+			"task_id",
+			"expected_version",
+			"idempotency_key",
+			"assignee_id",
+			"reason",
 		)
 	default:
 		return nil

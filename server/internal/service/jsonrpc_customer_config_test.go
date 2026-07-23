@@ -301,6 +301,26 @@ func TestMapCustomerConfigError_ProcessDomainCommandRecoveryRequired(t *testing.
 	}
 }
 
+func TestMapCustomerConfigError_ProcessTaskOwnerRoleGuidance(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	for _, tc := range []struct {
+		name    string
+		err     error
+		message string
+	}{
+		{name: "not found", err: biz.ErrProcessTaskOwnerRoleNotFound, message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"},
+		{name: "ambiguous", err: biz.ErrProcessTaskOwnerRoleAmbiguous, message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := dispatcher.mapCustomerConfigError(context.Background(), tc.err)
+			if result.Code != errcode.InvalidParam.Code || result.Message != tc.message {
+				t.Fatalf("unexpected owner role guidance result: %#v", result)
+			}
+		})
+	}
+}
+
 func TestCustomerConfigPublishInputFromParamsMergesFormalManifestMetadata(t *testing.T) {
 	snapshot := map[string]any{
 		"customer": map[string]any{"key": "yoyoosun"},

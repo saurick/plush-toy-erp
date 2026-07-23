@@ -18,6 +18,7 @@ import {
   getWorkflowTaskReason,
   getWorkflowTaskReasonLabel,
   getWorkflowTaskStatusMeta,
+  getWorkflowTaskStatusRiskTags,
   hasActiveWorkflowTaskBoardFilters,
   readWorkflowTaskBoardFiltersFromSearch,
   resolveWorkflowTaskBoardResponseState,
@@ -91,6 +92,58 @@ test('workflowTaskBoard: 状态文案和原因从任务或 payload 收口', () =
       payload: { rejected_reason: '资料不完整' },
     }),
     '退回原因'
+  )
+})
+
+test('workflowTaskBoard: 主状态与时间风险独立展示且各最多一个', () => {
+  const nowMs = 1_800_000_000_000
+  const dueAt = (offsetMs) => Math.floor((nowMs + offsetMs) / 1000)
+
+  assert.deepEqual(
+    getWorkflowTaskStatusRiskTags(
+      {
+        task_status_key: 'blocked',
+        due_at: dueAt(-60_000),
+      },
+      nowMs
+    ),
+    [
+      { key: 'status', label: '阻塞', color: 'red' },
+      { key: 'overdue', label: '逾期', color: 'red' },
+    ]
+  )
+  assert.deepEqual(
+    getWorkflowTaskStatusRiskTags(
+      {
+        task_status_key: 'ready',
+        due_at: dueAt(60 * 60 * 1000),
+      },
+      nowMs
+    ),
+    [
+      { key: 'status', label: '可执行', color: 'blue' },
+      { key: 'due_soon', label: '即将到期', color: 'orange' },
+    ]
+  )
+  assert.deepEqual(
+    getWorkflowTaskStatusRiskTags(
+      {
+        task_status_key: 'blocked',
+        due_at: dueAt(2 * 24 * 60 * 60 * 1000),
+      },
+      nowMs
+    ),
+    [{ key: 'status', label: '阻塞', color: 'red' }]
+  )
+  assert.deepEqual(
+    getWorkflowTaskStatusRiskTags(
+      {
+        task_status_key: 'done',
+        due_at: dueAt(-60_000),
+      },
+      nowMs
+    ),
+    [{ key: 'status', label: '已完成', color: 'green' }]
   )
 })
 

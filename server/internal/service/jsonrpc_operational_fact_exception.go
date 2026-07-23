@@ -10,15 +10,24 @@ import (
 )
 
 func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {
-	permission := biz.PermissionQualityExceptionHandle
-	switch method {
-	case "execute_production_exception", "reverse_production_exception":
-		permission = biz.PermissionProductionFactPost
-	case "get_production_exception", "list_production_exceptions":
-		permission = biz.PermissionProductionFactRead
-	}
-	if res := d.RequireAdminPermission(ctx, permission); res != nil {
-		return id, res, nil
+	if method == "get_production_exception" || method == "list_production_exceptions" {
+		if res := d.RequireAdminAnyPermission(
+			ctx,
+			biz.PermissionPMCRiskRead,
+			biz.PermissionProductionFactRead,
+			biz.PermissionQualityExceptionHandle,
+		); res != nil {
+			return id, res, nil
+		}
+	} else {
+		permission := biz.PermissionQualityExceptionHandle
+		switch method {
+		case "execute_production_exception", "reverse_production_exception":
+			permission = biz.PermissionProductionFactPost
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
 	}
 	if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production", "quality_inspections"); res != nil {
 		return id, res, nil

@@ -70,6 +70,25 @@ func TestPermissionUsageKeepsBackendOnlyPermissionsOutOfPageProjection(t *testin
 	}
 }
 
+func TestPermissionOptionsExposeBackendModuleNameAndDefinitionMetadata(t *testing.T) {
+	items := permissionOptionsToAny([]biz.AdminPermission{{
+		Key:        biz.PermissionProcessRuntimeRecover,
+		Module:     "stale_module",
+		Class:      biz.PermissionClassBusiness,
+		Assignable: true,
+	}})
+	if len(items) != 1 {
+		t.Fatalf("permission options len = %d, want 1", len(items))
+	}
+	permission := items[0].(map[string]any)
+	if permission["module"] != "process_runtime" ||
+		permission["module_name"] != "异常流程恢复" ||
+		permission["class"] != string(biz.PermissionClassControlPlane) ||
+		permission["assignable"] != false {
+		t.Fatalf("permission option metadata = %#v", permission)
+	}
+}
+
 func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *testing.T) {
 	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
 	repo := newServiceCustomerConfigRepo()
@@ -106,6 +125,7 @@ func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *te
 				[]string{roleKey},
 				biz.PermissionOutsourcingOrderConfirm,
 				biz.PermissionCustomerConfigRead,
+				biz.PermissionProcessRuntimeRecover,
 			)},
 			customerConfigUC: uc,
 		}
@@ -125,6 +145,35 @@ func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *te
 	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
 	if got := newDispatcher(biz.PurchaseRoleKey).RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); got != nil {
 		t.Fatalf("control-plane repair permission must stay under RBAC, got %#v", got)
+	}
+	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
+	if got := newDispatcher(biz.PurchaseRoleKey).RequireAdminPermission(ctx, biz.PermissionProcessRuntimeRecover); got != nil {
+		t.Fatalf("process runtime recovery must stay under control-plane RBAC, got %#v", got)
+	}
+}
+
+func TestCustomerConfigEntitlementBoundaryUsesPermissionClass(t *testing.T) {
+	for _, permissionKey := range []string{
+		biz.PermissionSystemUserRead,
+		biz.PermissionCustomerConfigRead,
+		biz.PermissionProcessRuntimeRecover,
+		biz.PermissionDebugBusinessClear,
+		biz.PermissionERPBusinessChainDebugRead,
+	} {
+		if customerConfigEntitlementApplies(permissionKey) {
+			t.Errorf("permission %q must stay outside customer business entitlements", permissionKey)
+		}
+	}
+	for _, permissionKey := range []string{
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionProductionFactRead,
+	} {
+		if !customerConfigEntitlementApplies(permissionKey) {
+			t.Errorf("business permission %q must be narrowed by customer entitlements", permissionKey)
+		}
+	}
+	if !customerConfigEntitlementApplies("legacy.unknown") {
+		t.Fatal("unknown RBAC permissions must remain fail-closed behind customer entitlements")
 	}
 }
 

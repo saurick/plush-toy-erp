@@ -518,6 +518,8 @@ func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
 		return "客户配置回滚", "high"
 	case workflowBreakGlassEventKey:
 		return "Workflow break-glass 请求", "high"
+	case workflowTaskAssignmentAuditEventKey:
+		return "协同任务转交", "warning"
 	case "admin_bootstrap.completed":
 		return "初始化完成", "normal"
 	case "admin_bootstrap.blocked":
@@ -564,6 +566,8 @@ func runtimeAuditSummary(event RuntimeAuditEvent) string {
 		return actor + " 回滚了客户配置 " + target
 	case workflowBreakGlassEventKey:
 		return actor + " 对 " + target + " 发起了 Workflow break-glass 请求"
+	case workflowTaskAssignmentAuditEventKey:
+		return actor + " 调整了 " + target + " 的任务处理人"
 	case "admin_bootstrap.blocked":
 		if reason := strings.TrimSpace(anyToString(event.Payload["reason"])); reason != "" {
 			return "启动初始化被阻止：" + reason
@@ -848,6 +852,33 @@ func (uc *AdminManageUsecase) GetRoleForAccessExplanation(ctx context.Context, r
 		return nil, ErrRoleNotFound
 	}
 	return uc.repo.GetRoleByKey(ctx, roleKey)
+}
+
+func (uc *AdminManageUsecase) GetRoleForAccessPreview(
+	ctx context.Context,
+	roleKey string,
+	permissionKeys []string,
+) (*AdminRole, error) {
+	role, err := uc.GetRoleForAccessExplanation(ctx, roleKey)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil || role.Disabled {
+		return nil, ErrRoleNotFound
+	}
+	if IsSystemManagedRole(*role) {
+		return nil, ErrSystemRoleImmutable
+	}
+	normalizedPermissionKeys, err := NormalizePermissionKeysStrict(permissionKeys)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateAssignablePermissionKeys(normalizedPermissionKeys); err != nil {
+		return nil, err
+	}
+	preview := *role
+	preview.Permissions = append([]string(nil), normalizedPermissionKeys...)
+	return &preview, nil
 }
 
 func (uc *AdminManageUsecase) ListRolesWithAccess(ctx context.Context) ([]AdminRole, map[string]AdminRoleAccess, error) {

@@ -47,7 +47,7 @@ async function workflowMockHarness(
       ]),
     },
   },
-  { workflowTaskFixtures = [] } = {}
+  { workflowTaskFixtures = [], workflowAssignmentCandidates = [] } = {}
 ) {
   const handlers = new Map()
   const page = {
@@ -62,6 +62,10 @@ async function workflowMockHarness(
     nowUnix: () => 1_750_000_000,
     resolveDelayFromReferer: () => 0,
     workflowTaskFixtures,
+    workflowAssignmentCandidates:
+      workflowAssignmentCandidates.length > 0
+        ? workflowAssignmentCandidates
+        : undefined,
   })
   const handler = handlers.get('**/rpc/workflow')
   assert.equal(typeof handler, 'function')
@@ -1381,6 +1385,129 @@ test('style-l1 workflow source task fixtures inject all formal producer contract
       },
     ]
   )
+})
+
+test('style-l1 workflow assignment mock keeps operator authority separate from eligible recipients', async () => {
+  const task = {
+    id: 875,
+    task_code: 'STYLE-L1-ASSIGNMENT-875',
+    task_group: 'workflow-contract',
+    task_name: '仓库请假转交',
+    source_type: 'workflow-contract',
+    source_id: 875,
+    source_no: 'ASSIGN-875',
+    task_status_key: 'ready',
+    owner_role_key: 'warehouse',
+    assignee_id: null,
+    version: 1,
+    payload: { source_snapshot: 'unchanged' },
+  }
+  const call = await workflowMockHarness(
+    {
+      id: 1,
+      is_super_admin: true,
+      roles: [{ role_key: 'boss' }],
+      permissions: ['workflow.task.read', 'workflow.task.assign'],
+      effective_session: {
+        actions: ['workflow.task.read', 'workflow.task.assign'],
+        workflow_visible_owner_role_keys_by_capability: workflowScopes(
+          'warehouse',
+          ['workflow.task.read']
+        ),
+      },
+    },
+    {
+      workflowTaskFixtures: [task],
+      workflowAssignmentCandidates: [
+        {
+          admin_id: 901,
+          username: 'super-without-warehouse-role',
+          role_keys: ['admin'],
+          permissions: [
+            'workflow.task.read',
+            'workflow.task.update',
+            'workflow.task.complete',
+          ],
+        },
+        {
+          admin_id: 902,
+          username: 'disabled-warehouse',
+          disabled: true,
+          role_keys: ['warehouse'],
+          permissions: [
+            'workflow.task.read',
+            'workflow.task.update',
+            'workflow.task.complete',
+          ],
+        },
+        {
+          admin_id: 903,
+          username: 'eligible-warehouse',
+          role_keys: ['warehouse'],
+          permissions: [
+            'workflow.task.read',
+            'workflow.task.update',
+            'workflow.task.complete',
+          ],
+        },
+        {
+          admin_id: 904,
+          username: 'readonly-warehouse',
+          role_keys: ['warehouse'],
+          permissions: ['workflow.task.read'],
+        },
+      ],
+    }
+  )
+
+  const options = await call('get_task_assignment_options', { task_id: 875 })
+  assert.equal(options.result.code, 0)
+  assert.equal(options.result.data.assignment.can_reassign, true)
+  assert.equal(options.result.data.assignment.can_return_to_pool, false)
+  assert.deepEqual(
+    options.result.data.assignment.candidates.map(
+      (candidate) => candidate.admin_id
+    ),
+    [903],
+    '超级管理员本身没有仓库岗位时不能自动成为接收人'
+  )
+
+  const params = {
+    task_id: 875,
+    expected_version: 1,
+    idempotency_key: 'style-l1-assignment-875',
+    assignee_id: 903,
+    reason: '原处理人请假',
+  }
+  const assigned = await call('reassign_task', params)
+  assert.equal(assigned.result.code, 0)
+  assert.equal(assigned.result.data.task.assignee_id, 903)
+  assert.equal(assigned.result.data.task.version, 2)
+  assert.equal(assigned.result.data.task.task_status_key, 'ready')
+  assert.deepEqual(assigned.result.data.task.payload, task.payload)
+
+  const replayed = await call('reassign_task', params)
+  assert.equal(replayed.result.code, 0)
+  assert.equal(replayed.result.data.task.version, 2)
+
+  const assignedOptions = await call('get_task_assignment_options', {
+    task_id: 875,
+  })
+  assert.equal(assignedOptions.result.data.assignment.can_return_to_pool, true)
+  assert.deepEqual(assignedOptions.result.data.assignment.candidates, [])
+
+  const released = await call('reassign_task', {
+    task_id: 875,
+    expected_version: 2,
+    idempotency_key: 'style-l1-assignment-release-875',
+    assignee_id: null,
+    reason: '退回仓库岗位待办池',
+  })
+  assert.equal(released.result.code, 0)
+  assert.equal(Number(released.result.data.task.assignee_id || 0), 0)
+  assert.equal(released.result.data.task.version, 3)
+  assert.equal(released.result.data.task.task_status_key, 'ready')
+  assert.deepEqual(released.result.data.task.payload, task.payload)
 })
 
 test('style-l1 workflow role task view mock applies role, view and cursor boundaries', async () => {

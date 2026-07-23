@@ -3908,18 +3908,29 @@ export function createBusinessFormalScenarios(deps) {
               process_instance: {
                 id: 101,
                 process_key: 'sales_order_acceptance',
+                business_ref_type: 'sales_order',
                 business_ref_id: 1,
                 business_ref_no: 'SO-STYLE-L1',
                 status: 'active',
               },
               started_node: {
                 id: 201,
+                process_instance_id: 101,
                 node_key: 'submit_sales_order',
                 node_type: 'domain_command',
                 version: 7,
                 status: 'active',
               },
-              nodes: [],
+              nodes: [
+                {
+                  id: 201,
+                  process_instance_id: 101,
+                  node_key: 'submit_sales_order',
+                  node_type: 'domain_command',
+                  version: 7,
+                  status: 'active',
+                },
+              ],
               runtime_boundary: {
                 fact_boundary: 'no_fact_posting',
               },
@@ -3948,8 +3959,12 @@ export function createBusinessFormalScenarios(deps) {
             data = {
               completed_node: {
                 id: 201,
+                process_instance_id: 101,
                 node_key: 'submit_sales_order',
+                node_type: 'domain_command',
                 status: 'completed',
+                outcome: 'sales_order.submitted',
+                version: 8,
               },
               next_node: {
                 id: 202,
@@ -3961,6 +3976,25 @@ export function createBusinessFormalScenarios(deps) {
                 task_code: 'order_approval',
                 owner_role_key: 'boss',
               },
+              nodes: [
+                {
+                  id: 201,
+                  process_instance_id: 101,
+                  node_key: 'submit_sales_order',
+                  node_type: 'domain_command',
+                  status: 'completed',
+                  outcome: 'sales_order.submitted',
+                  version: 8,
+                },
+                {
+                  id: 202,
+                  process_instance_id: 101,
+                  node_key: 'order_approval',
+                  node_type: 'approval',
+                  status: 'active',
+                  version: 2,
+                },
+              ],
             }
           }
 

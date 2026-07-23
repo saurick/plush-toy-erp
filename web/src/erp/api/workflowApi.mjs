@@ -149,6 +149,19 @@ function workflowTaskUrgeResultInvalid(params, task) {
   )
 }
 
+function workflowTaskAssignmentResultInvalid(params, task) {
+  if (
+    !WORKFLOW_TASK_URGE_STATUS_KEYS.has(task.task_status_key) ||
+    task.version !== params.expected_version + 1
+  ) {
+    return true
+  }
+  if (params.assignee_id === null) {
+    return Number(task.assignee_id || 0) !== 0
+  }
+  return task.assignee_id !== params.assignee_id
+}
+
 function requireWorkflowTaskMutationResult(operation, params, result) {
   const task = dataOf(result)?.task
   const expectedStatus = WORKFLOW_TASK_MUTATION_STATUS_BY_OPERATION[operation]
@@ -166,13 +179,90 @@ function requireWorkflowTaskMutationResult(operation, params, result) {
     (expectedStatus && task.task_status_key !== expectedStatus) ||
     (operation === 'urge' &&
       (!WORKFLOW_TASK_URGE_STATUS_KEYS.has(task.task_status_key) ||
-        workflowTaskUrgeResultInvalid(params, task)))
+        workflowTaskUrgeResultInvalid(params, task))) ||
+    (operation === 'assign' &&
+      workflowTaskAssignmentResultInvalid(params, task))
   ) {
     throw Object.assign(new Error('任务处理结果暂时无法确认，请刷新后重试'), {
       isInvalidResponse: true,
     })
   }
   return task
+}
+
+function invalidWorkflowTaskAssignmentOptionsResponse() {
+  return Object.assign(new Error('任务转交信息暂时无法确认，请稍后重试'), {
+    isInvalidResponse: true,
+  })
+}
+
+function requireWorkflowTaskAssignmentOptionsResponse(result, taskID) {
+  const assignment = dataOf(result)?.assignment
+  const candidates = assignment?.candidates
+  const currentAssignee = assignment?.current_assignee
+  const candidateIDs = new Set()
+  if (
+    !assignment ||
+    typeof assignment !== 'object' ||
+    Array.isArray(assignment) ||
+    assignment.task_id !== taskID ||
+    !Number.isSafeInteger(assignment.task_version) ||
+    assignment.task_version <= 0 ||
+    !WORKFLOW_TASK_STATUS_KEYS.has(assignment.task_status_key) ||
+    typeof assignment.owner_role_key !== 'string' ||
+    !assignment.owner_role_key.trim() ||
+    typeof assignment.owner_role_label !== 'string' ||
+    typeof assignment.can_reassign !== 'boolean' ||
+    typeof assignment.can_return_to_pool !== 'boolean' ||
+    typeof assignment.reason_code !== 'string' ||
+    typeof assignment.reason !== 'string' ||
+    !Array.isArray(candidates) ||
+    (currentAssignee !== null &&
+      currentAssignee !== undefined &&
+      (!currentAssignee ||
+        typeof currentAssignee !== 'object' ||
+        Array.isArray(currentAssignee) ||
+        !Number.isSafeInteger(currentAssignee.admin_id) ||
+        currentAssignee.admin_id <= 0 ||
+        typeof currentAssignee.username !== 'string' ||
+        !currentAssignee.username.trim())) ||
+    candidates.some((candidate) => {
+      const invalid =
+        !candidate ||
+        typeof candidate !== 'object' ||
+        Array.isArray(candidate) ||
+        !Number.isSafeInteger(candidate.admin_id) ||
+        candidate.admin_id <= 0 ||
+        candidateIDs.has(candidate.admin_id) ||
+        typeof candidate.username !== 'string' ||
+        !candidate.username.trim() ||
+        !Array.isArray(candidate.role_keys) ||
+        candidate.role_keys.some(
+          (roleKey) => typeof roleKey !== 'string' || !roleKey.trim()
+        ) ||
+        typeof candidate.role_label !== 'string'
+      candidateIDs.add(candidate?.admin_id)
+      return invalid
+    })
+  ) {
+    throw invalidWorkflowTaskAssignmentOptionsResponse()
+  }
+  return {
+    ...assignment,
+    candidates: candidates.map((candidate) => ({
+      admin_id: candidate.admin_id,
+      username: candidate.username.trim(),
+      role_keys: candidate.role_keys.map((roleKey) => roleKey.trim()),
+      role_label: candidate.role_label.trim(),
+    })),
+    current_assignee:
+      currentAssignee && typeof currentAssignee === 'object'
+        ? {
+            admin_id: currentAssignee.admin_id,
+            username: currentAssignee.username.trim(),
+          }
+        : null,
+  }
 }
 
 export async function listWorkflowTasks(params = {}, options = {}) {
@@ -245,6 +335,28 @@ export async function getWorkflowTaskBoard(params = {}) {
   return requireWorkflowTaskBoardResponse(dataOf(result), params)
 }
 
+export async function getWorkflowTaskAssignmentOptions(
+  params = {},
+  options = {}
+) {
+  if (
+    !params ||
+    typeof params !== 'object' ||
+    Array.isArray(params) ||
+    Object.keys(params).some((key) => key !== 'task_id') ||
+    !Number.isSafeInteger(params.task_id) ||
+    params.task_id <= 0
+  ) {
+    throw new TypeError('任务转交参数无效')
+  }
+  const result = await workflowRpc.call(
+    'get_task_assignment_options',
+    { task_id: params.task_id },
+    options
+  )
+  return requireWorkflowTaskAssignmentOptionsResponse(result, params.task_id)
+}
+
 export async function completeWorkflowTaskAction(params = {}) {
   const mutationParams = requireWorkflowMutationParams('complete', params)
   const result = await workflowRpc.call('complete_task_action', mutationParams)
@@ -273,6 +385,12 @@ export async function urgeWorkflowTask(params = {}) {
   const mutationParams = requireWorkflowMutationParams('urge', params)
   const result = await workflowRpc.call('urge_task', mutationParams)
   return requireWorkflowTaskMutationResult('urge', mutationParams, result)
+}
+
+export async function reassignWorkflowTask(params = {}) {
+  const mutationParams = requireWorkflowMutationParams('assign', params)
+  const result = await workflowRpc.call('reassign_task', mutationParams)
+  return requireWorkflowTaskMutationResult('assign', mutationParams, result)
 }
 
 export async function explainWorkflowActionAccess(params = {}, options = {}) {

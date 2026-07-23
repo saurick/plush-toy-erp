@@ -1001,6 +1001,12 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	case errors.Is(err, biz.ErrProcessDomainCommandRecoveryRequired):
 		l.Warnf("[customer_config] process domain command recovery required err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.ProcessDomainCommandRecoveryRequired.Code, Message: errcode.ProcessDomainCommandRecoveryRequired.Message}
+	case errors.Is(err, biz.ErrProcessTaskOwnerRoleNotFound):
+		l.Warnf("[customer_config] process task owner role not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"}
+	case errors.Is(err, biz.ErrProcessTaskOwnerRoleAmbiguous):
+		l.Warnf("[customer_config] process task owner role ambiguous err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"}
 	case errors.Is(err, biz.ErrProcessInstanceExists):
 		l.Warnf("[customer_config] process instance exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程实例已存在"}

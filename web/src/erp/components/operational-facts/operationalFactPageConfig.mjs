@@ -246,6 +246,7 @@ export function buildOperationalFactViewConfigs() {
       list: listProductionFacts,
       post: postProductionFact,
       cancel: cancelProductionFact,
+      readPermissions: ACTION_PERMISSIONS.productionRead,
       postPermissions: ACTION_PERMISSIONS.productionPost,
       cancelPermissions: ACTION_PERMISSIONS.productionCancel,
       dateOptions: OCCURRED_DATE_FILTER_OPTIONS,

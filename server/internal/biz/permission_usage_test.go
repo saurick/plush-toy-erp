@@ -97,6 +97,82 @@ func TestEveryMenuRequirementHasMatchingPermissionUsage(t *testing.T) {
 	}
 }
 
+func TestWorkflowBusinessPagesRegisterTheirInitialTaskRead(t *testing.T) {
+	usage, ok := PermissionUsageFor(PermissionWorkflowTaskRead)
+	if !ok {
+		t.Fatal("workflow task read usage missing")
+	}
+	requiredPages := map[string]bool{
+		"production-scheduling": false,
+		"production-exceptions": false,
+		"shipping-release":      false,
+	}
+	for _, surface := range usage.Surfaces {
+		if _, required := requiredPages[surface.PageKey]; !required {
+			continue
+		}
+		for _, method := range surface.BackendMethods {
+			if method.Domain == "workflow" && method.Method == "list_tasks" {
+				requiredPages[surface.PageKey] = true
+			}
+		}
+	}
+	for pageKey, found := range requiredPages {
+		if !found {
+			t.Errorf("workflow business page %q has no workflow.task.read list_tasks surface", pageKey)
+		}
+	}
+
+	qualityUsage, ok := PermissionUsageFor(PermissionQualityInspectionRead)
+	if !ok {
+		t.Fatal("quality inspection read usage missing")
+	}
+	for _, surface := range qualityUsage.Surfaces {
+		if surface.PageKey == "production-exceptions" {
+			t.Fatalf("quality inspection read must not advertise an absent production exception surface: %#v", surface)
+		}
+	}
+}
+
+func TestPrimaryBackendReadPagePermissionsGuardTheirMenuEntries(t *testing.T) {
+	definitions := make(map[string]PermissionDefinition, len(AllPermissionDefinitions()))
+	for _, definition := range AllPermissionDefinitions() {
+		definitions[definition.Key] = definition
+	}
+	menus := make(map[string]AdminMenu, len(BuiltinAdminMenus()))
+	for _, menu := range BuiltinAdminMenus() {
+		menus[menu.Key] = menu
+	}
+
+	for _, usage := range BuiltinPermissionUsages() {
+		definition, ok := definitions[usage.PermissionKey]
+		if !ok || definition.Action != "read" {
+			continue
+		}
+		for _, surface := range usage.Surfaces {
+			if surface.ControlType != permissionControlPage ||
+				surface.SectionKey != surface.PageKey ||
+				len(surface.BackendMethods) == 0 {
+				continue
+			}
+			menu, ok := menus[surface.PageKey]
+			if !ok {
+				continue
+			}
+			requirements := append(append([]string(nil), menu.RequiredAny...), menu.RequiredAll...)
+			if !PermissionSetHasAll(PermissionKeySet(requirements), usage.PermissionKey) {
+				t.Errorf(
+					"page %q calls backend read methods under %q but its menu is guarded by any=%v all=%v",
+					menu.Key,
+					usage.PermissionKey,
+					menu.RequiredAny,
+					menu.RequiredAll,
+				)
+			}
+		}
+	}
+}
+
 func TestDebugPermissionsAreBackendOnly(t *testing.T) {
 	for _, definition := range AllPermissionDefinitions() {
 		if definition.Class != PermissionClassDebug {

@@ -131,6 +131,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "finance.invoice.read",
         "workflow.task.read",
         "workflow.task.supervise",
+        "workflow.task.assign",
         "workflow.task.update",
         "workflow.task.approve",
         "workflow.task.reject",
@@ -142,7 +143,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "payment_approval.boss_approval",
       ]),
       guardrail:
-        "老板角色只做审批 / 退回协同判断，不绕过具体业务 usecase 的状态、引用、幂等和事实写入校验。",
+        "老板角色负责审批 / 退回协同判断，并可把未结束任务受控转给同一负责岗位的合格人员或退回岗位池；转交不改变任务状态，也不绕过具体业务 usecase 的状态、引用、幂等和事实写入校验。",
     }),
     Object.freeze({
       roleKey: "engineering",

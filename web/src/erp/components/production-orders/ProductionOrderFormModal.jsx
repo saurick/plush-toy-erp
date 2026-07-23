@@ -155,7 +155,13 @@ function ProductionMaterialRequirementsPanel({
   )
 }
 
-function RowReference({ field, form, optionsByType, readOnly }) {
+function RowReference({
+  field,
+  form,
+  optionsByType,
+  readOnly,
+  referenceAccess,
+}) {
   const index = field.name
   const productID = Form.useWatch(['items', index, 'product_id'], form)
   const skuID = Form.useWatch(['items', index, 'product_sku_id'], form)
@@ -177,7 +183,9 @@ function RowReference({ field, form, optionsByType, readOnly }) {
         >
           <ProductionOrderReferenceSelect
             referenceType="sales_order_item"
-            disabled={readOnly}
+            disabled={
+              readOnly || referenceAccess.sales_order_item !== true
+            }
             initialOptions={optionsByType.sales_order_item}
             filters={{
               ...(productID ? { product_id: productID } : {}),
@@ -209,7 +217,7 @@ function RowReference({ field, form, optionsByType, readOnly }) {
         >
           <ProductionOrderReferenceSelect
             referenceType="product"
-            disabled={readOnly}
+            disabled={readOnly || referenceAccess.product !== true}
             initialOptions={optionsByType.product}
             placeholder="搜索产品编号或名称"
             onChange={(value, option) => {
@@ -228,7 +236,11 @@ function RowReference({ field, form, optionsByType, readOnly }) {
         <Form.Item name={[field.name, 'product_sku_id']} label="规格（可选）">
           <ProductionOrderReferenceSelect
             referenceType="product_sku"
-            disabled={readOnly || !productID}
+            disabled={
+              readOnly ||
+              referenceAccess.product_sku !== true ||
+              !productID
+            }
             initialOptions={optionsByType.product_sku}
             filters={productID ? { product_id: productID } : {}}
             placeholder={productID ? '搜索规格' : '请先选择产品'}
@@ -283,7 +295,7 @@ function RowReference({ field, form, optionsByType, readOnly }) {
         >
           <ProductionOrderReferenceSelect
             referenceType="unit"
-            disabled={readOnly}
+            disabled={readOnly || referenceAccess.unit !== true}
             initialOptions={optionsByType.unit}
             placeholder="搜索单位"
             onChange={(value) =>
@@ -302,7 +314,9 @@ function RowReference({ field, form, optionsByType, readOnly }) {
         >
           <ProductionOrderReferenceSelect
             referenceType="active_bom"
-            disabled={readOnly || !productID}
+            disabled={
+              readOnly || referenceAccess.active_bom !== true || !productID
+            }
             initialOptions={optionsByType.active_bom}
             filters={productID ? { product_id: productID } : {}}
             placeholder={productID ? '搜索当前生效 BOM' : '请先选择产品'}
@@ -342,6 +356,7 @@ export default function ProductionOrderFormModal({
   mode,
   loading,
   optionsByType,
+  referenceAccess = {},
   order,
   materialRequirementsState,
   materialRequirements,
@@ -450,6 +465,7 @@ export default function ProductionOrderFormModal({
                     form={form}
                     optionsByType={normalizedOptions}
                     readOnly={readOnly}
+                    referenceAccess={referenceAccess}
                   />
                 </section>
               ))}

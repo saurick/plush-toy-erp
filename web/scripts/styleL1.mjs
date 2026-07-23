@@ -716,16 +716,19 @@ async function runScenarioOnce(browser, scenario) {
       ? scenario.customerConfig
       : null
   if (runtimeCustomerKey || runtimeCustomerConfig) {
-    await page.addInitScript(({ customerKey, customerConfig }) => {
-      window.__PLUSH_ERP_CUSTOMER_CONFIG__ = {
-        ...(window.__PLUSH_ERP_CUSTOMER_CONFIG__ || {}),
-        ...(customerConfig || {}),
-        ...(customerKey ? { customerKey } : {}),
+    await page.addInitScript(
+      ({ customerKey, customerConfig }) => {
+        window.__PLUSH_ERP_CUSTOMER_CONFIG__ = {
+          ...(window.__PLUSH_ERP_CUSTOMER_CONFIG__ || {}),
+          ...(customerConfig || {}),
+          ...(customerKey ? { customerKey } : {}),
+        }
+      },
+      {
+        customerKey: runtimeCustomerKey,
+        customerConfig: runtimeCustomerConfig,
       }
-    }, {
-      customerKey: runtimeCustomerKey,
-      customerConfig: runtimeCustomerConfig,
-    })
+    )
   }
 
   page.on('console', (message) => {
@@ -6115,8 +6118,8 @@ async function assertTaskActionDrawerLayout(
   )
   assert.equal(
     metrics.metaItems,
-    4,
-    `${scenarioName} 任务处理抽屉应展示 4 个任务摘要字段: ${JSON.stringify(metrics)}`
+    5,
+    `${scenarioName} 任务处理抽屉应展示 5 个任务摘要字段: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.stepItems,
@@ -8278,6 +8281,19 @@ async function assertDarkLoadingState(page, { scenarioName }) {
 
 async function assertDarkAntdStateSurfaces(page, { scenarioName }) {
   const metrics = await page.evaluate(() => {
+    const semanticTagToneNames = new Set([
+      'magenta',
+      'red',
+      'volcano',
+      'orange',
+      'gold',
+      'lime',
+      'green',
+      'cyan',
+      'blue',
+      'geekblue',
+      'purple',
+    ])
     const readNode = (selector) => {
       const node = document.querySelector(selector)
       if (!node) return null
@@ -8296,10 +8312,32 @@ async function assertDarkAntdStateSurfaces(page, { scenarioName }) {
       tag: readNode('.ant-tag'),
       paginationItem: readNode('.ant-pagination .ant-pagination-item'),
       tablePlaceholder: readNode('.ant-table-placeholder > td'),
+      semanticTags: [...document.querySelectorAll('.ant-tag')]
+        .filter((node) => node.getClientRects().length > 0)
+        .map((node) => {
+          const toneClass = [...node.classList].find((className) => {
+            if (!className.startsWith('ant-tag-')) return false
+            return semanticTagToneNames.has(className.slice('ant-tag-'.length))
+          })
+          if (!toneClass) return null
+          const style = window.getComputedStyle(node)
+          return {
+            tone: toneClass.slice('ant-tag-'.length),
+            text:
+              node.textContent?.replace(/\s+/g, ' ').trim().slice(0, 100) || '',
+            backgroundColor: style.backgroundColor,
+            borderColor: style.borderColor,
+            color: style.color,
+          }
+        })
+        .filter(Boolean),
     }
   })
 
-  const visibleStates = Object.values(metrics).filter(Boolean)
+  const visibleStates = Object.entries(metrics)
+    .filter(([key]) => key !== 'semanticTags')
+    .map(([, value]) => value)
+    .filter(Boolean)
   assert(
     visibleStates.length >= 1,
     `${scenarioName} 缺少可检查的 AntD 状态组件: ${JSON.stringify(metrics)}`
@@ -8321,6 +8359,35 @@ async function assertDarkAntdStateSurfaces(page, { scenarioName }) {
       `${scenarioName} ${item.selector} 文字对比度不足`
     )
   })
+
+  const semanticToneStyles = new Map()
+  metrics.semanticTags.forEach((item) => {
+    if (!semanticToneStyles.has(item.tone)) {
+      semanticToneStyles.set(
+        item.tone,
+        [item.color, item.backgroundColor, item.borderColor].join('|')
+      )
+    }
+    assert(
+      !isLightSurfaceColor(item.backgroundColor),
+      `${scenarioName} ${item.tone} Tag 仍是浅色背景: ${JSON.stringify(item)}`
+    )
+    assertReadableOnDark(
+      item.color,
+      item.backgroundColor,
+      `${scenarioName} ${item.tone} Tag 文字对比度不足`
+    )
+  })
+
+  if (semanticToneStyles.size >= 2) {
+    assert.equal(
+      new Set(semanticToneStyles.values()).size,
+      semanticToneStyles.size,
+      `${scenarioName} 不同语义 Tag 被渲染成相同颜色: ${JSON.stringify(
+        Object.fromEntries(semanticToneStyles)
+      )}`
+    )
+  }
 }
 
 async function assertRowSelectionClearsAfterCancel(

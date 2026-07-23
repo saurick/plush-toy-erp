@@ -36,6 +36,11 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
   const [action, setAction] = useState(null)
   const [reason, setReason] = useState('')
   const [approvedQuantity, setApprovedQuantity] = useState('')
+  const canRead = [
+    'pmc.risk.read',
+    'production.fact.read',
+    'quality.exception.handle',
+  ].some((permission) => hasActionPermission(adminProfile, permission))
   const canDecide = hasActionPermission(
     adminProfile,
     'quality.exception.handle'
@@ -43,6 +48,10 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
   const canExecute = hasActionPermission(adminProfile, 'production.fact.post')
 
   const load = useCallback(async () => {
+    if (!canRead) {
+      setRows([])
+      return []
+    }
     setLoading(true)
     try {
       const data = await listProductionExceptions({ limit: 100, offset: 0 })
@@ -59,7 +68,7 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canRead])
   useEffect(() => {
     load()
   }, [load])
@@ -224,6 +233,8 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
       ),
     },
   ]
+
+  if (!canRead) return null
 
   return (
     <>

@@ -25,6 +25,9 @@ type stubWorkflowJSONRPCRepo struct {
 	urgeInput          *biz.WorkflowTaskUrge
 	urgeActorID        int
 	urgeActorRoleKey   string
+	assignmentInput    *biz.WorkflowTaskAssignment
+	assignmentActorID  int
+	assignmentRoleKey  string
 	updateInput        *biz.WorkflowTaskStatusUpdate
 	updateCalls        int
 	updateActorID      int
@@ -182,6 +185,22 @@ func (s *stubWorkflowJSONRPCRepo) UrgeWorkflowTask(_ context.Context, in *biz.Wo
 			"last_urge_reason": in.Reason,
 		},
 	}, nil
+}
+
+func (s *stubWorkflowJSONRPCRepo) ReassignWorkflowTask(
+	_ context.Context,
+	in *biz.WorkflowTaskAssignment,
+	actorID int,
+	actorRoleKey string,
+) (*biz.WorkflowTask, error) {
+	s.assignmentInput = in
+	s.assignmentActorID = actorID
+	s.assignmentRoleKey = actorRoleKey
+	task := *s.currentTask
+	task.AssigneeID = in.TargetAssigneeID
+	task.Version = in.ExpectedVersion + 1
+	s.currentTask = &task
+	return &task, nil
 }
 
 func (s *stubWorkflowJSONRPCRepo) ListWorkflowBusinessStates(context.Context, biz.WorkflowBusinessStateFilter) ([]*biz.WorkflowBusinessState, int, error) {
@@ -1791,6 +1810,27 @@ func TestJsonrpcDispatcher_LinkedProcessReconciliationFailsClosedWithoutRuntime(
 			res := dispatcher.settleLinkedProcessNodeAfterTask(context.Background(), tt.task, 7)
 			if res == nil || res.Code != errcode.Internal.Code || !strings.Contains(res.Message, "请保留本次操作并重试") {
 				t.Fatalf("anchored task without process runtime must fail closed, got %#v", res)
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_ProcessTaskOwnerRoleReturnsActionableGuidance(t *testing.T) {
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+	}
+	for _, tc := range []struct {
+		name    string
+		err     error
+		message string
+	}{
+		{name: "not found", err: biz.ErrProcessTaskOwnerRoleNotFound, message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"},
+		{name: "ambiguous", err: biz.ErrProcessTaskOwnerRoleAmbiguous, message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res := dispatcher.mapWorkflowError(context.Background(), tc.err)
+			if res == nil || res.Code != errcode.InvalidParam.Code || res.Message != tc.message {
+				t.Fatalf("owner role mapping must be actionable, got %#v", res)
 			}
 		})
 	}

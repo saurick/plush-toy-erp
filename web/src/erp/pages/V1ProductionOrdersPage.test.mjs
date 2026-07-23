@@ -126,16 +126,47 @@ test('released production orders expose route execution through separate permiss
 test('WIP readers can open production orders without receiving PMC write permissions', () => {
   assert.match(
     page,
-    /const canRead =\s*hasActionPermission\(adminProfile, 'pmc\.plan\.read'\) \|\| canReadProductionWip/u
+    /const canReadProductionPlan = hasActionPermission\(\s*adminProfile,\s*'pmc\.plan\.read'\s*\)/u
   )
   assert.match(
     page,
-    /const canCreate = hasActionPermission\(adminProfile, 'pmc\.plan\.create'\)/u
+    /const canRead = canReadProductionPlan \|\| canReadProductionWip/u
   )
   assert.match(
     page,
-    /const canUpdate = hasActionPermission\(adminProfile, 'pmc\.plan\.update'\)/u
+    /const canCreate =\s*canReadProductionPlan &&\s*hasActionPermission\(adminProfile, 'pmc\.plan\.create'\)/u
   )
+  assert.match(
+    page,
+    /const canUpdate =\s*canReadProductionPlan &&\s*hasActionPermission\(adminProfile, 'pmc\.plan\.update'\)/u
+  )
+  assert.match(
+    page,
+    /if \(options\.mode === 'view'\) \{\s*setOptionsByType\(snapshotOptions\)\s*return\s*\}/u
+  )
+  assert.match(
+    page,
+    /resolveProductionOrderDetailAccess\(\{[\s\S]*requestedMode: mode,[\s\S]*referenceAccess: productionReferenceAccess/u
+  )
+  assert.match(
+    page,
+    /loadHistoricalOptions\(nextAggregate\.items, \{\s*mode: detailAccess\.mode,\s*\}\)/u
+  )
+  assert.match(
+    page,
+    /订单关联的\$\{detailAccess\.unreadableSources\.join\('、'\)\}不在当前账号读取范围内，已按只读方式打开/u
+  )
+  assert.match(
+    page,
+    /\.filter\(\(\[type\]\) => productionReferenceAccess\[type\] === true\)/u
+  )
+  assert.match(
+    page,
+    /sales_order_item:\s*canReadSalesOrderReferences[\s\S]*active_bom:\s*canReadBOMReferences/u
+  )
+  assert.match(form, /referenceAccess\.sales_order_item !== true/u)
+  assert.match(form, /referenceAccess\.active_bom !== true/u)
+  assert.match(page, /productionReferenceSnapshotOptions\(items\)/u)
 })
 
 test('routed completion fails closed until packaging is accepted and packaging material is confirmed', () => {

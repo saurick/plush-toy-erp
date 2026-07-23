@@ -7,6 +7,15 @@ const source = readFileSync(
   fileURLToPath(new URL('./DashboardPage.jsx', import.meta.url)),
   'utf8'
 )
+const collaborationPanelSource = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/business-list/CollaborationTaskPanel.jsx',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
 
 test('workbench keeps the explicit view button and opens plain rows on double-click', () => {
   assert.match(source, /openDashboardItemOnDoubleClick/u)
@@ -44,4 +53,18 @@ test('task surfaces expose the batch task code only as non-visible evidence meta
     /data-task-terminal=\{String\(isTerminalWorkflowTask\(task\)\)\}/u
   )
   assert.doesNotMatch(source, />\s*\{task\.task_code\}\s*</u)
+})
+
+test('task board alone injects the controlled assignment action into the shared drawer', () => {
+  assert.match(source, /useWorkflowTaskAssignmentAccess/u)
+  assert.match(source, /assignmentAccess\.can_reassign/u)
+  assert.match(source, /\[\.\.\.actionDrawerAccess\.allowedModes, 'assign'\]/u)
+  assert.match(source, /reassignWorkflowTask/u)
+  assert.match(source, /assignmentTargetSnapshot === 'pool'/u)
+  assert.match(source, /assignee_id:/u)
+  assert.match(source, /assignmentAccessSnapshot\.stale/u)
+  assert.match(source, /assignmentAccess=\{assignmentAccess\}/u)
+  assert.match(source, /onAssignmentTargetChange=\{setAssignmentTarget\}/u)
+  assert.doesNotMatch(collaborationPanelSource, /assignmentAccess=/u)
+  assert.doesNotMatch(collaborationPanelSource, /allowedActionModes=.*assign/u)
 })

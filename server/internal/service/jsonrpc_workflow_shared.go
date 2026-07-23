@@ -42,9 +42,21 @@ func (d *jsonrpcDispatcher) mapWorkflowError(ctx context.Context, err error) *v1
 	case errors.Is(err, biz.ErrWorkflowTaskConflict):
 		l.Warnf("[workflow] task version conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务已被其他人更新，请刷新后重试"}
+	case errors.Is(err, biz.ErrWorkflowTaskAssignmentNoop):
+		l.Warnf("[workflow] assignment unchanged err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务处理人没有变化，请重新选择"}
+	case errors.Is(err, biz.ErrWorkflowAssigneeIneligible):
+		l.Warnf("[workflow] assignee ineligible err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选接收人已不可用，请重新选择"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		l.Warnf("[workflow] idempotency intent conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrProcessTaskOwnerRoleNotFound):
+		l.Warnf("[workflow] process task owner role not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"}
+	case errors.Is(err, biz.ErrProcessTaskOwnerRoleAmbiguous):
+		l.Warnf("[workflow] process task owner role ambiguous err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"}
 	case errors.Is(err, biz.ErrProcessInstanceSettled),
 		errors.Is(err, biz.ErrProcessNodeInstanceConflict),
 		errors.Is(err, biz.ErrProcessNodeInstanceSettled),
