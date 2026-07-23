@@ -644,11 +644,7 @@ function normalizeFactReference(record, key, index) {
         "paymentTermDays",
         "payment_term_days",
       );
-      nullableValue(
-        "invoice_category",
-        "invoiceCategory",
-        "invoice_category",
-      );
+      nullableValue("invoice_category", "invoiceCategory", "invoice_category");
       nullableValue("cancelled_at", "cancelledAt", "cancelled_at");
       nullableValue(
         "cancelled_by_name",
@@ -894,11 +890,57 @@ function validateTaskReport(report) {
         ) === MOBILE_TASKS_PER_ROLE
       );
     });
+  const runtimeEvidence = report.runtimeEvidence;
+  const runtimeEvidenceByCase = new Map(
+    Array.isArray(runtimeEvidence)
+      ? runtimeEvidence.map((item) => [item?.caseKey, item])
+      : [],
+  );
+  const runtimeEvidenceIsExact =
+    Array.isArray(runtimeEvidence) &&
+    runtimeEvidence.length === 5 &&
+    runtimeEvidenceByCase.size === 5 &&
+    [
+      "started_only",
+      "active_ready",
+      "task_blocked",
+      "rejected",
+      "completed",
+    ].every((caseKey) => {
+      const item = runtimeEvidenceByCase.get(caseKey);
+      return (
+        item?.evidenceClass === "formal_process_runtime" &&
+        Number.isSafeInteger(item?.source?.id) &&
+        item.source.id > 0 &&
+        String(item?.source?.orderNo || "").trim()
+      );
+    }) &&
+    runtimeEvidenceByCase.get("started_only")?.processInstance?.status ===
+      "active" &&
+    runtimeEvidenceByCase.get("active_ready")?.processContext?.process_instance
+      ?.status === "active" &&
+    runtimeEvidenceByCase.get("task_blocked")?.task?.task_status_key ===
+      "blocked" &&
+    runtimeEvidenceByCase.get("task_blocked")?.processContext?.process_instance
+      ?.status === "active" &&
+    runtimeEvidenceByCase.get("rejected")?.task?.task_status_key ===
+      "rejected" &&
+    runtimeEvidenceByCase.get("rejected")?.processContext?.process_instance
+      ?.status === "blocked" &&
+    runtimeEvidenceByCase.get("completed")?.processContext?.process_instance
+      ?.status === "completed";
   if (
     report.mode !== "apply" ||
     report.simulatedOnly !== true ||
     report.realCustomerImport !== false ||
     report.writesFacts !== false ||
+    report.evidenceClass !==
+      "mixed_formal_runtime_and_simulated_display_only" ||
+    report.provesProcessRuntime !== true ||
+    !runtimeEvidenceIsExact ||
+    report.displayOnlyTasks?.evidenceClass !== "simulated_display_only" ||
+    report.displayOnlyTasks?.provesProcessRuntime !== false ||
+    Number(report.displayOnlyTasks?.total) !== MOBILE_TASK_TOTAL ||
     !String(report.datasetKey || "").trim() ||
     !String(report.dataVersion || "").trim() ||
     !String(report.target || "").trim() ||
@@ -2527,17 +2569,13 @@ function productionExceptionActiveResult(exceptionResult) {
     enoughRecords: passed,
     enoughStatuses: passed,
     enoughSecondaryKinds: true,
-    batchEvidence: sourceProven
-      ? exceptionResult.batchEvidence
-      : "not_proven",
+    batchEvidence: sourceProven ? exceptionResult.batchEvidence : "not_proven",
     exactSourceType: sourceProven ? exceptionResult.exactSourceType : null,
     exactSourceID: sourceProven ? exceptionResult.exactSourceID : null,
     exactTaskCodePrefix: sourceProven
       ? exceptionResult.exactTaskCodePrefix
       : null,
-    exactOwnerRoleKey: sourceProven
-      ? exceptionResult.exactOwnerRoleKey
-      : null,
+    exactOwnerRoleKey: sourceProven ? exceptionResult.exactOwnerRoleKey : null,
     exactTaskGroup: sourceProven ? exceptionResult.exactTaskGroup : null,
     notProvenReason: sourceProven
       ? null

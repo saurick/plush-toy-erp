@@ -731,7 +731,11 @@ export function createFinanceBusinessSourceScenarios(deps) {
         const relatedButton = page.getByRole('button', {
           name: /相关单据/u,
         })
-        assert.equal(await relatedButton.isDisabled(), true)
+        assert.equal(
+          await relatedButton.count(),
+          0,
+          '缺少来源单据读取权限时不应展示相关单据入口'
+        )
         assert.equal(await page.locator('.ant-message-error').count(), 0)
         assert.equal(new URL(page.url()).pathname, '/erp/finance/payables')
         await assertNoHorizontalOverflow(

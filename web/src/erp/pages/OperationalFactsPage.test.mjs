@@ -23,7 +23,7 @@ test('finance cancellation requires a bounded business reason and sends it to th
 test('draft facts can exit without pretending an inventory reversal happened', () => {
   assert.match(
     source,
-    /!\['DRAFT', 'POSTED'\]\.includes\(activeSelectedRow\.status\)/u
+    /\['DRAFT', 'POSTED'\]\.includes\(activeSelectedRow\.status\)/u
   )
   assert.match(source, /草稿尚未过账，不会变更库存/u)
   assert.match(source, /草稿尚未确认，作废不会生成过账或库存变更/u)
@@ -37,10 +37,9 @@ test('finance draft actions fail closed when a historical row lacks a formal sou
     /const financeDraftTransitionBlocked\s*=\s*[\s\S]*activeSelectedRow\?\.status === 'DRAFT'[\s\S]*!hasValidFinanceTransitionSource\(activeSelectedRow\)/u
   )
   assert.match(source, /该历史草稿缺少可核对来源，不能确认或作废/u)
-  assert.equal(
-    source.match(/financeDraftTransitionBlocked \|\|/gu)?.length,
-    2,
-    'finance confirm and draft cancellation must share the same source guard'
+  assert.ok(
+    (source.match(/financeDraftTransitionBlocked \|\|/gu)?.length || 0) >= 4,
+    'finance confirm and draft cancellation must share the same source guard in the tooltip and button'
   )
 })
 
@@ -51,10 +50,10 @@ test('production and outsourcing historical drafts fail closed without source co
     /const sourceBoundDraftTransitionBlocked\s*=\s*[\s\S]*\['production', 'outsourcing'\]\.includes\(currentActiveKey\)[\s\S]*hasRequiredOperationalFactDraftSource/u
   )
   assert.match(source, /该历史草稿缺少可核对来源，不能过账或作废/u)
-  assert.equal(
-    source.match(/sourceBoundDraftTransitionBlocked \|\|/gu)?.length,
-    2,
-    'post and draft cancellation must share the same source guard'
+  assert.ok(
+    (source.match(/sourceBoundDraftTransitionBlocked \|\|/gu)?.length || 0) >=
+      4,
+    'post and draft cancellation must share the same source guard in the tooltip and button'
   )
 })
 
@@ -62,7 +61,7 @@ test('shipment drafts can be voided without claiming an inventory reversal', () 
   assert.match(source, /确认作废出货草稿？草稿尚未出库，不会变更库存/u)
   assert.match(
     source,
-    /!\['DRAFT', 'SHIPPED'\]\.includes\(activeSelectedRow\.status\)/u
+    /\['DRAFT', 'SHIPPED'\]\.includes\(activeSelectedRow\.status\)/u
   )
   assert.match(source, /activeSelectedRow\?\.status === 'DRAFT'[\s\S]{0,100}'作废出货草稿'/u)
 })

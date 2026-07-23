@@ -912,14 +912,17 @@ func (s debugBusinessChainScenario) buildPlan(debugRunID string, now time.Time) 
 	cleanupToken := fmt.Sprintf("%s:%s", debugRunID, s.key)
 	basePayload := func(extra map[string]any) map[string]any {
 		payload := map[string]any{
-			"debug":            true,
-			"created_by_debug": true,
-			"debug_run_id":     debugRunID,
-			"scenario_key":     s.key,
-			"scenario_code":    s.code,
-			"cleanup_token":    cleanupToken,
-			"debug_seed":       debugSeedVersion,
-			"debug_created_at": now.UTC().Format(time.RFC3339),
+			"debug":                  true,
+			"created_by_debug":       true,
+			"simulated_only":         true,
+			"evidence_class":         "simulated_display_only",
+			"proves_process_runtime": false,
+			"debug_run_id":           debugRunID,
+			"scenario_key":           s.key,
+			"scenario_code":          s.code,
+			"cleanup_token":          cleanupToken,
+			"debug_seed":             debugSeedVersion,
+			"debug_created_at":       now.UTC().Format(time.RFC3339),
 		}
 		for key, value := range extra {
 			payload[key] = value
@@ -1033,6 +1036,7 @@ func (s debugBusinessChainScenario) buildPlan(debugRunID string, now time.Time) 
 	}
 
 	warnings := append([]string(nil), s.warnings...)
+	warnings = append(warnings, "该场景只生成模拟展示快照，不创建真实源单或 ProcessRuntime，不能计入流程闭环证据。")
 	sort.Strings(warnings)
 	return DebugSeedPlan{
 		ScenarioKey:     s.key,

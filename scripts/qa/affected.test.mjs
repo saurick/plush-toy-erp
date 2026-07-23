@@ -461,7 +461,7 @@ test("affected: full subsumes focused commands but keeps browser follow-up visib
   assert(plan.followUps.some((item) => item.id === "browser-regression"));
 });
 
-test("affected: formatted plan states that pre-push full remains mandatory", () => {
+test("affected: formatted plan keeps final clean HEAD preparation mandatory", () => {
   const output = formatPlan(
     buildAffectedPlan(["docs/product/自动化测试策略.md"], { root: ROOT }),
     {
@@ -469,6 +469,6 @@ test("affected: formatted plan states that pre-push full remains mandatory", () 
     },
   );
 
-  assert.match(output, /pre-push.*scripts\/qa\/full\.sh/u);
+  assert.match(output, /prepare-push\.sh.*full 回执/u);
   assert.match(output, /affected 通过不代表发布或目标环境验收完成/u);
 });

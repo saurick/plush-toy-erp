@@ -8,6 +8,17 @@ import {
   resolveWorkflowTaskSourceEntryPath,
 } from './dashboardTaskDisplay.mjs'
 
+test('formatWorkflowTaskSource marks simulated task catalog as display-only', () => {
+  assert.equal(
+    formatWorkflowTaskSource({
+      source_type: 'simulated-manual-acceptance-task-batch',
+      source_no: 'SIM-001',
+      payload: { simulated_only: true },
+    }),
+    '模拟任务批次'
+  )
+})
+
 const INTENT_HASH = 'b'.repeat(64)
 
 test('dashboardTaskDisplay: 任务来源类型使用业务可读标签', () => {

@@ -486,11 +486,53 @@ function taskReport(overrides = {}) {
     runId,
   });
   const coverage = taskPlan.coverage;
+  const runtimeEvidence = [
+    {
+      caseKey: "started_only",
+      source: { id: 1, orderNo: "SO-RUNTIME-1" },
+      processInstance: { status: "active" },
+      evidenceClass: "formal_process_runtime",
+    },
+    {
+      caseKey: "active_ready",
+      source: { id: 2, orderNo: "SO-RUNTIME-2" },
+      processContext: { process_instance: { status: "active" } },
+      evidenceClass: "formal_process_runtime",
+    },
+    {
+      caseKey: "task_blocked",
+      source: { id: 3, orderNo: "SO-RUNTIME-3" },
+      task: { task_status_key: "blocked" },
+      processContext: { process_instance: { status: "active" } },
+      evidenceClass: "formal_process_runtime",
+    },
+    {
+      caseKey: "rejected",
+      source: { id: 4, orderNo: "SO-RUNTIME-4" },
+      task: { task_status_key: "rejected" },
+      processContext: { process_instance: { status: "blocked" } },
+      evidenceClass: "formal_process_runtime",
+    },
+    {
+      caseKey: "completed",
+      source: { id: 5, orderNo: "SO-RUNTIME-5" },
+      processContext: { process_instance: { status: "completed" } },
+      evidenceClass: "formal_process_runtime",
+    },
+  ];
   return {
     mode: "apply",
     simulatedOnly: true,
     realCustomerImport: false,
     writesFacts: false,
+    evidenceClass: "mixed_formal_runtime_and_simulated_display_only",
+    provesProcessRuntime: true,
+    runtimeEvidence,
+    displayOnlyTasks: {
+      evidenceClass: "simulated_display_only",
+      provesProcessRuntime: false,
+      total: 180,
+    },
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId,
@@ -1257,8 +1299,7 @@ test("business dashboard projection proves the exact runtime module set", () => 
     "pass",
   );
   const pollutedInventory = structuredClone(modules);
-  pollutedInventory.find((item) => item.module_key === "inventory").total =
-    999;
+  pollutedInventory.find((item) => item.module_key === "inventory").total = 999;
   assert.equal(
     evaluateBusinessDashboardProjection(probe, {
       modules: pollutedInventory,
@@ -1808,8 +1849,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   );
   assert.deepEqual(
     report.summary.taskGroupCoverage.byRole.warehouse.groups
-      .trial_warehouse_work
-      .missingScenarios,
+      .trial_warehouse_work.missingScenarios,
     [],
   );
   assert.deepEqual(
@@ -1973,32 +2013,29 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert(
     calls
       .filter((item) => item.method === "list_tasks")
-      .every(
-        (item) => {
-          if (item.params.task_group) {
-            return (
-              [
-                "production_scheduling",
-                "production_exception",
-                "shipment_release",
-              ].includes(item.params.task_group) &&
-              Boolean(item.params.source_type) &&
-              Number(item.params.source_id) > 0 &&
-              !("customer_key" in item.params)
-            );
-          }
+      .every((item) => {
+        if (item.params.task_group) {
           return (
-            item.params.source_type ===
-              "simulated-manual-acceptance-task-batch" &&
-            item.params.source_id ===
-              manualAcceptanceTaskBatchIdentity(
-                CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
-              ).sourceID &&
-            Boolean(item.params.owner_role_key) &&
+            [
+              "production_scheduling",
+              "production_exception",
+              "shipment_release",
+            ].includes(item.params.task_group) &&
+            Boolean(item.params.source_type) &&
+            Number(item.params.source_id) > 0 &&
             !("customer_key" in item.params)
           );
-        },
-      ),
+        }
+        return (
+          item.params.source_type ===
+            "simulated-manual-acceptance-task-batch" &&
+          item.params.source_id ===
+            manualAcceptanceTaskBatchIdentity(CURRENT_MANUAL_ACCEPTANCE_RUN_ID)
+              .sourceID &&
+          Boolean(item.params.owner_role_key) &&
+          !("customer_key" in item.params)
+        );
+      }),
   );
   assert(
     calls.every(({ method }) =>

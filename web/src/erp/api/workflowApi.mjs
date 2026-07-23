@@ -1,6 +1,7 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { requireWorkflowProcessContext } from '../utils/processRuntimePresentation.mjs'
 import { requireWorkflowTaskMutationParams } from '../utils/workflowTaskMutation.mjs'
 import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'
 
@@ -282,6 +283,19 @@ export async function listWorkflowTaskEvents(taskId, options = {}) {
   )
   const data = dataOf(result)
   return Array.isArray(data?.items) ? data.items : []
+}
+
+export async function getWorkflowTaskProcessContext(taskId, options = {}) {
+  const normalizedTaskId = Number(taskId)
+  if (!Number.isSafeInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    throw new Error('任务流程参数无效')
+  }
+  const result = await workflowRpc.call(
+    'get_task_process_context',
+    { task_id: normalizedTaskId },
+    options
+  )
+  return requireWorkflowProcessContext(dataOf(result)?.process_context)
 }
 
 export async function listWorkflowRoleTasks(params = {}) {

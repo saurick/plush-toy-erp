@@ -157,6 +157,18 @@ test('mobile task detail keeps canonical completion feedback visible after reloa
   assert.match(detailScreenSource, /whitespace-pre-wrap/u)
 })
 
+test('mobile task detail loads formal process position and marks display-only tasks', () => {
+  assert.match(detailScreenSource, /getWorkflowTaskProcessContext/u)
+  assert.match(detailScreenSource, /mobile-task-process-context/u)
+  assert.match(detailScreenSource, /业务流程/u)
+  assert.match(detailScreenSource, /流程发起/u)
+  assert.match(detailScreenSource, /当前节点/u)
+  assert.match(detailScreenSource, /已完成节点/u)
+  assert.match(detailScreenSource, /最终状态/u)
+  assert.match(detailScreenSource, /模拟展示数据/u)
+  assert.match(detailScreenSource, /不计入流程闭环证据/u)
+})
+
 test('mobile task detail separates real attachments from historical text references', () => {
   assert.match(detailScreenSource, />\s*任务附件\s*</u)
   assert.match(detailScreenSource, />\s*历史处理线索\s*</u)

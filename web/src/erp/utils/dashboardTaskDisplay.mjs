@@ -154,6 +154,12 @@ export function getWorkflowTaskSourceTypeLabel(
 }
 
 export function formatWorkflowTaskSource(task = {}) {
+  if (
+    task?.payload?.simulated_only === true ||
+    String(task.source_type || '') === 'simulated-manual-acceptance-task-batch'
+  ) {
+    return '模拟任务批次'
+  }
   const sourceNo = resolveReadableWorkflowSourceNo(task, ['source_no'])
   if (sourceNo) {
     return sourceNo

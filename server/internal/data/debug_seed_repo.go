@@ -37,6 +37,8 @@ var debugBusinessDataClearTables = []string{
 	"workflow_task_events",
 	"workflow_tasks",
 	"workflow_business_states",
+	"process_node_instances",
+	"process_instances",
 	"finance_facts",
 	"stock_reservations",
 	"shipment_items",

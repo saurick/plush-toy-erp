@@ -115,6 +115,7 @@ export async function installAdminRpcMocks(
     adminProfileOverride = null,
     effectiveSessionOverride = null,
     workflowTaskFixtures = [],
+    workflowProcessContextFixtures = [],
   } = {}
 ) {
   const nowUnix = () => Math.floor(Date.now() / 1000)
@@ -124,10 +125,8 @@ export async function installAdminRpcMocks(
       key: item.key || item.path,
       label: item.label,
       path: item.path,
-      required_any:
-        mockMenuPermissionRequirements[item.key || item.path] ||
-        item.required_any ||
-        ['style.mock.unassigned'],
+      required_any: mockMenuPermissionRequirements[item.key || item.path] ||
+        item.required_any || ['style.mock.unassigned'],
       required_all: item.required_all || [],
     }))
     .filter((item) => item.path)
@@ -354,23 +353,23 @@ export async function installAdminRpcMocks(
     const readKey = [...parts.slice(0, -1), 'read'].join('.')
     const configuredMenuKeys =
       mockPermissionUsageMenuKeys[item.permission_key] || null
-    const menus = (configuredMenuKeys
-      ? configuredMenuKeys
-          .map((menuKey) => mockMenus.find((menu) => menu.key === menuKey))
-          .filter(Boolean)
-      : mockMenus.filter((menu) =>
-          [...(menu.required_any || []), ...(menu.required_all || [])].some(
-            (key) => key === item.permission_key || key === readKey
+    const menus = (
+      configuredMenuKeys
+        ? configuredMenuKeys
+            .map((menuKey) => mockMenus.find((menu) => menu.key === menuKey))
+            .filter(Boolean)
+        : mockMenus.filter((menu) =>
+            [...(menu.required_any || []), ...(menu.required_all || [])].some(
+              (key) => key === item.permission_key || key === readKey
+            )
           )
-        )
-    )
-      .map(({ key, label, path, required_any, required_all }) => ({
-        key,
-        label,
-        path,
-        required_any,
-        required_all,
-      }))
+    ).map(({ key, label, path, required_any, required_all }) => ({
+      key,
+      label,
+      path,
+      required_any,
+      required_all,
+    }))
     const isControlPlane = mockControlPlanePermissionModules.has(item.module)
     const conditions = [
       isControlPlane
@@ -542,6 +541,7 @@ export async function installAdminRpcMocks(
     resolveDelayFromReferer,
     createMockAdminToken,
     workflowTaskFixtures,
+    workflowProcessContextFixtures,
   }
 
   await installSystemRpcMocks(page, mockContext)

@@ -47,7 +47,11 @@ async function workflowMockHarness(
       ]),
     },
   },
-  { workflowTaskFixtures = [], workflowAssignmentCandidates = [] } = {}
+  {
+    workflowTaskFixtures = [],
+    workflowProcessContextFixtures = [],
+    workflowAssignmentCandidates = [],
+  } = {}
 ) {
   const handlers = new Map()
   const page = {
@@ -62,6 +66,7 @@ async function workflowMockHarness(
     nowUnix: () => 1_750_000_000,
     resolveDelayFromReferer: () => 0,
     workflowTaskFixtures,
+    workflowProcessContextFixtures,
     workflowAssignmentCandidates:
       workflowAssignmentCandidates.length > 0
         ? workflowAssignmentCandidates
@@ -1965,6 +1970,71 @@ test('style-l1 workflow approval completion uses the explicit approve capability
     action_key: 'complete',
   })
   assert.equal(denied.result.code, 40010)
+})
+
+test('style-l1 workflow process context mock returns only visible task runtime truth', async () => {
+  const task = {
+    id: 83,
+    task_code: 'STYLE-L1-PROCESS-CONTEXT-83',
+    task_group: 'engineering_data',
+    task_name: '工程资料',
+    source_type: 'sales_order',
+    source_id: 83,
+    source_no: 'SO-L1-83',
+    task_status_key: 'ready',
+    owner_role_key: 'sales',
+    required_capability_key: 'workflow.task.complete',
+    process_instance_id: 830,
+    process_node_instance_id: 831,
+    version: 1,
+    payload: {},
+  }
+  const processContext = {
+    source: { type: 'sales_order', id: 83, no: 'SO-L1-83' },
+    process_instance: {
+      id: 830,
+      process_key: 'sales_order_acceptance',
+      process_version: 'v1',
+      status: 'active',
+      started_at: 1_750_000_000,
+      completed_at: null,
+    },
+    nodes: [
+      {
+        id: 831,
+        process_instance_id: 830,
+        node_key: 'engineering_data',
+        node_type: 'human_task',
+        attempt: 1,
+        status: 'active',
+        outcome: '',
+      },
+    ],
+    current_nodes: [
+      {
+        id: 831,
+        process_instance_id: 830,
+        node_key: 'engineering_data',
+        node_type: 'human_task',
+        attempt: 1,
+        status: 'active',
+        outcome: '',
+      },
+    ],
+    completed_nodes: [],
+  }
+  const call = await workflowMockHarness(undefined, {
+    workflowTaskFixtures: [task],
+    workflowProcessContextFixtures: [{ taskID: 83, processContext }],
+  })
+
+  const visible = await call('get_task_process_context', { task_id: 83 })
+  assert.equal(visible.result.code, 0)
+  assert.deepEqual(visible.result.data.process_context, processContext)
+
+  const missing = await call('get_task_process_context', { task_id: 84 })
+  assert.equal(missing.result.code, 40010)
+  assert.deepEqual(missing.result.data, {})
 })
 
 test('style-l1 workflow mutations replay exact receipts before terminal and CAS checks', async () => {

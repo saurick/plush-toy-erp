@@ -27,7 +27,7 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
    - 常用入口：`README.md`、`docs/当前真源与交接顺序.md`、`docs/product/自动化测试策略.md`、`server/README.md`、`web/README.md`、`scripts/README.md`。
    - 不把历史 changes、聊天规划或单个测试名当成测试范围真源。
 3. 按影响面选择验证层级 T0-T8，不用一个固定清单套所有任务。
-4. 开发期先用 `bash scripts/qa/affected.sh --plan` 核对自动选择、required follow-up 与保守升级；确认计划后再用 `--run`。`affected` 不替代 pre-push `full.sh` 或发布前 `strict.sh`。
+4. 开发期先用 `bash scripts/qa/affected.sh --plan` 核对自动选择、required follow-up 与保守升级；确认计划后再用 `--run`。最终 clean HEAD 运行 `bash scripts/qa/prepare-push.sh`，由它在远端连接建立前完整执行一次 full 并签发短期回执；`affected` 不替代该收口或发布前 `strict.sh`。
 5. 执行前检查工作区状态；执行后记录命令、实际测试数、pass/fail/skip、未覆盖项和剩余风险。缺 summary、`0 tests executed` 或 skip 必须按 fail-closed 报告，不能写成通过。
 6. 有文件改动时，按项目约定更新 `progress.md`。
 
@@ -52,7 +52,7 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 | T5 Frontend / Page | 页面、表单、样式、表格、导航、交互态 | `cd web && pnpm lint`、`pnpm css`、`pnpm test`、`pnpm style:l1`，必要时真实浏览器脚本 |
 | T6 Config / Seed / Import | 客户配置、seed/fixture、source snapshot、模拟数据、导入预演 | 配置 manifest/边界测试、`node --test scripts/import/*.test.mjs`、相关 dry-run / freeze 检查 |
 | T7 Business Integration / E2E | 隔离 PostgreSQL 关键事务、JSON-RPC/RBAC、真实浏览器业务闭环 | 项目关键 PostgreSQL gate、定向 JSON-RPC/浏览器 E2E；必须实际执行且 fail/skip 为 0 |
-| T8 Release / Deploy | 冻结树门禁、制品、migration、目标运行态、恢复与回滚 | `full.sh` / `strict.sh` + production preflight + 固定 image + migration lock + target health/smoke + backup/restore/rollback evidence |
+| T8 Release / Deploy | 冻结树门禁、制品、migration、目标运行态、恢复与回滚 | 最终推送 `prepare-push.sh` / `full.sh`、发版 `strict.sh` + production preflight + 固定 image + migration lock + target health/smoke + backup/restore/rollback evidence |
 
 ## Test Shapes
 
@@ -74,7 +74,7 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 - 页面治理改动至少覆盖默认态、交互态、恢复态、相邻区域、长文本/大数字/多标签等边界样本；`style:l1` 是浏览器级回归，不替代真实后端读写回归。
 - Import / Seed 改动必须区分 dry-run、fixture、模拟客户数据和真实客户数据；当前没有可直接执行的真实客户数据导入。
 - 部署测试默认不在低配服务器构建；远端只做加载制品、migration、启动、健康检查和必要 smoke。
-- `full.sh` / `strict.sh` 绿色只证明对应当前树的本地门禁；没有目标环境 release、migration、health/smoke、恢复与回滚证据时，不能写成已发布或已交付。
+- `prepare-push.sh` 回执、`full.sh` / `strict.sh` 绿色只证明所绑定当前树和范围的本地门禁；任何代码、依赖、migration、测试、门禁或关键环境变化都必须重新验证。没有目标环境 release、migration、health/smoke、恢复与回滚证据时，不能写成已发布或已交付。
 
 ## Reporting Standard
 

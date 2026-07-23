@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -536,6 +536,7 @@ Usage:
   node scripts/qa/manual-acceptance-task-data.mjs [--run-id <text>] \\
     [--backend-url <url>] [--target <profile>] [--data-version <text>] \\
     [--database-name <name>] [--schedule-anchor-utc <iso>] \\
+    [--source-report <path>] \\
     [--out <directory>] [--apply] \\
     [--retire-legacy-run-id <text>] [--retire-legacy-copy-revision <text>]
 
@@ -551,6 +552,7 @@ Apply to the dedicated local acceptance runtime:
       --data-version 2026.07.16-v5 \\
       --run-id 20260716-V5 \\
       --schedule-anchor-utc 2026-07-17T09:00:00.000Z \\
+      --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \\
       --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/task
 
 The registered customer trial target additionally requires
@@ -1449,6 +1451,7 @@ export function parseArgs(argv) {
     dataVersion: process.env.MANUAL_ACCEPTANCE_TASK_DATA_VERSION,
     retireLegacyRunId: "",
     retireLegacyCopyRevision: "",
+    sourceReport: process.env.MANUAL_ACCEPTANCE_SOURCE_REPORT || "",
     runId:
       process.env.MANUAL_ACCEPTANCE_TASK_RUN_ID || timestampRunId(new Date()),
   };
@@ -1496,6 +1499,9 @@ export function parseArgs(argv) {
           "--schedule-anchor-utc",
         );
         break;
+      case "source-report":
+        options.sourceReport = requiredText(value, "--source-report");
+        break;
       case "retire-legacy-run-id":
         options.retireLegacyRunId = sanitizeRunId(value);
         break;
@@ -1532,6 +1538,12 @@ export function parseArgs(argv) {
   ) {
     throw new CliError(
       "task --apply requires --schedule-anchor-utc captured by the fresh dataset run; same-batch replay must reuse it",
+      2,
+    );
+  }
+  if (options.apply && !options.retireLegacyRunId && !options.sourceReport) {
+    throw new CliError(
+      "task --apply requires --source-report from the same dataset run",
       2,
     );
   }
@@ -1696,6 +1708,7 @@ async function assertSafeRuntime({
   accounts,
   runtimeAdmin,
   targetAttestation,
+  includeSalesRuntime = false,
   fetchImpl,
 }) {
   const attested = targetAttestation
@@ -1724,7 +1737,9 @@ async function assertSafeRuntime({
     policy: plan,
     capabilities,
     session,
-    requiredModules: ["workflow_tasks"],
+    requiredModules: includeSalesRuntime
+      ? ["workflow_tasks", "sales_orders"]
+      : ["workflow_tasks"],
     customerKey: CUSTOMER_KEY,
   });
   return attested
@@ -2050,6 +2065,482 @@ async function verifyFinalBatch({ plan, accounts, fetchImpl }) {
   return finalTasks;
 }
 
+export function validateSalesOrderAcceptanceSourceReport(report, plan) {
+  if (
+    !report ||
+    report.mode !== "apply" ||
+    report.simulatedOnly !== true ||
+    report.realCustomerImport !== false ||
+    report.datasetKey !== plan.datasetKey ||
+    report.dataVersion !== plan.dataVersion ||
+    report.runId !== plan.runId ||
+    report.target !== plan.target ||
+    report.backendURL !== plan.backendURL ||
+    report.databaseName !== plan.databaseName
+  ) {
+    throw new CliError(
+      "source report does not belong to this simulated task dataset run",
+      2,
+    );
+  }
+  const candidates = report.referenceRecords?.salesOrderProcessCandidates;
+  if (!Array.isArray(candidates) || candidates.length < 5) {
+    throw new CliError(
+      "source report requires five DRAFT sales order process candidates",
+      2,
+    );
+  }
+  const seen = new Set();
+  return candidates.slice(0, 5).map((candidate) => {
+    const id = positiveSafeInteger(candidate?.id, "process candidate id");
+    const orderNo = requiredText(
+      candidate?.orderNo,
+      "process candidate orderNo",
+    );
+    if (candidate?.status !== "DRAFT" || seen.has(id) || seen.has(orderNo)) {
+      throw new CliError(
+        "process candidates must be unique DRAFT sales orders",
+        2,
+      );
+    }
+    seen.add(id);
+    seen.add(orderNo);
+    return { id, orderNo, status: "DRAFT" };
+  });
+}
+
+function requireSalesRuntimeTask(task, source) {
+  if (
+    !task ||
+    typeof task !== "object" ||
+    positiveSafeInteger(task.id, "linked task id") <= 0 ||
+    positiveSafeInteger(task.version, "linked task version") <= 0 ||
+    task.source_type !== "sales_order" ||
+    Number(task.source_id) !== source.id ||
+    !String(task.task_status_key || "").trim() ||
+    !String(task.owner_role_key || "").trim() ||
+    !Number.isSafeInteger(Number(task.process_instance_id)) ||
+    Number(task.process_instance_id) <= 0 ||
+    !Number.isSafeInteger(Number(task.process_node_instance_id)) ||
+    Number(task.process_node_instance_id) <= 0
+  ) {
+    throw new CliError(`${source.orderNo} linked task readback is invalid`);
+  }
+  return task;
+}
+
+async function listSalesOrderProcessTasks({
+  plan,
+  source,
+  runtimeAdmin,
+  fetchImpl,
+}) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "workflow",
+    method: "list_tasks",
+    params: {
+      source_type: "sales_order",
+      source_id: source.id,
+      limit: 50,
+      offset: 0,
+    },
+    token: runtimeAdmin.token,
+    fetchImpl,
+  });
+  if (
+    !Array.isArray(data.tasks) ||
+    !Number.isSafeInteger(Number(data.total)) ||
+    Number(data.total) !== data.tasks.length
+  ) {
+    throw new CliError(`${source.orderNo} linked task readback is incomplete`);
+  }
+  return data.tasks.map((task) => requireSalesRuntimeTask(task, source));
+}
+
+async function readSalesOrderProcessContext({
+  plan,
+  source,
+  task,
+  token,
+  fetchImpl,
+}) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "workflow",
+    method: "get_task_process_context",
+    params: { task_id: task.id },
+    token,
+    fetchImpl,
+  });
+  const processContext = data.process_context;
+  if (
+    processContext?.source?.type !== "sales_order" ||
+    Number(processContext?.source?.id) !== source.id ||
+    processContext?.process_instance?.process_key !==
+      "sales_order_acceptance" ||
+    !new Set(["active", "blocked", "completed"]).has(
+      processContext?.process_instance?.status,
+    ) ||
+    !Array.isArray(processContext.nodes) ||
+    !Array.isArray(processContext.current_nodes) ||
+    !Array.isArray(processContext.completed_nodes)
+  ) {
+    throw new CliError(
+      `${source.orderNo} process context readback is incomplete`,
+    );
+  }
+  return processContext;
+}
+
+function requireSalesOrderAcceptanceStart(data, source) {
+  const instance = data?.process_instance;
+  const node = data?.started_node;
+  const matchingNode = Array.isArray(data?.nodes)
+    ? data.nodes.find(
+        (candidate) =>
+          candidate?.id === node?.id &&
+          candidate.process_instance_id === instance?.id &&
+          candidate.node_key === node?.node_key &&
+          candidate.node_type === node?.node_type &&
+          candidate.status === node?.status &&
+          candidate.version === node?.version,
+      )
+    : undefined;
+  if (
+    !Number.isSafeInteger(Number(instance?.id)) ||
+    Number(instance.id) <= 0 ||
+    instance.process_key !== "sales_order_acceptance" ||
+    instance.business_ref_type !== "sales_order" ||
+    Number(instance.business_ref_id) !== source.id ||
+    instance.status !== "active" ||
+    !Number.isSafeInteger(Number(node?.id)) ||
+    Number(node.id) <= 0 ||
+    !Number.isSafeInteger(Number(node?.version)) ||
+    Number(node.version) <= 0 ||
+    Number(node.process_instance_id) !== Number(instance.id) ||
+    node.node_key !== "submit_sales_order" ||
+    node.node_type !== "domain_command" ||
+    !new Set(["active", "completed"]).has(node.status) ||
+    !matchingNode ||
+    (node.status === "completed" && node.outcome !== "sales_order.submitted")
+  ) {
+    throw new CliError(
+      `${source.orderNo} process start readback is incomplete`,
+    );
+  }
+  return { instance, node, nodes: data.nodes };
+}
+
+function requireSalesOrderAcceptanceExecution(data, source, expected) {
+  const node = data?.completed_node;
+  const matchingNode = Array.isArray(data?.nodes)
+    ? data.nodes.find(
+        (candidate) =>
+          candidate?.id === node?.id &&
+          Number(candidate.process_instance_id) === expected.instanceID &&
+          candidate.node_key === "submit_sales_order" &&
+          candidate.node_type === "domain_command" &&
+          candidate.status === "completed" &&
+          candidate.version === node?.version,
+      )
+    : undefined;
+  if (
+    Number(node?.id) !== expected.nodeID ||
+    Number(node?.process_instance_id) !== expected.instanceID ||
+    node?.node_key !== "submit_sales_order" ||
+    node?.node_type !== "domain_command" ||
+    node?.status !== "completed" ||
+    node?.outcome !== "sales_order.submitted" ||
+    Number(node?.version) !== expected.version + 1 ||
+    !matchingNode
+  ) {
+    throw new CliError(
+      `${source.orderNo} submit execution readback is incomplete`,
+    );
+  }
+  return node;
+}
+
+async function mutateSalesOrderProcessTask({
+  plan,
+  source,
+  task,
+  target,
+  accounts,
+  fetchImpl,
+}) {
+  const contracts = {
+    blocked: ["block_task_action", "block"],
+    rejected: ["reject_task_action", "reject"],
+    done: ["complete_task_action", "complete"],
+  };
+  const [method, actionKey] = contracts[target] || [];
+  const account = accounts[task.owner_role_key];
+  if (!method || !account) {
+    throw new CliError(
+      `no trial account can perform ${target} for ${task.owner_role_key}`,
+    );
+  }
+  const reason =
+    target === "blocked"
+      ? "验收样例：等待客户补充资料。"
+      : target === "rejected"
+        ? "验收样例：订单资料不完整，退回补充。"
+        : "验收样例：当前节点已核对完成。";
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "workflow",
+    method,
+    params: {
+      task_id: task.id,
+      expected_version: task.version,
+      idempotency_key: [
+        "manual-acceptance-runtime",
+        plan.runId,
+        task.id,
+        target,
+      ].join(":"),
+      action_key: actionKey,
+      reason,
+      payload: target === "done" ? { feedback: reason } : {},
+    },
+    token: account.token,
+    fetchImpl,
+  });
+  const updated = requireSalesRuntimeTask(
+    requireTaskRecord(data, method),
+    source,
+  );
+  if (updated.id !== task.id || updated.task_status_key !== target) {
+    throw new CliError(
+      `${source.orderNo} ${method} returned another task state`,
+    );
+  }
+  return updated;
+}
+
+export async function applySalesOrderAcceptanceRuntimeEvidence({
+  plan,
+  sources,
+  accounts,
+  runtimeAdmin,
+  fetchImpl,
+}) {
+  const caseKeys = [
+    "started_only",
+    "active_ready",
+    "task_blocked",
+    "rejected",
+    "completed",
+  ];
+  const evidence = [];
+  for (let index = 0; index < caseKeys.length; index += 1) {
+    const caseKey = caseKeys[index];
+    const source = sources[index];
+    const startData = await rpcCall({
+      backendURL: plan.backendURL,
+      domain: "customer_config",
+      method: "start_sales_order_acceptance_process",
+      params: {
+        sales_order_id: source.id,
+        business_ref_no: source.orderNo,
+        idempotency_key: [
+          "manual-acceptance-runtime",
+          plan.runId,
+          source.orderNo,
+          "start",
+        ].join(":"),
+      },
+      token: accounts.sales.token,
+      fetchImpl,
+    });
+    const started = requireSalesOrderAcceptanceStart(startData, source);
+    if (caseKey === "started_only") {
+      if (started.node.status !== "active") {
+        throw new CliError(
+          `${source.orderNo} started-only evidence has already advanced`,
+        );
+      }
+      evidence.push({
+        caseKey,
+        source,
+        processInstance: started.instance,
+        startedNode: started.node,
+        nodes: started.nodes,
+        evidenceClass: "formal_process_runtime",
+      });
+      continue;
+    }
+
+    let tasks = await listSalesOrderProcessTasks({
+      plan,
+      source,
+      runtimeAdmin,
+      fetchImpl,
+    });
+    if (tasks.length === 0 && started.node.status === "active") {
+      const executionData = await rpcCall({
+        backendURL: plan.backendURL,
+        domain: "customer_config",
+        method: "execute_sales_order_acceptance_submit",
+        params: {
+          process_instance_id: Number(started.instance.id),
+          process_node_instance_id: Number(started.node.id),
+          expected_version: Number(started.node.version),
+          sales_order_id: source.id,
+          idempotency_key: [
+            "manual-acceptance-runtime",
+            plan.runId,
+            source.orderNo,
+            "submit",
+          ].join(":"),
+        },
+        token: accounts.sales.token,
+        fetchImpl,
+      });
+      requireSalesOrderAcceptanceExecution(executionData, source, {
+        instanceID: Number(started.instance.id),
+        nodeID: Number(started.node.id),
+        version: Number(started.node.version),
+      });
+      tasks = await listSalesOrderProcessTasks({
+        plan,
+        source,
+        runtimeAdmin,
+        fetchImpl,
+      });
+    }
+    let activeTask = tasks.find((task) => task.task_status_key === "ready");
+
+    if (caseKey === "task_blocked") {
+      activeTask =
+        tasks.find((task) => task.task_status_key === "blocked") || activeTask;
+      if (!activeTask) {
+        throw new CliError(`${source.orderNo} has no blockable linked task`);
+      }
+      if (activeTask.task_status_key === "ready") {
+        activeTask = await mutateSalesOrderProcessTask({
+          plan,
+          source,
+          task: activeTask,
+          target: "blocked",
+          accounts,
+          fetchImpl,
+        });
+      }
+    } else if (caseKey === "rejected") {
+      activeTask =
+        tasks.find((task) => task.task_status_key === "rejected") || activeTask;
+      if (!activeTask) {
+        throw new CliError(`${source.orderNo} has no rejectable linked task`);
+      }
+      if (activeTask.task_status_key === "ready") {
+        activeTask = await mutateSalesOrderProcessTask({
+          plan,
+          source,
+          task: activeTask,
+          target: "rejected",
+          accounts,
+          fetchImpl,
+        });
+      }
+    } else if (caseKey === "completed") {
+      let processCompleted = false;
+      for (let guard = 0; guard < 8; guard += 1) {
+        if (!activeTask) {
+          const contextTask = tasks[0];
+          if (!contextTask) {
+            throw new CliError(
+              `${source.orderNo} has no linked task for completion readback`,
+            );
+          }
+          const existingContext = await readSalesOrderProcessContext({
+            plan,
+            source,
+            task: contextTask,
+            token: runtimeAdmin.token,
+            fetchImpl,
+          });
+          if (existingContext.process_instance.status === "completed") {
+            activeTask = contextTask;
+            processCompleted = true;
+            break;
+          }
+          throw new CliError(`${source.orderNo} process stopped before end`);
+        }
+        activeTask = await mutateSalesOrderProcessTask({
+          plan,
+          source,
+          task: activeTask,
+          target: "done",
+          accounts,
+          fetchImpl,
+        });
+        const processContext = await readSalesOrderProcessContext({
+          plan,
+          source,
+          task: activeTask,
+          token: runtimeAdmin.token,
+          fetchImpl,
+        });
+        if (processContext.process_instance.status === "completed") {
+          processCompleted = true;
+          break;
+        }
+        if (processContext.process_instance.status === "blocked") {
+          throw new CliError(`${source.orderNo} process blocked before end`);
+        }
+        tasks = await listSalesOrderProcessTasks({
+          plan,
+          source,
+          runtimeAdmin,
+          fetchImpl,
+        });
+        activeTask = tasks.find((task) => task.task_status_key === "ready");
+      }
+      if (!processCompleted) {
+        throw new CliError(`${source.orderNo} process did not reach end`);
+      }
+    } else if (!activeTask) {
+      throw new CliError(
+        `${source.orderNo} did not create an active linked task`,
+      );
+    }
+    const processContext = await readSalesOrderProcessContext({
+      plan,
+      source,
+      task: activeTask,
+      token: runtimeAdmin.token,
+      fetchImpl,
+    });
+    evidence.push({
+      caseKey,
+      source,
+      task: activeTask,
+      processContext,
+      evidenceClass: "formal_process_runtime",
+      writesFacts: false,
+    });
+  }
+  const byKey = Object.fromEntries(
+    evidence.map((item) => [item.caseKey, item]),
+  );
+  if (
+    byKey.active_ready.processContext.process_instance.status !== "active" ||
+    byKey.task_blocked.task.task_status_key !== "blocked" ||
+    byKey.task_blocked.processContext.process_instance.status !== "active" ||
+    byKey.rejected.task.task_status_key !== "rejected" ||
+    byKey.rejected.processContext.process_instance.status !== "blocked" ||
+    byKey.completed.processContext.process_instance.status !== "completed"
+  ) {
+    throw new CliError(
+      "sales order acceptance runtime evidence states do not match the formal contract",
+    );
+  }
+  return evidence;
+}
+
 export async function applyManualAcceptanceTaskData(
   plan,
   {
@@ -2059,6 +2550,7 @@ export async function applyManualAcceptanceTaskData(
     targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
     targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
     fetchImpl = fetch,
+    sourceReport,
   } = {},
 ) {
   validateManualAcceptanceTaskPlan(plan);
@@ -2105,8 +2597,18 @@ export async function applyManualAcceptanceTaskData(
     accounts,
     runtimeAdmin,
     targetAttestation: parsedTargetAttestation,
+    includeSalesRuntime: Boolean(sourceReport),
     fetchImpl,
   });
+  const runtimeEvidence = sourceReport
+    ? await applySalesOrderAcceptanceRuntimeEvidence({
+        plan,
+        sources: validateSalesOrderAcceptanceSourceReport(sourceReport, plan),
+        accounts,
+        runtimeAdmin,
+        fetchImpl,
+      })
+    : [];
   const existingByCode = await preflightExistingBatch({
     plan,
     accounts,
@@ -2166,6 +2668,11 @@ export async function applyManualAcceptanceTaskData(
     realCustomerImport: false,
     writesFacts: false,
     directSQL: false,
+    evidenceClass:
+      runtimeEvidence.length > 0
+        ? "mixed_formal_runtime_and_simulated_display_only"
+        : "simulated_display_only",
+    provesProcessRuntime: runtimeEvidence.length > 0,
     runId: plan.runId,
     copyRevision: plan.copyRevision,
     datasetKey: plan.datasetKey,
@@ -2179,6 +2686,12 @@ export async function applyManualAcceptanceTaskData(
     coverage: plan.coverage,
     schedule: plan.schedule,
     runtime,
+    runtimeEvidence,
+    displayOnlyTasks: {
+      evidenceClass: "simulated_display_only",
+      provesProcessRuntime: false,
+      total: finalTasks.length,
+    },
     summary: {
       ...plan.summary,
       persisted: finalTasks.length,
@@ -2545,7 +3058,9 @@ async function main() {
         retireRunId: options.retireLegacyRunId,
         retireCopyRevision: options.retireLegacyCopyRevision,
       })
-    : await applyManualAcceptanceTaskData(plan);
+    : await applyManualAcceptanceTaskData(plan, {
+        sourceReport: JSON.parse(await readFile(options.sourceReport, "utf8")),
+      });
   const reportPath = await writeTaskReport(options.out, report);
   process.stdout.write(
     `[qa:manual-acceptance-task-data] ${report.mode} complete json=${reportPath}\n`,

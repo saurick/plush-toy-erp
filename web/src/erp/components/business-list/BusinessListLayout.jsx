@@ -21,6 +21,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import {
@@ -870,6 +871,20 @@ export function SelectionActionBar({
   }
 
   return <Card className={className}>{content}</Card>
+}
+
+export function BusinessActionTooltip({
+  children,
+  disabled = false,
+  disabledReason = '',
+}) {
+  if (!disabled || !disabledReason) return children
+
+  return (
+    <Tooltip title={disabledReason}>
+      <span>{children}</span>
+    </Tooltip>
+  )
 }
 
 export function SelectedItemsSummaryTag({

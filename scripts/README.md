@@ -30,7 +30,7 @@
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
 | `scripts/qa/test-data-isolation-boundary.mjs`          | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备是否分桶隔离，并锁住 dry-run 不具备执行能力 | 调整 seed、fixture、模拟数据或导入准备工具后                  |
 | `scripts/qa/manual-regression-data-plan.mjs`           | 只读汇总 Product Core 中性 seed、yoyoosun preview fixture、试用模拟数据、业务事实模拟和岗位任务模拟的手动回归数据入口；不连接后端、不写库、不执行真实导入 | 手动回归前梳理应准备哪些模拟数据和命令                    |
-| `scripts/qa/manual-acceptance-*.mjs`                   | 全页面甲方手工验收入口组：用唯一 runner 和页面归属合同为 local / 133 生成同语义数据，覆盖 48 项目录、账号、源数据、九岗位任务、事实矩阵、只读就绪核验和生命周期退出；详细命令见 `scripts/qa/README.md` | 准备全页面模拟验收数据与脱敏证据 |
+| `scripts/qa/manual-acceptance-*.mjs`                   | 全页面手工验收入口组：用唯一 runner 和页面归属合同为 local / 133 生成同语义模拟数据，覆盖 50 项目录、账号、源数据、九岗位任务、事实矩阵、只读就绪核验和无流程阻断旧批次退出；180 条长列表任务只证明展示交互，另以 5 张同批模拟销售订单走正式 ProcessRuntime 路径，完整清理须重建专用验收库；详细命令见 `scripts/qa/README.md` | 准备全页面模拟验收数据与脱敏证据 |
 | `scripts/qa/purchase-quality-simulated-matrix.mjs`     | 通过正式 JSON-RPC 和岗位演示账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单、采购入库与质检多状态矩阵；显式确认后才写入，不执行真实客户导入 | 本机 local / dev 覆盖草稿、提交、审批、关闭、取消、检验通过 / 拒收、入库过账 / 取消等人工回归状态 |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 旧业务事实模拟矩阵的只读输入 / 计划入口；`--apply` 已 fail-closed 退役，待生产订单、委外订单、销售订单、出货、采购入库和财务事实来源驱动 fixture 重建后才能恢复写入 | 审查旧模拟范围和来源驱动重建前置                  |
@@ -86,7 +86,8 @@
 | `scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住 yoyoosun 客户包 `businessFlows / stateMachines / processPolicies` 仍为 preview-only，不执行 runtime command、不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 | `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、受控流程定义、打印 snapshot 和 forbidden payload；正式编译与 `local_test_apply` 分开校验，revision 长度不超过 64，只允许白名单 ProcessRuntime 读取，不写 Fact | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`、secrets、前端 test / build、历史 populated upgrade、同批唯一 PostgreSQL 关键事务门禁、Chromium PDF 安全集成和剩余服务端 test / build；服务端全包复跑过滤已由专用矩阵真实执行的 PostgreSQL 用例，所有实际选中的测试仍要求零 skip；最后运行外部网络型 govulncheck | 提交前 / 推送前                                            |
+| `scripts/qa/prepare-push.sh`                           | 最终 clean HEAD 推送准备；先读取真实 remote/ref，按 aggregate range 完整执行一次 full，前后状态不变才在 Git common dir 原子签发 30 分钟本地回执 | commit 后、立即 push 前                                    |
+| `scripts/qa/full.sh`                                   | 完整本地检查，先执行 `fast.sh`、secrets、前端 test / build、历史 populated upgrade、同批唯一 PostgreSQL 关键事务门禁、Chromium PDF 安全集成和剩余服务端 test / build；服务端全包复跑过滤已由专用矩阵真实执行的 PostgreSQL 用例，所有实际选中的测试仍要求零 skip；最后运行外部网络型 govulncheck | 独立完整诊断、prepare-push / strict 内部                   |
 | `scripts/qa/strict.sh`                                 | 严格检查，完整复用 full 并补 shell / YAML / 前端零 warning 与漏洞检查 | 发版前                                                     |
 | `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
 | `scripts/qa/agents-size.sh`                            | 扫描全部 AGENTS.md；16 KiB 预警、超过 24 KiB 阻断，不自动改写                                                     | 修改长期协作规则后                                         |
@@ -875,7 +876,16 @@ cd /Users/simon/projects/plush-toy-erp
 node scripts/qa/erp-field-linkage.mjs
 ```
 
-### 4. 提交前检查
+### 4. 最终推送准备
+
+```bash
+bash /Users/simon/projects/plush-toy-erp/scripts/qa/prepare-push.sh
+git push
+```
+
+先完成 commit 并确认 worktree clean。准备脚本在建立远端 push 连接前执行一次完整 full，并把 HEAD/tree、remote/ref/aggregate range、gate contract、关键工具/依赖环境和 30 分钟 TTL 绑定到 Git common dir 下的本地回执。同一 HEAD 不要先手动运行 full 再运行 prepare-push；代码、测试、依赖、migration、门禁、关键环境或远端 ref 变化后必须重新准备。多 ref 或非默认目标使用重复的 `--ref <local-ref>:<remote-ref>` 和必要的 `--remote <name>` 显式准备。
+
+只想独立诊断完整本地门禁、不准备 push 时运行：
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
@@ -993,7 +1003,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 - 支持 `--staged`、`--base <ref-or-range>`、重复 `--file <path>` 和 `--json`，适合开发过程中按影响面取得快速反馈。
 - 优先运行同名 Node 测试；前端、服务端 API、业务事实 PostgreSQL、客户配置 / 导入、schema 和发布路径按风险逐级升级。
 - 页面 L1、`make data` 和目标环境证据作为 required follow-up 明示；未知路径保守升级到 `full.sh`。
-- 不修改 hooks，也不替代 pre-push 的 `full.sh` 或发版前的 `strict.sh`。
+- 不修改 hooks，也不替代最终 clean HEAD 的 `prepare-push.sh` / full 回执或发版前的 `strict.sh`。
 
 ### `fast.sh`
 
@@ -1007,6 +1017,15 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 - 包含 `fast.sh`
 - 补充 secrets、前端 test / build、本地 PostgreSQL 关键事务门禁和服务端 `go test ./...` / `make build`；最后运行 govulncheck，避免外部网络异常先扰动本地并发测试
 - 若定义了前端 `test`，会一并执行；它仍不替代浏览器里的样式 / box 模型回归
+- 始终真实执行固定门禁，不读取或签发本地推送回执；CI strict 也永不读取该回执
+
+### `prepare-push.sh` 与 pre-push 回执
+
+- 准备阶段在 Git 建立 receive-pack 连接前查询远端 ref，计算每个目标 range 和 aggregate range，并对 clean HEAD 完整调用一次 `full.sh`。
+- 只有 full 成功，且前后 HEAD/tree、worktree、remote/ref、gate contract 和关键工具/依赖环境均未变化时，才在 `git rev-parse --git-common-dir` 下按 worktree 隔离签发 HMAC 回执；采用并发锁、私有权限、同目录临时文件和原子 rename。
+- 并发 owner 仍存活、owner 信息不可读或 PID 状态不确定时锁保持 fail closed；只有带脚本 token 且 owner PID 已确认不存在的中断残留锁会被原子隔离并清理。
+- hook 必须读取真实 push stdin，重算 refs/aggregate range，复核 local SHA 等于 HEAD、clean 状态、回执签名/profile/version/environment/TTL，并实时执行每个 range 的 `git log --check` 和严格 secrets。新 ref 使用 `empty-tree..HEAD` aggregate range；纯删除/空 stdin是 no-op，混合删除与更新 fail closed。
+- 缺失、过期、远端漂移或任何代码/依赖/migration/测试/门禁/环境变化都会拒绝复用；hook 不回退到 full，因此不会在已经打开的 SSH 连接上长时间等待。`SKIP_PRE_PUSH`、`--no-verify`、调用者指定的 range、回执路径/token/TTL 都不是常规接口。
 
 ### npm registry token 边界
 
@@ -1022,6 +1041,8 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 - `commit-msg` -> `scripts/git-hooks/commit-msg.sh`
 
 `pre-commit` 只读取当前 staged index 快照，并通过 `db-guard` 拒绝缺少 versioned migration 或 `atlas.sum` 的 Ent schema 结构变更；它保持 check-only，不执行 `make data`、`migrate_apply` 或重新暂存文件。
+
+`pre-push` 在 Git 已打开远端 receive-pack 连接后运行，因此只执行回执与真实 push range 的短门禁；昂贵 full 由 `prepare-push.sh` 提前完成。回执不改变 Git 原生 hook 可被显式绕过的事实，远端 CI / branch protection 仍是独立安全边界。
 
 ## 版本锁定
 

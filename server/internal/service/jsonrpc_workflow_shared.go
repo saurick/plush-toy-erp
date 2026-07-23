@@ -149,6 +149,58 @@ func workflowTaskEventsToAny(items []*biz.WorkflowTaskEvent) []any {
 	return out
 }
 
+func workflowProcessTaskContextToMap(processContext *biz.ProcessTaskContext) map[string]any {
+	if processContext == nil || processContext.Task == nil || processContext.Instance == nil {
+		return nil
+	}
+	return map[string]any{
+		"source": map[string]any{
+			"type": processContext.Instance.BusinessRefType,
+			"id":   processContext.Instance.BusinessRefID,
+			"no":   workflowStringValue(processContext.Instance.BusinessRefNo),
+		},
+		"process_instance": workflowProcessInstanceSummaryToMap(processContext.Instance),
+		"nodes":            workflowProcessNodesToAny(processContext.Nodes),
+		"current_nodes":    workflowProcessNodesToAny(processContext.CurrentNodes),
+		"completed_nodes":  workflowProcessNodesToAny(processContext.CompletedNodes),
+	}
+}
+
+func workflowProcessInstanceSummaryToMap(instance *biz.ProcessInstance) map[string]any {
+	if instance == nil {
+		return nil
+	}
+	return map[string]any{
+		"id":              instance.ID,
+		"process_key":     instance.ProcessKey,
+		"process_version": instance.ProcessVersion,
+		"status":          instance.Status,
+		"started_at":      instance.StartedAt.Unix(),
+		"completed_at":    workflowUnixValue(instance.CompletedAt),
+	}
+}
+
+func workflowProcessNodesToAny(nodes []*biz.ProcessNodeInstance) []any {
+	out := make([]any, 0, len(nodes))
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		out = append(out, map[string]any{
+			"id":                  node.ID,
+			"process_instance_id": node.ProcessInstanceID,
+			"node_key":            node.NodeKey,
+			"node_type":           node.NodeType,
+			"attempt":             node.Attempt,
+			"status":              node.Status,
+			"started_at":          workflowUnixValue(node.StartedAt),
+			"completed_at":        workflowUnixValue(node.CompletedAt),
+			"outcome":             workflowStringValue(node.Outcome),
+		})
+	}
+	return out
+}
+
 func workflowBusinessStatesToAny(items []*biz.WorkflowBusinessState) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {

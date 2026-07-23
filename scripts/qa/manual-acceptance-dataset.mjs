@@ -707,6 +707,8 @@ function buildStages(identity) {
             identity.runId,
             "--backend-url",
             "${TARGET_BACKEND_URL}",
+            "--source-report",
+            `${REPORT_ROOT}/source/apply-report.json`,
             "--out",
             `${REPORT_ROOT}/task`,
           ],
@@ -1460,9 +1462,7 @@ async function prepareManualAcceptanceResume({
       completedStageKeys.push(stage.key);
       if (
         stage.key === "facts" &&
-        !manualAcceptanceOutsourcingInventoryCoverageIsComplete(
-          componentReport,
-        )
+        !manualAcceptanceOutsourcingInventoryCoverageIsComplete(componentReport)
       ) {
         // Earlier V5 reports omitted the outsourcing-return inventory lots.
         // The original digest is still verified above, then the idempotent fact

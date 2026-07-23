@@ -400,7 +400,7 @@ export function createMobileTaskAssertions(deps) {
       })
       const actionButtons = Array.from(scroll?.querySelectorAll('button') || [])
         .filter((button) =>
-          ['切换工作入口', '退出登录'].includes(
+          ['进入电脑端', '切换工作入口', '退出登录'].includes(
             button.textContent?.replace(/\s+/g, ' ').trim() || ''
           )
         )
@@ -447,10 +447,14 @@ export function createMobileTaskAssertions(deps) {
         `${scenarioName} 我的页信息卡布局或主题背景异常: ${JSON.stringify(metrics)}`
       )
     })
-    assert.deepEqual(
-      metrics.actionButtons.map((button) => button.text),
-      ['切换工作入口', '退出登录'],
-      `${scenarioName} 我的页应保留入口切换与退出动作: ${JSON.stringify(metrics)}`
+    const actionButtonTexts = metrics.actionButtons.map(
+      (button) => button.text
+    )
+    assert(
+      actionButtonTexts.length === 2 &&
+        ['进入电脑端', '切换工作入口'].includes(actionButtonTexts[0]) &&
+        actionButtonTexts[1] === '退出登录',
+      `${scenarioName} 我的页应保留可用入口与退出动作: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.actionButtons.every(

@@ -28,6 +28,7 @@ import {
 } from '../utils/businessPagination.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -1114,60 +1115,72 @@ export function OperationalFactWorkspace({
           >
             清空已选
           </Button>
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            disabled={!activeSelectedRow || relatedMenuItems.length === 0}
-            menu={{
-              items: relatedMenuItems,
-              onClick: openRelatedTable,
-            }}
+          {relatedMenuItems.length > 0 ? (
+            <Dropdown
+              trigger={['click']}
+              destroyOnHidden
+              menu={{
+                items: relatedMenuItems,
+                onClick: openRelatedTable,
+              }}
+            >
+              <Button size="small" icon={<LinkOutlined />}>
+                相关单据 <DownOutlined />
+              </Button>
+            </Dropdown>
+          ) : null}
+          <BusinessActionTooltip
+            disabled={!activeSelectedRow}
+            disabledReason="请先选择一条业务记录"
           >
             <Button
               size="small"
-              icon={<LinkOutlined />}
-              disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+              icon={<EyeOutlined />}
+              disabled={!activeSelectedRow}
+              onClick={() => openOperationalFactDetails(activeSelectedRow)}
             >
-              相关单据 <DownOutlined />
+              查看详情
             </Button>
-          </Dropdown>
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            disabled={!activeSelectedRow}
-            onClick={() => openOperationalFactDetails(activeSelectedRow)}
-          >
-            查看详情
-          </Button>
-          {['production', 'outsourcing'].includes(currentActiveKey) ? (
-            <Popconfirm
-              title="确认过账？"
-              onConfirm={() =>
-                runRowAction(activeConfig, activeSelectedRow, 'post', '过账')
+          </BusinessActionTooltip>
+          {['production', 'outsourcing'].includes(currentActiveKey) &&
+          canPostActive &&
+          (!activeSelectedRow || activeSelectedRow.status === 'DRAFT') ? (
+            <BusinessActionTooltip
+              disabled={
+                !activeSelectedRow ||
+                sourceBoundDraftTransitionBlocked ||
+                saving
               }
-              okText="确认"
-              cancelText="取消"
+              disabledReason={
+                sourceBoundDraftTransitionBlocked
+                  ? '该历史草稿缺少可核对来源，不能过账或作废'
+                  : saving
+                    ? '当前操作完成后可过账'
+                    : '请先选择一条业务草稿'
+              }
             >
-              <Button
-                size="small"
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                title={
-                  sourceBoundDraftTransitionBlocked
-                    ? '该历史草稿缺少可核对来源，不能过账或作废'
-                    : undefined
+              <Popconfirm
+                title="确认过账？"
+                onConfirm={() =>
+                  runRowAction(activeConfig, activeSelectedRow, 'post', '过账')
                 }
-                disabled={
-                  !activeSelectedRow ||
-                  activeSelectedRow.status !== 'DRAFT' ||
-                  sourceBoundDraftTransitionBlocked ||
-                  !canPostActive ||
-                  saving
-                }
+                okText="确认"
+                cancelText="取消"
               >
-                过账
-              </Button>
-            </Popconfirm>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  disabled={
+                    !activeSelectedRow ||
+                    sourceBoundDraftTransitionBlocked ||
+                    saving
+                  }
+                >
+                  过账
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
           ) : null}
           {currentActiveKey === 'production' && canCreateProductionRework ? (
             <Button
@@ -1183,35 +1196,35 @@ export function OperationalFactWorkspace({
               发起返工
             </Button>
           ) : null}
-          {currentActiveKey === 'finance' ? (
-            <Popconfirm
-              title="确认当前财务记录？"
-              onConfirm={() =>
-                runRowAction(activeConfig, activeSelectedRow, 'post', '确认')
+          {currentActiveKey === 'finance' &&
+          canFinanceAction &&
+          activeSelectedRow?.status === 'DRAFT' ? (
+            <BusinessActionTooltip
+              disabled={financeDraftTransitionBlocked || saving}
+              disabledReason={
+                financeDraftTransitionBlocked
+                  ? '该历史草稿缺少可核对来源，不能确认或作废'
+                  : '当前操作完成后可确认'
               }
-              okText="确认"
-              cancelText="取消"
             >
-              <Button
-                size="small"
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                title={
-                  financeDraftTransitionBlocked
-                    ? '该历史草稿缺少可核对来源，不能确认或作废'
-                    : undefined
+              <Popconfirm
+                title="确认当前财务记录？"
+                onConfirm={() =>
+                  runRowAction(activeConfig, activeSelectedRow, 'post', '确认')
                 }
-                disabled={
-                  !activeSelectedRow ||
-                  activeSelectedRow.status !== 'DRAFT' ||
-                  financeDraftTransitionBlocked ||
-                  !canFinanceAction ||
-                  saving
-                }
+                okText="确认"
+                cancelText="取消"
               >
-                确认
-              </Button>
-            </Popconfirm>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  disabled={financeDraftTransitionBlocked || saving}
+                >
+                  确认
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
           ) : null}
           {selectedIsSingleReconciliationSource &&
           canCreateSingleReconciliation ? (
@@ -1228,30 +1241,30 @@ export function OperationalFactWorkspace({
               单笔核对
             </Button>
           ) : null}
-          {currentActiveKey === 'finance' ? (
-            <Button
-              size="small"
-              danger
-              icon={<CloseCircleOutlined />}
-              title={
+          {currentActiveKey === 'finance' &&
+          canFinanceAction &&
+          ['DRAFT', 'POSTED'].includes(activeSelectedRow?.status) ? (
+            <BusinessActionTooltip
+              disabled={financeDraftTransitionBlocked || saving}
+              disabledReason={
                 financeDraftTransitionBlocked
                   ? '该历史草稿缺少可核对来源，不能确认或作废'
-                  : undefined
+                  : '当前操作完成后可取消'
               }
-              disabled={
-                !activeSelectedRow ||
-                !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
-                financeDraftTransitionBlocked ||
-                !canFinanceAction ||
-                saving
-              }
-              onClick={() => {
-                setFinanceCancelReason('')
-                setFinanceCancelOpen(true)
-              }}
             >
-              {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
-            </Button>
+              <Button
+                size="small"
+                danger
+                icon={<CloseCircleOutlined />}
+                disabled={financeDraftTransitionBlocked || saving}
+                onClick={() => {
+                  setFinanceCancelReason('')
+                  setFinanceCancelOpen(true)
+                }}
+              >
+                {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
           {currentActiveKey === 'outsourcing' ? (
             <Button
@@ -1285,161 +1298,187 @@ export function OperationalFactWorkspace({
               disabledReason="请先选择一条记录"
             />
           ) : null}
-          {currentActiveKey === 'shipments' ? (
-            <Popconfirm
-              title="确认发货并扣减相应库存？"
-              onConfirm={() =>
-                runRowAction(activeConfig, activeSelectedRow, 'post', '发货')
+          {currentActiveKey === 'shipments' &&
+          canPostActive &&
+          (!activeSelectedRow || activeSelectedRow.status === 'DRAFT') ? (
+            <BusinessActionTooltip
+              disabled={!activeSelectedRow || saving}
+              disabledReason={
+                saving ? '当前操作完成后可发货' : '请先选择一张出货草稿'
               }
-              okText="确认"
-              cancelText="取消"
             >
-              <Button
-                size="small"
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                disabled={
-                  !activeSelectedRow ||
-                  activeSelectedRow.status !== 'DRAFT' ||
-                  !canPostActive ||
-                  saving
+              <Popconfirm
+                title="确认发货并扣减相应库存？"
+                onConfirm={() =>
+                  runRowAction(activeConfig, activeSelectedRow, 'post', '发货')
                 }
+                okText="确认"
+                cancelText="取消"
               >
-                发货
-              </Button>
-            </Popconfirm>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  disabled={!activeSelectedRow || saving}
+                >
+                  发货
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
           ) : null}
-          {currentActiveKey === 'reservations' ? (
-            <Popconfirm
-              title="确认释放库存预留？"
-              onConfirm={() =>
-                runRowAction(
-                  activeConfig,
-                  activeSelectedRow,
-                  'release',
-                  '释放预留'
-                )
+          {currentActiveKey === 'reservations' &&
+          canReleaseActive &&
+          (!activeSelectedRow || activeSelectedRow.status === 'ACTIVE') ? (
+            <BusinessActionTooltip
+              disabled={!activeSelectedRow || saving}
+              disabledReason={
+                saving ? '当前操作完成后可释放' : '请先选择一条有效库存预留'
               }
-              okText="确认"
-              cancelText="取消"
             >
-              <Button
-                size="small"
-                icon={<RollbackOutlined />}
-                disabled={
-                  !activeSelectedRow ||
-                  activeSelectedRow.status !== 'ACTIVE' ||
-                  !canReleaseActive ||
-                  saving
+              <Popconfirm
+                title="确认释放库存预留？"
+                onConfirm={() =>
+                  runRowAction(
+                    activeConfig,
+                    activeSelectedRow,
+                    'release',
+                    '释放预留'
+                  )
                 }
+                okText="确认"
+                cancelText="取消"
               >
-                释放
-              </Button>
-            </Popconfirm>
+                <Button
+                  size="small"
+                  icon={<RollbackOutlined />}
+                  disabled={!activeSelectedRow || saving}
+                >
+                  释放
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
           ) : null}
-          {financeSettlementAction ? (
-            <Popconfirm
-              title={financeSettlementAction.confirmTitle}
-              onConfirm={() =>
-                runRowAction(
-                  activeConfig,
-                  activeSelectedRow,
-                  'settle',
-                  financeSettlementAction.label
-                )
-              }
-              okText="确认"
-              cancelText="取消"
+          {financeSettlementAction &&
+          canFinanceAction &&
+          activeSelectedRow?.status === 'POSTED' ? (
+            <BusinessActionTooltip
+              disabled={saving}
+              disabledReason="当前操作完成后可继续"
             >
-              <Button
-                size="small"
-                icon={<CheckCircleOutlined />}
-                disabled={
-                  !activeSelectedRow ||
-                  activeSelectedRow.status !== 'POSTED' ||
-                  !canFinanceAction ||
-                  saving
+              <Popconfirm
+                title={financeSettlementAction.confirmTitle}
+                onConfirm={() =>
+                  runRowAction(
+                    activeConfig,
+                    activeSelectedRow,
+                    'settle',
+                    financeSettlementAction.label
+                  )
                 }
+                okText="确认"
+                cancelText="取消"
               >
-                {financeSettlementAction.label}
-              </Button>
-            </Popconfirm>
+                <Button
+                  size="small"
+                  icon={<CheckCircleOutlined />}
+                  disabled={saving}
+                >
+                  {financeSettlementAction.label}
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
           ) : null}
-          {['production', 'outsourcing'].includes(currentActiveKey) ? (
-            <Popconfirm
-              title={
-                activeSelectedRow?.status === 'DRAFT'
-                  ? '确认作废草稿？草稿尚未过账，不会变更库存。'
-                  : '确认取消并按系统规则生成撤销调整记录？'
-              }
-              onConfirm={() =>
-                runRowAction(
-                  activeConfig,
-                  activeSelectedRow,
-                  'cancel',
-                  activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'
-                )
-              }
-              okText="确认"
-              cancelText="取消"
-            >
-              <Button
-                size="small"
-                danger
-                icon={<CloseCircleOutlined />}
-                title={
-                  sourceBoundDraftTransitionBlocked
-                    ? '该历史草稿缺少可核对来源，不能过账或作废'
-                    : undefined
-                }
+          {['production', 'outsourcing'].includes(currentActiveKey) &&
+          canCancelActive &&
+          (!activeSelectedRow ||
+            ['DRAFT', 'POSTED'].includes(activeSelectedRow.status)) ? (
+              <BusinessActionTooltip
                 disabled={
-                  !activeSelectedRow ||
-                  !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
-                  sourceBoundDraftTransitionBlocked ||
-                  !canCancelActive ||
-                  saving
-                }
-              >
-                {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
-              </Button>
-            </Popconfirm>
-          ) : null}
-          {currentActiveKey === 'shipments' ? (
-            <Popconfirm
-              title={
-                activeSelectedRow?.status === 'DRAFT'
-                  ? '确认作废出货草稿？草稿尚未出库，不会变更库存。'
-                  : '确认取消出库并恢复相应库存？'
+                !activeSelectedRow ||
+                sourceBoundDraftTransitionBlocked ||
+                saving
               }
-              onConfirm={() =>
-                runRowAction(
-                  activeConfig,
-                  activeSelectedRow,
-                  'cancel',
+                disabledReason={
+                sourceBoundDraftTransitionBlocked
+                  ? '该历史草稿缺少可核对来源，不能过账或作废'
+                  : saving
+                    ? '当前操作完成后可取消'
+                    : '请先选择一条业务记录'
+              }
+              >
+                <Popconfirm
+                  title={
                   activeSelectedRow?.status === 'DRAFT'
-                    ? '作废出货草稿'
-                    : '取消发货'
-                )
-              }
-              okText="确认"
-              cancelText="取消"
-            >
-              <Button
-                size="small"
-                danger
-                icon={<CloseCircleOutlined />}
-                disabled={
-                  !activeSelectedRow ||
-                  !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status) ||
-                  !canCancelActive ||
-                  saving
+                    ? '确认作废草稿？草稿尚未过账，不会变更库存。'
+                    : '确认取消并按系统规则生成撤销调整记录？'
                 }
+                  onConfirm={() =>
+                  runRowAction(
+                    activeConfig,
+                    activeSelectedRow,
+                    'cancel',
+                    activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'
+                  )
+                }
+                  okText="确认"
+                  cancelText="取消"
+                >
+                  <Button
+                    size="small"
+                    danger
+                    icon={<CloseCircleOutlined />}
+                    disabled={
+                    !activeSelectedRow ||
+                    sourceBoundDraftTransitionBlocked ||
+                    saving
+                  }
+                  >
+                    {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
+                  </Button>
+                </Popconfirm>
+              </BusinessActionTooltip>
+          ) : null}
+          {currentActiveKey === 'shipments' &&
+          canCancelActive &&
+          (!activeSelectedRow ||
+            ['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status)) ? (
+              <BusinessActionTooltip
+                disabled={!activeSelectedRow || saving}
+                disabledReason={
+                saving ? '当前操作完成后可取消' : '请先选择一张出货单'
+              }
               >
-                {activeSelectedRow?.status === 'DRAFT'
-                  ? '作废草稿'
-                  : '取消发货'}
-              </Button>
-            </Popconfirm>
+                <Popconfirm
+                  title={
+                  activeSelectedRow?.status === 'DRAFT'
+                    ? '确认作废出货草稿？草稿尚未出库，不会变更库存。'
+                    : '确认取消出库并恢复相应库存？'
+                }
+                  onConfirm={() =>
+                  runRowAction(
+                    activeConfig,
+                    activeSelectedRow,
+                    'cancel',
+                    activeSelectedRow?.status === 'DRAFT'
+                      ? '作废出货草稿'
+                      : '取消发货'
+                  )
+                }
+                  okText="确认"
+                  cancelText="取消"
+                >
+                  <Button
+                    size="small"
+                    danger
+                    icon={<CloseCircleOutlined />}
+                    disabled={!activeSelectedRow || saving}
+                  >
+                    {activeSelectedRow?.status === 'DRAFT'
+                    ? '作废草稿'
+                    : '取消发货'}
+                  </Button>
+                </Popconfirm>
+              </BusinessActionTooltip>
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>

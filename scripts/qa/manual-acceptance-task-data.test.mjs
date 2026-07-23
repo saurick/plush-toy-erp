@@ -7,6 +7,7 @@ import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catal
 
 import {
   applyManualAcceptanceTaskData,
+  applySalesOrderAcceptanceRuntimeEvidence,
   buildLegacyManualAcceptanceTaskBatchReference,
   buildManualAcceptanceTaskDataPlan,
   CONFIRM_PHRASE,
@@ -26,6 +27,7 @@ import {
   getManualAcceptanceTaskGroupScenarios,
   retireLegacyManualAcceptanceTaskBatch,
   validateManualAcceptanceTaskPlan,
+  validateSalesOrderAcceptanceSourceReport,
   WORKFLOW_TASK_CAS_MIGRATION,
   WORKFLOW_TASK_CAS_RELEASE,
 } from "./manual-acceptance-task-data.mjs";
@@ -52,6 +54,51 @@ const SCRIPT_PATH = fileURLToPath(
   new URL("./manual-acceptance-task-data.mjs", import.meta.url),
 );
 const RUNTIME_ADMIN_ID = 100;
+
+test("manual acceptance runtime source report binds five DRAFT sales orders to the same simulated dataset", () => {
+  const plan = buildLocalTaskMutationPlan({
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  });
+  const candidates = Array.from({ length: 5 }, (_, index) => ({
+    id: 100 + index,
+    orderNo: `SO-RUNTIME-${index + 1}`,
+    status: "DRAFT",
+  }));
+  const report = {
+    mode: "apply",
+    simulatedOnly: true,
+    realCustomerImport: false,
+    datasetKey: plan.datasetKey,
+    dataVersion: plan.dataVersion,
+    runId: plan.runId,
+    target: plan.target,
+    backendURL: plan.backendURL,
+    databaseName: plan.databaseName,
+    referenceRecords: { salesOrderProcessCandidates: candidates },
+  };
+  assert.deepEqual(
+    validateSalesOrderAcceptanceSourceReport(report, plan),
+    candidates,
+  );
+  assert.throws(
+    () =>
+      validateSalesOrderAcceptanceSourceReport(
+        { ...report, runId: "another-run" },
+        plan,
+      ),
+    /does not belong/u,
+  );
+  assert.throws(
+    () =>
+      validateSalesOrderAcceptanceSourceReport(
+        { ...report, simulatedOnly: false },
+        plan,
+      ),
+    /simulated task dataset/u,
+  );
+});
+
 const ROLE_IDS = Object.freeze(
   Object.fromEntries(
     Object.keys(ROLE_USERS).map((roleKey, offset) => [roleKey, 101 + offset]),
@@ -117,6 +164,340 @@ function runtimeIdentityResponse() {
     },
   };
 }
+
+function createSalesOrderRuntimeEvidenceMock(sources) {
+  const calls = [];
+  const records = new Map();
+  const tokenToRole = new Map([
+    ["token-sales", "sales"],
+    ["token-boss", "boss"],
+    ["token-pmc", "pmc"],
+    ["token-runtime-admin", "runtime_admin"],
+  ]);
+
+  function clone(value) {
+    return structuredClone(value);
+  }
+
+  function recordForSource(source) {
+    let record = records.get(source.id);
+    if (record) return record;
+    const instanceID = source.id * 100;
+    record = {
+      source,
+      processStatus: "active",
+      instance: {
+        id: instanceID,
+        process_key: "sales_order_acceptance",
+        process_version: "v1",
+        business_ref_type: "sales_order",
+        business_ref_id: source.id,
+        status: "active",
+        started_at: NOW_SEC,
+        completed_at: null,
+      },
+      nodes: [
+        {
+          id: instanceID + 1,
+          process_instance_id: instanceID,
+          node_key: "submit_sales_order",
+          node_type: "domain_command",
+          attempt: 1,
+          status: "active",
+          outcome: "",
+          version: 1,
+        },
+      ],
+      tasks: [],
+    };
+    records.set(source.id, record);
+    return record;
+  }
+
+  function createLinkedTask(record, roleKey, nodeKey, offset) {
+    const node = {
+      id: record.instance.id + offset,
+      process_instance_id: record.instance.id,
+      node_key: nodeKey,
+      node_type: roleKey === "boss" ? "approval" : "human_task",
+      attempt: 1,
+      status: "active",
+      outcome: "",
+      version: 1,
+    };
+    const task = {
+      id: record.instance.id + offset + 1,
+      task_code: `PROC-${record.instance.id}-${nodeKey}`,
+      task_group: nodeKey,
+      task_name: nodeKey === "order_approval" ? "订单审批" : "订单复核",
+      source_type: "sales_order",
+      source_id: record.source.id,
+      source_no: record.source.orderNo,
+      task_status_key: "ready",
+      owner_role_key: roleKey,
+      required_capability_key:
+        roleKey === "boss" ? "workflow.task.approve" : "workflow.task.complete",
+      process_instance_id: record.instance.id,
+      process_node_instance_id: node.id,
+      version: 1,
+      payload: {},
+    };
+    record.nodes.push(node);
+    record.tasks.push(task);
+    return task;
+  }
+
+  function processContext(record) {
+    const instance = {
+      ...record.instance,
+      status: record.processStatus,
+      completed_at: record.processStatus === "completed" ? NOW_SEC + 300 : null,
+    };
+    return {
+      source: {
+        type: "sales_order",
+        id: record.source.id,
+        no: record.source.orderNo,
+      },
+      process_instance: instance,
+      nodes: clone(record.nodes),
+      current_nodes: clone(
+        record.nodes.filter((node) =>
+          ["active", "blocked"].includes(node.status),
+        ),
+      ),
+      completed_nodes: clone(
+        record.nodes.filter((node) => node.status === "completed"),
+      ),
+    };
+  }
+
+  const fetchImpl = async (url, request) => {
+    const domain = new URL(url).pathname.split("/").filter(Boolean).at(-1);
+    const body = JSON.parse(request.body);
+    const params = body.params || {};
+    const token = String(request.headers.Authorization || "").replace(
+      /^Bearer\s+/u,
+      "",
+    );
+    const actorRole = tokenToRole.get(token);
+    calls.push({
+      domain,
+      method: body.method,
+      params: clone(params),
+      actorRole,
+    });
+    assert.equal(request.redirect, "error");
+    assert.ok(actorRole, `${domain}.${body.method} must be authenticated`);
+    if (domain === "workflow") {
+      assert.equal(
+        Object.hasOwn(params, "customer_key"),
+        false,
+        `${domain}.${body.method} must use the server customer context`,
+      );
+    } else {
+      assert.equal(params.customer_key, "yoyoosun");
+    }
+
+    if (
+      domain === "customer_config" &&
+      body.method === "start_sales_order_acceptance_process"
+    ) {
+      assert.equal(actorRole, "sales");
+      const source = sources.find(
+        (candidate) => candidate.id === params.sales_order_id,
+      );
+      assert.ok(source);
+      assert.equal(params.business_ref_no, source.orderNo);
+      const record = recordForSource(source);
+      return jsonResponse({
+        process_instance: clone(record.instance),
+        started_node: clone(record.nodes[0]),
+        nodes: clone(record.nodes),
+      });
+    }
+
+    if (
+      domain === "customer_config" &&
+      body.method === "execute_sales_order_acceptance_submit"
+    ) {
+      assert.equal(actorRole, "sales");
+      const source = sources.find(
+        (candidate) => candidate.id === params.sales_order_id,
+      );
+      const record = records.get(source?.id);
+      assert.ok(record);
+      const submitNode = record.nodes[0];
+      assert.equal(params.process_instance_id, record.instance.id);
+      assert.equal(params.process_node_instance_id, submitNode.id);
+      assert.equal(params.expected_version, submitNode.version);
+      submitNode.status = "completed";
+      submitNode.outcome = "sales_order.submitted";
+      submitNode.version += 1;
+      createLinkedTask(record, "boss", "order_approval", 10);
+      return jsonResponse({
+        completed_node: clone(submitNode),
+        nodes: clone(record.nodes),
+      });
+    }
+
+    assert.equal(domain, "workflow");
+    if (body.method === "list_tasks") {
+      assert.equal(actorRole, "runtime_admin");
+      const record = records.get(Number(params.source_id));
+      const tasks =
+        record?.source.id === Number(params.source_id)
+          ? record.tasks.map(clone)
+          : [];
+      return jsonResponse({
+        tasks,
+        total: tasks.length,
+        limit: 50,
+        offset: 0,
+      });
+    }
+
+    if (body.method === "get_task_process_context") {
+      assert.equal(actorRole, "runtime_admin");
+      const record = [...records.values()].find((candidate) =>
+        candidate.tasks.some((task) => task.id === params.task_id),
+      );
+      assert.ok(record);
+      return jsonResponse({ process_context: processContext(record) });
+    }
+
+    const targetByMethod = {
+      block_task_action: "blocked",
+      reject_task_action: "rejected",
+      complete_task_action: "done",
+    };
+    const target = targetByMethod[body.method];
+    assert.ok(target, `unexpected method ${body.method}`);
+    const record = [...records.values()].find((candidate) =>
+      candidate.tasks.some((task) => task.id === params.task_id),
+    );
+    const task = record?.tasks.find(
+      (candidate) => candidate.id === params.task_id,
+    );
+    const node = record?.nodes.find(
+      (candidate) => candidate.id === task?.process_node_instance_id,
+    );
+    assert.ok(record && task && node);
+    assert.equal(actorRole, task.owner_role_key);
+    assert.equal(params.expected_version, task.version);
+    task.task_status_key = target;
+    task.version += 1;
+    if (target === "rejected") {
+      node.status = "completed";
+      node.outcome = "rejected";
+      record.processStatus = "blocked";
+    } else if (target === "done") {
+      node.status = "completed";
+      node.outcome = task.owner_role_key === "boss" ? "approved" : "confirmed";
+      if (task.owner_role_key === "boss") {
+        createLinkedTask(record, "pmc", "order_review", 20);
+      } else {
+        record.nodes.push({
+          id: record.instance.id + 30,
+          process_instance_id: record.instance.id,
+          node_key: "end",
+          node_type: "end",
+          attempt: 1,
+          status: "completed",
+          outcome: "completed",
+          version: 2,
+        });
+        record.processStatus = "completed";
+      }
+    }
+    return jsonResponse({ task: clone(task) });
+  };
+
+  return { calls, fetchImpl };
+}
+
+test("runtime evidence advances five simulated sales orders through the formal process path", async () => {
+  const plan = buildLocalTaskMutationPlan({
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  });
+  const sources = Array.from({ length: 5 }, (_, index) => ({
+    id: 201 + index,
+    orderNo: `SO-RUNTIME-${index + 1}`,
+    status: "DRAFT",
+  }));
+  const mock = createSalesOrderRuntimeEvidenceMock(sources);
+  const evidence = await applySalesOrderAcceptanceRuntimeEvidence({
+    plan,
+    sources,
+    accounts: {
+      sales: { token: "token-sales" },
+      boss: { token: "token-boss" },
+      pmc: { token: "token-pmc" },
+    },
+    runtimeAdmin: { token: "token-runtime-admin" },
+    fetchImpl: mock.fetchImpl,
+  });
+
+  assert.deepEqual(
+    evidence.map((item) => item.caseKey),
+    ["started_only", "active_ready", "task_blocked", "rejected", "completed"],
+  );
+  assert.equal(
+    evidence.find((item) => item.caseKey === "task_blocked")?.task
+      ?.task_status_key,
+    "blocked",
+  );
+  assert.equal(
+    evidence.find((item) => item.caseKey === "rejected")?.processContext
+      ?.process_instance?.status,
+    "blocked",
+  );
+  assert.equal(
+    evidence.find((item) => item.caseKey === "completed")?.processContext
+      ?.process_instance?.status,
+    "completed",
+  );
+  assert.equal(
+    mock.calls.filter(
+      (call) =>
+        call.domain === "customer_config" &&
+        call.method === "start_sales_order_acceptance_process",
+    ).length,
+    5,
+  );
+  assert.equal(
+    mock.calls.filter(
+      (call) =>
+        call.domain === "customer_config" &&
+        call.method === "execute_sales_order_acceptance_submit",
+    ).length,
+    4,
+  );
+  assert.deepEqual(
+    mock.calls
+      .filter((call) =>
+        [
+          "block_task_action",
+          "reject_task_action",
+          "complete_task_action",
+        ].includes(call.method),
+      )
+      .map((call) => [call.method, call.actorRole]),
+    [
+      ["block_task_action", "boss"],
+      ["reject_task_action", "boss"],
+      ["complete_task_action", "boss"],
+      ["complete_task_action", "pmc"],
+    ],
+  );
+  assert.equal(
+    mock.calls.some((call) =>
+      ["submit_sales_order", "activate_sales_order"].includes(call.method),
+    ),
+    false,
+  );
+});
 
 function permissionsFor(roleKey) {
   if (roleKey === "debug") return ["debug.business.seed"];
@@ -710,7 +1091,13 @@ test("warehouse scenarios stay in the trial namespace and never fill the formal 
   );
   assert.deepEqual(
     plan.coverage.scenariosByRoleTaskGroup.warehouse.trial_warehouse_work,
-    { receiving: 4, inbound: 4, material_picking: 4, shipping: 4, exception: 4 },
+    {
+      receiving: 4,
+      inbound: 4,
+      material_picking: 4,
+      shipping: 4,
+      exception: 4,
+    },
   );
   assert.equal(
     plan.coverage.catalogScenarioDigest,
@@ -916,6 +1303,8 @@ test("CLI documents and parses the output report boundary", () => {
     "local-uat-20260711",
     "--schedule-anchor-utc",
     "2026-07-17T09:00:00.000Z",
+    "--source-report",
+    "output/source/apply-report.json",
     "--out",
     "output/custom-task-data",
   ]);
@@ -930,6 +1319,7 @@ test("CLI documents and parses the output report boundary", () => {
     runId: "LOCAL-UAT-20260711",
     scheduleAnchorUtc: "2026-07-17T09:00:00.000Z",
     nowSec: Date.parse("2026-07-17T09:00:00.000Z") / 1000,
+    sourceReport: "output/source/apply-report.json",
     retireLegacyRunId: "",
     retireLegacyCopyRevision: "",
   });
@@ -945,6 +1335,7 @@ test("CLI documents and parses the output report boundary", () => {
   assert.match(help.stdout, /sourceType, and sourceID/u);
   assert.match(help.stdout, /--database-name <name>/u);
   assert.match(help.stdout, /--schedule-anchor-utc <iso>/u);
+  assert.match(help.stdout, /--source-report <path>/u);
   assert.match(help.stdout, /http:\/\/127\.0\.0\.1:8310/u);
   assert.match(
     help.stdout,

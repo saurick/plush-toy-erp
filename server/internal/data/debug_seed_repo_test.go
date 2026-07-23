@@ -178,6 +178,23 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	assertProjectBusinessTablesEmpty(t, ctx, client)
 }
 
+func TestDebugBusinessDataClearIncludesProcessRuntimeBeforeSourceDocuments(t *testing.T) {
+	index := map[string]int{}
+	for position, table := range debugBusinessDataClearTables {
+		index[table] = position
+	}
+	for _, table := range []string{"workflow_tasks", "process_node_instances", "process_instances", "sales_order_items", "sales_orders"} {
+		if _, ok := index[table]; !ok {
+			t.Fatalf("business clear allowlist is missing %s", table)
+		}
+	}
+	if index["workflow_tasks"] >= index["process_node_instances"] ||
+		index["process_node_instances"] >= index["process_instances"] ||
+		index["process_instances"] >= index["sales_orders"] {
+		t.Fatalf("process runtime cleanup order is unsafe: %#v", index)
+	}
+}
+
 func createDebugOutsourcingOrderWithProcess(t *testing.T, ctx context.Context, client *ent.Client, fixtures inventoryTestFixtures) {
 	t.Helper()
 	supplier, err := client.Supplier.Create().

@@ -16,7 +16,10 @@ import {
   Timeline,
   Typography,
 } from 'antd'
-import { listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
+import {
+  getWorkflowTaskProcessContext,
+  listWorkflowTaskEvents,
+} from '../../api/workflowApi.mjs'
 import {
   formatWorkflowTaskSource,
   resolveWorkflowTaskEntryPath,
@@ -37,6 +40,14 @@ import {
   resolveWorkflowTaskActionStep,
 } from '../../utils/workflowTaskActionFlow.mjs'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
+import {
+  formatProcessStartedAt,
+  getProcessLabel,
+  getProcessNodeLabel,
+  getProcessNodeStatusLabel,
+  getProcessStatusLabel,
+  isDisplayOnlyWorkflowTask,
+} from '../../utils/processRuntimePresentation.mjs'
 import { getRoleDisplayName } from '../../utils/roleKeys.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
@@ -231,6 +242,8 @@ export default function WorkflowTaskActionDrawer({
   const [taskEvents, setTaskEvents] = React.useState([])
   const [taskEventsState, setTaskEventsState] = React.useState('idle')
   const [taskEventsError, setTaskEventsError] = React.useState('')
+  const [processContext, setProcessContext] = React.useState(null)
+  const [processContextState, setProcessContextState] = React.useState('idle')
   const previousTaskIdentityRef = React.useRef('')
   const stepButtonRefs = React.useRef(new Map())
   const actionOptionRefs = React.useRef(new Map())
@@ -314,6 +327,28 @@ export default function WorkflowTaskActionDrawer({
       })
     return () => controller.abort()
   }, [approvalTask, task?.id])
+
+  React.useEffect(() => {
+    if (!task?.id || !task?.process_instance_id) {
+      setProcessContext(null)
+      setProcessContextState('idle')
+      return undefined
+    }
+    const controller = new AbortController()
+    setProcessContext(null)
+    setProcessContextState('loading')
+    getWorkflowTaskProcessContext(task.id, { signal: controller.signal })
+      .then((context) => {
+        setProcessContext(context)
+        setProcessContextState('ready')
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setProcessContext(null)
+        setProcessContextState('error')
+      })
+    return () => controller.abort()
+  }, [task?.id, task?.process_instance_id])
 
   React.useEffect(() => {
     if (stepAvailability[activeStepKey]) return
@@ -543,7 +578,83 @@ export default function WorkflowTaskActionDrawer({
                 <strong>{taskReason}</strong>
               </div>
             ) : null}
+            {isDisplayOnlyWorkflowTask(task) ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="模拟展示数据"
+                description="这条任务只用于检查列表和办理界面，未接入真实流程，不计入流程闭环证据。"
+              />
+            ) : null}
           </section>
+
+          {task.process_instance_id ? (
+            <section
+              className="erp-task-action-drawer__summary"
+              aria-label="流程位置"
+            >
+              <div className="erp-task-action-drawer__eyebrow">流程位置</div>
+              {processContextState === 'loading' ? (
+                <Alert type="info" showIcon message="正在读取流程位置" />
+              ) : processContextState === 'error' ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  message="流程位置暂时无法确认"
+                  description="请刷新后重试；系统不会根据任务文案猜测流程节点。"
+                />
+              ) : processContext ? (
+                <div className="erp-task-action-drawer__meta-grid">
+                  <div>
+                    <span>业务流程</span>
+                    <strong>
+                      {getProcessLabel(processContext.process_instance)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>来源单据</span>
+                    <strong>
+                      {processContext.source.no ||
+                        formatWorkflowTaskSource(task)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>流程发起</span>
+                    <strong>
+                      {formatProcessStartedAt(
+                        processContext.process_instance.started_at
+                      )}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>当前节点</span>
+                    <strong>
+                      {processContext.current_nodes
+                        .map(getProcessNodeLabel)
+                        .join('、') || '无待办节点'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>已完成节点</span>
+                    <strong>
+                      {processContext.completed_nodes
+                        .map(
+                          (node) =>
+                            `${getProcessNodeLabel(node)}（${getProcessNodeStatusLabel(node)}）`
+                        )
+                        .join('、') || '暂无'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>最终状态</span>
+                    <strong>
+                      {getProcessStatusLabel(processContext.process_instance)}
+                    </strong>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           <section
             className="erp-task-action-drawer__guide"
@@ -806,8 +917,8 @@ export default function WorkflowTaskActionDrawer({
                           assignmentAccess.stale
                             ? '任务信息已更新，请刷新任务列表'
                             : assignmentAccess.failed
-                            ? '转交信息加载失败，请关闭后重试'
-                            : '当前没有符合条件的接收人'
+                              ? '转交信息加载失败，请关闭后重试'
+                              : '当前没有符合条件的接收人'
                         }
                         onChange={(value) => onAssignmentTargetChange?.(value)}
                       />

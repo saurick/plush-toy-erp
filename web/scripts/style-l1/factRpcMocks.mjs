@@ -1942,6 +1942,15 @@ export async function installFactRpcMocks(page, context) {
   const workflowTasks = Array.isArray(context.workflowTaskFixtures)
     ? context.workflowTaskFixtures.map(cloneWorkflowTask)
     : []
+  const workflowProcessContexts = new Map(
+    (Array.isArray(context.workflowProcessContextFixtures)
+      ? context.workflowProcessContextFixtures
+      : []
+    ).map((fixture) => [
+      Number(fixture.taskID),
+      cloneWorkflowTask(fixture.processContext),
+    ])
+  )
   const workflowBusinessStates = []
   const workflowMutationReceipts = new Map()
   const workflowRoleTaskSnapshotByCursor = new Map()
@@ -2271,6 +2280,21 @@ export async function installFactRpcMocks(page, context) {
           limit: Number(params.limit || 100),
           offset: 0,
         }
+        break
+      }
+      case 'get_task_process_context': {
+        const taskID = Number(params.task_id || 0)
+        const task = workflowTasks.find((item) => Number(item.id) === taskID)
+        const processContext = workflowProcessContexts.get(taskID)
+        if (
+          !task ||
+          !processContext ||
+          !workflowMockCanViewTask(adminProfile, effectiveSession, task)
+        ) {
+          fail('当前账号不能查看该任务流程位置')
+          break
+        }
+        data = { process_context: cloneWorkflowTask(processContext) }
         break
       }
       case 'list_role_tasks': {

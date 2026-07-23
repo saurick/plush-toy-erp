@@ -1057,15 +1057,16 @@ test("purchase order page keeps write buttons behind projected actions", () => {
     "purchase order page must pass projected permissions into operation panel, modal, and inbound draft guard",
   );
   assert(
-    panelSource.includes("disabled={!canCreate || !referenceDataReady}") &&
+    panelSource.includes("canCreate ? (") &&
+      panelSource.includes("disabled={!referenceDataReady}") &&
+      panelSource.includes("{canUpdate &&") &&
       panelSource.includes("loading={itemsLoading}") &&
       panelSource.includes(
         "!selectedOrderCanEdit || !referenceDataReady || itemsLoading",
       ) &&
-      panelSource.includes(
-        "disabled={\n                !canGenerateInboundDraft",
-      ),
-    "purchase order create/edit/inbound draft controls must stay disabled without projected actions",
+      panelSource.includes("{canCreateInboundDraftAction &&") &&
+      panelSource.includes("!canGenerateInboundDraft"),
+    "purchase order create/edit/inbound draft controls must hide without projected actions and stay disabled while temporarily unavailable",
   );
   assert(
     modalSource.includes("canUpload={canUpdate || canCreate}") &&
@@ -1106,13 +1107,12 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
     "outsourcing order page must derive create/update through projected action helper",
   );
   assert(
-    pageSource.includes("disabled={!canCreate}") &&
-      pageSource.includes(
-        "!canUpdate ||\n              !canEditOutsourcingOrder(selectedRow)",
-      ) &&
+    pageSource.includes("primaryAction={\n          canCreate ? (") &&
+      pageSource.includes("{canUpdate &&") &&
+      pageSource.includes("disabled={!selectedRow || itemsLoading}") &&
       pageSource.includes("canUpload={canUpdate || canCreate}") &&
       pageSource.includes("canDelete={canUpdate}"),
-    "outsourcing order create/edit/attachment controls must stay disabled without projected actions",
+    "outsourcing order create/edit controls must hide without projected actions while attachment writes keep projected permissions",
   );
   assert(
     pageSource.includes(
@@ -1154,11 +1154,12 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "const canCreate = hasActionPermission(adminProfile, 'shipment.create')",
         "const canShip = hasActionPermission(adminProfile, 'shipment.ship')",
         "const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')",
-        "disabled={!canCreate}",
+        "primaryAction={\n          canCreate ? (",
         "disabled={!selectedRow || saving}",
         "onClick={() => openShipmentDetails(selectedRow)}",
-        "selectedRow.status !== 'DRAFT' ||\n                !canShip",
-        "!['DRAFT', 'SHIPPED'].includes(selectedRow.status) ||\n                !canCancel",
+        "{canSubmitShipmentRelease &&",
+        "{canShip && (!selectedRow || selectedRow.status === 'DRAFT') ? (",
+        "{canCancel &&\n          (!selectedRow ||\n            ['DRAFT', 'SHIPPED'].includes(selectedRow.status)) ? (",
         "canCreate={canCreate}",
         "isViewModal={isViewModal}",
       ],
@@ -1173,8 +1174,10 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "canUpload={canCreate || canPost}",
         "canDelete={canCreate || canPost}",
         "页面不提供脱离采购来源的手工入库明细。",
-        "selectedRow.status !== 'DRAFT' ||\n                !canPost",
-        "!['DRAFT', 'POSTED'].includes(selectedRow.status) ||\n                !canPost",
+        "{canCreateReturn &&",
+        "{canCreateAdjustment &&",
+        "{canPost && (!selectedRow || selectedRow.status === 'DRAFT') ? (",
+        "{canPost &&\n          (!selectedRow ||\n            ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (",
         "草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存",
       ],
       forbiddenTokens: [
@@ -1189,10 +1192,11 @@ test("fact pages keep write buttons behind projected actions and status guards",
       tokens: [
         "const canCreate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.create'\n  )",
         "const canUpdate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.update'\n  )",
-        "disabled={!canCreate || referenceDataState !== 'ready'}",
-        "selectedRow.status !== 'DRAFT' ||\n                !canUpdate",
-        "selectedRow.status !== 'SUBMITTED' ||\n              !canUpdate",
-        "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||\n              !canUpdate",
+        "primaryAction={\n          canCreate ? (",
+        "disabled={referenceDataState !== 'ready'}",
+        "{canUpdate && (!selectedRow || selectedRow.status === 'DRAFT') ? (",
+        "{canUpdate &&\n          (!selectedRow || selectedRow.status === 'SUBMITTED') ? (",
+        "{canUpdate &&\n          (!selectedRow ||\n            ['DRAFT', 'SUBMITTED'].includes(selectedRow.status)) ? (",
         "canUpload={canCreate || canUpdate}",
         "canDelete={canUpdate}",
         "不会绕过来源规则直接改写库存数量或生产事实",

@@ -84,11 +84,15 @@ test('production order forms initialize only after their modal is mounted', () =
   assert.equal(page.match(/reasonForm\.resetFields/gu)?.length, 1)
   assert.match(page, /if \(!formMode \|\| !formValues\) return/u)
   assert.match(page, /if \(!reasonAction\) return/u)
+  assert.match(form, /forceRender/u)
 })
 
 test('released production orders create a source-bound completion draft', () => {
   assert.match(page, /'production\.completion\.create'/u)
-  assert.match(page, /selected\.status !== PRODUCTION_ORDER_STATUS\.RELEASED/u)
+  assert.match(
+    page,
+    /selected\?\.status !== PRODUCTION_ORDER_STATUS\.RELEASED/u
+  )
   assert.match(page, /createProductionCompletionFromOrder\(params\)/u)
   assert.match(page, /source_type: 'PRODUCTION_ORDER'/u)
   assert.match(page, /listAllProductionFacts/u)

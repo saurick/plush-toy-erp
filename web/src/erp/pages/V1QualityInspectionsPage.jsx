@@ -57,6 +57,7 @@ import {
 } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -1710,20 +1711,22 @@ export default function V1QualityInspectionsPage() {
           </Space>
         }
         primaryAction={
-          <ToolbarButton
-            type="primary"
-            className="erp-business-list-toolbar__primary-action"
-            icon={<PlusOutlined />}
-            disabled={!canCreate || referenceDataState !== 'ready'}
-            title={
-              referenceDataState !== 'ready'
-                ? '质检来源资料加载完成后可补建'
-                : undefined
-            }
-            onClick={openCreate}
-          >
-            补建来料质检
-          </ToolbarButton>
+          canCreate ? (
+            <BusinessActionTooltip
+              disabled={referenceDataState !== 'ready'}
+              disabledReason="质检来源资料加载完成后可补建"
+            >
+              <ToolbarButton
+                type="primary"
+                className="erp-business-list-toolbar__primary-action"
+                icon={<PlusOutlined />}
+                disabled={referenceDataState !== 'ready'}
+                onClick={openCreate}
+              >
+                补建来料质检
+              </ToolbarButton>
+            </BusinessActionTooltip>
+          ) : null
         }
       >
         <SelectionActionBar
@@ -1740,84 +1743,103 @@ export default function V1QualityInspectionsPage() {
           >
             清空已选
           </Button>
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            disabled={!selectedRow}
-            menu={{
-              items: relatedMenuItems,
-              onClick: openRelatedTable,
-            }}
-          >
-            <Button
-              size="small"
-              icon={<LinkOutlined />}
-              disabled={!selectedRow || relatedMenuItems.length === 0}
+          {relatedMenuItems.length > 0 ? (
+            <Dropdown
+              trigger={['click']}
+              destroyOnHidden
+              menu={{
+                items: relatedMenuItems,
+                onClick: openRelatedTable,
+              }}
             >
-              相关单据 <DownOutlined />
-            </Button>
-          </Dropdown>
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
+              <Button size="small" icon={<LinkOutlined />}>
+                相关单据 <DownOutlined />
+              </Button>
+            </Dropdown>
+          ) : null}
+          <BusinessActionTooltip
             disabled={!selectedRow}
-            onClick={() => openQualityInspectionDetails(selectedRow)}
-          >
-            查看详情
-          </Button>
-          <Popconfirm
-            title="确认提交质检并进入待判定状态？"
-            onConfirm={() =>
-              runInspectionAction(
-                selectedRow,
-                submitQualityInspection,
-                '质检已提交'
-              )
-            }
-            okText="确认"
-            cancelText="取消"
+            disabledReason="请先选择一条质检记录"
           >
             <Button
               size="small"
-              icon={<FileDoneOutlined />}
-              disabled={
-                !selectedRow ||
-                selectedRow.status !== 'DRAFT' ||
-                !canUpdate ||
-                saving
+              icon={<EyeOutlined />}
+              disabled={!selectedRow}
+              onClick={() => openQualityInspectionDetails(selectedRow)}
+            >
+              查看详情
+            </Button>
+          </BusinessActionTooltip>
+          {canUpdate && (!selectedRow || selectedRow.status === 'DRAFT') ? (
+            <BusinessActionTooltip
+              disabled={!selectedRow || saving}
+              disabledReason={
+                saving ? '当前操作完成后可提交' : '请先选择一条质检草稿'
               }
             >
-              提交质检
-            </Button>
-          </Popconfirm>
-          <Button
-            size="small"
-            type="primary"
-            icon={<CheckCircleOutlined />}
-            disabled={
-              !selectedRow ||
-              selectedRow.status !== 'SUBMITTED' ||
-              !canUpdate ||
-              saving
-            }
-            onClick={() => openDecision('pass', selectedRow)}
-          >
-            判定合格
-          </Button>
-          <Button
-            size="small"
-            danger
-            icon={<StopOutlined />}
-            disabled={
-              !selectedRow ||
-              selectedRow.status !== 'SUBMITTED' ||
-              !canUpdate ||
-              saving
-            }
-            onClick={() => openDecision('reject', selectedRow)}
-          >
-            判定不合格
-          </Button>
+              <Popconfirm
+                title="确认提交质检并进入待判定状态？"
+                onConfirm={() =>
+                  runInspectionAction(
+                    selectedRow,
+                    submitQualityInspection,
+                    '质检已提交'
+                  )
+                }
+                okText="确认"
+                cancelText="取消"
+              >
+                <Button
+                  size="small"
+                  icon={<FileDoneOutlined />}
+                  disabled={!selectedRow || saving}
+                >
+                  提交质检
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdate &&
+          (!selectedRow || selectedRow.status === 'SUBMITTED') ? (
+            <>
+              <BusinessActionTooltip
+                disabled={!selectedRow || saving}
+                disabledReason={
+                  saving
+                    ? '当前操作完成后可判定'
+                    : '请先选择一条待判定质检记录'
+                }
+              >
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  disabled={!selectedRow || saving}
+                  onClick={() => openDecision('pass', selectedRow)}
+                >
+                  判定合格
+                </Button>
+              </BusinessActionTooltip>
+              <BusinessActionTooltip
+                disabled={!selectedRow || saving}
+                disabledReason={
+                  saving
+                    ? '当前操作完成后可判定'
+                    : '请先选择一条待判定质检记录'
+                }
+              >
+                <Button
+                  size="small"
+                  danger
+                  icon={<StopOutlined />}
+                  disabled={!selectedRow || saving}
+                  onClick={() => openDecision('reject', selectedRow)}
+                >
+                  判定不合格
+                </Button>
+              </BusinessActionTooltip>
+            </>
+          ) : null}
           {canCreatePurchaseReturn ? (
             <Button
               size="small"
@@ -1885,19 +1907,25 @@ export default function V1QualityInspectionsPage() {
                 : '退供应商'}
             </Button>
           ) : null}
-          <Button
-            size="small"
-            icon={<CloseCircleOutlined />}
-            disabled={
-              !selectedRow ||
-              !['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||
-              !canUpdate ||
-              saving
-            }
-            onClick={() => openDecision('cancel', selectedRow)}
-          >
-            取消质检
-          </Button>
+          {canUpdate &&
+          (!selectedRow ||
+            ['DRAFT', 'SUBMITTED'].includes(selectedRow.status)) ? (
+              <BusinessActionTooltip
+                disabled={!selectedRow || saving}
+                disabledReason={
+                saving ? '当前操作完成后可取消' : '请先选择一条质检记录'
+              }
+              >
+                <Button
+                  size="small"
+                  icon={<CloseCircleOutlined />}
+                  disabled={!selectedRow || saving}
+                  onClick={() => openDecision('cancel', selectedRow)}
+                >
+                  取消质检
+                </Button>
+              </BusinessActionTooltip>
+          ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
 

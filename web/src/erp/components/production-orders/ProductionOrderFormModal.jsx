@@ -404,6 +404,7 @@ export default function ProductionOrderFormModal({
       cancelText="取消"
       onCancel={onCancel}
       onOk={readOnly ? undefined : () => form.submit()}
+      forceRender
       destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={onSubmit}>

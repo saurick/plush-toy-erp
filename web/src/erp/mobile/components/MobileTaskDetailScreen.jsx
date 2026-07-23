@@ -10,8 +10,19 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
-import { listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
+import {
+  getWorkflowTaskProcessContext,
+  listWorkflowTaskEvents,
+} from '../../api/workflowApi.mjs'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
+import {
+  formatProcessStartedAt,
+  getProcessLabel,
+  getProcessNodeLabel,
+  getProcessNodeStatusLabel,
+  getProcessStatusLabel,
+  isDisplayOnlyWorkflowTask,
+} from '../../utils/processRuntimePresentation.mjs'
 import {
   buildTaskFactRows,
   getMobileRoleLabel,
@@ -49,6 +60,8 @@ export default function MobileTaskDetailScreen({
   const approvalTask = isWorkflowApprovalTask(selectedTask)
   const [approvalEvents, setApprovalEvents] = React.useState([])
   const [approvalEventsState, setApprovalEventsState] = React.useState('idle')
+  const [processContext, setProcessContext] = React.useState(null)
+  const [processContextState, setProcessContextState] = React.useState('idle')
 
   React.useEffect(() => {
     if (!selectedTask?.id || !approvalTask) {
@@ -73,6 +86,30 @@ export default function MobileTaskDetailScreen({
       })
     return () => controller.abort()
   }, [approvalTask, selectedTask?.id])
+
+  React.useEffect(() => {
+    if (!selectedTask?.id || !selectedTask?.process_instance_id) {
+      setProcessContext(null)
+      setProcessContextState('idle')
+      return undefined
+    }
+    const controller = new AbortController()
+    setProcessContext(null)
+    setProcessContextState('loading')
+    getWorkflowTaskProcessContext(selectedTask.id, {
+      signal: controller.signal,
+    })
+      .then((context) => {
+        setProcessContext(context)
+        setProcessContextState('ready')
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setProcessContext(null)
+        setProcessContextState('error')
+      })
+    return () => controller.abort()
+  }, [selectedTask?.id, selectedTask?.process_instance_id])
 
   if (!selectedTask || !selectedSeverity) return null
 
@@ -153,6 +190,67 @@ export default function MobileTaskDetailScreen({
             <span className="min-w-0 break-all">{relatedSource}</span>
           </div>
         </section>
+
+        {isDisplayOnlyWorkflowTask(selectedTask) ? (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+            <strong>模拟展示数据</strong>
+            <p>
+              这条任务未接入真实流程，只用于检查列表和办理界面，不计入流程闭环证据。
+            </p>
+          </section>
+        ) : null}
+
+        {selectedTask.process_instance_id ? (
+          <section
+            className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            data-testid="mobile-task-process-context"
+          >
+            <h2 className="text-xl font-semibold text-slate-950">流程位置</h2>
+            {processContextState === 'loading' ? (
+              <p className="mt-3 text-sm text-slate-500">正在读取流程位置</p>
+            ) : processContextState === 'error' ? (
+              <p className="mt-3 text-sm text-red-600">
+                流程位置暂时无法确认，请刷新后重试。
+              </p>
+            ) : processContext ? (
+              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+                <p>
+                  <strong>业务流程：</strong>
+                  {getProcessLabel(processContext.process_instance)}
+                </p>
+                <p>
+                  <strong>来源单据：</strong>
+                  {processContext.source.no || relatedSource}
+                </p>
+                <p>
+                  <strong>流程发起：</strong>
+                  {formatProcessStartedAt(
+                    processContext.process_instance.started_at
+                  )}
+                </p>
+                <p>
+                  <strong>当前节点：</strong>
+                  {processContext.current_nodes
+                    .map(getProcessNodeLabel)
+                    .join('、') || '无待办节点'}
+                </p>
+                <p>
+                  <strong>已完成节点：</strong>
+                  {processContext.completed_nodes
+                    .map(
+                      (node) =>
+                        `${getProcessNodeLabel(node)}（${getProcessNodeStatusLabel(node)}）`
+                    )
+                    .join('、') || '暂无'}
+                </p>
+                <p>
+                  <strong>最终状态：</strong>
+                  {getProcessStatusLabel(processContext.process_instance)}
+                </p>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {actionGuidance ? (
           <section

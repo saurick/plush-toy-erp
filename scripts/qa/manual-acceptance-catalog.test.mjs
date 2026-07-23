@@ -466,7 +466,12 @@ test("formal customer checklist keeps all 50 targets and client-facing truth", (
   assert.match(checklist, /完成 50 项并不自动代表正式交付/u);
   assert.match(checklist, /本轮固定编号识别/u);
   assert.match(checklist, /名称保持简单易懂/u);
-  assert.match(checklist, /可执行、临近到期、阻塞/u);
+  assert.match(checklist, /180 条仅用于列表 \/ 办理交互的模拟任务/u);
+  assert.match(
+    checklist,
+    /5 张同批模拟销售订单覆盖流程已启动、待办、阻塞、退回和完成/u,
+  );
+  assert.match(checklist, /模拟展示任务不冒充流程闭环/u);
   assert.doesNotMatch(checklist, /订单摘要后同意一条/u);
   assert.doesNotMatch(checklist, /已经同意的历史/u);
   assert.doesNotMatch(checklist, /完成 48 项/u);

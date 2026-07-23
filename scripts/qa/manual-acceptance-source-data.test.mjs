@@ -5,6 +5,7 @@ import {
   DEFAULT_SOURCE_DATA_SCALE,
   MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
+  advanceSalesOrderLifecycleThroughProcess,
   applyManualAcceptanceSourceData,
   assertPersistedSourceRecord,
   buildOutsourcingOrderLineReferences,
@@ -670,6 +671,7 @@ test("customer-trial-133 source apply accepts only the registered attested runti
               "materials",
               "processes",
               "sales_orders",
+              "workflow_tasks",
               "purchase_orders",
               "outsourcing_orders",
               "material_bom",
@@ -914,6 +916,7 @@ test("source apply rejects a disabled required module before data reads or write
                       materials: "enabled",
                       processes: "enabled",
                       sales_orders: "enabled",
+                      workflow_tasks: "enabled",
                       purchase_orders: "enabled",
                       outsourcing_orders: "enabled",
                       material_bom: "disabled",
@@ -998,6 +1001,141 @@ test("lifecycle mutations reject malformed or stale success payloads", () => {
       },
     }),
     "SUBMITTED",
+  );
+});
+
+test("sales source lifecycle uses the formal acceptance process instead of removed direct methods", async () => {
+  const plan = buildLocalSourceMutationPlan({
+    runId: "FORMAL-SALES",
+    dataVersion: "FORMAL-SALES",
+  });
+  const methods = [];
+  let statusReads = 0;
+  const report = { steps: [] };
+  const task = {
+    id: 77,
+    version: 1,
+    task_code: "source-order-approval-77",
+    task_group: "order_approval",
+    source_type: "sales_order",
+    source_id: 42,
+    task_status_key: "ready",
+    owner_role_key: "boss",
+    process_instance_id: 101,
+    process_node_instance_id: 202,
+  };
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    methods.push(body.method);
+    if (body.method === "start_sales_order_acceptance_process") {
+      return ok({
+        process_instance: {
+          id: 101,
+          process_key: "sales_order_acceptance",
+          business_ref_type: "sales_order",
+          business_ref_id: 42,
+          status: "active",
+        },
+        started_node: {
+          id: 201,
+          process_instance_id: 101,
+          node_key: "submit_sales_order",
+          node_type: "domain_command",
+          version: 1,
+          status: "active",
+        },
+        nodes: [
+          {
+            id: 201,
+            process_instance_id: 101,
+            node_key: "submit_sales_order",
+            node_type: "domain_command",
+            version: 1,
+            status: "active",
+          },
+        ],
+      });
+    }
+    if (body.method === "execute_sales_order_acceptance_submit") {
+      return ok({
+        completed_node: {
+          id: 201,
+          process_instance_id: 101,
+          node_key: "submit_sales_order",
+          node_type: "domain_command",
+          version: 2,
+          status: "completed",
+          outcome: "sales_order.submitted",
+        },
+        nodes: [
+          {
+            id: 201,
+            process_instance_id: 101,
+            node_key: "submit_sales_order",
+            node_type: "domain_command",
+            version: 2,
+            status: "completed",
+            outcome: "sales_order.submitted",
+          },
+        ],
+      });
+    }
+    if (body.method === "get_sales_order") {
+      statusReads += 1;
+      return ok({
+        sales_order: {
+          id: 42,
+          lifecycle_status: statusReads === 1 ? "SUBMITTED" : "ACTIVE",
+        },
+      });
+    }
+    if (body.method === "list_tasks") {
+      assert.equal(Object.hasOwn(body.params, "customer_key"), false);
+      return ok({ tasks: [task], total: 1 });
+    }
+    if (body.method === "complete_task_action") {
+      assert.equal(init.headers.Authorization, "Bearer token-boss");
+      assert.equal(Object.hasOwn(body.params, "customer_key"), false);
+      return ok({
+        task: {
+          ...task,
+          version: 2,
+          task_status_key: "done",
+        },
+      });
+    }
+    throw new Error(`unexpected method ${body.method}`);
+  };
+
+  const status = await advanceSalesOrderLifecycleThroughProcess({
+    plan,
+    record: { order_no: "SO-FORMAL-42", targetStatus: "ACTIVE" },
+    item: { id: 42, lifecycle_status: "DRAFT" },
+    token: "token-admin",
+    roleTokens: {
+      sales: "token-sales",
+      boss: "token-boss",
+      engineering: "token-engineering",
+      pmc: "token-pmc",
+    },
+    fetchImpl,
+    report,
+  });
+
+  assert.equal(status, "ACTIVE");
+  assert.equal(methods.includes("submit_sales_order"), false);
+  assert.equal(methods.includes("activate_sales_order"), false);
+  assert.deepEqual(methods, [
+    "start_sales_order_acceptance_process",
+    "execute_sales_order_acceptance_submit",
+    "get_sales_order",
+    "list_tasks",
+    "complete_task_action",
+    "get_sales_order",
+  ]);
+  assert.deepEqual(
+    report.steps.map((step) => step.action),
+    ["submit", "complete"],
   );
 });
 

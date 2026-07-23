@@ -173,6 +173,17 @@ type ProcessInstanceStart struct {
 	ID int
 }
 
+// ProcessTaskContext is the read model behind a linked Workflow task. The
+// ProcessRuntime instance and nodes remain the only source of process position;
+// callers must not infer it from task payload snapshots.
+type ProcessTaskContext struct {
+	Task           *WorkflowTask
+	Instance       *ProcessInstance
+	Nodes          []*ProcessNodeInstance
+	CurrentNodes   []*ProcessNodeInstance
+	CompletedNodes []*ProcessNodeInstance
+}
+
 type ProcessLinkedWorkflowTaskCreate struct {
 	ProcessInstanceID     int
 	ProcessNodeInstanceID int
@@ -576,4 +587,54 @@ func (uc *ProcessRuntimeUsecase) ListProcessNodeInstances(ctx context.Context, p
 		return nil, ErrBadParam
 	}
 	return uc.repo.ListProcessNodeInstances(ctx, processInstanceID)
+}
+
+// GetProcessTaskContext reads process position for the exact task snapshot that
+// the caller has already authorized. This avoids a second task read after a
+// visibility decision while still validating every ProcessRuntime anchor.
+func (uc *ProcessRuntimeUsecase) GetProcessTaskContext(ctx context.Context, task *WorkflowTask) (*ProcessTaskContext, error) {
+	if uc == nil || uc.repo == nil || task == nil || task.ID <= 0 {
+		return nil, ErrBadParam
+	}
+	if task.ProcessInstanceID == nil || task.ProcessNodeInstanceID == nil {
+		return nil, ErrBadParam
+	}
+	instance, err := uc.repo.GetProcessInstance(ctx, *task.ProcessInstanceID)
+	if err != nil {
+		return nil, err
+	}
+	if instance.BusinessRefType != task.SourceType || instance.BusinessRefID != task.SourceID {
+		return nil, ErrBadParam
+	}
+	nodes, err := uc.repo.ListProcessNodeInstances(ctx, instance.ID)
+	if err != nil {
+		return nil, err
+	}
+	processContext := &ProcessTaskContext{
+		Task:     task,
+		Instance: instance,
+		Nodes:    nodes,
+	}
+	linkedNodeFound := false
+	for _, node := range nodes {
+		if node == nil || node.ProcessInstanceID != instance.ID {
+			return nil, ErrBadParam
+		}
+		if node.ID == *task.ProcessNodeInstanceID {
+			linkedNodeFound = true
+		}
+		switch node.Status {
+		case ProcessNodeStatusActive, ProcessNodeStatusBlocked:
+			processContext.CurrentNodes = append(processContext.CurrentNodes, node)
+		case ProcessNodeStatusCompleted:
+			processContext.CompletedNodes = append(processContext.CompletedNodes, node)
+		case ProcessNodeStatusWaiting:
+		default:
+			return nil, ErrBadParam
+		}
+	}
+	if !linkedNodeFound {
+		return nil, ErrBadParam
+	}
+	return processContext, nil
 }

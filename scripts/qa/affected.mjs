@@ -655,7 +655,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     commands,
     followUps,
     requiresFull: state.requiresFull,
-    prePushGate: "bash scripts/qa/full.sh",
+    prePushGate: "bash scripts/qa/prepare-push.sh",
   };
 }
 
@@ -714,7 +714,7 @@ export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
     );
   }
   lines.push(
-    `[qa:affected] pre-push 仍由 ${plan.prePushGate} 全量兜底；affected 通过不代表发布或目标环境验收完成。`,
+    `[qa:affected] 最终 clean HEAD 仍需 ${plan.prePushGate} 签发 full 回执；affected 通过不代表发布或目标环境验收完成。`,
   );
   return lines.join("\n");
 }
@@ -805,7 +805,8 @@ function printHelp() {
   页面浏览器回归、make data、目标环境 smoke/evidence 会作为 required follow-up 明示。
 
 边界:
-  affected 不替代 pre-push 的 full.sh，也不替代 strict、目标环境 migration、smoke 或发布证据。`);
+  affected 不替代最终 clean HEAD 的 prepare-push/full 回执，也不替代 strict、
+  目标环境 migration、smoke 或发布证据。`);
 }
 
 function parseArgs(argv) {

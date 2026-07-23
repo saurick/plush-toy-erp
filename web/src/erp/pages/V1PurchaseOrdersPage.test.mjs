@@ -121,7 +121,7 @@ test('purchase refresh reports failure and open forms remain disabled until thei
   assert.match(page, /referenceDataState !== 'ready'[\s\S]*handleSave/u)
   assert.match(
     operationPanel,
-    /disabled=\{!canCreate \|\| !referenceDataReady\}/u
+    /canCreate\s*\?[\s\S]*disabled=\{!referenceDataReady\}/u
   )
   assert.match(
     operationPanel,

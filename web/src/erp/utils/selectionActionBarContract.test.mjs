@@ -42,6 +42,16 @@ test('当前操作条的更多面板使用现有 Drawer 契约并显式恢复触
   assert.match(layoutSource, /destroyOnHidden=\{false\}/u)
 })
 
+test('临时不可用动作使用共享提示，禁用按钮仍可触发原因说明', () => {
+  assert.match(layoutSource, /export function BusinessActionTooltip/u)
+  assert.match(layoutSource, /disabledReason = ''/u)
+  assert.match(
+    layoutSource,
+    /<Tooltip title=\{disabledReason\}>[\s\S]*?<span>\{children\}<\/span>/u
+  )
+  assert.match(layoutSource, /if \(!disabled \|\| !disabledReason\) return children/u)
+})
+
 test('窄屏动作保持可读触控尺寸，不再把全部按钮逐行撑满', () => {
   assert.match(
     responsiveCss,

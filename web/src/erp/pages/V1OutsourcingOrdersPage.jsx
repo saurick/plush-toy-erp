@@ -21,6 +21,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -2298,15 +2299,16 @@ export default function V1OutsourcingOrdersPage() {
           </Space>
         }
         primaryAction={
-          <ToolbarButton
-            type="primary"
-            className="erp-business-list-toolbar__primary-action"
-            icon={<PlusOutlined />}
-            disabled={!canCreate}
-            onClick={openCreate}
-          >
-            新建加工合同
-          </ToolbarButton>
+          canCreate ? (
+            <ToolbarButton
+              type="primary"
+              className="erp-business-list-toolbar__primary-action"
+              icon={<PlusOutlined />}
+              onClick={openCreate}
+            >
+              新建加工合同
+            </ToolbarButton>
+          ) : null
         }
       >
         <SelectionActionBar
@@ -2327,20 +2329,27 @@ export default function V1OutsourcingOrdersPage() {
           {selectedRow
             ? renderOutsourcingOrderStatusTag(selectedRow.lifecycle_status)
             : null}
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            loading={itemsLoading}
-            disabled={
-              !selectedRow ||
-              !canUpdate ||
-              !canEditOutsourcingOrder(selectedRow) ||
-              itemsLoading
-            }
-            onClick={() => openEdit(selectedRow)}
-          >
-            编辑
-          </Button>
+          {canUpdate &&
+          (!selectedRow || canEditOutsourcingOrder(selectedRow)) ? (
+            <BusinessActionTooltip
+              disabled={!selectedRow || itemsLoading}
+              disabledReason={
+                itemsLoading
+                  ? '合同明细加载完成后可编辑'
+                  : '请先选择一条草稿加工合同'
+              }
+            >
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                loading={itemsLoading}
+                disabled={!selectedRow || itemsLoading}
+                onClick={() => openEdit(selectedRow)}
+              >
+                编辑
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
           {canReadOutsourcingFacts ? (
             <Button
               size="small"
@@ -2388,35 +2397,33 @@ export default function V1OutsourcingOrdersPage() {
           >
             作业指导书打印
           </Button>
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            getPopupContainer={(triggerNode) =>
-              triggerNode.parentElement || document.body
-            }
-            disabled={
-              !selectedRow || saving || secondaryLifecycleActions.length === 0
-            }
-            menu={{
-              items: lifecycleMenuItems,
-              onClick: ({ key }) => {
-                const action = secondaryLifecycleActions.find(
-                  (item) => item.key === key
-                )
-                if (action) runLifecycleAction(action)
-              },
-            }}
-          >
-            <Button
-              size="small"
-              aria-label="更多操作"
-              disabled={
-                !selectedRow || saving || secondaryLifecycleActions.length === 0
+          {secondaryLifecycleActions.length > 0 ? (
+            <Dropdown
+              trigger={['click']}
+              destroyOnHidden
+              getPopupContainer={(triggerNode) =>
+                triggerNode.parentElement || document.body
               }
+              disabled={!selectedRow || saving}
+              menu={{
+                items: lifecycleMenuItems,
+                onClick: ({ key }) => {
+                  const action = secondaryLifecycleActions.find(
+                    (item) => item.key === key
+                  )
+                  if (action) runLifecycleAction(action)
+                },
+              }}
             >
-              更多 <DownOutlined />
-            </Button>
-          </Dropdown>
+              <Button
+                size="small"
+                aria-label="更多操作"
+                disabled={!selectedRow || saving}
+              >
+                更多 <DownOutlined />
+              </Button>
+            </Dropdown>
+          ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
 

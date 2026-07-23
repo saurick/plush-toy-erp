@@ -8,6 +8,7 @@ import {
   requireWorkflowTaskMutationParams,
 } from '../utils/workflowTaskMutation.mjs'
 import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'
+import { requireWorkflowProcessContext } from '../utils/processRuntimePresentation.mjs'
 
 function read(relativePath) {
   return readFileSync(
@@ -21,6 +22,8 @@ async function loadWorkflowApi(call) {
   globalThis.__workflowApiTestRequireParams = requireWorkflowTaskMutationParams
   globalThis.__workflowApiTestRequireTaskBoardResponse =
     requireWorkflowTaskBoardResponse
+  globalThis.__workflowApiTestRequireWorkflowProcessContext =
+    requireWorkflowProcessContext
   const transformed = read('./workflowApi.mjs')
     .replace(
       "import { AUTH_SCOPE } from '@/common/auth/auth'",
@@ -46,6 +49,10 @@ async function loadWorkflowApi(call) {
       "import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'",
       'const requireWorkflowTaskBoardResponse = globalThis.__workflowApiTestRequireTaskBoardResponse'
     )
+    .replace(
+      "import { requireWorkflowProcessContext } from '../utils/processRuntimePresentation.mjs'",
+      'const requireWorkflowProcessContext = globalThis.__workflowApiTestRequireWorkflowProcessContext'
+    )
   const encoded = Buffer.from(transformed).toString('base64')
   return import(`data:text/javascript;base64,${encoded}#${Date.now()}`)
 }
@@ -65,6 +72,52 @@ function validTask(overrides = {}) {
     ...overrides,
   }
 }
+
+test('workflowApi: reads and validates task-scoped process context', async () => {
+  const calls = []
+  const completedNode = {
+    id: 19,
+    process_instance_id: 10,
+    node_key: 'submit_sales_order',
+    node_type: 'domain_command',
+    attempt: 1,
+    status: 'completed',
+  }
+  const currentNode = {
+    id: 20,
+    process_instance_id: 10,
+    node_key: 'order_approval',
+    node_type: 'approval',
+    attempt: 1,
+    status: 'active',
+  }
+  const processContext = {
+    source: { type: 'sales_order', id: 1001, no: 'SO-1001' },
+    process_instance: {
+      id: 10,
+      process_key: 'sales_order_acceptance',
+      process_version: 'v1',
+      status: 'active',
+      started_at: 1_800_000_000,
+    },
+    nodes: [completedNode, currentNode],
+    current_nodes: [currentNode],
+    completed_nodes: [completedNode],
+  }
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    return { data: { process_context: processContext } }
+  })
+
+  assert.equal(await api.getWorkflowTaskProcessContext(42), processContext)
+  assert.deepEqual(calls, [
+    { method: 'get_task_process_context', params: { task_id: 42 } },
+  ])
+  await assert.rejects(
+    api.getWorkflowTaskProcessContext(0),
+    /任务流程参数无效/u
+  )
+})
 
 const mutationCases = [
   {

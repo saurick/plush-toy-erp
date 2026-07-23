@@ -40,7 +40,9 @@ type stubWorkflowJSONRPCRepo struct {
 }
 
 type stubProcessRuntimeJSONRPCRepo struct {
+	process          *biz.ProcessInstance
 	node             *biz.ProcessNodeInstance
+	nodes            []*biz.ProcessNodeInstance
 	completedNode    *biz.ProcessNodeInstanceComplete
 	completedProcess *biz.ProcessInstanceComplete
 	blockedNode      *biz.ProcessNodeInstanceBlock
@@ -217,7 +219,10 @@ func (s *stubProcessRuntimeJSONRPCRepo) CreateProcessInstance(context.Context, *
 	return nil, nil, biz.ErrBadParam
 }
 
-func (s *stubProcessRuntimeJSONRPCRepo) GetProcessInstance(context.Context, int) (*biz.ProcessInstance, error) {
+func (s *stubProcessRuntimeJSONRPCRepo) GetProcessInstance(_ context.Context, id int) (*biz.ProcessInstance, error) {
+	if s.process != nil && s.process.ID == id {
+		return s.process, nil
+	}
 	return nil, biz.ErrProcessInstanceNotFound
 }
 
@@ -228,11 +233,59 @@ func (s *stubProcessRuntimeJSONRPCRepo) GetProcessNodeInstance(_ context.Context
 	return nil, biz.ErrProcessNodeInstanceNotFound
 }
 
-func (s *stubProcessRuntimeJSONRPCRepo) ListProcessNodeInstances(context.Context, int) ([]*biz.ProcessNodeInstance, error) {
+func (s *stubProcessRuntimeJSONRPCRepo) ListProcessNodeInstances(_ context.Context, processInstanceID int) ([]*biz.ProcessNodeInstance, error) {
+	if len(s.nodes) > 0 {
+		return s.nodes, nil
+	}
 	if s.node != nil {
 		return []*biz.ProcessNodeInstance{s.node}, nil
 	}
 	return []*biz.ProcessNodeInstance{}, nil
+}
+
+func TestJsonrpcDispatcher_WorkflowGetTaskProcessContextUsesTaskVisibility(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	sourceNo := "SO-TRIAL-001"
+	configRevision := "2026.06.30.workflow-tasks-enabled"
+	startedAt := time.Now().Add(-time.Hour)
+	repo := &stubWorkflowJSONRPCRepo{currentTask: &biz.WorkflowTask{
+		ID: 42, TaskGroup: "order_approval", SourceType: "sales_order", SourceID: 1001, SourceNo: &sourceNo,
+		TaskStatusKey: "ready", OwnerRoleKey: biz.BossRoleKey, ConfigRevision: &configRevision,
+		ProcessInstanceID: &processID, ProcessNodeInstanceID: &nodeID, Version: 1,
+	}}
+	processRepo := &stubProcessRuntimeJSONRPCRepo{
+		process: &biz.ProcessInstance{ID: processID, ProcessKey: biz.ProcessKeySalesOrderAcceptance, ProcessVersion: "v1", BusinessRefType: "sales_order", BusinessRefID: 1001, BusinessRefNo: &sourceNo, Status: biz.ProcessStatusActive, StartedAt: startedAt},
+		nodes: []*biz.ProcessNodeInstance{
+			{ID: 19, ProcessInstanceID: processID, NodeKey: "submit_sales_order", NodeType: biz.ProcessNodeTypeDomainCommand, Status: biz.ProcessNodeStatusCompleted},
+			{ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval", NodeType: biz.ProcessNodeTypeApproval, Status: biz.ProcessNodeStatusActive},
+		},
+	}
+	j := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionWorkflowTaskRead)},
+		workflowUC:  biz.NewWorkflowUsecase(repo), processRuntimeUC: biz.NewProcessRuntimeUsecase(processRepo, repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params, _ := structpb.NewStruct(map[string]any{"task_id": float64(42)})
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_process_context", "1", params)
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected process context OK, res=%#v err=%v", res, err)
+	}
+	contextMap := res.Data.AsMap()["process_context"].(map[string]any)
+	instance := contextMap["process_instance"].(map[string]any)
+	if instance["status"] != biz.ProcessStatusActive || len(contextMap["current_nodes"].([]any)) != 1 || len(contextMap["completed_nodes"].([]any)) != 1 {
+		t.Fatalf("unexpected process context %#v", contextMap)
+	}
+	if _, exposed := instance["definition_hash"]; exposed {
+		t.Fatalf("business read model must not expose internal definition hash")
+	}
+
+	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskRead)}
+	_, denied, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_process_context", "2", params)
+	if err != nil || denied == nil || denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("out-of-scope task process context must stay hidden, res=%#v err=%v", denied, err)
+	}
 }
 
 func (s *stubProcessRuntimeJSONRPCRepo) ClaimProcessNodeDomainCommand(_ context.Context, in *biz.ProcessNodeDomainCommandClaim) (*biz.ProcessNodeInstance, error) {

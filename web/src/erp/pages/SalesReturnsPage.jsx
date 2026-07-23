@@ -26,6 +26,7 @@ import {
   receiveSalesReturn,
 } from '../api/operationalFactApi.mjs'
 import {
+  BusinessActionTooltip,
   BusinessOperationPanel,
   BusinessPageLayout,
   PageHeaderCard,
@@ -371,53 +372,65 @@ export default function SalesReturnsPage() {
           selectedLabel={selected?.return_no || '请选择客户退货记录'}
           boundaryText="审批只确认退货申请；只有收货会写入退回库存，取消已收货记录会生成冲正，不会物理删除。"
         >
-          <Button disabled={!selected} onClick={() => setDetail(selected)}>
-            查看详情
-          </Button>
-          <Popconfirm
-            title="确认批准客户退货？"
-            onConfirm={() => transition('approve')}
+          <BusinessActionTooltip
+            disabled={!selected}
+            disabledReason="请先选择一条客户退货记录"
           >
-            <Button
-              type="primary"
-              disabled={
-                !selected ||
-                selected.status !== 'DRAFT' ||
-                !canApprove ||
-                saving
+            <Button disabled={!selected} onClick={() => setDetail(selected)}>
+              查看详情
+            </Button>
+          </BusinessActionTooltip>
+          {canApprove && (!selected || selected.status === 'DRAFT') ? (
+            <BusinessActionTooltip
+              disabled={!selected || saving}
+              disabledReason={
+                saving ? '当前操作完成后可批准' : '请先选择一条待审批退货'
               }
             >
-              批准
-            </Button>
-          </Popconfirm>
-          <Popconfirm
-            title="确认已收到客户退货？"
-            description="确认后会按退货明细形成库存入库。"
-            onConfirm={() => transition('receive')}
-          >
-            <Button
-              disabled={
-                !selected ||
-                selected.status !== 'APPROVED' ||
-                !canReceive ||
+              <Popconfirm
+                title="确认批准客户退货？"
+                onConfirm={() => transition('approve')}
+              >
+                <Button type="primary" disabled={!selected || saving}>
+                  批准
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {canReceive && (!selected || selected.status === 'APPROVED') ? (
+            <BusinessActionTooltip
+              disabled={!selected || saving}
+              disabledReason={
                 saving
+                  ? '当前操作完成后可确认收货'
+                  : '请先选择一条已批准退货'
               }
             >
-              确认收货
-            </Button>
-          </Popconfirm>
-          <Button
-            danger
-            disabled={
-              !selected ||
-              selected.status === 'CANCELLED' ||
-              !canCancel ||
-              saving
-            }
-            onClick={() => setCancelOpen(true)}
-          >
-            取消退货
-          </Button>
+              <Popconfirm
+                title="确认已收到客户退货？"
+                description="确认后会按退货明细形成库存入库。"
+                onConfirm={() => transition('receive')}
+              >
+                <Button disabled={!selected || saving}>确认收货</Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCancel && (!selected || selected.status !== 'CANCELLED') ? (
+            <BusinessActionTooltip
+              disabled={!selected || saving}
+              disabledReason={
+                saving ? '当前操作完成后可取消' : '请先选择一条客户退货'
+              }
+            >
+              <Button
+                danger
+                disabled={!selected || saving}
+                onClick={() => setCancelOpen(true)}
+              >
+                取消退货
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
       <Table

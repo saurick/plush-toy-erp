@@ -1235,6 +1235,8 @@ export default function V1PurchaseOrdersPage() {
       <PurchaseOrderOperationPanel
         applySelectedRowKeys={applySelectedRowKeys}
         canCreate={canCreate}
+        canCreateInboundDraftAction={canCreatePurchaseReceipt}
+        canUpdate={canUpdate}
         referenceDataReady={referenceDataState === 'ready'}
         canGenerateInboundDraft={canGenerateInboundDraft}
         hasInboundWarehouse={hasInboundWarehouse}

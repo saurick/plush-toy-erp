@@ -3168,9 +3168,7 @@ export function createStyleL1Scenarios(deps) {
       },
       verify: async (page) => {
         await expectHeading(page, '生产订单')
-        await page
-          .getByText('MO-STYLE-L1-20260713', { exact: true })
-          .dblclick()
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).dblclick()
         await page
           .locator('.ant-modal:visible')
           .filter({ hasText: '查看生产订单' })
@@ -3231,9 +3229,7 @@ export function createStyleL1Scenarios(deps) {
       },
       verify: async (page) => {
         await expectHeading(page, '生产订单')
-        await page
-          .getByText('MO-STYLE-L1-20260713', { exact: true })
-          .dblclick()
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).dblclick()
         await expectText(
           page,
           '订单关联的销售订单行、BOM 版本不在当前账号读取范围内，已按只读方式打开'
@@ -3286,8 +3282,7 @@ export function createStyleL1Scenarios(deps) {
           }
           try {
             if (
-              request.postDataJSON()?.method ===
-              'list_production_exceptions'
+              request.postDataJSON()?.method === 'list_production_exceptions'
             ) {
               permissionSafeProductionExceptionRequests += 1
             }
@@ -3448,10 +3443,7 @@ export function createStyleL1Scenarios(deps) {
           if (new URL(request.url()).pathname !== '/rpc/masterdata') return
           try {
             const method = request.postDataJSON()?.method
-            if (
-              method === 'list_products' ||
-              method === 'list_product_skus'
-            ) {
+            if (method === 'list_products' || method === 'list_product_skus') {
               permissionSafeProductReferenceRequests.push(method)
             }
           } catch {
@@ -3911,30 +3903,10 @@ export function createStyleL1Scenarios(deps) {
           }
         }
 
-        const expectProjectedActionDisabled = async (label, message) => {
-          const button = page.getByRole('button', { name: label }).first()
-          await button.waitFor({ state: 'visible', timeout: 10_000 })
-          await page.waitForFunction(
-            (buttonText) =>
-              Array.from(document.querySelectorAll('button')).some(
-                (node) =>
-                  String(node.textContent || '')
-                    .replace(/\s+/g, ' ')
-                    .includes(buttonText) && node.disabled
-              ),
-            label,
-            { timeout: 10_000 }
-          )
-          assert.equal(await button.isDisabled(), true, message)
-        }
-
         await assertEffectiveSessionMenuProjection()
         await expectHeading(page, '出货单')
         await expectText(page, 'SHIP-STYLE-L1')
-        await expectProjectedActionDisabled(
-          '新建草稿',
-          '出货页页面可见但 actions 为空时不应允许新建出货草稿'
-        )
+        await expectNoButton(page, '新建草稿')
         await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
         const shipmentDetailButton = page
           .getByRole('button', { name: '查看明细' })
@@ -3948,20 +3920,14 @@ export function createStyleL1Scenarios(deps) {
           false,
           '出货详情是只读能力，不应被写动作投影禁用'
         )
-        await expectProjectedActionDisabled(
-          '确认出货',
-          '出货页 actions 为空时不应允许确认出货'
-        )
+        await expectNoButton(page, '确认出货')
 
         await gotoScenarioPath(page, '/erp/production/quality-inspections', {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '质量检验')
         await expectText(page, 'QI-STYLE-L1')
-        await expectProjectedActionDisabled(
-          '补建来料质检',
-          '质检页页面可见但 actions 为空时不应允许生成草稿'
-        )
+        await expectNoButton(page, '补建来料质检')
         await page.getByText('QI-STYLE-L1', { exact: false }).first().click()
         for (const label of [
           '提交质检',
@@ -3969,10 +3935,7 @@ export function createStyleL1Scenarios(deps) {
           '判定不合格',
           '取消质检',
         ]) {
-          await expectProjectedActionDisabled(
-            label,
-            `质检页 actions 为空时不应允许${label}`
-          )
+          await expectNoButton(page, label)
         }
 
         await gotoScenarioPath(page, '/erp/warehouse/inbound', {
@@ -3982,10 +3945,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, 'PR-STYLE-L1-DRAFT')
         await page.getByText('PR-STYLE-L1-DRAFT', { exact: false }).click()
         await expectNoButton(page, '添加明细')
-        await expectProjectedActionDisabled(
-          '过账入库',
-          '采购入库页 actions 为空时不应允许确认过账'
-        )
+        await expectNoButton(page, '过账入库')
 
         await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
           waitUntil: 'domcontentloaded',
@@ -4002,19 +3962,10 @@ export function createStyleL1Scenarios(deps) {
         })
         await expectHeading(page, '采购订单')
         await expectText(page, 'PO-STYLE-L1')
-        await expectProjectedActionDisabled(
-          '新建采购订单',
-          '采购订单页页面可见但 actions 为空时不应允许新建采购订单'
-        )
+        await expectNoButton(page, '新建采购订单')
         await page.getByText('PO-STYLE-L1', { exact: false }).first().click()
-        await expectProjectedActionDisabled(
-          '编辑',
-          '采购订单页 actions 为空时不应允许编辑采购订单'
-        )
-        await expectProjectedActionDisabled(
-          '生成入库',
-          '采购订单页 actions 为空时不应允许生成采购入库草稿'
-        )
+        await expectNoButton(page, '编辑')
+        await expectNoButton(page, '生成入库')
         await expectNoButton(page, '提交')
         await expectNoButton(page, '取消')
 
@@ -4023,18 +3974,12 @@ export function createStyleL1Scenarios(deps) {
         })
         await expectHeading(page, '委外订单')
         await expectText(page, 'SIM-OUTSOURCE-CONTRACT-L1')
-        await expectProjectedActionDisabled(
-          '新建加工合同',
-          '委外订单页页面可见但 actions 为空时不应允许新建加工合同'
-        )
+        await expectNoButton(page, '新建加工合同')
         await page
           .getByRole('row')
           .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
           .click()
-        await expectProjectedActionDisabled(
-          '编辑',
-          '委外订单页 actions 为空时不应允许编辑加工合同'
-        )
+        await expectNoButton(page, '编辑')
         await expectNoButton(page, '提交')
         await expectNoButton(page, '确认下单')
       },
@@ -4082,7 +4027,7 @@ export function createStyleL1Scenarios(deps) {
           task_code: 'shipment-finance-approval-9101',
           task_group: 'shipment_finance_approval',
           task_name: '出货财务审批',
-          source_type: 'shipments',
+          source_type: 'shipment',
           source_id: 501,
           source_no: 'SHIP-L1-501',
           task_status_key: 'ready',
@@ -4093,6 +4038,64 @@ export function createStyleL1Scenarios(deps) {
           process_definition_revision_id: 703,
           version: 1,
           payload: { approval_scope: 'shipment_finance_release' },
+        },
+      ],
+      workflowProcessContextFixtures: [
+        {
+          taskID: 9101,
+          processContext: {
+            source: { type: 'shipment', id: 501, no: 'SHIP-L1-501' },
+            process_instance: {
+              id: 701,
+              process_key: 'finished_goods_delivery',
+              process_version: 'v1',
+              status: 'active',
+              started_at: 1_800_000_000,
+              completed_at: null,
+            },
+            nodes: [
+              {
+                id: 700,
+                process_instance_id: 701,
+                node_key: 'finished_goods_quality',
+                node_type: 'domain_command',
+                attempt: 1,
+                status: 'completed',
+                outcome: 'quality_passed',
+              },
+              {
+                id: 702,
+                process_instance_id: 701,
+                node_key: 'shipment_finance_approval',
+                node_type: 'approval',
+                attempt: 1,
+                status: 'active',
+                outcome: '',
+              },
+            ],
+            current_nodes: [
+              {
+                id: 702,
+                process_instance_id: 701,
+                node_key: 'shipment_finance_approval',
+                node_type: 'approval',
+                attempt: 1,
+                status: 'active',
+                outcome: '',
+              },
+            ],
+            completed_nodes: [
+              {
+                id: 700,
+                process_instance_id: 701,
+                node_key: 'finished_goods_quality',
+                node_type: 'domain_command',
+                attempt: 1,
+                status: 'completed',
+                outcome: 'quality_passed',
+              },
+            ],
+          },
         },
       ],
       viewport: { width: 1440, height: 900 },
@@ -4181,6 +4184,13 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '最近审批记录')
         await expectText(page, 'SHIP-L1-501')
         await expectText(page, '等待审批人核对来源单据与放行条件')
+        await expectText(page, '流程位置')
+        await expectText(page, '成品交付')
+        await expectText(page, '当前节点')
+        await expectText(page, '出货财务审批')
+        await expectText(page, '成品质检（已完成）')
+        await expectText(page, '最终状态')
+        await expectText(page, '办理中')
         await page.waitForFunction(() => {
           const wrapper = document.querySelector('.ant-drawer-content-wrapper')
           const rect = wrapper?.getBoundingClientRect()
@@ -4666,9 +4676,7 @@ export function createStyleL1Scenarios(deps) {
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
           .filter({ hasText: 'warehouse-backup · 仓库' })
           .click()
-        await taskDrawer
-          .locator('.erp-task-action-drawer__action-head')
-          .click()
+        await taskDrawer.locator('.erp-task-action-drawer__action-head').click()
         await taskDrawer
           .getByPlaceholder('填写请假、人员调整等转交原因')
           .fill('原处理人请假，由同岗位人员接手')
@@ -5694,6 +5702,102 @@ export function createStyleL1Scenarios(deps) {
         ],
         menus: [],
       },
+      workflowTaskFixtures: [
+        {
+          id: 9201,
+          task_code: 'sales-engineering-data-9201',
+          task_group: 'engineering_data',
+          task_name: '销售订单工程资料办理',
+          source_type: 'sales_order',
+          source_id: 601,
+          source_no: 'SO-L1-601',
+          business_status_key: 'engineering_preparing',
+          task_status_key: 'ready',
+          owner_role_key: 'engineering',
+          required_capability_key: 'workflow.task.complete',
+          process_instance_id: 801,
+          process_node_instance_id: 804,
+          version: 1,
+          priority: 1,
+          payload: {},
+        },
+      ],
+      workflowProcessContextFixtures: [
+        {
+          taskID: 9201,
+          processContext: {
+            source: { type: 'sales_order', id: 601, no: 'SO-L1-601' },
+            process_instance: {
+              id: 801,
+              process_key: 'sales_order_acceptance',
+              process_version: 'v1',
+              status: 'active',
+              started_at: 1_800_000_000,
+              completed_at: null,
+            },
+            nodes: [
+              {
+                id: 802,
+                process_instance_id: 801,
+                node_key: 'submit_sales_order',
+                node_type: 'domain_command',
+                attempt: 1,
+                status: 'completed',
+                outcome: 'sales_order.submitted',
+              },
+              {
+                id: 803,
+                process_instance_id: 801,
+                node_key: 'order_approval',
+                node_type: 'approval',
+                attempt: 1,
+                status: 'completed',
+                outcome: 'approved',
+              },
+              {
+                id: 804,
+                process_instance_id: 801,
+                node_key: 'engineering_data',
+                node_type: 'human_task',
+                attempt: 1,
+                status: 'active',
+                outcome: '',
+              },
+            ],
+            current_nodes: [
+              {
+                id: 804,
+                process_instance_id: 801,
+                node_key: 'engineering_data',
+                node_type: 'human_task',
+                attempt: 1,
+                status: 'active',
+                outcome: '',
+              },
+            ],
+            completed_nodes: [
+              {
+                id: 802,
+                process_instance_id: 801,
+                node_key: 'submit_sales_order',
+                node_type: 'domain_command',
+                attempt: 1,
+                status: 'completed',
+                outcome: 'sales_order.submitted',
+              },
+              {
+                id: 803,
+                process_instance_id: 801,
+                node_key: 'order_approval',
+                node_type: 'approval',
+                attempt: 1,
+                status: 'completed',
+                outcome: 'approved',
+              },
+            ],
+          },
+        },
+      ],
       viewport: { width: 430, height: 900 },
       verify: async (page) => {
         const roles = [
@@ -5968,6 +6072,34 @@ export function createStyleL1Scenarios(deps) {
           await page.getByRole('button', { name: '任务列表' }).click()
           await expectText(page, role.taskName)
         }
+        await gotoScenarioPath(page, '/m/engineering/tasks', {
+          waitUntil: 'domcontentloaded',
+        })
+        await page
+          .locator('.erp-mobile-list-item')
+          .filter({ hasText: '销售订单工程资料办理' })
+          .click()
+        const processContextCard = page.getByTestId(
+          'mobile-task-process-context'
+        )
+        await processContextCard.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await expectText(processContextCard, '销售订单受理')
+        await expectText(processContextCard, 'SO-L1-601')
+        await expectText(processContextCard, '当前节点：工程资料')
+        await expectText(
+          processContextCard,
+          '已完成节点：提交销售订单（已完成）、订单审批（已完成）'
+        )
+        await expectText(processContextCard, '最终状态：办理中')
+        await processContextCard.screenshot({
+          path: path.join(
+            outputDir,
+            'mobile-yoyo-engineering-process-context-430.png'
+          ),
+        })
       },
     },
     {
@@ -8683,7 +8815,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '开发文档 / Dev Docs')
         await expectText(page, '测试入口 / Test Entry')
         await expectText(page, '产品原型 / Prototypes')
-        await expectText(page, '能力台账 / Capability Ledger')
+        await expectText(page, '能力真源 / Capability Sources')
         await expectText(
           page,
           '客户配置包预检与发布 / Package Preflight & Release'
@@ -8904,7 +9036,7 @@ export function createStyleL1Scenarios(deps) {
             countText: '1/6',
             overflow: false,
           },
-          `开发导航分组筛选应只保留能力台账: ${JSON.stringify(groupMetrics)}`
+          `开发导航分组筛选应只保留能力真源入口: ${JSON.stringify(groupMetrics)}`
         )
 
         await page
@@ -10484,7 +10616,7 @@ export function createStyleL1Scenarios(deps) {
             '移动端 Workflow smoke / Mobile Workflow Smoke',
             '客户配置控制台 / Customer Config Console',
             '原型登记与查看器 / Prototype Registry',
-            '文档治理与台账查看器 / Docs Governance & Ledger',
+            '文档治理与能力真源 / Docs Governance & Capability Sources',
             '客户配置包运行时 / Customer Config Runtime',
             '客户导入 tooling / Customer Import Tooling',
             '客户配置前端投影 / Customer Config Projection',

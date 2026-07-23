@@ -234,6 +234,56 @@ func (r *memProcessRuntimeRepo) ListProcessNodeInstances(ctx context.Context, pr
 	return nil, errors.New("unexpected process")
 }
 
+func TestProcessRuntimeUsecaseGetProcessTaskContextUsesRuntimeTruth(t *testing.T) {
+	processID := 41
+	nodeID := 42
+	sourceNo := "SO-TRIAL-001"
+	task := &WorkflowTask{
+		ID:                    7,
+		SourceType:            "sales_order",
+		SourceID:              1001,
+		SourceNo:              &sourceNo,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          BossRoleKey,
+	}
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: processID, BusinessRefType: "sales_order", BusinessRefID: 1001, BusinessRefNo: &sourceNo, Status: ProcessStatusActive},
+		nodes: []*ProcessNodeInstance{
+			{ID: 40, ProcessInstanceID: processID, NodeKey: "submit_sales_order", Status: ProcessNodeStatusCompleted},
+			{ID: nodeID, ProcessInstanceID: processID, NodeKey: "order_approval", Status: ProcessNodeStatusActive},
+			{ID: 43, ProcessInstanceID: processID, NodeKey: "end", Status: ProcessNodeStatusWaiting},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, nil)
+
+	processContext, err := uc.GetProcessTaskContext(context.Background(), task)
+	if err != nil {
+		t.Fatalf("GetProcessTaskContext err = %v", err)
+	}
+	if processContext.Task != task || processContext.Instance.ID != processID || len(processContext.CurrentNodes) != 1 || processContext.CurrentNodes[0].ID != nodeID || len(processContext.CompletedNodes) != 1 {
+		t.Fatalf("unexpected process task context: %#v", processContext)
+	}
+}
+
+func TestProcessRuntimeUsecaseGetProcessTaskContextRejectsMismatchedSource(t *testing.T) {
+	processID := 41
+	nodeID := 42
+	task := &WorkflowTask{
+		ID: 7, SourceType: "sales_order", SourceID: 1002,
+		ProcessInstanceID: &processID, ProcessNodeInstanceID: &nodeID,
+	}
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: processID, BusinessRefType: "sales_order", BusinessRefID: 1001, Status: ProcessStatusActive},
+		nodes:   []*ProcessNodeInstance{{ID: nodeID, ProcessInstanceID: processID, Status: ProcessNodeStatusActive}},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, nil)
+	if _, err := uc.GetProcessTaskContext(context.Background(), task); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected mismatched source to fail closed, got %v", err)
+	}
+}
+
 func (r *memProcessRuntimeRepo) ClaimProcessNodeDomainCommand(ctx context.Context, in *ProcessNodeDomainCommandClaim) (*ProcessNodeInstance, error) {
 	r.claimedDomainCommand = in
 	r.claimCalls++

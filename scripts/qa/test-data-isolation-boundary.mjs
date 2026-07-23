@@ -556,7 +556,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     id: "manual-acceptance-task-data-stays-workflow-only-and-target-guarded",
     bucket: "customer-trial-simulated-data",
     description:
-      "manual acceptance task data remains a workflow-only fixture with exact target, runtime, module, CAS, and confirmation guards.",
+      "manual acceptance task data keeps simulated display tasks separate from formal ProcessRuntime evidence, with exact target, runtime, module, CAS, and confirmation guards.",
     required: Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-task-data.mjs",
@@ -569,7 +569,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
         path: "scripts/qa/manual-acceptance-task-data.mjs",
         pattern: /simulatedOnly:\s*true[\s\S]{0,120}writesFacts:\s*false/u,
         message:
-          "manual acceptance task data must remain simulated workflow-only data",
+          "manual acceptance task data must remain simulated-source evidence and never write Facts",
       },
       {
         path: "scripts/qa/manual-acceptance-task-data.mjs",
@@ -593,9 +593,9 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-task-data.mjs",
         pattern:
-          /assertManualAcceptanceRuntimePolicy\([\s\S]{0,250}requiredModules: \["workflow_tasks"\]/u,
+          /assertManualAcceptanceRuntimePolicy\([\s\S]{0,300}requiredModules: includeSalesRuntime[\s\S]{0,100}\? \["workflow_tasks", "sales_orders"\][\s\S]{0,80}: \["workflow_tasks"\]/u,
         message:
-          "manual acceptance task writes must require approved runtime, active revision, and workflow task module",
+          "manual acceptance task writes must require approved runtime, active revision, workflow tasks, and sales orders when ProcessRuntime evidence is requested",
       },
       {
         path: "scripts/qa/manual-acceptance-task-data.mjs",

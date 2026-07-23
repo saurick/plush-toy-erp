@@ -73,6 +73,18 @@ test('task action drawer loads the canonical approval trajectory and uses approv
   assert.match(source, /approvalTask \? '审批办理' : '任务处理'/u)
 })
 
+test('task action drawer shows task-scoped process position and marks display-only tasks', () => {
+  assert.match(source, /getWorkflowTaskProcessContext\(task\.id/u)
+  assert.match(source, /业务流程/u)
+  assert.match(source, /流程位置/u)
+  assert.match(source, /来源单据/u)
+  assert.match(source, /当前节点/u)
+  assert.match(source, /已完成节点/u)
+  assert.match(source, /最终状态/u)
+  assert.match(source, /模拟展示数据/u)
+  assert.match(source, /不计入流程闭环证据/u)
+})
+
 test('task transfer is an explicit scoped action with person and pool destinations', () => {
   assert.match(source, /assign:\s*\{[\s\S]*title: '转交任务'/u)
   assert.match(source, /assignmentAccess = \{\}/u)
@@ -85,10 +97,7 @@ test('task transfer is an explicit scoped action with person and pool destinatio
   assert.doesNotMatch(source, /待办池（状态不变）/u)
   assert.doesNotMatch(source, /岗位待办池/u)
   assert.match(source, /assignmentTargetValid/u)
-  assert.match(
-    source,
-    /如果暂时不确定由谁接手，可退回该岗位共同待办/u
-  )
+  assert.match(source, /如果暂时不确定由谁接手，可退回该岗位共同待办/u)
   assert.match(source, /assignmentAccess\.stale/u)
   assert.match(source, /任务信息已更新，请刷新任务列表/u)
   assert.match(source, /不会使用旧版本的转交候选人/u)

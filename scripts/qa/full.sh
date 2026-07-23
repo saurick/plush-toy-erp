@@ -7,11 +7,11 @@ print_help() {
   bash scripts/qa/full.sh
 
 作用:
-  执行推送前全量质量检查（pre-push 默认调用）
+  执行一次完整本地质量检查。最终推送准备由 prepare-push.sh 在建立远端连接前调用。
 
 检查内容:
   fast: 先执行 scripts/qa/fast.sh，自动发现全部 scripts Node 测试并运行高频边界
-  secrets: 严格密钥扫描；pre-push 的逐 ref 扫描不会跳过 full 自身扫描
+  secrets: 严格扫描 prepare-push 计算的聚合范围；真实 push hook 仍逐 ref 重新严格扫描
   web: fast 已跑 lint/css，这里强制 pnpm test + 非零执行/零 skip summary -> pnpm build
   browser: 动态独立端口自启当前 worktree Vite，再运行 Chromium 无写入 smoke
   server: 存量数据真实升级 -> 当前完整 Schema 关键 PostgreSQL 矩阵（含采购退货） -> 真实 Chromium PDF 安全集成 -> go test JSON 非零执行/零 skip -> make build
@@ -24,7 +24,8 @@ print_help() {
 
 结果边界:
   full/strict 拒绝 SKIP_*、STRICT_SKIP_* 与调用者提供的 coverage 变量。
-  full 始终真实执行全部固定 gate，只有全部成功才输出 complete。
+  full 始终真实执行全部固定 gate，只有全部成功才输出 complete；它不读取或签发回执。
+  只有 prepare-push.sh 能在 full 通过且 HEAD/tree/环境/远端范围未变化后签发本地回执。
 USAGE
 }
 

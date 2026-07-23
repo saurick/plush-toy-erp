@@ -79,10 +79,8 @@ test('shipment related records are permission-filtered and fail closed without a
   }
   assert.match(source, /if \(!selectedRow\?\.id\) return \[\]/u)
   assert.match(source, /if \(!selectedRow\?\.id\) return/u)
-  assert.match(
-    source,
-    /disabled=\{!selectedRow \|\| relatedMenuItems\.length === 0\}/u
-  )
+  assert.match(source, /\{relatedMenuItems\.length > 0 \? \(/u)
+  assert.doesNotMatch(source, /relatedMenuItems\.length === 0/u)
 })
 
 test('shipment related route uses exact read and keeps the readable number presentation-only', () => {
@@ -210,7 +208,7 @@ test('draft shipment starts the versioned finance approval process', () => {
 test('shipment cancellation distinguishes draft exit from shipped reversal', () => {
   assert.match(
     source,
-    /!\['DRAFT', 'SHIPPED'\]\.includes\(selectedRow\.status\)/u
+    /\['DRAFT', 'SHIPPED'\]\.includes\(selectedRow\.status\)/u
   )
   assert.match(source, /草稿作废不会扣减或恢复库存/u)
   assert.match(source, /如已提交放行，需先完成或退回放行待办/u)

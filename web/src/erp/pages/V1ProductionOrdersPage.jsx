@@ -15,6 +15,7 @@ import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -1442,38 +1443,58 @@ export default function V1ProductionOrdersPage() {
           selectedCount={selected ? 1 : 0}
           selectedLabel={selected ? `已选择 ${selected.order_no}` : ''}
         >
-          <Button
+          <BusinessActionTooltip
             disabled={!selected || detailLoading}
-            icon={<EyeOutlined />}
-            onClick={() => loadDetail(selected, 'view')}
-          >
-            查看
-          </Button>
-          <Button
-            disabled={
-              !selected ||
-              !canUpdate ||
-              selected.status !== PRODUCTION_ORDER_STATUS.DRAFT ||
-              detailLoading
+            disabledReason={
+              detailLoading ? '生产订单资料加载中' : '请先选择一张生产订单'
             }
-            icon={<EditOutlined />}
-            onClick={() => loadDetail(selected, 'edit')}
           >
-            编辑
-          </Button>
-          {canCreateCompletion ? (
             <Button
-              type="primary"
-              disabled={
-                !selected ||
-                selected.status !== PRODUCTION_ORDER_STATUS.RELEASED ||
-                detailLoading ||
-                completionLoading
-              }
-              onClick={openProductionCompletion}
+              disabled={!selected || detailLoading}
+              icon={<EyeOutlined />}
+              onClick={() => loadDetail(selected, 'view')}
             >
-              登记完工入库
+              查看
             </Button>
+          </BusinessActionTooltip>
+          {canUpdate &&
+          (!selected || selected.status === PRODUCTION_ORDER_STATUS.DRAFT) ? (
+            <BusinessActionTooltip
+              disabled={!selected || detailLoading}
+              disabledReason={
+                detailLoading
+                  ? '生产订单资料加载完成后可编辑'
+                  : '请先选择一张生产订单草稿'
+              }
+            >
+              <Button
+                disabled={!selected || detailLoading}
+                icon={<EditOutlined />}
+                onClick={() => loadDetail(selected, 'edit')}
+              >
+                编辑
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCreateCompletion &&
+          (!selected ||
+            selected.status === PRODUCTION_ORDER_STATUS.RELEASED) ? (
+              <BusinessActionTooltip
+                disabled={!selected || detailLoading || completionLoading}
+                disabledReason={
+                detailLoading || completionLoading
+                  ? '当前资料处理完成后可登记完工'
+                  : '请先选择一张已发布生产订单'
+              }
+              >
+                <Button
+                  type="primary"
+                  disabled={!selected || detailLoading || completionLoading}
+                  onClick={openProductionCompletion}
+                >
+                  登记完工入库
+                </Button>
+              </BusinessActionTooltip>
           ) : null}
           {canReadProductionWip &&
           selected?.status === PRODUCTION_ORDER_STATUS.RELEASED ? (
@@ -1485,57 +1506,89 @@ export default function V1ProductionOrdersPage() {
             </Button>
           ) : null}
           {canReadProductionFacts ? (
-            <Button
+            <BusinessActionTooltip
               disabled={!selected || detailLoading}
-              onClick={() => viewProductionFacts(selected)}
+              disabledReason={
+                detailLoading
+                  ? '生产订单资料加载中'
+                  : '请先选择一张生产订单'
+              }
             >
-              查看生产记录
-            </Button>
+              <Button
+                disabled={!selected || detailLoading}
+                onClick={() => viewProductionFacts(selected)}
+              >
+                查看生产记录
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
-          <Button
-            disabled={
-              !aggregate ||
-              !canUpdate ||
-              aggregate.order.status !== PRODUCTION_ORDER_STATUS.DRAFT ||
-              mutationLoading
-            }
-            onClick={() =>
-              modal.confirm({
-                title: '确认发布生产订单？',
-                content: '发布后计划明细将不能直接修改。',
-                okText: '确认发布',
-                onOk: () => runLifecycle('release'),
-              })
-            }
-          >
-            发布
-          </Button>
-          <Button
-            disabled={
-              !aggregate ||
-              !canUpdate ||
-              aggregate.order.status !== PRODUCTION_ORDER_STATUS.RELEASED ||
-              mutationLoading
-            }
-            onClick={() => setReasonAction('close')}
-          >
-            关闭
-          </Button>
-          <Button
-            danger
-            disabled={
-              !aggregate ||
-              !canUpdate ||
-              ![
-                PRODUCTION_ORDER_STATUS.DRAFT,
-                PRODUCTION_ORDER_STATUS.RELEASED,
-              ].includes(aggregate.order.status) ||
-              mutationLoading
-            }
-            onClick={() => setReasonAction('cancel')}
-          >
-            取消订单
-          </Button>
+          {canUpdate &&
+          (!selected || selected.status === PRODUCTION_ORDER_STATUS.DRAFT) ? (
+            <BusinessActionTooltip
+              disabled={!selected || !aggregate || mutationLoading}
+              disabledReason={
+                mutationLoading
+                  ? '当前操作完成后可发布'
+                  : '请先选择一张生产订单草稿'
+              }
+            >
+              <Button
+                disabled={!selected || !aggregate || mutationLoading}
+                onClick={() =>
+                  modal.confirm({
+                    title: '确认发布生产订单？',
+                    content: '发布后计划明细将不能直接修改。',
+                    okText: '确认发布',
+                    onOk: () => runLifecycle('release'),
+                  })
+                }
+              >
+                发布
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdate &&
+          (!selected ||
+            selected.status === PRODUCTION_ORDER_STATUS.RELEASED) ? (
+              <BusinessActionTooltip
+                disabled={!selected || !aggregate || mutationLoading}
+                disabledReason={
+                mutationLoading
+                  ? '当前操作完成后可关闭'
+                  : '请先选择一张已发布生产订单'
+              }
+              >
+                <Button
+                  disabled={!selected || !aggregate || mutationLoading}
+                  onClick={() => setReasonAction('close')}
+                >
+                  关闭
+                </Button>
+              </BusinessActionTooltip>
+          ) : null}
+          {canUpdate &&
+          (!selected ||
+            [
+              PRODUCTION_ORDER_STATUS.DRAFT,
+              PRODUCTION_ORDER_STATUS.RELEASED,
+            ].includes(selected.status)) ? (
+              <BusinessActionTooltip
+                disabled={!selected || !aggregate || mutationLoading}
+                disabledReason={
+                mutationLoading
+                  ? '当前操作完成后可取消'
+                  : '请先选择一张生产订单'
+              }
+              >
+                <Button
+                  danger
+                  disabled={!selected || !aggregate || mutationLoading}
+                  onClick={() => setReasonAction('cancel')}
+                >
+                  取消订单
+                </Button>
+              </BusinessActionTooltip>
+          ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
       <BusinessDataTable

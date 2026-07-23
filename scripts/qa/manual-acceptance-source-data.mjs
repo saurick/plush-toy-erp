@@ -35,6 +35,7 @@ const REQUIRED_SOURCE_MODULES = Object.freeze([
   "materials",
   "processes",
   "sales_orders",
+  "workflow_tasks",
   "purchase_orders",
   "outsourcing_orders",
   "material_bom",
@@ -62,6 +63,7 @@ export const ROLE_USERS = Object.freeze({
   engineering: "demo_engineering",
   production: "demo_production",
   boss: "demo_boss",
+  pmc: "demo_pmc",
 });
 
 class CliError extends Error {
@@ -81,6 +83,14 @@ function requiredText(value, name) {
   const text = optionalText(value);
   if (!text) throw new CliError(`${name} is required`);
   return text;
+}
+
+function positiveSafeInteger(value, name) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new CliError(`${name} must be a positive safe integer`);
+  }
+  return parsed;
 }
 
 function asPositiveInt(value, name, { min = 1, max = 200 } = {}) {
@@ -1026,7 +1036,9 @@ async function rpcCall({
       id: `manual-acceptance-${domain}-${method}-${Date.now()}`,
       method,
       params:
-        domain === "auth" ? params : { customer_key: CUSTOMER_KEY, ...params },
+        domain === "auth" || domain === "workflow"
+          ? params
+          : { customer_key: CUSTOMER_KEY, ...params },
     }),
   });
   if (response.redirected === true) {
@@ -1730,6 +1742,467 @@ async function advanceLifecycle({
   return status;
 }
 
+function requireSalesOrderProcessTask(task, sourceID) {
+  if (
+    !task ||
+    typeof task !== "object" ||
+    positiveSafeInteger(task.id, "workflow task id") <= 0 ||
+    positiveSafeInteger(task.version, "workflow task version") <= 0 ||
+    task.source_type !== "sales_order" ||
+    Number(task.source_id) !== sourceID ||
+    !String(task.task_status_key || "").trim() ||
+    !String(task.owner_role_key || "").trim() ||
+    !Number.isSafeInteger(Number(task.process_instance_id)) ||
+    Number(task.process_instance_id) <= 0 ||
+    !Number.isSafeInteger(Number(task.process_node_instance_id)) ||
+    Number(task.process_node_instance_id) <= 0
+  ) {
+    throw new CliError(`sales order id=${sourceID} has an invalid linked task`);
+  }
+  return task;
+}
+
+async function listSalesOrderProcessTasks({
+  plan,
+  sourceID,
+  token,
+  fetchImpl,
+}) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "workflow",
+    method: "list_tasks",
+    params: {
+      source_type: "sales_order",
+      source_id: sourceID,
+      limit: 50,
+      offset: 0,
+    },
+    token,
+    fetchImpl,
+  });
+  if (
+    !Array.isArray(data.tasks) ||
+    !Number.isSafeInteger(Number(data.total)) ||
+    Number(data.total) !== data.tasks.length
+  ) {
+    throw new CliError(
+      `sales order id=${sourceID} linked task readback is incomplete`,
+    );
+  }
+  return data.tasks.map((task) => requireSalesOrderProcessTask(task, sourceID));
+}
+
+async function readSalesOrderProcessContext({
+  plan,
+  sourceID,
+  task,
+  token,
+  fetchImpl,
+}) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "workflow",
+    method: "get_task_process_context",
+    params: { task_id: task.id },
+    token,
+    fetchImpl,
+  });
+  const processContext = data.process_context;
+  if (
+    processContext?.source?.type !== "sales_order" ||
+    Number(processContext?.source?.id) !== sourceID ||
+    processContext?.process_instance?.process_key !==
+      "sales_order_acceptance" ||
+    !new Set(["active", "blocked", "completed"]).has(
+      processContext?.process_instance?.status,
+    ) ||
+    !Array.isArray(processContext?.nodes) ||
+    !Array.isArray(processContext?.current_nodes) ||
+    !Array.isArray(processContext?.completed_nodes)
+  ) {
+    throw new CliError(
+      `sales order id=${sourceID} process context readback is incomplete`,
+    );
+  }
+  return processContext;
+}
+
+async function readSalesOrderStatus({ plan, sourceID, token, fetchImpl }) {
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "sales_order",
+    method: "get_sales_order",
+    params: { id: sourceID },
+    token,
+    fetchImpl,
+  });
+  const order = data.sales_order;
+  if (
+    !order ||
+    Number(order.id) !== sourceID ||
+    !String(order.lifecycle_status || "").trim()
+  ) {
+    throw new CliError(
+      `sales_order.get_sales_order id=${sourceID} returned an invalid source document`,
+    );
+  }
+  return String(order.lifecycle_status).toUpperCase();
+}
+
+function requireSalesOrderAcceptanceStart(data, sourceID) {
+  const instance = data?.process_instance;
+  const node = data?.started_node;
+  const matchingNode = Array.isArray(data?.nodes)
+    ? data.nodes.find(
+        (candidate) =>
+          candidate?.id === node?.id &&
+          candidate.process_instance_id === instance?.id &&
+          candidate.node_key === node?.node_key &&
+          candidate.node_type === node?.node_type &&
+          candidate.status === node?.status &&
+          candidate.version === node?.version,
+      )
+    : undefined;
+  if (
+    !Number.isSafeInteger(Number(instance?.id)) ||
+    Number(instance.id) <= 0 ||
+    instance.process_key !== "sales_order_acceptance" ||
+    instance.business_ref_type !== "sales_order" ||
+    Number(instance.business_ref_id) !== sourceID ||
+    instance.status !== "active" ||
+    !Number.isSafeInteger(Number(node?.id)) ||
+    Number(node.id) <= 0 ||
+    !Number.isSafeInteger(Number(node?.version)) ||
+    Number(node.version) <= 0 ||
+    Number(node.process_instance_id) !== Number(instance.id) ||
+    node.node_key !== "submit_sales_order" ||
+    node.node_type !== "domain_command" ||
+    !new Set(["active", "completed"]).has(node.status) ||
+    !matchingNode ||
+    (node.status === "completed" && node.outcome !== "sales_order.submitted")
+  ) {
+    throw new CliError(
+      `sales order id=${sourceID} process start readback is incomplete`,
+    );
+  }
+  return { instance, node };
+}
+
+function requireSalesOrderAcceptanceExecution(data, expected) {
+  const node = data?.completed_node;
+  const matchingNode = Array.isArray(data?.nodes)
+    ? data.nodes.find(
+        (candidate) =>
+          candidate?.id === node?.id &&
+          Number(candidate.process_instance_id) === expected.instanceID &&
+          candidate.node_key === "submit_sales_order" &&
+          candidate.node_type === "domain_command" &&
+          candidate.status === "completed" &&
+          candidate.version === node?.version,
+      )
+    : undefined;
+  if (
+    Number(node?.id) !== expected.nodeID ||
+    Number(node?.process_instance_id) !== expected.instanceID ||
+    node?.node_key !== "submit_sales_order" ||
+    node?.node_type !== "domain_command" ||
+    node?.status !== "completed" ||
+    node?.outcome !== "sales_order.submitted" ||
+    Number(node?.version) !== expected.version + 1 ||
+    !matchingNode
+  ) {
+    throw new CliError(
+      `sales order id=${expected.sourceID} submit execution readback is incomplete`,
+    );
+  }
+  return node;
+}
+
+async function submitSalesOrderThroughAcceptanceProcess({
+  plan,
+  sourceID,
+  orderNo,
+  token,
+  fetchImpl,
+  report,
+}) {
+  const baseKey = [
+    "manual-acceptance-source",
+    plan.runId,
+    orderNo,
+    "acceptance",
+  ].join(":");
+  const startData = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "customer_config",
+    method: "start_sales_order_acceptance_process",
+    params: {
+      sales_order_id: sourceID,
+      business_ref_no: orderNo,
+      idempotency_key: baseKey,
+    },
+    token,
+    fetchImpl,
+  });
+  const { instance, node } = requireSalesOrderAcceptanceStart(
+    startData,
+    sourceID,
+  );
+  if (node.status === "active") {
+    const executionData = await rpcCall({
+      backendURL: plan.backendURL,
+      domain: "customer_config",
+      method: "execute_sales_order_acceptance_submit",
+      params: {
+        process_instance_id: Number(instance.id),
+        process_node_instance_id: Number(node.id),
+        expected_version: Number(node.version),
+        sales_order_id: sourceID,
+        idempotency_key: `${baseKey}:submit`,
+      },
+      token,
+      fetchImpl,
+    });
+    requireSalesOrderAcceptanceExecution(executionData, {
+      instanceID: Number(instance.id),
+      nodeID: Number(node.id),
+      version: Number(node.version),
+      sourceID,
+    });
+  }
+  const status = await readSalesOrderStatus({
+    plan,
+    sourceID,
+    token,
+    fetchImpl,
+  });
+  if (status !== "SUBMITTED") {
+    throw new CliError(
+      `sales order id=${sourceID} expected SUBMITTED after process command, got ${status}`,
+    );
+  }
+  report.steps.push({
+    target: "sales_order_acceptance",
+    key: orderNo,
+    action: "submit",
+    id: Number(instance.id),
+  });
+  return status;
+}
+
+async function completeSalesOrderProcessTask({
+  plan,
+  task,
+  roleTokens,
+  fetchImpl,
+  report,
+}) {
+  const token = roleTokens[task.owner_role_key];
+  if (!token) {
+    throw new CliError(
+      `no trial account can complete ${task.owner_role_key} process task`,
+    );
+  }
+  const reason = "验收样例：当前流程节点已核对完成。";
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "workflow",
+    method: "complete_task_action",
+    params: {
+      task_id: task.id,
+      expected_version: task.version,
+      idempotency_key: [
+        "manual-acceptance-source",
+        plan.runId,
+        task.id,
+        "complete",
+      ].join(":"),
+      action_key: "complete",
+      reason,
+      payload: { feedback: reason },
+    },
+    token,
+    fetchImpl,
+  });
+  const updated = requireSalesOrderProcessTask(data.task, task.source_id);
+  if (
+    updated.id !== task.id ||
+    updated.task_status_key !== "done" ||
+    updated.version <= task.version
+  ) {
+    throw new CliError(
+      `workflow.complete_task_action task=${task.id} returned an invalid result`,
+    );
+  }
+  report.steps.push({
+    target: "sales_order_acceptance",
+    key: task.task_code,
+    action: "complete",
+    id: task.id,
+  });
+  return updated;
+}
+
+export async function advanceSalesOrderLifecycleThroughProcess({
+  plan,
+  record,
+  item,
+  token,
+  roleTokens,
+  fetchImpl,
+  report,
+}) {
+  const sourceID = positiveSafeInteger(item?.id, "sales order id");
+  const orderNo = requiredText(record?.order_no, "sales order number");
+  const target = requiredText(
+    record?.targetStatus,
+    "sales order target status",
+  ).toUpperCase();
+  let status = String(item?.lifecycle_status || "DRAFT").toUpperCase();
+  if (status === target) return status;
+  if (new Set(["CLOSED", "CANCELED"]).has(status)) {
+    throw new CliError(
+      `sales_order id=${sourceID} is terminal ${status}, expected ${target}`,
+    );
+  }
+  if (target === "CANCELED") {
+    const data = await rpcCall({
+      backendURL: plan.backendURL,
+      domain: "sales_order",
+      method: "cancel_sales_order",
+      params: { id: sourceID },
+      token: roleTokens.sales || token,
+      fetchImpl,
+    });
+    return requireLifecycleMutationStatus({
+      data,
+      resultKey: "sales_order",
+      domain: "sales_order",
+      id: sourceID,
+      method: "cancel_sales_order",
+      expectedStatus: "CANCELED",
+    });
+  }
+  if (!new Set(["SUBMITTED", "ACTIVE", "CLOSED"]).has(target)) {
+    throw new CliError(`unsupported sales order target status ${target}`);
+  }
+  if (status === "DRAFT") {
+    status = await submitSalesOrderThroughAcceptanceProcess({
+      plan,
+      sourceID,
+      orderNo,
+      token: roleTokens.sales || token,
+      fetchImpl,
+      report,
+    });
+  }
+  if (target === "SUBMITTED") return status;
+
+  let tasks = await listSalesOrderProcessTasks({
+    plan,
+    sourceID,
+    token,
+    fetchImpl,
+  });
+  if (status === "SUBMITTED") {
+    const approvalTask = tasks.find(
+      (task) =>
+        task.task_group === "order_approval" &&
+        task.task_status_key === "ready",
+    );
+    if (!approvalTask) {
+      throw new CliError(`${orderNo} has no ready sales order approval task`);
+    }
+    await completeSalesOrderProcessTask({
+      plan,
+      task: approvalTask,
+      roleTokens,
+      fetchImpl,
+      report,
+    });
+    status = await readSalesOrderStatus({
+      plan,
+      sourceID,
+      token,
+      fetchImpl,
+    });
+    if (status !== "ACTIVE") {
+      throw new CliError(
+        `${orderNo} approval did not activate the sales order; got ${status}`,
+      );
+    }
+  }
+  if (target === "ACTIVE") return status;
+  if (status !== "ACTIVE") {
+    throw new CliError(
+      `${orderNo} must be ACTIVE before process completion; got ${status}`,
+    );
+  }
+
+  let completed = false;
+  for (let guard = 0; guard < 8; guard += 1) {
+    tasks = await listSalesOrderProcessTasks({
+      plan,
+      sourceID,
+      token,
+      fetchImpl,
+    });
+    const readyTask = tasks.find((task) => task.task_status_key === "ready");
+    const contextTask =
+      readyTask ||
+      tasks.find((task) =>
+        ["done", "rejected", "blocked"].includes(task.task_status_key),
+      );
+    if (!contextTask) {
+      throw new CliError(`${orderNo} has no linked process task`);
+    }
+    const processContext = await readSalesOrderProcessContext({
+      plan,
+      sourceID,
+      task: contextTask,
+      token,
+      fetchImpl,
+    });
+    if (processContext.process_instance.status === "completed") {
+      completed = true;
+      break;
+    }
+    if (processContext.process_instance.status === "blocked") {
+      throw new CliError(`${orderNo} process is blocked before completion`);
+    }
+    if (!readyTask) {
+      throw new CliError(`${orderNo} process has no ready task before end`);
+    }
+    await completeSalesOrderProcessTask({
+      plan,
+      task: readyTask,
+      roleTokens,
+      fetchImpl,
+      report,
+    });
+  }
+  if (!completed) {
+    throw new CliError(`${orderNo} process did not reach its end node`);
+  }
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "sales_order",
+    method: "close_sales_order",
+    params: { id: sourceID },
+    token: roleTokens.sales || token,
+    fetchImpl,
+  });
+  return requireLifecycleMutationStatus({
+    data,
+    resultKey: "sales_order",
+    domain: "sales_order",
+    id: sourceID,
+    method: "close_sales_order",
+    expectedStatus: "CLOSED",
+  });
+}
+
 export function requireLifecycleMutationStatus({
   data,
   resultKey,
@@ -1781,6 +2254,7 @@ async function applyDocumentGroup({
   itemDateFields,
   itemDecimalFields,
   report,
+  advanceLifecycleFn,
 }) {
   for (const record of records) {
     const resolvedParams = resolveParams(record);
@@ -1848,17 +2322,30 @@ async function applyDocumentGroup({
       });
     }
     const current = item[listStatusKey] || "DRAFT";
-    const finalStatus = await advanceLifecycle({
-      plan,
-      token,
-      fetchImpl,
-      domain,
-      id: item.id,
-      current,
-      target: record.targetStatus,
-      actions: lifecycleActions,
-      resultKey,
-    });
+    const finalStatus = advanceLifecycleFn
+      ? await advanceLifecycleFn({
+          plan,
+          token,
+          fetchImpl,
+          domain,
+          item,
+          record,
+          current,
+          target: record.targetStatus,
+          resultKey,
+          report,
+        })
+      : await advanceLifecycle({
+          plan,
+          token,
+          fetchImpl,
+          domain,
+          id: item.id,
+          current,
+          target: record.targetStatus,
+          actions: lifecycleActions,
+          resultKey,
+        });
     item[listStatusKey] = finalStatus;
   }
 }
@@ -2020,6 +2507,7 @@ export function buildOutsourcingOrderLineReferences({
 async function createSourceDocuments({
   plan,
   tokens,
+  roleTokens,
   refs,
   fetchImpl,
   report,
@@ -2037,16 +2525,6 @@ async function createSourceDocuments({
   );
   const salesActions = {
     DRAFT: [],
-    SUBMITTED: [{ method: "submit_sales_order", resultStatus: "SUBMITTED" }],
-    ACTIVE: [
-      { method: "submit_sales_order", resultStatus: "SUBMITTED" },
-      { method: "activate_sales_order", resultStatus: "ACTIVE" },
-    ],
-    CLOSED: [
-      { method: "submit_sales_order", resultStatus: "SUBMITTED" },
-      { method: "activate_sales_order", resultStatus: "ACTIVE" },
-      { method: "close_sales_order", resultStatus: "CLOSED" },
-    ],
     CANCELED: [{ method: "cancel_sales_order", resultStatus: "CANCELED" }],
   };
   await applyDocumentGroup({
@@ -2061,6 +2539,11 @@ async function createSourceDocuments({
     resultKey: "sales_order",
     listStatusKey: "lifecycle_status",
     lifecycleActions: salesActions,
+    advanceLifecycleFn: (input) =>
+      advanceSalesOrderLifecycleThroughProcess({
+        ...input,
+        roleTokens,
+      }),
     headerFields: [
       "order_no",
       "customer_id",
@@ -3019,6 +3502,7 @@ export async function applyManualAcceptanceSourceData(
   const sourceDocuments = await createSourceDocuments({
     plan,
     tokens: writeTokens,
+    roleTokens: tokens,
     refs,
     fetchImpl,
     report,
@@ -3126,6 +3610,22 @@ export async function applyManualAcceptanceSourceData(
             sourceDocuments.sales.get(record.order_no).id,
           ) || [],
       })),
+    salesOrderProcessCandidates: plan.records.salesOrders
+      .filter((record) => record.targetStatus === "DRAFT")
+      .slice(0, 5)
+      .map((record) => {
+        const order = sourceDocuments.sales.get(record.order_no);
+        if (!order?.id || order.lifecycle_status !== "DRAFT") {
+          throw new CliError(
+            `${record.order_no} process candidate is not a read-back DRAFT sales order`,
+          );
+        }
+        return {
+          id: order.id,
+          orderNo: record.order_no,
+          status: order.lifecycle_status,
+        };
+      }),
     purchaseOrders: plan.records.purchaseOrders
       .filter((record) => record.targetStatus === "APPROVED")
       .map((record) => {

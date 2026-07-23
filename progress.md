@@ -10,6 +10,30 @@
 - 133 V5 仍运行固定 release `80b77faeab566660c77fc23cc66c272096692f16` 的技术试用版本；当前异常收口、客户退货 / RMA、收付款及岗位导航后续切片未整体重发，客户 UAT / 签收仍是独立关口。
 - 当前 Git 由单一 owner 执行本次 full-worktree 收口；提交 / 推送状态以 Git 远端读回为准。当前未部署，也未对共享、133 或生产数据库 apply migration。
 
+## 2026-07-23 任务流程起点、当前位置与终点
+
+完成：新增 task-scoped `get_task_process_context` 只读合同。服务端先按当前账号的任务可见范围取得任务，再校验任务、来源单据、流程实例和节点锚点一致，才返回来源单据、流程状态、起点、当前节点、已完成节点和终点；不向前端暴露内部 definition hash 或策略。桌面任务抽屉和移动岗位任务详情统一展示这组正式运行态，加载失败或合同不完整时 fail closed，不由前端根据任务名称猜流程位置。
+
+试用数据：现有 180 条长列表任务继续明确标记为 `simulated_display_only`，只证明列表、筛选和交互容量，不证明已创建 ProcessRuntime。另从同一批次 5 张模拟销售订单经正式客户配置入口创建流程运行证据，覆盖仅启动、审批就绪、已阻塞、已驳回和已完成五种状态；数据集整体仍为 `simulatedOnly: true`，不得描述为真实客户订单、客户验收或领域事实完成。
+
+清理边界：当前业务来源取消不等于 ProcessRuntime 取消；存在 active / blocked 的正式流程证据时，`manual-acceptance-source-retire` 不伪造通用流程撤销。需要完全清理时重建专用本地验收库；133 固定库按受控数据库重建 / 恢复流程处理。
+
+验证：Node `24.14.0` 下 `affected.sh --run` 覆盖 T0、T1、T3、T4、T5、T7；受影响脚本合同 `152 / 152`、Web 全集 `1780 / 1780`、隔离 PostgreSQL 关键事务与并发 `192 / 192` 均为零失败、零跳过，前端 lint、文档合同和 `git diff --check` 通过。真实 Chromium `erp-task-board-desktop,mobile-yoyo-role-task-projection` 为 `2 / 2`，覆盖桌面与移动端流程位置回显。
+
+边界：本轮只把独立 Worktree 中仍适配当前主线的改动选择性带回 Local；销售提交失败修复已存在于当前主线，没有重复覆盖。未提交、未推送、未部署，未对共享、133 或生产数据库写入 / apply migration，也未执行真实岗位 UAT；Local 中其他任务的门禁提速和页面操作权限改动继续保留，归属不变。
+
+## 2026-07-23 开发阶段 pre-push 门禁提速
+
+完成：开发内循环统一使用 `affected`、定向测试和 `fast`；最终代码形成 clean HEAD 后由 `prepare-push.sh` 在建立 receive-pack 连接前读取真实 remote/ref、计算 aggregate range，并完整执行一次 `full.sh`。pre-push hook 不再在已打开的 SSH 连接上重复等待 full，只消费真实 push stdin，复核短期回执并实时执行每个 range 的 `git log --check` 与严格 secrets，消除了“手动 full 后 hook 再 full”和长时间空闲 SSH 连接这两条结构性重复路径。
+
+门禁边界：本地回执绑定 worktree、HEAD/tree、每个 local/remote ref 与 SHA、aggregate range、full profile/gate contract、关键工具/依赖环境和 30 分钟 TTL；保存在 Git common dir，按 worktree 隔离，使用私有 HMAC key、目录并发锁、同目录临时文件、fsync 和原子 rename。full 失败、HEAD/tree/worktree/环境/远端任一前后漂移都先删除旧回执且不签发新回执；只有 owner PID 已确认不存在的脚本残留锁可被安全回收，其余锁状态继续 fail closed。hook 命中时仍重算真实范围并再次核对 clean HEAD、签名、profile、gate/environment/TTL；缺失、篡改、过期、代码/依赖/migration/测试/门禁/环境或远端变化均 fail closed。`SKIP_PRE_PUSH`、调用者注入 range、回执路径/token/TTL 和其他 skip 环境不再是常规接口；CI strict 永不读取本地回执。
+
+验证：hook 与回执的临时 Git 仓库 / bare remote 测试 `15 / 15` 通过，覆盖 full 只执行一次、真实多 ref/new ref 范围、失败无残留、签名/TTL/环境/远端/HEAD/dirty/锁漂移与确认死亡 owner 的残留锁恢复、实时 log/secrets 失败、删除语义、调用者伪造输入、detached HEAD、help 无副作用和 Git common dir 符号链接逃逸；affected、gate profile、gate orchestration 治理测试 `42 / 42` 通过。skill health、文档清单 `3 / 3`、full required-files 合同、ShellCheck、shfmt、`git diff --check` 与严格 secrets 通过，均为零失败、零跳过。
+
+继续复测：Local 静止后修正了 4 组与当前正式合同不一致的旧治理断言：无权限动作应隐藏而不是永久置灰、模拟展示任务不得冒充 ProcessRuntime、销售流程验收数据必须同时声明 `workflow_tasks / sales_orders` 隔离模块，以及新增任务流程位置读取必须复用任务可见范围。scripts Node `1334 / 1334`、Web `1780 / 1780`、server quick `2763 / 2763`、server all `2923 / 2923` 均为零失败、零跳过；Web production build、存量 PostgreSQL 升级、隔离关键 PostgreSQL 矩阵、服务端构建、严格 secrets 和严格 `govulncheck` 通过。完整 Chromium Style L1 `177 / 177` 通过；其中权限中心手机暗色场景曾出现一次不可稳定复现的分类状态失败，随后定向 `4 / 4` 和完整套件均通过，保留为后续观察项。
+
+风险 / 下一步：当前 Local 虽已静止，仍是包含多项待提交改动的 dirty tree，因此不能签发绑定最终 clean HEAD 的真实回执，也未运行 `prepare-push.sh`。本记录作为最终 full 的输入；记录落盘后必须从头执行 `bash scripts/qa/full.sh`，只有脚本明确输出 `status=complete` 才能在本次交付报告中记为最终通过。本轮按要求不提交、不推送、不部署，也不对共享、133 或生产数据库 apply migration；后续 owner 提交最终树后只运行一次 `prepare-push.sh` 并立即按同一 remote/ref push，任何代码、环境或远端范围变化都重新准备。
+
 ## 2026-07-23 页面入口与读取权限一致性治理
 
 完成：修复“菜单可见但页面首批请求权限不足”的主路径。生产进度入口、客户页面目录和页面读合同统一为 `production.fact.read`；未授权直达路由在子页面挂载前即返回可进入页面，不再先发请求后连续弹出“权限不足”。生产异常按复合页拆分权限：品质可进入协同任务页，但没有生产风险 / Fact / 异常办理权限时不加载生产异常决定面板；服务端异常决定读取保持最小权限，不因 `quality.inspection.read` 放宽生产事实读取。

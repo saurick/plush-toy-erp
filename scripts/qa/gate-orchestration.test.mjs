@@ -22,6 +22,7 @@ function cleanGateEnv(overrides = {}) {
   const env = { ...process.env, ...overrides };
   for (const key of [
     "SKIP_DB_GUARD",
+    "SKIP_PRE_PUSH",
     "SKIP_ERROR_CODE_SYNC",
     "SKIP_ERROR_CODE_GUARD",
     "ERROR_CODE_GUARD_STAGED_ONLY",
@@ -406,22 +407,39 @@ test("direct full rejects caller-supplied synthetic coverage before any gate", (
   assert.doesNotMatch(result.stdout, /先运行 fast 检查/u);
 });
 
-test("full, strict, and pre-push have no synthetic coverage path", () => {
+test("local receipt has one repository-owned issuer while full and CI stay real", () => {
   const full = read("scripts/qa/full.sh");
   const strict = read("scripts/qa/strict.sh");
   const prePush = read("scripts/git-hooks/pre-push.sh");
+  const preparePush = read("scripts/qa/prepare-push.sh");
+  const receipt = read("scripts/qa/pre-push-receipt.mjs");
+  const ci = read(".github/workflows/ci.yml");
 
   assert.match(full, /SECRETS_STRICT=1 bash/u);
   assert.match(full, /GOVULNCHECK_STRICT=1 bash/u);
   assert.doesNotMatch(full, /gate-coverage\.mjs|covered_by_|component_complete/u);
   assert.doesNotMatch(strict, /gate-coverage\.mjs|covered_by_|component_complete/u);
-  assert.doesNotMatch(prePush, /gate-coverage\.mjs|covered_by_|component_complete/u);
   assert.match(strict, /bash "\$ROOT_DIR\/scripts\/qa\/full\.sh"/u);
   assert.match(strict, /GOVULNCHECK_STRICT=1/u);
   assert.match(strict, /status=complete/u);
-  assert.match(prePush, /status=complete coverage=prior-ref-secrets\+full/u);
+  assert.doesNotMatch(
+    `${full}\n${strict}\n${ci}`,
+    /pre-push-receipt|PRE_PUSH_RECEIPT/u,
+  );
+
+  assert.match(preparePush, /pre-push-receipt\.mjs" prepare/u);
+  assert.match(prePush, /args=\(verify-hook --remote "\$remote_name"\)/u);
+  assert.doesNotMatch(prePush, /full\.sh|SKIP_PRE_PUSH/u);
+  assert.match(receipt, /PRE_PUSH_RECEIPT_TTL_MS = 30 \* 60 \* 1000/u);
+  assert.match(receipt, /rev-parse", "--git-common-dir"/u);
+  assert.match(receipt, /createHmac\("sha256"/u);
+  assert.match(receipt, /acquireReceiptLock/u);
+  assert.match(receipt, /renameSync\(temporary, target\)/u);
+  assert.match(receipt, /readFileSync\(0, "utf8"\)/u);
+  assert.match(receipt, /git", \["log", "--check", "--format=", ref\.range\]/u);
+  assert.match(receipt, /SECRETS_STRICT: "1"/u);
+  assert.doesNotMatch(receipt, /process\.env\.PRE_PUSH_RECEIPT_/u);
   assert.doesNotMatch(strict, /SKIP_GOVULNCHECK=1/u);
-  assert.doesNotMatch(prePush, /SKIP_SECRETS_SCAN=1/u);
 });
 
 test("fixed Node and Go gates require fail-closed execution summaries", () => {

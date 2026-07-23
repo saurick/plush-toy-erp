@@ -615,7 +615,7 @@ export async function retireManualAcceptanceSourceData(
     executed,
     postApplySummary,
     boundary:
-      "只取消或归档源单并停用主数据，不物理删除历史记录，也不处理已过账的库存、出货或财务记录。",
+      "只处理没有 active / blocked ProcessRuntime 阻断的源单取消或归档与主数据停用；不物理删除历史记录，也不处理流程撤销或已过账的库存、出货、财务记录。当前流程证据需通过专用验收库重建清理。",
   };
 }
 
@@ -748,7 +748,7 @@ function usage() {
 和包含精确 origin/customer/release/migration/debug=false 的
 MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
 
-默认仅预览，不物理删除历史记录；已过账记录不在本入口处理。`;
+默认仅预览，不物理删除历史记录；active / blocked ProcessRuntime 和已过账记录不在本入口处理。当前流程位置证据需通过专用验收库重建清理。`;
 }
 
 export async function runManualAcceptanceRetireCli(argv, deps = {}) {

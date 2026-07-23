@@ -41,6 +41,7 @@ import {
   listAllFinishedGoodsQualityInspections,
 } from '../api/qualityApi.mjs'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -1499,15 +1500,16 @@ export default function ShipmentsPage() {
           />
         }
         primaryAction={
-          <ToolbarButton
-            type="primary"
-            className="erp-business-list-toolbar__primary-action"
-            icon={<PlusOutlined />}
-            disabled={!canCreate}
-            onClick={openCreate}
-          >
-            新建草稿
-          </ToolbarButton>
+          canCreate ? (
+            <ToolbarButton
+              type="primary"
+              className="erp-business-list-toolbar__primary-action"
+              icon={<PlusOutlined />}
+              onClick={openCreate}
+            >
+              新建草稿
+            </ToolbarButton>
+          ) : null
         }
       >
         <SelectionActionBar
@@ -1523,28 +1525,32 @@ export default function ShipmentsPage() {
           >
             清空已选
           </Button>
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
+          <BusinessActionTooltip
             disabled={!selectedRow || saving}
-            onClick={() => openShipmentDetails(selectedRow)}
-          >
-            查看明细
-          </Button>
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            disabled={!selectedRow || relatedMenuItems.length === 0}
-            menu={{ items: relatedMenuItems, onClick: openRelatedRecord }}
+            disabledReason={
+              saving ? '当前操作完成后可查看明细' : '请先选择一张出货单'
+            }
           >
             <Button
               size="small"
-              icon={<LinkOutlined />}
-              disabled={!selectedRow || relatedMenuItems.length === 0}
+              icon={<EyeOutlined />}
+              disabled={!selectedRow || saving}
+              onClick={() => openShipmentDetails(selectedRow)}
             >
-              相关单据 <DownOutlined />
+              查看明细
             </Button>
-          </Dropdown>
+          </BusinessActionTooltip>
+          {relatedMenuItems.length > 0 ? (
+            <Dropdown
+              trigger={['click']}
+              destroyOnHidden
+              menu={{ items: relatedMenuItems, onClick: openRelatedRecord }}
+            >
+              <Button size="small" icon={<LinkOutlined />}>
+                相关单据 <DownOutlined />
+              </Button>
+            </Dropdown>
+          ) : null}
           {selectedRow?.status === 'DRAFT' &&
           canCreateFinishedGoodsQualityInspection ? (
             <Button
@@ -1556,76 +1562,92 @@ export default function ShipmentsPage() {
               发起出货前检验
             </Button>
           ) : null}
-          <Popconfirm
-            title="提交后将启动版本化出货流程；质量关口通过后进入财务审批，审批前不能确认出货。是否继续？"
-            onConfirm={submitSelectedShipmentRelease}
-            okText="提交放行"
-            cancelText="取消"
-          >
-            <Button
-              size="small"
-              disabled={
-                !selectedRow ||
-                selectedRow.status !== 'DRAFT' ||
-                !canSubmitShipmentRelease ||
-                saving
+          {canSubmitShipmentRelease &&
+          (!selectedRow || selectedRow.status === 'DRAFT') ? (
+            <BusinessActionTooltip
+              disabled={!selectedRow || saving}
+              disabledReason={
+                saving ? '当前操作完成后可提交' : '请先选择一张出货草稿'
               }
             >
-              提交出货审批
-            </Button>
-          </Popconfirm>
-          <Popconfirm
-            title="确认出货并扣减相应库存？"
-            onConfirm={() =>
-              runShipmentAction(selectedRow, shipShipment, '确认出货')
-            }
-            okText="确认"
-            cancelText="取消"
-          >
-            <Button
-              size="small"
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              disabled={
-                !selectedRow ||
-                selectedRow.status !== 'DRAFT' ||
-                !canShip ||
-                saving
+              <Popconfirm
+                title="提交后将启动版本化出货流程；质量关口通过后进入财务审批，审批前不能确认出货。是否继续？"
+                onConfirm={submitSelectedShipmentRelease}
+                okText="提交放行"
+                cancelText="取消"
+              >
+                <Button size="small" disabled={!selectedRow || saving}>
+                  提交出货审批
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {canShip && (!selectedRow || selectedRow.status === 'DRAFT') ? (
+            <BusinessActionTooltip
+              disabled={!selectedRow || saving}
+              disabledReason={
+                saving ? '当前操作完成后可确认出货' : '请先选择一张出货草稿'
               }
             >
-              确认出货
-            </Button>
-          </Popconfirm>
-          <Popconfirm
-            title={
-              selectedRow?.status === 'DRAFT'
-                ? '确认作废这张出货草稿？草稿作废不会扣减或恢复库存；如已提交放行，需先完成或退回放行待办。'
-                : '确认撤销已出货并恢复相应库存？'
-            }
-            onConfirm={() =>
-              runShipmentAction(
-                selectedRow,
-                cancelShipment,
-                selectedRow?.status === 'DRAFT' ? '作废出货草稿' : '撤销已出货'
-              )
-            }
-            okText="确认"
-            cancelText="取消"
-          >
-            <Button
-              size="small"
-              danger
-              icon={<CloseCircleOutlined />}
-              disabled={
-                !selectedRow ||
-                !['DRAFT', 'SHIPPED'].includes(selectedRow.status) ||
-                !canCancel ||
-                saving
+              <Popconfirm
+                title="确认出货并扣减相应库存？"
+                onConfirm={() =>
+                  runShipmentAction(selectedRow, shipShipment, '确认出货')
+                }
+                okText="确认"
+                cancelText="取消"
+              >
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  disabled={!selectedRow || saving}
+                >
+                  确认出货
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCancel &&
+          (!selectedRow ||
+            ['DRAFT', 'SHIPPED'].includes(selectedRow.status)) ? (
+              <BusinessActionTooltip
+                disabled={!selectedRow || saving}
+                disabledReason={
+                saving ? '当前操作完成后可继续' : '请先选择一张出货单'
               }
-            >
-              {selectedRow?.status === 'DRAFT' ? '作废草稿' : '撤销已出货'}
-            </Button>
-          </Popconfirm>
+              >
+                <Popconfirm
+                  title={
+                  selectedRow?.status === 'DRAFT'
+                    ? '确认作废这张出货草稿？草稿作废不会扣减或恢复库存；如已提交放行，需先完成或退回放行待办。'
+                    : '确认撤销已出货并恢复相应库存？'
+                }
+                  onConfirm={() =>
+                  runShipmentAction(
+                    selectedRow,
+                    cancelShipment,
+                    selectedRow?.status === 'DRAFT'
+                      ? '作废出货草稿'
+                      : '撤销已出货'
+                  )
+                }
+                  okText="确认"
+                  cancelText="取消"
+                >
+                  <Button
+                    size="small"
+                    danger
+                    icon={<CloseCircleOutlined />}
+                    disabled={!selectedRow || saving}
+                  >
+                    {selectedRow?.status === 'DRAFT'
+                    ? '作废草稿'
+                    : '撤销已出货'}
+                  </Button>
+                </Popconfirm>
+              </BusinessActionTooltip>
+          ) : null}
           {selectedRow?.status === 'SHIPPED' &&
           (canCreateReceivable || canCreateInvoice) ? (
             <>

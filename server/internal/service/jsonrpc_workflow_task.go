@@ -273,6 +273,47 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			return id, d.mapWorkflowError(ctx, err), nil
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": workflowTaskEventsToAny(events)})}, nil
+	case "get_task_process_context":
+		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownWorkflowTaskParams(pm, method, "task_id"); res != nil {
+			return id, res, nil
+		}
+		taskID := getInt(pm, "task_id", 0)
+		if taskID <= 0 {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务流程参数不完整"}, nil
+		}
+		admin, adminRes := d.CurrentAdmin(ctx)
+		if adminRes != nil {
+			return id, adminRes, nil
+		}
+		task, err := d.workflowUC.GetTask(ctx, taskID)
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+		visibilityScope, visibilityResult := d.workflowTaskReadVisibilityScope(ctx, admin)
+		if visibilityResult != nil {
+			return id, visibilityResult, nil
+		}
+		if !biz.WorkflowTaskVisibilityScopeIncludesTask(visibilityScope, task) {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
+		if task.ProcessInstanceID == nil || task.ProcessNodeInstanceID == nil {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前任务未关联正式流程"}, nil
+		}
+		if d.processRuntimeUC == nil {
+			return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
+		}
+		processContext, err := d.processRuntimeUC.GetProcessTaskContext(ctx, task)
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(map[string]any{"process_context": workflowProcessTaskContextToMap(processContext)}),
+		}, nil
 	case "get_task_assignment_options":
 		return d.handleWorkflowTaskAssignmentOptions(ctx, id, pm)
 	case "create_task":

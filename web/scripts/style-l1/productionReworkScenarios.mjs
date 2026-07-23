@@ -68,9 +68,9 @@ export function createProductionReworkScenarios(deps) {
         await reworkButton.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(await reworkButton.isEnabled(), true)
         assert.equal(
-          await page.getByRole('button', { name: '过账' }).first().isDisabled(),
-          true,
-          '仅具备返工权限时不得借用生产过账权限'
+          await page.getByRole('button', { name: '过账' }).count(),
+          0,
+          '仅具备返工权限时不应展示生产过账入口'
         )
         await reworkButton.click()
 

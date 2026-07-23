@@ -19,6 +19,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -310,6 +311,9 @@ export default function V1SalesOrdersPage() {
   const selectedOrderCanEdit = Boolean(
     canUpdateOrder && isDraftSourceDocument(selectedOrder)
   )
+  const selectedOrderLifecycleStatus = String(
+    selectedOrder?.lifecycle_status || ''
+  ).toLowerCase()
   // 订单头和明细共用一个聚合保存事务；明细编辑不能再投影旧分拆写接口权限。
   const canCreateItem = canCreateOrder || canUpdateOrder
   const canUpdateItem = canUpdateOrder
@@ -1381,57 +1385,97 @@ export default function V1SalesOrdersPage() {
           >
             清空已选
           </Button>
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            disabled={!selectedOrder}
-            menu={{
-              items: relatedMenuItems,
-              onClick: openRelatedTable,
-            }}
-          >
-            <Button
-              size="small"
-              icon={<LinkOutlined />}
-              disabled={!selectedOrder || relatedMenuItems.length === 0}
+          {relatedMenuItems.length > 0 ? (
+            <BusinessActionTooltip
+              disabled={!selectedOrder}
+              disabledReason="请先选择一条销售订单"
             >
-              相关单据 <DownOutlined />
-            </Button>
-          </Dropdown>
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            disabled={!selectedOrder}
-            onClick={() => openSalesOrderDetails(selectedOrder)}
-          >
-            查看详情
-          </Button>
-          {canUpdateOrder ? (
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              loading={itemLoading}
-              disabled={!selectedOrderCanEdit || itemLoading}
-              onClick={() => openEditOrder(selectedOrder)}
-            >
-              编辑订单
-            </Button>
+              <Dropdown
+                trigger={['click']}
+                destroyOnHidden
+                disabled={!selectedOrder}
+                menu={{
+                  items: relatedMenuItems,
+                  onClick: openRelatedTable,
+                }}
+              >
+                <Button
+                  size="small"
+                  icon={<LinkOutlined />}
+                  disabled={!selectedOrder}
+                >
+                  相关单据 <DownOutlined />
+                </Button>
+              </Dropdown>
+            </BusinessActionTooltip>
           ) : null}
-          {canCreateReservation ? (
+          <BusinessActionTooltip
+            disabled={!selectedOrder}
+            disabledReason="请先选择一条销售订单"
+          >
             <Button
               size="small"
+              icon={<EyeOutlined />}
+              disabled={!selectedOrder}
+              onClick={() => openSalesOrderDetails(selectedOrder)}
+            >
+              查看详情
+            </Button>
+          </BusinessActionTooltip>
+          {canUpdateOrder &&
+          (!selectedOrder || selectedOrderLifecycleStatus === 'draft') ? (
+            <BusinessActionTooltip
+              disabled={!selectedOrderCanEdit || itemLoading}
+              disabledReason={
+                itemLoading
+                  ? '订单明细加载完成后可编辑'
+                  : '请先选择一条草稿销售订单'
+              }
+            >
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                loading={itemLoading}
+                disabled={!selectedOrderCanEdit || itemLoading}
+                onClick={() => openEditOrder(selectedOrder)}
+              >
+                编辑订单
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCreateReservation &&
+          !['closed', 'canceled'].includes(selectedOrderLifecycleStatus) ? (
+            <BusinessActionTooltip
               disabled={
                 !selectedOrder ||
-                String(selectedOrder.lifecycle_status || '').toLowerCase() !==
-                  'active' ||
+                selectedOrderLifecycleStatus !== 'active' ||
                 reservationLoading ||
                 saving
               }
-              loading={reservationLoading}
-              onClick={openSalesOrderReservation}
+              disabledReason={
+                !selectedOrder
+                  ? '请先选择一条销售订单'
+                  : selectedOrderLifecycleStatus !== 'active'
+                    ? '销售订单生效后可预留库存'
+                    : reservationLoading || saving
+                      ? '当前操作完成后可继续预留库存'
+                      : ''
+              }
             >
-              预留库存
-            </Button>
+              <Button
+                size="small"
+                disabled={
+                  !selectedOrder ||
+                  selectedOrderLifecycleStatus !== 'active' ||
+                  reservationLoading ||
+                  saving
+                }
+                loading={reservationLoading}
+                onClick={openSalesOrderReservation}
+              >
+                预留库存
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
           {primaryLifecycleAction ? (
             <Button
@@ -1446,33 +1490,26 @@ export default function V1SalesOrdersPage() {
               {primaryLifecycleAction.label}
             </Button>
           ) : null}
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            disabled={
-              !selectedOrder || saving || secondaryLifecycleActions.length === 0
-            }
-            menu={{
-              items: lifecycleMenuItems,
-              onClick: ({ key }) => {
-                const action = secondaryLifecycleActions.find(
-                  (item) => item.key === key
-                )
-                requestLifecycleAction(action, selectedOrder)
-              },
-            }}
-          >
-            <Button
-              size="small"
-              disabled={
-                !selectedOrder ||
-                saving ||
-                secondaryLifecycleActions.length === 0
-              }
+          {secondaryLifecycleActions.length > 0 ? (
+            <Dropdown
+              trigger={['click']}
+              destroyOnHidden
+              disabled={!selectedOrder || saving}
+              menu={{
+                items: lifecycleMenuItems,
+                onClick: ({ key }) => {
+                  const action = secondaryLifecycleActions.find(
+                    (item) => item.key === key
+                  )
+                  requestLifecycleAction(action, selectedOrder)
+                },
+              }}
             >
-              更多操作 <DownOutlined />
-            </Button>
-          </Dropdown>
+              <Button size="small" disabled={!selectedOrder || saving}>
+                更多操作 <DownOutlined />
+              </Button>
+            </Dropdown>
+          ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
 

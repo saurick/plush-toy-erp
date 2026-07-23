@@ -12,7 +12,7 @@
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、模板意图、字段映射、编辑与 PDF/打印验证 |
 | `$plush-seed-import-governance` | seed、fixture、模拟试用、import dry-run、cleanup 和真实客户数据边界 |
 | `$plush-manual-acceptance-governance` | 人工验收目录、模拟数据、岗位账号/任务、浏览器/PDF、目标试用、签收与退出清理 |
-| `$plush-test-governance` | T0-T8、测试形态、PostgreSQL/migration、browser、release evidence |
+| `$plush-test-governance` | T0-T8、开发期 affected、最终 prepare-push/full、PostgreSQL/migration、browser、release evidence |
 | `$plush-operations-governance` | runtime 诊断、可观测/错误、安全/隐私、发布、迁移和回滚 |
 
 ## 选择规则

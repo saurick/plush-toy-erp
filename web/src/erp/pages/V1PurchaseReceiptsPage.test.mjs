@@ -85,7 +85,7 @@ test('purchase receipt rows remain source-generated and cannot append manual lin
 test('purchase receipt drafts have a truthful no-inventory cancellation exit', () => {
   assert.match(
     source,
-    /!\['DRAFT', 'POSTED'\]\.includes\(selectedRow\.status\)/u
+    /\['DRAFT', 'POSTED'\]\.includes\(selectedRow\.status\)/u
   )
   assert.match(source, /采购入库草稿已作废，未更新库存/u)
   assert.match(source, /草稿作废不更新库存/u)

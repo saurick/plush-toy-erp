@@ -182,9 +182,7 @@ function fakeComponentReport({ stageKey, businessInput, targetAdapter }) {
         }
       : null;
   const factCoverage = factReferenceRecords
-    ? evaluateManualAcceptanceOutsourcingInventoryCoverage(
-        factReferenceRecords,
-      )
+    ? evaluateManualAcceptanceOutsourcingInventoryCoverage(factReferenceRecords)
     : null;
   return {
     mode: stageKey === "readiness" ? "verify" : "apply",
@@ -204,9 +202,7 @@ function fakeComponentReport({ stageKey, businessInput, targetAdapter }) {
           ),
         }
       : {}),
-    ...(factReferenceRecords
-      ? { referenceRecords: factReferenceRecords }
-      : {}),
+    ...(factReferenceRecords ? { referenceRecords: factReferenceRecords } : {}),
     summary:
       stageKey === "facts"
         ? {
@@ -717,6 +713,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
     ],
     "2026.07.16-v5",
   );
+  assert.equal(source.commands[0].args.includes("--source-report"), false);
 
   const taskStage = plan.stages.find((stage) => stage.key === "task");
   assert.equal(taskStage.expected.tasks, 180);
@@ -737,6 +734,12 @@ test("semantic plan locks the nine narrow stage contracts", () => {
       taskStage.commands[0].args.indexOf("--data-version") + 1
     ],
     "2026.07.16-v5",
+  );
+  assert.equal(
+    taskStage.commands[0].args[
+      taskStage.commands[0].args.indexOf("--source-report") + 1
+    ],
+    "output/qa/manual-acceptance/datasets/${DATA_VERSION}/${TARGET_ALIAS}/source/apply-report.json",
   );
   assert.equal(
     source.commands[0].environment.MANUAL_ACCEPTANCE_SIM_CONFIRM,
@@ -1631,7 +1634,9 @@ test("resume refreshes legacy fact evidence without weakening digest checks", as
       "utf8",
     );
     const prior = structuredClone(first);
-    prior.stages.find((stage) => stage.key === "facts").references.runner.componentDigest =
+    prior.stages.find(
+      (stage) => stage.key === "facts",
+    ).references.runner.componentDigest =
       digestManualAcceptanceDatasetComponentReport(legacyFacts);
     await fs.writeFile(
       first.applyReportPath,
@@ -1668,10 +1673,7 @@ test("resume refreshes legacy fact evidence without weakening digest checks", as
     ]);
     assert.deepEqual(calls, ["core", "facts", "attachments", "readiness"]);
     const refreshedFacts = JSON.parse(await fs.readFile(factsPath, "utf8"));
-    assert.equal(
-      refreshedFacts.summary.businessDashboardInventoryTotal,
-      45,
-    );
+    assert.equal(refreshedFacts.summary.businessDashboardInventoryTotal, 45);
   } finally {
     await fs.rm(outputRoot, { recursive: true, force: true });
   }

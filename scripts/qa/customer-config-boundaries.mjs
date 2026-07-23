@@ -310,14 +310,14 @@ function validateWorkflowTaskRevisionVisibilityContract() {
     (serviceSource.match(/workflowTaskQueryVisibilityScope\(/g) || [])
       .length === 2 &&
       (serviceSource.match(/workflowTaskReadVisibilityScope\(/g) || [])
-        .length === 3 &&
+        .length === 4 &&
       serviceSource.includes(
         "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskApprove)",
       ) &&
       visibilitySource.includes(
         "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)",
       ),
-    `${servicePath} list, ordinary board and event reads must use supervised read scope while role-view and approval board use capability-specific revision-aware scope`,
+    `${servicePath} list, ordinary board, event and process-context reads must use supervised read scope while role-view and approval board use capability-specific revision-aware scope`,
   );
   assert(
     visibilitySource.includes(

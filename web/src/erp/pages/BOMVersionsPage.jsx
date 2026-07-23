@@ -36,6 +36,7 @@ import {
   listAllUnits,
 } from '../api/masterDataOrderApi.mjs'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -1320,15 +1321,16 @@ export default function BOMVersionsPage() {
           </Space>
         }
         primaryAction={
-          <ToolbarButton
-            type="primary"
-            className="erp-business-list-toolbar__primary-action"
-            icon={<PlusOutlined />}
-            disabled={!canCreate}
-            onClick={openCreate}
-          >
-            新建草稿
-          </ToolbarButton>
+          canCreate ? (
+            <ToolbarButton
+              type="primary"
+              className="erp-business-list-toolbar__primary-action"
+              icon={<PlusOutlined />}
+              onClick={openCreate}
+            >
+              新建草稿
+            </ToolbarButton>
+          ) : null
         }
       >
         <SelectionActionBar
@@ -1349,117 +1351,144 @@ export default function BOMVersionsPage() {
           >
             清空已选
           </Button>
-          <Button
-            size="small"
-            icon={<InboxOutlined />}
+          <BusinessActionTooltip
             disabled={selectedRowKeys.length !== 1}
-            onClick={() => openView(activeActionVersion)}
-          >
-            查看
-          </Button>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            disabled={selectedRowKeys.length !== 1 || !activeActionCanEdit}
-            onClick={() => openEdit(activeActionVersion)}
-          >
-            编辑草稿
-          </Button>
-          <Button
-            size="small"
-            icon={<CopyOutlined />}
-            disabled={
-              selectedRowKeys.length !== 1 ||
-              !canCreate ||
-              !canCopyBOM(activeActionVersion)
-            }
-            onClick={() => openCopy(activeActionVersion)}
-          >
-            复制新版本
-          </Button>
-          <Button
-            size="small"
-            icon={<PrinterOutlined />}
-            title={printPermissionHint}
-            disabled={
-              !canPrint ||
-              selectedRowKeys.length !== 1 ||
-              detailLoading ||
-              printingTemplateKey !== ''
-            }
-            loading={printingTemplateKey === MATERIAL_DETAIL_TEMPLATE_KEY}
-            onClick={() => openEngineeringPrint(MATERIAL_DETAIL_TEMPLATE_KEY)}
-          >
-            打印物料明细
-          </Button>
-          <Button
-            size="small"
-            icon={<PrinterOutlined />}
-            title={printPermissionHint}
-            disabled={
-              !canPrint ||
-              selectedRowKeys.length !== 1 ||
-              detailLoading ||
-              printingTemplateKey !== ''
-            }
-            loading={printingTemplateKey === COLOR_CARD_TEMPLATE_KEY}
-            onClick={() => openEngineeringPrint(COLOR_CARD_TEMPLATE_KEY)}
-          >
-            打印色卡
-          </Button>
-          <Button
-            size="small"
-            icon={<PrinterOutlined />}
-            title={printPermissionHint}
-            disabled={
-              !canPrint ||
-              selectedRowKeys.length !== 1 ||
-              detailLoading ||
-              printingTemplateKey !== ''
-            }
-            loading={printingTemplateKey === WORK_INSTRUCTION_TEMPLATE_KEY}
-            onClick={() => openEngineeringPrint(WORK_INSTRUCTION_TEMPLATE_KEY)}
-          >
-            打印作业指导书
-          </Button>
-          <Popconfirm
-            title="激活该 BOM 版本？同产品当前生效版本会设为历史版本。"
-            okText="激活"
-            cancelText="取消"
-            onConfirm={activateSelected}
-          >
-            <Button
-              size="small"
-              icon={<CheckCircleOutlined />}
-              disabled={
-                selectedRowKeys.length !== 1 ||
-                !activeActionVersion ||
-                !canActivate ||
-                !canActivateBOM(activeActionVersion)
-              }
-            >
-              激活
-            </Button>
-          </Popconfirm>
-          <Popconfirm
-            title="将该 BOM 版本设为历史版本？后续仍可重新激活。"
-            okText="设为历史版本"
-            cancelText="取消"
-            onConfirm={archiveSelected}
+            disabledReason="请先选择一个 BOM 版本"
           >
             <Button
               size="small"
               icon={<InboxOutlined />}
-              disabled={
-                selectedRowKeys.length === 0 ||
-                !canUpdate ||
-                !canRequestSelectedArchive ||
-                archivableSelectedVersions.length === 0
-              }
+              disabled={selectedRowKeys.length !== 1}
+              onClick={() => openView(activeActionVersion)}
             >
-              {selectedRowKeys.length > 1 ? '所选设为历史版本' : '设为历史版本'}
+              查看
             </Button>
-          </Popconfirm>
+          </BusinessActionTooltip>
+          {canUpdate &&
+          (!activeActionVersion || canEditBOM(activeActionVersion)) ? (
+            <BusinessActionTooltip
+              disabled={selectedRowKeys.length !== 1 || !activeActionCanEdit}
+              disabledReason="请先选择一个 BOM 草稿"
+            >
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                disabled={selectedRowKeys.length !== 1 || !activeActionCanEdit}
+                onClick={() => openEdit(activeActionVersion)}
+              >
+                编辑草稿
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCreate &&
+          (!activeActionVersion || canCopyBOM(activeActionVersion)) ? (
+            <BusinessActionTooltip
+              disabled={
+                selectedRowKeys.length !== 1 ||
+                !canCopyBOM(activeActionVersion)
+              }
+              disabledReason="请先选择一个可复制的 BOM 版本"
+            >
+              <Button
+                size="small"
+                icon={<CopyOutlined />}
+                disabled={
+                  selectedRowKeys.length !== 1 ||
+                  !canCopyBOM(activeActionVersion)
+                }
+                onClick={() => openCopy(activeActionVersion)}
+              >
+                复制新版本
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canPrint
+            ? [
+                [MATERIAL_DETAIL_TEMPLATE_KEY, '打印物料明细'],
+                [COLOR_CARD_TEMPLATE_KEY, '打印色卡'],
+                [WORK_INSTRUCTION_TEMPLATE_KEY, '打印作业指导书'],
+              ].map(([templateKey, label]) => (
+                <BusinessActionTooltip
+                  key={templateKey}
+                  disabled={
+                    selectedRowKeys.length !== 1 ||
+                    detailLoading ||
+                    printingTemplateKey !== ''
+                  }
+                  disabledReason={
+                    detailLoading || printingTemplateKey !== ''
+                      ? '当前资料处理完成后可打印'
+                      : '请先选择一个 BOM 版本'
+                  }
+                >
+                  <Button
+                    size="small"
+                    icon={<PrinterOutlined />}
+                    disabled={
+                      selectedRowKeys.length !== 1 ||
+                      detailLoading ||
+                      printingTemplateKey !== ''
+                    }
+                    loading={printingTemplateKey === templateKey}
+                    onClick={() => openEngineeringPrint(templateKey)}
+                  >
+                    {label}
+                  </Button>
+                </BusinessActionTooltip>
+              ))
+            : null}
+          {canActivate &&
+          (!activeActionVersion || canActivateBOM(activeActionVersion)) ? (
+            <BusinessActionTooltip
+              disabled={
+                selectedRowKeys.length !== 1 || !activeActionVersion
+              }
+              disabledReason="请先选择一个可激活的 BOM 版本"
+            >
+              <Popconfirm
+                title="激活该 BOM 版本？同产品当前生效版本会设为历史版本。"
+                okText="激活"
+                cancelText="取消"
+                onConfirm={activateSelected}
+              >
+                <Button
+                  size="small"
+                  icon={<CheckCircleOutlined />}
+                  disabled={
+                    selectedRowKeys.length !== 1 || !activeActionVersion
+                  }
+                >
+                  激活
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdate &&
+          (selectedRowKeys.length === 0 ||
+            (canRequestSelectedArchive &&
+              archivableSelectedVersions.length > 0)) ? (
+                <BusinessActionTooltip
+                  disabled={selectedRowKeys.length === 0}
+                  disabledReason="请先选择可设为历史版本的 BOM"
+                >
+                  <Popconfirm
+                    title="将该 BOM 版本设为历史版本？后续仍可重新激活。"
+                    okText="设为历史版本"
+                    cancelText="取消"
+                    onConfirm={archiveSelected}
+                  >
+                    <Button
+                      size="small"
+                      icon={<InboxOutlined />}
+                      disabled={selectedRowKeys.length === 0}
+                    >
+                      {selectedRowKeys.length > 1
+                    ? '所选设为历史版本'
+                    : '设为历史版本'}
+                    </Button>
+                  </Popconfirm>
+                </BusinessActionTooltip>
+          ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
 

@@ -63,15 +63,15 @@ test('product print images: BOM print entry reflects template permission and fai
     bomPageSource.indexOf('<SelectionActionBar'),
     bomPageSource.indexOf('<BusinessDataTable')
   )
-  assert.equal(
-    operationSource.match(/title=\{printPermissionHint\}/gu)?.length,
-    3,
-    '三个 BOM 打印入口都应显示权限提示'
+  assert.match(
+    operationSource,
+    /\{canPrint[\s\S]*?MATERIAL_DETAIL_TEMPLATE_KEY[\s\S]*?COLOR_CARD_TEMPLATE_KEY[\s\S]*?WORK_INSTRUCTION_TEMPLATE_KEY[\s\S]*?\.map\(/u,
+    '三个 BOM 打印入口都应由打印权限统一投影'
   )
-  assert.equal(
-    operationSource.match(/disabled=\{\s*!canPrint \|\|/gu)?.length,
-    3,
-    '三个 BOM 打印入口都应在无打印权限时禁用'
+  assert.doesNotMatch(
+    operationSource,
+    /disabled=\{\s*!canPrint/u,
+    '无打印权限时不应渲染永久置灰的打印按钮'
   )
 })
 

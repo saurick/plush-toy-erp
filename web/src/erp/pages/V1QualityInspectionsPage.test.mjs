@@ -147,7 +147,8 @@ test('quality page names and filters the shared read model by business inspectio
   assert.match(source, /'shipment\.read'/u)
   assert.match(source, /'warehouse\.inventory\.read'/u)
   assert.match(source, /'purchase\.receipt\.read'/u)
-  assert.match(source, /relatedMenuItems\.length === 0/u)
+  assert.match(source, /relatedMenuItems\.length > 0/u)
+  assert.doesNotMatch(source, /relatedMenuItems\.length === 0/u)
   assert.doesNotMatch(source, /title="来料质检"/u)
 })
 

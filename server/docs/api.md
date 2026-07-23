@@ -60,7 +60,10 @@ HTTP 路由：
 
 - `metadata`
 - `list_tasks`
+- `list_role_tasks`
 - `get_task_board`
+- `get_task_process_context`
+- `list_task_events`
 - `list_business_states`
 - `explain_action_access`
 - `explain_task_assignment`
@@ -74,6 +77,8 @@ HTTP 路由：
 - `reassign_task`
 
 用途：读取和处理 Workflow 协同任务。`create_task` 只用于普通、无流程关联的协同任务；公开入口精确拒绝 registry 中全部 19 个可驱动领域 transition 或生成下游任务的 task group，不会因更换 task code / payload 而绕过。生产排程、生产异常和出货放行还使用保留的确定性编号前缀；入口防伪不影响受信领域事务 / ProcessRuntime producer 创建真实任务。
+
+`get_task_process_context` 只接受 `task_id`。服务端先按当前账号、active / stored revision、owner / assignee 范围确认任务可见，再从任务的 `process_instance_id / process_node_instance_id` 锚点读取来源单据、流程实例、全部节点、当前节点和已完成节点；来源或节点锚点不一致时 fail closed。响应不暴露定义 hash、策略快照或内部权限解释。正式桌面任务抽屉和手机任务详情用该结果展示业务流程、来源单据、流程发起时间、当前节点、已完成节点和最终状态，不根据任务名称猜测起点或终点。
 
 `get_task_assignment_options` 只接受 `task_id`，返回当前任务 version、状态、负责岗位、当前处理人、是否可退回岗位池以及服务端筛选后的接收人。`reassign_task` 只接受 `task_id / expected_version / idempotency_key / assignee_id / reason`；`assignee_id` 必须显式为正整数接收人或 `null` 岗位池，原因不能为空。当前默认只有 `boss` 获得 `workflow.task.assign`，super admin 可通过全权限执行，但不会自动成为业务岗位接收人；PMC 的 `workflow.task.supervise` 仍是只读。接收人必须是 active 账号、直接持有任务负责岗位，并在任务 revision 中具备读取、更新和完成 / 审批能力。成功只改变任务 `assignee_id / updated_by / version` 并写事件、幂等 receipt 与运行审计，不改变任务状态、责任池、流程锚点或 Fact。
 

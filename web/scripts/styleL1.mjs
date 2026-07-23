@@ -593,6 +593,7 @@ async function runScenarioOnce(browser, scenario) {
       adminProfileOverride: scenario.adminProfile,
       effectiveSessionOverride: scenario.effectiveSession,
       workflowTaskFixtures: scenario.workflowTaskFixtures,
+      workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
       workflowSourceTaskProducerFixtures:
         scenario.workflowSourceTaskProducerFixtures,
     })
@@ -612,6 +613,7 @@ async function runScenarioOnce(browser, scenario) {
         adminProfileOverride: scenario.adminProfile,
         effectiveSessionOverride: scenario.effectiveSession,
         workflowTaskFixtures: scenario.workflowTaskFixtures,
+        workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
         workflowSourceTaskProducerFixtures:
           scenario.workflowSourceTaskProducerFixtures,
       })
@@ -622,6 +624,7 @@ async function runScenarioOnce(browser, scenario) {
         adminProfileOverride: scenario.adminProfile,
         effectiveSessionOverride: scenario.effectiveSession,
         workflowTaskFixtures: scenario.workflowTaskFixtures,
+        workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
         workflowSourceTaskProducerFixtures:
           scenario.workflowSourceTaskProducerFixtures,
       })
