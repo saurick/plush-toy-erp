@@ -47,7 +47,7 @@ async function workflowMockHarness(
       ]),
     },
   },
-  { workflowTaskFixtures = [], workflowSourceTaskProducerFixtures = [] } = {}
+  { workflowTaskFixtures = [] } = {}
 ) {
   const handlers = new Map()
   const page = {
@@ -62,7 +62,6 @@ async function workflowMockHarness(
     nowUnix: () => 1_750_000_000,
     resolveDelayFromReferer: () => 0,
     workflowTaskFixtures,
-    workflowSourceTaskProducerFixtures,
   })
   const handler = handlers.get('**/rpc/workflow')
   assert.equal(typeof handler, 'function')

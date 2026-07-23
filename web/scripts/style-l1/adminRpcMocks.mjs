@@ -53,7 +53,6 @@ export async function installAdminRpcMocks(
     adminProfileOverride = null,
     effectiveSessionOverride = null,
     workflowTaskFixtures = [],
-    workflowSourceTaskProducerFixtures = [],
   } = {}
 ) {
   const nowUnix = () => Math.floor(Date.now() / 1000)
@@ -321,7 +320,6 @@ export async function installAdminRpcMocks(
     resolveDelayFromReferer,
     createMockAdminToken,
     workflowTaskFixtures,
-    workflowSourceTaskProducerFixtures,
   }
 
   await installSystemRpcMocks(page, mockContext)
@@ -332,11 +330,69 @@ export async function installAdminRpcMocks(
 
   await page.route('**/rpc/customer_config', async (route) => {
     const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method } = body
-    const data =
-      method === 'get_effective_session'
-        ? { session: mockContext.effectiveSession }
-        : unsupportedRpcMethod('customer_config', method)
+    const { id = 'mock-id', method, params = {} } = body
+    let data
+    if (method === 'get_effective_session') {
+      data = { session: mockContext.effectiveSession }
+    } else if (method === 'start_finished_goods_delivery_process') {
+      const shipmentID = Number(params.shipment_id || 0)
+      const businessRefNo = String(params.business_ref_no || '').trim()
+      const idempotencyKey = String(params.idempotency_key || '').trim()
+      if (
+        !Number.isSafeInteger(shipmentID) ||
+        shipmentID <= 0 ||
+        !businessRefNo ||
+        !idempotencyKey
+      ) {
+        data = unsupportedRpcMethod(
+          'customer_config',
+          'start_finished_goods_delivery_process invalid params'
+        )
+      } else {
+        const processInstanceID = 76_001
+        const startedNode = {
+          id: 76_002,
+          process_instance_id: processInstanceID,
+          node_key: 'finished_goods_quality',
+          node_type: 'domain_command',
+          status: 'active',
+          version: 1,
+        }
+        data = {
+          process_instance: {
+            id: processInstanceID,
+            process_key: 'finished_goods_delivery',
+            process_version: 'v1',
+            variant_key: 'finished_goods_delivery',
+            business_ref_type: 'shipment',
+            business_ref_id: shipmentID,
+            business_ref_no: businessRefNo,
+            status: 'active',
+            version: 1,
+          },
+          started_node: startedNode,
+          nodes: [
+            startedNode,
+            {
+              id: 76_003,
+              process_instance_id: processInstanceID,
+              node_key: 'shipment_finance_approval',
+              node_type: 'approval',
+              status: 'waiting',
+              version: 1,
+            },
+          ],
+          runtime_boundary: {
+            runtime_loader_start_only: true,
+            executes_domain_command: false,
+            writes_shipment_or_finance_fact: false,
+            workflow_task_done_posts_fact: false,
+          },
+        }
+      }
+    } else {
+      data = unsupportedRpcMethod('customer_config', method)
+    }
 
     await route.fulfill({
       status: 200,

@@ -1906,6 +1906,8 @@ export function buildSalesOrderLineReferences({
         actual.product_name_snapshot || planned.product_name_snapshot,
       color: actual.color_snapshot || planned.color_snapshot,
       quantity: actual.ordered_quantity || planned.ordered_quantity,
+      unitPrice: actual.unit_price || planned.unit_price,
+      amount: actual.amount || planned.amount,
     };
   });
 }
@@ -2701,6 +2703,8 @@ export function buildSourceDrivenFactReferences({
         productSkuId: line.productSkuId,
         unitId: line.unitId,
         orderedQuantity: line.quantity,
+        unitPrice: line.unitPrice,
+        amount: line.amount,
       };
       salesCandidates.push({ order: salesOrder, item });
       const bomPlan = activeBOMPlans.get(plannedLine.productRef);

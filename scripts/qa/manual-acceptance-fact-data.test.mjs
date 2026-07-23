@@ -155,6 +155,7 @@ function sourceReport({ remote = false } = {}) {
       productSkuId: 901,
       unitId: 1001,
       orderedQuantity: "300",
+      unitPrice: "128.88",
     },
     bom: {
       id: 1101,
@@ -702,6 +703,33 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
       payload: { surface_key: "production-exception" },
     }),
     "production",
+  );
+  assert.equal(
+    manualAcceptanceFactRole("workflow", "complete_task_action", {
+      payload: { surface_key: "shipment-finance-approval" },
+    }),
+    "finance",
+  );
+  assert.equal(
+    manualAcceptanceFactRole(
+      "customer_config",
+      "start_finished_goods_delivery_process",
+    ),
+    "warehouse",
+  );
+  assert.equal(
+    manualAcceptanceFactRole(
+      "customer_config",
+      "execute_finished_goods_delivery_quality_decide",
+    ),
+    "quality",
+  );
+  assert.equal(
+    manualAcceptanceFactRole(
+      "customer_config",
+      "execute_finished_goods_delivery_receivable_lead",
+    ),
+    "finance",
   );
 });
 

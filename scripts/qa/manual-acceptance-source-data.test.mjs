@@ -1012,6 +1012,8 @@ test("persisted sales order lines retain exact IDs for linked reservations and s
         product_name_snapshot: "【试用】产品 1",
         color_snapshot: "米白",
         ordered_quantity: "120",
+        unit_price: "12.50",
+        amount: "1500.00",
       },
     ],
     actualItems: [
@@ -1024,6 +1026,8 @@ test("persisted sales order lines retain exact IDs for linked reservations and s
         product_name_snapshot: "【试用】产品 1",
         color_snapshot: "米白",
         ordered_quantity: "120",
+        unit_price: "12.50",
+        amount: "1500.00",
       },
     ],
     productIds: new Map([["P-1", 101]]),
@@ -1041,6 +1045,8 @@ test("persisted sales order lines retain exact IDs for linked reservations and s
       productName: "【试用】产品 1",
       color: "米白",
       quantity: "120",
+      unitPrice: "12.50",
+      amount: "1500.00",
     },
   ]);
   assert.throws(
@@ -1198,6 +1204,8 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
             productSkuId: 1004,
             unitId: 1005,
             quantity: "129",
+            unitPrice: "12.50",
+            amount: "1612.50",
           },
         ],
       ],
@@ -1299,6 +1307,10 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
   assert.equal(
     sourceDrivenFacts.sourceCandidates.production.item.orderedQuantity,
     "129",
+  );
+  assert.equal(
+    sourceDrivenFacts.sourceCandidates.production.item.unitPrice,
+    "12.50",
   );
   assert.equal(sourceDrivenFacts.sourceCandidates.sales.order.customerId, 5001);
   assert.equal(

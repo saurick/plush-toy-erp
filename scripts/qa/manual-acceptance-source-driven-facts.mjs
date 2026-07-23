@@ -52,6 +52,7 @@ const BUSINESS_NO_CODES = new Set([
   "WWDZ",
   "BL",
   "CK",
+  "CKZJ",
   "YS",
   "YSDZ",
   "FP",
@@ -159,6 +160,16 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "inspection_no",
     "note",
   ]),
+  "quality.create_finished_goods_quality_inspection_draft": Object.freeze([
+    "customer_key",
+    "inspection_no",
+    "shipment_id",
+    "finished_goods_lot_id",
+    "product_id",
+    "warehouse_id",
+    "decision_note",
+  ]),
+  "quality.get_quality_inspection": Object.freeze(["customer_key", "id"]),
   "quality.submit_quality_inspection": Object.freeze(["customer_key", "id"]),
   "quality.pass_quality_inspection": Object.freeze([
     "customer_key",
@@ -189,9 +200,30 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "note",
     "items",
   ]),
-  "operational_fact.submit_shipment_release": Object.freeze([
+  "customer_config.start_finished_goods_delivery_process": Object.freeze([
     "customer_key",
-    "id",
+    "shipment_id",
+    "idempotency_key",
+  ]),
+  "customer_config.execute_finished_goods_delivery_quality_decide":
+    Object.freeze([
+      "customer_key",
+      "process_instance_id",
+      "process_node_instance_id",
+      "expected_version",
+      "shipment_id",
+      "quality_inspection_id",
+      "finished_goods_lot_id",
+      "result",
+      "decision_note",
+      "idempotency_key",
+    ]),
+  "workflow.list_tasks": Object.freeze([
+    "task_group",
+    "source_type",
+    "source_id",
+    "limit",
+    "offset",
   ]),
   "workflow.complete_task_action": Object.freeze([
     "task_id",
@@ -200,13 +232,34 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "action_key",
     "payload",
   ]),
-  "operational_fact.ship_shipment": Object.freeze(["customer_key", "id"]),
-  "operational_fact.create_receivable_from_shipment": Object.freeze([
+  "customer_config.execute_finished_goods_delivery_shipment_ship":
+    Object.freeze([
+      "customer_key",
+      "process_instance_id",
+      "process_node_instance_id",
+      "expected_version",
+      "shipment_id",
+      "idempotency_key",
+    ]),
+  "operational_fact.get_shipment": Object.freeze(["customer_key", "id"]),
+  "customer_config.execute_finished_goods_delivery_receivable_lead":
+    Object.freeze([
+      "customer_key",
+      "process_instance_id",
+      "process_node_instance_id",
+      "expected_version",
+      "shipment_id",
+      "receivable_source_no",
+      "expected_amount",
+      "lead_note",
+      "idempotency_key",
+    ]),
+  "operational_fact.list_finance_facts": Object.freeze([
     "customer_key",
-    "fact_no",
-    "shipment_id",
-    "idempotency_key",
-    "note",
+    "keyword",
+    "fact_type",
+    "limit",
+    "offset",
   ]),
   "operational_fact.create_invoice_from_shipment": Object.freeze([
     "customer_key",
@@ -299,6 +352,18 @@ function formatQuantity(units) {
     .padStart(DECIMAL_SCALE, "0")
     .replace(/0+$/u, "");
   return fraction ? `${integer}.${fraction}` : String(integer);
+}
+
+function multiplyQuantities(left, right, name) {
+  const product =
+    quantityUnits(left, `${name}.left`) *
+    quantityUnits(right, `${name}.right`);
+  if (product % DECIMAL_FACTOR !== 0n) {
+    throw new SourceDrivenFactError(
+      `${name} must be exactly representable with at most ${DECIMAL_SCALE} places`,
+    );
+  }
+  return formatQuantity(product / DECIMAL_FACTOR);
 }
 
 function exactStatus(value, expected, name) {
@@ -527,6 +592,7 @@ function normalizeSales(source) {
       "sales.item.productSkuId",
     ),
     unitId: positiveID(source?.item?.unitId, "sales.item.unitId"),
+    unitPrice: quantity(source?.item?.unitPrice, "sales.item.unitPrice"),
   };
   const inventory = {
     warehouseId: positiveID(
@@ -641,6 +707,7 @@ function operationBusinessCode(label) {
     "outsourcing-reconciliation": "WWDZ",
     "sales-reservation": "BL",
     "sales-shipment": "CK",
+    "sales-quality": "CKZJ",
     "sales-receivable": "YS",
     "sales-receivable-reconciliation": "YSDZ",
     "sales-invoice": "FP",
@@ -759,6 +826,7 @@ function buildIdentities(identity, phases) {
         source.item.id,
       ),
       shipment: operationIdentity(identity, "sales-shipment", source.item.id),
+      quality: operationIdentity(identity, "sales-quality", source.item.id),
       receivable: operationIdentity(
         identity,
         "sales-receivable",
@@ -1208,6 +1276,401 @@ function requireResult(data, key, status, operation) {
   return item;
 }
 
+function processNodes(data, operation) {
+  if (!Array.isArray(data?.nodes) || data.nodes.length === 0) {
+    throw new SourceDrivenFactError(`${operation} response missing process nodes`);
+  }
+  return data.nodes;
+}
+
+function requireProcessNode(nodes, nodeKey, statuses, operation) {
+  const matches = nodes.filter(
+    (node) => String(node?.node_key || "") === nodeKey,
+  );
+  if (matches.length !== 1) {
+    throw new SourceDrivenFactError(
+      `${operation} expected one ${nodeKey} node, got ${matches.length}`,
+    );
+  }
+  const node = matches[0];
+  positiveID(node.id, `${operation}.${nodeKey}.id`);
+  positiveID(node.version, `${operation}.${nodeKey}.version`);
+  const status = String(node.status || "").toLowerCase();
+  if (!statuses.includes(status)) {
+    throw new SourceDrivenFactError(
+      `${operation}.${nodeKey} expected ${statuses.join(" or ")}, got ${status || "missing"}`,
+    );
+  }
+  return node;
+}
+
+function processNodeExecutionVersion(node, operation) {
+  const version = positiveID(node?.version, `${operation}.version`);
+  const status = String(node?.status || "").toLowerCase();
+  if (status === "active") return version;
+  if (status === "completed" && version > 1) return version - 1;
+  throw new SourceDrivenFactError(
+    `${operation} is not active or exactly replayable`,
+  );
+}
+
+async function exactProcessApprovalTask(
+  rpc,
+  { processInstanceID, shipmentID },
+) {
+  const data = await invoke(rpc, "workflow", "list_tasks", {
+    task_group: "shipment_finance_approval",
+    source_type: "shipment",
+    source_id: shipmentID,
+    limit: 20,
+    offset: 0,
+  });
+  const tasks = Array.isArray(data?.tasks)
+    ? data.tasks.filter(
+        (task) =>
+          String(task?.task_group || "") === "shipment_finance_approval" &&
+          String(task?.source_type || "") === "shipment" &&
+          Number(task?.source_id) === shipmentID &&
+          Number(task?.process_instance_id) === processInstanceID,
+      )
+    : [];
+  if (tasks.length !== 1) {
+    throw new SourceDrivenFactError(
+      `shipment finance approval expected one process task, got ${tasks.length}`,
+    );
+  }
+  return tasks[0];
+}
+
+async function exactReceivableLead(rpc, { factNo, shipmentID }) {
+  const data = await invoke(
+    rpc,
+    "operational_fact",
+    "list_finance_facts",
+    customerParams({
+      keyword: factNo,
+      fact_type: "RECEIVABLE",
+      limit: 20,
+      offset: 0,
+    }),
+  );
+  const facts = Array.isArray(data?.finance_facts)
+    ? data.finance_facts.filter(
+        (fact) =>
+          String(fact?.fact_no || "") === factNo &&
+          String(fact?.fact_type || "").toUpperCase() === "RECEIVABLE" &&
+          String(fact?.source_type || "").toUpperCase() === "SHIPMENT" &&
+          Number(fact?.source_id) === shipmentID,
+      )
+    : [];
+  if (facts.length !== 1) {
+    throw new SourceDrivenFactError(
+      `${factNo} expected one shipment receivable lead, got ${facts.length}`,
+    );
+  }
+  return facts[0];
+}
+
+export async function applyFinishedGoodsDeliveryProcess({
+  rpc,
+  shipment,
+  productId,
+  finishedGoodsLotId,
+  warehouseId,
+  inspectionNo,
+  expectedAmount,
+  receivableSourceNo,
+  processIdempotencyKey,
+  qualityDecisionIdempotencyKey,
+  approvalIdempotencyKey,
+  shipmentShipIdempotencyKey,
+  receivableIdempotencyKey,
+}) {
+  const shipmentID = positiveID(shipment?.id, "shipment.id");
+  const shipmentNo = requiredText(shipment?.shipment_no, "shipment.shipment_no", 64);
+  const normalizedProductID = positiveID(productId, "productId");
+  const normalizedLotID = positiveID(
+    finishedGoodsLotId,
+    "finishedGoodsLotId",
+  );
+  const normalizedWarehouseID = positiveID(warehouseId, "warehouseId");
+  const normalizedInspectionNo = requiredText(
+    inspectionNo,
+    "inspectionNo",
+    64,
+  );
+  const normalizedExpectedAmount = quantity(expectedAmount, "expectedAmount");
+  const normalizedReceivableNo = requiredText(
+    receivableSourceNo,
+    "receivableSourceNo",
+    64,
+  );
+  const idempotency = Object.fromEntries(
+    Object.entries({
+      process: processIdempotencyKey,
+      quality: qualityDecisionIdempotencyKey,
+      approval: approvalIdempotencyKey,
+      shipment: shipmentShipIdempotencyKey,
+      receivable: receivableIdempotencyKey,
+    }).map(([key, value]) => [
+      key,
+      requiredText(value, `${key}IdempotencyKey`, 128),
+    ]),
+  );
+
+  let inspection = requireResult(
+    await invoke(
+      rpc,
+      "quality",
+      "create_finished_goods_quality_inspection_draft",
+      customerParams({
+        inspection_no: normalizedInspectionNo,
+        shipment_id: shipmentID,
+        finished_goods_lot_id: normalizedLotID,
+        product_id: normalizedProductID,
+        warehouse_id: normalizedWarehouseID,
+        decision_note: SIMULATED_NOTE,
+      }),
+    ),
+    "quality_inspection",
+    null,
+    "create_finished_goods_quality_inspection_draft",
+  );
+  let inspectionStatus = String(inspection.status || "").toUpperCase();
+  if (inspectionStatus === "DRAFT") {
+    inspection = requireResult(
+      await invoke(
+        rpc,
+        "quality",
+        "submit_quality_inspection",
+        customerParams({ id: inspection.id }),
+      ),
+      "quality_inspection",
+      "SUBMITTED",
+      "submit_quality_inspection",
+    );
+    inspectionStatus = "SUBMITTED";
+  }
+  if (!new Set(["SUBMITTED", "PASSED"]).has(inspectionStatus)) {
+    throw new SourceDrivenFactError(
+      `finished goods quality expected SUBMITTED or PASSED, got ${inspectionStatus || "missing"}`,
+    );
+  }
+
+  const startParams = customerParams({
+    shipment_id: shipmentID,
+    idempotency_key: idempotency.process,
+  });
+  let processData = await invoke(
+    rpc,
+    "customer_config",
+    "start_finished_goods_delivery_process",
+    startParams,
+  );
+  const processInstance = requireResult(
+    processData,
+    "process_instance",
+    null,
+    "start_finished_goods_delivery_process",
+  );
+  if (
+    String(processInstance.process_key || "") !== "finished_goods_delivery" ||
+    String(processInstance.business_ref_type || "") !== "shipment" ||
+    Number(processInstance.business_ref_id) !== shipmentID ||
+    String(processInstance.business_ref_no || "") !== shipmentNo
+  ) {
+    throw new SourceDrivenFactError(
+      "finished goods delivery process does not match the shipment source",
+    );
+  }
+  let nodes = processNodes(processData, "start_finished_goods_delivery_process");
+  const qualityNode = requireProcessNode(
+    nodes,
+    "finished_goods_quality",
+    ["active", "completed"],
+    "finished goods delivery",
+  );
+  const qualityData = await invoke(
+    rpc,
+    "customer_config",
+    "execute_finished_goods_delivery_quality_decide",
+    customerParams({
+      process_instance_id: processInstance.id,
+      process_node_instance_id: qualityNode.id,
+      expected_version: processNodeExecutionVersion(
+        qualityNode,
+        "finished_goods_quality",
+      ),
+      shipment_id: shipmentID,
+      quality_inspection_id: inspection.id,
+      finished_goods_lot_id: normalizedLotID,
+      result: "PASS",
+      decision_note: SIMULATED_NOTE,
+      idempotency_key: idempotency.quality,
+    }),
+  );
+  nodes = processNodes(
+    qualityData,
+    "execute_finished_goods_delivery_quality_decide",
+  );
+  requireProcessNode(
+    nodes,
+    "shipment_finance_approval",
+    ["active", "completed"],
+    "finished goods delivery",
+  );
+  inspection = requireResult(
+    await invoke(
+      rpc,
+      "quality",
+      "get_quality_inspection",
+      customerParams({ id: inspection.id }),
+    ),
+    "quality_inspection",
+    "PASSED",
+    "get_quality_inspection",
+  );
+  if (String(inspection.result || "").toUpperCase() !== "PASS") {
+    throw new SourceDrivenFactError(
+      `finished goods quality expected PASS, got ${inspection.result || "missing"}`,
+    );
+  }
+
+  let approvalTask = await exactProcessApprovalTask(rpc, {
+    processInstanceID: processInstance.id,
+    shipmentID,
+  });
+  const approvalStatus = String(
+    approvalTask.task_status_key || "",
+  ).toLowerCase();
+  if (approvalStatus === "ready") {
+    approvalTask = requireResult(
+      await invoke(rpc, "workflow", "complete_task_action", {
+        task_id: approvalTask.id,
+        expected_version: positiveID(
+          approvalTask.version,
+          "shipment_finance_approval.version",
+        ),
+        idempotency_key: idempotency.approval,
+        action_key: "complete",
+        payload: {
+          surface_key: "shipment-finance-approval",
+          feedback: "已核对本批出货财务放行条件。",
+        },
+      }),
+      "task",
+      null,
+      "complete_task_action",
+    );
+  }
+  if (String(approvalTask.task_status_key || "").toLowerCase() !== "done") {
+    throw new SourceDrivenFactError(
+      `shipment finance approval expected done, got ${approvalTask.task_status_key || "missing"}`,
+    );
+  }
+
+  processData = await invoke(
+    rpc,
+    "customer_config",
+    "start_finished_goods_delivery_process",
+    startParams,
+  );
+  nodes = processNodes(processData, "finished goods delivery approval readback");
+  const shipmentNode = requireProcessNode(
+    nodes,
+    "shipment_execution",
+    ["active", "completed"],
+    "finished goods delivery",
+  );
+  const shipmentData = await invoke(
+    rpc,
+    "customer_config",
+    "execute_finished_goods_delivery_shipment_ship",
+    customerParams({
+      process_instance_id: processInstance.id,
+      process_node_instance_id: shipmentNode.id,
+      expected_version: processNodeExecutionVersion(
+        shipmentNode,
+        "shipment_execution",
+      ),
+      shipment_id: shipmentID,
+      idempotency_key: idempotency.shipment,
+    }),
+  );
+  nodes = processNodes(
+    shipmentData,
+    "execute_finished_goods_delivery_shipment_ship",
+  );
+  const shipped = requireResult(
+    await invoke(
+      rpc,
+      "operational_fact",
+      "get_shipment",
+      customerParams({ id: shipmentID }),
+    ),
+    "shipment",
+    "SHIPPED",
+    "get_shipment",
+  );
+  if (String(shipped.finance_release_status || "").toUpperCase() !== "APPROVED") {
+    throw new SourceDrivenFactError(
+      `shipment finance release expected APPROVED, got ${shipped.finance_release_status || "missing"}`,
+    );
+  }
+
+  const receivableNode = requireProcessNode(
+    nodes,
+    "receivable_lead",
+    ["active", "completed"],
+    "finished goods delivery",
+  );
+  const receivableData = await invoke(
+    rpc,
+    "customer_config",
+    "execute_finished_goods_delivery_receivable_lead",
+    customerParams({
+      process_instance_id: processInstance.id,
+      process_node_instance_id: receivableNode.id,
+      expected_version: processNodeExecutionVersion(
+        receivableNode,
+        "receivable_lead",
+      ),
+      shipment_id: shipmentID,
+      receivable_source_no: normalizedReceivableNo,
+      expected_amount: normalizedExpectedAmount,
+      lead_note: SIMULATED_NOTE,
+      idempotency_key: idempotency.receivable,
+    }),
+  );
+  nodes = processNodes(
+    receivableData,
+    "execute_finished_goods_delivery_receivable_lead",
+  );
+  requireProcessNode(
+    nodes,
+    "end",
+    ["completed"],
+    "finished goods delivery",
+  );
+  const receivable = await exactReceivableLead(rpc, {
+    factNo: normalizedReceivableNo,
+    shipmentID,
+  });
+  if (!new Set(["DRAFT", "POSTED"]).has(String(receivable.status || "").toUpperCase())) {
+    throw new SourceDrivenFactError(
+      `${normalizedReceivableNo} expected DRAFT or POSTED, got ${receivable.status || "missing"}`,
+    );
+  }
+  return {
+    processInstance,
+    qualityInspection: inspection,
+    approvalTask,
+    shipment: shipped,
+    receivable,
+    nodes,
+  };
+}
+
 async function createPostFact({
   rpc,
   createMethod,
@@ -1512,25 +1975,50 @@ async function createPostedFinanceWithReconciliation({
   sourceID,
   identity,
   createFields = {},
+  existingFinance,
 }) {
-  const finance = await createPostFact({
-    rpc,
-    createMethod,
-    createParams: customerParams({
-      fact_no: identity.businessNo,
-      [sourceParam]: sourceID,
-      idempotency_key: identity.idempotencyKey,
-      note: SIMULATED_NOTE,
-      ...createFields,
-    }),
-    resultKey: "finance_fact",
-    postMethod: "post_finance_fact",
-  });
+  let finance;
+  if (existingFinance) {
+    const status = String(existingFinance.status || "").toUpperCase();
+    if (status === "POSTED") {
+      finance = existingFinance;
+    } else if (status === "DRAFT") {
+      finance = requireResult(
+        await invoke(
+          rpc,
+          "operational_fact",
+          "post_finance_fact",
+          customerParams({ id: existingFinance.id }),
+        ),
+        "finance_fact",
+        "POSTED",
+        "post_finance_fact",
+      );
+    } else {
+      throw new SourceDrivenFactError(
+        `existing finance fact expected DRAFT or POSTED, got ${existingFinance.status || "missing"}`,
+      );
+    }
+  } else {
+    finance = await createPostFact({
+      rpc,
+      createMethod,
+      createParams: customerParams({
+        fact_no: identity.businessNo,
+        [sourceParam]: sourceID,
+        idempotency_key: identity.idempotencyKey,
+        note: SIMULATED_NOTE,
+        ...createFields,
+      }),
+      resultKey: "finance_fact",
+      postMethod: "post_finance_fact",
+    });
+  }
   const reconciliationIdentity =
     identity.reconciliation ||
     operationIdentity(
       plan,
-      `${createMethod}-reconciliation`,
+      `${createMethod || "existing-finance"}-reconciliation`,
       sourceID,
       finance.id,
     );
@@ -1659,65 +2147,35 @@ async function applySales(plan, rpc) {
     "DRAFT",
     "create_shipment_with_items",
   );
-  const releaseData = await invoke(
+  const delivery = await applyFinishedGoodsDeliveryProcess({
     rpc,
-    "operational_fact",
-    "submit_shipment_release",
-    customerParams({ id: shipmentDraft.id }),
-  );
-  let releaseTask = requireResult(
-    releaseData,
-    "workflow_task",
-    null,
-    "submit_shipment_release",
-  );
-  const releaseStatus = String(
-    releaseTask.task_status_key || "",
-  ).toLowerCase();
-  if (releaseStatus === "ready") {
-    const completed = await invoke(rpc, "workflow", "complete_task_action", {
-      task_id: releaseTask.id,
-      expected_version: positiveID(
-        releaseTask.version,
-        "submit_shipment_release.workflow_task.version",
-      ),
-      idempotency_key: `${identity.shipment.idempotencyKey}:release`,
-      action_key: "complete",
-      payload: { feedback: "已核对本批出货放行条件。" },
-    });
-    releaseTask = requireResult(
-      completed,
-      "task",
-      null,
-      "complete_task_action",
-    );
-  }
-  if (String(releaseTask.task_status_key || "").toLowerCase() !== "done") {
-    throw new SourceDrivenFactError(
-      `shipment release task expected done, got ${releaseTask.task_status_key || "missing"}`,
-    );
-  }
-  const shipment = requireResult(
-    await invoke(
-      rpc,
-      "operational_fact",
-      "ship_shipment",
-      customerParams({ id: shipmentDraft.id }),
+    shipment: shipmentDraft,
+    productId: source.item.productId,
+    finishedGoodsLotId: source.inventory.lotId,
+    warehouseId: source.inventory.warehouseId,
+    inspectionNo: identity.quality.businessNo,
+    expectedAmount: multiplyQuantities(
+      source.item.unitPrice,
+      source.inventory.quantity,
+      "sales.receivableAmount",
     ),
-    "shipment",
-    "SHIPPED",
-    "ship_shipment",
-  );
+    receivableSourceNo: identity.receivable.businessNo,
+    processIdempotencyKey: `${identity.shipment.idempotencyKey}:process`,
+    qualityDecisionIdempotencyKey: `${identity.quality.idempotencyKey}:decision`,
+    approvalIdempotencyKey: `${identity.shipment.idempotencyKey}:approval`,
+    shipmentShipIdempotencyKey: `${identity.shipment.idempotencyKey}:ship`,
+    receivableIdempotencyKey: identity.receivable.idempotencyKey,
+  });
+  const shipment = delivery.shipment;
   const receivable = await createPostedFinanceWithReconciliation({
     plan,
     rpc,
-    createMethod: "create_receivable_from_shipment",
-    sourceParam: "shipment_id",
     sourceID: shipment.id,
     identity: {
       ...identity.receivable,
       reconciliation: identity.receivableReconciliation,
     },
+    existingFinance: delivery.receivable,
   });
   const invoice = await createPostedFinanceWithReconciliation({
     plan,
@@ -1736,6 +2194,9 @@ async function applySales(plan, rpc) {
   return {
     reservation,
     shipment,
+    qualityInspection: delivery.qualityInspection,
+    approvalTask: delivery.approvalTask,
+    processInstance: delivery.processInstance,
     receivable,
     invoice,
   };

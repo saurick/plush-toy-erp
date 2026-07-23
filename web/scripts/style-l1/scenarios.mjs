@@ -7,10 +7,10 @@ import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
+import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliveryScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
 import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
-import { createWorkflowSourceTaskScenarios } from './workflowSourceTaskScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
   const {
@@ -17179,14 +17179,12 @@ export function createStyleL1Scenarios(deps) {
         )
       },
     },
-    ...createWorkflowSourceTaskScenarios({
+    ...createFinishedGoodsDeliveryScenarios({
       assert,
       expectHeading,
       expectText,
-      gotoScenarioPath,
       outputDir,
       path,
-      waitForPath,
     }),
     ...createBusinessFormalScenarios({
       assert,

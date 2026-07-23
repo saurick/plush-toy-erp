@@ -104,6 +104,7 @@ function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
         productId: 103,
         productSkuId: 104,
         unitId: 105,
+        unitPrice: "128.88",
       },
       inventory: {
         warehouseId: 204,
@@ -126,8 +127,11 @@ function createRPC({
   const calls = [];
   const records = new Map();
   let nextID = 1000;
-  let qualityInspection;
-  let shipmentReleaseTask;
+  let outsourcingQualityInspection;
+  let finishedGoodsQualityInspection;
+  let shipmentFinanceApprovalTask;
+  let deliveryProcess;
+  let deliveryNodes;
 
   const createRecord = (key, extra = {}, method = "") => {
     const item = {
@@ -203,64 +207,268 @@ function createRPC({
       }
       case "list_outsourcing_return_quality_inspections":
         return {
-          quality_inspections: qualityInspection ? [qualityInspection] : [],
-          total: qualityInspection ? 1 : 0,
+          quality_inspections: outsourcingQualityInspection
+            ? [outsourcingQualityInspection]
+            : [],
+          total: outsourcingQualityInspection ? 1 : 0,
         };
       case "create_quality_inspection_from_outsourcing_return":
-        qualityInspection = { id: nextID++, status: "DRAFT" };
-        return { quality_inspection: qualityInspection };
+        outsourcingQualityInspection = { id: nextID++, status: "DRAFT" };
+        return { quality_inspection: outsourcingQualityInspection };
       case "submit_quality_inspection":
-        qualityInspection.status = "SUBMITTED";
-        return { quality_inspection: qualityInspection };
+        if (finishedGoodsQualityInspection?.id === params.id) {
+          finishedGoodsQualityInspection.status = "SUBMITTED";
+          return { quality_inspection: finishedGoodsQualityInspection };
+        }
+        outsourcingQualityInspection.status = "SUBMITTED";
+        return { quality_inspection: outsourcingQualityInspection };
       case "pass_quality_inspection":
         assert.equal(params.defect_rate_operator, "APPROX");
         assert.equal(params.defect_rate_percent, "5");
         assert.equal(typeof params.defect_rate_percent, "string");
-        qualityInspection.status = "PASSED";
-        qualityInspection.result = "PASS";
-        qualityInspection.defect_rate_operator = params.defect_rate_operator;
-        qualityInspection.defect_rate_percent = params.defect_rate_percent;
-        return { quality_inspection: qualityInspection };
+        outsourcingQualityInspection.status = "PASSED";
+        outsourcingQualityInspection.result = "PASS";
+        outsourcingQualityInspection.defect_rate_operator =
+          params.defect_rate_operator;
+        outsourcingQualityInspection.defect_rate_percent =
+          params.defect_rate_percent;
+        return { quality_inspection: outsourcingQualityInspection };
       case "create_stock_reservation_from_sales_order":
         return createRecord("stock_reservation", { status: "ACTIVE" });
-      case "create_shipment_with_items":
-        return createRecord("shipment");
-      case "submit_shipment_release":
-        shipmentReleaseTask ||= {
+      case "create_shipment_with_items": {
+        const created = createRecord("shipment", {
+          shipment_no: params.shipment_no,
+          finance_release_status: "PENDING",
+        });
+        return created;
+      }
+      case "create_finished_goods_quality_inspection_draft":
+        finishedGoodsQualityInspection ||= {
           id: nextID++,
+          inspection_no: params.inspection_no,
+          status: "DRAFT",
+          source_type: "SHIPMENT",
+          source_id: params.shipment_id,
+          inspection_type: "FINISHED_GOODS",
+          inventory_lot_id: params.finished_goods_lot_id,
+        };
+        return { quality_inspection: finishedGoodsQualityInspection };
+      case "get_quality_inspection":
+        assert.equal(params.id, finishedGoodsQualityInspection.id);
+        return { quality_inspection: finishedGoodsQualityInspection };
+      case "start_finished_goods_delivery_process": {
+        const shipmentRecord = records.get(params.shipment_id);
+        assert.equal(shipmentRecord?.key, "shipment");
+        if (!deliveryProcess) {
+          deliveryProcess = {
+            id: nextID++,
+            process_key: "finished_goods_delivery",
+            business_ref_type: "shipment",
+            business_ref_id: params.shipment_id,
+            business_ref_no: shipmentRecord.item.shipment_no,
+            status: "active",
+          };
+          deliveryNodes = [
+            {
+              id: nextID++,
+              node_key: "finished_goods_quality",
+              node_type: "domain_command",
+              status: "active",
+              version: 1,
+            },
+            {
+              id: nextID++,
+              node_key: "shipment_finance_approval",
+              node_type: "approval",
+              status: "waiting",
+              version: 1,
+            },
+            {
+              id: nextID++,
+              node_key: "shipment_finance_release",
+              node_type: "domain_command",
+              status: "waiting",
+              version: 1,
+            },
+            {
+              id: nextID++,
+              node_key: "shipment_execution",
+              node_type: "domain_command",
+              status: "waiting",
+              version: 1,
+            },
+            {
+              id: nextID++,
+              node_key: "receivable_lead",
+              node_type: "domain_command",
+              status: "waiting",
+              version: 1,
+            },
+            {
+              id: nextID++,
+              node_key: "end",
+              node_type: "end",
+              status: "waiting",
+              version: 1,
+            },
+          ];
+        }
+        return {
+          process_instance: structuredClone(deliveryProcess),
+          started_node: structuredClone(deliveryNodes[0]),
+          nodes: structuredClone(deliveryNodes),
+        };
+      }
+      case "execute_finished_goods_delivery_quality_decide":
+        assert.equal(domain, "customer_config");
+        assert.equal(params.process_instance_id, deliveryProcess.id);
+        assert.equal(params.process_node_instance_id, deliveryNodes[0].id);
+        assert.equal(params.expected_version, 1);
+        assert.equal(params.quality_inspection_id, finishedGoodsQualityInspection.id);
+        finishedGoodsQualityInspection.status = "PASSED";
+        finishedGoodsQualityInspection.result = "PASS";
+        deliveryNodes[0] = {
+          ...deliveryNodes[0],
+          status: "completed",
+          version: 2,
+          outcome: "finished_goods_quality.passed",
+        };
+        deliveryNodes[1] = {
+          ...deliveryNodes[1],
+          status: "active",
+          version: 2,
+        };
+        shipmentFinanceApprovalTask ||= {
+          id: nextID++,
+          task_group: "shipment_finance_approval",
+          source_type: "shipment",
+          source_id: deliveryProcess.business_ref_id,
+          process_instance_id: deliveryProcess.id,
+          process_node_instance_id: deliveryNodes[1].id,
+          required_capability_key: "workflow.task.approve",
           version: 1,
           task_status_key: "ready",
         };
-        return { workflow_task: shipmentReleaseTask, created: true };
+        return {
+          completed_node: structuredClone(deliveryNodes[0]),
+          nodes: structuredClone(deliveryNodes),
+        };
+      case "list_tasks":
+        assert.equal(domain, "workflow");
+        return {
+          tasks: shipmentFinanceApprovalTask
+            ? [structuredClone(shipmentFinanceApprovalTask)]
+            : [],
+          total: shipmentFinanceApprovalTask ? 1 : 0,
+        };
       case "complete_task_action":
         assert.equal(domain, "workflow");
-        assert.equal(params.task_id, shipmentReleaseTask.id);
-        assert.equal(params.expected_version, shipmentReleaseTask.version);
+        assert.equal(params.task_id, shipmentFinanceApprovalTask.id);
+        assert.equal(params.expected_version, shipmentFinanceApprovalTask.version);
         assert.equal(params.action_key, "complete");
-        shipmentReleaseTask = {
-          ...shipmentReleaseTask,
-          version: shipmentReleaseTask.version + 1,
+        shipmentFinanceApprovalTask = {
+          ...shipmentFinanceApprovalTask,
+          version: shipmentFinanceApprovalTask.version + 1,
           task_status_key: "done",
         };
-        return { task: shipmentReleaseTask };
-      case "ship_shipment": {
-        const record = records.get(params.id);
+        deliveryNodes[1] = {
+          ...deliveryNodes[1],
+          status: "completed",
+          version: 3,
+        };
+        deliveryNodes[2] = {
+          ...deliveryNodes[2],
+          status: "completed",
+          version: 3,
+          outcome: "shipment.finance_released",
+        };
+        deliveryNodes[3] = {
+          ...deliveryNodes[3],
+          status: "active",
+          version: 2,
+        };
+        records.get(deliveryProcess.business_ref_id).item.finance_release_status =
+          "APPROVED";
+        return { task: shipmentFinanceApprovalTask };
+      case "execute_finished_goods_delivery_shipment_ship": {
+        assert.equal(domain, "customer_config");
+        assert.equal(params.process_instance_id, deliveryProcess.id);
+        assert.equal(params.process_node_instance_id, deliveryNodes[3].id);
+        assert.equal(params.expected_version, 2);
+        const record = records.get(params.shipment_id);
         assert.equal(record?.key, "shipment");
         record.item.status = "SHIPPED";
+        deliveryNodes[3] = {
+          ...deliveryNodes[3],
+          status: "completed",
+          version: 3,
+          outcome: "shipment.shipped",
+        };
+        deliveryNodes[4] = {
+          ...deliveryNodes[4],
+          status: "active",
+          version: 2,
+        };
+        return {
+          completed_node: structuredClone(deliveryNodes[3]),
+          nodes: structuredClone(deliveryNodes),
+        };
+      }
+      case "get_shipment": {
+        const record = records.get(params.id);
+        assert.equal(record?.key, "shipment");
         return { shipment: record.item };
       }
-      case "create_receivable_from_shipment":
-        return createRecord(
+      case "execute_finished_goods_delivery_receivable_lead": {
+        assert.equal(domain, "customer_config");
+        assert.equal(params.process_instance_id, deliveryProcess.id);
+        assert.equal(params.process_node_instance_id, deliveryNodes[4].id);
+        assert.equal(params.expected_version, 2);
+        const created = createRecord(
           "finance_fact",
           {
-            fact_no: params.fact_no,
+            fact_no: params.receivable_source_no,
             fact_type: "RECEIVABLE",
+            source_type: "SHIPMENT",
+            source_id: params.shipment_id,
+            idempotency_key: params.idempotency_key,
+            amount: params.expected_amount,
             collection_type: "ACCOUNTS_RECEIVABLE",
             payment_term: "EOM_30",
             payment_term_days: 30,
           },
           method,
         );
+        deliveryNodes[4] = {
+          ...deliveryNodes[4],
+          status: "completed",
+          version: 3,
+          outcome: "finance.receivable_lead.created",
+        };
+        deliveryNodes[5] = {
+          ...deliveryNodes[5],
+          status: "completed",
+          version: 3,
+          outcome: "completed",
+        };
+        deliveryProcess.status = "completed";
+        return {
+          completed_node: structuredClone(deliveryNodes[4]),
+          nodes: structuredClone(deliveryNodes),
+          finance_fact: created.finance_fact,
+        };
+      }
+      case "list_finance_facts": {
+        const financeFacts = [...records.values()]
+          .filter(
+            (record) =>
+              record.key === "finance_fact" &&
+              record.item.fact_no === params.keyword &&
+              record.item.fact_type === params.fact_type,
+          )
+          .map((record) => record.item);
+        return { finance_facts: financeFacts, total: financeFacts.length };
+      }
       case "create_invoice_from_shipment":
         assert.match(params.invoice_category, /^[A-Z0-9_]+$/u);
         return createRecord(
@@ -368,6 +576,7 @@ test("every allowlisted method is present in the current formal JSON-RPC dispatc
       "../../server/internal/service/jsonrpc_operational_fact_finance.go",
       "../../server/internal/service/jsonrpc_quality.go",
       "../../server/internal/service/jsonrpc_workflow_task.go",
+      "../../server/internal/service/jsonrpc_customer_config.go",
     ].map((relative) => readFile(new URL(relative, import.meta.url), "utf8")),
   );
   const dispatchers = files.join("\n");
@@ -479,7 +688,7 @@ test("outsourcing quality apply sends the required approximate defect-rate pair"
   );
 });
 
-test("sales apply completes the source-generated warehouse release task before shipping", async () => {
+test("sales apply completes quality and finance approval before process-owned shipping", async () => {
   const plan = buildSourceDrivenFactPlan(sourceReport(), {
     instanceKey: "ROW-SALES-RELEASE",
     enabledPhases: ["sales"],
@@ -493,15 +702,43 @@ test("sales apply completes the source-generated warehouse release task before s
   });
 
   assert.equal(report.results.sales.shipment.status, "SHIPPED");
+  assert.equal(
+    report.results.sales.shipment.finance_release_status,
+    "APPROVED",
+  );
+  assert.equal(report.results.sales.qualityInspection.status, "PASSED");
+  assert.equal(
+    report.results.sales.approvalTask.required_capability_key,
+    "workflow.task.approve",
+  );
   const orderedMethods = calls.map((call) => call.method);
-  const submitIndex = orderedMethods.indexOf("submit_shipment_release");
+  const startIndex = orderedMethods.indexOf(
+    "start_finished_goods_delivery_process",
+  );
+  const qualityIndex = orderedMethods.indexOf(
+    "execute_finished_goods_delivery_quality_decide",
+  );
   const completeIndex = orderedMethods.indexOf("complete_task_action");
-  const shipIndex = orderedMethods.indexOf("ship_shipment");
-  assert.ok(submitIndex >= 0);
-  assert.ok(completeIndex > submitIndex);
+  const shipIndex = orderedMethods.indexOf(
+    "execute_finished_goods_delivery_shipment_ship",
+  );
+  const receivableIndex = orderedMethods.indexOf(
+    "execute_finished_goods_delivery_receivable_lead",
+  );
+  assert.ok(startIndex >= 0);
+  assert.ok(qualityIndex > startIndex);
+  assert.ok(completeIndex > qualityIndex);
   assert.ok(shipIndex > completeIndex);
+  assert.ok(receivableIndex > shipIndex);
+  assert.equal(orderedMethods.includes("submit_shipment_release"), false);
+  assert.equal(orderedMethods.includes("ship_shipment"), false);
+  assert.equal(orderedMethods.includes("create_receivable_from_shipment"), false);
   const completion = calls[completeIndex];
   assert.equal(completion.domain, "workflow");
+  assert.equal(
+    completion.params.payload.surface_key,
+    "shipment-finance-approval",
+  );
   assert.deepEqual(Object.keys(completion.params).sort(), [
     "action_key",
     "expected_version",

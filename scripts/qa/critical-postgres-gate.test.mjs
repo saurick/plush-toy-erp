@@ -193,7 +193,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
 
   for (const testName of [
     'TestWorkflowPostgresConflictingTerminalUpdatesApplySideEffectsOnce',
-    'TestWorkflowPostgresConcurrentSameTerminalRetryIsIdempotent',
+    'TestWorkflowPostgresConcurrentSameApprovalRetryIsIdempotentWithoutDomainSideEffects',
     'TestWorkflowPostgresConcurrentDifferentIntentSameKeyConflicts',
     'TestWorkflowPostgresConcurrentSameUrgeKeyIncrementsOnce',
     'TestWorkflowPostgresMigrationShape',

@@ -667,6 +667,12 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
       params?.task_group || params?.payload?.surface_key || "",
     ).toLowerCase();
     if (
+      surfaceKey.includes("shipment_finance_approval") ||
+      surfaceKey.includes("shipment-finance-approval")
+    ) {
+      return "finance";
+    }
+    if (
       surfaceKey.includes("production_scheduling") ||
       surfaceKey.includes("production-scheduling")
     ) {
@@ -679,6 +685,20 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
       return "production";
     }
     return "warehouse";
+  }
+  if (domain === "customer_config") {
+    if (method === "execute_finished_goods_delivery_quality_decide") {
+      return "quality";
+    }
+    if (method === "execute_finished_goods_delivery_receivable_lead") {
+      return "finance";
+    }
+    if (
+      method === "start_finished_goods_delivery_process" ||
+      method === "execute_finished_goods_delivery_shipment_ship"
+    ) {
+      return "warehouse";
+    }
   }
   // This runner prepares one cross-domain acceptance dataset. Production orders
   // and Facts use the independently verified super admin so an existing editable
@@ -2886,28 +2906,14 @@ async function ensureShipmentSpecimen(
     String(shipment.status).toUpperCase() === "DRAFT" &&
     apply
   ) {
-    await rpc({
-      domain: "operational_fact",
-      method: "submit_shipment_release",
-      params: { id: shipment.id },
-    });
-    await completeExactSourceTask({
-      rpc,
-      taskGroup: "shipment_release",
-      sourceType: "shipments",
-      sourceID: shipment.id,
-      surfaceKey: "shipment-release",
-      idempotencyKey: `manual-acceptance:${plan.dataVersion}:shipment-release:${suffix}`,
-      feedback: "已完成本批出货放行核对。",
-    });
     shipment = resultItem(
       await rpc({
         domain: "operational_fact",
-        method: "ship_shipment",
+        method: "cancel_shipment",
         params: { id: shipment.id },
       }),
       "shipment",
-      "ship_shipment",
+      "cancel_shipment",
     );
   }
   if (

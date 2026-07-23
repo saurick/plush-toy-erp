@@ -26,19 +26,25 @@ test("industry-template industry template closure writes dry-run-only evidence",
   assert(persisted.deferredItems.includes("真实客户数据导入"));
 });
 
-test("industry-template keeps shipment release source-generated and warehouse-owned", () => {
+test("industry-template keeps shipment finance approval process-generated and finance-owned", () => {
   const patterns = plushIndustryTemplateConfig.mobileTaskPatternTemplate.filter(
-    (item) => item.key === "shipment_release",
+    (item) => item.key === "shipment_finance_approval",
   );
 
   assert.equal(patterns.length, 1);
-  assert.deepEqual(patterns[0].roles, ["warehouse"]);
-  assert.equal(patterns[0].ownerRoleKey, "warehouse");
+  assert.deepEqual(patterns[0].roles, ["finance"]);
+  assert.equal(patterns[0].ownerRoleKey, "finance");
   assert.equal(patterns[0].sourceGenerated, true);
   assert.equal(patterns[0].configurableProducer, false);
-  assert.equal(patterns[0].producer, "shipment.submit_release");
+  assert.equal(
+    patterns[0].producer,
+    "process_runtime.finished_goods_delivery",
+  );
   assert.equal(patterns[0].sourcePageKey, "shipments");
-  assert.equal(patterns[0].sourceAction, "submit_shipment_release");
-  assert.match(patterns[0].precondition, /成品检验.*提交放行/u);
-  assert.match(patterns[0].downstream, /SHIPPED.*财务/u);
+  assert.equal(
+    patterns[0].sourceAction,
+    "start_finished_goods_delivery_process",
+  );
+  assert.match(patterns[0].precondition, /成品质检.*财务审批/u);
+  assert.match(patterns[0].downstream, /审批通过.*SHIPPED.*应收/u);
 });

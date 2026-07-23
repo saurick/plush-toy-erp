@@ -510,7 +510,10 @@ test('yoyoosun flow orchestration coverage records runtime and preview layers', 
     yoyoosunFlowOrchestrationCoverage.layers.map((layer) => [layer.key, layer])
   )
   assert.equal(layers.get('workflow_task')?.status, 'runtime_enabled')
-  assert.equal(layers.get('process_runtime')?.status, 'runtime_enabled_partial')
+  assert.equal(
+    layers.get('process_runtime')?.status,
+    'runtime_enabled_local_target_evidence_required'
+  )
   assert.equal(layers.get('business_flows')?.status, 'preview_only')
   assert.equal(layers.get('state_machines')?.status, 'preview_only')
   assert.equal(layers.get('process_policies')?.status, 'preview_only')
@@ -551,23 +554,26 @@ test('yoyoosun flow orchestration coverage includes all configured preview flows
 })
 
 test('yoyoosun flow orchestration coverage includes required runtime processes and UI entries', () => {
-  const runtimeProcesses = new Set(
+  const runtimeProcesses = new Map(
     yoyoosunFlowOrchestrationCoverage.runtimeProcesses.map(
-      (process) => process.key
+      (process) => [process.key, process]
     )
   )
-  for (const key of [
-    'sales_order_acceptance',
-    'material_supply',
-    'finished_goods_delivery',
+  for (const [key, status] of [
+    ['sales_order_acceptance', 'runtime_enabled_local'],
+    ['material_supply', 'runtime_enabled_local'],
+    [
+      'finished_goods_delivery',
+      'runtime_enabled_local_target_evidence_required',
+    ],
   ]) {
-    assert.ok(
-      runtimeProcesses.has(key),
-      `${key} runtime process coverage required`
-    )
+    const process = runtimeProcesses.get(key)
+    assert.equal(process?.status, status, `${key} runtime process status`)
+    assert.ok(process?.nodeTypes.includes('approval'), `${key} approval node`)
   }
   for (const uiKey of [
     'desktop_task_board',
+    'desktop_approval_inbox',
     'mobile_role_tasks',
     'customer_config_preview',
     'purchase_contract_print',

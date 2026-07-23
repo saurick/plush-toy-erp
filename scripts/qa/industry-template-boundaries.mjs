@@ -182,48 +182,48 @@ function validateTemplate(config) {
     assertNonEmptyString(item.note, `${path}.note`);
   }
 
-  const shipmentReleasePatterns = config.mobileTaskPatternTemplate.filter(
-    (item) => item.key === "shipment_release",
+  const shipmentApprovalPatterns = config.mobileTaskPatternTemplate.filter(
+    (item) => item.key === "shipment_finance_approval",
   );
   assert(
-    shipmentReleasePatterns.length === 1,
-    "mobileTaskPatternTemplate must include exactly one shipment_release pattern",
+    shipmentApprovalPatterns.length === 1,
+    "mobileTaskPatternTemplate must include exactly one shipment_finance_approval pattern",
   );
-  const shipmentRelease = shipmentReleasePatterns[0];
+  const shipmentApproval = shipmentApprovalPatterns[0];
   assert(
-    shipmentRelease.sourceGenerated === true &&
-      shipmentRelease.configurableProducer === false,
-    "shipment_release must stay source-generated with a non-configurable producer",
-  );
-  assert(
-    shipmentRelease.producer === "shipment.submit_release" &&
-      shipmentRelease.sourcePageKey === "shipments" &&
-      shipmentRelease.sourceAction === "submit_shipment_release",
-    "shipment_release must be produced only by shipment submit_release",
+    shipmentApproval.sourceGenerated === true &&
+      shipmentApproval.configurableProducer === false,
+    "shipment finance approval must stay process-generated with a non-configurable producer",
   );
   assert(
-    shipmentRelease.ownerRoleKey === "warehouse" &&
-      shipmentRelease.roles.length === 1 &&
-      shipmentRelease.roles[0] === "warehouse",
-    "shipment_release must be owned only by warehouse",
+    shipmentApproval.producer === "process_runtime.finished_goods_delivery" &&
+      shipmentApproval.sourcePageKey === "shipments" &&
+      shipmentApproval.sourceAction === "start_finished_goods_delivery_process",
+    "shipment finance approval must be produced only by finished_goods_delivery",
+  );
+  assert(
+    shipmentApproval.ownerRoleKey === "finance" &&
+      shipmentApproval.roles.length === 1 &&
+      shipmentApproval.roles[0] === "finance",
+    "shipment finance approval must be owned only by finance",
   );
   assertNonEmptyString(
-    shipmentRelease.precondition,
-    "shipment_release.precondition",
+    shipmentApproval.precondition,
+    "shipment_finance_approval.precondition",
   );
   assertNonEmptyString(
-    shipmentRelease.downstream,
-    "shipment_release.downstream",
+    shipmentApproval.downstream,
+    "shipment_finance_approval.downstream",
   );
   assert(
-    shipmentRelease.precondition.includes("成品检验") &&
-      shipmentRelease.precondition.includes("提交放行"),
-    "shipment_release precondition must keep quality before submit",
+    shipmentApproval.precondition.includes("成品质检") &&
+      shipmentApproval.precondition.includes("财务审批"),
+    "shipment finance approval precondition must keep quality before approval",
   );
   assert(
-    shipmentRelease.downstream.includes("SHIPPED") &&
-      shipmentRelease.downstream.includes("财务"),
-    "shipment_release downstream must keep finance after shipped",
+    shipmentApproval.downstream.includes("SHIPPED") &&
+      shipmentApproval.downstream.includes("应收"),
+    "shipment finance approval downstream must keep shipping before receivable",
   );
 
   for (const [index, item] of config.fieldDisplayTemplate.entries()) {
