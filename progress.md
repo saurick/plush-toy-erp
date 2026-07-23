@@ -8,7 +8,7 @@
 - 审批任务、异常流 V1 及四项收口 Worktree 已带回 Local；本次保留 Local 的能力台账收敛、岗位导航与客户确认文档结构，只吸收 Worktree 的新领域事实，没有恢复已删除的旧状态台账。
 - 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 与 133 V5 固定库 `plush_erp_uat_20260716_v5` 仍只证明已应用到 `20260722000505` 的固定版本；当前 latest migration `20260722174820` 未对共享库、133 或生产库 apply。
 - 133 V5 仍运行固定 release `80b77faeab566660c77fc23cc66c272096692f16` 的技术试用版本；当前异常收口、客户退货 / RMA、收付款及岗位导航后续切片未整体重发，客户 UAT / 签收仍是独立关口。
-- 当前 Git 由单一 owner 完成收口：异常流、岗位导航与能力台账的功能 / 文档主提交为 `6a458cf2`，已推送至 `origin/main`；未部署，也未对共享、133 或生产数据库 apply migration。
+- 当前 Git 由单一 owner 完成收口：审批功能提交为 `1852ecad`，合并树验收合同提交为 `25ad3e19`；代码提交后的 `full.sh` 已完整通过。本轮只提交推送，不部署，也不对共享、133 或生产数据库 apply migration。
 
 ## 2026-07-23 审批产品层与领域门禁 Handoff
 
@@ -19,6 +19,10 @@ Handoff：Codex Worktree 的 86 个文件已带回 Local，并形成审批提交
 Worktree 验证：`go test -count=1 ./...`、前端 `1728 / 1728`、ESLint、Vite build、`make data`、`db-guard`、`agents-size`、`git diff --check` 和真实 Chromium 审批箱场景均通过。该证据只绑定 Worktree 固定树。
 
 Local 合并树验证：`make data` 确认 Ent 与 Atlas 无新增漂移，`affected.sh --run` 覆盖 T0-T7；文档 `12 / 12`、审批 / 浏览器 mock 定向 `38 / 38`、Web `1729 / 1729`、客户配置与私有部署边界 `76 / 76`、隔离 PostgreSQL 关键事务 `192 / 192` 均为零失败、零跳过，ESLint、`db-guard` 和 `git diff --check` 通过。真实 Chromium `erp-task-board-desktop` 场景 `1 / 1` 通过，覆盖待我审批入口、出货财务审批详情和返回任务看板。首轮合并树验证发现并修正已退役直连销售提交白名单、旧审批自动派生断言和 PostgreSQL fixture 全局岗位串数，随后从头复跑绿色。
+
+验收合同收口：首轮 `full.sh` 继续发现并修正 4 项合并树旧合同：PostgreSQL 关键测试旧名称、本地验收 manifest 旧内容地址、销售造数仍直连已退出的公开出货放行方法，以及样式回归仍模拟旧仓库放行 producer。销售造数现按“出货前质检 → 财务审批 → Shipment 财务放行门禁 → 确认出货 → 应收草稿”逐节点调用正式 API，并按 quality、finance、warehouse 岗位路由；行业模板与浏览器 mock 同步使用 `finished_goods_delivery` active revision。完整 Node 合同 `1321 / 1321`、现行出货流程 Chromium 场景 `1 / 1`、前端 lint 与 `git diff --check` 通过，均为零失败、零跳过。
+
+最终门禁：在代码提交 `25ad3e19` 的干净树从头执行 `bash scripts/qa/full.sh`，scripts Node `1321 / 1321`、server all `2864 / 2864` 均为零失败、零跳过；Web 合同与全集、ESLint / Stylelint、前后端构建、隔离 PostgreSQL populated upgrade 与关键事务、真实 Chromium smoke、密钥扫描和 Go 漏洞扫描全部通过，最终输出 `full status=complete`。
 
 风险：仅对登记的本地隔离事务测试库应用 latest migration；未对共享、133 或生产数据库 apply，未部署，未执行真实九岗位账号 smoke 或客户 UAT。Worktree 与 Local 浏览器验证使用 Node `26.5.0`，仓库声明 `24.14.x`。
 
