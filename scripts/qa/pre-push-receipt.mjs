@@ -36,7 +36,7 @@ import {
 
 export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-full-receipt/v1";
 export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
-export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v1";
+export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
 export const PRE_PUSH_GATE_CONTRACT = "plush.full-gate-tree/v1";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 
@@ -538,6 +538,24 @@ function toolFingerprint(command, args = ["--version"]) {
   };
 }
 
+function normalizedEnvironmentValue(root, env, key) {
+  const value = env[key] ?? null;
+  if (key !== "PATH" || value === null) return value;
+
+  const gitExecPath = commandResult("git", ["--exec-path"], {
+    cwd: root,
+    env,
+    timeout: 5_000,
+  });
+  if (gitExecPath.error || gitExecPath.status !== 0) return value;
+
+  const injectedPrefix = gitExecPath.stdout.trim();
+  if (!injectedPrefix) return value;
+  const entries = value.split(path.delimiter);
+  while (entries[0] === injectedPrefix) entries.shift();
+  return entries.join(path.delimiter);
+}
+
 export function environmentFingerprint(root, env = process.env) {
   const environment = Object.fromEntries(
     [
@@ -546,7 +564,7 @@ export function environmentFingerprint(root, env = process.env) {
     ]
       .filter((key, index, keys) => keys.indexOf(key) === index)
       .sort()
-      .map((key) => [key, env[key] ?? null]),
+      .map((key) => [key, normalizedEnvironmentValue(root, env, key)]),
   );
   const payload = {
     contract: PRE_PUSH_ENVIRONMENT_CONTRACT,

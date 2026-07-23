@@ -28,11 +28,13 @@
 
 门禁边界：本地回执绑定 worktree、HEAD/tree、每个 local/remote ref 与 SHA、aggregate range、full profile/gate contract、关键工具/依赖环境和 30 分钟 TTL；保存在 Git common dir，按 worktree 隔离，使用私有 HMAC key、目录并发锁、同目录临时文件、fsync 和原子 rename。full 失败、HEAD/tree/worktree/环境/远端任一前后漂移都先删除旧回执且不签发新回执；只有 owner PID 已确认不存在的脚本残留锁可被安全回收，其余锁状态继续 fail closed。hook 命中时仍重算真实范围并再次核对 clean HEAD、签名、profile、gate/environment/TTL；缺失、篡改、过期、代码/依赖/migration/测试/门禁/环境或远端变化均 fail closed。`SKIP_PRE_PUSH`、调用者注入 range、回执路径/token/TTL 和其他 skip 环境不再是常规接口；CI strict 永不读取本地回执。
 
-验证：hook 与回执的临时 Git 仓库 / bare remote 测试 `15 / 15` 通过，覆盖 full 只执行一次、真实多 ref/new ref 范围、失败无残留、签名/TTL/环境/远端/HEAD/dirty/锁漂移与确认死亡 owner 的残留锁恢复、实时 log/secrets 失败、删除语义、调用者伪造输入、detached HEAD、help 无副作用和 Git common dir 符号链接逃逸；affected、gate profile、gate orchestration 治理测试 `42 / 42` 通过。skill health、文档清单 `3 / 3`、full required-files 合同、ShellCheck、shfmt、`git diff --check` 与严格 secrets 通过，均为零失败、零跳过。
+验证：hook 与回执的临时 Git 仓库 / bare remote 测试 `16 / 16` 通过，覆盖 full 只执行一次、真实 `git push` 启动环境、真实多 ref/new ref 范围、失败无残留、签名/TTL/环境/远端/HEAD/dirty/锁漂移与确认死亡 owner 的残留锁恢复、实时 log/secrets 失败、删除语义、调用者伪造输入、detached HEAD、help 无副作用和 Git common dir 符号链接逃逸；affected、gate profile、gate orchestration 治理测试 `42 / 42` 通过。skill health、文档清单 `3 / 3`、full required-files 合同、ShellCheck、shfmt、`git diff --check` 与严格 secrets 通过，均为零失败、零跳过。
 
 继续复测：Local 静止后修正了 4 组与当前正式合同不一致的旧治理断言：无权限动作应隐藏而不是永久置灰、模拟展示任务不得冒充 ProcessRuntime、销售流程验收数据必须同时声明 `workflow_tasks / sales_orders` 隔离模块，以及新增任务流程位置读取必须复用任务可见范围。scripts Node `1334 / 1334`、Web `1780 / 1780`、server quick `2763 / 2763`、server all `2923 / 2923` 均为零失败、零跳过；Web production build、存量 PostgreSQL 升级、隔离关键 PostgreSQL 矩阵、服务端构建、严格 secrets 和严格 `govulncheck` 通过。完整 Chromium Style L1 `177 / 177` 通过；其中权限中心手机暗色场景曾出现一次不可稳定复现的分类状态失败，随后定向 `4 / 4` 和完整套件均通过，保留为后续观察项。
 
-风险 / 下一步：当前 Local 虽已静止，仍是包含多项待提交改动的 dirty tree，因此不能签发绑定最终 clean HEAD 的真实回执，也未运行 `prepare-push.sh`。本记录作为最终 full 的输入；记录落盘后必须从头执行 `bash scripts/qa/full.sh`，只有脚本明确输出 `status=complete` 才能在本次交付报告中记为最终通过。本轮按要求不提交、不推送、不部署，也不对共享、133 或生产数据库 apply migration；后续 owner 提交最终树后只运行一次 `prepare-push.sh` 并立即按同一 remote/ref push，任何代码、环境或远端范围变化都重新准备。
+真实 Git hook runner 复核：首次真实 push 在 4.94 秒内 fail closed，原因是 Git 会在 hook 子进程的 `PATH` 首部自动注入 `git --exec-path`，而准备阶段没有该前缀，导致同一工具环境被误判为漂移。环境合同升级为 v2，只归一化这一个 Git 自身注入的首部路径；其他 `PATH` 变化、工具版本、依赖元数据和关键环境仍会使回执失效。新增临时 bare remote 上的真实 `git push` 集成测试，防止仅用直接执行 hook 的测试再次漏掉 Git 启动上下文。
+
+收口边界：最终提交后必须由 `prepare-push.sh` 对新的 clean HEAD 从头完成唯一一次 full，再立即走未绕过的真实 push；提交、推送和远端同步状态只以本轮最终 Git 回读为准。未部署，也不对共享、133 或生产数据库 apply migration；任何代码、环境或远端范围变化都必须重新准备。
 
 ## 2026-07-23 页面入口与读取权限一致性治理
 

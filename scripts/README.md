@@ -1023,6 +1023,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 
 - 准备阶段在 Git 建立 receive-pack 连接前查询远端 ref，计算每个目标 range 和 aggregate range，并对 clean HEAD 完整调用一次 `full.sh`。
 - 只有 full 成功，且前后 HEAD/tree、worktree、remote/ref、gate contract 和关键工具/依赖环境均未变化时，才在 `git rev-parse --git-common-dir` 下按 worktree 隔离签发 HMAC 回执；采用并发锁、私有权限、同目录临时文件和原子 rename。
+- 环境指纹只归一化 Git 启动 hook 时自动添加在 `PATH` 首部的 `git --exec-path`；其他 `PATH`、工具版本、依赖元数据、数据库 / 浏览器门禁参数或代理环境变化仍会使回执失效。
 - 并发 owner 仍存活、owner 信息不可读或 PID 状态不确定时锁保持 fail closed；只有带脚本 token 且 owner PID 已确认不存在的中断残留锁会被原子隔离并清理。
 - hook 必须读取真实 push stdin，重算 refs/aggregate range，复核 local SHA 等于 HEAD、clean 状态、回执签名/profile/version/environment/TTL，并实时执行每个 range 的 `git log --check` 和严格 secrets。新 ref 使用 `empty-tree..HEAD` aggregate range；纯删除/空 stdin是 no-op，混合删除与更新 fail closed。
 - 缺失、过期、远端漂移或任何代码/依赖/migration/测试/门禁/环境变化都会拒绝复用；hook 不回退到 full，因此不会在已经打开的 SSH 连接上长时间等待。`SKIP_PRE_PUSH`、`--no-verify`、调用者指定的 range、回执路径/token/TTL 都不是常规接口。

@@ -25,6 +25,7 @@ import {
 } from "./gate-profiles.mjs";
 import {
   PRE_PUSH_RECEIPT_TTL_MS,
+  environmentFingerprint,
   resolveReceiptState,
 } from "./pre-push-receipt.mjs";
 
@@ -77,6 +78,7 @@ function materializeFullProfile(root) {
 
 function installRealReceiptFiles(root) {
   for (const file of [
+    ".githooks/pre-push",
     "scripts/qa/gate-profiles.mjs",
     "scripts/qa/pre-push-receipt.mjs",
     "scripts/qa/prepare-push.sh",
@@ -86,6 +88,7 @@ function installRealReceiptFiles(root) {
     mkdirSync(path.dirname(target), { recursive: true });
     copyFileSync(path.join(ROOT, file), target);
   }
+  chmodSync(path.join(root, ".githooks/pre-push"), 0o755);
   chmodSync(path.join(root, "scripts/qa/prepare-push.sh"), 0o755);
   chmodSync(path.join(root, "scripts/git-hooks/pre-push.sh"), 0o755);
 }
@@ -212,6 +215,20 @@ function runHook(
   );
 }
 
+function runRealGitPush(fixture, { env = cleanEnvironment() } = {}) {
+  git(fixture.root, [
+    "config",
+    "core.hooksPath",
+    path.join(fixture.root, ".githooks"),
+  ]);
+  return spawnSync("git", ["push", "--porcelain", "origin", "main"], {
+    cwd: fixture.root,
+    env,
+    encoding: "utf8",
+    maxBuffer: 32 * 1024 * 1024,
+  });
+}
+
 function gitStateFile(root, name) {
   return path.join(root, ".git", name);
 }
@@ -288,6 +305,46 @@ test("prepare runs full once before push and hook only runs live range gates", (
     assert.equal(
       readdirSync(state.stateDir).some((file) => file.endsWith(".tmp")),
       false,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("a real Git push PATH prefix preserves the prepared environment", () => {
+  const fixture = createFixture();
+  try {
+    const env = cleanEnvironment();
+    const gitExecPath = git(fixture.root, ["--exec-path"]);
+    const baseline = environmentFingerprint(fixture.root, env);
+    assert.equal(
+      environmentFingerprint(fixture.root, {
+        ...env,
+        PATH: `${gitExecPath}${path.delimiter}${env.PATH}`,
+      }),
+      baseline,
+    );
+    assert.notEqual(
+      environmentFingerprint(fixture.root, {
+        ...env,
+        PATH: `${fixture.root}${path.delimiter}${env.PATH}`,
+      }),
+      baseline,
+    );
+
+    const prepared = runPrepare(fixture.root, [], env);
+    assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
+    const pushed = runRealGitPush(fixture, { env });
+    assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
+    assert.deepEqual(readLines(gitStateFile(fixture.root, "full-ranges.txt")), [
+      `${fixture.remoteSha}..${fixture.localSha}`,
+    ]);
+    assert.deepEqual(readLines(gitStateFile(fixture.root, "secret-ranges.txt")), [
+      `${fixture.remoteSha}..${fixture.localSha}`,
+    ]);
+    assert.equal(
+      git(fixture.remote, ["rev-parse", "refs/heads/main"]),
+      fixture.localSha,
     );
   } finally {
     fixture.cleanup();
