@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   getAllowedMobileRoleKeys,
+  hasMobileRoleAccountPermission,
   hasMobileRolePermission,
 } from './mobileRolePermissions.mjs'
 
@@ -99,4 +100,55 @@ test('mobileRolePermissions: 可按权限筛出允许进入的岗位角色', () 
     ),
     ['quality', 'warehouse']
   )
+})
+
+test('mobileRolePermissions: 当前客户配置动作会收窄登录权限', () => {
+  assert.equal(
+    hasMobileRolePermission(
+      {
+        permissions: ['mobile.purchase.access'],
+        effective_session: { actions: ['mobile.purchase.access'] },
+      },
+      'purchase'
+    ),
+    true
+  )
+  assert.equal(
+    hasMobileRolePermission(
+      {
+        permissions: ['mobile.purchase.access'],
+        effective_session: { actions: ['workflow.task.read'] },
+      },
+      'purchase'
+    ),
+    false
+  )
+  assert.equal(
+    hasMobileRolePermission(
+      {
+        permissions: ['mobile.purchase.access'],
+        effective_session: {},
+      },
+      'purchase'
+    ),
+    false
+  )
+})
+
+test('mobileRolePermissions: 客户运行时不可用时仍可识别账号基础岗位权限', () => {
+  const profile = {
+    permissions: ['mobile.engineering.access'],
+    roles: [{ role_key: 'engineering' }],
+    effective_session: {
+      actions: [],
+      source: 'effective_session_sync_failed',
+    },
+  }
+
+  assert.equal(
+    hasMobileRoleAccountPermission(profile, 'engineering'),
+    true
+  )
+  assert.equal(hasMobileRolePermission(profile, 'engineering'), false)
+  assert.equal(hasMobileRoleAccountPermission(profile, 'quality'), false)
 })

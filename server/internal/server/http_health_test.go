@@ -13,6 +13,9 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	klog "github.com/go-kratos/kratos/v2/log"
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -104,6 +107,44 @@ func TestRegisterHealthRoutesReadyzOK(t *testing.T) {
 	}
 	if body := strings.TrimSpace(recorder.Body.String()); body != "ready" {
 		t.Fatalf("readyz body = %q, want %q", body, "ready")
+	}
+}
+
+func TestObservedHTTPHandlerRejectsOversizedBaggageHeader(t *testing.T) {
+	previousPropagator := otel.GetTextMapPropagator()
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(propagation.Baggage{}),
+	)
+	t.Cleanup(func() {
+		otel.SetTextMapPropagator(previousPropagator)
+	})
+
+	var memberCount int
+	handler := newObservedHTTPHandler(
+		&captureLogger{},
+		sdktrace.NewTracerProvider(),
+		"server.http.baggage-test",
+		func(ctx context.Context, w http.ResponseWriter, _ *http.Request) {
+			memberCount = baggage.FromContext(ctx).Len()
+			writePlainText(w, http.StatusOK, "ok")
+		},
+	)
+
+	normalRequest := httptest.NewRequest(http.MethodGet, "/baggage-test", nil)
+	normalRequest.Header.Set("baggage", "accepted=value")
+	handler.ServeHTTP(httptest.NewRecorder(), normalRequest)
+	if memberCount != 1 {
+		t.Fatalf("normal baggage member count = %d, want 1", memberCount)
+	}
+
+	oversizedRequest := httptest.NewRequest(http.MethodGet, "/baggage-test", nil)
+	oversizedRequest.Header.Set(
+		"baggage",
+		"accepted=value,"+strings.Repeat("x", 8192)+"=value",
+	)
+	handler.ServeHTTP(httptest.NewRecorder(), oversizedRequest)
+	if memberCount != 0 {
+		t.Fatalf("oversized baggage member count = %d, want 0", memberCount)
 	}
 }
 

@@ -44,7 +44,6 @@ const MERMAID_ZOOM = {
   max: 2.4,
   step: 0.2,
   defaultValue: 1,
-  fullscreenDefaultValue: 1.4,
 }
 
 function getCurrentERPTheme() {
@@ -90,7 +89,7 @@ function MermaidDiagram({ chart }) {
   }, [])
   const [zoom, setZoom] = useState(MERMAID_ZOOM.defaultValue)
   const [fullscreenZoom, setFullscreenZoom] = useState(
-    MERMAID_ZOOM.fullscreenDefaultValue
+    MERMAID_ZOOM.defaultValue
   )
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
   const fullscreenExitRef = useRef(null)
@@ -105,7 +104,7 @@ function MermaidDiagram({ chart }) {
 
   useEffect(() => {
     setZoom(MERMAID_ZOOM.defaultValue)
-    setFullscreenZoom(MERMAID_ZOOM.fullscreenDefaultValue)
+    setFullscreenZoom(MERMAID_ZOOM.defaultValue)
     setFullscreenOpen(false)
   }, [chart])
 
@@ -195,7 +194,7 @@ function MermaidDiagram({ chart }) {
   }
 
   const openFullscreen = () => {
-    setFullscreenZoom(Math.max(zoom, MERMAID_ZOOM.fullscreenDefaultValue))
+    setFullscreenZoom(MERMAID_ZOOM.defaultValue)
     setFullscreenOpen(true)
   }
 

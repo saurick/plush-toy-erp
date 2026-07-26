@@ -496,7 +496,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "start_material_supply_purchase_order_process":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderUpdate); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "customer_config", method); res != nil {
@@ -557,8 +557,51 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_quality_or_inventory_fact":   false,
 					"writes_shipment_or_finance_fact":    false,
 					"workflow_task_done_posts_fact":      false,
-					"scope":                              "purchase_order_to_purchase_receipt_quality_inbound",
+					"scope":                              "purchase_order_approval_only",
 				},
+			}),
+		}, nil
+
+	case "execute_material_supply_purchase_order_submit":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
+		admin, res := d.CurrentAdmin(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		in, ok := materialSupplyPurchaseOrderSubmitExecutionFromParams(pm)
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
+			return id, res, nil
+		}
+		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		nodes, err := d.processRuntimeUC.ListProcessNodeInstances(ctx, in.ProcessInstanceID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"completed_node": processNodeInstanceToMap(completedNode),
+				"nodes":          processNodeInstancesToMaps(nodes),
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
+					"process_key":                           biz.ProcessKeyMaterialSupply,
+					"command_key":                           biz.ProcessDomainCommandPurchaseOrderSubmit,
+					"executes_domain_command":               true,
+					"writes_purchase_order_source_document": true,
+					"writes_purchase_receipt_source_doc":    false,
+					"writes_quality_or_inventory_fact":      false,
+					"writes_shipment_or_finance_fact":       false,
+					"creates_next_linked_task":              true,
+				}),
 			}),
 		}, nil
 
@@ -621,7 +664,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_quality_fact":             false,
 					"writes_shipment_or_finance_fact": false,
 					"workflow_task_done_posts_fact":   false,
-					"scope":                           "shipment_to_quality_finance_ship_receivable",
+					"scope":                           "shipment_finance_approval_only",
 				},
 			}),
 		}, nil
@@ -1306,9 +1349,6 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 				"reason": customerConfigErrorReasonActiveRevisionRequired,
 			}),
 		}
-	case errors.Is(err, biz.ErrCustomerConfigApprovalDisabled):
-		l.Warnf("[customer_config] approval disabled for runtime process err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该审批已停用，当前单据流程不能发起，请先启用审批责任"}
 	case errors.Is(err, biz.ErrCustomerConfigRevisionImmutable):
 		l.Warnf("[customer_config] immutable revision overwrite rejected err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置版本已存在且内容不同，请使用新版本号发布"}
@@ -1395,7 +1435,8 @@ func (d *jsonrpcDispatcher) purchaseOrderProcessSourceRefNo(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if order == nil || order.ID != purchaseOrderID || order.LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
+	if order == nil || order.ID != purchaseOrderID ||
+		(order.LifecycleStatus != biz.PurchaseOrderStatusDraft && order.LifecycleStatus != biz.PurchaseOrderStatusSubmitted) {
 		return nil, biz.ErrBadParam
 	}
 	return requiredProcessSourceRefNo(order.PurchaseOrderNo)
@@ -1482,6 +1523,27 @@ func materialSupplyPurchaseOrderProcessInputFromParams(pm map[string]any) (biz.P
 		BusinessRefID:   purchaseOrderID,
 		CorrelationKey:  optionalRPCStringPointer(getString(pm, "correlation_key")),
 		IdempotencyKey:  idempotencyKey,
+	}, true
+}
+
+func materialSupplyPurchaseOrderSubmitExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	purchaseOrderID := getInt(pm, "purchase_order_id", 0)
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || purchaseOrderID <= 0 || idempotencyKey == "" {
+		return nil, false
+	}
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandPurchaseOrderSubmit,
+		IdempotencyKey:        idempotencyKey,
+		Payload: map[string]any{
+			"purchase_order_id": purchaseOrderID,
+		},
 	}, true
 }
 

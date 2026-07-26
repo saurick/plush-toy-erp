@@ -852,6 +852,10 @@ func validateShipmentFinishedGoodsQualityGate(ctx context.Context, tx *inventory
 	if err != nil {
 		return err
 	}
+	return validateShipmentFinishedGoodsQualityInspectionRows(inspections)
+}
+
+func validateShipmentFinishedGoodsQualityInspectionRows(inspections []*ent.QualityInspection) error {
 	pending := false
 	rejected := false
 	for _, inspection := range inspections {

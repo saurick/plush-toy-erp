@@ -11,8 +11,8 @@ const (
 
 	CustomerProcessVariantSalesApprovalPMC            = "approval_pmc"
 	CustomerProcessVariantSalesApprovalEngineeringPMC = "approval_engineering_pmc"
-	CustomerProcessVariantMaterialReceiptIQCInbound   = "purchase_receipt_iqc_inbound"
-	CustomerProcessVariantFinishedGoodsDelivery       = "quality_finance_ship_receivable"
+	CustomerProcessVariantPurchaseOrderApproval       = "purchase_order_approval"
+	CustomerProcessVariantShipmentFinanceApproval     = "shipment_finance_approval"
 )
 
 type customerProcessSelection struct {
@@ -111,15 +111,7 @@ func applyApprovalSettingsToCustomerProcessContract(snapshot map[string]any, con
 	if len(settings) == 0 {
 		return contract, nil
 	}
-	approvalKey := ""
-	switch contract.Selection.ProcessKey {
-	case ProcessKeySalesOrderAcceptance:
-		approvalKey = ApprovalSettingSalesOrder
-	case ProcessKeyMaterialSupply:
-		approvalKey = ApprovalSettingPurchaseOrder
-	case ProcessKeyFinishedGoodsDelivery:
-		approvalKey = ApprovalSettingShipmentFinance
-	}
+	approvalKey := approvalSettingKeyForProcessKey(contract.Selection.ProcessKey)
 	catalog, ok := approvalSettingCatalogByKey(approvalKey)
 	if !ok || !catalog.Configurable {
 		return contract, nil
@@ -143,6 +135,19 @@ func applyApprovalSettingsToCustomerProcessContract(snapshot map[string]any, con
 		node.PolicySnapshot["member_resolution"] = "lowest_enabled_priority"
 	}
 	return contract, nil
+}
+
+func approvalSettingKeyForProcessKey(processKey string) string {
+	switch strings.TrimSpace(processKey) {
+	case ProcessKeySalesOrderAcceptance:
+		return ApprovalSettingSalesOrder
+	case ProcessKeyMaterialSupply:
+		return ApprovalSettingPurchaseOrder
+	case ProcessKeyFinishedGoodsDelivery:
+		return ApprovalSettingShipmentFinance
+	default:
+		return ""
+	}
 }
 
 func validateCustomerProcessContractForPublish(contract customerProcessContract) error {
@@ -228,16 +233,12 @@ func customerProcessDefinitionFromContract(contract customerProcessContract) map
 		}
 		if len(node.PolicySnapshot) > 0 {
 			policy := cloneProcessPolicySnapshot(node.PolicySnapshot)
-			runtimeLoaderBlockers := []any{}
-			if enabled, configured := policy["approval_enabled"].(bool); configured && !enabled {
-				runtimeLoaderBlockers = append(runtimeLoaderBlockers, "approval_disabled")
-			}
 			item["policy_snapshot"] = policy
 			item["fact_command_contract"] = map[string]any{
 				"command_key":                        getStringFromAnyMap(policy, "command_key"),
 				"runtime_binding_status":             "process_runtime_handler_registered",
 				"process_runtime_handler_registered": true,
-				"runtime_loader_blockers":            runtimeLoaderBlockers,
+				"runtime_loader_blockers":            []any{},
 				"runtime_execute_blockers":           []any{},
 				"writes_fact":                        false,
 			}
@@ -335,13 +336,20 @@ func newMaterialSupplyContract() customerProcessContract {
 		Selection: customerProcessSelection{
 			ProcessKey:      ProcessKeyMaterialSupply,
 			ProcessVersion:  "v1",
-			VariantKey:      CustomerProcessVariantMaterialReceiptIQCInbound,
+			VariantKey:      CustomerProcessVariantPurchaseOrderApproval,
 			BusinessRefType: "purchase_order",
 		},
-		DomainBoundary: "explicit_fact_command_api",
+		DomainBoundary: "source_document_approval_only",
 		FactBoundary:   "no_fact_posting",
-		Guardrail:      "The Product Core creates the receipt source document, evaluates formal line quality decisions and posts inbound inventory only through registered domain usecases.",
+		Guardrail:      "The ProcessRuntime submits and approves only the purchase source document. Receipt, incoming quality and inbound inventory remain separate formal page actions owned by their domain usecases.",
 		Nodes: []ProcessNodeInstanceCreate{
+			customerDomainCommandNode(
+				"submit_purchase_order",
+				"",
+				PermissionPurchaseOrderUpdate,
+				ProcessDomainCommandPurchaseOrderSubmit,
+				"PurchaseOrderUsecase.SubmitPurchaseOrderForProcessCommand",
+			),
 			customerHumanProcessNode(
 				"purchase_order_approval",
 				ProcessNodeTypeApproval,
@@ -357,27 +365,6 @@ func newMaterialSupplyContract() customerProcessContract {
 				ProcessDomainCommandPurchaseOrderApprove,
 				"PurchaseOrderUsecase.ApprovePurchaseOrder",
 			),
-			customerDomainCommandNode(
-				"purchase_receipt_source",
-				"purchase_receipt_source",
-				PermissionPurchaseReceiptCreate,
-				ProcessDomainCommandPurchaseReceiptCreate,
-				"InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder",
-			),
-			customerDomainCommandNode(
-				"incoming_qc",
-				"incoming_qc",
-				PermissionQualityInspectionUpdate,
-				ProcessDomainCommandIncomingQualityGate,
-				"InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
-			),
-			customerDomainCommandNode(
-				"warehouse_inbound",
-				"warehouse_inbound",
-				PermissionWarehouseInboundConfirm,
-				ProcessDomainCommandInventoryPostInbound,
-				"InventoryUsecase.PostPurchaseReceipt",
-			),
 			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
 		},
 	}
@@ -388,20 +375,13 @@ func newFinishedGoodsDeliveryContract() customerProcessContract {
 		Selection: customerProcessSelection{
 			ProcessKey:      ProcessKeyFinishedGoodsDelivery,
 			ProcessVersion:  "v1",
-			VariantKey:      CustomerProcessVariantFinishedGoodsDelivery,
+			VariantKey:      CustomerProcessVariantShipmentFinanceApproval,
 			BusinessRefType: "shipment",
 		},
-		DomainBoundary: "explicit_fact_command_api",
+		DomainBoundary: "shipment_finance_approval_only",
 		FactBoundary:   "no_fact_posting",
-		Guardrail:      "Quality, finance release, shipment and receivable facts remain owned by registered Product Core domain usecases and their transaction and idempotency rules.",
+		Guardrail:      "The ProcessRuntime owns only finance approval and the versioned finance-release marker. Finished-goods quality, shipment posting and receivable creation stay on their formal domain pages and transaction boundaries.",
 		Nodes: []ProcessNodeInstanceCreate{
-			customerDomainCommandNode(
-				"finished_goods_quality",
-				"finished_goods_quality",
-				PermissionQualityInspectionUpdate,
-				ProcessDomainCommandFinishedGoodsQualityDecide,
-				"InventoryUsecase.PassQualityInspection/RejectQualityInspection",
-			),
 			customerHumanProcessNode(
 				"shipment_finance_approval",
 				ProcessNodeTypeApproval,
@@ -416,20 +396,6 @@ func newFinishedGoodsDeliveryContract() customerProcessContract {
 				PermissionFinanceReceivableConfirm,
 				ProcessDomainCommandShipmentFinanceRelease,
 				"OperationalFactUsecase.RecordShipmentFinanceRelease",
-			),
-			customerDomainCommandNode(
-				"shipment_execution",
-				"shipment_execution",
-				PermissionShipmentShip,
-				ProcessDomainCommandShipmentShip,
-				"OperationalFactUsecase.ShipShipment",
-			),
-			customerDomainCommandNode(
-				"receivable_lead",
-				"receivable_lead",
-				PermissionFinanceReceivableConfirm,
-				ProcessDomainCommandFinanceReceivableLead,
-				"OperationalFactUsecase.CreateFinanceFactDraft",
 			),
 			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
 		},

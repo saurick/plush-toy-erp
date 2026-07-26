@@ -5,54 +5,76 @@
 ## 当前活跃事项
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、产品能力台账、客户交付矩阵、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
-- 审批任务、异常流 V1 及四项收口 Worktree 已带回 Local；本次保留 Local 的能力台账收敛、岗位导航与客户确认文档结构，只吸收 Worktree 的新领域事实，没有恢复已删除的旧状态台账。
+- 单据流 / 业务流审计 Worktree 的 92 个任务归属路径已通过受控 Handoff 带回 Local；Local 原有的流程与状态观察台改动同时保留，起点继承内容没有被重复覆盖或误记为本轮新增。
 - 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 与 133 V5 固定库 `plush_erp_uat_20260716_v5` 仍只证明已应用到 `20260722000505` 的固定版本；当前 latest migration `20260723155358_reconcile_permission_assignment_boundaries.sql` 未对共享库、133 或生产库 apply。
 - 133 V5 仍运行固定 release `80b77faeab566660c77fc23cc66c272096692f16` 的技术试用版本；当前异常收口、客户退货 / RMA、收付款及岗位导航后续切片未整体重发，客户 UAT / 签收仍是独立关口。
-- 当前 Git 由单一 owner 执行本次 full-worktree 收口；提交 / 推送状态以 Git 远端读回为准。当前未部署，也未对共享、133 或生产数据库 apply migration。
+- 本轮 Git 收口范围已冻结为 Handoff 后完整 Local 工作树；提交前受影响门禁与完整浏览器回归已完成，clean HEAD 的 full 回执、实际提交与远端 ref 以 Git 和本轮回执为准。本轮不建 PR、不部署，也不对共享、133 或生产数据库 apply migration。
 
-## 2026-07-26 推送前 OpenTelemetry 安全门禁收口
+## 2026-07-26 Mermaid 全屏缩放修正
 
-完成：最终 clean HEAD 的 `prepare-push` 在严格 `govulncheck` 阶段发现当前服务端调用链命中 `GO-2026-5158`，没有沿用 2026-07-24 的旧绿色结果，也没有跳过漏洞门禁。`go.opentelemetry.io/otel`、OTLP HTTP trace exporter、SDK、trace、metric 与间接 OTLP trace 模块从 `v1.43.0` 统一升级到官方修复版 `v1.44.0`；随同一上游依赖合同更新 grpc-gateway `v2.29.0`、gRPC `v1.81.1` 和对应 genproto，避免 OTel 子模块版本错位。v1.44.0 对 baggage 解析增加 8192 字节上限并限制畸形 / 超长 header 的错误报告，不在应用层另造旁路限制。
+完成：共享 Markdown Mermaid 查看器进入全屏时固定从 100% 展示，不再自动放大到 140%，也不继承页面内已经放大的倍率；全屏内仍可继续缩放，退出后保留原页面内倍率。
 
-验证：`go mod verify`、`go test -count=1 ./cmd/server ./internal/server ./internal/service`、`go build ./...` 通过；修复后的 `govulncheck ./...` 回执为 `No vulnerabilities found`、当前代码调用链受影响漏洞 `0`。最终推送仍只接受包含本节与依赖锁文件的新 clean HEAD 重新执行 `prepare-push / full` 后签发的当前树回执，不复用安全修复前失败轮次的其余绿色分项。
+验证：定向 Chromium 场景覆盖开发文档和项目治理地图的全屏打开、100% 标签与 DOM 缩放值、视口几何、退出恢复和可访问 dialog 语义；前端自动化与静态检查结果以本轮最终回执为准。
 
-边界：本次安全收口只改变服务端 Go 依赖锁定与过程记录，没有 schema、Ent 生成物、Atlas migration、数据库 apply、部署、目标环境 smoke 或客户 UAT。
+边界：未改 Mermaid 图源、页面布局、RBAC、Workflow / Fact、schema 或 migration，未部署、未提交、未推送。
 
-## 2026-07-24 Local 会话合并收口与审批 / 动作边界复核
+## 2026-07-26 流程与状态观察台
 
-范围与合并：本轮只在当前 Local checkout 收口，没有创建 Codex App Worktree、底层 Git Worktree、分支或执行 Handoff。复核会话 `019f757e-4727-7f62-a4af-1d722724decc` 后没有发现当前 Local 缺失的独有改动；会话 `019f78fd-86b2-7560-ad40-e744d1fa800c` 对应旧 Worktree 落后当前主线 26 个提交、没有独有提交且有约 140 条未提交路径，因此没有整包带回。只把仍符合当前代码、正式合同和测试真源的行为按语义重实现到 Local；旧 migration / Atlas 生成物、发布部署记录、原型 / 旧文档、宽泛旧前端批次、删除历史证据和放宽门禁的残留均未导入。
+完成：新增仅开发环境开放的只读“流程与状态观察台” `/__dev/status-flows`，从同一目录集中展示 34 类当前状态对象、初始 / 终止 / 可返回边、无终态策略、守卫、动作、权限、Fact 边界和代码证据。页面包含总览、单机状态图、全局状态字典树、流程编排 / 客户差异、运行轨迹 / 证据五种视图，并把业务流、状态流、工作流、审批流、任务流、异常流、通知流、自动流转和 Fact 九个观察维度放进统一筛选。状态图和流程图分别建模，避免把业务编排误当成单一状态机。
 
-审批与账号边界：审批责任启停现在是正式运行时门禁，`enabled=false` 在创建 ProcessRuntime 和修改来源单据前失败关闭；已冻结的在途实例不被新配置改写。发布责任设置会同时检查操作人的全部真实岗位和具名身份，不能借较低优先级或其他岗位给自己新增审批能力。冻结 assignee 只在账号仍启用、仍持有所选岗位且具备冻结 entitlement 时继续可见 / 可办；岗位移除、停用或注销会原子释放未完成的具名任务、增加版本并记录事件与审计。权限中心预览与发布共用冻结 payload，发布中的编辑、刷新和重复提交被同步锁住；每次重新编辑都会生成新的安全 revision。
+客户与运行态：产品核心编排目录覆盖 3 个流程 key、4 个当前变体；`demo`、`reference-customer`、`yoyoosun` 三个已注册客户包只以选择 / 差异覆盖层引用产品核心，不复制运行状态机，也不能覆盖 Product Core。运行轨迹继续复用现有 task-scoped `workflow.get_task_process_context` 只读合同；未知状态、未知机器、未知客户选择和不完整运行证据均失败关闭。页面没有拖拽改图、通用 `set_status`、任意脚本 / SQL 或其他写入口。
 
-业务动作与基础收口：销售和采购页在生命周期、生成、打印或保存请求进行中会同步锁定选择、清空、编辑和关联动作，避免双击与旧快照竞态。移动端未知非空岗位失败关闭；员工列偏好按行锁和事务保留其他模块；岗位 Demo 重置同步提升 `auth_version` 并撤销会话；WIP 拆分至少要求两个子项；采购调整说明按 Unicode 字符截断到 64；JSON-RPC 对外只保留 POST。错误码生成改为 Go AST 扫描并阻断重复 id / 前端名 / code；commit-msg 只豁免真实 Merge、Revert、fixup 和 squash；畸形百分号解码失败关闭，RGB / HSV 转换与客户 Web CLI 参数校验同步修正。
+界面减负：根据页面复核反馈，代码 / 文档路径不再重复铺在每张迁移卡中，也不在客户摘要默认暴露。迁移卡只保留条件、动作、权限和 Fact 边界；状态机、状态、流程与客户包的实现依据按来源路径去重后收进一个默认折叠区，显示来源数量并支持键盘 Enter 展开 / 收起，仍保留完整可追溯性。
 
-Fact 与 migration：生产、委外和财务 Fact 的直接创建只允许 `DRAFT` 且不得预填过账 / 结算 / 取消审计字段，create 与 create-bulk 在发 SQL 前由共享 guard 拦截；测试需要构造损坏终态时先创建 DRAFT 再显式写入测试夹具，不为测试放宽正式入口。`make data` 回执为 migration directory synced、no changes，Ent 生成物和 Atlas migration 均无新增；`bash scripts/qa/db-guard.sh` 通过。本轮没有对个人共享库、133、生产或归属不明数据库执行 migration apply。
+图面减负：状态图不再把源码路径、完整 Guard、动作类名、权限串或原始 Fact key 塞进 Mermaid 边标签；节点 key 和边标签都有长度上限，返回边使用“恢复”，全图层最多显示流向、审批 / 异常和简短 Fact 边界。普通页画布默认收在 `600px` 宽和约 `560px` 高内，全屏默认收在 `820px` 宽，仍可继续缩放；完整条件、权限、动作和来源继续在图下方的详情区查看。
 
-浏览器场景复核：权限中心 Style L1 原有断言仍按旧的 2 个员工账号和固定岗位序号取值，已改为消费当前 6 个员工 / 财务岗位 3 个关联账号的同一 mock 真源，并明确选择非当前岗位验证未保存保护；菜单帮助浮层先把鼠标移入浮层再截图，避免离开触发器后节点归零。桌面与 390px 暗色移动端定向场景各 `1 / 1`，随后完整 Style L1 `184 / 184` 通过。
+验证：官方 `bash scripts/qa/affected.sh --run` 覆盖 T0、T1、T5，受影响文档合同 `12 / 12`、直接合同 `13 / 13`、Web 全集 `1817 / 1817` 均零失败。图面与界面减负后再次完成定向合同 `18 / 18`、Web 全集 `1817 / 1817`、ESLint、Stylelint、Prettier、生产构建（Vite `3336` 个模块）和差异检查；项目 Node `24.14.0` 下真实 Chromium 桌面、Workflow 全图层暗色与 390×844 暗色移动端场景 `3 / 3` 通过。Workflow 复现场景的普通图为 `600×479`，全屏图为 `820×654`，边标签最长 `15` 字符，技术路径 / 完整条件标签和几何重叠均为 `0`；桌面 body / document / root 宽度均为 `1440`，移动端均为 `390`，三种场景的写请求均为 `0`。默认折叠、展开证据、移动暗色及 Workflow 普通 / 全屏图定向截图已人工复核。
 
-自动化验证：当前代码树完成 `bash scripts/qa/full.sh` T8，无 skip 环境：scripts Node `1344 / 1344`、customer index `2 / 2`、Web contracts `201 / 201`、server quick `2824 / 2824`、Web `1805 / 1805`、隔离 PostgreSQL 关键事务 / 并发 `192 / 192`、server all `2984 / 2984` 均为零失败、零跳过；ESLint、Stylelint、Web production build、服务端 build、严格 secrets、`govulncheck`、存量升级和 disposable PostgreSQL 门禁通过，最终回执为 `[qa:full] status=complete 全部门禁通过`。T8 之后只调整上述 Style L1 场景断言并更新本过程记录，没有再改变产品代码。
+边界与下一步：本轮未改 schema、Ent 生成物、Atlas migration、后端写路径或 RBAC，没有数据库 apply、部署、目标岗位 smoke 或客户 UAT。观察台随本轮完整工作树统一执行 Git 收口，实际提交与远端 ref 以 Git 为准；观察台目录仍只是从当前真源整理出的开发投影与证据索引，不替代领域 usecase、Fact 表、ProcessRuntime 或客户配置真源，后续新增状态或编排时应先修改真实合同，再同步目录和守卫测试。
 
-边界：当前结果只证明 Local 静态、单元、集成、隔离 PostgreSQL 与受控 Chromium 场景；没有部署、目标环境 readback、真实岗位 smoke、客户 UAT、提交或推送。当前 dirty worktree 还包含本轮开始前已经存在并在同一 Local 串行复核的改动，提交前仍需重新读取 status / diff、精确确认范围并由唯一 Git owner 收口。
+## 2026-07-24 至 2026-07-26 当前单据流 / 业务流重新审计
 
-## 2026-07-24 权限中心关联账号核对
+完成：当前新建 `material_supply` 图收窄为“采购 Source Document 提交 → 统一审批 → 唯一采购批准命令 → end”。采购正式页和所有仍使用采购造数的验收脚本共用同一个 ProcessRuntime helper，不再调用公开直提 / 直批方法；采购收货、IQC 和库存入库继续由各自正式页面和领域 usecase 负责。当前新建 `finished_goods_delivery` 图收窄为“财务 approval → Shipment 版本化放行门禁 → end”，启动前只重验已有成品质检；质检判定、确认出货、库存 OUT、应收、发票与收付款不再伪装成流程隐藏节点。旧长图只允许冻结在途 revision 恢复。
+
+完成：通用 `settle_finance_fact` 只允许 `RECONCILIATION`，不能直接结清应收 / 应付；后两者只由 FinancePayment allocation、CreditNote 或冲正链改变余额。库存人工调整审批引用前后端统一为最多 128 字符。审批事项缺失或停用时新流程 fail closed，不回退默认老板池；独立 `purchase.order.approve` 权限已从 Product Core、永绅岗位配置和运行 manifest 退出，采购审批统一使用 `workflow.task.approve` 与任务冻结 revision / 责任池。
+
+完成：移动岗位端增加真实多岗位切换，并把账号 `mobile.<role>.access` 与 active revision 对同一岗位入口的 effective action 作为双重门禁；super admin 不能凭管理身份冒充业务岗位。审批责任页刷新在覆盖未保存草稿前必须确认。Shipment 正式页在财务门禁未达到 `APPROVED` 前明确禁用确认出货。正式真源文档、客户矩阵、服务端 / 前端 README 与验收脚本已同步到相同边界。
+
+范围量化：14 个审计切片中，当前 Product Core 代码边界已闭环 8 个、部分 4 个、因正式合同 / 数据缺失阻塞 1 个、当前 V1 范围外 1 个。部分项为 BOM / 工程、库存 / 预留、客户退货 / RMA、收付款页面与永绅投影；阻塞项为 PAYMENT 申请 / 审批和真实客户数据写入导入；银行直连 / 流水自动导入、总账和税控属于范围外。具体口径见产品能力台账，不能把部分 / 阻塞 / 范围外计为完整闭环。
+
+验证完成：仓库锁定 Node `24.14.0`、pnpm `10.13.1`、Go `1.26.5`，本地临时安装 CI 同版 Atlas `0.38.0`、govulncheck `1.6.0` 和 shfmt `3.13.1`，并使用任务专属 `postgres:18.1` 容器。最终 `affected.sh --run` 为文档 `12 / 12`、直接合同 `160 / 160` 与 `79 / 79`、隔离 PostgreSQL 关键事务 / 并发 `192 / 192`，均零失败、零跳过；完整 Style L1 为 `184 / 184`，属于真实 Chromium + 受控 mock 的 `simulated_display_only` 前端覆盖。`make data` 前后 schema / Ent / migration / `atlas.sum` 差异哈希均为空树哈希，`db-guard` 通过，没有生成 schema、migration 或 Ent 漂移。
+
+最终 `full.sh` 和 `strict.sh` 均从头完成：scripts Node `1337 / 1337`、Web 全集 `1807 / 1807`、server quick `2809 / 2809`、server all `2969 / 2969`、隔离 PostgreSQL `192 / 192`，全部零失败、零跳过；fresh migration 覆盖 `95` 条 migration / `622` 条 SQL，populated upgrade、ESLint、Stylelint、Vite build、shellcheck、shfmt、yamllint、零 warning 检查和 Chromium smoke 均通过，strict Chromium 为 `3 / 3`。首轮 full 暴露 6 条已过期的客户包 identity / 页面内联断言，修正为当前内容寻址 revision 和共享生命周期 action 合同后定向 `54 / 54` 通过；第二轮 full 又由当前漏洞库发现可达 `GO-2026-5158`，已把 OpenTelemetry `1.43.0` 升到 `1.44.0`，在真实 HTTP handler 增加超长 baggage fail-closed 回归，并以 govulncheck 复跑确认可达漏洞为 0。扫描器仍报告依赖图中存在未调用的 1 个 imported-package 与 15 个 required-module 漏洞，不包装为“依赖图完全无漏洞”。
+
+Local 受控 Handoff 后重新验证：Codex App 自动 Handoff 在 detach / stash source changes 阶段失败且未触碰 Local，随后按任务归属路径和 3 个重叠文件做语义合并；原流程观察台、采购订单 in-flight 锁与行选择保护均保留。首轮跨层静态合同发现采购页仍运行较新的 `recordActionBusy`，但带回的旧断言只识别 `itemsLoading`；断言已修正为继续要求统一 busy guard，定向脚本复跑 `64 / 64`。最终 `affected.sh --run` 覆盖 T0、T1、T3、T4、T5、T6、T7：文档 `12 / 12`、直接合同 `201 / 201`、Web `1826 / 1826`、隔离 PostgreSQL 关键事务 / 并发 `192 / 192` 均零失败、零跳过，前端 CSS、lint 与三轮 Go 包测试通过；另在真实 Chromium + 受控 mock 中完成审批责任、未配置审批、采购、出货、多岗位手机端和流程观察台等 `11 / 11` 场景。只有任务专属隔离库执行 migration；该轮 Handoff 验证结束时未对共享、133 或生产库 apply，也未 stage、commit、push、部署或执行客户 UAT。
+
+Git 收口冻结树验证：再次执行官方 `affected.sh --run` 覆盖 T0、T1、T3、T4、T5、T6、T7，文档、三轮 Go、直接合同、Web、客户配置以及隔离 PostgreSQL 关键事务 / 并发均通过，其中 PostgreSQL 为 `192 / 192`、零失败、零跳过。完整 Style L1 首轮发现开发导航新增流程观察台后仍保留旧的 6 项入口、7 项侧栏和虚拟下拉 DOM 断言；同步为当前 7 张入口卡、8 项工作台导航，并让移动端全页场景纳入观察台后，定向场景 `3 / 3`、开发导航合同 `12 / 12`、最终真实 Chromium + 受控 mock Style L1 `187 / 187` 通过，写请求审计保持 0。ESLint 与 `git diff --check` 同步通过；最终 clean HEAD 仍须由 `prepare-push.sh` 执行一次当前提交绑定的 full 并让真实 pre-push hook 核验实际推送范围，不能复用此段开发期绿色替代。
+
+本地 CI 模拟边界：`.github/workflows/ci.yml` 的锁定工具、PostgreSQL、range whitespace / commit-message、生成、strict 和 committed source archive 命令均已实际核对；`HEAD` 的 light archive 检查通过 `2651` 个文件，归档 SHA-256 为 `23408857044ffc76605d4d49d7f0b7353ef12dec805d3c7920e9a3f81384e4d4`。但它只归档起点提交 `bd943a09b818f573d8f7f81731521c4516754547`，脚本明确回读 `clean=false`、`formalEvidenceEligible=false`；当前实现仍是按任务要求保留的未提交 dirty tree，因此 CI 的“`make data` 后全树干净”和“当前实现 committed archive”门禁不能执行为 passed。GitHub Actions 未运行，不能写成 GitHub CI 通过。任务专属 PostgreSQL 容器在确认无 `plush_erp_%` 数据库残留后已删除。
+
+阻塞 / 未执行：九岗位真实登录 / JSON-RPC / 浏览器的只读 preflight 已执行，RBAC 与浏览器报告均为 `ready=false`，明确缺少演示账号密码环境；`8300` 虽返回 health 200，但监听进程 cwd 为 Local checkout `/Users/simon/projects/plush-toy-erp/server`，不属于本 Worktree，独立 `8310` 没有监听。本任务不能向归属不明的 Local 数据库 seed、发布 active revision 或写业务事实；同时仓库 local-test customer-config guard 只允许已登记的 `192.168.0.106:5432/plush_erp[_*_dev]` 集群，不能拿临时 loopback PostgreSQL 伪造永绅 active revision。因此真实九岗位验收保持 blocked；现有 mock / Style L1 只能证明 UI 交互与恢复态，不能替代真实 JSON-RPC 业务闭环或客户 UAT。没有对共享、133 或生产库 apply migration，也没有执行目标 migration status / apply / readback、发布、health / ready、目标账号 smoke 或客户 UAT。
+
+边界：本轮没有 schema 变更，不生成新 migration；没有对共享、133 或生产库 apply，也未发布客户配置、部署或执行客户 UAT。代码已通过受控 Handoff 带回 Local并进入本轮完整工作树 Git 收口；具体提交和远端状态以 Git ref 为准。
+
+## 2026-07-24 权限中心关联账号核对（起点继承记录）
 
 完成：岗位详情新增第 5 个“关联账号（数量）”Tab，按现有 `admin.list` 与账号岗位关系只读展示账号、三态状态和兼任岗位，启用账号优先排列；无员工账号查看权限时明确提示未知，不把未加载数据冒充零账号。账号分配、停用、重置和注销仍只在外层“员工账号”办理；从岗位详情进入时预填当前岗位搜索并回到第一页，没有新增后端接口、权限码、账号真源或第二套管理动作，也不根据账号名前缀猜测 Demo 身份。
 
 验证：Web 全集 `1792 / 1792`、ESLint、Stylelint、权限页静态合同 `63 / 63`、文档清单 / 试用账号 / 岗位手册合同 `13 / 13` 和目标差异检查通过。Node `24.14.0` 下真实 Chromium `permission-center-desktop,permission-center-navigation-mobile-dark` 各 `1 / 1` 通过，覆盖财务岗位关联账号数量、只读状态与兼任岗位、跳转后岗位搜索、桌面布局、390px 暗色布局和无页面级横向溢出；桌面与手机截图已人工检查。未改 RBAC、客户配置、Workflow / Fact、schema 或 migration，未保存真实岗位设置、未提交、未推送、未部署，也未执行目标账号实登或甲方 UAT。
 
-## 2026-07-24 权限中心审批责任与多角色完整性
+## 2026-07-24 权限中心审批责任与多角色完整性（起点继承记录；本轮未复用运行态结论）
 
 完成：审批责任已收进“权限管理”的第三个外层 Tab，与“岗位设置 / 员工账号”共用同一岗位和账号真源；删除独立审批设置路由与菜单，不再让管理员在两个页面间来回核对。页面只展示已有正式 ProcessRuntime 与领域命令闭环的销售订单、采购订单和出货财务放行，可维护启停、主办、备用、升级及岗位 / 具名员工；说明改为问号 Popover，停用事项使用紧凑的“不参与流程”状态。审批项现在显式区分“未配置、已启用、已停用”：active revision 缺少审批设置时显示“待初始化 / 待设置”并生成可编辑的推荐责任草稿，不再误报为“停用 / 不参与流程”；推荐草稿必须经过检查、发布和激活才正式生效，明确保存为关闭的事项仍保持停用。预览、发布、显式启用和 active revision / content hash CAS 仍保持分离，普通管理员不能借责任设置给自己或自己的业务岗位新增办理资格，系统 / 调试岗位继续受保护。
 
 多角色完整性：启用员工会按其全部真实岗位进入对应候选，多岗位员工可分别在销售、采购、财务等真实岗位下被选择；具名成员必须处于启用状态并继续持有所选岗位，同一责任成员不能在同一事项的多个层级重复。运行时只开放最低可用优先级：主办可用时备用与升级不可见、不可办理，主办失效后才交给备用，主办与备用均失效后才交给升级；唯一具名候选会冻结具体 assignee。员工停用或注销会释放其未结束具名待办，但任务继续绑定原流程 revision，并按该冻结 revision 重新解析下一可用层级，不会被后来激活的新配置改写。
 
-本地运行态：2026-07-24 在 `ERP_CUSTOMER_KEY=yoyoosun`、HTTP `8300` 健康、数据库 safe target 为 `192.168.0.106:5432/plush_erp_simon_dev` 的个人开发后端，通过权限中心使用正式 `preview_approval_settings -> publish_approval_settings -> check_customer_config_transition -> activate_customer_config -> get_approval_settings` 链路发布并激活推荐责任。读回 active revision 为 `yoyoosun-customer-package-v7.local-2d67add376fa18b4.runtime-v1.a`；销售订单为业务主办、老板升级，采购订单为采购主办、老板升级，出货财务放行为财务主办、老板升级，三项均显示“已生效 / 启用 / 可办理”。本次只改变本地客户配置 revision，不直接改数据库表，不改 Workflow / Fact，也不改已在途流程的冻结责任。
+起点历史记录曾描述一次本地客户配置发布 / 激活与管理员读回；本轮独立 Worktree 没有对该数据库或 active revision 做当前读回，也没有复用该记录作为验证证据。当前可执行结论只取本轮代码、测试和明确环境前提；若后续需要运行态结论，必须重新执行 `get_approval_settings / get_effective_session` 与真实岗位登录。
 
 边界：RBAC `workflow.task.approve` 只表达审批资格上限，实际列表、岗位视图与办理动作同时校验任务冻结 revision 的 entitlement、精确责任池 / 岗位或具名成员、账号状态、最低可用层级、owner / assignee、任务状态 / version、幂等键与审计。Workflow task done 仍不直接写 Fact，销售、采购和 Shipment 继续由各自唯一领域命令落地。客户退货和生产异常虽有领域审批但尚未进入配置化 ProcessRuntime；库存调整、PAYMENT、PMC / 工程审批缺正式 Source Document 或门禁，继续失败关闭。
 
-验证：官方 `bash scripts/qa/affected.sh --run` 覆盖 T0、T1、T3、T4、T5、T6、T7；文档合同 `12 / 12`、直接 Node 合同 `41 / 41`、Web 全集 `1798 / 1798`、隔离 PostgreSQL 关键事务与并发 `192 / 192` 均为零失败、零跳过，服务端全包及 domain / API / data、客户配置合同、ESLint、Stylelint 和差异检查通过。随后使用项目要求的 Node `24.14.0` 复跑 Web `1798 / 1798` 和生产构建；真实 Chromium `permission-center-approval-unconfigured,permission-center-approval-responsibility` `2 / 2` 通过，分别覆盖未配置推荐草稿与明确停用状态。本轮未改 Ent schema、未生成 migration；只重建并迁移项目登记的隔离事务测试库，没有对共享、133 或生产数据库 apply migration。
+起点验证记录中的 affected、Web、PostgreSQL 与 Chromium 数字只绑定其当时工作树；当前代码已变化，不能作为本轮绿色结果。当前任务的实际命令、非零测试数、fail / skip 和环境边界统一登记在上方“当前单据流 / 业务流重新审计”最终记录。
 
-风险：上述配置只在本地开发后端发布、激活和管理员读回，尚未向 133 / 生产目标环境发布；未执行销售 / 采购 / 财务 / 老板真实账号审批办理 smoke、客户 UAT、部署、提交或推送。WorkPoolMembership 当前只有启停，没有独立的时间到期字段，本轮不为尚无正式合同的“成员有效期”新增 schema。
+风险：当前没有本轮可复用的 active revision / effective session 或真实账号办理证据；133 / 生产目标环境发布、销售 / 采购 / 财务 / 老板真实账号 smoke、客户 UAT、部署、提交和推送均未执行。WorkPoolMembership 当前只有启停，没有独立的时间到期字段，不为尚无正式合同的“成员有效期”新增 schema。
 
 ## 2026-07-23 任务流程起点、当前位置与终点
 

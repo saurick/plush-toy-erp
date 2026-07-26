@@ -1806,12 +1806,8 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	if posted.Status != biz.OperationalFactStatusPosted {
 		t.Fatalf("expected posted receivable, got %s", posted.Status)
 	}
-	settled, err := uc.SettleFinanceFact(ctx, receivable.ID)
-	if err != nil {
-		t.Fatalf("settle receivable failed: %v", err)
-	}
-	if settled.Status != biz.OperationalFactStatusSettled {
-		t.Fatalf("expected settled receivable, got %s", settled.Status)
+	if _, err := uc.SettleFinanceFact(ctx, receivable.ID); !errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed) {
+		t.Fatalf("receivable must settle through payment allocation, got %v", err)
 	}
 
 	invoice, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{

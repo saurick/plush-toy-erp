@@ -15,6 +15,10 @@ import {
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import {
+  approvePurchaseOrderThroughProcess,
+  submitPurchaseOrderThroughProcess,
+} from "./purchase-order-approval-process.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-data";
@@ -2203,6 +2207,126 @@ export async function advanceSalesOrderLifecycleThroughProcess({
   });
 }
 
+export async function advancePurchaseOrderLifecycleThroughProcess({
+  plan,
+  record,
+  item,
+  token,
+  roleTokens,
+  fetchImpl,
+  report,
+}) {
+  const sourceID = positiveSafeInteger(item?.id, "purchase order id");
+  const orderNo = requiredText(
+    record?.purchase_order_no,
+    "purchase order number",
+  );
+  const target = requiredText(
+    record?.targetStatus,
+    "purchase order target status",
+  ).toUpperCase();
+  let status = String(item?.lifecycle_status || "DRAFT").toUpperCase();
+  if (status === target) return status;
+  if (new Set(["CLOSED", "CANCELED"]).has(status)) {
+    throw new CliError(
+      `purchase_order id=${sourceID} is terminal ${status}, expected ${target}`,
+    );
+  }
+  if (target === "CANCELED") {
+    const data = await rpcCall({
+      backendURL: plan.backendURL,
+      domain: "purchase_order",
+      method: "cancel_purchase_order",
+      params: { id: sourceID },
+      token,
+      fetchImpl,
+    });
+    return requireLifecycleMutationStatus({
+      data,
+      resultKey: "purchase_order",
+      domain: "purchase_order",
+      id: sourceID,
+      method: "cancel_purchase_order",
+      expectedStatus: "CANCELED",
+    });
+  }
+  if (!new Set(["SUBMITTED", "APPROVED", "CLOSED"]).has(target)) {
+    throw new CliError(`unsupported purchase order target status ${target}`);
+  }
+  if (status === "DRAFT" || status === "SUBMITTED") {
+    const advance =
+      target === "SUBMITTED"
+        ? submitPurchaseOrderThroughProcess
+        : approvePurchaseOrderThroughProcess;
+    const result = await advance({
+      purchaseOrder: {
+        id: sourceID,
+        purchase_order_no: orderNo,
+      },
+      idempotencyPrefix: [
+        "manual-acceptance-source",
+        plan.runId,
+        orderNo,
+        "approval",
+      ].join(":"),
+      invoke: ({ actor, domain, method, params }) => {
+        const actorToken =
+          actor === "source" || actor === "admin"
+            ? token
+            : roleTokens[actor];
+        if (!actorToken) {
+          throw new CliError(
+            `no trial account can perform ${domain}.${method} as ${actor}`,
+          );
+        }
+        return rpcCall({
+          backendURL: plan.backendURL,
+          domain,
+          method,
+          params,
+          token: actorToken,
+          fetchImpl,
+        });
+      },
+      sourceActor: "source",
+      listActor: "admin",
+      approvalActorForRole: (roleKey) =>
+        roleTokens[roleKey] ? roleKey : undefined,
+    });
+    status = String(
+      result.purchaseOrder.lifecycle_status || "",
+    ).toUpperCase();
+    report.steps.push({
+      target: "material_supply",
+      key: orderNo,
+      action: target === "SUBMITTED" ? "submit" : "approve",
+      id: result.processInstance.id,
+    });
+  }
+  if (target !== "CLOSED") return status;
+  if (status !== "APPROVED") {
+    throw new CliError(
+      `${orderNo} must be APPROVED before close; got ${status}`,
+    );
+  }
+  const data = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "purchase_order",
+    method: "close_purchase_order",
+    params: { id: sourceID },
+    token,
+    fetchImpl,
+  });
+  return requireLifecycleMutationStatus({
+    data,
+    resultKey: "purchase_order",
+    domain: "purchase_order",
+    id: sourceID,
+    method: "close_purchase_order",
+    expectedStatus: "CLOSED",
+  });
+}
+
 export function requireLifecycleMutationStatus({
   data,
   resultKey,
@@ -2642,24 +2766,6 @@ async function createSourceDocuments({
   );
   const purchaseActions = {
     DRAFT: [],
-    SUBMITTED: [{ method: "submit_purchase_order", resultStatus: "SUBMITTED" }],
-    APPROVED: [
-      { method: "submit_purchase_order", resultStatus: "SUBMITTED" },
-      {
-        method: "approve_purchase_order",
-        resultStatus: "APPROVED",
-        token: tokens.boss,
-      },
-    ],
-    CLOSED: [
-      { method: "submit_purchase_order", resultStatus: "SUBMITTED" },
-      {
-        method: "approve_purchase_order",
-        resultStatus: "APPROVED",
-        token: tokens.boss,
-      },
-      { method: "close_purchase_order", resultStatus: "CLOSED" },
-    ],
     CANCELED: [{ method: "cancel_purchase_order", resultStatus: "CANCELED" }],
   };
   await applyDocumentGroup({
@@ -2674,6 +2780,11 @@ async function createSourceDocuments({
     resultKey: "purchase_order",
     listStatusKey: "lifecycle_status",
     lifecycleActions: purchaseActions,
+    advanceLifecycleFn: (input) =>
+      advancePurchaseOrderLifecycleThroughProcess({
+        ...input,
+        roleTokens,
+      }),
     headerFields: [
       "purchase_order_no",
       "supplier_id",

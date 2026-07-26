@@ -99,17 +99,17 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 	if ok, err := boolFromProcessDefinition(definition, "runtime_loader_enabled"); err != nil || !ok {
 		return nil, ErrBadParam
 	}
-	if _, loaderBlockers, _ := processDefinitionNodeExplanations(definition); len(loaderBlockers) > 0 {
-		if stringSliceContains(loaderBlockers, "approval_disabled") {
-			return nil, ErrCustomerConfigApprovalDisabled
-		}
-		return nil, ErrBadParam
-	}
 	if getStringFromAnyMap(definition, "fact_boundary") != "no_fact_posting" {
 		return nil, ErrBadParam
 	}
 	if getStringFromAnyMap(definition, "process_key") != processKey {
 		return nil, ErrBadParam
+	}
+	approvalKey := approvalSettingKeyForProcessKey(processKey)
+	approvalSettings := approvalSettingsEnabledMap(active.CompiledSnapshot)
+	approvalEnabled, approvalConfigured := approvalSettings[approvalKey]
+	if approvalKey == "" || !approvalConfigured || !approvalEnabled {
+		return nil, ErrCustomerConfigTransitionBlocked
 	}
 	processVersion := getStringFromAnyMap(definition, "process_version")
 	if processVersion == "" {
@@ -142,6 +142,9 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 	nodes, err := processNodesFromCustomerConfigDefinition(processKey, definition)
 	if err != nil {
 		return nil, err
+	}
+	if !currentCustomerConfigProcessStartShape(processKey, nodes) {
+		return nil, ErrCustomerConfigTransitionBlocked
 	}
 	var variantKey *string
 	if value := getStringFromAnyMap(definition, "variant_key"); value != "" {
@@ -406,6 +409,11 @@ func (uc *CustomerConfigUsecase) ExplainProcessDefinition(ctx context.Context, c
 		out.ProcessKey = processKey
 	}
 	out.StartBlockedReasons = processDefinitionStartBlockedReasons(out)
+	approvalKey := approvalSettingKeyForProcessKey(processKey)
+	approvalEnabled, approvalConfigured := approvalSettingsEnabledMap(active.CompiledSnapshot)[approvalKey]
+	if approvalKey == "" || !approvalConfigured || !approvalEnabled {
+		out.StartBlockedReasons = sortedUniqueStrings(append(out.StartBlockedReasons, "approval_disabled"))
+	}
 	out.ExecuteBlockedReasons = processDefinitionExecuteBlockedReasons(out)
 	out.CanStartRuntime = len(out.StartBlockedReasons) == 0
 	out.CanExecuteRuntimeCommands = len(out.ExecuteBlockedReasons) == 0

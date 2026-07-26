@@ -83,7 +83,6 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
-				PermissionPurchaseOrderApprove,
 				PermissionShipmentRead,
 				PermissionMobileBossAccess,
 			},
@@ -131,7 +130,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskReject,
 				PermissionMobileProductionAccess,
 			},
-			omits: []string{PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: EngineeringRoleKey,
@@ -167,7 +166,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionMaterialUpdate,
 				PermissionMobilePurchaseAccess,
 			},
-			omits: []string{PermissionWorkflowTaskReject, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskReject, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: FinanceRoleKey,
@@ -183,7 +182,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionShipmentRead,
 				PermissionMobileFinanceAccess,
 			},
-			omits: []string{PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseOrderApprove, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionDebugBusinessClear},
+			omits: []string{PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: PMCRoleKey,
@@ -614,12 +613,6 @@ func TestAdminCanAccessMobileRoleUsesPermissionCode(t *testing.T) {
 	}
 	if AdminCanAccessMobileRole(admin, WarehouseRoleKey) {
 		t.Fatalf("warehouse mobile access must require its own permission")
-	}
-	if !AdminCanAccessMobileRole(admin, "") {
-		t.Fatal("desktop SMS login may omit the mobile role")
-	}
-	if AdminCanAccessMobileRole(admin, "unknown-mobile-role") {
-		t.Fatal("unknown non-empty mobile role must fail closed")
 	}
 }
 

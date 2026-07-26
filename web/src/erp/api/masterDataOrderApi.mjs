@@ -437,11 +437,6 @@ export async function getPurchaseOrder(params = {}, options = {}) {
   return dataOf(result)?.purchase_order || null
 }
 
-export async function submitPurchaseOrder(params = {}) {
-  const result = await purchaseOrderRpc.call('submit_purchase_order', params)
-  return dataOf(result)?.purchase_order || null
-}
-
 export async function closePurchaseOrder(params = {}) {
   const result = await purchaseOrderRpc.call('close_purchase_order', params)
   return dataOf(result)?.purchase_order || null

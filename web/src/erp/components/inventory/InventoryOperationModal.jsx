@@ -203,7 +203,7 @@ export default function InventoryOperationModal({
                 { required: true, whitespace: true, message: '请填写审批依据' },
               ]}
             >
-              <Input maxLength={255} autoComplete="off" />
+              <Input maxLength={128} autoComplete="off" />
             </Form.Item>
           </>
         ) : null}

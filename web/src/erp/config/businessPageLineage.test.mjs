@@ -155,6 +155,7 @@ const FORMAL_UI_PROCESS_RUNTIME_ACTIONS = Object.freeze([
   'start_sales_order_acceptance_process',
   'execute_sales_order_acceptance_submit',
   'start_material_supply_purchase_order_process',
+  'execute_material_supply_purchase_order_submit',
   'start_finished_goods_delivery_process',
 ])
 
@@ -669,13 +670,10 @@ test('business page lineage: real source and lifecycle service actions are class
   }
 })
 
-test('business page lineage: backend-only process commands never claim implemented formal UI reachability', () => {
+test('business page lineage: legacy process commands never claim current formal UI reachability', () => {
   assert.equal(BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS.length, 6)
 
-  for (const action of [
-    ...BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS,
-    'add_purchase_receipt_item',
-  ]) {
+  for (const action of BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS) {
     const actionFlows = businessPageFlowDefinitions.filter(
       (flowDefinition) => flowDefinition.action === action
     )
@@ -684,11 +682,25 @@ test('business page lineage: backend-only process commands never claim implement
       assert.equal(
         flowDefinition.availability,
         BUSINESS_PAGE_AVAILABILITY.PARTIAL,
-        `${flowDefinition.flowKey} must remain backend-only`
+        `${flowDefinition.flowKey} must remain legacy-only`
       )
-      assert.match(flowDefinition.availabilityNote, /backend-only/u)
-      assert.match(flowDefinition.availabilityNote, /正式 Web UI 无调用入口/u)
+      assert.match(flowDefinition.availabilityNote, /冻结的旧在途/u)
+      assert.match(flowDefinition.availabilityNote, /当前新建流程图/u)
     }
+  }
+
+  const addItemFlows = businessPageFlowDefinitions.filter(
+    (flowDefinition) =>
+      flowDefinition.action === 'add_purchase_receipt_item'
+  )
+  assert.equal(addItemFlows.length > 0, true)
+  for (const flowDefinition of addItemFlows) {
+    assert.equal(
+      flowDefinition.availability,
+      BUSINESS_PAGE_AVAILABILITY.PARTIAL
+    )
+    assert.match(flowDefinition.availabilityNote, /backend-only/u)
+    assert.match(flowDefinition.availabilityNote, /正式 Web UI 无调用入口/u)
   }
 
   const purchaseReceiptPageSource = readFileSync(
@@ -754,17 +766,12 @@ test('business page lineage: formal order and shipment process starts are implem
   )
 })
 
-test('business page lineage: invoice facts cannot advertise settlement', () => {
+test('business page lineage: only reconciliation facts advertise settlement', () => {
   const settledPageKeys = businessPageFlowDefinitions
     .filter((flowDefinition) => flowDefinition.action === 'settle_finance_fact')
     .map((flowDefinition) => flowDefinition.fromPageKey)
 
-  assert.deepEqual(settledPageKeys, [
-    'payables',
-    'receivables',
-    'reconciliation',
-  ])
-  assert.equal(settledPageKeys.includes('invoices'), false)
+  assert.deepEqual(settledPageKeys, ['reconciliation'])
 })
 
 test('business page lineage: carry-over, generation, WIP quality, and reversal semantics stay distinct', () => {

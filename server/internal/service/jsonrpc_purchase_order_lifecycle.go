@@ -13,8 +13,6 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderLifecycle(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "submit_purchase_order":
-		return d.handlePurchaseOrderLifecycleAction(ctx, id, pm, biz.PermissionPurchaseOrderUpdate, d.purchaseOrderUC.SubmitPurchaseOrder)
 	case "close_purchase_order":
 		return d.handlePurchaseOrderLifecycleAction(ctx, id, pm, biz.PermissionPurchaseOrderUpdate, d.purchaseOrderUC.ClosePurchaseOrder)
 	case "cancel_purchase_order":

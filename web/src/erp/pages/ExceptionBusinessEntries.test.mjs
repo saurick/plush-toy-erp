@@ -33,6 +33,10 @@ test('inventory operations: support the three controlled types and reconcile unc
   assert.match(inventoryPage, /expected_version:/u)
   assert.match(inventoryPage, /getInventoryOperation/u)
   assert.match(inventoryPage, /warehouse\.adjustment\.create/u)
+  assert.match(
+    inventoryModal,
+    /name="approval_ref"[\s\S]{0,300}<Input maxLength=\{128\}/u
+  )
   assert.doesNotMatch(inventoryModal, /客户ID|仓库ID|主体ID/u)
 })
 

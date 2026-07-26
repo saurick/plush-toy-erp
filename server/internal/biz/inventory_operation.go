@@ -151,6 +151,9 @@ func normalizeInventoryOperationCreate(in *InventoryOperationCreate) (*Inventory
 	if o.OperationType != InventoryOperationCycleCount && o.OperationType != InventoryOperationTransfer && o.OperationType != InventoryOperationManualAdjustment {
 		return nil, "", ErrBadParam
 	}
+	if o.ApprovalRef != nil && len([]rune(*o.ApprovalRef)) > 128 {
+		return nil, "", ErrBadParam
+	}
 	if o.OperationType == InventoryOperationManualAdjustment && o.ApprovalRef == nil {
 		return nil, "", ErrInventoryOperationApprovalMissing
 	}

@@ -136,14 +136,6 @@ const FINANCE_COUNTERPARTY_COLUMN_TITLES = Object.freeze({
 })
 
 const FINANCE_SETTLEMENT_ACTIONS = Object.freeze({
-  RECEIVABLE: Object.freeze({
-    label: '结清',
-    confirmTitle: '确认结清当前应收记录？',
-  }),
-  PAYABLE: Object.freeze({
-    label: '结清',
-    confirmTitle: '确认结清当前应付记录？',
-  }),
   RECONCILIATION: Object.freeze({
     label: '完成核对',
     confirmTitle: '确认完成当前对账核对？',

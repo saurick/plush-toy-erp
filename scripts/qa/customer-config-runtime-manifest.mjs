@@ -60,7 +60,6 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "material.read",
     "warehouse.inventory.read",
     "purchase.order.read",
-    "purchase.order.approve",
     "workflow.task.read",
     "workflow.task.assign",
     "workflow.task.update",

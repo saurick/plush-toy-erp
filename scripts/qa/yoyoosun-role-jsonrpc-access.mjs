@@ -65,13 +65,7 @@ export const YOYOOSUN_ROLE_JSONRPC_ACCESS_MATRIX = Object.freeze([
       params: Object.freeze({ limit: 1, offset: 0 }),
       totalField: "total",
     }),
-    deniedMutation: Object.freeze({
-      domain: "purchase_order",
-      method: "approve_purchase_order",
-      params: Object.freeze({ id: 0 }),
-      safety:
-        "an unexpected grant targets no positive purchase-order id and cannot approve a record",
-    }),
+    deniedMutation: deniedWorkflowCreateProbe,
   }),
   Object.freeze({
     roleKey: "production",

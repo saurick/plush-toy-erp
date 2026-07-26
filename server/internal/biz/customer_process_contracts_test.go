@@ -2,6 +2,7 @@ package biz
 
 import (
 	"errors"
+	"slices"
 	"testing"
 )
 
@@ -53,6 +54,45 @@ func TestNormalizeCustomerProcessContractsExpandsCanonicalSalesVariants(t *testi
 				if wantPool, ok := tt.wantPoolIndex[index]; ok && node["owner_pool_key"] != wantPool {
 					t.Fatalf("node %d owner pool = %#v, want %s", index, node["owner_pool_key"], wantPool)
 				}
+			}
+		})
+	}
+}
+
+func TestNormalizeCustomerProcessContractsKeepsFactActionsOutsideApprovalRuntime(t *testing.T) {
+	tests := []struct {
+		processKey      string
+		variantKey      string
+		businessRefType string
+		wantNodeKeys    []string
+	}{
+		{
+			processKey: ProcessKeyMaterialSupply, variantKey: CustomerProcessVariantPurchaseOrderApproval,
+			businessRefType: "purchase_order",
+			wantNodeKeys:    []string{"submit_purchase_order", "purchase_order_approval", "approve_purchase_order", "end"},
+		},
+		{
+			processKey: ProcessKeyFinishedGoodsDelivery, variantKey: CustomerProcessVariantShipmentFinanceApproval,
+			businessRefType: "shipment",
+			wantNodeKeys:    []string{"shipment_finance_approval", "shipment_finance_release", "end"},
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.processKey, func(t *testing.T) {
+			normalized, err := normalizeCustomerProcessContracts(runtimeSelectionSnapshot(
+				testCase.processKey, "v1", testCase.variantKey, testCase.businessRefType,
+			))
+			if err != nil {
+				t.Fatalf("normalizeCustomerProcessContracts error = %v", err)
+			}
+			definition := normalized["processDefinitions"].(map[string]any)[testCase.processKey].(map[string]any)
+			rawNodes := definition["nodes"].([]any)
+			got := make([]string, 0, len(rawNodes))
+			for _, raw := range rawNodes {
+				got = append(got, raw.(map[string]any)["node_key"].(string))
+			}
+			if !slices.Equal(got, testCase.wantNodeKeys) {
+				t.Fatalf("node keys = %#v, want %#v", got, testCase.wantNodeKeys)
 			}
 		})
 	}

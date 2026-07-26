@@ -36,8 +36,10 @@ import {
 } from '../utils/adminProfileSync.mjs'
 import {
   getAllowedMobileRoleKeys,
+  hasMobileRoleAccountPermission,
   hasMobileRolePermission,
 } from '../utils/mobileRolePermissions.mjs'
+import { getRoleDisplayName } from '../utils/roleKeys.mjs'
 
 const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = [200, 600]
 const PROFILE_SYNC_INTERVAL_MS = 60 * 1000
@@ -140,21 +142,30 @@ export default function MobileAppLayout() {
   const entryConfig = useMemo(() => getEntryConfig(), [])
   const mobileRoleEntryAvailable =
     Boolean(activeRole) && isMobileRoleEntryEnabled(activeRoleKey, entryConfig)
+  const mobileRoleAccountPermissionAllowed =
+    mobileRoleEntryAvailable &&
+    hasMobileRoleAccountPermission(adminProfile, activeRoleKey)
   const mobileRolePermissionAllowed =
     mobileRoleEntryAvailable &&
     hasMobileRolePermission(adminProfile, activeRoleKey)
-  const allowedMobileRoleKeys = getAllowedMobileRoleKeys(
-    adminProfile,
-    getEnabledMobileRoleKeys(entryConfig)
+  const allowedMobileRoleKeys = useMemo(
+    () =>
+      getAllowedMobileRoleKeys(
+        adminProfile,
+        getEnabledMobileRoleKeys(entryConfig)
+      ),
+    [adminProfile, entryConfig]
   )
   const customerRuntimeAvailable = canMountCustomerRuntime(adminProfile)
   const shouldBlockMissingCustomerRuntime =
     profileSyncCompleted &&
-    mobileRolePermissionAllowed &&
+    mobileRoleAccountPermissionAllowed &&
     !customerRuntimeAvailable
   const canUseCurrentMobileRole =
     mobileRolePermissionAllowed && customerRuntimeAvailable
-  const canReturnToEntries = hasDesktopEntryAccess(adminProfile, entryConfig)
+  const canEnterDesktop = hasDesktopEntryAccess(adminProfile, entryConfig)
+  const canReturnToEntries =
+    canEnterDesktop || allowedMobileRoleKeys.length > 1
   const authRpc = useMemo(
     () =>
       new JsonRpc({
@@ -393,9 +404,17 @@ export default function MobileAppLayout() {
   }
 
   const handleEnterDesktop = () => {
-    if (!canReturnToEntries) return
+    if (!canEnterDesktop) return
     rememberEntryChoice(ENTRY_TARGET.DESKTOP)
     navigate('/erp/dashboard')
+  }
+
+  const handleSwitchMobileRole = (roleKey) => {
+    if (!allowedMobileRoleKeys.includes(roleKey)) return
+    const path = resolveMobileTasksPath(roleKey)
+    if (!path) return
+    rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
+    navigate(path)
   }
 
   const handleRetry = () =>
@@ -466,10 +485,34 @@ export default function MobileAppLayout() {
                 </button>
               </div>
             ) : null}
+            {allowedMobileRoleKeys.length > 1 ? (
+              <nav
+                className="mx-3 mt-3 flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2"
+                aria-label="切换岗位任务端"
+              >
+                {allowedMobileRoleKeys.map((roleKey) => (
+                  <button
+                    key={roleKey}
+                    type="button"
+                    className={`min-h-11 shrink-0 rounded-lg px-4 py-2 text-sm font-semibold ${
+                      roleKey === activeRoleKey
+                        ? 'bg-emerald-600 text-white'
+                        : 'border border-slate-300 bg-white text-slate-700'
+                    }`}
+                    aria-current={
+                      roleKey === activeRoleKey ? 'page' : undefined
+                    }
+                    onClick={() => handleSwitchMobileRole(roleKey)}
+                  >
+                    {getRoleDisplayName(roleKey, '岗位')}
+                  </button>
+                ))}
+              </nav>
+            ) : null}
             <Outlet
               context={{
                 adminProfile,
-                canEnterDesktop: canReturnToEntries,
+                canEnterDesktop,
                 handleEnterDesktop,
                 handleLogout,
                 loggingOut,

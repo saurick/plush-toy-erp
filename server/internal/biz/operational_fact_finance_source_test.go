@@ -116,8 +116,8 @@ func TestOperationalFactUsecaseSettleFinanceFactAllowsOnlyBalanceTypes(t *testin
 		factType string
 		allowed  bool
 	}{
-		{factType: FinanceFactReceivable, allowed: true},
-		{factType: FinanceFactPayable, allowed: true},
+		{factType: FinanceFactReceivable, allowed: false},
+		{factType: FinanceFactPayable, allowed: false},
 		{factType: FinanceFactReconciliation, allowed: true},
 		{factType: FinanceFactInvoice, allowed: false},
 		{factType: FinanceFactPayment, allowed: false},

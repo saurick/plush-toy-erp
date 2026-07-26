@@ -11,6 +11,7 @@ import {
   loadDevPorts,
   resolveDevAuxPort,
 } from '../../scripts/dev-ports.mjs'
+import { approvePurchaseOrderThroughProcess } from '../../scripts/qa/purchase-order-approval-process.mjs'
 import {
   attachErrorCollectors,
   createRealLoginSmokeRuntime,
@@ -586,11 +587,13 @@ async function createReceiptWithItemForUI(page, refs, baseURL) {
     sourceOrder?.id && sourceOrderItem?.id,
     `创建采购订单来源失败: ${JSON.stringify(sourceOrderData)}`
   )
-  await rpc(page, 'purchase_order', 'submit_purchase_order', {
-    id: sourceOrder.id,
-  })
-  await rpc(page, 'purchase_order', 'approve_purchase_order', {
-    id: sourceOrder.id,
+  await approvePurchaseOrderThroughProcess({
+    purchaseOrder: sourceOrder,
+    idempotencyPrefix: `browser-e2e:${runID}:purchase-order-approval`,
+    invoke: ({ domain, method, params }) => rpc(page, domain, method, params),
+    sourceActor: 'current-session',
+    listActor: 'current-session',
+    approvalActorForRole: () => 'current-session',
   })
 
   const data = await rpc(

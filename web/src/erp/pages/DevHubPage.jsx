@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import {
+  ApartmentOutlined,
   AppstoreOutlined,
   CodeOutlined,
   DeploymentUnitOutlined,
@@ -35,6 +36,7 @@ const ICON_BY_KEY = {
   prototypes: <AppstoreOutlined />,
   'capability-ledger': <FundProjectionScreenOutlined />,
   'customer-config': <DeploymentUnitOutlined />,
+  'status-flows': <ApartmentOutlined />,
 }
 
 function readPinnedRoutes() {

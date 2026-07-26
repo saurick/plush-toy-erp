@@ -7,6 +7,7 @@ import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createBusinessActionStabilityScenarios } from './businessActionStabilityScenarios.mjs'
 import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
+import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliveryScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
@@ -1068,7 +1069,11 @@ export function createStyleL1Scenarios(deps) {
   const multiMobileRoleEffectiveSession = Object.freeze({
     ...customerRuntimeEffectiveSession,
     configRevision: 'style-l1-entry-multi-role',
-    actions: ['workflow.task.read'],
+    actions: [
+      'mobile.sales.access',
+      'mobile.quality.access',
+      'workflow.task.read',
+    ],
     workflow_visible_owner_role_keys_by_capability: {
       'workflow.task.read': ['sales', 'quality'],
     },
@@ -1206,6 +1211,12 @@ export function createStyleL1Scenarios(deps) {
   })
 
   return [
+    ...createDevFlowStateObservatoryScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      expectText,
+      gotoScenarioPath,
+    }),
     ...createBusinessActionStabilityScenarios({
       assert,
       assertERPThemeMode,
@@ -5657,6 +5668,11 @@ export function createStyleL1Scenarios(deps) {
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: [],
         actions: [
+          'mobile.engineering.access',
+          'mobile.production.access',
+          'mobile.warehouse.access',
+          'mobile.quality.access',
+          'mobile.finance.access',
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',
@@ -6122,7 +6138,18 @@ export function createStyleL1Scenarios(deps) {
         configHash: 'style-l1-mobile-nine-role-request-recovery-matrix-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: [],
-        actions: ['workflow.task.read'],
+        actions: [
+          'mobile.boss.access',
+          'mobile.sales.access',
+          'mobile.purchase.access',
+          'mobile.pmc.access',
+          'mobile.production.access',
+          'mobile.warehouse.access',
+          'mobile.quality.access',
+          'mobile.finance.access',
+          'mobile.engineering.access',
+          'workflow.task.read',
+        ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': [
             'boss',
@@ -6331,6 +6358,7 @@ export function createStyleL1Scenarios(deps) {
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: [],
         actions: [
+          'mobile.boss.access',
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',
@@ -6802,7 +6830,11 @@ export function createStyleL1Scenarios(deps) {
         configHash: 'style-l1-mobile-yoyo-role-task-readonly-actions-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: [],
-        actions: ['workflow.task.create', 'workflow.task.read'],
+        actions: [
+          'mobile.engineering.access',
+          'workflow.task.create',
+          'workflow.task.read',
+        ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['engineering'],
         },
@@ -6953,6 +6985,8 @@ export function createStyleL1Scenarios(deps) {
         ...customerRuntimeEffectiveSession,
         configRevision: 'style-l1-mobile-tasks-dark',
         actions: [
+          'mobile.boss.access',
+          'mobile.sales.access',
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',
@@ -7246,6 +7280,7 @@ export function createStyleL1Scenarios(deps) {
         ...customerRuntimeEffectiveSession,
         configRevision: 'style-l1-mobile-task-browser-back',
         actions: [
+          'mobile.sales.access',
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',
@@ -7751,15 +7786,15 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           mermaidFullscreenOpen.zoom,
-          '140',
-          `Mermaid 全屏态默认应放大到 140%: ${JSON.stringify(
+          '100',
+          `Mermaid 全屏态默认应保持 100%: ${JSON.stringify(
             mermaidFullscreenOpen
           )}`
         )
         assert.equal(
           mermaidFullscreenOpen.label,
-          '140%',
-          `Mermaid 全屏态缩放标签应显示 140%: ${JSON.stringify(
+          '100%',
+          `Mermaid 全屏态缩放标签应显示 100%: ${JSON.stringify(
             mermaidFullscreenOpen
           )}`
         )
@@ -7778,9 +7813,11 @@ export function createStyleL1Scenarios(deps) {
           )}`
         )
         assert.ok(
-          mermaidFullscreenOpen.canvasWidth >
-            mermaidFullscreenOpen.viewportWidth,
-          `Mermaid 全屏态默认应形成放大视图: ${JSON.stringify(
+          Math.abs(
+            mermaidFullscreenOpen.canvasWidth -
+              mermaidFullscreenOpen.viewportWidth
+          ) <= 2,
+          `Mermaid 全屏态默认应按视口 100% 展示: ${JSON.stringify(
             mermaidFullscreenOpen
           )}`
         )
@@ -8822,6 +8859,7 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '开发导航 / Dev Navigation')
         await expectText(page, '项目治理地图 / Governance Map')
+        await expectText(page, '流程与状态观察台 / Flow & State Observatory')
         await expectText(page, '开发文档 / Dev Docs')
         await expectText(page, '测试入口 / Test Entry')
         await expectText(page, '产品原型 / Prototypes')
@@ -8885,17 +8923,17 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           defaultMetrics.cardCount,
-          6,
-          `开发导航应渲染 6 个入口: ${JSON.stringify(defaultMetrics)}`
+          7,
+          `开发导航应渲染 7 个入口: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
           defaultMetrics.descriptionCount,
-          6,
+          7,
           `开发导航每张入口卡都应说明用途与边界: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
           defaultMetrics.pinButtonCount,
-          6,
+          7,
           `开发导航应为每个入口提供置顶按钮: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
@@ -8913,8 +8951,8 @@ export function createStyleL1Scenarios(deps) {
           `开发导航不应保留无独立用途的搜索动作按钮: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
-          defaultMetrics.enterAriaLabels.length === 6 &&
-            new Set(defaultMetrics.enterAriaLabels).size === 6 &&
+          defaultMetrics.enterAriaLabels.length === 7 &&
+            new Set(defaultMetrics.enterAriaLabels).size === 7 &&
             defaultMetrics.enterAriaLabels.every(Boolean),
           `每个“进入”动作应有唯一可访问名称: ${JSON.stringify(defaultMetrics)}`
         )
@@ -9017,7 +9055,7 @@ export function createStyleL1Scenarios(deps) {
               .querySelector(
                 '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
               )
-              ?.textContent?.replace(/\s+/gu, '') === '1/6' &&
+              ?.textContent?.replace(/\s+/gu, '') === '1/7' &&
             document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
               .length === 1
         )
@@ -9043,7 +9081,7 @@ export function createStyleL1Scenarios(deps) {
           {
             cardCount: 1,
             onlyHref: '/__dev/capability-ledger',
-            countText: '1/6',
+            countText: '1/7',
             overflow: false,
           },
           `开发导航分组筛选应只保留能力真源入口: ${JSON.stringify(groupMetrics)}`
@@ -9052,10 +9090,17 @@ export function createStyleL1Scenarios(deps) {
         await page
           .locator('.erp-dev-hub-group-filter .ant-select-selector')
           .click()
-        await page
-          .locator(
-            '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
-          )
+        // 分组选项超过下拉可视区时，Ant Design 会把虚拟列表定位到当前项；
+        // 先归零组件自己的滚动容器，再点击重新渲染的首项。
+        const groupDropdown = page.locator(
+          '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
+        )
+        await groupDropdown.locator('.rc-virtual-list-holder').evaluate((node) => {
+          node.scrollTop = 0
+          node.dispatchEvent(new Event('scroll', { bubbles: true }))
+        })
+        await groupDropdown
+          .locator('.ant-select-item-option')
           .filter({ hasText: '全部 / All' })
           .click()
         await page.getByPlaceholder('搜索入口或路径').fill('测试入口')
@@ -9065,7 +9110,7 @@ export function createStyleL1Scenarios(deps) {
               .querySelector(
                 '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
               )
-              ?.textContent?.replace(/\s+/gu, '') === '1/6' &&
+              ?.textContent?.replace(/\s+/gu, '') === '1/7' &&
             document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
               .length === 1
         )
@@ -9086,7 +9131,7 @@ export function createStyleL1Scenarios(deps) {
         assert.deepEqual(filteredMetrics, {
           cardCount: 1,
           onlyHref: '/__dev/testing',
-          countText: '1/6',
+          countText: '1/7',
         })
         await assertERPThemeMode(page, {
           scenarioName: 'dev-hub-dark-desktop',
@@ -9116,6 +9161,12 @@ export function createStyleL1Scenarios(deps) {
             heading: '项目治理地图 / Governance Map',
             rootSelector: '.erp-dev-governance-page',
             titlePrefix: '项目治理地图 · ',
+          },
+          {
+            path: '/__dev/status-flows',
+            heading: '流程与状态观察台 / Flow & State Observatory',
+            rootSelector: '.erp-dev-flow-state-page',
+            titlePrefix: '流程与状态观察台 · ',
           },
           {
             path: '/__dev/docs',
@@ -9171,6 +9222,7 @@ export function createStyleL1Scenarios(deps) {
               [
                 '.erp-dev-hub-header',
                 '.erp-dev-governance-header',
+                '.erp-dev-flow-state-header',
                 '.erp-dev-docs-header',
                 '.erp-dev-testing-header',
                 '.erp-dev-prototypes-header',
@@ -9182,6 +9234,7 @@ export function createStyleL1Scenarios(deps) {
               [
                 '.erp-dev-hub-shell',
                 '.erp-dev-governance-shell',
+                '.erp-dev-flow-state-main',
                 '.erp-dev-docs-shell',
                 '.erp-dev-testing-shell',
                 '.erp-dev-prototypes-shell',
@@ -9274,7 +9327,7 @@ export function createStyleL1Scenarios(deps) {
                 devPage.path === '/__dev/capability-ledger'
                   ? 0
                   : 1,
-              workspaceRouteCount: 7,
+              workspaceRouteCount: 8,
               currentWorkspaceRouteCount: 1,
               workspacePageDisplay: 'block',
               workspaceRoutesOverflowX: 'auto',
@@ -9334,7 +9387,7 @@ export function createStyleL1Scenarios(deps) {
           {
             navPosition: 'sticky',
             navWidth: 232,
-            workspaceRouteCount: 7,
+            workspaceRouteCount: 8,
           },
           `开发工作台桌面侧栏尺寸和入口应稳定: ${JSON.stringify(workspaceLayout)}`
         )
@@ -9825,7 +9878,7 @@ export function createStyleL1Scenarios(deps) {
             role: 'dialog',
             ariaModal: 'true',
             position: 'fixed',
-            zoom: '140',
+            zoom: '100',
             closeButtonCount: 1,
           },
           `项目治理地图 Mermaid 全屏操作应与 docs 页一致: ${JSON.stringify(
@@ -11307,7 +11360,6 @@ export function createStyleL1Scenarios(deps) {
           permissionHelpPopover,
           '当前调整仅预览，保存岗位设置后生效'
         )
-        await permissionHelpPopover.hover()
         const permissionHelpBox = await permissionHelpPopover.boundingBox()
         assert(
           permissionHelpBox &&
@@ -11315,6 +11367,8 @@ export function createStyleL1Scenarios(deps) {
             permissionHelpBox.height >= 90,
           `菜单与操作浮层尺寸异常: ${JSON.stringify(permissionHelpBox)}`
         )
+        await permissionHelpPopover.hover()
+        await permissionHelpPopover.waitFor({ state: 'visible' })
         await permissionHelpPopover.screenshot({
           path: 'output/playwright/style-l1/permission-center-help-popover-card.png',
         })
@@ -11332,10 +11386,13 @@ export function createStyleL1Scenarios(deps) {
         await expectText(associatedAccounts, '当前岗位账号')
         await expectText(associatedAccounts, '只读核对')
         await expectText(associatedAccounts, 'style-l1-admin')
-        await expectText(associatedAccounts, 'multi-role-employee')
-        await expectText(associatedAccounts, 'suspended-finance')
         await expectText(associatedAccounts, '始终启用')
         await expectText(associatedAccounts, '超级管理员')
+        await expectText(associatedAccounts, 'multi-role-employee')
+        await expectText(associatedAccounts, '启用')
+        await expectText(associatedAccounts, '业务')
+        await expectText(associatedAccounts, 'suspended-finance')
+        await expectText(associatedAccounts, '临时停用')
         await associatedAccounts.screenshot({
           path: 'output/playwright/style-l1/permission-center-associated-accounts.png',
         })
@@ -11372,10 +11429,10 @@ export function createStyleL1Scenarios(deps) {
             .locator('.erp-permission-category-nav__item')
             .count(),
           2,
-          '财务岗位只看已选时应只保留财务和任务协同分类'
+          '财务岗位只看已选时应保留任务协同与财务两个有已选功能的分类'
         )
-        await expectText(permissionCategoryNav, '财务')
         await expectText(permissionCategoryNav, '任务协同')
+        await expectText(permissionCategoryNav, '财务')
         await selectedOnlySwitch.click()
         const productionCategoryButton = permissionCategoryNav.getByRole(
           'button',
@@ -11788,11 +11845,12 @@ export function createStyleL1Scenarios(deps) {
           .first()
           .click()
         await expectText(page, '有未保存调整')
-        const inactiveRoleCards = page.locator(
-          '.erp-role-template-card[aria-pressed="false"]'
-        )
-        if ((await inactiveRoleCards.count()) > 0) {
-          await inactiveRoleCards.first().click()
+        const roleCards = page.locator('.erp-role-template-card')
+        if ((await roleCards.count()) > 1) {
+          await page
+            .locator('.erp-role-template-card[aria-pressed="false"]')
+            .first()
+            .click()
           await expectText(page, '放弃未保存的岗位调整？')
           await page.getByRole('button', { name: '继续编辑' }).click()
           await expectText(page, '有未保存调整')

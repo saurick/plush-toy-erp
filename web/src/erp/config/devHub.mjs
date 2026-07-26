@@ -5,6 +5,7 @@ import {
   DEV_GOVERNANCE_ROUTE,
   DEV_HUB_ROUTE,
   DEV_PROTOTYPES_ROUTE,
+  DEV_STATUS_FLOWS_ROUTE,
   DEV_TESTING_ROUTE,
 } from './devRoutes.mjs'
 
@@ -29,6 +30,23 @@ export const DEV_HUB_ITEMS = Object.freeze([
     ]),
     description:
       '把项目治理地图可视化成治理维度与口径、任务分流和文档跳转；navigate governance axes without creating a second truth source.',
+  }),
+  Object.freeze({
+    key: 'status-flows',
+    title: '流程与状态观察台 / Flow & State Observatory',
+    group: '流程治理 / Flow Governance',
+    route: DEV_STATUS_FLOWS_ROUTE,
+    source: 'docs/architecture/状态字典与生命周期索引.md',
+    truthSource: '代码合同、正式状态文档与已登记客户配置包',
+    status: '只读观察与差异检查 / Read-only inspection',
+    guardrails: Object.freeze([
+      '状态分层 / Layered truth',
+      '客户配置只叠加 / Customer overlay only',
+      '禁止通用改状态 / No generic status write',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '一处查看 Product Core 状态机、双语状态树、流程编排、九类流覆盖、甲方 preview 差异与运行证据边界；inspect without creating a second runtime authority.',
   }),
   Object.freeze({
     key: 'docs',

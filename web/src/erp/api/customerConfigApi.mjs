@@ -2,7 +2,6 @@ import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { buildCustomerConfigMutationPayload } from './customerConfigTransition.mjs'
-import { submitPurchaseOrder } from './masterDataOrderApi.mjs'
 
 const customerConfigRpc = new JsonRpc({
   url: 'customer_config',
@@ -213,31 +212,133 @@ export async function startPurchaseOrderApprovalProcess(params = {}) {
   return dataOf(result)
 }
 
+export async function executeMaterialSupplyPurchaseOrderSubmit(params = {}) {
+  const result = await customerConfigRpc.call(
+    'execute_material_supply_purchase_order_submit',
+    params
+  )
+  return dataOf(result)
+}
+
+const PURCHASE_PROCESS_RESULT_INVALID_MESSAGE =
+  '采购订单提交结果无法确认，请刷新后重试'
+
+function requireMaterialSupplyPurchaseStart(data, purchaseOrderID) {
+  const instance = data?.process_instance
+  const node = data?.started_node
+  const nodes = data?.nodes
+  const validInstance =
+    Number.isSafeInteger(instance?.id) &&
+    instance.id > 0 &&
+    instance.process_key === 'material_supply' &&
+    instance.business_ref_type === 'purchase_order' &&
+    instance.business_ref_id === purchaseOrderID &&
+    instance.status === 'active'
+  const validNode =
+    Number.isSafeInteger(node?.id) &&
+    node.id > 0 &&
+    Number.isSafeInteger(node?.version) &&
+    node.version > 0 &&
+    node.process_instance_id === instance?.id &&
+    node.node_key === 'submit_purchase_order' &&
+    node.node_type === 'domain_command' &&
+    (node.status === 'active' || node.status === 'completed')
+  const matchingNode = Array.isArray(nodes)
+    ? nodes.find(
+        (item) =>
+          item?.id === node?.id &&
+          item.process_instance_id === instance?.id &&
+          item.node_key === node?.node_key &&
+          item.node_type === node?.node_type &&
+          item.status === node?.status &&
+          item.version === node?.version
+      )
+    : null
+  if (
+    !validInstance ||
+    !validNode ||
+    !matchingNode ||
+    node.outcome === 'domain_command.compensated'
+  ) {
+    throw new Error(PURCHASE_PROCESS_RESULT_INVALID_MESSAGE)
+  }
+  if (
+    node.status === 'completed' &&
+    node.outcome !== 'purchase_order.submitted'
+  ) {
+    throw new Error(PURCHASE_PROCESS_RESULT_INVALID_MESSAGE)
+  }
+  return { instance, node }
+}
+
+function requireMaterialSupplyPurchaseExecution(data, expected) {
+  const node = data?.completed_node
+  const nodes = data?.nodes
+  const matchingNode = Array.isArray(nodes)
+    ? nodes.find(
+        (item) =>
+          item?.id === node?.id &&
+          item.process_instance_id === expected.instanceID &&
+          item.node_key === 'submit_purchase_order' &&
+          item.node_type === 'domain_command' &&
+          item.status === 'completed' &&
+          item.version === node?.version
+      )
+    : null
+  if (
+    !node ||
+    node.id !== expected.nodeID ||
+    node.process_instance_id !== expected.instanceID ||
+    node.node_key !== 'submit_purchase_order' ||
+    node.node_type !== 'domain_command' ||
+    node.status !== 'completed' ||
+    node.outcome !== 'purchase_order.submitted' ||
+    node.version !== expected.version + 1 ||
+    !matchingNode
+  ) {
+    throw new Error(PURCHASE_PROCESS_RESULT_INVALID_MESSAGE)
+  }
+  return node
+}
+
 export async function submitPurchaseOrderApprovalProcess(params = {}) {
   const purchaseOrderID = Number(params.purchase_order_id || params.id || 0)
   if (!Number.isSafeInteger(purchaseOrderID) || purchaseOrderID <= 0) {
     throw new Error('缺少采购订单，无法提交审批')
   }
-  const submitted = await submitPurchaseOrder({
-    ...params,
-    id: purchaseOrderID,
-  })
-  const processData = await startPurchaseOrderApprovalProcess({
+  const baseIdempotencyKey =
+    String(params.idempotency_key || '').trim() ||
+    `purchase-order-approval/${purchaseOrderID}`
+  const startData = await startPurchaseOrderApprovalProcess({
     customer_key: params.customer_key,
     purchase_order_id: purchaseOrderID,
     business_ref_no:
       String(params.business_ref_no || params.purchase_order_no || '').trim() ||
       undefined,
-    idempotency_key:
-      String(params.idempotency_key || '').trim() ||
-      `purchase-order-approval/${purchaseOrderID}`,
+    idempotency_key: baseIdempotencyKey,
   })
-  if (!processData?.process_instance?.id || !processData?.started_node?.id) {
-    throw new Error('采购审批流程启动结果缺少流程节点')
+  const { instance: processInstance, node: startedNode } =
+    requireMaterialSupplyPurchaseStart(startData, purchaseOrderID)
+  if (startedNode.status === 'completed') {
+    return startData
   }
+  const executeData = await executeMaterialSupplyPurchaseOrderSubmit({
+    customer_key: params.customer_key,
+    process_instance_id: processInstance.id,
+    process_node_instance_id: startedNode.id,
+    expected_version: startedNode.version,
+    purchase_order_id: purchaseOrderID,
+    idempotency_key: `${baseIdempotencyKey}/submit`,
+  })
+  requireMaterialSupplyPurchaseExecution(executeData, {
+    instanceID: processInstance.id,
+    nodeID: startedNode.id,
+    version: startedNode.version,
+  })
   return {
-    purchase_order: submitted,
-    ...processData,
+    ...executeData,
+    process_instance: processInstance,
+    started_node: startedNode,
   }
 }
 

@@ -498,6 +498,8 @@ test("receipt-created inspections start submitted, add a real draft, and include
   let orderId = 100;
   let receiptId = 200;
   const orderItemByOrderId = new Map();
+  const orderStatusByID = new Map();
+  const taskOrderByID = new Map();
   const fetchImpl = async (_url, init) => {
     const body = JSON.parse(init.body);
     calls.push({ method: body.method, params: body.params });
@@ -524,24 +526,136 @@ test("receipt-created inspections start submitted, add a real draft, and include
       orderId += 1;
       const orderItem = { id: orderId + 1000 };
       orderItemByOrderId.set(orderId, orderItem);
+      orderStatusByID.set(orderId, "DRAFT");
       data = {
-        purchase_order: { id: orderId, lifecycle_status: "draft" },
+        purchase_order: {
+          id: orderId,
+          purchase_order_no: body.params.purchase_order_no,
+          lifecycle_status: "draft",
+        },
         purchase_order_items: [orderItem],
       };
     } else if (
+      body.method === "start_material_supply_purchase_order_process"
+    ) {
+      const sourceID = body.params.purchase_order_id;
+      data = {
+        process_instance: {
+          id: sourceID + 10_000,
+          process_key: "material_supply",
+          business_ref_type: "purchase_order",
+          business_ref_id: sourceID,
+          status: "active",
+        },
+        started_node: {
+          id: sourceID + 20_000,
+          process_instance_id: sourceID + 10_000,
+          node_key: "submit_purchase_order",
+          node_type: "domain_command",
+          status: "active",
+          version: 1,
+        },
+        nodes: [
+          {
+            id: sourceID + 20_000,
+            process_instance_id: sourceID + 10_000,
+            node_key: "submit_purchase_order",
+            node_type: "domain_command",
+            status: "active",
+            version: 1,
+          },
+          {
+            id: sourceID + 21_000,
+            process_instance_id: sourceID + 10_000,
+            node_key: "purchase_order_approval",
+            node_type: "approval",
+            status: "waiting",
+            version: 1,
+          },
+        ],
+      };
+    } else if (
+      body.method === "execute_material_supply_purchase_order_submit"
+    ) {
+      const sourceID = body.params.purchase_order_id;
+      orderStatusByID.set(sourceID, "SUBMITTED");
+      data = {
+        completed_node: {
+          id: sourceID + 20_000,
+          process_instance_id: sourceID + 10_000,
+          node_key: "submit_purchase_order",
+          node_type: "domain_command",
+          status: "completed",
+          outcome: "purchase_order.submitted",
+          version: 2,
+        },
+        nodes: [
+          {
+            id: sourceID + 20_000,
+            process_instance_id: sourceID + 10_000,
+            node_key: "submit_purchase_order",
+            node_type: "domain_command",
+            status: "completed",
+            outcome: "purchase_order.submitted",
+            version: 2,
+          },
+          {
+            id: sourceID + 21_000,
+            process_instance_id: sourceID + 10_000,
+            node_key: "purchase_order_approval",
+            node_type: "approval",
+            status: "active",
+            version: 2,
+          },
+        ],
+      };
+    } else if (body.method === "list_tasks") {
+      const sourceID = body.params.source_id;
+      const taskID = sourceID + 30_000;
+      taskOrderByID.set(taskID, sourceID);
+      data = {
+        total: 1,
+        tasks: [
+          {
+            id: taskID,
+            version: 1,
+            owner_role_key: "boss",
+            task_status_key: "ready",
+            source_type: "purchase_order",
+            source_id: sourceID,
+            process_instance_id: sourceID + 10_000,
+            process_node_instance_id: sourceID + 21_000,
+          },
+        ],
+      };
+    } else if (body.method === "complete_task_action") {
+      const sourceID = taskOrderByID.get(body.params.task_id);
+      orderStatusByID.set(sourceID, "APPROVED");
+      data = {
+        task: {
+          id: body.params.task_id,
+          version: body.params.expected_version + 1,
+          task_status_key: "done",
+        },
+      };
+    } else if (body.method === "get_purchase_order") {
+      data = {
+        purchase_order: {
+          id: body.params.id,
+          lifecycle_status: orderStatusByID.get(body.params.id),
+        },
+      };
+    } else if (
       [
-        "submit_purchase_order",
-        "approve_purchase_order",
         "close_purchase_order",
         "cancel_purchase_order",
       ].includes(body.method)
     ) {
       const statuses = {
-        submit_purchase_order: "submitted",
-        approve_purchase_order: "approved",
         close_purchase_order: "closed",
         cancel_purchase_order: "canceled",
       };
+      orderStatusByID.set(body.params.id, statuses[body.method].toUpperCase());
       data = {
         purchase_order: {
           id: body.params.id,

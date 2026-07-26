@@ -74,6 +74,9 @@ export const BUSINESS_FLOW_TYPES = Object.freeze({
 
 const BACKEND_ONLY_FORMAL_UI_ACTIONS = new Set([
   'add_purchase_receipt_item',
+])
+
+const LEGACY_PROCESS_RUNTIME_ACTIONS = new Set([
   'execute_material_supply_purchase_receipt_create',
   'execute_material_supply_quality_gate',
   'execute_material_supply_post_inbound',
@@ -85,6 +88,9 @@ const BACKEND_ONLY_FORMAL_UI_ACTIONS = new Set([
 const BACKEND_ONLY_FORMAL_UI_NOTE =
   '服务端 JSON-RPC 已实现，但当前正式 Web UI 无调用入口；该动作仅登记为 backend-only 能力，不得作为页面可达的 implemented 链路。'
 
+const LEGACY_PROCESS_RUNTIME_NOTE =
+  '仅为冻结的旧在途 ProcessRuntime revision 保留恢复能力；当前新建流程图和正式 Web UI 均不调用，不得作为当前主路径或页面可达的 implemented 链路。'
+
 function businessFlow(definition) {
   const normalized = {
     fromPageKey: '',
@@ -95,7 +101,10 @@ function businessFlow(definition) {
     availabilityNote: '',
     ...definition,
   }
-  if (BACKEND_ONLY_FORMAL_UI_ACTIONS.has(normalized.action)) {
+  if (LEGACY_PROCESS_RUNTIME_ACTIONS.has(normalized.action)) {
+    normalized.availability = BUSINESS_PAGE_AVAILABILITY.PARTIAL
+    normalized.availabilityNote = LEGACY_PROCESS_RUNTIME_NOTE
+  } else if (BACKEND_ONLY_FORMAL_UI_ACTIONS.has(normalized.action)) {
     normalized.availability = BUSINESS_PAGE_AVAILABILITY.PARTIAL
     normalized.availabilityNote = BACKEND_ONLY_FORMAL_UI_NOTE
   }
@@ -461,7 +470,7 @@ export const businessPageFlowDefinitions = Object.freeze(
         [
           'accessories-purchase',
           'accessories-purchase',
-          'submit_purchase_order',
+          'execute_material_supply_purchase_order_submit',
         ],
         [
           'accessories-purchase',
@@ -572,9 +581,7 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['shipments', 'shipping-release', 'ship_shipment'],
         ['shipments', 'shipments', 'cancel_shipment'],
         ['shipments', 'shipping-release', 'cancel_shipment'],
-        ['payables', 'payables', 'settle_finance_fact'],
         ['payables', 'payables', 'cancel_finance_fact'],
-        ['receivables', 'receivables', 'settle_finance_fact'],
         ['receivables', 'receivables', 'cancel_finance_fact'],
         ['invoices', 'invoices', 'cancel_finance_fact'],
         ['reconciliation', 'reconciliation', 'settle_finance_fact'],
@@ -1119,7 +1126,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.IMPLEMENTED,
     availabilityNote:
-      '草稿出货单由页面启动版本化成品出货流程；质量关口通过后生成财务审批，审批完成由领域命令原子记录财务放行，仍不代表已出货或库存扣减。',
+      '草稿出货单由页面启动版本化财务审批；启动事务只重验已有成品质检，不创建或判定 Quality Fact。审批完成由领域命令原子记录 Shipment 放行门禁，正式出货、库存 OUT 与应收仍走各自领域入口。',
   },
   outbound: {
     pageRole: BUSINESS_PAGE_ROLES.FACT_PROCESSING,

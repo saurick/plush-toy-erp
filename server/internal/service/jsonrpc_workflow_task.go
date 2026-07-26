@@ -151,6 +151,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
+		if res := d.requireActiveMobileRoleAccess(ctx, admin, roleKey); res != nil {
+			return id, res, nil
+		}
 		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
 		if visibilityErr != nil {
 			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil

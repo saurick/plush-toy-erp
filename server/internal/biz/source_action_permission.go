@@ -102,6 +102,7 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "customer_config", Method: "start_sales_order_acceptance_process", Rules: sourceReadRules(PermissionSalesOrderRead)},
 	{Domain: "customer_config", Method: "execute_sales_order_acceptance_submit", Rules: sourceReadRules(PermissionSalesOrderRead)},
 	{Domain: "customer_config", Method: "start_material_supply_purchase_order_process", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
+	{Domain: "customer_config", Method: "execute_material_supply_purchase_order_submit", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
 	{Domain: "customer_config", Method: "execute_material_supply_purchase_receipt_create", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
 	{Domain: "customer_config", Method: "execute_material_supply_quality_gate", Rules: sourceReadRules(PermissionPurchaseReceiptRead, PermissionQualityInspectionRead)},
 	{Domain: "customer_config", Method: "execute_material_supply_post_inbound", Rules: sourceReadRules(PermissionPurchaseReceiptRead)},

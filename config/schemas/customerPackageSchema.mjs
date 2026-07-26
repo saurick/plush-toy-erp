@@ -35,13 +35,13 @@ export const customerPackageSchema = Object.freeze({
     Object.freeze({
       processKey: "material_supply",
       processVersion: "v1",
-      variantKeys: Object.freeze(["purchase_receipt_iqc_inbound"]),
+      variantKeys: Object.freeze(["purchase_order_approval"]),
       businessRefType: "purchase_order",
     }),
     Object.freeze({
       processKey: "finished_goods_delivery",
       processVersion: "v1",
-      variantKeys: Object.freeze(["quality_finance_ship_receivable"]),
+      variantKeys: Object.freeze(["shipment_finance_approval"]),
       businessRefType: "shipment",
     }),
   ]),

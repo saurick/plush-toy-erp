@@ -1604,7 +1604,7 @@ func normalizeFinanceFactFromShipmentCreate(in *FinanceFactFromShipmentCreate) (
 
 func financeFactTypeCanSettle(factType string) bool {
 	switch strings.ToUpper(strings.TrimSpace(factType)) {
-	case FinanceFactReceivable, FinanceFactPayable, FinanceFactReconciliation:
+	case FinanceFactReconciliation:
 		return true
 	default:
 		return false

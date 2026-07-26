@@ -1107,8 +1107,8 @@ export default function ShipmentsPage() {
       })
       message.success(
         result.process_instance?.id
-          ? '出货流程已提交，质量关口通过后进入财务审批'
-          : '出货流程已存在，本次未重复启动'
+          ? '财务审批已提交；成品质检仍由品质检验单独判定'
+          : '财务审批流程已存在，本次未重复启动'
       )
       await loadRows()
     } catch (error) {
@@ -1374,10 +1374,10 @@ export default function ShipmentsPage() {
       <PageHeaderCard
         compact
         title="出货单"
-        description="出货单维护出货信息和明细；草稿先提交仓库放行协同，放行完成后仍需确认出货才会记录实际出货并更新库存。"
+        description="出货单维护出货信息和明细；草稿先提交财务审批，品质检验仍由质检单独判定，财务放行后仍需确认出货才会记录实际出货并更新库存。"
         tags={[
           <Tag color="gold" key="release">
-            出货放行：仓库协同
+            出货放行：财务审批
           </Tag>,
           <Tag color="blue" key="shipment">
             出货单：实际出货记录
@@ -1623,7 +1623,7 @@ export default function ShipmentsPage() {
               }
             >
               <Popconfirm
-                title="提交后将启动版本化出货流程；质量关口通过后进入财务审批，审批前不能确认出货。是否继续？"
+                title="提交后将启动版本化财务审批；品质检验仍由质检单独判定，审批通过也不等于已出货。是否继续？"
                 onConfirm={submitSelectedShipmentRelease}
                 okText="提交放行"
                 cancelText="取消"
@@ -1643,13 +1643,18 @@ export default function ShipmentsPage() {
           {canShip && (!selectedRow || selectedRow.status === 'DRAFT') ? (
             <BusinessActionTooltip
               disabled={
-                !selectedRow || selectedRow.status !== 'DRAFT' || saving
+                !selectedRow ||
+                selectedRow.status !== 'DRAFT' ||
+                selectedRow.finance_release_status !== 'APPROVED' ||
+                saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一张出货单'
                   : selectedRow.status !== 'DRAFT'
                     ? '只有出货草稿可以确认出货'
+                    : selectedRow.finance_release_status !== 'APPROVED'
+                      ? '审批前不能确认出货'
                     : saving
                       ? '当前操作完成后可确认出货'
                       : ''
@@ -1669,7 +1674,10 @@ export default function ShipmentsPage() {
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   disabled={
-                    !selectedRow || selectedRow.status !== 'DRAFT' || saving
+                    !selectedRow ||
+                    selectedRow.status !== 'DRAFT' ||
+                    selectedRow.finance_release_status !== 'APPROVED' ||
+                    saving
                   }
                 >
                   确认出货

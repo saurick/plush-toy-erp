@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -31,6 +32,18 @@ func TestInventoryOperationCreateRequiresManualApproval(t *testing.T) {
 		Items: []InventoryOperationItemCreate{{LineNo: "1", SubjectType: InventorySubjectMaterial, SubjectID: 1, FromWarehouseID: 2, UnitID: 3, AdjustmentQuantity: decimal.NewFromInt(1)}},
 	})
 	if !errors.Is(err, ErrInventoryOperationApprovalMissing) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestInventoryOperationCreateRejectsApprovalReferenceBeyondSchemaLimit(t *testing.T) {
+	uc := NewInventoryUsecase(&inventoryOperationUsecaseRepoStub{})
+	approvalRef := strings.Repeat("批", 129)
+	_, err := uc.CreateInventoryOperation(context.Background(), &InventoryOperationCreate{
+		OperationNo: "MA-2", OperationType: InventoryOperationManualAdjustment, Reason: "调整", ApprovalRef: &approvalRef, IdempotencyKey: "ma-2", CreatedBy: 1,
+		Items: []InventoryOperationItemCreate{{LineNo: "1", SubjectType: InventorySubjectMaterial, SubjectID: 1, FromWarehouseID: 2, UnitID: 3, AdjustmentQuantity: decimal.NewFromInt(1)}},
+	})
+	if !errors.Is(err, ErrBadParam) {
 		t.Fatalf("err=%v", err)
 	}
 }

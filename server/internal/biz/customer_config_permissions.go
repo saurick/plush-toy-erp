@@ -137,6 +137,8 @@ func processDomainCommandRequiredPermission(commandKey string) string {
 	switch strings.TrimSpace(commandKey) {
 	case ProcessDomainCommandSalesOrderSubmit:
 		return PermissionSalesOrderSubmit
+	case ProcessDomainCommandPurchaseOrderSubmit:
+		return PermissionPurchaseOrderUpdate
 	case ProcessDomainCommandPurchaseReceiptCreate:
 		return PermissionPurchaseReceiptCreate
 	case ProcessDomainCommandIncomingQualityGate, ProcessDomainCommandFinishedGoodsQualityDecide:

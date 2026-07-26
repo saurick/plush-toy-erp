@@ -528,6 +528,7 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.FinanceRoleKey},
 		biz.PermissionFinanceReceivableConfirm,
+		biz.PermissionFinanceReconciliationConfirm,
 		biz.PermissionFinanceReceivableRead,
 		biz.PermissionShipmentRead,
 	)
@@ -578,6 +579,11 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 		{method: "settle_finance_fact", id: "enabled-settle"},
 		{method: "cancel_finance_fact", id: "enabled-cancel"},
 	} {
+		if tc.method == "settle_finance_fact" {
+			repo.financeFactType = biz.FinanceFactReconciliation
+		} else {
+			repo.financeFactType = biz.FinanceFactReceivable
+		}
 		params := map[string]any{"id": 300}
 		if tc.method == "cancel_finance_fact" {
 			params["reason"] = "客户账款已撤销"

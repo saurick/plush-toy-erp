@@ -215,7 +215,8 @@ test('draft shipment starts the versioned finance approval process', () => {
   assert.match(source, />\s*提交出货审批\s*</u)
   assert.match(source, /审批前不能确认出货/u)
   assert.match(source, /result\.process_instance\?\.id/u)
-  assert.match(source, /质量关口通过后进入财务审批/u)
+  assert.match(source, /成品质检仍由品质检验单独判定/u)
+  assert.match(source, /审批通过也不等于已出货/u)
 })
 
 test('shipment cancellation distinguishes draft exit from shipped reversal', () => {

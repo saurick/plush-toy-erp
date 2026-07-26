@@ -95,6 +95,8 @@ func processDomainCommandReferencedModuleKeys(commandKey string) []string {
 	switch strings.TrimSpace(commandKey) {
 	case ProcessDomainCommandSalesOrderSubmit:
 		return []string{"sales_orders", "workflow_tasks"}
+	case ProcessDomainCommandPurchaseOrderSubmit:
+		return []string{"purchase_orders", "workflow_tasks"}
 	case ProcessDomainCommandPurchaseReceiptCreate:
 		return []string{"purchase_orders", "purchase_receipts", "quality_inspections", "inventory"}
 	case ProcessDomainCommandIncomingQualityGate:
@@ -165,9 +167,9 @@ func defaultProcessReferencedModuleKeys(processKey string, businessRefType strin
 		if strings.TrimSpace(businessRefType) != "purchase_order" {
 			return []string{}
 		}
-		return []string{"purchase_orders", "purchase_receipts", "quality_inspections", "inventory"}
+		return []string{"purchase_orders", "workflow_tasks"}
 	case ProcessKeyFinishedGoodsDelivery:
-		return []string{"quality_inspections", "shipments", "finance"}
+		return []string{"shipments", "workflow_tasks", "finance"}
 	default:
 		return []string{}
 	}
@@ -263,11 +265,72 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 		})
 	}
 	if processKey == ProcessKeyMaterialSupply && businessRefType == "purchase_order" {
-		if len(nodes) < 3 || nodes[0].NodeKey != "purchase_order_approval" || nodes[1].NodeKey != "approve_purchase_order" || nodes[2].NodeKey != "purchase_receipt_source" {
+		if !processNodeKeysMatch(nodes, []string{
+			"submit_purchase_order",
+			"purchase_order_approval",
+			"approve_purchase_order",
+			"end",
+		}) && !processNodeKeysMatch(nodes, []string{
+			"submit_purchase_order",
+			"purchase_order_approval",
+			"approve_purchase_order",
+			"purchase_receipt_source",
+			"incoming_qc",
+			"warehouse_inbound",
+			"end",
+		}) {
+			return nil, ErrBadParam
+		}
+	}
+	if processKey == ProcessKeyFinishedGoodsDelivery && businessRefType == "shipment" {
+		if !processNodeKeysMatch(nodes, []string{
+			"shipment_finance_approval",
+			"shipment_finance_release",
+			"end",
+		}) && !processNodeKeysMatch(nodes, []string{
+			"finished_goods_quality",
+			"shipment_finance_approval",
+			"shipment_finance_release",
+			"shipment_execution",
+			"receivable_lead",
+			"end",
+		}) {
 			return nil, ErrBadParam
 		}
 	}
 	return nodes, nil
+}
+
+func processNodeKeysMatch(nodes []ProcessNodeInstanceCreate, expected []string) bool {
+	if len(nodes) != len(expected) {
+		return false
+	}
+	for index := range expected {
+		if nodes[index].NodeKey != expected[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func currentCustomerConfigProcessStartShape(processKey string, nodes []ProcessNodeInstanceCreate) bool {
+	switch strings.TrimSpace(processKey) {
+	case ProcessKeyMaterialSupply:
+		return processNodeKeysMatch(nodes, []string{
+			"submit_purchase_order",
+			"purchase_order_approval",
+			"approve_purchase_order",
+			"end",
+		})
+	case ProcessKeyFinishedGoodsDelivery:
+		return processNodeKeysMatch(nodes, []string{
+			"shipment_finance_approval",
+			"shipment_finance_release",
+			"end",
+		})
+	default:
+		return true
+	}
 }
 
 func validateCustomerConfigProcessNode(processKey, businessRefType, nodeKey, nodeType string, policySnapshot map[string]any) error {
@@ -318,6 +381,8 @@ func customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey
 		}
 	case ProcessKeyMaterialSupply:
 		switch nodeKey {
+		case "submit_purchase_order":
+			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseOrderSubmit
 		case "approve_purchase_order":
 			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseOrderApprove
 		case "purchase_receipt_source":

@@ -182,7 +182,6 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 		biz.PermissionPurchaseOrderCreate,
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseOrderUpdate,
-		biz.PermissionPurchaseOrderApprove,
 	))
 	ctx := workflowJSONRPCAdminContext()
 
@@ -297,23 +296,9 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 		t.Fatalf("expected one purchase order item in list, got %d", total)
 	}
 
-	for _, tc := range []struct {
-		method string
-		want   string
-	}{
-		{method: "submit_purchase_order", want: biz.PurchaseOrderStatusSubmitted},
-	} {
-		_, lifecycleRes, err := j.handlePurchaseOrder(ctx, tc.method, tc.method, mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
-		if err != nil {
-			t.Fatalf("%s expected nil err, got %v", tc.method, err)
-		}
-		if lifecycleRes == nil || lifecycleRes.Code != errcode.OK.Code {
-			t.Fatalf("%s expected OK, got %#v", tc.method, lifecycleRes)
-		}
-		got := jsonRPCNestedMap(t, lifecycleRes, "purchase_order")["lifecycle_status"]
-		if got != tc.want {
-			t.Fatalf("%s expected status %s, got %#v", tc.method, tc.want, got)
-		}
+	_, removedSubmitRes, err := j.handlePurchaseOrder(ctx, "submit_purchase_order", "submit-removed", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+	if err != nil || removedSubmitRes == nil || removedSubmitRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("direct purchase submit must stay removed, res=%#v err=%v", removedSubmitRes, err)
 	}
 	_, removedApproveRes, err := j.handlePurchaseOrder(ctx, "approve_purchase_order", "approve-removed", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
 	if err != nil || removedApproveRes == nil || removedApproveRes.Code != errcode.UnknownMethod.Code {
@@ -376,7 +361,7 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions(t *testing.
 		t.Fatalf("direct approval endpoint must be absent regardless of permission, got %#v", approveRes)
 	}
 
-	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionPurchaseOrderApprove)}
+	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionWorkflowTaskApprove)}
 	_, approveRes, err = j.handlePurchaseOrder(ctx, "approve_purchase_order", "5", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -461,7 +446,6 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
 		biz.PermissionPurchaseOrderCreate,
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseOrderUpdate,
-		biz.PermissionPurchaseOrderApprove,
 	))
 	ctx := workflowJSONRPCAdminContext()
 	saveParams := mustJSONRPCStruct(t, map[string]any{
@@ -525,8 +509,8 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if submitRes == nil || submitRes.Code != errcode.OK.Code || repo.orders[orderID].LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
-		t.Fatalf("expected enabled purchase_orders submit OK, res=%#v order=%#v", submitRes, repo.orders[orderID])
+	if submitRes == nil || submitRes.Code != errcode.UnknownMethod.Code || repo.orders[orderID].LifecycleStatus != biz.PurchaseOrderStatusDraft {
+		t.Fatalf("direct purchase submit must be unavailable, res=%#v order=%#v", submitRes, repo.orders[orderID])
 	}
 
 	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
@@ -564,7 +548,7 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
 	if cancelRes == nil || cancelRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected disabled purchase_orders cancel rejected, got %#v", cancelRes)
 	}
-	if repo.lifecycleCalls != beforeLifecycleCalls || repo.orders[orderID].LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
+	if repo.lifecycleCalls != beforeLifecycleCalls || repo.orders[orderID].LifecycleStatus != biz.PurchaseOrderStatusDraft {
 		t.Fatalf("disabled purchase_orders must not update lifecycle, calls=%d order=%#v", repo.lifecycleCalls, repo.orders[orderID])
 	}
 }

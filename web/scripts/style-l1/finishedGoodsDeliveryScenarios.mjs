@@ -55,7 +55,7 @@ export function createFinishedGoodsDeliveryScenarios({
         })
         await confirmButton.waitFor({ state: 'visible', timeout: 10_000 })
         await confirmButton.click()
-        await expectText(page, '出货流程已提交，质量关口通过后进入财务审批')
+        await expectText(page, '财务审批已提交；成品质检仍由品质检验单独判定')
         await page.screenshot({
           path: path.resolve(
             outputDir,

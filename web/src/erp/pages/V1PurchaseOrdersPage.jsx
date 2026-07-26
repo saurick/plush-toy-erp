@@ -851,8 +851,8 @@ export default function V1PurchaseOrdersPage() {
     setSaving(true)
     try {
       const updated = await action.run({ id: record.id })
-      message.success(`采购订单已${action.label}`)
-      if (updated) {
+      message.success(action.successMessage || `采购订单已${action.label}`)
+      if (updated && action.returnsRecord !== false) {
         setSelectedOrder(updated)
         applySelectedRowKeys([updated.id])
         const detailEffect = await settleSourceDocumentPostSaveEffect(() =>

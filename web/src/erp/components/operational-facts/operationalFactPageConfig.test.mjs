@@ -59,11 +59,9 @@ test('finance settlement actions match current business semantics', () => {
   assert.ok(match, 'missing finance settlement action map')
   const actionSource = match[1]
 
-  assert.match(actionSource, /RECEIVABLE/u)
-  assert.match(actionSource, /PAYABLE/u)
   assert.match(actionSource, /RECONCILIATION/u)
   assert.match(actionSource, /label: '完成核对'/u)
-  assert.doesNotMatch(actionSource, /INVOICE|PAYMENT/u)
+  assert.doesNotMatch(actionSource, /RECEIVABLE|PAYABLE|INVOICE|PAYMENT/u)
 })
 
 test('operational fact view config does not advertise a generic create form', () => {

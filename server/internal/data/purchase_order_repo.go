@@ -231,9 +231,47 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id
 	return entPurchaseOrderToBiz(row), nil
 }
 
+func (r *purchaseOrderRepo) SubmitPurchaseOrderForProcessCommand(
+	ctx context.Context,
+	purchaseOrderID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.PurchaseOrder, error) {
+	return r.updatePurchaseOrderForProcessCommand(
+		ctx,
+		purchaseOrderID,
+		biz.PurchaseOrderStatusDraft,
+		biz.PurchaseOrderStatusSubmitted,
+		command,
+		result,
+		actorID,
+	)
+}
+
 func (r *purchaseOrderRepo) ApprovePurchaseOrderForProcessCommand(
 	ctx context.Context,
 	purchaseOrderID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.PurchaseOrder, error) {
+	return r.updatePurchaseOrderForProcessCommand(
+		ctx,
+		purchaseOrderID,
+		biz.PurchaseOrderStatusSubmitted,
+		biz.PurchaseOrderStatusApproved,
+		command,
+		result,
+		actorID,
+	)
+}
+
+func (r *purchaseOrderRepo) updatePurchaseOrderForProcessCommand(
+	ctx context.Context,
+	purchaseOrderID int,
+	expectedStatus string,
+	nextStatus string,
 	command *biz.ProcessDomainCommandInput,
 	result *biz.ProcessDomainCommandResult,
 	actorID int,
@@ -261,12 +299,12 @@ func (r *purchaseOrderRepo) ApprovePurchaseOrderForProcessCommand(
 		}
 		return nil, err
 	}
-	if current.LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
+	if current.LifecycleStatus != expectedStatus {
 		return nil, biz.ErrBadParam
 	}
 	row, err := tx.PurchaseOrder.UpdateOneID(purchaseOrderID).
-		Where(purchaseorder.Version(current.Version), purchaseorder.LifecycleStatus(biz.PurchaseOrderStatusSubmitted)).
-		SetLifecycleStatus(biz.PurchaseOrderStatusApproved).
+		Where(purchaseorder.Version(current.Version), purchaseorder.LifecycleStatus(expectedStatus)).
+		SetLifecycleStatus(nextStatus).
 		SetVersion(current.Version + 1).
 		Save(ctx)
 	if err != nil {

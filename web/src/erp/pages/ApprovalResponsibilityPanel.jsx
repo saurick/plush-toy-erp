@@ -30,10 +30,6 @@ import {
   activateCustomerConfig,
   checkCustomerConfigTransition,
 } from '../api/customerConfigApi.mjs'
-import {
-  freezeApprovalSettingsPayload,
-  nextApprovalSettingsRevision,
-} from '../utils/approvalSettingsDraft.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
 
 const { Text, Title } = Typography
@@ -158,6 +154,16 @@ function draftSignature(items = []) {
   )
 }
 
+function nextRevision(activeRevision) {
+  const base = String(activeRevision || 'approval').trim()
+  const stamp = new Date()
+    .toISOString()
+    .replaceAll('-', '')
+    .replaceAll(':', '')
+    .replace(/\.\d{3}Z$/, 'Z')
+  return `${base}.approval.${stamp}`.slice(0, 64)
+}
+
 function blockerLabel(code) {
   return BLOCKER_LABELS[code] || '当前设置不能启用'
 }
@@ -196,13 +202,12 @@ export default function ApprovalResponsibilityPanel({
   const [editingKey, setEditingKey] = useState('')
   const [editorDirty, setEditorDirty] = useState(false)
   const requestIDRef = useRef(0)
-  const mutationRef = useRef(false)
   const [form] = Form.useForm()
 
   const applySettings = useCallback((nextSettings) => {
     setSettings(nextSettings)
     setDraftItems(normalizeDraftItems(nextSettings.items))
-    setRevision(nextApprovalSettingsRevision(nextSettings.config_revision))
+    setRevision(nextRevision(nextSettings.config_revision))
     setPreview(null)
     setPublished(null)
     setEditingKey('')
@@ -210,9 +215,6 @@ export default function ApprovalResponsibilityPanel({
   }, [])
 
   const load = useCallback(async () => {
-    if (mutationRef.current) {
-      return false
-    }
     if (!canRead) {
       setSettings(null)
       setDraftItems([])
@@ -385,7 +387,6 @@ export default function ApprovalResponsibilityPanel({
   )
 
   const openEditor = (item) => {
-    if (saving || published) return
     const draft = draftItems.find(
       (candidate) => candidate.approval_key === item.approval_key
     ) || { enabled: false, members: [] }
@@ -420,8 +421,25 @@ export default function ApprovalResponsibilityPanel({
     form.resetFields()
   }
 
+  const requestReload = () => {
+    if (!pageDirty && !editorDirty) {
+      return load()
+    }
+    modal.confirm({
+      centered: true,
+      title: '刷新前要放弃审批责任调整吗？',
+      content:
+        '刷新会重新读取当前生效设置，弹窗内尚未保存的选择、未发布调整或尚未启用的新设置都会丢失。',
+      okText: '放弃并刷新',
+      cancelText: '继续处理',
+      onOk: () => {
+        closeEditor(true)
+        return load()
+      },
+    })
+  }
+
   const saveEditor = async () => {
-    if (saving || published) return
     const values = await form.validateFields()
     const members = STRATEGIES.filter(({ key }) => values[`${key}_role`]).map(
       ({ key }) => ({
@@ -455,18 +473,18 @@ export default function ApprovalResponsibilityPanel({
     closeEditor(true)
   }
 
+  const payload = () => ({
+    customer_key: settings.customer_key,
+    revision,
+    expected_active_revision: settings.config_revision,
+    expected_active_hash: settings.config_hash,
+    items: draftItems,
+  })
+
   const checkAndPublish = async () => {
-    if (mutationRef.current || published) return
-    mutationRef.current = true
-    requestIDRef.current += 1
     setSaving(true)
     try {
-      const frozenPayload = freezeApprovalSettingsPayload({
-        settings,
-        revision,
-        draftItems,
-      })
-      const checked = await previewApprovalSettings(frozenPayload)
+      const checked = await previewApprovalSettings(payload())
       const blocking = (checked.items || []).filter(
         (item) =>
           item.configurable &&
@@ -487,21 +505,18 @@ export default function ApprovalResponsibilityPanel({
             .join('；')
         )
       }
-      const result = await publishApprovalSettings(frozenPayload)
+      const result = await publishApprovalSettings(payload())
       setPublished(result)
       message.success('新设置已发布，请确认启用')
     } catch (error) {
       message.error(getActionErrorMessage(error, '检查并发布审批责任失败'))
     } finally {
-      mutationRef.current = false
       setSaving(false)
     }
   }
 
   const activatePublished = async () => {
-    if (!published || mutationRef.current) return
-    mutationRef.current = true
-    requestIDRef.current += 1
+    if (!published) return
     setSaving(true)
     try {
       const transition = await checkCustomerConfigTransition({
@@ -531,48 +546,8 @@ export default function ApprovalResponsibilityPanel({
     } catch (error) {
       message.error(getActionErrorMessage(error, '启用审批责任失败'))
     } finally {
-      mutationRef.current = false
       setSaving(false)
     }
-  }
-
-  const discardPublished = () => {
-    if (!published || saving) return
-    modal.confirm({
-      centered: true,
-      title: '放弃启用这个已发布版本？',
-      content:
-        '已发布版本会保留为审计记录，但不会启用。继续调整时将生成一个全新的版本号。',
-      okText: '放弃并继续调整',
-      cancelText: '返回启用',
-      onOk: () => {
-        setPublished(null)
-        setPreview(null)
-        setRevision(nextApprovalSettingsRevision(settings.config_revision))
-      },
-    })
-  }
-
-  const refresh = () => {
-    if (saving || mutationRef.current) return
-    const reload = () => {
-      closeEditor(true)
-      load()
-    }
-    if (editorDirty || draftDirty || published) {
-      modal.confirm({
-        centered: true,
-        title: '放弃当前审批责任调整？',
-        content: published
-          ? '已发布但未启用的版本会保留为审计记录；刷新后页面不再继续启用它。'
-          : '未发布的责任调整会丢失。',
-        okText: '放弃并刷新',
-        cancelText: '继续处理',
-        onOk: reload,
-      })
-      return
-    }
-    reload()
   }
 
   const columns = [
@@ -649,11 +624,7 @@ export default function ApprovalResponsibilityPanel({
       width: 76,
       render: (_, item) =>
         canManage ? (
-          <Button
-            type="link"
-            disabled={saving || Boolean(published)}
-            onClick={() => openEditor(item)}
-          >
+          <Button type="link" onClick={() => openEditor(item)}>
             调整
           </Button>
         ) : null,
@@ -747,8 +718,7 @@ export default function ApprovalResponsibilityPanel({
                 shape="circle"
                 icon={<ReloadOutlined />}
                 aria-label="刷新审批责任"
-                disabled={saving}
-                onClick={refresh}
+                onClick={requestReload}
               />
             </Space>
           </div>
@@ -792,18 +762,13 @@ export default function ApprovalResponsibilityPanel({
                 </Text>
               </div>
               {published ? (
-                <Space size={8} wrap>
-                  <Button disabled={saving} onClick={discardPublished}>
-                    放弃并重新调整
-                  </Button>
-                  <Button
-                    type="primary"
-                    loading={saving}
-                    onClick={activatePublished}
-                  >
-                    启用新设置
-                  </Button>
-                </Space>
+                <Button
+                  type="primary"
+                  loading={saving}
+                  onClick={activatePublished}
+                >
+                  启用新设置
+                </Button>
               ) : (
                 <Button
                   type="primary"

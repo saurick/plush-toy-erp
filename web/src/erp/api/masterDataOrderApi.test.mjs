@@ -772,14 +772,16 @@ test('masterDataOrderApi: purchase order methods do not expose receipt inventory
     'list_purchase_orders',
     'save_purchase_order_with_items',
     'get_purchase_order',
-    'submit_purchase_order',
     'close_purchase_order',
     'cancel_purchase_order',
     'list_purchase_order_items',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
-  assert.doesNotMatch(source, /call\(\s*'approve_purchase_order'/u)
+  assert.doesNotMatch(
+    source,
+    /call\(\s*'(?:submit|approve)_purchase_order'/u
+  )
 
   const forbiddenActionNames = [
     ['post', 'Purchase', 'Receipt'],

@@ -197,8 +197,6 @@ export async function installOrderRpcMocks(page, context) {
       case 'create_purchase_order':
       case 'update_purchase_order':
       case 'get_purchase_order':
-      case 'submit_purchase_order':
-      case 'approve_purchase_order':
       case 'close_purchase_order':
       case 'cancel_purchase_order':
         data = { purchase_order: { ...purchaseOrder, ...params } }

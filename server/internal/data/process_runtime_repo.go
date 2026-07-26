@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/workflowtask"
@@ -236,10 +237,29 @@ func (r *processRuntimeRepo) lockProcessSourceInTx(
 			}
 			return "", "", err
 		}
+		if err := validateProcessShipmentQualityGate(ctx, tx, row.ID); err != nil {
+			return "", "", err
+		}
 		return requiredProcessSourceNo(row.ShipmentNo, row.Status)
 	default:
 		return "", "", biz.ErrBadParam
 	}
+}
+
+func validateProcessShipmentQualityGate(ctx context.Context, tx *ent.Tx, shipmentID int) error {
+	if tx == nil || shipmentID <= 0 {
+		return biz.ErrBadParam
+	}
+	inspections, err := tx.QualityInspection.Query().Where(
+		qualityinspection.SourceType(biz.QualityInspectionSourceShipment),
+		qualityinspection.SourceID(shipmentID),
+		qualityinspection.InspectionType(biz.QualityInspectionTypeFinishedGoods),
+		qualityinspection.StatusNEQ(biz.QualityInspectionStatusCancelled),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	return validateShipmentFinishedGoodsQualityInspectionRows(inspections)
 }
 
 func requiredProcessSourceNo(refNo, status string) (string, string, error) {
@@ -259,7 +279,7 @@ func processSourceStatusAllowed(in *biz.ProcessInstanceCreate, status string, re
 	case in.ProcessKey == biz.ProcessKeySalesOrderAcceptance && in.BusinessRefType == "sales_order":
 		return status == biz.SalesOrderStatusDraft || (replay && status == biz.SalesOrderStatusSubmitted)
 	case in.ProcessKey == biz.ProcessKeyMaterialSupply && in.BusinessRefType == "purchase_order":
-		return status == biz.PurchaseOrderStatusApproved
+		return status == biz.PurchaseOrderStatusDraft || (replay && status == biz.PurchaseOrderStatusSubmitted)
 	case in.ProcessKey == biz.ProcessKeyFinishedGoodsDelivery && in.BusinessRefType == "shipment":
 		return status == biz.ShipmentStatusDraft || (replay && status == biz.ShipmentStatusShipped)
 	default:

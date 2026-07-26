@@ -862,8 +862,8 @@ func TestAdminManageUsecase_SetRolesComposesFinanceAndPurchaseResponsibilities(t
 	if !AdminHasPermission(updated, PermissionPurchaseOrderCreate) {
 		t.Fatalf("expected purchase permission from purchase role")
 	}
-	if AdminHasPermission(updated, PermissionPurchaseOrderApprove) {
-		t.Fatalf("finance plus purchase operator must not inherit boss approval permission")
+	if AdminHasPermission(updated, PermissionSalesReturnApprove) {
+		t.Fatalf("finance plus purchase operator must not inherit sales-return approval permission")
 	}
 }
 

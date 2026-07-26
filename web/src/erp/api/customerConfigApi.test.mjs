@@ -40,10 +40,6 @@ async function loadCustomerConfigApiForTest(call) {
       /import \{ buildCustomerConfigMutationPayload \} from '[^']+'\n/,
       'const buildCustomerConfigMutationPayload = (_action, params) => params\n'
     )
-    .replace(
-      /import \{ submitPurchaseOrder \} from '[^']+'\n/,
-      'const submitPurchaseOrder = async (params) => params\n'
-    )
   return import(
     `data:text/javascript;base64,${Buffer.from(source).toString('base64')}#${Date.now()}-${Math.random()}`
   )
@@ -108,6 +104,73 @@ function processExecutionData() {
         id: 7,
         process_instance_id: 2,
         node_key: 'order_approval',
+        node_type: 'approval',
+        status: 'active',
+        version: 2,
+      },
+    ],
+  }
+}
+
+function purchaseProcessStartData({
+  purchaseOrderID = 5001,
+  status = 'active',
+  outcome = null,
+} = {}) {
+  const startedNode = {
+    id: 16,
+    process_instance_id: 12,
+    node_key: 'submit_purchase_order',
+    node_type: 'domain_command',
+    status,
+    outcome,
+    version: status === 'completed' ? 2 : 1,
+  }
+  return {
+    process_instance: {
+      id: 12,
+      process_key: 'material_supply',
+      business_ref_type: 'purchase_order',
+      business_ref_id: purchaseOrderID,
+      status: 'active',
+    },
+    started_node: startedNode,
+    nodes: [
+      startedNode,
+      ...(status === 'completed'
+        ? [
+            {
+              id: 17,
+              process_instance_id: 12,
+              node_key: 'purchase_order_approval',
+              node_type: 'approval',
+              status: 'active',
+              version: 2,
+            },
+          ]
+        : []),
+    ],
+  }
+}
+
+function purchaseProcessExecutionData() {
+  const completedNode = {
+    id: 16,
+    process_instance_id: 12,
+    node_key: 'submit_purchase_order',
+    node_type: 'domain_command',
+    status: 'completed',
+    outcome: 'purchase_order.submitted',
+    version: 2,
+  }
+  return {
+    completed_node: completedNode,
+    nodes: [
+      completedNode,
+      {
+        id: 17,
+        process_instance_id: 12,
+        node_key: 'purchase_order_approval',
         node_type: 'approval',
         status: 'active',
         version: 2,
@@ -278,6 +341,105 @@ test('customerConfigApi: malformed execution result fails closed', async () => {
     /销售订单提交结果无法确认，请刷新后重试/
   )
   assert.equal(calls.length, 2)
+})
+
+test('customerConfigApi: purchase submit uses process start then durable domain command', async () => {
+  const calls = []
+  const api = await loadCustomerConfigApiForTest(async (method, params) => {
+    calls.push({ method, params })
+    if (method === 'start_material_supply_purchase_order_process') {
+      return { data: purchaseProcessStartData() }
+    }
+    if (method === 'execute_material_supply_purchase_order_submit') {
+      return { data: purchaseProcessExecutionData() }
+    }
+    throw new Error(`unexpected method ${method}`)
+  })
+
+  const result = await api.submitPurchaseOrderApprovalProcess({
+    purchase_order_id: 5001,
+    purchase_order_no: 'PO-5001',
+    customer_key: 'yoyoosun',
+    idempotency_key: 'purchase-submit-5001',
+  })
+
+  assert.deepEqual(
+    calls.map((item) => item.method),
+    [
+      'start_material_supply_purchase_order_process',
+      'execute_material_supply_purchase_order_submit',
+    ]
+  )
+  assert.deepEqual(calls[0].params, {
+    customer_key: 'yoyoosun',
+    purchase_order_id: 5001,
+    business_ref_no: 'PO-5001',
+    idempotency_key: 'purchase-submit-5001',
+  })
+  assert.deepEqual(calls[1].params, {
+    customer_key: 'yoyoosun',
+    process_instance_id: 12,
+    process_node_instance_id: 16,
+    expected_version: 1,
+    purchase_order_id: 5001,
+    idempotency_key: 'purchase-submit-5001/submit',
+  })
+  assert.equal(result.completed_node.outcome, 'purchase_order.submitted')
+  assert.equal(result.process_instance.id, 12)
+})
+
+test('customerConfigApi: completed purchase submit replay does not execute twice', async () => {
+  const calls = []
+  const replay = purchaseProcessStartData({
+    status: 'completed',
+    outcome: 'purchase_order.submitted',
+  })
+  const api = await loadCustomerConfigApiForTest(async (method, params) => {
+    calls.push({ method, params })
+    return { data: replay }
+  })
+
+  const result = await api.submitPurchaseOrderApprovalProcess({
+    purchase_order_id: 5001,
+    idempotency_key: 'purchase-submit-5001',
+  })
+
+  assert.deepEqual(
+    calls.map((item) => item.method),
+    ['start_material_supply_purchase_order_process']
+  )
+  assert.equal(result.nodes[1].node_key, 'purchase_order_approval')
+})
+
+test('customerConfigApi: malformed purchase process result fails closed', async (t) => {
+  const cases = [
+    {
+      name: 'wrong source',
+      data: purchaseProcessStartData({ purchaseOrderID: 5002 }),
+    },
+    {
+      name: 'blocked submit',
+      data: purchaseProcessStartData({ status: 'blocked' }),
+    },
+    {
+      name: 'compensated submit',
+      data: purchaseProcessStartData({
+        status: 'completed',
+        outcome: 'domain_command.compensated',
+      }),
+    },
+  ]
+  for (const item of cases) {
+    await t.test(item.name, async () => {
+      const api = await loadCustomerConfigApiForTest(async () => ({
+        data: item.data,
+      }))
+      await assert.rejects(
+        api.submitPurchaseOrderApprovalProcess({ purchase_order_id: 5001 }),
+        /采购订单提交结果无法确认，请刷新后重试/
+      )
+    })
+  }
 })
 
 test('customerConfigApi: customer config transitions use strict shared payload builders', () => {

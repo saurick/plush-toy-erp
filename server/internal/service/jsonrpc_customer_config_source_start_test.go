@@ -84,9 +84,10 @@ func TestCustomerConfigProcessSourceValidationUsesDomainTruth(t *testing.T) {
 			want  string
 		}{
 			{name: "not found", err: biz.ErrPurchaseOrderNotFound},
-			{name: "wrong id", order: &biz.PurchaseOrder{ID: 5002, PurchaseOrderNo: "PO-5002", LifecycleStatus: biz.PurchaseOrderStatusApproved}, err: biz.ErrBadParam},
-			{name: "wrong state", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: "PO-5001", LifecycleStatus: biz.PurchaseOrderStatusDraft}, err: biz.ErrBadParam},
-			{name: "submitted", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: " PO-5001 ", LifecycleStatus: biz.PurchaseOrderStatusSubmitted}, want: "PO-5001"},
+			{name: "wrong id", order: &biz.PurchaseOrder{ID: 5002, PurchaseOrderNo: "PO-5002", LifecycleStatus: biz.PurchaseOrderStatusDraft}, err: biz.ErrBadParam},
+			{name: "wrong state", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: "PO-5001", LifecycleStatus: biz.PurchaseOrderStatusApproved}, err: biz.ErrBadParam},
+			{name: "draft", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: " PO-5001 ", LifecycleStatus: biz.PurchaseOrderStatusDraft}, want: "PO-5001"},
+			{name: "submitted replay", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: "PO-5001", LifecycleStatus: biz.PurchaseOrderStatusSubmitted}, want: "PO-5001"},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
 				repo := &customerConfigPurchaseOrderSourceRepoStub{order: tt.order}
@@ -147,7 +148,7 @@ func TestCustomerConfigProcessStartsRequireSourceReadPermissionBeforeRuntime(t *
 		params     map[string]any
 	}{
 		{name: "sales", permission: biz.PermissionSalesOrderSubmit, method: "start_sales_order_acceptance_process", params: map[string]any{"sales_order_id": float64(42), "idempotency_key": "test"}},
-		{name: "purchase", permission: biz.PermissionPurchaseReceiptCreate, method: "start_material_supply_purchase_order_process", params: map[string]any{"purchase_order_id": float64(5001), "idempotency_key": "test"}},
+		{name: "purchase", permission: biz.PermissionPurchaseOrderUpdate, method: "start_material_supply_purchase_order_process", params: map[string]any{"purchase_order_id": float64(5001), "idempotency_key": "test"}},
 		{name: "shipment", permission: biz.PermissionShipmentCreate, method: "start_finished_goods_delivery_process", params: map[string]any{"shipment_id": float64(9001), "idempotency_key": "test"}},
 	}
 	for _, tt := range tests {

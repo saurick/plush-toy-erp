@@ -5,6 +5,11 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import {
+  approvePurchaseOrderThroughProcess,
+  submitPurchaseOrderThroughProcess,
+} from "./purchase-order-approval-process.mjs";
+
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR =
   "output/customers/yoyoosun/purchase-quality-simulated-matrix";
@@ -420,7 +425,37 @@ function orderParams(plan, status, index) {
   };
 }
 
-async function createOrderMatrix(plan, tokens, steps, fetchImpl) {
+function purchaseOrderProcessInvoker(plan, tokens, adminToken, fetchImpl) {
+  const actorTokens = { ...tokens, admin: adminToken };
+  return ({ actor, domain, method, params }) => {
+    const token = actorTokens[actor];
+    if (!token) {
+      throw new CliError(`missing ${actor} token for ${domain}.${method}`);
+    }
+    return rpcCall({
+      backendURL: plan.backendURL,
+      domain,
+      method,
+      params,
+      token,
+      fetchImpl,
+    });
+  };
+}
+
+async function createOrderMatrix(
+  plan,
+  tokens,
+  adminToken,
+  steps,
+  fetchImpl,
+) {
+  const invoke = purchaseOrderProcessInvoker(
+    plan,
+    tokens,
+    adminToken,
+    fetchImpl,
+  );
   const orders = [];
   for (const [index, targetStatus] of plan.orderStatuses.entries()) {
     const created = await rpcCall({
@@ -446,36 +481,27 @@ async function createOrderMatrix(plan, tokens, steps, fetchImpl) {
     }
     let actualStatus = createdOrder.status;
     if (["SUBMITTED", "APPROVED", "CLOSED"].includes(targetStatus)) {
-      const submitted = await rpcCall({
-        backendURL: plan.backendURL,
-        domain: "purchase_order",
-        method: "submit_purchase_order",
-        params: { id: order.id },
-        token: tokens.purchase,
-        fetchImpl,
+      const advance =
+        targetStatus === "SUBMITTED"
+          ? submitPurchaseOrderThroughProcess
+          : approvePurchaseOrderThroughProcess;
+      const advanced = await advance({
+        purchaseOrder: {
+          ...order,
+          purchase_order_no:
+            order.purchase_order_no ||
+            orderParams(plan, targetStatus, index).purchase_order_no,
+        },
+        idempotencyPrefix: `${plan.prefix}:order:${order.id}:approval`,
+        invoke,
+        sourceActor: "purchase",
+        listActor: "admin",
+        approvalActorForRole: (roleKey) =>
+          tokens[roleKey] ? roleKey : undefined,
       });
-      actualStatus = requireMutationRecord(
-        submitted,
-        "purchase_order",
-        "submit_purchase_order",
-        "SUBMITTED",
-      ).status;
-    }
-    if (["APPROVED", "CLOSED"].includes(targetStatus)) {
-      const approved = await rpcCall({
-        backendURL: plan.backendURL,
-        domain: "purchase_order",
-        method: "approve_purchase_order",
-        params: { id: order.id },
-        token: tokens.boss,
-        fetchImpl,
-      });
-      actualStatus = requireMutationRecord(
-        approved,
-        "purchase_order",
-        "approve_purchase_order",
-        "APPROVED",
-      ).status;
+      actualStatus = String(
+        advanced.purchaseOrder.lifecycle_status || "",
+      ).toUpperCase();
     }
     if (targetStatus === "CLOSED") {
       const closed = await rpcCall({
@@ -578,6 +604,7 @@ async function createApprovedReceiptSourceOrder(
   scenario,
   index,
   tokens,
+  adminToken,
   steps,
   fetchImpl,
 ) {
@@ -599,21 +626,24 @@ async function createApprovedReceiptSourceOrder(
   if (!order?.id || !Array.isArray(items) || !items[0]?.id) {
     throw new CliError("receipt source purchase order is missing its first line");
   }
-  await rpcCall({
-    backendURL: plan.backendURL,
-    domain: "purchase_order",
-    method: "submit_purchase_order",
-    params: { id: order.id },
-    token: tokens.purchase,
-    fetchImpl,
-  });
-  await rpcCall({
-    backendURL: plan.backendURL,
-    domain: "purchase_order",
-    method: "approve_purchase_order",
-    params: { id: order.id },
-    token: tokens.boss,
-    fetchImpl,
+  await approvePurchaseOrderThroughProcess({
+    purchaseOrder: {
+      ...order,
+      purchase_order_no:
+        order.purchase_order_no ||
+        receiptSourceOrderParams(plan, scenario, index).purchase_order_no,
+    },
+    idempotencyPrefix: `${plan.prefix}:receipt-source:${order.id}:approval`,
+    invoke: purchaseOrderProcessInvoker(
+      plan,
+      tokens,
+      adminToken,
+      fetchImpl,
+    ),
+    sourceActor: "purchase",
+    listActor: "admin",
+    approvalActorForRole: (roleKey) =>
+      tokens[roleKey] ? roleKey : undefined,
   });
   steps.push({
     target: "purchase_receipt_source_order",
@@ -624,13 +654,20 @@ async function createApprovedReceiptSourceOrder(
   return { order, items };
 }
 
-async function createReceiptMatrix(plan, tokens, steps, fetchImpl) {
+async function createReceiptMatrix(
+  plan,
+  tokens,
+  adminToken,
+  steps,
+  fetchImpl,
+) {
   for (const [index, scenario] of plan.receiptScenarios.entries()) {
     const approvedOrder = await createApprovedReceiptSourceOrder(
       plan,
       scenario,
       index,
       tokens,
+      adminToken,
       steps,
       fetchImpl,
     );
@@ -859,8 +896,14 @@ export async function applyPlan(plan, password, deps = {}) {
     fetchImpl,
   });
   const steps = [];
-  await createOrderMatrix(safePlan, tokens, steps, fetchImpl);
-  await createReceiptMatrix(safePlan, tokens, steps, fetchImpl);
+  await createOrderMatrix(safePlan, tokens, adminToken, steps, fetchImpl);
+  await createReceiptMatrix(
+    safePlan,
+    tokens,
+    adminToken,
+    steps,
+    fetchImpl,
+  );
   return steps;
 }
 

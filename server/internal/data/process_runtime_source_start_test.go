@@ -92,7 +92,9 @@ func TestProcessSourceStatusAllowedSeparatesNewStartFromReplay(t *testing.T) {
 	}{
 		{name: "sales draft", process: biz.ProcessKeySalesOrderAcceptance, refType: "sales_order", status: biz.SalesOrderStatusDraft, newStart: true, replay: true},
 		{name: "sales submitted replay", process: biz.ProcessKeySalesOrderAcceptance, refType: "sales_order", status: biz.SalesOrderStatusSubmitted, replay: true},
-		{name: "purchase approved", process: biz.ProcessKeyMaterialSupply, refType: "purchase_order", status: biz.PurchaseOrderStatusApproved, newStart: true, replay: true},
+		{name: "purchase draft", process: biz.ProcessKeyMaterialSupply, refType: "purchase_order", status: biz.PurchaseOrderStatusDraft, newStart: true, replay: true},
+		{name: "purchase submitted replay", process: biz.ProcessKeyMaterialSupply, refType: "purchase_order", status: biz.PurchaseOrderStatusSubmitted, replay: true},
+		{name: "purchase approved", process: biz.ProcessKeyMaterialSupply, refType: "purchase_order", status: biz.PurchaseOrderStatusApproved},
 		{name: "shipment draft", process: biz.ProcessKeyFinishedGoodsDelivery, refType: "shipment", status: biz.ShipmentStatusDraft, newStart: true, replay: true},
 		{name: "shipment shipped replay", process: biz.ProcessKeyFinishedGoodsDelivery, refType: "shipment", status: biz.ShipmentStatusShipped, replay: true},
 		{name: "shipment cancelled", process: biz.ProcessKeyFinishedGoodsDelivery, refType: "shipment", status: biz.ShipmentStatusCancelled},

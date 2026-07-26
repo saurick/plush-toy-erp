@@ -10,9 +10,8 @@
 
 HTTP 路由：
 
+- `GET /rpc/{url}`
 - `POST /rpc/{url}`
-
-通用 JSON-RPC 不提供 GET 路由。鉴权参数和业务写入只能通过 POST body 进入；健康检查使用 `/ping`、`/healthz` 和 `/readyz` 等专用只读端点。
 
 其中：
 
@@ -79,17 +78,19 @@ HTTP 路由：
 
 用途：读取和处理 Workflow 协同任务。`create_task` 只用于普通、无流程关联的协同任务；公开入口精确拒绝 registry 中全部 19 个可驱动领域 transition 或生成下游任务的 task group，不会因更换 task code / payload 而绕过。生产排程、生产异常和出货放行还使用保留的确定性编号前缀；入口防伪不影响受信领域事务 / ProcessRuntime producer 创建真实任务。
 
+`list_role_tasks` 只用于岗位任务端。服务端先要求账号具备对应 `mobile.<role>.access`，再要求 active revision 的 effective session 对同一岗位投影该入口动作；缺 active revision、岗位 profile 停用、entitlement 撤销、账号没有该业务岗位或仅有 super admin 身份都会 fail closed。多岗位账号可按其真实角色切换，但不能把一个岗位的登录入口权限与另一个岗位的 effective action 拼接使用。
+
 `get_task_process_context` 只接受 `task_id`。服务端先按当前账号、active / stored revision、owner / assignee 范围确认任务可见，再从任务的 `process_instance_id / process_node_instance_id` 锚点读取来源单据、流程实例、全部节点、当前节点和已完成节点；来源或节点锚点不一致时 fail closed。响应不暴露定义 hash、策略快照或内部权限解释。正式桌面任务抽屉和手机任务详情用该结果展示业务流程、来源单据、流程发起时间、当前节点、已完成节点和最终状态，不根据任务名称猜测起点或终点。
 
 `get_task_assignment_options` 只接受 `task_id`，返回当前任务 version、状态、负责岗位、当前处理人、是否可退回岗位池以及服务端筛选后的接收人。`reassign_task` 只接受 `task_id / expected_version / idempotency_key / assignee_id / reason`；`assignee_id` 必须显式为正整数接收人或 `null` 岗位池，原因不能为空。当前默认只有 `boss` 获得 `workflow.task.assign`，super admin 可通过全权限执行，但不会自动成为业务岗位接收人；PMC 的 `workflow.task.supervise` 仍是只读。接收人必须是 active 账号、直接持有任务负责岗位，并在任务 revision 中具备读取、更新和完成 / 审批能力。成功只改变任务 `assignee_id / updated_by / version` 并写事件、幂等 receipt 与运行审计，不改变任务状态、责任池、流程锚点或 Fact。
 
 ### `customer_config` 审批设置
 
-- `get_approval_settings`：只接受可选 `customer_key`，要求 `customer_config.read`；未传时使用部署客户上下文，传入值仍必须与该上下文一致。返回固定审批事项、active revision/hash、主办 / 备用 / 升级成员、最终有效候选和阻塞原因。每个事项显式返回 `configured`：`false` 表示当前 active revision 尚未发布该设置，不能与 `configured=true / enabled=false` 的人工停用混为一谈。
+- `get_approval_settings`：只接受空参数，要求 `customer_config.read`；返回固定审批事项、active revision/hash、主办 / 备用 / 升级成员、最终有效候选和阻塞原因。每个事项显式返回 `configured`：`false` 表示当前 active revision 尚未发布该设置，不能与 `configured=true / enabled=false` 的人工停用混为一谈。
 - `preview_approval_settings`：要求 `customer_config.read`；精确接收 `customer_key / revision / expected_active_revision / expected_active_hash / items`，只校验并预览新 immutable revision，不落库。
 - `publish_approval_settings`：合同与 preview 相同，要求 `customer_config.publish`；使用 active revision/hash CAS 发布新 revision并写配置发布审计，不自动激活。
 
-`items` 只允许 `sales_order / purchase_order / shipment_finance`，成员只允许 `primary / backup / escalation` 的业务角色或具名账号。启用事项必须至少有一个可配置责任成员；停用事项可以没有成员。普通管理员不能把自己、自己持有的业务角色、系统角色或调试角色加入责任；激活仍走现有 transition check / activate 合同。active revision 中 `enabled=false` 会在创建 ProcessInstance 前拒绝相应的新流程，不先改来源单据，也不生成无候选审批任务；它不会终止或改写已按旧 revision 启动的实例。ProcessRuntime 任务办理使用任务自身存储的 revision，必须同时满足 RBAC、entitlement、精确 owner pool/role 或具名成员、assignee、状态/version 和幂等；没有候选人时失败关闭，配置变化不改写在途流程。已经具名分配的审批待办在更高优先级成员恢复后仍归原处理人，前提是其冻结岗位与 entitlement 仍有效；员工停用、注销或被移除该岗位时，未结束任务在同一事务释放回冻结责任池。
+`items` 只允许 `sales_order / purchase_order / shipment_finance`，成员只允许 `primary / backup / escalation` 的业务角色或具名账号。普通管理员不能把自己、自己持有的业务角色、系统角色或调试角色加入责任；激活仍走现有 transition check / activate 合同。ProcessRuntime 任务办理使用任务自身存储的 revision，必须同时满足 RBAC、entitlement、精确 owner pool/role 或具名成员、assignee、状态/version 和幂等；没有候选人时失败关闭，配置变化不改写在途流程。新流程启动时，对应审批事项缺失或显式停用都会 fail closed，不回退内置老板池，也不能把页面建议值当作已发布配置。
 
 ### `operational_fact`
 
@@ -102,15 +103,15 @@ HTTP 路由：
 - `get_shipment`
 - `list_shipments`
 
-用途：查询可出货销售订单行、创建出货草稿、确认真实出货、取消草稿或已出货单，以及按 ID 精确读取或列表查询出货单。`list_shipment_source_candidates` 与绑定销售订单或订单行的 `create_shipment_with_items` 都要求 `shipment.create + sales_order.read + sales_order_item.read`。`get_shipment` 与 `list_shipments` 均只读且要求 `shipment.read`。公开 `submit_shipment_release` 已退出；正式页面使用 `customer_config.start_finished_goods_delivery_process` 启动 active revision，财务审批通过后由绑定领域命令记录 Shipment 财务放行。`ship_shipment` 只有在该门禁为 `APPROVED` 时才写 `SHIPPED` 与库存 `OUT`。
+用途：查询可出货销售订单行、创建出货草稿、确认真实出货、取消草稿或已出货单，以及按 ID 精确读取或列表查询出货单。`list_shipment_source_candidates` 与绑定销售订单或订单行的 `create_shipment_with_items` 都要求 `shipment.create + sales_order.read + sales_order_item.read`。`get_shipment` 与 `list_shipments` 均只读且要求 `shipment.read`。公开 `submit_shipment_release` 已退出；正式页面使用 `customer_config.start_finished_goods_delivery_process` 启动 active revision。启动事务重验已有成品质检后直接创建财务 approval，审批通过由绑定领域命令记录 Shipment 财务放行并结束流程；流程不判定质检、不确认出货、不创建应收。只有独立 `ship_shipment` 在门禁为 `APPROVED` 且质检、来源、预留、库存均通过时才写 `SHIPPED` 与库存 `OUT`。
 
 `cancel_shipment` 按原状态分支：`DRAFT -> CANCELLED` 只终止未出库草稿，不写库存；`SHIPPED -> CANCELLED` 才逐行写库存 `REVERSAL`。active `finished_goods_delivery` 流程、未结成品质检、active 出货放行任务或非取消应收 / 发票都会阻断取消；草稿已提交放行时，须先将任务完成或退回。重复取消依真实 `shipped_at` 判断是否曾出库，不会把草稿取消误写成库存冲正。
 
 候选响应的 `total` 是相同关键词 / 销售订单过滤条件下的完整结果数，`items` 只包含当前 `limit / offset` 页；前端必须使用服务端分页、远程搜索与该 `total`，不得再客户端拼接有上限的销售订单、明细和出货列表。
 
-生产、委外和财务的状态方法继续使用 canonical RPC：`post_production_fact / cancel_production_fact`、`post_outsourcing_fact / cancel_outsourcing_fact`、`post_finance_fact / settle_finance_fact / cancel_finance_fact`。三类事实只能以 `DRAFT` 且不带 `posted_at` 创建；财务草稿还不能预填结清或取消审计字段。Ent create / create-bulk hook 在 SQL 执行前阻断直接制造 `POSTED / SETTLED / CANCELLED` 的旁路，生命周期变化只能由对应领域 action 完成。生产 / 委外取消接受来源完整的 `DRAFT / POSTED`，财务取消接受正式来源的 `DRAFT / POSTED`；`CANCELLED` 只允许精确幂等重放，`SETTLED` 财务事实不能直接取消。`settle_finance_fact` 只对该 RPC 允许的事实类型开放，发票页不提供直接 settle 动作；发票对账通过 `create_reconciliation_from_finance_fact` 生成对账事实表达。草稿取消不写库存，库存型事实只有已过账取消才写反向流水；财务取消写操作人、时间和原因审计，不写库存。
+生产、委外和财务的状态方法继续使用 canonical RPC：`post_production_fact / cancel_production_fact`、`post_outsourcing_fact / cancel_outsourcing_fact`、`post_finance_fact / settle_finance_fact / cancel_finance_fact`。生产 / 委外取消接受来源完整的 `DRAFT / POSTED`，财务取消接受正式来源的 `DRAFT / POSTED`；`CANCELLED` 只允许精确幂等重放，`SETTLED` 财务事实不能直接取消。`settle_finance_fact` 只允许 `RECONCILIATION`，不能直接结清应收、应付或发票；应收 / 应付余额只能由正式 FinancePayment allocation、CreditNote 或冲正改变。发票页不提供直接 settle 动作，对账通过 `create_reconciliation_from_finance_fact` 生成对账事实表达。草稿取消不写库存，库存型事实只有已过账取消才写反向流水；财务取消写操作人、时间和原因审计，不写库存。
 
-API 存在不代表正式 Web UI 可达：`add_purchase_receipt_item`、`material_supply` 4 个以及 `finished_goods_delivery` 5 个公开方法当前都是 `partial / backend-only`；销售订单正式提交则只走 `start_sales_order_acceptance_process + execute_sales_order_acceptance_submit`，不保留直连 `submit_sales_order` 的 Web 双轨。
+API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只走 `start_* + execute_*_submit`，不保留直连 submit；出货正式页只调用 `start_finished_goods_delivery_process` 创建财务审批。`add_purchase_receipt_item` 仍是后端能力，旧 `material_supply` 收货 / IQC / 入库 execute 和旧 `finished_goods_delivery` 质检 / 出货 / 应收 execute 只允许冻结在途 revision 恢复，当前 manifest 不能新建这些长图，正式页面也不调用它们。
 
 ### `production_wip`
 
@@ -152,10 +153,10 @@ API 存在不代表正式 Web UI 可达：`add_purchase_receipt_item`、`materia
 | 方法 | 来源与新建状态 | 权限 |
 | --- | --- | --- |
 | `start_sales_order_acceptance_process` | `DRAFT` 销售订单 | `sales_order.submit + sales_order.read` |
-| `start_material_supply_purchase_order_process` | `APPROVED` 采购订单 | `purchase.receipt.create + purchase_order.read` |
+| `start_material_supply_purchase_order_process` | `DRAFT` 采购订单 | `purchase.order.update + purchase.order.read` |
 | `start_finished_goods_delivery_process` | `DRAFT` 出货单 | `shipment.create + shipment.read` |
 
-创建事务锁定真实来源，从来源派生 canonical 单号并复核状态；只有完全匹配的已创建流程可精确重放。旧 `start_material_supply_process` 和公开无来源 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 均按 unknown method 处理。
+创建事务锁定真实来源，从来源派生 canonical 单号并复核状态；只有完全匹配的已创建流程可精确重放。销售与采购 start 只激活首个 domain command，页面还必须用同一业务意图调用对应 `execute_*_submit` 才提交 Source Document 并创建审批任务；start 成功本身不改变单据状态。旧 `start_material_supply_process` 和公开无来源 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 均按 unknown method 处理。
 
 事实取消不是通用删除，状态与库存合同如下：
 
@@ -191,9 +192,9 @@ API 存在不代表正式 Web UI 可达：`add_purchase_receipt_item`、`materia
 
 三类任务 payload 都携带 `source_task_contract=workflow.source-task/v1`、固定 producer 和来源意图摘要。对应 task group 与任务编号前缀是保留命名空间；公开 `workflow.create_task`、ProcessRuntime 显式 / node-key 回退任务组和客户流程人工 / 审批节点均会拒绝占用。该约束防止普通任务冒充来源任务，不把 payload 变成 Production、Shipment、Inventory、Quality 或 Finance 真源。
 
-`customer_config.start_finished_goods_delivery_process` 是新的出货审批入口。请求绑定正整数 `shipment_id`、stable business ref 和幂等键；服务端只使用 active revision。流程质量关口、财务 `workflow.task.approve` 节点、`shipment.finance_release` 领域命令、真实出货与应收线索顺序固定，不能从公开 Shipment API 跳过财务放行。
+`customer_config.start_finished_goods_delivery_process` 是新的出货审批入口。请求绑定正整数 `shipment_id`、stable business ref 和幂等键；服务端只使用 active revision。新建图固定为 `shipment_finance_approval → shipment_finance_release → end`：启动前在来源事务内重验已有成品质检，流程只创建财务 `workflow.task.approve` 并写版本化放行门禁。正式质检、真实出货、库存 OUT、应收、发票与收付款继续由各自领域 API 办理，不能从公开 Shipment API 跳过财务放行。
 
-放行任务完成只把协同投影推进到 `shipping_released`，不调用 `ship_shipment`，不写库存、应收或发票。`operational_fact.ship_shipment` 会在同一出货事务内重新核对上述完整来源合同并要求 task status 为 `done`，然后继续校验冻结的质检集合、销售来源数量、库存预留和可用量；全部通过后才写 `SHIPPED` 与库存 `OUT`。真实出货 / 取消冲正会把来源业务投影继续推进到 `shipped / cancelled`，生产订单关闭 / 取消和返工事实取消同理推进到 `closed / cancelled`；这些来源投影不改写既有 task status。
+财务审批 task 完成后，由自动领域命令写 `finance_release_status=APPROVED` 和流程锚点并结束 ProcessInstance；它不调用 `ship_shipment`，不写库存、应收或发票。`operational_fact.ship_shipment` 在独立出货事务内要求该门禁并重新校验质检、销售来源数量、库存预留和可用量；全部通过后才写 `SHIPPED` 与库存 `OUT`。真实出货 / 取消冲正会把来源业务投影继续推进到 `shipped / cancelled`，生产订单关闭 / 取消和返工事实取消同理推进到 `closed / cancelled`；这些来源投影不改写既有 task status。
 
 存量 `RELEASED` 生产订单与 `POSTED REWORK` 返工事实的缺失任务使用 `server/cmd/backfill-workflow-source-tasks` 受控修复，不属于 JSON-RPC API。命令默认事务 dry-run，apply 要求精确确认数据库名；它不推断历史任务 `done / rejected`，也不扫描或推断 `DRAFT` 出货单曾经提交。具体命令见 [`server/README.md`](../README.md#常用命令)。
 
@@ -248,7 +249,7 @@ API 存在不代表正式 Web UI 可达：`add_purchase_receipt_item`、`materia
 
 `auth.sms_login` 只接受 `scope=admin`，验证码通过后按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`。普通协作账号登录链路及 `scope=user` 已退出运行时。
 
-岗位任务端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`。对格式合法的手机号，发码接口始终返回相同的“验证码已发送”受理合同；服务端只在账号存在、active 且具备 `mobile.<role>.access` 时实际请求短信发送，账号资格、查询失败或短信供应商失败只进入内部脱敏日志，不能从公开响应判断手机号是否绑定管理员或具备岗位资格。
+岗位任务端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`。对格式合法的手机号，发码接口始终返回相同的“验证码已发送”受理合同；服务端只在账号存在、active 且具备 `mobile.<role>.access` 时实际请求短信发送，账号资格、查询失败或短信供应商失败只进入内部脱敏日志，不能从公开响应判断手机号是否绑定管理员或具备岗位资格。登录后的岗位任务读取还必须通过 active revision effective session 对同一角色的入口动作；短信登录成功不能替代该运行态门禁。
 
 短信登录先校验验证码，再读取账号和 RBAC。手机号未绑定、账号停用 / 注销、缺少当前岗位入口权限、验证码不存在 / 错误 / 过期或尝试次数耗尽，对外统一返回 `AuthLoginRejected`；内部日志仍使用稳定原因并只记录脱敏手机号。
 

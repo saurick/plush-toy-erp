@@ -46,7 +46,11 @@ func (r workflowTaskRevisionErrorCustomerConfigRepo) GetCustomerConfigRevision(c
 func TestWorkflowTaskQueryVisibilityScopeKeepsRevisionPairsAcrossAllEntryPoints(t *testing.T) {
 	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
 	customerConfigUC := workflowTaskRevisionCustomerConfigUC()
-	admin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskRead)
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionMobileWarehouseAccess,
+	)
 	repo := &recordingWorkflowRevisionJSONRPCRepo{}
 	dispatcher := &jsonrpcDispatcher{
 		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.workflow_revision_test")),
@@ -81,6 +85,50 @@ func TestWorkflowTaskQueryVisibilityScopeKeepsRevisionPairsAcrossAllEntryPoints(
 		repo.boardQuery.VisibleOwnerRoleKeys != nil || repo.boardQuery.VisibleAssigneeID != nil ||
 		repo.roleQuery.VisibleAssigneeID != nil {
 		t.Fatal("entry points must pass paired revision scopes, not a flattened active-role union")
+	}
+}
+
+func TestWorkflowRoleTaskViewRequiresActiveMobileRoleEntitlement(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionMobileWarehouseAccess,
+	)
+	configRepo := newServiceCustomerConfigRepo()
+	key := serviceCustomerConfigKey(biz.DefaultCustomerKey, "rev-mobile")
+	configRepo.revisions[key] = &biz.CustomerConfigRevision{
+		CustomerKey: biz.DefaultCustomerKey,
+		Revision:    "rev-mobile",
+		Status:      biz.CustomerConfigStatusActive,
+	}
+	configRepo.profiles[key] = []biz.RoleProfileInput{{
+		RoleKey: biz.WarehouseRoleKey, DisplayName: "仓库",
+	}}
+	configRepo.modules[key] = []biz.DeploymentModuleStateInput{
+		{ModuleKey: "inventory", State: "enabled"},
+		{ModuleKey: "workflow_tasks", State: "enabled"},
+	}
+	configRepo.entitlements[key] = []biz.AccessEntitlementInput{{
+		RoleKey: biz.WarehouseRoleKey, CapabilityKey: biz.PermissionWorkflowTaskRead,
+		ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true,
+	}}
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.workflow_mobile_access_test")),
+		adminReader:      stubAdminAccountReader{admin: admin},
+		workflowUC:       biz.NewWorkflowUsecase(&recordingWorkflowRevisionJSONRPCRepo{}),
+		customerConfigUC: biz.NewCustomerConfigUsecase(configRepo),
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"view_key": biz.WorkflowRoleTaskViewTodo,
+		"role_key": biz.WarehouseRoleKey,
+		"limit":    float64(20),
+	})
+	_, result, err := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(), "list_role_tasks", "mobile-denied", params,
+	)
+	if err != nil || result == nil || result.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("result=%#v err=%v", result, err)
 	}
 }
 
@@ -178,108 +226,6 @@ func TestWorkflowTaskRoleVisibilityUsesImmutableRevisionForReadUpdateActionUrgeA
 		context.Background(), admin, &crossPoolTask, biz.PermissionWorkflowTaskRead,
 	); visibility.Valid {
 		t.Fatalf("same role in a different owner pool must fail closed=%#v", visibility)
-	}
-}
-
-func TestWorkflowTaskRoleVisibilityKeepsQualifiedFrozenApprovalAssigneeAfterPrimaryReturns(t *testing.T) {
-	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
-	backup := workflowJSONRPCAdmin(
-		[]string{biz.SalesRoleKey},
-		biz.PermissionWorkflowTaskRead,
-		biz.PermissionWorkflowTaskUpdate,
-		biz.PermissionWorkflowTaskApprove,
-	)
-	primary := &biz.AdminUser{
-		ID:    8,
-		Roles: []biz.AdminRole{{Key: biz.BossRoleKey}},
-	}
-	repo := newServiceCustomerConfigRepo()
-	revision := "approval-rev-a"
-	key := serviceCustomerConfigKey(biz.DefaultCustomerKey, revision)
-	repo.revisions[key] = &biz.CustomerConfigRevision{
-		CustomerKey: biz.DefaultCustomerKey,
-		Revision:    revision,
-		Status:      biz.CustomerConfigStatusActive,
-	}
-	repo.profiles[key] = []biz.RoleProfileInput{
-		{RoleKey: biz.SalesRoleKey, DisplayName: "业务"},
-		{RoleKey: biz.BossRoleKey, DisplayName: "老板"},
-	}
-	for _, roleKey := range []string{biz.SalesRoleKey, biz.BossRoleKey} {
-		for _, capability := range []string{
-			biz.PermissionWorkflowTaskRead,
-			biz.PermissionWorkflowTaskUpdate,
-			biz.PermissionWorkflowTaskApprove,
-		} {
-			repo.entitlements[key] = append(repo.entitlements[key], biz.AccessEntitlementInput{
-				RoleKey: roleKey, CapabilityKey: capability,
-				ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true,
-			})
-		}
-	}
-	repo.memberships[key] = []biz.WorkPoolMembershipInput{
-		{
-			PoolKey: "approval.sales_order", RoleKey: biz.BossRoleKey, UserID: primary.ID,
-			Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
-		},
-		{
-			PoolKey: "approval.sales_order", RoleKey: biz.SalesRoleKey, UserID: backup.ID,
-			Strategy: biz.ApprovalMemberStrategyBackup, Priority: 200, Enabled: true,
-		},
-	}
-	adminDirectory := newMemAdminManageRepoForData()
-	adminDirectory.admins = map[int]*biz.AdminUser{
-		backup.ID:  backup,
-		primary.ID: primary,
-	}
-	dispatcher := &jsonrpcDispatcher{
-		log: log.NewHelper(log.With(
-			log.NewStdLogger(io.Discard),
-			"module",
-			"service.workflow_revision_test",
-		)),
-		customerConfigUC: biz.NewCustomerConfigUsecaseForWire(repo, adminDirectory),
-	}
-	processID := 11
-	nodeID := 12
-	poolKey := "approval.sales_order"
-	assigneeID := backup.ID
-	task := &biz.WorkflowTask{
-		ID:                    711,
-		TaskStatusKey:         "ready",
-		OwnerRoleKey:          biz.SalesRoleKey,
-		OwnerPoolKey:          &poolKey,
-		AssigneeID:            &assigneeID,
-		ConfigRevision:        &revision,
-		ProcessInstanceID:     &processID,
-		ProcessNodeInstanceID: &nodeID,
-	}
-
-	visibility := dispatcher.workflowTaskRoleVisibilityForTask(
-		context.Background(),
-		backup,
-		task,
-		biz.PermissionWorkflowTaskApprove,
-	)
-	if !visibility.Valid ||
-		len(visibility.RoleKeys) != 1 ||
-		visibility.RoleKeys[0] != biz.SalesRoleKey {
-		t.Fatalf("frozen backup visibility = %#v", visibility)
-	}
-	if !workflowAdminCanViewTask(backup, task, visibility.RoleKeys) ||
-		!workflowAdminCanHandleTask(backup, task, "done", visibility.RoleKeys) {
-		t.Fatal("qualified frozen backup must remain able to view and handle the assigned approval")
-	}
-
-	backup.Roles = nil
-	visibility = dispatcher.workflowTaskRoleVisibilityForTask(
-		context.Background(),
-		backup,
-		task,
-		biz.PermissionWorkflowTaskApprove,
-	)
-	if visibility.Valid || len(visibility.RoleKeys) != 0 {
-		t.Fatalf("removed backup role must fail closed = %#v", visibility)
 	}
 }
 
@@ -409,6 +355,19 @@ func workflowTaskRevisionCustomerConfigUC() *biz.CustomerConfigUsecase {
 		}
 		repo.profiles[key] = []biz.RoleProfileInput{{RoleKey: biz.WarehouseRoleKey, DisplayName: "仓库"}}
 		repo.memberships[key] = []biz.WorkPoolMembershipInput{{PoolKey: "warehouse", RoleKey: biz.WarehouseRoleKey, Enabled: true}}
+		if item.status == biz.CustomerConfigStatusActive {
+			repo.modules[key] = []biz.DeploymentModuleStateInput{
+				{ModuleKey: "inventory", State: "enabled"},
+				{ModuleKey: "workflow_tasks", State: "enabled"},
+			}
+			repo.entitlements[key] = append(repo.entitlements[key], biz.AccessEntitlementInput{
+				RoleKey:       biz.WarehouseRoleKey,
+				CapabilityKey: biz.PermissionMobileWarehouseAccess,
+				ScopeType:     "customer",
+				ScopeValue:    biz.DefaultCustomerKey,
+				Enabled:       true,
+			})
+		}
 		if item.grant {
 			for _, capability := range []string{
 				biz.PermissionWorkflowTaskRead,

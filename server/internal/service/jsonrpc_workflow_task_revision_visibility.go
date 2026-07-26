@@ -6,11 +6,45 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	"server/internal/errcode"
 )
 
 type workflowTaskRoleVisibility struct {
 	RoleKeys []string
 	Valid    bool
+}
+
+func (d *jsonrpcDispatcher) requireActiveMobileRoleAccess(
+	ctx context.Context,
+	admin *biz.AdminUser,
+	roleKey string,
+) *v1.JsonrpcResult {
+	permissionKey := biz.MobileRoleAccessPermission(roleKey)
+	if permissionKey == "" || !biz.AdminCanAccessMobileRole(admin, roleKey) {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	if d == nil || d.customerConfigUC == nil {
+		return nil
+	}
+	customerKey, err := runtimeCustomerKey("")
+	if err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	var session *biz.EffectiveSession
+	if runtimeCustomerConfigRequiresActiveRevision() {
+		session, err = d.customerConfigUC.GetEffectiveSessionRequiringActiveRevision(ctx, customerKey, admin)
+	} else {
+		session, err = d.customerConfigUC.GetEffectiveSession(ctx, customerKey, admin)
+	}
+	if err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	for _, actionKey := range session.Actions {
+		if strings.TrimSpace(actionKey) == permissionKey {
+			return nil
+		}
+	}
+	return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 }
 
 func (d *jsonrpcDispatcher) workflowTaskQueryVisibilityScope(
@@ -140,20 +174,6 @@ func (d *jsonrpcDispatcher) workflowTaskRoleVisibilityForTask(
 			roleKeys, err = d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevisionForPool(
 				ctx, customerKey, revision, ownerPoolKey, admin, requiredCapabilities...,
 			)
-			if err == nil &&
-				len(roleKeys) == 0 &&
-				biz.IsApprovalSettingsPoolKey(ownerPoolKey) &&
-				task.AssigneeID != nil &&
-				*task.AssigneeID == admin.ID &&
-				biz.AdminHasRole(admin, task.OwnerRoleKey) {
-				var assignedRoleKeys []string
-				assignedRoleKeys, err = d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevision(
-					ctx, customerKey, revision, admin, requiredCapabilities...,
-				)
-				if err == nil && workflowOwnerRoleVisible(task.OwnerRoleKey, assignedRoleKeys) {
-					roleKeys = []string{biz.NormalizeRoleKey(task.OwnerRoleKey)}
-				}
-			}
 		} else {
 			roleKeys, err = d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevision(
 				ctx, customerKey, revision, admin, requiredCapabilities...,

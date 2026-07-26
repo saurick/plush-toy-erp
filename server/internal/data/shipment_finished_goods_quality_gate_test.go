@@ -80,6 +80,16 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 	}
 
 	pending := createCase("PENDING", true)
+	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
+	processCreate := sourceBoundProcessCreate(
+		biz.ProcessKeyFinishedGoodsDelivery,
+		"shipment",
+		pending.shipment.ID,
+		"shipment-finance-quality-gate/PENDING",
+	)
+	if _, _, err := processRepo.CreateProcessInstanceFromSource(ctx, processCreate, 7); !errors.Is(err, biz.ErrShipmentQualityPending) {
+		t.Fatalf("pending inspection process start error=%v, want ErrShipmentQualityPending", err)
+	}
 	pendingActor := shipmentReleaseActorForTest(t, ctx, client, pending.shipment.ID)
 	if _, _, err := operationalUC.SubmitShipmentRelease(ctx, pending.shipment.ID, pendingActor.ID); !errors.Is(err, biz.ErrShipmentQualityPending) {
 		t.Fatalf("draft inspection release error=%v, want ErrShipmentQualityPending", err)
@@ -92,6 +102,9 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 	}
 	if _, err := inventoryUC.PassQualityInspection(ctx, approximateQualityInspectionDecision(pending.inspection.ID, biz.QualityInspectionResultConcession)); err != nil {
 		t.Fatalf("pass pending inspection: %v", err)
+	}
+	if _, _, err := processRepo.CreateProcessInstanceFromSource(ctx, processCreate, 7); err != nil {
+		t.Fatalf("passed inspection process start: %v", err)
 	}
 	if _, _, err := operationalUC.SubmitShipmentRelease(ctx, pending.shipment.ID, pendingActor.ID); err != nil {
 		t.Fatalf("submit release after passed inspection: %v", err)
@@ -109,6 +122,18 @@ func TestOperationalFactRepo_ShipmentFinishedGoodsQualityGate(t *testing.T) {
 		t.Fatalf("reject inspection: %v", err)
 	}
 	rejectedActor := shipmentReleaseActorForTest(t, ctx, client, rejected.shipment.ID)
+	if _, _, err := processRepo.CreateProcessInstanceFromSource(
+		ctx,
+		sourceBoundProcessCreate(
+			biz.ProcessKeyFinishedGoodsDelivery,
+			"shipment",
+			rejected.shipment.ID,
+			"shipment-finance-quality-gate/REJECTED",
+		),
+		7,
+	); !errors.Is(err, biz.ErrShipmentQualityRejected) {
+		t.Fatalf("rejected inspection process start error=%v, want ErrShipmentQualityRejected", err)
+	}
 	if _, _, err := operationalUC.SubmitShipmentRelease(ctx, rejected.shipment.ID, rejectedActor.ID); !errors.Is(err, biz.ErrShipmentQualityRejected) {
 		t.Fatalf("rejected inspection release error=%v, want ErrShipmentQualityRejected", err)
 	}

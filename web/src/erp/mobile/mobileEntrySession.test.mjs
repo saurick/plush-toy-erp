@@ -87,13 +87,26 @@ test('mobile entry session: 有电脑端菜单的岗位可从任务端直接进�
   )
   assert.match(
     layoutSource,
-    /canEnterDesktop: canReturnToEntries[\s\S]*?handleEnterDesktop/u
+    /canEnterDesktop,\s*handleEnterDesktop/u
   )
   assert.match(pageSource, /canEnterDesktop=\{canEnterDesktop === true\}/u)
   assert.match(pageSource, /handleEnterDesktop=\{handleEnterDesktop\}/u)
   assert.match(screenSource, /data-testid="mobile-role-desktop-entry"/u)
   assert.match(screenSource, /aria-label="进入电脑端"/u)
   assert.match(screenSource, />\s*进入电脑端\s*</u)
+})
+
+test('mobile entry session: 多岗位账号可在手机待办内显式切换岗位', () => {
+  const source = readSource('mobile', 'MobileAppLayout.jsx')
+
+  assert.match(source, /allowedMobileRoleKeys\.length > 1/u)
+  assert.match(source, /aria-label="切换岗位任务端"/u)
+  assert.match(
+    source,
+    /allowedMobileRoleKeys\.map\(\(roleKey\) =>[\s\S]*?handleSwitchMobileRole\(roleKey\)/u
+  )
+  assert.match(source, /resolveMobileTasksPath\(roleKey\)/u)
+  assert.match(source, /aria-current=/u)
 })
 
 test('mobile entry session: 直接访问未分配岗位时按账号业务岗位情况返回入口页', () => {

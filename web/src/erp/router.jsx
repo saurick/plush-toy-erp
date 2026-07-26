@@ -21,6 +21,7 @@ import {
   DEV_GOVERNANCE_ROUTE,
   DEV_HUB_ROUTE,
   DEV_PROTOTYPES_ROUTE,
+  DEV_STATUS_FLOWS_ROUTE,
   DEV_TESTING_ROUTE,
 } from './config/devRoutes.mjs'
 import {
@@ -99,6 +100,9 @@ const DevDocsPage = import.meta.env.DEV
   : null
 const DevGovernancePage = import.meta.env.DEV
   ? lazyRoute(() => import('./pages/DevGovernancePage.jsx'))
+  : null
+const DevFlowStateObservatoryPage = import.meta.env.DEV
+  ? lazyRoute(() => import('./pages/DevFlowStateObservatoryPage.jsx'))
   : null
 const DevPrototypesPage = import.meta.env.DEV
   ? lazyRoute(() => import('./pages/DevPrototypesPage.jsx'))
@@ -316,6 +320,12 @@ export default function ERPRouter() {
             <Route
               path={DEV_GOVERNANCE_ROUTE}
               element={<DevGovernancePage />}
+            />
+          ) : null}
+          {DevFlowStateObservatoryPage ? (
+            <Route
+              path={DEV_STATUS_FLOWS_ROUTE}
+              element={<DevFlowStateObservatoryPage />}
             />
           ) : null}
           {DevPrototypesPage ? (

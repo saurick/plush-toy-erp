@@ -219,13 +219,13 @@ test("customer-config-runtime-manifest: yoyoosun selects registered Product Core
   assert.deepEqual(selectionByProcess(manifest, "material_supply"), {
     process_key: "material_supply",
     process_version: "v1",
-    variant_key: "purchase_receipt_iqc_inbound",
+    variant_key: "purchase_order_approval",
     business_ref_type: "purchase_order",
   });
   assert.deepEqual(selectionByProcess(manifest, "finished_goods_delivery"), {
     process_key: "finished_goods_delivery",
     process_version: "v1",
-    variant_key: "quality_finance_ship_receivable",
+    variant_key: "shipment_finance_approval",
     business_ref_type: "shipment",
   });
 });

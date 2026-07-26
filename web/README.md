@@ -75,7 +75,7 @@ http://127.0.0.1:5175/m/engineering/tasks
 
 `adminProfileSync` 当前只做前端 profile 投影、菜单过滤和当前 URL 是否应跳转的 helper 判断；`customer_config.get_effective_session` 拉取、cached effective session 复用、`effective_session_sync_failed` 空投影挂载，以及实际 `navigate(..., { replace: true })` fallback 跳转都由 `ERPLayout` 负责。菜单投影固定为两层：第一层是 RBAC 菜单路径，普通账号必须命中 `allowedMenuPaths`；第二层是 `effective_session.pages` 页面 key，普通账号在 `pages` 是数组时必须命中页面 key，空数组会收窄为无可见页面，不退回 RBAC-only。`super admin` 是产品核心 / 客户系统的全功能审阅和配置账号；当 effective session 带有客户 key 时，侧栏使用完整产品导航审阅当前客户运行环境的已登记业务能力；没有有效客户 key 或 sync-failed 空投影时，侧栏只使用 Product Core 控制面导航，第一项为 `/erp/dashboard` 的产品核心总览，不把客户业务菜单或客户 Workflow 工作台当作产品核心菜单展示。当前 URL 识别仍用完整产品导航解析已登记业务页，避免直访业务 URL 绕过客户业务页 guard。`super_admin_product_core` 只表示 `visibilityMode`；是否能挂载客户业务页只看 `dataRuntimeScope` 和 `canMountCustomerBusinessPages`。当 effective session 带有客户 key 时，`dataRuntimeScope=customer_runtime`，业务页按当前客户运行环境挂载真实业务列表或事实页组件；没有有效客户 key 或 sync-failed 空投影时，`/erp/dashboard` 显示 Product Core 能力总览和审阅入口，客户业务数据页显示 Product Core 能力审阅页，两者都不读取客户订单、库存、Workflow 或财务事实。`pages` 缺失或不是数组时，正式普通账号不回退旧 RBAC；通过 `attachEffectiveSessionToAdminProfile` 挂载的 effective session 即使输入缺少 pages，也会被归一为空数组。
 
-岗位任务端也属于客户运行态入口，不属于无客户 key 的 Product Core 控制面。`/m/<role>/tasks` 先用当前静态客户配置 key 读取 `customer_config.get_effective_session`，只有 effective session 带有客户 key 时才挂载岗位任务页并请求 Workflow 任务；没有有效客户 key、Product Core 中性入口或 sync-failed 空投影时，只显示“暂时无法进入岗位任务端”的拦截页，不读取客户 Workflow 任务、不展示客户待办 / 逾期 / 详情 / 操作按钮。`mobile.<role>.access` 只表示账号具备该岗位入口权限，不等于已经进入某个客户运行环境。
+岗位任务端也属于客户运行态入口，不属于无客户 key 的 Product Core 控制面。`/m/<role>/tasks` 先用当前静态客户配置 key 读取 `customer_config.get_effective_session`，只有 effective session 带有客户 key，且账号 `mobile.<role>.access` 与 active revision 对同一岗位入口的 effective action 同时命中时，才挂载岗位任务页并请求 Workflow 任务；没有有效客户 key、Product Core 中性入口、sync-failed 空投影或入口动作被客户配置收窄时，只显示“暂时无法进入岗位任务端”的拦截页，不读取客户 Workflow 任务、不展示客户待办 / 逾期 / 详情 / 操作按钮。多岗位账号可以在其真实且有效的岗位间切换，super admin 也不能凭管理身份绕过业务岗位和 effective action。`mobile.<role>.access` 只表示账号具备该岗位入口上限，不等于已经进入某个客户运行环境。
 
 当前诊断例外都收口在 `adminProfileSync` helper 的前端 pages 判定层，不改变正式客户 / 非前端 DEV 构建普通账号必须同时命中 RBAC 菜单路径和 active revision pages 的强收窄：`local dev` 指前端 DEV 构建态，不等于测试 / 目标环境；local dev 只允许已登记且 RBAC 已允许的直达 URL 放开第二层 pages 用于排障，不把 active revision 隐藏页加入普通账号侧边菜单。菜单项过滤中普通账号仍必须先通过第一层 RBAC 菜单路径，再命中 active pages；空数组继续收窄为无可见页面。`super admin` 在 active customer runtime 用于查看当前客户系统能力进度，仍可看到完整产品导航中的业务页、业务动作和字段列；无客户运行态则只显示 Product Core 控制面导航，并在 `/erp/dashboard` 显示产品核心总览。这只是前端可见 / 可发起层，不扩大后端写入口。对业务看板、销售、采购、委外、库存、质检、出货、财务、主数据和异常闭环等客户业务数据页，`ERPLayout` 只通过 `shouldGuardCustomerBusinessPageRuntime` 消费 `dataRuntimeScope / canMountCustomerBusinessPages`，不直接复用 `super_admin_product_core` 判断数据挂载；只有带 customer key 且来源为 active revision 的 super admin 才属于 customer runtime，业务页读取当前客户部署数据库；`builtin_rbac_fallback` 即使带同 key 也不升级为 customer runtime。后端仍按 RBAC、active module states、业务状态机、Workflow owner / assignee / break-glass、Fact usecase、幂等和审计决定是否允许真正写入。helper 本身不登记页面，也不校验原始 URL 是否是正式入口；页面范围来自调用方：侧栏菜单项过滤传入当前运行态菜单，隐藏 URL 判定使用完整产品导航调用 `resolveCurrentNavigationEntry`。当前 URL 若解析出未授权菜单权限路径，普通账号仍会被 RBAC 层判定跳转；若无法解析出菜单权限路径，则不会单独因 RBAC 触发跳转。未命中菜单定义时只用工作台作为标题 / 面包屑显示 fallback，`pageKey / menuPath` 保持为空，不参与 active pages 授权，也不选中工作台菜单。`getAdminProfileSyncErrorAction` 的 `hasCachedProfile` 只决定同步失败错误的动作分类；`ERPLayout` 在客户配置同步失败时仍只复用 `adminProfileRef.current.effective_session`，普通 `me` profile 缓存不等于已经存在客户配置投影缓存。
 
@@ -346,6 +346,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 | -------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
 | `/__dev`                   | 开发态导航、搜索、分组和本地置顶         | `web/src/erp/config/devHub.mjs`                             |
 | `/__dev/governance`        | 项目治理地图只读可视化                   | `docs/项目治理地图.md`                                      |
+| `/__dev/status-flows`      | 分层状态机、流程编排与甲方差异只读观察   | 代码合同、正式状态文档与已登记客户配置包                    |
 | `/__dev/docs`              | 当前工作区 Markdown 查看器               | 仓库 Markdown 文件本身                                      |
 | `/__dev/testing`           | 验证层级、当前命令和预设查询             | `docs/product/自动化测试策略.md`                            |
 | `/__dev/prototypes`        | HTML / PNG / 截图原型资产预览            | `docs/product/prototypes/**`                                |
@@ -358,11 +359,19 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 卡片显示用途、真源路径和边界摘要；重复“进入”链接使用页面专属可访问名称，实时搜索不再渲染无动作的搜索按钮。
 - 置顶只写浏览器本地偏好，不是后端配置。
 - 开发导航使用 `/favicon-dev.svg`；测试入口使用 `/favicon-testing.svg`，每个开发页同时提供独立浏览器标题，只用于区分本地开发页面。
-- 六个子页统一提供开发工作台全局菜单、当前页高亮、返回开发导航、复制当前深链和按需打开来源文档；开发人员可以在任意子页直接切换治理、文档、测试、原型、能力和客户配置，不再先返回首页寻找入口。“开发工作台”按钮是唯一返回总览的入口，不在菜单中重复放第二个“总览”。移动端全局菜单允许横向滚动，并保持单一当前页语义。
+- 七个子页统一提供开发工作台全局菜单、当前页高亮、返回开发导航、复制当前深链和按需打开来源文档；开发人员可以在任意子页直接切换治理、流程状态、文档、测试、原型、能力和客户配置，不再先返回首页寻找入口。“开发工作台”按钮是唯一返回总览的入口，不在菜单中重复放第二个“总览”。移动端全局菜单允许横向滚动，并保持单一当前页语义。
 
 #### 项目治理地图 `/__dev/governance`
 
 该页只读解析 `docs/项目治理地图.md`，展示治理维度、常见任务分流、Mermaid 图、文档跳转和路径复制。`axis` / `scope` 写入 URL，可刷新、前进后退和分享；非法值会规范化。页面不创建第二份治理真源。
+
+#### 流程与状态观察台 `/__dev/status-flows`
+
+- 页面把 Source Document、Workflow task、Process Runtime、Fact / Ledger、MasterData lifecycle 和客户配置控制面分层展示，提供全局状态字典树、单对象合法转换图、Product Core 流程编排、九类流覆盖和证据详情。九类分别是业务、状态、工作流、审批、任务、异常、通知、自动流转与 Fact；默认图面只打开业务和状态，其他语义按需叠加。图内只使用状态名和受控短标签，不放源码路径、完整 Guard 或权限串；这些详情留在图下方，避免长边标签撑大画布或覆盖往返边。岗位与责任池在 Product Core 节点详情中单独显示。
+- `web/src/erp/config/devFlowStateCatalog.mjs` 是 dev-only 只读投影目录，不是新的状态真源。canonical key、合法转换、权限、领域动作和事实副作用仍回到后端 registry、lifecycle helper、Schema、usecase 与测试；目录中的每台机器和边必须携带来源证据，未知对象或状态 fail closed。
+- Product Core 与客户差异使用“核心合同 + 客户 overlay”表达。客户流程、状态机和策略直接从 `config/customers/index.mjs` 的已登记包派生；`demo`、`reference-customer` 和 `yoyoosun` 中的 `preview_only` 内容始终与 runtime authority 分开，漂移会显式显示，不会被观察台同步到正式状态机。
+- 页面只读且不导入通用 `set_status`、数据库写入或状态机编辑器。Workflow task `done`、Process node `completed` 和 Fact `POSTED` 继续是不同事实；取消、冲正、补偿和 return-to 只在正式领域合同显式存在时画边。
+- 视图、对象、甲方、搜索和叠加层写入 URL，便于刷新、前进后退和共享定位。运行轨迹只接受受后端登录态、精确 read permission 与任务可见性保护的 task-scoped 上下文；没有权限或没有实例时明确显示边界，不从任务标题、payload 或客户 preview 猜测流程位置。
 
 #### 开发文档 `/__dev/docs`
 

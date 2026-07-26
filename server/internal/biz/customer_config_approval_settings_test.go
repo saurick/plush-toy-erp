@@ -173,14 +173,14 @@ func TestDisabledApprovalBlocksNewRuntimeBeforeProcessCreation(t *testing.T) {
 		{
 			name:            "purchase order approval",
 			processKey:      ProcessKeyMaterialSupply,
-			variantKey:      CustomerProcessVariantMaterialReceiptIQCInbound,
+			variantKey:      CustomerProcessVariantPurchaseOrderApproval,
 			businessRefType: "purchase_order",
 			approvalKey:     ApprovalSettingPurchaseOrder,
 		},
 		{
 			name:            "shipment finance approval",
 			processKey:      ProcessKeyFinishedGoodsDelivery,
-			variantKey:      CustomerProcessVariantFinishedGoodsDelivery,
+			variantKey:      CustomerProcessVariantShipmentFinanceApproval,
 			businessRefType: "shipment",
 			approvalKey:     ApprovalSettingShipmentFinance,
 		},
@@ -213,8 +213,8 @@ func TestDisabledApprovalBlocksNewRuntimeBeforeProcessCreation(t *testing.T) {
 				BusinessRefID:   1001,
 				IdempotencyKey:  test.processKey + "/disabled-approval",
 			})
-			if !errors.Is(err, ErrCustomerConfigApprovalDisabled) {
-				t.Fatalf("BuildProcessInstanceCreateFromActiveCustomerConfig error = %v, want ErrCustomerConfigApprovalDisabled", err)
+			if !errors.Is(err, ErrCustomerConfigTransitionBlocked) {
+				t.Fatalf("BuildProcessInstanceCreateFromActiveCustomerConfig error = %v, want ErrCustomerConfigTransitionBlocked", err)
 			}
 
 			explanation, err := uc.ExplainProcessDefinition(ctx, in.CustomerKey, test.processKey)

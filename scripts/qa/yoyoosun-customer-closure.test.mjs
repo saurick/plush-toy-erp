@@ -486,12 +486,15 @@ test('yoyoosun finance purchase-contract responsibility uses role composition', 
   )
 
   assert.ok(bossRole.capabilityKeys.includes('purchase.order.read'))
-  assert.ok(bossRole.capabilityKeys.includes('purchase.order.approve'))
+  assert.ok(bossRole.capabilityKeys.includes('workflow.task.approve'))
   assert.ok(purchaseRole.capabilityKeys.includes('purchase.order.create'))
   assert.ok(purchaseRole.capabilityKeys.includes('purchase.order.update'))
   assert.equal(
-    purchaseRole.capabilityKeys.includes('purchase.order.approve'),
-    false
+    yoyoosunRoleFlowMatrix.roles.some((role) =>
+      role.capabilityKeys.includes('purchase.order.approve')
+    ),
+    false,
+    'retired purchase-specific approval capability must not return'
   )
   assert.equal(
     financeRole.capabilityKeys.some((key) => key.startsWith('purchase.order.')),

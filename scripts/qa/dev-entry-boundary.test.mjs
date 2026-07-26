@@ -14,6 +14,7 @@ import {
   buildImportToolingSummary,
   isDevCustomerConfigEnabled,
 } from "../../web/src/erp/config/devCustomerConfig.mjs";
+import { DEV_STATUS_FLOWS_ROUTE } from "../../web/src/erp/config/devRoutes.mjs";
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_CURRENT_DOC_PATHS,
@@ -88,6 +89,7 @@ function extractDevTestingPageGlobPaths(pageSource = "") {
 test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV", () => {
   const devDocsPageSource = read("web/src/erp/pages/DevDocsPage.jsx");
   assert.equal(DEV_HUB_ROUTE, "/__dev");
+  assert.equal(DEV_STATUS_FLOWS_ROUTE, "/__dev/status-flows");
   assert.equal(DEV_TESTING_ROUTE, "/__dev/testing");
   assert.equal(DEV_CUSTOMER_CONFIG_ROUTE, "/__dev/customer-config");
   assert.equal(isDevHubEnabled({ DEV: true }), true);

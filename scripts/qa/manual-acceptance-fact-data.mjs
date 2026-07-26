@@ -29,6 +29,7 @@ import {
 } from "./manual-acceptance-catalog.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
+import { approvePurchaseOrderThroughProcess } from "./purchase-order-approval-process.mjs";
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
@@ -817,13 +818,13 @@ async function createExecutionContext(plan, options = {}) {
     requiredModules: REQUIRED_MODULES,
     customerKey: CUSTOMER_KEY,
   });
-  const rpc = ({ domain, method, params }) =>
+  const rpc = ({ actor, domain, method, params }) =>
     rpcCall({
       backendURL: plan.backendURL,
       domain,
       method,
       params: manualAcceptanceFactRPCParams(domain, method, params),
-      token: tokens[manualAcceptanceFactRole(domain, method, params)],
+      token: tokens[actor || manualAcceptanceFactRole(domain, method, params)],
       fetchImpl,
     });
   return {
@@ -1247,29 +1248,23 @@ async function createOrReadReceiptSourcePurchaseOrder(rpc, receiptPlan, plan) {
     );
   }
   let status = String(order.lifecycle_status || order.status || "").toUpperCase();
-  if (status === "DRAFT") {
-    order = resultItem(
-      await rpc({
-        domain: "purchase_order",
-        method: "submit_purchase_order",
-        params: { id: order.id },
-      }),
-      "purchase_order",
-      "submit_purchase_order",
-    );
-    status = String(order.lifecycle_status || order.status || "").toUpperCase();
-  }
-  if (status === "SUBMITTED") {
-    order = resultItem(
-      await rpc({
-        domain: "purchase_order",
-        method: "approve_purchase_order",
-        params: { id: order.id },
-      }),
-      "purchase_order",
-      "approve_purchase_order",
-    );
-    status = String(order.lifecycle_status || order.status || "").toUpperCase();
+  if (status === "DRAFT" || status === "SUBMITTED") {
+    const advanced = await approvePurchaseOrderThroughProcess({
+      purchaseOrder: order,
+      customerKey: CUSTOMER_KEY,
+      idempotencyPrefix: [
+        "manual-acceptance-facts",
+        plan.runId,
+        receiptPlan.sourcePurchaseOrderNo,
+        "approval",
+      ].join(":"),
+      invoke: rpc,
+      sourceActor: "admin",
+      listActor: "admin",
+      approvalActorForRole: (roleKey) => roleKey,
+    });
+    order = advanced.purchaseOrder;
+    status = String(order.lifecycle_status || "").toUpperCase();
   }
   if (status !== "APPROVED") {
     throw new CliError(

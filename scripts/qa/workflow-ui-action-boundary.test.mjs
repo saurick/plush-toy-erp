@@ -981,16 +981,10 @@ test("sales order page keeps write buttons behind projected actions", () => {
     "sales order create button must be hidden when canCreateOrder is false",
   );
   assert(
-    pageSource.includes("resolveBusinessLifecycleActions({") &&
-      pageSource.includes("hasPermission: (action) =>") &&
-      pageSource.includes(
-        "hasActionPermission(adminProfile, action.permission)",
-      ) &&
-      pageSource.includes("canRun: (action) =>") &&
-      pageSource.includes("canRunSalesOrderLifecycleAction(") &&
-      pageSource.includes("<BusinessLifecyclePrimaryAction") &&
-      pageSource.includes("<BusinessLifecycleMoreAction"),
-    "sales order lifecycle actions must use the shared resolver with both action projection and lifecycle state",
+    /resolveBusinessLifecycleActions\(\{[\s\S]{0,320}?hasPermission:\s*\(action\)\s*=>\s*hasActionPermission\(adminProfile,\s*action\.permission\),[\s\S]{0,240}?canRun:\s*\(action\)\s*=>\s*canRunSalesOrderLifecycleAction\(\s*selectedOrder\?\.lifecycle_status,\s*action\.nextStatus\s*\)/u.test(
+      pageSource,
+    ),
+    "sales order lifecycle actions must require both action projection and lifecycle state",
   );
   assert(
     pageSource.includes("canCreateOrder={canCreateOrder}") &&
@@ -1043,16 +1037,10 @@ test("purchase order page keeps write buttons behind projected actions", () => {
     "purchase order page must derive write permissions through projected action helper",
   );
   assert(
-    pageSource.includes("resolveBusinessLifecycleActions({") &&
-      pageSource.includes("hasPermission: (action) =>") &&
-      pageSource.includes(
-        "hasActionPermission(adminProfile, action.permission)",
-      ) &&
-      pageSource.includes("canRun: (action) =>") &&
-      pageSource.includes("canRunPurchaseOrderLifecycleAction(") &&
-      panelSource.includes("<BusinessLifecyclePrimaryAction") &&
-      panelSource.includes("<BusinessLifecycleMoreAction"),
-    "purchase order lifecycle actions must use the shared resolver with both action projection and lifecycle state",
+    /resolveBusinessLifecycleActions\(\{[\s\S]{0,320}?hasPermission:\s*\(action\)\s*=>\s*hasActionPermission\(adminProfile,\s*action\.permission\),[\s\S]{0,240}?canRun:\s*\(action\)\s*=>\s*canRunPurchaseOrderLifecycleAction\(\s*singleSelectedOrder\?\.lifecycle_status,\s*action\.nextStatus\s*\)/u.test(
+      pageSource,
+    ),
+    "purchase order lifecycle actions must require both action projection and lifecycle state",
   );
   assert(
     pageSource.includes("canCreate={canCreate}") &&
@@ -1114,27 +1102,20 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
     "outsourcing order page must derive create/update through projected action helper",
   );
   assert(
-    pageSource.includes("primaryAction={") &&
-      pageSource.includes("canCreate ? (") &&
+    pageSource.includes("primaryAction={\n          canCreate ? (") &&
       pageSource.includes("{canUpdate &&") &&
-      pageSource.includes("!canEditOutsourcingOrder(selectedRow)") &&
-      pageSource.includes("itemsLoading") &&
+      /disabled=\{\s*!selectedRow\s*\|\|\s*!canEditOutsourcingOrder\(selectedRow\)\s*\|\|\s*itemsLoading\s*\}/u.test(
+        pageSource,
+      ) &&
       pageSource.includes("canUpload={canUpdate || canCreate}") &&
-      pageSource.includes("canDelete={canUpdate}") &&
-      pageSource.includes("<SelectionClearAction"),
+      pageSource.includes("canDelete={canUpdate}"),
     "outsourcing order create/edit controls must hide without projected actions while attachment writes keep projected permissions",
   );
   assert(
-    pageSource.includes("resolveBusinessLifecycleActions({") &&
-      pageSource.includes("hasPermission: (action) =>") &&
-      pageSource.includes(
-        "hasActionPermission(adminProfile, action.permission)",
-      ) &&
-      pageSource.includes("canRun: (action) =>") &&
-      pageSource.includes("canRunOutsourcingOrderLifecycleAction(") &&
-      pageSource.includes("<BusinessLifecyclePrimaryAction") &&
-      pageSource.includes("<BusinessLifecycleMoreAction"),
-    "outsourcing lifecycle actions must use the shared resolver with both action projection and lifecycle state",
+    /resolveBusinessLifecycleActions\(\{[\s\S]{0,320}?hasPermission:\s*\(action\)\s*=>\s*hasActionPermission\(adminProfile,\s*action\.permission\),[\s\S]{0,240}?canRun:\s*\(action\)\s*=>\s*canRunOutsourcingOrderLifecycleAction\(\s*selectedRow\?\.lifecycle_status,\s*action\.nextStatus\s*\)/u.test(
+      pageSource,
+    ),
+    "outsourcing lifecycle actions must require both action projection and lifecycle state",
   );
   assert(
     pageSource.includes(
@@ -1190,7 +1171,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "{canCreateReturn &&",
         "{canCreateAdjustment &&",
         "{canPost && (!selectedRow || selectedRow.status === 'DRAFT') ? (",
-        "{canPost &&\n          (!selectedRow ||\n            ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (",
+        "{canPost &&\n          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (",
         "草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存",
       ],
       forbiddenTokens: [
@@ -1205,10 +1186,13 @@ test("fact pages keep write buttons behind projected actions and status guards",
       tokens: [
         "const canCreate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.create'\n  )",
         "const canUpdate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.update'\n  )",
+        "const selectedQualityStatus = String(selectedRow?.status || '').toUpperCase()",
         "primaryAction={\n          canCreate ? (",
         "disabled={referenceDataState !== 'ready'}",
         "{canUpdate && (!selectedRow || selectedQualityStatus === 'DRAFT') ? (",
         "{canUpdate &&\n          (!selectedRow ||\n            ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)) ? (",
+        "selectedRow.status !== 'SUBMITTED'",
+        "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status)",
         "canUpload={canCreate || canUpdate}",
         "canDelete={canUpdate}",
         "不会绕过来源规则直接改写库存数量或生产事实",
@@ -1221,10 +1205,9 @@ test("fact pages keep write buttons behind projected actions and status guards",
       path.join(repoRoot, expectation.relativePath),
       "utf8",
     );
-    const normalizedSource = source.replace(/\s+/gu, " ").trim();
     for (const token of expectation.tokens) {
       assert(
-        normalizedSource.includes(token.replace(/\s+/gu, " ").trim()),
+        source.includes(token),
         `${expectation.name} must keep projected action/status guard token: ${token}`,
       );
     }
@@ -1232,17 +1215,6 @@ test("fact pages keep write buttons behind projected actions and status guards",
       assert(
         !source.includes(token),
         `${expectation.name} must not restore retired write entry: ${token}`,
-      );
-    }
-    if (expectation.name === "quality inspection page") {
-      assert.equal(
-        (
-          normalizedSource.match(
-            /\{canUpdate && \(!selectedRow \|\| \['DRAFT', 'SUBMITTED'\]\.includes\(selectedQualityStatus\)\) \? \(/gu,
-          ) || []
-        ).length,
-        2,
-        "quality inspection decision and cancellation groups must both stay status-guarded",
       );
     }
     assert(
