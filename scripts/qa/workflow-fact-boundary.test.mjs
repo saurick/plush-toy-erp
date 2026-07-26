@@ -130,6 +130,26 @@ test("status architecture is target-only and separates delivery evidence", () =>
 
   const chineseTree = extractTextTree(statusIndex, "中文状态字典树");
   const englishTree = extractTextTree(statusIndex, "English Status Dictionary Tree");
+  requireUniqueLine(
+    "English tree",
+    englishTree,
+    "WIP batch:",
+    [
+      "PLANNED",
+      "SPLIT",
+      "IN_PROGRESS",
+      "OUTSOURCED",
+      "CANCELLED",
+      "WAITING_QUALITY",
+      "ACCEPTED",
+      "REJECTED",
+    ],
+  );
+  assert.equal(
+    englishTree.match(/\bPLANNED\b/gu)?.length ?? 0,
+    1,
+    "English tree must contain exactly one canonical PLANNED state",
+  );
   for (const [treeName, tree] of [
     ["Chinese tree", chineseTree],
     ["English tree", englishTree],
@@ -139,8 +159,13 @@ test("status architecture is target-only and separates delivery evidence", () =>
       /\[(?:C|L|P|D)(?:\s*\/\s*(?:C|L|P|D))*\]/iu,
       `${treeName} must not use availability markers`,
     );
+    const maturityMarkerScope =
+      treeName === "English tree" ? tree.replace(/\bPLANNED\b/gu, "") : tree;
     for (const term of ["current", "legacy", "compatibility", "planned", "deferred"]) {
-      assert(!tree.toLowerCase().includes(term), `${treeName} must exclude ${term}`);
+      assert(
+        !maturityMarkerScope.toLowerCase().includes(term),
+        `${treeName} must exclude ${term} maturity markers`,
+      );
     }
     assert(!tree.includes("WorkflowReconcileJob"), `${treeName} must exclude draft jobs`);
   }
