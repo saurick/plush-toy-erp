@@ -30,10 +30,16 @@ func TestWorkflowTaskRevisionVisibilityScopesApplyBeforeListBoardAndRolePaginati
 				ConfigRevision:       "rev-a",
 				Status:               biz.CustomerConfigStatusSuperseded,
 				VisibleOwnerRoleKeys: []string{biz.SalesRoleKey},
+				VisibleOwnerPoolRoles: []biz.WorkflowTaskOwnerPoolRole{{
+					OwnerPoolKey: biz.SalesRoleKey, OwnerRoleKey: biz.SalesRoleKey,
+				}},
 			},
 			{
 				ConfigRevision: "rev-b",
 				Status:         biz.CustomerConfigStatusActive,
+				VisibleOwnerPoolRoles: []biz.WorkflowTaskOwnerPoolRole{{
+					OwnerPoolKey: biz.FinanceRoleKey, OwnerRoleKey: biz.FinanceRoleKey,
+				}},
 			},
 			{
 				ConfigRevision:       "published-only",
@@ -203,6 +209,9 @@ func TestWorkflowTaskRevisionVisibilityPredicateIsAppliedBeforeCountAndOffset(t 
 		ConfigRevision:       "rev-a",
 		Status:               biz.CustomerConfigStatusSuperseded,
 		VisibleOwnerRoleKeys: []string{biz.SalesRoleKey},
+		VisibleOwnerPoolRoles: []biz.WorkflowTaskOwnerPoolRole{{
+			OwnerPoolKey: biz.SalesRoleKey, OwnerRoleKey: biz.SalesRoleKey,
+		}},
 	}}}
 	page, total, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{Limit: 2, Offset: 4, VisibilityScope: scope})
 	if err != nil {
@@ -215,6 +224,140 @@ func TestWorkflowTaskRevisionVisibilityPredicateIsAppliedBeforeCountAndOffset(t 
 		if task.ConfigRevision == nil || *task.ConfigRevision != "rev-a" {
 			t.Fatalf("cross-revision task leaked after offset: %#v", task)
 		}
+	}
+}
+
+func TestWorkflowTaskRevisionVisibilityAllowsSelectedApprovalFallbackRoleToSeePoolTask(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_approval_fallback_visibility?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	processID, nodeID := createWorkflowTaskRuntimeAnchorFixture(
+		t,
+		ctx,
+		client,
+		"approval-fallback-visibility",
+		1,
+	)
+	revision := "approval-rev-a"
+	poolKey := "approval.sales_order"
+	task, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+		TaskCode:              "APPROVAL-FALLBACK-001",
+		TaskGroup:             "sales",
+		TaskName:              "销售订单审批",
+		SourceType:            "sales_order",
+		SourceID:              1,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          biz.SalesRoleKey,
+		OwnerPoolKey:          &poolKey,
+		ConfigRevision:        &revision,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+		Payload:               map[string]any{"assignee_released_to_pool": true},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create approval task: %v", err)
+	}
+	scope := &biz.WorkflowTaskVisibilityScope{
+		RevisionRoleScopes: []biz.WorkflowTaskRevisionRoleScope{{
+			ConfigRevision: revision,
+			Status:         biz.CustomerConfigStatusSuperseded,
+			VisibleOwnerPoolRoles: []biz.WorkflowTaskOwnerPoolRole{{
+				OwnerPoolKey: poolKey,
+				OwnerRoleKey: biz.PurchaseRoleKey,
+			}},
+		}},
+	}
+	tasks, total, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{
+		Limit:           20,
+		VisibilityScope: scope,
+	})
+	if err != nil {
+		t.Fatalf("list approval fallback tasks: %v", err)
+	}
+	if total != 1 || len(tasks) != 1 || tasks[0].ID != task.ID {
+		t.Fatalf("fallback visibility total=%d tasks=%#v", total, tasks)
+	}
+	roleView, err := repo.ListWorkflowRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
+		ViewKey:         biz.WorkflowRoleTaskViewTodo,
+		RoleKey:         biz.PurchaseRoleKey,
+		Limit:           20,
+		VisibilityScope: scope,
+	})
+	if err != nil {
+		t.Fatalf("list approval fallback role view: %v", err)
+	}
+	if len(roleView.Items) != 1 || roleView.Items[0].ID != task.ID {
+		t.Fatalf("fallback role view = %#v", roleView)
+	}
+}
+
+func TestWorkflowTaskRevisionVisibilityKeepsQualifiedFrozenApprovalAssignee(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_frozen_approval_assignee?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	processID, nodeID := createWorkflowTaskRuntimeAnchorFixture(
+		t,
+		ctx,
+		client,
+		"frozen-approval-assignee",
+		1,
+	)
+	revision := "approval-rev-a"
+	poolKey := "approval.sales_order"
+	assigneeID := 42
+	task, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+		TaskCode:              "APPROVAL-FROZEN-ASSIGNEE-001",
+		TaskGroup:             "sales",
+		TaskName:              "销售订单审批",
+		SourceType:            "sales_order",
+		SourceID:              1,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          biz.SalesRoleKey,
+		OwnerPoolKey:          &poolKey,
+		AssigneeID:            &assigneeID,
+		ConfigRevision:        &revision,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+		Payload:               map[string]any{},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create approval task: %v", err)
+	}
+	scope := &biz.WorkflowTaskVisibilityScope{
+		VisibleAssigneeID: &assigneeID,
+		RevisionRoleScopes: []biz.WorkflowTaskRevisionRoleScope{{
+			ConfigRevision:       revision,
+			Status:               biz.CustomerConfigStatusSuperseded,
+			VisibleOwnerRoleKeys: []string{biz.SalesRoleKey},
+			VisibleOwnerPoolRoles: []biz.WorkflowTaskOwnerPoolRole{{
+				OwnerPoolKey: poolKey,
+				OwnerRoleKey: biz.BossRoleKey,
+			}},
+		}},
+	}
+	tasks, total, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{
+		Limit:           20,
+		VisibilityScope: scope,
+	})
+	if err != nil {
+		t.Fatalf("list frozen approval assignee tasks: %v", err)
+	}
+	if total != 1 || len(tasks) != 1 || tasks[0].ID != task.ID {
+		t.Fatalf("frozen assignee visibility total=%d tasks=%#v", total, tasks)
+	}
+	roleView, err := repo.ListWorkflowRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
+		ViewKey:         biz.WorkflowRoleTaskViewTodo,
+		RoleKey:         biz.SalesRoleKey,
+		Limit:           20,
+		VisibilityScope: scope,
+	})
+	if err != nil {
+		t.Fatalf("list frozen approval role view: %v", err)
+	}
+	if len(roleView.Items) != 1 || roleView.Items[0].ID != task.ID {
+		t.Fatalf("frozen approval role view = %#v", roleView)
 	}
 }
 

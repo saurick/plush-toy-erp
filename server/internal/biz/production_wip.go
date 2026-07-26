@@ -598,7 +598,7 @@ func normalizeProductionWIPOutsourcingAllocations(input []ProductionWIPOutsourci
 }
 
 func normalizeProductionWIPSplits(input []ProductionWIPSplit) ([]ProductionWIPSplit, error) {
-	if len(input) == 0 {
+	if len(input) < 2 {
 		return nil, ErrBadParam
 	}
 	splits := append([]ProductionWIPSplit(nil), input...)
@@ -674,6 +674,9 @@ func ValidateProductionWIPSplit(source *ProductionWIPBatch, operation *Productio
 	}
 	if operation.OperationCode == ProductionWIPOperationFabricProcessing {
 		return ErrProductionWIPInvalidTransition
+	}
+	if len(splits) < 2 {
+		return ErrBadParam
 	}
 	remaining, err := ValidateProductionWIPAllocation(source.Quantity, alreadyAllocated, splits)
 	if err != nil {

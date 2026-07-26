@@ -211,6 +211,7 @@ func (r *memCustomerConfigRepo) ListWorkPoolMemberships(_ context.Context, custo
 	out := []WorkPoolMembershipInput{}
 	for _, item := range r.memberships[customerRevisionKey(customerKey, revision)] {
 		_, roleOK := allowed[item.RoleKey]
+		roleOK = roleOK && item.UserID == 0
 		if roleOK || (item.UserID > 0 && item.UserID == userID) {
 			out = append(out, item)
 		}

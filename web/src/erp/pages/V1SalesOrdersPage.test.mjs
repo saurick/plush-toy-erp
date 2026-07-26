@@ -30,7 +30,7 @@ test('planned delivery date header keeps enough width for one line', () => {
 
 test('active sales orders expose a permission-bound reservation action', () => {
   assert.match(page, /'stock\.reservation\.create'/u)
-  assert.match(page, /selectedOrder\.lifecycle_status/u)
+  assert.match(page, /selectedOrder\?\.lifecycle_status/u)
   assert.match(page, /\.toLowerCase\(\) !== 'active'/u)
   assert.match(page, /getSalesOrder\(\{ id: orderID \}\)/u)
   assert.match(page, /selectedOrderIDRef\.current = orderID/u)
@@ -98,4 +98,18 @@ test('reservation form keeps source and stock identities out of visible copy', (
   assert.match(modal, /label: '产品'/u)
   assert.match(modal, /label: 'SKU \/ 规格'/u)
   assert.match(modal, /label: '单位'/u)
+})
+
+test('sales lifecycle mutation locks selection and duplicate intent synchronously', () => {
+  assert.match(page, /const lifecycleInFlightRef = useRef\(false\)/u)
+  assert.match(
+    page,
+    /if \(lifecycleInFlightRef\.current \|\| !action \|\| !order\)/u
+  )
+  assert.match(page, /lifecycleInFlightRef\.current = true/u)
+  assert.match(page, /lifecycleInFlightRef\.current = false/u)
+  assert.match(page, /disabled=\{saving\}[\s\S]*当前订单操作完成后可更换选择/u)
+  assert.match(page, /getCheckboxProps: \(\) => \(\{ disabled: saving \}\)/u)
+  assert.match(page, /onChange: \(_keys, selectedRows\) => \{[\s\S]*if \(saving\) return/u)
+  assert.match(page, /onOpenRecord=\{saving \? undefined : openSalesOrderRecord\}/u)
 })

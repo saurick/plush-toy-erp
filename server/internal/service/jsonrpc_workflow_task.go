@@ -1141,7 +1141,10 @@ func workflowActorRoleKeyForAdminInScope(admin *biz.AdminUser, task *biz.Workflo
 	if admin == nil || task == nil {
 		return ""
 	}
-	if workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys) {
+	ownerPoolKey := workflowTaskOwnerPoolKey(task)
+	if workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys) &&
+		(biz.AdminHasRole(admin, task.OwnerRoleKey) ||
+			!biz.IsApprovalSettingsPoolKey(ownerPoolKey)) {
 		return task.OwnerRoleKey
 	}
 	if biz.AdminHasRole(admin, biz.PMCRoleKey) {
@@ -1159,7 +1162,7 @@ func workflowActorRoleKeyForAdminInScope(admin *biz.AdminUser, task *biz.Workflo
 		}
 	}
 	for _, roleKey := range biz.AdminRoleKeys(admin) {
-		if biz.NormalizeRoleKey(roleKey) != biz.NormalizeRoleKey(task.OwnerRoleKey) {
+		if workflowOwnerRoleVisible(roleKey, visibleOwnerRoleKeys) {
 			return roleKey
 		}
 	}
@@ -1698,7 +1701,11 @@ func workflowAdminCanViewTask(admin *biz.AdminUser, task *biz.WorkflowTask, visi
 	if admin.IsSuperAdmin {
 		return true
 	}
-	if workflowTaskAssignedToAdmin(admin, task) {
+	if workflowTaskAssignedToAdmin(admin, task) &&
+		workflowAssignedRuntimeTaskScopeMatched(task, visibleOwnerRoleKeys) {
+		return true
+	}
+	if workflowReleasedAssigneeFallbackMatched(admin, task, visibleOwnerRoleKeys) {
 		return true
 	}
 	if (biz.AdminHasRole(admin, biz.PMCRoleKey) && workflowOwnerRoleVisible(biz.PMCRoleKey, visibleOwnerRoleKeys)) ||
@@ -1717,7 +1724,11 @@ func workflowAdminCanHandleTask(admin *biz.AdminUser, task *biz.WorkflowTask, ne
 		return false
 	}
 	if task.AssigneeID != nil {
-		return *task.AssigneeID == admin.ID
+		return *task.AssigneeID == admin.ID &&
+			workflowAssignedRuntimeTaskScopeMatched(task, visibleOwnerRoleKeys)
+	}
+	if workflowReleasedAssigneeFallbackMatched(admin, task, visibleOwnerRoleKeys) {
+		return true
 	}
 	return workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
 }
@@ -1733,9 +1744,46 @@ func workflowAdminCanUrgeTask(admin *biz.AdminUser, task *biz.WorkflowTask, visi
 		return true
 	}
 	if task.AssigneeID != nil {
-		return *task.AssigneeID == admin.ID
+		return *task.AssigneeID == admin.ID &&
+			workflowAssignedRuntimeTaskScopeMatched(task, visibleOwnerRoleKeys)
+	}
+	if workflowReleasedAssigneeFallbackMatched(admin, task, visibleOwnerRoleKeys) {
+		return true
 	}
 	return workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
+}
+
+func workflowAssignedRuntimeTaskScopeMatched(
+	task *biz.WorkflowTask,
+	visibleOwnerRoleKeys []string,
+) bool {
+	_, hasRuntimeAnchor, completeRuntimeAnchor := workflowTaskRuntimeConfigRevision(task)
+	if !hasRuntimeAnchor {
+		return true
+	}
+	return completeRuntimeAnchor &&
+		workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
+}
+
+func workflowReleasedAssigneeFallbackMatched(
+	admin *biz.AdminUser,
+	task *biz.WorkflowTask,
+	visibleOwnerRoleKeys []string,
+) bool {
+	if admin == nil || task == nil || task.AssigneeID != nil ||
+		task.Payload["assignee_released_to_pool"] != true {
+		return false
+	}
+	_, _, completeRuntimeAnchor := workflowTaskRuntimeConfigRevision(task)
+	if !completeRuntimeAnchor {
+		return false
+	}
+	for _, roleKey := range biz.AdminRoleKeys(admin) {
+		if workflowOwnerRoleVisible(roleKey, visibleOwnerRoleKeys) {
+			return true
+		}
+	}
+	return false
 }
 
 func workflowOwnerRoleVisible(ownerRoleKey string, visibleOwnerRoleKeys []string) bool {

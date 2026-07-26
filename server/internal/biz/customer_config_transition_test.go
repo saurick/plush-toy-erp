@@ -3,7 +3,6 @@ package biz
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -162,11 +161,11 @@ func TestCustomerConfigTransitionCheckBlocksRuntimeBreakingChanges(t *testing.T)
 	if check.Allowed {
 		t.Fatalf("breaking transition must be blocked: %#v", check)
 	}
-	assertCustomerConfigTransitionBlocker(t, check, "in_flight_processes_for_changed_contracts", 2)
-	responsibilityBlocker := assertCustomerConfigTransitionBlocker(t, check, "open_workflow_tasks_for_changed_responsibility", 3)
-	if responsibilityBlocker.ScopeType != "responsibility" ||
-		!slices.Equal(responsibilityBlocker.ScopeKeys, []string{"finance", "sales", "sales_approval"}) {
-		t.Fatalf("responsibility blocker scope = %#v", responsibilityBlocker)
+	for _, blocker := range check.Blockers {
+		if blocker.Code == "in_flight_processes_for_changed_contracts" ||
+			blocker.Code == "open_workflow_tasks_for_changed_responsibility" {
+			t.Fatalf("immutable old revisions must isolate in-flight work: %#v", check.Blockers)
+		}
 	}
 	assertCustomerConfigTransitionBlocker(t, check, "open_business_documents_for_disabled_modules", 4)
 }

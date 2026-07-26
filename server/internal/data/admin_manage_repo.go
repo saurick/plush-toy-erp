@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/permission"
+	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
@@ -252,6 +253,24 @@ func (r *adminManageRepo) SetAdminRolesWithAudit(ctx context.Context, change *bi
 	if err != nil {
 		return nil, err
 	}
+	removedRoleKeys := removedAdminRoleKeys(before, after)
+	releasedTaskCount, err := releaseAssignedWorkflowTasksInTx(
+		ctx,
+		tx,
+		before.ID,
+		change.OperatorID,
+		removedRoleKeys,
+		"岗位移除，待办退回原岗位任务池",
+		map[string]any{"account_role_action": "roles_removed"},
+	)
+	if err != nil {
+		return nil, err
+	}
+	afterAuditSnapshot := biz.AdminAuditUserSnapshot(after)
+	if releasedTaskCount > 0 {
+		afterAuditSnapshot["released_workflow_task_count"] = releasedTaskCount
+		afterAuditSnapshot["released_owner_role_keys"] = removedRoleKeys
+	}
 	auditEvent, err := biz.BuildAdminControlAuditEvent(
 		operator,
 		"admin_user.roles.set",
@@ -259,7 +278,7 @@ func (r *adminManageRepo) SetAdminRolesWithAudit(ctx context.Context, change *bi
 		after.ID,
 		after.Username,
 		biz.AdminAuditUserSnapshot(before),
-		biz.AdminAuditUserSnapshot(after),
+		afterAuditSnapshot,
 	)
 	if err != nil {
 		return nil, err
@@ -1269,15 +1288,23 @@ func mapEntAdminRole(row *ent.Role) biz.AdminRole {
 }
 
 func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error {
-	if id <= 0 || strings.TrimSpace(moduleKey) == "" {
+	moduleKey = strings.TrimSpace(moduleKey)
+	if id <= 0 || moduleKey == "" {
 		return biz.ErrBadParam
 	}
-	row, err := r.data.postgres.AdminUser.Query().Where(adminuser.ID(id)).Only(ctx)
+	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return biz.ErrAdminNotFound
-		}
 		return err
+	}
+	defer func() { r.rollbackAdminManageTx(ctx, tx) }()
+
+	rows, err := r.loadAdminRowsForUpdate(ctx, tx, []int{id})
+	if err != nil {
+		return err
+	}
+	row, ok := rows[id]
+	if !ok {
+		return biz.ErrAdminNotFound
 	}
 	preferences := decodeAdminERPPreferences(row.ErpPreferences)
 	if preferences.ColumnOrders == nil {
@@ -1291,14 +1318,22 @@ func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int,
 	}
 	encoded := encodeAdminERPPreferences(preferences)
 	if encoded == row.ErpPreferences {
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		tx = nil
 		return nil
 	}
-	if _, err := r.data.postgres.AdminUser.UpdateOneID(id).SetErpPreferences(encoded).Save(ctx); err != nil {
+	if _, err := tx.AdminUser.UpdateOneID(id).SetErpPreferences(encoded).Save(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return biz.ErrAdminNotFound
 		}
 		return err
 	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	tx = nil
 	return nil
 }
 
@@ -1380,50 +1415,24 @@ func (r *adminManageRepo) ChangeAdminLifecycle(ctx context.Context, change *biz.
 	}
 
 	releasedTaskCount := 0
-	if change.Revoke {
-		terminalStatuses := biz.WorkflowTerminalTaskStatusKeys()
-		tasks, queryErr := tx.WorkflowTask.Query().Where(
-			workflowtask.AssigneeID(change.AdminID),
-			workflowtask.TaskStatusKeyNotIn(terminalStatuses...),
-		).All(ctx)
-		if queryErr != nil {
-			return nil, 0, queryErr
+	if change.Disabled {
+		lifecycleAction := adminSessionRevokeReasonAccountDisabled
+		releaseReason := "账号停用，待办退回原岗位任务池"
+		if change.Revoke {
+			lifecycleAction = adminSessionRevokeReasonAccountRevoked
+			releaseReason = "账号注销，待办退回原岗位任务池"
 		}
-		for _, task := range tasks {
-			nextVersion := task.Version + 1
-			updated, updateErr := tx.WorkflowTask.Update().Where(
-				workflowtask.ID(task.ID),
-				workflowtask.AssigneeID(change.AdminID),
-				workflowtask.Version(task.Version),
-				workflowtask.TaskStatusKey(task.TaskStatusKey),
-				workflowtask.TaskStatusKeyNotIn(terminalStatuses...),
-			).
-				ClearAssigneeID().
-				SetUpdatedBy(change.OperatorID).
-				SetVersion(nextVersion).
-				Save(ctx)
-			if updateErr != nil {
-				return nil, 0, updateErr
-			}
-			if updated != 1 {
-				return nil, 0, biz.ErrWorkflowTaskConflict
-			}
-			if _, eventErr := tx.WorkflowTaskEvent.Create().
-				SetTaskID(task.ID).
-				SetTaskVersion(nextVersion).
-				SetEventType("unassigned").
-				SetFromStatusKey(task.TaskStatusKey).
-				SetToStatusKey(task.TaskStatusKey).
-				SetActorID(change.OperatorID).
-				SetReason("账号注销，待办退回原岗位任务池").
-				SetPayload(map[string]any{
-					"released_assignee_id":     change.AdminID,
-					"account_lifecycle_action": adminSessionRevokeReasonAccountRevoked,
-				}).
-				Save(ctx); eventErr != nil {
-				return nil, 0, eventErr
-			}
-			releasedTaskCount++
+		releasedTaskCount, err = releaseAssignedWorkflowTasksInTx(
+			ctx,
+			tx,
+			change.AdminID,
+			change.OperatorID,
+			nil,
+			releaseReason,
+			map[string]any{"account_lifecycle_action": lifecycleAction},
+		)
+		if err != nil {
+			return nil, 0, err
 		}
 	}
 	after, err := r.loadAdminSnapshotInTx(ctx, tx, before.ID)
@@ -1458,6 +1467,102 @@ func (r *adminManageRepo) ChangeAdminLifecycle(ctx context.Context, change *biz.
 	}
 	tx = nil
 	return after, releasedTaskCount, nil
+}
+
+func removedAdminRoleKeys(before, after *biz.AdminUser) []string {
+	beforeKeys := biz.AdminRoleKeys(before)
+	afterSet := map[string]struct{}{}
+	for _, roleKey := range biz.AdminRoleKeys(after) {
+		afterSet[roleKey] = struct{}{}
+	}
+	removed := make([]string, 0, len(beforeKeys))
+	for _, roleKey := range beforeKeys {
+		if _, retained := afterSet[roleKey]; !retained {
+			removed = append(removed, roleKey)
+		}
+	}
+	return biz.NormalizeAdminRoleKeys(removed)
+}
+
+func releaseAssignedWorkflowTasksInTx(
+	ctx context.Context,
+	tx *ent.Tx,
+	adminID int,
+	operatorID int,
+	ownerRoleKeys []string,
+	releaseReason string,
+	releasePayload map[string]any,
+) (int, error) {
+	if tx == nil || adminID <= 0 || operatorID <= 0 {
+		return 0, biz.ErrBadParam
+	}
+	filterByOwnerRole := ownerRoleKeys != nil
+	ownerRoleKeys = biz.NormalizeAdminRoleKeys(ownerRoleKeys)
+	if filterByOwnerRole && len(ownerRoleKeys) == 0 {
+		return 0, nil
+	}
+	terminalStatuses := biz.WorkflowTerminalTaskStatusKeys()
+	predicates := []predicate.WorkflowTask{
+		workflowtask.AssigneeID(adminID),
+		workflowtask.TaskStatusKeyNotIn(terminalStatuses...),
+	}
+	if filterByOwnerRole {
+		predicates = append(predicates, workflowtask.OwnerRoleKeyIn(ownerRoleKeys...))
+	}
+	tasks, err := tx.WorkflowTask.Query().Where(predicates...).All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	releasedTaskCount := 0
+	for _, task := range tasks {
+		nextVersion := task.Version + 1
+		payload := make(map[string]any, len(task.Payload)+len(releasePayload)+2)
+		for key, value := range task.Payload {
+			payload[key] = value
+		}
+		payload["assignee_released_to_pool"] = true
+		payload["released_assignee_id"] = adminID
+		for key, value := range releasePayload {
+			payload[key] = value
+		}
+		updated, updateErr := tx.WorkflowTask.Update().Where(
+			workflowtask.ID(task.ID),
+			workflowtask.AssigneeID(adminID),
+			workflowtask.Version(task.Version),
+			workflowtask.TaskStatusKey(task.TaskStatusKey),
+			workflowtask.TaskStatusKeyNotIn(terminalStatuses...),
+		).
+			ClearAssigneeID().
+			SetPayload(payload).
+			SetUpdatedBy(operatorID).
+			SetVersion(nextVersion).
+			Save(ctx)
+		if updateErr != nil {
+			return 0, updateErr
+		}
+		if updated != 1 {
+			return 0, biz.ErrWorkflowTaskConflict
+		}
+		eventPayload := make(map[string]any, len(releasePayload)+1)
+		eventPayload["released_assignee_id"] = adminID
+		for key, value := range releasePayload {
+			eventPayload[key] = value
+		}
+		if _, eventErr := tx.WorkflowTaskEvent.Create().
+			SetTaskID(task.ID).
+			SetTaskVersion(nextVersion).
+			SetEventType("unassigned").
+			SetFromStatusKey(task.TaskStatusKey).
+			SetToStatusKey(task.TaskStatusKey).
+			SetActorID(operatorID).
+			SetReason(releaseReason).
+			SetPayload(eventPayload).
+			Save(ctx); eventErr != nil {
+			return 0, eventErr
+		}
+		releasedTaskCount++
+	}
+	return releasedTaskCount, nil
 }
 
 func (r *adminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, reset *biz.AdminPasswordReset) (*biz.AdminUser, error) {

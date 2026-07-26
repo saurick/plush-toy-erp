@@ -31,6 +31,7 @@ var (
 	ErrCustomerConfigRevisionImmutable      = errors.New("customer config revision is immutable")
 	ErrCustomerConfigHashMismatch           = errors.New("customer config hash mismatch")
 	ErrCustomerConfigActiveRevisionRequired = errors.New("customer config active revision required")
+	ErrCustomerConfigApprovalDisabled       = errors.New("customer config approval disabled")
 )
 
 var runtimeFieldPolicySurfaceKeys = map[string]map[string]struct{}{
@@ -242,11 +243,19 @@ type CustomerConfigRepo interface {
 }
 
 type CustomerConfigUsecase struct {
-	repo CustomerConfigRepo
+	repo           CustomerConfigRepo
+	adminDirectory AdminDirectoryReader
 }
 
 func NewCustomerConfigUsecase(repo CustomerConfigRepo) *CustomerConfigUsecase {
 	return &CustomerConfigUsecase{repo: repo}
+}
+
+func NewCustomerConfigUsecaseForWire(
+	repo CustomerConfigRepo,
+	adminDirectory AdminDirectoryReader,
+) *CustomerConfigUsecase {
+	return &CustomerConfigUsecase{repo: repo, adminDirectory: adminDirectory}
 }
 
 func (uc *CustomerConfigUsecase) ValidateCustomerConfig(_ context.Context, in CustomerConfigPublishInput) (*CustomerConfigValidationResult, error) {

@@ -125,7 +125,7 @@ test('purchase refresh reports failure and open forms remain disabled until thei
   )
   assert.match(
     operationPanel,
-    /!selectedOrderCanEdit \|\| !referenceDataReady \|\| itemsLoading/u
+    /!selectedOrderCanEdit \|\|[\s\S]*!referenceDataReady \|\|[\s\S]*recordActionBusy/u
   )
   assert.match(
     businessModal,
@@ -136,4 +136,32 @@ test('purchase refresh reports failure and open forms remain disabled until thei
     form,
     /if \(!referenceDataReady\) setMaterialImportOpen\(false\)/u
   )
+})
+
+test('purchase record mutations lock selection and every record-bound action', () => {
+  assert.match(page, /const lifecycleInFlightRef = useRef\(false\)/u)
+  assert.match(
+    page,
+    /if \(lifecycleInFlightRef\.current \|\| !action \|\| !record\)/u
+  )
+  assert.match(
+    page,
+    /const recordActionBusy =[\s\S]*saving \|\| generatingInboundDraft \|\| printingContract \|\| itemsLoading/u
+  )
+  assert.match(
+    page,
+    /getCheckboxProps: \(\) => \(\{ disabled: recordActionBusy \}\)/u
+  )
+  assert.match(
+    page,
+    /onChange: \(nextKeys, nextRows\) => \{[\s\S]*if \(recordActionBusy\) return/u
+  )
+  assert.match(
+    operationPanel,
+    /const recordActionBusy =[\s\S]*saving \|\| generatingInboundDraft \|\| printingContract \|\| itemsLoading/u
+  )
+  assert.match(operationPanel, /disabled=\{recordActionBusy\}/u)
+  assert.match(operationPanel, /当前订单操作完成后可更换选择/u)
+  assert.match(operationPanel, /当前订单操作完成后可查看相关单据/u)
+  assert.match(operationPanel, /当前订单操作完成后可打印/u)
 })

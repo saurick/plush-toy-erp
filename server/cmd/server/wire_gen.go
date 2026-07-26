@@ -45,7 +45,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	workflowUsecase := biz.NewWorkflowUsecase(workflowRepo)
 	processRuntimeRepo := data.NewProcessRuntimeRepo(dataData, logger)
 	customerConfigRepo := data.NewCustomerConfigRepo(dataData, logger)
-	customerConfigUsecase := biz.NewCustomerConfigUsecase(customerConfigRepo)
+	customerConfigUsecase := biz.NewCustomerConfigUsecaseForWire(customerConfigRepo, adminManageRepo)
 	processRuntimeUsecase := biz.NewProcessRuntimeUsecaseForWire(processRuntimeRepo, workflowRepo, customerConfigUsecase)
 	debugSeedRepo := data.NewDebugSeedRepo(dataData, logger)
 	debugUsecase := biz.NewDebugUsecase(debugSeedRepo, debugSafetyConfig)

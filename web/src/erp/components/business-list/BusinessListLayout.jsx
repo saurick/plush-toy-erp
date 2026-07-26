@@ -2,6 +2,7 @@ import React from 'react'
 
 import {
   CalendarOutlined,
+  DownOutlined,
   MoreOutlined,
   RollbackOutlined,
   SearchOutlined,
@@ -32,6 +33,7 @@ import {
   isDateInputRangeReversed,
   parseDateInputValue,
 } from '../../utils/dateRange.mjs'
+import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
 
 const { Text } = Typography
 
@@ -92,11 +94,7 @@ function inspectSelectionAction(action) {
     .filter((item) => item.actionable)
   if (nestedActions.length > 0) {
     const enabledNestedActions = nestedActions.filter((item) => item.enabled)
-    const rankedNestedActions =
-      enabledNestedActions.length > 0 ? enabledNestedActions : nestedActions
-    const nestedScore = Math.max(
-      ...rankedNestedActions.map((item) => item.score)
-    )
+    const nestedScore = Math.max(...nestedActions.map((item) => item.score))
     return {
       actionable: true,
       enabled:
@@ -108,10 +106,11 @@ function inspectSelectionAction(action) {
   // Shared action components such as the attachment button expose their
   // interaction internally, so keep them as normal-priority actions.
   if (typeof action.type === 'function' || typeof action.type === 'object') {
+    const explicitPriority = Number(action.type?.selectionActionPriority)
     return {
       actionable: true,
       enabled: action.props.disabled !== true && action.props.loading !== true,
-      score: 30,
+      score: Number.isFinite(explicitPriority) ? explicitPriority : 30,
     }
   }
 
@@ -126,16 +125,7 @@ function partitionSelectionActions(children, limit) {
     ...inspectSelectionAction(node),
   }))
   const visibleIndexes = new Set(
-    descriptors
-      .filter((item) => item.actionable)
-      .sort(
-        (left, right) =>
-          Number(right.enabled) - Number(left.enabled) ||
-          right.score - left.score ||
-          left.index - right.index
-      )
-      .slice(0, limit)
-      .map((item) => item.index)
+    selectStableBusinessActionIndexes(descriptors, limit)
   )
 
   return {
@@ -202,6 +192,7 @@ function wrapOverflowSelectionAction(action, close) {
 
 function containsDeferredSelectionAction(action) {
   if (!React.isValidElement(action)) return false
+  if (action.type?.selectionActionDeferred === true) return true
   if (action.type === Popconfirm || action.type === Dropdown) return true
   return React.Children.toArray(action.props.children).some(
     containsDeferredSelectionAction
@@ -878,14 +869,144 @@ export function BusinessActionTooltip({
   disabled = false,
   disabledReason = '',
 }) {
-  if (!disabled || !disabledReason) return children
-
   return (
-    <Tooltip title={disabledReason}>
-      <span>{children}</span>
+    <Tooltip
+      title={disabled && disabledReason ? disabledReason : null}
+      trigger={['hover', 'focus']}
+    >
+      {/* Disabled Ant buttons cannot receive focus; this stable wrapper exposes the reason to keyboard users. */}
+      {/* eslint-disable jsx-a11y/no-noninteractive-tabindex */}
+      <span
+        className="erp-business-action-tooltip-anchor"
+        tabIndex={disabled && disabledReason ? 0 : undefined}
+        aria-disabled={disabled && disabledReason ? true : undefined}
+        aria-label={disabled && disabledReason ? disabledReason : undefined}
+      >
+        {children}
+      </span>
+      {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
     </Tooltip>
   )
 }
+
+export function SelectionClearAction({
+  selectedCount = 0,
+  label = '清空已选',
+  selectionLabel = '记录',
+  disabled = false,
+  disabledReason = '',
+  onClear = () => {},
+}) {
+  const actionDisabled = disabled || Number(selectedCount) <= 0
+  const actionDisabledReason =
+    disabled && disabledReason
+      ? disabledReason
+      : `请先选择${selectionLabel}`
+
+  return (
+    <BusinessActionTooltip
+      disabled={actionDisabled}
+      disabledReason={actionDisabledReason}
+    >
+      <Button
+        data-business-action-key="clear-selection"
+        type="link"
+        size="small"
+        disabled={actionDisabled}
+        onClick={onClear}
+      >
+        {label}
+      </Button>
+    </BusinessActionTooltip>
+  )
+}
+
+SelectionClearAction.selectionActionPriority = 0
+
+export function BusinessLifecyclePrimaryAction({
+  action = null,
+  disabled = false,
+  disabledReason = '',
+  loading = false,
+  onAction = () => {},
+  placeholder = '状态办理',
+}) {
+  return (
+    <BusinessActionTooltip disabled={disabled} disabledReason={disabledReason}>
+      <Button
+        data-business-action-key="lifecycle-primary"
+        className="erp-business-module-status-action erp-business-lifecycle-slot"
+        size="small"
+        type="primary"
+        danger={action?.danger === true}
+        disabled={disabled}
+        loading={loading}
+        onClick={() => {
+          if (action) onAction(action)
+        }}
+      >
+        {action?.label || placeholder}
+      </Button>
+    </BusinessActionTooltip>
+  )
+}
+
+BusinessLifecyclePrimaryAction.selectionActionPriority = 100
+
+export function BusinessLifecycleMoreAction({
+  actions = [],
+  disabled = false,
+  disabledReason = '',
+  getPopupContainer,
+  label = '更多操作',
+  onAction = () => {},
+}) {
+  if (actions.length === 0) return null
+
+  const menuItems = [
+    {
+      key: 'status-transitions',
+      label: '状态变更',
+      type: 'group',
+      children: actions.map((action) => ({
+        key: action.key,
+        label: action.label,
+        danger: action.danger,
+      })),
+    },
+  ]
+
+  return (
+    <BusinessActionTooltip disabled={disabled} disabledReason={disabledReason}>
+      <Dropdown
+        trigger={['click']}
+        destroyOnHidden
+        disabled={disabled}
+        getPopupContainer={getPopupContainer}
+        menu={{
+          items: menuItems,
+          onClick: ({ key }) => {
+            const action = actions.find((item) => item.key === key)
+            if (action) onAction(action)
+          },
+        }}
+      >
+        <Button
+          data-business-action-key="lifecycle-more"
+          className="erp-business-module-status-action erp-business-lifecycle-slot"
+          size="small"
+          aria-label={label}
+          disabled={disabled}
+        >
+          {label} <DownOutlined />
+        </Button>
+      </Dropdown>
+    </BusinessActionTooltip>
+  )
+}
+
+BusinessLifecycleMoreAction.selectionActionPriority = 20
+BusinessLifecycleMoreAction.selectionActionDeferred = true
 
 export function SelectedItemsSummaryTag({
   selectedCount,

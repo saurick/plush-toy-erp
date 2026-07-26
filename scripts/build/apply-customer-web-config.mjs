@@ -39,6 +39,18 @@ const SECRET_SOURCE_NAME_PATTERN =
 const UNSAFE_TEXT_CONTROL_PATTERN = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/u;
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true });
 
+function requireOptionValue(argv, index, option) {
+  const value = argv[index + 1];
+  if (
+    typeof value !== "string" ||
+    value.trim() === "" ||
+    value.startsWith("--")
+  ) {
+    throw new Error(`${option} requires a non-empty value`);
+  }
+  return value;
+}
+
 function parseArgs(argv) {
   const options = {
     customer: process.env.ERP_CUSTOMER_KEY || "",
@@ -48,15 +60,16 @@ function parseArgs(argv) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    const next = argv[index + 1];
     if (arg === "--customer") {
-      options.customer = next || "";
+      options.customer = requireOptionValue(argv, index, arg);
       index += 1;
     } else if (arg === "--config-root") {
-      options.configRoot = path.resolve(next || "");
+      options.configRoot = path.resolve(requireOptionValue(argv, index, arg));
       index += 1;
     } else if (arg === "--web-build-dir") {
-      options.webBuildDir = path.resolve(next || "");
+      options.webBuildDir = path.resolve(
+        requireOptionValue(argv, index, arg),
+      );
       index += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);

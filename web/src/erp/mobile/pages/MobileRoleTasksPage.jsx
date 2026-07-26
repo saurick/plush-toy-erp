@@ -41,7 +41,10 @@ import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
 import MobileTaskReceiptScreen from '../components/MobileTaskReceiptScreen.jsx'
 import useMobileRoleTaskActions from '../hooks/useMobileRoleTaskActions'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess'
-import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
+import {
+  hasWorkflowTaskActionCapability,
+  workflowTaskAdminAccessRequestIdentity,
+} from '../../utils/workflowTaskActionAccess.mjs'
 import {
   MOBILE_MAIN_TAB_KEYS,
   MOBILE_MESSAGE_TAB_KEYS,
@@ -1231,6 +1234,14 @@ export default function MobileRoleTasksPage() {
         : selectedCanUrge
           ? MOBILE_TASK_ACTION_ACCESS_STATES.URGE_ONLY
           : MOBILE_TASK_ACTION_ACCESS_STATES.READONLY
+  const selectedHasActionCapability = useMemo(
+    () =>
+      hasWorkflowTaskActionCapability(
+        selectedTaskActionAccess,
+        (permission) => hasActionPermission(adminProfile, permission)
+      ),
+    [adminProfile, selectedTaskActionAccess]
+  )
   const actionBusy = Boolean(
     selectedTask &&
       (Number(updatingID) === Number(selectedTask.id) ||
@@ -1660,6 +1671,7 @@ export default function MobileRoleTasksPage() {
         availableActions={availableActions}
         busy={actionBusy}
         canViewReceipt={Boolean(selectedTaskReceipt)}
+        hasActionCapability={selectedHasActionCapability}
         onActionChange={(action) => handleTaskAction(selectedTask, action)}
         onBack={handleActionBack}
         onReasonChange={updateDetailReason}
@@ -1710,6 +1722,9 @@ export default function MobileRoleTasksPage() {
             ? false
             : selectedCanOperate &&
               hasActionPermission(adminProfile, 'workflow.task.update')
+        }
+        selectedHasActionCapability={
+          receiptSnapshotOnly ? false : selectedHasActionCapability
         }
         selectedCanOperate={receiptSnapshotOnly ? false : selectedCanOperate}
         selectedCanUrge={receiptSnapshotOnly ? false : selectedCanUrge}

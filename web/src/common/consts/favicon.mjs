@@ -106,7 +106,14 @@ function resolvePrintTemplateKeyFromPath(pathname = '') {
   const match = normalizePathname(pathname).match(
     /^\/erp\/print-workspace\/([^/]+)\/?$/
   )
-  return match ? decodeURIComponent(match[1]) : ''
+  if (!match) {
+    return ''
+  }
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return ''
+  }
 }
 
 function buildPrintTemplateFaviconVariant(pathname = '') {

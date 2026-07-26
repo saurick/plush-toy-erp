@@ -114,6 +114,7 @@ import {
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
+import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
 import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../utils/printWorkspace.js'
 
 export default function V1PurchaseOrdersPage() {
@@ -161,6 +162,7 @@ export default function V1PurchaseOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
+  const lifecycleInFlightRef = useRef(false)
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
@@ -842,6 +844,10 @@ export default function V1PurchaseOrdersPage() {
   }
 
   const runLifecycleAction = async (action, record) => {
+    if (lifecycleInFlightRef.current || !action || !record) {
+      return
+    }
+    lifecycleInFlightRef.current = true
     setSaving(true)
     try {
       const updated = await action.run({ id: record.id })
@@ -867,12 +873,13 @@ export default function V1PurchaseOrdersPage() {
     } catch (error) {
       message.error(getActionErrorMessage(error, `${action.label}采购订单失败`))
     } finally {
+      lifecycleInFlightRef.current = false
       setSaving(false)
     }
   }
 
   const requestLifecycleAction = (action, record) => {
-    if (!action || !record) {
+    if (!action || !record || lifecycleInFlightRef.current || saving) {
       return
     }
     if (!action.confirmTitle) {
@@ -1068,6 +1075,8 @@ export default function V1PurchaseOrdersPage() {
     selectedOrder: singleSelectedOrder,
     unitOptions,
   })
+  const recordActionBusy =
+    saving || generatingInboundDraft || printingContract || itemsLoading
   const inboundReferenceDataReady = inboundReferenceDataState === 'ready'
   const hasInboundWarehouse = warehouseOptions.length > 0
   const openInboundDraftModal = useCallback(
@@ -1158,7 +1167,7 @@ export default function V1PurchaseOrdersPage() {
       return
     }
     if (key === 'order-items') {
-      openEditModal(singleSelectedOrder)
+      openPurchaseOrderDetails(singleSelectedOrder)
       return
     }
     if (key === 'purchase-receipts') {
@@ -1189,39 +1198,27 @@ export default function V1PurchaseOrdersPage() {
       )
     }
   }
-  const visibleLifecycleActions = useMemo(() => {
-    if (!singleSelectedOrder) {
-      return []
-    }
-    return PURCHASE_ORDER_LIFECYCLE_ACTIONS.filter(
-      (action) =>
-        hasActionPermission(adminProfile, action.permission) &&
-        canRunPurchaseOrderLifecycleAction(
-          singleSelectedOrder.lifecycle_status,
-          action.nextStatus
-        )
-    )
-  }, [adminProfile, singleSelectedOrder])
-  const primaryLifecycleAction =
-    visibleLifecycleActions.find((action) => action.key !== 'cancel') || null
-  const secondaryLifecycleActions = visibleLifecycleActions.filter(
-    (action) => action.key !== primaryLifecycleAction?.key
+  const lifecycleActions = useMemo(
+    () =>
+      resolveBusinessLifecycleActions({
+        actions: PURCHASE_ORDER_LIFECYCLE_ACTIONS,
+        selected: Boolean(singleSelectedOrder),
+        hasPermission: (action) =>
+          hasActionPermission(adminProfile, action.permission),
+        canRun: (action) =>
+          canRunPurchaseOrderLifecycleAction(
+            singleSelectedOrder?.lifecycle_status,
+            action.nextStatus
+          ),
+      }),
+    [adminProfile, singleSelectedOrder]
   )
-  const lifecycleMenuItems =
-    secondaryLifecycleActions.length > 0
-      ? [
-          {
-            key: 'status-transitions',
-            label: '状态变更',
-            type: 'group',
-            children: secondaryLifecycleActions.map((action) => ({
-              key: action.key,
-              label: action.label,
-              danger: action.danger,
-            })),
-          },
-        ]
-      : []
+  const {
+    showPrimarySlot: showLifecyclePrimary,
+    showMoreSlot: showLifecycleMore,
+    primaryAction: primaryLifecycleAction,
+    secondaryActions: secondaryLifecycleActions,
+  } = lifecycleActions
 
   return (
     <BusinessPageLayout className="erp-v1-purchase-orders-page">
@@ -1250,7 +1247,8 @@ export default function V1PurchaseOrdersPage() {
         hasActiveFilters={hasActiveFilters}
         itemsLoading={itemsLoading}
         keyword={resolvedRouteKeyword || linkedKeyword || keyword}
-        lifecycleMenuItems={lifecycleMenuItems}
+        showLifecyclePrimary={showLifecyclePrimary}
+        showLifecycleMore={showLifecycleMore}
         loadOrders={loadOrders}
         openCreateModal={openCreateModal}
         openEditModal={openEditModal}
@@ -1300,7 +1298,9 @@ export default function V1PurchaseOrdersPage() {
         rowSelection={{
           type: 'radio',
           selectedRowKeys,
+          getCheckboxProps: () => ({ disabled: recordActionBusy }),
           onChange: (nextKeys, nextRows) => {
+            if (recordActionBusy) return
             applySelectedRowKeys(nextKeys)
             const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
             if (nextSingle?.id) {
@@ -1315,6 +1315,7 @@ export default function V1PurchaseOrdersPage() {
         }
         onRow={(record) => ({
           onClick: (event) => {
+            if (recordActionBusy) return
             if (
               event.target?.closest?.(
                 '.ant-checkbox-wrapper, .ant-checkbox, .ant-radio-wrapper, .ant-radio, .ant-table-selection-column'
@@ -1326,7 +1327,9 @@ export default function V1PurchaseOrdersPage() {
             setSelectedOrder(record)
           },
         })}
-        onOpenRecord={openPurchaseOrderRecord}
+        onOpenRecord={
+          recordActionBusy ? undefined : openPurchaseOrderRecord
+        }
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,

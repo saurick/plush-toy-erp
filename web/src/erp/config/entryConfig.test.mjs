@@ -192,6 +192,9 @@ test('entryConfig: 运行时关闭后台入口时记忆和 super admin 也不能
 
 test('entryConfig: 岗位任务端角色路径解析和生成稳定', () => {
   assert.equal(parseMobileRoleFromPath('/m/warehouse/tasks'), 'warehouse')
+  assert.equal(parseMobileRoleFromPath('/m/%77arehouse/tasks'), 'warehouse')
+  assert.equal(parseMobileRoleFromPath('/m/%/tasks'), '')
+  assert.equal(parseMobileRoleFromPath('/m/%E0%A4%A/tasks'), '')
   assert.equal(resolveMobileTasksPath('quality'), '/m/quality/tasks')
   assert.equal(resolveMobileTasksPath('engineering'), '/m/engineering/tasks')
 })

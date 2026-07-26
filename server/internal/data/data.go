@@ -36,6 +36,7 @@ var ProviderSet = wire.NewSet(
 	NewSMSLoginCodeProvider,
 	NewAdminManageRepo,
 	wire.Bind(new(biz.AdminManageRepo), new(*adminManageRepo)),
+	wire.Bind(new(biz.AdminDirectoryReader), new(*adminManageRepo)),
 
 	// domain repos
 	NewWorkflowRepo,

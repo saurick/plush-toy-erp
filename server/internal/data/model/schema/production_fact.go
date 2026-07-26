@@ -11,6 +11,8 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+
+	"server/internal/data/model/factguard"
 )
 
 type ProductionFact struct {
@@ -41,6 +43,9 @@ func (ProductionFact) Hooks() []ent.Hook {
 	return []ent.Hook{
 		func(next ent.Mutator) ent.Mutator {
 			return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+				if err := factguard.RejectCreateBypass(m, "production_fact"); err != nil {
+					return nil, err
+				}
 				if m.Op().Is(ent.OpDelete | ent.OpDeleteOne) {
 					return nil, errors.New("production_facts are immutable facts; cancel posted facts with reversal instead of deleting them")
 				}

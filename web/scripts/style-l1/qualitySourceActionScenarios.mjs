@@ -59,22 +59,6 @@ export function createQualitySourceActionScenarios(deps) {
     )
   }
 
-  const ensureSelectionActionDrawer = async (page) => {
-    const drawer = page.locator('.erp-business-selection-action-drawer:visible')
-    if ((await drawer.count()) === 0) {
-      const moreButtons = page.getByRole('button', { name: /更多操作/u })
-      let more = null
-      for (let index = 0; index < (await moreButtons.count()); index += 1) {
-        const candidate = moreButtons.nth(index)
-        if (await candidate.isVisible()) more = candidate
-      }
-      assert(more, '未找到可见的更多操作按钮')
-      await more.click()
-    }
-    await drawer.waitFor({ state: 'visible', timeout: 10_000 })
-    return drawer
-  }
-
   const clickSelectionAction = async (page, actionName) => {
     const button = await findSelectionActionButton(page, actionName)
     await button.click()
@@ -822,7 +806,10 @@ export function createQualitySourceActionScenarios(deps) {
             .getByRole('row')
             .filter({ hasText: 'QI-REJECT-STYLE-L1' })
             .click()
-          const returnButton = await findSelectionActionButton(page, '退供应商')
+          const returnButton = await findSelectionActionButton(
+            page,
+            '不合格处置'
+          )
           await page.waitForFunction(
             (button) => button instanceof HTMLButtonElement && !button.disabled,
             await returnButton.elementHandle()
@@ -947,80 +934,57 @@ export function createQualitySourceActionScenarios(deps) {
           ]) {
             assert.equal(derivedField in params, false)
           }
-          const completedButton = page.getByRole('button', {
-            name: '已生成退货',
-          })
-          if ((await completedButton.count()) > 0) {
-            assert.equal(await completedButton.isDisabled(), true)
-          } else {
-            await page.getByRole('button', { name: /更多操作/u }).click()
-            const completedDrawerButton = page
-              .locator('.ant-drawer:visible')
-              .getByRole('button', { name: '已生成退货' })
-            await completedDrawerButton.waitFor({
-              state: 'visible',
-              timeout: 10_000,
-            })
-            assert.equal(await completedDrawerButton.isDisabled(), true)
-            await page.keyboard.press('Escape')
-          }
+          assert.equal(
+            await page
+              .locator('[data-business-action-key="quality-disposition"]')
+              .count(),
+            0,
+            '退货已生成后应隐藏已完成的不合格处置动作'
+          )
           await expectText(
             page,
             '首次到货检验不合格可按来源行和部分数量办理退厂或补换'
           )
           await selectRow(page, 'QI-INITIAL-REJECT-STYLE-L1')
-          const initialRejectReturnButton = await findSelectionActionButton(
-            page,
-            '退供应商'
-          )
-          const initialRejectTitle =
-            '首次到货检验不合格只阻止入库，不在此生成采购退货'
+          const initialRejectDispositionButton =
+            await findSelectionActionButton(page, '不合格处置')
           await page.waitForFunction(
-            ({ button, title }) => button?.getAttribute('title') === title,
-            {
-              button: await initialRejectReturnButton.elementHandle(),
-              title: initialRejectTitle,
-            }
+            (button) =>
+              button instanceof HTMLButtonElement && !button.disabled,
+            await initialRejectDispositionButton.elementHandle()
           )
           assert(
             exactReceiptIDs.includes(603),
             '首次 IQC 来源不在首批列表时也应按 ID 精确读取'
           )
-          assert.equal(await initialRejectReturnButton.isDisabled(), true)
           assert.equal(
-            await initialRejectReturnButton.getAttribute('title'),
-            initialRejectTitle
+            await initialRejectDispositionButton.isEnabled(),
+            true,
+            '首次来料不合格应通过统一入口办理来源行处置'
           )
-          const initialRejectDrawer = await ensureSelectionActionDrawer(page)
-          const initialRejectDrawerButton = initialRejectDrawer
-            .locator('button')
-            .filter({ hasText: '退供应商' })
-          assert.equal(await initialRejectDrawerButton.isDisabled(), true)
-          assert.equal(
-            await initialRejectDrawerButton.getAttribute('title'),
-            initialRejectTitle
+          await initialRejectDispositionButton.click()
+          const initialRejectModal = page
+            .locator('.ant-modal:visible')
+            .filter({ hasText: '首次来料不合格退厂处置' })
+            .last()
+          await initialRejectModal.waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          await expectText(
+            initialRejectModal,
+            '该入口按当前不合格来源行和数量办理退厂或供应商补换'
           )
-          await page.waitForFunction(
-            (button) => {
-              const rect = button?.getBoundingClientRect()
-              return Boolean(
-                rect && rect.top >= 0 && rect.bottom <= window.innerHeight
-              )
-            },
-            await initialRejectDrawerButton.elementHandle()
-          )
-          await initialRejectDrawer.screenshot({
+          await initialRejectModal.screenshot({
             path: path.resolve(
               outputDir,
-              'quality-initial-iqc-rejection-disabled-drawer-dark-narrow.png'
+              'quality-initial-iqc-disposition-modal-dark-narrow.png'
             ),
           })
-          await page.screenshot({
-            path: path.resolve(
-              outputDir,
-              'quality-initial-iqc-rejection-disabled-dark-narrow.png'
-            ),
-            fullPage: true,
+          await page.keyboard.press('Escape')
+          await initialRejectModal.waitFor({
+            state: 'hidden',
+            timeout: 10_000,
           })
           await assertNoHorizontalOverflow(
             page,

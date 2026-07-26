@@ -36,7 +36,7 @@ fi
 
 subject="$(head -n 1 "$msg_file" | tr -d "\r")"
 
-if [[ "$subject" =~ ^(Merge|Revert|fixup!|squash!) ]]; then
+if [[ "$subject" =~ ^(Merge\ |Revert\ \"|fixup!\ |squash!\ ) ]]; then
   exit 0
 fi
 

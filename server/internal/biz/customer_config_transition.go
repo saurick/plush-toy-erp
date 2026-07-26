@@ -154,42 +154,11 @@ func (uc *CustomerConfigUsecase) CheckCustomerConfigTransition(
 		}
 	}
 
-	changedProcessKeys := customerConfigTransitionChangedProcessKeys(active.CompiledSnapshot, target.CompiledSnapshot)
-	if len(changedProcessKeys) > 0 {
-		count, err := uc.repo.CountInFlightProcessInstances(ctx, customerKey, active.Revision, changedProcessKeys)
-		if err != nil {
-			return nil, err
-		}
-		if count > 0 {
-			out.addBlocker("in_flight_processes_for_changed_contracts", "process", changedProcessKeys, count)
-		}
-	}
-
-	responsibilityChanged, activePoolKeys, activeRoleKeys, err := uc.customerConfigTransitionResponsibilityChanged(
-		ctx,
-		customerKey,
-		active.Revision,
-		targetRevision,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if responsibilityChanged && (len(activePoolKeys) > 0 || len(activeRoleKeys) > 0) {
-		count, err := uc.repo.CountOpenWorkflowTasksByResponsibilities(
-			ctx,
-			customerKey,
-			active.Revision,
-			activePoolKeys,
-			activeRoleKeys,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if count > 0 {
-			responsibilityKeys := append(append([]string{}, activePoolKeys...), activeRoleKeys...)
-			out.addBlocker("open_workflow_tasks_for_changed_responsibility", "responsibility", responsibilityKeys, count)
-		}
-	}
+	// Process instances, nodes and linked tasks retain their immutable
+	// config_revision. Activating a new responsibility or process definition
+	// therefore affects only newly started processes; existing work continues
+	// to authorize against the stored superseded revision. Module shutdown
+	// remains separately guarded by open business documents above.
 	return out.finalize(), nil
 }
 

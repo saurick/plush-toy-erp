@@ -86,6 +86,10 @@ func normalizeCustomerProcessContracts(snapshot map[string]any) (map[string]any,
 				selection.BusinessRefType,
 			)
 		}
+		contract, err = applyApprovalSettingsToCustomerProcessContract(snapshot, contract)
+		if err != nil {
+			return nil, err
+		}
 		if err := validateCustomerProcessContractForPublish(contract); err != nil {
 			return nil, err
 		}
@@ -100,6 +104,45 @@ func normalizeCustomerProcessContracts(snapshot map[string]any) (map[string]any,
 	out["runtimeProcessSelections"] = canonicalSelections
 	out["processDefinitions"] = canonicalDefinitions
 	return out, nil
+}
+
+func applyApprovalSettingsToCustomerProcessContract(snapshot map[string]any, contract customerProcessContract) (customerProcessContract, error) {
+	settings := approvalSettingsEnabledMap(snapshot)
+	if len(settings) == 0 {
+		return contract, nil
+	}
+	approvalKey := ""
+	switch contract.Selection.ProcessKey {
+	case ProcessKeySalesOrderAcceptance:
+		approvalKey = ApprovalSettingSalesOrder
+	case ProcessKeyMaterialSupply:
+		approvalKey = ApprovalSettingPurchaseOrder
+	case ProcessKeyFinishedGoodsDelivery:
+		approvalKey = ApprovalSettingShipmentFinance
+	}
+	catalog, ok := approvalSettingCatalogByKey(approvalKey)
+	if !ok || !catalog.Configurable {
+		return contract, nil
+	}
+	enabled, configured := settings[approvalKey]
+	if !configured {
+		return customerProcessContract{}, fmt.Errorf("%w: approval setting %s is missing", ErrBadParam, approvalKey)
+	}
+	for index := range contract.Nodes {
+		node := &contract.Nodes[index]
+		if node.NodeType != ProcessNodeTypeApproval {
+			continue
+		}
+		poolKey := catalog.PoolKey
+		node.OwnerPoolKey = &poolKey
+		if node.PolicySnapshot == nil {
+			node.PolicySnapshot = map[string]any{}
+		}
+		node.PolicySnapshot["approval_key"] = approvalKey
+		node.PolicySnapshot["approval_enabled"] = enabled
+		node.PolicySnapshot["member_resolution"] = "lowest_enabled_priority"
+	}
+	return contract, nil
 }
 
 func validateCustomerProcessContractForPublish(contract customerProcessContract) error {
@@ -185,12 +228,16 @@ func customerProcessDefinitionFromContract(contract customerProcessContract) map
 		}
 		if len(node.PolicySnapshot) > 0 {
 			policy := cloneProcessPolicySnapshot(node.PolicySnapshot)
+			runtimeLoaderBlockers := []any{}
+			if enabled, configured := policy["approval_enabled"].(bool); configured && !enabled {
+				runtimeLoaderBlockers = append(runtimeLoaderBlockers, "approval_disabled")
+			}
 			item["policy_snapshot"] = policy
 			item["fact_command_contract"] = map[string]any{
 				"command_key":                        getStringFromAnyMap(policy, "command_key"),
 				"runtime_binding_status":             "process_runtime_handler_registered",
 				"process_runtime_handler_registered": true,
-				"runtime_loader_blockers":            []any{},
+				"runtime_loader_blockers":            runtimeLoaderBlockers,
 				"runtime_execute_blockers":           []any{},
 				"writes_fact":                        false,
 			}

@@ -185,7 +185,17 @@ func TestProductionStockedScrapPostsOutAndCancelReverses(t *testing.T) {
 		t.Fatal(err)
 	}
 	sourceType, orderID, itemID := biz.ProductionOrderSourceType, fixture.order.ID, fixture.item.ID
-	f.client.ProductionFact.Create().SetFactNo("PF-STOCKED-SCRAP-SOURCE").SetFactType(biz.ProductionFactFinishedGoodsReceipt).SetStatus(biz.OperationalFactStatusPosted).SetSubjectType(biz.InventorySubjectProduct).SetSubjectID(f.productID).SetWarehouseID(warehouse.ID).SetUnitID(f.unitID).SetLotID(lot.ID).SetQuantity(decimal.NewFromInt(2)).SetSourceType(sourceType).SetSourceID(orderID).SetSourceLineID(itemID).SetIdempotencyKey("pf-stocked-scrap-source").SetPostedAt(time.Now()).SaveX(f.ctx)
+	sourceFact := f.client.ProductionFact.Create().SetFactNo("PF-STOCKED-SCRAP-SOURCE").SetFactType(biz.ProductionFactFinishedGoodsReceipt).SetStatus(biz.OperationalFactStatusDraft).SetSubjectType(biz.InventorySubjectProduct).SetSubjectID(f.productID).SetWarehouseID(warehouse.ID).SetUnitID(f.unitID).SetLotID(lot.ID).SetQuantity(decimal.NewFromInt(2)).SetSourceType(sourceType).SetSourceID(orderID).SetSourceLineID(itemID).SetIdempotencyKey("pf-stocked-scrap-source").SaveX(f.ctx)
+	if _, err := f.data.sqldb.ExecContext(
+		f.ctx,
+		"UPDATE production_facts SET status = ?, posted_at = ?, updated_at = ? WHERE id = ?",
+		biz.OperationalFactStatusPosted,
+		time.Now().UTC(),
+		time.Now().UTC(),
+		sourceFact.ID,
+	); err != nil {
+		t.Fatalf("prepare posted source fact fixture: %v", err)
+	}
 	f.client.InventoryLot.UpdateOneID(lot.ID).SetStatus(biz.InventoryLotRejected).SaveX(f.ctx)
 	result := biz.QualityInspectionResultReject
 	inspection := f.client.QualityInspection.Create().SetInspectionNo("QI-STOCKED-SCRAP").SetInventoryLotID(lot.ID).SetWarehouseID(warehouse.ID).SetSourceType(biz.QualityInspectionSourceShipment).SetSourceID(999).SetInspectionType(biz.QualityInspectionTypeFinishedGoods).SetSubjectType(biz.QualityInspectionSubjectProduct).SetSubjectID(f.productID).SetStatus(biz.QualityInspectionStatusRejected).SetResult(result).SaveX(f.ctx)

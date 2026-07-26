@@ -58,11 +58,6 @@ func safeRequestSummary(req any) string {
 			return "jsonrpc.post"
 		}
 		return fmt.Sprintf("jsonrpc.post url=%s method=%s id=%s", value.GetUrl(), value.GetMethod(), value.GetId())
-	case *v1.GetJsonrpcRequest:
-		if value == nil {
-			return "jsonrpc.get"
-		}
-		return fmt.Sprintf("jsonrpc.get url=%s method=%s id=%s", value.GetUrl(), value.GetMethod(), value.GetId())
 	default:
 		return fmt.Sprintf("type=%T", req)
 	}

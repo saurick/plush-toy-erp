@@ -57,16 +57,16 @@ func TestPermissionUsageUsesExplicitRegisteredSurface(t *testing.T) {
 	}
 }
 
-func TestPermissionUsageKeepsBackendOnlyPermissionsOutOfPageProjection(t *testing.T) {
+func TestPermissionUsageProjectsCustomerConfigReadToApprovalSettings(t *testing.T) {
 	usage := permissionUsageToMap(biz.AdminPermission{Key: biz.PermissionCustomerConfigRead})
-	if usage["backend_only"] != true {
+	if usage["backend_only"] != false {
 		t.Fatalf("backend_only = %#v", usage["backend_only"])
 	}
-	if pages := usage["pages"].([]any); len(pages) != 0 {
-		t.Fatalf("backend-only pages = %#v", pages)
+	if pages := usage["pages"].([]any); len(pages) == 0 {
+		t.Fatalf("approval settings page missing = %#v", pages)
 	}
 	if methods := usage["backend_methods"].([]any); len(methods) == 0 {
-		t.Fatalf("backend-only methods = %#v", methods)
+		t.Fatalf("customer config methods = %#v", methods)
 	}
 }
 

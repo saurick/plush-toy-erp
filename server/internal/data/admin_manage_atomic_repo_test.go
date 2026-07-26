@@ -308,6 +308,29 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 	}
 }
 
+func TestAdminManageRepoERPColumnOrdersPreserveOtherModules(t *testing.T) {
+	fx := newAdminManageAtomicFixture(t)
+
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "customers", []string{"name", "status"}); err != nil {
+		t.Fatalf("save customers columns: %v", err)
+	}
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "suppliers", []string{"code", "name"}); err != nil {
+		t.Fatalf("save suppliers columns: %v", err)
+	}
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, " customers ", []string{"status"}); err != nil {
+		t.Fatalf("update customers columns: %v", err)
+	}
+
+	row := fx.client.AdminUser.GetX(fx.ctx, fx.target.ID)
+	preferences := decodeAdminERPPreferences(row.ErpPreferences)
+	if got := preferences.ColumnOrders["customers"]; len(got) != 1 || got[0] != "status" {
+		t.Fatalf("customers columns = %#v", got)
+	}
+	if got := preferences.ColumnOrders["suppliers"]; len(got) != 2 || got[0] != "code" || got[1] != "name" {
+		t.Fatalf("suppliers columns were lost: %#v", got)
+	}
+}
+
 func TestAdminManageRepoRevokeCommitsSessionAuditAndTaskRelease(t *testing.T) {
 	fx := newAdminManageAtomicFixture(t)
 	now := time.Now()

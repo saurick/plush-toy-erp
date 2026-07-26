@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 )
 
@@ -96,6 +97,12 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 		return nil, err
 	}
 	if ok, err := boolFromProcessDefinition(definition, "runtime_loader_enabled"); err != nil || !ok {
+		return nil, ErrBadParam
+	}
+	if _, loaderBlockers, _ := processDefinitionNodeExplanations(definition); len(loaderBlockers) > 0 {
+		if stringSliceContains(loaderBlockers, "approval_disabled") {
+			return nil, ErrCustomerConfigApprovalDisabled
+		}
 		return nil, ErrBadParam
 	}
 	if getStringFromAnyMap(definition, "fact_boundary") != "no_fact_posting" {
@@ -420,6 +427,30 @@ func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeysRequiringActiveRevi
 // immutable revision stored on a formal ProcessRuntime task. It never consults
 // the current active revision and never falls back to builtin roles.
 func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeysAtRevision(ctx context.Context, customerKey, revision string, admin *AdminUser, requiredCapabilities ...string) ([]string, error) {
+	return uc.workflowVisibleOwnerRoleKeysAtStoredRevision(ctx, customerKey, revision, "", admin, requiredCapabilities...)
+}
+
+// WorkflowVisibleOwnerRoleKeysAtRevisionForPool additionally requires the
+// actor to be a role or named member of the task's immutable owner pool.
+func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeysAtRevisionForPool(
+	ctx context.Context,
+	customerKey, revision, ownerPoolKey string,
+	admin *AdminUser,
+	requiredCapabilities ...string,
+) ([]string, error) {
+	ownerPoolKey = strings.TrimSpace(ownerPoolKey)
+	if ownerPoolKey == "" {
+		return []string{}, ErrBadParam
+	}
+	return uc.workflowVisibleOwnerRoleKeysAtStoredRevision(ctx, customerKey, revision, ownerPoolKey, admin, requiredCapabilities...)
+}
+
+func (uc *CustomerConfigUsecase) workflowVisibleOwnerRoleKeysAtStoredRevision(
+	ctx context.Context,
+	customerKey, revision, ownerPoolKey string,
+	admin *AdminUser,
+	requiredCapabilities ...string,
+) ([]string, error) {
 	if admin == nil || admin.Disabled || uc == nil || uc.repo == nil {
 		return []string{}, ErrForbidden
 	}
@@ -438,6 +469,11 @@ func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeysAtRevision(ctx cont
 	if stored == nil || stored.CustomerKey != customerKey || stored.Revision != revision ||
 		!customerConfigRevisionCanAuthorizeRuntimeTask(stored.Status) {
 		return []string{}, ErrCustomerConfigNotFound
+	}
+	if ownerPoolKey != "" {
+		return uc.workflowVisibleOwnerRoleKeysAtRevisionForPool(
+			ctx, customerKey, revision, ownerPoolKey, admin, requiredCapabilities...,
+		)
 	}
 	return uc.workflowVisibleOwnerRoleKeysAtRevision(ctx, customerKey, revision, admin, requiredCapabilities...)
 }
@@ -506,6 +542,85 @@ func (uc *CustomerConfigUsecase) workflowVisibleOwnerRoleKeysAtRevision(ctx cont
 	return NormalizeAdminRoleKeys(visibleRoleKeys), nil
 }
 
+func (uc *CustomerConfigUsecase) workflowVisibleOwnerRoleKeysAtRevisionForPool(
+	ctx context.Context,
+	customerKey, revision, ownerPoolKey string,
+	admin *AdminUser,
+	requiredCapabilities ...string,
+) ([]string, error) {
+	baseRoleKeys := AdminRoleKeys(admin)
+	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, revision)
+	if err != nil {
+		return []string{}, err
+	}
+	enabledBaseRoleKeys := enabledCustomerRoleKeys(baseRoleKeys, roleProfiles)
+	memberships, err := uc.repo.ListWorkPoolMemberships(ctx, customerKey, revision, enabledBaseRoleKeys, admin.ID)
+	if err != nil {
+		return []string{}, err
+	}
+	membershipRoleKeys := []string{}
+	for _, item := range memberships {
+		if !item.Enabled || strings.TrimSpace(item.PoolKey) != ownerPoolKey {
+			continue
+		}
+		roleKey := NormalizeRoleKey(item.RoleKey)
+		if IsApprovalSettingsPoolKey(ownerPoolKey) {
+			roleMatched := AdminHasRole(admin, roleKey)
+			namedMatched := item.UserID > 0 && item.UserID == admin.ID && roleMatched
+			rolePoolMatched := item.UserID == 0 && roleMatched
+			if !namedMatched && !rolePoolMatched {
+				continue
+			}
+		}
+		if roleKey != "" {
+			membershipRoleKeys = append(membershipRoleKeys, roleKey)
+		}
+	}
+	candidateRoleKeys := enabledCustomerRoleKeys(membershipRoleKeys, roleProfiles)
+	requiredCapabilities = normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities)
+	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, revision, candidateRoleKeys)
+	if err != nil {
+		return []string{}, err
+	}
+	eligibleRoles := workflowEligibleRoleKeysWithCapabilities(
+		candidateRoleKeys, roleProfiles, entitlements, requiredCapabilities, customerKey,
+	)
+	visibleRoleKeys := make([]string, 0, len(candidateRoleKeys))
+	for _, roleKey := range candidateRoleKeys {
+		if _, ok := eligibleRoles[roleKey]; ok {
+			visibleRoleKeys = append(visibleRoleKeys, roleKey)
+		}
+	}
+	visibleRoleKeys = NormalizeAdminRoleKeys(visibleRoleKeys)
+	if IsApprovalSettingsPoolKey(ownerPoolKey) && uc.adminDirectory != nil {
+		selected, err := uc.WorkflowCandidateOwnerRoleKeysAtRevision(
+			ctx,
+			customerKey,
+			revision,
+			ownerPoolKey,
+			requiredCapabilities...,
+		)
+		if err != nil {
+			return []string{}, err
+		}
+		if len(selected.CandidateAssigneeIDs) > 0 && !positiveIntSliceContains(selected.CandidateAssigneeIDs, admin.ID) {
+			return []string{}, nil
+		}
+		selectedRoles := map[string]struct{}{}
+		for _, roleKey := range selected.CandidateOwnerRoleKeys {
+			selectedRoles[NormalizeRoleKey(roleKey)] = struct{}{}
+		}
+		filtered := make([]string, 0, len(visibleRoleKeys))
+		for _, roleKey := range visibleRoleKeys {
+			if _, ok := selectedRoles[NormalizeRoleKey(roleKey)]; ok {
+				filtered = append(filtered, roleKey)
+			}
+		}
+		visibleRoleKeys = filtered
+	}
+	return visibleRoleKeys, nil
+}
+
 type WorkflowTaskCandidateExplanation struct {
 	CustomerKey            string
 	ConfigRevision         string
@@ -514,6 +629,9 @@ type WorkflowTaskCandidateExplanation struct {
 	MembershipRoleKeys     []string
 	EntitledRoleKeys       []string
 	CandidateOwnerRoleKeys []string
+	CandidateAssigneeIDs   []int
+	SelectedStrategy       string
+	SelectedPriority       int
 	Source                 string
 }
 
@@ -591,13 +709,40 @@ func (uc *CustomerConfigUsecase) workflowCandidateOwnerRoleKeysAtRevision(ctx co
 		out.Source = "customer_config_error"
 		return out, err
 	}
+	approvalAdmins := []*AdminUser(nil)
+	if IsApprovalSettingsPoolKey(ownerPoolKey) && uc.adminDirectory != nil {
+		approvalAdmins, err = uc.adminDirectory.ListAdmins(ctx)
+		if err != nil {
+			out.Source = "admin_directory_error"
+			return out, err
+		}
+	}
 	membershipRoleKeys := []string{}
+	rolePriority := map[string]int{}
+	roleStrategy := map[string]string{}
+	roleUserIDs := map[string][]int{}
 	for _, item := range memberships {
 		if !item.Enabled {
 			continue
 		}
+		if approvalAdmins != nil && !approvalMembershipHasActiveAdmin(item, approvalAdmins) {
+			continue
+		}
 		if roleKey := NormalizeRoleKey(item.RoleKey); roleKey != "" {
 			membershipRoleKeys = append(membershipRoleKeys, roleKey)
+			priority := item.Priority
+			if priority <= 0 {
+				priority = 100
+			}
+			current, exists := rolePriority[roleKey]
+			if !exists || priority < current {
+				rolePriority[roleKey] = priority
+				roleStrategy[roleKey] = strings.TrimSpace(item.Strategy)
+				roleUserIDs[roleKey] = nil
+			}
+			if priority == rolePriority[roleKey] && item.UserID > 0 {
+				roleUserIDs[roleKey] = append(roleUserIDs[roleKey], item.UserID)
+			}
 		}
 	}
 	out.MembershipRoleKeys = enabledCustomerRoleKeys(membershipRoleKeys, roleProfiles)
@@ -612,11 +757,77 @@ func (uc *CustomerConfigUsecase) workflowCandidateOwnerRoleKeysAtRevision(ctx co
 	}
 	out.EntitledRoleKeys = NormalizeAdminRoleKeys(out.EntitledRoleKeys)
 	candidateRoleKeys := []string{}
+	selectedPriority := 0
 	for _, roleKey := range out.MembershipRoleKeys {
 		if _, ok := entitledRoleKeys[roleKey]; ok {
-			candidateRoleKeys = append(candidateRoleKeys, roleKey)
+			priority := rolePriority[roleKey]
+			if priority <= 0 {
+				priority = 100
+			}
+			if selectedPriority == 0 || priority < selectedPriority {
+				selectedPriority = priority
+				candidateRoleKeys = []string{roleKey}
+			} else if priority == selectedPriority {
+				candidateRoleKeys = append(candidateRoleKeys, roleKey)
+			}
 		}
 	}
 	out.CandidateOwnerRoleKeys = NormalizeAdminRoleKeys(candidateRoleKeys)
+	out.SelectedPriority = selectedPriority
+	for _, roleKey := range out.CandidateOwnerRoleKeys {
+		strategy := roleStrategy[roleKey]
+		if out.SelectedStrategy == "" {
+			out.SelectedStrategy = strategy
+		} else if out.SelectedStrategy != strategy {
+			out.SelectedStrategy = "mixed"
+		}
+		out.CandidateAssigneeIDs = append(out.CandidateAssigneeIDs, roleUserIDs[roleKey]...)
+	}
+	sort.Ints(out.CandidateAssigneeIDs)
+	out.CandidateAssigneeIDs = uniquePositiveInts(out.CandidateAssigneeIDs)
 	return out, nil
+}
+
+func approvalMembershipHasActiveAdmin(
+	membership WorkPoolMembershipInput,
+	admins []*AdminUser,
+) bool {
+	roleKey := NormalizeRoleKey(membership.RoleKey)
+	if roleKey == "" {
+		return false
+	}
+	for _, admin := range admins {
+		if !admin.IsActive() || !AdminHasRole(admin, roleKey) {
+			continue
+		}
+		if membership.UserID == 0 || membership.UserID == admin.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func uniquePositiveInts(values []int) []int {
+	out := make([]int, 0, len(values))
+	last := 0
+	for _, value := range values {
+		if value <= 0 || value == last {
+			continue
+		}
+		out = append(out, value)
+		last = value
+	}
+	return out
+}
+
+func positiveIntSliceContains(values []int, target int) bool {
+	if target <= 0 {
+		return false
+	}
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

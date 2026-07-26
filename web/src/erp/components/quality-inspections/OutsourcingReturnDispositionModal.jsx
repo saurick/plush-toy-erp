@@ -38,6 +38,7 @@ export default function OutsourcingReturnDispositionModal({
   const [rows, setRows] = useState([])
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(false)
+  const readOnly = !canCreate && !canPost && !canCancel
   const attempts = useRef(createSourceBusinessActionAttemptStore())
   const load = useCallback(async () => {
     if (!inspection?.id) return
@@ -187,7 +188,7 @@ export default function OutsourcingReturnDispositionModal({
   }
   return (
     <Modal
-      title="委外不合格返厂 / 返工"
+      title={readOnly ? '查看委外不合格处置' : '委外不合格返厂 / 返工'}
       open={open}
       width={900}
       footer={
@@ -230,7 +231,7 @@ export default function OutsourcingReturnDispositionModal({
       <Form
         form={form}
         layout="vertical"
-        disabled={loading}
+        disabled={loading || readOnly}
         style={{ marginTop: 12 }}
       >
         <Space align="start" wrap>

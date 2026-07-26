@@ -68,6 +68,49 @@ func (f productionOrderPGFixture) createAndPostLinkedFact(t *testing.T, ctx cont
 	return posted
 }
 
+func (f productionOrderPGFixture) createCorruptPostedFact(
+	t *testing.T,
+	ctx context.Context,
+	order *biz.ProductionOrderAggregate,
+	label string,
+	sourceLineID int,
+	quantity int64,
+) {
+	t.Helper()
+	fact := f.client.ProductionFact.Create().
+		SetFactNo("PF-" + label + "-" + f.suffix).
+		SetFactType(biz.ProductionFactFinishedGoodsReceipt).
+		SetStatus(biz.OperationalFactStatusDraft).
+		SetSubjectType(biz.InventorySubjectProduct).
+		SetSubjectID(f.productID).
+		SetProductSkuID(f.skuID).
+		SetWarehouseID(f.warehouseID).
+		SetUnitID(f.unitID).
+		SetQuantity(decimal.NewFromInt(quantity)).
+		SetIdempotencyKey("pf-" + label + "-" + f.suffix).
+		SetSourceType(biz.ProductionOrderSourceType).
+		SetSourceID(order.Order.ID).
+		SetSourceLineID(sourceLineID).
+		SetOccurredAt(time.Now().UTC()).
+		SetOccurredAtSpecified(true).
+		SaveX(ctx)
+
+	// The close path must fail closed for a corrupt historical terminal row,
+	// while runtime Ent builders must only create DRAFT facts.
+	result, err := f.data.sqldb.ExecContext(
+		ctx,
+		"UPDATE production_facts SET status = $1, posted_at = CURRENT_TIMESTAMP WHERE id = $2",
+		biz.OperationalFactStatusPosted,
+		fact.ID,
+	)
+	if err != nil {
+		t.Fatalf("prepare corrupt posted production fact: %v", err)
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		t.Fatalf("prepare corrupt posted production fact affected=%d err=%v", affected, err)
+	}
+}
+
 func (f productionOrderPGFixture) assertProductionFactReversed(t *testing.T, ctx context.Context, factID int) {
 	t.Helper()
 	fact := f.client.ProductionFact.GetX(ctx, factID)
@@ -417,23 +460,7 @@ func TestProductionOrderPostgresCloseFailsClosedForCorruptOrExcessFacts(t *testi
 
 	wrong := f.createReleasedOrder(t, ctx, "close-wrong-source")
 	wrongLineID := wrong.Items[0].ID + 999999
-	f.client.ProductionFact.Create().
-		SetFactNo("PF-CLOSE-WRONG-" + f.suffix).
-		SetFactType(biz.ProductionFactFinishedGoodsReceipt).
-		SetStatus(biz.OperationalFactStatusPosted).
-		SetSubjectType(biz.InventorySubjectProduct).
-		SetSubjectID(f.productID).
-		SetProductSkuID(f.skuID).
-		SetWarehouseID(f.warehouseID).
-		SetUnitID(f.unitID).
-		SetQuantity(decimal.NewFromInt(1)).
-		SetIdempotencyKey("pf-close-wrong-" + f.suffix).
-		SetSourceType(biz.ProductionOrderSourceType).
-		SetSourceID(wrong.Order.ID).
-		SetSourceLineID(wrongLineID).
-		SetOccurredAt(time.Now().UTC()).
-		SetOccurredAtSpecified(true).
-		SaveX(ctx)
+	f.createCorruptPostedFact(t, ctx, wrong, "close-wrong", wrongLineID, 1)
 	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{
 		ID: wrong.Order.ID, ExpectedVersion: 2, ActorID: f.actorID,
 		IdempotencyKey: "close-wrong-source-" + f.suffix, Reason: &reason,
@@ -442,23 +469,7 @@ func TestProductionOrderPostgresCloseFailsClosedForCorruptOrExcessFacts(t *testi
 	}
 
 	excess := f.createReleasedOrder(t, ctx, "close-excess")
-	f.client.ProductionFact.Create().
-		SetFactNo("PF-CLOSE-EXCESS-" + f.suffix).
-		SetFactType(biz.ProductionFactFinishedGoodsReceipt).
-		SetStatus(biz.OperationalFactStatusPosted).
-		SetSubjectType(biz.InventorySubjectProduct).
-		SetSubjectID(f.productID).
-		SetProductSkuID(f.skuID).
-		SetWarehouseID(f.warehouseID).
-		SetUnitID(f.unitID).
-		SetQuantity(decimal.NewFromInt(11)).
-		SetIdempotencyKey("pf-close-excess-" + f.suffix).
-		SetSourceType(biz.ProductionOrderSourceType).
-		SetSourceID(excess.Order.ID).
-		SetSourceLineID(excess.Items[0].ID).
-		SetOccurredAt(time.Now().UTC()).
-		SetOccurredAtSpecified(true).
-		SaveX(ctx)
+	f.createCorruptPostedFact(t, ctx, excess, "close-excess", excess.Items[0].ID, 11)
 	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{
 		ID: excess.Order.ID, ExpectedVersion: 2, ActorID: f.actorID,
 		IdempotencyKey: "close-excess-" + f.suffix, Reason: &reason,

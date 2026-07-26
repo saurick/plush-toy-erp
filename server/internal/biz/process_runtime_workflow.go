@@ -54,7 +54,7 @@ func (uc *ProcessRuntimeUsecase) CreateLinkedWorkflowTask(ctx context.Context, i
 	if taskStatusKey == "" {
 		taskStatusKey = "ready"
 	}
-	ownerRoleKey, err := uc.resolveLinkedWorkflowTaskOwnerRole(ctx, instance, node, normalized.OwnerRoleKey)
+	ownerRoleKey, assigneeID, err := uc.resolveLinkedWorkflowTaskOwner(ctx, instance, node, normalized.OwnerRoleKey)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +72,7 @@ func (uc *ProcessRuntimeUsecase) CreateLinkedWorkflowTask(ctx context.Context, i
 		OwnerRoleKey:          ownerRoleKey,
 		OwnerPoolKey:          node.OwnerPoolKey,
 		RequiredCapabilityKey: node.RequiredCapabilityKey,
+		AssigneeID:            assigneeID,
 		ConfigRevision:        &configRevision,
 		ProcessInstanceID:     &processInstanceID,
 		ProcessNodeInstanceID: &processNodeInstanceID,
@@ -99,38 +100,42 @@ func (uc *ProcessRuntimeUsecase) CreateLinkedWorkflowTask(ctx context.Context, i
 	return existing, nil
 }
 
-func (uc *ProcessRuntimeUsecase) resolveLinkedWorkflowTaskOwnerRole(ctx context.Context, instance *ProcessInstance, node *ProcessNodeInstance, explicitOwnerRoleKey string) (string, error) {
+func (uc *ProcessRuntimeUsecase) resolveLinkedWorkflowTaskOwner(ctx context.Context, instance *ProcessInstance, node *ProcessNodeInstance, explicitOwnerRoleKey string) (string, *int, error) {
 	if ownerRoleKey := NormalizeRoleKey(explicitOwnerRoleKey); ownerRoleKey != "" {
-		return ownerRoleKey, nil
+		return ownerRoleKey, nil, nil
 	}
 	if uc == nil || uc.ownerResolver == nil || instance == nil || node == nil ||
 		node.OwnerPoolKey == nil || strings.TrimSpace(*node.OwnerPoolKey) == "" ||
 		node.RequiredCapabilityKey == nil || strings.TrimSpace(*node.RequiredCapabilityKey) == "" {
-		return "", ErrProcessTaskOwnerRoleNotFound
+		return "", nil, ErrProcessTaskOwnerRoleNotFound
 	}
 	customerKey := processInstanceCustomerKey(instance)
 	configRevision := strings.TrimSpace(instance.ConfigRevision)
 	if configRevision == "" {
-		return "", ErrProcessTaskOwnerRoleNotFound
+		return "", nil, ErrProcessTaskOwnerRoleNotFound
 	}
 	explanation, err := uc.ownerResolver.WorkflowCandidateOwnerRoleKeysAtRevision(ctx, customerKey, configRevision, *node.OwnerPoolKey, *node.RequiredCapabilityKey)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if explanation == nil {
-		return "", ErrProcessTaskOwnerRoleNotFound
+		return "", nil, ErrProcessTaskOwnerRoleNotFound
 	}
 	if explanation.ConfigRevision != configRevision {
-		return "", ErrProcessTaskOwnerRoleNotFound
+		return "", nil, ErrProcessTaskOwnerRoleNotFound
 	}
 	candidates := NormalizeAdminRoleKeys(explanation.CandidateOwnerRoleKeys)
 	switch len(candidates) {
 	case 0:
-		return "", ErrProcessTaskOwnerRoleNotFound
+		return "", nil, ErrProcessTaskOwnerRoleNotFound
 	case 1:
-		return candidates[0], nil
+		if len(explanation.CandidateAssigneeIDs) == 1 {
+			assigneeID := explanation.CandidateAssigneeIDs[0]
+			return candidates[0], &assigneeID, nil
+		}
+		return candidates[0], nil, nil
 	default:
-		return "", ErrProcessTaskOwnerRoleAmbiguous
+		return "", nil, ErrProcessTaskOwnerRoleAmbiguous
 	}
 }
 

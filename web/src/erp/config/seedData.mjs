@@ -69,7 +69,7 @@ const navItemRegistry = {
     label: '权限管理',
     path: '/erp/system/permissions',
     shortLabel: '权限',
-    description: '集中管理员工账号、岗位、功能权限和账号状态。',
+    description: '集中管理员工账号、岗位、功能权限、菜单和审批责任。',
   },
   'system-audit-logs': {
     key: 'system-audit-logs',

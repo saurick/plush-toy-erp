@@ -18,10 +18,16 @@ type WorkflowTaskAuthorizationRevision struct {
 }
 
 type WorkflowTaskRevisionRoleScope struct {
-	ConfigRevision       string
-	Status               string
-	VisibleOwnerRoleKeys []string
-	AllowAllOwnerRoles   bool
+	ConfigRevision        string
+	Status                string
+	VisibleOwnerRoleKeys  []string
+	VisibleOwnerPoolRoles []WorkflowTaskOwnerPoolRole
+	AllowAllOwnerRoles    bool
+}
+
+type WorkflowTaskOwnerPoolRole struct {
+	OwnerPoolKey string
+	OwnerRoleKey string
 }
 
 // WorkflowTaskVisibilityScope keeps ProcessRuntime tasks bound to their
@@ -51,6 +57,16 @@ func (uc *CustomerConfigUsecase) WorkflowTaskRevisionRoleScopes(
 	if err != nil {
 		return nil, err
 	}
+	var approvalAdmins []*AdminUser
+	if !admin.IsSuperAdmin && workflowAuthorizationRevisionsUseApprovalPools(revisions) {
+		if uc.adminDirectory == nil {
+			return nil, ErrCustomerConfigActiveRevisionRequired
+		}
+		approvalAdmins, err = uc.adminDirectory.ListAdmins(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
 	out := make([]WorkflowTaskRevisionRoleScope, 0, len(revisions))
 	for _, revision := range revisions {
 		if NormalizeCustomerKey(revision.CustomerKey) != customerKey ||
@@ -67,11 +83,19 @@ func (uc *CustomerConfigUsecase) WorkflowTaskRevisionRoleScopes(
 			AllowAllOwnerRoles: admin.IsSuperAdmin,
 		}
 		if !admin.IsSuperAdmin {
-			scope.VisibleOwnerRoleKeys = workflowVisibleOwnerRoleKeysFromAuthorizationRevision(
+			scope.VisibleOwnerRoleKeys, scope.VisibleOwnerPoolRoles = workflowVisibleOwnerScopesFromAuthorizationRevision(
 				customerKey,
 				admin,
 				revision,
 				requiredCapabilities,
+			)
+			scope.VisibleOwnerPoolRoles = workflowApprovalCandidatePoolRolesForAdmin(
+				customerKey,
+				admin,
+				revision,
+				requiredCapabilities,
+				approvalAdmins,
+				scope.VisibleOwnerPoolRoles,
 			)
 		}
 		out = append(out, scope)
@@ -80,27 +104,127 @@ func (uc *CustomerConfigUsecase) WorkflowTaskRevisionRoleScopes(
 	return out, nil
 }
 
-func workflowVisibleOwnerRoleKeysFromAuthorizationRevision(
+func workflowAuthorizationRevisionsUseApprovalPools(revisions []WorkflowTaskAuthorizationRevision) bool {
+	for _, revision := range revisions {
+		for _, membership := range revision.WorkPoolMemberships {
+			if membership.Enabled && IsApprovalSettingsPoolKey(membership.PoolKey) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func workflowApprovalCandidatePoolRolesForAdmin(
 	customerKey string,
 	admin *AdminUser,
 	revision WorkflowTaskAuthorizationRevision,
 	requiredCapabilities []string,
-) []string {
+	approvalAdmins []*AdminUser,
+	visiblePairs []WorkflowTaskOwnerPoolRole,
+) []WorkflowTaskOwnerPoolRole {
+	if admin == nil || approvalAdmins == nil {
+		return visiblePairs
+	}
+	membershipRoleKeys := []string{}
+	for _, membership := range revision.WorkPoolMemberships {
+		if !membership.Enabled ||
+			!IsApprovalSettingsPoolKey(membership.PoolKey) ||
+			!approvalMembershipHasActiveAdmin(membership, approvalAdmins) {
+			continue
+		}
+		membershipRoleKeys = append(membershipRoleKeys, membership.RoleKey)
+	}
+	candidateRoleKeys := enabledCustomerRoleKeys(membershipRoleKeys, revision.RoleProfiles)
+	eligibleRoles := workflowEligibleRoleKeysWithCapabilities(
+		candidateRoleKeys,
+		revision.RoleProfiles,
+		revision.AccessEntitlements,
+		normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities),
+		customerKey,
+	)
+	selectedPriorityByPool := map[string]int{}
+	for _, membership := range revision.WorkPoolMemberships {
+		poolKey := strings.TrimSpace(membership.PoolKey)
+		roleKey := NormalizeRoleKey(membership.RoleKey)
+		if !membership.Enabled ||
+			!IsApprovalSettingsPoolKey(poolKey) ||
+			!approvalMembershipHasActiveAdmin(membership, approvalAdmins) {
+			continue
+		}
+		if _, eligible := eligibleRoles[roleKey]; !eligible {
+			continue
+		}
+		priority := membership.Priority
+		if priority <= 0 {
+			priority = 100
+		}
+		if current := selectedPriorityByPool[poolKey]; current == 0 || priority < current {
+			selectedPriorityByPool[poolKey] = priority
+		}
+	}
+	selectedForAdmin := map[string]struct{}{}
+	for _, membership := range revision.WorkPoolMemberships {
+		poolKey := strings.TrimSpace(membership.PoolKey)
+		roleKey := NormalizeRoleKey(membership.RoleKey)
+		priority := membership.Priority
+		if priority <= 0 {
+			priority = 100
+		}
+		if !membership.Enabled ||
+			selectedPriorityByPool[poolKey] == 0 ||
+			priority != selectedPriorityByPool[poolKey] ||
+			!approvalMembershipHasActiveAdmin(membership, approvalAdmins) ||
+			!AdminHasRole(admin, roleKey) ||
+			(membership.UserID > 0 && membership.UserID != admin.ID) {
+			continue
+		}
+		if _, eligible := eligibleRoles[roleKey]; !eligible {
+			continue
+		}
+		selectedForAdmin[poolKey+"\x00"+roleKey] = struct{}{}
+	}
+	out := make([]WorkflowTaskOwnerPoolRole, 0, len(visiblePairs))
+	for _, pair := range visiblePairs {
+		if !IsApprovalSettingsPoolKey(pair.OwnerPoolKey) {
+			out = append(out, pair)
+			continue
+		}
+		key := strings.TrimSpace(pair.OwnerPoolKey) + "\x00" + NormalizeRoleKey(pair.OwnerRoleKey)
+		if _, selected := selectedForAdmin[key]; selected {
+			out = append(out, pair)
+		}
+	}
+	return normalizeWorkflowOwnerPoolRoles(out)
+}
+
+func workflowVisibleOwnerScopesFromAuthorizationRevision(
+	customerKey string,
+	admin *AdminUser,
+	revision WorkflowTaskAuthorizationRevision,
+	requiredCapabilities []string,
+) ([]string, []WorkflowTaskOwnerPoolRole) {
 	baseRoleKeys := enabledCustomerRoleKeys(AdminRoleKeys(admin), revision.RoleProfiles)
 	baseRoleSet := map[string]struct{}{}
 	for _, roleKey := range baseRoleKeys {
 		baseRoleSet[roleKey] = struct{}{}
 	}
 	membershipRoleKeys := []string{}
+	matchedMemberships := []WorkPoolMembershipInput{}
 	for _, membership := range revision.WorkPoolMemberships {
 		if !membership.Enabled {
 			continue
 		}
 		roleKey := NormalizeRoleKey(membership.RoleKey)
-		_, baseRoleMatched := baseRoleSet[roleKey]
+		_, actorRoleMatched := baseRoleSet[roleKey]
+		rolePoolMatched := actorRoleMatched && membership.UserID == 0
 		userMatched := membership.UserID > 0 && membership.UserID == admin.ID
-		if roleKey != "" && (baseRoleMatched || userMatched) {
+		if IsApprovalSettingsPoolKey(membership.PoolKey) {
+			userMatched = userMatched && actorRoleMatched
+		}
+		if roleKey != "" && (rolePoolMatched || userMatched) {
 			membershipRoleKeys = append(membershipRoleKeys, roleKey)
+			matchedMemberships = append(matchedMemberships, membership)
 		}
 	}
 	candidateRoleKeys := enabledCustomerRoleKeys(
@@ -120,7 +244,24 @@ func workflowVisibleOwnerRoleKeysFromAuthorizationRevision(
 			visible = append(visible, roleKey)
 		}
 	}
-	return NormalizeAdminRoleKeys(visible)
+	visible = NormalizeAdminRoleKeys(visible)
+	visibleSet := map[string]struct{}{}
+	for _, roleKey := range visible {
+		visibleSet[roleKey] = struct{}{}
+	}
+	poolRoles := make([]WorkflowTaskOwnerPoolRole, 0, len(matchedMemberships))
+	for _, membership := range matchedMemberships {
+		roleKey := NormalizeRoleKey(membership.RoleKey)
+		poolKey := strings.TrimSpace(membership.PoolKey)
+		if _, ok := visibleSet[roleKey]; !ok || poolKey == "" {
+			continue
+		}
+		poolRoles = append(poolRoles, WorkflowTaskOwnerPoolRole{
+			OwnerPoolKey: poolKey,
+			OwnerRoleKey: roleKey,
+		})
+	}
+	return visible, normalizeWorkflowOwnerPoolRoles(poolRoles)
 }
 
 func customerConfigRevisionCanAuthorizeRuntimeTask(status string) bool {
@@ -156,6 +297,9 @@ func NormalizeWorkflowTaskVisibilityScope(scope *WorkflowTaskVisibilityScope) *W
 		item.AllowAllOwnerRoles = item.AllowAllOwnerRoles || raw.AllowAllOwnerRoles
 		item.VisibleOwnerRoleKeys = normalizeWorkflowVisibleOwnerRoleKeys(
 			append(item.VisibleOwnerRoleKeys, raw.VisibleOwnerRoleKeys...),
+		)
+		item.VisibleOwnerPoolRoles = normalizeWorkflowOwnerPoolRoles(
+			append(item.VisibleOwnerPoolRoles, raw.VisibleOwnerPoolRoles...),
 		)
 		byRevision[revision] = item
 	}
@@ -214,9 +358,67 @@ func WorkflowTaskVisibilityScopeIncludesTask(scope *WorkflowTaskVisibilityScope,
 		if revision.ConfigRevision != revisionKey {
 			continue
 		}
-		return revision.AllowAllOwnerRoles ||
-			workflowRoleKeyInList(roleKey, revision.VisibleOwnerRoleKeys) ||
-			assigneeVisible
+		if revision.AllowAllOwnerRoles {
+			return true
+		}
+		poolKey := ""
+		if task.OwnerPoolKey != nil {
+			poolKey = strings.TrimSpace(*task.OwnerPoolKey)
+		}
+		if poolKey == "" {
+			return workflowRoleKeyInList(roleKey, revision.VisibleOwnerRoleKeys) || assigneeVisible
+		}
+		if IsApprovalSettingsPoolKey(poolKey) {
+			return workflowOwnerPoolInList(poolKey, revision.VisibleOwnerPoolRoles) ||
+				(assigneeVisible && workflowRoleKeyInList(roleKey, revision.VisibleOwnerRoleKeys))
+		}
+		return workflowOwnerPoolRoleInList(poolKey, roleKey, revision.VisibleOwnerPoolRoles)
+	}
+	return false
+}
+
+func workflowOwnerPoolInList(poolKey string, values []WorkflowTaskOwnerPoolRole) bool {
+	poolKey = strings.TrimSpace(poolKey)
+	for _, value := range values {
+		if strings.TrimSpace(value.OwnerPoolKey) == poolKey {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeWorkflowOwnerPoolRoles(values []WorkflowTaskOwnerPoolRole) []WorkflowTaskOwnerPoolRole {
+	byKey := map[string]WorkflowTaskOwnerPoolRole{}
+	for _, value := range values {
+		poolKey := strings.TrimSpace(value.OwnerPoolKey)
+		roleKey := NormalizeRoleKey(value.OwnerRoleKey)
+		if poolKey == "" || roleKey == "" {
+			continue
+		}
+		byKey[poolKey+"\x00"+roleKey] = WorkflowTaskOwnerPoolRole{
+			OwnerPoolKey: poolKey,
+			OwnerRoleKey: roleKey,
+		}
+	}
+	keys := make([]string, 0, len(byKey))
+	for key := range byKey {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]WorkflowTaskOwnerPoolRole, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, byKey[key])
+	}
+	return out
+}
+
+func workflowOwnerPoolRoleInList(poolKey, roleKey string, values []WorkflowTaskOwnerPoolRole) bool {
+	poolKey = strings.TrimSpace(poolKey)
+	roleKey = NormalizeRoleKey(roleKey)
+	for _, value := range values {
+		if strings.TrimSpace(value.OwnerPoolKey) == poolKey && NormalizeRoleKey(value.OwnerRoleKey) == roleKey {
+			return true
+		}
 	}
 	return false
 }

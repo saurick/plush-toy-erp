@@ -38,6 +38,7 @@ import {
   listWarehouses,
 } from '../api/masterDataOrderApi.mjs'
 import {
+  BusinessActionTooltip,
   BusinessOperationPanel,
   BusinessPageLayout,
   DateRangeFilter,
@@ -45,6 +46,7 @@ import {
   SearchInput,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -60,7 +62,10 @@ import {
   hasActionPermission,
   trimOptional,
 } from '../utils/masterDataOrderView.mjs'
-import { businessSourceRouteFor } from '../utils/businessSourceNavigation.mjs'
+import {
+  businessSourceRouteFor,
+  sourceRouteFor,
+} from '../utils/businessSourceNavigation.mjs'
 import {
   canOpenRelatedDocumentPath,
   clearLinkedDocumentParams,
@@ -653,6 +658,21 @@ export default function V1InventoryLedgerPage() {
     }
     return []
   }, [activeView, canOpenRelatedPath, selectedRow])
+  const hasRelatedCapability =
+    activeView === VIEW_TXNS &&
+    [
+      'SALES_ORDER',
+      'PRODUCTION_ORDER',
+      'PRODUCTION_FACT',
+      'OUTSOURCING_ORDER',
+      'OUTSOURCING_FACT',
+      'PURCHASE_ORDER',
+      'PURCHASE_RECEIPT',
+      'QUALITY_INSPECTION',
+      'SHIPMENT',
+    ].some((sourceTypeValue) =>
+      canOpenRelatedPath(sourceRouteFor(sourceTypeValue))
+    )
 
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
@@ -1598,29 +1618,6 @@ export default function V1InventoryLedgerPage() {
         }
         actions={
           <Space size={8} wrap>
-            {canCreateInventoryOperation ? (
-              <>
-                <Button
-                  type="primary"
-                  disabled={!selectedRow || activeView !== VIEW_BALANCES}
-                  onClick={() => openInventoryOperation('CYCLE_COUNT')}
-                >
-                  盘点
-                </Button>
-                <Button
-                  disabled={!selectedRow || activeView !== VIEW_BALANCES}
-                  onClick={() => openInventoryOperation('TRANSFER')}
-                >
-                  调拨
-                </Button>
-                <Button
-                  disabled={!selectedRow || activeView !== VIEW_BALANCES}
-                  onClick={() => openInventoryOperation('MANUAL_ADJUSTMENT')}
-                >
-                  人工调整
-                </Button>
-              </>
-            ) : null}
             <BusinessListToolbarActions
               moduleTitle="库存台账"
               onExport={exportRows}
@@ -1636,39 +1633,81 @@ export default function V1InventoryLedgerPage() {
           selectedLabel={selectedLabelFor(activeView, selectedRow)}
           boundaryText="盘点、调拨和人工调整只从所选库存余额生成受控作业；草稿不会改变库存，确认出库、批次状态和预留仍由各自业务入口处理。"
         >
-          <Button
-            type="link"
-            size="small"
+          <SelectionClearAction
+            selectedCount={selectedRow ? 1 : 0}
+            selectionLabel="库存记录"
+            onClear={() => setSelectedRow(null)}
+          />
+          {hasRelatedCapability ? (
+            <BusinessActionTooltip
+              disabled={!selectedRow || relatedMenuItems.length === 0}
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条库存变动记录'
+                  : '当前库存变动没有可打开的来源单据'
+              }
+            >
+              <Dropdown
+                trigger={['click']}
+                destroyOnHidden
+                disabled={!selectedRow || relatedMenuItems.length === 0}
+                menu={{
+                  items: relatedMenuItems,
+                  onClick: openRelatedTable,
+                }}
+              >
+                <Button
+                  size="small"
+                  icon={<LinkOutlined />}
+                  disabled={!selectedRow || relatedMenuItems.length === 0}
+                >
+                  相关单据 <DownOutlined />
+                </Button>
+              </Dropdown>
+            </BusinessActionTooltip>
+          ) : null}
+          <BusinessActionTooltip
             disabled={!selectedRow}
-            onClick={() => setSelectedRow(null)}
-          >
-            清空已选
-          </Button>
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            disabled={!selectedRow || relatedMenuItems.length === 0}
-            menu={{
-              items: relatedMenuItems,
-              onClick: openRelatedTable,
-            }}
+            disabledReason="请先选择一条库存记录"
           >
             <Button
               size="small"
-              icon={<LinkOutlined />}
-              disabled={!selectedRow || relatedMenuItems.length === 0}
+              icon={<EyeOutlined />}
+              disabled={!selectedRow}
+              onClick={() => openInventoryDetails(selectedRow)}
             >
-              相关单据 <DownOutlined />
+              查看详情
             </Button>
-          </Dropdown>
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            disabled={!selectedRow}
-            onClick={() => openInventoryDetails(selectedRow)}
-          >
-            查看详情
-          </Button>
+          </BusinessActionTooltip>
+          {canCreateInventoryOperation && activeView === VIEW_BALANCES ? (
+            <>
+              {[
+                ['CYCLE_COUNT', '盘点', true],
+                ['TRANSFER', '调拨', false],
+                ['MANUAL_ADJUSTMENT', '人工调整', false],
+              ].map(([type, label, primary]) => (
+                <BusinessActionTooltip
+                  key={type}
+                  disabled={!selectedRow || operationLoading}
+                  disabledReason={
+                    !selectedRow
+                      ? '请先选择一条库存余额'
+                      : '当前库存作业完成后可继续'
+                  }
+                >
+                  <Button
+                    data-business-action-key={`inventory-${type.toLowerCase()}`}
+                    size="small"
+                    type={primary ? 'primary' : 'default'}
+                    disabled={!selectedRow || operationLoading}
+                    onClick={() => openInventoryOperation(type)}
+                  >
+                    {label}
+                  </Button>
+                </BusinessActionTooltip>
+              ))}
+            </>
+          ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
 

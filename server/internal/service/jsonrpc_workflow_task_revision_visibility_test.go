@@ -166,8 +166,120 @@ func TestWorkflowTaskRoleVisibilityUsesImmutableRevisionForReadUpdateActionUrgeA
 	assigned.ConfigRevision = &revision
 	assigned.AssigneeID = &assigneeID
 	assignedVisibility := dispatcher.workflowTaskRoleVisibilityForTask(context.Background(), admin, &assigned, biz.PermissionWorkflowTaskRead)
-	if !assignedVisibility.Valid || len(assignedVisibility.RoleKeys) != 0 || !workflowAdminCanViewTask(admin, &assigned, assignedVisibility.RoleKeys) {
-		t.Fatalf("valid rev-b direct assignee visibility=%#v", assignedVisibility)
+	if assignedVisibility.Valid || len(assignedVisibility.RoleKeys) != 0 {
+		t.Fatalf("rev-b direct assignee without entitlement must fail closed=%#v", assignedVisibility)
+	}
+
+	crossPool := "approval.other"
+	crossPoolTask := *task
+	crossPoolTask.ConfigRevision = workflowRevisionStringPtr("rev-a")
+	crossPoolTask.OwnerPoolKey = &crossPool
+	if visibility := dispatcher.workflowTaskRoleVisibilityForTask(
+		context.Background(), admin, &crossPoolTask, biz.PermissionWorkflowTaskRead,
+	); visibility.Valid {
+		t.Fatalf("same role in a different owner pool must fail closed=%#v", visibility)
+	}
+}
+
+func TestWorkflowTaskRoleVisibilityKeepsQualifiedFrozenApprovalAssigneeAfterPrimaryReturns(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	backup := workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskUpdate,
+		biz.PermissionWorkflowTaskApprove,
+	)
+	primary := &biz.AdminUser{
+		ID:    8,
+		Roles: []biz.AdminRole{{Key: biz.BossRoleKey}},
+	}
+	repo := newServiceCustomerConfigRepo()
+	revision := "approval-rev-a"
+	key := serviceCustomerConfigKey(biz.DefaultCustomerKey, revision)
+	repo.revisions[key] = &biz.CustomerConfigRevision{
+		CustomerKey: biz.DefaultCustomerKey,
+		Revision:    revision,
+		Status:      biz.CustomerConfigStatusActive,
+	}
+	repo.profiles[key] = []biz.RoleProfileInput{
+		{RoleKey: biz.SalesRoleKey, DisplayName: "业务"},
+		{RoleKey: biz.BossRoleKey, DisplayName: "老板"},
+	}
+	for _, roleKey := range []string{biz.SalesRoleKey, biz.BossRoleKey} {
+		for _, capability := range []string{
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+			biz.PermissionWorkflowTaskApprove,
+		} {
+			repo.entitlements[key] = append(repo.entitlements[key], biz.AccessEntitlementInput{
+				RoleKey: roleKey, CapabilityKey: capability,
+				ScopeType: "customer", ScopeValue: biz.DefaultCustomerKey, Enabled: true,
+			})
+		}
+	}
+	repo.memberships[key] = []biz.WorkPoolMembershipInput{
+		{
+			PoolKey: "approval.sales_order", RoleKey: biz.BossRoleKey, UserID: primary.ID,
+			Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
+		},
+		{
+			PoolKey: "approval.sales_order", RoleKey: biz.SalesRoleKey, UserID: backup.ID,
+			Strategy: biz.ApprovalMemberStrategyBackup, Priority: 200, Enabled: true,
+		},
+	}
+	adminDirectory := newMemAdminManageRepoForData()
+	adminDirectory.admins = map[int]*biz.AdminUser{
+		backup.ID:  backup,
+		primary.ID: primary,
+	}
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(
+			log.NewStdLogger(io.Discard),
+			"module",
+			"service.workflow_revision_test",
+		)),
+		customerConfigUC: biz.NewCustomerConfigUsecaseForWire(repo, adminDirectory),
+	}
+	processID := 11
+	nodeID := 12
+	poolKey := "approval.sales_order"
+	assigneeID := backup.ID
+	task := &biz.WorkflowTask{
+		ID:                    711,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          biz.SalesRoleKey,
+		OwnerPoolKey:          &poolKey,
+		AssigneeID:            &assigneeID,
+		ConfigRevision:        &revision,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+	}
+
+	visibility := dispatcher.workflowTaskRoleVisibilityForTask(
+		context.Background(),
+		backup,
+		task,
+		biz.PermissionWorkflowTaskApprove,
+	)
+	if !visibility.Valid ||
+		len(visibility.RoleKeys) != 1 ||
+		visibility.RoleKeys[0] != biz.SalesRoleKey {
+		t.Fatalf("frozen backup visibility = %#v", visibility)
+	}
+	if !workflowAdminCanViewTask(backup, task, visibility.RoleKeys) ||
+		!workflowAdminCanHandleTask(backup, task, "done", visibility.RoleKeys) {
+		t.Fatal("qualified frozen backup must remain able to view and handle the assigned approval")
+	}
+
+	backup.Roles = nil
+	visibility = dispatcher.workflowTaskRoleVisibilityForTask(
+		context.Background(),
+		backup,
+		task,
+		biz.PermissionWorkflowTaskApprove,
+	)
+	if visibility.Valid || len(visibility.RoleKeys) != 0 {
+		t.Fatalf("removed backup role must fail closed = %#v", visibility)
 	}
 }
 

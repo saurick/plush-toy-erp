@@ -3,11 +3,32 @@ package biz
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/shopspring/decimal"
 )
+
+func TestPurchaseReceiptAdjustmentSourceLineNoTruncatesByRune(t *testing.T) {
+	sourceLine := strings.Repeat("工", 64)
+	suffix := ":" + PurchaseReceiptAdjustmentQuantityIncrease
+	got := purchaseReceiptAdjustmentSourceLineNo(&PurchaseReceiptItem{
+		ID:           1,
+		SourceLineNo: &sourceLine,
+	}, PurchaseReceiptAdjustmentQuantityIncrease)
+
+	if !utf8.ValidString(got) {
+		t.Fatalf("source line must remain valid UTF-8: %q", got)
+	}
+	if count := utf8.RuneCountInString(got); count != 64 {
+		t.Fatalf("source line rune count=%d, want 64: %q", count, got)
+	}
+	if !strings.HasSuffix(got, suffix) {
+		t.Fatalf("source line must preserve suffix %q: %q", suffix, got)
+	}
+}
 
 func TestInventoryUsecase_PurchaseReturnFromReceiptDerivesSourceGrain(t *testing.T) {
 	lotID := 31

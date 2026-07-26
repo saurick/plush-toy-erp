@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   buildWorkflowActionAccessFallback,
   buildWorkflowActionAccessState,
+  hasWorkflowTaskActionCapability,
   normalizeWorkflowActionExplainData,
   normalizeWorkflowActionMode,
   requireWorkflowTaskExplainParams,
@@ -130,6 +131,38 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
   assert.equal(normalized.resume.reasonCode, 'status_transition_not_allowed')
   assert.equal(normalized.urge.allowed, true)
   assert.equal(normalized.custom_backend_action_key, undefined)
+})
+
+test('workflowTaskActionAccess: distinguishes permission capability from temporary action availability', () => {
+  const access = {
+    byAction: {
+      complete: {
+        allowed: false,
+        reasonCode: 'terminal_task',
+        requiredPermission: 'workflow.task.complete',
+      },
+      block: {
+        allowed: false,
+        reasonCode: 'missing_permission',
+        requiredPermission: 'workflow.task.block',
+      },
+    },
+  }
+  assert.equal(
+    hasWorkflowTaskActionCapability(
+      access,
+      (permission) => permission === 'workflow.task.complete'
+    ),
+    true
+  )
+  assert.equal(
+    hasWorkflowTaskActionCapability(
+      access,
+      (permission) => permission === 'workflow.task.urge'
+    ),
+    false
+  )
+  assert.equal(hasWorkflowTaskActionCapability({}, () => true), false)
 })
 
 test('workflowTaskActionAccess: accepts formal action modes only', () => {

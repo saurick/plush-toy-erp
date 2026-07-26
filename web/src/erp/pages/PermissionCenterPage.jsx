@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
+  MenuOutlined,
+  QuestionCircleOutlined,
+  RightOutlined,
+  SettingOutlined,
+} from '@ant-design/icons'
+import {
   Alert,
   Button,
   Card,
@@ -9,6 +15,7 @@ import {
   Form,
   Input,
   Modal,
+  Popover,
   Select,
   Space,
   Switch,
@@ -53,8 +60,6 @@ import {
 import {
   buildLocalPermissionDraftAccess,
   getMenuPlacementMap,
-  getMenuPlacementOrderMap,
-  getMissingMenuPermissionKeys,
   getPermissionMenuLinks,
   menuRequirementsSatisfied,
   normalizePermissionMenuOptions,
@@ -72,6 +77,7 @@ import {
   normalizeRoleNavigationSettings,
   ROLE_NAVIGATION_MODES,
 } from '../config/roleGuidedNavigation.mjs'
+import ApprovalResponsibilityPanel from './ApprovalResponsibilityPanel.jsx'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -82,6 +88,8 @@ const READ_USER_PERMISSION = 'system.user.read'
 const READ_ROLE_PERMISSION = 'system.role.read'
 const READ_PERMISSION_PERMISSION = 'system.permission.read'
 const READ_CUSTOMER_CONFIG_PERMISSION = 'customer_config.read'
+const PUBLISH_CUSTOMER_CONFIG_PERMISSION = 'customer_config.publish'
+const ACTIVATE_CUSTOMER_CONFIG_PERMISSION = 'customer_config.activate'
 const MANAGE_ROLE_PERMISSION = 'system.role.permission.manage'
 const UPDATE_USER_PERMISSION = 'system.user.update'
 const ASSIGN_USER_ROLE_PERMISSION = 'system.user.role.assign'
@@ -91,6 +99,7 @@ const REVOKE_USER_PERMISSION = 'system.user.revoke'
 const PERMISSION_CENTER_TAB_KEYS = {
   ROLES: 'roles',
   ADMINS: 'admins',
+  APPROVALS: 'approvals',
 }
 
 const adminStatusOptions = [
@@ -670,7 +679,7 @@ function NavigationPlacementOverview({
         type="warning"
         showIcon
         message="暂不能生成岗位导航预览"
-        description="需要先核对公司当前启用范围；未完成核对的草稿只会显示岗位权限预计结果。"
+        description="需要先核对公司当前启用范围，完成后会显示岗位导航预览。"
       />
     )
   }
@@ -898,36 +907,142 @@ function adminsForRole(admins = [], roleKey = '') {
   )
 }
 
+const ASSOCIATED_ADMIN_STATUS_ORDER = Object.freeze({
+  [ADMIN_ACCOUNT_STATUS.ACTIVE]: 0,
+  [ADMIN_ACCOUNT_STATUS.SUSPENDED]: 1,
+  [ADMIN_ACCOUNT_STATUS.REVOKED]: 2,
+})
+
+function compareAssociatedAdmins(left = {}, right = {}) {
+  const leftOrder =
+    ASSOCIATED_ADMIN_STATUS_ORDER[getAdminAccountStatus(left)] ?? 3
+  const rightOrder =
+    ASSOCIATED_ADMIN_STATUS_ORDER[getAdminAccountStatus(right)] ?? 3
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder
+  }
+  return String(left.username || '').localeCompare(
+    String(right.username || ''),
+    'zh-CN'
+  )
+}
+
+function renderAssociatedAdminStatus(admin = {}) {
+  if (admin.is_super_admin) {
+    return <Tag color="gold">始终启用</Tag>
+  }
+  switch (getAdminAccountStatus(admin)) {
+    case ADMIN_ACCOUNT_STATUS.ACTIVE:
+      return <Tag color="green">启用</Tag>
+    case ADMIN_ACCOUNT_STATUS.SUSPENDED:
+      return <Tag color="red">临时停用</Tag>
+    case ADMIN_ACCOUNT_STATUS.REVOKED:
+      return <Tag>已注销</Tag>
+    default:
+      return <Tag color="gold">状态待刷新</Tag>
+  }
+}
+
+function RoleAssociatedAccounts({
+  admins = [],
+  currentRoleKey = '',
+  canReadUsers = false,
+  onOpenAdminAccounts,
+}) {
+  if (!canReadUsers) {
+    return (
+      <Alert
+        type="info"
+        showIcon
+        message="您不能查看关联账号"
+        description="当前账号没有员工账号查看权限，不能据此判断该岗位是否无人使用。"
+      />
+    )
+  }
+
+  const sortedAdmins = [...admins].sort(compareAssociatedAdmins)
+  const columns = [
+    {
+      title: '关联账号',
+      dataIndex: 'username',
+      width: 220,
+    },
+    {
+      title: '状态',
+      dataIndex: 'account_status',
+      width: 140,
+      render: (_, record) => renderAssociatedAdminStatus(record),
+    },
+    {
+      title: '同时拥有的其他岗位',
+      dataIndex: 'roles',
+      render: (_, record) => {
+        if (record.is_super_admin) {
+          return <Tag color="gold">超级管理员</Tag>
+        }
+        const otherRoles = (Array.isArray(record.roles) ? record.roles : [])
+          .filter((role) => getRoleKey(role) !== currentRoleKey)
+          .filter((role) => getRoleKey(role))
+        if (otherRoles.length === 0) {
+          return <Text type="secondary">仅当前岗位</Text>
+        }
+        return (
+          <Space wrap size={[4, 6]}>
+            {otherRoles.map((role) => (
+              <Tag key={getRoleKey(role)}>{getRoleVisibleName(role)}</Tag>
+            ))}
+          </Space>
+        )
+      },
+    },
+  ]
+
+  return (
+    <div className="erp-role-associated-accounts">
+      <div className="erp-role-associated-accounts__head">
+        <div>
+          <Text strong>当前岗位账号</Text>
+          <Text type="secondary">只读核对；岗位设置保存后对这些账号生效。</Text>
+        </div>
+        <Button onClick={onOpenAdminAccounts}>去员工账号管理</Button>
+      </div>
+      <Table
+        rowKey="id"
+        className="erp-role-associated-accounts__table"
+        columns={columns}
+        dataSource={sortedAdmins}
+        size="small"
+        pagination={
+          sortedAdmins.length > DEFAULT_TABLE_PAGE_SIZE
+            ? {
+                pageSize: DEFAULT_TABLE_PAGE_SIZE,
+                showSizeChanger: false,
+                showTotal: (total) => `共 ${total} 个账号`,
+              }
+            : false
+        }
+        locale={{
+          emptyText: (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="当前岗位暂无关联账号"
+            />
+          ),
+        }}
+        scroll={{ x: 640 }}
+      />
+    </div>
+  )
+}
+
 function summarizeRolePermissions(
   permissionKeys,
   permissionDetailMap = new Map()
 ) {
-  const keys = normalizeStringList(permissionKeys)
-  const moduleCounts = new Map()
-  let mobileAccessCount = 0
-  let actionPermissionCount = 0
-
-  keys.forEach((permissionKey) => {
-    const detail = permissionDetailMap.get(permissionKey)
-    if (!detail) return
-    const moduleKey = detail.module || 'other'
-    moduleCounts.set(moduleKey, (moduleCounts.get(moduleKey) || 0) + 1)
-    if (detail.module === 'mobile') {
-      mobileAccessCount += 1
-    }
-    if (!['access', 'read'].includes(detail.action)) {
-      actionPermissionCount += 1
-    }
-  })
-
   return {
-    total: [...moduleCounts.values()].reduce(
-      (total, count) => total + count,
-      0
-    ),
-    moduleCounts,
-    mobileAccessCount,
-    actionPermissionCount,
+    total: normalizeStringList(permissionKeys).filter((permissionKey) =>
+      permissionDetailMap.has(permissionKey)
+    ).length,
   }
 }
 
@@ -938,255 +1053,177 @@ function getPermissionLabel(permissionDetailMap, permissionKey) {
   )
 }
 
-function describeMenuEntryRequirement(menu, permissionDetailMap) {
-  const requiredAnyLabels = (menu?.requiredAny || []).map((permissionKey) =>
-    getPermissionLabel(permissionDetailMap, permissionKey)
+function getMenuEntryPermissionKeys(menu = {}) {
+  return [
+    ...new Set([
+      ...normalizeStringList(menu.requiredAny),
+      ...normalizeStringList(menu.requiredAll),
+    ]),
+  ]
+}
+
+function getPermissionEntryMenu(item = {}) {
+  return (item.menuLinks || []).find((menu) =>
+    getMenuEntryPermissionKeys(menu).includes(item.key)
   )
-  const requiredAllLabels = (menu?.requiredAll || []).map((permissionKey) =>
-    getPermissionLabel(permissionDetailMap, permissionKey)
+}
+
+function describeMenuDependency(menu, permissionDetailMap) {
+  const requiredAnyLabels = normalizeStringList(menu?.requiredAny).map(
+    (permissionKey) => getPermissionLabel(permissionDetailMap, permissionKey)
+  )
+  const requiredAllLabels = normalizeStringList(menu?.requiredAll).map(
+    (permissionKey) => getPermissionLabel(permissionDetailMap, permissionKey)
   )
   if (requiredAnyLabels.length > 0 && requiredAllLabels.length > 0) {
-    return `页面入口：${requiredAnyLabels.join(' 或 ')}，并且 ${requiredAllLabels.join('、')}`
+    return `需先开启：${requiredAnyLabels.join(' / ')}（任选一项），以及 ${requiredAllLabels.join('、')}`
   }
-  if (requiredAnyLabels.length > 0) {
-    return `页面入口：${requiredAnyLabels.join(' 或 ')}`
+  if (requiredAnyLabels.length > 1) {
+    return `需先开启：${requiredAnyLabels.join(' / ')}（任选一项）`
   }
-  if (requiredAllLabels.length > 0) {
-    return `页面入口：${requiredAllLabels.join('、')}`
-  }
-  return '页面入口：登录后可进入'
+  const labels = [...requiredAnyLabels, ...requiredAllLabels]
+  return labels.length > 0 ? `需先开启：${labels.join('、')}` : ''
 }
 
-function describeMissingMenuRequirements(
-  menu,
-  permissionKeys,
-  permissionDetailMap
-) {
-  const { missingAny, missingAll } = getMissingMenuPermissionKeys(
-    menu,
-    permissionKeys
+function describeMenuEntryCondition(menu, permissionDetailMap) {
+  const requiredAnyLabels = normalizeStringList(menu?.requiredAny).map(
+    (permissionKey) => getPermissionLabel(permissionDetailMap, permissionKey)
   )
-  const descriptions = []
-  if (missingAny.length > 0) {
-    descriptions.push(
-      `还需${missingAny.length > 1 ? '任选' : '勾选'}“${missingAny
-        .map((permissionKey) =>
-          getPermissionLabel(permissionDetailMap, permissionKey)
-        )
-        .join('”或“')}”`
-    )
+  const requiredAllLabels = normalizeStringList(menu?.requiredAll).map(
+    (permissionKey) => getPermissionLabel(permissionDetailMap, permissionKey)
+  )
+  const requirementCount = requiredAnyLabels.length + requiredAllLabels.length
+  if (requirementCount <= 1) {
+    return ''
   }
-  if (missingAll.length > 0) {
-    descriptions.push(
-      `还需勾选“${missingAll
-        .map((permissionKey) =>
-          getPermissionLabel(permissionDetailMap, permissionKey)
-        )
-        .join('”“')}”`
-    )
-  }
-  return descriptions.join('；')
+  const requiredAnyDescription =
+    requiredAnyLabels.length > 1
+      ? `${requiredAnyLabels.join(' / ')}（任选一项）`
+      : requiredAnyLabels[0] || ''
+  const descriptions = [
+    requiredAnyDescription,
+    requiredAllLabels.length > 0 ? requiredAllLabels.join('、') : '',
+  ].filter(Boolean)
+  return `入口条件：${descriptions.join('，并开启 ')}`
 }
 
-function getPermissionOptionImpact(item = {}) {
-  const primaryMenu = item.menuLinks?.[0]
-  if (!primaryMenu) {
-    return (
-      item.usage?.defaultActionLabel ||
-      item.usage?.pages?.[0]?.actionLabel ||
-      '业务功能'
-    )
-  }
-  const entryPermissionKeys = [
-    ...(primaryMenu.requiredAny || []),
-    ...(primaryMenu.requiredAll || []),
-  ]
-  const otherPageLabels = [
+function getPermissionOtherMenuLabels(item = {}, primaryMenu = null) {
+  return [
     ...new Set(
       (item.menuLinks || [])
-        .slice(1)
+        .filter((menu) => menu?.key && menu.key !== primaryMenu?.key)
         .map((menu) => menu.label)
         .filter(Boolean)
     ),
   ]
-  const secondaryImpact =
-    otherPageLabels.length > 0 ? `；另影响${otherPageLabels.join('、')}` : ''
-  if (entryPermissionKeys.includes(item.key)) {
-    return `页面入口 · 决定“${primaryMenu.label}”是否显示${secondaryImpact}`
-  }
-  if (!['access', 'read'].includes(String(item.action || '').trim())) {
-    const entryCanBeCompleted =
-      (primaryMenu.requiredAny || []).length <= 1 &&
-      entryPermissionKeys.length > 0
-    return `页内操作 · ${primaryMenu.label}（${
-      entryCanBeCompleted
-        ? '主页面入口可自动补齐'
-        : '请按上方菜单结果配置入口'
-    }）${secondaryImpact}`
-  }
-  return `${item.usage?.defaultActionLabel || '页面功能'} · ${primaryMenu.label}${secondaryImpact}`
 }
 
-function PermissionMenuOutcomeGrid({
-  menuKeys = [],
-  menuOptions = [],
-  permissionKeys = [],
-  permissionDetailMap = new Map(),
-  access = null,
-  accessEstimated = false,
-  placementByPath = new Map(),
-  placementOrderByPath = new Map(),
-  loading = false,
+function PermissionRow({
+  item,
+  permissionKeys,
+  permissionDetailMap,
+  accessPageByKey,
+  placementByPath,
 }) {
-  const menuKeySet = new Set(menuKeys)
-  const menus = menuOptions.filter((menu) => menuKeySet.has(menu.key))
-  if (menus.length === 0) {
-    return null
+  const entryMenu = getPermissionEntryMenu(item)
+  const primaryMenu = entryMenu || item.menuLinks?.[0] || null
+  const detail = permissionDetailMap.get(item.key) || item
+  const otherMenuLabels = getPermissionOtherMenuLabels(item, primaryMenu)
+
+  if (entryMenu) {
+    const locallyVisible = menuRequirementsSatisfied(entryMenu, permissionKeys)
+    const accessPage = accessPageByKey.get(entryMenu.key)
+    const effective =
+      locallyVisible &&
+      (accessPage ? accessPage.effective === true : locallyVisible)
+    const placement = effective
+      ? placementByPath.get(entryMenu.path) || '可从导航进入'
+      : ''
+    const placementColor =
+      placement === '常用工作'
+        ? 'blue'
+        : placement === '看板中心'
+          ? 'purple'
+          : undefined
+    const entryCondition = describeMenuEntryCondition(
+      entryMenu,
+      permissionDetailMap
+    )
+    const rowNotes = [
+      entryCondition,
+      otherMenuLabels.length > 0 ? `另影响：${otherMenuLabels.join('、')}` : '',
+    ].filter(Boolean)
+
+    return (
+      <span
+        className="erp-permission-row__content"
+        data-menu-key={entryMenu.key}
+        data-permission-key={item.key}
+        data-permission-kind="menu"
+      >
+        <span className="erp-permission-row__main">
+          <MenuOutlined
+            className="erp-permission-row__icon"
+            aria-hidden="true"
+          />
+          <span className="erp-permission-row__label">{item.label}</span>
+          <span className="erp-permission-row__tags">
+            <Tag>菜单入口</Tag>
+            <Tag color={effective ? 'green' : undefined}>
+              {entryMenu.label}
+              {effective ? '显示' : '不显示'}
+            </Tag>
+            {placement ? <Tag color={placementColor}>{placement}</Tag> : null}
+          </span>
+        </span>
+        {rowNotes.length > 0 ? (
+          <span className="erp-permission-row__note">
+            {rowNotes.join('；')}
+          </span>
+        ) : null}
+      </span>
+    )
   }
-  const accessPageByKey = new Map(
-    (Array.isArray(access?.pages) ? access.pages : []).map((page) => [
-      String(page?.key || '').trim(),
-      page,
-    ])
-  )
-  const isLocalDraft = access?.source === 'local_permission_draft'
-  const isDraft = access?.is_preview === true
-  const isEstimated = accessEstimated && isLocalDraft
-  const menuRows = menus
-    .map((menu, originalIndex) => {
-      const localGranted = menuRequirementsSatisfied(menu, permissionKeys)
-      const accessPage = accessPageByKey.get(menu.key)
-      const effective =
-        localGranted &&
-        (accessPage ? accessPage.effective === true : localGranted)
-      const placement = effective
-        ? placementByPath.get(menu.path) || '已授权页面'
-        : ''
-      return {
-        menu,
-        originalIndex,
-        localGranted,
-        accessPage,
-        effective,
-        placement,
-      }
-    })
-    .sort((left, right) => {
-      if (left.effective !== right.effective) {
-        return left.effective ? -1 : 1
-      }
-      const leftOrder = placementOrderByPath.get(left.menu.path)
-      const rightOrder = placementOrderByPath.get(right.menu.path)
-      const normalizedLeftOrder = Number.isInteger(leftOrder)
-        ? leftOrder
-        : Number.MAX_SAFE_INTEGER
-      const normalizedRightOrder = Number.isInteger(rightOrder)
-        ? rightOrder
-        : Number.MAX_SAFE_INTEGER
-      return (
-        normalizedLeftOrder - normalizedRightOrder ||
-        left.originalIndex - right.originalIndex
-      )
-    })
+
+  const dependencyDescription = primaryMenu
+    ? describeMenuDependency(primaryMenu, permissionDetailMap)
+    : ''
 
   return (
-    <div
-      aria-busy={loading}
-      className="erp-permission-menu-results"
-      data-preview-state={
-        isEstimated ? 'estimated' : isDraft ? 'draft' : 'saved'
-      }
+    <span
+      className="erp-permission-row__content"
+      data-permission-key={item.key}
+      data-permission-kind="action"
     >
-      <div className="erp-permission-menu-results__head">
-        <Text strong>勾选后的菜单结果</Text>
-        <Text type="secondary">
-          {isEstimated
-            ? '岗位权限预计'
-            : isDraft
-              ? '未保存草稿预览'
-              : '当前已保存结果'}
-        </Text>
-      </div>
-      <div className="erp-permission-menu-results__grid">
-        {menuRows.map(({ menu, accessPage, effective, placement }) => {
-          const missingDescription = describeMissingMenuRequirements(
-            menu,
-            permissionKeys,
-            permissionDetailMap
-          )
-          const backendReason = Array.isArray(accessPage?.reasons)
-            ? accessPage.reasons
-                .map((reason) => String(reason?.label || '').trim())
-                .filter(Boolean)
-                .join('；')
-            : ''
-          const resultDescription = effective
-            ? placement === '常用工作'
-              ? '保存后直接出现在常用工作'
-              : placement === '更多功能'
-                ? '保存后收在更多功能'
-                : '保存后可从岗位导航进入'
-            : missingDescription ||
-              backendReason ||
-              '公司当前设置未开放这个页面'
-
-          return (
-            <div
-              className={`erp-permission-menu-result${
-                effective ? ' erp-permission-menu-result--visible' : ''
-              }`}
-              data-menu-key={menu.key}
-              key={menu.key}
-            >
-              <div className="erp-permission-menu-result__title">
-                <Text strong>{menu.label}</Text>
-                <Tag
-                  className="erp-permission-menu-result__status"
-                  color={effective ? 'green' : undefined}
-                >
-                  {effective
-                    ? isEstimated
-                      ? '预计显示'
-                      : isDraft
-                        ? '草稿会显示'
-                        : '当前显示'
-                    : isEstimated
-                      ? '预计不显示'
-                      : isDraft
-                        ? '草稿不显示'
-                        : '不显示'}
-                </Tag>
-                {placement ? (
-                  <Tag color={placement === '常用工作' ? 'blue' : undefined}>
-                    {placement}
-                  </Tag>
-                ) : null}
-              </div>
-              <Text type="secondary">
-                {describeMenuEntryRequirement(menu, permissionDetailMap)}
-              </Text>
-              <Text
-                className="erp-permission-menu-result__outcome"
-                type={effective ? undefined : 'secondary'}
-              >
-                {resultDescription}
-              </Text>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+      <span className="erp-permission-row__main">
+        <SettingOutlined
+          className="erp-permission-row__icon"
+          aria-hidden="true"
+        />
+        <span className="erp-permission-row__label">{item.label}</span>
+        <span className="erp-permission-row__tags">
+          <Tag>页内操作</Tag>
+          {isHighRiskPermission(detail) ? <Tag>敏感操作</Tag> : null}
+        </span>
+      </span>
+      {dependencyDescription || otherMenuLabels.length > 0 ? (
+        <span className="erp-permission-row__note">
+          {dependencyDescription}
+          {dependencyDescription && otherMenuLabels.length > 0 ? '；' : ''}
+          {otherMenuLabels.length > 0
+            ? `另影响：${otherMenuLabels.join('、')}`
+            : ''}
+        </span>
+      ) : null}
+    </span>
   )
 }
 
 function PermissionChecklist({
   groups,
-  menuOptions = [],
   access = null,
-  accessEstimated = false,
   accessLoading = false,
   placementByPath = new Map(),
-  placementOrderByPath = new Map(),
   permissionDetailMap = new Map(),
   value = [],
   onChange,
@@ -1200,6 +1237,16 @@ function PermissionChecklist({
   const selectedKeySet = useMemo(
     () => new Set(normalizedValue),
     [normalizedValue]
+  )
+  const accessPageByKey = useMemo(
+    () =>
+      new Map(
+        (Array.isArray(access?.pages) ? access.pages : []).map((page) => [
+          String(page?.key || '').trim(),
+          page,
+        ])
+      ),
+    [access]
   )
   const visibleGroups = useMemo(() => {
     if (!showSelectedOnly) {
@@ -1311,17 +1358,16 @@ function PermissionChecklist({
   }
 
   return (
-    <div className="erp-permission-checklist-shell">
-      <nav
-        className="erp-permission-category-nav"
-        aria-label="功能分类导航"
-      >
+    <div className="erp-permission-checklist-shell" aria-busy={accessLoading}>
+      <nav className="erp-permission-category-nav" aria-label="功能分类导航">
         <div className="erp-permission-category-nav__head">
           <span className="erp-permission-category-nav__title">
             <Text strong className="erp-permission-category-nav__label">
               功能分类
             </Text>
-            <Text type="secondary">点击分类直达对应分组</Text>
+            <Text className="erp-permission-category-nav__selected">
+              已选 {normalizedValue.length} 项
+            </Text>
           </span>
           <label className="erp-permission-checklist-filter">
             <Switch
@@ -1341,9 +1387,7 @@ function PermissionChecklist({
                   <button
                     type="button"
                     className={`erp-permission-category-nav__item${
-                      active
-                        ? ' erp-permission-category-nav__item--active'
-                        : ''
+                      active ? ' erp-permission-category-nav__item--active' : ''
                     }`}
                     aria-current={active ? 'location' : undefined}
                     key={item.key}
@@ -1390,15 +1434,6 @@ function PermissionChecklist({
           const allOriginalSelected =
             originalSectionKeys.length > 0 &&
             originalSectionKeys.every((item) => selectedKeySet.has(item))
-          const sectionMenuKeySet = new Set(
-            section.items
-              .map((item) => item.menuLinks?.[0]?.key)
-              .filter(Boolean)
-          )
-          const sectionMenuKeys = menuOptions
-            .map((menu) => menu.key)
-            .filter((menuKey) => sectionMenuKeySet.has(menuKey))
-
           return (
             <section
               className="erp-permission-checklist__section"
@@ -1445,38 +1480,30 @@ function PermissionChecklist({
                   </Button>
                 </span>
               </div>
-              <PermissionMenuOutcomeGrid
-                menuKeys={sectionMenuKeys}
-                menuOptions={menuOptions}
-                permissionKeys={normalizedValue}
-                permissionDetailMap={permissionDetailMap}
-                access={access}
-                accessEstimated={accessEstimated}
-                placementByPath={placementByPath}
-                placementOrderByPath={placementOrderByPath}
-                loading={accessLoading}
-              />
               <Checkbox.Group
-                options={section.items.map((item) => ({
-                  label: (
-                    <span className="erp-permission-option">
-                      <span className="erp-permission-option__label">
-                        {item.label}
-                      </span>
-                      <span className="erp-permission-option__impact">
-                        {getPermissionOptionImpact(item)}
-                      </span>
-                    </span>
-                  ),
-                  value: item.key,
-                }))}
                 value={selectedKeys}
                 disabled={disabled}
                 onChange={(nextValues) =>
                   handleSectionChange(sectionKeys, nextValues)
                 }
-                className="erp-permission-grid"
-              />
+                className="erp-permission-list"
+              >
+                {section.items.map((item) => (
+                  <Checkbox
+                    className="erp-permission-row"
+                    key={item.key}
+                    value={item.key}
+                  >
+                    <PermissionRow
+                      item={item}
+                      permissionKeys={normalizedValue}
+                      permissionDetailMap={permissionDetailMap}
+                      accessPageByKey={accessPageByKey}
+                      placementByPath={placementByPath}
+                    />
+                  </Checkbox>
+                ))}
+              </Checkbox.Group>
             </section>
           )
         })}
@@ -1562,6 +1589,10 @@ export default function PermissionCenterPage() {
   const [activeTabKey, setActiveTabKey] = useState(
     PERMISSION_CENTER_TAB_KEYS.ROLES
   )
+  const [approvalResponsibilityDirty, setApprovalResponsibilityDirty] =
+    useState(false)
+  const [approvalDiscardVersion, setApprovalDiscardVersion] = useState(0)
+  const [approvalRefreshVersion, setApprovalRefreshVersion] = useState(0)
   const [editingPhone, setEditingPhone] = useState('')
   const [createForm] = Form.useForm()
   const [resetForm] = Form.useForm()
@@ -1686,10 +1717,6 @@ export default function PermissionCenterPage() {
   const roleAccessForCurrentDraftLoading = rolePermissionsDirty
     ? permissionDraftAccessLoading && !matchingPermissionDraftAccess
     : effectiveRoleAccessLoading
-  const roleAccessForCurrentDraftEstimated =
-    rolePermissionsDirty &&
-    roleAccessForCurrentDraft?.source === 'local_permission_draft' &&
-    (!canReadEffectiveRoleAccess || Boolean(permissionDraftAccessError))
   const effectiveRoleNavigationPathSet = useMemo(
     () => getEffectiveRoleNavigationPathSet(roleAccessForCurrentDraft),
     [roleAccessForCurrentDraft]
@@ -1752,10 +1779,6 @@ export default function PermissionCenterPage() {
     () => getMenuPlacementMap(roleNavigationPlacement),
     [roleNavigationPlacement]
   )
-  const permissionMenuPlacementOrderByPath = useMemo(
-    () => getMenuPlacementOrderMap(roleNavigationPlacement),
-    [roleNavigationPlacement]
-  )
   const roleNavigationInvalid =
     roleNavigationDirty &&
     selectedRoleNavigationMode === ROLE_NAVIGATION_MODES.CUSTOM &&
@@ -1798,9 +1821,45 @@ export default function PermissionCenterPage() {
     ]
   )
 
+  const confirmDiscardApprovalChanges = useCallback(
+    ({ title, content, onDiscard, onKeepEditing }) => {
+      if (!approvalResponsibilityDirty) {
+        onDiscard?.()
+        return
+      }
+      modal.confirm({
+        centered: true,
+        title,
+        content,
+        okText: '放弃调整',
+        cancelText: '继续处理',
+        onOk: () => {
+          setApprovalDiscardVersion((current) => current + 1)
+          setApprovalResponsibilityDirty(false)
+          onDiscard?.()
+        },
+        onCancel: onKeepEditing,
+      })
+    },
+    [approvalResponsibilityDirty]
+  )
+
   const confirmLeavePermissionCenter = useCallback(
     () =>
       new Promise((resolve) => {
+        if (
+          activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS &&
+          approvalResponsibilityDirty
+        ) {
+          confirmDiscardApprovalChanges({
+            title: '离开前要放弃审批责任调整吗？',
+            content:
+              '尚未发布的调整或已经发布但尚未启用的新设置，离开后需要重新处理。',
+            onDiscard: () => resolve(true),
+            onKeepEditing: () => resolve(false),
+          })
+          return
+        }
         confirmDiscardRoleChanges({
           title: '离开前要放弃未保存的修改吗？',
           content: '离开权限管理后，当前岗位尚未保存的功能调整会丢失。',
@@ -1808,7 +1867,12 @@ export default function PermissionCenterPage() {
           onKeepEditing: () => resolve(false),
         })
       }),
-    [confirmDiscardRoleChanges]
+    [
+      activeTabKey,
+      approvalResponsibilityDirty,
+      confirmDiscardApprovalChanges,
+      confirmDiscardRoleChanges,
+    ]
   )
   const roleSummaries = useMemo(
     () =>
@@ -1836,15 +1900,6 @@ export default function PermissionCenterPage() {
       summarizeRolePermissions(selectedRolePermissionKeys, permissionDetailMap),
     [permissionDetailMap, selectedRolePermissionKeys]
   )
-  const selectedRolePermissionHighlights = useMemo(
-    () =>
-      normalizeStringList(selectedRolePermissionKeys)
-        .map((permissionKey) => permissionDetailMap.get(permissionKey))
-        .filter(Boolean)
-        .filter(isHighRiskPermission)
-        .slice(0, 8),
-    [permissionDetailMap, selectedRolePermissionKeys]
-  )
   const canReadUsers = hasPermission(currentAdmin, READ_USER_PERMISSION)
   const canReadRoleTemplates =
     hasPermission(currentAdmin, READ_ROLE_PERMISSION) &&
@@ -1861,6 +1916,20 @@ export default function PermissionCenterPage() {
     currentAdmin,
     MANAGE_ROLE_PERMISSION
   )
+  const canReadApprovalResponsibilities =
+    canReadUsers &&
+    canReadRoleTemplates &&
+    hasPermission(currentAdmin, READ_CUSTOMER_CONFIG_PERMISSION)
+  const canManageApprovalResponsibilities =
+    canReadApprovalResponsibilities &&
+    hasPermission(currentAdmin, PUBLISH_CUSTOMER_CONFIG_PERMISSION) &&
+    hasPermission(currentAdmin, ACTIVATE_CUSTOMER_CONFIG_PERMISSION)
+  const approvalReadOnlyReason = !canReadApprovalResponsibilities
+    ? '当前账号不能同时读取员工、岗位和审批责任。'
+    : !hasPermission(currentAdmin, PUBLISH_CUSTOMER_CONFIG_PERMISSION) ||
+        !hasPermission(currentAdmin, ACTIVATE_CUSTOMER_CONFIG_PERMISSION)
+      ? '调整审批责任需要同时具备发布和启用客户设置的权限。'
+      : ''
   const selectedRoleReadOnlyReason = getRolePermissionReadOnlyReason(
     selectedRole || {},
     { isProduction: IS_PRODUCTION_BUILD, currentAdmin }
@@ -2061,24 +2130,75 @@ export default function PermissionCenterPage() {
     if (nextTabKey === activeTabKey) {
       return
     }
+    if (
+      activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS &&
+      approvalResponsibilityDirty
+    ) {
+      confirmDiscardApprovalChanges({
+        title: '切换前要放弃审批责任调整吗？',
+        content:
+          '尚未发布的调整或已经发布但尚未启用的新设置，切换后需要重新处理。',
+        onDiscard: () => setActiveTabKey(nextTabKey),
+      })
+      return
+    }
+    confirmDiscardRoleChanges({
+      title: '切换页面前要放弃未保存的修改吗？',
+      content: '切换后，当前岗位尚未保存的功能调整会丢失。',
+      onDiscard: () => setActiveTabKey(nextTabKey),
+    })
+  }
+
+  const openSelectedRoleAdminAccounts = () => {
     confirmDiscardRoleChanges({
       title: '切换页面前要放弃未保存的修改吗？',
       content: '切换到员工账号后，当前岗位尚未保存的功能调整会丢失。',
-      onDiscard: () => setActiveTabKey(nextTabKey),
+      onDiscard: () => {
+        setAdminSearchKeyword(getRoleVisibleName(selectedRole || {}))
+        setAdminStatusFilter(ADMIN_STATUS_FILTERS.ALL)
+        setTablePagination((current) => ({ ...current, current: 1 }))
+        setActiveTabKey(PERMISSION_CENTER_TAB_KEYS.ADMINS)
+      },
     })
   }
 
   const refreshPermissionCenter = useCallback(
     () =>
       new Promise((resolve) => {
+        const refresh = async () => {
+          const loaded = await loadData()
+          if (loaded) {
+            setApprovalRefreshVersion((current) => current + 1)
+          }
+          resolve(loaded)
+        }
+        if (
+          activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS &&
+          approvalResponsibilityDirty
+        ) {
+          confirmDiscardApprovalChanges({
+            title: '刷新前要放弃审批责任调整吗？',
+            content:
+              '刷新会重新读取当前生效设置，未发布或尚未启用的调整需要重新处理。',
+            onDiscard: refresh,
+            onKeepEditing: () => resolve(false),
+          })
+          return
+        }
         confirmDiscardRoleChanges({
           title: '刷新前要放弃未保存的修改吗？',
           content: '刷新会重新加载权限数据，当前岗位尚未保存的功能调整会丢失。',
-          onDiscard: async () => resolve(await loadData()),
+          onDiscard: refresh,
           onKeepEditing: () => resolve(false),
         })
       }),
-    [confirmDiscardRoleChanges, loadData]
+    [
+      activeTabKey,
+      approvalResponsibilityDirty,
+      confirmDiscardApprovalChanges,
+      confirmDiscardRoleChanges,
+      loadData,
+    ]
   )
 
   useEffect(() => {
@@ -2091,12 +2211,19 @@ export default function PermissionCenterPage() {
 
   useEffect(() => {
     return outletContext?.registerPageLeaveGuard?.(
-      roleConfigurationDirty ? confirmLeavePermissionCenter : null
+      roleConfigurationDirty || approvalResponsibilityDirty
+        ? confirmLeavePermissionCenter
+        : null
     )
-  }, [confirmLeavePermissionCenter, outletContext, roleConfigurationDirty])
+  }, [
+    approvalResponsibilityDirty,
+    confirmLeavePermissionCenter,
+    outletContext,
+    roleConfigurationDirty,
+  ])
 
   useEffect(() => {
-    if (!roleConfigurationDirty) {
+    if (!roleConfigurationDirty && !approvalResponsibilityDirty) {
       return undefined
     }
     const warnBeforeUnload = (event) => {
@@ -2105,7 +2232,18 @@ export default function PermissionCenterPage() {
     }
     window.addEventListener('beforeunload', warnBeforeUnload)
     return () => window.removeEventListener('beforeunload', warnBeforeUnload)
-  }, [roleConfigurationDirty])
+  }, [approvalResponsibilityDirty, roleConfigurationDirty])
+
+  useEffect(() => {
+    if (
+      activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS &&
+      !canReadApprovalResponsibilities
+    ) {
+      setApprovalDiscardVersion((current) => current + 1)
+      setApprovalResponsibilityDirty(false)
+      setActiveTabKey(PERMISSION_CENTER_TAB_KEYS.ROLES)
+    }
+  }, [activeTabKey, canReadApprovalResponsibilities])
 
   useEffect(() => {
     if (!selectedRole) {
@@ -2888,7 +3026,9 @@ export default function PermissionCenterPage() {
     },
   ]
 
-  const emptyText = loading ? (
+  const emptyText = !canReadUsers ? (
+    <Empty description="无权查看员工账号" />
+  ) : loading ? (
     <Empty description="加载中..." />
   ) : hasAdminFilter ? (
     <Empty description="没有匹配的员工账号" />
@@ -2910,19 +3050,6 @@ export default function PermissionCenterPage() {
       className="erp-permission-section erp-permission-section--roles"
       variant="borderless"
     >
-      <div className="erp-role-center-header">
-        <div>
-          <Text className="erp-permission-section__eyebrow">岗位权限</Text>
-          <Title level={5} style={{ margin: 0 }}>
-            岗位设置
-          </Title>
-          <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            设置岗位可使用的页面、操作和数据范围，也可以调整常用入口与顺序。
-          </Paragraph>
-        </div>
-        <Tag color="blue">先设置岗位，再分配账号</Tag>
-      </div>
-
       <div className="erp-role-center-layout">
         <aside className="erp-role-center-sidebar" aria-label="岗位列表">
           {roles.length === 0 ? (
@@ -2943,24 +3070,21 @@ export default function PermissionCenterPage() {
                   className={`erp-role-template-card${
                     selected ? ' erp-role-template-card--active' : ''
                   }`}
+                  aria-pressed={selected}
                   onClick={() => selectRoleTemplate(roleKey)}
                 >
                   <span className="erp-role-template-card__main">
                     <Text strong>{getRoleVisibleName(role)}</Text>
-                    <Text type="secondary">
-                      {role.disabled ? '已停用岗位' : getRoleTypeLabel(role)}
-                    </Text>
+                    <RightOutlined aria-hidden="true" />
                   </span>
                   <span className="erp-role-template-card__meta">
-                    <Tag color={role.disabled ? 'default' : 'green'}>
-                      {role.disabled ? '停用' : '启用'}
-                    </Tag>
                     <Text type="secondary">
                       {summary.permissionSummary?.total || 0} 项功能
+                      {canReadUsers
+                        ? ` · ${summary.adminCount || 0} 个账号`
+                        : ''}
                     </Text>
-                    <Text type="secondary">
-                      {summary.adminCount || 0} 个账号
-                    </Text>
+                    {role.disabled ? <Tag>已停用</Tag> : null}
                   </span>
                 </button>
               )
@@ -2972,7 +3096,7 @@ export default function PermissionCenterPage() {
           {selectedRole ? (
             <>
               <div className="erp-role-center-detail__head">
-                <div>
+                <div className="erp-role-center-detail__identity">
                   <Space size={8} wrap>
                     <Title level={5} style={{ margin: 0 }}>
                       {getRoleVisibleName(selectedRole)}
@@ -2985,17 +3109,44 @@ export default function PermissionCenterPage() {
                       {getRoleTypeLabel(selectedRole)}
                     </Tag>
                   </Space>
-                  <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-                    {selectedRole.description ||
-                      '该岗位决定可使用的页面、手机待办和业务操作。'}
-                  </Paragraph>
+                  <Text type="secondary">
+                    {selectedRolePermissionSummary.total} 项功能
+                    {canReadUsers
+                      ? ` · ${selectedRoleAdmins.length} 个账号`
+                      : ''}
+                  </Text>
                 </div>
                 <div className="erp-role-center-actions">
+                  <Popover
+                    placement="bottomRight"
+                    trigger={['hover', 'focus', 'click']}
+                    rootClassName="erp-permission-help-popover"
+                    content={
+                      <div className="erp-permission-help">
+                        <Text strong>菜单与操作</Text>
+                        <Text>
+                          查看类功能决定菜单是否出现；办理类功能决定进入页面后能做什么。
+                        </Text>
+                        <Text type="secondary">
+                          当前调整仅预览，保存岗位设置后生效。
+                        </Text>
+                      </div>
+                    }
+                  >
+                    <Button
+                      type="text"
+                      shape="circle"
+                      icon={<QuestionCircleOutlined />}
+                      aria-label="菜单与操作说明"
+                      className="erp-permission-help-trigger"
+                    />
+                  </Popover>
                   <Tag color={roleConfigurationDirty ? 'orange' : 'green'}>
                     {roleConfigurationDirty ? '有未保存调整' : '已保存'}
                   </Tag>
                   <Button
                     type="primary"
+                    className="erp-role-center-save"
                     loading={saving}
                     disabled={
                       !canManageRolePermissions ||
@@ -3034,62 +3185,6 @@ export default function PermissionCenterPage() {
                 />
               ) : null}
 
-              <div className="erp-role-center-metrics">
-                <div>
-                  <Text type="secondary">可用功能</Text>
-                  <strong>{selectedRolePermissionSummary.total}</strong>
-                </div>
-                <div>
-                  <Text type="secondary">影响账号</Text>
-                  <strong>{selectedRoleAdmins.length}</strong>
-                </div>
-                <div>
-                  <Text type="secondary">任务端功能</Text>
-                  <strong>
-                    {selectedRolePermissionSummary.mobileAccessCount}
-                  </strong>
-                </div>
-                <div>
-                  <Text type="secondary">业务操作</Text>
-                  <strong>
-                    {selectedRolePermissionSummary.actionPermissionCount}
-                  </strong>
-                </div>
-              </div>
-
-              <div className="erp-role-center-impact">
-                <div>
-                  <Text strong>已分配账号</Text>
-                  <div className="erp-role-center-impact__list">
-                    {selectedRoleAdmins.length > 0 ? (
-                      selectedRoleAdmins.map((admin) => (
-                        <Tag key={admin.id || admin.username}>
-                          {admin.username}
-                        </Tag>
-                      ))
-                    ) : (
-                      <Text type="secondary">暂无账号分配到该岗位</Text>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <Text strong>重点功能</Text>
-                  <div className="erp-role-center-impact__list">
-                    {selectedRolePermissionHighlights.length > 0 ? (
-                      selectedRolePermissionHighlights.map((permission) => (
-                        <Tag key={permission.key} color="blue">
-                          {permission.label}
-                        </Tag>
-                      ))
-                    ) : (
-                      <Text type="secondary">
-                        未包含任务端功能或重要管理功能
-                      </Text>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {selectedRoleReadOnly ? (
                 <Alert
                   type="warning"
@@ -3112,41 +3207,19 @@ export default function PermissionCenterPage() {
                     label: '可用功能',
                     children: (
                       <div className="erp-role-policy-tab-content">
-                        <div className="erp-permission-checklist-heading">
-                          <div>
-                            <Text strong>先看菜单结果，再选择页内操作</Text>
-                            <Paragraph type="secondary">
-                              每组顶部直接显示页面会不会出现，以及进入常用工作还是更多功能。查看类功能控制页面入口；主办理页面明确且入口唯一时，会自动补齐入口。
-                            </Paragraph>
-                          </div>
-                          <Tag color="blue">
-                            已选 {selectedRolePermissionSummary.total} 项
-                          </Tag>
-                        </div>
-                        <Alert
-                          type="info"
-                          showIcon
-                          message="菜单入口和页内操作分开控制"
-                          description="例如“查看应收”决定有没有“应收管理”菜单，“确认应收”只决定进入页面后能否办理。当前勾选会先预览，保存岗位设置后才正式生效。"
-                        />
                         {permissionDraftAccessError ? (
                           <Alert
                             type="warning"
                             showIcon
                             message="公司当前启用范围暂时核对失败"
-                            description={`${permissionDraftAccessError}。页面结果暂按岗位权限预计，保存前请重试。`}
+                            description={`${permissionDraftAccessError}。页面先按当前岗位权限显示，保存前请重试。`}
                           />
                         ) : null}
                         <PermissionChecklist
                           groups={permissionGroups}
-                          menuOptions={normalizedPermissionMenus}
                           access={roleAccessForCurrentDraft}
-                          accessEstimated={roleAccessForCurrentDraftEstimated}
                           accessLoading={roleAccessForCurrentDraftLoading}
                           placementByPath={permissionMenuPlacementByPath}
-                          placementOrderByPath={
-                            permissionMenuPlacementOrderByPath
-                          }
                           permissionDetailMap={permissionDetailMap}
                           value={selectedRolePermissionKeys}
                           disabled={
@@ -3253,6 +3326,20 @@ export default function PermissionCenterPage() {
                       </Space>
                     ),
                   },
+                  {
+                    key: 'associated-accounts',
+                    label: canReadUsers
+                      ? `关联账号（${selectedRoleAdmins.length}）`
+                      : '关联账号',
+                    children: (
+                      <RoleAssociatedAccounts
+                        admins={selectedRoleAdmins}
+                        currentRoleKey={selectedRoleKey}
+                        canReadUsers={canReadUsers}
+                        onOpenAdminAccounts={openSelectedRoleAdminAccounts}
+                      />
+                    ),
+                  },
                 ]}
               />
             </>
@@ -3287,7 +3374,9 @@ export default function PermissionCenterPage() {
           </Paragraph>
         </div>
         <Space size={8} wrap>
-          <Tag color="green">共 {admins.length} 个员工账号</Tag>
+          {canReadUsers ? (
+            <Tag color="green">共 {admins.length} 个员工账号</Tag>
+          ) : null}
           <Button
             type="primary"
             disabled={!canCreateUsers}
@@ -3320,9 +3409,11 @@ export default function PermissionCenterPage() {
           />
         </div>
         <Text type="secondary">
-          {hasAdminFilter
-            ? `命中 ${filteredAdmins.length}/${admins.length} 个员工账号`
-            : `共 ${admins.length} 个员工账号`}
+          {!canReadUsers
+            ? '无权查看员工账号列表'
+            : hasAdminFilter
+              ? `命中 ${filteredAdmins.length}/${admins.length} 个员工账号`
+              : `共 ${admins.length} 个员工账号`}
         </Text>
       </div>
       <Table
@@ -3345,24 +3436,15 @@ export default function PermissionCenterPage() {
   )
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      <Card className="erp-permission-hero" variant="borderless">
-        <div className="erp-permission-hero__content">
-          <div>
-            <Title level={4} style={{ margin: 0 }}>
-              权限管理
-            </Title>
-            <Paragraph
-              type="secondary"
-              style={{ marginTop: 8, marginBottom: 0 }}
-            >
-              先设置岗位可使用的功能，再把岗位分配给员工账号。
-            </Paragraph>
-          </div>
-          <Tag color="blue">先设置岗位</Tag>
-        </div>
-      </Card>
-
+    <Space
+      className="erp-permission-page"
+      direction="vertical"
+      size={12}
+      style={{ width: '100%' }}
+    >
+      <Title level={1} className="erp-permission-page__title">
+        权限管理
+      </Title>
       {permissionWarningMessages.length > 0 ? (
         <Alert
           type="warning"
@@ -3391,12 +3473,39 @@ export default function PermissionCenterPage() {
             label: (
               <span className="erp-permission-tabs__label">
                 员工账号
-                <Tag color="green">{admins.length}</Tag>
+                {canReadUsers ? <Tag color="green">{admins.length}</Tag> : null}
               </span>
             ),
             children: adminAccountTab,
           },
-        ]}
+          canReadApprovalResponsibilities
+            ? {
+                key: PERMISSION_CENTER_TAB_KEYS.APPROVALS,
+                label: (
+                  <span className="erp-permission-tabs__label">
+                    审批责任
+                    <Tag color="purple">3</Tag>
+                  </span>
+                ),
+                children: (
+                  <ApprovalResponsibilityPanel
+                    active={
+                      activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS
+                    }
+                    admins={admins}
+                    roles={roles}
+                    currentAdmin={currentAdmin}
+                    canRead={canReadApprovalResponsibilities}
+                    canManage={canManageApprovalResponsibilities}
+                    readOnlyReason={approvalReadOnlyReason}
+                    discardVersion={approvalDiscardVersion}
+                    refreshVersion={approvalRefreshVersion}
+                    onDirtyChange={setApprovalResponsibilityDirty}
+                  />
+                ),
+              }
+            : null,
+        ].filter(Boolean)}
         onChange={changePermissionCenterTab}
       />
 

@@ -604,7 +604,7 @@ WHERE customer_key = $1
   AND config_revision = $2
   AND enabled = TRUE
   AND (
-    (role_key <> '' AND role_key IN (` + roleClause + `))
+    (user_id = 0 AND role_key <> '' AND role_key IN (` + roleClause + `))
     OR (user_id > 0 AND user_id = $3)
   )
 ORDER BY priority ASC, pool_key ASC`

@@ -61,6 +61,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
+        "workflow.task.approve",
         "mobile.sales.access",
       ]),
       flowResponsibilities: Object.freeze([
@@ -143,7 +144,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "payment_approval.boss_approval",
       ]),
       guardrail:
-        "老板角色负责审批 / 退回协同判断，并可把未结束任务受控转给同一负责岗位的合格人员或退回岗位池；转交不改变任务状态，也不绕过具体业务 usecase 的状态、引用、幂等和事实写入校验。",
+        "老板角色不是所有日常审批的默认主办，只负责固定配置中的备用 / 升级，并可把未结束任务受控转给同一负责岗位的合格人员或退回岗位池；转交不改变任务状态，也不绕过具体业务 usecase 的状态、引用、幂等和事实写入校验。",
     }),
     Object.freeze({
       roleKey: "engineering",
@@ -182,6 +183,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
+        "workflow.task.approve",
         "mobile.engineering.access",
       ]),
       flowResponsibilities: Object.freeze([
@@ -229,6 +231,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.create",
         "workflow.task.update",
         "workflow.task.complete",
+        "workflow.task.approve",
         "workflow.task.reject",
         "mobile.pmc.access",
       ]),
@@ -296,6 +299,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
+        "workflow.task.approve",
         "mobile.purchase.access",
       ]),
       flowResponsibilities: Object.freeze([
@@ -352,6 +356,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
+        "workflow.task.approve",
         "workflow.task.reject",
         "mobile.warehouse.access",
       ]),
@@ -408,6 +413,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
+        "workflow.task.approve",
         "workflow.task.reject",
         "mobile.quality.access",
       ]),
@@ -547,6 +553,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
+        "workflow.task.approve",
         "workflow.task.reject",
         "mobile.production.access",
       ]),

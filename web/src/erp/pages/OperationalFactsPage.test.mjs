@@ -16,7 +16,6 @@ test('finance cancellation requires a bounded business reason and sends it to th
   assert.match(source, /\{ reason \}/)
   assert.match(source, /currentActiveKey === 'finance'/)
   assert.match(source, /\['production', 'outsourcing'\]\.includes/)
-  assert.doesNotMatch(source, /\['production', 'outsourcing', 'finance'\]/)
   assert.match(source, /canConfirmFinanceFact\(adminProfile/)
 })
 

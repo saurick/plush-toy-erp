@@ -62,7 +62,7 @@ test('purchase receipt exception creation only opens a records view the user may
 
 test('posted purchase receipt payable uses the exact permission and source-bound request', () => {
   assert.match(source, /finance\.payable\.confirm/u)
-  assert.match(source, /selectedRow\?\.status === 'POSTED'/u)
+  assert.match(source, /selectedRow\.status !== 'POSTED'/u)
   assert.match(source, /生成应付/u)
   assert.match(source, /查看应付/u)
   assert.match(source, /buildPurchaseReceiptPayablePayload\(values, receipt\)/u)

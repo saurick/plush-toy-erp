@@ -178,6 +178,17 @@ export function normalizeWorkflowActionExplainData(data = {}) {
   return byAction
 }
 
+export function hasWorkflowTaskActionCapability(
+  actionAccess = {},
+  canUsePermission = () => false
+) {
+  if (typeof canUsePermission !== 'function') return false
+  return Object.values(actionAccess?.byAction || {}).some((item) => {
+    const permission = String(item?.requiredPermission || '').trim()
+    return permission && canUsePermission(permission)
+  })
+}
+
 export function buildWorkflowActionAccessFallback({
   adminProfile = {},
   task = null,

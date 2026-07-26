@@ -147,7 +147,14 @@ export function getEnabledMobileRoleKeys(config = getEntryConfig()) {
 
 export function parseMobileRoleFromPath(pathname = '') {
   const match = String(pathname || '').match(/^\/m\/([^/?#]+)/)
-  return match ? normalizeRoleKey(decodeURIComponent(match[1])) : ''
+  if (!match) {
+    return ''
+  }
+  try {
+    return normalizeRoleKey(decodeURIComponent(match[1]))
+  } catch {
+    return ''
+  }
 }
 
 export function resolveMobileTasksPath(roleKey = '') {

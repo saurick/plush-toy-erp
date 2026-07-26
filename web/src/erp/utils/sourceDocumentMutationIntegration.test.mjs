@@ -19,7 +19,8 @@ const pageSources = [
     openEnd: 'const saveOrder = async () => {',
     editBindCall: /setEditingOrder\(order\)/u,
     editModalCall: /setOrderModalOpen\(true\)/u,
-    recordOpenCall: /onOpenRecord=\{openSalesOrderRecord\}/u,
+    recordOpenCall:
+      /onOpenRecord=\{saving \? undefined : openSalesOrderRecord\}/u,
     detailsOpenStart: 'const openSalesOrderDetails = (order) => {',
     detailsOpenEnd: 'const openSalesOrderRecord = (order) => {',
     detailsModalEnd: '<ColumnOrderModal',
@@ -43,7 +44,8 @@ const pageSources = [
     openEnd: 'const resolveSupplierSnapshot',
     editBindCall: /setEditingOrder\(record\)/u,
     editModalCall: /setModalOpen\(true\)/u,
-    recordOpenCall: /onOpenRecord=\{openPurchaseOrderRecord\}/u,
+    recordOpenCall:
+      /onOpenRecord=\{\s*recordActionBusy \? undefined : openPurchaseOrderRecord\s*\}/u,
     detailsOpenStart: 'const openPurchaseOrderDetails = (record) => {',
     detailsOpenEnd: 'const openPurchaseOrderRecord = (record) => {',
     detailsModalEnd: '<CollaborationTaskPanel',
@@ -201,13 +203,13 @@ test('sales and purchase edit actions expose item-read loading and disable repea
   assert.match(salesPage.source, /loading=\{itemLoading\}/u)
   assert.match(
     salesPage.source,
-    /disabled=\{!selectedOrderCanEdit \|\| itemLoading\}/u
+    /disabled=\{!selectedOrderCanEdit \|\| itemLoading \|\| saving\}/u
   )
   assert.match(salesPage.source, /openEditOrder\(selectedOrder\)/u)
   assert.match(purchaseOperationPanelSource, /loading=\{itemsLoading\}/u)
   assert.match(
     purchaseOperationPanelSource,
-    /disabled=\{\s*!selectedOrderCanEdit \|\| !referenceDataReady \|\| itemsLoading\s*\}/u
+    /disabled=\{\s*!selectedOrderCanEdit \|\|\s*!referenceDataReady \|\|\s*recordActionBusy\s*\}/u
   )
   assert.match(
     purchaseOperationPanelSource,
@@ -215,7 +217,7 @@ test('sales and purchase edit actions expose item-read loading and disable repea
   )
   assert.match(
     purchasePage.source,
-    /key === 'order-items'[\s\S]*?openEditModal\(singleSelectedOrder\)/u
+    /key === 'order-items'[\s\S]*?openPurchaseOrderDetails\(singleSelectedOrder\)/u
   )
   assert.match(outsourcingPage.source, /openEdit\(selectedRow\)/u)
 })

@@ -120,6 +120,7 @@ export default function MobileTaskActionScreen({
   availableActions = [],
   busy = false,
   canViewReceipt = false,
+  hasActionCapability = false,
   onActionChange = () => {},
   onBack = () => {},
   onCancel = null,
@@ -163,6 +164,8 @@ export default function MobileTaskActionScreen({
     !canSubmit &&
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.FAILED &&
     Boolean(onRetryAccess)
+  const showDisabledSubmit =
+    !canSubmit && !showFooterRetry && hasActionCapability === true
   const accessCopy = resolveAccessCopy(accessState, accessMessage)
   const taskName = readableText(task?.task_name, '任务处理')
   const taskStatus = task
@@ -540,7 +543,9 @@ export default function MobileTaskActionScreen({
 
       <div
         className={`mobile-role-action-bar grid shrink-0 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur ${
-          canSubmit || showFooterRetry ? 'grid-cols-2 gap-3' : ''
+          canSubmit || showFooterRetry || showDisabledSubmit
+            ? 'grid-cols-2 gap-3'
+            : ''
         }`}
       >
         <button
@@ -570,6 +575,14 @@ export default function MobileTaskActionScreen({
           >
             <ReloadOutlined />
             重新确认
+          </button>
+        ) : showDisabledSubmit ? (
+          <button
+            type="button"
+            className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+            disabled
+          >
+            暂不能提交
           </button>
         ) : null}
       </div>

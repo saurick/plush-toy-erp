@@ -122,7 +122,7 @@ test('released production orders expose route execution through separate permiss
   )
   assert.match(
     page,
-    /selected\?\.status === PRODUCTION_ORDER_STATUS\.RELEASED/u
+    /selected\.status !== PRODUCTION_ORDER_STATUS\.RELEASED/u
   )
   assert.match(page, />\s*工序办理\s*</u)
 })

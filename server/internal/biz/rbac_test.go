@@ -95,10 +95,11 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
 				PermissionMobileQualityAccess,
 			},
-			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: WarehouseRoleKey,
@@ -106,13 +107,14 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
 				PermissionShipmentRead,
 				PermissionShipmentShip,
 				PermissionShipmentCancel,
 				PermissionMobileWarehouseAccess,
 			},
-			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: ProductionRoleKey,
@@ -125,10 +127,11 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
 				PermissionMobileProductionAccess,
 			},
-			omits: []string{PermissionWorkflowTaskApprove, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: EngineeringRoleKey,
@@ -146,9 +149,10 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskApprove,
 				PermissionMobileEngineeringAccess,
 			},
-			omits: []string{PermissionWorkflowTaskCreate, PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskCreate, PermissionWorkflowTaskReject, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: PurchaseRoleKey,
@@ -157,12 +161,13 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskApprove,
 				PermissionMaterialRead,
 				PermissionMaterialCreate,
 				PermissionMaterialUpdate,
 				PermissionMobilePurchaseAccess,
 			},
-			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskReject, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: FinanceRoleKey,
@@ -187,11 +192,12 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
 				PermissionShipmentRead,
 				PermissionMobilePMCAccess,
 			},
-			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: SalesRoleKey,
@@ -200,11 +206,12 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskApprove,
 				PermissionShipmentRead,
 				PermissionShipmentCreate,
 				PermissionMobileSalesAccess,
 			},
-			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskReject, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: AdminRoleKey,
@@ -607,6 +614,12 @@ func TestAdminCanAccessMobileRoleUsesPermissionCode(t *testing.T) {
 	}
 	if AdminCanAccessMobileRole(admin, WarehouseRoleKey) {
 		t.Fatalf("warehouse mobile access must require its own permission")
+	}
+	if !AdminCanAccessMobileRole(admin, "") {
+		t.Fatal("desktop SMS login may omit the mobile role")
+	}
+	if AdminCanAccessMobileRole(admin, "unknown-mobile-role") {
+		t.Fatal("unknown non-empty mobile role must fail closed")
 	}
 }
 

@@ -23,7 +23,11 @@ test('当前操作条按手机和平板宽度收口动作，不为页面各写�
     /erp-business-selection-action-bar__actions--compact/u
   )
   assert.match(layoutSource, /更多操作/u)
-  assert.match(layoutSource, /Number\(right\.enabled\) - Number\(left\.enabled\)/u)
+  assert.match(layoutSource, /selectStableBusinessActionIndexes/u)
+  assert.doesNotMatch(
+    layoutSource,
+    /Number\(right\.enabled\) - Number\(left\.enabled\)/u
+  )
 })
 
 test('当前操作条的更多面板使用现有 Drawer 契约并显式恢复触发点焦点', () => {
@@ -47,9 +51,12 @@ test('临时不可用动作使用共享提示，禁用按钮仍可触发原因�
   assert.match(layoutSource, /disabledReason = ''/u)
   assert.match(
     layoutSource,
-    /<Tooltip title=\{disabledReason\}>[\s\S]*?<span>\{children\}<\/span>/u
+    /<Tooltip[\s\S]*?title=\{disabled && disabledReason \? disabledReason : null\}[\s\S]*?trigger=\{\['hover', 'focus'\]\}[\s\S]*?erp-business-action-tooltip-anchor/u
   )
-  assert.match(layoutSource, /if \(!disabled \|\| !disabledReason\) return children/u)
+  assert.doesNotMatch(
+    layoutSource,
+    /if \(!disabled \|\| !disabledReason\) return children/u
+  )
 })
 
 test('窄屏动作保持可读触控尺寸，不再把全部按钮逐行撑满', () => {

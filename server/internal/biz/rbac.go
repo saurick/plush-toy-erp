@@ -724,7 +724,7 @@ func BuiltinRoles() []RoleDefinition {
 	}
 	for index := range roles {
 		switch roles[index].Key {
-		case FinanceRoleKey:
+		case SalesRoleKey, PurchaseRoleKey, WarehouseRoleKey, QualityRoleKey, FinanceRoleKey, PMCRoleKey, ProductionRoleKey, EngineeringRoleKey:
 			roles[index].Permissions = append(roles[index].Permissions, PermissionWorkflowTaskApprove)
 		}
 		if roles[index].Key == PMCRoleKey {
@@ -816,7 +816,7 @@ func AdminHasRole(admin *AdminUser, roleKey string) bool {
 func AdminCanAccessMobileRole(admin *AdminUser, roleKey string) bool {
 	permissionKey := MobileRoleAccessPermission(roleKey)
 	if permissionKey == "" {
-		return true
+		return strings.TrimSpace(roleKey) == ""
 	}
 	if admin != nil && admin.IsSuperAdmin {
 		return AdminHasRole(admin, roleKey)

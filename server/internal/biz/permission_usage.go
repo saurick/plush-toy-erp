@@ -218,23 +218,32 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	}
 
 	// System control plane.
-	addMenu(PermissionSystemUserRead, "permission-center", "admin-accounts", "管理员账号", "admin-account-list", "管理员账号列表", permissionControlPage, "允许进入并查看", permissionMethods("admin", "list"), systemUsageConditions)
+	add(PermissionSystemUserRead,
+		menuPermissionSurface("permission-center", "admin-accounts", "管理员账号", "admin-account-list", "管理员账号列表", permissionControlPage, "允许进入并查看", permissionMethods("admin", "list"), systemUsageConditions),
+		menuPermissionSurface("permission-center", "approval-responsibility", "审批责任", "approval-member-users", "可选具名员工", permissionControlSection, "允许读取可配置的员工候选", permissionMethods("admin", "list"), systemUsageConditions),
+	)
 	addMenu(PermissionSystemUserCreate, "permission-center", "admin-accounts", "管理员账号", "create-admin", "创建管理员", permissionControlButton, "显示并允许创建", permissionMethods("admin", "create"), systemUsageConditions)
 	addMenu(PermissionSystemUserUpdate, "permission-center", "admin-accounts", "管理员账号", "edit-admin-profile", "修改账号资料和重置密码", permissionControlForm, "显示并允许修改", permissionMethods("admin", "set_phone", "reset_password"), systemUsageConditions)
 	addMenu(PermissionSystemUserRoleAssign, "permission-center", "admin-accounts", "管理员账号", "assign-admin-roles", "分配业务角色", permissionControlForm, "显示并允许分配可委派角色", permissionMethods("admin", "set_roles"), systemUsageConditions)
 	addMenu(PermissionSystemUserDisable, "permission-center", "admin-accounts", "管理员账号", "set-admin-disabled", "临时停用或恢复账号", permissionControlSwitch, "显示并允许切换账号状态", permissionMethods("admin", "set_disabled"), systemUsageConditions)
 	addMenu(PermissionSystemUserRevoke, "permission-center", "admin-accounts", "管理员账号", "revoke-admin", "离职注销账号", permissionControlButton, "显示并允许正式注销", permissionMethods("admin", "revoke"), systemUsageConditions)
-	addMenu(PermissionSystemRoleRead, "permission-center", "role-templates", "角色模板", "role-list", "岗位角色列表", permissionControlPage, "允许进入并查看", permissionMethods("admin", "rbac_options"), systemUsageConditions)
+	add(PermissionSystemRoleRead,
+		menuPermissionSurface("permission-center", "role-templates", "角色模板", "role-list", "岗位角色列表", permissionControlPage, "允许进入并查看", permissionMethods("admin", "rbac_options"), systemUsageConditions),
+		menuPermissionSurface("permission-center", "approval-responsibility", "审批责任", "approval-member-roles", "可选业务岗位", permissionControlSection, "允许读取可配置的岗位候选", permissionMethods("admin", "rbac_options"), systemUsageConditions),
+	)
 	add(PermissionSystemRolePermissionManage,
 		menuPermissionSurface("permission-center", "role-templates", "角色模板", "save-role-permissions", "保存业务角色权限", permissionControlButton, "显示并允许保存可委派业务权限", permissionMethods("admin", "set_role_permissions"), systemUsageConditions),
 		menuPermissionSurface("permission-center", "role-templates", "角色模板", "save-role-navigation", "保存岗位菜单布局", permissionControlButton, "显示并允许保存岗位常用入口与顺序", permissionMethods("admin", "set_role_navigation"), systemUsageConditions),
 	)
-	addMenu(PermissionSystemPermissionRead, "permission-center", "role-templates", "角色模板", "permission-list", "功能权限和权限地图", permissionControlPage, "允许进入并查看", permissionMethods("admin", "rbac_options"), systemUsageConditions)
+	add(PermissionSystemPermissionRead,
+		menuPermissionSurface("permission-center", "role-templates", "角色模板", "permission-list", "功能权限和权限地图", permissionControlPage, "允许进入并查看", permissionMethods("admin", "rbac_options"), systemUsageConditions),
+		menuPermissionSurface("permission-center", "approval-responsibility", "审批责任", "approval-member-permissions", "岗位能力边界", permissionControlSection, "允许核对岗位权限上限", permissionMethods("admin", "rbac_options"), systemUsageConditions),
+	)
 	addMenu(PermissionSystemAuditRead, "system-audit-logs", "audit-events", "审计事件", "audit-event-list", "审计日志列表", permissionControlPage, "允许进入并查看", permissionMethods("admin", "audit_logs"), systemUsageConditions)
 
-	// Customer configuration has no product navigation entry.
-	addBackend(PermissionCustomerConfigRead, permissionMethods("customer_config", "validate_customer_config", "get_effective_session", "explain_module_status", "explain_process_definition"), []string{"仍受部署固定客户和 active revision 边界限制"})
-	addBackend(PermissionCustomerConfigPublish, permissionMethods("customer_config", "publish_customer_config"), []string{"仍受配置校验和发布版本状态限制"})
+	// Customer configuration control plane.
+	addMenu(PermissionCustomerConfigRead, "permission-center", "approval-responsibility", "审批责任", "approval-settings-page", "审批责任与有效资格预览", permissionControlPage, "允许进入并查看", permissionMethods("customer_config", "get_approval_settings", "preview_approval_settings", "validate_customer_config", "get_effective_session", "explain_module_status", "explain_process_definition"), []string{"仍受部署固定客户和 active revision 边界限制"})
+	addBackend(PermissionCustomerConfigPublish, permissionMethods("customer_config", "publish_customer_config", "publish_approval_settings"), []string{"仍受配置校验、发布版本状态和禁止自我扩权限制"})
 	addBackend(PermissionCustomerConfigActivate, permissionMethods("customer_config", "activate_customer_config"), []string{"仍受发布版本状态和部署客户边界限制"})
 	addBackend(PermissionCustomerConfigRollback, permissionMethods("customer_config", "rollback_customer_config"), []string{"仍受可回滚 revision 和部署客户边界限制"})
 	addBackend(PermissionProcessRuntimeRecover, permissionMethods("customer_config", "recover_compensated_process_domain_command"), []string{"仅允许对已补偿且无已生效下游事实的 domain_command 执行确定性终止与撤回"})

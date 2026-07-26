@@ -58,6 +58,69 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 	}
 
 	switch method {
+	case "get_approval_settings":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); res != nil {
+			return id, res, nil
+		}
+		if !customerConfigAllowsOnly(pm, "customer_key") {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		settings, err := d.customerConfigUC.GetApprovalSettings(ctx, customerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code: errcode.OK.Code, Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{"approval_settings": approvalSettingsExplanationToMap(settings)}),
+		}, nil
+
+	case "preview_approval_settings", "publish_approval_settings":
+		permission := biz.PermissionCustomerConfigRead
+		if method == "publish_approval_settings" {
+			permission = biz.PermissionCustomerConfigPublish
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
+		in, ok := approvalSettingsRevisionInputFromParams(pm)
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		customerKey, err := runtimeCustomerKey(in.CustomerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		in.CustomerKey = customerKey
+		admin, res := d.CurrentAdmin(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		settings, err := d.customerConfigUC.PreviewApprovalSettingsRevision(ctx, in)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		if candidateResult := d.validateApprovalSettingsCandidate(ctx, settings, admin); candidateResult != nil {
+			return id, candidateResult, nil
+		}
+		if method == "preview_approval_settings" {
+			return id, &v1.JsonrpcResult{
+				Code: errcode.OK.Code, Message: errcode.OK.Message,
+				Data: newDataStruct(map[string]any{"approval_settings": approvalSettingsExplanationToMap(settings)}),
+			}, nil
+		}
+		revision, err := d.customerConfigUC.PublishApprovalSettingsRevision(ctx, in, admin.ID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code: errcode.OK.Code, Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{"revision": customerConfigRevisionToMap(revision)}),
+		}, nil
+
 	case "validate_customer_config":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); res != nil {
 			return id, res, nil
@@ -110,6 +173,13 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
 		in.CustomerKey = resolvedCustomerKey
+		candidate, err := d.customerConfigUC.ExplainApprovalSettingsPublishInput(ctx, in)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		if candidateResult := d.validateApprovalSettingsCandidate(ctx, candidate, admin); candidateResult != nil {
+			return id, candidateResult, nil
+		}
 		revision, err := d.customerConfigUC.PublishCustomerConfig(ctx, in, admin.ID)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -908,6 +978,262 @@ func customerConfigProcessRuntimeBoundary(revision string, boundary map[string]a
 	return boundary
 }
 
+func approvalSettingsRevisionInputFromParams(pm map[string]any) (biz.ApprovalSettingsRevisionInput, bool) {
+	if !customerConfigAllowsOnly(
+		pm,
+		"customer_key",
+		"revision",
+		"expected_active_revision",
+		"expected_active_hash",
+		"items",
+	) {
+		return biz.ApprovalSettingsRevisionInput{}, false
+	}
+	rawItems, ok := pm["items"].([]any)
+	if !ok || len(rawItems) == 0 {
+		return biz.ApprovalSettingsRevisionInput{}, false
+	}
+	items := make([]biz.ApprovalSettingItemInput, 0, len(rawItems))
+	for _, rawItem := range rawItems {
+		itemMap, ok := rawItem.(map[string]any)
+		if !ok || !customerConfigAllowsOnly(itemMap, "approval_key", "enabled", "members") {
+			return biz.ApprovalSettingsRevisionInput{}, false
+		}
+		rawMembers, ok := itemMap["members"].([]any)
+		if !ok {
+			return biz.ApprovalSettingsRevisionInput{}, false
+		}
+		members := make([]biz.ApprovalSettingMemberInput, 0, len(rawMembers))
+		for _, rawMember := range rawMembers {
+			memberMap, ok := rawMember.(map[string]any)
+			if !ok || !customerConfigAllowsOnly(memberMap, "role_key", "user_id", "strategy", "enabled") {
+				return biz.ApprovalSettingsRevisionInput{}, false
+			}
+			enabled, ok := memberMap["enabled"].(bool)
+			if !ok {
+				return biz.ApprovalSettingsRevisionInput{}, false
+			}
+			members = append(members, biz.ApprovalSettingMemberInput{
+				RoleKey:  getString(memberMap, "role_key"),
+				UserID:   getInt(memberMap, "user_id", 0),
+				Strategy: getString(memberMap, "strategy"),
+				Enabled:  enabled,
+			})
+		}
+		enabled, ok := itemMap["enabled"].(bool)
+		if !ok {
+			return biz.ApprovalSettingsRevisionInput{}, false
+		}
+		items = append(items, biz.ApprovalSettingItemInput{
+			ApprovalKey: getString(itemMap, "approval_key"),
+			Enabled:     enabled,
+			Members:     members,
+		})
+	}
+	in := biz.ApprovalSettingsRevisionInput{
+		CustomerKey:            getString(pm, "customer_key"),
+		Revision:               getString(pm, "revision"),
+		ExpectedActiveRevision: getString(pm, "expected_active_revision"),
+		ExpectedActiveHash:     getString(pm, "expected_active_hash"),
+		Items:                  items,
+	}
+	if strings.TrimSpace(in.Revision) == "" || strings.TrimSpace(in.ExpectedActiveRevision) == "" || strings.TrimSpace(in.ExpectedActiveHash) == "" {
+		return biz.ApprovalSettingsRevisionInput{}, false
+	}
+	return in, true
+}
+
+func approvalSettingsWouldIncludeActor(items []biz.ApprovalSettingItemInput, admin *biz.AdminUser) bool {
+	if admin == nil {
+		return true
+	}
+	actorRoles := map[string]struct{}{}
+	for _, roleKey := range biz.AdminRoleKeys(admin) {
+		actorRoles[biz.NormalizeRoleKey(roleKey)] = struct{}{}
+	}
+	for _, item := range items {
+		if !item.Enabled {
+			continue
+		}
+		for _, member := range item.Members {
+			if !member.Enabled {
+				continue
+			}
+			if member.UserID == admin.ID {
+				return true
+			}
+			if _, matchesActorRole := actorRoles[biz.NormalizeRoleKey(member.RoleKey)]; matchesActorRole {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (d *jsonrpcDispatcher) validateApprovalSettingsCandidate(
+	ctx context.Context,
+	settings *biz.ApprovalSettingsExplanation,
+	admin *biz.AdminUser,
+) *v1.JsonrpcResult {
+	if settings == nil || settings.PublishInput == nil || admin == nil {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "审批责任设置不完整"}
+	}
+	for _, item := range settings.Items {
+		if item.Configurable && item.Enabled && len(item.BlockedReasons) > 0 {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "审批责任设置存在无人可办理的事项"}
+		}
+	}
+	if result := d.validateApprovalSettingsNamedMembers(ctx, settings.PublishInput.WorkPoolMemberships); result != nil {
+		return result
+	}
+	if admin.IsSuperAdmin {
+		return nil
+	}
+	candidateMembership := approvalSettingsActorMembership(settings, admin)
+	hasCandidateMembership := false
+	for _, included := range candidateMembership {
+		hasCandidateMembership = hasCandidateMembership || included
+	}
+	if !hasCandidateMembership {
+		return nil
+	}
+	active, err := d.customerConfigUC.GetApprovalSettings(ctx, settings.CustomerKey)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能通过审批责任给自己增加办理资格"}
+	}
+	activeMembership := approvalSettingsActorMembership(active, admin)
+	for approvalKey, included := range candidateMembership {
+		if included && !activeMembership[approvalKey] {
+			return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能通过审批责任给自己增加办理资格"}
+		}
+	}
+	return nil
+}
+
+func (d *jsonrpcDispatcher) validateApprovalSettingsNamedMembers(
+	ctx context.Context,
+	memberships []biz.WorkPoolMembershipInput,
+) *v1.JsonrpcResult {
+	managedMemberships := make([]biz.WorkPoolMembershipInput, 0, len(memberships))
+	for _, membership := range memberships {
+		if membership.Enabled && biz.IsApprovalSettingsPoolKey(membership.PoolKey) {
+			managedMemberships = append(managedMemberships, membership)
+		}
+	}
+	if len(managedMemberships) == 0 {
+		return nil
+	}
+	if d == nil || d.adminManageUC == nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	admins, err := d.adminManageUC.List(ctx)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	for _, membership := range managedMemberships {
+		if membership.UserID > 0 {
+			var named *biz.AdminUser
+			for _, admin := range admins {
+				if admin != nil && admin.ID == membership.UserID {
+					named = admin
+					break
+				}
+			}
+			if named == nil || named.AccountStatus() == biz.AdminAccountStatusRevoked {
+				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工不存在或已离职"}
+			}
+			if !named.IsActive() {
+				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工当前未启用"}
+			}
+			if !biz.AdminHasRole(named, membership.RoleKey) {
+				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工不属于所选岗位"}
+			}
+			continue
+		}
+		matched := false
+		for _, admin := range admins {
+			if !admin.IsActive() || !biz.AdminHasRole(admin, membership.RoleKey) {
+				continue
+			}
+			matched = true
+			break
+		}
+		if !matched {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前没有可办理员工"}
+		}
+	}
+	return nil
+}
+
+func approvalSettingsActorMembership(
+	settings *biz.ApprovalSettingsExplanation,
+	admin *biz.AdminUser,
+) map[string]bool {
+	out := map[string]bool{}
+	if settings == nil || admin == nil || !admin.IsActive() {
+		return out
+	}
+	for _, item := range settings.Items {
+		if !item.Configurable || !item.Enabled {
+			continue
+		}
+		for _, member := range item.Members {
+			roleKey := biz.NormalizeRoleKey(member.RoleKey)
+			if !member.Enabled {
+				continue
+			}
+			if member.UserID == admin.ID || biz.AdminHasRole(admin, roleKey) {
+				out[item.ApprovalKey] = true
+				break
+			}
+		}
+	}
+	return out
+}
+
+func approvalSettingsExplanationToMap(settings *biz.ApprovalSettingsExplanation) map[string]any {
+	if settings == nil {
+		return map[string]any{}
+	}
+	items := make([]any, 0, len(settings.Items))
+	for _, item := range settings.Items {
+		members := make([]any, 0, len(item.Members))
+		for _, member := range item.Members {
+			members = append(members, map[string]any{
+				"role_key": member.RoleKey,
+				"user_id":  member.UserID,
+				"strategy": member.Strategy,
+				"priority": member.Priority,
+				"enabled":  member.Enabled,
+			})
+		}
+		items = append(items, map[string]any{
+			"approval_key":        item.ApprovalKey,
+			"label":               item.Label,
+			"domain":              item.Domain,
+			"pool_key":            item.PoolKey,
+			"configurable":        item.Configurable,
+			"configured":          item.Configured,
+			"enabled":             item.Enabled,
+			"members":             members,
+			"effective_role_keys": toAnySliceString(item.EffectiveRoleKeys),
+			"effective_strategy":  item.EffectiveStrategy,
+			"blocked_reasons":     toAnySliceString(item.BlockedReasons),
+			"domain_boundary":     item.DomainBoundary,
+			"fact_boundary":       item.FactBoundary,
+		})
+	}
+	return map[string]any{
+		"customer_key":    settings.CustomerKey,
+		"config_revision": settings.ConfigRevision,
+		"config_hash":     settings.ConfigHash,
+		"product_version": settings.ProductVersion,
+		"schema_version":  settings.SchemaVersion,
+		"source":          settings.Source,
+		"items":           items,
+	}
+}
+
 func (d *jsonrpcDispatcher) requireCustomerConfigModulesEnabled(ctx context.Context, customerKey string, moduleKeys ...string) *v1.JsonrpcResult {
 	if d == nil || d.customerConfigUC == nil {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
@@ -980,6 +1306,9 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 				"reason": customerConfigErrorReasonActiveRevisionRequired,
 			}),
 		}
+	case errors.Is(err, biz.ErrCustomerConfigApprovalDisabled):
+		l.Warnf("[customer_config] approval disabled for runtime process err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该审批已停用，当前单据流程不能发起，请先启用审批责任"}
 	case errors.Is(err, biz.ErrCustomerConfigRevisionImmutable):
 		l.Warnf("[customer_config] immutable revision overwrite rejected err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置版本已存在且内容不同，请使用新版本号发布"}

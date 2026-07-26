@@ -21,6 +21,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -28,6 +29,7 @@ import {
   SearchInput,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
@@ -1021,60 +1023,85 @@ export default function V1MasterDataPage({ type }) {
           selectedCount={selectedRecord ? 1 : 0}
           selectedLabel={selectedRecordDisplayText}
         >
-          <Button
-            type="link"
-            size="small"
-            disabled={!selectedRecord}
-            onClick={() => {
+          <SelectionClearAction
+            selectedCount={selectedRecord ? 1 : 0}
+            selectionLabel={entityLabel}
+            onClear={() => {
               setSelectedRecord(null)
               setContacts([])
             }}
-          >
-            清空已选
-          </Button>
+          />
           {canUpdate ? (
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              disabled={!selectedRecord}
-              onClick={() => openEditRecord(selectedRecord)}
-            >
-              编辑{entityLabel}
-            </Button>
-          ) : (
-            <Button
-              size="small"
-              icon={<EyeOutlined />}
-              disabled={!selectedRecord}
-              onClick={() => setDetailRecord(selectedRecord)}
-            >
-              查看{entityLabel}
-            </Button>
-          )}
-          {canDisable ? (
-            <Popconfirm
-              title={
-                selectedRecord?.is_active === false
-                  ? '确认启用？'
-                  : '确认停用？'
+            <BusinessActionTooltip
+              disabled={!selectedRecord || saving}
+              disabledReason={
+                !selectedRecord
+                  ? `请先选择一个${entityLabel}`
+                  : `当前操作完成后可编辑${entityLabel}`
               }
-              onConfirm={() => toggleRecordActive(selectedRecord)}
-              disabled={!selectedRecord}
             >
               <Button
                 size="small"
-                disabled={!selectedRecord}
-                icon={
-                  selectedRecord?.is_active === false ? (
-                    <CheckCircleOutlined />
-                  ) : (
-                    <StopOutlined />
-                  )
-                }
+                icon={<EditOutlined />}
+                disabled={!selectedRecord || saving}
+                onClick={() => openEditRecord(selectedRecord)}
               >
-                {selectedRecord?.is_active === false ? '启用' : '停用'}
+                编辑{entityLabel}
               </Button>
-            </Popconfirm>
+            </BusinessActionTooltip>
+          ) : (
+            <BusinessActionTooltip
+              disabled={!selectedRecord || saving}
+              disabledReason={
+                !selectedRecord
+                  ? `请先选择一个${entityLabel}`
+                  : `当前操作完成后可查看${entityLabel}`
+              }
+            >
+              <Button
+                size="small"
+                icon={<EyeOutlined />}
+                disabled={!selectedRecord || saving}
+                onClick={() => setDetailRecord(selectedRecord)}
+              >
+                查看{entityLabel}
+              </Button>
+            </BusinessActionTooltip>
+          )}
+          {canDisable ? (
+            <BusinessActionTooltip
+              disabled={!selectedRecord || saving}
+              disabledReason={
+                !selectedRecord
+                  ? `请先选择一个${entityLabel}`
+                  : '当前操作完成后可继续'
+              }
+            >
+              <Popconfirm
+                title={
+                  selectedRecord?.is_active === false
+                    ? '确认启用？'
+                    : '确认停用？'
+                }
+                onConfirm={() => toggleRecordActive(selectedRecord)}
+                disabled={!selectedRecord || saving}
+              >
+                <Button
+                  size="small"
+                  className="erp-business-module-status-action"
+                  disabled={!selectedRecord || saving}
+                  icon={
+                    selectedRecord?.is_active === false ? (
+                      <CheckCircleOutlined />
+                    ) : (
+                      <StopOutlined />
+                    )
+                  }
+                >
+                  {selectedRecord?.is_active === false ? '启用' : '停用'}
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>

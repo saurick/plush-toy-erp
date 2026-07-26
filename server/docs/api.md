@@ -10,8 +10,9 @@
 
 HTTP 路由：
 
-- `GET /rpc/{url}`
 - `POST /rpc/{url}`
+
+通用 JSON-RPC 不提供 GET 路由。鉴权参数和业务写入只能通过 POST body 进入；健康检查使用 `/ping`、`/healthz` 和 `/readyz` 等专用只读端点。
 
 其中：
 
@@ -82,6 +83,14 @@ HTTP 路由：
 
 `get_task_assignment_options` 只接受 `task_id`，返回当前任务 version、状态、负责岗位、当前处理人、是否可退回岗位池以及服务端筛选后的接收人。`reassign_task` 只接受 `task_id / expected_version / idempotency_key / assignee_id / reason`；`assignee_id` 必须显式为正整数接收人或 `null` 岗位池，原因不能为空。当前默认只有 `boss` 获得 `workflow.task.assign`，super admin 可通过全权限执行，但不会自动成为业务岗位接收人；PMC 的 `workflow.task.supervise` 仍是只读。接收人必须是 active 账号、直接持有任务负责岗位，并在任务 revision 中具备读取、更新和完成 / 审批能力。成功只改变任务 `assignee_id / updated_by / version` 并写事件、幂等 receipt 与运行审计，不改变任务状态、责任池、流程锚点或 Fact。
 
+### `customer_config` 审批设置
+
+- `get_approval_settings`：只接受可选 `customer_key`，要求 `customer_config.read`；未传时使用部署客户上下文，传入值仍必须与该上下文一致。返回固定审批事项、active revision/hash、主办 / 备用 / 升级成员、最终有效候选和阻塞原因。每个事项显式返回 `configured`：`false` 表示当前 active revision 尚未发布该设置，不能与 `configured=true / enabled=false` 的人工停用混为一谈。
+- `preview_approval_settings`：要求 `customer_config.read`；精确接收 `customer_key / revision / expected_active_revision / expected_active_hash / items`，只校验并预览新 immutable revision，不落库。
+- `publish_approval_settings`：合同与 preview 相同，要求 `customer_config.publish`；使用 active revision/hash CAS 发布新 revision并写配置发布审计，不自动激活。
+
+`items` 只允许 `sales_order / purchase_order / shipment_finance`，成员只允许 `primary / backup / escalation` 的业务角色或具名账号。启用事项必须至少有一个可配置责任成员；停用事项可以没有成员。普通管理员不能把自己、自己持有的业务角色、系统角色或调试角色加入责任；激活仍走现有 transition check / activate 合同。active revision 中 `enabled=false` 会在创建 ProcessInstance 前拒绝相应的新流程，不先改来源单据，也不生成无候选审批任务；它不会终止或改写已按旧 revision 启动的实例。ProcessRuntime 任务办理使用任务自身存储的 revision，必须同时满足 RBAC、entitlement、精确 owner pool/role 或具名成员、assignee、状态/version 和幂等；没有候选人时失败关闭，配置变化不改写在途流程。已经具名分配的审批待办在更高优先级成员恢复后仍归原处理人，前提是其冻结岗位与 entitlement 仍有效；员工停用、注销或被移除该岗位时，未结束任务在同一事务释放回冻结责任池。
+
 ### `operational_fact`
 
 该域承载已登记的生产、委外、出货、库存预留和财务事实方法。出货主路径当前包括：
@@ -99,7 +108,7 @@ HTTP 路由：
 
 候选响应的 `total` 是相同关键词 / 销售订单过滤条件下的完整结果数，`items` 只包含当前 `limit / offset` 页；前端必须使用服务端分页、远程搜索与该 `total`，不得再客户端拼接有上限的销售订单、明细和出货列表。
 
-生产、委外和财务的状态方法继续使用 canonical RPC：`post_production_fact / cancel_production_fact`、`post_outsourcing_fact / cancel_outsourcing_fact`、`post_finance_fact / settle_finance_fact / cancel_finance_fact`。生产 / 委外取消接受来源完整的 `DRAFT / POSTED`，财务取消接受正式来源的 `DRAFT / POSTED`；`CANCELLED` 只允许精确幂等重放，`SETTLED` 财务事实不能直接取消。`settle_finance_fact` 只对该 RPC 允许的事实类型开放，发票页不提供直接 settle 动作；发票对账通过 `create_reconciliation_from_finance_fact` 生成对账事实表达。草稿取消不写库存，库存型事实只有已过账取消才写反向流水；财务取消写操作人、时间和原因审计，不写库存。
+生产、委外和财务的状态方法继续使用 canonical RPC：`post_production_fact / cancel_production_fact`、`post_outsourcing_fact / cancel_outsourcing_fact`、`post_finance_fact / settle_finance_fact / cancel_finance_fact`。三类事实只能以 `DRAFT` 且不带 `posted_at` 创建；财务草稿还不能预填结清或取消审计字段。Ent create / create-bulk hook 在 SQL 执行前阻断直接制造 `POSTED / SETTLED / CANCELLED` 的旁路，生命周期变化只能由对应领域 action 完成。生产 / 委外取消接受来源完整的 `DRAFT / POSTED`，财务取消接受正式来源的 `DRAFT / POSTED`；`CANCELLED` 只允许精确幂等重放，`SETTLED` 财务事实不能直接取消。`settle_finance_fact` 只对该 RPC 允许的事实类型开放，发票页不提供直接 settle 动作；发票对账通过 `create_reconciliation_from_finance_fact` 生成对账事实表达。草稿取消不写库存，库存型事实只有已过账取消才写反向流水；财务取消写操作人、时间和原因审计，不写库存。
 
 API 存在不代表正式 Web UI 可达：`add_purchase_receipt_item`、`material_supply` 4 个以及 `finished_goods_delivery` 5 个公开方法当前都是 `partial / backend-only`；销售订单正式提交则只走 `start_sales_order_acceptance_process + execute_sales_order_acceptance_submit`，不保留直连 `submit_sales_order` 的 Web 双轨。
 

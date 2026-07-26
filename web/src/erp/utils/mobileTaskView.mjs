@@ -470,7 +470,7 @@ export function explainMobileTaskVisibility(
     appendReason(
       reasons,
       taskView.notification_type === 'approval_required',
-      '该任务需要老板审批。'
+      '该任务需要当前审批责任岗位处理；只有升级事项才由老板承接。'
     )
     appendReason(reasons, isShipmentRisk, '该任务存在出货风险，需要老板关注。')
     appendReason(

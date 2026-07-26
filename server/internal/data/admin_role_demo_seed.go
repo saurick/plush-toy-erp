@@ -538,8 +538,20 @@ RETURNING id`, username, string(hash), now, now).Scan(&adminID); err != nil {
 	} else if resetPassword {
 		if _, err := tx.ExecContext(ctx, `
 UPDATE admin_users
-SET password_hash = $2, is_super_admin = FALSE, disabled = FALSE, updated_at = $3
+SET password_hash = $2,
+    auth_version = auth_version + 1,
+    is_super_admin = FALSE,
+    disabled = FALSE,
+    updated_at = $3
 WHERE id = $1`, adminID, string(hash), now); err != nil {
+			return RoleDemoAdminSeededAccount{}, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`, adminID, now, adminSessionRevokeReasonPasswordReset); err != nil {
 			return RoleDemoAdminSeededAccount{}, err
 		}
 	} else {

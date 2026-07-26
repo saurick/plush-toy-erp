@@ -594,6 +594,7 @@ async function runScenarioOnce(browser, scenario) {
       effectiveSessionOverride: scenario.effectiveSession,
       workflowTaskFixtures: scenario.workflowTaskFixtures,
       workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
+      approvalSettingsMode: scenario.approvalSettingsMode,
       workflowSourceTaskProducerFixtures:
         scenario.workflowSourceTaskProducerFixtures,
     })
@@ -614,6 +615,7 @@ async function runScenarioOnce(browser, scenario) {
         effectiveSessionOverride: scenario.effectiveSession,
         workflowTaskFixtures: scenario.workflowTaskFixtures,
         workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
+        approvalSettingsMode: scenario.approvalSettingsMode,
         workflowSourceTaskProducerFixtures:
           scenario.workflowSourceTaskProducerFixtures,
       })
@@ -625,6 +627,7 @@ async function runScenarioOnce(browser, scenario) {
         effectiveSessionOverride: scenario.effectiveSession,
         workflowTaskFixtures: scenario.workflowTaskFixtures,
         workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
+        approvalSettingsMode: scenario.approvalSettingsMode,
         workflowSourceTaskProducerFixtures:
           scenario.workflowSourceTaskProducerFixtures,
       })
@@ -3994,21 +3997,24 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
     const checklist = document.querySelector('.erp-permission-checklist')
     const wrappers = [
       ...document.querySelectorAll(
-        '.erp-permission-grid .ant-checkbox-wrapper'
+        '.erp-permission-list .erp-permission-row.ant-checkbox-wrapper'
       ),
     ].slice(0, 8)
     const bodyText = document.body.textContent || ''
     const readWrapper = (wrapper) => {
-      const label = wrapper.querySelector('.erp-permission-option__label')
+      const label = wrapper.querySelector('.erp-permission-row__label')
+      const content = wrapper.querySelector('.erp-permission-row__content')
       const wrapperRect = wrapper.getBoundingClientRect()
       const labelRect = label?.getBoundingClientRect()
       return {
         text: String(wrapper.textContent || '').trim(),
+        kind: content?.dataset?.permissionKind || '',
         wrapperWidth: wrapperRect.width,
         wrapperScrollWidth: wrapper.scrollWidth,
+        wrapperHeight: wrapperRect.height,
         labelWidth: labelRect?.width || 0,
         hasVisiblePermissionKey: Boolean(
-          wrapper.querySelector('.erp-permission-option__key')
+          wrapper.querySelector('.erp-permission-row__key')
         ),
       }
     }
@@ -4036,6 +4042,8 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
   const invalid = metrics.wrappers.filter(
     (item) =>
       item.labelWidth <= 0 ||
+      !['menu', 'action'].includes(item.kind) ||
+      item.wrapperHeight < 48 ||
       item.hasVisiblePermissionKey ||
       item.wrapperScrollWidth > item.wrapperWidth + 1
   )

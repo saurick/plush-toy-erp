@@ -420,6 +420,87 @@ test("applyCustomerWebConfig rejects symbolic links in target paths", async () =
   }
 });
 
+test("apply-customer-web-config CLI rejects missing values before mutating output", async () => {
+  const { root, configRoot, webBuildDir } = await setupCustomerPackage();
+  const cases = [
+    {
+      option: "--customer",
+      args: [
+        "--config-root",
+        configRoot,
+        "--web-build-dir",
+        webBuildDir,
+        "--customer",
+      ],
+    },
+    {
+      option: "--customer",
+      args: [
+        "--customer",
+        "--config-root",
+        configRoot,
+        "--web-build-dir",
+        webBuildDir,
+      ],
+    },
+    {
+      option: "--config-root",
+      args: [
+        "--customer",
+        "yoyoosun",
+        "--web-build-dir",
+        webBuildDir,
+        "--config-root",
+      ],
+    },
+    {
+      option: "--web-build-dir",
+      args: [
+        "--customer",
+        "yoyoosun",
+        "--config-root",
+        configRoot,
+        "--web-build-dir",
+      ],
+    },
+  ];
+
+  try {
+    for (const { option, args } of cases) {
+      seedStaleCustomerBuild(webBuildDir);
+      const result = spawnSync(process.execPath, [scriptPath, ...args], {
+        cwd: root,
+        encoding: "utf8",
+      });
+
+      assert.notEqual(result.status, 0);
+      assert.equal(
+        result.stderr.includes(`${option} requires a non-empty value`),
+        true,
+        result.stderr,
+      );
+      assert.match(
+        await readFile(path.join(webBuildDir, "customer-config.js"), "utf8"),
+        /customerKey:'stale'/u,
+      );
+      assert.equal(
+        fs.existsSync(
+          path.join(
+            webBuildDir,
+            "customer-assets",
+            "stale",
+            "stale.svg",
+          ),
+        ),
+        true,
+      );
+      assert.equal(fs.existsSync(path.join(root, "customer-config.js")), false);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("apply-customer-web-config CLI executes through a symlinked path", async () => {
   const { root, configRoot, webBuildDir } = await setupCustomerPackage();
   try {

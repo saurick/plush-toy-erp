@@ -42,6 +42,7 @@ import {
   SearchInput,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -272,22 +273,33 @@ export default function V1PurchaseReceiptsPage() {
     (canCreatePayable ||
       hasActionPermission(adminProfile, 'finance.payable.read')) &&
     canOpenRelatedPath(V1_ROUTE_PATHS.payables)
+  const canOpenPurchaseOrders = canOpenRelatedPath(
+    V1_ROUTE_PATHS.purchaseOrders
+  )
+  const canOpenQualityInspections = canOpenRelatedPath(
+    V1_ROUTE_PATHS.qualityInspections
+  )
+  const canOpenInventory = canOpenRelatedPath(V1_ROUTE_PATHS.inventory)
+  const hasRelatedCapability =
+    canOpenPurchaseOrders || canOpenQualityInspections || canOpenInventory
   const relatedMenuItems = useMemo(() => {
     const items = []
-    if (
-      selectedRow?.purchase_order_id &&
-      canOpenRelatedPath(V1_ROUTE_PATHS.purchaseOrders)
-    ) {
+    if (selectedRow?.purchase_order_id && canOpenPurchaseOrders) {
       items.push({ key: 'purchase-orders', label: '采购订单' })
     }
-    if (canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)) {
+    if (canOpenQualityInspections) {
       items.push({ key: 'quality-inspections', label: '来料质检' })
     }
-    if (canOpenRelatedPath(V1_ROUTE_PATHS.inventory)) {
+    if (canOpenInventory) {
       items.push({ key: 'inventory', label: '库存台账' })
     }
     return items
-  }, [canOpenRelatedPath, selectedRow?.purchase_order_id])
+  }, [
+    canOpenInventory,
+    canOpenPurchaseOrders,
+    canOpenQualityInspections,
+    selectedRow?.purchase_order_id,
+  ])
   const materialOptions = useMemo(
     () => uniqueReferenceOptions(materials, materialOption),
     [materials]
@@ -1121,23 +1133,24 @@ export default function V1PurchaseReceiptsPage() {
           selectedLabel={selectedRowLabel}
           boundaryText="草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存。页面不会绕过这些规则直接修改库存。"
         >
-          <Button
-            type="link"
-            size="small"
-            disabled={!selectedRow}
-            onClick={() => setSelectedRow(null)}
-          >
-            清空已选
-          </Button>
-          {relatedMenuItems.length > 0 ? (
+          <SelectionClearAction
+            selectedCount={selectedRow ? 1 : 0}
+            selectionLabel="入库记录"
+            onClear={() => setSelectedRow(null)}
+          />
+          {hasRelatedCapability ? (
             <BusinessActionTooltip
-              disabled={!selectedRow}
-              disabledReason="请先选择一条入库记录"
+              disabled={!selectedRow || relatedMenuItems.length === 0}
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : '当前入库记录没有可打开的关联单据'
+              }
             >
               <Dropdown
                 trigger={['click']}
                 destroyOnHidden
-                disabled={!selectedRow}
+                disabled={!selectedRow || relatedMenuItems.length === 0}
                 menu={{
                   items: relatedMenuItems,
                   onClick: openRelatedTable,
@@ -1146,7 +1159,7 @@ export default function V1PurchaseReceiptsPage() {
                 <Button
                   size="small"
                   icon={<LinkOutlined />}
-                  disabled={!selectedRow}
+                  disabled={!selectedRow || relatedMenuItems.length === 0}
                 >
                   相关单据 <DownOutlined />
                 </Button>
@@ -1194,18 +1207,26 @@ export default function V1PurchaseReceiptsPage() {
             </BusinessActionTooltip>
           ) : null}
           {canCreateReturn &&
-          (!selectedRow || selectedRow.status === 'POSTED') ? (
+          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || saving}
+              disabled={
+                !selectedRow || selectedRow.status !== 'POSTED' || saving
+              }
               disabledReason={
-                saving
-                  ? '当前操作完成后可生成采购退货'
-                  : '请先选择一条已过账入库记录'
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.status !== 'POSTED'
+                    ? '入库记录过账后可生成采购退货'
+                    : saving
+                      ? '当前操作完成后可生成采购退货'
+                      : ''
               }
             >
               <Button
                 size="small"
-                disabled={!selectedRow || saving}
+                disabled={
+                  !selectedRow || selectedRow.status !== 'POSTED' || saving
+                }
                 onClick={() => setReceiptExceptionMode('return')}
               >
                 生成采购退货
@@ -1213,47 +1234,107 @@ export default function V1PurchaseReceiptsPage() {
             </BusinessActionTooltip>
           ) : null}
           {canCreateAdjustment &&
-          (!selectedRow || selectedRow.status === 'POSTED') ? (
+          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || saving}
+              disabled={
+                !selectedRow || selectedRow.status !== 'POSTED' || saving
+              }
               disabledReason={
-                saving
-                  ? '当前操作完成后可登记入库调整'
-                  : '请先选择一条已过账入库记录'
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.status !== 'POSTED'
+                    ? '入库记录过账后可登记入库调整'
+                    : saving
+                      ? '当前操作完成后可登记入库调整'
+                      : ''
               }
             >
               <Button
                 size="small"
-                disabled={!selectedRow || saving}
+                disabled={
+                  !selectedRow || selectedRow.status !== 'POSTED' || saving
+                }
                 onClick={() => setReceiptExceptionMode('adjustment')}
               >
                 登记入库调整
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {selectedRow?.status === 'POSTED' && canViewPayable ? (
-            <Button
-              size="small"
-              disabled={saving || financeSourceLoading}
-              onClick={() => viewPurchaseReceiptPayable(selectedRow)}
+          {canViewPayable &&
+          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
+            <BusinessActionTooltip
+              disabled={
+                !selectedRow ||
+                selectedRow.status !== 'POSTED' ||
+                saving ||
+                financeSourceLoading
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.status !== 'POSTED'
+                    ? '入库记录过账后可查看应付'
+                    : '当前操作完成后可查看应付'
+              }
             >
-              查看应付
-            </Button>
+              <Button
+                size="small"
+                disabled={
+                  !selectedRow ||
+                  selectedRow.status !== 'POSTED' ||
+                  saving ||
+                  financeSourceLoading
+                }
+                onClick={() => viewPurchaseReceiptPayable(selectedRow)}
+              >
+                查看应付
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
-          {selectedRow?.status === 'POSTED' && canCreatePayable ? (
-            <Button
-              size="small"
-              disabled={saving || financeSourceLoading}
-              onClick={() => openPurchaseReceiptPayable(selectedRow)}
+          {canCreatePayable &&
+          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
+            <BusinessActionTooltip
+              disabled={
+                !selectedRow ||
+                selectedRow.status !== 'POSTED' ||
+                saving ||
+                financeSourceLoading
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.status !== 'POSTED'
+                    ? '入库记录过账后可生成应付'
+                    : '当前操作完成后可生成应付'
+              }
             >
-              生成应付
-            </Button>
+              <Button
+                size="small"
+                disabled={
+                  !selectedRow ||
+                  selectedRow.status !== 'POSTED' ||
+                  saving ||
+                  financeSourceLoading
+                }
+                onClick={() => openPurchaseReceiptPayable(selectedRow)}
+              >
+                生成应付
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
           {canPost && (!selectedRow || selectedRow.status === 'DRAFT') ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || saving}
+              disabled={
+                !selectedRow || selectedRow.status !== 'DRAFT' || saving
+              }
               disabledReason={
-                saving ? '当前操作完成后可过账' : '请先选择一条入库草稿'
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : selectedRow.status !== 'DRAFT'
+                    ? '只有入库草稿可以过账'
+                    : saving
+                      ? '当前操作完成后可过账'
+                      : ''
               }
             >
               <Popconfirm
@@ -1271,8 +1352,11 @@ export default function V1PurchaseReceiptsPage() {
                 <Button
                   size="small"
                   type="primary"
+                  className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
-                  disabled={!selectedRow || saving}
+                  disabled={
+                    !selectedRow || selectedRow.status !== 'DRAFT' || saving
+                  }
                 >
                   过账入库
                 </Button>
@@ -1280,21 +1364,30 @@ export default function V1PurchaseReceiptsPage() {
             </BusinessActionTooltip>
           ) : null}
           {canPost &&
-          (!selectedRow ||
-            ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
-              <BusinessActionTooltip
-                disabled={!selectedRow || saving}
-                disabledReason={
-                saving ? '当前操作完成后可继续' : '请先选择一条入库记录'
+          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
+            <BusinessActionTooltip
+              disabled={
+                !selectedRow ||
+                !['DRAFT', 'POSTED'].includes(selectedRow.status) ||
+                saving
               }
-              >
-                <Popconfirm
-                  title={
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条入库记录'
+                  : !['DRAFT', 'POSTED'].includes(selectedRow.status)
+                    ? '已取消入库记录不能再次取消'
+                    : saving
+                      ? '当前操作完成后可继续'
+                      : ''
+              }
+            >
+              <Popconfirm
+                title={
                   selectedRow?.status === 'DRAFT'
                     ? '确认作废采购入库草稿？草稿尚未过账，不会变更库存。'
                     : '确认取消已过账入库并恢复相应库存？'
                 }
-                  onConfirm={() =>
+                onConfirm={() =>
                   runReceiptAction(
                     selectedRow,
                     cancelPurchaseReceipt,
@@ -1303,21 +1396,24 @@ export default function V1PurchaseReceiptsPage() {
                       : '采购入库已取消，库存已恢复'
                   )
                 }
-                  okText="确认"
-                  cancelText="取消"
+                okText="确认"
+                cancelText="取消"
+              >
+                <Button
+                  size="small"
+                  danger
+                  className="erp-business-module-status-action"
+                  icon={<CloseCircleOutlined />}
+                  disabled={
+                    !selectedRow ||
+                    !['DRAFT', 'POSTED'].includes(selectedRow.status) ||
+                    saving
+                  }
                 >
-                  <Button
-                    size="small"
-                    danger
-                    icon={<CloseCircleOutlined />}
-                    disabled={!selectedRow || saving}
-                  >
-                    {selectedRow?.status === 'DRAFT'
-                    ? '作废草稿'
-                    : '取消入库'}
-                  </Button>
-                </Popconfirm>
-              </BusinessActionTooltip>
+                  {selectedRow?.status === 'DRAFT' ? '作废草稿' : '取消入库'}
+                </Button>
+              </Popconfirm>
+            </BusinessActionTooltip>
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>

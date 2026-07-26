@@ -12,14 +12,6 @@ option go_package = "server/api/jsonrpc/v1;v1";
 // method       <- 动作
 // params       <- 内容
 service Jsonrpc {
-  // GET /rpc/{url}?id=xxx&jsonrpc=2.0&method=ping 之类
-  rpc GetJsonrpc (GetJsonrpcRequest) returns (GetJsonrpcReply) {
-    option (google.api.http) = {
-      get: "/rpc/{url}"
-      // GET 没有 body，jsonrpc、id、method、params 走 query 即可（可选）
-    };
-  }
-
   // POST /rpc/{url}
   // body 是 JSON-RPC 报文的“结构化版本”
   rpc PostJsonrpc (PostJsonrpcRequest) returns (PostJsonrpcReply) {
@@ -31,32 +23,7 @@ service Jsonrpc {
 }
 
 // --------------------
-// GET 版本
-// --------------------
-message GetJsonrpcRequest {
-  // /rpc/{url} 里的 path 变量
-  string url = 1;
-
-  // JSON-RPC 版本，通常 "2.0"
-  string jsonrpc = 2;
-
-  // JSON-RPC id，用 string 存，前端是数字也能转成字符串
-  string id = 3;
-
-  // 可选：method & params 也可以跟在 query 里（不强制）
-  string method = 4;
-  google.protobuf.Struct params = 5;
-}
-
-message GetJsonrpcReply {
-  string jsonrpc = 1;
-  string id = 2;
-  JsonrpcResult result = 3;
-  string error = 4;
-}
-
-// --------------------
-// POST 版本（推荐）
+// POST 版本
 // --------------------
 message PostJsonrpcRequest {
   // /rpc/{url} 里的 path 变量，用于区分不同业务域，比如 "auth"、"erp"、"analytics" 等

@@ -217,6 +217,122 @@ ON CONFLICT (admin_user_id, role_id) DO NOTHING`)).
 	}
 }
 
+func TestSeedRoleDemoAdminAccountsResetBumpsAuthVersionAndRevokesSessions(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM roles WHERE role_key = $1 AND disabled = FALSE LIMIT 1")).
+		WithArgs(biz.SalesRoleKey).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(20))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM admin_users WHERE username = $1 LIMIT 1")).
+		WithArgs("demo_sales").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(100))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2,
+    auth_version = auth_version + 1,
+    is_super_admin = FALSE,
+    disabled = FALSE,
+    updated_at = $3
+WHERE id = $1`)).
+		WithArgs(100, bcryptHashMatcher("role-demo-password"), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`)).
+		WithArgs(100, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM admin_user_roles WHERE admin_user_id = $1")).
+		WithArgs(100).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+INSERT INTO admin_user_roles (admin_user_id, role_id, created_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (admin_user_id, role_id) DO NOTHING`)).
+		WithArgs(100, 20, sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	mock.ExpectClose()
+
+	result, err := SeedRoleDemoAdminAccounts(context.Background(), db, RoleDemoAdminSeedOptions{
+		Password:      "role-demo-password",
+		ResetPassword: true,
+		Accounts: []RoleDemoAdminAccountSpec{
+			{Username: "demo_sales", RoleKey: biz.SalesRoleKey},
+		},
+	})
+	if err != nil {
+		t.Fatalf("SeedRoleDemoAdminAccounts() error = %v", err)
+	}
+	if len(result.Accounts) != 1 || !result.Accounts[0].PasswordReset {
+		t.Fatalf("unexpected seeded accounts: %#v", result.Accounts)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestSeedRoleDemoAdminAccountsResetRollsBackWhenSessionRevocationFails(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM roles WHERE role_key = $1 AND disabled = FALSE LIMIT 1")).
+		WithArgs(biz.SalesRoleKey).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(20))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM admin_users WHERE username = $1 LIMIT 1")).
+		WithArgs("demo_sales").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(100))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2,
+    auth_version = auth_version + 1,
+    is_super_admin = FALSE,
+    disabled = FALSE,
+    updated_at = $3
+WHERE id = $1`)).
+		WithArgs(100, bcryptHashMatcher("role-demo-password"), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`)).
+		WithArgs(100, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
+		WillReturnError(errors.New("session storage unavailable"))
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	_, err = SeedRoleDemoAdminAccounts(context.Background(), db, RoleDemoAdminSeedOptions{
+		Password:      "role-demo-password",
+		ResetPassword: true,
+		Accounts: []RoleDemoAdminAccountSpec{
+			{Username: "demo_sales", RoleKey: biz.SalesRoleKey},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "session storage unavailable") {
+		t.Fatalf("SeedRoleDemoAdminAccounts() error = %v, want session revocation failure", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
 func TestSeedRoleDemoAdminAccountsRejectsMissingPassword(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

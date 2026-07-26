@@ -43,6 +43,11 @@
   min-height: 44px;
 }
 
+.erp-business-selection-action-drawer__item
+  .erp-business-action-tooltip-anchor {
+  width: 100%;
+}
+
 .erp-business-selection-action-drawer__item .ant-btn {
   width: 100%;
   min-height: 44px;
@@ -538,7 +543,6 @@
   .erp-dev-customer-release-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
 }
 
 @media screen and (max-width: 980px) {
@@ -757,7 +761,6 @@
   .erp-dev-customer-numbering {
     grid-template-columns: 1fr;
   }
-
 }
 
 @media screen and (max-width: 768px) {
@@ -774,10 +777,6 @@
   .erp-login-card__theme-toggle.ant-btn {
     top: 14px;
     right: 14px;
-  }
-
-  .erp-permission-hero__content > .ant-btn {
-    width: 100%;
   }
 
   .erp-permission-tabs > .ant-tabs-nav .ant-tabs-nav-wrap {
@@ -798,6 +797,24 @@
   .erp-permission-modal__fields,
   .erp-permission-checklist {
     grid-template-columns: 1fr;
+  }
+
+  .erp-approval-responsibility__header,
+  .erp-approval-responsibility__actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .erp-approval-responsibility__actions .ant-btn {
+    width: 100%;
+  }
+
+  .erp-approval-responsibility-form__tier {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-approval-responsibility-form__pool-note {
+    margin-top: 0;
   }
 
   .erp-permission-checklist__header,
@@ -835,12 +852,9 @@
     flex: 1 1 92px;
   }
 
-  .erp-permission-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .erp-permission-menu-results__grid {
-    grid-template-columns: 1fr;
+  .erp-permission-row__tags {
+    flex-basis: 100%;
+    padding-left: 21px;
   }
 
   .erp-business-collaboration-task-panel.ant-card {
@@ -887,21 +901,38 @@
   }
 
   .erp-role-center-layout,
-  .erp-role-center-impact,
   .erp-role-capability-overview__grid,
   .erp-role-navigation-preview__grid,
   .erp-role-policy-boundary__grid {
     grid-template-columns: 1fr;
   }
 
-  .erp-role-center-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .erp-role-center-sidebar {
+    display: flex;
+    overflow-x: auto;
+    padding: 8px;
+    border-right: 0;
+    border-bottom: 1px solid #e4ebe6;
+    scrollbar-width: thin;
+  }
+
+  .erp-role-template-card {
+    flex: 0 0 220px;
   }
 
   .erp-role-navigation-editor__head,
   .erp-role-navigation-editor__order-item {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .erp-role-associated-accounts__head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-role-associated-accounts__head .ant-btn {
+    width: 100%;
   }
 
   .erp-role-navigation-editor__head > .ant-select {
@@ -918,9 +949,9 @@
     width: 100%;
   }
 
-  .erp-role-center-detail__head .ant-btn,
+  .erp-role-center-save,
   .erp-role-center-footer .ant-btn {
-    width: 100%;
+    flex: 1 1 180px;
   }
 
   .erp-permission-list-toolbar__filters {

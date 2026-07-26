@@ -403,7 +403,10 @@
   background: var(--erp-surface-bg-soft);
 }
 
-[data-erp-theme='dark'] .erp-task-action-drawer__step:hover:not(.erp-task-action-drawer__step--disabled),
+[data-erp-theme='dark']
+  .erp-task-action-drawer__step:hover:not(
+    .erp-task-action-drawer__step--disabled
+  ),
 [data-erp-theme='dark'] .erp-task-action-drawer__action-option:hover,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-option:focus-visible,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-option--selected {
@@ -411,12 +414,14 @@
   background: var(--erp-surface-bg-soft);
 }
 
-[data-erp-theme='dark'] .erp-task-action-drawer__action-option--danger.erp-task-action-drawer__action-option--selected {
+[data-erp-theme='dark']
+  .erp-task-action-drawer__action-option--danger.erp-task-action-drawer__action-option--selected {
   border-color: #ff9aa3;
   background: rgb(255 154 163 / 0.12);
 }
 
-[data-erp-theme='dark'] .erp-task-action-drawer__action-option--warning.erp-task-action-drawer__action-option--selected {
+[data-erp-theme='dark']
+  .erp-task-action-drawer__action-option--warning.erp-task-action-drawer__action-option--selected {
   border-color: #f2bd65;
   background: rgb(242 189 101 / 0.12);
 }
@@ -950,8 +955,6 @@
 [data-erp-theme='dark'] .erp-role-template-card,
 [data-erp-theme='dark'] .erp-role-center-sidebar,
 [data-erp-theme='dark'] .erp-role-center-detail__head,
-[data-erp-theme='dark'] .erp-role-center-metrics > div,
-[data-erp-theme='dark'] .erp-role-center-impact > div,
 [data-erp-theme='dark'] .erp-role-navigation-editor,
 [data-erp-theme='dark'] .erp-role-navigation-editor__order-item,
 [data-erp-theme='dark'] .erp-role-navigation-preview__group,
@@ -960,8 +963,9 @@
 [data-erp-theme='dark'] .erp-role-capability-card,
 [data-erp-theme='dark'] .erp-role-policy-boundary__grid > div,
 [data-erp-theme='dark'] .erp-permission-category-nav,
-[data-erp-theme='dark'] .erp-permission-menu-results,
-[data-erp-theme='dark'] .erp-permission-menu-result,
+[data-erp-theme='dark']
+  .erp-permission-list
+  .erp-permission-row.ant-checkbox-wrapper,
 [data-erp-theme='dark'] .erp-permission-checklist__section {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
@@ -979,6 +983,10 @@
 
 [data-erp-theme='dark'] .erp-permission-category-nav__label {
   color: var(--erp-primary-strong);
+}
+
+[data-erp-theme='dark'] .erp-permission-category-nav__selected {
+  color: #86efac;
 }
 
 [data-erp-theme='dark'] .erp-permission-category-nav__label::before {
@@ -1022,7 +1030,9 @@
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-permission-menu-result--visible {
+[data-erp-theme='dark']
+  .erp-permission-list
+  .erp-permission-row.ant-checkbox-wrapper:has(.ant-checkbox-checked) {
   border-color: #315f43;
   background: #10271a;
 }
@@ -1037,14 +1047,14 @@
   border-top-color: var(--erp-border);
 }
 
-[data-erp-theme='dark'] .erp-permission-hero.ant-card {
-  border-color: #334155;
-  background: linear-gradient(135deg, #111827, #172033);
-  box-shadow: 0 16px 34px rgb(0 0 0 / 28%);
-}
-
 [data-erp-theme='dark'] .erp-permission-tabs > .ant-tabs-nav::before {
   border-bottom-color: var(--erp-border);
+}
+
+[data-erp-theme='dark'] .erp-permission-tabs > .ant-tabs-nav,
+[data-erp-theme='dark'] .erp-role-policy-tabs > .ant-tabs-nav {
+  border-color: var(--erp-border);
+  background: var(--erp-surface);
 }
 
 [data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab {
@@ -1068,12 +1078,14 @@
   box-shadow: 0 14px 30px rgb(0 0 0 / 24%);
 }
 
-[data-erp-theme='dark'] .erp-permission-section__eyebrow.ant-typography {
-  color: #86efac;
+[data-erp-theme='dark'] .erp-approval-responsibility__actions,
+[data-erp-theme='dark'] .erp-approval-responsibility-form__tier {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-soft);
 }
 
-[data-erp-theme='dark'] .erp-role-center-header {
-  border-bottom-color: var(--erp-border);
+[data-erp-theme='dark'] .erp-permission-section__eyebrow.ant-typography {
+  color: #86efac;
 }
 
 [data-erp-theme='dark']
@@ -1087,15 +1099,16 @@
 [data-erp-theme='dark'] .erp-business-list-toolbar__stat strong,
 [data-erp-theme='dark'] .erp-business-column-order-modal__index,
 [data-erp-theme='dark'] .erp-business-column-order-modal__label,
-[data-erp-theme='dark'] .erp-role-center-metrics strong,
 [data-erp-theme='dark'] .erp-business-selection-action-bar__copy,
 [data-erp-theme='dark'] .erp-business-module-select-popup .ant-select-item,
 [data-erp-theme='dark'] .erp-module-column-header-trigger.ant-btn:hover,
 [data-erp-theme='dark'] .erp-module-column-header-trigger.ant-btn:focus-visible,
 [data-erp-theme='dark'] .erp-permission-modal__title-main,
 [data-erp-theme='dark'] .erp-business-action-modal__title span,
-[data-erp-theme='dark'] .erp-permission-option__label,
-[data-erp-theme='dark'] .erp-permission-grid .ant-checkbox-wrapper {
+[data-erp-theme='dark'] .erp-permission-row__label,
+[data-erp-theme='dark']
+  .erp-permission-list
+  .erp-permission-row.ant-checkbox-wrapper {
   color: var(--erp-text);
 }
 
@@ -1103,7 +1116,8 @@
 [data-erp-theme='dark'] .erp-business-page-header-card p,
 [data-erp-theme='dark'] .erp-business-date-range-filter__range > span,
 [data-erp-theme='dark'] .erp-permission-checklist-filter,
-[data-erp-theme='dark'] .erp-permission-option__impact,
+[data-erp-theme='dark'] .erp-permission-row__note,
+[data-erp-theme='dark'] .erp-permission-row__icon,
 [data-erp-theme='dark'] .erp-business-status-transition-option span,
 [data-erp-theme='dark'] .erp-business-module-task-item span,
 [data-erp-theme='dark'] .erp-business-filter-panel__summary,

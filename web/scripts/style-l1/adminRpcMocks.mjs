@@ -116,6 +116,7 @@ export async function installAdminRpcMocks(
     effectiveSessionOverride = null,
     workflowTaskFixtures = [],
     workflowProcessContextFixtures = [],
+    approvalSettingsMode = 'configured',
   } = {}
 ) {
   const nowUnix = () => Math.floor(Date.now() / 1000)
@@ -170,6 +171,16 @@ export async function installAdminRpcMocks(
     {
       permission_key: 'customer_config.read',
       name: '查看客户配置',
+      module: 'customer_config',
+    },
+    {
+      permission_key: 'customer_config.publish',
+      name: '发布客户配置',
+      module: 'customer_config',
+    },
+    {
+      permission_key: 'customer_config.activate',
+      name: '启用客户配置',
       module: 'customer_config',
     },
     {
@@ -434,11 +445,30 @@ export async function installAdminRpcMocks(
       'field.party_private.read',
       'field.sales_commercial.read',
       'workflow.task.read',
+      'workflow.task.approve',
       'mobile.sales.access',
       'customer.read',
       'sales_order.read',
       'warehouse.inventory.read',
     ],
+    data_scopes: [
+      { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
+    ],
+  }
+  const purchaseRole = {
+    role_key: 'purchase',
+    name: '采购',
+    description: '采购下单、到货与供应商协同',
+    builtin: true,
+    role_type: 'business_default',
+    version: 1,
+    assignable_by_current_admin: true,
+    permissions_editable_by_current_admin: true,
+    disabled: false,
+    sort_order: 30,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
+    permissions: ['workflow.task.read', 'workflow.task.approve'],
     data_scopes: [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
     ],
@@ -457,10 +487,30 @@ export async function installAdminRpcMocks(
     navigation_mode: 'recommended',
     primary_menu_paths: [],
     permissions: [
+      'workflow.task.read',
+      'workflow.task.approve',
       'finance.receivable.confirm',
       'finance.reconciliation.confirm',
       'finance.reconciliation.read',
     ],
+    data_scopes: [
+      { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
+    ],
+  }
+  const bossRole = {
+    role_key: 'boss',
+    name: '老板',
+    description: '查看全局业务并承接升级审批',
+    builtin: true,
+    role_type: 'business_default',
+    version: 1,
+    assignable_by_current_admin: true,
+    permissions_editable_by_current_admin: true,
+    disabled: false,
+    sort_order: 10,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
+    permissions: ['workflow.task.read', 'workflow.task.approve'],
     data_scopes: [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
     ],
@@ -530,7 +580,9 @@ export async function installAdminRpcMocks(
       effectiveSessionOverride,
       adminProfile
     ),
+    bossRole,
     salesRole,
+    purchaseRole,
     financeRole,
     adminRole,
     mockMenus,
@@ -550,12 +602,219 @@ export async function installAdminRpcMocks(
   await installFactRpcMocks(page, mockContext)
   await installAttachmentRpcMocks(page, mockContext)
 
+  const approvalCatalog = {
+    sales_order: { label: '销售订单审批', domain: '销售' },
+    purchase_order: { label: '采购订单审批', domain: '采购' },
+    shipment_finance: { label: '出货财务放行', domain: '财务 / 出货' },
+  }
+  const initialApprovalItems = [
+    {
+      approval_key: 'sales_order',
+      enabled: true,
+      members: [
+        {
+          role_key: 'sales',
+          user_id: 0,
+          strategy: 'primary',
+          enabled: true,
+        },
+        {
+          role_key: 'boss',
+          user_id: 0,
+          strategy: 'escalation',
+          enabled: true,
+        },
+      ],
+    },
+    {
+      approval_key: 'purchase_order',
+      enabled: true,
+      members: [
+        {
+          role_key: 'purchase',
+          user_id: 0,
+          strategy: 'primary',
+          enabled: true,
+        },
+      ],
+    },
+    {
+      approval_key: 'shipment_finance',
+      enabled: false,
+      members: [],
+    },
+  ]
+  const approvalPriority = {
+    primary: 100,
+    backup: 200,
+    escalation: 300,
+  }
+  const explainApprovalItems = (items = [], { configured = true } = {}) =>
+    Object.keys(approvalCatalog).map((approvalKey) => {
+      const sourceItem = items.find(
+        (item) => item?.approval_key === approvalKey
+      )
+      const itemConfigured = configured && Boolean(sourceItem)
+      const source = sourceItem || {
+        approval_key: approvalKey,
+        enabled: false,
+        members: [],
+      }
+      const members = (Array.isArray(source.members) ? source.members : []).map(
+        (member) => ({
+          role_key: String(member.role_key || '').trim(),
+          user_id: Number(member.user_id || 0),
+          strategy: String(member.strategy || '').trim(),
+          priority: approvalPriority[member.strategy] || 100,
+          enabled: member.enabled !== false,
+        })
+      )
+      const effective = members
+        .filter((member) => source.enabled === true && member.enabled)
+        .sort((left, right) => left.priority - right.priority)[0]
+      const blockedReasons = []
+      if (!itemConfigured) {
+        blockedReasons.push('approval_settings_not_published')
+      } else if (source.enabled !== true) {
+        blockedReasons.push('approval_disabled')
+      }
+      if (source.enabled === true && !effective) {
+        blockedReasons.push('no_eligible_approver')
+      }
+      return {
+        approval_key: approvalKey,
+        ...approvalCatalog[approvalKey],
+        configurable: true,
+        configured: itemConfigured,
+        enabled: source.enabled === true,
+        members,
+        effective_role_keys: effective ? [effective.role_key] : [],
+        effective_strategy: effective?.strategy || '',
+        blocked_reasons: blockedReasons,
+      }
+    })
+  const approvalBoundaryItems = () => [
+    {
+      approval_key: 'payment',
+      label: '付款审批',
+      domain: '财务',
+      configurable: false,
+      configured: false,
+      enabled: false,
+      members: [],
+      effective_role_keys: [],
+      effective_strategy: '',
+      blocked_reasons: [
+        'payment_approval_source_document_missing',
+        'payment_approval_process_runtime_contract_missing',
+      ],
+    },
+  ]
+  const buildApprovalSettingsMock = ({
+    revision,
+    configHash,
+    source,
+    items,
+    configured = true,
+  }) => ({
+    customer_key: 'yoyoosun',
+    config_revision: revision,
+    config_hash: configHash,
+    product_version: 'style-l1-product',
+    schema_version: 'approval-settings/v1',
+    source,
+    items: [
+      ...explainApprovalItems(items, { configured }),
+      ...approvalBoundaryItems(),
+    ],
+  })
+  let activeApprovalSettings = buildApprovalSettingsMock({
+    revision: 'yoyoosun-approval-v1',
+    configHash: 'style-l1-approval-config-hash',
+    source: 'active_customer_config',
+    items: approvalSettingsMode === 'unconfigured' ? [] : initialApprovalItems,
+    configured: approvalSettingsMode !== 'unconfigured',
+  })
+  let pendingApprovalSettings = null
+
   await page.route('**/rpc/customer_config', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method, params = {} } = body
     let data
     if (method === 'get_effective_session') {
       data = { session: mockContext.effectiveSession }
+    } else if (method === 'get_approval_settings') {
+      data = {
+        approval_settings: activeApprovalSettings,
+      }
+    } else if (method === 'preview_approval_settings') {
+      data = {
+        approval_settings: buildApprovalSettingsMock({
+          revision: String(params.revision || ''),
+          configHash: '',
+          source: 'approval_settings_preview',
+          items: params.items,
+          configured: true,
+        }),
+      }
+    } else if (method === 'publish_approval_settings') {
+      const revision = String(params.revision || '').trim()
+      const configHash = `style-l1-${revision}-hash`
+      pendingApprovalSettings = buildApprovalSettingsMock({
+        revision,
+        configHash,
+        source: 'published_customer_config',
+        items: params.items,
+        configured: true,
+      })
+      data = {
+        revision: {
+          customer_key: 'yoyoosun',
+          revision,
+          config_hash: configHash,
+          product_version: 'style-l1-product',
+          status: 'published',
+        },
+      }
+    } else if (method === 'check_customer_config_transition') {
+      data = {
+        transition: {
+          action: 'activate',
+          customer_key: 'yoyoosun',
+          target_revision: String(params.target_revision || ''),
+          expected_active_revision: String(
+            params.expected_active_revision || ''
+          ),
+          observed_active_revision: activeApprovalSettings.config_revision,
+          allowed: Boolean(
+            pendingApprovalSettings &&
+              pendingApprovalSettings.config_revision ===
+                String(params.target_revision || '')
+          ),
+          blockers: [],
+        },
+      }
+    } else if (method === 'activate_customer_config') {
+      if (
+        pendingApprovalSettings &&
+        pendingApprovalSettings.config_revision ===
+          String(params.revision || '')
+      ) {
+        activeApprovalSettings = {
+          ...pendingApprovalSettings,
+          source: 'active_customer_config',
+        }
+        pendingApprovalSettings = null
+      }
+      data = {
+        revision: {
+          customer_key: activeApprovalSettings.customer_key,
+          revision: activeApprovalSettings.config_revision,
+          config_hash: activeApprovalSettings.config_hash,
+          product_version: activeApprovalSettings.product_version,
+          status: 'active',
+        },
+      }
     } else if (method === 'start_finished_goods_delivery_process') {
       const shipmentID = Number(params.shipment_id || 0)
       const businessRefNo = String(params.business_ref_no || '').trim()

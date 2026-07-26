@@ -121,24 +121,51 @@ func (d *jsonrpcDispatcher) workflowTaskRoleVisibilityForTask(
 			}
 			return workflowTaskRoleVisibility{}
 		}
+		if admin.IsSuperAdmin {
+			return workflowTaskRoleVisibility{
+				RoleKeys: []string{biz.NormalizeRoleKey(task.OwnerRoleKey)},
+				Valid:    true,
+			}
+		}
 		customerKey, err := runtimeCustomerKey("")
 		if err != nil {
 			return workflowTaskRoleVisibility{}
 		}
-		roleKeys, err := d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevision(
-			ctx,
-			customerKey,
-			revision,
-			admin,
-			requiredCapabilities...,
-		)
+		var roleKeys []string
+		ownerPoolKey := ""
+		if task.OwnerPoolKey != nil {
+			ownerPoolKey = strings.TrimSpace(*task.OwnerPoolKey)
+		}
+		if ownerPoolKey != "" {
+			roleKeys, err = d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevisionForPool(
+				ctx, customerKey, revision, ownerPoolKey, admin, requiredCapabilities...,
+			)
+			if err == nil &&
+				len(roleKeys) == 0 &&
+				biz.IsApprovalSettingsPoolKey(ownerPoolKey) &&
+				task.AssigneeID != nil &&
+				*task.AssigneeID == admin.ID &&
+				biz.AdminHasRole(admin, task.OwnerRoleKey) {
+				var assignedRoleKeys []string
+				assignedRoleKeys, err = d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevision(
+					ctx, customerKey, revision, admin, requiredCapabilities...,
+				)
+				if err == nil && workflowOwnerRoleVisible(task.OwnerRoleKey, assignedRoleKeys) {
+					roleKeys = []string{biz.NormalizeRoleKey(task.OwnerRoleKey)}
+				}
+			}
+		} else {
+			roleKeys, err = d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevision(
+				ctx, customerKey, revision, admin, requiredCapabilities...,
+			)
+		}
 		if err != nil {
 			if d.log != nil {
 				d.log.WithContext(ctx).Warnf("[workflow] stored customer config visibility unavailable task_id=%d config_revision=%s err=%v", task.ID, revision, err)
 			}
 			return workflowTaskRoleVisibility{}
 		}
-		return workflowTaskRoleVisibility{RoleKeys: roleKeys, Valid: true}
+		return workflowTaskRoleVisibility{RoleKeys: roleKeys, Valid: len(roleKeys) > 0}
 	}
 	return workflowTaskRoleVisibility{
 		RoleKeys: d.workflowVisibleOwnerRoleKeys(ctx, admin, requiredCapabilities...),

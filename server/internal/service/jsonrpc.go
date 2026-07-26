@@ -63,35 +63,6 @@ func NewJsonrpcService(
 	}
 }
 
-// GetJsonrpc 对应 GET /rpc/{url}
-func (s *JsonrpcService) GetJsonrpc(ctx context.Context, req *v1.GetJsonrpcRequest) (*v1.GetJsonrpcReply, error) {
-	s.log.WithContext(ctx).Infof(
-		"GetJsonrpc: url=%s jsonrpc=%s method=%s id=%s",
-		req.GetUrl(), req.GetJsonrpc(), req.GetMethod(), req.GetId(),
-	)
-
-	id, result, bizErr := s.dispatcher.Handle(
-		ctx,
-		req.GetUrl(),
-		req.GetJsonrpc(),
-		req.GetMethod(),
-		req.GetId(),
-		req.GetParams(),
-	)
-
-	reply := &v1.GetJsonrpcReply{
-		Jsonrpc: "2.0",
-		Id:      id,
-		Result:  result,
-	}
-
-	if bizErr != nil {
-		reply.Error = bizErr.Error()
-	}
-
-	return reply, nil
-}
-
 // PostJsonrpc 对应 POST /rpc/{url}
 func (s *JsonrpcService) PostJsonrpc(ctx context.Context, req *v1.PostJsonrpcRequest) (*v1.PostJsonrpcReply, error) {
 	start := time.Now()

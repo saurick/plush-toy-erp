@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  DownOutlined,
   DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
@@ -10,7 +7,7 @@ import {
   PrinterOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Form, Space, Tag } from 'antd'
+import { Button, Form, Space, Tag } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -23,6 +20,8 @@ import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js
 import {
   BusinessActionTooltip,
   BusinessDataTable,
+  BusinessLifecycleMoreAction,
+  BusinessLifecyclePrimaryAction,
   BusinessOperationPanel,
   BusinessPageLayout,
   CollaborationTaskPanel,
@@ -31,6 +30,7 @@ import {
   SearchInput,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
@@ -58,10 +58,7 @@ import OutsourcingOrderSourceFactModal from '../components/outsourcing-orders/Ou
 import OutsourcingReturnRecordsModal from '../components/outsourcing-orders/OutsourcingReturnRecordsModal.jsx'
 import OutsourcingReturnQualityInspectionModal from '../components/quality-inspections/OutsourcingReturnQualityInspectionModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
-import {
-  buildOutsourcingOrderColumns,
-  renderOutsourcingOrderStatusTag,
-} from '../components/outsourcing-orders/outsourcingOrderColumns.jsx'
+import { buildOutsourcingOrderColumns } from '../components/outsourcing-orders/outsourcingOrderColumns.jsx'
 import {
   listAllOutsourcingOrderItems,
   getOutsourcingOrder,
@@ -121,6 +118,7 @@ import {
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { referenceLabel } from '../utils/referenceSelectOptions.mjs'
+import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
 import {
   filterBusinessCollaborationTasksBySource,
   loadBusinessCollaborationTasksForSource,
@@ -284,8 +282,7 @@ export default function V1OutsourcingOrdersPage() {
   const [returnRecordsLoading, setReturnRecordsLoading] = useState(false)
   const [returnRecordsOrder, setReturnRecordsOrder] = useState(null)
   const [relatedReturnFacts, setRelatedReturnFacts] = useState([])
-  const [returnRecordActionLoading, setReturnRecordActionLoading] =
-    useState('')
+  const [returnRecordActionLoading, setReturnRecordActionLoading] = useState('')
   const [qualityInspectionByFactID, setQualityInspectionByFactID] = useState({})
   const [qualitySourceFact, setQualitySourceFact] = useState(null)
   const [qualitySourceLoading, setQualitySourceLoading] = useState(false)
@@ -846,10 +843,7 @@ export default function V1OutsourcingOrdersPage() {
   const cancelSelectedOutsourcingFact = useCallback(
     (fact) => {
       const status = String(fact?.status || '').toUpperCase()
-      if (
-        !canCancelOutsourcingFact ||
-        !['DRAFT', 'POSTED'].includes(status)
-      ) {
+      if (!canCancelOutsourcingFact || !['DRAFT', 'POSTED'].includes(status)) {
         message.warning('当前委外记录状态或账号权限不允许取消')
         return
       }
@@ -2151,36 +2145,31 @@ export default function V1OutsourcingOrdersPage() {
         },
       ]
     : []
-  const visibleLifecycleActions = selectedRow
-    ? OUTSOURCING_ORDER_LIFECYCLE_ACTIONS.filter(
-        (action) =>
-          hasActionPermission(adminProfile, action.permission) &&
-          canRunOutsourcingOrderLifecycleAction(
-            selectedRow.lifecycle_status,
-            action.nextStatus
-          )
-      )
-    : []
-  const primaryLifecycleAction =
-    visibleLifecycleActions.find((action) => action.key !== 'cancel') || null
-  const secondaryLifecycleActions = visibleLifecycleActions.filter(
-    (action) => action.key !== primaryLifecycleAction?.key
-  )
-  const lifecycleMenuItems =
-    secondaryLifecycleActions.length > 0
-      ? [
-          {
-            key: 'status-transitions',
-            label: '状态变更',
-            type: 'group',
-            children: secondaryLifecycleActions.map((action) => ({
-              key: action.key,
-              label: action.label,
-              danger: action.danger,
-            })),
-          },
-        ]
-      : []
+  const lifecycleActions = resolveBusinessLifecycleActions({
+    actions: OUTSOURCING_ORDER_LIFECYCLE_ACTIONS,
+    selected: Boolean(selectedRow),
+    hasPermission: (action) =>
+      hasActionPermission(adminProfile, action.permission),
+    canRun: (action) =>
+      canRunOutsourcingOrderLifecycleAction(
+        selectedRow?.lifecycle_status,
+        action.nextStatus
+      ),
+  })
+  const {
+    showPrimarySlot: showLifecyclePrimary,
+    showMoreSlot: showLifecycleMore,
+    primaryAction: primaryLifecycleAction,
+    secondaryActions: secondaryLifecycleActions,
+  } = lifecycleActions
+  const lifecyclePrimaryDisabled = !selectedRow || saving
+  const lifecyclePrimaryDisabledReason = !selectedRow
+    ? '请先选择一条加工合同'
+    : saving
+      ? '当前操作完成后可继续办理'
+      : ''
+  const lifecycleMoreDisabled = saving
+  const lifecycleMoreDisabledReason = saving ? '当前操作完成后可继续办理' : ''
 
   return (
     <BusinessPageLayout className="erp-v1-outsourcing-orders-page">
@@ -2316,34 +2305,56 @@ export default function V1OutsourcingOrdersPage() {
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedLabel}
           selectedItems={selectedItems}
+          summaryItems={
+            selectedRow
+              ? [
+                  {
+                    key: 'status',
+                    label: '状态',
+                    value: statusText(
+                      selectedRow.lifecycle_status,
+                      OUTSOURCING_ORDER_STATUS_LABELS,
+                      '委外订单状态'
+                    ),
+                  },
+                ]
+              : []
+          }
           boundaryText="确认下单只确认加工合同，不会同时完成发料、回货、质检或应付；这些事项请到对应页面继续办理。"
         >
-          <Button
-            type="link"
-            size="small"
-            disabled={!selectedRow}
-            onClick={() => setSelectedRow(null)}
-          >
-            清空
-          </Button>
-          {selectedRow
-            ? renderOutsourcingOrderStatusTag(selectedRow.lifecycle_status)
-            : null}
+          <SelectionClearAction
+            selectedCount={selectedRow ? 1 : 0}
+            selectionLabel="加工合同"
+            label="清空"
+            onClear={() => setSelectedRow(null)}
+          />
           {canUpdate &&
           (!selectedRow || canEditOutsourcingOrder(selectedRow)) ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || itemsLoading}
-              disabledReason={
+              disabled={
+                !selectedRow ||
+                !canEditOutsourcingOrder(selectedRow) ||
                 itemsLoading
-                  ? '合同明细加载完成后可编辑'
-                  : '请先选择一条草稿加工合同'
+              }
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条加工合同'
+                  : !canEditOutsourcingOrder(selectedRow)
+                    ? '只有草稿加工合同可以编辑'
+                    : itemsLoading
+                      ? '合同明细加载完成后可编辑'
+                      : ''
               }
             >
               <Button
                 size="small"
                 icon={<EditOutlined />}
                 loading={itemsLoading}
-                disabled={!selectedRow || itemsLoading}
+                disabled={
+                  !selectedRow ||
+                  !canEditOutsourcingOrder(selectedRow) ||
+                  itemsLoading
+                }
                 onClick={() => openEdit(selectedRow)}
               >
                 编辑
@@ -2351,78 +2362,75 @@ export default function V1OutsourcingOrdersPage() {
             </BusinessActionTooltip>
           ) : null}
           {canReadOutsourcingFacts ? (
-            <Button
-              size="small"
+            <BusinessActionTooltip
               disabled={!selectedRow || returnRecordsLoading}
-              loading={returnRecordsLoading}
-              onClick={() => openRelatedReturnRecords(selectedRow)}
-            >
-              委外记录
-            </Button>
-          ) : null}
-          {primaryLifecycleAction ? (
-            <Button
-              size="small"
-              type="primary"
-              danger={primaryLifecycleAction.danger}
-              icon={
-                primaryLifecycleAction.danger ? (
-                  <CloseCircleOutlined />
-                ) : (
-                  <CheckCircleOutlined />
-                )
+              disabledReason={
+                !selectedRow
+                  ? '请先选择一条加工合同'
+                  : '委外记录加载完成后可继续'
               }
-              disabled={!selectedRow || saving}
-              loading={saving}
-              onClick={() => runLifecycleAction(primaryLifecycleAction)}
-            >
-              {primaryLifecycleAction.label}
-            </Button>
-          ) : null}
-          <Button
-            size="small"
-            icon={<PrinterOutlined />}
-            disabled={!selectedRow || printingAction !== ''}
-            loading={printingAction === PROCESSING_CONTRACT_TEMPLATE_KEY}
-            onClick={openProcessingContractPrint}
-          >
-            加工合同打印
-          </Button>
-          <Button
-            size="small"
-            icon={<PrinterOutlined />}
-            disabled={!selectedRow || printingAction !== ''}
-            loading={printingAction === WORK_INSTRUCTION_TEMPLATE_KEY}
-            onClick={openWorkInstructionPrint}
-          >
-            作业指导书打印
-          </Button>
-          {secondaryLifecycleActions.length > 0 ? (
-            <Dropdown
-              trigger={['click']}
-              destroyOnHidden
-              getPopupContainer={(triggerNode) =>
-                triggerNode.parentElement || document.body
-              }
-              disabled={!selectedRow || saving}
-              menu={{
-                items: lifecycleMenuItems,
-                onClick: ({ key }) => {
-                  const action = secondaryLifecycleActions.find(
-                    (item) => item.key === key
-                  )
-                  if (action) runLifecycleAction(action)
-                },
-              }}
             >
               <Button
                 size="small"
-                aria-label="更多操作"
-                disabled={!selectedRow || saving}
+                disabled={!selectedRow || returnRecordsLoading}
+                loading={returnRecordsLoading}
+                onClick={() => openRelatedReturnRecords(selectedRow)}
               >
-                更多 <DownOutlined />
+                委外记录
               </Button>
-            </Dropdown>
+            </BusinessActionTooltip>
+          ) : null}
+          {showLifecyclePrimary ? (
+            <BusinessLifecyclePrimaryAction
+              action={primaryLifecycleAction}
+              disabled={lifecyclePrimaryDisabled}
+              disabledReason={lifecyclePrimaryDisabledReason}
+              loading={saving && Boolean(primaryLifecycleAction)}
+              onAction={runLifecycleAction}
+            />
+          ) : null}
+          <BusinessActionTooltip
+            disabled={!selectedRow || printingAction !== ''}
+            disabledReason={
+              !selectedRow ? '请先选择一条加工合同' : '当前打印任务完成后可继续'
+            }
+          >
+            <Button
+              size="small"
+              icon={<PrinterOutlined />}
+              disabled={!selectedRow || printingAction !== ''}
+              loading={printingAction === PROCESSING_CONTRACT_TEMPLATE_KEY}
+              onClick={openProcessingContractPrint}
+            >
+              加工合同打印
+            </Button>
+          </BusinessActionTooltip>
+          <BusinessActionTooltip
+            disabled={!selectedRow || printingAction !== ''}
+            disabledReason={
+              !selectedRow ? '请先选择一条加工合同' : '当前打印任务完成后可继续'
+            }
+          >
+            <Button
+              size="small"
+              icon={<PrinterOutlined />}
+              disabled={!selectedRow || printingAction !== ''}
+              loading={printingAction === WORK_INSTRUCTION_TEMPLATE_KEY}
+              onClick={openWorkInstructionPrint}
+            >
+              作业指导书打印
+            </Button>
+          </BusinessActionTooltip>
+          {showLifecycleMore ? (
+            <BusinessLifecycleMoreAction
+              actions={secondaryLifecycleActions}
+              disabled={lifecycleMoreDisabled}
+              disabledReason={lifecycleMoreDisabledReason}
+              getPopupContainer={(triggerNode) =>
+                triggerNode.parentElement || document.body
+              }
+              onAction={runLifecycleAction}
+            />
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>

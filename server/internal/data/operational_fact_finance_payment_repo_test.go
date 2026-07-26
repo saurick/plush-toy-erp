@@ -5,19 +5,71 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 )
+
+func createPostedFinanceFactFixture(
+	t *testing.T,
+	ctx context.Context,
+	data *Data,
+	client *ent.Client,
+	no string,
+	factType string,
+	counterpartyType string,
+	counterpartyID *int,
+	amount int64,
+) *ent.FinanceFact {
+	t.Helper()
+	row := client.FinanceFact.Create().
+		SetFactNo(no).
+		SetFactType(factType).
+		SetStatus(biz.OperationalFactStatusDraft).
+		SetCounterpartyType(counterpartyType).
+		SetNillableCounterpartyID(counterpartyID).
+		SetAmount(decimal.NewFromInt(amount)).
+		SetFeeAmount(decimal.Zero).
+		SetCurrency("CNY").
+		SetIdempotencyKey(no).
+		SaveX(ctx)
+	result, err := data.sqldb.ExecContext(
+		ctx,
+		"UPDATE finance_facts SET status = ?, posted_at = ?, updated_at = ? WHERE id = ?",
+		biz.OperationalFactStatusPosted,
+		time.Now().UTC(),
+		time.Now().UTC(),
+		row.ID,
+	)
+	if err != nil {
+		t.Fatalf("prepare posted finance fact fixture: %v", err)
+	}
+	if affected, err := result.RowsAffected(); err != nil || affected != 1 {
+		t.Fatalf("prepare posted finance fact fixture affected=%d err=%v", affected, err)
+	}
+	return client.FinanceFact.GetX(ctx, row.ID)
+}
 
 func TestFinancePaymentMultiAllocationAndReversal(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "finance_payment_allocation")
 	customer := client.Customer.Create().SetCode("C-FIN-1").SetName("核销客户").SetIsActive(true).SaveX(ctx)
 	createFact := func(no string, amount int64) int {
-		return client.FinanceFact.Create().SetFactNo(no).SetFactType(biz.FinanceFactReceivable).SetStatus(biz.OperationalFactStatusPosted).SetCounterpartyType(biz.FinanceCounterpartyCustomer).SetCounterpartyID(customer.ID).SetAmount(decimal.NewFromInt(amount)).SetFeeAmount(decimal.Zero).SetCurrency("CNY").SetIdempotencyKey(no).SaveX(ctx).ID
+		return createPostedFinanceFactFixture(
+			t,
+			ctx,
+			data,
+			client,
+			no,
+			biz.FinanceFactReceivable,
+			biz.FinanceCounterpartyCustomer,
+			&customer.ID,
+			amount,
+		).ID
 	}
 	fact1, fact2 := createFact("AR-PAY-1", 60), createFact("AR-PAY-2", 40)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
@@ -75,7 +127,10 @@ func TestFinancePaymentRejectsCrossCounterpartyAndOverAllocation(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "finance_payment_reject")
 	a := client.Customer.Create().SetCode("C-FIN-A").SetName("A").SaveX(ctx)
 	b := client.Customer.Create().SetCode("C-FIN-B").SetName("B").SaveX(ctx)
-	fact := client.FinanceFact.Create().SetFactNo("AR-CROSS").SetFactType(biz.FinanceFactReceivable).SetStatus(biz.OperationalFactStatusPosted).SetCounterpartyType(biz.FinanceCounterpartyCustomer).SetCounterpartyID(b.ID).SetAmount(decimal.NewFromInt(50)).SetFeeAmount(decimal.Zero).SetCurrency("CNY").SetIdempotencyKey("AR-CROSS").SaveX(ctx)
+	fact := createPostedFinanceFactFixture(
+		t, ctx, data, client, "AR-CROSS", biz.FinanceFactReceivable,
+		biz.FinanceCounterpartyCustomer, &b.ID, 50,
+	)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 	payment, err := uc.CreateFinancePayment(ctx, &biz.FinancePaymentCreate{PaymentNo: "PAY-CROSS", Direction: biz.FinancePaymentDirectionReceipt, CounterpartyType: biz.FinanceCounterpartyCustomer, CounterpartyID: a.ID, Amount: decimal.NewFromInt(60), Currency: "CNY", AccountRef: "BANK", EvidenceRef: "FLOW", IdempotencyKey: "PAY-CROSS"}, 7)
 	if err != nil {
@@ -91,7 +146,10 @@ func TestFinanceCreditNoteAndReversalPreserveOriginal(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "finance_credit_note")
 	customer := client.Customer.Create().SetCode("C-CREDIT").SetName("红冲客户").SaveX(ctx)
-	fact := client.FinanceFact.Create().SetFactNo("AR-CREDIT").SetFactType(biz.FinanceFactReceivable).SetStatus(biz.OperationalFactStatusPosted).SetCounterpartyType(biz.FinanceCounterpartyCustomer).SetCounterpartyID(customer.ID).SetAmount(decimal.NewFromInt(100)).SetFeeAmount(decimal.Zero).SetCurrency("CNY").SetIdempotencyKey("AR-CREDIT").SaveX(ctx)
+	fact := createPostedFinanceFactFixture(
+		t, ctx, data, client, "AR-CREDIT", biz.FinanceFactReceivable,
+		biz.FinanceCounterpartyCustomer, &customer.ID, 100,
+	)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 	credit, err := uc.CreateFinanceCreditNote(ctx, &biz.FinanceCreditNoteCreate{CreditNoteNo: "CN-1", FinanceFactID: fact.ID, Amount: decimal.NewFromInt(30), Reason: "折让红冲", IdempotencyKey: "CN-1"}, 7)
 	if err != nil || credit.Status != "POSTED" {
@@ -119,7 +177,10 @@ func TestFinanceCreditNoteAllowsOnlyReceivableAndPayable(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "finance_credit_note_exact_types")
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 	for index, factType := range []string{biz.FinanceFactReceivable, biz.FinanceFactPayable, biz.FinanceFactInvoice, biz.FinanceFactPayment, biz.FinanceFactReconciliation} {
-		fact := client.FinanceFact.Create().SetFactNo("CREDIT-TYPE-" + factType).SetFactType(factType).SetStatus(biz.OperationalFactStatusPosted).SetCounterpartyType(biz.FinanceCounterpartyOther).SetAmount(decimal.NewFromInt(10)).SetFeeAmount(decimal.Zero).SetCurrency("CNY").SetIdempotencyKey("credit-type-" + factType).SaveX(ctx)
+		fact := createPostedFinanceFactFixture(
+			t, ctx, data, client, "CREDIT-TYPE-"+factType, factType,
+			biz.FinanceCounterpartyOther, nil, 10,
+		)
 		credit, err := uc.CreateFinanceCreditNote(ctx, &biz.FinanceCreditNoteCreate{CreditNoteNo: "CN-TYPE-" + factType, FinanceFactID: fact.ID, Amount: decimal.NewFromInt(1), Reason: "来源类型门禁", IdempotencyKey: "cn-type-" + factType}, index+1)
 		allowed := factType == biz.FinanceFactReceivable || factType == biz.FinanceFactPayable
 		if allowed && (err != nil || credit == nil) {

@@ -1278,31 +1278,30 @@ body
   padding-top: 14px;
 }
 
-.erp-permission-hero.ant-card,
 .erp-permission-section.ant-card {
+  position: relative;
   border: 1px solid #dfe9e1;
-  border-radius: 12px;
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
   box-shadow: 0 10px 26px rgb(31 41 55 / 6%);
-}
-
-.erp-permission-hero.ant-card .ant-card-body {
-  padding: 16px 18px;
-}
-
-.erp-permission-hero__content {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
 }
 
 .erp-permission-tabs.ant-tabs {
   width: 100%;
 }
 
+.erp-permission-page__title.ant-typography {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
 .erp-permission-tabs > .ant-tabs-nav {
-  margin: 0 0 12px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid #dfe9e1;
+  border-radius: 12px 12px 0 0;
+  background: #fff;
 }
 
 .erp-permission-tabs > .ant-tabs-nav::before {
@@ -1311,8 +1310,7 @@ body
 
 .erp-permission-tabs .ant-tabs-tab {
   min-height: 42px;
-  padding: 8px 14px;
-  border-radius: 8px 8px 0 0;
+  padding: 9px 14px;
 }
 
 .erp-permission-tabs .ant-tabs-tab + .ant-tabs-tab {
@@ -1330,10 +1328,6 @@ body
   margin-inline-end: 0;
 }
 
-.erp-permission-section.ant-card {
-  position: relative;
-}
-
 .erp-permission-section.ant-card .ant-card-body {
   padding: 18px;
 }
@@ -1348,6 +1342,82 @@ body
   background: #fff;
 }
 
+.erp-permission-section--roles.ant-card .ant-card-body {
+  padding: 0;
+}
+
+.erp-permission-section--approvals.ant-card .ant-card-body {
+  padding: 16px 18px 18px;
+}
+
+.erp-approval-responsibility__header,
+.erp-approval-responsibility__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.erp-approval-responsibility__header {
+  margin-bottom: 12px;
+}
+
+.erp-approval-responsibility__header .ant-typography {
+  margin: 0;
+}
+
+.erp-approval-responsibility__help {
+  display: grid;
+  width: min(340px, calc(100vw - 56px));
+  gap: 8px;
+}
+
+.erp-approval-responsibility__table {
+  margin-top: 12px;
+}
+
+.erp-approval-responsibility__table .ant-table-cell {
+  vertical-align: middle;
+}
+
+.erp-approval-responsibility__actions {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dbe9de;
+  border-radius: 10px;
+  background: #f5faf6;
+}
+
+.erp-approval-responsibility-form {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-approval-responsibility-form__tier {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.8fr) minmax(
+      210px,
+      1.15fr
+    );
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e2e9e3;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+
+.erp-approval-responsibility-form__tier .ant-form-item {
+  margin-bottom: 0;
+}
+
+.erp-approval-responsibility-form__pool-note {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  margin-top: 30px;
+  color: #6b7280;
+}
+
 .erp-role-policy-tab-content,
 .erp-role-policy-boundary {
   display: grid;
@@ -1355,7 +1425,9 @@ body
 }
 
 .erp-role-policy-tabs > .ant-tabs-nav {
-  margin-bottom: 12px;
+  margin: 0;
+  padding: 0 16px;
+  background: #fff;
 }
 
 .erp-role-policy-tabs,
@@ -1401,43 +1473,32 @@ body
   color: #365c9f;
 }
 
-.erp-role-center-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid #e7efe8;
-}
-
 .erp-role-center-layout {
   display: grid;
-  grid-template-columns: minmax(248px, 308px) minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
+  grid-template-columns: minmax(220px, 268px) minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 640px;
 }
 
 .erp-role-center-sidebar {
   display: grid;
-  gap: 10px;
+  align-content: start;
+  gap: 2px;
   min-width: 0;
-  padding: 10px;
-  border: 1px solid #e2ece4;
-  border-radius: 12px;
-  background: #f8fbf9;
+  padding: 8px;
+  border-right: 1px solid #e4ebe6;
+  background: #fafcfb;
 }
 
 .erp-role-template-card {
   display: grid;
-  gap: 8px;
+  gap: 5px;
   width: 100%;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid #dfe9e1;
-  border-radius: 10px;
-  background: #fbfdfb;
+  padding: 11px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   color: #1f2937;
   text-align: left;
   cursor: pointer;
@@ -1450,18 +1511,16 @@ body
 
 .erp-role-template-card:hover,
 .erp-role-template-card:focus-visible {
-  border-color: #8ebc9d;
-  background: #f5faf6;
-  box-shadow: 0 0 0 3px rgb(34 139 84 / 10%);
+  border-color: #c7dbcc;
+  background: #f4f8f5;
+  box-shadow: none;
   outline: 0;
 }
 
 .erp-role-template-card--active {
-  border-color: #228b54;
-  background: #f0faf4;
-  box-shadow:
-    inset 3px 0 0 #228b54,
-    0 8px 18px rgb(34 139 84 / 10%);
+  border-color: #58a971;
+  background: #f2faf4;
+  box-shadow: inset 3px 0 0 #27934d;
 }
 
 .erp-role-template-card__main,
@@ -1477,6 +1536,12 @@ body
   justify-content: space-between;
 }
 
+.erp-role-template-card__main > .anticon {
+  flex: 0 0 auto;
+  color: #7a8780;
+  font-size: 11px;
+}
+
 .erp-role-template-card__main .ant-typography,
 .erp-role-template-card__meta .ant-typography {
   margin: 0;
@@ -1484,7 +1549,8 @@ body
 
 .erp-role-center-detail {
   display: grid;
-  gap: 14px;
+  align-content: start;
+  gap: 0;
   min-width: 0;
 }
 
@@ -1498,8 +1564,7 @@ body
 }
 
 .erp-role-capability-overview__head,
-.erp-role-capability-card__title,
-.erp-permission-checklist-heading {
+.erp-role-capability-card__title {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -1507,13 +1572,11 @@ body
   gap: 10px;
 }
 
-.erp-role-capability-overview__head .ant-typography,
-.erp-permission-checklist-heading .ant-typography {
+.erp-role-capability-overview__head .ant-typography {
   margin: 0;
 }
 
-.erp-role-capability-overview__head .ant-typography-secondary,
-.erp-permission-checklist-heading .ant-typography-secondary {
+.erp-role-capability-overview__head .ant-typography-secondary {
   margin-top: 4px;
 }
 
@@ -1557,20 +1620,26 @@ body
   opacity: 0.78;
 }
 
-.erp-permission-checklist-heading {
-  padding: 4px 2px 0;
-}
-
 .erp-role-center-detail__head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px;
-  border: 1px solid #e2ece4;
-  border-radius: 12px;
-  background: #fbfdfb;
+  min-height: 64px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e4ebe6;
+  background: #fff;
+}
+
+.erp-role-center-detail__identity {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.erp-role-center-detail > .ant-alert {
+  margin: 12px 14px 0;
 }
 
 .erp-role-center-actions {
@@ -1581,48 +1650,56 @@ body
   gap: 8px;
 }
 
-.erp-role-center-metrics {
+.erp-permission-help-trigger.ant-btn {
+  color: #45534a;
+}
+
+.erp-permission-help-trigger.ant-btn:hover,
+.erp-permission-help-trigger.ant-btn:focus-visible {
+  color: #1f7a3e;
+  background: #edf7ef;
+}
+
+.erp-permission-help {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 300px;
+}
+
+.erp-permission-help .ant-typography {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.erp-role-policy-tabs > .ant-tabs-content-holder {
+  padding: 12px 14px 16px;
+}
+
+.erp-role-associated-accounts {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-role-associated-accounts__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 
-.erp-role-center-metrics > div {
+.erp-role-associated-accounts__head > div {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid #e2ece4;
-  border-radius: 10px;
-  background: #f7fbf8;
 }
 
-.erp-role-center-metrics strong {
-  color: #166534;
-  font-size: 22px;
-  line-height: 1.2;
+.erp-role-associated-accounts__head .ant-typography {
+  margin: 0;
 }
 
-.erp-role-center-impact {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.erp-role-center-impact > div {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid #e2ece4;
-  border-radius: 10px;
-  background: #fbfdfb;
-}
-
-.erp-role-center-impact__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.erp-role-associated-accounts__table {
   min-width: 0;
 }
 

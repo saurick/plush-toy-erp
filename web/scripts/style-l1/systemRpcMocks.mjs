@@ -4,7 +4,9 @@ import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
 export async function installSystemRpcMocks(page, context) {
   const {
     adminProfile,
+    bossRole,
     salesRole,
+    purchaseRole,
     financeRole,
     adminRole,
     mockMenus,
@@ -15,11 +17,14 @@ export async function installSystemRpcMocks(page, context) {
     createMockAdminToken,
     nowUnix,
   } = context
-  const roleByKey = new Map(
-    [salesRole, financeRole, adminRole]
-      .filter(Boolean)
-      .map((role) => [role.role_key, role])
-  )
+  const availableRoles = [
+    bossRole,
+    salesRole,
+    purchaseRole,
+    financeRole,
+    adminRole,
+  ].filter(Boolean)
+  const roleByKey = new Map(availableRoles.map((role) => [role.role_key, role]))
   const roleForParams = (params = {}) =>
     roleByKey.get(String(params?.role_key || '').trim()) || salesRole
 
@@ -36,6 +41,60 @@ export async function installSystemRpcMocks(page, context) {
     permissions: salesRole.permissions,
     menus: mockMenus.filter((item) => item.path === '/erp/dashboard'),
   }
+  const purchaseAdmin = {
+    id: 3,
+    username: 'purchase-employee',
+    phone: '13900139001',
+    is_super_admin: false,
+    disabled: false,
+    account_status: 'active',
+    revoked_at: 0,
+    status_reason: '',
+    roles: [purchaseRole],
+    permissions: purchaseRole.permissions,
+    menus: [],
+  }
+  const multiRoleAdmin = {
+    id: 4,
+    username: 'multi-role-employee',
+    phone: '13900139002',
+    is_super_admin: false,
+    disabled: false,
+    account_status: 'active',
+    revoked_at: 0,
+    status_reason: '',
+    roles: [salesRole, financeRole],
+    permissions: Array.from(
+      new Set([...salesRole.permissions, ...financeRole.permissions])
+    ),
+    menus: [],
+  }
+  const suspendedAdmin = {
+    id: 5,
+    username: 'suspended-finance',
+    phone: '13900139003',
+    is_super_admin: false,
+    disabled: true,
+    account_status: 'suspended',
+    revoked_at: 0,
+    status_reason: '临时离岗',
+    roles: [financeRole],
+    permissions: financeRole.permissions,
+    menus: [],
+  }
+  const revokedAdmin = {
+    id: 6,
+    username: 'revoked-sales',
+    phone: '13900139004',
+    is_super_admin: false,
+    disabled: true,
+    account_status: 'revoked',
+    revoked_at: nowUnix() - 86_400,
+    status_reason: '已离职',
+    roles: [salesRole],
+    permissions: salesRole.permissions,
+    menus: [],
+  }
 
   await page.route('**/rpc/admin', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -48,7 +107,14 @@ export async function installSystemRpcMocks(page, context) {
         break
       case 'list':
         data = {
-          admins: [adminProfile, { ...assistantAdmin }],
+          admins: [
+            adminProfile,
+            { ...assistantAdmin },
+            purchaseAdmin,
+            multiRoleAdmin,
+            suspendedAdmin,
+            revokedAdmin,
+          ],
         }
         break
       case 'create':
@@ -141,10 +207,10 @@ export async function installSystemRpcMocks(page, context) {
       case 'rbac_options':
       case 'menu_options':
         data = {
-          roles: [salesRole, financeRole, adminRole].filter(Boolean),
+          roles: availableRoles,
           permissions: mockPermissions,
           menus: mockMenus,
-          role_options: [salesRole, financeRole, adminRole].filter(Boolean),
+          role_options: availableRoles,
           permission_options: mockPermissions,
           menu_options: mockMenus,
           warehouse_scope_options: [
@@ -264,7 +330,7 @@ export async function installSystemRpcMocks(page, context) {
                 route.request(),
                 '__style_l1_permission_draft_delay'
               )
-          : 0
+            : 0
 
     if (responseDelayMs > 0) {
       await delay(responseDelayMs)

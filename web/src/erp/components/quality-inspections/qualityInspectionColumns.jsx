@@ -120,8 +120,8 @@ function renderStackCell(primary, secondaryItems = []) {
   return (
     <Space direction="vertical" size={0}>
       <span>{primary || '-'}</span>
-      {secondary.map((item) => (
-        <Text type="secondary" key={item}>
+      {secondary.map((item, index) => (
+        <Text type="secondary" key={`${item}-${index}`}>
           {item}
         </Text>
       ))}

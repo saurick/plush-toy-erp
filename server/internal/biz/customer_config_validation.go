@@ -481,6 +481,9 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 			}
 		}
 	}
+	if err := validateApprovalSettingsPublishInput(in); err != nil {
+		return CustomerConfigPublishInput{}, err
+	}
 	if err := validateCustomerConfigModuleClosure(in.ModuleStates); err != nil {
 		return CustomerConfigPublishInput{}, fmt.Errorf("%w: invalid module dependency closure", err)
 	}

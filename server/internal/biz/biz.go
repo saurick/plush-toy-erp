@@ -18,7 +18,7 @@ var ProviderSet = wire.NewSet(
 	NewInventoryUsecase,
 	NewOperationalFactUsecase,
 	NewBusinessAttachmentUsecase,
-	NewCustomerConfigUsecase,
+	NewCustomerConfigUsecaseForWire,
 )
 
 func NewProcessRuntimeUsecaseForWire(repo ProcessRuntimeRepo, workflowRepo WorkflowRepo, ownerResolver ProcessRuntimeOwnerRoleResolver) *ProcessRuntimeUsecase {

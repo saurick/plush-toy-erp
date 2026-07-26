@@ -32,6 +32,7 @@ import {
   PageHeaderCard,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import {
@@ -372,6 +373,11 @@ export default function SalesReturnsPage() {
           selectedLabel={selected?.return_no || '请选择客户退货记录'}
           boundaryText="审批只确认退货申请；只有收货会写入退回库存，取消已收货记录会生成冲正，不会物理删除。"
         >
+          <SelectionClearAction
+            selectedCount={selected ? 1 : 0}
+            selectionLabel="客户退货记录"
+            onClear={() => setSelected(null)}
+          />
           <BusinessActionTooltip
             disabled={!selected}
             disabledReason="请先选择一条客户退货记录"
@@ -382,28 +388,43 @@ export default function SalesReturnsPage() {
           </BusinessActionTooltip>
           {canApprove && (!selected || selected.status === 'DRAFT') ? (
             <BusinessActionTooltip
-              disabled={!selected || saving}
+              disabled={!selected || selected.status !== 'DRAFT' || saving}
               disabledReason={
-                saving ? '当前操作完成后可批准' : '请先选择一条待审批退货'
+                !selected
+                  ? '请先选择一条客户退货记录'
+                  : selected.status !== 'DRAFT'
+                    ? '只有待审批退货可以批准'
+                    : saving
+                      ? '当前操作完成后可批准'
+                      : ''
               }
             >
               <Popconfirm
                 title="确认批准客户退货？"
                 onConfirm={() => transition('approve')}
               >
-                <Button type="primary" disabled={!selected || saving}>
+                <Button
+                  type="primary"
+                  className="erp-business-module-status-action"
+                  disabled={!selected || selected.status !== 'DRAFT' || saving}
+                >
                   批准
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canReceive && (!selected || selected.status === 'APPROVED') ? (
+          {canReceive &&
+          (!selected || ['DRAFT', 'APPROVED'].includes(selected.status)) ? (
             <BusinessActionTooltip
-              disabled={!selected || saving}
+              disabled={!selected || selected.status !== 'APPROVED' || saving}
               disabledReason={
-                saving
-                  ? '当前操作完成后可确认收货'
-                  : '请先选择一条已批准退货'
+                !selected
+                  ? '请先选择一条客户退货记录'
+                  : selected.status !== 'APPROVED'
+                    ? '退货批准后可确认收货'
+                    : saving
+                      ? '当前操作完成后可确认收货'
+                      : ''
               }
             >
               <Popconfirm
@@ -411,20 +432,36 @@ export default function SalesReturnsPage() {
                 description="确认后会按退货明细形成库存入库。"
                 onConfirm={() => transition('receive')}
               >
-                <Button disabled={!selected || saving}>确认收货</Button>
+                <Button
+                  className="erp-business-module-status-action"
+                  disabled={
+                    !selected || selected.status !== 'APPROVED' || saving
+                  }
+                >
+                  确认收货
+                </Button>
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
           {canCancel && (!selected || selected.status !== 'CANCELLED') ? (
             <BusinessActionTooltip
-              disabled={!selected || saving}
+              disabled={!selected || selected.status === 'CANCELLED' || saving}
               disabledReason={
-                saving ? '当前操作完成后可取消' : '请先选择一条客户退货'
+                !selected
+                  ? '请先选择一条客户退货记录'
+                  : selected.status === 'CANCELLED'
+                    ? '已取消退货不能再次取消'
+                    : saving
+                      ? '当前操作完成后可取消'
+                      : ''
               }
             >
               <Button
                 danger
-                disabled={!selected || saving}
+                className="erp-business-module-status-action"
+                disabled={
+                  !selected || selected.status === 'CANCELLED' || saving
+                }
                 onClick={() => setCancelOpen(true)}
               >
                 取消退货

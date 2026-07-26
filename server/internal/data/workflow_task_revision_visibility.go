@@ -31,12 +31,7 @@ func workflowTaskRevisionVisibilityPredicate(
 		))
 	}
 	for _, revision := range scope.RevisionRoleScopes {
-		visibility, ok := workflowTaskOwnerOrAssigneePredicate(
-			ownerRoleKey,
-			revision.VisibleOwnerRoleKeys,
-			scope.VisibleAssigneeID,
-			revision.AllowAllOwnerRoles,
-		)
+		visibility, ok := workflowTaskRuntimeOwnerPredicate(ownerRoleKey, revision, scope.VisibleAssigneeID)
 		if !ok {
 			continue
 		}
@@ -80,11 +75,8 @@ func workflowTaskRoleViewRevisionVisibilityPredicate(
 	}
 	for _, revision := range scope.RevisionRoleScopes {
 		roleAuthorized := revision.AllowAllOwnerRoles || workflowTaskRoleInScope(roleKey, revision.VisibleOwnerRoleKeys)
-		visibility, ok := workflowTaskRoleViewOwnerPredicate(
-			roleKey,
-			scope.VisibleAssigneeID,
-			crossRoleRiskAllowed,
-			roleAuthorized,
+		visibility, ok := workflowTaskRuntimeRoleViewOwnerPredicate(
+			roleKey, revision, scope.VisibleAssigneeID, crossRoleRiskAllowed, roleAuthorized,
 		)
 		if !ok {
 			continue
@@ -100,6 +92,124 @@ func workflowTaskRoleViewRevisionVisibilityPredicate(
 		return workflowtask.ID(0)
 	}
 	return workflowtask.Or(branches...)
+}
+
+func workflowTaskRuntimeOwnerPredicate(
+	ownerRoleKey string,
+	revision biz.WorkflowTaskRevisionRoleScope,
+	visibleAssigneeID *int,
+) (predicate.WorkflowTask, bool) {
+	if revision.AllowAllOwnerRoles {
+		return workflowTaskOwnerOrAssigneePredicate(ownerRoleKey, nil, visibleAssigneeID, true)
+	}
+	visible := []predicate.WorkflowTask{}
+	for _, pair := range revision.VisibleOwnerPoolRoles {
+		if ownerRoleKey != "" && biz.NormalizeRoleKey(pair.OwnerRoleKey) != biz.NormalizeRoleKey(ownerRoleKey) {
+			continue
+		}
+		if biz.IsApprovalSettingsPoolKey(pair.OwnerPoolKey) {
+			visible = append(visible, workflowtask.OwnerPoolKey(pair.OwnerPoolKey))
+			continue
+		}
+		visible = append(visible, workflowtask.And(
+			workflowtask.OwnerPoolKey(pair.OwnerPoolKey),
+			workflowtask.OwnerRoleKey(pair.OwnerRoleKey),
+		))
+	}
+	if assigned := workflowTaskRuntimeAssignedOwnerPredicate(
+		ownerRoleKey,
+		revision.VisibleOwnerRoleKeys,
+		visibleAssigneeID,
+	); assigned != nil {
+		visible = append(visible, assigned)
+	}
+	legacyVisibility, legacyOK := workflowTaskOwnerOrAssigneePredicate(
+		ownerRoleKey,
+		revision.VisibleOwnerRoleKeys,
+		visibleAssigneeID,
+		false,
+	)
+	if legacyOK {
+		visible = append(visible, workflowtask.And(workflowTaskOwnerPoolAbsentPredicate(), legacyVisibility))
+	}
+	if len(visible) == 0 {
+		return nil, false
+	}
+	return workflowtask.Or(visible...), true
+}
+
+func workflowTaskRuntimeRoleViewOwnerPredicate(
+	roleKey string,
+	revision biz.WorkflowTaskRevisionRoleScope,
+	visibleAssigneeID *int,
+	crossRoleRiskAllowed bool,
+	roleAuthorized bool,
+) (predicate.WorkflowTask, bool) {
+	if revision.AllowAllOwnerRoles {
+		return workflowTaskRoleViewOwnerPredicate(roleKey, visibleAssigneeID, crossRoleRiskAllowed, true)
+	}
+	visible := []predicate.WorkflowTask{}
+	for _, pair := range revision.VisibleOwnerPoolRoles {
+		if biz.NormalizeRoleKey(pair.OwnerRoleKey) != biz.NormalizeRoleKey(roleKey) {
+			continue
+		}
+		if biz.IsApprovalSettingsPoolKey(pair.OwnerPoolKey) {
+			visible = append(visible, workflowtask.OwnerPoolKey(pair.OwnerPoolKey))
+			continue
+		}
+		visible = append(visible, workflowtask.And(
+			workflowtask.OwnerPoolKey(pair.OwnerPoolKey),
+			workflowtask.OwnerRoleKey(roleKey),
+		))
+	}
+	if roleAuthorized && visibleAssigneeID != nil && *visibleAssigneeID > 0 {
+		visible = append(visible, workflowtask.And(
+			workflowtask.AssigneeID(*visibleAssigneeID),
+			workflowtask.OwnerRoleKey(roleKey),
+		))
+	}
+	legacyVisibility, legacyOK := workflowTaskRoleViewOwnerPredicate(
+		roleKey, visibleAssigneeID, crossRoleRiskAllowed, roleAuthorized,
+	)
+	if legacyOK {
+		visible = append(visible, workflowtask.And(workflowTaskOwnerPoolAbsentPredicate(), legacyVisibility))
+	}
+	if len(visible) == 0 {
+		return nil, false
+	}
+	return workflowtask.Or(visible...), true
+}
+
+func workflowTaskRuntimeAssignedOwnerPredicate(
+	ownerRoleKey string,
+	visibleOwnerRoleKeys []string,
+	visibleAssigneeID *int,
+) predicate.WorkflowTask {
+	if visibleAssigneeID == nil || *visibleAssigneeID <= 0 {
+		return nil
+	}
+	ownerRoleKey = biz.NormalizeRoleKey(ownerRoleKey)
+	visibleOwnerRoleKeys = biz.NormalizeAdminRoleKeys(visibleOwnerRoleKeys)
+	if ownerRoleKey != "" {
+		if !workflowTaskRoleInScope(ownerRoleKey, visibleOwnerRoleKeys) {
+			return nil
+		}
+		return workflowtask.And(
+			workflowtask.AssigneeID(*visibleAssigneeID),
+			workflowtask.OwnerRoleKey(ownerRoleKey),
+		)
+	}
+	if len(visibleOwnerRoleKeys) == 0 {
+		return nil
+	}
+	return workflowtask.And(
+		workflowtask.AssigneeID(*visibleAssigneeID),
+		workflowtask.OwnerRoleKeyIn(visibleOwnerRoleKeys...),
+	)
+}
+
+func workflowTaskOwnerPoolAbsentPredicate() predicate.WorkflowTask {
+	return workflowtask.Or(workflowtask.OwnerPoolKeyIsNil(), workflowtask.OwnerPoolKey(""))
 }
 
 func workflowTaskOwnerOrAssigneePredicate(

@@ -52,6 +52,7 @@ export default function MobileTaskDetailScreen({
   roleLabel,
   savedEvidenceRefs,
   selectedCanManageAttachments,
+  selectedHasActionCapability = false,
   selectedCanOperate,
   selectedCanUrge,
   selectedSeverity,
@@ -134,6 +135,12 @@ export default function MobileTaskDetailScreen({
     actionAccess?.failed && typeof actionAccess?.retry === 'function'
       ? actionAccess.retry
       : null
+  const showFooterAction =
+    canOpenProcess ||
+    canViewReceipt ||
+    Boolean(retryAccess) ||
+    actionAccess?.loading ||
+    selectedHasActionCapability
   const processUnavailableLabel = actionAccess?.loading
     ? '正在确认权限'
     : actionAccess?.failed
@@ -488,12 +495,7 @@ export default function MobileTaskDetailScreen({
 
       <div
         className={`mobile-role-action-bar grid border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur ${
-          canOpenProcess ||
-          canViewReceipt ||
-          retryAccess ||
-          actionAccess?.loading
-            ? 'grid-cols-2 gap-3'
-            : ''
+          showFooterAction ? 'grid-cols-2 gap-3' : ''
         }`}
       >
         <button
@@ -541,6 +543,14 @@ export default function MobileTaskDetailScreen({
           >
             <LoadingOutlined className="mr-2" spin aria-hidden="true" />
             正在确认
+          </button>
+        ) : selectedHasActionCapability ? (
+          <button
+            type="button"
+            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+            disabled
+          >
+            {processUnavailableLabel}
           </button>
         ) : null}
       </div>

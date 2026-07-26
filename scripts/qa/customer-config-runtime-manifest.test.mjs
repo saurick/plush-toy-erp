@@ -549,6 +549,9 @@ test("customer-config-runtime-manifest: responsibility pools map through roles a
   const yoyoosunOrderReview = yoyoosunManifest.work_pool_memberships.find(
     (membership) => membership.pool_key === "order_review",
   );
+  const salesApprovalMembers = yoyoosunManifest.work_pool_memberships.filter(
+    (membership) => membership.pool_key === "approval.sales_order",
+  );
 
   assert.equal(
     demoManifest.compiled_snapshot.workPoolRoleOverrides.order_review,
@@ -556,6 +559,22 @@ test("customer-config-runtime-manifest: responsibility pools map through roles a
   );
   assert.equal(demoOrderReview?.role_key, "sales");
   assert.equal(yoyoosunOrderReview?.role_key, "pmc");
+  assert(
+    salesApprovalMembers.some(
+      (item) =>
+        item.role_key === "sales" &&
+        item.strategy === "primary" &&
+        item.priority === 100,
+    ),
+  );
+  assert(
+    salesApprovalMembers.some(
+      (item) =>
+        item.role_key === "boss" &&
+        item.strategy === "escalation" &&
+        item.priority === 300,
+    ),
+  );
   assert(
     demoManifest.access_entitlements.some(
       (item) =>

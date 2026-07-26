@@ -594,7 +594,11 @@ test('权限中心角色展示不把 role_key 当用户可见 fallback', () => {
   assert.doesNotMatch(content, /selectedRole\.name\s*\|\|\s*selectedRoleKey/u)
   assert.doesNotMatch(content, /<Text type="secondary">\{roleKey\}<\/Text>/u)
   assert.doesNotMatch(content, /<Tag>\{selectedRoleKey\}<\/Tag>/u)
-  assert.match(content, /该岗位决定可使用的页面、手机待办和业务操作/u)
+  assert.match(content, /selectedRolePermissionSummary\.total\} 项功能/u)
+  assert.match(
+    content,
+    /canReadUsers\s*\?\s*` · \$\{selectedRoleAdmins\.length\} 个账号`/u
+  )
   assert.match(content, /多个岗位会合并最终有效权限/u)
   assert.match(content, /页面可见不代表拥有页面内全部按钮/u)
   assert.doesNotMatch(content, /岗位任务端/u)
@@ -641,10 +645,32 @@ test('权限中心用分类直达和只看已选替代低频功能搜索', () =>
 
   assert.match(content, /aria-label="功能分类导航"/u)
   assert.match(content, /aria-label="跳到功能分类"/u)
-  assert.match(content, /点击分类直达对应分组/u)
+  assert.match(content, /已选 \{normalizedValue\.length\} 项/u)
   assert.match(content, /只看已选/u)
+  assert.doesNotMatch(content, /点击分类直达对应分组/u)
   assert.doesNotMatch(content, /搜索功能名称或业务分类/u)
   assert.doesNotMatch(content, /filterPermissionGroups/u)
+})
+
+test('权限中心在权限行内区分菜单入口、页内操作、依赖和岗位导航位置', () => {
+  const content = readFileSync(
+    join(rootDir, 'pages/PermissionCenterPage.jsx'),
+    'utf8'
+  )
+
+  assert.match(content, /data-permission-kind="menu"/u)
+  assert.match(content, /data-permission-kind="action"/u)
+  assert.match(content, />菜单入口</u)
+  assert.match(content, />页内操作</u)
+  assert.match(content, /入口条件：/u)
+  assert.match(content, /需先开启：/u)
+  assert.match(content, /placement === '常用工作'/u)
+  assert.match(content, /placement === '看板中心'/u)
+  assert.match(content, /aria-label="菜单与操作说明"/u)
+  assert.match(content, /当前调整仅预览，保存岗位设置后生效/u)
+  assert.doesNotMatch(content, /预计显示/u)
+  assert.doesNotMatch(content, /先看菜单结果，再选择页内操作/u)
+  assert.doesNotMatch(content, /菜单入口和页内操作分开控制/u)
 })
 
 test('权限中心功能影响只展示业务页面、区域、动作和限制', () => {
@@ -728,6 +754,31 @@ test('权限中心把岗位权限与常用入口分开管理并串行传递岗�
   assert.match(content, /nextVersion = Number\(navigationResult/u)
   assert.match(content, /岗位设置已更新，相关账号刷新后生效/u)
   assert.doesNotMatch(content, /位置变化会自动获得权限/u)
+})
+
+test('权限中心岗位详情只读展示关联账号并复用员工账号管理入口', () => {
+  const filePath = join(rootDir, 'pages/PermissionCenterPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+  const associatedAccounts = content.slice(
+    content.indexOf('function RoleAssociatedAccounts'),
+    content.indexOf('function summarizeRolePermissions')
+  )
+
+  assert.match(content, /关联账号（\$\{selectedRoleAdmins\.length\}）/u)
+  assert.match(associatedAccounts, /只读核对/u)
+  assert.match(associatedAccounts, /当前岗位暂无关联账号/u)
+  assert.match(associatedAccounts, /同时拥有的其他岗位/u)
+  assert.match(associatedAccounts, /您不能查看关联账号/u)
+  assert.match(content, /setAdminSearchKeyword\(getRoleVisibleName/u)
+  assert.match(
+    content,
+    /setActiveTabKey\(PERMISSION_CENTER_TAB_KEYS\.ADMINS\)/u
+  )
+  assert.doesNotMatch(
+    associatedAccounts,
+    /分配岗位|修改手机号|重置密码|离职注销/u
+  )
+  assert.doesNotMatch(associatedAccounts, /demo_/iu)
 })
 
 test('BOM 页面导出和选中项不把内部 ID 当业务字段', () => {
@@ -1639,7 +1690,10 @@ test('权限中心模块分类消费后端岗位名称且不把 module key 当�
   )
 
   assert.match(content, /UNCLASSIFIED_PERMISSION_MODULE_TITLE/u)
-  assert.match(pageContent, /getPermissionModuleTitle\(permission\.module_name\)/u)
+  assert.match(
+    pageContent,
+    /getPermissionModuleTitle\(permission\.module_name\)/u
+  )
   assert.doesNotMatch(pageContent, /getPermissionModuleTitle\(moduleKey\)/u)
   assert.doesNotMatch(content, /\$\{normalizedName\}/u)
   assert.doesNotMatch(content, /:\s*normalizedName/u)

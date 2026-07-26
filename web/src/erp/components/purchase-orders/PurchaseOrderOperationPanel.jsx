@@ -13,11 +13,14 @@ import { Button, Dropdown, Space } from 'antd'
 
 import {
   BusinessActionTooltip,
+  BusinessLifecycleMoreAction,
+  BusinessLifecyclePrimaryAction,
   BusinessOperationPanel,
   DateRangeFilter,
   SearchInput,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
   ToolbarButton,
 } from '../business-list/BusinessListLayout.jsx'
 import {
@@ -45,7 +48,8 @@ export default function PurchaseOrderOperationPanel({
   hasActiveFilters = false,
   itemsLoading = false,
   keyword = '',
-  lifecycleMenuItems = [],
+  showLifecycleMore = false,
+  showLifecyclePrimary = false,
   loadOrders,
   openCreateModal,
   openEditModal,
@@ -81,6 +85,23 @@ export default function PurchaseOrderOperationPanel({
 }) {
   const resetPagination = () =>
     setPagination((current) => ({ ...current, current: 1 }))
+  const hasSingleSelection =
+    selectedRowKeys.length === 1 && Boolean(singleSelectedOrder)
+  const selectedLifecycleStatus = String(
+    singleSelectedOrder?.lifecycle_status || ''
+  ).toLowerCase()
+  const recordActionBusy =
+    saving || generatingInboundDraft || printingContract || itemsLoading
+  const lifecyclePrimaryDisabled = !hasSingleSelection || recordActionBusy
+  const lifecyclePrimaryDisabledReason = !hasSingleSelection
+    ? '请先选择一条采购订单'
+    : recordActionBusy
+      ? '当前操作完成后可继续办理'
+      : ''
+  const lifecycleMoreDisabled = recordActionBusy
+  const lifecycleMoreDisabledReason = recordActionBusy
+    ? '当前操作完成后可继续办理'
+    : ''
 
   return (
     <BusinessOperationPanel
@@ -191,57 +212,74 @@ export default function PurchaseOrderOperationPanel({
         selectedLabel={selectedOrderDisplayText}
         selectedItems={selectedItems}
       >
-        <Button
-          type="link"
-          size="small"
-          disabled={selectedRowKeys.length === 0}
-          onClick={() => {
+        <SelectionClearAction
+          selectedCount={selectedRowKeys.length}
+          selectionLabel="采购订单"
+          label="清空"
+          disabled={recordActionBusy}
+          disabledReason="当前订单操作完成后可更换选择"
+          onClear={() => {
+            if (recordActionBusy) return
             applySelectedRowKeys([])
             setSelectedOrder(null)
           }}
-        >
-          清空
-        </Button>
+        />
         {canUpdate &&
-        (!singleSelectedOrder ||
-          String(singleSelectedOrder.lifecycle_status || '').toLowerCase() ===
-            'draft') ? (
-              <BusinessActionTooltip
-                disabled={
-              !selectedOrderCanEdit || !referenceDataReady || itemsLoading
+        (!singleSelectedOrder || selectedLifecycleStatus === 'draft') ? (
+          <BusinessActionTooltip
+            disabled={
+              !selectedOrderCanEdit ||
+              !referenceDataReady ||
+              recordActionBusy
             }
-                disabledReason={
+            disabledReason={
               !singleSelectedOrder
-                ? '请先选择一条草稿采购订单'
-                : !referenceDataReady
-                  ? '采购基础资料加载完成后可编辑'
-                  : itemsLoading
-                    ? '订单明细加载完成后可编辑'
-                    : ''
+                ? '请先选择一条采购订单'
+                : selectedLifecycleStatus !== 'draft'
+                  ? '只有草稿采购订单可以编辑'
+                  : !referenceDataReady
+                    ? '采购基础资料加载完成后可编辑'
+                    : recordActionBusy
+                      ? '当前订单操作完成后可编辑'
+                      : ''
             }
-              >
-                <Button
-                  size="small"
-                  icon={<EditOutlined />}
-                  loading={itemsLoading}
-                  disabled={
-                !selectedOrderCanEdit || !referenceDataReady || itemsLoading
+          >
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              loading={itemsLoading}
+              disabled={
+                !selectedOrderCanEdit ||
+                !referenceDataReady ||
+                recordActionBusy
               }
-                  onClick={() => openEditModal(singleSelectedOrder)}
-                >
-                  编辑
-                </Button>
-              </BusinessActionTooltip>
+              onClick={() => openEditModal(singleSelectedOrder)}
+            >
+              编辑
+            </Button>
+          </BusinessActionTooltip>
         ) : null}
         {relatedMenuItems.length > 0 ? (
           <BusinessActionTooltip
-            disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
-            disabledReason="请先选择一条采购订单"
+            disabled={
+              selectedRowKeys.length !== 1 ||
+              !singleSelectedOrder ||
+              recordActionBusy
+            }
+            disabledReason={
+              recordActionBusy
+                ? '当前订单操作完成后可查看相关单据'
+                : '请先选择一条采购订单'
+            }
           >
             <Dropdown
               trigger={['click']}
               destroyOnHidden
-              disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
+              disabled={
+                selectedRowKeys.length !== 1 ||
+                !singleSelectedOrder ||
+                recordActionBusy
+              }
               menu={{
                 items: relatedMenuItems,
                 onClick: openRelatedTable,
@@ -250,80 +288,82 @@ export default function PurchaseOrderOperationPanel({
               <Button
                 size="small"
                 icon={<LinkOutlined />}
-                disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
+                disabled={
+                  selectedRowKeys.length !== 1 ||
+                  !singleSelectedOrder ||
+                  recordActionBusy
+                }
               >
                 相关单据 <DownOutlined />
               </Button>
             </Dropdown>
           </BusinessActionTooltip>
         ) : null}
-        {primaryLifecycleAction ? (
-          <Button
-            size="small"
-            type="primary"
-            disabled={
-              saving || selectedRowKeys.length !== 1 || !singleSelectedOrder
+        {showLifecyclePrimary ? (
+          <BusinessLifecyclePrimaryAction
+            action={primaryLifecycleAction}
+            disabled={lifecyclePrimaryDisabled}
+            disabledReason={lifecyclePrimaryDisabledReason}
+            loading={saving && Boolean(primaryLifecycleAction)}
+            onAction={(action) =>
+              requestLifecycleAction(action, singleSelectedOrder)
             }
-            loading={saving}
-            onClick={() =>
-              requestLifecycleAction(
-                primaryLifecycleAction,
-                singleSelectedOrder
-              )
-            }
-          >
-            {primaryLifecycleAction.label}
-          </Button>
+          />
         ) : null}
         {canCreateInboundDraftAction &&
         (!singleSelectedOrder ||
-          String(singleSelectedOrder.lifecycle_status || '').toLowerCase() ===
-            'approved') ? (
-              <BusinessActionTooltip
-                disabled={
+          !['closed', 'canceled'].includes(selectedLifecycleStatus)) ? (
+            <BusinessActionTooltip
+              disabled={
               !canGenerateInboundDraft ||
               inboundReferenceDataState !== 'ready' ||
               !hasInboundWarehouse ||
-              selectedRowKeys.length !== 1 ||
-              !singleSelectedOrder
+              !hasSingleSelection ||
+              recordActionBusy
             }
-                disabledReason={
+              disabledReason={
               !singleSelectedOrder
-                ? '请先选择一条已审核采购订单'
-                : inboundReferenceDataState !== 'ready'
-                  ? inboundReferenceDataState === 'loading'
-                    ? '入库仓库资料加载完成后可生成'
-                    : '入库仓库资料加载失败，请刷新当前页后重试'
-                  : !hasInboundWarehouse
-                    ? '请先维护至少一个启用的入库仓库'
-                    : ''
+                ? '请先选择一条采购订单'
+                : selectedLifecycleStatus !== 'approved'
+                  ? '采购订单审核通过后可生成入库'
+                  : inboundReferenceDataState !== 'ready'
+                    ? inboundReferenceDataState === 'loading'
+                      ? '入库仓库资料加载完成后可生成'
+                      : '入库仓库资料加载失败，请刷新当前页后重试'
+                    : !hasInboundWarehouse
+                      ? '请先维护至少一个启用的入库仓库'
+                    : recordActionBusy
+                        ? '入库草稿生成完成后可继续'
+                        : ''
             }
-              >
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<ImportOutlined />}
-                  disabled={
+            >
+              <Button
+                size="small"
+                type="primary"
+                icon={<ImportOutlined />}
+                disabled={
                 !canGenerateInboundDraft ||
                 inboundReferenceDataState !== 'ready' ||
                 !hasInboundWarehouse ||
-                selectedRowKeys.length !== 1 ||
-                !singleSelectedOrder
+                !hasSingleSelection ||
+                recordActionBusy
               }
-                  loading={generatingInboundDraft}
-                  onClick={() => openInboundDraftModal(singleSelectedOrder)}
-                >
-                  生成入库
-                </Button>
-              </BusinessActionTooltip>
+                loading={generatingInboundDraft}
+                onClick={() => openInboundDraftModal(singleSelectedOrder)}
+              >
+                生成入库
+              </Button>
+            </BusinessActionTooltip>
         ) : null}
         <BusinessActionTooltip
           disabled={
-            selectedRowKeys.length !== 1 || !singleSelectedOrder || itemsLoading
+            selectedRowKeys.length !== 1 ||
+            !singleSelectedOrder ||
+            recordActionBusy
           }
           disabledReason={
-            itemsLoading
-              ? '订单明细加载完成后可打印'
+            recordActionBusy
+              ? '当前订单操作完成后可打印'
               : '请先选择一条采购订单'
           }
         >
@@ -333,7 +373,7 @@ export default function PurchaseOrderOperationPanel({
             disabled={
               selectedRowKeys.length !== 1 ||
               !singleSelectedOrder ||
-              itemsLoading
+              recordActionBusy
             }
             loading={printingContract}
             onClick={() => printPurchaseContract(singleSelectedOrder)}
@@ -341,37 +381,15 @@ export default function PurchaseOrderOperationPanel({
             打印合同
           </Button>
         </BusinessActionTooltip>
-        {secondaryLifecycleActions.length > 0 ? (
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            disabled={
-              saving ||
-              selectedRowKeys.length !== 1 ||
-              !singleSelectedOrder
+        {showLifecycleMore ? (
+          <BusinessLifecycleMoreAction
+            actions={secondaryLifecycleActions}
+            disabled={lifecycleMoreDisabled}
+            disabledReason={lifecycleMoreDisabledReason}
+            onAction={(action) =>
+              requestLifecycleAction(action, singleSelectedOrder)
             }
-            menu={{
-              items: lifecycleMenuItems,
-              onClick: ({ key }) => {
-                const action = secondaryLifecycleActions.find(
-                  (item) => item.key === key
-                )
-                requestLifecycleAction(action, singleSelectedOrder)
-              },
-            }}
-          >
-            <Button
-              size="small"
-              aria-label="更多操作"
-              disabled={
-                saving ||
-                selectedRowKeys.length !== 1 ||
-                !singleSelectedOrder
-              }
-            >
-              更多 <DownOutlined />
-            </Button>
-          </Dropdown>
+          />
         ) : null}
       </SelectionActionBar>
     </BusinessOperationPanel>

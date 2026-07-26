@@ -228,6 +228,10 @@ func TestProductionWIPActionNormalizationAndSemanticEvents(t *testing.T) {
 	if normalized.IdempotencyKey != "key" || !normalized.Splits[0].Quantity.Equal(productionWIPTestDecimal("4")) {
 		t.Fatalf("normalized split=%+v", normalized)
 	}
+	split.Splits = []ProductionWIPSplit{{Quantity: productionWIPTestDecimal("10")}}
+	if _, err := normalizeProductionWIPAction(split); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("single-child split normalization error=%v", err)
+	}
 	transfer := base
 	transfer.Action = ProductionWIPActionTransferToNextOperation
 	transfer.TargetOperationID = 30
@@ -350,10 +354,13 @@ func TestProductionWIPSplitIsAtomicTerminalAndQuantityConserving(t *testing.T) {
 	if status, err := NextProductionWIPBatchStatus(ProductionWIPActionSplitBatch, batch, operation, nil, 0); err != nil || status != ProductionWIPStatusSplit {
 		t.Fatalf("split status=%q err=%v", status, err)
 	}
-	if err := ValidateProductionWIPSplit(batch, operation, decimal.Zero, []ProductionWIPSplit{{Quantity: productionWIPTestDecimal("9")}}); !errors.Is(err, ErrProductionWIPQuantityExceeded) {
+	if err := ValidateProductionWIPSplit(batch, operation, decimal.Zero, []ProductionWIPSplit{{Quantity: productionWIPTestDecimal("10")}}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("single-child split error=%v", err)
+	}
+	if err := ValidateProductionWIPSplit(batch, operation, decimal.Zero, []ProductionWIPSplit{{Quantity: productionWIPTestDecimal("4")}, {Quantity: productionWIPTestDecimal("5")}}); !errors.Is(err, ErrProductionWIPQuantityExceeded) {
 		t.Fatalf("under-allocation error=%v", err)
 	}
-	if err := ValidateProductionWIPSplit(batch, operation, decimal.Zero, []ProductionWIPSplit{{Quantity: productionWIPTestDecimal("11")}}); !errors.Is(err, ErrProductionWIPQuantityExceeded) {
+	if err := ValidateProductionWIPSplit(batch, operation, decimal.Zero, []ProductionWIPSplit{{Quantity: productionWIPTestDecimal("5")}, {Quantity: productionWIPTestDecimal("6")}}); !errors.Is(err, ErrProductionWIPQuantityExceeded) {
 		t.Fatalf("over-allocation error=%v", err)
 	}
 	if err := ValidateProductionWIPSplit(batch, operation, productionWIPTestDecimal("1"), exact); !errors.Is(err, ErrProductionWIPInvalidTransition) {

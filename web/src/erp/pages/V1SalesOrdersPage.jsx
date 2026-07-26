@@ -20,6 +20,8 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessActionTooltip,
+  BusinessLifecycleMoreAction,
+  BusinessLifecyclePrimaryAction,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -28,6 +30,7 @@ import {
   SearchInput,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
@@ -132,6 +135,7 @@ import {
   buildSalesOrderReservationItemChoices,
   buildSalesOrderReservationPayload,
 } from '../utils/salesOrderReservationAction.mjs'
+import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
 import {
   createSourceBusinessActionAttemptStore,
   sourceBusinessActionNo,
@@ -279,6 +283,7 @@ export default function V1SalesOrdersPage() {
   const reservationContextRequestRef = useRef(0)
   const reservationBalanceRequestRef = useRef(0)
   const reservationInFlightRef = useRef(false)
+  const lifecycleInFlightRef = useRef(false)
   const reservationAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
   )
@@ -1014,6 +1019,10 @@ export default function V1SalesOrdersPage() {
   }
 
   const runLifecycleAction = async (action, order) => {
+    if (lifecycleInFlightRef.current || !action || !order) {
+      return
+    }
+    lifecycleInFlightRef.current = true
     setSaving(true)
     try {
       const updated = await action.run({
@@ -1031,12 +1040,13 @@ export default function V1SalesOrdersPage() {
     } catch (error) {
       message.error(getActionErrorMessage(error, `${action.label}销售订单`))
     } finally {
+      lifecycleInFlightRef.current = false
       setSaving(false)
     }
   }
 
   const requestLifecycleAction = (action, order) => {
-    if (!action || !order) {
+    if (!action || !order || lifecycleInFlightRef.current || saving) {
       return
     }
     if (!action.confirmTitle) {
@@ -1185,39 +1195,33 @@ export default function V1SalesOrdersPage() {
       (selectedOrder.customer_id ? '客户已关联' : '未指定客户')
     return `${selectedOrder.order_no || '已登记销售订单'} / ${customerName}`
   }, [selectedOrder])
-  const visibleLifecycleActions = useMemo(() => {
-    if (!selectedOrder) {
-      return []
-    }
-    return SALES_ORDER_LIFECYCLE_ACTIONS.filter(
-      (action) =>
-        hasActionPermission(adminProfile, action.permission) &&
+  const lifecycleActions = useMemo(() => {
+    return resolveBusinessLifecycleActions({
+      actions: SALES_ORDER_LIFECYCLE_ACTIONS,
+      selected: Boolean(selectedOrder),
+      hasPermission: (action) =>
+        hasActionPermission(adminProfile, action.permission),
+      canRun: (action) =>
         canRunSalesOrderLifecycleAction(
-          selectedOrder.lifecycle_status,
+          selectedOrder?.lifecycle_status,
           action.nextStatus
-        )
-    )
+        ),
+    })
   }, [adminProfile, selectedOrder])
-  const primaryLifecycleAction =
-    visibleLifecycleActions.find((action) => action.key !== 'cancel') || null
-  const secondaryLifecycleActions = visibleLifecycleActions.filter(
-    (action) => action.key !== primaryLifecycleAction?.key
-  )
-  const lifecycleMenuItems =
-    secondaryLifecycleActions.length > 0
-      ? [
-          {
-            key: 'status-transitions',
-            label: '状态变更',
-            type: 'group',
-            children: secondaryLifecycleActions.map((action) => ({
-              key: action.key,
-              label: action.label,
-              danger: action.danger,
-            })),
-          },
-        ]
-      : []
+  const {
+    showPrimarySlot: showLifecyclePrimary,
+    showMoreSlot: showLifecycleMore,
+    primaryAction: primaryLifecycleAction,
+    secondaryActions: secondaryLifecycleActions,
+  } = lifecycleActions
+  const lifecyclePrimaryDisabled = !selectedOrder || saving
+  const lifecyclePrimaryDisabledReason = !selectedOrder
+    ? '请先选择一条销售订单'
+    : saving
+      ? '当前操作完成后可继续办理'
+      : ''
+  const lifecycleMoreDisabled = saving
+  const lifecycleMoreDisabledReason = saving ? '当前操作完成后可继续办理' : ''
   const relatedMenuItems = useMemo(
     () =>
       [
@@ -1375,34 +1379,39 @@ export default function V1SalesOrdersPage() {
           selectedCount={selectedOrder ? 1 : 0}
           selectedLabel={selectedOrderDisplayText}
         >
-          <Button
-            type="link"
-            size="small"
-            disabled={!selectedOrder || relatedMenuItems.length === 0}
-            onClick={() => {
+          <SelectionClearAction
+            selectedCount={selectedOrder ? 1 : 0}
+            selectionLabel="销售订单"
+            disabled={saving}
+            disabledReason="当前订单操作完成后可更换选择"
+            onClear={() => {
+              if (saving) return
               setSelectedOrder(null)
             }}
-          >
-            清空已选
-          </Button>
+          />
           {relatedMenuItems.length > 0 ? (
             <BusinessActionTooltip
-              disabled={!selectedOrder}
-              disabledReason="请先选择一条销售订单"
+              disabled={!selectedOrder || saving}
+              disabledReason={
+                saving
+                  ? '当前订单操作完成后可查看相关单据'
+                  : '请先选择一条销售订单'
+              }
             >
               <Dropdown
                 trigger={['click']}
                 destroyOnHidden
-                disabled={!selectedOrder}
+                disabled={!selectedOrder || saving}
                 menu={{
                   items: relatedMenuItems,
                   onClick: openRelatedTable,
                 }}
               >
                 <Button
+                  data-business-action-key="related-records"
                   size="small"
                   icon={<LinkOutlined />}
-                  disabled={!selectedOrder}
+                  disabled={!selectedOrder || saving}
                 >
                   相关单据 <DownOutlined />
                 </Button>
@@ -1410,13 +1419,18 @@ export default function V1SalesOrdersPage() {
             </BusinessActionTooltip>
           ) : null}
           <BusinessActionTooltip
-            disabled={!selectedOrder}
-            disabledReason="请先选择一条销售订单"
+            disabled={!selectedOrder || saving}
+            disabledReason={
+              saving
+                ? '当前订单操作完成后可查看详情'
+                : '请先选择一条销售订单'
+            }
           >
             <Button
+              data-business-action-key="view-details"
               size="small"
               icon={<EyeOutlined />}
-              disabled={!selectedOrder}
+              disabled={!selectedOrder || saving}
               onClick={() => openSalesOrderDetails(selectedOrder)}
             >
               查看详情
@@ -1425,18 +1439,23 @@ export default function V1SalesOrdersPage() {
           {canUpdateOrder &&
           (!selectedOrder || selectedOrderLifecycleStatus === 'draft') ? (
             <BusinessActionTooltip
-              disabled={!selectedOrderCanEdit || itemLoading}
+              disabled={!selectedOrderCanEdit || itemLoading || saving}
               disabledReason={
-                itemLoading
-                  ? '订单明细加载完成后可编辑'
-                  : '请先选择一条草稿销售订单'
+                !selectedOrder
+                  ? '请先选择一条销售订单'
+                  : selectedOrderLifecycleStatus !== 'draft'
+                    ? '只有草稿销售订单可以编辑'
+                    : itemLoading || saving
+                      ? '当前订单操作完成后可编辑'
+                      : ''
               }
             >
               <Button
+                data-business-action-key="edit"
                 size="small"
                 icon={<EditOutlined />}
                 loading={itemLoading}
-                disabled={!selectedOrderCanEdit || itemLoading}
+                disabled={!selectedOrderCanEdit || itemLoading || saving}
                 onClick={() => openEditOrder(selectedOrder)}
               >
                 编辑订单
@@ -1444,15 +1463,16 @@ export default function V1SalesOrdersPage() {
             </BusinessActionTooltip>
           ) : null}
           {canCreateReservation &&
-          !['closed', 'canceled'].includes(selectedOrderLifecycleStatus) ? (
-            <BusinessActionTooltip
-              disabled={
+          (!selectedOrder ||
+            !['closed', 'canceled'].includes(selectedOrderLifecycleStatus)) ? (
+              <BusinessActionTooltip
+                disabled={
                 !selectedOrder ||
                 selectedOrderLifecycleStatus !== 'active' ||
                 reservationLoading ||
                 saving
               }
-              disabledReason={
+                disabledReason={
                 !selectedOrder
                   ? '请先选择一条销售订单'
                   : selectedOrderLifecycleStatus !== 'active'
@@ -1461,54 +1481,43 @@ export default function V1SalesOrdersPage() {
                       ? '当前操作完成后可继续预留库存'
                       : ''
               }
-            >
-              <Button
-                size="small"
-                disabled={
+              >
+                <Button
+                  data-business-action-key="reserve-stock"
+                  size="small"
+                  disabled={
                   !selectedOrder ||
                   selectedOrderLifecycleStatus !== 'active' ||
                   reservationLoading ||
                   saving
                 }
-                loading={reservationLoading}
-                onClick={openSalesOrderReservation}
-              >
-                预留库存
-              </Button>
-            </BusinessActionTooltip>
+                  loading={reservationLoading}
+                  onClick={openSalesOrderReservation}
+                >
+                  预留库存
+                </Button>
+              </BusinessActionTooltip>
           ) : null}
-          {primaryLifecycleAction ? (
-            <Button
-              size="small"
-              type="primary"
-              disabled={!selectedOrder || saving}
-              loading={saving}
-              onClick={() =>
-                requestLifecycleAction(primaryLifecycleAction, selectedOrder)
+          {showLifecyclePrimary ? (
+            <BusinessLifecyclePrimaryAction
+              action={primaryLifecycleAction}
+              disabled={lifecyclePrimaryDisabled}
+              disabledReason={lifecyclePrimaryDisabledReason}
+              loading={saving && Boolean(primaryLifecycleAction)}
+              onAction={(action) =>
+                requestLifecycleAction(action, selectedOrder)
               }
-            >
-              {primaryLifecycleAction.label}
-            </Button>
+            />
           ) : null}
-          {secondaryLifecycleActions.length > 0 ? (
-            <Dropdown
-              trigger={['click']}
-              destroyOnHidden
-              disabled={!selectedOrder || saving}
-              menu={{
-                items: lifecycleMenuItems,
-                onClick: ({ key }) => {
-                  const action = secondaryLifecycleActions.find(
-                    (item) => item.key === key
-                  )
-                  requestLifecycleAction(action, selectedOrder)
-                },
-              }}
-            >
-              <Button size="small" disabled={!selectedOrder || saving}>
-                更多操作 <DownOutlined />
-              </Button>
-            </Dropdown>
+          {showLifecycleMore ? (
+            <BusinessLifecycleMoreAction
+              actions={secondaryLifecycleActions}
+              disabled={lifecycleMoreDisabled}
+              disabledReason={lifecycleMoreDisabledReason}
+              onAction={(action) =>
+                requestLifecycleAction(action, selectedOrder)
+              }
+            />
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>
@@ -1529,16 +1538,22 @@ export default function V1SalesOrdersPage() {
         rowSelection={{
           type: 'radio',
           selectedRowKeys: selectedOrder?.id ? [selectedOrder.id] : [],
-          onChange: (_keys, selectedRows) =>
-            setSelectedOrder(selectedRows[0] || null),
+          getCheckboxProps: () => ({ disabled: saving }),
+          onChange: (_keys, selectedRows) => {
+            if (saving) return
+            setSelectedOrder(selectedRows[0] || null)
+          },
         }}
         rowClassName={(record) =>
           record.id === selectedOrder?.id ? 'ant-table-row-selected' : ''
         }
         onRow={(record) => ({
-          onClick: () => setSelectedOrder(record),
+          onClick: () => {
+            if (saving) return
+            setSelectedOrder(record)
+          },
         })}
-        onOpenRecord={openSalesOrderRecord}
+        onOpenRecord={saving ? undefined : openSalesOrderRecord}
       />
 
       {salesOrderItemsPreview.modal}

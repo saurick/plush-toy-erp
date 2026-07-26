@@ -342,8 +342,10 @@ func purchaseReceiptAdjustmentSourceLineNo(source *PurchaseReceiptItem, adjustTy
 		base = strings.TrimSpace(*source.SourceLineNo)
 	}
 	suffix := ":" + strings.ToUpper(strings.TrimSpace(adjustType))
-	if len(base)+len(suffix) > 64 {
-		base = base[:64-len(suffix)]
+	baseRunes := []rune(base)
+	suffixRunes := []rune(suffix)
+	if len(baseRunes)+len(suffixRunes) > 64 {
+		base = string(baseRunes[:64-len(suffixRunes)])
 	}
 	return base + suffix
 }

@@ -13,11 +13,21 @@ test('shipped shipment finance actions require their exact confirm projections',
     /canConfirmFinanceFact\(\s*adminProfile,\s*'RECEIVABLE'\s*\)/u
   )
   assert.match(source, /canConfirmFinanceFact\(adminProfile, 'INVOICE'\)/u)
-  assert.match(source, /canCreateReceivable \|\| canCreateInvoice/u)
+  assert.match(
+    source,
+    /\{canCreateReceivable\s*&&[\s\S]{0,140}\['DRAFT', 'SHIPPED'\]/u
+  )
+  assert.match(
+    source,
+    /\{canCreateInvoice\s*&&[\s\S]{0,140}\['DRAFT', 'SHIPPED'\]/u
+  )
   assert.match(source, /action === 'receivable' \? canCreateReceivable/u)
   assert.match(source, />\s*生成应收\s*</u)
   assert.match(source, />\s*生成开票记录\s*</u)
-  assert.match(source, /disabled=\{saving \|\| financeSourceLoading\}/u)
+  assert.match(
+    source,
+    /selectedRow\.status !== 'SHIPPED' \|\|[\s\S]{0,80}saving \|\|[\s\S]{0,80}financeSourceLoading/u
+  )
 })
 
 test('shipment finance submit uses source-owned APIs without frontend money fields', () => {
@@ -79,8 +89,11 @@ test('shipment related records are permission-filtered and fail closed without a
   }
   assert.match(source, /if \(!selectedRow\?\.id\) return \[\]/u)
   assert.match(source, /if \(!selectedRow\?\.id\) return/u)
-  assert.match(source, /\{relatedMenuItems\.length > 0 \? \(/u)
-  assert.doesNotMatch(source, /relatedMenuItems\.length === 0/u)
+  assert.match(source, /\{hasRelatedCapability \? \(/u)
+  assert.match(
+    source,
+    /disabled=\{!selectedRow \|\| relatedMenuItems\.length === 0\}/u
+  )
 })
 
 test('shipment related route uses exact read and keeps the readable number presentation-only', () => {

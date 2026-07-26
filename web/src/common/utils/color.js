@@ -148,7 +148,7 @@ export const rgbToHsv = (r, g, b) => {
         h = (g - b) / difference + (g < b ? 6 : 0)
         break
       case g:
-        h = 2.0 + (v - r) / difference
+        h = 2.0 + (b - r) / difference
         break
       case b:
         h = 4.0 + (r - g) / difference

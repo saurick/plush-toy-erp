@@ -114,7 +114,34 @@ test('quality page mounts the return modal and marks a successful source once', 
   assert.match(source, /<QualityInspectionPurchaseReturnModal/u)
   assert.match(source, /markInspectionReturned\(inspection\.id\)/u)
   assert.match(source, /returnedInspectionIDs\.has\(selectedRow\.id\)/u)
-  assert.match(source, /已生成退货/u)
+  assert.match(
+    source,
+    /selectedDispositionCompleted[\s\S]*returnedInspectionIDs\.has\(selectedRow\.id\)/u
+  )
+  assert.match(source, /!selectedDispositionCompleted/u)
+  assert.doesNotMatch(source, />\s*已生成退货\s*</u)
+})
+
+test('quality disposition separates mutation permissions from read-only access and routes by source', () => {
+  assert.match(
+    source,
+    /canManageOutsourcingDisposition\s*=\s*canHandleQualityException\s*\|\|\s*canPostOutsourcingDisposition\s*\|\|\s*canCancelOutsourcingDisposition/u
+  )
+  assert.match(
+    source,
+    /canReadOutsourcingDisposition\s*&&\s*!canManageOutsourcingDisposition/u
+  )
+  assert.match(source, />\s*不合格处置\s*</u)
+  assert.match(source, />\s*查看委外处置\s*</u)
+  assert.doesNotMatch(source, />\s*委外返厂 \/ 返工\s*</u)
+  for (const dispositionKind of [
+    'incoming-rejection',
+    'incoming-return',
+    'outsourcing',
+    'production',
+  ]) {
+    assert.match(source, new RegExp(`'${dispositionKind}'`, 'u'))
+  }
 })
 
 test('quality page preserves the source receipt numeric(20,6) quantity string', () => {
@@ -147,8 +174,8 @@ test('quality page names and filters the shared read model by business inspectio
   assert.match(source, /'shipment\.read'/u)
   assert.match(source, /'warehouse\.inventory\.read'/u)
   assert.match(source, /'purchase\.receipt\.read'/u)
-  assert.match(source, /relatedMenuItems\.length > 0/u)
-  assert.doesNotMatch(source, /relatedMenuItems\.length === 0/u)
+  assert.match(source, /hasRelatedCapability/u)
+  assert.match(source, /relatedMenuItems\.length === 0/u)
   assert.doesNotMatch(source, /title="来料质检"/u)
 })
 
@@ -222,7 +249,7 @@ test('production-stage decision summary displays backend business snapshots and 
   )
   assert.match(
     source,
-    /type="link"[\s\S]*?disabled=\{!selectedRow\}[\s\S]*?清空已选/u
+    /<SelectionClearAction[\s\S]*?selectionLabel="质检记录"/u
   )
 })
 

@@ -17,63 +17,6 @@
   ],
   "paths": {
     "/rpc/{url}": {
-      "get": {
-        "summary": "GET /rpc/{url}?id=xxx\u0026jsonrpc=2.0\u0026method=ping 之类",
-        "operationId": "Jsonrpc_GetJsonrpc",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1GetJsonrpcReply"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "url",
-            "description": "/rpc/{url} 里的 path 变量",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "jsonrpc",
-            "description": "JSON-RPC 版本，通常 \"2.0\"",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "id",
-            "description": "JSON-RPC id，用 string 存，前端是数字也能转成字符串",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "method",
-            "description": "可选：method \u0026 params 也可以跟在 query 里（不强制）",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "params",
-            "in": "query",
-            "required": false,
-            "type": "object"
-          }
-        ],
-        "tags": [
-          "Jsonrpc"
-        ]
-      },
       "post": {
         "summary": "POST /rpc/{url}\nbody 是 JSON-RPC 报文的“结构化版本”",
         "operationId": "Jsonrpc_PostJsonrpc",
@@ -136,7 +79,7 @@
           "title": "JSON-RPC id，不带 id 则可以视为通知"
         }
       },
-      "title": "--------------------\nPOST 版本（推荐）\n--------------------"
+      "title": "--------------------\nPOST 版本\n--------------------"
     },
     "protobufAny": {
       "type": "object",
@@ -171,23 +114,6 @@
             "type": "object",
             "$ref": "#/definitions/protobufAny"
           }
-        }
-      }
-    },
-    "v1GetJsonrpcReply": {
-      "type": "object",
-      "properties": {
-        "jsonrpc": {
-          "type": "string"
-        },
-        "id": {
-          "type": "string"
-        },
-        "result": {
-          "$ref": "#/definitions/v1JsonrpcResult"
-        },
-        "error": {
-          "type": "string"
         }
       }
     },

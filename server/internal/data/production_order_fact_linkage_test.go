@@ -226,10 +226,10 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 			if err != nil {
 				t.Fatalf("create draft order: %v", err)
 			}
-			client.ProductionFact.Create().
+			fact := client.ProductionFact.Create().
 				SetFactNo("PF-DRAFT-CANCEL-" + status).
 				SetFactType(biz.ProductionFactFinishedGoodsReceipt).
-				SetStatus(status).
+				SetStatus(biz.OperationalFactStatusDraft).
 				SetSubjectType(biz.InventorySubjectProduct).
 				SetSubjectID(productRow.ID).
 				SetWarehouseID(warehouseRow.ID).
@@ -242,6 +242,18 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 				SetOccurredAt(time.Now().UTC()).
 				SetOccurredAtSpecified(true).
 				SaveX(ctx)
+			if status != biz.OperationalFactStatusDraft {
+				// This test exercises fail-closed cancellation against a
+				// persisted terminal row. Runtime builders cannot manufacture it.
+				if _, err := data.sqldb.ExecContext(
+					ctx,
+					"UPDATE production_facts SET status = ? WHERE id = ?",
+					status,
+					fact.ID,
+				); err != nil {
+					t.Fatalf("prepare terminal %s fact fixture: %v", status, err)
+				}
+			}
 			reason := "草稿取消依赖验证"
 			cancelled, err := orderUC.Cancel(ctx, &biz.ProductionOrderAction{
 				ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID,

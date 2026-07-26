@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,6 +156,123 @@ END`); err != nil {
 	}
 	if count := client.WorkflowTask.Query().Where(workflowtask.AssigneeID(target.ID)).CountX(ctx); count != 0 {
 		t.Fatalf("revoked admin still has %d assigned tasks", count)
+	}
+}
+
+func TestAdminManageRepoDisableReleasesActiveTasksWithoutRevokingAccount(t *testing.T) {
+	ctx := context.Background()
+	dsn := "file:admin_lifecycle_disable?mode=memory&cache=shared&_fk=1"
+	client := enttest.Open(t, dialect.SQLite, dsn)
+	sqldb, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = sqldb.Close() })
+	repo := &adminManageRepo{data: &Data{postgres: client, sqldb: sqldb, sqlDialect: dialect.SQLite}}
+	operator := client.AdminUser.Create().
+		SetUsername("root_disable").SetPasswordHash("hash").SetIsSuperAdmin(true).SaveX(ctx)
+	target := client.AdminUser.Create().
+		SetUsername("leave_temporarily").SetPasswordHash("hash").SaveX(ctx)
+	task := client.WorkflowTask.Create().
+		SetTaskCode("DISABLE-001").SetTaskGroup("sales").SetTaskName("待审批订单").
+		SetSourceType("sales_order").SetSourceID(1).SetTaskStatusKey("ready").
+		SetOwnerRoleKey(biz.SalesRoleKey).SetAssigneeID(target.ID).SaveX(ctx)
+
+	updated, released, err := repo.ChangeAdminLifecycle(ctx, &biz.AdminLifecycleChange{
+		AdminID: target.ID, OperatorID: operator.ID, Disabled: true, Reason: "临时离岗",
+	})
+	if err != nil {
+		t.Fatalf("ChangeAdminLifecycle(disable) error = %v", err)
+	}
+	if released != 1 || updated == nil || updated.AccountStatus() != biz.AdminAccountStatusSuspended || updated.RevokedAt != nil {
+		t.Fatalf("disable result admin=%#v released=%d", updated, released)
+	}
+	updatedTask := client.WorkflowTask.GetX(ctx, task.ID)
+	if updatedTask.AssigneeID != nil ||
+		updatedTask.Payload["assignee_released_to_pool"] != true ||
+		updatedTask.Payload["account_lifecycle_action"] != adminSessionRevokeReasonAccountDisabled {
+		t.Fatalf("disabled account task was not released: %#v", updatedTask)
+	}
+	event := client.WorkflowTaskEvent.Query().
+		Where(workflowtaskevent.TaskID(task.ID), workflowtaskevent.EventType("unassigned")).
+		OnlyX(ctx)
+	if event.Payload["account_lifecycle_action"] != adminSessionRevokeReasonAccountDisabled ||
+		event.Reason == nil ||
+		!strings.Contains(*event.Reason, "账号停用") {
+		t.Fatalf("disable unassignment event = %#v", event)
+	}
+}
+
+func TestAdminManageRepoRoleRemovalReleasesOnlyTasksOwnedByRemovedRoles(t *testing.T) {
+	ctx := context.Background()
+	dsn := "file:admin_role_removal_release?mode=memory&cache=shared&_fk=1"
+	client := enttest.Open(t, dialect.SQLite, dsn)
+	sqldb, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = sqldb.Close() })
+	repo := &adminManageRepo{data: &Data{postgres: client, sqldb: sqldb, sqlDialect: dialect.SQLite}}
+	operator := client.AdminUser.Create().
+		SetUsername("root_role_release").SetPasswordHash("hash").SetIsSuperAdmin(true).SaveX(ctx)
+	target := client.AdminUser.Create().
+		SetUsername("role_release_target").SetPasswordHash("hash").SaveX(ctx)
+	salesRole := client.Role.Create().
+		SetRoleKey(biz.SalesRoleKey).SetName("业务").SaveX(ctx)
+	client.Role.Create().
+		SetRoleKey(biz.PurchaseRoleKey).SetName("采购").SaveX(ctx)
+	client.AdminUserRole.Create().
+		SetAdminUserID(target.ID).
+		SetRoleID(salesRole.ID).
+		SaveX(ctx)
+
+	removedRoleTask := client.WorkflowTask.Create().
+		SetTaskCode("ROLE-REMOVED-001").SetTaskGroup("sales").SetTaskName("销售审批").
+		SetSourceType("sales_order").SetSourceID(1).SetTaskStatusKey("ready").
+		SetOwnerRoleKey(biz.SalesRoleKey).SetAssigneeID(target.ID).SaveX(ctx)
+	retainedRoleTask := client.WorkflowTask.Create().
+		SetTaskCode("ROLE-RETAINED-001").SetTaskGroup("purchase").SetTaskName("采购审批").
+		SetSourceType("purchase_order").SetSourceID(2).SetTaskStatusKey("ready").
+		SetOwnerRoleKey(biz.PurchaseRoleKey).SetAssigneeID(target.ID).SaveX(ctx)
+	terminalTask := client.WorkflowTask.Create().
+		SetTaskCode("ROLE-TERMINAL-001").SetTaskGroup("sales").SetTaskName("已完成销售审批").
+		SetSourceType("sales_order").SetSourceID(3).SetTaskStatusKey("done").
+		SetOwnerRoleKey(biz.SalesRoleKey).SetAssigneeID(target.ID).SaveX(ctx)
+
+	updated, err := repo.SetAdminRolesWithAudit(ctx, &biz.AdminRolesChange{
+		AdminID: target.ID, OperatorID: operator.ID, RoleKeys: []string{biz.PurchaseRoleKey},
+	})
+	if err != nil {
+		t.Fatalf("SetAdminRolesWithAudit error = %v", err)
+	}
+	if !biz.AdminHasRole(updated, biz.PurchaseRoleKey) || biz.AdminHasRole(updated, biz.SalesRoleKey) {
+		t.Fatalf("updated roles = %#v", biz.AdminRoleKeys(updated))
+	}
+	released := client.WorkflowTask.GetX(ctx, removedRoleTask.ID)
+	if released.AssigneeID != nil ||
+		released.Version != removedRoleTask.Version+1 ||
+		released.Payload["assignee_released_to_pool"] != true ||
+		released.Payload["account_role_action"] != "roles_removed" {
+		t.Fatalf("removed role task was not released = %#v", released)
+	}
+	if current := client.WorkflowTask.GetX(ctx, retainedRoleTask.ID); current.AssigneeID == nil || *current.AssigneeID != target.ID {
+		t.Fatalf("retained role task must keep assignee = %#v", current)
+	}
+	if current := client.WorkflowTask.GetX(ctx, terminalTask.ID); current.AssigneeID == nil || *current.AssigneeID != target.ID {
+		t.Fatalf("terminal task must remain immutable = %#v", current)
+	}
+	event := client.WorkflowTaskEvent.Query().
+		Where(workflowtaskevent.TaskID(removedRoleTask.ID), workflowtaskevent.EventType("unassigned")).
+		OnlyX(ctx)
+	if event.Payload["account_role_action"] != "roles_removed" ||
+		event.Reason == nil ||
+		!strings.Contains(*event.Reason, "岗位移除") {
+		t.Fatalf("role removal unassignment event = %#v", event)
+	}
+	if count := client.WorkflowTaskEvent.Query().
+		Where(workflowtaskevent.TaskIDIn(retainedRoleTask.ID, terminalTask.ID)).
+		CountX(ctx); count != 0 {
+		t.Fatalf("unrelated tasks received %d events", count)
 	}
 }
 

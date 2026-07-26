@@ -37,7 +37,9 @@ test('inventory operations: support the three controlled types and reconcile unc
 })
 
 test('first incoming rejection: keeps draft, post and cancellation distinct from stocked returns', () => {
-  assert.match(qualityPage, /首次来料退厂/u)
+  assert.match(qualityPage, /selectedDispositionKind === 'incoming-rejection'/u)
+  assert.match(qualityPage, /setRejectionDispositionOpen\(true\)/u)
+  assert.match(qualityPage, />\s*不合格处置\s*</u)
   assert.match(rejectionModal, /createPurchaseRejectionDisposition/u)
   assert.match(rejectionModal, /postPurchaseRejectionDisposition/u)
   assert.match(rejectionModal, /cancelPurchaseRejectionDisposition/u)

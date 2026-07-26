@@ -41,7 +41,7 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 当前服务默认暴露以下 HTTP 能力：
 
 - `/rpc/{url}`
-  - JSON-RPC HTTP 入口，支持 `GET` 和 `POST`
+  - JSON-RPC HTTP 入口，只接受 `POST`；不允许用 GET query 传递鉴权参数或调用业务方法
 - `/ping`
   - 最简单的探活接口，返回 `pong`
 - `/healthz`

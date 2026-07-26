@@ -329,14 +329,32 @@ const SALES_ORDER_ACCEPTANCE_PROCESS_KEY = "sales_order_acceptance";
 const MATERIAL_SUPPLY_PROCESS_KEY = "material_supply";
 const FINISHED_GOODS_DELIVERY_PROCESS_KEY = "finished_goods_delivery";
 
-const SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS = Object.freeze([
-  Object.freeze({
-    pool_key: "order_approval",
-    source_pool_key: "boss",
-    module_key: "workflow_tasks",
+const APPROVAL_SETTINGS_SCHEMA_VERSION = "approval-settings/v1";
+const APPROVAL_SETTING_POOLS = Object.freeze({
+  sales_order: Object.freeze({
+    pool_key: "approval.sales_order",
+    source_pool_key: "sales",
+    module_key: "sales_orders",
     display_name: "销售订单审批责任池",
-    description: "derived from sales order acceptance process definition",
+    description: "fixed approval setting for sales order acceptance",
   }),
+  purchase_order: Object.freeze({
+    pool_key: "approval.purchase_order",
+    source_pool_key: "purchase",
+    module_key: "purchase_orders",
+    display_name: "采购订单审批责任池",
+    description: "fixed approval setting for purchase order approval",
+  }),
+  shipment_finance: Object.freeze({
+    pool_key: "approval.shipment_finance",
+    source_pool_key: "finance",
+    module_key: "shipments",
+    display_name: "出货财务放行审批责任池",
+    description: "fixed approval setting for shipment finance release",
+  }),
+});
+
+const SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS = Object.freeze([
   Object.freeze({
     pool_key: "engineering_data",
     source_pool_key: "engineering",
@@ -409,6 +427,7 @@ const FINISHED_GOODS_DELIVERY_EVIDENCE_OWNER_POOLS = Object.freeze([
 ]);
 
 const RUNTIME_PROCESS_POOL_KEYS = Object.freeze([
+  ...Object.values(APPROVAL_SETTING_POOLS).map((pool) => pool.pool_key),
   ...SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS.map((pool) => pool.pool_key),
   ...MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS.map((pool) => pool.pool_key),
   ...FINISHED_GOODS_DELIVERY_EVIDENCE_OWNER_POOLS.map((pool) => pool.pool_key),
@@ -826,13 +845,13 @@ function selectedProcessPoolDefinitions(runtimeProcessSelections = []) {
   );
   if (salesSelection) {
     const runtimePoolKeys = new Set([
-      "order_approval",
       "order_review",
       ...(salesSelection.variant_key === "approval_engineering_pmc"
         ? ["engineering_data"]
         : []),
     ]);
     processPools.push(
+      APPROVAL_SETTING_POOLS.sales_order,
       ...SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS.filter((pool) =>
         runtimePoolKeys.has(pool.pool_key),
       ),
@@ -843,14 +862,20 @@ function selectedProcessPoolDefinitions(runtimeProcessSelections = []) {
       (selection) => selection.process_key === MATERIAL_SUPPLY_PROCESS_KEY,
     )
   ) {
-    processPools.push(...MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS);
+    processPools.push(
+      APPROVAL_SETTING_POOLS.purchase_order,
+      ...MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS,
+    );
   }
   if (
     runtimeProcessSelections.some(
       (selection) => selection.process_key === FINISHED_GOODS_DELIVERY_PROCESS_KEY,
     )
   ) {
-    processPools.push(...FINISHED_GOODS_DELIVERY_EVIDENCE_OWNER_POOLS);
+    processPools.push(
+      APPROVAL_SETTING_POOLS.shipment_finance,
+      ...FINISHED_GOODS_DELIVERY_EVIDENCE_OWNER_POOLS,
+    );
   }
   return processPools;
 }
@@ -889,21 +914,62 @@ function processWorkPoolMembershipsFromSelections(
   overrides = {},
 ) {
   const processPools = selectedProcessPoolDefinitions(runtimeProcessSelections);
-  return processPools.map((pool, index) => {
+  return processPools.flatMap((pool, index) => {
     const roleKey = roleKeyForPool(pool.pool_key, overrides) || roleKeyForPool(pool.source_pool_key, overrides);
     assert(
       roleKey,
       `process owner pool ${pool.pool_key} source pool ${pool.source_pool_key} does not map to a role key`,
     );
-    return {
+    const primary = {
       pool_key: pool.pool_key,
       role_key: roleKey,
       user_id: 0,
-      strategy: "process_role_pool",
-      priority: priorityOffset + index + 1,
+      strategy: pool.pool_key.startsWith("approval.")
+        ? "primary"
+        : "process_role_pool",
+      priority: pool.pool_key.startsWith("approval.")
+        ? 100
+        : priorityOffset + index + 1,
       enabled: true,
     };
+    if (!pool.pool_key.startsWith("approval.") || roleKey === "boss") {
+      return [primary];
+    }
+    return [
+      primary,
+      {
+        pool_key: pool.pool_key,
+        role_key: "boss",
+        user_id: 0,
+        strategy: "escalation",
+        priority: 300,
+        enabled: true,
+      },
+    ];
   });
+}
+
+function approvalSettingsFromSelections(runtimeProcessSelections = []) {
+  const selected = new Set(
+    runtimeProcessSelections.map((selection) => selection.process_key),
+  );
+  return {
+    schema_version: APPROVAL_SETTINGS_SCHEMA_VERSION,
+    items: [
+      {
+        approval_key: "sales_order",
+        enabled: selected.has(SALES_ORDER_ACCEPTANCE_PROCESS_KEY),
+      },
+      {
+        approval_key: "purchase_order",
+        enabled: selected.has(MATERIAL_SUPPLY_PROCESS_KEY),
+      },
+      {
+        approval_key: "shipment_finance",
+        enabled: selected.has(FINISHED_GOODS_DELIVERY_PROCESS_KEY),
+      },
+    ],
+  };
 }
 
 function workPoolMembershipsFromCatalog(
@@ -1126,6 +1192,7 @@ function compiledSnapshotFromPackage(
     })),
     fieldPolicies: fieldPoliciesFromCatalog(catalog, config),
     workPoolRoleOverrides: customerWorkPoolRoleOverrides(config, catalog),
+    approval_settings: approvalSettingsFromSelections(runtimeProcessSelections),
     runtimeProcessSelections,
     flowCatalog: flowCatalogFromPackage(config),
     policyCatalog: policyCatalogFromPackage(config),

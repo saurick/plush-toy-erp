@@ -21,6 +21,7 @@ import {
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import {
+  BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -29,6 +30,7 @@ import {
   SearchInput,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -199,6 +201,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     adminProfile,
     'workflow.task.complete'
   )
+  const canApproveWorkflowTasks = hasActionPermission(
+    adminProfile,
+    'workflow.task.approve'
+  )
+  const canRejectWorkflowTasks = hasActionPermission(
+    adminProfile,
+    'workflow.task.reject'
+  )
   const loadWorkflowTasks = useCallback(async () => {
     const request = beginLatestRequest('workflow-business-tasks')
     if (!config || !canReadWorkflowTasks) {
@@ -356,6 +366,27 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('resume')
   const canUrgeSelected =
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('urge')
+  const shouldShowWorkflowAction = (actionMode) =>
+    !selectedTask ||
+    selectedTaskActionAccess.loading ||
+    selectedTaskActionAccess.failed ||
+    selectedTaskActionAccess.canRun(actionMode)
+  const workflowActionDisabledReason = (actionMode, actionLabel) => {
+    if (!selectedTask) return '请先选择一条任务'
+    if (selectedTaskActionAccess.loading) {
+      return `正在确认是否可以${actionLabel}`
+    }
+    if (!selectedTaskActionAccess.canRun(actionMode)) {
+      return (
+        selectedTaskActionAccess.getReason(actionMode) ||
+        `当前任务暂不能${actionLabel}`
+      )
+    }
+    if (taskActionLoadingID > 0 || urgingTaskID > 0) {
+      return '当前操作完成后可继续办理'
+    }
+    return ''
+  }
 
   const verifyMutationAccess = useCallback(
     ({ task, actionKey, reason = '', scope, operation, params }) =>
@@ -919,77 +950,154 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             '当前操作只更新任务状态；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。'
           }
         >
-          <Button
-            type="link"
-            size="small"
+          <SelectionClearAction
+            selectedCount={selectedTask ? 1 : 0}
+            selectionLabel="任务"
+            onClear={() => setSelectedTaskKeys([])}
+          />
+          <BusinessActionTooltip
             disabled={!selectedTask}
-            onClick={() => setSelectedTaskKeys([])}
+            disabledReason="请先选择一条任务"
           >
-            清空已选
-          </Button>
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            disabled={!selectedTask}
-            onClick={() => setDetailTask(selectedTask)}
-          >
-            查看任务
-          </Button>
-          {canCompleteSelected ? (
             <Button
               size="small"
-              type="primary"
-              icon={<CheckCircleOutlined />}
-              loading={taskActionLoadingID === selectedTask?.id}
-              disabled={taskActionLoadingID > 0}
-              onClick={() => completeWorkflowTask(selectedTask)}
+              icon={<EyeOutlined />}
+              disabled={!selectedTask}
+              onClick={() => setDetailTask(selectedTask)}
             >
-              完成任务
+              查看任务
             </Button>
+          </BusinessActionTooltip>
+          {(canCompleteWorkflowTasks || canApproveWorkflowTasks) &&
+          shouldShowWorkflowAction('complete') ? (
+            <BusinessActionTooltip
+              disabled={
+                !canCompleteSelected ||
+                taskActionLoadingID > 0 ||
+                urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason(
+                'complete',
+                '完成任务'
+              )}
+            >
+              <Button
+                size="small"
+                type="primary"
+                className="erp-business-module-status-action"
+                icon={<CheckCircleOutlined />}
+                loading={taskActionLoadingID === selectedTask?.id}
+                disabled={
+                  !canCompleteSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => completeWorkflowTask(selectedTask)}
+              >
+                完成任务
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
-          {canBlockSelected ? (
-            <Button
-              size="small"
-              danger
-              icon={<ExclamationCircleOutlined />}
-              disabled={taskActionLoadingID > 0}
-              onClick={() => openTaskReasonModal('block')}
+          {canUpdateWorkflowTasks && shouldShowWorkflowAction('block') ? (
+            <BusinessActionTooltip
+              disabled={
+                !canBlockSelected || taskActionLoadingID > 0 || urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason('block', '标记阻塞')}
             >
-              标记阻塞
-            </Button>
+              <Button
+                size="small"
+                danger
+                className="erp-business-module-status-action"
+                icon={<ExclamationCircleOutlined />}
+                disabled={
+                  !canBlockSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => openTaskReasonModal('block')}
+              >
+                标记阻塞
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
-          {canRejectSelected ? (
-            <Button
-              size="small"
-              danger
-              icon={<ExclamationCircleOutlined />}
-              disabled={taskActionLoadingID > 0}
-              onClick={() => openTaskReasonModal('reject')}
+          {canRejectWorkflowTasks && shouldShowWorkflowAction('reject') ? (
+            <BusinessActionTooltip
+              disabled={
+                !canRejectSelected ||
+                taskActionLoadingID > 0 ||
+                urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason(
+                'reject',
+                '退回任务'
+              )}
             >
-              退回任务
-            </Button>
+              <Button
+                size="small"
+                danger
+                className="erp-business-module-status-action"
+                icon={<ExclamationCircleOutlined />}
+                disabled={
+                  !canRejectSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => openTaskReasonModal('reject')}
+              >
+                退回任务
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
-          {canResumeSelected ? (
-            <Button
-              size="small"
-              type="primary"
-              icon={<RedoOutlined />}
-              disabled={taskActionLoadingID > 0}
-              onClick={() => openTaskReasonModal('resume')}
+          {canUpdateWorkflowTasks && shouldShowWorkflowAction('resume') ? (
+            <BusinessActionTooltip
+              disabled={
+                !canResumeSelected ||
+                taskActionLoadingID > 0 ||
+                urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason(
+                'resume',
+                '解除阻塞'
+              )}
             >
-              解除阻塞
-            </Button>
+              <Button
+                size="small"
+                type="primary"
+                className="erp-business-module-status-action"
+                icon={<RedoOutlined />}
+                disabled={
+                  !canResumeSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => openTaskReasonModal('resume')}
+              >
+                解除阻塞
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
-          {canUrgeSelected ? (
-            <Button
-              size="small"
-              icon={<SendOutlined />}
-              loading={urgingTaskID === selectedTask?.id}
-              disabled={urgingTaskID > 0}
-              onClick={() => openTaskReasonModal('urge')}
+          {canUpdateWorkflowTasks && shouldShowWorkflowAction('urge') ? (
+            <BusinessActionTooltip
+              disabled={
+                !canUrgeSelected || taskActionLoadingID > 0 || urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason('urge', '催办')}
             >
-              催办
-            </Button>
+              <Button
+                size="small"
+                icon={<SendOutlined />}
+                loading={urgingTaskID === selectedTask?.id}
+                disabled={
+                  !canUrgeSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => openTaskReasonModal('urge')}
+              >
+                催办
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
           <BusinessAttachmentModalButton
             ownerType="workflow_task"

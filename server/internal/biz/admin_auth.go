@@ -33,6 +33,11 @@ type AdminAccountReader interface {
 	GetAdminByID(ctx context.Context, id int) (*AdminUser, error)
 }
 
+type AdminDirectoryReader interface {
+	AdminAccountReader
+	ListAdmins(ctx context.Context) ([]*AdminUser, error)
+}
+
 type AdminUser struct {
 	ID              int
 	Username        string

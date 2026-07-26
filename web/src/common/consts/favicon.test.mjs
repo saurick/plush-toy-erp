@@ -183,6 +183,25 @@ test('favicon: print workspace keeps template glyph before customer branding', (
   assert.match(decodeURIComponent(result.href), />加<\/text>/)
 })
 
+test('favicon: malformed print workspace encoding falls back without throwing', () => {
+  for (const pathname of [
+    '/erp/print-workspace/%',
+    '/erp/print-workspace/%E0%A4%A',
+  ]) {
+    assert.equal(resolveERPFavicon(pathname), ERP_FAVICON_VARIANTS.admin)
+    assert.deepEqual(
+      resolveERPFavicon(pathname, {
+        customerFaviconHref: CUSTOMER_FAVICON_HREF,
+      }),
+      {
+        key: 'customer',
+        href: CUSTOMER_FAVICON_HREF,
+        type: 'image/svg+xml',
+      }
+    )
+  }
+})
+
 test('favicon: runtime update keeps a single active icon link', () => {
   const documentStub = createDocumentStub([
     { rel: 'icon', href: '/favicon.svg' },

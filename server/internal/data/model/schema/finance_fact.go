@@ -12,6 +12,8 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/shopspring/decimal"
+
+	"server/internal/data/model/factguard"
 )
 
 type FinanceFact struct {
@@ -48,6 +50,16 @@ func (FinanceFact) Hooks() []ent.Hook {
 	return []ent.Hook{
 		func(next ent.Mutator) ent.Mutator {
 			return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+				if err := factguard.RejectCreateBypass(
+					m,
+					"finance_fact",
+					"settled_at",
+					"cancelled_at",
+					"cancelled_by",
+					"cancel_reason",
+				); err != nil {
+					return nil, err
+				}
 				if m.Op().Is(ent.OpDelete | ent.OpDeleteOne) {
 					return nil, errors.New("finance_facts are immutable accounting facts; cancel or settle instead of deleting them")
 				}

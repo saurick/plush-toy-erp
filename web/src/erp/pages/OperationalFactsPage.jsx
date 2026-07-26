@@ -37,6 +37,7 @@ import {
   SearchInput,
   SelectFilter,
   SelectionActionBar,
+  SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
@@ -98,6 +99,7 @@ import { hasRequiredOperationalFactDraftSource } from '../utils/operationalFactD
 import {
   businessRecordInventoryRouteFor,
   businessSourceRouteFor,
+  sourceRouteFor,
 } from '../utils/businessSourceNavigation.mjs'
 import { resolveOperationalFactRouteRecord } from '../utils/operationalFactRelatedNavigation.mjs'
 import {
@@ -796,7 +798,7 @@ export function OperationalFactWorkspace({
   }, [activeRows, visibleColumns])
   const canFinanceAction =
     currentActiveKey === 'finance'
-      ? canConfirmFinanceFact(adminProfile, activeSelectedRow?.fact_type)
+      ? canConfirmFinanceFact(adminProfile, activeFinanceFactType)
       : false
   const financeDraftTransitionBlocked =
     currentActiveKey === 'finance' &&
@@ -805,10 +807,7 @@ export function OperationalFactWorkspace({
   const sourceBoundDraftTransitionBlocked =
     ['production', 'outsourcing'].includes(currentActiveKey) &&
     activeSelectedRow?.status === 'DRAFT' &&
-    !hasRequiredOperationalFactDraftSource(
-      currentActiveKey,
-      activeSelectedRow
-    )
+    !hasRequiredOperationalFactDraftSource(currentActiveKey, activeSelectedRow)
   const canViewOutsourcingPayable =
     hasActionPermission(adminProfile, 'finance.payable.read') &&
     canOpenRelatedPath(V1_ROUTE_PATHS.payables)
@@ -825,6 +824,28 @@ export function OperationalFactWorkspace({
   const selectedCanStartProductionRework =
     currentActiveKey === 'production' &&
     isProductionReworkEligible(activeSelectedRow, activeRows)
+  const selectedIsProductionReworkCandidate =
+    currentActiveKey === 'production' &&
+    String(activeSelectedRow?.fact_type || '').toUpperCase() ===
+      'FINISHED_GOODS_RECEIPT' &&
+    ['DRAFT', 'POSTED'].includes(
+      String(activeSelectedRow?.status || '').toUpperCase()
+    )
+  const selectedIsSingleReconciliationCandidate =
+    currentActiveKey === 'finance' &&
+    ['RECEIVABLE', 'PAYABLE', 'INVOICE'].includes(
+      String(activeSelectedRow?.fact_type || '').toUpperCase()
+    ) &&
+    ['DRAFT', 'POSTED'].includes(
+      String(activeSelectedRow?.status || '').toUpperCase()
+    )
+  const selectedIsOutsourcingPayableCandidate =
+    currentActiveKey === 'outsourcing' &&
+    String(activeSelectedRow?.fact_type || '').toUpperCase() ===
+      'RETURN_RECEIPT' &&
+    ['DRAFT', 'POSTED'].includes(
+      String(activeSelectedRow?.status || '').toUpperCase()
+    )
   const canPostActive =
     canFinanceAction ||
     hasAnyPermission(
@@ -865,6 +886,28 @@ export function OperationalFactWorkspace({
       }),
     [activeSelectedRow, canOpenRelatedPath, currentActiveKey]
   )
+  const hasRelatedCapability =
+    (['shipments', 'reservations'].includes(currentActiveKey) &&
+      canOpenRelatedPath(V1_ROUTE_PATHS.salesOrders)) ||
+    (['production', 'outsourcing', 'shipments'].includes(currentActiveKey) &&
+      canOpenRelatedPath(V1_ROUTE_PATHS.inventory)) ||
+    (currentActiveKey === 'shipments' &&
+      (canOpenRelatedPath(V1_ROUTE_PATHS.receivables) ||
+        canOpenRelatedPath(V1_ROUTE_PATHS.invoices))) ||
+    (['production', 'outsourcing', 'finance'].includes(currentActiveKey) &&
+      [
+        'SALES_ORDER',
+        'PRODUCTION_ORDER',
+        'PRODUCTION_FACT',
+        'OUTSOURCING_ORDER',
+        'OUTSOURCING_FACT',
+        'PURCHASE_ORDER',
+        'PURCHASE_RECEIPT',
+        'QUALITY_INSPECTION',
+        'SHIPMENT',
+      ].some((sourceTypeValue) =>
+        canOpenRelatedPath(sourceRouteFor(sourceTypeValue))
+      ))
 
   const openRelatedTable = ({ key }) => {
     if (!activeSelectedRow) return
@@ -1107,27 +1150,38 @@ export function OperationalFactWorkspace({
           selectedLabel={selectedLabel}
           boundaryText={activeBoundaryText}
         >
-          <Button
-            type="link"
-            size="small"
-            disabled={!activeSelectedRow}
-            onClick={clearActiveSelection}
-          >
-            清空已选
-          </Button>
-          {relatedMenuItems.length > 0 ? (
-            <Dropdown
-              trigger={['click']}
-              destroyOnHidden
-              menu={{
-                items: relatedMenuItems,
-                onClick: openRelatedTable,
-              }}
+          <SelectionClearAction
+            selectedCount={activeSelectedRow ? 1 : 0}
+            selectionLabel="业务记录"
+            onClear={clearActiveSelection}
+          />
+          {hasRelatedCapability ? (
+            <BusinessActionTooltip
+              disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+              disabledReason={
+                !activeSelectedRow
+                  ? '请先选择一条业务记录'
+                  : '当前业务记录没有可打开的关联单据'
+              }
             >
-              <Button size="small" icon={<LinkOutlined />}>
-                相关单据 <DownOutlined />
-              </Button>
-            </Dropdown>
+              <Dropdown
+                trigger={['click']}
+                destroyOnHidden
+                disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+                menu={{
+                  items: relatedMenuItems,
+                  onClick: openRelatedTable,
+                }}
+              >
+                <Button
+                  size="small"
+                  icon={<LinkOutlined />}
+                  disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+                >
+                  相关单据 <DownOutlined />
+                </Button>
+              </Dropdown>
+            </BusinessActionTooltip>
           ) : null}
           <BusinessActionTooltip
             disabled={!activeSelectedRow}
@@ -1148,15 +1202,20 @@ export function OperationalFactWorkspace({
             <BusinessActionTooltip
               disabled={
                 !activeSelectedRow ||
+                activeSelectedRow.status !== 'DRAFT' ||
                 sourceBoundDraftTransitionBlocked ||
                 saving
               }
               disabledReason={
-                sourceBoundDraftTransitionBlocked
-                  ? '该历史草稿缺少可核对来源，不能过账或作废'
-                  : saving
-                    ? '当前操作完成后可过账'
-                    : '请先选择一条业务草稿'
+                !activeSelectedRow
+                  ? '请先选择一条业务记录'
+                  : activeSelectedRow.status !== 'DRAFT'
+                    ? '只有业务草稿可以过账'
+                    : sourceBoundDraftTransitionBlocked
+                      ? '该历史草稿缺少可核对来源，不能过账或作废'
+                      : saving
+                        ? '当前操作完成后可过账'
+                        : ''
               }
             >
               <Popconfirm
@@ -1170,9 +1229,11 @@ export function OperationalFactWorkspace({
                 <Button
                   size="small"
                   type="primary"
+                  className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   disabled={
                     !activeSelectedRow ||
+                    activeSelectedRow.status !== 'DRAFT' ||
                     sourceBoundDraftTransitionBlocked ||
                     saving
                   }
@@ -1182,29 +1243,64 @@ export function OperationalFactWorkspace({
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {currentActiveKey === 'production' && canCreateProductionRework ? (
-            <Button
-              size="small"
-              disabled={
+          {currentActiveKey === 'production' &&
+          canCreateProductionRework &&
+          (!activeSelectedRow ||
+            (selectedIsProductionReworkCandidate &&
+              (activeSelectedRow.status === 'DRAFT' ||
+                selectedCanStartProductionRework))) ? (
+                  <BusinessActionTooltip
+                    disabled={
+                !activeSelectedRow ||
                 !selectedCanStartProductionRework ||
                 saving ||
                 productionReworkLoading
               }
-              loading={productionReworkLoading && !productionReworkContext}
-              onClick={() => openProductionRework(activeSelectedRow)}
-            >
-              发起返工
-            </Button>
+                    disabledReason={
+                !activeSelectedRow
+                  ? '请先选择一条生产记录'
+                  : !selectedCanStartProductionRework
+                    ? '只有符合返工条件的已过账完工记录可以发起返工'
+                    : saving || productionReworkLoading
+                      ? '当前操作完成后可发起返工'
+                      : ''
+              }
+                  >
+                    <Button
+                      size="small"
+                      disabled={
+                  !activeSelectedRow ||
+                  !selectedCanStartProductionRework ||
+                  saving ||
+                  productionReworkLoading
+                }
+                      loading={productionReworkLoading && !productionReworkContext}
+                      onClick={() => openProductionRework(activeSelectedRow)}
+                    >
+                      发起返工
+                    </Button>
+                  </BusinessActionTooltip>
           ) : null}
           {currentActiveKey === 'finance' &&
           canFinanceAction &&
-          activeSelectedRow?.status === 'DRAFT' ? (
+          (!activeSelectedRow || activeSelectedRow.status === 'DRAFT') ? (
             <BusinessActionTooltip
-              disabled={financeDraftTransitionBlocked || saving}
+              disabled={
+                !activeSelectedRow ||
+                activeSelectedRow.status !== 'DRAFT' ||
+                financeDraftTransitionBlocked ||
+                saving
+              }
               disabledReason={
-                financeDraftTransitionBlocked
-                  ? '该历史草稿缺少可核对来源，不能确认或作废'
-                  : '当前操作完成后可确认'
+                !activeSelectedRow
+                  ? '请先选择一条财务记录'
+                  : activeSelectedRow.status !== 'DRAFT'
+                    ? '只有财务草稿可以确认'
+                    : financeDraftTransitionBlocked
+                      ? '该历史草稿缺少可核对来源，不能确认或作废'
+                      : saving
+                        ? '当前操作完成后可确认'
+                        : ''
               }
             >
               <Popconfirm
@@ -1218,72 +1314,146 @@ export function OperationalFactWorkspace({
                 <Button
                   size="small"
                   type="primary"
+                  className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
-                  disabled={financeDraftTransitionBlocked || saving}
+                  disabled={
+                    !activeSelectedRow ||
+                    activeSelectedRow.status !== 'DRAFT' ||
+                    financeDraftTransitionBlocked ||
+                    saving
+                  }
                 >
                   确认
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {selectedIsSingleReconciliationSource &&
-          canCreateSingleReconciliation ? (
-            <Button
-              size="small"
-              disabled={saving || financeSourceLoading}
-              onClick={() =>
-                openFinanceSourceAction(
-                  FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION,
-                  activeSelectedRow
-                )
-              }
-            >
-              单笔核对
-            </Button>
-          ) : null}
           {currentActiveKey === 'finance' &&
-          canFinanceAction &&
-          ['DRAFT', 'POSTED'].includes(activeSelectedRow?.status) ? (
+          canCreateSingleReconciliation &&
+          (!activeSelectedRow || selectedIsSingleReconciliationCandidate) ? (
             <BusinessActionTooltip
-              disabled={financeDraftTransitionBlocked || saving}
+              disabled={
+                !activeSelectedRow ||
+                !selectedIsSingleReconciliationSource ||
+                saving ||
+                financeSourceLoading
+              }
               disabledReason={
-                financeDraftTransitionBlocked
-                  ? '该历史草稿缺少可核对来源，不能确认或作废'
-                  : '当前操作完成后可取消'
+                !activeSelectedRow
+                  ? '请先选择一条财务记录'
+                  : !selectedIsSingleReconciliationSource
+                    ? '请选择可进行单笔核对的已确认财务记录'
+                    : '当前操作完成后可进行单笔核对'
               }
             >
               <Button
                 size="small"
-                danger
-                icon={<CloseCircleOutlined />}
-                disabled={financeDraftTransitionBlocked || saving}
-                onClick={() => {
-                  setFinanceCancelReason('')
-                  setFinanceCancelOpen(true)
-                }}
+                disabled={
+                  !activeSelectedRow ||
+                  !selectedIsSingleReconciliationSource ||
+                  saving ||
+                  financeSourceLoading
+                }
+                onClick={() =>
+                  openFinanceSourceAction(
+                    FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION,
+                    activeSelectedRow
+                  )
+                }
               >
-                {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
+                单笔核对
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {currentActiveKey === 'outsourcing' ? (
-            <Button
-              size="small"
-              icon={<PrinterOutlined />}
-              disabled={!activeSelectedRow}
-              onClick={openProcessingContractPrint}
-            >
-              加工合同打印
-            </Button>
+          {currentActiveKey === 'finance' &&
+          canFinanceAction &&
+          (!activeSelectedRow ||
+            ['DRAFT', 'POSTED'].includes(activeSelectedRow.status)) ? (
+              <BusinessActionTooltip
+                disabled={
+                !activeSelectedRow ||
+                !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
+                financeDraftTransitionBlocked ||
+                saving
+              }
+                disabledReason={
+                !activeSelectedRow
+                  ? '请先选择一条财务记录'
+                  : !['DRAFT', 'POSTED'].includes(activeSelectedRow.status)
+                    ? '当前财务状态不能取消'
+                    : financeDraftTransitionBlocked
+                      ? '该历史草稿缺少可核对来源，不能确认或作废'
+                      : saving
+                        ? '当前操作完成后可取消'
+                        : ''
+              }
+              >
+                <Button
+                  size="small"
+                  danger
+                  className="erp-business-module-status-action"
+                  icon={<CloseCircleOutlined />}
+                  disabled={
+                  !activeSelectedRow ||
+                  !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
+                  financeDraftTransitionBlocked ||
+                  saving
+                }
+                  onClick={() => {
+                  setFinanceCancelReason('')
+                  setFinanceCancelOpen(true)
+                }}
+                >
+                  {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
+                </Button>
+              </BusinessActionTooltip>
           ) : null}
-          {selectedIsPostedOutsourcingReturn && canViewOutsourcingPayable ? (
-            <Button
-              size="small"
-              disabled={saving || financeSourceLoading}
-              onClick={() => viewOutsourcingPayable(activeSelectedRow)}
+          {currentActiveKey === 'outsourcing' ? (
+            <BusinessActionTooltip
+              disabled={!activeSelectedRow}
+              disabledReason="请先选择一条委外记录"
             >
-              查看应付
-            </Button>
+              <Button
+                size="small"
+                icon={<PrinterOutlined />}
+                disabled={!activeSelectedRow}
+                onClick={openProcessingContractPrint}
+              >
+                加工合同打印
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {currentActiveKey === 'outsourcing' &&
+          canViewOutsourcingPayable &&
+          (!activeSelectedRow || selectedIsOutsourcingPayableCandidate) ? (
+            <BusinessActionTooltip
+              disabled={
+                !activeSelectedRow ||
+                !selectedIsPostedOutsourcingReturn ||
+                saving ||
+                financeSourceLoading
+              }
+              disabledReason={
+                !activeSelectedRow
+                  ? '请先选择一条委外记录'
+                  : !selectedIsPostedOutsourcingReturn
+                    ? '请选择已过账的委外回货记录'
+                    : '当前操作完成后可查看应付'
+              }
+            >
+              <Button
+                size="small"
+                disabled={
+                  !activeSelectedRow ||
+                  !selectedIsPostedOutsourcingReturn ||
+                  saving ||
+                  financeSourceLoading
+                }
+                onClick={() => viewOutsourcingPayable(activeSelectedRow)}
+              >
+                查看应付
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
           {activeAttachmentOwnerType ? (
             <BusinessAttachmentModalButton
@@ -1302,9 +1472,19 @@ export function OperationalFactWorkspace({
           canPostActive &&
           (!activeSelectedRow || activeSelectedRow.status === 'DRAFT') ? (
             <BusinessActionTooltip
-              disabled={!activeSelectedRow || saving}
+              disabled={
+                !activeSelectedRow ||
+                activeSelectedRow.status !== 'DRAFT' ||
+                saving
+              }
               disabledReason={
-                saving ? '当前操作完成后可发货' : '请先选择一张出货草稿'
+                !activeSelectedRow
+                  ? '请先选择一张出货单'
+                  : activeSelectedRow.status !== 'DRAFT'
+                    ? '只有出货草稿可以发货'
+                    : saving
+                      ? '当前操作完成后可发货'
+                      : ''
               }
             >
               <Popconfirm
@@ -1318,8 +1498,13 @@ export function OperationalFactWorkspace({
                 <Button
                   size="small"
                   type="primary"
+                  className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
-                  disabled={!activeSelectedRow || saving}
+                  disabled={
+                    !activeSelectedRow ||
+                    activeSelectedRow.status !== 'DRAFT' ||
+                    saving
+                  }
                 >
                   发货
                 </Button>
@@ -1330,9 +1515,19 @@ export function OperationalFactWorkspace({
           canReleaseActive &&
           (!activeSelectedRow || activeSelectedRow.status === 'ACTIVE') ? (
             <BusinessActionTooltip
-              disabled={!activeSelectedRow || saving}
+              disabled={
+                !activeSelectedRow ||
+                activeSelectedRow.status !== 'ACTIVE' ||
+                saving
+              }
               disabledReason={
-                saving ? '当前操作完成后可释放' : '请先选择一条有效库存预留'
+                !activeSelectedRow
+                  ? '请先选择一条库存预留'
+                  : activeSelectedRow.status !== 'ACTIVE'
+                    ? '只有有效库存预留可以释放'
+                    : saving
+                      ? '当前操作完成后可释放'
+                      : ''
               }
             >
               <Popconfirm
@@ -1350,8 +1545,13 @@ export function OperationalFactWorkspace({
               >
                 <Button
                   size="small"
+                  className="erp-business-module-status-action"
                   icon={<RollbackOutlined />}
-                  disabled={!activeSelectedRow || saving}
+                  disabled={
+                    !activeSelectedRow ||
+                    activeSelectedRow.status !== 'ACTIVE' ||
+                    saving
+                  }
                 >
                   释放
                 </Button>
@@ -1360,14 +1560,27 @@ export function OperationalFactWorkspace({
           ) : null}
           {financeSettlementAction &&
           canFinanceAction &&
-          activeSelectedRow?.status === 'POSTED' ? (
-            <BusinessActionTooltip
-              disabled={saving}
-              disabledReason="当前操作完成后可继续"
-            >
-              <Popconfirm
-                title={financeSettlementAction.confirmTitle}
-                onConfirm={() =>
+          (!activeSelectedRow ||
+            ['DRAFT', 'POSTED'].includes(activeSelectedRow.status)) ? (
+              <BusinessActionTooltip
+                disabled={
+                !activeSelectedRow ||
+                activeSelectedRow.status !== 'POSTED' ||
+                saving
+              }
+                disabledReason={
+                !activeSelectedRow
+                  ? '请先选择一条财务记录'
+                  : activeSelectedRow.status !== 'POSTED'
+                    ? '财务记录确认后可继续办理'
+                    : saving
+                      ? '当前操作完成后可继续'
+                      : ''
+              }
+              >
+                <Popconfirm
+                  title={financeSettlementAction.confirmTitle}
+                  onConfirm={() =>
                   runRowAction(
                     activeConfig,
                     activeSelectedRow,
@@ -1375,18 +1588,23 @@ export function OperationalFactWorkspace({
                     financeSettlementAction.label
                   )
                 }
-                okText="确认"
-                cancelText="取消"
-              >
-                <Button
-                  size="small"
-                  icon={<CheckCircleOutlined />}
-                  disabled={saving}
+                  okText="确认"
+                  cancelText="取消"
                 >
-                  {financeSettlementAction.label}
-                </Button>
-              </Popconfirm>
-            </BusinessActionTooltip>
+                  <Button
+                    size="small"
+                    className="erp-business-module-status-action"
+                    icon={<CheckCircleOutlined />}
+                    disabled={
+                    !activeSelectedRow ||
+                    activeSelectedRow.status !== 'POSTED' ||
+                    saving
+                  }
+                  >
+                    {financeSettlementAction.label}
+                  </Button>
+                </Popconfirm>
+              </BusinessActionTooltip>
           ) : null}
           {['production', 'outsourcing'].includes(currentActiveKey) &&
           canCancelActive &&
@@ -1395,15 +1613,20 @@ export function OperationalFactWorkspace({
               <BusinessActionTooltip
                 disabled={
                 !activeSelectedRow ||
+                !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
                 sourceBoundDraftTransitionBlocked ||
                 saving
               }
                 disabledReason={
-                sourceBoundDraftTransitionBlocked
-                  ? '该历史草稿缺少可核对来源，不能过账或作废'
-                  : saving
-                    ? '当前操作完成后可取消'
-                    : '请先选择一条业务记录'
+                !activeSelectedRow
+                  ? '请先选择一条业务记录'
+                  : !['DRAFT', 'POSTED'].includes(activeSelectedRow.status)
+                    ? '当前业务记录状态不能取消'
+                    : sourceBoundDraftTransitionBlocked
+                      ? '该历史草稿缺少可核对来源，不能过账或作废'
+                      : saving
+                        ? '当前操作完成后可取消'
+                        : ''
               }
               >
                 <Popconfirm
@@ -1426,9 +1649,11 @@ export function OperationalFactWorkspace({
                   <Button
                     size="small"
                     danger
+                    className="erp-business-module-status-action"
                     icon={<CloseCircleOutlined />}
                     disabled={
                     !activeSelectedRow ||
+                    !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
                     sourceBoundDraftTransitionBlocked ||
                     saving
                   }
@@ -1443,9 +1668,19 @@ export function OperationalFactWorkspace({
           (!activeSelectedRow ||
             ['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status)) ? (
               <BusinessActionTooltip
-                disabled={!activeSelectedRow || saving}
+                disabled={
+                !activeSelectedRow ||
+                !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status) ||
+                saving
+              }
                 disabledReason={
-                saving ? '当前操作完成后可取消' : '请先选择一张出货单'
+                !activeSelectedRow
+                  ? '请先选择一张出货单'
+                  : !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status)
+                    ? '当前出货状态不能取消'
+                    : saving
+                      ? '当前操作完成后可取消'
+                      : ''
               }
               >
                 <Popconfirm
@@ -1470,8 +1705,13 @@ export function OperationalFactWorkspace({
                   <Button
                     size="small"
                     danger
+                    className="erp-business-module-status-action"
                     icon={<CloseCircleOutlined />}
-                    disabled={!activeSelectedRow || saving}
+                    disabled={
+                    !activeSelectedRow ||
+                    !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status) ||
+                    saving
+                  }
                   >
                     {activeSelectedRow?.status === 'DRAFT'
                     ? '作废草稿'
