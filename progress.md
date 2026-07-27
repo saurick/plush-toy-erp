@@ -324,7 +324,7 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 完成：研发效能工作台、统一质量回执 / 预推送门禁、数据库目标身份与清理、容量基线、不可变发布制品和本地发布演练已进入当前主线。首次全新验收库运行在客户配置发布前发现正式岗位账号尚未初始化，已把账号初始化前移到客户配置激活之前；第二次运行继续在 F02 工程节点发现来源单据读取被 `40304` 拒绝。根因是工程和 PMC 已承担 `sales_order_approval` 节点，却没有完整的销售订单页面来源读取合同。
 
-当前修正：Product Core 的工程 / PMC 默认角色与 yoyoosun 投影同步补齐 `customer.read`、`contact.read`、`sales_order.read`、`sales_order_item.read`，并开放 `sales-orders` 页面；测试锁定所有 F02 责任岗位均可读取并打开来源单据。内容寻址的待验证 revision 已更新为 `yoyoosun-customer-package-v7.local-b8b14c39f0e3d7d6.runtime-v1`。两次失败运行均完成受控清理，没有遗留验收数据库。
+当前修正：Product Core 的工程 / PMC 默认角色与 yoyoosun 投影同步补齐 `customer.read`、`contact.read`、`sales_order.read`、`sales_order_item.read`，并开放 `sales-orders` 页面；测试锁定所有 F02 责任岗位均可读取并打开来源单据。第三次运行已完成 F02 全部节点，随后在销售关闭已完成流程的订单时发现 yoyoosun 投影遗漏 Product Core 已有的 `sales_order.close`；该动作已按客户交付矩阵原有承诺补入销售岗位。内容寻址的待验证 revision 更新为 `yoyoosun-customer-package-v7.local-40a5a9924b269f4b.runtime-v1`。三次失败运行均完成受控清理，没有遗留验收数据库。
 
 待完成：从新的干净提交重新执行全新数据库生命周期、50 页与九岗位浏览器 smoke、四条异常流、清理读回；只有同一最终提交通过完整门禁、精确 SHA CI、不可变制品、本地发布演练和 133 技术发布后，才更新为对应层级的完成证据。客户 UAT / 签收始终单独保留。
 

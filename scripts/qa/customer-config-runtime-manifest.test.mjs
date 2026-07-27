@@ -423,6 +423,7 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   assert(pages.sales.includes("production-orders"));
   assert(entitlementsFor("sales").has("stock.reservation.create"));
   assert(entitlementsFor("sales").has("sales_order.cancel"));
+  assert(entitlementsFor("sales").has("sales_order.close"));
   assert(entitlementsFor("sales").has("contact.disable"));
   assert(entitlementsFor("sales").has("contact.set_primary"));
   assert(entitlementsFor("sales").has("production.wip.read"));
