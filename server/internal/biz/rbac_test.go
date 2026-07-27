@@ -136,6 +136,10 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 			roleKey: EngineeringRoleKey,
 			has: []string{
 				PermissionERPPrintTemplateRead,
+				PermissionCustomerRead,
+				PermissionContactRead,
+				PermissionSalesOrderRead,
+				PermissionSalesOrderItemRead,
 				PermissionMaterialRead,
 				PermissionMaterialCreate,
 				PermissionMaterialUpdate,
@@ -187,6 +191,10 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 		{
 			roleKey: PMCRoleKey,
 			has: []string{
+				PermissionCustomerRead,
+				PermissionContactRead,
+				PermissionSalesOrderRead,
+				PermissionSalesOrderItemRead,
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,

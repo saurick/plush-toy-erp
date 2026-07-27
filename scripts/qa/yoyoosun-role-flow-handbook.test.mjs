@@ -162,7 +162,7 @@ test("yoyoosun role handbook lists the exact tracked role profiles", () => {
       (total, role) => total + role.capabilityKeys.length,
       0,
     ),
-    312,
+    320,
   );
   assert.equal(
     new Set(yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.capabilityKeys))
@@ -261,6 +261,40 @@ test("yoyoosun role handbook lists the exact tracked role profiles", () => {
       section,
       /`[a-z_]+(?:\.[a-z_]+)*\.\*`/u,
       `${role.roleKey} must not use wildcard permissions`,
+    );
+  }
+});
+
+test("sales-order process responsibility roles can read and open their source document", () => {
+  const responsibleRoles = yoyoosunRoleFlowMatrix.roles.filter((role) =>
+    role.flowResponsibilities.some((item) =>
+      item.startsWith("sales_order_approval."),
+    ),
+  );
+  assert.deepEqual(
+    responsibleRoles.map((role) => role.roleKey),
+    ["sales", "boss", "engineering", "pmc"],
+  );
+  for (const role of responsibleRoles) {
+    assert.ok(
+      role.capabilityKeys.includes("sales_order.read"),
+      `${role.roleKey} sales-order task responsibility requires source read`,
+    );
+    assert.ok(
+      role.capabilityKeys.includes("customer.read"),
+      `${role.roleKey} sales-order page requires customer read`,
+    );
+    assert.ok(
+      role.capabilityKeys.includes("contact.read"),
+      `${role.roleKey} sales-order page requires contact read`,
+    );
+    assert.ok(
+      role.capabilityKeys.includes("sales_order_item.read"),
+      `${role.roleKey} sales-order task responsibility requires item read`,
+    );
+    assert.ok(
+      role.menuSurfaces.includes("sales-orders"),
+      `${role.roleKey} sales-order task responsibility requires a source page`,
     );
   }
 });

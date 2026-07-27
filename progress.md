@@ -320,6 +320,14 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 ## 下一步与停止条件
 
+### 2026-07-28 研发效能工作台与本地质量交付收口
+
+完成：研发效能工作台、统一质量回执 / 预推送门禁、数据库目标身份与清理、容量基线、不可变发布制品和本地发布演练已进入当前主线。首次全新验收库运行在客户配置发布前发现正式岗位账号尚未初始化，已把账号初始化前移到客户配置激活之前；第二次运行继续在 F02 工程节点发现来源单据读取被 `40304` 拒绝。根因是工程和 PMC 已承担 `sales_order_approval` 节点，却没有完整的销售订单页面来源读取合同。
+
+当前修正：Product Core 的工程 / PMC 默认角色与 yoyoosun 投影同步补齐 `customer.read`、`contact.read`、`sales_order.read`、`sales_order_item.read`，并开放 `sales-orders` 页面；测试锁定所有 F02 责任岗位均可读取并打开来源单据。内容寻址的待验证 revision 已更新为 `yoyoosun-customer-package-v7.local-b8b14c39f0e3d7d6.runtime-v1`。两次失败运行均完成受控清理，没有遗留验收数据库。
+
+待完成：从新的干净提交重新执行全新数据库生命周期、50 页与九岗位浏览器 smoke、四条异常流、清理读回；只有同一最终提交通过完整门禁、精确 SHA CI、不可变制品、本地发布演练和 133 技术发布后，才更新为对应层级的完成证据。客户 UAT / 签收始终单独保留。
+
 1. 发布前必须绑定最终 commit / image，按正式流程执行备份 / 回滚点、migration status / apply / readback、health / ready、真实账号与业务 smoke。
 2. 客户交付仍须甲方岗位 UAT / 签收；本地或固定旧版本绿色不能替代。
 3. 异常流 Worktree 暂保留为恢复副本；后续清理须单独确认目标和现场，不把 Handoff、提交或推送等同于 Worktree 删除。

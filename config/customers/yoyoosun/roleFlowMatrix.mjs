@@ -164,6 +164,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       ownerPools: Object.freeze(["engineering"]),
       menuSurfaces: Object.freeze([
         "global-dashboard",
+        "sales-orders",
         "products",
         "materials",
         "processes",
@@ -174,6 +175,10 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       capabilityKeys: Object.freeze([
         "erp.workbench.read",
         "erp.print_template.read",
+        "customer.read",
+        "contact.read",
+        "sales_order.read",
+        "sales_order_item.read",
         "material.read",
         "material.create",
         "material.update",
@@ -212,6 +217,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       menuSurfaces: Object.freeze([
         "global-dashboard",
         "business-dashboard",
+        "sales-orders",
         "products",
         "materials",
         "processes",
@@ -225,6 +231,10 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       capabilityKeys: Object.freeze([
         "erp.workbench.read",
         "erp.business_dashboard.read",
+        "customer.read",
+        "contact.read",
+        "sales_order.read",
+        "sales_order_item.read",
         "material.read",
         "process.read",
         "product.read",
