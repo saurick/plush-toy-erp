@@ -265,6 +265,11 @@ function createRPC({
         const shipmentRecord = records.get(params.shipment_id);
         assert.equal(shipmentRecord?.key, "shipment");
         if (!deliveryProcess) {
+          assert.equal(
+            finishedGoodsQualityInspection,
+            undefined,
+            "delivery process must start before creating a pending inspection",
+          );
           deliveryProcess = {
             id: nextID++,
             process_key: "finished_goods_delivery",
@@ -722,6 +727,12 @@ test("sales apply completes quality and finance approval before process-owned sh
   const startIndex = orderedMethods.indexOf(
     "start_finished_goods_delivery_process",
   );
+  const createQualityIndex = orderedMethods.indexOf(
+    "create_finished_goods_quality_inspection_draft",
+  );
+  const submitQualityIndex = orderedMethods.indexOf(
+    "submit_quality_inspection",
+  );
   const qualityIndex = orderedMethods.indexOf(
     "execute_finished_goods_delivery_quality_decide",
   );
@@ -733,7 +744,9 @@ test("sales apply completes quality and finance approval before process-owned sh
     "execute_finished_goods_delivery_receivable_lead",
   );
   assert.ok(startIndex >= 0);
-  assert.ok(qualityIndex > startIndex);
+  assert.ok(createQualityIndex > startIndex);
+  assert.ok(submitQualityIndex > createQualityIndex);
+  assert.ok(qualityIndex > submitQualityIndex);
   assert.ok(completeIndex > qualityIndex);
   assert.ok(shipIndex > completeIndex);
   assert.ok(receivableIndex > shipIndex);

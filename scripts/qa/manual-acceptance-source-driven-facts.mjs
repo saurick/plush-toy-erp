@@ -1424,6 +1424,39 @@ export async function applyFinishedGoodsDeliveryProcess({
     ]),
   );
 
+  const startParams = customerParams({
+    shipment_id: shipmentID,
+    idempotency_key: idempotency.process,
+  });
+  let processData = await invoke(
+    rpc,
+    "customer_config",
+    "start_finished_goods_delivery_process",
+    startParams,
+  );
+  const processInstance = requireResult(
+    processData,
+    "process_instance",
+    null,
+    "start_finished_goods_delivery_process",
+  );
+  if (
+    String(processInstance.process_key || "") !== "finished_goods_delivery" ||
+    String(processInstance.business_ref_type || "") !== "shipment" ||
+    Number(processInstance.business_ref_id) !== shipmentID ||
+    String(processInstance.business_ref_no || "") !== shipmentNo
+  ) {
+    throw new SourceDrivenFactError(
+      "finished goods delivery process does not match the shipment source",
+    );
+  }
+  let nodes = processNodes(processData, "start_finished_goods_delivery_process");
+  const qualityNode = requireProcessNode(
+    nodes,
+    "finished_goods_quality",
+    ["active", "completed"],
+    "finished goods delivery",
+  );
   let inspection = requireResult(
     await invoke(
       rpc,
@@ -1462,40 +1495,6 @@ export async function applyFinishedGoodsDeliveryProcess({
       `finished goods quality expected SUBMITTED or PASSED, got ${inspectionStatus || "missing"}`,
     );
   }
-
-  const startParams = customerParams({
-    shipment_id: shipmentID,
-    idempotency_key: idempotency.process,
-  });
-  let processData = await invoke(
-    rpc,
-    "customer_config",
-    "start_finished_goods_delivery_process",
-    startParams,
-  );
-  const processInstance = requireResult(
-    processData,
-    "process_instance",
-    null,
-    "start_finished_goods_delivery_process",
-  );
-  if (
-    String(processInstance.process_key || "") !== "finished_goods_delivery" ||
-    String(processInstance.business_ref_type || "") !== "shipment" ||
-    Number(processInstance.business_ref_id) !== shipmentID ||
-    String(processInstance.business_ref_no || "") !== shipmentNo
-  ) {
-    throw new SourceDrivenFactError(
-      "finished goods delivery process does not match the shipment source",
-    );
-  }
-  let nodes = processNodes(processData, "start_finished_goods_delivery_process");
-  const qualityNode = requireProcessNode(
-    nodes,
-    "finished_goods_quality",
-    ["active", "completed"],
-    "finished goods delivery",
-  );
   const qualityData = await invoke(
     rpc,
     "customer_config",

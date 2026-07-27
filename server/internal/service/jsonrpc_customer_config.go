@@ -1553,6 +1553,12 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	case errors.Is(err, biz.ErrShipmentNotFound), errors.Is(err, biz.ErrShipmentItemNotFound):
 		l.Warnf("[customer_config] shipment not found err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单不存在"}
+	case errors.Is(err, biz.ErrShipmentQualityPending):
+		l.Warnf("[customer_config] shipment quality gate pending err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
+	case errors.Is(err, biz.ErrShipmentQualityRejected):
+		l.Warnf("[customer_config] shipment quality gate rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
 	default:
 		l.Errorf("[customer_config] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}

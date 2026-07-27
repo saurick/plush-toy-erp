@@ -345,6 +345,26 @@ func TestMapCustomerConfigError_ProcessTaskOwnerRoleGuidance(t *testing.T) {
 	}
 }
 
+func TestMapCustomerConfigError_ShipmentQualityGate(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	for _, tc := range []struct {
+		name    string
+		err     error
+		message string
+	}{
+		{name: "pending", err: biz.ErrShipmentQualityPending, message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"},
+		{name: "rejected", err: biz.ErrShipmentQualityRejected, message: "该出货单的出货前成品检验不合格，请先完成质量处置"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := dispatcher.mapCustomerConfigError(context.Background(), tc.err)
+			if result.Code != errcode.InvalidParam.Code || result.Message != tc.message {
+				t.Fatalf("unexpected shipment quality gate result: %#v", result)
+			}
+		})
+	}
+}
+
 func TestCustomerConfigPublishInputFromParamsMergesFormalManifestMetadata(t *testing.T) {
 	snapshot := map[string]any{
 		"customer": map[string]any{"key": "yoyoosun"},
