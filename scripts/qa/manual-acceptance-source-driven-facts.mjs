@@ -223,7 +223,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
   ]),
   "workflow.get_task_process_context": Object.freeze(["task_id"]),
   "operational_fact.ship_shipment": Object.freeze(["customer_key", "id"]),
-  "operational_fact.get_shipment": Object.freeze(["customer_key", "id"]),
+  "operational_fact.get_shipment": Object.freeze(["id"]),
   "operational_fact.create_receivable_from_shipment": Object.freeze([
     "customer_key",
     "fact_no",
@@ -1589,7 +1589,7 @@ export async function applyFinishedGoodsDeliveryProcess({
       rpc,
       "operational_fact",
       "get_shipment",
-      customerParams({ id: shipmentID }),
+      { id: shipmentID },
     ),
     "shipment",
     "DRAFT",

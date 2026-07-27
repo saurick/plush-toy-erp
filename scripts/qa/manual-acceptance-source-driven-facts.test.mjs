@@ -682,6 +682,7 @@ test("sales apply keeps quality, finance release, shipping, and receivable on th
   const qualityIndex = orderedMethods.indexOf("pass_quality_inspection");
   const completeIndex = orderedMethods.indexOf("complete_task_action");
   const contextIndex = orderedMethods.indexOf("get_task_process_context");
+  const getShipmentIndex = orderedMethods.indexOf("get_shipment");
   const shipIndex = orderedMethods.indexOf("ship_shipment");
   const receivableIndex = orderedMethods.indexOf(
     "create_receivable_from_shipment",
@@ -693,7 +694,8 @@ test("sales apply keeps quality, finance release, shipping, and receivable on th
   assert.ok(startIndex > qualityIndex);
   assert.ok(completeIndex > startIndex);
   assert.ok(contextIndex > completeIndex);
-  assert.ok(shipIndex > contextIndex);
+  assert.ok(getShipmentIndex > contextIndex);
+  assert.ok(shipIndex > getShipmentIndex);
   assert.ok(receivableIndex > shipIndex);
   assert.equal(orderedMethods.includes("submit_shipment_release"), false);
   assert.equal(
@@ -725,11 +727,19 @@ test("sales apply keeps quality, finance release, shipping, and receivable on th
   assert.deepEqual(calls[contextIndex].params, {
     task_id: report.results.sales.approvalTask.id,
   });
+  assert.equal(calls[getShipmentIndex].domain, "operational_fact");
+  assert.deepEqual(calls[getShipmentIndex].params, {
+    id: report.results.sales.shipment.id,
+  });
   assert.equal(calls[shipIndex].domain, "operational_fact");
   assert.equal(calls[receivableIndex].domain, "operational_fact");
   assert.deepEqual(
     FORMAL_RPC_PARAM_ALLOWLIST["workflow.get_task_process_context"],
     ["task_id"],
+  );
+  assert.deepEqual(
+    FORMAL_RPC_PARAM_ALLOWLIST["operational_fact.get_shipment"],
+    ["id"],
   );
   assert.deepEqual(
     FORMAL_RPC_PARAM_ALLOWLIST["operational_fact.ship_shipment"],
