@@ -664,6 +664,7 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
   if (domain === "quality") return "quality";
   if (domain === "inventory") return "warehouse";
   if (domain === "workflow") {
+    if (method === "get_task_process_context") return "finance";
     const surfaceKey = String(
       params?.task_group || params?.payload?.surface_key || "",
     ).toLowerCase();
@@ -688,16 +689,7 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
     return "warehouse";
   }
   if (domain === "customer_config") {
-    if (method === "execute_finished_goods_delivery_quality_decide") {
-      return "quality";
-    }
-    if (method === "execute_finished_goods_delivery_receivable_lead") {
-      return "finance";
-    }
-    if (
-      method === "start_finished_goods_delivery_process" ||
-      method === "execute_finished_goods_delivery_shipment_ship"
-    ) {
+    if (method === "start_finished_goods_delivery_process") {
       return "warehouse";
     }
   }

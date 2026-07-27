@@ -718,17 +718,9 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
     "warehouse",
   );
   assert.equal(
-    manualAcceptanceFactRole(
-      "customer_config",
-      "execute_finished_goods_delivery_quality_decide",
-    ),
-    "quality",
-  );
-  assert.equal(
-    manualAcceptanceFactRole(
-      "customer_config",
-      "execute_finished_goods_delivery_receivable_lead",
-    ),
+    manualAcceptanceFactRole("workflow", "get_task_process_context", {
+      task_id: 42,
+    }),
     "finance",
   );
 });

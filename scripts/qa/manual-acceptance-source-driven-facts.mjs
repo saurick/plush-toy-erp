@@ -207,19 +207,6 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "shipment_id",
     "idempotency_key",
   ]),
-  "customer_config.execute_finished_goods_delivery_quality_decide":
-    Object.freeze([
-      "customer_key",
-      "process_instance_id",
-      "process_node_instance_id",
-      "expected_version",
-      "shipment_id",
-      "quality_inspection_id",
-      "finished_goods_lot_id",
-      "result",
-      "decision_note",
-      "idempotency_key",
-    ]),
   "workflow.list_tasks": Object.freeze([
     "task_group",
     "source_type",
@@ -234,28 +221,16 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "action_key",
     "payload",
   ]),
-  "customer_config.execute_finished_goods_delivery_shipment_ship":
-    Object.freeze([
-      "customer_key",
-      "process_instance_id",
-      "process_node_instance_id",
-      "expected_version",
-      "shipment_id",
-      "idempotency_key",
-    ]),
+  "workflow.get_task_process_context": Object.freeze(["task_id"]),
+  "operational_fact.ship_shipment": Object.freeze(["customer_key", "id"]),
   "operational_fact.get_shipment": Object.freeze(["customer_key", "id"]),
-  "customer_config.execute_finished_goods_delivery_receivable_lead":
-    Object.freeze([
-      "customer_key",
-      "process_instance_id",
-      "process_node_instance_id",
-      "expected_version",
-      "shipment_id",
-      "receivable_source_no",
-      "expected_amount",
-      "lead_note",
-      "idempotency_key",
-    ]),
+  "operational_fact.create_receivable_from_shipment": Object.freeze([
+    "customer_key",
+    "fact_no",
+    "shipment_id",
+    "idempotency_key",
+    "note",
+  ]),
   "operational_fact.list_finance_facts": Object.freeze([
     "customer_key",
     "keyword",
@@ -1310,16 +1285,6 @@ function requireProcessNode(nodes, nodeKey, statuses, operation) {
   return node;
 }
 
-function processNodeExecutionVersion(node, operation) {
-  const version = positiveID(node?.version, `${operation}.version`);
-  const status = String(node?.status || "").toLowerCase();
-  if (status === "active") return version;
-  if (status === "completed" && version > 1) return version - 1;
-  throw new SourceDrivenFactError(
-    `${operation} is not active or exactly replayable`,
-  );
-}
-
 async function exactProcessApprovalTask(
   rpc,
   { processInstanceID, shipmentID },
@@ -1387,24 +1352,19 @@ export async function applyFinishedGoodsDeliveryProcess({
   expectedAmount,
   receivableSourceNo,
   processIdempotencyKey,
-  qualityDecisionIdempotencyKey,
   approvalIdempotencyKey,
-  shipmentShipIdempotencyKey,
   receivableIdempotencyKey,
 }) {
   const shipmentID = positiveID(shipment?.id, "shipment.id");
-  const shipmentNo = requiredText(shipment?.shipment_no, "shipment.shipment_no", 64);
-  const normalizedProductID = positiveID(productId, "productId");
-  const normalizedLotID = positiveID(
-    finishedGoodsLotId,
-    "finishedGoodsLotId",
-  );
-  const normalizedWarehouseID = positiveID(warehouseId, "warehouseId");
-  const normalizedInspectionNo = requiredText(
-    inspectionNo,
-    "inspectionNo",
+  const shipmentNo = requiredText(
+    shipment?.shipment_no,
+    "shipment.shipment_no",
     64,
   );
+  const normalizedProductID = positiveID(productId, "productId");
+  const normalizedLotID = positiveID(finishedGoodsLotId, "finishedGoodsLotId");
+  const normalizedWarehouseID = positiveID(warehouseId, "warehouseId");
+  const normalizedInspectionNo = requiredText(inspectionNo, "inspectionNo", 64);
   const normalizedExpectedAmount = quantity(expectedAmount, "expectedAmount");
   const normalizedReceivableNo = requiredText(
     receivableSourceNo,
@@ -1414,9 +1374,7 @@ export async function applyFinishedGoodsDeliveryProcess({
   const idempotency = Object.fromEntries(
     Object.entries({
       process: processIdempotencyKey,
-      quality: qualityDecisionIdempotencyKey,
       approval: approvalIdempotencyKey,
-      shipment: shipmentShipIdempotencyKey,
       receivable: receivableIdempotencyKey,
     }).map(([key, value]) => [
       key,
@@ -1424,39 +1382,6 @@ export async function applyFinishedGoodsDeliveryProcess({
     ]),
   );
 
-  const startParams = customerParams({
-    shipment_id: shipmentID,
-    idempotency_key: idempotency.process,
-  });
-  let processData = await invoke(
-    rpc,
-    "customer_config",
-    "start_finished_goods_delivery_process",
-    startParams,
-  );
-  const processInstance = requireResult(
-    processData,
-    "process_instance",
-    null,
-    "start_finished_goods_delivery_process",
-  );
-  if (
-    String(processInstance.process_key || "") !== "finished_goods_delivery" ||
-    String(processInstance.business_ref_type || "") !== "shipment" ||
-    Number(processInstance.business_ref_id) !== shipmentID ||
-    String(processInstance.business_ref_no || "") !== shipmentNo
-  ) {
-    throw new SourceDrivenFactError(
-      "finished goods delivery process does not match the shipment source",
-    );
-  }
-  let nodes = processNodes(processData, "start_finished_goods_delivery_process");
-  const qualityNode = requireProcessNode(
-    nodes,
-    "finished_goods_quality",
-    ["active", "completed"],
-    "finished goods delivery",
-  );
   let inspection = requireResult(
     await invoke(
       rpc,
@@ -1495,35 +1420,25 @@ export async function applyFinishedGoodsDeliveryProcess({
       `finished goods quality expected SUBMITTED or PASSED, got ${inspectionStatus || "missing"}`,
     );
   }
-  const qualityData = await invoke(
-    rpc,
-    "customer_config",
-    "execute_finished_goods_delivery_quality_decide",
-    customerParams({
-      process_instance_id: processInstance.id,
-      process_node_instance_id: qualityNode.id,
-      expected_version: processNodeExecutionVersion(
-        qualityNode,
-        "finished_goods_quality",
+  if (inspectionStatus === "SUBMITTED") {
+    inspection = requireResult(
+      await invoke(
+        rpc,
+        "quality",
+        "pass_quality_inspection",
+        customerParams({
+          id: inspection.id,
+          result: "PASS",
+          defect_rate_operator: "APPROX",
+          defect_rate_percent: "5",
+          decision_note: SIMULATED_NOTE,
+        }),
       ),
-      shipment_id: shipmentID,
-      quality_inspection_id: inspection.id,
-      finished_goods_lot_id: normalizedLotID,
-      result: "PASS",
-      decision_note: SIMULATED_NOTE,
-      idempotency_key: idempotency.quality,
-    }),
-  );
-  nodes = processNodes(
-    qualityData,
-    "execute_finished_goods_delivery_quality_decide",
-  );
-  requireProcessNode(
-    nodes,
-    "shipment_finance_approval",
-    ["active", "completed"],
-    "finished goods delivery",
-  );
+      "quality_inspection",
+      "PASSED",
+      "pass_quality_inspection",
+    );
+  }
   inspection = requireResult(
     await invoke(
       rpc,
@@ -1538,6 +1453,60 @@ export async function applyFinishedGoodsDeliveryProcess({
   if (String(inspection.result || "").toUpperCase() !== "PASS") {
     throw new SourceDrivenFactError(
       `finished goods quality expected PASS, got ${inspection.result || "missing"}`,
+    );
+  }
+
+  const startParams = customerParams({
+    shipment_id: shipmentID,
+    idempotency_key: idempotency.process,
+  });
+  const processData = await invoke(
+    rpc,
+    "customer_config",
+    "start_finished_goods_delivery_process",
+    startParams,
+  );
+  const processInstance = requireResult(
+    processData,
+    "process_instance",
+    null,
+    "start_finished_goods_delivery_process",
+  );
+  if (
+    String(processInstance.process_key || "") !== "finished_goods_delivery" ||
+    String(processInstance.business_ref_type || "") !== "shipment" ||
+    Number(processInstance.business_ref_id) !== shipmentID ||
+    String(processInstance.business_ref_no || "") !== shipmentNo
+  ) {
+    throw new SourceDrivenFactError(
+      "finished goods delivery process does not match the shipment source",
+    );
+  }
+  let nodes = processNodes(
+    processData,
+    "start_finished_goods_delivery_process",
+  );
+  requireProcessNode(
+    nodes,
+    "shipment_finance_approval",
+    ["active", "completed"],
+    "finished goods delivery",
+  );
+  requireProcessNode(
+    nodes,
+    "shipment_finance_release",
+    ["waiting", "completed"],
+    "finished goods delivery",
+  );
+  requireProcessNode(
+    nodes,
+    "end",
+    ["waiting", "completed"],
+    "finished goods delivery",
+  );
+  if (nodes.length !== 3) {
+    throw new SourceDrivenFactError(
+      `finished goods delivery expected the current 3-node contract, got ${nodes.length}`,
     );
   }
 
@@ -1574,39 +1543,48 @@ export async function applyFinishedGoodsDeliveryProcess({
     );
   }
 
-  processData = await invoke(
-    rpc,
-    "customer_config",
-    "start_finished_goods_delivery_process",
-    startParams,
+  const contextData = await invoke(rpc, "workflow", "get_task_process_context", {
+    task_id: approvalTask.id,
+  });
+  const processContext = contextData?.process_context;
+  if (!processContext || typeof processContext !== "object") {
+    throw new SourceDrivenFactError(
+      "get_task_process_context response missing process_context",
+    );
+  }
+  const completedProcessInstance = requireResult(
+    processContext,
+    "process_instance",
+    "COMPLETED",
+    "get_task_process_context",
   );
-  nodes = processNodes(processData, "finished goods delivery approval readback");
-  const shipmentNode = requireProcessNode(
+  if (
+    Number(completedProcessInstance.id) !== Number(processInstance.id) ||
+    String(completedProcessInstance.process_key || "") !==
+      "finished_goods_delivery"
+  ) {
+    throw new SourceDrivenFactError(
+      "finished goods delivery process completion readback drifted",
+    );
+  }
+  nodes = processNodes(
+    processContext,
+    "finished goods delivery approval readback",
+  );
+  requireProcessNode(
     nodes,
-    "shipment_execution",
-    ["active", "completed"],
+    "shipment_finance_approval",
+    ["completed"],
     "finished goods delivery",
   );
-  const shipmentData = await invoke(
-    rpc,
-    "customer_config",
-    "execute_finished_goods_delivery_shipment_ship",
-    customerParams({
-      process_instance_id: processInstance.id,
-      process_node_instance_id: shipmentNode.id,
-      expected_version: processNodeExecutionVersion(
-        shipmentNode,
-        "shipment_execution",
-      ),
-      shipment_id: shipmentID,
-      idempotency_key: idempotency.shipment,
-    }),
+  requireProcessNode(
+    nodes,
+    "shipment_finance_release",
+    ["completed"],
+    "finished goods delivery",
   );
-  nodes = processNodes(
-    shipmentData,
-    "execute_finished_goods_delivery_shipment_ship",
-  );
-  const shipped = requireResult(
+  requireProcessNode(nodes, "end", ["completed"], "finished goods delivery");
+  const releasedShipment = requireResult(
     await invoke(
       rpc,
       "operational_fact",
@@ -1614,60 +1592,73 @@ export async function applyFinishedGoodsDeliveryProcess({
       customerParams({ id: shipmentID }),
     ),
     "shipment",
-    "SHIPPED",
+    "DRAFT",
     "get_shipment",
   );
-  if (String(shipped.finance_release_status || "").toUpperCase() !== "APPROVED") {
+  if (
+    String(releasedShipment.finance_release_status || "").toUpperCase() !==
+    "APPROVED"
+  ) {
     throw new SourceDrivenFactError(
-      `shipment finance release expected APPROVED, got ${shipped.finance_release_status || "missing"}`,
+      `shipment finance release expected APPROVED, got ${releasedShipment.finance_release_status || "missing"}`,
     );
   }
 
-  const receivableNode = requireProcessNode(
-    nodes,
-    "receivable_lead",
-    ["active", "completed"],
-    "finished goods delivery",
+  const shipped = requireResult(
+    await invoke(
+      rpc,
+      "operational_fact",
+      "ship_shipment",
+      customerParams({ id: shipmentID }),
+    ),
+    "shipment",
+    "SHIPPED",
+    "ship_shipment",
   );
-  const receivableData = await invoke(
-    rpc,
-    "customer_config",
-    "execute_finished_goods_delivery_receivable_lead",
-    customerParams({
-      process_instance_id: processInstance.id,
-      process_node_instance_id: receivableNode.id,
-      expected_version: processNodeExecutionVersion(
-        receivableNode,
-        "receivable_lead",
-      ),
-      shipment_id: shipmentID,
-      receivable_source_no: normalizedReceivableNo,
-      expected_amount: normalizedExpectedAmount,
-      lead_note: SIMULATED_NOTE,
-      idempotency_key: idempotency.receivable,
-    }),
-  );
-  nodes = processNodes(
-    receivableData,
-    "execute_finished_goods_delivery_receivable_lead",
-  );
-  requireProcessNode(
-    nodes,
-    "end",
-    ["completed"],
-    "finished goods delivery",
+  const createdReceivable = requireResult(
+    await invoke(
+      rpc,
+      "operational_fact",
+      "create_receivable_from_shipment",
+      customerParams({
+        fact_no: normalizedReceivableNo,
+        shipment_id: shipmentID,
+        idempotency_key: idempotency.receivable,
+        note: SIMULATED_NOTE,
+      }),
+    ),
+    "finance_fact",
+    null,
+    "create_receivable_from_shipment",
   );
   const receivable = await exactReceivableLead(rpc, {
     factNo: normalizedReceivableNo,
     shipmentID,
   });
-  if (!new Set(["DRAFT", "POSTED"]).has(String(receivable.status || "").toUpperCase())) {
+  if (Number(receivable.id) !== Number(createdReceivable.id)) {
+    throw new SourceDrivenFactError(
+      `${normalizedReceivableNo} creation and readback identities differ`,
+    );
+  }
+  if (
+    !new Set(["DRAFT", "POSTED"]).has(
+      String(receivable.status || "").toUpperCase(),
+    )
+  ) {
     throw new SourceDrivenFactError(
       `${normalizedReceivableNo} expected DRAFT or POSTED, got ${receivable.status || "missing"}`,
     );
   }
+  if (
+    quantityUnits(receivable.amount, `${normalizedReceivableNo}.amount`) !==
+    quantityUnits(normalizedExpectedAmount, "expectedAmount")
+  ) {
+    throw new SourceDrivenFactError(
+      `${normalizedReceivableNo} amount does not match the shipment source`,
+    );
+  }
   return {
-    processInstance,
+    processInstance: completedProcessInstance,
     qualityInspection: inspection,
     approvalTask,
     shipment: shipped,
@@ -2178,9 +2169,7 @@ async function applySales(plan, rpc) {
     ),
     receivableSourceNo: identity.receivable.businessNo,
     processIdempotencyKey: `${identity.shipment.idempotencyKey}:process`,
-    qualityDecisionIdempotencyKey: `${identity.quality.idempotencyKey}:decision`,
     approvalIdempotencyKey: `${identity.shipment.idempotencyKey}:approval`,
-    shipmentShipIdempotencyKey: `${identity.shipment.idempotencyKey}:ship`,
     receivableIdempotencyKey: identity.receivable.idempotencyKey,
   });
   const shipment = delivery.shipment;
