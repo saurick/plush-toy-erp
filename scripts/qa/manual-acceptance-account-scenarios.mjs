@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import {
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_DEV_TARGET,
+  assertManualAcceptanceCapabilitiesPolicy,
+  assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
@@ -497,6 +499,117 @@ async function bootstrapMissingFormalAccounts({
   };
 }
 
+export async function bootstrapManualAcceptanceFormalAccounts(
+  plan,
+  {
+    password,
+    adminPassword,
+    targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    formalAccountConfirmation = process.env
+      .MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM,
+    fetchImpl = fetch,
+  } = {},
+) {
+  const safePlan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: plan?.backendURL,
+    target: plan?.target,
+    dataVersion: plan?.dataVersion,
+    runId: plan?.runId,
+    databaseName: plan?.databaseName,
+  });
+  const resolvedTarget = assertManualAcceptanceMutationTarget(safePlan, {
+    confirmation: targetConfirmation,
+  });
+  const parsedTargetAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
+  if (resolvedTarget.external) {
+    assertManualAcceptanceTargetAttestation({
+      policy: safePlan,
+      attestation: parsedTargetAttestation,
+    });
+  } else if (parsedTargetAttestation) {
+    throw new CliError(
+      "target attestation is only valid for customer-trial-133",
+      2,
+    );
+  }
+
+  const effectivePassword = requiredText(
+    password ||
+      process.env.MANUAL_ACCEPTANCE_PASSWORD ||
+      process.env.TRIAL_ACCOUNT_PASSWORD ||
+      process.env.ERP_ROLE_DEMO_PASSWORD,
+    "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
+  );
+  if ([...effectivePassword].length < 8 || [...effectivePassword].length > 20) {
+    throw new CliError("account password must contain 8-20 characters", 2);
+  }
+  const effectiveAdminPassword = requiredText(
+    adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+  );
+  if (
+    resolvedTarget.external &&
+    (LOCAL_ONLY_PUBLIC_PASSWORDS.has(effectivePassword) ||
+      LOCAL_ONLY_PUBLIC_PASSWORDS.has(effectiveAdminPassword))
+  ) {
+    throw new CliError(
+      "customer-trial-133 passwords must not use a local-only public password",
+      2,
+    );
+  }
+  if (resolvedTarget.external && effectivePassword === effectiveAdminPassword) {
+    throw new CliError(
+      "customer-trial-133 admin and demo passwords must be different",
+      2,
+    );
+  }
+
+  const runtimeIdentity =
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy: safePlan,
+      attestation: parsedTargetAttestation,
+      fetchImpl,
+    });
+  const { token: guardToken } = await loginAdmin({
+    backendURL: safePlan.backendURL,
+    username: GUARD_ADMIN_USERNAME,
+    password: effectiveAdminPassword,
+    requireSuperAdmin: true,
+    fetchImpl,
+  });
+  const capabilities = await rpcCall({
+    backendURL: safePlan.backendURL,
+    domain: "debug",
+    method: "capabilities",
+    token: guardToken,
+    fetchImpl,
+  });
+  const databaseIdentity = assertManualAcceptanceDatabaseIdentity({
+    policy: safePlan,
+    capabilities,
+  });
+  const runtimePolicy = assertManualAcceptanceCapabilitiesPolicy({
+    policy: safePlan,
+    capabilities,
+  });
+  const bootstrap = await bootstrapMissingFormalAccounts({
+    plan: safePlan,
+    token: guardToken,
+    password: effectivePassword,
+    confirmation: formalAccountConfirmation,
+    fetchImpl,
+  });
+  return {
+    target: resolvedTarget.target,
+    databaseName: databaseIdentity.databaseName,
+    environment: runtimePolicy.environment,
+    runtimeIdentityProof: runtimeIdentity.proof,
+    ...bootstrap,
+  };
+}
+
 export function buildManualAcceptanceAccountScenarioPlan({
   backendURL = DEFAULT_BACKEND_URL,
   auditMinimum = 0,
@@ -768,7 +881,10 @@ async function alignAcceptanceWarehouseScopes({
       continue;
     }
     if (!allowMutation) {
-      throw new CliError(`岗位 ${roleKey} 的仓库数据范围未绑定当前 4 个核心仓库`, 2);
+      throw new CliError(
+        `岗位 ${roleKey} 的仓库数据范围未绑定当前 4 个核心仓库`,
+        2,
+      );
     }
     const updatedData = await rpcCall({
       backendURL,

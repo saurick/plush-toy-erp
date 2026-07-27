@@ -114,7 +114,7 @@ node scripts/qa/manual-acceptance-data-depth.mjs
 
 正常整批写入只使用顶层 runner。它按 `core → baseline → role → source → task → facts → purchase-quality → attachments → readiness` 串行执行；两端 handler 身份和 target-free 业务输入相同，目标适配层只提供 endpoint、数据库身份、凭据、确认、带外证明和报告目录。`core` 在登录前先调用只读 `/readyz/runtime-identity`，用摘要同时绑定实际数据库、完整 40 位 release commit 和 14 位 Atlas revision；探针只返回匹配 marker，不返回数据库名或连接信息。随后登录 admin 读取真实 `debug.capabilities`，再次核对数据库、运行环境和六个 debug=false，只读证明后续阶段依赖的 1 个稳定单位和 4 个仓库。`baseline` 再逐类读回客户、供应商、材料、产品、SKU、工序、BOM、来源单、Workflow 和全部 Fact 都为 0；任何已有业务记录都会阻断，不能用历史数据凑页面数量。`role` 在已注册的 local 与 133 验收目标中统一通过带版本校验和审计的 `admin.set_role_data_scopes`，把 `warehouse / quality` 精确绑定到这 4 个核心仓库；不得用脚本直写 RBAC 表。材料、产品、工序、BOM 与业务源单数量随后由 `source` 阶段独立写入并读回。密码创建与重置统一要求 8～20 位且 UTF-8 编码后不超过 72 字节，凭据只从环境变量注入，不写报告。
 
-`local-acceptance-lifecycle.mjs` 是本地完整验收的统一入口：它只接受登记的 `192.168.0.106:5432` 开发 PostgreSQL、clean exact commit、按批生成的 `plush_erp_acceptance_<run-id>_dev` 与 `plush_erp_acceptance_<run-id>_browser_actions_dev`，并使用隔离端口完成建库、migration、后端、客户配置、core、九岗位数据、50 项只读浏览器和四条真实写异常流。只读验收完成并停后端后才克隆 `browser_actions` 库；无论成功失败都会停服务、逐库强制删除和读回残留，清理失败返回非零并报告精确库名。默认只打印 plan；真实执行必须传入 exact commit、run id、由 plan 生成的确认串和 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，回执不保存 DSN、密码或 token：
+`local-acceptance-lifecycle.mjs` 是本地完整验收的统一入口：它只接受登记的 `192.168.0.106:5432` 开发 PostgreSQL、clean exact commit、按批生成的 `plush_erp_acceptance_<run-id>_dev` 与 `plush_erp_acceptance_<run-id>_browser_actions_dev`，并使用隔离端口完成建库、migration、后端、十个正式模拟岗位账号的受控预配置 bootstrap、客户配置、core、九岗位数据、50 项只读浏览器和四条真实写异常流。预配置 bootstrap 只在 runtime identity、精确数据库、环境、super admin、目标确认和账号确认均通过后走 `admin.create`，不直写账号表；它先满足客户配置审批责任岗位的“有可办理员工”发布门禁，dataset role 阶段仍会重新核对账号并补齐正式岗位权限和仓库范围。只读验收完成并停后端后才克隆 `browser_actions` 库；无论成功失败都会停服务、逐库强制删除和读回残留，清理失败返回非零并报告精确库名。默认只打印 plan；真实执行必须传入 exact commit、run id、由 plan 生成的确认串和 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，回执不保存 DSN、密码或 token：
 
 ```bash
 node scripts/qa/local-acceptance-lifecycle.mjs \
@@ -129,7 +129,7 @@ LOCAL_ACCEPTANCE_DATABASE_BASE_URL='postgres://<user>:<password>@192.168.0.106:5
     --confirm 'RUN_LOCAL_ACCEPTANCE_LIFECYCLE:plush_erp_acceptance_20260728_delivery_dev:plush_erp_acceptance_20260728_delivery_browser_actions_dev:<clean-40-character-commit>'
 ```
 
-下面的组件命令只用于分段诊断；它们不替代统一生命周期和自动清理。两端完整顺序仍固定为 `fresh database → migration → first admin → customer config apply/readback → exact core bootstrap → dataset runner → browser`。133 使用镜像内 `/app/bootstrap-manual-acceptance-core`，详见 [Compose 部署说明](../../server/deploy/compose/prod/README.md)。
+下面的组件命令只用于分段诊断；它们不替代统一生命周期和自动清理。两端完整顺序固定为 `fresh database → migration → first admin → exact formal account bootstrap → customer config apply/readback → exact core bootstrap → dataset runner → browser`。formal account bootstrap 必须先于带审批责任岗位的客户配置发布，并由后续 role stage 再次读回；133 使用镜像内 `/app/bootstrap-manual-acceptance-core`，详见 [Compose 部署说明](../../server/deploy/compose/prod/README.md)。
 
 两端配置都从当前 tracked yoyoosun 包生成同一份 preview 输入；这一步只写 ignored 报告，不连接后端：
 

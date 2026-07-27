@@ -8,6 +8,7 @@ import {
   MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS,
   MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE,
   applyManualAcceptanceAccountScenarios,
+  bootstrapManualAcceptanceFormalAccounts,
   buildManualAcceptanceAccountScenarioPlan,
   manualAcceptanceFormalAccountBootstrapConfirmation,
   normalizeAccountScenarioBackendURL,
@@ -19,6 +20,7 @@ import {
   CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
   CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
   CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
@@ -257,6 +259,9 @@ function createBackend({
       return ok(
         {
           environment,
+          databaseName: remote
+            ? CUSTOMER_TRIAL_133_DATABASE
+            : LOCAL_DATABASE_NAME,
           ...(["sql", "prod", "remote"].includes(environment)
             ? {
                 seedEnabled: false,
@@ -493,6 +498,43 @@ test("report-only plan keeps ten formal accounts and describes three clear scena
   assert.equal(result.report.mode, "report-only");
 });
 
+test("fresh database bootstraps exact formal accounts before customer configuration exists", async () => {
+  const plan = localPlan();
+  const backend = createBackend({ initialAccounts: [] });
+  const result = await bootstrapManualAcceptanceFormalAccounts(plan, {
+    password: "demo-pass",
+    adminPassword: "guard-pass",
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    formalAccountConfirmation:
+      manualAcceptanceFormalAccountBootstrapConfirmation(plan),
+    fetchImpl: backend.fetchImpl,
+  });
+  assert.equal(result.target, "local-dev");
+  assert.equal(result.databaseName, LOCAL_DATABASE_NAME);
+  assert.equal(result.environment, "local");
+  assert.equal(result.runtimeIdentityProof, "matched-v1");
+  assert.equal(result.created, 10);
+  assert.equal(result.verified, 0);
+  assert.deepEqual(
+    result.accounts.map((item) => item.username),
+    FORMAL_DEMO_ACCOUNTS,
+  );
+  assert.equal(
+    backend.calls.some(
+      (call) =>
+        call.domain === "customer_config" &&
+        call.method === "get_effective_session",
+    ),
+    false,
+  );
+  assert.equal(
+    backend.calls.filter(
+      (call) => call.domain === "admin" && call.method === "create",
+    ).length,
+    10,
+  );
+});
+
 test("loopback URL normalization rejects credentials and every external host", () => {
   assert.equal(
     normalizeAccountScenarioBackendURL("http://localhost:8300/"),
@@ -651,7 +693,9 @@ test("registered 133 target reconciles the same three scenario accounts without 
     revision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
   });
   for (const roleKey of ["warehouse", "quality"]) {
-    const selected = backend.roleState.find((item) => item.role_key === roleKey);
+    const selected = backend.roleState.find(
+      (item) => item.role_key === roleKey,
+    );
     selected.data_scopes = [
       { resource_type: "warehouse", mode: "NONE", resource_ids: [] },
     ];
@@ -977,7 +1021,9 @@ test("local acceptance adds missing customer capabilities without replacing role
 test("local acceptance binds warehouse and quality to the exact four seeded warehouses", async () => {
   const backend = createBackend();
   for (const roleKey of ["warehouse", "quality"]) {
-    const selected = backend.roleState.find((item) => item.role_key === roleKey);
+    const selected = backend.roleState.find(
+      (item) => item.role_key === roleKey,
+    );
     selected.data_scopes = [
       { resource_type: "warehouse", mode: "NONE", resource_ids: [] },
     ];

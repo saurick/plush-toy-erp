@@ -38,6 +38,10 @@ import {
   runManualAcceptanceDatasetCli,
 } from "./manual-acceptance-dataset.mjs";
 import { manualAcceptanceDatasetStageReportPath } from "./manual-acceptance-dataset-runner.mjs";
+import {
+  bootstrapManualAcceptanceFormalAccounts,
+  manualAcceptanceFormalAccountBootstrapConfirmation,
+} from "./manual-acceptance-account-scenarios.mjs";
 import { runManualAcceptanceCustomerConfig } from "./manual-acceptance-customer-config.mjs";
 import { runManualAcceptanceBrowser } from "./manual-acceptance-browser.mjs";
 import {
@@ -71,10 +75,7 @@ function redact(value) {
       /postgres(?:ql)?:\/\/[^:\s/@]+:[^@\s]+@/giu,
       "postgres://<redacted>@",
     )
-    .replace(
-      /\b(password|token|secret)=([^\s&]+)/giu,
-      "$1=<redacted>",
-    )
+    .replace(/\b(password|token|secret)=([^\s&]+)/giu, "$1=<redacted>")
     .slice(0, 1200);
 }
 
@@ -137,18 +138,14 @@ function databaseLifecycleConfirmation({
   ].join(":");
 }
 
-export function buildLocalAcceptanceLifecycleIdentity({
-  commit,
-  runID,
-}) {
+export function buildLocalAcceptanceLifecycleIdentity({ commit, runID }) {
   if (!COMMIT_PATTERN.test(String(commit || ""))) {
-    throw new Error("local acceptance lifecycle requires an exact 40-character commit");
+    throw new Error(
+      "local acceptance lifecycle requires an exact 40-character commit",
+    );
   }
   const normalizedRunID = normalizeDatabaseRunID(runID);
-  const acceptanceDatabase = databaseNameForRun(
-    "acceptance",
-    normalizedRunID,
-  );
+  const acceptanceDatabase = databaseNameForRun("acceptance", normalizedRunID);
   const browserActionsDatabase = databaseNameForRun(
     "browser-actions",
     normalizedRunID,
@@ -177,7 +174,8 @@ export async function runLocalAcceptanceLifecycle({
   runtime,
 }) {
   const identity = buildLocalAcceptanceLifecycleIdentity({ commit, runID });
-  if (!runtime) throw new Error("local acceptance lifecycle runtime is required");
+  if (!runtime)
+    throw new Error("local acceptance lifecycle runtime is required");
   const stages = [];
   const created = new Set();
   let backendStarted = false;
@@ -194,11 +192,15 @@ export async function runLocalAcceptanceLifecycle({
   };
 
   try {
-    await stage("preflight", () => runtime.preflight(identity), (result) => ({
-      sourceClean: result?.sourceClean === true,
-      commitVerified: result?.commitVerified === true,
-      target: result?.target || "",
-    }));
+    await stage(
+      "preflight",
+      () => runtime.preflight(identity),
+      (result) => ({
+        sourceClean: result?.sourceClean === true,
+        commitVerified: result?.commitVerified === true,
+        target: result?.target || "",
+      }),
+    );
     for (const databaseName of [
       identity.acceptanceDatabase,
       identity.browserActionsDatabase,
@@ -234,6 +236,16 @@ export async function runLocalAcceptanceLifecycle({
       "backend-verify-acceptance",
       () => runtime.verifyBackend(identity.acceptanceDatabase),
       (result) => ({
+        runtimeIdentityProof: result?.runtimeIdentityProof || "",
+      }),
+    );
+    await stage(
+      "formal-account-bootstrap",
+      () => runtime.bootstrapFormalAccounts(identity.acceptanceDatabase),
+      (result) => ({
+        created: Number(result?.created || 0),
+        verified: Number(result?.verified || 0),
+        accounts: Number(result?.accounts || 0),
         runtimeIdentityProof: result?.runtimeIdentityProof || "",
       }),
     );
@@ -481,14 +493,7 @@ async function fetchOK(url, expectedText = "") {
   return { response, body };
 }
 
-function startLoggedService({
-  command,
-  args,
-  cwd,
-  env,
-  logPath,
-  label,
-}) {
+function startLoggedService({ command, args, cwd, env, logPath, label }) {
   mkdirSync(path.dirname(logPath), { recursive: true, mode: 0o700 });
   const descriptor = openSync(logPath, "a", 0o600);
   const child = spawn(command, args, {
@@ -734,10 +739,7 @@ function createDirectRuntime(context) {
           DEV_HTTP_PORT: String(context.httpPort),
           DEV_GRPC_PORT: String(context.grpcPort),
         },
-        logPath: path.join(
-          context.outputDir,
-          `backend-${databaseName}.log`,
-        ),
+        logPath: path.join(context.outputDir, `backend-${databaseName}.log`),
         label: "acceptance backend",
       });
       try {
@@ -784,6 +786,29 @@ function createDirectRuntime(context) {
       }
       return { runtimeIdentityProof: "matched-v1" };
     },
+    async bootstrapFormalAccounts(databaseName) {
+      const policy = resolveManualAcceptanceTarget({
+        backendURL: context.backendURL,
+        target: LOCAL_DEV_TARGET,
+        datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+        dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+        runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+        databaseName,
+      });
+      const result = await bootstrapManualAcceptanceFormalAccounts(policy, {
+        password: context.rolePassword,
+        adminPassword: context.adminPassword,
+        targetConfirmation: manualAcceptanceTargetConfirmation(policy),
+        formalAccountConfirmation:
+          manualAcceptanceFormalAccountBootstrapConfirmation(policy),
+      });
+      return {
+        created: result.created,
+        verified: result.verified,
+        accounts: result.accounts.length,
+        runtimeIdentityProof: result.runtimeIdentityProof,
+      };
+    },
     async activateCustomerConfig(databaseName) {
       const policy = resolveManualAcceptanceTarget({
         backendURL: context.backendURL,
@@ -824,7 +849,9 @@ function createDirectRuntime(context) {
         repoRoot: context.repoRoot,
       });
       if (result.report?.status !== "completed") {
-        throw new Error("local customer configuration activation did not complete");
+        throw new Error(
+          "local customer configuration activation did not complete",
+        );
       }
       return {
         revision: result.report.identity?.revision || result.manifest.revision,
@@ -860,7 +887,9 @@ function createDirectRuntime(context) {
         },
       );
       if (!/units=1\b/u.test(output) || !/warehouses=4\b/u.test(output)) {
-        throw new Error("manual acceptance core reference seed readback failed");
+        throw new Error(
+          "manual acceptance core reference seed readback failed",
+        );
       }
       return { units: 1, warehouses: 4 };
     },
@@ -1079,12 +1108,7 @@ async function buildDirectContext({
   const outputDir = path.resolve(
     repoRoot,
     out ||
-      path.join(
-        "output",
-        "qa",
-        "local-acceptance-lifecycle",
-        identity.runID,
-      ),
+      path.join("output", "qa", "local-acceptance-lifecycle", identity.runID),
   );
   const relativeOutput = path.relative(repoRoot, outputDir);
   if (
@@ -1092,7 +1116,9 @@ async function buildDirectContext({
     relativeOutput.startsWith("..") ||
     path.isAbsolute(relativeOutput)
   ) {
-    throw new Error("local acceptance lifecycle output must stay in the repository");
+    throw new Error(
+      "local acceptance lifecycle output must stay in the repository",
+    );
   }
   const [httpPort, grpcPort, webPort] = await Promise.all([
     allocatePort(),
@@ -1100,7 +1126,9 @@ async function buildDirectContext({
     allocatePort(),
   ]);
   if (new Set([httpPort, grpcPort, webPort]).size !== 3 || httpPort === 8300) {
-    throw new Error("local acceptance lifecycle could not allocate isolated ports");
+    throw new Error(
+      "local acceptance lifecycle could not allocate isolated ports",
+    );
   }
   mkdirSync(outputDir, { recursive: true, mode: 0o700 });
   return Object.freeze({
@@ -1203,7 +1231,9 @@ if (isDirectRun) {
         process.env[LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV] || "",
       );
       if (!baseDatabaseURL) {
-        throw new Error(`${LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV} is required`);
+        throw new Error(
+          `${LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV} is required`,
+        );
       }
       const repoRoot = path.resolve(import.meta.dirname, "../..");
       const context = await buildDirectContext({
@@ -1228,9 +1258,7 @@ if (isDirectRun) {
       if (report.status !== "passed") process.exitCode = 1;
     }
   } catch (error) {
-    process.stderr.write(
-      `[local-acceptance-lifecycle] ${safeError(error)}\n`,
-    );
+    process.stderr.write(`[local-acceptance-lifecycle] ${safeError(error)}\n`);
     process.exitCode = 1;
   }
 }

@@ -51,6 +51,14 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
         runtimeIdentityProof: "matched-v1",
       });
     },
+    async bootstrapFormalAccounts(name) {
+      return invoke(`accounts:bootstrap:${name}`, {
+        created: 10,
+        verified: 0,
+        accounts: 10,
+        runtimeIdentityProof: "matched-v1",
+      });
+    },
     async activateCustomerConfig(name) {
       return invoke(`config:${name}`, {
         revision: "local-config-v1",
@@ -126,6 +134,13 @@ test("local acceptance lifecycle runs read-only evidence before cloned real writ
   assert.equal(report.schemaVersion, LOCAL_ACCEPTANCE_LIFECYCLE_SCHEMA);
   assert.equal(report.status, "passed");
   assert.deepEqual(report.cleanup.residualDatabases, []);
+  const accountBootstrapIndex = runtime.events.findIndex((item) =>
+    item.startsWith("accounts:bootstrap:"),
+  );
+  const configIndex = runtime.events.findIndex((item) =>
+    item.startsWith("config:"),
+  );
+  assert(accountBootstrapIndex < configIndex);
   const manualIndex = runtime.events.indexOf("browser:manual");
   const stopIndex = runtime.events.indexOf("backend:stop");
   const cloneIndex = runtime.events.findIndex((item) =>
@@ -137,7 +152,11 @@ test("local acceptance lifecycle runs read-only evidence before cloned real writ
   assert(manualIndex < stopIndex);
   assert(stopIndex < cloneIndex);
   assert(cloneIndex < exceptionIndex);
-  assert.deepEqual(runtime.state(), { backend: false, web: false, existing: [] });
+  assert.deepEqual(runtime.state(), {
+    backend: false,
+    web: false,
+    existing: [],
+  });
   assert.equal(report.boundary.customerUAT, false);
   assert.doesNotMatch(JSON.stringify(report), /password|postgres:\/\//iu);
 });

@@ -22,6 +22,8 @@
 
 提交前验证：Node `24.14.0` 下新增 / 受影响脚本合同 `178 / 178`，seed / dev DB guard Go 定向测试通过；工作台 Style L1 `11 / 11`、开发入口定向合同 `17 / 17`、production build 与 production DEV boundary 通过。`bash scripts/qa/fast.sh` 从头完成，server quick `2996 / 2996`，零失败、零跳过；最终 dirty tree 的 `bash scripts/qa/full.sh` 从头完成，scripts Node `1427 / 1427`、Web 合同 `207 / 207`、Web 全集 `1889 / 1889`、server all `3156 / 3156` 均为零失败、零跳过，生产构建、DEV 零残留浏览器检查、Style L1、populated upgrade、隔离 PostgreSQL、构建和清理均通过。首轮漏洞门禁发现当前代码可达 `GO-2026-6061`，已将 gRPC-Go 从 `1.81.1` 升到修复版本 `1.82.1`；最终 govulncheck 确认可达漏洞为 `0`。扫描器仍报告依赖图中 1 个 imported-package 与 15 个 required-module 漏洞当前不可达，不将其包装为“整个依赖图零漏洞”。没有 schema / Ent / Atlas migration 变更。
 
+执行期修正：提交后的首次本地生命周期在 fresh 库发布客户配置时，被新增的审批责任岗位门禁以“所选岗位当前没有可办理员工”正确拒绝；失败回执显示 migration、runtime identity 已通过，两个批次库均已清理且残留为 `0`。根因是旧顺序把正式模拟岗位账号放在客户配置之后，形成 fresh database 初始化死锁。统一入口现先在 exact runtime identity、数据库、环境、super admin、目标确认和账号确认下通过 `admin.create` 创建或核对十个固定单岗位账号，再发布客户配置；dataset role 阶段仍会二次核对账号并补齐权限与仓库范围，不放宽客户配置发布门禁，也不直写账号表。该修正需绑定新的最终 clean HEAD 从头重跑生命周期与全部发布门禁。
+
 下一步与边界：实现落盘后必须在最终 clean HEAD 真实执行本地验收生命周期、full、strict、prepare-push、非强制推送、exact-SHA 远端 CI、不可变制品构建 / 校验、本地发布演练及 133 技术发布；这些运行证据写入 ignored receipt 和正式发布 evidence，不为补记运行结果再制造与已部署 SHA 不一致的提交。本节不证明尚未执行的目标动作，也不证明客户真实数据导入、岗位人工 UAT 或签收。当前无已知代码阻塞；外部 target / CI / SSH / secret / 运行身份若无法从正式入口证明，发布流程必须失败关闭并保持最后一个已验证版本。
 
 ## 2026-07-28 Workflow 任务来源读取门禁
