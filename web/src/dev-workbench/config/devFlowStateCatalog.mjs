@@ -1618,7 +1618,8 @@ const FLOW_DEFINITIONS = [
     scopeKey: 'fact_ledger',
     kind: 'state_machine',
     label: '业务财务事实',
-    summary: '应收、应付、发票和对账等事实从草稿过账，再结清或取消。',
+    summary:
+      '财务事实从草稿过账或取消；对账可显式完成，应收应付只由收付款核销、红冲或冲正派生结清。',
     states: [
       state('DRAFT', '草稿'),
       state('POSTED', '已过账'),
@@ -1640,13 +1641,14 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'fact_ledger',
       }),
       transition('POSTED', 'SETTLED', {
-        guard: '只有允许结清的事实类型可以推进。',
-        action: 'settle_finance_fact',
+        guard:
+          'RECONCILIATION 可显式完成核对；RECEIVABLE / PAYABLE 只能由正式 FinancePayment 分配、CreditNote 或对应冲正结果重算余额；INVOICE 不支持结清。',
+        action:
+          'settle_finance_fact / execute_finance_payment_post / create_finance_credit_note',
         permission: [
-          'finance.receivable.confirm',
-          'finance.payable.confirm',
-          'finance.invoice.confirm',
           'finance.reconciliation.confirm',
+          'finance.payment.post',
+          'finance.credit_note.create',
         ],
         factBoundary: 'fact_ledger',
       }),
@@ -1674,8 +1676,8 @@ const FLOW_DEFINITIONS = [
       ...factEvidence,
       evidence(
         'code',
-        'server/internal/biz/operational_fact.go',
-        '财务事实状态集合与 post/settle/cancel usecase。'
+        'server/internal/data/operational_fact_finance_payment_repo.go',
+        '应收应付结清由收付款分配与红冲后的余额重算派生。'
       ),
       evidence(
         'schema',

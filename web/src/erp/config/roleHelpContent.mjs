@@ -314,7 +314,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     label: '财务',
     headline: '从已发生的业务结果办理应收、应付、发票和对账。',
     summary:
-      '财务岗位帮助聚焦来源核对、过账、结清、取消和单笔对账，不替代银行或税控系统。',
+      '财务岗位帮助聚焦来源核对、过账、取消、收付款核销和单笔对账，不替代银行或税控系统。',
     recommendedPrimaryLimit: 4,
     priorities: [
       {
@@ -345,7 +345,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     workflow: [
       '先核对来源单号、往来方、金额和业务状态。',
       '从符合条件的入库、委外回货或出货记录生成财务记录。',
-      '确认无误后过账，再按实际进展结清或取消。',
+      '确认无误后过账；应收应付通过正式收付款核销或红冲派生结清，不能直接改成已结清。',
       '发现差异时到对账页面记录并退回来源岗位核对。',
     ],
     completion:

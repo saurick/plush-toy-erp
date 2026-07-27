@@ -172,14 +172,15 @@ test('roleHelpContent: 用户帮助不暴露内部工程术语', () => {
   )
 })
 
-test('roleHelpContent: 永绅岗位帮助不指导未开放或越权动作', () => {
+test('roleHelpContent: 永绅岗位帮助只指导已开放且有权限的动作', () => {
   const financeCopy = JSON.stringify(getRoleHelpGuide('finance'))
   const financeGuide = getRoleHelpGuide('finance')
   const pmcCopy = JSON.stringify(getRoleHelpGuide('pmc'))
   const warehouseCopy = JSON.stringify(getRoleHelpGuide('warehouse'))
   const productionGuide = getRoleHelpGuide('production')
 
-  assert.doesNotMatch(financeCopy, /登记真实收付款|多笔应收或应付核销|红冲/u)
+  assert.match(financeCopy, /收付款核销/u)
+  assert.doesNotMatch(financeCopy, /直接(?:办理)?结清|手工改成已结清/u)
   assert.equal(financeGuide.recommendedPrimaryLimit, 4)
   assert.deepEqual(
     financeGuide.priorities.slice(0, 4).map((priority) => priority.path),

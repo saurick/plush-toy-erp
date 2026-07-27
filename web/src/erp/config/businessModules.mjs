@@ -595,7 +595,8 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/finance/payables',
     shortLabel: '应付',
     pageKind: 'formal-v1',
-    description: '应付管理记录来源明确的应付款项，可过账、结清或取消。',
+    description:
+      '应付管理记录来源明确的应付款项，可过账或取消；结清由正式付款核销、红冲或冲正结果派生。',
     primaryEntity: 'finance_facts.PAYABLE',
     factSource: 'finance_facts',
     boundary:
@@ -605,7 +606,7 @@ export const businessModuleDefinitions = Object.freeze([
       '从已过账采购入库生成应付',
       '从合格 / 让步委外回货生成应付',
       '过账',
-      '结清',
+      '读取付款核销或红冲派生的结清状态',
       '取消',
     ],
   },
@@ -617,13 +618,19 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/finance/receivables',
     shortLabel: '应收',
     pageKind: 'formal-v1',
-    description: '应收管理记录已出货业务产生的应收款项，可过账、结清或取消。',
+    description:
+      '应收管理记录已出货业务产生的应收款项，可过账或取消；结清由正式收款核销、红冲或冲正结果派生。',
     primaryEntity: 'finance_facts.RECEIVABLE',
     factSource: 'finance_facts',
     boundary:
       '应收只从已出货出货单生成，不由销售订单、出货放行或任务完成直接生成；当前不代表收款核销、总账或税控已交付。',
     sourceRefs: ['finance_facts', 'shipments'],
-    currentScope: ['从已出货出货单生成应收', '过账', '结清', '取消'],
+    currentScope: [
+      '从已出货出货单生成应收',
+      '过账',
+      '读取收款核销或红冲派生的结清状态',
+      '取消',
+    ],
   },
   {
     key: 'invoices',

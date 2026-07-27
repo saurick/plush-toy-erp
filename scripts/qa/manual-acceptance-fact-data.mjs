@@ -47,6 +47,7 @@ const REQUIRED_MODULES = Object.freeze([
   "inventory",
   "shipments",
   "finance",
+  "finance_payments",
   "purchase_receipts",
   "quality_inspections",
 ]);
@@ -57,6 +58,7 @@ const RAW_RPC_ENDPOINTS = new Set([
   "operational_fact.cancel_finance_fact",
 ]);
 const ROLE_USERS = Object.freeze({
+  boss: "demo_boss",
   purchase: "demo_purchase",
   quality: "demo_quality",
   warehouse: "demo_warehouse",
@@ -136,6 +138,12 @@ const FINANCE_DRAFT_NUMBER = Object.freeze({
   "RECEIVABLE-DRAFT": Object.freeze({ code: "YS", sequence: 901 }),
   "INVOICE-DRAFT": Object.freeze({ code: "FP", sequence: 901 }),
   "RECONCILIATION-DRAFT": Object.freeze({ code: "CGDZ", sequence: 901 }),
+});
+
+const FINANCE_PAYMENT_NUMBER = Object.freeze({
+  "PAYABLE-SETTLED": Object.freeze({ code: "FK", sequence: 901 }),
+  "RECEIVABLE-SETTLED": Object.freeze({ code: "SK", sequence: 901 }),
+  "RECEIVABLE-APPROVED": Object.freeze({ code: "SK", sequence: 902 }),
 });
 
 function decimal(value, name) {
@@ -2965,6 +2973,302 @@ function replaceByID(items, value) {
   else items.push(value);
 }
 
+function financePaymentProcessNodes(data, operation) {
+  const nodes = data?.process_context?.nodes || data?.nodes;
+  if (!Array.isArray(nodes)) {
+    throw new CliError(`${operation} response is missing process nodes`);
+  }
+  return nodes;
+}
+
+function requireFinancePaymentProcessNode(data, nodeKey, statuses, operation) {
+  const node = financePaymentProcessNodes(data, operation).find(
+    (candidate) => candidate?.node_key === nodeKey,
+  );
+  if (
+    positiveID(node?.id, `${operation}.${nodeKey}.id`) <= 0 ||
+    positiveID(node?.process_instance_id, `${operation}.process_instance_id`) <=
+      0 ||
+    positiveID(node?.version, `${operation}.${nodeKey}.version`) <= 0 ||
+    !statuses.includes(String(node?.status || "").toLowerCase())
+  ) {
+    throw new CliError(
+      `${operation} ${nodeKey} expected ${statuses.join("/")}, got ${node?.status || "missing"}`,
+    );
+  }
+  return node;
+}
+
+async function readFinancePaymentProcess(rpc, paymentID) {
+  return rpc({
+    actor: "finance",
+    domain: "customer_config",
+    method: "get_finance_payment_approval_process",
+    params: { finance_payment_id: paymentID },
+  });
+}
+
+async function completeFinancePaymentHumanNode({
+  actor,
+  nodeKey,
+  payment,
+  processData,
+  processDecision,
+  rpc,
+}) {
+  const node = requireFinancePaymentProcessNode(
+    processData,
+    nodeKey,
+    ["active", "completed"],
+    "finance payment process",
+  );
+  if (String(node.status).toLowerCase() === "completed") {
+    return readFinancePaymentProcess(rpc, payment.id);
+  }
+  const taskData = await rpc({
+    actor,
+    domain: "workflow",
+    method: "list_tasks",
+    params: {
+      source_type: "finance_payment",
+      source_id: payment.id,
+      limit: 50,
+      offset: 0,
+    },
+  });
+  const task = (taskData?.tasks || []).find(
+    (candidate) =>
+      Number(candidate?.process_instance_id) ===
+        Number(node.process_instance_id) &&
+      Number(candidate?.process_node_instance_id) === Number(node.id),
+  );
+  if (
+    positiveID(task?.id, `${nodeKey}.task.id`) <= 0 ||
+    positiveID(task?.version, `${nodeKey}.task.version`) <= 0 ||
+    String(task?.task_status_key || "").toLowerCase() !== "ready"
+  ) {
+    throw new CliError(`${nodeKey} active task is missing or not ready`);
+  }
+  const reason = "本地验收：已核对模拟收付款来源与核销金额。";
+  const completed = await rpc({
+    actor,
+    domain: "workflow",
+    method: "complete_task_action",
+    params: {
+      task_id: task.id,
+      expected_version: task.version,
+      idempotency_key: `manual-acceptance:finance-payment:${payment.id}:task:${task.id}:complete`,
+      action_key: "complete",
+      reason,
+      payload: {
+        surface_key:
+          nodeKey === "finance_payment_approval"
+            ? "finance-payment-approval"
+            : "finance-payment-execution",
+        ...(processDecision ? { process_decision: { reason } } : {}),
+      },
+    },
+  });
+  if (
+    Number(completed?.task?.id) !== Number(task.id) ||
+    String(completed?.task?.task_status_key || "").toLowerCase() !== "done" ||
+    Number(completed?.task?.version || 0) <= Number(task.version)
+  ) {
+    throw new CliError(`${nodeKey} task completion readback is incomplete`);
+  }
+  return readFinancePaymentProcess(rpc, payment.id);
+}
+
+async function ensureFinancePaymentSpecimen({
+  apply,
+  financeFact,
+  plan,
+  post,
+  rpc,
+  specimenKey,
+}) {
+  const factType = String(financeFact?.fact_type || "").toUpperCase();
+  const expected = {
+    PAYABLE: {
+      counterpartyType: "SUPPLIER",
+      direction: "DISBURSEMENT",
+    },
+    RECEIVABLE: {
+      counterpartyType: "CUSTOMER",
+      direction: "RECEIPT",
+    },
+  }[factType];
+  const number = FINANCE_PAYMENT_NUMBER[specimenKey];
+  if (
+    !expected ||
+    !number ||
+    String(financeFact?.counterparty_type || "").toUpperCase() !==
+      expected.counterpartyType
+  ) {
+    throw new CliError(
+      `${specimenKey} requires a posted payable or receivable with an exact counterparty`,
+    );
+  }
+  const factID = positiveID(financeFact.id, `${specimenKey}.finance_fact_id`);
+  const counterpartyID = positiveID(
+    financeFact.counterparty_id,
+    `${specimenKey}.counterparty_id`,
+  );
+  const amount = post
+    ? requiredText(financeFact.amount, `${specimenKey}.amount`, 64)
+    : "1";
+  if (!apply) {
+    if (post && String(financeFact.status || "").toUpperCase() !== "SETTLED") {
+      throw new CliError(
+        `${financeFact.fact_no} expected SETTLED from a posted FinancePayment allocation`,
+      );
+    }
+    return financeFact;
+  }
+  const paymentNo = shortBusinessNo(plan, number.code, number.sequence);
+  const payment = resultItem(
+    await rpc({
+      actor: "finance",
+      domain: "operational_fact",
+      method: "create_finance_payment",
+      params: {
+        payment_no: paymentNo,
+        direction: expected.direction,
+        counterparty_type: expected.counterpartyType,
+        counterparty_id: counterpartyID,
+        amount,
+        currency: requiredText(
+          financeFact.currency,
+          `${specimenKey}.currency`,
+          8,
+        ),
+        account_ref: "本地验收模拟账户",
+        evidence_ref: "本地验收模拟凭据，不代表真实收付款",
+        idempotency_key: `manual-acceptance:${plan.dataVersion}:finance-payment:${specimenKey.toLowerCase()}`,
+      },
+    }),
+    "payment",
+    "create_finance_payment",
+  );
+  let processData = await readFinancePaymentProcess(rpc, payment.id);
+  if (!processData?.process_context) {
+    processData = await rpc({
+      actor: "finance",
+      domain: "customer_config",
+      method: "start_finance_payment_approval_process",
+      params: {
+        finance_payment_id: payment.id,
+        idempotency_key: `finance-payment-approval/${payment.id}`,
+      },
+    });
+  }
+  let currentPayment = processData?.source_readback || payment;
+  if (String(currentPayment.status || "").toUpperCase() === "DRAFT") {
+    processData = await completeFinancePaymentHumanNode({
+      actor: "boss",
+      nodeKey: "finance_payment_approval",
+      payment: currentPayment,
+      processData,
+      processDecision: true,
+      rpc,
+    });
+    currentPayment = processData?.source_readback;
+  }
+  if (
+    !currentPayment ||
+    !["APPROVED", "POSTED"].includes(
+      String(currentPayment.status || "").toUpperCase(),
+    )
+  ) {
+    throw new CliError(
+      `${paymentNo} approval did not reach APPROVED or POSTED`,
+    );
+  }
+  if (!post) {
+    if (String(currentPayment.status).toUpperCase() !== "APPROVED") {
+      throw new CliError(`${paymentNo} must remain APPROVED for browser flow`);
+    }
+    requireFinancePaymentProcessNode(
+      processData,
+      "finance_payment_execution",
+      ["active"],
+      "approved finance payment specimen",
+    );
+    return financeFact;
+  }
+  if (String(currentPayment.status).toUpperCase() === "APPROVED") {
+    processData = await completeFinancePaymentHumanNode({
+      actor: "finance",
+      nodeKey: "finance_payment_execution",
+      payment: currentPayment,
+      processData,
+      processDecision: false,
+      rpc,
+    });
+    const commandNode = requireFinancePaymentProcessNode(
+      processData,
+      "post_finance_payment",
+      ["active"],
+      "finance payment post",
+    );
+    const instance = processData?.process_context?.process_instance;
+    const execution = await rpc({
+      actor: "finance",
+      domain: "customer_config",
+      method: "execute_finance_payment_post",
+      params: {
+        process_instance_id: positiveID(
+          instance?.id,
+          "finance payment process instance",
+        ),
+        process_node_instance_id: commandNode.id,
+        expected_version: commandNode.version,
+        finance_payment_id: currentPayment.id,
+        idempotency_key: `finance-payment-post/${currentPayment.id}/${commandNode.id}`,
+        allocations: [{ finance_fact_id: factID, amount }],
+      },
+    });
+    currentPayment = execution?.source_readback;
+  }
+  const postedPayment = resultItem(
+    await rpc({
+      actor: "finance",
+      domain: "operational_fact",
+      method: "get_finance_payment",
+      params: { id: payment.id },
+    }),
+    "payment",
+    "get_finance_payment",
+  );
+  if (
+    String(currentPayment?.status || "").toUpperCase() !== "POSTED" ||
+    String(postedPayment.status || "").toUpperCase() !== "POSTED" ||
+    !(postedPayment.allocations || []).some(
+      (allocation) =>
+        Number(allocation?.finance_fact_id) === factID &&
+        Number(allocation?.amount) === Number(amount),
+    )
+  ) {
+    throw new CliError(
+      `${paymentNo} post or allocation readback is incomplete`,
+    );
+  }
+  const settled = await exactRequired({
+    rpc,
+    domain: "operational_fact",
+    method: "list_finance_facts",
+    listKey: "finance_facts",
+    businessField: "fact_no",
+    businessNo: financeFact.fact_no,
+  });
+  if (String(settled.status || "").toUpperCase() !== "SETTLED") {
+    throw new CliError(
+      `${financeFact.fact_no} did not settle from FinancePayment allocation`,
+    );
+  }
+  return settled;
+}
+
 async function financeTransition(rpc, record, target, apply) {
   let item = record;
   const status = String(item.status || "").toUpperCase();
@@ -3217,7 +3521,14 @@ export async function applyManualAcceptanceFinanceLifecycle({
     if (type !== "INVOICE") {
       replaceByID(
         finance,
-        await financeTransition(rpc, records[1], "SETTLED", true),
+        await ensureFinancePaymentSpecimen({
+          apply: true,
+          financeFact: records[1],
+          plan,
+          post: true,
+          rpc,
+          specimenKey: `${type}-SETTLED`,
+        }),
       );
     }
     await cancelDependency(records[2]);
@@ -3234,6 +3545,15 @@ export async function applyManualAcceptanceFinanceLifecycle({
       await createFinanceDraft(rpc, plan, records[3], `${type}-DRAFT`, true),
     );
   }
+
+  await ensureFinancePaymentSpecimen({
+    apply: true,
+    financeFact: stableFinanceRecords(finance, "RECEIVABLE")[0],
+    plan,
+    post: false,
+    rpc,
+    specimenKey: "RECEIVABLE-APPROVED",
+  });
 
   const reconciliationCandidates = stableFinanceRecords(
     financeFacts,

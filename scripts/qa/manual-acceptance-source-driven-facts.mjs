@@ -59,6 +59,8 @@ const BUSINESS_NO_CODES = new Set([
   "FPDZ",
   "CGYF",
   "CGDZ",
+  "SK",
+  "FK",
 ]);
 
 export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({

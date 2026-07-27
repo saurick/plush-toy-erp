@@ -586,6 +586,9 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
   assert.ok(
     MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES.includes("outsourcing_orders"),
   );
+  assert.ok(
+    MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES.includes("finance_payments"),
+  );
   assert.deepEqual(
     [...new Set(plan.receipts.map((item) => item.status))].sort(),
     ["CANCELLED", "DRAFT", "POSTED"],
@@ -1738,8 +1741,14 @@ test("complete sales phase with a consumed reservation replays without mutation"
 
 test("finance lifecycle uses stable business numbers and second apply is a no-op", async () => {
   const records = new Map();
+  const payments = new Map();
+  const paymentProcesses = new Map();
+  const tasks = new Map();
   const baseIDs = new Set();
   let nextID = 50000;
+  let nextProcessID = 60000;
+  let nextNodeID = 70000;
+  let nextTaskID = 80000;
   let mutations = 0;
   let creations = 0;
   const add = (record, base = true) => {
@@ -1754,6 +1763,10 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
         fact_no: `${type}-${suffix}`,
         fact_type: type,
         status: "POSTED",
+        counterparty_type: type === "PAYABLE" ? "SUPPLIER" : "CUSTOMER",
+        counterparty_id: type === "PAYABLE" ? 901 : 902,
+        amount: "100",
+        currency: "CNY",
         source_type: type === "PAYABLE" ? "OUTSOURCING_FACT" : "SHIPMENT",
         source_id: 70000 + nextID,
         source_no: `SOURCE-${type}-${suffix}`,
@@ -1767,13 +1780,39 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
               : `RECON-${type}-${suffix}`,
         fact_type: "RECONCILIATION",
         status: "POSTED",
+        counterparty_type: source.counterparty_type,
+        counterparty_id: source.counterparty_id,
+        amount: source.amount,
+        currency: source.currency,
         source_type: "FINANCE_FACT",
         source_id: source.id,
         source_no: source.fact_no,
       });
     }
   }
-  const rpc = async ({ method, params }) => {
+  const processData = (state) => ({
+    process_context: {
+      process_instance: structuredClone(state.instance),
+      nodes: structuredClone(state.nodes),
+    },
+    source_readback: structuredClone(payments.get(state.paymentID)),
+  });
+  const addTask = (state, node, ownerRoleKey, capability) => {
+    const task = {
+      id: nextTaskID++,
+      version: 1,
+      task_status_key: "ready",
+      source_type: "finance_payment",
+      source_id: state.paymentID,
+      process_instance_id: state.instance.id,
+      process_node_instance_id: node.id,
+      owner_role_key: ownerRoleKey,
+      required_capability_key: capability,
+    };
+    tasks.set(task.id, task);
+    return task;
+  };
+  const rpc = async ({ actor, method, params }) => {
     if (method === "list_finance_facts") {
       return {
         finance_facts: [...records.values()].filter(
@@ -1781,10 +1820,180 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
         ),
       };
     }
+    if (method === "create_finance_payment") {
+      const existing = [...payments.values()].find(
+        (item) => item.idempotency_key === params.idempotency_key,
+      );
+      if (existing) return { payment: structuredClone(existing) };
+      assert.equal(actor, "finance");
+      const created = {
+        id: nextID++,
+        version: 1,
+        status: "DRAFT",
+        payment_no: params.payment_no,
+        direction: params.direction,
+        counterparty_type: params.counterparty_type,
+        counterparty_id: params.counterparty_id,
+        amount: params.amount,
+        currency: params.currency,
+        idempotency_key: params.idempotency_key,
+        allocations: [],
+      };
+      payments.set(created.id, created);
+      creations += 1;
+      mutations += 1;
+      return { payment: structuredClone(created) };
+    }
+    if (method === "get_finance_payment") {
+      return { payment: structuredClone(payments.get(params.id)) };
+    }
+    if (method === "get_finance_payment_approval_process") {
+      const state = paymentProcesses.get(params.finance_payment_id);
+      return state
+        ? processData(state)
+        : {
+            process_context: null,
+            source_readback: structuredClone(
+              payments.get(params.finance_payment_id),
+            ),
+          };
+    }
+    if (method === "start_finance_payment_approval_process") {
+      assert.equal(actor, "finance");
+      let state = paymentProcesses.get(params.finance_payment_id);
+      if (!state) {
+        const processInstanceID = nextProcessID++;
+        const node = (nodeKey, nodeType, status = "pending") => ({
+          id: nextNodeID++,
+          process_instance_id: processInstanceID,
+          node_key: nodeKey,
+          node_type: nodeType,
+          status,
+          version: 1,
+        });
+        state = {
+          paymentID: params.finance_payment_id,
+          instance: {
+            id: processInstanceID,
+            process_key: "finance_payment_approval",
+            status: "running",
+          },
+          nodes: [
+            node("finance_payment_approval", "approval", "active"),
+            node("approve_finance_payment", "domain_command"),
+            node("finance_payment_execution", "human_task"),
+            node("post_finance_payment", "domain_command"),
+            node("end", "end"),
+            node("reject_finance_payment", "domain_command"),
+            node("rejected_end", "end"),
+          ],
+        };
+        paymentProcesses.set(state.paymentID, state);
+        addTask(state, state.nodes[0], "boss", "finance.payment.approve");
+        mutations += 1;
+      }
+      return {
+        ...processData(state),
+        process_instance: structuredClone(state.instance),
+        started_node: structuredClone(state.nodes[0]),
+        nodes: structuredClone(state.nodes),
+      };
+    }
+    if (method === "list_tasks") {
+      return {
+        tasks: [...tasks.values()]
+          .filter(
+            (item) =>
+              item.source_type === params.source_type &&
+              Number(item.source_id) === Number(params.source_id),
+          )
+          .map((item) => structuredClone(item)),
+        total: tasks.size,
+      };
+    }
+    if (method === "complete_task_action") {
+      const task = tasks.get(params.task_id);
+      assert.equal(task.task_status_key, "ready");
+      assert.equal(params.expected_version, task.version);
+      const state = [...paymentProcesses.values()].find(
+        (item) => item.instance.id === task.process_instance_id,
+      );
+      const node = state.nodes.find(
+        (item) => item.id === task.process_node_instance_id,
+      );
+      task.task_status_key = "done";
+      task.version += 1;
+      node.status = "completed";
+      node.version += 1;
+      if (node.node_key === "finance_payment_approval") {
+        assert.equal(actor, "boss");
+        assert.ok(params.payload.process_decision.reason);
+        state.nodes[1].status = "completed";
+        state.nodes[1].version += 1;
+        state.nodes[2].status = "active";
+        const payment = payments.get(state.paymentID);
+        payment.status = "APPROVED";
+        payment.version += 1;
+        addTask(state, state.nodes[2], "finance", "workflow.task.complete");
+      } else {
+        assert.equal(node.node_key, "finance_payment_execution");
+        assert.equal(actor, "finance");
+        assert.equal(params.payload.process_decision, undefined);
+        state.nodes[3].status = "active";
+      }
+      mutations += 1;
+      return { task: structuredClone(task) };
+    }
+    if (method === "execute_finance_payment_post") {
+      assert.equal(actor, "finance");
+      const state = [...paymentProcesses.values()].find(
+        (item) => item.instance.id === params.process_instance_id,
+      );
+      const node = state.nodes.find(
+        (item) => item.id === params.process_node_instance_id,
+      );
+      assert.equal(node.node_key, "post_finance_payment");
+      assert.equal(node.status, "active");
+      assert.equal(params.expected_version, node.version);
+      const payment = payments.get(params.finance_payment_id);
+      assert.equal(payment.status, "APPROVED");
+      assert.equal(
+        params.allocations.reduce((sum, item) => sum + Number(item.amount), 0),
+        Number(payment.amount),
+      );
+      payment.allocations = params.allocations.map((item, index) => {
+        const fact = records.get(item.finance_fact_id);
+        assert.equal(fact.status, "POSTED");
+        fact.status = "SETTLED";
+        fact.version += 1;
+        return {
+          id: nextID + index,
+          finance_fact_id: item.finance_fact_id,
+          amount: item.amount,
+          status: "POSTED",
+        };
+      });
+      nextID += payment.allocations.length;
+      payment.status = "POSTED";
+      payment.version += 1;
+      node.status = "completed";
+      node.version += 1;
+      state.nodes[4].status = "completed";
+      state.nodes[4].version += 1;
+      state.instance.status = "completed";
+      mutations += 1;
+      return {
+        ...processData(state),
+        completed_node: structuredClone(node),
+      };
+    }
     if (method === "settle_finance_fact" || method === "cancel_finance_fact") {
       const current = records.get(params.id);
       assert.equal(current.status, "POSTED");
       assert.equal(params.expected_version, current.version);
+      if (method === "settle_finance_fact") {
+        assert.equal(current.fact_type, "RECONCILIATION");
+      }
       const updated = {
         ...current,
         status: method === "settle_finance_fact" ? "SETTLED" : "CANCELLED",
