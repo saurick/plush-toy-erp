@@ -641,6 +641,12 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
     { customer_key: "yoyoosun", id: 1 },
   );
   assert.deepEqual(
+    manualAcceptanceFactRPCParams("operational_fact", "get_shipment", {
+      id: 1,
+    }),
+    { id: 1 },
+  );
+  assert.deepEqual(
     manualAcceptanceFactRPCParams("workflow", "list_tasks", {
       task_group: "production_scheduling",
     }),

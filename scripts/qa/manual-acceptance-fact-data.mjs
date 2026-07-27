@@ -6,6 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  FORMAL_RPC_PARAM_ALLOWLIST,
   buildSourceDrivenFactPlan,
   applySourceDrivenFactPlan,
   manualAcceptanceBusinessNo,
@@ -707,11 +708,13 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
 }
 
 export function manualAcceptanceFactRPCParams(domain, method, params = {}) {
+  const formalParams = FORMAL_RPC_PARAM_ALLOWLIST[`${domain}.${method}`];
   if (
     domain === "auth" ||
     domain === "workflow" ||
     domain === "production_order" ||
-    RAW_RPC_ENDPOINTS.has(`${domain}.${method}`)
+    RAW_RPC_ENDPOINTS.has(`${domain}.${method}`) ||
+    (formalParams && !formalParams.includes("customer_key"))
   ) {
     return { ...params };
   }
