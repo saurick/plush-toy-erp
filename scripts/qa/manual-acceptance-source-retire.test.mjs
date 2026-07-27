@@ -223,7 +223,7 @@ test("retirement apply requires exact confirmation before login or reads", async
   const plan = buildManualAcceptanceSourceDataPlan({
     runId: "RETIRE-CONFIRM",
     backendURL: "http://127.0.0.1:8310",
-    databaseName: "plush_erp_acceptance_20260716_v5_dev",
+    databaseName: "plush_erp_acceptance_local_fixture_dev",
   });
   const previous = process.env.MANUAL_ACCEPTANCE_RETIRE_CONFIRM;
   delete process.env.MANUAL_ACCEPTANCE_RETIRE_CONFIRM;

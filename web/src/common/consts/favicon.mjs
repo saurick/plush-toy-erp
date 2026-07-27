@@ -1,12 +1,3 @@
-import {
-  DEV_CAPABILITY_LEDGER_ROUTE,
-  DEV_CUSTOMER_CONFIG_ROUTE,
-  DEV_DOCS_ROUTE,
-  DEV_GOVERNANCE_ROUTE,
-  DEV_HUB_ROUTE,
-  DEV_PROTOTYPES_ROUTE,
-  DEV_TESTING_ROUTE,
-} from '../../erp/config/devRoutes.mjs'
 import { getPrintTemplateByKey } from '../../erp/config/printTemplates.mjs'
 
 export const ERP_FAVICON_VARIANTS = Object.freeze({
@@ -18,41 +9,6 @@ export const ERP_FAVICON_VARIANTS = Object.freeze({
   tasks: Object.freeze({
     key: 'tasks',
     href: '/favicon-tasks.svg',
-    type: 'image/svg+xml',
-  }),
-  devHub: Object.freeze({
-    key: 'dev-hub',
-    href: '/favicon-dev.svg',
-    type: 'image/svg+xml',
-  }),
-  testing: Object.freeze({
-    key: 'testing',
-    href: '/favicon-testing.svg',
-    type: 'image/svg+xml',
-  }),
-  docs: Object.freeze({
-    key: 'docs',
-    href: '/favicon-docs.svg',
-    type: 'image/svg+xml',
-  }),
-  governance: Object.freeze({
-    key: 'governance',
-    href: '/favicon-governance.svg',
-    type: 'image/svg+xml',
-  }),
-  capabilityLedger: Object.freeze({
-    key: 'capability-ledger',
-    href: '/favicon-capability-ledger.svg',
-    type: 'image/svg+xml',
-  }),
-  prototypes: Object.freeze({
-    key: 'prototypes',
-    href: '/favicon-prototypes.svg',
-    type: 'image/svg+xml',
-  }),
-  customerConfig: Object.freeze({
-    key: 'customer-config',
-    href: '/favicon-customer-config.svg',
     type: 'image/svg+xml',
   }),
 })
@@ -137,30 +93,6 @@ export function resolveERPFavicon(pathname = '', options = {}) {
   const normalizedFromPathname = options.fromPathname
     ? normalizePathname(options.fromPathname)
     : ''
-  if (
-    normalizedPathname === DEV_HUB_ROUTE ||
-    normalizedPathname === `${DEV_HUB_ROUTE}/`
-  ) {
-    return ERP_FAVICON_VARIANTS.devHub
-  }
-  if (normalizedPathname === DEV_TESTING_ROUTE) {
-    return ERP_FAVICON_VARIANTS.testing
-  }
-  if (normalizedPathname === DEV_GOVERNANCE_ROUTE) {
-    return ERP_FAVICON_VARIANTS.governance
-  }
-  if (normalizedPathname === DEV_CAPABILITY_LEDGER_ROUTE) {
-    return ERP_FAVICON_VARIANTS.capabilityLedger
-  }
-  if (normalizedPathname === DEV_DOCS_ROUTE) {
-    return ERP_FAVICON_VARIANTS.docs
-  }
-  if (normalizedPathname === DEV_PROTOTYPES_ROUTE) {
-    return ERP_FAVICON_VARIANTS.prototypes
-  }
-  if (normalizedPathname === DEV_CUSTOMER_CONFIG_ROUTE) {
-    return ERP_FAVICON_VARIANTS.customerConfig
-  }
   const printTemplateFavicon =
     buildPrintTemplateFaviconVariant(normalizedPathname)
   if (printTemplateFavicon) {

@@ -28,7 +28,7 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
-const LOCAL_DATABASE_NAME = "plush_erp_acceptance_20260716_v5_dev";
+const LOCAL_DATABASE_NAME = "plush_erp_acceptance_local_fixture_dev";
 
 function localPlan(overrides = {}) {
   return buildManualAcceptanceAccountScenarioPlan({
@@ -1222,7 +1222,7 @@ test("CLI help points only to the dedicated current local acceptance database", 
   assert.match(help.text, /http:\/\/127\.0\.0\.1:8310/u);
   assert.match(
     help.text,
-    /--database-name plush_erp_acceptance_20260716_v5_dev/u,
+    /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
   assert.match(help.text, /--data-version 2026\.07\.16-v5/u);
   assert.match(help.text, /--run-id 20260716-V5/u);

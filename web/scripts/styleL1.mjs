@@ -5802,37 +5802,46 @@ async function assertDashboardWorkbenchEntryNavigation(page, { scenarioName }) {
   await createTask({
     task_code: 'style-l1-dashboard-entry-sales-order',
     task_group: 'sales-orders',
-    task_name: '工作台正式页关联任务',
+    task_name: '工作台来源标签非真实关联任务',
     source_type: 'sales-orders',
     source_id: 1,
     source_no: 'SO-STYLE-L1',
     business_status_key: 'project_pending',
     task_status_key: 'ready',
-    owner_role_key: 'sales',
+    owner_role_key: 'boss',
     due_at: nowSec + 3_600,
     payload: { notification_type: 'task_created' },
   })
   await page.getByRole('button', { name: '刷新当前页' }).click()
-  await expectText(page, '工作台正式页关联任务')
+  await page.getByRole('button', { name: /待我处理，\d+ 项/ }).click()
+  await expectText(page, '工作台来源标签非真实关联任务')
 
   const formalRow = page
     .locator('.erp-workbench-queue-panel .ant-table-row')
-    .filter({ hasText: '工作台正式页关联任务' })
+    .filter({ hasText: '工作台来源标签非真实关联任务' })
     .first()
   await formalRow.click()
   const detailPanel = page.locator('.erp-workbench-task-detail')
   await expectText(page, 'SO-STYLE-L1')
-  await detailPanel
-    .getByRole('button', { name: '关联记录', exact: true })
-    .click()
-  await waitForPath(page, '/erp/sales/project-orders/sales-orders')
-  assert.match(
-    page.url(),
-    /[?&]link_keyword=SO-STYLE-L1(?:&|$)/,
-    `${scenarioName} 正式页关联入口应带来源单号: ${page.url()}`
+  assert.equal(
+    await detailPanel
+      .getByRole('button', { name: '查看相关单据', exact: true })
+      .count(),
+    0,
+    `${scenarioName} 仅有来源标签和 source_id 的普通任务不得显示相关单据入口`
   )
-  await expectHeading(page, '销售订单')
-  await expectText(page, 'SO-STYLE-L1')
+  await formalRow.dblclick({ position: { x: 24, y: 20 } })
+  const drawer = page.locator('.erp-task-action-drawer')
+  await drawer.waitFor({ state: 'visible', timeout: 10_000 })
+  assert.equal(
+    await drawer
+      .getByRole('button', { name: '查看相关单据', exact: true })
+      .count(),
+    0,
+    `${scenarioName} 任务抽屉不得恢复未授权的相关单据入口`
+  )
+  await drawer.locator('.ant-drawer-close').click()
+  await drawer.waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
 async function assertDashboardTaskBoardLayout(page, { scenarioName }) {

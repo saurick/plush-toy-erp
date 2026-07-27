@@ -130,6 +130,10 @@ ent_migrate:
 migrate_hash:
 	atlas migrate hash --dir "file://internal/data/model/migrate"
 
+MIGRATE_TARGET_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_TARGET_CONFIRM)
+MIGRATE_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_CONFIRM)
+MIGRATE_MAINTENANCE_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_MAINTENANCE_CONFIRM)
+
 ENV_FILE := .env
 
 ifneq ("$(wildcard $(ENV_FILE))","")
@@ -137,28 +141,29 @@ ifneq ("$(wildcard $(ENV_FILE))","")
   export
 endif	
 
-.PHONY: migrate_apply
-# 将 migration 执行到数据库（需要你确认）
+.PHONY: migrate_status migrate_plan migrate_apply
+# 只读检查工作区、目标身份和 Atlas revision；不执行 migration。
+migrate_status:
+	@node ../scripts/local-migration.mjs status
+
+# 对 pending migration 做 dry-run 和真实事务预演，最终强制 ROLLBACK。
+migrate_plan:
+	@LOCK_FILE="$$(git rev-parse --git-path plush-local-migration.lock)"; \
+	mkdir -p "$$(dirname "$$LOCK_FILE")"; \
+	LOCAL_MIGRATION_TARGET_CONFIRM="$(MIGRATE_TARGET_CONFIRM_FROM_COMMAND_ENV)" \
+		lockf -t 0 "$$LOCK_FILE" node ../scripts/local-migration.mjs plan
+
+# 只接受当前命令环境中由 migrate_plan 输出的精确确认值；.env 残值无效。
 migrate_apply:
-	@URL=$$(go run ./cmd/dburl -conf ./configs/dev/config.yaml); \
-	if [ "$$USE_ENV_DB_URL" = "1" ] && [ -n "$$DB_URL" ]; then \
-		URL="$$DB_URL"; \
-		echo "USE_ENV_DB_URL=1, use DB_URL from environment"; \
-	elif [ -n "$$DB_URL" ]; then \
-		echo "DB_URL is set but ignored by default. Set USE_ENV_DB_URL=1 to use it."; \
-	fi; \
-	SAFE_TARGET=$$(POSTGRES_DSN="$$URL" go run ./cmd/dburl -conf ./configs/dev/config.yaml -safe-target); \
-	echo "using database target $$SAFE_TARGET"; \
-	POPULATED_UPGRADE_DATABASE_URL="$$URL" sh ../scripts/qa/populated-upgrade-preflight.sh \
-		--audit populated-upgrade \
-		--database-url-env POPULATED_UPGRADE_DATABASE_URL; \
-	atlas migrate apply \
-		--dir "file://internal/data/model/migrate" \
-		--url "$$URL"
+	@LOCK_FILE="$$(git rev-parse --git-path plush-local-migration.lock)"; \
+	mkdir -p "$$(dirname "$$LOCK_FILE")"; \
+	LOCAL_MIGRATION_CONFIRM="$(MIGRATE_CONFIRM_FROM_COMMAND_ENV)" \
+		LOCAL_MIGRATION_MAINTENANCE_CONFIRM="$(MIGRATE_MAINTENANCE_CONFIRM_FROM_COMMAND_ENV)" \
+		lockf -t 0 "$$LOCK_FILE" node ../scripts/local-migration.mjs apply
 
 .PHONY: print_db_url
 print_db_url:
-	@go run ./cmd/dburl -conf ./configs/dev/config.yaml && echo
+	@go run ./cmd/dburl -conf ./configs/dev/config.yaml -safe-target && echo
 
 .PHONY: seed_role_demo_admins
 # 生成开发/验收角色演示账号；无输入默认仅限登记的隔离 *_dev 库和普通业务角色。
@@ -172,19 +177,6 @@ reset_local_admin_password:
 	go run ./cmd/reset-local-admin-password \
 		-conf ./configs/dev/config.yaml \
 		-confirm "RESET_LOCAL_ADMIN_PASSWORD:$$username"
-
-.PHONY: migrate_status
-migrate_status:
-	@URL=$$(go run ./cmd/dburl -conf ./configs/dev/config.yaml); \
-	if [ "$$USE_ENV_DB_URL" = "1" ] && [ -n "$$DB_URL" ]; then \
-		URL="$$DB_URL"; \
-		echo "USE_ENV_DB_URL=1, use DB_URL from environment"; \
-	elif [ -n "$$DB_URL" ]; then \
-		echo "DB_URL is set but ignored by default. Set USE_ENV_DB_URL=1 to use it."; \
-	fi; \
-	SAFE_TARGET=$$(POSTGRES_DSN="$$URL" go run ./cmd/dburl -conf ./configs/dev/config.yaml -safe-target); \
-	echo "using database target $$SAFE_TARGET"; \
-	atlas migrate status --dir "file://internal/data/model/migrate" --url "$$URL"
 
 .PHONY: migrate_set
 # 标记某个 migration 已应用（用于修复已手动执行但迁移状态未记录的情况）
@@ -223,10 +215,10 @@ db_create:
 		psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$$DBNAME\"" 2>/dev/null || psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = '$$DBNAME'" >/dev/null; \
 	}
 
-INVENTORY_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_inventory_test?sslmode=disable
-BOM_LOT_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_bom_lot_test?sslmode=disable
-PURCHASE_RECEIPT_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable
-PURCHASE_RETURN_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_purchase_return_test?sslmode=disable
+INVENTORY_PG_DB_URL ?=
+BOM_LOT_PG_DB_URL ?=
+PURCHASE_RECEIPT_PG_DB_URL ?=
+PURCHASE_RETURN_PG_DB_URL ?=
 
 .PHONY: inventory_pg_createdb inventory_migrate_status inventory_migrate_apply inventory_pg_test inventory_pg_dropdb
 inventory_pg_createdb:

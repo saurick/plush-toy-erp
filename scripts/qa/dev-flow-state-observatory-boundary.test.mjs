@@ -9,7 +9,7 @@ import {
   getDevFlowState,
   getDevFlowStateMachine,
   getDevFlowStateTransitions,
-} from "../../web/src/erp/config/devFlowStateCatalog.mjs";
+} from "../../web/src/dev-workbench/config/devFlowStateCatalog.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const observatoryRoute = "/__dev/status-flows";
@@ -25,6 +25,16 @@ const expectedFlowLayerKeys = [
   "notification",
   "automation",
   "fact",
+];
+const expectedPathKinds = [
+  "blocked",
+  "rejected",
+  "cancelled",
+  "reversed",
+  "adjusted",
+  "returned",
+  "rework",
+  "resumed",
 ];
 
 function read(relativePath) {
@@ -91,6 +101,10 @@ test("dev flow state observatory: catalog stays read-only and structurally compl
   );
   assert.equal(DEV_FLOW_STATE_CATALOG.allowsGenericStatusWrite, false);
   assert.deepEqual(DEV_FLOW_STATE_CATALOG.writeApis, []);
+  assert.deepEqual(DEV_FLOW_STATE_CATALOG.pathKinds, expectedPathKinds);
+  const pathKindCounts = Object.fromEntries(
+    expectedPathKinds.map((pathKind) => [pathKind, 0]),
+  );
 
   assert(Array.isArray(DEV_FLOW_STATE_CATALOG.scopes));
   assert(DEV_FLOW_STATE_CATALOG.scopes.length > 0);
@@ -307,7 +321,32 @@ test("dev flow state observatory: catalog stays read-only and structurally compl
         `${transitionContext}.sourceRefs`,
       );
       assertEvidenceList(transition.evidence, `${transitionContext}.evidence`);
+      assert(
+        Array.isArray(transition.pathKinds),
+        `${transitionContext}.pathKinds must be an array`,
+      );
+      assert.equal(
+        new Set(transition.pathKinds).size,
+        transition.pathKinds.length,
+        `${transitionContext}.pathKinds must be unique`,
+      );
+      for (const pathKind of transition.pathKinds) {
+        assert(
+          expectedPathKinds.includes(pathKind),
+          `${transitionContext}.pathKinds contains unknown ${pathKind}`,
+        );
+        pathKindCounts[pathKind] += 1;
+      }
+      if (transition.pathKinds.length > 0) {
+        assert(
+          transition.permission.length > 0,
+          `${transitionContext} exceptional path must declare permission`,
+        );
+      }
     }
+  }
+  for (const [pathKind, count] of Object.entries(pathKindCounts)) {
+    assert(count > 0, `catalog must include a positive ${pathKind} path`);
   }
 
   const bomFlow = DEV_FLOW_STATE_CATALOG.flows.find(
@@ -659,11 +698,12 @@ test("dev flow state observatory: lookups and transition checks fail closed", ()
 });
 
 test("dev flow state observatory: route and page stay DEV-only and read-only", () => {
-  const catalogSource = read("web/src/erp/config/devFlowStateCatalog.mjs");
-  const devRoutesSource = read("web/src/erp/config/devRoutes.mjs");
-  const devHubSource = read("web/src/erp/config/devHub.mjs");
+  const catalogSource = read("web/src/dev-workbench/config/devFlowStateCatalog.mjs");
+  const devRoutesSource = read("web/src/dev-workbench/config/devRoutes.mjs");
+  const devHubSource = read("web/src/dev-workbench/config/devHub.mjs");
   const routerSource = read("web/src/erp/router.jsx");
-  const pageSource = read("web/src/erp/pages/DevFlowStateObservatoryPage.jsx");
+  const workbenchRoutesSource = read("web/src/dev-workbench/DevWorkbenchRoutes.jsx");
+  const pageSource = read("web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx");
   const formalMenuSources = [
     read("web/src/erp/config/menuPermissions.mjs"),
     read("web/src/erp/config/seedData.mjs"),
@@ -684,11 +724,19 @@ test("dev flow state observatory: route and page stay DEV-only and read-only", (
   assert.doesNotMatch(formalMenuSources, /\/__dev\/status-flows/u);
   assert.match(
     routerSource,
-    /const DevFlowStateObservatoryPage\s*=\s*import\.meta\.env\.DEV[\s\S]{0,240}?DevFlowStateObservatoryPage\.jsx/u,
+    /const DevWorkbenchRoutes\s*=\s*import\.meta\.env\.DEV[\s\S]{0,180}?@\/dev-workbench\/DevWorkbenchRoutes\.jsx/u,
   );
   assert.match(
     routerSource,
-    /\{DevFlowStateObservatoryPage\s*\?\s*\([\s\S]{0,300}?<Route[\s\S]{0,180}?<DevFlowStateObservatoryPage/u,
+    /<Route path="\/__dev\/\*" element=\{<DevWorkbenchRoutes \/>\}/u,
+  );
+  assert.match(
+    workbenchRoutesSource,
+    /import\(['"]\.\/pages\/DevFlowStateObservatoryPage\.jsx['"]\)/u,
+  );
+  assert.match(
+    workbenchRoutesSource,
+    /path="status-flows"[\s\S]{0,100}?<DevFlowStateObservatoryPage/u,
   );
 
   assert.match(
@@ -763,6 +811,11 @@ test("dev flow state observatory: route and page stay DEV-only and read-only", (
     /<EvidenceList/u,
     "each transition card must not repeat source file paths",
   );
+  assert.match(
+    pageSource.slice(transitionCardsStart, transitionCardsEnd),
+    /<EvidenceDisclosure/u,
+    "each transition card must expose its canonical evidence on demand",
+  );
   const graphLabelStart = pageSource.indexOf("function transitionLayerValues");
   const graphLabelEnd = pageSource.indexOf(
     "\nfunction buildFlowMermaid",
@@ -777,6 +830,27 @@ test("dev flow state observatory: route and page stay DEV-only and read-only", (
     graphLabelSource,
     /compactGraphText/u,
     "graph labels must pass through the compact text policy",
+  );
+  assert.match(
+    graphLabelSource,
+    /transition\.pathKinds/u,
+    "exception, correction and recovery labels must use registered pathKinds",
+  );
+  assert.doesNotMatch(
+    graphLabelSource,
+    /block\|reject\|cancel\|exception\|error/u,
+    "path authority must not be inferred from transition keywords",
+  );
+  for (const queryKey of ["path_mode", "path_kind", "path_objects"]) {
+    assert(
+      pageSource.includes(queryKey),
+      `observatory deep links must preserve ${queryKey}`,
+    );
+  }
+  assert.match(
+    pageSource,
+    /fail closed 拒绝放宽/u,
+    "unknown path filters must fail closed visibly",
   );
   assert.doesNotMatch(
     graphLabelSource,

@@ -43,6 +43,7 @@ export function createStyleL1Scenarios(deps) {
     assertDarkThemeNeutralInteractions,
     assertDashboardMetricInteractionSemantics,
     assertDashboardTaskBoardLayout,
+    assertDashboardWorkbenchEntryNavigation,
     assertDevPageUsesGlobalThemeOnly,
     assertERPThemeMode,
     assertEditablePrintWorkspacePopupRefresh,
@@ -2091,13 +2092,14 @@ export function createStyleL1Scenarios(deps) {
         configRevision: 'style-l1-yoyo-global-dashboard',
         configHash: 'style-l1-yoyo-global-dashboard-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
-        pages: ['global-dashboard', 'task-board'],
+        pages: ['global-dashboard', 'task-board', 'sales-orders'],
         actions: [
           'erp.workbench.read',
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',
           'workflow.task.complete',
+          'sales_order.read',
         ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['boss'],
@@ -2118,6 +2120,7 @@ export function createStyleL1Scenarios(deps) {
           'workflow.task.read',
           'workflow.task.update',
           'workflow.task.complete',
+          'sales_order.read',
         ],
         menus: [
           {
@@ -2132,6 +2135,13 @@ export function createStyleL1Scenarios(deps) {
             label: '任务看板',
             path: '/erp/task-board',
             required_any: ['workflow.task.read'],
+            required_all: [],
+          },
+          {
+            key: 'sales-orders',
+            label: '销售订单',
+            path: '/erp/sales/project-orders/sales-orders',
+            required_any: ['sales_order.read'],
             required_all: [],
           },
         ],
@@ -2604,6 +2614,9 @@ export function createStyleL1Scenarios(deps) {
           ),
         })
         await clickERPThemeOption(page, '浅色')
+        await assertDashboardWorkbenchEntryNavigation(page, {
+          scenarioName: 'erp-yoyo-global-dashboard-source-access',
+        })
       },
     },
     {
@@ -4081,6 +4094,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'finished_goods_quality',
                 node_type: 'domain_command',
                 attempt: 1,
+                version: 1,
                 status: 'completed',
                 outcome: 'quality_passed',
               },
@@ -4090,6 +4104,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'shipment_finance_approval',
                 node_type: 'approval',
                 attempt: 1,
+                version: 1,
                 status: 'active',
                 outcome: '',
               },
@@ -4101,6 +4116,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'shipment_finance_approval',
                 node_type: 'approval',
                 attempt: 1,
+                version: 1,
                 status: 'active',
                 outcome: '',
               },
@@ -4112,6 +4128,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'finished_goods_quality',
                 node_type: 'domain_command',
                 attempt: 1,
+                version: 1,
                 status: 'completed',
                 outcome: 'quality_passed',
               },
@@ -8857,7 +8874,10 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'dark',
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '开发导航 / Dev Navigation')
+        await expectHeading(
+          page,
+          '研发效能工作台 / Engineering Delivery Workbench'
+        )
         await expectText(page, '项目治理地图 / Governance Map')
         await expectText(page, '流程与状态观察台 / Flow & State Observatory')
         await expectText(page, '开发文档 / Dev Docs')
@@ -8868,7 +8888,7 @@ export function createStyleL1Scenarios(deps) {
           page,
           '客户配置包预检与发布 / Package Preflight & Release'
         )
-        await expectText(page, '本地 dev-only 入口')
+        await expectText(page, '仅本地开发态')
         const defaultMetrics = await page.evaluate(() => ({
           path: location.pathname,
           documentTitle: document.title,
@@ -8918,7 +8938,7 @@ export function createStyleL1Scenarios(deps) {
           `开发导航 favicon 异常: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
-          defaultMetrics.documentTitle.startsWith('开发导航 · '),
+          defaultMetrics.documentTitle.startsWith('研发效能工作台 · '),
           `开发导航应提供可区分的浏览器标题: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
@@ -9152,9 +9172,27 @@ export function createStyleL1Scenarios(deps) {
         const devPages = [
           {
             path: '/__dev/',
-            heading: '开发导航 / Dev Navigation',
+            heading: '研发效能工作台 / Engineering Delivery Workbench',
             rootSelector: '.erp-dev-hub-page',
-            titlePrefix: '开发导航 · ',
+            titlePrefix: '研发效能工作台 · ',
+          },
+          {
+            path: '/__dev/product-engineering',
+            heading: '产品工程 / Product Engineering',
+            rootSelector: '.erp-dev-hub-page',
+            titlePrefix: '产品工程 · ',
+          },
+          {
+            path: '/__dev/quality',
+            heading: '质量 / Quality',
+            rootSelector: '.erp-dev-hub-page',
+            titlePrefix: '质量 · ',
+          },
+          {
+            path: '/__dev/delivery',
+            heading: '交付 / Delivery',
+            rootSelector: '.erp-dev-hub-page',
+            titlePrefix: '交付 · ',
           },
           {
             path: '/__dev/governance',
@@ -9324,10 +9362,13 @@ export function createStyleL1Scenarios(deps) {
               copyActionCount: 1,
               sourceActionCount:
                 devPage.path === '/__dev/' ||
+                devPage.path === '/__dev/product-engineering' ||
+                devPage.path === '/__dev/quality' ||
+                devPage.path === '/__dev/delivery' ||
                 devPage.path === '/__dev/capability-ledger'
                   ? 0
                   : 1,
-              workspaceRouteCount: 8,
+              workspaceRouteCount: 4,
               currentWorkspaceRouteCount: 1,
               workspacePageDisplay: 'block',
               workspaceRoutesOverflowX: 'auto',
@@ -9358,7 +9399,10 @@ export function createStyleL1Scenarios(deps) {
             }
           }, selector)
 
-        await expectHeading(page, '开发导航 / Dev Navigation')
+        await expectHeading(
+          page,
+          '研发效能工作台 / Engineering Delivery Workbench'
+        )
         const workspaceLayout = await page.evaluate(() => {
           const root = document.querySelector('.erp-dev-workspace-page')
           const nav = document.querySelector('.erp-dev-workspace-nav')
@@ -9387,7 +9431,7 @@ export function createStyleL1Scenarios(deps) {
           {
             navPosition: 'sticky',
             navWidth: 232,
-            workspaceRouteCount: 8,
+            workspaceRouteCount: 4,
           },
           `开发工作台桌面侧栏尺寸和入口应稳定: ${JSON.stringify(workspaceLayout)}`
         )
@@ -10802,7 +10846,7 @@ export function createStyleL1Scenarios(deps) {
         )
         assert(
           customerConfigPresetClipboard.includes(
-            'web/src/erp/config/devCustomerConfig.test.mjs'
+            'web/src/dev-workbench/config/devCustomerConfig.test.mjs'
           ) &&
             customerConfigPresetClipboard.includes(
               'dev-customer-config-dark-desktop'
@@ -11310,6 +11354,70 @@ export function createStyleL1Scenarios(deps) {
           .getByRole('button', { name: '启用新设置', exact: true })
           .click()
         await expectText(page, '已生效')
+      },
+    },
+    {
+      name: 'permission-center-approval-role-permission-drift',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      approvalSettingsMode: 'role_permission_drift',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '权限管理')
+        await page.getByRole('tab', { name: /审批责任/ }).click()
+        await page
+          .getByRole('row', { name: /销售订单审批/ })
+          .getByRole('button', { name: '调整' })
+          .click()
+        const dialog = page
+          .getByRole('dialog')
+          .filter({ hasText: '调整销售订单审批' })
+        await expectText(dialog, '当前设置包含不可用岗位')
+        await expectText(dialog, '业务：未开启审批功能')
+        await expectText(dialog, '当前只有“老板”具备审批资格')
+        await assertTextAbsent(dialog, 'sales')
+
+        const primaryRoleSelect = dialog
+          .locator('.erp-approval-responsibility-form__tier')
+          .first()
+          .locator('.ant-select')
+          .first()
+        await expectText(primaryRoleSelect, '业务（未开启审批功能）')
+        await primaryRoleSelect.click()
+        const dropdown = page.locator('.ant-select-dropdown:visible')
+        const salesOption = dropdown
+          .locator('.ant-select-item-option-disabled')
+          .filter({ hasText: '业务（未开启审批功能）' })
+        const bossOption = dropdown
+          .locator('.ant-select-item-option-disabled')
+          .filter({ hasText: '老板（已用于升级责任）' })
+        await salesOption.waitFor({ state: 'visible' })
+        await bossOption.waitFor({ state: 'visible' })
+        assert.equal(await salesOption.count(), 1)
+        assert.equal(await bossOption.count(), 1)
+        const visibleRoleLabels = await dropdown
+          .locator('.ant-select-item-option-content')
+          .allTextContents()
+        assert.equal(
+          visibleRoleLabels.some((label) => label.trim() === 'sales'),
+          false,
+          `岗位候选不应显示原始 role key: ${JSON.stringify(visibleRoleLabels)}`
+        )
+        await page.keyboard.press('Escape')
+
+        await dialog
+          .getByRole('button', { name: '保存调整', exact: true })
+          .click()
+        await expectText(dialog, '当前岗位未开启审批功能，请先在岗位设置中开启')
+        await assertAntdModalCentered(
+          page,
+          dialog,
+          'permission-center-approval-role-permission-drift'
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'permission-center-approval-role-permission-drift'
+        )
       },
     },
     {

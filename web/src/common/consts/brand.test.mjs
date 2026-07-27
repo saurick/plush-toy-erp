@@ -14,8 +14,8 @@ test('brand: product runtime does not statically import customer packages', () =
     new URL('./brand.js', import.meta.url),
     new URL('./favicon.mjs', import.meta.url),
     new URL('../../erp/config/customerMenuConfig.mjs', import.meta.url),
-    new URL('../../erp/config/devCustomerConfigRoute.mjs', import.meta.url),
-    new URL('../../erp/config/devRoutes.mjs', import.meta.url),
+    new URL('../../dev-workbench/config/devCustomerConfigRoute.mjs', import.meta.url),
+    new URL('../../dev-workbench/config/devRoutes.mjs', import.meta.url),
     new URL('../../erp/router.jsx', import.meta.url),
   ]
 

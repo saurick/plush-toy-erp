@@ -344,7 +344,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 | 路径                       | 职责                                     | 维护真源                                                    |
 | -------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
-| `/__dev`                   | 开发态导航、搜索、分组和本地置顶         | `web/src/erp/config/devHub.mjs`                             |
+| `/__dev`                   | 开发态导航、搜索、分组和本地置顶         | `web/src/dev-workbench/config/devHub.mjs`                             |
 | `/__dev/governance`        | 项目治理地图只读可视化                   | `docs/项目治理地图.md`                                      |
 | `/__dev/status-flows`      | 分层状态机、流程编排与甲方差异只读观察   | 代码合同、正式状态文档与已登记客户配置包                    |
 | `/__dev/docs`              | 当前工作区 Markdown 查看器               | 仓库 Markdown 文件本身                                      |
@@ -368,7 +368,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 #### 流程与状态观察台 `/__dev/status-flows`
 
 - 页面把 Source Document、Workflow task、Process Runtime、Fact / Ledger、MasterData lifecycle 和客户配置控制面分层展示，提供全局状态字典树、单对象合法转换图、Product Core 流程编排、九类流覆盖和证据详情。九类分别是业务、状态、工作流、审批、任务、异常、通知、自动流转与 Fact；默认图面只打开业务和状态，其他语义按需叠加。图内只使用状态名和受控短标签，不放源码路径、完整 Guard 或权限串；这些详情留在图下方，避免长边标签撑大画布或覆盖往返边。岗位与责任池在 Product Core 节点详情中单独显示。
-- `web/src/erp/config/devFlowStateCatalog.mjs` 是 dev-only 只读投影目录，不是新的状态真源。canonical key、合法转换、权限、领域动作和事实副作用仍回到后端 registry、lifecycle helper、Schema、usecase 与测试；目录中的每台机器和边必须携带来源证据，未知对象或状态 fail closed。
+- `web/src/dev-workbench/config/devFlowStateCatalog.mjs` 是 dev-only 只读投影目录，不是新的状态真源。canonical key、合法转换、权限、领域动作和事实副作用仍回到后端 registry、lifecycle helper、Schema、usecase 与测试；目录中的每台机器和边必须携带来源证据，未知对象或状态 fail closed。
 - Product Core 与客户差异使用“核心合同 + 客户 overlay”表达。客户流程、状态机和策略直接从 `config/customers/index.mjs` 的已登记包派生；`demo`、`reference-customer` 和 `yoyoosun` 中的 `preview_only` 内容始终与 runtime authority 分开，漂移会显式显示，不会被观察台同步到正式状态机。
 - 页面只读且不导入通用 `set_status`、数据库写入或状态机编辑器。Workflow task `done`、Process node `completed` 和 Fact `POSTED` 继续是不同事实；取消、冲正、补偿和 return-to 只在正式领域合同显式存在时画边。
 - 视图、对象、甲方、搜索和叠加层写入 URL，便于刷新、前进后退和共享定位。运行轨迹只接受受后端登录态、精确 read permission 与任务可见性保护的 task-scoped 上下文；没有权限或没有实例时明确显示边界，不从任务标题、payload 或客户 preview 猜测流程位置。

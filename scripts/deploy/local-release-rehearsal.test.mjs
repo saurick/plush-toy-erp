@@ -1,0 +1,259 @@
+import assert from "node:assert/strict";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import test from "node:test";
+
+import {
+  activateRehearsalCustomerConfig,
+  buildRehearsalEnvironment,
+  formatRehearsalEnv,
+  parseLocalRehearsalArgs,
+  runtimeIdentityDigest,
+} from "./local-release-rehearsal.mjs";
+
+const commit = "a".repeat(40);
+const manifest = {
+  schemaVersion: "plush-release-artifact/v1",
+  passed: true,
+  customer: "yoyoosun",
+  git: { commit, head: commit, worktreeClean: true },
+  sourceArchive: {
+    secretScan: "passed",
+    sha256: "b".repeat(64),
+  },
+  migration: {
+    latest: "20260726174057",
+    sequenceSha256: "c".repeat(64),
+  },
+  customerConfig: {
+    packageKey: "yoyoosun-customer-package-v7",
+    sourceSha256: "d".repeat(64),
+  },
+  sbom: { sha256: "e".repeat(64) },
+  images: ["server", "web"].map((kind) => ({
+    kind,
+    ref: `plush-toy-erp-${kind}:yoyoosun-${commit}`,
+    contentId: `sha256:${kind === "server" ? "1" : "2"}`.padEnd(
+      71,
+      kind === "server" ? "1" : "2",
+    ),
+    platform: "linux/amd64",
+    gitSha: commit,
+    archive: {
+      file: `${kind}.tar`,
+      sha256: "f".repeat(64),
+      sizeBytes: 1,
+    },
+    metadataSecretScan: { passed: true },
+  })),
+};
+const ports = {
+  postgres: 51001,
+  appHttp: 51002,
+  appGrpc: 51003,
+  web: 51004,
+  jaeger5775: 51005,
+  jaeger6831: 51006,
+  jaeger6832: 51007,
+  jaeger5778: 51008,
+  jaegerUi: 51009,
+  jaeger14268: 51010,
+  jaeger14250: 51011,
+  jaeger9411: 51012,
+  jaegerOtlpGrpc: 51013,
+  jaegerOtlpHttp: 51014,
+};
+
+test("local release rehearsal CLI requires explicit manifest inputs", () => {
+  assert.deepEqual(
+    parseLocalRehearsalArgs([
+      "--execute",
+      "--manifest",
+      "output/release.json",
+      "--run-id",
+      "release_20260728",
+      "--json",
+    ]),
+    {
+      execute: true,
+      manifest: "output/release.json",
+      runId: "release_20260728",
+      json: true,
+      help: false,
+    },
+  );
+  assert.throws(
+    () => parseLocalRehearsalArgs(["--manifest"]),
+    /missing value/u,
+  );
+});
+
+test("local release rehearsal environment binds isolated database fixed images and safe runtime", () => {
+  const built = buildRehearsalEnvironment({
+    manifest,
+    runId: "release_20260728",
+    workspace: "/private/tmp/release",
+    ports,
+    postgresPassword: "postgres-password",
+    jwtSecret: "jwt-secret",
+    adminPassword: "admin-password",
+    bootstrap: true,
+  });
+  assert.equal(built.database, "plush_erp_release_release_20260728");
+  assert.equal(
+    built.values.APP_IMAGE,
+    `plush-toy-erp-server:yoyoosun-${commit}`,
+  );
+  assert.equal(built.values.WEB_IMAGE, `plush-toy-erp-web:yoyoosun-${commit}`);
+  assert.equal(built.values.POSTGRES_IMAGE, "postgres:18.1");
+  assert.equal(built.values.JAEGER_IMAGE, "jaegertracing/all-in-one:1.76.0");
+  assert.equal(built.values.ERP_DEBUG_ENV, "prod");
+  assert.equal(built.values.ERP_DEBUG_SEED_ENABLED, "false");
+  assert.equal(built.values.BOOTSTRAP_ADMIN_ONCE, "true");
+  assert.equal(built.values.APP_ADMIN_PASSWORD, "admin-password");
+  const steady = buildRehearsalEnvironment({
+    manifest,
+    runId: "release_20260728",
+    workspace: "/private/tmp/release",
+    ports,
+    postgresPassword: "postgres-password",
+    jwtSecret: "jwt-secret",
+    adminPassword: "admin-password",
+    bootstrap: false,
+  });
+  assert.equal(steady.values.BOOTSTRAP_ADMIN_ONCE, "false");
+  assert.equal("APP_ADMIN_PASSWORD" in steady.values, false);
+});
+
+test("local release rehearsal runtime identity binds database SHA and migration", () => {
+  const first = runtimeIdentityDigest(
+    "plush_erp_release_release_20260728",
+    commit,
+    "20260726174057",
+  );
+  assert.match(first, /^[a-f0-9]{64}$/u);
+  assert.notEqual(
+    first,
+    runtimeIdentityDigest(
+      "plush_erp_release_release_20260729",
+      commit,
+      "20260726174057",
+    ),
+  );
+  assert.throws(
+    () => runtimeIdentityDigest("database", "short", "20260726174057"),
+    /input is invalid/u,
+  );
+});
+
+test("local release rehearsal activates only the content-addressed local-test customer manifest", async () => {
+  const methods = [];
+  let appliedManifest;
+  const configHash = "9".repeat(64);
+  const rpc = async (_appUrl, _token, method, params) => {
+    methods.push(method);
+    if (method === "validate_customer_config") {
+      appliedManifest = params;
+      return {
+        validation: {
+          customer_key: params.customer_key,
+          revision: params.revision,
+          compiled_snapshot_ok: true,
+          config_hash: configHash,
+          config_hash_version: 1,
+        },
+      };
+    }
+    if (method === "publish_customer_config") {
+      return {
+        revision: {
+          revision: appliedManifest.revision,
+          product_version: appliedManifest.product_version,
+          config_hash: configHash,
+          status: "published",
+        },
+      };
+    }
+    if (method === "check_customer_config_transition") {
+      assert.equal(params.expected_active_revision, "");
+      return {
+        transition: {
+          allowed: true,
+          blockers: [],
+          target_revision: appliedManifest.revision,
+          observed_active_revision: "",
+        },
+      };
+    }
+    if (method === "activate_customer_config") {
+      assert.equal(params.expected_config_hash, configHash);
+      return {
+        revision: {
+          status: "active",
+          revision: appliedManifest.revision,
+          product_version: appliedManifest.product_version,
+          config_hash: configHash,
+        },
+      };
+    }
+    if (method === "get_effective_session") {
+      return {
+        session: {
+          source: "active_customer_config_revision",
+          configRevision: appliedManifest.revision,
+          configProductVersion: appliedManifest.product_version,
+          configHash,
+          pages: ["dashboard"],
+        },
+      };
+    }
+    throw new Error(`unexpected method ${method}`);
+  };
+  const result = await activateRehearsalCustomerConfig(
+    "http://127.0.0.1:51002",
+    "test-token",
+    manifest,
+    { rpc },
+  );
+  assert.deepEqual(methods, [
+    "validate_customer_config",
+    "publish_customer_config",
+    "check_customer_config_transition",
+    "activate_customer_config",
+    "get_effective_session",
+  ]);
+  assert.equal(
+    appliedManifest.compiled_snapshot.applyPurpose,
+    "local_test_apply",
+  );
+  assert.match(
+    appliedManifest.revision,
+    /^yoyoosun-customer-package-v7\.local-[a-f0-9]{16}\.runtime-v1$/u,
+  );
+  assert.equal(result.status, "passed");
+  assert.equal(result.writesBusinessFacts, false);
+});
+
+test("local release rehearsal env formatting is deterministic and contains no shell syntax", () => {
+  const content = formatRehearsalEnv({
+    PROJECT_SLUG: "plush-release-example",
+    BOOTSTRAP_ADMIN_ONCE: "false",
+  });
+  assert.equal(
+    content,
+    "PROJECT_SLUG=plush-release-example\nBOOTSTRAP_ADMIN_ONCE=false\n",
+  );
+  assert.doesNotMatch(content, /\bexport\b|[`;$]/u);
+});
+
+test("local release rehearsal help documents teardown and evidence boundary", () => {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(import.meta.dirname, "local-release-rehearsal.mjs"), "--help"],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /backup\+restore drill/u);
+  assert.match(result.stdout, /destroys the\s+Compose\/database/u);
+  assert.match(result.stdout, /does not contact or prove 133\/UAT/u);
+});

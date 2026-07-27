@@ -189,17 +189,19 @@ type WorkflowTaskUrge struct {
 }
 
 type WorkflowTaskAssignment struct {
-	ID                     int
-	ExpectedVersion        int
-	CommandKey             string
-	IdempotencyKey         string
-	IntentHash             string
-	TargetAssigneeID       *int
-	ReleaseToPool          bool
-	Reason                 string
-	RequiredOwnerRoleKey   string
-	RequiredPermissionKeys []string
-	AuditEvent             *RuntimeAuditEventCreate
+	ID                           int
+	ExpectedVersion              int
+	CommandKey                   string
+	IdempotencyKey               string
+	IntentHash                   string
+	TargetAssigneeID             *int
+	ReleaseToPool                bool
+	Reason                       string
+	RequiredOwnerRoleKey         string
+	RequiredPermissionKeys       []string
+	RequiredAccountPermissionAll []string
+	RequiredAccountPermissionAny []string
+	AuditEvent                   *RuntimeAuditEventCreate
 }
 
 type WorkflowTaskAssignmentRepo interface {

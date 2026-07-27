@@ -147,8 +147,10 @@ const FIXED_COMMANDS = {
     ["critical_transactions_pg_test"],
     "server",
   ),
-  full: command("full", "T8", "运行推送前全量质量门禁", "bash", [
-    "scripts/qa/full.sh",
+  full: command("full", "T8", "运行推送前全量质量门禁并生成脱敏回执", "node", [
+    "scripts/qa/run-gate-with-receipt.mjs",
+    "--gate",
+    "full",
   ]),
 };
 

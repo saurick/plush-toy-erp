@@ -30,6 +30,7 @@
 | `node scripts/qa/experimental/canonical-runtime-audit.mjs`                                                                          | 非阻断实验审计；宽泛 keyword 命中只作只读复核线索，不进入 fast / affected，不代表产品缺陷或发布证据；恢复阻断前必须改成逐域 status key / API field / function / runtime branch 精确合同 | 需要人工盘点历史词命中时                        |
 | `node scripts/qa/test-data-isolation-boundary.mjs --json`                                                                           | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力                                                                                     | 改 seed、fixture、模拟数据或导入准备工具后      |
 | `node scripts/qa/manual-acceptance-catalog.mjs`                                                                                     | 生成既有 50 项只读基线验收目录；新增客户退货与收付款页由独立真实写 companion 覆盖，不把两条异常写链混进原目录的数据和打印合同，默认只输出、不连接后端                                  | 准备全页面试用验收范围时                        |
+| `node scripts/qa/local-acceptance-lifecycle.mjs --commit <sha> --run-id <run>`                                                      | 默认输出本地统一生命周期 plan；显式 `--execute` 后在两个按批隔离库串行完成 migration、九岗位数据、50 项只读浏览器与四条真实写异常流，并在成功或失败后停服、删库和读回残留             | 对 clean exact SHA 做本地完整技术验收时          |
 | `node scripts/qa/manual-acceptance-dataset.mjs`                                                                                     | 默认生成 local 与 133 同语义计划；显式 `--apply --target` 后由唯一串行 runner 调用同一组正式 API 入口并校验严格阶段回执                                                                 | 准备或重放双环境全页面模拟数据时                |
 | `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.07.16-v5 --run-id 20260716-V5 --json`     | 生成带稳定批次前缀的客户、供应商、产品规格、材料、加工环节及销售 / 采购 / 委外 / BOM 源数据计划；默认只读                                                                               | 写入模拟源数据前确认数量、状态和边界时          |
 | `node scripts/qa/manual-acceptance-account-scenarios.mjs --json`                                                                    | 生成停用、多岗位和无业务入口三种补充账号计划；在已完成首个管理员 bootstrap 的 fresh 本地 / 133 验收库中，创建或精确核对十个正式岗位账号，再调和三类场景账号                             | 核对登录与入口异常场景前                        |
@@ -51,7 +52,7 @@
 | 覆盖证据             | `erp-field-linkage.mjs`、`test-coverage-report.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | 只聚合真实、脱敏、ignored 制品；未采集、过期、跳过、阻塞和零执行必须单列，不把文件数或历史绿色换算成覆盖率，也不执行 full / 数据库 / 浏览器写入                         |
 | 客户配置与私有化边界 | `config/customers/index.test.mjs`、`scripts/build/apply-customer-web-config.test.mjs`、`customer-config-boundaries.mjs`、`customer-config-effective-session-probe.mjs`、`customer-package-lint.mjs`、`customer-package-preview-boundary.test.mjs`、`customer-config-runtime-manifest.mjs`、`private-deployment-boundaries.mjs`、`private-deployment-package-closure.test.mjs`                                                                                                                                                                   | 只做构建期索引、overlay、lint / preview / manifest 编译、无凭据读回探针和模板边界检查；`boundariesSatisfied` 不等于交付、evidence 或签收完成，不写 Fact                 |
 | Workflow / Fact 边界 | `workflow-fact-boundary.test.mjs`、`workflow-ui-action-boundary.test.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | 防止协同任务路径越界写入事实层                                                                                                                                          |
-| 测试数据隔离         | `test-data-isolation-boundary.mjs`、`manual-acceptance-dataset.mjs`、`manual-acceptance-dataset-runner.mjs`、`manual-acceptance-page-data-contract.mjs`、`manual-acceptance-catalog.mjs`、`manual-acceptance-account-scenarios.mjs`、`manual-acceptance-source-data.mjs`、`manual-acceptance-task-data.mjs`、`manual-acceptance-fact-data.mjs`、`manual-acceptance-source-driven-facts.mjs`、`manual-acceptance-attachment-data.mjs`、`manual-acceptance-readiness.mjs`、`manual-acceptance-browser.mjs`、`manual-acceptance-source-retire.mjs` | Product Core、本地 / 133 同版模拟数据、页面归属、真实导入准备和执行门禁分桶检查；当前事实只走正式来源驱动 API，旧通用写入器不得回流，浏览器入口只执行登录和只读页面查询 |
+| 测试数据隔离         | `test-data-isolation-boundary.mjs`、`local-acceptance-lifecycle.mjs`、`manual-acceptance-dataset.mjs`、`manual-acceptance-dataset-runner.mjs`、`manual-acceptance-page-data-contract.mjs`、`manual-acceptance-catalog.mjs`、`manual-acceptance-account-scenarios.mjs`、`manual-acceptance-source-data.mjs`、`manual-acceptance-task-data.mjs`、`manual-acceptance-fact-data.mjs`、`manual-acceptance-source-driven-facts.mjs`、`manual-acceptance-attachment-data.mjs`、`manual-acceptance-readiness.mjs`、`manual-acceptance-browser.mjs`、`manual-acceptance-source-retire.mjs` | Product Core、本地 / 133 同版模拟数据、页面归属、真实导入准备和执行门禁分桶检查；本地完整入口按批建库并自动回收，当前事实只走正式来源驱动 API，旧通用写入器不得回流 |
 | 代码质量和安全       | `secrets.sh`、`error-codes.sh`、`go-vet.sh`、`govulncheck.sh`、`shellcheck.sh`、`shfmt.sh`、`yamllint.sh`                                                                                                                                                                                                                                                                                                                                                                                                                                       | 按对应语言 / 配置类型补充检查，不替代业务回归                                                                                                                           |
 
 ## 门禁完整性与 CI 边界
@@ -113,7 +114,22 @@ node scripts/qa/manual-acceptance-data-depth.mjs
 
 正常整批写入只使用顶层 runner。它按 `core → baseline → role → source → task → facts → purchase-quality → attachments → readiness` 串行执行；两端 handler 身份和 target-free 业务输入相同，目标适配层只提供 endpoint、数据库身份、凭据、确认、带外证明和报告目录。`core` 在登录前先调用只读 `/readyz/runtime-identity`，用摘要同时绑定实际数据库、完整 40 位 release commit 和 14 位 Atlas revision；探针只返回匹配 marker，不返回数据库名或连接信息。随后登录 admin 读取真实 `debug.capabilities`，再次核对数据库、运行环境和六个 debug=false，只读证明后续阶段依赖的 1 个稳定单位和 4 个仓库。`baseline` 再逐类读回客户、供应商、材料、产品、SKU、工序、BOM、来源单、Workflow 和全部 Fact 都为 0；任何已有业务记录都会阻断，不能用历史数据凑页面数量。`role` 在已注册的 local 与 133 验收目标中统一通过带版本校验和审计的 `admin.set_role_data_scopes`，把 `warehouse / quality` 精确绑定到这 4 个核心仓库；不得用脚本直写 RBAC 表。材料、产品、工序、BOM 与业务源单数量随后由 `source` 阶段独立写入并读回。密码创建与重置统一要求 8～20 位且 UTF-8 编码后不超过 72 字节，凭据只从环境变量注入，不写报告。
 
-顶层 runner 不隐式创建数据库、执行 migration、创建首个管理员、激活客户配置或直接执行 core seed。两端完整顺序固定为 `fresh database → migration → first admin → customer config apply/readback → exact core bootstrap → dataset runner → browser`。本地 core 仅允许下面这条精确数据库绑定命令；133 使用镜像内 `/app/bootstrap-manual-acceptance-core`，详见 [Compose 部署说明](../../server/deploy/compose/prod/README.md)。
+`local-acceptance-lifecycle.mjs` 是本地完整验收的统一入口：它只接受登记的 `192.168.0.106:5432` 开发 PostgreSQL、clean exact commit、按批生成的 `plush_erp_acceptance_<run-id>_dev` 与 `plush_erp_acceptance_<run-id>_browser_actions_dev`，并使用隔离端口完成建库、migration、后端、客户配置、core、九岗位数据、50 项只读浏览器和四条真实写异常流。只读验收完成并停后端后才克隆 `browser_actions` 库；无论成功失败都会停服务、逐库强制删除和读回残留，清理失败返回非零并报告精确库名。默认只打印 plan；真实执行必须传入 exact commit、run id、由 plan 生成的确认串和 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，回执不保存 DSN、密码或 token：
+
+```bash
+node scripts/qa/local-acceptance-lifecycle.mjs \
+  --commit '<clean-40-character-commit>' \
+  --run-id 20260728-delivery
+
+LOCAL_ACCEPTANCE_DATABASE_BASE_URL='postgres://<user>:<password>@192.168.0.106:5432/postgres?sslmode=disable' \
+  node scripts/qa/local-acceptance-lifecycle.mjs \
+    --execute \
+    --commit '<clean-40-character-commit>' \
+    --run-id 20260728-delivery \
+    --confirm 'RUN_LOCAL_ACCEPTANCE_LIFECYCLE:plush_erp_acceptance_20260728_delivery_dev:plush_erp_acceptance_20260728_delivery_browser_actions_dev:<clean-40-character-commit>'
+```
+
+下面的组件命令只用于分段诊断；它们不替代统一生命周期和自动清理。两端完整顺序仍固定为 `fresh database → migration → first admin → customer config apply/readback → exact core bootstrap → dataset runner → browser`。133 使用镜像内 `/app/bootstrap-manual-acceptance-core`，详见 [Compose 部署说明](../../server/deploy/compose/prod/README.md)。
 
 两端配置都从当前 tracked yoyoosun 包生成同一份 preview 输入；这一步只写 ignored 报告，不连接后端：
 
@@ -127,7 +143,7 @@ node scripts/qa/customer-config-runtime-manifest.mjs \
 本地隔离库通过本地专用 gate 应用配置，不能携带远端 attestation：
 
 ```bash
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_ADMIN_USERNAME=admin \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<isolated-local-admin-password>' \
 MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
@@ -136,18 +152,18 @@ MANUAL_ACCEPTANCE_PASSWORD='<different-demo-password>' \
     --preview-manifest output/qa/manual-acceptance-dataset/yoyoosun-runtime-manifest-preview.json \
     --target local-dev \
     --backend-url http://127.0.0.1:8310 \
-    --database-name plush_erp_acceptance_20260716_v5_dev \
+    --database-name plush_erp_acceptance_20260728_delivery_dev \
     --data-version 2026.07.16-v5 \
     --run-id 20260716-V5 \
     --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/customer-config
 ```
 
 ```bash
-POSTGRES_DSN='postgres://<user>:<password>@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable' \
+POSTGRES_DSN='postgres://<user>:<password>@192.168.0.106:5432/plush_erp_acceptance_20260728_delivery_dev?sslmode=disable' \
   bash scripts/seed-core-demo-data.sh \
     --references-only \
-    --expected-database plush_erp_acceptance_20260716_v5_dev \
-    --confirm SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260716_v5_dev:2026.07.16-v5:20260716-V5
+    --expected-database plush_erp_acceptance_20260728_delivery_dev \
+    --confirm SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.07.16-v5:20260716-V5
 ```
 
 本地命令必须指向明确绑定专用验收数据库的后端；当前共享开发端口不能因为地址是本机就当作验收库：
@@ -161,8 +177,8 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<8-to-20-character-admin-password>' \
     --data-version 2026.07.16-v5 \
     --run-id 20260716-V5 \
     --backend-url '<dedicated-local-acceptance-backend-url-not-port-8300>' \
-    --database-name plush_erp_acceptance_20260716_v5_dev \
-    --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev
+    --database-name plush_erp_acceptance_20260728_delivery_dev \
+    --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev
 ```
 
 本地 `--apply` 同时要求显式后端、`plush_erp_acceptance_*` 数据库名和数据库绑定确认串；端口 `8300` 在参数解析阶段直接拒绝。运行态数据库摘要不匹配时，runner 在认证前停止，不会创建登录会话，也不会进入 `role` 或任何业务写阶段。
@@ -235,7 +251,7 @@ fresh 和 resume 都会原子占用同目录的 `dataset/.apply.lock`，同一�
 
 ```bash
 MANUAL_ACCEPTANCE_SIM_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-source-data.mjs \
@@ -244,7 +260,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --data-version 2026.07.16-v5 \
     --run-id 20260716-V5 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
-    --database-name plush_erp_acceptance_20260716_v5_dev \
+    --database-name plush_erp_acceptance_20260728_delivery_dev \
     --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source
 ```
 
@@ -257,7 +273,7 @@ node scripts/qa/manual-acceptance-task-data.mjs \
   --run-id 20260716-V5
 
 MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=APPLY_SIMULATED_ACCOUNT_SCENARIOS \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-account-scenarios.mjs \
@@ -266,11 +282,11 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --data-version 2026.07.16-v5 \
     --run-id 20260716-V5 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
-    --database-name plush_erp_acceptance_20260716_v5_dev \
+    --database-name plush_erp_acceptance_20260728_delivery_dev \
     --json
 
 MANUAL_ACCEPTANCE_TASK_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-task-data.mjs \
@@ -279,7 +295,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --data-version 2026.07.16-v5 \
     --run-id 20260716-V5 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
-    --database-name plush_erp_acceptance_20260716_v5_dev \
+    --database-name plush_erp_acceptance_20260728_delivery_dev \
     --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/task
 ```
 
@@ -287,7 +303,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
 
 ```bash
 MANUAL_ACCEPTANCE_SIM_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-fact-data.mjs \
@@ -296,7 +312,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --data-version 2026.07.16-v5 \
     --run-id 20260716-V5 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
-    --database-name plush_erp_acceptance_20260716_v5_dev \
+    --database-name plush_erp_acceptance_20260728_delivery_dev \
     --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \
     --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/facts
 ```
@@ -311,7 +327,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-readiness.mjs \
     --verify \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
-    --database-name plush_erp_acceptance_20260716_v5_dev \
+    --database-name plush_erp_acceptance_20260728_delivery_dev \
     --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \
     --fact-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/facts/apply-report.json \
     --task-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/task/apply-report.json \
@@ -385,7 +401,7 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
     --run-id 20260716-V5
 
 MANUAL_ACCEPTANCE_RETIRE_CONFIRM=RETIRE_SIMULATED_MANUAL_ACCEPTANCE_SOURCE_DATA \
-MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \
+MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-source-retire.mjs \
@@ -394,7 +410,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --data-version 2026.07.16-v5 \
     --run-id 20260716-V5 \
     --backend-url '<dedicated-local-acceptance-backend-url>' \
-    --database-name plush_erp_acceptance_20260716_v5_dev
+    --database-name plush_erp_acceptance_20260728_delivery_dev
 ```
 
 手工验收数据不是压测数据。容量和压力入口只能使用一次性隔离数据库；共享开发库与 133 试用库都不得拿来压测。容量幂等探针必须通过 `--task-source-type / --task-source-id` 绑定同批 `trial_pmc_work` 模拟任务，并校验 `simulated_only / trial_task` 标记；不得借用正式来源生成任务。ignored 本地报告也不等于目标服务器的发布证据。

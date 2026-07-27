@@ -77,7 +77,7 @@ func TestRequireCustomerConfigLocalTestDSNOnlyAllowsRegisteredDevelopmentFamily(
 	for _, dsn := range []string{
 		"postgres://test_user:secret@192.168.0.106:5432/plush_erp?sslmode=disable",
 		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
-		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
 	} {
 		if err := RequireCustomerConfigLocalTestDSN(dsn); err != nil {
 			t.Fatalf("expected registered development database to pass, got %v", err)
@@ -101,8 +101,8 @@ func TestRequireCustomerConfigLocalTestDSNOnlyAllowsRegisteredDevelopmentFamily(
 func TestRequireCustomerConfigLocalTestRuntimeBindsConfiguredAndConnectedDatabase(t *testing.T) {
 	t.Parallel()
 
-	const dsn = "postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable"
-	if err := RequireCustomerConfigLocalTestRuntime(dsn, "plush_erp_acceptance_20260716_v5_dev", CustomerConfigLocalTestSystemIdentifier); err != nil {
+	const dsn = "postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable"
+	if err := RequireCustomerConfigLocalTestRuntime(dsn, "plush_erp_acceptance_local_fixture_dev", CustomerConfigLocalTestSystemIdentifier); err != nil {
 		t.Fatalf("expected matching registered runtime to pass, got %v", err)
 	}
 	for _, currentDatabase := range []string{"", "plush_erp", "plush_erp_acceptance_other_dev"} {
@@ -110,12 +110,12 @@ func TestRequireCustomerConfigLocalTestRuntimeBindsConfiguredAndConnectedDatabas
 			t.Fatalf("expected connected database %q to be rejected", currentDatabase)
 		}
 	}
-	if err := RequireCustomerConfigLocalTestRuntime(dsn, "plush_erp_acceptance_20260716_v5_dev", "9999999999999999999"); err == nil {
+	if err := RequireCustomerConfigLocalTestRuntime(dsn, "plush_erp_acceptance_local_fixture_dev", "9999999999999999999"); err == nil {
 		t.Fatal("expected a different PostgreSQL cluster identity to be rejected")
 	}
 	if err := RequireCustomerConfigLocalTestRuntime(
-		"postgres://postgres:secret@192.168.0.133:5435/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
-		"plush_erp_acceptance_20260716_v5_dev",
+		"postgres://postgres:secret@192.168.0.133:5435/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
+		"plush_erp_acceptance_local_fixture_dev",
 		CustomerConfigLocalTestSystemIdentifier,
 	); err == nil {
 		t.Fatal("expected unregistered configured target to be rejected")
@@ -128,7 +128,7 @@ func TestRequireLocalAdminResetDSNAllowsOnlyRegisteredDevelopmentFamily(t *testi
 	for _, dsn := range []string{
 		"postgres://test_user:secret@192.168.0.106:5432/plush_erp?sslmode=disable",
 		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
-		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
 	} {
 		if err := RequireLocalAdminResetDSN(dsn); err != nil {
 			t.Fatalf("expected registered local database to pass, got %v", err)

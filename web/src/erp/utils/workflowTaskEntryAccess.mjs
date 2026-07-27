@@ -10,9 +10,20 @@ function pathnameOf(entryPath) {
     .split(/[?#]/u, 1)[0]
 }
 
-export function canOpenWorkflowTaskEntry(adminProfile = {}, entryPath = '') {
+export function canOpenWorkflowTaskEntry(
+  adminProfile = {},
+  entryPath = '',
+  sourceAccess = {}
+) {
   const requiredMenuPath = resolveMenuPermissionKey(pathnameOf(entryPath))
   if (!requiredMenuPath) return false
+  if (
+    sourceAccess?.applicable !== true ||
+    sourceAccess?.resolved !== true ||
+    sourceAccess?.allowed !== true
+  ) {
+    return false
+  }
   if (adminProfile?.is_super_admin === true) return true
 
   return (Array.isArray(adminProfile?.menus) ? adminProfile.menus : []).some(

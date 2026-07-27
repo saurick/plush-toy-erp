@@ -234,6 +234,84 @@ func TestWorkflowRepo_ReassignmentRejectsPermissionsStitchedAcrossRoles(t *testi
 	}
 }
 
+func TestWorkflowRepo_ReassignmentAcceptsSourceReadFromAnotherActiveRole(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_assignment_source_role?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client, sqlDialect: dialect.SQLite}, log.NewStdLogger(io.Discard))
+	uc := biz.NewWorkflowUsecase(repo)
+	task := createWorkflowIdempotencyTestTask(t, ctx, repo, "ASSIGNMENT-SOURCE-ROLE")
+
+	ownerRole := createWorkflowAssignmentRoleWithPermissions(
+		t,
+		ctx,
+		client,
+		biz.QualityRoleKey,
+		workflowAssignmentRequiredPermissions()...,
+	)
+	sourceRole := createWorkflowAssignmentRoleWithPermissions(
+		t,
+		ctx,
+		client,
+		biz.FinanceRoleKey,
+		biz.PermissionShipmentRead,
+		biz.PermissionProductionFactRead,
+	)
+	target, err := client.AdminUser.Create().
+		SetUsername("source_permission_target").
+		SetPasswordHash("hash").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create source permission target: %v", err)
+	}
+	for _, roleID := range []int{ownerRole, sourceRole} {
+		if _, err := client.AdminUserRole.Create().
+			SetAdminUserID(target.ID).
+			SetRoleID(roleID).
+			Save(ctx); err != nil {
+			t.Fatalf("link source permission target role %d: %v", roleID, err)
+		}
+	}
+	in := &biz.WorkflowTaskAssignment{
+		ID:                           task.ID,
+		ExpectedVersion:              task.Version,
+		CommandKey:                   "reassign_task",
+		IdempotencyKey:               "workflow-assignment-source-role",
+		TargetAssigneeID:             &target.ID,
+		Reason:                       "源单权限来自另一个有效岗位",
+		RequiredOwnerRoleKey:         biz.QualityRoleKey,
+		RequiredPermissionKeys:       workflowAssignmentRequiredPermissions(),
+		RequiredAccountPermissionAll: []string{biz.PermissionShipmentRead},
+		RequiredAccountPermissionAny: []string{
+			biz.PermissionProductionFactRead,
+			biz.PermissionPMCPlanRead,
+		},
+	}
+	assigned, err := uc.ReassignTask(ctx, in, 7, biz.BossRoleKey)
+	if err != nil {
+		t.Fatalf("source permission from another active role should be accepted: %v", err)
+	}
+	if assigned.AssigneeID == nil || *assigned.AssigneeID != target.ID {
+		t.Fatalf("assigned target = %#v, want %d", assigned.AssigneeID, target.ID)
+	}
+
+	if _, err := client.Role.UpdateOneID(sourceRole).SetDisabled(true).Save(ctx); err != nil {
+		t.Fatalf("disable source permission role: %v", err)
+	}
+	blockedTask := createWorkflowIdempotencyTestTask(t, ctx, repo, "ASSIGNMENT-DISABLED-SOURCE-ROLE")
+	blockedInput := *in
+	blockedInput.ID = blockedTask.ID
+	blockedInput.ExpectedVersion = blockedTask.Version
+	blockedInput.IdempotencyKey = "workflow-assignment-disabled-source-role"
+	if _, err := uc.ReassignTask(ctx, &blockedInput, 7, biz.BossRoleKey); !errors.Is(err, biz.ErrWorkflowAssigneeIneligible) {
+		t.Fatalf("disabled source role error = %v, want ineligible", err)
+	}
+	persisted, err := repo.GetWorkflowTask(ctx, blockedTask.ID)
+	if err != nil || persisted.AssigneeID != nil || persisted.Version != blockedTask.Version {
+		t.Fatalf("disabled source role changed task: task=%#v err=%v", persisted, err)
+	}
+}
+
 func createWorkflowAssignmentTarget(
 	t *testing.T,
 	ctx context.Context,

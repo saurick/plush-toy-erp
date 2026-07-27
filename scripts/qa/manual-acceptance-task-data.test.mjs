@@ -49,7 +49,7 @@ import {
 
 const NOW_SEC = 1_800_000_000;
 const LOCAL_ACCEPTANCE_BACKEND_URL = "http://127.0.0.1:8310";
-const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_20260716_v5_dev";
+const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_local_fixture_dev";
 const SCRIPT_PATH = fileURLToPath(
   new URL("./manual-acceptance-task-data.mjs", import.meta.url),
 );
@@ -1339,7 +1339,7 @@ test("CLI documents and parses the output report boundary", () => {
   assert.match(help.stdout, /http:\/\/127\.0\.0\.1:8310/u);
   assert.match(
     help.stdout,
-    /--database-name plush_erp_acceptance_20260716_v5_dev/u,
+    /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
   assert.match(help.stdout, /--run-id 20260716-V5/u);
   assert.doesNotMatch(help.stdout, /127\.0\.0\.1:8300/u);

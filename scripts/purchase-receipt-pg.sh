@@ -12,16 +12,20 @@ if [ -z "$cmd" ]; then
   exit 2
 fi
 
-PURCHASE_RECEIPT_PG_DB_URL="${PURCHASE_RECEIPT_PG_DB_URL:-postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable}"
+PURCHASE_RECEIPT_PG_DB_URL="${PURCHASE_RECEIPT_PG_DB_URL:-}"
+if [ -z "$PURCHASE_RECEIPT_PG_DB_URL" ]; then
+  echo "ERROR: PURCHASE_RECEIPT_PG_DB_URL is required and must point to a generated plush_erp_ci_<run-id> database" >&2
+  exit 2
+fi
 
 parse_output="$(
-  python3 - "$PURCHASE_RECEIPT_PG_DB_URL" <<'PY'
+  python3 - "$PURCHASE_RECEIPT_PG_DB_URL" "$cmd" <<'PY'
 import re
 import shlex
 import sys
 import urllib.parse
 
-raw = sys.argv[1]
+raw, command = sys.argv[1:]
 u = urllib.parse.urlparse(raw)
 if u.scheme not in {"postgres", "postgresql"}:
     raise SystemExit("ERROR: PURCHASE_RECEIPT_PG_DB_URL must use postgres/postgresql scheme")
@@ -40,8 +44,14 @@ if host not in allowed_hosts:
     raise SystemExit(f"ERROR: refuse non-local PURCHASE_RECEIPT_PG_DB_URL host: {host}")
 if not dbname:
     raise SystemExit("ERROR: PURCHASE_RECEIPT_PG_DB_URL missing database name")
-if "purchase_receipt" not in dbname.lower() and "test" not in dbname.lower():
-    raise SystemExit(f"ERROR: database name must contain purchase_receipt or test: {dbname}")
+owns_disposable_lifecycle = command in {
+    "test-critical-disposable",
+    "test-populated-upgrade",
+}
+if not re.fullmatch(r"plush_erp_ci_[a-z0-9_]+", dbname) and not (
+    owns_disposable_lifecycle and dbname == "postgres"
+):
+    raise SystemExit(f"ERROR: database name must match plush_erp_ci_<run-id>: {dbname}")
 if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
     raise SystemExit(f"ERROR: database name must be alphanumeric/underscore only: {dbname}")
 
@@ -215,6 +225,8 @@ import sys
 import urllib.parse
 
 raw, base_name, process_id, random_value = sys.argv[1:]
+if base_name == "postgres":
+    base_name = "plush_erp_ci"
 suffix = f"_populated_{process_id}_{random_value}"
 prefix = base_name[: 63 - len(suffix)]
 database_name = prefix + suffix

@@ -41,7 +41,7 @@ const DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
 const RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 const DATASET_KEY = "yoyoosun-manual-acceptance";
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
-const LOCAL_DATABASE_NAME = "plush_erp_acceptance_20260716_v5_dev";
+const LOCAL_DATABASE_NAME = "plush_erp_acceptance_local_fixture_dev";
 
 test("runtime admin guard consumes the formal top-level auth.me profile", () => {
   assert.deepEqual(

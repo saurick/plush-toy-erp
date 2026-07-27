@@ -334,6 +334,7 @@ export function createDevCustomerImportDryRunPlugin({
 } = {}) {
   return {
     name: 'plush-dev-customer-import-dry-run-api',
+    apply: 'serve',
     configureServer(server) {
       server.middlewares.use(API_PATH, async (req, res) => {
         if (req.method !== 'POST') {

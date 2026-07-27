@@ -52,7 +52,7 @@ import { buildManualAcceptanceTaskSchedule } from "./manual-acceptance-task-data
 
 const GENERATED_AT = "2026-07-15T01:02:03.000Z";
 const LOCAL_APPLY_BACKEND = "http://127.0.0.1:18376";
-const LOCAL_APPLY_DATABASE = "plush_erp_acceptance_20260716_v5_dev";
+const LOCAL_APPLY_DATABASE = "plush_erp_acceptance_local_fixture_dev";
 let runnerOutputSequence = 0;
 
 test("component report digest treats undefined object fields as omitted JSON fields", () => {
@@ -625,9 +625,9 @@ test("semantic plan locks the nine narrow stage contracts", () => {
   assert.deepEqual(core.commands[0].args, [
     "--references-only",
     "--expected-database",
-    "plush_erp_acceptance_20260716_v5_dev",
+    "plush_erp_acceptance_20260728_delivery_dev",
     "--confirm",
-    "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260716_v5_dev:2026.07.16-v5:20260716-V5",
+    "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.07.16-v5:20260716-V5",
   ]);
   assert.equal(
     core.targetExecution[CUSTOMER_TRIAL_133_TARGET].seedAllowed,

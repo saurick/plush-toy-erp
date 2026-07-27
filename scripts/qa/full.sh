@@ -19,7 +19,7 @@ print_help() {
 
 环境变量:
   QA_BASE_RANGE=...    指定 diff 范围供 db-guard/secrets 使用
-  PURCHASE_RECEIPT_PG_DB_URL=...  本地 PostgreSQL 连接基线；门禁派生唯一 disposable test 库，不写入基线库
+  DISPOSABLE_DATABASE_BASE_URL=... 本地 PostgreSQL 管理连接基线；门禁派生唯一 disposable test 库，不写入基线库
   QA_BROWSER_SCENARIOS=...        浏览器诊断时覆盖默认场景；门禁始终至少运行一个场景
 
 结果边界:
@@ -107,6 +107,8 @@ echo "[qa:full] 运行 web 测试与构建"
     --kind node --label web-all -- \
     "$PNPM_BIN" test --test-reporter=tap
   "$PNPM_BIN" build
+  node "$ROOT_DIR/scripts/qa/dev-workbench-production-boundary.mjs" \
+    --build-dir "$ROOT_DIR/web/build"
 )
 
 echo "[qa:full] 实际启动 Chromium 运行无写入浏览器 smoke"
@@ -123,6 +125,9 @@ browser_port="$(
     --find-free-aux-port \
     --project-root "$ROOT_DIR"
 )"
+node "$ROOT_DIR/web/scripts/productionDevBoundaryBrowserSmoke.mjs" \
+  --port "$browser_port" \
+  --build-dir "$ROOT_DIR/web/build"
 (
   cd "$ROOT_DIR/web"
   # styleL1.mjs 会派生 pnpm 启动 Vite；确保使用项目锁定的 pnpm 所在 PATH。
@@ -139,8 +144,15 @@ trap - EXIT
 echo "[qa:full] 运行 server 全量检查"
 (
   cd "$ROOT_DIR/server"
-  make populated_upgrade_pg_test
-  bash "$ROOT_DIR/scripts/purchase-receipt-pg.sh" test-critical-disposable
+  if [[ -z "${DISPOSABLE_DATABASE_BASE_URL:-}" ]]; then
+    echo "[qa:full] status=incomplete reason=missing_database_base variable=DISPOSABLE_DATABASE_BASE_URL"
+    exit 2
+  fi
+  PURCHASE_RECEIPT_PG_DB_URL="$DISPOSABLE_DATABASE_BASE_URL" \
+    make populated_upgrade_pg_test
+  node "$ROOT_DIR/scripts/qa/disposable-database-runner.mjs" \
+    --profile ci \
+    --workflow critical-postgres
   ERP_PDF_CHROMIUM_INTEGRATION=1 \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind go --label server-all -- \

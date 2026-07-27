@@ -6,6 +6,7 @@ import {
   hasWorkflowTaskActionCapability,
   normalizeWorkflowActionExplainData,
   normalizeWorkflowActionMode,
+  normalizeWorkflowTaskSourceAccess,
   requireWorkflowTaskExplainParams,
   resolveWorkflowActionAccessRequestOutcome,
   workflowTaskActionAccessRequestIdentity,
@@ -38,6 +39,14 @@ function task(overrides = {}) {
     ...overrides,
   }
 }
+
+const sourceAccessNotApplicable = Object.freeze({
+  applicable: false,
+  resolved: true,
+  allowed: true,
+  reason_code: 'source_access_not_applicable',
+  reason: '当前任务没有需要核对的相关单据。',
+})
 
 test('workflowTaskActionAccess: normalizes backend explain actions', () => {
   const normalized = normalizeWorkflowActionExplainData({
@@ -133,6 +142,44 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
   assert.equal(normalized.custom_backend_action_key, undefined)
 })
 
+test('workflowTaskActionAccess: source access projection is strict and fail closed', () => {
+  assert.deepEqual(
+    normalizeWorkflowTaskSourceAccess({
+      source_access: {
+        applicable: true,
+        resolved: true,
+        allowed: false,
+        reason_code: 'source_read_permission_missing',
+        reason: '当前账号不能查看相关单据。',
+      },
+    }),
+    {
+      source: 'backend',
+      applicable: true,
+      resolved: true,
+      allowed: false,
+      reasonCode: 'source_read_permission_missing',
+      reason: '当前账号不能查看相关单据。',
+    }
+  )
+
+  for (const data of [
+    {},
+    { source_access: null },
+    {
+      source_access: {
+        applicable: true,
+        resolved: false,
+        allowed: true,
+      },
+    },
+  ]) {
+    const sourceAccess = normalizeWorkflowTaskSourceAccess(data)
+    assert.equal(sourceAccess.allowed, false)
+    assert.match(sourceAccess.reasonCode, /source_access_/u)
+  }
+})
+
 test('workflowTaskActionAccess: distinguishes permission capability from temporary action availability', () => {
   const access = {
     byAction: {
@@ -162,7 +209,10 @@ test('workflowTaskActionAccess: distinguishes permission capability from tempora
     ),
     false
   )
-  assert.equal(hasWorkflowTaskActionCapability({}, () => true), false)
+  assert.equal(
+    hasWorkflowTaskActionCapability({}, () => true),
+    false
+  )
 })
 
 test('workflowTaskActionAccess: accepts formal action modes only', () => {
@@ -261,6 +311,7 @@ test('workflowTaskActionAccess: backend explain overrides local fallback', () =>
     adminProfile: admin(),
     task: task(),
     explainData: {
+      source_access: sourceAccessNotApplicable,
       actions: [
         {
           action_key: 'complete',
@@ -290,6 +341,35 @@ test('workflowTaskActionAccess: backend explain overrides local fallback', () =>
     access.byAction.urge.reasonCode,
     'action_access_missing_from_backend'
   )
+})
+
+test('workflowTaskActionAccess: denied source access blocks handling but keeps an allowed urge', () => {
+  const sourceReason =
+    '当前账号不能查看该任务的相关单据，因此不能办理；可催办责任人或联系管理员调整岗位权限。'
+  const access = buildWorkflowActionAccessState({
+    adminProfile: admin(),
+    task: task(),
+    explainData: {
+      source_access: {
+        applicable: true,
+        resolved: true,
+        allowed: false,
+        reason_code: 'source_read_permission_missing',
+        reason: sourceReason,
+      },
+      actions: [
+        { action_key: 'complete', allowed: true, reason: '可完成' },
+        { action_key: 'urge', allowed: true, reason: '可催办' },
+      ],
+    },
+  })
+
+  assert.deepEqual(access.allowedModes, ['urge'])
+  assert.equal(access.canHandle, false)
+  assert.equal(access.urgeOnly, true)
+  assert.equal(access.canRun('complete'), false)
+  assert.equal(access.getReason('complete'), sourceReason)
+  assert.equal(access.canRun('urge'), true)
 })
 
 test('workflowTaskActionAccess: fallback keeps local owner and terminal reasons', () => {

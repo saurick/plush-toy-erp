@@ -538,9 +538,9 @@ function buildStages(identity) {
           [
             "--references-only",
             "--expected-database",
-            "plush_erp_acceptance_20260716_v5_dev",
+            "plush_erp_acceptance_20260728_delivery_dev",
             "--confirm",
-            "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260716_v5_dev:2026.07.16-v5:20260716-V5",
+            "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260728_delivery_dev:2026.07.16-v5:20260716-V5",
           ],
           {
             execution: "out-of-band-explicit-only",

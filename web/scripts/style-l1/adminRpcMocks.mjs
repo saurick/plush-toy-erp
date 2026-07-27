@@ -445,7 +445,9 @@ export async function installAdminRpcMocks(
       'field.party_private.read',
       'field.sales_commercial.read',
       'workflow.task.read',
-      'workflow.task.approve',
+      ...(approvalSettingsMode === 'role_permission_drift'
+        ? []
+        : ['workflow.task.approve']),
       'mobile.sales.access',
       'customer.read',
       'sales_order.read',
@@ -468,7 +470,12 @@ export async function installAdminRpcMocks(
     sort_order: 30,
     navigation_mode: 'recommended',
     primary_menu_paths: [],
-    permissions: ['workflow.task.read', 'workflow.task.approve'],
+    permissions: [
+      'workflow.task.read',
+      ...(approvalSettingsMode === 'role_permission_drift'
+        ? []
+        : ['workflow.task.approve']),
+    ],
     data_scopes: [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
     ],
@@ -488,7 +495,9 @@ export async function installAdminRpcMocks(
     primary_menu_paths: [],
     permissions: [
       'workflow.task.read',
-      'workflow.task.approve',
+      ...(approvalSettingsMode === 'role_permission_drift'
+        ? []
+        : ['workflow.task.approve']),
       'finance.receivable.confirm',
       'finance.reconciliation.confirm',
       'finance.reconciliation.read',

@@ -909,8 +909,10 @@ func (r *workflowRepo) validateWorkflowAssignmentTargetInTx(
 		return err
 	}
 	requiredOwnerRoleKey := biz.NormalizeRoleKey(in.RequiredOwnerRoleKey)
+	activeRoleIDs := make([]int, 0, len(roles))
 	ownerRoleIDs := make([]int, 0, 1)
 	for _, item := range roles {
+		activeRoleIDs = append(activeRoleIDs, item.ID)
 		if biz.NormalizeRoleKey(item.RoleKey) == requiredOwnerRoleKey {
 			ownerRoleIDs = append(ownerRoleIDs, item.ID)
 		}
@@ -957,6 +959,61 @@ func (r *workflowRepo) validateWorkflowAssignmentTargetInTx(
 	}
 	for _, required := range biz.NormalizePermissionKeys(in.RequiredPermissionKeys) {
 		if _, ok := effective[required]; !ok {
+			return biz.ErrWorkflowAssigneeIneligible
+		}
+	}
+	requiredAccountAll := biz.NormalizePermissionKeys(in.RequiredAccountPermissionAll)
+	requiredAccountAny := biz.NormalizePermissionKeys(in.RequiredAccountPermissionAny)
+	if len(requiredAccountAll) == 0 && len(requiredAccountAny) == 0 {
+		return nil
+	}
+	accountRolePermissionQuery := tx.RolePermission.Query().
+		Where(rolepermission.RoleIDIn(activeRoleIDs...))
+	if r.data.sqlDialect == dialect.Postgres {
+		accountRolePermissionQuery = accountRolePermissionQuery.Where(func(selector *entsql.Selector) {
+			selector.ForUpdate()
+		})
+	}
+	accountRolePermissions, err := accountRolePermissionQuery.All(ctx)
+	if err != nil {
+		return err
+	}
+	accountPermissionIDs := make([]int, 0, len(accountRolePermissions))
+	for _, item := range accountRolePermissions {
+		accountPermissionIDs = append(accountPermissionIDs, item.PermissionID)
+	}
+	if len(accountPermissionIDs) == 0 {
+		return biz.ErrWorkflowAssigneeIneligible
+	}
+	accountPermissionQuery := tx.Permission.Query().
+		Where(permission.IDIn(accountPermissionIDs...))
+	if r.data.sqlDialect == dialect.Postgres {
+		accountPermissionQuery = accountPermissionQuery.Where(func(selector *entsql.Selector) {
+			selector.ForUpdate()
+		})
+	}
+	accountPermissions, err := accountPermissionQuery.All(ctx)
+	if err != nil {
+		return err
+	}
+	accountEffective := make(map[string]struct{}, len(accountPermissions))
+	for _, item := range accountPermissions {
+		accountEffective[strings.TrimSpace(item.PermissionKey)] = struct{}{}
+	}
+	for _, required := range requiredAccountAll {
+		if _, ok := accountEffective[required]; !ok {
+			return biz.ErrWorkflowAssigneeIneligible
+		}
+	}
+	if len(requiredAccountAny) > 0 {
+		allowed := false
+		for _, required := range requiredAccountAny {
+			if _, ok := accountEffective[required]; ok {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
 			return biz.ErrWorkflowAssigneeIneligible
 		}
 	}

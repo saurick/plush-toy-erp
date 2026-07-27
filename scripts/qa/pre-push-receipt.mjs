@@ -1044,12 +1044,22 @@ export function preparePush(root, options, { env = process.env } = {}) {
     console.log(
       `[qa:prepare-push] 运行 full（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange}）`,
     );
-    runCommand("bash", [path.join(root, "scripts/qa/full.sh")], {
-      cwd: root,
-      env: { ...env, QA_BASE_RANGE: initialPlan.aggregateRange },
-      inherit: true,
-      reason: "full_gate_failed",
-    });
+    runCommand(
+      "node",
+      [
+        path.join(root, "scripts/qa/run-gate-with-receipt.mjs"),
+        "--gate",
+        "full",
+        "--out",
+        path.join(state.stateDir, `${state.worktreeKey}.full-receipt.json`),
+      ],
+      {
+        cwd: root,
+        env: { ...env, QA_BASE_RANGE: initialPlan.aggregateRange },
+        inherit: true,
+        reason: "full_gate_failed",
+      },
+    );
 
     const after = readRepositorySnapshot(root);
     assertSnapshotUnchanged(before, after);

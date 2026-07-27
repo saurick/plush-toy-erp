@@ -2,9 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
-import { createDevCustomerImportDryRunPlugin } from './devCustomerImportDryRunPlugin.mjs'
-import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
-import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
+import { createDevWorkbenchServePlugins } from './devWorkbenchPlugins.mjs'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
 import { loadDevPorts } from '../scripts/dev-ports.mjs'
 import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
@@ -116,21 +114,13 @@ export function createERPViteConfig(appId) {
         // 本机开发统一用 IPv4 origin，避免 localhost 解析或代理链路导致源模块加载抖动。
         isDev ? createDevLocalhostOriginNormalizer(serverPort) : null,
         react(),
-        isDev
-          ? createDevCustomerImportDryRunPlugin({
-              projectRoot: resolve(ROOT_DIR, '..'),
-              apiOrigin,
-              devCustomerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',
-            })
-          : null,
-        isDev
-          ? createDevCustomerConfigPlugin({
-              projectRoot: resolve(ROOT_DIR, '..'),
-            })
-          : null,
-        isDev && command === 'serve'
-          ? createDevQaCoveragePlugin({ projectRoot: PROJECT_ROOT })
-          : null,
+        ...createDevWorkbenchServePlugins({
+          apiOrigin,
+          command,
+          devCustomerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',
+          mode,
+          projectRoot: PROJECT_ROOT,
+        }),
       ].filter(Boolean),
       esbuild: {
         drop: isProd ? ['console', 'debugger'] : [],

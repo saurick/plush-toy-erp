@@ -73,14 +73,14 @@ func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
 		dsn     string
 		wantErr string
 	}{
-		{name: "local", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable"},
-		{name: "local rejects loopback", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable", wantErr: "registered local"},
-		{name: "local rejects IPv6 loopback", target: targetLocalDev, dsn: "postgres://user:secret@[::1]:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable", wantErr: "registered local"},
-		{name: "local rejects 133", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.133:55435/plush_erp_uat_20260716_v5?sslmode=disable", wantErr: "registered local"},
-		{name: "local rejects unregistered remote", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.88:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable", wantErr: "registered local"},
-		{name: "local rejects shared dev database", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable", wantErr: "plush_erp_acceptance_20260716_v5_dev"},
-		{name: "local rejects generic database", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.106:5432/plush_erp?sslmode=disable", wantErr: "plush_erp_acceptance_20260716_v5_dev"},
-		{name: "local rejects production-like database", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.106:5432/plush_erp_production?sslmode=disable", wantErr: "plush_erp_acceptance_20260716_v5_dev"},
+		{name: "local IPv4", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_acceptance_local_fixture_dev?sslmode=disable"},
+		{name: "local hostname", target: targetLocalDev, dsn: "postgres://user:secret@localhost:55432/plush_erp_acceptance_other_run_dev?sslmode=disable"},
+		{name: "local IPv6", target: targetLocalDev, dsn: "postgres://user:secret@[::1]:55432/plush_erp_acceptance_ipv6_run_dev?sslmode=disable"},
+		{name: "local rejects 133", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.133:55435/plush_erp_uat_20260716_v5?sslmode=disable", wantErr: "loopback"},
+		{name: "local rejects unregistered remote", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.88:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable", wantErr: "loopback"},
+		{name: "local rejects shared dev database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_simon_dev?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
+		{name: "local rejects generic database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
+		{name: "local rejects browser action database", target: targetLocalDev, dsn: "postgres://user:secret@127.0.0.1:55432/plush_erp_acceptance_local_fixture_browser_actions_dev?sslmode=disable", wantErr: "plush_erp_acceptance_<run-id>_dev"},
 		{name: "133 host loopback", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable"},
 		{name: "133 postgresql URL and escaped password", target: targetCustomerTrial133, dsn: "postgresql://user:secret%40value%3A1@localhost:55435/plush_erp_uat_20260716_v5?sslmode=disable"},
 		{name: "133 exact compose endpoint", target: targetCustomerTrial133, dsn: "postgres://user:secret@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable"},
@@ -197,57 +197,57 @@ func TestValidateTargetDSNRejectsURLAndPGXOverrideAttacks(t *testing.T) {
 		{
 			name:   "local host query override",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?host=192.168.0.133&sslmode=disable",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?host=192.168.0.133&sslmode=disable",
 		},
 		{
 			name:   "local database query override",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?dbname=plush_erp&sslmode=disable",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?dbname=plush_erp&sslmode=disable",
 		},
 		{
 			name:   "local user query override",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?user=postgres&sslmode=disable",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?user=postgres&sslmode=disable",
 		},
 		{
 			name:   "local multi host URL",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106,192.168.0.133:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+			dsn:    "postgres://user:top-secret@192.168.0.106,192.168.0.133:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
 		},
 		{
 			name:   "local keyword multi host fallback",
 			target: targetLocalDev,
-			dsn:    "host=192.168.0.106,192.168.0.133 port=5432,5435 dbname=plush_erp_acceptance_20260716_v5_dev user=user password=top-secret sslmode=disable",
+			dsn:    "host=192.168.0.106,192.168.0.133 port=5432,5435 dbname=plush_erp_acceptance_local_fixture_dev user=user password=top-secret sslmode=disable",
 		},
 		{
 			name:   "local duplicate sslmode",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable&sslmode=disable",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable&sslmode=disable",
 		},
 		{
 			name:   "local extra query",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable&application_name=acceptance",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable&application_name=acceptance",
 		},
 		{
 			name:   "local missing sslmode",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev",
 		},
 		{
 			name:   "local fragment",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable#host=192.168.0.133",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable#host=192.168.0.133",
 		},
 		{
 			name:   "local empty fragment",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable#",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable#",
 		},
 		{
 			name:   "local opaque URL",
 			target: targetLocalDev,
-			dsn:    "postgres:user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+			dsn:    "postgres:user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
 		},
 		{
 			name:   "local escaped database path",
@@ -257,12 +257,12 @@ func TestValidateTargetDSNRejectsURLAndPGXOverrideAttacks(t *testing.T) {
 		{
 			name:   "local invalid URL",
 			target: targetLocalDev,
-			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=%zz",
+			dsn:    "postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=%zz",
 		},
 		{
 			name:   "local surrounding whitespace",
 			target: targetLocalDev,
-			dsn:    " postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable\n",
+			dsn:    " postgres://user:top-secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable\n",
 		},
 		{
 			name:   "133 host query override",

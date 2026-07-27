@@ -21,12 +21,28 @@ PostgreSQL trigger 必须走下文的受控 Atlas custom migration，不得混�
     ```
     *解释：此命令会自动运行 `atlas migrate diff` (根据你的 schema 变更生成 `.sql` 文件) 和 `ent generate` (更新 Go 客户端代码)。*
 
-3.  **应用迁移**:
-    运行：
+3.  **检查、预演、应用迁移**:
+    先读取目标和 revision：
     ```bash
+    make migrate_status
+    ```
+    复制输出的 `MIGRATE_TARGET_CONFIRM`，运行只读 plan：
+    ```bash
+    MIGRATE_TARGET_CONFIRM='<migrate_status 输出>' make migrate_plan
+    ```
+    plan 会执行 Atlas validate / dry-run，并把全部 pending SQL 放进同一个
+    PostgreSQL 事务真实预演，最后强制 `ROLLBACK`。只有 plan 通过后，才复制
+    它输出的 `MIGRATE_CONFIRM`；登记的 106 共享开发库还必须完成备份、停止
+    本仓库后端、DbGate 与其它 writer，并复制
+    `MIGRATE_MAINTENANCE_CONFIRM`：
+    ```bash
+    MIGRATE_CONFIRM='<migrate_plan 输出>' \
+    MIGRATE_MAINTENANCE_CONFIRM='<共享开发库 migrate_plan 输出>' \
     make migrate_apply
     ```
-    *解释：此命令会将生成的 SQL 应用到实际数据库，并更新 `atlas_schema_revisions` 表。*
+    apply 使用 plan 绑定的目标、pending revisions 与 migration hash，整批以
+    `tx-mode=all` 执行，并在同一目标上读回 Atlas status 与 Ent /
+    PostgreSQL schema 零差异。确认值只接受当前命令环境，`.env` 残值无效。
 
 4. **Ent 无法表达的 data / trigger migration**:
    先完成结构 schema 与 `make data`，再由单一 migration owner 创建空的
@@ -46,19 +62,29 @@ PostgreSQL trigger 必须走下文的受控 Atlas custom migration，不得混�
    schema inspect 不会覆盖 function / trigger，因此零结构漂移不能替代这些
    PostgreSQL 行为测试。
 
-4.  **只补齐当前开发库已有迁移时的做法**:
+5.  **只补齐当前开发库已有迁移时的做法**:
     如果问题已经明确定位为“代码和迁移文件都已存在，但当前开发库还没 apply 到最新版本”，不要重新生成 migration，也不要手动改库；直接在 `server/` 目录执行：
     ```bash
+    make migrate_status
+    MIGRATE_TARGET_CONFIRM='<status 输出>' make migrate_plan
+    MIGRATE_CONFIRM='<plan 输出>' \
+    MIGRATE_MAINTENANCE_CONFIRM='<共享开发库 plan 输出>' \
     make migrate_apply
     ```
     执行后再做只读确认，至少核对：
-    - `migrate_apply` 已成功应用到目标 revision，没有 checksum / drift 报错
-    - 目标字段 / 索引 / 表已在当前开发库中可见
+    - `migrate_plan` 的真实事务预演已明确 `ROLLBACK`
+    - `migrate_apply` 返回 `applied_verified`，没有 checksum / drift 报错
+    - Atlas status 为 `pending=0`
+    - Ent / PostgreSQL schema 同目标读回零差异
 
     **注意：**
-    - 这里只适用于当前仓库开发配置命中的非生产库，例如 `server/configs/dev/config.yaml`、`server/configs/dev/config.local.yaml` 或用户明确指定的开发/个人测试库。
-    - 如果当前 shell 里还带着旧的 `DB_URL`、`USE_ENV_DB_URL=1` 或其他连接环境变量，必须先确认实际命中的库，再执行 `make migrate_apply`。
+    - 开发 plan/apply 只接受 loopback 的 `plush_erp*` 隔离库，以及 application config 精确命中的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev`。环境变量覆盖同一共享地址也不会被当成登记目标。
+    - 如果当前 shell 里还带着旧的 `DB_URL`、`POSTGRES_DSN`、`USE_ENV_DB_URL=1` 或其他连接环境变量，必须先确认 `make migrate_status` 的脱敏目标。
     - 如果目标库可能是生产库、共享测试库，或当前无法明确判断数据库归属，必须先说明将命中的库和风险，再等待确认。
+    - `20260726173924` 之后的 operational fact lifecycle 审计不会猜测
+      `posted_by / settled_by / cancelled_by`。只读审计失败时，只能从权威审计
+      来源精确治理，或在确认数据可丢弃并备份后重建个人开发库；不得填固定
+      管理员、放宽约束或用 `migrate_set` 跳过。
 
 ## 🔴 严格禁止的操作 (WHAT NOT TO DO)
 
@@ -71,8 +97,8 @@ PostgreSQL trigger 必须走下文的受控 Atlas custom migration，不得混�
 ## 🛠 常见问题处理
 
 *   **Checksum Mismatch (校验和不匹配)**: 如果遇到此错误，请运行 `make migrate_hash`。
-*   **开发库只是落后于仓库已有 migration**: 直接执行 `make migrate_apply`，不要因为“缺字段”就重新 `make data`，也不要跳版本。
-*   **Drift Detected / Duplicate Column (字段已存在)**: 这通常表示数据库曾被手动改过，或当前库状态已经偏离迁移历史；不要把它和“开发库单纯还没 apply 最新 migration”混为一谈。只有在确认数据库已被手动改动、且你明确理解后果时，才考虑使用 `make migrate_set` 跳过版本，或先清理数据库中的脏状态。
+*   **开发库只是落后于仓库已有 migration**: 执行 `status → plan → apply → status/readback`，不要因为“缺字段”就重新 `make data`，也不要跳版本。
+*   **Drift Detected / Duplicate Column (字段已存在)**: 这通常表示数据库曾被手动改过，或当前库状态已经偏离迁移历史；不要把它和“开发库单纯还没 apply 最新 migration”混为一谈。先做结构和 revision 对账；`migrate_set` 只能用于已经证明 SQL 效果完整存在、且有专项备份与修复证据的 revision 修复，不能用于跳过失败的数据门禁。
 
 ---
 **请严格遵守此流程以保证数据库完整性。**

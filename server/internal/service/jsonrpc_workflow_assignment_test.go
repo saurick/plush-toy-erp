@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	"server/internal/biz"
@@ -208,5 +209,121 @@ func TestWorkflowTaskAssignmentCandidateRequiresActiveDirectOwnerRole(t *testing
 		task,
 	) {
 		t.Fatal("disabled owner-role account must not be eligible")
+	}
+}
+
+func TestWorkflowTaskAssignmentCandidateRequiresAuthoritativeSourceReadAccess(t *testing.T) {
+	task := workflowAssignmentShipmentSourceTask()
+	dispatcher := &jsonrpcDispatcher{}
+	withoutSourceRead := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskUpdate,
+		biz.PermissionWorkflowTaskComplete,
+	)
+	if dispatcher.workflowTaskAssignmentCandidateEligible(
+		context.Background(),
+		withoutSourceRead,
+		task,
+	) {
+		t.Fatal("candidate without shipment read access must be ineligible")
+	}
+
+	withSourceReadFromAnotherRole := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey, biz.SalesRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskUpdate,
+		biz.PermissionWorkflowTaskComplete,
+		biz.PermissionShipmentRead,
+	)
+	if !dispatcher.workflowTaskAssignmentCandidateEligible(
+		context.Background(),
+		withSourceReadFromAnotherRole,
+		task,
+	) {
+		t.Fatal("candidate may satisfy source read access through another active role")
+	}
+}
+
+func TestJsonrpcDispatcher_ReassignTaskCarriesSourceReadContractToRepo(t *testing.T) {
+	actor := workflowJSONRPCAdmin(
+		[]string{biz.BossRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskAssign,
+	)
+	actor.ID = 7
+	actor.Username = "boss"
+	target := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskUpdate,
+		biz.PermissionWorkflowTaskComplete,
+		biz.PermissionShipmentRead,
+	)
+	target.ID = 8
+	target.Username = "warehouse_backup"
+	task := workflowAssignmentShipmentSourceTask()
+	repo := &stubWorkflowJSONRPCRepo{currentTask: task}
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(
+			log.NewStdLogger(io.Discard),
+			"module",
+			"service.jsonrpc.workflow_assignment_source.test",
+		)),
+		adminReader: workflowAssignmentAdminReader{actor.ID: actor, target.ID: target},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	_, result, err := dispatcher.handleWorkflowTask(
+		workflowJSONRPCAdminContext(),
+		"reassign_task",
+		"assignment-source-success",
+		mustJSONRPCStruct(t, map[string]any{
+			"task_id":          float64(task.ID),
+			"expected_version": float64(task.Version),
+			"idempotency_key":  "assignment-source-success-key",
+			"assignee_id":      float64(target.ID),
+			"reason":           "转给具备出货查看权限的仓库人员",
+		}).AsMap(),
+		actor.ID,
+	)
+	if err != nil || result.Code != errcode.OK.Code {
+		t.Fatalf("reassign source task result = %#v err=%v", result, err)
+	}
+	if repo.assignmentInput == nil {
+		t.Fatal("expected assignment input")
+	}
+	if len(repo.assignmentInput.RequiredAccountPermissionAll) != 1 ||
+		repo.assignmentInput.RequiredAccountPermissionAll[0] != biz.PermissionShipmentRead {
+		t.Fatalf(
+			"source read requirements = %#v, want shipment.read",
+			repo.assignmentInput.RequiredAccountPermissionAll,
+		)
+	}
+	if len(repo.assignmentInput.RequiredAccountPermissionAny) != 0 {
+		t.Fatalf(
+			"unexpected source any requirements %#v",
+			repo.assignmentInput.RequiredAccountPermissionAny,
+		)
+	}
+}
+
+func workflowAssignmentShipmentSourceTask() *biz.WorkflowTask {
+	return &biz.WorkflowTask{
+		ID:            42,
+		TaskCode:      biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskShipmentReleaseGroup, 18),
+		TaskGroup:     biz.WorkflowSourceTaskShipmentReleaseGroup,
+		TaskName:      "出货放行",
+		SourceType:    biz.WorkflowSourceTaskShipmentSourceType,
+		SourceID:      18,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.WarehouseRoleKey,
+		Payload: map[string]any{
+			"source_task_contract":    biz.WorkflowSourceTaskContractV1,
+			"source_task_producer":    biz.WorkflowSourceTaskShipmentSubmitReleaseProducer,
+			"source_task_intent_hash": strings.Repeat("a", 64),
+			"shipment_id":             float64(18),
+			"shipment_release":        true,
+		},
+		Version: 3,
 	}
 }

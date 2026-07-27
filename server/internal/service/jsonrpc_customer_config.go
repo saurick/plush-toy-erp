@@ -1248,7 +1248,7 @@ func (d *jsonrpcDispatcher) validateApprovalSettingsCandidate(
 			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "审批责任设置存在无人可办理的事项"}
 		}
 	}
-	if result := d.validateApprovalSettingsNamedMembers(ctx, settings.PublishInput.WorkPoolMemberships); result != nil {
+	if result := d.validateApprovalSettingsMemberEligibility(ctx, settings.PublishInput.WorkPoolMemberships); result != nil {
 		return result
 	}
 	if admin.IsSuperAdmin {
@@ -1275,7 +1275,7 @@ func (d *jsonrpcDispatcher) validateApprovalSettingsCandidate(
 	return nil
 }
 
-func (d *jsonrpcDispatcher) validateApprovalSettingsNamedMembers(
+func (d *jsonrpcDispatcher) validateApprovalSettingsMemberEligibility(
 	ctx context.Context,
 	memberships []biz.WorkPoolMembershipInput,
 ) *v1.JsonrpcResult {
@@ -1291,11 +1291,36 @@ func (d *jsonrpcDispatcher) validateApprovalSettingsNamedMembers(
 	if d == nil || d.adminManageUC == nil {
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}
+	roles, err := d.adminManageUC.ListRoles(ctx)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
 	admins, err := d.adminManageUC.List(ctx)
 	if err != nil {
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}
+	roleByKey := make(map[string]biz.AdminRole, len(roles))
+	for _, role := range roles {
+		roleKey := biz.NormalizeRoleKey(role.Key)
+		if roleKey != "" {
+			roleByKey[roleKey] = role
+		}
+	}
 	for _, membership := range managedMemberships {
+		roleKey := biz.NormalizeRoleKey(membership.RoleKey)
+		role, exists := roleByKey[roleKey]
+		if !exists {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位不存在"}
+		}
+		if role.Disabled {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前已停用"}
+		}
+		if !biz.PermissionSetHasAny(
+			biz.PermissionKeySet(role.Permissions),
+			biz.PermissionWorkflowTaskApprove,
+		) {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前未开启审批功能"}
+		}
 		if membership.UserID > 0 {
 			var named *biz.AdminUser
 			for _, admin := range admins {
@@ -1310,14 +1335,14 @@ func (d *jsonrpcDispatcher) validateApprovalSettingsNamedMembers(
 			if !named.IsActive() {
 				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工当前未启用"}
 			}
-			if !biz.AdminHasRole(named, membership.RoleKey) {
+			if !biz.AdminHasRole(named, roleKey) {
 				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工不属于所选岗位"}
 			}
 			continue
 		}
 		matched := false
 		for _, admin := range admins {
-			if !admin.IsActive() || !biz.AdminHasRole(admin, membership.RoleKey) {
+			if !admin.IsActive() || !biz.AdminHasRole(admin, roleKey) {
 				continue
 			}
 			matched = true

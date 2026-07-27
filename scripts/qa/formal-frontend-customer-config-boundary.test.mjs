@@ -20,11 +20,11 @@ const erpSourceRoot = path.join(repoRoot, "web/src/erp");
 const sourceExtensions = new Set([".js", ".jsx", ".mjs"]);
 const skippedSuffixes = [".test.js", ".test.jsx", ".test.mjs"];
 
-const devOnlyPrefixes = ["web/src/erp/config/dev", "web/src/erp/pages/Dev"];
+const devOnlyPrefixes = ["web/src/dev-workbench/config/dev", "web/src/dev-workbench/pages/Dev"];
 
 const allowedRawConfigPaths = new Set([
-  "web/src/erp/config/devCustomerConfig.mjs",
-  "web/src/erp/config/devHub.mjs",
+  "web/src/dev-workbench/config/devCustomerConfig.mjs",
+  "web/src/dev-workbench/config/devHub.mjs",
 ]);
 
 const forbiddenRawConfigTokens = [
@@ -90,7 +90,7 @@ test("formal frontend customer config boundary: runtime reads effective session,
   }
 
   const devConfigSource = readRelative(
-    "web/src/erp/config/devCustomerConfig.mjs",
+    "web/src/dev-workbench/config/devCustomerConfig.mjs",
   );
   assert(
     forbiddenRawConfigTokens.some((token) => devConfigSource.includes(token)),

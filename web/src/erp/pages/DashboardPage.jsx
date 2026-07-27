@@ -307,7 +307,6 @@ function TaskLane({
   selectedTaskId,
   onSelectTask,
   onOpenTask,
-  onOpenEntry,
   onViewAll,
   onPageChange,
 }) {
@@ -335,7 +334,6 @@ function TaskLane({
           lane.tasks.map((task) => {
             const statusMeta = getWorkflowTaskStatusMeta(task)
             const reasonMeta = getWorkflowTaskReasonMeta(task)
-            const entryPath = resolveWorkflowTaskEntryPath(task)
             const taskId = getWorkflowTaskStableKey(task)
             const isSelected = taskId && taskId === selectedTaskId
             return (
@@ -359,19 +357,9 @@ function TaskLane({
                   align="start"
                   size={8}
                 >
-                  {entryPath ? (
-                    <Button
-                      type="link"
-                      className="erp-dashboard-link-button erp-task-board-card-title"
-                      onClick={() => onOpenEntry(task)}
-                    >
-                      {task.task_name || '未命名任务'}
-                    </Button>
-                  ) : (
-                    <Text strong className="erp-task-board-card-title">
-                      {task.task_name || '未命名任务'}
-                    </Text>
-                  )}
+                  <Text strong className="erp-task-board-card-title">
+                    {task.task_name || '未命名任务'}
+                  </Text>
                   <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
                 </Space>
                 <Text type="secondary" className="erp-task-board-card-meta">
@@ -493,6 +481,12 @@ function isWorkflowTaskAccessChecking(access = {}) {
   return access.loading || access.source === 'fallback_checking'
 }
 
+function getWorkflowTaskPrimaryButtonLabel(access = {}) {
+  if (access.canHandle) return '处理任务'
+  if (access.urgeOnly) return '催办'
+  return '查看详情'
+}
+
 function TaskProcessingHint({ task, access = {}, canOpenEntry = false }) {
   const hint = getWorkflowTaskProcessingHint({
     task,
@@ -501,6 +495,7 @@ function TaskProcessingHint({ task, access = {}, canOpenEntry = false }) {
     failed: access.failed || access.source === 'fallback_failed',
     readonlyReason: access.readonlyReason,
     canOpenEntry,
+    sourceAccess: access.sourceAccess,
   })
 
   return (
@@ -769,10 +764,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const taskCenterCurrentEntryPath = taskCenterCurrentTask
     ? resolveWorkflowTaskEntryPath(taskCenterCurrentTask)
     : ''
-  const taskCenterCurrentCanOpenEntry = canOpenWorkflowTaskEntry(
-    adminProfile,
-    taskCenterCurrentEntryPath
-  )
 
   useEffect(() => {
     if (!taskBoardReady || !selectedTaskBoardTaskId) return
@@ -952,10 +943,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const selectedWorkbenchEntryPath = selectedWorkbenchTask
     ? resolveWorkflowTaskEntryPath(selectedWorkbenchTask)
     : ''
-  const selectedWorkbenchCanOpenEntry = canOpenWorkflowTaskEntry(
-    adminProfile,
-    selectedWorkbenchEntryPath
-  )
   const selectedWorkbenchTaskAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedWorkbenchTask,
@@ -971,6 +958,24 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     task: selectedTask,
     enabled: Boolean(selectedTask),
   })
+  const selectedWorkbenchCanOpenEntry = canOpenWorkflowTaskEntry(
+    adminProfile,
+    selectedWorkbenchEntryPath,
+    selectedWorkbenchTaskAccess.sourceAccess
+  )
+  const taskCenterCurrentCanOpenEntry = canOpenWorkflowTaskEntry(
+    adminProfile,
+    taskCenterCurrentEntryPath,
+    taskCenterCurrentTaskAccess.sourceAccess
+  )
+  const actionDrawerEntryPath = selectedTask
+    ? resolveWorkflowTaskEntryPath(selectedTask)
+    : ''
+  const actionDrawerCanOpenEntry = canOpenWorkflowTaskEntry(
+    adminProfile,
+    actionDrawerEntryPath,
+    actionDrawerAccess.sourceAccess
+  )
   const assignmentAccess = useWorkflowTaskAssignmentAccess({
     adminProfile,
     task: selectedTask,
@@ -1056,9 +1061,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     )
   }
 
-  const openTaskEntry = (task) => {
+  const openTaskEntry = (task, access) => {
     const entryPath = resolveWorkflowTaskEntryPath(task)
-    if (entryPath) {
+    if (
+      canOpenWorkflowTaskEntry(adminProfile, entryPath, access?.sourceAccess)
+    ) {
       navigate(entryPath)
     }
   }
@@ -1593,14 +1600,19 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                               openTaskDrawer(selectedWorkbenchTask)
                             }
                           >
-                            {selectedWorkbenchTaskAccess.allowedModes.length > 0
-                              ? '处理任务'
-                              : '查看详情'}
+                            {getWorkflowTaskPrimaryButtonLabel(
+                              selectedWorkbenchTaskAccess
+                            )}
                           </Button>
                         )}
                         {selectedWorkbenchCanOpenEntry ? (
                           <Button
-                            onClick={() => openTaskEntry(selectedWorkbenchTask)}
+                            onClick={() =>
+                              openTaskEntry(
+                                selectedWorkbenchTask,
+                                selectedWorkbenchTaskAccess
+                              )
+                            }
                           >
                             查看相关单据
                           </Button>
@@ -1775,15 +1787,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           }
                           onClick={() => openTaskDrawer(taskCenterCurrentTask)}
                         >
-                          {taskCenterCurrentTaskAccess.allowedModes.length > 0
-                            ? '处理任务'
-                            : '查看详情'}
+                          {getWorkflowTaskPrimaryButtonLabel(
+                            taskCenterCurrentTaskAccess
+                          )}
                         </Button>
                       )}
                       {taskCenterCurrentCanOpenEntry ? (
                         <Button
                           size="small"
-                          onClick={() => openTaskEntry(taskCenterCurrentTask)}
+                          onClick={() =>
+                            openTaskEntry(
+                              taskCenterCurrentTask,
+                              taskCenterCurrentTaskAccess
+                            )
+                          }
                         >
                           查看相关单据
                         </Button>
@@ -1881,10 +1898,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       selectTaskBoardTask(task)
                       openTaskDrawer(task)
                     }}
-                    onOpenEntry={(task) => {
-                      selectTaskBoardTask(task)
-                      openTaskEntry(task)
-                    }}
                     onViewAll={() => selectTaskBoardLane(lane.key)}
                     onPageChange={selectTaskBoardPage}
                   />
@@ -1913,11 +1926,12 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         }
         assignmentAccess={assignmentAccess}
         assignmentTarget={assignmentTarget}
+        canOpenEntry={actionDrawerCanOpenEntry}
         onActionModeChange={changeTaskActionMode}
         onActionReasonChange={setActionReason}
         onAssignmentTargetChange={setAssignmentTarget}
         onClose={closeTaskDrawer}
-        onOpenEntry={openTaskEntry}
+        onOpenEntry={(task) => openTaskEntry(task, actionDrawerAccess)}
         onSubmit={submitTaskAction}
       />
     </Space>

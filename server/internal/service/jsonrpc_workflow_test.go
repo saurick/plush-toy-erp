@@ -1544,6 +1544,104 @@ func TestJsonrpcDispatcher_WorkflowActionRequiresCustomerWorkPoolActionEntitleme
 	}
 }
 
+func TestJsonrpcDispatcher_WorkflowActionRequiresAuthoritativeSourceReadAccess(t *testing.T) {
+	task := workflowAssignmentShipmentSourceTask()
+	repo := &stubWorkflowJSONRPCRepo{currentTask: task}
+	j := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(
+			log.NewStdLogger(io.Discard),
+			"module",
+			"service.jsonrpc.workflow_source_access.test",
+		)),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskComplete,
+		)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"task_id":          float64(task.ID),
+		"expected_version": float64(task.Version),
+		"idempotency_key":  "workflow-source-access-denied",
+		"action_key":       "complete",
+		"payload":          map[string]any{},
+	})
+
+	_, res, err := j.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"complete_task_action",
+		"source-access-denied",
+		params,
+	)
+	if err != nil {
+		t.Fatalf("source access denial transport error: %v", err)
+	}
+	if res == nil || res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected source access permission denied, got %#v", res)
+	}
+	if repo.updateInput != nil {
+		t.Fatalf("source access denial must not update the task: %#v", repo.updateInput)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowActionExactReplaySurvivesSourceReadPermissionLoss(t *testing.T) {
+	task := workflowAssignmentShipmentSourceTask()
+	task.TaskStatusKey = "done"
+	task.Version = 4
+	repo := &stubWorkflowJSONRPCRepo{currentTask: task}
+	repo.resolveMutation = func(taskID int, idempotencyKey string, intentHash string) (*biz.WorkflowTask, bool, error) {
+		if taskID != task.ID ||
+			idempotencyKey != "workflow-source-access-replay" ||
+			strings.TrimSpace(intentHash) == "" {
+			return nil, false, nil
+		}
+		return task, true, nil
+	}
+	j := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(
+			log.NewStdLogger(io.Discard),
+			"module",
+			"service.jsonrpc.workflow_source_access_replay.test",
+		)),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskComplete,
+		)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"task_id":          float64(task.ID),
+		"expected_version": float64(3),
+		"idempotency_key":  "workflow-source-access-replay",
+		"action_key":       "complete",
+		"payload":          map[string]any{},
+	})
+
+	_, res, err := j.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"complete_task_action",
+		"source-access-replay",
+		params,
+	)
+	if err != nil {
+		t.Fatalf("source access exact replay transport error: %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("exact replay must survive later source read permission loss, got %#v", res)
+	}
+	if repo.updateCalls != 0 || repo.updateInput != nil {
+		t.Fatalf(
+			"exact replay must not rewrite the task after source read permission loss: calls=%d input=%#v",
+			repo.updateCalls,
+			repo.updateInput,
+		)
+	}
+}
+
 func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsEmptyReason(t *testing.T) {
 	repo := &stubWorkflowJSONRPCRepo{}
 	j := &jsonrpcDispatcher{
@@ -1904,7 +2002,7 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(
 		currentTask: &biz.WorkflowTask{
 			ID:                    42,
 			TaskGroup:             "engineering_data",
-			SourceType:            "project-orders",
+			SourceType:            "sales_order",
 			SourceID:              1001,
 			TaskStatusKey:         "ready",
 			OwnerRoleKey:          biz.EngineeringRoleKey,
@@ -1917,7 +2015,7 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(
 	processRepo := &stubProcessRuntimeJSONRPCRepo{
 		process: &biz.ProcessInstance{
 			ID: processID, ProcessKey: biz.ProcessKeySalesOrderAcceptance,
-			BusinessRefType: "project-orders", BusinessRefID: 1001,
+			BusinessRefType: "sales_order", BusinessRefID: 1001,
 			Status: biz.ProcessStatusActive,
 		},
 		node: &biz.ProcessNodeInstance{
@@ -1929,8 +2027,12 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(
 		},
 	}
 	j := &jsonrpcDispatcher{
-		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
-		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.EngineeringRoleKey}, biz.PermissionWorkflowTaskComplete)},
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.EngineeringRoleKey, biz.SalesRoleKey},
+			biz.PermissionWorkflowTaskComplete,
+			biz.PermissionSalesOrderRead,
+		)},
 		workflowUC:       biz.NewWorkflowUsecase(repo),
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 		processRuntimeUC: biz.NewProcessRuntimeUsecase(processRepo, repo),
@@ -1997,8 +2099,12 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionSettlesLinkedProcessNode(t *t
 		Status: biz.ProcessStatusActive,
 	}}
 	j := &jsonrpcDispatcher{
-		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
-		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionWorkflowTaskReject)},
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.BossRoleKey},
+			biz.PermissionWorkflowTaskReject,
+			biz.PermissionSalesOrderRead,
+		)},
 		workflowUC:       biz.NewWorkflowUsecase(repo),
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 		processRuntimeUC: biz.NewProcessRuntimeUsecase(processRepo, repo),
@@ -2689,6 +2795,7 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccess(t *testing.T) {
 		wantReasonCode   string
 		wantPermission   string
 		wantActorRoleKey string
+		wantSourceCode   string
 	}{
 		{
 			name:             "owner can complete with complete permission",
@@ -2772,6 +2879,39 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccess(t *testing.T) {
 			wantPermission:   biz.PermissionWorkflowTaskUpdate,
 			wantActorRoleKey: biz.PMCRoleKey,
 		},
+		{
+			name:             "owner cannot complete a source task without source read permission",
+			admin:            workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskComplete),
+			currentTask:      workflowAssignmentShipmentSourceTask(),
+			actionKey:        "complete",
+			wantAllowed:      false,
+			wantReasonCode:   workflowTaskSourceAccessMissingCode,
+			wantPermission:   biz.PermissionWorkflowTaskComplete,
+			wantActorRoleKey: biz.WarehouseRoleKey,
+			wantSourceCode:   workflowTaskSourceAccessMissingCode,
+		},
+		{
+			name:             "owner can complete a source task with source read permission",
+			admin:            workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskComplete, biz.PermissionShipmentRead),
+			currentTask:      workflowAssignmentShipmentSourceTask(),
+			actionKey:        "complete",
+			wantAllowed:      true,
+			wantReasonCode:   "allowed",
+			wantPermission:   biz.PermissionWorkflowTaskComplete,
+			wantActorRoleKey: biz.WarehouseRoleKey,
+			wantSourceCode:   workflowTaskSourceAccessAllowedCode,
+		},
+		{
+			name:             "urge remains available when source read permission is missing",
+			admin:            workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskUpdate),
+			currentTask:      workflowAssignmentShipmentSourceTask(),
+			actionKey:        "urge",
+			wantAllowed:      true,
+			wantReasonCode:   "allowed",
+			wantPermission:   biz.PermissionWorkflowTaskUpdate,
+			wantActorRoleKey: biz.WarehouseRoleKey,
+			wantSourceCode:   workflowTaskSourceAccessMissingCode,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2813,6 +2953,17 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccess(t *testing.T) {
 			}
 			if action["actor_role_key"] != tt.wantActorRoleKey {
 				t.Fatalf("expected actor_role_key %q, got %#v", tt.wantActorRoleKey, action["actor_role_key"])
+			}
+			sourceAccess, ok := res.Data.AsMap()["source_access"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected source_access map, got %#v", res.Data.AsMap()["source_access"])
+			}
+			wantSourceCode := tt.wantSourceCode
+			if wantSourceCode == "" {
+				wantSourceCode = workflowTaskSourceAccessNotApplicableCode
+			}
+			if sourceAccess["reason_code"] != wantSourceCode {
+				t.Fatalf("expected source reason_code %q, got %#v", wantSourceCode, sourceAccess["reason_code"])
 			}
 		})
 	}
@@ -3114,7 +3265,22 @@ func TestJsonrpcDispatcher_WorkflowExplainTaskAssignment(t *testing.T) {
 				admin.IsSuperAdmin = true
 				return admin
 			}(),
-			currentTask:    &biz.WorkflowTask{ID: 95, TaskGroup: "shipment_release", SourceType: "shipping-release", SourceID: 1, TaskStatusKey: "ready", OwnerRoleKey: biz.WarehouseRoleKey, Payload: map[string]any{"shipment_release": true}},
+			currentTask: &biz.WorkflowTask{
+				ID:            95,
+				TaskCode:      biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskShipmentReleaseGroup, 1),
+				TaskGroup:     biz.WorkflowSourceTaskShipmentReleaseGroup,
+				SourceType:    biz.WorkflowSourceTaskShipmentSourceType,
+				SourceID:      1,
+				TaskStatusKey: "ready",
+				OwnerRoleKey:  biz.WarehouseRoleKey,
+				Payload: map[string]any{
+					"source_task_contract":    biz.WorkflowSourceTaskContractV1,
+					"source_task_producer":    biz.WorkflowSourceTaskShipmentSubmitReleaseProducer,
+					"source_task_intent_hash": strings.Repeat("a", 64),
+					"shipment_id":             float64(1),
+					"shipment_release":        true,
+				},
+			},
 			wantCanHandle:  false,
 			wantCanUrge:    true,
 			wantReasonCode: "can_urge_only",
@@ -3428,13 +3594,19 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionAllowsAuditedSuperAdminBrea
 	repo := &stubWorkflowJSONRPCRepo{
 		currentTask: &biz.WorkflowTask{
 			ID:            13,
-			TaskCode:      "SHIP-REL-13",
-			TaskGroup:     "shipment_release",
-			SourceType:    "shipping-release",
+			TaskCode:      biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskShipmentReleaseGroup, 13),
+			TaskGroup:     biz.WorkflowSourceTaskShipmentReleaseGroup,
+			SourceType:    biz.WorkflowSourceTaskShipmentSourceType,
 			SourceID:      13,
 			TaskStatusKey: "ready",
 			OwnerRoleKey:  biz.WarehouseRoleKey,
-			Payload:       map[string]any{"shipment_release": true},
+			Payload: map[string]any{
+				"source_task_contract":    biz.WorkflowSourceTaskContractV1,
+				"source_task_producer":    biz.WorkflowSourceTaskShipmentSubmitReleaseProducer,
+				"source_task_intent_hash": strings.Repeat("a", 64),
+				"shipment_id":             13,
+				"shipment_release":        true,
+			},
 		},
 	}
 	admin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionWorkflowTaskComplete)
@@ -3517,8 +3689,66 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionAllowsAuditedSuperAdminBrea
 		t.Fatalf("break-glass audit summary must describe a request, got %q", event.Summary)
 	}
 	target, ok := event.Payload["target"].(map[string]any)
-	if !ok || target["type"] != "workflow_task" || target["key"] != "SHIP-REL-13" {
+	if !ok ||
+		target["type"] != "workflow_task" ||
+		target["key"] != biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskShipmentReleaseGroup, 13) {
 		t.Fatalf("unexpected audit target %#v", event.Payload["target"])
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowBreakGlassCannotBypassUnresolvedSourceAccess(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{
+		currentTask: &biz.WorkflowTask{
+			ID:            14,
+			TaskCode:      biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskShipmentReleaseGroup, 14),
+			TaskGroup:     biz.WorkflowSourceTaskShipmentReleaseGroup,
+			SourceType:    biz.WorkflowSourceTaskShipmentSourceType,
+			SourceID:      14,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.WarehouseRoleKey,
+			Payload:       map[string]any{"shipment_release": true},
+		},
+	}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.FinanceRoleKey},
+		biz.PermissionWorkflowTaskComplete,
+	)
+	admin.IsSuperAdmin = true
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(
+			log.NewStdLogger(io.Discard),
+			"module",
+			"service.jsonrpc.workflow_source_break_glass.test",
+		)),
+		adminReader:      stubAdminAccountReader{admin: admin},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"task_id":                float64(14),
+		"expected_version":       float64(1),
+		"idempotency_key":        "workflow-break-glass-unresolved-source-14",
+		"action_key":             "complete",
+		"break_glass":            true,
+		"break_glass_reason":     "来源规则异常时尝试紧急放行",
+		"break_glass_expires_at": float64(time.Now().Add(time.Hour).Unix()),
+		"payload":                map[string]any{},
+	})
+
+	_, result, err := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"complete_task_action",
+		"workflow-break-glass-unresolved-source",
+		params,
+	)
+	if err != nil {
+		t.Fatalf("unresolved source break-glass transport error: %v", err)
+	}
+	if result == nil || result.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("unresolved source break-glass result = %#v, want permission denied", result)
+	}
+	if repo.updateInput != nil {
+		t.Fatalf("unresolved source break-glass must not update the task: %#v", repo.updateInput)
 	}
 }
 

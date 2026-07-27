@@ -273,13 +273,7 @@ func isFinishedGoodsReworkTask(task *WorkflowTask) bool {
 }
 
 func isProductionSchedulingSourceTask(task *WorkflowTask) bool {
-	if !IsTrustedProductionSchedulingSourceTask(task) ||
-		strings.TrimSpace(task.OwnerRoleKey) != PMCRoleKey ||
-		!workflowSourceTaskIntentMarkerValid(task.Payload) {
-		return false
-	}
-	productionOrderID, found, err := processCommandPositiveIntFromPayload(task.Payload, "production_order_id")
-	if err != nil || !found || productionOrderID != task.SourceID {
+	if !trustedProductionSchedulingSourceLink(task) {
 		return false
 	}
 	if task.BusinessStatusKey == nil {
@@ -294,13 +288,7 @@ func isProductionSchedulingSourceTask(task *WorkflowTask) bool {
 }
 
 func isProductionExceptionSourceTask(task *WorkflowTask) bool {
-	if !IsTrustedProductionExceptionSourceTask(task) ||
-		strings.TrimSpace(task.OwnerRoleKey) != ProductionRoleKey ||
-		!workflowSourceTaskIntentMarkerValid(task.Payload) {
-		return false
-	}
-	productionFactID, found, err := processCommandPositiveIntFromPayload(task.Payload, "production_fact_id")
-	if err != nil || !found || productionFactID != task.SourceID {
+	if !trustedProductionExceptionSourceLink(task) {
 		return false
 	}
 	productionOrderID, found, err := processCommandPositiveIntFromPayload(task.Payload, "production_order_id")
@@ -320,13 +308,7 @@ func workflowSourceTaskIntentMarkerValid(payload map[string]any) bool {
 }
 
 func isShipmentReleaseTask(task *WorkflowTask) bool {
-	if !IsTrustedShipmentReleaseSourceTask(task) ||
-		strings.TrimSpace(task.OwnerRoleKey) != WarehouseRoleKey ||
-		!workflowSourceTaskIntentMarkerValid(task.Payload) {
-		return false
-	}
-	shipmentID, found, err := processCommandPositiveIntFromPayload(task.Payload, "shipment_id")
-	if err != nil || !found || shipmentID != task.SourceID {
+	if !trustedShipmentReleaseSourceLink(task) {
 		return false
 	}
 	if workflowPayloadString(task.Payload, "shipment_release") != "true" {

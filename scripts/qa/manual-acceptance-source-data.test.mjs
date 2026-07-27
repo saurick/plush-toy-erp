@@ -41,7 +41,7 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 const LOCAL_ACCEPTANCE_BACKEND_URL = "http://127.0.0.1:8310";
-const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_20260716_v5_dev";
+const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_local_fixture_dev";
 const forbiddenVisibleCopy =
   /\b(?:workflow|fact|json-rpc|rbac|usecase|schema|api|debugrunid|raw id)\b|甲方/iu;
 
@@ -554,7 +554,7 @@ test("CLI help points only to the dedicated current local acceptance database", 
   assert.match(help.text, /http:\/\/127\.0\.0\.1:8310/u);
   assert.match(
     help.text,
-    /--database-name plush_erp_acceptance_20260716_v5_dev/u,
+    /--database-name plush_erp_acceptance_20260728_delivery_dev/u,
   );
   assert.match(help.text, /--data-version 2026\.07\.16-v5/u);
   assert.match(help.text, /--run-id 20260716-V5/u);
@@ -617,7 +617,7 @@ test("local source mutation fails closed without the dedicated database identity
         backendURL: LOCAL_ACCEPTANCE_BACKEND_URL,
         databaseName: "plush_erp",
       }),
-    /requires databaseName=plush_erp_acceptance_20260716_v5_dev/u,
+    /requires databaseName=plush_erp_acceptance_<run-id>_dev/u,
   );
 });
 

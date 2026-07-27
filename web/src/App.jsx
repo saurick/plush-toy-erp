@@ -16,7 +16,6 @@ import {
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
-import { resolveDevPageTitle } from '@/erp/config/devRoutes.mjs'
 
 const ERPRouter = lazyWithDynamicImportRetry(() => import('@/erp/router'))
 
@@ -26,8 +25,9 @@ function AppContent() {
   const { appConfig, isMobileExperience } = useERPWorkspace()
   const appTitle =
     appConfig.title || import.meta.env.VITE_APP_TITLE || '毛绒玩具管理系统'
-  const documentTitle = resolveDevPageTitle(location.pathname, appTitle)
   const activeBrand = getActiveERPBrand()
+  const isDevWorkbenchRoute =
+    import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(location.pathname)
 
   useEffect(() => {
     return authBus.onUnauthorized(({ from, message, loginPath }) => {
@@ -66,6 +66,7 @@ function AppContent() {
   }, [isMobileExperience, navigate])
 
   useEffect(() => {
+    if (isDevWorkbenchRoute) return
     applyERPFavicon(document, location.pathname, {
       customerFaviconHref: activeBrand.faviconHref,
       fromPathname: location.state?.from?.pathname,
@@ -73,6 +74,7 @@ function AppContent() {
     })
   }, [
     activeBrand.faviconHref,
+    isDevWorkbenchRoute,
     isMobileExperience,
     location.pathname,
     location.state,
@@ -80,9 +82,11 @@ function AppContent() {
 
   return (
     <>
-      <Helmet>
-        <title>{documentTitle}</title>
-      </Helmet>
+      {!isDevWorkbenchRoute ? (
+        <Helmet>
+          <title>{appTitle}</title>
+        </Helmet>
+      ) : null}
       <Suspense fallback={null}>
         <ERPRouter />
       </Suspense>

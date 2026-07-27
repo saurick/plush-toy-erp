@@ -322,7 +322,7 @@ test("builds the exact content-addressed local-test manifest from the same track
 });
 
 test("local-test apply is bound to the fresh database and exact active-session identity", async () => {
-  const databaseName = "plush_erp_acceptance_20260716_v5_dev";
+  const databaseName = "plush_erp_acceptance_local_fixture_dev";
   const policy = resolveManualAcceptanceTarget({
     backendURL: "http://127.0.0.1:8310",
     databaseName,

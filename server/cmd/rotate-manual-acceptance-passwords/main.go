@@ -29,7 +29,6 @@ const (
 	smsPhoneEnv             = "MANUAL_ACCEPTANCE_SMS_PHONE"
 	registeredAdminPassword = "adminadmin"
 	dsnEnv                  = "POSTGRES_DSN"
-	localAcceptanceDB       = "plush_erp_acceptance_20260716_v5_dev"
 	customerTrial133DB      = "plush_erp_uat_20260716_v5"
 	customerTrial133Port    = "55435"
 	currentDatasetVersion   = "2026.07.16-v5"
@@ -45,6 +44,7 @@ var Version = "dev"
 
 var immutableReleasePattern = regexp.MustCompile(`^[a-f0-9]{40}$`)
 var operationIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+var localAcceptanceDatabasePattern = regexp.MustCompile(`^plush_erp_acceptance_([a-z0-9][a-z0-9_]{2,39})_dev$`)
 
 var localCustomerConfigRevisionPattern = regexp.MustCompile(
 	`^yoyoosun-customer-package-v[1-9][0-9]*\.local-[a-f0-9]{16}\.runtime-v1$`,
@@ -181,11 +181,12 @@ func validateTargetDSN(target, datasetVersion, rawDSN string) error {
 	}
 	switch target {
 	case targetLocalDev:
-		if port != "5432" || host != "192.168.0.106" {
-			return errors.New("local-dev target requires the registered local PostgreSQL endpoint")
+		if host != "127.0.0.1" && host != "localhost" && host != "::1" {
+			return errors.New("local-dev target requires a loopback PostgreSQL endpoint")
 		}
-		if databaseName != localAcceptanceDB {
-			return fmt.Errorf("local-dev target requires database %s", localAcceptanceDB)
+		matches := localAcceptanceDatabasePattern.FindStringSubmatch(databaseName)
+		if len(matches) != 2 || strings.HasSuffix(matches[1], "_browser_actions") {
+			return errors.New("local-dev target requires database plush_erp_acceptance_<run-id>_dev")
 		}
 	case targetCustomerTrial133:
 		if datasetVersion != currentDatasetVersion {

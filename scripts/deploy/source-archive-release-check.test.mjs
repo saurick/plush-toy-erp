@@ -459,6 +459,27 @@ test("release mode runs source scan Web Go overlay and optional Docker checks", 
     assert.equal(pnpmSpecs.length, 2);
     assert(pnpmSpecs.every((spec) => spec.command === "/fixture/project-pnpm"));
     assert(!commandSpecs.some((spec) => spec.command === "pnpm"));
+    const webDockerSpec = commandSpecs.find(
+      (spec) => spec.label === "build Web Docker image",
+    );
+    const serverDockerSpec = commandSpecs.find(
+      (spec) => spec.label === "build server Docker image",
+    );
+    for (const spec of [webDockerSpec, serverDockerSpec]) {
+      assert.deepEqual(spec.args.slice(0, 3), [
+        "build",
+        "--platform",
+        "linux/amd64",
+      ]);
+    }
+    assert(
+      webDockerSpec.args.includes(`GIT_SHA=${report.commit}`),
+      "Web image must embed the exact release SHA",
+    );
+    assert(
+      serverDockerSpec.args.includes(`GIT_SHA=${report.commit}`),
+      "server image must embed the exact release SHA",
+    );
   } finally {
     removeFixtureRepo(root);
   }

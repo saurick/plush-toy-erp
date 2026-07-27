@@ -1650,7 +1650,7 @@ async function writeReport(reportPath, report) {
   await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
 }
 
-async function run(options) {
+export async function runExceptionFlowRealWriteBrowser(options) {
   const requireFromWeb = createRequire(
     path.join(REPO_ROOT, "web", "package.json"),
   );
@@ -1753,7 +1753,7 @@ if (isDirectRun) {
   let options;
   try {
     options = parseExceptionFlowArgs(process.argv.slice(2));
-    const report = await run(options);
+    const report = await runExceptionFlowRealWriteBrowser(options);
     process.stdout.write(
       `[exception-flow-real-write-browser] passed ${report.summary.passedFlowCount}/${report.summary.flowCount}; report=${path.relative(REPO_ROOT, options.reportPath)}\n`,
     );

@@ -190,3 +190,34 @@ test("local runtime preflight: 数据库配置失败不回显 DSN 或密码", as
   );
   assert.deepEqual(calls, ["bash", "go"]);
 });
+
+test("local runtime preflight: pending migration 指向只读 status 和 plan，不自动 apply", async () => {
+  const calls = [];
+  const pending = currentMigrationStatus();
+  pending.Applied = pending.Applied.slice(0, 1);
+  pending.Current = "20260714080000";
+  pending.Next = "20260714081153";
+
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      writeLine: () => {},
+      execFile: async (command, args) => {
+        calls.push([command, ...args]);
+        if (command === "bash") return { stdout: "", stderr: "" };
+        if (command === "go") {
+          return {
+            stdout:
+              "postgres://test_user:private-secret@192.168.0.106:5432/plush_erp_simon_dev",
+            stderr: "",
+          };
+        }
+        return { stdout: JSON.stringify(pending), stderr: "" };
+      },
+    }),
+    /make migrate_status.*make migrate_plan.*不会自动 apply/u,
+  );
+  assert.deepEqual(
+    calls.map(([command]) => command),
+    ["bash", "go", "atlas"],
+  );
+});

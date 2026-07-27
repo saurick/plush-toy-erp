@@ -543,6 +543,13 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     })
     assert.equal(allActionsExplain.result.code, 0)
     assert.equal(allActionsExplain.result.data.task_id, urgeStrictTask.id)
+    assert.deepEqual(allActionsExplain.result.data.source_access, {
+      applicable: false,
+      resolved: true,
+      allowed: true,
+      reason_code: 'source_access_not_applicable',
+      reason: '当前任务没有需要核对的相关单据。',
+    })
     assert.deepEqual(
       allActionsExplain.result.data.actions.map((item) => item.action_key),
       ['complete', 'block', 'reject', 'resume', 'urge']

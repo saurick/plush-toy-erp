@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   PRESSURE_LEVELS,
+  PRESSURE_PROFILES,
   normalizeLoopbackURL,
   percentile,
   selectCapacityIdempotencyTask,
 } from "./manual-acceptance-capacity-pressure.mjs";
+import { assertDisposableDatabaseTarget } from "./database-target.mjs";
 
 test("pressure target fails closed outside loopback", () => {
   assert.equal(
@@ -20,11 +22,36 @@ test("pressure target fails closed outside loopback", () => {
     assert.throws(() => normalizeLoopbackURL(value));
 });
 
-test("capacity and stress levels are distinct and reach 100 concurrent users", () => {
+test("capacity, saturation, and soak profiles have ramp and recovery semantics", () => {
   assert.deepEqual(PRESSURE_LEVELS, [
-    { key: "capacity", concurrency: 20, requests: 1000 },
-    { key: "stress", concurrency: 100, requests: 5000 },
+    { key: "ramp", concurrency: 5, requests: 100 },
+    {
+      key: "capacity",
+      concurrency: 20,
+      requests: 1000,
+      cooldownBeforeMs: 2000,
+      pacingMs: 400,
+    },
+    {
+      key: "recovery",
+      concurrency: 5,
+      requests: 100,
+      cooldownBeforeMs: 5000,
+      pacingMs: 200,
+    },
   ]);
+  assert.equal(PRESSURE_PROFILES.saturation[1].concurrency, 100);
+  assert.equal(PRESSURE_PROFILES.saturation[1].key, "saturation");
+  assert.deepEqual(PRESSURE_PROFILES.saturation[1].allowedErrorClasses, [
+    "rate_limited",
+    "overloaded",
+    "timeout",
+  ]);
+  assert.equal(PRESSURE_PROFILES.soak[1].key, "soak");
+  for (const profile of Object.values(PRESSURE_PROFILES)) {
+    assert.equal(profile.at(0).key, "ramp");
+    assert.equal(profile.at(-1).key, "recovery");
+  }
 });
 
 test("percentile uses nearest-rank semantics", () => {
@@ -88,4 +115,26 @@ test("capacity idempotency probe uses only the same-batch ready trial PMC task",
     ),
     undefined,
   );
+});
+
+test("capacity database target cannot escape loopback or reuse a long-lived database", () => {
+  const databaseName = "plush_erp_capacity_20260728_a1b2";
+  const target = assertDisposableDatabaseTarget({
+    databaseName,
+    databaseURL: `postgres://u:p@127.0.0.1:55432/${databaseName}?sslmode=disable`,
+    profile: "capacity",
+  });
+  assert.equal(target.databaseRunIdentity, "capacity:20260728_a1b2");
+  for (const databaseURL of [
+    "postgres://u:p@127.0.0.1:55432/plush_erp?sslmode=disable",
+    `postgres://u:p@192.168.0.133:55432/${databaseName}?sslmode=disable`,
+  ]) {
+    assert.throws(() =>
+      assertDisposableDatabaseTarget({
+        databaseName: new URL(databaseURL).pathname.slice(1),
+        databaseURL,
+        profile: "capacity",
+      }),
+    );
+  }
 });

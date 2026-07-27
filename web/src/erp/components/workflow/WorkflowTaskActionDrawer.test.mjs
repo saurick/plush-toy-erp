@@ -59,6 +59,18 @@ test('task action drawer explains loading and readonly access before action sele
   assert.match(source, /description=\{readonlyReason/u)
 })
 
+test('task action drawer only renders the explicitly authorized related document entry', () => {
+  assert.match(source, /canOpenEntry = false/u)
+  assert.match(
+    source,
+    /const canOpenRelatedEntry = Boolean\(task && canOpenEntry && onOpenEntry\)/u
+  )
+  assert.match(source, /\{canOpenRelatedEntry \? \(/u)
+  assert.match(source, />\s*查看相关单据\s*<\/Button>/u)
+  assert.doesNotMatch(source, /resolveWorkflowTaskEntryPath/u)
+  assert.doesNotMatch(source, />\s*去办理\s*<\/Button>/u)
+})
+
 test('task action drawer loads the canonical approval trajectory and uses approval language', () => {
   assert.match(source, /listWorkflowTaskEvents\(task\.id/u)
   assert.match(source, /审批轨迹/u)

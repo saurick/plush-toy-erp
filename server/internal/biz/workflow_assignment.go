@@ -95,6 +95,8 @@ func prepareWorkflowTaskAssignmentMutation(in *WorkflowTaskAssignment, actorID i
 	in.Reason = strings.TrimSpace(in.Reason)
 	in.RequiredOwnerRoleKey = NormalizeRoleKey(in.RequiredOwnerRoleKey)
 	in.RequiredPermissionKeys = NormalizePermissionKeys(in.RequiredPermissionKeys)
+	in.RequiredAccountPermissionAll = NormalizePermissionKeys(in.RequiredAccountPermissionAll)
+	in.RequiredAccountPermissionAny = NormalizePermissionKeys(in.RequiredAccountPermissionAny)
 	if in.ID <= 0 ||
 		in.ExpectedVersion <= 0 ||
 		actorID <= 0 ||

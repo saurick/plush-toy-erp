@@ -7,7 +7,11 @@ if [ -z "$cmd" ]; then
   exit 2
 fi
 
-INVENTORY_PG_DB_URL="${INVENTORY_PG_DB_URL:-postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_inventory_test?sslmode=disable}"
+INVENTORY_PG_DB_URL="${INVENTORY_PG_DB_URL:-}"
+if [ -z "$INVENTORY_PG_DB_URL" ]; then
+  echo "ERROR: INVENTORY_PG_DB_URL is required and must point to a generated plush_erp_ci_<run-id> database" >&2
+  exit 2
+fi
 
 parse_output="$(
   python3 - "$INVENTORY_PG_DB_URL" <<'PY'
@@ -35,8 +39,8 @@ if host not in allowed_hosts:
     raise SystemExit(f"ERROR: refuse non-local INVENTORY_PG_DB_URL host: {host}")
 if not dbname:
     raise SystemExit("ERROR: INVENTORY_PG_DB_URL missing database name")
-if "inventory" not in dbname.lower() and "test" not in dbname.lower():
-    raise SystemExit(f"ERROR: database name must contain inventory or test: {dbname}")
+if not re.fullmatch(r"plush_erp_ci_[a-z0-9_]+", dbname):
+    raise SystemExit(f"ERROR: database name must match plush_erp_ci_<run-id>: {dbname}")
 if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
     raise SystemExit(f"ERROR: database name must be alphanumeric/underscore only: {dbname}")
 

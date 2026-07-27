@@ -10,7 +10,7 @@ import {
   CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_DEV_TARGET,
-  LOCAL_MANUAL_ACCEPTANCE_DATABASE,
+  LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
@@ -188,10 +188,10 @@ test("local dedicated apply confirmation and runtime database identity are exact
     datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
     dataVersion: "2026.07.16-v5",
     runId: "20260716-V5",
-    databaseName: LOCAL_MANUAL_ACCEPTANCE_DATABASE,
+    databaseName: LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE,
   };
   const confirmation =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev";
+    `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:${LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE}`;
   assert.equal(manualAcceptanceTargetConfirmation(localPolicy), confirmation);
   assert.throws(
     () => assertManualAcceptanceMutationTarget(localPolicy),
@@ -200,16 +200,16 @@ test("local dedicated apply confirmation and runtime database identity are exact
   assert.equal(
     assertManualAcceptanceMutationTarget(localPolicy, { confirmation })
       .databaseName,
-    LOCAL_MANUAL_ACCEPTANCE_DATABASE,
+    LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE,
   );
   assert.equal(
     assertManualAcceptanceDatabaseIdentity({
       policy: localPolicy,
       capabilities: {
-        databaseName: LOCAL_MANUAL_ACCEPTANCE_DATABASE,
+        databaseName: LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE,
       },
     }).databaseName,
-    LOCAL_MANUAL_ACCEPTANCE_DATABASE,
+    LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE,
   );
   assert.throws(
     () =>
@@ -225,15 +225,23 @@ test("local dedicated apply confirmation and runtime database identity are exact
         ...localPolicy,
         databaseName: "plush_erp_simon_dev",
       }),
-    /requires databaseName=plush_erp_acceptance_20260716_v5_dev/u,
+    /requires databaseName=plush_erp_acceptance_<run-id>_dev/u,
+  );
+  assert.equal(
+    resolveManualAcceptanceTarget({
+      ...localPolicy,
+      databaseName: "plush_erp_acceptance_other_run_dev",
+    }).databaseName,
+    "plush_erp_acceptance_other_run_dev",
   );
   assert.throws(
     () =>
       resolveManualAcceptanceTarget({
         ...localPolicy,
-        databaseName: "plush_erp_acceptance_20260716_other_dev",
+        databaseName:
+          "plush_erp_acceptance_other_run_browser_actions_dev",
       }),
-    /requires databaseName=plush_erp_acceptance_20260716_v5_dev/u,
+    /requires databaseName=plush_erp_acceptance_<run-id>_dev/u,
   );
   assert.throws(
     () =>
@@ -453,7 +461,7 @@ test("customer-trial-133 fails closed when any debug mutation flag is true or ab
 test("local runtime accepts only the tracked local-test package without trial markers", () => {
   const policy = {
     backendURL: "http://127.0.0.1:8310",
-    databaseName: "plush_erp_acceptance_20260716_v5_dev",
+    databaseName: "plush_erp_acceptance_local_fixture_dev",
     dataVersion: "2026.07.16-v5",
     runId: "20260716-V5",
   };

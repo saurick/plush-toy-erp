@@ -18,7 +18,7 @@ import {
   manualAcceptanceTargetConfirmation,
 } from "./manual-acceptance-target-policy.mjs";
 
-const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_20260716_v5_dev";
+const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_local_fixture_dev";
 
 function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
   const report = {

@@ -14,6 +14,10 @@ const WORKFLOW_GRAPH_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=machine&flo
     'fact',
   ].join(',')
 )}`
+const ADJUSTMENT_PATH_OVERLAY_PATH =
+  `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=machine` +
+  '&flow=fact.inventory_operation&path_mode=overlay' +
+  '&path_kind=adjusted&path_objects=with'
 
 async function collectBoxMetrics(page) {
   return page.evaluate(() => {
@@ -192,9 +196,13 @@ export function createDevFlowStateObservatoryScenarios({
           )
           return {
             transitionCardCount: cards?.length || 0,
-            evidenceListsInsideCards:
+            transitionDisclosureCount:
               machineView?.querySelectorAll(
-                '.erp-dev-flow-state-transition .erp-dev-flow-state-evidence-list'
+                '.erp-dev-flow-state-transition details[data-evidence-disclosure]'
+              ).length || 0,
+            openTransitionDisclosureCount:
+              machineView?.querySelectorAll(
+                '.erp-dev-flow-state-transition details[open]'
               ).length || 0,
             disclosureExists: Boolean(disclosure),
             disclosureOpen: Boolean(disclosure?.open),
@@ -202,10 +210,12 @@ export function createDevFlowStateObservatoryScenarios({
         })
         assert(
           evidenceHierarchy.transitionCardCount > 0 &&
-            evidenceHierarchy.evidenceListsInsideCards === 0 &&
+            evidenceHierarchy.transitionDisclosureCount ===
+              evidenceHierarchy.transitionCardCount &&
+            evidenceHierarchy.openTransitionDisclosureCount === 0 &&
             evidenceHierarchy.disclosureExists &&
             !evidenceHierarchy.disclosureOpen,
-          `迁移卡默认只展示决策信息，文件依据必须去重后折叠: ${JSON.stringify(
+          `迁移卡默认展示决策信息，逐边与整机依据都必须折叠: ${JSON.stringify(
             evidenceHierarchy
           )}`
         )
@@ -357,12 +367,12 @@ export function createDevFlowStateObservatoryScenarios({
         assert.deepEqual(
           graphMetrics.edgeLabels,
           [
-            '阻塞 · 异常 · 仅工作流',
+            '阻塞 · 仅工作流',
             '已完成 · 审批 · 仅工作流',
-            '已退回 · 异常 · 仅工作流',
-            '恢复 · 异常 · 仅工作流',
+            '退回 / 拒绝 · 仅工作流',
+            '恢复 · 仅工作流',
           ],
-          `全图层标签必须保留流向、异常或审批语义及 Fact 边界: ${JSON.stringify(
+          `全图层标签必须使用 pathKinds、审批语义及 Fact 边界: ${JSON.stringify(
             graphMetrics
           )}`
         )
@@ -449,6 +459,142 @@ export function createDevFlowStateObservatoryScenarios({
       },
     },
     {
+      name: 'dev-flow-state-observatory-path-filter-recovery',
+      path: ADJUSTMENT_PATH_OVERLAY_PATH,
+      viewport: { width: 1280, height: 800 },
+      beforeNavigate: async (page) => {
+        const writeRequests = []
+        writeRequestsByPage.set(page, writeRequests)
+        page.on('request', (request) => {
+          if (WRITE_METHODS.has(request.method().toUpperCase())) {
+            writeRequests.push({
+              method: request.method(),
+              url: request.url(),
+            })
+          }
+        })
+      },
+      verify: async (page) => {
+        await expectText(page, '库存操作单')
+        await expectText(page, '在完整图中高亮')
+        const machineView = page.locator('[data-flow-state-view="machine"]')
+        await machineView.waitFor({ state: 'visible', timeout: 10_000 })
+        await machineView
+          .locator('.erp-markdown-mermaid__canvas svg')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await machineView.locator('.erp-dev-flow-state-transition').count(),
+          9,
+          'overlay 模式必须保留完整迁移图和详情'
+        )
+        const highlightedEdges = await machineView.evaluate((root) =>
+          [...root.querySelectorAll('.erp-markdown-mermaid__canvas svg path')]
+            .filter((path) => {
+              const style = `${path.getAttribute('style') || ''} ${
+                path.getAttribute('stroke-width') || ''
+              }`
+              return /stroke-width:\s*3px|(?:^|\s)3px(?:\s|$)/u.test(style)
+            })
+            .length
+        )
+        assert(
+          highlightedEdges >= 2,
+          `overlay 必须高亮命中的调整路径: ${highlightedEdges}`
+        )
+
+        const pathModeSelect = page.getByRole('combobox', {
+          name: '路径呈现',
+        })
+        await pathModeSelect
+          .locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+          )
+          .locator('.ant-select-selector')
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .getByText('仅看异常、纠正与恢复路径', { exact: true })
+          .click()
+        await page.waitForFunction(
+          () =>
+            new URLSearchParams(window.location.search).get('path_mode') ===
+            'only'
+        )
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '[data-flow-state-view="machine"] .erp-dev-flow-state-transition'
+            ).length === 2
+        )
+        assert.equal(
+          await machineView.locator('.erp-dev-flow-state-transition').count(),
+          2,
+          'only 模式只保留命中的两条人工调整边'
+        )
+        await expectText(page, '调整')
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-flow-state-observatory-path-filter-recovery:only'
+        )
+        await machineView.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-adjusted-only.png',
+          animations: 'disabled',
+        })
+
+        await gotoScenarioPath(
+          page,
+          `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=machine&flow=fact.inventory_operation&path_mode=only&path_kind=unknown`,
+          { waitUntil: 'domcontentloaded' }
+        )
+        await expectText(page, 'fail closed 拒绝放宽')
+        assert.equal(
+          await page
+            .locator(
+              '[data-flow-state-view="machine"] .erp-dev-flow-state-view-stack'
+            )
+            .count(),
+          0,
+          '未知路径类型不得回退到全量图'
+        )
+
+        await page.goBack({ waitUntil: 'domcontentloaded' })
+        await machineView.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForFunction(
+          () =>
+            new URLSearchParams(window.location.search).get('path_kind') ===
+              'adjusted' &&
+            new URLSearchParams(window.location.search).get('path_mode') ===
+              'only'
+        )
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '[data-flow-state-view="machine"] .erp-dev-flow-state-transition'
+            ).length === 2
+        )
+        assert.equal(
+          await machineView.locator('.erp-dev-flow-state-transition').count(),
+          2,
+          '浏览器返回必须恢复路径类型、模式、对象和详情'
+        )
+
+        const writeRequests = writeRequestsByPage.get(page) || []
+        assert.deepEqual(
+          writeRequests,
+          [],
+          '路径高亮、筛选、fail closed 和恢复不得发出写请求'
+        )
+        reportScenarioEvidence(
+          'dev-flow-state-observatory-path-filter-recovery',
+          {
+            only: await collectBoxMetrics(page),
+            highlightedEdges,
+          },
+          writeRequests
+        )
+      },
+    },
+    {
       name: 'dev-flow-state-observatory-mobile-dark',
       path: DEV_FLOW_STATE_OBSERVATORY_PATH,
       viewport: { width: 390, height: 844 },
@@ -524,7 +670,7 @@ export function createDevFlowStateObservatoryScenarios({
             theme: 'dark',
             rootExists: true,
             workspaceNavVisible: true,
-            workspaceRouteCount: 8,
+            workspaceRouteCount: 4,
             currentWorkspaceRouteCount: 1,
             layerToggleCount: 9,
             viewButtonCount: 5,
@@ -558,20 +704,24 @@ export function createDevFlowStateObservatoryScenarios({
             'details[data-evidence-disclosure="machine"]'
           )
           return {
-            evidenceListsInsideCards:
+            transitionDisclosureCount:
               machineView?.querySelectorAll(
-                '.erp-dev-flow-state-transition .erp-dev-flow-state-evidence-list'
+                '.erp-dev-flow-state-transition details[data-evidence-disclosure]'
+              ).length || 0,
+            openTransitionDisclosureCount:
+              machineView?.querySelectorAll(
+                '.erp-dev-flow-state-transition details[open]'
               ).length || 0,
             disclosureOpen: Boolean(disclosure?.open),
           }
         })
-        assert.deepEqual(
-          mobileEvidenceHierarchy,
-          {
-            evidenceListsInsideCards: 0,
-            disclosureOpen: false,
-          },
-          '移动端暗色模式也应默认收起文件依据'
+        assert(
+          mobileEvidenceHierarchy.transitionDisclosureCount > 0 &&
+            mobileEvidenceHierarchy.openTransitionDisclosureCount === 0 &&
+            mobileEvidenceHierarchy.disclosureOpen === false,
+          `移动端暗色模式也应默认收起逐边和整机依据: ${JSON.stringify(
+            mobileEvidenceHierarchy
+          )}`
         )
         await assertNoHorizontalOverflow(
           page,

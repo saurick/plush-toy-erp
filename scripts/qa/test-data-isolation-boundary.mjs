@@ -892,19 +892,22 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
-        pattern: /\^plush_erp_capacity_\[a-z0-9_\]\+\$/u,
+        pattern:
+          /import \{ assertDisposableDatabaseTarget \} from "\.\/database-target\.mjs"/u,
         message:
-          "pressure execution must require a disposable capacity database name",
+          "pressure execution must reuse the shared disposable database target policy",
       },
       {
         path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
-        pattern: /parsedDatabaseURL\.pathname !== `\/\$\{databaseName\}`/u,
+        pattern:
+          /assertDisposableDatabaseTarget\(\{[\s\S]{0,180}databaseName,[\s\S]{0,120}databaseURL,[\s\S]{0,120}profile: "capacity"/u,
         message:
-          "pressure database URL must match the declared disposable database",
+          "pressure database URL and name must match the declared capacity lifecycle",
       },
       {
         path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
-        pattern: /concurrency:\s*100, requests:\s*5000/u,
+        pattern:
+          /key: "saturation"[\s\S]{0,120}concurrency:\s*100,[\s\S]{0,80}requests:\s*5000/u,
         message: "stress level must retain the 100-concurrency profile",
       },
     ]),

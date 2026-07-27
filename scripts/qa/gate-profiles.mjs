@@ -86,6 +86,23 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/qa/affected.test.mjs",
   "scripts/qa/experimental/canonical-runtime-audit.mjs",
   "scripts/qa/canonical-runtime-audit-contract.test.mjs",
+  "scripts/qa/dev-flow-state-canonical-contract.mjs",
+  "scripts/qa/database-target.mjs",
+  "scripts/qa/database-target.test.mjs",
+  "scripts/qa/database-inventory.mjs",
+  "scripts/qa/database-inventory.test.mjs",
+  "scripts/qa/disposable-database-runner.mjs",
+  "scripts/qa/disposable-database-runner.test.mjs",
+  "scripts/qa/local-acceptance-lifecycle.mjs",
+  "scripts/qa/local-acceptance-lifecycle.test.mjs",
+  "scripts/qa/dev-flow-state-observatory-boundary.test.mjs",
+  "scripts/qa/dev-workbench-boundary.test.mjs",
+  "scripts/qa/dev-workbench-production-boundary.mjs",
+  "scripts/qa/dev-workbench-production-boundary.test.mjs",
+  "scripts/qa/dev-workbench-receipt.mjs",
+  "scripts/qa/dev-workbench-receipt.test.mjs",
+  "scripts/qa/run-gate-with-receipt.mjs",
+  "scripts/qa/run-gate-with-receipt.test.mjs",
   "scripts/qa/core-boundary.test.mjs",
   "scripts/qa/workflow-fact-boundary.test.mjs",
   "scripts/qa/workflow-ui-action-boundary.test.mjs",
@@ -108,6 +125,14 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/qa/private-deployment-package-closure.mjs",
   "scripts/qa/private-deployment-package-closure.test.mjs",
   "scripts/deploy/deployment-package-lint.mjs",
+  "scripts/deploy/source-archive-release-check.mjs",
+  "scripts/deploy/source-archive-release-check.test.mjs",
+  "scripts/deploy/release-artifact-bundle.mjs",
+  "scripts/deploy/release-artifact-bundle.test.mjs",
+  "scripts/deploy/release-artifact-verify.mjs",
+  "scripts/deploy/release-artifact-verify.test.mjs",
+  "scripts/deploy/local-release-rehearsal.mjs",
+  "scripts/deploy/local-release-rehearsal.test.mjs",
   "scripts/qa/test-data-isolation-boundary.test.mjs",
   "scripts/qa/docs-inventory.test.mjs",
   "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
@@ -139,17 +164,23 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "web/src/erp/config/menuPermissions.test.mjs",
   "web/src/erp/config/seedData.test.mjs",
   "web/src/erp/config/workflowStatus.test.mjs",
-  "web/src/erp/config/devHub.test.mjs",
-  "web/src/erp/config/devTesting.test.mjs",
-  "web/src/erp/config/devDocs.test.mjs",
-  "web/src/erp/config/devGovernance.test.mjs",
-  "web/src/erp/config/devPrototypes.test.mjs",
-  "web/src/erp/config/devCapabilityLedger.test.mjs",
-  "web/src/erp/config/devCustomerConfig.test.mjs",
+  "web/src/dev-workbench/config/devHub.test.mjs",
+  "web/src/dev-workbench/config/devReceipts.test.mjs",
+  "web/src/dev-workbench/config/devTesting.test.mjs",
+  "web/src/dev-workbench/config/devDocs.test.mjs",
+  "web/src/dev-workbench/config/devGovernance.test.mjs",
+  "web/src/dev-workbench/config/devPrototypes.test.mjs",
+  "web/src/dev-workbench/config/devCapabilityLedger.test.mjs",
+  "web/src/dev-workbench/config/devCustomerConfig.test.mjs",
   "web/src/erp/config/printTemplates.test.mjs",
   "web/scripts/trialDemoAccountBrowserSmoke.test.mjs",
   "web/scripts/realLoginSmokeShared.test.mjs",
   "web/scripts/mobileAuthLoginRouteSmoke.test.mjs",
+  "web/scripts/productionDevBoundaryBrowserSmoke.mjs",
+  "web/scripts/productionDevBoundaryBrowserSmoke.test.mjs",
+  "web/devWorkbenchReceiptPlugin.test.mjs",
+  "web/devWorkbenchReceiptPlugin.mjs",
+  "web/devWorkbenchPlugins.mjs",
   "web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs",
   "web/package.json",
   "server/go.mod",
@@ -217,7 +248,10 @@ export const PROFILE_REQUIRED_FILES = Object.freeze({
 
 export const PROFILE_REQUIRED_EXECUTABLES = Object.freeze({
   fast: FAST_REQUIRED_EXECUTABLES,
-  full: Object.freeze([...FAST_REQUIRED_EXECUTABLES, ...FULL_REQUIRED_EXECUTABLES]),
+  full: Object.freeze([
+    ...FAST_REQUIRED_EXECUTABLES,
+    ...FULL_REQUIRED_EXECUTABLES,
+  ]),
   strict: Object.freeze([
     ...FAST_REQUIRED_EXECUTABLES,
     ...FULL_REQUIRED_EXECUTABLES,
@@ -231,7 +265,9 @@ export function assertProfileHierarchy() {
     ["full", "strict"],
   ]) {
     const superset = new Set(GATE_PROFILES[supersetName]);
-    const missing = GATE_PROFILES[subsetName].filter((gate) => !superset.has(gate));
+    const missing = GATE_PROFILES[subsetName].filter(
+      (gate) => !superset.has(gate),
+    );
     if (missing.length > 0) {
       throw new Error(
         `[qa:profiles] ${supersetName} is missing ${subsetName} gates: ${missing.join(", ")}`,
@@ -255,7 +291,9 @@ function runGit(root, args) {
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (error) {
-    const detail = String(error?.stderr || error?.message || "git command failed")
+    const detail = String(
+      error?.stderr || error?.message || "git command failed",
+    )
       .trim()
       .split("\n")[0];
     throw new Error(`[qa:profiles] git ${args[0]} failed: ${detail}`);
@@ -263,10 +301,20 @@ function runGit(root, args) {
 }
 
 function assertCommit(root, ref) {
-  if (!ref || typeof ref !== "string" || /\s|\0/u.test(ref) || ref.startsWith("-")) {
+  if (
+    !ref ||
+    typeof ref !== "string" ||
+    /\s|\0/u.test(ref) ||
+    ref.startsWith("-")
+  ) {
     throw new Error(`[qa:profiles] unsafe commit ref: ${ref || "(empty)"}`);
   }
-  runGit(root, ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`]);
+  runGit(root, [
+    "rev-parse",
+    "--verify",
+    "--end-of-options",
+    `${ref}^{commit}`,
+  ]);
 }
 
 function treeMode(root, ref, file) {
@@ -386,7 +434,11 @@ export function validateProfileFiles(
   throw new Error(`[qa:profiles] unknown validation source: ${source}`);
 }
 
-export function validateProfileIndexTransition(profile, root, baseline = "HEAD") {
+export function validateProfileIndexTransition(
+  profile,
+  root,
+  baseline = "HEAD",
+) {
   assertKnownProfile(profile);
   assertCommit(root, baseline);
   const result = validateInspections(
@@ -401,7 +453,12 @@ export function validateProfileIndexTransition(profile, root, baseline = "HEAD")
 }
 
 function parseCliArgs(args) {
-  const options = { baseline: "HEAD", profile: "", ref: "", source: "worktree" };
+  const options = {
+    baseline: "HEAD",
+    profile: "",
+    ref: "",
+    source: "worktree",
+  };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (!["--baseline", "--profile", "--ref", "--source"].includes(arg)) {
@@ -413,7 +470,9 @@ function parseCliArgs(args) {
     index += 1;
   }
   if (!options.profile) {
-    throw new Error("usage: node scripts/qa/gate-profiles.mjs --profile fast|full|strict [--source worktree|tree|index-transition] [--ref COMMIT]");
+    throw new Error(
+      "usage: node scripts/qa/gate-profiles.mjs --profile fast|full|strict [--source worktree|tree|index-transition] [--ref COMMIT]",
+    );
   }
   return options;
 }
@@ -421,7 +480,10 @@ function parseCliArgs(args) {
 function main() {
   const options = parseCliArgs(process.argv.slice(2));
   assertProfileHierarchy();
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+  const root = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../..",
+  );
   const result =
     options.source === "index-transition"
       ? validateProfileIndexTransition(options.profile, root, options.baseline)
@@ -432,7 +494,9 @@ function main() {
       for (const file of result.missing) console.error(`  - ${file}`);
     }
     if (result.invalidType.length > 0) {
-      console.error(`[qa:profiles] ${options.profile} required 路径不是普通文件:`);
+      console.error(
+        `[qa:profiles] ${options.profile} required 路径不是普通文件:`,
+      );
       for (const file of result.invalidType) console.error(`  - ${file}`);
     }
     if (result.nonExecutable.length > 0) {
@@ -451,7 +515,10 @@ function main() {
   );
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   try {
     main();
   } catch (error) {

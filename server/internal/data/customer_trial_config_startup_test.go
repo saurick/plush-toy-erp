@@ -120,7 +120,7 @@ func TestValidateActiveCustomerTrialConfigRejectsReservedVersionDrift(t *testing
 }
 
 func TestValidateActiveCustomerTrialConfigRequiresRegisteredLocalTestRuntime(t *testing.T) {
-	const acceptanceDatabase = "plush_erp_acceptance_20260716_v5_dev"
+	const acceptanceDatabase = "plush_erp_acceptance_local_fixture_dev"
 	const localAcceptanceDSN = "postgres://test_user:secret@192.168.0.106:5432/" + acceptanceDatabase + "?sslmode=disable"
 	localMarkers := map[string]string{"applyPurpose": biz.CustomerConfigLocalTestApplyPurpose}
 	for _, tc := range []struct {
@@ -249,7 +249,7 @@ func TestValidateActiveCustomerTrialConfigRejectsIncompleteLocalTestMarker(t *te
 				"local-revision",
 				tc.productVersion,
 				tc.markers,
-				"plush_erp_acceptance_20260716_v5_dev",
+				"plush_erp_acceptance_local_fixture_dev",
 				devdbguard.CustomerConfigLocalTestSystemIdentifier,
 				nil,
 			)
@@ -258,7 +258,7 @@ func TestValidateActiveCustomerTrialConfigRejectsIncompleteLocalTestMarker(t *te
 				context.Background(),
 				db,
 				false,
-				"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+				"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
 			)
 			if err == nil || !strings.Contains(err.Error(), "local-test customer config marker is incomplete or invalid") {
 				t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)

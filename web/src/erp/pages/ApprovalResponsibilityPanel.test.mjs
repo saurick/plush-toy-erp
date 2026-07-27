@@ -18,8 +18,14 @@ test('approval responsibility panel reuses permission-center accounts and roles'
   assert.match(source, /adminIsActive\(admin\)/)
   assert.match(source, /activeEmployeeCount/)
   assert.match(source, /暂无启用员工/)
-  assert.match(source, /已停用/)
-  assert.match(source, /只显示该岗位的启用员工/)
+  assert.match(source, /岗位已停用/)
+  assert.match(source, /未开启审批功能/)
+  assert.match(source, /岗位已不存在，请重新选择/)
+  assert.match(source, /不可用账号会标明原因/)
+  assert.doesNotMatch(
+    source,
+    /role\.name \|\| role\.display_name \|\| '已配置岗位'/
+  )
 })
 
 test('approval responsibility panel keeps publish activate and immutable revision boundaries', () => {
@@ -44,7 +50,10 @@ test('approval responsibility panel exposes only the three configurable approval
   assert.match(source, /启用新设置/)
   assert.match(source, /审批责任加载失败/)
   assert.match(source, /重试/)
-  assert.match(source, /同一责任成员不能重复承担多个责任层级/)
+  assert.match(source, /同一岗位池或同一指定员工不能重复承担多个责任层级/)
+  assert.match(source, /当前只有一个可承接岗位/)
+  assert.match(source, /备用和升级可以留空/)
+  assert.match(source, /已用于.*责任/)
   assert.match(source, /不参与流程/)
 })
 

@@ -222,16 +222,19 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskReassignment(
 		}, nil
 	}
 	requiredPermissions := workflowTaskAssignmentRequiredPermissions(task)
+	sourceContract := biz.ResolveWorkflowTaskSourceAccessContract(task)
 	assignment := &biz.WorkflowTaskAssignment{
-		ID:                     taskID,
-		ExpectedVersion:        expectedVersion,
-		CommandKey:             "reassign_task",
-		IdempotencyKey:         idempotencyKey,
-		TargetAssigneeID:       targetAssigneeID,
-		ReleaseToPool:          releaseToPool,
-		Reason:                 reason,
-		RequiredOwnerRoleKey:   task.OwnerRoleKey,
-		RequiredPermissionKeys: requiredPermissions,
+		ID:                           taskID,
+		ExpectedVersion:              expectedVersion,
+		CommandKey:                   "reassign_task",
+		IdempotencyKey:               idempotencyKey,
+		TargetAssigneeID:             targetAssigneeID,
+		ReleaseToPool:                releaseToPool,
+		Reason:                       reason,
+		RequiredOwnerRoleKey:         task.OwnerRoleKey,
+		RequiredPermissionKeys:       requiredPermissions,
+		RequiredAccountPermissionAll: sourceContract.RequiredAll,
+		RequiredAccountPermissionAny: sourceContract.RequiredAny,
 	}
 	if replayed, replayedOK, replayErr := d.workflowUC.ResolveTaskAssignmentMutationReplay(
 		ctx,
@@ -343,6 +346,10 @@ func (d *jsonrpcDispatcher) workflowTaskAssignmentCandidateEligible(
 			!workflowOwnerRoleVisible(task.OwnerRoleKey, visibility.RoleKeys) {
 			return false
 		}
+	}
+	sourceAccess := d.workflowTaskSourceAccessForCandidate(ctx, candidate, task)
+	if sourceAccess.Applicable && !sourceAccess.Allowed {
+		return false
 	}
 	return true
 }

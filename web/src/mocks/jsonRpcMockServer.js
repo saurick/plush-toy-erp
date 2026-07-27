@@ -154,7 +154,11 @@ const mockPermissions = [
     name: '管理角色权限',
     module: 'system',
   },
-  { permission_key: 'erp.workbench.read', name: '查看岗位工作台', module: 'erp' },
+  {
+    permission_key: 'erp.workbench.read',
+    name: '查看岗位工作台',
+    module: 'erp',
+  },
   {
     permission_key: 'erp.business_dashboard.read',
     name: '查看业务看板',
@@ -897,6 +901,16 @@ function buildMockWorkflowActionExplain(task, actionKey = 'complete') {
   }
 }
 
+function buildMockWorkflowSourceAccess() {
+  return {
+    applicable: false,
+    resolved: true,
+    allowed: true,
+    reason_code: 'source_access_not_applicable',
+    reason: '当前任务没有需要核对的相关单据。',
+  }
+}
+
 // 构造一个 JSON-RPC 业务错误响应（code != 0）
 function makeJsonRpcBizError(id, code, message) {
   return {
@@ -1429,12 +1443,17 @@ export function setupJsonRpcMockServer() {
             result: makeBizResult(
               request.actionKey
                 ? {
+                    source_access: buildMockWorkflowSourceAccess(),
                     action: buildMockWorkflowActionExplain(
                       request.task,
                       request.actionKey
                     ),
                   }
-                : { task_id: request.task.id, actions }
+                : {
+                    task_id: request.task.id,
+                    source_access: buildMockWorkflowSourceAccess(),
+                    actions,
+                  }
             ),
             error: '',
           }
@@ -1507,6 +1526,7 @@ export function setupJsonRpcMockServer() {
                 admin_role_keys: mockSuperAdminProfile.roles.map(
                   (role) => role.role_key
                 ),
+                source_access: buildMockWorkflowSourceAccess(),
                 visible: true,
                 assigned_to_current_admin: assignedToCurrentAdmin,
                 owner_role_matched: ownerRoleMatched,

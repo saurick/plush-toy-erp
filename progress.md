@@ -6,9 +6,53 @@
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、产品能力台账、客户交付矩阵、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
 - 单据流 / 业务流审计 Worktree 的 92 个任务归属路径已通过受控 Handoff 带回 Local；Local 原有的流程与状态观察台改动同时保留，起点继承内容没有被重复覆盖或误记为本轮新增。
-- 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 与 133 V5 固定库 `plush_erp_uat_20260716_v5` 仍只证明已应用到 `20260722000505` 的固定版本；当前 latest migration `20260723155358_reconcile_permission_assignment_boundaries.sql` 未对共享库、133 或生产库 apply。
-- 133 V5 仍运行固定 release `80b77faeab566660c77fc23cc66c272096692f16` 的技术试用版本；当前异常收口、客户退货 / RMA、收付款及岗位导航后续切片未整体重发，客户 UAT / 签收仍是独立关口。
-- 本轮 Git 收口范围已冻结为 Handoff 后完整 Local 工作树；提交前受影响门禁与完整浏览器回归已完成，clean HEAD 的 full 回执、实际提交与远端 ref 以 Git 和本轮回执为准。本轮不建 PR、不部署，也不对共享、133 或生产数据库 apply migration。
+- 本地开发数据库已统一为 `192.168.0.106:5432/plush_erp`；历史 `plush_erp_*_dev` / acceptance / archive 库完成逐库备份后删除，本地不再保留第二个 plush 开发库。133 V5 固定库 `plush_erp_uat_20260716_v5` 属于独立测试 / 目标环境，本轮未触碰。
+- 133 当前 release、数据库、active config、镜像与回滚点必须在每次发布前从目标环境重新读回；历史记录只作定位，不得替代当前技术发布证据。客户 UAT / 签收始终是独立关口。
+- 本轮 Git 与发布收口只能由单一 owner 串行执行；clean HEAD 的 full / strict / prepare-push、exact-SHA 远端 CI、不可变制品、本地发布演练和 133 技术发布必须绑定同一最终 SHA，以 Git、CI、制品 manifest 和运行回执为准，不由本文件预写绿色结论。
+
+## 2026-07-28 研发效能工作台与本地质量交付收口
+
+完成：状态合同收敛到服务端 canonical catalog，当前 34 类状态对象、初始 / 终止 / 返回边、守卫、动作、权限与 Fact 边界由正式领域合同生成，DEV 观察台只消费投影；状态漂移守卫覆盖 8 条代表业务路径。异常展示按阻塞、退回、恢复、取消 / 冲正和过期证据分类，不新增万能 `exception_status` 或第二棵状态树。Workflow 任务来源读取门禁与异常动作在解释和写入前均由后端重验，页面不能以菜单、标签或 payload 补造可读性，Workflow task done 仍不等于 Fact posted。
+
+工作台：开发能力迁入 `web/src/dev-workbench/`，一级信息架构固定为总览、产品工程、质量验证、交付运行；正式 router 只保留 compile-time DEV bridge，业务页面、移动端、产品配置与 server runtime 对工作台零依赖。工作台搜索、状态域、对象、异常类型、环境与详情写入 URL，支持深链、前进 / 后退、失败关闭、旧请求失效、键盘焦点、暗色和代表视口；真实 Chromium 代表场景 `11 / 11` 通过，写请求为 `0`。production build 的 import、路由、chunk、source map、HTML / CSS / JS / asset 和 production preview 零残留扫描通过。
+
+质量与数据库：新增统一 receipt schema、脱敏 wrapper、private HMAC pre-push receipt、门禁 profile 与 CI 编排，严格区分 passed、failed、blocked、skipped、partial、stale 和 notProven。固定本地验收库改为每次唯一的 `plush_erp_acceptance_<run>_dev` 与 `plush_erp_acceptance_<run>_browser_actions_dev`；统一生命周期 runner 串联建库、Atlas migration、正式 seed、九岗位数据、50 项真实浏览器只读检查、克隆隔离、4 条异常真实写链、领域读回和最终精确清理，任一步失败仍先固化脱敏回执再清理，残留库会使运行失败。loopback 隔离实例上 24 个已证明归属的旧测试库已逐库生成 manifest、归档并删除，收口读回没有残留测试库；长期开发库仍只有登记的 `192.168.0.106:5432/plush_erp`。
+
+稳定性与交付：容量数据集只写 5000 条 Workflow、2000 条生产草稿、2000 条财务草稿和 1000 条附件元数据，不把草稿或模拟数据包装成 Fact。真实隔离 PostgreSQL 基线为 ramp `100 / 100`、capacity `1000 / 1000`、recovery `100 / 100`，错误、死锁、冲突与残留锁等待均为 `0`，capacity p95 `117.28ms`、p99 `171.43ms`，持久幂等读回严格为一条；容量库已完成归档、restore drill 与清理。新增 exact-SHA 不可变制品 bundle / verify 和本地 release rehearsal，固定 linux/amd64 server / web 镜像、digest、SBOM、migration 序列、客户包来源、secret scan、备份恢复、migration、health / ready、登录、PDF、重启与清理合同；目标机只允许 load、migration、启动和检查。
+
+提交前验证：Node `24.14.0` 下新增 / 受影响脚本合同 `178 / 178`，seed / dev DB guard Go 定向测试通过；工作台 Style L1 `11 / 11`、开发入口定向合同 `17 / 17`、production build 与 production DEV boundary 通过。`bash scripts/qa/fast.sh` 从头完成，server quick `2996 / 2996`，零失败、零跳过；最终 dirty tree 的 `bash scripts/qa/full.sh` 从头完成，scripts Node `1427 / 1427`、Web 合同 `207 / 207`、Web 全集 `1889 / 1889`、server all `3156 / 3156` 均为零失败、零跳过，生产构建、DEV 零残留浏览器检查、Style L1、populated upgrade、隔离 PostgreSQL、构建和清理均通过。首轮漏洞门禁发现当前代码可达 `GO-2026-6061`，已将 gRPC-Go 从 `1.81.1` 升到修复版本 `1.82.1`；最终 govulncheck 确认可达漏洞为 `0`。扫描器仍报告依赖图中 1 个 imported-package 与 15 个 required-module 漏洞当前不可达，不将其包装为“整个依赖图零漏洞”。没有 schema / Ent / Atlas migration 变更。
+
+下一步与边界：实现落盘后必须在最终 clean HEAD 真实执行本地验收生命周期、full、strict、prepare-push、非强制推送、exact-SHA 远端 CI、不可变制品构建 / 校验、本地发布演练及 133 技术发布；这些运行证据写入 ignored receipt 和正式发布 evidence，不为补记运行结果再制造与已部署 SHA 不一致的提交。本节不证明尚未执行的目标动作，也不证明客户真实数据导入、岗位人工 UAT 或签收。当前无已知代码阻塞；外部 target / CI / SSH / secret / 运行身份若无法从正式入口证明，发布流程必须失败关闭并保持最后一个已验证版本。
+
+## 2026-07-28 Workflow 任务来源读取门禁
+
+完成：工作台、任务看板和业务看板继续按责任、指派、阻塞与逾期展示协同任务，不再用来源菜单权限过滤任务本身。服务端新增权威来源关联与当前账号来源读取门禁：只有完整 ProcessRuntime 锚点或受信任业务生产者签名可证明真实来源，普通 `source_type / source_id / source_no` 标签不能证明已关联单据；非催办状态动作在解释和最终写入前都重验来源读取权限，break-glass 不绕过，`urge` 继续独立可用。转交候选也必须具备来源读取能力；来源读取可来自候选账号另一个启用岗位，但 Workflow 办理权限仍必须由任务责任岗位自身满足，不能跨岗位拼接。
+
+前端：所有“查看相关单据”入口统一要求后端 `source_access` 明确允许、已登记页面路由和当前有效菜单投影同时成立；任务行标题、双击、详情面板、抽屉与业务看板风险卡片不再形成旁路。无来源读取权限时任务与上下文仍可见，只显示只读原因；若仅可催办，主按钮明确显示“催办”。后端缺失或返回畸形来源投影时前端失败关闭。同步更新当前真源、永绅角色矩阵和任务指挥中心原型说明；没有新增、重命名或重分类长期文档，因此文档清单无需改动。
+
+验证：服务端 `internal/biz`、`internal/service`、`internal/data` 定向测试通过；前端定向 Node 测试 `92 / 92`、ESLint、目标文件 Prettier、脚本语法检查和 Vite production build 通过。真实 Chromium + 受控 mock 的全局工作台、任务看板和业务看板场景 `3 / 3` 通过，覆盖“菜单与读取权限存在但没有权威来源锚点时仍不显示入口”、任务抽屉 / 双击和风险卡片旁路。追加的出货放行只读场景两次都在 Vite 启动前被共享工作区另一任务并发写入中的 `scripts/qa/dev-workbench-receipt.mjs` 语法中间态阻断，未执行页面断言；该场景脚本本身已通过 `node --check`。前端全集为 `1880 / 1883`：三项失败均来自同一 DEV workbench 迁移后，旧测试仍读取已删除的 `DevCustomerConfigPage.jsx` / `devCustomerConfigRoute.mjs`，与本轮 Workflow 文件无关；当前命令使用 Node `26.5.0`，仓库要求 `24.14.x`，pnpm 对此给出 engine warning。
+
+边界：Workflow task done 仍不写 Fact。ProcessRuntime 初始具名候选仍按冻结 revision 的 Workflow 责任配置选择；若该责任配置中的人员缺少来源读取权限，任务会继续可见但不可办理，需要修正配置或由具备 `workflow.task.assign` 的管理者转交给同责任岗位且可读来源的候选。本轮没有 schema、Ent、Atlas migration 或数据库变更，未执行数据库 apply、部署、目标账号登录 smoke 或客户 UAT，也未提交或推送。共享工作树同时存在其他任务的大量 DEV workbench、migration 和治理改动；上述验证只作为本轮定向证据，不把整棵 dirty tree 包装成完整 T8 绿色。
+
+## 2026-07-28 本地开发数据库统一与运行态闭环
+
+恢复点：使用 PostgreSQL 18 客户端把 `trade_erp`、`plush_erp`、`plush_erp_simon_dev` 及十个历史 acceptance / archive 库分别备份到 `/Users/simon/Backups/erp-local-db-consolidation/20260727T170955Z`。13 个 custom-format archive 均通过 `pg_restore --list` 并记录 SHA-256；`plush_erp`、`plush_erp_simon_dev`、`trade_erp` 又分别完整恢复到一次性隔离库并成功查询，随后删除隔离库。旧 PostgreSQL 14 客户端在版本检查阶段失败的零字节产物已立即删除，没有被当成恢复点。
+
+数据库统一：精确核对备份 manifest 与实时数据库清单后，逐个强制断连并删除十二个 `plush_erp*` 旧库，再按原 owner、UTF8 和 `en_US.utf8` locale 重建唯一 `plush_erp`。本机 ignored `server/configs/dev/config.local.yaml` 已从 `plush_erp_simon_dev` 切回正式默认 `plush_erp`。空库通过正式 migration plan 完成 102 条 migration / 648 条 SQL 的整链事务回滚预演，再以 `tx-mode=all` 整批提交；最终 status 为 `102 / 102`、pending `0`，Ent / PostgreSQL schema 同目标零差异并返回 `applied_verified`。旧库数据只保留在上述备份中，没有猜造 582 条历史事实的 actor。
+
+迁移校验修正：Atlas 在零差异时会输出 `Schemas are synced, no changes to be made.`；旧包装器把这条成功提示误判为 drift，导致 migration 已提交后返回 `committed_unverified`。包装器现在只把空输出或该精确成功提示识别为零差异，其他输出继续 fail closed；数据库已是 latest 时再次执行 `make migrate_apply` 只做同目标 schema readback 并返回 `applied_verified`，不会重放 revision。migration / runtime / Makefile 定向测试 `19 / 19`、Prettier 与 `git diff --check` 通过。
+
+运行态：`trade_erp` 的最后一条 `20260727223000` 已在同一备份与停写窗口内完成 plan、事务回滚预演、整批 apply 和 `db_schema_check`，最终 `20 / 20`、pending `0`。两个项目均实际执行 `make dev_restart` 并保持运行：plush HTTP / gRPC 为 `8300 / 9300`，trade 为 `8100 / 9100`；两边 `/healthz` 与 `/readyz` 均为 HTTP 200。未提交、未推送、未部署，也未执行 133 / 生产数据库变更或客户 UAT。
+
+## 2026-07-27 开发库 migration 事务预演与整批 apply 门禁
+
+完成：开发入口从直接 `migrate_apply` 收口为 `migrate_status → migrate_plan → migrate_apply → 同目标 status / schema readback`。status 绑定脱敏目标和 PostgreSQL cluster identity；plan / apply 使用 Git 内部路径的本机串行锁，冻结 migration 快照，执行既有 populated-upgrade / customer-config-cutover 审计、operational fact lifecycle 只读审计、Atlas `tx-mode=all` dry-run，并在单个 PostgreSQL 事务内真实预演全部 pending SQL 后强制 `ROLLBACK`；apply 重新核对目标、pending revisions、migration hash 与包装器 / 审计 / Ent schema 指纹，重跑门禁后才以 `tx-mode=all` 整批提交，只有同目标 `pending=0` 且 Ent / PostgreSQL schema 零差异才报告 `applied_verified`。apply 异常会继续读 status，区分 `apply_failed_no_revision_advance` 与 `committed_unverified`；确认值只接受当前命令环境，`.env` 残值无效。
+
+目标边界：loopback `plush_erp*` 隔离库可使用开发入口；application config 精确命中的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 识别为登记共享开发库，plan 前要求停止本仓库后端和其它数据库客户端，apply 前额外要求备份 / 停写维护确认。环境变量覆盖的远程库、133、生产和归属不明目标继续拒绝并转正式发布流程。启动预检保持只读，只给出 status / plan 的纠正顺序，不自动 apply。
+
+当时数据诊断：`plush_erp_simon_dev` 已由旧的逐文件 apply 推进到 `20260726173924`，仍有 `20260726173943` 与 `20260726174057` 两条 pending；只读核对发现 finance `270`、production `221`、outsourcing `91` 条既有事实缺精确生命周期 actor / cancellation audit。仓库没有足以逐行证明这些 actor 的权威来源，因此当日没有自动回填、放宽约束、`migrate_set`、继续 apply 或重建数据库；后续处置见上方 2026-07-28 记录。
+
+当日验证：最终代码的 migration / runtime / Makefile / SQL 定向 Node 测试 `26 / 26` 通过；项目 `bash scripts/qa/fast.sh` 从头通过，递归发现的 `109` 个 scripts 测试文件、Web 合同 `201 / 201`、ESLint、Stylelint 和 server quick `2977 / 2977` 均零失败。真实 `migrate_status` 在当日 plan 前后都保持 `100 / 102`、pending `2`；真实只读 plan 依次通过 populated-upgrade 与 customer-config-cutover 审计，再以 finance `270`、production `221`、outsourcing `91` 的 operational fact blocker 失败关闭。当日未对共享开发库执行持久数据库写入；后续经明确授权的重建与 apply 见上方 2026-07-28 记录。
 
 ## 2026-07-26 Mermaid 全屏缩放修正
 
@@ -263,6 +307,14 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 四条异常流真实写入为 `4 / 4`：销售退货完成收货与入库冲正，收付款完成过账 / 核销与冲销恢复，库存调整完成新建 / 提交 / 老板审批 / 仓库执行 / 过账 / 取消冲正，生产超领完成额度消费、领料 Fact 过账、取消冲正和额度恢复。四条主 mutation 均由产品 UI 点击触发；另有四个结构合法的无权角色请求被服务端以 `40304` 拒绝，四次后端成功后丢弃响应均由页面权威读回恢复，四个重复或旧 version 请求均以 `40920` 拒绝。报告不保存密码、token 或 Authorization header。数据库额外读回四个对应 ProcessInstance 均为 `completed`，销售退货、收付款、库存调整的执行节点与 end 均完成；生产超领按审批决定的 `over_issue_end` 完成，不把后续领料 Fact 误写成审批任务结果。
 
 验证边界：定向 Go、Node、文档合同、`db-guard`、`go test ./...`、`go build ./...`、前端单测 / lint / CSS / production build、真实 Chromium、shell / YAML / 漏洞检查均已在当前实现阶段通过。最终仓库门禁固定为在本节落盘后的同一工作树执行 `bash scripts/qa/strict.sh`；本文件不预写该命令的绿色结果，最终交接以终端回执为准。当前没有提交、推送、部署或 Handoff 后 Git 收口，133 / 生产 migration、目标 readback、真实客户数据导入、甲方 UAT / 签收仍未执行。
+
+## 2026-07-27 审批责任岗位候选与权限失配提示
+
+完成：审批责任弹窗不再过滤后裸露 `sales` 等原始岗位 key。已保存但停用、缺少审批功能、没有启用员工或已经不存在的岗位会保留为不可选项，并使用中文岗位名和原因回显；当前只有一个可承接岗位时，页面明确说明备用、升级可留空，同一岗位池已占用时直接标明所在责任层级。岗位池或指定员工重复承担多个层级改为候选禁用、字段校验和保存兜底三层提示。服务端发布检查同步读取持久化岗位状态与 `workflow.task.approve`，缺权、停用或不存在的岗位不能通过前端外的调用发布。
+
+验证：affected 计划判定为 T0 / T1 / T4 / T5；服务端 `go test -count=1 ./internal/core/... ./internal/biz ./internal/data ./internal/service ./internal/server`、Web ESLint、定向 Node `5 / 5`、脚本语法与 `git diff --check` 通过。真实 Chromium `3 / 3` 覆盖未初始化、正常发布 / 启用和持久化岗位权限漂移；漂移场景确认“业务（未开启审批功能）”、唯一可用“老板”、跨层占用原因、字段错误、弹窗居中、无横向溢出和零未声明控制台错误，截图已人工检查。
+
+边界：本轮没有自动给业务、采购或财务岗位扩权，也没有修改数据库、已发布 revision 或在途流程；当前失配配置需要管理员在岗位设置中恢复审批功能，或把责任改到现有合格岗位。浏览器证据来自本地自托管前端与受控 mock，只证明当前 Local UI 合同；未部署、未执行目标账号实登或甲方 UAT。本机使用 Node `26.5.0`，仓库声明 `24.14.x`。
 
 ## 下一步与停止条件
 

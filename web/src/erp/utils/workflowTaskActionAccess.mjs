@@ -21,6 +21,8 @@ const WORKFLOW_ACTION_ACCESS_FAILED_REASON =
 const WORKFLOW_ACTION_ACCESS_MISSING_REASON = '当前操作暂不可用，请刷新后重试。'
 const WORKFLOW_ACTION_ACCESS_CHECKING_REASON =
   '正在确认操作权限，请稍后再提交。'
+const WORKFLOW_SOURCE_ACCESS_MISSING_REASON =
+  '暂时无法确认相关单据访问权限，当前不能办理；请刷新后重试。'
 
 function sortedIdentityStrings(values = [], mapValue = (value) => value) {
   if (!Array.isArray(values)) return []
@@ -163,6 +165,55 @@ function normalizeActionExplainItem(item = {}) {
   }
 }
 
+export function normalizeWorkflowTaskSourceAccess(data = {}) {
+  const item = data?.source_access
+  if (
+    !item ||
+    typeof item !== 'object' ||
+    Array.isArray(item) ||
+    typeof item.applicable !== 'boolean' ||
+    typeof item.resolved !== 'boolean' ||
+    typeof item.allowed !== 'boolean'
+  ) {
+    return {
+      source: 'missing',
+      applicable: true,
+      resolved: false,
+      allowed: false,
+      reasonCode: 'source_access_missing_from_backend',
+      reason: WORKFLOW_SOURCE_ACCESS_MISSING_REASON,
+    }
+  }
+
+  const applicable = item.applicable === true
+  const resolved = item.resolved === true
+  const allowed = item.allowed === true
+  const valid =
+    (!applicable && resolved && allowed) ||
+    (applicable && ((resolved && allowed) || !allowed))
+  if (!valid) {
+    return {
+      source: 'invalid',
+      applicable: true,
+      resolved: false,
+      allowed: false,
+      reasonCode: 'source_access_invalid_from_backend',
+      reason: WORKFLOW_SOURCE_ACCESS_MISSING_REASON,
+    }
+  }
+
+  return {
+    source: 'backend',
+    applicable,
+    resolved,
+    allowed,
+    reasonCode: String(item.reason_code || '').trim(),
+    reason:
+      String(item.reason || '').trim() ||
+      (allowed ? '' : WORKFLOW_SOURCE_ACCESS_MISSING_REASON),
+  }
+}
+
 export function normalizeWorkflowActionExplainData(data = {}) {
   const rawActions = Array.isArray(data?.actions)
     ? data.actions
@@ -197,6 +248,14 @@ export function buildWorkflowActionAccessFallback({
   if (!task) {
     return {
       source: 'none',
+      sourceAccess: {
+        source: 'none',
+        applicable: false,
+        resolved: true,
+        allowed: false,
+        reasonCode: '',
+        reason: '',
+      },
       byAction: {},
       allowedModes: [],
       readonlyReason: '',
@@ -231,6 +290,14 @@ export function buildWorkflowActionAccessFallback({
   }
   return {
     source: 'fallback',
+    sourceAccess: {
+      source: 'checking',
+      applicable: true,
+      resolved: false,
+      allowed: false,
+      reasonCode: 'source_access_checking',
+      reason: WORKFLOW_ACTION_ACCESS_CHECKING_REASON,
+    },
     byAction,
     allowedModes,
     readonlyReason,
@@ -252,6 +319,18 @@ export function buildWorkflowActionAccessState({
   })
   const explainedByAction = normalizeWorkflowActionExplainData(explainData)
   const hasExplainData = Object.keys(explainedByAction).length > 0
+  const sourceAccess = hasExplainData
+    ? normalizeWorkflowTaskSourceAccess(explainData)
+    : {
+        ...fallback.sourceAccess,
+        source: failed ? 'failed' : 'checking',
+        reasonCode: failed
+          ? 'source_access_check_failed'
+          : 'source_access_checking',
+        reason: failed
+          ? WORKFLOW_ACTION_ACCESS_FAILED_REASON
+          : WORKFLOW_ACTION_ACCESS_CHECKING_REASON,
+      }
   const shouldGateLocalActions =
     Boolean(task) &&
     !hasExplainData &&
@@ -272,6 +351,17 @@ export function buildWorkflowActionAccessState({
           allowed: false,
           reason: WORKFLOW_ACTION_ACCESS_MISSING_REASON,
           reasonCode: 'action_access_missing_from_backend',
+        }
+      }
+    }
+    if (!sourceAccess.allowed) {
+      for (const actionMode of actionModes) {
+        if (actionMode === 'urge') continue
+        byAction[actionMode] = {
+          ...byAction[actionMode],
+          allowed: false,
+          reason: sourceAccess.reason,
+          reasonCode: sourceAccess.reasonCode,
         }
       }
     }
@@ -316,8 +406,11 @@ export function buildWorkflowActionAccessState({
           : 'fallback',
     loading,
     failed,
+    sourceAccess,
     byAction,
     allowedModes,
+    canHandle: allowedModes.some((actionMode) => actionMode !== 'urge'),
+    urgeOnly: allowedModes.length === 1 && allowedModes[0] === 'urge',
     readonlyReason,
     canRun(actionMode) {
       return byAction[normalizeWorkflowActionMode(actionMode)]?.allowed === true

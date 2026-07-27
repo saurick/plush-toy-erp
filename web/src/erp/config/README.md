@@ -31,8 +31,8 @@
 node --test web/src/erp/config/seedData.test.mjs
 node --test web/src/erp/config/menuPermissions.test.mjs
 node --test web/src/erp/config/entryConfig.test.mjs
-node --test web/src/erp/config/devHub.test.mjs
-node --test web/src/erp/config/devTesting.test.mjs
+node --test web/src/dev-workbench/config/devHub.test.mjs
+node --test web/src/dev-workbench/config/devTesting.test.mjs
 git diff --check
 ```
 

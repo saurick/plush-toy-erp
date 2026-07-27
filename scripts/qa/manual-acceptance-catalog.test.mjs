@@ -509,7 +509,7 @@ test("active trial runbook keeps the exact 50-target and fresh-database evidence
     /50 项：2 个登录与入口、29 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台/u,
   );
   assert.match(runbook, /fresh 空库基线已记录/u);
-  assert.match(runbook, /plush_erp_acceptance_20260716_v5_dev/u);
+  assert.match(runbook, /plush_erp_acceptance_<run-id>_dev/u);
   assert.match(runbook, /plush_erp_uat_20260716_v5/u);
   assert.match(runbook, /出货放行[\s\S]*4 条/u);
   assert.match(runbook, /出货管理[\s\S]*47 张/u);

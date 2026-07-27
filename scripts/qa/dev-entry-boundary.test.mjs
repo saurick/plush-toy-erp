@@ -7,14 +7,14 @@ import {
   DEV_HUB_ITEMS,
   DEV_HUB_ROUTE,
   isDevHubEnabled,
-} from "../../web/src/erp/config/devHub.mjs";
+} from "../../web/src/dev-workbench/config/devHub.mjs";
 import {
   DEV_CUSTOMER_CONFIG_ROUTE,
   buildCustomerConfigDevOverviewFromSearch,
   buildImportToolingSummary,
   isDevCustomerConfigEnabled,
-} from "../../web/src/erp/config/devCustomerConfig.mjs";
-import { DEV_STATUS_FLOWS_ROUTE } from "../../web/src/erp/config/devRoutes.mjs";
+} from "../../web/src/dev-workbench/config/devCustomerConfig.mjs";
+import { DEV_STATUS_FLOWS_ROUTE } from "../../web/src/dev-workbench/config/devRoutes.mjs";
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_CURRENT_DOC_PATHS,
@@ -22,7 +22,7 @@ import {
   buildDevTestingDocs,
   extractDevTestingCommandBlocks,
   isDevTestingEnabled,
-} from "../../web/src/erp/config/devTesting.mjs";
+} from "../../web/src/dev-workbench/config/devTesting.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
@@ -87,7 +87,11 @@ function extractDevTestingPageGlobPaths(pageSource = "") {
 }
 
 test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV", () => {
-  const devDocsPageSource = read("web/src/erp/pages/DevDocsPage.jsx");
+  const appSource = read("web/src/App.jsx");
+  const devRoutesSource = read(
+    "web/src/dev-workbench/DevWorkbenchRoutes.jsx",
+  );
+  const devDocsPageSource = read("web/src/dev-workbench/pages/DevDocsPage.jsx");
   assert.equal(DEV_HUB_ROUTE, "/__dev");
   assert.equal(DEV_STATUS_FLOWS_ROUTE, "/__dev/status-flows");
   assert.equal(DEV_TESTING_ROUTE, "/__dev/testing");
@@ -98,6 +102,26 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   assert.equal(isDevTestingEnabled({ DEV: false }), false);
   assert.equal(isDevCustomerConfigEnabled({ DEV: true }), true);
   assert.equal(isDevCustomerConfigEnabled({ DEV: false }), false);
+  assert.match(
+    appSource,
+    /import\.meta\.env\.DEV\s*&&\s*\/\^\\\/__dev/u,
+    "the product favicon owner must yield only for compile-time DEV workbench routes",
+  );
+  assert.match(
+    appSource,
+    /if \(isDevWorkbenchRoute\) return/u,
+    "the product favicon effect must not overwrite the DEV workbench icon",
+  );
+  assert.match(
+    appSource,
+    /!isDevWorkbenchRoute\s*\?\s*\(/u,
+    "the product title owner must yield to DEV workbench routes",
+  );
+  assertIncludes(
+    devRoutesSource,
+    "applyDevWorkbenchFavicon(document, faviconHref)",
+    "dev workbench favicon owner",
+  );
   assert(
     DEV_HUB_ITEMS.every((item) =>
       String(item.route || "").startsWith("/__dev"),
@@ -142,8 +166,8 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
 });
 
 test("dev entry boundary: dev testing indexes only current maintained docs", () => {
-  const devTestingPageSource = read("web/src/erp/pages/DevTestingPage.jsx");
-  const devTestingCssSource = read("web/src/erp/styles/app/dev-prototypes.css");
+  const devTestingPageSource = read("web/src/dev-workbench/pages/DevTestingPage.jsx");
+  const devTestingCssSource = read("web/src/dev-workbench/styles/dev-prototypes.css");
   assert.deepEqual(DEV_TESTING_CURRENT_DOC_PATHS, [
     "docs/product/自动化测试策略.md",
     "README.md",
@@ -958,7 +982,7 @@ test("dev entry boundary: indexed testing doc command scripts exist", () => {
 });
 
 test("dev entry boundary: customer config console stays preview or gated apply only", () => {
-  const pageSource = read("web/src/erp/pages/DevCustomerConfigPage.jsx");
+  const pageSource = read("web/src/dev-workbench/pages/DevCustomerConfigPage.jsx");
   assertIncludes(
     pageSource,
     "客户配置包预检与发布控制台",

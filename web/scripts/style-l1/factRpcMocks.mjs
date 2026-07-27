@@ -2852,9 +2852,19 @@ export async function installFactRpcMocks(page, context) {
             }
           }
         )
+        const sourceAccess = {
+          applicable: false,
+          resolved: true,
+          allowed: true,
+          reason_code: 'source_access_not_applicable',
+          reason: '当前任务没有需要核对的相关单据。',
+        }
         data = actionKey
-          ? { action: actions.find((item) => item.action_key === actionKey) }
-          : { task_id: taskID, actions }
+          ? {
+              source_access: sourceAccess,
+              action: actions.find((item) => item.action_key === actionKey),
+            }
+          : { task_id: taskID, source_access: sourceAccess, actions }
         break
       }
       default:

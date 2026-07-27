@@ -82,20 +82,38 @@ test('business dashboard explains the four business-facing data boundaries', () 
   assert.doesNotMatch(source, />\s*当前风险\s*</u)
 })
 
-test('business dashboard keeps explicit entries and adds guarded double-click shortcuts', () => {
+test('business dashboard keeps explicit entries and guards task shortcuts with source access', () => {
   assert.match(source, /openDashboardItemOnDoubleClick/u)
   assert.match(source, /erp-business-board-source-item--openable/u)
   assert.match(source, /erp-business-board-alert-item--openable/u)
   assert.match(source, /data-open-on-double-click/u)
-  assert.match(source, /source\.canOpen[\s\S]*?'data-target-path': source\.path/u)
-  assert.match(source, /source\.canOpen[\s\S]*?title: `双击进入\$\{source\.label\}`/u)
+  assert.match(
+    source,
+    /source\.canOpen[\s\S]*?'data-target-path': source\.path/u
+  )
+  assert.match(
+    source,
+    /source\.canOpen[\s\S]*?title: `双击进入\$\{source\.label\}`/u
+  )
   assert.match(
     source,
     /openDashboardItemOnDoubleClick\(event,\s*\(\) =>[\s\S]*?navigate\(source\.path\)[\s\S]*?\)/u
   )
   assert.match(
     source,
-    /openDashboardItemOnDoubleClick\(event,\s*\(\) =>\s*openTaskEntry\(task\)/u
+    /useWorkflowTaskActionAccess\(\{[\s\S]*?task,[\s\S]*?enabled: Boolean\(task\)/u
+  )
+  assert.match(
+    source,
+    /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*entryPath,\s*access\.sourceAccess/u
+  )
+  assert.match(
+    source,
+    /canOpenWorkflowTaskEntry\(\s*taskEntryAdminProfile,\s*entryPath,\s*access\?\.sourceAccess/u
+  )
+  assert.match(
+    source,
+    /openDashboardItemOnDoubleClick\(event,\s*\(\) =>[\s\S]*?onOpenEntry\(task, access\)/u
   )
   assert.match(source, /有“查看业务记录”的项目可进入/u)
   assert.match(source, /其他项目仅显示数量/u)

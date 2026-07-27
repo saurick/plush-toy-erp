@@ -15,16 +15,6 @@ import {
 } from '@/common/utils/lazyImportRetry.mjs'
 import ERPLayout from './components/ERPLayout.jsx'
 import {
-  DEV_CAPABILITY_LEDGER_ROUTE,
-  DEV_CUSTOMER_CONFIG_ROUTE,
-  DEV_DOCS_ROUTE,
-  DEV_GOVERNANCE_ROUTE,
-  DEV_HUB_ROUTE,
-  DEV_PROTOTYPES_ROUTE,
-  DEV_STATUS_FLOWS_ROUTE,
-  DEV_TESTING_ROUTE,
-} from './config/devRoutes.mjs'
-import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
   getEntryConfig,
@@ -92,29 +82,8 @@ const MobileAppLayout = lazyRoute(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazyRoute(
   () => import('./mobile/pages/MobileRoleTasksPage')
 )
-const DevHubPage = import.meta.env.DEV
-  ? lazyRoute(() => import('./pages/DevHubPage.jsx'))
-  : null
-const DevDocsPage = import.meta.env.DEV
-  ? lazyRoute(() => import('./pages/DevDocsPage.jsx'))
-  : null
-const DevGovernancePage = import.meta.env.DEV
-  ? lazyRoute(() => import('./pages/DevGovernancePage.jsx'))
-  : null
-const DevFlowStateObservatoryPage = import.meta.env.DEV
-  ? lazyRoute(() => import('./pages/DevFlowStateObservatoryPage.jsx'))
-  : null
-const DevPrototypesPage = import.meta.env.DEV
-  ? lazyRoute(() => import('./pages/DevPrototypesPage.jsx'))
-  : null
-const DevCapabilityLedgerPage = import.meta.env.DEV
-  ? lazyRoute(() => import('./pages/DevCapabilityLedgerPage.jsx'))
-  : null
-const DevCustomerConfigPage = import.meta.env.DEV
-  ? lazyRoute(() => import('./pages/DevCustomerConfigPage.jsx'))
-  : null
-const DevTestingPage = import.meta.env.DEV
-  ? lazyRoute(() => import('./pages/DevTestingPage.jsx'))
+const DevWorkbenchRoutes = import.meta.env.DEV
+  ? lazyRoute(() => import('@/dev-workbench/DevWorkbenchRoutes.jsx'))
   : null
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
@@ -310,44 +279,8 @@ export default function ERPRouter() {
     <RouteRuntimeBoundary>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
-          {DevHubPage ? (
-            <Route path={DEV_HUB_ROUTE} element={<DevHubPage />} />
-          ) : null}
-          {DevDocsPage ? (
-            <Route path={DEV_DOCS_ROUTE} element={<DevDocsPage />} />
-          ) : null}
-          {DevGovernancePage ? (
-            <Route
-              path={DEV_GOVERNANCE_ROUTE}
-              element={<DevGovernancePage />}
-            />
-          ) : null}
-          {DevFlowStateObservatoryPage ? (
-            <Route
-              path={DEV_STATUS_FLOWS_ROUTE}
-              element={<DevFlowStateObservatoryPage />}
-            />
-          ) : null}
-          {DevPrototypesPage ? (
-            <Route
-              path={DEV_PROTOTYPES_ROUTE}
-              element={<DevPrototypesPage />}
-            />
-          ) : null}
-          {DevCapabilityLedgerPage ? (
-            <Route
-              path={DEV_CAPABILITY_LEDGER_ROUTE}
-              element={<DevCapabilityLedgerPage />}
-            />
-          ) : null}
-          {DevCustomerConfigPage ? (
-            <Route
-              path={DEV_CUSTOMER_CONFIG_ROUTE}
-              element={<DevCustomerConfigPage />}
-            />
-          ) : null}
-          {DevTestingPage ? (
-            <Route path={DEV_TESTING_ROUTE} element={<DevTestingPage />} />
+          {DevWorkbenchRoutes ? (
+            <Route path="/__dev/*" element={<DevWorkbenchRoutes />} />
           ) : null}
           <Route path="/" element={<RootEntryRedirect />} />
           <Route path="/admin-login" element={<AdminLoginPage />} />

@@ -1787,7 +1787,6 @@ test('业务状态和类型列不把未知枚举 raw key 作为用户可见 fall
     'pages/V1InventoryLedgerPage.jsx',
     'pages/V1PurchaseReceiptsPage.jsx',
     'pages/BOMVersionsPage.jsx',
-    'pages/DevCustomerConfigPage.jsx',
     'components/bom/BOMVersionColumns.jsx',
     'components/quality-inspections/qualityInspectionColumns.jsx',
     'components/shipments/shipmentColumns.jsx',
@@ -1795,6 +1794,9 @@ test('业务状态和类型列不把未知枚举 raw key 作为用户可见 fall
     'utils/masterDataOrderView.mjs',
     'utils/mobileTaskView.mjs',
   ].map((file) => join(rootDir, file))
+  files.push(
+    join(webSourceRoot, 'dev-workbench/pages/DevCustomerConfigPage.jsx')
+  )
   const combined = files
     .map((filePath) => readFileSync(filePath, 'utf8'))
     .join('\n')
@@ -1852,7 +1854,10 @@ test('业务状态和类型列不把未知枚举 raw key 作为用户可见 fall
 })
 
 test('__dev/customer-config 边界列表不把 raw key 当可见 fallback', () => {
-  const filePath = join(rootDir, 'pages/DevCustomerConfigPage.jsx')
+  const filePath = join(
+    webSourceRoot,
+    'dev-workbench/pages/DevCustomerConfigPage.jsx'
+  )
   const content = readFileSync(filePath, 'utf8')
 
   assert.match(content, /function guardItemLabel\(item, fallbackLabel\)/u)

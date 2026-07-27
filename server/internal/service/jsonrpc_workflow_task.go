@@ -825,6 +825,13 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	if !biz.CanTransitionWorkflowTaskStatus(currentTask.TaskStatusKey, contract.StatusKey) {
 		return id, d.mapWorkflowError(ctx, biz.ErrBadParam), nil
 	}
+	sourceAccess := d.workflowTaskSourceAccess(ctx, currentTask)
+	if sourceAccess.Applicable && !sourceAccess.Allowed {
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.PermissionDenied.Code,
+			Message: sourceAccess.Reason,
+		}, nil
+	}
 	canHandle := workflowAdminCanHandleTask(admin, currentTask, contract.StatusKey, visibleOwnerRoleKeys)
 	useBreakGlass := false
 	if breakGlass != nil {
@@ -1289,19 +1296,21 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskActionExplain(
 	if !workflowAdminCanViewTask(admin, currentTask, readVisibleOwnerRoleKeys) {
 		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 	}
+	sourceAccess := d.workflowTaskSourceAccess(ctx, currentTask)
 
 	rawActionKey, hasActionKey := pm["action_key"]
 	if !hasActionKey {
 		actions := make([]any, 0, 5)
 		for _, contract := range workflowTaskActionExplainContracts(currentTask) {
-			actions = append(actions, d.workflowTaskActionAccessToMap(ctx, admin, currentTask, contract))
+			actions = append(actions, d.workflowTaskActionAccessToMapWithSource(ctx, admin, currentTask, contract, sourceAccess))
 		}
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
-				"task_id": currentTask.ID,
-				"actions": actions,
+				"task_id":       currentTask.ID,
+				"source_access": workflowTaskSourceAccessToMap(sourceAccess),
+				"actions":       actions,
 			}),
 		}, nil
 	}
@@ -1317,7 +1326,10 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskActionExplain(
 	return id, &v1.JsonrpcResult{
 		Code:    errcode.OK.Code,
 		Message: errcode.OK.Message,
-		Data:    newDataStruct(map[string]any{"action": d.workflowTaskActionAccessToMap(ctx, admin, currentTask, contract)}),
+		Data: newDataStruct(map[string]any{
+			"source_access": workflowTaskSourceAccessToMap(sourceAccess),
+			"action":        d.workflowTaskActionAccessToMapWithSource(ctx, admin, currentTask, contract, sourceAccess),
+		}),
 	}, nil
 }
 
@@ -1356,16 +1368,21 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentExplain(
 	assigned := workflowTaskAssignedToAdmin(admin, currentTask)
 	ownerMatched := workflowEffectiveOwnerRoleMatched(admin, currentTask, readVisibleOwnerRoleKeys)
 	workPoolMatched := workflowWorkPoolEntitlementMatched(admin, currentTask, readVisibleOwnerRoleKeys)
-	canHandle := workflowAdminCanHandleTask(admin, currentTask, "done", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("done", currentTask)).RoleKeys) ||
-		workflowAdminCanHandleTask(admin, currentTask, "blocked", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("blocked", currentTask)).RoleKeys) ||
-		workflowAdminCanHandleTask(admin, currentTask, "rejected", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("rejected", currentTask)).RoleKeys) ||
-		workflowAdminCanHandleTask(admin, currentTask, "ready", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.PermissionWorkflowTaskUpdate).RoleKeys)
+	sourceAccess := d.workflowTaskSourceAccess(ctx, currentTask)
+	canHandle := sourceAccess.Allowed &&
+		(workflowAdminCanHandleTask(admin, currentTask, "done", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("done", currentTask)).RoleKeys) ||
+			workflowAdminCanHandleTask(admin, currentTask, "blocked", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("blocked", currentTask)).RoleKeys) ||
+			workflowAdminCanHandleTask(admin, currentTask, "rejected", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("rejected", currentTask)).RoleKeys) ||
+			workflowAdminCanHandleTask(admin, currentTask, "ready", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.PermissionWorkflowTaskUpdate).RoleKeys))
 	canUrge := workflowAdminCanUrgeTask(admin, currentTask, d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.PermissionWorkflowTaskUpdate).RoleKeys)
 	reasonCode := "not_assigned_or_owner"
 	reason := "当前账号不是该任务的指定处理人，也不属于任务责任角色。"
 	if biz.IsTerminalWorkflowTaskStatus(currentTask.TaskStatusKey) {
 		reasonCode = "terminal_task"
 		reason = "该任务已结束，只能查看上下文。"
+	} else if sourceAccess.Applicable && !sourceAccess.Allowed {
+		reasonCode = sourceAccess.ReasonCode
+		reason = sourceAccess.Reason
 	} else if assigned {
 		reasonCode = "assigned_to_current_admin"
 		reason = "当前账号是该任务的指定处理人。"
@@ -1399,6 +1416,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentExplain(
 		"action_configured_candidate_sources":         d.workflowTaskActionConfiguredCandidateSourcesMap(ctx, currentTask),
 		"action_domain_command_entries":               workflowTaskActionDomainCommandEntriesMap(currentTask),
 		"action_work_pool_scope_matches":              d.workflowTaskActionWorkPoolScopeMatchesMap(ctx, admin, currentTask),
+		"source_access":                               workflowTaskSourceAccessToMap(sourceAccess),
 		"visible":                                     true,
 		"assigned_to_current_admin":                   assigned,
 		"owner_role_matched":                          ownerMatched,
@@ -1474,13 +1492,36 @@ func (d *jsonrpcDispatcher) workflowTaskActionAccessToMap(
 	task *biz.WorkflowTask,
 	contract workflowTaskActionExplainContract,
 ) map[string]any {
+	return d.workflowTaskActionAccessToMapWithSource(
+		ctx,
+		admin,
+		task,
+		contract,
+		d.workflowTaskSourceAccess(ctx, task),
+	)
+}
+
+func (d *jsonrpcDispatcher) workflowTaskActionAccessToMapWithSource(
+	ctx context.Context,
+	admin *biz.AdminUser,
+	task *biz.WorkflowTask,
+	contract workflowTaskActionExplainContract,
+	sourceAccess workflowTaskSourceAccessDecision,
+) map[string]any {
 	visibility := d.workflowTaskRoleVisibilityForTask(ctx, admin, task, contract.RequiredPermission)
 	visibleOwnerRoleKeys := visibility.RoleKeys
 	permissionAllowed, permissionResult := d.AdminHasPermission(ctx, contract.RequiredPermission)
 	if permissionResult != nil || !visibility.Valid {
 		permissionAllowed = false
 	}
-	allowed, reasonCode, reason := workflowTaskActionAccessDecision(admin, task, contract, visibleOwnerRoleKeys, permissionAllowed)
+	allowed, reasonCode, reason := workflowTaskActionAccessDecision(
+		admin,
+		task,
+		contract,
+		visibleOwnerRoleKeys,
+		permissionAllowed,
+		sourceAccess,
+	)
 	ownerMatched := workflowEffectiveOwnerRoleMatched(admin, task, visibleOwnerRoleKeys)
 	workPoolMatched := workflowWorkPoolEntitlementMatched(admin, task, visibleOwnerRoleKeys)
 	configuredCandidates := d.workflowTaskConfiguredCandidateExplanation(ctx, task, contract.RequiredPermission)
@@ -1716,6 +1757,7 @@ func workflowTaskActionAccessDecision(
 	contract workflowTaskActionExplainContract,
 	visibleOwnerRoleKeys []string,
 	permissionAllowed bool,
+	sourceAccess workflowTaskSourceAccessDecision,
 ) (bool, string, string) {
 	if admin == nil || admin.Disabled {
 		return false, "admin_disabled", "当前账号已停用，不能处理任务。"
@@ -1731,6 +1773,9 @@ func workflowTaskActionAccessDecision(
 	}
 	if !permissionAllowed {
 		return false, "missing_permission", "当前账号缺少执行该动作所需权限。"
+	}
+	if !contract.Urge && sourceAccess.Applicable && !sourceAccess.Allowed {
+		return false, sourceAccess.ReasonCode, sourceAccess.Reason
 	}
 	if contract.Urge {
 		if workflowAdminCanUrgeTask(admin, task, visibleOwnerRoleKeys) {

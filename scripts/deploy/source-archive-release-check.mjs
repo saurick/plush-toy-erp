@@ -632,10 +632,14 @@ async function runReleaseBuilds({
       command: "docker",
       args: [
         "build",
+        "--platform",
+        "linux/amd64",
         "-f",
         "web/Dockerfile",
         "--build-arg",
         `ERP_CUSTOMER_KEY=${customer}`,
+        "--build-arg",
+        `GIT_SHA=${gitState.commit}`,
         "-t",
         webImage,
         ".",
@@ -648,6 +652,8 @@ async function runReleaseBuilds({
       command: "docker",
       args: [
         "build",
+        "--platform",
+        "linux/amd64",
         "-f",
         "server/Dockerfile",
         "--build-arg",

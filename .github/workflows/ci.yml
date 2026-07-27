@@ -16,8 +16,7 @@ concurrency:
 
 env:
   CI: "true"
-  PURCHASE_RECEIPT_PG_DB_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable
-  PURCHASE_RETURN_PG_DB_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/plush_erp_purchase_return_test?sslmode=disable
+  DISPOSABLE_DATABASE_BASE_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/postgres?sslmode=disable
 
 jobs:
   strict:
@@ -137,7 +136,7 @@ jobs:
             exit 1
           fi
       - name: Run the repository strict gate
-        run: bash scripts/qa/strict.sh
+        run: node scripts/qa/run-gate-with-receipt.mjs --gate strict
       - name: Validate the committed source archive
         run: |
           set -euo pipefail
@@ -148,3 +147,10 @@ jobs:
             echo "[ci] strict gate changed the committed tree"
             exit 1
           fi
+      - name: Upload the sanitized exact-SHA quality receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: strict-receipt-${{ github.sha }}
+          path: output/dev-workbench/receipts/strict-latest.json
+          if-no-files-found: error
+          retention-days: 14

@@ -88,6 +88,8 @@ linked ProcessRuntime 对账在任务已提交后失败时返回可重试未知�
 
 `20260711063237 / 20260711075355` 已在本地隔离 migration chain 执行并固定为不可变 revision；`20260711104729` 新增 portable receipt bundle CHECK；`20260711204000` 把本项目迁移前投影表里的 `shipment_release_pending` 规范为正式业务状态 `shipment_pending`，不改 payload 中同名提醒类型。本项目迁移前且无法证明准确版本的事件继续保存 `task_version=NULL`，不使用事件行号或当前任务版本伪造 backfill；这不是旧项目、旧客户端或旧 API 兼容路径。当前迁移链包含两项不同的存量门槛：`--audit populated-upgrade` 核对 `20260714055504` 的状态、审计束、生命周期、流程锚点和待删除时间字段；`--audit customer-config-cutover` 核对 `20260714055825` 前必须显式治理的流程运行态和任务配置锚点。两项都由 `scripts/qa/populated-upgrade-preflight.sh` 在只读事务中执行，任一失败即停止 apply；迁移和发布脚本不得自动 DML。fresh schema、静态 DDL、Ent 零漂移和 Atlas validate 仍只证明结构与迁移链，不替代存量数据升级证据。共享工作树的 migration chain 可能继续增长，必须按当前代码与 Atlas status 重查。目标环境是否已发布仍以绑定具体 commit / image、数据库 status 和发布证据为准，本地 latest 不代表目标环境已经发布。
 
+本地开发 migration 入口固定为 `make migrate_status → make migrate_plan → make migrate_apply`。status 只打印脱敏目标、revision 和绑定 PostgreSQL cluster identity 的目标确认；plan / apply 使用 Git 内部路径上的本机 `lockf` 串行锁，复制 migration 目录快照，依次执行 populated-upgrade / customer-config-cutover 与 operational fact lifecycle 只读审计、Atlas `tx-mode=all` dry-run，并把全部 pending SQL 放在同一个事务中真实执行后强制 `ROLLBACK`。apply 重新核对相同目标、pending revisions、migration hash 与包装器 / 审计 / Ent schema 指纹，重跑 plan 门禁后才以 `tx-mode=all` 整批提交，并对同一 DSN 读回 `pending=0` 与 Ent / PostgreSQL schema 零差异；apply 异常会继续读 status 并区分 revision 未前进和提交状态未知，失败不得自动重试或 `migrate_set`。application config 精确命中的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 属于登记共享开发库，但 plan 前必须停止本仓库后端和其它数据库客户端，apply 前还必须完成备份并提供 plan 输出的维护确认；环境变量覆盖的远程库、133、生产和归属不明目标仍走正式发布流程。`20260726173943` 审计发现旧 operational facts 缺少精确 actor 时只报告三张事实表的 blocker 数，不猜造操作者或自动 DML。
+
 `attachment` JSON-RPC 域承载业务附件证据层和窄版产品媒体槽，canonical 读取 / 上传方法为 `list_attachments / upload_attachment / download_attachment`；另提供 `clear_product_image`，且只接受已保存产品的 `primary / secondary` 图片槽。普通物理删除接口仍已退出；除产品图片同槽替换 / 清空外，已上传证据不能由页面无痕删除，后续如需纠错必须先完成受控撤销与持久审计设计。产品图片固定使用 `owner_type=product + attachment_type=product_image`，只接受 PNG / JPEG / WEBP，写入要求 `product.update` 和 `products=enabled`；上传或清空在同一事务内锁定 `products` 行，同槽替换失败会回滚并保留旧图，数据库 partial unique index 再约束每个产品 / 槽位最多一行。服务端在 base64 解码后按声明格式完整解码图片；宽高单边不得超过 8192px、总像素不得超过 2000 万，扩展名、声明 MIME、完整图片内容或尺寸不一致时都会拒绝。其它附件挂到既有业务对象的 `owner_type + owner_id`，读取内容前会再次确认 owner 存在；上传 repo 在同一事务内锁定 owner 行并创建附件，debug 清理会先清理附件再清理 owner，避免孤儿记录。单个附件上限为 5MB，HTTP `/rpc/attachment` 在 JSON / protobuf 解析前限制 7MB 编码请求体，业务层还会在 base64 解码分配前检查编码长度，并在解码后复核 5MB 上限。当前 JSON-RPC 下载仍会在内存中生成 base64 响应，因此 5MB 是低配宿主的收窄内存预算，不代表大文件流式能力已经交付。
 
 `workflow_task` owner 额外执行行级边界：list / download 必须同时具备 `workflow.task.read` 且任务处于当前 active revision 的可见责任范围；upload 只接受 `workflow.task.update`，并要求当前账号是有效 owner scope 或指定处理人，终态任务拒绝继续追加附件。PMC / 老板 / super admin 的催办能力不等于附件写权。其它 owner 继续复用所属业务对象权限和 active module state；附件只作为证据，不改变 Source Document、Fact、Workflow、库存、质检、财务、税控或总账状态，`content_base64` 等文件内容字段在 JSON-RPC 日志中脱敏。该切片不代表对象存储、流式大文件、病毒扫描或目标环境 release evidence 已闭环。
@@ -205,7 +207,7 @@ make init
 make run
 ```
 
-`make run`、`make dev` 和 `make dev_restart` 会先校验仓库根目录 `config/dev-ports.env`，并把其中固定的 HTTP `8300`、gRPC `9300` 注入 dev 配置；生产配置不消费这组覆盖。随后共享本地启动预检运行 `db-guard` 核对 Ent schema 与 versioned migration，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision 且 pending 为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 `migrate apply`；失败时应先审查并完成 migration，不应绕过。
+`make run`、`make dev` 和 `make dev_restart` 会先校验仓库根目录 `config/dev-ports.env`，并把其中固定的 HTTP `8300`、gRPC `9300` 注入 dev 配置；生产配置不消费这组覆盖。随后共享本地启动预检运行 `db-guard` 核对 Ent schema 与 versioned migration，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision 且 pending 为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 `migrate apply`；pending 时应在 `server/` 先运行 `make migrate_status`，复制目标确认完成 `make migrate_plan`，再按 plan 输出决定是否 apply，不应绕过。
 
 主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
 
@@ -274,7 +276,7 @@ make bom_lot_migrate_apply
 make bom_lot_pg_test
 ```
 
-采购入库 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_purchase_receipt_test`：
+采购入库 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_ci_purchase_receipt_fixture`：
 
 ```bash
 make purchase_receipt_pg_createdb

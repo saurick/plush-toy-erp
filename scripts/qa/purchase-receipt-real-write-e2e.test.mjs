@@ -122,7 +122,7 @@ test("purchase receipt real-write e2e preflight report is local no-write and che
 
 test("purchase receipt real-write e2e preflight requires pg_isready when postgres mode is requested", () => {
   const secretDsn =
-    "postgres://postgres:super-secret-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable";
+    "postgres://postgres:super-secret-password@127.0.0.1:55432/plush_erp_ci_purchase_receipt_fixture?sslmode=disable";
   const report = buildPreflightReport(
     {
       out: "output/qa/purchase-receipt-real-write-e2e",
@@ -139,7 +139,7 @@ test("purchase receipt real-write e2e preflight requires pg_isready when postgre
 
   assert.equal(report.readyForRequestedCommand, true);
   assert.equal(report.postgresGuard.readyForRequestedPostgresMode, true);
-  assert.equal(report.postgresGuard.target.safeTarget, "127.0.0.1:55432/plush_erp_purchase_receipt_test");
+  assert.equal(report.postgresGuard.target.safeTarget, "127.0.0.1:55432/plush_erp_ci_purchase_receipt_fixture");
   assert.equal(report.postgresGuard.target.urlValueStored, false);
   assert.equal(report.postgresGuard.readiness.checked, true);
   assert.equal(report.postgresGuard.readiness.reachable, true);
@@ -158,7 +158,7 @@ test("purchase receipt real-write e2e preflight blocks postgres mode when local 
       env: {
         ...process.env,
         PURCHASE_RECEIPT_PG_DB_URL:
-          "postgres://postgres:local-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable",
+          "postgres://postgres:local-password@127.0.0.1:55432/plush_erp_ci_purchase_receipt_fixture?sslmode=disable",
       },
       spawnSync: buildSpawnMock({ pgReady: false }),
     },
@@ -179,7 +179,7 @@ test("purchase receipt real-write e2e CLI preflight writes sanitized report", ()
   fs.rmSync(path.dirname(absoluteReportPath), { recursive: true, force: true });
 
   const secretDsn =
-    "postgres://postgres:super-secret-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable";
+    "postgres://postgres:super-secret-password@127.0.0.1:55432/plush_erp_ci_purchase_receipt_fixture?sslmode=disable";
   const result = spawnSync(
     process.execPath,
     [

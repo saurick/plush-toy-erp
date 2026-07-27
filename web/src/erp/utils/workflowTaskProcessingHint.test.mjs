@@ -42,6 +42,41 @@ test('urge-only access explains that a reminder does not handle the task', () =>
   )
 })
 
+test('source access denial explains why handling and the related entry are unavailable', () => {
+  const reason =
+    '当前账号不能查看该任务的相关单据，因此不能办理；可催办责任人或联系管理员调整岗位权限。'
+  assert.equal(
+    getWorkflowTaskProcessingHint({
+      task: { task_status_key: 'ready' },
+      allowedActionModes: ['urge'],
+      canOpenEntry: false,
+      sourceAccess: {
+        applicable: true,
+        resolved: true,
+        allowed: false,
+        reason,
+      },
+    }),
+    reason
+  )
+})
+
+test('tasks without an authoritative source link do not claim a source permission problem', () => {
+  assert.equal(
+    getWorkflowTaskProcessingHint({
+      task: { task_status_key: 'ready' },
+      allowedActionModes: ['urge'],
+      sourceAccess: {
+        applicable: false,
+        resolved: true,
+        allowed: true,
+        reason: '当前任务没有需要核对的相关单据。',
+      },
+    }),
+    '当前仅可催办；催办只发送提醒，不代替负责人处理任务。'
+  )
+})
+
 test('single workflow actions have deterministic business-readable hints', () => {
   const task = { task_status_key: 'ready' }
   const cases = [

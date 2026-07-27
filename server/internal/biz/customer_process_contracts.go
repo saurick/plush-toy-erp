@@ -279,6 +279,19 @@ func builtinCustomerProcessContracts() []customerProcessContract {
 	}
 }
 
+// CanonicalCustomerProcessContractDefinitions exposes a fresh, read-only
+// projection of the Product Core process contracts. Callers may inspect the
+// registered variants and nodes, but customer input still cannot supply or
+// mutate executable graphs.
+func CanonicalCustomerProcessContractDefinitions() []map[string]any {
+	contracts := builtinCustomerProcessContracts()
+	out := make([]map[string]any, 0, len(contracts))
+	for _, contract := range contracts {
+		out = append(out, customerProcessDefinitionFromContract(contract))
+	}
+	return out
+}
+
 func newSalesOrderAcceptanceContract(variantKey string, includeEngineering bool) customerProcessContract {
 	nodes := []ProcessNodeInstanceCreate{
 		customerDomainCommandNode(

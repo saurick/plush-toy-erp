@@ -17,6 +17,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   const strict = read('scripts/qa/strict.sh')
   const makefile = read('server/Makefile')
   const pgScript = read('scripts/purchase-receipt-pg.sh')
+  const disposableRunner = read('scripts/qa/disposable-database-runner.mjs')
   const criticalTestConfig = read('scripts/qa/critical-postgres-tests.sh')
   const workflowConcurrency = read(
     'server/internal/data/workflow_repo_postgres_concurrency_test.go',
@@ -40,9 +41,10 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
 
   assert.match(
     full,
-    /purchase-receipt-pg\.sh" test-critical-disposable/u,
+    /PURCHASE_RECEIPT_PG_DB_URL="\$DISPOSABLE_DATABASE_BASE_URL"[\s\S]*make populated_upgrade_pg_test[\s\S]*disposable-database-runner\.mjs"[\s\S]*--profile ci[\s\S]*--workflow critical-postgres/u,
     'full must create, migrate, test, and clean a per-run PostgreSQL database',
   )
+  assert.doesNotMatch(full, /test-critical-disposable/u)
   assert.doesNotMatch(
     full,
     /make purchase_receipt_(?:pg_createdb|migrate_apply)|make critical_transactions_pg_test/u,
@@ -55,7 +57,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   )
   const fullVulnerabilityScanIndex = full.lastIndexOf('scripts/qa/govulncheck.sh')
   for (const gate of [
-    'test-critical-disposable',
+    '--workflow critical-postgres',
     '--kind go --label server-all',
     'make build',
   ]) {
@@ -67,28 +69,17 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   assert.match(strict, /bash "\$ROOT_DIR\/scripts\/qa\/full\.sh"/u, 'strict must delegate to the complete full profile')
   assert.match(strict, /GOVULNCHECK_STRICT=1/u, 'strict must finish with a blocking vulnerability scan')
 
-  const defaultDSNs = Object.fromEntries(
-    ['INVENTORY', 'BOM_LOT', 'PURCHASE_RECEIPT', 'PURCHASE_RETURN'].map((name) => [
-      name,
-      makefile.match(new RegExp(`^${name}_PG_DB_URL \\?= (.+)$`, 'mu'))?.[1],
-    ]),
-  )
-  for (const [name, dsn] of Object.entries(defaultDSNs)) {
-    assert.ok(dsn, `Makefile must define a ${name.toLowerCase()} PostgreSQL test DSN`)
-  }
-  const receiptDefault = defaultDSNs.PURCHASE_RECEIPT
-  const returnDefault = defaultDSNs.PURCHASE_RETURN
-  const receiptURL = new URL(receiptDefault)
-  const databasePaths = new Set()
-  for (const [name, dsn] of Object.entries(defaultDSNs)) {
-    const url = new URL(dsn)
-    assert.equal(url.protocol, receiptURL.protocol)
-    assert.equal(url.username, receiptURL.username)
-    assert.equal(url.password, receiptURL.password)
-    assert.equal(url.hostname, receiptURL.hostname)
-    assert.equal(url.port, receiptURL.port)
-    assert.equal(url.search, receiptURL.search)
-    databasePaths.add(url.pathname)
+  for (const name of [
+    'INVENTORY',
+    'BOM_LOT',
+    'PURCHASE_RECEIPT',
+    'PURCHASE_RETURN',
+  ]) {
+    assert.equal(
+      makefile.split(/\r?\n/u).includes(`${name}_PG_DB_URL ?=`),
+      true,
+      `${name}_PG_DB_URL must not retain a fixed database default`,
+    )
     const helper = {
       INVENTORY: 'scripts/inventory-pg.sh',
       BOM_LOT: 'scripts/bom-lot-pg.sh',
@@ -97,11 +88,18 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     }[name]
     assert.match(
       read(helper),
-      new RegExp(dsn.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'),
-      `${helper} must use the Makefile default isolated server DSN`,
+      new RegExp(
+        `${name}_PG_DB_URL is required and must point to a generated plush_erp_ci_<run-id> database`,
+        'u',
+      ),
+      `${helper} must require an explicit generated database DSN`,
+    )
+    assert.match(
+      read(helper),
+      /re\.fullmatch\(r"plush_erp_ci_\[a-z0-9_\]\+"/u,
+      `${helper} must reject fixed or non-CI database names`,
     )
   }
-  assert.equal(databasePaths.size, Object.keys(defaultDSNs).length)
   const returnHelper = read('scripts/purchase-return-pg.sh')
   assert.match(returnHelper, /file:\/\/internal\/data\/model\/migrate/u)
   assert.doesNotMatch(returnHelper, /MAX_MIGRATION_VERSION|max_version/u)
@@ -109,6 +107,9 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   assert.match(makefile, /^critical_transactions_pg_test:/mu)
   assert.match(pgScript, /test-critical\)/u)
   assert.match(pgScript, /test-critical-disposable\)/u)
+  assert.match(disposableRunner, /buildDisposableDatabaseTarget/u)
+  assert.match(disposableRunner, /DROP DATABASE "\$\{databaseName\}" WITH \(FORCE\)/u)
+  assert.match(disposableRunner, /cleanup-readback/u)
   assert.match(pgScript, /_critical_\{process_id\}_\{secrets\.token_hex\(4\)\}/u)
   assert.match(pgScript, /CREATE DATABASE \\"\$\{CRITICAL_DATABASE_NAME\}\\"/u)
   assert.match(pgScript, /DROP DATABASE IF EXISTS \\"\$\{CRITICAL_DATABASE_NAME\}\\" WITH \(FORCE\)/u)
@@ -269,7 +270,7 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   const profiles = read('scripts/qa/gate-profiles.mjs')
 
   const populatedIndex = full.indexOf('make populated_upgrade_pg_test')
-  const criticalIndex = full.indexOf('test-critical-disposable')
+  const criticalIndex = full.indexOf('--workflow critical-postgres')
   assert(populatedIndex >= 0, 'full must run the populated upgrade PostgreSQL gate')
   assert(
     populatedIndex < criticalIndex,
@@ -489,7 +490,7 @@ exit 42
           FAKE_PG_LOG: logFile,
           PATH: `${fakeBin}${path.delimiter}${process.env.PATH}`,
           PURCHASE_RECEIPT_PG_DB_URL:
-            'postgres://postgres:local-test-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable',
+            'postgres://postgres:local-test-password@127.0.0.1:55432/plush_erp_ci_purchase_receipt_fixture?sslmode=disable',
         },
       },
     )
@@ -505,7 +506,7 @@ exit 42
     )?.[1]
     assert.ok(createdDatabase, 'entrypoint must create a disposable database before Atlas')
     assert.match(createdDatabase, /_populated_[0-9]+_[0-9]+$/u)
-    assert.notEqual(createdDatabase, 'plush_erp_purchase_receipt_test')
+    assert.notEqual(createdDatabase, 'plush_erp_ci_purchase_receipt_fixture')
     assert.equal(droppedDatabase, createdDatabase, 'Atlas failure must clean the exact created database')
 
     const failedCreate = run(true)
@@ -570,7 +571,7 @@ printf 'node:%s\n' "$*" >> "\${FAKE_PG_LOG:?}"
           FAKE_PG_LOG: logFile,
           PATH: `${fakeBin}${path.delimiter}${process.env.PATH}`,
           PURCHASE_RECEIPT_PG_DB_URL:
-            'postgres://postgres:critical-secret@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable',
+            'postgres://postgres:critical-secret@127.0.0.1:55432/plush_erp_ci_purchase_receipt_fixture?sslmode=disable',
           ...extraEnv,
         },
       },
@@ -588,7 +589,7 @@ printf 'node:%s\n' "$*" >> "\${FAKE_PG_LOG:?}"
     const firstIdentity = identities(first.log)
     assert.equal(first.result.status, 0, `${first.result.stdout}\n${first.result.stderr}`)
     assert.match(firstIdentity.created, /_critical_[0-9]+_[0-9a-f]{8}$/u)
-    assert.notEqual(firstIdentity.created, 'plush_erp_purchase_receipt_test')
+    assert.notEqual(firstIdentity.created, 'plush_erp_ci_purchase_receipt_fixture')
     assert.equal(firstIdentity.dropped, firstIdentity.created)
     assert.match(first.log, new RegExp(`/${firstIdentity.created}\\?sslmode=disable`, 'u'))
     assert.doesNotMatch(`${first.result.stdout}\n${first.result.stderr}`, /critical-secret/u)
@@ -680,6 +681,10 @@ esac
               FAKE_GO_RESULT: resultMode,
               FAKE_GO_TEST_NAME: entrypoint.testName,
               PATH: `${fakeBin}${path.delimiter}${process.env.PATH}`,
+              PURCHASE_RECEIPT_PG_DB_URL:
+                'postgres://postgres:fixture-password@127.0.0.1:55432/plush_erp_ci_direct_entry_fixture?sslmode=disable',
+              PURCHASE_RETURN_PG_DB_URL:
+                'postgres://postgres:fixture-password@127.0.0.1:55432/plush_erp_ci_direct_entry_fixture?sslmode=disable',
             },
           },
         )

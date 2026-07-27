@@ -44,7 +44,7 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
-const LOCAL_DATABASE_NAME = "plush_erp_acceptance_20260716_v5_dev";
+const LOCAL_DATABASE_NAME = "plush_erp_acceptance_local_fixture_dev";
 
 test("readiness imports the shared page-data contract exactly once", async () => {
   const source = await readFile(
@@ -2320,7 +2320,7 @@ test("local and 133 database mismatches stop before the first network request", 
         adminPassword: "local-admin-password",
         fetchImpl: failIfFetched,
       }),
-    /requires databaseName=plush_erp_acceptance_20260716_v5_dev/u,
+    /--backend-url 和 --database-name 必须与业务记录报告完全一致/u,
   );
 
   const backendURL = "http://127.0.0.1:18375";

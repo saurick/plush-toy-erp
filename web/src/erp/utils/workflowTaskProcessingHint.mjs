@@ -59,6 +59,7 @@ export function getWorkflowTaskProcessingHint({
   failed = false,
   readonlyReason = '',
   canOpenEntry = false,
+  sourceAccess = {},
 } = {}) {
   if (!task) return '当前没有可查看的任务。'
 
@@ -72,6 +73,20 @@ export function getWorkflowTaskProcessingHint({
   if (failed) return '暂时无法确认可用的处理方式，请稍后重试。'
 
   const actionModes = normalizeAllowedActionModes(allowedActionModes)
+  if (sourceAccess?.applicable === true && sourceAccess?.allowed !== true) {
+    const sourceReason =
+      String(sourceAccess?.reason || '').trim() ||
+      String(readonlyReason || '').trim() ||
+      '当前不能核对该任务的相关单据，因此不能办理。'
+    if (
+      actionModes.length === 1 &&
+      actionModes[0] === 'urge' &&
+      !sourceReason.includes('催办')
+    ) {
+      return `${sourceReason}当前仍可催办责任人。`
+    }
+    return sourceReason
+  }
   if (actionModes.length === 1) {
     return appendEntryHint(SINGLE_ACTION_HINTS[actionModes[0]], canOpenEntry)
   }

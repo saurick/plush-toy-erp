@@ -47,6 +47,7 @@ export function createDevCustomerConfigPlugin({ projectRoot } = {}) {
 
   return {
     name: 'plush-dev-customer-config',
+    apply: 'serve',
     configureServer(server) {
       server.middlewares.use(async (request, response, next) => {
         const requestUrl = new URL(

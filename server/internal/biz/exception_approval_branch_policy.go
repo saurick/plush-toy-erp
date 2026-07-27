@@ -72,48 +72,70 @@ func (productionExceptionExecutionBranchPolicyHandler) ResolveProcessBranch(
 	}
 }
 
-func RegisterExceptionApprovalProcessBranchPolicyHandlers(processRuntimeUC *ProcessRuntimeUsecase) error {
-	if processRuntimeUC == nil {
-		return ErrBadParam
-	}
-	handlers := []struct {
-		key     string
-		handler ProcessBranchPolicyHandler
-	}{
+type exceptionApprovalProcessBranchPolicyRegistration struct {
+	key          string
+	nextNodeKeys []string
+	handler      ProcessBranchPolicyHandler
+}
+
+func exceptionApprovalProcessBranchPolicyRegistrations() []exceptionApprovalProcessBranchPolicyRegistration {
+	return []exceptionApprovalProcessBranchPolicyRegistration{
 		{
-			key: ProcessBranchPolicySalesReturnApproval,
+			key:          ProcessBranchPolicySalesReturnApproval,
+			nextNodeKeys: []string{"approve_sales_return", "reject_sales_return"},
 			handler: approvalOutcomeBranchPolicyHandler{
 				approveNodeKey: "approve_sales_return",
 				rejectNodeKey:  "reject_sales_return",
 			},
 		},
 		{
-			key: ProcessBranchPolicyFinancePaymentApproval,
+			key:          ProcessBranchPolicyFinancePaymentApproval,
+			nextNodeKeys: []string{"approve_finance_payment", "reject_finance_payment"},
 			handler: approvalOutcomeBranchPolicyHandler{
 				approveNodeKey: "approve_finance_payment",
 				rejectNodeKey:  "reject_finance_payment",
 			},
 		},
 		{
-			key: ProcessBranchPolicyInventoryAdjustmentApproval,
+			key:          ProcessBranchPolicyInventoryAdjustmentApproval,
+			nextNodeKeys: []string{"approve_inventory_adjustment", "reject_inventory_adjustment"},
 			handler: approvalOutcomeBranchPolicyHandler{
 				approveNodeKey: "approve_inventory_adjustment",
 				rejectNodeKey:  "reject_inventory_adjustment",
 			},
 		},
 		{
-			key: ProcessBranchPolicyProductionExceptionApproval,
+			key:          ProcessBranchPolicyProductionExceptionApproval,
+			nextNodeKeys: []string{"approve_production_exception", "reject_production_exception"},
 			handler: approvalOutcomeBranchPolicyHandler{
 				approveNodeKey: "approve_production_exception",
 				rejectNodeKey:  "reject_production_exception",
 			},
 		},
 		{
-			key:     ProcessBranchPolicyProductionExceptionExecution,
-			handler: productionExceptionExecutionBranchPolicyHandler{},
+			key:          ProcessBranchPolicyProductionExceptionExecution,
+			nextNodeKeys: []string{"production_exception_execution", "over_issue_end"},
+			handler:      productionExceptionExecutionBranchPolicyHandler{},
 		},
 	}
-	for _, item := range handlers {
+}
+
+// CanonicalProcessBranchTargets returns the registered next-node set for every
+// named ProcessRuntime branch policy. The returned slices are independent
+// copies and cannot mutate runtime handlers.
+func CanonicalProcessBranchTargets() map[string][]string {
+	out := make(map[string][]string)
+	for _, registration := range exceptionApprovalProcessBranchPolicyRegistrations() {
+		out[registration.key] = append([]string(nil), registration.nextNodeKeys...)
+	}
+	return out
+}
+
+func RegisterExceptionApprovalProcessBranchPolicyHandlers(processRuntimeUC *ProcessRuntimeUsecase) error {
+	if processRuntimeUC == nil {
+		return ErrBadParam
+	}
+	for _, item := range exceptionApprovalProcessBranchPolicyRegistrations() {
 		if err := processRuntimeUC.RegisterBranchPolicyHandler(item.key, item.handler); err != nil {
 			return err
 		}

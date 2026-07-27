@@ -90,7 +90,7 @@ test("exception-flow browser runner rejects the shared backend and non-action da
     () =>
       parseExceptionFlowArgs(
         validArgs().map((value) =>
-          value === DATABASE_NAME ? "plush_erp_acceptance_20260716_v5_dev" : value,
+          value === DATABASE_NAME ? "plush_erp_acceptance_local_fixture_dev" : value,
         ),
         validEnv(),
       ),

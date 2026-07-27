@@ -454,7 +454,7 @@ func TestResolveCustomerConfigLocalTestGateBindsFlagToRegisteredDevelopmentFamil
 	t.Parallel()
 
 	exact := &conf.Data{Postgres: &conf.Data_Postgres{
-		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_local_fixture_dev?sslmode=disable",
 	}}
 	enabled, err := resolveCustomerConfigLocalTestGate(exact, func(key string) string {
 		if key == biz.CustomerConfigLocalTestAllowEnv {

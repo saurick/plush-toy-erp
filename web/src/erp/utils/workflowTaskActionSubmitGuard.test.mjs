@@ -6,6 +6,7 @@ import vm from 'node:vm'
 import {
   normalizeWorkflowActionExplainData,
   normalizeWorkflowActionMode,
+  normalizeWorkflowTaskSourceAccess,
 } from './workflowTaskActionAccess.mjs'
 
 function getUserFacingErrorMessage(err, fallback = '请求失败，请稍后重试') {
@@ -42,9 +43,10 @@ function loadSubmitGuard({ explainWorkflowActionAccess }) {
       `import {
   normalizeWorkflowActionExplainData,
   normalizeWorkflowActionMode,
+  normalizeWorkflowTaskSourceAccess,
 } from './workflowTaskActionAccess.mjs'
 `,
-      `const { normalizeWorkflowActionExplainData, normalizeWorkflowActionMode } = __access__
+      `const { normalizeWorkflowActionExplainData, normalizeWorkflowActionMode, normalizeWorkflowTaskSourceAccess } = __access__
 `
     )
     .replace(
@@ -68,6 +70,7 @@ module.exports = { verifyWorkflowTaskActionAccessBeforeSubmit }`,
       __access__: {
         normalizeWorkflowActionExplainData,
         normalizeWorkflowActionMode,
+        normalizeWorkflowTaskSourceAccess,
       },
       module,
     }
@@ -123,6 +126,11 @@ test('workflowTaskActionSubmitGuard: allows only after backend explain allows th
     explainWorkflowActionAccess: async (params) => {
       requests.push(params)
       return {
+        source_access: {
+          applicable: false,
+          resolved: true,
+          allowed: true,
+        },
         actions: [{ action_key: 'complete', allowed: true, reason: '可完成' }],
       }
     },
@@ -137,6 +145,61 @@ test('workflowTaskActionSubmitGuard: allows only after backend explain allows th
   assert.deepEqual(
     requests.map((request) => ({ ...request })),
     [{ task_id: 42, action_key: 'complete' }]
+  )
+})
+
+test('workflowTaskActionSubmitGuard: source access is required for non-reminder actions', async () => {
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => ({
+      source_access: {
+        applicable: true,
+        resolved: true,
+        allowed: false,
+        reason: '当前账号不能查看该任务的相关单据，因此不能办理。',
+      },
+      action: {
+        action_key: 'complete',
+        allowed: true,
+        reason: '可完成',
+      },
+    }),
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'complete',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.deepEqual(warnings, [
+    '当前账号不能查看该任务的相关单据，因此不能办理。',
+  ])
+})
+
+test('workflowTaskActionSubmitGuard: reminder stays independent from source access', async () => {
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => ({
+      source_access: {
+        applicable: true,
+        resolved: true,
+        allowed: false,
+      },
+      action: {
+        action_key: 'urge',
+        allowed: true,
+      },
+    }),
+  })
+
+  assert.equal(
+    await verifyWorkflowTaskActionAccessBeforeSubmit({
+      task: { id: 42 },
+      actionKey: 'urge',
+      reason: '请尽快处理',
+    }),
+    true
   )
 })
 

@@ -66,6 +66,7 @@ test("CI YAML has one protected job, read-only permissions, and exact action pin
     "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
     "actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c",
     "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e",
+    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     "ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea",
   ];
   const actualUses = collectUses(workflow).sort();
@@ -128,7 +129,14 @@ test("CI versions and dependencies follow repository gate requirements", () => {
 });
 
 test("CI reuses strict instead of copying local gate families", () => {
-  assert.equal((stepRuns.match(/bash scripts\/qa\/strict\.sh/gu) || []).length, 1);
+  assert.equal(
+    (
+      stepRuns.match(
+        /node scripts\/qa\/run-gate-with-receipt\.mjs --gate strict/gu,
+      ) || []
+    ).length,
+    1,
+  );
   assert.doesNotMatch(stepRuns, /scripts\/qa\/(?:fast|full)\.sh/u);
   assert.doesNotMatch(
     stepRuns,
@@ -143,7 +151,7 @@ test("CI reuses strict instead of copying local gate families", () => {
 
   const makeDataIndex = strictSteps.findIndex((step) => /\bmake data\b/u.test(step.run || ""));
   const strictIndex = strictSteps.findIndex((step) =>
-    /bash scripts\/qa\/strict\.sh/u.test(step.run || ""),
+    /run-gate-with-receipt\.mjs --gate strict/u.test(step.run || ""),
   );
   const archiveIndex = strictSteps.findIndex((step) =>
     /source-archive-release-check\.mjs --light --ref HEAD/u.test(step.run || ""),
@@ -168,15 +176,12 @@ test("CI comparison, schema generation, PostgreSQL, and archive evidence fail cl
   assert.match(stepRuns, /\bmake data\b/u);
   assert.match(stepRuns, /git status --porcelain --untracked-files=all/u);
   assert.match(stepRuns, /make data changed the committed tree/u);
-  const receiptURL = new URL(workflow.env.PURCHASE_RECEIPT_PG_DB_URL);
-  const returnURL = new URL(workflow.env.PURCHASE_RETURN_PG_DB_URL);
+  const disposableURL = new URL(workflow.env.DISPOSABLE_DATABASE_BASE_URL);
   const postgres = strictJob.services.postgres;
-  assert.equal(receiptURL.hostname, "127.0.0.1");
-  assert.equal(returnURL.hostname, "127.0.0.1");
-  assert.equal(receiptURL.port, "55432");
-  assert.equal(returnURL.port, "55432");
-  assert.equal(receiptURL.password, postgres.env.POSTGRES_PASSWORD);
-  assert.equal(returnURL.password, postgres.env.POSTGRES_PASSWORD);
+  assert.equal(disposableURL.hostname, "127.0.0.1");
+  assert.equal(disposableURL.port, "55432");
+  assert.equal(disposableURL.pathname, "/postgres");
+  assert.equal(disposableURL.password, postgres.env.POSTGRES_PASSWORD);
   assert.deepEqual(postgres.ports, ["55432:5432"]);
   assert.match(postgres.options, /--health-cmd "pg_isready -U postgres"/u);
   assert.match(stepRuns, /source-archive-release-check\.mjs --light --ref HEAD/u);

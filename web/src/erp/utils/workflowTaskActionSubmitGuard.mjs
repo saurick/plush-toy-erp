@@ -6,6 +6,7 @@ import { explainWorkflowActionAccess } from '../api/workflowApi.mjs'
 import {
   normalizeWorkflowActionExplainData,
   normalizeWorkflowActionMode,
+  normalizeWorkflowTaskSourceAccess,
 } from './workflowTaskActionAccess.mjs'
 
 const DEFAULT_DENIED_FALLBACK = '当前账号不能提交这项操作'
@@ -61,9 +62,18 @@ export async function verifyWorkflowTaskActionAccessBeforeSubmit({
     })
     const byAction = normalizeWorkflowActionExplainData(data)
     const action = byAction[normalizedActionKey]
+    const sourceAccess = normalizeWorkflowTaskSourceAccess(data)
+    const sourceAccessDenied =
+      normalizedActionKey !== 'urge' && sourceAccess.allowed !== true
     if (action?.allowed !== true) {
       onWarning?.(
         getUserFacingErrorMessage(action?.reason || '', deniedFallback)
+      )
+      return false
+    }
+    if (sourceAccessDenied) {
+      onWarning?.(
+        getUserFacingErrorMessage(sourceAccess.reason, deniedFallback)
       )
       return false
     }

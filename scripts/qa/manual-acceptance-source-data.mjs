@@ -4117,13 +4117,13 @@ function usage() {
 
 写入本地开发环境：
   MANUAL_ACCEPTANCE_SIM_CONFIRM=${CONFIRM_PHRASE} \\
-  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260728_delivery_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-source-data.mjs --apply \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
-      --database-name plush_erp_acceptance_20260716_v5_dev \\
+      --database-name plush_erp_acceptance_20260728_delivery_dev \\
       --data-version 2026.07.16-v5 \\
       --run-id 20260716-V5 \\
       --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source
@@ -4141,7 +4141,7 @@ MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
     node scripts/qa/manual-acceptance-source-data.mjs --verify \\
       --target local-dev \\
       --backend-url http://127.0.0.1:8310 \\
-      --database-name plush_erp_acceptance_20260716_v5_dev \\
+      --database-name plush_erp_acceptance_20260728_delivery_dev \\
       --data-version 2026.07.16-v5 \\
       --run-id 20260716-V5
 

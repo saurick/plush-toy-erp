@@ -62,7 +62,7 @@ function createDocumentStub(existingLinks = []) {
   }
 }
 
-test('favicon: routes resolve to separate admin, tasks, dev, governance, testing, docs, capability ledger, prototype, customer config and print template icons', () => {
+test('favicon: product routes resolve admin, tasks and print template icons without dev-only metadata', () => {
   assert.equal(resolveERPFavicon('/erp/dashboard'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(resolveERPFavicon('/admin-login'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(
@@ -73,30 +73,7 @@ test('favicon: routes resolve to separate admin, tasks, dev, governance, testing
     resolveERPFavicon('/not-a-mobile-task'),
     ERP_FAVICON_VARIANTS.admin
   )
-  assert.equal(resolveERPFavicon('/__dev'), ERP_FAVICON_VARIANTS.devHub)
-  assert.equal(resolveERPFavicon('/__dev/'), ERP_FAVICON_VARIANTS.devHub)
-  assert.equal(ERP_FAVICON_VARIANTS.governance.href, '/favicon-governance.svg')
-  assert.equal(
-    resolveERPFavicon('/__dev/governance'),
-    ERP_FAVICON_VARIANTS.governance
-  )
-  assert.equal(
-    resolveERPFavicon('/__dev/testing'),
-    ERP_FAVICON_VARIANTS.testing
-  )
-  assert.equal(resolveERPFavicon('/__dev/docs'), ERP_FAVICON_VARIANTS.docs)
-  assert.equal(
-    resolveERPFavicon('/__dev/capability-ledger'),
-    ERP_FAVICON_VARIANTS.capabilityLedger
-  )
-  assert.equal(
-    resolveERPFavicon('/__dev/prototypes'),
-    ERP_FAVICON_VARIANTS.prototypes
-  )
-  assert.equal(
-    resolveERPFavicon('/__dev/customer-config'),
-    ERP_FAVICON_VARIANTS.customerConfig
-  )
+  assert.equal(resolveERPFavicon('/__dev'), ERP_FAVICON_VARIANTS.admin)
 
   const materialTemplateFavicon = resolveERPFavicon(
     '/erp/print-workspace/material-purchase-contract'
@@ -152,24 +129,6 @@ test('favicon: customer favicon overrides customer-facing admin and task routes'
       href: '/favicon-yoyoosun.png',
       type: 'image/png',
     }
-  )
-  assert.equal(
-    resolveERPFavicon('/__dev', {
-      customerFaviconHref: CUSTOMER_FAVICON_HREF,
-    }),
-    ERP_FAVICON_VARIANTS.devHub
-  )
-  assert.equal(
-    resolveERPFavicon('/__dev/testing', {
-      customerFaviconHref: CUSTOMER_FAVICON_HREF,
-    }),
-    ERP_FAVICON_VARIANTS.testing
-  )
-  assert.equal(
-    resolveERPFavicon('/__dev/governance', {
-      customerFaviconHref: CUSTOMER_FAVICON_HREF,
-    }),
-    ERP_FAVICON_VARIANTS.governance
   )
 })
 
@@ -243,12 +202,12 @@ test('favicon: runtime update applies configured customer favicon', () => {
 test('favicon: runtime update creates an icon link when HTML has none', () => {
   const documentStub = createDocumentStub()
 
-  const result = applyERPFavicon(documentStub, '/__dev/capability-ledger')
+  const result = applyERPFavicon(documentStub, '/erp/dashboard')
 
-  assert.equal(result, ERP_FAVICON_VARIANTS.capabilityLedger)
+  assert.equal(result, ERP_FAVICON_VARIANTS.admin)
   assert.equal(documentStub.appended.length, 1)
   assert.equal(
     documentStub.appended[0].getAttribute('href'),
-    '/favicon-capability-ledger.svg'
+    '/favicon-admin.svg'
   )
 })

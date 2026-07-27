@@ -255,7 +255,7 @@ func TestApprovalSettingsExplanationSerializesRoleAndBlockerLists(t *testing.T) 
 	}
 }
 
-func TestApprovalSettingsNamedMembersRequireActiveEmployeeInSelectedRole(t *testing.T) {
+func TestApprovalSettingsMembersRequireEligibleRoleAndActiveEmployee(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	revokedAt := time.Now()
 	repo.admins = map[int]*biz.AdminUser{
@@ -361,7 +361,7 @@ func TestApprovalSettingsNamedMembersRequireActiveEmployeeInSelectedRole(t *test
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := dispatcher.validateApprovalSettingsNamedMembers(
+			result := dispatcher.validateApprovalSettingsMemberEligibility(
 				customerConfigAdminCtx(1, biz.AdminRoleKey),
 				[]biz.WorkPoolMembershipInput{test.membership},
 			)
@@ -375,5 +375,41 @@ func TestApprovalSettingsNamedMembersRequireActiveEmployeeInSelectedRole(t *test
 				t.Fatalf("validation result = %#v, want %q", result, test.wantMessage)
 			}
 		})
+	}
+}
+
+func TestApprovalSettingsMembersRequirePersistedApprovalPermission(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	repo.rolePerms[biz.SalesRoleKey] = []string{biz.PermissionWorkflowTaskRead}
+	repo.admins = map[int]*biz.AdminUser{
+		1: {
+			ID:           1,
+			Username:     "root",
+			IsSuperAdmin: true,
+			Roles:        []biz.AdminRole{{Key: biz.AdminRoleKey}},
+		},
+		12: {
+			ID:       12,
+			Username: "sales-active",
+			Roles:    []biz.AdminRole{{Key: biz.SalesRoleKey}},
+		},
+	}
+	dispatcher := &jsonrpcDispatcher{
+		adminManageUC: biz.NewAdminManageUsecase(
+			repo,
+			log.NewStdLogger(io.Discard),
+			nil,
+		),
+	}
+
+	result := dispatcher.validateApprovalSettingsMemberEligibility(
+		customerConfigAdminCtx(1, biz.AdminRoleKey),
+		[]biz.WorkPoolMembershipInput{{
+			PoolKey: "approval.sales_order", RoleKey: biz.SalesRoleKey,
+			Strategy: biz.ApprovalMemberStrategyPrimary, Priority: 100, Enabled: true,
+		}},
+	)
+	if result == nil || result.Message != "所选岗位当前未开启审批功能" {
+		t.Fatalf("validation result = %#v", result)
 	}
 }

@@ -1229,6 +1229,13 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
 
   const allActions = await call('explain_action_access', { task_id: taskID })
   assert.equal(allActions.result.code, 0)
+  assert.deepEqual(allActions.result.data.source_access, {
+    applicable: false,
+    resolved: true,
+    allowed: true,
+    reason_code: 'source_access_not_applicable',
+    reason: '当前任务没有需要核对的相关单据。',
+  })
   assert.deepEqual(
     allActions.result.data.actions.map((item) => item.action_key),
     ['complete', 'block', 'reject', 'resume', 'urge']

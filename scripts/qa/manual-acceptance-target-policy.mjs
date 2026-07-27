@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { classifyDatabaseName } from "./database-target.mjs";
+
 const DEFAULT_LOCAL_BACKEND_URL = "http://127.0.0.1:8300";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const EXPLICIT_LOCAL_ENVIRONMENTS = new Set(["local", "dev"]);
@@ -7,12 +9,9 @@ const SAFE_DATA_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/u;
 const SAFE_RUN_ID = /^[A-Z0-9][A-Z0-9_-]{0,31}$/u;
 const IMMUTABLE_RELEASE_SHA = /^[0-9a-f]{40}$/u;
 const ATLAS_MIGRATION_VERSION = /^[0-9]{14}$/u;
-const EXACT_LOCAL_ACCEPTANCE_DATABASE =
-  /^plush_erp_acceptance_20260716_v5_dev$/u;
-
 export const LOCAL_DEV_TARGET = "local-dev";
-export const LOCAL_MANUAL_ACCEPTANCE_DATABASE =
-  "plush_erp_acceptance_20260716_v5_dev";
+export const LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE =
+  "plush_erp_acceptance_local_run_dev";
 export const CUSTOMER_TRIAL_133_TARGET = "customer-trial-133";
 // Customer-trial writes carry administrator credentials and bearer tokens. Keep
 // the registered endpoint on loopback so callers must reach 133 through an SSH
@@ -102,6 +101,21 @@ function requiredIdentity(value, name, pattern, description) {
   return text;
 }
 
+export function assertLocalManualAcceptanceDatabaseName(value) {
+  const databaseName = optionalText(value);
+  const classification = classifyDatabaseName(databaseName);
+  if (
+    !databaseName ||
+    !classification.disposable ||
+    classification.profile !== "acceptance"
+  ) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${LOCAL_DEV_TARGET} requires databaseName=plush_erp_acceptance_<run-id>_dev`,
+    );
+  }
+  return databaseName;
+}
+
 export function normalizeManualAcceptanceBackendURL(
   value = DEFAULT_LOCAL_BACKEND_URL,
 ) {
@@ -187,14 +201,9 @@ export function resolveManualAcceptanceTarget({
         `${requestedTarget} must use its registered SSH tunnel origin`,
       );
     }
-    if (
-      requestedDatabaseName &&
-      requestedDatabaseName !== LOCAL_MANUAL_ACCEPTANCE_DATABASE
-    ) {
-      throw new ManualAcceptanceTargetPolicyError(
-        `${LOCAL_DEV_TARGET} requires databaseName=${LOCAL_MANUAL_ACCEPTANCE_DATABASE}`,
-      );
-    }
+    const localDatabaseName = requestedDatabaseName
+      ? assertLocalManualAcceptanceDatabaseName(requestedDatabaseName)
+      : undefined;
     return Object.freeze({
       target: LOCAL_DEV_TARGET,
       datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
@@ -203,7 +212,7 @@ export function resolveManualAcceptanceTarget({
       dataVersion: optionalText(dataVersion) || optionalText(runId),
       runId: optionalText(runId),
       external: false,
-      ...(requestedDatabaseName ? { databaseName: requestedDatabaseName } : {}),
+      ...(localDatabaseName ? { databaseName: localDatabaseName } : {}),
     });
   }
 
@@ -449,16 +458,17 @@ export async function assertManualAcceptanceRuntimeIdentityPrecondition({
     );
   }
   const scope = resolved.external ? "release-v1" : "database-v1";
+  const databaseIdentity = resolved.external
+    ? requiredIdentity(
+        resolved.databaseName,
+        "runtime databaseName",
+        /^plush_erp_uat_[a-z0-9_]+$/u,
+        "the registered acceptance database identity",
+      )
+    : assertLocalManualAcceptanceDatabaseName(resolved.databaseName);
   const identityFields = [
     scope,
-    requiredIdentity(
-      resolved.databaseName,
-      "runtime databaseName",
-      resolved.external
-        ? /^plush_erp_uat_[a-z0-9_]+$/u
-        : EXACT_LOCAL_ACCEPTANCE_DATABASE,
-      "the registered acceptance database identity",
-    ),
+    databaseIdentity,
   ];
   if (checkedAttestation) {
     identityFields.push(

@@ -11,8 +11,6 @@ const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../
 const DEFAULT_OUT_DIR = "output/qa/purchase-receipt-real-write-e2e";
 const INPUT_TEMPLATE_SCOPE = "purchase-receipt-real-write-e2e-input-template";
 const PREFLIGHT_REPORT_SCOPE = "purchase-receipt-real-write-e2e-preflight-report";
-const DEFAULT_PURCHASE_RECEIPT_PG_DB_URL =
-  "postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable";
 const ALLOWED_POSTGRES_HOSTS = new Set([
   "localhost",
   "127.0.0.1",
@@ -155,7 +153,21 @@ function commandVersion(command, args, runtime = {}) {
 }
 
 function resolvePostgresTarget(env = process.env) {
-  const raw = env.PURCHASE_RECEIPT_PG_DB_URL || DEFAULT_PURCHASE_RECEIPT_PG_DB_URL;
+  const raw = String(env.PURCHASE_RECEIPT_PG_DB_URL || "").trim();
+  if (!raw) {
+    return {
+      valid: false,
+      error: "missing-postgres-url",
+      scheme: "",
+      host: "",
+      port: null,
+      database: "",
+      allowedHost: false,
+      safeTarget: "",
+      dbNameLooksTestOnly: false,
+      urlValueStored: false,
+    };
+  }
   let parsed;
   try {
     parsed = new URL(raw);
@@ -179,8 +191,7 @@ function resolvePostgresTarget(env = process.env) {
   const database = parsed.pathname.replace(/^\//, "");
   const port = parsed.port ? Number(parsed.port) : 5432;
   const allowedHost = ALLOWED_POSTGRES_HOSTS.has(host);
-  const dbNameLooksTestOnly =
-    database.toLowerCase().includes("purchase_receipt") || database.toLowerCase().includes("test");
+  const dbNameLooksTestOnly = /^plush_erp_ci_[a-z0-9_]+$/u.test(database);
   return {
     valid: ["postgres", "postgresql"].includes(scheme) && allowedHost && Boolean(database),
     error: "",

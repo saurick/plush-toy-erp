@@ -4644,6 +4644,14 @@ export function createBusinessFormalScenarios(deps) {
                     code: 0,
                     message: 'OK',
                     data: {
+                      source_access: {
+                        applicable: true,
+                        resolved: true,
+                        allowed: false,
+                        reason_code: 'source_read_permission_missing',
+                        reason:
+                          '当前账号不能查看该任务的相关单据，因此不能办理；可催办责任人或联系管理员调整岗位权限。',
+                      },
                       actions: [
                         {
                           action_key: 'complete',

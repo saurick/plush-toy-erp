@@ -3206,7 +3206,7 @@ function helpText() {
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
     node scripts/qa/manual-acceptance-readiness.mjs --verify \\
       --backend-url http://127.0.0.1:8310 \\
-      --database-name plush_erp_acceptance_20260716_v5_dev \\
+      --database-name plush_erp_acceptance_20260728_delivery_dev \\
       --source-report output/qa/manual-acceptance/source-data/apply-report.json \\
       --fact-report output/qa/manual-acceptance/fact-data/apply-report.json \\
       --task-report output/qa/manual-acceptance/task-data/apply-report.json \\

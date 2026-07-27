@@ -20,10 +20,7 @@ import {
   getWorkflowTaskProcessContext,
   listWorkflowTaskEvents,
 } from '../../api/workflowApi.mjs'
-import {
-  formatWorkflowTaskSource,
-  resolveWorkflowTaskEntryPath,
-} from '../../utils/dashboardTaskDisplay.mjs'
+import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
 import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import {
   getWorkflowTaskCodeLabel,
@@ -224,6 +221,7 @@ export default function WorkflowTaskActionDrawer({
   readonlyReason = '',
   assignmentAccess = {},
   assignmentTarget,
+  canOpenEntry = false,
   onActionModeChange,
   onActionReasonChange,
   onAssignmentTargetChange,
@@ -235,11 +233,10 @@ export default function WorkflowTaskActionDrawer({
   const approvalTask = isWorkflowApprovalTask(task)
   const statusMeta = task ? getWorkflowTaskStatusMeta(task) : null
   const isTerminal = task ? isTerminalWorkflowTask(task) : false
-  const entryPath = task ? resolveWorkflowTaskEntryPath(task) : ''
   const taskReason = task ? getWorkflowTaskReason(task) : ''
   const actionTone = getTaskActionTone(actionMode)
   const ownerRoleLabel = task ? getWorkflowTaskOwnerRoleLabel(task) : ''
-  const canOpenEntry = Boolean(task && entryPath && onOpenEntry)
+  const canOpenRelatedEntry = Boolean(task && canOpenEntry && onOpenEntry)
   const allowedActionModeSet = new Set(allowedActionModes)
   const canSubmitAction = Boolean(
     actionMode && allowedActionModeSet.has(actionMode) && !isTerminal
@@ -543,13 +540,13 @@ export default function WorkflowTaskActionDrawer({
                   上一步
                 </Button>
               )}
-              {canOpenEntry ? (
+              {canOpenRelatedEntry ? (
                 <Button
                   icon={<LinkOutlined />}
                   disabled={actionSaving}
                   onClick={() => onOpenEntry(task)}
                 >
-                  {isTerminal ? '查看关联记录' : '去办理'}
+                  查看相关单据
                 </Button>
               ) : null}
             </div>
@@ -573,7 +570,7 @@ export default function WorkflowTaskActionDrawer({
                       : processDecisionRequired && !processDecisionReady
                         ? '审批表单尚未与当前流程节点核对完成'
                         : approvedQuantityError ||
-                            (actionMeta?.requireReason
+                          (actionMeta?.requireReason
                             ? '先选择处理方式并填写原因'
                             : '先选择处理方式')
                   }

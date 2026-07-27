@@ -26,13 +26,18 @@ func TestSeedCoreDemoReferencesOnlyRejectsAlternatePrefix(t *testing.T) {
 }
 
 func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testing.T) {
-	valid := "postgres://acceptance:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable"
-	if err := validateManualAcceptanceReferenceTarget(
-		valid,
-		manualAcceptanceReferenceDatabase,
-		manualAcceptanceReferenceConfirm,
-	); err != nil {
-		t.Fatalf("valid target rejected: %v", err)
+	const database = "plush_erp_acceptance_20260728_delivery_dev"
+	const confirmation = "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + database + ":2026.07.16-v5:20260716-V5"
+	validLoopback := "postgres://acceptance:secret@127.0.0.1:55432/" + database + "?sslmode=disable"
+	validRegisteredDevelopment := "postgres://acceptance:secret@192.168.0.106:5432/" + database + "?sslmode=disable"
+	for _, valid := range []string{validLoopback, validRegisteredDevelopment} {
+		if err := validateManualAcceptanceReferenceTarget(
+			valid,
+			database,
+			confirmation,
+		); err != nil {
+			t.Fatalf("valid target rejected: %v", err)
+		}
 	}
 	for name, input := range map[string]struct {
 		dsn      string
@@ -40,33 +45,33 @@ func TestManualAcceptanceReferenceTargetIsBoundToTheExactFreshDatabase(t *testin
 		confirm  string
 	}{
 		"shared database": {
-			dsn:      "postgres://acceptance:secret@192.168.0.106:5432/plush_erp?sslmode=disable",
-			database: manualAcceptanceReferenceDatabase,
-			confirm:  manualAcceptanceReferenceConfirm,
+			dsn:      "postgres://acceptance:secret@127.0.0.1:55432/plush_erp?sslmode=disable",
+			database: database,
+			confirm:  confirmation,
 		},
 		"other dev database": {
-			dsn:      "postgres://acceptance:secret@192.168.0.106:5432/plush_erp_other_dev?sslmode=disable",
-			database: manualAcceptanceReferenceDatabase,
-			confirm:  manualAcceptanceReferenceConfirm,
+			dsn:      "postgres://acceptance:secret@127.0.0.1:55432/plush_erp_other_dev?sslmode=disable",
+			database: database,
+			confirm:  confirmation,
 		},
-		"loopback tunnel": {
-			dsn:      "postgres://acceptance:secret@127.0.0.1:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
-			database: manualAcceptanceReferenceDatabase,
-			confirm:  manualAcceptanceReferenceConfirm,
+		"target endpoint": {
+			dsn:      "postgres://acceptance:secret@192.168.0.133:5435/" + database + "?sslmode=disable",
+			database: database,
+			confirm:  confirmation,
 		},
 		"query override": {
-			dsn:      valid + "&host=192.168.0.133",
-			database: manualAcceptanceReferenceDatabase,
-			confirm:  manualAcceptanceReferenceConfirm,
+			dsn:      validLoopback + "&host=192.168.0.133",
+			database: database,
+			confirm:  confirmation,
 		},
 		"wrong explicit database": {
-			dsn:      valid,
+			dsn:      validLoopback,
 			database: "plush_erp_acceptance_other_dev",
-			confirm:  manualAcceptanceReferenceConfirm,
+			confirm:  confirmation,
 		},
 		"wrong confirmation": {
-			dsn:      valid,
-			database: manualAcceptanceReferenceDatabase,
+			dsn:      validLoopback,
+			database: database,
 			confirm:  "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES",
 		},
 	} {

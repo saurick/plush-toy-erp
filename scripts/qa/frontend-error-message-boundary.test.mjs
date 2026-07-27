@@ -15,7 +15,7 @@ const scannedRoots = Object.freeze([
 ]);
 
 const devUserVisibleAllowlist = Object.freeze(
-  new Set(["web/src/erp/pages/DevCustomerConfigPage.jsx"]),
+  new Set(["web/src/dev-workbench/pages/DevCustomerConfigPage.jsx"]),
 );
 
 const rawMessagePatterns = Object.freeze([
@@ -127,7 +127,7 @@ test("frontend error message boundary: Markdown Mermaid errors do not expose par
 
 test("frontend error message boundary: dev customer config workbench uses shared helper", () => {
   const source = readFileSync(
-    path.join(repoRoot, "web/src/erp/pages/DevCustomerConfigPage.jsx"),
+    path.join(repoRoot, "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx"),
     "utf8",
   );
   assert(source.includes("getActionErrorMessage"));

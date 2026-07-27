@@ -79,9 +79,11 @@ function materializeFullProfile(root) {
 function installRealReceiptFiles(root) {
   for (const file of [
     ".githooks/pre-push",
+    "scripts/qa/dev-workbench-receipt.mjs",
     "scripts/qa/gate-profiles.mjs",
     "scripts/qa/pre-push-receipt.mjs",
     "scripts/qa/prepare-push.sh",
+    "scripts/qa/run-gate-with-receipt.mjs",
     "scripts/git-hooks/pre-push.sh",
   ]) {
     const target = path.join(root, file);
@@ -106,6 +108,7 @@ if [[ "\${MUTATE_FULL_HEAD:-0}" == "1" ]]; then
   git -c user.name=Fixture -c user.email=fixture@example.invalid -c commit.gpgsign=false commit --allow-empty -qm moved-head
 fi
 if [[ "\${MUTATE_REMOTE:-0}" == "1" ]]; then git push --quiet origin HEAD:refs/heads/main; fi
+printf '%s\\n' '[qa:test-gate] status=complete tests=1 pass=1 fail=0 skipped=0'
 `,
     "utf8",
   );

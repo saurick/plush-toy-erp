@@ -43,6 +43,27 @@ test('task board keeps selection on click and opens the same detail surface on d
   )
   assert.match(source, /title="单击选中，双击查看任务详情"/u)
   assert.match(source, /电脑端可双击任务卡快速查看详情/u)
+  assert.match(
+    source,
+    /<Text strong className="erp-task-board-card-title">[\s\S]{0,100}task\.task_name/u
+  )
+})
+
+test('related document entry is gated by backend source access and menu projection on every path', () => {
+  assert.match(
+    source,
+    /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*selectedWorkbenchEntryPath,\s*selectedWorkbenchTaskAccess\.sourceAccess/u
+  )
+  assert.match(
+    source,
+    /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*taskCenterCurrentEntryPath,\s*taskCenterCurrentTaskAccess\.sourceAccess/u
+  )
+  assert.match(
+    source,
+    /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*entryPath,\s*access\?\.sourceAccess/u
+  )
+  assert.match(source, /canOpenEntry=\{actionDrawerCanOpenEntry\}/u)
+  assert.match(source, /if \(access\.urgeOnly\) return '催办'/u)
 })
 
 test('task surfaces expose the batch task code only as non-visible evidence metadata', () => {

@@ -16,6 +16,7 @@ test('dev flow state observatory L1 scenario stays DEV-only and no-write', () =>
     [
       'dev-flow-state-observatory-readonly',
       'dev-flow-state-observatory-workflow-graph-dark',
+      'dev-flow-state-observatory-path-filter-recovery',
       'dev-flow-state-observatory-mobile-dark',
     ]
   )
@@ -34,6 +35,9 @@ test('dev flow state observatory L1 scenario stays DEV-only and no-write', () =>
   assert.equal(scenarios[1].themeMode, 'dark')
   assert.match(scenarios[1].path, /flow=workflow\.task/u)
   assert.match(scenarios[1].path, /layers=/u)
-  assert.deepEqual(scenarios[2].viewport, { width: 390, height: 844 })
-  assert.equal(scenarios[2].themeMode, 'dark')
+  assert.deepEqual(scenarios[2].viewport, { width: 1280, height: 800 })
+  assert.match(scenarios[2].path, /path_mode=overlay/u)
+  assert.match(scenarios[2].path, /path_kind=adjusted/u)
+  assert.deepEqual(scenarios[3].viewport, { width: 390, height: 844 })
+  assert.equal(scenarios[3].themeMode, 'dark')
 })

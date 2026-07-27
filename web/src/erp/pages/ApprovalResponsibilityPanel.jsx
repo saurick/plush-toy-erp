@@ -30,7 +30,7 @@ import {
   activateCustomerConfig,
   checkCustomerConfigTransition,
 } from '../api/customerConfigApi.mjs'
-import { getRoleDisplayName } from '../utils/roleKeys.mjs'
+import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 
 const { Text, Title } = Typography
 
@@ -52,6 +52,12 @@ const STRATEGIES = [
     fieldLabel: '超时或需要升级时',
   },
 ]
+const APPROVAL_ROLE_KEYS = new Set(Object.keys(ROLE_DISPLAY_NAMES))
+const EDITOR_MEMBER_FIELDS = STRATEGIES.flatMap(({ key }) => [
+  `${key}_role`,
+  `${key}_mode`,
+  `${key}_user`,
+])
 
 const BLOCKER_LABELS = {
   approval_settings_not_published: '尚未发布审批责任',
@@ -85,6 +91,33 @@ function adminIsActive(admin = {}) {
 
 function adminHasRole(admin = {}, roleKey = '') {
   return adminRoleKeys(admin).includes(String(roleKey || '').trim())
+}
+
+function strategyShortLabel(strategyKey) {
+  return (
+    STRATEGIES.find((strategy) => strategy.key === strategyKey)?.shortLabel ||
+    '其他'
+  )
+}
+
+function responsibilityIdentity(values = {}, strategyKey = '') {
+  const roleKey = String(values[`${strategyKey}_role`] || '').trim()
+  if (!roleKey) return ''
+  if (values[`${strategyKey}_mode`] === 'user') {
+    const userID = Number(values[`${strategyKey}_user`] || 0)
+    return userID > 0 ? `${roleKey}:${userID}` : ''
+  }
+  return `${roleKey}:0`
+}
+
+function conflictingStrategy(values = {}, strategyKey = '', identity = '') {
+  if (!identity) return ''
+  return (
+    STRATEGIES.find(
+      ({ key }) =>
+        key !== strategyKey && responsibilityIdentity(values, key) === identity
+    )?.key || ''
+  )
 }
 
 function defaultMembers(approvalKey) {
@@ -201,6 +234,7 @@ export default function ApprovalResponsibilityPanel({
   const [published, setPublished] = useState(null)
   const [editingKey, setEditingKey] = useState('')
   const [editorDirty, setEditorDirty] = useState(false)
+  const [editorValues, setEditorValues] = useState({})
   const requestIDRef = useRef(0)
   const [form] = Form.useForm()
 
@@ -212,6 +246,7 @@ export default function ApprovalResponsibilityPanel({
     setPublished(null)
     setEditingKey('')
     setEditorDirty(false)
+    setEditorValues({})
   }, [])
 
   const load = useCallback(async () => {
@@ -291,71 +326,148 @@ export default function ApprovalResponsibilityPanel({
     [currentAdmin]
   )
 
-  const roleOptions = useMemo(
-    () =>
+  const roleOptions = useMemo(() => {
+    const roleByKey = new Map(
       roles
-        .filter((role) => {
-          const key = roleKeyOf(role)
-          return (
-            key &&
-            !['admin', 'debug_operator'].includes(key) &&
-            role.disabled !== true &&
-            (Array.isArray(role.permissions)
-              ? role.permissions.includes('workflow.task.approve')
-              : true)
-          )
-        })
-        .map((role) => {
-          const key = roleKeyOf(role)
-          const protectedOwnRole =
-            currentAdmin?.is_super_admin !== true &&
-            currentAdminRoleSet.has(key)
-          const activeEmployeeCount = admins.filter(
-            (admin) => adminIsActive(admin) && adminHasRole(admin, key)
-          ).length
-          return {
-            value: key,
-            label: `${getRoleDisplayName(
-              key,
-              role.name || role.display_name || '已配置岗位'
-            )}${
-              protectedOwnRole
-                ? '（本人岗位）'
-                : activeEmployeeCount === 0
-                  ? '（暂无启用员工）'
-                  : ''
-            }`,
-            disabled: protectedOwnRole || activeEmployeeCount === 0,
-          }
-        }),
-    [admins, currentAdmin, currentAdminRoleSet, roles]
+        .map((role) => [roleKeyOf(role), role])
+        .filter(([key]) => key && !['admin', 'debug_operator'].includes(key))
+    )
+    const savedRoleKeys = new Set(
+      draftItems.flatMap((item) =>
+        (item.members || []).map((member) =>
+          String(member.role_key || '').trim()
+        )
+      )
+    )
+    savedRoleKeys.forEach((key) => {
+      if (key && !roleByKey.has(key)) {
+        roleByKey.set(key, { role_key: key, missing: true })
+      }
+    })
+
+    return Array.from(roleByKey.entries()).map(([key, role]) => {
+      const displayLabel = getRoleDisplayName(key)
+      const protectedOwnRole =
+        currentAdmin?.is_super_admin !== true && currentAdminRoleSet.has(key)
+      const activeEmployeeCount = admins.filter(
+        (admin) => adminIsActive(admin) && adminHasRole(admin, key)
+      ).length
+      let reason = ''
+      let validationMessage = ''
+      if (role.missing === true) {
+        reason = '岗位已不存在，请重新选择'
+        validationMessage = '当前岗位已不存在，请重新选择'
+      } else if (!APPROVAL_ROLE_KEYS.has(key)) {
+        reason = '不支持审批责任'
+        validationMessage = '当前岗位不支持审批责任，请重新选择'
+      } else if (role.disabled === true) {
+        reason = '岗位已停用'
+        validationMessage = '当前岗位已停用，请重新选择'
+      } else if (
+        !Array.isArray(role.permissions) ||
+        !role.permissions.includes('workflow.task.approve')
+      ) {
+        reason = '未开启审批功能'
+        validationMessage = '当前岗位未开启审批功能，请先在岗位设置中开启'
+      } else if (activeEmployeeCount === 0) {
+        reason = '暂无启用员工'
+        validationMessage = '当前岗位暂无启用员工，请先启用员工'
+      } else if (protectedOwnRole) {
+        reason = '不能配置本人岗位'
+        validationMessage = '不能通过审批责任配置本人岗位'
+      }
+      return {
+        value: key,
+        displayLabel,
+        label: reason ? `${displayLabel}（${reason}）` : displayLabel,
+        disabled: Boolean(reason),
+        eligible: !reason,
+        reason,
+        validationMessage,
+      }
+    })
+  }, [admins, currentAdmin, currentAdminRoleSet, draftItems, roles])
+
+  const roleOptionByKey = useMemo(
+    () => new Map(roleOptions.map((option) => [option.value, option])),
+    [roleOptions]
+  )
+
+  const selectableRoleOptions = useMemo(
+    () => roleOptions.filter((option) => option.eligible),
+    [roleOptions]
+  )
+
+  const roleOptionsForStrategy = useCallback(
+    (strategyKey) =>
+      roleOptions.map((option) => {
+        if (option.disabled || editorValues[`${strategyKey}_mode`] === 'user') {
+          return option
+        }
+        const occupiedBy = conflictingStrategy(
+          editorValues,
+          strategyKey,
+          `${option.value}:0`
+        )
+        if (!occupiedBy) return option
+        return {
+          ...option,
+          label: `${option.displayLabel}（已用于${strategyShortLabel(
+            occupiedBy
+          )}责任）`,
+          disabled: true,
+        }
+      }),
+    [editorValues, roleOptions]
   )
 
   const usersForRole = useCallback(
-    (roleKey, selectedUserID = 0) =>
-      admins
+    (roleKey, selectedUserID = 0, strategyKey = '') => {
+      const candidates = admins
         .filter(
           (admin) =>
-            adminHasRole(admin, roleKey) &&
-            (adminIsActive(admin) || Number(admin.id) === selectedUserID)
+            adminHasRole(admin, roleKey) ||
+            Number(admin.id) === Number(selectedUserID)
         )
-        .map((admin) => {
-          const protectedSelf =
-            currentAdmin?.is_super_admin !== true &&
-            Number(admin.id) === Number(currentAdmin?.id)
-          return {
-            value: Number(admin.id),
-            label: `${admin.username || admin.phone || `员工 ${admin.id}`}${
-              protectedSelf
-                ? '（本人）'
-                : !adminIsActive(admin)
-                  ? '（已停用）'
-                  : ''
-            }`,
-            disabled: protectedSelf || !adminIsActive(admin),
-          }
-        }),
-    [admins, currentAdmin]
+        .map((admin) => ({ ...admin, missing: false }))
+      if (
+        selectedUserID > 0 &&
+        !candidates.some((admin) => Number(admin.id) === Number(selectedUserID))
+      ) {
+        candidates.push({ id: selectedUserID, missing: true })
+      }
+      return candidates.map((admin) => {
+        const adminID = Number(admin.id)
+        const protectedSelf =
+          currentAdmin?.is_super_admin !== true &&
+          adminID === Number(currentAdmin?.id)
+        const occupiedBy = conflictingStrategy(
+          editorValues,
+          strategyKey,
+          `${roleKey}:${adminID}`
+        )
+        let reason = ''
+        if (admin.missing === true || admin.account_status === 'revoked') {
+          reason = '账号不存在或已离职'
+        } else if (!adminHasRole(admin, roleKey)) {
+          reason = '已不属于该岗位'
+        } else if (!adminIsActive(admin)) {
+          reason = '账号已停用'
+        } else if (protectedSelf) {
+          reason = '不能指定本人'
+        } else if (occupiedBy) {
+          reason = `已用于${strategyShortLabel(occupiedBy)}责任`
+        }
+        const displayLabel = admin.username || admin.phone || `员工 ${adminID}`
+        return {
+          value: adminID,
+          label: reason ? `${displayLabel}（${reason}）` : displayLabel,
+          disabled: Boolean(reason),
+          reason,
+        }
+      })
+    },
+    [admins, currentAdmin, editorValues]
   )
 
   const displayItems = useMemo(() => {
@@ -385,6 +497,51 @@ export default function ApprovalResponsibilityPanel({
   const activeEditable = draftItems.find(
     (item) => item.approval_key === editingKey
   )
+  const selectedUnavailableRoles = useMemo(() => {
+    const seen = new Set()
+    return STRATEGIES.flatMap(({ key }) => {
+      const roleKey = String(editorValues[`${key}_role`] || '').trim()
+      const option = roleOptionByKey.get(roleKey)
+      if (!roleKey || !option?.disabled || seen.has(roleKey)) return []
+      seen.add(roleKey)
+      return [option]
+    })
+  }, [editorValues, roleOptionByKey])
+
+  const editorEligibilityNotice = useMemo(() => {
+    const onlyOption = selectableRoleOptions[0]
+    const availabilityCopy =
+      selectableRoleOptions.length === 0
+        ? '当前没有具备审批资格的岗位。请先在“岗位设置”中启用岗位、开启审批功能，并至少保留一名启用员工。'
+        : selectableRoleOptions.length === 1
+          ? `当前只有“${onlyOption.displayLabel}”具备审批资格。备用和升级可以留空；同一岗位池或同一指定员工不能重复设置，如需将该岗位池改为主办，请先清空现有的备用或升级责任。`
+          : ''
+    if (selectedUnavailableRoles.length > 0) {
+      return {
+        type: 'warning',
+        message: '当前设置包含不可用岗位',
+        description: `${selectedUnavailableRoles
+          .map(
+            (option) =>
+              `${option.displayLabel}：${option.reason || '当前不可用'}`
+          )
+          .join(
+            '；'
+          )}。${availabilityCopy || '请重新选择具备审批资格的岗位。'}`,
+      }
+    }
+    if (availabilityCopy) {
+      return {
+        type: selectableRoleOptions.length === 0 ? 'warning' : 'info',
+        message:
+          selectableRoleOptions.length === 0
+            ? '当前没有可承接岗位'
+            : '当前只有一个可承接岗位',
+        description: availabilityCopy,
+      }
+    }
+    return null
+  }, [selectableRoleOptions, selectedUnavailableRoles])
 
   const openEditor = (item) => {
     const draft = draftItems.find(
@@ -400,6 +557,7 @@ export default function ApprovalResponsibilityPanel({
       values[`${key}_user`] = member?.user_id || undefined
     })
     form.setFieldsValue(values)
+    setEditorValues(values)
     setEditingKey(item.approval_key)
     setEditorDirty(false)
   }
@@ -418,6 +576,7 @@ export default function ApprovalResponsibilityPanel({
     }
     setEditingKey('')
     setEditorDirty(false)
+    setEditorValues({})
     form.resetFields()
   }
 
@@ -440,7 +599,12 @@ export default function ApprovalResponsibilityPanel({
   }
 
   const saveEditor = async () => {
-    const values = await form.validateFields()
+    let values
+    try {
+      values = await form.validateFields()
+    } catch {
+      return
+    }
     const members = STRATEGIES.filter(({ key }) => values[`${key}_role`]).map(
       ({ key }) => ({
         role_key: values[`${key}_role`],
@@ -456,7 +620,7 @@ export default function ApprovalResponsibilityPanel({
     for (const member of members) {
       const identity = `${member.role_key}:${member.user_id}`
       if (memberIdentities.has(identity)) {
-        message.warning('同一责任成员不能重复承担多个责任层级')
+        message.warning('同一岗位池或同一指定员工不能重复承担多个责任层级')
         return
       }
       memberIdentities.add(identity)
@@ -798,17 +962,33 @@ export default function ApprovalResponsibilityPanel({
           form={form}
           layout="vertical"
           className="erp-approval-responsibility-form"
-          onValuesChange={() => setEditorDirty(true)}
+          onValuesChange={(_, values) => {
+            setEditorValues(values)
+            setEditorDirty(true)
+          }}
         >
           <Form.Item name="enabled" label="启用此审批" valuePropName="checked">
             <Switch />
           </Form.Item>
+          {editorEligibilityNotice ? (
+            <Alert
+              showIcon
+              type={editorEligibilityNotice.type}
+              message={editorEligibilityNotice.message}
+              description={editorEligibilityNotice.description}
+            />
+          ) : null}
           {STRATEGIES.map(({ key, fieldLabel }) => (
             <div className="erp-approval-responsibility-form__tier" key={key}>
               <Form.Item
                 name={`${key}_role`}
                 label={fieldLabel}
-                dependencies={['enabled']}
+                dependencies={[
+                  'enabled',
+                  ...EDITOR_MEMBER_FIELDS.filter(
+                    (field) => field !== `${key}_role`
+                  ),
+                ]}
                 rules={[
                   ({ getFieldValue }) => ({
                     validator(_, value) {
@@ -819,6 +999,32 @@ export default function ApprovalResponsibilityPanel({
                       ) {
                         return Promise.reject(new Error('请选择主要审批岗位'))
                       }
+                      if (!value) return Promise.resolve()
+                      const option = roleOptionByKey.get(String(value))
+                      if (!option || option.disabled) {
+                        return Promise.reject(
+                          new Error(
+                            option?.validationMessage ||
+                              '当前岗位不可用，请重新选择'
+                          )
+                        )
+                      }
+                      if (getFieldValue(`${key}_mode`) !== 'user') {
+                        const occupiedBy = conflictingStrategy(
+                          form.getFieldsValue(true),
+                          key,
+                          `${value}:0`
+                        )
+                        if (occupiedBy) {
+                          return Promise.reject(
+                            new Error(
+                              `该岗位池已用于${strategyShortLabel(
+                                occupiedBy
+                              )}责任`
+                            )
+                          )
+                        }
+                      }
                       return Promise.resolve()
                     },
                   }),
@@ -826,8 +1032,9 @@ export default function ApprovalResponsibilityPanel({
               >
                 <Select
                   allowClear={key !== 'primary'}
-                  options={roleOptions}
+                  options={roleOptionsForStrategy(key)}
                   placeholder="选择岗位"
+                  notFoundContent="没有可选审批岗位"
                   onChange={(roleKey) => {
                     const userID = Number(
                       form.getFieldValue(`${key}_user`) || 0
@@ -837,6 +1044,11 @@ export default function ApprovalResponsibilityPanel({
                       !adminHasRole(adminByID.get(userID), roleKey)
                     ) {
                       form.setFieldValue(`${key}_user`, undefined)
+                      setEditorValues({
+                        ...form.getFieldsValue(true),
+                        [`${key}_role`]: roleKey,
+                        [`${key}_user`]: undefined,
+                      })
                     }
                   }}
                 />
@@ -865,7 +1077,9 @@ export default function ApprovalResponsibilityPanel({
                     <Form.Item
                       name={`${key}_user`}
                       label="指定员工"
-                      dependencies={[`${key}_mode`, `${key}_role`]}
+                      dependencies={EDITOR_MEMBER_FIELDS.filter(
+                        (field) => field !== `${key}_user`
+                      )}
                       rules={[
                         ({ getFieldValue: getValue }) => ({
                           validator(_, value) {
@@ -875,6 +1089,54 @@ export default function ApprovalResponsibilityPanel({
                             ) {
                               return Promise.reject(
                                 new Error('请选择该岗位下的员工')
+                              )
+                            }
+                            if (getValue(`${key}_mode`) !== 'user') {
+                              return Promise.resolve()
+                            }
+                            const roleKey = String(
+                              getValue(`${key}_role`) || ''
+                            ).trim()
+                            const selectedAdmin = adminByID.get(Number(value))
+                            if (
+                              !selectedAdmin ||
+                              selectedAdmin.account_status === 'revoked'
+                            ) {
+                              return Promise.reject(
+                                new Error('指定员工不存在或已离职')
+                              )
+                            }
+                            if (!adminHasRole(selectedAdmin, roleKey)) {
+                              return Promise.reject(
+                                new Error('指定员工已不属于该岗位')
+                              )
+                            }
+                            if (!adminIsActive(selectedAdmin)) {
+                              return Promise.reject(
+                                new Error('指定员工当前未启用')
+                              )
+                            }
+                            if (
+                              currentAdmin?.is_super_admin !== true &&
+                              Number(selectedAdmin.id) ===
+                                Number(currentAdmin?.id)
+                            ) {
+                              return Promise.reject(
+                                new Error('不能通过审批责任指定本人')
+                              )
+                            }
+                            const occupiedBy = conflictingStrategy(
+                              form.getFieldsValue(true),
+                              key,
+                              `${roleKey}:${Number(value)}`
+                            )
+                            if (occupiedBy) {
+                              return Promise.reject(
+                                new Error(
+                                  `该指定员工已用于${strategyShortLabel(
+                                    occupiedBy
+                                  )}责任`
+                                )
                               )
                             }
                             return Promise.resolve()
@@ -887,9 +1149,10 @@ export default function ApprovalResponsibilityPanel({
                         optionFilterProp="label"
                         options={usersForRole(
                           getFieldValue(`${key}_role`),
-                          Number(getFieldValue(`${key}_user`) || 0)
+                          Number(getFieldValue(`${key}_user`) || 0),
+                          key
                         )}
-                        placeholder="只显示该岗位的启用员工"
+                        placeholder="显示该岗位员工；不可用账号会标明原因"
                       />
                     </Form.Item>
                   ) : (

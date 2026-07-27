@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -28,10 +29,7 @@ type bootstrapConfig struct {
 	} `yaml:"data"`
 }
 
-const (
-	manualAcceptanceReferenceDatabase = "plush_erp_acceptance_20260716_v5_dev"
-	manualAcceptanceReferenceConfirm  = "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260716_v5_dev:2026.07.16-v5:20260716-V5"
-)
+var manualAcceptanceReferenceDatabasePattern = regexp.MustCompile(`^plush_erp_acceptance_([a-z0-9][a-z0-9_]{2,39})_dev$`)
 
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
@@ -123,19 +121,31 @@ func main() {
 }
 
 func validateManualAcceptanceReferenceTarget(dsn, expectedDatabase, confirmation string) error {
-	if strings.TrimSpace(expectedDatabase) != manualAcceptanceReferenceDatabase {
-		return fmt.Errorf("references-only expected database must be %q", manualAcceptanceReferenceDatabase)
+	expectedDatabase = strings.TrimSpace(expectedDatabase)
+	matches := manualAcceptanceReferenceDatabasePattern.FindStringSubmatch(expectedDatabase)
+	if len(matches) != 2 || strings.HasSuffix(matches[1], "_browser_actions") {
+		return fmt.Errorf("references-only expected database must match plush_erp_acceptance_<run-id>_dev")
 	}
-	if confirmation != manualAcceptanceReferenceConfirm {
-		return fmt.Errorf("references-only confirmation must equal %s", manualAcceptanceReferenceConfirm)
+	expectedConfirmation := "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:" + expectedDatabase + ":2026.07.16-v5:20260716-V5"
+	if confirmation != expectedConfirmation {
+		return fmt.Errorf("references-only confirmation must equal %s", expectedConfirmation)
 	}
 	parsed, err := url.Parse(strings.TrimSpace(dsn))
+	host := ""
+	port := ""
+	if parsed != nil {
+		host = strings.TrimSpace(parsed.Hostname())
+		port = strings.TrimSpace(parsed.Port())
+	}
+	loopbackHost := host == "127.0.0.1" || host == "localhost" || host == "::1"
+	registeredDevelopmentHost := host == devdbguard.CustomerConfigLocalTestHost &&
+		port == fmt.Sprint(devdbguard.CustomerConfigLocalTestPort)
 	if err != nil || parsed == nil ||
 		(parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") ||
 		parsed.Opaque != "" || parsed.Fragment != "" ||
-		parsed.Hostname() != "192.168.0.106" || parsed.Port() != "5432" ||
-		parsed.Path != "/"+manualAcceptanceReferenceDatabase {
-		return fmt.Errorf("references-only DSN must target the registered local acceptance database")
+		(!loopbackHost && !registeredDevelopmentHost) ||
+		parsed.Path != "/"+expectedDatabase {
+		return fmt.Errorf("references-only DSN must target the declared local acceptance database")
 	}
 	query := parsed.Query()
 	sslModes, ok := query["sslmode"]
@@ -143,10 +153,20 @@ func validateManualAcceptanceReferenceTarget(dsn, expectedDatabase, confirmation
 		return fmt.Errorf("references-only DSN query must contain only sslmode=disable")
 	}
 	config, err := pgconn.ParseConfig(dsn)
-	if err != nil || config == nil || strings.TrimSpace(config.Host) != "192.168.0.106" ||
-		config.Port != 5432 || strings.TrimSpace(config.Database) != manualAcceptanceReferenceDatabase ||
+	resolvedHost := ""
+	resolvedPort := uint16(0)
+	if config != nil {
+		resolvedHost = strings.TrimSpace(config.Host)
+		resolvedPort = config.Port
+	}
+	resolvedLoopback := resolvedHost == "127.0.0.1" || resolvedHost == "localhost" || resolvedHost == "::1"
+	resolvedRegisteredDevelopment := resolvedHost == devdbguard.CustomerConfigLocalTestHost &&
+		resolvedPort == devdbguard.CustomerConfigLocalTestPort
+	if err != nil || config == nil ||
+		(!resolvedLoopback && !resolvedRegisteredDevelopment) ||
+		strings.TrimSpace(config.Database) != expectedDatabase ||
 		len(config.Fallbacks) != 0 || config.TLSConfig != nil {
-		return fmt.Errorf("references-only resolved DSN must be the single registered local acceptance database")
+		return fmt.Errorf("references-only resolved DSN must be the single declared local acceptance database")
 	}
 	return nil
 }
