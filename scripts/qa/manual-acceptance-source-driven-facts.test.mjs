@@ -137,6 +137,7 @@ function createRPC({
     const item = {
       id: nextID,
       status: prepostedCreateMethods.has(method) ? "POSTED" : "DRAFT",
+      version: 1,
       ...extra,
     };
     nextID += 1;
@@ -193,7 +194,9 @@ function createRPC({
       case "post_production_fact": {
         const record = records.get(params.id);
         assert.equal(record?.key, "production_fact");
+        assert.equal(params.expected_version, record.item.version);
         record.item.status = "POSTED";
+        record.item.version += 1;
         return { production_fact: record.item };
       }
       case "create_outsourcing_material_issue_from_order":
@@ -202,7 +205,9 @@ function createRPC({
       case "post_outsourcing_fact": {
         const record = records.get(params.id);
         assert.equal(record?.key, "outsourcing_fact");
+        assert.equal(params.expected_version, record.item.version);
         record.item.status = "POSTED";
+        record.item.version += 1;
         return { outsourcing_fact: record.item };
       }
       case "list_outsourcing_return_quality_inspections":
@@ -496,7 +501,9 @@ function createRPC({
       case "post_finance_fact": {
         const record = records.get(params.id);
         assert.equal(record?.key, "finance_fact");
+        assert.equal(params.expected_version, record.item.version);
         record.item.status = "POSTED";
+        record.item.version += 1;
         return { finance_fact: record.item };
       }
       default:

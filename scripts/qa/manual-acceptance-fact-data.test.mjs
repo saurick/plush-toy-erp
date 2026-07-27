@@ -1745,7 +1745,7 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
   let mutations = 0;
   let creations = 0;
   const add = (record, base = true) => {
-    const item = { id: nextID++, ...record };
+    const item = { id: nextID++, version: 1, ...record };
     records.set(item.id, item);
     if (base) baseIDs.add(item.id);
     return item;
@@ -1786,9 +1786,11 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
     if (method === "settle_finance_fact" || method === "cancel_finance_fact") {
       const current = records.get(params.id);
       assert.equal(current.status, "POSTED");
+      assert.equal(params.expected_version, current.version);
       const updated = {
         ...current,
         status: method === "settle_finance_fact" ? "SETTLED" : "CANCELLED",
+        version: current.version + 1,
       };
       records.set(updated.id, updated);
       mutations += 1;

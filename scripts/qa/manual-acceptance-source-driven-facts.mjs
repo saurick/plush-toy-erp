@@ -119,6 +119,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
   "operational_fact.post_production_fact": Object.freeze([
     "customer_key",
     "id",
+    "expected_version",
   ]),
   "operational_fact.create_outsourcing_material_issue_from_order":
     Object.freeze([
@@ -147,6 +148,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
   "operational_fact.post_outsourcing_fact": Object.freeze([
     "customer_key",
     "id",
+    "expected_version",
   ]),
   "quality.list_outsourcing_return_quality_inspections": Object.freeze([
     "customer_key",
@@ -290,7 +292,11 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "idempotency_key",
     "note",
   ]),
-  "operational_fact.post_finance_fact": Object.freeze(["customer_key", "id"]),
+  "operational_fact.post_finance_fact": Object.freeze([
+    "customer_key",
+    "id",
+    "expected_version",
+  ]),
 });
 
 export class SourceDrivenFactError extends Error {
@@ -1696,7 +1702,13 @@ async function createPostFact({
       rpc,
       "operational_fact",
       postMethod,
-      customerParams({ id: created.id }),
+      customerParams({
+        id: created.id,
+        expected_version: positiveID(
+          created.version,
+          `${createMethod}.version`,
+        ),
+      }),
     ),
     resultKey,
     "POSTED",
@@ -1988,7 +2000,13 @@ async function createPostedFinanceWithReconciliation({
           rpc,
           "operational_fact",
           "post_finance_fact",
-          customerParams({ id: existingFinance.id }),
+          customerParams({
+            id: existingFinance.id,
+            expected_version: positiveID(
+              existingFinance.version,
+              "existing finance fact version",
+            ),
+          }),
         ),
         "finance_fact",
         "POSTED",

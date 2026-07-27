@@ -2718,7 +2718,13 @@ async function ensureProductionFactSpecimen(
       await rpc({
         domain: "operational_fact",
         method: "post_production_fact",
-        params: { id: fact.id },
+        params: {
+          id: fact.id,
+          expected_version: positiveID(
+            fact.version,
+            "production fact version",
+          ),
+        },
       }),
       "production_fact",
       "post_production_fact",
@@ -2742,7 +2748,14 @@ async function ensureProductionFactSpecimen(
       await rpc({
         domain: "operational_fact",
         method: "cancel_production_fact",
-        params: { id: fact.id },
+        params: {
+          id: fact.id,
+          expected_version: positiveID(
+            fact.version,
+            "production fact version",
+          ),
+          reason: "本批返工样例取消",
+        },
       }),
       "production_fact",
       "cancel_production_fact",
@@ -2978,7 +2991,13 @@ async function financeTransition(rpc, record, target, apply) {
       await rpc({
         domain: "operational_fact",
         method: "settle_finance_fact",
-        params: { id: item.id },
+        params: {
+          id: item.id,
+          expected_version: positiveID(
+            item.version,
+            "finance fact version",
+          ),
+        },
       }),
       "finance_fact",
       "settle_finance_fact",
@@ -2988,7 +3007,14 @@ async function financeTransition(rpc, record, target, apply) {
       await rpc({
         domain: "operational_fact",
         method: "cancel_finance_fact",
-        params: { id: item.id, reason: "本笔取消" },
+        params: {
+          id: item.id,
+          expected_version: positiveID(
+            item.version,
+            "finance fact version",
+          ),
+          reason: "本笔取消",
+        },
       }),
       "finance_fact",
       "cancel_finance_fact",
