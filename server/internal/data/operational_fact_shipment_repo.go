@@ -507,8 +507,10 @@ func (r *operationalFactRepo) RecordShipmentFinanceReleaseProcessCommand(
 		return nil, biz.ErrShipmentFinanceReleaseRequired
 	}
 	now := time.Now().UTC()
-	updated, err := tx.client.Shipment.UpdateOneID(id).
+	affected, err := tx.client.Shipment.Update().
 		Where(
+			shipment.ID(id),
+			shipment.Status(biz.ShipmentStatusDraft),
 			shipment.FinanceReleaseStatus(biz.ShipmentFinanceReleaseStatusPending),
 			shipment.FinanceReleaseVersion(row.FinanceReleaseVersion),
 		).
@@ -521,8 +523,15 @@ func (r *operationalFactRepo) RecordShipmentFinanceReleaseProcessCommand(
 		SetFinanceReleaseNote("审批通过").
 		Save(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if affected != 1 {
+		return nil, biz.ErrShipmentFinanceReleaseConflict
+	}
+	updated, err := tx.client.Shipment.Get(ctx, id)
+	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, biz.ErrShipmentFinanceReleaseConflict
+			return nil, biz.ErrShipmentNotFound
 		}
 		return nil, err
 	}

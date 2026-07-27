@@ -923,6 +923,118 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	}
 }
 
+func TestOperationalFactRepo_ShipmentFinanceReleaseProcessCommandUsesExistingTransaction(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "shipment_finance_release_process_command_tx")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	logger := log.NewStdLogger(io.Discard)
+	repo := NewOperationalFactRepo(data, logger)
+	processRepo := NewProcessRuntimeRepo(data, logger)
+	actor := client.AdminUser.Create().
+		SetUsername("shipment-finance-release-actor").
+		SetPasswordHash("test-password-hash").
+		SaveX(ctx)
+
+	createCase := func(label string) (*biz.Shipment, *biz.ProcessDomainCommandInput, *biz.ProcessDomainCommandResult) {
+		t.Helper()
+		shipmentRow, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+			Shipment: &biz.ShipmentCreate{
+				ShipmentNo:     "SHP-FINANCE-RELEASE-" + label,
+				IdempotencyKey: "shipment-finance-release/" + label,
+			},
+			Items: []*biz.ShipmentItemCreate{{
+				ProductID:   fixtures.productID,
+				WarehouseID: fixtures.warehouseID,
+				UnitID:      fixtures.unitID,
+				Quantity:    decimal.NewFromInt(1),
+			}},
+		})
+		if err != nil {
+			t.Fatalf("create shipment %s: %v", label, err)
+		}
+		payload := map[string]any{"shipment_id": shipmentRow.ID}
+		command := claimedPostgresProcessCommandForBusinessRef(
+			t,
+			ctx,
+			processRepo,
+			biz.ProcessDomainCommandShipmentFinanceRelease,
+			"shipment-finance-release-command/"+label,
+			payload,
+			biz.ShipmentSourceType,
+			shipmentRow.ID,
+		)
+		result := &biz.ProcessDomainCommandResult{
+			Outcome:     biz.ShipmentProcessCommandOutcomeFinanceReleased,
+			EffectState: biz.ProcessDomainCommandEffectStateApplied,
+			EffectRef: &biz.ProcessBusinessRef{
+				RefType: biz.ShipmentSourceType,
+				RefID:   shipmentRow.ID,
+			},
+		}
+		return shipmentRow, command, result
+	}
+
+	shipmentRow, command, result := createCase("SUCCESS")
+	released, err := repo.RecordShipmentFinanceReleaseProcessCommand(
+		ctx,
+		shipmentRow.ID,
+		command,
+		result,
+		actor.ID,
+	)
+	if err != nil {
+		t.Fatalf("record shipment finance release in inventory transaction: %v", err)
+	}
+	if released.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusApproved ||
+		released.FinanceReleaseVersion != shipmentRow.FinanceReleaseVersion+1 ||
+		released.FinanceReleasedBy == nil || *released.FinanceReleasedBy != actor.ID ||
+		released.FinanceReleaseProcessInstanceID == nil || *released.FinanceReleaseProcessInstanceID != command.ProcessInstance.ID ||
+		released.FinanceReleaseProcessNodeID == nil || *released.FinanceReleaseProcessNodeID != command.Node.ID {
+		t.Fatalf("unexpected shipment finance release result %#v", released)
+	}
+	assertPostgresProcessEffect(
+		t,
+		ctx,
+		processRepo,
+		command.Node.ID,
+		biz.ProcessDomainCommandEffectStateApplied,
+		biz.ShipmentSourceType,
+		shipmentRow.ID,
+	)
+	replayed, err := repo.RecordShipmentFinanceReleaseProcessCommand(
+		ctx,
+		shipmentRow.ID,
+		command,
+		result,
+		actor.ID,
+	)
+	if err != nil || replayed.FinanceReleaseVersion != released.FinanceReleaseVersion {
+		t.Fatalf("exact shipment finance release replay=%#v err=%v", replayed, err)
+	}
+
+	conflictShipment, conflictCommand, conflictResult := createCase("CONFLICT")
+	recordConflictingPostgresProcessResult(t, ctx, processRepo, conflictCommand)
+	if _, err := repo.RecordShipmentFinanceReleaseProcessCommand(
+		ctx,
+		conflictShipment.ID,
+		conflictCommand,
+		conflictResult,
+		actor.ID,
+	); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("conflicting process result error=%v, want ErrIdempotencyConflict", err)
+	}
+	persisted, err := repo.GetShipment(ctx, conflictShipment.ID)
+	if err != nil {
+		t.Fatalf("read conflict shipment after rollback: %v", err)
+	}
+	if persisted.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusPending ||
+		persisted.FinanceReleaseVersion != conflictShipment.FinanceReleaseVersion ||
+		persisted.FinanceReleasedAt != nil ||
+		persisted.FinanceReleasedBy != nil {
+		t.Fatalf("conflicting process result must roll back shipment release, got %#v", persisted)
+	}
+}
+
 func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_net_weight")
