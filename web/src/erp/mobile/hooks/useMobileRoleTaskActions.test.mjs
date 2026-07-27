@@ -234,6 +234,17 @@ module.exports = { useMobileRoleTaskActions }`,
           isWorkflowTaskMutationResultUnknown,
           verifyNewWorkflowTaskMutationAttempt,
         },
+        '../../utils/workflowTaskActionContract.mjs': {
+          isWorkflowProcessDecisionTask: (task) =>
+            [
+              'sales_return.approve',
+              'finance.payment.approve',
+              'warehouse.adjustment.approve',
+              'production.exception.approve',
+            ].includes(task?.required_capability_key),
+          workflowTaskAllowsApprovedQuantity: (task) =>
+            task?.required_capability_key === 'production.exception.approve',
+        },
       },
       module,
     }
@@ -261,6 +272,7 @@ function createHookHarness(options = {}) {
     initialAction: detailAction,
     initialActionReceipt: options.initialActionReceipt,
     initialActionTaskID: selectedTask.id,
+    initialApprovedQuantity: options.initialApprovedQuantity || '',
     initialReason: Object.hasOwn(options, 'initialReason')
       ? options.initialReason
       : detailAction === 'done'
@@ -549,6 +561,50 @@ test('useMobileRoleTaskActions: restores a history draft for the exact task and 
   view = harness.render()
 
   assert.equal(view.detailReasonValue, '等待现场确认')
+})
+
+test('useMobileRoleTaskActions: restores and submits authoritative production approval quantity', async () => {
+  const submitted = []
+  const harness = createHookHarness({
+    initialApprovedQuantity: '12.5',
+    initialReason: '批准部分数量',
+    selectedTask: {
+      id: 42,
+      owner_role_key: 'production',
+      required_capability_key: 'production.exception.approve',
+      version: 5,
+    },
+    completeWorkflowTaskAction: async (params) => {
+      submitted.push(params)
+      return {
+        id: 42,
+        owner_role_key: 'production',
+        task_status_key: 'done',
+        version: 6,
+      }
+    },
+  })
+
+  let view = harness.render()
+  assert.equal(view.detailApprovedQuantityValue, '12.5')
+  assert.equal(
+    view.restoreActionDraft({
+      action: 'done',
+      approvedQuantity: '8.25',
+      reason: '恢复审批草稿',
+      taskID: 42,
+    }),
+    true
+  )
+  view = harness.render()
+  assert.equal(view.detailApprovedQuantityValue, '8.25')
+  assert.equal(view.detailReasonValue, '恢复审批草稿')
+
+  await view.submitDetailAction()
+  assert.deepEqual(submitted[0].payload.process_decision, {
+    reason: '恢复审批草稿',
+    approved_quantity: '8.25',
+  })
 })
 
 test('useMobileRoleTaskActions: missing canonical task stays visibly unconfirmed', async () => {

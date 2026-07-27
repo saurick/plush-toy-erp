@@ -28,6 +28,7 @@ import {
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
+import ProductionOverIssueRequestModal from '../components/production-orders/ProductionOverIssueRequestModal.jsx'
 import ProductionOrderFormModal from '../components/production-orders/ProductionOrderFormModal.jsx'
 import ProductionRouteExecutionModal from '../components/production-orders/ProductionRouteExecutionModal.jsx'
 import { listAllInventoryLots } from '../api/inventoryApi.mjs'
@@ -281,6 +282,7 @@ export default function V1ProductionOrdersPage() {
   const [materialIssueContext, setMaterialIssueContext] = useState(
     EMPTY_MATERIAL_ISSUE_CONTEXT
   )
+  const [overIssueRequirement, setOverIssueRequirement] = useState(null)
   const attemptsRef = useRef(createProductionOrderAttemptStore())
   const completionAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const materialIssueAttemptsRef = useRef(
@@ -338,6 +340,10 @@ export default function V1ProductionOrdersPage() {
   const canCreateMaterialIssue = hasActionPermission(
     adminProfile,
     'production.material_issue.create'
+  )
+  const canSubmitProductionException = hasActionPermission(
+    adminProfile,
+    'production.exception.submit'
   )
   const canAssignProductionWip = hasActionPermission(
     adminProfile,
@@ -898,6 +904,19 @@ export default function V1ProductionOrdersPage() {
     setMaterialIssueLoading(false)
     setMaterialIssueLotsLoading(false)
     setMaterialIssueContext(EMPTY_MATERIAL_ISSUE_CONTEXT)
+  }
+
+  const openProductionOverIssue = (requirement) => {
+    if (
+      !canReadProductionPlan ||
+      !canSubmitProductionException ||
+      aggregate?.order?.status !== PRODUCTION_ORDER_STATUS.RELEASED ||
+      !requirement?.id
+    ) {
+      message.warning('当前物料需求不能发起超领申请')
+      return
+    }
+    setOverIssueRequirement(requirement)
   }
 
   const submitProductionMaterialIssue = async (values) => {
@@ -1767,8 +1786,12 @@ export default function V1ProductionOrdersPage() {
         canCreateMaterialIssue={
           canCreateMaterialIssue && canReadProductionFacts
         }
+        canRequestOverIssue={
+          canReadProductionPlan && canSubmitProductionException
+        }
         materialIssueLoading={materialIssueLoading}
         onCreateMaterialIssue={openProductionMaterialIssue}
+        onRequestOverIssue={openProductionOverIssue}
         onCancel={() => {
           setFormMode(null)
           setFormValues(null)
@@ -1815,6 +1838,17 @@ export default function V1ProductionOrdersPage() {
         onWarehouseChange={loadProductionMaterialIssueLots}
         onCancel={closeProductionMaterialIssue}
         onSubmit={submitProductionMaterialIssue}
+      />
+
+      <ProductionOverIssueRequestModal
+        open={Boolean(overIssueRequirement)}
+        order={aggregate?.order}
+        requirement={overIssueRequirement}
+        customerKey={activeCustomerKey}
+        onClose={() => setOverIssueRequirement(null)}
+        onChanged={() => {
+          if (selected) selectRecord(selected)
+        }}
       />
 
       <Modal

@@ -74,10 +74,11 @@ func TestFinanceProcessCommandPostgresRecoversExactResultAndMarksCompensation(t 
 	if _, err := factRepo.CreateFinanceFactDraftForProcessCommand(ctx, &changed, command, 7); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("changed finance payload must conflict, got %v", err)
 	}
-	if _, err := factRepo.PostFinanceFact(ctx, created.ID); err != nil {
+	posted, err := factRepo.PostFinanceFact(ctx, operationalFactStatusMutation(created.ID, created.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post finance fact before cancellation: %v", err)
 	}
-	if _, err := factRepo.CancelPostedFinanceFact(ctx, created.ID, actor.ID, "测试取消应收线索"); err != nil {
+	if _, err := factRepo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(posted.ID, posted.Version, actor.ID, "测试取消应收线索")); err != nil {
 		t.Fatalf("cancel finance fact: %v", err)
 	}
 	assertPostgresProcessEffect(t, ctx, processRepo, command.Node.ID, biz.ProcessDomainCommandEffectStateCompensated, "finance_fact", created.ID)
@@ -112,10 +113,11 @@ func TestFinanceProcessCommandPostgresRejectsCancelledFactBeforeExactRecovery(t 
 	if err != nil {
 		t.Fatalf("create finance fact before cancelled recovery: %v", err)
 	}
-	if _, err := factRepo.PostFinanceFact(ctx, created.ID); err != nil {
+	posted, err := factRepo.PostFinanceFact(ctx, operationalFactStatusMutation(created.ID, created.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post finance fact before cancelled recovery: %v", err)
 	}
-	cancelled, err := factRepo.CancelPostedFinanceFact(ctx, created.ID, actor.ID, "测试取消后恢复")
+	cancelled, err := factRepo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(posted.ID, posted.Version, actor.ID, "测试取消后恢复"))
 	if err != nil {
 		t.Fatalf("cancel finance fact before exact recovery: %v", err)
 	}
@@ -812,8 +814,12 @@ func claimedPostgresProcessCommandForBusinessRef(
 ) *biz.ProcessDomainCommandInput {
 	t.Helper()
 	suffix := postgresTestSuffix()
+	processKey := "atomic_result_" + suffix
+	if commandKey == biz.ProcessDomainCommandFinanceReceivableLead {
+		processKey = biz.ProcessKeyFinishedGoodsDelivery
+	}
 	instance, nodes, err := repo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
-		ProcessKey: "atomic_result_" + suffix, ProcessVersion: "v1", ConfigRevision: "atomic-result-test",
+		ProcessKey: processKey, ProcessVersion: "v1", ConfigRevision: "atomic-result-test",
 		DefinitionHash: "sha256:atomic-result-" + suffix, BusinessRefType: businessRefType, BusinessRefID: businessRefID,
 		IdempotencyKey: "atomic-process/" + suffix, Status: biz.ProcessStatusActive,
 		Nodes: []biz.ProcessNodeInstanceCreate{{NodeKey: "command", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1, Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{"command_key": commandKey}}},

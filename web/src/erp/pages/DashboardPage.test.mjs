@@ -16,6 +16,12 @@ const collaborationPanelSource = readFileSync(
   ),
   'utf8'
 )
+const desktopTaskActionSource = readFileSync(
+  fileURLToPath(
+    new URL('../utils/desktopWorkflowTaskAction.mjs', import.meta.url)
+  ),
+  'utf8'
+)
 
 test('workbench keeps the explicit view button and opens plain rows on double-click', () => {
   assert.match(source, /openDashboardItemOnDoubleClick/u)
@@ -60,11 +66,23 @@ test('task board alone injects the controlled assignment action into the shared 
   assert.match(source, /assignmentAccess\.can_reassign/u)
   assert.match(source, /\[\.\.\.actionDrawerAccess\.allowedModes, 'assign'\]/u)
   assert.match(source, /reassignWorkflowTask/u)
-  assert.match(source, /assignmentTargetSnapshot === 'pool'/u)
-  assert.match(source, /assignee_id:/u)
+  assert.match(desktopTaskActionSource, /assignmentTarget === 'pool'/u)
+  assert.match(source, /assignmentTarget:\s*assignmentTargetSnapshot/u)
+  assert.match(desktopTaskActionSource, /assignee_id:/u)
   assert.match(source, /assignmentAccessSnapshot\.stale/u)
   assert.match(source, /assignmentAccess=\{assignmentAccess\}/u)
   assert.match(source, /onAssignmentTargetChange=\{setAssignmentTarget\}/u)
   assert.doesNotMatch(collaborationPanelSource, /assignmentAccess=/u)
   assert.doesNotMatch(collaborationPanelSource, /allowedActionModes=.*assign/u)
+})
+
+test('desktop task board preserves the drawer decision and refuses to invent approval payloads', () => {
+  assert.match(
+    source,
+    /submitTaskAction = async \(\{ processDecision = null \} = \{\}\)/u
+  )
+  assert.match(source, /buildDesktopWorkflowTaskActionParams/u)
+  assert.match(source, /processDecision,/u)
+  assert.match(source, /审批表单与当前流程节点不一致/u)
+  assert.doesNotMatch(source, /process_decision:/u)
 })

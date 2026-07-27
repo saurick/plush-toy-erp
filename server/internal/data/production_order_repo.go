@@ -13,7 +13,9 @@ import (
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/outsourcingreturndisposition"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
@@ -36,6 +38,8 @@ type productionOrderRepo struct {
 	log  *log.Helper
 	inv  *inventoryRepo
 }
+
+var maxProductionNumericQuantity = decimal.RequireFromString("99999999999999.999999")
 
 type productionOrderCommandTx struct {
 	sqlTx  *stdsql.Tx
@@ -491,6 +495,13 @@ func (r *productionOrderRepo) closeProductionOrder(ctx context.Context, in *biz.
 	if err := requireProductionSchedulingTaskTerminal(ctx, tx, schedulingTask, false); err != nil {
 		return nil, err
 	}
+	hasExceptionDependency, err := productionOrderHasExceptionLifecycleDependency(ctx, tx.client, in.ID, false)
+	if err != nil {
+		return nil, err
+	}
+	if hasExceptionDependency {
+		return nil, biz.ErrProductionOrderExceptionDependency
+	}
 	activeWIP, err := productionOrderHasActiveWIP(ctx, tx.client, in.ID)
 	if err != nil {
 		return nil, err
@@ -588,6 +599,67 @@ func productionOrderHasActiveWIP(ctx context.Context, client *ent.Client, orderI
 		}
 		if blocks {
 			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func productionOrderHasExceptionLifecycleDependency(ctx context.Context, client *ent.Client, orderID int, cancelling bool) (bool, error) {
+	decisions, err := client.ProductionExceptionDecision.Query().
+		Where(productionexceptiondecision.ProductionOrderID(orderID)).
+		All(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, decision := range decisions {
+		if cancelling {
+			if decision.Status == biz.ProductionExceptionRejected ||
+				decision.Status == biz.ProductionExceptionCancelled ||
+				(decision.Status == biz.ProductionExceptionApproved && decision.ExecutionStatus == biz.ProductionExceptionExecutionReversed) {
+				continue
+			}
+			return true, nil
+		}
+		if decision.Status == biz.ProductionExceptionSubmitted ||
+			(decision.Status == biz.ProductionExceptionApproved && decision.ExecutionStatus == biz.ProductionExceptionExecutionPending) {
+			return true, nil
+		}
+	}
+	wipIDs, err := client.ProductionWIPBatch.Query().
+		Where(productionwipbatch.ProductionOrderID(orderID)).
+		IDs(ctx)
+	if err != nil {
+		return false, err
+	}
+	if len(wipIDs) == 0 {
+		return false, nil
+	}
+	dispositions, err := client.OutsourcingReturnDisposition.Query().
+		Where(outsourcingreturndisposition.ProductionWipBatchIDIn(wipIDs...)).
+		All(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, disposition := range dispositions {
+		if cancelling {
+			if disposition.Status != biz.OutsourcingDispositionCancelled {
+				return true, nil
+			}
+			continue
+		}
+		if disposition.Status == biz.OutsourcingDispositionDraft {
+			return true, nil
+		}
+		if disposition.Status == biz.OutsourcingDispositionPosted &&
+			disposition.DispositionType == biz.OutsourcingDispositionRework &&
+			disposition.ResultWipBatchID != nil {
+			result, err := client.ProductionWIPBatch.Get(ctx, *disposition.ResultWipBatchID)
+			if err != nil {
+				return false, err
+			}
+			if result.Status != biz.ProductionWIPStatusAccepted && result.Status != biz.ProductionWIPStatusCancelled {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -713,6 +785,13 @@ func (r *productionOrderRepo) cancelProductionOrder(ctx context.Context, in *biz
 		}
 		if err := requireProductionSchedulingTaskTerminal(ctx, tx, schedulingTask, true); err != nil {
 			return nil, err
+		}
+		hasExceptionDependency, err := productionOrderHasExceptionLifecycleDependency(ctx, tx.client, in.ID, true)
+		if err != nil {
+			return nil, err
+		}
+		if hasExceptionDependency {
+			return nil, biz.ErrProductionOrderExceptionDependency
 		}
 		activeWIP, err := productionOrderHasActiveWIP(ctx, tx.client, in.ID)
 		if err != nil {
@@ -1256,7 +1335,14 @@ func loadProductionOrderMaterialRequirements(ctx context.Context, client *ent.Cl
 		return nil, err
 	}
 	issuedByRequirement := make(map[int]decimal.Decimal, len(rows))
+	approvedOverIssueByRequirement := make(map[int]decimal.Decimal, len(rows))
 	if len(rows) > 0 {
+		requirementIDs := make([]int, 0, len(rows))
+		requirementByID := make(map[int]*ent.ProductionOrderMaterialRequirement, len(rows))
+		for _, row := range rows {
+			requirementIDs = append(requirementIDs, row.ID)
+			requirementByID[row.ID] = row
+		}
 		facts, err := client.ProductionFact.Query().Where(
 			productionfact.SourceType(biz.ProductionOrderSourceType),
 			productionfact.SourceID(orderID),
@@ -1270,31 +1356,77 @@ func loadProductionOrderMaterialRequirements(ctx context.Context, client *ent.Cl
 			if fact.SourceLineID == nil {
 				return nil, biz.ErrProductionOrderMaterialRequirementInvalid
 			}
+			requirement := requirementByID[*fact.SourceLineID]
+			if requirement == nil ||
+				fact.SubjectType != biz.InventorySubjectMaterial ||
+				fact.SubjectID != requirement.MaterialID ||
+				fact.ProductSkuID != nil ||
+				fact.UnitID != requirement.UnitID {
+				return nil, biz.ErrProductionOrderMaterialRequirementInvalid
+			}
 			issuedByRequirement[*fact.SourceLineID] = issuedByRequirement[*fact.SourceLineID].Add(fact.Quantity)
+		}
+		allowancePredicates := append(
+			activeProductionOverIssuePredicates(),
+			productionexceptiondecision.ProductionMaterialRequirementIDIn(requirementIDs...),
+		)
+		allowances, err := client.ProductionExceptionDecision.Query().
+			Where(allowancePredicates...).
+			All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, allowance := range allowances {
+			if allowance.ProductionMaterialRequirementID == nil || allowance.ApprovedQuantity == nil {
+				return nil, biz.ErrProductionExceptionSourceInvalid
+			}
+			requirement := requirementByID[*allowance.ProductionMaterialRequirementID]
+			if requirement == nil ||
+				allowance.ProductionOrderID != requirement.ProductionOrderID ||
+				allowance.ProductionOrderItemID != requirement.ProductionOrderItemID ||
+				!allowance.ApprovedQuantity.IsPositive() {
+				return nil, biz.ErrProductionExceptionSourceInvalid
+			}
+			approvedOverIssueByRequirement[requirement.ID] =
+				approvedOverIssueByRequirement[requirement.ID].Add(*allowance.ApprovedQuantity)
 		}
 	}
 	out := make([]*biz.ProductionOrderMaterialRequirement, 0, len(rows))
 	for _, row := range rows {
 		issued := issuedByRequirement[row.ID]
-		if issued.GreaterThan(row.PlannedQuantity) {
+		approvedOverIssue := approvedOverIssueByRequirement[row.ID]
+		effectiveLimit := row.PlannedQuantity.Add(approvedOverIssue)
+		if effectiveLimit.GreaterThan(maxProductionNumericQuantity) {
+			return nil, biz.ErrProductionOrderMaterialRequirementInvalid
+		}
+		if issued.GreaterThan(effectiveLimit) {
 			return nil, biz.ErrProductionOrderMaterialIssueQuantityExceeded
 		}
-		out = append(out, entProductionOrderMaterialRequirementToBiz(row, issued))
+		out = append(out, entProductionOrderMaterialRequirementToBiz(row, issued, approvedOverIssue))
 	}
 	return out, nil
 }
 
-func entProductionOrderMaterialRequirementToBiz(row *ent.ProductionOrderMaterialRequirement, issued decimal.Decimal) *biz.ProductionOrderMaterialRequirement {
+func entProductionOrderMaterialRequirementToBiz(
+	row *ent.ProductionOrderMaterialRequirement,
+	issued decimal.Decimal,
+	approvedOverIssue decimal.Decimal,
+) *biz.ProductionOrderMaterialRequirement {
 	if row == nil {
 		return nil
 	}
+	effectiveLimit := row.PlannedQuantity.Add(approvedOverIssue)
 	return &biz.ProductionOrderMaterialRequirement{
 		ID: row.ID, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID,
 		BOMHeaderID: row.BomHeaderID, BOMItemID: row.BomItemID, MaterialID: row.MaterialID, UnitID: row.UnitID,
 		ProductionOperationCode: row.ProductionOperationCode,
 		UnitQuantitySnapshot:    row.UnitQuantitySnapshot, LossRateSnapshot: row.LossRateSnapshot,
-		PlannedQuantity: row.PlannedQuantity, IssuedQuantity: issued, RemainingQuantity: row.PlannedQuantity.Sub(issued),
-		MaterialCodeSnapshot: row.MaterialCodeSnapshot, MaterialNameSnapshot: row.MaterialNameSnapshot,
+		PlannedQuantity:           row.PlannedQuantity,
+		ApprovedOverIssueQuantity: approvedOverIssue,
+		EffectiveLimitQuantity:    effectiveLimit,
+		IssuedQuantity:            issued,
+		RemainingQuantity:         effectiveLimit.Sub(issued),
+		MaterialCodeSnapshot:      row.MaterialCodeSnapshot, MaterialNameSnapshot: row.MaterialNameSnapshot,
 		UnitCodeSnapshot: row.UnitCodeSnapshot, UnitNameSnapshot: row.UnitNameSnapshot,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}

@@ -4,6 +4,7 @@ package ent
 
 import (
 	"fmt"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
@@ -28,6 +29,8 @@ type ProductionFact struct {
 	FactType string `json:"fact_type,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// Version holds the value of the "version" field.
+	Version int `json:"version,omitempty"`
 	// SubjectType holds the value of the "subject_type" field.
 	SubjectType string `json:"subject_type,omitempty"`
 	// SubjectID holds the value of the "subject_id" field.
@@ -56,6 +59,14 @@ type ProductionFact struct {
 	OccurredAtSpecified bool `json:"occurred_at_specified,omitempty"`
 	// PostedAt holds the value of the "posted_at" field.
 	PostedAt *time.Time `json:"posted_at,omitempty"`
+	// PostedBy holds the value of the "posted_by" field.
+	PostedBy *int `json:"posted_by,omitempty"`
+	// CancelledAt holds the value of the "cancelled_at" field.
+	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
+	// CancelledBy holds the value of the "cancelled_by" field.
+	CancelledBy *int `json:"cancelled_by,omitempty"`
+	// CancelReason holds the value of the "cancel_reason" field.
+	CancelReason *string `json:"cancel_reason,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -78,9 +89,13 @@ type ProductionFactEdges struct {
 	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// InventoryLot holds the value of the inventory_lot edge.
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
+	// Poster holds the value of the poster edge.
+	Poster *AdminUser `json:"poster,omitempty"`
+	// Canceller holds the value of the canceller edge.
+	Canceller *AdminUser `json:"canceller,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [6]bool
 }
 
 // WarehouseOrErr returns the Warehouse value or an error if the edge
@@ -127,6 +142,28 @@ func (e ProductionFactEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	return nil, &NotLoadedError{edge: "inventory_lot"}
 }
 
+// PosterOrErr returns the Poster value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ProductionFactEdges) PosterOrErr() (*AdminUser, error) {
+	if e.Poster != nil {
+		return e.Poster, nil
+	} else if e.loadedTypes[4] {
+		return nil, &NotFoundError{label: adminuser.Label}
+	}
+	return nil, &NotLoadedError{edge: "poster"}
+}
+
+// CancellerOrErr returns the Canceller value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ProductionFactEdges) CancellerOrErr() (*AdminUser, error) {
+	if e.Canceller != nil {
+		return e.Canceller, nil
+	} else if e.loadedTypes[5] {
+		return nil, &NotFoundError{label: adminuser.Label}
+	}
+	return nil, &NotLoadedError{edge: "canceller"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*ProductionFact) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -136,11 +173,11 @@ func (*ProductionFact) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case productionfact.FieldOccurredAtSpecified:
 			values[i] = new(sql.NullBool)
-		case productionfact.FieldID, productionfact.FieldSubjectID, productionfact.FieldProductSkuID, productionfact.FieldWarehouseID, productionfact.FieldUnitID, productionfact.FieldLotID, productionfact.FieldSourceID, productionfact.FieldSourceLineID:
+		case productionfact.FieldID, productionfact.FieldVersion, productionfact.FieldSubjectID, productionfact.FieldProductSkuID, productionfact.FieldWarehouseID, productionfact.FieldUnitID, productionfact.FieldLotID, productionfact.FieldSourceID, productionfact.FieldSourceLineID, productionfact.FieldPostedBy, productionfact.FieldCancelledBy:
 			values[i] = new(sql.NullInt64)
-		case productionfact.FieldFactNo, productionfact.FieldFactType, productionfact.FieldStatus, productionfact.FieldSubjectType, productionfact.FieldSourceType, productionfact.FieldIdempotencyKey, productionfact.FieldNote:
+		case productionfact.FieldFactNo, productionfact.FieldFactType, productionfact.FieldStatus, productionfact.FieldSubjectType, productionfact.FieldSourceType, productionfact.FieldIdempotencyKey, productionfact.FieldCancelReason, productionfact.FieldNote:
 			values[i] = new(sql.NullString)
-		case productionfact.FieldOccurredAt, productionfact.FieldPostedAt, productionfact.FieldCreatedAt, productionfact.FieldUpdatedAt:
+		case productionfact.FieldOccurredAt, productionfact.FieldPostedAt, productionfact.FieldCancelledAt, productionfact.FieldCreatedAt, productionfact.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -180,6 +217,12 @@ func (_m *ProductionFact) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case productionfact.FieldVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field version", values[i])
+			} else if value.Valid {
+				_m.Version = int(value.Int64)
 			}
 		case productionfact.FieldSubjectType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -271,6 +314,34 @@ func (_m *ProductionFact) assignValues(columns []string, values []any) error {
 				_m.PostedAt = new(time.Time)
 				*_m.PostedAt = value.Time
 			}
+		case productionfact.FieldPostedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field posted_by", values[i])
+			} else if value.Valid {
+				_m.PostedBy = new(int)
+				*_m.PostedBy = int(value.Int64)
+			}
+		case productionfact.FieldCancelledAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field cancelled_at", values[i])
+			} else if value.Valid {
+				_m.CancelledAt = new(time.Time)
+				*_m.CancelledAt = value.Time
+			}
+		case productionfact.FieldCancelledBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cancelled_by", values[i])
+			} else if value.Valid {
+				_m.CancelledBy = new(int)
+				*_m.CancelledBy = int(value.Int64)
+			}
+		case productionfact.FieldCancelReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cancel_reason", values[i])
+			} else if value.Valid {
+				_m.CancelReason = new(string)
+				*_m.CancelReason = value.String
+			}
 		case productionfact.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field note", values[i])
@@ -323,6 +394,16 @@ func (_m *ProductionFact) QueryInventoryLot() *InventoryLotQuery {
 	return NewProductionFactClient(_m.config).QueryInventoryLot(_m)
 }
 
+// QueryPoster queries the "poster" edge of the ProductionFact entity.
+func (_m *ProductionFact) QueryPoster() *AdminUserQuery {
+	return NewProductionFactClient(_m.config).QueryPoster(_m)
+}
+
+// QueryCanceller queries the "canceller" edge of the ProductionFact entity.
+func (_m *ProductionFact) QueryCanceller() *AdminUserQuery {
+	return NewProductionFactClient(_m.config).QueryCanceller(_m)
+}
+
 // Update returns a builder for updating this ProductionFact.
 // Note that you need to call ProductionFact.Unwrap() before calling this method if this ProductionFact
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -354,6 +435,9 @@ func (_m *ProductionFact) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Version))
 	builder.WriteString(", ")
 	builder.WriteString("subject_type=")
 	builder.WriteString(_m.SubjectType)
@@ -407,6 +491,26 @@ func (_m *ProductionFact) String() string {
 	if v := _m.PostedAt; v != nil {
 		builder.WriteString("posted_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.PostedBy; v != nil {
+		builder.WriteString("posted_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelledAt; v != nil {
+		builder.WriteString("cancelled_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelledBy; v != nil {
+		builder.WriteString("cancelled_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelReason; v != nil {
+		builder.WriteString("cancel_reason=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {

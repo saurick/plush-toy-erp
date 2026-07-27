@@ -28,6 +28,7 @@ import {
 export default function OutsourcingReturnDispositionModal({
   open,
   inspection,
+  fact,
   canCreate,
   canPost,
   canCancel,
@@ -40,12 +41,16 @@ export default function OutsourcingReturnDispositionModal({
   const [loading, setLoading] = useState(false)
   const readOnly = !canCreate && !canPost && !canCancel
   const attempts = useRef(createSourceBusinessActionAttemptStore())
+  const sourceFactID = Number(fact?.id || 0)
+  const sourceInspectionID = Number(inspection?.id || 0)
   const load = useCallback(async () => {
-    if (!inspection?.id) return
+    if (!sourceInspectionID && !sourceFactID) return
     setLoading(true)
     try {
       const data = await listOutsourcingReturnDispositions({
-        quality_inspection_id: inspection.id,
+        ...(sourceInspectionID
+          ? { quality_inspection_id: sourceInspectionID }
+          : { outsourcing_return_fact_id: sourceFactID }),
         limit: 50,
         offset: 0,
       })
@@ -70,7 +75,7 @@ export default function OutsourcingReturnDispositionModal({
     } finally {
       setLoading(false)
     }
-  }, [inspection?.id])
+  }, [sourceFactID, sourceInspectionID])
   useEffect(() => {
     if (!open) return
     form.resetFields()
@@ -89,6 +94,7 @@ export default function OutsourcingReturnDispositionModal({
   }, [form, inspection?.inspection_no, load, open])
 
   const create = async () => {
+    if (!canCreate || !sourceInspectionID) return
     const values = await form.validateFields([
       'disposition_no',
       'disposition_type',
@@ -97,13 +103,13 @@ export default function OutsourcingReturnDispositionModal({
     ])
     const payload = {
       disposition_no: values.disposition_no.trim(),
-      quality_inspection_id: Number(inspection.id),
+      quality_inspection_id: sourceInspectionID,
       disposition_type: values.disposition_type,
       quantity: String(values.quantity).trim(),
       reason: values.reason.trim(),
     }
     const attempt = attempts.current.prepare(
-      `outsourcing-disposition:${inspection.id}`,
+      `outsourcing-disposition:${sourceInspectionID}`,
       payload
     )
     setLoading(true)
@@ -115,7 +121,7 @@ export default function OutsourcingReturnDispositionModal({
         })
       }
       attempts.current.settle(
-        `outsourcing-disposition:${inspection.id}`,
+        `outsourcing-disposition:${sourceInspectionID}`,
         attempt,
         null
       )
@@ -125,7 +131,7 @@ export default function OutsourcingReturnDispositionModal({
       message.success('委外处置草稿已生成')
     } catch (error) {
       const retained = attempts.current.settle(
-        `outsourcing-disposition:${inspection.id}`,
+        `outsourcing-disposition:${sourceInspectionID}`,
         attempt,
         error
       )
@@ -196,7 +202,7 @@ export default function OutsourcingReturnDispositionModal({
           <Button onClick={onClose} disabled={loading}>
             关闭
           </Button>
-          {canCreate ? (
+          {canCreate && sourceInspectionID ? (
             <Button type="primary" onClick={create} loading={loading}>
               生成处置草稿
             </Button>
@@ -228,48 +234,60 @@ export default function OutsourcingReturnDispositionModal({
         showIcon
         message="返厂确认写库存出库，取消写冲正；返工确认生成新的在制返工批次。质检结论本身不会代写这些事实。"
       />
+      {!sourceInspectionID && rows.length === 0 && !loading ? (
+        <Alert
+          type="info"
+          showIcon
+          message="品质尚未生成该委外回货的不合格处置草稿。"
+          style={{ marginTop: 12 }}
+        />
+      ) : null}
       <Form
         form={form}
         layout="vertical"
         disabled={loading || readOnly}
         style={{ marginTop: 12 }}
       >
-        <Space align="start" wrap>
-          <Form.Item
-            name="disposition_no"
-            label="处置单号"
-            rules={[{ required: true, whitespace: true }]}
-          >
-            <Input maxLength={64} />
-          </Form.Item>
-          <Form.Item
-            name="disposition_type"
-            label="处置方式"
-            rules={[{ required: true }]}
-          >
-            <Select
-              style={{ width: 180 }}
-              options={[
-                { value: 'RETURN_TO_VENDOR', label: '返厂' },
-                { value: 'REWORK', label: '返工' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item
-            name="quantity"
-            label="处置数量"
-            rules={[{ required: true }]}
-          >
-            <Input inputMode="decimal" />
-          </Form.Item>
-        </Space>
-        <Form.Item
-          name="reason"
-          label="处置原因"
-          rules={[{ required: true, whitespace: true }]}
-        >
-          <Input.TextArea rows={2} maxLength={255} />
-        </Form.Item>
+        {canCreate && sourceInspectionID ? (
+          <>
+            <Space align="start" wrap>
+              <Form.Item
+                name="disposition_no"
+                label="处置单号"
+                rules={[{ required: true, whitespace: true }]}
+              >
+                <Input maxLength={64} />
+              </Form.Item>
+              <Form.Item
+                name="disposition_type"
+                label="处置方式"
+                rules={[{ required: true }]}
+              >
+                <Select
+                  style={{ width: 180 }}
+                  options={[
+                    { value: 'RETURN_TO_VENDOR', label: '返厂' },
+                    { value: 'REWORK', label: '返工' },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item
+                name="quantity"
+                label="处置数量"
+                rules={[{ required: true }]}
+              >
+                <Input inputMode="decimal" />
+              </Form.Item>
+            </Space>
+            <Form.Item
+              name="reason"
+              label="处置原因"
+              rules={[{ required: true, whitespace: true }]}
+            >
+              <Input.TextArea rows={2} maxLength={255} />
+            </Form.Item>
+          </>
+        ) : null}
         <Form.Item name="cancel_reason" label="取消或冲正原因">
           <Input.TextArea rows={2} maxLength={255} />
         </Form.Item>

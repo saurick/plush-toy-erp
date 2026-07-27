@@ -175,6 +175,7 @@ function requireWorkflowTaskMutationResult(operation, params, result) {
     task.id !== params.task_id ||
     !Number.isSafeInteger(task.version) ||
     task.version <= 0 ||
+    task.version !== params.expected_version + 1 ||
     typeof task.task_status_key !== 'string' ||
     !WORKFLOW_TASK_STATUS_KEYS.has(task.task_status_key) ||
     (expectedStatus && task.task_status_key !== expectedStatus) ||

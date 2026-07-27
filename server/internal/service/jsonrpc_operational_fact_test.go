@@ -579,12 +579,11 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 		{method: "settle_finance_fact", id: "enabled-settle"},
 		{method: "cancel_finance_fact", id: "enabled-cancel"},
 	} {
+		params := map[string]any{"id": 300, "expected_version": 1}
+		repo.financeFactType = biz.FinanceFactReceivable
 		if tc.method == "settle_finance_fact" {
 			repo.financeFactType = biz.FinanceFactReconciliation
-		} else {
-			repo.financeFactType = biz.FinanceFactReceivable
 		}
-		params := map[string]any{"id": 300}
 		if tc.method == "cancel_finance_fact" {
 			params["reason"] = "客户账款已撤销"
 		}
@@ -601,11 +600,11 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 		method string
 		params map[string]any
 	}{
-		{name: "missing reason", method: "cancel_finance_fact", params: map[string]any{"id": 300}},
-		{name: "blank reason", method: "cancel_finance_fact", params: map[string]any{"id": 300, "reason": "   "}},
-		{name: "too long reason", method: "cancel_finance_fact", params: map[string]any{"id": 300, "reason": strings.Repeat("理", 256)}},
-		{name: "unknown field", method: "cancel_finance_fact", params: map[string]any{"id": 300, "reason": "客户撤销", "actor_id": 99}},
-		{name: "legacy method alias", method: "cancelFinanceFact", params: map[string]any{"id": 300, "reason": "客户撤销"}},
+		{name: "missing reason", method: "cancel_finance_fact", params: map[string]any{"id": 300, "expected_version": 1}},
+		{name: "blank reason", method: "cancel_finance_fact", params: map[string]any{"id": 300, "expected_version": 1, "reason": "   "}},
+		{name: "too long reason", method: "cancel_finance_fact", params: map[string]any{"id": 300, "expected_version": 1, "reason": strings.Repeat("理", 256)}},
+		{name: "unknown field", method: "cancel_finance_fact", params: map[string]any{"id": 300, "expected_version": 1, "reason": "客户撤销", "actor_id": 99}},
+		{name: "legacy method alias", method: "cancelFinanceFact", params: map[string]any{"id": 300, "expected_version": 1, "reason": "客户撤销"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, res, err := j.handleOperationalFact(ctx, tc.method, "strict-cancel", mustJSONRPCStruct(t, tc.params))
@@ -637,7 +636,11 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 		{method: "settle_finance_fact", id: "disabled-settle"},
 		{method: "cancel_finance_fact", id: "disabled-cancel"},
 	} {
-		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, map[string]any{"id": 300}))
+		params := map[string]any{"id": 300, "expected_version": 1}
+		if tc.method == "cancel_finance_fact" {
+			params["reason"] = "客户账款已撤销"
+		}
+		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, params))
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
@@ -657,7 +660,7 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 }
 
 func TestJsonrpcDispatcher_CancelFinanceFactAuthAndPermissions(t *testing.T) {
-	params := mustJSONRPCStruct(t, map[string]any{"id": 300, "reason": "客户撤销账款"})
+	params := mustJSONRPCStruct(t, map[string]any{"id": 300, "expected_version": 1, "reason": "客户撤销账款"})
 	repo := &financeModuleGateOperationalFactRepo{}
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}), repo)
 	_, noLogin, _ := j.handleOperationalFact(context.Background(), "cancel_finance_fact", "no-login", params)
@@ -828,7 +831,7 @@ func TestJsonrpcDispatcher_FinanceFactMutationsRequireTargetTypePermission(t *te
 				j,
 				customerConfigPublishParamsForRevision(t, "2026.07.14.finance-mutation-scope-"+method),
 			)
-			params := map[string]any{"id": 300}
+			params := map[string]any{"id": 300, "expected_version": 1}
 			if method == "cancel_finance_fact" {
 				params["reason"] = "客户账款已撤销"
 			}
@@ -886,7 +889,7 @@ func TestJsonrpcDispatcher_FinanceFactListUsesReadScope(t *testing.T) {
 	for _, factType := range []string{
 		biz.FinanceFactPayable,
 		biz.FinanceFactInvoice,
-		biz.FinanceFactPayment,
+		"PAYMENT",
 		biz.FinanceFactReconciliation,
 	} {
 		if repo.listFinanceAccess.AllowsType(factType) {
@@ -972,14 +975,18 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 	if createEnabledRes == nil || createEnabledRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled create production OK, got %#v", createEnabledRes)
 	}
-	_, postRes, err := j.handleOperationalFact(ctx, "post_production_fact", "enabled-post", mustJSONRPCStruct(t, map[string]any{"id": 500}))
+	_, postRes, err := j.handleOperationalFact(ctx, "post_production_fact", "enabled-post", mustJSONRPCStruct(t, map[string]any{
+		"id": 500, "expected_version": 1,
+	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if postRes == nil || postRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled post production OK, got %#v", postRes)
 	}
-	_, cancelRes, err := j.handleOperationalFact(ctx, "cancel_production_fact", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": 500}))
+	_, cancelRes, err := j.handleOperationalFact(ctx, "cancel_production_fact", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{
+		"id": 500, "expected_version": 2, "reason": "完工入库登记有误",
+	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -1002,7 +1009,11 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 		{method: "post_production_fact", id: "disabled-post"},
 		{method: "cancel_production_fact", id: "disabled-cancel"},
 	} {
-		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, map[string]any{"id": 500}))
+		params := map[string]any{"id": 500, "expected_version": 1}
+		if tc.method == "cancel_production_fact" {
+			params["reason"] = "完工入库登记有误"
+		}
+		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, params))
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
@@ -1054,7 +1065,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 		ctx,
 		"post_production_fact",
 		"rework-workflow-read-only",
-		mustJSONRPCStruct(t, map[string]any{"id": 501}),
+		mustJSONRPCStruct(t, map[string]any{"id": 501, "expected_version": 1}),
 	)
 	if err != nil {
 		t.Fatalf("read_only workflow gate transport error: %v", err)
@@ -1066,7 +1077,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 		ctx,
 		"cancel_production_fact",
 		"rework-cancel-workflow-read-only",
-		mustJSONRPCStruct(t, map[string]any{"id": 502}),
+		mustJSONRPCStruct(t, map[string]any{"id": 502, "expected_version": 1, "reason": "返工登记有误"}),
 	)
 	if err != nil {
 		t.Fatalf("read_only workflow cancel gate transport error: %v", err)
@@ -1084,7 +1095,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 		ctx,
 		"post_production_fact",
 		"rework-workflow-enabled",
-		mustJSONRPCStruct(t, map[string]any{"id": 501}),
+		mustJSONRPCStruct(t, map[string]any{"id": 501, "expected_version": 1}),
 	)
 	if err != nil {
 		t.Fatalf("enabled workflow gate transport error: %v", err)
@@ -1096,7 +1107,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 		ctx,
 		"cancel_production_fact",
 		"rework-cancel-workflow-enabled",
-		mustJSONRPCStruct(t, map[string]any{"id": 502}),
+		mustJSONRPCStruct(t, map[string]any{"id": 502, "expected_version": 1, "reason": "返工登记有误"}),
 	)
 	if err != nil {
 		t.Fatalf("enabled workflow cancel transport error: %v", err)
@@ -1114,7 +1125,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 		ctx,
 		"cancel_production_fact",
 		"rework-cancel-workflow-disabled",
-		mustJSONRPCStruct(t, map[string]any{"id": 502}),
+		mustJSONRPCStruct(t, map[string]any{"id": 502, "expected_version": 1, "reason": "返工登记有误"}),
 	)
 	if err != nil {
 		t.Fatalf("disabled workflow cancel gate transport error: %v", err)
@@ -1362,14 +1373,18 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 	if retiredCreateRes == nil || retiredCreateRes.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("expected generic outsourcing create to be retired, got %#v", retiredCreateRes)
 	}
-	_, postRes, err := j.handleOperationalFact(ctx, "post_outsourcing_fact", "enabled-post", mustJSONRPCStruct(t, map[string]any{"id": 600}))
+	_, postRes, err := j.handleOperationalFact(ctx, "post_outsourcing_fact", "enabled-post", mustJSONRPCStruct(t, map[string]any{
+		"id": 600, "expected_version": 1,
+	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if postRes == nil || postRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled post outsourcing OK, got %#v", postRes)
 	}
-	_, cancelRes, err := j.handleOperationalFact(ctx, "cancel_outsourcing_fact", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": 600}))
+	_, cancelRes, err := j.handleOperationalFact(ctx, "cancel_outsourcing_fact", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{
+		"id": 600, "expected_version": 2, "reason": "委外事实登记有误",
+	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -1392,7 +1407,11 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 		{method: "post_outsourcing_fact", id: "disabled-post"},
 		{method: "cancel_outsourcing_fact", id: "disabled-cancel"},
 	} {
-		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, map[string]any{"id": 600}))
+		params := map[string]any{"id": 600, "expected_version": 1}
+		if tc.method == "cancel_outsourcing_fact" {
+			params["reason"] = "委外事实登记有误"
+		}
+		_, res, err := j.handleOperationalFact(ctx, tc.method, tc.id, mustJSONRPCStruct(t, params))
 		if err != nil {
 			t.Fatalf("%s expected nil err, got %v", tc.method, err)
 		}
@@ -1836,56 +1855,68 @@ func (r *financeModuleGateOperationalFactRepo) CreateFinanceFactDraftFromShipmen
 	})
 }
 
-func (r *financeModuleGateOperationalFactRepo) PostFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
+func (r *financeModuleGateOperationalFactRepo) PostFinanceFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
 	r.postFinanceFactCalls++
 	now := time.Now()
+	actorID := in.ActorID
 	return &biz.FinanceFact{
-		ID:               id,
+		ID:               in.ID,
 		FactNo:           "FIN-MODULE-GATE",
 		FactType:         biz.FinanceFactReceivable,
 		Status:           biz.OperationalFactStatusPosted,
+		Version:          in.ExpectedVersion + 1,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		Amount:           decimal.RequireFromString("128.50"),
 		Currency:         biz.FinanceCurrencyCNY,
 		OccurredAt:       now,
 		PostedAt:         &now,
+		PostedBy:         &actorID,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}, nil
 }
 
-func (r *financeModuleGateOperationalFactRepo) SettleFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
+func (r *financeModuleGateOperationalFactRepo) SettleFinanceFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
 	r.settleFinanceFactCalls++
 	now := time.Now()
+	actorID := in.ActorID
 	return &biz.FinanceFact{
-		ID:               id,
+		ID:               in.ID,
 		FactNo:           "FIN-MODULE-GATE",
 		FactType:         biz.FinanceFactReceivable,
 		Status:           biz.OperationalFactStatusSettled,
+		Version:          in.ExpectedVersion + 1,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		Amount:           decimal.RequireFromString("128.50"),
 		Currency:         biz.FinanceCurrencyCNY,
 		OccurredAt:       now,
 		SettledAt:        &now,
+		SettledBy:        &actorID,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}, nil
 }
 
-func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int, actorID int, reason string) (*biz.FinanceFact, error) {
+func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
 	r.cancelFinanceFactCalls++
-	r.cancelFinanceFactActorID = actorID
-	r.cancelFinanceFactReason = reason
+	r.cancelFinanceFactActorID = in.ActorID
+	r.cancelFinanceFactReason = in.Reason
 	now := time.Now()
+	actorID := in.ActorID
+	reason := in.Reason
 	return &biz.FinanceFact{
-		ID:               id,
+		ID:               in.ID,
 		FactNo:           "FIN-MODULE-GATE",
 		FactType:         biz.FinanceFactReceivable,
 		Status:           biz.OperationalFactStatusCancelled,
+		Version:          in.ExpectedVersion + 1,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		Amount:           decimal.RequireFromString("128.50"),
 		Currency:         biz.FinanceCurrencyCNY,
 		OccurredAt:       now,
+		CancelledAt:      &now,
+		CancelledBy:      &actorID,
+		CancelReason:     &reason,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}, nil
@@ -2114,14 +2145,16 @@ func (r *productionModuleGateOperationalFactRepo) CreateProductionFactDraft(_ co
 	}, nil
 }
 
-func (r *productionModuleGateOperationalFactRepo) PostProductionFact(_ context.Context, id int) (*biz.ProductionFact, error) {
+func (r *productionModuleGateOperationalFactRepo) PostProductionFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.ProductionFact, error) {
 	r.postProductionFactCalls++
 	now := time.Now()
+	actorID := in.ActorID
 	return &biz.ProductionFact{
-		ID:          id,
+		ID:          in.ID,
 		FactNo:      "PROD-MODULE-GATE",
 		FactType:    biz.ProductionFactFinishedGoodsReceipt,
 		Status:      biz.OperationalFactStatusPosted,
+		Version:     in.ExpectedVersion + 1,
 		SubjectType: biz.InventorySubjectProduct,
 		SubjectID:   1,
 		WarehouseID: 1,
@@ -2129,27 +2162,34 @@ func (r *productionModuleGateOperationalFactRepo) PostProductionFact(_ context.C
 		Quantity:    decimal.RequireFromString("12"),
 		OccurredAt:  now,
 		PostedAt:    &now,
+		PostedBy:    &actorID,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}, nil
 }
 
-func (r *productionModuleGateOperationalFactRepo) CancelPostedProductionFact(_ context.Context, id int) (*biz.ProductionFact, error) {
+func (r *productionModuleGateOperationalFactRepo) CancelPostedProductionFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.ProductionFact, error) {
 	r.cancelProductionFactCalls++
 	now := time.Now()
+	actorID := in.ActorID
+	reason := in.Reason
 	return &biz.ProductionFact{
-		ID:          id,
-		FactNo:      "PROD-MODULE-GATE",
-		FactType:    biz.ProductionFactFinishedGoodsReceipt,
-		Status:      biz.OperationalFactStatusCancelled,
-		SubjectType: biz.InventorySubjectProduct,
-		SubjectID:   1,
-		WarehouseID: 1,
-		UnitID:      1,
-		Quantity:    decimal.RequireFromString("12"),
-		OccurredAt:  now,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:           in.ID,
+		FactNo:       "PROD-MODULE-GATE",
+		FactType:     biz.ProductionFactFinishedGoodsReceipt,
+		Status:       biz.OperationalFactStatusCancelled,
+		Version:      in.ExpectedVersion + 1,
+		SubjectType:  biz.InventorySubjectProduct,
+		SubjectID:    1,
+		WarehouseID:  1,
+		UnitID:       1,
+		Quantity:     decimal.RequireFromString("12"),
+		OccurredAt:   now,
+		CancelledAt:  &now,
+		CancelledBy:  &actorID,
+		CancelReason: &reason,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}, nil
 }
 
@@ -2250,14 +2290,16 @@ func (r *outsourcingModuleGateOperationalFactRepo) CreateOutsourcingReturnReceip
 	return item, nil
 }
 
-func (r *outsourcingModuleGateOperationalFactRepo) PostOutsourcingFact(_ context.Context, id int) (*biz.OutsourcingFact, error) {
+func (r *outsourcingModuleGateOperationalFactRepo) PostOutsourcingFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.OutsourcingFact, error) {
 	r.postOutsourcingFactCalls++
 	now := time.Now()
+	actorID := in.ActorID
 	return &biz.OutsourcingFact{
-		ID:          id,
+		ID:          in.ID,
 		FactNo:      "OUT-MODULE-GATE",
 		FactType:    biz.OutsourcingFactMaterialIssue,
 		Status:      biz.OperationalFactStatusPosted,
+		Version:     in.ExpectedVersion + 1,
 		SubjectType: biz.InventorySubjectMaterial,
 		SubjectID:   1,
 		WarehouseID: 1,
@@ -2265,27 +2307,34 @@ func (r *outsourcingModuleGateOperationalFactRepo) PostOutsourcingFact(_ context
 		Quantity:    decimal.RequireFromString("6"),
 		OccurredAt:  now,
 		PostedAt:    &now,
+		PostedBy:    &actorID,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}, nil
 }
 
-func (r *outsourcingModuleGateOperationalFactRepo) CancelPostedOutsourcingFact(_ context.Context, id int) (*biz.OutsourcingFact, error) {
+func (r *outsourcingModuleGateOperationalFactRepo) CancelPostedOutsourcingFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.OutsourcingFact, error) {
 	r.cancelOutsourcingFactCalls++
 	now := time.Now()
+	actorID := in.ActorID
+	reason := in.Reason
 	return &biz.OutsourcingFact{
-		ID:          id,
-		FactNo:      "OUT-MODULE-GATE",
-		FactType:    biz.OutsourcingFactMaterialIssue,
-		Status:      biz.OperationalFactStatusCancelled,
-		SubjectType: biz.InventorySubjectMaterial,
-		SubjectID:   1,
-		WarehouseID: 1,
-		UnitID:      1,
-		Quantity:    decimal.RequireFromString("6"),
-		OccurredAt:  now,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:           in.ID,
+		FactNo:       "OUT-MODULE-GATE",
+		FactType:     biz.OutsourcingFactMaterialIssue,
+		Status:       biz.OperationalFactStatusCancelled,
+		Version:      in.ExpectedVersion + 1,
+		SubjectType:  biz.InventorySubjectMaterial,
+		SubjectID:    1,
+		WarehouseID:  1,
+		UnitID:       1,
+		Quantity:     decimal.RequireFromString("6"),
+		OccurredAt:   now,
+		CancelledAt:  &now,
+		CancelledBy:  &actorID,
+		CancelReason: &reason,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}, nil
 }
 
@@ -2329,32 +2378,34 @@ func TestOperationalFactFilterFromParamsParsesFactType(t *testing.T) {
 	}
 }
 
-func TestFinanceFactFromShipmentParamsRejectForgedFactsAndAllowInvoiceCategory(t *testing.T) {
-	input, ok := financeFactFromShipmentCreateFromParams(mustJSONRPCStruct(t, map[string]any{
+func TestFinanceInvoiceFromShipmentParamsRejectForgedFactsAndRequireInvoiceCategory(t *testing.T) {
+	input, ok := financeInvoiceFromShipmentCreateFromParams(mustJSONRPCStruct(t, map[string]any{
 		"fact_no":          "INV-JSONRPC-001",
 		"shipment_id":      float64(91),
 		"invoice_category": "VAT_SPECIAL_13",
 		"idempotency_key":  "INV-JSONRPC-001",
-	}).AsMap(), true)
+	}).AsMap())
 	if !ok {
 		t.Fatal("expected source-driven invoice params to parse")
 	}
 	if input.ShipmentID != 91 || input.InvoiceCategory == nil || *input.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 {
 		t.Fatalf("unexpected invoice category %#v", input.InvoiceCategory)
 	}
-	if _, ok := financeFactFromShipmentCreateFromParams(map[string]any{
+	if _, ok := financeInvoiceFromShipmentCreateFromParams(map[string]any{
 		"fact_no": "INV-MISSING-CATEGORY", "shipment_id": float64(91), "idempotency_key": "INV-MISSING-CATEGORY",
-	}, true); ok {
+	}); ok {
 		t.Fatal("source-driven invoice parser accepted missing invoice category")
 	}
-	if _, ok := financeFactFromShipmentCreateFromParams(map[string]any{
-		"fact_no": "AR-FORGED", "shipment_id": float64(91), "idempotency_key": "AR-FORGED", "amount": "999999",
-	}, false); ok {
-		t.Fatal("source-driven receivable parser accepted caller-supplied amount")
+	if _, ok := financeInvoiceFromShipmentCreateFromParams(map[string]any{
+		"fact_no": "INV-FORGED", "shipment_id": float64(91), "idempotency_key": "INV-FORGED",
+		"invoice_category": "VAT_SPECIAL_13", "amount": "999999",
+	}); ok {
+		t.Fatal("source-driven invoice parser accepted caller-supplied amount")
 	}
-	if _, ok := financeFactFromShipmentCreateFromParams(map[string]any{
-		"fact_no": "AR-INVOICE-FIELD", "shipment_id": float64(91), "idempotency_key": "AR-INVOICE-FIELD", "invoice_category": "NONE",
-	}, false); ok {
-		t.Fatal("receivable parser accepted invoice-only field")
+	if _, ok := financeInvoiceFromShipmentCreateFromParams(map[string]any{
+		"fact_no": "INV-FORGED-TERM", "shipment_id": float64(91), "idempotency_key": "INV-FORGED-TERM",
+		"invoice_category": "VAT_SPECIAL_13", "payment_term_days": float64(30),
+	}); ok {
+		t.Fatal("source-driven invoice parser accepted caller-supplied payment term")
 	}
 }

@@ -52,6 +52,30 @@ export const yoyoosunCustomerPackage = Object.freeze({
       variantKey: "shipment_finance_approval",
       businessRefType: "shipment",
     }),
+    Object.freeze({
+      processKey: "sales_return_acceptance",
+      processVersion: "v1",
+      variantKey: "approval_receipt",
+      businessRefType: "sales_return",
+    }),
+    Object.freeze({
+      processKey: "finance_payment_approval",
+      processVersion: "v1",
+      variantKey: "approval_post",
+      businessRefType: "finance_payment",
+    }),
+    Object.freeze({
+      processKey: "inventory_adjustment_approval",
+      processVersion: "v1",
+      variantKey: "manual_adjustment_approval",
+      businessRefType: "inventory_operation",
+    }),
+    Object.freeze({
+      processKey: "production_exception_approval",
+      processVersion: "v1",
+      variantKey: "exception_decision_approval",
+      businessRefType: "production_exception_decision",
+    }),
   ]),
   roleProfiles: yoyoosunRoleFlowMatrix.roles,
   printTemplateDefaults: Object.freeze([

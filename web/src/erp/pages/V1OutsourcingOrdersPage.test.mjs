@@ -189,7 +189,12 @@ test('outsourcing record lifecycle uses exact permissions, canonical commands, a
     source,
     /currentFacts = await loadRelatedOutsourcingFacts\([\s\S]*setRelatedReturnFacts\(currentFacts\)/u
   )
-  assert.match(source, /isMatchingOutsourcingFactState/u)
+  assert.match(source, /matchesOperationalFactLifecycleResult/u)
+  assert.match(source, /expected_version: fact\?\.version/u)
+  assert.match(
+    source,
+    /\.\.\.\(!isPost \? \{ reason: String\(reason \|\| ''\)\.trim\(\) \} : \{\}\)/u
+  )
   assert.match(source, /写入后重新读取仍未确认目标状态/u)
   assert.match(source, /作废不会产生任何库存变动/u)
   assert.match(source, /库存已恢复至过账前状态/u)

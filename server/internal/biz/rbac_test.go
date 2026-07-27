@@ -465,7 +465,8 @@ func TestAdminMenuRequirementsDistinguishAnyAndAll(t *testing.T) {
 			PermissionWorkflowTaskRead,
 			PermissionPMCRiskRead,
 			PermissionProductionFactRead,
-			PermissionQualityExceptionHandle,
+			PermissionProductionExceptionSubmit,
+			PermissionProductionExceptionApprove,
 		} {
 			menus := AdminVisibleMenus(&AdminUser{Permissions: []string{permission}})
 			if !adminMenusContainKey(menus, "production-exceptions") {

@@ -152,7 +152,8 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create SKU production fact: %v", err)
 	}
-	if _, err := uc.PostProductionFact(ctx, production.ID); err != nil {
+	postedProduction, err := uc.PostProductionFact(ctx, operationalFactStatusMutation(production.ID, production.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post SKU production fact: %v", err)
 	}
 	outsourcingSource := createOutsourcingFactSourceFixtureWithSKU(t, ctx, client, fixtures, "SKU-GRAIN", decimal.NewFromInt(2), &sku.ID)
@@ -163,7 +164,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create SKU outsourcing fact: %v", err)
 	}
-	if _, err := uc.PostOutsourcingFact(ctx, outsourcing.ID); err != nil {
+	if _, err := uc.PostOutsourcingFact(ctx, operationalFactStatusMutation(outsourcing.ID, outsourcing.Version, actor.ID, "")); err != nil {
 		t.Fatalf("post SKU outsourcing fact: %v", err)
 	}
 	balance, err := biz.NewInventoryUsecase(NewInventoryRepo(data, logger)).GetInventoryBalance(ctx, biz.InventoryBalanceKey{
@@ -177,7 +178,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	if err != nil || !balance.Quantity.Equal(decimal.NewFromInt(5)) {
 		t.Fatalf("SKU fact balance=%v err=%v, want 5", balance, err)
 	}
-	if _, err := uc.CancelPostedProductionFact(ctx, production.ID); err != nil {
+	if _, err := uc.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedProduction.ID, postedProduction.Version, actor.ID, "验证 SKU 粒度冲正")); err != nil {
 		t.Fatalf("cancel SKU production fact: %v", err)
 	}
 	reversal, err := client.InventoryTxn.Query().Where(inventorytxn.IdempotencyKey(

@@ -236,6 +236,10 @@ func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *t
 		"enabled",
 	))
 	operationalUC := biz.NewOperationalFactUsecase(datarepo.NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	actor := client.AdminUser.Create().
+		SetUsername("quality-outsourcing-poster").
+		SetPasswordHash("test-password-hash").
+		SaveX(ctx)
 
 	process := client.Process.Create().
 		SetCode("QI-RPC-OUT-PROC").
@@ -284,7 +288,9 @@ func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *t
 	if err != nil {
 		t.Fatalf("create outsourcing return: %v", err)
 	}
-	fact, err = operationalUC.PostOutsourcingFact(ctx, fact.ID)
+	fact, err = operationalUC.PostOutsourcingFact(ctx, &biz.OperationalFactStatusMutation{
+		ID: fact.ID, ExpectedVersion: fact.Version, ActorID: actor.ID,
+	})
 	if err != nil {
 		t.Fatalf("post outsourcing return: %v", err)
 	}

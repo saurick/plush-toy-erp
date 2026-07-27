@@ -64,6 +64,167 @@ func (_u *InventoryOperationUpdate) AddVersion(v int) *InventoryOperationUpdate 
 	return _u
 }
 
+// SetSubmittedAt sets the "submitted_at" field.
+func (_u *InventoryOperationUpdate) SetSubmittedAt(v time.Time) *InventoryOperationUpdate {
+	_u.mutation.SetSubmittedAt(v)
+	return _u
+}
+
+// SetNillableSubmittedAt sets the "submitted_at" field if the given value is not nil.
+func (_u *InventoryOperationUpdate) SetNillableSubmittedAt(v *time.Time) *InventoryOperationUpdate {
+	if v != nil {
+		_u.SetSubmittedAt(*v)
+	}
+	return _u
+}
+
+// ClearSubmittedAt clears the value of the "submitted_at" field.
+func (_u *InventoryOperationUpdate) ClearSubmittedAt() *InventoryOperationUpdate {
+	_u.mutation.ClearSubmittedAt()
+	return _u
+}
+
+// SetSubmittedBy sets the "submitted_by" field.
+func (_u *InventoryOperationUpdate) SetSubmittedBy(v int) *InventoryOperationUpdate {
+	_u.mutation.ResetSubmittedBy()
+	_u.mutation.SetSubmittedBy(v)
+	return _u
+}
+
+// SetNillableSubmittedBy sets the "submitted_by" field if the given value is not nil.
+func (_u *InventoryOperationUpdate) SetNillableSubmittedBy(v *int) *InventoryOperationUpdate {
+	if v != nil {
+		_u.SetSubmittedBy(*v)
+	}
+	return _u
+}
+
+// AddSubmittedBy adds value to the "submitted_by" field.
+func (_u *InventoryOperationUpdate) AddSubmittedBy(v int) *InventoryOperationUpdate {
+	_u.mutation.AddSubmittedBy(v)
+	return _u
+}
+
+// ClearSubmittedBy clears the value of the "submitted_by" field.
+func (_u *InventoryOperationUpdate) ClearSubmittedBy() *InventoryOperationUpdate {
+	_u.mutation.ClearSubmittedBy()
+	return _u
+}
+
+// SetApprovedAt sets the "approved_at" field.
+func (_u *InventoryOperationUpdate) SetApprovedAt(v time.Time) *InventoryOperationUpdate {
+	_u.mutation.SetApprovedAt(v)
+	return _u
+}
+
+// SetNillableApprovedAt sets the "approved_at" field if the given value is not nil.
+func (_u *InventoryOperationUpdate) SetNillableApprovedAt(v *time.Time) *InventoryOperationUpdate {
+	if v != nil {
+		_u.SetApprovedAt(*v)
+	}
+	return _u
+}
+
+// ClearApprovedAt clears the value of the "approved_at" field.
+func (_u *InventoryOperationUpdate) ClearApprovedAt() *InventoryOperationUpdate {
+	_u.mutation.ClearApprovedAt()
+	return _u
+}
+
+// SetApprovedBy sets the "approved_by" field.
+func (_u *InventoryOperationUpdate) SetApprovedBy(v int) *InventoryOperationUpdate {
+	_u.mutation.ResetApprovedBy()
+	_u.mutation.SetApprovedBy(v)
+	return _u
+}
+
+// SetNillableApprovedBy sets the "approved_by" field if the given value is not nil.
+func (_u *InventoryOperationUpdate) SetNillableApprovedBy(v *int) *InventoryOperationUpdate {
+	if v != nil {
+		_u.SetApprovedBy(*v)
+	}
+	return _u
+}
+
+// AddApprovedBy adds value to the "approved_by" field.
+func (_u *InventoryOperationUpdate) AddApprovedBy(v int) *InventoryOperationUpdate {
+	_u.mutation.AddApprovedBy(v)
+	return _u
+}
+
+// ClearApprovedBy clears the value of the "approved_by" field.
+func (_u *InventoryOperationUpdate) ClearApprovedBy() *InventoryOperationUpdate {
+	_u.mutation.ClearApprovedBy()
+	return _u
+}
+
+// SetRejectedAt sets the "rejected_at" field.
+func (_u *InventoryOperationUpdate) SetRejectedAt(v time.Time) *InventoryOperationUpdate {
+	_u.mutation.SetRejectedAt(v)
+	return _u
+}
+
+// SetNillableRejectedAt sets the "rejected_at" field if the given value is not nil.
+func (_u *InventoryOperationUpdate) SetNillableRejectedAt(v *time.Time) *InventoryOperationUpdate {
+	if v != nil {
+		_u.SetRejectedAt(*v)
+	}
+	return _u
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (_u *InventoryOperationUpdate) ClearRejectedAt() *InventoryOperationUpdate {
+	_u.mutation.ClearRejectedAt()
+	return _u
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (_u *InventoryOperationUpdate) SetRejectedBy(v int) *InventoryOperationUpdate {
+	_u.mutation.ResetRejectedBy()
+	_u.mutation.SetRejectedBy(v)
+	return _u
+}
+
+// SetNillableRejectedBy sets the "rejected_by" field if the given value is not nil.
+func (_u *InventoryOperationUpdate) SetNillableRejectedBy(v *int) *InventoryOperationUpdate {
+	if v != nil {
+		_u.SetRejectedBy(*v)
+	}
+	return _u
+}
+
+// AddRejectedBy adds value to the "rejected_by" field.
+func (_u *InventoryOperationUpdate) AddRejectedBy(v int) *InventoryOperationUpdate {
+	_u.mutation.AddRejectedBy(v)
+	return _u
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (_u *InventoryOperationUpdate) ClearRejectedBy() *InventoryOperationUpdate {
+	_u.mutation.ClearRejectedBy()
+	return _u
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (_u *InventoryOperationUpdate) SetRejectReason(v string) *InventoryOperationUpdate {
+	_u.mutation.SetRejectReason(v)
+	return _u
+}
+
+// SetNillableRejectReason sets the "reject_reason" field if the given value is not nil.
+func (_u *InventoryOperationUpdate) SetNillableRejectReason(v *string) *InventoryOperationUpdate {
+	if v != nil {
+		_u.SetRejectReason(*v)
+	}
+	return _u
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (_u *InventoryOperationUpdate) ClearRejectReason() *InventoryOperationUpdate {
+	_u.mutation.ClearRejectReason()
+	return _u
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_u *InventoryOperationUpdate) SetPostedAt(v time.Time) *InventoryOperationUpdate {
 	_u.mutation.SetPostedAt(v)
@@ -279,6 +440,26 @@ func (_u *InventoryOperationUpdate) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SubmittedBy(); ok {
+		if err := inventoryoperation.SubmittedByValidator(v); err != nil {
+			return &ValidationError{Name: "submitted_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.submitted_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ApprovedBy(); ok {
+		if err := inventoryoperation.ApprovedByValidator(v); err != nil {
+			return &ValidationError{Name: "approved_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.approved_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectedBy(); ok {
+		if err := inventoryoperation.RejectedByValidator(v); err != nil {
+			return &ValidationError{Name: "rejected_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.rejected_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectReason(); ok {
+		if err := inventoryoperation.RejectReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reject_reason", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.reject_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PostedBy(); ok {
 		if err := inventoryoperation.PostedByValidator(v); err != nil {
 			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.posted_by": %w`, err)}
@@ -312,14 +493,62 @@ func (_u *InventoryOperationUpdate) sqlSave(ctx context.Context) (_node int, err
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(inventoryoperation.FieldStatus, field.TypeString, value)
 	}
-	if _u.mutation.ApprovalRefCleared() {
-		_spec.ClearField(inventoryoperation.FieldApprovalRef, field.TypeString)
-	}
 	if value, ok := _u.mutation.Version(); ok {
 		_spec.SetField(inventoryoperation.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(inventoryoperation.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SubmittedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldSubmittedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SubmittedAtCleared() {
+		_spec.ClearField(inventoryoperation.FieldSubmittedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SubmittedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldSubmittedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSubmittedBy(); ok {
+		_spec.AddField(inventoryoperation.FieldSubmittedBy, field.TypeInt, value)
+	}
+	if _u.mutation.SubmittedByCleared() {
+		_spec.ClearField(inventoryoperation.FieldSubmittedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ApprovedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldApprovedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ApprovedAtCleared() {
+		_spec.ClearField(inventoryoperation.FieldApprovedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ApprovedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldApprovedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedApprovedBy(); ok {
+		_spec.AddField(inventoryoperation.FieldApprovedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ApprovedByCleared() {
+		_spec.ClearField(inventoryoperation.FieldApprovedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RejectedAtCleared() {
+		_spec.ClearField(inventoryoperation.FieldRejectedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RejectedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRejectedBy(); ok {
+		_spec.AddField(inventoryoperation.FieldRejectedBy, field.TypeInt, value)
+	}
+	if _u.mutation.RejectedByCleared() {
+		_spec.ClearField(inventoryoperation.FieldRejectedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectReason(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectReason, field.TypeString, value)
+	}
+	if _u.mutation.RejectReasonCleared() {
+		_spec.ClearField(inventoryoperation.FieldRejectReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.PostedAt(); ok {
 		_spec.SetField(inventoryoperation.FieldPostedAt, field.TypeTime, value)
@@ -457,6 +686,167 @@ func (_u *InventoryOperationUpdateOne) SetNillableVersion(v *int) *InventoryOper
 // AddVersion adds value to the "version" field.
 func (_u *InventoryOperationUpdateOne) AddVersion(v int) *InventoryOperationUpdateOne {
 	_u.mutation.AddVersion(v)
+	return _u
+}
+
+// SetSubmittedAt sets the "submitted_at" field.
+func (_u *InventoryOperationUpdateOne) SetSubmittedAt(v time.Time) *InventoryOperationUpdateOne {
+	_u.mutation.SetSubmittedAt(v)
+	return _u
+}
+
+// SetNillableSubmittedAt sets the "submitted_at" field if the given value is not nil.
+func (_u *InventoryOperationUpdateOne) SetNillableSubmittedAt(v *time.Time) *InventoryOperationUpdateOne {
+	if v != nil {
+		_u.SetSubmittedAt(*v)
+	}
+	return _u
+}
+
+// ClearSubmittedAt clears the value of the "submitted_at" field.
+func (_u *InventoryOperationUpdateOne) ClearSubmittedAt() *InventoryOperationUpdateOne {
+	_u.mutation.ClearSubmittedAt()
+	return _u
+}
+
+// SetSubmittedBy sets the "submitted_by" field.
+func (_u *InventoryOperationUpdateOne) SetSubmittedBy(v int) *InventoryOperationUpdateOne {
+	_u.mutation.ResetSubmittedBy()
+	_u.mutation.SetSubmittedBy(v)
+	return _u
+}
+
+// SetNillableSubmittedBy sets the "submitted_by" field if the given value is not nil.
+func (_u *InventoryOperationUpdateOne) SetNillableSubmittedBy(v *int) *InventoryOperationUpdateOne {
+	if v != nil {
+		_u.SetSubmittedBy(*v)
+	}
+	return _u
+}
+
+// AddSubmittedBy adds value to the "submitted_by" field.
+func (_u *InventoryOperationUpdateOne) AddSubmittedBy(v int) *InventoryOperationUpdateOne {
+	_u.mutation.AddSubmittedBy(v)
+	return _u
+}
+
+// ClearSubmittedBy clears the value of the "submitted_by" field.
+func (_u *InventoryOperationUpdateOne) ClearSubmittedBy() *InventoryOperationUpdateOne {
+	_u.mutation.ClearSubmittedBy()
+	return _u
+}
+
+// SetApprovedAt sets the "approved_at" field.
+func (_u *InventoryOperationUpdateOne) SetApprovedAt(v time.Time) *InventoryOperationUpdateOne {
+	_u.mutation.SetApprovedAt(v)
+	return _u
+}
+
+// SetNillableApprovedAt sets the "approved_at" field if the given value is not nil.
+func (_u *InventoryOperationUpdateOne) SetNillableApprovedAt(v *time.Time) *InventoryOperationUpdateOne {
+	if v != nil {
+		_u.SetApprovedAt(*v)
+	}
+	return _u
+}
+
+// ClearApprovedAt clears the value of the "approved_at" field.
+func (_u *InventoryOperationUpdateOne) ClearApprovedAt() *InventoryOperationUpdateOne {
+	_u.mutation.ClearApprovedAt()
+	return _u
+}
+
+// SetApprovedBy sets the "approved_by" field.
+func (_u *InventoryOperationUpdateOne) SetApprovedBy(v int) *InventoryOperationUpdateOne {
+	_u.mutation.ResetApprovedBy()
+	_u.mutation.SetApprovedBy(v)
+	return _u
+}
+
+// SetNillableApprovedBy sets the "approved_by" field if the given value is not nil.
+func (_u *InventoryOperationUpdateOne) SetNillableApprovedBy(v *int) *InventoryOperationUpdateOne {
+	if v != nil {
+		_u.SetApprovedBy(*v)
+	}
+	return _u
+}
+
+// AddApprovedBy adds value to the "approved_by" field.
+func (_u *InventoryOperationUpdateOne) AddApprovedBy(v int) *InventoryOperationUpdateOne {
+	_u.mutation.AddApprovedBy(v)
+	return _u
+}
+
+// ClearApprovedBy clears the value of the "approved_by" field.
+func (_u *InventoryOperationUpdateOne) ClearApprovedBy() *InventoryOperationUpdateOne {
+	_u.mutation.ClearApprovedBy()
+	return _u
+}
+
+// SetRejectedAt sets the "rejected_at" field.
+func (_u *InventoryOperationUpdateOne) SetRejectedAt(v time.Time) *InventoryOperationUpdateOne {
+	_u.mutation.SetRejectedAt(v)
+	return _u
+}
+
+// SetNillableRejectedAt sets the "rejected_at" field if the given value is not nil.
+func (_u *InventoryOperationUpdateOne) SetNillableRejectedAt(v *time.Time) *InventoryOperationUpdateOne {
+	if v != nil {
+		_u.SetRejectedAt(*v)
+	}
+	return _u
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (_u *InventoryOperationUpdateOne) ClearRejectedAt() *InventoryOperationUpdateOne {
+	_u.mutation.ClearRejectedAt()
+	return _u
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (_u *InventoryOperationUpdateOne) SetRejectedBy(v int) *InventoryOperationUpdateOne {
+	_u.mutation.ResetRejectedBy()
+	_u.mutation.SetRejectedBy(v)
+	return _u
+}
+
+// SetNillableRejectedBy sets the "rejected_by" field if the given value is not nil.
+func (_u *InventoryOperationUpdateOne) SetNillableRejectedBy(v *int) *InventoryOperationUpdateOne {
+	if v != nil {
+		_u.SetRejectedBy(*v)
+	}
+	return _u
+}
+
+// AddRejectedBy adds value to the "rejected_by" field.
+func (_u *InventoryOperationUpdateOne) AddRejectedBy(v int) *InventoryOperationUpdateOne {
+	_u.mutation.AddRejectedBy(v)
+	return _u
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (_u *InventoryOperationUpdateOne) ClearRejectedBy() *InventoryOperationUpdateOne {
+	_u.mutation.ClearRejectedBy()
+	return _u
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (_u *InventoryOperationUpdateOne) SetRejectReason(v string) *InventoryOperationUpdateOne {
+	_u.mutation.SetRejectReason(v)
+	return _u
+}
+
+// SetNillableRejectReason sets the "reject_reason" field if the given value is not nil.
+func (_u *InventoryOperationUpdateOne) SetNillableRejectReason(v *string) *InventoryOperationUpdateOne {
+	if v != nil {
+		_u.SetRejectReason(*v)
+	}
+	return _u
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (_u *InventoryOperationUpdateOne) ClearRejectReason() *InventoryOperationUpdateOne {
+	_u.mutation.ClearRejectReason()
 	return _u
 }
 
@@ -688,6 +1078,26 @@ func (_u *InventoryOperationUpdateOne) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SubmittedBy(); ok {
+		if err := inventoryoperation.SubmittedByValidator(v); err != nil {
+			return &ValidationError{Name: "submitted_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.submitted_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ApprovedBy(); ok {
+		if err := inventoryoperation.ApprovedByValidator(v); err != nil {
+			return &ValidationError{Name: "approved_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.approved_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectedBy(); ok {
+		if err := inventoryoperation.RejectedByValidator(v); err != nil {
+			return &ValidationError{Name: "rejected_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.rejected_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectReason(); ok {
+		if err := inventoryoperation.RejectReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reject_reason", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.reject_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PostedBy(); ok {
 		if err := inventoryoperation.PostedByValidator(v); err != nil {
 			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.posted_by": %w`, err)}
@@ -738,14 +1148,62 @@ func (_u *InventoryOperationUpdateOne) sqlSave(ctx context.Context) (_node *Inve
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(inventoryoperation.FieldStatus, field.TypeString, value)
 	}
-	if _u.mutation.ApprovalRefCleared() {
-		_spec.ClearField(inventoryoperation.FieldApprovalRef, field.TypeString)
-	}
 	if value, ok := _u.mutation.Version(); ok {
 		_spec.SetField(inventoryoperation.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(inventoryoperation.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SubmittedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldSubmittedAt, field.TypeTime, value)
+	}
+	if _u.mutation.SubmittedAtCleared() {
+		_spec.ClearField(inventoryoperation.FieldSubmittedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SubmittedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldSubmittedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSubmittedBy(); ok {
+		_spec.AddField(inventoryoperation.FieldSubmittedBy, field.TypeInt, value)
+	}
+	if _u.mutation.SubmittedByCleared() {
+		_spec.ClearField(inventoryoperation.FieldSubmittedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ApprovedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldApprovedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ApprovedAtCleared() {
+		_spec.ClearField(inventoryoperation.FieldApprovedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ApprovedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldApprovedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedApprovedBy(); ok {
+		_spec.AddField(inventoryoperation.FieldApprovedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ApprovedByCleared() {
+		_spec.ClearField(inventoryoperation.FieldApprovedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RejectedAtCleared() {
+		_spec.ClearField(inventoryoperation.FieldRejectedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RejectedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRejectedBy(); ok {
+		_spec.AddField(inventoryoperation.FieldRejectedBy, field.TypeInt, value)
+	}
+	if _u.mutation.RejectedByCleared() {
+		_spec.ClearField(inventoryoperation.FieldRejectedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectReason(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectReason, field.TypeString, value)
+	}
+	if _u.mutation.RejectReasonCleared() {
+		_spec.ClearField(inventoryoperation.FieldRejectReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.PostedAt(); ok {
 		_spec.SetField(inventoryoperation.FieldPostedAt, field.TypeTime, value)

@@ -223,22 +223,24 @@ func TestOperationalFactUsecaseCancelFinanceRequiresActorAndTrimmedReason(t *tes
 	for _, tc := range []struct {
 		name    string
 		id      int
+		version int
 		actorID int
 		reason  string
 	}{
-		{name: "missing id", actorID: 7, reason: "客户撤销"},
-		{name: "missing actor", id: 9, reason: "客户撤销"},
-		{name: "empty reason", id: 9, actorID: 7},
-		{name: "blank reason", id: 9, actorID: 7, reason: "  \t "},
-		{name: "too long reason", id: 9, actorID: 7, reason: strings.Repeat("理", 256)},
+		{name: "missing id", version: 1, actorID: 7, reason: "客户撤销"},
+		{name: "missing version", id: 9, actorID: 7, reason: "客户撤销"},
+		{name: "missing actor", id: 9, version: 1, reason: "客户撤销"},
+		{name: "empty reason", id: 9, version: 1, actorID: 7},
+		{name: "blank reason", id: 9, version: 1, actorID: 7, reason: "  \t "},
+		{name: "too long reason", id: 9, version: 1, actorID: 7, reason: strings.Repeat("理", 256)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := uc.CancelPostedFinanceFact(context.Background(), tc.id, tc.actorID, tc.reason); !errors.Is(err, ErrBadParam) {
+			if _, err := uc.CancelPostedFinanceFact(context.Background(), &OperationalFactStatusMutation{ID: tc.id, ExpectedVersion: tc.version, ActorID: tc.actorID, Reason: tc.reason}); !errors.Is(err, ErrBadParam) {
 				t.Fatalf("error=%v, want ErrBadParam", err)
 			}
 		})
 	}
-	if _, err := uc.CancelPostedFinanceFact(context.Background(), 9, 7, "  客户撤销账款  "); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CancelPostedFinanceFact(context.Background(), &OperationalFactStatusMutation{ID: 9, ExpectedVersion: 1, ActorID: 7, Reason: "  客户撤销账款  "}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("stub error=%v, want forwarded ErrBadParam", err)
 	}
 	if repo.cancelledFinanceFactID != 9 || repo.cancelledFinanceFactActorID != 7 || repo.cancelledFinanceFactReason != "客户撤销账款" {
@@ -304,19 +306,19 @@ func (r *financeProcessOperationalFactRepoStub) CreateFinanceFactDraft(_ context
 	}, nil
 }
 
-func (r *financeProcessOperationalFactRepoStub) PostFinanceFact(_ context.Context, id int) (*FinanceFact, error) {
-	r.postedFinanceFactID = id
+func (r *financeProcessOperationalFactRepoStub) PostFinanceFact(_ context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+	r.postedFinanceFactID = in.ID
 	return nil, ErrBadParam
 }
 
-func (r *financeProcessOperationalFactRepoStub) SettleFinanceFact(_ context.Context, id int) (*FinanceFact, error) {
-	r.settledFinanceFactID = id
+func (r *financeProcessOperationalFactRepoStub) SettleFinanceFact(_ context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+	r.settledFinanceFactID = in.ID
 	return nil, ErrBadParam
 }
 
-func (r *financeProcessOperationalFactRepoStub) CancelPostedFinanceFact(_ context.Context, id int, actorID int, reason string) (*FinanceFact, error) {
-	r.cancelledFinanceFactID = id
-	r.cancelledFinanceFactActorID = actorID
-	r.cancelledFinanceFactReason = reason
+func (r *financeProcessOperationalFactRepoStub) CancelPostedFinanceFact(_ context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+	r.cancelledFinanceFactID = in.ID
+	r.cancelledFinanceFactActorID = in.ActorID
+	r.cancelledFinanceFactReason = in.Reason
 	return nil, ErrBadParam
 }

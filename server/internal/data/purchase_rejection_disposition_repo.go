@@ -67,6 +67,14 @@ func (r *inventoryRepo) CreatePurchaseRejectionDisposition(ctx context.Context, 
 	}
 	row, err := tx.client.PurchaseRejectionDisposition.Create().SetDispositionNo(in.DispositionNo).SetQualityInspectionID(inspection.ID).SetPurchaseReceiptID(receipt.ID).SetPurchaseReceiptItemID(item.ID).SetDispositionType(in.DispositionType).SetStatus(biz.PurchaseRejectionStatusDraft).SetQuantity(in.Quantity).SetNillableSupplierID(receipt.SupplierID).SetSupplierName(receipt.SupplierName).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(intentHash).SetCreatedBy(in.CreatedBy).Save(ctx)
 	if err != nil {
+		if ent.IsConstraintError(err) {
+			rollbackInventoryDBTx(ctx, tx, r.log)
+			tx = nil
+			if replay, found, replayErr := r.resolvePurchaseRejectionReplay(ctx, r.data.postgres, in, intentHash); replayErr != nil || found {
+				return replay, replayErr
+			}
+			return nil, biz.ErrPurchaseRejectionConflict
+		}
 		return nil, err
 	}
 	out := entPurchaseRejectionDispositionToBiz(row)
@@ -248,7 +256,7 @@ func (r *inventoryRepo) ListPurchaseRejectionDispositions(ctx context.Context, f
 }
 
 func validatePurchaseRejectionSource(ctx context.Context, client *ent.Client, inspection *ent.QualityInspection, quantity decimal.Decimal) (*ent.PurchaseReceipt, *ent.PurchaseReceiptItem, error) {
-	if client == nil || inspection == nil || inspection.Status != biz.QualityInspectionStatusRejected || inspection.Result == nil || *inspection.Result != biz.QualityInspectionResultReject ||
+	if client == nil || inspection == nil || inspection.SupersededAt != nil || inspection.Status != biz.QualityInspectionStatusRejected || inspection.Result == nil || *inspection.Result != biz.QualityInspectionResultReject ||
 		inspection.PurchaseReceiptID == nil || inspection.PurchaseReceiptItemID == nil || inspection.SourceType == nil || *inspection.SourceType != biz.QualityInspectionSourcePurchaseReceipt ||
 		inspection.SourceID == nil || *inspection.SourceID != *inspection.PurchaseReceiptID || inspection.InspectionType == nil || *inspection.InspectionType != biz.QualityInspectionTypeIncoming || !quantity.IsPositive() {
 		return nil, nil, biz.ErrPurchaseRejectionSourceInvalid

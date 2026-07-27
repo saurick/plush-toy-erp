@@ -1052,7 +1052,7 @@ func validateProductionWIPOutsourcingAssignment(
 		requirements := make([]*biz.ProductionOrderMaterialRequirement, 0, len(requirementRows))
 		rowByID := make(map[int]*ent.ProductionOrderMaterialRequirement, len(requirementRows))
 		for _, row := range requirementRows {
-			requirements = append(requirements, entProductionOrderMaterialRequirementToBiz(row, decimal.Zero))
+			requirements = append(requirements, entProductionOrderMaterialRequirementToBiz(row, decimal.Zero, decimal.Zero))
 			rowByID[row.ID] = row
 		}
 		fabricRequirements, err := biz.SelectProductionWIPFabricRequirements(orderItem.ID, requirements)

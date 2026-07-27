@@ -120,7 +120,6 @@ func TestOperationalFactUsecaseSettleFinanceFactAllowsOnlyBalanceTypes(t *testin
 		{factType: FinanceFactPayable, allowed: false},
 		{factType: FinanceFactReconciliation, allowed: true},
 		{factType: FinanceFactInvoice, allowed: false},
-		{factType: FinanceFactPayment, allowed: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.factType, func(t *testing.T) {
@@ -129,7 +128,7 @@ func TestOperationalFactUsecaseSettleFinanceFactAllowsOnlyBalanceTypes(t *testin
 				financeToRead:                &FinanceFact{ID: 1, FactType: tt.factType, Status: OperationalFactStatusPosted},
 			}
 			uc := NewOperationalFactUsecase(repo)
-			_, err := uc.SettleFinanceFact(context.Background(), 1)
+			_, err := uc.SettleFinanceFact(context.Background(), &OperationalFactStatusMutation{ID: 1, ExpectedVersion: 1, ActorID: 7})
 			if tt.allowed {
 				if err != nil || repo.settleCalls != 1 {
 					t.Fatalf("allowed settle error=%v calls=%d", err, repo.settleCalls)
@@ -201,10 +200,10 @@ func (r *financeFromShipmentRepoStub) GetFinanceFact(context.Context, int) (*Fin
 	return r.financeToRead, nil
 }
 
-func (r *financeFromShipmentRepoStub) SettleFinanceFact(_ context.Context, id int) (*FinanceFact, error) {
+func (r *financeFromShipmentRepoStub) SettleFinanceFact(_ context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
 	r.settleCalls++
 	copy := *r.financeToRead
-	copy.ID = id
+	copy.ID = in.ID
 	copy.Status = OperationalFactStatusSettled
 	return &copy, nil
 }

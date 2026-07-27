@@ -675,6 +675,8 @@ test("desktop workflow task actions explain backend access before submitting act
         "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*selectedTask\.id,/mu,
+      payloadBuilderPath:
+        "web/src/erp/utils/desktopWorkflowTaskAction.mjs",
     },
     {
       relativePath: "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
@@ -738,18 +740,36 @@ test("desktop workflow task actions explain backend access before submitting act
       source,
       relativePath: expectation.relativePath,
     });
-    assert.match(
-      source,
-      /task_id:\s*(?:selectedTask|task|taskSnapshot)\.id/u,
-      `${expectation.relativePath} must submit formal task_id action payloads`,
-    );
+    const payloadContractSource = expectation.payloadBuilderPath
+      ? readFileSync(path.join(repoRoot, expectation.payloadBuilderPath), "utf8")
+      : source;
+    if (expectation.payloadBuilderPath) {
+      assert.match(
+        source,
+        /buildDesktopWorkflowTaskActionParams\(\{/u,
+        `${expectation.relativePath} must delegate its action payload to the exact desktop builder`,
+      );
+      assert.match(
+        payloadContractSource,
+        /requireWorkflowTaskMutationParams\(actionMode,\s*\{[\s\S]*task_id:\s*task\.id/u,
+        `${expectation.payloadBuilderPath} must submit formal task_id action payloads`,
+      );
+    } else {
+      assert.match(
+        payloadContractSource,
+        /task_id:\s*(?:selectedTask|task|taskSnapshot)\.id/u,
+        `${expectation.relativePath} must submit formal task_id action payloads`,
+      );
+    }
     assert(
       !expectation.forbiddenLegacyIDPattern.test(source),
       `${expectation.relativePath} must not rely on legacy id workflow action fallback`,
     );
     assert(
       !source.includes("business_status_key:") &&
-        !source.includes("completeBusinessStatusKey"),
+        !source.includes("completeBusinessStatusKey") &&
+        !payloadContractSource.includes("business_status_key:") &&
+        !payloadContractSource.includes("completeBusinessStatusKey"),
       `${expectation.relativePath} must not submit client-controlled business_status_key; backend action/usecase derives business status`,
     );
     if (

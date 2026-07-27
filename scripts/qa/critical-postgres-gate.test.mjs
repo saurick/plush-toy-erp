@@ -242,6 +242,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     'TestProductionOrderPostgresCloseSerializesWithFactPostAndReversal',
     'TestProductionOrderPostgresGetAndListReadContract',
     'TestProductionOrderPostgresSalesEligibilityLocksAndRollsBack',
+    'TestProductionMaterialIssuePostgresConcurrentOverIssueAllowanceHasOneWinnerAndExactReadback',
   ]) {
     assert.match(
       productionOrderFactConcurrency + productionOrderConcurrency,

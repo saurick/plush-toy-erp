@@ -58,6 +58,8 @@ const (
 	FieldExecutedBy = "executed_by"
 	// FieldExecutedAt holds the string denoting the executed_at field in the database.
 	FieldExecutedAt = "executed_at"
+	// FieldExecutionReason holds the string denoting the execution_reason field in the database.
+	FieldExecutionReason = "execution_reason"
 	// FieldReversedBy holds the string denoting the reversed_by field in the database.
 	FieldReversedBy = "reversed_by"
 	// FieldReversedAt holds the string denoting the reversed_at field in the database.
@@ -93,6 +95,7 @@ var Columns = []string{
 	FieldDecisionReason,
 	FieldExecutedBy,
 	FieldExecutedAt,
+	FieldExecutionReason,
 	FieldReversedBy,
 	FieldReversedAt,
 	FieldReverseReason,
@@ -157,6 +160,8 @@ var (
 	DecisionReasonValidator func(string) error
 	// ExecutedByValidator is a validator for the "executed_by" field. It is called by the builders before save.
 	ExecutedByValidator func(int) error
+	// ExecutionReasonValidator is a validator for the "execution_reason" field. It is called by the builders before save.
+	ExecutionReasonValidator func(string) error
 	// ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
 	ReversedByValidator func(int) error
 	// ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
@@ -279,6 +284,11 @@ func ByExecutedBy(opts ...sql.OrderTermOption) OrderOption {
 // ByExecutedAt orders the results by the executed_at field.
 func ByExecutedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExecutedAt, opts...).ToFunc()
+}
+
+// ByExecutionReason orders the results by the execution_reason field.
+func ByExecutionReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExecutionReason, opts...).ToFunc()
 }
 
 // ByReversedBy orders the results by the reversed_by field.

@@ -13,6 +13,13 @@ const form = readFileSync(
   ),
   'utf8'
 )
+const overIssueModal = readFileSync(
+  new URL(
+    '../components/production-orders/ProductionOverIssueRequestModal.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
 const completionModal = readFileSync(
   new URL(
     '../components/production-orders/ProductionCompletionModal.jsx',
@@ -85,6 +92,15 @@ test('production order forms initialize only after their modal is mounted', () =
   assert.match(page, /if \(!formMode \|\| !formValues\) return/u)
   assert.match(page, /if \(!reasonAction\) return/u)
   assert.match(form, /forceRender/u)
+})
+
+test('closed production over-issue modal keeps its empty requirement null-safe', () => {
+  assert.match(page, /open=\{Boolean\(overIssueRequirement\)\}/u)
+  assert.match(page, /requirement=\{overIssueRequirement\}/u)
+  assert.match(overIssueModal, /requirement\?\.material_code_snapshot/u)
+  assert.match(overIssueModal, /requirement\?\.material_name_snapshot/u)
+  assert.match(overIssueModal, /已批准超领/u)
+  assert.match(overIssueModal, /当前可领上限/u)
 })
 
 test('released production orders create a source-bound completion draft', () => {
@@ -220,6 +236,8 @@ test('production completion submits exactly one inbound lot intent', () => {
 test('released production order detail renders frozen requirements and fails closed on review', () => {
   assert.match(form, /物料需求与领料/u)
   assert.match(form, /计划需求/u)
+  assert.match(form, /已批准超领/u)
+  assert.match(form, /当前可领上限/u)
   assert.match(form, /已过账领料/u)
   assert.match(form, /剩余可领/u)
   assert.match(form, /物料需求需要复核，暂不能领料/u)

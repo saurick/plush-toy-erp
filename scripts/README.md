@@ -31,6 +31,7 @@
 | `scripts/qa/test-data-isolation-boundary.mjs`          | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备是否分桶隔离，并锁住 dry-run 不具备执行能力 | 调整 seed、fixture、模拟数据或导入准备工具后                  |
 | `scripts/qa/manual-regression-data-plan.mjs`           | 只读汇总 Product Core 中性 seed、yoyoosun preview fixture、试用模拟数据、业务事实模拟和岗位任务模拟的手动回归数据入口；不连接后端、不写库、不执行真实导入 | 手动回归前梳理应准备哪些模拟数据和命令                    |
 | `scripts/qa/manual-acceptance-*.mjs`                   | 全页面手工验收入口组：用唯一 runner 和页面归属合同为 local / 133 生成同语义模拟数据，覆盖 50 项目录、账号、源数据、九岗位任务、事实矩阵、只读就绪核验和无流程阻断旧批次退出；180 条长列表任务只证明展示交互，另以 5 张同批模拟销售订单走正式 ProcessRuntime 路径，完整清理须重建专用验收库；详细命令见 `scripts/qa/README.md` | 准备全页面模拟验收数据与脱敏证据 |
+| `scripts/qa/exception-flow-real-write-browser.mjs`     | 四条异常流的本地真实写浏览器 companion：只接受 loopback、非 8300、名称匹配 `browser_actions` 的显式隔离库，绑定 runtime identity 后验证业务 UI、Workflow task、Fact / 库存 / 核销读回、反向、CAS 与服务端 RBAC；登录会写 `last_login_at`，传输故障为后端成功后丢弃响应，不是 mock 业务结果，也不等于 50 项只读基线验收或客户 UAT | 在可回收的全新本地隔离库验收异常流写主路径 |
 | `scripts/qa/purchase-order-approval-process.mjs`       | 采购订单 ProcessRuntime 共享执行器：从 DRAFT 启动流程、执行唯一提交命令、按流程锚点读取并完成审批任务，再读回 authoritative `APPROVED`；不调用已退出的直提 / 直批 API | 采购模拟矩阵、手工验收和真实浏览器造数需要统一采购审批主路径时 |
 | `scripts/qa/purchase-quality-simulated-matrix.mjs`     | 通过正式 JSON-RPC 和岗位演示账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单、采购入库与质检多状态矩阵；显式确认后才写入，不执行真实客户导入 | 本机 local / dev 覆盖草稿、提交、审批、关闭、取消、检验通过 / 拒收、入库过账 / 取消等人工回归状态 |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |

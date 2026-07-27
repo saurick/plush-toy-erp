@@ -19,6 +19,13 @@ import {
 } from "../../web/src/erp/utils/printWorkspace.js";
 
 const EXPECTED_DESKTOP_PAGE_COUNT = 29;
+export const MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS = Object.freeze([
+  "sales-returns",
+  "finance-payments",
+]);
+const EXPECTED_FORMAL_DESKTOP_PAGE_COUNT =
+  EXPECTED_DESKTOP_PAGE_COUNT +
+  MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS.length;
 const EXPECTED_MOBILE_PAGE_COUNT = 9;
 const EXPECTED_PRINT_TEMPLATE_COUNT = 5;
 const FORMAL_TRIAL_ACCOUNT_COUNT = 10;
@@ -939,8 +946,29 @@ export function buildManualAcceptanceCatalog() {
   );
 
   assertSource(
-    formalDesktopItems.length === EXPECTED_DESKTOP_PAGE_COUNT,
-    `当前正式桌面路由应为 ${EXPECTED_DESKTOP_PAGE_COUNT} 个，实际为 ${formalDesktopItems.length} 个`,
+    formalDesktopItems.length === EXPECTED_FORMAL_DESKTOP_PAGE_COUNT,
+    `当前正式桌面路由应为 ${EXPECTED_FORMAL_DESKTOP_PAGE_COUNT} 个，实际为 ${formalDesktopItems.length} 个`,
+  );
+  const dedicatedExceptionPageKeys = new Set(
+    MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS,
+  );
+  const dedicatedExceptionItems = formalDesktopItems.filter((item) =>
+    dedicatedExceptionPageKeys.has(item.key),
+  );
+  assertSource(
+    dedicatedExceptionItems.length ===
+      MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS.length &&
+      dedicatedExceptionItems.every((item) =>
+        getRoleKeysForDesktopPage(item.key, roles).length > 0
+      ),
+    "客户退货与收付款页面必须由独立异常流真实写 companion 覆盖并保持岗位可达",
+  );
+  const baselineDesktopItems = formalDesktopItems.filter(
+    (item) => !dedicatedExceptionPageKeys.has(item.key),
+  );
+  assertSource(
+    baselineDesktopItems.length === EXPECTED_DESKTOP_PAGE_COUNT,
+    `基线只读桌面目录应为 ${EXPECTED_DESKTOP_PAGE_COUNT} 个，实际为 ${baselineDesktopItems.length} 个`,
   );
   assertSource(
     roleWorkbenches.length === EXPECTED_MOBILE_PAGE_COUNT,
@@ -986,7 +1014,7 @@ export function buildManualAcceptanceCatalog() {
     createAcceptanceItem(item, ENTRY_PLANS[item.key], roleByKey),
   );
 
-  const desktopTechnical = formalDesktopItems.map((item) => {
+  const desktopTechnical = baselineDesktopItems.map((item) => {
     const plan = DESKTOP_PLANS[item.key];
     assertSource(plan, `桌面页 ${item.key} 缺少验收方案`);
     assertSource(

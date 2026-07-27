@@ -53,20 +53,6 @@ func (_c *InventoryOperationCreate) SetReason(v string) *InventoryOperationCreat
 	return _c
 }
 
-// SetApprovalRef sets the "approval_ref" field.
-func (_c *InventoryOperationCreate) SetApprovalRef(v string) *InventoryOperationCreate {
-	_c.mutation.SetApprovalRef(v)
-	return _c
-}
-
-// SetNillableApprovalRef sets the "approval_ref" field if the given value is not nil.
-func (_c *InventoryOperationCreate) SetNillableApprovalRef(v *string) *InventoryOperationCreate {
-	if v != nil {
-		_c.SetApprovalRef(*v)
-	}
-	return _c
-}
-
 // SetIdempotencyKey sets the "idempotency_key" field.
 func (_c *InventoryOperationCreate) SetIdempotencyKey(v string) *InventoryOperationCreate {
 	_c.mutation.SetIdempotencyKey(v)
@@ -95,6 +81,104 @@ func (_c *InventoryOperationCreate) SetVersion(v int) *InventoryOperationCreate 
 func (_c *InventoryOperationCreate) SetNillableVersion(v *int) *InventoryOperationCreate {
 	if v != nil {
 		_c.SetVersion(*v)
+	}
+	return _c
+}
+
+// SetSubmittedAt sets the "submitted_at" field.
+func (_c *InventoryOperationCreate) SetSubmittedAt(v time.Time) *InventoryOperationCreate {
+	_c.mutation.SetSubmittedAt(v)
+	return _c
+}
+
+// SetNillableSubmittedAt sets the "submitted_at" field if the given value is not nil.
+func (_c *InventoryOperationCreate) SetNillableSubmittedAt(v *time.Time) *InventoryOperationCreate {
+	if v != nil {
+		_c.SetSubmittedAt(*v)
+	}
+	return _c
+}
+
+// SetSubmittedBy sets the "submitted_by" field.
+func (_c *InventoryOperationCreate) SetSubmittedBy(v int) *InventoryOperationCreate {
+	_c.mutation.SetSubmittedBy(v)
+	return _c
+}
+
+// SetNillableSubmittedBy sets the "submitted_by" field if the given value is not nil.
+func (_c *InventoryOperationCreate) SetNillableSubmittedBy(v *int) *InventoryOperationCreate {
+	if v != nil {
+		_c.SetSubmittedBy(*v)
+	}
+	return _c
+}
+
+// SetApprovedAt sets the "approved_at" field.
+func (_c *InventoryOperationCreate) SetApprovedAt(v time.Time) *InventoryOperationCreate {
+	_c.mutation.SetApprovedAt(v)
+	return _c
+}
+
+// SetNillableApprovedAt sets the "approved_at" field if the given value is not nil.
+func (_c *InventoryOperationCreate) SetNillableApprovedAt(v *time.Time) *InventoryOperationCreate {
+	if v != nil {
+		_c.SetApprovedAt(*v)
+	}
+	return _c
+}
+
+// SetApprovedBy sets the "approved_by" field.
+func (_c *InventoryOperationCreate) SetApprovedBy(v int) *InventoryOperationCreate {
+	_c.mutation.SetApprovedBy(v)
+	return _c
+}
+
+// SetNillableApprovedBy sets the "approved_by" field if the given value is not nil.
+func (_c *InventoryOperationCreate) SetNillableApprovedBy(v *int) *InventoryOperationCreate {
+	if v != nil {
+		_c.SetApprovedBy(*v)
+	}
+	return _c
+}
+
+// SetRejectedAt sets the "rejected_at" field.
+func (_c *InventoryOperationCreate) SetRejectedAt(v time.Time) *InventoryOperationCreate {
+	_c.mutation.SetRejectedAt(v)
+	return _c
+}
+
+// SetNillableRejectedAt sets the "rejected_at" field if the given value is not nil.
+func (_c *InventoryOperationCreate) SetNillableRejectedAt(v *time.Time) *InventoryOperationCreate {
+	if v != nil {
+		_c.SetRejectedAt(*v)
+	}
+	return _c
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (_c *InventoryOperationCreate) SetRejectedBy(v int) *InventoryOperationCreate {
+	_c.mutation.SetRejectedBy(v)
+	return _c
+}
+
+// SetNillableRejectedBy sets the "rejected_by" field if the given value is not nil.
+func (_c *InventoryOperationCreate) SetNillableRejectedBy(v *int) *InventoryOperationCreate {
+	if v != nil {
+		_c.SetRejectedBy(*v)
+	}
+	return _c
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (_c *InventoryOperationCreate) SetRejectReason(v string) *InventoryOperationCreate {
+	_c.mutation.SetRejectReason(v)
+	return _c
+}
+
+// SetNillableRejectReason sets the "reject_reason" field if the given value is not nil.
+func (_c *InventoryOperationCreate) SetNillableRejectReason(v *string) *InventoryOperationCreate {
+	if v != nil {
+		_c.SetRejectReason(*v)
 	}
 	return _c
 }
@@ -314,11 +398,6 @@ func (_c *InventoryOperationCreate) check() error {
 			return &ValidationError{Name: "reason", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.reason": %w`, err)}
 		}
 	}
-	if v, ok := _c.mutation.ApprovalRef(); ok {
-		if err := inventoryoperation.ApprovalRefValidator(v); err != nil {
-			return &ValidationError{Name: "approval_ref", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.approval_ref": %w`, err)}
-		}
-	}
 	if _, ok := _c.mutation.IdempotencyKey(); !ok {
 		return &ValidationError{Name: "idempotency_key", err: errors.New(`ent: missing required field "InventoryOperation.idempotency_key"`)}
 	}
@@ -349,6 +428,26 @@ func (_c *InventoryOperationCreate) check() error {
 	if v, ok := _c.mutation.Version(); ok {
 		if err := inventoryoperation.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.version": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SubmittedBy(); ok {
+		if err := inventoryoperation.SubmittedByValidator(v); err != nil {
+			return &ValidationError{Name: "submitted_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.submitted_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ApprovedBy(); ok {
+		if err := inventoryoperation.ApprovedByValidator(v); err != nil {
+			return &ValidationError{Name: "approved_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.approved_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.RejectedBy(); ok {
+		if err := inventoryoperation.RejectedByValidator(v); err != nil {
+			return &ValidationError{Name: "rejected_by", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.rejected_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.RejectReason(); ok {
+		if err := inventoryoperation.RejectReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reject_reason", err: fmt.Errorf(`ent: validator failed for field "InventoryOperation.reject_reason": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.PostedBy(); ok {
@@ -422,10 +521,6 @@ func (_c *InventoryOperationCreate) createSpec() (*InventoryOperation, *sqlgraph
 		_spec.SetField(inventoryoperation.FieldReason, field.TypeString, value)
 		_node.Reason = value
 	}
-	if value, ok := _c.mutation.ApprovalRef(); ok {
-		_spec.SetField(inventoryoperation.FieldApprovalRef, field.TypeString, value)
-		_node.ApprovalRef = &value
-	}
 	if value, ok := _c.mutation.IdempotencyKey(); ok {
 		_spec.SetField(inventoryoperation.FieldIdempotencyKey, field.TypeString, value)
 		_node.IdempotencyKey = value
@@ -441,6 +536,34 @@ func (_c *InventoryOperationCreate) createSpec() (*InventoryOperation, *sqlgraph
 	if value, ok := _c.mutation.Version(); ok {
 		_spec.SetField(inventoryoperation.FieldVersion, field.TypeInt, value)
 		_node.Version = value
+	}
+	if value, ok := _c.mutation.SubmittedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldSubmittedAt, field.TypeTime, value)
+		_node.SubmittedAt = &value
+	}
+	if value, ok := _c.mutation.SubmittedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldSubmittedBy, field.TypeInt, value)
+		_node.SubmittedBy = &value
+	}
+	if value, ok := _c.mutation.ApprovedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldApprovedAt, field.TypeTime, value)
+		_node.ApprovedAt = &value
+	}
+	if value, ok := _c.mutation.ApprovedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldApprovedBy, field.TypeInt, value)
+		_node.ApprovedBy = &value
+	}
+	if value, ok := _c.mutation.RejectedAt(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectedAt, field.TypeTime, value)
+		_node.RejectedAt = &value
+	}
+	if value, ok := _c.mutation.RejectedBy(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectedBy, field.TypeInt, value)
+		_node.RejectedBy = &value
+	}
+	if value, ok := _c.mutation.RejectReason(); ok {
+		_spec.SetField(inventoryoperation.FieldRejectReason, field.TypeString, value)
+		_node.RejectReason = &value
 	}
 	if value, ok := _c.mutation.PostedAt(); ok {
 		_spec.SetField(inventoryoperation.FieldPostedAt, field.TypeTime, value)

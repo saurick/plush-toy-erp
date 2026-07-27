@@ -30,7 +30,7 @@ func (d *jsonrpcDispatcher) handleInventory(
 	}
 
 	switch method {
-	case "create_inventory_operation", "post_inventory_operation", "cancel_inventory_operation", "get_inventory_operation":
+	case "create_inventory_operation", "post_inventory_operation", "cancel_inventory_operation", "get_inventory_operation", "list_inventory_operations":
 		return d.handleInventoryOperation(ctx, method, id, pm, claims.UserID)
 	case "list_inventory_balances":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
@@ -164,6 +164,10 @@ func inventoryTxnFilterFromParams(pm map[string]any) (biz.InventoryTxnFilter, bo
 func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrProcessRuntimeRequired):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该动作必须通过业务流程任务办理，请刷新流程状态"}
+	case errors.Is(err, biz.ErrProcessSourceLifecycleDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单据仍有未收口的业务流程，请先在任务中心完成或驳回流程后再操作"}
 	case errors.Is(err, biz.ErrDataScopeForbidden):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
@@ -174,8 +178,12 @@ func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "库存作业已被其他人处理，请刷新后重试"}
 	case errors.Is(err, biz.ErrInventoryOperationStaleCount):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "盘点期间账面库存已变化，请刷新后重新盘点"}
-	case errors.Is(err, biz.ErrInventoryOperationApprovalMissing):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "人工库存调整必须填写审批依据"}
+	case errors.Is(err, biz.ErrInventoryOperationSubmitOwner):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人可以提交人工库存调整"}
+	case errors.Is(err, biz.ErrInventoryOperationSelfApproval):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "人工库存调整必须由另一位有权人员审批"}
+	case errors.Is(err, biz.ErrInventoryOperationCancelOwner):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人或过账人可以取消库存作业"}
 	case errors.Is(err, biz.ErrInventoryInsufficientStock):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足，无法完成本次库存作业"}
 	case errors.Is(err, biz.ErrBadParam):

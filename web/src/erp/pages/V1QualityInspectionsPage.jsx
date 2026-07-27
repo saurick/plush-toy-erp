@@ -479,6 +479,10 @@ export default function V1QualityInspectionsPage() {
     adminProfile,
     'quality.exception.handle'
   )
+  const canSubmitProductionException = hasActionPermission(
+    adminProfile,
+    'production.exception.submit'
+  )
   const canManageOutsourcingDisposition =
     canHandleQualityException ||
     canPostOutsourcingDisposition ||
@@ -612,7 +616,7 @@ export default function V1QualityInspectionsPage() {
     : selectedIsOutsourcingInspection
       ? canManageOutsourcingDisposition
       : selectedIsProductionInspection
-        ? canHandleQualityException
+        ? canSubmitProductionException
         : false
   const selectedDispositionCompleted =
     ['PASSED', 'CANCELLED'].includes(selectedQualityStatus) ||
@@ -622,7 +626,7 @@ export default function V1QualityInspectionsPage() {
   const hasAnyDispositionCapability =
     canCreatePurchaseReturn ||
     canManageOutsourcingDisposition ||
-    canHandleQualityException
+    canSubmitProductionException
   const showQualityDispositionAction =
     hasAnyDispositionCapability &&
     (!selectedRow ||
@@ -2174,6 +2178,7 @@ export default function V1QualityInspectionsPage() {
       <ProductionExceptionRequestModal
         open={productionExceptionOpen}
         inspection={selectedRow}
+        customerKey={activeCustomerKey}
         onClose={() => setProductionExceptionOpen(false)}
         onChanged={() => loadRows()}
       />

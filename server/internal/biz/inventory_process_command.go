@@ -91,10 +91,7 @@ func (h *inventoryPostInboundProcessCommandHandler) ExecuteProcessDomainCommand(
 		}
 		return result, nil
 	}
-	if _, err := h.uc.PostPurchaseReceipt(ctx, receiptID); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return nil, ErrProcessDomainCommandHandlerNotFound
 }
 
 func purchaseReceiptIDFromProcessCommandPayload(payload map[string]any) (int, error) {

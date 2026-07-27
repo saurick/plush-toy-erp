@@ -185,6 +185,235 @@ const expectedProcessNodes = {
     ],
     ['end', 'end', '结束', null, []],
   ],
+  'sales_return_acceptance/approval_receipt': [
+    [
+      'sales_return_approval',
+      'approval',
+      '客户退货审批',
+      null,
+      ['sales_return.approve'],
+    ],
+    [
+      'approve_sales_return',
+      'domain_command',
+      '批准客户退货',
+      'OperationalFactUsecase.ApproveSalesReturnForProcessCommand',
+      ['workflow.task.approve'],
+    ],
+    [
+      'sales_return_receipt',
+      'human_task',
+      '客户退货收货',
+      null,
+      ['workflow.task.complete'],
+    ],
+    [
+      'receive_sales_return',
+      'domain_command',
+      '确认客户退货入库',
+      'OperationalFactUsecase.ReceiveSalesReturnForProcessCommand',
+      ['sales_return.receive'],
+    ],
+    ['end', 'end', '结束', null, []],
+    [
+      'reject_sales_return',
+      'domain_command',
+      '驳回客户退货',
+      'OperationalFactUsecase.RejectSalesReturnForProcessCommand',
+      ['workflow.task.reject'],
+    ],
+    ['rejected_end', 'end', '驳回结束', null, []],
+  ],
+  'finance_payment_approval/approval_post': [
+    [
+      'finance_payment_approval',
+      'approval',
+      '收付款审批',
+      null,
+      ['finance.payment.approve'],
+    ],
+    [
+      'approve_finance_payment',
+      'domain_command',
+      '批准收付款',
+      'OperationalFactUsecase.ApproveFinancePaymentForProcessCommand',
+      ['workflow.task.approve'],
+    ],
+    [
+      'finance_payment_execution',
+      'human_task',
+      '收付款执行',
+      null,
+      ['workflow.task.complete'],
+    ],
+    [
+      'post_finance_payment',
+      'domain_command',
+      '过账并核销收付款',
+      'OperationalFactUsecase.PostFinancePaymentForProcessCommand',
+      ['finance.payment.post'],
+    ],
+    ['end', 'end', '结束', null, []],
+    [
+      'reject_finance_payment',
+      'domain_command',
+      '驳回收付款',
+      'OperationalFactUsecase.RejectFinancePaymentForProcessCommand',
+      ['workflow.task.reject'],
+    ],
+    ['rejected_end', 'end', '驳回结束', null, []],
+  ],
+  'inventory_adjustment_approval/manual_adjustment_approval': [
+    [
+      'submit_inventory_adjustment',
+      'domain_command',
+      '提交人工库存调整',
+      'InventoryUsecase.SubmitInventoryOperationForProcessCommand',
+      ['warehouse.adjustment.create'],
+    ],
+    [
+      'inventory_adjustment_approval',
+      'approval',
+      '人工库存调整审批',
+      null,
+      ['warehouse.adjustment.approve'],
+    ],
+    [
+      'approve_inventory_adjustment',
+      'domain_command',
+      '批准人工库存调整',
+      'InventoryUsecase.ApproveInventoryOperationForProcessCommand',
+      ['workflow.task.approve'],
+    ],
+    [
+      'inventory_adjustment_execution',
+      'human_task',
+      '人工库存调整执行',
+      null,
+      ['workflow.task.complete'],
+    ],
+    [
+      'post_inventory_adjustment',
+      'domain_command',
+      '过账人工库存调整',
+      'InventoryUsecase.PostInventoryOperationForProcessCommand',
+      ['warehouse.adjustment.create'],
+    ],
+    ['end', 'end', '结束', null, []],
+    [
+      'reject_inventory_adjustment',
+      'domain_command',
+      '驳回人工库存调整',
+      'InventoryUsecase.RejectInventoryOperationForProcessCommand',
+      ['workflow.task.reject'],
+    ],
+    ['rejected_end', 'end', '驳回结束', null, []],
+  ],
+  'production_exception_approval/exception_decision_approval': [
+    [
+      'production_exception_decision_approval',
+      'approval',
+      '生产异常决策审批',
+      null,
+      ['production.exception.approve'],
+    ],
+    [
+      'approve_production_exception',
+      'domain_command',
+      '批准生产异常决策',
+      'OperationalFactUsecase.ApproveProductionExceptionForProcessCommand',
+      ['workflow.task.approve'],
+    ],
+    [
+      'production_exception_execution',
+      'human_task',
+      '生产异常执行',
+      null,
+      ['workflow.task.complete'],
+    ],
+    [
+      'execute_production_exception',
+      'domain_command',
+      '执行生产异常处置',
+      'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
+      ['production.fact.post'],
+    ],
+    ['end', 'end', '结束', null, []],
+    [
+      'reject_production_exception',
+      'domain_command',
+      '驳回生产异常决策',
+      'OperationalFactUsecase.RejectProductionExceptionForProcessCommand',
+      ['workflow.task.reject'],
+    ],
+    ['rejected_end', 'end', '驳回结束', null, []],
+    ['over_issue_end', 'end', '超领审批结束', null, []],
+  ],
+}
+
+const expectedProcessEdges = {
+  'sales_order_acceptance/approval_pmc': [
+    ['submit_sales_order', 'order_approval'],
+    ['order_approval', 'activate_sales_order'],
+    ['activate_sales_order', 'order_review'],
+    ['order_review', 'end'],
+  ],
+  'sales_order_acceptance/approval_engineering_pmc': [
+    ['submit_sales_order', 'order_approval'],
+    ['order_approval', 'activate_sales_order'],
+    ['activate_sales_order', 'engineering_data'],
+    ['engineering_data', 'order_review'],
+    ['order_review', 'end'],
+  ],
+  'material_supply/purchase_order_approval': [
+    ['submit_purchase_order', 'purchase_order_approval'],
+    ['purchase_order_approval', 'approve_purchase_order'],
+    ['approve_purchase_order', 'end'],
+  ],
+  'finished_goods_delivery/shipment_finance_approval': [
+    ['shipment_finance_approval', 'shipment_finance_release'],
+    ['shipment_finance_release', 'end'],
+  ],
+  'sales_return_acceptance/approval_receipt': [
+    ['sales_return_approval', 'approve_sales_return'],
+    ['sales_return_approval', 'reject_sales_return'],
+    ['approve_sales_return', 'sales_return_receipt'],
+    ['sales_return_receipt', 'receive_sales_return'],
+    ['receive_sales_return', 'end'],
+    ['reject_sales_return', 'rejected_end'],
+  ],
+  'finance_payment_approval/approval_post': [
+    ['finance_payment_approval', 'approve_finance_payment'],
+    ['finance_payment_approval', 'reject_finance_payment'],
+    ['approve_finance_payment', 'finance_payment_execution'],
+    ['finance_payment_execution', 'post_finance_payment'],
+    ['post_finance_payment', 'end'],
+    ['reject_finance_payment', 'rejected_end'],
+  ],
+  'inventory_adjustment_approval/manual_adjustment_approval': [
+    ['submit_inventory_adjustment', 'inventory_adjustment_approval'],
+    ['inventory_adjustment_approval', 'approve_inventory_adjustment'],
+    ['inventory_adjustment_approval', 'reject_inventory_adjustment'],
+    ['approve_inventory_adjustment', 'inventory_adjustment_execution'],
+    ['inventory_adjustment_execution', 'post_inventory_adjustment'],
+    ['post_inventory_adjustment', 'end'],
+    ['reject_inventory_adjustment', 'rejected_end'],
+  ],
+  'production_exception_approval/exception_decision_approval': [
+    [
+      'production_exception_decision_approval',
+      'approve_production_exception',
+    ],
+    [
+      'production_exception_decision_approval',
+      'reject_production_exception',
+    ],
+    ['approve_production_exception', 'production_exception_execution'],
+    ['approve_production_exception', 'over_issue_end'],
+    ['production_exception_execution', 'execute_production_exception'],
+    ['execute_production_exception', 'end'],
+    ['reject_production_exception', 'rejected_end'],
+  ],
 }
 
 function projectProcessNodes(definition) {
@@ -195,6 +424,10 @@ function projectProcessNodes(definition) {
     node.action,
     [...node.permission],
   ])
+}
+
+function projectProcessEdges(definition) {
+  return definition.edges.map((edge) => [edge.from, edge.to])
 }
 
 function collectSourceRefs(value) {
@@ -406,11 +639,11 @@ test('devFlowStateCatalog: 九个语义层与 scope 分离', () => {
   )
 })
 
-test('devFlowStateCatalog: Product Core 保持 3 process key / 4 variants', () => {
-  assert.equal(processDefinitions.length, 4)
+test('devFlowStateCatalog: Product Core 保持 7 process key / 8 variants', () => {
+  assert.equal(processDefinitions.length, 8)
   assert.equal(
     new Set(processDefinitions.map((item) => item.processKey)).size,
-    3
+    7
   )
   assert.equal(
     DEV_FLOW_STATE_CATALOG.processDefinitions,
@@ -426,22 +659,44 @@ test('devFlowStateCatalog: Product Core 保持 3 process key / 4 variants', () =
       projectProcessNodes(definition),
       expectedProcessNodes[definition.key]
     )
+    assert.deepEqual(
+      projectProcessEdges(definition),
+      expectedProcessEdges[definition.key]
+    )
     assert.equal(definition.readOnly, true)
     assert.equal(
       definition.runtimeAuthority,
       'backend_domain_contract'
     )
     assert.equal(definition.allowsActionExecution, false)
-    assert.equal(definition.edges.length, definition.nodes.length - 1)
     assert.equal(definition.initial, definition.nodes[0].key)
-    assert.equal(
-      definition.terminal,
-      definition.nodes[definition.nodes.length - 1].key
+    assert(
+      definition.nodes.some(
+        (node) => node.key === definition.terminal && node.type === 'end'
+      )
     )
+    const reachable = new Set([definition.initial])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const edge of definition.edges) {
+        if (reachable.has(edge.from) && !reachable.has(edge.to)) {
+          reachable.add(edge.to)
+          changed = true
+        }
+      }
+    }
+    assert.equal(reachable.size, definition.nodes.length)
     for (const node of definition.nodes) {
       assert(node.factBoundary)
       assert(node.sourceRefs.length > 0)
       assert(node.evidence.length > 0)
+      if (node.type === 'end') {
+        assert.equal(
+          definition.edges.some((edge) => edge.from === node.key),
+          false
+        )
+      }
     }
     for (const edge of definition.edges) {
       assert(edge.factBoundary)

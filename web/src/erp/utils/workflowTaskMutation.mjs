@@ -1,7 +1,10 @@
+import { normalizePositiveNumeric20Scale6 } from './numeric20Scale6.mjs'
+
 const WORKFLOW_TASK_ACTION_PAYLOAD_KEYS = new Set([
   'entry_path',
   'evidence_refs',
   'feedback',
+  'process_decision',
   'surface_key',
 ])
 
@@ -68,6 +71,34 @@ function plainObject(value) {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
 
+function requireWorkflowProcessDecision(value) {
+  if (!plainObject(value)) throw workflowTaskMutationInvalid()
+  for (const key of Object.keys(value)) {
+    if (key !== 'reason' && key !== 'approved_quantity') {
+      throw workflowTaskMutationInvalid()
+    }
+  }
+  if (typeof value.reason !== 'string') throw workflowTaskMutationInvalid()
+  const reason = value.reason.trim()
+  if (!reason || [...reason].length > 255) {
+    throw workflowTaskMutationInvalid()
+  }
+  const normalized = { reason }
+  if (Object.hasOwn(value, 'approved_quantity')) {
+    if (typeof value.approved_quantity !== 'string') {
+      throw workflowTaskMutationInvalid()
+    }
+    const quantity = normalizePositiveNumeric20Scale6(
+      value.approved_quantity.trim()
+    )
+    if (!quantity) {
+      throw workflowTaskMutationInvalid()
+    }
+    normalized.approved_quantity = quantity
+  }
+  return normalized
+}
+
 function requireWorkflowTaskActionPayload(operation, value) {
   if (value === undefined || value === null) return {}
   if (!plainObject(value)) throw workflowTaskMutationInvalid()
@@ -77,6 +108,9 @@ function requireWorkflowTaskActionPayload(operation, value) {
     }
   }
   if (operation !== 'complete' && Object.hasOwn(value, 'feedback')) {
+    throw workflowTaskMutationInvalid()
+  }
+  if (operation !== 'complete' && Object.hasOwn(value, 'process_decision')) {
     throw workflowTaskMutationInvalid()
   }
 
@@ -100,6 +134,11 @@ function requireWorkflowTaskActionPayload(operation, value) {
       ),
     ].sort()
     if (evidenceRefs.length) normalized.evidence_refs = evidenceRefs
+  }
+  if (Object.hasOwn(value, 'process_decision')) {
+    normalized.process_decision = requireWorkflowProcessDecision(
+      value.process_decision
+    )
   }
   return normalized
 }

@@ -44,6 +44,30 @@ export const customerPackageSchema = Object.freeze({
       variantKeys: Object.freeze(["shipment_finance_approval"]),
       businessRefType: "shipment",
     }),
+    Object.freeze({
+      processKey: "sales_return_acceptance",
+      processVersion: "v1",
+      variantKeys: Object.freeze(["approval_receipt"]),
+      businessRefType: "sales_return",
+    }),
+    Object.freeze({
+      processKey: "finance_payment_approval",
+      processVersion: "v1",
+      variantKeys: Object.freeze(["approval_post"]),
+      businessRefType: "finance_payment",
+    }),
+    Object.freeze({
+      processKey: "inventory_adjustment_approval",
+      processVersion: "v1",
+      variantKeys: Object.freeze(["manual_adjustment_approval"]),
+      businessRefType: "inventory_operation",
+    }),
+    Object.freeze({
+      processKey: "production_exception_approval",
+      processVersion: "v1",
+      variantKeys: Object.freeze(["exception_decision_approval"]),
+      businessRefType: "production_exception_decision",
+    }),
   ]),
   allowedWorkflowNodeTypes: Object.freeze([
     "human_task",

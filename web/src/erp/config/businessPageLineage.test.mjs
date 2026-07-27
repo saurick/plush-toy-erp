@@ -54,6 +54,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'get_material',
   'get_outsourcing_order',
   'get_process',
+  'get_process_recovery_context',
   'get_product',
   'get_product_sku',
   'get_production_order',
@@ -79,6 +80,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_finance_facts',
   'list_finance_credit_notes',
   'list_finance_payments',
+  'list_inventory_operations',
   'list_inventory_balances',
   'list_inventory_lots',
   'list_inventory_txns',
@@ -157,6 +159,19 @@ const FORMAL_UI_PROCESS_RUNTIME_ACTIONS = Object.freeze([
   'start_material_supply_purchase_order_process',
   'execute_material_supply_purchase_order_submit',
   'start_finished_goods_delivery_process',
+  'start_sales_return_acceptance_process',
+  'get_sales_return_acceptance_process',
+  'execute_sales_return_receive',
+  'start_finance_payment_approval_process',
+  'get_finance_payment_approval_process',
+  'execute_finance_payment_post',
+  'start_inventory_adjustment_approval_process',
+  'get_inventory_adjustment_approval_process',
+  'execute_inventory_adjustment_submit',
+  'execute_inventory_adjustment_post',
+  'start_production_exception_approval_process',
+  'get_production_exception_approval_process',
+  'execute_production_exception_process',
 ])
 
 const BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS = Object.freeze([
@@ -171,7 +186,6 @@ const BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS = Object.freeze([
 const NON_LINEAGE_BACKEND_ONLY_ACTIONS = Object.freeze([
   // These corrective commands intentionally remain backend-only until their
   // dedicated business pages expose a reviewed entrypoint.
-  'approve_production_exception',
   'cancel_outsourcing_return_disposition',
   'cancel_production_exception',
   'correct_quality_inspection_result',

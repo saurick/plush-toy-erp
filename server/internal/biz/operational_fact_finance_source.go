@@ -18,6 +18,8 @@ var (
 	ErrOutsourcingReturnQualityPending    = errors.New("outsourcing return quality inspection is not accepted")
 	ErrOutsourcingReturnQualityRejected   = errors.New("outsourcing return quality inspection is rejected")
 	ErrFinanceReconciliationDependency    = errors.New("finance fact has an active reconciliation")
+	ErrFinanceAllocationDependency        = errors.New("finance fact has an active payment allocation")
+	ErrFinanceCreditNoteDependency        = errors.New("finance fact has an active credit note")
 	ErrFinanceReconciliationSourceInvalid = errors.New("finance reconciliation source is invalid")
 )
 

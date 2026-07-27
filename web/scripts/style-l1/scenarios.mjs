@@ -11249,7 +11249,7 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '权限管理')
         await page.getByRole('tab', { name: /审批责任/ }).click()
-        await expectText(page, '为三项正式审批指定主办、备用和升级责任')
+        await expectText(page, '为三项可配置审批指定主办、备用和升级责任')
         await expectText(page, '销售订单审批')
         await expectText(page, '采购订单审批')
         await expectText(page, '出货财务放行')

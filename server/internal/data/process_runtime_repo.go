@@ -10,11 +10,15 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/financepayment"
+	"server/internal/data/model/ent/inventoryoperation"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/processnodeinstance"
+	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/salesorder"
+	"server/internal/data/model/ent/salesreturn"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/workflowtask"
 
@@ -38,6 +42,7 @@ func NewProcessRuntimeRepo(d *Data, logger log.Logger) *processRuntimeRepo {
 var _ biz.ProcessRuntimeRepo = (*processRuntimeRepo)(nil)
 var _ biz.ProcessRuntimeDomainCommandResultRepo = (*processRuntimeRepo)(nil)
 var _ biz.ProcessRuntimeSourceCreateRepo = (*processRuntimeRepo)(nil)
+var _ biz.ProcessRuntimeBusinessRefReadRepo = (*processRuntimeRepo)(nil)
 
 func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.ProcessInstanceCreate, actorID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
 	if in == nil || !biz.IsCreatableProcessStatus(in.Status) {
@@ -241,6 +246,45 @@ func (r *processRuntimeRepo) lockProcessSourceInTx(
 			return "", "", err
 		}
 		return requiredProcessSourceNo(row.ShipmentNo, row.Status)
+	case in.ProcessKey == biz.ProcessKeySalesReturnApproval && in.BusinessRefType == "sales_return":
+		row, err := tx.SalesReturn.Query().Where(salesreturn.ID(in.BusinessRefID)).Where(lock).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return "", "", biz.ErrBadParam
+			}
+			return "", "", err
+		}
+		return requiredProcessSourceNo(row.ReturnNo, row.Status)
+	case in.ProcessKey == biz.ProcessKeyFinancePaymentApproval && in.BusinessRefType == "finance_payment":
+		row, err := tx.FinancePayment.Query().Where(financepayment.ID(in.BusinessRefID)).Where(lock).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return "", "", biz.ErrBadParam
+			}
+			return "", "", err
+		}
+		return requiredProcessSourceNo(row.PaymentNo, row.Status)
+	case in.ProcessKey == biz.ProcessKeyInventoryAdjustmentApproval && in.BusinessRefType == "inventory_operation":
+		row, err := tx.InventoryOperation.Query().Where(inventoryoperation.ID(in.BusinessRefID)).Where(lock).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return "", "", biz.ErrBadParam
+			}
+			return "", "", err
+		}
+		if row.OperationType != biz.InventoryOperationManualAdjustment {
+			return "", "", biz.ErrBadParam
+		}
+		return requiredProcessSourceNo(row.OperationNo, row.Status)
+	case in.ProcessKey == biz.ProcessKeyProductionExceptionApproval && in.BusinessRefType == "production_exception_decision":
+		row, err := tx.ProductionExceptionDecision.Query().Where(productionexceptiondecision.ID(in.BusinessRefID)).Where(lock).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return "", "", biz.ErrProductionExceptionNotFound
+			}
+			return "", "", err
+		}
+		return requiredProcessSourceNo(row.DecisionNo, row.Status)
 	default:
 		return "", "", biz.ErrBadParam
 	}
@@ -282,6 +326,32 @@ func processSourceStatusAllowed(in *biz.ProcessInstanceCreate, status string, re
 		return status == biz.PurchaseOrderStatusDraft || (replay && status == biz.PurchaseOrderStatusSubmitted)
 	case in.ProcessKey == biz.ProcessKeyFinishedGoodsDelivery && in.BusinessRefType == "shipment":
 		return status == biz.ShipmentStatusDraft || (replay && status == biz.ShipmentStatusShipped)
+	case in.ProcessKey == biz.ProcessKeySalesReturnApproval && in.BusinessRefType == "sales_return":
+		return status == biz.SalesReturnStatusDraft ||
+			(replay && (status == biz.SalesReturnStatusApproved ||
+				status == biz.SalesReturnStatusReceived ||
+				status == biz.SalesReturnStatusRejected ||
+				status == biz.SalesReturnStatusCancelled ||
+				status == biz.SalesReturnStatusReversed))
+	case in.ProcessKey == biz.ProcessKeyFinancePaymentApproval && in.BusinessRefType == "finance_payment":
+		return status == biz.FinancePaymentStatusDraft ||
+			(replay && (status == biz.FinancePaymentStatusApproved ||
+				status == biz.FinancePaymentStatusPosted ||
+				status == biz.FinancePaymentStatusRejected ||
+				status == biz.FinancePaymentStatusCancelled ||
+				status == biz.FinancePaymentStatusReversed))
+	case in.ProcessKey == biz.ProcessKeyInventoryAdjustmentApproval && in.BusinessRefType == "inventory_operation":
+		return status == biz.InventoryOperationStatusDraft ||
+			(replay && (status == biz.InventoryOperationStatusSubmitted ||
+				status == biz.InventoryOperationStatusApproved ||
+				status == biz.InventoryOperationStatusRejected ||
+				status == biz.InventoryOperationStatusPosted ||
+				status == biz.InventoryOperationStatusCancelled))
+	case in.ProcessKey == biz.ProcessKeyProductionExceptionApproval && in.BusinessRefType == "production_exception_decision":
+		return status == biz.ProductionExceptionSubmitted ||
+			(replay && (status == biz.ProductionExceptionApproved ||
+				status == biz.ProductionExceptionRejected ||
+				status == biz.ProductionExceptionCancelled))
 	default:
 		return false
 	}
@@ -469,6 +539,24 @@ func (r *processRuntimeRepo) getProcessInstanceByBusinessRef(ctx context.Context
 		return nil, nil, err
 	}
 	return instance, nodes, nil
+}
+
+func (r *processRuntimeRepo) GetProcessInstanceByBusinessRef(
+	ctx context.Context,
+	processKey string,
+	businessRefType string,
+	businessRefID int,
+) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil ||
+		strings.TrimSpace(processKey) == "" || strings.TrimSpace(businessRefType) == "" || businessRefID <= 0 {
+		return nil, nil, biz.ErrBadParam
+	}
+	return r.getProcessInstanceByBusinessRef(
+		ctx,
+		strings.TrimSpace(processKey),
+		strings.TrimSpace(businessRefType),
+		businessRefID,
+	)
 }
 
 func (r *processRuntimeRepo) GetProcessInstance(ctx context.Context, id int) (*biz.ProcessInstance, error) {
@@ -1005,6 +1093,31 @@ func markProcessDomainCommandEffectCompensatedWithClient(
 			return err
 		}
 		if _, err := markProcessNodeDomainCommandCompensatedWithClient(ctx, client, mark, actorID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func markProcessDomainCommandEffectsCompensatedWithClient(
+	ctx context.Context,
+	client *ent.Client,
+	commandKeys []string,
+	effectRefType string,
+	effectRefID int,
+	reason string,
+	actorID int,
+) error {
+	for _, commandKey := range commandKeys {
+		if err := markProcessDomainCommandEffectCompensatedWithClient(
+			ctx,
+			client,
+			commandKey,
+			effectRefType,
+			effectRefID,
+			reason,
+			actorID,
+		); err != nil {
 			return err
 		}
 	}

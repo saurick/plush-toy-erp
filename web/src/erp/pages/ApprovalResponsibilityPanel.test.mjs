@@ -33,11 +33,12 @@ test('approval responsibility panel keeps publish activate and immutable revisio
   assert.match(source, /在途审批继续使用原责任/)
 })
 
-test('approval responsibility panel exposes only the three formal approval items', () => {
+test('approval responsibility panel exposes only the three configurable approval items', () => {
   assert.match(
     source,
     /APPROVAL_KEYS = \['sales_order', 'purchase_order', 'shipment_finance'\]/
   )
+  assert.match(source, /为三项可配置审批指定主办、备用和升级责任/)
   assert.doesNotMatch(source, /付款审批|客户退货审批|暂不可配置/)
   assert.match(source, /检查并发布/)
   assert.match(source, /启用新设置/)

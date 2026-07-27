@@ -179,6 +179,125 @@ function purchaseProcessExecutionData() {
   }
 }
 
+const EXCEPTION_PROCESS_TEST_CONTRACTS = Object.freeze([
+  {
+    processKey: 'sales_return_acceptance',
+    businessRefType: 'sales_return',
+    idParam: 'sales_return_id',
+    sourceID: 91,
+    startMethod: 'start_sales_return_acceptance_process',
+    getMethod: 'get_sales_return_acceptance_process',
+    executeMethod: 'execute_sales_return_receive',
+    startExport: 'startSalesReturnAcceptanceProcess',
+    getExport: 'getSalesReturnAcceptanceProcess',
+    executeExport: 'executeSalesReturnReceive',
+    startNodeKey: 'sales_return_approval',
+    startNodeType: 'approval',
+    executeNodeKey: 'receive_sales_return',
+  },
+  {
+    processKey: 'finance_payment_approval',
+    businessRefType: 'finance_payment',
+    idParam: 'finance_payment_id',
+    sourceID: 92,
+    startMethod: 'start_finance_payment_approval_process',
+    getMethod: 'get_finance_payment_approval_process',
+    executeMethod: 'execute_finance_payment_post',
+    startExport: 'startFinancePaymentApprovalProcess',
+    getExport: 'getFinancePaymentApprovalProcess',
+    executeExport: 'executeFinancePaymentPost',
+    startNodeKey: 'finance_payment_approval',
+    startNodeType: 'approval',
+    executeNodeKey: 'post_finance_payment',
+  },
+  {
+    processKey: 'inventory_adjustment_approval',
+    businessRefType: 'inventory_operation',
+    idParam: 'inventory_operation_id',
+    sourceID: 93,
+    startMethod: 'start_inventory_adjustment_approval_process',
+    getMethod: 'get_inventory_adjustment_approval_process',
+    executeMethod: 'execute_inventory_adjustment_submit',
+    secondExecuteMethod: 'execute_inventory_adjustment_post',
+    startExport: 'startInventoryAdjustmentApprovalProcess',
+    getExport: 'getInventoryAdjustmentApprovalProcess',
+    executeExport: 'executeInventoryAdjustmentSubmit',
+    secondExecuteExport: 'executeInventoryAdjustmentPost',
+    startNodeKey: 'submit_inventory_adjustment',
+    startNodeType: 'domain_command',
+    executeNodeKey: 'submit_inventory_adjustment',
+    secondExecuteNodeKey: 'post_inventory_adjustment',
+  },
+  {
+    processKey: 'production_exception_approval',
+    businessRefType: 'production_exception_decision',
+    idParam: 'production_exception_id',
+    sourceID: 94,
+    startMethod: 'start_production_exception_approval_process',
+    getMethod: 'get_production_exception_approval_process',
+    executeMethod: 'execute_production_exception_process',
+    startExport: 'startProductionExceptionApprovalProcess',
+    getExport: 'getProductionExceptionApprovalProcess',
+    executeExport: 'executeProductionExceptionProcess',
+    startNodeKey: 'production_exception_decision_approval',
+    startNodeType: 'approval',
+    executeNodeKey: 'execute_production_exception',
+  },
+])
+
+function exceptionProcessContext(
+  contract,
+  node,
+  { sourceID = contract.sourceID, processStatus = 'active' } = {}
+) {
+  return {
+    process_instance: {
+      id: 700 + sourceID,
+      process_key: contract.processKey,
+      business_ref_type: contract.businessRefType,
+      business_ref_id: sourceID,
+      status: processStatus,
+    },
+    nodes: [node],
+    active_nodes: node.status === 'active' ? [node] : [],
+    settled_nodes: ['completed', 'blocked'].includes(node.status) ? [node] : [],
+  }
+}
+
+function exceptionStartResult(contract) {
+  const instanceID = 700 + contract.sourceID
+  const startedNode = {
+    id: 800 + contract.sourceID,
+    process_instance_id: instanceID,
+    node_key: contract.startNodeKey,
+    node_type: contract.startNodeType,
+    status: 'active',
+    version: 1,
+  }
+  return {
+    process_context: exceptionProcessContext(contract, startedNode),
+    started_node: startedNode,
+    source_readback: { id: contract.sourceID, status: 'DRAFT' },
+  }
+}
+
+function exceptionExecutionResult(contract, nodeKey = contract.executeNodeKey) {
+  const instanceID = 700 + contract.sourceID
+  const completedNode = {
+    id: 900 + contract.sourceID,
+    process_instance_id: instanceID,
+    node_key: nodeKey,
+    node_type: 'domain_command',
+    status: 'completed',
+    version: 2,
+  }
+  return {
+    process_context: exceptionProcessContext(contract, completedNode),
+    completed_node: completedNode,
+    source_readback: { id: contract.sourceID, status: 'UPDATED' },
+  }
+}
+
 test('customerConfigApi: sales order acceptance submit uses explicit start and domain command APIs', () => {
   assert.match(customerConfigApiSource, /rollback_customer_config/)
   assert.match(customerConfigApiSource, /rollbackCustomerConfig/)
@@ -440,6 +559,191 @@ test('customerConfigApi: malformed purchase process result fails closed', async 
       )
     })
   }
+})
+
+test('customerConfigApi: exception processes use all 13 exact start, get, and execute RPC contracts', async (t) => {
+  for (const contract of EXCEPTION_PROCESS_TEST_CONTRACTS) {
+    await t.test(`${contract.processKey} start`, async () => {
+      const calls = []
+      const api = await loadCustomerConfigApiForTest(async (method, params) => {
+        calls.push({ method, params })
+        return { data: exceptionStartResult(contract) }
+      })
+      const result = await api[contract.startExport]({
+        [contract.idParam]: contract.sourceID,
+      })
+      assert.equal(result.source_readback.id, contract.sourceID)
+      assert.deepEqual(calls, [
+        {
+          method: contract.startMethod,
+          params: { [contract.idParam]: contract.sourceID },
+        },
+      ])
+    })
+
+    await t.test(`${contract.processKey} get`, async () => {
+      const calls = []
+      const api = await loadCustomerConfigApiForTest(async (method, params) => {
+        calls.push({ method, params })
+        const data = exceptionStartResult(contract)
+        delete data.started_node
+        return { data }
+      })
+      const result = await api[contract.getExport]({
+        [contract.idParam]: contract.sourceID,
+      })
+      assert.equal(
+        result.process_context.process_instance.business_ref_id,
+        contract.sourceID
+      )
+      assert.equal(calls[0].method, contract.getMethod)
+    })
+
+    const executions = [
+      {
+        method: contract.executeMethod,
+        exportName: contract.executeExport,
+        nodeKey: contract.executeNodeKey,
+      },
+      ...(contract.secondExecuteMethod
+        ? [
+            {
+              method: contract.secondExecuteMethod,
+              exportName: contract.secondExecuteExport,
+              nodeKey: contract.secondExecuteNodeKey,
+            },
+          ]
+        : []),
+    ]
+    for (const execution of executions) {
+      await t.test(`${contract.processKey} ${execution.nodeKey}`, async () => {
+        const calls = []
+        const api = await loadCustomerConfigApiForTest(
+          async (method, params) => {
+            calls.push({ method, params })
+            return {
+              data: exceptionExecutionResult(contract, execution.nodeKey),
+            }
+          }
+        )
+        const params = {
+          [contract.idParam]: contract.sourceID,
+          process_instance_id: 700 + contract.sourceID,
+          process_node_instance_id: 900 + contract.sourceID,
+          expected_version: 1,
+        }
+        const result = await api[execution.exportName](params)
+        assert.equal(result.completed_node.node_key, execution.nodeKey)
+        assert.deepEqual(calls, [{ method: execution.method, params }])
+      })
+    }
+  }
+})
+
+test('customerConfigApi: exception process readback and node mismatches fail closed', async () => {
+  const contract = EXCEPTION_PROCESS_TEST_CONTRACTS[0]
+  const api = await loadCustomerConfigApiForTest(async () => {
+    const data = structuredClone(exceptionStartResult(contract))
+    data.source_readback.id += 1
+    return { data }
+  })
+  await assert.rejects(
+    api.startSalesReturnAcceptanceProcess({
+      sales_return_id: contract.sourceID,
+    }),
+    /异常业务流程结果无法确认，请刷新后重试/
+  )
+
+  const missingProcessApi = await loadCustomerConfigApiForTest(async () => ({
+    data: {
+      process_context: null,
+      source_readback: { id: contract.sourceID, status: 'DRAFT' },
+    },
+  }))
+  const missing = await missingProcessApi.getSalesReturnAcceptanceProcess({
+    sales_return_id: contract.sourceID,
+  })
+  assert.equal(missing.process_context, null)
+})
+
+test('customerConfigApi: compensated process recovery uses exact evidence and readback', async () => {
+  const resultHash = 'a'.repeat(64)
+  const compensationHash = 'b'.repeat(64)
+  const candidate = {
+    id: 991,
+    process_instance_id: 791,
+    node_key: 'sales_return_approval_command',
+    node_type: 'domain_command',
+    status: 'completed',
+    version: 7,
+    domain_command_effect_state: 'compensated',
+    domain_command_result_hash: resultHash,
+    domain_command_compensation_hash: compensationHash,
+    domain_command_compensated_at: 1_700_000_000,
+    domain_command_compensated_by: 31,
+    domain_command_recovery_decision: null,
+    domain_command_recovered_at: null,
+    domain_command_recovered_by: null,
+  }
+  const downstream = {
+    id: 992,
+    process_instance_id: 791,
+    node_key: 'receive_sales_return',
+    node_type: 'domain_command',
+    status: 'active',
+    version: 2,
+  }
+  const processData = {
+    process_context: {
+      process_instance: { id: 791, status: 'blocked' },
+      nodes: [candidate, downstream],
+    },
+  }
+  const calls = []
+  const recoveredNode = {
+    ...candidate,
+    version: 8,
+    domain_command_recovery_decision: 'terminate_and_withdraw_downstream',
+    domain_command_recovered_at: 1_700_000_100,
+    domain_command_recovered_by: 1,
+  }
+  const api = await loadCustomerConfigApiForTest(async (method, params) => {
+    calls.push({ method, params })
+    return { data: { recovered_node: recoveredNode } }
+  })
+
+  assert.equal(api.findExceptionProcessRecoveryCandidate(processData), candidate)
+  const recovered = await api.recoverCompensatedProcessDomainCommand({
+    process_instance_id: 791,
+    process_node_instance_id: 991,
+    expected_version: 7,
+    expected_result_hash: resultHash,
+    expected_compensation_hash: compensationHash,
+    ignored_field: 'must-not-cross-contract',
+  })
+  assert.equal(recovered.version, 8)
+  assert.deepEqual(calls[0], {
+    method: 'recover_compensated_process_domain_command',
+    params: {
+      process_instance_id: 791,
+      process_node_instance_id: 991,
+      expected_version: 7,
+      decision: 'terminate_and_withdraw_downstream',
+      expected_result_hash: resultHash,
+      expected_compensation_hash: compensationHash,
+    },
+  })
+  assert.equal(
+    api.exceptionProcessRecoveryReadbackMatches(
+      {
+        process_context: {
+          nodes: [recoveredNode, { ...downstream, status: 'blocked' }],
+        },
+      },
+      calls[0].params
+    ),
+    true
+  )
 })
 
 test('customerConfigApi: customer config transitions use strict shared payload builders', () => {

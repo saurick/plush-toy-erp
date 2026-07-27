@@ -41,6 +41,12 @@ type SalesReturn struct {
 	ApprovedAt *time.Time `json:"approved_at,omitempty"`
 	// ApprovedBy holds the value of the "approved_by" field.
 	ApprovedBy *int `json:"approved_by,omitempty"`
+	// RejectedAt holds the value of the "rejected_at" field.
+	RejectedAt *time.Time `json:"rejected_at,omitempty"`
+	// RejectedBy holds the value of the "rejected_by" field.
+	RejectedBy *int `json:"rejected_by,omitempty"`
+	// RejectReason holds the value of the "reject_reason" field.
+	RejectReason *string `json:"reject_reason,omitempty"`
 	// ReceivedAt holds the value of the "received_at" field.
 	ReceivedAt *time.Time `json:"received_at,omitempty"`
 	// ReceivedBy holds the value of the "received_by" field.
@@ -51,6 +57,12 @@ type SalesReturn struct {
 	CancelledBy *int `json:"cancelled_by,omitempty"`
 	// CancelReason holds the value of the "cancel_reason" field.
 	CancelReason *string `json:"cancel_reason,omitempty"`
+	// ReversedAt holds the value of the "reversed_at" field.
+	ReversedAt *time.Time `json:"reversed_at,omitempty"`
+	// ReversedBy holds the value of the "reversed_by" field.
+	ReversedBy *int `json:"reversed_by,omitempty"`
+	// ReverseReason holds the value of the "reverse_reason" field.
+	ReverseReason *string `json:"reverse_reason,omitempty"`
 	// CreatedBy holds the value of the "created_by" field.
 	CreatedBy int `json:"created_by,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -86,11 +98,11 @@ func (*SalesReturn) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case salesreturn.FieldID, salesreturn.FieldShipmentID, salesreturn.FieldCustomerID, salesreturn.FieldIdempotencyItemCount, salesreturn.FieldVersion, salesreturn.FieldApprovedBy, salesreturn.FieldReceivedBy, salesreturn.FieldCancelledBy, salesreturn.FieldCreatedBy:
+		case salesreturn.FieldID, salesreturn.FieldShipmentID, salesreturn.FieldCustomerID, salesreturn.FieldIdempotencyItemCount, salesreturn.FieldVersion, salesreturn.FieldApprovedBy, salesreturn.FieldRejectedBy, salesreturn.FieldReceivedBy, salesreturn.FieldCancelledBy, salesreturn.FieldReversedBy, salesreturn.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
-		case salesreturn.FieldReturnNo, salesreturn.FieldCustomerNameSnapshot, salesreturn.FieldStatus, salesreturn.FieldReason, salesreturn.FieldIdempotencyKey, salesreturn.FieldIdempotencyPayloadHash, salesreturn.FieldCancelReason:
+		case salesreturn.FieldReturnNo, salesreturn.FieldCustomerNameSnapshot, salesreturn.FieldStatus, salesreturn.FieldReason, salesreturn.FieldIdempotencyKey, salesreturn.FieldIdempotencyPayloadHash, salesreturn.FieldRejectReason, salesreturn.FieldCancelReason, salesreturn.FieldReverseReason:
 			values[i] = new(sql.NullString)
-		case salesreturn.FieldApprovedAt, salesreturn.FieldReceivedAt, salesreturn.FieldCancelledAt, salesreturn.FieldCreatedAt, salesreturn.FieldUpdatedAt:
+		case salesreturn.FieldApprovedAt, salesreturn.FieldRejectedAt, salesreturn.FieldReceivedAt, salesreturn.FieldCancelledAt, salesreturn.FieldReversedAt, salesreturn.FieldCreatedAt, salesreturn.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -187,6 +199,27 @@ func (_m *SalesReturn) assignValues(columns []string, values []any) error {
 				_m.ApprovedBy = new(int)
 				*_m.ApprovedBy = int(value.Int64)
 			}
+		case salesreturn.FieldRejectedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field rejected_at", values[i])
+			} else if value.Valid {
+				_m.RejectedAt = new(time.Time)
+				*_m.RejectedAt = value.Time
+			}
+		case salesreturn.FieldRejectedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field rejected_by", values[i])
+			} else if value.Valid {
+				_m.RejectedBy = new(int)
+				*_m.RejectedBy = int(value.Int64)
+			}
+		case salesreturn.FieldRejectReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field reject_reason", values[i])
+			} else if value.Valid {
+				_m.RejectReason = new(string)
+				*_m.RejectReason = value.String
+			}
 		case salesreturn.FieldReceivedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field received_at", values[i])
@@ -221,6 +254,27 @@ func (_m *SalesReturn) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.CancelReason = new(string)
 				*_m.CancelReason = value.String
+			}
+		case salesreturn.FieldReversedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field reversed_at", values[i])
+			} else if value.Valid {
+				_m.ReversedAt = new(time.Time)
+				*_m.ReversedAt = value.Time
+			}
+		case salesreturn.FieldReversedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field reversed_by", values[i])
+			} else if value.Valid {
+				_m.ReversedBy = new(int)
+				*_m.ReversedBy = int(value.Int64)
+			}
+		case salesreturn.FieldReverseReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field reverse_reason", values[i])
+			} else if value.Valid {
+				_m.ReverseReason = new(string)
+				*_m.ReverseReason = value.String
 			}
 		case salesreturn.FieldCreatedBy:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -321,6 +375,21 @@ func (_m *SalesReturn) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
+	if v := _m.RejectedAt; v != nil {
+		builder.WriteString("rejected_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.RejectedBy; v != nil {
+		builder.WriteString("rejected_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RejectReason; v != nil {
+		builder.WriteString("reject_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	if v := _m.ReceivedAt; v != nil {
 		builder.WriteString("received_at=")
 		builder.WriteString(v.Format(time.ANSIC))
@@ -343,6 +412,21 @@ func (_m *SalesReturn) String() string {
 	builder.WriteString(", ")
 	if v := _m.CancelReason; v != nil {
 		builder.WriteString("cancel_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ReversedAt; v != nil {
+		builder.WriteString("reversed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ReversedBy; v != nil {
+		builder.WriteString("reversed_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ReverseReason; v != nil {
+		builder.WriteString("reverse_reason=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

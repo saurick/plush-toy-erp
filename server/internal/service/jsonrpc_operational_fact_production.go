@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "submit_production_exception", "approve_production_exception", "reject_production_exception", "cancel_production_exception", "execute_production_exception", "reverse_production_exception", "get_production_exception", "list_production_exceptions":
+	case "submit_production_exception", "cancel_production_exception", "reverse_production_exception", "get_production_exception", "list_production_exceptions":
 		return d.handleProductionException(ctx, method, id, pm, actorID)
 	case "create_production_completion_from_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionCompletionCreate); res != nil {
@@ -74,13 +74,20 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		item, err := d.operationalFactUC.CreateProductionReworkFromCompletion(ctx, in)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "post_production_fact":
+		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version") {
+			return id, invalidParamResult(), nil
+		}
+		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, false)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactPost); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
-		factID := getInt(pm, "id", 0)
+		factID := mutation.ID
 		requiresSourceTask, err := d.operationalFactUC.ProductionFactRequiresSourceTask(ctx, factID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
@@ -92,13 +99,20 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.PostProductionFactWithActor(ctx, factID, actorID)
+		item, err := d.operationalFactUC.PostProductionFact(ctx, mutation)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "cancel_production_fact":
+		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
+			return id, invalidParamResult(), nil
+		}
+		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, true)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactCancel); res != nil {
 			return id, res, nil
 		}
-		factID := getInt(pm, "id", 0)
+		factID := mutation.ID
 		requiresSourceTask, err := d.operationalFactUC.ProductionFactRequiresSourceTask(ctx, factID)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
@@ -110,7 +124,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CancelPostedProductionFactWithActor(ctx, factID, actorID)
+		item, err := d.operationalFactUC.CancelPostedProductionFact(ctx, mutation)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "list_production_facts":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactRead); res != nil {
@@ -302,7 +316,10 @@ func productionOrderMaterialRequirementToAny(item *biz.ProductionOrderMaterialRe
 		"bom_header_id": item.BOMHeaderID, "bom_item_id": item.BOMItemID, "material_id": item.MaterialID, "unit_id": item.UnitID,
 		"production_operation_code": optionalStringToAny(item.ProductionOperationCode),
 		"unit_quantity_snapshot":    item.UnitQuantitySnapshot.String(), "loss_rate_snapshot": item.LossRateSnapshot.String(),
-		"planned_quantity": item.PlannedQuantity.String(), "issued_quantity": item.IssuedQuantity.String(), "remaining_quantity": item.RemainingQuantity.String(),
+		"planned_quantity":             item.PlannedQuantity.String(),
+		"approved_over_issue_quantity": item.ApprovedOverIssueQuantity.String(),
+		"effective_limit_quantity":     item.EffectiveLimitQuantity.String(),
+		"issued_quantity":              item.IssuedQuantity.String(), "remaining_quantity": item.RemainingQuantity.String(),
 		"material_code_snapshot": item.MaterialCodeSnapshot, "material_name_snapshot": item.MaterialNameSnapshot,
 		"unit_code_snapshot": item.UnitCodeSnapshot, "unit_name_snapshot": item.UnitNameSnapshot,
 		"created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix(),
@@ -313,5 +330,5 @@ func productionFactToAny(item *biz.ProductionFact) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

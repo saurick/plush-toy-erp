@@ -57,6 +57,7 @@ var (
 	ErrProductionOrderSchedulingTaskRequired         = errors.New("production order scheduling task required")
 	ErrProductionOrderSchedulingTaskActive           = errors.New("production order scheduling task active")
 	ErrProductionOrderWIPActive                      = errors.New("production order has active WIP")
+	ErrProductionOrderExceptionDependency            = errors.New("production order has unsettled exception decisions")
 )
 
 type ProductionOrder struct {
@@ -104,28 +105,31 @@ type ProductionOrderItem struct {
 }
 
 // ProductionOrderMaterialRequirement is an immutable release-time BOM
-// snapshot. IssuedQuantity and RemainingQuantity are query projections derived
-// from posted production material issues.
+// snapshot. ApprovedOverIssueQuantity, EffectiveLimitQuantity, IssuedQuantity
+// and RemainingQuantity are query projections derived from active approved
+// over-issue decisions and posted production material issues.
 type ProductionOrderMaterialRequirement struct {
-	ID                      int             `json:"id"`
-	ProductionOrderID       int             `json:"production_order_id"`
-	ProductionOrderItemID   int             `json:"production_order_item_id"`
-	BOMHeaderID             int             `json:"bom_header_id"`
-	BOMItemID               int             `json:"bom_item_id"`
-	MaterialID              int             `json:"material_id"`
-	UnitID                  int             `json:"unit_id"`
-	ProductionOperationCode *string         `json:"production_operation_code,omitempty"`
-	UnitQuantitySnapshot    decimal.Decimal `json:"unit_quantity_snapshot"`
-	LossRateSnapshot        decimal.Decimal `json:"loss_rate_snapshot"`
-	PlannedQuantity         decimal.Decimal `json:"planned_quantity"`
-	IssuedQuantity          decimal.Decimal `json:"issued_quantity"`
-	RemainingQuantity       decimal.Decimal `json:"remaining_quantity"`
-	MaterialCodeSnapshot    string          `json:"material_code_snapshot"`
-	MaterialNameSnapshot    string          `json:"material_name_snapshot"`
-	UnitCodeSnapshot        string          `json:"unit_code_snapshot"`
-	UnitNameSnapshot        string          `json:"unit_name_snapshot"`
-	CreatedAt               time.Time       `json:"created_at"`
-	UpdatedAt               time.Time       `json:"updated_at"`
+	ID                        int             `json:"id"`
+	ProductionOrderID         int             `json:"production_order_id"`
+	ProductionOrderItemID     int             `json:"production_order_item_id"`
+	BOMHeaderID               int             `json:"bom_header_id"`
+	BOMItemID                 int             `json:"bom_item_id"`
+	MaterialID                int             `json:"material_id"`
+	UnitID                    int             `json:"unit_id"`
+	ProductionOperationCode   *string         `json:"production_operation_code,omitempty"`
+	UnitQuantitySnapshot      decimal.Decimal `json:"unit_quantity_snapshot"`
+	LossRateSnapshot          decimal.Decimal `json:"loss_rate_snapshot"`
+	PlannedQuantity           decimal.Decimal `json:"planned_quantity"`
+	ApprovedOverIssueQuantity decimal.Decimal `json:"approved_over_issue_quantity"`
+	EffectiveLimitQuantity    decimal.Decimal `json:"effective_limit_quantity"`
+	IssuedQuantity            decimal.Decimal `json:"issued_quantity"`
+	RemainingQuantity         decimal.Decimal `json:"remaining_quantity"`
+	MaterialCodeSnapshot      string          `json:"material_code_snapshot"`
+	MaterialNameSnapshot      string          `json:"material_name_snapshot"`
+	UnitCodeSnapshot          string          `json:"unit_code_snapshot"`
+	UnitNameSnapshot          string          `json:"unit_name_snapshot"`
+	CreatedAt                 time.Time       `json:"created_at"`
+	UpdatedAt                 time.Time       `json:"updated_at"`
 }
 
 type ProductionOrderAggregate struct {

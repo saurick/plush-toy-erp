@@ -16,8 +16,10 @@ const (
 	SalesReturnSourceType      = "SALES_RETURN"
 	SalesReturnStatusDraft     = "DRAFT"
 	SalesReturnStatusApproved  = "APPROVED"
+	SalesReturnStatusRejected  = "REJECTED"
 	SalesReturnStatusReceived  = "RECEIVED"
 	SalesReturnStatusCancelled = "CANCELLED"
+	SalesReturnStatusReversed  = "REVERSED"
 )
 
 type SalesReturn struct {
@@ -33,11 +35,17 @@ type SalesReturn struct {
 	Version                int
 	ApprovedAt             *time.Time
 	ApprovedBy             *int
+	RejectedAt             *time.Time
+	RejectedBy             *int
+	RejectReason           *string
 	ReceivedAt             *time.Time
 	ReceivedBy             *int
 	CancelledAt            *time.Time
 	CancelledBy            *int
 	CancelReason           *string
+	ReversedAt             *time.Time
+	ReversedBy             *int
+	ReverseReason          *string
 	CreatedBy              int
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
@@ -45,19 +53,23 @@ type SalesReturn struct {
 }
 
 type SalesReturnItem struct {
-	ID                  int
-	SalesReturnID       int
-	LineNo              string
-	ShipmentItemID      int
-	ProductID           int
-	ProductSkuID        *int
-	WarehouseID         int
-	UnitID              int
-	LotID               *int
-	QualityInspectionID int
-	Quantity            decimal.Decimal
-	Condition           string
-	Note                *string
+	ID                             int
+	SalesReturnID                  int
+	LineNo                         string
+	ShipmentItemID                 int
+	ProductID                      int
+	ProductSkuID                   *int
+	WarehouseID                    int
+	UnitID                         int
+	LotID                          *int
+	QualityInspectionID            int
+	CurrentQualityInspectionID     int
+	CurrentQualityInspectionNo     string
+	CurrentQualityInspectionStatus string
+	CurrentQualityInspectionResult *string
+	Quantity                       decimal.Decimal
+	Condition                      string
+	Note                           *string
 }
 
 type SalesReturnCreate struct {
@@ -93,6 +105,7 @@ type SalesReturnRepo interface {
 	ApproveSalesReturn(ctx context.Context, in *SalesReturnTransition, actorID int) (*SalesReturn, error)
 	ReceiveSalesReturn(ctx context.Context, in *SalesReturnTransition, actorID int) (*SalesReturn, error)
 	CancelSalesReturn(ctx context.Context, in *SalesReturnTransition, actorID int) (*SalesReturn, error)
+	ReverseSalesReturn(ctx context.Context, in *SalesReturnTransition, actorID int) (*SalesReturn, error)
 	GetSalesReturn(ctx context.Context, id int) (*SalesReturn, error)
 	ListSalesReturns(ctx context.Context, filter SalesReturnFilter) ([]*SalesReturn, int, error)
 }
@@ -110,25 +123,40 @@ func (uc *OperationalFactUsecase) CreateSalesReturn(ctx context.Context, in *Sal
 }
 
 func (uc *OperationalFactUsecase) ApproveSalesReturn(ctx context.Context, in *SalesReturnTransition, actorID int) (*SalesReturn, error) {
-	repo, ok := uc.salesReturnRepo()
+	_, ok := uc.salesReturnRepo()
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
-	return repo.ApproveSalesReturn(ctx, in, actorID)
+	return nil, ErrProcessRuntimeRequired
 }
 func (uc *OperationalFactUsecase) ReceiveSalesReturn(ctx context.Context, in *SalesReturnTransition, actorID int) (*SalesReturn, error) {
-	repo, ok := uc.salesReturnRepo()
+	_, ok := uc.salesReturnRepo()
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
-	return repo.ReceiveSalesReturn(ctx, in, actorID)
+	return nil, ErrProcessRuntimeRequired
 }
 func (uc *OperationalFactUsecase) CancelSalesReturn(ctx context.Context, in *SalesReturnTransition, actorID int) (*SalesReturn, error) {
 	repo, ok := uc.salesReturnRepo()
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 || strings.TrimSpace(in.Reason) == "" {
 		return nil, ErrBadParam
 	}
+	in.Reason = strings.TrimSpace(in.Reason)
+	if len([]rune(in.Reason)) > 255 {
+		return nil, ErrBadParam
+	}
 	return repo.CancelSalesReturn(ctx, in, actorID)
+}
+func (uc *OperationalFactUsecase) ReverseSalesReturn(ctx context.Context, in *SalesReturnTransition, actorID int) (*SalesReturn, error) {
+	repo, ok := uc.salesReturnRepo()
+	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 || strings.TrimSpace(in.Reason) == "" {
+		return nil, ErrBadParam
+	}
+	in.Reason = strings.TrimSpace(in.Reason)
+	if len([]rune(in.Reason)) > 255 {
+		return nil, ErrBadParam
+	}
+	return repo.ReverseSalesReturn(ctx, in, actorID)
 }
 func (uc *OperationalFactUsecase) GetSalesReturn(ctx context.Context, id int) (*SalesReturn, error) {
 	repo, ok := uc.salesReturnRepo()
@@ -149,6 +177,11 @@ func (uc *OperationalFactUsecase) ListSalesReturns(ctx context.Context, filter S
 		filter.Offset = 0
 	}
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
+	switch filter.Status {
+	case "", SalesReturnStatusDraft, SalesReturnStatusApproved, SalesReturnStatusRejected, SalesReturnStatusReceived, SalesReturnStatusCancelled, SalesReturnStatusReversed:
+	default:
+		return nil, 0, ErrBadParam
+	}
 	return repo.ListSalesReturns(ctx, filter)
 }
 func (uc *OperationalFactUsecase) salesReturnRepo() (SalesReturnRepo, bool) {
@@ -163,7 +196,8 @@ func normalizeSalesReturnCreate(in SalesReturnCreate) (SalesReturnCreate, string
 	in.ReturnNo = strings.TrimSpace(in.ReturnNo)
 	in.Reason = strings.TrimSpace(in.Reason)
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
-	if in.ReturnNo == "" || in.Reason == "" || in.IdempotencyKey == "" || len(in.IdempotencyKey) > 128 || in.ShipmentID <= 0 || len(in.Items) == 0 {
+	if in.ReturnNo == "" || in.Reason == "" || in.IdempotencyKey == "" || len(in.Items) == 0 || in.ShipmentID <= 0 ||
+		len([]rune(in.ReturnNo)) > 64 || len([]rune(in.Reason)) > 255 || len([]rune(in.IdempotencyKey)) > 128 {
 		return SalesReturnCreate{}, "", ErrBadParam
 	}
 	sort.Slice(in.Items, func(i, j int) bool { return in.Items[i].ShipmentItemID < in.Items[j].ShipmentItemID })
@@ -177,6 +211,9 @@ func normalizeSalesReturnCreate(in SalesReturnCreate) (SalesReturnCreate, string
 		}
 		seen[in.Items[i].ShipmentItemID] = struct{}{}
 		in.Items[i].Note = normalizeOptionalString(in.Items[i].Note)
+		if in.Items[i].Note != nil && len([]rune(*in.Items[i].Note)) > 255 {
+			return SalesReturnCreate{}, "", ErrBadParam
+		}
 	}
 	payload := struct {
 		ReturnNo   string                  `json:"return_no"`

@@ -39,7 +39,7 @@ func IsWorkflowApprovalTask(task *WorkflowTask) bool {
 	if task == nil {
 		return false
 	}
-	if task.RequiredCapabilityKey != nil && strings.TrimSpace(*task.RequiredCapabilityKey) == PermissionWorkflowTaskApprove {
+	if task.RequiredCapabilityKey != nil && IsWorkflowApprovalCapabilityKey(*task.RequiredCapabilityKey) {
 		return true
 	}
 	return false

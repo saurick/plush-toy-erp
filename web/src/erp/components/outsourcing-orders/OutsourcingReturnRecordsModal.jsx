@@ -91,12 +91,14 @@ export default function OutsourcingReturnRecordsModal({
   canViewPayable = false,
   canCreateQualityInspection = false,
   canViewQualityInspection = false,
+  canViewDisposition = false,
   qualityInspectionByFactID = {},
   onCancel,
   onPostFact,
   onCancelFact,
   onCreateQualityInspection,
   onViewQualityInspection,
+  onViewDisposition,
   onGeneratePayable,
   onViewPayable,
 }) {
@@ -263,6 +265,11 @@ export default function OutsourcingReturnRecordsModal({
               )
                 ? '继续质检'
                 : '查看质检'}
+            </Button>
+          ) : null}
+          {canViewDisposition && selectedPostedReturn ? (
+            <Button onClick={() => onViewDisposition?.(selected)}>
+              返厂 / 返工处置
             </Button>
           ) : null}
           {canViewPayable ? (

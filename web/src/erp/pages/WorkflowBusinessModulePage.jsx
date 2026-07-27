@@ -6,7 +6,7 @@ import {
   RedoOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Button, Input, Modal, Space, Tag } from 'antd'
+import { Alert, Button, Input, Modal, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -15,6 +15,7 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
+  getWorkflowTaskProcessContext,
   listWorkflowTasks,
   rejectWorkflowTaskAction,
   resumeWorkflowTaskAction,
@@ -70,6 +71,14 @@ import {
   getWorkflowTaskReason,
   getWorkflowTaskStatusMeta,
 } from '../utils/workflowTaskBoard.mjs'
+import { isWorkflowProcessDecisionTask } from '../utils/workflowTaskActionContract.mjs'
+import {
+  buildWorkflowProcessDecision,
+  getWorkflowProcessDecisionApprovalForm,
+  getWorkflowProcessDecisionApprovedQuantityError,
+  requireWorkflowProcessDecisionSubmission,
+  workflowProcessDecisionAllowsApprovedQuantity,
+} from '../utils/workflowProcessDecision.mjs'
 
 function businessActionModalTitle(title, description) {
   return (
@@ -109,17 +118,17 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
     payloadScope: 'production_scheduling_workflow_only',
   },
   'production-exceptions': {
-    taskGroup: 'production_exception',
+    taskGroup: 'production_exception_decision_approval',
     completionMessage:
-      '异常任务已完成，返工、报废或库存调整仍需到对应业务页面办理。',
-    emptyText: '暂无生产异常任务。',
+      '异常审批已完成；生产岗位仍需在异常来源记录中执行或冲正，任务完成本身不写生产或库存事实。',
+    emptyText: '暂无待审批的生产异常处置。',
     ownerRoleOptions: [
       workflowRoleOption('production'),
       workflowRoleOption('pmc'),
       workflowRoleOption('quality'),
       workflowRoleOption('warehouse'),
     ],
-    payloadScope: 'production_exception_workflow_only',
+    payloadScope: 'production_exception_decision_process_approval',
   },
   'shipping-release': {
     taskGroup: 'shipment_release',
@@ -179,6 +188,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
   const [loading, setLoading] = useState(false)
   const [taskReasonModal, setTaskReasonModal] = useState(null)
+  const [taskReasonProcessContext, setTaskReasonProcessContext] = useState(null)
+  const [taskReasonProcessContextState, setTaskReasonProcessContextState] =
+    useState('idle')
   const linkedKeyword = String(searchParams.get('link_keyword') || '').trim()
   const [keyword, setKeyword] = useState(linkedKeyword)
   const [status, setStatus] = useState('')
@@ -205,6 +217,15 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     adminProfile,
     'workflow.task.approve'
   )
+  const canCompleteOrApproveWorkflowTasks =
+    canCompleteWorkflowTasks ||
+    canApproveWorkflowTasks ||
+    [
+      'sales_return.approve',
+      'finance.payment.approve',
+      'warehouse.adjustment.approve',
+      'production.exception.approve',
+    ].some((permission) => hasActionPermission(adminProfile, permission))
   const canRejectWorkflowTasks = hasActionPermission(
     adminProfile,
     'workflow.task.reject'
@@ -325,6 +346,60 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     [selectedTaskKeys, tasks]
   )
   const selectedTask = selectedTasks[0] || null
+  const taskReasonProcessDecisionRequired = Boolean(
+    taskReasonModal?.mode === 'complete' &&
+      isWorkflowProcessDecisionTask(selectedTask)
+  )
+  const taskReasonProcessApprovalForm = getWorkflowProcessDecisionApprovalForm(
+    selectedTask,
+    taskReasonProcessContext
+  )
+  const taskReasonProcessDecisionReady =
+    !taskReasonProcessDecisionRequired ||
+    (taskReasonProcessContextState === 'ready' &&
+      Boolean(taskReasonProcessApprovalForm))
+  const taskReasonApprovedQuantityAllowed =
+    taskReasonProcessDecisionRequired &&
+    workflowProcessDecisionAllowsApprovedQuantity(taskReasonProcessApprovalForm)
+  const taskReasonApprovedQuantityError = taskReasonApprovedQuantityAllowed
+    ? getWorkflowProcessDecisionApprovedQuantityError(
+        taskReasonProcessApprovalForm,
+        taskReasonModal?.approvedQuantity || ''
+      )
+    : ''
+
+  useEffect(() => {
+    if (!taskReasonProcessDecisionRequired) {
+      setTaskReasonProcessContext(null)
+      setTaskReasonProcessContextState('idle')
+      return undefined
+    }
+    if (!selectedTask?.id || !selectedTask?.process_instance_id) {
+      setTaskReasonProcessContext(null)
+      setTaskReasonProcessContextState('error')
+      return undefined
+    }
+
+    const controller = new AbortController()
+    setTaskReasonProcessContext(null)
+    setTaskReasonProcessContextState('loading')
+    getWorkflowTaskProcessContext(selectedTask.id, {
+      signal: controller.signal,
+    })
+      .then((context) => {
+        if (!getWorkflowProcessDecisionApprovalForm(selectedTask, context)) {
+          throw new Error('审批表单与流程节点不一致')
+        }
+        setTaskReasonProcessContext(context)
+        setTaskReasonProcessContextState('ready')
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setTaskReasonProcessContext(null)
+        setTaskReasonProcessContextState('error')
+      })
+    return () => controller.abort()
+  }, [selectedTask, taskReasonProcessDecisionRequired])
 
   const stats = useMemo(
     () => buildWorkflowBusinessTaskStats({ total, pageCount: tasks.length }),
@@ -408,23 +483,53 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   )
 
   const completeWorkflowTask = useCallback(
-    async (task) => {
+    async (task, { processDecision = null, reason = '' } = {}) => {
+      const requiresDecision = isWorkflowProcessDecisionTask(task)
+      const normalizedReason = String(reason || '').trim()
+      if (requiresDecision && !normalizedReason) {
+        message.warning('请先填写审批意见')
+        return false
+      }
+      let canonicalProcessDecision = null
+      if (requiresDecision) {
+        try {
+          canonicalProcessDecision = requireWorkflowProcessDecisionSubmission(
+            task,
+            processDecision,
+            {
+              reason: normalizedReason,
+            }
+          )
+        } catch (error) {
+          message.warning(
+            getActionErrorMessage(
+              error,
+              '审批表单与当前流程节点不一致，请刷新后重试'
+            )
+          )
+          return false
+        }
+      }
       const scope = `${task.id}:complete`
       const operation = 'complete'
       const params = {
         task_id: task.id,
         expected_version: task.version,
         action_key: operation,
-        reason: '',
+        ...(normalizedReason ? { reason: normalizedReason } : {}),
         payload: {
           entry_path: moduleItem?.path || '',
           surface_key: 'workflow_business_module',
+          ...(canonicalProcessDecision
+            ? { process_decision: canonicalProcessDecision }
+            : {}),
         },
       }
       return runMutationInFlight(`task:${task.id}`, async () => {
         const accessVerified = await verifyMutationAccess({
           task,
           actionKey: operation,
+          reason: normalizedReason,
           scope,
           operation,
           params,
@@ -708,7 +813,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   )
 
   const openTaskReasonModal = useCallback((mode) => {
-    setTaskReasonModal({ mode, reason: '' })
+    setTaskReasonModal({ approvedQuantity: '', mode, reason: '' })
   }, [])
 
   const closeTaskReasonModal = useCallback(() => {
@@ -722,8 +827,39 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       message.warning('请先填写原因')
       return
     }
+    const approvedQuantity = String(
+      taskReasonModal.approvedQuantity || ''
+    ).trim()
     let succeeded = false
-    if (taskReasonModal.mode === 'block') {
+    if (taskReasonModal.mode === 'complete') {
+      let processDecision = null
+      if (taskReasonProcessDecisionRequired) {
+        if (!taskReasonProcessDecisionReady) {
+          message.warning('审批表单与当前流程节点不一致，请关闭后刷新任务再试')
+          return
+        }
+        try {
+          processDecision = buildWorkflowProcessDecision({
+            task: selectedTask,
+            processContext: taskReasonProcessContext,
+            reason,
+            approvedQuantity,
+          })
+        } catch (error) {
+          message.warning(
+            getActionErrorMessage(
+              error,
+              '审批表单与当前流程节点不一致，请刷新后重试'
+            )
+          )
+          return
+        }
+      }
+      succeeded = await completeWorkflowTask(selectedTask, {
+        processDecision,
+        reason,
+      })
+    } else if (taskReasonModal.mode === 'block') {
       succeeded = await blockWorkflowTask(selectedTask, { reason })
     } else if (taskReasonModal.mode === 'reject') {
       succeeded = await rejectWorkflowTask(selectedTask, { reason })
@@ -736,10 +872,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   }, [
     blockWorkflowTask,
     closeTaskReasonModal,
+    completeWorkflowTask,
     rejectWorkflowTask,
     resumeWorkflowTask,
     selectedTask,
     taskReasonModal,
+    taskReasonProcessContext,
+    taskReasonProcessDecisionReady,
+    taskReasonProcessDecisionRequired,
     urgeWorkflowTaskFromPage,
   ])
 
@@ -968,7 +1108,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               查看任务
             </Button>
           </BusinessActionTooltip>
-          {(canCompleteWorkflowTasks || canApproveWorkflowTasks) &&
+          {canCompleteOrApproveWorkflowTasks &&
           shouldShowWorkflowAction('complete') ? (
             <BusinessActionTooltip
               disabled={
@@ -978,7 +1118,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               }
               disabledReason={workflowActionDisabledReason(
                 'complete',
-                '完成任务'
+                isWorkflowProcessDecisionTask(selectedTask)
+                  ? '审批通过'
+                  : '完成任务'
               )}
             >
               <Button
@@ -992,9 +1134,15 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                   taskActionLoadingID > 0 ||
                   urgingTaskID > 0
                 }
-                onClick={() => completeWorkflowTask(selectedTask)}
+                onClick={() =>
+                  isWorkflowProcessDecisionTask(selectedTask)
+                    ? openTaskReasonModal('complete')
+                    : completeWorkflowTask(selectedTask)
+                }
               >
-                完成任务
+                {isWorkflowProcessDecisionTask(selectedTask)
+                  ? '审批通过'
+                  : '完成任务'}
               </Button>
             </BusinessActionTooltip>
           ) : null}
@@ -1165,28 +1313,56 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         title={businessActionModalTitle(
           taskReasonModal?.mode === 'block'
             ? '标记阻塞'
-            : taskReasonModal?.mode === 'reject'
-              ? '退回任务'
-              : taskReasonModal?.mode === 'resume'
-                ? '解除阻塞'
-                : '催办任务',
+            : taskReasonModal?.mode === 'complete'
+              ? '审批通过'
+              : taskReasonModal?.mode === 'reject'
+                ? '退回任务'
+                : taskReasonModal?.mode === 'resume'
+                  ? '解除阻塞'
+                  : '催办任务',
           selectedTaskLabel
         )}
         open={Boolean(taskReasonModal)}
         onCancel={closeTaskReasonModal}
         onOk={submitTaskReasonAction}
+        okButtonProps={{
+          disabled:
+            !taskReasonProcessDecisionReady ||
+            Boolean(taskReasonApprovedQuantityError),
+        }}
         okText={
           taskReasonModal?.mode === 'block'
             ? '确认阻塞'
-            : taskReasonModal?.mode === 'reject'
-              ? '确认退回'
-              : taskReasonModal?.mode === 'resume'
-                ? '确认恢复'
-                : '确认催办'
+            : taskReasonModal?.mode === 'complete'
+              ? '确认通过'
+              : taskReasonModal?.mode === 'reject'
+                ? '确认退回'
+                : taskReasonModal?.mode === 'resume'
+                  ? '确认恢复'
+                  : '确认催办'
         }
         confirmLoading={taskActionLoadingID > 0 || urgingTaskID > 0}
         destroyOnHidden
       >
+        {taskReasonProcessDecisionRequired &&
+        taskReasonProcessContextState === 'loading' ? (
+          <Alert
+            type="info"
+            showIcon
+            message="正在核对当前流程的审批表单"
+            description="核对完成前不会提交审批决策。"
+            style={{ marginBottom: 16 }}
+          />
+        ) : taskReasonProcessDecisionRequired &&
+          !taskReasonProcessApprovalForm ? (
+            <Alert
+              type="error"
+              showIcon
+              message="审批表单与当前流程节点不一致"
+              description="请关闭后刷新任务再试；系统不会按任务名称或页面入口猜测审批字段。"
+              style={{ marginBottom: 16 }}
+            />
+        ) : null}
         <Input.TextArea
           rows={4}
           maxLength={240}
@@ -1195,11 +1371,13 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           placeholder={
             taskReasonModal?.mode === 'block'
               ? '填写阻塞原因；提交后只更新当前任务状态。'
-              : taskReasonModal?.mode === 'reject'
-                ? '填写退回原因；提交后只更新当前任务状态。'
-                : taskReasonModal?.mode === 'resume'
-                  ? '填写阻塞解除说明；任务将恢复为可执行。'
-                  : '填写催办原因；只保存本次催办记录。'
+              : taskReasonModal?.mode === 'complete'
+                ? '填写审批意见和判断依据；审批不会直接写入业务事实。'
+                : taskReasonModal?.mode === 'reject'
+                  ? '填写退回原因；提交后只更新当前任务状态。'
+                  : taskReasonModal?.mode === 'resume'
+                    ? '填写阻塞解除说明；任务将恢复为可执行。'
+                    : '填写催办原因；只保存本次催办记录。'
           }
           value={taskReasonModal?.reason || ''}
           onChange={(event) =>
@@ -1208,6 +1386,32 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             )
           }
         />
+        {taskReasonApprovedQuantityAllowed ? (
+          <>
+            <Input
+              style={{ marginTop: 16 }}
+              inputMode="decimal"
+              status={taskReasonApprovedQuantityError ? 'error' : undefined}
+              placeholder="批准数量（可选；留空表示按申请数量批准）"
+              value={taskReasonModal?.approvedQuantity || ''}
+              onChange={(event) =>
+                setTaskReasonModal((current) =>
+                  current
+                    ? { ...current, approvedQuantity: event.target.value }
+                    : current
+                )
+              }
+            />
+            {taskReasonApprovedQuantityError ? (
+              <Alert
+                type="error"
+                showIcon
+                message={taskReasonApprovedQuantityError}
+                style={{ marginTop: 8 }}
+              />
+            ) : null}
+          </>
+        ) : null}
       </Modal>
     </BusinessPageLayout>
   )

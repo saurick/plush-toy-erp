@@ -20,20 +20,14 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'create_production_completion_from_order',
     'create_production_material_issue_from_order',
     'create_production_rework_from_completion',
-    'post_production_fact',
-    'cancel_production_fact',
     'list_production_exceptions',
+    'get_production_exception',
     'submit_production_exception',
-    'approve_production_exception',
-    'reject_production_exception',
     'cancel_production_exception',
-    'execute_production_exception',
     'reverse_production_exception',
     'list_outsourcing_facts',
     'create_outsourcing_material_issue_from_order',
     'create_outsourcing_return_receipt_from_order',
-    'post_outsourcing_fact',
-    'cancel_outsourcing_fact',
     'list_outsourcing_return_dispositions',
     'create_outsourcing_return_disposition',
     'post_outsourcing_return_disposition',
@@ -53,20 +47,17 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'create_payable_from_purchase_receipt',
     'create_payable_from_outsourcing_return',
     'create_reconciliation_from_finance_fact',
-    'post_finance_fact',
-    'settle_finance_fact',
     'cancel_finance_fact',
     'list_sales_returns',
     'create_sales_return',
-    'approve_sales_return',
-    'receive_sales_return',
     'cancel_sales_return',
+    'reverse_sales_return',
     'get_sales_return',
     'list_finance_payments',
     'get_finance_credit_note',
     'list_finance_credit_notes',
     'create_finance_payment',
-    'post_finance_payment',
+    'cancel_finance_payment',
     'reverse_finance_payment',
     'get_finance_payment',
     'create_finance_credit_note',
@@ -74,6 +65,24 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
+
+  for (const lifecycleMethodName of [
+    'post_production_fact',
+    'cancel_production_fact',
+    'post_outsourcing_fact',
+    'cancel_outsourcing_fact',
+    'post_finance_fact',
+    'settle_finance_fact',
+  ]) {
+    assert.match(
+      source,
+      new RegExp(`method:\\s*'${lifecycleMethodName}'`, 'u')
+    )
+  }
+  assert.match(
+    source,
+    /normalizeOperationalFactLifecycleRequest\(params,[\s\S]*operationalFactRpc\.call\(method, request\)[\s\S]*validateOperationalFactLifecycleResult/u
+  )
 
   assert.doesNotMatch(source, /consume_stock_reservation/)
   assert.doesNotMatch(source, /call\(\s*'create_outsourcing_fact'\s*,/)
@@ -89,6 +98,16 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
   assert.doesNotMatch(source, /call\(\s*'create_finance_fact'/)
   assert.doesNotMatch(source, /call\(\s*'create_shipment'/)
   assert.doesNotMatch(source, /call\(\s*'add_shipment_item'/)
+  for (const retiredMethodName of [
+    'approve_production_exception',
+    'reject_production_exception',
+    'execute_production_exception',
+    'approve_sales_return',
+    'receive_sales_return',
+    'post_finance_payment',
+  ]) {
+    assert.doesNotMatch(source, new RegExp(`call\\(\\s*'${retiredMethodName}'`))
+  }
 
   for (const forbiddenName of [
     'business_records',

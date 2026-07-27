@@ -579,11 +579,11 @@ func (s *stubBusinessDashboardOperationalFactRepo) CreateProductionFactDraft(con
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) PostProductionFact(context.Context, int) (*biz.ProductionFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) PostProductionFact(context.Context, *biz.OperationalFactStatusMutation) (*biz.ProductionFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedProductionFact(context.Context, int) (*biz.ProductionFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedProductionFact(context.Context, *biz.OperationalFactStatusMutation) (*biz.ProductionFact, error) {
 	return nil, biz.ErrBadParam
 }
 
@@ -595,11 +595,11 @@ func (s *stubBusinessDashboardOperationalFactRepo) CreateOutsourcingFactDraft(co
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) PostOutsourcingFact(context.Context, int) (*biz.OutsourcingFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) PostOutsourcingFact(context.Context, *biz.OperationalFactStatusMutation) (*biz.OutsourcingFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedOutsourcingFact(context.Context, int) (*biz.OutsourcingFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedOutsourcingFact(context.Context, *biz.OperationalFactStatusMutation) (*biz.OutsourcingFact, error) {
 	return nil, biz.ErrBadParam
 }
 
@@ -655,15 +655,15 @@ func (s *stubBusinessDashboardOperationalFactRepo) CreateFinanceFactDraft(contex
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) PostFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) PostFinanceFact(context.Context, *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) SettleFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) SettleFinanceFact(context.Context, *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFact(context.Context, int, int, string) (*biz.FinanceFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFact(context.Context, *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
 }
 

@@ -481,7 +481,7 @@ func TestProductionWIPExternalReturnCreatesFirstQualityDraftAndReplaysExactly(t 
 		if err != nil {
 			t.Fatalf("create material issue %s: %v", suffix, err)
 		}
-		posted, err := factUC.PostOutsourcingFact(ctx, draft.ID)
+		posted, err := factUC.PostOutsourcingFact(ctx, operationalFactStatusMutation(draft.ID, draft.Version, f.actorID, ""))
 		if err != nil {
 			t.Fatalf("post material issue %s: %v", suffix, err)
 		}
@@ -495,7 +495,7 @@ func TestProductionWIPExternalReturnCreatesFirstQualityDraftAndReplaysExactly(t 
 	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, outsourceOrder.ID, biz.OutsourcingOrderStatusClosed); !errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency) {
 		t.Fatalf("close active outsourcing order error = %v", err)
 	}
-	if cancelled, err := factRepo.CancelPostedOutsourcingFact(ctx, initialIssueFact.ID); err != nil || cancelled.Status != biz.OperationalFactStatusCancelled {
+	if cancelled, err := factRepo.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(initialIssueFact.ID, initialIssueFact.Version, f.actorID, "撤销未投入 WIP 的委外发料")); err != nil || cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("cancel material issue while WIP is planned = %#v err=%v", cancelled, err)
 	}
 	issueFact := createAndPostIssue("repost")
@@ -510,7 +510,7 @@ func TestProductionWIPExternalReturnCreatesFirstQualityDraftAndReplaysExactly(t 
 	if startedRoot.Status != biz.ProductionWIPStatusOutsourced {
 		t.Fatalf("started external status = %s", startedRoot.Status)
 	}
-	if _, err := factRepo.CancelPostedOutsourcingFact(ctx, issueFact.ID); !errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency) {
+	if _, err := factRepo.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(issueFact.ID, issueFact.Version, f.actorID, "撤销已投入 WIP 的委外发料")); !errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency) {
 		t.Fatalf("cancel material issue used by started WIP error = %v", err)
 	}
 	receivedInput := &biz.ProductionWIPAction{

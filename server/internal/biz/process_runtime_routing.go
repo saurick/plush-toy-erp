@@ -159,12 +159,21 @@ func (uc *ProcessRuntimeUsecase) getActiveProcessNodeForMutation(ctx context.Con
 }
 
 func (uc *ProcessRuntimeUsecase) advanceAfterNodeCompletion(ctx context.Context, completedNode *ProcessNodeInstance, actorID int) error {
+	return uc.advanceAfterNodeCompletionWithPayload(ctx, completedNode, actorID, nil)
+}
+
+func (uc *ProcessRuntimeUsecase) advanceAfterNodeCompletionWithPayload(
+	ctx context.Context,
+	completedNode *ProcessNodeInstance,
+	actorID int,
+	additionalPayload map[string]any,
+) error {
 	activatedNodes, err := uc.activateNextNodesAfterCompletion(ctx, completedNode, actorID)
 	if err != nil {
 		return err
 	}
 	for _, activatedNode := range activatedNodes {
-		if err := uc.handleActivatedSequentialNode(ctx, activatedNode, actorID); err != nil {
+		if err := uc.handleActivatedSequentialNodeWithPayload(ctx, activatedNode, actorID, additionalPayload); err != nil {
 			return err
 		}
 	}
@@ -172,6 +181,15 @@ func (uc *ProcessRuntimeUsecase) advanceAfterNodeCompletion(ctx context.Context,
 }
 
 func (uc *ProcessRuntimeUsecase) handleActivatedSequentialNode(ctx context.Context, activatedNode *ProcessNodeInstance, actorID int) error {
+	return uc.handleActivatedSequentialNodeWithPayload(ctx, activatedNode, actorID, nil)
+}
+
+func (uc *ProcessRuntimeUsecase) handleActivatedSequentialNodeWithPayload(
+	ctx context.Context,
+	activatedNode *ProcessNodeInstance,
+	actorID int,
+	additionalPayload map[string]any,
+) error {
 	if activatedNode == nil {
 		return nil
 	}
@@ -196,6 +214,12 @@ func (uc *ProcessRuntimeUsecase) handleActivatedSequentialNode(ctx context.Conte
 		payload, err := automaticProcessDomainCommandPayload(instance)
 		if err != nil {
 			return err
+		}
+		for key, value := range additionalPayload {
+			if _, exists := payload[key]; exists {
+				return ErrBadParam
+			}
+			payload[key] = value
 		}
 		_, err = uc.ExecuteDomainCommandNode(ctx, &ProcessDomainCommandExecution{
 			ProcessInstanceID:     activatedNode.ProcessInstanceID,
@@ -222,6 +246,14 @@ func automaticProcessDomainCommandPayload(instance *ProcessInstance) (map[string
 		return map[string]any{"purchase_order_id": instance.BusinessRefID}, nil
 	case "shipment":
 		return map[string]any{"shipment_id": instance.BusinessRefID}, nil
+	case "sales_return":
+		return map[string]any{"sales_return_id": instance.BusinessRefID}, nil
+	case "finance_payment":
+		return map[string]any{"finance_payment_id": instance.BusinessRefID}, nil
+	case "inventory_operation":
+		return map[string]any{"inventory_operation_id": instance.BusinessRefID}, nil
+	case "production_exception_decision":
+		return map[string]any{"production_exception_id": instance.BusinessRefID}, nil
 	default:
 		return nil, ErrBadParam
 	}

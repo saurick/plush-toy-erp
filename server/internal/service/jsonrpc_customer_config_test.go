@@ -105,6 +105,9 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 		if err := biz.RegisterInventoryProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
 			panic(err)
 		}
+		if err := biz.RegisterInventoryAdjustmentProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
+			panic(err)
+		}
 	}
 	var operationalFactUC *biz.OperationalFactUsecase
 	if operationalFactRepo != nil {
@@ -115,12 +118,24 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 		if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
 			panic(err)
 		}
+		if err := biz.RegisterSalesReturnProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+			panic(err)
+		}
+		if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+			panic(err)
+		}
+		if err := biz.RegisterProductionExceptionProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
+			panic(err)
+		}
 	} else {
 		// Start handlers still read the authoritative source document even when a
 		// focused runtime-command test intentionally omits command registrations.
 		operationalFactUC = biz.NewOperationalFactUsecase(&customerConfigShipmentOperationalFactRepo{
 			shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusDraft, FinanceReleaseStatus: biz.ShipmentFinanceReleaseStatusPending, FinanceReleaseVersion: 1},
 		})
+	}
+	if err := biz.RegisterExceptionApprovalProcessBranchPolicyHandlers(processRuntimeUC); err != nil {
+		panic(err)
 	}
 	return &jsonrpcDispatcher{
 		log:               log.NewHelper(logger),
@@ -742,6 +757,30 @@ func (r *serviceProcessRuntimeRepo) GetProcessInstance(_ context.Context, id int
 		return nil, biz.ErrProcessInstanceNotFound
 	}
 	return cloneServiceProcessInstance(item), nil
+}
+
+func (r *serviceProcessRuntimeRepo) GetProcessInstanceByBusinessRef(
+	_ context.Context,
+	processKey string,
+	businessRefType string,
+	businessRefID int,
+) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
+	for _, item := range r.processes {
+		if item == nil ||
+			item.ProcessKey != processKey ||
+			item.BusinessRefType != businessRefType ||
+			item.BusinessRefID != businessRefID {
+			continue
+		}
+		nodes := make([]*biz.ProcessNodeInstance, 0, len(r.nodesByProcess[item.ID]))
+		for _, nodeID := range r.nodesByProcess[item.ID] {
+			if node := r.nodes[nodeID]; node != nil {
+				nodes = append(nodes, cloneServiceProcessNodeInstance(node))
+			}
+		}
+		return cloneServiceProcessInstance(item), nodes, nil
+	}
+	return nil, nil, biz.ErrProcessInstanceNotFound
 }
 
 func (r *serviceProcessRuntimeRepo) GetProcessNodeInstance(_ context.Context, id int) (*biz.ProcessNodeInstance, error) {
@@ -1601,16 +1640,18 @@ func customerConfigPublishParamsWithRevisionAndModuleState(t *testing.T, params 
 		byKey[key] = item
 	}
 	dependentModules := map[string][]string{
-		"customers":           {"sales_orders"},
-		"suppliers":           {"purchase_orders", "outsourcing_orders"},
+		"customers":           {"sales_orders", "finance_payments"},
+		"suppliers":           {"purchase_orders", "outsourcing_orders", "finance_payments"},
 		"products":            {"material_bom", "sales_orders"},
 		"materials":           {"material_bom", "purchase_orders"},
 		"material_bom":        {"production_orders"},
 		"processes":           {"outsourcing_orders"},
 		"sales_orders":        {"shipments"},
 		"purchase_orders":     {"purchase_receipts"},
-		"quality_inspections": {"purchase_receipts"},
-		"inventory":           {"purchase_receipts", "quality_inspections", "shipments"},
+		"quality_inspections": {"purchase_receipts", "sales_returns"},
+		"inventory":           {"purchase_receipts", "quality_inspections", "shipments", "sales_returns"},
+		"shipments":           {"sales_returns"},
+		"finance":             {"finance_payments"},
 	}
 	queue := []string{moduleKey}
 	seen := map[string]struct{}{}
@@ -1788,6 +1829,7 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 			map[string]any{"module_key": "inventory", "state": "enabled"},
 			map[string]any{"module_key": "shipments", "state": "enabled"},
 			map[string]any{"module_key": "finance", "state": "enabled"},
+			map[string]any{"module_key": "finance_payments", "state": "enabled"},
 			map[string]any{"module_key": "production_orders", "state": "enabled"},
 		},
 		"role_profiles":       roleProfiles,
@@ -1797,12 +1839,16 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 			map[string]any{"pool_key": "sales", "module_key": "sales_orders", "display_name": "业务池"},
 			map[string]any{"pool_key": "boss", "module_key": "workflow_tasks", "display_name": "审批池"},
 			map[string]any{"pool_key": "finance", "module_key": "finance", "display_name": "财务审批池"},
+			map[string]any{"pool_key": "warehouse", "module_key": "inventory", "display_name": "仓库池"},
+			map[string]any{"pool_key": "production", "module_key": "production_orders", "display_name": "生产池"},
 		},
 		"work_pool_memberships": []any{
 			map[string]any{"pool_key": "admin", "role_key": biz.AdminRoleKey, "enabled": true},
 			map[string]any{"pool_key": "sales", "role_key": biz.SalesRoleKey, "enabled": true},
 			map[string]any{"pool_key": "boss", "role_key": biz.BossRoleKey, "enabled": true},
 			map[string]any{"pool_key": "finance", "role_key": biz.FinanceRoleKey, "enabled": true},
+			map[string]any{"pool_key": "warehouse", "role_key": biz.WarehouseRoleKey, "enabled": true},
+			map[string]any{"pool_key": "production", "role_key": biz.ProductionRoleKey, "enabled": true},
 		},
 	})
 	if err != nil {
@@ -3187,18 +3233,18 @@ func (r *customerConfigShipmentOperationalFactRepo) CreateFinanceFactDraft(_ con
 	}, nil
 }
 
-func (r *customerConfigShipmentOperationalFactRepo) PostFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
-	r.postedFinanceFactID = id
+func (r *customerConfigShipmentOperationalFactRepo) PostFinanceFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
+	r.postedFinanceFactID = in.ID
 	return nil, biz.ErrBadParam
 }
 
-func (r *customerConfigShipmentOperationalFactRepo) SettleFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
-	r.settledFinanceFactID = id
+func (r *customerConfigShipmentOperationalFactRepo) SettleFinanceFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
+	r.settledFinanceFactID = in.ID
 	return nil, biz.ErrBadParam
 }
 
-func (r *customerConfigShipmentOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int, _ int, _ string) (*biz.FinanceFact, error) {
-	r.cancelledFinanceFactID = id
+func (r *customerConfigShipmentOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
+	r.cancelledFinanceFactID = in.ID
 	return nil, biz.ErrBadParam
 }
 

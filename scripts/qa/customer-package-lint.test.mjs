@@ -96,7 +96,8 @@ test("customer-package-lint: production exception page and decision reads stay l
     "workflow.task.read",
     "pmc.risk.read",
     "production.fact.read",
-    "quality.exception.handle",
+    "production.exception.submit",
+    "production.exception.approve",
   ]);
   assert.equal(
     productionExceptions.requiredAnyCapabilityKeys.includes(

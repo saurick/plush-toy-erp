@@ -61,7 +61,7 @@ func (f productionOrderPGFixture) createAndPostLinkedFact(t *testing.T, ctx cont
 	if err != nil {
 		t.Fatalf("create linked fact: %v", err)
 	}
-	posted, err := f.factUC.PostProductionFact(ctx, fact.ID)
+	posted, err := f.factUC.PostProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, ""))
 	if err != nil {
 		t.Fatalf("post linked fact: %v", err)
 	}
@@ -99,8 +99,9 @@ func (f productionOrderPGFixture) createCorruptPostedFact(
 	// while runtime Ent builders must only create DRAFT facts.
 	result, err := f.data.sqldb.ExecContext(
 		ctx,
-		"UPDATE production_facts SET status = $1, posted_at = CURRENT_TIMESTAMP WHERE id = $2",
+		"UPDATE production_facts SET status = $1, posted_at = CURRENT_TIMESTAMP, posted_by = $2 WHERE id = $3",
 		biz.OperationalFactStatusPosted,
+		f.actorID,
 		fact.ID,
 	)
 	if err != nil {
@@ -158,16 +159,22 @@ func TestProductionOrderPostgresConcurrentFactReplayAndQuantityWinner(t *testing
 	if err != nil {
 		t.Fatalf("create second fact: %v", err)
 	}
-	postIDs := []int{created[0].ID, second.ID}
+	postFacts := []*biz.ProductionFact{created[0], second}
+	postIDs := []int{postFacts[0].ID, postFacts[1].ID}
+	postRequests := map[int]*biz.OperationalFactStatusMutation{
+		postFacts[0].ID: operationalFactStatusMutation(postFacts[0].ID, postFacts[0].Version, f.actorID, ""),
+		postFacts[1].ID: operationalFactStatusMutation(postFacts[1].ID, postFacts[1].Version, f.actorID, ""),
+	}
 	postErrs := make([]error, 2)
 	start = make(chan struct{})
-	for i := range postIDs {
+	for i := range postFacts {
+		postRequest := postRequests[postFacts[i].ID]
 		wg.Add(1)
-		go func(index int) {
+		go func(index int, in *biz.OperationalFactStatusMutation) {
 			defer wg.Done()
 			<-start
-			_, postErrs[index] = f.factUC.PostProductionFact(ctx, postIDs[index])
-		}(i)
+			_, postErrs[index] = f.factUC.PostProductionFact(ctx, in)
+		}(i, postRequest)
 	}
 	close(start)
 	wg.Wait()
@@ -191,7 +198,7 @@ func TestProductionOrderPostgresConcurrentFactReplayAndQuantityWinner(t *testing
 		switch row.Status {
 		case biz.OperationalFactStatusPosted:
 			posted++
-			if replay, err := f.factUC.PostProductionFact(ctx, row.ID); err != nil || replay.Status != biz.OperationalFactStatusPosted {
+			if replay, err := f.factUC.PostProductionFact(ctx, postRequests[row.ID]); err != nil || replay.Status != biz.OperationalFactStatusPosted {
 				t.Fatalf("posted fact replay failed: fact=%#v err=%v", replay, err)
 			}
 		case biz.OperationalFactStatusDraft:
@@ -216,6 +223,7 @@ func TestProductionOrderPostgresCancellationAndFactPostingOneWinner(t *testing.T
 		if err != nil {
 			t.Fatalf("create linked fact: %v", err)
 		}
+		postRequest := operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "")
 
 		start := make(chan struct{})
 		var postErr, cancelErr error
@@ -225,7 +233,7 @@ func TestProductionOrderPostgresCancellationAndFactPostingOneWinner(t *testing.T
 		go func() {
 			defer wg.Done()
 			<-start
-			_, postErr = f.factUC.PostProductionFact(ctx, fact.ID)
+			_, postErr = f.factUC.PostProductionFact(ctx, postRequest)
 		}()
 		go func() {
 			defer wg.Done()
@@ -381,7 +389,7 @@ func TestProductionOrderPostgresCloseRequiresCompletionOrReasonAndReplaysExactly
 
 	reversed := f.createReleasedOrder(t, ctx, "close-reversed")
 	fact := f.createAndPostLinkedFact(t, ctx, reversed, 0, "close-reversed", 10)
-	if _, err := f.factUC.CancelPostedProductionFact(ctx, fact.ID); err != nil {
+	if _, err := f.factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "撤销已完成入库以验证短关闭")); err != nil {
 		t.Fatalf("reverse completed fact: %v", err)
 	}
 	f.assertProductionFactReversed(t, ctx, fact.ID)
@@ -407,7 +415,7 @@ func TestProductionOrderPostgresCloseRequiresCompletionOrReasonAndReplaysExactly
 	if err != nil || closedOrder.Order.Status != biz.ProductionOrderStatusClosed || closedOrder.Order.CloseReason != nil {
 		t.Fatalf("close before correction = %#v, %v", closedOrder, err)
 	}
-	if _, err := f.factUC.CancelPostedProductionFact(ctx, closedFact.ID); err != nil {
+	if _, err := f.factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(closedFact.ID, closedFact.Version, f.actorID, "关闭后纠正完工入库")); err != nil {
 		t.Fatalf("closed order fact must remain reversible: %v", err)
 	}
 	f.assertProductionFactReversed(t, ctx, closedFact.ID)
@@ -501,11 +509,12 @@ func TestProductionOrderPostgresCloseSerializesWithFactPostAndReversal(t *testin
 		if err != nil {
 			t.Fatalf("create post-race fact: %v", err)
 		}
+		postRequest := operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "")
 		start := make(chan struct{})
 		var postErr, closeErr error
 		var wg sync.WaitGroup
 		wg.Add(2)
-		go func() { defer wg.Done(); <-start; _, postErr = f.factUC.PostProductionFact(ctx, fact.ID) }()
+		go func() { defer wg.Done(); <-start; _, postErr = f.factUC.PostProductionFact(ctx, postRequest) }()
 		go func() {
 			defer wg.Done()
 			<-start
@@ -536,11 +545,16 @@ func TestProductionOrderPostgresCloseSerializesWithFactPostAndReversal(t *testin
 		label := fmt.Sprintf("close-reverse-race-%d", iteration)
 		order := f.createReleasedOrder(t, ctx, label)
 		fact := f.createAndPostLinkedFact(t, ctx, order, 0, label, 10)
+		cancelRequest := operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "并发撤销完工入库")
 		start := make(chan struct{})
 		var reverseErr, closeErr error
 		var wg sync.WaitGroup
 		wg.Add(2)
-		go func() { defer wg.Done(); <-start; _, reverseErr = f.factUC.CancelPostedProductionFact(ctx, fact.ID) }()
+		go func() {
+			defer wg.Done()
+			<-start
+			_, reverseErr = f.factUC.CancelPostedProductionFact(ctx, cancelRequest)
+		}()
 		go func() {
 			defer wg.Done()
 			<-start

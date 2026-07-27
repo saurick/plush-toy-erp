@@ -143,26 +143,27 @@ type QualityInspectionDecision struct {
 }
 
 type QualityInspectionFilter struct {
-	Status                string
-	Result                string
-	Keyword               string
-	DateFrom              *time.Time
-	DateTo                *time.Time
-	PurchaseReceiptID     int
-	PurchaseReceiptItemID int
-	PurchaseOrderID       int
-	InventoryLotID        int
-	ProductionWIPBatchID  int
-	GateCode              string
-	MaterialID            int
-	WarehouseID           int
-	SourceType            string
-	SourceID              int
-	InspectionType        string
-	SubjectType           string
-	SubjectID             int
-	Limit                 int
-	Offset                int
+	Status                   string
+	Result                   string
+	Keyword                  string
+	DateFrom                 *time.Time
+	DateTo                   *time.Time
+	PurchaseReceiptID        int
+	PurchaseReceiptItemID    int
+	PurchaseOrderID          int
+	InventoryLotID           int
+	ProductionWIPBatchID     int
+	GateCode                 string
+	MaterialID               int
+	WarehouseID              int
+	SourceType               string
+	SourceID                 int
+	InspectionType           string
+	SubjectType              string
+	SubjectID                int
+	CorrectionOfInspectionID int
+	Limit                    int
+	Offset                   int
 }
 
 const (

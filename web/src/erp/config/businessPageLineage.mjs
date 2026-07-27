@@ -586,8 +586,14 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['invoices', 'invoices', 'cancel_finance_fact'],
         ['reconciliation', 'reconciliation', 'settle_finance_fact'],
         ['reconciliation', 'reconciliation', 'cancel_finance_fact'],
-        ['sales-returns', 'sales-returns', 'approve_sales_return'],
         ['sales-returns', 'sales-returns', 'cancel_sales_return'],
+        ['sales-returns', 'sales-returns', 'reverse_sales_return'],
+        [
+          'finance-payments',
+          'finance-payments',
+          'cancel_finance_payment',
+        ],
+        ['inventory', 'inventory', 'execute_inventory_adjustment_submit'],
         ['inventory', 'inventory', 'cancel_inventory_operation'],
         [
           'quality-inspections',
@@ -612,22 +618,7 @@ export const businessPageFlowDefinitions = Object.freeze(
         [
           'production-exceptions',
           'production-exceptions',
-          'approve_production_exception',
-        ],
-        [
-          'production-exceptions',
-          'production-exceptions',
-          'reject_production_exception',
-        ],
-        [
-          'production-exceptions',
-          'production-exceptions',
           'cancel_production_exception',
-        ],
-        [
-          'production-exceptions',
-          'production-progress',
-          'execute_production_exception',
         ],
         [
           'production-exceptions',
@@ -687,8 +678,18 @@ export const businessPageFlowDefinitions = Object.freeze(
     .concat(
       [
         ['inventory', 'inventory', 'post_inventory_operation'],
-        ['sales-returns', 'inventory', 'receive_sales_return'],
-        ['finance-payments', 'finance-payments', 'post_finance_payment'],
+        ['sales-returns', 'inventory', 'execute_sales_return_receive'],
+        [
+          'finance-payments',
+          'finance-payments',
+          'execute_finance_payment_post',
+        ],
+        ['inventory', 'inventory', 'execute_inventory_adjustment_post'],
+        [
+          'production-exceptions',
+          'production-progress',
+          'execute_production_exception_process',
+        ],
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({
           flowType: BUSINESS_FLOW_TYPES.POST_FACT,
@@ -734,6 +735,42 @@ export const businessPageFlowDefinitions = Object.freeze(
           'start_finished_goods_delivery_process',
         ],
         ['inbound', 'inbound', 'execute_material_supply_quality_gate'],
+        [
+          'sales-returns',
+          'sales-returns',
+          'start_sales_return_acceptance_process',
+        ],
+        [
+          'sales-returns',
+          'sales-returns',
+          'get_sales_return_acceptance_process',
+        ],
+        [
+          'finance-payments',
+          'finance-payments',
+          'start_finance_payment_approval_process',
+        ],
+        [
+          'finance-payments',
+          'finance-payments',
+          'get_finance_payment_approval_process',
+        ],
+        [
+          'inventory',
+          'inventory',
+          'start_inventory_adjustment_approval_process',
+        ],
+        ['inventory', 'inventory', 'get_inventory_adjustment_approval_process'],
+        [
+          'production-exceptions',
+          'production-exceptions',
+          'start_production_exception_approval_process',
+        ],
+        [
+          'production-exceptions',
+          'production-exceptions',
+          'get_production_exception_approval_process',
+        ],
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({
           flowType: BUSINESS_FLOW_TYPES.PROCESS_ORCHESTRATION,

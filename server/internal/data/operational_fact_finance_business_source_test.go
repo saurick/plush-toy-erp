@@ -103,7 +103,7 @@ func runPurchaseReceiptPayableAndReconciliation(t *testing.T, ctx context.Contex
 		t.Fatalf("cancel receipt with active payable error=%v", err)
 	}
 
-	payable, err = operationalUC.PostFinanceFact(ctx, payable.ID)
+	payable, err = operationalUC.PostFinanceFact(ctx, operationalFactStatusMutation(payable.ID, payable.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post payable: %v", err)
 	}
@@ -118,17 +118,17 @@ func runPurchaseReceiptPayableAndReconciliation(t *testing.T, ctx context.Contex
 		reconciliation.CounterpartyID == nil || *reconciliation.CounterpartyID != supplier.ID {
 		t.Fatalf("derived reconciliation = %#v", reconciliation)
 	}
-	if _, err := operationalUC.CancelPostedFinanceFact(ctx, payable.ID, actor.ID, "来源更正"); !errors.Is(err, biz.ErrFinanceReconciliationDependency) {
+	if _, err := operationalUC.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(payable.ID, payable.Version, actor.ID, "来源更正")); !errors.Is(err, biz.ErrFinanceReconciliationDependency) {
 		t.Fatalf("cancel payable with active reconciliation error=%v", err)
 	}
-	reconciliation, err = operationalUC.PostFinanceFact(ctx, reconciliation.ID)
+	reconciliation, err = operationalUC.PostFinanceFact(ctx, operationalFactStatusMutation(reconciliation.ID, reconciliation.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post reconciliation: %v", err)
 	}
-	if _, err := operationalUC.CancelPostedFinanceFact(ctx, reconciliation.ID, actor.ID, "核对撤销"); err != nil {
+	if _, err := operationalUC.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(reconciliation.ID, reconciliation.Version, actor.ID, "核对撤销")); err != nil {
 		t.Fatalf("cancel reconciliation: %v", err)
 	}
-	if _, err := operationalUC.CancelPostedFinanceFact(ctx, payable.ID, actor.ID, "来源更正"); err != nil {
+	if _, err := operationalUC.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(payable.ID, payable.Version, actor.ID, "来源更正")); err != nil {
 		t.Fatalf("cancel payable after reconciliation cancellation: %v", err)
 	}
 	if _, err := inventoryUC.PostPurchaseReturn(ctx, returnDraft.ID); err != nil {
@@ -172,7 +172,7 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 	if err != nil {
 		t.Fatalf("create outsourcing return payable source: %v", err)
 	}
-	returnFact, err = operationalUC.PostOutsourcingFact(ctx, returnFact.ID)
+	returnFact, err = operationalUC.PostOutsourcingFact(ctx, operationalFactStatusMutation(returnFact.ID, returnFact.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post outsourcing return payable source: %v", err)
 	}
@@ -217,16 +217,17 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 		payable.SourceType == nil || *payable.SourceType != biz.OutsourcingFactSourceType || payable.SourceID == nil || *payable.SourceID != returnFact.ID {
 		t.Fatalf("derived outsourcing payable = %#v", payable)
 	}
-	if _, err := operationalUC.CancelPostedOutsourcingFact(ctx, returnFact.ID); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
+	if _, err := operationalUC.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(returnFact.ID, returnFact.Version, actor.ID, "委外回货已形成品质处置")); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
 		t.Fatalf("cancel accepted outsourcing return with active quality error=%v", err)
 	}
-	if _, err := operationalUC.PostFinanceFact(ctx, payable.ID); err != nil {
+	payable, err = operationalUC.PostFinanceFact(ctx, operationalFactStatusMutation(payable.ID, payable.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post outsourcing payable: %v", err)
 	}
-	if _, err := operationalUC.CancelPostedFinanceFact(ctx, payable.ID, actor.ID, "委外来源更正"); err != nil {
+	if _, err := operationalUC.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(payable.ID, payable.Version, actor.ID, "委外来源更正")); err != nil {
 		t.Fatalf("cancel outsourcing payable: %v", err)
 	}
-	if _, err := operationalUC.CancelPostedOutsourcingFact(ctx, returnFact.ID); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
+	if _, err := operationalUC.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(returnFact.ID, returnFact.Version, actor.ID, "委外回货已形成品质处置")); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
 		t.Fatalf("cancel accepted outsourcing return after payable cancellation error=%v", err)
 	}
 
@@ -243,7 +244,7 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 	if err != nil {
 		t.Fatalf("create rejected outsourcing return payable source: %v", err)
 	}
-	rejectedReturn, err = operationalUC.PostOutsourcingFact(ctx, rejectedReturn.ID)
+	rejectedReturn, err = operationalUC.PostOutsourcingFact(ctx, operationalFactStatusMutation(rejectedReturn.ID, rejectedReturn.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post rejected outsourcing return payable source: %v", err)
 	}

@@ -115,6 +115,21 @@ func ApprovedBy(v int) predicate.SalesReturn {
 	return predicate.SalesReturn(sql.FieldEQ(FieldApprovedBy, v))
 }
 
+// RejectedAt applies equality check predicate on the "rejected_at" field. It's identical to RejectedAtEQ.
+func RejectedAt(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldRejectedAt, v))
+}
+
+// RejectedBy applies equality check predicate on the "rejected_by" field. It's identical to RejectedByEQ.
+func RejectedBy(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldRejectedBy, v))
+}
+
+// RejectReason applies equality check predicate on the "reject_reason" field. It's identical to RejectReasonEQ.
+func RejectReason(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldRejectReason, v))
+}
+
 // ReceivedAt applies equality check predicate on the "received_at" field. It's identical to ReceivedAtEQ.
 func ReceivedAt(v time.Time) predicate.SalesReturn {
 	return predicate.SalesReturn(sql.FieldEQ(FieldReceivedAt, v))
@@ -138,6 +153,21 @@ func CancelledBy(v int) predicate.SalesReturn {
 // CancelReason applies equality check predicate on the "cancel_reason" field. It's identical to CancelReasonEQ.
 func CancelReason(v string) predicate.SalesReturn {
 	return predicate.SalesReturn(sql.FieldEQ(FieldCancelReason, v))
+}
+
+// ReversedAt applies equality check predicate on the "reversed_at" field. It's identical to ReversedAtEQ.
+func ReversedAt(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldReversedAt, v))
+}
+
+// ReversedBy applies equality check predicate on the "reversed_by" field. It's identical to ReversedByEQ.
+func ReversedBy(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldReversedBy, v))
+}
+
+// ReverseReason applies equality check predicate on the "reverse_reason" field. It's identical to ReverseReasonEQ.
+func ReverseReason(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldReverseReason, v))
 }
 
 // CreatedBy applies equality check predicate on the "created_by" field. It's identical to CreatedByEQ.
@@ -805,6 +835,181 @@ func ApprovedByNotNil() predicate.SalesReturn {
 	return predicate.SalesReturn(sql.FieldNotNull(FieldApprovedBy))
 }
 
+// RejectedAtEQ applies the EQ predicate on the "rejected_at" field.
+func RejectedAtEQ(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldRejectedAt, v))
+}
+
+// RejectedAtNEQ applies the NEQ predicate on the "rejected_at" field.
+func RejectedAtNEQ(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNEQ(FieldRejectedAt, v))
+}
+
+// RejectedAtIn applies the In predicate on the "rejected_at" field.
+func RejectedAtIn(vs ...time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIn(FieldRejectedAt, vs...))
+}
+
+// RejectedAtNotIn applies the NotIn predicate on the "rejected_at" field.
+func RejectedAtNotIn(vs ...time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotIn(FieldRejectedAt, vs...))
+}
+
+// RejectedAtGT applies the GT predicate on the "rejected_at" field.
+func RejectedAtGT(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGT(FieldRejectedAt, v))
+}
+
+// RejectedAtGTE applies the GTE predicate on the "rejected_at" field.
+func RejectedAtGTE(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGTE(FieldRejectedAt, v))
+}
+
+// RejectedAtLT applies the LT predicate on the "rejected_at" field.
+func RejectedAtLT(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLT(FieldRejectedAt, v))
+}
+
+// RejectedAtLTE applies the LTE predicate on the "rejected_at" field.
+func RejectedAtLTE(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLTE(FieldRejectedAt, v))
+}
+
+// RejectedAtIsNil applies the IsNil predicate on the "rejected_at" field.
+func RejectedAtIsNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIsNull(FieldRejectedAt))
+}
+
+// RejectedAtNotNil applies the NotNil predicate on the "rejected_at" field.
+func RejectedAtNotNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotNull(FieldRejectedAt))
+}
+
+// RejectedByEQ applies the EQ predicate on the "rejected_by" field.
+func RejectedByEQ(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldRejectedBy, v))
+}
+
+// RejectedByNEQ applies the NEQ predicate on the "rejected_by" field.
+func RejectedByNEQ(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNEQ(FieldRejectedBy, v))
+}
+
+// RejectedByIn applies the In predicate on the "rejected_by" field.
+func RejectedByIn(vs ...int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIn(FieldRejectedBy, vs...))
+}
+
+// RejectedByNotIn applies the NotIn predicate on the "rejected_by" field.
+func RejectedByNotIn(vs ...int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotIn(FieldRejectedBy, vs...))
+}
+
+// RejectedByGT applies the GT predicate on the "rejected_by" field.
+func RejectedByGT(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGT(FieldRejectedBy, v))
+}
+
+// RejectedByGTE applies the GTE predicate on the "rejected_by" field.
+func RejectedByGTE(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGTE(FieldRejectedBy, v))
+}
+
+// RejectedByLT applies the LT predicate on the "rejected_by" field.
+func RejectedByLT(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLT(FieldRejectedBy, v))
+}
+
+// RejectedByLTE applies the LTE predicate on the "rejected_by" field.
+func RejectedByLTE(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLTE(FieldRejectedBy, v))
+}
+
+// RejectedByIsNil applies the IsNil predicate on the "rejected_by" field.
+func RejectedByIsNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIsNull(FieldRejectedBy))
+}
+
+// RejectedByNotNil applies the NotNil predicate on the "rejected_by" field.
+func RejectedByNotNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotNull(FieldRejectedBy))
+}
+
+// RejectReasonEQ applies the EQ predicate on the "reject_reason" field.
+func RejectReasonEQ(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldRejectReason, v))
+}
+
+// RejectReasonNEQ applies the NEQ predicate on the "reject_reason" field.
+func RejectReasonNEQ(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNEQ(FieldRejectReason, v))
+}
+
+// RejectReasonIn applies the In predicate on the "reject_reason" field.
+func RejectReasonIn(vs ...string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIn(FieldRejectReason, vs...))
+}
+
+// RejectReasonNotIn applies the NotIn predicate on the "reject_reason" field.
+func RejectReasonNotIn(vs ...string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotIn(FieldRejectReason, vs...))
+}
+
+// RejectReasonGT applies the GT predicate on the "reject_reason" field.
+func RejectReasonGT(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGT(FieldRejectReason, v))
+}
+
+// RejectReasonGTE applies the GTE predicate on the "reject_reason" field.
+func RejectReasonGTE(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGTE(FieldRejectReason, v))
+}
+
+// RejectReasonLT applies the LT predicate on the "reject_reason" field.
+func RejectReasonLT(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLT(FieldRejectReason, v))
+}
+
+// RejectReasonLTE applies the LTE predicate on the "reject_reason" field.
+func RejectReasonLTE(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLTE(FieldRejectReason, v))
+}
+
+// RejectReasonContains applies the Contains predicate on the "reject_reason" field.
+func RejectReasonContains(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldContains(FieldRejectReason, v))
+}
+
+// RejectReasonHasPrefix applies the HasPrefix predicate on the "reject_reason" field.
+func RejectReasonHasPrefix(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldHasPrefix(FieldRejectReason, v))
+}
+
+// RejectReasonHasSuffix applies the HasSuffix predicate on the "reject_reason" field.
+func RejectReasonHasSuffix(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldHasSuffix(FieldRejectReason, v))
+}
+
+// RejectReasonIsNil applies the IsNil predicate on the "reject_reason" field.
+func RejectReasonIsNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIsNull(FieldRejectReason))
+}
+
+// RejectReasonNotNil applies the NotNil predicate on the "reject_reason" field.
+func RejectReasonNotNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotNull(FieldRejectReason))
+}
+
+// RejectReasonEqualFold applies the EqualFold predicate on the "reject_reason" field.
+func RejectReasonEqualFold(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEqualFold(FieldRejectReason, v))
+}
+
+// RejectReasonContainsFold applies the ContainsFold predicate on the "reject_reason" field.
+func RejectReasonContainsFold(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldContainsFold(FieldRejectReason, v))
+}
+
 // ReceivedAtEQ applies the EQ predicate on the "received_at" field.
 func ReceivedAtEQ(v time.Time) predicate.SalesReturn {
 	return predicate.SalesReturn(sql.FieldEQ(FieldReceivedAt, v))
@@ -1078,6 +1283,181 @@ func CancelReasonEqualFold(v string) predicate.SalesReturn {
 // CancelReasonContainsFold applies the ContainsFold predicate on the "cancel_reason" field.
 func CancelReasonContainsFold(v string) predicate.SalesReturn {
 	return predicate.SalesReturn(sql.FieldContainsFold(FieldCancelReason, v))
+}
+
+// ReversedAtEQ applies the EQ predicate on the "reversed_at" field.
+func ReversedAtEQ(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldReversedAt, v))
+}
+
+// ReversedAtNEQ applies the NEQ predicate on the "reversed_at" field.
+func ReversedAtNEQ(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNEQ(FieldReversedAt, v))
+}
+
+// ReversedAtIn applies the In predicate on the "reversed_at" field.
+func ReversedAtIn(vs ...time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIn(FieldReversedAt, vs...))
+}
+
+// ReversedAtNotIn applies the NotIn predicate on the "reversed_at" field.
+func ReversedAtNotIn(vs ...time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotIn(FieldReversedAt, vs...))
+}
+
+// ReversedAtGT applies the GT predicate on the "reversed_at" field.
+func ReversedAtGT(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGT(FieldReversedAt, v))
+}
+
+// ReversedAtGTE applies the GTE predicate on the "reversed_at" field.
+func ReversedAtGTE(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGTE(FieldReversedAt, v))
+}
+
+// ReversedAtLT applies the LT predicate on the "reversed_at" field.
+func ReversedAtLT(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLT(FieldReversedAt, v))
+}
+
+// ReversedAtLTE applies the LTE predicate on the "reversed_at" field.
+func ReversedAtLTE(v time.Time) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLTE(FieldReversedAt, v))
+}
+
+// ReversedAtIsNil applies the IsNil predicate on the "reversed_at" field.
+func ReversedAtIsNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIsNull(FieldReversedAt))
+}
+
+// ReversedAtNotNil applies the NotNil predicate on the "reversed_at" field.
+func ReversedAtNotNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotNull(FieldReversedAt))
+}
+
+// ReversedByEQ applies the EQ predicate on the "reversed_by" field.
+func ReversedByEQ(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldReversedBy, v))
+}
+
+// ReversedByNEQ applies the NEQ predicate on the "reversed_by" field.
+func ReversedByNEQ(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNEQ(FieldReversedBy, v))
+}
+
+// ReversedByIn applies the In predicate on the "reversed_by" field.
+func ReversedByIn(vs ...int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIn(FieldReversedBy, vs...))
+}
+
+// ReversedByNotIn applies the NotIn predicate on the "reversed_by" field.
+func ReversedByNotIn(vs ...int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotIn(FieldReversedBy, vs...))
+}
+
+// ReversedByGT applies the GT predicate on the "reversed_by" field.
+func ReversedByGT(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGT(FieldReversedBy, v))
+}
+
+// ReversedByGTE applies the GTE predicate on the "reversed_by" field.
+func ReversedByGTE(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGTE(FieldReversedBy, v))
+}
+
+// ReversedByLT applies the LT predicate on the "reversed_by" field.
+func ReversedByLT(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLT(FieldReversedBy, v))
+}
+
+// ReversedByLTE applies the LTE predicate on the "reversed_by" field.
+func ReversedByLTE(v int) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLTE(FieldReversedBy, v))
+}
+
+// ReversedByIsNil applies the IsNil predicate on the "reversed_by" field.
+func ReversedByIsNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIsNull(FieldReversedBy))
+}
+
+// ReversedByNotNil applies the NotNil predicate on the "reversed_by" field.
+func ReversedByNotNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotNull(FieldReversedBy))
+}
+
+// ReverseReasonEQ applies the EQ predicate on the "reverse_reason" field.
+func ReverseReasonEQ(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEQ(FieldReverseReason, v))
+}
+
+// ReverseReasonNEQ applies the NEQ predicate on the "reverse_reason" field.
+func ReverseReasonNEQ(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNEQ(FieldReverseReason, v))
+}
+
+// ReverseReasonIn applies the In predicate on the "reverse_reason" field.
+func ReverseReasonIn(vs ...string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIn(FieldReverseReason, vs...))
+}
+
+// ReverseReasonNotIn applies the NotIn predicate on the "reverse_reason" field.
+func ReverseReasonNotIn(vs ...string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotIn(FieldReverseReason, vs...))
+}
+
+// ReverseReasonGT applies the GT predicate on the "reverse_reason" field.
+func ReverseReasonGT(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGT(FieldReverseReason, v))
+}
+
+// ReverseReasonGTE applies the GTE predicate on the "reverse_reason" field.
+func ReverseReasonGTE(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldGTE(FieldReverseReason, v))
+}
+
+// ReverseReasonLT applies the LT predicate on the "reverse_reason" field.
+func ReverseReasonLT(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLT(FieldReverseReason, v))
+}
+
+// ReverseReasonLTE applies the LTE predicate on the "reverse_reason" field.
+func ReverseReasonLTE(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldLTE(FieldReverseReason, v))
+}
+
+// ReverseReasonContains applies the Contains predicate on the "reverse_reason" field.
+func ReverseReasonContains(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldContains(FieldReverseReason, v))
+}
+
+// ReverseReasonHasPrefix applies the HasPrefix predicate on the "reverse_reason" field.
+func ReverseReasonHasPrefix(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldHasPrefix(FieldReverseReason, v))
+}
+
+// ReverseReasonHasSuffix applies the HasSuffix predicate on the "reverse_reason" field.
+func ReverseReasonHasSuffix(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldHasSuffix(FieldReverseReason, v))
+}
+
+// ReverseReasonIsNil applies the IsNil predicate on the "reverse_reason" field.
+func ReverseReasonIsNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldIsNull(FieldReverseReason))
+}
+
+// ReverseReasonNotNil applies the NotNil predicate on the "reverse_reason" field.
+func ReverseReasonNotNil() predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldNotNull(FieldReverseReason))
+}
+
+// ReverseReasonEqualFold applies the EqualFold predicate on the "reverse_reason" field.
+func ReverseReasonEqualFold(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldEqualFold(FieldReverseReason, v))
+}
+
+// ReverseReasonContainsFold applies the ContainsFold predicate on the "reverse_reason" field.
+func ReverseReasonContainsFold(v string) predicate.SalesReturn {
+	return predicate.SalesReturn(sql.FieldContainsFold(FieldReverseReason, v))
 }
 
 // CreatedByEQ applies the EQ predicate on the "created_by" field.

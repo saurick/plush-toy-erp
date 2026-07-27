@@ -42,7 +42,10 @@ func TestProductionOrderReleaseFreezesMaterialRequirementsAndKeepsNoBOMExplicit(
 	requirement := released.MaterialRequirements[0]
 	if requirement.MaterialID != f.materialID || !requirement.UnitQuantitySnapshot.Equal(decimal.NewFromInt(2)) ||
 		!requirement.LossRateSnapshot.Equal(decimal.RequireFromString("0.1")) ||
-		!requirement.PlannedQuantity.Equal(decimal.NewFromInt(22)) || !requirement.IssuedQuantity.IsZero() ||
+		!requirement.PlannedQuantity.Equal(decimal.NewFromInt(22)) ||
+		!requirement.ApprovedOverIssueQuantity.IsZero() ||
+		!requirement.EffectiveLimitQuantity.Equal(decimal.NewFromInt(22)) ||
+		!requirement.IssuedQuantity.IsZero() ||
 		!requirement.RemainingQuantity.Equal(decimal.NewFromInt(22)) {
 		t.Fatalf("released material requirement=%#v", requirement)
 	}
@@ -168,7 +171,8 @@ func TestProductionMaterialIssueFromOrderLifecycleDerivesSourceAndReversesInvent
 	if err != nil {
 		t.Fatalf("create second material issue draft: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, first.ID); err != nil {
+	postedFirst, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(first.ID, first.Version, f.actorID, ""))
+	if err != nil {
 		t.Fatalf("post first material issue: %v", err)
 	}
 	assertProductionMaterialBalance(t, ctx, f, warehouseID, lotID, decimal.NewFromInt(18))
@@ -176,7 +180,7 @@ func TestProductionMaterialIssueFromOrderLifecycleDerivesSourceAndReversesInvent
 	if err != nil || len(requirements) != 1 || !requirements[0].IssuedQuantity.Equal(decimal.NewFromInt(12)) || !requirements[0].RemainingQuantity.Equal(decimal.NewFromInt(10)) {
 		t.Fatalf("material requirements after post=%#v err=%v", requirements, err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, second.ID); !errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded) {
+	if _, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(second.ID, second.Version, f.actorID, "")); !errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded) {
 		t.Fatalf("over-limit material issue post error=%v", err)
 	}
 	if count := f.client.InventoryTxn.Query().Where(
@@ -184,15 +188,17 @@ func TestProductionMaterialIssueFromOrderLifecycleDerivesSourceAndReversesInvent
 	).CountX(ctx); count != 0 {
 		t.Fatalf("failed over-limit post wrote %d inventory transactions", count)
 	}
-	if row := f.client.ProductionFact.GetX(ctx, second.ID); row.Status != biz.OperationalFactStatusDraft {
-		t.Fatalf("failed over-limit post changed status=%s", row.Status)
+	secondReadback := f.client.ProductionFact.GetX(ctx, second.ID)
+	if secondReadback.Status != biz.OperationalFactStatusDraft {
+		t.Fatalf("failed over-limit post changed status=%s", secondReadback.Status)
 	}
 
-	if _, err := factUC.CancelPostedProductionFact(ctx, first.ID); err != nil {
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedFirst.ID, postedFirst.Version, f.actorID, "撤销首笔领料")); err != nil {
 		t.Fatalf("cancel first material issue: %v", err)
 	}
 	assertProductionMaterialBalance(t, ctx, f, warehouseID, lotID, decimal.NewFromInt(30))
-	if _, err := factUC.PostProductionFact(ctx, second.ID); err != nil {
+	postedSecond, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(secondReadback.ID, secondReadback.Version, f.actorID, ""))
+	if err != nil {
 		t.Fatalf("post second after reversal: %v", err)
 	}
 	assertProductionMaterialBalance(t, ctx, f, warehouseID, lotID, decimal.NewFromInt(19))
@@ -200,7 +206,7 @@ func TestProductionMaterialIssueFromOrderLifecycleDerivesSourceAndReversesInvent
 	if err != nil || len(aggregate.MaterialRequirements) != 1 || !aggregate.MaterialRequirements[0].IssuedQuantity.Equal(decimal.NewFromInt(11)) {
 		t.Fatalf("aggregate issued projection=%#v err=%v", aggregate, err)
 	}
-	if _, err := factUC.CancelPostedProductionFact(ctx, second.ID); err != nil {
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedSecond.ID, postedSecond.Version, f.actorID, "撤销第二笔领料")); err != nil {
 		t.Fatalf("cancel second material issue: %v", err)
 	}
 	assertProductionMaterialBalance(t, ctx, f, warehouseID, lotID, decimal.NewFromInt(30))
@@ -233,13 +239,14 @@ func TestProductionMaterialIssueSQLiteConcurrentPostDoesNotExceedRequirement(t *
 	var wg sync.WaitGroup
 	for _, fact := range facts {
 		fact := fact
+		postRequest := operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "")
 		wg.Add(1)
-		go func() {
+		go func(in *biz.OperationalFactStatusMutation) {
 			defer wg.Done()
 			<-start
-			_, err := factUC.PostProductionFact(ctx, fact.ID)
+			_, err := factUC.PostProductionFact(ctx, in)
 			errs <- err
-		}()
+		}(postRequest)
 	}
 	close(start)
 	wg.Wait()

@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	stdsql "database/sql"
 	"errors"
 	"strings"
 	"time"
@@ -441,16 +442,32 @@ func validateProductionReworkQuantity(ctx context.Context, client *ent.Client, s
 }
 
 func (r *operationalFactRepo) ListProductionOrderMaterialRequirements(ctx context.Context, productionOrderID int) ([]*biz.ProductionOrderMaterialRequirement, error) {
-	if productionOrderID <= 0 {
+	if r == nil || r.data == nil || r.data.sqldb == nil || productionOrderID <= 0 {
 		return nil, biz.ErrBadParam
 	}
-	if _, err := r.data.postgres.ProductionOrder.Get(ctx, productionOrderID); err != nil {
+	sqlTx, err := r.data.sqldb.BeginTx(ctx, &stdsql.TxOptions{
+		Isolation: stdsql.LevelRepeatableRead,
+		ReadOnly:  true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = sqlTx.Rollback() }()
+	client := productionWIPClientForSQLTx(r.data, sqlTx)
+	if _, err := client.ProductionOrder.Get(ctx, productionOrderID); err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionOrderNotFound
 		}
 		return nil, err
 	}
-	return loadProductionOrderMaterialRequirements(ctx, r.data.postgres, productionOrderID)
+	items, err := loadProductionOrderMaterialRequirements(ctx, client, productionOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func createProductionFactDraftWithClient(ctx context.Context, client *ent.Client, in *biz.OperationalFactMutation) (*biz.ProductionFact, error) {
@@ -730,11 +747,13 @@ func validateProductionOrderMaterialIssueQuantity(
 		}
 		issued = issued.Add(row.Quantity)
 	}
-	approvedRows, err := client.ProductionExceptionDecision.Query().Where(
-		productionexceptiondecision.DecisionType(biz.ProductionExceptionOverIssue),
-		productionexceptiondecision.Status(biz.ProductionExceptionApproved),
+	allowancePredicates := append(
+		activeProductionOverIssuePredicates(),
 		productionexceptiondecision.ProductionMaterialRequirementID(requirement.ID),
-	).All(ctx)
+	)
+	approvedRows, err := client.ProductionExceptionDecision.Query().
+		Where(allowancePredicates...).
+		All(ctx)
 	if err != nil {
 		return err
 	}
@@ -873,19 +892,19 @@ func (r *operationalFactRepo) createProductionOrderLinkedFactDraft(ctx context.C
 	return row, nil
 }
 
-func (r *operationalFactRepo) PostProductionFact(ctx context.Context, id int) (*biz.ProductionFact, error) {
-	return r.postProductionFact(ctx, id, false, 0)
-}
-
-func (r *operationalFactRepo) CancelPostedProductionFact(ctx context.Context, id int) (*biz.ProductionFact, error) {
-	return r.postProductionFact(ctx, id, true, 0)
-}
-
-func (r *operationalFactRepo) PostProductionFactWithActor(ctx context.Context, id int, actorID int) (*biz.ProductionFact, error) {
-	if actorID <= 0 {
+func (r *operationalFactRepo) PostProductionFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.ProductionFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || in.Reason != "" {
 		return nil, biz.ErrBadParam
 	}
-	return r.postProductionFact(ctx, id, false, actorID)
+	return r.postProductionFact(ctx, in, false)
+}
+
+func (r *operationalFactRepo) CancelPostedProductionFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.ProductionFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 ||
+		in.Reason == "" || len([]rune(in.Reason)) > 255 {
+		return nil, biz.ErrBadParam
+	}
+	return r.postProductionFact(ctx, in, true)
 }
 
 func (r *operationalFactRepo) ProductionFactRequiresSourceTask(ctx context.Context, id int) (bool, error) {
@@ -900,13 +919,6 @@ func (r *operationalFactRepo) ProductionFactRequiresSourceTask(ctx context.Conte
 		return false, err
 	}
 	return isProductionReworkLinkedFactRow(row), nil
-}
-
-func (r *operationalFactRepo) CancelPostedProductionFactWithActor(ctx context.Context, id int, actorID int) (*biz.ProductionFact, error) {
-	if actorID <= 0 {
-		return nil, biz.ErrBadParam
-	}
-	return r.postProductionFact(ctx, id, true, actorID)
 }
 
 func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.ProductionFact, int, error) {
@@ -965,7 +977,7 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := q.Order(ent.Desc(productionfact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := q.WithPoster().WithCanceller().Order(ent.Desc(productionfact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -986,8 +998,8 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 	return out, total, nil
 }
 
-func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, cancel bool, actorID int) (*biz.ProductionFact, error) {
-	preview, err := r.data.postgres.ProductionFact.Get(ctx, id)
+func (r *operationalFactRepo) postProductionFact(ctx context.Context, in *biz.OperationalFactStatusMutation, cancel bool) (*biz.ProductionFact, error) {
+	preview, err := r.data.postgres.ProductionFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionFactNotFound
@@ -995,10 +1007,10 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, ca
 		return nil, err
 	}
 	if isProductionReworkLinkedFactRow(preview) {
-		return r.postProductionReworkFact(ctx, id, cancel, actorID)
+		return r.postProductionReworkFact(ctx, in, cancel)
 	}
 	if isProductionOrderLinkedFactRow(preview) {
-		return r.postProductionOrderLinkedFact(ctx, id, cancel)
+		return r.postProductionOrderLinkedFact(ctx, in, cancel)
 	}
 	if !cancel {
 		return nil, biz.ErrProductionOrderFactSourceInvalid
@@ -1008,10 +1020,10 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, ca
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockOperationalFactRow(ctx, tx, "production_facts", id, biz.ErrProductionFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", in.ID, biz.ErrProductionFactNotFound); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.ProductionFact.Get(ctx, id)
+	row, err := tx.client.ProductionFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionFactNotFound
@@ -1019,42 +1031,70 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, ca
 		return nil, err
 	}
 	if cancel {
-		if row.Status == biz.OperationalFactStatusCancelled {
+		replay, err := versionedOperationalFactCancellationReplay(
+			row.Status,
+			row.Version,
+			row.CancelledBy,
+			row.CancelReason,
+			in,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitProductionFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
-		if err := r.applyProductionFactInventory(ctx, tx, row, true); err != nil {
+		if err := r.applyProductionFactInventory(ctx, tx, row, in, true); err != nil {
 			return nil, err
 		}
-		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+		if err := updateVersionedOperationalFactCancellation(
+			ctx, tx, "production_facts", in.ID, in.ExpectedVersion, row.Status,
+			in.ActorID, in.Reason, time.Now(),
+		); err != nil {
 			return nil, err
 		}
 	} else {
-		if row.Status == biz.OperationalFactStatusPosted {
+		replay, err := versionedOperationalFactTransitionReplay(
+			row.Status,
+			row.Version,
+			in.ExpectedVersion,
+			biz.OperationalFactStatusPosted,
+			row.PostedBy,
+			in.ActorID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitProductionFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusDraft {
 			return nil, biz.ErrBadParam
 		}
-		if err := r.applyProductionFactInventory(ctx, tx, row, false); err != nil {
+		if err := r.applyProductionFactInventory(ctx, tx, row, in, false); err != nil {
 			return nil, err
 		}
 		now := time.Now()
-		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
+		if err := updateVersionedOperationalFactStatus(
+			ctx, tx, "production_facts", in.ID, in.ExpectedVersion,
+			biz.OperationalFactStatusDraft, biz.OperationalFactStatusPosted, "posted_at", now,
+			"posted_by", in.ActorID,
+		); err != nil {
 			return nil, err
 		}
 	}
-	row, err = tx.client.ProductionFact.Get(ctx, id)
+	row, err = tx.client.ProductionFact.Query().Where(productionfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return commitProductionFact(ctx, tx, row)
 }
 
-func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id int, cancel bool, actorID int) (*biz.ProductionFact, error) {
-	preview, err := r.data.postgres.ProductionFact.Get(ctx, id)
+func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, in *biz.OperationalFactStatusMutation, cancel bool) (*biz.ProductionFact, error) {
+	preview, err := r.data.postgres.ProductionFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionFactNotFound
@@ -1087,10 +1127,10 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id i
 	if err := lockOperationalFactRow(ctx, tx, "production_facts", sourcePreview.ID, biz.ErrProductionFactNotFound); err != nil {
 		return nil, err
 	}
-	if err := lockOperationalFactRow(ctx, tx, "production_facts", id, biz.ErrProductionFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", in.ID, biz.ErrProductionFactNotFound); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.ProductionFact.Get(ctx, id)
+	row, err := tx.client.ProductionFact.Get(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -1118,14 +1158,27 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id i
 		return nil, err
 	}
 	if cancel {
-		if row.Status == biz.OperationalFactStatusCancelled {
+		replay, err := versionedOperationalFactCancellationReplay(
+			row.Status,
+			row.Version,
+			row.CancelledBy,
+			row.CancelReason,
+			in,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitProductionFact(ctx, tx, row)
 		}
 		if row.Status == biz.OperationalFactStatusDraft {
-			if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+			if err := updateVersionedOperationalFactCancellation(
+				ctx, tx, "production_facts", in.ID, in.ExpectedVersion,
+				row.Status, in.ActorID, in.Reason, time.Now(),
+			); err != nil {
 				return nil, err
 			}
-			row, err = tx.client.ProductionFact.Get(ctx, id)
+			row, err = tx.client.ProductionFact.Query().Where(productionfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -1161,23 +1214,39 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id i
 		if effective.Add(row.Quantity).GreaterThan(item.PlannedQuantity) {
 			return nil, biz.ErrProductionOrderQuantityExceeded
 		}
-		if err := r.applyProductionFactInventory(ctx, tx, row, true); err != nil {
+		if err := r.applyProductionFactInventory(ctx, tx, row, in, true); err != nil {
 			return nil, err
 		}
-		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+		cancelledAt := time.Now()
+		if err := updateVersionedOperationalFactCancellation(
+			ctx, tx, "production_facts", in.ID, in.ExpectedVersion,
+			row.Status, in.ActorID, in.Reason, cancelledAt,
+		); err != nil {
 			return nil, err
 		}
 		if err := transitionSourceWorkflowProjection(
-			ctx, tx.client, task, "cancelled", biz.ProductionRoleKey, actorID,
+			ctx, tx.client, task, "cancelled", biz.ProductionRoleKey, in.ActorID,
 			"production_rework.cancel", map[string]any{
 				"source_document_status": biz.OperationalFactStatusCancelled,
-				"cancelled_at":           time.Now().UTC().Unix(),
+				"cancelled_at":           cancelledAt.UTC().Unix(),
+				"cancel_reason":          in.Reason,
 			},
 		); err != nil {
 			return nil, err
 		}
 	} else {
-		if row.Status == biz.OperationalFactStatusPosted {
+		replay, err := versionedOperationalFactTransitionReplay(
+			row.Status,
+			row.Version,
+			in.ExpectedVersion,
+			biz.OperationalFactStatusPosted,
+			row.PostedBy,
+			in.ActorID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitProductionFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusDraft {
@@ -1186,28 +1255,32 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id i
 		if err := validateProductionReworkQuantity(ctx, tx.client, source, row.Quantity, row.ID); err != nil {
 			return nil, err
 		}
-		if err := r.applyProductionFactInventory(ctx, tx, row, false); err != nil {
+		if err := r.applyProductionFactInventory(ctx, tx, row, in, false); err != nil {
 			return nil, err
 		}
 		now := time.Now()
-		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
+		if err := updateVersionedOperationalFactStatus(
+			ctx, tx, "production_facts", in.ID, in.ExpectedVersion,
+			biz.OperationalFactStatusDraft, biz.OperationalFactStatusPosted, "posted_at", now,
+			"posted_by", in.ActorID,
+		); err != nil {
 			return nil, err
 		}
 	}
-	row, err = tx.client.ProductionFact.Get(ctx, id)
+	row, err = tx.client.ProductionFact.Query().Where(productionfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if !cancel {
-		if _, _, err := ensureSourceWorkflowTaskWithClient(ctx, tx.client, task, state, actorID); err != nil {
+		if _, _, err := ensureSourceWorkflowTaskWithClient(ctx, tx.client, task, state, in.ActorID); err != nil {
 			return nil, err
 		}
 	}
 	return commitProductionFact(ctx, tx, row)
 }
 
-func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context, id int, cancel bool) (*biz.ProductionFact, error) {
-	preview, err := r.data.postgres.ProductionFact.Get(ctx, id)
+func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context, in *biz.OperationalFactStatusMutation, cancel bool) (*biz.ProductionFact, error) {
+	preview, err := r.data.postgres.ProductionFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionFactNotFound
@@ -1229,10 +1302,10 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 	if err := lockProductionOrderMaterialIssueSource(ctx, tx, preview, orderID); err != nil {
 		return nil, err
 	}
-	if err := lockOperationalFactRow(ctx, tx, "production_facts", id, biz.ErrProductionFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", in.ID, biz.ErrProductionFactNotFound); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.ProductionFact.Get(ctx, id)
+	row, err := tx.client.ProductionFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrProductionFactNotFound
@@ -1240,7 +1313,17 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 		return nil, err
 	}
 	if cancel {
-		if row.Status == biz.OperationalFactStatusCancelled {
+		replay, err := versionedOperationalFactCancellationReplay(
+			row.Status,
+			row.Version,
+			row.CancelledBy,
+			row.CancelReason,
+			in,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitProductionFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusDraft && row.Status != biz.OperationalFactStatusPosted {
@@ -1273,15 +1356,29 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 			return nil, biz.ErrProductionOrderFactSourceInvalid
 		}
 		if row.Status == biz.OperationalFactStatusPosted {
-			if err := r.applyProductionFactInventory(ctx, tx, row, true); err != nil {
+			if err := r.applyProductionFactInventory(ctx, tx, row, in, true); err != nil {
 				return nil, err
 			}
 		}
-		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+		if err := updateVersionedOperationalFactCancellation(
+			ctx, tx, "production_facts", in.ID, in.ExpectedVersion,
+			row.Status, in.ActorID, in.Reason, time.Now(),
+		); err != nil {
 			return nil, err
 		}
 	} else {
-		if row.Status == biz.OperationalFactStatusPosted {
+		replay, err := versionedOperationalFactTransitionReplay(
+			row.Status,
+			row.Version,
+			in.ExpectedVersion,
+			biz.OperationalFactStatusPosted,
+			row.PostedBy,
+			in.ActorID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitProductionFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusDraft {
@@ -1307,22 +1404,26 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 		default:
 			return nil, biz.ErrProductionOrderFactSourceInvalid
 		}
-		if err := r.applyProductionFactInventory(ctx, tx, row, false); err != nil {
+		if err := r.applyProductionFactInventory(ctx, tx, row, in, false); err != nil {
 			return nil, err
 		}
 		now := time.Now()
-		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
+		if err := updateVersionedOperationalFactStatus(
+			ctx, tx, "production_facts", in.ID, in.ExpectedVersion,
+			biz.OperationalFactStatusDraft, biz.OperationalFactStatusPosted, "posted_at", now,
+			"posted_by", in.ActorID,
+		); err != nil {
 			return nil, err
 		}
 	}
-	row, err = tx.client.ProductionFact.Get(ctx, id)
+	row, err = tx.client.ProductionFact.Query().Where(productionfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return commitProductionFact(ctx, tx, row)
 }
 
-func (r *operationalFactRepo) applyProductionFactInventory(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, cancel bool) error {
+func (r *operationalFactRepo) applyProductionFactInventory(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, in *biz.OperationalFactStatusMutation, cancel bool) error {
 	direction, txnType := productionFactInventoryDirection(row.FactType)
 	return r.applyOperationalFactInventory(ctx, tx, operationalFactInventoryArgs{
 		sourceType:   biz.ProductionFactSourceType,
@@ -1338,6 +1439,8 @@ func (r *operationalFactRepo) applyProductionFactInventory(ctx context.Context, 
 		direction:    direction,
 		txnType:      txnType,
 		occurredAt:   row.OccurredAt,
+		actorID:      in.ActorID,
+		reason:       in.Reason,
 		cancel:       cancel,
 	})
 }
@@ -1361,5 +1464,15 @@ func entProductionFactToBiz(row *ent.ProductionFact) *biz.ProductionFact {
 	if row == nil {
 		return nil
 	}
-	return &biz.ProductionFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	var cancellerName *string
+	var posterName *string
+	if poster, err := row.Edges.PosterOrErr(); err == nil && poster != nil {
+		name := poster.Username
+		posterName = &name
+	}
+	if canceller, err := row.Edges.CancellerOrErr(); err == nil && canceller != nil {
+		name := canceller.Username
+		cancellerName = &name
+	}
+	return &biz.ProductionFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

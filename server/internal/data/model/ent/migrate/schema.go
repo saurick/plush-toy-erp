@@ -586,6 +586,7 @@ var (
 		{Name: "fact_no", Type: field.TypeString, Size: 64},
 		{Name: "fact_type", Type: field.TypeString, Size: 32},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "counterparty_type", Type: field.TypeString, Size: 16},
 		{Name: "counterparty_id", Type: field.TypeInt, Nullable: true},
 		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
@@ -608,6 +609,8 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "posted_by", Type: field.TypeInt, Nullable: true},
+		{Name: "settled_by", Type: field.TypeInt, Nullable: true},
 		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
 	}
 	// FinanceFactsTable holds the schema information for the "finance_facts" table.
@@ -617,8 +620,20 @@ var (
 		PrimaryKey: []*schema.Column{FinanceFactsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
+				Symbol:     "finance_facts_admin_users_poster",
+				Columns:    []*schema.Column{FinanceFactsColumns[27]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "finance_facts_admin_users_settler",
+				Columns:    []*schema.Column{FinanceFactsColumns[28]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "finance_facts_admin_users_canceller",
-				Columns:    []*schema.Column{FinanceFactsColumns[26]},
+				Columns:    []*schema.Column{FinanceFactsColumns[29]},
 				RefColumns: []*schema.Column{AdminUsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -632,7 +647,7 @@ var (
 			{
 				Name:    "financefact_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceFactsColumns[16]},
+				Columns: []*schema.Column{FinanceFactsColumns[17]},
 			},
 			{
 				Name:    "financefact_fact_type_status",
@@ -642,17 +657,17 @@ var (
 			{
 				Name:    "financefact_counterparty_type_counterparty_id",
 				Unique:  false,
-				Columns: []*schema.Column{FinanceFactsColumns[4], FinanceFactsColumns[5]},
+				Columns: []*schema.Column{FinanceFactsColumns[5], FinanceFactsColumns[6]},
 			},
 			{
 				Name:    "financefact_source_type_source_id_source_line_id",
 				Unique:  false,
-				Columns: []*schema.Column{FinanceFactsColumns[13], FinanceFactsColumns[14], FinanceFactsColumns[15]},
+				Columns: []*schema.Column{FinanceFactsColumns[14], FinanceFactsColumns[15], FinanceFactsColumns[16]},
 			},
 			{
 				Name:    "financefact_fact_type_source_type_source_id",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceFactsColumns[2], FinanceFactsColumns[13], FinanceFactsColumns[14]},
+				Columns: []*schema.Column{FinanceFactsColumns[2], FinanceFactsColumns[14], FinanceFactsColumns[15]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "source_type IS NOT NULL AND source_id IS NOT NULL AND status <> 'CANCELLED'",
 				},
@@ -675,8 +690,16 @@ var (
 		{Name: "idempotency_payload_hash", Type: field.TypeString, Size: 64},
 		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "occurred_at", Type: field.TypeTime},
+		{Name: "approved_at", Type: field.TypeTime, Nullable: true},
+		{Name: "approved_by", Type: field.TypeInt, Nullable: true},
+		{Name: "rejected_at", Type: field.TypeTime, Nullable: true},
+		{Name: "rejected_by", Type: field.TypeInt, Nullable: true},
+		{Name: "reject_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "posted_by", Type: field.TypeInt, Nullable: true},
+		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
+		{Name: "cancel_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "reversed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "reversed_by", Type: field.TypeInt, Nullable: true},
 		{Name: "reverse_reason", Type: field.TypeString, Nullable: true, Size: 255},
@@ -698,7 +721,7 @@ var (
 			{
 				Name:    "financepayment_created_by_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{FinancePaymentsColumns[19], FinancePaymentsColumns[10]},
+				Columns: []*schema.Column{FinancePaymentsColumns[27], FinancePaymentsColumns[10]},
 			},
 			{
 				Name:    "financepayment_counterparty_type_counterparty_id_currency_status",
@@ -849,11 +872,17 @@ var (
 		{Name: "operation_type", Type: field.TypeString, Size: 32},
 		{Name: "status", Type: field.TypeString, Size: 16, Default: "DRAFT"},
 		{Name: "reason", Type: field.TypeString, Size: 255},
-		{Name: "approval_ref", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
 		{Name: "idempotency_payload_hash", Type: field.TypeString, Size: 64},
 		{Name: "idempotency_item_count", Type: field.TypeInt},
 		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "submitted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "submitted_by", Type: field.TypeInt, Nullable: true},
+		{Name: "approved_at", Type: field.TypeTime, Nullable: true},
+		{Name: "approved_by", Type: field.TypeInt, Nullable: true},
+		{Name: "rejected_at", Type: field.TypeTime, Nullable: true},
+		{Name: "rejected_by", Type: field.TypeInt, Nullable: true},
+		{Name: "reject_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
 		{Name: "posted_by", Type: field.TypeInt, Nullable: true},
 		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
@@ -877,12 +906,12 @@ var (
 			{
 				Name:    "inventoryoperation_created_by_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{InventoryOperationsColumns[15], InventoryOperationsColumns[6]},
+				Columns: []*schema.Column{InventoryOperationsColumns[21], InventoryOperationsColumns[5]},
 			},
 			{
 				Name:    "inventoryoperation_operation_type_status_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{InventoryOperationsColumns[2], InventoryOperationsColumns[3], InventoryOperationsColumns[16]},
+				Columns: []*schema.Column{InventoryOperationsColumns[2], InventoryOperationsColumns[3], InventoryOperationsColumns[22]},
 			},
 		},
 	}
@@ -1063,6 +1092,7 @@ var (
 		{Name: "fact_no", Type: field.TypeString, Size: 64},
 		{Name: "fact_type", Type: field.TypeString, Size: 32},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "subject_type", Type: field.TypeString, Size: 16},
 		{Name: "subject_id", Type: field.TypeInt},
 		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
@@ -1075,10 +1105,14 @@ var (
 		{Name: "occurred_at", Type: field.TypeTime},
 		{Name: "occurred_at_specified", Type: field.TypeBool, Default: false},
 		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancel_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "posted_by", Type: field.TypeInt, Nullable: true},
+		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
 		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
 		{Name: "warehouse_id", Type: field.TypeInt},
@@ -1091,25 +1125,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "outsourcing_facts_inventory_lots_outsourcing_facts",
-				Columns:    []*schema.Column{OutsourcingFactsColumns[19]},
+				Columns:    []*schema.Column{OutsourcingFactsColumns[22]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
+				Symbol:     "outsourcing_facts_admin_users_poster",
+				Columns:    []*schema.Column{OutsourcingFactsColumns[23]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "outsourcing_facts_admin_users_canceller",
+				Columns:    []*schema.Column{OutsourcingFactsColumns[24]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "outsourcing_facts_product_skus_outsourcing_facts",
-				Columns:    []*schema.Column{OutsourcingFactsColumns[20]},
+				Columns:    []*schema.Column{OutsourcingFactsColumns[25]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_facts_units_outsourcing_facts",
-				Columns:    []*schema.Column{OutsourcingFactsColumns[21]},
+				Columns:    []*schema.Column{OutsourcingFactsColumns[26]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "outsourcing_facts_warehouses_outsourcing_facts",
-				Columns:    []*schema.Column{OutsourcingFactsColumns[22]},
+				Columns:    []*schema.Column{OutsourcingFactsColumns[27]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1123,7 +1169,7 @@ var (
 			{
 				Name:    "outsourcingfact_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{OutsourcingFactsColumns[12]},
+				Columns: []*schema.Column{OutsourcingFactsColumns[13]},
 			},
 			{
 				Name:    "outsourcingfact_fact_type_status",
@@ -1133,22 +1179,22 @@ var (
 			{
 				Name:    "outsourcingfact_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingFactsColumns[20]},
+				Columns: []*schema.Column{OutsourcingFactsColumns[25]},
 			},
 			{
 				Name:    "outsourcingfact_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingFactsColumns[7]},
+				Columns: []*schema.Column{OutsourcingFactsColumns[8]},
 			},
 			{
 				Name:    "outsourcingfact_source_type_source_id_source_line_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingFactsColumns[9], OutsourcingFactsColumns[10], OutsourcingFactsColumns[11]},
+				Columns: []*schema.Column{OutsourcingFactsColumns[10], OutsourcingFactsColumns[11], OutsourcingFactsColumns[12]},
 			},
 			{
 				Name:    "outsourcingfact_subject_type_subject_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingFactsColumns[4], OutsourcingFactsColumns[5], OutsourcingFactsColumns[22], OutsourcingFactsColumns[19]},
+				Columns: []*schema.Column{OutsourcingFactsColumns[5], OutsourcingFactsColumns[6], OutsourcingFactsColumns[27], OutsourcingFactsColumns[22]},
 			},
 		},
 	}
@@ -1386,6 +1432,11 @@ var (
 				Name:    "outsourcingreturndisposition_outsourcing_return_fact_id_status",
 				Unique:  false,
 				Columns: []*schema.Column{OutsourcingReturnDispositionsColumns[3], OutsourcingReturnDispositionsColumns[5]},
+			},
+			{
+				Name:    "outsourcingreturndisposition_production_wip_batch_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{OutsourcingReturnDispositionsColumns[7], OutsourcingReturnDispositionsColumns[5]},
 			},
 		},
 	}
@@ -1789,6 +1840,7 @@ var (
 		{Name: "decision_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "executed_by", Type: field.TypeInt, Nullable: true},
 		{Name: "executed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "execution_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "reversed_by", Type: field.TypeInt, Nullable: true},
 		{Name: "reversed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "reverse_reason", Type: field.TypeString, Nullable: true, Size: 255},
@@ -1824,7 +1876,7 @@ var (
 				Unique:  true,
 				Columns: []*schema.Column{ProductionExceptionDecisionsColumns[9]},
 				Annotation: &entsql.IndexAnnotation{
-					Where: "decision_type = 'WIP_CONCESSION' AND (status = 'SUBMITTED' OR status = 'APPROVED')",
+					Where: "((decision_type = 'SCRAP' OR decision_type = 'WIP_CONCESSION') AND (status = 'SUBMITTED' OR status = 'APPROVED'))",
 				},
 			},
 		},
@@ -1835,6 +1887,7 @@ var (
 		{Name: "fact_no", Type: field.TypeString, Size: 64},
 		{Name: "fact_type", Type: field.TypeString, Size: 32},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "subject_type", Type: field.TypeString, Size: 16},
 		{Name: "subject_id", Type: field.TypeInt},
 		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
@@ -1845,11 +1898,15 @@ var (
 		{Name: "occurred_at", Type: field.TypeTime},
 		{Name: "occurred_at_specified", Type: field.TypeBool, Default: false},
 		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "cancel_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
 		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
+		{Name: "posted_by", Type: field.TypeInt, Nullable: true},
+		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
 		{Name: "warehouse_id", Type: field.TypeInt},
 	}
@@ -1861,25 +1918,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "production_facts_inventory_lots_production_facts",
-				Columns:    []*schema.Column{ProductionFactsColumns[17]},
+				Columns:    []*schema.Column{ProductionFactsColumns[20]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_facts_product_skus_production_facts",
-				Columns:    []*schema.Column{ProductionFactsColumns[18]},
+				Columns:    []*schema.Column{ProductionFactsColumns[21]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
+				Symbol:     "production_facts_admin_users_poster",
+				Columns:    []*schema.Column{ProductionFactsColumns[22]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_facts_admin_users_canceller",
+				Columns:    []*schema.Column{ProductionFactsColumns[23]},
+				RefColumns: []*schema.Column{AdminUsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
 				Symbol:     "production_facts_units_production_facts",
-				Columns:    []*schema.Column{ProductionFactsColumns[19]},
+				Columns:    []*schema.Column{ProductionFactsColumns[24]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_facts_warehouses_production_facts",
-				Columns:    []*schema.Column{ProductionFactsColumns[20]},
+				Columns:    []*schema.Column{ProductionFactsColumns[25]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1893,7 +1962,7 @@ var (
 			{
 				Name:    "productionfact_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{ProductionFactsColumns[10]},
+				Columns: []*schema.Column{ProductionFactsColumns[11]},
 			},
 			{
 				Name:    "productionfact_fact_type_status",
@@ -1903,17 +1972,17 @@ var (
 			{
 				Name:    "productionfact_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionFactsColumns[18]},
+				Columns: []*schema.Column{ProductionFactsColumns[21]},
 			},
 			{
 				Name:    "productionfact_source_type_source_id_source_line_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionFactsColumns[7], ProductionFactsColumns[8], ProductionFactsColumns[9]},
+				Columns: []*schema.Column{ProductionFactsColumns[8], ProductionFactsColumns[9], ProductionFactsColumns[10]},
 			},
 			{
 				Name:    "productionfact_subject_type_subject_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionFactsColumns[4], ProductionFactsColumns[5], ProductionFactsColumns[20], ProductionFactsColumns[17]},
+				Columns: []*schema.Column{ProductionFactsColumns[5], ProductionFactsColumns[6], ProductionFactsColumns[25], ProductionFactsColumns[20]},
 			},
 		},
 	}
@@ -3786,11 +3855,17 @@ var (
 		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "approved_at", Type: field.TypeTime, Nullable: true},
 		{Name: "approved_by", Type: field.TypeInt, Nullable: true},
+		{Name: "rejected_at", Type: field.TypeTime, Nullable: true},
+		{Name: "rejected_by", Type: field.TypeInt, Nullable: true},
+		{Name: "reject_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "received_at", Type: field.TypeTime, Nullable: true},
 		{Name: "received_by", Type: field.TypeInt, Nullable: true},
 		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
 		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
 		{Name: "cancel_reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "reversed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "reversed_by", Type: field.TypeInt, Nullable: true},
+		{Name: "reverse_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_by", Type: field.TypeInt},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -3809,7 +3884,7 @@ var (
 			{
 				Name:    "salesreturn_created_by_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{SalesReturnsColumns[18], SalesReturnsColumns[7]},
+				Columns: []*schema.Column{SalesReturnsColumns[24], SalesReturnsColumns[7]},
 			},
 			{
 				Name:    "salesreturn_shipment_id_status",
@@ -4351,7 +4426,7 @@ var (
 	WorkflowTasksColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "task_code", Type: field.TypeString, Size: 64},
-		{Name: "task_group", Type: field.TypeString, Size: 32},
+		{Name: "task_group", Type: field.TypeString, Size: 128},
 		{Name: "task_name", Type: field.TypeString, Size: 128},
 		{Name: "source_type", Type: field.TypeString, Size: 64},
 		{Name: "source_id", Type: field.TypeInt},
@@ -4673,9 +4748,12 @@ func init() {
 		"finance_credit_notes_amount_positive":  "amount > 0",
 		"finance_credit_notes_currency_allowed": "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_credit_notes_intent_bundle":    "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
+		"finance_credit_notes_reversal_bundle":  "((status = 'POSTED' AND reversal_of_credit_note_id IS NULL) OR (status = 'REVERSED' AND reversal_of_credit_note_id IS NOT NULL))",
 		"finance_credit_notes_status_allowed":   "status IN ('POSTED', 'REVERSED')",
 	}
 	FinanceFactsTable.ForeignKeys[0].RefTable = AdminUsersTable
+	FinanceFactsTable.ForeignKeys[1].RefTable = AdminUsersTable
+	FinanceFactsTable.ForeignKeys[2].RefTable = AdminUsersTable
 	FinanceFactsTable.Annotation = &entsql.Annotation{}
 	FinanceFactsTable.Annotation.Checks = map[string]string{
 		"finance_facts_amount_positive":          "amount > 0",
@@ -4688,7 +4766,9 @@ func init() {
 		"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('CASH_ON_SHIPMENT', 'EOM_30', 'EOM_45')",
 		"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
 		"finance_facts_status_allowed":           "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
-		"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'PAYMENT', 'RECONCILIATION')",
+		"finance_facts_status_audit_bundle":      "\n(\n  (status = 'DRAFT'\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND settled_at IS NULL AND settled_by IS NULL)\n  OR\n  (status = 'POSTED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND settled_at IS NULL AND settled_by IS NULL)\n  OR\n  (status = 'SETTLED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND settled_at IS NOT NULL AND settled_by IS NOT NULL)\n  OR\n  (status = 'CANCELLED'\n    AND settled_at IS NULL AND settled_by IS NULL\n    AND ((posted_at IS NULL AND posted_by IS NULL)\n      OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))\n)",
+		"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'RECONCILIATION')",
+		"finance_facts_version_positive":         "version > 0",
 	}
 	FinancePaymentsTable.Annotation = &entsql.Annotation{}
 	FinancePaymentsTable.Annotation.Checks = map[string]string{
@@ -4696,8 +4776,11 @@ func init() {
 		"finance_payments_counterparty_allowed": "counterparty_type IN ('CUSTOMER', 'SUPPLIER')",
 		"finance_payments_currency_allowed":     "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_payments_direction_allowed":    "direction IN ('RECEIPT', 'DISBURSEMENT')",
+		"finance_payments_direction_party_pair": "((direction = 'RECEIPT' AND counterparty_type = 'CUSTOMER') OR (direction = 'DISBURSEMENT' AND counterparty_type = 'SUPPLIER'))",
 		"finance_payments_intent_bundle":        "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
-		"finance_payments_status_allowed":       "status IN ('DRAFT', 'POSTED', 'REVERSED')",
+		"finance_payments_lifecycle_audit":      "\n(\n  (status = 'DRAFT'\n    AND approved_at IS NULL AND approved_by IS NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'APPROVED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'REJECTED'\n    AND approved_at IS NULL AND approved_by IS NULL\n    AND rejected_at IS NOT NULL AND rejected_by IS NOT NULL\n    AND reject_reason IS NOT NULL AND length(trim(reject_reason)) BETWEEN 1 AND 255\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'POSTED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'REVERSED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL\n    AND reverse_reason IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255)\n  OR\n  (status = 'CANCELLED'\n    AND (\n      (approved_at IS NULL AND approved_by IS NULL\n        AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL)\n      OR\n      (approved_at IS NOT NULL AND approved_by IS NOT NULL\n        AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL)\n      OR\n      (approved_at IS NULL AND approved_by IS NULL\n        AND rejected_at IS NOT NULL AND rejected_by IS NOT NULL\n        AND reject_reason IS NOT NULL AND length(trim(reject_reason)) BETWEEN 1 AND 255)\n    )\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n)",
+		"finance_payments_maker_checker":        "approved_by IS NULL OR approved_by <> created_by",
+		"finance_payments_status_allowed":       "status IN ('DRAFT', 'APPROVED', 'REJECTED', 'POSTED', 'REVERSED', 'CANCELLED')",
 		"finance_payments_version_positive":     "version > 0",
 	}
 	InventoryBalancesTable.ForeignKeys[0].RefTable = InventoryLotsTable
@@ -4715,9 +4798,11 @@ func init() {
 	}
 	InventoryOperationsTable.Annotation = &entsql.Annotation{}
 	InventoryOperationsTable.Annotation.Checks = map[string]string{
+		"inventory_operations_approval_bundle":  "((operation_type <> 'MANUAL_ADJUSTMENT' AND submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (operation_type = 'MANUAL_ADJUSTMENT' AND ((status = 'DRAFT' AND submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status = 'SUBMITTED' AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status IN ('APPROVED', 'POSTED') AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NOT NULL AND approved_by IS NOT NULL AND approved_by <> created_by AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (status = 'REJECTED' AND submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NOT NULL AND rejected_by IS NOT NULL AND rejected_by <> created_by AND reject_reason IS NOT NULL AND length(trim(reject_reason)) > 0) OR (status = 'CANCELLED' AND ((submitted_at IS NULL AND submitted_by IS NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NULL AND approved_by IS NULL AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL) OR (submitted_at IS NOT NULL AND submitted_by IS NOT NULL AND approved_at IS NOT NULL AND approved_by IS NOT NULL AND approved_by <> created_by AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL))))))",
 		"inventory_operations_cancel_bundle":    "((status = 'CANCELLED' AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) > 0) OR (status <> 'CANCELLED' AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL))",
 		"inventory_operations_intent_bundle":    "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64 AND idempotency_item_count > 0",
-		"inventory_operations_status_allowed":   "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+		"inventory_operations_post_bundle":      "((status = 'POSTED' AND posted_at IS NOT NULL AND posted_by IS NOT NULL) OR (status <> 'POSTED' AND posted_at IS NULL AND posted_by IS NULL) OR (status = 'CANCELLED' AND posted_at IS NOT NULL AND posted_by IS NOT NULL))",
+		"inventory_operations_status_allowed":   "status IN ('DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'POSTED', 'CANCELLED')",
 		"inventory_operations_type_allowed":     "operation_type IN ('CYCLE_COUNT', 'TRANSFER', 'MANUAL_ADJUSTMENT')",
 		"inventory_operations_version_positive": "version > 0",
 	}
@@ -4740,16 +4825,20 @@ func init() {
 	}
 	MaterialsTable.ForeignKeys[0].RefTable = UnitsTable
 	OutsourcingFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
-	OutsourcingFactsTable.ForeignKeys[1].RefTable = ProductSkusTable
-	OutsourcingFactsTable.ForeignKeys[2].RefTable = UnitsTable
-	OutsourcingFactsTable.ForeignKeys[3].RefTable = WarehousesTable
+	OutsourcingFactsTable.ForeignKeys[1].RefTable = AdminUsersTable
+	OutsourcingFactsTable.ForeignKeys[2].RefTable = AdminUsersTable
+	OutsourcingFactsTable.ForeignKeys[3].RefTable = ProductSkusTable
+	OutsourcingFactsTable.ForeignKeys[4].RefTable = UnitsTable
+	OutsourcingFactsTable.ForeignKeys[5].RefTable = WarehousesTable
 	OutsourcingFactsTable.Annotation = &entsql.Annotation{}
 	OutsourcingFactsTable.Annotation.Checks = map[string]string{
 		"outsourcing_facts_quantity_positive":   "quantity > 0",
 		"outsourcing_facts_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
 		"outsourcing_facts_status_allowed":      "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+		"outsourcing_facts_status_audit_bundle": "\n(\n  (status = 'DRAFT'\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n  OR\n  (status = 'POSTED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n  OR\n  (status = 'CANCELLED'\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255\n    AND ((posted_at IS NULL AND posted_by IS NULL)\n      OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))\n)",
 		"outsourcing_facts_subject_allowed":     "subject_type IN ('MATERIAL', 'PRODUCT')",
 		"outsourcing_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'RETURN_RECEIPT')",
+		"outsourcing_facts_version_positive":    "version > 0",
 	}
 	OutsourcingOrdersTable.ForeignKeys[0].RefTable = SuppliersTable
 	OutsourcingOrdersTable.Annotation = &entsql.Annotation{}
@@ -4784,6 +4873,7 @@ func init() {
 		"outsourcing_return_dispositions_status_allowed":    "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
 		"outsourcing_return_dispositions_type_allowed":      "disposition_type IN ('RETURN_TO_VENDOR', 'REWORK')",
 		"outsourcing_return_dispositions_version_positive":  "version > 0",
+		"outsourcing_return_dispositions_wip_source":        "production_wip_batch_id IS NOT NULL",
 	}
 	ProcessesTable.Annotation = &entsql.Annotation{}
 	ProcessesTable.Annotation.Checks = map[string]string{
@@ -4821,24 +4911,29 @@ func init() {
 	ProductionExceptionDecisionsTable.Annotation = &entsql.Annotation{}
 	ProductionExceptionDecisionsTable.Annotation.Checks = map[string]string{
 		"production_exception_decisions_execution_allowed": "execution_status IN ('PENDING', 'APPLIED', 'REVERSED')",
-		"production_exception_decisions_execution_audit":   "\n(\n  (execution_status = 'PENDING' AND executed_at IS NULL AND executed_by IS NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR (execution_status = 'APPLIED' AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR (execution_status = 'REVERSED' AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255)\n)",
+		"production_exception_decisions_execution_audit":   "\n(\n  (execution_status = 'PENDING' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR (execution_status = 'APPLIED' AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255 AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR (execution_status = 'REVERSED'\n    AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255\n    AND ((decision_type = 'OVER_ISSUE' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL)\n      OR (decision_type IN ('SCRAP', 'WIP_CONCESSION') AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255)))\n)",
 		"production_exception_decisions_intent_bundle":     "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
 		"production_exception_decisions_quantity_positive": "requested_quantity > 0 AND (approved_quantity IS NULL OR approved_quantity > 0)",
+		"production_exception_decisions_source_bundle":     "\n(\n  (decision_type = 'OVER_ISSUE' AND production_material_requirement_id IS NOT NULL AND production_wip_batch_id IS NULL AND quality_inspection_id IS NULL)\n  OR\n  (decision_type IN ('SCRAP', 'WIP_CONCESSION') AND production_material_requirement_id IS NULL AND production_wip_batch_id IS NOT NULL AND quality_inspection_id IS NOT NULL)\n)",
 		"production_exception_decisions_status_allowed":    "status IN ('SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED')",
 		"production_exception_decisions_type_allowed":      "decision_type IN ('SCRAP', 'OVER_ISSUE', 'WIP_CONCESSION')",
 		"production_exception_decisions_version_positive":  "version > 0",
 	}
 	ProductionFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ProductionFactsTable.ForeignKeys[1].RefTable = ProductSkusTable
-	ProductionFactsTable.ForeignKeys[2].RefTable = UnitsTable
-	ProductionFactsTable.ForeignKeys[3].RefTable = WarehousesTable
+	ProductionFactsTable.ForeignKeys[2].RefTable = AdminUsersTable
+	ProductionFactsTable.ForeignKeys[3].RefTable = AdminUsersTable
+	ProductionFactsTable.ForeignKeys[4].RefTable = UnitsTable
+	ProductionFactsTable.ForeignKeys[5].RefTable = WarehousesTable
 	ProductionFactsTable.Annotation = &entsql.Annotation{}
 	ProductionFactsTable.Annotation.Checks = map[string]string{
 		"production_facts_quantity_positive":   "quantity > 0",
 		"production_facts_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
 		"production_facts_status_allowed":      "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+		"production_facts_status_audit_bundle": "\n(\n  (status = 'DRAFT'\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n  OR\n  (status = 'POSTED'\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n  OR\n  (status = 'CANCELLED'\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255\n    AND ((posted_at IS NULL AND posted_by IS NULL)\n      OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))\n)",
 		"production_facts_subject_allowed":     "subject_type IN ('MATERIAL', 'PRODUCT')",
-		"production_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK', 'SCRAP')",
+		"production_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK')",
+		"production_facts_version_positive":    "version > 0",
 	}
 	ProductionOrdersTable.ForeignKeys[0].RefTable = AdminUsersTable
 	ProductionOrdersTable.ForeignKeys[1].RefTable = AdminUsersTable
@@ -4948,7 +5043,7 @@ func init() {
 	ProductionWipEventsTable.ForeignKeys[1].RefTable = AdminUsersTable
 	ProductionWipEventsTable.Annotation = &entsql.Annotation{}
 	ProductionWipEventsTable.Annotation.Checks = map[string]string{
-		"production_wip_events_action_allowed":    "action IN ('SPLIT_BATCH', 'ASSIGN_EXECUTION', 'START_OPERATION', 'COMPLETE_OPERATION', 'WIP_TRANSFER', 'OUTSOURCE_RETURN', 'REWORK', 'CANCEL')",
+		"production_wip_events_action_allowed":    "action IN ('SPLIT_BATCH', 'ASSIGN_EXECUTION', 'START_OPERATION', 'COMPLETE_OPERATION', 'WIP_TRANSFER', 'OUTSOURCE_RETURN', 'REWORK', 'CANCEL', 'EXCEPTION_APPLY', 'EXCEPTION_REVERSE', 'OUTSOURCE_REWORK', 'OUTSOURCE_REWORK_CANCEL')",
 		"production_wip_events_contract_v1":       "result_contract = 'production.wip-mutation-result/v1'",
 		"production_wip_events_hash_length":       "length(intent_hash) = 64",
 		"production_wip_events_key_present":       "length(trim(idempotency_key)) BETWEEN 1 AND 128",
@@ -5093,7 +5188,9 @@ func init() {
 	SalesReturnsTable.Annotation = &entsql.Annotation{}
 	SalesReturnsTable.Annotation.Checks = map[string]string{
 		"sales_returns_intent_bundle":    "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64 AND idempotency_item_count > 0",
-		"sales_returns_status_allowed":   "status IN ('DRAFT', 'APPROVED', 'RECEIVED', 'CANCELLED')",
+		"sales_returns_lifecycle_audit":  "\n(\n  (status = 'DRAFT'\n    AND approved_at IS NULL AND approved_by IS NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND received_at IS NULL AND received_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'APPROVED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND received_at IS NULL AND received_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'REJECTED'\n    AND approved_at IS NULL AND approved_by IS NULL\n    AND rejected_at IS NOT NULL AND rejected_by IS NOT NULL\n    AND reject_reason IS NOT NULL AND length(trim(reject_reason)) BETWEEN 1 AND 255\n    AND received_at IS NULL AND received_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'RECEIVED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND received_at IS NOT NULL AND received_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'CANCELLED'\n    AND ((approved_at IS NULL AND approved_by IS NULL)\n      OR (approved_at IS NOT NULL AND approved_by IS NOT NULL))\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND received_at IS NULL AND received_by IS NULL\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'REVERSED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND received_at IS NOT NULL AND received_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL\n    AND reverse_reason IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255)\n)",
+		"sales_returns_maker_checker":    "((approved_by IS NULL OR approved_by <> created_by) AND (rejected_by IS NULL OR rejected_by <> created_by))",
+		"sales_returns_status_allowed":   "status IN ('DRAFT', 'APPROVED', 'REJECTED', 'RECEIVED', 'CANCELLED', 'REVERSED')",
 		"sales_returns_version_positive": "version > 0",
 	}
 	SalesReturnItemsTable.ForeignKeys[0].RefTable = SalesReturnsTable

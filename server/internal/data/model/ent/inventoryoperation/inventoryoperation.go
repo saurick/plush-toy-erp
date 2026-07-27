@@ -23,8 +23,6 @@ const (
 	FieldStatus = "status"
 	// FieldReason holds the string denoting the reason field in the database.
 	FieldReason = "reason"
-	// FieldApprovalRef holds the string denoting the approval_ref field in the database.
-	FieldApprovalRef = "approval_ref"
 	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
 	FieldIdempotencyKey = "idempotency_key"
 	// FieldIdempotencyPayloadHash holds the string denoting the idempotency_payload_hash field in the database.
@@ -33,6 +31,20 @@ const (
 	FieldIdempotencyItemCount = "idempotency_item_count"
 	// FieldVersion holds the string denoting the version field in the database.
 	FieldVersion = "version"
+	// FieldSubmittedAt holds the string denoting the submitted_at field in the database.
+	FieldSubmittedAt = "submitted_at"
+	// FieldSubmittedBy holds the string denoting the submitted_by field in the database.
+	FieldSubmittedBy = "submitted_by"
+	// FieldApprovedAt holds the string denoting the approved_at field in the database.
+	FieldApprovedAt = "approved_at"
+	// FieldApprovedBy holds the string denoting the approved_by field in the database.
+	FieldApprovedBy = "approved_by"
+	// FieldRejectedAt holds the string denoting the rejected_at field in the database.
+	FieldRejectedAt = "rejected_at"
+	// FieldRejectedBy holds the string denoting the rejected_by field in the database.
+	FieldRejectedBy = "rejected_by"
+	// FieldRejectReason holds the string denoting the reject_reason field in the database.
+	FieldRejectReason = "reject_reason"
 	// FieldPostedAt holds the string denoting the posted_at field in the database.
 	FieldPostedAt = "posted_at"
 	// FieldPostedBy holds the string denoting the posted_by field in the database.
@@ -69,11 +81,17 @@ var Columns = []string{
 	FieldOperationType,
 	FieldStatus,
 	FieldReason,
-	FieldApprovalRef,
 	FieldIdempotencyKey,
 	FieldIdempotencyPayloadHash,
 	FieldIdempotencyItemCount,
 	FieldVersion,
+	FieldSubmittedAt,
+	FieldSubmittedBy,
+	FieldApprovedAt,
+	FieldApprovedBy,
+	FieldRejectedAt,
+	FieldRejectedBy,
+	FieldRejectReason,
 	FieldPostedAt,
 	FieldPostedBy,
 	FieldCancelledAt,
@@ -111,8 +129,6 @@ var (
 	StatusValidator func(string) error
 	// ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
 	ReasonValidator func(string) error
-	// ApprovalRefValidator is a validator for the "approval_ref" field. It is called by the builders before save.
-	ApprovalRefValidator func(string) error
 	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	IdempotencyKeyValidator func(string) error
 	// IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
@@ -123,6 +139,14 @@ var (
 	DefaultVersion int
 	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	VersionValidator func(int) error
+	// SubmittedByValidator is a validator for the "submitted_by" field. It is called by the builders before save.
+	SubmittedByValidator func(int) error
+	// ApprovedByValidator is a validator for the "approved_by" field. It is called by the builders before save.
+	ApprovedByValidator func(int) error
+	// RejectedByValidator is a validator for the "rejected_by" field. It is called by the builders before save.
+	RejectedByValidator func(int) error
+	// RejectReasonValidator is a validator for the "reject_reason" field. It is called by the builders before save.
+	RejectReasonValidator func(string) error
 	// PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
 	PostedByValidator func(int) error
 	// CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
@@ -167,11 +191,6 @@ func ByReason(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReason, opts...).ToFunc()
 }
 
-// ByApprovalRef orders the results by the approval_ref field.
-func ByApprovalRef(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldApprovalRef, opts...).ToFunc()
-}
-
 // ByIdempotencyKey orders the results by the idempotency_key field.
 func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIdempotencyKey, opts...).ToFunc()
@@ -190,6 +209,41 @@ func ByIdempotencyItemCount(opts ...sql.OrderTermOption) OrderOption {
 // ByVersion orders the results by the version field.
 func ByVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVersion, opts...).ToFunc()
+}
+
+// BySubmittedAt orders the results by the submitted_at field.
+func BySubmittedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubmittedAt, opts...).ToFunc()
+}
+
+// BySubmittedBy orders the results by the submitted_by field.
+func BySubmittedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubmittedBy, opts...).ToFunc()
+}
+
+// ByApprovedAt orders the results by the approved_at field.
+func ByApprovedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldApprovedAt, opts...).ToFunc()
+}
+
+// ByApprovedBy orders the results by the approved_by field.
+func ByApprovedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldApprovedBy, opts...).ToFunc()
+}
+
+// ByRejectedAt orders the results by the rejected_at field.
+func ByRejectedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRejectedAt, opts...).ToFunc()
+}
+
+// ByRejectedBy orders the results by the rejected_by field.
+func ByRejectedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRejectedBy, opts...).ToFunc()
+}
+
+// ByRejectReason orders the results by the reject_reason field.
+func ByRejectReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRejectReason, opts...).ToFunc()
 }
 
 // ByPostedAt orders the results by the posted_at field.

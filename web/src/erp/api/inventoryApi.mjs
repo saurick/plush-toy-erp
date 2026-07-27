@@ -79,3 +79,12 @@ export async function getInventoryOperation(params = {}, options = {}) {
   )
   return dataOf(result)?.inventory_operation || null
 }
+
+export async function listInventoryOperations(params = {}, options = {}) {
+  const result = await inventoryRpc.call(
+    'list_inventory_operations',
+    params,
+    options
+  )
+  return dataOf(result)
+}

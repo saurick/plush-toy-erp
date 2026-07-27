@@ -150,6 +150,16 @@ func (r *inventoryPostInboundProcessInventoryRepoStub) PostPurchaseReceipt(_ con
 	return &copied, nil
 }
 
+func (r *inventoryPostInboundProcessInventoryRepoStub) PostPurchaseReceiptForProcessCommand(
+	ctx context.Context,
+	receiptID int,
+	_ *ProcessDomainCommandInput,
+	_ *ProcessDomainCommandResult,
+	_ int,
+) (*PurchaseReceipt, error) {
+	return r.PostPurchaseReceipt(ctx, receiptID)
+}
+
 func (r *inventoryPostInboundProcessInventoryRepoStub) GetPurchaseReceipt(_ context.Context, receiptID int) (*PurchaseReceipt, error) {
 	if r.postedReceipt == nil || r.postedReceipt.ID != receiptID {
 		return nil, ErrPurchaseReceiptNotFound

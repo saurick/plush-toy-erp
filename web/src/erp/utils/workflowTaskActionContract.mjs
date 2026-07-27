@@ -1,8 +1,42 @@
+const WORKFLOW_APPROVAL_CAPABILITY_KEYS = new Set([
+  'workflow.task.approve',
+  'sales_return.approve',
+  'finance.payment.approve',
+  'warehouse.adjustment.approve',
+  'production.exception.approve',
+])
+
+const WORKFLOW_PROCESS_DECISION_PROFILE_BY_CAPABILITY = Object.freeze({
+  'sales_return.approve': 'sales_return_approval',
+  'finance.payment.approve': 'finance_payment_approval',
+  'warehouse.adjustment.approve': 'inventory_adjustment_approval',
+  'production.exception.approve': 'production_exception_approval',
+})
+
 export function isWorkflowApprovalTask(task = {}) {
   const requiredCapabilityKey = String(
     task?.required_capability_key || ''
   ).trim()
-  return requiredCapabilityKey === 'workflow.task.approve'
+  return WORKFLOW_APPROVAL_CAPABILITY_KEYS.has(requiredCapabilityKey)
+}
+
+export function isWorkflowProcessDecisionTask(task = {}) {
+  return Boolean(getWorkflowProcessDecisionApprovalProfile(task))
+}
+
+export function getWorkflowProcessDecisionApprovalProfile(task = {}) {
+  return (
+    WORKFLOW_PROCESS_DECISION_PROFILE_BY_CAPABILITY[
+      String(task?.required_capability_key || '').trim()
+    ] || ''
+  )
+}
+
+export function workflowTaskAllowsApprovedQuantity(task = {}) {
+  return (
+    String(task?.required_capability_key || '').trim() ===
+    'production.exception.approve'
+  )
 }
 
 export const isWorkflowBossOrderApprovalTask = isWorkflowApprovalTask
@@ -10,7 +44,7 @@ export const isWorkflowBossOrderApprovalTask = isWorkflowApprovalTask
 export function getWorkflowTaskActionPermission(actionMode = '', task = {}) {
   if (actionMode === 'complete') {
     return isWorkflowApprovalTask(task)
-      ? 'workflow.task.approve'
+      ? String(task?.required_capability_key || '').trim()
       : 'workflow.task.complete'
   }
   if (actionMode === 'reject') return 'workflow.task.reject'

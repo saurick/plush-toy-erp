@@ -51,15 +51,12 @@ func TestFinanceFactReadAccessScopeKeepsFamiliesSeparated(t *testing.T) {
 		t.Fatal("invoice read must only expose invoice facts")
 	}
 	reconciliation := FinanceFactReadAccessScope([]string{PermissionFinanceReconciliationRead})
-	if !reconciliation.AllowsType(FinanceFactReconciliation) || reconciliation.AllowsType(FinanceFactPayment) {
+	if !reconciliation.AllowsType(FinanceFactReconciliation) || reconciliation.AllowsType("PAYMENT") {
 		t.Fatal("reconciliation read must only expose reconciliation facts")
 	}
 
 	report := FinanceFactReadAccessScope([]string{PermissionFinanceReportRead})
-	if !report.AllowsType(FinanceFactPayment) {
-		t.Fatal("finance report read must allow legacy payment facts")
-	}
-	if report.AllowsType(FinanceFactReceivable) || report.AllowsType(FinanceFactPayable) || report.AllowsType(FinanceFactInvoice) || report.AllowsType(FinanceFactReconciliation) {
+	if !report.Empty() {
 		t.Fatal("report read alone must not expose operational finance ledgers")
 	}
 

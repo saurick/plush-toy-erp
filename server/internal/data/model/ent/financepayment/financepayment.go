@@ -41,10 +41,26 @@ const (
 	FieldVersion = "version"
 	// FieldOccurredAt holds the string denoting the occurred_at field in the database.
 	FieldOccurredAt = "occurred_at"
+	// FieldApprovedAt holds the string denoting the approved_at field in the database.
+	FieldApprovedAt = "approved_at"
+	// FieldApprovedBy holds the string denoting the approved_by field in the database.
+	FieldApprovedBy = "approved_by"
+	// FieldRejectedAt holds the string denoting the rejected_at field in the database.
+	FieldRejectedAt = "rejected_at"
+	// FieldRejectedBy holds the string denoting the rejected_by field in the database.
+	FieldRejectedBy = "rejected_by"
+	// FieldRejectReason holds the string denoting the reject_reason field in the database.
+	FieldRejectReason = "reject_reason"
 	// FieldPostedAt holds the string denoting the posted_at field in the database.
 	FieldPostedAt = "posted_at"
 	// FieldPostedBy holds the string denoting the posted_by field in the database.
 	FieldPostedBy = "posted_by"
+	// FieldCancelledAt holds the string denoting the cancelled_at field in the database.
+	FieldCancelledAt = "cancelled_at"
+	// FieldCancelledBy holds the string denoting the cancelled_by field in the database.
+	FieldCancelledBy = "cancelled_by"
+	// FieldCancelReason holds the string denoting the cancel_reason field in the database.
+	FieldCancelReason = "cancel_reason"
 	// FieldReversedAt holds the string denoting the reversed_at field in the database.
 	FieldReversedAt = "reversed_at"
 	// FieldReversedBy holds the string denoting the reversed_by field in the database.
@@ -86,8 +102,16 @@ var Columns = []string{
 	FieldIdempotencyPayloadHash,
 	FieldVersion,
 	FieldOccurredAt,
+	FieldApprovedAt,
+	FieldApprovedBy,
+	FieldRejectedAt,
+	FieldRejectedBy,
+	FieldRejectReason,
 	FieldPostedAt,
 	FieldPostedBy,
+	FieldCancelledAt,
+	FieldCancelledBy,
+	FieldCancelReason,
 	FieldReversedAt,
 	FieldReversedBy,
 	FieldReverseReason,
@@ -141,8 +165,18 @@ var (
 	VersionValidator func(int) error
 	// DefaultOccurredAt holds the default value on creation for the "occurred_at" field.
 	DefaultOccurredAt func() time.Time
+	// ApprovedByValidator is a validator for the "approved_by" field. It is called by the builders before save.
+	ApprovedByValidator func(int) error
+	// RejectedByValidator is a validator for the "rejected_by" field. It is called by the builders before save.
+	RejectedByValidator func(int) error
+	// RejectReasonValidator is a validator for the "reject_reason" field. It is called by the builders before save.
+	RejectReasonValidator func(string) error
 	// PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
 	PostedByValidator func(int) error
+	// CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
+	CancelledByValidator func(int) error
+	// CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
+	CancelReasonValidator func(string) error
 	// ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
 	ReversedByValidator func(int) error
 	// ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
@@ -230,6 +264,31 @@ func ByOccurredAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOccurredAt, opts...).ToFunc()
 }
 
+// ByApprovedAt orders the results by the approved_at field.
+func ByApprovedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldApprovedAt, opts...).ToFunc()
+}
+
+// ByApprovedBy orders the results by the approved_by field.
+func ByApprovedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldApprovedBy, opts...).ToFunc()
+}
+
+// ByRejectedAt orders the results by the rejected_at field.
+func ByRejectedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRejectedAt, opts...).ToFunc()
+}
+
+// ByRejectedBy orders the results by the rejected_by field.
+func ByRejectedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRejectedBy, opts...).ToFunc()
+}
+
+// ByRejectReason orders the results by the reject_reason field.
+func ByRejectReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRejectReason, opts...).ToFunc()
+}
+
 // ByPostedAt orders the results by the posted_at field.
 func ByPostedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPostedAt, opts...).ToFunc()
@@ -238,6 +297,21 @@ func ByPostedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByPostedBy orders the results by the posted_by field.
 func ByPostedBy(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPostedBy, opts...).ToFunc()
+}
+
+// ByCancelledAt orders the results by the cancelled_at field.
+func ByCancelledAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelledAt, opts...).ToFunc()
+}
+
+// ByCancelledBy orders the results by the cancelled_by field.
+func ByCancelledBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelledBy, opts...).ToFunc()
+}
+
+// ByCancelReason orders the results by the cancel_reason field.
+func ByCancelReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelReason, opts...).ToFunc()
 }
 
 // ByReversedAt orders the results by the reversed_at field.

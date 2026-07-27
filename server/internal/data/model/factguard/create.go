@@ -11,7 +11,7 @@ import (
 func RejectCreateBypass(
 	m ent.Mutation,
 	entity string,
-	additionalLifecycleFields ...string,
+	lifecycleFields []string,
 ) error {
 	if !m.Op().Is(ent.OpCreate) {
 		return nil
@@ -24,7 +24,7 @@ func RejectCreateBypass(
 	if _, exists := m.Field("posted_at"); exists {
 		return fmt.Errorf("%s must be created without posted_at; use the domain post action", entity)
 	}
-	for _, fieldName := range additionalLifecycleFields {
+	for _, fieldName := range lifecycleFields {
 		if _, exists := m.Field(fieldName); exists {
 			return fmt.Errorf("%s must be created without %s; use the domain lifecycle action", entity, fieldName)
 		}

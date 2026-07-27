@@ -35,9 +35,24 @@ func TestWorkflowApprovalClassificationIgnoresSalesRoleAndNames(t *testing.T) {
 	if IsWorkflowApprovalTask(legacy) {
 		t.Fatal("sales source, order_approval group and boss role must not classify approval")
 	}
-	capability := PermissionWorkflowTaskApprove
-	generic := &WorkflowTask{RequiredCapabilityKey: &capability}
-	if !IsWorkflowApprovalTask(generic) {
-		t.Fatal("workflow.task.approve capability must classify approval")
+
+	for _, capability := range []string{
+		PermissionWorkflowTaskApprove,
+		PermissionSalesReturnApprove,
+		PermissionFinancePaymentApprove,
+		PermissionWarehouseAdjustmentApprove,
+		PermissionProductionExceptionApprove,
+	} {
+		t.Run(capability, func(t *testing.T) {
+			taskCapability := capability
+			if !IsWorkflowApprovalTask(&WorkflowTask{RequiredCapabilityKey: &taskCapability}) {
+				t.Fatalf("%s capability must classify approval", capability)
+			}
+		})
+	}
+
+	nonApprovalCapability := PermissionWorkflowTaskComplete
+	if IsWorkflowApprovalTask(&WorkflowTask{RequiredCapabilityKey: &nonApprovalCapability}) {
+		t.Fatal("workflow.task.complete capability must not classify approval")
 	}
 }

@@ -56,7 +56,7 @@ func TestRejectCreateBypass(t *testing.T) {
 			err := RejectCreateBypass(
 				&createMutation{op: ent.OpCreate, fields: tt.fields},
 				"operational_fact",
-				tt.additionalFields...,
+				tt.additionalFields,
 			)
 			if tt.wantErr == "" {
 				if err != nil {

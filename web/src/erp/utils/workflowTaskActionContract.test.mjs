@@ -1,0 +1,77 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import {
+  getWorkflowProcessDecisionApprovalProfile,
+  getWorkflowTaskActionPermission,
+  isWorkflowApprovalTask,
+  isWorkflowProcessDecisionTask,
+  workflowTaskAllowsApprovedQuantity,
+} from './workflowTaskActionContract.mjs'
+
+const APPROVAL_CAPABILITIES = Object.freeze([
+  'sales_return.approve',
+  'finance.payment.approve',
+  'warehouse.adjustment.approve',
+  'production.exception.approve',
+])
+const PROFILE_BY_CAPABILITY = Object.freeze({
+  'sales_return.approve': 'sales_return_approval',
+  'finance.payment.approve': 'finance_payment_approval',
+  'warehouse.adjustment.approve': 'inventory_adjustment_approval',
+  'production.exception.approve': 'production_exception_approval',
+})
+
+test('workflow task action contract binds every domain approval to its exact capability and profile', () => {
+  for (const capability of APPROVAL_CAPABILITIES) {
+    const task = { required_capability_key: capability }
+    assert.equal(isWorkflowApprovalTask(task), true)
+    assert.equal(isWorkflowProcessDecisionTask(task), true)
+    assert.equal(
+      getWorkflowTaskActionPermission('complete', task),
+      capability
+    )
+    assert.equal(
+      getWorkflowProcessDecisionApprovalProfile(task),
+      PROFILE_BY_CAPABILITY[capability]
+    )
+  }
+})
+
+test('workflow task action contract keeps generic completion and non-decision approvals distinct', () => {
+  assert.equal(
+    getWorkflowTaskActionPermission('complete', {
+      required_capability_key: 'finance.payment.post',
+    }),
+    'workflow.task.complete'
+  )
+  assert.equal(
+    isWorkflowProcessDecisionTask({
+      required_capability_key: 'workflow.task.approve',
+    }),
+    false
+  )
+})
+
+test('workflow task action contract allows approved quantity only for production exceptions', () => {
+  assert.equal(
+    workflowTaskAllowsApprovedQuantity({
+      required_capability_key: 'production.exception.approve',
+    }),
+    true
+  )
+  for (const capability of [
+    'sales_return.approve',
+    'finance.payment.approve',
+    'warehouse.adjustment.approve',
+    'production.exception.execute',
+    '',
+  ]) {
+    assert.equal(
+      workflowTaskAllowsApprovedQuantity({
+        required_capability_key: capability,
+      }),
+      false
+    )
+  }
+})

@@ -160,6 +160,16 @@ export default function ProductionMaterialIssueModal({
             children: requirement?.planned_quantity || '0',
           },
           {
+            key: 'approved-over-issue',
+            label: '已批准超领',
+            children: requirement?.approved_over_issue_quantity || '0',
+          },
+          {
+            key: 'effective-limit',
+            label: '当前可领上限',
+            children: requirement?.effective_limit_quantity || '0',
+          },
+          {
             key: 'issued',
             label: '已过账领料',
             children: requirement?.issued_quantity || '0',

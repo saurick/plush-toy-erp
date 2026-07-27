@@ -8,7 +8,7 @@ import (
 )
 
 func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {
-	permission := map[string]string{"create_finance_payment": biz.PermissionFinancePaymentCreate, "post_finance_payment": biz.PermissionFinancePaymentPost, "reverse_finance_payment": biz.PermissionFinancePaymentReverse, "get_finance_payment": biz.PermissionFinancePaymentRead, "list_finance_payments": biz.PermissionFinancePaymentRead, "get_finance_credit_note": biz.PermissionFinancePaymentRead, "list_finance_credit_notes": biz.PermissionFinancePaymentRead, "create_finance_credit_note": biz.PermissionFinanceCreditNoteCreate, "reverse_finance_credit_note": biz.PermissionFinanceCreditNoteReverse}[method]
+	permission := map[string]string{"create_finance_payment": biz.PermissionFinancePaymentCreate, "cancel_finance_payment": biz.PermissionFinancePaymentCreate, "reverse_finance_payment": biz.PermissionFinancePaymentReverse, "get_finance_payment": biz.PermissionFinancePaymentRead, "list_finance_payments": biz.PermissionFinancePaymentRead, "get_finance_credit_note": biz.PermissionFinancePaymentRead, "list_finance_credit_notes": biz.PermissionFinancePaymentRead, "create_finance_credit_note": biz.PermissionFinanceCreditNoteCreate, "reverse_finance_credit_note": biz.PermissionFinanceCreditNoteReverse}[method]
 	if permission == "" {
 		return id, unknownOperationalFactResult(method), nil
 	}
@@ -16,10 +16,10 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		return id, res, nil
 	}
 	if method != "get_finance_payment" && method != "list_finance_payments" && method != "get_finance_credit_note" && method != "list_finance_credit_notes" {
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance", "finance_payments"); res != nil {
 			return id, res, nil
 		}
-	} else if res := d.requireCustomerConfigModulesReadable(ctx, "finance"); res != nil {
+	} else if res := d.requireCustomerConfigModulesReadable(ctx, "finance", "finance_payments"); res != nil {
 		return id, res, nil
 	}
 	switch method {
@@ -42,27 +42,11 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		}
 		out, err := d.operationalFactUC.CreateFinancePayment(ctx, in, actorID)
 		return id, financePaymentResult(d, ctx, out, err), nil
-	case "post_finance_payment":
-		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version", "allocations") {
+	case "cancel_finance_payment":
+		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
-		raw, ok := pm["allocations"].([]any)
-		if !ok || len(raw) == 0 {
-			return id, invalidParamResult(), nil
-		}
-		allocations := make([]biz.FinancePaymentAllocationInput, 0, len(raw))
-		for _, value := range raw {
-			item, ok := value.(map[string]any)
-			if !ok || !financeFactAllowsOnly(item, "finance_fact_id", "amount") {
-				return id, invalidParamResult(), nil
-			}
-			amount, ok := getRequiredJSONRPCNumeric20Scale6(item, "amount")
-			if !ok {
-				return id, invalidParamResult(), nil
-			}
-			allocations = append(allocations, biz.FinancePaymentAllocationInput{FinanceFactID: getInt(item, "finance_fact_id", 0), Amount: amount})
-		}
-		out, err := d.operationalFactUC.PostFinancePayment(ctx, &biz.FinancePaymentPost{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), Allocations: allocations}, actorID)
+		out, err := d.operationalFactUC.CancelFinancePayment(ctx, &biz.FinancePaymentTransition{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), Reason: getString(pm, "reason")}, actorID)
 		return id, financePaymentResult(d, ctx, out, err), nil
 	case "reverse_finance_payment":
 		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
@@ -117,13 +101,56 @@ func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, 
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		out, err := d.operationalFactUC.CreateFinanceCreditNote(ctx, &biz.FinanceCreditNoteCreate{CreditNoteNo: getString(pm, "credit_note_no"), FinanceFactID: getInt(pm, "finance_fact_id", 0), Amount: amount, Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key")}, actorID)
+		if res := d.requireAnySourceActionReadPermission(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		factID := getInt(pm, "finance_fact_id", 0)
+		source, err := d.operationalFactUC.GetFinanceFact(ctx, factID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		if source == nil {
+			return id, d.mapOperationalFactError(ctx, biz.ErrFinanceFactNotFound), nil
+		}
+		condition, ok := biz.FinanceCreditSourceReadCondition(source.FactType)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method, condition); res != nil {
+			return id, res, nil
+		}
+		out, err := d.operationalFactUC.CreateFinanceCreditNote(ctx, &biz.FinanceCreditNoteCreate{CreditNoteNo: getString(pm, "credit_note_no"), FinanceFactID: factID, Amount: amount, Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key")}, actorID)
 		return id, financeCreditNoteResult(d, ctx, out, err), nil
 	case "reverse_finance_credit_note":
 		if !financeFactAllowsOnly(pm, "customer_key", "credit_note_id", "credit_note_no", "reason", "idempotency_key") {
 			return id, invalidParamResult(), nil
 		}
-		out, err := d.operationalFactUC.ReverseFinanceCreditNote(ctx, &biz.FinanceCreditNoteReverse{CreditNoteID: getInt(pm, "credit_note_id", 0), CreditNoteNo: getString(pm, "credit_note_no"), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key")}, actorID)
+		if res := d.requireAnySourceActionReadPermission(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		creditNoteID := getInt(pm, "credit_note_id", 0)
+		creditNote, err := d.operationalFactUC.GetFinanceCreditNote(ctx, creditNoteID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		if creditNote == nil {
+			return id, d.mapOperationalFactError(ctx, biz.ErrBadParam), nil
+		}
+		source, err := d.operationalFactUC.GetFinanceFact(ctx, creditNote.FinanceFactID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		if source == nil {
+			return id, d.mapOperationalFactError(ctx, biz.ErrFinanceFactNotFound), nil
+		}
+		condition, ok := biz.FinanceCreditSourceReadCondition(source.FactType)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method, condition); res != nil {
+			return id, res, nil
+		}
+		out, err := d.operationalFactUC.ReverseFinanceCreditNote(ctx, &biz.FinanceCreditNoteReverse{CreditNoteID: creditNoteID, CreditNoteNo: getString(pm, "credit_note_no"), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key")}, actorID)
 		return id, financeCreditNoteResult(d, ctx, out, err), nil
 	}
 	return id, unknownOperationalFactResult(method), nil
@@ -148,7 +175,37 @@ func financePaymentToMap(item *biz.FinancePayment) map[string]any {
 	for _, a := range item.Allocations {
 		allocations = append(allocations, map[string]any{"id": a.ID, "finance_fact_id": a.FinanceFactID, "amount": a.Amount.String(), "currency": a.Currency, "status": a.Status, "reversal_of_allocation_id": optionalIntValue(a.ReversalOfAllocationID)})
 	}
-	return map[string]any{"id": item.ID, "payment_no": item.PaymentNo, "direction": item.Direction, "status": item.Status, "counterparty_type": item.CounterpartyType, "counterparty_id": item.CounterpartyID, "amount": item.Amount.String(), "currency": item.Currency, "account_ref": item.AccountRef, "evidence_ref": item.EvidenceRef, "version": item.Version, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalTimeUnix(item.PostedAt), "reversed_at": optionalTimeUnix(item.ReversedAt), "reverse_reason": optionalStringValue(item.ReverseReason), "allocations": allocations}
+	return map[string]any{
+		"id":                item.ID,
+		"payment_no":        item.PaymentNo,
+		"direction":         item.Direction,
+		"status":            item.Status,
+		"counterparty_type": item.CounterpartyType,
+		"counterparty_id":   item.CounterpartyID,
+		"amount":            item.Amount.String(),
+		"currency":          item.Currency,
+		"account_ref":       item.AccountRef,
+		"evidence_ref":      item.EvidenceRef,
+		"version":           item.Version,
+		"occurred_at":       item.OccurredAt.Unix(),
+		"approved_at":       optionalTimeUnix(item.ApprovedAt),
+		"approved_by":       optionalIntValue(item.ApprovedBy),
+		"rejected_at":       optionalTimeUnix(item.RejectedAt),
+		"rejected_by":       optionalIntValue(item.RejectedBy),
+		"reject_reason":     optionalStringValue(item.RejectReason),
+		"posted_at":         optionalTimeUnix(item.PostedAt),
+		"posted_by":         optionalIntValue(item.PostedBy),
+		"cancelled_at":      optionalTimeUnix(item.CancelledAt),
+		"cancelled_by":      optionalIntValue(item.CancelledBy),
+		"cancel_reason":     optionalStringValue(item.CancelReason),
+		"reversed_at":       optionalTimeUnix(item.ReversedAt),
+		"reversed_by":       optionalIntValue(item.ReversedBy),
+		"reverse_reason":    optionalStringValue(item.ReverseReason),
+		"created_by":        item.CreatedBy,
+		"created_at":        item.CreatedAt.Unix(),
+		"updated_at":        item.UpdatedAt.Unix(),
+		"allocations":       allocations,
+	}
 }
 func financeCreditNoteToMap(item *biz.FinanceCreditNote) map[string]any {
 	if item == nil {

@@ -42,7 +42,7 @@ func TestProductionReworkPostgresConcurrentQuantityAndSourceCancellation(t *test
 		if err != nil {
 			t.Fatalf("create rework source completion %s: %v", suffix, err)
 		}
-		completion, err = f.factUC.PostProductionFact(ctx, completion.ID)
+		completion, err = f.factUC.PostProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, f.actorID, ""))
 		if err != nil {
 			t.Fatalf("post rework source completion %s: %v", suffix, err)
 		}
@@ -66,14 +66,15 @@ func TestProductionReworkPostgresConcurrentQuantityAndSourceCancellation(t *test
 	start := make(chan struct{})
 	errs := make(chan error, 2)
 	var wg sync.WaitGroup
-	for _, factID := range []int{first.ID, second.ID} {
+	for _, fact := range []*biz.ProductionFact{first, second} {
+		postRequest := operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "")
 		wg.Add(1)
-		go func(id int) {
+		go func(in *biz.OperationalFactStatusMutation) {
 			defer wg.Done()
 			<-start
-			_, err := f.factUC.PostProductionFact(ctx, id)
+			_, err := f.factUC.PostProductionFact(ctx, in)
 			errs <- err
-		}(factID)
+		}(postRequest)
 	}
 	close(start)
 	wg.Wait()
@@ -109,17 +110,19 @@ func TestProductionReworkPostgresConcurrentQuantityAndSourceCancellation(t *test
 	if err != nil {
 		t.Fatalf("create cancellation-race rework: %v", err)
 	}
+	postRequest := operationalFactStatusMutation(raceRework.ID, raceRework.Version, f.actorID, "")
+	cancelRequest := operationalFactStatusMutation(raceCompletion.ID, raceCompletion.Version, f.actorID, "并发撤销返工来源完工")
 	start = make(chan struct{})
 	postResult := make(chan error, 1)
 	cancelResult := make(chan error, 1)
 	go func() {
 		<-start
-		_, callErr := f.factUC.PostProductionFact(ctx, raceRework.ID)
+		_, callErr := f.factUC.PostProductionFact(ctx, postRequest)
 		postResult <- callErr
 	}()
 	go func() {
 		<-start
-		_, callErr := f.factUC.CancelPostedProductionFact(ctx, raceCompletion.ID)
+		_, callErr := f.factUC.CancelPostedProductionFact(ctx, cancelRequest)
 		cancelResult <- callErr
 	}()
 	close(start)

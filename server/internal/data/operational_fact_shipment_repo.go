@@ -16,6 +16,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/salesreturn"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
@@ -830,6 +831,20 @@ func validateShipmentCancellationDependencies(ctx context.Context, tx *inventory
 	}
 	if hasPendingQuality {
 		return biz.ErrShipmentQualityPending
+	}
+	hasActiveSalesReturn, err := tx.client.SalesReturn.Query().Where(
+		salesreturn.ShipmentID(shipmentID),
+		salesreturn.StatusIn(
+			biz.SalesReturnStatusDraft,
+			biz.SalesReturnStatusApproved,
+			biz.SalesReturnStatusReceived,
+		),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasActiveSalesReturn {
+		return biz.ErrShipmentSalesReturnDependency
 	}
 	return nil
 }

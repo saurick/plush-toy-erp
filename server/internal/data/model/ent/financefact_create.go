@@ -48,6 +48,20 @@ func (_c *FinanceFactCreate) SetNillableStatus(v *string) *FinanceFactCreate {
 	return _c
 }
 
+// SetVersion sets the "version" field.
+func (_c *FinanceFactCreate) SetVersion(v int) *FinanceFactCreate {
+	_c.mutation.SetVersion(v)
+	return _c
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillableVersion(v *int) *FinanceFactCreate {
+	if v != nil {
+		_c.SetVersion(*v)
+	}
+	return _c
+}
+
 // SetCounterpartyType sets the "counterparty_type" field.
 func (_c *FinanceFactCreate) SetCounterpartyType(v string) *FinanceFactCreate {
 	_c.mutation.SetCounterpartyType(v)
@@ -248,6 +262,20 @@ func (_c *FinanceFactCreate) SetNillablePostedAt(v *time.Time) *FinanceFactCreat
 	return _c
 }
 
+// SetPostedBy sets the "posted_by" field.
+func (_c *FinanceFactCreate) SetPostedBy(v int) *FinanceFactCreate {
+	_c.mutation.SetPostedBy(v)
+	return _c
+}
+
+// SetNillablePostedBy sets the "posted_by" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillablePostedBy(v *int) *FinanceFactCreate {
+	if v != nil {
+		_c.SetPostedBy(*v)
+	}
+	return _c
+}
+
 // SetSettledAt sets the "settled_at" field.
 func (_c *FinanceFactCreate) SetSettledAt(v time.Time) *FinanceFactCreate {
 	_c.mutation.SetSettledAt(v)
@@ -258,6 +286,20 @@ func (_c *FinanceFactCreate) SetSettledAt(v time.Time) *FinanceFactCreate {
 func (_c *FinanceFactCreate) SetNillableSettledAt(v *time.Time) *FinanceFactCreate {
 	if v != nil {
 		_c.SetSettledAt(*v)
+	}
+	return _c
+}
+
+// SetSettledBy sets the "settled_by" field.
+func (_c *FinanceFactCreate) SetSettledBy(v int) *FinanceFactCreate {
+	_c.mutation.SetSettledBy(v)
+	return _c
+}
+
+// SetNillableSettledBy sets the "settled_by" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillableSettledBy(v *int) *FinanceFactCreate {
+	if v != nil {
+		_c.SetSettledBy(*v)
 	}
 	return _c
 }
@@ -346,6 +388,44 @@ func (_c *FinanceFactCreate) SetNillableUpdatedAt(v *time.Time) *FinanceFactCrea
 	return _c
 }
 
+// SetPosterID sets the "poster" edge to the AdminUser entity by ID.
+func (_c *FinanceFactCreate) SetPosterID(id int) *FinanceFactCreate {
+	_c.mutation.SetPosterID(id)
+	return _c
+}
+
+// SetNillablePosterID sets the "poster" edge to the AdminUser entity by ID if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillablePosterID(id *int) *FinanceFactCreate {
+	if id != nil {
+		_c = _c.SetPosterID(*id)
+	}
+	return _c
+}
+
+// SetPoster sets the "poster" edge to the AdminUser entity.
+func (_c *FinanceFactCreate) SetPoster(v *AdminUser) *FinanceFactCreate {
+	return _c.SetPosterID(v.ID)
+}
+
+// SetSettlerID sets the "settler" edge to the AdminUser entity by ID.
+func (_c *FinanceFactCreate) SetSettlerID(id int) *FinanceFactCreate {
+	_c.mutation.SetSettlerID(id)
+	return _c
+}
+
+// SetNillableSettlerID sets the "settler" edge to the AdminUser entity by ID if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillableSettlerID(id *int) *FinanceFactCreate {
+	if id != nil {
+		_c = _c.SetSettlerID(*id)
+	}
+	return _c
+}
+
+// SetSettler sets the "settler" edge to the AdminUser entity.
+func (_c *FinanceFactCreate) SetSettler(v *AdminUser) *FinanceFactCreate {
+	return _c.SetSettlerID(v.ID)
+}
+
 // SetCancellerID sets the "canceller" edge to the AdminUser entity by ID.
 func (_c *FinanceFactCreate) SetCancellerID(id int) *FinanceFactCreate {
 	_c.mutation.SetCancellerID(id)
@@ -405,6 +485,10 @@ func (_c *FinanceFactCreate) defaults() error {
 	if _, ok := _c.mutation.Status(); !ok {
 		v := financefact.DefaultStatus
 		_c.mutation.SetStatus(v)
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		v := financefact.DefaultVersion
+		_c.mutation.SetVersion(v)
 	}
 	if _, ok := _c.mutation.FeeAmount(); !ok {
 		v := financefact.DefaultFeeAmount
@@ -466,6 +550,14 @@ func (_c *FinanceFactCreate) check() error {
 	if v, ok := _c.mutation.Status(); ok {
 		if err := financefact.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "FinanceFact.version"`)}
+	}
+	if v, ok := _c.mutation.Version(); ok {
+		if err := financefact.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.version": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.CounterpartyType(); !ok {
@@ -544,6 +636,16 @@ func (_c *FinanceFactCreate) check() error {
 	if _, ok := _c.mutation.OccurredAtSpecified(); !ok {
 		return &ValidationError{Name: "occurred_at_specified", err: errors.New(`ent: missing required field "FinanceFact.occurred_at_specified"`)}
 	}
+	if v, ok := _c.mutation.PostedBy(); ok {
+		if err := financefact.PostedByValidator(v); err != nil {
+			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.posted_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SettledBy(); ok {
+		if err := financefact.SettledByValidator(v); err != nil {
+			return &ValidationError{Name: "settled_by", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.settled_by": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.CancelledBy(); ok {
 		if err := financefact.CancelledByValidator(v); err != nil {
 			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.cancelled_by": %w`, err)}
@@ -602,6 +704,10 @@ func (_c *FinanceFactCreate) createSpec() (*FinanceFact, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(financefact.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.Version(); ok {
+		_spec.SetField(financefact.FieldVersion, field.TypeInt, value)
+		_node.Version = value
 	}
 	if value, ok := _c.mutation.CounterpartyType(); ok {
 		_spec.SetField(financefact.FieldCounterpartyType, field.TypeString, value)
@@ -690,6 +796,40 @@ func (_c *FinanceFactCreate) createSpec() (*FinanceFact, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(financefact.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.PosterIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   financefact.PosterTable,
+			Columns: []string{financefact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.PostedBy = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.SettlerIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   financefact.SettlerTable,
+			Columns: []string{financefact.SettlerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.SettledBy = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.CancellerIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

@@ -789,6 +789,22 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	if !workflowAdminCanViewTask(admin, currentTask, visibleOwnerRoleKeys) {
 		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 	}
+	if (contract.StatusKey == "done" || contract.StatusKey == "rejected") &&
+		(currentTask.ProcessInstanceID != nil || currentTask.ProcessNodeInstanceID != nil) {
+		if d.processRuntimeUC == nil {
+			return id, linkedProcessReconciliationPendingResult(), nil
+		}
+		if err := d.processRuntimeUC.ValidateLinkedWorkflowTaskCompletionIntent(
+			ctx,
+			currentTask,
+			contract.StatusKey,
+			payload,
+			reason,
+			actorID,
+		); err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+	}
 	if replayedTask, replayed, replayErr := d.workflowUC.ResolveTaskStatusMutationReplay(ctx, statusUpdate, actorID); replayErr != nil {
 		return id, d.mapWorkflowError(ctx, replayErr), nil
 	} else if replayed {
@@ -907,6 +923,37 @@ func normalizeWorkflowTaskActionPayload(method string, payload map[string]any) (
 				sort.Strings(refs)
 				normalized[key] = refs
 			}
+		case "process_decision":
+			if method != "complete_task_action" {
+				return invalid()
+			}
+			decision, ok := value.(map[string]any)
+			if !ok || len(decision) == 0 || len(decision) > 2 {
+				return invalid()
+			}
+			reasonValue, ok := decision["reason"].(string)
+			reason := strings.TrimSpace(reasonValue)
+			if !ok || reason == "" || utf8.RuneCountInString(reason) > 255 {
+				return invalid()
+			}
+			normalizedDecision := map[string]any{"reason": reason}
+			for decisionKey := range decision {
+				if decisionKey != "reason" && decisionKey != "approved_quantity" {
+					return invalid()
+				}
+			}
+			if rawQuantity, exists := decision["approved_quantity"]; exists {
+				_, ok := rawQuantity.(string)
+				if !ok {
+					return invalid()
+				}
+				quantity, ok := getRequiredJSONRPCNumeric20Scale6(decision, "approved_quantity")
+				if !ok || !quantity.IsPositive() {
+					return invalid()
+				}
+				normalizedDecision["approved_quantity"] = quantity.String()
+			}
+			normalized[key] = normalizedDecision
 		default:
 			return invalid()
 		}

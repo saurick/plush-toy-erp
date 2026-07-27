@@ -31,10 +31,7 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"create_production_material_issue_from_order",
 		"create_production_rework_from_completion",
 		"submit_production_exception",
-		"approve_production_exception",
-		"reject_production_exception",
 		"cancel_production_exception",
-		"execute_production_exception",
 		"reverse_production_exception",
 		"get_production_exception",
 		"list_production_exceptions",
@@ -65,7 +62,7 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"release_stock_reservation",
 		"list_stock_reservations":
 		return d.handleOperationalFactReservation(ctx, method, id, pm)
-	case "create_sales_return", "approve_sales_return", "receive_sales_return", "cancel_sales_return", "get_sales_return", "list_sales_returns":
+	case "create_sales_return", "cancel_sales_return", "reverse_sales_return", "get_sales_return", "list_sales_returns":
 		return d.handleOperationalFactSalesReturn(ctx, method, id, pm, claims.UserID)
 	case "create_receivable_from_shipment",
 		"create_invoice_from_shipment",
@@ -76,7 +73,7 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"settle_finance_fact",
 		"cancel_finance_fact",
 		"list_finance_facts",
-		"create_finance_payment", "post_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
+		"create_finance_payment", "cancel_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
 		return d.handleOperationalFactFinance(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownOperationalFactResult(method), nil

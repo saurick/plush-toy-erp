@@ -24,6 +24,7 @@ function context(overrides = {}) {
     node_key: 'submit_sales_order',
     node_type: 'domain_command',
     attempt: 1,
+    version: 2,
     status: 'completed',
   }
   const current = {
@@ -32,6 +33,7 @@ function context(overrides = {}) {
     node_key: 'order_approval',
     node_type: 'approval',
     attempt: 1,
+    version: 1,
     status: 'active',
   }
   return {
@@ -58,6 +60,22 @@ test('process runtime presentation covers every current Product Core process', (
     getProcessLabel({ process_key: 'finished_goods_delivery' }),
     '成品交付'
   )
+  assert.equal(
+    getProcessLabel({ process_key: 'sales_return_acceptance' }),
+    '客户退货受理'
+  )
+  assert.equal(
+    getProcessLabel({ process_key: 'finance_payment_approval' }),
+    '收付款审批'
+  )
+  assert.equal(
+    getProcessLabel({ process_key: 'inventory_adjustment_approval' }),
+    '人工库存调整'
+  )
+  assert.equal(
+    getProcessLabel({ process_key: 'production_exception_approval' }),
+    '生产异常处置'
+  )
   const nodeLabels = {
     submit_sales_order: '提交销售订单',
     order_approval: '订单审批',
@@ -74,11 +92,79 @@ test('process runtime presentation covers every current Product Core process', (
     shipment_finance_release: '财务放行',
     shipment_execution: '执行出货',
     receivable_lead: '应收跟进',
+    sales_return_approval: '客户退货审批',
+    approve_sales_return: '确认客户退货申请',
+    sales_return_receipt: '客户退货收货交接',
+    receive_sales_return: '客户退货收货入库',
+    reject_sales_return: '退回客户退货申请',
+    finance_payment_approval: '收付款审批',
+    approve_finance_payment: '确认收付款申请',
+    finance_payment_execution: '收付款执行交接',
+    post_finance_payment: '收付款过账核销',
+    reject_finance_payment: '退回收付款申请',
+    submit_inventory_adjustment: '提交人工库存调整',
+    inventory_adjustment_approval: '人工库存调整审批',
+    approve_inventory_adjustment: '确认人工库存调整',
+    inventory_adjustment_execution: '人工库存调整执行交接',
+    post_inventory_adjustment: '人工库存调整过账',
+    reject_inventory_adjustment: '退回人工库存调整',
+    production_exception_decision_approval: '生产异常审批',
+    approve_production_exception: '确认生产异常处置',
+    production_exception_execution: '生产异常执行交接',
+    execute_production_exception: '执行生产异常处置',
+    reject_production_exception: '退回生产异常申请',
+    rejected_end: '流程退回结束',
     end: '流程结束',
   }
   Object.entries(nodeLabels).forEach(([nodeKey, label]) => {
     assert.equal(getProcessNodeLabel({ node_key: nodeKey }), label)
   })
+})
+
+test('process runtime presentation validates all exception approval form profiles', () => {
+  for (const [processKey, profileKey] of [
+    ['sales_return_acceptance', 'sales_return_approval'],
+    ['finance_payment_approval', 'finance_payment_approval'],
+    ['inventory_adjustment_approval', 'inventory_adjustment_approval'],
+    ['production_exception_approval', 'production_exception_approval'],
+  ]) {
+    const value = context()
+    const [, approvalNode] = value.nodes
+    value.process_instance.process_key = processKey
+    approvalNode.node_key =
+      processKey === 'production_exception_approval'
+        ? 'production_exception_decision_approval'
+        : profileKey
+    approvalNode.form_profile_key = profileKey
+    value.linked_node = approvalNode
+    value.approval_form = {
+      profile_key: profileKey,
+      reason_required: true,
+      approved_quantity:
+        profileKey === 'production_exception_approval'
+          ? { required: false, precision: 20, scale: 6 }
+          : null,
+    }
+    assert.equal(requireWorkflowProcessContext(value), value)
+  }
+})
+
+test('process runtime presentation rejects approval form/profile drift', () => {
+  const value = context()
+  const [, approvalNode] = value.nodes
+  value.process_instance.process_key = 'production_exception_approval'
+  approvalNode.node_key = 'production_exception_decision_approval'
+  approvalNode.form_profile_key = 'production_exception_approval'
+  value.linked_node = approvalNode
+  value.approval_form = {
+    profile_key: 'production_exception_approval',
+    reason_required: true,
+    approved_quantity: { required: false, precision: 20, scale: 2 },
+  }
+  assert.throws(
+    () => requireWorkflowProcessContext(value),
+    /流程位置暂时无法确认/u
+  )
 })
 
 test('process runtime presentation distinguishes rejected node from blocked process', () => {
@@ -101,6 +187,7 @@ test('process runtime presentation fails closed on foreign or invalid nodes', ()
               node_key: 'order_approval',
               node_type: 'approval',
               attempt: 1,
+              version: 1,
               status: 'active',
             },
           ],

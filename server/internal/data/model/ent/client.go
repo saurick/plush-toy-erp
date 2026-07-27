@@ -2823,6 +2823,38 @@ func (c *FinanceFactClient) GetX(ctx context.Context, id int) *FinanceFact {
 	return obj
 }
 
+// QueryPoster queries the poster edge of a FinanceFact.
+func (c *FinanceFactClient) QueryPoster(_m *FinanceFact) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financefact.Table, financefact.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, financefact.PosterTable, financefact.PosterColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySettler queries the settler edge of a FinanceFact.
+func (c *FinanceFactClient) QuerySettler(_m *FinanceFact) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financefact.Table, financefact.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, financefact.SettlerTable, financefact.SettlerColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryCanceller queries the canceller edge of a FinanceFact.
 func (c *FinanceFactClient) QueryCanceller(_m *FinanceFact) *AdminUserQuery {
 	query := (&AdminUserClient{config: c.config}).Query()
@@ -4462,6 +4494,38 @@ func (c *OutsourcingFactClient) QueryInventoryLot(_m *OutsourcingFact) *Inventor
 			sqlgraph.From(outsourcingfact.Table, outsourcingfact.FieldID, id),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingfact.InventoryLotTable, outsourcingfact.InventoryLotColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPoster queries the poster edge of a OutsourcingFact.
+func (c *OutsourcingFactClient) QueryPoster(_m *OutsourcingFact) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingfact.Table, outsourcingfact.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, outsourcingfact.PosterTable, outsourcingfact.PosterColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCanceller queries the canceller edge of a OutsourcingFact.
+func (c *OutsourcingFactClient) QueryCanceller(_m *OutsourcingFact) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingfact.Table, outsourcingfact.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, outsourcingfact.CancellerTable, outsourcingfact.CancellerColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -6488,6 +6552,38 @@ func (c *ProductionFactClient) QueryInventoryLot(_m *ProductionFact) *InventoryL
 			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, productionfact.InventoryLotTable, productionfact.InventoryLotColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPoster queries the poster edge of a ProductionFact.
+func (c *ProductionFactClient) QueryPoster(_m *ProductionFact) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionfact.PosterTable, productionfact.PosterColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCanceller queries the canceller edge of a ProductionFact.
+func (c *ProductionFactClient) QueryCanceller(_m *ProductionFact) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionfact.CancellerTable, productionfact.CancellerColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil

@@ -6,15 +6,13 @@ import (
 )
 
 // FinanceFactAccessScope is the server-side data and mutation boundary for the
-// finance fact families. PAYMENT remains read-only under report access until a
-// verified payment source contract exists; invoice and reconciliation actions
-// use their own permissions instead of inheriting receivable/payable access.
+// finance fact families. Payment documents have their own repository and
+// permissions; they are never projected as finance_facts.
 type FinanceFactAccessScope struct {
 	Receivable     bool
 	Payable        bool
 	Invoice        bool
 	Reconciliation bool
-	Shared         bool
 }
 
 func FinanceFactReadAccessScope(permissionKeys []string) FinanceFactAccessScope {
@@ -23,13 +21,11 @@ func FinanceFactReadAccessScope(permissionKeys []string) FinanceFactAccessScope 
 	payable := PermissionSetHasAny(permissionSet, PermissionFinancePayableRead)
 	invoice := PermissionSetHasAny(permissionSet, PermissionFinanceInvoiceRead)
 	reconciliation := PermissionSetHasAny(permissionSet, PermissionFinanceReconciliationRead)
-	report := PermissionSetHasAny(permissionSet, PermissionFinanceReportRead)
 	return FinanceFactAccessScope{
 		Receivable:     receivable,
 		Payable:        payable,
 		Invoice:        invoice,
 		Reconciliation: reconciliation,
-		Shared:         report,
 	}
 }
 
@@ -48,7 +44,7 @@ func FinanceFactConfirmAccessScope(permissionKeys []string) FinanceFactAccessSco
 }
 
 func (scope FinanceFactAccessScope) Empty() bool {
-	return !scope.Receivable && !scope.Payable && !scope.Invoice && !scope.Reconciliation && !scope.Shared
+	return !scope.Receivable && !scope.Payable && !scope.Invoice && !scope.Reconciliation
 }
 
 func (scope FinanceFactAccessScope) AllowsType(factType string) bool {
@@ -59,8 +55,6 @@ func (scope FinanceFactAccessScope) AllowsType(factType string) bool {
 		return scope.Payable
 	case FinanceFactInvoice:
 		return scope.Invoice
-	case FinanceFactPayment:
-		return scope.Shared
 	case FinanceFactReconciliation:
 		return scope.Reconciliation
 	default:
@@ -69,7 +63,7 @@ func (scope FinanceFactAccessScope) AllowsType(factType string) bool {
 }
 
 func (scope FinanceFactAccessScope) AllowedTypes() []string {
-	out := make([]string, 0, 5)
+	out := make([]string, 0, 4)
 	if scope.Receivable {
 		out = append(out, FinanceFactReceivable)
 	}
@@ -78,9 +72,6 @@ func (scope FinanceFactAccessScope) AllowedTypes() []string {
 	}
 	if scope.Invoice {
 		out = append(out, FinanceFactInvoice)
-	}
-	if scope.Shared {
-		out = append(out, FinanceFactPayment)
 	}
 	if scope.Reconciliation {
 		out = append(out, FinanceFactReconciliation)

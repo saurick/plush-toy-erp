@@ -143,7 +143,8 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if _, err := factUC.CreateProductionFactDraft(ctx, &changedFact1); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("changed linked fact replay error = %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, fact1.ID); err != nil {
+	postedFact1, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(fact1.ID, fact1.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post first linked fact: %v", err)
 	}
 	cancelReason := "计划取消"
@@ -156,11 +157,12 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if err != nil {
 		t.Fatalf("create over-limit draft: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, over.ID); !errors.Is(err, biz.ErrProductionOrderQuantityExceeded) {
+	if _, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(over.ID, over.Version, actor.ID, "")); !errors.Is(err, biz.ErrProductionOrderQuantityExceeded) {
 		t.Fatalf("over-limit post error = %v", err)
 	}
-	if row := client.ProductionFact.GetX(ctx, over.ID); row.Status != biz.OperationalFactStatusDraft {
-		t.Fatalf("failed over-limit post must remain DRAFT: %#v", row)
+	overReadback := client.ProductionFact.GetX(ctx, over.ID)
+	if overReadback.Status != biz.OperationalFactStatusDraft {
+		t.Fatalf("failed over-limit post must remain DRAFT: %#v", overReadback)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.IdempotencyKey(biz.OperationalFactInventoryIdempotencyKey(biz.ProductionFactSourceType, over.ID, over.ID, "POST"))).CountX(ctx); count != 0 {
 		t.Fatalf("failed over-limit post must write zero inventory txn, count=%d", count)
@@ -170,20 +172,22 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if err != nil {
 		t.Fatalf("create second linked fact: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, fact2.ID); err != nil {
+	postedFact2, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(fact2.ID, fact2.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post second linked fact: %v", err)
 	}
-	if _, err := factUC.CancelPostedProductionFact(ctx, fact1.ID); err != nil {
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedFact1.ID, postedFact1.Version, actor.ID, "撤销首笔完工")); err != nil {
 		t.Fatalf("cancel first linked fact: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, over.ID); err != nil {
+	postedOver, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(overReadback.ID, overReadback.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("reversal must release effective quantity for later post: %v", err)
 	}
 
-	if _, err := factUC.CancelPostedProductionFact(ctx, fact2.ID); err != nil {
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedFact2.ID, postedFact2.Version, actor.ID, "撤销第二笔完工")); err != nil {
 		t.Fatalf("cancel second linked fact: %v", err)
 	}
-	if _, err := factUC.CancelPostedProductionFact(ctx, over.ID); err != nil {
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedOver.ID, postedOver.Version, actor.ID, "撤销原超量完工")); err != nil {
 		t.Fatalf("cancel formerly over-limit linked fact: %v", err)
 	}
 	cancelled, err := orderUC.Cancel(ctx, &biz.ProductionOrderAction{ID: released.Order.ID, ExpectedVersion: 2, ActorID: actor.ID, IdempotencyKey: "cancel-after-reversal", Reason: &cancelReason})
@@ -226,37 +230,58 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 			if err != nil {
 				t.Fatalf("create draft order: %v", err)
 			}
-			fact := client.ProductionFact.Create().
-				SetFactNo("PF-DRAFT-CANCEL-" + status).
-				SetFactType(biz.ProductionFactFinishedGoodsReceipt).
-				SetStatus(biz.OperationalFactStatusDraft).
-				SetSubjectType(biz.InventorySubjectProduct).
-				SetSubjectID(productRow.ID).
-				SetWarehouseID(warehouseRow.ID).
-				SetUnitID(unitRow.ID).
-				SetQuantity(decimal.NewFromInt(1)).
-				SetSourceType(biz.ProductionOrderSourceType).
-				SetSourceID(created.Order.ID).
-				SetSourceLineID(created.Items[0].ID).
-				SetIdempotencyKey("pf-draft-cancel-" + status).
-				SetOccurredAt(time.Now().UTC()).
-				SetOccurredAtSpecified(true).
-				SaveX(ctx)
-			if status != biz.OperationalFactStatusDraft {
-				// This test exercises fail-closed cancellation against a
-				// persisted terminal row. Runtime builders cannot manufacture it.
-				if _, err := data.sqldb.ExecContext(
-					ctx,
-					"UPDATE production_facts SET status = ? WHERE id = ?",
-					status,
-					fact.ID,
-				); err != nil {
-					t.Fatalf("prepare terminal %s fact fixture: %v", status, err)
+			cancelExpectedVersion := created.Order.Version
+			switch status {
+			case biz.OperationalFactStatusDraft:
+				client.ProductionFact.Create().
+					SetFactNo("PF-DRAFT-CANCEL-" + status).
+					SetFactType(biz.ProductionFactFinishedGoodsReceipt).
+					SetStatus(biz.OperationalFactStatusDraft).
+					SetSubjectType(biz.InventorySubjectProduct).
+					SetSubjectID(productRow.ID).
+					SetWarehouseID(warehouseRow.ID).
+					SetUnitID(unitRow.ID).
+					SetQuantity(decimal.NewFromInt(1)).
+					SetSourceType(biz.ProductionOrderSourceType).
+					SetSourceID(created.Order.ID).
+					SetSourceLineID(created.Items[0].ID).
+					SetIdempotencyKey("pf-draft-cancel-" + status).
+					SetOccurredAt(time.Now().UTC()).
+					SetOccurredAtSpecified(true).
+					SaveX(ctx)
+			case biz.OperationalFactStatusPosted, biz.OperationalFactStatusCancelled:
+				released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{
+					ID: created.Order.ID, ExpectedVersion: created.Order.Version, ActorID: actor.ID,
+					IdempotencyKey: "release-draft-order-" + status,
+				})
+				if err != nil {
+					t.Fatalf("release terminal fixture order: %v", err)
 				}
+				completeProductionSchedulingTaskForTest(t, ctx, data, client, released.Order.ID, actor.ID)
+				factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
+				lotNo := "PDC-LOT-" + status
+				draftFact, err := factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
+					FactNo: "PF-DRAFT-CANCEL-" + status, ProductionOrderID: released.Order.ID,
+					ProductionOrderItemID: released.Items[0].ID, WarehouseID: warehouseRow.ID,
+					NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pf-draft-cancel-" + status,
+				})
+				if err != nil {
+					t.Fatalf("create terminal fixture fact: %v", err)
+				}
+				postedFact, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(draftFact.ID, draftFact.Version, actor.ID, ""))
+				if err != nil {
+					t.Fatalf("post terminal fixture fact: %v", err)
+				}
+				if status == biz.OperationalFactStatusCancelled {
+					if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedFact.ID, postedFact.Version, actor.ID, "准备已撤销事实夹具")); err != nil {
+						t.Fatalf("cancel terminal fixture fact: %v", err)
+					}
+				}
+				cancelExpectedVersion = released.Order.Version
 			}
 			reason := "草稿取消依赖验证"
 			cancelled, err := orderUC.Cancel(ctx, &biz.ProductionOrderAction{
-				ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID,
+				ID: created.Order.ID, ExpectedVersion: cancelExpectedVersion, ActorID: actor.ID,
 				IdempotencyKey: "cancel-draft-order-" + status, Reason: &reason,
 			})
 			switch status {

@@ -85,6 +85,20 @@ test('task action drawer shows task-scoped process position and marks display-on
   assert.match(source, /不计入流程闭环证据/u)
 })
 
+test('task action drawer submits formal approvals only from the authoritative runtime form', () => {
+  assert.match(source, /isWorkflowProcessDecisionTask\(task\)/u)
+  assert.match(source, /getWorkflowProcessDecisionApprovalForm/u)
+  assert.match(source, /buildWorkflowProcessDecision/u)
+  assert.match(source, /workflowProcessDecisionAllowsApprovedQuantity/u)
+  assert.match(source, /processContextState === 'ready'/u)
+  assert.match(source, /onSubmit\?\.\(\{ processDecision \}\)/u)
+  assert.match(source, /审批表单与当前流程节点不一致/u)
+  assert.match(source, /系统不会按任务名称或页面入口猜测审批字段/u)
+  assert.match(source, /id="erp-task-approved-quantity"/u)
+  assert.match(source, /onClick=\{submitAction\}/u)
+  assert.doesNotMatch(source, /onClick=\{onSubmit\}/u)
+})
+
 test('task transfer is an explicit scoped action with person and pool destinations', () => {
   assert.match(source, /assign:\s*\{[\s\S]*title: '转交任务'/u)
   assert.match(source, /assignmentAccess = \{\}/u)

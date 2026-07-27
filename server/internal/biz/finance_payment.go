@@ -16,8 +16,11 @@ const (
 	FinancePaymentDirectionReceipt      = "RECEIPT"
 	FinancePaymentDirectionDisbursement = "DISBURSEMENT"
 	FinancePaymentStatusDraft           = "DRAFT"
+	FinancePaymentStatusApproved        = "APPROVED"
+	FinancePaymentStatusRejected        = "REJECTED"
 	FinancePaymentStatusPosted          = "POSTED"
 	FinancePaymentStatusReversed        = "REVERSED"
+	FinancePaymentStatusCancelled       = "CANCELLED"
 	FinanceAllocationStatusPosted       = "POSTED"
 	FinanceAllocationStatusReversed     = "REVERSED"
 )
@@ -37,8 +40,16 @@ type FinancePayment struct {
 	IdempotencyPayloadHash string
 	Version                int
 	OccurredAt             time.Time
+	ApprovedAt             *time.Time
+	ApprovedBy             *int
+	RejectedAt             *time.Time
+	RejectedBy             *int
+	RejectReason           *string
 	PostedAt               *time.Time
 	PostedBy               *int
+	CancelledAt            *time.Time
+	CancelledBy            *int
+	CancelReason           *string
 	ReversedAt             *time.Time
 	ReversedBy             *int
 	ReverseReason          *string
@@ -96,6 +107,11 @@ type FinancePaymentPost struct {
 	ExpectedVersion int
 	Allocations     []FinancePaymentAllocationInput
 }
+type FinancePaymentTransition struct {
+	ID              int
+	ExpectedVersion int
+	Reason          string
+}
 type FinancePaymentReverse struct {
 	ID              int
 	ExpectedVersion int
@@ -131,6 +147,7 @@ type FinanceCreditNoteFilter struct {
 
 type FinancePaymentRepo interface {
 	CreateFinancePayment(ctx context.Context, in *FinancePaymentCreate, actorID int, payloadHash string) (*FinancePayment, error)
+	CancelFinancePayment(ctx context.Context, in *FinancePaymentTransition, actorID int) (*FinancePayment, error)
 	PostFinancePayment(ctx context.Context, in *FinancePaymentPost, actorID int) (*FinancePayment, error)
 	ReverseFinancePayment(ctx context.Context, in *FinancePaymentReverse, actorID int) (*FinancePayment, error)
 	CreateFinanceCreditNote(ctx context.Context, in *FinanceCreditNoteCreate, actorID int, payloadHash string) (*FinanceCreditNote, error)
@@ -152,8 +169,19 @@ func (uc *OperationalFactUsecase) CreateFinancePayment(ctx context.Context, in *
 	}
 	return repo.CreateFinancePayment(ctx, &normalized, actorID, hash)
 }
-func (uc *OperationalFactUsecase) PostFinancePayment(ctx context.Context, in *FinancePaymentPost, actorID int) (*FinancePayment, error) {
+func (uc *OperationalFactUsecase) CancelFinancePayment(ctx context.Context, in *FinancePaymentTransition, actorID int) (*FinancePayment, error) {
 	repo, ok := uc.financePaymentRepo()
+	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	in.Reason = strings.TrimSpace(in.Reason)
+	if in.Reason == "" || len([]rune(in.Reason)) > 255 {
+		return nil, ErrBadParam
+	}
+	return repo.CancelFinancePayment(ctx, in, actorID)
+}
+func (uc *OperationalFactUsecase) PostFinancePayment(ctx context.Context, in *FinancePaymentPost, actorID int) (*FinancePayment, error) {
+	_, ok := uc.financePaymentRepo()
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 || len(in.Allocations) == 0 {
 		return nil, ErrBadParam
 	}
@@ -168,7 +196,7 @@ func (uc *OperationalFactUsecase) PostFinancePayment(ctx context.Context, in *Fi
 		}
 		seen[a.FinanceFactID] = struct{}{}
 	}
-	return repo.PostFinancePayment(ctx, in, actorID)
+	return nil, ErrProcessRuntimeRequired
 }
 func (uc *OperationalFactUsecase) ReverseFinancePayment(ctx context.Context, in *FinancePaymentReverse, actorID int) (*FinancePayment, error) {
 	repo, ok := uc.financePaymentRepo()
@@ -176,6 +204,9 @@ func (uc *OperationalFactUsecase) ReverseFinancePayment(ctx context.Context, in 
 		return nil, ErrBadParam
 	}
 	in.Reason = strings.TrimSpace(in.Reason)
+	if len([]rune(in.Reason)) > 255 {
+		return nil, ErrBadParam
+	}
 	return repo.ReverseFinancePayment(ctx, in, actorID)
 }
 func (uc *OperationalFactUsecase) CreateFinanceCreditNote(ctx context.Context, in *FinanceCreditNoteCreate, actorID int) (*FinanceCreditNote, error) {
@@ -198,6 +229,9 @@ func (uc *OperationalFactUsecase) ReverseFinanceCreditNote(ctx context.Context, 
 	in.Reason = strings.TrimSpace(in.Reason)
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
 	if in.CreditNoteNo == "" || in.Reason == "" || in.IdempotencyKey == "" {
+		return nil, ErrBadParam
+	}
+	if len([]rune(in.CreditNoteNo)) > 64 || len([]rune(in.Reason)) > 255 || len([]rune(in.IdempotencyKey)) > 128 {
 		return nil, ErrBadParam
 	}
 	raw, _ := json.Marshal(in)
@@ -243,7 +277,13 @@ func (uc *OperationalFactUsecase) ListFinancePayments(ctx context.Context, filte
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
 	filter.Direction = strings.ToUpper(strings.TrimSpace(filter.Direction))
 	filter.CounterpartyType = strings.ToUpper(strings.TrimSpace(filter.CounterpartyType))
-	if filter.Status != "" && filter.Status != FinancePaymentStatusDraft && filter.Status != FinancePaymentStatusPosted && filter.Status != FinancePaymentStatusReversed {
+	if filter.Status != "" &&
+		filter.Status != FinancePaymentStatusDraft &&
+		filter.Status != FinancePaymentStatusApproved &&
+		filter.Status != FinancePaymentStatusRejected &&
+		filter.Status != FinancePaymentStatusPosted &&
+		filter.Status != FinancePaymentStatusReversed &&
+		filter.Status != FinancePaymentStatusCancelled {
 		return nil, 0, ErrBadParam
 	}
 	if filter.Direction != "" && filter.Direction != FinancePaymentDirectionReceipt && filter.Direction != FinancePaymentDirectionDisbursement {
@@ -276,7 +316,13 @@ func normalizeFinancePaymentCreate(in FinancePaymentCreate) (FinancePaymentCreat
 	in.AccountRef = strings.TrimSpace(in.AccountRef)
 	in.EvidenceRef = strings.TrimSpace(in.EvidenceRef)
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
-	if in.PaymentNo == "" || (in.Direction != FinancePaymentDirectionReceipt && in.Direction != FinancePaymentDirectionDisbursement) || (in.CounterpartyType != FinanceCounterpartyCustomer && in.CounterpartyType != FinanceCounterpartySupplier) || in.CounterpartyID <= 0 || !in.Amount.IsPositive() || (in.Currency != "CNY" && in.Currency != "USD" && in.Currency != "HKD") || in.AccountRef == "" || in.EvidenceRef == "" || in.IdempotencyKey == "" {
+	validPairing := (in.Direction == FinancePaymentDirectionReceipt && in.CounterpartyType == FinanceCounterpartyCustomer) ||
+		(in.Direction == FinancePaymentDirectionDisbursement && in.CounterpartyType == FinanceCounterpartySupplier)
+	if in.PaymentNo == "" || !validPairing || in.CounterpartyID <= 0 || !in.Amount.IsPositive() || (in.Currency != "CNY" && in.Currency != "USD" && in.Currency != "HKD") || in.AccountRef == "" || in.EvidenceRef == "" || in.IdempotencyKey == "" {
+		return FinancePaymentCreate{}, "", ErrBadParam
+	}
+	if len([]rune(in.PaymentNo)) > 64 || len([]rune(in.AccountRef)) > 128 ||
+		len([]rune(in.EvidenceRef)) > 255 || len([]rune(in.IdempotencyKey)) > 128 {
 		return FinancePaymentCreate{}, "", ErrBadParam
 	}
 	if in.OccurredAtSpecified && in.OccurredAt.IsZero() {
@@ -294,6 +340,9 @@ func normalizeFinanceCreditNoteCreate(in FinanceCreditNoteCreate) (FinanceCredit
 	in.Reason = strings.TrimSpace(in.Reason)
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
 	if in.CreditNoteNo == "" || in.FinanceFactID <= 0 || !in.Amount.IsPositive() || in.Reason == "" || in.IdempotencyKey == "" {
+		return FinanceCreditNoteCreate{}, "", ErrBadParam
+	}
+	if len([]rune(in.CreditNoteNo)) > 64 || len([]rune(in.Reason)) > 255 || len([]rune(in.IdempotencyKey)) > 128 {
 		return FinanceCreditNoteCreate{}, "", ErrBadParam
 	}
 	raw, err := json.Marshal(in)

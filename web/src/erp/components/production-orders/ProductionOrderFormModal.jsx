@@ -53,8 +53,10 @@ function ProductionMaterialRequirementsPanel({
   state,
   requirements = [],
   canCreateMaterialIssue = false,
+  canRequestOverIssue = false,
   loading = false,
   onCreateMaterialIssue,
+  onRequestOverIssue,
 }) {
   if (order?.status !== PRODUCTION_ORDER_STATUS.RELEASED) return null
 
@@ -95,6 +97,16 @@ function ProductionMaterialRequirementsPanel({
       width: 120,
     },
     {
+      title: '已批准超领',
+      dataIndex: 'approved_over_issue_quantity',
+      width: 120,
+    },
+    {
+      title: '当前可领上限',
+      dataIndex: 'effective_limit_quantity',
+      width: 120,
+    },
+    {
       title: '已过账领料',
       dataIndex: 'issued_quantity',
       width: 120,
@@ -112,24 +124,45 @@ function ProductionMaterialRequirementsPanel({
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 190,
       fixed: 'right',
       render: (_, requirement) => {
-        if (!isProductionMaterialIssueEligible(order, state, requirement)) {
-          return state === PRODUCTION_MATERIAL_REQUIREMENTS_STATE.NEEDS_REVIEW
-            ? '待复核'
-            : '已领完'
-        }
-        if (!canCreateMaterialIssue) return '仅查看'
+        const canIssue = isProductionMaterialIssueEligible(
+          order,
+          state,
+          requirement
+        )
         return (
-          <Button
-            size="small"
-            type="primary"
-            loading={loading}
-            onClick={() => onCreateMaterialIssue?.(requirement)}
-          >
-            领料
-          </Button>
+          <Space size={6}>
+            {canIssue && canCreateMaterialIssue ? (
+              <Button
+                size="small"
+                type="primary"
+                loading={loading}
+                onClick={() => onCreateMaterialIssue?.(requirement)}
+              >
+                领料
+              </Button>
+            ) : null}
+            {canRequestOverIssue &&
+            state === PRODUCTION_MATERIAL_REQUIREMENTS_STATE.READY ? (
+              <Button
+                size="small"
+                disabled={loading}
+                onClick={() => onRequestOverIssue?.(requirement)}
+              >
+                申请超领
+              </Button>
+            ) : null}
+            {!canIssue && !canRequestOverIssue
+              ? state === PRODUCTION_MATERIAL_REQUIREMENTS_STATE.NEEDS_REVIEW
+                ? '待复核'
+                : '已领完'
+              : null}
+            {canIssue && !canCreateMaterialIssue && !canRequestOverIssue
+              ? '仅查看'
+              : null}
+          </Space>
         )
       },
     },
@@ -147,7 +180,7 @@ function ProductionMaterialRequirementsPanel({
             pagination={false}
             columns={columns}
             dataSource={requirements}
-            scroll={{ x: 800 }}
+            scroll={{ x: 1150 }}
           />
         ) : null}
       </Space>
@@ -361,8 +394,10 @@ export default function ProductionOrderFormModal({
   materialRequirementsState,
   materialRequirements,
   canCreateMaterialIssue,
+  canRequestOverIssue,
   materialIssueLoading,
   onCreateMaterialIssue,
+  onRequestOverIssue,
   onCancel,
   onSubmit,
 }) {
@@ -496,8 +531,10 @@ export default function ProductionOrderFormModal({
             state={materialRequirementsState}
             requirements={materialRequirements}
             canCreateMaterialIssue={canCreateMaterialIssue}
+            canRequestOverIssue={canRequestOverIssue}
             loading={materialIssueLoading}
             onCreateMaterialIssue={onCreateMaterialIssue}
+            onRequestOverIssue={onRequestOverIssue}
           />
         ) : null}
       </Form>

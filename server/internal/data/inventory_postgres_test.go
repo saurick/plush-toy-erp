@@ -546,6 +546,10 @@ func TestOperationalFactPostgresOutsourcingMaterialIssueWithoutLotPostAndCancel(
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewOperationalFactUsecase(repo)
+	actor := client.AdminUser.Create().
+		SetUsername("outsourcing-post-cancel-" + fixtures.suffix).
+		SetPasswordHash("test-password-hash").
+		SaveX(ctx)
 	source := createOutsourcingFactSourceFixture(
 		t,
 		ctx,
@@ -582,14 +586,14 @@ func TestOperationalFactPostgresOutsourcingMaterialIssueWithoutLotPostAndCancel(
 	if err != nil {
 		t.Fatalf("create postgres outsourcing fact failed: %v", err)
 	}
-	posted, err := repo.PostOutsourcingFact(ctx, fact.ID)
+	posted, err := repo.PostOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post postgres outsourcing fact failed: %v", err)
 	}
 	if posted.Status != biz.OperationalFactStatusPosted {
 		t.Fatalf("expected POSTED, got %s", posted.Status)
 	}
-	cancelled, err := repo.CancelPostedOutsourcingFact(ctx, fact.ID)
+	cancelled, err := repo.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(posted.ID, posted.Version, actor.ID, "验证委外发料冲正"))
 	if err != nil {
 		t.Fatalf("cancel postgres outsourcing fact failed: %v", err)
 	}

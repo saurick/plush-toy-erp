@@ -244,6 +244,8 @@ type operationalFactInventoryArgs struct {
 	direction    int
 	txnType      string
 	occurredAt   time.Time
+	actorID      int
+	reason       string
 	cancel       bool
 }
 
@@ -261,6 +263,16 @@ func (r *operationalFactRepo) applyOperationalFactInventory(ctx context.Context,
 			return err
 		}
 		reversalOf := original.ID
+		var createdBy *int
+		if in.actorID > 0 {
+			actorID := in.actorID
+			createdBy = &actorID
+		}
+		var note *string
+		if in.reason != "" {
+			reason := in.reason
+			note = &reason
+		}
 		_, err = r.inv.applyInventoryTxnAndUpdateBalanceInTx(ctx, tx, &biz.InventoryTxnCreate{
 			SubjectType:     original.SubjectType,
 			SubjectID:       original.SubjectID,
@@ -277,8 +289,15 @@ func (r *operationalFactRepo) applyOperationalFactInventory(ctx context.Context,
 			IdempotencyKey:  biz.OperationalFactInventoryIdempotencyKey(in.sourceType, sourceID, sourceLineID, "REVERSAL"),
 			ReversalOfTxnID: &reversalOf,
 			OccurredAt:      time.Now(),
+			CreatedBy:       createdBy,
+			Note:            note,
 		})
 		return err
+	}
+	var createdBy *int
+	if in.actorID > 0 {
+		actorID := in.actorID
+		createdBy = &actorID
 	}
 	_, err := r.inv.applyInventoryTxnAndUpdateBalanceInTx(ctx, tx, &biz.InventoryTxnCreate{
 		SubjectType:    in.subjectType,
@@ -295,6 +314,7 @@ func (r *operationalFactRepo) applyOperationalFactInventory(ctx context.Context,
 		SourceLineID:   &sourceLineID,
 		IdempotencyKey: biz.OperationalFactInventoryIdempotencyKey(in.sourceType, sourceID, sourceLineID, "POST"),
 		OccurredAt:     in.occurredAt,
+		CreatedBy:      createdBy,
 	})
 	return err
 }
@@ -324,4 +344,145 @@ func updateOperationalFactStatus(ctx context.Context, tx *inventoryDBTx, table s
 	query := fmt.Sprintf(`UPDATE %s SET status = %s, %s = %s, updated_at = %s WHERE id = %s`, table, p[0], timeField, p[1], p[2], p[3])
 	_, err := tx.sqlTx.ExecContext(ctx, query, status, *timeValue, time.Now(), id)
 	return err
+}
+
+func updateVersionedOperationalFactStatus(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	table string,
+	id int,
+	expectedVersion int,
+	expectedStatus string,
+	status string,
+	timeField string,
+	timeValue time.Time,
+	actorField string,
+	actorID int,
+) error {
+	if (actorField != "posted_by" && actorField != "settled_by") || actorID <= 0 {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 7)
+	query := fmt.Sprintf(
+		`UPDATE %s SET status = %s, %s = %s, %s = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = %s AND version = %s`,
+		table,
+		p[0],
+		timeField,
+		p[1],
+		actorField,
+		p[2],
+		p[3],
+		p[4],
+		p[5],
+		p[6],
+	)
+	result, err := tx.sqlTx.ExecContext(ctx, query, status, timeValue, actorID, time.Now(), id, expectedStatus, expectedVersion)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return biz.ErrOperationalFactVersionConflict
+	}
+	return nil
+}
+
+func updateVersionedOperationalFactCancellation(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	table string,
+	id int,
+	expectedVersion int,
+	expectedStatus string,
+	actorID int,
+	reason string,
+	cancelledAt time.Time,
+) error {
+	p := inventorySQLPlaceholders(tx.dialect, 8)
+	query := fmt.Sprintf(
+		`UPDATE %s
+SET status = %s, cancelled_at = %s, cancelled_by = %s, cancel_reason = %s,
+    version = version + 1, updated_at = %s
+WHERE id = %s AND status = %s AND version = %s`,
+		table,
+		p[0],
+		p[1],
+		p[2],
+		p[3],
+		p[4],
+		p[5],
+		p[6],
+		p[7],
+	)
+	result, err := tx.sqlTx.ExecContext(
+		ctx,
+		query,
+		biz.OperationalFactStatusCancelled,
+		cancelledAt,
+		actorID,
+		reason,
+		time.Now(),
+		id,
+		expectedStatus,
+		expectedVersion,
+	)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return biz.ErrOperationalFactVersionConflict
+	}
+	return nil
+}
+
+func versionedOperationalFactTransitionReplay(
+	currentStatus string,
+	currentVersion int,
+	expectedVersion int,
+	targetStatus string,
+	transitionActor *int,
+	actorID int,
+) (bool, error) {
+	if currentStatus == targetStatus {
+		if currentVersion == expectedVersion+1 && transitionActor != nil && *transitionActor == actorID {
+			return true, nil
+		}
+		return false, biz.ErrOperationalFactVersionConflict
+	}
+	if currentVersion != expectedVersion {
+		return false, biz.ErrOperationalFactVersionConflict
+	}
+	return false, nil
+}
+
+func versionedOperationalFactCancellationReplay(
+	currentStatus string,
+	currentVersion int,
+	cancelledBy *int,
+	cancelReason *string,
+	in *biz.OperationalFactStatusMutation,
+) (bool, error) {
+	replay, err := versionedOperationalFactTransitionReplay(
+		currentStatus,
+		currentVersion,
+		in.ExpectedVersion,
+		biz.OperationalFactStatusCancelled,
+		cancelledBy,
+		in.ActorID,
+	)
+	if err != nil || !replay {
+		return replay, err
+	}
+	if cancelledBy == nil || cancelReason == nil ||
+		*cancelledBy != in.ActorID || *cancelReason != in.Reason {
+		return false, biz.ErrIdempotencyConflict
+	}
+	return true, nil
 }

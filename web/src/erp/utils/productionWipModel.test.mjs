@@ -66,6 +66,8 @@ function aggregateFixture(patch = {}) {
         unit_quantity_snapshot: '0.5',
         loss_rate_snapshot: '0',
         planned_quantity: '60',
+        approved_over_issue_quantity: '0',
+        effective_limit_quantity: '60',
         issued_quantity: '60',
         remaining_quantity: '0',
         material_code_snapshot: 'FABRIC-BROWN',
@@ -313,6 +315,40 @@ test('production WIP aggregate fails closed for invented statuses and dangling b
     () => validateProductionWipAggregate(concession),
     /生产工序信息不完整/u,
     '生产阶段质量关口必须明确合格，不能把让步接收当成路线通过'
+  )
+})
+
+test('production WIP material requirements fail closed when approved allowance conservation is broken', () => {
+  for (const [field, value] of [
+    ['approved_over_issue_quantity', '2'],
+    ['effective_limit_quantity', '61'],
+    ['issued_quantity', '59'],
+    ['remaining_quantity', '2'],
+  ]) {
+    const broken = aggregateFixture()
+    broken.material_requirements[0] = {
+      ...broken.material_requirements[0],
+      [field]: value,
+    }
+    assert.throws(
+      () => validateProductionWipAggregate(broken),
+      /生产工序信息不完整/u,
+      `${field} must preserve planned + approved = effective = issued + remaining`
+    )
+  }
+
+  const allowed = aggregateFixture()
+  allowed.material_requirements[0] = {
+    ...allowed.material_requirements[0],
+    approved_over_issue_quantity: '2',
+    effective_limit_quantity: '62',
+    issued_quantity: '61',
+    remaining_quantity: '1',
+  }
+  assert.equal(
+    validateProductionWipAggregate(allowed).materialRequirements[0]
+      .effective_limit_quantity,
+    '62'
   )
 })
 

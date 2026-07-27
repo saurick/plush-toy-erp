@@ -11,20 +11,25 @@ import {
   Table,
   Tag,
 } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
 import {
-  approveSalesReturn,
   cancelSalesReturn,
   createSalesReturn,
   getSalesReturn,
   listAllShipments,
   listSalesReturns,
-  receiveSalesReturn,
+  reverseSalesReturn,
 } from '../api/operationalFactApi.mjs'
+import {
+  executeSalesReturnReceive,
+  findExceptionProcessActiveNode,
+  getSalesReturnAcceptanceProcess,
+  startSalesReturnAcceptanceProcess,
+} from '../api/customerConfigApi.mjs'
 import {
   BusinessActionTooltip,
   BusinessOperationPanel,
@@ -35,6 +40,7 @@ import {
   SelectionClearAction,
 } from '../components/business-list/BusinessListLayout.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -60,15 +66,47 @@ const STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
   { value: 'DRAFT', label: '待审批' },
   { value: 'APPROVED', label: '已批准待收货' },
+  { value: 'REJECTED', label: '已驳回' },
   { value: 'RECEIVED', label: '已收货' },
   { value: 'CANCELLED', label: '已取消' },
+  { value: 'REVERSED', label: '已冲正' },
 ]
 const STATUS_META = Object.freeze({
   DRAFT: ['待审批', 'blue'],
   APPROVED: ['已批准待收货', 'gold'],
+  REJECTED: ['已驳回', 'red'],
   RECEIVED: ['已收货', 'green'],
   CANCELLED: ['已取消', 'default'],
+  REVERSED: ['已冲正', 'magenta'],
 })
+
+const TRANSITION_RECEIPTS = Object.freeze({
+  receive: { status: 'RECEIVED', actorField: 'received_by' },
+  cancel: {
+    status: 'CANCELLED',
+    actorField: 'cancelled_by',
+    reasonField: 'cancel_reason',
+  },
+  reverse: {
+    status: 'REVERSED',
+    actorField: 'reversed_by',
+    reasonField: 'reverse_reason',
+  },
+})
+
+function transitionReceiptMatches(item, previous, action, reason, actorID) {
+  const receipt = TRANSITION_RECEIPTS[action]
+  return Boolean(
+    receipt &&
+      item?.id &&
+      Number(item.id) === Number(previous?.id) &&
+      Number(item.version) === Number(previous?.version) + 1 &&
+      item.status === receipt.status &&
+      Number(item[receipt.actorField]) === Number(actorID) &&
+      (!receipt.reasonField ||
+        String(item[receipt.reasonField] || '').trim() === reason.trim())
+  )
+}
 
 function statusTag(value) {
   const [label, color] = STATUS_META[value] || ['状态待核对', 'default']
@@ -85,6 +123,7 @@ function shipmentOption(shipment) {
 }
 
 export default function SalesReturnsPage() {
+  const [searchParams] = useSearchParams()
   const outletContext = useOutletContext()
   const adminProfile = outletContext?.adminProfile || {}
   const customerKey = adminProfile?.effective_session?.customer?.key || ''
@@ -99,11 +138,14 @@ export default function SalesReturnsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [reverseOpen, setReverseOpen] = useState(false)
+  const [reverseReason, setReverseReason] = useState('')
   const [shipments, setShipments] = useState([])
   const [form] = Form.useForm()
   const requestRef = useRef(0)
   const attemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const selectedShipmentID = Form.useWatch('shipment_id', form)
+  const linkedSalesReturnID = Number(searchParams.get('sales_return_id') || 0)
   const selectedShipment = useMemo(
     () =>
       shipments.find(
@@ -113,9 +155,13 @@ export default function SalesReturnsPage() {
   )
 
   const canCreate = hasActionPermission(adminProfile, 'sales_return.create')
-  const canApprove = hasActionPermission(adminProfile, 'sales_return.approve')
   const canReceive = hasActionPermission(adminProfile, 'sales_return.receive')
   const canCancel = hasActionPermission(adminProfile, 'sales_return.cancel')
+  const canReverse = hasActionPermission(adminProfile, 'sales_return.reverse')
+  const canRecoverProcess = hasActionPermission(
+    adminProfile,
+    'process_runtime.recover'
+  )
 
   const loadRows = useCallback(async () => {
     const sequence = requestRef.current + 1
@@ -142,7 +188,8 @@ export default function SalesReturnsPage() {
       setTotal(Number(data?.total || 0))
       setSelected((current) =>
         current?.id
-          ? nextRows.find((item) => item.id === current.id) || null
+          ? nextRows.find((item) => item.id === current.id) ||
+            (current.id === linkedSalesReturnID ? current : null)
           : null
       )
     } catch (error) {
@@ -151,7 +198,7 @@ export default function SalesReturnsPage() {
     } finally {
       if (requestRef.current === sequence) setLoading(false)
     }
-  }, [pagination, status])
+  }, [linkedSalesReturnID, pagination, status])
 
   useEffect(() => {
     loadRows()
@@ -163,10 +210,101 @@ export default function SalesReturnsPage() {
     () => outletContext?.registerPageRefresh?.(loadRows),
     [loadRows, outletContext]
   )
+  useEffect(() => {
+    if (
+      !Number.isSafeInteger(linkedSalesReturnID) ||
+      linkedSalesReturnID <= 0
+    ) {
+      return
+    }
+    getSalesReturn({ id: linkedSalesReturnID })
+      .then((item) => {
+        if (item?.id === linkedSalesReturnID) setSelected(item)
+      })
+      .catch((error) =>
+        message.error(getActionErrorMessage(error, '打开关联客户退货'))
+      )
+  }, [linkedSalesReturnID])
 
   const openCreate = async () => {
     setCreateOpen(true)
     form.resetFields()
+  }
+
+  const openCancel = async () => {
+    if (!selected?.id) return
+    setSaving(true)
+    try {
+      const processData = await getSalesReturnAcceptanceProcess({
+        ...(customerKey ? { customer_key: customerKey } : {}),
+        sales_return_id: selected.id,
+      })
+      const next = processData.source_readback
+      setSelected(next)
+      const processStatus =
+        processData.process_context?.process_instance?.status || ''
+      if (
+        !['DRAFT', 'APPROVED'].includes(next.status) ||
+        (processData.process_context && processStatus !== 'blocked')
+      ) {
+        message.warning(
+          ['DRAFT', 'APPROVED'].includes(next.status)
+            ? '该退货流程仍在办理，请先在任务中心驳回或阻塞流程'
+            : '当前状态不能取消客户退货'
+        )
+        return
+      }
+      setCancelReason('')
+      setCancelOpen(true)
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '核对客户退货取消条件'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const ensureApprovalProcess = async () => {
+    if (!selected?.id || selected.status !== 'DRAFT') return
+    setSaving(true)
+    try {
+      let processData = await getSalesReturnAcceptanceProcess({
+        ...(customerKey ? { customer_key: customerKey } : {}),
+        sales_return_id: selected.id,
+      })
+      const alreadyStarted = Boolean(processData?.process_context)
+      if (!alreadyStarted) {
+        try {
+          processData = await startSalesReturnAcceptanceProcess({
+            ...(customerKey ? { customer_key: customerKey } : {}),
+            sales_return_id: selected.id,
+            idempotency_key: `sales-return-acceptance/${selected.id}`,
+          })
+        } catch (error) {
+          if (!isSourceBusinessActionResultUnknown(error)) throw error
+          processData = await getSalesReturnAcceptanceProcess({
+            ...(customerKey ? { customer_key: customerKey } : {}),
+            sales_return_id: selected.id,
+          })
+          if (!processData?.process_context) throw error
+        }
+      }
+      if (!processData?.process_context || !processData?.source_readback?.id) {
+        throw Object.assign(new Error('客户退货审批流结果暂时无法确认'), {
+          isInvalidResponse: true,
+        })
+      }
+      setSelected(processData.source_readback)
+      await loadRows()
+      message[alreadyStarted ? 'info' : 'success'](
+        alreadyStarted
+          ? '客户退货审批流已存在，请到任务中心继续办理'
+          : '客户退货审批流已恢复发起'
+      )
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '核对客户退货审批流'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   useEffect(() => {
@@ -216,12 +354,28 @@ export default function SalesReturnsPage() {
     const attempt = attemptsRef.current.prepare(scope, payload)
     setSaving(true)
     try {
-      const next = await createSalesReturn(attempt.params)
-      if (!next?.id || next.status !== 'DRAFT') {
+      const created = await createSalesReturn(attempt.params)
+      if (!created?.id || created.status !== 'DRAFT') {
         throw Object.assign(new Error('客户退货结果暂时无法确认'), {
           isInvalidResponse: true,
         })
       }
+      let processData
+      try {
+        processData = await startSalesReturnAcceptanceProcess({
+          ...(customerKey ? { customer_key: customerKey } : {}),
+          sales_return_id: created.id,
+          idempotency_key: `sales-return-acceptance/${created.id}`,
+        })
+      } catch (error) {
+        if (!isSourceBusinessActionResultUnknown(error)) throw error
+        processData = await getSalesReturnAcceptanceProcess({
+          ...(customerKey ? { customer_key: customerKey } : {}),
+          sales_return_id: created.id,
+        })
+        if (!processData?.process_context) throw error
+      }
+      const next = processData.source_readback
       attemptsRef.current.settle(scope, attempt, null)
       setCreateOpen(false)
       form.resetFields()
@@ -242,41 +396,100 @@ export default function SalesReturnsPage() {
 
   const transition = async (action, reason = '') => {
     if (!selected?.id || !selected?.version) return
+    const previous = selected
     setSaving(true)
     try {
       const params = compactParams({
         customer_key: customerKey || undefined,
-        id: selected.id,
-        expected_version: selected.version,
+        id: previous.id,
+        expected_version: previous.version,
         reason: trimOptional(reason),
       })
-      const next =
-        action === 'approve'
-          ? await approveSalesReturn(params)
-          : action === 'receive'
-            ? await receiveSalesReturn(params)
+      let next
+      if (action === 'receive') {
+        const processData = await getSalesReturnAcceptanceProcess({
+          ...(customerKey ? { customer_key: customerKey } : {}),
+          sales_return_id: previous.id,
+        })
+        const node = findExceptionProcessActiveNode(
+          processData,
+          'receive_sales_return'
+        )
+        const execution = await executeSalesReturnReceive({
+          ...(customerKey ? { customer_key: customerKey } : {}),
+          process_instance_id: processData.process_context.process_instance.id,
+          process_node_instance_id: node.id,
+          expected_version: node.version,
+          sales_return_id: previous.id,
+          idempotency_key: `sales-return-receive/${previous.id}/${node.id}`,
+        })
+        next = execution.source_readback
+      } else {
+        next =
+          action === 'reverse'
+            ? await reverseSalesReturn(params)
             : await cancelSalesReturn(params)
-      if (!next?.id) throw new Error('客户退货结果暂时无法确认')
+      }
+      if (
+        !transitionReceiptMatches(
+          next,
+          previous,
+          action,
+          reason,
+          Number(adminProfile?.id || 0)
+        )
+      ) {
+        throw Object.assign(new Error('客户退货结果暂时无法确认'), {
+          isInvalidResponse: true,
+        })
+      }
       setSelected(next)
       setCancelOpen(false)
       setCancelReason('')
+      setReverseOpen(false)
+      setReverseReason('')
       await loadRows()
       message.success(
-        action === 'approve'
-          ? '客户退货已批准'
-          : action === 'receive'
-            ? '退货已收货入库'
+        action === 'receive'
+          ? '退货已收货入库'
+          : action === 'reverse'
+            ? '客户退货入库已冲正'
             : '客户退货已取消'
       )
     } catch (error) {
       if (isSourceBusinessActionResultUnknown(error)) {
-        const recovered = await getSalesReturn({ id: selected.id }).catch(
-          () => null
-        )
-        if (recovered?.version !== selected.version) {
+        let recovered = null
+        if (action === 'receive') {
+          recovered = await getSalesReturnAcceptanceProcess({
+            ...(customerKey ? { customer_key: customerKey } : {}),
+            sales_return_id: previous.id,
+          })
+            .then((data) => data.source_readback)
+            .catch(() => null)
+        }
+        if (!recovered) {
+          recovered = await getSalesReturn({ id: previous.id }).catch(
+            () => null
+          )
+        }
+        if (
+          transitionReceiptMatches(
+            recovered,
+            previous,
+            action,
+            reason,
+            Number(adminProfile?.id || 0)
+          )
+        ) {
           setSelected(recovered)
           await loadRows()
           message.success('已重新读取客户退货结果')
+          return
+        }
+        if (recovered?.id) {
+          setSelected(recovered)
+          await loadRows()
+          message.warning('客户退货状态已被其他操作更新，请核对后重试')
           return
         }
       }
@@ -323,6 +536,12 @@ export default function SalesReturnsPage() {
       width: 170,
       render: formatUnixDateTime,
     },
+    {
+      title: '冲正时间',
+      dataIndex: 'reversed_at',
+      width: 170,
+      render: formatUnixDateTime,
+    },
   ]
 
   return (
@@ -330,7 +549,7 @@ export default function SalesReturnsPage() {
       <PageHeaderCard
         compact
         title="客户退货 / RMA"
-        description="从真实已出货记录创建客户退货，按审批、收货和取消状态办理；收货才会形成退回库存，取消已收货记录会保留冲正追溯。"
+        description="从真实已出货记录创建客户退货；审批通过不代表已经收货，仓库确认收货后才增加退回库存。收货前可取消，收货后必须独立冲正并保留质检记录。"
         tags={[
           <Tag color="blue" key="source">
             来源出货
@@ -371,7 +590,7 @@ export default function SalesReturnsPage() {
           embedded
           selectedCount={selected ? 1 : 0}
           selectedLabel={selected?.return_no || '请选择客户退货记录'}
-          boundaryText="审批只确认退货申请；只有收货会写入退回库存，取消已收货记录会生成冲正，不会物理删除。"
+          boundaryText="审批只确认退货申请；只有收货会写入退回库存。入库前可取消，入库后只能冲正，均不物理删除。"
         >
           <SelectionClearAction
             selectedCount={selected ? 1 : 0}
@@ -386,45 +605,11 @@ export default function SalesReturnsPage() {
               查看详情
             </Button>
           </BusinessActionTooltip>
-          {canApprove && (!selected || selected.status === 'DRAFT') ? (
+          {canReceive && (!selected || selected.status === 'APPROVED') ? (
             <BusinessActionTooltip
-              disabled={!selected || selected.status !== 'DRAFT' || saving}
+              disabled={!selected || saving}
               disabledReason={
-                !selected
-                  ? '请先选择一条客户退货记录'
-                  : selected.status !== 'DRAFT'
-                    ? '只有待审批退货可以批准'
-                    : saving
-                      ? '当前操作完成后可批准'
-                      : ''
-              }
-            >
-              <Popconfirm
-                title="确认批准客户退货？"
-                onConfirm={() => transition('approve')}
-              >
-                <Button
-                  type="primary"
-                  className="erp-business-module-status-action"
-                  disabled={!selected || selected.status !== 'DRAFT' || saving}
-                >
-                  批准
-                </Button>
-              </Popconfirm>
-            </BusinessActionTooltip>
-          ) : null}
-          {canReceive &&
-          (!selected || ['DRAFT', 'APPROVED'].includes(selected.status)) ? (
-            <BusinessActionTooltip
-              disabled={!selected || selected.status !== 'APPROVED' || saving}
-              disabledReason={
-                !selected
-                  ? '请先选择一条客户退货记录'
-                  : selected.status !== 'APPROVED'
-                    ? '退货批准后可确认收货'
-                    : saving
-                      ? '当前操作完成后可确认收货'
-                      : ''
+                saving ? '当前操作完成后可确认收货' : '请先选择一条已批准退货'
               }
             >
               <Popconfirm
@@ -432,42 +617,73 @@ export default function SalesReturnsPage() {
                 description="确认后会按退货明细形成库存入库。"
                 onConfirm={() => transition('receive')}
               >
-                <Button
-                  className="erp-business-module-status-action"
-                  disabled={
-                    !selected || selected.status !== 'APPROVED' || saving
-                  }
-                >
-                  确认收货
-                </Button>
+                <Button disabled={!selected || saving}>确认收货</Button>
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canCancel && (!selected || selected.status !== 'CANCELLED') ? (
+          {canCreate && (!selected || selected.status === 'DRAFT') ? (
             <BusinessActionTooltip
-              disabled={!selected || selected.status === 'CANCELLED' || saving}
+              disabled={!selected || saving}
               disabledReason={
-                !selected
-                  ? '请先选择一条客户退货记录'
-                  : selected.status === 'CANCELLED'
-                    ? '已取消退货不能再次取消'
-                    : saving
-                      ? '当前操作完成后可取消'
-                      : ''
+                saving
+                  ? '当前操作完成后可核对审批流'
+                  : '请先选择一条待审批客户退货'
+              }
+            >
+              <Button
+                disabled={!selected || saving}
+                onClick={ensureApprovalProcess}
+              >
+                核对审批流
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCancel &&
+          (!selected ||
+            selected.status === 'DRAFT' ||
+            selected.status === 'APPROVED') ? (
+              <BusinessActionTooltip
+                disabled={!selected || saving}
+                disabledReason={
+                  saving ? '当前操作完成后可取消' : '请先选择一条客户退货'
+                }
+              >
+                <Button
+                  danger
+                  disabled={!selected || saving}
+                  onClick={openCancel}
+                >
+                  核对并取消
+                </Button>
+              </BusinessActionTooltip>
+          ) : null}
+          {canReverse && (!selected || selected.status === 'RECEIVED') ? (
+            <BusinessActionTooltip
+              disabled={!selected || saving}
+              disabledReason={
+                saving ? '当前操作完成后可冲正' : '请先选择一条已收货退货'
               }
             >
               <Button
                 danger
-                className="erp-business-module-status-action"
-                disabled={
-                  !selected || selected.status === 'CANCELLED' || saving
-                }
-                onClick={() => setCancelOpen(true)}
+                disabled={!selected || saving}
+                onClick={() => setReverseOpen(true)}
               >
-                取消退货
+                冲正退货入库
               </Button>
             </BusinessActionTooltip>
           ) : null}
+          <ExceptionProcessRecoveryButton
+            canRecover={canRecoverProcess}
+            disabled={!selected || saving}
+            loadProcess={() =>
+              getSalesReturnAcceptanceProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                sales_return_id: selected.id,
+              })
+            }
+            onRecovered={loadRows}
+          />
         </SelectionActionBar>
       </BusinessOperationPanel>
       <Table
@@ -571,6 +787,31 @@ export default function SalesReturnsPage() {
             )}
           </Form.List>
         </Form>
+      </Modal>
+      <Modal
+        title="冲正客户退货入库"
+        open={reverseOpen}
+        okText="确认冲正"
+        cancelText="返回"
+        okButtonProps={{ danger: true }}
+        confirmLoading={saving}
+        onCancel={() => !saving && setReverseOpen(false)}
+        onOk={() => {
+          if (!reverseReason.trim()) {
+            message.warning('请填写冲正原因')
+            return
+          }
+          transition('reverse', reverseReason)
+        }}
+      >
+        <Input.TextArea
+          value={reverseReason}
+          rows={3}
+          maxLength={255}
+          showCount
+          placeholder="请填写冲正原因"
+          onChange={(event) => setReverseReason(event.target.value)}
+        />
       </Modal>
       <Modal
         title="取消客户退货"

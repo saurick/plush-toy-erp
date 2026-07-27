@@ -82,11 +82,29 @@ test('workflow business pages guard their initial task list with workflow task r
   )
 })
 
+test('workflow business module keeps stable task actions while submitting exact process decisions', () => {
+  assert.match(source, /SelectionClearAction/u)
+  assert.match(source, /shouldShowWorkflowAction\('complete'\)/u)
+  assert.match(source, /workflowActionDisabledReason/u)
+  assert.match(source, /isWorkflowProcessDecisionTask/u)
+  assert.match(source, /process_decision/u)
+  assert.match(source, /getWorkflowTaskProcessContext/u)
+  assert.match(source, /getWorkflowProcessDecisionApprovalForm/u)
+  assert.match(source, /buildWorkflowProcessDecision/u)
+  assert.match(source, /requireWorkflowProcessDecisionSubmission/u)
+  assert.match(source, /taskReasonProcessDecisionReady/u)
+  assert.match(source, /workflowProcessDecisionAllowsApprovedQuantity/u)
+  assert.match(source, /系统不会按任务名称或页面入口猜测审批字段/u)
+  assert.doesNotMatch(source, /workflowTaskAllowsApprovedQuantity/u)
+  assert.doesNotMatch(source, /ProcessRecoveryWorkbench/u)
+})
+
 test('production exception decision reads expose only real decision-list permissions', () => {
   for (const permission of [
     'pmc.risk.read',
     'production.fact.read',
-    'quality.exception.handle',
+    'production.exception.submit',
+    'production.exception.approve',
   ]) {
     assert.match(
       productionExceptionPanel,

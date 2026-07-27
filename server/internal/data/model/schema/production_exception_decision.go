@@ -22,11 +22,20 @@ func (ProductionExceptionDecision) Annotations() []schema.Annotation {
 		"production_exception_decisions_quantity_positive": "requested_quantity > 0 AND (approved_quantity IS NULL OR approved_quantity > 0)",
 		"production_exception_decisions_version_positive":  "version > 0",
 		"production_exception_decisions_intent_bundle":     "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
+		"production_exception_decisions_source_bundle": `
+(
+  (decision_type = 'OVER_ISSUE' AND production_material_requirement_id IS NOT NULL AND production_wip_batch_id IS NULL AND quality_inspection_id IS NULL)
+  OR
+  (decision_type IN ('SCRAP', 'WIP_CONCESSION') AND production_material_requirement_id IS NULL AND production_wip_batch_id IS NOT NULL AND quality_inspection_id IS NOT NULL)
+)`,
 		"production_exception_decisions_execution_audit": `
 (
-  (execution_status = 'PENDING' AND executed_at IS NULL AND executed_by IS NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)
-  OR (execution_status = 'APPLIED' AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)
-  OR (execution_status = 'REVERSED' AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255)
+  (execution_status = 'PENDING' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)
+  OR (execution_status = 'APPLIED' AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255 AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)
+  OR (execution_status = 'REVERSED'
+    AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255
+    AND ((decision_type = 'OVER_ISSUE' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL)
+      OR (decision_type IN ('SCRAP', 'WIP_CONCESSION') AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255)))
 )`,
 	}}}
 }
@@ -44,7 +53,7 @@ func (ProductionExceptionDecision) Fields() []ent.Field {
 		field.String("idempotency_key").NotEmpty().MaxLen(128).Immutable(), field.String("idempotency_payload_hash").NotEmpty().MinLen(64).MaxLen(64).Immutable(),
 		field.Int("version").Default(1).Positive(), field.Int("requested_by").Positive().Immutable(), field.Time("requested_at").Default(time.Now).Immutable(),
 		field.Int("decided_by").Optional().Nillable().Positive(), field.Time("decided_at").Optional().Nillable(), field.String("decision_reason").Optional().Nillable().MaxLen(255),
-		field.Int("executed_by").Optional().Nillable().Positive(), field.Time("executed_at").Optional().Nillable(),
+		field.Int("executed_by").Optional().Nillable().Positive(), field.Time("executed_at").Optional().Nillable(), field.String("execution_reason").Optional().Nillable().MaxLen(255),
 		field.Int("reversed_by").Optional().Nillable().Positive(), field.Time("reversed_at").Optional().Nillable(), field.String("reverse_reason").Optional().Nillable().MaxLen(255),
 	}
 }
@@ -52,6 +61,6 @@ func (ProductionExceptionDecision) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("decision_no").Unique(), index.Fields("requested_by", "idempotency_key").Unique(),
 		index.Fields("decision_type", "status", "execution_status", "requested_at"), index.Fields("production_order_id", "production_order_item_id"),
-		index.Fields("quality_inspection_id").Unique().Annotations(entsql.IndexWhere("decision_type = 'WIP_CONCESSION' AND (status = 'SUBMITTED' OR status = 'APPROVED')")),
+		index.Fields("quality_inspection_id").Unique().Annotations(entsql.IndexWhere("((decision_type = 'SCRAP' OR decision_type = 'WIP_CONCESSION') AND (status = 'SUBMITTED' OR status = 'APPROVED'))")),
 	}
 }

@@ -162,14 +162,14 @@ test("yoyoosun role handbook lists the exact tracked role profiles", () => {
       (total, role) => total + role.capabilityKeys.length,
       0,
     ),
-    288,
+    312,
   );
   assert.equal(
     new Set(yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.capabilityKeys))
       .size,
-    119,
+    136,
   );
-  assert.equal(registeredPermissionKeys.size, 160);
+  assert.equal(registeredPermissionKeys.size, 165);
   assert.deepEqual(
     [...handbook.matchAll(/<!-- role-profile:([^:]+):start -->/gu)].map(
       (match) => match[1],
@@ -519,8 +519,8 @@ test("yoyoosun role handbook preserves every client-source process checkpoint an
     "补换生成新待收待检链",
     "Shipment 版本化强制门禁",
     "包材没有独立采购、IQC、领用 / 耗用事实闭环",
-    "永绅 finance 未获收付款页面 / 权限",
-    "付款审批、银行直连、总账、税控仍未实现",
+    "永绅本地 entitlement 已激活读回",
+    "银行直连、支付凭证、总账和税控仍未实现",
   ];
   for (const text of [
     ...requiredClientTerms,
@@ -849,7 +849,7 @@ test("yoyoosun customer confirmation separates business decisions from system ev
   );
   assert.match(
     customerDeliveryMatrix,
-    /异常处置能力只部分进入永绅 entitlement.*客户退货 \/ RMA 与收付款尚未进入永绅 entitlement/u,
+    /客户退货、收付款、库存调整和生产异常页面 \/ 权限已进入永绅跟踪 entitlement.*仍未整体进入 133 \/ 生产/u,
   );
   for (const forbiddenTechnicalToken of [
     "workflow.task.approve",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "server/api/jsonrpc/v1"
@@ -114,6 +115,36 @@ func okData(data map[string]any) *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(data)}
 }
 
+func operationalFactStatusMutationFromParams(
+	pm map[string]any,
+	actorID int,
+	requireReason bool,
+) (*biz.OperationalFactStatusMutation, bool) {
+	id, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+	if !ok {
+		return nil, false
+	}
+	expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+	if !ok || actorID <= 0 {
+		return nil, false
+	}
+	reason := ""
+	if requireReason {
+		value, exists := pm["reason"]
+		raw, stringOK := value.(string)
+		reason = strings.TrimSpace(raw)
+		if !exists || !stringOK || reason == "" || len([]rune(reason)) > 255 {
+			return nil, false
+		}
+	}
+	return &biz.OperationalFactStatusMutation{
+		ID:              id,
+		ExpectedVersion: expectedVersion,
+		ActorID:         actorID,
+		Reason:          reason,
+	}, true
+}
+
 func unknownOperationalFactResult(method string) *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知业务事实接口 method=%s", method)}
 }
@@ -121,12 +152,21 @@ func unknownOperationalFactResult(method string) *v1.JsonrpcResult {
 func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrProcessRuntimeRequired):
+		l.Warnf("[operational_fact] process runtime required err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该动作必须通过业务流程任务办理，请刷新流程状态"}
+	case errors.Is(err, biz.ErrProcessSourceLifecycleDependency):
+		l.Warnf("[operational_fact] linked process blocks source lifecycle change err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该单据仍有未收口的业务流程，请先在任务中心完成或驳回流程后再操作"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		l.Warnf("[operational_fact] idempotency payload conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrFinanceFactSourceConflict):
 		l.Warnf("[operational_fact] active finance fact source conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该业务来源已生成同类型的有效财务记录"}
+	case errors.Is(err, biz.ErrOperationalFactVersionConflict):
+		l.Warnf("[operational_fact] lifecycle version conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "业务记录版本已变化，请刷新后重试"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[operational_fact] invalid param err=%v", err)
 		return invalidParamResult()
@@ -158,6 +198,16 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产异常审批状态已变化，请刷新后重试"}
 	case errors.Is(err, biz.ErrProductionExceptionSourceInvalid), errors.Is(err, biz.ErrProductionExceptionApprovalAmount):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产异常来源或批准数量不符合当前业务状态"}
+	case errors.Is(err, biz.ErrProductionExceptionSelfApproval):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "申请人不能审批或驳回自己的生产异常，请交由其他有权岗位办理"}
+	case errors.Is(err, biz.ErrProductionExceptionCancelOwner):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有生产异常申请人可以撤回尚未审批的申请"}
+	case errors.Is(err, biz.ErrProductionExceptionWIPDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该在制批次已有返工或下游批次，不能再执行或撤销本次异常处置"}
+	case errors.Is(err, biz.ErrProductionExceptionFactDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该在制批次已支撑完工入库，请先取消相关完工事实后再撤销让步"}
+	case errors.Is(err, biz.ErrProductionExceptionAllowanceUsed):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该超领额度已被领料使用；请先冲正超出原计划的领料记录后再撤销额度"}
 	case errors.Is(err, biz.ErrProductionOrderNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单不存在"}
 	case errors.Is(err, biz.ErrProductionOrderFactSourceInvalid):
@@ -222,6 +272,8 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"}
 	case errors.Is(err, biz.ErrShipmentFinanceDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未取消的应收或发票记录，请先取消相关财务记录"}
+	case errors.Is(err, biz.ErrShipmentSalesReturnDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未取消的客户退货，请先取消客户退货后再取消出货"}
 	case errors.Is(err, biz.ErrShipmentQualityPending):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
 	case errors.Is(err, biz.ErrShipmentQualityRejected):
@@ -266,6 +318,10 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该采购入库已有未取消的应付记录，请先取消应付后再更正或撤销来源"}
 	case errors.Is(err, biz.ErrFinanceReconciliationDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该财务记录已有未取消的单笔核对，请先取消核对记录"}
+	case errors.Is(err, biz.ErrFinanceAllocationDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该财务记录已有未冲正的收付款核销，请先冲正对应收付款"}
+	case errors.Is(err, biz.ErrFinanceCreditNoteDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该财务记录已有未反向的贷项或红冲，请先完成反向处理"}
 	case errors.Is(err, biz.ErrFinanceReconciliationSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该财务记录当前不能生成单笔核对，请确认已过账且往来方和金额完整"}
 	case errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed):

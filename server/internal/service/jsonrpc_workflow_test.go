@@ -1915,6 +1915,11 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(
 		},
 	}
 	processRepo := &stubProcessRuntimeJSONRPCRepo{
+		process: &biz.ProcessInstance{
+			ID: processID, ProcessKey: biz.ProcessKeySalesOrderAcceptance,
+			BusinessRefType: "project-orders", BusinessRefID: 1001,
+			Status: biz.ProcessStatusActive,
+		},
 		node: &biz.ProcessNodeInstance{
 			ID:                nodeID,
 			ProcessInstanceID: processID,
@@ -1986,6 +1991,10 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionSettlesLinkedProcessNode(t *t
 		NodeType:          biz.ProcessNodeTypeApproval,
 		Status:            biz.ProcessNodeStatusActive,
 		Version:           4,
+	}, process: &biz.ProcessInstance{
+		ID: processID, ProcessKey: biz.ProcessKeySalesOrderAcceptance,
+		BusinessRefType: "sales_order", BusinessRefID: 1001,
+		Status: biz.ProcessStatusActive,
 	}}
 	j := &jsonrpcDispatcher{
 		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
@@ -2053,6 +2062,10 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionRetryReconcilesWithoutTaskRew
 		NodeType:          biz.ProcessNodeTypeApproval,
 		Status:            biz.ProcessNodeStatusActive,
 		Version:           4,
+	}, process: &biz.ProcessInstance{
+		ID: processID, ProcessKey: biz.ProcessKeySalesOrderAcceptance,
+		BusinessRefType: "sales_order", BusinessRefID: 1001,
+		Status: biz.ProcessStatusActive,
 	}}
 	j := &jsonrpcDispatcher{
 		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
@@ -2686,6 +2699,28 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccess(t *testing.T) {
 			wantReasonCode:   "allowed",
 			wantPermission:   biz.PermissionWorkflowTaskComplete,
 			wantActorRoleKey: biz.QualityRoleKey,
+		},
+		{
+			name:  "boss owner can approve inventory adjustment with exact specialized permission",
+			admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWarehouseAdjustmentApprove),
+			currentTask: func() *biz.WorkflowTask {
+				capability := biz.PermissionWarehouseAdjustmentApprove
+				return &biz.WorkflowTask{
+					ID:                    77,
+					TaskGroup:             "inventory_adjustment_approval",
+					SourceType:            "inventory-operation",
+					SourceID:              1,
+					TaskStatusKey:         "ready",
+					OwnerRoleKey:          biz.BossRoleKey,
+					RequiredCapabilityKey: &capability,
+					Payload:               map[string]any{},
+				}
+			}(),
+			actionKey:        "complete",
+			wantAllowed:      true,
+			wantReasonCode:   "allowed",
+			wantPermission:   biz.PermissionWarehouseAdjustmentApprove,
+			wantActorRoleKey: biz.BossRoleKey,
 		},
 		{
 			name:             "reject explains missing reject permission",

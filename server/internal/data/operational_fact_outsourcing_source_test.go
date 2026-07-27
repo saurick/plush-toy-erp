@@ -38,6 +38,7 @@ func TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes(t *testing.T
 	}
 	source := createOutsourcingFactSourceFixtureWithSKU(t, ctx, client, fixtures, "DERIVE", decimal.NewFromInt(8), &productSKU.ID)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	actor := client.AdminUser.Create().SetUsername("outsourcing-derive-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 
 	issueIn := &biz.OutsourcingFactFromOrderCreate{
 		FactNo:                 "OUT-ISSUE-DERIVE",
@@ -101,12 +102,12 @@ func TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes(t *testing.T
 		t.Fatalf("same-intent return replay = %#v, err=%v", replayedReceipt, err)
 	}
 	assertOutsourcingFactSKUSnapshot(t, replayedReceipt, productSKU.SkuCode)
-	postedReceipt, err := uc.PostOutsourcingFact(ctx, receipt.ID)
+	postedReceipt, err := uc.PostOutsourcingFact(ctx, operationalFactStatusMutation(receipt.ID, receipt.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post sourced return receipt: %v", err)
 	}
 	assertOutsourcingFactSKUSnapshot(t, postedReceipt, productSKU.SkuCode)
-	cancelledReceipt, err := uc.CancelPostedOutsourcingFact(ctx, receipt.ID)
+	cancelledReceipt, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(postedReceipt.ID, postedReceipt.Version, actor.ID, "撤销委外回货"))
 	if err != nil {
 		t.Fatalf("cancel sourced return receipt: %v", err)
 	}
@@ -283,6 +284,7 @@ func TestOutsourcingFactFromOrderEnforcesPostedQuantityAndAllowsClosedSourceReve
 	source := createOutsourcingFactSourceFixture(t, ctx, client, fixtures, "QTY", decimal.NewFromInt(5))
 	logger := log.NewStdLogger(io.Discard)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
+	actor := client.AdminUser.Create().SetUsername("outsourcing-quantity-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	orderRepo := NewOutsourcingOrderRepo(data, logger)
 	inventoryRepo := NewInventoryRepo(data, logger)
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
@@ -316,10 +318,10 @@ func TestOutsourcingFactFromOrderEnforcesPostedQuantityAndAllowsClosedSourceReve
 	}
 	first := createIssue("QTY-1", decimal.NewFromInt(3))
 	second := createIssue("QTY-2", decimal.NewFromInt(3))
-	if _, err := uc.PostOutsourcingFact(ctx, first.ID); err != nil {
+	if _, err := uc.PostOutsourcingFact(ctx, operationalFactStatusMutation(first.ID, first.Version, actor.ID, "")); err != nil {
 		t.Fatalf("post first issue: %v", err)
 	}
-	if _, err := uc.PostOutsourcingFact(ctx, second.ID); !errors.Is(err, biz.ErrOutsourcingOrderFactQuantityExceeded) {
+	if _, err := uc.PostOutsourcingFact(ctx, operationalFactStatusMutation(second.ID, second.Version, actor.ID, "")); !errors.Is(err, biz.ErrOutsourcingOrderFactQuantityExceeded) {
 		t.Fatalf("post over-quantity issue error = %v, want quantity exceeded", err)
 	}
 
@@ -339,14 +341,15 @@ func TestOutsourcingFactFromOrderEnforcesPostedQuantityAndAllowsClosedSourceReve
 	if err != nil {
 		t.Fatalf("create close source issue: %v", err)
 	}
-	if _, err := uc.PostOutsourcingFact(ctx, closeFact.ID); err != nil {
+	postedCloseFact, err := uc.PostOutsourcingFact(ctx, operationalFactStatusMutation(closeFact.ID, closeFact.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post close source issue: %v", err)
 	}
 	closed, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, closeSource.order.ID, biz.OutsourcingOrderStatusClosed)
 	if err != nil || closed.LifecycleStatus != biz.OutsourcingOrderStatusClosed {
 		t.Fatalf("close order after only posted issue = %#v, err=%v", closed, err)
 	}
-	cancelled, err := uc.CancelPostedOutsourcingFact(ctx, closeFact.ID)
+	cancelled, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(postedCloseFact.ID, postedCloseFact.Version, actor.ID, "关闭后撤销委外发料"))
 	if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("cancel posted issue after parent close = %#v, err=%v", cancelled, err)
 	}
@@ -363,6 +366,7 @@ func TestOutsourcingOrderCancelRejectsPostedFactDependency(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	orderRepo := NewOutsourcingOrderRepo(data, logger)
+	actor := client.AdminUser.Create().SetUsername("outsourcing-dependency-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 
 	returnLotNo := "OUT-RETURN-DEPENDENCY-LOT"
 	fact, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
@@ -380,13 +384,14 @@ func TestOutsourcingOrderCancelRejectsPostedFactDependency(t *testing.T) {
 	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
 		t.Fatalf("cancel order with draft fact error = %v, want dependency", err)
 	}
-	if _, err := uc.PostOutsourcingFact(ctx, fact.ID); err != nil {
+	postedFact, err := uc.PostOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post return receipt: %v", err)
 	}
 	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
 		t.Fatalf("cancel order with posted fact error = %v, want dependency", err)
 	}
-	if _, err := uc.CancelPostedOutsourcingFact(ctx, fact.ID); err != nil {
+	if _, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(postedFact.ID, postedFact.Version, actor.ID, "撤销委外回货后取消订单")); err != nil {
 		t.Fatalf("cancel posted return receipt: %v", err)
 	}
 	cancelled, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusCanceled)

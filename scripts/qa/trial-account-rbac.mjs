@@ -440,10 +440,13 @@ export const buildStaticProjectionReport = ({
     } else {
       Object.assign(checks, {
         adminHasNoExpectedMobilePermission: true,
-        browserMobileDenied: includes(
-          "trialBrowserSmoke",
-          "expectSuccess: false",
-        ),
+        browserMobileDenied:
+          includes("trialBrowserSmoke", "demo_admin-mobile-denied.png") &&
+          includes("trialBrowserSmoke", "mobile-role-unassigned") &&
+          includes(
+            "trialBrowserSmoke",
+            "当前账号未分配业务岗位",
+          ),
       });
     }
 

@@ -261,6 +261,10 @@ export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
     'workflow.task.update',
     'workflow.task.reject',
     'workflow.task.approve',
+    'sales_return.approve',
+    'finance.payment.approve',
+    'warehouse.adjustment.approve',
+    'production.exception.approve',
   ].some((permissionKey) => hasActionPermission(admin, permissionKey))
   if (!hasAnyWorkflowActionPermission) {
     return '当前账号只有查看任务权限，没有完成、阻塞或催办权限。'

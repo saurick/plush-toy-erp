@@ -11,6 +11,7 @@ import { loadDevPorts, resolveDevAuxPort } from '../../scripts/dev-ports.mjs'
 import { yoyoosunMenuConfig } from '../../config/customers/yoyoosun/menuConfig.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { businessModuleDefinitions } from '../src/erp/config/businessModules.mjs'
+import { MAX_ROLE_PRIMARY_LIMIT } from '../src/erp/config/roleGuidedNavigation.mjs'
 import { navigationItemRegistry } from '../src/erp/config/seedData.mjs'
 import { getRoleDisplayName } from '../src/erp/utils/roleKeys.mjs'
 import {
@@ -295,7 +296,11 @@ function buildMobileDeniedAccountSummary({ verified } = {}) {
     mobileTaskEntry: buildMobileTaskEntryLabel('sales'),
     expectedDenied: true,
     ...(verified === undefined ? {} : { verified }),
-    expectedMessage: '当前账号不能使用所选工作方式，请联系系统管理员。',
+    expectedPath: '/entry',
+    expectedReason: 'mobile-role-unassigned',
+    expectedMessage: '当前账号未分配业务岗位',
+    expectedDescription:
+      '手机待办只向明确分配的业务岗位开放。您可以进入电脑端后台，或联系管理员分配业务岗位。',
   }
 }
 
@@ -445,8 +450,9 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
         account.username === 'demo_admin' &&
         account.role === getTrialRoleLabel('sales') &&
         account.mobileTaskEntry === buildMobileTaskEntryLabel('sales') &&
-        account.expectedMessage ===
-          '当前账号不能使用所选工作方式，请联系系统管理员。'
+        account.expectedPath === '/entry' &&
+        account.expectedReason === 'mobile-role-unassigned' &&
+        account.expectedMessage === '当前账号未分配业务岗位'
     ),
     coversFormalCustomerPageProjection:
       plan.customerHiddenMenuLabels.length === 0 &&
@@ -1095,14 +1101,14 @@ async function verifyDesktopAccount(browser, account) {
     const expectedVisibleMenus = visibleCustomerMenuLabels(
       account.expectedMenus
     ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
-    await verifyRoleGuidedMenuStructure(page, account.username)
-    for (const label of visibleCustomerMenuLabels(account.expectedMenus)) {
-      await findVisibleMenuItem(page, label)
-    }
     const expectedVisibleLeafMenus = uniqueStrings([
       ...expectedVisibleMenus,
       ...authenticatedMenuLabels,
     ]).sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    await verifyRoleGuidedMenuStructure(page, account.username)
+    for (const label of expectedVisibleLeafMenus) {
+      await findVisibleMenuItem(page, label)
+    }
     const actualVisibleMenus = (
       await page.locator('.erp-admin-menu .ant-menu-item').allTextContents()
     )
@@ -1149,20 +1155,60 @@ async function verifyDesktopAccount(browser, account) {
 
 async function findVisibleMenuItem(page, label) {
   const menu = page.locator('.erp-admin-menu')
-  const item = menu.locator('.ant-menu-item').filter({ hasText: label }).first()
-  if (await item.isVisible().catch(() => false)) {
-    return item
-  }
   const moreFunctions = menu
     .locator('.ant-menu-submenu-title')
     .filter({ hasText: '更多功能' })
     .first()
-  if (await moreFunctions.isVisible().catch(() => false)) {
+  const openMoreFunctions = async () => {
+    assert.equal(
+      await moreFunctions.count(),
+      1,
+      `${label} 不在首层菜单时必须存在唯一的“更多功能”入口`
+    )
     const submenu = moreFunctions.locator('..')
     const submenuClass = String((await submenu.getAttribute('class')) || '')
     if (!submenuClass.includes('ant-menu-submenu-open')) {
       await moreFunctions.click()
     }
+    await page.waitForFunction(
+      (node) => node.classList.contains('ant-menu-submenu-open'),
+      await submenu.elementHandle(),
+      { timeout: 15_000 }
+    )
+    return submenu
+  }
+  const item = menu
+    .getByText(label, { exact: true })
+    .locator(
+      'xpath=ancestor::li[contains(concat(" ", normalize-space(@class), " "), " ant-menu-item ")][1]'
+    )
+  if (
+    (await item.count()) === 0 &&
+    (await menu.getAttribute('data-navigation-presentation')) === 'role_guided'
+  ) {
+    await openMoreFunctions()
+  }
+  assert.equal(
+    await item.count(),
+    1,
+    `左侧菜单必须且只能有一个“${label}”入口`
+  )
+  const parentSubmenu = item.locator(
+    'xpath=ancestor::li[contains(concat(" ", normalize-space(@class), " "), " ant-menu-submenu ")][1]'
+  )
+  if ((await parentSubmenu.count()) === 0) {
+    await item.waitFor({ state: 'visible', timeout: 15_000 })
+    return item
+  }
+
+  const submenuClass = String((await parentSubmenu.getAttribute('class')) || '')
+  assert.match(
+    String((await moreFunctions.innerText()) || '').trim(),
+    /^更多功能（\d+）$/u,
+    `${label} 的父菜单必须是正式“更多功能”分组`
+  )
+  if (!submenuClass.includes('ant-menu-submenu-open')) {
+    await openMoreFunctions()
   }
   await item.waitFor({ state: 'visible', timeout: 15_000 })
   return item
@@ -1180,30 +1226,47 @@ async function verifyRoleGuidedMenuStructure(page, username) {
     timeout: 15_000,
   })
   const metrics = await menu.evaluate((node) => {
-    const submenuByTitle = (title) =>
-      Array.from(node.querySelectorAll('.ant-menu-submenu')).find((submenu) =>
-        Array.from(submenu.children).some(
-          (child) =>
-            child.classList.contains('ant-menu-submenu-title') &&
-            String(child.textContent || '').trim() === title
-        )
-      )
-    const common = submenuByTitle('常用工作')
-    const commonItems = common
-      ? Array.from(common.querySelectorAll('.ant-menu-item')).filter(
-          (item) => item.getClientRects().length > 0
-        )
-      : []
+    const commonGroups = Array.from(
+      node.querySelectorAll('.ant-menu-item-group')
+    ).filter(
+      (group) =>
+        String(
+          group.querySelector(':scope > .ant-menu-item-group-title')
+            ?.textContent || ''
+        ).trim() === '常用工作'
+    )
+    const commonItems =
+      commonGroups.length === 1
+        ? Array.from(
+            commonGroups[0].querySelectorAll(
+              ':scope > .ant-menu-item-group-list > .ant-menu-item'
+            )
+          ).filter((item) => item.getClientRects().length > 0)
+        : []
+    const commonLabels = commonItems.map((item) =>
+      String(item.textContent || '').trim()
+    )
     return {
+      commonGroupCount: commonGroups.length,
       commonItemCount: commonItems.length,
-      commonLabels: commonItems.map((item) =>
-        String(item.textContent || '').trim()
-      ),
+      commonLabels,
+      uniqueCommonItemCount: new Set(commonLabels).size,
     }
   })
+  assert.equal(
+    metrics.commonGroupCount,
+    1,
+    `${username} 电脑端必须且只能有一个常用工作分组: ${JSON.stringify(metrics)}`
+  )
   assert(
-    metrics.commonItemCount > 0 && metrics.commonItemCount <= 3,
-    `${username} 电脑端常用工作应有 1 至 3 个业务入口: ${JSON.stringify(metrics)}`
+    metrics.commonItemCount > 0 &&
+      metrics.commonItemCount <= MAX_ROLE_PRIMARY_LIMIT,
+    `${username} 电脑端常用工作应有 1 至 ${MAX_ROLE_PRIMARY_LIMIT} 个业务入口: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.uniqueCommonItemCount,
+    metrics.commonItemCount,
+    `${username} 电脑端常用工作不能出现重复入口: ${JSON.stringify(metrics)}`
   )
 }
 
@@ -1447,18 +1510,51 @@ async function verifyMobileDeniedAccount(browser) {
       username: 'demo_admin',
       entry: 'mobile',
       fromPath: '/m/sales/tasks',
-      expectSuccess: false,
     })
+    await page.waitForURL(
+      (url) =>
+        url.pathname === '/entry' &&
+        url.searchParams.get('reason') === 'mobile-role-unassigned',
+      { timeout: 15_000 }
+    )
     await page
-      .getByText('当前账号不能使用所选工作方式，请联系系统管理员。')
+      .getByText('当前账号未分配业务岗位', { exact: true })
       .waitFor({
         state: 'visible',
         timeout: 15_000,
       })
+    await page
+      .getByText(
+        '手机待办只向明确分配的业务岗位开放。您可以进入电脑端后台，或联系管理员分配业务岗位。',
+        { exact: true }
+      )
+      .waitFor({ state: 'visible', timeout: 15_000 })
+    const desktopEntryButton = page
+      .getByText('电脑端', { exact: true })
+      .locator('xpath=ancestor::button[1]')
+    assert.equal(
+      await desktopEntryButton.count(),
+      1,
+      '无业务岗位账号必须且只能有一个电脑端入口'
+    )
+    await desktopEntryButton.waitFor({ state: 'visible', timeout: 15_000 })
+    const mobileEntryButton = page
+      .getByText('手机待办', { exact: true })
+      .locator('xpath=ancestor::button[1]')
+    assert.equal(
+      await mobileEntryButton.count(),
+      0,
+      '无业务岗位账号不应获得手机待办入口'
+    )
     assert.equal(
       new URL(page.url()).pathname,
-      '/admin-login',
-      '无岗位权限账号应停留在登录页'
+      '/entry',
+      '无业务岗位账号应进入保留登录态的入口提示页'
+    )
+    assert.equal(
+      new URL(page.url()).searchParams.get('reason'),
+      'mobile-role-unassigned',
+      '入口提示页必须保留未分配业务岗位的精确原因'
     )
     await page.screenshot({
       path: path.resolve(outputDir, 'demo_admin-mobile-denied.png'),

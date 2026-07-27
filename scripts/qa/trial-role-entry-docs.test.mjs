@@ -166,7 +166,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     yoyoosunTrialAccountChecklist,
-    "常用：`应付管理`、`应收管理`、`发票管理`；更多：`对账管理`和来源核对页",
+    "常用：`应付管理`、`应收管理`、`发票管理`；更多：`对账管理`、`收付款与核销`和来源核对页",
     "finance trial navigation priority",
   );
   assertIncludes(
@@ -211,8 +211,13 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     trialBrowserSmoke,
-    "expectSuccess: false",
-    "trial browser smoke admin denial",
+    "mobile-role-unassigned",
+    "trial browser smoke post-login mobile-role denial reason",
+  );
+  assertIncludes(
+    trialBrowserSmoke,
+    "demo_admin-mobile-denied.png",
+    "trial browser smoke admin denial evidence",
   );
   assertIncludes(
     trialBrowserSmoke,
@@ -261,8 +266,8 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     trialBrowserSmoke,
-    "当前账号不能使用所选工作方式，请联系系统管理员。",
-    "trial browser smoke admin denial",
+    "手机待办只向明确分配的业务岗位开放。您可以进入电脑端后台，或联系管理员分配业务岗位。",
+    "trial browser smoke post-login admin denial guidance",
   );
   assertIncludes(
     scriptReadme,

@@ -81,7 +81,13 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 	if processKey == "" {
 		processKey = ProcessKeySalesOrderAcceptance
 	}
-	if processKey != ProcessKeySalesOrderAcceptance && processKey != ProcessKeyMaterialSupply && processKey != ProcessKeyFinishedGoodsDelivery {
+	if processKey != ProcessKeySalesOrderAcceptance &&
+		processKey != ProcessKeyMaterialSupply &&
+		processKey != ProcessKeyFinishedGoodsDelivery &&
+		processKey != ProcessKeySalesReturnApproval &&
+		processKey != ProcessKeyFinancePaymentApproval &&
+		processKey != ProcessKeyInventoryAdjustmentApproval &&
+		processKey != ProcessKeyProductionExceptionApproval {
 		return nil, ErrBadParam
 	}
 	idempotencyKey := strings.TrimSpace(in.IdempotencyKey)
@@ -106,10 +112,21 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 		return nil, ErrBadParam
 	}
 	approvalKey := approvalSettingKeyForProcessKey(processKey)
-	approvalSettings := approvalSettingsEnabledMap(active.CompiledSnapshot)
-	approvalEnabled, approvalConfigured := approvalSettings[approvalKey]
-	if approvalKey == "" || !approvalConfigured || !approvalEnabled {
-		return nil, ErrCustomerConfigTransitionBlocked
+	if approvalKey == "" {
+		switch processKey {
+		case ProcessKeySalesReturnApproval,
+			ProcessKeyFinancePaymentApproval,
+			ProcessKeyInventoryAdjustmentApproval,
+			ProcessKeyProductionExceptionApproval:
+		default:
+			return nil, ErrBadParam
+		}
+	} else {
+		approvalSettings := approvalSettingsEnabledMap(active.CompiledSnapshot)
+		approvalEnabled, approvalConfigured := approvalSettings[approvalKey]
+		if !approvalConfigured || !approvalEnabled {
+			return nil, ErrCustomerConfigTransitionBlocked
+		}
 	}
 	processVersion := getStringFromAnyMap(definition, "process_version")
 	if processVersion == "" {

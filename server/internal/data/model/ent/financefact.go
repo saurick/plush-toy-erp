@@ -25,6 +25,8 @@ type FinanceFact struct {
 	FactType string `json:"fact_type,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// Version holds the value of the "version" field.
+	Version int `json:"version,omitempty"`
 	// CounterpartyType holds the value of the "counterparty_type" field.
 	CounterpartyType string `json:"counterparty_type,omitempty"`
 	// CounterpartyID holds the value of the "counterparty_id" field.
@@ -57,8 +59,12 @@ type FinanceFact struct {
 	OccurredAtSpecified bool `json:"occurred_at_specified,omitempty"`
 	// PostedAt holds the value of the "posted_at" field.
 	PostedAt *time.Time `json:"posted_at,omitempty"`
+	// PostedBy holds the value of the "posted_by" field.
+	PostedBy *int `json:"posted_by,omitempty"`
 	// SettledAt holds the value of the "settled_at" field.
 	SettledAt *time.Time `json:"settled_at,omitempty"`
+	// SettledBy holds the value of the "settled_by" field.
+	SettledBy *int `json:"settled_by,omitempty"`
 	// CancelledAt holds the value of the "cancelled_at" field.
 	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
 	// CancelledBy holds the value of the "cancelled_by" field.
@@ -79,11 +85,37 @@ type FinanceFact struct {
 
 // FinanceFactEdges holds the relations/edges for other nodes in the graph.
 type FinanceFactEdges struct {
+	// Poster holds the value of the poster edge.
+	Poster *AdminUser `json:"poster,omitempty"`
+	// Settler holds the value of the settler edge.
+	Settler *AdminUser `json:"settler,omitempty"`
 	// Canceller holds the value of the canceller edge.
 	Canceller *AdminUser `json:"canceller,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [3]bool
+}
+
+// PosterOrErr returns the Poster value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e FinanceFactEdges) PosterOrErr() (*AdminUser, error) {
+	if e.Poster != nil {
+		return e.Poster, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: adminuser.Label}
+	}
+	return nil, &NotLoadedError{edge: "poster"}
+}
+
+// SettlerOrErr returns the Settler value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e FinanceFactEdges) SettlerOrErr() (*AdminUser, error) {
+	if e.Settler != nil {
+		return e.Settler, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: adminuser.Label}
+	}
+	return nil, &NotLoadedError{edge: "settler"}
 }
 
 // CancellerOrErr returns the Canceller value or an error if the edge
@@ -91,7 +123,7 @@ type FinanceFactEdges struct {
 func (e FinanceFactEdges) CancellerOrErr() (*AdminUser, error) {
 	if e.Canceller != nil {
 		return e.Canceller, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "canceller"}
@@ -106,7 +138,7 @@ func (*FinanceFact) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case financefact.FieldOccurredAtSpecified:
 			values[i] = new(sql.NullBool)
-		case financefact.FieldID, financefact.FieldCounterpartyID, financefact.FieldPaymentTermDays, financefact.FieldSourceID, financefact.FieldSourceLineID, financefact.FieldCancelledBy:
+		case financefact.FieldID, financefact.FieldVersion, financefact.FieldCounterpartyID, financefact.FieldPaymentTermDays, financefact.FieldSourceID, financefact.FieldSourceLineID, financefact.FieldPostedBy, financefact.FieldSettledBy, financefact.FieldCancelledBy:
 			values[i] = new(sql.NullInt64)
 		case financefact.FieldFactNo, financefact.FieldFactType, financefact.FieldStatus, financefact.FieldCounterpartyType, financefact.FieldCurrency, financefact.FieldCollectionType, financefact.FieldPaymentTerm, financefact.FieldInvoiceCategory, financefact.FieldSourceType, financefact.FieldIdempotencyKey, financefact.FieldCancelReason, financefact.FieldNote:
 			values[i] = new(sql.NullString)
@@ -150,6 +182,12 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case financefact.FieldVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field version", values[i])
+			} else if value.Valid {
+				_m.Version = int(value.Int64)
 			}
 		case financefact.FieldCounterpartyType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -256,12 +294,26 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 				_m.PostedAt = new(time.Time)
 				*_m.PostedAt = value.Time
 			}
+		case financefact.FieldPostedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field posted_by", values[i])
+			} else if value.Valid {
+				_m.PostedBy = new(int)
+				*_m.PostedBy = int(value.Int64)
+			}
 		case financefact.FieldSettledAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field settled_at", values[i])
 			} else if value.Valid {
 				_m.SettledAt = new(time.Time)
 				*_m.SettledAt = value.Time
+			}
+		case financefact.FieldSettledBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field settled_by", values[i])
+			} else if value.Valid {
+				_m.SettledBy = new(int)
+				*_m.SettledBy = int(value.Int64)
 			}
 		case financefact.FieldCancelledAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -316,6 +368,16 @@ func (_m *FinanceFact) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QueryPoster queries the "poster" edge of the FinanceFact entity.
+func (_m *FinanceFact) QueryPoster() *AdminUserQuery {
+	return NewFinanceFactClient(_m.config).QueryPoster(_m)
+}
+
+// QuerySettler queries the "settler" edge of the FinanceFact entity.
+func (_m *FinanceFact) QuerySettler() *AdminUserQuery {
+	return NewFinanceFactClient(_m.config).QuerySettler(_m)
+}
+
 // QueryCanceller queries the "canceller" edge of the FinanceFact entity.
 func (_m *FinanceFact) QueryCanceller() *AdminUserQuery {
 	return NewFinanceFactClient(_m.config).QueryCanceller(_m)
@@ -352,6 +414,9 @@ func (_m *FinanceFact) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Version))
 	builder.WriteString(", ")
 	builder.WriteString("counterparty_type=")
 	builder.WriteString(_m.CounterpartyType)
@@ -419,9 +484,19 @@ func (_m *FinanceFact) String() string {
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
+	if v := _m.PostedBy; v != nil {
+		builder.WriteString("posted_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	if v := _m.SettledAt; v != nil {
 		builder.WriteString("settled_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SettledBy; v != nil {
+		builder.WriteString("settled_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.CancelledAt; v != nil {

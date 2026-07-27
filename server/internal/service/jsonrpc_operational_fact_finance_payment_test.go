@@ -17,10 +17,20 @@ type financePaymentServiceRepo struct {
 }
 
 func (r *financePaymentServiceRepo) CreateFinancePayment(_ context.Context, in *biz.FinancePaymentCreate, actorID int, _ string) (*biz.FinancePayment, error) {
-	r.item = &biz.FinancePayment{ID: 31, PaymentNo: in.PaymentNo, Direction: in.Direction, Status: biz.FinancePaymentStatusDraft, CounterpartyType: in.CounterpartyType, CounterpartyID: in.CounterpartyID, Amount: in.Amount, Currency: in.Currency, AccountRef: in.AccountRef, EvidenceRef: in.EvidenceRef, Version: 1, OccurredAt: time.Now(), CreatedBy: actorID}
+	now := time.Now()
+	r.item = &biz.FinancePayment{ID: 31, PaymentNo: in.PaymentNo, Direction: in.Direction, Status: biz.FinancePaymentStatusDraft, CounterpartyType: in.CounterpartyType, CounterpartyID: in.CounterpartyID, Amount: in.Amount, Currency: in.Currency, AccountRef: in.AccountRef, EvidenceRef: in.EvidenceRef, Version: 1, OccurredAt: now, CreatedBy: actorID, CreatedAt: now, UpdatedAt: now}
 	return r.item, nil
 }
 func (r *financePaymentServiceRepo) PostFinancePayment(_ context.Context, _ *biz.FinancePaymentPost, _ int) (*biz.FinancePayment, error) {
+	return r.item, nil
+}
+func (r *financePaymentServiceRepo) CancelFinancePayment(_ context.Context, in *biz.FinancePaymentTransition, actorID int) (*biz.FinancePayment, error) {
+	now := time.Now()
+	r.item.Status = biz.FinancePaymentStatusCancelled
+	r.item.Version = in.ExpectedVersion + 1
+	r.item.CancelledAt = &now
+	r.item.CancelledBy = &actorID
+	r.item.CancelReason = &in.Reason
 	return r.item, nil
 }
 func (r *financePaymentServiceRepo) ReverseFinancePayment(_ context.Context, _ *biz.FinancePaymentReverse, _ int) (*biz.FinancePayment, error) {
@@ -47,6 +57,32 @@ func (r *financePaymentServiceRepo) GetFinanceCreditNote(_ context.Context, id i
 func (r *financePaymentServiceRepo) ListFinanceCreditNotes(_ context.Context, _ biz.FinanceCreditNoteFilter) ([]*biz.FinanceCreditNote, int, error) {
 	return []*biz.FinanceCreditNote{{ID: 1, CreditNoteNo: "CN-RPC-1", Status: "POSTED", Amount: decimal.NewFromInt(10), Currency: "CNY"}}, 1, nil
 }
+func (r *financePaymentServiceRepo) GetFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
+	now := time.Now()
+	return &biz.FinanceFact{
+		ID:               id,
+		FactNo:           "REC-RPC-1",
+		FactType:         biz.FinanceFactReceivable,
+		Status:           biz.OperationalFactStatusPosted,
+		Version:          1,
+		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		Amount:           decimal.NewFromInt(20),
+		Currency:         biz.FinanceCurrencyCNY,
+		OccurredAt:       now,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}, nil
+}
+func (r *financePaymentServiceRepo) ListFinanceFactsForAccess(_ context.Context, _ biz.OperationalFactFilter, scope biz.FinanceFactAccessScope) ([]*biz.FinanceFact, int, error) {
+	if !scope.AllowsType(biz.FinanceFactReceivable) {
+		return nil, 0, biz.ErrBadParam
+	}
+	item, err := r.GetFinanceFact(context.Background(), 9)
+	if err != nil {
+		return nil, 0, err
+	}
+	return []*biz.FinanceFact{item}, 1, nil
+}
 
 func TestOperationalFactFinancePaymentCreateAndListContract(t *testing.T) {
 	repo := &financePaymentServiceRepo{}
@@ -68,6 +104,19 @@ func TestOperationalFactFinancePaymentCreateAndListContract(t *testing.T) {
 	if err != nil || listed == nil || listed.Code != errcode.OK.Code || jsonRPCInt(t, listed.Data.AsMap(), "total") != 1 {
 		t.Fatalf("listed=%#v err=%v", listed, err)
 	}
+	_, cancelled, err := d.handleOperationalFact(ctx, "cancel_finance_payment", "cancel", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(31), "expected_version": float64(1), "reason": "原付款信息有误",
+	}))
+	if err != nil || cancelled == nil || cancelled.Code != errcode.OK.Code {
+		t.Fatalf("cancelled=%#v err=%v", cancelled, err)
+	}
+	cancelledPayment := jsonRPCNestedMap(t, cancelled, "payment")
+	if cancelledPayment["status"] != biz.FinancePaymentStatusCancelled ||
+		jsonRPCInt(t, cancelledPayment, "version") != 2 ||
+		jsonRPCInt(t, cancelledPayment, "cancelled_by") != 7 ||
+		cancelledPayment["cancel_reason"] != "原付款信息有误" {
+		t.Fatalf("cancel receipt=%#v", cancelledPayment)
+	}
 	_, listedCredits, err := d.handleOperationalFact(ctx, "list_finance_credit_notes", "list-credit", mustJSONRPCStruct(t, map[string]any{"status": "POSTED", "limit": float64(10), "offset": float64(0)}))
 	if err != nil || listedCredits == nil || listedCredits.Code != errcode.OK.Code || jsonRPCInt(t, listedCredits.Data.AsMap(), "total") != 1 {
 		t.Fatalf("listed credits=%#v err=%v", listedCredits, err)
@@ -79,7 +128,11 @@ func TestOperationalFactFinancePaymentCreateAndListContract(t *testing.T) {
 	if err != nil || deniedCredit == nil || deniedCredit.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("credit note without dedicated permission=%#v err=%v", deniedCredit, err)
 	}
-	creditAdmin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionFinanceCreditNoteCreate)
+	creditAdmin := workflowJSONRPCAdmin(
+		[]string{biz.FinanceRoleKey},
+		biz.PermissionFinanceCreditNoteCreate,
+		biz.PermissionFinanceReceivableRead,
+	)
 	creditDispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, creditAdmin, repo)
 	_, allowedCredit, err := creditDispatcher.handleOperationalFact(ctx, "create_finance_credit_note", "allowed-credit", creditParams)
 	if err != nil || allowedCredit == nil || allowedCredit.Code != errcode.OK.Code {

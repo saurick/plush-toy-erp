@@ -160,7 +160,10 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
         account.username === 'demo_admin' &&
         account.role === '业务' &&
         account.mobileTaskEntry === '业务岗位任务端' &&
-        account.expectedDenied === true
+        account.expectedDenied === true &&
+        account.expectedPath === '/entry' &&
+        account.expectedReason === 'mobile-role-unassigned' &&
+        account.expectedMessage === '当前账号未分配业务岗位'
     )
   )
   assert.equal(template.menuProjectionCoverage.ok, true)
@@ -406,7 +409,10 @@ test('trial demo account browser smoke CLI preflight writes sanitized report', (
         account.username === 'demo_admin' &&
         account.role === '业务' &&
         account.mobileTaskEntry === '业务岗位任务端' &&
-        account.expectedDenied === true
+        account.expectedDenied === true &&
+        account.expectedPath === '/entry' &&
+        account.expectedReason === 'mobile-role-unassigned' &&
+        account.expectedMessage === '当前账号未分配业务岗位'
     )
   )
   assert.equal(
@@ -649,7 +655,24 @@ test('trial demo account browser smoke source keeps no-write template before run
   assert.match(source, /verifyEffectiveSessionDiagnostic/u)
   assert.match(source, /verifyRoleGuidedMenuStructure/u)
   assert.match(source, /findVisibleMenuItem/u)
-  assert.match(source, /常用工作应有 1 至 3 个业务入口/u)
+  assert.match(
+    source,
+    /for \(const label of expectedVisibleLeafMenus\)[\s\S]*?findVisibleMenuItem/u
+  )
+  assert.match(source, /ancestor::li/u)
+  assert.match(source, /ant-menu-submenu-open/u)
+  assert.match(source, /item\.count\(\)\) === 0/u)
+  assert.match(source, /data-navigation-presentation/u)
+  assert.match(source, /不在首层菜单时必须存在唯一的“更多功能”入口/u)
+  assert.match(source, /父菜单必须是正式“更多功能”分组/u)
+  assert.doesNotMatch(source, /if \(await item\.isVisible/u)
+  assert.match(source, /\.ant-menu-item-group/u)
+  assert.match(source, /\.ant-menu-item-group-title/u)
+  assert.match(source, /\.ant-menu-item-group-list/u)
+  assert.match(source, /MAX_ROLE_PRIMARY_LIMIT/u)
+  assert.match(source, /电脑端必须且只能有一个常用工作分组/u)
+  assert.match(source, /电脑端常用工作不能出现重复入口/u)
+  assert.doesNotMatch(source, /submenuByTitle\('常用工作'\)/u)
   assert.match(source, /local_dev_customer_config_diagnostic/u)
   assert.match(source, /configHash/u)
   assert.match(source, /authorizationHeader/u)
@@ -675,7 +698,9 @@ test('trial demo account browser smoke source keeps no-write template before run
   assert.match(source, /coversAdminBusinessMenuDenial/u)
   assert.match(source, /coversLegacyMenuCleanup/u)
   assert.match(source, /demo_admin/u)
-  assert.match(source, /expectSuccess: false/u)
+  assert.match(source, /mobile-role-unassigned/u)
+  assert.match(source, /无业务岗位账号必须且只能有一个电脑端入口/u)
+  assert.match(source, /无业务岗位账号不应获得手机待办入口/u)
   assert.match(source, /login-form-unavailable/u)
   assert.match(source, /describeLoginPageState/u)
   assert.match(
@@ -687,5 +712,10 @@ test('trial demo account browser smoke source keeps no-write template before run
     /accountInput\.isVisible\(\{ timeout: 8_000 \}\)/u
   )
   assert.match(source, /URL must not contain username or password/u)
-  assert.match(source, /当前账号不能使用所选工作方式，请联系系统管理员。/u)
+  assert.match(source, /当前账号未分配业务岗位/u)
+  assert.match(source, /手机待办只向明确分配的业务岗位开放/u)
+  assert.doesNotMatch(
+    source,
+    /当前账号不能使用所选工作方式，请联系系统管理员。/u
+  )
 })

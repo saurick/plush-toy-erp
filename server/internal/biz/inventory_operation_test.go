@@ -2,8 +2,6 @@ package biz
 
 import (
 	"context"
-	"errors"
-	"strings"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -25,26 +23,15 @@ func TestInventoryOperationCreateNormalizesCycleCountIntent(t *testing.T) {
 	}
 }
 
-func TestInventoryOperationCreateRequiresManualApproval(t *testing.T) {
-	uc := NewInventoryUsecase(&inventoryOperationUsecaseRepoStub{})
-	_, err := uc.CreateInventoryOperation(context.Background(), &InventoryOperationCreate{
+func TestInventoryOperationCreateAcceptsManualAdjustmentAsDraft(t *testing.T) {
+	repo := &inventoryOperationUsecaseRepoStub{}
+	uc := NewInventoryUsecase(repo)
+	got, err := uc.CreateInventoryOperation(context.Background(), &InventoryOperationCreate{
 		OperationNo: "MA-1", OperationType: InventoryOperationManualAdjustment, Reason: "调整", IdempotencyKey: "ma-1", CreatedBy: 1,
 		Items: []InventoryOperationItemCreate{{LineNo: "1", SubjectType: InventorySubjectMaterial, SubjectID: 1, FromWarehouseID: 2, UnitID: 3, AdjustmentQuantity: decimal.NewFromInt(1)}},
 	})
-	if !errors.Is(err, ErrInventoryOperationApprovalMissing) {
-		t.Fatalf("err=%v", err)
-	}
-}
-
-func TestInventoryOperationCreateRejectsApprovalReferenceBeyondSchemaLimit(t *testing.T) {
-	uc := NewInventoryUsecase(&inventoryOperationUsecaseRepoStub{})
-	approvalRef := strings.Repeat("批", 129)
-	_, err := uc.CreateInventoryOperation(context.Background(), &InventoryOperationCreate{
-		OperationNo: "MA-2", OperationType: InventoryOperationManualAdjustment, Reason: "调整", ApprovalRef: &approvalRef, IdempotencyKey: "ma-2", CreatedBy: 1,
-		Items: []InventoryOperationItemCreate{{LineNo: "1", SubjectType: InventorySubjectMaterial, SubjectID: 1, FromWarehouseID: 2, UnitID: 3, AdjustmentQuantity: decimal.NewFromInt(1)}},
-	})
-	if !errors.Is(err, ErrBadParam) {
-		t.Fatalf("err=%v", err)
+	if err != nil || got.Status != InventoryOperationStatusDraft || repo.created.OperationType != InventoryOperationManualAdjustment {
+		t.Fatalf("got=%#v created=%#v err=%v", got, repo.created, err)
 	}
 }
 
@@ -62,9 +49,21 @@ func (r *inventoryOperationUsecaseRepoStub) CreateInventoryOperation(_ context.C
 func (r *inventoryOperationUsecaseRepoStub) PostInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
 	return nil, nil
 }
+func (r *inventoryOperationUsecaseRepoStub) SubmitInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
+	return nil, nil
+}
+func (r *inventoryOperationUsecaseRepoStub) ApproveInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
+	return nil, nil
+}
+func (r *inventoryOperationUsecaseRepoStub) RejectInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
+	return nil, nil
+}
 func (r *inventoryOperationUsecaseRepoStub) CancelInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error) {
 	return nil, nil
 }
 func (r *inventoryOperationUsecaseRepoStub) GetInventoryOperation(context.Context, int) (*InventoryOperation, error) {
 	return nil, nil
+}
+func (r *inventoryOperationUsecaseRepoStub) ListInventoryOperationsForAccess(context.Context, InventoryOperationFilter, WarehouseDataScope) ([]*InventoryOperation, int, error) {
+	return nil, 0, nil
 }

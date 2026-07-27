@@ -6,7 +6,6 @@ import (
 	"io"
 	"sync"
 	"testing"
-	"time"
 
 	"server/internal/biz"
 
@@ -17,71 +16,174 @@ import (
 func TestProductionOverIssueApprovalExtendsAndCapsMaterialIssue(t *testing.T) {
 	ctx := context.Background()
 	f, warehouseID, lotID, factUC := openProductionMaterialIssueFixture(t, "production_over_issue")
+	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
 	released := createAndReleaseProductionMaterialIssueOrder(t, ctx, f, "MO-OVER-ISSUE", "over-issue")
 	requirement := released.MaterialRequirements[0]
 	decision, err := factUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-OVER-1", DecisionType: biz.ProductionExceptionOverIssue, ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID, ProductionMaterialRequirementID: &requirement.ID, RequestedQuantity: decimal.NewFromInt(5), Reason: "损耗超领", IdempotencyKey: "ex-over-1", RequestedBy: f.actorID})
 	if err != nil {
 		t.Fatal(err)
 	}
+	approver := f.client.AdminUser.Create().SetUsername("over-issue-approver").SetPasswordHash("test-password-hash").SaveX(ctx)
 	approved := decimal.NewFromInt(3)
-	decision, err = factUC.ApproveProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: f.actorID, ApprovedQuantity: &approved, Reason: "批准三件"})
+	if _, guardErr := factUC.ApproveProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, ApprovedQuantity: &approved, Reason: "批准三件"}); !errors.Is(guardErr, biz.ErrProcessRuntimeRequired) {
+		t.Fatalf("direct production exception approval guard err=%v", guardErr)
+	}
+	decision, err = factRepo.decideProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, ApprovedQuantity: &approved, Reason: "批准三件"}, biz.ProductionExceptionApproved, nil, nil)
 	if err != nil || decision.Status != biz.ProductionExceptionApproved || decision.ApprovedQuantity == nil || !decision.ApprovedQuantity.Equal(approved) {
 		t.Fatalf("decision=%#v err=%v", decision, err)
+	}
+	requirements, err := factUC.ListProductionOrderMaterialRequirements(ctx, released.Order.ID)
+	if err != nil || len(requirements) != 1 ||
+		!requirements[0].ApprovedOverIssueQuantity.Equal(approved) ||
+		!requirements[0].EffectiveLimitQuantity.Equal(decimal.NewFromInt(25)) ||
+		!requirements[0].RemainingQuantity.Equal(decimal.NewFromInt(25)) {
+		t.Fatalf("approved over-issue requirement projection=%#v err=%v", requirements, err)
 	}
 	fact, err := factUC.CreateProductionMaterialIssueFromOrder(ctx, productionMaterialIssueInput("PF-OVER-1", "pf-over-1", released.Order.ID, released.Items[0].ID, requirement.ID, warehouseID, lotID, decimal.NewFromInt(25)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, fact.ID); err != nil {
+	if _, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "")); err != nil {
 		t.Fatalf("approved issue post err=%v", err)
+	}
+	requirements, err = factUC.ListProductionOrderMaterialRequirements(ctx, released.Order.ID)
+	if err != nil || len(requirements) != 1 ||
+		!requirements[0].IssuedQuantity.Equal(decimal.NewFromInt(25)) ||
+		!requirements[0].EffectiveLimitQuantity.Equal(decimal.NewFromInt(25)) ||
+		!requirements[0].RemainingQuantity.IsZero() {
+		t.Fatalf("consumed over-issue requirement projection=%#v err=%v", requirements, err)
+	}
+	if _, err := factUC.ReverseProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: f.actorID, Reason: "撤销已使用额度"}); !errors.Is(err, biz.ErrProductionExceptionAllowanceUsed) {
+		t.Fatalf("reverse consumed allowance err=%v", err)
 	}
 	excess, err := factUC.CreateProductionMaterialIssueFromOrder(ctx, productionMaterialIssueInput("PF-OVER-2", "pf-over-2", released.Order.ID, released.Items[0].ID, requirement.ID, warehouseID, lotID, decimal.NewFromInt(1)))
 	if err == nil {
-		_, err = factUC.PostProductionFact(ctx, excess.ID)
+		_, err = factUC.PostProductionFact(ctx, operationalFactStatusMutation(excess.ID, excess.Version, f.actorID, ""))
 	}
 	if !errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded) {
 		t.Fatalf("allowance overspend err=%v", err)
 	}
 }
 
+func TestProductionOverIssueAllowanceCanBeRevokedBeforeUse(t *testing.T) {
+	ctx := context.Background()
+	f, warehouseID, lotID, factUC := openProductionMaterialIssueFixture(t, "production_over_issue_revoke")
+	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
+	released := createAndReleaseProductionMaterialIssueOrder(t, ctx, f, "MO-OVER-REVOKE", "over-revoke")
+	requirement := released.MaterialRequirements[0]
+	decision, err := factUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-OVER-REVOKE", DecisionType: biz.ProductionExceptionOverIssue, ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID, ProductionMaterialRequirementID: &requirement.ID, RequestedQuantity: decimal.NewFromInt(2), Reason: "临时损耗", IdempotencyKey: "ex-over-revoke", RequestedBy: f.actorID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approver := f.client.AdminUser.Create().SetUsername("over-revoke-approver").SetPasswordHash("test-password-hash").SaveX(ctx)
+	approved, err := factRepo.decideProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, Reason: "批准"}, biz.ProductionExceptionApproved, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reversed, err := factUC.ReverseProductionException(ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "不再需要"})
+	if err != nil || reversed.ExecutionStatus != biz.ProductionExceptionExecutionReversed || reversed.ExecutedAt != nil || reversed.ExecutedBy != nil {
+		t.Fatalf("reversed=%#v err=%v", reversed, err)
+	}
+	requirements, err := factUC.ListProductionOrderMaterialRequirements(ctx, released.Order.ID)
+	if err != nil || len(requirements) != 1 ||
+		!requirements[0].ApprovedOverIssueQuantity.IsZero() ||
+		!requirements[0].EffectiveLimitQuantity.Equal(requirement.PlannedQuantity) ||
+		!requirements[0].RemainingQuantity.Equal(requirement.PlannedQuantity) {
+		t.Fatalf("reversed over-issue requirement projection=%#v err=%v", requirements, err)
+	}
+	replay, err := factUC.ReverseProductionException(ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "不再需要"})
+	if err != nil || replay.ID != reversed.ID {
+		t.Fatalf("reverse replay=%#v err=%v", replay, err)
+	}
+	excess, err := factUC.CreateProductionMaterialIssueFromOrder(ctx, productionMaterialIssueInput("PF-OVER-REVOKED", "pf-over-revoked", released.Order.ID, released.Items[0].ID, requirement.ID, warehouseID, lotID, requirement.PlannedQuantity.Add(decimal.NewFromInt(1))))
+	if err == nil {
+		_, err = factUC.PostProductionFact(ctx, operationalFactStatusMutation(excess.ID, excess.Version, f.actorID, ""))
+	}
+	if !errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded) {
+		t.Fatalf("revoked allowance still spendable err=%v", err)
+	}
+}
+
+func TestProductionOverIssueApprovalRejectsEffectiveLimitOverflow(t *testing.T) {
+	ctx := context.Background()
+	f, _, _, factUC := openProductionMaterialIssueFixture(t, "production_over_issue_overflow")
+	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
+	released := createAndReleaseProductionMaterialIssueOrder(t, ctx, f, "MO-OVER-OVERFLOW", "over-overflow")
+	requirement := released.MaterialRequirements[0]
+	decision, err := factUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{
+		DecisionNo: "EX-OVER-OVERFLOW", DecisionType: biz.ProductionExceptionOverIssue,
+		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
+		ProductionMaterialRequirementID: &requirement.ID,
+		RequestedQuantity:               maxProductionNumericQuantity,
+		Reason:                          "极值超领", IdempotencyKey: "ex-over-overflow", RequestedBy: f.actorID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approver := f.client.AdminUser.Create().
+		SetUsername("over-overflow-approver").
+		SetPasswordHash("test-password-hash").
+		SaveX(ctx)
+	_, err = factRepo.decideProductionException(
+		ctx,
+		&biz.ProductionExceptionMutation{
+			ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID,
+			Reason: "拒绝超出 numeric 上限",
+		},
+		biz.ProductionExceptionApproved,
+		nil,
+		nil,
+	)
+	if !errors.Is(err, biz.ErrProductionExceptionApprovalAmount) {
+		t.Fatalf("over-issue overflow approval err=%v", err)
+	}
+	current, getErr := factUC.GetProductionException(ctx, decision.ID)
+	if getErr != nil || current.Status != biz.ProductionExceptionSubmitted || current.ApprovedQuantity != nil {
+		t.Fatalf("overflow approval changed decision=%#v err=%v", current, getErr)
+	}
+}
+
 func TestProductionOverIssueApprovalCannotBeSpentTwiceConcurrently(t *testing.T) {
 	ctx := context.Background()
 	f, warehouseID, lotID, factUC := openProductionMaterialIssueFixture(t, "production_over_issue_concurrent")
+	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
 	released := createAndReleaseProductionMaterialIssueOrder(t, ctx, f, "MO-OVER-CONCURRENT", "over-concurrent")
 	requirement := released.MaterialRequirements[0]
 	base, err := factUC.CreateProductionMaterialIssueFromOrder(ctx, productionMaterialIssueInput("PF-OVER-BASE", "pf-over-base", released.Order.ID, released.Items[0].ID, requirement.ID, warehouseID, lotID, requirement.PlannedQuantity))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, base.ID); err != nil {
+	if _, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(base.ID, base.Version, f.actorID, "")); err != nil {
 		t.Fatal(err)
 	}
 	decision, err := factUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-OVER-CONCURRENT", DecisionType: biz.ProductionExceptionOverIssue, ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID, ProductionMaterialRequirementID: &requirement.ID, RequestedQuantity: decimal.NewFromInt(1), Reason: "只批准一件", IdempotencyKey: "ex-over-concurrent", RequestedBy: f.actorID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := factUC.ApproveProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: f.actorID, Reason: "批准"}); err != nil {
+	approver := f.client.AdminUser.Create().SetUsername("over-issue-concurrent-approver").SetPasswordHash("test-password-hash").SaveX(ctx)
+	if _, err := factRepo.decideProductionException(ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, Reason: "批准"}, biz.ProductionExceptionApproved, nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	ids := make([]int, 2)
-	for index := range ids {
+	facts := make([]*biz.ProductionFact, 2)
+	for index := range facts {
 		fact, err := factUC.CreateProductionMaterialIssueFromOrder(ctx, productionMaterialIssueInput("PF-OVER-RACE-"+string(rune('A'+index)), "pf-over-race-"+string(rune('a'+index)), released.Order.ID, released.Items[0].ID, requirement.ID, warehouseID, lotID, decimal.NewFromInt(1)))
 		if err != nil {
 			t.Fatal(err)
 		}
-		ids[index] = fact.ID
+		facts[index] = fact
 	}
 	start := make(chan struct{})
 	errs := make(chan error, 2)
 	var wg sync.WaitGroup
-	for _, id := range ids {
+	for _, fact := range facts {
+		postRequest := operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "")
 		wg.Add(1)
-		go func() {
+		go func(in *biz.OperationalFactStatusMutation) {
 			defer wg.Done()
 			<-start
-			_, err := factUC.PostProductionFact(ctx, id)
+			_, err := factUC.PostProductionFact(ctx, in)
 			errs <- err
-		}()
+		}(postRequest)
 	}
 	close(start)
 	wg.Wait()
@@ -112,20 +214,22 @@ func TestProductionWIPConcessionKeepsRejectedInspectionAndAcceptsBatch(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
+	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
+	factUC := biz.NewOperationalFactUsecase(factRepo)
 	batchID, inspectionID := fixture.batch.ID, rejected.ID
 	decision, err := factUC.SubmitProductionException(f.ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-CONCESSION-1", DecisionType: biz.ProductionExceptionWIPConcession, ProductionOrderID: fixture.order.ID, ProductionOrderItemID: fixture.item.ID, ProductionWIPBatchID: &batchID, QualityInspectionID: &inspectionID, RequestedQuantity: fixture.batch.Quantity, Reason: "客户让步接收", IdempotencyKey: "ex-concession-1", RequestedBy: f.actorID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	approved, err := factUC.ApproveProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: f.actorID, Reason: "批准让步"})
+	approver := f.client.AdminUser.Create().SetUsername("wip-concession-approver").SetPasswordHash("test-password-hash").SaveX(f.ctx)
+	approved, err := factRepo.decideProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, Reason: "批准让步"}, biz.ProductionExceptionApproved, nil, nil)
 	if err != nil || approved.Status != biz.ProductionExceptionApproved {
 		t.Fatalf("approved=%#v err=%v", approved, err)
 	}
 	if current := f.client.ProductionWIPBatch.GetX(f.ctx, batchID); current.Status != biz.ProductionWIPStatusRejected {
 		t.Fatalf("approval must not change WIP, got %s", current.Status)
 	}
-	applied, err := factUC.ExecuteProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行让步"})
+	applied, err := factRepo.executeProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行让步"}, nil, nil)
 	if err != nil || applied.ExecutionStatus != biz.ProductionExceptionExecutionApplied {
 		t.Fatalf("applied=%#v err=%v", applied, err)
 	}
@@ -138,7 +242,7 @@ func TestProductionWIPConcessionKeepsRejectedInspectionAndAcceptsBatch(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := factUC.ReverseProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: applied.ID, ExpectedVersion: applied.Version, ActorID: f.actorID, Reason: "撤销让步"}); !errors.Is(err, biz.ErrProductionExceptionSourceInvalid) {
+	if _, err := factUC.ReverseProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: applied.ID, ExpectedVersion: applied.Version, ActorID: f.actorID, Reason: "撤销让步"}); !errors.Is(err, biz.ErrProductionExceptionWIPDependency) {
 		t.Fatalf("reverse with active downstream err=%v", err)
 	}
 	f.client.ProductionWIPBatch.UpdateOneID(child.ID).SetStatus(biz.ProductionWIPStatusCancelled).AddVersion(1).SaveX(f.ctx)
@@ -151,19 +255,27 @@ func TestProductionWIPConcessionKeepsRejectedInspectionAndAcceptsBatch(t *testin
 func TestProductionWIPScrapIsNonInventoryAndCancelsWholeBatch(t *testing.T) {
 	f := openProductionWIPQualityTestFixture(t, "production_wip_scrap_decision")
 	fixture := f.createWaitingBatch(t, "SCRAP-DECISION", []string{biz.ProductionWIPQualityGateFinishedGoods})
-	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
-	batchID := fixture.batch.ID
-	f.client.ProductionWIPBatch.UpdateOneID(batchID).SetStatus(biz.ProductionWIPStatusRejected).SaveX(f.ctx)
+	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
+	factUC := biz.NewOperationalFactUsecase(factRepo)
+	if _, err := f.uc.SubmitQualityInspection(f.ctx, fixture.inspection.ID); err != nil {
+		t.Fatal(err)
+	}
+	rejected, err := f.uc.RejectQualityInspection(f.ctx, approximateQualityInspectionDecision(fixture.inspection.ID, biz.QualityInspectionResultReject))
+	if err != nil {
+		t.Fatal(err)
+	}
+	batchID, inspectionID := fixture.batch.ID, rejected.ID
 	before := f.client.InventoryTxn.Query().CountX(f.ctx)
-	decision, err := factUC.SubmitProductionException(f.ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-SCRAP-WIP-1", DecisionType: biz.ProductionExceptionScrap, ProductionOrderID: fixture.order.ID, ProductionOrderItemID: fixture.item.ID, ProductionWIPBatchID: &batchID, RequestedQuantity: fixture.batch.Quantity, Reason: "在制整批报废", IdempotencyKey: "ex-scrap-wip-1", RequestedBy: f.actorID})
+	decision, err := factUC.SubmitProductionException(f.ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-SCRAP-WIP-1", DecisionType: biz.ProductionExceptionScrap, ProductionOrderID: fixture.order.ID, ProductionOrderItemID: fixture.item.ID, ProductionWIPBatchID: &batchID, QualityInspectionID: &inspectionID, RequestedQuantity: fixture.batch.Quantity, Reason: "在制整批报废", IdempotencyKey: "ex-scrap-wip-1", RequestedBy: f.actorID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	approved, err := factUC.ApproveProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: f.actorID, Reason: "批准报废"})
+	approver := f.client.AdminUser.Create().SetUsername("wip-scrap-approver").SetPasswordHash("test-password-hash").SaveX(f.ctx)
+	approved, err := factRepo.decideProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, Reason: "批准报废"}, biz.ProductionExceptionApproved, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := factUC.ExecuteProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行报废"}); err != nil {
+	if _, err := factRepo.executeProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行报废"}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	batch := f.client.ProductionWIPBatch.GetX(f.ctx, batchID)
@@ -173,56 +285,12 @@ func TestProductionWIPScrapIsNonInventoryAndCancelsWholeBatch(t *testing.T) {
 	}
 }
 
-func TestProductionStockedScrapPostsOutAndCancelReverses(t *testing.T) {
+func TestProductionStockedScrapSourceIsRejected(t *testing.T) {
 	f := openProductionWIPQualityTestFixture(t, "production_stocked_scrap_decision")
 	fixture := f.createWaitingBatch(t, "STOCKED-SCRAP", []string{biz.ProductionWIPQualityGateFinishedGoods})
-	logger := log.NewStdLogger(io.Discard)
-	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(f.data, logger))
-	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, logger))
-	warehouse := createTestWarehouse(t, f.ctx, f.client, "SCRAP-FG-WH")
-	lot := createTestInventoryLot(t, f.ctx, inventoryUC, biz.InventorySubjectProduct, f.productID, "SCRAP-FG-LOT")
-	if _, err := inventoryUC.ApplyInventoryTxnAndUpdateBalance(f.ctx, &biz.InventoryTxnCreate{SubjectType: biz.InventorySubjectProduct, SubjectID: f.productID, WarehouseID: warehouse.ID, LotID: &lot.ID, UnitID: f.unitID, TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(2), SourceType: "TEST_STOCKED_SCRAP", IdempotencyKey: "test-stocked-scrap"}); err != nil {
-		t.Fatal(err)
-	}
-	sourceType, orderID, itemID := biz.ProductionOrderSourceType, fixture.order.ID, fixture.item.ID
-	sourceFact := f.client.ProductionFact.Create().SetFactNo("PF-STOCKED-SCRAP-SOURCE").SetFactType(biz.ProductionFactFinishedGoodsReceipt).SetStatus(biz.OperationalFactStatusDraft).SetSubjectType(biz.InventorySubjectProduct).SetSubjectID(f.productID).SetWarehouseID(warehouse.ID).SetUnitID(f.unitID).SetLotID(lot.ID).SetQuantity(decimal.NewFromInt(2)).SetSourceType(sourceType).SetSourceID(orderID).SetSourceLineID(itemID).SetIdempotencyKey("pf-stocked-scrap-source").SaveX(f.ctx)
-	if _, err := f.data.sqldb.ExecContext(
-		f.ctx,
-		"UPDATE production_facts SET status = ?, posted_at = ?, updated_at = ? WHERE id = ?",
-		biz.OperationalFactStatusPosted,
-		time.Now().UTC(),
-		time.Now().UTC(),
-		sourceFact.ID,
-	); err != nil {
-		t.Fatalf("prepare posted source fact fixture: %v", err)
-	}
-	f.client.InventoryLot.UpdateOneID(lot.ID).SetStatus(biz.InventoryLotRejected).SaveX(f.ctx)
-	result := biz.QualityInspectionResultReject
-	inspection := f.client.QualityInspection.Create().SetInspectionNo("QI-STOCKED-SCRAP").SetInventoryLotID(lot.ID).SetWarehouseID(warehouse.ID).SetSourceType(biz.QualityInspectionSourceShipment).SetSourceID(999).SetInspectionType(biz.QualityInspectionTypeFinishedGoods).SetSubjectType(biz.QualityInspectionSubjectProduct).SetSubjectID(f.productID).SetStatus(biz.QualityInspectionStatusRejected).SetResult(result).SaveX(f.ctx)
-	inspectionID := inspection.ID
-	decision, err := factUC.SubmitProductionException(f.ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-SCRAP-FG-1", DecisionType: biz.ProductionExceptionScrap, ProductionOrderID: orderID, ProductionOrderItemID: itemID, QualityInspectionID: &inspectionID, RequestedQuantity: decimal.NewFromInt(1), Reason: "成品报废", IdempotencyKey: "ex-scrap-fg-1", RequestedBy: f.actorID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	approved, err := factUC.ApproveProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: f.actorID, Reason: "批准成品报废"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	applied, err := factUC.ExecuteProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行成品报废"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertProductionStockedScrapBalance(t, f.ctx, inventoryUC, f.productID, warehouse.ID, lot.ID, f.unitID, decimal.NewFromInt(1))
-	if _, err := factUC.ReverseProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: applied.ID, ExpectedVersion: applied.Version, ActorID: f.actorID, Reason: "撤销误报废"}); err != nil {
-		t.Fatal(err)
-	}
-	assertProductionStockedScrapBalance(t, f.ctx, inventoryUC, f.productID, warehouse.ID, lot.ID, f.unitID, decimal.NewFromInt(2))
-}
-
-func assertProductionStockedScrapBalance(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, productID, warehouseID, lotID, unitID int, want decimal.Decimal) {
-	t.Helper()
-	got, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectProduct, SubjectID: productID, WarehouseID: warehouseID, LotID: &lotID, UnitID: unitID})
-	if err != nil || !got.Quantity.Equal(want) {
-		t.Fatalf("balance=%#v err=%v want=%s", got, err, want)
+	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
+	_, err := factUC.SubmitProductionException(f.ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-SCRAP-FG-1", DecisionType: biz.ProductionExceptionScrap, ProductionOrderID: fixture.order.ID, ProductionOrderItemID: fixture.item.ID, RequestedQuantity: decimal.NewFromInt(1), Reason: "成品报废", IdempotencyKey: "ex-scrap-fg-1", RequestedBy: f.actorID})
+	if !errors.Is(err, biz.ErrProductionExceptionSourceInvalid) {
+		t.Fatalf("stocked scrap source err=%v", err)
 	}
 }

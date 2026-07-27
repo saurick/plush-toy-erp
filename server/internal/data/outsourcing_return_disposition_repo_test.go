@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/productionwipbatch"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -20,7 +21,11 @@ func TestOutsourcingReturnToVendorPostsOutAndCancelsWithReversal(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
-	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, factUC, fixtures, "DISPOSITION")
+	creator := client.AdminUser.Create().SetUsername("outsourcing-disposition-creator").SetPasswordHash("test-password-hash").SaveX(ctx)
+	poster := client.AdminUser.Create().SetUsername("outsourcing-disposition-poster").SetPasswordHash("test-password-hash").SaveX(ctx)
+	canceller := client.AdminUser.Create().SetUsername("outsourcing-disposition-canceller").SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, factUC, fixtures, poster.ID, "DISPOSITION")
+	linkRejectedOutsourcingReturnBatchForDisposition(t, ctx, data, client, fact, "OUT-RETURN")
 	inspection, err := inventoryUC.CreateQualityInspectionFromOutsourcingReturn(ctx, &biz.QualityInspectionFromOutsourcingReturnCreate{InspectionNo: "QI-OUT-DISPOSITION", OutsourcingFactID: fact.ID})
 	if err != nil {
 		t.Fatal(err)
@@ -32,19 +37,19 @@ func TestOutsourcingReturnToVendorPostsOutAndCancelsWithReversal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := factUC.CreateOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionCreate{DispositionNo: "OD-RETURN-1", QualityInspectionID: rejected.ID, DispositionType: biz.OutsourcingDispositionReturnToVendor, Quantity: decimal.NewFromInt(1), Reason: "退回加工商", IdempotencyKey: "od-return-1", CreatedBy: 1})
+	created, err := factUC.CreateOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionCreate{DispositionNo: "OD-RETURN-1", QualityInspectionID: rejected.ID, DispositionType: biz.OutsourcingDispositionReturnToVendor, Quantity: decimal.NewFromInt(1), Reason: "退回加工商", IdempotencyKey: "od-return-1", CreatedBy: creator.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	posted, err := factUC.PostOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: created.Version, ActorID: 2})
+	posted, err := factUC.PostOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: created.Version, ActorID: poster.ID})
 	if err != nil || posted.Status != biz.OutsourcingDispositionPosted {
 		t.Fatalf("posted=%#v err=%v", posted, err)
 	}
 	assertOutsourcingDispositionBalance(t, ctx, inventoryUC, fact, decimal.NewFromInt(1))
-	if _, err := factUC.CancelOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: posted.Version + 1, ActorID: 3, Reason: "过期页面撤销"}); !errors.Is(err, biz.ErrOutsourcingDispositionConflict) {
+	if _, err := factUC.CancelOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: posted.Version + 1, ActorID: canceller.ID, Reason: "过期页面撤销"}); !errors.Is(err, biz.ErrOutsourcingDispositionConflict) {
 		t.Fatalf("stale cancel err=%v", err)
 	}
-	cancelled, err := factUC.CancelOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: posted.Version, ActorID: 3, Reason: "撤销退回"})
+	cancelled, err := factUC.CancelOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: posted.Version, ActorID: canceller.ID, Reason: "撤销退回"})
 	if err != nil || cancelled.Status != biz.OutsourcingDispositionCancelled {
 		t.Fatalf("cancelled=%#v err=%v", cancelled, err)
 	}
@@ -58,7 +63,9 @@ func TestOutsourcingReturnToVendorBlockedByActivePayable(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
-	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, factUC, fixtures, "DISPOSITION-AP")
+	actor := client.AdminUser.Create().SetUsername("outsourcing-disposition-payable-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, factUC, fixtures, actor.ID, "DISPOSITION-AP")
+	linkRejectedOutsourcingReturnBatchForDisposition(t, ctx, data, client, fact, "OUT-RETURN-AP")
 	inspection, err := inventoryUC.CreateQualityInspectionFromOutsourcingReturn(ctx, &biz.QualityInspectionFromOutsourcingReturnCreate{InspectionNo: "QI-OUT-DISPOSITION-AP", OutsourcingFactID: fact.ID})
 	if err != nil {
 		t.Fatal(err)
@@ -70,12 +77,12 @@ func TestOutsourcingReturnToVendorBlockedByActivePayable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := factUC.CreateOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionCreate{DispositionNo: "OD-RETURN-AP", QualityInspectionID: rejected.ID, DispositionType: biz.OutsourcingDispositionReturnToVendor, Quantity: decimal.NewFromInt(1), Reason: "退回加工商", IdempotencyKey: "od-return-ap", CreatedBy: 1})
+	created, err := factUC.CreateOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionCreate{DispositionNo: "OD-RETURN-AP", QualityInspectionID: rejected.ID, DispositionType: biz.OutsourcingDispositionReturnToVendor, Quantity: decimal.NewFromInt(1), Reason: "退回加工商", IdempotencyKey: "od-return-ap", CreatedBy: actor.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	client.FinanceFact.Create().SetFactNo("AP-OUT-DISPOSITION-BLOCK").SetFactType(biz.FinanceFactPayable).SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartyOther).SetAmount(decimal.NewFromInt(1)).SetSourceType(biz.OutsourcingFactSourceType).SetSourceID(fact.ID).SetIdempotencyKey("ap-out-disposition-block").SaveX(ctx)
-	if _, err := factUC.PostOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: created.Version, ActorID: 2}); !errors.Is(err, biz.ErrOutsourcingReturnFinanceDependency) {
+	if _, err := factUC.PostOutsourcingReturnDisposition(ctx, &biz.OutsourcingReturnDispositionMutation{ID: created.ID, ExpectedVersion: created.Version, ActorID: actor.ID}); !errors.Is(err, biz.ErrOutsourcingReturnFinanceDependency) {
 		t.Fatalf("active payable err=%v", err)
 	}
 }
@@ -87,7 +94,8 @@ func TestOutsourcingRejectedReturnReworkCreatesExplicitWIPChild(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
-	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, factUC, fixtures, "REWORK-DISPOSITION")
+	actor := client.AdminUser.Create().SetUsername("outsourcing-rework-disposition-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, factUC, fixtures, actor.ID, "REWORK-DISPOSITION")
 	inspection, err := inventoryUC.CreateQualityInspectionFromOutsourcingReturn(ctx, &biz.QualityInspectionFromOutsourcingReturnCreate{InspectionNo: "QI-OUT-REWORK-DISPOSITION", OutsourcingFactID: fact.ID})
 	if err != nil {
 		t.Fatal(err)
@@ -115,6 +123,32 @@ func TestOutsourcingRejectedReturnReworkCreatesExplicitWIPChild(t *testing.T) {
 	if len(children) != 1 || !children[0].Quantity.Equal(decimal.NewFromInt(1)) {
 		t.Fatalf("children=%#v", children)
 	}
+}
+
+func linkRejectedOutsourcingReturnBatchForDisposition(
+	t *testing.T,
+	ctx context.Context,
+	data *Data,
+	client *ent.Client,
+	fact *biz.OutsourcingFact,
+	suffix string,
+) int {
+	t.Helper()
+	if fact == nil || fact.SourceLineID == nil {
+		t.Fatal("outsourcing return disposition fixture requires an exact source line")
+	}
+	wip := newProductionWIPQualityTestFixture(t, ctx, data, client, suffix)
+	source := wip.createWaitingBatch(t, suffix, []string{biz.ProductionWIPQualityGateFinishedGoods})
+	client.ProductionWIPBatch.UpdateOneID(source.batch.ID).SetStatus(biz.ProductionWIPStatusRejected).SaveX(ctx)
+	client.ProductionWIPOutsourcingAllocation.Create().
+		SetProductionWipBatchID(source.batch.ID).
+		SetOutsourcingOrderItemID(*fact.SourceLineID).
+		SetSubjectType(biz.OutsourcingOrderSubjectProduct).
+		SetAllocatedQuantity(source.batch.Quantity).
+		SetUnitID(wip.unitID).
+		SetCreatedBy(wip.actorID).
+		SaveX(ctx)
+	return source.batch.ID
 }
 
 func assertOutsourcingDispositionBalance(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, fact *biz.OutsourcingFact, want decimal.Decimal) {

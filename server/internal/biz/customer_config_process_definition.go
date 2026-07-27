@@ -111,6 +111,23 @@ func processDomainCommandReferencedModuleKeys(commandKey string) []string {
 		return []string{"shipments", "inventory", "workflow_tasks"}
 	case ProcessDomainCommandFinanceReceivableLead:
 		return []string{"shipments", "finance"}
+	case ProcessDomainCommandSalesReturnApprove,
+		ProcessDomainCommandSalesReturnReject,
+		ProcessDomainCommandSalesReturnReceive:
+		return []string{"sales_returns", "shipments", "quality_inspections", "inventory", "workflow_tasks"}
+	case ProcessDomainCommandFinancePaymentApprove,
+		ProcessDomainCommandFinancePaymentReject,
+		ProcessDomainCommandFinancePaymentPost:
+		return []string{"finance", "finance_payments", "customers", "suppliers", "workflow_tasks"}
+	case ProcessDomainCommandInventoryAdjustmentSubmit,
+		ProcessDomainCommandInventoryAdjustmentApprove,
+		ProcessDomainCommandInventoryAdjustmentReject,
+		ProcessDomainCommandInventoryAdjustmentPost:
+		return []string{"inventory", "workflow_tasks"}
+	case ProcessDomainCommandProductionExceptionApprove,
+		ProcessDomainCommandProductionExceptionReject,
+		ProcessDomainCommandProductionExceptionExecute:
+		return []string{"production", "quality_inspections", "inventory", "workflow_tasks"}
 	default:
 		return []string{}
 	}
@@ -170,6 +187,14 @@ func defaultProcessReferencedModuleKeys(processKey string, businessRefType strin
 		return []string{"purchase_orders", "workflow_tasks"}
 	case ProcessKeyFinishedGoodsDelivery:
 		return []string{"shipments", "workflow_tasks", "finance"}
+	case ProcessKeySalesReturnApproval:
+		return []string{"sales_returns", "shipments", "quality_inspections", "inventory", "workflow_tasks"}
+	case ProcessKeyFinancePaymentApproval:
+		return []string{"finance", "finance_payments", "customers", "suppliers", "workflow_tasks"}
+	case ProcessKeyInventoryAdjustmentApproval:
+		return []string{"inventory", "workflow_tasks"}
+	case ProcessKeyProductionExceptionApproval:
+		return []string{"production", "quality_inspections", "inventory", "workflow_tasks"}
 	default:
 		return []string{}
 	}
@@ -184,6 +209,10 @@ func customerConfigRuntimeProcessKeysForModule(moduleKey string) []string {
 		ProcessKeySalesOrderAcceptance,
 		ProcessKeyMaterialSupply,
 		ProcessKeyFinishedGoodsDelivery,
+		ProcessKeySalesReturnApproval,
+		ProcessKeyFinancePaymentApproval,
+		ProcessKeyInventoryAdjustmentApproval,
+		ProcessKeyProductionExceptionApproval,
 	}
 	out := []string{}
 	for _, processKey := range processKeys {
@@ -244,7 +273,7 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 		if nodeKey == "" || nodeType == "" {
 			return nil, ErrBadParam
 		}
-		if nodeType == ProcessNodeTypeApproval && requiredCapabilityKey != PermissionWorkflowTaskApprove {
+		if nodeType == ProcessNodeTypeApproval && !IsWorkflowApprovalCapabilityKey(requiredCapabilityKey) {
 			return nil, ErrBadParam
 		}
 		policySnapshot, err := mapFromAnyValue(nodeDefinition["policy_snapshot"])
@@ -363,6 +392,14 @@ func customerConfigProcessBusinessRefAllowed(processKey, businessRefType string)
 		return businessRefType == "purchase_order"
 	case ProcessKeyFinishedGoodsDelivery:
 		return businessRefType == "shipment"
+	case ProcessKeySalesReturnApproval:
+		return businessRefType == "sales_return"
+	case ProcessKeyFinancePaymentApproval:
+		return businessRefType == "finance_payment"
+	case ProcessKeyInventoryAdjustmentApproval:
+		return businessRefType == "inventory_operation"
+	case ProcessKeyProductionExceptionApproval:
+		return businessRefType == "production_exception_decision"
 	default:
 		return false
 	}
@@ -407,6 +444,64 @@ func customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey
 			return commandKey == ProcessDomainCommandShipmentShip
 		case "receivable_lead":
 			return commandKey == ProcessDomainCommandFinanceReceivableLead
+		default:
+			return false
+		}
+	case ProcessKeySalesReturnApproval:
+		if businessRefType != "sales_return" {
+			return false
+		}
+		switch nodeKey {
+		case "approve_sales_return":
+			return commandKey == ProcessDomainCommandSalesReturnApprove
+		case "receive_sales_return":
+			return commandKey == ProcessDomainCommandSalesReturnReceive
+		case "reject_sales_return":
+			return commandKey == ProcessDomainCommandSalesReturnReject
+		default:
+			return false
+		}
+	case ProcessKeyFinancePaymentApproval:
+		if businessRefType != "finance_payment" {
+			return false
+		}
+		switch nodeKey {
+		case "approve_finance_payment":
+			return commandKey == ProcessDomainCommandFinancePaymentApprove
+		case "post_finance_payment":
+			return commandKey == ProcessDomainCommandFinancePaymentPost
+		case "reject_finance_payment":
+			return commandKey == ProcessDomainCommandFinancePaymentReject
+		default:
+			return false
+		}
+	case ProcessKeyInventoryAdjustmentApproval:
+		if businessRefType != "inventory_operation" {
+			return false
+		}
+		switch nodeKey {
+		case "submit_inventory_adjustment":
+			return commandKey == ProcessDomainCommandInventoryAdjustmentSubmit
+		case "approve_inventory_adjustment":
+			return commandKey == ProcessDomainCommandInventoryAdjustmentApprove
+		case "post_inventory_adjustment":
+			return commandKey == ProcessDomainCommandInventoryAdjustmentPost
+		case "reject_inventory_adjustment":
+			return commandKey == ProcessDomainCommandInventoryAdjustmentReject
+		default:
+			return false
+		}
+	case ProcessKeyProductionExceptionApproval:
+		if businessRefType != "production_exception_decision" {
+			return false
+		}
+		switch nodeKey {
+		case "approve_production_exception":
+			return commandKey == ProcessDomainCommandProductionExceptionApprove
+		case "execute_production_exception":
+			return commandKey == ProcessDomainCommandProductionExceptionExecute
+		case "reject_production_exception":
+			return commandKey == ProcessDomainCommandProductionExceptionReject
 		default:
 			return false
 		}
@@ -502,7 +597,13 @@ func customerConfigProcessManifestCanStart(status string) bool {
 
 func customerConfigRuntimeBuilderRegistered(processKey string) bool {
 	switch processKey {
-	case ProcessKeySalesOrderAcceptance, ProcessKeyMaterialSupply, ProcessKeyFinishedGoodsDelivery:
+	case ProcessKeySalesOrderAcceptance,
+		ProcessKeyMaterialSupply,
+		ProcessKeyFinishedGoodsDelivery,
+		ProcessKeySalesReturnApproval,
+		ProcessKeyFinancePaymentApproval,
+		ProcessKeyInventoryAdjustmentApproval,
+		ProcessKeyProductionExceptionApproval:
 		return true
 	default:
 		return false

@@ -23,6 +23,7 @@ func TestOperationalFactRepo_SourceLessProductionDraftCannotPost(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "operational_fact_production")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	actor := client.AdminUser.Create().SetUsername("source-less-production-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 
 	fact, err := repo.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
 		FactNo:         "PF-001",
@@ -37,7 +38,7 @@ func TestOperationalFactRepo_SourceLessProductionDraftCannotPost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create production fact failed: %v", err)
 	}
-	if _, err := repo.PostProductionFact(ctx, fact.ID); !errors.Is(err, biz.ErrProductionOrderFactSourceInvalid) {
+	if _, err := repo.PostProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "")); !errors.Is(err, biz.ErrProductionOrderFactSourceInvalid) {
 		t.Fatalf("source-less production post error = %v", err)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionFactSourceType)).CountX(ctx); count != 0 {
@@ -326,7 +327,8 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	if err != nil {
 		t.Fatalf("create production completion failed: %v", err)
 	}
-	if _, err := uc.PostProductionFact(ctx, fact.ID); err != nil {
+	postedFact, err := uc.PostProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post production fact failed: %v", err)
 	}
 	reservation, err := uc.CreateStockReservation(ctx, &biz.StockReservationCreate{
@@ -344,7 +346,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	if _, err := client.Product.UpdateOneID(fixtures.productID).SetIsActive(false).Save(ctx); err != nil {
 		t.Fatalf("disable product failed: %v", err)
 	}
-	if cancelled, err := uc.CancelPostedProductionFact(ctx, fact.ID); err != nil {
+	if cancelled, err := uc.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedFact.ID, postedFact.Version, actor.ID, "停用主数据后撤销历史完工")); err != nil {
 		t.Fatalf("cancel posted production fact should not be blocked by inactive product: %v", err)
 	} else if cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("expected cancelled production fact, got %s", cancelled.Status)
@@ -672,6 +674,7 @@ func TestOperationalFactRepo_SourceLessOutsourcingDraftCannotPost(t *testing.T) 
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	actor := client.AdminUser.Create().SetUsername("source-less-outsourcing-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
@@ -699,7 +702,7 @@ func TestOperationalFactRepo_SourceLessOutsourcingDraftCannotPost(t *testing.T) 
 	if err != nil {
 		t.Fatalf("create outsourcing fact failed: %v", err)
 	}
-	if _, err := repo.PostOutsourcingFact(ctx, fact.ID); !errors.Is(err, biz.ErrOutsourcingOrderFactSourceInvalid) {
+	if _, err := repo.PostOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "")); !errors.Is(err, biz.ErrOutsourcingOrderFactSourceInvalid) {
 		t.Fatalf("source-less outsourcing post error = %v", err)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType)).CountX(ctx); count != 0 {
@@ -712,6 +715,7 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 	data, client := openInventoryRepoTestData(t, "operational_fact_outsourcing_inactive_refs")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	actor := client.AdminUser.Create().SetUsername("inactive-outsourcing-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	source := createOutsourcingFactSourceFixture(t, ctx, client, fixtures, "INACTIVE-HISTORY", decimal.NewFromInt(1))
 	lotNo := "OF-INACTIVE-HISTORY-LOT"
 	fact, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
@@ -721,13 +725,14 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 	if err != nil {
 		t.Fatalf("create outsourcing fact failed: %v", err)
 	}
-	if _, err := uc.PostOutsourcingFact(ctx, fact.ID); err != nil {
+	postedFact, err := uc.PostOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post outsourcing fact failed: %v", err)
 	}
 	if _, err := client.Product.UpdateOneID(fixtures.productID).SetIsActive(false).Save(ctx); err != nil {
 		t.Fatalf("disable product failed: %v", err)
 	}
-	if cancelled, err := uc.CancelPostedOutsourcingFact(ctx, fact.ID); err != nil {
+	if cancelled, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(postedFact.ID, postedFact.Version, actor.ID, "停用主数据后撤销委外事实")); err != nil {
 		t.Fatalf("cancel posted outsourcing fact should not be blocked by inactive product: %v", err)
 	} else if cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("expected cancelled outsourcing fact, got %s", cancelled.Status)
@@ -1669,6 +1674,7 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewOperationalFactUsecase(repo)
+	actor := client.AdminUser.Create().SetUsername("shipment-finance-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
@@ -1799,15 +1805,18 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	if receivable.InvoiceCategory == nil || *receivable.InvoiceCategory != biz.FinanceInvoiceCategoryNone {
 		t.Fatalf("expected receivable invoice category persisted, got %#v", receivable.InvoiceCategory)
 	}
-	posted, err := uc.PostFinanceFact(ctx, receivable.ID)
+	posted, err := uc.PostFinanceFact(ctx, operationalFactStatusMutation(receivable.ID, receivable.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post receivable failed: %v", err)
 	}
 	if posted.Status != biz.OperationalFactStatusPosted {
 		t.Fatalf("expected posted receivable, got %s", posted.Status)
 	}
-	if _, err := uc.SettleFinanceFact(ctx, receivable.ID); !errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed) {
-		t.Fatalf("receivable must settle through payment allocation, got %v", err)
+	if _, err := uc.SettleFinanceFact(ctx, operationalFactStatusMutation(posted.ID, posted.Version, actor.ID, "")); !errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed) {
+		t.Fatalf("receivable must settle only through posted payment allocations, got %v", err)
+	}
+	if current := client.FinanceFact.GetX(ctx, receivable.ID); current.Status != biz.OperationalFactStatusPosted {
+		t.Fatalf("failed direct settlement must preserve posted receivable, got %s", current.Status)
 	}
 
 	invoice, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
@@ -1854,7 +1863,7 @@ func TestOperationalFactUsecase_FinanceRejectsInactiveManualCounterparties(t *te
 	}
 	if _, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
 		FactNo:           "FIN-INACTIVE-CUSTOMER",
-		FactType:         biz.FinanceFactPayment,
+		FactType:         biz.FinanceFactReconciliation,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		CounterpartyID:   &customer.ID,
 		Amount:           decimal.NewFromInt(100),

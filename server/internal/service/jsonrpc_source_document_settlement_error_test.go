@@ -25,7 +25,7 @@ func TestSourceDocumentSettlementErrorsUseBusinessMessages(t *testing.T) {
 		{name: "purchase draft receipt", err: biz.ErrPurchaseOrderCloseDraftReceiptDependency, mapf: func(ctx context.Context, err error) string { return d.mapPurchaseOrderError(ctx, err).Message }, want: "采购订单存在待入账的入库草稿，不能关闭"},
 		{name: "purchase receipt", err: biz.ErrPurchaseOrderCancelReceiptDependency, mapf: func(ctx context.Context, err error) string { return d.mapPurchaseOrderError(ctx, err).Message }, want: "采购订单已生成未取消的入库单，不能取消"},
 		{name: "purchase process", err: biz.ErrPurchaseOrderLifecycleProcessDependency, mapf: func(ctx context.Context, err error) string { return d.mapPurchaseOrderError(ctx, err).Message }, want: "采购订单仍有进行中的备料流程，不能关闭或取消"},
-		{name: "purchase receipt correction", err: biz.ErrPurchaseReceiptCorrectionDependency, mapf: func(ctx context.Context, err error) string { return d.mapPurchaseError(ctx, err).Message }, want: "采购入库仍有未取消的退货或调整单，不能取消"},
+		{name: "purchase receipt correction", err: biz.ErrPurchaseReceiptCorrectionDependency, mapf: func(ctx context.Context, err error) string { return d.mapPurchaseError(ctx, err).Message }, want: "采购入库仍有未取消的退货、调整或拒收补换处置，不能取消"},
 		{name: "production fact", err: biz.ErrProductionOrderFactDependency, mapf: func(ctx context.Context, err error) string { return d.mapProductionOrderError(ctx, err).Message }, want: "生产订单仍有未过账或未取消的领料、完工或返工记录，请先处理后再关闭或取消"},
 		{name: "outsourcing fact", err: biz.ErrOutsourcingOrderFactDependency, mapf: func(ctx context.Context, err error) string { return d.mapOutsourcingOrderError(ctx, err).Message }, want: "委外合同仍有未结清的发料或回货记录；关闭前请完成或取消草稿，取消合同前请先取消或冲正相关记录"},
 	}

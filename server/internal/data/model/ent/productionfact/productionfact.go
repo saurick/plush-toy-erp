@@ -21,6 +21,8 @@ const (
 	FieldFactType = "fact_type"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldVersion holds the string denoting the version field in the database.
+	FieldVersion = "version"
 	// FieldSubjectType holds the string denoting the subject_type field in the database.
 	FieldSubjectType = "subject_type"
 	// FieldSubjectID holds the string denoting the subject_id field in the database.
@@ -49,6 +51,14 @@ const (
 	FieldOccurredAtSpecified = "occurred_at_specified"
 	// FieldPostedAt holds the string denoting the posted_at field in the database.
 	FieldPostedAt = "posted_at"
+	// FieldPostedBy holds the string denoting the posted_by field in the database.
+	FieldPostedBy = "posted_by"
+	// FieldCancelledAt holds the string denoting the cancelled_at field in the database.
+	FieldCancelledAt = "cancelled_at"
+	// FieldCancelledBy holds the string denoting the cancelled_by field in the database.
+	FieldCancelledBy = "cancelled_by"
+	// FieldCancelReason holds the string denoting the cancel_reason field in the database.
+	FieldCancelReason = "cancel_reason"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -63,6 +73,10 @@ const (
 	EdgeProductSku = "product_sku"
 	// EdgeInventoryLot holds the string denoting the inventory_lot edge name in mutations.
 	EdgeInventoryLot = "inventory_lot"
+	// EdgePoster holds the string denoting the poster edge name in mutations.
+	EdgePoster = "poster"
+	// EdgeCanceller holds the string denoting the canceller edge name in mutations.
+	EdgeCanceller = "canceller"
 	// Table holds the table name of the productionfact in the database.
 	Table = "production_facts"
 	// WarehouseTable is the table that holds the warehouse relation/edge.
@@ -93,6 +107,20 @@ const (
 	InventoryLotInverseTable = "inventory_lots"
 	// InventoryLotColumn is the table column denoting the inventory_lot relation/edge.
 	InventoryLotColumn = "lot_id"
+	// PosterTable is the table that holds the poster relation/edge.
+	PosterTable = "production_facts"
+	// PosterInverseTable is the table name for the AdminUser entity.
+	// It exists in this package in order to avoid circular dependency with the "adminuser" package.
+	PosterInverseTable = "admin_users"
+	// PosterColumn is the table column denoting the poster relation/edge.
+	PosterColumn = "posted_by"
+	// CancellerTable is the table that holds the canceller relation/edge.
+	CancellerTable = "production_facts"
+	// CancellerInverseTable is the table name for the AdminUser entity.
+	// It exists in this package in order to avoid circular dependency with the "adminuser" package.
+	CancellerInverseTable = "admin_users"
+	// CancellerColumn is the table column denoting the canceller relation/edge.
+	CancellerColumn = "cancelled_by"
 )
 
 // Columns holds all SQL columns for productionfact fields.
@@ -101,6 +129,7 @@ var Columns = []string{
 	FieldFactNo,
 	FieldFactType,
 	FieldStatus,
+	FieldVersion,
 	FieldSubjectType,
 	FieldSubjectID,
 	FieldProductSkuID,
@@ -115,6 +144,10 @@ var Columns = []string{
 	FieldOccurredAt,
 	FieldOccurredAtSpecified,
 	FieldPostedAt,
+	FieldPostedBy,
+	FieldCancelledAt,
+	FieldCancelledBy,
+	FieldCancelReason,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -145,6 +178,10 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultVersion holds the default value on creation for the "version" field.
+	DefaultVersion int
+	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	VersionValidator func(int) error
 	// SubjectTypeValidator is a validator for the "subject_type" field. It is called by the builders before save.
 	SubjectTypeValidator func(string) error
 	// SubjectIDValidator is a validator for the "subject_id" field. It is called by the builders before save.
@@ -169,6 +206,12 @@ var (
 	DefaultOccurredAt func() time.Time
 	// DefaultOccurredAtSpecified holds the default value on creation for the "occurred_at_specified" field.
 	DefaultOccurredAtSpecified bool
+	// PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
+	PostedByValidator func(int) error
+	// CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
+	CancelledByValidator func(int) error
+	// CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
+	CancelReasonValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -200,6 +243,11 @@ func ByFactType(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByVersion orders the results by the version field.
+func ByVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVersion, opts...).ToFunc()
 }
 
 // BySubjectType orders the results by the subject_type field.
@@ -272,6 +320,26 @@ func ByPostedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPostedAt, opts...).ToFunc()
 }
 
+// ByPostedBy orders the results by the posted_by field.
+func ByPostedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPostedBy, opts...).ToFunc()
+}
+
+// ByCancelledAt orders the results by the cancelled_at field.
+func ByCancelledAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelledAt, opts...).ToFunc()
+}
+
+// ByCancelledBy orders the results by the cancelled_by field.
+func ByCancelledBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelledBy, opts...).ToFunc()
+}
+
+// ByCancelReason orders the results by the cancel_reason field.
+func ByCancelReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCancelReason, opts...).ToFunc()
+}
+
 // ByNote orders the results by the note field.
 func ByNote(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNote, opts...).ToFunc()
@@ -314,6 +382,20 @@ func ByInventoryLotField(field string, opts ...sql.OrderTermOption) OrderOption 
 		sqlgraph.OrderByNeighborTerms(s, newInventoryLotStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByPosterField orders the results by poster field.
+func ByPosterField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPosterStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByCancellerField orders the results by canceller field.
+func ByCancellerField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCancellerStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newWarehouseStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -340,5 +422,19 @@ func newInventoryLotStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(InventoryLotInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, InventoryLotTable, InventoryLotColumn),
+	)
+}
+func newPosterStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PosterInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, PosterTable, PosterColumn),
+	)
+}
+func newCancellerStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CancellerInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, CancellerTable, CancellerColumn),
 	)
 }

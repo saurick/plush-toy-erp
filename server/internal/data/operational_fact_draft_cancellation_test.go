@@ -42,7 +42,7 @@ func TestProductionOrderLinkedDraftFactsCancelWithoutInventory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cancelled, err := factUC.CancelPostedProductionFact(ctx, fact.ID)
+		cancelled, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "完工入库草稿作废"))
 		if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.PostedAt != nil {
 			t.Fatalf("draft completion cancel=%#v err=%v", cancelled, err)
 		}
@@ -64,7 +64,7 @@ func TestProductionOrderLinkedDraftFactsCancelWithoutInventory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cancelled, err := factUC.CancelPostedProductionFact(ctx, fact.ID)
+		cancelled, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "领料草稿作废"))
 		if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.PostedAt != nil {
 			t.Fatalf("draft material issue cancel=%#v err=%v", cancelled, err)
 		}
@@ -90,6 +90,7 @@ func TestOutsourcingOrderLinkedDraftFactsCancelWithoutInventoryAndReleaseParent(
 	logger := log.NewStdLogger(io.Discard)
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	orderRepo := NewOutsourcingOrderRepo(data, logger)
+	actor := client.AdminUser.Create().SetUsername("outsourcing-draft-fact-cancel").SetPasswordHash("test-password-hash").SaveX(ctx)
 
 	issue, err := factUC.CreateOutsourcingMaterialIssueFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
 		FactNo: "OUT-ISSUE-DRAFT-CANCEL", OutsourcingOrderID: source.order.ID, OutsourcingOrderItemID: source.materialLine.ID,
@@ -107,7 +108,7 @@ func TestOutsourcingOrderLinkedDraftFactsCancelWithoutInventoryAndReleaseParent(
 		t.Fatal(err)
 	}
 	for _, fact := range []*biz.OutsourcingFact{issue, returned} {
-		cancelled, cancelErr := factUC.CancelPostedOutsourcingFact(ctx, fact.ID)
+		cancelled, cancelErr := factUC.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "委外草稿事实作废"))
 		if cancelErr != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.PostedAt != nil {
 			t.Fatalf("cancel draft outsourcing fact=%#v err=%v", cancelled, cancelErr)
 		}
@@ -127,7 +128,7 @@ func TestOutsourcingOrderLinkedDraftFactsCancelWithoutInventoryAndReleaseParent(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := factUC.CancelPostedOutsourcingFact(ctx, cancelIssue.ID); err != nil {
+	if _, err := factUC.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(cancelIssue.ID, cancelIssue.Version, actor.ID, "委外发料草稿作废")); err != nil {
 		t.Fatalf("cancel draft outsourcing issue before parent cancellation: %v", err)
 	}
 	cancelledParent, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, cancelSource.order.ID, biz.OutsourcingOrderStatusCanceled)
@@ -161,20 +162,20 @@ func TestDraftOutsourcingReturnCancellationBlocksActiveQualityAndFinance(t *test
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).SetCounterpartyID(supplierID).
 		SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
 		SetSourceType(biz.OutsourcingFactSourceType).SetSourceID(fact.ID).SetIdempotencyKey("fin-out-draft-dependency").SaveX(ctx)
-	if _, err := uc.CancelPostedOutsourcingFact(ctx, fact.ID); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
+	if _, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "委外回货草稿作废")); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
 		t.Fatalf("active quality dependency error=%v", err)
 	}
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	if _, err := inventoryUC.CancelQualityInspection(ctx, inspection.ID, nil); err != nil {
 		t.Fatalf("cancel dependent quality inspection: %v", err)
 	}
-	if _, err := uc.CancelPostedOutsourcingFact(ctx, fact.ID); !errors.Is(err, biz.ErrOutsourcingReturnFinanceDependency) {
+	if _, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "委外回货草稿作废")); !errors.Is(err, biz.ErrOutsourcingReturnFinanceDependency) {
 		t.Fatalf("active finance dependency error=%v", err)
 	}
-	if _, err := repo.CancelPostedFinanceFact(ctx, finance.ID, actor.ID, "撤销未确认委外应付"); err != nil {
+	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(finance.ID, finance.Version, actor.ID, "撤销未确认委外应付")); err != nil {
 		t.Fatalf("cancel draft payable dependency: %v", err)
 	}
-	if _, err := uc.CancelPostedOutsourcingFact(ctx, fact.ID); err != nil {
+	if _, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "委外回货草稿作废")); err != nil {
 		t.Fatalf("cancel return after dependencies terminated: %v", err)
 	}
 }
@@ -212,7 +213,7 @@ func TestDraftOperationalFactCancellationRejectsMalformedSourceCoordinates(t *te
 		if _, err := f.data.sqldb.ExecContext(ctx, "UPDATE production_facts SET source_line_id = ? WHERE id = ?", released.Items[0].ID+999999, fact.ID); err != nil {
 			t.Fatalf("corrupt production source coordinate: %v", err)
 		}
-		if _, err := uc.CancelPostedProductionFact(ctx, fact.ID); !errors.Is(err, biz.ErrProductionOrderFactSourceInvalid) {
+		if _, err := uc.CancelPostedProductionFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "生产事实来源坐标异常")); !errors.Is(err, biz.ErrProductionOrderFactSourceInvalid) {
 			t.Fatalf("malformed production source cancellation error=%v", err)
 		}
 		assertOperationalFactHasZeroInventoryTxns(t, ctx, f.client, biz.ProductionFactSourceType, fact.ID)
@@ -223,6 +224,7 @@ func TestDraftOperationalFactCancellationRejectsMalformedSourceCoordinates(t *te
 		fixtures := createInventoryTestFixtures(t, ctx, client)
 		source := createOutsourcingFactSourceFixture(t, ctx, client, fixtures, "DRAFT-CANCEL-WRONG-SOURCE", decimal.NewFromInt(2))
 		uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+		actor := client.AdminUser.Create().SetUsername("outsourcing-draft-cancel-wrong-source").SetPasswordHash("test-password-hash").SaveX(ctx)
 		fact, err := uc.CreateOutsourcingMaterialIssueFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
 			FactNo: "OUT-DRAFT-CANCEL-WRONG-SOURCE", OutsourcingOrderID: source.order.ID,
 			OutsourcingOrderItemID: source.materialLine.ID, WarehouseID: fixtures.warehouseID,
@@ -234,7 +236,7 @@ func TestDraftOperationalFactCancellationRejectsMalformedSourceCoordinates(t *te
 		if _, err := data.sqldb.ExecContext(ctx, "UPDATE outsourcing_facts SET source_line_id = ? WHERE id = ?", source.productLine.ID, fact.ID); err != nil {
 			t.Fatalf("corrupt outsourcing source coordinate: %v", err)
 		}
-		if _, err := uc.CancelPostedOutsourcingFact(ctx, fact.ID); !errors.Is(err, biz.ErrOutsourcingOrderFactSourceInvalid) {
+		if _, err := uc.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "委外事实来源坐标异常")); !errors.Is(err, biz.ErrOutsourcingOrderFactSourceInvalid) {
 			t.Fatalf("malformed outsourcing source cancellation error=%v", err)
 		}
 		assertOperationalFactHasZeroInventoryTxns(t, ctx, client, biz.OutsourcingFactSourceType, fact.ID)
@@ -249,6 +251,7 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 	otherActor := client.AdminUser.Create().SetUsername("finance-source-draft-cancel-other").SetPasswordHash("test-password-hash").SaveX(ctx)
 	beforeTxns := client.InventoryTxn.Query().CountX(ctx)
 	firstCancelledID := 0
+	firstCancelledVersion := 0
 
 	types := []struct{ factType, sourceType, counterpartyType string }{
 		{biz.FinanceFactReceivable, biz.ShipmentSourceType, biz.FinanceCounterpartyCustomer},
@@ -262,30 +265,31 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 			SetFactType(test.factType).SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(test.counterpartyType).
 			SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
 			SetSourceType(test.sourceType).SetSourceID(1000 + index).SetIdempotencyKey("fin-draft-cancel-" + test.factType + "-" + test.sourceType).SaveX(ctx)
-		cancelled, err := repo.CancelPostedFinanceFact(ctx, row.ID, actor.ID, "来源草稿作废")
+		cancelled, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(row.ID, row.Version, actor.ID, "来源草稿作废"))
 		if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled || cancelled.PostedAt != nil || cancelled.SettledAt != nil ||
 			cancelled.CancelledAt == nil || cancelled.CancelledBy == nil || *cancelled.CancelledBy != actor.ID || cancelled.CancelReason == nil {
 			t.Fatalf("finance draft cancellation=%#v err=%v", cancelled, err)
 		}
-		replay, err := repo.CancelPostedFinanceFact(ctx, row.ID, actor.ID, "来源草稿作废")
+		replay, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(row.ID, row.Version, actor.ID, "来源草稿作废"))
 		if err != nil || replay.CancelledAt == nil || !replay.CancelledAt.Equal(*cancelled.CancelledAt) {
 			t.Fatalf("finance draft cancellation replay=%#v err=%v", replay, err)
 		}
-		if _, err := repo.CancelPostedFinanceFact(ctx, row.ID, actor.ID, "改写原因"); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(row.ID, row.Version, actor.ID, "改写原因")); !errors.Is(err, biz.ErrIdempotencyConflict) {
 			t.Fatalf("changed finance draft cancel intent error=%v", err)
 		}
 		if firstCancelledID == 0 {
 			firstCancelledID = row.ID
+			firstCancelledVersion = row.Version
 		}
 	}
-	if _, err := repo.CancelPostedFinanceFact(ctx, firstCancelledID, otherActor.ID, "来源草稿作废"); !errors.Is(err, biz.ErrIdempotencyConflict) {
+	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(firstCancelledID, firstCancelledVersion, otherActor.ID, "来源草稿作废")); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("changed finance draft cancel actor error=%v", err)
 	}
 	manual := client.FinanceFact.Create().SetFactNo("FIN-MANUAL-DRAFT-NO-CANCEL").SetFactType(biz.FinanceFactPayable).
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).
 		SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
 		SetIdempotencyKey("fin-manual-draft-no-cancel").SaveX(ctx)
-	if _, err := repo.CancelPostedFinanceFact(ctx, manual.ID, actor.ID, "手工草稿不得走来源作废"); !errors.Is(err, biz.ErrFinanceFactSourceInvalid) {
+	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(manual.ID, manual.Version, actor.ID, "手工草稿不得走来源作废")); !errors.Is(err, biz.ErrFinanceFactSourceInvalid) {
 		t.Fatalf("manual finance draft cancellation error=%v", err)
 	}
 	assertFinanceFactHasNoCancelAudit(t, ctx, client, manual.ID, biz.OperationalFactStatusDraft)
@@ -301,13 +305,13 @@ func TestFormalSourceFinanceDraftCancellationAuditsAndReplaysExactly(t *testing.
 		SetStatus(biz.OperationalFactStatusDraft).SetCounterpartyType(biz.FinanceCounterpartySupplier).
 		SetAmount(decimal.NewFromInt(1)).SetFeeAmount(decimal.Zero).SetCurrency(biz.FinanceCurrencyCNY).
 		SetSourceType(biz.FinanceFactSourceType).SetSourceID(source.ID).SetIdempotencyKey("fin-draft-recon-child").SaveX(ctx)
-	if _, err := repo.CancelPostedFinanceFact(ctx, source.ID, actor.ID, "有核对记录"); !errors.Is(err, biz.ErrFinanceReconciliationDependency) {
+	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(source.ID, source.Version, actor.ID, "有核对记录")); !errors.Is(err, biz.ErrFinanceReconciliationDependency) {
 		t.Fatalf("active reconciliation dependency error=%v", err)
 	}
-	if _, err := repo.CancelPostedFinanceFact(ctx, child.ID, actor.ID, "撤销核对草稿"); err != nil {
+	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(child.ID, child.Version, actor.ID, "撤销核对草稿")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.CancelPostedFinanceFact(ctx, source.ID, actor.ID, "有核对记录"); err != nil {
+	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(source.ID, source.Version, actor.ID, "有核对记录")); err != nil {
 		t.Fatal(err)
 	}
 	if active := client.FinanceFact.Query().Where(financefact.SourceType(biz.FinanceFactSourceType), financefact.SourceID(source.ID), financefact.StatusNEQ(biz.OperationalFactStatusCancelled)).CountX(ctx); active != 0 {

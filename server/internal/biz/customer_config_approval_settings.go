@@ -18,6 +18,8 @@ const (
 	ApprovalMemberStrategyPrimary    = "primary"
 	ApprovalMemberStrategyBackup     = "backup"
 	ApprovalMemberStrategyEscalation = "escalation"
+
+	approvalResponsibilityFixedByProcessContract = "approval_responsibility_fixed_by_process_contract"
 )
 
 type ApprovalSettingMemberInput struct {
@@ -110,30 +112,30 @@ var approvalSettingCatalog = []approvalSettingCatalogItem{
 	{
 		Key: "sales_return", Label: "客户退货审批", Domain: "销售 / 仓库",
 		Configurable:   false,
-		BlockedReasons: []string{"sales_return_process_runtime_contract_missing"},
-		DomainBoundary: "当前有 SalesReturn 领域审批，但尚未接 immutable ProcessRuntime",
+		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
+		DomainBoundary: "已登记客户退货 ProcessRuntime；老板审批后由仓库责任池办理收货，责任池由流程合同固定",
 		FactBoundary:   "批准不等于收货；收货才写退回库存",
 	},
 	{
 		Key: "production_exception", Label: "生产异常决定", Domain: "生产 / 品质",
 		Configurable:   false,
-		BlockedReasons: []string{"production_exception_process_runtime_contract_missing", "customer_approval_responsibility_unconfirmed"},
-		DomainBoundary: "当前决定与执行已分离，但尚未接可配置审批路由",
+		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
+		DomainBoundary: "已登记生产异常 ProcessRuntime；老板决定与生产执行分离，责任池由流程合同固定",
 		FactBoundary:   "批准不执行 SCRAP、超领或 WIP 让步",
 	},
 	{
 		Key: "inventory_adjustment", Label: "库存人工调整审批", Domain: "仓库",
 		Configurable:   false,
-		BlockedReasons: []string{"inventory_adjustment_approval_source_document_missing"},
-		DomainBoundary: "当前只有审批依据文本，没有正式审批源单",
-		FactBoundary:   "不能用 Workflow 任务代替库存调整过账",
+		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
+		DomainBoundary: "已登记库存人工调整源单与 ProcessRuntime；老板审批后由仓库责任池显式过账",
+		FactBoundary:   "批准不等于过账；只有库存领域命令写库存交易和余额",
 	},
 	{
 		Key: "payment", Label: "付款审批", Domain: "财务",
 		Configurable:   false,
-		BlockedReasons: []string{"payment_approval_source_document_missing", "payment_approval_process_runtime_contract_missing"},
-		DomainBoundary: "当前 PAYMENT 只有收付款事实生命周期，没有付款申请审批合同",
-		FactBoundary:   "审批不得生成、过账、核销或冲正付款事实",
+		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
+		DomainBoundary: "已登记收付款单与 ProcessRuntime；老板审批后由财务责任池显式过账与核销",
+		FactBoundary:   "批准不等于过账；只有财务领域命令写付款、核销或冲正事实",
 	},
 	{
 		Key: "pmc_engineering", Label: "PMC / 工程审批", Domain: "PMC / 工程",

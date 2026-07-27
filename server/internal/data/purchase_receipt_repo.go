@@ -22,6 +22,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
 
@@ -716,6 +717,21 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 			return nil, biz.ErrPurchaseReceiptNotFound
 		}
 		return nil, err
+	}
+	hasActiveRejectionDisposition, err := tx.client.PurchaseRejectionDisposition.Query().
+		Where(
+			purchaserejectiondisposition.StatusNEQ(biz.PurchaseRejectionStatusCancelled),
+			purchaserejectiondisposition.Or(
+				purchaserejectiondisposition.PurchaseReceiptID(receipt.ID),
+				purchaserejectiondisposition.ReplacementReceiptID(receipt.ID),
+			),
+		).
+		Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasActiveRejectionDisposition {
+		return nil, biz.ErrPurchaseReceiptCorrectionDependency
 	}
 	transition, ok := corestatus.CancelPurchaseReceipt(receipt.Status)
 	if !ok {

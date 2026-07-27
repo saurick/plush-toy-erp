@@ -121,6 +121,31 @@ func OccurredAt(v time.Time) predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldEQ(FieldOccurredAt, v))
 }
 
+// ApprovedAt applies equality check predicate on the "approved_at" field. It's identical to ApprovedAtEQ.
+func ApprovedAt(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldApprovedAt, v))
+}
+
+// ApprovedBy applies equality check predicate on the "approved_by" field. It's identical to ApprovedByEQ.
+func ApprovedBy(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldApprovedBy, v))
+}
+
+// RejectedAt applies equality check predicate on the "rejected_at" field. It's identical to RejectedAtEQ.
+func RejectedAt(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldRejectedAt, v))
+}
+
+// RejectedBy applies equality check predicate on the "rejected_by" field. It's identical to RejectedByEQ.
+func RejectedBy(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldRejectedBy, v))
+}
+
+// RejectReason applies equality check predicate on the "reject_reason" field. It's identical to RejectReasonEQ.
+func RejectReason(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldRejectReason, v))
+}
+
 // PostedAt applies equality check predicate on the "posted_at" field. It's identical to PostedAtEQ.
 func PostedAt(v time.Time) predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldEQ(FieldPostedAt, v))
@@ -129,6 +154,21 @@ func PostedAt(v time.Time) predicate.FinancePayment {
 // PostedBy applies equality check predicate on the "posted_by" field. It's identical to PostedByEQ.
 func PostedBy(v int) predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldEQ(FieldPostedBy, v))
+}
+
+// CancelledAt applies equality check predicate on the "cancelled_at" field. It's identical to CancelledAtEQ.
+func CancelledAt(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldCancelledAt, v))
+}
+
+// CancelledBy applies equality check predicate on the "cancelled_by" field. It's identical to CancelledByEQ.
+func CancelledBy(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldCancelledBy, v))
+}
+
+// CancelReason applies equality check predicate on the "cancel_reason" field. It's identical to CancelReasonEQ.
+func CancelReason(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldCancelReason, v))
 }
 
 // ReversedAt applies equality check predicate on the "reversed_at" field. It's identical to ReversedAtEQ.
@@ -906,6 +946,281 @@ func OccurredAtLTE(v time.Time) predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldLTE(FieldOccurredAt, v))
 }
 
+// ApprovedAtEQ applies the EQ predicate on the "approved_at" field.
+func ApprovedAtEQ(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldApprovedAt, v))
+}
+
+// ApprovedAtNEQ applies the NEQ predicate on the "approved_at" field.
+func ApprovedAtNEQ(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldApprovedAt, v))
+}
+
+// ApprovedAtIn applies the In predicate on the "approved_at" field.
+func ApprovedAtIn(vs ...time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldApprovedAt, vs...))
+}
+
+// ApprovedAtNotIn applies the NotIn predicate on the "approved_at" field.
+func ApprovedAtNotIn(vs ...time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldApprovedAt, vs...))
+}
+
+// ApprovedAtGT applies the GT predicate on the "approved_at" field.
+func ApprovedAtGT(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldApprovedAt, v))
+}
+
+// ApprovedAtGTE applies the GTE predicate on the "approved_at" field.
+func ApprovedAtGTE(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldApprovedAt, v))
+}
+
+// ApprovedAtLT applies the LT predicate on the "approved_at" field.
+func ApprovedAtLT(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldApprovedAt, v))
+}
+
+// ApprovedAtLTE applies the LTE predicate on the "approved_at" field.
+func ApprovedAtLTE(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldApprovedAt, v))
+}
+
+// ApprovedAtIsNil applies the IsNil predicate on the "approved_at" field.
+func ApprovedAtIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldApprovedAt))
+}
+
+// ApprovedAtNotNil applies the NotNil predicate on the "approved_at" field.
+func ApprovedAtNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldApprovedAt))
+}
+
+// ApprovedByEQ applies the EQ predicate on the "approved_by" field.
+func ApprovedByEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldApprovedBy, v))
+}
+
+// ApprovedByNEQ applies the NEQ predicate on the "approved_by" field.
+func ApprovedByNEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldApprovedBy, v))
+}
+
+// ApprovedByIn applies the In predicate on the "approved_by" field.
+func ApprovedByIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldApprovedBy, vs...))
+}
+
+// ApprovedByNotIn applies the NotIn predicate on the "approved_by" field.
+func ApprovedByNotIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldApprovedBy, vs...))
+}
+
+// ApprovedByGT applies the GT predicate on the "approved_by" field.
+func ApprovedByGT(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldApprovedBy, v))
+}
+
+// ApprovedByGTE applies the GTE predicate on the "approved_by" field.
+func ApprovedByGTE(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldApprovedBy, v))
+}
+
+// ApprovedByLT applies the LT predicate on the "approved_by" field.
+func ApprovedByLT(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldApprovedBy, v))
+}
+
+// ApprovedByLTE applies the LTE predicate on the "approved_by" field.
+func ApprovedByLTE(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldApprovedBy, v))
+}
+
+// ApprovedByIsNil applies the IsNil predicate on the "approved_by" field.
+func ApprovedByIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldApprovedBy))
+}
+
+// ApprovedByNotNil applies the NotNil predicate on the "approved_by" field.
+func ApprovedByNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldApprovedBy))
+}
+
+// RejectedAtEQ applies the EQ predicate on the "rejected_at" field.
+func RejectedAtEQ(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldRejectedAt, v))
+}
+
+// RejectedAtNEQ applies the NEQ predicate on the "rejected_at" field.
+func RejectedAtNEQ(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldRejectedAt, v))
+}
+
+// RejectedAtIn applies the In predicate on the "rejected_at" field.
+func RejectedAtIn(vs ...time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldRejectedAt, vs...))
+}
+
+// RejectedAtNotIn applies the NotIn predicate on the "rejected_at" field.
+func RejectedAtNotIn(vs ...time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldRejectedAt, vs...))
+}
+
+// RejectedAtGT applies the GT predicate on the "rejected_at" field.
+func RejectedAtGT(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldRejectedAt, v))
+}
+
+// RejectedAtGTE applies the GTE predicate on the "rejected_at" field.
+func RejectedAtGTE(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldRejectedAt, v))
+}
+
+// RejectedAtLT applies the LT predicate on the "rejected_at" field.
+func RejectedAtLT(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldRejectedAt, v))
+}
+
+// RejectedAtLTE applies the LTE predicate on the "rejected_at" field.
+func RejectedAtLTE(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldRejectedAt, v))
+}
+
+// RejectedAtIsNil applies the IsNil predicate on the "rejected_at" field.
+func RejectedAtIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldRejectedAt))
+}
+
+// RejectedAtNotNil applies the NotNil predicate on the "rejected_at" field.
+func RejectedAtNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldRejectedAt))
+}
+
+// RejectedByEQ applies the EQ predicate on the "rejected_by" field.
+func RejectedByEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldRejectedBy, v))
+}
+
+// RejectedByNEQ applies the NEQ predicate on the "rejected_by" field.
+func RejectedByNEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldRejectedBy, v))
+}
+
+// RejectedByIn applies the In predicate on the "rejected_by" field.
+func RejectedByIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldRejectedBy, vs...))
+}
+
+// RejectedByNotIn applies the NotIn predicate on the "rejected_by" field.
+func RejectedByNotIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldRejectedBy, vs...))
+}
+
+// RejectedByGT applies the GT predicate on the "rejected_by" field.
+func RejectedByGT(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldRejectedBy, v))
+}
+
+// RejectedByGTE applies the GTE predicate on the "rejected_by" field.
+func RejectedByGTE(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldRejectedBy, v))
+}
+
+// RejectedByLT applies the LT predicate on the "rejected_by" field.
+func RejectedByLT(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldRejectedBy, v))
+}
+
+// RejectedByLTE applies the LTE predicate on the "rejected_by" field.
+func RejectedByLTE(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldRejectedBy, v))
+}
+
+// RejectedByIsNil applies the IsNil predicate on the "rejected_by" field.
+func RejectedByIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldRejectedBy))
+}
+
+// RejectedByNotNil applies the NotNil predicate on the "rejected_by" field.
+func RejectedByNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldRejectedBy))
+}
+
+// RejectReasonEQ applies the EQ predicate on the "reject_reason" field.
+func RejectReasonEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldRejectReason, v))
+}
+
+// RejectReasonNEQ applies the NEQ predicate on the "reject_reason" field.
+func RejectReasonNEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldRejectReason, v))
+}
+
+// RejectReasonIn applies the In predicate on the "reject_reason" field.
+func RejectReasonIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldRejectReason, vs...))
+}
+
+// RejectReasonNotIn applies the NotIn predicate on the "reject_reason" field.
+func RejectReasonNotIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldRejectReason, vs...))
+}
+
+// RejectReasonGT applies the GT predicate on the "reject_reason" field.
+func RejectReasonGT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldRejectReason, v))
+}
+
+// RejectReasonGTE applies the GTE predicate on the "reject_reason" field.
+func RejectReasonGTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldRejectReason, v))
+}
+
+// RejectReasonLT applies the LT predicate on the "reject_reason" field.
+func RejectReasonLT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldRejectReason, v))
+}
+
+// RejectReasonLTE applies the LTE predicate on the "reject_reason" field.
+func RejectReasonLTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldRejectReason, v))
+}
+
+// RejectReasonContains applies the Contains predicate on the "reject_reason" field.
+func RejectReasonContains(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContains(FieldRejectReason, v))
+}
+
+// RejectReasonHasPrefix applies the HasPrefix predicate on the "reject_reason" field.
+func RejectReasonHasPrefix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasPrefix(FieldRejectReason, v))
+}
+
+// RejectReasonHasSuffix applies the HasSuffix predicate on the "reject_reason" field.
+func RejectReasonHasSuffix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasSuffix(FieldRejectReason, v))
+}
+
+// RejectReasonIsNil applies the IsNil predicate on the "reject_reason" field.
+func RejectReasonIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldRejectReason))
+}
+
+// RejectReasonNotNil applies the NotNil predicate on the "reject_reason" field.
+func RejectReasonNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldRejectReason))
+}
+
+// RejectReasonEqualFold applies the EqualFold predicate on the "reject_reason" field.
+func RejectReasonEqualFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEqualFold(FieldRejectReason, v))
+}
+
+// RejectReasonContainsFold applies the ContainsFold predicate on the "reject_reason" field.
+func RejectReasonContainsFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContainsFold(FieldRejectReason, v))
+}
+
 // PostedAtEQ applies the EQ predicate on the "posted_at" field.
 func PostedAtEQ(v time.Time) predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldEQ(FieldPostedAt, v))
@@ -1004,6 +1319,181 @@ func PostedByIsNil() predicate.FinancePayment {
 // PostedByNotNil applies the NotNil predicate on the "posted_by" field.
 func PostedByNotNil() predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldNotNull(FieldPostedBy))
+}
+
+// CancelledAtEQ applies the EQ predicate on the "cancelled_at" field.
+func CancelledAtEQ(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldCancelledAt, v))
+}
+
+// CancelledAtNEQ applies the NEQ predicate on the "cancelled_at" field.
+func CancelledAtNEQ(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldCancelledAt, v))
+}
+
+// CancelledAtIn applies the In predicate on the "cancelled_at" field.
+func CancelledAtIn(vs ...time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldCancelledAt, vs...))
+}
+
+// CancelledAtNotIn applies the NotIn predicate on the "cancelled_at" field.
+func CancelledAtNotIn(vs ...time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldCancelledAt, vs...))
+}
+
+// CancelledAtGT applies the GT predicate on the "cancelled_at" field.
+func CancelledAtGT(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldCancelledAt, v))
+}
+
+// CancelledAtGTE applies the GTE predicate on the "cancelled_at" field.
+func CancelledAtGTE(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldCancelledAt, v))
+}
+
+// CancelledAtLT applies the LT predicate on the "cancelled_at" field.
+func CancelledAtLT(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldCancelledAt, v))
+}
+
+// CancelledAtLTE applies the LTE predicate on the "cancelled_at" field.
+func CancelledAtLTE(v time.Time) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldCancelledAt, v))
+}
+
+// CancelledAtIsNil applies the IsNil predicate on the "cancelled_at" field.
+func CancelledAtIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldCancelledAt))
+}
+
+// CancelledAtNotNil applies the NotNil predicate on the "cancelled_at" field.
+func CancelledAtNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldCancelledAt))
+}
+
+// CancelledByEQ applies the EQ predicate on the "cancelled_by" field.
+func CancelledByEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldCancelledBy, v))
+}
+
+// CancelledByNEQ applies the NEQ predicate on the "cancelled_by" field.
+func CancelledByNEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldCancelledBy, v))
+}
+
+// CancelledByIn applies the In predicate on the "cancelled_by" field.
+func CancelledByIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldCancelledBy, vs...))
+}
+
+// CancelledByNotIn applies the NotIn predicate on the "cancelled_by" field.
+func CancelledByNotIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldCancelledBy, vs...))
+}
+
+// CancelledByGT applies the GT predicate on the "cancelled_by" field.
+func CancelledByGT(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldCancelledBy, v))
+}
+
+// CancelledByGTE applies the GTE predicate on the "cancelled_by" field.
+func CancelledByGTE(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldCancelledBy, v))
+}
+
+// CancelledByLT applies the LT predicate on the "cancelled_by" field.
+func CancelledByLT(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldCancelledBy, v))
+}
+
+// CancelledByLTE applies the LTE predicate on the "cancelled_by" field.
+func CancelledByLTE(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldCancelledBy, v))
+}
+
+// CancelledByIsNil applies the IsNil predicate on the "cancelled_by" field.
+func CancelledByIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldCancelledBy))
+}
+
+// CancelledByNotNil applies the NotNil predicate on the "cancelled_by" field.
+func CancelledByNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldCancelledBy))
+}
+
+// CancelReasonEQ applies the EQ predicate on the "cancel_reason" field.
+func CancelReasonEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldCancelReason, v))
+}
+
+// CancelReasonNEQ applies the NEQ predicate on the "cancel_reason" field.
+func CancelReasonNEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldCancelReason, v))
+}
+
+// CancelReasonIn applies the In predicate on the "cancel_reason" field.
+func CancelReasonIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldCancelReason, vs...))
+}
+
+// CancelReasonNotIn applies the NotIn predicate on the "cancel_reason" field.
+func CancelReasonNotIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldCancelReason, vs...))
+}
+
+// CancelReasonGT applies the GT predicate on the "cancel_reason" field.
+func CancelReasonGT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldCancelReason, v))
+}
+
+// CancelReasonGTE applies the GTE predicate on the "cancel_reason" field.
+func CancelReasonGTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldCancelReason, v))
+}
+
+// CancelReasonLT applies the LT predicate on the "cancel_reason" field.
+func CancelReasonLT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldCancelReason, v))
+}
+
+// CancelReasonLTE applies the LTE predicate on the "cancel_reason" field.
+func CancelReasonLTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldCancelReason, v))
+}
+
+// CancelReasonContains applies the Contains predicate on the "cancel_reason" field.
+func CancelReasonContains(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContains(FieldCancelReason, v))
+}
+
+// CancelReasonHasPrefix applies the HasPrefix predicate on the "cancel_reason" field.
+func CancelReasonHasPrefix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasPrefix(FieldCancelReason, v))
+}
+
+// CancelReasonHasSuffix applies the HasSuffix predicate on the "cancel_reason" field.
+func CancelReasonHasSuffix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasSuffix(FieldCancelReason, v))
+}
+
+// CancelReasonIsNil applies the IsNil predicate on the "cancel_reason" field.
+func CancelReasonIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldCancelReason))
+}
+
+// CancelReasonNotNil applies the NotNil predicate on the "cancel_reason" field.
+func CancelReasonNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldCancelReason))
+}
+
+// CancelReasonEqualFold applies the EqualFold predicate on the "cancel_reason" field.
+func CancelReasonEqualFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEqualFold(FieldCancelReason, v))
+}
+
+// CancelReasonContainsFold applies the ContainsFold predicate on the "cancel_reason" field.
+func CancelReasonContainsFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContainsFold(FieldCancelReason, v))
 }
 
 // ReversedAtEQ applies the EQ predicate on the "reversed_at" field.

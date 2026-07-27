@@ -1,3 +1,8 @@
+import {
+  addNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from './numeric20Scale6.mjs'
+
 export const PRODUCTION_WIP_ROUTE_CODE = 'PLUSH_SEW_HAND_V1'
 
 export const PRODUCTION_WIP_ACTION = Object.freeze({
@@ -410,6 +415,13 @@ function validateBatch(batch, productionOrderID) {
 }
 
 function validateMaterialRequirement(value, productionOrderID) {
+  const planned = numeric20Scale6Units(value?.planned_quantity)
+  const approvedOverIssue = numeric20Scale6Units(
+    value?.approved_over_issue_quantity
+  )
+  const effectiveLimit = numeric20Scale6Units(value?.effective_limit_quantity)
+  const issued = numeric20Scale6Units(value?.issued_quantity)
+  const remaining = numeric20Scale6Units(value?.remaining_quantity)
   if (
     !value ||
     typeof value !== 'object' ||
@@ -425,8 +437,17 @@ function validateMaterialRequirement(value, productionOrderID) {
     !canonicalQuantity(value.unit_quantity_snapshot) ||
     !canonicalNonNegativeQuantity(value.loss_rate_snapshot) ||
     !canonicalQuantity(value.planned_quantity) ||
+    !canonicalNonNegativeQuantity(value.approved_over_issue_quantity) ||
+    !canonicalQuantity(value.effective_limit_quantity) ||
     !canonicalNonNegativeQuantity(value.issued_quantity) ||
     !canonicalNonNegativeQuantity(value.remaining_quantity) ||
+    planned === null ||
+    approvedOverIssue === null ||
+    effectiveLimit === null ||
+    issued === null ||
+    remaining === null ||
+    addNumeric20Scale6Units(planned, approvedOverIssue) !== effectiveLimit ||
+    addNumeric20Scale6Units(issued, remaining) !== effectiveLimit ||
     !requiredText(value.material_code_snapshot) ||
     !requiredText(value.material_name_snapshot) ||
     !requiredText(value.unit_code_snapshot) ||

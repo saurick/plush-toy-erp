@@ -39,7 +39,16 @@ import {
   resolveWorkflowTaskActionInitialStep,
   resolveWorkflowTaskActionStep,
 } from '../../utils/workflowTaskActionFlow.mjs'
-import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
+import {
+  isWorkflowApprovalTask,
+  isWorkflowProcessDecisionTask,
+} from '../../utils/workflowTaskActionContract.mjs'
+import {
+  buildWorkflowProcessDecision,
+  getWorkflowProcessDecisionApprovalForm,
+  getWorkflowProcessDecisionApprovedQuantityError,
+  workflowProcessDecisionAllowsApprovedQuantity,
+} from '../../utils/workflowProcessDecision.mjs'
 import {
   formatProcessStartedAt,
   getProcessLabel,
@@ -49,6 +58,7 @@ import {
   isDisplayOnlyWorkflowTask,
 } from '../../utils/processRuntimePresentation.mjs'
 import { getRoleDisplayName } from '../../utils/roleKeys.mjs'
+import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 const { Paragraph, Title } = Typography
@@ -244,12 +254,31 @@ export default function WorkflowTaskActionDrawer({
   const [taskEventsError, setTaskEventsError] = React.useState('')
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
+  const [approvedQuantity, setApprovedQuantity] = React.useState('')
   const previousTaskIdentityRef = React.useRef('')
   const stepButtonRefs = React.useRef(new Map())
   const actionOptionRefs = React.useRef(new Map())
   const visibleActionModes = allowedActionModes.filter(
     (mode) => TASK_ACTION_META[mode]
   )
+  const processDecisionRequired =
+    actionMode === 'complete' && isWorkflowProcessDecisionTask(task)
+  const processApprovalForm = getWorkflowProcessDecisionApprovalForm(
+    task,
+    processContext
+  )
+  const processDecisionReady =
+    !processDecisionRequired ||
+    (processContextState === 'ready' && Boolean(processApprovalForm))
+  const approvedQuantityAllowed =
+    processDecisionRequired &&
+    workflowProcessDecisionAllowsApprovedQuantity(processApprovalForm)
+  const approvedQuantityError = approvedQuantityAllowed
+    ? getWorkflowProcessDecisionApprovedQuantityError(
+        processApprovalForm,
+        approvedQuantity
+      )
+    : ''
   const assignmentOptions = [
     ...(assignmentAccess.can_return_to_pool
       ? [
@@ -277,6 +306,8 @@ export default function WorkflowTaskActionDrawer({
   const hasVisibleActionSelection = visibleActionModes.includes(actionMode)
   const canConfirm =
     assignmentTargetValid &&
+    processDecisionReady &&
+    !approvedQuantityError &&
     isWorkflowTaskActionReady({
       actionMode,
       actionReason,
@@ -294,12 +325,14 @@ export default function WorkflowTaskActionDrawer({
   React.useEffect(() => {
     if (taskIdentity === previousTaskIdentityRef.current) return
     previousTaskIdentityRef.current = taskIdentity
+    setApprovedQuantity('')
     setActiveStepKey(resolveWorkflowTaskActionInitialStep(actionMode))
   }, [actionMode, taskIdentity])
 
   React.useEffect(() => {
     if (!task) {
       previousTaskIdentityRef.current = ''
+      setApprovedQuantity('')
       setActiveStepKey('context')
     }
   }, [task])
@@ -375,6 +408,29 @@ export default function WorkflowTaskActionDrawer({
       fallbackStep: activeStepKey,
     })
     setActiveStepKey(nextStep)
+  }
+
+  const submitAction = () => {
+    let processDecision = null
+    if (processDecisionRequired) {
+      try {
+        processDecision = buildWorkflowProcessDecision({
+          task,
+          processContext,
+          reason: actionReason,
+          approvedQuantity,
+        })
+      } catch (error) {
+        message.warning(
+          getActionErrorMessage(
+            error,
+            '审批表单与当前流程节点不一致，请刷新后重试'
+          )
+        )
+        return
+      }
+    }
+    onSubmit?.({ processDecision })
   }
 
   const handleStepKeyDown = (event, stepKey) => {
@@ -514,9 +570,12 @@ export default function WorkflowTaskActionDrawer({
                   title={
                     canConfirm
                       ? undefined
-                      : actionMeta?.requireReason
-                        ? '先选择处理方式并填写原因'
-                        : '先选择处理方式'
+                      : processDecisionRequired && !processDecisionReady
+                        ? '审批表单尚未与当前流程节点核对完成'
+                        : approvedQuantityError ||
+                            (actionMeta?.requireReason
+                            ? '先选择处理方式并填写原因'
+                            : '先选择处理方式')
                   }
                   onClick={() => selectStep('confirm')}
                 >
@@ -530,7 +589,7 @@ export default function WorkflowTaskActionDrawer({
                   icon={<SendOutlined />}
                   loading={actionSaving}
                   disabled={actionSaving || !canSubmitAction || !canConfirm}
-                  onClick={onSubmit}
+                  onClick={submitAction}
                 >
                   {actionMeta?.buttonLabel || '确认提交'}
                 </Button>
@@ -949,6 +1008,22 @@ export default function WorkflowTaskActionDrawer({
                       }
                     />
                   ) : null}
+                  {processDecisionRequired &&
+                  processContextState === 'loading' ? (
+                    <Alert
+                      type="info"
+                      showIcon
+                      message="正在核对当前流程的审批表单"
+                      description="核对完成前不会提交审批决策。"
+                    />
+                  ) : processDecisionRequired && !processApprovalForm ? (
+                    <Alert
+                      type="error"
+                      showIcon
+                      message="审批表单与当前流程节点不一致"
+                      description="请关闭后刷新任务再试；系统不会按任务名称或页面入口猜测审批字段。"
+                    />
+                  ) : null}
                   {actionMeta.requireReason ? (
                     <TextArea
                       value={actionReason}
@@ -975,6 +1050,31 @@ export default function WorkflowTaskActionDrawer({
                       </span>
                     </div>
                   )}
+                  {approvedQuantityAllowed ? (
+                    <div className="erp-task-action-drawer__assignment">
+                      <label htmlFor="erp-task-approved-quantity">
+                        批准数量（可选）
+                      </label>
+                      <Input
+                        id="erp-task-approved-quantity"
+                        inputMode="decimal"
+                        value={approvedQuantity}
+                        status={approvedQuantityError ? 'error' : undefined}
+                        disabled={actionSaving || !canSubmitAction}
+                        placeholder="留空表示按申请数量批准"
+                        onChange={(event) =>
+                          setApprovedQuantity(event.target.value)
+                        }
+                      />
+                      {approvedQuantityError ? (
+                        <Alert
+                          type="error"
+                          showIcon
+                          message={approvedQuantityError}
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
             </div>
@@ -1006,6 +1106,12 @@ export default function WorkflowTaskActionDrawer({
                     <div>
                       <dt>处理原因</dt>
                       <dd>{actionReason.trim()}</dd>
+                    </div>
+                  ) : null}
+                  {approvedQuantityAllowed && approvedQuantity.trim() ? (
+                    <div>
+                      <dt>批准数量</dt>
+                      <dd>{approvedQuantity.trim()}</dd>
                     </div>
                   ) : null}
                   {actionMode === 'assign' ? (

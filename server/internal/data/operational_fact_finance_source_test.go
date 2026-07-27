@@ -256,11 +256,11 @@ func TestOperationalFactRepoFinanceFromShipmentLifecycleAndCancellationGuardSQLi
 	if _, err := repo.CancelShippedShipment(ctx, shipment.ID); !errors.Is(err, biz.ErrShipmentFinanceDependency) {
 		t.Fatalf("shipment cancellation with active finance error=%v", err)
 	}
-	posted, err := repo.PostFinanceFact(ctx, created.ID)
+	posted, err := repo.PostFinanceFact(ctx, operationalFactStatusMutation(created.ID, created.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post receivable: %v", err)
 	}
-	if _, err := repo.CancelPostedFinanceFact(ctx, posted.ID, actor.ID, "来源业务撤销"); err != nil {
+	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(posted.ID, posted.Version, actor.ID, "来源业务撤销")); err != nil {
 		t.Fatalf("cancel receivable: %v", err)
 	}
 	oldReplay, err := uc.CreateReceivableFromShipment(ctx, input)
@@ -274,11 +274,11 @@ func TestOperationalFactRepoFinanceFromShipmentLifecycleAndCancellationGuardSQLi
 	if err != nil || recreated.ID == created.ID {
 		t.Fatalf("recreate after cancellation=%#v err=%v", recreated, err)
 	}
-	recreated, err = repo.PostFinanceFact(ctx, recreated.ID)
+	recreated, err = repo.PostFinanceFact(ctx, operationalFactStatusMutation(recreated.ID, recreated.Version, actor.ID, ""))
 	if err != nil {
 		t.Fatalf("post recreated receivable: %v", err)
 	}
-	if _, err := repo.CancelPostedFinanceFact(ctx, recreated.ID, actor.ID, "来源业务最终撤销"); err != nil {
+	if _, err := repo.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(recreated.ID, recreated.Version, actor.ID, "来源业务最终撤销")); err != nil {
 		t.Fatalf("cancel recreated receivable: %v", err)
 	}
 	if _, err := repo.CancelShippedShipment(ctx, shipment.ID); err != nil {
@@ -316,13 +316,21 @@ func TestOperationalFactRepoFinanceProcessShipmentRevalidatesAmountSnapshotsSQLi
 		processRepo,
 		biz.ProcessDomainCommandFinanceReceivableLead,
 		idempotencyKey,
-		map[string]any{"shipment_id": shipment.ID, "expected_amount": "21"},
-		biz.ShipmentSourceType,
+		map[string]any{"shipment_id": shipment.ID},
+		"shipment",
 		shipment.ID,
 	)
 	collectionType := biz.FinanceCollectionAccountsReceivable
 	sourceType := biz.ShipmentSourceType
-	_, err := repo.CreateFinanceFactDraftForProcessCommand(ctx, &biz.FinanceFactCreate{
+	paymentTermDays, err := repo.GetShipmentPaymentTermDays(ctx, shipment.ID)
+	if err != nil {
+		t.Fatalf("read shipment payment term: %v", err)
+	}
+	paymentTerm, paymentTermDays, err := biz.FinancePaymentTermSnapshotFromDays(paymentTermDays)
+	if err != nil {
+		t.Fatalf("build shipment payment term snapshot: %v", err)
+	}
+	_, err = repo.CreateFinanceFactDraftForProcessCommand(ctx, &biz.FinanceFactCreate{
 		FactNo:              "AR-PROCESS-SNAPSHOT-RECHECK",
 		FactType:            biz.FinanceFactReceivable,
 		CounterpartyType:    biz.FinanceCounterpartyCustomer,
@@ -330,6 +338,8 @@ func TestOperationalFactRepoFinanceProcessShipmentRevalidatesAmountSnapshotsSQLi
 		Amount:              decimal.NewFromInt(21),
 		Currency:            biz.FinanceCurrencyCNY,
 		CollectionType:      &collectionType,
+		PaymentTerm:         paymentTerm,
+		PaymentTermDays:     paymentTermDays,
 		SourceType:          &sourceType,
 		SourceID:            &shipment.ID,
 		IdempotencyKey:      idempotencyKey,
@@ -365,20 +375,21 @@ func TestOperationalFactRepoFinanceProcessShipmentCreateCancelRacePostgres(t *te
 	runFinanceProcessShipmentCancelRace(t, ctx, data, client, "pg-process-race-"+postgresTestSuffix())
 }
 
-func TestOperationalFactRepoSettleRejectsInvoiceAndPayment(t *testing.T) {
+func TestOperationalFactRepoSettleRejectsInvoice(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "finance_settle_type_guard")
-	repo, uc, shipment, _ := prepareShipmentFinanceSource(t, ctx, data, client, "settle-guard")
+	repo, uc, shipment, actor := prepareShipmentFinanceSource(t, ctx, data, client, "settle-guard")
 	invoice, err := uc.CreateInvoiceFromShipment(ctx, &biz.FinanceFactFromShipmentCreate{
 		FactNo: "INV-SETTLE-GUARD", ShipmentID: shipment.ID, IdempotencyKey: "inv-settle-guard", InvoiceCategory: stringPointer(biz.FinanceInvoiceCategoryVATGeneral1),
 	})
 	if err != nil {
 		t.Fatalf("create invoice: %v", err)
 	}
-	if _, err := repo.PostFinanceFact(ctx, invoice.ID); err != nil {
+	postedInvoice, err := repo.PostFinanceFact(ctx, operationalFactStatusMutation(invoice.ID, invoice.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post invoice: %v", err)
 	}
-	if _, err := repo.SettleFinanceFact(ctx, invoice.ID); !errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed) {
+	if _, err := repo.SettleFinanceFact(ctx, operationalFactStatusMutation(postedInvoice.ID, postedInvoice.Version, actor.ID, "")); !errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed) {
 		t.Fatalf("invoice settle error=%v", err)
 	}
 	sourceLessReceivable, err := repo.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
@@ -388,22 +399,88 @@ func TestOperationalFactRepoSettleRejectsInvoiceAndPayment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create source-less receivable fixture: %v", err)
 	}
-	if _, err := repo.PostFinanceFact(ctx, sourceLessReceivable.ID); !errors.Is(err, biz.ErrFinanceFactSourceInvalid) {
+	if _, err := repo.PostFinanceFact(ctx, operationalFactStatusMutation(sourceLessReceivable.ID, sourceLessReceivable.Version, actor.ID, "")); !errors.Is(err, biz.ErrFinanceFactSourceInvalid) {
 		t.Fatalf("source-less receivable post error=%v", err)
 	}
-	payment, err := repo.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
-		FactNo: "PAY-SETTLE-GUARD", FactType: biz.FinanceFactPayment, CounterpartyType: biz.FinanceCounterpartyOther,
-		Amount: decimal.NewFromInt(1), Currency: biz.FinanceCurrencyCNY, IdempotencyKey: "pay-settle-guard",
-	})
+	receivable := createReceivableViaProcessCommandForTest(
+		t,
+		ctx,
+		data,
+		repo,
+		shipment,
+		actor.ID,
+		"AR-SETTLE-GUARD",
+		"ar-settle-guard",
+	)
+	postedReceivable, err := repo.PostFinanceFact(ctx, operationalFactStatusMutation(receivable.ID, receivable.Version, actor.ID, ""))
 	if err != nil {
-		t.Fatalf("create payment: %v", err)
+		t.Fatalf("post receivable: %v", err)
 	}
-	if _, err := repo.PostFinanceFact(ctx, payment.ID); !errors.Is(err, biz.ErrFinanceFactSourceInvalid) {
-		t.Fatalf("source-less payment post error=%v", err)
+	if _, err := repo.SettleFinanceFact(ctx, operationalFactStatusMutation(postedReceivable.ID, postedReceivable.Version, actor.ID, "")); !errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed) {
+		t.Fatalf("receivable manual settle error=%v", err)
 	}
-	if _, err := repo.SettleFinanceFact(ctx, payment.ID); !errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed) {
-		t.Fatalf("payment settle error=%v", err)
+}
+
+func createReceivableViaProcessCommandForTest(
+	t *testing.T,
+	ctx context.Context,
+	data *Data,
+	repo *operationalFactRepo,
+	shipment *biz.Shipment,
+	actorID int,
+	factNo string,
+	idempotencyKey string,
+) *biz.FinanceFact {
+	t.Helper()
+	if data == nil || repo == nil || shipment == nil || shipment.ID <= 0 || actorID <= 0 {
+		t.Fatal("invalid finance process command fixture")
 	}
+	amount, err := repo.GetShipmentFinanceAmountSnapshot(ctx, shipment.ID)
+	if err != nil {
+		t.Fatalf("read shipment finance amount snapshot: %v", err)
+	}
+	paymentTermDays, err := repo.GetShipmentPaymentTermDays(ctx, shipment.ID)
+	if err != nil {
+		t.Fatalf("read shipment payment term: %v", err)
+	}
+	paymentTerm, paymentTermDays, err := biz.FinancePaymentTermSnapshotFromDays(paymentTermDays)
+	if err != nil {
+		t.Fatalf("build shipment payment term snapshot: %v", err)
+	}
+	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
+	command := claimedPostgresProcessCommandForBusinessRef(
+		t,
+		ctx,
+		processRepo,
+		biz.ProcessDomainCommandFinanceReceivableLead,
+		idempotencyKey,
+		map[string]any{"shipment_id": shipment.ID},
+		"shipment",
+		shipment.ID,
+	)
+	collectionType := biz.FinanceCollectionAccountsReceivable
+	sourceType := biz.ShipmentSourceType
+	fact, err := repo.CreateFinanceFactDraftForProcessCommand(ctx, &biz.FinanceFactCreate{
+		FactNo:              factNo,
+		FactType:            biz.FinanceFactReceivable,
+		CounterpartyType:    biz.FinanceCounterpartyCustomer,
+		CounterpartyID:      shipment.CustomerID,
+		Amount:              amount,
+		FeeAmount:           decimal.Zero,
+		Currency:            biz.FinanceCurrencyCNY,
+		CollectionType:      &collectionType,
+		PaymentTerm:         paymentTerm,
+		PaymentTermDays:     paymentTermDays,
+		SourceType:          &sourceType,
+		SourceID:            &shipment.ID,
+		IdempotencyKey:      idempotencyKey,
+		OccurredAt:          time.Now().UTC().Truncate(time.Microsecond),
+		OccurredAtSpecified: true,
+	}, command, actorID)
+	if err != nil {
+		t.Fatalf("create receivable via process command: %v", err)
+	}
+	return fact
 }
 
 func runFinanceShipmentCancelRace(t *testing.T, ctx context.Context, data *Data, client *ent.Client, suffix string) {

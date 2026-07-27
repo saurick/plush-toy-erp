@@ -18,6 +18,10 @@ const requirement = {
   production_order_item_id: 11,
   material_id: 23,
   unit_id: 5,
+  planned_quantity: '10.000000',
+  approved_over_issue_quantity: '2.000000',
+  effective_limit_quantity: '12.000000',
+  issued_quantity: '6.000000',
   remaining_quantity: '6.000000',
 }
 
@@ -93,6 +97,40 @@ test('production material issue payload derives source identity and excludes for
         order,
         'READY',
         requirement
+      ),
+    /不能超过/u
+  )
+})
+
+test('production material issue consumes server-projected approved over-issue capacity', () => {
+  const approvedRequirement = {
+    ...requirement,
+    planned_quantity: '10',
+    approved_over_issue_quantity: '2',
+    effective_limit_quantity: '12',
+    issued_quantity: '10',
+    remaining_quantity: '2',
+  }
+  assert.equal(
+    isProductionMaterialIssueEligible(order, 'READY', approvedRequirement),
+    true
+  )
+  assert.equal(
+    buildProductionMaterialIssuePayload(
+      { warehouse_id: 2, lot_id: 41, quantity: '2' },
+      order,
+      'READY',
+      approvedRequirement
+    ).quantity,
+    '2'
+  )
+  assert.throws(
+    () =>
+      buildProductionMaterialIssuePayload(
+        { warehouse_id: 2, lot_id: 41, quantity: '2.000001' },
+        order,
+        'READY',
+        approvedRequirement
       ),
     /不能超过/u
   )

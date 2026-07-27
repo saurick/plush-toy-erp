@@ -292,14 +292,14 @@ func TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner(t *tes
 	postErrs := make(chan error, 2)
 	var postWG sync.WaitGroup
 	for _, fact := range []*biz.ProductionFact{first, second} {
-		fact := fact
+		postRequest := operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "")
 		postWG.Add(1)
-		go func() {
+		go func(in *biz.OperationalFactStatusMutation) {
 			defer postWG.Done()
 			<-startPost
-			_, err := f.factUC.PostProductionFact(ctx, fact.ID)
+			_, err := f.factUC.PostProductionFact(ctx, in)
 			postErrs <- err
-		}()
+		}(postRequest)
 	}
 	close(startPost)
 	postWG.Wait()
@@ -324,6 +324,127 @@ func TestProductionMaterialIssuePostgresConcurrentReplayAndQuantityWinner(t *tes
 	).Only(ctx)
 	if err != nil || !balance.Quantity.Equal(decimal.NewFromInt(14)) {
 		t.Fatalf("postgres material issue balance=%#v err=%v", balance, err)
+	}
+}
+
+func TestProductionMaterialIssuePostgresConcurrentOverIssueAllowanceHasOneWinnerAndExactReadback(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderPGFixture(t)
+	created, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{
+		Draft: f.draft("MO-PG-OVER-ISSUE-" + f.suffix), ActorID: f.actorID, IdempotencyKey: "pg-over-issue-create-" + f.suffix,
+	})
+	if err != nil {
+		t.Fatalf("create postgres over-issue order: %v", err)
+	}
+	released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
+		ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "pg-over-issue-release-" + f.suffix,
+	})
+	if err != nil || len(released.MaterialRequirements) != 1 {
+		t.Fatalf("release postgres over-issue order=%#v err=%v", released, err)
+	}
+	requirement := released.MaterialRequirements[0]
+	inventoryRepo := NewInventoryRepo(f.data, log.NewStdLogger(io.Discard))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: f.materialID,
+		WarehouseID: f.warehouseID, UnitID: f.unitID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(20),
+		SourceType: "PG_PRODUCTION_OVER_ISSUE", IdempotencyKey: "pg-over-issue-opening-" + f.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres over-issue inventory: %v", err)
+	}
+
+	base, err := f.factUC.CreateProductionMaterialIssueFromOrder(ctx, &biz.ProductionMaterialIssueFromOrderCreate{
+		FactNo:            "PF-PG-OVER-BASE-" + f.suffix,
+		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
+		ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.warehouseID,
+		Quantity: requirement.PlannedQuantity, IdempotencyKey: "pg-over-issue-base-" + f.suffix,
+	})
+	if err != nil {
+		t.Fatalf("create postgres base material issue: %v", err)
+	}
+	if _, err := f.factUC.PostProductionFact(ctx, operationalFactStatusMutation(base.ID, base.Version, f.actorID, "")); err != nil {
+		t.Fatalf("post postgres base material issue: %v", err)
+	}
+
+	decision, err := f.factUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{
+		DecisionNo: "EX-PG-OVER-ISSUE-" + f.suffix, DecisionType: biz.ProductionExceptionOverIssue,
+		ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
+		ProductionMaterialRequirementID: &requirement.ID,
+		RequestedQuantity:               decimal.NewFromInt(1),
+		Reason:                          "并发超领额度", IdempotencyKey: "pg-over-issue-decision-" + f.suffix, RequestedBy: f.actorID,
+	})
+	if err != nil {
+		t.Fatalf("submit postgres over-issue decision: %v", err)
+	}
+	approver := f.client.AdminUser.Create().
+		SetUsername("production-over-issue-approver-" + f.suffix).
+		SetPasswordHash("test-password-hash").
+		SaveX(ctx)
+	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
+	if _, err := factRepo.decideProductionException(ctx, &biz.ProductionExceptionMutation{
+		ID: decision.ID, ExpectedVersion: decision.Version, ActorID: approver.ID, Reason: "批准一件",
+	}, biz.ProductionExceptionApproved, nil, nil); err != nil {
+		t.Fatalf("approve postgres over-issue decision: %v", err)
+	}
+
+	overIssueFacts := make([]*biz.ProductionFact, 2)
+	for index := range overIssueFacts {
+		overIssueFacts[index], err = f.factUC.CreateProductionMaterialIssueFromOrder(ctx, &biz.ProductionMaterialIssueFromOrderCreate{
+			FactNo:            "PF-PG-OVER-" + string(rune('A'+index)) + "-" + f.suffix,
+			ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
+			ProductionOrderMaterialRequirementID: requirement.ID, WarehouseID: f.warehouseID,
+			Quantity: decimal.NewFromInt(1), IdempotencyKey: "pg-over-issue-fact-" + string(rune('A'+index)) + "-" + f.suffix,
+		})
+		if err != nil {
+			t.Fatalf("create postgres over-issue fact %d: %v", index, err)
+		}
+	}
+	startPost := make(chan struct{})
+	postErrs := make(chan error, len(overIssueFacts))
+	var postWG sync.WaitGroup
+	for _, fact := range overIssueFacts {
+		postRequest := operationalFactStatusMutation(fact.ID, fact.Version, f.actorID, "")
+		postWG.Add(1)
+		go func(in *biz.OperationalFactStatusMutation) {
+			defer postWG.Done()
+			<-startPost
+			_, postErr := f.factUC.PostProductionFact(ctx, in)
+			postErrs <- postErr
+		}(postRequest)
+	}
+	close(startPost)
+	postWG.Wait()
+	close(postErrs)
+	assertOneProductionMaterialIssuePostWinner(t, postErrs)
+
+	requirements, err := f.factUC.ListProductionOrderMaterialRequirements(ctx, released.Order.ID)
+	if err != nil || len(requirements) != 1 ||
+		!requirements[0].PlannedQuantity.Equal(decimal.NewFromInt(10)) ||
+		!requirements[0].ApprovedOverIssueQuantity.Equal(decimal.NewFromInt(1)) ||
+		!requirements[0].EffectiveLimitQuantity.Equal(decimal.NewFromInt(11)) ||
+		!requirements[0].IssuedQuantity.Equal(decimal.NewFromInt(11)) ||
+		!requirements[0].RemainingQuantity.IsZero() {
+		t.Fatalf("postgres over-issue exact readback=%#v err=%v", requirements, err)
+	}
+	if count := f.client.ProductionFact.Query().Where(
+		productionfact.SourceType(biz.ProductionOrderSourceType),
+		productionfact.SourceID(released.Order.ID),
+		productionfact.SourceLineID(requirement.ID),
+		productionfact.FactType(biz.ProductionFactMaterialIssue),
+		productionfact.Status(biz.OperationalFactStatusPosted),
+	).CountX(ctx); count != 2 {
+		t.Fatalf("postgres over-issue posted fact count=%d, want 2", count)
+	}
+	balance, err := f.client.InventoryBalance.Query().Where(
+		inventorybalance.SubjectType(biz.InventorySubjectMaterial),
+		inventorybalance.SubjectID(f.materialID),
+		inventorybalance.ProductSkuIDIsNil(),
+		inventorybalance.WarehouseID(f.warehouseID),
+		inventorybalance.LotIDIsNil(),
+		inventorybalance.UnitID(f.unitID),
+	).Only(ctx)
+	if err != nil || !balance.Quantity.Equal(decimal.NewFromInt(9)) {
+		t.Fatalf("postgres over-issue balance=%#v err=%v", balance, err)
 	}
 }
 

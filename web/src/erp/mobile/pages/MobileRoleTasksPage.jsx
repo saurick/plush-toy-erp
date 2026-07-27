@@ -79,6 +79,8 @@ const MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY =
   'mobileRoleTasksLoadedCountsByView'
 const MOBILE_TASK_HISTORY_SCOPE_KEY = 'mobileRoleTasksScope'
 const MOBILE_TASK_HISTORY_REASON_KEY = 'mobileRoleTasksReason'
+const MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY =
+  'mobileRoleTasksApprovedQuantity'
 const MOBILE_TASK_DRAFT_STORAGE_PREFIX = 'plush-toy-erp:mobile-task-draft:v1:'
 
 const MOBILE_TASK_HISTORY_SCREENS = new Set(['detail', 'action', 'receipt'])
@@ -111,6 +113,7 @@ function persistMobileTaskDraftBackup(scopeKey, draft) {
       storageKey,
       JSON.stringify({
         action,
+        approvedQuantity: String(draft?.approvedQuantity || ''),
         reason: String(draft?.reason || ''),
         scopeKey: String(scopeKey || '').trim(),
         taskID: String(draft.taskID),
@@ -141,6 +144,7 @@ function readMobileTaskDraftBackup(scopeKey, taskID) {
     }
     return {
       action: String(value.action),
+      approvedQuantity: String(value.approvedQuantity || ''),
       reason: String(value.reason || ''),
     }
   } catch {
@@ -648,6 +652,7 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_DEPTH_KEY]: 0,
         [MOBILE_TASK_HISTORY_TASK_KEY]: null,
         [MOBILE_TASK_HISTORY_ACTION_KEY]: '',
+        [MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY]: '',
         [MOBILE_TASK_HISTORY_RECEIPT_KEY]: null,
         [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: {},
         [MOBILE_TASK_HISTORY_REASON_KEY]: '',
@@ -838,6 +843,7 @@ export default function MobileRoleTasksPage() {
     actionReceiptRetryable,
     clearActionReceipt,
     detailReasonValue,
+    detailApprovedQuantityValue,
     handleTaskAction,
     restoreActionReceipt,
     restoreActionDraft,
@@ -853,6 +859,7 @@ export default function MobileRoleTasksPage() {
     showTaskReceipt,
     submitDetailAction,
     updateDetailReason,
+    updateDetailApprovedQuantity,
     updatingID,
     urgingID,
   } = useMobileRoleTaskActions({
@@ -870,6 +877,10 @@ export default function MobileRoleTasksPage() {
       initialHistoryScreen === 'action'
         ? initialHistoryState[MOBILE_TASK_HISTORY_TASK_KEY]
         : null,
+    initialApprovedQuantity:
+      initialHistoryScreen === 'action'
+        ? initialHistoryState[MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY]
+        : '',
     initialReason:
       initialHistoryScreen === 'action'
         ? initialHistoryState[MOBILE_TASK_HISTORY_REASON_KEY]
@@ -944,6 +955,9 @@ export default function MobileRoleTasksPage() {
     if (restoredScreen === 'action') {
       restoreActionDraft({
         action: restoredAction,
+        approvedQuantity:
+          initialHistoryCandidate[MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY] ||
+          '',
         reason: initialHistoryCandidate[MOBILE_TASK_HISTORY_REASON_KEY] || '',
         taskID: restoredTaskID,
       })
@@ -964,11 +978,13 @@ export default function MobileRoleTasksPage() {
 
   const actionDraftHistoryRef = useRef({
     action: '',
+    approvedQuantity: '',
     reason: '',
     taskID: null,
   })
   actionDraftHistoryRef.current = {
     action: detailAction || '',
+    approvedQuantity: detailApprovedQuantityValue,
     reason: detailReasonValue,
     taskID: selectedTask?.id || null,
   }
@@ -995,6 +1011,7 @@ export default function MobileRoleTasksPage() {
         {
           ...currentState,
           [MOBILE_TASK_HISTORY_ACTION_KEY]: draft.action,
+          [MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY]: draft.approvedQuantity,
           [MOBILE_TASK_HISTORY_REASON_KEY]: draft.reason,
         },
         ''
@@ -1033,6 +1050,7 @@ export default function MobileRoleTasksPage() {
   }, [
     actionReceipt,
     detailAction,
+    detailApprovedQuantityValue,
     detailReasonValue,
     flushMobileTaskDraftHistory,
     selectedTask,
@@ -1158,6 +1176,7 @@ export default function MobileRoleTasksPage() {
           : Number(currentState[MOBILE_TASK_HISTORY_DEPTH_KEY] || 0) + 1,
         [MOBILE_TASK_HISTORY_TASK_KEY]: taskID,
         [MOBILE_TASK_HISTORY_ACTION_KEY]: action,
+        [MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY]: '',
         [MOBILE_TASK_HISTORY_RECEIPT_KEY]: receipt,
         [MOBILE_TASK_HISTORY_MAIN_TAB_KEY]: activeMainTabKey,
         [MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY]: activeMessageTabKey,
@@ -1451,6 +1470,7 @@ export default function MobileRoleTasksPage() {
             [MOBILE_TASK_HISTORY_DEPTH_KEY]: 0,
             [MOBILE_TASK_HISTORY_TASK_KEY]: null,
             [MOBILE_TASK_HISTORY_ACTION_KEY]: '',
+            [MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY]: '',
             [MOBILE_TASK_HISTORY_RECEIPT_KEY]: null,
             [MOBILE_TASK_HISTORY_REASON_KEY]: '',
             [MOBILE_TASK_HISTORY_LIST_LIMITS_KEY]: {},
@@ -1505,10 +1525,14 @@ export default function MobileRoleTasksPage() {
         const reason = backupMatchesAction
           ? backup.reason
           : historyState[MOBILE_TASK_HISTORY_REASON_KEY] || ''
+        const approvedQuantity = backupMatchesAction
+          ? backup.approvedQuantity
+          : historyState[MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY] || ''
         restoringHistoryTaskRef.current = Boolean(targetTaskID)
         setSelectedTaskID(targetTaskID || null)
         restoreActionDraft({
           action: targetAction,
+          approvedQuantity,
           reason,
           taskID: targetTaskID,
         })
@@ -1518,6 +1542,7 @@ export default function MobileRoleTasksPage() {
             window.history.replaceState(
               {
                 ...historyState,
+                [MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY]: approvedQuantity,
                 [MOBILE_TASK_HISTORY_REASON_KEY]: reason,
               },
               ''
@@ -1668,11 +1693,13 @@ export default function MobileRoleTasksPage() {
       <MobileTaskActionScreen
         accessMessage={selectedTaskActionAccess.readonlyReason}
         accessState={actionAccessState}
+        approvedQuantity={detailApprovedQuantityValue}
         availableActions={availableActions}
         busy={actionBusy}
         canViewReceipt={Boolean(selectedTaskReceipt)}
         hasActionCapability={selectedHasActionCapability}
         onActionChange={(action) => handleTaskAction(selectedTask, action)}
+        onApprovedQuantityChange={updateDetailApprovedQuantity}
         onBack={handleActionBack}
         onReasonChange={updateDetailReason}
         onRetryAccess={selectedTaskActionAccess.retry}

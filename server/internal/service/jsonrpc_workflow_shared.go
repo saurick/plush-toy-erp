@@ -160,6 +160,8 @@ func workflowProcessTaskContextToMap(processContext *biz.ProcessTaskContext) map
 			"no":   workflowStringValue(processContext.Instance.BusinessRefNo),
 		},
 		"process_instance": workflowProcessInstanceSummaryToMap(processContext.Instance),
+		"linked_node":      workflowProcessNodeToMap(processContext.LinkedNode),
+		"approval_form":    workflowProcessApprovalFormToMap(processContext.LinkedNode),
 		"nodes":            workflowProcessNodesToAny(processContext.Nodes),
 		"current_nodes":    workflowProcessNodesToAny(processContext.CurrentNodes),
 		"completed_nodes":  workflowProcessNodesToAny(processContext.CompletedNodes),
@@ -186,19 +188,58 @@ func workflowProcessNodesToAny(nodes []*biz.ProcessNodeInstance) []any {
 		if node == nil {
 			continue
 		}
-		out = append(out, map[string]any{
-			"id":                  node.ID,
-			"process_instance_id": node.ProcessInstanceID,
-			"node_key":            node.NodeKey,
-			"node_type":           node.NodeType,
-			"attempt":             node.Attempt,
-			"status":              node.Status,
-			"started_at":          workflowUnixValue(node.StartedAt),
-			"completed_at":        workflowUnixValue(node.CompletedAt),
-			"outcome":             workflowStringValue(node.Outcome),
-		})
+		out = append(out, workflowProcessNodeToMap(node))
 	}
 	return out
+}
+
+func workflowProcessNodeToMap(node *biz.ProcessNodeInstance) map[string]any {
+	if node == nil {
+		return nil
+	}
+	return map[string]any{
+		"id":                      node.ID,
+		"process_instance_id":     node.ProcessInstanceID,
+		"node_key":                node.NodeKey,
+		"node_type":               node.NodeType,
+		"attempt":                 node.Attempt,
+		"status":                  node.Status,
+		"version":                 node.Version,
+		"owner_pool_key":          workflowStringValue(node.OwnerPoolKey),
+		"required_capability_key": workflowStringValue(node.RequiredCapabilityKey),
+		"form_profile_key":        workflowStringValue(node.FormProfileKey),
+		"action_set_key":          workflowStringValue(node.ActionSetKey),
+		"started_at":              workflowUnixValue(node.StartedAt),
+		"completed_at":            workflowUnixValue(node.CompletedAt),
+		"outcome":                 workflowStringValue(node.Outcome),
+	}
+}
+
+func workflowProcessApprovalFormToMap(node *biz.ProcessNodeInstance) map[string]any {
+	if node == nil || node.NodeType != biz.ProcessNodeTypeApproval || node.FormProfileKey == nil {
+		return nil
+	}
+	profileKey := strings.TrimSpace(*node.FormProfileKey)
+	switch profileKey {
+	case "sales_return_approval", "finance_payment_approval", "inventory_adjustment_approval":
+		return map[string]any{
+			"profile_key":       profileKey,
+			"reason_required":   true,
+			"approved_quantity": nil,
+		}
+	case "production_exception_approval":
+		return map[string]any{
+			"profile_key":     profileKey,
+			"reason_required": true,
+			"approved_quantity": map[string]any{
+				"required":  false,
+				"precision": 20,
+				"scale":     6,
+			},
+		}
+	default:
+		return nil
+	}
 }
 
 func workflowBusinessStatesToAny(items []*biz.WorkflowBusinessState) []any {

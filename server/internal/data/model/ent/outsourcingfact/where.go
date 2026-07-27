@@ -71,6 +71,11 @@ func Status(v string) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldEQ(FieldStatus, v))
 }
 
+// Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
+func Version(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldVersion, v))
+}
+
 // SubjectType applies equality check predicate on the "subject_type" field. It's identical to SubjectTypeEQ.
 func SubjectType(v string) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldEQ(FieldSubjectType, v))
@@ -149,6 +154,26 @@ func OccurredAtSpecified(v bool) predicate.OutsourcingFact {
 // PostedAt applies equality check predicate on the "posted_at" field. It's identical to PostedAtEQ.
 func PostedAt(v time.Time) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldEQ(FieldPostedAt, v))
+}
+
+// PostedBy applies equality check predicate on the "posted_by" field. It's identical to PostedByEQ.
+func PostedBy(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldPostedBy, v))
+}
+
+// CancelledAt applies equality check predicate on the "cancelled_at" field. It's identical to CancelledAtEQ.
+func CancelledAt(v time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldCancelledAt, v))
+}
+
+// CancelledBy applies equality check predicate on the "cancelled_by" field. It's identical to CancelledByEQ.
+func CancelledBy(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldCancelledBy, v))
+}
+
+// CancelReason applies equality check predicate on the "cancel_reason" field. It's identical to CancelReasonEQ.
+func CancelReason(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldCancelReason, v))
 }
 
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
@@ -359,6 +384,46 @@ func StatusEqualFold(v string) predicate.OutsourcingFact {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldContainsFold(FieldStatus, v))
+}
+
+// VersionEQ applies the EQ predicate on the "version" field.
+func VersionEQ(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldVersion, v))
+}
+
+// VersionNEQ applies the NEQ predicate on the "version" field.
+func VersionNEQ(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNEQ(FieldVersion, v))
+}
+
+// VersionIn applies the In predicate on the "version" field.
+func VersionIn(vs ...int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIn(FieldVersion, vs...))
+}
+
+// VersionNotIn applies the NotIn predicate on the "version" field.
+func VersionNotIn(vs ...int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotIn(FieldVersion, vs...))
+}
+
+// VersionGT applies the GT predicate on the "version" field.
+func VersionGT(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldGT(FieldVersion, v))
+}
+
+// VersionGTE applies the GTE predicate on the "version" field.
+func VersionGTE(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldGTE(FieldVersion, v))
+}
+
+// VersionLT applies the LT predicate on the "version" field.
+func VersionLT(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldLT(FieldVersion, v))
+}
+
+// VersionLTE applies the LTE predicate on the "version" field.
+func VersionLTE(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldLTE(FieldVersion, v))
 }
 
 // SubjectTypeEQ applies the EQ predicate on the "subject_type" field.
@@ -1071,6 +1136,191 @@ func PostedAtNotNil() predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldNotNull(FieldPostedAt))
 }
 
+// PostedByEQ applies the EQ predicate on the "posted_by" field.
+func PostedByEQ(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldPostedBy, v))
+}
+
+// PostedByNEQ applies the NEQ predicate on the "posted_by" field.
+func PostedByNEQ(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNEQ(FieldPostedBy, v))
+}
+
+// PostedByIn applies the In predicate on the "posted_by" field.
+func PostedByIn(vs ...int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIn(FieldPostedBy, vs...))
+}
+
+// PostedByNotIn applies the NotIn predicate on the "posted_by" field.
+func PostedByNotIn(vs ...int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotIn(FieldPostedBy, vs...))
+}
+
+// PostedByIsNil applies the IsNil predicate on the "posted_by" field.
+func PostedByIsNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIsNull(FieldPostedBy))
+}
+
+// PostedByNotNil applies the NotNil predicate on the "posted_by" field.
+func PostedByNotNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotNull(FieldPostedBy))
+}
+
+// CancelledAtEQ applies the EQ predicate on the "cancelled_at" field.
+func CancelledAtEQ(v time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldCancelledAt, v))
+}
+
+// CancelledAtNEQ applies the NEQ predicate on the "cancelled_at" field.
+func CancelledAtNEQ(v time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNEQ(FieldCancelledAt, v))
+}
+
+// CancelledAtIn applies the In predicate on the "cancelled_at" field.
+func CancelledAtIn(vs ...time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIn(FieldCancelledAt, vs...))
+}
+
+// CancelledAtNotIn applies the NotIn predicate on the "cancelled_at" field.
+func CancelledAtNotIn(vs ...time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotIn(FieldCancelledAt, vs...))
+}
+
+// CancelledAtGT applies the GT predicate on the "cancelled_at" field.
+func CancelledAtGT(v time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldGT(FieldCancelledAt, v))
+}
+
+// CancelledAtGTE applies the GTE predicate on the "cancelled_at" field.
+func CancelledAtGTE(v time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldGTE(FieldCancelledAt, v))
+}
+
+// CancelledAtLT applies the LT predicate on the "cancelled_at" field.
+func CancelledAtLT(v time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldLT(FieldCancelledAt, v))
+}
+
+// CancelledAtLTE applies the LTE predicate on the "cancelled_at" field.
+func CancelledAtLTE(v time.Time) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldLTE(FieldCancelledAt, v))
+}
+
+// CancelledAtIsNil applies the IsNil predicate on the "cancelled_at" field.
+func CancelledAtIsNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIsNull(FieldCancelledAt))
+}
+
+// CancelledAtNotNil applies the NotNil predicate on the "cancelled_at" field.
+func CancelledAtNotNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotNull(FieldCancelledAt))
+}
+
+// CancelledByEQ applies the EQ predicate on the "cancelled_by" field.
+func CancelledByEQ(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldCancelledBy, v))
+}
+
+// CancelledByNEQ applies the NEQ predicate on the "cancelled_by" field.
+func CancelledByNEQ(v int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNEQ(FieldCancelledBy, v))
+}
+
+// CancelledByIn applies the In predicate on the "cancelled_by" field.
+func CancelledByIn(vs ...int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIn(FieldCancelledBy, vs...))
+}
+
+// CancelledByNotIn applies the NotIn predicate on the "cancelled_by" field.
+func CancelledByNotIn(vs ...int) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotIn(FieldCancelledBy, vs...))
+}
+
+// CancelledByIsNil applies the IsNil predicate on the "cancelled_by" field.
+func CancelledByIsNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIsNull(FieldCancelledBy))
+}
+
+// CancelledByNotNil applies the NotNil predicate on the "cancelled_by" field.
+func CancelledByNotNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotNull(FieldCancelledBy))
+}
+
+// CancelReasonEQ applies the EQ predicate on the "cancel_reason" field.
+func CancelReasonEQ(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEQ(FieldCancelReason, v))
+}
+
+// CancelReasonNEQ applies the NEQ predicate on the "cancel_reason" field.
+func CancelReasonNEQ(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNEQ(FieldCancelReason, v))
+}
+
+// CancelReasonIn applies the In predicate on the "cancel_reason" field.
+func CancelReasonIn(vs ...string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIn(FieldCancelReason, vs...))
+}
+
+// CancelReasonNotIn applies the NotIn predicate on the "cancel_reason" field.
+func CancelReasonNotIn(vs ...string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotIn(FieldCancelReason, vs...))
+}
+
+// CancelReasonGT applies the GT predicate on the "cancel_reason" field.
+func CancelReasonGT(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldGT(FieldCancelReason, v))
+}
+
+// CancelReasonGTE applies the GTE predicate on the "cancel_reason" field.
+func CancelReasonGTE(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldGTE(FieldCancelReason, v))
+}
+
+// CancelReasonLT applies the LT predicate on the "cancel_reason" field.
+func CancelReasonLT(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldLT(FieldCancelReason, v))
+}
+
+// CancelReasonLTE applies the LTE predicate on the "cancel_reason" field.
+func CancelReasonLTE(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldLTE(FieldCancelReason, v))
+}
+
+// CancelReasonContains applies the Contains predicate on the "cancel_reason" field.
+func CancelReasonContains(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldContains(FieldCancelReason, v))
+}
+
+// CancelReasonHasPrefix applies the HasPrefix predicate on the "cancel_reason" field.
+func CancelReasonHasPrefix(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldHasPrefix(FieldCancelReason, v))
+}
+
+// CancelReasonHasSuffix applies the HasSuffix predicate on the "cancel_reason" field.
+func CancelReasonHasSuffix(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldHasSuffix(FieldCancelReason, v))
+}
+
+// CancelReasonIsNil applies the IsNil predicate on the "cancel_reason" field.
+func CancelReasonIsNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldIsNull(FieldCancelReason))
+}
+
+// CancelReasonNotNil applies the NotNil predicate on the "cancel_reason" field.
+func CancelReasonNotNil() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldNotNull(FieldCancelReason))
+}
+
+// CancelReasonEqualFold applies the EqualFold predicate on the "cancel_reason" field.
+func CancelReasonEqualFold(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldEqualFold(FieldCancelReason, v))
+}
+
+// CancelReasonContainsFold applies the ContainsFold predicate on the "cancel_reason" field.
+func CancelReasonContainsFold(v string) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(sql.FieldContainsFold(FieldCancelReason, v))
+}
+
 // NoteEQ applies the EQ predicate on the "note" field.
 func NoteEQ(v string) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(sql.FieldEQ(FieldNote, v))
@@ -1310,6 +1560,52 @@ func HasInventoryLot() predicate.OutsourcingFact {
 func HasInventoryLotWith(preds ...predicate.InventoryLot) predicate.OutsourcingFact {
 	return predicate.OutsourcingFact(func(s *sql.Selector) {
 		step := newInventoryLotStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPoster applies the HasEdge predicate on the "poster" edge.
+func HasPoster() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, PosterTable, PosterColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPosterWith applies the HasEdge predicate on the "poster" edge with a given conditions (other predicates).
+func HasPosterWith(preds ...predicate.AdminUser) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(func(s *sql.Selector) {
+		step := newPosterStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasCanceller applies the HasEdge predicate on the "canceller" edge.
+func HasCanceller() predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, CancellerTable, CancellerColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasCancellerWith applies the HasEdge predicate on the "canceller" edge with a given conditions (other predicates).
+func HasCancellerWith(preds ...predicate.AdminUser) predicate.OutsourcingFact {
+	return predicate.OutsourcingFact(func(s *sql.Selector) {
+		step := newCancellerStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

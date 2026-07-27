@@ -135,6 +135,8 @@ export function validateProductionMaterialRequirements(
       requirement?.unit_quantity_snapshot,
       requirement?.loss_rate_snapshot,
       requirement?.planned_quantity,
+      requirement?.approved_over_issue_quantity,
+      requirement?.effective_limit_quantity,
       requirement?.issued_quantity,
       requirement?.remaining_quantity,
     ]
@@ -162,13 +164,22 @@ export function validateProductionMaterialRequirements(
       throw invalidResponse()
     }
     const planned = numeric20Scale6Units(requirement.planned_quantity)
+    const approvedOverIssue = numeric20Scale6Units(
+      requirement.approved_over_issue_quantity
+    )
+    const effectiveLimit = numeric20Scale6Units(
+      requirement.effective_limit_quantity
+    )
     const issued = numeric20Scale6Units(requirement.issued_quantity)
     const remaining = numeric20Scale6Units(requirement.remaining_quantity)
     if (
       !isPositiveNumeric20Scale6Units(planned) ||
+      approvedOverIssue === null ||
+      effectiveLimit === null ||
       issued === null ||
       remaining === null ||
-      addNumeric20Scale6Units(issued, remaining) !== planned
+      addNumeric20Scale6Units(planned, approvedOverIssue) !== effectiveLimit ||
+      addNumeric20Scale6Units(issued, remaining) !== effectiveLimit
     ) {
       throw invalidResponse()
     }

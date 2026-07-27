@@ -22,7 +22,8 @@ func TestQualityInspectionFromOutsourcingReturnPostgresConcurrentCreateIsSourceU
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
 	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
-	fact := createPostgresOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, "CREATE-"+fixtures.suffix)
+	actor := client.AdminUser.Create().SetUsername("pg-quality-create-actor-" + fixtures.suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostgresOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, actor.ID, "CREATE-"+fixtures.suffix)
 
 	start := make(chan struct{})
 	errs := make(chan error, 2)
@@ -73,7 +74,9 @@ func TestQualityInspectionFromOutsourcingReturnPostgresCreateCancelRaceKeepsVali
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
 	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
-	fact := createPostgresOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, "CANCEL-"+fixtures.suffix)
+	actor := client.AdminUser.Create().SetUsername("pg-quality-cancel-actor-" + fixtures.suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostgresOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, actor.ID, "CANCEL-"+fixtures.suffix)
+	cancelRequest := operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "并发撤销委外回货")
 
 	start := make(chan struct{})
 	createErr := make(chan error, 1)
@@ -88,7 +91,7 @@ func TestQualityInspectionFromOutsourcingReturnPostgresCreateCancelRaceKeepsVali
 	}()
 	go func() {
 		<-start
-		_, err := operationalUC.CancelPostedOutsourcingFact(ctx, fact.ID)
+		_, err := operationalUC.CancelPostedOutsourcingFact(ctx, cancelRequest)
 		cancelErr <- err
 	}()
 	close(start)
@@ -125,6 +128,7 @@ func createPostgresOutsourcingReturnForQuality(
 	inventoryUC *biz.InventoryUsecase,
 	operationalUC *biz.OperationalFactUsecase,
 	fixtures inventoryPostgresFixtures,
+	actorID int,
 	suffix string,
 ) *biz.OutsourcingFact {
 	t.Helper()
@@ -149,7 +153,7 @@ func createPostgresOutsourcingReturnForQuality(
 	if err != nil {
 		t.Fatalf("create postgres outsourcing return: %v", err)
 	}
-	posted, err := operationalUC.PostOutsourcingFact(ctx, fact.ID)
+	posted, err := operationalUC.PostOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actorID, ""))
 	if err != nil {
 		t.Fatalf("post postgres outsourcing return: %v", err)
 	}

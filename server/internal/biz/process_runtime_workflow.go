@@ -194,13 +194,21 @@ func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context,
 		if node.Status != ProcessNodeStatusCompleted || !processNodeOutcomeMatches(node, outcome) {
 			return nil, ErrProcessNodeInstanceSettled
 		}
-		if err := uc.reconcileLinkedWorkflowTaskCompletion(ctx, node, taskStatusKey, reason, actorID); err != nil {
+		commandPayload, payloadErr := workflowTaskProcessCommandPayload(task, node, taskStatusKey, reason)
+		if payloadErr != nil {
+			return nil, payloadErr
+		}
+		if err := uc.reconcileLinkedWorkflowTaskCompletion(ctx, node, taskStatusKey, reason, actorID, commandPayload); err != nil {
 			return nil, err
 		}
 		return node, nil
 	}
 	if node.Status != ProcessNodeStatusActive {
 		return nil, ErrProcessNodeInstanceNotActive
+	}
+	commandPayload, err := workflowTaskProcessCommandPayload(task, node, taskStatusKey, reason)
+	if err != nil {
+		return nil, err
 	}
 	completedNode, err := uc.repo.CompleteProcessNodeInstance(ctx, &ProcessNodeInstanceComplete{
 		ID:                node.ID,
@@ -212,18 +220,164 @@ func (uc *ProcessRuntimeUsecase) CompleteLinkedWorkflowTask(ctx context.Context,
 		return nil, err
 	}
 	if taskStatusKey == "rejected" {
-		if err := uc.settleRejectedProcessAfterNodeCompletion(ctx, completedNode, reason, actorID); err != nil {
+		if err := uc.settleRejectedProcessAfterNodeCompletion(ctx, completedNode, reason, actorID, commandPayload); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := uc.advanceAfterNodeCompletion(ctx, completedNode, actorID); err != nil {
+		if err := uc.advanceAfterNodeCompletionWithPayload(ctx, completedNode, actorID, commandPayload); err != nil {
 			return nil, err
 		}
 	}
 	return completedNode, nil
 }
 
-func (uc *ProcessRuntimeUsecase) settleRejectedProcessAfterNodeCompletion(ctx context.Context, completedNode *ProcessNodeInstance, reason string, actorID int) error {
+// ValidateLinkedWorkflowTaskCompletionIntent performs the linked ProcessRuntime
+// checks before a Workflow task mutation is replayed or committed. It keeps a
+// malformed approval form from making the task terminal while leaving the
+// authoritative process node active.
+func (uc *ProcessRuntimeUsecase) ValidateLinkedWorkflowTaskCompletionIntent(
+	ctx context.Context,
+	task *WorkflowTask,
+	targetStatus string,
+	payloadPatch map[string]any,
+	reason string,
+	actorID int,
+) error {
+	if uc == nil || uc.repo == nil || task == nil || actorID <= 0 {
+		return ErrBadParam
+	}
+	hasProcessInstance := task.ProcessInstanceID != nil
+	hasProcessNode := task.ProcessNodeInstanceID != nil
+	if !hasProcessInstance && !hasProcessNode {
+		return nil
+	}
+	if !hasProcessInstance || !hasProcessNode || (targetStatus != "done" && targetStatus != "rejected") {
+		return ErrBadParam
+	}
+	processContext, err := uc.GetProcessTaskContext(ctx, task)
+	if err != nil {
+		return err
+	}
+	if processContext.LinkedNode.NodeType != ProcessNodeTypeHumanTask &&
+		processContext.LinkedNode.NodeType != ProcessNodeTypeApproval {
+		return ErrBadParam
+	}
+	currentStatus := strings.TrimSpace(processContext.LinkedNode.Status)
+	if currentStatus != ProcessNodeStatusActive && currentStatus != ProcessNodeStatusCompleted {
+		return ErrProcessNodeInstanceNotActive
+	}
+	candidate := *task
+	candidate.TaskStatusKey = targetStatus
+	candidate.Payload = mergeWorkflowPayload(task.Payload, payloadPatch)
+	commandPayload, err := workflowTaskProcessCommandPayload(
+		&candidate,
+		processContext.LinkedNode,
+		targetStatus,
+		strings.TrimSpace(reason),
+	)
+	if err != nil || currentStatus == ProcessNodeStatusCompleted {
+		return err
+	}
+	return uc.validateNextAutomaticDomainCommandAfterWorkflowTaskCompletion(
+		ctx,
+		processContext,
+		&candidate,
+		targetStatus,
+		strings.TrimSpace(reason),
+		commandPayload,
+		actorID,
+	)
+}
+
+func (uc *ProcessRuntimeUsecase) validateNextAutomaticDomainCommandAfterWorkflowTaskCompletion(
+	ctx context.Context,
+	processContext *ProcessTaskContext,
+	task *WorkflowTask,
+	targetStatus string,
+	reason string,
+	additionalPayload map[string]any,
+	actorID int,
+) error {
+	if uc == nil || processContext == nil || processContext.Instance == nil ||
+		processContext.LinkedNode == nil || task == nil || actorID <= 0 {
+		return ErrBadParam
+	}
+	branchPolicyKey := processBranchPolicyKeyFromNode(processContext.LinkedNode)
+	if branchPolicyKey == "" {
+		return nil
+	}
+	outcome := workflowTaskPayloadOutcome(task)
+	if targetStatus == "rejected" {
+		outcome = "rejected"
+	}
+	prospectiveNode := *processContext.LinkedNode
+	prospectiveNode.Status = ProcessNodeStatusCompleted
+	prospectiveNode.Outcome = optionalStringPointer(outcome)
+	nextNodeKey, err := uc.resolveNamedPolicyBranchNodeKey(
+		ctx,
+		&prospectiveNode,
+		branchPolicyKey,
+		reason,
+		actorID,
+	)
+	if err != nil {
+		return err
+	}
+	var nextNode *ProcessNodeInstance
+	for _, node := range processContext.Nodes {
+		if node == nil || node.ProcessInstanceID != processContext.Instance.ID ||
+			node.NodeKey != nextNodeKey || node.Status != ProcessNodeStatusWaiting {
+			continue
+		}
+		if nextNode != nil {
+			return ErrProcessNodeInstanceConflict
+		}
+		nextNode = node
+	}
+	if nextNode == nil {
+		return ErrProcessNodeInstanceNotFound
+	}
+	if nextNode.NodeType != ProcessNodeTypeDomainCommand ||
+		!boolValueFromAny(nextNode.PolicySnapshot["execute_after_approval"]) {
+		return nil
+	}
+	commandKey := processDomainCommandKeyFromNode(nextNode)
+	handler := uc.domainCommandHandlers[commandKey]
+	if commandKey == "" || handler == nil {
+		return ErrProcessDomainCommandHandlerNotFound
+	}
+	payload, err := automaticProcessDomainCommandPayload(processContext.Instance)
+	if err != nil {
+		return err
+	}
+	for key, value := range additionalPayload {
+		if _, exists := payload[key]; exists {
+			return ErrBadParam
+		}
+		payload[key] = value
+	}
+	if normalizer, ok := handler.(ProcessDomainCommandPayloadNormalizer); ok {
+		payload, err = normalizer.NormalizeProcessDomainCommandPayload(payload)
+		if err != nil {
+			return err
+		}
+	}
+	return handler.ValidateProcessDomainCommand(ctx, &ProcessDomainCommandInput{
+		ProcessInstance: processContext.Instance,
+		Node:            nextNode,
+		CommandKey:      commandKey,
+		IdempotencyKey:  fmt.Sprintf("process:%d:node:%d:auto-after-approval", processContext.Instance.ID, nextNode.ID),
+		Payload:         payload,
+	}, actorID)
+}
+
+func (uc *ProcessRuntimeUsecase) settleRejectedProcessAfterNodeCompletion(
+	ctx context.Context,
+	completedNode *ProcessNodeInstance,
+	reason string,
+	actorID int,
+	commandPayload map[string]any,
+) error {
 	if uc == nil || uc.repo == nil || completedNode == nil || completedNode.ProcessInstanceID <= 0 || strings.TrimSpace(reason) == "" {
 		return ErrBadParam
 	}
@@ -232,7 +386,7 @@ func (uc *ProcessRuntimeUsecase) settleRejectedProcessAfterNodeCompletion(ctx co
 		var activatedNode *ProcessNodeInstance
 		activatedNode, err = uc.activateReturnToNodeAttempt(ctx, completedNode, returnRoute, actorID)
 		if err == nil {
-			err = uc.handleActivatedSequentialNode(ctx, activatedNode, actorID)
+			err = uc.handleActivatedSequentialNodeWithPayload(ctx, activatedNode, actorID, commandPayload)
 		}
 	} else if err == nil {
 		branchPolicyKey := processBranchPolicyKeyFromNode(completedNode)
@@ -240,7 +394,7 @@ func (uc *ProcessRuntimeUsecase) settleRejectedProcessAfterNodeCompletion(ctx co
 			var activatedNode *ProcessNodeInstance
 			activatedNode, err = uc.activateNamedPolicyBranchNodeWithReason(ctx, completedNode, branchPolicyKey, reason, actorID)
 			if err == nil {
-				err = uc.handleActivatedSequentialNode(ctx, activatedNode, actorID)
+				err = uc.handleActivatedSequentialNodeWithPayload(ctx, activatedNode, actorID, commandPayload)
 			}
 		} else {
 			return uc.ensureRejectedProcessBlocked(ctx, completedNode.ProcessInstanceID, actorID)
@@ -249,7 +403,14 @@ func (uc *ProcessRuntimeUsecase) settleRejectedProcessAfterNodeCompletion(ctx co
 	return err
 }
 
-func (uc *ProcessRuntimeUsecase) reconcileLinkedWorkflowTaskCompletion(ctx context.Context, completedNode *ProcessNodeInstance, taskStatusKey string, reason string, actorID int) error {
+func (uc *ProcessRuntimeUsecase) reconcileLinkedWorkflowTaskCompletion(
+	ctx context.Context,
+	completedNode *ProcessNodeInstance,
+	taskStatusKey string,
+	reason string,
+	actorID int,
+	commandPayload map[string]any,
+) error {
 	if uc == nil || uc.repo == nil || completedNode == nil || completedNode.ProcessInstanceID <= 0 {
 		return ErrBadParam
 	}
@@ -261,7 +422,7 @@ func (uc *ProcessRuntimeUsecase) reconcileLinkedWorkflowTaskCompletion(ctx conte
 		return err
 	}
 	for _, activatedNode := range activatedNodes {
-		if err := uc.reconcileActivatedSequentialNode(ctx, activatedNode, actorID); err != nil {
+		if err := uc.reconcileActivatedSequentialNodeWithPayload(ctx, activatedNode, actorID, commandPayload); err != nil {
 			return err
 		}
 	}
@@ -375,6 +536,15 @@ func (uc *ProcessRuntimeUsecase) reconcileProcessNodeActivation(ctx context.Cont
 }
 
 func (uc *ProcessRuntimeUsecase) reconcileActivatedSequentialNode(ctx context.Context, node *ProcessNodeInstance, actorID int) error {
+	return uc.reconcileActivatedSequentialNodeWithPayload(ctx, node, actorID, nil)
+}
+
+func (uc *ProcessRuntimeUsecase) reconcileActivatedSequentialNodeWithPayload(
+	ctx context.Context,
+	node *ProcessNodeInstance,
+	actorID int,
+	commandPayload map[string]any,
+) error {
 	if node == nil {
 		return nil
 	}
@@ -384,7 +554,7 @@ func (uc *ProcessRuntimeUsecase) reconcileActivatedSequentialNode(ctx context.Co
 	if node.Status != ProcessNodeStatusActive {
 		return nil
 	}
-	return uc.handleActivatedSequentialNode(ctx, node, actorID)
+	return uc.handleActivatedSequentialNodeWithPayload(ctx, node, actorID, commandPayload)
 }
 
 func (uc *ProcessRuntimeUsecase) ensureProcessInstanceCompleted(ctx context.Context, processInstanceID int, actorID int) error {
@@ -429,6 +599,72 @@ func (uc *ProcessRuntimeUsecase) ensureRejectedProcessBlocked(ctx context.Contex
 		}
 	}
 	return nil
+}
+
+func workflowTaskProcessCommandPayload(
+	task *WorkflowTask,
+	node *ProcessNodeInstance,
+	taskStatusKey string,
+	rejectionReason string,
+) (map[string]any, error) {
+	if task == nil || node == nil {
+		return nil, ErrBadParam
+	}
+	if taskStatusKey == "rejected" {
+		reason := strings.TrimSpace(rejectionReason)
+		if reason == "" {
+			return nil, ErrBadParam
+		}
+		return map[string]any{"reason": reason}, nil
+	}
+	profileKey := ""
+	if node.FormProfileKey != nil {
+		profileKey = strings.TrimSpace(*node.FormProfileKey)
+	}
+	requiresDecision := profileKey == "sales_return_approval" ||
+		profileKey == "finance_payment_approval" ||
+		profileKey == "inventory_adjustment_approval" ||
+		profileKey == "production_exception_approval"
+	rawDecision, hasDecision := task.Payload["process_decision"]
+	if !requiresDecision {
+		if hasDecision {
+			return nil, ErrBadParam
+		}
+		return nil, nil
+	}
+	decision, ok := rawDecision.(map[string]any)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	reasonValue, ok := decision["reason"].(string)
+	reason := strings.TrimSpace(reasonValue)
+	if !ok || reason == "" || len([]rune(reason)) > 255 {
+		return nil, ErrBadParam
+	}
+	out := map[string]any{"reason": reason}
+	for key := range decision {
+		if key != "reason" && key != "approved_quantity" {
+			return nil, ErrBadParam
+		}
+	}
+	if profileKey != "production_exception_approval" {
+		if _, exists := decision["approved_quantity"]; exists {
+			return nil, ErrBadParam
+		}
+		return out, nil
+	}
+	if value, exists := decision["approved_quantity"]; exists {
+		text, ok := value.(string)
+		if !ok || text == "" {
+			return nil, ErrBadParam
+		}
+		quantity, ok := parsePositiveNumeric20Scale6Contract(text)
+		if !ok {
+			return nil, ErrBadParam
+		}
+		out["approved_quantity"] = quantity.String()
+	}
+	return out, nil
 }
 
 func processNodeOutcomeMatches(node *ProcessNodeInstance, outcome string) bool {

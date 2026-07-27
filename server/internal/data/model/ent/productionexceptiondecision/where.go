@@ -165,6 +165,11 @@ func ExecutedAt(v time.Time) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutedAt, v))
 }
 
+// ExecutionReason applies equality check predicate on the "execution_reason" field. It's identical to ExecutionReasonEQ.
+func ExecutionReason(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutionReason, v))
+}
+
 // ReversedBy applies equality check predicate on the "reversed_by" field. It's identical to ReversedByEQ.
 func ReversedBy(v int) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldReversedBy, v))
@@ -1348,6 +1353,81 @@ func ExecutedAtIsNil() predicate.ProductionExceptionDecision {
 // ExecutedAtNotNil applies the NotNil predicate on the "executed_at" field.
 func ExecutedAtNotNil() predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldExecutedAt))
+}
+
+// ExecutionReasonEQ applies the EQ predicate on the "execution_reason" field.
+func ExecutionReasonEQ(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutionReason, v))
+}
+
+// ExecutionReasonNEQ applies the NEQ predicate on the "execution_reason" field.
+func ExecutionReasonNEQ(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldExecutionReason, v))
+}
+
+// ExecutionReasonIn applies the In predicate on the "execution_reason" field.
+func ExecutionReasonIn(vs ...string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldExecutionReason, vs...))
+}
+
+// ExecutionReasonNotIn applies the NotIn predicate on the "execution_reason" field.
+func ExecutionReasonNotIn(vs ...string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldExecutionReason, vs...))
+}
+
+// ExecutionReasonGT applies the GT predicate on the "execution_reason" field.
+func ExecutionReasonGT(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldExecutionReason, v))
+}
+
+// ExecutionReasonGTE applies the GTE predicate on the "execution_reason" field.
+func ExecutionReasonGTE(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldExecutionReason, v))
+}
+
+// ExecutionReasonLT applies the LT predicate on the "execution_reason" field.
+func ExecutionReasonLT(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldExecutionReason, v))
+}
+
+// ExecutionReasonLTE applies the LTE predicate on the "execution_reason" field.
+func ExecutionReasonLTE(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldExecutionReason, v))
+}
+
+// ExecutionReasonContains applies the Contains predicate on the "execution_reason" field.
+func ExecutionReasonContains(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldContains(FieldExecutionReason, v))
+}
+
+// ExecutionReasonHasPrefix applies the HasPrefix predicate on the "execution_reason" field.
+func ExecutionReasonHasPrefix(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldHasPrefix(FieldExecutionReason, v))
+}
+
+// ExecutionReasonHasSuffix applies the HasSuffix predicate on the "execution_reason" field.
+func ExecutionReasonHasSuffix(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldHasSuffix(FieldExecutionReason, v))
+}
+
+// ExecutionReasonIsNil applies the IsNil predicate on the "execution_reason" field.
+func ExecutionReasonIsNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIsNull(FieldExecutionReason))
+}
+
+// ExecutionReasonNotNil applies the NotNil predicate on the "execution_reason" field.
+func ExecutionReasonNotNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldExecutionReason))
+}
+
+// ExecutionReasonEqualFold applies the EqualFold predicate on the "execution_reason" field.
+func ExecutionReasonEqualFold(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEqualFold(FieldExecutionReason, v))
+}
+
+// ExecutionReasonContainsFold applies the ContainsFold predicate on the "execution_reason" field.
+func ExecutionReasonContainsFold(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldContainsFold(FieldExecutionReason, v))
 }
 
 // ReversedByEQ applies the EQ predicate on the "reversed_by" field.

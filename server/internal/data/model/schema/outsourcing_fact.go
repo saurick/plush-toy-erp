@@ -23,6 +23,7 @@ var outsourcingFactLockedFields = map[string]struct{}{
 	"fact_no":               {},
 	"fact_type":             {},
 	"status":                {},
+	"version":               {},
 	"subject_type":          {},
 	"subject_id":            {},
 	"product_sku_id":        {},
@@ -39,13 +40,27 @@ var outsourcingFactLockedFields = map[string]struct{}{
 	"occurred_at":           {},
 	"occurred_at_specified": {},
 	"posted_at":             {},
+	"posted_by":             {},
+	"cancelled_at":          {},
+	"cancelled_by":          {},
+	"cancel_reason":         {},
 }
 
 func (OutsourcingFact) Hooks() []ent.Hook {
 	return []ent.Hook{
 		func(next ent.Mutator) ent.Mutator {
 			return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-				if err := factguard.RejectCreateBypass(m, "outsourcing_fact"); err != nil {
+				if err := factguard.RejectCreateBypass(
+					m,
+					"outsourcing_fact",
+					[]string{
+						"posted_at",
+						"posted_by",
+						"cancelled_at",
+						"cancelled_by",
+						"cancel_reason",
+					},
+				); err != nil {
 					return nil, err
 				}
 				if m.Op().Is(ent.OpDelete | ent.OpDeleteOne) {
@@ -70,6 +85,23 @@ func (OutsourcingFact) Annotations() []schema.Annotation {
 				"outsourcing_facts_subject_allowed":     "subject_type IN ('MATERIAL', 'PRODUCT')",
 				"outsourcing_facts_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
 				"outsourcing_facts_quantity_positive":   "quantity > 0",
+				"outsourcing_facts_version_positive":    "version > 0",
+				"outsourcing_facts_status_audit_bundle": `
+(
+  (status = 'DRAFT'
+    AND posted_at IS NULL AND posted_by IS NULL
+    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)
+  OR
+  (status = 'POSTED'
+    AND posted_at IS NOT NULL AND posted_by IS NOT NULL
+    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)
+  OR
+  (status = 'CANCELLED'
+    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL
+    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255
+    AND ((posted_at IS NULL AND posted_by IS NULL)
+      OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))
+)`,
 			},
 		},
 	}
@@ -81,6 +113,7 @@ func (OutsourcingFact) Fields() []ent.Field {
 		field.String("fact_no").NotEmpty().MaxLen(64),
 		field.String("fact_type").NotEmpty().MaxLen(32),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
+		field.Int("version").Default(1).Positive(),
 		field.String("subject_type").NotEmpty().MaxLen(16),
 		field.Int("subject_id").Positive(),
 		field.Int("product_sku_id").Optional().Nillable().Positive(),
@@ -99,6 +132,10 @@ func (OutsourcingFact) Fields() []ent.Field {
 		field.Time("occurred_at").Default(time.Now),
 		field.Bool("occurred_at_specified").Default(false),
 		field.Time("posted_at").Optional().Nillable(),
+		field.Int("posted_by").Optional().Nillable().Positive(),
+		field.Time("cancelled_at").Optional().Nillable(),
+		field.Int("cancelled_by").Optional().Nillable().Positive(),
+		field.String("cancel_reason").Optional().Nillable().MaxLen(255),
 		field.String("note").Optional().Nillable().MaxLen(255),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
@@ -111,6 +148,14 @@ func (OutsourcingFact) Edges() []ent.Edge {
 		edge.From("unit", Unit.Type).Ref("outsourcing_facts").Field("unit_id").Required().Unique(),
 		edge.From("product_sku", ProductSKU.Type).Ref("outsourcing_facts").Field("product_sku_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("inventory_lot", InventoryLot.Type).Ref("outsourcing_facts").Field("lot_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("poster", AdminUser.Type).
+			Field("posted_by").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("canceller", AdminUser.Type).
+			Field("cancelled_by").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 

@@ -1,29 +1,24 @@
+import {
+  normalizeOperationalFactLifecycleRequest,
+  validateOperationalFactLifecycleResult,
+} from './operationalFactLifecycle.mjs'
+
 export function normalizeFinanceCancellationRequest(params = {}) {
-  const id = Number(params?.id)
-  const reason = typeof params?.reason === 'string' ? params.reason.trim() : ''
-  if (
-    !Number.isSafeInteger(id) ||
-    id <= 0 ||
-    !reason ||
-    [...reason].length > 255
-  ) {
-    throw new TypeError('财务记录或取消原因不正确')
-  }
-  return { id, reason }
+  return normalizeOperationalFactLifecycleRequest(params, {
+    requireReason: true,
+  })
 }
 
 export function validateFinanceCancellationResult(task, request) {
+  validateOperationalFactLifecycleResult(
+    task,
+    request,
+    'CANCELLED',
+    '财务记录已提交，但返回结果不完整，请刷新后核对'
+  )
   if (
-    !task ||
-    typeof task !== 'object' ||
-    Number(task.id) !== request.id ||
-    task.status !== 'CANCELLED' ||
-    !Number.isSafeInteger(Number(task.cancelled_at)) ||
-    Number(task.cancelled_at) <= 0 ||
     typeof task.cancelled_by_name !== 'string' ||
-    !task.cancelled_by_name.trim() ||
-    typeof task.cancel_reason !== 'string' ||
-    !task.cancel_reason.trim()
+    !task.cancelled_by_name.trim()
   ) {
     const error = new Error('财务记录已提交，但返回结果不完整，请刷新后核对')
     error.isInvalidResponse = true

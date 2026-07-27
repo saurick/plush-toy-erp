@@ -672,7 +672,7 @@ export default function ApprovalResponsibilityPanel({
             <div>
               <Title level={5}>审批责任</Title>
               <Text type="secondary">
-                为三项正式审批指定主办、备用和升级责任。
+                为三项可配置审批指定主办、备用和升级责任。
               </Text>
             </div>
             <Space size={6} wrap>

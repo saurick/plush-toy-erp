@@ -8,6 +8,7 @@ import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlow
 import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 import { printTemplateCatalog } from "../../web/src/erp/config/printTemplates.mjs";
 import {
+  MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS,
   MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS,
   buildManualAcceptanceCatalog,
   parseManualAcceptanceCatalogArgs,
@@ -59,7 +60,7 @@ function routerLiteralPaths() {
   };
 }
 
-test("manual acceptance catalog derives the complete current yoyoosun page inventory", () => {
+test("manual acceptance catalog keeps the 50-item read-only baseline separate from dedicated exception writes", () => {
   const catalog = buildManualAcceptanceCatalog();
   const expectedDesktopItems = getNavigationSections({
     ...yoyoosunMenuConfig,
@@ -77,7 +78,20 @@ test("manual acceptance catalog derives the complete current yoyoosun page inven
   assert.equal(catalog.summary.totalScenarios, 50);
   assert.deepEqual(
     catalog.technicalManifest.desktopPages.map((item) => item.key),
-    expectedDesktopItems.map((item) => item.key),
+    expectedDesktopItems
+      .map((item) => item.key)
+      .filter(
+        (key) =>
+          !MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS.includes(key),
+      ),
+  );
+  assert.deepEqual(
+    expectedDesktopItems
+      .map((item) => item.key)
+      .filter((key) =>
+        MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS.includes(key),
+      ),
+    [...MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS],
   );
   assert.deepEqual(
     new Set(catalog.technicalManifest.mobileRolePages.map((item) => item.key)),

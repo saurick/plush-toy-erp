@@ -25,6 +25,7 @@ var productModuleCatalog = map[string]productModuleCatalogItem{
 	"processes":           {Name: "加工环节", Layer: "MasterData", Maturity: "runtime_v1", PageKeys: []string{"processes"}},
 	"material_bom":        {Name: "BOM 管理", Layer: "MasterData", Maturity: "runtime_v1", Dependencies: []string{"products", "materials"}, PageKeys: []string{"material-bom"}},
 	"sales_orders":        {Name: "销售订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"customers", "products"}, PageKeys: []string{"sales-orders"}},
+	"sales_returns":       {Name: "销售退货", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"shipments", "quality_inspections", "inventory"}, PageKeys: []string{"sales-returns"}},
 	"purchase_orders":     {Name: "采购订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"suppliers", "materials"}, PageKeys: []string{"accessories-purchase"}},
 	"purchase_receipts":   {Name: "采购入库", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"purchase_orders", "quality_inspections", "inventory"}, PageKeys: []string{"inbound"}},
 	"quality_inspections": {Name: "质检", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"inventory"}, PageKeys: []string{"quality-inspections"}},
@@ -33,6 +34,7 @@ var productModuleCatalog = map[string]productModuleCatalogItem{
 	"inventory":           {Name: "库存台账", Layer: "FactReadModel", Maturity: "runtime_v1", PageKeys: []string{"inventory", "inbound", "outbound"}},
 	"shipments":           {Name: "出货单", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"sales_orders", "inventory"}, PageKeys: []string{"shipments", "outbound"}},
 	"finance":             {Name: "财务业务", Layer: "FactCandidate", Maturity: "workflow_assisted", PageKeys: []string{"finance-dashboard", "payable-reconciliation", "shipment-finance"}},
+	"finance_payments":    {Name: "收付款与核销", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"finance", "customers", "suppliers"}, PageKeys: []string{"finance-payments"}},
 	"workflow_tasks":      {Name: "协同任务", Layer: "Workflow", Maturity: "runtime_v1", PageKeys: []string{"task-board", "shipping-release"}},
 	"production":          {Name: "生产协同", Layer: "Workflow", Maturity: "workflow_assisted", PageKeys: []string{"production-progress"}},
 }

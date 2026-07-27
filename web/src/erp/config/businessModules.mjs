@@ -107,11 +107,11 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '客户退货',
     pageKind: 'formal-v1',
     description:
-      '客户退货从已出货记录发起，依次办理审核、实物收回和取消；确认收回后才形成库存恢复记录。',
+      '客户退货从已出货记录发起，依次办理审批和实物收回；收回前可取消，收回后必须单独冲正。',
     primaryEntity: 'sales_returns / sales_return_items',
     factSource: 'sales_returns, sales_return_items, shipments, inventory_txns',
     boundary:
-      '客户提出退货、销售任务完成或退货审核都不等于库存已收回；只有退货单确认收回后才增加库存，取消已收回退货会通过反向库存记录恢复。',
+      '客户提出退货、审批通过都不代表商品已收回；仓库确认收货后才增加退回库存。收货前取消不调整库存，收货后只能办理退货冲正并保留记录。',
     sourceRefs: [
       'shipments',
       'shipment_items',
@@ -266,15 +266,18 @@ export const businessModuleDefinitions = Object.freeze([
     pageKind: 'formal-v1',
     description:
       '库存台账统一查看库存余额、已预留、可用量、批次和变动记录；库存数量以已确认的入库、出库和调整记录为准。',
-    primaryEntity: 'inventory_balances / inventory_txns / inventory_lots',
+    primaryEntity:
+      'inventory_operations / inventory_balances / inventory_txns / inventory_lots',
     factSource:
-      'inventory_txns, inventory_balances, inventory_lots, stock_reservations',
+      'inventory_operations, inventory_operation_items, inventory_txns, inventory_balances, inventory_lots, stock_reservations',
     boundary:
       '入库、生产、委外、出货和预留必须通过对应来源单据或业务记录办理；本页只额外提供盘点、仓间调拨和有权限的人工调整，过账后才改变库存。',
     sourceRefs: [
       'inventory_txns',
       'inventory_balances',
       'inventory_lots',
+      'inventory_operations',
+      'inventory_operation_items',
       'stock_reservations',
     ],
     currentScope: [
@@ -431,21 +434,27 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '异常',
     pageKind: 'formal-v1',
     description:
-      '生产异常处理返工记录过账时生成的协同待办；完成异常任务不会代写返工、报废或库存调整。',
-    primaryEntity: 'workflow_tasks / workflow_task_events',
-    factSource: 'workflow_tasks, workflow_task_events',
+      '生产异常以报废、在制让步和超领申请为来源，经独立审批后由生产岗位执行或冲正；返工事项继续保留后续办理入口。',
+    primaryEntity:
+      'production_exception_decisions / production_wip_events / workflow_tasks',
+    factSource:
+      'production_exception_decisions, production_wip_events, inventory_txns, workflow_tasks, process_instances',
     boundary:
-      '异常处理只更新已有任务；当前不提供通用新建任务，也不会直接修改生产、库存、出货或财务记录。',
+      '审批任务完成只表达审批结论，不自动写生产或库存事实；必须在精确异常来源上执行。已执行异常不可改删，只能以独立冲正记录恢复。',
     sourceRefs: [
       'production_facts',
+      'production_exception_decisions',
+      'production_wip_events',
+      'process_instances',
       'workflow_tasks',
       'workflow_task_events',
       'workflow_business_states',
     ],
     currentScope: [
-      '返工记录过账生成的异常任务',
-      '退回和催办',
-      '返回来源生产记录',
+      '报废、在制让步和超领申请',
+      '提交审批、通过、退回、阻塞和恢复',
+      '执行、冲正与来源记录核对',
+      '返工记录过账后生成的后续办理事项',
     ],
   },
   {

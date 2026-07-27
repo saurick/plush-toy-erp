@@ -27,6 +27,15 @@ type inventoryTestFixtures struct {
 	warehouseID int
 }
 
+func operationalFactStatusMutation(id, expectedVersion, actorID int, reason string) *biz.OperationalFactStatusMutation {
+	return &biz.OperationalFactStatusMutation{
+		ID:              id,
+		ExpectedVersion: expectedVersion,
+		ActorID:         actorID,
+		Reason:          reason,
+	}
+}
+
 func TestInventoryMasterDataCodeUnique(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:inventory_master_unique?mode=memory&cache=shared&_fk=1")

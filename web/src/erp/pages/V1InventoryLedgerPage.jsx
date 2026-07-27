@@ -31,6 +31,13 @@ import {
   postInventoryOperation,
 } from '../api/inventoryApi.mjs'
 import {
+  executeInventoryAdjustmentPost,
+  executeInventoryAdjustmentSubmit,
+  findExceptionProcessActiveNode,
+  getInventoryAdjustmentApprovalProcess,
+  startInventoryAdjustmentApprovalProcess,
+} from '../api/customerConfigApi.mjs'
+import {
   listProductSKUs,
   listUnits,
   listMaterials,
@@ -55,6 +62,7 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
+import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import {
   compactParams,
   formatUnixDate,
@@ -102,6 +110,50 @@ const VIEW_LOTS = 'lots'
 const VIEW_TXNS = 'txns'
 const INVENTORY_OPERATION_SESSION_PREFIX =
   'plush-erp:inventory-operation:last:v1:'
+const INVENTORY_OPERATION_STATUS_LABELS = Object.freeze({
+  DRAFT: '草稿',
+  SUBMITTED: '待审批',
+  APPROVED: '已批准待过账',
+  REJECTED: '已驳回',
+  POSTED: '已过账',
+  CANCELLED: '已取消',
+})
+
+const INVENTORY_OPERATION_MUTATION_RECEIPTS = Object.freeze({
+  submit: {
+    status: 'SUBMITTED',
+    actorField: 'submitted_by',
+  },
+  post: {
+    status: 'POSTED',
+    actorField: 'posted_by',
+  },
+  cancel: {
+    status: 'CANCELLED',
+    actorField: 'cancelled_by',
+    reasonField: 'cancel_reason',
+  },
+})
+
+function inventoryOperationMutationReceiptMatches(
+  item,
+  previous,
+  action,
+  reason,
+  actorID
+) {
+  const receipt = INVENTORY_OPERATION_MUTATION_RECEIPTS[action]
+  return Boolean(
+    receipt &&
+      item?.id &&
+      Number(item.id) === Number(previous?.id) &&
+      Number(item.version) === Number(previous?.version) + 1 &&
+      item.status === receipt.status &&
+      Number(item[receipt.actorField]) === Number(actorID) &&
+      (!receipt.reasonField ||
+        String(item[receipt.reasonField] || '').trim() === reason.trim())
+  )
+}
 
 const VIEW_ITEMS = [
   { key: VIEW_BALANCES, label: '库存余额', children: null },
@@ -381,6 +433,10 @@ export default function V1InventoryLedgerPage() {
   const routeView = searchParamText(searchParams, 'view')
   const routeLotID = searchParamPositiveInt(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
+  const routeInventoryOperationID = searchParamPositiveInt(
+    searchParams,
+    'inventory_operation_id'
+  )
   const routeSourceType = searchParamText(searchParams, 'source_type')
   const linkedKeyword = linkedDocumentContext(searchParams).keyword
   const allowedMenuPaths = useMemo(
@@ -400,6 +456,17 @@ export default function V1InventoryLedgerPage() {
     adminProfile,
     'warehouse.adjustment.create'
   )
+  const canApproveInventoryOperation = hasActionPermission(
+    adminProfile,
+    'warehouse.adjustment.approve'
+  )
+  const canRecoverProcess = hasActionPermission(
+    adminProfile,
+    'process_runtime.recover'
+  )
+  const customerKey = String(
+    adminProfile?.effective_session?.customer?.key || ''
+  ).trim()
   const canReadInventory = hasActionPermission(
     adminProfile,
     'warehouse.inventory.read'
@@ -488,6 +555,11 @@ export default function V1InventoryLedgerPage() {
       recoverInventoryOperation(operationID, { quiet: true })
     }
   }, [operationSessionKey, recoverInventoryOperation])
+  useEffect(() => {
+    if (routeInventoryOperationID > 0) {
+      recoverInventoryOperation(routeInventoryOperationID)
+    }
+  }, [recoverInventoryOperation, routeInventoryOperationID])
 
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
@@ -864,7 +936,6 @@ export default function V1InventoryLedgerPage() {
         from_warehouse_id: selectedRow.warehouse_id,
         from_lot_id: selectedRow.lot_id || undefined,
         to_warehouse_id: values.to_warehouse_id || undefined,
-        to_lot_id: values.to_lot_id || undefined,
         unit_id: selectedRow.unit_id,
         expected_quantity:
           operationType === 'CYCLE_COUNT'
@@ -884,23 +955,72 @@ export default function V1InventoryLedgerPage() {
         operation_no: trimOptional(values.operation_no),
         operation_type: operationType,
         reason: trimOptional(values.reason),
-        approval_ref: trimOptional(values.approval_ref),
         items: [item],
       })
       const scope = `${operationType}:${selectedRow.subject_type}:${selectedRow.subject_id}:${selectedRow.product_sku_id || 0}:${selectedRow.warehouse_id}:${selectedRow.lot_id || 0}`
       const attempt = operationAttemptsRef.current.prepare(scope, payload)
       setOperationLoading(true)
       try {
-        const operation = await createInventoryOperation(attempt.params)
-        if (!operation?.id || operation.status !== 'DRAFT') {
+        const created = await createInventoryOperation(attempt.params)
+        if (!created?.id || created.status !== 'DRAFT') {
           throw Object.assign(new Error('库存作业结果暂时无法确认'), {
             isInvalidResponse: true,
           })
         }
+        let operation = created
+        if (operationType === 'MANUAL_ADJUSTMENT') {
+          let processData
+          try {
+            processData = await startInventoryAdjustmentApprovalProcess({
+              ...(customerKey ? { customer_key: customerKey } : {}),
+              inventory_operation_id: created.id,
+              idempotency_key: `inventory-adjustment-approval/${created.id}`,
+            })
+          } catch (error) {
+            if (!isSourceBusinessActionResultUnknown(error)) throw error
+            processData = await getInventoryAdjustmentApprovalProcess({
+              ...(customerKey ? { customer_key: customerKey } : {}),
+              inventory_operation_id: created.id,
+            })
+            if (!processData?.process_context) throw error
+          }
+          if (processData.source_readback?.status === 'DRAFT') {
+            const node = findExceptionProcessActiveNode(
+              processData,
+              'submit_inventory_adjustment'
+            )
+            try {
+              const execution = await executeInventoryAdjustmentSubmit({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                process_instance_id:
+                  processData.process_context.process_instance.id,
+                process_node_instance_id: node.id,
+                expected_version: node.version,
+                inventory_operation_id: created.id,
+                idempotency_key: `inventory-adjustment-submit/${created.id}/${node.id}`,
+              })
+              operation = execution.source_readback
+            } catch (error) {
+              if (!isSourceBusinessActionResultUnknown(error)) throw error
+              const readback = await getInventoryAdjustmentApprovalProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                inventory_operation_id: created.id,
+              })
+              if (readback?.source_readback?.status !== 'SUBMITTED') throw error
+              operation = readback.source_readback
+            }
+          } else {
+            operation = processData.source_readback
+          }
+        }
         operationAttemptsRef.current.settle(scope, attempt, null)
         rememberInventoryOperation(operation)
         setOperationType('')
-        message.success('库存作业草稿已生成，请核对后过账')
+        message.success(
+          operationType === 'MANUAL_ADJUSTMENT'
+            ? '人工库存调整已提交审批'
+            : '库存作业草稿已生成，请核对后过账'
+        )
       } catch (error) {
         const retained = operationAttemptsRef.current.settle(
           scope,
@@ -916,39 +1036,143 @@ export default function V1InventoryLedgerPage() {
         setOperationLoading(false)
       }
     },
-    [operationType, rememberInventoryOperation, selectedRow]
+    [customerKey, operationType, rememberInventoryOperation, selectedRow]
   )
 
   const transitionInventoryOperation = useCallback(
-    async (action, reason = '') => {
-      if (!currentOperation?.id || !currentOperation?.version) return
+    async (action, reason = '', operation = currentOperation) => {
+      if (!operation?.id || !operation?.version) return
       setOperationLoading(true)
       try {
         const params = {
-          id: currentOperation.id,
-          expected_version: currentOperation.version,
+          id: operation.id,
+          expected_version: operation.version,
           ...(reason ? { reason: reason.trim() } : {}),
         }
-        const next =
-          action === 'post'
-            ? await postInventoryOperation(params)
-            : await cancelInventoryOperation(params)
-        if (!next?.id) throw new Error('库存作业结果暂时无法确认')
+        let next
+        if (
+          operation.operation_type === 'MANUAL_ADJUSTMENT' &&
+          (action === 'submit' || action === 'post')
+        ) {
+          let processData
+          if (action === 'submit') {
+            try {
+              processData = await startInventoryAdjustmentApprovalProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                inventory_operation_id: operation.id,
+                idempotency_key: `inventory-adjustment-approval/${operation.id}`,
+              })
+            } catch (error) {
+              if (!isSourceBusinessActionResultUnknown(error)) throw error
+              processData = await getInventoryAdjustmentApprovalProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                inventory_operation_id: operation.id,
+              })
+              if (!processData?.process_context) throw error
+            }
+          } else {
+            processData = await getInventoryAdjustmentApprovalProcess({
+              ...(customerKey ? { customer_key: customerKey } : {}),
+              inventory_operation_id: operation.id,
+            })
+          }
+          if (
+            action === 'submit' &&
+            processData.source_readback?.status !== 'DRAFT'
+          ) {
+            next = processData.source_readback
+          } else {
+            const nodeKey =
+              action === 'submit'
+                ? 'submit_inventory_adjustment'
+                : 'post_inventory_adjustment'
+            const node = findExceptionProcessActiveNode(processData, nodeKey)
+            const execute =
+              action === 'submit'
+                ? executeInventoryAdjustmentSubmit
+                : executeInventoryAdjustmentPost
+            const execution = await execute({
+              ...(customerKey ? { customer_key: customerKey } : {}),
+              process_instance_id:
+                processData.process_context.process_instance.id,
+              process_node_instance_id: node.id,
+              expected_version: node.version,
+              inventory_operation_id: operation.id,
+              idempotency_key: `inventory-adjustment-${action}/${operation.id}/${node.id}`,
+            })
+            next = execution.source_readback
+          }
+        } else {
+          const transition =
+            action === 'post'
+              ? postInventoryOperation
+              : action === 'cancel'
+                ? cancelInventoryOperation
+                : null
+          if (!transition) return
+          next = await transition(params)
+        }
+        if (
+          !inventoryOperationMutationReceiptMatches(
+            next,
+            operation,
+            action,
+            reason,
+            Number(adminProfile?.id || 0)
+          )
+        ) {
+          throw Object.assign(new Error('库存作业结果暂时无法确认'), {
+            isInvalidResponse: true,
+          })
+        }
         rememberInventoryOperation(next)
         setOperationCancelOpen(false)
         setOperationCancelReason('')
         await loadRows()
-        message.success(action === 'post' ? '库存作业已过账' : '库存作业已取消')
+        message.success(
+          {
+            submit: '人工库存调整已提交审批',
+            post: '库存作业已过账',
+            cancel: '库存作业已取消',
+          }[action] || '库存作业已更新'
+        )
       } catch (error) {
         if (isSourceBusinessActionResultUnknown(error)) {
-          const recovered = await recoverInventoryOperation(
-            currentOperation.id,
-            {
-              quiet: true,
-            }
-          )
-          if (recovered?.status !== currentOperation.status) {
+          let recovered = null
+          if (
+            operation.operation_type === 'MANUAL_ADJUSTMENT' &&
+            (action === 'submit' || action === 'post')
+          ) {
+            recovered = await getInventoryAdjustmentApprovalProcess({
+              ...(customerKey ? { customer_key: customerKey } : {}),
+              inventory_operation_id: operation.id,
+            })
+              .then((data) => data.source_readback)
+              .catch(() => null)
+          }
+          if (!recovered) {
+            recovered = await getInventoryOperation({
+              id: operation.id,
+            }).catch(() => null)
+          }
+          if (
+            inventoryOperationMutationReceiptMatches(
+              recovered,
+              operation,
+              action,
+              reason,
+              Number(adminProfile?.id || 0)
+            )
+          ) {
+            rememberInventoryOperation(recovered)
+            await loadRows()
             message.success('已重新读取库存作业结果')
+            return
+          }
+          if (recovered?.id) {
+            rememberInventoryOperation(recovered)
+            await loadRows()
+            message.warning('库存作业状态已被其他操作更新，请核对后重试')
             return
           }
         }
@@ -959,8 +1183,9 @@ export default function V1InventoryLedgerPage() {
     },
     [
       currentOperation,
+      adminProfile?.id,
+      customerKey,
       loadRows,
-      recoverInventoryOperation,
       rememberInventoryOperation,
     ]
   )
@@ -1347,6 +1572,53 @@ export default function V1InventoryLedgerPage() {
     setDateFilterEnd('')
     clearRouteContext()
   }, [clearRouteContext])
+  const currentAdminID = Number(adminProfile?.id || 0)
+  const openOperationCancellation = async () => {
+    if (!currentOperation?.id) return
+    if (
+      currentOperation.operation_type !== 'MANUAL_ADJUSTMENT' ||
+      currentOperation.status === 'POSTED'
+    ) {
+      setOperationCancelOpen(true)
+      return
+    }
+    setOperationLoading(true)
+    try {
+      const processData = await getInventoryAdjustmentApprovalProcess({
+        ...(customerKey ? { customer_key: customerKey } : {}),
+        inventory_operation_id: currentOperation.id,
+      })
+      const operation = processData.source_readback
+      rememberInventoryOperation(operation)
+      if (
+        !['DRAFT', 'SUBMITTED', 'APPROVED'].includes(operation.status) ||
+        (processData.process_context &&
+          processData.process_context.process_instance.status !== 'blocked')
+      ) {
+        message.warning(
+          ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(operation.status)
+            ? '该人工调整流程仍在办理，请先在任务中心驳回或阻塞流程'
+            : '当前状态不能取消人工库存调整'
+        )
+        return
+      }
+      setOperationCancelReason('')
+      setOperationCancelOpen(true)
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '核对库存作业取消条件'))
+    } finally {
+      setOperationLoading(false)
+    }
+  }
+  const currentOperationCanCancel =
+    canCreateInventoryOperation &&
+    currentOperation?.id &&
+    ['DRAFT', 'SUBMITTED', 'APPROVED', 'POSTED'].includes(
+      currentOperation.status
+    ) &&
+    (Number(currentOperation.created_by || 0) === currentAdminID ||
+      (currentOperation.status === 'POSTED' &&
+        Number(currentOperation.posted_by || 0) === currentAdminID))
 
   return (
     <BusinessPageLayout className="erp-v1-inventory-ledger-page">
@@ -1377,55 +1649,124 @@ export default function V1InventoryLedgerPage() {
           message={
             currentOperation
               ? `最近库存作业：${currentOperation.operation_no || '已登记'} / ${
-                  {
-                    DRAFT: '草稿',
-                    POSTED: '已过账',
-                    CANCELLED: '已取消',
-                  }[currentOperation.status] || '状态待核对'
+                  INVENTORY_OPERATION_STATUS_LABELS[currentOperation.status] ||
+                  '状态待核对'
                 }`
               : '最近库存作业暂时无法恢复'
           }
           description={
             operationRecoveryError ||
             (currentOperation?.status === 'DRAFT'
-              ? '请核对作业内容后过账，或填写原因取消；过账前库存不会变化。'
-              : currentOperation?.cancel_reason ||
-                currentOperation?.reason ||
-                '')
+              ? currentOperation.operation_type === 'MANUAL_ADJUSTMENT'
+                ? '请核对后提交审批；创建人不能审批，批准后仍须由仓库过账。'
+                : '请核对作业内容后过账；过账前库存不会变化。'
+              : currentOperation?.status === 'SUBMITTED'
+                ? '等待另一位有权人员批准或驳回；审批本身不会改变库存。'
+                : currentOperation?.status === 'APPROVED'
+                  ? '审批已通过，仓库过账后才会形成库存变动。'
+                  : currentOperation?.reject_reason ||
+                    currentOperation?.cancel_reason ||
+                    currentOperation?.reason ||
+                    '')
           }
           action={
-            currentOperation?.status === 'DRAFT' ? (
-              <Space wrap>
-                <Popconfirm
-                  title="确认过账这张库存作业？"
-                  okText="确认过账"
-                  cancelText="返回"
-                  onConfirm={() => transitionInventoryOperation('post')}
-                >
-                  <Button
-                    type="primary"
-                    size="small"
-                    loading={operationLoading}
+            currentOperation?.id ? (
+              <Space wrap size={6}>
+                {currentOperation.status === 'DRAFT' &&
+                canCreateInventoryOperation &&
+                Number(currentOperation.created_by || 0) === currentAdminID ? (
+                  currentOperation.operation_type === 'MANUAL_ADJUSTMENT' ? (
+                    <Popconfirm
+                      title="确认提交这张人工库存调整审批？"
+                      okText="提交审批"
+                      cancelText="返回"
+                      onConfirm={() => transitionInventoryOperation('submit')}
+                    >
+                      <Button
+                        type="primary"
+                        size="small"
+                        loading={operationLoading}
+                      >
+                        提交审批
+                      </Button>
+                    </Popconfirm>
+                  ) : (
+                    <Popconfirm
+                      title="确认过账这张库存作业？"
+                      okText="确认过账"
+                      cancelText="返回"
+                      onConfirm={() => transitionInventoryOperation('post')}
+                    >
+                      <Button
+                        type="primary"
+                        size="small"
+                        loading={operationLoading}
+                      >
+                        过账
+                      </Button>
+                    </Popconfirm>
+                  )
+                ) : null}
+                {currentOperation.status === 'APPROVED' &&
+                canCreateInventoryOperation ? (
+                  <Popconfirm
+                    title="确认过账这张库存作业？"
+                    okText="确认过账"
+                    cancelText="返回"
+                    onConfirm={() => transitionInventoryOperation('post')}
                   >
-                    过账
+                    <Button
+                      type="primary"
+                      size="small"
+                      loading={operationLoading}
+                    >
+                      过账
+                    </Button>
+                  </Popconfirm>
+                ) : null}
+                {currentOperation.status === 'SUBMITTED' &&
+                canApproveInventoryOperation ? (
+                  <Button
+                    size="small"
+                    onClick={() => navigate('/erp/task-board')}
+                  >
+                    去任务中心审批
                   </Button>
-                </Popconfirm>
-                <Button
-                  danger
-                  size="small"
+                ) : null}
+                {currentOperationCanCancel ? (
+                  <Button
+                    danger
+                    size="small"
+                    disabled={operationLoading}
+                    onClick={openOperationCancellation}
+                  >
+                    核对并取消
+                  </Button>
+                ) : null}
+                <ExceptionProcessRecoveryButton
+                  canRecover={
+                    canRecoverProcess &&
+                    currentOperation.operation_type === 'MANUAL_ADJUSTMENT'
+                  }
                   disabled={operationLoading}
-                  onClick={() => setOperationCancelOpen(true)}
+                  loadProcess={() =>
+                    getInventoryAdjustmentApprovalProcess({
+                      ...(customerKey ? { customer_key: customerKey } : {}),
+                      inventory_operation_id: currentOperation.id,
+                    })
+                  }
+                  onRecovered={async () => {
+                    await recoverInventoryOperation(currentOperation.id)
+                    await loadRows()
+                  }}
+                />
+                <Button
+                  size="small"
+                  onClick={() => recoverInventoryOperation(currentOperation.id)}
                 >
-                  取消作业
+                  重新读取
                 </Button>
               </Space>
-            ) : currentOperation?.id ? (
-              <Button
-                size="small"
-                onClick={() => recoverInventoryOperation(currentOperation.id)}
-              >
-                重新读取
-              </Button>
             ) : null
           }
         />
@@ -1774,7 +2115,6 @@ export default function V1InventoryLedgerPage() {
         sourceRecord={selectedRow}
         sourceLabels={operationSourceLabels}
         warehouseOptions={warehouseOptions}
-        lotOptions={inventoryLotOptions}
         loading={operationLoading}
         onCancel={() => setOperationType('')}
         onSubmit={submitInventoryOperation}

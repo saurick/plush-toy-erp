@@ -20,7 +20,8 @@ const TYPE_META = Object.freeze({
   MANUAL_ADJUSTMENT: {
     title: '登记人工库存调整',
     submit: '生成调整作业',
-    notice: '人工调整必须填写审批依据；过账后保留不可变审计记录。',
+    notice:
+      '人工调整生成后须由另一位有权人员审批；审批不会改变库存，过账后才形成库存变动。',
   },
 })
 
@@ -44,7 +45,6 @@ export default function InventoryOperationModal({
   sourceRecord,
   sourceLabels,
   warehouseOptions = [],
-  lotOptions = [],
   loading = false,
   onCancel,
   onSubmit,
@@ -58,11 +58,9 @@ export default function InventoryOperationModal({
     form.setFieldsValue({
       operation_no: '',
       reason: '',
-      approval_ref: '',
       counted_quantity: '',
       adjustment_quantity: '',
       to_warehouse_id: undefined,
-      to_lot_id: undefined,
       note: '',
     })
   }, [form, open, operationType, sourceRecord?.id])
@@ -169,43 +167,24 @@ export default function InventoryOperationModal({
                 options={warehouseOptions}
               />
             </Form.Item>
-            <Form.Item name="to_lot_id" label="目标批次（可选）">
-              <Select
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                options={lotOptions}
-              />
-            </Form.Item>
           </>
         ) : null}
         {operationType === 'MANUAL_ADJUSTMENT' ? (
-          <>
-            <Form.Item
-              name="adjustment_quantity"
-              label="调整数量（增加填正数，扣减填负数）"
-              rules={[
-                { required: true, message: '请填写调整数量' },
-                {
-                  validator: (_, value) =>
-                    isSignedNumeric20Scale6(value) && Number(value) !== 0
-                      ? Promise.resolve()
-                      : Promise.reject(new Error('调整数量不能为 0')),
-                },
-              ]}
-            >
-              <Input inputMode="decimal" autoComplete="off" />
-            </Form.Item>
-            <Form.Item
-              name="approval_ref"
-              label="审批依据"
-              rules={[
-                { required: true, whitespace: true, message: '请填写审批依据' },
-              ]}
-            >
-              <Input maxLength={128} autoComplete="off" />
-            </Form.Item>
-          </>
+          <Form.Item
+            name="adjustment_quantity"
+            label="调整数量（增加填正数，扣减填负数）"
+            rules={[
+              { required: true, message: '请填写调整数量' },
+              {
+                validator: (_, value) =>
+                  isSignedNumeric20Scale6(value) && Number(value) !== 0
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('调整数量不能为 0')),
+              },
+            ]}
+          >
+            <Input inputMode="decimal" autoComplete="off" />
+          </Form.Item>
         ) : null}
         <Form.Item name="note" label="明细备注">
           <Input maxLength={255} />

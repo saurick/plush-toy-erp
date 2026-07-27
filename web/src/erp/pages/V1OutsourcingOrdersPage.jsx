@@ -7,7 +7,7 @@ import {
   PrinterOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Space, Tag } from 'antd'
+import { Button, Form, Input, Space, Tag } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -57,6 +57,7 @@ import OutsourcingOrderForm, {
 import OutsourcingOrderSourceFactModal from '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx'
 import OutsourcingReturnRecordsModal from '../components/outsourcing-orders/OutsourcingReturnRecordsModal.jsx'
 import OutsourcingReturnQualityInspectionModal from '../components/quality-inspections/OutsourcingReturnQualityInspectionModal.jsx'
+import OutsourcingReturnDispositionModal from '../components/quality-inspections/OutsourcingReturnDispositionModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import { buildOutsourcingOrderColumns } from '../components/outsourcing-orders/outsourcingOrderColumns.jsx'
 import {
@@ -183,6 +184,7 @@ import {
   isSourceBusinessActionResultUnknown,
   sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
+import { matchesOperationalFactLifecycleResult } from '../utils/operationalFactLifecycle.mjs'
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
   buildOutsourcingReturnPayablePayload,
@@ -213,19 +215,6 @@ const EMPTY_SOURCE_FACT_CONTEXT = Object.freeze({
   lots: [],
   facts: [],
 })
-
-function invalidOutsourcingFactLifecycleResponse() {
-  const error = new Error('委外记录操作结果不完整')
-  error.isInvalidResponse = true
-  return error
-}
-
-function isMatchingOutsourcingFactState(fact, expectedID, expectedStatus) {
-  return (
-    Number(fact?.id || 0) === Number(expectedID || 0) &&
-    String(fact?.status || '').toUpperCase() === expectedStatus
-  )
-}
 
 export default function V1OutsourcingOrdersPage() {
   const outletContext = useOutletContext()
@@ -286,6 +275,7 @@ export default function V1OutsourcingOrdersPage() {
   const [qualityInspectionByFactID, setQualityInspectionByFactID] = useState({})
   const [qualitySourceFact, setQualitySourceFact] = useState(null)
   const [qualitySourceLoading, setQualitySourceLoading] = useState(false)
+  const [dispositionSourceFact, setDispositionSourceFact] = useState(null)
   const [financeSourceFact, setFinanceSourceFact] = useState(null)
   const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
   const sourceFactRequestRef = useRef(0)
@@ -727,7 +717,7 @@ export default function V1OutsourcingOrdersPage() {
   }, [returnRecordsLoading])
 
   const mutateOutsourcingFact = useCallback(
-    async (action, fact) => {
+    async (action, fact, reason = '') => {
       const factID = Number(fact?.id || 0)
       const currentStatus = String(fact?.status || '').toUpperCase()
       const isPost = action === 'post'
@@ -751,18 +741,29 @@ export default function V1OutsourcingOrdersPage() {
       const expectedStatus = isPost ? 'POSTED' : 'CANCELLED'
       const command = isPost ? postOutsourcingFact : cancelOutsourcingFact
       const actionLabel = isPost ? '过账委外记录' : '取消委外记录'
+      const attempt = Object.freeze({
+        id: factID,
+        expected_version: fact?.version,
+        customer_key: activeCustomerKey || undefined,
+        ...(!isPost ? { reason: String(reason || '').trim() } : {}),
+      })
       let resultWasUnknown = false
 
       returnRecordActionInFlightRef.current = true
       setReturnRecordActionLoading(`${action}:${factID}`)
       try {
         try {
-          const result = await command({
-            id: factID,
-            customer_key: activeCustomerKey || undefined,
-          })
-          if (!isMatchingOutsourcingFactState(result, factID, expectedStatus)) {
-            throw invalidOutsourcingFactLifecycleResponse()
+          const result = await command(attempt)
+          if (
+            !matchesOperationalFactLifecycleResult(
+              result,
+              attempt,
+              expectedStatus
+            )
+          ) {
+            const error = new Error('委外记录操作结果不完整')
+            error.isInvalidResponse = true
+            throw error
           }
         } catch (error) {
           if (!isSourceBusinessActionResultUnknown(error)) {
@@ -791,7 +792,11 @@ export default function V1OutsourcingOrdersPage() {
         }
 
         const confirmed = currentFacts.find((item) =>
-          isMatchingOutsourcingFactState(item, factID, expectedStatus)
+          matchesOperationalFactLifecycleResult(
+            item,
+            attempt,
+            expectedStatus
+          )
         )
         if (!confirmed) {
           message.warning(
@@ -848,15 +853,38 @@ export default function V1OutsourcingOrdersPage() {
         return
       }
       const isDraft = status === 'DRAFT'
+      let cancelReason = ''
       modal.confirm({
         title: isDraft ? '确认作废委外草稿？' : '确认取消已过账委外记录？',
-        content: isDraft
-          ? '草稿尚未过账，本次作废不会产生任何库存变动。'
-          : '取消后将冲正本次过账，并把库存恢复至过账前状态。',
+        content: (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <span>
+              {isDraft
+                ? '草稿尚未过账，本次作废不会产生任何库存变动。'
+                : '取消后将冲正本次过账，并把库存恢复至过账前状态。'}
+            </span>
+            <Input.TextArea
+              rows={3}
+              maxLength={255}
+              showCount
+              placeholder="请填写作废或取消的业务原因"
+              onChange={(event) => {
+                cancelReason = event.target.value
+              }}
+            />
+          </Space>
+        ),
         okText: isDraft ? '确认作废' : '确认取消过账',
         cancelText: '返回',
         okButtonProps: { danger: true },
-        onOk: () => mutateOutsourcingFact('cancel', fact),
+        onOk: () => {
+          const reason = cancelReason.trim()
+          if (!reason || [...reason].length > 255) {
+            message.warning('请填写不超过 255 个字的业务原因')
+            return Promise.reject()
+          }
+          return mutateOutsourcingFact('cancel', fact, reason)
+        },
       })
     },
     [canCancelOutsourcingFact, mutateOutsourcingFact]
@@ -1009,6 +1037,20 @@ export default function V1OutsourcingOrdersPage() {
     },
     [canOpenQualityInspection, navigate]
   )
+
+  const openOutsourcingReturnDisposition = useCallback((fact) => {
+    if (!isPostedOutsourcingReturn(fact)) {
+      message.warning('请先选择已过账的委外回货记录')
+      return
+    }
+    setReturnRecordsOpen(false)
+    setDispositionSourceFact(fact)
+  }, [])
+
+  const closeOutsourcingReturnDisposition = useCallback(() => {
+    setDispositionSourceFact(null)
+    if (returnRecordsOrder?.id) setReturnRecordsOpen(true)
+  }, [returnRecordsOrder?.id])
 
   const openOutsourcingReturnPayable = useCallback(
     (fact) => {
@@ -2531,6 +2573,7 @@ export default function V1OutsourcingOrdersPage() {
         canCancelFact={canCancelOutsourcingFact}
         canCreateQualityInspection={canCreateQualityInspection}
         canViewQualityInspection={canOpenQualityInspection}
+        canViewDisposition={canReadOutsourcingFacts}
         qualityInspectionByFactID={qualityInspectionByFactID}
         canCreatePayable={canCreatePayable}
         canViewPayable={canViewPayable}
@@ -2539,6 +2582,7 @@ export default function V1OutsourcingOrdersPage() {
         onCancelFact={cancelSelectedOutsourcingFact}
         onCreateQualityInspection={openOutsourcingReturnQualityInspection}
         onViewQualityInspection={viewOutsourcingReturnQualityInspection}
+        onViewDisposition={openOutsourcingReturnDisposition}
         onGeneratePayable={openOutsourcingReturnPayable}
         onViewPayable={viewOutsourcingReturnPayable}
       />
@@ -2550,6 +2594,15 @@ export default function V1OutsourcingOrdersPage() {
         loading={qualitySourceLoading}
         onCancel={closeOutsourcingReturnQualityInspection}
         onSubmit={submitOutsourcingReturnQualityInspection}
+      />
+
+      <OutsourcingReturnDispositionModal
+        open={Boolean(dispositionSourceFact)}
+        fact={dispositionSourceFact}
+        canCreate={false}
+        canPost={canPostOutsourcingFact}
+        canCancel={canCancelOutsourcingFact}
+        onClose={closeOutsourcingReturnDisposition}
       />
 
       <FinanceBusinessSourceModal

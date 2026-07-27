@@ -319,7 +319,7 @@ test("dev flow state observatory: catalog stays read-only and structurally compl
   assert.deepEqual(bomFlow.terminalStates, []);
 });
 
-test("dev flow state observatory: process catalog covers three processes and four exact variants", () => {
+test("dev flow state observatory: process catalog covers seven processes and eight exact variants", () => {
   const definitions = DEV_FLOW_STATE_CATALOG.processDefinitions;
   assert(Array.isArray(definitions));
   assert.deepEqual(
@@ -329,11 +329,23 @@ test("dev flow state observatory: process catalog covers three processes and fou
       "sales_order_acceptance/approval_engineering_pmc",
       "material_supply/purchase_order_approval",
       "finished_goods_delivery/shipment_finance_approval",
+      "sales_return_acceptance/approval_receipt",
+      "finance_payment_approval/approval_post",
+      "inventory_adjustment_approval/manual_adjustment_approval",
+      "production_exception_approval/exception_decision_approval",
     ],
   );
   assert.deepEqual(
     [...new Set(definitions.map((definition) => definition.processKey))].sort(),
-    ["finished_goods_delivery", "material_supply", "sales_order_acceptance"],
+    [
+      "finance_payment_approval",
+      "finished_goods_delivery",
+      "inventory_adjustment_approval",
+      "material_supply",
+      "production_exception_approval",
+      "sales_order_acceptance",
+      "sales_return_acceptance",
+    ],
   );
 
   const definitionByIdentity = new Map();

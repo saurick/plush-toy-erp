@@ -24,7 +24,6 @@ const (
 	ProductionExceptionExecutionApplied  = "APPLIED"
 	ProductionExceptionExecutionReversed = "REVERSED"
 	ProductionExceptionSourceType        = "PRODUCTION_EXCEPTION"
-	ProductionFactScrap                  = "SCRAP"
 )
 
 var (
@@ -33,6 +32,11 @@ var (
 	ErrProductionExceptionSourceInvalid  = errors.New("production exception source invalid")
 	ErrProductionExceptionInvalidState   = errors.New("production exception state invalid")
 	ErrProductionExceptionApprovalAmount = errors.New("production exception approved quantity invalid")
+	ErrProductionExceptionSelfApproval   = errors.New("production exception requester cannot approve own request")
+	ErrProductionExceptionCancelOwner    = errors.New("only production exception requester can cancel request")
+	ErrProductionExceptionWIPDependency  = errors.New("production exception WIP has active downstream dependency")
+	ErrProductionExceptionFactDependency = errors.New("production exception WIP supports posted finished goods")
+	ErrProductionExceptionAllowanceUsed  = errors.New("production over-issue allowance has already been consumed")
 )
 
 type ProductionExceptionDecision struct {
@@ -47,7 +51,7 @@ type ProductionExceptionDecision struct {
 	DecisionReason                                                     *string
 	ExecutedBy, ReversedBy                                             *int
 	ExecutedAt, ReversedAt                                             *time.Time
-	ReverseReason                                                      *string
+	ExecutionReason, ReverseReason                                     *string
 }
 
 type ProductionExceptionSubmit struct {
@@ -128,7 +132,7 @@ func (uc *OperationalFactUsecase) SubmitProductionException(ctx context.Context,
 			return nil, ErrProductionExceptionSourceInvalid
 		}
 	case ProductionExceptionScrap:
-		if (n.ProductionWIPBatchID == nil) == (n.QualityInspectionID == nil) || n.ProductionMaterialRequirementID != nil {
+		if n.ProductionWIPBatchID == nil || n.QualityInspectionID == nil || n.ProductionMaterialRequirementID != nil {
 			return nil, ErrProductionExceptionSourceInvalid
 		}
 	default:
@@ -143,23 +147,18 @@ func (uc *OperationalFactUsecase) SubmitProductionException(ctx context.Context,
 }
 
 func (uc *OperationalFactUsecase) ApproveProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
-	repo, ok := productionExceptionRepo(uc)
+	_, ok := productionExceptionRepo(uc)
 	if !ok || !validProductionExceptionMutation(in, true) {
 		return nil, ErrBadParam
 	}
-	n := *in
-	n.Reason = strings.TrimSpace(n.Reason)
-	return repo.ApproveProductionException(ctx, &n)
+	return nil, ErrProcessRuntimeRequired
 }
 func (uc *OperationalFactUsecase) RejectProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
-	repo, ok := productionExceptionRepo(uc)
+	_, ok := productionExceptionRepo(uc)
 	if !ok || !validProductionExceptionMutation(in, false) {
 		return nil, ErrBadParam
 	}
-	n := *in
-	n.Reason = strings.TrimSpace(n.Reason)
-	n.ApprovedQuantity = nil
-	return repo.RejectProductionException(ctx, &n)
+	return nil, ErrProcessRuntimeRequired
 }
 func (uc *OperationalFactUsecase) CancelProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
 	repo, ok := productionExceptionRepo(uc)
@@ -175,14 +174,11 @@ func (uc *OperationalFactUsecase) ExecuteProductionException(ctx context.Context
 	if uc == nil || uc.repo == nil || !validProductionExceptionMutation(in, false) {
 		return nil, ErrBadParam
 	}
-	repo, ok := any(uc.repo).(ProductionExceptionExecutionRepo)
+	_, ok := any(uc.repo).(ProductionExceptionExecutionRepo)
 	if !ok {
 		return nil, ErrBadParam
 	}
-	n := *in
-	n.Reason = strings.TrimSpace(n.Reason)
-	n.ApprovedQuantity = nil
-	return repo.ExecuteProductionException(ctx, &n)
+	return nil, ErrProcessRuntimeRequired
 }
 func (uc *OperationalFactUsecase) ReverseProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
 	if uc == nil || uc.repo == nil || !validProductionExceptionMutation(in, false) {

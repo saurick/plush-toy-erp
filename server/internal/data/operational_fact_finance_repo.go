@@ -4,11 +4,12 @@ import (
 	"context"
 	stdsql "database/sql"
 	"errors"
-	"fmt"
 	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/shipmentitem"
 
@@ -216,7 +217,6 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 			return nil, err
 		}
 	}
-
 	sourceType := biz.ShipmentSourceType
 	shipmentID := parent.ID
 	customerID := *parent.CustomerID
@@ -294,7 +294,7 @@ func (r *operationalFactRepo) CreateFinanceFactDraftForProcessCommand(
 	command *biz.ProcessDomainCommandInput,
 	actorID int,
 ) (*biz.FinanceFact, error) {
-	if in == nil || command == nil {
+	if in == nil || command == nil || r == nil || r.inv == nil {
 		return nil, biz.ErrBadParam
 	}
 	tx, err := r.inv.beginInventoryDBTx(ctx)
@@ -384,6 +384,26 @@ func (r *operationalFactRepo) CreateFinanceFactDraftForProcessCommand(
 	return out, nil
 }
 
+func (r *operationalFactRepo) GetShipmentFinanceAmountSnapshot(
+	ctx context.Context,
+	shipmentID int,
+) (decimal.Decimal, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || shipmentID <= 0 {
+		return decimal.Zero, biz.ErrBadParam
+	}
+	parent, err := r.data.postgres.Shipment.Get(ctx, shipmentID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return decimal.Zero, biz.ErrShipmentNotFound
+		}
+		return decimal.Zero, err
+	}
+	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
+		return decimal.Zero, biz.ErrBadParam
+	}
+	return shipmentFinanceAmountFromSnapshots(ctx, r.data.postgres, shipmentID)
+}
+
 func (r *operationalFactRepo) recoverFinanceFactProcessCommandReplayInTx(
 	ctx context.Context,
 	tx *inventoryDBTx,
@@ -419,15 +439,9 @@ func (r *operationalFactRepo) recoverFinanceFactProcessCommandReplayInTx(
 }
 
 func lockAndValidateFinanceFactShipmentSource(ctx context.Context, tx *inventoryDBTx, in *biz.FinanceFactCreate) error {
-	if in == nil || (in.FactType != biz.FinanceFactReceivable && in.FactType != biz.FinanceFactInvoice) {
-		return nil
-	}
-	if in.SourceType == nil && in.SourceID == nil {
-		// Historical unlinked process-command recovery remains supported. New
-		// source-linked commands are validated by the business usecase first.
-		return nil
-	}
-	if in.SourceType == nil || *in.SourceType != biz.ShipmentSourceType || in.SourceID == nil || *in.SourceID <= 0 {
+	if in == nil || in.FactType != biz.FinanceFactReceivable ||
+		in.SourceType == nil || *in.SourceType != biz.ShipmentSourceType ||
+		in.SourceID == nil || *in.SourceID <= 0 {
 		return biz.ErrBadParam
 	}
 	if err := lockOperationalFactRow(ctx, tx, "shipments", *in.SourceID, biz.ErrShipmentNotFound); err != nil {
@@ -453,12 +467,6 @@ func lockAndValidateFinanceFactShipmentSource(ctx context.Context, tx *inventory
 	}
 	if !in.Amount.Equal(amount) {
 		return biz.ErrFinanceFactShipmentAmountInvalid
-	}
-	if in.FactType == biz.FinanceFactInvoice {
-		if in.InvoiceCategory == nil || in.CollectionType != nil || in.PaymentTerm != nil || in.PaymentTermDays != nil {
-			return biz.ErrBadParam
-		}
-		return nil
 	}
 	collectionType := biz.FinanceCollectionAccountsReceivable
 	paymentTerm, paymentTermDays, err := lockAndResolveShipmentFinancePaymentTermSnapshot(ctx, tx, parent)
@@ -581,19 +589,26 @@ func (r *operationalFactRepo) ValidateFinanceFactCreateReplay(ctx context.Contex
 	return nil
 }
 
-func (r *operationalFactRepo) PostFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
-	return r.changeFinanceFactStatus(ctx, id, biz.OperationalFactStatusPosted)
-}
-
-func (r *operationalFactRepo) SettleFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
-	return r.changeFinanceFactStatus(ctx, id, biz.OperationalFactStatusSettled)
-}
-
-func (r *operationalFactRepo) CancelPostedFinanceFact(ctx context.Context, id int, actorID int, reason string) (*biz.FinanceFact, error) {
-	if id <= 0 || actorID <= 0 || reason == "" || len([]rune(reason)) > 255 {
+func (r *operationalFactRepo) PostFinanceFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || in.Reason != "" {
 		return nil, biz.ErrBadParam
 	}
-	return r.cancelPostedFinanceFact(ctx, id, actorID, reason)
+	return r.changeFinanceFactStatus(ctx, in, biz.OperationalFactStatusPosted)
+}
+
+func (r *operationalFactRepo) SettleFinanceFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || in.Reason != "" {
+		return nil, biz.ErrBadParam
+	}
+	return r.changeFinanceFactStatus(ctx, in, biz.OperationalFactStatusSettled)
+}
+
+func (r *operationalFactRepo) CancelPostedFinanceFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 ||
+		in.Reason == "" || len([]rune(in.Reason)) > 255 {
+		return nil, biz.ErrBadParam
+	}
+	return r.cancelPostedFinanceFact(ctx, in)
 }
 
 func (r *operationalFactRepo) GetFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
@@ -602,6 +617,8 @@ func (r *operationalFactRepo) GetFinanceFact(ctx context.Context, id int) (*biz.
 	}
 	row, err := r.data.postgres.FinanceFact.Query().
 		Where(financefact.ID(id)).
+		WithPoster().
+		WithSettler().
 		WithCanceller().
 		Only(ctx)
 	if err != nil {
@@ -681,7 +698,7 @@ func (r *operationalFactRepo) listFinanceFacts(
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := q.WithCanceller().Order(ent.Desc(financefact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := q.WithPoster().WithSettler().WithCanceller().Order(ent.Desc(financefact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -702,60 +719,95 @@ func (r *operationalFactRepo) listFinanceFacts(
 	return out, total, nil
 }
 
-func (r *operationalFactRepo) changeFinanceFactStatus(ctx context.Context, id int, status string) (*biz.FinanceFact, error) {
+func (r *operationalFactRepo) changeFinanceFactStatus(ctx context.Context, in *biz.OperationalFactStatusMutation, status string) (*biz.FinanceFact, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockOperationalFactRow(ctx, tx, "finance_facts", id, biz.ErrFinanceFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "finance_facts", in.ID, biz.ErrFinanceFactNotFound); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.FinanceFact.Get(ctx, id)
+	row, err := tx.client.FinanceFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrFinanceFactNotFound
 		}
 		return nil, err
 	}
+	transitionActor := row.PostedBy
+	if status == biz.OperationalFactStatusSettled {
+		transitionActor = row.SettledBy
+	}
+	if row.Status == status {
+		if row.Version == in.ExpectedVersion+1 && transitionActor != nil && *transitionActor == in.ActorID {
+			if err := tx.sqlTx.Commit(); err != nil {
+				return nil, err
+			}
+			tx = nil
+			return entFinanceFactToBiz(row), nil
+		}
+		return nil, biz.ErrOperationalFactVersionConflict
+	}
+	if row.Version != in.ExpectedVersion {
+		return nil, biz.ErrOperationalFactVersionConflict
+	}
+	expectedStatus := ""
 	switch status {
 	case biz.OperationalFactStatusPosted:
-		if row.Status != biz.OperationalFactStatusDraft && row.Status != biz.OperationalFactStatusPosted {
+		expectedStatus = biz.OperationalFactStatusDraft
+		if row.Status != expectedStatus {
 			return nil, biz.ErrBadParam
 		}
-		if row.Status == biz.OperationalFactStatusDraft {
-			if err := validateFinanceFactTransitionSource(row); err != nil {
-				return nil, err
-			}
+		if err := validateFinanceFactTransitionSource(row); err != nil {
+			return nil, err
 		}
 	case biz.OperationalFactStatusSettled:
-		if row.FactType != biz.FinanceFactReceivable && row.FactType != biz.FinanceFactPayable && row.FactType != biz.FinanceFactReconciliation {
+		expectedStatus = biz.OperationalFactStatusPosted
+		if row.FactType != biz.FinanceFactReconciliation {
 			return nil, biz.ErrFinanceFactSettlementNotAllowed
 		}
-		if row.Status != biz.OperationalFactStatusPosted && row.Status != biz.OperationalFactStatusSettled {
+		if row.Status != expectedStatus {
 			return nil, biz.ErrBadParam
 		}
-		if row.Status == biz.OperationalFactStatusPosted {
-			if err := validateFinanceFactTransitionSource(row); err != nil {
-				return nil, err
-			}
+		if err := validateFinanceFactTransitionSource(row); err != nil {
+			return nil, err
 		}
 	default:
 		return nil, biz.ErrBadParam
 	}
-	if row.Status != status {
-		tsField := "posted_at"
-		if status == biz.OperationalFactStatusSettled {
-			tsField = "settled_at"
-		}
-		now := time.Now()
-		if err := updateOperationalFactStatus(ctx, tx, "finance_facts", id, status, tsField, &now); err != nil {
-			return nil, err
-		}
-		row, err = tx.client.FinanceFact.Get(ctx, id)
-		if err != nil {
-			return nil, err
-		}
+	tsField := "posted_at"
+	if status == biz.OperationalFactStatusSettled {
+		tsField = "settled_at"
+	}
+	now := time.Now()
+	actorField := "posted_by"
+	if status == biz.OperationalFactStatusSettled {
+		actorField = "settled_by"
+	}
+	if err := updateVersionedOperationalFactStatus(
+		ctx,
+		tx,
+		"finance_facts",
+		in.ID,
+		in.ExpectedVersion,
+		expectedStatus,
+		status,
+		tsField,
+		now,
+		actorField,
+		in.ActorID,
+	); err != nil {
+		return nil, err
+	}
+	row, err = tx.client.FinanceFact.Query().
+		Where(financefact.ID(in.ID)).
+		WithPoster().
+		WithSettler().
+		WithCanceller().
+		Only(ctx)
+	if err != nil {
+		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
@@ -787,16 +839,16 @@ func validateFinanceFactTransitionSource(row *ent.FinanceFact) error {
 	return nil
 }
 
-func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, id int, actorID int, reason string) (*biz.FinanceFact, error) {
+func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.FinanceFact, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockOperationalFactRow(ctx, tx, "finance_facts", id, biz.ErrFinanceFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "finance_facts", in.ID, biz.ErrFinanceFactNotFound); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.FinanceFact.Get(ctx, id)
+	row, err := tx.client.FinanceFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrFinanceFactNotFound
@@ -804,11 +856,17 @@ func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, id in
 		return nil, err
 	}
 	if row.Status == biz.OperationalFactStatusCancelled {
+		if row.Version != in.ExpectedVersion+1 {
+			return nil, biz.ErrOperationalFactVersionConflict
+		}
 		if row.CancelledBy == nil || row.CancelReason == nil ||
-			*row.CancelledBy != actorID || *row.CancelReason != reason {
+			*row.CancelledBy != in.ActorID || *row.CancelReason != in.Reason {
 			return nil, biz.ErrIdempotencyConflict
 		}
 	} else {
+		if row.Version != in.ExpectedVersion {
+			return nil, biz.ErrOperationalFactVersionConflict
+		}
 		if row.Status != biz.OperationalFactStatusDraft && row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
@@ -824,8 +882,32 @@ func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, id in
 		if activeReconciliation {
 			return nil, biz.ErrFinanceReconciliationDependency
 		}
+		hasActiveAllocation, err := hasActiveFinanceAllocationForFact(ctx, tx.client, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		if hasActiveAllocation {
+			return nil, biz.ErrFinanceAllocationDependency
+		}
+		hasActiveCredit, err := hasActiveFinanceCreditForFact(ctx, tx.client, row.ID)
+		if err != nil {
+			return nil, err
+		}
+		if hasActiveCredit {
+			return nil, biz.ErrFinanceCreditNoteDependency
+		}
 		now := time.Now()
-		if err := updateFinanceFactCancellation(ctx, tx, id, actorID, reason, now); err != nil {
+		if err := updateVersionedOperationalFactCancellation(
+			ctx,
+			tx,
+			"finance_facts",
+			in.ID,
+			in.ExpectedVersion,
+			row.Status,
+			in.ActorID,
+			in.Reason,
+			now,
+		); err != nil {
 			return nil, err
 		}
 		if err := markProcessDomainCommandEffectCompensatedWithClient(
@@ -834,13 +916,18 @@ func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, id in
 			biz.ProcessDomainCommandFinanceReceivableLead,
 			"finance_fact",
 			row.ID,
-			reason,
-			actorID,
+			in.Reason,
+			in.ActorID,
 		); err != nil {
 			return nil, err
 		}
 	}
-	row, err = tx.client.FinanceFact.Query().Where(financefact.ID(id)).WithCanceller().Only(ctx)
+	row, err = tx.client.FinanceFact.Query().
+		Where(financefact.ID(in.ID)).
+		WithPoster().
+		WithSettler().
+		WithCanceller().
+		Only(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -851,34 +938,70 @@ func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, id in
 	return entFinanceFactToBiz(row), nil
 }
 
+func hasActiveFinanceAllocationForFact(ctx context.Context, client *ent.Client, factID int) (bool, error) {
+	rows, err := client.FinanceAllocation.Query().Where(
+		financeallocation.FinanceFactID(factID),
+	).All(ctx)
+	if err != nil {
+		return false, err
+	}
+	reversed := make(map[int]struct{}, len(rows))
+	for _, row := range rows {
+		if row.Status == biz.FinanceAllocationStatusReversed && row.ReversalOfAllocationID != nil {
+			reversed[*row.ReversalOfAllocationID] = struct{}{}
+		}
+	}
+	for _, row := range rows {
+		if row.Status == biz.FinanceAllocationStatusPosted && row.ReversalOfAllocationID == nil {
+			if _, found := reversed[row.ID]; !found {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func hasActiveFinanceCreditForFact(ctx context.Context, client *ent.Client, factID int) (bool, error) {
+	rows, err := client.FinanceCreditNote.Query().Where(
+		financecreditnote.FinanceFactID(factID),
+	).All(ctx)
+	if err != nil {
+		return false, err
+	}
+	reversed := make(map[int]struct{}, len(rows))
+	for _, row := range rows {
+		if row.Status == "REVERSED" && row.ReversalOfCreditNoteID != nil {
+			reversed[*row.ReversalOfCreditNoteID] = struct{}{}
+		}
+	}
+	for _, row := range rows {
+		if row.Status == "POSTED" && row.ReversalOfCreditNoteID == nil {
+			if _, found := reversed[row.ID]; !found {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 func entFinanceFactToBiz(row *ent.FinanceFact) *biz.FinanceFact {
 	if row == nil {
 		return nil
 	}
 	var cancellerName *string
+	var posterName *string
+	var settlerName *string
+	if poster, err := row.Edges.PosterOrErr(); err == nil && poster != nil {
+		name := poster.Username
+		posterName = &name
+	}
+	if settler, err := row.Edges.SettlerOrErr(); err == nil && settler != nil {
+		name := settler.Username
+		settlerName = &name
+	}
 	if canceller, err := row.Edges.CancellerOrErr(); err == nil && canceller != nil {
 		name := canceller.Username
 		cancellerName = &name
 	}
-	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, SettledAt: row.SettledAt, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
-}
-
-func updateFinanceFactCancellation(ctx context.Context, tx *inventoryDBTx, id int, actorID int, reason string, cancelledAt time.Time) error {
-	p := inventorySQLPlaceholders(tx.dialect, 6)
-	query := fmt.Sprintf(`UPDATE finance_facts
-SET status = %s, cancelled_at = %s, cancelled_by = %s, cancel_reason = %s,
-    updated_at = %s
-WHERE id = %s AND status IN ('DRAFT', 'POSTED')`, p[0], p[1], p[2], p[3], p[4], p[5])
-	result, err := tx.sqlTx.ExecContext(ctx, query, biz.OperationalFactStatusCancelled, cancelledAt, actorID, reason, time.Now(), id)
-	if err != nil {
-		return err
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows != 1 {
-		return biz.ErrBadParam
-	}
-	return nil
+	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, SettledAt: row.SettledAt, SettledBy: row.SettledBy, SettledByName: settlerName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

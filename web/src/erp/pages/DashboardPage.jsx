@@ -58,6 +58,7 @@ import {
 } from '../utils/workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
+import { buildDesktopWorkflowTaskActionParams } from '../utils/desktopWorkflowTaskAction.mjs'
 import {
   createTaskMutationAttemptStore,
   createTaskMutationInFlightGuard,
@@ -1116,7 +1117,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setAssignmentTarget(undefined)
   }
 
-  const submitTaskAction = async () => {
+  const submitTaskAction = async ({ processDecision = null } = {}) => {
     if (!selectedTask || !actionMode || !actionMeta) return
 
     const taskSnapshot = selectedTask
@@ -1145,36 +1146,24 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               : actionModeSnapshot === 'reject'
                 ? rejectWorkflowTaskAction
                 : resumeWorkflowTaskAction
-    const params =
-      actionModeSnapshot === 'assign'
-        ? {
-            task_id: taskSnapshot.id,
-            expected_version: taskSnapshot.version,
-            assignee_id:
-              assignmentTargetSnapshot === 'pool'
-                ? null
-                : assignmentTargetSnapshot,
-            reason,
-          }
-        : actionModeSnapshot === 'urge'
-          ? {
-              task_id: taskSnapshot.id,
-              expected_version: taskSnapshot.version,
-              action: 'urge_task',
-              reason,
-              payload: {
-                surface_key: 'desktop_task_board',
-              },
-            }
-          : {
-              task_id: taskSnapshot.id,
-              expected_version: taskSnapshot.version,
-              action_key: actionModeSnapshot,
-              reason,
-              payload: {
-                surface_key: 'desktop_task_board',
-              },
-            }
+    let params
+    try {
+      params = buildDesktopWorkflowTaskActionParams({
+        task: taskSnapshot,
+        actionMode: actionModeSnapshot,
+        reason,
+        assignmentTarget: assignmentTargetSnapshot,
+        processDecision,
+      })
+    } catch (error) {
+      message.warning(
+        getActionErrorMessage(
+          error,
+          '审批表单与当前流程节点不一致，请刷新后重试'
+        )
+      )
+      return
+    }
     const inFlightLease = mutationInFlightRef.current.acquire(
       `task:${taskSnapshot.id}`
     )

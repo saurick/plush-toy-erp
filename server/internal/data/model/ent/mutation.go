@@ -13640,6 +13640,8 @@ type FinanceFactMutation struct {
 	fact_no               *string
 	fact_type             *string
 	status                *string
+	version               *int
+	addversion            *int
 	counterparty_type     *string
 	counterparty_id       *int
 	addcounterparty_id    *int
@@ -13667,6 +13669,10 @@ type FinanceFactMutation struct {
 	created_at            *time.Time
 	updated_at            *time.Time
 	clearedFields         map[string]struct{}
+	poster                *int
+	clearedposter         bool
+	settler               *int
+	clearedsettler        bool
 	canceller             *int
 	clearedcanceller      bool
 	done                  bool
@@ -13878,6 +13884,62 @@ func (m *FinanceFactMutation) OldStatus(ctx context.Context) (v string, err erro
 // ResetStatus resets all changes to the "status" field.
 func (m *FinanceFactMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *FinanceFactMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *FinanceFactMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the FinanceFact entity.
+// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceFactMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *FinanceFactMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *FinanceFactMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *FinanceFactMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
 }
 
 // SetCounterpartyType sets the "counterparty_type" field.
@@ -14657,6 +14719,55 @@ func (m *FinanceFactMutation) ResetPostedAt() {
 	delete(m.clearedFields, financefact.FieldPostedAt)
 }
 
+// SetPostedBy sets the "posted_by" field.
+func (m *FinanceFactMutation) SetPostedBy(i int) {
+	m.poster = &i
+}
+
+// PostedBy returns the value of the "posted_by" field in the mutation.
+func (m *FinanceFactMutation) PostedBy() (r int, exists bool) {
+	v := m.poster
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPostedBy returns the old "posted_by" field's value of the FinanceFact entity.
+// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceFactMutation) OldPostedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPostedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPostedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPostedBy: %w", err)
+	}
+	return oldValue.PostedBy, nil
+}
+
+// ClearPostedBy clears the value of the "posted_by" field.
+func (m *FinanceFactMutation) ClearPostedBy() {
+	m.poster = nil
+	m.clearedFields[financefact.FieldPostedBy] = struct{}{}
+}
+
+// PostedByCleared returns if the "posted_by" field was cleared in this mutation.
+func (m *FinanceFactMutation) PostedByCleared() bool {
+	_, ok := m.clearedFields[financefact.FieldPostedBy]
+	return ok
+}
+
+// ResetPostedBy resets all changes to the "posted_by" field.
+func (m *FinanceFactMutation) ResetPostedBy() {
+	m.poster = nil
+	delete(m.clearedFields, financefact.FieldPostedBy)
+}
+
 // SetSettledAt sets the "settled_at" field.
 func (m *FinanceFactMutation) SetSettledAt(t time.Time) {
 	m.settled_at = &t
@@ -14704,6 +14815,55 @@ func (m *FinanceFactMutation) SettledAtCleared() bool {
 func (m *FinanceFactMutation) ResetSettledAt() {
 	m.settled_at = nil
 	delete(m.clearedFields, financefact.FieldSettledAt)
+}
+
+// SetSettledBy sets the "settled_by" field.
+func (m *FinanceFactMutation) SetSettledBy(i int) {
+	m.settler = &i
+}
+
+// SettledBy returns the value of the "settled_by" field in the mutation.
+func (m *FinanceFactMutation) SettledBy() (r int, exists bool) {
+	v := m.settler
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSettledBy returns the old "settled_by" field's value of the FinanceFact entity.
+// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceFactMutation) OldSettledBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSettledBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSettledBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSettledBy: %w", err)
+	}
+	return oldValue.SettledBy, nil
+}
+
+// ClearSettledBy clears the value of the "settled_by" field.
+func (m *FinanceFactMutation) ClearSettledBy() {
+	m.settler = nil
+	m.clearedFields[financefact.FieldSettledBy] = struct{}{}
+}
+
+// SettledByCleared returns if the "settled_by" field was cleared in this mutation.
+func (m *FinanceFactMutation) SettledByCleared() bool {
+	_, ok := m.clearedFields[financefact.FieldSettledBy]
+	return ok
+}
+
+// ResetSettledBy resets all changes to the "settled_by" field.
+func (m *FinanceFactMutation) ResetSettledBy() {
+	m.settler = nil
+	delete(m.clearedFields, financefact.FieldSettledBy)
 }
 
 // SetCancelledAt sets the "cancelled_at" field.
@@ -14974,6 +15134,86 @@ func (m *FinanceFactMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
+// SetPosterID sets the "poster" edge to the AdminUser entity by id.
+func (m *FinanceFactMutation) SetPosterID(id int) {
+	m.poster = &id
+}
+
+// ClearPoster clears the "poster" edge to the AdminUser entity.
+func (m *FinanceFactMutation) ClearPoster() {
+	m.clearedposter = true
+	m.clearedFields[financefact.FieldPostedBy] = struct{}{}
+}
+
+// PosterCleared reports if the "poster" edge to the AdminUser entity was cleared.
+func (m *FinanceFactMutation) PosterCleared() bool {
+	return m.PostedByCleared() || m.clearedposter
+}
+
+// PosterID returns the "poster" edge ID in the mutation.
+func (m *FinanceFactMutation) PosterID() (id int, exists bool) {
+	if m.poster != nil {
+		return *m.poster, true
+	}
+	return
+}
+
+// PosterIDs returns the "poster" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PosterID instead. It exists only for internal usage by the builders.
+func (m *FinanceFactMutation) PosterIDs() (ids []int) {
+	if id := m.poster; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPoster resets all changes to the "poster" edge.
+func (m *FinanceFactMutation) ResetPoster() {
+	m.poster = nil
+	m.clearedposter = false
+}
+
+// SetSettlerID sets the "settler" edge to the AdminUser entity by id.
+func (m *FinanceFactMutation) SetSettlerID(id int) {
+	m.settler = &id
+}
+
+// ClearSettler clears the "settler" edge to the AdminUser entity.
+func (m *FinanceFactMutation) ClearSettler() {
+	m.clearedsettler = true
+	m.clearedFields[financefact.FieldSettledBy] = struct{}{}
+}
+
+// SettlerCleared reports if the "settler" edge to the AdminUser entity was cleared.
+func (m *FinanceFactMutation) SettlerCleared() bool {
+	return m.SettledByCleared() || m.clearedsettler
+}
+
+// SettlerID returns the "settler" edge ID in the mutation.
+func (m *FinanceFactMutation) SettlerID() (id int, exists bool) {
+	if m.settler != nil {
+		return *m.settler, true
+	}
+	return
+}
+
+// SettlerIDs returns the "settler" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SettlerID instead. It exists only for internal usage by the builders.
+func (m *FinanceFactMutation) SettlerIDs() (ids []int) {
+	if id := m.settler; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSettler resets all changes to the "settler" edge.
+func (m *FinanceFactMutation) ResetSettler() {
+	m.settler = nil
+	m.clearedsettler = false
+}
+
 // SetCancellerID sets the "canceller" edge to the AdminUser entity by id.
 func (m *FinanceFactMutation) SetCancellerID(id int) {
 	m.canceller = &id
@@ -15048,7 +15288,7 @@ func (m *FinanceFactMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FinanceFactMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 29)
 	if m.fact_no != nil {
 		fields = append(fields, financefact.FieldFactNo)
 	}
@@ -15057,6 +15297,9 @@ func (m *FinanceFactMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, financefact.FieldStatus)
+	}
+	if m.version != nil {
+		fields = append(fields, financefact.FieldVersion)
 	}
 	if m.counterparty_type != nil {
 		fields = append(fields, financefact.FieldCounterpartyType)
@@ -15106,8 +15349,14 @@ func (m *FinanceFactMutation) Fields() []string {
 	if m.posted_at != nil {
 		fields = append(fields, financefact.FieldPostedAt)
 	}
+	if m.poster != nil {
+		fields = append(fields, financefact.FieldPostedBy)
+	}
 	if m.settled_at != nil {
 		fields = append(fields, financefact.FieldSettledAt)
+	}
+	if m.settler != nil {
+		fields = append(fields, financefact.FieldSettledBy)
 	}
 	if m.cancelled_at != nil {
 		fields = append(fields, financefact.FieldCancelledAt)
@@ -15141,6 +15390,8 @@ func (m *FinanceFactMutation) Field(name string) (ent.Value, bool) {
 		return m.FactType()
 	case financefact.FieldStatus:
 		return m.Status()
+	case financefact.FieldVersion:
+		return m.Version()
 	case financefact.FieldCounterpartyType:
 		return m.CounterpartyType()
 	case financefact.FieldCounterpartyID:
@@ -15173,8 +15424,12 @@ func (m *FinanceFactMutation) Field(name string) (ent.Value, bool) {
 		return m.OccurredAtSpecified()
 	case financefact.FieldPostedAt:
 		return m.PostedAt()
+	case financefact.FieldPostedBy:
+		return m.PostedBy()
 	case financefact.FieldSettledAt:
 		return m.SettledAt()
+	case financefact.FieldSettledBy:
+		return m.SettledBy()
 	case financefact.FieldCancelledAt:
 		return m.CancelledAt()
 	case financefact.FieldCancelledBy:
@@ -15202,6 +15457,8 @@ func (m *FinanceFactMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldFactType(ctx)
 	case financefact.FieldStatus:
 		return m.OldStatus(ctx)
+	case financefact.FieldVersion:
+		return m.OldVersion(ctx)
 	case financefact.FieldCounterpartyType:
 		return m.OldCounterpartyType(ctx)
 	case financefact.FieldCounterpartyID:
@@ -15234,8 +15491,12 @@ func (m *FinanceFactMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldOccurredAtSpecified(ctx)
 	case financefact.FieldPostedAt:
 		return m.OldPostedAt(ctx)
+	case financefact.FieldPostedBy:
+		return m.OldPostedBy(ctx)
 	case financefact.FieldSettledAt:
 		return m.OldSettledAt(ctx)
+	case financefact.FieldSettledBy:
+		return m.OldSettledBy(ctx)
 	case financefact.FieldCancelledAt:
 		return m.OldCancelledAt(ctx)
 	case financefact.FieldCancelledBy:
@@ -15277,6 +15538,13 @@ func (m *FinanceFactMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case financefact.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
 		return nil
 	case financefact.FieldCounterpartyType:
 		v, ok := value.(string)
@@ -15390,12 +15658,26 @@ func (m *FinanceFactMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPostedAt(v)
 		return nil
+	case financefact.FieldPostedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPostedBy(v)
+		return nil
 	case financefact.FieldSettledAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSettledAt(v)
+		return nil
+	case financefact.FieldSettledBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSettledBy(v)
 		return nil
 	case financefact.FieldCancelledAt:
 		v, ok := value.(time.Time)
@@ -15447,6 +15729,9 @@ func (m *FinanceFactMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *FinanceFactMutation) AddedFields() []string {
 	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, financefact.FieldVersion)
+	}
 	if m.addcounterparty_id != nil {
 		fields = append(fields, financefact.FieldCounterpartyID)
 	}
@@ -15467,6 +15752,8 @@ func (m *FinanceFactMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *FinanceFactMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case financefact.FieldVersion:
+		return m.AddedVersion()
 	case financefact.FieldCounterpartyID:
 		return m.AddedCounterpartyID()
 	case financefact.FieldPaymentTermDays:
@@ -15484,6 +15771,13 @@ func (m *FinanceFactMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *FinanceFactMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case financefact.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
 	case financefact.FieldCounterpartyID:
 		v, ok := value.(int)
 		if !ok {
@@ -15547,8 +15841,14 @@ func (m *FinanceFactMutation) ClearedFields() []string {
 	if m.FieldCleared(financefact.FieldPostedAt) {
 		fields = append(fields, financefact.FieldPostedAt)
 	}
+	if m.FieldCleared(financefact.FieldPostedBy) {
+		fields = append(fields, financefact.FieldPostedBy)
+	}
 	if m.FieldCleared(financefact.FieldSettledAt) {
 		fields = append(fields, financefact.FieldSettledAt)
+	}
+	if m.FieldCleared(financefact.FieldSettledBy) {
+		fields = append(fields, financefact.FieldSettledBy)
 	}
 	if m.FieldCleared(financefact.FieldCancelledAt) {
 		fields = append(fields, financefact.FieldCancelledAt)
@@ -15603,8 +15903,14 @@ func (m *FinanceFactMutation) ClearField(name string) error {
 	case financefact.FieldPostedAt:
 		m.ClearPostedAt()
 		return nil
+	case financefact.FieldPostedBy:
+		m.ClearPostedBy()
+		return nil
 	case financefact.FieldSettledAt:
 		m.ClearSettledAt()
+		return nil
+	case financefact.FieldSettledBy:
+		m.ClearSettledBy()
 		return nil
 	case financefact.FieldCancelledAt:
 		m.ClearCancelledAt()
@@ -15634,6 +15940,9 @@ func (m *FinanceFactMutation) ResetField(name string) error {
 		return nil
 	case financefact.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case financefact.FieldVersion:
+		m.ResetVersion()
 		return nil
 	case financefact.FieldCounterpartyType:
 		m.ResetCounterpartyType()
@@ -15683,8 +15992,14 @@ func (m *FinanceFactMutation) ResetField(name string) error {
 	case financefact.FieldPostedAt:
 		m.ResetPostedAt()
 		return nil
+	case financefact.FieldPostedBy:
+		m.ResetPostedBy()
+		return nil
 	case financefact.FieldSettledAt:
 		m.ResetSettledAt()
+		return nil
+	case financefact.FieldSettledBy:
+		m.ResetSettledBy()
 		return nil
 	case financefact.FieldCancelledAt:
 		m.ResetCancelledAt()
@@ -15710,7 +16025,13 @@ func (m *FinanceFactMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *FinanceFactMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
+	if m.poster != nil {
+		edges = append(edges, financefact.EdgePoster)
+	}
+	if m.settler != nil {
+		edges = append(edges, financefact.EdgeSettler)
+	}
 	if m.canceller != nil {
 		edges = append(edges, financefact.EdgeCanceller)
 	}
@@ -15721,6 +16042,14 @@ func (m *FinanceFactMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *FinanceFactMutation) AddedIDs(name string) []ent.Value {
 	switch name {
+	case financefact.EdgePoster:
+		if id := m.poster; id != nil {
+			return []ent.Value{*id}
+		}
+	case financefact.EdgeSettler:
+		if id := m.settler; id != nil {
+			return []ent.Value{*id}
+		}
 	case financefact.EdgeCanceller:
 		if id := m.canceller; id != nil {
 			return []ent.Value{*id}
@@ -15731,7 +16060,7 @@ func (m *FinanceFactMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *FinanceFactMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	return edges
 }
 
@@ -15743,7 +16072,13 @@ func (m *FinanceFactMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *FinanceFactMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
+	if m.clearedposter {
+		edges = append(edges, financefact.EdgePoster)
+	}
+	if m.clearedsettler {
+		edges = append(edges, financefact.EdgeSettler)
+	}
 	if m.clearedcanceller {
 		edges = append(edges, financefact.EdgeCanceller)
 	}
@@ -15754,6 +16089,10 @@ func (m *FinanceFactMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *FinanceFactMutation) EdgeCleared(name string) bool {
 	switch name {
+	case financefact.EdgePoster:
+		return m.clearedposter
+	case financefact.EdgeSettler:
+		return m.clearedsettler
 	case financefact.EdgeCanceller:
 		return m.clearedcanceller
 	}
@@ -15764,6 +16103,12 @@ func (m *FinanceFactMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *FinanceFactMutation) ClearEdge(name string) error {
 	switch name {
+	case financefact.EdgePoster:
+		m.ClearPoster()
+		return nil
+	case financefact.EdgeSettler:
+		m.ClearSettler()
+		return nil
 	case financefact.EdgeCanceller:
 		m.ClearCanceller()
 		return nil
@@ -15775,6 +16120,12 @@ func (m *FinanceFactMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *FinanceFactMutation) ResetEdge(name string) error {
 	switch name {
+	case financefact.EdgePoster:
+		m.ResetPoster()
+		return nil
+	case financefact.EdgeSettler:
+		m.ResetSettler()
+		return nil
 	case financefact.EdgeCanceller:
 		m.ResetCanceller()
 		return nil
@@ -15803,9 +16154,20 @@ type FinancePaymentMutation struct {
 	version                  *int
 	addversion               *int
 	occurred_at              *time.Time
+	approved_at              *time.Time
+	approved_by              *int
+	addapproved_by           *int
+	rejected_at              *time.Time
+	rejected_by              *int
+	addrejected_by           *int
+	reject_reason            *string
 	posted_at                *time.Time
 	posted_by                *int
 	addposted_by             *int
+	cancelled_at             *time.Time
+	cancelled_by             *int
+	addcancelled_by          *int
+	cancel_reason            *string
 	reversed_at              *time.Time
 	reversed_by              *int
 	addreversed_by           *int
@@ -16429,6 +16791,293 @@ func (m *FinancePaymentMutation) ResetOccurredAt() {
 	m.occurred_at = nil
 }
 
+// SetApprovedAt sets the "approved_at" field.
+func (m *FinancePaymentMutation) SetApprovedAt(t time.Time) {
+	m.approved_at = &t
+}
+
+// ApprovedAt returns the value of the "approved_at" field in the mutation.
+func (m *FinancePaymentMutation) ApprovedAt() (r time.Time, exists bool) {
+	v := m.approved_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedAt returns the old "approved_at" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldApprovedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedAt: %w", err)
+	}
+	return oldValue.ApprovedAt, nil
+}
+
+// ClearApprovedAt clears the value of the "approved_at" field.
+func (m *FinancePaymentMutation) ClearApprovedAt() {
+	m.approved_at = nil
+	m.clearedFields[financepayment.FieldApprovedAt] = struct{}{}
+}
+
+// ApprovedAtCleared returns if the "approved_at" field was cleared in this mutation.
+func (m *FinancePaymentMutation) ApprovedAtCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldApprovedAt]
+	return ok
+}
+
+// ResetApprovedAt resets all changes to the "approved_at" field.
+func (m *FinancePaymentMutation) ResetApprovedAt() {
+	m.approved_at = nil
+	delete(m.clearedFields, financepayment.FieldApprovedAt)
+}
+
+// SetApprovedBy sets the "approved_by" field.
+func (m *FinancePaymentMutation) SetApprovedBy(i int) {
+	m.approved_by = &i
+	m.addapproved_by = nil
+}
+
+// ApprovedBy returns the value of the "approved_by" field in the mutation.
+func (m *FinancePaymentMutation) ApprovedBy() (r int, exists bool) {
+	v := m.approved_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedBy returns the old "approved_by" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldApprovedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedBy: %w", err)
+	}
+	return oldValue.ApprovedBy, nil
+}
+
+// AddApprovedBy adds i to the "approved_by" field.
+func (m *FinancePaymentMutation) AddApprovedBy(i int) {
+	if m.addapproved_by != nil {
+		*m.addapproved_by += i
+	} else {
+		m.addapproved_by = &i
+	}
+}
+
+// AddedApprovedBy returns the value that was added to the "approved_by" field in this mutation.
+func (m *FinancePaymentMutation) AddedApprovedBy() (r int, exists bool) {
+	v := m.addapproved_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearApprovedBy clears the value of the "approved_by" field.
+func (m *FinancePaymentMutation) ClearApprovedBy() {
+	m.approved_by = nil
+	m.addapproved_by = nil
+	m.clearedFields[financepayment.FieldApprovedBy] = struct{}{}
+}
+
+// ApprovedByCleared returns if the "approved_by" field was cleared in this mutation.
+func (m *FinancePaymentMutation) ApprovedByCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldApprovedBy]
+	return ok
+}
+
+// ResetApprovedBy resets all changes to the "approved_by" field.
+func (m *FinancePaymentMutation) ResetApprovedBy() {
+	m.approved_by = nil
+	m.addapproved_by = nil
+	delete(m.clearedFields, financepayment.FieldApprovedBy)
+}
+
+// SetRejectedAt sets the "rejected_at" field.
+func (m *FinancePaymentMutation) SetRejectedAt(t time.Time) {
+	m.rejected_at = &t
+}
+
+// RejectedAt returns the value of the "rejected_at" field in the mutation.
+func (m *FinancePaymentMutation) RejectedAt() (r time.Time, exists bool) {
+	v := m.rejected_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedAt returns the old "rejected_at" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldRejectedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedAt: %w", err)
+	}
+	return oldValue.RejectedAt, nil
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (m *FinancePaymentMutation) ClearRejectedAt() {
+	m.rejected_at = nil
+	m.clearedFields[financepayment.FieldRejectedAt] = struct{}{}
+}
+
+// RejectedAtCleared returns if the "rejected_at" field was cleared in this mutation.
+func (m *FinancePaymentMutation) RejectedAtCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldRejectedAt]
+	return ok
+}
+
+// ResetRejectedAt resets all changes to the "rejected_at" field.
+func (m *FinancePaymentMutation) ResetRejectedAt() {
+	m.rejected_at = nil
+	delete(m.clearedFields, financepayment.FieldRejectedAt)
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (m *FinancePaymentMutation) SetRejectedBy(i int) {
+	m.rejected_by = &i
+	m.addrejected_by = nil
+}
+
+// RejectedBy returns the value of the "rejected_by" field in the mutation.
+func (m *FinancePaymentMutation) RejectedBy() (r int, exists bool) {
+	v := m.rejected_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedBy returns the old "rejected_by" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldRejectedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedBy: %w", err)
+	}
+	return oldValue.RejectedBy, nil
+}
+
+// AddRejectedBy adds i to the "rejected_by" field.
+func (m *FinancePaymentMutation) AddRejectedBy(i int) {
+	if m.addrejected_by != nil {
+		*m.addrejected_by += i
+	} else {
+		m.addrejected_by = &i
+	}
+}
+
+// AddedRejectedBy returns the value that was added to the "rejected_by" field in this mutation.
+func (m *FinancePaymentMutation) AddedRejectedBy() (r int, exists bool) {
+	v := m.addrejected_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (m *FinancePaymentMutation) ClearRejectedBy() {
+	m.rejected_by = nil
+	m.addrejected_by = nil
+	m.clearedFields[financepayment.FieldRejectedBy] = struct{}{}
+}
+
+// RejectedByCleared returns if the "rejected_by" field was cleared in this mutation.
+func (m *FinancePaymentMutation) RejectedByCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldRejectedBy]
+	return ok
+}
+
+// ResetRejectedBy resets all changes to the "rejected_by" field.
+func (m *FinancePaymentMutation) ResetRejectedBy() {
+	m.rejected_by = nil
+	m.addrejected_by = nil
+	delete(m.clearedFields, financepayment.FieldRejectedBy)
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (m *FinancePaymentMutation) SetRejectReason(s string) {
+	m.reject_reason = &s
+}
+
+// RejectReason returns the value of the "reject_reason" field in the mutation.
+func (m *FinancePaymentMutation) RejectReason() (r string, exists bool) {
+	v := m.reject_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectReason returns the old "reject_reason" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldRejectReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectReason: %w", err)
+	}
+	return oldValue.RejectReason, nil
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (m *FinancePaymentMutation) ClearRejectReason() {
+	m.reject_reason = nil
+	m.clearedFields[financepayment.FieldRejectReason] = struct{}{}
+}
+
+// RejectReasonCleared returns if the "reject_reason" field was cleared in this mutation.
+func (m *FinancePaymentMutation) RejectReasonCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldRejectReason]
+	return ok
+}
+
+// ResetRejectReason resets all changes to the "reject_reason" field.
+func (m *FinancePaymentMutation) ResetRejectReason() {
+	m.reject_reason = nil
+	delete(m.clearedFields, financepayment.FieldRejectReason)
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (m *FinancePaymentMutation) SetPostedAt(t time.Time) {
 	m.posted_at = &t
@@ -16546,6 +17195,174 @@ func (m *FinancePaymentMutation) ResetPostedBy() {
 	m.posted_by = nil
 	m.addposted_by = nil
 	delete(m.clearedFields, financepayment.FieldPostedBy)
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (m *FinancePaymentMutation) SetCancelledAt(t time.Time) {
+	m.cancelled_at = &t
+}
+
+// CancelledAt returns the value of the "cancelled_at" field in the mutation.
+func (m *FinancePaymentMutation) CancelledAt() (r time.Time, exists bool) {
+	v := m.cancelled_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelledAt returns the old "cancelled_at" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldCancelledAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelledAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelledAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelledAt: %w", err)
+	}
+	return oldValue.CancelledAt, nil
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (m *FinancePaymentMutation) ClearCancelledAt() {
+	m.cancelled_at = nil
+	m.clearedFields[financepayment.FieldCancelledAt] = struct{}{}
+}
+
+// CancelledAtCleared returns if the "cancelled_at" field was cleared in this mutation.
+func (m *FinancePaymentMutation) CancelledAtCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldCancelledAt]
+	return ok
+}
+
+// ResetCancelledAt resets all changes to the "cancelled_at" field.
+func (m *FinancePaymentMutation) ResetCancelledAt() {
+	m.cancelled_at = nil
+	delete(m.clearedFields, financepayment.FieldCancelledAt)
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (m *FinancePaymentMutation) SetCancelledBy(i int) {
+	m.cancelled_by = &i
+	m.addcancelled_by = nil
+}
+
+// CancelledBy returns the value of the "cancelled_by" field in the mutation.
+func (m *FinancePaymentMutation) CancelledBy() (r int, exists bool) {
+	v := m.cancelled_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelledBy returns the old "cancelled_by" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldCancelledBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelledBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelledBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelledBy: %w", err)
+	}
+	return oldValue.CancelledBy, nil
+}
+
+// AddCancelledBy adds i to the "cancelled_by" field.
+func (m *FinancePaymentMutation) AddCancelledBy(i int) {
+	if m.addcancelled_by != nil {
+		*m.addcancelled_by += i
+	} else {
+		m.addcancelled_by = &i
+	}
+}
+
+// AddedCancelledBy returns the value that was added to the "cancelled_by" field in this mutation.
+func (m *FinancePaymentMutation) AddedCancelledBy() (r int, exists bool) {
+	v := m.addcancelled_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (m *FinancePaymentMutation) ClearCancelledBy() {
+	m.cancelled_by = nil
+	m.addcancelled_by = nil
+	m.clearedFields[financepayment.FieldCancelledBy] = struct{}{}
+}
+
+// CancelledByCleared returns if the "cancelled_by" field was cleared in this mutation.
+func (m *FinancePaymentMutation) CancelledByCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldCancelledBy]
+	return ok
+}
+
+// ResetCancelledBy resets all changes to the "cancelled_by" field.
+func (m *FinancePaymentMutation) ResetCancelledBy() {
+	m.cancelled_by = nil
+	m.addcancelled_by = nil
+	delete(m.clearedFields, financepayment.FieldCancelledBy)
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (m *FinancePaymentMutation) SetCancelReason(s string) {
+	m.cancel_reason = &s
+}
+
+// CancelReason returns the value of the "cancel_reason" field in the mutation.
+func (m *FinancePaymentMutation) CancelReason() (r string, exists bool) {
+	v := m.cancel_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelReason returns the old "cancel_reason" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldCancelReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelReason: %w", err)
+	}
+	return oldValue.CancelReason, nil
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (m *FinancePaymentMutation) ClearCancelReason() {
+	m.cancel_reason = nil
+	m.clearedFields[financepayment.FieldCancelReason] = struct{}{}
+}
+
+// CancelReasonCleared returns if the "cancel_reason" field was cleared in this mutation.
+func (m *FinancePaymentMutation) CancelReasonCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldCancelReason]
+	return ok
+}
+
+// ResetCancelReason resets all changes to the "cancel_reason" field.
+func (m *FinancePaymentMutation) ResetCancelReason() {
+	m.cancel_reason = nil
+	delete(m.clearedFields, financepayment.FieldCancelReason)
 }
 
 // SetReversedAt sets the "reversed_at" field.
@@ -16932,7 +17749,7 @@ func (m *FinancePaymentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FinancePaymentMutation) Fields() []string {
-	fields := make([]string, 0, 21)
+	fields := make([]string, 0, 29)
 	if m.payment_no != nil {
 		fields = append(fields, financepayment.FieldPaymentNo)
 	}
@@ -16972,11 +17789,35 @@ func (m *FinancePaymentMutation) Fields() []string {
 	if m.occurred_at != nil {
 		fields = append(fields, financepayment.FieldOccurredAt)
 	}
+	if m.approved_at != nil {
+		fields = append(fields, financepayment.FieldApprovedAt)
+	}
+	if m.approved_by != nil {
+		fields = append(fields, financepayment.FieldApprovedBy)
+	}
+	if m.rejected_at != nil {
+		fields = append(fields, financepayment.FieldRejectedAt)
+	}
+	if m.rejected_by != nil {
+		fields = append(fields, financepayment.FieldRejectedBy)
+	}
+	if m.reject_reason != nil {
+		fields = append(fields, financepayment.FieldRejectReason)
+	}
 	if m.posted_at != nil {
 		fields = append(fields, financepayment.FieldPostedAt)
 	}
 	if m.posted_by != nil {
 		fields = append(fields, financepayment.FieldPostedBy)
+	}
+	if m.cancelled_at != nil {
+		fields = append(fields, financepayment.FieldCancelledAt)
+	}
+	if m.cancelled_by != nil {
+		fields = append(fields, financepayment.FieldCancelledBy)
+	}
+	if m.cancel_reason != nil {
+		fields = append(fields, financepayment.FieldCancelReason)
 	}
 	if m.reversed_at != nil {
 		fields = append(fields, financepayment.FieldReversedAt)
@@ -17030,10 +17871,26 @@ func (m *FinancePaymentMutation) Field(name string) (ent.Value, bool) {
 		return m.Version()
 	case financepayment.FieldOccurredAt:
 		return m.OccurredAt()
+	case financepayment.FieldApprovedAt:
+		return m.ApprovedAt()
+	case financepayment.FieldApprovedBy:
+		return m.ApprovedBy()
+	case financepayment.FieldRejectedAt:
+		return m.RejectedAt()
+	case financepayment.FieldRejectedBy:
+		return m.RejectedBy()
+	case financepayment.FieldRejectReason:
+		return m.RejectReason()
 	case financepayment.FieldPostedAt:
 		return m.PostedAt()
 	case financepayment.FieldPostedBy:
 		return m.PostedBy()
+	case financepayment.FieldCancelledAt:
+		return m.CancelledAt()
+	case financepayment.FieldCancelledBy:
+		return m.CancelledBy()
+	case financepayment.FieldCancelReason:
+		return m.CancelReason()
 	case financepayment.FieldReversedAt:
 		return m.ReversedAt()
 	case financepayment.FieldReversedBy:
@@ -17081,10 +17938,26 @@ func (m *FinancePaymentMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldVersion(ctx)
 	case financepayment.FieldOccurredAt:
 		return m.OldOccurredAt(ctx)
+	case financepayment.FieldApprovedAt:
+		return m.OldApprovedAt(ctx)
+	case financepayment.FieldApprovedBy:
+		return m.OldApprovedBy(ctx)
+	case financepayment.FieldRejectedAt:
+		return m.OldRejectedAt(ctx)
+	case financepayment.FieldRejectedBy:
+		return m.OldRejectedBy(ctx)
+	case financepayment.FieldRejectReason:
+		return m.OldRejectReason(ctx)
 	case financepayment.FieldPostedAt:
 		return m.OldPostedAt(ctx)
 	case financepayment.FieldPostedBy:
 		return m.OldPostedBy(ctx)
+	case financepayment.FieldCancelledAt:
+		return m.OldCancelledAt(ctx)
+	case financepayment.FieldCancelledBy:
+		return m.OldCancelledBy(ctx)
+	case financepayment.FieldCancelReason:
+		return m.OldCancelReason(ctx)
 	case financepayment.FieldReversedAt:
 		return m.OldReversedAt(ctx)
 	case financepayment.FieldReversedBy:
@@ -17197,6 +18070,41 @@ func (m *FinancePaymentMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetOccurredAt(v)
 		return nil
+	case financepayment.FieldApprovedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedAt(v)
+		return nil
+	case financepayment.FieldApprovedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedBy(v)
+		return nil
+	case financepayment.FieldRejectedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedAt(v)
+		return nil
+	case financepayment.FieldRejectedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedBy(v)
+		return nil
+	case financepayment.FieldRejectReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectReason(v)
+		return nil
 	case financepayment.FieldPostedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -17210,6 +18118,27 @@ func (m *FinancePaymentMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPostedBy(v)
+		return nil
+	case financepayment.FieldCancelledAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelledAt(v)
+		return nil
+	case financepayment.FieldCancelledBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelledBy(v)
+		return nil
+	case financepayment.FieldCancelReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelReason(v)
 		return nil
 	case financepayment.FieldReversedAt:
 		v, ok := value.(time.Time)
@@ -17267,8 +18196,17 @@ func (m *FinancePaymentMutation) AddedFields() []string {
 	if m.addversion != nil {
 		fields = append(fields, financepayment.FieldVersion)
 	}
+	if m.addapproved_by != nil {
+		fields = append(fields, financepayment.FieldApprovedBy)
+	}
+	if m.addrejected_by != nil {
+		fields = append(fields, financepayment.FieldRejectedBy)
+	}
 	if m.addposted_by != nil {
 		fields = append(fields, financepayment.FieldPostedBy)
+	}
+	if m.addcancelled_by != nil {
+		fields = append(fields, financepayment.FieldCancelledBy)
 	}
 	if m.addreversed_by != nil {
 		fields = append(fields, financepayment.FieldReversedBy)
@@ -17288,8 +18226,14 @@ func (m *FinancePaymentMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedCounterpartyID()
 	case financepayment.FieldVersion:
 		return m.AddedVersion()
+	case financepayment.FieldApprovedBy:
+		return m.AddedApprovedBy()
+	case financepayment.FieldRejectedBy:
+		return m.AddedRejectedBy()
 	case financepayment.FieldPostedBy:
 		return m.AddedPostedBy()
+	case financepayment.FieldCancelledBy:
+		return m.AddedCancelledBy()
 	case financepayment.FieldReversedBy:
 		return m.AddedReversedBy()
 	case financepayment.FieldCreatedBy:
@@ -17317,12 +18261,33 @@ func (m *FinancePaymentMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddVersion(v)
 		return nil
+	case financepayment.FieldApprovedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddApprovedBy(v)
+		return nil
+	case financepayment.FieldRejectedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRejectedBy(v)
+		return nil
 	case financepayment.FieldPostedBy:
 		v, ok := value.(int)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPostedBy(v)
+		return nil
+	case financepayment.FieldCancelledBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCancelledBy(v)
 		return nil
 	case financepayment.FieldReversedBy:
 		v, ok := value.(int)
@@ -17346,11 +18311,35 @@ func (m *FinancePaymentMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *FinancePaymentMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(financepayment.FieldApprovedAt) {
+		fields = append(fields, financepayment.FieldApprovedAt)
+	}
+	if m.FieldCleared(financepayment.FieldApprovedBy) {
+		fields = append(fields, financepayment.FieldApprovedBy)
+	}
+	if m.FieldCleared(financepayment.FieldRejectedAt) {
+		fields = append(fields, financepayment.FieldRejectedAt)
+	}
+	if m.FieldCleared(financepayment.FieldRejectedBy) {
+		fields = append(fields, financepayment.FieldRejectedBy)
+	}
+	if m.FieldCleared(financepayment.FieldRejectReason) {
+		fields = append(fields, financepayment.FieldRejectReason)
+	}
 	if m.FieldCleared(financepayment.FieldPostedAt) {
 		fields = append(fields, financepayment.FieldPostedAt)
 	}
 	if m.FieldCleared(financepayment.FieldPostedBy) {
 		fields = append(fields, financepayment.FieldPostedBy)
+	}
+	if m.FieldCleared(financepayment.FieldCancelledAt) {
+		fields = append(fields, financepayment.FieldCancelledAt)
+	}
+	if m.FieldCleared(financepayment.FieldCancelledBy) {
+		fields = append(fields, financepayment.FieldCancelledBy)
+	}
+	if m.FieldCleared(financepayment.FieldCancelReason) {
+		fields = append(fields, financepayment.FieldCancelReason)
 	}
 	if m.FieldCleared(financepayment.FieldReversedAt) {
 		fields = append(fields, financepayment.FieldReversedAt)
@@ -17375,11 +18364,35 @@ func (m *FinancePaymentMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *FinancePaymentMutation) ClearField(name string) error {
 	switch name {
+	case financepayment.FieldApprovedAt:
+		m.ClearApprovedAt()
+		return nil
+	case financepayment.FieldApprovedBy:
+		m.ClearApprovedBy()
+		return nil
+	case financepayment.FieldRejectedAt:
+		m.ClearRejectedAt()
+		return nil
+	case financepayment.FieldRejectedBy:
+		m.ClearRejectedBy()
+		return nil
+	case financepayment.FieldRejectReason:
+		m.ClearRejectReason()
+		return nil
 	case financepayment.FieldPostedAt:
 		m.ClearPostedAt()
 		return nil
 	case financepayment.FieldPostedBy:
 		m.ClearPostedBy()
+		return nil
+	case financepayment.FieldCancelledAt:
+		m.ClearCancelledAt()
+		return nil
+	case financepayment.FieldCancelledBy:
+		m.ClearCancelledBy()
+		return nil
+	case financepayment.FieldCancelReason:
+		m.ClearCancelReason()
 		return nil
 	case financepayment.FieldReversedAt:
 		m.ClearReversedAt()
@@ -17437,11 +18450,35 @@ func (m *FinancePaymentMutation) ResetField(name string) error {
 	case financepayment.FieldOccurredAt:
 		m.ResetOccurredAt()
 		return nil
+	case financepayment.FieldApprovedAt:
+		m.ResetApprovedAt()
+		return nil
+	case financepayment.FieldApprovedBy:
+		m.ResetApprovedBy()
+		return nil
+	case financepayment.FieldRejectedAt:
+		m.ResetRejectedAt()
+		return nil
+	case financepayment.FieldRejectedBy:
+		m.ResetRejectedBy()
+		return nil
+	case financepayment.FieldRejectReason:
+		m.ResetRejectReason()
+		return nil
 	case financepayment.FieldPostedAt:
 		m.ResetPostedAt()
 		return nil
 	case financepayment.FieldPostedBy:
 		m.ResetPostedBy()
+		return nil
+	case financepayment.FieldCancelledAt:
+		m.ResetCancelledAt()
+		return nil
+	case financepayment.FieldCancelledBy:
+		m.ResetCancelledBy()
+		return nil
+	case financepayment.FieldCancelReason:
+		m.ResetCancelReason()
 		return nil
 	case financepayment.FieldReversedAt:
 		m.ResetReversedAt()
@@ -20504,13 +21541,22 @@ type InventoryOperationMutation struct {
 	operation_type            *string
 	status                    *string
 	reason                    *string
-	approval_ref              *string
 	idempotency_key           *string
 	idempotency_payload_hash  *string
 	idempotency_item_count    *int
 	addidempotency_item_count *int
 	version                   *int
 	addversion                *int
+	submitted_at              *time.Time
+	submitted_by              *int
+	addsubmitted_by           *int
+	approved_at               *time.Time
+	approved_by               *int
+	addapproved_by            *int
+	rejected_at               *time.Time
+	rejected_by               *int
+	addrejected_by            *int
+	reject_reason             *string
 	posted_at                 *time.Time
 	posted_by                 *int
 	addposted_by              *int
@@ -20773,55 +21819,6 @@ func (m *InventoryOperationMutation) ResetReason() {
 	m.reason = nil
 }
 
-// SetApprovalRef sets the "approval_ref" field.
-func (m *InventoryOperationMutation) SetApprovalRef(s string) {
-	m.approval_ref = &s
-}
-
-// ApprovalRef returns the value of the "approval_ref" field in the mutation.
-func (m *InventoryOperationMutation) ApprovalRef() (r string, exists bool) {
-	v := m.approval_ref
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldApprovalRef returns the old "approval_ref" field's value of the InventoryOperation entity.
-// If the InventoryOperation object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *InventoryOperationMutation) OldApprovalRef(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldApprovalRef is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldApprovalRef requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldApprovalRef: %w", err)
-	}
-	return oldValue.ApprovalRef, nil
-}
-
-// ClearApprovalRef clears the value of the "approval_ref" field.
-func (m *InventoryOperationMutation) ClearApprovalRef() {
-	m.approval_ref = nil
-	m.clearedFields[inventoryoperation.FieldApprovalRef] = struct{}{}
-}
-
-// ApprovalRefCleared returns if the "approval_ref" field was cleared in this mutation.
-func (m *InventoryOperationMutation) ApprovalRefCleared() bool {
-	_, ok := m.clearedFields[inventoryoperation.FieldApprovalRef]
-	return ok
-}
-
-// ResetApprovalRef resets all changes to the "approval_ref" field.
-func (m *InventoryOperationMutation) ResetApprovalRef() {
-	m.approval_ref = nil
-	delete(m.clearedFields, inventoryoperation.FieldApprovalRef)
-}
-
 // SetIdempotencyKey sets the "idempotency_key" field.
 func (m *InventoryOperationMutation) SetIdempotencyKey(s string) {
 	m.idempotency_key = &s
@@ -21004,6 +22001,412 @@ func (m *InventoryOperationMutation) AddedVersion() (r int, exists bool) {
 func (m *InventoryOperationMutation) ResetVersion() {
 	m.version = nil
 	m.addversion = nil
+}
+
+// SetSubmittedAt sets the "submitted_at" field.
+func (m *InventoryOperationMutation) SetSubmittedAt(t time.Time) {
+	m.submitted_at = &t
+}
+
+// SubmittedAt returns the value of the "submitted_at" field in the mutation.
+func (m *InventoryOperationMutation) SubmittedAt() (r time.Time, exists bool) {
+	v := m.submitted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubmittedAt returns the old "submitted_at" field's value of the InventoryOperation entity.
+// If the InventoryOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InventoryOperationMutation) OldSubmittedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubmittedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubmittedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubmittedAt: %w", err)
+	}
+	return oldValue.SubmittedAt, nil
+}
+
+// ClearSubmittedAt clears the value of the "submitted_at" field.
+func (m *InventoryOperationMutation) ClearSubmittedAt() {
+	m.submitted_at = nil
+	m.clearedFields[inventoryoperation.FieldSubmittedAt] = struct{}{}
+}
+
+// SubmittedAtCleared returns if the "submitted_at" field was cleared in this mutation.
+func (m *InventoryOperationMutation) SubmittedAtCleared() bool {
+	_, ok := m.clearedFields[inventoryoperation.FieldSubmittedAt]
+	return ok
+}
+
+// ResetSubmittedAt resets all changes to the "submitted_at" field.
+func (m *InventoryOperationMutation) ResetSubmittedAt() {
+	m.submitted_at = nil
+	delete(m.clearedFields, inventoryoperation.FieldSubmittedAt)
+}
+
+// SetSubmittedBy sets the "submitted_by" field.
+func (m *InventoryOperationMutation) SetSubmittedBy(i int) {
+	m.submitted_by = &i
+	m.addsubmitted_by = nil
+}
+
+// SubmittedBy returns the value of the "submitted_by" field in the mutation.
+func (m *InventoryOperationMutation) SubmittedBy() (r int, exists bool) {
+	v := m.submitted_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubmittedBy returns the old "submitted_by" field's value of the InventoryOperation entity.
+// If the InventoryOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InventoryOperationMutation) OldSubmittedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubmittedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubmittedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubmittedBy: %w", err)
+	}
+	return oldValue.SubmittedBy, nil
+}
+
+// AddSubmittedBy adds i to the "submitted_by" field.
+func (m *InventoryOperationMutation) AddSubmittedBy(i int) {
+	if m.addsubmitted_by != nil {
+		*m.addsubmitted_by += i
+	} else {
+		m.addsubmitted_by = &i
+	}
+}
+
+// AddedSubmittedBy returns the value that was added to the "submitted_by" field in this mutation.
+func (m *InventoryOperationMutation) AddedSubmittedBy() (r int, exists bool) {
+	v := m.addsubmitted_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSubmittedBy clears the value of the "submitted_by" field.
+func (m *InventoryOperationMutation) ClearSubmittedBy() {
+	m.submitted_by = nil
+	m.addsubmitted_by = nil
+	m.clearedFields[inventoryoperation.FieldSubmittedBy] = struct{}{}
+}
+
+// SubmittedByCleared returns if the "submitted_by" field was cleared in this mutation.
+func (m *InventoryOperationMutation) SubmittedByCleared() bool {
+	_, ok := m.clearedFields[inventoryoperation.FieldSubmittedBy]
+	return ok
+}
+
+// ResetSubmittedBy resets all changes to the "submitted_by" field.
+func (m *InventoryOperationMutation) ResetSubmittedBy() {
+	m.submitted_by = nil
+	m.addsubmitted_by = nil
+	delete(m.clearedFields, inventoryoperation.FieldSubmittedBy)
+}
+
+// SetApprovedAt sets the "approved_at" field.
+func (m *InventoryOperationMutation) SetApprovedAt(t time.Time) {
+	m.approved_at = &t
+}
+
+// ApprovedAt returns the value of the "approved_at" field in the mutation.
+func (m *InventoryOperationMutation) ApprovedAt() (r time.Time, exists bool) {
+	v := m.approved_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedAt returns the old "approved_at" field's value of the InventoryOperation entity.
+// If the InventoryOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InventoryOperationMutation) OldApprovedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedAt: %w", err)
+	}
+	return oldValue.ApprovedAt, nil
+}
+
+// ClearApprovedAt clears the value of the "approved_at" field.
+func (m *InventoryOperationMutation) ClearApprovedAt() {
+	m.approved_at = nil
+	m.clearedFields[inventoryoperation.FieldApprovedAt] = struct{}{}
+}
+
+// ApprovedAtCleared returns if the "approved_at" field was cleared in this mutation.
+func (m *InventoryOperationMutation) ApprovedAtCleared() bool {
+	_, ok := m.clearedFields[inventoryoperation.FieldApprovedAt]
+	return ok
+}
+
+// ResetApprovedAt resets all changes to the "approved_at" field.
+func (m *InventoryOperationMutation) ResetApprovedAt() {
+	m.approved_at = nil
+	delete(m.clearedFields, inventoryoperation.FieldApprovedAt)
+}
+
+// SetApprovedBy sets the "approved_by" field.
+func (m *InventoryOperationMutation) SetApprovedBy(i int) {
+	m.approved_by = &i
+	m.addapproved_by = nil
+}
+
+// ApprovedBy returns the value of the "approved_by" field in the mutation.
+func (m *InventoryOperationMutation) ApprovedBy() (r int, exists bool) {
+	v := m.approved_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedBy returns the old "approved_by" field's value of the InventoryOperation entity.
+// If the InventoryOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InventoryOperationMutation) OldApprovedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedBy: %w", err)
+	}
+	return oldValue.ApprovedBy, nil
+}
+
+// AddApprovedBy adds i to the "approved_by" field.
+func (m *InventoryOperationMutation) AddApprovedBy(i int) {
+	if m.addapproved_by != nil {
+		*m.addapproved_by += i
+	} else {
+		m.addapproved_by = &i
+	}
+}
+
+// AddedApprovedBy returns the value that was added to the "approved_by" field in this mutation.
+func (m *InventoryOperationMutation) AddedApprovedBy() (r int, exists bool) {
+	v := m.addapproved_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearApprovedBy clears the value of the "approved_by" field.
+func (m *InventoryOperationMutation) ClearApprovedBy() {
+	m.approved_by = nil
+	m.addapproved_by = nil
+	m.clearedFields[inventoryoperation.FieldApprovedBy] = struct{}{}
+}
+
+// ApprovedByCleared returns if the "approved_by" field was cleared in this mutation.
+func (m *InventoryOperationMutation) ApprovedByCleared() bool {
+	_, ok := m.clearedFields[inventoryoperation.FieldApprovedBy]
+	return ok
+}
+
+// ResetApprovedBy resets all changes to the "approved_by" field.
+func (m *InventoryOperationMutation) ResetApprovedBy() {
+	m.approved_by = nil
+	m.addapproved_by = nil
+	delete(m.clearedFields, inventoryoperation.FieldApprovedBy)
+}
+
+// SetRejectedAt sets the "rejected_at" field.
+func (m *InventoryOperationMutation) SetRejectedAt(t time.Time) {
+	m.rejected_at = &t
+}
+
+// RejectedAt returns the value of the "rejected_at" field in the mutation.
+func (m *InventoryOperationMutation) RejectedAt() (r time.Time, exists bool) {
+	v := m.rejected_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedAt returns the old "rejected_at" field's value of the InventoryOperation entity.
+// If the InventoryOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InventoryOperationMutation) OldRejectedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedAt: %w", err)
+	}
+	return oldValue.RejectedAt, nil
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (m *InventoryOperationMutation) ClearRejectedAt() {
+	m.rejected_at = nil
+	m.clearedFields[inventoryoperation.FieldRejectedAt] = struct{}{}
+}
+
+// RejectedAtCleared returns if the "rejected_at" field was cleared in this mutation.
+func (m *InventoryOperationMutation) RejectedAtCleared() bool {
+	_, ok := m.clearedFields[inventoryoperation.FieldRejectedAt]
+	return ok
+}
+
+// ResetRejectedAt resets all changes to the "rejected_at" field.
+func (m *InventoryOperationMutation) ResetRejectedAt() {
+	m.rejected_at = nil
+	delete(m.clearedFields, inventoryoperation.FieldRejectedAt)
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (m *InventoryOperationMutation) SetRejectedBy(i int) {
+	m.rejected_by = &i
+	m.addrejected_by = nil
+}
+
+// RejectedBy returns the value of the "rejected_by" field in the mutation.
+func (m *InventoryOperationMutation) RejectedBy() (r int, exists bool) {
+	v := m.rejected_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedBy returns the old "rejected_by" field's value of the InventoryOperation entity.
+// If the InventoryOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InventoryOperationMutation) OldRejectedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedBy: %w", err)
+	}
+	return oldValue.RejectedBy, nil
+}
+
+// AddRejectedBy adds i to the "rejected_by" field.
+func (m *InventoryOperationMutation) AddRejectedBy(i int) {
+	if m.addrejected_by != nil {
+		*m.addrejected_by += i
+	} else {
+		m.addrejected_by = &i
+	}
+}
+
+// AddedRejectedBy returns the value that was added to the "rejected_by" field in this mutation.
+func (m *InventoryOperationMutation) AddedRejectedBy() (r int, exists bool) {
+	v := m.addrejected_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (m *InventoryOperationMutation) ClearRejectedBy() {
+	m.rejected_by = nil
+	m.addrejected_by = nil
+	m.clearedFields[inventoryoperation.FieldRejectedBy] = struct{}{}
+}
+
+// RejectedByCleared returns if the "rejected_by" field was cleared in this mutation.
+func (m *InventoryOperationMutation) RejectedByCleared() bool {
+	_, ok := m.clearedFields[inventoryoperation.FieldRejectedBy]
+	return ok
+}
+
+// ResetRejectedBy resets all changes to the "rejected_by" field.
+func (m *InventoryOperationMutation) ResetRejectedBy() {
+	m.rejected_by = nil
+	m.addrejected_by = nil
+	delete(m.clearedFields, inventoryoperation.FieldRejectedBy)
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (m *InventoryOperationMutation) SetRejectReason(s string) {
+	m.reject_reason = &s
+}
+
+// RejectReason returns the value of the "reject_reason" field in the mutation.
+func (m *InventoryOperationMutation) RejectReason() (r string, exists bool) {
+	v := m.reject_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectReason returns the old "reject_reason" field's value of the InventoryOperation entity.
+// If the InventoryOperation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InventoryOperationMutation) OldRejectReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectReason: %w", err)
+	}
+	return oldValue.RejectReason, nil
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (m *InventoryOperationMutation) ClearRejectReason() {
+	m.reject_reason = nil
+	m.clearedFields[inventoryoperation.FieldRejectReason] = struct{}{}
+}
+
+// RejectReasonCleared returns if the "reject_reason" field was cleared in this mutation.
+func (m *InventoryOperationMutation) RejectReasonCleared() bool {
+	_, ok := m.clearedFields[inventoryoperation.FieldRejectReason]
+	return ok
+}
+
+// ResetRejectReason resets all changes to the "reject_reason" field.
+func (m *InventoryOperationMutation) ResetRejectReason() {
+	m.reject_reason = nil
+	delete(m.clearedFields, inventoryoperation.FieldRejectReason)
 }
 
 // SetPostedAt sets the "posted_at" field.
@@ -21509,7 +22912,7 @@ func (m *InventoryOperationMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *InventoryOperationMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 23)
 	if m.operation_no != nil {
 		fields = append(fields, inventoryoperation.FieldOperationNo)
 	}
@@ -21522,9 +22925,6 @@ func (m *InventoryOperationMutation) Fields() []string {
 	if m.reason != nil {
 		fields = append(fields, inventoryoperation.FieldReason)
 	}
-	if m.approval_ref != nil {
-		fields = append(fields, inventoryoperation.FieldApprovalRef)
-	}
 	if m.idempotency_key != nil {
 		fields = append(fields, inventoryoperation.FieldIdempotencyKey)
 	}
@@ -21536,6 +22936,27 @@ func (m *InventoryOperationMutation) Fields() []string {
 	}
 	if m.version != nil {
 		fields = append(fields, inventoryoperation.FieldVersion)
+	}
+	if m.submitted_at != nil {
+		fields = append(fields, inventoryoperation.FieldSubmittedAt)
+	}
+	if m.submitted_by != nil {
+		fields = append(fields, inventoryoperation.FieldSubmittedBy)
+	}
+	if m.approved_at != nil {
+		fields = append(fields, inventoryoperation.FieldApprovedAt)
+	}
+	if m.approved_by != nil {
+		fields = append(fields, inventoryoperation.FieldApprovedBy)
+	}
+	if m.rejected_at != nil {
+		fields = append(fields, inventoryoperation.FieldRejectedAt)
+	}
+	if m.rejected_by != nil {
+		fields = append(fields, inventoryoperation.FieldRejectedBy)
+	}
+	if m.reject_reason != nil {
+		fields = append(fields, inventoryoperation.FieldRejectReason)
 	}
 	if m.posted_at != nil {
 		fields = append(fields, inventoryoperation.FieldPostedAt)
@@ -21577,8 +22998,6 @@ func (m *InventoryOperationMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case inventoryoperation.FieldReason:
 		return m.Reason()
-	case inventoryoperation.FieldApprovalRef:
-		return m.ApprovalRef()
 	case inventoryoperation.FieldIdempotencyKey:
 		return m.IdempotencyKey()
 	case inventoryoperation.FieldIdempotencyPayloadHash:
@@ -21587,6 +23006,20 @@ func (m *InventoryOperationMutation) Field(name string) (ent.Value, bool) {
 		return m.IdempotencyItemCount()
 	case inventoryoperation.FieldVersion:
 		return m.Version()
+	case inventoryoperation.FieldSubmittedAt:
+		return m.SubmittedAt()
+	case inventoryoperation.FieldSubmittedBy:
+		return m.SubmittedBy()
+	case inventoryoperation.FieldApprovedAt:
+		return m.ApprovedAt()
+	case inventoryoperation.FieldApprovedBy:
+		return m.ApprovedBy()
+	case inventoryoperation.FieldRejectedAt:
+		return m.RejectedAt()
+	case inventoryoperation.FieldRejectedBy:
+		return m.RejectedBy()
+	case inventoryoperation.FieldRejectReason:
+		return m.RejectReason()
 	case inventoryoperation.FieldPostedAt:
 		return m.PostedAt()
 	case inventoryoperation.FieldPostedBy:
@@ -21620,8 +23053,6 @@ func (m *InventoryOperationMutation) OldField(ctx context.Context, name string) 
 		return m.OldStatus(ctx)
 	case inventoryoperation.FieldReason:
 		return m.OldReason(ctx)
-	case inventoryoperation.FieldApprovalRef:
-		return m.OldApprovalRef(ctx)
 	case inventoryoperation.FieldIdempotencyKey:
 		return m.OldIdempotencyKey(ctx)
 	case inventoryoperation.FieldIdempotencyPayloadHash:
@@ -21630,6 +23061,20 @@ func (m *InventoryOperationMutation) OldField(ctx context.Context, name string) 
 		return m.OldIdempotencyItemCount(ctx)
 	case inventoryoperation.FieldVersion:
 		return m.OldVersion(ctx)
+	case inventoryoperation.FieldSubmittedAt:
+		return m.OldSubmittedAt(ctx)
+	case inventoryoperation.FieldSubmittedBy:
+		return m.OldSubmittedBy(ctx)
+	case inventoryoperation.FieldApprovedAt:
+		return m.OldApprovedAt(ctx)
+	case inventoryoperation.FieldApprovedBy:
+		return m.OldApprovedBy(ctx)
+	case inventoryoperation.FieldRejectedAt:
+		return m.OldRejectedAt(ctx)
+	case inventoryoperation.FieldRejectedBy:
+		return m.OldRejectedBy(ctx)
+	case inventoryoperation.FieldRejectReason:
+		return m.OldRejectReason(ctx)
 	case inventoryoperation.FieldPostedAt:
 		return m.OldPostedAt(ctx)
 	case inventoryoperation.FieldPostedBy:
@@ -21683,13 +23128,6 @@ func (m *InventoryOperationMutation) SetField(name string, value ent.Value) erro
 		}
 		m.SetReason(v)
 		return nil
-	case inventoryoperation.FieldApprovalRef:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetApprovalRef(v)
-		return nil
 	case inventoryoperation.FieldIdempotencyKey:
 		v, ok := value.(string)
 		if !ok {
@@ -21717,6 +23155,55 @@ func (m *InventoryOperationMutation) SetField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetVersion(v)
+		return nil
+	case inventoryoperation.FieldSubmittedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubmittedAt(v)
+		return nil
+	case inventoryoperation.FieldSubmittedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubmittedBy(v)
+		return nil
+	case inventoryoperation.FieldApprovedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedAt(v)
+		return nil
+	case inventoryoperation.FieldApprovedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedBy(v)
+		return nil
+	case inventoryoperation.FieldRejectedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedAt(v)
+		return nil
+	case inventoryoperation.FieldRejectedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedBy(v)
+		return nil
+	case inventoryoperation.FieldRejectReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectReason(v)
 		return nil
 	case inventoryoperation.FieldPostedAt:
 		v, ok := value.(time.Time)
@@ -21788,6 +23275,15 @@ func (m *InventoryOperationMutation) AddedFields() []string {
 	if m.addversion != nil {
 		fields = append(fields, inventoryoperation.FieldVersion)
 	}
+	if m.addsubmitted_by != nil {
+		fields = append(fields, inventoryoperation.FieldSubmittedBy)
+	}
+	if m.addapproved_by != nil {
+		fields = append(fields, inventoryoperation.FieldApprovedBy)
+	}
+	if m.addrejected_by != nil {
+		fields = append(fields, inventoryoperation.FieldRejectedBy)
+	}
 	if m.addposted_by != nil {
 		fields = append(fields, inventoryoperation.FieldPostedBy)
 	}
@@ -21809,6 +23305,12 @@ func (m *InventoryOperationMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedIdempotencyItemCount()
 	case inventoryoperation.FieldVersion:
 		return m.AddedVersion()
+	case inventoryoperation.FieldSubmittedBy:
+		return m.AddedSubmittedBy()
+	case inventoryoperation.FieldApprovedBy:
+		return m.AddedApprovedBy()
+	case inventoryoperation.FieldRejectedBy:
+		return m.AddedRejectedBy()
 	case inventoryoperation.FieldPostedBy:
 		return m.AddedPostedBy()
 	case inventoryoperation.FieldCancelledBy:
@@ -21837,6 +23339,27 @@ func (m *InventoryOperationMutation) AddField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddVersion(v)
+		return nil
+	case inventoryoperation.FieldSubmittedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSubmittedBy(v)
+		return nil
+	case inventoryoperation.FieldApprovedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddApprovedBy(v)
+		return nil
+	case inventoryoperation.FieldRejectedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRejectedBy(v)
 		return nil
 	case inventoryoperation.FieldPostedBy:
 		v, ok := value.(int)
@@ -21867,8 +23390,26 @@ func (m *InventoryOperationMutation) AddField(name string, value ent.Value) erro
 // mutation.
 func (m *InventoryOperationMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(inventoryoperation.FieldApprovalRef) {
-		fields = append(fields, inventoryoperation.FieldApprovalRef)
+	if m.FieldCleared(inventoryoperation.FieldSubmittedAt) {
+		fields = append(fields, inventoryoperation.FieldSubmittedAt)
+	}
+	if m.FieldCleared(inventoryoperation.FieldSubmittedBy) {
+		fields = append(fields, inventoryoperation.FieldSubmittedBy)
+	}
+	if m.FieldCleared(inventoryoperation.FieldApprovedAt) {
+		fields = append(fields, inventoryoperation.FieldApprovedAt)
+	}
+	if m.FieldCleared(inventoryoperation.FieldApprovedBy) {
+		fields = append(fields, inventoryoperation.FieldApprovedBy)
+	}
+	if m.FieldCleared(inventoryoperation.FieldRejectedAt) {
+		fields = append(fields, inventoryoperation.FieldRejectedAt)
+	}
+	if m.FieldCleared(inventoryoperation.FieldRejectedBy) {
+		fields = append(fields, inventoryoperation.FieldRejectedBy)
+	}
+	if m.FieldCleared(inventoryoperation.FieldRejectReason) {
+		fields = append(fields, inventoryoperation.FieldRejectReason)
 	}
 	if m.FieldCleared(inventoryoperation.FieldPostedAt) {
 		fields = append(fields, inventoryoperation.FieldPostedAt)
@@ -21899,8 +23440,26 @@ func (m *InventoryOperationMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *InventoryOperationMutation) ClearField(name string) error {
 	switch name {
-	case inventoryoperation.FieldApprovalRef:
-		m.ClearApprovalRef()
+	case inventoryoperation.FieldSubmittedAt:
+		m.ClearSubmittedAt()
+		return nil
+	case inventoryoperation.FieldSubmittedBy:
+		m.ClearSubmittedBy()
+		return nil
+	case inventoryoperation.FieldApprovedAt:
+		m.ClearApprovedAt()
+		return nil
+	case inventoryoperation.FieldApprovedBy:
+		m.ClearApprovedBy()
+		return nil
+	case inventoryoperation.FieldRejectedAt:
+		m.ClearRejectedAt()
+		return nil
+	case inventoryoperation.FieldRejectedBy:
+		m.ClearRejectedBy()
+		return nil
+	case inventoryoperation.FieldRejectReason:
+		m.ClearRejectReason()
 		return nil
 	case inventoryoperation.FieldPostedAt:
 		m.ClearPostedAt()
@@ -21937,9 +23496,6 @@ func (m *InventoryOperationMutation) ResetField(name string) error {
 	case inventoryoperation.FieldReason:
 		m.ResetReason()
 		return nil
-	case inventoryoperation.FieldApprovalRef:
-		m.ResetApprovalRef()
-		return nil
 	case inventoryoperation.FieldIdempotencyKey:
 		m.ResetIdempotencyKey()
 		return nil
@@ -21951,6 +23507,27 @@ func (m *InventoryOperationMutation) ResetField(name string) error {
 		return nil
 	case inventoryoperation.FieldVersion:
 		m.ResetVersion()
+		return nil
+	case inventoryoperation.FieldSubmittedAt:
+		m.ResetSubmittedAt()
+		return nil
+	case inventoryoperation.FieldSubmittedBy:
+		m.ResetSubmittedBy()
+		return nil
+	case inventoryoperation.FieldApprovedAt:
+		m.ResetApprovedAt()
+		return nil
+	case inventoryoperation.FieldApprovedBy:
+		m.ResetApprovedBy()
+		return nil
+	case inventoryoperation.FieldRejectedAt:
+		m.ResetRejectedAt()
+		return nil
+	case inventoryoperation.FieldRejectedBy:
+		m.ResetRejectedBy()
+		return nil
+	case inventoryoperation.FieldRejectReason:
+		m.ResetRejectReason()
 		return nil
 	case inventoryoperation.FieldPostedAt:
 		m.ResetPostedAt()
@@ -26968,6 +28545,8 @@ type OutsourcingFactMutation struct {
 	fact_no               *string
 	fact_type             *string
 	status                *string
+	version               *int
+	addversion            *int
 	subject_type          *string
 	subject_id            *int
 	addsubject_id         *int
@@ -26984,6 +28563,8 @@ type OutsourcingFactMutation struct {
 	occurred_at           *time.Time
 	occurred_at_specified *bool
 	posted_at             *time.Time
+	cancelled_at          *time.Time
+	cancel_reason         *string
 	note                  *string
 	created_at            *time.Time
 	updated_at            *time.Time
@@ -26996,6 +28577,10 @@ type OutsourcingFactMutation struct {
 	clearedproduct_sku    bool
 	inventory_lot         *int
 	clearedinventory_lot  bool
+	poster                *int
+	clearedposter         bool
+	canceller             *int
+	clearedcanceller      bool
 	done                  bool
 	oldValue              func(context.Context) (*OutsourcingFact, error)
 	predicates            []predicate.OutsourcingFact
@@ -27205,6 +28790,62 @@ func (m *OutsourcingFactMutation) OldStatus(ctx context.Context) (v string, err 
 // ResetStatus resets all changes to the "status" field.
 func (m *OutsourcingFactMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *OutsourcingFactMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *OutsourcingFactMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the OutsourcingFact entity.
+// If the OutsourcingFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingFactMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *OutsourcingFactMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *OutsourcingFactMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *OutsourcingFactMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
 }
 
 // SetSubjectType sets the "subject_type" field.
@@ -27970,6 +29611,202 @@ func (m *OutsourcingFactMutation) ResetPostedAt() {
 	delete(m.clearedFields, outsourcingfact.FieldPostedAt)
 }
 
+// SetPostedBy sets the "posted_by" field.
+func (m *OutsourcingFactMutation) SetPostedBy(i int) {
+	m.poster = &i
+}
+
+// PostedBy returns the value of the "posted_by" field in the mutation.
+func (m *OutsourcingFactMutation) PostedBy() (r int, exists bool) {
+	v := m.poster
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPostedBy returns the old "posted_by" field's value of the OutsourcingFact entity.
+// If the OutsourcingFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingFactMutation) OldPostedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPostedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPostedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPostedBy: %w", err)
+	}
+	return oldValue.PostedBy, nil
+}
+
+// ClearPostedBy clears the value of the "posted_by" field.
+func (m *OutsourcingFactMutation) ClearPostedBy() {
+	m.poster = nil
+	m.clearedFields[outsourcingfact.FieldPostedBy] = struct{}{}
+}
+
+// PostedByCleared returns if the "posted_by" field was cleared in this mutation.
+func (m *OutsourcingFactMutation) PostedByCleared() bool {
+	_, ok := m.clearedFields[outsourcingfact.FieldPostedBy]
+	return ok
+}
+
+// ResetPostedBy resets all changes to the "posted_by" field.
+func (m *OutsourcingFactMutation) ResetPostedBy() {
+	m.poster = nil
+	delete(m.clearedFields, outsourcingfact.FieldPostedBy)
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (m *OutsourcingFactMutation) SetCancelledAt(t time.Time) {
+	m.cancelled_at = &t
+}
+
+// CancelledAt returns the value of the "cancelled_at" field in the mutation.
+func (m *OutsourcingFactMutation) CancelledAt() (r time.Time, exists bool) {
+	v := m.cancelled_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelledAt returns the old "cancelled_at" field's value of the OutsourcingFact entity.
+// If the OutsourcingFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingFactMutation) OldCancelledAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelledAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelledAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelledAt: %w", err)
+	}
+	return oldValue.CancelledAt, nil
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (m *OutsourcingFactMutation) ClearCancelledAt() {
+	m.cancelled_at = nil
+	m.clearedFields[outsourcingfact.FieldCancelledAt] = struct{}{}
+}
+
+// CancelledAtCleared returns if the "cancelled_at" field was cleared in this mutation.
+func (m *OutsourcingFactMutation) CancelledAtCleared() bool {
+	_, ok := m.clearedFields[outsourcingfact.FieldCancelledAt]
+	return ok
+}
+
+// ResetCancelledAt resets all changes to the "cancelled_at" field.
+func (m *OutsourcingFactMutation) ResetCancelledAt() {
+	m.cancelled_at = nil
+	delete(m.clearedFields, outsourcingfact.FieldCancelledAt)
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (m *OutsourcingFactMutation) SetCancelledBy(i int) {
+	m.canceller = &i
+}
+
+// CancelledBy returns the value of the "cancelled_by" field in the mutation.
+func (m *OutsourcingFactMutation) CancelledBy() (r int, exists bool) {
+	v := m.canceller
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelledBy returns the old "cancelled_by" field's value of the OutsourcingFact entity.
+// If the OutsourcingFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingFactMutation) OldCancelledBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelledBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelledBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelledBy: %w", err)
+	}
+	return oldValue.CancelledBy, nil
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (m *OutsourcingFactMutation) ClearCancelledBy() {
+	m.canceller = nil
+	m.clearedFields[outsourcingfact.FieldCancelledBy] = struct{}{}
+}
+
+// CancelledByCleared returns if the "cancelled_by" field was cleared in this mutation.
+func (m *OutsourcingFactMutation) CancelledByCleared() bool {
+	_, ok := m.clearedFields[outsourcingfact.FieldCancelledBy]
+	return ok
+}
+
+// ResetCancelledBy resets all changes to the "cancelled_by" field.
+func (m *OutsourcingFactMutation) ResetCancelledBy() {
+	m.canceller = nil
+	delete(m.clearedFields, outsourcingfact.FieldCancelledBy)
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (m *OutsourcingFactMutation) SetCancelReason(s string) {
+	m.cancel_reason = &s
+}
+
+// CancelReason returns the value of the "cancel_reason" field in the mutation.
+func (m *OutsourcingFactMutation) CancelReason() (r string, exists bool) {
+	v := m.cancel_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelReason returns the old "cancel_reason" field's value of the OutsourcingFact entity.
+// If the OutsourcingFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingFactMutation) OldCancelReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelReason: %w", err)
+	}
+	return oldValue.CancelReason, nil
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (m *OutsourcingFactMutation) ClearCancelReason() {
+	m.cancel_reason = nil
+	m.clearedFields[outsourcingfact.FieldCancelReason] = struct{}{}
+}
+
+// CancelReasonCleared returns if the "cancel_reason" field was cleared in this mutation.
+func (m *OutsourcingFactMutation) CancelReasonCleared() bool {
+	_, ok := m.clearedFields[outsourcingfact.FieldCancelReason]
+	return ok
+}
+
+// ResetCancelReason resets all changes to the "cancel_reason" field.
+func (m *OutsourcingFactMutation) ResetCancelReason() {
+	m.cancel_reason = nil
+	delete(m.clearedFields, outsourcingfact.FieldCancelReason)
+}
+
 // SetNote sets the "note" field.
 func (m *OutsourcingFactMutation) SetNote(s string) {
 	m.note = &s
@@ -28212,6 +30049,86 @@ func (m *OutsourcingFactMutation) ResetInventoryLot() {
 	m.clearedinventory_lot = false
 }
 
+// SetPosterID sets the "poster" edge to the AdminUser entity by id.
+func (m *OutsourcingFactMutation) SetPosterID(id int) {
+	m.poster = &id
+}
+
+// ClearPoster clears the "poster" edge to the AdminUser entity.
+func (m *OutsourcingFactMutation) ClearPoster() {
+	m.clearedposter = true
+	m.clearedFields[outsourcingfact.FieldPostedBy] = struct{}{}
+}
+
+// PosterCleared reports if the "poster" edge to the AdminUser entity was cleared.
+func (m *OutsourcingFactMutation) PosterCleared() bool {
+	return m.PostedByCleared() || m.clearedposter
+}
+
+// PosterID returns the "poster" edge ID in the mutation.
+func (m *OutsourcingFactMutation) PosterID() (id int, exists bool) {
+	if m.poster != nil {
+		return *m.poster, true
+	}
+	return
+}
+
+// PosterIDs returns the "poster" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PosterID instead. It exists only for internal usage by the builders.
+func (m *OutsourcingFactMutation) PosterIDs() (ids []int) {
+	if id := m.poster; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPoster resets all changes to the "poster" edge.
+func (m *OutsourcingFactMutation) ResetPoster() {
+	m.poster = nil
+	m.clearedposter = false
+}
+
+// SetCancellerID sets the "canceller" edge to the AdminUser entity by id.
+func (m *OutsourcingFactMutation) SetCancellerID(id int) {
+	m.canceller = &id
+}
+
+// ClearCanceller clears the "canceller" edge to the AdminUser entity.
+func (m *OutsourcingFactMutation) ClearCanceller() {
+	m.clearedcanceller = true
+	m.clearedFields[outsourcingfact.FieldCancelledBy] = struct{}{}
+}
+
+// CancellerCleared reports if the "canceller" edge to the AdminUser entity was cleared.
+func (m *OutsourcingFactMutation) CancellerCleared() bool {
+	return m.CancelledByCleared() || m.clearedcanceller
+}
+
+// CancellerID returns the "canceller" edge ID in the mutation.
+func (m *OutsourcingFactMutation) CancellerID() (id int, exists bool) {
+	if m.canceller != nil {
+		return *m.canceller, true
+	}
+	return
+}
+
+// CancellerIDs returns the "canceller" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// CancellerID instead. It exists only for internal usage by the builders.
+func (m *OutsourcingFactMutation) CancellerIDs() (ids []int) {
+	if id := m.canceller; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetCanceller resets all changes to the "canceller" edge.
+func (m *OutsourcingFactMutation) ResetCanceller() {
+	m.canceller = nil
+	m.clearedcanceller = false
+}
+
 // Where appends a list predicates to the OutsourcingFactMutation builder.
 func (m *OutsourcingFactMutation) Where(ps ...predicate.OutsourcingFact) {
 	m.predicates = append(m.predicates, ps...)
@@ -28246,7 +30163,7 @@ func (m *OutsourcingFactMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OutsourcingFactMutation) Fields() []string {
-	fields := make([]string, 0, 22)
+	fields := make([]string, 0, 27)
 	if m.fact_no != nil {
 		fields = append(fields, outsourcingfact.FieldFactNo)
 	}
@@ -28255,6 +30172,9 @@ func (m *OutsourcingFactMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, outsourcingfact.FieldStatus)
+	}
+	if m.version != nil {
+		fields = append(fields, outsourcingfact.FieldVersion)
 	}
 	if m.subject_type != nil {
 		fields = append(fields, outsourcingfact.FieldSubjectType)
@@ -28304,6 +30224,18 @@ func (m *OutsourcingFactMutation) Fields() []string {
 	if m.posted_at != nil {
 		fields = append(fields, outsourcingfact.FieldPostedAt)
 	}
+	if m.poster != nil {
+		fields = append(fields, outsourcingfact.FieldPostedBy)
+	}
+	if m.cancelled_at != nil {
+		fields = append(fields, outsourcingfact.FieldCancelledAt)
+	}
+	if m.canceller != nil {
+		fields = append(fields, outsourcingfact.FieldCancelledBy)
+	}
+	if m.cancel_reason != nil {
+		fields = append(fields, outsourcingfact.FieldCancelReason)
+	}
 	if m.note != nil {
 		fields = append(fields, outsourcingfact.FieldNote)
 	}
@@ -28327,6 +30259,8 @@ func (m *OutsourcingFactMutation) Field(name string) (ent.Value, bool) {
 		return m.FactType()
 	case outsourcingfact.FieldStatus:
 		return m.Status()
+	case outsourcingfact.FieldVersion:
+		return m.Version()
 	case outsourcingfact.FieldSubjectType:
 		return m.SubjectType()
 	case outsourcingfact.FieldSubjectID:
@@ -28359,6 +30293,14 @@ func (m *OutsourcingFactMutation) Field(name string) (ent.Value, bool) {
 		return m.OccurredAtSpecified()
 	case outsourcingfact.FieldPostedAt:
 		return m.PostedAt()
+	case outsourcingfact.FieldPostedBy:
+		return m.PostedBy()
+	case outsourcingfact.FieldCancelledAt:
+		return m.CancelledAt()
+	case outsourcingfact.FieldCancelledBy:
+		return m.CancelledBy()
+	case outsourcingfact.FieldCancelReason:
+		return m.CancelReason()
 	case outsourcingfact.FieldNote:
 		return m.Note()
 	case outsourcingfact.FieldCreatedAt:
@@ -28380,6 +30322,8 @@ func (m *OutsourcingFactMutation) OldField(ctx context.Context, name string) (en
 		return m.OldFactType(ctx)
 	case outsourcingfact.FieldStatus:
 		return m.OldStatus(ctx)
+	case outsourcingfact.FieldVersion:
+		return m.OldVersion(ctx)
 	case outsourcingfact.FieldSubjectType:
 		return m.OldSubjectType(ctx)
 	case outsourcingfact.FieldSubjectID:
@@ -28412,6 +30356,14 @@ func (m *OutsourcingFactMutation) OldField(ctx context.Context, name string) (en
 		return m.OldOccurredAtSpecified(ctx)
 	case outsourcingfact.FieldPostedAt:
 		return m.OldPostedAt(ctx)
+	case outsourcingfact.FieldPostedBy:
+		return m.OldPostedBy(ctx)
+	case outsourcingfact.FieldCancelledAt:
+		return m.OldCancelledAt(ctx)
+	case outsourcingfact.FieldCancelledBy:
+		return m.OldCancelledBy(ctx)
+	case outsourcingfact.FieldCancelReason:
+		return m.OldCancelReason(ctx)
 	case outsourcingfact.FieldNote:
 		return m.OldNote(ctx)
 	case outsourcingfact.FieldCreatedAt:
@@ -28447,6 +30399,13 @@ func (m *OutsourcingFactMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case outsourcingfact.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
 		return nil
 	case outsourcingfact.FieldSubjectType:
 		v, ok := value.(string)
@@ -28560,6 +30519,34 @@ func (m *OutsourcingFactMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPostedAt(v)
 		return nil
+	case outsourcingfact.FieldPostedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPostedBy(v)
+		return nil
+	case outsourcingfact.FieldCancelledAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelledAt(v)
+		return nil
+	case outsourcingfact.FieldCancelledBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelledBy(v)
+		return nil
+	case outsourcingfact.FieldCancelReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelReason(v)
+		return nil
 	case outsourcingfact.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -28589,6 +30576,9 @@ func (m *OutsourcingFactMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *OutsourcingFactMutation) AddedFields() []string {
 	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, outsourcingfact.FieldVersion)
+	}
 	if m.addsubject_id != nil {
 		fields = append(fields, outsourcingfact.FieldSubjectID)
 	}
@@ -28609,6 +30599,8 @@ func (m *OutsourcingFactMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *OutsourcingFactMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case outsourcingfact.FieldVersion:
+		return m.AddedVersion()
 	case outsourcingfact.FieldSubjectID:
 		return m.AddedSubjectID()
 	case outsourcingfact.FieldSupplierID:
@@ -28626,6 +30618,13 @@ func (m *OutsourcingFactMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *OutsourcingFactMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case outsourcingfact.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
 	case outsourcingfact.FieldSubjectID:
 		v, ok := value.(int)
 		if !ok {
@@ -28686,6 +30685,18 @@ func (m *OutsourcingFactMutation) ClearedFields() []string {
 	if m.FieldCleared(outsourcingfact.FieldPostedAt) {
 		fields = append(fields, outsourcingfact.FieldPostedAt)
 	}
+	if m.FieldCleared(outsourcingfact.FieldPostedBy) {
+		fields = append(fields, outsourcingfact.FieldPostedBy)
+	}
+	if m.FieldCleared(outsourcingfact.FieldCancelledAt) {
+		fields = append(fields, outsourcingfact.FieldCancelledAt)
+	}
+	if m.FieldCleared(outsourcingfact.FieldCancelledBy) {
+		fields = append(fields, outsourcingfact.FieldCancelledBy)
+	}
+	if m.FieldCleared(outsourcingfact.FieldCancelReason) {
+		fields = append(fields, outsourcingfact.FieldCancelReason)
+	}
 	if m.FieldCleared(outsourcingfact.FieldNote) {
 		fields = append(fields, outsourcingfact.FieldNote)
 	}
@@ -28727,6 +30738,18 @@ func (m *OutsourcingFactMutation) ClearField(name string) error {
 	case outsourcingfact.FieldPostedAt:
 		m.ClearPostedAt()
 		return nil
+	case outsourcingfact.FieldPostedBy:
+		m.ClearPostedBy()
+		return nil
+	case outsourcingfact.FieldCancelledAt:
+		m.ClearCancelledAt()
+		return nil
+	case outsourcingfact.FieldCancelledBy:
+		m.ClearCancelledBy()
+		return nil
+	case outsourcingfact.FieldCancelReason:
+		m.ClearCancelReason()
+		return nil
 	case outsourcingfact.FieldNote:
 		m.ClearNote()
 		return nil
@@ -28746,6 +30769,9 @@ func (m *OutsourcingFactMutation) ResetField(name string) error {
 		return nil
 	case outsourcingfact.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case outsourcingfact.FieldVersion:
+		m.ResetVersion()
 		return nil
 	case outsourcingfact.FieldSubjectType:
 		m.ResetSubjectType()
@@ -28795,6 +30821,18 @@ func (m *OutsourcingFactMutation) ResetField(name string) error {
 	case outsourcingfact.FieldPostedAt:
 		m.ResetPostedAt()
 		return nil
+	case outsourcingfact.FieldPostedBy:
+		m.ResetPostedBy()
+		return nil
+	case outsourcingfact.FieldCancelledAt:
+		m.ResetCancelledAt()
+		return nil
+	case outsourcingfact.FieldCancelledBy:
+		m.ResetCancelledBy()
+		return nil
+	case outsourcingfact.FieldCancelReason:
+		m.ResetCancelReason()
+		return nil
 	case outsourcingfact.FieldNote:
 		m.ResetNote()
 		return nil
@@ -28810,7 +30848,7 @@ func (m *OutsourcingFactMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *OutsourcingFactMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 6)
 	if m.warehouse != nil {
 		edges = append(edges, outsourcingfact.EdgeWarehouse)
 	}
@@ -28822,6 +30860,12 @@ func (m *OutsourcingFactMutation) AddedEdges() []string {
 	}
 	if m.inventory_lot != nil {
 		edges = append(edges, outsourcingfact.EdgeInventoryLot)
+	}
+	if m.poster != nil {
+		edges = append(edges, outsourcingfact.EdgePoster)
+	}
+	if m.canceller != nil {
+		edges = append(edges, outsourcingfact.EdgeCanceller)
 	}
 	return edges
 }
@@ -28846,13 +30890,21 @@ func (m *OutsourcingFactMutation) AddedIDs(name string) []ent.Value {
 		if id := m.inventory_lot; id != nil {
 			return []ent.Value{*id}
 		}
+	case outsourcingfact.EdgePoster:
+		if id := m.poster; id != nil {
+			return []ent.Value{*id}
+		}
+	case outsourcingfact.EdgeCanceller:
+		if id := m.canceller; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *OutsourcingFactMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 6)
 	return edges
 }
 
@@ -28864,7 +30916,7 @@ func (m *OutsourcingFactMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *OutsourcingFactMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 6)
 	if m.clearedwarehouse {
 		edges = append(edges, outsourcingfact.EdgeWarehouse)
 	}
@@ -28876,6 +30928,12 @@ func (m *OutsourcingFactMutation) ClearedEdges() []string {
 	}
 	if m.clearedinventory_lot {
 		edges = append(edges, outsourcingfact.EdgeInventoryLot)
+	}
+	if m.clearedposter {
+		edges = append(edges, outsourcingfact.EdgePoster)
+	}
+	if m.clearedcanceller {
+		edges = append(edges, outsourcingfact.EdgeCanceller)
 	}
 	return edges
 }
@@ -28892,6 +30950,10 @@ func (m *OutsourcingFactMutation) EdgeCleared(name string) bool {
 		return m.clearedproduct_sku
 	case outsourcingfact.EdgeInventoryLot:
 		return m.clearedinventory_lot
+	case outsourcingfact.EdgePoster:
+		return m.clearedposter
+	case outsourcingfact.EdgeCanceller:
+		return m.clearedcanceller
 	}
 	return false
 }
@@ -28912,6 +30974,12 @@ func (m *OutsourcingFactMutation) ClearEdge(name string) error {
 	case outsourcingfact.EdgeInventoryLot:
 		m.ClearInventoryLot()
 		return nil
+	case outsourcingfact.EdgePoster:
+		m.ClearPoster()
+		return nil
+	case outsourcingfact.EdgeCanceller:
+		m.ClearCanceller()
+		return nil
 	}
 	return fmt.Errorf("unknown OutsourcingFact unique edge %s", name)
 }
@@ -28931,6 +30999,12 @@ func (m *OutsourcingFactMutation) ResetEdge(name string) error {
 		return nil
 	case outsourcingfact.EdgeInventoryLot:
 		m.ResetInventoryLot()
+		return nil
+	case outsourcingfact.EdgePoster:
+		m.ResetPoster()
+		return nil
+	case outsourcingfact.EdgeCanceller:
+		m.ResetCanceller()
 		return nil
 	}
 	return fmt.Errorf("unknown OutsourcingFact edge %s", name)
@@ -44207,6 +46281,7 @@ type ProductionExceptionDecisionMutation struct {
 	executed_by                           *int
 	addexecuted_by                        *int
 	executed_at                           *time.Time
+	execution_reason                      *string
 	reversed_by                           *int
 	addreversed_by                        *int
 	reversed_at                           *time.Time
@@ -45409,6 +47484,55 @@ func (m *ProductionExceptionDecisionMutation) ResetExecutedAt() {
 	delete(m.clearedFields, productionexceptiondecision.FieldExecutedAt)
 }
 
+// SetExecutionReason sets the "execution_reason" field.
+func (m *ProductionExceptionDecisionMutation) SetExecutionReason(s string) {
+	m.execution_reason = &s
+}
+
+// ExecutionReason returns the value of the "execution_reason" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) ExecutionReason() (r string, exists bool) {
+	v := m.execution_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExecutionReason returns the old "execution_reason" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldExecutionReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExecutionReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExecutionReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExecutionReason: %w", err)
+	}
+	return oldValue.ExecutionReason, nil
+}
+
+// ClearExecutionReason clears the value of the "execution_reason" field.
+func (m *ProductionExceptionDecisionMutation) ClearExecutionReason() {
+	m.execution_reason = nil
+	m.clearedFields[productionexceptiondecision.FieldExecutionReason] = struct{}{}
+}
+
+// ExecutionReasonCleared returns if the "execution_reason" field was cleared in this mutation.
+func (m *ProductionExceptionDecisionMutation) ExecutionReasonCleared() bool {
+	_, ok := m.clearedFields[productionexceptiondecision.FieldExecutionReason]
+	return ok
+}
+
+// ResetExecutionReason resets all changes to the "execution_reason" field.
+func (m *ProductionExceptionDecisionMutation) ResetExecutionReason() {
+	m.execution_reason = nil
+	delete(m.clearedFields, productionexceptiondecision.FieldExecutionReason)
+}
+
 // SetReversedBy sets the "reversed_by" field.
 func (m *ProductionExceptionDecisionMutation) SetReversedBy(i int) {
 	m.reversed_by = &i
@@ -45611,7 +47735,7 @@ func (m *ProductionExceptionDecisionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductionExceptionDecisionMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.decision_no != nil {
 		fields = append(fields, productionexceptiondecision.FieldDecisionNo)
 	}
@@ -45678,6 +47802,9 @@ func (m *ProductionExceptionDecisionMutation) Fields() []string {
 	if m.executed_at != nil {
 		fields = append(fields, productionexceptiondecision.FieldExecutedAt)
 	}
+	if m.execution_reason != nil {
+		fields = append(fields, productionexceptiondecision.FieldExecutionReason)
+	}
 	if m.reversed_by != nil {
 		fields = append(fields, productionexceptiondecision.FieldReversedBy)
 	}
@@ -45739,6 +47866,8 @@ func (m *ProductionExceptionDecisionMutation) Field(name string) (ent.Value, boo
 		return m.ExecutedBy()
 	case productionexceptiondecision.FieldExecutedAt:
 		return m.ExecutedAt()
+	case productionexceptiondecision.FieldExecutionReason:
+		return m.ExecutionReason()
 	case productionexceptiondecision.FieldReversedBy:
 		return m.ReversedBy()
 	case productionexceptiondecision.FieldReversedAt:
@@ -45798,6 +47927,8 @@ func (m *ProductionExceptionDecisionMutation) OldField(ctx context.Context, name
 		return m.OldExecutedBy(ctx)
 	case productionexceptiondecision.FieldExecutedAt:
 		return m.OldExecutedAt(ctx)
+	case productionexceptiondecision.FieldExecutionReason:
+		return m.OldExecutionReason(ctx)
 	case productionexceptiondecision.FieldReversedBy:
 		return m.OldReversedBy(ctx)
 	case productionexceptiondecision.FieldReversedAt:
@@ -45966,6 +48097,13 @@ func (m *ProductionExceptionDecisionMutation) SetField(name string, value ent.Va
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetExecutedAt(v)
+		return nil
+	case productionexceptiondecision.FieldExecutionReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExecutionReason(v)
 		return nil
 	case productionexceptiondecision.FieldReversedBy:
 		v, ok := value.(int)
@@ -46168,6 +48306,9 @@ func (m *ProductionExceptionDecisionMutation) ClearedFields() []string {
 	if m.FieldCleared(productionexceptiondecision.FieldExecutedAt) {
 		fields = append(fields, productionexceptiondecision.FieldExecutedAt)
 	}
+	if m.FieldCleared(productionexceptiondecision.FieldExecutionReason) {
+		fields = append(fields, productionexceptiondecision.FieldExecutionReason)
+	}
 	if m.FieldCleared(productionexceptiondecision.FieldReversedBy) {
 		fields = append(fields, productionexceptiondecision.FieldReversedBy)
 	}
@@ -46217,6 +48358,9 @@ func (m *ProductionExceptionDecisionMutation) ClearField(name string) error {
 		return nil
 	case productionexceptiondecision.FieldExecutedAt:
 		m.ClearExecutedAt()
+		return nil
+	case productionexceptiondecision.FieldExecutionReason:
+		m.ClearExecutionReason()
 		return nil
 	case productionexceptiondecision.FieldReversedBy:
 		m.ClearReversedBy()
@@ -46301,6 +48445,9 @@ func (m *ProductionExceptionDecisionMutation) ResetField(name string) error {
 	case productionexceptiondecision.FieldExecutedAt:
 		m.ResetExecutedAt()
 		return nil
+	case productionexceptiondecision.FieldExecutionReason:
+		m.ResetExecutionReason()
+		return nil
 	case productionexceptiondecision.FieldReversedBy:
 		m.ResetReversedBy()
 		return nil
@@ -46371,6 +48518,8 @@ type ProductionFactMutation struct {
 	fact_no               *string
 	fact_type             *string
 	status                *string
+	version               *int
+	addversion            *int
 	subject_type          *string
 	subject_id            *int
 	addsubject_id         *int
@@ -46384,6 +48533,8 @@ type ProductionFactMutation struct {
 	occurred_at           *time.Time
 	occurred_at_specified *bool
 	posted_at             *time.Time
+	cancelled_at          *time.Time
+	cancel_reason         *string
 	note                  *string
 	created_at            *time.Time
 	updated_at            *time.Time
@@ -46396,6 +48547,10 @@ type ProductionFactMutation struct {
 	clearedproduct_sku    bool
 	inventory_lot         *int
 	clearedinventory_lot  bool
+	poster                *int
+	clearedposter         bool
+	canceller             *int
+	clearedcanceller      bool
 	done                  bool
 	oldValue              func(context.Context) (*ProductionFact, error)
 	predicates            []predicate.ProductionFact
@@ -46605,6 +48760,62 @@ func (m *ProductionFactMutation) OldStatus(ctx context.Context) (v string, err e
 // ResetStatus resets all changes to the "status" field.
 func (m *ProductionFactMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *ProductionFactMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *ProductionFactMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the ProductionFact entity.
+// If the ProductionFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionFactMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *ProductionFactMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *ProductionFactMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *ProductionFactMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
 }
 
 // SetSubjectType sets the "subject_type" field.
@@ -47251,6 +49462,202 @@ func (m *ProductionFactMutation) ResetPostedAt() {
 	delete(m.clearedFields, productionfact.FieldPostedAt)
 }
 
+// SetPostedBy sets the "posted_by" field.
+func (m *ProductionFactMutation) SetPostedBy(i int) {
+	m.poster = &i
+}
+
+// PostedBy returns the value of the "posted_by" field in the mutation.
+func (m *ProductionFactMutation) PostedBy() (r int, exists bool) {
+	v := m.poster
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPostedBy returns the old "posted_by" field's value of the ProductionFact entity.
+// If the ProductionFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionFactMutation) OldPostedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPostedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPostedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPostedBy: %w", err)
+	}
+	return oldValue.PostedBy, nil
+}
+
+// ClearPostedBy clears the value of the "posted_by" field.
+func (m *ProductionFactMutation) ClearPostedBy() {
+	m.poster = nil
+	m.clearedFields[productionfact.FieldPostedBy] = struct{}{}
+}
+
+// PostedByCleared returns if the "posted_by" field was cleared in this mutation.
+func (m *ProductionFactMutation) PostedByCleared() bool {
+	_, ok := m.clearedFields[productionfact.FieldPostedBy]
+	return ok
+}
+
+// ResetPostedBy resets all changes to the "posted_by" field.
+func (m *ProductionFactMutation) ResetPostedBy() {
+	m.poster = nil
+	delete(m.clearedFields, productionfact.FieldPostedBy)
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (m *ProductionFactMutation) SetCancelledAt(t time.Time) {
+	m.cancelled_at = &t
+}
+
+// CancelledAt returns the value of the "cancelled_at" field in the mutation.
+func (m *ProductionFactMutation) CancelledAt() (r time.Time, exists bool) {
+	v := m.cancelled_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelledAt returns the old "cancelled_at" field's value of the ProductionFact entity.
+// If the ProductionFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionFactMutation) OldCancelledAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelledAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelledAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelledAt: %w", err)
+	}
+	return oldValue.CancelledAt, nil
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (m *ProductionFactMutation) ClearCancelledAt() {
+	m.cancelled_at = nil
+	m.clearedFields[productionfact.FieldCancelledAt] = struct{}{}
+}
+
+// CancelledAtCleared returns if the "cancelled_at" field was cleared in this mutation.
+func (m *ProductionFactMutation) CancelledAtCleared() bool {
+	_, ok := m.clearedFields[productionfact.FieldCancelledAt]
+	return ok
+}
+
+// ResetCancelledAt resets all changes to the "cancelled_at" field.
+func (m *ProductionFactMutation) ResetCancelledAt() {
+	m.cancelled_at = nil
+	delete(m.clearedFields, productionfact.FieldCancelledAt)
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (m *ProductionFactMutation) SetCancelledBy(i int) {
+	m.canceller = &i
+}
+
+// CancelledBy returns the value of the "cancelled_by" field in the mutation.
+func (m *ProductionFactMutation) CancelledBy() (r int, exists bool) {
+	v := m.canceller
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelledBy returns the old "cancelled_by" field's value of the ProductionFact entity.
+// If the ProductionFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionFactMutation) OldCancelledBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelledBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelledBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelledBy: %w", err)
+	}
+	return oldValue.CancelledBy, nil
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (m *ProductionFactMutation) ClearCancelledBy() {
+	m.canceller = nil
+	m.clearedFields[productionfact.FieldCancelledBy] = struct{}{}
+}
+
+// CancelledByCleared returns if the "cancelled_by" field was cleared in this mutation.
+func (m *ProductionFactMutation) CancelledByCleared() bool {
+	_, ok := m.clearedFields[productionfact.FieldCancelledBy]
+	return ok
+}
+
+// ResetCancelledBy resets all changes to the "cancelled_by" field.
+func (m *ProductionFactMutation) ResetCancelledBy() {
+	m.canceller = nil
+	delete(m.clearedFields, productionfact.FieldCancelledBy)
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (m *ProductionFactMutation) SetCancelReason(s string) {
+	m.cancel_reason = &s
+}
+
+// CancelReason returns the value of the "cancel_reason" field in the mutation.
+func (m *ProductionFactMutation) CancelReason() (r string, exists bool) {
+	v := m.cancel_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCancelReason returns the old "cancel_reason" field's value of the ProductionFact entity.
+// If the ProductionFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionFactMutation) OldCancelReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCancelReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCancelReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCancelReason: %w", err)
+	}
+	return oldValue.CancelReason, nil
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (m *ProductionFactMutation) ClearCancelReason() {
+	m.cancel_reason = nil
+	m.clearedFields[productionfact.FieldCancelReason] = struct{}{}
+}
+
+// CancelReasonCleared returns if the "cancel_reason" field was cleared in this mutation.
+func (m *ProductionFactMutation) CancelReasonCleared() bool {
+	_, ok := m.clearedFields[productionfact.FieldCancelReason]
+	return ok
+}
+
+// ResetCancelReason resets all changes to the "cancel_reason" field.
+func (m *ProductionFactMutation) ResetCancelReason() {
+	m.cancel_reason = nil
+	delete(m.clearedFields, productionfact.FieldCancelReason)
+}
+
 // SetNote sets the "note" field.
 func (m *ProductionFactMutation) SetNote(s string) {
 	m.note = &s
@@ -47493,6 +49900,86 @@ func (m *ProductionFactMutation) ResetInventoryLot() {
 	m.clearedinventory_lot = false
 }
 
+// SetPosterID sets the "poster" edge to the AdminUser entity by id.
+func (m *ProductionFactMutation) SetPosterID(id int) {
+	m.poster = &id
+}
+
+// ClearPoster clears the "poster" edge to the AdminUser entity.
+func (m *ProductionFactMutation) ClearPoster() {
+	m.clearedposter = true
+	m.clearedFields[productionfact.FieldPostedBy] = struct{}{}
+}
+
+// PosterCleared reports if the "poster" edge to the AdminUser entity was cleared.
+func (m *ProductionFactMutation) PosterCleared() bool {
+	return m.PostedByCleared() || m.clearedposter
+}
+
+// PosterID returns the "poster" edge ID in the mutation.
+func (m *ProductionFactMutation) PosterID() (id int, exists bool) {
+	if m.poster != nil {
+		return *m.poster, true
+	}
+	return
+}
+
+// PosterIDs returns the "poster" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PosterID instead. It exists only for internal usage by the builders.
+func (m *ProductionFactMutation) PosterIDs() (ids []int) {
+	if id := m.poster; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPoster resets all changes to the "poster" edge.
+func (m *ProductionFactMutation) ResetPoster() {
+	m.poster = nil
+	m.clearedposter = false
+}
+
+// SetCancellerID sets the "canceller" edge to the AdminUser entity by id.
+func (m *ProductionFactMutation) SetCancellerID(id int) {
+	m.canceller = &id
+}
+
+// ClearCanceller clears the "canceller" edge to the AdminUser entity.
+func (m *ProductionFactMutation) ClearCanceller() {
+	m.clearedcanceller = true
+	m.clearedFields[productionfact.FieldCancelledBy] = struct{}{}
+}
+
+// CancellerCleared reports if the "canceller" edge to the AdminUser entity was cleared.
+func (m *ProductionFactMutation) CancellerCleared() bool {
+	return m.CancelledByCleared() || m.clearedcanceller
+}
+
+// CancellerID returns the "canceller" edge ID in the mutation.
+func (m *ProductionFactMutation) CancellerID() (id int, exists bool) {
+	if m.canceller != nil {
+		return *m.canceller, true
+	}
+	return
+}
+
+// CancellerIDs returns the "canceller" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// CancellerID instead. It exists only for internal usage by the builders.
+func (m *ProductionFactMutation) CancellerIDs() (ids []int) {
+	if id := m.canceller; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetCanceller resets all changes to the "canceller" edge.
+func (m *ProductionFactMutation) ResetCanceller() {
+	m.canceller = nil
+	m.clearedcanceller = false
+}
+
 // Where appends a list predicates to the ProductionFactMutation builder.
 func (m *ProductionFactMutation) Where(ps ...predicate.ProductionFact) {
 	m.predicates = append(m.predicates, ps...)
@@ -47527,7 +50014,7 @@ func (m *ProductionFactMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductionFactMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 25)
 	if m.fact_no != nil {
 		fields = append(fields, productionfact.FieldFactNo)
 	}
@@ -47536,6 +50023,9 @@ func (m *ProductionFactMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, productionfact.FieldStatus)
+	}
+	if m.version != nil {
+		fields = append(fields, productionfact.FieldVersion)
 	}
 	if m.subject_type != nil {
 		fields = append(fields, productionfact.FieldSubjectType)
@@ -47579,6 +50069,18 @@ func (m *ProductionFactMutation) Fields() []string {
 	if m.posted_at != nil {
 		fields = append(fields, productionfact.FieldPostedAt)
 	}
+	if m.poster != nil {
+		fields = append(fields, productionfact.FieldPostedBy)
+	}
+	if m.cancelled_at != nil {
+		fields = append(fields, productionfact.FieldCancelledAt)
+	}
+	if m.canceller != nil {
+		fields = append(fields, productionfact.FieldCancelledBy)
+	}
+	if m.cancel_reason != nil {
+		fields = append(fields, productionfact.FieldCancelReason)
+	}
 	if m.note != nil {
 		fields = append(fields, productionfact.FieldNote)
 	}
@@ -47602,6 +50104,8 @@ func (m *ProductionFactMutation) Field(name string) (ent.Value, bool) {
 		return m.FactType()
 	case productionfact.FieldStatus:
 		return m.Status()
+	case productionfact.FieldVersion:
+		return m.Version()
 	case productionfact.FieldSubjectType:
 		return m.SubjectType()
 	case productionfact.FieldSubjectID:
@@ -47630,6 +50134,14 @@ func (m *ProductionFactMutation) Field(name string) (ent.Value, bool) {
 		return m.OccurredAtSpecified()
 	case productionfact.FieldPostedAt:
 		return m.PostedAt()
+	case productionfact.FieldPostedBy:
+		return m.PostedBy()
+	case productionfact.FieldCancelledAt:
+		return m.CancelledAt()
+	case productionfact.FieldCancelledBy:
+		return m.CancelledBy()
+	case productionfact.FieldCancelReason:
+		return m.CancelReason()
 	case productionfact.FieldNote:
 		return m.Note()
 	case productionfact.FieldCreatedAt:
@@ -47651,6 +50163,8 @@ func (m *ProductionFactMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldFactType(ctx)
 	case productionfact.FieldStatus:
 		return m.OldStatus(ctx)
+	case productionfact.FieldVersion:
+		return m.OldVersion(ctx)
 	case productionfact.FieldSubjectType:
 		return m.OldSubjectType(ctx)
 	case productionfact.FieldSubjectID:
@@ -47679,6 +50193,14 @@ func (m *ProductionFactMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldOccurredAtSpecified(ctx)
 	case productionfact.FieldPostedAt:
 		return m.OldPostedAt(ctx)
+	case productionfact.FieldPostedBy:
+		return m.OldPostedBy(ctx)
+	case productionfact.FieldCancelledAt:
+		return m.OldCancelledAt(ctx)
+	case productionfact.FieldCancelledBy:
+		return m.OldCancelledBy(ctx)
+	case productionfact.FieldCancelReason:
+		return m.OldCancelReason(ctx)
 	case productionfact.FieldNote:
 		return m.OldNote(ctx)
 	case productionfact.FieldCreatedAt:
@@ -47714,6 +50236,13 @@ func (m *ProductionFactMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case productionfact.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
 		return nil
 	case productionfact.FieldSubjectType:
 		v, ok := value.(string)
@@ -47813,6 +50342,34 @@ func (m *ProductionFactMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPostedAt(v)
 		return nil
+	case productionfact.FieldPostedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPostedBy(v)
+		return nil
+	case productionfact.FieldCancelledAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelledAt(v)
+		return nil
+	case productionfact.FieldCancelledBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelledBy(v)
+		return nil
+	case productionfact.FieldCancelReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCancelReason(v)
+		return nil
 	case productionfact.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -47842,6 +50399,9 @@ func (m *ProductionFactMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *ProductionFactMutation) AddedFields() []string {
 	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, productionfact.FieldVersion)
+	}
 	if m.addsubject_id != nil {
 		fields = append(fields, productionfact.FieldSubjectID)
 	}
@@ -47859,6 +50419,8 @@ func (m *ProductionFactMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *ProductionFactMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case productionfact.FieldVersion:
+		return m.AddedVersion()
 	case productionfact.FieldSubjectID:
 		return m.AddedSubjectID()
 	case productionfact.FieldSourceID:
@@ -47874,6 +50436,13 @@ func (m *ProductionFactMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *ProductionFactMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case productionfact.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
 	case productionfact.FieldSubjectID:
 		v, ok := value.(int)
 		if !ok {
@@ -47921,6 +50490,18 @@ func (m *ProductionFactMutation) ClearedFields() []string {
 	if m.FieldCleared(productionfact.FieldPostedAt) {
 		fields = append(fields, productionfact.FieldPostedAt)
 	}
+	if m.FieldCleared(productionfact.FieldPostedBy) {
+		fields = append(fields, productionfact.FieldPostedBy)
+	}
+	if m.FieldCleared(productionfact.FieldCancelledAt) {
+		fields = append(fields, productionfact.FieldCancelledAt)
+	}
+	if m.FieldCleared(productionfact.FieldCancelledBy) {
+		fields = append(fields, productionfact.FieldCancelledBy)
+	}
+	if m.FieldCleared(productionfact.FieldCancelReason) {
+		fields = append(fields, productionfact.FieldCancelReason)
+	}
 	if m.FieldCleared(productionfact.FieldNote) {
 		fields = append(fields, productionfact.FieldNote)
 	}
@@ -47956,6 +50537,18 @@ func (m *ProductionFactMutation) ClearField(name string) error {
 	case productionfact.FieldPostedAt:
 		m.ClearPostedAt()
 		return nil
+	case productionfact.FieldPostedBy:
+		m.ClearPostedBy()
+		return nil
+	case productionfact.FieldCancelledAt:
+		m.ClearCancelledAt()
+		return nil
+	case productionfact.FieldCancelledBy:
+		m.ClearCancelledBy()
+		return nil
+	case productionfact.FieldCancelReason:
+		m.ClearCancelReason()
+		return nil
 	case productionfact.FieldNote:
 		m.ClearNote()
 		return nil
@@ -47975,6 +50568,9 @@ func (m *ProductionFactMutation) ResetField(name string) error {
 		return nil
 	case productionfact.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case productionfact.FieldVersion:
+		m.ResetVersion()
 		return nil
 	case productionfact.FieldSubjectType:
 		m.ResetSubjectType()
@@ -48018,6 +50614,18 @@ func (m *ProductionFactMutation) ResetField(name string) error {
 	case productionfact.FieldPostedAt:
 		m.ResetPostedAt()
 		return nil
+	case productionfact.FieldPostedBy:
+		m.ResetPostedBy()
+		return nil
+	case productionfact.FieldCancelledAt:
+		m.ResetCancelledAt()
+		return nil
+	case productionfact.FieldCancelledBy:
+		m.ResetCancelledBy()
+		return nil
+	case productionfact.FieldCancelReason:
+		m.ResetCancelReason()
+		return nil
 	case productionfact.FieldNote:
 		m.ResetNote()
 		return nil
@@ -48033,7 +50641,7 @@ func (m *ProductionFactMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProductionFactMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 6)
 	if m.warehouse != nil {
 		edges = append(edges, productionfact.EdgeWarehouse)
 	}
@@ -48045,6 +50653,12 @@ func (m *ProductionFactMutation) AddedEdges() []string {
 	}
 	if m.inventory_lot != nil {
 		edges = append(edges, productionfact.EdgeInventoryLot)
+	}
+	if m.poster != nil {
+		edges = append(edges, productionfact.EdgePoster)
+	}
+	if m.canceller != nil {
+		edges = append(edges, productionfact.EdgeCanceller)
 	}
 	return edges
 }
@@ -48069,13 +50683,21 @@ func (m *ProductionFactMutation) AddedIDs(name string) []ent.Value {
 		if id := m.inventory_lot; id != nil {
 			return []ent.Value{*id}
 		}
+	case productionfact.EdgePoster:
+		if id := m.poster; id != nil {
+			return []ent.Value{*id}
+		}
+	case productionfact.EdgeCanceller:
+		if id := m.canceller; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProductionFactMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 6)
 	return edges
 }
 
@@ -48087,7 +50709,7 @@ func (m *ProductionFactMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProductionFactMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 6)
 	if m.clearedwarehouse {
 		edges = append(edges, productionfact.EdgeWarehouse)
 	}
@@ -48099,6 +50721,12 @@ func (m *ProductionFactMutation) ClearedEdges() []string {
 	}
 	if m.clearedinventory_lot {
 		edges = append(edges, productionfact.EdgeInventoryLot)
+	}
+	if m.clearedposter {
+		edges = append(edges, productionfact.EdgePoster)
+	}
+	if m.clearedcanceller {
+		edges = append(edges, productionfact.EdgeCanceller)
 	}
 	return edges
 }
@@ -48115,6 +50743,10 @@ func (m *ProductionFactMutation) EdgeCleared(name string) bool {
 		return m.clearedproduct_sku
 	case productionfact.EdgeInventoryLot:
 		return m.clearedinventory_lot
+	case productionfact.EdgePoster:
+		return m.clearedposter
+	case productionfact.EdgeCanceller:
+		return m.clearedcanceller
 	}
 	return false
 }
@@ -48135,6 +50767,12 @@ func (m *ProductionFactMutation) ClearEdge(name string) error {
 	case productionfact.EdgeInventoryLot:
 		m.ClearInventoryLot()
 		return nil
+	case productionfact.EdgePoster:
+		m.ClearPoster()
+		return nil
+	case productionfact.EdgeCanceller:
+		m.ClearCanceller()
+		return nil
 	}
 	return fmt.Errorf("unknown ProductionFact unique edge %s", name)
 }
@@ -48154,6 +50792,12 @@ func (m *ProductionFactMutation) ResetEdge(name string) error {
 		return nil
 	case productionfact.EdgeInventoryLot:
 		m.ResetInventoryLot()
+		return nil
+	case productionfact.EdgePoster:
+		m.ResetPoster()
+		return nil
+	case productionfact.EdgeCanceller:
+		m.ResetCanceller()
 		return nil
 	}
 	return fmt.Errorf("unknown ProductionFact edge %s", name)
@@ -85505,6 +88149,10 @@ type SalesReturnMutation struct {
 	approved_at               *time.Time
 	approved_by               *int
 	addapproved_by            *int
+	rejected_at               *time.Time
+	rejected_by               *int
+	addrejected_by            *int
+	reject_reason             *string
 	received_at               *time.Time
 	received_by               *int
 	addreceived_by            *int
@@ -85512,6 +88160,10 @@ type SalesReturnMutation struct {
 	cancelled_by              *int
 	addcancelled_by           *int
 	cancel_reason             *string
+	reversed_at               *time.Time
+	reversed_by               *int
+	addreversed_by            *int
+	reverse_reason            *string
 	created_by                *int
 	addcreated_by             *int
 	created_at                *time.Time
@@ -86182,6 +88834,174 @@ func (m *SalesReturnMutation) ResetApprovedBy() {
 	delete(m.clearedFields, salesreturn.FieldApprovedBy)
 }
 
+// SetRejectedAt sets the "rejected_at" field.
+func (m *SalesReturnMutation) SetRejectedAt(t time.Time) {
+	m.rejected_at = &t
+}
+
+// RejectedAt returns the value of the "rejected_at" field in the mutation.
+func (m *SalesReturnMutation) RejectedAt() (r time.Time, exists bool) {
+	v := m.rejected_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedAt returns the old "rejected_at" field's value of the SalesReturn entity.
+// If the SalesReturn object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesReturnMutation) OldRejectedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedAt: %w", err)
+	}
+	return oldValue.RejectedAt, nil
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (m *SalesReturnMutation) ClearRejectedAt() {
+	m.rejected_at = nil
+	m.clearedFields[salesreturn.FieldRejectedAt] = struct{}{}
+}
+
+// RejectedAtCleared returns if the "rejected_at" field was cleared in this mutation.
+func (m *SalesReturnMutation) RejectedAtCleared() bool {
+	_, ok := m.clearedFields[salesreturn.FieldRejectedAt]
+	return ok
+}
+
+// ResetRejectedAt resets all changes to the "rejected_at" field.
+func (m *SalesReturnMutation) ResetRejectedAt() {
+	m.rejected_at = nil
+	delete(m.clearedFields, salesreturn.FieldRejectedAt)
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (m *SalesReturnMutation) SetRejectedBy(i int) {
+	m.rejected_by = &i
+	m.addrejected_by = nil
+}
+
+// RejectedBy returns the value of the "rejected_by" field in the mutation.
+func (m *SalesReturnMutation) RejectedBy() (r int, exists bool) {
+	v := m.rejected_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedBy returns the old "rejected_by" field's value of the SalesReturn entity.
+// If the SalesReturn object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesReturnMutation) OldRejectedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedBy: %w", err)
+	}
+	return oldValue.RejectedBy, nil
+}
+
+// AddRejectedBy adds i to the "rejected_by" field.
+func (m *SalesReturnMutation) AddRejectedBy(i int) {
+	if m.addrejected_by != nil {
+		*m.addrejected_by += i
+	} else {
+		m.addrejected_by = &i
+	}
+}
+
+// AddedRejectedBy returns the value that was added to the "rejected_by" field in this mutation.
+func (m *SalesReturnMutation) AddedRejectedBy() (r int, exists bool) {
+	v := m.addrejected_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (m *SalesReturnMutation) ClearRejectedBy() {
+	m.rejected_by = nil
+	m.addrejected_by = nil
+	m.clearedFields[salesreturn.FieldRejectedBy] = struct{}{}
+}
+
+// RejectedByCleared returns if the "rejected_by" field was cleared in this mutation.
+func (m *SalesReturnMutation) RejectedByCleared() bool {
+	_, ok := m.clearedFields[salesreturn.FieldRejectedBy]
+	return ok
+}
+
+// ResetRejectedBy resets all changes to the "rejected_by" field.
+func (m *SalesReturnMutation) ResetRejectedBy() {
+	m.rejected_by = nil
+	m.addrejected_by = nil
+	delete(m.clearedFields, salesreturn.FieldRejectedBy)
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (m *SalesReturnMutation) SetRejectReason(s string) {
+	m.reject_reason = &s
+}
+
+// RejectReason returns the value of the "reject_reason" field in the mutation.
+func (m *SalesReturnMutation) RejectReason() (r string, exists bool) {
+	v := m.reject_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectReason returns the old "reject_reason" field's value of the SalesReturn entity.
+// If the SalesReturn object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesReturnMutation) OldRejectReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectReason: %w", err)
+	}
+	return oldValue.RejectReason, nil
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (m *SalesReturnMutation) ClearRejectReason() {
+	m.reject_reason = nil
+	m.clearedFields[salesreturn.FieldRejectReason] = struct{}{}
+}
+
+// RejectReasonCleared returns if the "reject_reason" field was cleared in this mutation.
+func (m *SalesReturnMutation) RejectReasonCleared() bool {
+	_, ok := m.clearedFields[salesreturn.FieldRejectReason]
+	return ok
+}
+
+// ResetRejectReason resets all changes to the "reject_reason" field.
+func (m *SalesReturnMutation) ResetRejectReason() {
+	m.reject_reason = nil
+	delete(m.clearedFields, salesreturn.FieldRejectReason)
+}
+
 // SetReceivedAt sets the "received_at" field.
 func (m *SalesReturnMutation) SetReceivedAt(t time.Time) {
 	m.received_at = &t
@@ -86469,6 +89289,174 @@ func (m *SalesReturnMutation) ResetCancelReason() {
 	delete(m.clearedFields, salesreturn.FieldCancelReason)
 }
 
+// SetReversedAt sets the "reversed_at" field.
+func (m *SalesReturnMutation) SetReversedAt(t time.Time) {
+	m.reversed_at = &t
+}
+
+// ReversedAt returns the value of the "reversed_at" field in the mutation.
+func (m *SalesReturnMutation) ReversedAt() (r time.Time, exists bool) {
+	v := m.reversed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReversedAt returns the old "reversed_at" field's value of the SalesReturn entity.
+// If the SalesReturn object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesReturnMutation) OldReversedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReversedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReversedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReversedAt: %w", err)
+	}
+	return oldValue.ReversedAt, nil
+}
+
+// ClearReversedAt clears the value of the "reversed_at" field.
+func (m *SalesReturnMutation) ClearReversedAt() {
+	m.reversed_at = nil
+	m.clearedFields[salesreturn.FieldReversedAt] = struct{}{}
+}
+
+// ReversedAtCleared returns if the "reversed_at" field was cleared in this mutation.
+func (m *SalesReturnMutation) ReversedAtCleared() bool {
+	_, ok := m.clearedFields[salesreturn.FieldReversedAt]
+	return ok
+}
+
+// ResetReversedAt resets all changes to the "reversed_at" field.
+func (m *SalesReturnMutation) ResetReversedAt() {
+	m.reversed_at = nil
+	delete(m.clearedFields, salesreturn.FieldReversedAt)
+}
+
+// SetReversedBy sets the "reversed_by" field.
+func (m *SalesReturnMutation) SetReversedBy(i int) {
+	m.reversed_by = &i
+	m.addreversed_by = nil
+}
+
+// ReversedBy returns the value of the "reversed_by" field in the mutation.
+func (m *SalesReturnMutation) ReversedBy() (r int, exists bool) {
+	v := m.reversed_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReversedBy returns the old "reversed_by" field's value of the SalesReturn entity.
+// If the SalesReturn object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesReturnMutation) OldReversedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReversedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReversedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReversedBy: %w", err)
+	}
+	return oldValue.ReversedBy, nil
+}
+
+// AddReversedBy adds i to the "reversed_by" field.
+func (m *SalesReturnMutation) AddReversedBy(i int) {
+	if m.addreversed_by != nil {
+		*m.addreversed_by += i
+	} else {
+		m.addreversed_by = &i
+	}
+}
+
+// AddedReversedBy returns the value that was added to the "reversed_by" field in this mutation.
+func (m *SalesReturnMutation) AddedReversedBy() (r int, exists bool) {
+	v := m.addreversed_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearReversedBy clears the value of the "reversed_by" field.
+func (m *SalesReturnMutation) ClearReversedBy() {
+	m.reversed_by = nil
+	m.addreversed_by = nil
+	m.clearedFields[salesreturn.FieldReversedBy] = struct{}{}
+}
+
+// ReversedByCleared returns if the "reversed_by" field was cleared in this mutation.
+func (m *SalesReturnMutation) ReversedByCleared() bool {
+	_, ok := m.clearedFields[salesreturn.FieldReversedBy]
+	return ok
+}
+
+// ResetReversedBy resets all changes to the "reversed_by" field.
+func (m *SalesReturnMutation) ResetReversedBy() {
+	m.reversed_by = nil
+	m.addreversed_by = nil
+	delete(m.clearedFields, salesreturn.FieldReversedBy)
+}
+
+// SetReverseReason sets the "reverse_reason" field.
+func (m *SalesReturnMutation) SetReverseReason(s string) {
+	m.reverse_reason = &s
+}
+
+// ReverseReason returns the value of the "reverse_reason" field in the mutation.
+func (m *SalesReturnMutation) ReverseReason() (r string, exists bool) {
+	v := m.reverse_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReverseReason returns the old "reverse_reason" field's value of the SalesReturn entity.
+// If the SalesReturn object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesReturnMutation) OldReverseReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReverseReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReverseReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReverseReason: %w", err)
+	}
+	return oldValue.ReverseReason, nil
+}
+
+// ClearReverseReason clears the value of the "reverse_reason" field.
+func (m *SalesReturnMutation) ClearReverseReason() {
+	m.reverse_reason = nil
+	m.clearedFields[salesreturn.FieldReverseReason] = struct{}{}
+}
+
+// ReverseReasonCleared returns if the "reverse_reason" field was cleared in this mutation.
+func (m *SalesReturnMutation) ReverseReasonCleared() bool {
+	_, ok := m.clearedFields[salesreturn.FieldReverseReason]
+	return ok
+}
+
+// ResetReverseReason resets all changes to the "reverse_reason" field.
+func (m *SalesReturnMutation) ResetReverseReason() {
+	m.reverse_reason = nil
+	delete(m.clearedFields, salesreturn.FieldReverseReason)
+}
+
 // SetCreatedBy sets the "created_by" field.
 func (m *SalesReturnMutation) SetCreatedBy(i int) {
 	m.created_by = &i
@@ -86685,7 +89673,7 @@ func (m *SalesReturnMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesReturnMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 26)
 	if m.return_no != nil {
 		fields = append(fields, salesreturn.FieldReturnNo)
 	}
@@ -86722,6 +89710,15 @@ func (m *SalesReturnMutation) Fields() []string {
 	if m.approved_by != nil {
 		fields = append(fields, salesreturn.FieldApprovedBy)
 	}
+	if m.rejected_at != nil {
+		fields = append(fields, salesreturn.FieldRejectedAt)
+	}
+	if m.rejected_by != nil {
+		fields = append(fields, salesreturn.FieldRejectedBy)
+	}
+	if m.reject_reason != nil {
+		fields = append(fields, salesreturn.FieldRejectReason)
+	}
 	if m.received_at != nil {
 		fields = append(fields, salesreturn.FieldReceivedAt)
 	}
@@ -86736,6 +89733,15 @@ func (m *SalesReturnMutation) Fields() []string {
 	}
 	if m.cancel_reason != nil {
 		fields = append(fields, salesreturn.FieldCancelReason)
+	}
+	if m.reversed_at != nil {
+		fields = append(fields, salesreturn.FieldReversedAt)
+	}
+	if m.reversed_by != nil {
+		fields = append(fields, salesreturn.FieldReversedBy)
+	}
+	if m.reverse_reason != nil {
+		fields = append(fields, salesreturn.FieldReverseReason)
 	}
 	if m.created_by != nil {
 		fields = append(fields, salesreturn.FieldCreatedBy)
@@ -86778,6 +89784,12 @@ func (m *SalesReturnMutation) Field(name string) (ent.Value, bool) {
 		return m.ApprovedAt()
 	case salesreturn.FieldApprovedBy:
 		return m.ApprovedBy()
+	case salesreturn.FieldRejectedAt:
+		return m.RejectedAt()
+	case salesreturn.FieldRejectedBy:
+		return m.RejectedBy()
+	case salesreturn.FieldRejectReason:
+		return m.RejectReason()
 	case salesreturn.FieldReceivedAt:
 		return m.ReceivedAt()
 	case salesreturn.FieldReceivedBy:
@@ -86788,6 +89800,12 @@ func (m *SalesReturnMutation) Field(name string) (ent.Value, bool) {
 		return m.CancelledBy()
 	case salesreturn.FieldCancelReason:
 		return m.CancelReason()
+	case salesreturn.FieldReversedAt:
+		return m.ReversedAt()
+	case salesreturn.FieldReversedBy:
+		return m.ReversedBy()
+	case salesreturn.FieldReverseReason:
+		return m.ReverseReason()
 	case salesreturn.FieldCreatedBy:
 		return m.CreatedBy()
 	case salesreturn.FieldCreatedAt:
@@ -86827,6 +89845,12 @@ func (m *SalesReturnMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldApprovedAt(ctx)
 	case salesreturn.FieldApprovedBy:
 		return m.OldApprovedBy(ctx)
+	case salesreturn.FieldRejectedAt:
+		return m.OldRejectedAt(ctx)
+	case salesreturn.FieldRejectedBy:
+		return m.OldRejectedBy(ctx)
+	case salesreturn.FieldRejectReason:
+		return m.OldRejectReason(ctx)
 	case salesreturn.FieldReceivedAt:
 		return m.OldReceivedAt(ctx)
 	case salesreturn.FieldReceivedBy:
@@ -86837,6 +89861,12 @@ func (m *SalesReturnMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldCancelledBy(ctx)
 	case salesreturn.FieldCancelReason:
 		return m.OldCancelReason(ctx)
+	case salesreturn.FieldReversedAt:
+		return m.OldReversedAt(ctx)
+	case salesreturn.FieldReversedBy:
+		return m.OldReversedBy(ctx)
+	case salesreturn.FieldReverseReason:
+		return m.OldReverseReason(ctx)
 	case salesreturn.FieldCreatedBy:
 		return m.OldCreatedBy(ctx)
 	case salesreturn.FieldCreatedAt:
@@ -86936,6 +89966,27 @@ func (m *SalesReturnMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetApprovedBy(v)
 		return nil
+	case salesreturn.FieldRejectedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedAt(v)
+		return nil
+	case salesreturn.FieldRejectedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedBy(v)
+		return nil
+	case salesreturn.FieldRejectReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectReason(v)
+		return nil
 	case salesreturn.FieldReceivedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -86970,6 +90021,27 @@ func (m *SalesReturnMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCancelReason(v)
+		return nil
+	case salesreturn.FieldReversedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReversedAt(v)
+		return nil
+	case salesreturn.FieldReversedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReversedBy(v)
+		return nil
+	case salesreturn.FieldReverseReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReverseReason(v)
 		return nil
 	case salesreturn.FieldCreatedBy:
 		v, ok := value.(int)
@@ -87015,11 +90087,17 @@ func (m *SalesReturnMutation) AddedFields() []string {
 	if m.addapproved_by != nil {
 		fields = append(fields, salesreturn.FieldApprovedBy)
 	}
+	if m.addrejected_by != nil {
+		fields = append(fields, salesreturn.FieldRejectedBy)
+	}
 	if m.addreceived_by != nil {
 		fields = append(fields, salesreturn.FieldReceivedBy)
 	}
 	if m.addcancelled_by != nil {
 		fields = append(fields, salesreturn.FieldCancelledBy)
+	}
+	if m.addreversed_by != nil {
+		fields = append(fields, salesreturn.FieldReversedBy)
 	}
 	if m.addcreated_by != nil {
 		fields = append(fields, salesreturn.FieldCreatedBy)
@@ -87042,10 +90120,14 @@ func (m *SalesReturnMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedVersion()
 	case salesreturn.FieldApprovedBy:
 		return m.AddedApprovedBy()
+	case salesreturn.FieldRejectedBy:
+		return m.AddedRejectedBy()
 	case salesreturn.FieldReceivedBy:
 		return m.AddedReceivedBy()
 	case salesreturn.FieldCancelledBy:
 		return m.AddedCancelledBy()
+	case salesreturn.FieldReversedBy:
+		return m.AddedReversedBy()
 	case salesreturn.FieldCreatedBy:
 		return m.AddedCreatedBy()
 	}
@@ -87092,6 +90174,13 @@ func (m *SalesReturnMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddApprovedBy(v)
 		return nil
+	case salesreturn.FieldRejectedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRejectedBy(v)
+		return nil
 	case salesreturn.FieldReceivedBy:
 		v, ok := value.(int)
 		if !ok {
@@ -87105,6 +90194,13 @@ func (m *SalesReturnMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddCancelledBy(v)
+		return nil
+	case salesreturn.FieldReversedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddReversedBy(v)
 		return nil
 	case salesreturn.FieldCreatedBy:
 		v, ok := value.(int)
@@ -87127,6 +90223,15 @@ func (m *SalesReturnMutation) ClearedFields() []string {
 	if m.FieldCleared(salesreturn.FieldApprovedBy) {
 		fields = append(fields, salesreturn.FieldApprovedBy)
 	}
+	if m.FieldCleared(salesreturn.FieldRejectedAt) {
+		fields = append(fields, salesreturn.FieldRejectedAt)
+	}
+	if m.FieldCleared(salesreturn.FieldRejectedBy) {
+		fields = append(fields, salesreturn.FieldRejectedBy)
+	}
+	if m.FieldCleared(salesreturn.FieldRejectReason) {
+		fields = append(fields, salesreturn.FieldRejectReason)
+	}
 	if m.FieldCleared(salesreturn.FieldReceivedAt) {
 		fields = append(fields, salesreturn.FieldReceivedAt)
 	}
@@ -87141,6 +90246,15 @@ func (m *SalesReturnMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(salesreturn.FieldCancelReason) {
 		fields = append(fields, salesreturn.FieldCancelReason)
+	}
+	if m.FieldCleared(salesreturn.FieldReversedAt) {
+		fields = append(fields, salesreturn.FieldReversedAt)
+	}
+	if m.FieldCleared(salesreturn.FieldReversedBy) {
+		fields = append(fields, salesreturn.FieldReversedBy)
+	}
+	if m.FieldCleared(salesreturn.FieldReverseReason) {
+		fields = append(fields, salesreturn.FieldReverseReason)
 	}
 	return fields
 }
@@ -87162,6 +90276,15 @@ func (m *SalesReturnMutation) ClearField(name string) error {
 	case salesreturn.FieldApprovedBy:
 		m.ClearApprovedBy()
 		return nil
+	case salesreturn.FieldRejectedAt:
+		m.ClearRejectedAt()
+		return nil
+	case salesreturn.FieldRejectedBy:
+		m.ClearRejectedBy()
+		return nil
+	case salesreturn.FieldRejectReason:
+		m.ClearRejectReason()
+		return nil
 	case salesreturn.FieldReceivedAt:
 		m.ClearReceivedAt()
 		return nil
@@ -87176,6 +90299,15 @@ func (m *SalesReturnMutation) ClearField(name string) error {
 		return nil
 	case salesreturn.FieldCancelReason:
 		m.ClearCancelReason()
+		return nil
+	case salesreturn.FieldReversedAt:
+		m.ClearReversedAt()
+		return nil
+	case salesreturn.FieldReversedBy:
+		m.ClearReversedBy()
+		return nil
+	case salesreturn.FieldReverseReason:
+		m.ClearReverseReason()
 		return nil
 	}
 	return fmt.Errorf("unknown SalesReturn nullable field %s", name)
@@ -87221,6 +90353,15 @@ func (m *SalesReturnMutation) ResetField(name string) error {
 	case salesreturn.FieldApprovedBy:
 		m.ResetApprovedBy()
 		return nil
+	case salesreturn.FieldRejectedAt:
+		m.ResetRejectedAt()
+		return nil
+	case salesreturn.FieldRejectedBy:
+		m.ResetRejectedBy()
+		return nil
+	case salesreturn.FieldRejectReason:
+		m.ResetRejectReason()
+		return nil
 	case salesreturn.FieldReceivedAt:
 		m.ResetReceivedAt()
 		return nil
@@ -87235,6 +90376,15 @@ func (m *SalesReturnMutation) ResetField(name string) error {
 		return nil
 	case salesreturn.FieldCancelReason:
 		m.ResetCancelReason()
+		return nil
+	case salesreturn.FieldReversedAt:
+		m.ResetReversedAt()
+		return nil
+	case salesreturn.FieldReversedBy:
+		m.ResetReversedBy()
+		return nil
+	case salesreturn.FieldReverseReason:
+		m.ResetReverseReason()
 		return nil
 	case salesreturn.FieldCreatedBy:
 		m.ResetCreatedBy()

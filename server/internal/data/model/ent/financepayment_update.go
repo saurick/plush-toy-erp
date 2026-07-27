@@ -64,6 +64,120 @@ func (_u *FinancePaymentUpdate) AddVersion(v int) *FinancePaymentUpdate {
 	return _u
 }
 
+// SetApprovedAt sets the "approved_at" field.
+func (_u *FinancePaymentUpdate) SetApprovedAt(v time.Time) *FinancePaymentUpdate {
+	_u.mutation.SetApprovedAt(v)
+	return _u
+}
+
+// SetNillableApprovedAt sets the "approved_at" field if the given value is not nil.
+func (_u *FinancePaymentUpdate) SetNillableApprovedAt(v *time.Time) *FinancePaymentUpdate {
+	if v != nil {
+		_u.SetApprovedAt(*v)
+	}
+	return _u
+}
+
+// ClearApprovedAt clears the value of the "approved_at" field.
+func (_u *FinancePaymentUpdate) ClearApprovedAt() *FinancePaymentUpdate {
+	_u.mutation.ClearApprovedAt()
+	return _u
+}
+
+// SetApprovedBy sets the "approved_by" field.
+func (_u *FinancePaymentUpdate) SetApprovedBy(v int) *FinancePaymentUpdate {
+	_u.mutation.ResetApprovedBy()
+	_u.mutation.SetApprovedBy(v)
+	return _u
+}
+
+// SetNillableApprovedBy sets the "approved_by" field if the given value is not nil.
+func (_u *FinancePaymentUpdate) SetNillableApprovedBy(v *int) *FinancePaymentUpdate {
+	if v != nil {
+		_u.SetApprovedBy(*v)
+	}
+	return _u
+}
+
+// AddApprovedBy adds value to the "approved_by" field.
+func (_u *FinancePaymentUpdate) AddApprovedBy(v int) *FinancePaymentUpdate {
+	_u.mutation.AddApprovedBy(v)
+	return _u
+}
+
+// ClearApprovedBy clears the value of the "approved_by" field.
+func (_u *FinancePaymentUpdate) ClearApprovedBy() *FinancePaymentUpdate {
+	_u.mutation.ClearApprovedBy()
+	return _u
+}
+
+// SetRejectedAt sets the "rejected_at" field.
+func (_u *FinancePaymentUpdate) SetRejectedAt(v time.Time) *FinancePaymentUpdate {
+	_u.mutation.SetRejectedAt(v)
+	return _u
+}
+
+// SetNillableRejectedAt sets the "rejected_at" field if the given value is not nil.
+func (_u *FinancePaymentUpdate) SetNillableRejectedAt(v *time.Time) *FinancePaymentUpdate {
+	if v != nil {
+		_u.SetRejectedAt(*v)
+	}
+	return _u
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (_u *FinancePaymentUpdate) ClearRejectedAt() *FinancePaymentUpdate {
+	_u.mutation.ClearRejectedAt()
+	return _u
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (_u *FinancePaymentUpdate) SetRejectedBy(v int) *FinancePaymentUpdate {
+	_u.mutation.ResetRejectedBy()
+	_u.mutation.SetRejectedBy(v)
+	return _u
+}
+
+// SetNillableRejectedBy sets the "rejected_by" field if the given value is not nil.
+func (_u *FinancePaymentUpdate) SetNillableRejectedBy(v *int) *FinancePaymentUpdate {
+	if v != nil {
+		_u.SetRejectedBy(*v)
+	}
+	return _u
+}
+
+// AddRejectedBy adds value to the "rejected_by" field.
+func (_u *FinancePaymentUpdate) AddRejectedBy(v int) *FinancePaymentUpdate {
+	_u.mutation.AddRejectedBy(v)
+	return _u
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (_u *FinancePaymentUpdate) ClearRejectedBy() *FinancePaymentUpdate {
+	_u.mutation.ClearRejectedBy()
+	return _u
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (_u *FinancePaymentUpdate) SetRejectReason(v string) *FinancePaymentUpdate {
+	_u.mutation.SetRejectReason(v)
+	return _u
+}
+
+// SetNillableRejectReason sets the "reject_reason" field if the given value is not nil.
+func (_u *FinancePaymentUpdate) SetNillableRejectReason(v *string) *FinancePaymentUpdate {
+	if v != nil {
+		_u.SetRejectReason(*v)
+	}
+	return _u
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (_u *FinancePaymentUpdate) ClearRejectReason() *FinancePaymentUpdate {
+	_u.mutation.ClearRejectReason()
+	return _u
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_u *FinancePaymentUpdate) SetPostedAt(v time.Time) *FinancePaymentUpdate {
 	_u.mutation.SetPostedAt(v)
@@ -108,6 +222,73 @@ func (_u *FinancePaymentUpdate) AddPostedBy(v int) *FinancePaymentUpdate {
 // ClearPostedBy clears the value of the "posted_by" field.
 func (_u *FinancePaymentUpdate) ClearPostedBy() *FinancePaymentUpdate {
 	_u.mutation.ClearPostedBy()
+	return _u
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (_u *FinancePaymentUpdate) SetCancelledAt(v time.Time) *FinancePaymentUpdate {
+	_u.mutation.SetCancelledAt(v)
+	return _u
+}
+
+// SetNillableCancelledAt sets the "cancelled_at" field if the given value is not nil.
+func (_u *FinancePaymentUpdate) SetNillableCancelledAt(v *time.Time) *FinancePaymentUpdate {
+	if v != nil {
+		_u.SetCancelledAt(*v)
+	}
+	return _u
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (_u *FinancePaymentUpdate) ClearCancelledAt() *FinancePaymentUpdate {
+	_u.mutation.ClearCancelledAt()
+	return _u
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (_u *FinancePaymentUpdate) SetCancelledBy(v int) *FinancePaymentUpdate {
+	_u.mutation.ResetCancelledBy()
+	_u.mutation.SetCancelledBy(v)
+	return _u
+}
+
+// SetNillableCancelledBy sets the "cancelled_by" field if the given value is not nil.
+func (_u *FinancePaymentUpdate) SetNillableCancelledBy(v *int) *FinancePaymentUpdate {
+	if v != nil {
+		_u.SetCancelledBy(*v)
+	}
+	return _u
+}
+
+// AddCancelledBy adds value to the "cancelled_by" field.
+func (_u *FinancePaymentUpdate) AddCancelledBy(v int) *FinancePaymentUpdate {
+	_u.mutation.AddCancelledBy(v)
+	return _u
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (_u *FinancePaymentUpdate) ClearCancelledBy() *FinancePaymentUpdate {
+	_u.mutation.ClearCancelledBy()
+	return _u
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (_u *FinancePaymentUpdate) SetCancelReason(v string) *FinancePaymentUpdate {
+	_u.mutation.SetCancelReason(v)
+	return _u
+}
+
+// SetNillableCancelReason sets the "cancel_reason" field if the given value is not nil.
+func (_u *FinancePaymentUpdate) SetNillableCancelReason(v *string) *FinancePaymentUpdate {
+	if v != nil {
+		_u.SetCancelReason(*v)
+	}
+	return _u
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (_u *FinancePaymentUpdate) ClearCancelReason() *FinancePaymentUpdate {
+	_u.mutation.ClearCancelReason()
 	return _u
 }
 
@@ -279,9 +460,34 @@ func (_u *FinancePaymentUpdate) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ApprovedBy(); ok {
+		if err := financepayment.ApprovedByValidator(v); err != nil {
+			return &ValidationError{Name: "approved_by", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.approved_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectedBy(); ok {
+		if err := financepayment.RejectedByValidator(v); err != nil {
+			return &ValidationError{Name: "rejected_by", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.rejected_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectReason(); ok {
+		if err := financepayment.RejectReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reject_reason", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.reject_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PostedBy(); ok {
 		if err := financepayment.PostedByValidator(v); err != nil {
 			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.posted_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelledBy(); ok {
+		if err := financepayment.CancelledByValidator(v); err != nil {
+			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.cancelled_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelReason(); ok {
+		if err := financepayment.CancelReasonValidator(v); err != nil {
+			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.cancel_reason": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ReversedBy(); ok {
@@ -318,6 +524,42 @@ func (_u *FinancePaymentUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(financepayment.FieldVersion, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.ApprovedAt(); ok {
+		_spec.SetField(financepayment.FieldApprovedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ApprovedAtCleared() {
+		_spec.ClearField(financepayment.FieldApprovedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ApprovedBy(); ok {
+		_spec.SetField(financepayment.FieldApprovedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedApprovedBy(); ok {
+		_spec.AddField(financepayment.FieldApprovedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ApprovedByCleared() {
+		_spec.ClearField(financepayment.FieldApprovedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectedAt(); ok {
+		_spec.SetField(financepayment.FieldRejectedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RejectedAtCleared() {
+		_spec.ClearField(financepayment.FieldRejectedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RejectedBy(); ok {
+		_spec.SetField(financepayment.FieldRejectedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRejectedBy(); ok {
+		_spec.AddField(financepayment.FieldRejectedBy, field.TypeInt, value)
+	}
+	if _u.mutation.RejectedByCleared() {
+		_spec.ClearField(financepayment.FieldRejectedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectReason(); ok {
+		_spec.SetField(financepayment.FieldRejectReason, field.TypeString, value)
+	}
+	if _u.mutation.RejectReasonCleared() {
+		_spec.ClearField(financepayment.FieldRejectReason, field.TypeString)
+	}
 	if value, ok := _u.mutation.PostedAt(); ok {
 		_spec.SetField(financepayment.FieldPostedAt, field.TypeTime, value)
 	}
@@ -332,6 +574,27 @@ func (_u *FinancePaymentUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if _u.mutation.PostedByCleared() {
 		_spec.ClearField(financepayment.FieldPostedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CancelledAt(); ok {
+		_spec.SetField(financepayment.FieldCancelledAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancelledAtCleared() {
+		_spec.ClearField(financepayment.FieldCancelledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelledBy(); ok {
+		_spec.SetField(financepayment.FieldCancelledBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedCancelledBy(); ok {
+		_spec.AddField(financepayment.FieldCancelledBy, field.TypeInt, value)
+	}
+	if _u.mutation.CancelledByCleared() {
+		_spec.ClearField(financepayment.FieldCancelledBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CancelReason(); ok {
+		_spec.SetField(financepayment.FieldCancelReason, field.TypeString, value)
+	}
+	if _u.mutation.CancelReasonCleared() {
+		_spec.ClearField(financepayment.FieldCancelReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.ReversedAt(); ok {
 		_spec.SetField(financepayment.FieldReversedAt, field.TypeTime, value)
@@ -457,6 +720,120 @@ func (_u *FinancePaymentUpdateOne) AddVersion(v int) *FinancePaymentUpdateOne {
 	return _u
 }
 
+// SetApprovedAt sets the "approved_at" field.
+func (_u *FinancePaymentUpdateOne) SetApprovedAt(v time.Time) *FinancePaymentUpdateOne {
+	_u.mutation.SetApprovedAt(v)
+	return _u
+}
+
+// SetNillableApprovedAt sets the "approved_at" field if the given value is not nil.
+func (_u *FinancePaymentUpdateOne) SetNillableApprovedAt(v *time.Time) *FinancePaymentUpdateOne {
+	if v != nil {
+		_u.SetApprovedAt(*v)
+	}
+	return _u
+}
+
+// ClearApprovedAt clears the value of the "approved_at" field.
+func (_u *FinancePaymentUpdateOne) ClearApprovedAt() *FinancePaymentUpdateOne {
+	_u.mutation.ClearApprovedAt()
+	return _u
+}
+
+// SetApprovedBy sets the "approved_by" field.
+func (_u *FinancePaymentUpdateOne) SetApprovedBy(v int) *FinancePaymentUpdateOne {
+	_u.mutation.ResetApprovedBy()
+	_u.mutation.SetApprovedBy(v)
+	return _u
+}
+
+// SetNillableApprovedBy sets the "approved_by" field if the given value is not nil.
+func (_u *FinancePaymentUpdateOne) SetNillableApprovedBy(v *int) *FinancePaymentUpdateOne {
+	if v != nil {
+		_u.SetApprovedBy(*v)
+	}
+	return _u
+}
+
+// AddApprovedBy adds value to the "approved_by" field.
+func (_u *FinancePaymentUpdateOne) AddApprovedBy(v int) *FinancePaymentUpdateOne {
+	_u.mutation.AddApprovedBy(v)
+	return _u
+}
+
+// ClearApprovedBy clears the value of the "approved_by" field.
+func (_u *FinancePaymentUpdateOne) ClearApprovedBy() *FinancePaymentUpdateOne {
+	_u.mutation.ClearApprovedBy()
+	return _u
+}
+
+// SetRejectedAt sets the "rejected_at" field.
+func (_u *FinancePaymentUpdateOne) SetRejectedAt(v time.Time) *FinancePaymentUpdateOne {
+	_u.mutation.SetRejectedAt(v)
+	return _u
+}
+
+// SetNillableRejectedAt sets the "rejected_at" field if the given value is not nil.
+func (_u *FinancePaymentUpdateOne) SetNillableRejectedAt(v *time.Time) *FinancePaymentUpdateOne {
+	if v != nil {
+		_u.SetRejectedAt(*v)
+	}
+	return _u
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (_u *FinancePaymentUpdateOne) ClearRejectedAt() *FinancePaymentUpdateOne {
+	_u.mutation.ClearRejectedAt()
+	return _u
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (_u *FinancePaymentUpdateOne) SetRejectedBy(v int) *FinancePaymentUpdateOne {
+	_u.mutation.ResetRejectedBy()
+	_u.mutation.SetRejectedBy(v)
+	return _u
+}
+
+// SetNillableRejectedBy sets the "rejected_by" field if the given value is not nil.
+func (_u *FinancePaymentUpdateOne) SetNillableRejectedBy(v *int) *FinancePaymentUpdateOne {
+	if v != nil {
+		_u.SetRejectedBy(*v)
+	}
+	return _u
+}
+
+// AddRejectedBy adds value to the "rejected_by" field.
+func (_u *FinancePaymentUpdateOne) AddRejectedBy(v int) *FinancePaymentUpdateOne {
+	_u.mutation.AddRejectedBy(v)
+	return _u
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (_u *FinancePaymentUpdateOne) ClearRejectedBy() *FinancePaymentUpdateOne {
+	_u.mutation.ClearRejectedBy()
+	return _u
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (_u *FinancePaymentUpdateOne) SetRejectReason(v string) *FinancePaymentUpdateOne {
+	_u.mutation.SetRejectReason(v)
+	return _u
+}
+
+// SetNillableRejectReason sets the "reject_reason" field if the given value is not nil.
+func (_u *FinancePaymentUpdateOne) SetNillableRejectReason(v *string) *FinancePaymentUpdateOne {
+	if v != nil {
+		_u.SetRejectReason(*v)
+	}
+	return _u
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (_u *FinancePaymentUpdateOne) ClearRejectReason() *FinancePaymentUpdateOne {
+	_u.mutation.ClearRejectReason()
+	return _u
+}
+
 // SetPostedAt sets the "posted_at" field.
 func (_u *FinancePaymentUpdateOne) SetPostedAt(v time.Time) *FinancePaymentUpdateOne {
 	_u.mutation.SetPostedAt(v)
@@ -501,6 +878,73 @@ func (_u *FinancePaymentUpdateOne) AddPostedBy(v int) *FinancePaymentUpdateOne {
 // ClearPostedBy clears the value of the "posted_by" field.
 func (_u *FinancePaymentUpdateOne) ClearPostedBy() *FinancePaymentUpdateOne {
 	_u.mutation.ClearPostedBy()
+	return _u
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (_u *FinancePaymentUpdateOne) SetCancelledAt(v time.Time) *FinancePaymentUpdateOne {
+	_u.mutation.SetCancelledAt(v)
+	return _u
+}
+
+// SetNillableCancelledAt sets the "cancelled_at" field if the given value is not nil.
+func (_u *FinancePaymentUpdateOne) SetNillableCancelledAt(v *time.Time) *FinancePaymentUpdateOne {
+	if v != nil {
+		_u.SetCancelledAt(*v)
+	}
+	return _u
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (_u *FinancePaymentUpdateOne) ClearCancelledAt() *FinancePaymentUpdateOne {
+	_u.mutation.ClearCancelledAt()
+	return _u
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (_u *FinancePaymentUpdateOne) SetCancelledBy(v int) *FinancePaymentUpdateOne {
+	_u.mutation.ResetCancelledBy()
+	_u.mutation.SetCancelledBy(v)
+	return _u
+}
+
+// SetNillableCancelledBy sets the "cancelled_by" field if the given value is not nil.
+func (_u *FinancePaymentUpdateOne) SetNillableCancelledBy(v *int) *FinancePaymentUpdateOne {
+	if v != nil {
+		_u.SetCancelledBy(*v)
+	}
+	return _u
+}
+
+// AddCancelledBy adds value to the "cancelled_by" field.
+func (_u *FinancePaymentUpdateOne) AddCancelledBy(v int) *FinancePaymentUpdateOne {
+	_u.mutation.AddCancelledBy(v)
+	return _u
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (_u *FinancePaymentUpdateOne) ClearCancelledBy() *FinancePaymentUpdateOne {
+	_u.mutation.ClearCancelledBy()
+	return _u
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (_u *FinancePaymentUpdateOne) SetCancelReason(v string) *FinancePaymentUpdateOne {
+	_u.mutation.SetCancelReason(v)
+	return _u
+}
+
+// SetNillableCancelReason sets the "cancel_reason" field if the given value is not nil.
+func (_u *FinancePaymentUpdateOne) SetNillableCancelReason(v *string) *FinancePaymentUpdateOne {
+	if v != nil {
+		_u.SetCancelReason(*v)
+	}
+	return _u
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (_u *FinancePaymentUpdateOne) ClearCancelReason() *FinancePaymentUpdateOne {
+	_u.mutation.ClearCancelReason()
 	return _u
 }
 
@@ -685,9 +1129,34 @@ func (_u *FinancePaymentUpdateOne) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ApprovedBy(); ok {
+		if err := financepayment.ApprovedByValidator(v); err != nil {
+			return &ValidationError{Name: "approved_by", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.approved_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectedBy(); ok {
+		if err := financepayment.RejectedByValidator(v); err != nil {
+			return &ValidationError{Name: "rejected_by", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.rejected_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectReason(); ok {
+		if err := financepayment.RejectReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reject_reason", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.reject_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PostedBy(); ok {
 		if err := financepayment.PostedByValidator(v); err != nil {
 			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.posted_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelledBy(); ok {
+		if err := financepayment.CancelledByValidator(v); err != nil {
+			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.cancelled_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelReason(); ok {
+		if err := financepayment.CancelReasonValidator(v); err != nil {
+			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.cancel_reason": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ReversedBy(); ok {
@@ -741,6 +1210,42 @@ func (_u *FinancePaymentUpdateOne) sqlSave(ctx context.Context) (_node *FinanceP
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(financepayment.FieldVersion, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.ApprovedAt(); ok {
+		_spec.SetField(financepayment.FieldApprovedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ApprovedAtCleared() {
+		_spec.ClearField(financepayment.FieldApprovedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ApprovedBy(); ok {
+		_spec.SetField(financepayment.FieldApprovedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedApprovedBy(); ok {
+		_spec.AddField(financepayment.FieldApprovedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ApprovedByCleared() {
+		_spec.ClearField(financepayment.FieldApprovedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectedAt(); ok {
+		_spec.SetField(financepayment.FieldRejectedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RejectedAtCleared() {
+		_spec.ClearField(financepayment.FieldRejectedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RejectedBy(); ok {
+		_spec.SetField(financepayment.FieldRejectedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRejectedBy(); ok {
+		_spec.AddField(financepayment.FieldRejectedBy, field.TypeInt, value)
+	}
+	if _u.mutation.RejectedByCleared() {
+		_spec.ClearField(financepayment.FieldRejectedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectReason(); ok {
+		_spec.SetField(financepayment.FieldRejectReason, field.TypeString, value)
+	}
+	if _u.mutation.RejectReasonCleared() {
+		_spec.ClearField(financepayment.FieldRejectReason, field.TypeString)
+	}
 	if value, ok := _u.mutation.PostedAt(); ok {
 		_spec.SetField(financepayment.FieldPostedAt, field.TypeTime, value)
 	}
@@ -755,6 +1260,27 @@ func (_u *FinancePaymentUpdateOne) sqlSave(ctx context.Context) (_node *FinanceP
 	}
 	if _u.mutation.PostedByCleared() {
 		_spec.ClearField(financepayment.FieldPostedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CancelledAt(); ok {
+		_spec.SetField(financepayment.FieldCancelledAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancelledAtCleared() {
+		_spec.ClearField(financepayment.FieldCancelledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelledBy(); ok {
+		_spec.SetField(financepayment.FieldCancelledBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedCancelledBy(); ok {
+		_spec.AddField(financepayment.FieldCancelledBy, field.TypeInt, value)
+	}
+	if _u.mutation.CancelledByCleared() {
+		_spec.ClearField(financepayment.FieldCancelledBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.CancelReason(); ok {
+		_spec.SetField(financepayment.FieldCancelReason, field.TypeString, value)
+	}
+	if _u.mutation.CancelReasonCleared() {
+		_spec.ClearField(financepayment.FieldCancelReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.ReversedAt(); ok {
 		_spec.SetField(financepayment.FieldReversedAt, field.TypeTime, value)

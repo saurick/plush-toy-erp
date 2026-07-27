@@ -157,6 +157,7 @@ test('formal workflow action surfaces use a synchronous task-level in-flight gua
 
 test('formal workflow action surfaces submit only canonical payload fields', () => {
   const dashboard = read('../pages/DashboardPage.jsx')
+  const desktopTaskAction = read('./desktopWorkflowTaskAction.mjs')
   const workflowPage = read('../pages/WorkflowBusinessModulePage.jsx')
   const mobile = read('../mobile/hooks/useMobileRoleTaskActions.js')
   const purchase = read(
@@ -166,8 +167,9 @@ test('formal workflow action surfaces submit only canonical payload fields', () 
     '../components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs'
   )
 
-  assert.match(dashboard, /surface_key:\s*'desktop_task_board'/u)
-  assert.doesNotMatch(dashboard, /desktop_task_board_action/u)
+  assert.match(dashboard, /buildDesktopWorkflowTaskActionParams/u)
+  assert.match(desktopTaskAction, /surface_key:\s*'desktop_task_board'/u)
+  assert.doesNotMatch(desktopTaskAction, /desktop_task_board_action/u)
   assert.match(workflowPage, /surface_key:\s*'workflow_business_module'/u)
   assert.doesNotMatch(workflowPage, /workflow_page_(?:action|scope)/u)
   assert.match(mobile, /buildMobileTaskActionPayload/u)
@@ -310,6 +312,69 @@ test('workflow task mutation params require the exact versioned command contract
         requireWorkflowTaskMutationParams('complete', invalid, {
           requireIdempotencyKey: true,
         }),
+      /页面已更新/u
+    )
+  }
+})
+
+test('workflow task process decisions normalize exact numeric(20,6) approval intent', () => {
+  const base = {
+    task_id: 42,
+    expected_version: 7,
+    action_key: 'complete',
+    payload: {
+      process_decision: {
+        reason: '  依据在制数量批准  ',
+        approved_quantity: '00012.340000',
+      },
+    },
+  }
+  const normalized = requireWorkflowTaskMutationParams('complete', base)
+  assert.deepEqual(normalized.payload.process_decision, {
+    reason: '依据在制数量批准',
+    approved_quantity: '12.34',
+  })
+
+  for (const processDecision of [
+    null,
+    {},
+    { reason: '' },
+    { reason: '同意', approved_quantity: 0 },
+    { reason: '同意', approved_quantity: '0' },
+    { reason: '同意', approved_quantity: '-1' },
+    { reason: '同意', approved_quantity: '1e2' },
+    { reason: '同意', approved_quantity: '100000000000000' },
+    { reason: '同意', approved_quantity: '1.0000000' },
+    { reason: '同意', unexpected: true },
+  ]) {
+    assert.throws(
+      () =>
+        requireWorkflowTaskMutationParams('complete', {
+          ...base,
+          payload: { process_decision: processDecision },
+        }),
+      /页面已更新/u
+    )
+  }
+  for (const operation of ['block', 'reject', 'resume', 'urge']) {
+    const params =
+      operation === 'urge'
+        ? {
+            task_id: 42,
+            expected_version: 7,
+            action: 'urge_task',
+            reason: '催办',
+            payload: base.payload,
+          }
+        : {
+            task_id: 42,
+            expected_version: 7,
+            action_key: operation,
+            reason: '原因',
+            payload: base.payload,
+          }
+    assert.throws(
+      () => requireWorkflowTaskMutationParams(operation, params),
       /页面已更新/u
     )
   }
@@ -856,6 +921,46 @@ test('workflow task semantic signature ignores transport copies but keeps busine
   })
   assert.equal(first, same)
   assert.notEqual(first, changed)
+})
+
+test('workflow task semantic signature includes normalized process decisions', () => {
+  const approved = workflowTaskMutationSignature('complete', {
+    task_id: 5,
+    expected_version: 1,
+    action_key: 'complete',
+    payload: {
+      process_decision: {
+        reason: '批准部分数量',
+        approved_quantity: '12.5',
+      },
+      surface_key: 'mobile_role_tasks',
+    },
+  })
+  const approvedSame = workflowTaskMutationSignature('complete', {
+    task_id: 5,
+    expected_version: 99,
+    action_key: 'complete',
+    payload: {
+      process_decision: {
+        reason: '批准部分数量',
+        approved_quantity: '12.500000',
+      },
+      surface_key: 'desktop_task_board',
+    },
+  })
+  const approvedChanged = workflowTaskMutationSignature('complete', {
+    task_id: 5,
+    expected_version: 1,
+    action_key: 'complete',
+    payload: {
+      process_decision: {
+        reason: '批准部分数量',
+        approved_quantity: '11.5',
+      },
+    },
+  })
+  assert.equal(approved, approvedSame)
+  assert.notEqual(approved, approvedChanged)
 })
 
 test('workflow task semantic signature matches the shared v1 intent vectors', () => {

@@ -8,9 +8,12 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/financeallocation"
 	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financepayment"
+	"server/internal/data/model/ent/processinstance"
+	"server/internal/data/model/ent/supplier"
 
 	"github.com/shopspring/decimal"
 )
@@ -21,23 +24,85 @@ func (r *operationalFactRepo) CreateFinancePayment(ctx context.Context, in *biz.
 	if replay, found, err := r.findFinancePaymentReplay(ctx, actorID, in.IdempotencyKey, payloadHash); err != nil || found {
 		return replay, err
 	}
-	create := r.data.postgres.FinancePayment.Create().SetPaymentNo(in.PaymentNo).SetDirection(in.Direction).SetCounterpartyType(in.CounterpartyType).SetCounterpartyID(in.CounterpartyID).SetAmount(in.Amount).SetCurrency(in.Currency).SetAccountRef(in.AccountRef).SetEvidenceRef(in.EvidenceRef).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID)
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockAndValidateFinancePaymentCounterparty(ctx, tx, in.CounterpartyType, in.CounterpartyID); err != nil {
+		return nil, err
+	}
+	if replay, found, replayErr := r.findFinancePaymentReplayWithClient(ctx, tx.client, actorID, in.IdempotencyKey, payloadHash); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return replay, nil
+	}
+	create := tx.client.FinancePayment.Create().SetPaymentNo(in.PaymentNo).SetDirection(in.Direction).SetCounterpartyType(in.CounterpartyType).SetCounterpartyID(in.CounterpartyID).SetAmount(in.Amount).SetCurrency(in.Currency).SetAccountRef(in.AccountRef).SetEvidenceRef(in.EvidenceRef).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID)
 	if in.OccurredAtSpecified {
 		create.SetOccurredAt(in.OccurredAt)
 	}
 	row, err := create.Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
+			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {
+				return nil, rollbackErr
+			}
+			tx = nil
 			if replay, found, replayErr := r.findFinancePaymentReplay(ctx, actorID, in.IdempotencyKey, payloadHash); replayErr != nil || found {
 				return replay, replayErr
 			}
 		}
 		return nil, err
 	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return entFinancePaymentToBiz(row, nil), nil
 }
 
-func (r *operationalFactRepo) PostFinancePayment(ctx context.Context, in *biz.FinancePaymentPost, actorID int) (*biz.FinancePayment, error) {
+func lockAndValidateFinancePaymentCounterparty(ctx context.Context, tx *inventoryDBTx, counterpartyType string, counterpartyID int) error {
+	switch counterpartyType {
+	case biz.FinanceCounterpartyCustomer:
+		if err := lockOperationalFactRow(ctx, tx, "customers", counterpartyID, biz.ErrCustomerNotFound); err != nil {
+			return err
+		}
+		row, err := tx.client.Customer.Query().Where(customer.ID(counterpartyID)).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrCustomerNotFound
+			}
+			return err
+		}
+		if !row.IsActive {
+			return biz.ErrCustomerInactive
+		}
+	case biz.FinanceCounterpartySupplier:
+		if err := lockOperationalFactRow(ctx, tx, "suppliers", counterpartyID, biz.ErrSupplierNotFound); err != nil {
+			return err
+		}
+		row, err := tx.client.Supplier.Query().Where(supplier.ID(counterpartyID)).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrSupplierNotFound
+			}
+			return err
+		}
+		if !row.IsActive {
+			return biz.ErrSupplierInactive
+		}
+	default:
+		return biz.ErrBadParam
+	}
+	return nil
+}
+
+func (r *operationalFactRepo) CancelFinancePayment(ctx context.Context, in *biz.FinancePaymentTransition, actorID int) (*biz.FinancePayment, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -49,6 +114,227 @@ func (r *operationalFactRepo) PostFinancePayment(ctx context.Context, in *biz.Fi
 	payment, err := tx.client.FinancePayment.Get(ctx, in.ID)
 	if err != nil {
 		return nil, err
+	}
+	if payment.Version != in.ExpectedVersion {
+		if payment.Status == biz.FinancePaymentStatusCancelled &&
+			payment.Version == in.ExpectedVersion+1 &&
+			payment.CancelledBy != nil && *payment.CancelledBy == actorID &&
+			payment.CancelReason != nil && *payment.CancelReason == in.Reason {
+			return financePaymentWithAllocations(ctx, tx.client, payment)
+		}
+		return nil, biz.ErrIdempotencyConflict
+	}
+	switch payment.Status {
+	case biz.FinancePaymentStatusDraft:
+		hasProcess, err := tx.client.ProcessInstance.Query().Where(
+			processinstance.ProcessKey(biz.ProcessKeyFinancePaymentApproval),
+			processinstance.BusinessRefType("finance_payment"),
+			processinstance.BusinessRefID(payment.ID),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasProcess {
+			return nil, biz.ErrProcessSourceLifecycleDependency
+		}
+	case biz.FinancePaymentStatusApproved:
+		blocked, err := tx.client.ProcessInstance.Query().Where(
+			processinstance.ProcessKey(biz.ProcessKeyFinancePaymentApproval),
+			processinstance.BusinessRefType("finance_payment"),
+			processinstance.BusinessRefID(payment.ID),
+			processinstance.Status(biz.ProcessStatusBlocked),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !blocked {
+			return nil, biz.ErrProcessSourceLifecycleDependency
+		}
+	default:
+		return nil, biz.ErrBadParam
+	}
+	now := time.Now().UTC()
+	affected, err := tx.client.FinancePayment.Update().
+		Where(
+			financepayment.ID(payment.ID),
+			financepayment.Version(payment.Version),
+			financepayment.Status(payment.Status),
+		).
+		SetStatus(biz.FinancePaymentStatusCancelled).
+		SetCancelledAt(now).
+		SetCancelledBy(actorID).
+		SetCancelReason(in.Reason).
+		SetVersion(payment.Version + 1).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected != 1 {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	updated, err := tx.client.FinancePayment.Get(ctx, payment.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBadParam
+		}
+		return nil, err
+	}
+	if payment.Status == biz.FinancePaymentStatusApproved {
+		if err := markProcessDomainCommandEffectCompensatedWithClient(
+			ctx,
+			tx.client,
+			biz.ProcessDomainCommandFinancePaymentApprove,
+			"finance_payment",
+			payment.ID,
+			in.Reason,
+			actorID,
+		); err != nil {
+			return nil, err
+		}
+	}
+	out, err := financePaymentWithAllocations(ctx, tx.client, updated)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
+}
+
+func (r *operationalFactRepo) ApproveFinancePaymentForProcessCommand(
+	ctx context.Context,
+	id int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+	reason string,
+) (*biz.FinancePayment, error) {
+	return r.decideFinancePaymentForProcessCommand(ctx, id, command, result, actorID, reason, biz.FinancePaymentStatusApproved)
+}
+
+func (r *operationalFactRepo) RejectFinancePaymentForProcessCommand(
+	ctx context.Context,
+	id int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+	reason string,
+) (*biz.FinancePayment, error) {
+	return r.decideFinancePaymentForProcessCommand(ctx, id, command, result, actorID, reason, biz.FinancePaymentStatusRejected)
+}
+
+func (r *operationalFactRepo) decideFinancePaymentForProcessCommand(
+	ctx context.Context,
+	id int,
+	command *biz.ProcessDomainCommandInput,
+	commandResult *biz.ProcessDomainCommandResult,
+	actorID int,
+	reason string,
+	target string,
+) (*biz.FinancePayment, error) {
+	if command == nil || commandResult == nil || id <= 0 || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "finance_payments", id, biz.ErrBadParam); err != nil {
+		return nil, err
+	}
+	payment, err := tx.client.FinancePayment.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if payment.Status != biz.FinancePaymentStatusDraft || payment.CreatedBy == actorID {
+		return nil, biz.ErrBadParam
+	}
+	now := time.Now().UTC()
+	update := tx.client.FinancePayment.Update().
+		Where(
+			financepayment.ID(payment.ID),
+			financepayment.Version(payment.Version),
+			financepayment.Status(biz.FinancePaymentStatusDraft),
+		).
+		SetStatus(target).
+		SetVersion(payment.Version + 1)
+	switch target {
+	case biz.FinancePaymentStatusApproved:
+		update.SetApprovedAt(now).SetApprovedBy(actorID)
+	case biz.FinancePaymentStatusRejected:
+		if reason == "" {
+			return nil, biz.ErrBadParam
+		}
+		update.SetRejectedAt(now).SetRejectedBy(actorID).SetRejectReason(reason)
+	default:
+		return nil, biz.ErrBadParam
+	}
+	affected, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected != 1 {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	updated, err := tx.client.FinancePayment.Get(ctx, payment.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBadParam
+		}
+		return nil, err
+	}
+	if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, actorID); err != nil {
+		return nil, err
+	}
+	out, err := financePaymentWithAllocations(ctx, tx.client, updated)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx.sqlTx = nil
+	return out, nil
+}
+
+func (r *operationalFactRepo) PostFinancePayment(ctx context.Context, in *biz.FinancePaymentPost, actorID int) (*biz.FinancePayment, error) {
+	return nil, biz.ErrProcessRuntimeRequired
+}
+
+func (r *operationalFactRepo) PostFinancePaymentForProcessCommand(
+	ctx context.Context,
+	in *biz.FinancePaymentPost,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.FinancePayment, error) {
+	return r.postFinancePayment(ctx, in, actorID, command, result)
+}
+
+func (r *operationalFactRepo) postFinancePayment(
+	ctx context.Context,
+	in *biz.FinancePaymentPost,
+	actorID int,
+	command *biz.ProcessDomainCommandInput,
+	commandResult *biz.ProcessDomainCommandResult,
+) (*biz.FinancePayment, error) {
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "finance_payments", in.ID, biz.ErrBadParam); err != nil {
+		return nil, err
+	}
+	payment, err := tx.client.FinancePayment.Get(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if command != nil {
+		in.ExpectedVersion = payment.Version
 	}
 	if payment.Version != in.ExpectedVersion {
 		if payment.Status == biz.FinancePaymentStatusPosted && payment.Version == in.ExpectedVersion+1 &&
@@ -63,7 +349,7 @@ func (r *operationalFactRepo) PostFinancePayment(ctx context.Context, in *biz.Fi
 		}
 		return nil, biz.ErrIdempotencyConflict
 	}
-	if payment.Status != biz.FinancePaymentStatusDraft {
+	if payment.Status != biz.FinancePaymentStatusApproved {
 		return nil, biz.ErrBadParam
 	}
 	allocations := append([]biz.FinancePaymentAllocationInput(nil), in.Allocations...)
@@ -71,6 +357,11 @@ func (r *operationalFactRepo) PostFinancePayment(ctx context.Context, in *biz.Fi
 	total := decimal.Zero
 	for _, a := range allocations {
 		total = total.Add(a.Amount)
+	}
+	if !total.Equal(payment.Amount) {
+		return nil, biz.ErrBadParam
+	}
+	for _, a := range allocations {
 		if err := lockOperationalFactRow(ctx, tx, "finance_facts", a.FinanceFactID, biz.ErrBadParam); err != nil {
 			return nil, err
 		}
@@ -94,13 +385,10 @@ func (r *operationalFactRepo) PostFinancePayment(ctx context.Context, in *biz.Fi
 			return nil, err
 		}
 		if a.Amount.Equal(outstanding) {
-			if err := setFinanceFactSettlement(ctx, tx, fact.ID, true); err != nil {
+			if err := setFinanceFactSettlement(ctx, tx, fact.ID, true, actorID); err != nil {
 				return nil, err
 			}
 		}
-	}
-	if total.GreaterThan(payment.Amount) {
-		return nil, biz.ErrBadParam
 	}
 	now := time.Now()
 	if err := updateFinancePaymentStatus(ctx, tx, payment.ID, payment.Version, biz.FinancePaymentStatusPosted, now, actorID, ""); err != nil {
@@ -113,6 +401,11 @@ func (r *operationalFactRepo) PostFinancePayment(ctx context.Context, in *biz.Fi
 	out, err := financePaymentWithAllocations(ctx, tx.client, updated)
 	if err != nil {
 		return nil, err
+	}
+	if command != nil {
+		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, actorID); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
@@ -153,17 +446,39 @@ func (r *operationalFactRepo) ReverseFinancePayment(ctx context.Context, in *biz
 		if err := lockOperationalFactRow(ctx, tx, "finance_facts", a.FinanceFactID, biz.ErrBadParam); err != nil {
 			return nil, err
 		}
-		key := fmt.Sprintf("FINANCE_PAYMENT:%d:%d:REVERSE", payment.ID, a.ID)
-		_, err := tx.client.FinanceAllocation.Create().SetPaymentID(payment.ID).SetFinanceFactID(a.FinanceFactID).SetAmount(a.Amount).SetCurrency(a.Currency).SetStatus(biz.FinanceAllocationStatusReversed).SetReversalOfAllocationID(a.ID).SetIdempotencyKey(key).SetCreatedBy(actorID).Save(ctx)
+		fact, err := tx.client.FinanceFact.Get(ctx, a.FinanceFactID)
 		if err != nil {
 			return nil, err
 		}
-		if err := setFinanceFactSettlement(ctx, tx, a.FinanceFactID, false); err != nil {
+		key := fmt.Sprintf("FINANCE_PAYMENT:%d:%d:REVERSE", payment.ID, a.ID)
+		_, err = tx.client.FinanceAllocation.Create().SetPaymentID(payment.ID).SetFinanceFactID(a.FinanceFactID).SetAmount(a.Amount).SetCurrency(a.Currency).SetStatus(biz.FinanceAllocationStatusReversed).SetReversalOfAllocationID(a.ID).SetIdempotencyKey(key).SetCreatedBy(actorID).Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+		outstanding, err := financeFactOutstanding(ctx, tx.client, a.FinanceFactID, fact.Amount)
+		if err != nil {
+			return nil, err
+		}
+		if err := setFinanceFactSettlement(ctx, tx, a.FinanceFactID, outstanding.IsZero(), actorID); err != nil {
 			return nil, err
 		}
 	}
 	now := time.Now()
 	if err := updateFinancePaymentStatus(ctx, tx, payment.ID, payment.Version, biz.FinancePaymentStatusReversed, now, actorID, in.Reason); err != nil {
+		return nil, err
+	}
+	if err := markProcessDomainCommandEffectsCompensatedWithClient(
+		ctx,
+		tx.client,
+		[]string{
+			biz.ProcessDomainCommandFinancePaymentApprove,
+			biz.ProcessDomainCommandFinancePaymentPost,
+		},
+		"finance_payment",
+		payment.ID,
+		in.Reason,
+		actorID,
+	); err != nil {
 		return nil, err
 	}
 	updated, err := tx.client.FinancePayment.Get(ctx, payment.ID)
@@ -217,6 +532,16 @@ func (r *operationalFactRepo) CreateFinanceCreditNote(ctx context.Context, in *b
 	if err := lockOperationalFactRow(ctx, tx, "finance_facts", in.FinanceFactID, biz.ErrBadParam); err != nil {
 		return nil, err
 	}
+	if replay, found, replayErr := r.findFinanceCreditReplayWithClient(ctx, tx.client, actorID, in.IdempotencyKey, payloadHash); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return replay, nil
+	}
 	fact, err := tx.client.FinanceFact.Get(ctx, in.FinanceFactID)
 	if err != nil {
 		return nil, err
@@ -236,10 +561,19 @@ func (r *operationalFactRepo) CreateFinanceCreditNote(ctx context.Context, in *b
 	}
 	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(fact.ID).SetAmount(in.Amount).SetCurrency(fact.Currency).SetStatus("POSTED").SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
 	if err != nil {
+		if ent.IsConstraintError(err) {
+			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {
+				return nil, rollbackErr
+			}
+			tx = nil
+			if replay, found, replayErr := r.findFinanceCreditReplay(ctx, actorID, in.IdempotencyKey, payloadHash); replayErr != nil || found {
+				return replay, replayErr
+			}
+		}
 		return nil, err
 	}
 	if in.Amount.Equal(outstanding) {
-		if err := setFinanceFactSettlement(ctx, tx, fact.ID, true); err != nil {
+		if err := setFinanceFactSettlement(ctx, tx, fact.ID, true, actorID); err != nil {
 			return nil, err
 		}
 	}
@@ -262,6 +596,16 @@ func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *
 	if err := lockOperationalFactRow(ctx, tx, "finance_credit_notes", in.CreditNoteID, biz.ErrBadParam); err != nil {
 		return nil, err
 	}
+	if replay, found, replayErr := r.findFinanceCreditReplayWithClient(ctx, tx.client, actorID, in.IdempotencyKey, payloadHash); replayErr != nil || found {
+		if replayErr != nil {
+			return nil, replayErr
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return replay, nil
+	}
 	source, err := tx.client.FinanceCreditNote.Get(ctx, in.CreditNoteID)
 	if err != nil {
 		return nil, err
@@ -281,9 +625,26 @@ func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *
 	}
 	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(source.FinanceFactID).SetReversalOfCreditNoteID(source.ID).SetAmount(source.Amount).SetCurrency(source.Currency).SetStatus("REVERSED").SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
 	if err != nil {
+		if ent.IsConstraintError(err) {
+			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {
+				return nil, rollbackErr
+			}
+			tx = nil
+			if replay, found, replayErr := r.findFinanceCreditReplay(ctx, actorID, in.IdempotencyKey, payloadHash); replayErr != nil || found {
+				return replay, replayErr
+			}
+		}
 		return nil, err
 	}
-	if err := setFinanceFactSettlement(ctx, tx, source.FinanceFactID, false); err != nil {
+	fact, err := tx.client.FinanceFact.Get(ctx, source.FinanceFactID)
+	if err != nil {
+		return nil, err
+	}
+	outstanding, err := financeFactOutstanding(ctx, tx.client, source.FinanceFactID, fact.Amount)
+	if err != nil {
+		return nil, err
+	}
+	if err := setFinanceFactSettlement(ctx, tx, source.FinanceFactID, outstanding.IsZero(), actorID); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
@@ -337,21 +698,45 @@ func financeFactOutstanding(ctx context.Context, client *ent.Client, factID int,
 	}
 	return out, nil
 }
-func setFinanceFactSettlement(ctx context.Context, tx *inventoryDBTx, id int, settled bool) error {
-	p := inventorySQLPlaceholders(tx.dialect, 3)
-	status := biz.OperationalFactStatusPosted
-	var at any = nil
-	if settled {
-		status = biz.OperationalFactStatusSettled
-		at = time.Now()
+func setFinanceFactSettlement(ctx context.Context, tx *inventoryDBTx, id int, settled bool, actorID int) error {
+	if tx == nil || id <= 0 || actorID <= 0 {
+		return biz.ErrBadParam
 	}
-	result, err := tx.sqlTx.ExecContext(ctx, "UPDATE finance_facts SET status="+p[0]+", settled_at="+p[1]+", updated_at=CURRENT_TIMESTAMP WHERE id="+p[2], status, at, id)
+	fact, err := tx.client.FinanceFact.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	targetStatus := biz.OperationalFactStatusPosted
+	if settled {
+		targetStatus = biz.OperationalFactStatusSettled
+	}
+	if fact.Status == targetStatus {
+		return nil
+	}
+	expectedStatus := biz.OperationalFactStatusSettled
+	if settled {
+		expectedStatus = biz.OperationalFactStatusPosted
+	}
+	if fact.Status != expectedStatus {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 6)
+	var query string
+	var args []any
+	if settled {
+		query = "UPDATE finance_facts SET status=" + p[0] + ", version=version+1, settled_at=" + p[1] + ", settled_by=" + p[2] + ", updated_at=CURRENT_TIMESTAMP WHERE id=" + p[3] + " AND status=" + p[4] + " AND version=" + p[5]
+		args = []any{targetStatus, time.Now().UTC(), actorID, id, expectedStatus, fact.Version}
+	} else {
+		query = "UPDATE finance_facts SET status=" + p[0] + ", version=version+1, settled_at=NULL, settled_by=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=" + p[1] + " AND status=" + p[2] + " AND version=" + p[3]
+		args = []any{targetStatus, id, expectedStatus, fact.Version}
+	}
+	result, err := tx.sqlTx.ExecContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
 	n, _ := result.RowsAffected()
 	if n != 1 {
-		return biz.ErrBadParam
+		return biz.ErrOperationalFactVersionConflict
 	}
 	return nil
 }
@@ -445,7 +830,10 @@ func (r *operationalFactRepo) ListFinanceCreditNotes(ctx context.Context, filter
 	return out, total, nil
 }
 func (r *operationalFactRepo) findFinancePaymentReplay(ctx context.Context, actorID int, key, hash string) (*biz.FinancePayment, bool, error) {
-	row, err := r.data.postgres.FinancePayment.Query().Where(financepayment.CreatedBy(actorID), financepayment.IdempotencyKey(key)).Only(ctx)
+	return r.findFinancePaymentReplayWithClient(ctx, r.data.postgres, actorID, key, hash)
+}
+func (r *operationalFactRepo) findFinancePaymentReplayWithClient(ctx context.Context, client *ent.Client, actorID int, key, hash string) (*biz.FinancePayment, bool, error) {
+	row, err := client.FinancePayment.Query().Where(financepayment.CreatedBy(actorID), financepayment.IdempotencyKey(key)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, false, nil
 	}
@@ -455,11 +843,15 @@ func (r *operationalFactRepo) findFinancePaymentReplay(ctx context.Context, acto
 	if row.IdempotencyPayloadHash != hash {
 		return nil, true, biz.ErrIdempotencyConflict
 	}
-	out, err := financePaymentWithAllocations(ctx, r.data.postgres, row)
+	out, err := financePaymentWithAllocations(ctx, client, row)
 	return out, true, err
 }
 func (r *operationalFactRepo) findFinanceCreditReplay(ctx context.Context, actorID int, key, hash string) (*biz.FinanceCreditNote, bool, error) {
-	row, err := r.data.postgres.FinanceCreditNote.Query().Where(financecreditnote.CreatedBy(actorID), financecreditnote.IdempotencyKey(key)).Only(ctx)
+	return r.findFinanceCreditReplayWithClient(ctx, r.data.postgres, actorID, key, hash)
+}
+
+func (r *operationalFactRepo) findFinanceCreditReplayWithClient(ctx context.Context, client *ent.Client, actorID int, key, hash string) (*biz.FinanceCreditNote, bool, error) {
+	row, err := client.FinanceCreditNote.Query().Where(financecreditnote.CreatedBy(actorID), financecreditnote.IdempotencyKey(key)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, false, nil
 	}
@@ -482,7 +874,7 @@ func entFinancePaymentToBiz(row *ent.FinancePayment, items []*ent.FinanceAllocat
 	if row == nil {
 		return nil
 	}
-	out := &biz.FinancePayment{ID: row.ID, PaymentNo: row.PaymentNo, Direction: row.Direction, Status: row.Status, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, Currency: row.Currency, AccountRef: row.AccountRef, EvidenceRef: row.EvidenceRef, IdempotencyKey: row.IdempotencyKey, IdempotencyPayloadHash: row.IdempotencyPayloadHash, Version: row.Version, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, ReversedAt: row.ReversedAt, ReversedBy: row.ReversedBy, ReverseReason: row.ReverseReason, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	out := &biz.FinancePayment{ID: row.ID, PaymentNo: row.PaymentNo, Direction: row.Direction, Status: row.Status, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, Currency: row.Currency, AccountRef: row.AccountRef, EvidenceRef: row.EvidenceRef, IdempotencyKey: row.IdempotencyKey, IdempotencyPayloadHash: row.IdempotencyPayloadHash, Version: row.Version, OccurredAt: row.OccurredAt, ApprovedAt: row.ApprovedAt, ApprovedBy: row.ApprovedBy, RejectedAt: row.RejectedAt, RejectedBy: row.RejectedBy, RejectReason: row.RejectReason, PostedAt: row.PostedAt, PostedBy: row.PostedBy, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelReason: row.CancelReason, ReversedAt: row.ReversedAt, ReversedBy: row.ReversedBy, ReverseReason: row.ReverseReason, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	for _, a := range items {
 		out.Allocations = append(out.Allocations, &biz.FinanceAllocation{ID: a.ID, PaymentID: a.PaymentID, FinanceFactID: a.FinanceFactID, Amount: a.Amount, Currency: a.Currency, Status: a.Status, ReversalOfAllocationID: a.ReversalOfAllocationID, IdempotencyKey: a.IdempotencyKey, CreatedBy: a.CreatedBy, CreatedAt: a.CreatedAt})
 	}

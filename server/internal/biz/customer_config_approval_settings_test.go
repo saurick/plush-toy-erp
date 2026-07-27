@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -124,6 +125,42 @@ func TestApprovalSettingsMissingSnapshotIsUnconfiguredNotDisabled(t *testing.T) 
 		}
 		if stringSliceContains(item.BlockedReasons, "approval_disabled") {
 			t.Fatalf("unconfigured approval must not be reported disabled: %#v", item.BlockedReasons)
+		}
+	}
+}
+
+func TestApprovalSettingsCatalogReportsRegisteredFixedProcessResponsibilities(t *testing.T) {
+	uc, _, _, active := activeApprovalSettingsFixture(t)
+	settings, err := uc.GetApprovalSettings(context.Background(), active.CustomerKey)
+	if err != nil {
+		t.Fatalf("GetApprovalSettings error = %v", err)
+	}
+	fixedProcessKeys := map[string]bool{
+		"sales_return":         false,
+		"production_exception": false,
+		"inventory_adjustment": false,
+		"payment":              false,
+	}
+	for _, item := range settings.Items {
+		if _, ok := fixedProcessKeys[item.ApprovalKey]; !ok {
+			continue
+		}
+		fixedProcessKeys[item.ApprovalKey] = true
+		if item.Configurable {
+			t.Fatalf("%s must remain outside approval-settings editing", item.ApprovalKey)
+		}
+		if len(item.BlockedReasons) != 1 || item.BlockedReasons[0] != approvalResponsibilityFixedByProcessContract {
+			t.Fatalf("%s blockers = %#v", item.ApprovalKey, item.BlockedReasons)
+		}
+		if !strings.Contains(item.DomainBoundary, "已登记") ||
+			strings.Contains(item.DomainBoundary, "缺失") ||
+			strings.Contains(item.DomainBoundary, "尚未接") {
+			t.Fatalf("%s domain boundary = %q", item.ApprovalKey, item.DomainBoundary)
+		}
+	}
+	for key, found := range fixedProcessKeys {
+		if !found {
+			t.Fatalf("missing fixed process responsibility %q", key)
 		}
 	}
 }

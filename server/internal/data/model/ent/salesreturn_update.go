@@ -111,6 +111,73 @@ func (_u *SalesReturnUpdate) ClearApprovedBy() *SalesReturnUpdate {
 	return _u
 }
 
+// SetRejectedAt sets the "rejected_at" field.
+func (_u *SalesReturnUpdate) SetRejectedAt(v time.Time) *SalesReturnUpdate {
+	_u.mutation.SetRejectedAt(v)
+	return _u
+}
+
+// SetNillableRejectedAt sets the "rejected_at" field if the given value is not nil.
+func (_u *SalesReturnUpdate) SetNillableRejectedAt(v *time.Time) *SalesReturnUpdate {
+	if v != nil {
+		_u.SetRejectedAt(*v)
+	}
+	return _u
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (_u *SalesReturnUpdate) ClearRejectedAt() *SalesReturnUpdate {
+	_u.mutation.ClearRejectedAt()
+	return _u
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (_u *SalesReturnUpdate) SetRejectedBy(v int) *SalesReturnUpdate {
+	_u.mutation.ResetRejectedBy()
+	_u.mutation.SetRejectedBy(v)
+	return _u
+}
+
+// SetNillableRejectedBy sets the "rejected_by" field if the given value is not nil.
+func (_u *SalesReturnUpdate) SetNillableRejectedBy(v *int) *SalesReturnUpdate {
+	if v != nil {
+		_u.SetRejectedBy(*v)
+	}
+	return _u
+}
+
+// AddRejectedBy adds value to the "rejected_by" field.
+func (_u *SalesReturnUpdate) AddRejectedBy(v int) *SalesReturnUpdate {
+	_u.mutation.AddRejectedBy(v)
+	return _u
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (_u *SalesReturnUpdate) ClearRejectedBy() *SalesReturnUpdate {
+	_u.mutation.ClearRejectedBy()
+	return _u
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (_u *SalesReturnUpdate) SetRejectReason(v string) *SalesReturnUpdate {
+	_u.mutation.SetRejectReason(v)
+	return _u
+}
+
+// SetNillableRejectReason sets the "reject_reason" field if the given value is not nil.
+func (_u *SalesReturnUpdate) SetNillableRejectReason(v *string) *SalesReturnUpdate {
+	if v != nil {
+		_u.SetRejectReason(*v)
+	}
+	return _u
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (_u *SalesReturnUpdate) ClearRejectReason() *SalesReturnUpdate {
+	_u.mutation.ClearRejectReason()
+	return _u
+}
+
 // SetReceivedAt sets the "received_at" field.
 func (_u *SalesReturnUpdate) SetReceivedAt(v time.Time) *SalesReturnUpdate {
 	_u.mutation.SetReceivedAt(v)
@@ -225,6 +292,73 @@ func (_u *SalesReturnUpdate) ClearCancelReason() *SalesReturnUpdate {
 	return _u
 }
 
+// SetReversedAt sets the "reversed_at" field.
+func (_u *SalesReturnUpdate) SetReversedAt(v time.Time) *SalesReturnUpdate {
+	_u.mutation.SetReversedAt(v)
+	return _u
+}
+
+// SetNillableReversedAt sets the "reversed_at" field if the given value is not nil.
+func (_u *SalesReturnUpdate) SetNillableReversedAt(v *time.Time) *SalesReturnUpdate {
+	if v != nil {
+		_u.SetReversedAt(*v)
+	}
+	return _u
+}
+
+// ClearReversedAt clears the value of the "reversed_at" field.
+func (_u *SalesReturnUpdate) ClearReversedAt() *SalesReturnUpdate {
+	_u.mutation.ClearReversedAt()
+	return _u
+}
+
+// SetReversedBy sets the "reversed_by" field.
+func (_u *SalesReturnUpdate) SetReversedBy(v int) *SalesReturnUpdate {
+	_u.mutation.ResetReversedBy()
+	_u.mutation.SetReversedBy(v)
+	return _u
+}
+
+// SetNillableReversedBy sets the "reversed_by" field if the given value is not nil.
+func (_u *SalesReturnUpdate) SetNillableReversedBy(v *int) *SalesReturnUpdate {
+	if v != nil {
+		_u.SetReversedBy(*v)
+	}
+	return _u
+}
+
+// AddReversedBy adds value to the "reversed_by" field.
+func (_u *SalesReturnUpdate) AddReversedBy(v int) *SalesReturnUpdate {
+	_u.mutation.AddReversedBy(v)
+	return _u
+}
+
+// ClearReversedBy clears the value of the "reversed_by" field.
+func (_u *SalesReturnUpdate) ClearReversedBy() *SalesReturnUpdate {
+	_u.mutation.ClearReversedBy()
+	return _u
+}
+
+// SetReverseReason sets the "reverse_reason" field.
+func (_u *SalesReturnUpdate) SetReverseReason(v string) *SalesReturnUpdate {
+	_u.mutation.SetReverseReason(v)
+	return _u
+}
+
+// SetNillableReverseReason sets the "reverse_reason" field if the given value is not nil.
+func (_u *SalesReturnUpdate) SetNillableReverseReason(v *string) *SalesReturnUpdate {
+	if v != nil {
+		_u.SetReverseReason(*v)
+	}
+	return _u
+}
+
+// ClearReverseReason clears the value of the "reverse_reason" field.
+func (_u *SalesReturnUpdate) ClearReverseReason() *SalesReturnUpdate {
+	_u.mutation.ClearReverseReason()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *SalesReturnUpdate) SetUpdatedAt(v time.Time) *SalesReturnUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -331,6 +465,16 @@ func (_u *SalesReturnUpdate) check() error {
 			return &ValidationError{Name: "approved_by", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.approved_by": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RejectedBy(); ok {
+		if err := salesreturn.RejectedByValidator(v); err != nil {
+			return &ValidationError{Name: "rejected_by", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.rejected_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectReason(); ok {
+		if err := salesreturn.RejectReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reject_reason", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.reject_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ReceivedBy(); ok {
 		if err := salesreturn.ReceivedByValidator(v); err != nil {
 			return &ValidationError{Name: "received_by", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.received_by": %w`, err)}
@@ -344,6 +488,16 @@ func (_u *SalesReturnUpdate) check() error {
 	if v, ok := _u.mutation.CancelReason(); ok {
 		if err := salesreturn.CancelReasonValidator(v); err != nil {
 			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.cancel_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReversedBy(); ok {
+		if err := salesreturn.ReversedByValidator(v); err != nil {
+			return &ValidationError{Name: "reversed_by", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.reversed_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReverseReason(); ok {
+		if err := salesreturn.ReverseReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reverse_reason", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.reverse_reason": %w`, err)}
 		}
 	}
 	return nil
@@ -385,6 +539,27 @@ func (_u *SalesReturnUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if _u.mutation.ApprovedByCleared() {
 		_spec.ClearField(salesreturn.FieldApprovedBy, field.TypeInt)
 	}
+	if value, ok := _u.mutation.RejectedAt(); ok {
+		_spec.SetField(salesreturn.FieldRejectedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RejectedAtCleared() {
+		_spec.ClearField(salesreturn.FieldRejectedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RejectedBy(); ok {
+		_spec.SetField(salesreturn.FieldRejectedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRejectedBy(); ok {
+		_spec.AddField(salesreturn.FieldRejectedBy, field.TypeInt, value)
+	}
+	if _u.mutation.RejectedByCleared() {
+		_spec.ClearField(salesreturn.FieldRejectedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectReason(); ok {
+		_spec.SetField(salesreturn.FieldRejectReason, field.TypeString, value)
+	}
+	if _u.mutation.RejectReasonCleared() {
+		_spec.ClearField(salesreturn.FieldRejectReason, field.TypeString)
+	}
 	if value, ok := _u.mutation.ReceivedAt(); ok {
 		_spec.SetField(salesreturn.FieldReceivedAt, field.TypeTime, value)
 	}
@@ -420,6 +595,27 @@ func (_u *SalesReturnUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	}
 	if _u.mutation.CancelReasonCleared() {
 		_spec.ClearField(salesreturn.FieldCancelReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ReversedAt(); ok {
+		_spec.SetField(salesreturn.FieldReversedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ReversedAtCleared() {
+		_spec.ClearField(salesreturn.FieldReversedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ReversedBy(); ok {
+		_spec.SetField(salesreturn.FieldReversedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedReversedBy(); ok {
+		_spec.AddField(salesreturn.FieldReversedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ReversedByCleared() {
+		_spec.ClearField(salesreturn.FieldReversedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ReverseReason(); ok {
+		_spec.SetField(salesreturn.FieldReverseReason, field.TypeString, value)
+	}
+	if _u.mutation.ReverseReasonCleared() {
+		_spec.ClearField(salesreturn.FieldReverseReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(salesreturn.FieldUpdatedAt, field.TypeTime, value)
@@ -571,6 +767,73 @@ func (_u *SalesReturnUpdateOne) ClearApprovedBy() *SalesReturnUpdateOne {
 	return _u
 }
 
+// SetRejectedAt sets the "rejected_at" field.
+func (_u *SalesReturnUpdateOne) SetRejectedAt(v time.Time) *SalesReturnUpdateOne {
+	_u.mutation.SetRejectedAt(v)
+	return _u
+}
+
+// SetNillableRejectedAt sets the "rejected_at" field if the given value is not nil.
+func (_u *SalesReturnUpdateOne) SetNillableRejectedAt(v *time.Time) *SalesReturnUpdateOne {
+	if v != nil {
+		_u.SetRejectedAt(*v)
+	}
+	return _u
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (_u *SalesReturnUpdateOne) ClearRejectedAt() *SalesReturnUpdateOne {
+	_u.mutation.ClearRejectedAt()
+	return _u
+}
+
+// SetRejectedBy sets the "rejected_by" field.
+func (_u *SalesReturnUpdateOne) SetRejectedBy(v int) *SalesReturnUpdateOne {
+	_u.mutation.ResetRejectedBy()
+	_u.mutation.SetRejectedBy(v)
+	return _u
+}
+
+// SetNillableRejectedBy sets the "rejected_by" field if the given value is not nil.
+func (_u *SalesReturnUpdateOne) SetNillableRejectedBy(v *int) *SalesReturnUpdateOne {
+	if v != nil {
+		_u.SetRejectedBy(*v)
+	}
+	return _u
+}
+
+// AddRejectedBy adds value to the "rejected_by" field.
+func (_u *SalesReturnUpdateOne) AddRejectedBy(v int) *SalesReturnUpdateOne {
+	_u.mutation.AddRejectedBy(v)
+	return _u
+}
+
+// ClearRejectedBy clears the value of the "rejected_by" field.
+func (_u *SalesReturnUpdateOne) ClearRejectedBy() *SalesReturnUpdateOne {
+	_u.mutation.ClearRejectedBy()
+	return _u
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (_u *SalesReturnUpdateOne) SetRejectReason(v string) *SalesReturnUpdateOne {
+	_u.mutation.SetRejectReason(v)
+	return _u
+}
+
+// SetNillableRejectReason sets the "reject_reason" field if the given value is not nil.
+func (_u *SalesReturnUpdateOne) SetNillableRejectReason(v *string) *SalesReturnUpdateOne {
+	if v != nil {
+		_u.SetRejectReason(*v)
+	}
+	return _u
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (_u *SalesReturnUpdateOne) ClearRejectReason() *SalesReturnUpdateOne {
+	_u.mutation.ClearRejectReason()
+	return _u
+}
+
 // SetReceivedAt sets the "received_at" field.
 func (_u *SalesReturnUpdateOne) SetReceivedAt(v time.Time) *SalesReturnUpdateOne {
 	_u.mutation.SetReceivedAt(v)
@@ -682,6 +945,73 @@ func (_u *SalesReturnUpdateOne) SetNillableCancelReason(v *string) *SalesReturnU
 // ClearCancelReason clears the value of the "cancel_reason" field.
 func (_u *SalesReturnUpdateOne) ClearCancelReason() *SalesReturnUpdateOne {
 	_u.mutation.ClearCancelReason()
+	return _u
+}
+
+// SetReversedAt sets the "reversed_at" field.
+func (_u *SalesReturnUpdateOne) SetReversedAt(v time.Time) *SalesReturnUpdateOne {
+	_u.mutation.SetReversedAt(v)
+	return _u
+}
+
+// SetNillableReversedAt sets the "reversed_at" field if the given value is not nil.
+func (_u *SalesReturnUpdateOne) SetNillableReversedAt(v *time.Time) *SalesReturnUpdateOne {
+	if v != nil {
+		_u.SetReversedAt(*v)
+	}
+	return _u
+}
+
+// ClearReversedAt clears the value of the "reversed_at" field.
+func (_u *SalesReturnUpdateOne) ClearReversedAt() *SalesReturnUpdateOne {
+	_u.mutation.ClearReversedAt()
+	return _u
+}
+
+// SetReversedBy sets the "reversed_by" field.
+func (_u *SalesReturnUpdateOne) SetReversedBy(v int) *SalesReturnUpdateOne {
+	_u.mutation.ResetReversedBy()
+	_u.mutation.SetReversedBy(v)
+	return _u
+}
+
+// SetNillableReversedBy sets the "reversed_by" field if the given value is not nil.
+func (_u *SalesReturnUpdateOne) SetNillableReversedBy(v *int) *SalesReturnUpdateOne {
+	if v != nil {
+		_u.SetReversedBy(*v)
+	}
+	return _u
+}
+
+// AddReversedBy adds value to the "reversed_by" field.
+func (_u *SalesReturnUpdateOne) AddReversedBy(v int) *SalesReturnUpdateOne {
+	_u.mutation.AddReversedBy(v)
+	return _u
+}
+
+// ClearReversedBy clears the value of the "reversed_by" field.
+func (_u *SalesReturnUpdateOne) ClearReversedBy() *SalesReturnUpdateOne {
+	_u.mutation.ClearReversedBy()
+	return _u
+}
+
+// SetReverseReason sets the "reverse_reason" field.
+func (_u *SalesReturnUpdateOne) SetReverseReason(v string) *SalesReturnUpdateOne {
+	_u.mutation.SetReverseReason(v)
+	return _u
+}
+
+// SetNillableReverseReason sets the "reverse_reason" field if the given value is not nil.
+func (_u *SalesReturnUpdateOne) SetNillableReverseReason(v *string) *SalesReturnUpdateOne {
+	if v != nil {
+		_u.SetReverseReason(*v)
+	}
+	return _u
+}
+
+// ClearReverseReason clears the value of the "reverse_reason" field.
+func (_u *SalesReturnUpdateOne) ClearReverseReason() *SalesReturnUpdateOne {
+	_u.mutation.ClearReverseReason()
 	return _u
 }
 
@@ -804,6 +1134,16 @@ func (_u *SalesReturnUpdateOne) check() error {
 			return &ValidationError{Name: "approved_by", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.approved_by": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RejectedBy(); ok {
+		if err := salesreturn.RejectedByValidator(v); err != nil {
+			return &ValidationError{Name: "rejected_by", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.rejected_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.RejectReason(); ok {
+		if err := salesreturn.RejectReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reject_reason", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.reject_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ReceivedBy(); ok {
 		if err := salesreturn.ReceivedByValidator(v); err != nil {
 			return &ValidationError{Name: "received_by", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.received_by": %w`, err)}
@@ -817,6 +1157,16 @@ func (_u *SalesReturnUpdateOne) check() error {
 	if v, ok := _u.mutation.CancelReason(); ok {
 		if err := salesreturn.CancelReasonValidator(v); err != nil {
 			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.cancel_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReversedBy(); ok {
+		if err := salesreturn.ReversedByValidator(v); err != nil {
+			return &ValidationError{Name: "reversed_by", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.reversed_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReverseReason(); ok {
+		if err := salesreturn.ReverseReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reverse_reason", err: fmt.Errorf(`ent: validator failed for field "SalesReturn.reverse_reason": %w`, err)}
 		}
 	}
 	return nil
@@ -875,6 +1225,27 @@ func (_u *SalesReturnUpdateOne) sqlSave(ctx context.Context) (_node *SalesReturn
 	if _u.mutation.ApprovedByCleared() {
 		_spec.ClearField(salesreturn.FieldApprovedBy, field.TypeInt)
 	}
+	if value, ok := _u.mutation.RejectedAt(); ok {
+		_spec.SetField(salesreturn.FieldRejectedAt, field.TypeTime, value)
+	}
+	if _u.mutation.RejectedAtCleared() {
+		_spec.ClearField(salesreturn.FieldRejectedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.RejectedBy(); ok {
+		_spec.SetField(salesreturn.FieldRejectedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedRejectedBy(); ok {
+		_spec.AddField(salesreturn.FieldRejectedBy, field.TypeInt, value)
+	}
+	if _u.mutation.RejectedByCleared() {
+		_spec.ClearField(salesreturn.FieldRejectedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.RejectReason(); ok {
+		_spec.SetField(salesreturn.FieldRejectReason, field.TypeString, value)
+	}
+	if _u.mutation.RejectReasonCleared() {
+		_spec.ClearField(salesreturn.FieldRejectReason, field.TypeString)
+	}
 	if value, ok := _u.mutation.ReceivedAt(); ok {
 		_spec.SetField(salesreturn.FieldReceivedAt, field.TypeTime, value)
 	}
@@ -910,6 +1281,27 @@ func (_u *SalesReturnUpdateOne) sqlSave(ctx context.Context) (_node *SalesReturn
 	}
 	if _u.mutation.CancelReasonCleared() {
 		_spec.ClearField(salesreturn.FieldCancelReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ReversedAt(); ok {
+		_spec.SetField(salesreturn.FieldReversedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ReversedAtCleared() {
+		_spec.ClearField(salesreturn.FieldReversedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ReversedBy(); ok {
+		_spec.SetField(salesreturn.FieldReversedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedReversedBy(); ok {
+		_spec.AddField(salesreturn.FieldReversedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ReversedByCleared() {
+		_spec.ClearField(salesreturn.FieldReversedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ReverseReason(); ok {
+		_spec.SetField(salesreturn.FieldReverseReason, field.TypeString, value)
+	}
+	if _u.mutation.ReverseReasonCleared() {
+		_spec.ClearField(salesreturn.FieldReverseReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(salesreturn.FieldUpdatedAt, field.TypeTime, value)

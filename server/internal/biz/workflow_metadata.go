@@ -178,8 +178,8 @@ func CanTransitionWorkflowTaskStatus(fromStatusKey, toStatusKey string) bool {
 func WorkflowStatusActionPermission(nextStatusKey string, current *WorkflowTask) string {
 	switch strings.TrimSpace(nextStatusKey) {
 	case "done":
-		if IsWorkflowApprovalTask(current) {
-			return PermissionWorkflowTaskApprove
+		if IsWorkflowApprovalTask(current) && current.RequiredCapabilityKey != nil {
+			return strings.TrimSpace(*current.RequiredCapabilityKey)
 		}
 		return PermissionWorkflowTaskComplete
 	case "rejected":

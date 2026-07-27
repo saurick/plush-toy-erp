@@ -99,11 +99,12 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create finance fact: %v", err)
 		}
-		if _, err := factUC.PostFinanceFact(ctx, fact.ID); err != nil {
+		posted, err := factUC.PostFinanceFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, ""))
+		if err != nil {
 			t.Fatalf("post finance fact: %v", err)
 		}
 		nodeID := recordAppliedProcessCommandEffect(t, ctx, data, biz.ProcessDomainCommandFinanceReceivableLead, "finance_fact", fact.ID)
-		if _, err := factUC.CancelPostedFinanceFact(ctx, fact.ID, actor.ID, "测试取消并核对流程结果"); err != nil {
+		if _, err := factUC.CancelPostedFinanceFact(ctx, operationalFactStatusMutation(posted.ID, posted.Version, actor.ID, "测试取消并核对流程结果")); err != nil {
 			t.Fatalf("cancel finance fact with actor: %v", err)
 		}
 		assertCompensationActor(t, ctx, client, nodeID, actor.ID)

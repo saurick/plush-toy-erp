@@ -17,6 +17,9 @@ const (
 	InventoryOperationTransfer         = "TRANSFER"
 	InventoryOperationManualAdjustment = "MANUAL_ADJUSTMENT"
 	InventoryOperationStatusDraft      = "DRAFT"
+	InventoryOperationStatusSubmitted  = "SUBMITTED"
+	InventoryOperationStatusApproved   = "APPROVED"
+	InventoryOperationStatusRejected   = "REJECTED"
 	InventoryOperationStatusPosted     = "POSTED"
 	InventoryOperationStatusCancelled  = "CANCELLED"
 	InventoryOperationSourceType       = "INVENTORY_OPERATION"
@@ -26,14 +29,22 @@ var (
 	ErrInventoryOperationNotFound        = errors.New("inventory operation not found")
 	ErrInventoryOperationVersionConflict = errors.New("inventory operation version conflict")
 	ErrInventoryOperationStaleCount      = errors.New("inventory cycle count expected quantity is stale")
-	ErrInventoryOperationApprovalMissing = errors.New("manual inventory adjustment requires approval reference")
+	ErrInventoryOperationSubmitOwner     = errors.New("only the inventory operation creator can submit it")
+	ErrInventoryOperationSelfApproval    = errors.New("inventory operation creator cannot decide it")
+	ErrInventoryOperationCancelOwner     = errors.New("only the inventory operation creator or poster can cancel it")
 )
 
 type InventoryOperation struct {
 	ID                                         int
 	OperationNo, OperationType, Status, Reason string
-	ApprovalRef                                *string
 	Version                                    int
+	SubmittedAt                                *time.Time
+	SubmittedBy                                *int
+	ApprovedAt                                 *time.Time
+	ApprovedBy                                 *int
+	RejectedAt                                 *time.Time
+	RejectedBy                                 *int
+	RejectReason                               *string
 	PostedAt                                   *time.Time
 	PostedBy                                   *int
 	CancelledAt                                *time.Time
@@ -59,7 +70,6 @@ type InventoryOperationItem struct {
 
 type InventoryOperationCreate struct {
 	OperationNo, OperationType, Reason string
-	ApprovalRef                        *string
 	IdempotencyKey                     string
 	CreatedBy                          int
 	Items                              []InventoryOperationItemCreate
@@ -82,11 +92,23 @@ type InventoryOperationMutation struct {
 	Reason                       string
 }
 
+type InventoryOperationFilter struct {
+	OperationType string
+	Status        string
+	CreatedBy     int
+	Limit         int
+	Offset        int
+}
+
 type InventoryOperationRepo interface {
 	CreateInventoryOperation(context.Context, *InventoryOperationCreate, string) (*InventoryOperation, error)
+	SubmitInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
+	ApproveInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
+	RejectInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
 	PostInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
 	CancelInventoryOperation(context.Context, *InventoryOperationMutation) (*InventoryOperation, error)
 	GetInventoryOperation(context.Context, int) (*InventoryOperation, error)
+	ListInventoryOperationsForAccess(context.Context, InventoryOperationFilter, WarehouseDataScope) ([]*InventoryOperation, int, error)
 }
 
 func (uc *InventoryUsecase) CreateInventoryOperation(ctx context.Context, in *InventoryOperationCreate) (*InventoryOperation, error) {
@@ -103,18 +125,62 @@ func (uc *InventoryUsecase) CreateInventoryOperation(ctx context.Context, in *In
 	}
 	return repo.CreateInventoryOperation(ctx, n, hash)
 }
+func (uc *InventoryUsecase) SubmitInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
+	if !validInventoryOperationMutation(uc, in) {
+		return nil, ErrBadParam
+	}
+	_, ok := any(uc.repo).(InventoryOperationRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return nil, ErrProcessRuntimeRequired
+}
+func (uc *InventoryUsecase) ApproveInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
+	if !validInventoryOperationMutation(uc, in) {
+		return nil, ErrBadParam
+	}
+	_, ok := any(uc.repo).(InventoryOperationRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return nil, ErrProcessRuntimeRequired
+}
+func (uc *InventoryUsecase) RejectInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
+	if !validInventoryOperationMutation(uc, in) {
+		return nil, ErrBadParam
+	}
+	in.Reason = strings.TrimSpace(in.Reason)
+	if in.Reason == "" || len([]rune(in.Reason)) > 255 {
+		return nil, ErrBadParam
+	}
+	_, ok := any(uc.repo).(InventoryOperationRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return nil, ErrProcessRuntimeRequired
+}
 func (uc *InventoryUsecase) PostInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
-	if uc == nil || uc.repo == nil || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 {
+	if !validInventoryOperationMutation(uc, in) {
 		return nil, ErrBadParam
 	}
 	repo, ok := any(uc.repo).(InventoryOperationRepo)
 	if !ok {
 		return nil, ErrBadParam
 	}
+	item, err := repo.GetInventoryOperation(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if item == nil {
+		return nil, ErrInventoryOperationNotFound
+	}
+	if item.OperationType == InventoryOperationManualAdjustment {
+		return nil, ErrProcessRuntimeRequired
+	}
 	return repo.PostInventoryOperation(ctx, in)
 }
 func (uc *InventoryUsecase) CancelInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
-	if uc == nil || uc.repo == nil || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 {
+	if !validInventoryOperationMutation(uc, in) {
 		return nil, ErrBadParam
 	}
 	repo, ok := any(uc.repo).(InventoryOperationRepo)
@@ -137,25 +203,44 @@ func (uc *InventoryUsecase) GetInventoryOperation(ctx context.Context, id int) (
 	}
 	return repo.GetInventoryOperation(ctx, id)
 }
+func (uc *InventoryUsecase) ListInventoryOperationsForAccess(ctx context.Context, filter InventoryOperationFilter, scope WarehouseDataScope) ([]*InventoryOperation, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	filter.OperationType = strings.ToUpper(strings.TrimSpace(filter.OperationType))
+	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
+	if filter.OperationType != "" && filter.OperationType != InventoryOperationCycleCount && filter.OperationType != InventoryOperationTransfer && filter.OperationType != InventoryOperationManualAdjustment {
+		return nil, 0, ErrBadParam
+	}
+	switch filter.Status {
+	case "", InventoryOperationStatusDraft, InventoryOperationStatusSubmitted, InventoryOperationStatusApproved, InventoryOperationStatusRejected, InventoryOperationStatusPosted, InventoryOperationStatusCancelled:
+	default:
+		return nil, 0, ErrBadParam
+	}
+	if filter.CreatedBy < 0 || filter.Offset < 0 {
+		return nil, 0, ErrBadParam
+	}
+	if filter.Limit <= 0 || filter.Limit > 200 {
+		filter.Limit = 50
+	}
+	repo, ok := any(uc.repo).(InventoryOperationRepo)
+	if !ok {
+		return nil, 0, ErrBadParam
+	}
+	return repo.ListInventoryOperationsForAccess(ctx, filter, NormalizeWarehouseDataScope(scope))
+}
 
 func normalizeInventoryOperationCreate(in *InventoryOperationCreate) (*InventoryOperationCreate, string, error) {
 	o := *in
 	o.OperationNo = strings.TrimSpace(o.OperationNo)
 	o.OperationType = strings.ToUpper(strings.TrimSpace(o.OperationType))
 	o.Reason = strings.TrimSpace(o.Reason)
-	o.ApprovalRef = normalizeOptionalString(o.ApprovalRef)
 	o.IdempotencyKey = strings.TrimSpace(o.IdempotencyKey)
 	if o.OperationNo == "" || o.Reason == "" || o.IdempotencyKey == "" || len(o.IdempotencyKey) > 128 || o.CreatedBy <= 0 || len(o.Items) == 0 {
 		return nil, "", ErrBadParam
 	}
 	if o.OperationType != InventoryOperationCycleCount && o.OperationType != InventoryOperationTransfer && o.OperationType != InventoryOperationManualAdjustment {
 		return nil, "", ErrBadParam
-	}
-	if o.ApprovalRef != nil && len([]rune(*o.ApprovalRef)) > 128 {
-		return nil, "", ErrBadParam
-	}
-	if o.OperationType == InventoryOperationManualAdjustment && o.ApprovalRef == nil {
-		return nil, "", ErrInventoryOperationApprovalMissing
 	}
 	seen := map[string]struct{}{}
 	o.Items = append([]InventoryOperationItemCreate(nil), o.Items...)
@@ -181,9 +266,13 @@ func normalizeInventoryOperationCreate(in *InventoryOperationCreate) (*Inventory
 				return nil, "", ErrBadParam
 			}
 		case InventoryOperationTransfer:
-			if !item.AdjustmentQuantity.IsPositive() || item.ToWarehouseID == nil || *item.ToWarehouseID <= 0 || (*item.ToWarehouseID == item.FromWarehouseID && sameBizOptionalInt(item.ToLotID, item.FromLotID)) || item.ExpectedQuantity != nil || item.CountedQuantity != nil {
+			if !item.AdjustmentQuantity.IsPositive() || item.ToWarehouseID == nil || *item.ToWarehouseID <= 0 || *item.ToWarehouseID == item.FromWarehouseID || item.ExpectedQuantity != nil || item.CountedQuantity != nil {
 				return nil, "", ErrBadParam
 			}
+			if item.ToLotID != nil && !sameBizOptionalInt(item.ToLotID, item.FromLotID) {
+				return nil, "", ErrBadParam
+			}
+			item.ToLotID = item.FromLotID
 		case InventoryOperationManualAdjustment:
 			if item.AdjustmentQuantity.IsZero() || item.ToWarehouseID != nil || item.ToLotID != nil || item.ExpectedQuantity != nil || item.CountedQuantity != nil {
 				return nil, "", ErrBadParam
@@ -196,6 +285,10 @@ func normalizeInventoryOperationCreate(in *InventoryOperationCreate) (*Inventory
 	}
 	sum := sha256.Sum256(payload)
 	return &o, hex.EncodeToString(sum[:]), nil
+}
+
+func validInventoryOperationMutation(uc *InventoryUsecase, in *InventoryOperationMutation) bool {
+	return uc != nil && uc.repo != nil && in != nil && in.ID > 0 && in.ExpectedVersion > 0 && in.ActorID > 0
 }
 
 func sameBizOptionalInt(a, b *int) bool {

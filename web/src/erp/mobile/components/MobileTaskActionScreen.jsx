@@ -16,7 +16,16 @@ import {
   resolveMobileTaskStatusLabel,
   resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
-import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
+import {
+  getWorkflowProcessDecisionApprovalProfile,
+  isWorkflowApprovalTask,
+  isWorkflowProcessDecisionTask,
+} from '../../utils/workflowTaskActionContract.mjs'
+import { getWorkflowTaskProcessContext } from '../../api/workflowApi.mjs'
+import {
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 
 const ACTION_OPTIONS = Object.freeze([
@@ -104,12 +113,28 @@ function resolveReasonPlaceholder(action, approvalTask = false) {
   return '请填写处理原因'
 }
 
-function validationErrorsFor({ action, approvalTask = false, reason }) {
+function validationErrorsFor({
+  action,
+  approvalTask = false,
+  approvedQuantity = '',
+  approvedQuantityAllowed = false,
+  processDecisionRequired = false,
+  reason,
+}) {
+  const normalizedReason = String(reason || '').trim()
   return {
     action: action ? '' : '请选择本次处理方式',
     reason:
-      REASON_REQUIRED_ACTIONS.has(action) && !String(reason || '').trim()
+      REASON_REQUIRED_ACTIONS.has(action) && !normalizedReason
         ? `${resolveReasonLabel(action, approvalTask)}为必填项`
+        : processDecisionRequired && [...normalizedReason].length > 255
+          ? '审批意见不能超过 255 个字符'
+          : '',
+    approvedQuantity:
+      approvedQuantityAllowed &&
+      String(approvedQuantity || '').trim() &&
+      !isPositiveNumeric20Scale6Units(numeric20Scale6Units(approvedQuantity))
+        ? '批准数量必须大于 0，且最多保留 6 位小数'
         : '',
   }
 }
@@ -117,11 +142,13 @@ function validationErrorsFor({ action, approvalTask = false, reason }) {
 export default function MobileTaskActionScreen({
   accessMessage = '',
   accessState = MOBILE_TASK_ACTION_ACCESS_STATES.CHECKING,
+  approvedQuantity = '',
   availableActions = [],
   busy = false,
   canViewReceipt = false,
   hasActionCapability = false,
   onActionChange = () => {},
+  onApprovedQuantityChange = () => {},
   onBack = () => {},
   onCancel = null,
   onReasonChange = () => {},
@@ -138,8 +165,12 @@ export default function MobileTaskActionScreen({
   const reasonRef = useRef(null)
   const [validationErrors, setValidationErrors] = useState({
     action: '',
+    approvedQuantity: '',
     reason: '',
   })
+  const [processContextState, setProcessContextState] = useState('idle')
+  const [processApprovalForm, setProcessApprovalForm] = useState(null)
+  const [processContextRetry, setProcessContextRetry] = useState(0)
 
   const normalizedActions = ACTION_OPTIONS.filter((option) =>
     availableActions.includes(option.key)
@@ -157,9 +188,19 @@ export default function MobileTaskActionScreen({
     : visibleActions.some((option) => option.key === selectedAction)
       ? selectedAction
       : ''
-  const canSubmit =
+  const accessAllowsSubmit =
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.ACTIONABLE ||
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.URGE_ONLY
+  const processDecisionRequired =
+    effectiveAction === 'done' && isWorkflowProcessDecisionTask(task)
+  const expectedApprovalProfile =
+    getWorkflowProcessDecisionApprovalProfile(task)
+  const processDecisionReady =
+    !processDecisionRequired ||
+    (processContextState === 'ready' &&
+      processApprovalForm?.profile_key === expectedApprovalProfile &&
+      processApprovalForm?.reason_required === true)
+  const canSubmit = accessAllowsSubmit && processDecisionReady
   const showFooterRetry =
     !canSubmit &&
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.FAILED &&
@@ -173,6 +214,11 @@ export default function MobileTaskActionScreen({
     : '任务状态暂不可用'
   const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
   const approvalTask = isWorkflowApprovalTask(task)
+  const approvedQuantityAllowed =
+    processDecisionReady &&
+    processApprovalForm?.profile_key === 'production_exception_approval' &&
+    processApprovalForm?.approved_quantity?.precision === 20 &&
+    processApprovalForm?.approved_quantity?.scale === 6
   const reasonRequired = REASON_REQUIRED_ACTIONS.has(effectiveAction)
   const effectiveActionLabel = effectiveAction
     ? approvalTask && effectiveAction === 'done'
@@ -187,18 +233,65 @@ export default function MobileTaskActionScreen({
     : '正在提交'
 
   useEffect(() => {
+    if (!processDecisionRequired) {
+      setProcessContextState('idle')
+      setProcessApprovalForm(null)
+      return undefined
+    }
+    if (!task?.id || !task?.process_instance_id || !expectedApprovalProfile) {
+      setProcessContextState('error')
+      setProcessApprovalForm(null)
+      return undefined
+    }
+    const controller = new AbortController()
+    setProcessContextState('loading')
+    setProcessApprovalForm(null)
+    getWorkflowTaskProcessContext(task.id, { signal: controller.signal })
+      .then((context) => {
+        const approvalForm = context?.approval_form
+        if (
+          approvalForm?.profile_key !== expectedApprovalProfile ||
+          approvalForm?.reason_required !== true
+        ) {
+          throw new Error('审批表单与流程节点不一致')
+        }
+        setProcessApprovalForm(approvalForm)
+        setProcessContextState('ready')
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setProcessApprovalForm(null)
+        setProcessContextState('error')
+      })
+    return () => controller.abort()
+  }, [
+    expectedApprovalProfile,
+    processContextRetry,
+    processDecisionRequired,
+    task?.id,
+    task?.process_instance_id,
+  ])
+
+  useEffect(() => {
     if (
-      !canSubmit ||
+      !accessAllowsSubmit ||
       !singleVisibleActionKey ||
       selectedAction === singleVisibleActionKey
     ) {
       return
     }
     setValidationErrors((current) =>
-      current.action || current.reason ? { action: '', reason: '' } : current
+      current.action || current.approvedQuantity || current.reason
+        ? { action: '', approvedQuantity: '', reason: '' }
+        : current
     )
     onActionChange(singleVisibleActionKey)
-  }, [canSubmit, onActionChange, selectedAction, singleVisibleActionKey])
+  }, [
+    accessAllowsSubmit,
+    onActionChange,
+    selectedAction,
+    singleVisibleActionKey,
+  ])
 
   useEffect(() => {
     const { visualViewport } = window
@@ -248,6 +341,9 @@ export default function MobileTaskActionScreen({
     const errors = validationErrorsFor({
       action: effectiveAction,
       approvalTask,
+      approvedQuantity,
+      approvedQuantityAllowed,
+      processDecisionRequired,
       reason,
     })
     setValidationErrors(errors)
@@ -259,8 +355,10 @@ export default function MobileTaskActionScreen({
       reasonRef.current?.focus()
       return
     }
+    if (errors.approvedQuantity) return
     onSubmit({
       action: effectiveAction,
+      approvedQuantity: String(approvedQuantity || '').trim(),
       reason: String(reason || '').trim(),
     })
   }
@@ -362,8 +460,37 @@ export default function MobileTaskActionScreen({
           </section>
         ) : null}
 
-        {canSubmit ? (
+        {accessAllowsSubmit ? (
           <>
+            {processDecisionRequired && processContextState !== 'ready' ? (
+              <section
+                className={`rounded-2xl border px-4 py-4 text-sm leading-6 ${
+                  processContextState === 'error'
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : 'border-blue-200 bg-blue-50 text-blue-700'
+                }`}
+                role={processContextState === 'error' ? 'alert' : 'status'}
+              >
+                <div className="font-semibold">
+                  {processContextState === 'error'
+                    ? '审批表单暂时无法从流程真源确认'
+                    : '正在读取审批表单'}
+                </div>
+                <div className="mt-1">
+                  系统不会根据任务文案或岗位名称猜测审批字段。
+                </div>
+                {processContextState === 'error' ? (
+                  <button
+                    type="button"
+                    className="mt-3 min-h-[44px] rounded-xl border border-red-300 bg-white px-4 py-2 font-semibold text-red-700"
+                    disabled={busy}
+                    onClick={() => setProcessContextRetry((value) => value + 1)}
+                  >
+                    重新读取流程表单
+                  </button>
+                ) : null}
+              </section>
+            ) : null}
             {visibleActions.length > 1 ? (
               <section
                 className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -504,7 +631,7 @@ export default function MobileTaskActionScreen({
                   }
                   aria-invalid={Boolean(validationErrors.reason)}
                   disabled={busy}
-                  maxLength={500}
+                  maxLength={processDecisionRequired ? 255 : 500}
                   placeholder={resolveReasonPlaceholder(
                     effectiveAction,
                     approvalTask
@@ -525,9 +652,46 @@ export default function MobileTaskActionScreen({
                     {validationErrors.reason}
                   </span>
                   <span className="shrink-0 text-slate-400">
-                    {String(reason || '').length}/500
+                    {String(reason || '').length}/
+                    {processDecisionRequired ? 255 : 500}
                   </span>
                 </div>
+              </section>
+            ) : null}
+
+            {approvedQuantityAllowed ? (
+              <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <label
+                    className="text-lg font-semibold text-slate-950"
+                    htmlFor={`${fieldID}-approved-quantity`}
+                  >
+                    批准数量
+                  </label>
+                  <span className="text-sm font-semibold text-slate-400">
+                    可选
+                  </span>
+                </div>
+                <input
+                  id={`${fieldID}-approved-quantity`}
+                  className="mt-3 min-h-[48px] w-full rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  inputMode="decimal"
+                  disabled={busy}
+                  placeholder="留空表示按申请数量批准"
+                  value={approvedQuantity}
+                  onChange={(event) => {
+                    clearValidationError('approvedQuantity')
+                    onApprovedQuantityChange(event.target.value)
+                  }}
+                />
+                {validationErrors.approvedQuantity ? (
+                  <p
+                    className="mt-2 text-sm font-medium text-red-600"
+                    role="alert"
+                  >
+                    {validationErrors.approvedQuantity}
+                  </p>
+                ) : null}
               </section>
             ) : null}
 
@@ -543,7 +707,7 @@ export default function MobileTaskActionScreen({
 
       <div
         className={`mobile-role-action-bar grid shrink-0 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur ${
-          canSubmit || showFooterRetry || showDisabledSubmit
+          accessAllowsSubmit || showFooterRetry || showDisabledSubmit
             ? 'grid-cols-2 gap-3'
             : ''
         }`}
@@ -554,13 +718,13 @@ export default function MobileTaskActionScreen({
           disabled={busy}
           onClick={handleCancel}
         >
-          {canSubmit ? '取消' : '返回任务'}
+          {accessAllowsSubmit ? '取消' : '返回任务'}
         </button>
-        {canSubmit ? (
+        {accessAllowsSubmit ? (
           <button
             type="submit"
             className="inline-flex min-h-[48px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={busy || visibleActions.length === 0}
+            disabled={busy || !canSubmit || visibleActions.length === 0}
           >
             {busy ? <LoadingOutlined spin /> : null}
             <span>{busy ? busySubmitLabel : submitLabel}</span>

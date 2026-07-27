@@ -519,6 +519,21 @@ func TestWorkflowStatusActionPermissionMapsUpdateCompleteApproveReject(t *testin
 	}); got != PermissionWorkflowTaskApprove {
 		t.Fatalf("generic approval node should require approve, got %s", got)
 	}
+	for _, specializedCapability := range []string{
+		PermissionSalesReturnApprove,
+		PermissionFinancePaymentApprove,
+		PermissionWarehouseAdjustmentApprove,
+		PermissionProductionExceptionApprove,
+	} {
+		t.Run(specializedCapability, func(t *testing.T) {
+			requiredCapability := specializedCapability
+			if got := WorkflowStatusActionPermission("done", &WorkflowTask{
+				RequiredCapabilityKey: &requiredCapability,
+			}); got != specializedCapability {
+				t.Fatalf("specialized approval node should require %s, got %s", specializedCapability, got)
+			}
+		})
+	}
 }
 
 func TestWorkflowRejectedIsTerminalAndCannotTransitionAgain(t *testing.T) {

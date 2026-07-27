@@ -25,8 +25,6 @@ type InventoryOperation struct {
 	Status string `json:"status,omitempty"`
 	// Reason holds the value of the "reason" field.
 	Reason string `json:"reason,omitempty"`
-	// ApprovalRef holds the value of the "approval_ref" field.
-	ApprovalRef *string `json:"approval_ref,omitempty"`
 	// IdempotencyKey holds the value of the "idempotency_key" field.
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 	// IdempotencyPayloadHash holds the value of the "idempotency_payload_hash" field.
@@ -35,6 +33,20 @@ type InventoryOperation struct {
 	IdempotencyItemCount int `json:"idempotency_item_count,omitempty"`
 	// Version holds the value of the "version" field.
 	Version int `json:"version,omitempty"`
+	// SubmittedAt holds the value of the "submitted_at" field.
+	SubmittedAt *time.Time `json:"submitted_at,omitempty"`
+	// SubmittedBy holds the value of the "submitted_by" field.
+	SubmittedBy *int `json:"submitted_by,omitempty"`
+	// ApprovedAt holds the value of the "approved_at" field.
+	ApprovedAt *time.Time `json:"approved_at,omitempty"`
+	// ApprovedBy holds the value of the "approved_by" field.
+	ApprovedBy *int `json:"approved_by,omitempty"`
+	// RejectedAt holds the value of the "rejected_at" field.
+	RejectedAt *time.Time `json:"rejected_at,omitempty"`
+	// RejectedBy holds the value of the "rejected_by" field.
+	RejectedBy *int `json:"rejected_by,omitempty"`
+	// RejectReason holds the value of the "reject_reason" field.
+	RejectReason *string `json:"reject_reason,omitempty"`
 	// PostedAt holds the value of the "posted_at" field.
 	PostedAt *time.Time `json:"posted_at,omitempty"`
 	// PostedBy holds the value of the "posted_by" field.
@@ -80,11 +92,11 @@ func (*InventoryOperation) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case inventoryoperation.FieldID, inventoryoperation.FieldIdempotencyItemCount, inventoryoperation.FieldVersion, inventoryoperation.FieldPostedBy, inventoryoperation.FieldCancelledBy, inventoryoperation.FieldCreatedBy:
+		case inventoryoperation.FieldID, inventoryoperation.FieldIdempotencyItemCount, inventoryoperation.FieldVersion, inventoryoperation.FieldSubmittedBy, inventoryoperation.FieldApprovedBy, inventoryoperation.FieldRejectedBy, inventoryoperation.FieldPostedBy, inventoryoperation.FieldCancelledBy, inventoryoperation.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
-		case inventoryoperation.FieldOperationNo, inventoryoperation.FieldOperationType, inventoryoperation.FieldStatus, inventoryoperation.FieldReason, inventoryoperation.FieldApprovalRef, inventoryoperation.FieldIdempotencyKey, inventoryoperation.FieldIdempotencyPayloadHash, inventoryoperation.FieldCancelReason:
+		case inventoryoperation.FieldOperationNo, inventoryoperation.FieldOperationType, inventoryoperation.FieldStatus, inventoryoperation.FieldReason, inventoryoperation.FieldIdempotencyKey, inventoryoperation.FieldIdempotencyPayloadHash, inventoryoperation.FieldRejectReason, inventoryoperation.FieldCancelReason:
 			values[i] = new(sql.NullString)
-		case inventoryoperation.FieldPostedAt, inventoryoperation.FieldCancelledAt, inventoryoperation.FieldCreatedAt, inventoryoperation.FieldUpdatedAt:
+		case inventoryoperation.FieldSubmittedAt, inventoryoperation.FieldApprovedAt, inventoryoperation.FieldRejectedAt, inventoryoperation.FieldPostedAt, inventoryoperation.FieldCancelledAt, inventoryoperation.FieldCreatedAt, inventoryoperation.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -131,13 +143,6 @@ func (_m *InventoryOperation) assignValues(columns []string, values []any) error
 			} else if value.Valid {
 				_m.Reason = value.String
 			}
-		case inventoryoperation.FieldApprovalRef:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field approval_ref", values[i])
-			} else if value.Valid {
-				_m.ApprovalRef = new(string)
-				*_m.ApprovalRef = value.String
-			}
 		case inventoryoperation.FieldIdempotencyKey:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field idempotency_key", values[i])
@@ -161,6 +166,55 @@ func (_m *InventoryOperation) assignValues(columns []string, values []any) error
 				return fmt.Errorf("unexpected type %T for field version", values[i])
 			} else if value.Valid {
 				_m.Version = int(value.Int64)
+			}
+		case inventoryoperation.FieldSubmittedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field submitted_at", values[i])
+			} else if value.Valid {
+				_m.SubmittedAt = new(time.Time)
+				*_m.SubmittedAt = value.Time
+			}
+		case inventoryoperation.FieldSubmittedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field submitted_by", values[i])
+			} else if value.Valid {
+				_m.SubmittedBy = new(int)
+				*_m.SubmittedBy = int(value.Int64)
+			}
+		case inventoryoperation.FieldApprovedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field approved_at", values[i])
+			} else if value.Valid {
+				_m.ApprovedAt = new(time.Time)
+				*_m.ApprovedAt = value.Time
+			}
+		case inventoryoperation.FieldApprovedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field approved_by", values[i])
+			} else if value.Valid {
+				_m.ApprovedBy = new(int)
+				*_m.ApprovedBy = int(value.Int64)
+			}
+		case inventoryoperation.FieldRejectedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field rejected_at", values[i])
+			} else if value.Valid {
+				_m.RejectedAt = new(time.Time)
+				*_m.RejectedAt = value.Time
+			}
+		case inventoryoperation.FieldRejectedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field rejected_by", values[i])
+			} else if value.Valid {
+				_m.RejectedBy = new(int)
+				*_m.RejectedBy = int(value.Int64)
+			}
+		case inventoryoperation.FieldRejectReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field reject_reason", values[i])
+			} else if value.Valid {
+				_m.RejectReason = new(string)
+				*_m.RejectReason = value.String
 			}
 		case inventoryoperation.FieldPostedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -268,11 +322,6 @@ func (_m *InventoryOperation) String() string {
 	builder.WriteString("reason=")
 	builder.WriteString(_m.Reason)
 	builder.WriteString(", ")
-	if v := _m.ApprovalRef; v != nil {
-		builder.WriteString("approval_ref=")
-		builder.WriteString(*v)
-	}
-	builder.WriteString(", ")
 	builder.WriteString("idempotency_key=")
 	builder.WriteString(_m.IdempotencyKey)
 	builder.WriteString(", ")
@@ -284,6 +333,41 @@ func (_m *InventoryOperation) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("version=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Version))
+	builder.WriteString(", ")
+	if v := _m.SubmittedAt; v != nil {
+		builder.WriteString("submitted_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SubmittedBy; v != nil {
+		builder.WriteString("submitted_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ApprovedAt; v != nil {
+		builder.WriteString("approved_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ApprovedBy; v != nil {
+		builder.WriteString("approved_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RejectedAt; v != nil {
+		builder.WriteString("rejected_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.RejectedBy; v != nil {
+		builder.WriteString("rejected_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RejectReason; v != nil {
+		builder.WriteString("reject_reason=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	if v := _m.PostedAt; v != nil {
 		builder.WriteString("posted_at=")

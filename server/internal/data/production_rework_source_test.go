@@ -50,7 +50,8 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	if err != nil {
 		t.Fatalf("create source completion: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, completion.ID); err != nil {
+	postedCompletion, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post source completion: %v", err)
 	}
 	if _, err := client.InventoryLot.UpdateOneID(*completion.LotID).SetStatus(biz.InventoryLotRejected).Save(ctx); err != nil {
@@ -78,7 +79,8 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	if _, err := factUC.CreateProductionReworkFromCompletion(ctx, &changed); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("changed rework intent error = %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, rework.ID); err != nil {
+	postedRework, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(rework.ID, rework.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post rework from rejected source lot: %v", err)
 	}
 	legacyTaskCode := biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskProductionExceptionGroup, rework.ID)
@@ -97,7 +99,8 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	if got := lotBalanceQuantity(t, ctx, client, fixtures.productID, fixtures.warehouseID, fixtures.unitID, *completion.LotID); !got.Equal(decimal.NewFromInt(2)) {
 		t.Fatalf("source lot balance after rework = %s, want 2", got)
 	}
-	if _, err := factUC.CancelPostedProductionFact(ctx, completion.ID); !errors.Is(err, biz.ErrProductionReworkDependency) {
+	sourceCancelRequest := operationalFactStatusMutation(postedCompletion.ID, postedCompletion.Version, actor.ID, "撤销来源完工")
+	if _, err := factUC.CancelPostedProductionFact(ctx, sourceCancelRequest); !errors.Is(err, biz.ErrProductionReworkDependency) {
 		t.Fatalf("source completion cancellation error = %v", err)
 	}
 	tooMuch := *reworkIn
@@ -117,16 +120,19 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	if err != nil {
 		t.Fatalf("create completion after rework: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, recompleted.ID); err != nil {
+	postedRecompleted, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(recompleted.ID, recompleted.Version, actor.ID, ""))
+	if err != nil {
 		t.Fatalf("post completion after rework: %v", err)
 	}
-	if _, err := factUC.CancelPostedProductionFact(ctx, rework.ID); !errors.Is(err, biz.ErrProductionOrderQuantityExceeded) {
+	reworkCancelReason := "撤销返工"
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedRework.ID, postedRework.Version, actor.ID, reworkCancelReason)); !errors.Is(err, biz.ErrProductionOrderQuantityExceeded) {
 		t.Fatalf("rework cancellation with replacement completion error = %v", err)
 	}
-	if _, err := factUC.CancelPostedProductionFact(ctx, recompleted.ID); err != nil {
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(postedRecompleted.ID, postedRecompleted.Version, actor.ID, "撤销替代完工")); err != nil {
 		t.Fatalf("cancel replacement completion: %v", err)
 	}
-	if _, err := factUC.CancelPostedProductionFact(ctx, rework.ID); err != nil {
+	currentRework := client.ProductionFact.GetX(ctx, postedRework.ID)
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(currentRework.ID, currentRework.Version, actor.ID, reworkCancelReason)); err != nil {
 		t.Fatalf("cancel rework after replacement reversal: %v", err)
 	}
 	cancelledTask := client.WorkflowTask.Query().Where(workflowtask.TaskCode(legacyTaskCode)).OnlyX(ctx)
@@ -143,7 +149,8 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	if got := lotBalanceQuantity(t, ctx, client, fixtures.productID, fixtures.warehouseID, fixtures.unitID, *completion.LotID); !got.Equal(decimal.NewFromInt(6)) {
 		t.Fatalf("source lot balance after rework reversal = %s, want 6", got)
 	}
-	if _, err := factUC.CancelPostedProductionFact(ctx, completion.ID); err != nil {
+	currentCompletion := client.ProductionFact.GetX(ctx, postedCompletion.ID)
+	if _, err := factUC.CancelPostedProductionFact(ctx, operationalFactStatusMutation(currentCompletion.ID, currentCompletion.Version, actor.ID, "撤销来源完工")); err != nil {
 		t.Fatalf("cancel source completion after rework reversal: %v", err)
 	}
 }
@@ -183,7 +190,7 @@ func TestProductionOrderCloseUsesNetCompletionAfterRework(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create initial completion: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, completion.ID); err != nil {
+	if _, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, actor.ID, "")); err != nil {
 		t.Fatalf("post initial completion: %v", err)
 	}
 	rework, err := factUC.CreateProductionReworkFromCompletion(ctx, &biz.ProductionReworkFromCompletionCreate{
@@ -193,7 +200,7 @@ func TestProductionOrderCloseUsesNetCompletionAfterRework(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create rework: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, rework.ID); err != nil {
+	if _, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(rework.ID, rework.Version, actor.ID, "")); err != nil {
 		t.Fatalf("post rework: %v", err)
 	}
 	if _, err := orderUC.Close(ctx, &biz.ProductionOrderAction{
@@ -211,7 +218,7 @@ func TestProductionOrderCloseUsesNetCompletionAfterRework(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create replacement completion: %v", err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, replacement.ID); err != nil {
+	if _, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(replacement.ID, replacement.Version, actor.ID, "")); err != nil {
 		t.Fatalf("post replacement completion: %v", err)
 	}
 	closed, err := orderUC.Close(ctx, &biz.ProductionOrderAction{

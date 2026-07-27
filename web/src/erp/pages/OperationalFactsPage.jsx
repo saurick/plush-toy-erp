@@ -84,6 +84,7 @@ import {
   createSourceBusinessActionAttemptStore,
   isSourceBusinessActionResultUnknown,
 } from '../utils/sourceBusinessAction.mjs'
+import { matchesOperationalFactLifecycleResult } from '../utils/operationalFactLifecycle.mjs'
 import {
   buildProductionReworkPayload,
   findProductionReworkResult,
@@ -450,7 +451,7 @@ export function OperationalFactWorkspace({
           const refreshed = nextRows.find((item) => item.id === current.id)
           return {
             ...prev,
-            [key]: refreshed || current,
+            [key]: refreshed || null,
           }
         })
         setTotalByKey((prev) => ({
@@ -460,10 +461,14 @@ export function OperationalFactWorkspace({
               ? nextRows.length
               : Number(data?.total || 0),
         }))
+        return nextRows
       } catch (error) {
         if (shouldApplyRequest()) {
+          setSelectedByKey((prev) => ({ ...prev, [key]: null }))
+          setDetailRecord(null)
           message.error(getActionErrorMessage(error, `加载${config.title}`))
         }
+        return null
       } finally {
         if (shouldApplyRequest()) {
           setLoading(false)
@@ -508,38 +513,76 @@ export function OperationalFactWorkspace({
   ) => {
     const action = config[actionKey]
     if (!action || !row?.id) {
-      return
-    }
-    try {
-      setSaving(true)
-      await action({
-        id: row.id,
-        ...(currentActiveKey === 'outsourcing' && activeCustomerKey
-          ? { customer_key: activeCustomerKey }
-          : {}),
-        ...extraParams,
-      })
-      message.success(
-        currentActiveKey === 'production' &&
-          actionKey === 'post' &&
-          String(row.fact_type || '')
-            .trim()
-            .toUpperCase() === 'REWORK'
-          ? '返工记录已过账，生产异常任务已生成'
-          : `${actionLabel}已完成`
-      )
-    } catch (error) {
-      message.error(getActionErrorMessage(error, actionLabel))
-      setSaving(false)
       return false
     }
+    const usesStrictFactLifecycle =
+      ['production', 'outsourcing', 'finance'].includes(currentActiveKey) &&
+      ['post', 'settle', 'cancel'].includes(actionKey)
+    const targetStatus = usesStrictFactLifecycle
+      ? {
+          post: 'POSTED',
+          settle: 'SETTLED',
+          cancel: 'CANCELLED',
+        }[actionKey]
+      : ''
+    const attempt = Object.freeze({
+      id: row.id,
+      ...(usesStrictFactLifecycle
+        ? {
+            expected_version: row.version,
+            ...(activeCustomerKey
+              ? { customer_key: activeCustomerKey }
+              : {}),
+          }
+        : currentActiveKey === 'outsourcing' && activeCustomerKey
+          ? { customer_key: activeCustomerKey }
+          : {}),
+      ...extraParams,
+    })
+    let resultUnknown = false
     try {
-      await loadRows(currentActiveKey)
-    } catch (_error) {
-      message.warning(`${actionLabel}已完成，请稍后刷新查看最新结果`)
-    } finally {
-      setSaving(false)
+      setSaving(true)
+      await action(attempt)
+    } catch (error) {
+      if (
+        !usesStrictFactLifecycle ||
+        !isSourceBusinessActionResultUnknown(error) ||
+        !targetStatus
+      ) {
+        message.error(getActionErrorMessage(error, actionLabel))
+        setSaving(false)
+        return false
+      }
+      resultUnknown = true
     }
+    const refreshedRows = await loadRows(currentActiveKey)
+    if (resultUnknown) {
+      const confirmed = refreshedRows?.find((record) =>
+        matchesOperationalFactLifecycleResult(record, attempt, targetStatus)
+      )
+      if (!confirmed) {
+        message.warning(
+          '暂时无法确认操作结果，已清除当前选择；请刷新核对后再决定是否重试'
+        )
+        setSaving(false)
+        return false
+      }
+    }
+    message.success(
+      currentActiveKey === 'production' &&
+        actionKey === 'post' &&
+        String(row.fact_type || '')
+          .trim()
+          .toUpperCase() === 'REWORK'
+        ? '返工记录已过账，生产异常任务已生成'
+        : resultUnknown
+          ? `已重新读取并确认${actionLabel}完成`
+          : `${actionLabel}已完成`
+    )
+    if (!refreshedRows) {
+      message.warning(`${actionLabel}已完成，请稍后刷新查看最新结果`)
+    }
+    setSaving(false)
     return true
   }
 
@@ -666,11 +709,19 @@ export function OperationalFactWorkspace({
       message.error('取消原因不能超过 255 个字')
       return
     }
+    const actionLabel =
+      currentActiveKey === 'finance'
+        ? activeSelectedRow?.status === 'DRAFT'
+          ? '作废财务草稿'
+          : '取消财务记录'
+        : activeSelectedRow?.status === 'DRAFT'
+          ? '作废业务草稿'
+          : '取消业务记录'
     const succeeded = await runRowAction(
       activeConfig,
       activeSelectedRow,
       'cancel',
-      activeSelectedRow?.status === 'DRAFT' ? '作废财务草稿' : '取消财务记录',
+      actionLabel,
       { reason }
     )
     if (succeeded) {
@@ -1629,38 +1680,24 @@ export function OperationalFactWorkspace({
                         : ''
               }
               >
-                <Popconfirm
-                  title={
-                  activeSelectedRow?.status === 'DRAFT'
-                    ? '确认作废草稿？草稿尚未过账，不会变更库存。'
-                    : '确认取消并按系统规则生成撤销调整记录？'
-                }
-                  onConfirm={() =>
-                  runRowAction(
-                    activeConfig,
-                    activeSelectedRow,
-                    'cancel',
-                    activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'
-                  )
-                }
-                  okText="确认"
-                  cancelText="取消"
-                >
-                  <Button
-                    size="small"
-                    danger
-                    className="erp-business-module-status-action"
-                    icon={<CloseCircleOutlined />}
-                    disabled={
+                <Button
+                  size="small"
+                  danger
+                  className="erp-business-module-status-action"
+                  icon={<CloseCircleOutlined />}
+                  disabled={
                     !activeSelectedRow ||
                     !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
                     sourceBoundDraftTransitionBlocked ||
                     saving
                   }
-                  >
-                    {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
-                  </Button>
-                </Popconfirm>
+                  onClick={() => {
+                    setFinanceCancelReason('')
+                    setFinanceCancelOpen(true)
+                  }}
+                >
+                  {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
+                </Button>
               </BusinessActionTooltip>
           ) : null}
           {currentActiveKey === 'shipments' &&
@@ -1800,9 +1837,13 @@ export function OperationalFactWorkspace({
       />
       <Modal
         title={
-          activeSelectedRow?.status === 'DRAFT'
-            ? '作废财务草稿'
-            : '取消财务记录'
+          currentActiveKey === 'finance'
+            ? activeSelectedRow?.status === 'DRAFT'
+              ? '作废财务草稿'
+              : '取消财务记录'
+            : activeSelectedRow?.status === 'DRAFT'
+              ? '作废业务草稿'
+              : '取消已过账业务记录'
         }
         open={financeCancelOpen}
         okText="确认取消"
@@ -1818,15 +1859,21 @@ export function OperationalFactWorkspace({
       >
         <p>
           {activeSelectedRow?.status === 'DRAFT'
-            ? '草稿尚未确认，作废不会生成过账或库存变更；系统会记录操作人、时间和原因。'
-            : '取消后将保留原过账时间，并记录本次操作人、时间和原因。'}
+            ? currentActiveKey === 'finance'
+              ? '草稿尚未确认，作废不会生成过账或库存变更；系统会记录操作人、时间和原因。'
+              : '草稿尚未过账，不会变更库存；系统会记录操作人、时间和原因。'
+            : '取消后将保留原过账时间，按系统规则冲正库存，并记录本次操作人、时间和原因。'}
         </p>
         <Input.TextArea
           value={financeCancelReason}
           maxLength={255}
           showCount
           rows={4}
-          placeholder="请填写客户、供应商或账款调整的业务原因"
+          placeholder={
+            currentActiveKey === 'finance'
+              ? '请填写客户、供应商或账款调整的业务原因'
+              : '请填写作废或取消的业务原因'
+          }
           onChange={(event) => setFinanceCancelReason(event.target.value)}
         />
       </Modal>

@@ -29,6 +29,8 @@ const (
 	SourceReadConditionFinancePayable           = "finance_payable"
 	SourceReadConditionFinanceReceivable        = "finance_receivable"
 	SourceReadConditionFinanceInvoice           = "finance_invoice"
+	SourceReadConditionProductionExceptionWIP   = "production_exception_wip"
+	SourceReadConditionProductionExceptionIssue = "production_exception_over_issue"
 )
 
 var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionContract{
@@ -53,7 +55,14 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "operational_fact", Method: "create_outsourcing_material_issue_from_order", Rules: sourceReadRules(PermissionOutsourcingOrderRead)},
 	{Domain: "operational_fact", Method: "create_outsourcing_return_receipt_from_order", Rules: sourceReadRules(PermissionOutsourcingOrderRead)},
 	{Domain: "operational_fact", Method: "create_outsourcing_return_disposition", Rules: sourceReadRules(PermissionQualityInspectionRead, PermissionOutsourcingFactRead)},
-	{Domain: "operational_fact", Method: "submit_production_exception", Rules: sourceReadRules(PermissionQualityInspectionRead, PermissionProductionWIPRead)},
+	{
+		Domain: "operational_fact", Method: "submit_production_exception",
+		Rules: []SourceActionReadPermissionRule{
+			{PermissionKey: PermissionQualityInspectionRead, Condition: SourceReadConditionProductionExceptionWIP},
+			{PermissionKey: PermissionProductionWIPRead, Condition: SourceReadConditionProductionExceptionWIP},
+			{PermissionKey: PermissionPMCPlanRead, Condition: SourceReadConditionProductionExceptionIssue},
+		},
+	},
 	{Domain: "operational_fact", Method: "create_stock_reservation_from_sales_order", Rules: sourceReadRules(PermissionSalesOrderRead, PermissionSalesOrderItemRead)},
 	{Domain: "operational_fact", Method: "create_receivable_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "operational_fact", Method: "create_invoice_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
@@ -66,6 +75,20 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 			{PermissionKey: PermissionFinancePayableRead, Condition: SourceReadConditionFinancePayable},
 			{PermissionKey: PermissionFinanceReceivableRead, Condition: SourceReadConditionFinanceReceivable},
 			{PermissionKey: PermissionFinanceInvoiceRead, Condition: SourceReadConditionFinanceInvoice},
+		},
+	},
+	{
+		Domain: "operational_fact", Method: "create_finance_credit_note",
+		Rules: []SourceActionReadPermissionRule{
+			{PermissionKey: PermissionFinancePayableRead, Condition: SourceReadConditionFinancePayable},
+			{PermissionKey: PermissionFinanceReceivableRead, Condition: SourceReadConditionFinanceReceivable},
+		},
+	},
+	{
+		Domain: "operational_fact", Method: "reverse_finance_credit_note",
+		Rules: []SourceActionReadPermissionRule{
+			{PermissionKey: PermissionFinancePayableRead, Condition: SourceReadConditionFinancePayable},
+			{PermissionKey: PermissionFinanceReceivableRead, Condition: SourceReadConditionFinanceReceivable},
 		},
 	},
 	{
@@ -110,6 +133,40 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_quality_decide", Rules: sourceReadRules(PermissionShipmentRead, PermissionQualityInspectionRead)},
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_shipment_ship", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_receivable_lead", Rules: sourceReadRules(PermissionShipmentRead)},
+	{Domain: "customer_config", Method: "start_sales_return_acceptance_process", Rules: sourceReadRules(PermissionSalesReturnRead)},
+	{Domain: "customer_config", Method: "get_sales_return_acceptance_process", Rules: sourceReadRules(PermissionSalesReturnRead)},
+	{Domain: "customer_config", Method: "execute_sales_return_receive", Rules: sourceReadRules(PermissionSalesReturnRead)},
+	{Domain: "customer_config", Method: "start_finance_payment_approval_process", Rules: sourceReadRules(PermissionFinancePaymentRead)},
+	{Domain: "customer_config", Method: "get_finance_payment_approval_process", Rules: sourceReadRules(PermissionFinancePaymentRead)},
+	{
+		Domain: "customer_config", Method: "execute_finance_payment_post",
+		Rules: []SourceActionReadPermissionRule{
+			{PermissionKey: PermissionFinancePaymentRead},
+			{PermissionKey: PermissionFinanceReceivableRead, Condition: SourceReadConditionFinanceReceivable},
+			{PermissionKey: PermissionFinancePayableRead, Condition: SourceReadConditionFinancePayable},
+		},
+	},
+	{Domain: "customer_config", Method: "start_inventory_adjustment_approval_process", Rules: sourceReadRules(PermissionWarehouseInventoryRead)},
+	{Domain: "customer_config", Method: "get_inventory_adjustment_approval_process", Rules: sourceReadRules(PermissionWarehouseInventoryRead)},
+	{Domain: "customer_config", Method: "execute_inventory_adjustment_submit", Rules: sourceReadRules(PermissionWarehouseInventoryRead)},
+	{Domain: "customer_config", Method: "execute_inventory_adjustment_post", Rules: sourceReadRules(PermissionWarehouseInventoryRead)},
+	{
+		Domain: "customer_config", Method: "start_production_exception_approval_process",
+		Rules: []SourceActionReadPermissionRule{
+			{PermissionKey: PermissionQualityInspectionRead, Condition: SourceReadConditionProductionExceptionWIP},
+			{PermissionKey: PermissionProductionWIPRead, Condition: SourceReadConditionProductionExceptionWIP},
+			{PermissionKey: PermissionPMCPlanRead, Condition: SourceReadConditionProductionExceptionIssue},
+		},
+	},
+	{
+		Domain: "customer_config", Method: "get_production_exception_approval_process",
+		Rules: []SourceActionReadPermissionRule{
+			{PermissionKey: PermissionQualityInspectionRead, Condition: SourceReadConditionProductionExceptionWIP},
+			{PermissionKey: PermissionProductionWIPRead, Condition: SourceReadConditionProductionExceptionWIP},
+			{PermissionKey: PermissionPMCPlanRead, Condition: SourceReadConditionProductionExceptionIssue},
+		},
+	},
+	{Domain: "customer_config", Method: "execute_production_exception_process", Rules: sourceReadRules(PermissionProductionFactRead, PermissionProductionWIPRead)},
 }
 
 func sourceReadRules(permissionKeys ...string) []SourceActionReadPermissionRule {
@@ -213,6 +270,20 @@ func FinanceSourceReadCondition(factType string) (string, bool) {
 		return SourceReadConditionFinanceReceivable, true
 	case FinanceFactInvoice:
 		return SourceReadConditionFinanceInvoice, true
+	default:
+		return "", false
+	}
+}
+
+// FinanceCreditSourceReadCondition restricts credit notes to the two ledger
+// types that can legally carry them. Invoice read access cannot be used as a
+// fallback for an accounts-receivable or accounts-payable credit.
+func FinanceCreditSourceReadCondition(factType string) (string, bool) {
+	switch strings.ToUpper(strings.TrimSpace(factType)) {
+	case FinanceFactPayable:
+		return SourceReadConditionFinancePayable, true
+	case FinanceFactReceivable:
+		return SourceReadConditionFinanceReceivable, true
 	default:
 		return "", false
 	}

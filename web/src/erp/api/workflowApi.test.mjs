@@ -81,6 +81,7 @@ test('workflowApi: reads and validates task-scoped process context', async () =>
     node_key: 'submit_sales_order',
     node_type: 'domain_command',
     attempt: 1,
+    version: 2,
     status: 'completed',
   }
   const currentNode = {
@@ -89,6 +90,7 @@ test('workflowApi: reads and validates task-scoped process context', async () =>
     node_key: 'order_approval',
     node_type: 'approval',
     attempt: 1,
+    version: 1,
     status: 'active',
   }
   const processContext = {
@@ -605,14 +607,12 @@ test('workflowApi: every public task mutation rejects malformed successful respo
   response = {
     data: { task: validTask({ version: 2, task_status_key: 'ready' }) },
   }
-  assert.equal(
-    (
-      await api.urgeWorkflowTask({
-        ...mutationCases.find((entry) => entry.method === 'urge_task').params,
-        expected_version: 999,
-      })
-    ).version,
-    2
+  await assert.rejects(
+    api.urgeWorkflowTask({
+      ...mutationCases.find((entry) => entry.method === 'urge_task').params,
+      expected_version: 999,
+    }),
+    (error) => error.isInvalidResponse === true
   )
 
   for (const taskStatusKey of [
@@ -662,20 +662,19 @@ test('workflowApi: every public task mutation rejects malformed successful respo
     (
       await api.urgeWorkflowTask({
         ...mutationCases.find((entry) => entry.method === 'urge_task').params,
+        expected_version: 2,
         action: 'escalate_to_boss',
       })
     ).version,
     3
   )
   response = { data: { task: validTask({ version: 2 }) } }
-  assert.equal(
-    (
-      await api.completeWorkflowTaskAction({
-        ...mutationCases[0].params,
-        expected_version: 999,
-      })
-    ).version,
-    2
+  await assert.rejects(
+    api.completeWorkflowTaskAction({
+      ...mutationCases[0].params,
+      expected_version: 999,
+    }),
+    (error) => error.isInvalidResponse === true
   )
 })
 

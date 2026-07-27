@@ -62,6 +62,8 @@ type ProductionExceptionDecision struct {
 	ExecutedBy *int `json:"executed_by,omitempty"`
 	// ExecutedAt holds the value of the "executed_at" field.
 	ExecutedAt *time.Time `json:"executed_at,omitempty"`
+	// ExecutionReason holds the value of the "execution_reason" field.
+	ExecutionReason *string `json:"execution_reason,omitempty"`
 	// ReversedBy holds the value of the "reversed_by" field.
 	ReversedBy *int `json:"reversed_by,omitempty"`
 	// ReversedAt holds the value of the "reversed_at" field.
@@ -82,7 +84,7 @@ func (*ProductionExceptionDecision) scanValues(columns []string) ([]any, error) 
 			values[i] = new(decimal.Decimal)
 		case productionexceptiondecision.FieldID, productionexceptiondecision.FieldProductionOrderID, productionexceptiondecision.FieldProductionOrderItemID, productionexceptiondecision.FieldProductionMaterialRequirementID, productionexceptiondecision.FieldProductionWipBatchID, productionexceptiondecision.FieldQualityInspectionID, productionexceptiondecision.FieldVersion, productionexceptiondecision.FieldRequestedBy, productionexceptiondecision.FieldDecidedBy, productionexceptiondecision.FieldExecutedBy, productionexceptiondecision.FieldReversedBy:
 			values[i] = new(sql.NullInt64)
-		case productionexceptiondecision.FieldDecisionNo, productionexceptiondecision.FieldDecisionType, productionexceptiondecision.FieldStatus, productionexceptiondecision.FieldExecutionStatus, productionexceptiondecision.FieldReason, productionexceptiondecision.FieldIdempotencyKey, productionexceptiondecision.FieldIdempotencyPayloadHash, productionexceptiondecision.FieldDecisionReason, productionexceptiondecision.FieldReverseReason:
+		case productionexceptiondecision.FieldDecisionNo, productionexceptiondecision.FieldDecisionType, productionexceptiondecision.FieldStatus, productionexceptiondecision.FieldExecutionStatus, productionexceptiondecision.FieldReason, productionexceptiondecision.FieldIdempotencyKey, productionexceptiondecision.FieldIdempotencyPayloadHash, productionexceptiondecision.FieldDecisionReason, productionexceptiondecision.FieldExecutionReason, productionexceptiondecision.FieldReverseReason:
 			values[i] = new(sql.NullString)
 		case productionexceptiondecision.FieldRequestedAt, productionexceptiondecision.FieldDecidedAt, productionexceptiondecision.FieldExecutedAt, productionexceptiondecision.FieldReversedAt:
 			values[i] = new(sql.NullTime)
@@ -248,6 +250,13 @@ func (_m *ProductionExceptionDecision) assignValues(columns []string, values []a
 				_m.ExecutedAt = new(time.Time)
 				*_m.ExecutedAt = value.Time
 			}
+		case productionexceptiondecision.FieldExecutionReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field execution_reason", values[i])
+			} else if value.Valid {
+				_m.ExecutionReason = new(string)
+				*_m.ExecutionReason = value.String
+			}
 		case productionexceptiondecision.FieldReversedBy:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field reversed_by", values[i])
@@ -387,6 +396,11 @@ func (_m *ProductionExceptionDecision) String() string {
 	if v := _m.ExecutedAt; v != nil {
 		builder.WriteString("executed_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ExecutionReason; v != nil {
+		builder.WriteString("execution_reason=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.ReversedBy; v != nil {

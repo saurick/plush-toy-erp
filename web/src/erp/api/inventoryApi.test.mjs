@@ -18,6 +18,7 @@ test('inventoryApi: exposes ledger reads and controlled inventory operations onl
     'list_inventory_balances',
     'list_inventory_lots',
     'list_inventory_txns',
+    'list_inventory_operations',
     'create_inventory_operation',
     'post_inventory_operation',
     'cancel_inventory_operation',
@@ -28,9 +29,20 @@ test('inventoryApi: exposes ledger reads and controlled inventory operations onl
   assert.match(source, /listInventoryBalances\(params = \{\}, options = \{\}\)/)
   assert.match(source, /listInventoryLots\(params = \{\}, options = \{\}\)/)
   assert.match(source, /listInventoryTxns\(params = \{\}, options = \{\}\)/)
+  assert.match(
+    source,
+    /listInventoryOperations\(params = \{\}, options = \{\}\)/
+  )
   assert.match(source, /'list_inventory_balances',[\s\S]*params,[\s\S]*options/)
   assert.match(source, /'list_inventory_lots', params, options/)
   assert.match(source, /'list_inventory_txns', params, options/)
+  for (const retiredMethodName of [
+    'submit_inventory_operation',
+    'approve_inventory_operation',
+    'reject_inventory_operation',
+  ]) {
+    assert.doesNotMatch(source, new RegExp(`call\\(\\s*'${retiredMethodName}'`))
+  }
 
   for (const forbiddenActionName of [
     'createInventoryTxn',

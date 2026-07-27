@@ -71,6 +71,11 @@ func Status(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldStatus, v))
 }
 
+// Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
+func Version(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldVersion, v))
+}
+
 // CounterpartyType applies equality check predicate on the "counterparty_type" field. It's identical to CounterpartyTypeEQ.
 func CounterpartyType(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldCounterpartyType, v))
@@ -151,9 +156,19 @@ func PostedAt(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldPostedAt, v))
 }
 
+// PostedBy applies equality check predicate on the "posted_by" field. It's identical to PostedByEQ.
+func PostedBy(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldPostedBy, v))
+}
+
 // SettledAt applies equality check predicate on the "settled_at" field. It's identical to SettledAtEQ.
 func SettledAt(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldSettledAt, v))
+}
+
+// SettledBy applies equality check predicate on the "settled_by" field. It's identical to SettledByEQ.
+func SettledBy(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldSettledBy, v))
 }
 
 // CancelledAt applies equality check predicate on the "cancelled_at" field. It's identical to CancelledAtEQ.
@@ -379,6 +394,46 @@ func StatusEqualFold(v string) predicate.FinanceFact {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldContainsFold(FieldStatus, v))
+}
+
+// VersionEQ applies the EQ predicate on the "version" field.
+func VersionEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldVersion, v))
+}
+
+// VersionNEQ applies the NEQ predicate on the "version" field.
+func VersionNEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldVersion, v))
+}
+
+// VersionIn applies the In predicate on the "version" field.
+func VersionIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldVersion, vs...))
+}
+
+// VersionNotIn applies the NotIn predicate on the "version" field.
+func VersionNotIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldVersion, vs...))
+}
+
+// VersionGT applies the GT predicate on the "version" field.
+func VersionGT(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldVersion, v))
+}
+
+// VersionGTE applies the GTE predicate on the "version" field.
+func VersionGTE(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldVersion, v))
+}
+
+// VersionLT applies the LT predicate on the "version" field.
+func VersionLT(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldVersion, v))
+}
+
+// VersionLTE applies the LTE predicate on the "version" field.
+func VersionLTE(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldVersion, v))
 }
 
 // CounterpartyTypeEQ applies the EQ predicate on the "counterparty_type" field.
@@ -1256,6 +1311,36 @@ func PostedAtNotNil() predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldNotNull(FieldPostedAt))
 }
 
+// PostedByEQ applies the EQ predicate on the "posted_by" field.
+func PostedByEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldPostedBy, v))
+}
+
+// PostedByNEQ applies the NEQ predicate on the "posted_by" field.
+func PostedByNEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldPostedBy, v))
+}
+
+// PostedByIn applies the In predicate on the "posted_by" field.
+func PostedByIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldPostedBy, vs...))
+}
+
+// PostedByNotIn applies the NotIn predicate on the "posted_by" field.
+func PostedByNotIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldPostedBy, vs...))
+}
+
+// PostedByIsNil applies the IsNil predicate on the "posted_by" field.
+func PostedByIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldPostedBy))
+}
+
+// PostedByNotNil applies the NotNil predicate on the "posted_by" field.
+func PostedByNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldPostedBy))
+}
+
 // SettledAtEQ applies the EQ predicate on the "settled_at" field.
 func SettledAtEQ(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldSettledAt, v))
@@ -1304,6 +1389,36 @@ func SettledAtIsNil() predicate.FinanceFact {
 // SettledAtNotNil applies the NotNil predicate on the "settled_at" field.
 func SettledAtNotNil() predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldNotNull(FieldSettledAt))
+}
+
+// SettledByEQ applies the EQ predicate on the "settled_by" field.
+func SettledByEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldSettledBy, v))
+}
+
+// SettledByNEQ applies the NEQ predicate on the "settled_by" field.
+func SettledByNEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldSettledBy, v))
+}
+
+// SettledByIn applies the In predicate on the "settled_by" field.
+func SettledByIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldSettledBy, vs...))
+}
+
+// SettledByNotIn applies the NotIn predicate on the "settled_by" field.
+func SettledByNotIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldSettledBy, vs...))
+}
+
+// SettledByIsNil applies the IsNil predicate on the "settled_by" field.
+func SettledByIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldSettledBy))
+}
+
+// SettledByNotNil applies the NotNil predicate on the "settled_by" field.
+func SettledByNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldSettledBy))
 }
 
 // CancelledAtEQ applies the EQ predicate on the "cancelled_at" field.
@@ -1614,6 +1729,52 @@ func UpdatedAtLT(v time.Time) predicate.FinanceFact {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasPoster applies the HasEdge predicate on the "poster" edge.
+func HasPoster() predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, PosterTable, PosterColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPosterWith applies the HasEdge predicate on the "poster" edge with a given conditions (other predicates).
+func HasPosterWith(preds ...predicate.AdminUser) predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := newPosterStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasSettler applies the HasEdge predicate on the "settler" edge.
+func HasSettler() predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, SettlerTable, SettlerColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSettlerWith applies the HasEdge predicate on the "settler" edge with a given conditions (other predicates).
+func HasSettlerWith(preds ...predicate.AdminUser) predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := newSettlerStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // HasCanceller applies the HasEdge predicate on the "canceller" edge.

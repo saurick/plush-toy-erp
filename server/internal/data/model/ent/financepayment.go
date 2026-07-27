@@ -44,10 +44,26 @@ type FinancePayment struct {
 	Version int `json:"version,omitempty"`
 	// OccurredAt holds the value of the "occurred_at" field.
 	OccurredAt time.Time `json:"occurred_at,omitempty"`
+	// ApprovedAt holds the value of the "approved_at" field.
+	ApprovedAt *time.Time `json:"approved_at,omitempty"`
+	// ApprovedBy holds the value of the "approved_by" field.
+	ApprovedBy *int `json:"approved_by,omitempty"`
+	// RejectedAt holds the value of the "rejected_at" field.
+	RejectedAt *time.Time `json:"rejected_at,omitempty"`
+	// RejectedBy holds the value of the "rejected_by" field.
+	RejectedBy *int `json:"rejected_by,omitempty"`
+	// RejectReason holds the value of the "reject_reason" field.
+	RejectReason *string `json:"reject_reason,omitempty"`
 	// PostedAt holds the value of the "posted_at" field.
 	PostedAt *time.Time `json:"posted_at,omitempty"`
 	// PostedBy holds the value of the "posted_by" field.
 	PostedBy *int `json:"posted_by,omitempty"`
+	// CancelledAt holds the value of the "cancelled_at" field.
+	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
+	// CancelledBy holds the value of the "cancelled_by" field.
+	CancelledBy *int `json:"cancelled_by,omitempty"`
+	// CancelReason holds the value of the "cancel_reason" field.
+	CancelReason *string `json:"cancel_reason,omitempty"`
 	// ReversedAt holds the value of the "reversed_at" field.
 	ReversedAt *time.Time `json:"reversed_at,omitempty"`
 	// ReversedBy holds the value of the "reversed_by" field.
@@ -91,11 +107,11 @@ func (*FinancePayment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case financepayment.FieldAmount:
 			values[i] = new(decimal.Decimal)
-		case financepayment.FieldID, financepayment.FieldCounterpartyID, financepayment.FieldVersion, financepayment.FieldPostedBy, financepayment.FieldReversedBy, financepayment.FieldCreatedBy:
+		case financepayment.FieldID, financepayment.FieldCounterpartyID, financepayment.FieldVersion, financepayment.FieldApprovedBy, financepayment.FieldRejectedBy, financepayment.FieldPostedBy, financepayment.FieldCancelledBy, financepayment.FieldReversedBy, financepayment.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
-		case financepayment.FieldPaymentNo, financepayment.FieldDirection, financepayment.FieldStatus, financepayment.FieldCounterpartyType, financepayment.FieldCurrency, financepayment.FieldAccountRef, financepayment.FieldEvidenceRef, financepayment.FieldIdempotencyKey, financepayment.FieldIdempotencyPayloadHash, financepayment.FieldReverseReason:
+		case financepayment.FieldPaymentNo, financepayment.FieldDirection, financepayment.FieldStatus, financepayment.FieldCounterpartyType, financepayment.FieldCurrency, financepayment.FieldAccountRef, financepayment.FieldEvidenceRef, financepayment.FieldIdempotencyKey, financepayment.FieldIdempotencyPayloadHash, financepayment.FieldRejectReason, financepayment.FieldCancelReason, financepayment.FieldReverseReason:
 			values[i] = new(sql.NullString)
-		case financepayment.FieldOccurredAt, financepayment.FieldPostedAt, financepayment.FieldReversedAt, financepayment.FieldCreatedAt, financepayment.FieldUpdatedAt:
+		case financepayment.FieldOccurredAt, financepayment.FieldApprovedAt, financepayment.FieldRejectedAt, financepayment.FieldPostedAt, financepayment.FieldCancelledAt, financepayment.FieldReversedAt, financepayment.FieldCreatedAt, financepayment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -196,6 +212,41 @@ func (_m *FinancePayment) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.OccurredAt = value.Time
 			}
+		case financepayment.FieldApprovedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field approved_at", values[i])
+			} else if value.Valid {
+				_m.ApprovedAt = new(time.Time)
+				*_m.ApprovedAt = value.Time
+			}
+		case financepayment.FieldApprovedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field approved_by", values[i])
+			} else if value.Valid {
+				_m.ApprovedBy = new(int)
+				*_m.ApprovedBy = int(value.Int64)
+			}
+		case financepayment.FieldRejectedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field rejected_at", values[i])
+			} else if value.Valid {
+				_m.RejectedAt = new(time.Time)
+				*_m.RejectedAt = value.Time
+			}
+		case financepayment.FieldRejectedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field rejected_by", values[i])
+			} else if value.Valid {
+				_m.RejectedBy = new(int)
+				*_m.RejectedBy = int(value.Int64)
+			}
+		case financepayment.FieldRejectReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field reject_reason", values[i])
+			} else if value.Valid {
+				_m.RejectReason = new(string)
+				*_m.RejectReason = value.String
+			}
 		case financepayment.FieldPostedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field posted_at", values[i])
@@ -209,6 +260,27 @@ func (_m *FinancePayment) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.PostedBy = new(int)
 				*_m.PostedBy = int(value.Int64)
+			}
+		case financepayment.FieldCancelledAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field cancelled_at", values[i])
+			} else if value.Valid {
+				_m.CancelledAt = new(time.Time)
+				*_m.CancelledAt = value.Time
+			}
+		case financepayment.FieldCancelledBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cancelled_by", values[i])
+			} else if value.Valid {
+				_m.CancelledBy = new(int)
+				*_m.CancelledBy = int(value.Int64)
+			}
+		case financepayment.FieldCancelReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cancel_reason", values[i])
+			} else if value.Valid {
+				_m.CancelReason = new(string)
+				*_m.CancelReason = value.String
 			}
 		case financepayment.FieldReversedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -329,6 +401,31 @@ func (_m *FinancePayment) String() string {
 	builder.WriteString("occurred_at=")
 	builder.WriteString(_m.OccurredAt.Format(time.ANSIC))
 	builder.WriteString(", ")
+	if v := _m.ApprovedAt; v != nil {
+		builder.WriteString("approved_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ApprovedBy; v != nil {
+		builder.WriteString("approved_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RejectedAt; v != nil {
+		builder.WriteString("rejected_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.RejectedBy; v != nil {
+		builder.WriteString("rejected_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RejectReason; v != nil {
+		builder.WriteString("reject_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	if v := _m.PostedAt; v != nil {
 		builder.WriteString("posted_at=")
 		builder.WriteString(v.Format(time.ANSIC))
@@ -337,6 +434,21 @@ func (_m *FinancePayment) String() string {
 	if v := _m.PostedBy; v != nil {
 		builder.WriteString("posted_by=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelledAt; v != nil {
+		builder.WriteString("cancelled_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelledBy; v != nil {
+		builder.WriteString("cancelled_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelReason; v != nil {
+		builder.WriteString("cancel_reason=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.ReversedAt; v != nil {

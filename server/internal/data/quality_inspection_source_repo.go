@@ -314,19 +314,28 @@ func qualityInspectionMatchesCreate(row *ent.QualityInspection, in *biz.QualityI
 	if row == nil || in == nil {
 		return false
 	}
-	return row.InspectionNo == in.InspectionNo &&
-		optionalIntValueOrZero(row.PurchaseReceiptID) == in.PurchaseReceiptID &&
-		sameOptionalInt(row.PurchaseReceiptItemID, in.PurchaseReceiptItemID) &&
-		optionalIntValueOrZero(row.InventoryLotID) == in.InventoryLotID &&
-		optionalIntValueOrZero(row.MaterialID) == in.MaterialID &&
-		optionalIntValueOrZero(row.WarehouseID) == in.WarehouseID &&
-		optionalStringValueOrEmpty(row.SourceType) == in.SourceType &&
-		optionalIntValueOrZero(row.SourceID) == in.SourceID &&
-		optionalStringValueOrEmpty(row.InspectionType) == in.InspectionType &&
-		optionalStringValueOrEmpty(row.SubjectType) == in.SubjectType &&
-		optionalIntValueOrZero(row.SubjectID) == in.SubjectID &&
-		sameOptionalInt(row.InspectorID, in.InspectorID) &&
-		sameOptionalString(row.DecisionNote, in.DecisionNote)
+	if row.InspectionNo != in.InspectionNo ||
+		optionalIntValueOrZero(row.PurchaseReceiptID) != in.PurchaseReceiptID ||
+		!sameOptionalInt(row.PurchaseReceiptItemID, in.PurchaseReceiptItemID) ||
+		optionalIntValueOrZero(row.InventoryLotID) != in.InventoryLotID ||
+		optionalIntValueOrZero(row.MaterialID) != in.MaterialID ||
+		optionalIntValueOrZero(row.WarehouseID) != in.WarehouseID ||
+		optionalStringValueOrEmpty(row.SourceType) != in.SourceType ||
+		optionalIntValueOrZero(row.SourceID) != in.SourceID ||
+		optionalStringValueOrEmpty(row.InspectionType) != in.InspectionType ||
+		optionalStringValueOrEmpty(row.SubjectType) != in.SubjectType ||
+		optionalIntValueOrZero(row.SubjectID) != in.SubjectID {
+		return false
+	}
+	// Inspector and decision note are mutable decision fields. Keep the strict
+	// create-payload comparison while the inspection is still pending, but do
+	// not let a later decision make the original source-document create
+	// command impossible to replay after an unknown result.
+	if row.Status == biz.QualityInspectionStatusDraft || row.Status == biz.QualityInspectionStatusSubmitted {
+		return sameOptionalInt(row.InspectorID, in.InspectorID) &&
+			sameOptionalString(row.DecisionNote, in.DecisionNote)
+	}
+	return true
 }
 
 func createQualityInspectionDraftRow(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) (*ent.QualityInspection, error) {

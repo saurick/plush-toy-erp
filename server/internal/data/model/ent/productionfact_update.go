@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/productionfact"
@@ -72,6 +73,27 @@ func (_u *ProductionFactUpdate) SetNillableStatus(v *string) *ProductionFactUpda
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetVersion sets the "version" field.
+func (_u *ProductionFactUpdate) SetVersion(v int) *ProductionFactUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillableVersion(v *int) *ProductionFactUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *ProductionFactUpdate) AddVersion(v int) *ProductionFactUpdate {
+	_u.mutation.AddVersion(v)
 	return _u
 }
 
@@ -328,6 +350,86 @@ func (_u *ProductionFactUpdate) ClearPostedAt() *ProductionFactUpdate {
 	return _u
 }
 
+// SetPostedBy sets the "posted_by" field.
+func (_u *ProductionFactUpdate) SetPostedBy(v int) *ProductionFactUpdate {
+	_u.mutation.SetPostedBy(v)
+	return _u
+}
+
+// SetNillablePostedBy sets the "posted_by" field if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillablePostedBy(v *int) *ProductionFactUpdate {
+	if v != nil {
+		_u.SetPostedBy(*v)
+	}
+	return _u
+}
+
+// ClearPostedBy clears the value of the "posted_by" field.
+func (_u *ProductionFactUpdate) ClearPostedBy() *ProductionFactUpdate {
+	_u.mutation.ClearPostedBy()
+	return _u
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (_u *ProductionFactUpdate) SetCancelledAt(v time.Time) *ProductionFactUpdate {
+	_u.mutation.SetCancelledAt(v)
+	return _u
+}
+
+// SetNillableCancelledAt sets the "cancelled_at" field if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillableCancelledAt(v *time.Time) *ProductionFactUpdate {
+	if v != nil {
+		_u.SetCancelledAt(*v)
+	}
+	return _u
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (_u *ProductionFactUpdate) ClearCancelledAt() *ProductionFactUpdate {
+	_u.mutation.ClearCancelledAt()
+	return _u
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (_u *ProductionFactUpdate) SetCancelledBy(v int) *ProductionFactUpdate {
+	_u.mutation.SetCancelledBy(v)
+	return _u
+}
+
+// SetNillableCancelledBy sets the "cancelled_by" field if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillableCancelledBy(v *int) *ProductionFactUpdate {
+	if v != nil {
+		_u.SetCancelledBy(*v)
+	}
+	return _u
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (_u *ProductionFactUpdate) ClearCancelledBy() *ProductionFactUpdate {
+	_u.mutation.ClearCancelledBy()
+	return _u
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (_u *ProductionFactUpdate) SetCancelReason(v string) *ProductionFactUpdate {
+	_u.mutation.SetCancelReason(v)
+	return _u
+}
+
+// SetNillableCancelReason sets the "cancel_reason" field if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillableCancelReason(v *string) *ProductionFactUpdate {
+	if v != nil {
+		_u.SetCancelReason(*v)
+	}
+	return _u
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (_u *ProductionFactUpdate) ClearCancelReason() *ProductionFactUpdate {
+	_u.mutation.ClearCancelReason()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *ProductionFactUpdate) SetNote(v string) *ProductionFactUpdate {
 	_u.mutation.SetNote(v)
@@ -388,6 +490,44 @@ func (_u *ProductionFactUpdate) SetInventoryLot(v *InventoryLot) *ProductionFact
 	return _u.SetInventoryLotID(v.ID)
 }
 
+// SetPosterID sets the "poster" edge to the AdminUser entity by ID.
+func (_u *ProductionFactUpdate) SetPosterID(id int) *ProductionFactUpdate {
+	_u.mutation.SetPosterID(id)
+	return _u
+}
+
+// SetNillablePosterID sets the "poster" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillablePosterID(id *int) *ProductionFactUpdate {
+	if id != nil {
+		_u = _u.SetPosterID(*id)
+	}
+	return _u
+}
+
+// SetPoster sets the "poster" edge to the AdminUser entity.
+func (_u *ProductionFactUpdate) SetPoster(v *AdminUser) *ProductionFactUpdate {
+	return _u.SetPosterID(v.ID)
+}
+
+// SetCancellerID sets the "canceller" edge to the AdminUser entity by ID.
+func (_u *ProductionFactUpdate) SetCancellerID(id int) *ProductionFactUpdate {
+	_u.mutation.SetCancellerID(id)
+	return _u
+}
+
+// SetNillableCancellerID sets the "canceller" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *ProductionFactUpdate) SetNillableCancellerID(id *int) *ProductionFactUpdate {
+	if id != nil {
+		_u = _u.SetCancellerID(*id)
+	}
+	return _u
+}
+
+// SetCanceller sets the "canceller" edge to the AdminUser entity.
+func (_u *ProductionFactUpdate) SetCanceller(v *AdminUser) *ProductionFactUpdate {
+	return _u.SetCancellerID(v.ID)
+}
+
 // Mutation returns the ProductionFactMutation object of the builder.
 func (_u *ProductionFactUpdate) Mutation() *ProductionFactMutation {
 	return _u.mutation
@@ -414,6 +554,18 @@ func (_u *ProductionFactUpdate) ClearProductSku() *ProductionFactUpdate {
 // ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
 func (_u *ProductionFactUpdate) ClearInventoryLot() *ProductionFactUpdate {
 	_u.mutation.ClearInventoryLot()
+	return _u
+}
+
+// ClearPoster clears the "poster" edge to the AdminUser entity.
+func (_u *ProductionFactUpdate) ClearPoster() *ProductionFactUpdate {
+	_u.mutation.ClearPoster()
+	return _u
+}
+
+// ClearCanceller clears the "canceller" edge to the AdminUser entity.
+func (_u *ProductionFactUpdate) ClearCanceller() *ProductionFactUpdate {
+	_u.mutation.ClearCanceller()
 	return _u
 }
 
@@ -476,6 +628,11 @@ func (_u *ProductionFactUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := productionfact.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SubjectType(); ok {
 		if err := productionfact.SubjectTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.subject_type": %w`, err)}
@@ -526,6 +683,21 @@ func (_u *ProductionFactUpdate) check() error {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.idempotency_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PostedBy(); ok {
+		if err := productionfact.PostedByValidator(v); err != nil {
+			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.posted_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelledBy(); ok {
+		if err := productionfact.CancelledByValidator(v); err != nil {
+			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.cancelled_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelReason(); ok {
+		if err := productionfact.CancelReasonValidator(v); err != nil {
+			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.cancel_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := productionfact.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.note": %w`, err)}
@@ -560,6 +732,12 @@ func (_u *ProductionFactUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(productionfact.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(productionfact.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(productionfact.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.SubjectType(); ok {
 		_spec.SetField(productionfact.FieldSubjectType, field.TypeString, value)
@@ -611,6 +789,18 @@ func (_u *ProductionFactUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if _u.mutation.PostedAtCleared() {
 		_spec.ClearField(productionfact.FieldPostedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelledAt(); ok {
+		_spec.SetField(productionfact.FieldCancelledAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancelledAtCleared() {
+		_spec.ClearField(productionfact.FieldCancelledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelReason(); ok {
+		_spec.SetField(productionfact.FieldCancelReason, field.TypeString, value)
+	}
+	if _u.mutation.CancelReasonCleared() {
+		_spec.ClearField(productionfact.FieldCancelReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(productionfact.FieldNote, field.TypeString, value)
@@ -737,6 +927,64 @@ func (_u *ProductionFactUpdate) sqlSave(ctx context.Context) (_node int, err err
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.PosterCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   productionfact.PosterTable,
+			Columns: []string{productionfact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PosterIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   productionfact.PosterTable,
+			Columns: []string{productionfact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CancellerCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   productionfact.CancellerTable,
+			Columns: []string{productionfact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CancellerIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   productionfact.CancellerTable,
+			Columns: []string{productionfact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{productionfact.Label}
@@ -796,6 +1044,27 @@ func (_u *ProductionFactUpdateOne) SetNillableStatus(v *string) *ProductionFactU
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetVersion sets the "version" field.
+func (_u *ProductionFactUpdateOne) SetVersion(v int) *ProductionFactUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillableVersion(v *int) *ProductionFactUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *ProductionFactUpdateOne) AddVersion(v int) *ProductionFactUpdateOne {
+	_u.mutation.AddVersion(v)
 	return _u
 }
 
@@ -1052,6 +1321,86 @@ func (_u *ProductionFactUpdateOne) ClearPostedAt() *ProductionFactUpdateOne {
 	return _u
 }
 
+// SetPostedBy sets the "posted_by" field.
+func (_u *ProductionFactUpdateOne) SetPostedBy(v int) *ProductionFactUpdateOne {
+	_u.mutation.SetPostedBy(v)
+	return _u
+}
+
+// SetNillablePostedBy sets the "posted_by" field if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillablePostedBy(v *int) *ProductionFactUpdateOne {
+	if v != nil {
+		_u.SetPostedBy(*v)
+	}
+	return _u
+}
+
+// ClearPostedBy clears the value of the "posted_by" field.
+func (_u *ProductionFactUpdateOne) ClearPostedBy() *ProductionFactUpdateOne {
+	_u.mutation.ClearPostedBy()
+	return _u
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (_u *ProductionFactUpdateOne) SetCancelledAt(v time.Time) *ProductionFactUpdateOne {
+	_u.mutation.SetCancelledAt(v)
+	return _u
+}
+
+// SetNillableCancelledAt sets the "cancelled_at" field if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillableCancelledAt(v *time.Time) *ProductionFactUpdateOne {
+	if v != nil {
+		_u.SetCancelledAt(*v)
+	}
+	return _u
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (_u *ProductionFactUpdateOne) ClearCancelledAt() *ProductionFactUpdateOne {
+	_u.mutation.ClearCancelledAt()
+	return _u
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (_u *ProductionFactUpdateOne) SetCancelledBy(v int) *ProductionFactUpdateOne {
+	_u.mutation.SetCancelledBy(v)
+	return _u
+}
+
+// SetNillableCancelledBy sets the "cancelled_by" field if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillableCancelledBy(v *int) *ProductionFactUpdateOne {
+	if v != nil {
+		_u.SetCancelledBy(*v)
+	}
+	return _u
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (_u *ProductionFactUpdateOne) ClearCancelledBy() *ProductionFactUpdateOne {
+	_u.mutation.ClearCancelledBy()
+	return _u
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (_u *ProductionFactUpdateOne) SetCancelReason(v string) *ProductionFactUpdateOne {
+	_u.mutation.SetCancelReason(v)
+	return _u
+}
+
+// SetNillableCancelReason sets the "cancel_reason" field if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillableCancelReason(v *string) *ProductionFactUpdateOne {
+	if v != nil {
+		_u.SetCancelReason(*v)
+	}
+	return _u
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (_u *ProductionFactUpdateOne) ClearCancelReason() *ProductionFactUpdateOne {
+	_u.mutation.ClearCancelReason()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *ProductionFactUpdateOne) SetNote(v string) *ProductionFactUpdateOne {
 	_u.mutation.SetNote(v)
@@ -1112,6 +1461,44 @@ func (_u *ProductionFactUpdateOne) SetInventoryLot(v *InventoryLot) *ProductionF
 	return _u.SetInventoryLotID(v.ID)
 }
 
+// SetPosterID sets the "poster" edge to the AdminUser entity by ID.
+func (_u *ProductionFactUpdateOne) SetPosterID(id int) *ProductionFactUpdateOne {
+	_u.mutation.SetPosterID(id)
+	return _u
+}
+
+// SetNillablePosterID sets the "poster" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillablePosterID(id *int) *ProductionFactUpdateOne {
+	if id != nil {
+		_u = _u.SetPosterID(*id)
+	}
+	return _u
+}
+
+// SetPoster sets the "poster" edge to the AdminUser entity.
+func (_u *ProductionFactUpdateOne) SetPoster(v *AdminUser) *ProductionFactUpdateOne {
+	return _u.SetPosterID(v.ID)
+}
+
+// SetCancellerID sets the "canceller" edge to the AdminUser entity by ID.
+func (_u *ProductionFactUpdateOne) SetCancellerID(id int) *ProductionFactUpdateOne {
+	_u.mutation.SetCancellerID(id)
+	return _u
+}
+
+// SetNillableCancellerID sets the "canceller" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *ProductionFactUpdateOne) SetNillableCancellerID(id *int) *ProductionFactUpdateOne {
+	if id != nil {
+		_u = _u.SetCancellerID(*id)
+	}
+	return _u
+}
+
+// SetCanceller sets the "canceller" edge to the AdminUser entity.
+func (_u *ProductionFactUpdateOne) SetCanceller(v *AdminUser) *ProductionFactUpdateOne {
+	return _u.SetCancellerID(v.ID)
+}
+
 // Mutation returns the ProductionFactMutation object of the builder.
 func (_u *ProductionFactUpdateOne) Mutation() *ProductionFactMutation {
 	return _u.mutation
@@ -1138,6 +1525,18 @@ func (_u *ProductionFactUpdateOne) ClearProductSku() *ProductionFactUpdateOne {
 // ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
 func (_u *ProductionFactUpdateOne) ClearInventoryLot() *ProductionFactUpdateOne {
 	_u.mutation.ClearInventoryLot()
+	return _u
+}
+
+// ClearPoster clears the "poster" edge to the AdminUser entity.
+func (_u *ProductionFactUpdateOne) ClearPoster() *ProductionFactUpdateOne {
+	_u.mutation.ClearPoster()
+	return _u
+}
+
+// ClearCanceller clears the "canceller" edge to the AdminUser entity.
+func (_u *ProductionFactUpdateOne) ClearCanceller() *ProductionFactUpdateOne {
+	_u.mutation.ClearCanceller()
 	return _u
 }
 
@@ -1213,6 +1612,11 @@ func (_u *ProductionFactUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := productionfact.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SubjectType(); ok {
 		if err := productionfact.SubjectTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.subject_type": %w`, err)}
@@ -1261,6 +1665,21 @@ func (_u *ProductionFactUpdateOne) check() error {
 	if v, ok := _u.mutation.IdempotencyKey(); ok {
 		if err := productionfact.IdempotencyKeyValidator(v); err != nil {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PostedBy(); ok {
+		if err := productionfact.PostedByValidator(v); err != nil {
+			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.posted_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelledBy(); ok {
+		if err := productionfact.CancelledByValidator(v); err != nil {
+			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.cancelled_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelReason(); ok {
+		if err := productionfact.CancelReasonValidator(v); err != nil {
+			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.cancel_reason": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Note(); ok {
@@ -1315,6 +1734,12 @@ func (_u *ProductionFactUpdateOne) sqlSave(ctx context.Context) (_node *Producti
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(productionfact.FieldStatus, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(productionfact.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(productionfact.FieldVersion, field.TypeInt, value)
+	}
 	if value, ok := _u.mutation.SubjectType(); ok {
 		_spec.SetField(productionfact.FieldSubjectType, field.TypeString, value)
 	}
@@ -1365,6 +1790,18 @@ func (_u *ProductionFactUpdateOne) sqlSave(ctx context.Context) (_node *Producti
 	}
 	if _u.mutation.PostedAtCleared() {
 		_spec.ClearField(productionfact.FieldPostedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelledAt(); ok {
+		_spec.SetField(productionfact.FieldCancelledAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancelledAtCleared() {
+		_spec.ClearField(productionfact.FieldCancelledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelReason(); ok {
+		_spec.SetField(productionfact.FieldCancelReason, field.TypeString, value)
+	}
+	if _u.mutation.CancelReasonCleared() {
+		_spec.ClearField(productionfact.FieldCancelReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(productionfact.FieldNote, field.TypeString, value)
@@ -1484,6 +1921,64 @@ func (_u *ProductionFactUpdateOne) sqlSave(ctx context.Context) (_node *Producti
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PosterCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   productionfact.PosterTable,
+			Columns: []string{productionfact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PosterIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   productionfact.PosterTable,
+			Columns: []string{productionfact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CancellerCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   productionfact.CancellerTable,
+			Columns: []string{productionfact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CancellerIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   productionfact.CancellerTable,
+			Columns: []string{productionfact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

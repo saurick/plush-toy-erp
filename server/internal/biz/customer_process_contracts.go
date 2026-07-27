@@ -13,6 +13,10 @@ const (
 	CustomerProcessVariantSalesApprovalEngineeringPMC = "approval_engineering_pmc"
 	CustomerProcessVariantPurchaseOrderApproval       = "purchase_order_approval"
 	CustomerProcessVariantShipmentFinanceApproval     = "shipment_finance_approval"
+	CustomerProcessVariantSalesReturnApprovalReceipt  = "approval_receipt"
+	CustomerProcessVariantFinancePaymentApprovalPost  = "approval_post"
+	CustomerProcessVariantInventoryAdjustmentApproval = "manual_adjustment_approval"
+	CustomerProcessVariantProductionExceptionApproval = "exception_decision_approval"
 )
 
 type customerProcessSelection struct {
@@ -268,6 +272,10 @@ func builtinCustomerProcessContracts() []customerProcessContract {
 		newSalesOrderAcceptanceContract(CustomerProcessVariantSalesApprovalEngineeringPMC, true),
 		newMaterialSupplyContract(),
 		newFinishedGoodsDeliveryContract(),
+		newSalesReturnAcceptanceContract(),
+		newFinancePaymentApprovalContract(),
+		newInventoryAdjustmentApprovalContract(),
+		newProductionExceptionApprovalContract(),
 	}
 }
 
@@ -402,6 +410,252 @@ func newFinishedGoodsDeliveryContract() customerProcessContract {
 	}
 }
 
+func newSalesReturnAcceptanceContract() customerProcessContract {
+	approval := customerHumanProcessNode(
+		"sales_return_approval",
+		ProcessNodeTypeApproval,
+		"boss",
+		PermissionSalesReturnApprove,
+		"sales_return_approval",
+		"sales_return_approval",
+	)
+	approval.PolicySnapshot = map[string]any{
+		"branch_policy_key": ProcessBranchPolicySalesReturnApproval,
+	}
+	return customerProcessContract{
+		Selection: customerProcessSelection{
+			ProcessKey:      ProcessKeySalesReturnApproval,
+			ProcessVersion:  "v1",
+			VariantKey:      CustomerProcessVariantSalesReturnApprovalReceipt,
+			BusinessRefType: "sales_return",
+		},
+		DomainBoundary: "explicit_source_and_fact_commands",
+		FactBoundary:   "no_fact_posting",
+		Guardrail:      "The approval task changes only the sales-return source document. The warehouse receipt task merely activates the explicit receive command; only that command writes return inventory and submits the linked RMA quality inspection.",
+		Nodes: []ProcessNodeInstanceCreate{
+			approval,
+			customerDomainCommandNode(
+				"approve_sales_return",
+				"",
+				PermissionWorkflowTaskApprove,
+				ProcessDomainCommandSalesReturnApprove,
+				"OperationalFactUsecase.ApproveSalesReturnForProcessCommand",
+			),
+			customerHumanProcessNode(
+				"sales_return_receipt",
+				ProcessNodeTypeHumanTask,
+				"warehouse",
+				PermissionWorkflowTaskComplete,
+				"sales_return_receipt",
+				"sales_return_receipt",
+			),
+			customerDomainCommandNode(
+				"receive_sales_return",
+				"warehouse",
+				PermissionSalesReturnReceive,
+				ProcessDomainCommandSalesReturnReceive,
+				"OperationalFactUsecase.ReceiveSalesReturnForProcessCommand",
+			),
+			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
+			customerDomainCommandNode(
+				"reject_sales_return",
+				"",
+				PermissionWorkflowTaskReject,
+				ProcessDomainCommandSalesReturnReject,
+				"OperationalFactUsecase.RejectSalesReturnForProcessCommand",
+			),
+			{NodeKey: "rejected_end", NodeType: ProcessNodeTypeEnd},
+		},
+	}
+}
+
+func newFinancePaymentApprovalContract() customerProcessContract {
+	approval := customerHumanProcessNode(
+		"finance_payment_approval",
+		ProcessNodeTypeApproval,
+		"boss",
+		PermissionFinancePaymentApprove,
+		"finance_payment_approval",
+		"finance_payment_approval",
+	)
+	approval.PolicySnapshot = map[string]any{
+		"branch_policy_key": ProcessBranchPolicyFinancePaymentApproval,
+	}
+	return customerProcessContract{
+		Selection: customerProcessSelection{
+			ProcessKey:      ProcessKeyFinancePaymentApproval,
+			ProcessVersion:  "v1",
+			VariantKey:      CustomerProcessVariantFinancePaymentApprovalPost,
+			BusinessRefType: "finance_payment",
+		},
+		DomainBoundary: "explicit_source_and_fact_commands",
+		FactBoundary:   "no_fact_posting",
+		Guardrail:      "The approval task changes only the payment source document. The finance execution task merely activates the explicit post command; allocations and settlement read models are written only by that command.",
+		Nodes: []ProcessNodeInstanceCreate{
+			approval,
+			customerDomainCommandNode(
+				"approve_finance_payment",
+				"",
+				PermissionWorkflowTaskApprove,
+				ProcessDomainCommandFinancePaymentApprove,
+				"OperationalFactUsecase.ApproveFinancePaymentForProcessCommand",
+			),
+			customerHumanProcessNode(
+				"finance_payment_execution",
+				ProcessNodeTypeHumanTask,
+				"finance",
+				PermissionWorkflowTaskComplete,
+				"finance_payment_execution",
+				"finance_payment_execution",
+			),
+			customerDomainCommandNode(
+				"post_finance_payment",
+				"finance",
+				PermissionFinancePaymentPost,
+				ProcessDomainCommandFinancePaymentPost,
+				"OperationalFactUsecase.PostFinancePaymentForProcessCommand",
+			),
+			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
+			customerDomainCommandNode(
+				"reject_finance_payment",
+				"",
+				PermissionWorkflowTaskReject,
+				ProcessDomainCommandFinancePaymentReject,
+				"OperationalFactUsecase.RejectFinancePaymentForProcessCommand",
+			),
+			{NodeKey: "rejected_end", NodeType: ProcessNodeTypeEnd},
+		},
+	}
+}
+
+func newInventoryAdjustmentApprovalContract() customerProcessContract {
+	approval := customerHumanProcessNode(
+		"inventory_adjustment_approval",
+		ProcessNodeTypeApproval,
+		"boss",
+		PermissionWarehouseAdjustmentApprove,
+		"inventory_adjustment_approval",
+		"inventory_adjustment_approval",
+	)
+	approval.PolicySnapshot = map[string]any{
+		"branch_policy_key": ProcessBranchPolicyInventoryAdjustmentApproval,
+	}
+	return customerProcessContract{
+		Selection: customerProcessSelection{
+			ProcessKey:      ProcessKeyInventoryAdjustmentApproval,
+			ProcessVersion:  "v1",
+			VariantKey:      CustomerProcessVariantInventoryAdjustmentApproval,
+			BusinessRefType: "inventory_operation",
+		},
+		DomainBoundary: "explicit_source_and_fact_commands",
+		FactBoundary:   "no_fact_posting",
+		Guardrail:      "Submission and approval update only the manual-adjustment source document. The warehouse execution task merely activates the explicit post command; only that command writes inventory transactions and balances.",
+		Nodes: []ProcessNodeInstanceCreate{
+			customerDomainCommandNode(
+				"submit_inventory_adjustment",
+				"",
+				PermissionWarehouseAdjustmentCreate,
+				ProcessDomainCommandInventoryAdjustmentSubmit,
+				"InventoryUsecase.SubmitInventoryOperationForProcessCommand",
+			),
+			approval,
+			customerDomainCommandNode(
+				"approve_inventory_adjustment",
+				"",
+				PermissionWorkflowTaskApprove,
+				ProcessDomainCommandInventoryAdjustmentApprove,
+				"InventoryUsecase.ApproveInventoryOperationForProcessCommand",
+			),
+			customerHumanProcessNode(
+				"inventory_adjustment_execution",
+				ProcessNodeTypeHumanTask,
+				"warehouse",
+				PermissionWorkflowTaskComplete,
+				"inventory_adjustment_execution",
+				"inventory_adjustment_execution",
+			),
+			customerDomainCommandNode(
+				"post_inventory_adjustment",
+				"warehouse",
+				PermissionWarehouseAdjustmentCreate,
+				ProcessDomainCommandInventoryAdjustmentPost,
+				"InventoryUsecase.PostInventoryOperationForProcessCommand",
+			),
+			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
+			customerDomainCommandNode(
+				"reject_inventory_adjustment",
+				"",
+				PermissionWorkflowTaskReject,
+				ProcessDomainCommandInventoryAdjustmentReject,
+				"InventoryUsecase.RejectInventoryOperationForProcessCommand",
+			),
+			{NodeKey: "rejected_end", NodeType: ProcessNodeTypeEnd},
+		},
+	}
+}
+
+func newProductionExceptionApprovalContract() customerProcessContract {
+	approval := customerHumanProcessNode(
+		"production_exception_decision_approval",
+		ProcessNodeTypeApproval,
+		"boss",
+		PermissionProductionExceptionApprove,
+		"production_exception_approval",
+		"production_exception_approval",
+	)
+	approval.PolicySnapshot = map[string]any{
+		"branch_policy_key": ProcessBranchPolicyProductionExceptionApproval,
+	}
+	approve := customerDomainCommandNode(
+		"approve_production_exception",
+		"",
+		PermissionWorkflowTaskApprove,
+		ProcessDomainCommandProductionExceptionApprove,
+		"OperationalFactUsecase.ApproveProductionExceptionForProcessCommand",
+	)
+	approve.PolicySnapshot["branch_policy_key"] = ProcessBranchPolicyProductionExceptionExecution
+	return customerProcessContract{
+		Selection: customerProcessSelection{
+			ProcessKey:      ProcessKeyProductionExceptionApproval,
+			ProcessVersion:  "v1",
+			VariantKey:      CustomerProcessVariantProductionExceptionApproval,
+			BusinessRefType: "production_exception_decision",
+		},
+		DomainBoundary: "explicit_source_and_wip_commands",
+		FactBoundary:   "no_fact_posting",
+		Guardrail:      "Approval records only the production-exception decision and quantity. Scrap and WIP-concession execution remains a separate production task and explicit command; an over-issue approval is an allowance consumed only by the normal material-issue fact path.",
+		Nodes: []ProcessNodeInstanceCreate{
+			approval,
+			approve,
+			customerHumanProcessNode(
+				"production_exception_execution",
+				ProcessNodeTypeHumanTask,
+				"production",
+				PermissionWorkflowTaskComplete,
+				"production_exception_execution",
+				"production_exception_execution",
+			),
+			customerDomainCommandNode(
+				"execute_production_exception",
+				"production",
+				PermissionProductionFactPost,
+				ProcessDomainCommandProductionExceptionExecute,
+				"OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand",
+			),
+			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
+			customerDomainCommandNode(
+				"reject_production_exception",
+				"",
+				PermissionWorkflowTaskReject,
+				ProcessDomainCommandProductionExceptionReject,
+				"OperationalFactUsecase.RejectProductionExceptionForProcessCommand",
+			),
+			{NodeKey: "rejected_end", NodeType: ProcessNodeTypeEnd},
+			{NodeKey: "over_issue_end", NodeType: ProcessNodeTypeEnd},
+		},
+	}
+}
+
 func customerHumanProcessNode(nodeKey, nodeType, ownerPoolKey, capabilityKey, formProfileKey, actionSetKey string) ProcessNodeInstanceCreate {
 	return ProcessNodeInstanceCreate{
 		NodeKey:               nodeKey,
@@ -426,7 +680,17 @@ func customerDomainCommandNode(nodeKey, ownerPoolKey, capabilityKey, commandKey,
 			"writes_fact":              false,
 		},
 	}
-	if commandKey == ProcessDomainCommandSalesOrderActivate || commandKey == ProcessDomainCommandPurchaseOrderApprove || commandKey == ProcessDomainCommandShipmentFinanceRelease {
+	if commandKey == ProcessDomainCommandSalesOrderActivate ||
+		commandKey == ProcessDomainCommandPurchaseOrderApprove ||
+		commandKey == ProcessDomainCommandShipmentFinanceRelease ||
+		commandKey == ProcessDomainCommandSalesReturnApprove ||
+		commandKey == ProcessDomainCommandSalesReturnReject ||
+		commandKey == ProcessDomainCommandFinancePaymentApprove ||
+		commandKey == ProcessDomainCommandFinancePaymentReject ||
+		commandKey == ProcessDomainCommandInventoryAdjustmentApprove ||
+		commandKey == ProcessDomainCommandInventoryAdjustmentReject ||
+		commandKey == ProcessDomainCommandProductionExceptionApprove ||
+		commandKey == ProcessDomainCommandProductionExceptionReject {
 		node.PolicySnapshot["execute_after_approval"] = true
 	}
 	return node

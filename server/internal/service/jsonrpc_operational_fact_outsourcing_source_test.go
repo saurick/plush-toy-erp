@@ -71,8 +71,8 @@ func TestOutsourcingFactRPCUsesExactPermissionsAndRetiresGenericCreate(t *testin
 	}{
 		{method: "create_outsourcing_material_issue_from_order", params: outsourcingFactModuleGateParams(t).AsMap()},
 		{method: "create_outsourcing_return_receipt_from_order", params: outsourcingFactModuleGateParams(t).AsMap()},
-		{method: "post_outsourcing_fact", params: map[string]any{"id": float64(600)}},
-		{method: "cancel_outsourcing_fact", params: map[string]any{"id": float64(600)}},
+		{method: "post_outsourcing_fact", params: map[string]any{"id": float64(600), "expected_version": float64(1)}},
+		{method: "cancel_outsourcing_fact", params: map[string]any{"id": float64(600), "expected_version": float64(1), "reason": "来源单据已作废"}},
 		{method: "list_outsourcing_facts", params: map[string]any{"limit": float64(20)}},
 	} {
 		_, res, err := denied.handleOperationalFact(ctx, tc.method, tc.method, mustJSONRPCStruct(t, tc.params))

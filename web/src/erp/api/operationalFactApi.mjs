@@ -35,6 +35,10 @@ import {
 } from '../utils/outsourcingOrderFactAction.mjs'
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 import { validateShipmentSourceCandidatePage } from '../utils/shipmentSourceCandidate.mjs'
+import {
+  normalizeOperationalFactLifecycleRequest,
+  validateOperationalFactLifecycleResult,
+} from '../utils/operationalFactLifecycle.mjs'
 
 const operationalFactRpc = new JsonRpc({
   url: 'operational_fact',
@@ -119,13 +123,22 @@ export async function createProductionReworkFromCompletion(params = {}) {
 }
 
 export async function postProductionFact(params = {}) {
-  const result = await operationalFactRpc.call('post_production_fact', params)
-  return dataOf(result)?.production_fact || null
+  return runOperationalFactLifecycle({
+    method: 'post_production_fact',
+    resultKey: 'production_fact',
+    targetStatus: 'POSTED',
+    params,
+  })
 }
 
 export async function cancelProductionFact(params = {}) {
-  const result = await operationalFactRpc.call('cancel_production_fact', params)
-  return dataOf(result)?.production_fact || null
+  return runOperationalFactLifecycle({
+    method: 'cancel_production_fact',
+    resultKey: 'production_fact',
+    targetStatus: 'CANCELLED',
+    params,
+    requireReason: true,
+  })
 }
 
 export async function listOutsourcingFacts(params = {}, options = {}) {
@@ -188,16 +201,22 @@ export async function createOutsourcingReturnReceiptFromOrder(params = {}) {
 }
 
 export async function postOutsourcingFact(params = {}) {
-  const result = await operationalFactRpc.call('post_outsourcing_fact', params)
-  return dataOf(result)?.outsourcing_fact || null
+  return runOperationalFactLifecycle({
+    method: 'post_outsourcing_fact',
+    resultKey: 'outsourcing_fact',
+    targetStatus: 'POSTED',
+    params,
+  })
 }
 
 export async function cancelOutsourcingFact(params = {}) {
-  const result = await operationalFactRpc.call(
-    'cancel_outsourcing_fact',
-    params
-  )
-  return dataOf(result)?.outsourcing_fact || null
+  return runOperationalFactLifecycle({
+    method: 'cancel_outsourcing_fact',
+    resultKey: 'outsourcing_fact',
+    targetStatus: 'CANCELLED',
+    params,
+    requireReason: true,
+  })
 }
 
 export async function listOutsourcingReturnDispositions(
@@ -245,6 +264,15 @@ export async function listProductionExceptions(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function getProductionException(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'get_production_exception',
+    params,
+    options
+  )
+  return dataOf(result)?.production_exception || null
+}
+
 export async function submitProductionException(params = {}) {
   const result = await operationalFactRpc.call(
     'submit_production_exception',
@@ -257,31 +285,10 @@ async function productionExceptionResult(method, params) {
   const result = await method(params)
   return dataOf(result)?.production_exception || null
 }
-export async function approveProductionException(params = {}) {
-  return productionExceptionResult(
-    (request) =>
-      operationalFactRpc.call('approve_production_exception', request),
-    params
-  )
-}
-export async function rejectProductionException(params = {}) {
-  return productionExceptionResult(
-    (request) =>
-      operationalFactRpc.call('reject_production_exception', request),
-    params
-  )
-}
 export async function cancelProductionException(params = {}) {
   return productionExceptionResult(
     (request) =>
       operationalFactRpc.call('cancel_production_exception', request),
-    params
-  )
-}
-export async function executeProductionException(params = {}) {
-  return productionExceptionResult(
-    (request) =>
-      operationalFactRpc.call('execute_production_exception', request),
     params
   )
 }
@@ -436,8 +443,12 @@ export async function createReconciliationFromFinanceFact(params = {}) {
 }
 
 export async function postFinanceFact(params = {}) {
-  const result = await operationalFactRpc.call('post_finance_fact', params)
-  return dataOf(result)?.finance_fact || null
+  return runOperationalFactLifecycle({
+    method: 'post_finance_fact',
+    resultKey: 'finance_fact',
+    targetStatus: 'POSTED',
+    params,
+  })
 }
 
 export async function listSalesReturns(params = {}, options = {}) {
@@ -454,18 +465,13 @@ export async function createSalesReturn(params = {}) {
   return dataOf(result)?.sales_return || null
 }
 
-export async function approveSalesReturn(params = {}) {
-  const result = await operationalFactRpc.call('approve_sales_return', params)
-  return dataOf(result)?.sales_return || null
-}
-
-export async function receiveSalesReturn(params = {}) {
-  const result = await operationalFactRpc.call('receive_sales_return', params)
-  return dataOf(result)?.sales_return || null
-}
-
 export async function cancelSalesReturn(params = {}) {
   const result = await operationalFactRpc.call('cancel_sales_return', params)
+  return dataOf(result)?.sales_return || null
+}
+
+export async function reverseSalesReturn(params = {}) {
+  const result = await operationalFactRpc.call('reverse_sales_return', params)
   return dataOf(result)?.sales_return || null
 }
 
@@ -483,8 +489,8 @@ export async function createFinancePayment(params = {}) {
   return dataOf(result)?.payment || null
 }
 
-export async function postFinancePayment(params = {}) {
-  const result = await operationalFactRpc.call('post_finance_payment', params)
+export async function cancelFinancePayment(params = {}) {
+  const result = await operationalFactRpc.call('cancel_finance_payment', params)
   return dataOf(result)?.payment || null
 }
 
@@ -549,8 +555,12 @@ export async function reverseFinanceCreditNote(params = {}) {
 }
 
 export async function settleFinanceFact(params = {}) {
-  const result = await operationalFactRpc.call('settle_finance_fact', params)
-  return dataOf(result)?.finance_fact || null
+  return runOperationalFactLifecycle({
+    method: 'settle_finance_fact',
+    resultKey: 'finance_fact',
+    targetStatus: 'SETTLED',
+    params,
+  })
 }
 
 export async function cancelFinanceFact(params = {}) {
@@ -559,5 +569,23 @@ export async function cancelFinanceFact(params = {}) {
   return validateFinanceCancellationResult(
     dataOf(result)?.finance_fact,
     request
+  )
+}
+
+async function runOperationalFactLifecycle({
+  method,
+  resultKey,
+  targetStatus,
+  params,
+  requireReason = false,
+}) {
+  const request = normalizeOperationalFactLifecycleRequest(params, {
+    requireReason,
+  })
+  const result = await operationalFactRpc.call(method, request)
+  return validateOperationalFactLifecycleResult(
+    dataOf(result)?.[resultKey],
+    request,
+    targetStatus
   )
 }

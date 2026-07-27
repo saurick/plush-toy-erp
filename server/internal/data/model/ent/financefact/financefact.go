@@ -22,6 +22,8 @@ const (
 	FieldFactType = "fact_type"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldVersion holds the string denoting the version field in the database.
+	FieldVersion = "version"
 	// FieldCounterpartyType holds the string denoting the counterparty_type field in the database.
 	FieldCounterpartyType = "counterparty_type"
 	// FieldCounterpartyID holds the string denoting the counterparty_id field in the database.
@@ -54,8 +56,12 @@ const (
 	FieldOccurredAtSpecified = "occurred_at_specified"
 	// FieldPostedAt holds the string denoting the posted_at field in the database.
 	FieldPostedAt = "posted_at"
+	// FieldPostedBy holds the string denoting the posted_by field in the database.
+	FieldPostedBy = "posted_by"
 	// FieldSettledAt holds the string denoting the settled_at field in the database.
 	FieldSettledAt = "settled_at"
+	// FieldSettledBy holds the string denoting the settled_by field in the database.
+	FieldSettledBy = "settled_by"
 	// FieldCancelledAt holds the string denoting the cancelled_at field in the database.
 	FieldCancelledAt = "cancelled_at"
 	// FieldCancelledBy holds the string denoting the cancelled_by field in the database.
@@ -68,10 +74,28 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgePoster holds the string denoting the poster edge name in mutations.
+	EdgePoster = "poster"
+	// EdgeSettler holds the string denoting the settler edge name in mutations.
+	EdgeSettler = "settler"
 	// EdgeCanceller holds the string denoting the canceller edge name in mutations.
 	EdgeCanceller = "canceller"
 	// Table holds the table name of the financefact in the database.
 	Table = "finance_facts"
+	// PosterTable is the table that holds the poster relation/edge.
+	PosterTable = "finance_facts"
+	// PosterInverseTable is the table name for the AdminUser entity.
+	// It exists in this package in order to avoid circular dependency with the "adminuser" package.
+	PosterInverseTable = "admin_users"
+	// PosterColumn is the table column denoting the poster relation/edge.
+	PosterColumn = "posted_by"
+	// SettlerTable is the table that holds the settler relation/edge.
+	SettlerTable = "finance_facts"
+	// SettlerInverseTable is the table name for the AdminUser entity.
+	// It exists in this package in order to avoid circular dependency with the "adminuser" package.
+	SettlerInverseTable = "admin_users"
+	// SettlerColumn is the table column denoting the settler relation/edge.
+	SettlerColumn = "settled_by"
 	// CancellerTable is the table that holds the canceller relation/edge.
 	CancellerTable = "finance_facts"
 	// CancellerInverseTable is the table name for the AdminUser entity.
@@ -87,6 +111,7 @@ var Columns = []string{
 	FieldFactNo,
 	FieldFactType,
 	FieldStatus,
+	FieldVersion,
 	FieldCounterpartyType,
 	FieldCounterpartyID,
 	FieldAmount,
@@ -103,7 +128,9 @@ var Columns = []string{
 	FieldOccurredAt,
 	FieldOccurredAtSpecified,
 	FieldPostedAt,
+	FieldPostedBy,
 	FieldSettledAt,
+	FieldSettledBy,
 	FieldCancelledAt,
 	FieldCancelledBy,
 	FieldCancelReason,
@@ -137,6 +164,10 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultVersion holds the default value on creation for the "version" field.
+	DefaultVersion int
+	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	VersionValidator func(int) error
 	// CounterpartyTypeValidator is a validator for the "counterparty_type" field. It is called by the builders before save.
 	CounterpartyTypeValidator func(string) error
 	// CounterpartyIDValidator is a validator for the "counterparty_id" field. It is called by the builders before save.
@@ -167,6 +198,10 @@ var (
 	DefaultOccurredAt func() time.Time
 	// DefaultOccurredAtSpecified holds the default value on creation for the "occurred_at_specified" field.
 	DefaultOccurredAtSpecified bool
+	// PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
+	PostedByValidator func(int) error
+	// SettledByValidator is a validator for the "settled_by" field. It is called by the builders before save.
+	SettledByValidator func(int) error
 	// CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
 	CancelledByValidator func(int) error
 	// CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
@@ -202,6 +237,11 @@ func ByFactType(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByVersion orders the results by the version field.
+func ByVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVersion, opts...).ToFunc()
 }
 
 // ByCounterpartyType orders the results by the counterparty_type field.
@@ -284,9 +324,19 @@ func ByPostedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPostedAt, opts...).ToFunc()
 }
 
+// ByPostedBy orders the results by the posted_by field.
+func ByPostedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPostedBy, opts...).ToFunc()
+}
+
 // BySettledAt orders the results by the settled_at field.
 func BySettledAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSettledAt, opts...).ToFunc()
+}
+
+// BySettledBy orders the results by the settled_by field.
+func BySettledBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettledBy, opts...).ToFunc()
 }
 
 // ByCancelledAt orders the results by the cancelled_at field.
@@ -319,11 +369,39 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
+// ByPosterField orders the results by poster field.
+func ByPosterField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPosterStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// BySettlerField orders the results by settler field.
+func BySettlerField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSettlerStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByCancellerField orders the results by canceller field.
 func ByCancellerField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newCancellerStep(), sql.OrderByField(field, opts...))
 	}
+}
+func newPosterStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PosterInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, PosterTable, PosterColumn),
+	)
+}
+func newSettlerStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SettlerInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, SettlerTable, SettlerColumn),
+	)
 }
 func newCancellerStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

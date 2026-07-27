@@ -886,7 +886,7 @@ func isProductionReworkDispositionTxn(ctx context.Context, client *ent.Client, i
 		}
 		return false, err
 	}
-	return row.FactType == biz.ProductionFactRework || row.FactType == biz.ProductionFactScrap, nil
+	return row.FactType == biz.ProductionFactRework, nil
 }
 
 func validateInventoryLotStatusForTxn(status string, in *biz.InventoryTxnCreate, allowBlockedLotDisposition bool) error {

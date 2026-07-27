@@ -250,6 +250,20 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 边界：浏览器证据来自本地自托管 React + Chromium 与受控 mock RPC，只证明当前 Local 前端合同和运行态，不是目标账号实登、共享 / 133 / 生产数据库验证、部署、甲方 UAT 或客户签收。本机使用 Node `26.5.0`，仓库声明 `24.14.x`；本轮未提交、未推送、未部署。
 
+## 2026-07-27 异常流完整收口与最终 Local 验收
+
+完成：79da Worktree 的异常流改动已按业务真源逐文件、逐 hunk 语义带回 Local，没有整树覆盖、merge、cherry-pick、rebase 或兼容兜底。Local 原有的正常流、审批责任、状态观察台和页面治理继续保留；异常流补齐客户退货、收付款、手工库存调整和生产异常四条正式 ProcessRuntime，以及对应 Source Document / Fact / Inventory / Allocation、RBAC、CAS、幂等、审计和前端动作。Workflow task done 仍不等于 Fact posted，四条流程的领域结果只由各自 usecase 写入。
+
+配置真源：当前 yoyoosun runtime manifest 选择七条正式流程：销售接单、采购供料、成品交付、客户退货、收付款、手工库存调整和生产异常。权限中心“审批责任”只允许配置销售、采购和 Shipment 财务放行三类日常责任模板；四条异常流程继续使用注册流程合同中的固定责任池，页面不再把已注册流程误报为“尚未接入”。没有新增别名、默认经办人、默认原因、默认数量、任务名猜测或测试专用业务旁路。
+
+迁移与生成：`make data` 连续执行保持 Ent / Atlas 零漂移；生成模型 diff 的 SHA-256 保持 `181ecc97c899c833cbaed5f3f6723abd2cb56f524a154fdf2b38f248c6680abf`。全新登记隔离库 `plush_erp_acceptance_local_browser_actions_20260727_v5_dev` 在 `192.168.0.106:5432` 完成 `migrate_status → migrate_apply → migrate_status`，populated preflight 通过，Atlas 为 `102 / 102`、最新 `20260726174057`、pending 0。没有对共享开发库、133、客户试用或生产数据库 apply。
+
+浏览器验收：当前 Local 源码后端固定在独立 `8324`，yoyoosun Vite 固定在 `15215`；管理员从真实客户配置控制台点击应用，读回 active revision `yoyoosun-customer-package-v7.local-931c8fda75bc4b6a.runtime-v1`，active snapshot 恰好包含上述七条流程。完整角色 smoke 为桌面 `10 / 10`、手机业务岗位 `9 / 9`、管理员手机拒绝 1 项通过，10 个账号的 effective-session 诊断均来自 active revision 且 blocker 为 0。
+
+四条异常流真实写入为 `4 / 4`：销售退货完成收货与入库冲正，收付款完成过账 / 核销与冲销恢复，库存调整完成新建 / 提交 / 老板审批 / 仓库执行 / 过账 / 取消冲正，生产超领完成额度消费、领料 Fact 过账、取消冲正和额度恢复。四条主 mutation 均由产品 UI 点击触发；另有四个结构合法的无权角色请求被服务端以 `40304` 拒绝，四次后端成功后丢弃响应均由页面权威读回恢复，四个重复或旧 version 请求均以 `40920` 拒绝。报告不保存密码、token 或 Authorization header。数据库额外读回四个对应 ProcessInstance 均为 `completed`，销售退货、收付款、库存调整的执行节点与 end 均完成；生产超领按审批决定的 `over_issue_end` 完成，不把后续领料 Fact 误写成审批任务结果。
+
+验证边界：定向 Go、Node、文档合同、`db-guard`、`go test ./...`、`go build ./...`、前端单测 / lint / CSS / production build、真实 Chromium、shell / YAML / 漏洞检查均已在当前实现阶段通过。最终仓库门禁固定为在本节落盘后的同一工作树执行 `bash scripts/qa/strict.sh`；本文件不预写该命令的绿色结果，最终交接以终端回执为准。当前没有提交、推送、部署或 Handoff 后 Git 收口，133 / 生产 migration、目标 readback、真实客户数据导入、甲方 UAT / 签收仍未执行。
+
 ## 下一步与停止条件
 
 1. 发布前必须绑定最终 commit / image，按正式流程执行备份 / 回滚点、migration status / apply / readback、health / ready、真实账号与业务 smoke。

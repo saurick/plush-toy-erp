@@ -303,6 +303,37 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data:    newDataStruct(map[string]any{"revision": customerConfigRevisionToMap(item)}),
 		}, nil
 
+	case "get_process_recovery_context":
+		if !customerConfigAllowsOnly(pm, "process_instance_id") {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRuntimeRecover); res != nil {
+			return id, res, nil
+		}
+		processInstanceID := getInt(pm, "process_instance_id", 0)
+		if processInstanceID <= 0 {
+			return id, invalidParamResult(), nil
+		}
+		instance, err := d.processRuntimeUC.GetProcessInstance(ctx, processInstanceID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		switch instance.ProcessKey {
+		case biz.ProcessKeySalesReturnApproval,
+			biz.ProcessKeyFinancePaymentApproval,
+			biz.ProcessKeyInventoryAdjustmentApproval,
+			biz.ProcessKeyProductionExceptionApproval:
+		default:
+			return id, invalidParamResult(), nil
+		}
+		nodes, err := d.processRuntimeUC.ListProcessNodeInstances(ctx, processInstanceID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		return id, okData(map[string]any{
+			"process_context": exceptionProcessContextToMap(instance, nodes),
+		}), nil
+
 	case "recover_compensated_process_domain_command":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRuntimeRecover); res != nil {
 			return id, res, nil
@@ -391,6 +422,25 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Message: errcode.OK.Message,
 			Data:    newDataStruct(map[string]any{"process_definition": customerProcessDefinitionExplanationToMap(definition)}),
 		}, nil
+
+	case "start_sales_return_acceptance_process",
+		"get_sales_return_acceptance_process",
+		"execute_sales_return_receive",
+		"start_finance_payment_approval_process",
+		"get_finance_payment_approval_process",
+		"execute_finance_payment_post",
+		"start_inventory_adjustment_approval_process",
+		"get_inventory_adjustment_approval_process",
+		"execute_inventory_adjustment_submit",
+		"execute_inventory_adjustment_post",
+		"start_production_exception_approval_process",
+		"get_production_exception_approval_process",
+		"execute_production_exception_process":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
+		result := d.handleCustomerConfigExceptionProcess(ctx, method, pm)
+		return id, result, nil
 
 	case "start_sales_order_acceptance_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderSubmit); res != nil {
@@ -987,6 +1037,28 @@ func (d *jsonrpcDispatcher) requireCustomerConfigProcessDomainCommandAllowed(
 	if instance == nil || instance.ID != in.ProcessInstanceID || strings.TrimSpace(instance.ConfigRevision) == "" {
 		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
+	nodes, err := d.processRuntimeUC.ListProcessNodeInstances(ctx, instance.ID)
+	if err != nil {
+		return "", d.mapCustomerConfigError(ctx, err)
+	}
+	var targetNode *biz.ProcessNodeInstance
+	for _, node := range nodes {
+		if node == nil || node.ID != in.ProcessNodeInstanceID {
+			continue
+		}
+		if targetNode != nil {
+			return "", d.mapCustomerConfigError(ctx, biz.ErrProcessNodeInstanceConflict)
+		}
+		targetNode = node
+	}
+	if targetNode == nil || targetNode.ProcessInstanceID != instance.ID ||
+		targetNode.NodeType != biz.ProcessNodeTypeDomainCommand {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	nodeCommandKey, _ := targetNode.PolicySnapshot["command_key"].(string)
+	if strings.TrimSpace(nodeCommandKey) == "" || strings.TrimSpace(nodeCommandKey) != strings.TrimSpace(in.CommandKey) {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
 	instanceCustomerKey, _ := instance.ModuleContractSnapshot["customer_key"].(string)
 	instanceCustomerKey = biz.NormalizeCustomerKey(instanceCustomerKey)
 	if instanceCustomerKey == "" {
@@ -1009,7 +1081,57 @@ func (d *jsonrpcDispatcher) requireCustomerConfigProcessDomainCommandAllowed(
 	); err != nil {
 		return "", d.mapCustomerConfigError(ctx, err)
 	}
+	ownerPoolKey := ""
+	if targetNode.OwnerPoolKey != nil {
+		ownerPoolKey = strings.TrimSpace(*targetNode.OwnerPoolKey)
+	}
+	if ownerPoolKey != "" {
+		requiredCapabilityKey := ""
+		if targetNode.RequiredCapabilityKey != nil {
+			requiredCapabilityKey = strings.TrimSpace(*targetNode.RequiredCapabilityKey)
+		}
+		if requiredCapabilityKey == "" {
+			return "", d.mapCustomerConfigError(ctx, biz.ErrForbidden)
+		}
+		visibleRoleKeys, err := d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevision(
+			ctx,
+			resolvedCustomerKey,
+			instance.ConfigRevision,
+			admin,
+			requiredCapabilityKey,
+		)
+		if err != nil {
+			return "", d.mapCustomerConfigError(ctx, err)
+		}
+		explanation, err := d.customerConfigUC.WorkflowCandidateOwnerRoleKeysAtRevision(
+			ctx,
+			resolvedCustomerKey,
+			instance.ConfigRevision,
+			ownerPoolKey,
+			requiredCapabilityKey,
+		)
+		if err != nil {
+			return "", d.mapCustomerConfigError(ctx, err)
+		}
+		if explanation == nil ||
+			!workflowRoleKeySetsIntersect(visibleRoleKeys, explanation.CandidateOwnerRoleKeys) {
+			return "", d.mapCustomerConfigError(ctx, biz.ErrForbidden)
+		}
+	}
 	return instance.ConfigRevision, nil
+}
+
+func workflowRoleKeySetsIntersect(left, right []string) bool {
+	rightSet := make(map[string]struct{}, len(right))
+	for _, roleKey := range biz.NormalizeAdminRoleKeys(right) {
+		rightSet[roleKey] = struct{}{}
+	}
+	for _, roleKey := range biz.NormalizeAdminRoleKeys(left) {
+		if _, ok := rightSet[roleKey]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func customerConfigProcessRuntimeBoundary(revision string, boundary map[string]any) map[string]any {
@@ -2226,9 +2348,33 @@ func processNodeInstanceToMap(item *biz.ProcessNodeInstance) map[string]any {
 		"started_at":              optionalTimeUnix(item.StartedAt),
 		"completed_at":            optionalTimeUnix(item.CompletedAt),
 		"outcome":                 optionalStringValue(item.Outcome),
-		"version":                 item.Version,
-		"created_at":              item.CreatedAt.Unix(),
-		"updated_at":              item.UpdatedAt.Unix(),
+		"domain_command_effect_state": optionalStringValue(
+			item.DomainCommandEffectState,
+		),
+		"domain_command_result_hash": optionalStringValue(
+			item.DomainCommandResultHash,
+		),
+		"domain_command_compensation_hash": optionalStringValue(
+			item.DomainCommandCompensationHash,
+		),
+		"domain_command_compensated_at": optionalTimeUnix(
+			item.DomainCommandCompensatedAt,
+		),
+		"domain_command_compensated_by": optionalIntValue(
+			item.DomainCommandCompensatedBy,
+		),
+		"domain_command_recovery_decision": optionalStringValue(
+			item.DomainCommandRecoveryDecision,
+		),
+		"domain_command_recovered_at": optionalTimeUnix(
+			item.DomainCommandRecoveredAt,
+		),
+		"domain_command_recovered_by": optionalIntValue(
+			item.DomainCommandRecoveredBy,
+		),
+		"version":    item.Version,
+		"created_at": item.CreatedAt.Unix(),
+		"updated_at": item.UpdatedAt.Unix(),
 	}
 }
 

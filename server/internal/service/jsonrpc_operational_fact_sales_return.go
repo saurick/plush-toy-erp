@@ -9,7 +9,7 @@ import (
 )
 
 func (d *jsonrpcDispatcher) handleOperationalFactSalesReturn(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {
-	permission := map[string]string{"create_sales_return": biz.PermissionSalesReturnCreate, "approve_sales_return": biz.PermissionSalesReturnApprove, "receive_sales_return": biz.PermissionSalesReturnReceive, "cancel_sales_return": biz.PermissionSalesReturnCancel, "get_sales_return": biz.PermissionSalesReturnRead, "list_sales_returns": biz.PermissionSalesReturnRead}[method]
+	permission := map[string]string{"create_sales_return": biz.PermissionSalesReturnCreate, "cancel_sales_return": biz.PermissionSalesReturnCancel, "reverse_sales_return": biz.PermissionSalesReturnReverse, "get_sales_return": biz.PermissionSalesReturnRead, "list_sales_returns": biz.PermissionSalesReturnRead}[method]
 	if permission == "" {
 		return id, unknownOperationalFactResult(method), nil
 	}
@@ -17,10 +17,10 @@ func (d *jsonrpcDispatcher) handleOperationalFactSalesReturn(ctx context.Context
 		return id, res, nil
 	}
 	if method != "get_sales_return" && method != "list_sales_returns" {
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "sales_returns"); res != nil {
 			return id, res, nil
 		}
-	} else if res := d.requireCustomerConfigModulesReadable(ctx, "shipments"); res != nil {
+	} else if res := d.requireCustomerConfigModulesReadable(ctx, "shipments", "sales_returns"); res != nil {
 		return id, res, nil
 	}
 	switch method {
@@ -49,7 +49,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactSalesReturn(ctx context.Context
 		}
 		out, err := d.operationalFactUC.CreateSalesReturn(ctx, &biz.SalesReturnCreate{ReturnNo: getString(pm, "return_no"), ShipmentID: getInt(pm, "shipment_id", 0), Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), Items: items}, actorID)
 		return id, salesReturnResult(d, ctx, out, err), nil
-	case "approve_sales_return", "receive_sales_return", "cancel_sales_return":
+	case "cancel_sales_return", "reverse_sales_return":
 		if !financeFactAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
 			return id, invalidParamResult(), nil
 		}
@@ -57,10 +57,8 @@ func (d *jsonrpcDispatcher) handleOperationalFactSalesReturn(ctx context.Context
 		var out *biz.SalesReturn
 		var err error
 		switch method {
-		case "approve_sales_return":
-			out, err = d.operationalFactUC.ApproveSalesReturn(ctx, in, actorID)
-		case "receive_sales_return":
-			out, err = d.operationalFactUC.ReceiveSalesReturn(ctx, in, actorID)
+		case "reverse_sales_return":
+			out, err = d.operationalFactUC.ReverseSalesReturn(ctx, in, actorID)
 		default:
 			out, err = d.operationalFactUC.CancelSalesReturn(ctx, in, actorID)
 		}
@@ -99,7 +97,7 @@ func salesReturnToMap(item *biz.SalesReturn) map[string]any {
 	}
 	items := make([]any, 0, len(item.Items))
 	for _, line := range item.Items {
-		items = append(items, map[string]any{"id": line.ID, "line_no": line.LineNo, "shipment_item_id": line.ShipmentItemID, "product_id": line.ProductID, "product_sku_id": optionalIntValue(line.ProductSkuID), "warehouse_id": line.WarehouseID, "unit_id": line.UnitID, "lot_id": optionalIntValue(line.LotID), "quality_inspection_id": line.QualityInspectionID, "quantity": line.Quantity.String(), "condition": line.Condition, "note": optionalStringValue(line.Note)})
+		items = append(items, map[string]any{"id": line.ID, "line_no": line.LineNo, "shipment_item_id": line.ShipmentItemID, "product_id": line.ProductID, "product_sku_id": optionalIntValue(line.ProductSkuID), "warehouse_id": line.WarehouseID, "unit_id": line.UnitID, "lot_id": optionalIntValue(line.LotID), "quality_inspection_id": line.QualityInspectionID, "current_quality_inspection_id": line.CurrentQualityInspectionID, "current_quality_inspection_no": line.CurrentQualityInspectionNo, "current_quality_inspection_status": line.CurrentQualityInspectionStatus, "current_quality_inspection_result": optionalStringValue(line.CurrentQualityInspectionResult), "quantity": line.Quantity.String(), "condition": line.Condition, "note": optionalStringValue(line.Note)})
 	}
-	return map[string]any{"id": item.ID, "return_no": item.ReturnNo, "shipment_id": item.ShipmentID, "customer_id": item.CustomerID, "customer_name": item.CustomerNameSnapshot, "status": item.Status, "reason": item.Reason, "version": item.Version, "approved_at": optionalTimeUnix(item.ApprovedAt), "received_at": optionalTimeUnix(item.ReceivedAt), "cancelled_at": optionalTimeUnix(item.CancelledAt), "cancel_reason": optionalStringValue(item.CancelReason), "items": items}
+	return map[string]any{"id": item.ID, "return_no": item.ReturnNo, "shipment_id": item.ShipmentID, "customer_id": item.CustomerID, "customer_name": item.CustomerNameSnapshot, "status": item.Status, "reason": item.Reason, "version": item.Version, "approved_at": optionalTimeUnix(item.ApprovedAt), "approved_by": optionalIntValue(item.ApprovedBy), "rejected_at": optionalTimeUnix(item.RejectedAt), "rejected_by": optionalIntValue(item.RejectedBy), "reject_reason": optionalStringValue(item.RejectReason), "received_at": optionalTimeUnix(item.ReceivedAt), "received_by": optionalIntValue(item.ReceivedBy), "cancelled_at": optionalTimeUnix(item.CancelledAt), "cancelled_by": optionalIntValue(item.CancelledBy), "cancel_reason": optionalStringValue(item.CancelReason), "reversed_at": optionalTimeUnix(item.ReversedAt), "reversed_by": optionalIntValue(item.ReversedBy), "reverse_reason": optionalStringValue(item.ReverseReason), "created_by": item.CreatedBy, "created_at": item.CreatedAt.Unix(), "items": items}
 }

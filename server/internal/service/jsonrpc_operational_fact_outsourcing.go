@@ -49,22 +49,36 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		item, err := d.operationalFactUC.CreateOutsourcingReturnReceiptFromOrder(ctx, in)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "post_outsourcing_fact":
+		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version") {
+			return id, invalidParamResult(), nil
+		}
+		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, false)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingFactPost); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.PostOutsourcingFact(ctx, getInt(pm, "id", 0))
+		item, err := d.operationalFactUC.PostOutsourcingFact(ctx, mutation)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "cancel_outsourcing_fact":
+		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
+			return id, invalidParamResult(), nil
+		}
+		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, true)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingFactCancel); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CancelPostedOutsourcingFact(ctx, getInt(pm, "id", 0))
+		item, err := d.operationalFactUC.CancelPostedOutsourcingFact(ctx, mutation)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "list_outsourcing_facts":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingFactRead); res != nil {
@@ -142,5 +156,5 @@ func outsourcingFactToAny(item *biz.OutsourcingFact) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "sku_code_snapshot": optionalStringToAny(item.SKUCodeSnapshot), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "supplier_id": optionalIntToAny(item.SupplierID), "supplier_name": optionalStringToAny(item.SupplierName), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "sku_code_snapshot": optionalStringToAny(item.SKUCodeSnapshot), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "supplier_id": optionalIntToAny(item.SupplierID), "supplier_name": optionalStringToAny(item.SupplierName), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

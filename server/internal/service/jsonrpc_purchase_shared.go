@@ -154,7 +154,7 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库调整行不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptCorrectionDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库仍有未取消的退货或调整单，不能取消"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库仍有未取消的退货、调整或拒收补换处置，不能取消"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityPending):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检尚未逐行完成，不能入库过账"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityRejected):

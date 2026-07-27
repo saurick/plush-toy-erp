@@ -20,20 +20,39 @@ var (
 	ErrProcessDomainCommandHandlerNotFound  = errors.New("process domain command handler not found")
 	ErrProcessDomainCommandRecoveryRequired = errors.New("process domain command recovery requires explicit review")
 	ErrProcessBranchPolicyHandlerNotFound   = errors.New("process branch policy handler not found")
+	ErrProcessRuntimeRequired               = errors.New("business transition must be executed through process runtime")
+	ErrProcessSourceLifecycleDependency     = errors.New("source lifecycle change blocked by linked process")
 	ErrProcessReturnAttemptLimit            = errors.New("process return attempt limit exceeded")
 	ErrProcessNodeDueAtMissing              = errors.New("process node due_at is missing")
 	ErrProcessNodeDueAtNotReached           = errors.New("process node due_at is not reached")
 )
 
 const (
-	ProcessKeySalesOrderAcceptance  = "sales_order_acceptance"
-	ProcessKeyMaterialSupply        = "material_supply"
-	ProcessKeyFinishedGoodsDelivery = "finished_goods_delivery"
+	ProcessKeySalesOrderAcceptance        = "sales_order_acceptance"
+	ProcessKeyMaterialSupply              = "material_supply"
+	ProcessKeyFinishedGoodsDelivery       = "finished_goods_delivery"
+	ProcessKeySalesReturnApproval         = "sales_return_acceptance"
+	ProcessKeyFinancePaymentApproval      = "finance_payment_approval"
+	ProcessKeyInventoryAdjustmentApproval = "inventory_adjustment_approval"
+	ProcessKeyProductionExceptionApproval = "production_exception_approval"
 
 	ProcessDomainCommandFinishedGoodsQualityDecide = "finished_goods_quality.decide"
 	ProcessDomainCommandShipmentFinanceRelease     = "shipment.finance_release"
 	ProcessDomainCommandShipmentShip               = "shipment.ship"
 	ProcessDomainCommandFinanceReceivableLead      = "finance.receivable_lead"
+	ProcessDomainCommandSalesReturnApprove         = "sales_return.approve_after_workflow"
+	ProcessDomainCommandSalesReturnReject          = "sales_return.reject_after_workflow"
+	ProcessDomainCommandSalesReturnReceive         = "sales_return.receive"
+	ProcessDomainCommandFinancePaymentApprove      = "finance_payment.approve_after_workflow"
+	ProcessDomainCommandFinancePaymentReject       = "finance_payment.reject_after_workflow"
+	ProcessDomainCommandFinancePaymentPost         = "finance_payment.post"
+	ProcessDomainCommandInventoryAdjustmentSubmit  = "inventory_operation.submit_for_approval"
+	ProcessDomainCommandInventoryAdjustmentApprove = "inventory_operation.approve_after_workflow"
+	ProcessDomainCommandInventoryAdjustmentReject  = "inventory_operation.reject_after_workflow"
+	ProcessDomainCommandInventoryAdjustmentPost    = "inventory_operation.post"
+	ProcessDomainCommandProductionExceptionApprove = "production_exception.approve_after_workflow"
+	ProcessDomainCommandProductionExceptionReject  = "production_exception.reject_after_workflow"
+	ProcessDomainCommandProductionExceptionExecute = "production_exception.execute"
 
 	ShipmentFinanceReleaseStatusPending  = "PENDING"
 	ShipmentFinanceReleaseStatusApproved = "APPROVED"
@@ -179,6 +198,7 @@ type ProcessInstanceStart struct {
 type ProcessTaskContext struct {
 	Task           *WorkflowTask
 	Instance       *ProcessInstance
+	LinkedNode     *ProcessNodeInstance
 	Nodes          []*ProcessNodeInstance
 	CurrentNodes   []*ProcessNodeInstance
 	CompletedNodes []*ProcessNodeInstance
@@ -389,6 +409,10 @@ type ProcessRuntimeSourceCreateRepo interface {
 	CreateProcessInstanceFromSource(ctx context.Context, in *ProcessInstanceCreate, actorID int) (*ProcessInstance, []*ProcessNodeInstance, error)
 }
 
+type ProcessRuntimeBusinessRefReadRepo interface {
+	GetProcessInstanceByBusinessRef(ctx context.Context, processKey, businessRefType string, businessRefID int) (*ProcessInstance, []*ProcessNodeInstance, error)
+}
+
 // ProcessRuntimeDomainCommandResultRepo is intentionally separate from
 // ProcessRuntimeRepo while existing non-persistent test adapters migrate. The
 // production repository implements it; ProcessRuntime never treats an adapter
@@ -582,6 +606,28 @@ func (uc *ProcessRuntimeUsecase) GetProcessInstance(ctx context.Context, id int)
 	return uc.repo.GetProcessInstance(ctx, id)
 }
 
+func (uc *ProcessRuntimeUsecase) GetProcessInstanceByBusinessRef(
+	ctx context.Context,
+	processKey string,
+	businessRefType string,
+	businessRefID int,
+) (*ProcessInstance, []*ProcessNodeInstance, error) {
+	if uc == nil || uc.repo == nil || strings.TrimSpace(processKey) == "" ||
+		strings.TrimSpace(businessRefType) == "" || businessRefID <= 0 {
+		return nil, nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(ProcessRuntimeBusinessRefReadRepo)
+	if !ok {
+		return nil, nil, ErrBadParam
+	}
+	return repo.GetProcessInstanceByBusinessRef(
+		ctx,
+		strings.TrimSpace(processKey),
+		strings.TrimSpace(businessRefType),
+		businessRefID,
+	)
+}
+
 func (uc *ProcessRuntimeUsecase) ListProcessNodeInstances(ctx context.Context, processInstanceID int) ([]*ProcessNodeInstance, error) {
 	if uc == nil || uc.repo == nil || processInstanceID <= 0 {
 		return nil, ErrBadParam
@@ -615,13 +661,15 @@ func (uc *ProcessRuntimeUsecase) GetProcessTaskContext(ctx context.Context, task
 		Instance: instance,
 		Nodes:    nodes,
 	}
-	linkedNodeFound := false
 	for _, node := range nodes {
 		if node == nil || node.ProcessInstanceID != instance.ID {
 			return nil, ErrBadParam
 		}
 		if node.ID == *task.ProcessNodeInstanceID {
-			linkedNodeFound = true
+			if processContext.LinkedNode != nil {
+				return nil, ErrBadParam
+			}
+			processContext.LinkedNode = node
 		}
 		switch node.Status {
 		case ProcessNodeStatusActive, ProcessNodeStatusBlocked:
@@ -633,7 +681,7 @@ func (uc *ProcessRuntimeUsecase) GetProcessTaskContext(ctx context.Context, task
 			return nil, ErrBadParam
 		}
 	}
-	if !linkedNodeFound {
+	if processContext.LinkedNode == nil {
 		return nil, ErrBadParam
 	}
 	return processContext, nil

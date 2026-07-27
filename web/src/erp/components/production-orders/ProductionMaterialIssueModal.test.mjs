@@ -13,6 +13,8 @@ test('production material issue modal only exposes operator-owned business field
     '生产产品',
     '需求物料',
     '计划需求',
+    '已批准超领',
+    '当前可领上限',
     '已过账领料',
     '剩余可领',
     '领料仓库',

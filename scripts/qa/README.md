@@ -29,7 +29,7 @@
 | `node scripts/qa/phase-label-boundaries.mjs` + `node --test scripts/qa/phase-label-boundaries.test.mjs`                             | 全仓扫描活跃代码、脚本和正式文档中的编号阶段命名，并验证完整 Phase 编号、P 子阶段编号和 P 编号发布目标会被拒绝；P0/P1 风险等级、p95 百分位和产品编码不受影响                            | 改脚本、API、命名或治理文档后                   |
 | `node scripts/qa/experimental/canonical-runtime-audit.mjs`                                                                          | 非阻断实验审计；宽泛 keyword 命中只作只读复核线索，不进入 fast / affected，不代表产品缺陷或发布证据；恢复阻断前必须改成逐域 status key / API field / function / runtime branch 精确合同 | 需要人工盘点历史词命中时                        |
 | `node scripts/qa/test-data-isolation-boundary.mjs --json`                                                                           | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力                                                                                     | 改 seed、fixture、模拟数据或导入准备工具后      |
-| `node scripts/qa/manual-acceptance-catalog.mjs`                                                                                     | 从当前正式路由、客户菜单、岗位矩阵和打印模板生成 50 项全页面手工验收目录；当前 yoyoosun 正式页面全部进入目录，默认只输出、不连接后端                                                    | 准备全页面试用验收范围时                        |
+| `node scripts/qa/manual-acceptance-catalog.mjs`                                                                                     | 生成既有 50 项只读基线验收目录；新增客户退货与收付款页由独立真实写 companion 覆盖，不把两条异常写链混进原目录的数据和打印合同，默认只输出、不连接后端                                  | 准备全页面试用验收范围时                        |
 | `node scripts/qa/manual-acceptance-dataset.mjs`                                                                                     | 默认生成 local 与 133 同语义计划；显式 `--apply --target` 后由唯一串行 runner 调用同一组正式 API 入口并校验严格阶段回执                                                                 | 准备或重放双环境全页面模拟数据时                |
 | `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.07.16-v5 --run-id 20260716-V5 --json`     | 生成带稳定批次前缀的客户、供应商、产品规格、材料、加工环节及销售 / 采购 / 委外 / BOM 源数据计划；默认只读                                                                               | 写入模拟源数据前确认数量、状态和边界时          |
 | `node scripts/qa/manual-acceptance-account-scenarios.mjs --json`                                                                    | 生成停用、多岗位和无业务入口三种补充账号计划；在已完成首个管理员 bootstrap 的 fresh 本地 / 133 验收库中，创建或精确核对十个正式岗位账号，再调和三类场景账号                             | 核对登录与入口异常场景前                        |
@@ -37,6 +37,7 @@
 | `node scripts/qa/manual-acceptance-fact-data.mjs --source-report <report> --data-version 2026.07.16-v5 --run-id 20260716-V5 --json` | 复用已核验源数据，按正式来源驱动 API 统一准备采购、质检、库存、生产、出货和财务事实；默认只读                                                                                           | 写入模拟业务事实前                              |
 | `node scripts/qa/manual-acceptance-readiness.mjs`                                                                                   | 生成 50 项只读就绪核验计划，并校验每页只引用共享 role / source / task / facts / catalog 阶段；显式 `--verify --backend-url` 才查询运行数据                                              | 写入后核对页面数据是否达到手工验收门槛时        |
 | `node scripts/qa/manual-acceptance-browser.mjs --plan --base-url <local-url> --backend-url <local-url>`                             | 生成 50 项本机浏览器验收计划；真实模式只登录、逐页读取和切换只读任务页签，列表及两个数据看板都必须取得当前页面数据证据，不点击业务写动作                                                | 核对真实账号、页面、岗位端和打印入口时          |
+| `node scripts/qa/exception-flow-real-write-browser.mjs ...`                                                                        | 仅在显式确认的全新本地 `browser_actions` 隔离库中，用真实 Chromium 和真实后端办理 Sales Return、Finance Payment、Inventory Adjustment、Production OVER_ISSUE 四条业务写链；它是 50 项只读基线的独立 companion，不是客户 UAT | 异常流主路径完成 API / 单元验证后的本地写验收   |
 | `node scripts/qa/manual-acceptance-source-retire.mjs --data-version 2026.07.16-v5 --run-id 20260716-V5`                             | 默认 dry-run，预览无活动流程阻断的源单取消 / 归档与主数据停用；不处理 active / blocked ProcessRuntime、已过账事实或物理删除。当前 V5 流程位置证据要完整清理时必须重建专用验收库                                                       | 无流程阻断的旧批次退出前                        |
 | `node scripts/qa/customer-config-effective-session-probe.mjs --json`                                                                | 无 Authorization 探测本地 `customer_config.get_effective_session`，确认后端可达和 `40302 未登录` 边界                                                                                   | yoyoosun 静态入口已命中、但还没有真实登录证据时 |
 | `node --test scripts/qa/customer-package-preview-boundary.test.mjs`                                                                 | 锁住客户配置包 businessFlows / stateMachines / processPolicies 仍为 preview-only，不写 Fact、不覆盖 usecase 生命周期                                                                    | 调整客户包流程、状态机或策略预览后              |
@@ -342,6 +343,20 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 ```
 
 `customer-trial-133` 的浏览器报告必须写到当前版本与目标的规范路径 `output/qa/manual-acceptance/datasets/<dataVersion>/customer-trial-133/browser/report.json`，并同时提供同批 `dataset/apply-report.json`、`readiness/verify-report.json` 与 `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON`。浏览器启动前会重新调用 `/readyz/runtime-identity`，把当前数据库、完整 release commit、Atlas migration、fresh baseline、attachments、source / fact / task / readiness 批次身份原子绑定；readiness 只参与身份闭合，列表数量仍必须由当前页面 DOM 重新证明，打印仍必须由当前 5 份 PDF 证明。
+
+四条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须匹配 `plush_erp_acceptance_*browser_actions_*_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向共享开发库、133、客户试用或生产数据库。
+
+```bash
+MANUAL_ACCEPTANCE_DEMO_PASSWORD='<local-demo-password>' \
+EXCEPTION_FLOW_BROWSER_CONFIRM='RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:plush_erp_acceptance_exception_browser_actions_example_dev:http://127.0.0.1:8323' \
+  node scripts/qa/exception-flow-real-write-browser.mjs \
+    --base-url http://127.0.0.1:15214 \
+    --backend-url http://127.0.0.1:8323 \
+    --database-name plush_erp_acceptance_exception_browser_actions_example_dev \
+    --report output/qa/manual-acceptance/local-business-actions/report.json
+```
+
+该 companion 的主业务 mutation 由真实产品 UI 点击触发；直接浏览器上下文 RPC 只用于结构合法的无权角色负例和重复 / 旧 version 重试。未知结果场景是在后端已经返回成功后丢弃浏览器响应，再由页面权威读回确认，不 mock 业务成功。报告会明确记录 `admin_users.last_login_at` 的 `auth-write`、四条业务写、四个服务端 `40304`、四个 simulated transport fault、终态 Fact / 库存 / 核销读回及 `40920` CAS 拒绝。Sales Return、Finance Payment 使用隔离数据集中已经批准的来源，Inventory Adjustment 由浏览器新建并办理老板审批与仓库执行任务，Production OVER_ISSUE 使用已批准额度并由真实领料 Fact 消费后取消恢复。它不证明其他岗位、IQC / 委外写动作、打印工作台、部署、客户账号或客户 UAT；这些证据继续按各自验收层级单列。
 
 133 前端隧道为 `18376` 时，最终浏览器命令为：
 

@@ -75,11 +75,6 @@ func Reason(v string) predicate.InventoryOperation {
 	return predicate.InventoryOperation(sql.FieldEQ(FieldReason, v))
 }
 
-// ApprovalRef applies equality check predicate on the "approval_ref" field. It's identical to ApprovalRefEQ.
-func ApprovalRef(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldEQ(FieldApprovalRef, v))
-}
-
 // IdempotencyKey applies equality check predicate on the "idempotency_key" field. It's identical to IdempotencyKeyEQ.
 func IdempotencyKey(v string) predicate.InventoryOperation {
 	return predicate.InventoryOperation(sql.FieldEQ(FieldIdempotencyKey, v))
@@ -98,6 +93,41 @@ func IdempotencyItemCount(v int) predicate.InventoryOperation {
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
 func Version(v int) predicate.InventoryOperation {
 	return predicate.InventoryOperation(sql.FieldEQ(FieldVersion, v))
+}
+
+// SubmittedAt applies equality check predicate on the "submitted_at" field. It's identical to SubmittedAtEQ.
+func SubmittedAt(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldSubmittedAt, v))
+}
+
+// SubmittedBy applies equality check predicate on the "submitted_by" field. It's identical to SubmittedByEQ.
+func SubmittedBy(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldSubmittedBy, v))
+}
+
+// ApprovedAt applies equality check predicate on the "approved_at" field. It's identical to ApprovedAtEQ.
+func ApprovedAt(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldApprovedAt, v))
+}
+
+// ApprovedBy applies equality check predicate on the "approved_by" field. It's identical to ApprovedByEQ.
+func ApprovedBy(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldApprovedBy, v))
+}
+
+// RejectedAt applies equality check predicate on the "rejected_at" field. It's identical to RejectedAtEQ.
+func RejectedAt(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldRejectedAt, v))
+}
+
+// RejectedBy applies equality check predicate on the "rejected_by" field. It's identical to RejectedByEQ.
+func RejectedBy(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldRejectedBy, v))
+}
+
+// RejectReason applies equality check predicate on the "reject_reason" field. It's identical to RejectReasonEQ.
+func RejectReason(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldRejectReason, v))
 }
 
 // PostedAt applies equality check predicate on the "posted_at" field. It's identical to PostedAtEQ.
@@ -400,81 +430,6 @@ func ReasonContainsFold(v string) predicate.InventoryOperation {
 	return predicate.InventoryOperation(sql.FieldContainsFold(FieldReason, v))
 }
 
-// ApprovalRefEQ applies the EQ predicate on the "approval_ref" field.
-func ApprovalRefEQ(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldEQ(FieldApprovalRef, v))
-}
-
-// ApprovalRefNEQ applies the NEQ predicate on the "approval_ref" field.
-func ApprovalRefNEQ(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldNEQ(FieldApprovalRef, v))
-}
-
-// ApprovalRefIn applies the In predicate on the "approval_ref" field.
-func ApprovalRefIn(vs ...string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldIn(FieldApprovalRef, vs...))
-}
-
-// ApprovalRefNotIn applies the NotIn predicate on the "approval_ref" field.
-func ApprovalRefNotIn(vs ...string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldNotIn(FieldApprovalRef, vs...))
-}
-
-// ApprovalRefGT applies the GT predicate on the "approval_ref" field.
-func ApprovalRefGT(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldGT(FieldApprovalRef, v))
-}
-
-// ApprovalRefGTE applies the GTE predicate on the "approval_ref" field.
-func ApprovalRefGTE(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldGTE(FieldApprovalRef, v))
-}
-
-// ApprovalRefLT applies the LT predicate on the "approval_ref" field.
-func ApprovalRefLT(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldLT(FieldApprovalRef, v))
-}
-
-// ApprovalRefLTE applies the LTE predicate on the "approval_ref" field.
-func ApprovalRefLTE(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldLTE(FieldApprovalRef, v))
-}
-
-// ApprovalRefContains applies the Contains predicate on the "approval_ref" field.
-func ApprovalRefContains(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldContains(FieldApprovalRef, v))
-}
-
-// ApprovalRefHasPrefix applies the HasPrefix predicate on the "approval_ref" field.
-func ApprovalRefHasPrefix(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldHasPrefix(FieldApprovalRef, v))
-}
-
-// ApprovalRefHasSuffix applies the HasSuffix predicate on the "approval_ref" field.
-func ApprovalRefHasSuffix(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldHasSuffix(FieldApprovalRef, v))
-}
-
-// ApprovalRefIsNil applies the IsNil predicate on the "approval_ref" field.
-func ApprovalRefIsNil() predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldIsNull(FieldApprovalRef))
-}
-
-// ApprovalRefNotNil applies the NotNil predicate on the "approval_ref" field.
-func ApprovalRefNotNil() predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldNotNull(FieldApprovalRef))
-}
-
-// ApprovalRefEqualFold applies the EqualFold predicate on the "approval_ref" field.
-func ApprovalRefEqualFold(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldEqualFold(FieldApprovalRef, v))
-}
-
-// ApprovalRefContainsFold applies the ContainsFold predicate on the "approval_ref" field.
-func ApprovalRefContainsFold(v string) predicate.InventoryOperation {
-	return predicate.InventoryOperation(sql.FieldContainsFold(FieldApprovalRef, v))
-}
-
 // IdempotencyKeyEQ applies the EQ predicate on the "idempotency_key" field.
 func IdempotencyKeyEQ(v string) predicate.InventoryOperation {
 	return predicate.InventoryOperation(sql.FieldEQ(FieldIdempotencyKey, v))
@@ -683,6 +638,381 @@ func VersionLT(v int) predicate.InventoryOperation {
 // VersionLTE applies the LTE predicate on the "version" field.
 func VersionLTE(v int) predicate.InventoryOperation {
 	return predicate.InventoryOperation(sql.FieldLTE(FieldVersion, v))
+}
+
+// SubmittedAtEQ applies the EQ predicate on the "submitted_at" field.
+func SubmittedAtEQ(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldSubmittedAt, v))
+}
+
+// SubmittedAtNEQ applies the NEQ predicate on the "submitted_at" field.
+func SubmittedAtNEQ(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNEQ(FieldSubmittedAt, v))
+}
+
+// SubmittedAtIn applies the In predicate on the "submitted_at" field.
+func SubmittedAtIn(vs ...time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIn(FieldSubmittedAt, vs...))
+}
+
+// SubmittedAtNotIn applies the NotIn predicate on the "submitted_at" field.
+func SubmittedAtNotIn(vs ...time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotIn(FieldSubmittedAt, vs...))
+}
+
+// SubmittedAtGT applies the GT predicate on the "submitted_at" field.
+func SubmittedAtGT(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGT(FieldSubmittedAt, v))
+}
+
+// SubmittedAtGTE applies the GTE predicate on the "submitted_at" field.
+func SubmittedAtGTE(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGTE(FieldSubmittedAt, v))
+}
+
+// SubmittedAtLT applies the LT predicate on the "submitted_at" field.
+func SubmittedAtLT(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLT(FieldSubmittedAt, v))
+}
+
+// SubmittedAtLTE applies the LTE predicate on the "submitted_at" field.
+func SubmittedAtLTE(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLTE(FieldSubmittedAt, v))
+}
+
+// SubmittedAtIsNil applies the IsNil predicate on the "submitted_at" field.
+func SubmittedAtIsNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIsNull(FieldSubmittedAt))
+}
+
+// SubmittedAtNotNil applies the NotNil predicate on the "submitted_at" field.
+func SubmittedAtNotNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotNull(FieldSubmittedAt))
+}
+
+// SubmittedByEQ applies the EQ predicate on the "submitted_by" field.
+func SubmittedByEQ(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldSubmittedBy, v))
+}
+
+// SubmittedByNEQ applies the NEQ predicate on the "submitted_by" field.
+func SubmittedByNEQ(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNEQ(FieldSubmittedBy, v))
+}
+
+// SubmittedByIn applies the In predicate on the "submitted_by" field.
+func SubmittedByIn(vs ...int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIn(FieldSubmittedBy, vs...))
+}
+
+// SubmittedByNotIn applies the NotIn predicate on the "submitted_by" field.
+func SubmittedByNotIn(vs ...int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotIn(FieldSubmittedBy, vs...))
+}
+
+// SubmittedByGT applies the GT predicate on the "submitted_by" field.
+func SubmittedByGT(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGT(FieldSubmittedBy, v))
+}
+
+// SubmittedByGTE applies the GTE predicate on the "submitted_by" field.
+func SubmittedByGTE(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGTE(FieldSubmittedBy, v))
+}
+
+// SubmittedByLT applies the LT predicate on the "submitted_by" field.
+func SubmittedByLT(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLT(FieldSubmittedBy, v))
+}
+
+// SubmittedByLTE applies the LTE predicate on the "submitted_by" field.
+func SubmittedByLTE(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLTE(FieldSubmittedBy, v))
+}
+
+// SubmittedByIsNil applies the IsNil predicate on the "submitted_by" field.
+func SubmittedByIsNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIsNull(FieldSubmittedBy))
+}
+
+// SubmittedByNotNil applies the NotNil predicate on the "submitted_by" field.
+func SubmittedByNotNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotNull(FieldSubmittedBy))
+}
+
+// ApprovedAtEQ applies the EQ predicate on the "approved_at" field.
+func ApprovedAtEQ(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldApprovedAt, v))
+}
+
+// ApprovedAtNEQ applies the NEQ predicate on the "approved_at" field.
+func ApprovedAtNEQ(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNEQ(FieldApprovedAt, v))
+}
+
+// ApprovedAtIn applies the In predicate on the "approved_at" field.
+func ApprovedAtIn(vs ...time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIn(FieldApprovedAt, vs...))
+}
+
+// ApprovedAtNotIn applies the NotIn predicate on the "approved_at" field.
+func ApprovedAtNotIn(vs ...time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotIn(FieldApprovedAt, vs...))
+}
+
+// ApprovedAtGT applies the GT predicate on the "approved_at" field.
+func ApprovedAtGT(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGT(FieldApprovedAt, v))
+}
+
+// ApprovedAtGTE applies the GTE predicate on the "approved_at" field.
+func ApprovedAtGTE(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGTE(FieldApprovedAt, v))
+}
+
+// ApprovedAtLT applies the LT predicate on the "approved_at" field.
+func ApprovedAtLT(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLT(FieldApprovedAt, v))
+}
+
+// ApprovedAtLTE applies the LTE predicate on the "approved_at" field.
+func ApprovedAtLTE(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLTE(FieldApprovedAt, v))
+}
+
+// ApprovedAtIsNil applies the IsNil predicate on the "approved_at" field.
+func ApprovedAtIsNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIsNull(FieldApprovedAt))
+}
+
+// ApprovedAtNotNil applies the NotNil predicate on the "approved_at" field.
+func ApprovedAtNotNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotNull(FieldApprovedAt))
+}
+
+// ApprovedByEQ applies the EQ predicate on the "approved_by" field.
+func ApprovedByEQ(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldApprovedBy, v))
+}
+
+// ApprovedByNEQ applies the NEQ predicate on the "approved_by" field.
+func ApprovedByNEQ(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNEQ(FieldApprovedBy, v))
+}
+
+// ApprovedByIn applies the In predicate on the "approved_by" field.
+func ApprovedByIn(vs ...int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIn(FieldApprovedBy, vs...))
+}
+
+// ApprovedByNotIn applies the NotIn predicate on the "approved_by" field.
+func ApprovedByNotIn(vs ...int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotIn(FieldApprovedBy, vs...))
+}
+
+// ApprovedByGT applies the GT predicate on the "approved_by" field.
+func ApprovedByGT(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGT(FieldApprovedBy, v))
+}
+
+// ApprovedByGTE applies the GTE predicate on the "approved_by" field.
+func ApprovedByGTE(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGTE(FieldApprovedBy, v))
+}
+
+// ApprovedByLT applies the LT predicate on the "approved_by" field.
+func ApprovedByLT(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLT(FieldApprovedBy, v))
+}
+
+// ApprovedByLTE applies the LTE predicate on the "approved_by" field.
+func ApprovedByLTE(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLTE(FieldApprovedBy, v))
+}
+
+// ApprovedByIsNil applies the IsNil predicate on the "approved_by" field.
+func ApprovedByIsNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIsNull(FieldApprovedBy))
+}
+
+// ApprovedByNotNil applies the NotNil predicate on the "approved_by" field.
+func ApprovedByNotNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotNull(FieldApprovedBy))
+}
+
+// RejectedAtEQ applies the EQ predicate on the "rejected_at" field.
+func RejectedAtEQ(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldRejectedAt, v))
+}
+
+// RejectedAtNEQ applies the NEQ predicate on the "rejected_at" field.
+func RejectedAtNEQ(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNEQ(FieldRejectedAt, v))
+}
+
+// RejectedAtIn applies the In predicate on the "rejected_at" field.
+func RejectedAtIn(vs ...time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIn(FieldRejectedAt, vs...))
+}
+
+// RejectedAtNotIn applies the NotIn predicate on the "rejected_at" field.
+func RejectedAtNotIn(vs ...time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotIn(FieldRejectedAt, vs...))
+}
+
+// RejectedAtGT applies the GT predicate on the "rejected_at" field.
+func RejectedAtGT(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGT(FieldRejectedAt, v))
+}
+
+// RejectedAtGTE applies the GTE predicate on the "rejected_at" field.
+func RejectedAtGTE(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGTE(FieldRejectedAt, v))
+}
+
+// RejectedAtLT applies the LT predicate on the "rejected_at" field.
+func RejectedAtLT(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLT(FieldRejectedAt, v))
+}
+
+// RejectedAtLTE applies the LTE predicate on the "rejected_at" field.
+func RejectedAtLTE(v time.Time) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLTE(FieldRejectedAt, v))
+}
+
+// RejectedAtIsNil applies the IsNil predicate on the "rejected_at" field.
+func RejectedAtIsNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIsNull(FieldRejectedAt))
+}
+
+// RejectedAtNotNil applies the NotNil predicate on the "rejected_at" field.
+func RejectedAtNotNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotNull(FieldRejectedAt))
+}
+
+// RejectedByEQ applies the EQ predicate on the "rejected_by" field.
+func RejectedByEQ(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldRejectedBy, v))
+}
+
+// RejectedByNEQ applies the NEQ predicate on the "rejected_by" field.
+func RejectedByNEQ(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNEQ(FieldRejectedBy, v))
+}
+
+// RejectedByIn applies the In predicate on the "rejected_by" field.
+func RejectedByIn(vs ...int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIn(FieldRejectedBy, vs...))
+}
+
+// RejectedByNotIn applies the NotIn predicate on the "rejected_by" field.
+func RejectedByNotIn(vs ...int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotIn(FieldRejectedBy, vs...))
+}
+
+// RejectedByGT applies the GT predicate on the "rejected_by" field.
+func RejectedByGT(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGT(FieldRejectedBy, v))
+}
+
+// RejectedByGTE applies the GTE predicate on the "rejected_by" field.
+func RejectedByGTE(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGTE(FieldRejectedBy, v))
+}
+
+// RejectedByLT applies the LT predicate on the "rejected_by" field.
+func RejectedByLT(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLT(FieldRejectedBy, v))
+}
+
+// RejectedByLTE applies the LTE predicate on the "rejected_by" field.
+func RejectedByLTE(v int) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLTE(FieldRejectedBy, v))
+}
+
+// RejectedByIsNil applies the IsNil predicate on the "rejected_by" field.
+func RejectedByIsNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIsNull(FieldRejectedBy))
+}
+
+// RejectedByNotNil applies the NotNil predicate on the "rejected_by" field.
+func RejectedByNotNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotNull(FieldRejectedBy))
+}
+
+// RejectReasonEQ applies the EQ predicate on the "reject_reason" field.
+func RejectReasonEQ(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEQ(FieldRejectReason, v))
+}
+
+// RejectReasonNEQ applies the NEQ predicate on the "reject_reason" field.
+func RejectReasonNEQ(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNEQ(FieldRejectReason, v))
+}
+
+// RejectReasonIn applies the In predicate on the "reject_reason" field.
+func RejectReasonIn(vs ...string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIn(FieldRejectReason, vs...))
+}
+
+// RejectReasonNotIn applies the NotIn predicate on the "reject_reason" field.
+func RejectReasonNotIn(vs ...string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotIn(FieldRejectReason, vs...))
+}
+
+// RejectReasonGT applies the GT predicate on the "reject_reason" field.
+func RejectReasonGT(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGT(FieldRejectReason, v))
+}
+
+// RejectReasonGTE applies the GTE predicate on the "reject_reason" field.
+func RejectReasonGTE(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldGTE(FieldRejectReason, v))
+}
+
+// RejectReasonLT applies the LT predicate on the "reject_reason" field.
+func RejectReasonLT(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLT(FieldRejectReason, v))
+}
+
+// RejectReasonLTE applies the LTE predicate on the "reject_reason" field.
+func RejectReasonLTE(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldLTE(FieldRejectReason, v))
+}
+
+// RejectReasonContains applies the Contains predicate on the "reject_reason" field.
+func RejectReasonContains(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldContains(FieldRejectReason, v))
+}
+
+// RejectReasonHasPrefix applies the HasPrefix predicate on the "reject_reason" field.
+func RejectReasonHasPrefix(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldHasPrefix(FieldRejectReason, v))
+}
+
+// RejectReasonHasSuffix applies the HasSuffix predicate on the "reject_reason" field.
+func RejectReasonHasSuffix(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldHasSuffix(FieldRejectReason, v))
+}
+
+// RejectReasonIsNil applies the IsNil predicate on the "reject_reason" field.
+func RejectReasonIsNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldIsNull(FieldRejectReason))
+}
+
+// RejectReasonNotNil applies the NotNil predicate on the "reject_reason" field.
+func RejectReasonNotNil() predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldNotNull(FieldRejectReason))
+}
+
+// RejectReasonEqualFold applies the EqualFold predicate on the "reject_reason" field.
+func RejectReasonEqualFold(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldEqualFold(FieldRejectReason, v))
+}
+
+// RejectReasonContainsFold applies the ContainsFold predicate on the "reject_reason" field.
+func RejectReasonContainsFold(v string) predicate.InventoryOperation {
+	return predicate.InventoryOperation(sql.FieldContainsFold(FieldRejectReason, v))
 }
 
 // PostedAtEQ applies the EQ predicate on the "posted_at" field.

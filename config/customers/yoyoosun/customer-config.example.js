@@ -19,7 +19,10 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
         title: "基础资料",
         items: Object.freeze(["customers", "suppliers", "products", "materials"]),
       }),
-      Object.freeze({ title: "销售管理", items: Object.freeze(["sales-orders"]) }),
+      Object.freeze({
+        title: "销售管理",
+        items: Object.freeze(["sales-orders", "sales-returns"]),
+      }),
       Object.freeze({
         title: "产品工程",
         items: Object.freeze(["material-bom", "processes"]),
@@ -43,7 +46,13 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
       }),
       Object.freeze({
         title: "财务管理",
-        items: Object.freeze(["reconciliation", "payables", "receivables", "invoices"]),
+        items: Object.freeze([
+          "reconciliation",
+          "payables",
+          "receivables",
+          "invoices",
+          "finance-payments",
+        ]),
       }),
       Object.freeze({ title: "运营工具", items: Object.freeze(["print-center"]) }),
       Object.freeze({

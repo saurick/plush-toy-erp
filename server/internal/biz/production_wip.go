@@ -70,6 +70,10 @@ const (
 	ProductionWIPEventActionTransfer          = "WIP_TRANSFER"
 	ProductionWIPEventActionOutsourcingReturn = "OUTSOURCE_RETURN"
 	ProductionWIPEventActionCancel            = "CANCEL"
+	ProductionWIPEventActionExceptionApply    = "EXCEPTION_APPLY"
+	ProductionWIPEventActionExceptionReverse  = "EXCEPTION_REVERSE"
+	ProductionWIPEventActionOutsourceRework   = "OUTSOURCE_REWORK"
+	ProductionWIPEventActionOutsourceCancel   = "OUTSOURCE_REWORK_CANCEL"
 )
 
 var (

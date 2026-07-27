@@ -27,6 +27,10 @@ import {
   isWorkflowTaskMutationResultUnknown,
   verifyNewWorkflowTaskMutationAttempt,
 } from '../../utils/workflowTaskMutation.mjs'
+import {
+  isWorkflowProcessDecisionTask,
+  workflowTaskAllowsApprovedQuantity,
+} from '../../utils/workflowTaskActionContract.mjs'
 
 function resolveWorkflowTaskActionMode(action = '') {
   if (action === 'done') return 'complete'
@@ -37,8 +41,11 @@ function resolveWorkflowTaskActionMode(action = '') {
   return ''
 }
 
-function buildMobileWorkflowActionPayload({ feedback }) {
-  return buildMobileTaskActionPayload({ feedback })
+function buildMobileWorkflowActionPayload({ feedback, processDecision }) {
+  return {
+    ...buildMobileTaskActionPayload({ feedback }),
+    ...(processDecision ? { process_decision: processDecision } : {}),
+  }
 }
 
 const MOBILE_TASK_RECEIPT_STATUSES = new Set(['confirmed', 'failed', 'unknown'])
@@ -117,6 +124,7 @@ export default function useMobileRoleTaskActions({
   initialAction = '',
   initialActionReceipt = null,
   initialActionTaskID = null,
+  initialApprovedQuantity = '',
   initialReason = '',
   selectedTask,
   taskActionAccess,
@@ -133,6 +141,9 @@ export default function useMobileRoleTaskActions({
   const [urgingTaskIDs, setUrgingTaskIDs] = useState(() => new Set())
   const normalizedInitialAction = normalizeMobileTaskActionKey(initialAction)
   const normalizedInitialTaskID = Number(initialActionTaskID || 0)
+  const normalizedInitialApprovedQuantity = String(
+    initialApprovedQuantity || ''
+  )
   const normalizedInitialReason = String(initialReason || '')
   const [taskActionReasonDrafts, setTaskActionReasonDrafts] = useState(() => {
     if (
@@ -152,6 +163,19 @@ export default function useMobileRoleTaskActions({
       [initialDraftKey]: normalizedInitialReason,
     }
   })
+  const [taskApprovedQuantityDrafts, setTaskApprovedQuantityDrafts] = useState(
+    () =>
+      normalizedInitialTaskID > 0 &&
+      normalizedInitialAction === 'done' &&
+      normalizedInitialApprovedQuantity
+        ? {
+            [mobileTaskScopedValueKey(
+              normalizedReceiptScopeKey,
+              normalizedInitialTaskID
+            )]: normalizedInitialApprovedQuantity,
+          }
+        : {}
+  )
   const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState(() =>
     normalizedInitialTaskID > 0 &&
     normalizedInitialAction === 'urge' &&
@@ -282,8 +306,10 @@ export default function useMobileRoleTaskActions({
           reasonDrafts: taskActionReasonDrafts,
         })
       ).trim()
+      const processDecisionRequired =
+        taskStatusKey === 'done' && isWorkflowProcessDecisionTask(task)
       const completionFeedbackRequired =
-        requiresMobileActionFeedback(taskStatusKey)
+        !processDecisionRequired && requiresMobileActionFeedback(taskStatusKey)
       const completionFeedback = completionFeedbackRequired ? actionInput : ''
       const actionReason = completionFeedbackRequired ? '' : actionInput
       const reasonRequired = ['blocked', 'rejected', 'resume'].includes(
@@ -301,8 +327,20 @@ export default function useMobileRoleTaskActions({
         )
         return false
       }
+      const approvedQuantity = String(
+        taskApprovedQuantityDrafts[taskOperationKey] || ''
+      ).trim()
+      const processDecision = processDecisionRequired
+        ? {
+            reason: actionReason,
+            ...(approvedQuantity
+              ? { approved_quantity: approvedQuantity }
+              : {}),
+          }
+        : null
       const payload = buildMobileWorkflowActionPayload({
         feedback: completionFeedback,
+        processDecision,
       })
       const actionParams = {
         task_id: task.id,
@@ -415,6 +453,14 @@ export default function useMobileRoleTaskActions({
         }
         return next
       })
+      if (processDecisionRequired) {
+        setTaskApprovedQuantityDrafts((current) => {
+          if (!Object.hasOwn(current, taskOperationKey)) return current
+          const next = { ...current }
+          delete next[taskOperationKey]
+          return next
+        })
+      }
       message.success('任务状态已更新')
       loadTasks({ canonicalTask: confirmedTask }).catch(() => {
         message.warning('操作已成功但列表刷新失败，请手动刷新')
@@ -647,6 +693,12 @@ export default function useMobileRoleTaskActions({
           reasonDrafts: taskActionReasonDrafts,
         })
     : ''
+  const detailApprovedQuantityValue =
+    selectedTask &&
+    detailAction === 'done' &&
+    workflowTaskAllowsApprovedQuantity(selectedTask)
+      ? taskApprovedQuantityDrafts[selectedTaskScopedKey] || ''
+      : ''
   const savedEvidenceRefs = selectedTask
     ? normalizeMobileActionEvidenceRefs(
         selectedTask.mobile_action_evidence_refs
@@ -682,8 +734,22 @@ export default function useMobileRoleTaskActions({
     }))
   }
 
+  const updateDetailApprovedQuantity = (value) => {
+    if (
+      !selectedTask ||
+      detailAction !== 'done' ||
+      !workflowTaskAllowsApprovedQuantity(selectedTask)
+    ) {
+      return
+    }
+    setTaskApprovedQuantityDrafts((current) => ({
+      ...current,
+      [selectedTaskScopedKey]: value,
+    }))
+  }
+
   const restoreActionDraft = useCallback(
-    ({ taskID, action, reason = '' } = {}) => {
+    ({ taskID, action, approvedQuantity = '', reason = '' } = {}) => {
       const normalizedTaskID = Number(taskID || 0)
       const normalizedAction = normalizeMobileTaskActionKey(action)
       if (
@@ -712,6 +778,12 @@ export default function useMobileRoleTaskActions({
         setTaskActionReasonDrafts((current) => ({
           ...current,
           [draftKey]: normalizedReason,
+        }))
+      }
+      if (normalizedAction === 'done') {
+        setTaskApprovedQuantityDrafts((current) => ({
+          ...current,
+          [scopedTaskKey]: String(approvedQuantity || ''),
         }))
       }
       return true
@@ -800,6 +872,7 @@ export default function useMobileRoleTaskActions({
     actionReceipt: scopedActionReceipt,
     clearActionReceipt,
     detailReasonValue,
+    detailApprovedQuantityValue,
     handleTaskAction,
     savedEvidenceRefs,
     selectedCanOperate,
@@ -815,6 +888,7 @@ export default function useMobileRoleTaskActions({
     showTaskReceipt,
     submitDetailAction,
     updateDetailReason,
+    updateDetailApprovedQuantity,
     updatingID,
     urgingID,
   }

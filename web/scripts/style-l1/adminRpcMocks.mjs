@@ -704,10 +704,11 @@ export async function installAdminRpcMocks(
       members: [],
       effective_role_keys: [],
       effective_strategy: '',
-      blocked_reasons: [
-        'payment_approval_source_document_missing',
-        'payment_approval_process_runtime_contract_missing',
-      ],
+      blocked_reasons: ['approval_responsibility_fixed_by_process_contract'],
+      domain_boundary:
+        '已登记收付款单与 ProcessRuntime；老板审批后由财务责任池显式过账与核销',
+      fact_boundary:
+        '批准不等于过账；只有财务领域命令写付款、核销或冲正事实',
     },
   ]
   const buildApprovalSettingsMock = ({

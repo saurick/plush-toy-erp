@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
@@ -72,6 +73,27 @@ func (_u *OutsourcingFactUpdate) SetNillableStatus(v *string) *OutsourcingFactUp
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetVersion sets the "version" field.
+func (_u *OutsourcingFactUpdate) SetVersion(v int) *OutsourcingFactUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillableVersion(v *int) *OutsourcingFactUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *OutsourcingFactUpdate) AddVersion(v int) *OutsourcingFactUpdate {
+	_u.mutation.AddVersion(v)
 	return _u
 }
 
@@ -375,6 +397,86 @@ func (_u *OutsourcingFactUpdate) ClearPostedAt() *OutsourcingFactUpdate {
 	return _u
 }
 
+// SetPostedBy sets the "posted_by" field.
+func (_u *OutsourcingFactUpdate) SetPostedBy(v int) *OutsourcingFactUpdate {
+	_u.mutation.SetPostedBy(v)
+	return _u
+}
+
+// SetNillablePostedBy sets the "posted_by" field if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillablePostedBy(v *int) *OutsourcingFactUpdate {
+	if v != nil {
+		_u.SetPostedBy(*v)
+	}
+	return _u
+}
+
+// ClearPostedBy clears the value of the "posted_by" field.
+func (_u *OutsourcingFactUpdate) ClearPostedBy() *OutsourcingFactUpdate {
+	_u.mutation.ClearPostedBy()
+	return _u
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (_u *OutsourcingFactUpdate) SetCancelledAt(v time.Time) *OutsourcingFactUpdate {
+	_u.mutation.SetCancelledAt(v)
+	return _u
+}
+
+// SetNillableCancelledAt sets the "cancelled_at" field if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillableCancelledAt(v *time.Time) *OutsourcingFactUpdate {
+	if v != nil {
+		_u.SetCancelledAt(*v)
+	}
+	return _u
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (_u *OutsourcingFactUpdate) ClearCancelledAt() *OutsourcingFactUpdate {
+	_u.mutation.ClearCancelledAt()
+	return _u
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (_u *OutsourcingFactUpdate) SetCancelledBy(v int) *OutsourcingFactUpdate {
+	_u.mutation.SetCancelledBy(v)
+	return _u
+}
+
+// SetNillableCancelledBy sets the "cancelled_by" field if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillableCancelledBy(v *int) *OutsourcingFactUpdate {
+	if v != nil {
+		_u.SetCancelledBy(*v)
+	}
+	return _u
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (_u *OutsourcingFactUpdate) ClearCancelledBy() *OutsourcingFactUpdate {
+	_u.mutation.ClearCancelledBy()
+	return _u
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (_u *OutsourcingFactUpdate) SetCancelReason(v string) *OutsourcingFactUpdate {
+	_u.mutation.SetCancelReason(v)
+	return _u
+}
+
+// SetNillableCancelReason sets the "cancel_reason" field if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillableCancelReason(v *string) *OutsourcingFactUpdate {
+	if v != nil {
+		_u.SetCancelReason(*v)
+	}
+	return _u
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (_u *OutsourcingFactUpdate) ClearCancelReason() *OutsourcingFactUpdate {
+	_u.mutation.ClearCancelReason()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *OutsourcingFactUpdate) SetNote(v string) *OutsourcingFactUpdate {
 	_u.mutation.SetNote(v)
@@ -435,6 +537,44 @@ func (_u *OutsourcingFactUpdate) SetInventoryLot(v *InventoryLot) *OutsourcingFa
 	return _u.SetInventoryLotID(v.ID)
 }
 
+// SetPosterID sets the "poster" edge to the AdminUser entity by ID.
+func (_u *OutsourcingFactUpdate) SetPosterID(id int) *OutsourcingFactUpdate {
+	_u.mutation.SetPosterID(id)
+	return _u
+}
+
+// SetNillablePosterID sets the "poster" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillablePosterID(id *int) *OutsourcingFactUpdate {
+	if id != nil {
+		_u = _u.SetPosterID(*id)
+	}
+	return _u
+}
+
+// SetPoster sets the "poster" edge to the AdminUser entity.
+func (_u *OutsourcingFactUpdate) SetPoster(v *AdminUser) *OutsourcingFactUpdate {
+	return _u.SetPosterID(v.ID)
+}
+
+// SetCancellerID sets the "canceller" edge to the AdminUser entity by ID.
+func (_u *OutsourcingFactUpdate) SetCancellerID(id int) *OutsourcingFactUpdate {
+	_u.mutation.SetCancellerID(id)
+	return _u
+}
+
+// SetNillableCancellerID sets the "canceller" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *OutsourcingFactUpdate) SetNillableCancellerID(id *int) *OutsourcingFactUpdate {
+	if id != nil {
+		_u = _u.SetCancellerID(*id)
+	}
+	return _u
+}
+
+// SetCanceller sets the "canceller" edge to the AdminUser entity.
+func (_u *OutsourcingFactUpdate) SetCanceller(v *AdminUser) *OutsourcingFactUpdate {
+	return _u.SetCancellerID(v.ID)
+}
+
 // Mutation returns the OutsourcingFactMutation object of the builder.
 func (_u *OutsourcingFactUpdate) Mutation() *OutsourcingFactMutation {
 	return _u.mutation
@@ -461,6 +601,18 @@ func (_u *OutsourcingFactUpdate) ClearProductSku() *OutsourcingFactUpdate {
 // ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
 func (_u *OutsourcingFactUpdate) ClearInventoryLot() *OutsourcingFactUpdate {
 	_u.mutation.ClearInventoryLot()
+	return _u
+}
+
+// ClearPoster clears the "poster" edge to the AdminUser entity.
+func (_u *OutsourcingFactUpdate) ClearPoster() *OutsourcingFactUpdate {
+	_u.mutation.ClearPoster()
+	return _u
+}
+
+// ClearCanceller clears the "canceller" edge to the AdminUser entity.
+func (_u *OutsourcingFactUpdate) ClearCanceller() *OutsourcingFactUpdate {
+	_u.mutation.ClearCanceller()
 	return _u
 }
 
@@ -523,6 +675,11 @@ func (_u *OutsourcingFactUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := outsourcingfact.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SubjectType(); ok {
 		if err := outsourcingfact.SubjectTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.subject_type": %w`, err)}
@@ -583,6 +740,21 @@ func (_u *OutsourcingFactUpdate) check() error {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.idempotency_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PostedBy(); ok {
+		if err := outsourcingfact.PostedByValidator(v); err != nil {
+			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.posted_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelledBy(); ok {
+		if err := outsourcingfact.CancelledByValidator(v); err != nil {
+			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.cancelled_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelReason(); ok {
+		if err := outsourcingfact.CancelReasonValidator(v); err != nil {
+			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.cancel_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := outsourcingfact.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.note": %w`, err)}
@@ -617,6 +789,12 @@ func (_u *OutsourcingFactUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(outsourcingfact.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(outsourcingfact.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(outsourcingfact.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.SubjectType(); ok {
 		_spec.SetField(outsourcingfact.FieldSubjectType, field.TypeString, value)
@@ -683,6 +861,18 @@ func (_u *OutsourcingFactUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if _u.mutation.PostedAtCleared() {
 		_spec.ClearField(outsourcingfact.FieldPostedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelledAt(); ok {
+		_spec.SetField(outsourcingfact.FieldCancelledAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancelledAtCleared() {
+		_spec.ClearField(outsourcingfact.FieldCancelledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelReason(); ok {
+		_spec.SetField(outsourcingfact.FieldCancelReason, field.TypeString, value)
+	}
+	if _u.mutation.CancelReasonCleared() {
+		_spec.ClearField(outsourcingfact.FieldCancelReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(outsourcingfact.FieldNote, field.TypeString, value)
@@ -809,6 +999,64 @@ func (_u *OutsourcingFactUpdate) sqlSave(ctx context.Context) (_node int, err er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.PosterCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingfact.PosterTable,
+			Columns: []string{outsourcingfact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PosterIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingfact.PosterTable,
+			Columns: []string{outsourcingfact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CancellerCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingfact.CancellerTable,
+			Columns: []string{outsourcingfact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CancellerIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingfact.CancellerTable,
+			Columns: []string{outsourcingfact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{outsourcingfact.Label}
@@ -868,6 +1116,27 @@ func (_u *OutsourcingFactUpdateOne) SetNillableStatus(v *string) *OutsourcingFac
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetVersion sets the "version" field.
+func (_u *OutsourcingFactUpdateOne) SetVersion(v int) *OutsourcingFactUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillableVersion(v *int) *OutsourcingFactUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *OutsourcingFactUpdateOne) AddVersion(v int) *OutsourcingFactUpdateOne {
+	_u.mutation.AddVersion(v)
 	return _u
 }
 
@@ -1171,6 +1440,86 @@ func (_u *OutsourcingFactUpdateOne) ClearPostedAt() *OutsourcingFactUpdateOne {
 	return _u
 }
 
+// SetPostedBy sets the "posted_by" field.
+func (_u *OutsourcingFactUpdateOne) SetPostedBy(v int) *OutsourcingFactUpdateOne {
+	_u.mutation.SetPostedBy(v)
+	return _u
+}
+
+// SetNillablePostedBy sets the "posted_by" field if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillablePostedBy(v *int) *OutsourcingFactUpdateOne {
+	if v != nil {
+		_u.SetPostedBy(*v)
+	}
+	return _u
+}
+
+// ClearPostedBy clears the value of the "posted_by" field.
+func (_u *OutsourcingFactUpdateOne) ClearPostedBy() *OutsourcingFactUpdateOne {
+	_u.mutation.ClearPostedBy()
+	return _u
+}
+
+// SetCancelledAt sets the "cancelled_at" field.
+func (_u *OutsourcingFactUpdateOne) SetCancelledAt(v time.Time) *OutsourcingFactUpdateOne {
+	_u.mutation.SetCancelledAt(v)
+	return _u
+}
+
+// SetNillableCancelledAt sets the "cancelled_at" field if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillableCancelledAt(v *time.Time) *OutsourcingFactUpdateOne {
+	if v != nil {
+		_u.SetCancelledAt(*v)
+	}
+	return _u
+}
+
+// ClearCancelledAt clears the value of the "cancelled_at" field.
+func (_u *OutsourcingFactUpdateOne) ClearCancelledAt() *OutsourcingFactUpdateOne {
+	_u.mutation.ClearCancelledAt()
+	return _u
+}
+
+// SetCancelledBy sets the "cancelled_by" field.
+func (_u *OutsourcingFactUpdateOne) SetCancelledBy(v int) *OutsourcingFactUpdateOne {
+	_u.mutation.SetCancelledBy(v)
+	return _u
+}
+
+// SetNillableCancelledBy sets the "cancelled_by" field if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillableCancelledBy(v *int) *OutsourcingFactUpdateOne {
+	if v != nil {
+		_u.SetCancelledBy(*v)
+	}
+	return _u
+}
+
+// ClearCancelledBy clears the value of the "cancelled_by" field.
+func (_u *OutsourcingFactUpdateOne) ClearCancelledBy() *OutsourcingFactUpdateOne {
+	_u.mutation.ClearCancelledBy()
+	return _u
+}
+
+// SetCancelReason sets the "cancel_reason" field.
+func (_u *OutsourcingFactUpdateOne) SetCancelReason(v string) *OutsourcingFactUpdateOne {
+	_u.mutation.SetCancelReason(v)
+	return _u
+}
+
+// SetNillableCancelReason sets the "cancel_reason" field if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillableCancelReason(v *string) *OutsourcingFactUpdateOne {
+	if v != nil {
+		_u.SetCancelReason(*v)
+	}
+	return _u
+}
+
+// ClearCancelReason clears the value of the "cancel_reason" field.
+func (_u *OutsourcingFactUpdateOne) ClearCancelReason() *OutsourcingFactUpdateOne {
+	_u.mutation.ClearCancelReason()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *OutsourcingFactUpdateOne) SetNote(v string) *OutsourcingFactUpdateOne {
 	_u.mutation.SetNote(v)
@@ -1231,6 +1580,44 @@ func (_u *OutsourcingFactUpdateOne) SetInventoryLot(v *InventoryLot) *Outsourcin
 	return _u.SetInventoryLotID(v.ID)
 }
 
+// SetPosterID sets the "poster" edge to the AdminUser entity by ID.
+func (_u *OutsourcingFactUpdateOne) SetPosterID(id int) *OutsourcingFactUpdateOne {
+	_u.mutation.SetPosterID(id)
+	return _u
+}
+
+// SetNillablePosterID sets the "poster" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillablePosterID(id *int) *OutsourcingFactUpdateOne {
+	if id != nil {
+		_u = _u.SetPosterID(*id)
+	}
+	return _u
+}
+
+// SetPoster sets the "poster" edge to the AdminUser entity.
+func (_u *OutsourcingFactUpdateOne) SetPoster(v *AdminUser) *OutsourcingFactUpdateOne {
+	return _u.SetPosterID(v.ID)
+}
+
+// SetCancellerID sets the "canceller" edge to the AdminUser entity by ID.
+func (_u *OutsourcingFactUpdateOne) SetCancellerID(id int) *OutsourcingFactUpdateOne {
+	_u.mutation.SetCancellerID(id)
+	return _u
+}
+
+// SetNillableCancellerID sets the "canceller" edge to the AdminUser entity by ID if the given value is not nil.
+func (_u *OutsourcingFactUpdateOne) SetNillableCancellerID(id *int) *OutsourcingFactUpdateOne {
+	if id != nil {
+		_u = _u.SetCancellerID(*id)
+	}
+	return _u
+}
+
+// SetCanceller sets the "canceller" edge to the AdminUser entity.
+func (_u *OutsourcingFactUpdateOne) SetCanceller(v *AdminUser) *OutsourcingFactUpdateOne {
+	return _u.SetCancellerID(v.ID)
+}
+
 // Mutation returns the OutsourcingFactMutation object of the builder.
 func (_u *OutsourcingFactUpdateOne) Mutation() *OutsourcingFactMutation {
 	return _u.mutation
@@ -1257,6 +1644,18 @@ func (_u *OutsourcingFactUpdateOne) ClearProductSku() *OutsourcingFactUpdateOne 
 // ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
 func (_u *OutsourcingFactUpdateOne) ClearInventoryLot() *OutsourcingFactUpdateOne {
 	_u.mutation.ClearInventoryLot()
+	return _u
+}
+
+// ClearPoster clears the "poster" edge to the AdminUser entity.
+func (_u *OutsourcingFactUpdateOne) ClearPoster() *OutsourcingFactUpdateOne {
+	_u.mutation.ClearPoster()
+	return _u
+}
+
+// ClearCanceller clears the "canceller" edge to the AdminUser entity.
+func (_u *OutsourcingFactUpdateOne) ClearCanceller() *OutsourcingFactUpdateOne {
+	_u.mutation.ClearCanceller()
 	return _u
 }
 
@@ -1332,6 +1731,11 @@ func (_u *OutsourcingFactUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := outsourcingfact.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SubjectType(); ok {
 		if err := outsourcingfact.SubjectTypeValidator(v); err != nil {
 			return &ValidationError{Name: "subject_type", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.subject_type": %w`, err)}
@@ -1392,6 +1796,21 @@ func (_u *OutsourcingFactUpdateOne) check() error {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.idempotency_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PostedBy(); ok {
+		if err := outsourcingfact.PostedByValidator(v); err != nil {
+			return &ValidationError{Name: "posted_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.posted_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelledBy(); ok {
+		if err := outsourcingfact.CancelledByValidator(v); err != nil {
+			return &ValidationError{Name: "cancelled_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.cancelled_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.CancelReason(); ok {
+		if err := outsourcingfact.CancelReasonValidator(v); err != nil {
+			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.cancel_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := outsourcingfact.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "OutsourcingFact.note": %w`, err)}
@@ -1443,6 +1862,12 @@ func (_u *OutsourcingFactUpdateOne) sqlSave(ctx context.Context) (_node *Outsour
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(outsourcingfact.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(outsourcingfact.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(outsourcingfact.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.SubjectType(); ok {
 		_spec.SetField(outsourcingfact.FieldSubjectType, field.TypeString, value)
@@ -1509,6 +1934,18 @@ func (_u *OutsourcingFactUpdateOne) sqlSave(ctx context.Context) (_node *Outsour
 	}
 	if _u.mutation.PostedAtCleared() {
 		_spec.ClearField(outsourcingfact.FieldPostedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelledAt(); ok {
+		_spec.SetField(outsourcingfact.FieldCancelledAt, field.TypeTime, value)
+	}
+	if _u.mutation.CancelledAtCleared() {
+		_spec.ClearField(outsourcingfact.FieldCancelledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.CancelReason(); ok {
+		_spec.SetField(outsourcingfact.FieldCancelReason, field.TypeString, value)
+	}
+	if _u.mutation.CancelReasonCleared() {
+		_spec.ClearField(outsourcingfact.FieldCancelReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(outsourcingfact.FieldNote, field.TypeString, value)
@@ -1628,6 +2065,64 @@ func (_u *OutsourcingFactUpdateOne) sqlSave(ctx context.Context) (_node *Outsour
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PosterCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingfact.PosterTable,
+			Columns: []string{outsourcingfact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PosterIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingfact.PosterTable,
+			Columns: []string{outsourcingfact.PosterColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CancellerCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingfact.CancellerTable,
+			Columns: []string{outsourcingfact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CancellerIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   outsourcingfact.CancellerTable,
+			Columns: []string{outsourcingfact.CancellerColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(adminuser.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -5,7 +5,12 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 import { submitProductionException } from '../../api/operationalFactApi.mjs'
 import {
+  getProductionExceptionApprovalProcess,
+  startProductionExceptionApprovalProcess,
+} from '../../api/customerConfigApi.mjs'
+import {
   createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
   sourceBusinessActionNo,
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
@@ -13,6 +18,7 @@ import {
 export default function ProductionExceptionRequestModal({
   open,
   inspection,
+  customerKey,
   onClose,
   onChanged,
 }) {
@@ -39,10 +45,7 @@ export default function ProductionExceptionRequestModal({
       decision_no: values.decision_no.trim(),
       decision_type: values.decision_type,
       production_wip_batch_id: Number(inspection?.production_wip_batch_id || 0),
-      quality_inspection_id:
-        values.decision_type === 'WIP_CONCESSION'
-          ? Number(inspection?.id || 0)
-          : undefined,
+      quality_inspection_id: Number(inspection?.id || 0),
       requested_quantity: String(values.requested_quantity).trim(),
       reason: values.reason.trim(),
     }
@@ -52,18 +55,34 @@ export default function ProductionExceptionRequestModal({
     )
     setLoading(true)
     try {
-      const next = await submitProductionException(attempt.params)
-      if (!next?.id || next.status !== 'SUBMITTED') {
+      const created = await submitProductionException(attempt.params)
+      if (!created?.id || created.status !== 'SUBMITTED') {
         throw Object.assign(new Error('生产异常申请结果暂时无法确认'), {
           isInvalidResponse: true,
         })
       }
+      let processData
+      try {
+        processData = await startProductionExceptionApprovalProcess({
+          ...(customerKey ? { customer_key: customerKey } : {}),
+          production_exception_id: created.id,
+          idempotency_key: `production-exception-approval/${created.id}`,
+        })
+      } catch (error) {
+        if (!isSourceBusinessActionResultUnknown(error)) throw error
+        processData = await getProductionExceptionApprovalProcess({
+          ...(customerKey ? { customer_key: customerKey } : {}),
+          production_exception_id: created.id,
+        })
+        if (!processData?.process_context) throw error
+      }
+      const next = processData.source_readback
       attempts.current.settle(
         `production-exception:${inspection.id}`,
         attempt,
         null
       )
-      message.success('生产异常申请已提交，请到生产异常页面审批并确认执行')
+      message.success('生产异常申请已提交，请到任务中心审批')
       onChanged?.(next)
       onClose?.()
     } catch (error) {

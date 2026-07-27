@@ -8,6 +8,10 @@ const PROCESS_LABELS = Object.freeze({
   sales_order_acceptance: '销售订单受理',
   material_supply: '采购供料',
   finished_goods_delivery: '成品交付',
+  sales_return_acceptance: '客户退货受理',
+  finance_payment_approval: '收付款审批',
+  inventory_adjustment_approval: '人工库存调整',
+  production_exception_approval: '生产异常处置',
 })
 
 const NODE_STATUS_LABELS = Object.freeze({
@@ -33,8 +37,37 @@ const NODE_LABELS = Object.freeze({
   shipment_finance_release: '财务放行',
   shipment_execution: '执行出货',
   receivable_lead: '应收跟进',
+  sales_return_approval: '客户退货审批',
+  approve_sales_return: '确认客户退货申请',
+  sales_return_receipt: '客户退货收货交接',
+  receive_sales_return: '客户退货收货入库',
+  reject_sales_return: '退回客户退货申请',
+  finance_payment_approval: '收付款审批',
+  approve_finance_payment: '确认收付款申请',
+  finance_payment_execution: '收付款执行交接',
+  post_finance_payment: '收付款过账核销',
+  reject_finance_payment: '退回收付款申请',
+  submit_inventory_adjustment: '提交人工库存调整',
+  inventory_adjustment_approval: '人工库存调整审批',
+  approve_inventory_adjustment: '确认人工库存调整',
+  inventory_adjustment_execution: '人工库存调整执行交接',
+  post_inventory_adjustment: '人工库存调整过账',
+  reject_inventory_adjustment: '退回人工库存调整',
+  production_exception_decision_approval: '生产异常审批',
+  approve_production_exception: '确认生产异常处置',
+  production_exception_execution: '生产异常执行交接',
+  execute_production_exception: '执行生产异常处置',
+  reject_production_exception: '退回生产异常申请',
+  rejected_end: '流程退回结束',
   end: '流程结束',
 })
+
+const APPROVAL_FORM_PROFILE_KEYS = new Set([
+  'sales_return_approval',
+  'finance_payment_approval',
+  'inventory_adjustment_approval',
+  'production_exception_approval',
+])
 
 const PROCESS_STATUS_KEYS = new Set(Object.keys(PROCESS_STATUS_LABELS))
 const PROCESS_KEYS = new Set(Object.keys(PROCESS_LABELS))
@@ -65,6 +98,8 @@ export function requireWorkflowProcessContext(value) {
   const nodes = value?.nodes
   const currentNodes = value?.current_nodes
   const completedNodes = value?.completed_nodes
+  const linkedNode = value?.linked_node
+  const approvalForm = value?.approval_form
   if (
     !value ||
     typeof value !== 'object' ||
@@ -102,6 +137,8 @@ export function requireWorkflowProcessContext(value) {
     NODE_TYPE_KEYS.has(node.node_type) &&
     Number.isSafeInteger(node.attempt) &&
     node.attempt > 0 &&
+    Number.isSafeInteger(node.version) &&
+    node.version > 0 &&
     NODE_STATUS_KEYS.has(node.status)
   if (!nodes.every(validateNode)) {
     invalidProcessContext()
@@ -123,6 +160,40 @@ export function requireWorkflowProcessContext(value) {
     )
   ) {
     invalidProcessContext()
+  }
+  if (linkedNode != null) {
+    if (!validateNode(linkedNode) || !nodeIDs.has(linkedNode.id)) {
+      invalidProcessContext()
+    }
+    const canonicalLinkedNode = nodes.find((node) => node.id === linkedNode.id)
+    if (
+      !canonicalLinkedNode ||
+      canonicalLinkedNode.node_key !== linkedNode.node_key ||
+      canonicalLinkedNode.status !== linkedNode.status
+    ) {
+      invalidProcessContext()
+    }
+  }
+  if (approvalForm != null) {
+    const approvedQuantity = approvalForm.approved_quantity
+    if (
+      !linkedNode ||
+      linkedNode.node_type !== 'approval' ||
+      !APPROVAL_FORM_PROFILE_KEYS.has(approvalForm.profile_key) ||
+      approvalForm.profile_key !== linkedNode.form_profile_key ||
+      approvalForm.reason_required !== true ||
+      (approvedQuantity != null &&
+        (approvalForm.profile_key !== 'production_exception_approval' ||
+          approvedQuantity.required !== false ||
+          approvedQuantity.precision !== 20 ||
+          approvedQuantity.scale !== 6)) ||
+      (approvalForm.profile_key === 'production_exception_approval' &&
+        approvedQuantity == null) ||
+      (approvalForm.profile_key !== 'production_exception_approval' &&
+        approvedQuantity != null)
+    ) {
+      invalidProcessContext()
+    }
   }
   return value
 }

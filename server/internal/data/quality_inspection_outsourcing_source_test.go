@@ -21,7 +21,8 @@ func TestQualityInspectionFromOutsourcingReturnDerivesSourceAndGuardsCancellatio
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
 	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
-	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, "SOURCE")
+	actor := client.AdminUser.Create().SetUsername("quality-outsourcing-source-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, actor.ID, "SOURCE")
 
 	in := &biz.QualityInspectionFromOutsourcingReturnCreate{
 		InspectionNo:      "QI-OUT-RETURN-SOURCE",
@@ -54,13 +55,14 @@ func TestQualityInspectionFromOutsourcingReturnDerivesSourceAndGuardsCancellatio
 	if _, err := inventoryUC.CreateQualityInspectionFromOutsourcingReturn(ctx, &conflict); !errors.Is(err, biz.ErrQualityInspectionSourceConflict) {
 		t.Fatalf("second active inspection error = %v, want source conflict", err)
 	}
-	if _, err := operationalUC.CancelPostedOutsourcingFact(ctx, fact.ID); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
+	cancelRequest := operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "撤销委外回货")
+	if _, err := operationalUC.CancelPostedOutsourcingFact(ctx, cancelRequest); !errors.Is(err, biz.ErrOutsourcingReturnQualityDependency) {
 		t.Fatalf("cancel return with active quality error = %v, want dependency", err)
 	}
 	if _, err := inventoryUC.CancelQualityInspection(ctx, draft.ID, stringPtr("撤销抽检")); err != nil {
 		t.Fatalf("cancel draft quality inspection: %v", err)
 	}
-	cancelled, err := operationalUC.CancelPostedOutsourcingFact(ctx, fact.ID)
+	cancelled, err := operationalUC.CancelPostedOutsourcingFact(ctx, cancelRequest)
 	if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("cancel return after quality cancellation = %#v err=%v", cancelled, err)
 	}
@@ -73,7 +75,8 @@ func TestQualityInspectionFromOutsourcingReturnReusesLifecycle(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
 	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
-	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, "LIFECYCLE")
+	actor := client.AdminUser.Create().SetUsername("quality-outsourcing-lifecycle-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, actor.ID, "LIFECYCLE")
 
 	draft, err := inventoryUC.CreateQualityInspectionFromOutsourcingReturn(ctx, &biz.QualityInspectionFromOutsourcingReturnCreate{
 		InspectionNo:      "QI-OUT-RETURN-LIFECYCLE",
@@ -109,6 +112,7 @@ func createPostedOutsourcingReturnForQuality(
 	inventoryUC *biz.InventoryUsecase,
 	operationalUC *biz.OperationalFactUsecase,
 	fixtures inventoryTestFixtures,
+	actorID int,
 	suffix string,
 ) *biz.OutsourcingFact {
 	t.Helper()
@@ -133,7 +137,7 @@ func createPostedOutsourcingReturnForQuality(
 	if err != nil {
 		t.Fatalf("create outsourcing return: %v", err)
 	}
-	posted, err := operationalUC.PostOutsourcingFact(ctx, fact.ID)
+	posted, err := operationalUC.PostOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actorID, ""))
 	if err != nil {
 		t.Fatalf("post outsourcing return: %v", err)
 	}

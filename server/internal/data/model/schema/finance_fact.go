@@ -24,6 +24,7 @@ var financeFactLockedFields = map[string]struct{}{
 	"fact_no":               {},
 	"fact_type":             {},
 	"status":                {},
+	"version":               {},
 	"counterparty_type":     {},
 	"counterparty_id":       {},
 	"amount":                {},
@@ -40,7 +41,9 @@ var financeFactLockedFields = map[string]struct{}{
 	"occurred_at":           {},
 	"occurred_at_specified": {},
 	"posted_at":             {},
+	"posted_by":             {},
 	"settled_at":            {},
+	"settled_by":            {},
 	"cancelled_at":          {},
 	"cancelled_by":          {},
 	"cancel_reason":         {},
@@ -53,10 +56,15 @@ func (FinanceFact) Hooks() []ent.Hook {
 				if err := factguard.RejectCreateBypass(
 					m,
 					"finance_fact",
-					"settled_at",
-					"cancelled_at",
-					"cancelled_by",
-					"cancel_reason",
+					[]string{
+						"posted_at",
+						"posted_by",
+						"settled_at",
+						"settled_by",
+						"cancelled_at",
+						"cancelled_by",
+						"cancel_reason",
+					},
 				); err != nil {
 					return nil, err
 				}
@@ -77,7 +85,7 @@ func (FinanceFact) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'PAYMENT', 'RECONCILIATION')",
+				"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'RECONCILIATION')",
 				"finance_facts_status_allowed":           "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
 				"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
 				"finance_facts_amount_positive":          "amount > 0",
@@ -87,6 +95,26 @@ func (FinanceFact) Annotations() []schema.Annotation {
 				"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('CASH_ON_SHIPMENT', 'EOM_30', 'EOM_45')",
 				"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
 				"finance_facts_invoice_category_allowed": "invoice_category IS NULL OR invoice_category IN ('NONE', 'EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
+				"finance_facts_version_positive":         "version > 0",
+				"finance_facts_status_audit_bundle": `
+(
+  (status = 'DRAFT'
+    AND posted_at IS NULL AND posted_by IS NULL
+    AND settled_at IS NULL AND settled_by IS NULL)
+  OR
+  (status = 'POSTED'
+    AND posted_at IS NOT NULL AND posted_by IS NOT NULL
+    AND settled_at IS NULL AND settled_by IS NULL)
+  OR
+  (status = 'SETTLED'
+    AND posted_at IS NOT NULL AND posted_by IS NOT NULL
+    AND settled_at IS NOT NULL AND settled_by IS NOT NULL)
+  OR
+  (status = 'CANCELLED'
+    AND settled_at IS NULL AND settled_by IS NULL
+    AND ((posted_at IS NULL AND posted_by IS NULL)
+      OR (posted_at IS NOT NULL AND posted_by IS NOT NULL)))
+)`,
 				"finance_facts_cancel_audit_bundle": `
 (
   (status = 'CANCELLED'
@@ -107,6 +135,7 @@ func (FinanceFact) Fields() []ent.Field {
 		field.String("fact_no").NotEmpty().MaxLen(64),
 		field.String("fact_type").NotEmpty().MaxLen(32),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
+		field.Int("version").Default(1).Positive(),
 		field.String("counterparty_type").NotEmpty().MaxLen(16),
 		field.Int("counterparty_id").Optional().Nillable().Positive(),
 		decimalQuantityField("amount"),
@@ -124,7 +153,9 @@ func (FinanceFact) Fields() []ent.Field {
 		field.Time("occurred_at").Default(time.Now),
 		field.Bool("occurred_at_specified").Default(false),
 		field.Time("posted_at").Optional().Nillable(),
+		field.Int("posted_by").Optional().Nillable().Positive(),
 		field.Time("settled_at").Optional().Nillable(),
+		field.Int("settled_by").Optional().Nillable().Positive(),
 		field.Time("cancelled_at").Optional().Nillable(),
 		field.Int("cancelled_by").Optional().Nillable().Positive(),
 		field.String("cancel_reason").Optional().Nillable().MaxLen(255),
@@ -136,6 +167,14 @@ func (FinanceFact) Fields() []ent.Field {
 
 func (FinanceFact) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.To("poster", AdminUser.Type).
+			Field("posted_by").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("settler", AdminUser.Type).
+			Field("settled_by").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("canceller", AdminUser.Type).
 			Field("cancelled_by").
 			Unique().

@@ -21,7 +21,7 @@ export const yoyoosunMenuConfig = Object.freeze({
       },
       {
         title: "销售管理",
-        items: ["sales-orders"],
+        items: ["sales-orders", "sales-returns"],
       },
       {
         title: "产品工程",
@@ -58,7 +58,13 @@ export const yoyoosunMenuConfig = Object.freeze({
       },
       {
         title: "财务管理",
-        items: ["reconciliation", "payables", "receivables", "invoices"],
+        items: [
+          "reconciliation",
+          "payables",
+          "receivables",
+          "invoices",
+          "finance-payments",
+        ],
       },
       {
         title: "运营工具",

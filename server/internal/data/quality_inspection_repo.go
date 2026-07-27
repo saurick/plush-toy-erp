@@ -143,6 +143,9 @@ func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionI
 	if err != nil {
 		return nil, err
 	}
+	if row.SourceType != nil && *row.SourceType == biz.QualityInspectionSourceSalesReturn {
+		return nil, biz.ErrBadParam
+	}
 	transition, ok := corestatus.SubmitQualityInspection(row.Status)
 	if !ok {
 		return nil, biz.ErrBadParam
@@ -271,6 +274,9 @@ func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionI
 	row, err := getLockedQualityInspection(ctx, tx, inspectionID)
 	if err != nil {
 		return nil, err
+	}
+	if row.SourceType != nil && *row.SourceType == biz.QualityInspectionSourceSalesReturn {
+		return nil, biz.ErrQualityInspectionSalesReturnLifecycle
 	}
 	transition, ok := corestatus.CancelQualityInspection(row.Status)
 	if !ok {
@@ -454,6 +460,9 @@ func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.Q
 	}
 	if filter.SubjectID > 0 {
 		query = query.Where(qualityinspection.SubjectID(filter.SubjectID))
+	}
+	if filter.CorrectionOfInspectionID > 0 {
+		query = query.Where(qualityinspection.CorrectionOfInspectionID(filter.CorrectionOfInspectionID))
 	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {

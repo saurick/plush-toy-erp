@@ -11,7 +11,10 @@ const source = readFileSync(
 test('finance cancellation requires a bounded business reason and sends it to the canonical action', () => {
   assert.match(source, /'作废财务草稿'/)
   assert.match(source, /'取消财务记录'/)
-  assert.match(source, /placeholder="请填写客户、供应商或账款调整的业务原因"/)
+  assert.match(
+    source,
+    /currentActiveKey === 'finance'[\s\S]*\? '请填写客户、供应商或账款调整的业务原因'[\s\S]*: '请填写作废或取消的业务原因'/u
+  )
   assert.match(source, /maxLength=\{255\}/)
   assert.match(source, /\{ reason \}/)
   assert.match(source, /currentActiveKey === 'finance'/)

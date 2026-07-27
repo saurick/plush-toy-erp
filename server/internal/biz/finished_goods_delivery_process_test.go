@@ -327,17 +327,17 @@ func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) CreateFinanceFactD
 	}, nil
 }
 
-func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) PostFinanceFact(_ context.Context, id int) (*FinanceFact, error) {
-	r.postedFinanceFactID = id
+func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) PostFinanceFact(_ context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+	r.postedFinanceFactID = in.ID
 	return nil, ErrBadParam
 }
 
-func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) SettleFinanceFact(_ context.Context, id int) (*FinanceFact, error) {
-	r.settledFinanceFactID = id
+func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) SettleFinanceFact(_ context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+	r.settledFinanceFactID = in.ID
 	return nil, ErrBadParam
 }
 
-func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, id int, _ int, _ string) (*FinanceFact, error) {
-	r.cancelledFinanceFactID = id
+func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) CancelPostedFinanceFact(_ context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+	r.cancelledFinanceFactID = in.ID
 	return nil, ErrBadParam
 }

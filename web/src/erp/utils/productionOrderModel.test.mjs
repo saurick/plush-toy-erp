@@ -42,6 +42,8 @@ function aggregate() {
         unit_quantity_snapshot: '0.500000',
         loss_rate_snapshot: '0.020000',
         planned_quantity: '10.200000',
+        approved_over_issue_quantity: '0',
+        effective_limit_quantity: '10.200000',
         issued_quantity: '4.200000',
         remaining_quantity: '6.000000',
         material_code_snapshot: 'MAT-023',
@@ -99,11 +101,30 @@ test('production material requirement response binds order and quantity projecti
   assert.throws(() =>
     validateProductionMaterialRequirementsResponse(inconsistent)
   )
+
+  const approvedOverIssue = structuredClone(data)
+  approvedOverIssue.material_requirements[0].approved_over_issue_quantity =
+    '2.000000'
+  approvedOverIssue.material_requirements[0].effective_limit_quantity =
+    '12.200000'
+  approvedOverIssue.material_requirements[0].remaining_quantity = '8.000000'
+  assert.equal(
+    validateProductionMaterialRequirementsResponse(approvedOverIssue)[0]
+      .effective_limit_quantity,
+    '12.200000'
+  )
+  approvedOverIssue.material_requirements[0].effective_limit_quantity =
+    '12.100000'
+  assert.throws(() =>
+    validateProductionMaterialRequirementsResponse(approvedOverIssue)
+  )
 })
 
 test('production material requirement conservation is exact at numeric(20,6) boundaries', () => {
   const tiny = aggregate()
   tiny.production_material_requirements[0].planned_quantity = '0.000001'
+  tiny.production_material_requirements[0].approved_over_issue_quantity = '0'
+  tiny.production_material_requirements[0].effective_limit_quantity = '0.000001'
   tiny.production_material_requirements[0].issued_quantity = '0'
   tiny.production_material_requirements[0].remaining_quantity = '0.000001'
   assert.equal(
@@ -115,6 +136,10 @@ test('production material requirement conservation is exact at numeric(20,6) bou
 
   const maximum = aggregate()
   maximum.production_material_requirements[0].planned_quantity =
+    '99999999999999.999999'
+  maximum.production_material_requirements[0].approved_over_issue_quantity =
+    '0'
+  maximum.production_material_requirements[0].effective_limit_quantity =
     '99999999999999.999999'
   maximum.production_material_requirements[0].issued_quantity = '0.000001'
   maximum.production_material_requirements[0].remaining_quantity =

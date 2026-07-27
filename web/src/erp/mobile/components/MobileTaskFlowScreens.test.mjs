@@ -106,6 +106,29 @@ test('mobile task action screen validates and focuses the first missing field', 
   assert.match(actionScreenSource, /event\.key === 'Escape'/u)
 })
 
+test('mobile task action screen loads authoritative approval form and fails closed on drift', () => {
+  assert.match(actionScreenSource, /getWorkflowTaskProcessContext/u)
+  assert.match(actionScreenSource, /expectedApprovalProfile/u)
+  assert.match(
+    actionScreenSource,
+    /processApprovalForm\?\.profile_key === 'production_exception_approval'/u
+  )
+  assert.match(actionScreenSource, /审批表单暂时无法从流程真源确认/u)
+  assert.match(actionScreenSource, /重新读取流程表单/u)
+  assert.match(
+    actionScreenSource,
+    /系统不会根据任务文案或岗位名称猜测审批字段/u
+  )
+  assert.match(actionScreenSource, /processDecisionRequired \? 255 : 500/u)
+  assert.match(roleTaskPageSource, /mobileRoleTasksApprovedQuantity/u)
+  assert.match(
+    roleTaskPageSource,
+    /approvedQuantity:\s*detailApprovedQuantityValue/u
+  )
+  assert.match(roleTaskPageSource, /persistMobileTaskDraftBackup/u)
+  assert.match(actionScreenSource, /showDisabledSubmit/u)
+})
+
 test('mobile task flow exposes one shared three-step navigation contract', () => {
   for (const source of [
     detailScreenSource,

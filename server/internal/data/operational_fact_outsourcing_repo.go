@@ -412,12 +412,19 @@ func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in
 	return outsourcingFactWithSourceSKUProjection(ctx, r.data.postgres, row)
 }
 
-func (r *operationalFactRepo) PostOutsourcingFact(ctx context.Context, id int) (*biz.OutsourcingFact, error) {
-	return r.postOutsourcingFact(ctx, id, false)
+func (r *operationalFactRepo) PostOutsourcingFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.OutsourcingFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || in.Reason != "" {
+		return nil, biz.ErrBadParam
+	}
+	return r.postOutsourcingFact(ctx, in, false)
 }
 
-func (r *operationalFactRepo) CancelPostedOutsourcingFact(ctx context.Context, id int) (*biz.OutsourcingFact, error) {
-	return r.postOutsourcingFact(ctx, id, true)
+func (r *operationalFactRepo) CancelPostedOutsourcingFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.OutsourcingFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 ||
+		in.Reason == "" || len([]rune(in.Reason)) > 255 {
+		return nil, biz.ErrBadParam
+	}
+	return r.postOutsourcingFact(ctx, in, true)
 }
 
 func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.OutsourcingFact, int, error) {
@@ -481,7 +488,7 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := q.Order(ent.Desc(outsourcingfact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := q.WithPoster().WithCanceller().Order(ent.Desc(outsourcingfact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -607,8 +614,8 @@ func resolveOutsourcingFactSourceSKUSnapshots(
 	return resolved, nil
 }
 
-func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, cancel bool) (*biz.OutsourcingFact, error) {
-	preview, err := r.data.postgres.OutsourcingFact.Get(ctx, id)
+func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, in *biz.OperationalFactStatusMutation, cancel bool) (*biz.OutsourcingFact, error) {
+	preview, err := r.data.postgres.OutsourcingFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrOutsourcingFactNotFound
@@ -619,7 +626,7 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 		if !cancel {
 			return nil, biz.ErrOutsourcingOrderFactSourceInvalid
 		}
-		return r.postLegacyOutsourcingFact(ctx, id, cancel)
+		return r.postLegacyOutsourcingFact(ctx, in, cancel)
 	}
 	orderID, itemID, err := outsourcingOrderSourceIDsFromFact(preview)
 	if err != nil {
@@ -654,10 +661,10 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_order_items", itemID, biz.ErrOutsourcingOrderItemNotFound); err != nil {
 		return nil, err
 	}
-	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", id, biz.ErrOutsourcingFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", in.ID, biz.ErrOutsourcingFactNotFound); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.OutsourcingFact.Get(ctx, id)
+	row, err := tx.client.OutsourcingFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrOutsourcingFactNotFound
@@ -676,7 +683,17 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 		return nil, biz.ErrOutsourcingOrderFactSourceInvalid
 	}
 	if cancel {
-		if row.Status == biz.OperationalFactStatusCancelled {
+		replay, err := versionedOperationalFactCancellationReplay(
+			row.Status,
+			row.Version,
+			row.CancelledBy,
+			row.CancelReason,
+			in,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitOutsourcingFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusDraft && row.Status != biz.OperationalFactStatusPosted {
@@ -740,15 +757,29 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 			}
 		}
 		if row.Status == biz.OperationalFactStatusPosted {
-			if err := r.applyOutsourcingFactInventory(ctx, tx, row, true); err != nil {
+			if err := r.applyOutsourcingFactInventory(ctx, tx, row, in, true); err != nil {
 				return nil, err
 			}
 		}
-		if err := updateOperationalFactStatus(ctx, tx, "outsourcing_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+		if err := updateVersionedOperationalFactCancellation(
+			ctx, tx, "outsourcing_facts", in.ID, in.ExpectedVersion,
+			row.Status, in.ActorID, in.Reason, time.Now(),
+		); err != nil {
 			return nil, err
 		}
 	} else {
-		if row.Status == biz.OperationalFactStatusPosted {
+		replay, err := versionedOperationalFactTransitionReplay(
+			row.Status,
+			row.Version,
+			in.ExpectedVersion,
+			biz.OperationalFactStatusPosted,
+			row.PostedBy,
+			in.ActorID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitOutsourcingFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusDraft {
@@ -757,15 +788,19 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 		if err := validateOutsourcingOrderFactQuantity(ctx, tx.client, item, row.FactType, row.Quantity); err != nil {
 			return nil, err
 		}
-		if err := r.applyOutsourcingFactInventory(ctx, tx, row, false); err != nil {
+		if err := r.applyOutsourcingFactInventory(ctx, tx, row, in, false); err != nil {
 			return nil, err
 		}
 		now := time.Now()
-		if err := updateOperationalFactStatus(ctx, tx, "outsourcing_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
+		if err := updateVersionedOperationalFactStatus(
+			ctx, tx, "outsourcing_facts", in.ID, in.ExpectedVersion,
+			biz.OperationalFactStatusDraft, biz.OperationalFactStatusPosted, "posted_at", now,
+			"posted_by", in.ActorID,
+		); err != nil {
 			return nil, err
 		}
 	}
-	row, err = tx.client.OutsourcingFact.Get(ctx, id)
+	row, err = tx.client.OutsourcingFact.Query().Where(outsourcingfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -774,16 +809,16 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 
 // postLegacyOutsourcingFact only reverses historical posted rows that predate
 // source-driven creation. New source-less drafts fail closed before this path.
-func (r *operationalFactRepo) postLegacyOutsourcingFact(ctx context.Context, id int, cancel bool) (*biz.OutsourcingFact, error) {
+func (r *operationalFactRepo) postLegacyOutsourcingFact(ctx context.Context, in *biz.OperationalFactStatusMutation, cancel bool) (*biz.OutsourcingFact, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", id, biz.ErrOutsourcingFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", in.ID, biz.ErrOutsourcingFactNotFound); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.OutsourcingFact.Get(ctx, id)
+	row, err := tx.client.OutsourcingFact.Get(ctx, in.ID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrOutsourcingFactNotFound
@@ -791,34 +826,62 @@ func (r *operationalFactRepo) postLegacyOutsourcingFact(ctx context.Context, id 
 		return nil, err
 	}
 	if cancel {
-		if row.Status == biz.OperationalFactStatusCancelled {
+		replay, err := versionedOperationalFactCancellationReplay(
+			row.Status,
+			row.Version,
+			row.CancelledBy,
+			row.CancelReason,
+			in,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitOutsourcingFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
-		if err := r.applyOutsourcingFactInventory(ctx, tx, row, true); err != nil {
+		if err := r.applyOutsourcingFactInventory(ctx, tx, row, in, true); err != nil {
 			return nil, err
 		}
-		if err := updateOperationalFactStatus(ctx, tx, "outsourcing_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+		if err := updateVersionedOperationalFactCancellation(
+			ctx, tx, "outsourcing_facts", in.ID, in.ExpectedVersion,
+			row.Status, in.ActorID, in.Reason, time.Now(),
+		); err != nil {
 			return nil, err
 		}
 	} else {
-		if row.Status == biz.OperationalFactStatusPosted {
+		replay, err := versionedOperationalFactTransitionReplay(
+			row.Status,
+			row.Version,
+			in.ExpectedVersion,
+			biz.OperationalFactStatusPosted,
+			row.PostedBy,
+			in.ActorID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if replay {
 			return commitOutsourcingFact(ctx, tx, row)
 		}
 		if row.Status != biz.OperationalFactStatusDraft {
 			return nil, biz.ErrBadParam
 		}
-		if err := r.applyOutsourcingFactInventory(ctx, tx, row, false); err != nil {
+		if err := r.applyOutsourcingFactInventory(ctx, tx, row, in, false); err != nil {
 			return nil, err
 		}
 		now := time.Now()
-		if err := updateOperationalFactStatus(ctx, tx, "outsourcing_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
+		if err := updateVersionedOperationalFactStatus(
+			ctx, tx, "outsourcing_facts", in.ID, in.ExpectedVersion,
+			biz.OperationalFactStatusDraft, biz.OperationalFactStatusPosted, "posted_at", now,
+			"posted_by", in.ActorID,
+		); err != nil {
 			return nil, err
 		}
 	}
-	row, err = tx.client.OutsourcingFact.Get(ctx, id)
+	row, err = tx.client.OutsourcingFact.Query().Where(outsourcingfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -854,7 +917,7 @@ func outsourcingOrderFactCreateFromRow(row *ent.OutsourcingFact, orderID, itemID
 	}
 }
 
-func (r *operationalFactRepo) applyOutsourcingFactInventory(ctx context.Context, tx *inventoryDBTx, row *ent.OutsourcingFact, cancel bool) error {
+func (r *operationalFactRepo) applyOutsourcingFactInventory(ctx context.Context, tx *inventoryDBTx, row *ent.OutsourcingFact, in *biz.OperationalFactStatusMutation, cancel bool) error {
 	direction, txnType := outsourcingFactInventoryDirection(row.FactType)
 	return r.applyOperationalFactInventory(ctx, tx, operationalFactInventoryArgs{
 		sourceType:   biz.OutsourcingFactSourceType,
@@ -870,6 +933,8 @@ func (r *operationalFactRepo) applyOutsourcingFactInventory(ctx context.Context,
 		direction:    direction,
 		txnType:      txnType,
 		occurredAt:   row.OccurredAt,
+		actorID:      in.ActorID,
+		reason:       in.Reason,
 		cancel:       cancel,
 	})
 }
@@ -908,5 +973,15 @@ func entOutsourcingFactToBiz(row *ent.OutsourcingFact) *biz.OutsourcingFact {
 	if row == nil {
 		return nil
 	}
-	return &biz.OutsourcingFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, SupplierID: row.SupplierID, SupplierName: row.SupplierName, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	var cancellerName *string
+	var posterName *string
+	if poster, err := row.Edges.PosterOrErr(); err == nil && poster != nil {
+		name := poster.Username
+		posterName = &name
+	}
+	if canceller, err := row.Edges.CancellerOrErr(); err == nil && canceller != nil {
+		name := canceller.Username
+		cancellerName = &name
+	}
+	return &biz.OutsourcingFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, SupplierID: row.SupplierID, SupplierName: row.SupplierName, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

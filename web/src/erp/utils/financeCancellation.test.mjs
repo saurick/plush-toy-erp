@@ -9,15 +9,20 @@ import {
 
 test('finance cancellation request requires a positive id and trimmed bounded reason', () => {
   assert.deepEqual(
-    normalizeFinanceCancellationRequest({ id: 7, reason: '  客户撤销账款  ' }),
-    { id: 7, reason: '客户撤销账款' }
+    normalizeFinanceCancellationRequest({
+      id: 7,
+      expected_version: 3,
+      reason: '  客户撤销账款  ',
+    }),
+    { id: 7, expected_version: 3, reason: '客户撤销账款' }
   )
   for (const params of [
     {},
-    { id: 0, reason: '客户撤销' },
-    { id: 7, reason: '' },
-    { id: 7, reason: '   ' },
-    { id: 7, reason: '理'.repeat(256) },
+    { id: 0, expected_version: 3, reason: '客户撤销' },
+    { id: 7, expected_version: 0, reason: '客户撤销' },
+    { id: 7, expected_version: 3, reason: '' },
+    { id: 7, expected_version: 3, reason: '   ' },
+    { id: 7, expected_version: 3, reason: '理'.repeat(256) },
   ]) {
     assert.throws(() => normalizeFinanceCancellationRequest(params), TypeError)
   }
@@ -45,11 +50,13 @@ test('finance cancellation audit copy requires the canonical complete audit bund
 })
 
 test('finance cancellation result is bound to the request and complete audit projection', () => {
-  const request = { id: 7, reason: '客户撤销账款' }
+  const request = { id: 7, expected_version: 3, reason: '客户撤销账款' }
   const valid = {
     id: 7,
     status: 'CANCELLED',
+    version: 4,
     cancelled_at: 1_700_000_000,
+    cancelled_by: 9,
     cancelled_by_name: '财务主管',
     cancel_reason: '客户撤销账款',
   }
@@ -58,7 +65,9 @@ test('finance cancellation result is bound to the request and complete audit pro
     null,
     { ...valid, id: 8 },
     { ...valid, status: 'POSTED' },
+    { ...valid, version: 3 },
     { ...valid, cancelled_at: null },
+    { ...valid, cancelled_by: null },
     { ...valid, cancelled_by_name: '' },
     { ...valid, cancel_reason: '' },
   ]) {

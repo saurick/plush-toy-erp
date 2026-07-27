@@ -20,7 +20,8 @@ func TestSalesReturnLifecyclePostsAndReversesInventory(t *testing.T) {
 	customer := client.Customer.Create().SetCode("C-RMA-1").SetName("退货客户").SetIsActive(true).SaveX(ctx)
 	shipment := client.Shipment.Create().SetShipmentNo("SHP-RMA-1").SetCustomerID(customer.ID).SetCustomerSnapshot(customer.Name).SetStatus(biz.ShipmentStatusShipped).SetIdempotencyKey("shipment-rma-1").SaveX(ctx)
 	shipmentItem := client.ShipmentItem.Create().SetShipmentID(shipment.ID).SetProductID(fixtures.productID).SetWarehouseID(fixtures.warehouseID).SetUnitID(fixtures.unitID).SetQuantity(decimal.NewFromInt(5)).SaveX(ctx)
-	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewOperationalFactUsecase(repo)
 
 	input := &biz.SalesReturnCreate{ReturnNo: "RMA-1", ShipmentID: shipment.ID, Reason: "客户退回", IdempotencyKey: "rma-create-1", Items: []biz.SalesReturnItemCreate{{ShipmentItemID: shipmentItem.ID, Quantity: decimal.NewFromInt(2)}}}
 	created, err := uc.CreateSalesReturn(ctx, input, 7)
@@ -46,13 +47,19 @@ func TestSalesReturnLifecyclePostsAndReversesInventory(t *testing.T) {
 		t.Fatalf("changed replay error=%v", err)
 	}
 
-	approved, err := uc.ApproveSalesReturn(ctx, &biz.SalesReturnTransition{ID: created.ID, ExpectedVersion: created.Version}, 8)
+	approved, err := repo.transitionSalesReturn(ctx, &biz.SalesReturnTransition{ID: created.ID, ExpectedVersion: created.Version}, 8, biz.SalesReturnStatusApproved, nil, nil)
 	if err != nil || approved.Status != biz.SalesReturnStatusApproved {
 		t.Fatalf("approve = %#v, err=%v", approved, err)
 	}
-	received, err := uc.ReceiveSalesReturn(ctx, &biz.SalesReturnTransition{ID: approved.ID, ExpectedVersion: approved.Version}, 9)
+	if replay, err := repo.transitionSalesReturn(ctx, &biz.SalesReturnTransition{ID: created.ID, ExpectedVersion: created.Version}, 8, biz.SalesReturnStatusApproved, nil, nil); err != nil || replay.ID != approved.ID || replay.Version != approved.Version {
+		t.Fatalf("approve replay = %#v, err=%v", replay, err)
+	}
+	received, err := repo.transitionSalesReturn(ctx, &biz.SalesReturnTransition{ID: approved.ID, ExpectedVersion: approved.Version}, 9, biz.SalesReturnStatusReceived, nil, nil)
 	if err != nil || received.Status != biz.SalesReturnStatusReceived {
 		t.Fatalf("receive = %#v, err=%v", received, err)
+	}
+	if replay, err := repo.transitionSalesReturn(ctx, &biz.SalesReturnTransition{ID: approved.ID, ExpectedVersion: approved.Version}, 9, biz.SalesReturnStatusReceived, nil, nil); err != nil || replay.ID != received.ID || replay.Version != received.Version {
+		t.Fatalf("receive replay = %#v, err=%v", replay, err)
 	}
 	if got := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.SalesReturnSourceType), inventorytxn.SourceID(received.ID)).CountX(ctx); got != 1 {
 		t.Fatalf("received inventory txns=%d, want 1", got)
@@ -60,18 +67,24 @@ func TestSalesReturnLifecyclePostsAndReversesInventory(t *testing.T) {
 	if inspection := client.QualityInspection.GetX(ctx, received.Items[0].QualityInspectionID); inspection.Status != biz.QualityInspectionStatusSubmitted {
 		t.Fatalf("received return inspection status=%s", inspection.Status)
 	}
-	cancelled, err := uc.CancelSalesReturn(ctx, &biz.SalesReturnTransition{ID: received.ID, ExpectedVersion: received.Version, Reason: "客户撤销退货"}, 10)
-	if err != nil || cancelled.Status != biz.SalesReturnStatusCancelled {
-		t.Fatalf("cancel = %#v, err=%v", cancelled, err)
+	if _, err := uc.CancelSalesReturn(ctx, &biz.SalesReturnTransition{ID: received.ID, ExpectedVersion: received.Version, Reason: "错误使用取消"}, 10); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("received return cancel error=%v", err)
+	}
+	reversed, err := uc.ReverseSalesReturn(ctx, &biz.SalesReturnTransition{ID: received.ID, ExpectedVersion: received.Version, Reason: "客户撤销退货"}, 10)
+	if err != nil || reversed.Status != biz.SalesReturnStatusReversed {
+		t.Fatalf("reverse = %#v, err=%v", reversed, err)
 	}
 	if got := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.SalesReturnSourceType), inventorytxn.SourceID(received.ID)).CountX(ctx); got != 2 {
-		t.Fatalf("cancel inventory txns=%d, want in+reversal", got)
+		t.Fatalf("reverse inventory txns=%d, want in+reversal", got)
 	}
-	if inspection := client.QualityInspection.GetX(ctx, cancelled.Items[0].QualityInspectionID); inspection.Status != biz.QualityInspectionStatusCancelled {
-		t.Fatalf("cancelled return inspection status=%s", inspection.Status)
+	if inspection := client.QualityInspection.GetX(ctx, reversed.Items[0].QualityInspectionID); inspection.Status != biz.QualityInspectionStatusCancelled {
+		t.Fatalf("reversed return inspection status=%s", inspection.Status)
 	}
-	if lot := client.InventoryLot.GetX(ctx, *cancelled.Items[0].LotID); lot.Status != biz.InventoryLotDisabled {
-		t.Fatalf("cancelled return lot status=%s", lot.Status)
+	if lot := client.InventoryLot.GetX(ctx, *reversed.Items[0].LotID); lot.Status != biz.InventoryLotDisabled {
+		t.Fatalf("reversed return lot status=%s", lot.Status)
+	}
+	if replay, err := uc.ReverseSalesReturn(ctx, &biz.SalesReturnTransition{ID: received.ID, ExpectedVersion: received.Version, Reason: "客户撤销退货"}, 10); err != nil || replay.ID != reversed.ID || replay.Version != reversed.Version {
+		t.Fatalf("reverse replay = %#v, err=%v", replay, err)
 	}
 }
 
@@ -95,7 +108,7 @@ func TestSalesReturnCumulativeQuantityCannotExceedShipment(t *testing.T) {
 	}
 }
 
-func TestSalesReturnCannotCancelAfterQualityDisposition(t *testing.T) {
+func TestSalesReturnReversePreservesTerminalQualityDisposition(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "sales_return_quality_disposition")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
@@ -108,22 +121,43 @@ func TestSalesReturnCannotCancelAfterQualityDisposition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	approved, err := operationalUC.ApproveSalesReturn(ctx, &biz.SalesReturnTransition{ID: created.ID, ExpectedVersion: created.Version}, 8)
+	approved, err := repo.transitionSalesReturn(ctx, &biz.SalesReturnTransition{ID: created.ID, ExpectedVersion: created.Version}, 8, biz.SalesReturnStatusApproved, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	received, err := operationalUC.ReceiveSalesReturn(ctx, &biz.SalesReturnTransition{ID: approved.ID, ExpectedVersion: approved.Version}, 9)
+	received, err := repo.transitionSalesReturn(ctx, &biz.SalesReturnTransition{ID: approved.ID, ExpectedVersion: approved.Version}, 9, biz.SalesReturnStatusReceived, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	if _, err := inventoryUC.CancelQualityInspection(ctx, received.Items[0].QualityInspectionID, stringPtr("不能绕过退货单取消")); !errors.Is(err, biz.ErrQualityInspectionSalesReturnLifecycle) {
+		t.Fatalf("sales return quality direct cancel error=%v", err)
+	}
 	if _, err := inventoryUC.PassQualityInspection(ctx, approximateQualityInspectionDecision(received.Items[0].QualityInspectionID, biz.QualityInspectionResultPass)); err != nil {
 		t.Fatalf("pass return inspection: %v", err)
 	}
 	if lot := client.InventoryLot.GetX(ctx, *received.Items[0].LotID); lot.Status != biz.InventoryLotActive {
 		t.Fatalf("passed return lot status=%s", lot.Status)
 	}
+	corrected, err := inventoryUC.CorrectQualityInspectionResult(ctx, &biz.QualityInspectionCorrectionCreate{
+		InspectionID:           received.Items[0].QualityInspectionID,
+		CorrectionInspectionNo: "RMA-QI-CORRECTION",
+		Reason:                 "复检纠正",
+	}, 11)
+	if err != nil || corrected.Status != biz.QualityInspectionStatusSubmitted || corrected.CorrectionOfInspectionID == nil {
+		t.Fatalf("sales return quality correction=%#v err=%v", corrected, err)
+	}
 	if _, err := operationalUC.CancelSalesReturn(ctx, &biz.SalesReturnTransition{ID: received.ID, ExpectedVersion: received.Version, Reason: "不应越过已完成质检"}, 10); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("cancel after quality disposition error=%v", err)
+	}
+	reversed, err := operationalUC.ReverseSalesReturn(ctx, &biz.SalesReturnTransition{ID: received.ID, ExpectedVersion: received.Version, Reason: "退货入库冲正"}, 10)
+	if err != nil || reversed.Status != biz.SalesReturnStatusReversed {
+		t.Fatalf("reverse after quality disposition=%#v err=%v", reversed, err)
+	}
+	if inspection := client.QualityInspection.GetX(ctx, received.Items[0].QualityInspectionID); inspection.Status != biz.QualityInspectionStatusPassed || inspection.SupersededAt == nil {
+		t.Fatalf("terminal quality audit was rewritten: %#v", inspection)
+	}
+	if inspection := client.QualityInspection.GetX(ctx, corrected.ID); inspection.Status != biz.QualityInspectionStatusCancelled {
+		t.Fatalf("current correction inspection was not cancelled: %#v", inspection)
 	}
 }

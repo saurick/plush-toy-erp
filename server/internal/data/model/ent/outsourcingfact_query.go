@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
@@ -30,6 +31,8 @@ type OutsourcingFactQuery struct {
 	withUnit         *UnitQuery
 	withProductSku   *ProductSKUQuery
 	withInventoryLot *InventoryLotQuery
+	withPoster       *AdminUserQuery
+	withCanceller    *AdminUserQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -147,6 +150,50 @@ func (_q *OutsourcingFactQuery) QueryInventoryLot() *InventoryLotQuery {
 			sqlgraph.From(outsourcingfact.Table, outsourcingfact.FieldID, selector),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingfact.InventoryLotTable, outsourcingfact.InventoryLotColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPoster chains the current query on the "poster" edge.
+func (_q *OutsourcingFactQuery) QueryPoster() *AdminUserQuery {
+	query := (&AdminUserClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingfact.Table, outsourcingfact.FieldID, selector),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, outsourcingfact.PosterTable, outsourcingfact.PosterColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryCanceller chains the current query on the "canceller" edge.
+func (_q *OutsourcingFactQuery) QueryCanceller() *AdminUserQuery {
+	query := (&AdminUserClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingfact.Table, outsourcingfact.FieldID, selector),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, outsourcingfact.CancellerTable, outsourcingfact.CancellerColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -350,6 +397,8 @@ func (_q *OutsourcingFactQuery) Clone() *OutsourcingFactQuery {
 		withUnit:         _q.withUnit.Clone(),
 		withProductSku:   _q.withProductSku.Clone(),
 		withInventoryLot: _q.withInventoryLot.Clone(),
+		withPoster:       _q.withPoster.Clone(),
+		withCanceller:    _q.withCanceller.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -397,6 +446,28 @@ func (_q *OutsourcingFactQuery) WithInventoryLot(opts ...func(*InventoryLotQuery
 		opt(query)
 	}
 	_q.withInventoryLot = query
+	return _q
+}
+
+// WithPoster tells the query-builder to eager-load the nodes that are connected to
+// the "poster" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *OutsourcingFactQuery) WithPoster(opts ...func(*AdminUserQuery)) *OutsourcingFactQuery {
+	query := (&AdminUserClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPoster = query
+	return _q
+}
+
+// WithCanceller tells the query-builder to eager-load the nodes that are connected to
+// the "canceller" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *OutsourcingFactQuery) WithCanceller(opts ...func(*AdminUserQuery)) *OutsourcingFactQuery {
+	query := (&AdminUserClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withCanceller = query
 	return _q
 }
 
@@ -478,11 +549,13 @@ func (_q *OutsourcingFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	var (
 		nodes       = []*OutsourcingFact{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [6]bool{
 			_q.withWarehouse != nil,
 			_q.withUnit != nil,
 			_q.withProductSku != nil,
 			_q.withInventoryLot != nil,
+			_q.withPoster != nil,
+			_q.withCanceller != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -524,6 +597,18 @@ func (_q *OutsourcingFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	if query := _q.withInventoryLot; query != nil {
 		if err := _q.loadInventoryLot(ctx, query, nodes, nil,
 			func(n *OutsourcingFact, e *InventoryLot) { n.Edges.InventoryLot = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPoster; query != nil {
+		if err := _q.loadPoster(ctx, query, nodes, nil,
+			func(n *OutsourcingFact, e *AdminUser) { n.Edges.Poster = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withCanceller; query != nil {
+		if err := _q.loadCanceller(ctx, query, nodes, nil,
+			func(n *OutsourcingFact, e *AdminUser) { n.Edges.Canceller = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -652,6 +737,70 @@ func (_q *OutsourcingFactQuery) loadInventoryLot(ctx context.Context, query *Inv
 	}
 	return nil
 }
+func (_q *OutsourcingFactQuery) loadPoster(ctx context.Context, query *AdminUserQuery, nodes []*OutsourcingFact, init func(*OutsourcingFact), assign func(*OutsourcingFact, *AdminUser)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*OutsourcingFact)
+	for i := range nodes {
+		if nodes[i].PostedBy == nil {
+			continue
+		}
+		fk := *nodes[i].PostedBy
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(adminuser.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "posted_by" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *OutsourcingFactQuery) loadCanceller(ctx context.Context, query *AdminUserQuery, nodes []*OutsourcingFact, init func(*OutsourcingFact), assign func(*OutsourcingFact, *AdminUser)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*OutsourcingFact)
+	for i := range nodes {
+		if nodes[i].CancelledBy == nil {
+			continue
+		}
+		fk := *nodes[i].CancelledBy
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(adminuser.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "cancelled_by" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 
 func (_q *OutsourcingFactQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
@@ -689,6 +838,12 @@ func (_q *OutsourcingFactQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withInventoryLot != nil {
 			_spec.Node.AddColumnOnce(outsourcingfact.FieldLotID)
+		}
+		if _q.withPoster != nil {
+			_spec.Node.AddColumnOnce(outsourcingfact.FieldPostedBy)
+		}
+		if _q.withCanceller != nil {
+			_spec.Node.AddColumnOnce(outsourcingfact.FieldCancelledBy)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

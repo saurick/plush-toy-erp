@@ -111,10 +111,10 @@ func (r *productionCompletionRepoStub) CreateProductionFactDraft(_ context.Conte
 		SourceType: in.SourceType, SourceID: in.SourceID, SourceLineID: in.SourceLineID,
 	}, nil
 }
-func (r *productionCompletionRepoStub) PostProductionFact(context.Context, int) (*ProductionFact, error) {
+func (r *productionCompletionRepoStub) PostProductionFact(context.Context, *OperationalFactStatusMutation) (*ProductionFact, error) {
 	return nil, ErrBadParam
 }
-func (r *productionCompletionRepoStub) CancelPostedProductionFact(context.Context, int) (*ProductionFact, error) {
+func (r *productionCompletionRepoStub) CancelPostedProductionFact(context.Context, *OperationalFactStatusMutation) (*ProductionFact, error) {
 	return nil, ErrBadParam
 }
 func (r *productionCompletionRepoStub) ListProductionFacts(context.Context, OperationalFactFilter) ([]*ProductionFact, int, error) {
@@ -123,10 +123,10 @@ func (r *productionCompletionRepoStub) ListProductionFacts(context.Context, Oper
 func (r *productionCompletionRepoStub) CreateOutsourcingFactDraft(context.Context, *OperationalFactMutation) (*OutsourcingFact, error) {
 	return nil, ErrBadParam
 }
-func (r *productionCompletionRepoStub) PostOutsourcingFact(context.Context, int) (*OutsourcingFact, error) {
+func (r *productionCompletionRepoStub) PostOutsourcingFact(context.Context, *OperationalFactStatusMutation) (*OutsourcingFact, error) {
 	return nil, ErrBadParam
 }
-func (r *productionCompletionRepoStub) CancelPostedOutsourcingFact(context.Context, int) (*OutsourcingFact, error) {
+func (r *productionCompletionRepoStub) CancelPostedOutsourcingFact(context.Context, *OperationalFactStatusMutation) (*OutsourcingFact, error) {
 	return nil, ErrBadParam
 }
 func (r *productionCompletionRepoStub) ListOutsourcingFacts(context.Context, OperationalFactFilter) ([]*OutsourcingFact, int, error) {
@@ -162,13 +162,13 @@ func (r *productionCompletionRepoStub) ListStockReservations(context.Context, Op
 func (r *productionCompletionRepoStub) CreateFinanceFactDraft(context.Context, *FinanceFactCreate) (*FinanceFact, error) {
 	return nil, ErrBadParam
 }
-func (r *productionCompletionRepoStub) PostFinanceFact(context.Context, int) (*FinanceFact, error) {
+func (r *productionCompletionRepoStub) PostFinanceFact(context.Context, *OperationalFactStatusMutation) (*FinanceFact, error) {
 	return nil, ErrBadParam
 }
-func (r *productionCompletionRepoStub) SettleFinanceFact(context.Context, int) (*FinanceFact, error) {
+func (r *productionCompletionRepoStub) SettleFinanceFact(context.Context, *OperationalFactStatusMutation) (*FinanceFact, error) {
 	return nil, ErrBadParam
 }
-func (r *productionCompletionRepoStub) CancelPostedFinanceFact(context.Context, int, int, string) (*FinanceFact, error) {
+func (r *productionCompletionRepoStub) CancelPostedFinanceFact(context.Context, *OperationalFactStatusMutation) (*FinanceFact, error) {
 	return nil, ErrBadParam
 }
 func (r *productionCompletionRepoStub) ListFinanceFacts(context.Context, OperationalFactFilter) ([]*FinanceFact, int, error) {

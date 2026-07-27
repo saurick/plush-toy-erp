@@ -34,7 +34,7 @@ func (WorkflowTask) Fields() []ent.Field {
 			MaxLen(64),
 		field.String("task_group").
 			NotEmpty().
-			MaxLen(32),
+			MaxLen(128),
 		field.String("task_name").
 			NotEmpty().
 			MaxLen(128),

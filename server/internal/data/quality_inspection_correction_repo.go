@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/outsourcingreturndisposition"
 	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/salesreturnitem"
 )
 
 var _ biz.QualityInspectionCorrectionRepo = (*inventoryRepo)(nil)
@@ -25,6 +26,9 @@ func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, i
 		return nil, err
 	}
 	if original.SupersededAt != nil {
+		if original.SupersededBy == nil || *original.SupersededBy != actorID {
+			return nil, biz.ErrIdempotencyConflict
+		}
 		existing, err := tx.client.QualityInspection.Query().Where(qualityinspection.CorrectionOfInspectionID(original.ID)).Only(ctx)
 		if err != nil {
 			return nil, err
@@ -88,7 +92,29 @@ func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, i
 
 func validateQualityCorrectionDependencies(ctx context.Context, tx *inventoryDBTx, row *ent.QualityInspection) error {
 	if row.SourceType != nil && *row.SourceType == biz.QualityInspectionSourceSalesReturn {
-		return biz.ErrBadParam
+		if row.SourceID == nil || *row.SourceID <= 0 || row.InventoryLotID == nil {
+			return biz.ErrBadParam
+		}
+		parent, err := tx.client.SalesReturn.Get(ctx, *row.SourceID)
+		if err != nil {
+			return err
+		}
+		if parent.Status != biz.SalesReturnStatusReceived {
+			return biz.ErrBadParam
+		}
+		matched, err := tx.client.SalesReturnItem.Query().
+			Where(
+				salesreturnitem.SalesReturnID(parent.ID),
+				salesreturnitem.LotID(*row.InventoryLotID),
+			).
+			Exist(ctx)
+		if err != nil || !matched {
+			if err != nil {
+				return err
+			}
+			return biz.ErrBadParam
+		}
+		return nil
 	}
 	if row.PurchaseReceiptID != nil {
 		receipt, err := tx.client.PurchaseReceipt.Get(ctx, *row.PurchaseReceiptID)

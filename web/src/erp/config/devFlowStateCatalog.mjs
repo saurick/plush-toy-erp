@@ -2015,6 +2015,16 @@ function processNode(
   }
 }
 
+function processEdge(from, to, branchPolicy = null) {
+  return {
+    from,
+    to,
+    ...(branchPolicy ? { branchPolicy } : {}),
+    factBoundary: 'orchestration_only',
+    sourceRefs: PROCESS_SOURCE_REFS,
+  }
+}
+
 function normalizeProcessDefinition(definition) {
   const sourceRefs = freezeStrings(PROCESS_SOURCE_REFS)
   const nodes = Object.freeze(
@@ -2034,23 +2044,41 @@ function normalizeProcessDefinition(definition) {
     )
   )
   const nodeKeys = new Set(nodes.map((node) => node.key))
+  const declaredEdges =
+    definition.edges ||
+    nodes
+      .slice(0, -1)
+      .map((node, index) => processEdge(node.key, nodes[index + 1].key))
   const edges = Object.freeze(
-    nodes.slice(0, -1).map((node, index) =>
-      Object.freeze({
-        key: `${node.key}->${nodes[index + 1].key}`,
-        from: node.key,
-        to: nodes[index + 1].key,
-        factBoundary: 'orchestration_only',
-        sourceRefs,
+    declaredEdges.map((edge) => {
+      if (!nodeKeys.has(edge.from) || !nodeKeys.has(edge.to)) {
+        throw new Error(
+          `${definition.key} has an edge outside its registered nodes`
+        )
+      }
+      return Object.freeze({
+        ...edge,
+        key: edge.key || `${edge.from}->${edge.to}`,
+        factBoundary: edge.factBoundary || 'orchestration_only',
+        sourceRefs: freezeStrings(edge.sourceRefs || sourceRefs),
         evidence: Object.freeze([
           evidence(
             'code',
             'server/internal/biz/customer_process_contracts.go',
-            '边顺序直接来自 Product Core 冻结节点序列。'
+            '边来自 Product Core 冻结节点序列或登记的命名分支策略。'
           ),
+          ...(edge.branchPolicy
+            ? [
+                evidence(
+                  'code',
+                  'server/internal/biz/exception_approval_branch_policy.go',
+                  `${edge.branchPolicy} 命名分支策略的显式路由。`
+                ),
+              ]
+            : []),
         ]),
       })
-    )
+    })
   )
   if (!nodeKeys.has(definition.initial) || !nodeKeys.has(definition.terminal)) {
     throw new Error(`${definition.key} has an invalid process boundary`)
@@ -2198,6 +2226,360 @@ export const processDefinitions = Object.freeze(
           }
         ),
         processNode('end', 'end', '结束'),
+      ],
+    },
+    {
+      key: 'sales_return_acceptance/approval_receipt',
+      processKey: 'sales_return_acceptance',
+      processVersion: 'v1',
+      variantKey: 'approval_receipt',
+      businessRefType: 'sales_return',
+      label: '客户退货受理（审批 + 收货）',
+      initial: 'sales_return_approval',
+      terminal: 'end',
+      nodes: [
+        processNode('sales_return_approval', 'approval', '客户退货审批', {
+          ownerPool: 'boss',
+          permission: ['sales_return.approve'],
+          factBoundary: 'orchestration_only',
+        }),
+        processNode(
+          'approve_sales_return',
+          'domain_command',
+          '批准客户退货',
+          {
+            action:
+              'OperationalFactUsecase.ApproveSalesReturnForProcessCommand',
+            permission: ['workflow.task.approve'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode('sales_return_receipt', 'human_task', '客户退货收货', {
+          ownerPool: 'warehouse',
+          permission: ['workflow.task.complete'],
+          factBoundary: 'orchestration_only',
+        }),
+        processNode(
+          'receive_sales_return',
+          'domain_command',
+          '确认客户退货入库',
+          {
+            ownerPool: 'warehouse',
+            action:
+              'OperationalFactUsecase.ReceiveSalesReturnForProcessCommand',
+            permission: ['sales_return.receive'],
+            factBoundary: 'sales_return_inventory_via_domain_usecase',
+          }
+        ),
+        processNode('end', 'end', '结束'),
+        processNode(
+          'reject_sales_return',
+          'domain_command',
+          '驳回客户退货',
+          {
+            action:
+              'OperationalFactUsecase.RejectSalesReturnForProcessCommand',
+            permission: ['workflow.task.reject'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode('rejected_end', 'end', '驳回结束'),
+      ],
+      edges: [
+        processEdge(
+          'sales_return_approval',
+          'approve_sales_return',
+          'sales_return.approval_outcome'
+        ),
+        processEdge(
+          'sales_return_approval',
+          'reject_sales_return',
+          'sales_return.approval_outcome'
+        ),
+        processEdge('approve_sales_return', 'sales_return_receipt'),
+        processEdge('sales_return_receipt', 'receive_sales_return'),
+        processEdge('receive_sales_return', 'end'),
+        processEdge('reject_sales_return', 'rejected_end'),
+      ],
+    },
+    {
+      key: 'finance_payment_approval/approval_post',
+      processKey: 'finance_payment_approval',
+      processVersion: 'v1',
+      variantKey: 'approval_post',
+      businessRefType: 'finance_payment',
+      label: '收付款审批（审批 + 过账）',
+      initial: 'finance_payment_approval',
+      terminal: 'end',
+      nodes: [
+        processNode('finance_payment_approval', 'approval', '收付款审批', {
+          ownerPool: 'boss',
+          permission: ['finance.payment.approve'],
+          factBoundary: 'orchestration_only',
+        }),
+        processNode(
+          'approve_finance_payment',
+          'domain_command',
+          '批准收付款',
+          {
+            action:
+              'OperationalFactUsecase.ApproveFinancePaymentForProcessCommand',
+            permission: ['workflow.task.approve'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode(
+          'finance_payment_execution',
+          'human_task',
+          '收付款执行',
+          {
+            ownerPool: 'finance',
+            permission: ['workflow.task.complete'],
+            factBoundary: 'orchestration_only',
+          }
+        ),
+        processNode(
+          'post_finance_payment',
+          'domain_command',
+          '过账并核销收付款',
+          {
+            ownerPool: 'finance',
+            action:
+              'OperationalFactUsecase.PostFinancePaymentForProcessCommand',
+            permission: ['finance.payment.post'],
+            factBoundary: 'finance_payment_post_via_domain_usecase',
+          }
+        ),
+        processNode('end', 'end', '结束'),
+        processNode(
+          'reject_finance_payment',
+          'domain_command',
+          '驳回收付款',
+          {
+            action:
+              'OperationalFactUsecase.RejectFinancePaymentForProcessCommand',
+            permission: ['workflow.task.reject'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode('rejected_end', 'end', '驳回结束'),
+      ],
+      edges: [
+        processEdge(
+          'finance_payment_approval',
+          'approve_finance_payment',
+          'finance_payment.approval_outcome'
+        ),
+        processEdge(
+          'finance_payment_approval',
+          'reject_finance_payment',
+          'finance_payment.approval_outcome'
+        ),
+        processEdge('approve_finance_payment', 'finance_payment_execution'),
+        processEdge('finance_payment_execution', 'post_finance_payment'),
+        processEdge('post_finance_payment', 'end'),
+        processEdge('reject_finance_payment', 'rejected_end'),
+      ],
+    },
+    {
+      key: 'inventory_adjustment_approval/manual_adjustment_approval',
+      processKey: 'inventory_adjustment_approval',
+      processVersion: 'v1',
+      variantKey: 'manual_adjustment_approval',
+      businessRefType: 'inventory_operation',
+      label: '人工库存调整（提交 + 审批 + 过账）',
+      initial: 'submit_inventory_adjustment',
+      terminal: 'end',
+      nodes: [
+        processNode(
+          'submit_inventory_adjustment',
+          'domain_command',
+          '提交人工库存调整',
+          {
+            action:
+              'InventoryUsecase.SubmitInventoryOperationForProcessCommand',
+            permission: ['warehouse.adjustment.create'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode(
+          'inventory_adjustment_approval',
+          'approval',
+          '人工库存调整审批',
+          {
+            ownerPool: 'boss',
+            permission: ['warehouse.adjustment.approve'],
+            factBoundary: 'orchestration_only',
+          }
+        ),
+        processNode(
+          'approve_inventory_adjustment',
+          'domain_command',
+          '批准人工库存调整',
+          {
+            action:
+              'InventoryUsecase.ApproveInventoryOperationForProcessCommand',
+            permission: ['workflow.task.approve'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode(
+          'inventory_adjustment_execution',
+          'human_task',
+          '人工库存调整执行',
+          {
+            ownerPool: 'warehouse',
+            permission: ['workflow.task.complete'],
+            factBoundary: 'orchestration_only',
+          }
+        ),
+        processNode(
+          'post_inventory_adjustment',
+          'domain_command',
+          '过账人工库存调整',
+          {
+            ownerPool: 'warehouse',
+            action: 'InventoryUsecase.PostInventoryOperationForProcessCommand',
+            permission: ['warehouse.adjustment.create'],
+            factBoundary: 'inventory_adjustment_post_via_domain_usecase',
+          }
+        ),
+        processNode('end', 'end', '结束'),
+        processNode(
+          'reject_inventory_adjustment',
+          'domain_command',
+          '驳回人工库存调整',
+          {
+            action:
+              'InventoryUsecase.RejectInventoryOperationForProcessCommand',
+            permission: ['workflow.task.reject'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode('rejected_end', 'end', '驳回结束'),
+      ],
+      edges: [
+        processEdge(
+          'submit_inventory_adjustment',
+          'inventory_adjustment_approval'
+        ),
+        processEdge(
+          'inventory_adjustment_approval',
+          'approve_inventory_adjustment',
+          'inventory_adjustment.approval_outcome'
+        ),
+        processEdge(
+          'inventory_adjustment_approval',
+          'reject_inventory_adjustment',
+          'inventory_adjustment.approval_outcome'
+        ),
+        processEdge(
+          'approve_inventory_adjustment',
+          'inventory_adjustment_execution'
+        ),
+        processEdge(
+          'inventory_adjustment_execution',
+          'post_inventory_adjustment'
+        ),
+        processEdge('post_inventory_adjustment', 'end'),
+        processEdge('reject_inventory_adjustment', 'rejected_end'),
+      ],
+    },
+    {
+      key: 'production_exception_approval/exception_decision_approval',
+      processKey: 'production_exception_approval',
+      processVersion: 'v1',
+      variantKey: 'exception_decision_approval',
+      businessRefType: 'production_exception_decision',
+      label: '生产异常决策（审批 + 分流执行）',
+      initial: 'production_exception_decision_approval',
+      terminal: 'end',
+      nodes: [
+        processNode(
+          'production_exception_decision_approval',
+          'approval',
+          '生产异常决策审批',
+          {
+            ownerPool: 'boss',
+            permission: ['production.exception.approve'],
+            factBoundary: 'orchestration_only',
+          }
+        ),
+        processNode(
+          'approve_production_exception',
+          'domain_command',
+          '批准生产异常决策',
+          {
+            action:
+              'OperationalFactUsecase.ApproveProductionExceptionForProcessCommand',
+            permission: ['workflow.task.approve'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode(
+          'production_exception_execution',
+          'human_task',
+          '生产异常执行',
+          {
+            ownerPool: 'production',
+            permission: ['workflow.task.complete'],
+            factBoundary: 'orchestration_only',
+          }
+        ),
+        processNode(
+          'execute_production_exception',
+          'domain_command',
+          '执行生产异常处置',
+          {
+            ownerPool: 'production',
+            action:
+              'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
+            permission: ['production.fact.post'],
+            factBoundary: 'production_wip_via_domain_usecase',
+          }
+        ),
+        processNode('end', 'end', '结束'),
+        processNode(
+          'reject_production_exception',
+          'domain_command',
+          '驳回生产异常决策',
+          {
+            action:
+              'OperationalFactUsecase.RejectProductionExceptionForProcessCommand',
+            permission: ['workflow.task.reject'],
+            factBoundary: 'source_document_only',
+          }
+        ),
+        processNode('rejected_end', 'end', '驳回结束'),
+        processNode('over_issue_end', 'end', '超领审批结束'),
+      ],
+      edges: [
+        processEdge(
+          'production_exception_decision_approval',
+          'approve_production_exception',
+          'production_exception.approval_outcome'
+        ),
+        processEdge(
+          'production_exception_decision_approval',
+          'reject_production_exception',
+          'production_exception.approval_outcome'
+        ),
+        processEdge(
+          'approve_production_exception',
+          'production_exception_execution',
+          'production_exception.execution_route'
+        ),
+        processEdge(
+          'approve_production_exception',
+          'over_issue_end',
+          'production_exception.execution_route'
+        ),
+        processEdge(
+          'production_exception_execution',
+          'execute_production_exception'
+        ),
+        processEdge('execute_production_exception', 'end'),
+        processEdge('reject_production_exception', 'rejected_end'),
       ],
     },
   ].map(normalizeProcessDefinition)

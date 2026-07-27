@@ -1217,8 +1217,14 @@ func init() {
 			return nil
 		}
 	}()
+	// financefactDescVersion is the schema descriptor for version field.
+	financefactDescVersion := financefactFields[3].Descriptor()
+	// financefact.DefaultVersion holds the default value on creation for the version field.
+	financefact.DefaultVersion = financefactDescVersion.Default.(int)
+	// financefact.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	financefact.VersionValidator = financefactDescVersion.Validators[0].(func(int) error)
 	// financefactDescCounterpartyType is the schema descriptor for counterparty_type field.
-	financefactDescCounterpartyType := financefactFields[3].Descriptor()
+	financefactDescCounterpartyType := financefactFields[4].Descriptor()
 	// financefact.CounterpartyTypeValidator is a validator for the "counterparty_type" field. It is called by the builders before save.
 	financefact.CounterpartyTypeValidator = func() func(string) error {
 		validators := financefactDescCounterpartyType.Validators
@@ -1236,15 +1242,15 @@ func init() {
 		}
 	}()
 	// financefactDescCounterpartyID is the schema descriptor for counterparty_id field.
-	financefactDescCounterpartyID := financefactFields[4].Descriptor()
+	financefactDescCounterpartyID := financefactFields[5].Descriptor()
 	// financefact.CounterpartyIDValidator is a validator for the "counterparty_id" field. It is called by the builders before save.
 	financefact.CounterpartyIDValidator = financefactDescCounterpartyID.Validators[0].(func(int) error)
 	// financefactDescFeeAmount is the schema descriptor for fee_amount field.
-	financefactDescFeeAmount := financefactFields[6].Descriptor()
+	financefactDescFeeAmount := financefactFields[7].Descriptor()
 	// financefact.DefaultFeeAmount holds the default value on creation for the fee_amount field.
 	financefact.DefaultFeeAmount = financefactDescFeeAmount.Default.(decimal.Decimal)
 	// financefactDescCurrency is the schema descriptor for currency field.
-	financefactDescCurrency := financefactFields[7].Descriptor()
+	financefactDescCurrency := financefactFields[8].Descriptor()
 	// financefact.DefaultCurrency holds the default value on creation for the currency field.
 	financefact.DefaultCurrency = financefactDescCurrency.Default.(string)
 	// financefact.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
@@ -1264,35 +1270,35 @@ func init() {
 		}
 	}()
 	// financefactDescCollectionType is the schema descriptor for collection_type field.
-	financefactDescCollectionType := financefactFields[8].Descriptor()
+	financefactDescCollectionType := financefactFields[9].Descriptor()
 	// financefact.CollectionTypeValidator is a validator for the "collection_type" field. It is called by the builders before save.
 	financefact.CollectionTypeValidator = financefactDescCollectionType.Validators[0].(func(string) error)
 	// financefactDescPaymentTerm is the schema descriptor for payment_term field.
-	financefactDescPaymentTerm := financefactFields[9].Descriptor()
+	financefactDescPaymentTerm := financefactFields[10].Descriptor()
 	// financefact.PaymentTermValidator is a validator for the "payment_term" field. It is called by the builders before save.
 	financefact.PaymentTermValidator = financefactDescPaymentTerm.Validators[0].(func(string) error)
 	// financefactDescPaymentTermDays is the schema descriptor for payment_term_days field.
-	financefactDescPaymentTermDays := financefactFields[10].Descriptor()
+	financefactDescPaymentTermDays := financefactFields[11].Descriptor()
 	// financefact.PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
 	financefact.PaymentTermDaysValidator = financefactDescPaymentTermDays.Validators[0].(func(int) error)
 	// financefactDescInvoiceCategory is the schema descriptor for invoice_category field.
-	financefactDescInvoiceCategory := financefactFields[11].Descriptor()
+	financefactDescInvoiceCategory := financefactFields[12].Descriptor()
 	// financefact.InvoiceCategoryValidator is a validator for the "invoice_category" field. It is called by the builders before save.
 	financefact.InvoiceCategoryValidator = financefactDescInvoiceCategory.Validators[0].(func(string) error)
 	// financefactDescSourceType is the schema descriptor for source_type field.
-	financefactDescSourceType := financefactFields[12].Descriptor()
+	financefactDescSourceType := financefactFields[13].Descriptor()
 	// financefact.SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
 	financefact.SourceTypeValidator = financefactDescSourceType.Validators[0].(func(string) error)
 	// financefactDescSourceID is the schema descriptor for source_id field.
-	financefactDescSourceID := financefactFields[13].Descriptor()
+	financefactDescSourceID := financefactFields[14].Descriptor()
 	// financefact.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
 	financefact.SourceIDValidator = financefactDescSourceID.Validators[0].(func(int) error)
 	// financefactDescSourceLineID is the schema descriptor for source_line_id field.
-	financefactDescSourceLineID := financefactFields[14].Descriptor()
+	financefactDescSourceLineID := financefactFields[15].Descriptor()
 	// financefact.SourceLineIDValidator is a validator for the "source_line_id" field. It is called by the builders before save.
 	financefact.SourceLineIDValidator = financefactDescSourceLineID.Validators[0].(func(int) error)
 	// financefactDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	financefactDescIdempotencyKey := financefactFields[15].Descriptor()
+	financefactDescIdempotencyKey := financefactFields[16].Descriptor()
 	// financefact.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	financefact.IdempotencyKeyValidator = func() func(string) error {
 		validators := financefactDescIdempotencyKey.Validators
@@ -1310,31 +1316,39 @@ func init() {
 		}
 	}()
 	// financefactDescOccurredAt is the schema descriptor for occurred_at field.
-	financefactDescOccurredAt := financefactFields[16].Descriptor()
+	financefactDescOccurredAt := financefactFields[17].Descriptor()
 	// financefact.DefaultOccurredAt holds the default value on creation for the occurred_at field.
 	financefact.DefaultOccurredAt = financefactDescOccurredAt.Default.(func() time.Time)
 	// financefactDescOccurredAtSpecified is the schema descriptor for occurred_at_specified field.
-	financefactDescOccurredAtSpecified := financefactFields[17].Descriptor()
+	financefactDescOccurredAtSpecified := financefactFields[18].Descriptor()
 	// financefact.DefaultOccurredAtSpecified holds the default value on creation for the occurred_at_specified field.
 	financefact.DefaultOccurredAtSpecified = financefactDescOccurredAtSpecified.Default.(bool)
+	// financefactDescPostedBy is the schema descriptor for posted_by field.
+	financefactDescPostedBy := financefactFields[20].Descriptor()
+	// financefact.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
+	financefact.PostedByValidator = financefactDescPostedBy.Validators[0].(func(int) error)
+	// financefactDescSettledBy is the schema descriptor for settled_by field.
+	financefactDescSettledBy := financefactFields[22].Descriptor()
+	// financefact.SettledByValidator is a validator for the "settled_by" field. It is called by the builders before save.
+	financefact.SettledByValidator = financefactDescSettledBy.Validators[0].(func(int) error)
 	// financefactDescCancelledBy is the schema descriptor for cancelled_by field.
-	financefactDescCancelledBy := financefactFields[21].Descriptor()
+	financefactDescCancelledBy := financefactFields[24].Descriptor()
 	// financefact.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
 	financefact.CancelledByValidator = financefactDescCancelledBy.Validators[0].(func(int) error)
 	// financefactDescCancelReason is the schema descriptor for cancel_reason field.
-	financefactDescCancelReason := financefactFields[22].Descriptor()
+	financefactDescCancelReason := financefactFields[25].Descriptor()
 	// financefact.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
 	financefact.CancelReasonValidator = financefactDescCancelReason.Validators[0].(func(string) error)
 	// financefactDescNote is the schema descriptor for note field.
-	financefactDescNote := financefactFields[23].Descriptor()
+	financefactDescNote := financefactFields[26].Descriptor()
 	// financefact.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	financefact.NoteValidator = financefactDescNote.Validators[0].(func(string) error)
 	// financefactDescCreatedAt is the schema descriptor for created_at field.
-	financefactDescCreatedAt := financefactFields[24].Descriptor()
+	financefactDescCreatedAt := financefactFields[27].Descriptor()
 	// financefact.DefaultCreatedAt holds the default value on creation for the created_at field.
 	financefact.DefaultCreatedAt = financefactDescCreatedAt.Default.(func() time.Time)
 	// financefactDescUpdatedAt is the schema descriptor for updated_at field.
-	financefactDescUpdatedAt := financefactFields[25].Descriptor()
+	financefactDescUpdatedAt := financefactFields[28].Descriptor()
 	// financefact.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	financefact.DefaultUpdatedAt = financefactDescUpdatedAt.Default.(func() time.Time)
 	// financefact.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -1522,28 +1536,48 @@ func init() {
 	financepaymentDescOccurredAt := financepaymentFields[12].Descriptor()
 	// financepayment.DefaultOccurredAt holds the default value on creation for the occurred_at field.
 	financepayment.DefaultOccurredAt = financepaymentDescOccurredAt.Default.(func() time.Time)
+	// financepaymentDescApprovedBy is the schema descriptor for approved_by field.
+	financepaymentDescApprovedBy := financepaymentFields[14].Descriptor()
+	// financepayment.ApprovedByValidator is a validator for the "approved_by" field. It is called by the builders before save.
+	financepayment.ApprovedByValidator = financepaymentDescApprovedBy.Validators[0].(func(int) error)
+	// financepaymentDescRejectedBy is the schema descriptor for rejected_by field.
+	financepaymentDescRejectedBy := financepaymentFields[16].Descriptor()
+	// financepayment.RejectedByValidator is a validator for the "rejected_by" field. It is called by the builders before save.
+	financepayment.RejectedByValidator = financepaymentDescRejectedBy.Validators[0].(func(int) error)
+	// financepaymentDescRejectReason is the schema descriptor for reject_reason field.
+	financepaymentDescRejectReason := financepaymentFields[17].Descriptor()
+	// financepayment.RejectReasonValidator is a validator for the "reject_reason" field. It is called by the builders before save.
+	financepayment.RejectReasonValidator = financepaymentDescRejectReason.Validators[0].(func(string) error)
 	// financepaymentDescPostedBy is the schema descriptor for posted_by field.
-	financepaymentDescPostedBy := financepaymentFields[14].Descriptor()
+	financepaymentDescPostedBy := financepaymentFields[19].Descriptor()
 	// financepayment.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
 	financepayment.PostedByValidator = financepaymentDescPostedBy.Validators[0].(func(int) error)
+	// financepaymentDescCancelledBy is the schema descriptor for cancelled_by field.
+	financepaymentDescCancelledBy := financepaymentFields[21].Descriptor()
+	// financepayment.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
+	financepayment.CancelledByValidator = financepaymentDescCancelledBy.Validators[0].(func(int) error)
+	// financepaymentDescCancelReason is the schema descriptor for cancel_reason field.
+	financepaymentDescCancelReason := financepaymentFields[22].Descriptor()
+	// financepayment.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
+	financepayment.CancelReasonValidator = financepaymentDescCancelReason.Validators[0].(func(string) error)
 	// financepaymentDescReversedBy is the schema descriptor for reversed_by field.
-	financepaymentDescReversedBy := financepaymentFields[16].Descriptor()
+	financepaymentDescReversedBy := financepaymentFields[24].Descriptor()
 	// financepayment.ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
 	financepayment.ReversedByValidator = financepaymentDescReversedBy.Validators[0].(func(int) error)
 	// financepaymentDescReverseReason is the schema descriptor for reverse_reason field.
-	financepaymentDescReverseReason := financepaymentFields[17].Descriptor()
+	financepaymentDescReverseReason := financepaymentFields[25].Descriptor()
 	// financepayment.ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
 	financepayment.ReverseReasonValidator = financepaymentDescReverseReason.Validators[0].(func(string) error)
 	// financepaymentDescCreatedBy is the schema descriptor for created_by field.
-	financepaymentDescCreatedBy := financepaymentFields[18].Descriptor()
+	financepaymentDescCreatedBy := financepaymentFields[26].Descriptor()
 	// financepayment.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	financepayment.CreatedByValidator = financepaymentDescCreatedBy.Validators[0].(func(int) error)
 	// financepaymentDescCreatedAt is the schema descriptor for created_at field.
-	financepaymentDescCreatedAt := financepaymentFields[19].Descriptor()
+	financepaymentDescCreatedAt := financepaymentFields[27].Descriptor()
 	// financepayment.DefaultCreatedAt holds the default value on creation for the created_at field.
 	financepayment.DefaultCreatedAt = financepaymentDescCreatedAt.Default.(func() time.Time)
 	// financepaymentDescUpdatedAt is the schema descriptor for updated_at field.
-	financepaymentDescUpdatedAt := financepaymentFields[20].Descriptor()
+	financepaymentDescUpdatedAt := financepaymentFields[28].Descriptor()
 	// financepayment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	financepayment.DefaultUpdatedAt = financepaymentDescUpdatedAt.Default.(func() time.Time)
 	// financepayment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -1766,12 +1800,8 @@ func init() {
 			return nil
 		}
 	}()
-	// inventoryoperationDescApprovalRef is the schema descriptor for approval_ref field.
-	inventoryoperationDescApprovalRef := inventoryoperationFields[4].Descriptor()
-	// inventoryoperation.ApprovalRefValidator is a validator for the "approval_ref" field. It is called by the builders before save.
-	inventoryoperation.ApprovalRefValidator = inventoryoperationDescApprovalRef.Validators[0].(func(string) error)
 	// inventoryoperationDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	inventoryoperationDescIdempotencyKey := inventoryoperationFields[5].Descriptor()
+	inventoryoperationDescIdempotencyKey := inventoryoperationFields[4].Descriptor()
 	// inventoryoperation.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	inventoryoperation.IdempotencyKeyValidator = func() func(string) error {
 		validators := inventoryoperationDescIdempotencyKey.Validators
@@ -1789,7 +1819,7 @@ func init() {
 		}
 	}()
 	// inventoryoperationDescIdempotencyPayloadHash is the schema descriptor for idempotency_payload_hash field.
-	inventoryoperationDescIdempotencyPayloadHash := inventoryoperationFields[6].Descriptor()
+	inventoryoperationDescIdempotencyPayloadHash := inventoryoperationFields[5].Descriptor()
 	// inventoryoperation.IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
 	inventoryoperation.IdempotencyPayloadHashValidator = func() func(string) error {
 		validators := inventoryoperationDescIdempotencyPayloadHash.Validators
@@ -1808,37 +1838,53 @@ func init() {
 		}
 	}()
 	// inventoryoperationDescIdempotencyItemCount is the schema descriptor for idempotency_item_count field.
-	inventoryoperationDescIdempotencyItemCount := inventoryoperationFields[7].Descriptor()
+	inventoryoperationDescIdempotencyItemCount := inventoryoperationFields[6].Descriptor()
 	// inventoryoperation.IdempotencyItemCountValidator is a validator for the "idempotency_item_count" field. It is called by the builders before save.
 	inventoryoperation.IdempotencyItemCountValidator = inventoryoperationDescIdempotencyItemCount.Validators[0].(func(int) error)
 	// inventoryoperationDescVersion is the schema descriptor for version field.
-	inventoryoperationDescVersion := inventoryoperationFields[8].Descriptor()
+	inventoryoperationDescVersion := inventoryoperationFields[7].Descriptor()
 	// inventoryoperation.DefaultVersion holds the default value on creation for the version field.
 	inventoryoperation.DefaultVersion = inventoryoperationDescVersion.Default.(int)
 	// inventoryoperation.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	inventoryoperation.VersionValidator = inventoryoperationDescVersion.Validators[0].(func(int) error)
+	// inventoryoperationDescSubmittedBy is the schema descriptor for submitted_by field.
+	inventoryoperationDescSubmittedBy := inventoryoperationFields[9].Descriptor()
+	// inventoryoperation.SubmittedByValidator is a validator for the "submitted_by" field. It is called by the builders before save.
+	inventoryoperation.SubmittedByValidator = inventoryoperationDescSubmittedBy.Validators[0].(func(int) error)
+	// inventoryoperationDescApprovedBy is the schema descriptor for approved_by field.
+	inventoryoperationDescApprovedBy := inventoryoperationFields[11].Descriptor()
+	// inventoryoperation.ApprovedByValidator is a validator for the "approved_by" field. It is called by the builders before save.
+	inventoryoperation.ApprovedByValidator = inventoryoperationDescApprovedBy.Validators[0].(func(int) error)
+	// inventoryoperationDescRejectedBy is the schema descriptor for rejected_by field.
+	inventoryoperationDescRejectedBy := inventoryoperationFields[13].Descriptor()
+	// inventoryoperation.RejectedByValidator is a validator for the "rejected_by" field. It is called by the builders before save.
+	inventoryoperation.RejectedByValidator = inventoryoperationDescRejectedBy.Validators[0].(func(int) error)
+	// inventoryoperationDescRejectReason is the schema descriptor for reject_reason field.
+	inventoryoperationDescRejectReason := inventoryoperationFields[14].Descriptor()
+	// inventoryoperation.RejectReasonValidator is a validator for the "reject_reason" field. It is called by the builders before save.
+	inventoryoperation.RejectReasonValidator = inventoryoperationDescRejectReason.Validators[0].(func(string) error)
 	// inventoryoperationDescPostedBy is the schema descriptor for posted_by field.
-	inventoryoperationDescPostedBy := inventoryoperationFields[10].Descriptor()
+	inventoryoperationDescPostedBy := inventoryoperationFields[16].Descriptor()
 	// inventoryoperation.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
 	inventoryoperation.PostedByValidator = inventoryoperationDescPostedBy.Validators[0].(func(int) error)
 	// inventoryoperationDescCancelledBy is the schema descriptor for cancelled_by field.
-	inventoryoperationDescCancelledBy := inventoryoperationFields[12].Descriptor()
+	inventoryoperationDescCancelledBy := inventoryoperationFields[18].Descriptor()
 	// inventoryoperation.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
 	inventoryoperation.CancelledByValidator = inventoryoperationDescCancelledBy.Validators[0].(func(int) error)
 	// inventoryoperationDescCancelReason is the schema descriptor for cancel_reason field.
-	inventoryoperationDescCancelReason := inventoryoperationFields[13].Descriptor()
+	inventoryoperationDescCancelReason := inventoryoperationFields[19].Descriptor()
 	// inventoryoperation.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
 	inventoryoperation.CancelReasonValidator = inventoryoperationDescCancelReason.Validators[0].(func(string) error)
 	// inventoryoperationDescCreatedBy is the schema descriptor for created_by field.
-	inventoryoperationDescCreatedBy := inventoryoperationFields[14].Descriptor()
+	inventoryoperationDescCreatedBy := inventoryoperationFields[20].Descriptor()
 	// inventoryoperation.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	inventoryoperation.CreatedByValidator = inventoryoperationDescCreatedBy.Validators[0].(func(int) error)
 	// inventoryoperationDescCreatedAt is the schema descriptor for created_at field.
-	inventoryoperationDescCreatedAt := inventoryoperationFields[15].Descriptor()
+	inventoryoperationDescCreatedAt := inventoryoperationFields[21].Descriptor()
 	// inventoryoperation.DefaultCreatedAt holds the default value on creation for the created_at field.
 	inventoryoperation.DefaultCreatedAt = inventoryoperationDescCreatedAt.Default.(func() time.Time)
 	// inventoryoperationDescUpdatedAt is the schema descriptor for updated_at field.
-	inventoryoperationDescUpdatedAt := inventoryoperationFields[16].Descriptor()
+	inventoryoperationDescUpdatedAt := inventoryoperationFields[22].Descriptor()
 	// inventoryoperation.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	inventoryoperation.DefaultUpdatedAt = inventoryoperationDescUpdatedAt.Default.(func() time.Time)
 	// inventoryoperation.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -2179,8 +2225,14 @@ func init() {
 			return nil
 		}
 	}()
+	// outsourcingfactDescVersion is the schema descriptor for version field.
+	outsourcingfactDescVersion := outsourcingfactFields[3].Descriptor()
+	// outsourcingfact.DefaultVersion holds the default value on creation for the version field.
+	outsourcingfact.DefaultVersion = outsourcingfactDescVersion.Default.(int)
+	// outsourcingfact.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	outsourcingfact.VersionValidator = outsourcingfactDescVersion.Validators[0].(func(int) error)
 	// outsourcingfactDescSubjectType is the schema descriptor for subject_type field.
-	outsourcingfactDescSubjectType := outsourcingfactFields[3].Descriptor()
+	outsourcingfactDescSubjectType := outsourcingfactFields[4].Descriptor()
 	// outsourcingfact.SubjectTypeValidator is a validator for the "subject_type" field. It is called by the builders before save.
 	outsourcingfact.SubjectTypeValidator = func() func(string) error {
 		validators := outsourcingfactDescSubjectType.Validators
@@ -2198,47 +2250,47 @@ func init() {
 		}
 	}()
 	// outsourcingfactDescSubjectID is the schema descriptor for subject_id field.
-	outsourcingfactDescSubjectID := outsourcingfactFields[4].Descriptor()
+	outsourcingfactDescSubjectID := outsourcingfactFields[5].Descriptor()
 	// outsourcingfact.SubjectIDValidator is a validator for the "subject_id" field. It is called by the builders before save.
 	outsourcingfact.SubjectIDValidator = outsourcingfactDescSubjectID.Validators[0].(func(int) error)
 	// outsourcingfactDescProductSkuID is the schema descriptor for product_sku_id field.
-	outsourcingfactDescProductSkuID := outsourcingfactFields[5].Descriptor()
+	outsourcingfactDescProductSkuID := outsourcingfactFields[6].Descriptor()
 	// outsourcingfact.ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
 	outsourcingfact.ProductSkuIDValidator = outsourcingfactDescProductSkuID.Validators[0].(func(int) error)
 	// outsourcingfactDescWarehouseID is the schema descriptor for warehouse_id field.
-	outsourcingfactDescWarehouseID := outsourcingfactFields[6].Descriptor()
+	outsourcingfactDescWarehouseID := outsourcingfactFields[7].Descriptor()
 	// outsourcingfact.WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
 	outsourcingfact.WarehouseIDValidator = outsourcingfactDescWarehouseID.Validators[0].(func(int) error)
 	// outsourcingfactDescUnitID is the schema descriptor for unit_id field.
-	outsourcingfactDescUnitID := outsourcingfactFields[7].Descriptor()
+	outsourcingfactDescUnitID := outsourcingfactFields[8].Descriptor()
 	// outsourcingfact.UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
 	outsourcingfact.UnitIDValidator = outsourcingfactDescUnitID.Validators[0].(func(int) error)
 	// outsourcingfactDescLotID is the schema descriptor for lot_id field.
-	outsourcingfactDescLotID := outsourcingfactFields[8].Descriptor()
+	outsourcingfactDescLotID := outsourcingfactFields[9].Descriptor()
 	// outsourcingfact.LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
 	outsourcingfact.LotIDValidator = outsourcingfactDescLotID.Validators[0].(func(int) error)
 	// outsourcingfactDescSupplierID is the schema descriptor for supplier_id field.
-	outsourcingfactDescSupplierID := outsourcingfactFields[10].Descriptor()
+	outsourcingfactDescSupplierID := outsourcingfactFields[11].Descriptor()
 	// outsourcingfact.SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
 	outsourcingfact.SupplierIDValidator = outsourcingfactDescSupplierID.Validators[0].(func(int) error)
 	// outsourcingfactDescSupplierName is the schema descriptor for supplier_name field.
-	outsourcingfactDescSupplierName := outsourcingfactFields[11].Descriptor()
+	outsourcingfactDescSupplierName := outsourcingfactFields[12].Descriptor()
 	// outsourcingfact.SupplierNameValidator is a validator for the "supplier_name" field. It is called by the builders before save.
 	outsourcingfact.SupplierNameValidator = outsourcingfactDescSupplierName.Validators[0].(func(string) error)
 	// outsourcingfactDescSourceType is the schema descriptor for source_type field.
-	outsourcingfactDescSourceType := outsourcingfactFields[12].Descriptor()
+	outsourcingfactDescSourceType := outsourcingfactFields[13].Descriptor()
 	// outsourcingfact.SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
 	outsourcingfact.SourceTypeValidator = outsourcingfactDescSourceType.Validators[0].(func(string) error)
 	// outsourcingfactDescSourceID is the schema descriptor for source_id field.
-	outsourcingfactDescSourceID := outsourcingfactFields[13].Descriptor()
+	outsourcingfactDescSourceID := outsourcingfactFields[14].Descriptor()
 	// outsourcingfact.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
 	outsourcingfact.SourceIDValidator = outsourcingfactDescSourceID.Validators[0].(func(int) error)
 	// outsourcingfactDescSourceLineID is the schema descriptor for source_line_id field.
-	outsourcingfactDescSourceLineID := outsourcingfactFields[14].Descriptor()
+	outsourcingfactDescSourceLineID := outsourcingfactFields[15].Descriptor()
 	// outsourcingfact.SourceLineIDValidator is a validator for the "source_line_id" field. It is called by the builders before save.
 	outsourcingfact.SourceLineIDValidator = outsourcingfactDescSourceLineID.Validators[0].(func(int) error)
 	// outsourcingfactDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	outsourcingfactDescIdempotencyKey := outsourcingfactFields[15].Descriptor()
+	outsourcingfactDescIdempotencyKey := outsourcingfactFields[16].Descriptor()
 	// outsourcingfact.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	outsourcingfact.IdempotencyKeyValidator = func() func(string) error {
 		validators := outsourcingfactDescIdempotencyKey.Validators
@@ -2256,23 +2308,35 @@ func init() {
 		}
 	}()
 	// outsourcingfactDescOccurredAt is the schema descriptor for occurred_at field.
-	outsourcingfactDescOccurredAt := outsourcingfactFields[16].Descriptor()
+	outsourcingfactDescOccurredAt := outsourcingfactFields[17].Descriptor()
 	// outsourcingfact.DefaultOccurredAt holds the default value on creation for the occurred_at field.
 	outsourcingfact.DefaultOccurredAt = outsourcingfactDescOccurredAt.Default.(func() time.Time)
 	// outsourcingfactDescOccurredAtSpecified is the schema descriptor for occurred_at_specified field.
-	outsourcingfactDescOccurredAtSpecified := outsourcingfactFields[17].Descriptor()
+	outsourcingfactDescOccurredAtSpecified := outsourcingfactFields[18].Descriptor()
 	// outsourcingfact.DefaultOccurredAtSpecified holds the default value on creation for the occurred_at_specified field.
 	outsourcingfact.DefaultOccurredAtSpecified = outsourcingfactDescOccurredAtSpecified.Default.(bool)
+	// outsourcingfactDescPostedBy is the schema descriptor for posted_by field.
+	outsourcingfactDescPostedBy := outsourcingfactFields[20].Descriptor()
+	// outsourcingfact.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
+	outsourcingfact.PostedByValidator = outsourcingfactDescPostedBy.Validators[0].(func(int) error)
+	// outsourcingfactDescCancelledBy is the schema descriptor for cancelled_by field.
+	outsourcingfactDescCancelledBy := outsourcingfactFields[22].Descriptor()
+	// outsourcingfact.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
+	outsourcingfact.CancelledByValidator = outsourcingfactDescCancelledBy.Validators[0].(func(int) error)
+	// outsourcingfactDescCancelReason is the schema descriptor for cancel_reason field.
+	outsourcingfactDescCancelReason := outsourcingfactFields[23].Descriptor()
+	// outsourcingfact.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
+	outsourcingfact.CancelReasonValidator = outsourcingfactDescCancelReason.Validators[0].(func(string) error)
 	// outsourcingfactDescNote is the schema descriptor for note field.
-	outsourcingfactDescNote := outsourcingfactFields[19].Descriptor()
+	outsourcingfactDescNote := outsourcingfactFields[24].Descriptor()
 	// outsourcingfact.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	outsourcingfact.NoteValidator = outsourcingfactDescNote.Validators[0].(func(string) error)
 	// outsourcingfactDescCreatedAt is the schema descriptor for created_at field.
-	outsourcingfactDescCreatedAt := outsourcingfactFields[20].Descriptor()
+	outsourcingfactDescCreatedAt := outsourcingfactFields[25].Descriptor()
 	// outsourcingfact.DefaultCreatedAt holds the default value on creation for the created_at field.
 	outsourcingfact.DefaultCreatedAt = outsourcingfactDescCreatedAt.Default.(func() time.Time)
 	// outsourcingfactDescUpdatedAt is the schema descriptor for updated_at field.
-	outsourcingfactDescUpdatedAt := outsourcingfactFields[21].Descriptor()
+	outsourcingfactDescUpdatedAt := outsourcingfactFields[26].Descriptor()
 	// outsourcingfact.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	outsourcingfact.DefaultUpdatedAt = outsourcingfactDescUpdatedAt.Default.(func() time.Time)
 	// outsourcingfact.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -3501,12 +3565,16 @@ func init() {
 	productionexceptiondecisionDescExecutedBy := productionexceptiondecisionFields[20].Descriptor()
 	// productionexceptiondecision.ExecutedByValidator is a validator for the "executed_by" field. It is called by the builders before save.
 	productionexceptiondecision.ExecutedByValidator = productionexceptiondecisionDescExecutedBy.Validators[0].(func(int) error)
+	// productionexceptiondecisionDescExecutionReason is the schema descriptor for execution_reason field.
+	productionexceptiondecisionDescExecutionReason := productionexceptiondecisionFields[22].Descriptor()
+	// productionexceptiondecision.ExecutionReasonValidator is a validator for the "execution_reason" field. It is called by the builders before save.
+	productionexceptiondecision.ExecutionReasonValidator = productionexceptiondecisionDescExecutionReason.Validators[0].(func(string) error)
 	// productionexceptiondecisionDescReversedBy is the schema descriptor for reversed_by field.
-	productionexceptiondecisionDescReversedBy := productionexceptiondecisionFields[22].Descriptor()
+	productionexceptiondecisionDescReversedBy := productionexceptiondecisionFields[23].Descriptor()
 	// productionexceptiondecision.ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
 	productionexceptiondecision.ReversedByValidator = productionexceptiondecisionDescReversedBy.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescReverseReason is the schema descriptor for reverse_reason field.
-	productionexceptiondecisionDescReverseReason := productionexceptiondecisionFields[24].Descriptor()
+	productionexceptiondecisionDescReverseReason := productionexceptiondecisionFields[25].Descriptor()
 	// productionexceptiondecision.ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
 	productionexceptiondecision.ReverseReasonValidator = productionexceptiondecisionDescReverseReason.Validators[0].(func(string) error)
 	productionfactHooks := schema.ProductionFact{}.Hooks()
@@ -3569,8 +3637,14 @@ func init() {
 			return nil
 		}
 	}()
+	// productionfactDescVersion is the schema descriptor for version field.
+	productionfactDescVersion := productionfactFields[3].Descriptor()
+	// productionfact.DefaultVersion holds the default value on creation for the version field.
+	productionfact.DefaultVersion = productionfactDescVersion.Default.(int)
+	// productionfact.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	productionfact.VersionValidator = productionfactDescVersion.Validators[0].(func(int) error)
 	// productionfactDescSubjectType is the schema descriptor for subject_type field.
-	productionfactDescSubjectType := productionfactFields[3].Descriptor()
+	productionfactDescSubjectType := productionfactFields[4].Descriptor()
 	// productionfact.SubjectTypeValidator is a validator for the "subject_type" field. It is called by the builders before save.
 	productionfact.SubjectTypeValidator = func() func(string) error {
 		validators := productionfactDescSubjectType.Validators
@@ -3588,39 +3662,39 @@ func init() {
 		}
 	}()
 	// productionfactDescSubjectID is the schema descriptor for subject_id field.
-	productionfactDescSubjectID := productionfactFields[4].Descriptor()
+	productionfactDescSubjectID := productionfactFields[5].Descriptor()
 	// productionfact.SubjectIDValidator is a validator for the "subject_id" field. It is called by the builders before save.
 	productionfact.SubjectIDValidator = productionfactDescSubjectID.Validators[0].(func(int) error)
 	// productionfactDescProductSkuID is the schema descriptor for product_sku_id field.
-	productionfactDescProductSkuID := productionfactFields[5].Descriptor()
+	productionfactDescProductSkuID := productionfactFields[6].Descriptor()
 	// productionfact.ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
 	productionfact.ProductSkuIDValidator = productionfactDescProductSkuID.Validators[0].(func(int) error)
 	// productionfactDescWarehouseID is the schema descriptor for warehouse_id field.
-	productionfactDescWarehouseID := productionfactFields[6].Descriptor()
+	productionfactDescWarehouseID := productionfactFields[7].Descriptor()
 	// productionfact.WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
 	productionfact.WarehouseIDValidator = productionfactDescWarehouseID.Validators[0].(func(int) error)
 	// productionfactDescUnitID is the schema descriptor for unit_id field.
-	productionfactDescUnitID := productionfactFields[7].Descriptor()
+	productionfactDescUnitID := productionfactFields[8].Descriptor()
 	// productionfact.UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
 	productionfact.UnitIDValidator = productionfactDescUnitID.Validators[0].(func(int) error)
 	// productionfactDescLotID is the schema descriptor for lot_id field.
-	productionfactDescLotID := productionfactFields[8].Descriptor()
+	productionfactDescLotID := productionfactFields[9].Descriptor()
 	// productionfact.LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
 	productionfact.LotIDValidator = productionfactDescLotID.Validators[0].(func(int) error)
 	// productionfactDescSourceType is the schema descriptor for source_type field.
-	productionfactDescSourceType := productionfactFields[10].Descriptor()
+	productionfactDescSourceType := productionfactFields[11].Descriptor()
 	// productionfact.SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
 	productionfact.SourceTypeValidator = productionfactDescSourceType.Validators[0].(func(string) error)
 	// productionfactDescSourceID is the schema descriptor for source_id field.
-	productionfactDescSourceID := productionfactFields[11].Descriptor()
+	productionfactDescSourceID := productionfactFields[12].Descriptor()
 	// productionfact.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
 	productionfact.SourceIDValidator = productionfactDescSourceID.Validators[0].(func(int) error)
 	// productionfactDescSourceLineID is the schema descriptor for source_line_id field.
-	productionfactDescSourceLineID := productionfactFields[12].Descriptor()
+	productionfactDescSourceLineID := productionfactFields[13].Descriptor()
 	// productionfact.SourceLineIDValidator is a validator for the "source_line_id" field. It is called by the builders before save.
 	productionfact.SourceLineIDValidator = productionfactDescSourceLineID.Validators[0].(func(int) error)
 	// productionfactDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	productionfactDescIdempotencyKey := productionfactFields[13].Descriptor()
+	productionfactDescIdempotencyKey := productionfactFields[14].Descriptor()
 	// productionfact.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	productionfact.IdempotencyKeyValidator = func() func(string) error {
 		validators := productionfactDescIdempotencyKey.Validators
@@ -3638,23 +3712,35 @@ func init() {
 		}
 	}()
 	// productionfactDescOccurredAt is the schema descriptor for occurred_at field.
-	productionfactDescOccurredAt := productionfactFields[14].Descriptor()
+	productionfactDescOccurredAt := productionfactFields[15].Descriptor()
 	// productionfact.DefaultOccurredAt holds the default value on creation for the occurred_at field.
 	productionfact.DefaultOccurredAt = productionfactDescOccurredAt.Default.(func() time.Time)
 	// productionfactDescOccurredAtSpecified is the schema descriptor for occurred_at_specified field.
-	productionfactDescOccurredAtSpecified := productionfactFields[15].Descriptor()
+	productionfactDescOccurredAtSpecified := productionfactFields[16].Descriptor()
 	// productionfact.DefaultOccurredAtSpecified holds the default value on creation for the occurred_at_specified field.
 	productionfact.DefaultOccurredAtSpecified = productionfactDescOccurredAtSpecified.Default.(bool)
+	// productionfactDescPostedBy is the schema descriptor for posted_by field.
+	productionfactDescPostedBy := productionfactFields[18].Descriptor()
+	// productionfact.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
+	productionfact.PostedByValidator = productionfactDescPostedBy.Validators[0].(func(int) error)
+	// productionfactDescCancelledBy is the schema descriptor for cancelled_by field.
+	productionfactDescCancelledBy := productionfactFields[20].Descriptor()
+	// productionfact.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
+	productionfact.CancelledByValidator = productionfactDescCancelledBy.Validators[0].(func(int) error)
+	// productionfactDescCancelReason is the schema descriptor for cancel_reason field.
+	productionfactDescCancelReason := productionfactFields[21].Descriptor()
+	// productionfact.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
+	productionfact.CancelReasonValidator = productionfactDescCancelReason.Validators[0].(func(string) error)
 	// productionfactDescNote is the schema descriptor for note field.
-	productionfactDescNote := productionfactFields[17].Descriptor()
+	productionfactDescNote := productionfactFields[22].Descriptor()
 	// productionfact.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	productionfact.NoteValidator = productionfactDescNote.Validators[0].(func(string) error)
 	// productionfactDescCreatedAt is the schema descriptor for created_at field.
-	productionfactDescCreatedAt := productionfactFields[18].Descriptor()
+	productionfactDescCreatedAt := productionfactFields[23].Descriptor()
 	// productionfact.DefaultCreatedAt holds the default value on creation for the created_at field.
 	productionfact.DefaultCreatedAt = productionfactDescCreatedAt.Default.(func() time.Time)
 	// productionfactDescUpdatedAt is the schema descriptor for updated_at field.
-	productionfactDescUpdatedAt := productionfactFields[19].Descriptor()
+	productionfactDescUpdatedAt := productionfactFields[24].Descriptor()
 	// productionfact.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	productionfact.DefaultUpdatedAt = productionfactDescUpdatedAt.Default.(func() time.Time)
 	// productionfact.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -6035,28 +6121,44 @@ func init() {
 	salesreturnDescApprovedBy := salesreturnFields[11].Descriptor()
 	// salesreturn.ApprovedByValidator is a validator for the "approved_by" field. It is called by the builders before save.
 	salesreturn.ApprovedByValidator = salesreturnDescApprovedBy.Validators[0].(func(int) error)
+	// salesreturnDescRejectedBy is the schema descriptor for rejected_by field.
+	salesreturnDescRejectedBy := salesreturnFields[13].Descriptor()
+	// salesreturn.RejectedByValidator is a validator for the "rejected_by" field. It is called by the builders before save.
+	salesreturn.RejectedByValidator = salesreturnDescRejectedBy.Validators[0].(func(int) error)
+	// salesreturnDescRejectReason is the schema descriptor for reject_reason field.
+	salesreturnDescRejectReason := salesreturnFields[14].Descriptor()
+	// salesreturn.RejectReasonValidator is a validator for the "reject_reason" field. It is called by the builders before save.
+	salesreturn.RejectReasonValidator = salesreturnDescRejectReason.Validators[0].(func(string) error)
 	// salesreturnDescReceivedBy is the schema descriptor for received_by field.
-	salesreturnDescReceivedBy := salesreturnFields[13].Descriptor()
+	salesreturnDescReceivedBy := salesreturnFields[16].Descriptor()
 	// salesreturn.ReceivedByValidator is a validator for the "received_by" field. It is called by the builders before save.
 	salesreturn.ReceivedByValidator = salesreturnDescReceivedBy.Validators[0].(func(int) error)
 	// salesreturnDescCancelledBy is the schema descriptor for cancelled_by field.
-	salesreturnDescCancelledBy := salesreturnFields[15].Descriptor()
+	salesreturnDescCancelledBy := salesreturnFields[18].Descriptor()
 	// salesreturn.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
 	salesreturn.CancelledByValidator = salesreturnDescCancelledBy.Validators[0].(func(int) error)
 	// salesreturnDescCancelReason is the schema descriptor for cancel_reason field.
-	salesreturnDescCancelReason := salesreturnFields[16].Descriptor()
+	salesreturnDescCancelReason := salesreturnFields[19].Descriptor()
 	// salesreturn.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
 	salesreturn.CancelReasonValidator = salesreturnDescCancelReason.Validators[0].(func(string) error)
+	// salesreturnDescReversedBy is the schema descriptor for reversed_by field.
+	salesreturnDescReversedBy := salesreturnFields[21].Descriptor()
+	// salesreturn.ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
+	salesreturn.ReversedByValidator = salesreturnDescReversedBy.Validators[0].(func(int) error)
+	// salesreturnDescReverseReason is the schema descriptor for reverse_reason field.
+	salesreturnDescReverseReason := salesreturnFields[22].Descriptor()
+	// salesreturn.ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
+	salesreturn.ReverseReasonValidator = salesreturnDescReverseReason.Validators[0].(func(string) error)
 	// salesreturnDescCreatedBy is the schema descriptor for created_by field.
-	salesreturnDescCreatedBy := salesreturnFields[17].Descriptor()
+	salesreturnDescCreatedBy := salesreturnFields[23].Descriptor()
 	// salesreturn.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	salesreturn.CreatedByValidator = salesreturnDescCreatedBy.Validators[0].(func(int) error)
 	// salesreturnDescCreatedAt is the schema descriptor for created_at field.
-	salesreturnDescCreatedAt := salesreturnFields[18].Descriptor()
+	salesreturnDescCreatedAt := salesreturnFields[24].Descriptor()
 	// salesreturn.DefaultCreatedAt holds the default value on creation for the created_at field.
 	salesreturn.DefaultCreatedAt = salesreturnDescCreatedAt.Default.(func() time.Time)
 	// salesreturnDescUpdatedAt is the schema descriptor for updated_at field.
-	salesreturnDescUpdatedAt := salesreturnFields[19].Descriptor()
+	salesreturnDescUpdatedAt := salesreturnFields[25].Descriptor()
 	// salesreturn.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	salesreturn.DefaultUpdatedAt = salesreturnDescUpdatedAt.Default.(func() time.Time)
 	// salesreturn.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

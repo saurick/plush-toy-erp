@@ -18,6 +18,7 @@ func (FinanceCreditNote) Annotations() []schema.Annotation {
 	return []schema.Annotation{entsql.Annotation{Checks: map[string]string{
 		"finance_credit_notes_amount_positive": "amount > 0", "finance_credit_notes_currency_allowed": "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_credit_notes_status_allowed": "status IN ('POSTED', 'REVERSED')", "finance_credit_notes_intent_bundle": "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
+		"finance_credit_notes_reversal_bundle": "((status = 'POSTED' AND reversal_of_credit_note_id IS NULL) OR (status = 'REVERSED' AND reversal_of_credit_note_id IS NOT NULL))",
 	}}}
 }
 func (FinanceCreditNote) Fields() []ent.Field {

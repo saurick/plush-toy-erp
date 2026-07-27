@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -15,14 +16,15 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 			ctx,
 			biz.PermissionPMCRiskRead,
 			biz.PermissionProductionFactRead,
-			biz.PermissionQualityExceptionHandle,
+			biz.PermissionProductionExceptionSubmit,
+			biz.PermissionProductionExceptionApprove,
 		); res != nil {
 			return id, res, nil
 		}
 	} else {
-		permission := biz.PermissionQualityExceptionHandle
+		permission := biz.PermissionProductionExceptionSubmit
 		switch method {
-		case "execute_production_exception", "reverse_production_exception":
+		case "reverse_production_exception":
 			permission = biz.PermissionProductionFactPost
 		}
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
@@ -36,7 +38,17 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 	var err error
 	switch method {
 	case "submit_production_exception":
-		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+		decisionType := strings.ToUpper(strings.TrimSpace(getString(pm, "decision_type")))
+		condition := ""
+		switch decisionType {
+		case biz.ProductionExceptionOverIssue:
+			condition = biz.SourceReadConditionProductionExceptionIssue
+		case biz.ProductionExceptionScrap, biz.ProductionExceptionWIPConcession:
+			condition = biz.SourceReadConditionProductionExceptionWIP
+		default:
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method, condition); res != nil {
 			return id, res, nil
 		}
 		if !productionCompletionAllowsOnly(pm, "customer_key", "decision_no", "decision_type", "production_order_id", "production_order_item_id", "production_material_requirement_id", "production_wip_batch_id", "quality_inspection_id", "requested_quantity", "reason", "idempotency_key") {
@@ -46,31 +58,13 @@ func (d *jsonrpcDispatcher) handleProductionException(ctx context.Context, metho
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err = d.operationalFactUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{DecisionNo: getString(pm, "decision_no"), DecisionType: getString(pm, "decision_type"), ProductionOrderID: getInt(pm, "production_order_id", 0), ProductionOrderItemID: getInt(pm, "production_order_item_id", 0), ProductionMaterialRequirementID: getOptionalInt(pm, "production_material_requirement_id"), ProductionWIPBatchID: getOptionalInt(pm, "production_wip_batch_id"), QualityInspectionID: getOptionalInt(pm, "quality_inspection_id"), RequestedQuantity: quantity, Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), RequestedBy: actorID})
-	case "approve_production_exception":
-		mutation, ok := productionExceptionMutationFromParams(pm, actorID, true)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err = d.operationalFactUC.ApproveProductionException(ctx, mutation)
-	case "reject_production_exception":
-		mutation, ok := productionExceptionMutationFromParams(pm, actorID, false)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err = d.operationalFactUC.RejectProductionException(ctx, mutation)
+		item, err = d.operationalFactUC.SubmitProductionException(ctx, &biz.ProductionExceptionSubmit{DecisionNo: getString(pm, "decision_no"), DecisionType: decisionType, ProductionOrderID: getInt(pm, "production_order_id", 0), ProductionOrderItemID: getInt(pm, "production_order_item_id", 0), ProductionMaterialRequirementID: getOptionalInt(pm, "production_material_requirement_id"), ProductionWIPBatchID: getOptionalInt(pm, "production_wip_batch_id"), QualityInspectionID: getOptionalInt(pm, "quality_inspection_id"), RequestedQuantity: quantity, Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), RequestedBy: actorID})
 	case "cancel_production_exception":
 		mutation, ok := productionExceptionMutationFromParams(pm, actorID, false)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
 		item, err = d.operationalFactUC.CancelProductionException(ctx, mutation)
-	case "execute_production_exception":
-		mutation, ok := productionExceptionMutationFromParams(pm, actorID, false)
-		if !ok {
-			return id, invalidParamResult(), nil
-		}
-		item, err = d.operationalFactUC.ExecuteProductionException(ctx, mutation)
 	case "reverse_production_exception":
 		mutation, ok := productionExceptionMutationFromParams(pm, actorID, false)
 		if !ok {
@@ -125,7 +119,7 @@ func productionExceptionToAny(item *biz.ProductionExceptionDecision) map[string]
 	if item == nil {
 		return nil
 	}
-	return map[string]any{"id": item.ID, "decision_no": item.DecisionNo, "decision_type": item.DecisionType, "status": item.Status, "execution_status": item.ExecutionStatus, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID, "production_material_requirement_id": optionalIntToAny(item.ProductionMaterialRequirementID), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "quality_inspection_id": optionalIntToAny(item.QualityInspectionID), "requested_quantity": item.RequestedQuantity.String(), "approved_quantity": optionalDecimalToAny(item.ApprovedQuantity), "reason": item.Reason, "version": item.Version, "requested_by": item.RequestedBy, "requested_at": item.RequestedAt.Unix(), "decided_by": optionalIntToAny(item.DecidedBy), "decided_at": optionalUnix(item.DecidedAt), "decision_reason": optionalStringToAny(item.DecisionReason), "executed_by": optionalIntToAny(item.ExecutedBy), "executed_at": optionalUnix(item.ExecutedAt), "reversed_by": optionalIntToAny(item.ReversedBy), "reversed_at": optionalUnix(item.ReversedAt), "reverse_reason": optionalStringToAny(item.ReverseReason)}
+	return map[string]any{"id": item.ID, "decision_no": item.DecisionNo, "decision_type": item.DecisionType, "status": item.Status, "execution_status": item.ExecutionStatus, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID, "production_material_requirement_id": optionalIntToAny(item.ProductionMaterialRequirementID), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "quality_inspection_id": optionalIntToAny(item.QualityInspectionID), "requested_quantity": item.RequestedQuantity.String(), "approved_quantity": optionalDecimalToAny(item.ApprovedQuantity), "reason": item.Reason, "version": item.Version, "requested_by": item.RequestedBy, "requested_at": item.RequestedAt.Unix(), "decided_by": optionalIntToAny(item.DecidedBy), "decided_at": optionalUnix(item.DecidedAt), "decision_reason": optionalStringToAny(item.DecisionReason), "executed_by": optionalIntToAny(item.ExecutedBy), "executed_at": optionalUnix(item.ExecutedAt), "execution_reason": optionalStringToAny(item.ExecutionReason), "reversed_by": optionalIntToAny(item.ReversedBy), "reversed_at": optionalUnix(item.ReversedAt), "reverse_reason": optionalStringToAny(item.ReverseReason)}
 }
 
 func (d *jsonrpcDispatcher) handleOutsourcingReturnDisposition(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {

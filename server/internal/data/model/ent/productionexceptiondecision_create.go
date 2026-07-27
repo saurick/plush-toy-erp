@@ -257,6 +257,20 @@ func (_c *ProductionExceptionDecisionCreate) SetNillableExecutedAt(v *time.Time)
 	return _c
 }
 
+// SetExecutionReason sets the "execution_reason" field.
+func (_c *ProductionExceptionDecisionCreate) SetExecutionReason(v string) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetExecutionReason(v)
+	return _c
+}
+
+// SetNillableExecutionReason sets the "execution_reason" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableExecutionReason(v *string) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetExecutionReason(*v)
+	}
+	return _c
+}
+
 // SetReversedBy sets the "reversed_by" field.
 func (_c *ProductionExceptionDecisionCreate) SetReversedBy(v int) *ProductionExceptionDecisionCreate {
 	_c.mutation.SetReversedBy(v)
@@ -484,6 +498,11 @@ func (_c *ProductionExceptionDecisionCreate) check() error {
 			return &ValidationError{Name: "executed_by", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.executed_by": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ExecutionReason(); ok {
+		if err := productionexceptiondecision.ExecutionReasonValidator(v); err != nil {
+			return &ValidationError{Name: "execution_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.execution_reason": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.ReversedBy(); ok {
 		if err := productionexceptiondecision.ReversedByValidator(v); err != nil {
 			return &ValidationError{Name: "reversed_by", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.reversed_by": %w`, err)}
@@ -607,6 +626,10 @@ func (_c *ProductionExceptionDecisionCreate) createSpec() (*ProductionExceptionD
 	if value, ok := _c.mutation.ExecutedAt(); ok {
 		_spec.SetField(productionexceptiondecision.FieldExecutedAt, field.TypeTime, value)
 		_node.ExecutedAt = &value
+	}
+	if value, ok := _c.mutation.ExecutionReason(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutionReason, field.TypeString, value)
+		_node.ExecutionReason = &value
 	}
 	if value, ok := _c.mutation.ReversedBy(); ok {
 		_spec.SetField(productionexceptiondecision.FieldReversedBy, field.TypeInt, value)

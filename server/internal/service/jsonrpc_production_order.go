@@ -622,6 +622,8 @@ func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "排产任务尚未结束，请先到生产订单或任务中心完成处理"}
 	case errors.Is(err, biz.ErrProductionOrderWIPActive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "仍有未结束的在制批次，请先完成对应工序、外发回仓或质量处理后再关闭生产订单"}
+	case errors.Is(err, biz.ErrProductionOrderExceptionDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单仍有未结的异常审批、超领额度或委外返工处置，请先处理后再关闭或取消"}
 	case errors.Is(err, biz.ErrProductionOrderQuantityExceeded), errors.Is(err, biz.ErrProductionOrderInvalidState), errors.Is(err, biz.ErrBadParam):
 		return invalidParamResult()
 	default:

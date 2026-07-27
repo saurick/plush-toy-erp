@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/inventoryoperation"
 	"server/internal/data/model/ent/inventoryoperationitem"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/processinstance"
 
 	"entgo.io/ent/dialect"
 	"github.com/shopspring/decimal"
@@ -32,8 +33,15 @@ func (r *inventoryRepo) CreateInventoryOperation(ctx context.Context, in *biz.In
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	row, err := tx.client.InventoryOperation.Create().SetOperationNo(in.OperationNo).SetOperationType(in.OperationType).SetStatus(biz.InventoryOperationStatusDraft).SetReason(in.Reason).SetNillableApprovalRef(in.ApprovalRef).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(intentHash).SetIdempotencyItemCount(len(in.Items)).SetCreatedBy(in.CreatedBy).Save(ctx)
+	row, err := tx.client.InventoryOperation.Create().SetOperationNo(in.OperationNo).SetOperationType(in.OperationType).SetStatus(biz.InventoryOperationStatusDraft).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(intentHash).SetIdempotencyItemCount(len(in.Items)).SetCreatedBy(in.CreatedBy).Save(ctx)
 	if err != nil {
+		if ent.IsConstraintError(err) {
+			rollbackInventoryDBTx(ctx, tx, r.log)
+			tx = nil
+			if replay, found, replayErr := r.resolveInventoryOperationReplay(ctx, r.data.postgres, in, intentHash); replayErr != nil || found {
+				return replay, replayErr
+			}
+		}
 		return nil, err
 	}
 	for _, item := range in.Items {
@@ -68,26 +76,252 @@ func (r *inventoryRepo) resolveInventoryOperationReplay(ctx context.Context, cli
 	return out, true, err
 }
 
-func (r *inventoryRepo) PostInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
-	tx, err := r.beginInventoryDBTx(ctx)
+func (r *inventoryRepo) SubmitInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
+	return nil, biz.ErrProcessRuntimeRequired
+}
+
+func (r *inventoryRepo) SubmitInventoryOperationForProcessCommand(
+	ctx context.Context,
+	id int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.InventoryOperation, error) {
+	return r.submitInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: id, ActorID: actorID}, command, result)
+}
+
+func (r *inventoryRepo) submitInventoryOperation(
+	ctx context.Context,
+	in *biz.InventoryOperationMutation,
+	command *biz.ProcessDomainCommandInput,
+	commandResult *biz.ProcessDomainCommandResult,
+) (*biz.InventoryOperation, error) {
+	tx, row, err := r.beginLockedInventoryOperation(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockInventoryOperation(ctx, tx, in.ID); err != nil {
-		return nil, err
+	if command != nil {
+		in.ExpectedVersion = row.Version
 	}
-	row, err := tx.client.InventoryOperation.Get(ctx, in.ID)
-	if ent.IsNotFound(err) {
-		return nil, biz.ErrInventoryOperationNotFound
+	if row.Status == biz.InventoryOperationStatusSubmitted && row.Version == in.ExpectedVersion+1 && row.SubmittedBy != nil && *row.SubmittedBy == in.ActorID {
+		if command != nil {
+			if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, in.ActorID); err != nil {
+				return nil, err
+			}
+		}
+		return commitInventoryOperation(ctx, tx, row.ID)
 	}
+	if row.OperationType != biz.InventoryOperationManualAdjustment || row.Status != biz.InventoryOperationStatusDraft || row.Version != in.ExpectedVersion {
+		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if row.CreatedBy != in.ActorID {
+		return nil, biz.ErrInventoryOperationSubmitOwner
+	}
+	now := time.Now()
+	affected, err := tx.client.InventoryOperation.Update().
+		Where(inventoryoperation.ID(row.ID), inventoryoperation.StatusEQ(biz.InventoryOperationStatusDraft), inventoryoperation.VersionEQ(in.ExpectedVersion)).
+		SetStatus(biz.InventoryOperationStatusSubmitted).
+		SetSubmittedAt(now).
+		SetSubmittedBy(in.ActorID).
+		AddVersion(1).
+		Save(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if row.Status == biz.InventoryOperationStatusPosted && row.Version == in.ExpectedVersion+1 && row.PostedBy != nil && *row.PostedBy == in.ActorID {
+	if affected != 1 {
+		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if command != nil {
+		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, in.ActorID); err != nil {
+			return nil, err
+		}
+	}
+	return commitInventoryOperation(ctx, tx, row.ID)
+}
+
+func (r *inventoryRepo) ApproveInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
+	return nil, biz.ErrProcessRuntimeRequired
+}
+
+func (r *inventoryRepo) ApproveInventoryOperationForProcessCommand(
+	ctx context.Context,
+	id int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+	reason string,
+) (*biz.InventoryOperation, error) {
+	return r.approveInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: id, ActorID: actorID, Reason: reason}, command, result)
+}
+
+func (r *inventoryRepo) approveInventoryOperation(
+	ctx context.Context,
+	in *biz.InventoryOperationMutation,
+	command *biz.ProcessDomainCommandInput,
+	commandResult *biz.ProcessDomainCommandResult,
+) (*biz.InventoryOperation, error) {
+	tx, row, err := r.beginLockedInventoryOperation(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if command != nil {
+		in.ExpectedVersion = row.Version
+	}
+	if row.Status == biz.InventoryOperationStatusApproved && row.Version == in.ExpectedVersion+1 && row.ApprovedBy != nil && *row.ApprovedBy == in.ActorID {
+		if command != nil {
+			if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, in.ActorID); err != nil {
+				return nil, err
+			}
+		}
 		return commitInventoryOperation(ctx, tx, row.ID)
 	}
-	if row.Status != biz.InventoryOperationStatusDraft || row.Version != in.ExpectedVersion {
+	if row.OperationType != biz.InventoryOperationManualAdjustment || row.Status != biz.InventoryOperationStatusSubmitted || row.Version != in.ExpectedVersion {
+		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if row.CreatedBy == in.ActorID {
+		return nil, biz.ErrInventoryOperationSelfApproval
+	}
+	now := time.Now()
+	affected, err := tx.client.InventoryOperation.Update().
+		Where(inventoryoperation.ID(row.ID), inventoryoperation.StatusEQ(biz.InventoryOperationStatusSubmitted), inventoryoperation.VersionEQ(in.ExpectedVersion)).
+		SetStatus(biz.InventoryOperationStatusApproved).
+		SetApprovedAt(now).
+		SetApprovedBy(in.ActorID).
+		AddVersion(1).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected != 1 {
+		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if command != nil {
+		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, in.ActorID); err != nil {
+			return nil, err
+		}
+	}
+	return commitInventoryOperation(ctx, tx, row.ID)
+}
+
+func (r *inventoryRepo) RejectInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
+	return nil, biz.ErrProcessRuntimeRequired
+}
+
+func (r *inventoryRepo) RejectInventoryOperationForProcessCommand(
+	ctx context.Context,
+	id int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+	reason string,
+) (*biz.InventoryOperation, error) {
+	return r.rejectInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: id, ActorID: actorID, Reason: reason}, command, result)
+}
+
+func (r *inventoryRepo) rejectInventoryOperation(
+	ctx context.Context,
+	in *biz.InventoryOperationMutation,
+	command *biz.ProcessDomainCommandInput,
+	commandResult *biz.ProcessDomainCommandResult,
+) (*biz.InventoryOperation, error) {
+	tx, row, err := r.beginLockedInventoryOperation(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if command != nil {
+		in.ExpectedVersion = row.Version
+	}
+	if row.Status == biz.InventoryOperationStatusRejected && row.Version == in.ExpectedVersion+1 && row.RejectedBy != nil && *row.RejectedBy == in.ActorID && row.RejectReason != nil && *row.RejectReason == in.Reason {
+		if command != nil {
+			if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, in.ActorID); err != nil {
+				return nil, err
+			}
+		}
+		return commitInventoryOperation(ctx, tx, row.ID)
+	}
+	if row.OperationType != biz.InventoryOperationManualAdjustment || row.Status != biz.InventoryOperationStatusSubmitted || row.Version != in.ExpectedVersion {
+		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if row.CreatedBy == in.ActorID {
+		return nil, biz.ErrInventoryOperationSelfApproval
+	}
+	now := time.Now()
+	affected, err := tx.client.InventoryOperation.Update().
+		Where(inventoryoperation.ID(row.ID), inventoryoperation.StatusEQ(biz.InventoryOperationStatusSubmitted), inventoryoperation.VersionEQ(in.ExpectedVersion)).
+		SetStatus(biz.InventoryOperationStatusRejected).
+		SetRejectedAt(now).
+		SetRejectedBy(in.ActorID).
+		SetRejectReason(in.Reason).
+		AddVersion(1).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected != 1 {
+		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if command != nil {
+		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, in.ActorID); err != nil {
+			return nil, err
+		}
+	}
+	return commitInventoryOperation(ctx, tx, row.ID)
+}
+
+func (r *inventoryRepo) PostInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
+	if in == nil {
+		return nil, biz.ErrBadParam
+	}
+	item, err := r.GetInventoryOperation(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if item.OperationType == biz.InventoryOperationManualAdjustment {
+		return nil, biz.ErrProcessRuntimeRequired
+	}
+	return r.postInventoryOperation(ctx, in, nil, nil)
+}
+
+func (r *inventoryRepo) PostInventoryOperationForProcessCommand(
+	ctx context.Context,
+	id int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.InventoryOperation, error) {
+	return r.postInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: id, ActorID: actorID}, command, result)
+}
+
+func (r *inventoryRepo) postInventoryOperation(
+	ctx context.Context,
+	in *biz.InventoryOperationMutation,
+	command *biz.ProcessDomainCommandInput,
+	commandResult *biz.ProcessDomainCommandResult,
+) (*biz.InventoryOperation, error) {
+	tx, row, err := r.beginLockedInventoryOperation(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if command != nil {
+		in.ExpectedVersion = row.Version
+	}
+	if row.Status == biz.InventoryOperationStatusPosted && row.Version == in.ExpectedVersion+1 && row.PostedBy != nil && *row.PostedBy == in.ActorID {
+		if command != nil {
+			if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, in.ActorID); err != nil {
+				return nil, err
+			}
+		}
+		return commitInventoryOperation(ctx, tx, row.ID)
+	}
+	expectedStatus := biz.InventoryOperationStatusDraft
+	if row.OperationType == biz.InventoryOperationManualAdjustment {
+		expectedStatus = biz.InventoryOperationStatusApproved
+	}
+	if row.Status != expectedStatus || row.Version != in.ExpectedVersion {
 		return nil, biz.ErrInventoryOperationVersionConflict
 	}
 	items, err := tx.client.InventoryOperationItem.Query().Where(inventoryoperationitem.OperationID(row.ID)).Order(ent.Asc(inventoryoperationitem.FieldID)).All(ctx)
@@ -103,12 +337,17 @@ func (r *inventoryRepo) PostInventoryOperation(ctx context.Context, in *biz.Inve
 		}
 	}
 	now := time.Now()
-	affected, err := tx.client.InventoryOperation.Update().Where(inventoryoperation.ID(row.ID), inventoryoperation.StatusEQ(biz.InventoryOperationStatusDraft), inventoryoperation.VersionEQ(in.ExpectedVersion)).SetStatus(biz.InventoryOperationStatusPosted).SetPostedAt(now).SetPostedBy(in.ActorID).AddVersion(1).Save(ctx)
+	affected, err := tx.client.InventoryOperation.Update().Where(inventoryoperation.ID(row.ID), inventoryoperation.StatusEQ(expectedStatus), inventoryoperation.VersionEQ(in.ExpectedVersion)).SetStatus(biz.InventoryOperationStatusPosted).SetPostedAt(now).SetPostedBy(in.ActorID).AddVersion(1).Save(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if affected != 1 {
 		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if command != nil {
+		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, commandResult, in.ActorID); err != nil {
+			return nil, err
+		}
 	}
 	return commitInventoryOperation(ctx, tx, row.ID)
 }
@@ -156,26 +395,42 @@ func inventoryOperationTxn(op *ent.InventoryOperation, item *ent.InventoryOperat
 }
 
 func (r *inventoryRepo) CancelInventoryOperation(ctx context.Context, in *biz.InventoryOperationMutation) (*biz.InventoryOperation, error) {
-	tx, err := r.beginInventoryDBTx(ctx)
+	tx, row, err := r.beginLockedInventoryOperation(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockInventoryOperation(ctx, tx, in.ID); err != nil {
-		return nil, err
-	}
-	row, err := tx.client.InventoryOperation.Get(ctx, in.ID)
-	if ent.IsNotFound(err) {
-		return nil, biz.ErrInventoryOperationNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
 	if row.Status == biz.InventoryOperationStatusCancelled && row.Version == in.ExpectedVersion+1 && row.CancelledBy != nil && *row.CancelledBy == in.ActorID && row.CancelReason != nil && *row.CancelReason == in.Reason {
 		return commitInventoryOperation(ctx, tx, row.ID)
 	}
-	if (row.Status != biz.InventoryOperationStatusDraft && row.Status != biz.InventoryOperationStatusPosted) || row.Version != in.ExpectedVersion {
+	if (row.Status != biz.InventoryOperationStatusDraft && row.Status != biz.InventoryOperationStatusSubmitted && row.Status != biz.InventoryOperationStatusApproved && row.Status != biz.InventoryOperationStatusPosted) || row.Version != in.ExpectedVersion {
 		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if row.CreatedBy != in.ActorID && (row.Status != biz.InventoryOperationStatusPosted || row.PostedBy == nil || *row.PostedBy != in.ActorID) {
+		return nil, biz.ErrInventoryOperationCancelOwner
+	}
+	if row.OperationType == biz.InventoryOperationManualAdjustment &&
+		row.Status != biz.InventoryOperationStatusPosted {
+		processQuery := tx.client.ProcessInstance.Query().Where(
+			processinstance.ProcessKey(biz.ProcessKeyInventoryAdjustmentApproval),
+			processinstance.BusinessRefType("inventory_operation"),
+			processinstance.BusinessRefID(row.ID),
+		)
+		hasProcess, err := processQuery.Clone().Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasProcess {
+			blocked, err := processQuery.Clone().Where(
+				processinstance.Status(biz.ProcessStatusBlocked),
+			).Exist(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if !blocked {
+				return nil, biz.ErrProcessSourceLifecycleDependency
+			}
+		}
 	}
 	if row.Status == biz.InventoryOperationStatusPosted {
 		txns, err := tx.client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.InventoryOperationSourceType), inventorytxn.SourceID(row.ID), inventorytxn.ReversalOfTxnIDIsNil()).All(ctx)
@@ -197,12 +452,41 @@ func (r *inventoryRepo) CancelInventoryOperation(ctx context.Context, in *biz.In
 		}
 	}
 	now := time.Now()
-	affected, err := tx.client.InventoryOperation.Update().Where(inventoryoperation.ID(row.ID), inventoryoperation.VersionEQ(in.ExpectedVersion)).SetStatus(biz.InventoryOperationStatusCancelled).SetCancelledAt(now).SetCancelledBy(in.ActorID).SetCancelReason(in.Reason).AddVersion(1).Save(ctx)
+	affected, err := tx.client.InventoryOperation.Update().Where(inventoryoperation.ID(row.ID), inventoryoperation.StatusEQ(row.Status), inventoryoperation.VersionEQ(in.ExpectedVersion)).SetStatus(biz.InventoryOperationStatusCancelled).SetCancelledAt(now).SetCancelledBy(in.ActorID).SetCancelReason(in.Reason).AddVersion(1).Save(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if affected != 1 {
 		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if row.OperationType == biz.InventoryOperationManualAdjustment {
+		compensatedCommands := []string{}
+		switch row.Status {
+		case biz.InventoryOperationStatusSubmitted:
+			compensatedCommands = []string{biz.ProcessDomainCommandInventoryAdjustmentSubmit}
+		case biz.InventoryOperationStatusApproved:
+			compensatedCommands = []string{
+				biz.ProcessDomainCommandInventoryAdjustmentSubmit,
+				biz.ProcessDomainCommandInventoryAdjustmentApprove,
+			}
+		case biz.InventoryOperationStatusPosted:
+			compensatedCommands = []string{
+				biz.ProcessDomainCommandInventoryAdjustmentSubmit,
+				biz.ProcessDomainCommandInventoryAdjustmentApprove,
+				biz.ProcessDomainCommandInventoryAdjustmentPost,
+			}
+		}
+		if err := markProcessDomainCommandEffectsCompensatedWithClient(
+			ctx,
+			tx.client,
+			compensatedCommands,
+			"inventory_operation",
+			row.ID,
+			in.Reason,
+			in.ActorID,
+		); err != nil {
+			return nil, err
+		}
 	}
 	return commitInventoryOperation(ctx, tx, row.ID)
 }
@@ -214,6 +498,47 @@ func (r *inventoryRepo) GetInventoryOperation(ctx context.Context, id int) (*biz
 	}
 	return out, err
 }
+
+func (r *inventoryRepo) ListInventoryOperationsForAccess(ctx context.Context, filter biz.InventoryOperationFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryOperation, int, error) {
+	query := r.data.postgres.InventoryOperation.Query()
+	switch scope.Mode {
+	case biz.DataScopeModeAssigned:
+		query = query.Where(inventoryoperation.Not(inventoryoperation.HasItemsWith(inventoryoperationitem.Or(
+			inventoryoperationitem.FromWarehouseIDNotIn(scope.WarehouseIDs...),
+			inventoryoperationitem.And(inventoryoperationitem.ToWarehouseIDNotNil(), inventoryoperationitem.ToWarehouseIDNotIn(scope.WarehouseIDs...)),
+		))))
+	case biz.DataScopeModeAll:
+	default:
+		return []*biz.InventoryOperation{}, 0, nil
+	}
+	if filter.OperationType != "" {
+		query = query.Where(inventoryoperation.OperationTypeEQ(filter.OperationType))
+	}
+	if filter.Status != "" {
+		query = query.Where(inventoryoperation.StatusEQ(filter.Status))
+	}
+	if filter.CreatedBy > 0 {
+		query = query.Where(inventoryoperation.CreatedBy(filter.CreatedBy))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Desc(inventoryoperation.FieldUpdatedAt), ent.Desc(inventoryoperation.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.InventoryOperation, 0, len(rows))
+	for _, row := range rows {
+		item, err := inventoryOperationByID(ctx, r.data.postgres, row.ID)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
 func commitInventoryOperation(ctx context.Context, tx *inventoryDBTx, id int) (*biz.InventoryOperation, error) {
 	out, err := inventoryOperationByID(ctx, tx.client, id)
 	if err != nil {
@@ -231,11 +556,31 @@ func inventoryOperationByID(ctx context.Context, client *ent.Client, id int) (*b
 	if err != nil {
 		return nil, err
 	}
-	out := &biz.InventoryOperation{ID: row.ID, OperationNo: row.OperationNo, OperationType: row.OperationType, Status: row.Status, Reason: row.Reason, ApprovalRef: row.ApprovalRef, Version: row.Version, PostedAt: row.PostedAt, PostedBy: row.PostedBy, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelReason: row.CancelReason, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	out := &biz.InventoryOperation{ID: row.ID, OperationNo: row.OperationNo, OperationType: row.OperationType, Status: row.Status, Reason: row.Reason, Version: row.Version, SubmittedAt: row.SubmittedAt, SubmittedBy: row.SubmittedBy, ApprovedAt: row.ApprovedAt, ApprovedBy: row.ApprovedBy, RejectedAt: row.RejectedAt, RejectedBy: row.RejectedBy, RejectReason: row.RejectReason, PostedAt: row.PostedAt, PostedBy: row.PostedBy, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelReason: row.CancelReason, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 	for _, item := range row.Edges.Items {
 		out.Items = append(out.Items, &biz.InventoryOperationItem{ID: item.ID, OperationID: item.OperationID, LineNo: item.LineNo, SubjectType: item.SubjectType, SubjectID: item.SubjectID, ProductSkuID: item.ProductSkuID, FromWarehouseID: item.FromWarehouseID, FromLotID: item.FromLotID, ToWarehouseID: item.ToWarehouseID, ToLotID: item.ToLotID, UnitID: item.UnitID, ExpectedQuantity: item.ExpectedQuantity, CountedQuantity: item.CountedQuantity, AdjustmentQuantity: item.AdjustmentQuantity, Note: item.Note})
 	}
 	return out, nil
+}
+
+func (r *inventoryRepo) beginLockedInventoryOperation(ctx context.Context, id int) (*inventoryDBTx, *ent.InventoryOperation, error) {
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := lockInventoryOperation(ctx, tx, id); err != nil {
+		rollbackInventoryDBTx(ctx, tx, r.log)
+		return nil, nil, err
+	}
+	row, err := tx.client.InventoryOperation.Get(ctx, id)
+	if ent.IsNotFound(err) {
+		err = biz.ErrInventoryOperationNotFound
+	}
+	if err != nil {
+		rollbackInventoryDBTx(ctx, tx, r.log)
+		return nil, nil, err
+	}
+	return tx, row, nil
 }
 
 func lockInventoryOperation(ctx context.Context, tx *inventoryDBTx, id int) error {

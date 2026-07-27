@@ -4,6 +4,7 @@ package ent
 
 import (
 	"fmt"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/productsku"
@@ -28,6 +29,8 @@ type OutsourcingFact struct {
 	FactType string `json:"fact_type,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// Version holds the value of the "version" field.
+	Version int `json:"version,omitempty"`
 	// SubjectType holds the value of the "subject_type" field.
 	SubjectType string `json:"subject_type,omitempty"`
 	// SubjectID holds the value of the "subject_id" field.
@@ -60,6 +63,14 @@ type OutsourcingFact struct {
 	OccurredAtSpecified bool `json:"occurred_at_specified,omitempty"`
 	// PostedAt holds the value of the "posted_at" field.
 	PostedAt *time.Time `json:"posted_at,omitempty"`
+	// PostedBy holds the value of the "posted_by" field.
+	PostedBy *int `json:"posted_by,omitempty"`
+	// CancelledAt holds the value of the "cancelled_at" field.
+	CancelledAt *time.Time `json:"cancelled_at,omitempty"`
+	// CancelledBy holds the value of the "cancelled_by" field.
+	CancelledBy *int `json:"cancelled_by,omitempty"`
+	// CancelReason holds the value of the "cancel_reason" field.
+	CancelReason *string `json:"cancel_reason,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -82,9 +93,13 @@ type OutsourcingFactEdges struct {
 	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// InventoryLot holds the value of the inventory_lot edge.
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
+	// Poster holds the value of the poster edge.
+	Poster *AdminUser `json:"poster,omitempty"`
+	// Canceller holds the value of the canceller edge.
+	Canceller *AdminUser `json:"canceller,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [6]bool
 }
 
 // WarehouseOrErr returns the Warehouse value or an error if the edge
@@ -131,6 +146,28 @@ func (e OutsourcingFactEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	return nil, &NotLoadedError{edge: "inventory_lot"}
 }
 
+// PosterOrErr returns the Poster value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e OutsourcingFactEdges) PosterOrErr() (*AdminUser, error) {
+	if e.Poster != nil {
+		return e.Poster, nil
+	} else if e.loadedTypes[4] {
+		return nil, &NotFoundError{label: adminuser.Label}
+	}
+	return nil, &NotLoadedError{edge: "poster"}
+}
+
+// CancellerOrErr returns the Canceller value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e OutsourcingFactEdges) CancellerOrErr() (*AdminUser, error) {
+	if e.Canceller != nil {
+		return e.Canceller, nil
+	} else if e.loadedTypes[5] {
+		return nil, &NotFoundError{label: adminuser.Label}
+	}
+	return nil, &NotLoadedError{edge: "canceller"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*OutsourcingFact) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -140,11 +177,11 @@ func (*OutsourcingFact) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case outsourcingfact.FieldOccurredAtSpecified:
 			values[i] = new(sql.NullBool)
-		case outsourcingfact.FieldID, outsourcingfact.FieldSubjectID, outsourcingfact.FieldProductSkuID, outsourcingfact.FieldWarehouseID, outsourcingfact.FieldUnitID, outsourcingfact.FieldLotID, outsourcingfact.FieldSupplierID, outsourcingfact.FieldSourceID, outsourcingfact.FieldSourceLineID:
+		case outsourcingfact.FieldID, outsourcingfact.FieldVersion, outsourcingfact.FieldSubjectID, outsourcingfact.FieldProductSkuID, outsourcingfact.FieldWarehouseID, outsourcingfact.FieldUnitID, outsourcingfact.FieldLotID, outsourcingfact.FieldSupplierID, outsourcingfact.FieldSourceID, outsourcingfact.FieldSourceLineID, outsourcingfact.FieldPostedBy, outsourcingfact.FieldCancelledBy:
 			values[i] = new(sql.NullInt64)
-		case outsourcingfact.FieldFactNo, outsourcingfact.FieldFactType, outsourcingfact.FieldStatus, outsourcingfact.FieldSubjectType, outsourcingfact.FieldSupplierName, outsourcingfact.FieldSourceType, outsourcingfact.FieldIdempotencyKey, outsourcingfact.FieldNote:
+		case outsourcingfact.FieldFactNo, outsourcingfact.FieldFactType, outsourcingfact.FieldStatus, outsourcingfact.FieldSubjectType, outsourcingfact.FieldSupplierName, outsourcingfact.FieldSourceType, outsourcingfact.FieldIdempotencyKey, outsourcingfact.FieldCancelReason, outsourcingfact.FieldNote:
 			values[i] = new(sql.NullString)
-		case outsourcingfact.FieldOccurredAt, outsourcingfact.FieldPostedAt, outsourcingfact.FieldCreatedAt, outsourcingfact.FieldUpdatedAt:
+		case outsourcingfact.FieldOccurredAt, outsourcingfact.FieldPostedAt, outsourcingfact.FieldCancelledAt, outsourcingfact.FieldCreatedAt, outsourcingfact.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -184,6 +221,12 @@ func (_m *OutsourcingFact) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case outsourcingfact.FieldVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field version", values[i])
+			} else if value.Valid {
+				_m.Version = int(value.Int64)
 			}
 		case outsourcingfact.FieldSubjectType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -289,6 +332,34 @@ func (_m *OutsourcingFact) assignValues(columns []string, values []any) error {
 				_m.PostedAt = new(time.Time)
 				*_m.PostedAt = value.Time
 			}
+		case outsourcingfact.FieldPostedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field posted_by", values[i])
+			} else if value.Valid {
+				_m.PostedBy = new(int)
+				*_m.PostedBy = int(value.Int64)
+			}
+		case outsourcingfact.FieldCancelledAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field cancelled_at", values[i])
+			} else if value.Valid {
+				_m.CancelledAt = new(time.Time)
+				*_m.CancelledAt = value.Time
+			}
+		case outsourcingfact.FieldCancelledBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field cancelled_by", values[i])
+			} else if value.Valid {
+				_m.CancelledBy = new(int)
+				*_m.CancelledBy = int(value.Int64)
+			}
+		case outsourcingfact.FieldCancelReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cancel_reason", values[i])
+			} else if value.Valid {
+				_m.CancelReason = new(string)
+				*_m.CancelReason = value.String
+			}
 		case outsourcingfact.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field note", values[i])
@@ -341,6 +412,16 @@ func (_m *OutsourcingFact) QueryInventoryLot() *InventoryLotQuery {
 	return NewOutsourcingFactClient(_m.config).QueryInventoryLot(_m)
 }
 
+// QueryPoster queries the "poster" edge of the OutsourcingFact entity.
+func (_m *OutsourcingFact) QueryPoster() *AdminUserQuery {
+	return NewOutsourcingFactClient(_m.config).QueryPoster(_m)
+}
+
+// QueryCanceller queries the "canceller" edge of the OutsourcingFact entity.
+func (_m *OutsourcingFact) QueryCanceller() *AdminUserQuery {
+	return NewOutsourcingFactClient(_m.config).QueryCanceller(_m)
+}
+
 // Update returns a builder for updating this OutsourcingFact.
 // Note that you need to call OutsourcingFact.Unwrap() before calling this method if this OutsourcingFact
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -372,6 +453,9 @@ func (_m *OutsourcingFact) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Version))
 	builder.WriteString(", ")
 	builder.WriteString("subject_type=")
 	builder.WriteString(_m.SubjectType)
@@ -435,6 +519,26 @@ func (_m *OutsourcingFact) String() string {
 	if v := _m.PostedAt; v != nil {
 		builder.WriteString("posted_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.PostedBy; v != nil {
+		builder.WriteString("posted_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelledAt; v != nil {
+		builder.WriteString("cancelled_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelledBy; v != nil {
+		builder.WriteString("cancelled_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CancelReason; v != nil {
+		builder.WriteString("cancel_reason=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {

@@ -23,6 +23,7 @@ func TestOutsourcingFactFromOrderPostgresConcurrentPostsDoNotExceedSourceLine(t 
 	fixtures := createInventoryPostgresFixtures(t, ctx, client)
 	order, line := createPostgresOutsourcingProductSource(t, ctx, client, fixtures, "POST-"+fixtures.suffix, decimal.NewFromInt(5))
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	actor := client.AdminUser.Create().SetUsername("pg-outsourcing-post-actor-" + fixtures.suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 
 	create := func(suffix string) *biz.OutsourcingFact {
 		t.Helper()
@@ -47,14 +48,15 @@ func TestOutsourcingFactFromOrderPostgresConcurrentPostsDoNotExceedSourceLine(t 
 	start := make(chan struct{})
 	errs := make(chan error, 2)
 	var wg sync.WaitGroup
-	for _, factID := range []int{first.ID, second.ID} {
+	for _, fact := range []*biz.OutsourcingFact{first, second} {
+		postRequest := operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "")
 		wg.Add(1)
-		go func(id int) {
+		go func(in *biz.OperationalFactStatusMutation) {
 			defer wg.Done()
 			<-start
-			_, err := uc.PostOutsourcingFact(ctx, id)
+			_, err := uc.PostOutsourcingFact(ctx, in)
 			errs <- err
-		}(factID)
+		}(postRequest)
 	}
 	close(start)
 	wg.Wait()
@@ -96,6 +98,7 @@ func TestOutsourcingFactFromOrderPostgresOrderCancelRaceKeepsValidState(t *testi
 	logger := log.NewStdLogger(io.Discard)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	orderRepo := NewOutsourcingOrderRepo(data, logger)
+	actor := client.AdminUser.Create().SetUsername("pg-outsourcing-cancel-actor-" + fixtures.suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 	lotNo := "PG-OUT-CANCEL-RACE-LOT-" + fixtures.suffix
 	fact, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
 		FactNo:                 "PG-OUT-CANCEL-RACE-" + fixtures.suffix,
@@ -109,13 +112,14 @@ func TestOutsourcingFactFromOrderPostgresOrderCancelRaceKeepsValidState(t *testi
 	if err != nil {
 		t.Fatalf("create race draft: %v", err)
 	}
+	postRequest := operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "")
 
 	start := make(chan struct{})
 	postErr := make(chan error, 1)
 	cancelErr := make(chan error, 1)
 	go func() {
 		<-start
-		_, err := uc.PostOutsourcingFact(ctx, fact.ID)
+		_, err := uc.PostOutsourcingFact(ctx, postRequest)
 		postErr <- err
 	}()
 	go func() {
