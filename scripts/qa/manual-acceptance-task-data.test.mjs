@@ -694,6 +694,8 @@ function createMockRuntime(options = {}) {
       }
       assert.equal(params.payload.simulated_only, true);
       assert.equal(params.payload.real_customer_data, false);
+      assert.equal(typeof params.idempotency_key, "string");
+      assert.ok(params.idempotency_key.trim());
       assert.equal(tasks.has(params.task_code), false);
       const task = {
         ...structuredClone(params),
@@ -835,6 +837,20 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
   assert.equal(plan.summary.assigned, 90);
   assert.equal(plan.summary.ownerPoolOnly, 90);
   assert.equal(plan.summary.actionCount, 59);
+  const createIdempotencyKeys = plan.tasks.map(
+    (task) => task.createParams.idempotency_key,
+  );
+  assert.equal(new Set(createIdempotencyKeys).size, TOTAL_TASKS);
+  assert.equal(
+    createIdempotencyKeys.every(
+      (key) =>
+        typeof key === "string" &&
+        key.startsWith("manual-acceptance:PLAN-COVERAGE:") &&
+        key.endsWith(":create") &&
+        key.length <= 128,
+    ),
+    true,
+  );
   assert.equal(
     plan.tasks.filter(
       (task) => task.createParams.task_group === "trial_pmc_work",

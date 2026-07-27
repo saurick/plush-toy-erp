@@ -1083,6 +1083,7 @@ function buildRoleTask({ roleKey, index, runId, sourceID, nowSec }) {
       business_status_key: businessStatus,
       // create_task 只接受 ready；blocked/done/rejected 必须由正式动作产生。
       task_status_key: "ready",
+      idempotency_key: `manual-acceptance:${runId}:${roleKey}:${pad(index)}:create`,
       owner_role_key: roleKey,
       owner_pool_key: roleKey,
       required_capability_key: profile.requiredCapability,
@@ -1294,6 +1295,15 @@ export function validateManualAcceptanceTaskPlan(plan) {
       ) {
         throw new CliError(
           `${task.key} exceeds the workflow task field length`,
+        );
+      }
+      if (
+        typeof params.idempotency_key !== "string" ||
+        !params.idempotency_key.trim() ||
+        params.idempotency_key.length > 128
+      ) {
+        throw new CliError(
+          `${task.key} create must include a bounded idempotency key`,
         );
       }
       if (!Number.isSafeInteger(params.due_at) || params.due_at <= 0) {
