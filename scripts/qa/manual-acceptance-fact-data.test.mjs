@@ -18,6 +18,7 @@ import {
   readManualAcceptanceFinalInventoryReferences,
   parseManualAcceptanceFactArgs,
   readPurchaseReceiptQualities,
+  readManualAcceptanceSalesPlan,
   reuseOrApplyManualAcceptanceFactPhase,
   sourceDrivenPhaseIdentitySpecs,
   validatePurchaseCorrectionRecord,
@@ -1305,6 +1306,86 @@ function phaseLookupRPC(specs, rows, productionDetail) {
     return { [spec.listKey]: record ? [structuredClone(record)] : [] };
   };
 }
+
+test("sales readback preserves the exact completed finance approval task anchor", async () => {
+  const sales = salesResumeFixture();
+  const [
+    reservation,
+    rawShipment,
+    receivable,
+    receivableReconciliation,
+    invoice,
+    invoiceReconciliation,
+  ] = sales.records;
+  const shipment = {
+    ...rawShipment,
+    finance_release_status: "APPROVED",
+    finance_release_process_instance_id: 30_000,
+    finance_release_process_node_id: 30_002,
+  };
+  const approvalTask = {
+    id: 30_003,
+    task_code: "PROC-30000-NODE-30001-A1",
+    task_group: "shipment_finance_approval",
+    source_type: "shipment",
+    source_id: shipment.id,
+    task_status_key: "done",
+    owner_role_key: "finance",
+    process_instance_id: 30_000,
+    process_node_instance_id: 30_001,
+    version: 2,
+  };
+  const rows = new Map(
+    [
+      reservation,
+      shipment,
+      receivable,
+      receivableReconciliation,
+      invoice,
+      invoiceReconciliation,
+    ].map((record, index) => [sales.specs[index].businessNo, record]),
+  );
+  const calls = [];
+  const rpc = async ({ domain, method, params }) => {
+    calls.push({ domain, method, params });
+    if (domain === "workflow" && method === "list_tasks") {
+      return { tasks: [structuredClone(approvalTask)], total: 1 };
+    }
+    const spec = sales.specs.find(
+      (candidate) => candidate.businessNo === params.keyword,
+    );
+    if (!spec) throw new Error(`unexpected sales readback ${domain}.${method}`);
+    const record = rows.get(spec.businessNo);
+    return { [spec.listKey]: record ? [structuredClone(record)] : [] };
+  };
+
+  const result = await readManualAcceptanceSalesPlan(rpc, sales.sourcePlan);
+
+  assert.deepEqual(result, {
+    reservation,
+    shipment,
+    finance: [
+      receivable,
+      receivableReconciliation,
+      invoice,
+      invoiceReconciliation,
+    ],
+    approvalTask,
+  });
+  assert.deepEqual(
+    calls.find(
+      (call) =>
+        call.domain === "workflow" && call.method === "list_tasks",
+    )?.params,
+    {
+      task_group: "shipment_finance_approval",
+      source_type: "shipment",
+      source_id: shipment.id,
+      limit: 20,
+      offset: 0,
+    },
+  );
+});
 
 test("verified production and sales prefixes resume and reach exact complete readback", async () => {
   const production = productionResumeFixture();

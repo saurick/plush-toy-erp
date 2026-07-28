@@ -9,6 +9,7 @@ import {
   FORMAL_RPC_PARAM_ALLOWLIST,
   buildSourceDrivenFactPlan,
   applySourceDrivenFactPlan,
+  exactProcessApprovalTask,
   manualAcceptanceBusinessNo,
   sourceDrivenFactConfirmation,
 } from "./manual-acceptance-source-driven-facts.mjs";
@@ -1990,7 +1991,7 @@ async function readOutsourcingPlan(rpc, sourcePlan) {
   };
 }
 
-async function readSalesPlan(rpc, sourcePlan) {
+export async function readManualAcceptanceSalesPlan(rpc, sourcePlan) {
   const identities = sourcePlan.identities.sales;
   const reservation = await exactRequired({
     rpc,
@@ -2008,6 +2009,47 @@ async function readSalesPlan(rpc, sourcePlan) {
     businessField: "shipment_no",
     businessNo: identities.shipment.businessNo,
   });
+  if (
+    String(shipment.finance_release_status || "").toUpperCase() !== "APPROVED"
+  ) {
+    throw new CliError(
+      `${identities.shipment.businessNo} finance approval is not APPROVED`,
+      2,
+    );
+  }
+  const shipmentID = positiveID(shipment.id, "shipment.id");
+  const processInstanceID = positiveID(
+    shipment.finance_release_process_instance_id,
+    "shipment.finance_release_process_instance_id",
+  );
+  const releaseProcessNodeID = positiveID(
+    shipment.finance_release_process_node_id,
+    "shipment.finance_release_process_node_id",
+  );
+  const approvalTask = await exactProcessApprovalTask(rpc, {
+    processInstanceID,
+    shipmentID,
+  });
+  const approvalProcessNodeID = positiveID(
+    approvalTask.process_node_instance_id,
+    "shipment_finance_approval.process_node_instance_id",
+  );
+  const approvalTaskCode = requiredText(
+    approvalTask.task_code,
+    "shipment_finance_approval.task_code",
+    128,
+  );
+  if (
+    approvalProcessNodeID === releaseProcessNodeID ||
+    approvalTaskCode !==
+      `PROC-${processInstanceID}-NODE-${approvalProcessNodeID}-A1` ||
+    String(approvalTask.task_status_key || "").toLowerCase() !== "done"
+  ) {
+    throw new CliError(
+      `${identities.shipment.businessNo} formal finance approval task readback drifted`,
+      2,
+    );
+  }
   const finance = [];
   for (const identity of [
     identities.receivable,
@@ -2026,7 +2068,7 @@ async function readSalesPlan(rpc, sourcePlan) {
       }),
     );
   }
-  return { reservation, shipment, finance };
+  return { reservation, shipment, finance, approvalTask };
 }
 
 function phaseIdentitySpec({
@@ -4006,7 +4048,7 @@ export async function runSourceDrivenFactStage(
         allowVerifiedPartialResume: true,
         validatePartialRecords: (records) =>
           validateSalesPhasePartialRecords(sourcePlan, records),
-        readComplete: () => readSalesPlan(rpc, sourcePlan),
+        readComplete: () => readManualAcceptanceSalesPlan(rpc, sourcePlan),
       }),
     );
   }

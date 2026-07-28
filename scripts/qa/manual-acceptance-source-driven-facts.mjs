@@ -1287,7 +1287,7 @@ function requireProcessNode(nodes, nodeKey, statuses, operation) {
   return node;
 }
 
-async function exactProcessApprovalTask(
+export async function exactProcessApprovalTask(
   rpc,
   { processInstanceID, shipmentID },
 ) {
