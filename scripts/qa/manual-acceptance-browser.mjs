@@ -28,6 +28,7 @@ import {
   digestManualAcceptanceDatasetComponentReport,
   manualAcceptanceDatasetStageReportPath,
 } from "./manual-acceptance-dataset-runner.mjs";
+import { normalizeDatabaseRunID } from "./database-target.mjs";
 import {
   CUSTOMER_TRIAL_133_TARGET,
   assertManualAcceptanceRuntimeIdentityPrecondition,
@@ -2638,13 +2639,104 @@ function currentBatchFactIdentifiers(factReport) {
   };
 }
 
+export function resolveManualAcceptanceDatasetReportRoot({
+  datasetReportPath,
+  dataVersion,
+  targetAlias,
+}) {
+  const absoluteReportPath = path.resolve(
+    requiredText(datasetReportPath, "--dataset-report"),
+  );
+  const relativeReportPath = path.relative(
+    DATASET_REPORT_ROOT,
+    absoluteReportPath,
+  );
+  if (
+    !relativeReportPath ||
+    relativeReportPath.startsWith("..") ||
+    path.isAbsolute(relativeReportPath)
+  ) {
+    throw new BrowserAcceptanceError(
+      "dataset apply 报告必须位于受控 dataset 目录",
+      2,
+    );
+  }
+
+  const reportSegments = relativeReportPath.split(path.sep);
+  const canonicalTail = [
+    requiredText(dataVersion, "dataset dataVersion"),
+    requiredText(targetAlias, "dataset targetAlias"),
+    "dataset",
+    "apply-report.json",
+  ];
+  if (
+    reportSegments.length === canonicalTail.length &&
+    reportSegments.every((segment, index) => segment === canonicalTail[index])
+  ) {
+    return DATASET_REPORT_ROOT;
+  }
+
+  const lifecycleRunID = reportSegments[1] || "";
+  let normalizedLifecycleRunID = "";
+  try {
+    normalizedLifecycleRunID = normalizeDatabaseRunID(lifecycleRunID);
+  } catch {
+    normalizedLifecycleRunID = "";
+  }
+  const lifecycleSegments = ["lifecycle", lifecycleRunID, ...canonicalTail];
+  if (
+    lifecycleRunID &&
+    normalizedLifecycleRunID === lifecycleRunID &&
+    reportSegments.length === lifecycleSegments.length &&
+    reportSegments.every(
+      (segment, index) => segment === lifecycleSegments[index],
+    )
+  ) {
+    return path.join(DATASET_REPORT_ROOT, "lifecycle", lifecycleRunID);
+  }
+
+  throw new BrowserAcceptanceError(
+    "dataset apply 报告不在当前批次与目标的 canonical 或 lifecycle path",
+    2,
+  );
+}
+
+async function assertManualAcceptanceDatasetEvidenceRealPath(
+  evidencePath,
+  label,
+) {
+  let reportRootRealPath;
+  let evidenceRealPath;
+  try {
+    [reportRootRealPath, evidenceRealPath] = await Promise.all([
+      fs.realpath(DATASET_REPORT_ROOT),
+      fs.realpath(evidencePath),
+    ]);
+  } catch {
+    throw new BrowserAcceptanceError(`${label}不存在或无法读取`, 2);
+  }
+  const relativeEvidencePath = path.relative(
+    DATASET_REPORT_ROOT,
+    path.resolve(evidencePath),
+  );
+  const expectedRealPath = path.resolve(
+    reportRootRealPath,
+    relativeEvidencePath,
+  );
+  if (evidenceRealPath !== expectedRealPath) {
+    throw new BrowserAcceptanceError(
+      `${label}真实路径不是受控 canonical path`,
+      2,
+    );
+  }
+}
+
 export async function verifyManualAcceptanceDatasetApplyReportBinding({
   datasetReportPath,
   sourceReportPath,
   factReportPath,
   readinessReportPath,
   printInput,
-  datasetReportRoot = DATASET_REPORT_ROOT,
 }) {
   if (!datasetReportPath) {
     throw new BrowserAcceptanceError(
@@ -2653,6 +2745,11 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
     );
   }
   const targetAlias = expectedDatasetTargetAlias(printInput.target);
+  const datasetReportRoot = resolveManualAcceptanceDatasetReportRoot({
+    datasetReportPath,
+    dataVersion: printInput.dataVersion,
+    targetAlias,
+  });
   const expectedDatasetPath = path.resolve(
     datasetReportRoot,
     printInput.dataVersion,
@@ -2665,6 +2762,10 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
       2,
     );
   }
+  await assertManualAcceptanceDatasetEvidenceRealPath(
+    expectedDatasetPath,
+    "dataset apply 报告",
+  );
   const datasetEvidence = await readJSONEvidence(
     expectedDatasetPath,
     "dataset apply 报告",
@@ -2730,6 +2831,10 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
         `dataset ${stage.key} stage 报告路径不是 canonical path`,
       );
     }
+    await assertManualAcceptanceDatasetEvidenceRealPath(
+      expectedPath,
+      `dataset ${stage.key} stage 报告`,
+    );
     const evidence = await readJSONEvidence(
       expectedPath,
       `dataset ${stage.key} stage 报告`,

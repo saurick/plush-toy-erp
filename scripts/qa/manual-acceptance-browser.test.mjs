@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -23,6 +23,7 @@ import {
   parseManualAcceptanceBrowserArgs,
   resolveManualAcceptanceBrowserReportPath,
   resolveManualAcceptanceBrowserInputReportPath,
+  resolveManualAcceptanceDatasetReportRoot,
   runManualAcceptanceBrowser,
   readBusinessSummaryTotal,
   readMobileLoadedTaskCount,
@@ -146,9 +147,12 @@ function taskGroupCoverageFixture(catalogScenarioDigest = "c".repeat(64)) {
 }
 
 async function datasetApplyEvidenceFixture() {
-  const outputRoot = await fs.mkdtemp(
-    path.join(os.tmpdir(), "plush-browser-dataset-binding-"),
+  const outputRoot = path.join(
+    repoRoot,
+    "output/qa/manual-acceptance/datasets/lifecycle",
+    `binding_${randomBytes(8).toString("hex")}`,
   );
+  await fs.mkdir(outputRoot, { recursive: true });
   const dataVersion = "2026.07.16-v5";
   const targetAlias = "local";
   const datasetSemanticDigest = "e".repeat(64);
@@ -970,7 +974,6 @@ test("browser dataset binding requires the complete stage chain including baseli
       factReportPath: fixture.factReportPath,
       readinessReportPath: fixture.readinessReportPath,
       printInput: fixture.printInput,
-      datasetReportRoot: fixture.outputRoot,
     });
     assert.notEqual(
       fixture.datasetSemanticDigest,
@@ -1014,12 +1017,107 @@ test("browser dataset binding requires the complete stage chain including baseli
           factReportPath: fixture.factReportPath,
           readinessReportPath: fixture.readinessReportPath,
           printInput: fixture.printInput,
-          datasetReportRoot: fixture.outputRoot,
         }),
       /attachments stage component digest/u,
     );
   } finally {
     await fs.rm(fixture.outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("dataset report root only accepts canonical or one controlled lifecycle run", () => {
+  const dataVersion = "2026.07.16-v5";
+  const targetAlias = "local";
+  const datasetRoot = path.join(
+    repoRoot,
+    "output/qa/manual-acceptance/datasets",
+  );
+  assert.equal(
+    resolveManualAcceptanceDatasetReportRoot({
+      datasetReportPath: path.join(
+        datasetRoot,
+        dataVersion,
+        targetAlias,
+        "dataset/apply-report.json",
+      ),
+      dataVersion,
+      targetAlias,
+    }),
+    datasetRoot,
+  );
+  assert.equal(
+    resolveManualAcceptanceDatasetReportRoot({
+      datasetReportPath: path.join(
+        datasetRoot,
+        "lifecycle/final_run_1",
+        dataVersion,
+        targetAlias,
+        "dataset/apply-report.json",
+      ),
+      dataVersion,
+      targetAlias,
+    }),
+    path.join(datasetRoot, "lifecycle/final_run_1"),
+  );
+  for (const invalidPath of [
+    path.join(
+      datasetRoot,
+      "scratch/final_run_1",
+      dataVersion,
+      targetAlias,
+      "dataset/apply-report.json",
+    ),
+    path.join(
+      datasetRoot,
+      "lifecycle/final_run_1/nested",
+      dataVersion,
+      targetAlias,
+      "dataset/apply-report.json",
+    ),
+    path.join(
+      datasetRoot,
+      "lifecycle/INVALID-RUN",
+      dataVersion,
+      targetAlias,
+      "dataset/apply-report.json",
+    ),
+  ]) {
+    assert.throws(
+      () =>
+        resolveManualAcceptanceDatasetReportRoot({
+          datasetReportPath: invalidPath,
+          dataVersion,
+          targetAlias,
+        }),
+      /canonical 或 lifecycle path/u,
+    );
+  }
+});
+
+test("dataset binding rejects evidence redirected through an external symlink", async () => {
+  const fixture = await datasetApplyEvidenceFixture();
+  const externalRoot = await fs.mkdtemp(
+    path.join("/tmp", "plush-browser-dataset-external-"),
+  );
+  try {
+    const externalReportPath = path.join(externalRoot, "apply-report.json");
+    await fs.copyFile(fixture.datasetReportPath, externalReportPath);
+    await fs.unlink(fixture.datasetReportPath);
+    await fs.symlink(externalReportPath, fixture.datasetReportPath);
+    await assert.rejects(
+      () =>
+        verifyManualAcceptanceDatasetApplyReportBinding({
+          datasetReportPath: fixture.datasetReportPath,
+          sourceReportPath: fixture.sourceReportPath,
+          factReportPath: fixture.factReportPath,
+          readinessReportPath: fixture.readinessReportPath,
+          printInput: fixture.printInput,
+        }),
+      /真实路径不是受控 canonical path/u,
+    );
+  } finally {
+    await fs.rm(fixture.outputRoot, { recursive: true, force: true });
+    await fs.rm(externalRoot, { recursive: true, force: true });
   }
 });
 
@@ -1042,7 +1140,6 @@ test("browser dataset binding rejects incomplete stages and task coverage digest
           factReportPath: incomplete.factReportPath,
           readinessReportPath: incomplete.readinessReportPath,
           printInput: incomplete.printInput,
-          datasetReportRoot: incomplete.outputRoot,
         }),
       /没有完整完成全部 canonical stages/u,
     );
@@ -1077,7 +1174,6 @@ test("browser dataset binding rejects incomplete stages and task coverage digest
           factReportPath: drifted.factReportPath,
           readinessReportPath: drifted.readinessReportPath,
           printInput: drifted.printInput,
-          datasetReportRoot: drifted.outputRoot,
         }),
       /taskGroup coverage digest/u,
     );

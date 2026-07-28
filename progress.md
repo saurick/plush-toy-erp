@@ -322,15 +322,11 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 ### 2026-07-28 研发效能工作台与本地质量交付收口
 
-完成：研发效能工作台、统一质量回执 / 预推送门禁、数据库目标身份与清理、容量基线、不可变发布制品和本地发布演练已进入当前主线。首次全新验收库运行在客户配置发布前发现正式岗位账号尚未初始化，已把账号初始化前移到客户配置激活之前；第二次运行继续在 F02 工程节点发现来源单据读取被 `40304` 拒绝。根因是工程和 PMC 已承担 `sales_order_approval` 节点，却没有完整的销售订单页面来源读取合同。
+完成：研发效能工作台、统一质量回执 / 预推送门禁、数据库目标身份与清理、容量基线、不可变发布制品、本地发布演练和全新库 lifecycle 已进入当前主线。真实全新库迭代依次修正正式账号初始化顺序、F02 来源读取、销售关闭权限、任务幂等键、Fact CAS 版本、成品质检与交付流程顺序、Shipment 放行事务、RPC 精确参数和 ProcessRuntime 责任权限；没有放宽质量、RBAC、CAS、幂等或 Fact 边界。
 
-当前修正：Product Core 的工程 / PMC 默认角色与 yoyoosun 投影同步补齐 `customer.read`、`contact.read`、`sales_order.read`、`sales_order_item.read`，并开放 `sales-orders` 页面；测试锁定所有 F02 责任岗位均可读取并打开来源单据。第三次运行已完成 F02 全部节点，随后在销售关闭已完成流程的订单时发现 yoyoosun 投影遗漏 Product Core 已有的 `sales_order.close`；该动作已按客户交付矩阵原有承诺补入销售岗位。第四次运行继续完成全新库、客户配置、角色、来源与事实阶段，在创建 180 条模拟岗位任务时发现任务脚本未跟随正式 `workflow.create_task` 的幂等合同；现已为每条创建请求生成确定、唯一、长度受限的 `idempotency_key`。第五次运行又完成 180 条任务，在来源驱动事实阶段发现生产 / 委外 / 财务 post 与生产 / 财务后续状态动作仍发送旧的非 CAS 参数；现已统一带入创建或读回结果的 `expected_version`，取消生产事实同时发送明确原因，没有放宽服务端版本门禁。第六次运行已越过上述阶段，随后发现销售验收先创建并提交待检质检单、再启动成品交付流程，触发服务端“待检 / 在检时禁止新建流程”的正式质量门禁；客户配置入口已把该待检 / 不合格冲突从内部错误收口为既有业务提示，未放宽质量门禁。第七次运行改用登记的本地开发数据库身份并完整完成全新库、migration、正式账号、客户配置、来源、180 条任务和生产事实，随后证明验收脚本仍把已退役的质检、确认出货与应收节点当作当前六节点长图。当前正式合同实际是“独立成品质检通过 → 财务审批、版本化放行、end 三节点流程 → 正式出货与应收领域动作”；脚本现按该唯一真源分别调用 quality、Workflow 和 operational_fact，并通过已完成审批任务读回 ProcessRuntime，不恢复旧节点或兼容分支。第八次运行真实进入财务审批自动放行后，发现 Shipment `UpdateOne` 在已开启的库存事务内再次 `BeginTx` 并触发 Ent driver panic；当前改为在原事务内以 `id + DRAFT + PENDING + version` 执行唯一行 CAS、读回 Shipment、再原子写 durable command result，测试锁定成功、精确重放及结果冲突整体回滚。第九次运行证明该事务链已成功结束，随后严格读回因验收脚本给仅接受 `id` 的 `get_shipment` 多传 `customer_key` 而失败；当前调用与 allowlist 均已收紧到唯一正式合同。内容寻址 revision 保持 `yoyoosun-customer-package-v7.local-40a5a9924b269f4b.runtime-v1`。九次失败运行均已固化脱敏回执并完成受控清理，没有遗留验收数据库；另一次误用示例 DSN 的预检在认证阶段即失败，未创建数据库。
+当前出货合同已收敛为 `出货单动作 → ProcessRuntime → shipment_finance_approval task/node → Shipment 放行门禁 → 正式出货 / 应收领域动作`。45 张已出货单、财务岗位页面、工作台、浏览器探针、事实报告和 readiness 均绑定同一审批任务与节点；公共建任务禁止伪造正式 task group 与 `PROC-` 任务码。当前 revision 为 `yoyoosun-customer-package-v7.local-8ab8deaa7b7e9c6f.runtime-v1`，试用执行手册数量已按同批读回更新为审批任务 `45`、库存余额 / 批次 / 流水 `193 / 211 / 496`。
 
-第十次运行证明来源驱动函数参数已经正确，但外层 Fact RPC 适配器又统一补入了 `customer_key`；适配器现优先服从同一正式 allowlist，最终传输参数测试锁定 `get_shipment` 仅含 `id`。截至本次十次失败运行均清理为零残留。
-
-第十二、十三次运行已真实通过 Facts，并补齐正式 ProcessRuntime 各主办岗位的受控退回权限。第十四次运行进一步证明 45 张已出货单均由 `finished_goods_delivery` 的财务审批节点完成放行，但就绪检查仍读取已退役的独立 `shipment_release` 任务。当前已收敛为 `出货单动作 → ProcessRuntime → shipment_finance_approval task/node → Shipment 放行门禁 → 正式出货 / 应收领域动作`：财务岗位持有出货放行页，工作台、浏览器探针、验收事实报告与就绪检查均读回同一流程任务和节点锚点；公共建任务同时禁止伪造该 task group 与 `PROC-` 任务码。十四轮失败均固化脱敏回执并清理为零残留。
-
-当前 revision 为 `yoyoosun-customer-package-v7.local-8ab8deaa7b7e9c6f.runtime-v1`。定向验收合同、后端 dashboard、前端全量 `1885 / 1885`、用户可见技术字段、脚本语法与 diff check 已通过；待完成最终全量门禁并从干净提交重跑全新数据库生命周期，再执行精确 SHA CI、不可变制品、本地发布演练和 133 技术发布。客户 UAT / 签收单独保留。
+最新 lifecycle 已完成九阶段 dataset apply、40 项可查询 readiness 且 0 项失败，随后在浏览器启动前发现 dataset 总回执只接受顶层路径、未接受 lifecycle 隔离根目录。浏览器现仅接受顶层 canonical 路径或单层合法 `lifecycle/<run-id>`，同时校验每个阶段的精确路径、摘要、批次身份和真实文件路径；任意嵌套根目录及外部符号链接均失败关闭，定向 Node `47 / 47` 与脚本语法、diff check 已通过。上述失败运行均保留脱敏回执并清理为零残留；最终提交仍须重跑全新库 lifecycle、全量门禁、精确 SHA CI、不可变制品、本地发布演练和 133 技术发布，客户 UAT / 签收单独保留。
 
 1. 发布前必须绑定最终 commit / image，按正式流程执行备份 / 回滚点、migration status / apply / readback、health / ready、真实账号与业务 smoke。
 2. 客户交付仍须甲方岗位 UAT / 签收；本地或固定旧版本绿色不能替代。
