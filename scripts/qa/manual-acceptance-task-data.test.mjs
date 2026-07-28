@@ -171,6 +171,7 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
   const tokenToRole = new Map([
     ["token-sales", "sales"],
     ["token-boss", "boss"],
+    ["token-engineering", "engineering"],
     ["token-pmc", "pmc"],
     ["token-runtime-admin", "runtime_admin"],
   ]);
@@ -214,12 +215,18 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
     return record;
   }
 
-  function createLinkedTask(record, roleKey, nodeKey, offset) {
+  function createLinkedTask(
+    record,
+    roleKey,
+    nodeKey,
+    offset,
+    { nodeType = "human_task", ownerPoolKey = roleKey } = {},
+  ) {
     const node = {
       id: record.instance.id + offset,
       process_instance_id: record.instance.id,
       node_key: nodeKey,
-      node_type: roleKey === "boss" ? "approval" : "human_task",
+      node_type: nodeType,
       attempt: 1,
       status: "active",
       outcome: "",
@@ -235,8 +242,11 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
       source_no: record.source.orderNo,
       task_status_key: "ready",
       owner_role_key: roleKey,
+      owner_pool_key: ownerPoolKey,
       required_capability_key:
-        roleKey === "boss" ? "workflow.task.approve" : "workflow.task.complete",
+        nodeType === "approval"
+          ? "workflow.task.approve"
+          : "workflow.task.complete",
       process_instance_id: record.instance.id,
       process_node_instance_id: node.id,
       version: 1,
@@ -334,7 +344,10 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
       submitNode.status = "completed";
       submitNode.outcome = "sales_order.submitted";
       submitNode.version += 1;
-      createLinkedTask(record, "boss", "order_approval", 10);
+      createLinkedTask(record, "sales", "order_approval", 10, {
+        nodeType: "approval",
+        ownerPoolKey: "approval.sales_order",
+      });
       return jsonResponse({
         completed_node: clone(submitNode),
         nodes: clone(record.nodes),
@@ -366,6 +379,26 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
       return jsonResponse({ process_context: processContext(record) });
     }
 
+    if (body.method === "explain_action_access") {
+      const record = [...records.values()].find((candidate) =>
+        candidate.tasks.some((task) => task.id === params.task_id),
+      );
+      const task = record?.tasks.find(
+        (candidate) => candidate.id === params.task_id,
+      );
+      assert.ok(record && task);
+      const allowed = actorRole === task.owner_role_key;
+      return jsonResponse({
+        action: {
+          task_id: task.id,
+          action_key: params.action_key,
+          allowed,
+          actor_role_key: allowed ? actorRole : "",
+          reason_code: allowed ? "allowed" : "missing_action_permission",
+        },
+      });
+    }
+
     const targetByMethod = {
       block_task_action: "blocked",
       reject_task_action: "rejected",
@@ -393,12 +426,14 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
       record.processStatus = "blocked";
     } else if (target === "done") {
       node.status = "completed";
-      node.outcome = task.owner_role_key === "boss" ? "approved" : "confirmed";
-      if (task.owner_role_key === "boss") {
-        createLinkedTask(record, "pmc", "order_review", 20);
+      node.outcome = node.node_type === "approval" ? "approved" : "confirmed";
+      if (node.node_key === "order_approval") {
+        createLinkedTask(record, "engineering", "engineering_data", 20);
+      } else if (node.node_key === "engineering_data") {
+        createLinkedTask(record, "pmc", "order_review", 30);
       } else {
         record.nodes.push({
-          id: record.instance.id + 30,
+          id: record.instance.id + 40,
           process_instance_id: record.instance.id,
           node_key: "end",
           node_type: "end",
@@ -433,6 +468,7 @@ test("runtime evidence advances five simulated sales orders through the formal p
     accounts: {
       sales: { token: "token-sales" },
       boss: { token: "token-boss" },
+      engineering: { token: "token-engineering" },
       pmc: { token: "token-pmc" },
     },
     runtimeAdmin: { token: "token-runtime-admin" },
@@ -485,9 +521,10 @@ test("runtime evidence advances five simulated sales orders through the formal p
       )
       .map((call) => [call.method, call.actorRole]),
     [
-      ["block_task_action", "boss"],
-      ["reject_task_action", "boss"],
-      ["complete_task_action", "boss"],
+      ["block_task_action", "sales"],
+      ["reject_task_action", "sales"],
+      ["complete_task_action", "sales"],
+      ["complete_task_action", "engineering"],
       ["complete_task_action", "pmc"],
     ],
   );

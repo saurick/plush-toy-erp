@@ -328,9 +328,9 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 第十次运行证明来源驱动函数参数已经正确，但外层 Fact RPC 适配器又统一补入了 `customer_key`；适配器现优先服从同一正式 allowlist，最终传输参数测试锁定 `get_shipment` 仅含 `id`。截至本次十次失败运行均清理为零残留。
 
-第十二次运行已真实证明成品质检、财务放行、仅 `id` 出货读回、出货、应收以及正式 `finance_payment_approval` 创建、老板审批、财务执行、过账核销和结清读回，Facts 阶段完整通过。readiness 随后发现 dataset runner 未把同批 Source Report 传入任务阶段，致 5 个正式 ProcessRuntime 证据缺失；当前接线已补齐并以测试锁定同批报告，十二轮失败均清理为零残留。
+第十二次运行已真实证明成品质检、财务放行、出货、应收和正式收付款审批、过账核销与结清，Facts 阶段完整通过；同批 Source Report 接线也已补齐。第十三次运行进入正式 ProcessRuntime 后发现审批候选只具备 `approve` 上限，sales / purchase / engineering 被选为主办时不能退回。Product Core、客户角色投影和前向 migration 现统一补齐受控 `reject`；脚本先用 `explain_action_access` 选择真实允许账号，测试还原“销售主办 / 老板升级 → 工程 → PMC”主链。十三轮失败均清理为零残留。
 
-待完成：从新的干净提交重新执行全新数据库生命周期、50 页与九岗位浏览器 smoke、四条异常流、清理读回；只有同一最终提交通过完整门禁、精确 SHA CI、不可变制品、本地发布演练和 133 技术发布后，才更新为对应层级的完成证据。客户 UAT / 签收始终单独保留。
+定向验证：本地验收 / 客户配置 / 手册 / 文档合同 `379 / 379`，后端 biz / data / service、Atlas hash、DB guard、脚本语法与 diff check 全部通过；新 revision 为 `yoyoosun-customer-package-v7.local-f2f31bc4c170a126.runtime-v1`。待从干净提交重跑全新数据库生命周期、50 页与九岗位 smoke、四条异常流和清理读回；其后仍需完整门禁、精确 SHA CI、不可变制品、本地发布演练和 133 技术发布。客户 UAT / 签收单独保留。
 
 1. 发布前必须绑定最终 commit / image，按正式流程执行备份 / 回滚点、migration status / apply / readback、health / ready、真实账号与业务 smoke。
 2. 客户交付仍须甲方岗位 UAT / 签收；本地或固定旧版本绿色不能替代。

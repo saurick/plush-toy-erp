@@ -417,6 +417,19 @@ test('yoyoosun source task owners can reject invalid production handoffs', () =>
   }
 })
 
+test('yoyoosun approval candidates can approve or reject only through controlled task actions', () => {
+  for (const role of yoyoosunRoleFlowMatrix.roles) {
+    assert.ok(
+      role.capabilityKeys.includes('workflow.task.approve'),
+      `${role.roleKey} approval candidate needs workflow.task.approve`
+    )
+    assert.ok(
+      role.capabilityKeys.includes('workflow.task.reject'),
+      `${role.roleKey} approval candidate needs workflow.task.reject`
+    )
+  }
+})
+
 test('yoyoosun production owns processing contract confirmation', () => {
   const roleByKey = new Map(
     yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role])

@@ -1617,9 +1617,12 @@ async function rpcCall({
   }
   const json = await response.json();
   if (json?.result?.code !== 0) {
-    throw new CliError(
+    const error = new CliError(
       `${domain}.${method} code=${json?.result?.code} message=${json?.result?.message}`,
     );
+    error.rpcCode = Number(json?.result?.code);
+    error.rpcMessage = optionalText(json?.result?.message);
+    throw error;
   }
   return json.result.data || {};
 }
@@ -2286,10 +2289,58 @@ async function mutateSalesOrderProcessTask({
     done: ["complete_task_action", "complete"],
   };
   const [method, actionKey] = contracts[target] || [];
-  const account = accounts[task.owner_role_key];
-  if (!method || !account) {
+  if (!method) {
+    throw new CliError(`no formal task action contract exists for ${target}`);
+  }
+  const candidates = [
+    ...new Set([task.owner_role_key, "boss", ...TASK_ROLES]),
+  ];
+  const actorDiagnostics = [];
+  let selectedActor;
+  for (const roleKey of candidates) {
+    const account = accounts[roleKey];
+    if (!account) continue;
+    let explained;
+    try {
+      explained = await rpcCall({
+        backendURL: plan.backendURL,
+        domain: "workflow",
+        method: "explain_action_access",
+        params: {
+          task_id: task.id,
+          action_key: actionKey,
+        },
+        token: account.token,
+        fetchImpl,
+      });
+    } catch (error) {
+      if (error?.rpcCode === 40304) {
+        actorDiagnostics.push(`${roleKey}:not_visible`);
+        continue;
+      }
+      throw error;
+    }
+    const action = explained?.action;
+    if (
+      Number(action?.task_id) !== task.id ||
+      action?.action_key !== actionKey ||
+      typeof action?.allowed !== "boolean"
+    ) {
+      throw new CliError(
+        `${source.orderNo} ${roleKey} action access readback is incomplete`,
+      );
+    }
+    actorDiagnostics.push(
+      `${roleKey}:${action.allowed ? "allowed" : action.reason_code || "denied"}`,
+    );
+    if (action.allowed) {
+      selectedActor = { account, roleKey };
+      break;
+    }
+  }
+  if (!selectedActor) {
     throw new CliError(
-      `no trial account can perform ${target} for ${task.owner_role_key}`,
+      `${source.orderNo} has no formal actor for ${actionKey} (${actorDiagnostics.join(", ")})`,
     );
   }
   const reason =
@@ -2315,7 +2366,7 @@ async function mutateSalesOrderProcessTask({
       reason,
       payload: target === "done" ? { feedback: reason } : {},
     },
-    token: account.token,
+    token: selectedActor.account.token,
     fetchImpl,
   });
   const updated = requireSalesRuntimeTask(

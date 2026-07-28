@@ -11,7 +11,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       responsibility:
         "永绅由财务人员根据已确认工程资料制作采购合同和维护采购源单时，为同一管理员账号同时分配财务与采购两个内置角色。",
       guardrail:
-        "不把 purchase.order.* 权限并入 Product Core 的 finance 角色；采购任务仍归 purchase 责任池，采购订单审批仍由 boss 角色执行。",
+        "不把 purchase.order.* 权限并入 Product Core 的 finance 角色；采购任务和日常审批仍归 purchase 主办，boss 只承接备用 / 升级。",
     }),
   ]),
   roles: Object.freeze([
@@ -66,6 +66,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.update",
         "workflow.task.complete",
         "workflow.task.approve",
+        "workflow.task.reject",
         "mobile.sales.access",
       ]),
       flowResponsibilities: Object.freeze([
@@ -201,6 +202,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.update",
         "workflow.task.complete",
         "workflow.task.approve",
+        "workflow.task.reject",
         "mobile.engineering.access",
       ]),
       flowResponsibilities: Object.freeze([
@@ -324,6 +326,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.update",
         "workflow.task.complete",
         "workflow.task.approve",
+        "workflow.task.reject",
         "mobile.purchase.access",
       ]),
       flowResponsibilities: Object.freeze([
