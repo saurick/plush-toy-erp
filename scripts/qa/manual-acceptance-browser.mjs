@@ -978,6 +978,18 @@ export function readBusinessSummaryTotal(targetKey, bodyText = "") {
   return values.length ? Math.max(...values) : 0;
 }
 
+export function shipmentListReady(expectedCount) {
+  const bodyText = document.body?.innerText || "";
+  const match = String(bodyText).match(/总出货单\s*(\d+)/u);
+  const total = match ? Number(match[1]) : 0;
+  const rows = [
+    ...document.querySelectorAll(".ant-table-tbody > tr.ant-table-row"),
+  ].filter(
+    (row) => !row.classList?.contains("ant-table-placeholder"),
+  );
+  return total === Number(expectedCount) && rows.length > 0;
+}
+
 export function readMobileLoadedTaskCount(tabKey, bodyText = "") {
   const label = tabKey === "done" ? "已办" : "待处理";
   const match = String(bodyText).match(
@@ -1834,6 +1846,8 @@ export function evaluateFinanceFieldBrowserEvidence({
 async function readListEvidence(page, target, datasetBinding) {
   let specializedEvidence = null;
   let currentBatchDOM = null;
+  const expectedShipments =
+    target.key === "shipments" ? datasetBinding?.dataset?.shipments : null;
   if (target.group === "mobile") {
     return readMobileTaskEvidence(page, target, datasetBinding);
   }
@@ -1856,6 +1870,21 @@ async function readListEvidence(page, target, datasetBinding) {
       state: "visible",
       timeout: PAGE_TIMEOUT_MS,
     });
+  }
+  if (target.key === "shipments") {
+    if (
+      expectedShipments?.exactCount !==
+      MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT
+    ) {
+      throw new BrowserAcceptanceError(
+        `出货数据报告必须精确包含 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单`,
+      );
+    }
+    await page.waitForFunction(
+      shipmentListReady,
+      expectedShipments.exactCount,
+      { timeout: PAGE_TIMEOUT_MS },
+    );
   }
   if (target.key !== "shipments") {
     const filter = resolveCurrentBatchListFilter(
@@ -1931,11 +1960,8 @@ async function readListEvidence(page, target, datasetBinding) {
     readBusinessSummaryTotal(target.key, metrics.bodyText),
   );
   if (target.key === "shipments") {
-    const expected = datasetBinding?.dataset?.shipments;
-    if (
-      expected?.exactCount !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT ||
-      pageReportedTotal !== expected.exactCount
-    ) {
+    const expected = expectedShipments;
+    if (pageReportedTotal !== expected.exactCount) {
       throw new BrowserAcceptanceError(
         `出货页面必须精确显示 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单，当前为 ${pageReportedTotal}`,
       );

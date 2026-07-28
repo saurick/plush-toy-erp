@@ -28,6 +28,7 @@ import {
   readBusinessSummaryTotal,
   readMobileLoadedTaskCount,
   resolveCurrentBatchListFilter,
+  shipmentListReady,
   evaluateBusinessDashboardEvidence,
   evaluateBusinessDashboardCurrentBatchEvidence,
   evaluateDashboardTaskCurrentBatchEvidence,
@@ -1315,6 +1316,27 @@ test("business summary totals use the visible client-facing counters", () => {
     readBusinessSummaryTotal("production-orders", "符合条件 47 当前页 20"),
     47,
   );
+  assert.equal(readBusinessSummaryTotal("shipments", "总出货单 47"), 47);
+});
+
+test("shipment list readiness waits for both the exact total and rendered rows", () => {
+  const originalDocument = globalThis.document;
+  try {
+    globalThis.document = {
+      body: { innerText: "总出货单 47 本页显示 20" },
+      querySelectorAll: () => [{ classList: { contains: () => false } }],
+    };
+    assert.equal(shipmentListReady(47), true);
+    assert.equal(shipmentListReady(46), false);
+    globalThis.document = {
+      body: { innerText: "总出货单 47 本页显示 0" },
+      querySelectorAll: () => [],
+    };
+    assert.equal(shipmentListReady(47), false);
+  } finally {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+  }
 });
 
 test("shipment release browser evidence proves live due-soon and overdue categories", () => {
