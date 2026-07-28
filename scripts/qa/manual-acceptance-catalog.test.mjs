@@ -233,7 +233,7 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       "production-scheduling": 45,
       "production-progress": 45,
       "production-exceptions": 1,
-      "shipping-release": 46,
+      "shipping-release": 45,
       outbound: 45,
       shipments: 47,
       reconciliation: 45,

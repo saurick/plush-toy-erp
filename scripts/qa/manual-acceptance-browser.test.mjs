@@ -260,6 +260,16 @@ async function datasetApplyEvidenceFixture() {
     shipments: Array.from({ length: 47 }, (_, index) => ({
       id: 120_000 + index,
       shipmentNo: `SIM-SDF-SHIP-${String(index + 1).padStart(3, "0")}`,
+      status: index < 45 ? "SHIPPED" : index === 45 ? "DRAFT" : "CANCELLED",
+      financeReleaseStatus: index < 45 ? "APPROVED" : "PENDING",
+      financeReleaseProcessInstanceID: index < 45 ? 210_000 + index : null,
+      financeReleaseProcessNodeID: index < 45 ? 230_000 + index : null,
+      financeApprovalTaskID: index < 45 ? 240_000 + index : null,
+      financeApprovalProcessNodeID: index < 45 ? 220_000 + index : null,
+      financeApprovalTaskCode:
+        index < 45
+          ? `PROC-${210_000 + index}-NODE-${220_000 + index}-A1`
+          : null,
       items:
         index === 0
           ? Array.from({ length: 25 }, (_, itemIndex) => ({
@@ -439,7 +449,7 @@ test("manual acceptance browser plan covers all 50 catalog targets and ten forma
   );
   assert.equal(
     plan.targets.find((item) => item.key === "shipping-release")?.username,
-    "demo_warehouse",
+    "demo_finance",
   );
   assert.equal(
     plan.targets
@@ -1123,7 +1133,7 @@ test("taskGroup coverage ignores source workflow probes without role scenarios",
     probes: [
       ...taskCoverage.probes,
       {
-        id: "workflow-tasks:shipment_release",
+        id: "workflow-tasks:shipment_finance_approval",
         requiredScenarios: [],
         requiredTaskGroups: [],
         taskGroupCounts: {},
@@ -1464,11 +1474,11 @@ test("dashboard data evidence fails closed for empty or unavailable sources", ()
 
   const requirements = [
     { key: "customers", label: "客户", minimumRecords: 60 },
-    { key: "shipping-release", label: "出货放行", minimumRecords: 4 },
+    { key: "shipping-release", label: "出货放行", minimumRecords: 45 },
   ];
   assert.equal(
     evaluateBusinessDashboardEvidence(
-      ["客户数量60", "出货放行数量4"],
+      ["客户数量60", "出货放行数量45"],
       requirements,
     ).minimumSatisfied,
     true,

@@ -121,7 +121,7 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     'rejectWorkflowTaskAction',
     'resumeWorkflowTaskAction',
     'urgeWorkflowTask',
-    "taskGroup: 'shipment_release'",
+    "taskGroup: 'shipment_finance_approval'",
     "surface_key: 'workflow_business_module'",
     "entry_path: moduleItem?.path || ''",
     'BusinessListToolbarActions',

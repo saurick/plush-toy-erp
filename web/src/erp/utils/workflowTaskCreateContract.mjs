@@ -27,13 +27,13 @@ const WORKFLOW_TASK_CREATE_REQUIRED_STRING_KEYS = Object.freeze([
 const WORKFLOW_SOURCE_TASK_GROUPS = new Set([
   'production_scheduling',
   'production_exception',
-  'shipment_release',
+  'shipment_finance_approval',
 ])
 
 const WORKFLOW_SOURCE_TASK_CODE_PREFIXES = Object.freeze([
+  'PROC-',
   'source-production-scheduling-',
   'source-production-exception-',
-  'source-shipment-release-',
 ])
 
 const WORKFLOW_BUSINESS_STATE_KEYS = new Set([

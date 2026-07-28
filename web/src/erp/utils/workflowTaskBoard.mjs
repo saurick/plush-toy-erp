@@ -209,13 +209,8 @@ function isAssignedToAdmin(admin = {}, task = {}) {
   return assigneeID === Number(admin?.id || 0)
 }
 
-function isShipmentReleaseTask(task = {}) {
-  return String(task?.task_group || '').trim() === 'shipment_release'
-}
-
 function canHandleTaskByOwner(admin = {}, task = {}) {
   if (isAssignedToAdmin(admin, task)) return true
-  if (admin?.is_super_admin === true && isShipmentReleaseTask(task)) return true
   return adminHasRole(admin, getTaskOwnerRoleKey(task))
 }
 

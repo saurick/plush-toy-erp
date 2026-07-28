@@ -62,10 +62,10 @@ test('workflow task public create reserves source-produced groups and task-code 
   for (const [taskGroup, taskCode] of [
     ['production_scheduling', 'MANUAL-SCHEDULING'],
     ['production_exception', 'MANUAL-EXCEPTION'],
-    ['shipment_release', 'MANUAL-SHIPMENT'],
+    ['shipment_finance_approval', 'MANUAL-SHIPMENT'],
+    ['trial_finance_work', 'PROC-41-NODE-51-A1'],
     ['trial_pmc_work', 'source-production-scheduling-71'],
     ['trial_production_work', 'source-production-exception-81'],
-    ['trial_warehouse_work', 'source-shipment-release-92'],
   ]) {
     const params = baseParams({ task_group: taskGroup, task_code: taskCode })
     assert.equal(isReservedWorkflowSourceTaskNamespace(params), true)
@@ -74,6 +74,16 @@ test('workflow task public create reserves source-produced groups and task-code 
       /该类任务由业务单据自动生成，不能手工创建/u
     )
   }
+
+  assert.equal(
+    isReservedWorkflowSourceTaskNamespace(
+      baseParams({
+        task_group: 'shipment_release',
+        task_code: 'source-shipment-release-92',
+      })
+    ),
+    false
+  )
 
   assert.equal(
     isReservedWorkflowSourceTaskNamespace(

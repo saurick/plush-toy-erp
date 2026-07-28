@@ -77,7 +77,7 @@ export const customerPackageCatalog = Object.freeze({
         "production.exception.approve",
       ],
     },
-    { key: "shipping-release", label: "出货放行", requiredCapabilityKeys: ["workflow.task.read", "warehouse.outbound.read"] },
+    { key: "shipping-release", label: "出货放行", requiredCapabilityKeys: ["workflow.task.read"] },
     { key: "outbound", label: "出库管理", requiredCapabilityKeys: ["warehouse.outbound.read", "warehouse.inventory.read"] },
     { key: "shipments", label: "出货单", requiredCapabilityKeys: ["shipment.read", "customer.read", "warehouse.inventory.read", "product.read", "product_sku.read", "sales_order.read", "sales_order_item.read", "material.read"] },
     { key: "reconciliation", label: "业务对账", requiredCapabilityKeys: ["finance.reconciliation.read"] },

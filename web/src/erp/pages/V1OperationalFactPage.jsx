@@ -35,7 +35,7 @@ const PAGE_CONFIGS = Object.freeze({
       finance: {
         title: '应收记录',
         selectionBoundaryText:
-          '本页不直接结清应收；结清状态只能由正式收款核销、红冲或冲正结果派生，且不代表税控或总账已经完成。',
+          '本页不直接结清应收；结清状态只会根据正式收款核销、红冲或冲正结果更新，且不代表税控或总账已经完成。',
         listParams: { fact_type: 'RECEIVABLE' },
       },
     },
@@ -50,7 +50,7 @@ const PAGE_CONFIGS = Object.freeze({
       finance: {
         title: '应付记录',
         selectionBoundaryText:
-          '本页不直接结清应付；结清状态只能由正式付款核销、红冲或冲正结果派生，且不代表总账已经完成。',
+          '本页不直接结清应付；结清状态只会根据正式付款核销、红冲或冲正结果更新，且不代表总账已经完成。',
         listParams: { fact_type: 'PAYABLE' },
       },
     },

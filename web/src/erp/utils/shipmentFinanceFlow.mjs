@@ -9,7 +9,7 @@ export const OUTBOUND_MODULE_KEY = 'outbound'
 export const RECEIVABLES_MODULE_KEY = 'receivables'
 export const INVOICES_MODULE_KEY = 'invoices'
 
-export const SHIPMENT_RELEASE_TASK_GROUP = 'shipment_release'
+export const SHIPMENT_RELEASE_TASK_GROUP = 'shipment_finance_approval'
 export const RECEIVABLE_REGISTRATION_TASK_GROUP = 'receivable_registration'
 export const INVOICE_REGISTRATION_TASK_GROUP = 'invoice_registration'
 
@@ -23,6 +23,7 @@ const SHIPMENT_SOURCE_TYPE_KEYS = new Set([
   PRODUCTION_PROGRESS_MODULE_KEY,
 ])
 const FINANCE_SOURCE_TYPE_KEYS = new Set([
+  'shipment',
   SHIPPING_RELEASE_MODULE_KEY,
   OUTBOUND_MODULE_KEY,
   PRODUCTION_PROGRESS_MODULE_KEY,

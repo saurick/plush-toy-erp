@@ -466,16 +466,16 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '放行',
     pageKind: 'formal-v1',
     description:
-      '出货放行处理草稿出货单显式提交后生成的仓库待办；放行完成不等于已出货。',
-    primaryEntity: 'workflow_tasks / workflow_business_states',
-    factSource: 'shipments -> workflow_tasks, workflow_business_states',
+      '出货放行用于财务办理版本化出货审批；批准后仍须由仓库在出货单页面独立确认实际出货。',
+    primaryEntity: 'process_instances / workflow_tasks / shipments',
+    factSource: 'shipments -> ProcessRuntime -> Shipment finance gate',
     boundary:
-      '当前不提供通用新建任务；放行完成不等于已出货，不会自动扣减库存或生成应收、开票、收付款记录。',
-    sourceRefs: ['shipments', 'workflow_tasks', 'workflow_business_states'],
+      '当前不提供通用新建任务；财务审批只记录当前出货单版本的放行结果，不代表已经出货、已经扣减库存，也不会生成应收、开票或收付款记录。',
+    sourceRefs: ['shipments', 'process_instances', 'workflow_tasks'],
     currentScope: [
-      '草稿出货单提交生成的待放行任务',
-      '完成 / 阻塞 / 催办',
-      '返回来源出货单',
+      '出货单启动交付流程后生成的财务审批任务',
+      '审批 / 退回 / 阻塞 / 恢复 / 催办',
+      '核对流程轨迹、财务放行锚点和来源出货单',
     ],
   },
   {
@@ -596,7 +596,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '应付',
     pageKind: 'formal-v1',
     description:
-      '应付管理记录来源明确的应付款项，可过账或取消；结清由正式付款核销、红冲或冲正结果派生。',
+      '应付管理记录来源明确的应付款项，可过账或取消；结清状态根据正式付款核销、红冲或冲正结果更新。',
     primaryEntity: 'finance_facts.PAYABLE',
     factSource: 'finance_facts',
     boundary:
@@ -606,7 +606,7 @@ export const businessModuleDefinitions = Object.freeze([
       '从已过账采购入库生成应付',
       '从合格 / 让步委外回货生成应付',
       '过账',
-      '读取付款核销或红冲派生的结清状态',
+      '读取付款核销或红冲后的结清状态',
       '取消',
     ],
   },
@@ -619,7 +619,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '应收',
     pageKind: 'formal-v1',
     description:
-      '应收管理记录已出货业务产生的应收款项，可过账或取消；结清由正式收款核销、红冲或冲正结果派生。',
+      '应收管理记录已出货业务产生的应收款项，可过账或取消；结清状态根据正式收款核销、红冲或冲正结果更新。',
     primaryEntity: 'finance_facts.RECEIVABLE',
     factSource: 'finance_facts',
     boundary:
@@ -628,7 +628,7 @@ export const businessModuleDefinitions = Object.freeze([
     currentScope: [
       '从已出货出货单生成应收',
       '过账',
-      '读取收款核销或红冲派生的结清状态',
+      '读取收款核销或红冲后的结清状态',
       '取消',
     ],
   },

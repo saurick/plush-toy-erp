@@ -1113,6 +1113,7 @@ test("warehouse scenarios stay in the trial namespace and never fill the formal 
   assert.equal(TASK_COPY_REVISION, "PLAIN5");
   assert.equal(warehouseTasks.length, 20);
   assert.equal(plan.summary.byTaskGroup.trial_warehouse_work, 20);
+  assert.equal(plan.summary.byTaskGroup.shipment_finance_approval, undefined);
   assert.equal(plan.summary.byTaskGroup.shipment_release, undefined);
   assert(
     warehouseTasks.every((task) => {
@@ -1199,7 +1200,7 @@ test("formal source task groups and codes are rejected from simulated plans", ()
       task.roleKey === "warehouse" &&
       task.createParams.payload.acceptance_scenario_key === "inbound",
   );
-  inbound.createParams.task_group = "shipment_release";
+  inbound.createParams.task_group = "shipment_finance_approval";
   assert.throws(
     () => validateManualAcceptanceTaskPlan(shippingMismatch),
     /task group does not match scenario inbound/u,
@@ -1225,7 +1226,7 @@ test("formal source task groups and codes are rejected from simulated plans", ()
     nowSec: NOW_SEC,
   });
   const first = formalCode.tasks[0];
-  first.createParams.task_code = "source-shipment-release-41";
+  first.createParams.task_code = "PROC-41-NODE-51-A1";
   assert.throws(
     () => validateManualAcceptanceTaskPlan(formalCode),
     /formal source task code/u,

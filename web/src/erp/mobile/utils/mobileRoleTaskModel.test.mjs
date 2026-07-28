@@ -384,7 +384,10 @@ test('mobileRoleTaskModel: 岗位标签复用共享角色显示口径', () => {
 })
 
 test('mobileRoleTaskModel: 任务摘要和事实行不透出技术 task_group', () => {
-  assert.equal(getMobileTaskGroupLabel('shipment_release'), '出货放行')
+  assert.equal(
+    getMobileTaskGroupLabel('shipment_finance_approval'),
+    '出货财务审批'
+  )
   assert.equal(getMobileTaskGroupLabel('unknown_task_group'), '业务任务')
 
   const unknownGroupTask = task({

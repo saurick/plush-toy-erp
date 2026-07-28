@@ -12,6 +12,7 @@ export const ACTIONABLE_TASK_STATUS_KEYS = new Set(['ready'])
 export const ACTIVE_TASK_STATUS_KEYS = new Set(['ready', 'blocked'])
 export const RISK_TASK_STATUS_KEYS = new Set(['blocked'])
 export const FINANCE_MODULE_KEYS = new Set([
+  'shipping-release',
   'reconciliation',
   'payables',
   'receivables',
@@ -20,7 +21,6 @@ export const FINANCE_MODULE_KEYS = new Set([
 export const WAREHOUSE_MODULE_KEYS = new Set([
   'inbound',
   'inventory',
-  'shipping-release',
   'outbound',
 ])
 export const OUTSOURCE_RETURN_TASK_GROUP_KEYS = new Set([
@@ -33,7 +33,7 @@ export const FINISHED_GOODS_TASK_GROUP_KEYS = new Set([
   'finished_goods_qc',
   'finished_goods_inbound',
   'finished_goods_rework',
-  'shipment_release',
+  'shipment_finance_approval',
 ])
 export const FINANCE_TASK_GROUP_KEYS = new Set([
   'receivable_registration',
@@ -311,7 +311,6 @@ export function isFinishedGoodsInboundPendingWorkflowTask(task = {}) {
 export function isShipmentPendingWorkflowTask(task = {}) {
   const payload = payloadOf(task)
   return (
-    String(task.task_group || '').trim() === 'shipment_release' ||
     payload.alert_type === 'shipment_pending' ||
     String(task.business_status_key || '').trim() === 'shipment_pending'
   )
@@ -320,7 +319,7 @@ export function isShipmentPendingWorkflowTask(task = {}) {
 export function isShipmentWorkflowTask(task = {}) {
   const payload = payloadOf(task)
   return (
-    normalizeSourceType(task) === 'shipping-release' ||
+    normalizeSourceType(task) === 'shipment' ||
     normalizeSourceType(task) === 'outbound' ||
     isShipmentPendingWorkflowTask(task) ||
     payload.shipment_risk === true ||
@@ -817,6 +816,8 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
       ),
       qcFailed: alerts.filter((alert) => alert.alert_type === 'qc_failed'),
       financePending: alerts.filter((alert) =>
+        String(alert.task?.task_group || '').trim() ===
+          'shipment_finance_approval' ||
         [
           'finance_pending',
           'payable_pending',

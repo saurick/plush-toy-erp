@@ -260,8 +260,14 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
   )
   assert(
     template.desktopAccounts
-      .find((account) => account.username === 'demo_warehouse')
+      .find((account) => account.username === 'demo_finance')
       ?.expectedMenus.includes('出货放行')
+  )
+  assert.equal(
+    template.desktopAccounts
+      .find((account) => account.username === 'demo_warehouse')
+      ?.expectedMenus.includes('出货放行'),
+    false
   )
   assert(
     template.desktopAccounts
@@ -277,6 +283,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
   )
   assert.deepEqual(engineeringPlan.visibleExpectedMenus, [
     '工作台',
+    '销售订单',
     '产品档案',
     '材料档案',
     '加工环节',
@@ -387,8 +394,14 @@ test('trial demo account browser smoke CLI preflight writes sanitized report', (
   )
   assert(
     report.menuProjectionPlan.desktopAccounts
-      .find((account) => account.username === 'demo_warehouse')
+      .find((account) => account.username === 'demo_finance')
       ?.configuredExpectedMenus.includes('出货放行')
+  )
+  assert.equal(
+    report.menuProjectionPlan.desktopAccounts
+      .find((account) => account.username === 'demo_warehouse')
+      ?.configuredExpectedMenus.includes('出货放行'),
+    false
   )
   assert(
     report.menuProjectionPlan.desktopAccounts

@@ -337,13 +337,13 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
     ),
   );
   assert(
-    manifest.compiled_snapshot.rolePageProjections.warehouse.includes(
+    manifest.compiled_snapshot.rolePageProjections.finance.includes(
       "shipping-release",
     ),
   );
   for (const [pageKey, expectedOwners] of [
     ["business-dashboard", ["boss", "pmc"]],
-    ["shipping-release", ["warehouse"]],
+    ["shipping-release", ["finance"]],
   ]) {
     const owners = Object.entries(
       manifest.compiled_snapshot.rolePageProjections,

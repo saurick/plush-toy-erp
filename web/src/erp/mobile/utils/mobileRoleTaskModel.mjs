@@ -449,10 +449,10 @@ export function supportsRejectedAction(roleKey, task) {
         isFinishedGoodsQcTask(task))) ||
     (roleKey === 'warehouse' &&
       (isWarehouseInboundTask(task) ||
-        isFinishedGoodsInboundTask(task) ||
-        isShipmentReleaseTask(task))) ||
+        isFinishedGoodsInboundTask(task))) ||
     (roleKey === 'finance' &&
-      (isReceivableRegistrationTask(task) ||
+      (isShipmentReleaseTask(task) ||
+        isReceivableRegistrationTask(task) ||
         isInvoiceRegistrationTask(task) ||
         isPayableRegistrationTask(task) ||
         isPayableReconciliationTask(task)))

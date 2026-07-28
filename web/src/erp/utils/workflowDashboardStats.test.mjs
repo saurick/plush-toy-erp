@@ -308,8 +308,9 @@ test('workflowDashboardStats: 预警等级覆盖 blocked due_soon qc shipment pr
     payload: { notification_type: 'qc_failed', alert_type: 'qc_failed' },
   })
   const shipmentDue = task({
-    source_type: 'shipping-release',
-    owner_role_key: 'warehouse',
+    source_type: 'shipment',
+    owner_role_key: 'finance',
+    task_group: 'shipment_finance_approval',
     due_at: NOW_SEC + 60 * 60,
   })
   const highPriority = task({ priority: 3 })
@@ -387,9 +388,9 @@ test('workflowDashboardStats: 预警等级覆盖 blocked due_soon qc shipment pr
     },
   })
   const shipmentPending = task({
-    source_type: 'production-progress',
-    owner_role_key: 'warehouse',
-    task_group: 'shipment_release',
+    source_type: 'shipment',
+    owner_role_key: 'finance',
+    task_group: 'shipment_finance_approval',
     business_status_key: 'shipment_pending',
     payload: {
       notification_type: 'task_created',
@@ -532,7 +533,9 @@ test('workflowDashboardStats: PMC 老板和财务关注事项按规则汇总', (
         payload: { notification_type: 'approval_required' },
       }),
       task({
-        source_type: 'shipping-release',
+        source_type: 'shipment',
+        owner_role_key: 'finance',
+        task_group: 'shipment_finance_approval',
         due_at: NOW_SEC + 60 * 60,
       }),
       task({
@@ -546,8 +549,8 @@ test('workflowDashboardStats: PMC 老板和财务关注事项按规则汇总', (
 
   assert(stats.pmcFocus >= 4)
   assert(stats.bossFocus >= 3)
-  assert.equal(stats.financePending, 1)
-  assert.equal(stats.buckets.financePending.length, 1)
+  assert.equal(stats.financePending, 2)
+  assert.equal(stats.buckets.financePending.length, 2)
   assert.equal(stats.buckets.approvalPending.length, 1)
 })
 

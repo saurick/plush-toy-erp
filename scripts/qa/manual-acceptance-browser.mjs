@@ -245,7 +245,7 @@ const BUSINESS_DASHBOARD_PROBE_ID_BY_SOURCE = Object.freeze({
   inbound: "purchase-receipts",
   "quality-inspections": "quality-inspections",
   inventory: "inventory-balances",
-  "shipping-release": "workflow-tasks:shipment_release",
+  "shipping-release": "workflow-tasks:shipment_finance_approval",
   outbound: "shipments",
   "production-orders": "production-orders",
   "production-scheduling": "workflow-tasks:production_scheduling",
@@ -2592,14 +2592,37 @@ function currentBatchFactIdentifiers(factReport) {
           "REWORK" &&
         String(item?.status || "").toUpperCase() === "CANCELLED",
     ),
-    "shipping-release": sourceTaskCode(
-      "source-shipment-release",
-      records.shipments,
-      (item) =>
-        ["SHIPPED", "CANCELLED"].includes(
-          String(item?.status || "").toUpperCase(),
-        ),
-    ),
+    "shipping-release": (() => {
+      const shipment = records.shipments.find(
+        (item) =>
+          String(item?.status || "").toUpperCase() === "SHIPPED" &&
+          String(
+            item?.finance_release_status ||
+              item?.financeReleaseStatus ||
+              "",
+          ).toUpperCase() === "APPROVED" &&
+          Number(
+            item?.finance_release_process_instance_id ||
+              item?.financeReleaseProcessInstanceID ||
+              0,
+          ) > 0 &&
+          Number(
+            item?.finance_approval_process_node_id ||
+              item?.financeApprovalProcessNodeID ||
+              0,
+          ) > 0 &&
+          String(
+            item?.finance_approval_task_code ||
+              item?.financeApprovalTaskCode ||
+              "",
+          ).startsWith("PROC-"),
+      );
+      if (!shipment) return "";
+      return String(
+        shipment.finance_approval_task_code ||
+          shipment.financeApprovalTaskCode,
+      );
+    })(),
     outbound: firstCurrentBatchBusinessNo(records.stockReservations, [
       "reservation_no",
       "reservationNo",

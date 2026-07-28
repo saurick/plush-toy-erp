@@ -420,6 +420,9 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
   const warehouseDesktop = plan.desktopAccounts.find(
     (account) => account.username === 'demo_warehouse'
   )
+  const financeDesktop = plan.desktopAccounts.find(
+    (account) => account.username === 'demo_finance'
+  )
   const productionDesktop = plan.desktopAccounts.find(
     (account) => account.username === 'demo_production'
   )
@@ -457,7 +460,8 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
     coversFormalCustomerPageProjection:
       plan.customerHiddenMenuLabels.length === 0 &&
       bossDesktop?.visibleExpectedMenus.includes('业务看板') &&
-      warehouseDesktop?.visibleExpectedMenus.includes('出货放行') &&
+      !warehouseDesktop?.visibleExpectedMenus.includes('出货放行') &&
+      financeDesktop?.visibleExpectedMenus.includes('出货放行') &&
       productionDesktop?.visibleExpectedMenus.includes('生产异常') &&
       ['业务看板', '出货放行', '生产异常', '异常处理'].every((label) =>
         adminDesktop?.forbiddenMenus.includes(label)

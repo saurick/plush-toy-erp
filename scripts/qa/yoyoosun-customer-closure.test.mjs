@@ -37,9 +37,9 @@ const expectedRoleMenuSurfaces = Object.freeze({
   engineering: ['global-dashboard', 'sales-orders', 'products', 'materials', 'processes', 'material-bom', 'task-board', 'print-center'],
   pmc: ['global-dashboard', 'business-dashboard', 'sales-orders', 'products', 'materials', 'processes', 'material-bom', 'production-orders', 'production-scheduling', 'production-progress', 'production-exceptions', 'task-board'],
   purchase: ['global-dashboard', 'suppliers', 'materials', 'products', 'processes', 'material-bom', 'inventory', 'accessories-purchase', 'processing-contracts', 'inbound', 'quality-inspections', 'task-board', 'print-center'],
-  warehouse: ['global-dashboard', 'materials', 'products', 'inventory', 'inbound', 'quality-inspections', 'shipping-release', 'outbound', 'shipments', 'sales-returns', 'task-board'],
+  warehouse: ['global-dashboard', 'materials', 'products', 'inventory', 'inbound', 'quality-inspections', 'outbound', 'shipments', 'sales-returns', 'task-board'],
   quality: ['global-dashboard', 'materials', 'products', 'processes', 'quality-inspections', 'production-orders', 'production-exceptions', 'inventory', 'shipments', 'inbound', 'processing-contracts', 'task-board'],
-  finance: ['global-dashboard', 'customers', 'suppliers', 'reconciliation', 'payables', 'receivables', 'invoices', 'finance-payments', 'processing-contracts', 'sales-orders', 'quality-inspections', 'inventory', 'inbound', 'shipments', 'task-board', 'print-center'],
+  finance: ['global-dashboard', 'customers', 'suppliers', 'reconciliation', 'payables', 'receivables', 'invoices', 'finance-payments', 'processing-contracts', 'sales-orders', 'quality-inspections', 'inventory', 'inbound', 'shipping-release', 'shipments', 'task-board', 'print-center'],
   production: ['global-dashboard', 'suppliers', 'materials', 'products', 'processes', 'production-orders', 'production-scheduling', 'inventory', 'processing-contracts', 'production-exceptions', 'production-progress', 'task-board', 'print-center'],
 })
 
@@ -1154,7 +1154,12 @@ test('yoyoosun trial fixture covers manual regression states without claiming re
   )
   assert.equal(
     yoyoosunTrialDataFixture.workflowTasks.some((task) =>
-      ['production_scheduling', 'production_exception', 'shipment_release'].includes(
+      [
+        'production_scheduling',
+        'production_exception',
+        'shipment_finance_approval',
+        'shipment_release',
+      ].includes(
         task.taskGroup
       )
     ),

@@ -236,6 +236,35 @@ test('style-l1 primary production draft has a canonical order source', async () 
   assert.equal(draft.source_line_id, 7100)
 })
 
+test('style-l1 production cancellation returns and reads back a versioned audit receipt', async () => {
+  const call = await operationalFactMockHarness()
+  const cancelled = await call('cancel_production_fact', {
+    id: 1,
+    expected_version: 1,
+    reason: 'L1 回归作废原因',
+  })
+
+  assert.equal(cancelled.result.code, 0)
+  assert.equal(cancelled.result.data.production_fact.status, 'CANCELLED')
+  assert.equal(cancelled.result.data.production_fact.version, 2)
+  assert.equal(
+    cancelled.result.data.production_fact.cancel_reason,
+    'L1 回归作废原因'
+  )
+  assert.equal(cancelled.result.data.production_fact.cancelled_at > 0, true)
+  assert.equal(cancelled.result.data.production_fact.cancelled_by, 1)
+
+  const listed = await call('list_production_facts', {
+    customer_key: 'yoyoosun',
+    limit: 100,
+    offset: 0,
+  })
+  const readback = listed.result.data.production_facts.find(
+    (fact) => fact.id === 1
+  )
+  assert.deepEqual(readback, cancelled.result.data.production_fact)
+})
+
 test('style-l1 quality mock serves the strict outsourcing return read contract', async () => {
   const call = await qualityMockHarness()
   const valid = await call('list_outsourcing_return_quality_inspections', {
@@ -1303,10 +1332,10 @@ test('style-l1 workflow mock rejects source-produced task groups and code namesp
   for (const [taskGroup, taskCode] of [
     ['production_scheduling', 'STYLE-L1-MANUAL-SCHEDULING'],
     ['production_exception', 'STYLE-L1-MANUAL-EXCEPTION'],
-    ['shipment_release', 'STYLE-L1-MANUAL-SHIPMENT'],
+    ['shipment_finance_approval', 'STYLE-L1-MANUAL-SHIPMENT'],
+    ['trial_finance_work', 'PROC-41-NODE-51-A1'],
     ['trial_pmc_work', 'source-production-scheduling-71'],
     ['trial_production_work', 'source-production-exception-81'],
-    ['trial_warehouse_work', 'source-shipment-release-92'],
   ]) {
     const rejected = await call('create_task', {
       task_code: taskCode,

@@ -79,6 +79,11 @@ test('workflow list failure assertion follows the current module title', () => {
   assert.doesNotMatch(source, /加载出货放行协同任务失败/u)
 })
 
+test('production exception workflow scenario follows the current approval empty state', () => {
+  assert.match(source, /expectText\(page, '暂无待审批的生产异常处置。'\)/u)
+  assert.doesNotMatch(source, /expectText\(page, '暂无生产异常任务。'\)/u)
+})
+
 test('read-only shipment release mock preserves requested paging metadata', () => {
   const startIndex = source.indexOf('const readonlyShipmentReleaseTask')
   const routeCase = source.slice(startIndex, startIndex + 6_000)
@@ -88,6 +93,56 @@ test('read-only shipment release mock preserves requested paging metadata', () =
   assert.match(routeCase, /'tasks'/u)
   assert.match(routeCase, /body\.params \|\| \{\}/u)
   assert.doesNotMatch(routeCase, /limit:\s*100|offset:\s*0/u)
+})
+
+test('shipping release L1 scenarios use the formal finance approval process task', () => {
+  const fixture = source.slice(
+    source.indexOf('const createShipmentFinanceApprovalTaskFixture'),
+    source.indexOf(
+      'const {',
+      source.indexOf('const createShipmentFinanceApprovalTaskFixture')
+    )
+  )
+  const currentScenarios = source.slice(
+    source.indexOf("name: 'business-core-pages-desktop'"),
+    source.indexOf(
+      "name: 'business-formal-shipping-release-readonly-actions-desktop'"
+    ) + 7_000
+  )
+  const readonlyScenario = source.slice(
+    source.indexOf(
+      "name: 'business-formal-shipping-release-readonly-actions-desktop'"
+    ),
+    source.indexOf(
+      "name: 'business-formal-shipping-release-readonly-actions-desktop'"
+    ) + 7_000
+  )
+
+  assert.match(fixture, /task_group: 'shipment_finance_approval'/u)
+  assert.match(fixture, /source_type: 'shipment'/u)
+  assert.match(fixture, /owner_role_key: 'finance'/u)
+  assert.match(
+    fixture,
+    /required_capability_key: 'workflow\.task\.approve'/u
+  )
+  assert.match(
+    fixture,
+    /task_code: `PROC-\$\{processInstanceID\}-NODE-\$\{processNodeInstanceID\}-A1`/u
+  )
+  assert.match(
+    currentScenarios,
+    /createShipmentFinanceApprovalTaskFixture\(\{/u
+  )
+  assert.match(readonlyScenario, /role_key: 'finance', name: '财务'/u)
+  assert.doesNotMatch(currentScenarios, /taskGroup: 'shipment_release'/u)
+  assert.doesNotMatch(
+    currentScenarios,
+    /出货放行(?:协同确认|刷新后协同确认)/u
+  )
+  assert.doesNotMatch(
+    readonlyScenario,
+    /role_key: 'warehouse', name: '仓库'/u
+  )
 })
 
 test('business-core detail and lineage checks are scoped to their surfaces', () => {
@@ -158,17 +213,28 @@ test('business-core destructive draft actions confirm through visible popconfirm
   assert.match(source, /const confirmVisiblePopconfirm/u)
   assert.match(source, /const compactVisibleText/u)
   assert.match(source, /compactVisibleText\(await candidate\.innerText\(\)\)/u)
-  assert.match(
-    source,
-    /const confirmButton = popconfirm\.locator\('button\.ant-btn-primary:visible'\)/u
-  )
-  assert.match(source, /\(await confirmButton\.count\(\)\) === 1/u)
+  assert.match(source, /const buttons = popconfirm\.locator\('button'\)/u)
+  assert.match(source, /candidate\.waitFor\(\{ state: 'visible' \}\)/u)
+  assert.match(source, /compactVisibleText\('确认'\)/u)
   assert.match(source, /ant-popconfirm:visible/u)
   assert.match(source, /confirmVisiblePopconfirm\(page\)/u)
   assert.doesNotMatch(
     source,
     /\.locator\('\.ant-popover:visible'\)[\s\S]{0,160}getByRole\('button', \{ name: '确认'/u
   )
+})
+
+test('production draft cancellation uses the current reason-required modal', () => {
+  const startIndex = source.indexOf('const cancelProductionDraftButton')
+  const interaction = source.slice(startIndex, startIndex + 1_300)
+
+  assert.ok(startIndex >= 0)
+  assert.match(interaction, /hasText: '作废业务草稿'/u)
+  assert.match(interaction, /\.locator\('textarea'\)/u)
+  assert.match(interaction, /L1 回归：确认未过账生产草稿可追溯作废/u)
+  assert.match(interaction, /getByRole\('button', \{ name: '确认取消' \}\)/u)
+  assert.match(interaction, /expectText\(page, '作废业务草稿已完成'\)/u)
+  assert.doesNotMatch(interaction, /confirmVisiblePopconfirm/u)
 })
 
 test('quality table assertion includes defect-rate and WIP lineage columns', () => {

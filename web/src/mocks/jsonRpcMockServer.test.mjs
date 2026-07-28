@@ -198,10 +198,10 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     for (const [taskGroup, taskCode] of [
       ['production_scheduling', 'MOCK-MANUAL-SCHEDULING'],
       ['production_exception', 'MOCK-MANUAL-EXCEPTION'],
-      ['shipment_release', 'MOCK-MANUAL-SHIPMENT'],
+      ['shipment_finance_approval', 'MOCK-MANUAL-SHIPMENT'],
+      ['trial_finance_work', 'PROC-41-NODE-51-A1'],
       ['trial_pmc_work', 'source-production-scheduling-71'],
       ['trial_production_work', 'source-production-exception-81'],
-      ['trial_warehouse_work', 'source-shipment-release-92'],
     ]) {
       const invalidCreate = await workflowCall('create_task', {
         ...validCreateParams,

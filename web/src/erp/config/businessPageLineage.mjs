@@ -1156,14 +1156,14 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,
     upstreamPageKeys: ['shipments'],
     producerActions: ['start_finished_goods_delivery_process'],
-    sourceTypes: ['shipments'],
+    sourceTypes: ['shipment'],
     downstreamPageKeys: ['shipments'],
-    taskGroups: ['shipment_release'],
+    taskGroups: ['shipment_finance_approval'],
     allowsGenericPageCreate: false,
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.IMPLEMENTED,
     availabilityNote:
-      '草稿出货单由页面启动版本化财务审批；启动事务只重验已有成品质检，不创建或判定 Quality Fact。审批完成由领域命令原子记录 Shipment 放行门禁，正式出货、库存 OUT 与应收仍走各自领域入口。',
+      '草稿出货单由页面启动版本化财务审批；启动时只复核已有成品质检结果，不创建或判定新的质检记录。审批完成只记录当前出货单版本的放行结果，正式出货、库存扣减与应收仍需分别办理。',
   },
   outbound: {
     pageRole: BUSINESS_PAGE_ROLES.FACT_PROCESSING,

@@ -157,22 +157,6 @@ test('dashboardTaskDisplay: 白名单来源任务不依赖流程实例也能精�
       },
       '/erp/production/progress?fact_id=81&link_source=task-dashboard',
     ],
-    [
-      {
-        task_code: 'source-shipment-release-92',
-        task_group: 'shipment_release',
-        owner_role_key: 'warehouse',
-        source_type: 'shipments',
-        source_id: 92,
-        payload: {
-          source_task_contract: 'workflow.source-task/v1',
-          source_task_producer: 'shipment.submit_release',
-          source_task_intent_hash: INTENT_HASH,
-          shipment_id: 92,
-        },
-      },
-      '/erp/warehouse/shipments?shipment_id=92&link_source=task-dashboard',
-    ],
   ]
 
   for (const [task, expected] of tasks) {
@@ -181,73 +165,33 @@ test('dashboardTaskDisplay: 白名单来源任务不依赖流程实例也能精�
   }
 })
 
-test('dashboardTaskDisplay: standalone 来源任务缺完整来源合同或被伪造时 fail closed', () => {
-  const baseTask = {
+test('dashboardTaskDisplay: 出货财务审批只信任 ProcessRuntime 关联来源', () => {
+  const processTask = {
+    task_code: 'PROC-501-NODE-701-A1',
+    task_group: 'shipment_finance_approval',
+    owner_role_key: 'finance',
+    source_type: 'shipment',
+    source_id: 92,
+    process_instance_id: 501,
+    process_node_instance_id: 701,
+    payload: {},
+  }
+  const expected =
+    '/erp/warehouse/shipments?shipment_id=92&link_source=task-dashboard'
+  assert.equal(resolveWorkflowTaskSourceEntryPath(processTask), expected)
+  assert.equal(resolveWorkflowTaskEntryPath(processTask), expected)
+
+  const retiredStandaloneTask = {
     task_code: 'source-shipment-release-92',
     task_group: 'shipment_release',
     owner_role_key: 'warehouse',
     source_type: 'shipments',
     source_id: 92,
-    process_instance_id: 501,
-    payload: {
-      entry_path: '/erp/warehouse/shipments',
-      source_task_contract: 'workflow.source-task/v1',
-      source_task_producer: 'shipment.submit_release',
-      source_task_intent_hash: INTENT_HASH,
-      shipment_id: 92,
-    },
+    payload: {},
   }
-  for (const task of [
-    {
-      ...baseTask,
-      task_code: 'source-shipment-release-91',
-    },
-    {
-      ...baseTask,
-      owner_role_key: 'sales',
-    },
-    {
-      ...baseTask,
-      source_type: 'shipment',
-    },
-    {
-      ...baseTask,
-      payload: {
-        ...baseTask.payload,
-        source_task_contract: 'workflow.source-task/v2',
-      },
-    },
-    {
-      ...baseTask,
-      source_id: 91,
-    },
-    {
-      ...baseTask,
-      payload: {
-        ...baseTask.payload,
-        shipment_id: 91,
-      },
-    },
-    {
-      ...baseTask,
-      payload: {
-        ...baseTask.payload,
-        source_task_producer: 'workflow.create_task',
-      },
-    },
-    {
-      ...baseTask,
-      payload: {
-        ...baseTask.payload,
-        source_task_intent_hash: 'B'.repeat(64),
-      },
-    },
-    {
-      ...baseTask,
-      task_group: 'SHIPMENT_RELEASE',
-    },
-  ]) {
-    assert.equal(resolveWorkflowTaskSourceEntryPath(task), '')
-    assert.equal(resolveWorkflowTaskEntryPath(task), '')
-  }
+  assert.equal(resolveWorkflowTaskSourceEntryPath(retiredStandaloneTask), '')
+  assert.equal(
+    resolveWorkflowTaskEntryPath(retiredStandaloneTask),
+    '/erp/warehouse/shipments?link_source=task-dashboard&link_fields=document_no%2Csource_no'
+  )
 })

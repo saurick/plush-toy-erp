@@ -221,7 +221,7 @@ func (d *jsonrpcDispatcher) businessDashboardProjectionStats(
 			moduleKey string
 			taskGroup string
 		}{
-			{moduleKey: "shipping-release", taskGroup: "shipment_release"},
+			{moduleKey: "shipping-release", taskGroup: "shipment_finance_approval"},
 			{moduleKey: "production-scheduling", taskGroup: "production_scheduling"},
 			{moduleKey: "production-exceptions", taskGroup: "production_exception"},
 		} {

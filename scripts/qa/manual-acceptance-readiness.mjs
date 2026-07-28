@@ -532,6 +532,11 @@ function normalizeFactReference(record, key, index) {
     const value = reportValue(record, ...aliases);
     normalized[outputKey] = value == null ? null : value;
   };
+  const nullableID = (outputKey, ...aliases) => {
+    const value = reportValue(record, ...aliases);
+    normalized[outputKey] =
+      value == null ? null : reportPositiveID(value, `${name}.${aliases[0]}`);
+  };
   switch (key) {
     case "productionOrders":
       textField("order_no", "orderNo", "order_no");
@@ -627,6 +632,40 @@ function normalizeFactReference(record, key, index) {
     case "shipments":
       textField("shipment_no", "shipmentNo", "shipment_no");
       textField("status", "status");
+      textField(
+        "finance_release_status",
+        "financeReleaseStatus",
+        "finance_release_status",
+      );
+      nullableID(
+        "finance_release_process_instance_id",
+        "financeReleaseProcessInstanceID",
+        "financeReleaseProcessInstanceId",
+        "finance_release_process_instance_id",
+      );
+      nullableID(
+        "finance_release_process_node_id",
+        "financeReleaseProcessNodeID",
+        "financeReleaseProcessNodeId",
+        "finance_release_process_node_id",
+      );
+      nullableID(
+        "finance_approval_task_id",
+        "financeApprovalTaskID",
+        "financeApprovalTaskId",
+        "finance_approval_task_id",
+      );
+      nullableValue(
+        "finance_approval_task_code",
+        "financeApprovalTaskCode",
+        "finance_approval_task_code",
+      );
+      nullableID(
+        "finance_approval_process_node_id",
+        "financeApprovalProcessNodeID",
+        "financeApprovalProcessNodeId",
+        "finance_approval_process_node_id",
+      );
       break;
     case "financeFacts":
       textField("fact_no", "factNo", "fact_no");
@@ -1171,18 +1210,54 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
       (item) => item.fact_type === "REWORK" && item.status === "CANCELLED",
     );
     expectedStatus = () => "done";
-  } else if (taskGroup === "shipment_release") {
-    sourceType = "shipments";
-    ownerRoleKey = "warehouse";
-    records = factReport.normalizedReferenceRecords.shipments.filter((item) =>
-      ["SHIPPED", "CANCELLED"].includes(item.status),
-    );
+  } else if (taskGroup === "shipment_finance_approval") {
+    sourceType = "shipment";
+    ownerRoleKey = "finance";
+    const shipmentRecords = factReport.normalizedReferenceRecords.shipments;
+    for (const item of shipmentRecords) {
+      if (item.status === "SHIPPED") {
+        if (
+          item.finance_release_status !== "APPROVED" ||
+          !Number.isSafeInteger(item.finance_release_process_instance_id) ||
+          item.finance_release_process_instance_id <= 0 ||
+          !Number.isSafeInteger(item.finance_release_process_node_id) ||
+          item.finance_release_process_node_id <= 0 ||
+          !Number.isSafeInteger(item.finance_approval_task_id) ||
+          item.finance_approval_task_id <= 0 ||
+          !Number.isSafeInteger(item.finance_approval_process_node_id) ||
+          item.finance_approval_process_node_id <= 0 ||
+          item.finance_approval_task_code !==
+            `PROC-${item.finance_release_process_instance_id}-NODE-${item.finance_approval_process_node_id}-A1`
+        ) {
+          throw new CliError(
+            `已出货记录 ${item.shipment_no} 缺少正式财务审批 ProcessRuntime 锚点`,
+            2,
+          );
+        }
+      } else if (
+        item.finance_release_status !== "PENDING" ||
+        item.finance_release_process_instance_id !== null ||
+        item.finance_release_process_node_id !== null ||
+        item.finance_approval_task_id !== null ||
+        item.finance_approval_task_code !== null ||
+        item.finance_approval_process_node_id !== null
+      ) {
+        throw new CliError(
+          `未出货记录 ${item.shipment_no} 不得伪造财务审批 ProcessRuntime 锚点`,
+          2,
+        );
+      }
+    }
+    records = shipmentRecords.filter((item) => item.status === "SHIPPED");
     expectedStatus = () => "done";
   } else {
     throw new CliError(`未知来源协同任务组 ${taskGroup}`, 2);
   }
   const expectedReferences = records.map((item) => {
-    const taskCode = `source-${taskGroup.replaceAll("_", "-")}-${item.id}`;
+    const taskCode =
+      taskGroup === "shipment_finance_approval"
+        ? item.finance_approval_task_code
+        : `source-${taskGroup.replaceAll("_", "-")}-${item.id}`;
     return {
       key: `${taskCode}:${sourceType}:${item.id}`,
       id: null,
@@ -1194,6 +1269,12 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
         source_id: item.id,
         owner_role_key: ownerRoleKey,
         task_status_key: expectedStatus(item),
+        ...(taskGroup === "shipment_finance_approval"
+          ? {
+              process_instance_id: item.finance_release_process_instance_id,
+              process_node_instance_id: item.finance_approval_process_node_id,
+            }
+          : {}),
       },
     };
   });
@@ -1416,9 +1497,9 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
     ],
     [
       "shipping-release",
-      "warehouse",
-      "shipment_release",
-      ["ready", "blocked", "done", "rejected"],
+      "finance",
+      "shipment_finance_approval",
+      ["done"],
     ],
   ]) {
     const sourceEvidence = sourceWorkflowTaskEvidence(taskGroup, factReport);

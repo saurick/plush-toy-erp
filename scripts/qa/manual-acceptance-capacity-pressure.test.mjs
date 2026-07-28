@@ -74,6 +74,7 @@ test("capacity idempotency probe uses only the same-batch ready trial PMC task",
     ...[
       "production_scheduling",
       "production_exception",
+      "shipment_finance_approval",
       "shipment_release",
     ].map((task_group, index) => ({
       id: index + 1,

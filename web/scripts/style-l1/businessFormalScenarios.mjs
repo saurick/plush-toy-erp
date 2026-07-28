@@ -12,7 +12,6 @@ import { createProductionWipScenarios } from './productionWipScenarios.mjs'
 import { createQualitySourceActionScenarios } from './qualitySourceActionScenarios.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { createSalesOrderSkuGrainScenarios } from './salesOrderSkuGrainScenarios.mjs'
-import { createWorkflowSourceTaskFixture } from './workflowSourceTaskFixtures.mjs'
 
 export function createBusinessFormalScenarios(deps) {
   const {
@@ -47,7 +46,43 @@ export function createBusinessFormalScenarios(deps) {
     customerRuntimeEffectiveSession,
   } = deps
   const compactVisibleText = (value) =>
-    String(value || '').replace(/\s+/gu, '')
+    String(value || '').replace(/[\s\p{Cf}]+/gu, '')
+  const createShipmentFinanceApprovalTaskFixture = ({
+    taskID,
+    sourceID,
+    sourceNo,
+    taskName,
+    processInstanceID,
+    processNodeInstanceID,
+  }) => ({
+    id: taskID,
+    version: 1,
+    task_code: `PROC-${processInstanceID}-NODE-${processNodeInstanceID}-A1`,
+    task_group: 'shipment_finance_approval',
+    task_name: taskName,
+    source_type: 'shipment',
+    source_id: sourceID,
+    source_no: sourceNo,
+    business_status_key: 'shipment_pending',
+    task_status_key: 'ready',
+    owner_role_key: 'finance',
+    owner_pool_key: 'finance',
+    required_capability_key: 'workflow.task.approve',
+    process_instance_id: processInstanceID,
+    process_node_instance_id: processNodeInstanceID,
+    assignee_id: '',
+    priority: 2,
+    blocked_reason: '',
+    critical_path: true,
+    due_at: null,
+    payload: {
+      approval_scope: 'shipment_finance_release',
+      entry_path: '/erp/warehouse/shipments',
+      critical_path: true,
+    },
+    created_at: 1_750_000_000,
+    updated_at: 1_750_000_000,
+  })
   const {
     assertLineItemAddActionScrollsToNewRow,
     assertLineItemDuplicateAction,
@@ -127,10 +162,17 @@ export function createBusinessFormalScenarios(deps) {
   const confirmVisiblePopconfirm = async (page) => {
     const popconfirm = page.locator('.ant-popconfirm:visible').last()
     await popconfirm.waitFor({ state: 'visible' })
-    const confirmButton = popconfirm.locator('button.ant-btn-primary:visible')
-    if ((await confirmButton.count()) === 1) {
-      await confirmButton.click()
-      return
+    const buttons = popconfirm.locator('button')
+    for (let index = 0; index < (await buttons.count()); index += 1) {
+      const candidate = buttons.nth(index)
+      await candidate.waitFor({ state: 'visible' })
+      if (
+        compactVisibleText(await candidate.innerText()) ===
+        compactVisibleText('确认')
+      ) {
+        await candidate.click()
+        return
+      }
     }
     throw new Error(
       `确认弹层缺少“确认”按钮: ${String((await popconfirm.innerText()) || '')
@@ -1556,27 +1598,30 @@ export function createBusinessFormalScenarios(deps) {
           'workflow.task.read',
         ],
         workflow_visible_owner_role_keys_by_capability: {
-          'workflow.task.read': ['production', 'warehouse', 'sales'],
+          'workflow.task.read': [
+            'production',
+            'warehouse',
+            'sales',
+            'finance',
+          ],
         },
       },
       workflowTaskFixtures: [
-        createWorkflowSourceTaskFixture({
-          taskGroup: 'shipment_release',
+        createShipmentFinanceApprovalTaskFixture({
           sourceID: 9101,
           taskID: 91_01,
+          processInstanceID: 19_101,
+          processNodeInstanceID: 29_101,
           sourceNo: 'SHIP-REL-L1',
-          taskName: '出货放行协同确认',
-          intentHash: '3'.repeat(64),
-          payload: { shipment_release_page_scope: 'workflow_only' },
+          taskName: '出货财务审批确认',
         }),
-        createWorkflowSourceTaskFixture({
-          taskGroup: 'shipment_release',
+        createShipmentFinanceApprovalTaskFixture({
           sourceID: 9103,
           taskID: 91_03,
+          processInstanceID: 19_103,
+          processNodeInstanceID: 29_103,
           sourceNo: 'SHIP-REL-STALE',
-          taskName: '出货放行刷新后协同确认',
-          intentHash: '4'.repeat(64),
-          payload: { shipment_release_page_scope: 'workflow_only' },
+          taskName: '出货财务审批刷新后确认',
         }),
       ],
       viewport: { width: 1440, height: 900 },
@@ -3340,7 +3385,7 @@ export function createBusinessFormalScenarios(deps) {
           ],
           scenarioName: 'business-workflow-production-exceptions',
           afterPageReady: async () => {
-            await expectText(page, '暂无生产异常任务。')
+            await expectText(page, '暂无待审批的生产异常处置。')
           },
         })
 
@@ -3399,7 +3444,7 @@ export function createBusinessFormalScenarios(deps) {
             await shippingReleaseTaskRow
               .getByText('可执行', { exact: true })
               .waitFor({ state: 'visible' })
-            await expectText(page, '出货放行协同确认')
+            await expectText(page, '出货财务审批确认')
             await expectText(page, 'SHIP-REL-L1')
             await assertTextAbsent(page, '同来源非放行任务')
             await assertTextAbsent(page, 'SHIP-REL-OTHER')
@@ -3435,18 +3480,18 @@ export function createBusinessFormalScenarios(deps) {
             })
             await page.getByRole('button', { name: '刷新当前页' }).click()
             await expectText(page, '加载出货放行任务失败')
-            await expectText(page, '暂无出货放行任务。')
-            await assertTextAbsent(page, '出货放行协同确认')
+            await expectText(page, '暂无出货财务审批任务。')
+            await assertTextAbsent(page, '出货财务审批确认')
 
             await page.getByRole('button', { name: '刷新当前页' }).click()
-            await expectText(page, '出货放行刷新后协同确认')
+            await expectText(page, '出货财务审批刷新后确认')
             await expectText(page, 'SHIP-REL-STALE')
 
             const refreshedTaskRow = page
               .locator(
                 '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
               )
-              .filter({ hasText: '出货放行刷新后协同确认' })
+              .filter({ hasText: '出货财务审批刷新后确认' })
               .first()
             await refreshedTaskRow.click()
             const viewTaskButton = await findSelectionActionButton(
@@ -3525,7 +3570,7 @@ export function createBusinessFormalScenarios(deps) {
                 .every(
                   (node) =>
                     !String(node.textContent || '').includes(
-                      '出货放行刷新后协同确认'
+                      '出货财务审批刷新后确认'
                     )
                 )
             })
@@ -3555,7 +3600,7 @@ export function createBusinessFormalScenarios(deps) {
               return {
                 visibleTaskTexts,
                 staleTaskVisible: visibleTaskTexts.some((text) =>
-                  text.includes('出货放行刷新后协同确认')
+                  text.includes('出货财务审批刷新后确认')
                 ),
               }
             })
@@ -3594,8 +3639,17 @@ export function createBusinessFormalScenarios(deps) {
         )
         assert.equal(await cancelProductionDraftButton.isDisabled(), false)
         await cancelProductionDraftButton.click()
-        await confirmVisiblePopconfirm(page)
-        await expectText(page, '作废草稿已完成')
+        const cancelProductionDraftModal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '作废业务草稿' })
+        await cancelProductionDraftModal.waitFor({ state: 'visible' })
+        await cancelProductionDraftModal
+          .locator('textarea')
+          .fill('L1 回归：确认未过账生产草稿可追溯作废')
+        await cancelProductionDraftModal
+          .getByRole('button', { name: '确认取消' })
+          .click()
+        await expectText(page, '作废业务草稿已完成')
         await assertNoHorizontalOverflow(
           page,
           'business-v1-production-progress'
@@ -3869,10 +3923,10 @@ export function createBusinessFormalScenarios(deps) {
         assert.equal(
           shippingReleaseListTaskCalls,
           0,
-          '无 workflow.task.read 时出货放行页不应调用 list_tasks 拉取协同任务'
+          '无 workflow.task.read 时出货放行页不应调用 list_tasks 拉取审批任务'
         )
         await assertTextAbsent(page, '出货放行任务已刷新')
-        await assertTextAbsent(page, '出货放行协同确认')
+        await assertTextAbsent(page, '出货财务审批确认')
         await assertNoHorizontalOverflow(
           page,
           'business-formal-shipping-release-no-permission-desktop'
@@ -4564,15 +4618,15 @@ export function createBusinessFormalScenarios(deps) {
     (() => {
       let shippingReleaseListTaskCalls = 0
       let workflowWriteCalls = 0
-      const readonlyShipmentReleaseTask = createWorkflowSourceTaskFixture({
-        taskGroup: 'shipment_release',
-        sourceID: 9201,
-        taskID: 9201,
-        sourceNo: 'SHIP-REL-READONLY',
-        taskName: '出货放行只读协同确认',
-        intentHash: '5'.repeat(64),
-        payload: { shipment_release_page_scope: 'workflow_only' },
-      })
+      const readonlyShipmentReleaseTask =
+        createShipmentFinanceApprovalTaskFixture({
+          sourceID: 9201,
+          taskID: 9201,
+          processInstanceID: 19_201,
+          processNodeInstanceID: 29_201,
+          sourceNo: 'SHIP-REL-READONLY',
+          taskName: '出货财务审批只读确认',
+        })
       return {
         name: 'business-formal-shipping-release-readonly-actions-desktop',
         path: '/erp/warehouse/shipping-release',
@@ -4582,7 +4636,7 @@ export function createBusinessFormalScenarios(deps) {
         adminProfile: {
           username: 'style-l1-workflow-readonly',
           is_super_admin: false,
-          roles: [{ role_key: 'warehouse', name: '仓库' }],
+          roles: [{ role_key: 'finance', name: '财务' }],
           permissions: ['erp.workbench.read', 'workflow.task.read'],
           menus: [
             {
@@ -4659,7 +4713,7 @@ export function createBusinessFormalScenarios(deps) {
                           reason: readonlyReason,
                           reason_code: 'missing_workflow_write_permission',
                           required_permission: 'workflow.task.complete',
-                          owner_role_key: 'warehouse',
+                          owner_role_key: 'finance',
                         },
                         {
                           action_key: 'block',
@@ -4667,7 +4721,7 @@ export function createBusinessFormalScenarios(deps) {
                           reason: readonlyReason,
                           reason_code: 'missing_workflow_write_permission',
                           required_permission: 'workflow.task.update',
-                          owner_role_key: 'warehouse',
+                          owner_role_key: 'finance',
                         },
                         {
                           action_key: 'reject',
@@ -4675,7 +4729,7 @@ export function createBusinessFormalScenarios(deps) {
                           reason: readonlyReason,
                           reason_code: 'missing_workflow_write_permission',
                           required_permission: 'workflow.task.update',
-                          owner_role_key: 'warehouse',
+                          owner_role_key: 'finance',
                         },
                         {
                           action_key: 'urge',
@@ -4683,7 +4737,7 @@ export function createBusinessFormalScenarios(deps) {
                           reason: readonlyReason,
                           reason_code: 'missing_workflow_write_permission',
                           required_permission: 'workflow.task.update',
-                          owner_role_key: 'warehouse',
+                          owner_role_key: 'finance',
                         },
                       ],
                     },
@@ -4753,11 +4807,11 @@ export function createBusinessFormalScenarios(deps) {
             exportDisabled: true,
             exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
           })
-          await expectText(page, '出货放行只读协同确认')
+          await expectText(page, '出货财务审批只读确认')
           await expectText(page, 'SHIP-REL-READONLY')
           const readonlyShippingReleaseRow = page
             .locator('.ant-table-row')
-            .filter({ hasText: '出货放行只读协同确认' })
+            .filter({ hasText: '出货财务审批只读确认' })
             .first()
           await readonlyShippingReleaseRow
             .getByText('可执行', { exact: true })
@@ -4778,7 +4832,7 @@ export function createBusinessFormalScenarios(deps) {
 
           const readonlyMetrics = await page
             .locator('.ant-table-row')
-            .filter({ hasText: '出货放行只读协同确认' })
+            .filter({ hasText: '出货财务审批只读确认' })
             .first()
             .evaluate((node) => {
               const buttons = Array.from(node.querySelectorAll('button')).map(
@@ -4809,7 +4863,7 @@ export function createBusinessFormalScenarios(deps) {
           )
           assert.equal(workflowWriteCalls, 0, '只读协同任务不应触发 urge_task')
           await assertTextAbsent(page, '任务处理')
-          await assertTextAbsent(page, '出货放行协同任务已完成')
+          await assertTextAbsent(page, '出货财务审批已完成')
           await assertNoHorizontalOverflow(
             page,
             'business-formal-shipping-release-readonly-actions-desktop'

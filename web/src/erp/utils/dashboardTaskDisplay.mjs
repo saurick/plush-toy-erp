@@ -22,6 +22,7 @@ const TASK_SOURCE_TITLE_MAP = new Map([
   ['production-progress', '生产记录'],
   ['production-exceptions', '生产异常'],
   ['quality-inspections', '质量检验'],
+  ['shipment', '出货单'],
   ['reconciliation', '财务对账'],
   ['payables', '应付处理'],
   ['receivables', '应收与开票'],
@@ -127,17 +128,6 @@ const STANDALONE_SOURCE_TASK_CONTRACTS = new Map([
       taskCodePrefix: 'source-production-exception-',
       ownerRoleKey: 'production',
       payloadSourceIDKey: 'production_fact_id',
-    }),
-  ],
-  [
-    'shipment_release',
-    Object.freeze({
-      taskGroup: 'shipment_release',
-      sourceType: 'shipments',
-      producer: 'shipment.submit_release',
-      taskCodePrefix: 'source-shipment-release-',
-      ownerRoleKey: 'warehouse',
-      payloadSourceIDKey: 'shipment_id',
     }),
   ],
 ])

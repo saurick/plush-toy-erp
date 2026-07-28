@@ -331,10 +331,29 @@ function factReferenceRecords(countOverrides = {}) {
       idBase: 120_000,
       numberKey: "shipmentNo",
       numberPrefix: "SIM-SDF-SHIP",
-      statuses: ["DRAFT", "SHIPPED", "CANCELLED"],
       sourceType: "SALES_ORDER",
     }).map((shipment, index) => ({
       ...shipment,
+      status:
+        index < count("shipments", 47) - 2
+          ? "SHIPPED"
+          : index === count("shipments", 47) - 2
+            ? "DRAFT"
+            : "CANCELLED",
+      financeReleaseStatus:
+        index < count("shipments", 47) - 2 ? "APPROVED" : "PENDING",
+      financeReleaseProcessInstanceID:
+        index < count("shipments", 47) - 2 ? 210_000 + index : null,
+      financeReleaseProcessNodeID:
+        index < count("shipments", 47) - 2 ? 230_000 + index : null,
+      financeApprovalTaskID:
+        index < count("shipments", 47) - 2 ? 240_000 + index : null,
+      financeApprovalProcessNodeID:
+        index < count("shipments", 47) - 2 ? 220_000 + index : null,
+      financeApprovalTaskCode:
+        index < count("shipments", 47) - 2
+          ? `PROC-${210_000 + index}-NODE-${220_000 + index}-A1`
+          : null,
       items:
         index === 0
           ? Array.from({ length: 25 }, (_, itemIndex) => ({
@@ -724,6 +743,14 @@ function createReadinessFetch(runtimeOptions = {}) {
         id: item.id,
         shipment_no: item.shipmentNo,
         status: item.status,
+        finance_release_status: item.financeReleaseStatus,
+        finance_release_process_instance_id:
+          item.financeReleaseProcessInstanceID,
+        finance_release_process_node_id: item.financeReleaseProcessNodeID,
+        finance_approval_task_id: item.financeApprovalTaskID,
+        finance_approval_task_code: item.financeApprovalTaskCode,
+        finance_approval_process_node_id:
+          item.financeApprovalProcessNodeID,
       })),
     ],
     list_finance_facts: [
@@ -937,7 +964,7 @@ function createReadinessFetch(runtimeOptions = {}) {
         [
           "production_scheduling",
           "production_exception",
-          "shipment_release",
+          "shipment_finance_approval",
         ].includes(body.params.task_group)
       ) {
         const taskGroup = body.params.task_group;
@@ -953,12 +980,16 @@ function createReadinessFetch(runtimeOptions = {}) {
           sourceRecord?.status === "RELEASED"
             ? "ready"
             : "done";
+        const taskCode =
+          taskGroup === "shipment_finance_approval"
+            ? sourceRecord?.financeApprovalTaskCode
+            : `source-${taskGroup.replaceAll("_", "-")}-${sourceID}`;
         return okResponse({
           tasks: sourceRecord
             ? [
                 {
                   id: 500_000 + sourceID,
-                  task_code: `source-${taskGroup.replaceAll("_", "-")}-${sourceID}`,
+                  task_code: taskCode,
                   task_group: taskGroup,
                   source_type: body.params.source_type,
                   source_id: sourceID,
@@ -967,8 +998,16 @@ function createReadinessFetch(runtimeOptions = {}) {
                       ? "pmc"
                       : taskGroup === "production_exception"
                         ? "production"
-                        : "warehouse",
+                        : "finance",
                   task_status_key: status,
+                  ...(taskGroup === "shipment_finance_approval"
+                    ? {
+                        process_instance_id:
+                          sourceRecord.financeReleaseProcessInstanceID,
+                        process_node_instance_id:
+                          sourceRecord.financeApprovalProcessNodeID,
+                      }
+                    : {}),
                   payload: {},
                 },
               ]
@@ -1229,7 +1268,7 @@ test("default plan covers all 50 targets and never connects to a backend", async
     result.plan.targets.find(
       (item) => item.id === "desktopPages:shipping-release",
     ).probeIds,
-    ["workflow-tasks:shipment_release"],
+    ["workflow-tasks:shipment_finance_approval"],
   );
   const productionOrders = result.plan.targets.find(
     (item) => item.id === "desktopPages:production-orders",
@@ -2019,7 +2058,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
             [
               "production_scheduling",
               "production_exception",
-              "shipment_release",
+              "shipment_finance_approval",
             ].includes(item.params.task_group) &&
             Boolean(item.params.source_type) &&
             Number(item.params.source_id) > 0 &&

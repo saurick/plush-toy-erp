@@ -114,9 +114,11 @@ export const TASK_GROUP_BY_ROLE = Object.freeze({
 const FORMAL_SOURCE_TASK_GROUPS = Object.freeze([
   "production_scheduling",
   "production_exception",
+  "shipment_finance_approval",
   "shipment_release",
 ]);
 const FORMAL_SOURCE_TASK_CODE_PREFIXES = Object.freeze([
+  "PROC-",
   "source-production-scheduling-",
   "source-production-exception-",
   "source-shipment-release-",

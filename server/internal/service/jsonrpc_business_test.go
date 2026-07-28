@@ -63,6 +63,9 @@ func TestJsonrpcDispatcher_BusinessDashboardStatsReadsDomainProjection(t *testin
 	if len(workflowRepo.filters) != 3 {
 		t.Fatalf("expected three workflow module queries, got %#v", workflowRepo.filters)
 	}
+	if workflowRepo.filters[0].TaskGroup != "shipment_finance_approval" {
+		t.Fatalf("shipping release task group=%q, want shipment_finance_approval", workflowRepo.filters[0].TaskGroup)
+	}
 	for _, filter := range workflowRepo.filters {
 		if filter.Limit != 1 {
 			t.Fatalf("workflow filter limit=%d, want 1", filter.Limit)
@@ -538,9 +541,9 @@ type businessDashboardWorkflowRepo struct {
 func (r *businessDashboardWorkflowRepo) ListWorkflowTasks(_ context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
 	r.filters = append(r.filters, filter)
 	totals := map[string]int{
-		"shipment_release":      10,
-		"production_scheduling": 13,
-		"production_exception":  15,
+		"shipment_finance_approval": 10,
+		"production_scheduling":     13,
+		"production_exception":      15,
 	}
 	return nil, totals[filter.TaskGroup], nil
 }

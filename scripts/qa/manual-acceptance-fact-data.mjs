@@ -4060,7 +4060,13 @@ export async function runSourceDrivenFactStage(
       ...lifecycle.reservations,
     ]),
     shipments: dedupeByID([
-      ...salesReadback.map((item) => item.shipment),
+      ...salesReadback.map((item) => ({
+        ...item.shipment,
+        finance_approval_task_id: item.approvalTask?.id ?? null,
+        finance_approval_task_code: item.approvalTask?.task_code ?? null,
+        finance_approval_process_node_id:
+          item.approvalTask?.process_node_instance_id ?? null,
+      })),
       ...lifecycle.shipments,
     ]),
     financeFacts: dedupeByID(lifecycle.financeFacts),

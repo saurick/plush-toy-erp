@@ -6,12 +6,12 @@ import {
 export const PRODUCTION_PROGRESS_MODULE_KEY = 'production-progress'
 export const INBOUND_MODULE_KEY = 'inbound'
 export const SHIPPING_RELEASE_MODULE_KEY = 'shipping-release'
-export const SHIPMENT_SOURCE_TYPE_KEY = 'shipments'
+export const SHIPMENT_SOURCE_TYPE_KEY = 'shipment'
 
 export const FINISHED_GOODS_QC_TASK_GROUP = 'finished_goods_qc'
 export const FINISHED_GOODS_INBOUND_TASK_GROUP = 'finished_goods_inbound'
 export const FINISHED_GOODS_REWORK_TASK_GROUP = 'finished_goods_rework'
-export const SHIPMENT_RELEASE_TASK_GROUP = 'shipment_release'
+export const SHIPMENT_RELEASE_TASK_GROUP = 'shipment_finance_approval'
 
 export const PRODUCTION_PROCESSING_STATUS_KEY = 'production_processing'
 export const QC_PENDING_STATUS_KEY = 'qc_pending'

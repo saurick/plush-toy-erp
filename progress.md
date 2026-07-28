@@ -328,9 +328,9 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 第十次运行证明来源驱动函数参数已经正确，但外层 Fact RPC 适配器又统一补入了 `customer_key`；适配器现优先服从同一正式 allowlist，最终传输参数测试锁定 `get_shipment` 仅含 `id`。截至本次十次失败运行均清理为零残留。
 
-第十二次运行已真实证明成品质检、财务放行、出货、应收和正式收付款审批、过账核销与结清，Facts 阶段完整通过；同批 Source Report 接线也已补齐。第十三次运行进入正式 ProcessRuntime 后发现审批候选只具备 `approve` 上限，sales / purchase / engineering 被选为主办时不能退回。Product Core、客户角色投影和前向 migration 现统一补齐受控 `reject`；脚本先用 `explain_action_access` 选择真实允许账号，测试还原“销售主办 / 老板升级 → 工程 → PMC”主链。十三轮失败均清理为零残留。
+第十二、十三次运行已真实通过 Facts，并补齐正式 ProcessRuntime 各主办岗位的受控退回权限。第十四次运行进一步证明 45 张已出货单均由 `finished_goods_delivery` 的财务审批节点完成放行，但就绪检查仍读取已退役的独立 `shipment_release` 任务。当前已收敛为 `出货单动作 → ProcessRuntime → shipment_finance_approval task/node → Shipment 放行门禁 → 正式出货 / 应收领域动作`：财务岗位持有出货放行页，工作台、浏览器探针、验收事实报告与就绪检查均读回同一流程任务和节点锚点；公共建任务同时禁止伪造该 task group 与 `PROC-` 任务码。十四轮失败均固化脱敏回执并清理为零残留。
 
-定向验证：本地验收 / 客户配置 / 手册 / 文档合同 `379 / 379`，后端 biz / data / service、Atlas hash、DB guard、脚本语法与 diff check 全部通过；新 revision 为 `yoyoosun-customer-package-v7.local-f2f31bc4c170a126.runtime-v1`。待从干净提交重跑全新数据库生命周期、50 页与九岗位 smoke、四条异常流和清理读回；其后仍需完整门禁、精确 SHA CI、不可变制品、本地发布演练和 133 技术发布。客户 UAT / 签收单独保留。
+当前 revision 为 `yoyoosun-customer-package-v7.local-8ab8deaa7b7e9c6f.runtime-v1`。定向验收合同、后端 dashboard、前端全量 `1885 / 1885`、用户可见技术字段、脚本语法与 diff check 已通过；待完成最终全量门禁并从干净提交重跑全新数据库生命周期，再执行精确 SHA CI、不可变制品、本地发布演练和 133 技术发布。客户 UAT / 签收单独保留。
 
 1. 发布前必须绑定最终 commit / image，按正式流程执行备份 / 回滚点、migration status / apply / readback、health / ready、真实账号与业务 smoke。
 2. 客户交付仍须甲方岗位 UAT / 签收；本地或固定旧版本绿色不能替代。

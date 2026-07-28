@@ -1290,7 +1290,11 @@ test('business page lineage: workflow inboxes declare exact source task producer
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.taskGroups[0]),
-    ['production_scheduling', 'production_exception', 'shipment_release']
+    [
+      'production_scheduling',
+      'production_exception',
+      'shipment_finance_approval',
+    ]
   )
 
   assert.deepEqual(
@@ -1311,7 +1315,7 @@ test('business page lineage: workflow inboxes declare exact source task producer
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.sourceTypes),
-    [['production-orders'], ['production-progress'], ['shipments']]
+    [['production-orders'], ['production-progress'], ['shipment']]
   )
   for (const definition of workflowDefinitions) {
     assert.equal(definition.taskGroups.length, 1)

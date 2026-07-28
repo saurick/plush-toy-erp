@@ -131,16 +131,15 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
     payloadScope: 'production_exception_decision_process_approval',
   },
   'shipping-release': {
-    taskGroup: 'shipment_release',
-    completionMessage: '出货放行任务已完成，实际出货仍需在出货单中确认完成。',
-    emptyText: '暂无出货放行任务。',
+    taskGroup: 'shipment_finance_approval',
+    completionMessage:
+      '出货财务审批已完成；仓库仍需在出货单中独立确认实际出货。',
+    emptyText: '暂无出货财务审批任务。',
     ownerRoleOptions: [
-      workflowRoleOption('warehouse'),
-      workflowRoleOption('sales'),
-      workflowRoleOption('quality'),
       workflowRoleOption('finance'),
+      workflowRoleOption('boss'),
     ],
-    payloadScope: 'shipment_release_workflow_only',
+    payloadScope: 'shipment_finance_approval_process_only',
   },
 })
 

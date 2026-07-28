@@ -4058,7 +4058,7 @@ export function createStyleL1Scenarios(deps) {
       workflowTaskFixtures: [
         {
           id: 9101,
-          task_code: 'shipment-finance-approval-9101',
+          task_code: 'PROC-701-NODE-702-A1',
           task_group: 'shipment_finance_approval',
           task_name: '出货财务审批',
           source_type: 'shipment',

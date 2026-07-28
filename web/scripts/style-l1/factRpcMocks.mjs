@@ -294,6 +294,33 @@ export async function installFactRpcMocks(page, context) {
   const productionReworkAttempts = new Map()
   const outsourcingSourceFactAttempts = new Map()
   let shipmentStatus = 'DRAFT'
+  const productionFactBase = {
+    id: 1,
+    version: 1,
+    fact_no: 'PROD-FACT-L1',
+    fact_type: 'FINISHED_GOODS_RECEIPT',
+    status: 'DRAFT',
+    subject_type: 'PRODUCT',
+    subject_id: 1,
+    warehouse_id: 1,
+    unit_id: 1,
+    lot_id: 1,
+    quantity: '6',
+    source_type: 'PRODUCTION_ORDER',
+    source_id: 71,
+    source_line_id: 7100,
+    idempotency_key: 'PROD-FACT-L1',
+    occurred_at: nowUnix(),
+    note: '样式生产事实',
+    posted_at: null,
+    posted_by: null,
+    cancelled_at: null,
+    cancelled_by: null,
+    cancel_reason: null,
+    created_at: nowUnix(),
+    updated_at: nowUnix(),
+  }
+  let productionFact = { ...productionFactBase }
 
   await page.route('**/rpc/operational_fact', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -363,31 +390,13 @@ export async function installFactRpcMocks(page, context) {
         disabled_reason: '',
       }
     })
-    const productionFact = {
-      id: 1,
-      fact_no: 'PROD-FACT-L1',
-      fact_type: 'FINISHED_GOODS_RECEIPT',
-      status: 'DRAFT',
-      subject_type: 'PRODUCT',
-      subject_id: 1,
-      warehouse_id: 1,
-      unit_id: 1,
-      lot_id: 1,
-      quantity: '6',
-      source_type: 'PRODUCTION_ORDER',
-      source_id: 71,
-      source_line_id: 7100,
-      idempotency_key: 'PROD-FACT-L1',
-      occurred_at: nowUnix(),
-      note: '样式生产事实',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
     const postedProductionCompletion = {
-      ...productionFact,
+      ...productionFactBase,
       id: 81,
       fact_no: 'PROD-FG-POSTED-L1',
       status: 'POSTED',
+      posted_at: nowUnix(),
+      posted_by: 1,
       subject_id: 301,
       product_sku_id: 401,
       warehouse_id: 1,
@@ -787,14 +796,27 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       case 'post_production_fact':
-        data = {
-          production_fact: { ...productionFact, status: 'POSTED' },
+        productionFact = {
+          ...productionFact,
+          status: 'POSTED',
+          version: productionFact.version + 1,
+          posted_at: nowUnix(),
+          posted_by: 1,
+          updated_at: nowUnix(),
         }
+        data = { production_fact: { ...productionFact } }
         break
       case 'cancel_production_fact':
-        data = {
-          production_fact: { ...productionFact, status: 'CANCELLED' },
+        productionFact = {
+          ...productionFact,
+          status: 'CANCELLED',
+          version: productionFact.version + 1,
+          cancelled_at: nowUnix(),
+          cancelled_by: 1,
+          cancel_reason: String(params.reason || '').trim(),
+          updated_at: nowUnix(),
         }
+        data = { production_fact: { ...productionFact } }
         break
       case 'list_outsourcing_facts':
         {

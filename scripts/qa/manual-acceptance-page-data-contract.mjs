@@ -124,7 +124,7 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
 const WORKFLOW_TASK_GROUP_PROBES = Object.freeze({
   "production-scheduling": "workflow-tasks:production_scheduling",
   "production-exceptions": "workflow-tasks:production_exception",
-  "shipping-release": "workflow-tasks:shipment_release",
+  "shipping-release": "workflow-tasks:shipment_finance_approval",
 });
 
 const FORBIDDEN_TARGET_ENTRYPOINT_KEY =
@@ -264,7 +264,7 @@ function targetEvidence(item) {
         "purchase-receipts",
         "quality-inspections",
         "inventory-balances",
-        "workflow-tasks:shipment_release",
+        "workflow-tasks:shipment_finance_approval",
         "shipments",
         "production-orders",
         "workflow-tasks:production_scheduling",

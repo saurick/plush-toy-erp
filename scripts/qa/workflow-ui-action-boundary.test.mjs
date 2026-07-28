@@ -458,8 +458,8 @@ test("workflow business role filters use shared role display names", () => {
     "production",
     "warehouse",
     "quality",
-    "sales",
     "finance",
+    "boss",
   ]) {
     assert(
       source.includes(`workflowRoleOption('${roleKey}')`),
@@ -471,8 +471,8 @@ test("workflow business role filters use shared role display names", () => {
     "{ label: '生产', value: 'production' }",
     "{ label: '仓库', value: 'warehouse' }",
     "{ label: '品质', value: 'quality' }",
-    "{ label: '业务', value: 'sales' }",
     "{ label: '财务', value: 'finance' }",
+    "{ label: '老板', value: 'boss' }",
   ]) {
     assert(
       !source.includes(hardCodedRoleOption),
