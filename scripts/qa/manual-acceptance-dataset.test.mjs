@@ -38,6 +38,7 @@ import {
   verifyManualAcceptanceEmptyBaseline,
   verifyManualAcceptanceCoreReferences,
   manualAcceptanceDatasetStageReportPath,
+  runDefaultManualAcceptanceTaskComponent,
 } from "./manual-acceptance-dataset-runner.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import {
@@ -70,6 +71,80 @@ test("component report digest treats undefined object fields as omitted JSON fie
       }),
     /unsupported JSON value undefined/u,
   );
+});
+
+test("default task runner binds the exact same-run source report", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-task-source-binding-"),
+  );
+  const reportPath = path.join(outputRoot, "task-report.json");
+  const sourceReport = {
+    mode: "apply",
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  };
+  const sourceReportPath = path.join(outputRoot, "source-report.json");
+  const invocation = {
+    businessInput: {
+      dataVersion: "2026.07.16-v5",
+      runId: "20260716-V5",
+      taskScheduleAnchorUtc: GENERATED_AT,
+    },
+    targetAdapter: {
+      policyTarget: "local-dev",
+      backendURL: LOCAL_APPLY_BACKEND,
+      databaseName: LOCAL_APPLY_DATABASE,
+      confirmation: "target-confirmation",
+      attestation: null,
+      credentials: {
+        rolePassword: "role-password",
+        adminPassword: "admin-password",
+      },
+    },
+    reportPath,
+  };
+  let receivedSourceReport = null;
+  try {
+    await assert.rejects(
+      () =>
+        runDefaultManualAcceptanceTaskComponent(invocation, {
+          state: { componentReports: new Map() },
+          applyTaskData: async () => {
+            throw new Error("task apply must not run without the source report");
+          },
+        }),
+      (error) => error?.code === "task_source_report_missing",
+    );
+    await runDefaultManualAcceptanceTaskComponent(invocation, {
+      state: {
+        componentReports: new Map([
+          [
+            "source",
+            {
+              report: sourceReport,
+              reportPath: sourceReportPath,
+            },
+          ],
+        ]),
+      },
+      fetchImpl: async () => {
+        throw new Error("fetch must not run through the injected task apply");
+      },
+      applyTaskData: async (_plan, options) => {
+        receivedSourceReport = options.sourceReport;
+        return {
+          mode: "apply",
+          datasetKey: "yoyoosun-manual-acceptance",
+          dataVersion: "2026.07.16-v5",
+          runId: "20260716-V5",
+        };
+      },
+    });
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+  assert.equal(receivedSourceReport, sourceReport);
 });
 
 function localApplyPlan(overrides = {}) {

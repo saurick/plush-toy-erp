@@ -1256,8 +1256,19 @@ async function defaultRoleComponent(invocation, deps) {
   };
 }
 
-async function defaultTaskComponent(invocation, deps) {
+export async function runDefaultManualAcceptanceTaskComponent(
+  invocation,
+  deps,
+) {
   const { businessInput, targetAdapter, reportPath } = invocation;
+  const sourceState = deps.state.componentReports.get("source");
+  if (!sourceState?.report || !sourceState?.reportPath) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "task_source_report_missing",
+      "task requires the exact source report from the same runner execution",
+      { stageKey: "task" },
+    );
+  }
   const plan = buildManualAcceptanceTaskDataPlan({
     target: targetAdapter.policyTarget,
     dataVersion: businessInput.dataVersion,
@@ -1266,7 +1277,9 @@ async function defaultTaskComponent(invocation, deps) {
     databaseName: targetAdapter.databaseName,
     nowSec: Math.floor(Date.parse(businessInput.taskScheduleAnchorUtc) / 1000),
   });
-  const report = await applyManualAcceptanceTaskData(plan, {
+  const applyTaskData =
+    deps.applyTaskData || applyManualAcceptanceTaskData;
+  const report = await applyTaskData(plan, {
     password: requiredCredential(
       targetAdapter.credentials.rolePassword,
       "rolePassword",
@@ -1281,6 +1294,7 @@ async function defaultTaskComponent(invocation, deps) {
     targetConfirmation: targetAdapter.confirmation || undefined,
     targetAttestation: targetAdapter.attestation || undefined,
     fetchImpl: deps.fetchImpl,
+    sourceReport: sourceState.report,
   });
   await persistReport(reportPath, report);
   return { operation: "applied", report, reportPath };
@@ -1673,7 +1687,11 @@ async function sourceStageHandler(execution) {
 }
 
 async function taskStageHandler(execution) {
-  return registeredStage(execution, defaultTaskComponent, "applied");
+  return registeredStage(
+    execution,
+    runDefaultManualAcceptanceTaskComponent,
+    "applied",
+  );
 }
 
 async function factsStageHandler(execution) {
