@@ -2585,14 +2585,20 @@ function currentBatchFactIdentifiers(factReport) {
           String(item?.status || "").toUpperCase(),
         ),
     ),
-    "production-exceptions": sourceTaskCode(
-      "source-production-exception",
-      records.productionFacts,
-      (item) =>
-        String(item?.fact_type || item?.factType || "").toUpperCase() ===
-          "REWORK" &&
-        String(item?.status || "").toUpperCase() === "CANCELLED",
-    ),
+    "production-exceptions": (() => {
+      const decision = (records.productionExceptions || []).find(
+        (item) =>
+          String(item?.decision_type || item?.decisionType || "").toUpperCase() ===
+            "OVER_ISSUE" &&
+          String(item?.status || "").toUpperCase() === "APPROVED" &&
+          String(
+            item?.approval_task_code || item?.approvalTaskCode || "",
+          ).startsWith("PROC-"),
+      );
+      return String(
+        decision?.approval_task_code || decision?.approvalTaskCode || "",
+      );
+    })(),
     "shipping-release": (() => {
       const shipment = records.shipments.find(
         (item) =>

@@ -230,6 +230,26 @@ function factReferenceRecords(countOverrides = {}) {
       statuses: ["DRAFT", "RELEASED", "CLOSED", "CANCELLED"],
     }),
     productionFacts,
+    productionExceptions: [
+      {
+        id: 15_001,
+        decisionNo: "SIM-SDF-SCYC-001",
+        decisionType: "OVER_ISSUE",
+        status: "APPROVED",
+        executionStatus: "PENDING",
+        productionOrderID: 1_001,
+        productionOrderItemID: 1_101,
+        productionMaterialRequirementID: 1_201,
+        requestedQuantity: "1",
+        approvedQuantity: "1",
+        productionOrderNo: "SIM-SDF-PO-2",
+        processInstanceID: 310_001,
+        approvalTaskID: 320_001,
+        approvalTaskCode: "PROC-310001-NODE-330001-A1",
+        approvalProcessNodeID: 330_001,
+        approvedRemainingQuantity: "1",
+      },
+    ],
     purchaseReceipts: referenceRecords(count("purchaseReceipts", 54), {
       idBase: 20_000,
       numberKey: "receiptNo",
@@ -650,6 +670,22 @@ function createReadinessFetch(runtimeOptions = {}) {
         source_id: item.sourceID,
       })),
     ],
+    list_production_exceptions: [
+      "production_exceptions",
+      factRefs.productionExceptions.map((item) => ({
+        id: item.id,
+        decision_no: item.decisionNo,
+        decision_type: item.decisionType,
+        status: item.status,
+        execution_status: item.executionStatus,
+        production_order_id: item.productionOrderID,
+        production_order_item_id: item.productionOrderItemID,
+        production_material_requirement_id:
+          item.productionMaterialRequirementID,
+        requested_quantity: item.requestedQuantity,
+        approved_quantity: item.approvedQuantity,
+      })),
+    ],
     list_purchase_receipts: [
       "purchase_receipts",
       factRefs.purchaseReceipts.map((item) => ({
@@ -960,6 +996,7 @@ function createReadinessFetch(runtimeOptions = {}) {
         [
           "production_scheduling",
           "production_exception",
+          "production_exception_decision_approval",
           "shipment_finance_approval",
         ].includes(body.params.task_group)
       ) {
@@ -970,6 +1007,10 @@ function createReadinessFetch(runtimeOptions = {}) {
             ? factRefs.productionOrders.find((item) => item.id === sourceID)
             : taskGroup === "production_exception"
               ? factRefs.productionFacts.find((item) => item.id === sourceID)
+              : taskGroup === "production_exception_decision_approval"
+                ? factRefs.productionExceptions.find(
+                    (item) => item.id === sourceID,
+                  )
               : factRefs.shipments.find((item) => item.id === sourceID);
         const status =
           taskGroup === "production_scheduling" &&
@@ -979,6 +1020,8 @@ function createReadinessFetch(runtimeOptions = {}) {
         const taskCode =
           taskGroup === "shipment_finance_approval"
             ? sourceRecord?.financeApprovalTaskCode
+            : taskGroup === "production_exception_decision_approval"
+              ? sourceRecord?.approvalTaskCode
             : `source-${taskGroup.replaceAll("_", "-")}-${sourceID}`;
         return okResponse({
           tasks: sourceRecord
@@ -994,14 +1037,22 @@ function createReadinessFetch(runtimeOptions = {}) {
                       ? "pmc"
                       : taskGroup === "production_exception"
                         ? "production"
-                        : "finance",
+                        : taskGroup ===
+                            "production_exception_decision_approval"
+                          ? "boss"
+                          : "finance",
                   task_status_key: status,
-                  ...(taskGroup === "shipment_finance_approval"
+                  ...(["shipment_finance_approval",
+                    "production_exception_decision_approval"].includes(taskGroup)
                     ? {
                         process_instance_id:
-                          sourceRecord.financeReleaseProcessInstanceID,
+                          taskGroup === "shipment_finance_approval"
+                            ? sourceRecord.financeReleaseProcessInstanceID
+                            : sourceRecord.processInstanceID,
                         process_node_instance_id:
-                          sourceRecord.financeApprovalProcessNodeID,
+                          taskGroup === "shipment_finance_approval"
+                            ? sourceRecord.financeApprovalProcessNodeID
+                            : sourceRecord.approvalProcessNodeID,
                       }
                     : {}),
                   payload: {},
@@ -1066,6 +1117,10 @@ function createReadinessFetch(runtimeOptions = {}) {
           "source_type",
           "source_id",
           "fact_type",
+          "status",
+          "execution_status",
+          "decision_type",
+          "production_order_id",
         ]) {
           if (
             body.params[key] != null &&
@@ -1256,8 +1311,8 @@ test("default plan covers all 50 targets and never connects to a backend", async
       (item) => item.id === "desktopPages:production-exceptions",
     ).probeIds,
     [
-      "workflow-tasks:production_exception",
-      "production-exception-active-tasks",
+      "production-exceptions",
+      "workflow-tasks:production_exception_decision_approval",
     ],
   );
   assert.deepEqual(
@@ -1954,7 +2009,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   const workflowPageProbes = report.probes.filter((item) =>
     item.id.startsWith("workflow-tasks:"),
   );
-  assert.equal(workflowPageProbes.length, 3);
+  assert.equal(workflowPageProbes.length, 4);
   assert(
     workflowPageProbes.every(
       (item) =>
@@ -1966,13 +2021,6 @@ test("explicit verification reports page data, nine role totals, and honest manu
     ),
     JSON.stringify(workflowPageProbes, null, 2),
   );
-  const activeProductionExceptions = report.probes.find(
-    (item) => item.id === "production-exception-active-tasks",
-  );
-  assert.equal(activeProductionExceptions.status, "pass");
-  assert.equal(activeProductionExceptions.expectedExact, 0);
-  assert.equal(activeProductionExceptions.actual, 0);
-  assert.deepEqual(activeProductionExceptions.statusCounts, {});
   assert.equal(mobileProbes.length, 9);
   assert(
     mobileProbes.every(
@@ -2067,6 +2115,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
           "list_inventory_txns",
           "list_production_orders",
           "list_production_facts",
+          "list_production_exceptions",
           "list_stock_reservations",
           "list_shipments",
           "list_finance_facts",
@@ -2089,6 +2138,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
             [
               "production_scheduling",
               "production_exception",
+              "production_exception_decision_approval",
               "shipment_finance_approval",
             ].includes(item.params.task_group) &&
             Boolean(item.params.source_type) &&

@@ -10,6 +10,7 @@ import {
   applyManualAcceptanceFinanceLifecycle,
   applyManualAcceptanceFactPlan,
   buildManualAcceptanceFactPlan,
+  ensureManualAcceptanceProductionExceptionApproval,
   ensureReceiptQualities,
   manualAcceptanceFactRPCCall,
   manualAcceptanceFactRole,
@@ -461,6 +462,26 @@ function factStage() {
       source_type: "PRODUCTION_ORDER",
       source_id: 8000 + (offset % 48),
     })),
+    productionExceptions: [
+      {
+        id: 10_500,
+        decision_no: "SCYC-001",
+        decision_type: "OVER_ISSUE",
+        status: "APPROVED",
+        execution_status: "PENDING",
+        production_order_id: 8_001,
+        production_order_item_id: 8_101,
+        production_material_requirement_id: 8_201,
+        requested_quantity: "1",
+        approved_quantity: "1",
+        production_order_no: "MO-1",
+        process_instance_id: 410_001,
+        approval_task_id: 420_001,
+        approval_task_code: "PROC-410001-NODE-430001-A1",
+        approval_process_node_id: 430_001,
+        approved_remaining_quantity: "1",
+      },
+    ],
     outsourcingFacts: fakeRecords(90, 11000).map((item, offset) => ({
       ...item,
       fact_no: `OF-${offset + 1}`,
@@ -733,6 +754,185 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
     }),
     "finance",
   );
+});
+
+test("production exception fixture completes one formal over-issue approval and replays read-only", async () => {
+  const order = { id: 41, order_no: "YS-V5-SC-02" };
+  const requirement = {
+    id: 51,
+    production_order_id: order.id,
+    production_order_item_id: 61,
+    approved_over_issue_quantity: "0",
+    remaining_quantity: "0",
+  };
+  let decision = null;
+  let instance = null;
+  let nodes = [];
+  let task = null;
+  let mutations = 0;
+  const processData = () => ({
+    process_context: instance
+      ? {
+          process_instance: structuredClone(instance),
+          nodes: structuredClone(nodes),
+        }
+      : null,
+    source_readback: decision ? structuredClone(decision) : null,
+  });
+  const rpc = async ({ actor, domain, method, params }) => {
+    const key = `${domain}.${method}`;
+    if (key === "operational_fact.list_production_exceptions") {
+      assert.equal(actor, "admin");
+      assert.equal(params.production_order_id, order.id);
+      return {
+        production_exceptions: decision ? [structuredClone(decision)] : [],
+      };
+    }
+    if (
+      key ===
+      "operational_fact.list_production_order_material_requirements"
+    ) {
+      assert.equal(actor, "admin");
+      return { material_requirements: [structuredClone(requirement)] };
+    }
+    if (key === "operational_fact.submit_production_exception") {
+      assert.equal(actor, "admin");
+      assert.equal(params.decision_type, "OVER_ISSUE");
+      assert.equal(params.production_order_id, order.id);
+      assert.equal(params.production_material_requirement_id, requirement.id);
+      assert.equal(params.requested_quantity, "1");
+      decision = {
+        id: 71,
+        decision_no: params.decision_no,
+        decision_type: "OVER_ISSUE",
+        status: "SUBMITTED",
+        execution_status: "PENDING",
+        production_order_id: order.id,
+        production_order_item_id: requirement.production_order_item_id,
+        production_material_requirement_id: requirement.id,
+        requested_quantity: "1",
+        approved_quantity: null,
+        version: 1,
+      };
+      mutations += 1;
+      return { production_exception: structuredClone(decision) };
+    }
+    if (
+      key ===
+      "customer_config.get_production_exception_approval_process"
+    ) {
+      assert.equal(actor, "admin");
+      assert.equal(params.production_exception_id, decision.id);
+      return processData();
+    }
+    if (
+      key ===
+      "customer_config.start_production_exception_approval_process"
+    ) {
+      assert.equal(actor, "admin");
+      instance = {
+        id: 81,
+        process_key: "production_exception_approval",
+        business_ref_type: "production_exception_decision",
+        business_ref_id: decision.id,
+        business_ref_no: decision.decision_no,
+        status: "active",
+      };
+      const nodeKeys = [
+        "production_exception_decision_approval",
+        "approve_production_exception",
+        "production_exception_execution",
+        "execute_production_exception",
+        "end",
+        "reject_production_exception",
+        "rejected_end",
+        "over_issue_end",
+      ];
+      nodes = nodeKeys.map((nodeKey, index) => ({
+        id: 91 + index,
+        process_instance_id: instance.id,
+        node_key: nodeKey,
+        status: index === 0 ? "active" : "waiting",
+        version: 1,
+      }));
+      task = {
+        id: 111,
+        version: 1,
+        task_code: `PROC-${instance.id}-NODE-${nodes[0].id}-A1`,
+        task_group: "production_exception_decision_approval",
+        source_type: "production_exception_decision",
+        source_id: decision.id,
+        owner_role_key: "boss",
+        task_status_key: "ready",
+        process_instance_id: instance.id,
+        process_node_instance_id: nodes[0].id,
+      };
+      mutations += 1;
+      return {
+        ...processData(),
+        process_instance: structuredClone(instance),
+        nodes: structuredClone(nodes),
+      };
+    }
+    if (key === "workflow.list_tasks") {
+      assert.equal(actor, "boss");
+      assert.equal(
+        params.task_group,
+        "production_exception_decision_approval",
+      );
+      return { tasks: task ? [structuredClone(task)] : [] };
+    }
+    if (key === "workflow.complete_task_action") {
+      assert.equal(actor, "boss");
+      assert.equal(params.task_id, task.id);
+      assert.equal(params.reason, params.payload.process_decision.reason);
+      assert.equal(
+        params.payload.process_decision.approved_quantity,
+        "1",
+      );
+      task.task_status_key = "done";
+      task.version += 1;
+      nodes[0].status = "completed";
+      nodes[0].version += 1;
+      nodes[1].status = "completed";
+      nodes[1].version += 1;
+      nodes[7].status = "completed";
+      nodes[7].version += 1;
+      instance.status = "completed";
+      decision.status = "APPROVED";
+      decision.approved_quantity = "1";
+      decision.version += 1;
+      requirement.approved_over_issue_quantity = "1";
+      requirement.remaining_quantity = "1";
+      mutations += 1;
+      return { task: structuredClone(task) };
+    }
+    throw new Error(`unexpected ${key}`);
+  };
+
+  const args = {
+    rpc,
+    plan: { dataVersion: DATA_VERSION },
+    production: { order },
+    apply: true,
+  };
+  const first = await ensureManualAcceptanceProductionExceptionApproval(args);
+  assert.equal(first.status, "APPROVED");
+  assert.equal(first.execution_status, "PENDING");
+  assert.equal(first.approved_quantity, "1");
+  assert.equal(first.approved_remaining_quantity, "1");
+  assert.equal(
+    first.approval_task_code,
+    `PROC-${first.process_instance_id}-NODE-${first.approval_process_node_id}-A1`,
+  );
+  assert.equal(mutations, 3);
+
+  const second = await ensureManualAcceptanceProductionExceptionApproval({
+    ...args,
+    apply: false,
+  });
+  assert.deepEqual(second, first);
+  assert.equal(mutations, 3);
 });
 
 test("receipt quality readback uses the formal quality list instead of an empty receipt embed", async () => {

@@ -328,6 +328,8 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 最新 lifecycle 已完成九阶段 dataset apply、40 项可查询 readiness 且 0 项失败，随后在浏览器启动前发现 dataset 总回执只接受顶层路径、未接受 lifecycle 隔离根目录。浏览器现仅接受顶层 canonical 路径或单层合法 `lifecycle/<run-id>`，同时校验每个阶段的精确路径、摘要、批次身份和真实文件路径；任意嵌套根目录及外部符号链接均失败关闭，定向 Node `47 / 47` 与脚本语法、diff check 已通过。上述失败运行均保留脱敏回执并清理为零残留；最终提交仍须重跑全新库 lifecycle、全量门禁、精确 SHA CI、不可变制品、本地发布演练和 133 技术发布，客户 UAT / 签收单独保留。
 
+随后绑定 `7dfbd11235141b5d00e29acfd0f69aedcec4a37c` 的 fresh lifecycle 已走完九阶段数据、readiness 与浏览器启动，50 个页面中 49 个通过；唯一失败是“生产异常”仍用已取消返工事实生成的 `production_exception` 来源提醒任务作为页面证据，而当前页面只查询正式 `production_exception_decision_approval`。本轮没有恢复旧任务组兼容，而是让 V5 从已发布生产订单物料需求提交 1 条 `OVER_ISSUE` 正式异常申请，由老板完成 `production_exception_approval`，精确读回 8 个节点、确定性 `PROC-<process>-NODE-<approval>-A1` 任务码、`APPROVED / PENDING` 决定及 1 件可消费额度。Fact 报告、readiness、页面数据合同、浏览器检索、客户手册与当前真源已统一；返工来源提醒继续只服务其原协同语义，不能冒充正式申请或审批。受影响脚本测试和自动发现的 124 个脚本测试文件均已通过；新的最终 clean SHA lifecycle 与发布全链仍待执行。
+
 1. 发布前必须绑定最终 commit / image，按正式流程执行备份 / 回滚点、migration status / apply / readback、health / ready、真实账号与业务 smoke。
 2. 客户交付仍须甲方岗位 UAT / 签收；本地或固定旧版本绿色不能替代。
 3. 异常流 Worktree 暂保留为恢复副本；后续清理须单独确认目标和现场，不把 Handoff、提交或推送等同于 Worktree 删除。

@@ -40,6 +40,7 @@ const BUSINESS_NO_CODES = new Set([
   "CP",
   "ZJ",
   "SC",
+  "SCYC",
   "XF",
   "LL",
   "WG",
@@ -122,6 +123,38 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "customer_key",
     "id",
     "expected_version",
+  ]),
+  "operational_fact.list_production_order_material_requirements":
+    Object.freeze(["customer_key", "production_order_id"]),
+  "operational_fact.submit_production_exception": Object.freeze([
+    "customer_key",
+    "decision_no",
+    "decision_type",
+    "production_order_id",
+    "production_order_item_id",
+    "production_material_requirement_id",
+    "requested_quantity",
+    "reason",
+    "idempotency_key",
+  ]),
+  "operational_fact.list_production_exceptions": Object.freeze([
+    "customer_key",
+    "status",
+    "execution_status",
+    "decision_type",
+    "production_order_id",
+    "limit",
+    "offset",
+  ]),
+  "customer_config.start_production_exception_approval_process":
+    Object.freeze([
+      "customer_key",
+      "production_exception_id",
+      "idempotency_key",
+    ]),
+  "customer_config.get_production_exception_approval_process": Object.freeze([
+    "customer_key",
+    "production_exception_id",
   ]),
   "operational_fact.create_outsourcing_material_issue_from_order":
     Object.freeze([
@@ -221,6 +254,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "expected_version",
     "idempotency_key",
     "action_key",
+    "reason",
     "payload",
   ]),
   "workflow.get_task_process_context": Object.freeze(["task_id"]),

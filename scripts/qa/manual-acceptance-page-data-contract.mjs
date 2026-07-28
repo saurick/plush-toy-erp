@@ -58,6 +58,7 @@ export const MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE = Object.freeze({
   "processing-contracts": "outsourcing-orders",
   "production-orders": "production-orders",
   "production-progress": "production-facts",
+  "production-exceptions": "production-exceptions",
   outbound: "stock-reservations",
   shipments: "shipments",
   reconciliation: "finance-reconciliation",
@@ -78,7 +79,6 @@ const PRINT_SUPPORT_DATASET = Object.freeze({
 export const MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS = Object.freeze({
   validAccountLogins: "valid-account-logins",
   bossDashboardActiveTasks: "boss-dashboard-active-tasks",
-  productionExceptionActiveTasks: "production-exception-active-tasks",
   mobileTaskTotal: "mobile-task-total",
   catalogPrintTemplates: "catalog-print-templates",
 });
@@ -103,6 +103,7 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
   "inventory-lots": "facts",
   "inventory-txns": "facts",
   "production-facts": "facts",
+  "production-exceptions": "facts",
   "stock-reservations": "facts",
   shipments: "facts",
   "finance-reconciliation": "facts",
@@ -115,7 +116,6 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
   "valid-account-logins": "role",
   "boss-dashboard-tasks": "task",
   "boss-dashboard-active-tasks": "task",
-  "production-exception-active-tasks": "task",
   "mobile-task-total": "task",
   "catalog-print-templates": "catalog",
   "business-dashboard-stats": "facts",
@@ -123,9 +123,14 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
 
 const WORKFLOW_TASK_GROUP_PROBES = Object.freeze({
   "production-scheduling": "workflow-tasks:production_scheduling",
-  "production-exceptions": "workflow-tasks:production_exception",
+  "production-exceptions":
+    "workflow-tasks:production_exception_decision_approval",
   "shipping-release": "workflow-tasks:shipment_finance_approval",
 });
+const WORKFLOW_TASK_PROBE_IDS = new Set([
+  ...Object.values(WORKFLOW_TASK_GROUP_PROBES),
+  "workflow-tasks:production_exception",
+]);
 
 const FORBIDDEN_TARGET_ENTRYPOINT_KEY =
   /(?:builder|command|entrypoint|generatorScript|scriptPath)/iu;
@@ -187,7 +192,7 @@ function generatorStageForProbe(probeId, mobileRoleKeys) {
   const workflowPrefix = "workflow-tasks:";
   if (
     probeId.startsWith(workflowPrefix) &&
-    Object.values(WORKFLOW_TASK_GROUP_PROBES).includes(probeId)
+    WORKFLOW_TASK_PROBE_IDS.has(probeId)
   ) {
     return "task";
   }
@@ -286,13 +291,13 @@ function targetEvidence(item) {
   if (item.key === "production-exceptions") {
     return {
       probeIds: [
-        "workflow-tasks:production_exception",
-        MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.productionExceptionActiveTasks,
+        "production-exceptions",
+        "workflow-tasks:production_exception_decision_approval",
       ],
-      actualProbeId: "workflow-tasks:production_exception",
+      actualProbeId: "production-exceptions",
       browserRequired: true,
       reason:
-        "完整生产异常来源任务与当前可处理任务分别按同批岗位任务核对；页面数量采用完整来源任务，当前没有可处理任务也不能抹掉已完成异常记录。",
+        "生产异常申请按领域真源核对，正式审批任务按同一 ProcessRuntime 来源、节点和任务码核对；页面数量采用正式异常申请，不能用返工来源提醒任务代替审批记录。",
     };
   }
   const workflowProbeId = WORKFLOW_TASK_GROUP_PROBES[item.key];

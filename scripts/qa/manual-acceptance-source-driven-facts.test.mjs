@@ -528,6 +528,7 @@ test("every allowlisted method is present in the current formal JSON-RPC dispatc
       "../../server/internal/service/jsonrpc_inventory.go",
       "../../server/internal/service/jsonrpc_production_order.go",
       "../../server/internal/service/jsonrpc_operational_fact_production.go",
+      "../../server/internal/service/jsonrpc_operational_fact_exception.go",
       "../../server/internal/service/jsonrpc_operational_fact_outsourcing.go",
       "../../server/internal/service/jsonrpc_operational_fact_reservation.go",
       "../../server/internal/service/jsonrpc_operational_fact_shipment.go",
@@ -535,13 +536,28 @@ test("every allowlisted method is present in the current formal JSON-RPC dispatc
       "../../server/internal/service/jsonrpc_quality.go",
       "../../server/internal/service/jsonrpc_workflow_task.go",
       "../../server/internal/service/jsonrpc_customer_config.go",
+      "../../server/internal/service/jsonrpc_customer_config_exception_process.go",
     ].map((relative) => readFile(new URL(relative, import.meta.url), "utf8")),
   );
   const dispatchers = files.join("\n");
+  const exceptionProcessDispatcher = files.at(-1);
+  assert.match(exceptionProcessDispatcher, /case contract\.startMethod:/u);
+  assert.match(exceptionProcessDispatcher, /case contract\.getMethod:/u);
   for (const key of Object.keys(FORMAL_RPC_PARAM_ALLOWLIST)) {
     const method = key.slice(key.indexOf(".") + 1);
+    const contractField = method.startsWith("start_")
+      ? "startMethod"
+      : method.startsWith("get_")
+        ? "getMethod"
+        : "";
+    const declaredByExceptionProcessContract =
+      contractField !== "" &&
+      new RegExp(`${contractField}:\\s+"${method}"`, "u").test(
+        exceptionProcessDispatcher,
+      );
     assert.ok(
-      dispatchers.includes(`case "${method}"`),
+      dispatchers.includes(`case "${method}"`) ||
+        declaredByExceptionProcessContract,
       `${key} must remain a formal dispatcher method`,
     );
   }

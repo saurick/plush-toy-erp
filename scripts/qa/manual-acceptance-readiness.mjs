@@ -144,6 +144,9 @@ const SOURCE_EXPECTATION_KEYS = Object.freeze({
 const FACT_REFERENCE_DATASETS = Object.freeze({
   "production-orders": Object.freeze({ referenceKey: "productionOrders" }),
   "production-facts": Object.freeze({ referenceKey: "productionFacts" }),
+  "production-exceptions": Object.freeze({
+    referenceKey: "productionExceptions",
+  }),
   "purchase-receipts": Object.freeze({ referenceKey: "purchaseReceipts" }),
   "purchase-returns": Object.freeze({ referenceKey: "purchaseReturns" }),
   "purchase-receipt-adjustments": Object.freeze({
@@ -373,6 +376,18 @@ const DATASET_BLUEPRINTS = Object.freeze({
     batchReport: "fact",
     factReferenceKey: "productionFacts",
   },
+  "production-exceptions": {
+    roleKey: "boss",
+    domain: "operational_fact",
+    method: "list_production_exceptions",
+    listKey: "production_exceptions",
+    statusField: "status",
+    requiredStatuses: ["APPROVED"],
+    secondaryField: "decision_type",
+    requiredSecondaryKinds: ["OVER_ISSUE"],
+    batchReport: "fact",
+    factReferenceKey: "productionExceptions",
+  },
   "stock-reservations": {
     roleKey: "warehouse",
     domain: "operational_fact",
@@ -550,6 +565,61 @@ function normalizeFactReference(record, key, index) {
       normalized.source_id = reportPositiveID(
         reportValue(record, "sourceID", "sourceId", "source_id"),
         `${name}.sourceID`,
+      );
+      break;
+    case "productionExceptions":
+      textField("decision_no", "decisionNo", "decision_no");
+      textField("decision_type", "decisionType", "decision_type");
+      textField("status", "status");
+      textField("execution_status", "executionStatus", "execution_status");
+      normalized.production_order_id = reportPositiveID(
+        reportValue(record, "productionOrderID", "production_order_id"),
+        `${name}.productionOrderID`,
+      );
+      normalized.production_order_item_id = reportPositiveID(
+        reportValue(record, "productionOrderItemID", "production_order_item_id"),
+        `${name}.productionOrderItemID`,
+      );
+      normalized.production_material_requirement_id = reportPositiveID(
+        reportValue(
+          record,
+          "productionMaterialRequirementID",
+          "production_material_requirement_id",
+        ),
+        `${name}.productionMaterialRequirementID`,
+      );
+      textField("requested_quantity", "requestedQuantity", "requested_quantity");
+      textField("approved_quantity", "approvedQuantity", "approved_quantity");
+      textField(
+        "production_order_no",
+        "productionOrderNo",
+        "production_order_no",
+      );
+      normalized.process_instance_id = reportPositiveID(
+        reportValue(record, "processInstanceID", "process_instance_id"),
+        `${name}.processInstanceID`,
+      );
+      normalized.approval_task_id = reportPositiveID(
+        reportValue(record, "approvalTaskID", "approval_task_id"),
+        `${name}.approvalTaskID`,
+      );
+      textField(
+        "approval_task_code",
+        "approvalTaskCode",
+        "approval_task_code",
+      );
+      normalized.approval_process_node_id = reportPositiveID(
+        reportValue(
+          record,
+          "approvalProcessNodeID",
+          "approval_process_node_id",
+        ),
+        `${name}.approvalProcessNodeID`,
+      );
+      textField(
+        "approved_remaining_quantity",
+        "approvedRemainingQuantity",
+        "approved_remaining_quantity",
       );
       break;
     case "purchaseReceipts":
@@ -1093,6 +1163,7 @@ function buildInputWarnings(canonical, declared) {
 const FACT_BUSINESS_FIELDS = Object.freeze({
   productionOrders: "order_no",
   productionFacts: "fact_no",
+  productionExceptions: "decision_no",
   purchaseReceipts: "receipt_no",
   purchaseReturns: "return_no",
   purchaseReceiptAdjustments: "adjustment_no",
@@ -1104,6 +1175,14 @@ const FACT_BUSINESS_FIELDS = Object.freeze({
 });
 
 const FACT_REPORT_ONLY_REFERENCE_FIELDS = Object.freeze({
+  productionExceptions: new Set([
+    "production_order_no",
+    "process_instance_id",
+    "approval_task_id",
+    "approval_task_code",
+    "approval_process_node_id",
+    "approved_remaining_quantity",
+  ]),
   shipments: new Set([
     "finance_approval_task_id",
     "finance_approval_task_code",
@@ -1149,7 +1228,14 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
   });
   const referenceQueries = records.map((item) => {
     let params;
-    if (referenceKey === "inventoryBalances") {
+    if (referenceKey === "productionExceptions") {
+      params = {
+        production_order_id: item.production_order_id,
+        decision_type: item.decision_type,
+        limit: QUERY_LIMIT,
+        offset: 0,
+      };
+    } else if (referenceKey === "inventoryBalances") {
       params = {
         subject_type: item.subject_type,
         subject_id: item.subject_id,
@@ -1223,6 +1309,33 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
       (item) => item.fact_type === "REWORK" && item.status === "CANCELLED",
     );
     expectedStatus = () => "done";
+  } else if (
+    taskGroup === "production_exception_decision_approval"
+  ) {
+    sourceType = "production_exception_decision";
+    ownerRoleKey = "boss";
+    records = factReport.normalizedReferenceRecords.productionExceptions;
+    for (const item of records) {
+      if (
+        item.status !== "APPROVED" ||
+        item.decision_type !== "OVER_ISSUE" ||
+        item.execution_status !== "PENDING" ||
+        !Number.isSafeInteger(item.process_instance_id) ||
+        item.process_instance_id <= 0 ||
+        !Number.isSafeInteger(item.approval_task_id) ||
+        item.approval_task_id <= 0 ||
+        !Number.isSafeInteger(item.approval_process_node_id) ||
+        item.approval_process_node_id <= 0 ||
+        item.approval_task_code !==
+          `PROC-${item.process_instance_id}-NODE-${item.approval_process_node_id}-A1`
+      ) {
+        throw new CliError(
+          `生产异常申请 ${item.decision_no} 缺少正式审批 ProcessRuntime 锚点`,
+          2,
+        );
+      }
+    }
+    expectedStatus = () => "done";
   } else if (taskGroup === "shipment_finance_approval") {
     sourceType = "shipment";
     ownerRoleKey = "finance";
@@ -1267,10 +1380,24 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
     throw new CliError(`未知来源协同任务组 ${taskGroup}`, 2);
   }
   const expectedReferences = records.map((item) => {
-    const taskCode =
-      taskGroup === "shipment_finance_approval"
-        ? item.finance_approval_task_code
-        : `source-${taskGroup.replaceAll("_", "-")}-${item.id}`;
+    const taskCode = {
+      production_exception_decision_approval: item.approval_task_code,
+      shipment_finance_approval: item.finance_approval_task_code,
+    }[taskGroup] || `source-${taskGroup.replaceAll("_", "-")}-${item.id}`;
+    const processAnchors =
+      taskGroup === "production_exception_decision_approval"
+        ? {
+            process_instance_id: item.process_instance_id,
+            process_node_instance_id: item.approval_process_node_id,
+          }
+        : taskGroup === "shipment_finance_approval"
+          ? {
+              process_instance_id:
+                item.finance_release_process_instance_id,
+              process_node_instance_id:
+                item.finance_approval_process_node_id,
+            }
+          : {};
     return {
       key: `${taskCode}:${sourceType}:${item.id}`,
       id: null,
@@ -1282,12 +1409,7 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
         source_id: item.id,
         owner_role_key: ownerRoleKey,
         task_status_key: expectedStatus(item),
-        ...(taskGroup === "shipment_finance_approval"
-          ? {
-              process_instance_id: item.finance_release_process_instance_id,
-              process_node_instance_id: item.finance_approval_process_node_id,
-            }
-          : {}),
+        ...processAnchors,
       },
     };
   });
@@ -1507,6 +1629,12 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       "production",
       "production_exception",
       ["ready", "blocked", "done"],
+    ],
+    [
+      "production-exception-decisions",
+      "boss",
+      "production_exception_decision_approval",
+      ["done"],
     ],
     [
       "shipping-release",
@@ -2622,62 +2750,6 @@ function bossDashboardActiveResult(bossResult) {
   };
 }
 
-function productionExceptionActiveResult(exceptionResult) {
-  const terminalStatuses = new Set(["DONE", "REJECTED"]);
-  const expectedCounts = exceptionResult?.requiredStatusCounts || {};
-  const expectedMinimum = Object.entries(expectedCounts).reduce(
-    (sum, [status, count]) =>
-      terminalStatuses.has(status) ? sum : sum + Number(count || 0),
-    0,
-  );
-  const statusCounts = Object.fromEntries(
-    Object.entries(exceptionResult?.statusCounts || {}).filter(
-      ([status]) => !terminalStatuses.has(status),
-    ),
-  );
-  const actual = Object.values(statusCounts).reduce(
-    (sum, count) => sum + Number(count || 0),
-    0,
-  );
-  const sourceProven = ["exact_source", "exact_references"].includes(
-    exceptionResult?.batchEvidence,
-  );
-  const passed =
-    exceptionResult?.status === "pass" &&
-    sourceProven &&
-    actual === expectedMinimum;
-  return {
-    id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.productionExceptionActiveTasks,
-    status: passed ? "pass" : sourceProven ? "fail" : "not_proven",
-    expectedMinimum,
-    expectedExact: expectedMinimum,
-    actual: sourceProven ? actual : null,
-    returned: exceptionResult?.returned ?? 0,
-    statusField: "task_status_key",
-    statusCounts,
-    statusKinds: Object.keys(statusCounts).length,
-    requiredStatuses: Object.keys(expectedCounts).filter(
-      (status) => !terminalStatuses.has(status),
-    ),
-    missingStatuses: [],
-    enoughRecords: passed,
-    enoughStatuses: passed,
-    enoughSecondaryKinds: true,
-    batchEvidence: sourceProven ? exceptionResult.batchEvidence : "not_proven",
-    exactSourceType: sourceProven ? exceptionResult.exactSourceType : null,
-    exactSourceID: sourceProven ? exceptionResult.exactSourceID : null,
-    exactTaskCodePrefix: sourceProven
-      ? exceptionResult.exactTaskCodePrefix
-      : null,
-    exactOwnerRoleKey: sourceProven ? exceptionResult.exactOwnerRoleKey : null,
-    exactTaskGroup: sourceProven ? exceptionResult.exactTaskGroup : null,
-    notProvenReason: sourceProven
-      ? null
-      : "未提供生产岗位本批异常任务，不能证明当前可处理异常。",
-    error: null,
-  };
-}
-
 function catalogPrintTemplateResult(plan) {
   const actual = plan.targets.filter(
     (item) => item.catalogGroup === "printPreviewPages",
@@ -3063,16 +3135,6 @@ export async function verifyManualAcceptanceReadiness(
     ...resultById.get("boss-dashboard-tasks"),
   });
   resultById.set(activeBossResult.id, activeBossResult);
-  const activeProductionExceptionResult = productionExceptionActiveResult({
-    ...plan.probes.find(
-      (probe) => probe.id === "workflow-tasks:production_exception",
-    ),
-    ...resultById.get("workflow-tasks:production_exception"),
-  });
-  resultById.set(
-    activeProductionExceptionResult.id,
-    activeProductionExceptionResult,
-  );
   const printCatalogResult = catalogPrintTemplateResult(plan);
   resultById.set(printCatalogResult.id, printCatalogResult);
 
@@ -3103,7 +3165,6 @@ export async function verifyManualAcceptanceReadiness(
     ...rawResults.map(({ probe, result }) => sanitizeProbe(probe, result)),
     loginResult,
     activeBossResult,
-    activeProductionExceptionResult,
     totalResult,
     printCatalogResult,
   ];

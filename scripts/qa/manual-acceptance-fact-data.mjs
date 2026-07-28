@@ -71,6 +71,7 @@ const ROLE_USERS = Object.freeze({
 const REFERENCE_KEYS = Object.freeze([
   "productionOrders",
   "productionFacts",
+  "productionExceptions",
   "purchaseReceipts",
   "purchaseReturns",
   "purchaseReceiptAdjustments",
@@ -583,6 +584,7 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
       qualityInspections: RECEIPT_COUNT,
       productionOrders: FACT_RUN_COUNT,
       productionFacts: FACT_RUN_COUNT,
+      productionExceptions: 1,
       stockReservations: FACT_RUN_COUNT,
       shipments: MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
       payables: FACT_RUN_COUNT,
@@ -689,6 +691,13 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
       surfaceKey.includes("production-scheduling")
     ) {
       return "pmc";
+    }
+    if (
+      surfaceKey.includes("production_exception_decision_approval") ||
+      surfaceKey.includes("production-exception-decision-approval") ||
+      surfaceKey.includes("production-exception-approval")
+    ) {
+      return "boss";
     }
     if (
       surfaceKey.includes("production_exception") ||
@@ -2821,6 +2830,365 @@ async function ensureProductionFactSpecimen(
   });
 }
 
+function productionExceptionProcessNodes(data, operation) {
+  const nodes = data?.process_context?.nodes || data?.nodes;
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    throw new CliError(`${operation} response is missing process nodes`);
+  }
+  return nodes;
+}
+
+function productionExceptionProcessInstance(data, operation) {
+  const instance =
+    data?.process_context?.process_instance || data?.process_instance;
+  positiveID(instance?.id, `${operation}.process_instance.id`);
+  return instance;
+}
+
+function requireProductionExceptionProcessNode(
+  data,
+  nodeKey,
+  statuses,
+  operation,
+) {
+  const matches = productionExceptionProcessNodes(data, operation).filter(
+    (node) => String(node?.node_key || "") === nodeKey,
+  );
+  if (matches.length !== 1) {
+    throw new CliError(
+      `${operation} expected one ${nodeKey} node, got ${matches.length}`,
+    );
+  }
+  const node = matches[0];
+  positiveID(node.id, `${operation}.${nodeKey}.id`);
+  positiveID(
+    node.process_instance_id,
+    `${operation}.${nodeKey}.process_instance_id`,
+  );
+  positiveID(node.version, `${operation}.${nodeKey}.version`);
+  const status = String(node.status || "").toLowerCase();
+  if (!statuses.includes(status)) {
+    throw new CliError(
+      `${operation}.${nodeKey} expected ${statuses.join("/")}, got ${status || "missing"}`,
+    );
+  }
+  return node;
+}
+
+async function listProductionExceptionsForOrder(rpc, productionOrderID) {
+  const data = await rpc({
+    actor: "admin",
+    domain: "operational_fact",
+    method: "list_production_exceptions",
+    params: {
+      production_order_id: productionOrderID,
+      limit: 200,
+      offset: 0,
+    },
+  });
+  return Array.isArray(data?.production_exceptions)
+    ? data.production_exceptions
+    : [];
+}
+
+async function readProductionExceptionApprovalProcess(rpc, decisionID) {
+  return rpc({
+    actor: "admin",
+    domain: "customer_config",
+    method: "get_production_exception_approval_process",
+    params: { production_exception_id: decisionID },
+  });
+}
+
+async function exactProductionExceptionApprovalTask({
+  rpc,
+  decisionID,
+  processInstanceID,
+  processNodeID,
+}) {
+  const data = await rpc({
+    actor: "boss",
+    domain: "workflow",
+    method: "list_tasks",
+    params: {
+      task_group: "production_exception_decision_approval",
+      source_type: "production_exception_decision",
+      source_id: decisionID,
+      limit: 20,
+      offset: 0,
+    },
+  });
+  const tasks = (Array.isArray(data?.tasks) ? data.tasks : []).filter(
+    (task) =>
+      String(task?.task_group || "") ===
+        "production_exception_decision_approval" &&
+      String(task?.source_type || "") === "production_exception_decision" &&
+      Number(task?.source_id) === decisionID &&
+      Number(task?.process_instance_id) === processInstanceID &&
+      Number(task?.process_node_instance_id) === processNodeID,
+  );
+  if (tasks.length !== 1) {
+    throw new CliError(
+      `production exception ${decisionID} expected one formal approval task, got ${tasks.length}`,
+    );
+  }
+  return tasks[0];
+}
+
+export async function ensureManualAcceptanceProductionExceptionApproval({
+  rpc,
+  plan,
+  production,
+  apply = true,
+}) {
+  const order = production?.order;
+  const productionOrderID = positiveID(
+    order?.id,
+    "production exception production order id",
+  );
+  const orderNo = requiredText(
+    order?.order_no,
+    "production exception production order no",
+    64,
+  );
+  const decisionNo = shortBusinessNo(plan, "SCYC", 1);
+  const existing = (
+    await listProductionExceptionsForOrder(rpc, productionOrderID)
+  ).filter((item) => String(item?.decision_no || "") === decisionNo);
+  if (existing.length > 1) {
+    throw new CliError(
+      `${decisionNo} has ${existing.length} conflicting production exceptions`,
+    );
+  }
+
+  const requirementData = await rpc({
+    actor: "admin",
+    domain: "operational_fact",
+    method: "list_production_order_material_requirements",
+    params: { production_order_id: productionOrderID },
+  });
+  const requirements = (
+    Array.isArray(requirementData?.material_requirements)
+      ? requirementData.material_requirements
+      : []
+  ).sort((left, right) => Number(left?.id || 0) - Number(right?.id || 0));
+  const requirement = existing[0]?.production_material_requirement_id
+    ? requirements.find(
+        (item) =>
+          Number(item?.id) ===
+          Number(existing[0].production_material_requirement_id),
+      )
+    : requirements[0];
+  positiveID(requirement?.id, `${decisionNo}.material_requirement.id`);
+  const productionOrderItemID = positiveID(
+    requirement?.production_order_item_id,
+    `${decisionNo}.production_order_item_id`,
+  );
+
+  let decision = existing[0];
+  if (!decision && apply) {
+    decision = resultItem(
+      await rpc({
+        actor: "admin",
+        domain: "operational_fact",
+        method: "submit_production_exception",
+        params: {
+          decision_no: decisionNo,
+          decision_type: "OVER_ISSUE",
+          production_order_id: productionOrderID,
+          production_order_item_id: productionOrderItemID,
+          production_material_requirement_id: requirement.id,
+          requested_quantity: "1",
+          reason: "本地验收：模拟生产损耗需追加领料一件。",
+          idempotency_key: `manual-acceptance:${plan.dataVersion}:production-exception:${decisionNo}:submit`,
+        },
+      }),
+      "production_exception",
+      "submit_production_exception",
+    );
+  }
+  if (!decision) throw new CliError(`${decisionNo} is missing`);
+  const decisionID = positiveID(decision.id, `${decisionNo}.id`);
+  if (
+    String(decision.decision_type || "").toUpperCase() !== "OVER_ISSUE" ||
+    Number(decision.production_order_id) !== productionOrderID ||
+    Number(decision.production_order_item_id) !== productionOrderItemID ||
+    Number(decision.production_material_requirement_id) !==
+      Number(requirement.id) ||
+    Number(decision.requested_quantity) !== 1
+  ) {
+    throw new CliError(`${decisionNo} source grain drifted`);
+  }
+
+  let processData = await readProductionExceptionApprovalProcess(
+    rpc,
+    decisionID,
+  );
+  if (!processData?.process_context) {
+    if (!apply) {
+      throw new CliError(`${decisionNo} approval process is missing`);
+    }
+    processData = await rpc({
+      actor: "admin",
+      domain: "customer_config",
+      method: "start_production_exception_approval_process",
+      params: {
+        production_exception_id: decisionID,
+        idempotency_key: `manual-acceptance:${plan.dataVersion}:production-exception:${decisionNo}:process`,
+      },
+    });
+  }
+  let instance = productionExceptionProcessInstance(
+    processData,
+    `${decisionNo} approval process`,
+  );
+  if (
+    String(instance.process_key || "") !== "production_exception_approval" ||
+    String(instance.business_ref_type || "") !==
+      "production_exception_decision" ||
+    Number(instance.business_ref_id) !== decisionID ||
+    String(instance.business_ref_no || "") !== decisionNo
+  ) {
+    throw new CliError(`${decisionNo} approval process source binding drifted`);
+  }
+  let approvalNode = requireProductionExceptionProcessNode(
+    processData,
+    "production_exception_decision_approval",
+    ["active", "completed"],
+    `${decisionNo} approval process`,
+  );
+  let approvalTask = await exactProductionExceptionApprovalTask({
+    rpc,
+    decisionID,
+    processInstanceID: Number(instance.id),
+    processNodeID: Number(approvalNode.id),
+  });
+  const approvalReason = "本地验收：批准本批模拟超领额度。";
+  if (
+    String(approvalTask.task_status_key || "").toLowerCase() === "ready" &&
+    apply
+  ) {
+    approvalTask = resultItem(
+      await rpc({
+        actor: "boss",
+        domain: "workflow",
+        method: "complete_task_action",
+        params: {
+          task_id: approvalTask.id,
+          expected_version: approvalTask.version,
+          idempotency_key: `manual-acceptance:${plan.dataVersion}:production-exception:${decisionNo}:approve`,
+          action_key: "complete",
+          reason: approvalReason,
+          payload: {
+            entry_path: "/erp/production/exceptions",
+            surface_key: "workflow_business_module",
+            process_decision: {
+              reason: approvalReason,
+              approved_quantity: "1",
+            },
+          },
+        },
+      }),
+      "task",
+      "complete_task_action",
+    );
+  }
+  if (String(approvalTask.task_status_key || "").toLowerCase() !== "done") {
+    throw new CliError(
+      `${decisionNo} formal approval task expected done, got ${approvalTask.task_status_key || "missing"}`,
+    );
+  }
+
+  processData = await readProductionExceptionApprovalProcess(rpc, decisionID);
+  instance = productionExceptionProcessInstance(
+    processData,
+    `${decisionNo} approval readback`,
+  );
+  approvalNode = requireProductionExceptionProcessNode(
+    processData,
+    "production_exception_decision_approval",
+    ["completed"],
+    `${decisionNo} approval readback`,
+  );
+  requireProductionExceptionProcessNode(
+    processData,
+    "approve_production_exception",
+    ["completed"],
+    `${decisionNo} approval readback`,
+  );
+  requireProductionExceptionProcessNode(
+    processData,
+    "over_issue_end",
+    ["completed"],
+    `${decisionNo} approval readback`,
+  );
+  const nodes = productionExceptionProcessNodes(
+    processData,
+    `${decisionNo} approval readback`,
+  );
+  const sourceReadback = processData?.source_readback;
+  if (
+    nodes.length !== 8 ||
+    String(instance.status || "").toLowerCase() !== "completed" ||
+    Number(sourceReadback?.id) !== decisionID ||
+    String(sourceReadback?.status || "").toUpperCase() !== "APPROVED" ||
+    String(sourceReadback?.execution_status || "").toUpperCase() !==
+      "PENDING" ||
+    Number(sourceReadback?.approved_quantity) !== 1
+  ) {
+    throw new CliError(`${decisionNo} formal approval readback is incomplete`);
+  }
+
+  approvalTask = await exactProductionExceptionApprovalTask({
+    rpc,
+    decisionID,
+    processInstanceID: Number(instance.id),
+    processNodeID: Number(approvalNode.id),
+  });
+  const approvalTaskCode = requiredText(
+    approvalTask.task_code,
+    `${decisionNo}.approval_task_code`,
+    128,
+  );
+  if (
+    String(approvalTask.task_status_key || "").toLowerCase() !== "done" ||
+    String(approvalTask.owner_role_key || "") !== "boss" ||
+    approvalTaskCode !==
+      `PROC-${instance.id}-NODE-${approvalNode.id}-A1`
+  ) {
+    throw new CliError(`${decisionNo} formal approval task readback drifted`);
+  }
+
+  const requirementReadback = await rpc({
+    actor: "admin",
+    domain: "operational_fact",
+    method: "list_production_order_material_requirements",
+    params: { production_order_id: productionOrderID },
+  });
+  const approvedRequirement = (
+    requirementReadback?.material_requirements || []
+  ).find((item) => Number(item?.id) === Number(requirement.id));
+  if (
+    Number(approvedRequirement?.approved_over_issue_quantity) !== 1 ||
+    Number(approvedRequirement?.remaining_quantity) !== 1
+  ) {
+    throw new CliError(
+      `${decisionNo} approved over-issue allowance did not read back as one`,
+    );
+  }
+  return {
+    ...sourceReadback,
+    production_order_no: orderNo,
+    process_instance_id: Number(instance.id),
+    approval_task_id: Number(approvalTask.id),
+    approval_task_code: approvalTaskCode,
+    approval_process_node_id: Number(approvalNode.id),
+    approved_remaining_quantity: String(
+      approvedRequirement.remaining_quantity,
+    ),
+  };
+}
+
 async function ensureReservationSpecimen(
   rpc,
   plan,
@@ -4065,6 +4433,13 @@ export async function runSourceDrivenFactStage(
     financeFacts: baseFinanceFacts,
     apply,
   });
+  const productionException =
+    await ensureManualAcceptanceProductionExceptionApproval({
+      rpc,
+      plan,
+      production: productionReadback[1],
+      apply,
+    });
   return {
     plans: {
       production: productionPlans,
@@ -4079,6 +4454,7 @@ export async function runSourceDrivenFactStage(
       ...productionReadback.flatMap((item) => item.facts),
       ...lifecycle.productionFacts,
     ]),
+    productionExceptions: [productionException],
     outsourcingFacts: dedupeByID(
       outsourcingReadback.flatMap((item) => item.facts),
     ),
@@ -4160,6 +4536,7 @@ function assertReferenceRecords(plan, records) {
     qualityInspections: plan.expectedMinimums.qualityInspections,
     productionOrders: plan.expectedMinimums.productionOrders,
     productionFacts: plan.expectedMinimums.productionFacts,
+    productionExceptions: plan.expectedMinimums.productionExceptions,
     inventoryLots: 45,
     inventoryBalances: 45,
     inventoryTxns: 45,
@@ -4211,6 +4588,7 @@ function assertReferenceRecords(plan, records) {
     "CANCELLED",
   ]);
   requireStatuses("productionFacts", ["DRAFT", "POSTED", "CANCELLED"]);
+  requireStatuses("productionExceptions", ["APPROVED"]);
   requireStatuses("stockReservations", ["ACTIVE", "RELEASED"]);
   requireStatuses("shipments", ["DRAFT", "SHIPPED", "CANCELLED"]);
   const longShipments = records.shipments.filter(
@@ -4233,6 +4611,35 @@ function assertReferenceRecords(plan, records) {
   for (const type of ["MATERIAL_ISSUE", "FINISHED_GOODS_RECEIPT", "REWORK"]) {
     if (!productionTypes.has(type))
       throw new CliError(`productionFacts is missing ${type}`);
+  }
+  const productionException = records.productionExceptions[0];
+  if (
+    records.productionExceptions.length !== 1 ||
+    String(productionException?.decision_type || "").toUpperCase() !==
+      "OVER_ISSUE" ||
+    String(productionException?.execution_status || "").toUpperCase() !==
+      "PENDING" ||
+    Number(productionException?.requested_quantity) !== 1 ||
+    Number(productionException?.approved_quantity) !== 1 ||
+    Number(productionException?.approved_remaining_quantity) !== 1 ||
+    positiveID(
+      productionException?.process_instance_id,
+      "productionException.process_instance_id",
+    ) <= 0 ||
+    positiveID(
+      productionException?.approval_task_id,
+      "productionException.approval_task_id",
+    ) <= 0 ||
+    positiveID(
+      productionException?.approval_process_node_id,
+      "productionException.approval_process_node_id",
+    ) <= 0 ||
+    String(productionException?.approval_task_code || "") !==
+      `PROC-${productionException.process_instance_id}-NODE-${productionException.approval_process_node_id}-A1`
+  ) {
+    throw new CliError(
+      "productionExceptions must contain one approved formal over-issue decision with exact ProcessRuntime anchors",
+    );
   }
   const txnTypes = new Set(
     records.inventoryTxns.map((item) =>
@@ -4337,6 +4744,7 @@ function buildFactReport({
   const referenceRecords = assertReferenceRecords(plan, {
     productionOrders: dedupeByID(facts.productionOrders),
     productionFacts: dedupeByID(facts.productionFacts),
+    productionExceptions: dedupeByID(facts.productionExceptions),
     purchaseReceipts: dedupeByID(purchase.purchaseReceipts),
     purchaseReturns: dedupeByID(purchase.purchaseReturns),
     purchaseReceiptAdjustments: dedupeByID(
@@ -4418,12 +4826,20 @@ function buildFactReport({
       ),
       productionOrders: countBy(referenceRecords.productionOrders, "status"),
       productionFacts: countBy(referenceRecords.productionFacts, "status"),
+      productionExceptions: countBy(
+        referenceRecords.productionExceptions,
+        "status",
+      ),
       stockReservations: countBy(referenceRecords.stockReservations, "status"),
       shipments: countBy(referenceRecords.shipments, "status"),
       financeFacts: countBy(referenceRecords.financeFacts, "status"),
     },
     typeCounts: {
       productionFacts: countBy(referenceRecords.productionFacts, "fact_type"),
+      productionExceptions: countBy(
+        referenceRecords.productionExceptions,
+        "decision_type",
+      ),
       financeFacts: countBy(referenceRecords.financeFacts, "fact_type"),
       inventoryTxns: countBy(referenceRecords.inventoryTxns, "txn_type"),
     },

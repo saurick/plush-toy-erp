@@ -314,7 +314,11 @@ test("production collaboration pages match the roles' executable task states", (
     [...exceptions.keyStates, ...exceptions.whatToDo].join("\n"),
     /退回/u,
   );
-  assert.match(exceptions.whatToDo.join("\n"), /资料不足、等待补充/u);
+  assert.match(
+    exceptions.whatToDo.join("\n"),
+    /正式审批任务编号.*超领生产异常申请/u,
+  );
+  assert.match(exceptions.whatToSee.join("\n"), /只形成可消费额度/u);
 });
 
 test("manual acceptance catalog gives quality production context without changing source-driven actions", () => {
@@ -511,7 +515,8 @@ test("active trial runbook keeps the exact 50-target and fresh-database evidence
   assert.match(runbook, /fresh 空库基线已记录/u);
   assert.match(runbook, /plush_erp_acceptance_<run-id>_dev/u);
   assert.match(runbook, /plush_erp_uat_20260716_v5/u);
-  assert.match(runbook, /出货放行[\s\S]*4 条/u);
+  assert.match(runbook, /生产异常[\s\S]*1 条已批准超领申请/u);
+  assert.match(runbook, /出货放行[\s\S]*45 条/u);
   assert.match(runbook, /出货管理[\s\S]*47 张/u);
 });
 
