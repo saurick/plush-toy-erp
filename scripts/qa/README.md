@@ -360,15 +360,15 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 
 `customer-trial-133` 的浏览器报告必须写到当前版本与目标的规范路径 `output/qa/manual-acceptance/datasets/<dataVersion>/customer-trial-133/browser/report.json`，并同时提供同批 `dataset/apply-report.json`、`readiness/verify-report.json` 与 `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON`。浏览器启动前会重新调用 `/readyz/runtime-identity`，把当前数据库、完整 release commit、Atlas migration、fresh baseline、attachments、source / fact / task / readiness 批次身份原子绑定；readiness 只参与身份闭合，列表数量仍必须由当前页面 DOM 重新证明，打印仍必须由当前 5 份 PDF 证明。
 
-四条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须匹配 `plush_erp_acceptance_*browser_actions_*_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向共享开发库、133、客户试用或生产数据库。
+四条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须由 `database-target.mjs` 的 `browser-actions` 生命周期生成并匹配 `plush_erp_acceptance_<run-id>_browser_actions_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向共享开发库、133、客户试用或生产数据库。
 
 ```bash
 MANUAL_ACCEPTANCE_DEMO_PASSWORD='<local-demo-password>' \
-EXCEPTION_FLOW_BROWSER_CONFIRM='RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:plush_erp_acceptance_exception_browser_actions_example_dev:http://127.0.0.1:8323' \
+EXCEPTION_FLOW_BROWSER_CONFIRM='RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:plush_erp_acceptance_exception_example_browser_actions_dev:http://127.0.0.1:8323' \
   node scripts/qa/exception-flow-real-write-browser.mjs \
     --base-url http://127.0.0.1:15214 \
     --backend-url http://127.0.0.1:8323 \
-    --database-name plush_erp_acceptance_exception_browser_actions_example_dev \
+    --database-name plush_erp_acceptance_exception_example_browser_actions_dev \
     --report output/qa/manual-acceptance/local-business-actions/report.json
 ```
 

@@ -8,6 +8,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { classifyDatabaseName } from "./database-target.mjs";
 import { FORMAL_DEMO_ACCOUNT_PROFILES } from "./manual-acceptance-account-scenarios.mjs";
 
 const REPO_ROOT = path.resolve(
@@ -19,8 +20,6 @@ const REPORT_ROOT = path.resolve(
   "output/qa/manual-acceptance",
 );
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
-const ACTION_DATABASE =
-  /^plush_erp_acceptance_[a-z0-9_]*browser_actions_[a-z0-9_]*_dev$/u;
 const CUSTOMER_KEY = "yoyoosun";
 const PERMISSION_DENIED = 40304;
 const STALE_WRITE_CONFLICT = 40920;
@@ -124,7 +123,11 @@ export function parseExceptionFlowArgs(argv = [], env = process.env) {
       2,
     );
   }
-  if (!ACTION_DATABASE.test(options.databaseName)) {
+  const databaseTarget = classifyDatabaseName(options.databaseName);
+  if (
+    databaseTarget.disposable !== true ||
+    databaseTarget.profile !== "browser-actions"
+  ) {
     throw new AcceptanceError(
       "--database-name must identify a dedicated browser_actions acceptance database ending in _dev",
       2,

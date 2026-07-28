@@ -11,7 +11,7 @@ import {
 } from "./exception-flow-real-write-browser.mjs";
 
 const DATABASE_NAME =
-  "plush_erp_acceptance_79da_browser_actions_contract_dev";
+  "plush_erp_acceptance_79da_contract_browser_actions_dev";
 const BACKEND_URL = "http://127.0.0.1:8323";
 const REPORT =
   "output/qa/manual-acceptance/contracts/exception-flow-browser.json";

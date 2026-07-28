@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
 
-import { resolveExceptionFlowReportPath } from "./exception-flow-real-write-browser.mjs";
+import {
+  exceptionFlowConfirmation,
+  parseExceptionFlowArgs,
+  resolveExceptionFlowReportPath,
+} from "./exception-flow-real-write-browser.mjs";
 import {
   LOCAL_ACCEPTANCE_LIFECYCLE_SCHEMA,
   allocateLocalAcceptancePorts,
@@ -14,12 +18,37 @@ import {
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
 
 test("local acceptance lifecycle keeps the cloned-write report inside the exception-flow evidence root", () => {
+  const identity = buildLocalAcceptanceLifecycleIdentity({
+    commit: COMMIT,
+    runID: "final-run",
+  });
   const datasetOutputRoot = path.resolve(
     "output/qa/manual-acceptance/datasets/lifecycle/final-run",
   );
   const reportPath = localAcceptanceExceptionReportPath(datasetOutputRoot);
+  const backendURL = "http://127.0.0.1:18323";
+  const options = parseExceptionFlowArgs(
+    [
+      "--base-url",
+      "http://127.0.0.1:15210",
+      "--backend-url",
+      backendURL,
+      "--database-name",
+      identity.browserActionsDatabase,
+      "--report",
+      reportPath,
+    ],
+    {
+      MANUAL_ACCEPTANCE_DEMO_PASSWORD: "unit-test-only-password",
+      EXCEPTION_FLOW_BROWSER_CONFIRM: exceptionFlowConfirmation({
+        backendURL,
+        databaseName: identity.browserActionsDatabase,
+      }),
+    },
+  );
 
   assert.equal(resolveExceptionFlowReportPath(reportPath), reportPath);
+  assert.equal(options.databaseName, identity.browserActionsDatabase);
   assert.equal(
     path.relative(datasetOutputRoot, reportPath),
     "2026.07.16-v5/local/browser-actions/report.json",
