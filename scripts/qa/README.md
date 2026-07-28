@@ -360,6 +360,8 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 
 `customer-trial-133` 的浏览器报告必须写到当前版本与目标的规范路径 `output/qa/manual-acceptance/datasets/<dataVersion>/customer-trial-133/browser/report.json`，并同时提供同批 `dataset/apply-report.json`、`readiness/verify-report.json` 与 `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON`。浏览器启动前会重新调用 `/readyz/runtime-identity`，把当前数据库、完整 release commit、Atlas migration、fresh baseline、attachments、source / fact / task / readiness 批次身份原子绑定；readiness 只参与身份闭合，列表数量仍必须由当前页面 DOM 重新证明，打印仍必须由当前 5 份 PDF 证明。
 
+本地 Kratos BBR 若在逐页读取期间返回纯 HTTP 429，浏览器验收会按递增等待最多重试两次，并在报告保留每次失败事件与截图。只要混入其他运行时错误、最终页面数据不足，或第三次仍被限流，整轮验收仍失败；该重试不能把持续过载或业务错误改写成绿色。
+
 四条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须由 `database-target.mjs` 的 `browser-actions` 生命周期生成并匹配 `plush_erp_acceptance_<run-id>_browser_actions_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向共享开发库、133、客户试用或生产数据库。
 
 ```bash

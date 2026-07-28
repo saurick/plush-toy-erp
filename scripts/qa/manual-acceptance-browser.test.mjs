@@ -19,6 +19,8 @@ import {
   buildManualAcceptanceCurrentBatchReadiness,
   normalizeLocalBrowserURL,
   partitionTargetRuntimeEvents,
+  isRetryableTargetRateLimitFailure,
+  runTargetWithRateLimitRetry,
   summarizeManualAcceptance,
   parseManualAcceptanceBrowserArgs,
   resolveManualAcceptanceBrowserReportPath,
@@ -1279,6 +1281,70 @@ test("fresh print workspaces never hide render-pdf failures by route or status",
   );
   assert.equal(businessPage.blocking.length, 2);
   assert.equal(businessPage.expected.length, 0);
+});
+
+test("browser target retries only bounded pure HTTP 429 failures and retains evidence", async () => {
+  const rateLimited = {
+    passed: false,
+    runtimeErrors: [
+      {
+        type: "response",
+        message: "429 http://127.0.0.1:15200/rpc/quality",
+      },
+      {
+        type: "console",
+        message:
+          "Failed to load resource: the server responded with a status of 429 (Too Many Requests)",
+      },
+    ],
+    failureScreenshot: "output/qa/first-failure.png",
+  };
+  assert.equal(isRetryableTargetRateLimitFailure(rateLimited), true);
+  assert.equal(
+    isRetryableTargetRateLimitFailure({
+      ...rateLimited,
+      runtimeErrors: [
+        ...rateLimited.runtimeErrors,
+        { type: "response", message: "500 http://127.0.0.1:15200/rpc/quality" },
+      ],
+    }),
+    false,
+  );
+
+  const waits = [];
+  let attempts = 0;
+  const recovered = await runTargetWithRateLimitRetry(
+    async () => {
+      attempts += 1;
+      return attempts === 1
+        ? rateLimited
+        : { passed: true, runtimeErrors: [], dataEvidence: { proven: true } };
+    },
+    {
+      waitImpl: async (milliseconds) => waits.push(milliseconds),
+      retryDelayMs: 25,
+    },
+  );
+  assert.equal(attempts, 2);
+  assert.deepEqual(waits, [25]);
+  assert.equal(recovered.passed, true);
+  assert.equal(recovered.rateLimitRetryEvidence.length, 1);
+  assert.equal(
+    recovered.rateLimitRetryEvidence[0].failureScreenshot,
+    "output/qa/first-failure.png",
+  );
+
+  attempts = 0;
+  const persistent = await runTargetWithRateLimitRetry(
+    async () => {
+      attempts += 1;
+      return rateLimited;
+    },
+    { waitImpl: async () => {}, maxAttempts: 3, retryDelayMs: 0 },
+  );
+  assert.equal(attempts, 3);
+  assert.equal(persistent.passed, false);
+  assert.equal(persistent.rateLimitRetryEvidence.length, 3);
 });
 
 test("business summary totals use the visible client-facing counters", () => {

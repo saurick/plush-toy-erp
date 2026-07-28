@@ -79,6 +79,8 @@ const LOGIN_TIMEOUT_MS = 20_000;
 const PAGE_TIMEOUT_MS = 25_000;
 const AUTH_PACE_MS = 3_000;
 const TARGET_PACE_MS = 3_000;
+const TARGET_RATE_LIMIT_MAX_ATTEMPTS = 3;
+const TARGET_RATE_LIMIT_RETRY_DELAY_MS = 3_000;
 
 export const FORMAL_BROWSER_ACCOUNTS = Object.freeze([
   Object.freeze({ username: "demo_boss", roleKey: "boss" }),
@@ -3727,6 +3729,49 @@ export function partitionTargetRuntimeEvents(target, events) {
   return { blocking: events, expected: [] };
 }
 
+export function isRetryableTargetRateLimitFailure(result) {
+  const events = Array.isArray(result?.runtimeErrors)
+    ? result.runtimeErrors
+    : [];
+  if (result?.passed !== false || events.length === 0) return false;
+  return events.every((event) => {
+    const message = String(event?.message || "");
+    if (event?.type === "response") return /^429\s/u.test(message);
+    if (event?.type === "console") {
+      return /\bstatus of 429\b.*\bToo Many Requests\b/iu.test(message);
+    }
+    return false;
+  });
+}
+
+export async function runTargetWithRateLimitRetry(
+  runAttempt,
+  {
+    waitImpl = wait,
+    maxAttempts = TARGET_RATE_LIMIT_MAX_ATTEMPTS,
+    retryDelayMs = TARGET_RATE_LIMIT_RETRY_DELAY_MS,
+  } = {},
+) {
+  const retryEvidence = [];
+  let result;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    result = await runAttempt(attempt);
+    if (!isRetryableTargetRateLimitFailure(result)) break;
+    retryEvidence.push({
+      attempt,
+      runtimeErrors: result.runtimeErrors,
+      failureScreenshot: result.failureScreenshot || "",
+    });
+    if (attempt === maxAttempts) break;
+    await waitImpl(retryDelayMs * attempt);
+  }
+  if (retryEvidence.length === 0) return result;
+  return {
+    ...result,
+    rateLimitRetryEvidence: retryEvidence,
+  };
+}
+
 export function summarizeManualAcceptance({
   targets,
   formalAccounts,
@@ -4212,15 +4257,17 @@ export async function runManualAcceptanceBrowser(
     for (const target of plan.targets) {
       if (target.group === "print-workspace") continue;
       targets.push(
-        await verifyTarget(browser, {
-          baseURL: normalizedBaseURL,
-          target,
-          desktopStorageStates,
-          mobileStorageStates,
-          preflight,
-          reportPath: normalizedReportPath,
-          datasetBinding,
-        }),
+        await runTargetWithRateLimitRetry(() =>
+          verifyTarget(browser, {
+            baseURL: normalizedBaseURL,
+            target,
+            desktopStorageStates,
+            mobileStorageStates,
+            preflight,
+            reportPath: normalizedReportPath,
+            datasetBinding,
+          }),
+        ),
       );
       await wait(TARGET_PACE_MS);
     }
