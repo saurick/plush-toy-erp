@@ -3,11 +3,33 @@ import test from "node:test";
 
 import {
   LOCAL_ACCEPTANCE_LIFECYCLE_SCHEMA,
+  allocateLocalAcceptancePorts,
   buildLocalAcceptanceLifecycleIdentity,
   runLocalAcceptanceLifecycle,
 } from "./local-acceptance-lifecycle.mjs";
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
+
+test("local acceptance lifecycle reserves the web port from the canonical auxiliary range", async () => {
+  const candidates = [8300, 15_210, 44_001, 44_001, 44_002];
+  const roots = [];
+  const result = await allocateLocalAcceptancePorts("/repo", {
+    loadPorts(repoRoot) {
+      roots.push(repoRoot);
+      return { auxStart: 15_200 };
+    },
+    findAvailableAuxPort: async (ports) => ports.auxStart + 10,
+    allocateUnrestrictedPort: async () => candidates.shift(),
+  });
+
+  assert.deepEqual(roots, ["/repo"]);
+  assert.deepEqual(result, {
+    httpPort: 44_001,
+    grpcPort: 44_002,
+    webPort: 15_210,
+  });
+  assert.deepEqual(candidates, []);
+});
 
 function fakeRuntime({ failAt = "", residual = "" } = {}) {
   const events = [];

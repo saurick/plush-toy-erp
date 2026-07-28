@@ -18,6 +18,10 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import {
+  findAvailableDevAuxPort,
+  loadDevPorts,
+} from "../dev-ports.mjs";
 import { buildRuntimePreviewManifest } from "./customer-config-runtime-manifest.mjs";
 import {
   databaseNameForRun,
@@ -457,6 +461,34 @@ function allocatePort() {
       });
     });
   });
+}
+
+export async function allocateLocalAcceptancePorts(
+  repoRoot,
+  {
+    allocateUnrestrictedPort = allocatePort,
+    findAvailableAuxPort = findAvailableDevAuxPort,
+    loadPorts = loadDevPorts,
+  } = {},
+) {
+  const devPorts = loadPorts(repoRoot);
+  const webPort = await findAvailableAuxPort(devPorts);
+  const reserved = new Set([8300, webPort]);
+  const allocateDistinctPort = async (label) => {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const port = await allocateUnrestrictedPort();
+      if (!reserved.has(port)) {
+        reserved.add(port);
+        return port;
+      }
+    }
+    throw new Error(
+      `local acceptance lifecycle could not allocate a distinct ${label} port`,
+    );
+  };
+  const httpPort = await allocateDistinctPort("HTTP");
+  const grpcPort = await allocateDistinctPort("gRPC");
+  return { httpPort, grpcPort, webPort };
 }
 
 async function waitFor(check, label, timeoutMs = SERVICE_READY_TIMEOUT_MS) {
@@ -1120,16 +1152,8 @@ async function buildDirectContext({
       "local acceptance lifecycle output must stay in the repository",
     );
   }
-  const [httpPort, grpcPort, webPort] = await Promise.all([
-    allocatePort(),
-    allocatePort(),
-    allocatePort(),
-  ]);
-  if (new Set([httpPort, grpcPort, webPort]).size !== 3 || httpPort === 8300) {
-    throw new Error(
-      "local acceptance lifecycle could not allocate isolated ports",
-    );
-  }
+  const { httpPort, grpcPort, webPort } =
+    await allocateLocalAcceptancePorts(repoRoot);
   mkdirSync(outputDir, { recursive: true, mode: 0o700 });
   return Object.freeze({
     repoRoot,
