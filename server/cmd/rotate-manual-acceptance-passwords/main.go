@@ -35,7 +35,7 @@ const (
 
 	localCustomerConfigProductVersion = "local-customer-package-test-apply"
 	localCustomerConfigApplyPurpose   = "local_test_apply"
-	customerTrial133Revision          = "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1"
+	customerTrial133Revision          = "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1"
 	customerTrial133ProductVersion    = "customer-trial-133-test-2026.07.16-v5"
 	customerTrial133ApplyPurpose      = "customer_trial_test_apply"
 )

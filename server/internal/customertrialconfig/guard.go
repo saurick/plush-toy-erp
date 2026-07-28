@@ -19,7 +19,7 @@ const (
 	ProductVersion = biz.CustomerConfigTrialProductVersion
 	ApplyPurpose   = biz.CustomerConfigTrialApplyPurpose
 	DatasetVersion = biz.CustomerConfigTrialDatasetVersion
-	Revision       = "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1"
+	Revision       = "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1"
 
 	expectedDatabase = "plush_erp_uat_20260716_v5"
 	expectedHost     = "postgres"

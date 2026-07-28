@@ -31,7 +31,7 @@ export const CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION =
 export const CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION =
   "customer-trial-133-test-2026.07.16-v5";
 export const CUSTOMER_TRIAL_133_CONFIG_REVISION =
-  "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1";
+  "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1";
 export const CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE =
   "customer_trial_test_apply";
 export const MANUAL_ACCEPTANCE_DATASET_KEY = "yoyoosun-manual-acceptance";

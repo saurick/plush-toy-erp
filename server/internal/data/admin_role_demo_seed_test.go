@@ -609,7 +609,7 @@ func testRotationOperation() ManualAcceptancePasswordRotationOperation {
 		DatasetVersion:   "2026.07.16-v5",
 		Release:          strings.Repeat("a", 40),
 		MigrationVersion: "20260722000505",
-		CustomerRevision: "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1",
+		CustomerRevision: "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1",
 	}
 }
 
