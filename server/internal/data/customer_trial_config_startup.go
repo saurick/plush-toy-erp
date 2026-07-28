@@ -70,7 +70,7 @@ LIMIT 1`, customertrialconfig.ExpectedCustomerKey).Scan(
 			return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the registered local development database family")
 		}
 	}
-	trial, err := customertrialconfig.ClassifyManifest(
+	trial, err := customertrialconfig.ClassifyActiveManifest(
 		customertrialconfig.ExpectedCustomerKey,
 		revision,
 		productVersion,

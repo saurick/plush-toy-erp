@@ -334,6 +334,8 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 发布身份预检发现 133 当前激活的 V5 revision hash 为 `cc60f2462936777125206f55416ed60b95d0a195152418f271ca8b43459b8b3d`，当前 V7 内容按正式归一化合同计算为 `17e504945d066fcca973ab9a8463e5e1e26f517fa4630f856b8e6e32f9cf83bc`；同名 revision 内容不同会按追加式门禁失败关闭。133 目标 revision 因此升级为独立的 `yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1`，数据合同与运行批次继续保持 `2026.07.16-v5 / 20260716-V5`，并同步目标策略、服务端守卫、凭据轮换合同、测试和客户交付矩阵。相关 Node 合同 `31 / 31` 与 Go 定向包均已通过；最终提交仍须重新绑定 fresh lifecycle、全量门禁、精确 SHA CI、不可变制品、本机发布演练和 133 激活读回。
 
+升级启动复核进一步确认：若新后端在 V5 仍为 active 时只识别 V7，会在正式 API 切换前因启动检查失败。当前实现只在启动读回中接受精确的 V5 → V7 前置状态；validate、publish、transition 和 activate 仍只接受 V7，旧 V5 不能成为新写入别名。V7 激活后运行主路径只读取 V7；旧镜像回滚必须先由仍健康的新后端按正式 rollback 链切回 V5。服务端启动 / trial guard 定向测试和客户配置 Node 合同 `29 / 29` 已通过，切换与回滚顺序已同步到试用执行手册。
+
 1. 发布前必须绑定最终 commit / image，按正式流程执行备份 / 回滚点、migration status / apply / readback、health / ready、真实账号与业务 smoke。
 2. 客户交付仍须甲方岗位 UAT / 签收；本地或固定旧版本绿色不能替代。
 3. 异常流 Worktree 暂保留为恢复副本；后续清理须单独确认目标和现场，不把 Handoff、提交或推送等同于 Worktree 删除。

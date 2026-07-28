@@ -136,6 +136,44 @@ func TestClassifyManifestRequiresAtomicExactMarker(t *testing.T) {
 	}
 }
 
+func TestClassifyActiveManifestAllowsOnlyExactPreviousStartupIdentity(t *testing.T) {
+	marker := map[string]any{
+		"applyPurpose":   ApplyPurpose,
+		"datasetVersion": DatasetVersion,
+		"target":         ExpectedTarget,
+	}
+	trial, err := ClassifyActiveManifest(
+		ExpectedCustomerKey,
+		PreviousActiveRevision,
+		ProductVersion,
+		marker,
+	)
+	if err != nil || !trial {
+		t.Fatalf("ClassifyActiveManifest() = (%v, %v), want exact previous active revision", trial, err)
+	}
+	if trial, err := ClassifyManifest(
+		ExpectedCustomerKey,
+		PreviousActiveRevision,
+		ProductVersion,
+		marker,
+	); err == nil || trial {
+		t.Fatalf("ClassifyManifest() = (%v, %v), previous revision must remain rejected for writes", trial, err)
+	}
+	for _, revision := range []string{
+		"yoyoosun-customer-trial-133-package-v3.runtime-manifest-v1",
+		PreviousActiveRevision + ".other",
+	} {
+		if trial, err := ClassifyActiveManifest(
+			ExpectedCustomerKey,
+			revision,
+			ProductVersion,
+			marker,
+		); err == nil || trial {
+			t.Fatalf("ClassifyActiveManifest(%q) = (%v, %v), want rejection", revision, trial, err)
+		}
+	}
+}
+
 func TestClassifyRevisionProductVersionReservesTrialNamespace(t *testing.T) {
 	if trial, err := ClassifyRevisionProductVersion(ExpectedCustomerKey, Revision, ProductVersion); err != nil || !trial {
 		t.Fatalf("ClassifyRevisionProductVersion() = (%v, %v), want trial", trial, err)

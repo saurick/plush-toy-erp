@@ -75,22 +75,44 @@ func TestValidateActiveCustomerTrialConfigAllowsFormalOrMissingRevision(t *testi
 }
 
 func TestValidateActiveCustomerTrialConfigRequiresExactRuntimeOptIn(t *testing.T) {
+	for _, revision := range []string{
+		customertrialconfig.Revision,
+		customertrialconfig.PreviousActiveRevision,
+	} {
+		t.Run(revision, func(t *testing.T) {
+			db, mock := expectActiveCustomerConfigVersion(t, revision, customertrialconfig.ProductVersion, map[string]string{
+				"applyPurpose":   customertrialconfig.ApplyPurpose,
+				"datasetVersion": customertrialconfig.DatasetVersion,
+				"target":         customertrialconfig.ExpectedTarget,
+			}, "plush_erp_uat_20260716_v5", "trial-system", nil)
+			defer func() { _ = db.Close() }()
+			if err := validateActiveCustomerTrialConfig(context.Background(), db, false, ""); err == nil {
+				t.Fatal("expected active trial revision to be rejected while gate is disabled")
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T) {
 	db, mock := expectActiveCustomerConfigVersion(t, customertrialconfig.Revision, customertrialconfig.ProductVersion, map[string]string{
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.DatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
 	}, "plush_erp_uat_20260716_v5", "trial-system", nil)
 	defer func() { _ = db.Close() }()
-	if err := validateActiveCustomerTrialConfig(context.Background(), db, false, ""); err == nil {
-		t.Fatal("expected active trial revision to be rejected while gate is disabled")
+	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err != nil {
+		t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T) {
-	db, mock := expectActiveCustomerConfigVersion(t, customertrialconfig.Revision, customertrialconfig.ProductVersion, map[string]string{
+func TestValidateActiveCustomerTrialConfigAllowsExactPreviousRevisionDuringV7Activation(t *testing.T) {
+	db, mock := expectActiveCustomerConfigVersion(t, customertrialconfig.PreviousActiveRevision, customertrialconfig.ProductVersion, map[string]string{
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.DatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,

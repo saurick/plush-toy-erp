@@ -20,6 +20,10 @@ const (
 	ApplyPurpose   = biz.CustomerConfigTrialApplyPurpose
 	DatasetVersion = biz.CustomerConfigTrialDatasetVersion
 	Revision       = "yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1"
+	// PreviousActiveRevision is admitted only by the startup readback during
+	// the V5-to-V7 activation window. Publish and transition classifiers still
+	// accept Revision only, so the previous identity cannot become a write alias.
+	PreviousActiveRevision = "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1"
 
 	expectedDatabase = "plush_erp_uat_20260716_v5"
 	expectedHost     = "postgres"
@@ -57,6 +61,21 @@ func ResolveGate(dsn string, getenv func(string) string) (bool, error) {
 // ClassifyManifest reserves the trial marker fields as one atomic identity.
 // A payload carrying any reserved marker must carry every exact marker value.
 func ClassifyManifest(customerKey, revision, productVersion string, compiledSnapshot map[string]any) (bool, error) {
+	return classifyManifestForRevision(customerKey, revision, productVersion, compiledSnapshot, Revision)
+}
+
+// ClassifyActiveManifest admits the exact previous active revision only long
+// enough for the V7 server to start and activate Revision through the formal
+// API. It must not be used by publish or transition operations.
+func ClassifyActiveManifest(customerKey, revision, productVersion string, compiledSnapshot map[string]any) (bool, error) {
+	trial, err := ClassifyManifest(customerKey, revision, productVersion, compiledSnapshot)
+	if err == nil || strings.TrimSpace(revision) != PreviousActiveRevision {
+		return trial, err
+	}
+	return classifyManifestForRevision(customerKey, revision, productVersion, compiledSnapshot, PreviousActiveRevision)
+}
+
+func classifyManifestForRevision(customerKey, revision, productVersion string, compiledSnapshot map[string]any, expectedRevision string) (bool, error) {
 	customerKey = strings.TrimSpace(customerKey)
 	revision = strings.TrimSpace(revision)
 	productVersion = strings.TrimSpace(productVersion)
@@ -70,7 +89,7 @@ func ClassifyManifest(customerKey, revision, productVersion string, compiledSnap
 		return false, nil
 	}
 	if customerKey != ExpectedCustomerKey ||
-		revision != Revision ||
+		revision != expectedRevision ||
 		productVersion != ProductVersion ||
 		!exactSnapshotString(compiledSnapshot, "applyPurpose", ApplyPurpose) ||
 		!exactSnapshotString(compiledSnapshot, "datasetVersion", DatasetVersion) ||
