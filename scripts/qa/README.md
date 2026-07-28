@@ -374,7 +374,7 @@ EXCEPTION_FLOW_BROWSER_CONFIRM='RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:plus
     --report output/qa/manual-acceptance/local-business-actions/report.json
 ```
 
-该 companion 的主业务 mutation 由真实产品 UI 点击触发；直接浏览器上下文 RPC 只用于结构合法的无权角色负例和重复 / 旧 version 重试。未知结果场景是在后端已经返回成功后丢弃浏览器响应，再由页面权威读回确认，不 mock 业务成功。报告会明确记录 `admin_users.last_login_at` 的 `auth-write`、四条业务写、四个服务端 `40304`、四个 simulated transport fault、终态 Fact / 库存 / 核销读回及 `40920` CAS 拒绝。Sales Return、Finance Payment 使用隔离数据集中已经批准的来源，Inventory Adjustment 由浏览器新建并办理老板审批与仓库执行任务，Production OVER_ISSUE 使用已批准额度并由真实领料 Fact 消费后取消恢复。它不证明其他岗位、IQC / 委外写动作、打印工作台、部署、客户账号或客户 UAT；这些证据继续按各自验收层级单列。
+该 companion 的主业务 mutation 由真实产品 UI 点击触发；直接浏览器上下文 RPC 只用于结构合法的无权角色负例、权威读回和重复 / 旧 version 重试。未知结果场景是在后端已经返回成功后丢弃浏览器响应，再由页面权威读回确认，不 mock 业务成功。报告会明确记录 `admin_users.last_login_at` 的 `auth-write`、四条业务写、四个服务端 `40304`、四个 simulated transport fault、终态 Fact / 库存 / 核销读回及 `40920` CAS 拒绝。Sales Return 从克隆库的已出货来源经产品 UI 新建、启动流程、老板审批和仓库任务后再显式收货 / 冲正；Finance Payment 使用隔离数据集中已经批准的来源，Inventory Adjustment 由浏览器新建并办理老板审批与仓库执行任务，Production OVER_ISSUE 使用已批准额度并由真实领料 Fact 消费后取消恢复。它不证明其他岗位、IQC / 委外写动作、打印工作台、部署、客户账号或客户 UAT；这些证据继续按各自验收层级单列。
 
 133 前端隧道为 `18376` 时，最终浏览器命令为：
 

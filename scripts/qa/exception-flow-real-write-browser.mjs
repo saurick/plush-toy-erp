@@ -542,6 +542,95 @@ function findRecord(items, predicate, label) {
   return item;
 }
 
+async function createSalesReturnSourceInBrowser(browser, options) {
+  const session = await login(browser, { ...options, roleKey: "sales" });
+  try {
+    const listed = await browserRpc(
+      session.page,
+      "operational_fact",
+      "list_shipments",
+      { status: "SHIPPED", limit: 100, offset: 0 },
+    );
+    const shipment = findRecord(
+      listed.shipments,
+      (item) =>
+        item.status === "SHIPPED" &&
+        Array.isArray(item.items) &&
+        item.items.some((line) => Number(line.quantity) >= 1),
+      "shipped sales return source",
+    );
+    const returnNo = `RMA-ACT-${String(Date.now()).slice(-10)}`;
+
+    await goto(
+      session.page,
+      options.baseURL,
+      "/erp/sales/customer-returns",
+      "客户退货 / RMA",
+    );
+    await session.page
+      .getByRole("button", { name: "新建客户退货", exact: true })
+      .click();
+    const modal = await visibleModal(session.page, "新建客户退货");
+    const shipmentField = modal
+      .locator(".ant-form-item")
+      .filter({ hasText: "来源出货" })
+      .first();
+    const shipmentCombobox = shipmentField.getByRole("combobox");
+    await shipmentField.locator(".ant-select-selector").click();
+    await shipmentCombobox.fill(shipment.shipment_no);
+    const shipmentOption = session.page
+      .locator(".ant-select-dropdown:visible .ant-select-item-option")
+      .filter({ hasText: shipment.shipment_no })
+      .first();
+    await shipmentOption.waitFor({ state: "visible" });
+    await shipmentOption.click();
+    await modal.getByLabel("退货单号").fill(returnNo);
+    await modal
+      .getByLabel("退货原因")
+      .fill("真实浏览器异常流验收客户退货");
+    const quantity = modal.getByLabel("退货数量").first();
+    await quantity.waitFor({ state: "visible" });
+    await quantity.fill("1");
+    await modal
+      .getByRole("button", { name: "提交退货申请", exact: true })
+      .click();
+    await waitMessage(session.page, "客户退货申请已生成，等待审批");
+
+    const returns = await browserRpc(
+      session.page,
+      "operational_fact",
+      "list_sales_returns",
+      { status: "DRAFT", limit: 100, offset: 0 },
+    );
+    const created = findRecord(
+      returns.sales_returns,
+      (item) => item.return_no === returnNo && item.status === "DRAFT",
+      "browser-created sales return",
+    );
+    const process = await browserRpc(
+      session.page,
+      "customer_config",
+      "get_sales_return_acceptance_process",
+      { customer_key: CUSTOMER_KEY, sales_return_id: created.id },
+    );
+    if (!process?.process_context) {
+      throw new AcceptanceError(
+        "browser-created sales return approval process is missing",
+      );
+    }
+    return {
+      created,
+      process,
+      shipment: {
+        id: shipment.id,
+        no: shipment.shipment_no,
+      },
+    };
+  } finally {
+    await session.context.close();
+  }
+}
+
 async function verifyRuntimeIdentity({ backendURL, databaseName }) {
   const ready = await fetch(new URL("/readyz", `${backendURL}/`));
   if (!ready.ok || String(await ready.text()).trim() !== "ready") {
@@ -573,39 +662,19 @@ async function verifyRuntimeIdentity({ backendURL, databaseName }) {
 }
 
 async function runSalesReturnFlow(browser, options, report) {
-  const negative = await login(browser, { ...options, roleKey: "sales" });
-  try {
-    const listed = await browserRpc(
-      negative.page,
-      "operational_fact",
-      "list_sales_returns",
-      { status: "RECEIVED", limit: 100, offset: 0 },
-    );
-    const received = findRecord(
-      listed.sales_returns,
-      (item) => item.status === "RECEIVED",
-      "received sales return",
-    );
-    report.negativePermissions.push(
-      await expectPermissionDenied(
-        negative.page,
-        "operational_fact",
-        "reverse_sales_return",
-        {
-          id: received.id,
-          expected_version: received.version,
-          reason: "无权角色服务端拒绝验证",
-        },
-      ),
-    );
-  } finally {
-    await negative.context.close();
-  }
-
+  const sourceSetup = await createSalesReturnSourceInBrowser(browser, options);
+  const approvalTaskAction = await actOnTaskInBrowser(browser, options, {
+    roleKey: "boss",
+    sourceNo: sourceSetup.created.return_no,
+    actionTitle: "审批通过",
+    confirmLabel: "确认通过",
+    successMessage: "审批已通过",
+    reason: "真实浏览器异常流验收批准客户退货",
+  });
   const session = await login(browser, { ...options, roleKey: "warehouse" });
   const flow = {
     key: "sales_return",
-    sourceSetup: "existing_isolated_dataset_approved_source",
+    sourceSetup: "browser_created_from_shipped_source",
     browserActions: [],
     readbacks: [],
   };
@@ -633,8 +702,11 @@ async function runSalesReturnFlow(browser, options, report) {
       status: source.status,
       version: source.version,
     };
+    flow.sourceShipment = sourceSetup.shipment;
+    flow.processBeforeApproval = summarizeProcess(sourceSetup.process);
     flow.processBefore = summarizeProcess(process);
     flow.taskActions = [
+      approvalTaskAction,
       await actOnTaskInBrowser(browser, options, {
         roleKey: "warehouse",
         sourceNo: source.return_no,
@@ -692,6 +764,24 @@ async function runSalesReturnFlow(browser, options, report) {
       version: received.version,
       inventoryTxnCount: receiptTxns.inventory_txns.length,
     });
+
+    const negative = await login(browser, { ...options, roleKey: "sales" });
+    try {
+      report.negativePermissions.push(
+        await expectPermissionDenied(
+          negative.page,
+          "operational_fact",
+          "reverse_sales_return",
+          {
+            id: received.id,
+            expected_version: received.version,
+            reason: "无权角色服务端拒绝验证",
+          },
+        ),
+      );
+    } finally {
+      await negative.context.close();
+    }
 
     await session.page
       .getByRole("button", { name: "冲正退货入库", exact: true })
