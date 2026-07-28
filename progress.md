@@ -330,6 +330,8 @@ Git 收口：用户授权提交推送所有 Local 代码后，单一 owner 将 1
 
 随后绑定 `7dfbd11235141b5d00e29acfd0f69aedcec4a37c` 的 fresh lifecycle 已走完九阶段数据、readiness 与浏览器启动，50 个页面中 49 个通过；唯一失败是“生产异常”仍用已取消返工事实生成的 `production_exception` 来源提醒任务作为页面证据，而当前页面只查询正式 `production_exception_decision_approval`。本轮没有恢复旧任务组兼容，而是让 V5 从已发布生产订单物料需求提交 1 条 `OVER_ISSUE` 正式异常申请，由老板完成 `production_exception_approval`，精确读回 8 个节点、确定性 `PROC-<process>-NODE-<approval>-A1` 任务码、`APPROVED / PENDING` 决定及 1 件可消费额度。Fact 报告、readiness、页面数据合同、浏览器检索、客户手册与当前真源已统一；返工来源提醒继续只服务其原协同语义，不能冒充正式申请或审批。受影响脚本测试和自动发现的 124 个脚本测试文件均已通过；新的最终 clean SHA lifecycle 与发布全链仍待执行。
 
+候选 `9bbf5ccca75983f9376b2027a09e2180e5bd9cca` 的 fresh lifecycle 已真实通过 migration、正式账号、客户配置、9 / 9 数据阶段、readiness 与 50 / 50 浏览器页面，证明上述生产异常正式链路已在隔离库闭环；随后在克隆 `browser_actions` 库启动四条真实写异常流前，生命周期把 `--report` 放在工作台目录，违反异常流只允许 `output/qa/manual-acceptance/**/*.json` 的证据根合同而失败。该运行自动停服务、删除两个数据库并读回零残留。当前修复把 companion 回执收口到同批 dataset lifecycle 根目录，并增加跨脚本路径合同测试；定向测试 13 / 13、自动发现的 124 个文件共 1438 / 1438 已复跑通过。修复提交仍须从 fresh 库重跑完整 lifecycle，不能复用本次 50 / 50 作为最终 SHA 证据。
+
 1. 发布前必须绑定最终 commit / image，按正式流程执行备份 / 回滚点、migration status / apply / readback、health / ready、真实账号与业务 smoke。
 2. 客户交付仍须甲方岗位 UAT / 签收；本地或固定旧版本绿色不能替代。
 3. 异常流 Worktree 暂保留为恢复副本；后续清理须单独确认目标和现场，不把 Handoff、提交或推送等同于 Worktree 删除。

@@ -167,6 +167,16 @@ export function buildLocalAcceptanceLifecycleIdentity({ commit, runID }) {
   });
 }
 
+export function localAcceptanceExceptionReportPath(datasetOutputRoot) {
+  return path.join(
+    path.resolve(datasetOutputRoot),
+    CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    "local",
+    "browser-actions",
+    "report.json",
+  );
+}
+
 function recordStage(stages, stage, status, details = {}) {
   stages.push(Object.freeze({ stage, status, ...details }));
 }
@@ -1069,10 +1079,8 @@ function createDirectRuntime(context) {
       );
     },
     async runExceptionBrowser(databaseName) {
-      const reportPath = path.join(
-        context.outputDir,
-        "browser-actions",
-        "report.json",
+      const reportPath = localAcceptanceExceptionReportPath(
+        context.datasetOutputRoot,
       );
       const env = {
         MANUAL_ACCEPTANCE_DEMO_PASSWORD: context.rolePassword,

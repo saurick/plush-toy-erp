@@ -1,14 +1,30 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
 
+import { resolveExceptionFlowReportPath } from "./exception-flow-real-write-browser.mjs";
 import {
   LOCAL_ACCEPTANCE_LIFECYCLE_SCHEMA,
   allocateLocalAcceptancePorts,
   buildLocalAcceptanceLifecycleIdentity,
+  localAcceptanceExceptionReportPath,
   runLocalAcceptanceLifecycle,
 } from "./local-acceptance-lifecycle.mjs";
 
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
+
+test("local acceptance lifecycle keeps the cloned-write report inside the exception-flow evidence root", () => {
+  const datasetOutputRoot = path.resolve(
+    "output/qa/manual-acceptance/datasets/lifecycle/final-run",
+  );
+  const reportPath = localAcceptanceExceptionReportPath(datasetOutputRoot);
+
+  assert.equal(resolveExceptionFlowReportPath(reportPath), reportPath);
+  assert.equal(
+    path.relative(datasetOutputRoot, reportPath),
+    "2026.07.16-v5/local/browser-actions/report.json",
+  );
+});
 
 test("local acceptance lifecycle reserves the web port from the canonical auxiliary range", async () => {
   const candidates = [8300, 15_210, 44_001, 44_001, 44_002];
