@@ -18,10 +18,7 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
-import {
-  findAvailableDevAuxPort,
-  loadDevPorts,
-} from "../dev-ports.mjs";
+import { findAvailableDevAuxPort, loadDevPorts } from "../dev-ports.mjs";
 import { buildRuntimePreviewManifest } from "./customer-config-runtime-manifest.mjs";
 import {
   databaseNameForRun,
@@ -501,6 +498,20 @@ export async function allocateLocalAcceptancePorts(
   return { httpPort, grpcPort, webPort };
 }
 
+export async function allocateLocalAcceptanceWebEndpoint(
+  repoRoot,
+  {
+    findAvailableAuxPort = findAvailableDevAuxPort,
+    loadPorts = loadDevPorts,
+  } = {},
+) {
+  const webPort = await findAvailableAuxPort(loadPorts(repoRoot));
+  return Object.freeze({
+    webPort,
+    webURL: `http://127.0.0.1:${webPort}`,
+  });
+}
+
 async function waitFor(check, label, timeoutMs = SERVICE_READY_TIMEOUT_MS) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
@@ -517,6 +528,46 @@ async function waitFor(check, label, timeoutMs = SERVICE_READY_TIMEOUT_MS) {
     label,
     `${label} timed out${lastError ? `: ${safeError(lastError)}` : ""}`,
   );
+}
+
+export function assertLoggedServiceAlive(handle, label) {
+  if (
+    !handle?.child ||
+    handle.child.exitCode !== null ||
+    (handle.child.signalCode !== null && handle.child.signalCode !== undefined)
+  ) {
+    throw new Error(`${label} exited before readiness`);
+  }
+  return true;
+}
+
+async function waitForLoggedService(handle, check, label) {
+  assertLoggedServiceAlive(handle, label);
+  let rejectExit;
+  const exited = new Promise((_, reject) => {
+    rejectExit = (code, signal) =>
+      reject(
+        new Error(
+          `${label} exited before readiness code=${String(code)} signal=${String(signal)}`,
+        ),
+      );
+    handle.child.once("exit", rejectExit);
+  });
+  try {
+    await Promise.race([
+      waitFor(async () => {
+        assertLoggedServiceAlive(handle, label);
+        return check();
+      }, `${label} readiness`),
+      exited,
+    ]);
+  } finally {
+    handle.child.off("exit", rejectExit);
+  }
+  await new Promise((resolve) => setTimeout(resolve, 750));
+  assertLoggedServiceAlive(handle, label);
+  await check();
+  assertLoggedServiceAlive(handle, label);
 }
 
 async function fetchOK(url, expectedText = "") {
@@ -645,6 +696,8 @@ function createDirectRuntime(context) {
   let backend = null;
   let web = null;
   let activeDatabase = "";
+  let webPort = context.webPort;
+  let webURL = context.webURL;
 
   const databaseURL = (databaseName) =>
     replaceDatabaseName(context.baseDatabaseURL, databaseName, {
@@ -785,14 +838,15 @@ function createDirectRuntime(context) {
         label: "acceptance backend",
       });
       try {
-        await waitFor(async () => {
-          if (backend.child.exitCode !== null) {
-            throw new Error("acceptance backend exited before readiness");
-          }
-          await fetchOK(`${context.backendURL}/healthz`, "ok");
-          await fetchOK(`${context.backendURL}/readyz`, "ready");
-          return true;
-        }, "acceptance backend readiness");
+        await waitForLoggedService(
+          backend,
+          async () => {
+            await fetchOK(`${context.backendURL}/healthz`, "ok");
+            await fetchOK(`${context.backendURL}/readyz`, "ready");
+            return true;
+          },
+          "acceptance backend",
+        );
       } catch (error) {
         await stopLoggedService(backend).catch(() => {});
         backend = null;
@@ -987,6 +1041,9 @@ function createDirectRuntime(context) {
     },
     async startWeb() {
       if (web) throw new Error("acceptance web is already running");
+      ({ webPort, webURL } = await allocateLocalAcceptanceWebEndpoint(
+        context.repoRoot,
+      ));
       web = startLoggedService({
         command: "pnpm",
         args: ["exec", "vite", "--config", "vite.config.mjs"],
@@ -994,21 +1051,19 @@ function createDirectRuntime(context) {
         env: {
           ...process.env,
           ERP_DEV_CUSTOMER_KEY: "yoyoosun",
-          ERP_VITE_PORT: String(context.webPort),
-          ERP_VITE_HMR_CLIENT_PORT: String(context.webPort),
+          ERP_VITE_PORT: String(webPort),
+          ERP_VITE_HMR_CLIENT_PORT: String(webPort),
           API_ORIGIN: context.backendURL,
         },
         logPath: path.join(context.outputDir, "web.log"),
         label: "acceptance web",
       });
       try {
-        await waitFor(async () => {
-          if (web.child.exitCode !== null) {
-            throw new Error("acceptance web exited before readiness");
-          }
-          await fetchOK(`${context.webURL}/erp`);
-          return true;
-        }, "acceptance web readiness");
+        await waitForLoggedService(
+          web,
+          () => fetchOK(`${webURL}/erp`),
+          "acceptance web",
+        );
       } catch (error) {
         await stopLoggedService(web).catch(() => {});
         web = null;
@@ -1016,11 +1071,9 @@ function createDirectRuntime(context) {
       }
     },
     async verifyWeb() {
-      await fetchOK(`${context.webURL}/customer-config.js`);
-      await fetchOK(
-        `${context.webURL}/customer-assets/yoyoosun/favicon-yoyoosun.svg`,
-      );
-      return { customerAssets: "passed" };
+      await fetchOK(`${webURL}/customer-config.js`);
+      await fetchOK(`${webURL}/customer-assets/yoyoosun/favicon-yoyoosun.svg`);
+      return { customerAssets: "passed", webPort };
     },
     async runManualBrowser() {
       const targetRoot = path.join(
@@ -1030,7 +1083,7 @@ function createDirectRuntime(context) {
       );
       const reportPath = path.join(targetRoot, "browser", "report.json");
       const report = await runManualAcceptanceBrowser({
-        baseURL: context.webURL,
+        baseURL: webURL,
         backendURL: context.backendURL,
         password: context.rolePassword,
         reportPath,
@@ -1092,7 +1145,7 @@ function createDirectRuntime(context) {
       const options = parseExceptionFlowArgs(
         [
           "--base-url",
-          context.webURL,
+          webURL,
           "--backend-url",
           context.backendURL,
           "--database-name",

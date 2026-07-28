@@ -9,7 +9,9 @@ import {
 } from "./exception-flow-real-write-browser.mjs";
 import {
   LOCAL_ACCEPTANCE_LIFECYCLE_SCHEMA,
+  allocateLocalAcceptanceWebEndpoint,
   allocateLocalAcceptancePorts,
+  assertLoggedServiceAlive,
   buildLocalAcceptanceLifecycleIdentity,
   localAcceptanceExceptionReportPath,
   runLocalAcceptanceLifecycle,
@@ -74,6 +76,34 @@ test("local acceptance lifecycle reserves the web port from the canonical auxili
     webPort: 15_210,
   });
   assert.deepEqual(candidates, []);
+});
+
+test("local acceptance lifecycle refreshes the web endpoint and requires its own live child", async () => {
+  const endpoint = await allocateLocalAcceptanceWebEndpoint("/repo", {
+    loadPorts: () => ({ auxStart: 15_200 }),
+    findAvailableAuxPort: async () => 15_207,
+  });
+  assert.deepEqual(endpoint, {
+    webPort: 15_207,
+    webURL: "http://127.0.0.1:15207",
+  });
+  assert.equal(
+    assertLoggedServiceAlive({ child: { exitCode: null } }, "acceptance web"),
+    true,
+  );
+  assert.throws(
+    () =>
+      assertLoggedServiceAlive({ child: { exitCode: 1 } }, "acceptance web"),
+    /acceptance web exited before readiness/u,
+  );
+  assert.throws(
+    () =>
+      assertLoggedServiceAlive(
+        { child: { exitCode: null, signalCode: "SIGTERM" } },
+        "acceptance web",
+      ),
+    /acceptance web exited before readiness/u,
+  );
 });
 
 function fakeRuntime({ failAt = "", residual = "" } = {}) {
