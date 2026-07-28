@@ -1103,6 +1103,14 @@ const FACT_BUSINESS_FIELDS = Object.freeze({
   financeFacts: "fact_no",
 });
 
+const FACT_REPORT_ONLY_REFERENCE_FIELDS = Object.freeze({
+  shipments: new Set([
+    "finance_approval_task_id",
+    "finance_approval_task_code",
+    "finance_approval_process_node_id",
+  ]),
+});
+
 function factReferenceEvidence(datasetId, blueprint, factReport) {
   if (!factReport) {
     return {
@@ -1120,11 +1128,16 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
   const records = factReport.normalizedReferenceRecords[referenceKey].filter(
     (item) => !definition?.factType || item.fact_type === definition.factType,
   );
+  const reportOnlyFields =
+    FACT_REPORT_ONLY_REFERENCE_FIELDS[referenceKey] || new Set();
   const expectedReferences = records.map((item) => {
     const businessNo = businessField ? item[businessField] : undefined;
     const expectedFields = Object.fromEntries(
       Object.entries(item).filter(
-        ([key]) => key !== "id" && key !== businessField,
+        ([key]) =>
+          key !== "id" &&
+          key !== businessField &&
+          !reportOnlyFields.has(key),
       ),
     );
     return {

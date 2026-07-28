@@ -747,10 +747,6 @@ function createReadinessFetch(runtimeOptions = {}) {
         finance_release_process_instance_id:
           item.financeReleaseProcessInstanceID,
         finance_release_process_node_id: item.financeReleaseProcessNodeID,
-        finance_approval_task_id: item.financeApprovalTaskID,
-        finance_approval_task_code: item.financeApprovalTaskCode,
-        finance_approval_process_node_id:
-          item.financeApprovalProcessNodeID,
       })),
     ],
     list_finance_facts: [
@@ -1372,6 +1368,41 @@ test("apply reports may raise minimums while the shipment dataset stays exact", 
   assert.equal(byId.get("shipments").params.keyword, undefined);
   assert.equal(byId.get("shipments").batchEvidence, "exact_references");
   assert.equal(byId.get("shipments").referenceQueries.length, 47);
+  assert.equal(
+    Object.hasOwn(
+      byId.get("shipments").expectedReferences[0].expectedFields,
+      "finance_approval_task_id",
+    ),
+    false,
+  );
+  assert.equal(
+    Object.hasOwn(
+      byId.get("shipments").expectedReferences[0].expectedFields,
+      "finance_approval_task_code",
+    ),
+    false,
+  );
+  assert.equal(
+    Object.hasOwn(
+      byId.get("shipments").expectedReferences[0].expectedFields,
+      "finance_approval_process_node_id",
+    ),
+    false,
+  );
+  assert.deepEqual(
+    byId
+      .get("workflow-tasks:shipment_finance_approval")
+      .expectedReferences[0].expectedFields,
+    {
+      task_group: "shipment_finance_approval",
+      source_type: "shipment",
+      source_id: 120_000,
+      owner_role_key: "finance",
+      task_status_key: "done",
+      process_instance_id: 210_000,
+      process_node_instance_id: 220_000,
+    },
+  );
   assert.equal(byId.get("purchase-receipts").batchEvidence, "exact_references");
   assert.equal(
     byId.get("quality-inspections").batchEvidence,
