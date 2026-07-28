@@ -181,7 +181,13 @@ func TestClassifyRevisionProductVersionReservesTrialNamespace(t *testing.T) {
 	if trial, err := ClassifyRevisionProductVersion(ExpectedCustomerKey, "formal-revision", "formal-product-version"); err != nil || trial {
 		t.Fatalf("ClassifyRevisionProductVersion() changed formal input: (%v, %v)", trial, err)
 	}
-	for _, identity := range [][3]string{{ExpectedCustomerKey, "wrong-revision", ProductVersion}, {ExpectedCustomerKey, Revision, "customer-trial-133-test-2026.07.15-v3"}, {"other", Revision, ProductVersion}, {ExpectedCustomerKey, Revision, "formal-product-version"}} {
+	for _, identity := range [][3]string{
+		{ExpectedCustomerKey, "wrong-revision", ProductVersion},
+		{ExpectedCustomerKey, PreviousActiveRevision, ProductVersion},
+		{ExpectedCustomerKey, Revision, "customer-trial-133-test-2026.07.15-v3"},
+		{"other", Revision, ProductVersion},
+		{ExpectedCustomerKey, Revision, "formal-product-version"},
+	} {
 		if trial, err := ClassifyRevisionProductVersion(identity[0], identity[1], identity[2]); err == nil || trial {
 			t.Fatalf("ClassifyRevisionProductVersion() = (%v, %v), want reserved namespace rejection", trial, err)
 		}
