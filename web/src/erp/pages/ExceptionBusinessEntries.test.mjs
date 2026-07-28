@@ -66,6 +66,14 @@ test('RMA: uses shipment source, optimistic version and inventory-writing receiv
   assert.match(salesReturnsPage, /getSalesReturnAcceptanceProcess/u)
   assert.match(salesReturnsPage, /startSalesReturnAcceptanceProcess/u)
   assert.match(salesReturnsPage, />\s*核对审批流\s*</u)
+  assert.match(
+    salesReturnsPage,
+    /const sourceItems = Array\.isArray\(selectedShipment\?\.items\)[\s\S]*shipment_item_id: Number\(sourceItem\.id\)/u
+  )
+  assert.doesNotMatch(
+    salesReturnsPage,
+    /name=\{\[field\.name, 'shipment_item_id'\]\}/u
+  )
   assert.doesNotMatch(salesReturnsPage, /客户ID|出货ID|明细ID/u)
 })
 

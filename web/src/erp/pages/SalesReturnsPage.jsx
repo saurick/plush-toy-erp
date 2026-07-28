@@ -317,7 +317,6 @@ export default function SalesReturnsPage() {
       ),
       reason: '',
       items: (selectedShipment.items || []).map((item, index) => ({
-        shipment_item_id: item.id,
         label: `出货明细 ${index + 1} / 已出货 ${item.quantity || '-'}`,
         quantity: '',
         note: '',
@@ -332,17 +331,31 @@ export default function SalesReturnsPage() {
     } catch {
       return
     }
-    const items = (values.items || [])
-      .filter((item) => String(item.quantity || '').trim())
-      .map((item) => ({
-        shipment_item_id: Number(item.shipment_item_id),
-        quantity: String(item.quantity).trim(),
-        ...(trimOptional(item.note) ? { note: trimOptional(item.note) } : {}),
-      }))
-    if (items.length === 0) {
+    const sourceItems = Array.isArray(selectedShipment?.items)
+      ? selectedShipment.items
+      : []
+    const requestedItems = (values.items || [])
+      .map((item, index) => ({ item, sourceItem: sourceItems[index] }))
+      .filter(({ item }) => String(item.quantity || '').trim())
+    if (requestedItems.length === 0) {
       message.warning('请至少填写一项退货数量')
       return
     }
+    if (
+      requestedItems.some(
+        ({ sourceItem }) =>
+          !Number.isSafeInteger(Number(sourceItem?.id)) ||
+          Number(sourceItem?.id) <= 0
+      )
+    ) {
+      message.error('来源出货明细暂时无法确认，请重新选择来源出货')
+      return
+    }
+    const items = requestedItems.map(({ item, sourceItem }) => ({
+      shipment_item_id: Number(sourceItem.id),
+      quantity: String(item.quantity).trim(),
+      ...(trimOptional(item.note) ? { note: trimOptional(item.note) } : {}),
+    }))
     const payload = compactParams({
       customer_key: customerKey || undefined,
       return_no: trimOptional(values.return_no),
@@ -755,9 +768,6 @@ export default function SalesReturnsPage() {
               <Space direction="vertical" style={{ width: '100%' }}>
                 {fields.map((field) => (
                   <Space key={field.key} align="start" wrap>
-                    <Form.Item name={[field.name, 'shipment_item_id']} hidden>
-                      <Input />
-                    </Form.Item>
                     <Form.Item name={[field.name, 'label']} label="出货明细">
                       <Input disabled style={{ width: 260 }} />
                     </Form.Item>
