@@ -178,10 +178,16 @@ function sanitizedChildEnv(fixture, overrides = {}) {
 function runPreflight(
   fixture,
   extraArgs = [],
-  { env = {}, skipComposeConfig = true, includeExpectedRelease = true } = {},
+  {
+    env = {},
+    skipComposeConfig = true,
+    includeExpectedRelease = true,
+    preflightScript = scriptPath,
+    cwd = repoRoot,
+  } = {},
 ) {
   const args = [
-    scriptPath,
+    preflightScript,
     "--env-file",
     fixture.envFile,
     "--compose-dir",
@@ -199,7 +205,7 @@ function runPreflight(
   }
   args.push(...extraArgs);
   return spawnSync("bash", args, {
-    cwd: repoRoot,
+    cwd,
     encoding: "utf8",
     env: sanitizedChildEnv(fixture, env),
   });
@@ -504,6 +510,48 @@ test("production preflight accepts a prepared runtime env without docker config"
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /all checks passed/);
+});
+
+test("production preflight resolves a packaged source root without Git metadata", () => {
+  const fixture = writeFixture();
+  configureExactCustomerTrialFixture(fixture);
+  const packageRoot = path.join(fixture.root, "immutable-release");
+  const packagedScript = path.join(
+    packageRoot,
+    "scripts/deploy/production-preflight.sh",
+  );
+  const packagedContract = path.join(
+    packageRoot,
+    "deployments/yoyoosun/env/runtime.contract.json",
+  );
+  fs.mkdirSync(path.dirname(packagedScript), { recursive: true });
+  fs.mkdirSync(path.dirname(packagedContract), { recursive: true });
+  fs.copyFileSync(scriptPath, packagedScript);
+  fs.copyFileSync(
+    path.join(
+      repoRoot,
+      "deployments/yoyoosun/env/runtime.contract.json",
+    ),
+    packagedContract,
+  );
+  fs.chmodSync(packagedScript, 0o755);
+
+  const fakeBin = createFakeRuntimeBin(fixture.root);
+  const result = runPreflight(fixture, trialOverrideArgs(fixture), {
+    skipComposeConfig: false,
+    preflightScript: packagedScript,
+    cwd: fixture.root,
+    env: {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      FAKE_RUNTIME_COMPOSE_PROJECT: "plush-toy-erp-v5",
+      FAKE_RUNTIME_EXPECTED_RELEASE: fixture.expectedRelease,
+      FAKE_RUNTIME_AUTH_SMS_MODE: "provider",
+    },
+  });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /yoyoosun SMS 运行合同已绑定/u);
+  assert.doesNotMatch(result.stderr, /缺少 yoyoosun 运行合同/u);
 });
 
 test("production preflight accepts the supported normal web bind addresses", async (t) => {

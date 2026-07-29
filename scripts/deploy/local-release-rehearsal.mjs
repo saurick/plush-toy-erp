@@ -1448,6 +1448,42 @@ function safeReceiptPath(repoRoot, requested, commit, runId) {
   return candidate;
 }
 
+export function selectRehearsalWorkbenchArtifact({
+  repoRoot,
+  manifestPath,
+  receiptPath,
+}) {
+  const toSafeRelativePath = (target) => {
+    const relative = path.relative(repoRoot, target);
+    if (
+      !relative ||
+      path.isAbsolute(relative) ||
+      relative.split(path.sep).includes("..")
+    ) {
+      return "";
+    }
+    return relative.split(path.sep).join("/");
+  };
+  const manifestArtifact = toSafeRelativePath(manifestPath);
+  if (manifestArtifact) {
+    return {
+      artifactPath: manifestArtifact,
+      materializeReceiptFirst: false,
+    };
+  }
+  const receiptArtifact = toSafeRelativePath(receiptPath);
+  if (!receiptArtifact) {
+    throw new RehearsalError(
+      "workbench receipt",
+      "release rehearsal has no repository-relative evidence artifact",
+    );
+  }
+  return {
+    artifactPath: receiptArtifact,
+    materializeReceiptFirst: true,
+  };
+}
+
 function sanitizeFailure(error) {
   return {
     stage: String(error?.stage || "unknown").slice(0, 120),
@@ -1782,8 +1818,16 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     }
     receipt.finishedAt = new Date().toISOString();
     try {
+      const workbenchArtifact = selectRehearsalWorkbenchArtifact({
+        repoRoot,
+        manifestPath,
+        receiptPath,
+      });
+      if (workbenchArtifact.materializeReceiptFirst) {
+        writeReceipt(receiptPath, receipt);
+      }
       const workbenchReceipt = buildDevWorkbenchReceipt({
-        artifactPaths: [path.relative(repoRoot, manifestPath)],
+        artifactPaths: [workbenchArtifact.artifactPath],
         databaseRunIdentity: environment.database,
         durationMs: Math.max(
           0,

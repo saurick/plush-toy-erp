@@ -13,11 +13,17 @@ import {
 
 class VerificationError extends Error {}
 
+const IMAGE_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+
 function sha256File(filePath) {
   return crypto
     .createHash("sha256")
     .update(readFileSync(filePath))
     .digest("hex");
+}
+
+function sha256Text(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
 }
 
 function safeArtifactFile(bundleDir, relativeFile) {
@@ -43,6 +49,103 @@ function inspectLoadedImage(imageRef, repoRoot, runCommand) {
     throw new VerificationError(`loaded image is not unique: ${imageRef}`);
   }
   return parsed[0];
+}
+
+function readImageArchiveJson(
+  archivePath,
+  member,
+  repoRoot,
+  runCommand,
+) {
+  const raw = runCommand({
+    command: "tar",
+    args: ["-xOf", archivePath, member],
+    cwd: repoRoot,
+    label: `read image archive member ${member}`,
+  });
+  try {
+    return { raw, value: JSON.parse(raw) };
+  } catch {
+    throw new VerificationError(`image archive member is not JSON: ${member}`);
+  }
+}
+
+export function inspectPortableImageArchiveIdentity(
+  archivePath,
+  image,
+  repoRoot,
+  runCommand,
+) {
+  const configPath = `blobs/sha256/${image.contentId.slice("sha256:".length)}`;
+  const dockerManifest = readImageArchiveJson(
+    archivePath,
+    "manifest.json",
+    repoRoot,
+    runCommand,
+  ).value;
+  if (
+    !Array.isArray(dockerManifest) ||
+    dockerManifest.length !== 1 ||
+    dockerManifest[0]?.Config !== configPath ||
+    !Array.isArray(dockerManifest[0]?.RepoTags) ||
+    dockerManifest[0].RepoTags.length !== 1 ||
+    dockerManifest[0].RepoTags[0] !== image.ref
+  ) {
+    throw new VerificationError(
+      `${image.kind} image archive tag or config identity is invalid`,
+    );
+  }
+  const archiveConfig = readImageArchiveJson(
+    archivePath,
+    configPath,
+    repoRoot,
+    runCommand,
+  );
+  if (
+    sha256Text(archiveConfig.raw) !==
+    image.contentId.slice("sha256:".length)
+  ) {
+    throw new VerificationError(
+      `${image.kind} image archive config checksum does not match`,
+    );
+  }
+  const index = readImageArchiveJson(
+    archivePath,
+    "index.json",
+    repoRoot,
+    runCommand,
+  ).value;
+  const manifestDigest =
+    index?.schemaVersion === 2 && index?.manifests?.length === 1
+      ? index.manifests[0]?.digest
+      : "";
+  if (!IMAGE_DIGEST_PATTERN.test(String(manifestDigest || ""))) {
+    throw new VerificationError(
+      `${image.kind} image archive manifest identity is invalid`,
+    );
+  }
+  const manifestMember =
+    `blobs/sha256/${manifestDigest.slice("sha256:".length)}`;
+  const archiveManifest = readImageArchiveJson(
+    archivePath,
+    manifestMember,
+    repoRoot,
+    runCommand,
+  );
+  if (
+    sha256Text(archiveManifest.raw) !==
+      manifestDigest.slice("sha256:".length) ||
+    archiveManifest.value?.schemaVersion !== 2 ||
+    archiveManifest.value?.config?.digest !== image.contentId
+  ) {
+    throw new VerificationError(
+      `${image.kind} image archive manifest does not bind the config identity`,
+    );
+  }
+  return {
+    configDigest: image.contentId,
+    manifestDigest,
+  };
 }
 
 export function verifyReleaseArtifact(
@@ -85,6 +188,12 @@ export function verifyReleaseArtifact(
       );
     }
     if (options.load === true) {
+      const archiveIdentity = inspectPortableImageArchiveIdentity(
+        archivePath,
+        image,
+        repoRoot,
+        runCommand,
+      );
       runCommand({
         command: "docker",
         args: ["image", "load", "--input", archivePath],
@@ -96,7 +205,9 @@ export function verifyReleaseArtifact(
         .find((item) => item.startsWith("GIT_SHA="))
         ?.slice("GIT_SHA=".length);
       if (
-        inspected?.Id !== image.contentId ||
+        ![image.contentId, archiveIdentity.manifestDigest].includes(
+          inspected?.Id,
+        ) ||
         inspected?.Os !== "linux" ||
         inspected?.Architecture !== "amd64" ||
         embeddedGitSha !== manifest.git.commit
@@ -107,7 +218,9 @@ export function verifyReleaseArtifact(
       }
       images.push({
         kind: image.kind,
-        contentId: inspected.Id,
+        contentId: image.contentId,
+        archiveManifestDigest: archiveIdentity.manifestDigest,
+        loadedImageId: inspected.Id,
         gitSha: embeddedGitSha,
         platform: `${inspected.Os}/${inspected.Architecture}`,
       });

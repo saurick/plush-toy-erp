@@ -52,3 +52,4 @@
 | `docs/archive/progress-2026-07-23-before-exception-flow-v1-final-handoff.md` | 异常流 V1 四项收口最终 Handoff 前的 `progress.md` 完整过程记录归档 |
 | `docs/archive/progress-2026-07-28-before-login-style-recovery.md` | 登录页样式回归修正前的 `progress.md` 完整过程记录归档 |
 | `docs/archive/progress-2026-07-29-before-recent-task-closeout.md` | 近期产品、业务页面、数据库与 DEV-only 工作台统一 Git 收口前的 `progress.md` 完整过程记录归档 |
+| `docs/archive/progress-2026-07-29-before-cicd-portable-image-identity.md` | OCI 镜像身份、promotion 回执与外部 Release manifest 前向修复前的 `progress.md` 完整过程记录归档 |

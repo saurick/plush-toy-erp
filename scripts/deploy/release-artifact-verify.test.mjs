@@ -97,16 +97,52 @@ test("release artifact verifier fails closed on archive drift", () => {
 test("release artifact verifier validates loaded image identity", () => {
   const fixture = writeFixture();
   try {
+    const archiveConfigByKind = new Map(
+      fixture.manifest.images.map((item) => {
+        const archiveConfig = JSON.stringify({
+          architecture: "amd64",
+          kind: item.kind,
+          os: "linux",
+        });
+        item.contentId = `sha256:${sha(archiveConfig)}`;
+        return [item.kind, archiveConfig];
+      }),
+    );
+    writeFileSync(
+      fixture.manifestPath,
+      `${JSON.stringify(fixture.manifest, null, 2)}\n`,
+    );
+    const archiveIdentityByKind = new Map(
+      fixture.manifest.images.map((item) => {
+        const ociManifest = JSON.stringify({
+          schemaVersion: 2,
+          config: { digest: item.contentId },
+        });
+        return [
+          item.kind,
+          {
+            manifestDigest: `sha256:${sha(ociManifest)}`,
+            ociManifest,
+          },
+        ];
+      }),
+    );
     const byRef = new Map(
-      fixture.manifest.images.map((item) => [
-        item.ref,
-        {
-          Id: item.contentId,
-          Os: "linux",
-          Architecture: "amd64",
-          Config: { Env: [`GIT_SHA=${commit}`] },
-        },
-      ]),
+      fixture.manifest.images.map((item, index) => {
+        const archiveIdentity = archiveIdentityByKind.get(item.kind);
+        return [
+          item.ref,
+          {
+            Id:
+              index === 0
+                ? archiveIdentity.manifestDigest
+                : item.contentId,
+            Os: "linux",
+            Architecture: "amd64",
+            Config: { Env: [`GIT_SHA=${commit}`] },
+          },
+        ];
+      }),
     );
     const report = verifyReleaseArtifact(
       fixture.manifestPath,
@@ -114,6 +150,42 @@ test("release artifact verifier validates loaded image identity", () => {
       {
         repoRoot: fixture.root,
         runCommand: ({ args }) => {
+          if (args[0] === "-xOf") {
+            const archivePath = args[1];
+            const member = args[2];
+            const kind = path.basename(archivePath, ".tar");
+            const image = fixture.manifest.images.find(
+              (item) => item.kind === kind,
+            );
+            const archiveIdentity = archiveIdentityByKind.get(kind);
+            if (member === "manifest.json") {
+              return JSON.stringify([
+                {
+                  Config:
+                    `blobs/sha256/${image.contentId.slice("sha256:".length)}`,
+                  RepoTags: [image.ref],
+                },
+              ]);
+            }
+            if (member === "index.json") {
+              return JSON.stringify({
+                schemaVersion: 2,
+                manifests: [{ digest: archiveIdentity.manifestDigest }],
+              });
+            }
+            if (
+              member ===
+              `blobs/sha256/${image.contentId.slice("sha256:".length)}`
+            ) {
+              return archiveConfigByKind.get(kind);
+            }
+            if (
+              member ===
+              `blobs/sha256/${archiveIdentity.manifestDigest.slice("sha256:".length)}`
+            ) {
+              return archiveIdentity.ociManifest;
+            }
+          }
           if (args[0] === "image" && args[1] === "load") return "";
           if (args[0] === "image" && args[1] === "inspect") {
             return JSON.stringify([byRef.get(args[2])]);
@@ -124,6 +196,14 @@ test("release artifact verifier validates loaded image identity", () => {
     );
     assert.equal(report.checks.loadedImageIdentity, "passed");
     assert.equal(report.images.length, 2);
+    assert.equal(
+      report.images[0].loadedImageId,
+      archiveIdentityByKind.get("server").manifestDigest,
+    );
+    assert.equal(
+      report.images[1].loadedImageId,
+      fixture.manifest.images.find((item) => item.kind === "web").contentId,
+    );
   } finally {
     rmSync(fixture.root, { recursive: true, force: true });
   }

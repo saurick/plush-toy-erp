@@ -53,6 +53,53 @@ fail() {
   return 1
 }
 
+portable_archive_manifest_digest() {
+  local archive="$1"
+  local image_ref="$2"
+  local config_digest="$3"
+  local config_path
+  local actual_config_sha256
+  local actual_manifest_sha256
+  local manifest_digest
+  local manifest_member
+  config_path="blobs/sha256/${config_digest#sha256:}"
+  tar -xOf "$archive" manifest.json |
+    jq -e \
+      --arg ref "$image_ref" \
+      --arg configPath "$config_path" \
+      'type == "array" and length == 1 and
+       .[0].Config == $configPath and
+       (.[0].RepoTags | type == "array" and
+        length == 1 and .[0] == $ref)' \
+      >/dev/null
+  actual_config_sha256="$(
+    tar -xOf "$archive" "$config_path" | sha256sum | awk '{print $1}'
+  )"
+  [[ "$actual_config_sha256" == "${config_digest#sha256:}" ]] ||
+    fail "image archive config checksum does not match"
+  manifest_digest="$(
+    tar -xOf "$archive" index.json |
+      jq -er \
+        'select(.schemaVersion == 2 and
+                (.manifests | type == "array" and length == 1)) |
+         .manifests[0].digest'
+  )"
+  [[ "$manifest_digest" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+    fail "image archive manifest digest is invalid"
+  manifest_member="blobs/sha256/${manifest_digest#sha256:}"
+  actual_manifest_sha256="$(
+    tar -xOf "$archive" "$manifest_member" | sha256sum | awk '{print $1}'
+  )"
+  [[ "$actual_manifest_sha256" == "${manifest_digest#sha256:}" ]] ||
+    fail "image archive manifest checksum does not match"
+  tar -xOf "$archive" "$manifest_member" |
+    jq -e \
+      --arg configDigest "$config_digest" \
+      '.schemaVersion == 2 and .config.digest == $configDigest' \
+      >/dev/null
+  printf '%s\n' "$manifest_digest"
+}
+
 [[ "$action" == rollback ]] || fail "unsupported action"
 [[ "$operation_id" =~ $uuid_v4_pattern ]] || fail "invalid operation id"
 [[ "$from_sha" =~ $sha_pattern && "$to_sha" =~ $sha_pattern ]] ||
@@ -184,7 +231,7 @@ write_receipt() {
         ready: ($status == "passed"),
         basicSmoke: ($status == "passed")
       },
-      serviceSwitchStarted: $serviceSwitchStarted,
+      serviceSwitchStarted: ($serviceSwitchStarted == 1),
       finishedAt: $finishedAt,
       redaction: {
         containsSecrets: false,
@@ -340,6 +387,14 @@ web_content_id="$(jq -r '.images[] | select(.kind == "web") | .contentId' "$inco
   "$server_content_id" =~ ^sha256:[0-9a-f]{64}$ &&
   "$web_content_id" =~ ^sha256:[0-9a-f]{64}$ ]] ||
   fail "rollback image identity is invalid"
+server_archive_manifest_digest="$(
+  portable_archive_manifest_digest \
+    "$incoming/server-image.tar" "$server_ref" "$server_content_id"
+)"
+web_archive_manifest_digest="$(
+  portable_archive_manifest_digest \
+    "$incoming/web-image.tar" "$web_ref" "$web_content_id"
+)"
 
 stage=target_identity_recheck
 write_state running
@@ -403,8 +458,12 @@ stage=image_load_and_readback
 write_state running
 docker load --input "$incoming/server-image.tar" >>"$log_file" 2>&1
 docker load --input "$incoming/web-image.tar" >>"$log_file" 2>&1
-[[ "$(docker image inspect --format '{{.Id}}' "$server_ref")" == "$server_content_id" &&
-"$(docker image inspect --format '{{.Id}}' "$web_ref")" == "$web_content_id" ]] ||
+actual_server_content_id="$(docker image inspect --format '{{.Id}}' "$server_ref")"
+actual_web_content_id="$(docker image inspect --format '{{.Id}}' "$web_ref")"
+[[ ("$actual_server_content_id" == "$server_content_id" ||
+  "$actual_server_content_id" == "$server_archive_manifest_digest") &&
+  ("$actual_web_content_id" == "$web_content_id" ||
+  "$actual_web_content_id" == "$web_archive_manifest_digest") ]] ||
   fail "loaded rollback image content IDs do not match"
 for image_ref in "$server_ref" "$web_ref"; do
   image_platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image_ref")"
