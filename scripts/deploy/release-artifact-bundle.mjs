@@ -85,6 +85,14 @@ function sha256File(filePath) {
   return hash.digest("hex");
 }
 
+function normalizeSha256(value, field) {
+  const normalized = String(value || "").replace(/^sha256:/u, "");
+  if (!SHA256_PATTERN.test(normalized)) {
+    throw new ReleaseArtifactError(`${field} is invalid`);
+  }
+  return normalized;
+}
+
 function writeJSON(filePath, value) {
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, {
     mode: 0o600,
@@ -667,7 +675,10 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
         worktreeClean: sourceReport.worktreeClean,
       },
       sourceArchive: {
-        sha256: sourceReport.archiveSha256,
+        sha256: normalizeSha256(
+          sourceReport.archiveSha256,
+          "source archive sha256",
+        ),
         secretScan: "passed",
         inventoryFileCount: sourceReport.inventory.fileCount,
         customerBoundaryPassed:

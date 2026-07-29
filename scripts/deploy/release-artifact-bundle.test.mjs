@@ -13,6 +13,7 @@ import test from "node:test";
 
 import {
   assertReleaseArtifactManifest,
+  buildReleaseArtifact,
   buildCustomerConfigEvidence,
   buildDependencySbom,
   buildMigrationEvidence,
@@ -220,6 +221,118 @@ test("release artifact manifest rejects mismatched or incomplete image evidence"
       }),
     /image entry is invalid/u,
   );
+});
+
+test("release artifact builder normalizes the source hash and writes complete checksums", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "release-bundle-"));
+  const migrationPath =
+    "server/internal/data/model/migrate/20260202020202_release.sql";
+  const files = {
+    [migrationPath]: "CREATE TABLE release_fixture(id int);\n",
+    "config/customers/yoyoosun/customerPackage.mjs":
+      'export const value = { packageKey: "yoyoosun-customer-package-v9", status: "active", runtimeEnabled: true };\n',
+    "config/customers/yoyoosun/roleFlowMatrix.mjs":
+      "export const roles = [];\n",
+    "server/go.sum": "example.com/module v1.2.3 h1:one\n",
+    "web/pnpm-lock.yaml":
+      "lockfileVersion: '9.0'\npackages:\n\n  plain@1.0.0:\n    resolution: {}\n\nsnapshots:\n",
+    "server/Dockerfile":
+      "ARG GO_BUILDER_IMAGE=golang:1.26.5\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
+    "web/Dockerfile":
+      "ARG NODE_BUILDER_IMAGE=node:24.14.0\nARG RUNTIME_BASE_IMAGE=node:24.14.0-slim\n",
+    "web/package.json":
+      '{"packageManager":"pnpm@10.13.1","name":"fixture","version":"1.0.0"}\n',
+  };
+  const sourceImages = {
+    server: `plush-source-archive-server:${commit.slice(0, 12)}`,
+    web: `plush-source-archive-web:${commit.slice(0, 12)}`,
+  };
+  const runCommand = ({ command, args }) => {
+    if (command === "git") {
+      if (args[0] === "ls-tree") return `${migrationPath}\n`;
+      if (args[0] === "show") {
+        const key = String(args[1]).slice(commit.length + 1);
+        if (!(key in files)) throw new Error(`missing fixture ${key}`);
+        return files[key];
+      }
+    }
+    if (command === "docker") {
+      if (args[0] === "image" && args[1] === "tag") return "";
+      if (args[0] === "image" && args[1] === "inspect") {
+        const kind = String(args[2]).includes("-server:") ? "server" : "web";
+        const idDigit = kind === "server" ? "2" : "3";
+        return JSON.stringify([
+          {
+            Id: `sha256:${idDigit.repeat(64)}`,
+            Os: "linux",
+            Architecture: "amd64",
+            Size: 128,
+            Config: { Env: [`GIT_SHA=${commit}`], Labels: {} },
+          },
+        ]);
+      }
+      if (args[0] === "image" && args[1] === "save") {
+        const outputIndex = args.indexOf("--output");
+        const target = args[outputIndex + 1];
+        const kind = String(args.at(-1)).includes("-server:")
+          ? "server"
+          : "web";
+        writeFileSync(target, `${kind}-archive\n`);
+        return "";
+      }
+      if (args[0] === "version") return "27.5.1\n";
+      if (args[0] === "buildx") return "github.com/docker/buildx v0.30.1\n";
+    }
+    if (command === "go" && args[0] === "version") {
+      return "go version go1.26.5 darwin/arm64\n";
+    }
+    throw new Error(`unexpected command ${command} ${args.join(" ")}`);
+  };
+
+  try {
+    const report = await buildReleaseArtifact(
+      {
+        ref: "HEAD",
+        customer: "yoyoosun",
+        out: "output/releases/fixture",
+      },
+      {
+        repoRoot: root,
+        runSourceArchiveReleaseCheck: async () => ({
+          commit,
+          head: commit,
+          ref: "HEAD",
+          refIsHead: true,
+          worktreeClean: true,
+          archiveSha256: `sha256:${"9".repeat(64)}`,
+          inventory: { fileCount: 9 },
+          repositoryBoundary: { passed: true },
+          releaseCheckPassed: true,
+          formalEvidenceEligible: true,
+          dockerBuilt: true,
+          dockerImages: [sourceImages.web, sourceImages.server],
+        }),
+        runCommand,
+      },
+    );
+    const output = path.join(root, report.outputDirectory);
+    const manifest = JSON.parse(
+      readFileSync(path.join(output, "release-artifact.json"), "utf8"),
+    );
+    const checksums = readFileSync(
+      path.join(output, "checksums.sha256"),
+      "utf8",
+    );
+
+    assert.equal(manifest.sourceArchive.sha256, "9".repeat(64));
+    assert.equal(checksums.trim().split("\n").length, 4);
+    assert.match(checksums, /^[a-f0-9]{64}  release-artifact\.json$/mu);
+    assert.match(checksums, /^[a-f0-9]{64}  sbom\.cdx\.json$/mu);
+    assert.match(checksums, /^[a-f0-9]{64}  server-image\.tar$/mu);
+    assert.match(checksums, /^[a-f0-9]{64}  web-image\.tar$/mu);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("release artifact help is runnable without building", async () => {
