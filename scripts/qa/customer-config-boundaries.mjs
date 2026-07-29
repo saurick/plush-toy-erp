@@ -577,13 +577,16 @@ function validateCustomerConfigReleaseOverlay() {
       !importPath.startsWith("vite.") && !importPath.includes("/"),
   );
   const serverDockerfile = readFileSync(repoPath("server/Dockerfile"), "utf8");
+  const copiesAllRootMjs = serverDockerfile
+    .split(/\r?\n/u)
+    .some((line) => /^\s*COPY\s+web\/\*\.mjs\s+\.\/\s*$/u.test(line));
   for (const importPath of viteRootImports) {
     assert(
       existsSync(repoPath(path.join("web", importPath))),
       `web/vite.shared.mjs imports missing root module ${importPath}`,
     );
     assert(
-      serverDockerfile.includes(`web/${importPath}`),
+      copiesAllRootMjs || serverDockerfile.includes(`web/${importPath}`),
       `server/Dockerfile must copy web/${importPath} because vite.shared.mjs imports it during the embedded frontend build`,
     );
   }

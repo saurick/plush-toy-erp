@@ -16,9 +16,9 @@
 
 发布证据：`babd2393e6bf7d30acf2c4bc4ae600a52856c40e` 的单次 `2026.07.29-1` 发布在 strict 通过后，因独立 Web Dockerfile 的 Node-only builder 调用 Go 错误码生成器而失败。修正形成 `50c203ed51334f95089abccf81348eeed356bc18` 后，本地 full、非强制推送和远端 CI 均通过；其单次 `2026.07.29-2` 发布也通过 strict，但随后暴露 Server Dockerfile 内还有一份重复的 Web builder，仍调用带 prebuild 的旧命令。两次失败都没有生成 GitHub Release、tag 或可晋级制品，也没有自动重跑。
 
-修正与验证：两份 Dockerfile 现在统一消费 CI 已校验的 committed error-code projection；Server 内嵌 Web builder 同时改为复制完整顶层 `.mjs` 构建图，避免手工插件清单再次漂移。定向合同、`git diff --check` 和真实 Server `linux/amd64` Docker 构建通过；镜像内三个二进制、正式 Web 入口、客户配置及内置 SHA 均已读回，临时镜像已精确移除。完整本地 bundle 继续推进到两张镜像均成功后，又发现 source archive 的 `sha256:<64hex>` 合同没有在 manifest 边界归一化；现已在唯一入口严格转为裸 64 位哈希，并新增 bundle 级集成合同，验证 manifest、SBOM、两张 image tar 与四行 checksums 一起原子落盘。
+修正与验证：两份 Dockerfile 现在统一消费 CI 已校验的 committed error-code projection；Server 内嵌 Web builder 同时改为复制完整顶层 `.mjs` 构建图，避免手工插件清单再次漂移。定向合同、`git diff --check` 和真实 Server `linux/amd64` Docker 构建通过；镜像内三个二进制、正式 Web 入口、客户配置及内置 SHA 均已读回，临时镜像已精确移除。完整本地 bundle 继续推进到两张镜像均成功后，又发现 source archive 的 `sha256:<64hex>` 合同没有在 manifest 边界归一化；现已在唯一入口严格转为裸 64 位哈希，并新增 bundle 级集成合同，验证 manifest、SBOM、两张 image tar 与四行 checksums 一起原子落盘。clean `25b21dec1db9561ad1f430366bf8ab49b5a5b5bc` 的完整 bundle 与 load verify 随后通过，manifest、SBOM、两张镜像归档、内置 SHA、`linux/amd64` 与加载后 content identity 全部一致，脱敏扫描通过。
 
-下一步与边界：将上述修正形成新的 clean SHA 后，先完成一次完整本地 bundle / load verify，再从头执行该 SHA 的 prepare-push、远端 CI 与一次 `2026.07.29-3` 不可变发布，随后校验远端 manifest / digest、执行同制品本地发布演练并从版本中心晋级 133。当前尚未部署新版本、执行目标 migration / 岗位 smoke 或客户 UAT；两个失败 SHA 均不复用、不重跑。
+当前阻塞与下一步：`25b21dec` 的首次 prepare-push 在 full 的客户配置边界检查中失败；旧断言只接受 Server Dockerfile 逐个枚举 Vite 顶层插件，没有识别已经真实构建通过的 `COPY web/*.mjs ./` 合同。该失败发生在静态门禁，没有触发远端 CI 或新发布，隔离数据库残留读回为 0 并已停止。先提交只兼容显式复制或受控顶层 `.mjs` glob 的门禁修正，在新 clean SHA 上完成定向合同、一次完整 bundle / load verify 和一次有效 prepare-push，再推进远端 CI 与一次 `2026.07.29-3` 不可变发布，随后校验远端 manifest / digest、执行同制品本地发布演练并从版本中心晋级 133。当前尚未部署新版本、执行目标 migration / 岗位 smoke 或客户 UAT；两个失败发布 SHA 均不复用、不重跑。
 
 ## 2026-07-29 GitHub CI/CD 去重与版本中心
 
