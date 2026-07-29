@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   DATABASE_BASE_URL_ENV,
@@ -9,6 +14,9 @@ import {
 
 const BASE_URL =
   "postgres://tester:local-secret@127.0.0.1:55432/postgres?sslmode=disable";
+const PREFLIGHT_CLI = fileURLToPath(
+  new URL("./database-base-preflight.mjs", import.meta.url),
+);
 
 test("database base preflight keeps credentials out of psql arguments", () => {
   let observed;
@@ -46,11 +54,13 @@ test("database base preflight rejects missing and non-loopback targets before ps
     calls += 1;
     return { status: 0, stdout: "allowed\n", stderr: "" };
   };
-  assert.equal(probeDatabaseBase({ databaseURL: "", run }).reason, "missing_database_base");
+  assert.equal(
+    probeDatabaseBase({ databaseURL: "", run }).reason,
+    "missing_database_base",
+  );
   assert.equal(
     probeDatabaseBase({
-      databaseURL:
-        "postgres://tester:local-secret@192.168.0.133:5432/postgres",
+      databaseURL: "postgres://tester:local-secret@192.168.0.133:5432/postgres",
       run,
     }).reason,
     "invalid_database_base",
@@ -81,6 +91,32 @@ test("database base preflight distinguishes client, connectivity and privilege b
   assert.equal(forbidden.reason, "database_create_forbidden");
 
   for (const report of [missingClient, unavailable, forbidden]) {
-    assert.doesNotMatch(JSON.stringify(report), /tester|local-secret|secret detail/u);
+    assert.doesNotMatch(
+      JSON.stringify(report),
+      /tester|local-secret|secret detail/u,
+    );
+  }
+});
+
+test("database base preflight CLI executes through a symbolic-link path", () => {
+  const fixtureRoot = mkdtempSync(
+    path.join(tmpdir(), "plush-database-base-preflight-"),
+  );
+  const linkedCLI = path.join(fixtureRoot, "database-base-preflight.mjs");
+  symlinkSync(PREFLIGHT_CLI, linkedCLI);
+  try {
+    const environment = { ...process.env };
+    delete environment[DATABASE_BASE_URL_ENV];
+    const result = spawnSync(process.execPath, [linkedCLI], {
+      encoding: "utf8",
+      env: environment,
+    });
+    assert.equal(result.status, 2, result.stderr || result.stdout);
+    assert.match(
+      `${result.stdout}\n${result.stderr}`,
+      /reason=missing_database_base/u,
+    );
+  } finally {
+    rmSync(fixtureRoot, { force: true, recursive: true });
   }
 });

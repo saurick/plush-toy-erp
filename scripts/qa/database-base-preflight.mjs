@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { parseLoopbackDatabaseURL } from "./database-target.mjs";
 
@@ -131,5 +132,5 @@ function main() {
 
 const isDirectRun =
   process.argv[1] &&
-  pathToFileURL(process.argv[1]).href === import.meta.url;
+  realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun) main();
