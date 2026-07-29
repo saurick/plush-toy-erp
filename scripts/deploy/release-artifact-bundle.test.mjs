@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -20,6 +21,7 @@ import {
 } from "./release-artifact-bundle.mjs";
 
 const commit = "a".repeat(40);
+const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
 function fixtureCommand(files, paths = []) {
   return ({ args }) => {
@@ -140,6 +142,24 @@ test("release artifact builds a non-empty CycloneDX dependency inventory", () =>
     ),
   );
   assert(sbom.components.some((item) => item.name === "example.com/module"));
+});
+
+test("Web release image consumes the committed generated projection without a Go toolchain", () => {
+  const dockerfile = readFileSync(
+    path.join(repoRoot, "web", "Dockerfile"),
+    "utf8",
+  );
+  const packageJson = JSON.parse(
+    readFileSync(path.join(repoRoot, "web", "package.json"), "utf8"),
+  );
+
+  assert.equal(
+    packageJson.scripts["build:committed"],
+    "vite build --config vite.config.mjs",
+  );
+  assert.match(dockerfile, /RUN pnpm build:committed/u);
+  assert.doesNotMatch(dockerfile, /pnpm build:all|gen-error-codes/u);
+  assert.doesNotMatch(dockerfile, /COPY server\/internal\/errcode/u);
 });
 
 test("release artifact manifest rejects mismatched or incomplete image evidence", () => {

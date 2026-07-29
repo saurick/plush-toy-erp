@@ -21,13 +21,14 @@ RUN npm install -g pnpm@10.13.1 && \
 COPY web ./web
 COPY config ./config
 COPY scripts ./scripts
-COPY server/internal/errcode ./server/internal/errcode
 
 WORKDIR /app/web
 
 ARG ERP_CUSTOMER_KEY=
 
-RUN pnpm build:all && \
+# CI has already generated and checked the committed error-code projection.
+# The Web-only image builder consumes that projection and does not install Go.
+RUN pnpm build:committed && \
     node ../scripts/build/apply-customer-web-config.mjs \
       --customer "${ERP_CUSTOMER_KEY}" \
       --config-root /app/config \

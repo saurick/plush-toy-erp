@@ -58,6 +58,7 @@
   "scripts": {
     "build": "vite build --config vite.config.mjs",
     "build:all": "node ../scripts/gen-error-codes.mjs && vite build --config vite.config.mjs",
+    "build:committed": "vite build --config vite.config.mjs",
     "start": "node ./scripts/startWebDev.mjs",
     "start:frontend-only": "node ./scripts/startWebDev.mjs --frontend-only",
     "start:yoyoosun": "node ./scripts/startYoyoosunDev.mjs",

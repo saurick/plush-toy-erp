@@ -10,6 +10,14 @@
 - 133 当前 release、数据库、active config、镜像与回滚点必须在每次发布前从目标环境重新读回；历史记录只作定位，不得替代当前技术发布证据。客户 UAT / 签收始终是独立关口。
 - 本轮 Git 与发布收口只能由单一 owner 串行执行；clean HEAD 的 full / strict / prepare-push、exact-SHA 远端 CI、不可变制品、本地发布演练和 133 技术发布必须绑定同一最终 SHA，以 Git、CI、制品 manifest 和运行回执为准，不由本文件预写绿色结论。
 
+## 2026-07-29 133 扩容与不可变制品构建边界修正
+
+完成：用户确认虚拟机快照后，133 的 root LV 与 ext4 已从 100GiB 在线扩至 250GiB，当前根分区约 155GiB 可用；ERP 容器未重启。扩容后的目标只读前检已通过容量、环境、Compose、数据库身份、health / ready 与 migration lock，旧运行版本保持不变。
+
+发布证据：对 `babd2393e6bf7d30acf2c4bc4ae600a52856c40e` 只触发一次 `2026.07.29-1` 不可变发布；exact-SHA strict 通过，但 Web 镜像构建因 Node-only builder 调用 Go 错误码生成器而失败，未生成可晋级制品，也没有自动重跑。Web Dockerfile 现只消费 CI 已校验的 committed error-code projection，并通过专用 `build:committed` 执行 Vite build；定向合同、production build、`git diff --check` 与真实 `linux/amd64` Docker 构建均通过。
+
+下一步与边界：将本修正形成新的 clean SHA 后，从头完成该 SHA 的 prepare-push、远端 CI 与一次新的不可变发布，再校验 manifest / digest、执行本地发布演练并从版本中心晋级 133。当前尚未部署新版本、执行目标 migration / 岗位 smoke 或客户 UAT；失败的旧 SHA 不复用、不重跑。
+
 ## 2026-07-29 GitHub CI/CD 去重与版本中心
 
 完成：按 `docs/engineering/研发效能工作台与CI-CD实施计划.md` 收敛普通反馈、最终验证、制品发布和 133 promotion。普通 PR / push 只走 affected 或 full；strict 只由 clean exact SHA 的发布 workflow 触发，同 gate fingerprint 复用已有终态且失败不自动重启 lifecycle。GitHub-hosted Runner 负责一次 linux/amd64 Server / Web 构建并发布 GHCR digest、GitHub Release、manifest、SBOM 和 checksums；133 固定为 `test-133`，只允许 load、migration、启动和检查，不安装公开仓库 self-hosted runner，也不在目标机编译源码。
