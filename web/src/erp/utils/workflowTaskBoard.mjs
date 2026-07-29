@@ -447,6 +447,16 @@ export function getWorkflowTaskBoardRequestKey(request = {}) {
   )
 }
 
+export function getWorkflowTaskBoardSummaryRequestKey(request = {}) {
+  const {
+    lane_key: _laneKey,
+    limit: _limit,
+    offset: _offset,
+    ...summaryRequest
+  } = request
+  return getWorkflowTaskBoardRequestKey(summaryRequest)
+}
+
 export function resolveWorkflowTaskBoardResponseState(
   responseState = null,
   request = {}

@@ -4710,10 +4710,122 @@ export function createStyleL1Scenarios(deps) {
         await actionableOverviewLane
           .getByRole('button', { name: '查看全部 19 条', exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
+        const readTaskBoardRefreshMetrics = () =>
+          page.evaluate(() => {
+            const boardCard = document.querySelector(
+              '.erp-dashboard-task-board-card'
+            )
+            const summary = document.querySelector('.erp-task-center-summary')
+            const lanes = document.querySelector('.erp-task-board-lanes')
+            const metricButtons = [
+              ...document.querySelectorAll('.erp-task-center-metric'),
+            ]
+            const content = document.querySelector('.erp-admin-content')
+            const summaryRect = summary?.getBoundingClientRect()
+            const boardCardRect = boardCard?.getBoundingClientRect()
+            const lanesRect = lanes?.getBoundingClientRect()
+            return {
+              outerLoading:
+                boardCard?.classList.contains('ant-card-loading') === true,
+              laneLoadingCount: [
+                ...document.querySelectorAll('.erp-task-board-lane'),
+              ].filter((lane) => lane.classList.contains('ant-card-loading'))
+                .length,
+              lanesBusy: lanes?.getAttribute('aria-busy') || '',
+              metricValues: metricButtons.map((button) =>
+                String(button.querySelector('strong')?.textContent || '').trim()
+              ),
+              activeLabels: metricButtons
+                .filter(
+                  (button) => button.getAttribute('aria-pressed') === 'true'
+                )
+                .map((button) =>
+                  String(
+                    button.querySelector('.erp-task-center-metric__head span')
+                      ?.textContent || ''
+                  ).trim()
+                ),
+              summaryTop: summaryRect?.top || 0,
+              summaryHeight: summaryRect?.height || 0,
+              boardCardTop: boardCardRect?.top || 0,
+              boardCardHeight: boardCardRect?.height || 0,
+              boardCardMinHeight: boardCard
+                ? window.getComputedStyle(boardCard).minHeight
+                : '',
+              lanesHeight: lanesRect?.height || 0,
+              contentScrollTop: content?.scrollTop || 0,
+              contentScrollHeight: content?.scrollHeight || 0,
+              contentClientHeight: content?.clientHeight || 0,
+            }
+          })
+        const partialRefreshBefore = await readTaskBoardRefreshMetrics()
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-partial-refresh-before.png'
+          ),
+          fullPage: false,
+        })
+        let delayNextTaskBoardRequest = true
+        const delayedTaskBoardRoute = async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            delayNextTaskBoardRequest &&
+            body.method === 'get_task_board' &&
+            body.params?.lane_key === 'actionable'
+          ) {
+            delayNextTaskBoardRequest = false
+            await new Promise((resolve) => setTimeout(resolve, 1200))
+          }
+          await route.fallback()
+        }
+        await page.route('**/rpc/workflow', delayedTaskBoardRoute)
+        const focusedTaskBoardRequest = page.waitForRequest((request) => {
+          try {
+            const body = request.postDataJSON() || {}
+            return (
+              body.method === 'get_task_board' &&
+              body.params?.lane_key === 'actionable'
+            )
+          } catch {
+            return false
+          }
+        })
         await page
           .locator('.erp-task-center-metric')
           .filter({ hasText: '常规待办' })
           .click()
+        await focusedTaskBoardRequest
+        await page
+          .locator('.erp-task-board-lanes[aria-busy="true"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const partialRefreshDuring = await readTaskBoardRefreshMetrics()
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-partial-refresh-loading.png'
+          ),
+          fullPage: false,
+        })
+        assert(
+          !partialRefreshDuring.outerLoading &&
+            partialRefreshDuring.laneLoadingCount === 1 &&
+            partialRefreshDuring.lanesBusy === 'true' &&
+            partialRefreshDuring.activeLabels.join(',') === '常规待办' &&
+            partialRefreshDuring.metricValues.join(',') ===
+              partialRefreshBefore.metricValues.join(',') &&
+            Math.abs(
+              partialRefreshDuring.summaryTop - partialRefreshBefore.summaryTop
+            ) <= 1 &&
+            Math.abs(
+              partialRefreshDuring.summaryHeight -
+                partialRefreshBefore.summaryHeight
+            ) <= 1,
+          `任务分类切换应只刷新下方泳道并保持顶部指标稳定: ${JSON.stringify({
+            before: partialRefreshBefore,
+            during: partialRefreshDuring,
+          })}`
+        )
         await page.waitForFunction(() => {
           const params = new URLSearchParams(window.location.search)
           return (
@@ -4734,6 +4846,33 @@ export function createStyleL1Scenarios(deps) {
           undefined,
           { timeout: 10_000 }
         )
+        const partialRefreshAfter = await readTaskBoardRefreshMetrics()
+        assert(
+          !partialRefreshAfter.outerLoading &&
+            partialRefreshAfter.laneLoadingCount === 0 &&
+            partialRefreshAfter.lanesBusy === 'false' &&
+            partialRefreshAfter.metricValues.join(',') ===
+              partialRefreshBefore.metricValues.join(',') &&
+            Math.abs(
+              partialRefreshAfter.summaryTop - partialRefreshBefore.summaryTop
+            ) <= 1 &&
+            Math.abs(
+              partialRefreshAfter.summaryHeight -
+                partialRefreshBefore.summaryHeight
+            ) <= 1,
+          `任务分类切换完成后顶部指标与局部加载状态异常: ${JSON.stringify({
+            before: partialRefreshBefore,
+            after: partialRefreshAfter,
+          })}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-partial-refresh-after.png'
+          ),
+          fullPage: false,
+        })
+        await page.unroute('**/rpc/workflow', delayedTaskBoardRoute)
         assert.equal(
           await page.locator('.erp-task-board-lane').count(),
           1,

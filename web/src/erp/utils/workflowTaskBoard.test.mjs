@@ -8,6 +8,7 @@ import {
   buildWorkflowTaskBoardRequest,
   buildWorkflowTaskBoardRoleOptions,
   getWorkflowTaskBoardRequestKey,
+  getWorkflowTaskBoardSummaryRequestKey,
   canRunWorkflowTaskAction,
   getWorkflowTaskActionPermission,
   getWorkflowTaskAllowedActionModes,
@@ -454,6 +455,45 @@ test('workflowTaskBoard: lane/page 切换不会把上一请求响应交给新筛
       buildWorkflowTaskBoardRequest({ lane: 'actionable', page: 2 })
     ),
     null
+  )
+})
+
+test('workflowTaskBoard: 分类与翻页共享同一顶部摘要范围', () => {
+  const overviewRequest = buildWorkflowTaskBoardRequest({
+    keyword: '出货',
+    role: 'warehouse',
+  })
+  const firstPageRequest = buildWorkflowTaskBoardRequest({
+    keyword: '出货',
+    role: 'warehouse',
+    lane: 'actionable',
+    page: 1,
+  })
+  const secondPageRequest = buildWorkflowTaskBoardRequest({
+    keyword: '出货',
+    role: 'warehouse',
+    lane: 'actionable',
+    page: 2,
+  })
+
+  assert.equal(
+    getWorkflowTaskBoardSummaryRequestKey(overviewRequest),
+    getWorkflowTaskBoardSummaryRequestKey(firstPageRequest)
+  )
+  assert.equal(
+    getWorkflowTaskBoardSummaryRequestKey(firstPageRequest),
+    getWorkflowTaskBoardSummaryRequestKey(secondPageRequest)
+  )
+  assert.notEqual(
+    getWorkflowTaskBoardSummaryRequestKey(firstPageRequest),
+    getWorkflowTaskBoardSummaryRequestKey(
+      buildWorkflowTaskBoardRequest({
+        keyword: '采购',
+        role: 'warehouse',
+        lane: 'actionable',
+        page: 1,
+      })
+    )
   )
 })
 

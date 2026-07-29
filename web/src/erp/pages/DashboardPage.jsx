@@ -74,6 +74,7 @@ import {
   getTaskStatusKey,
   getWorkflowTaskDueLabel,
   getWorkflowTaskBoardRequestKey,
+  getWorkflowTaskBoardSummaryRequestKey,
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
   getWorkflowTaskReasonLabel,
@@ -302,6 +303,7 @@ function getWorkflowTaskStableKey(task) {
 
 function TaskLane({
   lane,
+  loading = false,
   focused,
   page,
   selectedTaskId,
@@ -317,6 +319,8 @@ function TaskLane({
       size="small"
       variant="borderless"
       className="erp-task-board-lane"
+      loading={loading}
+      aria-busy={loading}
       title={
         <Space>
           <Tag color={lane.count > 0 ? lane.tagColor : 'default'}>
@@ -522,6 +526,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => createWorkflowWorkbenchSnapshot()
   )
   const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
+  const [taskBoardSummaryState, setTaskBoardSummaryState] = useState(null)
   const [taskBoardKeywordDraft, setTaskBoardKeywordDraft] = useState('')
   const [selectedTask, setSelectedTask] = useState(null)
   const [selectedTaskBoardTaskId, setSelectedTaskBoardTaskId] = useState('')
@@ -541,6 +546,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const dashboardLoadRequestSeqRef = useRef(0)
   const taskBoardLanesRef = useRef(null)
   const pendingTaskBoardPageScrollRef = useRef(null)
+  const pendingTaskBoardTransitionRequestKeyRef = useRef('')
   const mutationAttemptsRef = useRef(null)
   mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
   const mutationInFlightRef = useRef(null)
@@ -590,6 +596,24 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => getWorkflowTaskBoardRequestKey(taskBoardRequest),
     [taskBoardRequest]
   )
+  const taskBoardSummaryRequestKey = useMemo(
+    () => getWorkflowTaskBoardSummaryRequestKey(taskBoardRequest),
+    [taskBoardRequest]
+  )
+  const preserveTaskBoardTransitionHeight = useCallback(
+    (nextRequest = taskBoardRequest) => {
+      pendingTaskBoardTransitionRequestKeyRef.current =
+        getWorkflowTaskBoardRequestKey(nextRequest)
+      const taskBoardCard = taskBoardLanesRef.current?.closest?.(
+        '.erp-dashboard-task-board-card'
+      )
+      const currentCardHeight = Math.ceil(
+        taskBoardCard?.getBoundingClientRect().height || 0
+      )
+      setTaskBoardTransitionMinHeight(currentCardHeight)
+    },
+    [taskBoardRequest]
+  )
 
   const loadDashboardStats = useCallback(async () => {
     const requestSeq = dashboardLoadRequestSeqRef.current + 1
@@ -601,6 +625,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       )
       setLoading(false)
       return true
+    }
+    if (isTaskBoardView && mountedRef.current) {
+      preserveTaskBoardTransitionHeight(taskBoardRequest)
     }
     setLoading(true)
     if (isTaskBoardView && mountedRef.current) {
@@ -622,6 +649,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             requestKey: taskBoardRequestKey,
             response: taskBoardResult,
             error: '',
+          })
+          setTaskBoardSummaryState({
+            requestKey: taskBoardSummaryRequestKey,
+            response: taskBoardResult,
           })
         }
       } else {
@@ -688,9 +719,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
   }, [
     isTaskBoardView,
+    preserveTaskBoardTransitionHeight,
     shouldShowProductCoreDashboard,
     taskBoardRequest,
     taskBoardRequestKey,
+    taskBoardSummaryRequestKey,
     workflowWorkbenchRoleKeys,
     workflowWorkbenchScopeKey,
   ])
@@ -728,12 +761,39 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     taskBoardResponseState?.requestKey === taskBoardRequestKey
       ? taskBoardResponseState.error
       : ''
+  const taskBoardSummaryResponse =
+    taskBoardSummaryState?.requestKey === taskBoardSummaryRequestKey
+      ? taskBoardSummaryState.response
+      : null
   const taskBoardModel = useMemo(
     () => buildWorkflowTaskBoardModel(taskBoardResponse, filters),
     [filters, taskBoardResponse]
   )
   const taskBoardReady = Boolean(taskBoardResponse) && !taskBoardLoadError
-  const taskLanes = taskBoardModel.visibleLanes
+  const taskBoardHasLoaded = Boolean(taskBoardSummaryState?.response)
+  const taskBoardMetricsReady =
+    Boolean(taskBoardSummaryResponse) || taskBoardReady
+  const taskBoardCounts =
+    taskBoardSummaryResponse?.counts || taskBoardModel.counts
+  const taskBoardTotal = taskBoardSummaryResponse?.total ?? taskBoardModel.total
+  const taskBoardInitialLoading =
+    isTaskBoardView &&
+    !taskBoardHasLoaded &&
+    !taskBoardResponse &&
+    !taskBoardLoadError
+  const taskBoardUpdating =
+    isTaskBoardView &&
+    taskBoardHasLoaded &&
+    !taskBoardResponse &&
+    !taskBoardLoadError
+  const taskLanes = useMemo(
+    () =>
+      taskBoardModel.visibleLanes.map((lane) => ({
+        ...lane,
+        count: taskBoardMetricsReady ? taskBoardCounts[lane.key] : lane.count,
+      })),
+    [taskBoardCounts, taskBoardMetricsReady, taskBoardModel.visibleLanes]
+  )
   const taskBoardVisibleTasks = useMemo(
     () => taskLanes.flatMap((lane) => lane.tasks),
     [taskLanes]
@@ -741,14 +801,23 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const sourceOptions = useMemo(
     () =>
       buildSourceOptions([
-        ...taskBoardModel.sourceTypes,
+        ...(taskBoardSummaryResponse?.source_types ||
+          taskBoardModel.sourceTypes),
         filters.sourceType === 'all' ? '' : filters.sourceType,
       ]),
-    [filters.sourceType, taskBoardModel.sourceTypes]
+    [
+      filters.sourceType,
+      taskBoardModel.sourceTypes,
+      taskBoardSummaryResponse?.source_types,
+    ]
   )
   const roleOptions = useMemo(
-    () => buildWorkflowTaskBoardRoleOptions(taskBoardModel.ownerRoleKeys),
-    [taskBoardModel.ownerRoleKeys]
+    () =>
+      buildWorkflowTaskBoardRoleOptions(
+        taskBoardSummaryResponse?.owner_role_keys ||
+          taskBoardModel.ownerRoleKeys
+      ),
+    [taskBoardModel.ownerRoleKeys, taskBoardSummaryResponse?.owner_role_keys]
   )
   const actionMeta = actionMode
     ? getWorkflowTaskActionMeta(selectedTask, actionMode)
@@ -808,18 +877,27 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   useLayoutEffect(() => {
     const pendingScroll = pendingTaskBoardPageScrollRef.current
     if (
-      !pendingScroll ||
+      !pendingTaskBoardTransitionRequestKeyRef.current ||
+      pendingTaskBoardTransitionRequestKeyRef.current !== taskBoardRequestKey ||
       loading ||
       !taskBoardReady ||
-      !taskBoardModel.focused ||
-      filters.lane !== pendingScroll.lane ||
-      taskBoardModel.page !== pendingScroll.page
+      taskBoardTransitionMinHeight <= 0
     ) {
       return
     }
 
-    scrollTaskBoardLanesToStart(taskBoardLanesRef.current)
-    pendingTaskBoardPageScrollRef.current = null
+    if (pendingScroll) {
+      if (
+        !taskBoardModel.focused ||
+        filters.lane !== pendingScroll.lane ||
+        taskBoardModel.page !== pendingScroll.page
+      ) {
+        return
+      }
+      scrollTaskBoardLanesToStart(taskBoardLanesRef.current)
+      pendingTaskBoardPageScrollRef.current = null
+    }
+    pendingTaskBoardTransitionRequestKeyRef.current = ''
     setTaskBoardTransitionMinHeight(0)
   }, [
     filters.lane,
@@ -827,11 +905,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     taskBoardModel.focused,
     taskBoardModel.page,
     taskBoardReady,
+    taskBoardRequestKey,
+    taskBoardTransitionMinHeight,
   ])
 
   useEffect(() => {
-    if (!taskBoardLoadError || !pendingTaskBoardPageScrollRef.current) return
+    if (!taskBoardLoadError) return
     pendingTaskBoardPageScrollRef.current = null
+    pendingTaskBoardTransitionRequestKeyRef.current = ''
     setTaskBoardTransitionMinHeight(0)
   }, [taskBoardLoadError])
 
@@ -848,6 +929,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         ...pendingTaskBoardPageScrollRef.current,
         page: taskBoardModel.pageCount,
       }
+      pendingTaskBoardTransitionRequestKeyRef.current =
+        getWorkflowTaskBoardRequestKey(
+          buildWorkflowTaskBoardRequest({
+            ...filters,
+            page: taskBoardModel.pageCount,
+          })
+        )
     }
     setSelectedTaskBoardTaskId('')
     setSearchParams(
@@ -998,36 +1086,42 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [activeWorkbenchQueuePage, workbenchQueuePage])
 
   const updateFilter = (key, value) => {
+    const nextFilters = {
+      ...filters,
+      [key]: value,
+      page: 1,
+    }
     pendingTaskBoardPageScrollRef.current = null
-    setTaskBoardTransitionMinHeight(0)
+    preserveTaskBoardTransitionHeight(
+      buildWorkflowTaskBoardRequest(nextFilters)
+    )
     setSearchParams(
-      writeWorkflowTaskBoardFiltersToSearch(searchParams, {
-        ...filters,
-        [key]: value,
-        page: 1,
-      }),
+      writeWorkflowTaskBoardFiltersToSearch(searchParams, nextFilters),
       { replace: true }
     )
   }
 
   const clearFilters = () => {
     pendingTaskBoardPageScrollRef.current = null
-    setTaskBoardTransitionMinHeight(0)
+    preserveTaskBoardTransitionHeight(buildWorkflowTaskBoardRequest({}))
     setSearchParams(writeWorkflowTaskBoardFiltersToSearch(searchParams), {
       replace: true,
     })
   }
 
   const selectTaskBoardLane = (lane) => {
+    const nextFilters = {
+      ...filters,
+      lane,
+      page: 1,
+    }
     pendingTaskBoardPageScrollRef.current = null
-    setTaskBoardTransitionMinHeight(0)
+    preserveTaskBoardTransitionHeight(
+      buildWorkflowTaskBoardRequest(nextFilters)
+    )
     setSelectedTaskBoardTaskId('')
     setSearchParams(
-      writeWorkflowTaskBoardFiltersToSearch(searchParams, {
-        ...filters,
-        lane,
-        page: 1,
-      }),
+      writeWorkflowTaskBoardFiltersToSearch(searchParams, nextFilters),
       { replace: true }
     )
   }
@@ -1042,17 +1136,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     ) {
       return
     }
-    const taskBoardCard = taskBoardLanesRef.current?.closest?.(
-      '.erp-dashboard-task-board-card'
-    )
-    const currentCardHeight = Math.ceil(
-      taskBoardCard?.getBoundingClientRect().height || 0
-    )
     pendingTaskBoardPageScrollRef.current = {
       lane: filters.lane,
       page: nextPage,
     }
-    setTaskBoardTransitionMinHeight(currentCardHeight)
+    preserveTaskBoardTransitionHeight(
+      buildWorkflowTaskBoardRequest({
+        ...filters,
+        page: nextPage,
+      })
+    )
     setSelectedTaskBoardTaskId('')
     setSearchParams(
       writeWorkflowTaskBoardFiltersToSearch(searchParams, {
@@ -1644,7 +1737,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         <Card
           className="erp-dashboard-card erp-dashboard-task-board-card"
           variant="borderless"
-          loading={loading}
+          loading={taskBoardInitialLoading}
           style={
             taskBoardTransitionMinHeight > 0
               ? { minHeight: taskBoardTransitionMinHeight }
@@ -1685,7 +1778,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     label="常规待办"
                     tone="actionable"
                     value={
-                      taskBoardReady ? taskBoardModel.counts.actionable : '-'
+                      taskBoardMetricsReady ? taskBoardCounts.actionable : '-'
                     }
                     actionLabel="查看常规待办"
                     active={filters.lane === 'actionable'}
@@ -1695,27 +1788,27 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     label="阻塞"
                     tone="exception"
                     value={
-                      taskBoardReady ? taskBoardModel.counts.exception : '-'
+                      taskBoardMetricsReady ? taskBoardCounts.exception : '-'
                     }
                     actionLabel="查看阻塞任务"
                     active={filters.lane === 'exception'}
-                    danger={taskBoardModel.counts.exception > 0}
+                    danger={taskBoardCounts.exception > 0}
                     onClick={() => selectTaskBoardLane('exception')}
                   />
                   <TaskMetricAction
                     label="到期提醒"
                     tone="due"
-                    value={taskBoardReady ? taskBoardModel.counts.due : '-'}
+                    value={taskBoardMetricsReady ? taskBoardCounts.due : '-'}
                     actionLabel="查看到期提醒"
                     active={filters.lane === 'due'}
-                    danger={taskBoardModel.counts.due > 0}
+                    danger={taskBoardCounts.due > 0}
                     onClick={() => selectTaskBoardLane('due')}
                   />
                   <TaskMetricAction
                     label="已结束"
                     tone="finished"
                     value={
-                      taskBoardReady ? taskBoardModel.counts.finished : '-'
+                      taskBoardMetricsReady ? taskBoardCounts.finished : '-'
                     }
                     actionLabel="查看已结束任务"
                     active={filters.lane === 'finished'}
@@ -1864,7 +1957,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               </Button>
               <div className="erp-task-board-filter-summary" aria-live="polite">
                 <Text type="secondary">
-                  筛选结果 {taskBoardReady ? taskBoardModel.total : '-'} 条
+                  筛选结果 {taskBoardMetricsReady ? taskBoardTotal : '-'} 条
                 </Text>
                 {taskBoardModel.focused ? (
                   <Button
@@ -1891,11 +1984,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   taskBoardModel.focused ? ' erp-task-board-lanes--focused' : ''
                 }`}
                 aria-label="任务看板分类"
+                aria-busy={taskBoardUpdating}
               >
                 {taskLanes.map((lane) => (
                   <TaskLane
                     key={lane.key}
                     lane={lane}
+                    loading={taskBoardUpdating}
                     focused={taskBoardModel.focused}
                     page={taskBoardModel.page}
                     selectedTaskId={selectedTaskBoardTaskId}
