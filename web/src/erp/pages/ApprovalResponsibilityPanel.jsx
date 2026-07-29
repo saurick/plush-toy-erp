@@ -762,7 +762,7 @@ export default function ApprovalResponsibilityPanel({
     } catch (error) {
       message.error(
         getActionErrorMessage(error, '', {
-          fallback: error?.message || '保存审批责任失败，请稍后重试',
+          fallback: '保存审批责任失败，请稍后重试',
         })
       )
     } finally {

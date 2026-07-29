@@ -494,7 +494,6 @@ test("workflow business role filters use shared role display names", () => {
     "pmc",
     "production",
     "warehouse",
-    "quality",
     "finance",
     "boss",
   ]) {
