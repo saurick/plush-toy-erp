@@ -596,7 +596,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
-    /devCustomerConfigPlugin\.test\.mjs/
+    /web\/dev-server\/devCustomerConfigPlugin\.test\.mjs/
   )
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),

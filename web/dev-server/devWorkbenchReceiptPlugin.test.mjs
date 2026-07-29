@@ -7,7 +7,7 @@ import test from 'node:test'
 import {
   buildDevWorkbenchReceipt,
   writeDevWorkbenchReceipt,
-} from '../scripts/qa/dev-workbench-receipt.mjs'
+} from '../../scripts/qa/dev-workbench-receipt.mjs'
 import {
   DEV_WORKBENCH_RECEIPT_API_PATH,
   createDevWorkbenchReceiptMiddleware,
@@ -19,7 +19,7 @@ import {
   DEV_WORKBENCH_SERVE_PLUGIN_NAMES,
   createDevWorkbenchServePlugins,
 } from './devWorkbenchPlugins.mjs'
-import { createERPViteConfig } from './vite.shared.mjs'
+import { createERPViteConfig } from '../vite.shared.mjs'
 
 const COMMIT = 'a'.repeat(40)
 const REPOSITORY = Object.freeze({

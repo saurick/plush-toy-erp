@@ -6,7 +6,7 @@ import process from 'node:process'
 import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 
-import { normalizeDevCustomerKey } from '../devCustomerConfigPlugin.mjs'
+import { normalizeDevCustomerKey } from '../dev-server/devCustomerConfigPlugin.mjs'
 import { loadDevPorts } from '../../scripts/dev-ports.mjs'
 
 const execFileAsync = promisify(execFile)

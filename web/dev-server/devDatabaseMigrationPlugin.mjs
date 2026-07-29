@@ -4,7 +4,7 @@ import path from 'node:path'
 import {
   isLoopbackAPIOrigin,
   normalizeAPIOrigin,
-} from '../scripts/local-runtime-preflight-core.mjs'
+} from '../../scripts/local-runtime-preflight-core.mjs'
 import {
   acquireDatabaseMigrationExecutionLock,
   createOrReuseDatabaseMigrationOperation,
@@ -15,11 +15,11 @@ import {
   releaseDatabaseMigrationExecutionLock,
   resolveDatabaseMigrationOperationStore,
   transitionDatabaseMigrationOperation,
-} from '../scripts/qa/dev-database-migration-operation-store.mjs'
+} from '../../scripts/qa/dev-database-migration-operation-store.mjs'
 import {
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
-} from './devQaCoveragePlugin.mjs'
+} from './devServerSecurity.mjs'
 import {
   createDevDatabaseMigrationRuntime,
   redactDatabaseMigrationDiagnostic,

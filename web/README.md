@@ -28,14 +28,16 @@ pnpm install
 
 ## 目录结构（简版）
 
-| 路径          | 职责                                                              |
-| ------------- | ----------------------------------------------------------------- |
-| `src/common/` | 通用认证、组件、hooks、状态、常量与工具函数                       |
-| `src/erp/`    | 毛绒 ERP 桌面后台、业务页、岗位任务端页面和打印工作台             |
-| `src/erp/qa/` | 字段联动等前端 QA catalog 与报告生成依赖                          |
-| `src/pages/`  | 根路由重定向、登录、注册、管理员登录                              |
-| `scripts/`    | 前端本地服务、浏览器级回归和 smoke 脚本，详见 `scripts/README.md` |
-| `build/`      | 构建产物，不作为业务真源                                          |
+| 路径                 | 职责                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `src/common/`        | 通用认证、组件、hooks、状态、常量与工具函数                                              |
+| `src/erp/`           | 毛绒 ERP 桌面后台、业务页、岗位任务端页面和打印工作台                                    |
+| `src/erp/qa/`        | 字段联动等前端 QA catalog 与报告生成依赖                                                 |
+| `src/dev-workbench/` | `/__dev` 浏览器端页面、配置、组件和样式，不进入 production build                         |
+| `src/pages/`         | 根路由重定向、登录、注册、管理员登录                                                     |
+| `dev-server/`        | Node/Vite development-serve Bridge、operation 适配器及合同测试，详见 `dev-server/README.md` |
+| `scripts/`           | 前端本地服务、浏览器级回归和 smoke 脚本，详见 `scripts/README.md`                        |
+| `build/`             | 构建产物，不作为业务真源                                                                 |
 
 ## 启动命令
 

@@ -10,16 +10,16 @@ import {
   recoverInterruptedDeliveryOperations,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
-} from '../scripts/deploy/delivery-operation-store.mjs'
-import { createGithubDeliveryProvider } from '../scripts/deploy/github-delivery-provider.mjs'
-import { preparePromotion } from '../scripts/deploy/promotion-controller.mjs'
-import { prepareRollback } from '../scripts/deploy/rollback-controller.mjs'
-import { runTargetPreflight } from '../scripts/deploy/target-preflight.mjs'
-import { readRepositoryIdentity } from '../scripts/qa/lib/repository-identity.mjs'
+} from '../../scripts/deploy/delivery-operation-store.mjs'
+import { createGithubDeliveryProvider } from '../../scripts/deploy/github-delivery-provider.mjs'
+import { preparePromotion } from '../../scripts/deploy/promotion-controller.mjs'
+import { prepareRollback } from '../../scripts/deploy/rollback-controller.mjs'
+import { runTargetPreflight } from '../../scripts/deploy/target-preflight.mjs'
+import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
 import {
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
-} from './devQaCoveragePlugin.mjs'
+} from './devServerSecurity.mjs'
 
 export const DEV_DELIVERY_API_PREFIX = '/__dev/api/delivery'
 export const DEV_DELIVERY_SESSION_API_PATH = `${DEV_DELIVERY_API_PREFIX}/session`

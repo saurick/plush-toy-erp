@@ -12,11 +12,36 @@ import path from 'node:path'
 import test from 'node:test'
 
 import {
+  DEV_DATABASE_MIGRATION_SOURCE_FILES,
   createDevDatabaseMigrationRuntime,
   redactDatabaseMigrationDiagnostic,
 } from './devDatabaseMigrationRuntime.mjs'
 
 const BACKUP_ID = 'br-yoyoosun-20260729T080000+0800'
+
+test('database migration source identity follows the centralized dev server paths', () => {
+  assert(
+    DEV_DATABASE_MIGRATION_SOURCE_FILES.includes(
+      'web/dev-server/devDatabaseMigrationPlugin.mjs'
+    )
+  )
+  assert(
+    DEV_DATABASE_MIGRATION_SOURCE_FILES.includes(
+      'web/dev-server/devDatabaseMigrationRuntime.mjs'
+    )
+  )
+  assert(
+    DEV_DATABASE_MIGRATION_SOURCE_FILES.includes(
+      'web/dev-server/devServerSecurity.mjs'
+    )
+  )
+  assert.equal(
+    DEV_DATABASE_MIGRATION_SOURCE_FILES.some((file) =>
+      /^web\/dev(?:DatabaseMigration|ServerSecurity)/u.test(file)
+    ),
+    false
+  )
+})
 
 function createRoot(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'plush-migration-runtime-'))

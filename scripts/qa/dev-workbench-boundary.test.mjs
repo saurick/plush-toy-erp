@@ -126,6 +126,39 @@ test("dev workbench boundary: source and styles live outside product directories
   );
 });
 
+test("dev workbench boundary: Node serve bridges are centralized outside browser sources", () => {
+  const rootDevModules = readdirSync(path.join(repoRoot, "web"), {
+    withFileTypes: true,
+  })
+    .filter(
+      (entry) =>
+        entry.isFile() && /^dev[A-Z].*(?:Plugin|Plugins|Runtime).*\.mjs$/u.test(entry.name),
+    )
+    .map((entry) => entry.name);
+  assert.deepEqual(rootDevModules, []);
+
+  for (const requiredPath of [
+    "web/dev-server/README.md",
+    "web/dev-server/devWorkbenchPlugins.mjs",
+    "web/dev-server/devCustomerConfigPlugin.mjs",
+    "web/dev-server/devCustomerImportDryRunPlugin.mjs",
+    "web/dev-server/devDataPreparationPlugin.mjs",
+    "web/dev-server/devDatabaseMigrationPlugin.mjs",
+    "web/dev-server/devDatabaseMigrationRuntime.mjs",
+    "web/dev-server/devDeliveryBridgePlugin.mjs",
+    "web/dev-server/devQaCoveragePlugin.mjs",
+    "web/dev-server/devWorkbenchReceiptPlugin.mjs",
+    "web/dev-server/devServerSecurity.mjs",
+  ]) {
+    assert.equal(existsSync(path.join(repoRoot, requiredPath)), true, requiredPath);
+  }
+
+  assert.match(
+    read("web/vite.shared.mjs"),
+    /from '\.\/dev-server\/devWorkbenchPlugins\.mjs'/u,
+  );
+});
+
 test("dev workbench boundary: primary navigation is fixed to four areas", () => {
   assert.deepEqual(
     DEV_WORKSPACE_NAV_ITEMS.map(({ key, route }) => ({ key, route })),

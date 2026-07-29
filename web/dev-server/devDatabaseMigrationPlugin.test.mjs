@@ -8,7 +8,7 @@ import test from 'node:test'
 import {
   resolveDatabaseMigrationOperationStore,
   transitionDatabaseMigrationOperation,
-} from '../scripts/qa/dev-database-migration-operation-store.mjs'
+} from '../../scripts/qa/dev-database-migration-operation-store.mjs'
 import {
   DEV_DATABASE_MIGRATION_ACTION_API_PATH,
   DEV_DATABASE_MIGRATION_SESSION_API_PATH,

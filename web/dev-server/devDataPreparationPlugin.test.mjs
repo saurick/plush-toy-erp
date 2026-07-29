@@ -13,7 +13,7 @@ import {
   hashDataPreparationPlan,
   readDataPreparationOperation,
   transitionDataPreparationOperation,
-} from '../scripts/qa/dev-data-preparation-operation-store.mjs'
+} from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
 import {
   coreDemoExecutionCommands,
   coreDemoPreflightCommand,

@@ -24,12 +24,12 @@ import {
   releaseDataPreparationExecutionLock,
   resolveDataPreparationOperationStore,
   transitionDataPreparationOperation,
-} from '../scripts/qa/dev-data-preparation-operation-store.mjs'
-import { readRepositoryIdentity } from '../scripts/qa/lib/repository-identity.mjs'
+} from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
+import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
 import {
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
-} from './devQaCoveragePlugin.mjs'
+} from './devServerSecurity.mjs'
 
 export const DEV_DATA_PREPARATION_API_PREFIX = '/__dev/api/data-preparation'
 export const DEV_DATA_PREPARATION_SESSION_API_PATH = `${DEV_DATA_PREPARATION_API_PREFIX}/session`
@@ -54,7 +54,7 @@ const LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV =
   'LOCAL_ACCEPTANCE_DATABASE_BASE_URL'
 const DATABASE_TARGET_MODULE_URL = pathToFileURL(
   path.join(
-    path.resolve(import.meta.dirname, '..'),
+    path.resolve(import.meta.dirname, '..', '..'),
     'scripts',
     'qa',
     'database-target.mjs'

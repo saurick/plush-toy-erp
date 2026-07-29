@@ -11,7 +11,7 @@ import {
   readDeliveryOperation,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
-} from '../scripts/deploy/delivery-operation-store.mjs'
+} from '../../scripts/deploy/delivery-operation-store.mjs'
 import {
   DEV_DELIVERY_ACTION_API_PATH,
   DEV_DELIVERY_SESSION_API_PATH,

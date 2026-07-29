@@ -254,7 +254,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web start:yoyoosun -- --print-plan',
       'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web preview:yoyoosun -- --print-plan',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/customer-package-lint.test.mjs scripts/qa/customer-config-runtime-manifest.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/customer-config-release-readiness.test.mjs scripts/deploy/run-smoke-script.test.mjs web/scripts/yoyoosunEntryPlan.test.mjs web/devCustomerConfigPlugin.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/customer-package-lint.test.mjs scripts/qa/customer-config-runtime-manifest.test.mjs scripts/deploy/customer-config-release-execute.test.mjs scripts/deploy/customer-config-release-readiness.test.mjs scripts/deploy/run-smoke-script.test.mjs web/scripts/yoyoosunEntryPlan.test.mjs web/dev-server/devCustomerConfigPlugin.test.mjs',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo --mode compile',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer yoyoosun',

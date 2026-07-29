@@ -4,7 +4,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-import { normalizeDevCustomerKey } from '../devCustomerConfigPlugin.mjs'
+import { normalizeDevCustomerKey } from '../dev-server/devCustomerConfigPlugin.mjs'
 import {
   loadDevPorts,
   validateDevAuxPort,

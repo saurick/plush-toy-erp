@@ -7,11 +7,11 @@ import {
   DEV_WORKBENCH_RECEIPT_GATES,
   getDevWorkbenchGitContext,
   validateDevWorkbenchReceipt,
-} from '../scripts/qa/dev-workbench-receipt.mjs'
+} from '../../scripts/qa/dev-workbench-receipt.mjs'
 import {
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
-} from './devQaCoveragePlugin.mjs'
+} from './devServerSecurity.mjs'
 
 export const DEV_WORKBENCH_RECEIPT_API_PATH = '/__dev/api/receipts'
 export const MAX_DEV_WORKBENCH_RECEIPT_BYTES = 256 * 1024

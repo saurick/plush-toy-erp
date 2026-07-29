@@ -148,10 +148,11 @@ web_tests=(
   "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs"
   "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs"
   "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs"
-  "$ROOT_DIR/web/devWorkbenchReceiptPlugin.test.mjs"
-  "$ROOT_DIR/web/devDataPreparationPlugin.test.mjs"
-  "$ROOT_DIR/web/devDatabaseMigrationRuntime.test.mjs"
-  "$ROOT_DIR/web/devDatabaseMigrationPlugin.test.mjs"
+  "$ROOT_DIR/web/dev-server/devServerSecurity.test.mjs"
+  "$ROOT_DIR/web/dev-server/devWorkbenchReceiptPlugin.test.mjs"
+  "$ROOT_DIR/web/dev-server/devDataPreparationPlugin.test.mjs"
+  "$ROOT_DIR/web/dev-server/devDatabaseMigrationRuntime.test.mjs"
+  "$ROOT_DIR/web/dev-server/devDatabaseMigrationPlugin.test.mjs"
 )
 node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
   --kind node --label web-contracts -- \

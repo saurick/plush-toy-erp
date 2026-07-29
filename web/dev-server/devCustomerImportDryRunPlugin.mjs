@@ -4,8 +4,8 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
-import { getCustomerPackage } from '../config/customers/index.mjs'
-import { isLoopbackAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
+import { getCustomerPackage } from '../../config/customers/index.mjs'
+import { isLoopbackAPIOrigin } from '../../scripts/local-runtime-preflight-core.mjs'
 
 const execFileAsync = promisify(execFile)
 

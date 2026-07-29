@@ -2,7 +2,6 @@ import { execFileSync, spawn } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { accessSync, constants, readFileSync } from 'node:fs'
 import { open } from 'node:fs/promises'
-import net from 'node:net'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -10,7 +9,7 @@ import {
   buildRepositoryFingerprint,
   readRepositoryIdentity,
   repositoryIdentitiesEqual,
-} from '../scripts/qa/lib/repository-identity.mjs'
+} from '../../scripts/qa/lib/repository-identity.mjs'
 import {
   COVERAGE_OPERATION_ACTIVE_STATUSES,
   COVERAGE_OPERATION_STAGES,
@@ -24,7 +23,11 @@ import {
   releaseCoverageExecutionLock,
   resolveCoverageOperationStore,
   transitionCoverageOperation,
-} from '../scripts/qa/dev-coverage-operation-store.mjs'
+} from '../../scripts/qa/dev-coverage-operation-store.mjs'
+import {
+  isLoopbackHostHeader,
+  isLoopbackRemoteAddress,
+} from './devServerSecurity.mjs'
 
 export { buildRepositoryFingerprint }
 
@@ -119,60 +122,6 @@ const normalizeKey = (value) =>
   String(value || '')
     .replace(/[^a-z0-9]/giu, '')
     .toLowerCase()
-
-const isLoopbackIPv4 = (value) =>
-  net.isIP(value) === 4 && Number(value.split('.')[0]) === 127
-
-const isMappedLoopbackIPv4 = (value) => {
-  const normalized = String(value || '')
-    .trim()
-    .toLowerCase()
-  const match = normalized.match(/^(?:::ffff:|0:0:0:0:0:ffff:)([0-9a-f:.]+)$/u)
-  if (!match) return false
-
-  const mapped = match[1]
-  if (isLoopbackIPv4(mapped)) return true
-
-  const hexMatch = mapped.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u)
-  if (!hexMatch) return false
-  const highWord = Number.parseInt(hexMatch[1], 16)
-  return Math.floor(highWord / 256) === 127
-}
-
-export function isLoopbackRemoteAddress(value) {
-  const address = String(value || '')
-    .trim()
-    .toLowerCase()
-  return (
-    address === '::1' ||
-    isLoopbackIPv4(address) ||
-    isMappedLoopbackIPv4(address)
-  )
-}
-
-const isValidPort = (value) => {
-  if (value === undefined) return true
-  if (!/^\d{1,5}$/u.test(value)) return false
-  const port = Number(value)
-  return Number.isInteger(port) && port >= 1 && port <= 65535
-}
-
-export function isLoopbackHostHeader(value) {
-  if (Array.isArray(value)) return false
-  const host = String(value || '')
-    .trim()
-    .toLowerCase()
-  if (!host || /[\s,/@#?]/u.test(host)) return false
-
-  const ipv6Match = host.match(/^\[([^\]]+)\](?::(\d{1,5}))?$/u)
-  if (ipv6Match) {
-    return ipv6Match[1] === '::1' && isValidPort(ipv6Match[2])
-  }
-
-  const match = host.match(/^([^:]+)(?::(\d{1,5}))?$/u)
-  if (!match || !isValidPort(match[2])) return false
-  return match[1] === 'localhost' || isLoopbackIPv4(match[1])
-}
 
 export function resolveDevQaCoverageReportPath(projectRoot) {
   return path.join(
@@ -557,7 +506,7 @@ export function createDevQaCoverageService({
     ;(async () => {
       let status = 'failed'
       let outcome = null
-      let exitCode = Number.isSafeInteger(code) ? code : null
+      const exitCode = Number.isSafeInteger(code) ? code : null
       let message = '覆盖采集未完成，上一份报告保持不变'
       try {
         const report = await readReport(reportPath, MAX_QA_COVERAGE_REPORT_BYTES)
@@ -900,7 +849,7 @@ export function createDevQaCoverageMiddleware({
         { status: 'failed', message: '该开发接口不支持当前请求方法' },
         { allow }
       )
-    } catch (error) {
+    } catch {
       sendJson(response, 400, {
         status: 'failed',
         message: '覆盖采集请求无效或当前无法执行',

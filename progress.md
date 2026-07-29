@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### DEV-only 开发服务目录收口
+
+- 完成：把原先散落在 `web/` 根目录的 17 个 DEV-only Vite / Node Bridge 实现与测试集中到 `web/dev-server/`，抽出共享 loopback / Host 安全校验，并同步 Vite 注册、客户预览脚本、QA profile、迁移 source identity、测试入口和目录文档。新增边界测试，禁止同类模块重新散落到 `web/` 根目录；浏览器端 `/__dev` 仍独立位于 `web/src/dev-workbench/`，正式业务代码未迁入该目录。
+- 验证：目录相关 Node 合同 120 / 120、文档清单 3 / 3、定向 ESLint、Shell 语法和 `git diff --check` 通过；production Vite build 通过，123 个产物文件的 DEV-only 边界扫描通过且无 source map；真实 Chromium 确认 production 直访 `/__dev` 会重定向到 `/admin-login`。
+- 下一步：本轮不涉及 schema、migration、API、RBAC、业务事实或客户部署；提交后仍不自动推送，后续发布继续按 exact SHA、完整门禁和目标环境证据另行处理。
+- 阻塞 / 风险：共享工作区的全量 Web 测试曾执行到 1971 / 1972，唯一失败来自另一项未提交 `DashboardPage.jsx` 文案与静态可见字段合同不一致；本轮未修改或暂存该并行现场。上述本地绿色不代表目标环境 smoke 或客户 UAT。
+
 ### 岗位使用帮助导航展开状态
 
 - 完成：岗位导航的“更多功能”展开判断改为读取路由导航真源 `currentNavigationEntry.menuPath`；进入或刷新 `/erp/help-center` 时继续显示并选中“岗位使用帮助”，返回看板或常用工作后仍自动收起。业务菜单权限继续使用 `resolveMenuPermissionKey`，未把登录态帮助入口并入 RBAC 菜单权限。

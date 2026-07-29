@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFileCallback)
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
 const COMMAND_TIMEOUT_MS = 15 * 60 * 1000
 const RUNTIME_WAIT_TIMEOUT_MS = 90 * 1000
-const SOURCE_FILES = Object.freeze([
+export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-migration.mjs',
   'scripts/local-runtime-preflight-core.mjs',
   'scripts/qa/database-programmability.mjs',
@@ -28,8 +28,9 @@ const SOURCE_FILES = Object.freeze([
   'scripts/qa/dev-database-migration-operation-store.mjs',
   'deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh',
   'server/Makefile',
-  'web/devDatabaseMigrationPlugin.mjs',
-  'web/devDatabaseMigrationRuntime.mjs',
+  'web/dev-server/devDatabaseMigrationPlugin.mjs',
+  'web/dev-server/devDatabaseMigrationRuntime.mjs',
+  'web/dev-server/devServerSecurity.mjs',
 ])
 
 export function redactDatabaseMigrationDiagnostic(value) {
@@ -143,7 +144,7 @@ function walkRegularFiles(root, relativeDirectory) {
 export async function readMigrationSourceIdentity(projectRoot) {
   const root = path.resolve(projectRoot)
   const files = [
-    ...SOURCE_FILES,
+    ...DEV_DATABASE_MIGRATION_SOURCE_FILES,
     ...walkRegularFiles(root, 'server/internal/data/model/migrate'),
     ...walkRegularFiles(root, 'server/internal/data/model/schema').filter(
       (file) => file.endsWith('.go')
