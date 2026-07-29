@@ -11,7 +11,8 @@
 - 首次 133 promotion 操作 `705e2c3d-df6c-4de1-aadd-ae43063dc626` 在 migration 前失败关闭并冻结为 `not_proven`，禁止重试或改写。目标容器仍运行旧 SHA `ba2a6860883fa91a7ffc4fafcc576bfa9701b96f`；该次操作没有启动备份、migration 或服务切换。
 - 失败根因是不同 Docker image store 对 `docker image inspect .Id` 的合法表示不同：经典 Docker 返回 OCI config digest，133 的 containerd image store 返回 OCI manifest digest。发布 tar 与 `GIT_SHA` 均正确，旧校验器却只接受 config digest。
 - 当前前向修复同时收口三个合同：严格校验并接受同一 tar 唯一对应的 OCI config / manifest 双身份；promotion / rollback 回执输出真正 boolean；外部 Release manifest 的本地演练回执改用仓库内安全路径。不能手工绕过，也不能复用失败操作。
-- 当前 deploy 测试全集 536/536、补强后的核心合同 23/23、文档清单与链接 3/3 通过；`fast.sh` 完成且 Server quick 为 3016/3016。ShellCheck、shfmt、Bash 语法和 diff whitespace 通过；实际 Release tar 已同时验证唯一标签、config blob、OCI manifest blob、config digest、manifest digest、`linux/amd64` 与内置 SHA，并与 133 读到的 image ID 精确对应。仍须在新 clean exact SHA 上完成一次最终门禁和新 Release 后，才可创建一次全新的 promotion。
+- 前向修复 SHA `35d09c3856a5010b49c075d7d8009ad6a7e50ec7` 已完成一次 `prepare-push`、GitHub CI、strict、不可变 Release `2026.07.29-5`、远端制品下载与本地生产 Compose 演练。第二次 133 promotion 操作 `cfa26c47-7b13-48b1-8a18-e9f17accb174` 在 migration 前冻结为 `failed`；旧 SHA、health/ready/Web 均保持正常，fresh backup 已恢复校验。
+- 第二次失败根因是 `production-preflight.sh` 在无 `.git` 的不可变 release 目录中错误地用 SSH 调用者 `pwd` 作为仓库根，因而把随制品存在的 `deployments/yoyoosun/env/runtime.contract.json` 误判为 `/home/simon/deployments/...` 下缺失。修复必须从脚本自身位置推导 release 根；仍须形成新 SHA、新 Release 和新 operation，禁止复用两个历史失败操作。
 
 ### 发布停止条件
 
@@ -23,8 +24,8 @@
 
 ### 下一步
 
-1. 创建唯一前向修复 SHA，审查 clean tree 后只运行一次该 SHA 的 `prepare-push`。
-2. 推送该 SHA并只等待一次远端 CI 和 Release，不复用旧 SHA 的失败操作。
+1. 为 packaged-source root 补充回归测试，创建唯一前向修复 SHA，并只运行一次该 SHA 的 `prepare-push`。
+2. 推送该 SHA 并只等待一次远端 CI 和 Release，不复用两个历史失败操作。
 3. 对新 Release 下载一次资产并完成一次本地生产 Compose 演练，确认外部 manifest 回执也通过。
 4. 重新执行 133 只读 preflight，创建新 operation 并只执行一次 promotion。
 5. 从 133 读回 exact SHA、image identity、migration latest、active config、health/ready、岗位技术 smoke、PDF 与 rollback point。

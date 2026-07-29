@@ -138,7 +138,8 @@ path_mode() {
   printf '%s' "$mode_value"
 }
 
-root_dir="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+root_dir="$(cd "$script_dir/../.." && pwd -P)"
 compose_dir="server/deploy/compose/prod"
 compose_override=""
 env_file=""
