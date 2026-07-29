@@ -46,21 +46,24 @@ HTTP 路由：
 - `create`
 - `rbac_options`
 - `menu_options`
+- `effective_role_access`
 - `set_roles`
-- `set_role_permissions`
+- `set_role_settings`
 - `set_phone`
 - `set_erp_column_order`
+- `audit_logs`
 - `set_disabled`
 - `revoke`
 - `reset_password`
 
-用途：管理员读取当前账号资料；具备对应系统权限的管理员创建管理员、绑定登录手机号、给管理员分配角色、给角色分配权限、启用 / 禁用普通管理员，以及在普通管理员忘记密码时协助重置密码。
+用途：管理员读取当前账号资料；具备对应系统权限的管理员创建管理员、绑定登录手机号、给管理员分配角色、启用 / 禁用普通管理员，以及在普通管理员忘记密码时协助重置密码。`effective_role_access` 只读解释已保存或待保存权限在当前客户启用版本下的最终页面；`set_role_settings` 使用一个精确请求和角色版本 CAS，原子保存业务岗位的权限、唯一仓库数据范围、`recommended / custom` 导航模式以及有序的“常用工作 / 更多功能”页面分区，并只写一条聚合审计。自定义分区必须恰好覆盖拟保存权限的全部最终可进入业务页面，菜单位置不会增加权限。
 
 ### `workflow`
 
 - `metadata`
 - `list_tasks`
 - `list_role_tasks`
+- `list_workbench_role_tasks`
 - `get_task_board`
 - `get_task_process_context`
 - `list_task_events`
@@ -80,6 +83,8 @@ HTTP 路由：
 
 `list_role_tasks` 只用于岗位任务端。服务端先要求账号具备对应 `mobile.<role>.access`，再要求 active revision 的 effective session 对同一岗位投影该入口动作；缺 active revision、岗位 profile 停用、entitlement 撤销、账号没有该业务岗位或仅有 super admin 身份都会 fail closed。多岗位账号可按其真实角色切换，但不能把一个岗位的登录入口权限与另一个岗位的 effective action 拼接使用。
 
+`list_workbench_role_tasks` 只用于桌面岗位工作台，参数、游标和响应结构与 `list_role_tasks` 相同。服务端同时要求当前 effective `erp.workbench.read` 与 `workflow.task.read`，并要求 `role_key` 存在于当前 effective session 的桌面岗位投影；查询使用账号的任务只读可见范围，因此 `workflow.task.supervise` 和 super admin 可以保留跨岗位只读监督，但不会获得完成、阻塞、驳回或改派权限。该方法不替代也不放宽岗位任务端的 `mobile.<role>.access` 与真实业务岗位门禁。
+
 `get_task_process_context` 只接受 `task_id`。服务端先按当前账号、active / stored revision、owner / assignee 范围确认任务可见，再从任务的 `process_instance_id / process_node_instance_id` 锚点读取来源单据、流程实例、全部节点、当前节点和已完成节点；来源或节点锚点不一致时 fail closed。响应不暴露定义 hash、策略快照或内部权限解释。正式桌面任务抽屉和手机任务详情用该结果展示业务流程、来源单据、流程发起时间、当前节点、已完成节点和最终状态，不根据任务名称猜测起点或终点。
 
 `get_task_assignment_options` 只接受 `task_id`，返回当前任务 version、状态、负责岗位、当前处理人、是否可退回岗位池以及服务端筛选后的接收人。`reassign_task` 只接受 `task_id / expected_version / idempotency_key / assignee_id / reason`；`assignee_id` 必须显式为正整数接收人或 `null` 岗位池，原因不能为空。当前默认只有 `boss` 获得 `workflow.task.assign`，super admin 可通过全权限执行，但不会自动成为业务岗位接收人；PMC 的 `workflow.task.supervise` 仍是只读。接收人必须是 active 账号、直接持有任务负责岗位，并在任务 revision 中具备读取、更新和完成 / 审批能力。成功只改变任务 `assignee_id / updated_by / version` 并写事件、幂等 receipt 与运行审计，不改变任务状态、责任池、流程锚点或 Fact。
@@ -89,8 +94,9 @@ HTTP 路由：
 - `get_approval_settings`：只接受空参数，要求 `customer_config.read`；返回固定审批事项、active revision/hash、主办 / 备用 / 升级成员、最终有效候选和阻塞原因。每个事项显式返回 `configured`：`false` 表示当前 active revision 尚未发布该设置，不能与 `configured=true / enabled=false` 的人工停用混为一谈。
 - `preview_approval_settings`：要求 `customer_config.read`；精确接收 `customer_key / revision / expected_active_revision / expected_active_hash / items`，只校验并预览新 immutable revision，不落库。
 - `publish_approval_settings`：合同与 preview 相同，要求 `customer_config.publish`；使用 active revision/hash CAS 发布新 revision并写配置发布审计，不自动激活。
+- `apply_approval_settings`：合同与 preview 相同，同时要求 `customer_config.publish` 和 `customer_config.activate`；服务端在一个 PostgreSQL 事务内重新校验 active revision/hash、写入 immutable revision 及完整投影、切换 active revision 并写单条生效审计。任一步失败都会整体回滚，不会向其他请求暴露 `building / published` 中间态；响应丢失时只允许同一操作者、同一 revision/hash 和同一审批投影精确重试，成功响应的 revision 必须为 `active`。
 
-`items` 只允许 `sales_order / purchase_order / shipment_finance`，成员只允许 `primary / backup / escalation` 的业务角色或具名账号。普通管理员不能把自己、自己持有的业务角色、系统角色或调试角色加入责任；激活仍走现有 transition check / activate 合同。ProcessRuntime 任务办理使用任务自身存储的 revision，必须同时满足 RBAC、entitlement、精确 owner pool/role 或具名成员、assignee、状态/version 和幂等；没有候选人时失败关闭，配置变化不改写在途流程。新流程启动时，对应审批事项缺失或显式停用都会 fail closed，不回退内置老板池，也不能把页面建议值当作已发布配置。
+`items` 只允许 `sales_order / purchase_order / shipment_finance`，成员只允许 `primary / backup / escalation` 的业务角色或具名账号。普通管理员不能把自己、自己持有的业务角色、系统角色或调试角色加入责任。权限页面的常规写路径使用 `apply_approval_settings` 一次保存并生效；通用客户配置发布流水线仍保留独立 publish / activate transition 合同，不能用前端串联冒充原子操作。ProcessRuntime 任务办理使用任务自身存储的 revision，必须同时满足 RBAC、entitlement、精确 owner pool/role 或具名成员、assignee、状态/version 和幂等；没有候选人时失败关闭。事务提交后启动的新流程立即读取新 active revision，已经启动的流程继续读取自身冻结 revision。对应审批事项缺失或显式停用都会在新流程启动前 fail closed，不回退内置老板池，也不能把页面建议值当作已生效配置。
 
 ### `operational_fact`
 

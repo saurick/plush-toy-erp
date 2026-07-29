@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_DEV_TARGET,
+  SCENARIO_DEMO_TARGET,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
@@ -200,6 +201,21 @@ function requireAdminRoleRecord(value, context) {
   if (typeof permissionsEditable !== "boolean") {
     throw new CliError(`${context} response missing permission edit status`);
   }
+  const navigationMode = requiredText(
+    value.navigation_mode,
+    `${context}.navigation_mode`,
+  );
+  if (!["recommended", "custom"].includes(navigationMode)) {
+    throw new CliError(`${context} response has invalid navigation mode`);
+  }
+  const normalizeMenuPaths = (paths, field) => {
+    if (!Array.isArray(paths)) {
+      throw new CliError(`${context} response missing ${field}`);
+    }
+    return paths.map((path, index) =>
+      requiredText(path, `${context}.${field}[${index}]`),
+    );
+  };
   return {
     roleKey,
     roleType,
@@ -207,6 +223,15 @@ function requireAdminRoleRecord(value, context) {
     disabled: value.disabled,
     permissionsEditable,
     permissionKeys: normalizePermissionKeys(value.permissions, context),
+    navigationMode,
+    primaryMenuPaths: normalizeMenuPaths(
+      value.primary_menu_paths,
+      "primary_menu_paths",
+    ),
+    secondaryMenuPaths: normalizeMenuPaths(
+      value.secondary_menu_paths,
+      "secondary_menu_paths",
+    ),
     dataScopes: Array.isArray(value.data_scopes)
       ? value.data_scopes.map((scope, index) => ({
           resourceType: requiredText(
@@ -222,6 +247,35 @@ function requireAdminRoleRecord(value, context) {
             : [],
         }))
       : [],
+  };
+}
+
+function roleSettingsParams(
+  role,
+  { permissionKeys = role.permissionKeys, dataScopes = role.dataScopes } = {},
+) {
+  const normalizedScopes =
+    dataScopes.length > 0
+      ? dataScopes
+      : [
+          {
+            resourceType: "warehouse",
+            mode: "NONE",
+            resourceIds: [],
+          },
+        ];
+  return {
+    role_key: role.roleKey,
+    permission_keys: permissionKeys,
+    data_scopes: normalizedScopes.map((scope) => ({
+      resource_type: scope.resourceType,
+      mode: scope.mode,
+      resource_ids: scope.resourceIds,
+    })),
+    navigation_mode: role.navigationMode,
+    primary_menu_paths: role.primaryMenuPaths,
+    secondary_menu_paths: role.secondaryMenuPaths,
+    expected_version: role.version,
   };
 }
 
@@ -889,24 +943,22 @@ async function alignAcceptanceWarehouseScopes({
     const updatedData = await rpcCall({
       backendURL,
       domain: "admin",
-      method: "set_role_data_scopes",
-      params: {
-        role_key: roleKey,
-        data_scopes: [
+      method: "set_role_settings",
+      params: roleSettingsParams(role, {
+        dataScopes: [
           {
-            resource_type: "warehouse",
+            resourceType: "warehouse",
             mode: "ASSIGNED",
-            resource_ids: controlPlane.warehouseIds,
+            resourceIds: controlPlane.warehouseIds,
           },
         ],
-        expected_version: role.version,
-      },
+      }),
       token,
       fetchImpl,
     });
     role = requireAdminRoleRecord(
       updatedData.role,
-      `admin.set_role_data_scopes ${roleKey}`,
+      `admin.set_role_settings ${roleKey}`,
     );
     const readback = role.dataScopes.find(
       (scope) => scope.resourceType === "warehouse",
@@ -1003,18 +1055,14 @@ async function alignAcceptanceRoleCapabilities({
     const updatedData = await rpcCall({
       backendURL,
       domain: "admin",
-      method: "set_role_permissions",
-      params: {
-        role_key: role.roleKey,
-        permission_keys: desired,
-        expected_version: role.version,
-      },
+      method: "set_role_settings",
+      params: roleSettingsParams(role, { permissionKeys: desired }),
       token,
       fetchImpl,
     });
     const updated = requireAdminRoleRecord(
       updatedData.role,
-      `admin.set_role_permissions ${role.roleKey}`,
+      `admin.set_role_settings ${role.roleKey}`,
     );
     if (
       updated.roleKey !== role.roleKey ||
@@ -1564,10 +1612,14 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
   options.backendURL = normalizeAccountScenarioBackendURL(options.backendURL);
   if (
     options.target &&
-    !new Set([LOCAL_DEV_TARGET, CUSTOMER_TRIAL_133_TARGET]).has(options.target)
+    !new Set([
+      LOCAL_DEV_TARGET,
+      SCENARIO_DEMO_TARGET,
+      CUSTOMER_TRIAL_133_TARGET,
+    ]).has(options.target)
   ) {
     throw new CliError(
-      `--target must be ${LOCAL_DEV_TARGET} or ${CUSTOMER_TRIAL_133_TARGET}`,
+      `--target must be ${LOCAL_DEV_TARGET}, ${SCENARIO_DEMO_TARGET}, or ${CUSTOMER_TRIAL_133_TARGET}`,
       2,
     );
   }

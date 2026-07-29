@@ -8,10 +8,10 @@ export async function installSystemRpcMocks(page, context) {
     salesRole,
     purchaseRole,
     financeRole,
+    pmcRole,
     adminRole,
     mockMenus,
     mockPermissions,
-    baseURL,
     mockPdfBuffer,
     resolveDelayFromReferer,
     createMockAdminToken,
@@ -22,6 +22,7 @@ export async function installSystemRpcMocks(page, context) {
     salesRole,
     purchaseRole,
     financeRole,
+    pmcRole,
     adminRole,
   ].filter(Boolean)
   const roleByKey = new Map(availableRoles.map((role) => [role.role_key, role]))
@@ -52,6 +53,19 @@ export async function installSystemRpcMocks(page, context) {
     status_reason: '',
     roles: [purchaseRole],
     permissions: purchaseRole.permissions,
+    menus: [],
+  }
+  const pmcAdmin = {
+    id: 7,
+    username: 'pmc-employee',
+    phone: '13900139005',
+    is_super_admin: false,
+    disabled: false,
+    account_status: 'active',
+    revoked_at: 0,
+    status_reason: '',
+    roles: [pmcRole],
+    permissions: pmcRole.permissions,
     menus: [],
   }
   const multiRoleAdmin = {
@@ -111,6 +125,7 @@ export async function installSystemRpcMocks(page, context) {
             adminProfile,
             { ...assistantAdmin },
             purchaseAdmin,
+            pmcAdmin,
             multiRoleAdmin,
             suspendedAdmin,
             revokedAdmin,
@@ -150,33 +165,26 @@ export async function installSystemRpcMocks(page, context) {
           released_task_count: 1,
         }
         break
-      case 'set_role_permissions': {
+      case 'set_role_settings': {
         const role = roleForParams(params)
         role.version += 1
         role.permissions = Array.isArray(params.permission_keys)
           ? params.permission_keys
           : role.permissions
-        data = { role: { ...role } }
-        break
-      }
-      case 'set_role_data_scopes': {
-        const role = roleForParams(params)
-        role.version += 1
         role.data_scopes = Array.isArray(params.data_scopes)
           ? params.data_scopes
           : role.data_scopes
-        data = { role: { ...role } }
-        break
-      }
-      case 'set_role_navigation': {
-        const role = roleForParams(params)
-        role.version += 1
         role.navigation_mode =
-          params.mode === 'custom' ? 'custom' : 'recommended'
+          params.navigation_mode === 'custom' ? 'custom' : 'recommended'
         role.primary_menu_paths =
           role.navigation_mode === 'custom' &&
           Array.isArray(params.primary_menu_paths)
             ? params.primary_menu_paths
+            : []
+        role.secondary_menu_paths =
+          role.navigation_mode === 'custom' &&
+          Array.isArray(params.secondary_menu_paths)
+            ? params.secondary_menu_paths
             : []
         data = { role: { ...role } }
         break

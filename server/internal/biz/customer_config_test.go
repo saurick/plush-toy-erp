@@ -97,6 +97,56 @@ func (r *memCustomerConfigRepo) PublishCustomerConfig(_ context.Context, in Cust
 	return &cloned, nil
 }
 
+func (r *memCustomerConfigRepo) ApplyApprovalSettingsRevision(
+	ctx context.Context,
+	in CustomerConfigPublishInput,
+	configHash string,
+	expectedActiveRevision string,
+	expectedActiveHash string,
+	actorID int,
+	appliedAt time.Time,
+) (*CustomerConfigRevision, error) {
+	key := customerRevisionKey(in.CustomerKey, in.Revision)
+	if existing := r.revisions[key]; existing != nil {
+		if existing.ConfigHash != configHash ||
+			existing.ConfigHashVersion != CustomerConfigHashVersion ||
+			existing.ProductVersion != in.ProductVersion ||
+			existing.PublishedBy == nil ||
+			*existing.PublishedBy != actorID {
+			return nil, ErrCustomerConfigRevisionImmutable
+		}
+		if existing.Status == CustomerConfigStatusActive {
+			cloned := *existing
+			return &cloned, nil
+		}
+		if existing.Status != CustomerConfigStatusPublished {
+			return nil, ErrCustomerConfigActiveRevisionChanged
+		}
+	}
+	active, err := r.GetActiveCustomerConfigRevision(ctx, in.CustomerKey)
+	if err != nil {
+		return nil, err
+	}
+	if active.Revision != expectedActiveRevision || active.ConfigHash != expectedActiveHash {
+		return nil, ErrCustomerConfigActiveRevisionChanged
+	}
+	if r.revisions[key] == nil {
+		if _, err := r.PublishCustomerConfig(ctx, in, configHash, actorID, appliedAt); err != nil {
+			return nil, err
+		}
+	}
+	return r.switchActiveCustomerConfigRevision(
+		CustomerConfigTransitionActivate,
+		in.CustomerKey,
+		in.Revision,
+		configHash,
+		in.ProductVersion,
+		expectedActiveRevision,
+		actorID,
+		appliedAt,
+	)
+}
+
 func (r *memCustomerConfigRepo) ActivateCustomerConfig(_ context.Context, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, activatedBy int, activatedAt time.Time) (*CustomerConfigRevision, error) {
 	return r.switchActiveCustomerConfigRevision(CustomerConfigTransitionActivate, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision, activatedBy, activatedAt)
 }

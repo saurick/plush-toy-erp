@@ -239,39 +239,40 @@ type StockReservation struct {
 }
 
 type FinanceFact struct {
-	ID               int
-	FactNo           string
-	FactType         string
-	Status           string
-	Version          int
-	CounterpartyType string
-	CounterpartyID   *int
-	Amount           decimal.Decimal
-	FeeAmount        decimal.Decimal
-	Currency         string
-	CollectionType   *string
-	PaymentTerm      *string
-	PaymentTermDays  *int
-	InvoiceCategory  *string
-	SourceType       *string
-	SourceID         *int
-	SourceNo         *string
-	SourceLineID     *int
-	IdempotencyKey   string
-	OccurredAt       time.Time
-	PostedAt         *time.Time
-	PostedBy         *int
-	PostedByName     *string
-	SettledAt        *time.Time
-	SettledBy        *int
-	SettledByName    *string
-	CancelledAt      *time.Time
-	CancelledBy      *int
-	CancelledByName  *string
-	CancelReason     *string
-	Note             *string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                int
+	FactNo            string
+	FactType          string
+	Status            string
+	Version           int
+	CounterpartyType  string
+	CounterpartyID    *int
+	Amount            decimal.Decimal
+	OutstandingAmount decimal.Decimal
+	FeeAmount         decimal.Decimal
+	Currency          string
+	CollectionType    *string
+	PaymentTerm       *string
+	PaymentTermDays   *int
+	InvoiceCategory   *string
+	SourceType        *string
+	SourceID          *int
+	SourceNo          *string
+	SourceLineID      *int
+	IdempotencyKey    string
+	OccurredAt        time.Time
+	PostedAt          *time.Time
+	PostedBy          *int
+	PostedByName      *string
+	SettledAt         *time.Time
+	SettledBy         *int
+	SettledByName     *string
+	CancelledAt       *time.Time
+	CancelledBy       *int
+	CancelledByName   *string
+	CancelReason      *string
+	Note              *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type OperationalFactMutation struct {

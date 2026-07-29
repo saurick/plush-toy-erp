@@ -114,11 +114,18 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 		SetAdminUserID(limitedOperator.ID).
 		SetRoleID(fx.salesRole.ID).
 		SaveX(fx.ctx)
-	if _, err := fx.repo.SetRolePermissionsWithAudit(fx.ctx, &biz.RolePermissionsChange{
-		RoleKey: biz.SalesRoleKey, OperatorID: limitedOperator.ID, ExpectedVersion: fx.salesRole.Version,
-		PermissionKeys: []string{biz.PermissionCustomerCreate},
+	if _, err := fx.repo.SetRoleSettingsWithAudit(fx.ctx, &biz.RoleSettingsChangeCommand{
+		RoleKey:         biz.SalesRoleKey,
+		OperatorID:      limitedOperator.ID,
+		ExpectedVersion: fx.salesRole.Version,
+		PermissionKeys:  []string{biz.PermissionCustomerCreate},
+		Scopes: []biz.RoleDataScope{{
+			ResourceType: biz.DataScopeResourceWarehouse,
+			Mode:         biz.DataScopeModeNone,
+		}},
+		Mode: biz.RoleNavigationModeRecommended,
 	}); !errors.Is(err, biz.ErrAdminSelfRolePermissionForbidden) {
-		t.Fatalf("own business role permission change error = %v, want ErrAdminSelfRolePermissionForbidden", err)
+		t.Fatalf("own business role settings change error = %v, want ErrAdminSelfRolePermissionForbidden", err)
 	}
 
 	created, err := fx.repo.CreateAdminWithAudit(fx.ctx, &biz.AdminCreateCommand{
@@ -140,49 +147,46 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 	}
 	assertAdminRoleKeys(t, created, []string{biz.PurchaseRoleKey})
 
-	updatedRole, err := fx.repo.SetRolePermissionsWithAudit(fx.ctx, &biz.RolePermissionsChange{
-		RoleKey: biz.PurchaseRoleKey, OperatorID: fx.operator.ID, ExpectedVersion: fx.purchaseRole.Version,
-		PermissionKeys: []string{biz.PermissionCustomerRead},
-	})
-	if err != nil {
-		t.Fatalf("SetRolePermissionsWithAudit() error = %v", err)
-	}
-	if updatedRole.Version != fx.purchaseRole.Version+1 || len(updatedRole.Permissions) != 1 || updatedRole.Permissions[0] != biz.PermissionCustomerRead {
-		t.Fatalf("unexpected updated role: %#v", updatedRole)
-	}
-	if _, err := fx.repo.SetRolePermissionsWithAudit(fx.ctx, &biz.RolePermissionsChange{
-		RoleKey: biz.PurchaseRoleKey, OperatorID: fx.operator.ID, ExpectedVersion: fx.purchaseRole.Version,
-		PermissionKeys: []string{biz.PermissionCustomerCreate},
-	}); !errors.Is(err, biz.ErrRoleVersionConflict) {
-		t.Fatalf("stale role version error = %v, want ErrRoleVersionConflict", err)
-	}
-
-	navigationRole, err := fx.repo.SetRoleNavigationWithAudit(fx.ctx, &biz.RoleNavigationChange{
-		RoleKey:         biz.SalesRoleKey,
+	updatedRole, err := fx.repo.SetRoleSettingsWithAudit(fx.ctx, &biz.RoleSettingsChangeCommand{
+		RoleKey:         biz.PurchaseRoleKey,
 		OperatorID:      fx.operator.ID,
-		ExpectedVersion: fx.salesRole.Version,
-		Mode:            biz.RoleNavigationModeCustom,
-		PrimaryMenuPaths: []string{
-			"/erp/warehouse/inventory",
+		ExpectedVersion: fx.purchaseRole.Version,
+		PermissionKeys:  []string{biz.PermissionCustomerRead},
+		Scopes: []biz.RoleDataScope{{
+			ResourceType: biz.DataScopeResourceWarehouse,
+			Mode:         biz.DataScopeModeNone,
+		}},
+		Mode:             biz.RoleNavigationModeCustom,
+		PrimaryMenuPaths: []string{"/erp/warehouse/inventory"},
+		SecondaryMenuPaths: []string{
 			"/erp/sales/project-orders/sales-orders",
 		},
 	})
 	if err != nil {
-		t.Fatalf("SetRoleNavigationWithAudit() error = %v", err)
+		t.Fatalf("SetRoleSettingsWithAudit() error = %v", err)
 	}
-	if navigationRole.Version != fx.salesRole.Version+1 ||
-		navigationRole.NavigationMode != biz.RoleNavigationModeCustom ||
-		len(navigationRole.PrimaryMenuPaths) != 2 ||
-		navigationRole.PrimaryMenuPaths[0] != "/erp/warehouse/inventory" {
-		t.Fatalf("unexpected navigation role: %#v", navigationRole)
+	if updatedRole.Version != fx.purchaseRole.Version+1 ||
+		len(updatedRole.Permissions) != 1 ||
+		updatedRole.Permissions[0] != biz.PermissionCustomerRead ||
+		len(updatedRole.DataScopes) != 1 ||
+		updatedRole.DataScopes[0].Mode != biz.DataScopeModeNone ||
+		updatedRole.NavigationMode != biz.RoleNavigationModeCustom ||
+		len(updatedRole.PrimaryMenuPaths) != 1 ||
+		len(updatedRole.SecondaryMenuPaths) != 1 {
+		t.Fatalf("unexpected updated role: %#v", updatedRole)
 	}
-	if _, err := fx.repo.SetRoleNavigationWithAudit(fx.ctx, &biz.RoleNavigationChange{
-		RoleKey:         biz.SalesRoleKey,
+	if _, err := fx.repo.SetRoleSettingsWithAudit(fx.ctx, &biz.RoleSettingsChangeCommand{
+		RoleKey:         biz.PurchaseRoleKey,
 		OperatorID:      fx.operator.ID,
-		ExpectedVersion: fx.salesRole.Version,
-		Mode:            biz.RoleNavigationModeRecommended,
+		ExpectedVersion: fx.purchaseRole.Version,
+		PermissionKeys:  []string{biz.PermissionCustomerCreate},
+		Scopes: []biz.RoleDataScope{{
+			ResourceType: biz.DataScopeResourceWarehouse,
+			Mode:         biz.DataScopeModeNone,
+		}},
+		Mode: biz.RoleNavigationModeRecommended,
 	}); !errors.Is(err, biz.ErrRoleVersionConflict) {
-		t.Fatalf("stale navigation version error = %v, want ErrRoleVersionConflict", err)
+		t.Fatalf("stale role version error = %v, want ErrRoleVersionConflict", err)
 	}
 
 	created, err = fx.repo.SetAdminPhoneWithAudit(fx.ctx, &biz.AdminPhoneChange{
@@ -296,8 +300,7 @@ func TestAdminManageRepoControlPlaneMutationsCommitWithAudit(t *testing.T) {
 	for _, eventKey := range []string{
 		"admin_user.create",
 		"admin_user.roles.set",
-		"role.permissions.set",
-		"role.navigation.set",
+		"role.settings.set",
 		"admin_user.phone.set",
 		"admin_user.password.reset",
 		"admin_user.disabled.set",
@@ -437,13 +440,11 @@ func TestAdminManageRepoControlPlaneMutationsRollBackWhenAuditWriteFails(t *test
 		SetOwnerRoleKey(biz.SalesRoleKey).
 		SetAssigneeID(fx.target.ID).
 		SaveX(fx.ctx)
-	if _, err := fx.sqldb.ExecContext(fx.ctx, `
-CREATE TRIGGER reject_admin_control_audit
-BEFORE INSERT ON runtime_audit_events
-BEGIN
-  SELECT RAISE(ABORT, 'forced audit failure');
-END`); err != nil {
-		t.Fatalf("create audit failure trigger: %v", err)
+	if _, err := fx.sqldb.ExecContext(
+		fx.ctx,
+		"ALTER TABLE runtime_audit_events RENAME TO runtime_audit_events_unavailable_for_test",
+	); err != nil {
+		t.Fatalf("make audit table unavailable: %v", err)
 	}
 
 	if _, err := fx.repo.CreateAdminWithAudit(fx.ctx, &biz.AdminCreateCommand{
@@ -468,34 +469,32 @@ END`); err != nil {
 		t.Fatalf("role assignments survived failed transaction: %#v", assignments)
 	}
 
-	if _, err := fx.repo.SetRolePermissionsWithAudit(fx.ctx, &biz.RolePermissionsChange{
-		RoleKey: biz.SalesRoleKey, OperatorID: fx.operator.ID, ExpectedVersion: fx.salesRole.Version,
-		PermissionKeys: []string{biz.PermissionCustomerCreate},
-	}); err == nil {
-		t.Fatal("SetRolePermissionsWithAudit() must fail when audit insert fails")
-	}
-	roleAfterFailure := fx.client.Role.GetX(fx.ctx, fx.salesRole.ID)
-	links := fx.client.RolePermission.Query().Where(rolepermission.RoleID(fx.salesRole.ID)).AllX(fx.ctx)
-	if roleAfterFailure.Version != fx.salesRole.Version || len(links) != 1 || links[0].PermissionID != fx.readPermission.ID {
-		t.Fatalf("role permission mutation survived audit rollback: role=%#v links=%#v", roleAfterFailure, links)
-	}
-
-	if _, err := fx.repo.SetRoleNavigationWithAudit(fx.ctx, &biz.RoleNavigationChange{
+	if _, err := fx.repo.SetRoleSettingsWithAudit(fx.ctx, &biz.RoleSettingsChangeCommand{
 		RoleKey:         biz.SalesRoleKey,
 		OperatorID:      fx.operator.ID,
 		ExpectedVersion: fx.salesRole.Version,
-		Mode:            biz.RoleNavigationModeCustom,
-		PrimaryMenuPaths: []string{
-			"/erp/warehouse/inventory",
+		PermissionKeys:  []string{biz.PermissionCustomerCreate},
+		Scopes: []biz.RoleDataScope{{
+			ResourceType: biz.DataScopeResourceWarehouse,
+			Mode:         biz.DataScopeModeNone,
+		}},
+		Mode:             biz.RoleNavigationModeCustom,
+		PrimaryMenuPaths: []string{"/erp/warehouse/inventory"},
+		SecondaryMenuPaths: []string{
+			"/erp/sales/project-orders/sales-orders",
 		},
 	}); err == nil {
-		t.Fatal("SetRoleNavigationWithAudit() must fail when audit insert fails")
+		t.Fatal("SetRoleSettingsWithAudit() must fail when audit insert fails")
 	}
-	navigationAfterFailure := fx.client.Role.GetX(fx.ctx, fx.salesRole.ID)
-	if navigationAfterFailure.Version != fx.salesRole.Version ||
-		navigationAfterFailure.NavigationMode != "recommended" ||
-		len(navigationAfterFailure.PrimaryMenuPaths) != 0 {
-		t.Fatalf("role navigation mutation survived audit rollback: %#v", navigationAfterFailure)
+	roleAfterFailure := fx.client.Role.GetX(fx.ctx, fx.salesRole.ID)
+	links := fx.client.RolePermission.Query().Where(rolepermission.RoleID(fx.salesRole.ID)).AllX(fx.ctx)
+	if roleAfterFailure.Version != fx.salesRole.Version ||
+		roleAfterFailure.NavigationMode != "recommended" ||
+		len(roleAfterFailure.PrimaryMenuPaths) != 0 ||
+		len(roleAfterFailure.SecondaryMenuPaths) != 0 ||
+		len(links) != 1 ||
+		links[0].PermissionID != fx.readPermission.ID {
+		t.Fatalf("role settings mutation survived audit rollback: role=%#v links=%#v", roleAfterFailure, links)
 	}
 
 	if _, err := fx.repo.SetAdminPhoneWithAudit(fx.ctx, &biz.AdminPhoneChange{
@@ -535,6 +534,12 @@ END`); err != nil {
 	}
 	if sessionAfterFailure := fx.client.AdminSession.GetX(fx.ctx, rollbackSession.ID); sessionAfterFailure.RevokedAt != nil || sessionAfterFailure.RevokeReason != nil {
 		t.Fatalf("session revocation survived failed lifecycle transaction: %#v", sessionAfterFailure)
+	}
+	if _, err := fx.sqldb.ExecContext(
+		fx.ctx,
+		"ALTER TABLE runtime_audit_events_unavailable_for_test RENAME TO runtime_audit_events",
+	); err != nil {
+		t.Fatalf("restore audit table: %v", err)
 	}
 	if count := fx.client.RuntimeAuditEvent.Query().CountX(fx.ctx); count != 0 {
 		t.Fatalf("audit count = %d, want 0", count)

@@ -3,6 +3,7 @@ import { Alert, Button, Input, Modal, Space, Table, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
 import {
   cancelProductionException,
@@ -19,6 +20,7 @@ import {
 import ExceptionProcessRecoveryButton from '../workflow/ExceptionProcessRecoveryButton.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
+import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
 
 const TYPE_LABELS = {
   SCRAP: '生产报废',
@@ -35,6 +37,18 @@ const EXECUTION_LABELS = {
   PENDING: '待业务办理',
   APPLIED: '业务已执行',
   REVERSED: '业务已冲正',
+}
+const READ_PERMISSIONS = Object.freeze([
+  'pmc.risk.read',
+  'production.fact.read',
+  'production.exception.submit',
+  'production.exception.approve',
+])
+
+export function canReadProductionExceptionDecisions(adminProfile) {
+  return READ_PERMISSIONS.some((permission) =>
+    hasActionPermission(adminProfile, permission)
+  )
 }
 
 function mutationReceiptMatches(item, action, reason, actorID) {
@@ -68,19 +82,19 @@ function mutationReceiptMatches(item, action, reason, actorID) {
   return true
 }
 
-export default function ProductionExceptionDecisionPanel({ adminProfile }) {
+export default function ProductionExceptionDecisionPanel({
+  adminProfile,
+  onRefreshReady,
+  onSummaryChange,
+}) {
   const [searchParams] = useSearchParams()
+  const beginLatestRequest = useLatestRequestCoordinator()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState(null)
   const [selectedID, setSelectedID] = useState(null)
   const [reason, setReason] = useState('')
-  const canRead = [
-    'pmc.risk.read',
-    'production.fact.read',
-    'production.exception.submit',
-    'production.exception.approve',
-  ].some((permission) => hasActionPermission(adminProfile, permission))
+  const canRead = canReadProductionExceptionDecisions(adminProfile)
   const canDecide = hasActionPermission(
     adminProfile,
     'production.exception.approve'
@@ -102,13 +116,24 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
   )
 
   const load = useCallback(async () => {
+    const request = beginLatestRequest('production-exception-decisions')
     if (!canRead) {
-      setRows([])
+      if (request.isCurrent()) {
+        setRows([])
+        setSelectedID(null)
+        setLoading(false)
+        onSummaryChange?.({ total: 0, pageCount: 0 })
+        request.finish()
+      }
       return []
     }
     setLoading(true)
     try {
-      const data = await listProductionExceptions({ limit: 100, offset: 0 })
+      const data = await listProductionExceptions(
+        { limit: 100, offset: 0 },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) return null
       if (!Array.isArray(data?.production_exceptions)) {
         throw Object.assign(new Error('生产异常记录返回不完整'), {
           isInvalidResponse: true,
@@ -119,12 +144,14 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
         Number.isSafeInteger(linkedProductionExceptionID) &&
         linkedProductionExceptionID > 0
       ) {
-        if (
-          !nextRows.some((item) => item.id === linkedProductionExceptionID)
-        ) {
-          const linked = await getProductionException({
-            id: linkedProductionExceptionID,
-          })
+        if (!nextRows.some((item) => item.id === linkedProductionExceptionID)) {
+          const linked = await getProductionException(
+            {
+              id: linkedProductionExceptionID,
+            },
+            { signal: request.signal }
+          )
+          if (!request.isCurrent()) return null
           if (linked?.id !== linkedProductionExceptionID) {
             throw Object.assign(new Error('关联生产异常返回不完整'), {
               isInvalidResponse: true,
@@ -135,14 +162,35 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
         setSelectedID(linkedProductionExceptionID)
       }
       setRows(nextRows)
+      const total = Number(data?.total)
+      onSummaryChange?.({
+        total:
+          Number.isSafeInteger(total) && total >= 0
+            ? Math.max(total, nextRows.length)
+            : nextRows.length,
+        pageCount: nextRows.length,
+      })
       return nextRows
     } catch (error) {
-      message.error(getActionErrorMessage(error, '读取生产异常办理记录'))
+      if (isRpcAbortError(error) || !request.isCurrent()) return null
+      message.error(getActionErrorMessage(error, '读取生产异常处置申请'))
       return null
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
-  }, [canRead, linkedProductionExceptionID])
+  }, [
+    beginLatestRequest,
+    canRead,
+    linkedProductionExceptionID,
+    onSummaryChange,
+  ])
+  useEffect(() => {
+    onRefreshReady?.(load)
+    return () => onRefreshReady?.(null)
+  }, [load, onRefreshReady])
   useEffect(() => {
     load()
   }, [load])
@@ -267,7 +315,7 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
         next = await action.run(params)
       }
       if (!mutationReceiptMatches(next, action, text, adminID)) {
-        throw Object.assign(new Error('生产异常办理结果暂时无法确认'), {
+        throw Object.assign(new Error('生产异常处置结果暂时无法确认'), {
           isInvalidResponse: true,
         })
       }
@@ -295,7 +343,7 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
           setAction(null)
           setReason('')
           await load()
-          message.success('已重新读取生产异常办理结果')
+          message.success('已重新读取生产异常处置结果')
           return
         }
         if (latest?.id) {
@@ -304,7 +352,7 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
           return
         }
       }
-      message.error(getActionErrorMessage(error, '办理生产异常'))
+      message.error(getActionErrorMessage(error, '办理生产异常处置'))
     } finally {
       setLoading(false)
     }
@@ -471,10 +519,10 @@ export default function ProductionExceptionDecisionPanel({ adminProfile }) {
         })}
         pagination={false}
         scroll={{ x: 1100 }}
-        locale={{ emptyText: '暂无生产异常办理记录' }}
+        locale={{ emptyText: '暂无生产异常处置申请' }}
       />
       <Modal
-        title="确认生产异常办理"
+        title="确认生产异常处置"
         open={Boolean(action)}
         confirmLoading={loading}
         okText="确认办理"

@@ -48,10 +48,6 @@ func (r *allWarehouseScopeAdminRepo) ListRoleDataScopesByRoleKeys(context.Contex
 	return []biz.RoleDataScope{{ResourceType: biz.DataScopeResourceWarehouse, Mode: biz.DataScopeModeAll}}, nil
 }
 
-func (r *allWarehouseScopeAdminRepo) SetRoleDataScopesWithAudit(context.Context, *biz.RoleDataScopesChangeCommand) (*biz.AdminRole, error) {
-	return nil, biz.ErrBadParam
-}
-
 func newAllWarehouseScopeAdminUsecase() *biz.AdminManageUsecase {
 	return biz.NewAdminManageUsecase(
 		&allWarehouseScopeAdminRepo{memAdminManageRepoForData: newMemAdminManageRepoForData()},

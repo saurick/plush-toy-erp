@@ -138,6 +138,12 @@ func (_c *RoleCreate) SetPrimaryMenuPaths(v []string) *RoleCreate {
 	return _c
 }
 
+// SetSecondaryMenuPaths sets the "secondary_menu_paths" field.
+func (_c *RoleCreate) SetSecondaryMenuPaths(v []string) *RoleCreate {
+	_c.mutation.SetSecondaryMenuPaths(v)
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *RoleCreate) SetCreatedAt(v time.Time) *RoleCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -248,6 +254,10 @@ func (_c *RoleCreate) defaults() {
 		v := role.DefaultPrimaryMenuPaths
 		_c.mutation.SetPrimaryMenuPaths(v)
 	}
+	if _, ok := _c.mutation.SecondaryMenuPaths(); !ok {
+		v := role.DefaultSecondaryMenuPaths
+		_c.mutation.SetSecondaryMenuPaths(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := role.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -323,6 +333,12 @@ func (_c *RoleCreate) check() error {
 			return &ValidationError{Name: "primary_menu_paths", err: errors.New(`ent: missing required field "Role.primary_menu_paths"`)}
 		}
 	}
+	switch _c.driver.Dialect() {
+	case dialect.MySQL, dialect.SQLite:
+		if _, ok := _c.mutation.SecondaryMenuPaths(); !ok {
+			return &ValidationError{Name: "secondary_menu_paths", err: errors.New(`ent: missing required field "Role.secondary_menu_paths"`)}
+		}
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Role.created_at"`)}
 	}
@@ -394,6 +410,10 @@ func (_c *RoleCreate) createSpec() (*Role, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.PrimaryMenuPaths(); ok {
 		_spec.SetField(role.FieldPrimaryMenuPaths, field.TypeJSON, value)
 		_node.PrimaryMenuPaths = value
+	}
+	if value, ok := _c.mutation.SecondaryMenuPaths(); ok {
+		_spec.SetField(role.FieldSecondaryMenuPaths, field.TypeJSON, value)
+		_node.SecondaryMenuPaths = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(role.FieldCreatedAt, field.TypeTime, value)

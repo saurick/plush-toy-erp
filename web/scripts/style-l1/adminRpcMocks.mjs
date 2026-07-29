@@ -440,6 +440,7 @@ export async function installAdminRpcMocks(
     sort_order: 20,
     navigation_mode: 'recommended',
     primary_menu_paths: [],
+    secondary_menu_paths: [],
     permissions: [
       'erp.workbench.read',
       'field.party_private.read',
@@ -470,6 +471,7 @@ export async function installAdminRpcMocks(
     sort_order: 30,
     navigation_mode: 'recommended',
     primary_menu_paths: [],
+    secondary_menu_paths: [],
     permissions: [
       'workflow.task.read',
       ...(approvalSettingsMode === 'role_permission_drift'
@@ -493,6 +495,7 @@ export async function installAdminRpcMocks(
     sort_order: 60,
     navigation_mode: 'recommended',
     primary_menu_paths: [],
+    secondary_menu_paths: [],
     permissions: [
       'workflow.task.read',
       ...(approvalSettingsMode === 'role_permission_drift'
@@ -501,6 +504,30 @@ export async function installAdminRpcMocks(
       'finance.receivable.confirm',
       'finance.reconciliation.confirm',
       'finance.reconciliation.read',
+    ],
+    data_scopes: [
+      { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
+    ],
+  }
+  const pmcRole = {
+    role_key: 'pmc',
+    name: 'PMC',
+    description: '排程、物料协调与审批备用责任',
+    builtin: true,
+    role_type: 'business_default',
+    version: 1,
+    assignable_by_current_admin: true,
+    permissions_editable_by_current_admin: true,
+    disabled: false,
+    sort_order: 40,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
+    secondary_menu_paths: [],
+    permissions: [
+      'workflow.task.read',
+      ...(approvalSettingsMode === 'role_permission_drift'
+        ? []
+        : ['workflow.task.approve']),
     ],
     data_scopes: [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
@@ -519,6 +546,7 @@ export async function installAdminRpcMocks(
     sort_order: 10,
     navigation_mode: 'recommended',
     primary_menu_paths: [],
+    secondary_menu_paths: [],
     permissions: ['workflow.task.read', 'workflow.task.approve'],
     data_scopes: [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
@@ -537,6 +565,7 @@ export async function installAdminRpcMocks(
     sort_order: 80,
     navigation_mode: 'recommended',
     primary_menu_paths: [],
+    secondary_menu_paths: [],
     permissions: allPermissionKeys.filter((key) => key.startsWith('system.')),
   }
   const defaultAdminProfile = {
@@ -593,6 +622,7 @@ export async function installAdminRpcMocks(
     salesRole,
     purchaseRole,
     financeRole,
+    pmcRole,
     adminRole,
     mockMenus,
     mockPermissions,
@@ -716,8 +746,7 @@ export async function installAdminRpcMocks(
       blocked_reasons: ['approval_responsibility_fixed_by_process_contract'],
       domain_boundary:
         '已登记收付款单与 ProcessRuntime；老板审批后由财务责任池显式过账与核销',
-      fact_boundary:
-        '批准不等于过账；只有财务领域命令写付款、核销或冲正事实',
+      fact_boundary: '批准不等于过账；只有财务领域命令写付款、核销或冲正事实',
     },
   ]
   const buildApprovalSettingsMock = ({
@@ -739,13 +768,16 @@ export async function installAdminRpcMocks(
     ],
   })
   let activeApprovalSettings = buildApprovalSettingsMock({
-    revision: 'yoyoosun-approval-v1',
+    revision:
+      'yoyoosun-customer-package-v7.local-8ab8deaa7b7e9c6f.runtime-v1.a',
     configHash: 'style-l1-approval-config-hash',
     source: 'active_customer_config',
     items: approvalSettingsMode === 'unconfigured' ? [] : initialApprovalItems,
     configured: approvalSettingsMode !== 'unconfigured',
   })
   let pendingApprovalSettings = null
+  let approvalSettingsApplied = false
+  let confirmationReadbackFailed = false
 
   await page.route('**/rpc/customer_config', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -754,8 +786,17 @@ export async function installAdminRpcMocks(
     if (method === 'get_effective_session') {
       data = { session: mockContext.effectiveSession }
     } else if (method === 'get_approval_settings') {
-      data = {
-        approval_settings: activeApprovalSettings,
+      if (
+        approvalSettingsMode === 'confirmation_recovery' &&
+        approvalSettingsApplied &&
+        !confirmationReadbackFailed
+      ) {
+        confirmationReadbackFailed = true
+        data = { approval_settings: {} }
+      } else {
+        data = {
+          approval_settings: activeApprovalSettings,
+        }
       }
     } else if (method === 'preview_approval_settings') {
       data = {
@@ -767,8 +808,61 @@ export async function installAdminRpcMocks(
           configured: true,
         }),
       }
+    } else if (method === 'apply_approval_settings') {
+      const revision = String(params.revision || '').trim()
+      if (revision === activeApprovalSettings.config_revision) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              code: RpcErrorCode.IDEMPOTENCY_CONFLICT,
+              message: '客户配置版本已存在且内容不同，请使用新版本号发布',
+              data: {},
+            },
+          }),
+        })
+        return
+      }
+      const configHash = `style-l1-${revision}-hash`
+      activeApprovalSettings = buildApprovalSettingsMock({
+        revision,
+        configHash,
+        source: 'active_customer_config',
+        items: params.items,
+        configured: true,
+      })
+      pendingApprovalSettings = null
+      approvalSettingsApplied = true
+      data = {
+        revision: {
+          customer_key: 'yoyoosun',
+          revision,
+          config_hash: configHash,
+          product_version: 'style-l1-product',
+          status: 'active',
+        },
+      }
     } else if (method === 'publish_approval_settings') {
       const revision = String(params.revision || '').trim()
+      if (revision === activeApprovalSettings.config_revision) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              code: RpcErrorCode.IDEMPOTENCY_CONFLICT,
+              message: '客户配置版本已存在且内容不同，请使用新版本号发布',
+              data: {},
+            },
+          }),
+        })
+        return
+      }
       const configHash = `style-l1-${revision}-hash`
       pendingApprovalSettings = buildApprovalSettingsMock({
         revision,

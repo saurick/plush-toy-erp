@@ -59,30 +59,38 @@ type FinancePayment struct {
 	Allocations            []*FinanceAllocation
 }
 type FinanceAllocation struct {
-	ID                     int
-	PaymentID              int
-	FinanceFactID          int
-	Amount                 decimal.Decimal
-	Currency               string
-	Status                 string
-	ReversalOfAllocationID *int
-	IdempotencyKey         string
-	CreatedBy              int
-	CreatedAt              time.Time
+	ID                           int
+	PaymentID                    int
+	FinanceFactID                int
+	FinanceFactNo                string
+	FinanceFactType              string
+	FinanceFactOriginalAmount    decimal.Decimal
+	FinanceFactOutstandingAmount decimal.Decimal
+	Amount                       decimal.Decimal
+	Currency                     string
+	Status                       string
+	ReversalOfAllocationID       *int
+	IdempotencyKey               string
+	CreatedBy                    int
+	CreatedAt                    time.Time
 }
 type FinanceCreditNote struct {
-	ID                     int
-	CreditNoteNo           string
-	FinanceFactID          int
-	ReversalOfCreditNoteID *int
-	Amount                 decimal.Decimal
-	Currency               string
-	Status                 string
-	Reason                 string
-	IdempotencyKey         string
-	IdempotencyPayloadHash string
-	CreatedBy              int
-	CreatedAt              time.Time
+	ID                           int
+	CreditNoteNo                 string
+	FinanceFactID                int
+	FinanceFactNo                string
+	FinanceFactType              string
+	FinanceFactOriginalAmount    decimal.Decimal
+	FinanceFactOutstandingAmount decimal.Decimal
+	ReversalOfCreditNoteID       *int
+	Amount                       decimal.Decimal
+	Currency                     string
+	Status                       string
+	Reason                       string
+	IdempotencyKey               string
+	IdempotencyPayloadHash       string
+	CreatedBy                    int
+	CreatedAt                    time.Time
 }
 
 type FinancePaymentCreate struct {

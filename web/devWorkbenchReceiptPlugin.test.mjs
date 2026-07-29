@@ -136,10 +136,7 @@ test('receipt middleware exposes fixed current and historical slots only', async
   assert.equal(body.status, 'success')
   assert.equal(body.repository.gitCommit, COMMIT)
   assert.deepEqual(
-    body.receipts.map(({ freshness, receipt }) => [
-      receipt.gate,
-      freshness,
-    ]),
+    body.receipts.map(({ freshness, receipt }) => [receipt.gate, freshness]),
     [
       ['full', 'current'],
       ['browser', 'historical'],
@@ -226,6 +223,8 @@ test('development serve registry is exact and absent from all builds', async () 
   )
   assert.deepEqual(installedServePlugins, [
     'plush-dev-customer-import-dry-run-api',
+    'plush-dev-database-migration',
+    'plush-dev-data-preparation',
     'plush-dev-qa-coverage',
     'plush-dev-workbench-receipts',
     'plush-dev-delivery-bridge',

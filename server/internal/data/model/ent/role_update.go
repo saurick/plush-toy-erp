@@ -182,6 +182,18 @@ func (_u *RoleUpdate) AppendPrimaryMenuPaths(v []string) *RoleUpdate {
 	return _u
 }
 
+// SetSecondaryMenuPaths sets the "secondary_menu_paths" field.
+func (_u *RoleUpdate) SetSecondaryMenuPaths(v []string) *RoleUpdate {
+	_u.mutation.SetSecondaryMenuPaths(v)
+	return _u
+}
+
+// AppendSecondaryMenuPaths appends value to the "secondary_menu_paths" field.
+func (_u *RoleUpdate) AppendSecondaryMenuPaths(v []string) *RoleUpdate {
+	_u.mutation.AppendSecondaryMenuPaths(v)
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *RoleUpdate) SetUpdatedAt(v time.Time) *RoleUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -351,6 +363,14 @@ func (_u *RoleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AppendedPrimaryMenuPaths(); ok {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, role.FieldPrimaryMenuPaths, value)
+		})
+	}
+	if value, ok := _u.mutation.SecondaryMenuPaths(); ok {
+		_spec.SetField(role.FieldSecondaryMenuPaths, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedSecondaryMenuPaths(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, role.FieldSecondaryMenuPaths, value)
 		})
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
@@ -573,6 +593,18 @@ func (_u *RoleUpdateOne) AppendPrimaryMenuPaths(v []string) *RoleUpdateOne {
 	return _u
 }
 
+// SetSecondaryMenuPaths sets the "secondary_menu_paths" field.
+func (_u *RoleUpdateOne) SetSecondaryMenuPaths(v []string) *RoleUpdateOne {
+	_u.mutation.SetSecondaryMenuPaths(v)
+	return _u
+}
+
+// AppendSecondaryMenuPaths appends value to the "secondary_menu_paths" field.
+func (_u *RoleUpdateOne) AppendSecondaryMenuPaths(v []string) *RoleUpdateOne {
+	_u.mutation.AppendSecondaryMenuPaths(v)
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *RoleUpdateOne) SetUpdatedAt(v time.Time) *RoleUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -772,6 +804,14 @@ func (_u *RoleUpdateOne) sqlSave(ctx context.Context) (_node *Role, err error) {
 	if value, ok := _u.mutation.AppendedPrimaryMenuPaths(); ok {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, role.FieldPrimaryMenuPaths, value)
+		})
+	}
+	if value, ok := _u.mutation.SecondaryMenuPaths(); ok {
+		_spec.SetField(role.FieldSecondaryMenuPaths, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedSecondaryMenuPaths(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, role.FieldSecondaryMenuPaths, value)
 		})
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {

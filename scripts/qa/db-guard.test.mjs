@@ -5,7 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { evaluateDbGuard } from "./db-guard.mjs";
+import {
+  evaluateDatabaseProgrammabilityPolicy,
+  evaluateDbGuard,
+} from "./db-guard.mjs";
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
@@ -75,6 +78,60 @@ test("db guard fails closed for an invalid base range", async () => {
         }),
       /git rev-list failed/u,
     );
+  });
+});
+
+test("db guard rejects new database Function, Procedure and Trigger definitions", async () => {
+  for (const ddl of [
+    "CREATE FUNCTION forbidden_fn() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;",
+    "CREATE PROCEDURE forbidden_proc() LANGUAGE SQL AS $$ SELECT 1 $$;",
+    "CREATE TRIGGER forbidden_trigger BEFORE UPDATE ON items FOR EACH ROW EXECUTE FUNCTION forbidden_fn();",
+  ]) {
+    await withRepository(async (root) => {
+      await write(
+        root,
+        "server/internal/data/model/migrate/20260102000000_forbidden.sql",
+        `${ddl}\n`,
+      );
+      await write(
+        root,
+        "server/internal/data/model/migrate/atlas.sum",
+        "h1:next\n",
+      );
+      const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+      assert.equal(result.ok, false, ddl);
+      assert.equal(result.reason, "database-programmability-forbidden", ddl);
+    });
+  }
+});
+
+test("database programmability policy rejects executable Trigger SQL in tests", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/repository_test.go",
+      "package data\nconst sql = `CREATE TRIGGER forbidden BEFORE INSERT ON items BEGIN SELECT 1; END`\n",
+    );
+    const result = evaluateDatabaseProgrammabilityPolicy(root);
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "database-programmability-forbidden");
+    assert.deepEqual(result.files, ["server/internal/data/repository_test.go"]);
+  });
+});
+
+test("database programmability policy allows an exact forward DROP-only migration", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_cleanup.sql",
+      [
+        "DROP TRIGGER retired_trigger ON items;",
+        "DROP FUNCTION retired_function();",
+        "",
+      ].join("\n"),
+    );
+    const result = evaluateDatabaseProgrammabilityPolicy(root);
+    assert.deepEqual(result, { ok: true });
   });
 });
 

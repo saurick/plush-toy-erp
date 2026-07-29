@@ -643,13 +643,12 @@ func TestWorkflowPostgresMigrationShape(t *testing.T) {
 		SELECT count(*)
 		FROM pg_trigger
 		WHERE tgrelid = 'public.workflow_tasks'::regclass
-		  AND tgname = 'workflow_task_process_anchor_match'
 		  AND NOT tgisinternal
 	`).Scan(&anchorTriggerCount); err != nil {
-		t.Fatalf("query workflow task anchor trigger: %v", err)
+		t.Fatalf("query workflow task custom triggers: %v", err)
 	}
-	if anchorTriggerCount != 1 {
-		t.Fatalf("workflow task anchor trigger count=%d, want 1", anchorTriggerCount)
+	if anchorTriggerCount != 0 {
+		t.Fatalf("workflow task custom trigger count=%d, want 0", anchorTriggerCount)
 	}
 
 	processSuffix := strings.ToLower(postgresTestSuffix())
@@ -680,19 +679,21 @@ func TestWorkflowPostgresMigrationShape(t *testing.T) {
 	`, processB).Scan(&nodeB); err != nil {
 		t.Fatalf("create process node anchor fixture: %v", err)
 	}
-	_, anchorInsertErr := data.sqldb.ExecContext(ctx, `
-		INSERT INTO workflow_tasks (
-			task_code, task_group, task_name, source_type, source_id,
-			task_status_key, owner_role_key, process_instance_id,
-			process_node_instance_id, created_at, updated_at
-		)
-		VALUES ($1, 'anchor_contract', '跨流程锚点负例', 'workflow-anchor-test', $2,
-			'ready', 'boss', $3, $4, NOW(), NOW())
-	`, "WF-ANCHOR-MISMATCH-"+processSuffix, workflowPostgresSourceID(), processA, nodeB)
-	var anchorErr *pgconn.PgError
-	if !errors.As(anchorInsertErr, &anchorErr) || anchorErr.Code != "23514" ||
-		!strings.Contains(anchorErr.Message, "does not belong") {
-		t.Fatalf("cross-process workflow anchors must be rejected, err=%v", anchorInsertErr)
+	anchorRepo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
+	_, anchorInsertErr := anchorRepo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+		TaskCode:              "WF-ANCHOR-MISMATCH-" + processSuffix,
+		TaskGroup:             "anchor_contract",
+		TaskName:              "跨流程锚点负例",
+		SourceType:            "workflow-anchor-test",
+		SourceID:              workflowPostgresSourceID(),
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          "boss",
+		ProcessInstanceID:     &processA,
+		ProcessNodeInstanceID: &nodeB,
+		Payload:               map[string]any{},
+	}, 1)
+	if !errors.Is(anchorInsertErr, biz.ErrBadParam) {
+		t.Fatalf("cross-process workflow anchors must be rejected by repository, err=%v", anchorInsertErr)
 	}
 
 	repo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))

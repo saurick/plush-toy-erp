@@ -48,3 +48,17 @@ test("industry-template keeps shipment finance approval process-generated and fi
   assert.match(patterns[0].precondition, /成品质检.*财务审批/u);
   assert.match(patterns[0].downstream, /审批通过.*SHIPPED.*应收/u);
 });
+
+test("industry-template keeps receivables before payables in finance navigation", () => {
+  const financeSection =
+    plushIndustryTemplateConfig.desktopMenuTemplate.sections.find(
+      (section) => section.title === "财务业务",
+    );
+
+  assert.deepEqual(financeSection?.items, [
+    "reconciliation",
+    "receivables",
+    "payables",
+    "invoices",
+  ]);
+});

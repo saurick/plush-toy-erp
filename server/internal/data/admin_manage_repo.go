@@ -40,6 +40,7 @@ func NewAdminManageRepo(d *Data, logger log.Logger) *adminManageRepo {
 
 var _ biz.AdminManageRepo = (*adminManageRepo)(nil)
 var _ biz.RoleDataScopeRepo = (*adminManageRepo)(nil)
+var _ biz.RoleSettingsRepo = (*adminManageRepo)(nil)
 
 const (
 	defaultRuntimeAuditListLimit = 50
@@ -296,7 +297,7 @@ func (r *adminManageRepo) SetAdminRolesWithAudit(ctx context.Context, change *bi
 func (r *adminManageRepo) ListRoles(ctx context.Context) ([]biz.AdminRole, error) {
 	rows, err := r.data.sqldb.QueryContext(ctx, `
 SELECT id, role_key, name, description, builtin, role_type, disabled, sort_order, version,
-       navigation_mode, primary_menu_paths
+       navigation_mode, primary_menu_paths, secondary_menu_paths
 FROM roles
 ORDER BY sort_order ASC, id ASC`)
 	if err != nil {
@@ -310,6 +311,7 @@ ORDER BY sort_order ASC, id ASC`)
 	for rows.Next() {
 		var item biz.AdminRole
 		var primaryMenuPathsJSON string
+		var secondaryMenuPathsJSON string
 		if err := rows.Scan(
 			&item.ID,
 			&item.Key,
@@ -322,6 +324,7 @@ ORDER BY sort_order ASC, id ASC`)
 			&item.Version,
 			&item.NavigationMode,
 			&primaryMenuPathsJSON,
+			&secondaryMenuPathsJSON,
 		); err != nil {
 			return nil, err
 		}
@@ -329,10 +332,12 @@ ORDER BY sort_order ASC, id ASC`)
 		item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
 		settings := biz.NormalizePersistedRoleNavigationSettings(
 			item.NavigationMode,
-			decodeRolePrimaryMenuPaths(primaryMenuPathsJSON),
+			decodeRoleMenuPaths(primaryMenuPathsJSON),
+			decodeRoleMenuPaths(secondaryMenuPathsJSON),
 		)
 		item.NavigationMode = settings.Mode
 		item.PrimaryMenuPaths = settings.PrimaryMenuPaths
+		item.SecondaryMenuPaths = settings.SecondaryMenuPaths
 		item.Permissions, err = r.loadRolePermissionKeys(ctx, item.ID)
 		if err != nil {
 			return nil, err
@@ -437,9 +442,10 @@ func (r *adminManageRepo) GetRoleByKey(ctx context.Context, roleKey string) (*bi
 	}
 	var item biz.AdminRole
 	var primaryMenuPathsJSON string
+	var secondaryMenuPathsJSON string
 	err := r.data.sqldb.QueryRowContext(ctx, `
 SELECT id, role_key, name, description, builtin, role_type, disabled, sort_order, version,
-       navigation_mode, primary_menu_paths
+       navigation_mode, primary_menu_paths, secondary_menu_paths
 FROM roles WHERE role_key = $1 LIMIT 1`, roleKey).Scan(
 		&item.ID,
 		&item.Key,
@@ -452,6 +458,7 @@ FROM roles WHERE role_key = $1 LIMIT 1`, roleKey).Scan(
 		&item.Version,
 		&item.NavigationMode,
 		&primaryMenuPathsJSON,
+		&secondaryMenuPathsJSON,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -463,10 +470,12 @@ FROM roles WHERE role_key = $1 LIMIT 1`, roleKey).Scan(
 	item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
 	settings := biz.NormalizePersistedRoleNavigationSettings(
 		item.NavigationMode,
-		decodeRolePrimaryMenuPaths(primaryMenuPathsJSON),
+		decodeRoleMenuPaths(primaryMenuPathsJSON),
+		decodeRoleMenuPaths(secondaryMenuPathsJSON),
 	)
 	item.NavigationMode = settings.Mode
 	item.PrimaryMenuPaths = settings.PrimaryMenuPaths
+	item.SecondaryMenuPaths = settings.SecondaryMenuPaths
 	item.Permissions, err = r.loadRolePermissionKeys(ctx, item.ID)
 	if err != nil {
 		return nil, err
@@ -505,128 +514,31 @@ func (r *adminManageRepo) ListRoleDataScopesByRoleKeys(ctx context.Context, role
 	return out, nil
 }
 
-func (r *adminManageRepo) SetRoleDataScopesWithAudit(ctx context.Context, change *biz.RoleDataScopesChangeCommand) (*biz.AdminRole, error) {
+func (r *adminManageRepo) SetRoleSettingsWithAudit(
+	ctx context.Context,
+	change *biz.RoleSettingsChangeCommand,
+) (*biz.AdminRole, error) {
 	if change == nil || change.OperatorID <= 0 || change.ExpectedVersion <= 0 {
 		return nil, biz.ErrBadParam
 	}
 	roleKey := biz.NormalizeRoleKey(change.RoleKey)
-	scopes, err := biz.NormalizeRoleDataScopes(change.Scopes)
+	permissionKeys, err := biz.NormalizePermissionKeysStrict(change.PermissionKeys)
 	if roleKey == "" || err != nil {
 		return nil, biz.ErrBadParam
 	}
-
-	tx, err := r.data.postgres.Tx(ctx)
+	if err := biz.ValidateAssignablePermissionKeys(permissionKeys); err != nil {
+		return nil, err
+	}
+	scopes, err := biz.NormalizeRoleDataScopes(change.Scopes)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { r.rollbackAdminManageTx(ctx, tx) }()
-
-	operator, err := r.loadOperatorForUpdate(ctx, tx, change.OperatorID)
-	if err != nil {
-		return nil, err
-	}
-	if !operator.IsSuperAdmin && biz.AdminHasRole(operator, roleKey) {
-		return nil, biz.ErrAdminSelfRolePermissionForbidden
-	}
-	roleRow, err := r.loadRoleForUpdate(ctx, tx, roleKey)
-	if err != nil {
-		return nil, err
-	}
-	if roleRow.Disabled {
-		return nil, biz.ErrRoleNotFound
-	}
-	if biz.IsSystemManagedRole(mapEntAdminRole(roleRow)) {
-		return nil, biz.ErrSystemRoleImmutable
-	}
-	if roleRow.Version != change.ExpectedVersion {
-		return nil, biz.ErrRoleVersionConflict
-	}
-	before, err := r.loadRoleSnapshotFromRowInTx(ctx, tx, roleRow)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateWarehouseDataScopeResourcesInTx(ctx, tx, scopes[0]); err != nil {
-		return nil, err
-	}
-
-	affected, err := tx.Role.Update().Where(
-		role.ID(roleRow.ID),
-		role.Version(change.ExpectedVersion),
-		role.Disabled(false),
-	).AddVersion(1).Save(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if affected == 0 {
-		return nil, biz.ErrRoleVersionConflict
-	}
-	if _, err := tx.RoleDataScope.Delete().Where(
-		roledatascope.RoleID(roleRow.ID),
-		roledatascope.ResourceType(scopes[0].ResourceType),
-	).Exec(ctx); err != nil {
-		return nil, err
-	}
-	if _, err := tx.RoleDataScope.Create().
-		SetRoleID(roleRow.ID).
-		SetResourceType(scopes[0].ResourceType).
-		SetMode(scopes[0].Mode).
-		SetResourceIds(scopes[0].ResourceIDs).
-		Save(ctx); err != nil {
-		return nil, err
-	}
-	after, err := r.loadRoleSnapshotInTx(ctx, tx, roleRow.ID)
-	if err != nil {
-		return nil, err
-	}
-	auditEvent, err := biz.BuildAdminControlAuditEvent(
-		operator,
-		"role.data_scopes.set",
-		"role",
-		after.ID,
-		after.Key,
-		biz.AdminAuditRoleSnapshot(before),
-		biz.AdminAuditRoleSnapshot(after),
+	navigation, err := biz.NormalizeRoleNavigationSettings(
+		change.Mode,
+		change.PrimaryMenuPaths,
+		change.SecondaryMenuPaths,
 	)
 	if err != nil {
-		return nil, err
-	}
-	if err := createRuntimeAuditEventInTx(ctx, tx, auditEvent); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-	return after, nil
-}
-
-func validateWarehouseDataScopeResourcesInTx(ctx context.Context, tx *ent.Tx, scope biz.RoleDataScope) error {
-	if scope.Mode != biz.DataScopeModeAssigned {
-		return nil
-	}
-	count, err := tx.Warehouse.Query().Where(warehouse.IDIn(scope.ResourceIDs...)).Count(ctx)
-	if err != nil {
-		return err
-	}
-	if count != len(scope.ResourceIDs) {
-		return biz.ErrRoleDataScopeResourceNotFound
-	}
-	return nil
-}
-
-func (r *adminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, change *biz.RolePermissionsChange) (*biz.AdminRole, error) {
-	if change == nil || change.OperatorID <= 0 || change.ExpectedVersion <= 0 {
-		return nil, biz.ErrBadParam
-	}
-	roleKey := biz.NormalizeRoleKey(change.RoleKey)
-	if roleKey == "" {
-		return nil, biz.ErrBadParam
-	}
-	permissionKeys, err := biz.NormalizePermissionKeysStrict(change.PermissionKeys)
-	if err != nil {
-		return nil, err
-	}
-	if err := biz.ValidateAssignablePermissionKeys(permissionKeys); err != nil {
 		return nil, err
 	}
 
@@ -664,12 +576,20 @@ func (r *adminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, chang
 	if err != nil {
 		return nil, err
 	}
+	if err := validateWarehouseDataScopeResourcesInTx(ctx, tx, scopes[0]); err != nil {
+		return nil, err
+	}
 
 	affected, err := tx.Role.Update().Where(
 		role.ID(roleRow.ID),
 		role.Version(change.ExpectedVersion),
 		role.Disabled(false),
-	).AddVersion(1).Save(ctx)
+	).
+		SetNavigationMode(role.NavigationMode(navigation.Mode)).
+		SetPrimaryMenuPaths(navigation.PrimaryMenuPaths).
+		SetSecondaryMenuPaths(navigation.SecondaryMenuPaths).
+		AddVersion(1).
+		Save(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -687,13 +607,27 @@ func (r *adminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, chang
 			return nil, err
 		}
 	}
+	if _, err := tx.RoleDataScope.Delete().Where(
+		roledatascope.RoleID(roleRow.ID),
+		roledatascope.ResourceType(scopes[0].ResourceType),
+	).Exec(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := tx.RoleDataScope.Create().
+		SetRoleID(roleRow.ID).
+		SetResourceType(scopes[0].ResourceType).
+		SetMode(scopes[0].Mode).
+		SetResourceIds(scopes[0].ResourceIDs).
+		Save(ctx); err != nil {
+		return nil, err
+	}
 	after, err := r.loadRoleSnapshotInTx(ctx, tx, roleRow.ID)
 	if err != nil {
 		return nil, err
 	}
 	auditEvent, err := biz.BuildAdminControlAuditEvent(
 		operator,
-		"role.permissions.set",
+		"role.settings.set",
 		"role",
 		after.ID,
 		after.Key,
@@ -713,95 +647,18 @@ func (r *adminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, chang
 	return after, nil
 }
 
-func (r *adminManageRepo) SetRoleNavigationWithAudit(
-	ctx context.Context,
-	change *biz.RoleNavigationChange,
-) (*biz.AdminRole, error) {
-	if change == nil || change.OperatorID <= 0 || change.ExpectedVersion <= 0 {
-		return nil, biz.ErrBadParam
+func validateWarehouseDataScopeResourcesInTx(ctx context.Context, tx *ent.Tx, scope biz.RoleDataScope) error {
+	if scope.Mode != biz.DataScopeModeAssigned {
+		return nil
 	}
-	roleKey := biz.NormalizeRoleKey(change.RoleKey)
-	if roleKey == "" {
-		return nil, biz.ErrBadParam
-	}
-	settings, err := biz.NormalizeRoleNavigationSettings(
-		change.Mode,
-		change.PrimaryMenuPaths,
-	)
+	count, err := tx.Warehouse.Query().Where(warehouse.IDIn(scope.ResourceIDs...)).Count(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return nil, err
+	if count != len(scope.ResourceIDs) {
+		return biz.ErrRoleDataScopeResourceNotFound
 	}
-	defer func() { r.rollbackAdminManageTx(ctx, tx) }()
-
-	operator, err := r.loadOperatorForUpdate(ctx, tx, change.OperatorID)
-	if err != nil {
-		return nil, err
-	}
-	if !operator.IsSuperAdmin && biz.AdminHasRole(operator, roleKey) {
-		return nil, biz.ErrAdminSelfRolePermissionForbidden
-	}
-	roleRow, err := r.loadRoleForUpdate(ctx, tx, roleKey)
-	if err != nil {
-		return nil, err
-	}
-	if roleRow.Disabled {
-		return nil, biz.ErrRoleNotFound
-	}
-	if biz.IsSystemManagedRole(mapEntAdminRole(roleRow)) {
-		return nil, biz.ErrSystemRoleImmutable
-	}
-	if roleRow.Version != change.ExpectedVersion {
-		return nil, biz.ErrRoleVersionConflict
-	}
-	before, err := r.loadRoleSnapshotFromRowInTx(ctx, tx, roleRow)
-	if err != nil {
-		return nil, err
-	}
-
-	affected, err := tx.Role.Update().Where(
-		role.ID(roleRow.ID),
-		role.Version(change.ExpectedVersion),
-		role.Disabled(false),
-	).
-		SetNavigationMode(role.NavigationMode(settings.Mode)).
-		SetPrimaryMenuPaths(settings.PrimaryMenuPaths).
-		AddVersion(1).
-		Save(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if affected == 0 {
-		return nil, biz.ErrRoleVersionConflict
-	}
-	after, err := r.loadRoleSnapshotInTx(ctx, tx, roleRow.ID)
-	if err != nil {
-		return nil, err
-	}
-	auditEvent, err := biz.BuildAdminControlAuditEvent(
-		operator,
-		"role.navigation.set",
-		"role",
-		after.ID,
-		after.Key,
-		biz.AdminAuditRoleSnapshot(before),
-		biz.AdminAuditRoleSnapshot(after),
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err := createRuntimeAuditEventInTx(ctx, tx, auditEvent); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-	return after, nil
+	return nil
 }
 
 func (r *adminManageRepo) SetAdminPhoneWithAudit(ctx context.Context, change *biz.AdminPhoneChange) (*biz.AdminUser, error) {
@@ -1269,21 +1126,23 @@ func mapEntAdminRole(row *ent.Role) biz.AdminRole {
 	settings := biz.NormalizePersistedRoleNavigationSettings(
 		biz.RoleNavigationMode(row.NavigationMode),
 		row.PrimaryMenuPaths,
+		row.SecondaryMenuPaths,
 	)
 	return biz.AdminRole{
-		ID:               row.ID,
-		Key:              roleKey,
-		Name:             row.Name,
-		Description:      row.Description,
-		Builtin:          row.Builtin,
-		Disabled:         row.Disabled,
-		SortOrder:        row.SortOrder,
-		Type:             biz.NormalizeRoleType(biz.RoleType(row.RoleType), roleKey, row.Builtin),
-		Version:          row.Version,
-		NavigationMode:   settings.Mode,
-		PrimaryMenuPaths: settings.PrimaryMenuPaths,
-		Permissions:      []string{},
-		DataScopes:       []biz.RoleDataScope{},
+		ID:                 row.ID,
+		Key:                roleKey,
+		Name:               row.Name,
+		Description:        row.Description,
+		Builtin:            row.Builtin,
+		Disabled:           row.Disabled,
+		SortOrder:          row.SortOrder,
+		Type:               biz.NormalizeRoleType(biz.RoleType(row.RoleType), roleKey, row.Builtin),
+		Version:            row.Version,
+		NavigationMode:     settings.Mode,
+		PrimaryMenuPaths:   settings.PrimaryMenuPaths,
+		SecondaryMenuPaths: settings.SecondaryMenuPaths,
+		Permissions:        []string{},
+		DataScopes:         []biz.RoleDataScope{},
 	}
 }
 
@@ -1824,7 +1683,7 @@ func stringPtrOrNil(value string) *string {
 	return &value
 }
 
-func decodeRolePrimaryMenuPaths(raw string) []string {
+func decodeRoleMenuPaths(raw string) []string {
 	var paths []string
 	if strings.TrimSpace(raw) == "" {
 		return []string{}

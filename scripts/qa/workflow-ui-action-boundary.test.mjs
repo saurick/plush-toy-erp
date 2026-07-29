@@ -304,13 +304,50 @@ test("mobile task visibility copy stays readable and role task query uses server
     );
   }
   assert(
-    workflowApiSource.includes("workflowRpc.call('list_role_tasks', query)"),
+    /export async function listWorkflowRoleTasks\(params = \{\}\) \{\s*return listWorkflowRoleTaskPage\('list_role_tasks', params\)\s*\}/u.test(
+      workflowApiSource,
+    ),
     "mobile role tasks must query the backend list_role_tasks projection",
   );
   assert(
     !taskQueriesSource.includes("limit: 200") &&
       !taskQueriesSource.includes("按主责岗位直查任务池"),
     "mobile role tasks must not restore the old capped client-side owner-pool query",
+  );
+});
+
+test("desktop workbench and mobile task page use separate role-task read methods", () => {
+  const workflowApiSource = readFileSync(
+    path.join(erpSourceRoot, "api/workflowApi.mjs"),
+    "utf8",
+  );
+  const dashboardSource = readFileSync(
+    path.join(erpSourceRoot, "pages/DashboardPage.jsx"),
+    "utf8",
+  );
+  const mobileRoleTasksSource = readFileSync(
+    path.join(erpSourceRoot, "mobile/pages/MobileRoleTasksPage.jsx"),
+    "utf8",
+  );
+
+  assert.match(
+    workflowApiSource,
+    /export async function listWorkflowWorkbenchRoleTasks\(params = \{\}\) \{\s*return listWorkflowRoleTaskPage\('list_workbench_role_tasks', params\)\s*\}/u,
+  );
+  assert.match(
+    workflowApiSource,
+    /export async function listAllWorkflowWorkbenchRoleTasks\(params = \{\}\) \{\s*return listAllWorkflowRoleTaskPages\('list_workbench_role_tasks', params\)\s*\}/u,
+  );
+  assert.doesNotMatch(
+    workflowApiSource,
+    /export async function listAllWorkflowRoleTasks\b/u,
+  );
+  assert.match(dashboardSource, /\blistAllWorkflowWorkbenchRoleTasks\b/u);
+  assert.doesNotMatch(dashboardSource, /\blistAllWorkflowRoleTasks\b/u);
+  assert.match(mobileRoleTasksSource, /\blistWorkflowRoleTasks\b/u);
+  assert.doesNotMatch(
+    mobileRoleTasksSource,
+    /\blistWorkflowWorkbenchRoleTasks\b/u,
   );
 });
 

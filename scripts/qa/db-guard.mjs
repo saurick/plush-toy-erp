@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +19,165 @@ const BUILDER_START =
   /\b(?:field\.[A-Za-z][A-Za-z0-9]*\(|index\.(?:Fields|Edges)\(|edge\.(?:To|From)\()/u;
 
 const POSTGRES_IDENTIFIER_MAX_BYTES = 63;
+const LEGACY_PROGRAMMABILITY_MIGRATION =
+  "server/internal/data/model/migrate/20260714055825_customer_config_append_only_and_role_backfill.sql";
+const LEGACY_PROGRAMMABILITY_OBJECTS = Object.freeze([
+  ["function", "enforce_customer_config_revision_lifecycle"],
+  ["function", "enforce_workflow_task_process_anchor_match"],
+  ["function", "prevent_customer_config_revision_content_update"],
+  ["function", "prevent_customer_config_revision_delete"],
+  ["function", "protect_customer_config_projection"],
+  ["trigger", "access_entitlements_immutable"],
+  ["trigger", "customer_config_revision_content_immutable"],
+  ["trigger", "customer_config_revision_delete_immutable"],
+  ["trigger", "customer_config_revision_lifecycle_guard"],
+  ["trigger", "deployment_module_states_immutable"],
+  ["trigger", "role_profiles_immutable"],
+  ["trigger", "work_pool_memberships_immutable"],
+  ["trigger", "work_pools_immutable"],
+  ["trigger", "workflow_task_process_anchor_match"],
+]);
+const PROGRAMMABILITY_SCAN_ROOTS = Object.freeze(["server", "scripts"]);
+const PROGRAMMABILITY_SCAN_EXTENSIONS = new Set([
+  ".cjs",
+  ".go",
+  ".js",
+  ".mjs",
+  ".sh",
+  ".sql",
+]);
+const PROGRAMMABILITY_SCAN_EXCLUSIONS = new Set([
+  "scripts/qa/db-guard.mjs",
+  "scripts/qa/db-guard.test.mjs",
+]);
+const CREATE_PROGRAMMABILITY_OBJECT =
+  /\bcreate\s+(?:or\s+replace\s+)?(?:(?:constraint|event)\s+)?(function|procedure|trigger)\s+"?([a-z_][a-z0-9_]*)"?/giu;
+const EXECUTE_PROGRAMMABILITY_OBJECT =
+  /\bexecute\s+(?:function|procedure)\b/iu;
+
+function collectProgrammabilityFiles(root) {
+  const files = [];
+  const visit = (relativePath) => {
+    const absolutePath = path.join(root, relativePath);
+    for (const entry of readdirSync(absolutePath, { withFileTypes: true })) {
+      const child = path.posix.join(relativePath, entry.name);
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) {
+        visit(child);
+        continue;
+      }
+      if (
+        entry.isFile() &&
+        PROGRAMMABILITY_SCAN_EXTENSIONS.has(path.extname(entry.name)) &&
+        !PROGRAMMABILITY_SCAN_EXCLUSIONS.has(child)
+      ) {
+        files.push(child);
+      }
+    }
+  };
+  for (const relativePath of PROGRAMMABILITY_SCAN_ROOTS) {
+    if (existsSync(path.join(root, relativePath))) visit(relativePath);
+  }
+  return files.sort();
+}
+
+function createdProgrammabilityObjects(source) {
+  return [...source.matchAll(CREATE_PROGRAMMABILITY_OBJECT)].map((match) => [
+    match[1].toLowerCase(),
+    match[2].toLowerCase(),
+  ]);
+}
+
+function sameProgrammabilityObjects(actual, expected) {
+  const normalize = (values) =>
+    values.map(([kind, name]) => `${kind}:${name}`).sort();
+  return JSON.stringify(normalize(actual)) === JSON.stringify(normalize(expected));
+}
+
+function legacyProgrammabilityRetired(root) {
+  const migrationDir = path.join(
+    root,
+    "server/internal/data/model/migrate",
+  );
+  const cleanupSource = readdirSync(migrationDir, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.endsWith(".sql") &&
+        entry.name > path.basename(LEGACY_PROGRAMMABILITY_MIGRATION),
+    )
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map((entry) => readFileSync(path.join(migrationDir, entry.name), "utf8"))
+    .join("\n");
+  const missing = LEGACY_PROGRAMMABILITY_OBJECTS.filter(([kind, name]) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    const pattern =
+      kind === "function"
+        ? new RegExp(
+            `\\bdrop\\s+function\\s+(?:if\\s+exists\\s+)?(?:public\\.)?"?${escaped}"?\\s*\\(`,
+            "iu",
+          )
+        : new RegExp(
+            `\\bdrop\\s+trigger\\s+(?:if\\s+exists\\s+)?"?${escaped}"?\\s+on\\b`,
+            "iu",
+          );
+    return !pattern.test(cleanupSource);
+  });
+  return missing.map(([kind, name]) => `${kind}:${name}`);
+}
+
+export function evaluateDatabaseProgrammabilityPolicy(root) {
+  const legacyPath = path.join(root, LEGACY_PROGRAMMABILITY_MIGRATION);
+  if (existsSync(legacyPath)) {
+    const legacyObjects = createdProgrammabilityObjects(
+      readFileSync(legacyPath, "utf8"),
+    );
+    if (
+      !sameProgrammabilityObjects(
+        legacyObjects,
+        LEGACY_PROGRAMMABILITY_OBJECTS,
+      )
+    ) {
+      return {
+        ok: false,
+        reason: "legacy-programmability-contract-changed",
+        files: [LEGACY_PROGRAMMABILITY_MIGRATION],
+      };
+    }
+  }
+
+  const violations = [];
+  for (const relativePath of collectProgrammabilityFiles(root)) {
+    if (relativePath === LEGACY_PROGRAMMABILITY_MIGRATION) continue;
+    const source = readFileSync(path.join(root, relativePath), "utf8");
+    if (
+      createdProgrammabilityObjects(source).length > 0 ||
+      EXECUTE_PROGRAMMABILITY_OBJECT.test(source)
+    ) {
+      violations.push(relativePath);
+    }
+  }
+  if (violations.length > 0) {
+    return {
+      ok: false,
+      reason: "database-programmability-forbidden",
+      files: violations,
+    };
+  }
+
+  if (existsSync(legacyPath)) {
+    const missing = legacyProgrammabilityRetired(root);
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        reason: "legacy-programmability-not-retired",
+        files: [LEGACY_PROGRAMMABILITY_MIGRATION],
+        missing,
+      };
+    }
+  }
+  return { ok: true };
+}
 
 function parseNameStatus(buffer) {
   const values = readNullDelimited(buffer);
@@ -817,6 +976,13 @@ export function evaluateDbGuard({ root, range = "" }) {
 
   const effectiveRange = range || resolveDefaultRange(root);
   if (effectiveRange) validateGitRange(root, effectiveRange);
+  const programmability = evaluateDatabaseProgrammabilityPolicy(root);
+  if (!programmability.ok) {
+    return {
+      ...programmability,
+      range: effectiveRange,
+    };
+  }
 
   const entries = [];
   if (effectiveRange) entries.push(...nameStatus(root, [effectiveRange]));
@@ -1008,6 +1174,19 @@ function main() {
   if (!result.ok) {
     if (result.reason === "base-migration-modified") {
       console.error("[qa:db-guard] base 中已有 migration 不可修改、删除或重命名:");
+    } else if (result.reason === "database-programmability-forbidden") {
+      console.error(
+        "[qa:db-guard] 禁止新增数据库 Function、Procedure、非内部 Trigger 或其执行语句:",
+      );
+    } else if (result.reason === "legacy-programmability-contract-changed") {
+      console.error(
+        "[qa:db-guard] 冻结历史 migration 的数据库可编程对象清单发生变化:",
+      );
+    } else if (result.reason === "legacy-programmability-not-retired") {
+      console.error(
+        "[qa:db-guard] 冻结历史 migration 的数据库可编程对象缺少后续精确退出:",
+      );
+      for (const item of result.missing || []) console.error(`  - ${item}`);
     } else if (result.reason === "missing-atlas-sum") {
       console.error("[qa:db-guard] 新 migration 未同步 atlas.sum:");
     } else if (result.reason === "schema-migration-proof-missing") {

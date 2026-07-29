@@ -110,20 +110,58 @@ async function run() {
     })
     await page.waitForLoadState('networkidle', { timeout: 15_000 })
 
-    const result = await page.evaluate(() => ({
-      bodyText: document.body?.innerText || '',
-      faviconHrefs: Array.from(
-        document.querySelectorAll('link[rel~="icon"]')
-      ).map((link) => link.getAttribute('href') || ''),
-      pathname: window.location.pathname,
-      title: document.title,
-    }))
+    const result = await page.evaluate(() => {
+      const loginPage = document.querySelector('.erp-login-page')
+      const loginCard = document.querySelector('.erp-login-card')
+      const loginPageStyle = loginPage
+        ? window.getComputedStyle(loginPage)
+        : null
+      const loginPageRect = loginPage?.getBoundingClientRect?.()
+      const loginCardRect = loginCard?.getBoundingClientRect?.()
+
+      return {
+        bodyText: document.body?.innerText || '',
+        faviconHrefs: Array.from(
+          document.querySelectorAll('link[rel~="icon"]')
+        ).map((link) => link.getAttribute('href') || ''),
+        loginCardCenterDelta: loginCardRect
+          ? Math.abs(
+              loginCardRect.left +
+                loginCardRect.width / 2 -
+                window.innerWidth / 2
+            )
+          : Number.POSITIVE_INFINITY,
+        loginCardWidth: loginCardRect?.width || 0,
+        loginPageDisplay: loginPageStyle?.display || '',
+        loginPageHeight: loginPageRect?.height || 0,
+        pathname: window.location.pathname,
+        title: document.title,
+        viewportHeight: window.innerHeight,
+      }
+    })
     assert.equal(result.pathname, '/admin-login')
     assert.doesNotMatch(result.bodyText, /研发效能工作台/u)
     assert.doesNotMatch(result.title, /研发效能工作台/u)
     assert(
       result.faviconHrefs.every((href) => !href.includes('favicon-dev.svg')),
       `production favicon leaked DEV metadata: ${JSON.stringify(result.faviconHrefs)}`
+    )
+    assert.equal(
+      result.loginPageDisplay,
+      'flex',
+      `production login centering is missing: ${JSON.stringify(result)}`
+    )
+    assert(
+      result.loginCardWidth >= 520 && result.loginCardWidth <= 622,
+      `production login card width is invalid: ${JSON.stringify(result)}`
+    )
+    assert(
+      result.loginCardCenterDelta <= 2,
+      `production login card is not centered: ${JSON.stringify(result)}`
+    )
+    assert(
+      result.loginPageHeight >= result.viewportHeight,
+      `production login page does not cover the viewport: ${JSON.stringify(result)}`
     )
     process.stdout.write(
       `[production-dev-boundary-browser] status=passed direct=/__dev redirected=${result.pathname}\n`

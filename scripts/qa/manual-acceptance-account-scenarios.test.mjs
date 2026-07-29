@@ -112,6 +112,9 @@ function acceptanceRoles(overrides = {}) {
     disabled: false,
     permissions_editable: true,
     permissions_editable_by_current_admin: true,
+    navigation_mode: "recommended",
+    primary_menu_paths: [],
+    secondary_menu_paths: [],
     data_scopes: [
       {
         resource_type: "warehouse",
@@ -312,24 +315,23 @@ function createBackend({
         url,
       );
     }
-    if (domain === "admin" && body.method === "set_role_permissions") {
+    if (domain === "admin" && body.method === "set_role_settings") {
       const selected = roleState.find(
         (item) => item.role_key === body.params.role_key,
       );
       assert(selected);
       assert.equal(body.params.expected_version, selected.version);
+      const beforePermissions = JSON.stringify(selected.permissions);
+      const beforeDataScopes = JSON.stringify(selected.data_scopes);
       selected.permissions = [...body.params.permission_keys].sort();
-      selected.version += 1;
-      auditTotal += 1;
-      return ok({ role: structuredClone(selected) }, url);
-    }
-    if (domain === "admin" && body.method === "set_role_data_scopes") {
-      const selected = roleState.find(
-        (item) => item.role_key === body.params.role_key,
-      );
-      assert(selected);
-      assert.equal(body.params.expected_version, selected.version);
       selected.data_scopes = structuredClone(body.params.data_scopes);
+      selected.navigation_mode = body.params.navigation_mode;
+      selected.primary_menu_paths = [...body.params.primary_menu_paths];
+      selected.secondary_menu_paths = [...body.params.secondary_menu_paths];
+      entry.roleSettingsChangedPermissions =
+        beforePermissions !== JSON.stringify(selected.permissions);
+      entry.roleSettingsChangedDataScopes =
+        beforeDataScopes !== JSON.stringify(selected.data_scopes);
       selected.version += 1;
       auditTotal += 1;
       return ok({ role: structuredClone(selected) }, url);
@@ -395,13 +397,19 @@ function passwordResetCalls(backend) {
 
 function rolePermissionCalls(backend) {
   return backend.calls.filter(
-    (call) => call.domain === "admin" && call.method === "set_role_permissions",
+    (call) =>
+      call.domain === "admin" &&
+      call.method === "set_role_settings" &&
+      call.roleSettingsChangedPermissions,
   );
 }
 
 function roleDataScopeCalls(backend) {
   return backend.calls.filter(
-    (call) => call.domain === "admin" && call.method === "set_role_data_scopes",
+    (call) =>
+      call.domain === "admin" &&
+      call.method === "set_role_settings" &&
+      call.roleSettingsChangedDataScopes,
   );
 }
 

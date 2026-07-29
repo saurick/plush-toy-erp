@@ -302,7 +302,7 @@ test("production collaboration pages match the roles' executable task states", (
     catalog.acceptanceGuide.desktopPages.map((item) => [item.title, item]),
   );
   const scheduling = byTitle.get("生产排程");
-  const exceptions = byTitle.get("生产异常");
+  const exceptions = byTitle.get("生产异常处置");
 
   assert(scheduling);
   assert(exceptions);

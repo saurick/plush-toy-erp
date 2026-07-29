@@ -159,6 +159,9 @@ status)
   ;;
 apply)
   atlas migrate apply --dir "file://internal/data/model/migrate" --url "$PURCHASE_RECEIPT_PG_DB_URL"
+  PLUSH_DATABASE_PROGRAMMABILITY_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
+    node ../scripts/qa/database-programmability.mjs \
+    --database-url-env PLUSH_DATABASE_PROGRAMMABILITY_URL
   ;;
 test)
   run_verified_go_test TestPurchaseReceiptPostgres \
@@ -816,6 +819,9 @@ SQL
   atlas migrate apply \
     --dir "file://${migration_dir}" \
     --url "$POPULATED_UPGRADE_DB_URL"
+  PLUSH_DATABASE_PROGRAMMABILITY_URL="$POPULATED_UPGRADE_DB_URL" \
+    node "$root_dir/scripts/qa/database-programmability.mjs" \
+    --database-url-env PLUSH_DATABASE_PROGRAMMABILITY_URL
   assert_net_weight_gram_upgrade
   assert_populated_preflight_green latest
   assert_customer_config_cutover_preflight_green latest

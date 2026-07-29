@@ -60,10 +60,10 @@ export const yoyoosunMenuConfig = Object.freeze({
         title: "财务管理",
         items: [
           "reconciliation",
-          "payables",
           "receivables",
-          "invoices",
+          "payables",
           "finance-payments",
+          "invoices",
         ],
       },
       {

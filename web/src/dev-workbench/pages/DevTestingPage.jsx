@@ -4,6 +4,7 @@ import {
   CodeOutlined,
   CopyOutlined,
   FileSearchOutlined,
+  PlayCircleOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
@@ -13,6 +14,7 @@ import {
   Button,
   Empty,
   Input,
+  Progress,
   Segmented,
   Skeleton,
   Space,
@@ -26,7 +28,7 @@ import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS,
   DEV_TESTING_COVERAGE_API_PATH,
-  DEV_TESTING_COVERAGE_WRITE_COMMAND,
+  DEV_TESTING_COVERAGE_COLLECT_COMMAND,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   buildDevTestingDocs,
   buildDevTestingSummary,
@@ -38,6 +40,13 @@ import {
   parseDevTestingStrategyTiers,
   resolveDevTestingSelectedDoc,
 } from '../config/devTesting.mjs'
+import {
+  createDevCoverageIdempotencyKey,
+  createDevCoverageOperationClient,
+  getDevCoverageOperationPresentation,
+  isDevCoverageOperationActive,
+  normalizeOptionalDevCoverageOperation,
+} from '../config/devCoverageOperation.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -339,8 +348,8 @@ function CoverageEvidenceCard({ item }) {
         {item?.note ||
           (item?.status === 'not_applicable'
             ? '本轮未受影响，不属于必跑门禁。'
-            : item?.status === 'not_collected'
-              ? '当前报告未采集这一层；不能计为通过。'
+            : item?.status === 'not_collected' || item?.status === 'missing'
+              ? '当前报告未采集这一层；空值不是 0%，也不能计为通过。'
               : '报告未提供补充说明。')}
       </p>
       {evidence.length > 0 ? (
@@ -375,15 +384,16 @@ function coverageReportAlert(state) {
       type: 'success',
       title: '报告与当前仓库指纹匹配',
       description:
-        'Current 只表示报告身份新鲜；各层是否通过仍以本页分项状态为准。',
+        'Current 只表示报告身份新鲜；各层是否通过仍以本页分项状态为准。空值表示未采集，不是 0%。',
     }
   }
   if (state?.status === 'stale') {
     return {
       type: 'warning',
       title: '覆盖报告已过期',
-      description:
-        state.message || '报告未绑定当前工作区，数值只能作为历史参考。',
+      description: `${
+        state.message || '报告未绑定当前工作区，数值只能作为历史参考。'
+      } 空值表示未采集，不是 0%。`,
     }
   }
   if (state?.status === 'failed') {
@@ -392,15 +402,16 @@ function coverageReportAlert(state) {
       title: '覆盖报告读取失败',
       description:
         state.message && state.message !== '覆盖报告读取失败'
-          ? state.message
-          : '请检查本地只读报告接口。',
+          ? `${state.message}；空值表示未采集，不是 0%。`
+          : '请检查本地只读报告接口；空值表示未采集，不是 0%。',
     }
   }
   return {
     type: 'info',
     title: '尚未生成覆盖报告',
-    description:
-      state?.message || '复制生成命令到终端执行；本页面不会运行测试。',
+    description: `${
+      state?.message || '当前还没有可展示的覆盖证据'
+    }；空值表示未采集，不是 0%。可以直接一键采集；“重新读取”仍只读取本地报告。`,
   }
 }
 
@@ -411,9 +422,65 @@ function formatCoverageGeneratedAt(value) {
   return date.toLocaleString('zh-CN', { hour12: false })
 }
 
-function CoverageReportView({ state, loading, onReload }) {
+function CoverageOperationPanel({ operation, error }) {
+  if (!operation && !error) return null
+  const presentation = getDevCoverageOperationPresentation(operation)
+  const progressStatus = presentation.active
+    ? 'active'
+    : operation?.status === 'completed' && operation?.outcome === 'passed'
+      ? 'success'
+      : operation?.status === 'failed'
+        ? 'exception'
+        : 'normal'
+  const tagColor = {
+    primary: 'blue',
+    success: 'green',
+    warning: 'gold',
+    danger: 'red',
+  }[presentation.tone]
+
+  return (
+    <div
+      className={`erp-dev-testing-coverage-operation erp-dev-testing-coverage-operation--${presentation.tone}`}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="erp-dev-testing-coverage-operation__head">
+        <div>
+          <Tag color={tagColor}>{presentation.label}</Tag>
+          <strong>{presentation.stageLabel}</strong>
+        </div>
+        {operation?.updatedAt ? (
+          <small>{formatCoverageGeneratedAt(operation.updatedAt)}</small>
+        ) : null}
+      </div>
+      <Progress
+        percent={presentation.percentage}
+        status={progressStatus}
+        showInfo={false}
+        size="small"
+      />
+      {operation?.message ? <p>{operation.message}</p> : null}
+      {error ? (
+        <p className="erp-dev-testing-coverage-operation__error">{error}</p>
+      ) : null}
+    </div>
+  )
+}
+
+function CoverageReportView({
+  state,
+  loading,
+  operation,
+  operationError,
+  operationStarting,
+  onCollect,
+  onReload,
+}) {
   const alert = coverageReportAlert(state)
   const report = state?.report || null
+  const operationPresentation =
+    getDevCoverageOperationPresentation(operation)
   const repository = report?.repository || {}
   const shortCommit = repository.commit
     ? repository.commit.slice(0, 12)
@@ -423,7 +490,7 @@ function CoverageReportView({ state, loading, onReload }) {
     <div
       className="erp-dev-testing-coverage-view"
       aria-label="测试覆盖状态"
-      aria-busy={loading}
+      aria-busy={loading || operationPresentation.active}
     >
       <div className="erp-dev-testing-coverage-overview">
         <Alert
@@ -432,13 +499,20 @@ function CoverageReportView({ state, loading, onReload }) {
           message={alert.title}
           description={alert.description}
         />
+        <CoverageOperationPanel
+          operation={operation}
+          error={operationError}
+        />
         <div className="erp-dev-testing-coverage-actions">
-          <code>{DEV_TESTING_COVERAGE_WRITE_COMMAND}</code>
+          <code>{DEV_TESTING_COVERAGE_COLLECT_COMMAND}</code>
           <Button
-            icon={<CopyOutlined />}
-            onClick={() => runCopy(DEV_TESTING_COVERAGE_WRITE_COMMAND)}
+            type="primary"
+            icon={<PlayCircleOutlined />}
+            loading={operationStarting || operationPresentation.active}
+            disabled={operationPresentation.active}
+            onClick={onCollect}
           >
-            复制生成命令
+            {operationPresentation.active ? '采集中…' : '一键采集覆盖率'}
           </Button>
           <Button
             icon={<ReloadOutlined />}
@@ -447,10 +521,19 @@ function CoverageReportView({ state, loading, onReload }) {
           >
             重新读取
           </Button>
+          <Button
+            icon={<CopyOutlined />}
+            onClick={() => runCopy(DEV_TESTING_COVERAGE_COLLECT_COMMAND)}
+          >
+            复制备用命令
+          </Button>
         </div>
         <Paragraph className="erp-dev-testing-coverage-boundary">
-          指标口径不同，不合并为“全系统覆盖率”。skipped、blocked、missing、failed
-          和 0 tests executed 均不能算通过。
+          空值表示未采集，不是
+          0%。一键采集固定运行真实本地 baseline
+          测试并自动聚合报告，但不会执行数据库写入、真实业务浏览器、目标环境部署或客户
+          UAT；切换页面不会停止后台任务，“重新读取”只读取本地报告。指标口径不同，不合并为“全系统覆盖率”；skipped、blocked、missing、failed
+          和 0 tests executed 均不能算通过。备用命令用于开发接口不可用时手工执行同一采集器。
         </Paragraph>
       </div>
 
@@ -467,7 +550,7 @@ function CoverageReportView({ state, loading, onReload }) {
         <div className="erp-dev-testing-coverage-empty">
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="当前没有可展示的覆盖报告 / No coverage report"
+            description="尚未采集可展示的覆盖证据；空值不是 0% / No coverage evidence collected"
           />
         </div>
       ) : null}
@@ -521,7 +604,7 @@ function CoverageReportView({ state, loading, onReload }) {
 
           <CoverageSection
             title="代码覆盖 / Code Coverage"
-            description="后端与前端分开统计；未采集时不显示推测百分比。"
+            description="后端与前端分开统计；空值表示未采集，不是 0%，不显示推测百分比。"
           >
             <div className="erp-dev-testing-coverage-grid erp-dev-testing-coverage-grid--code">
               <CoverageEvidenceCard item={report.codeCoverage.go} />
@@ -587,9 +670,20 @@ function CoverageReportView({ state, loading, onReload }) {
 export default function DevTestingPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const coverageRequestSequence = React.useRef(0)
+  const coverageStartInFlight = React.useRef(false)
+  const coverageIdempotencyKey = React.useRef('')
+  const handledCoverageTerminal = React.useRef('')
   const [coverageReloadKey, setCoverageReloadKey] = useState(0)
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageState, setCoverageState] = useState(null)
+  const [coverageOperation, setCoverageOperation] = useState(null)
+  const [coverageOperationError, setCoverageOperationError] = useState('')
+  const [coverageOperationStarting, setCoverageOperationStarting] =
+    useState(false)
+  const coverageOperationClient = useMemo(
+    () => createDevCoverageOperationClient(),
+    []
+  )
   const docs = useMemo(() => buildDevTestingDocs(markdownModules), [])
   const strategySource =
     docs.find((item) => item.path === DEV_TESTING_STRATEGY_SOURCE_PATH)
@@ -623,6 +717,9 @@ export default function DevTestingPage() {
   )
   const canonicalDocKey = selectedDoc?.key || requestedDoc?.key || ''
   const allCommandBlocks = filteredDocs.flatMap((doc) => doc.commandBlocks)
+  const coverageOperationId = coverageOperation?.id || ''
+  const coverageOperationIsActive =
+    isDevCoverageOperationActive(coverageOperation)
 
   React.useEffect(() => {
     if (!isCoverageView) return undefined
@@ -660,6 +757,20 @@ export default function DevTestingPage() {
             httpStatus: response.status,
           })
         )
+        const incomingOperation = normalizeOptionalDevCoverageOperation(
+          payload?.operation
+        )
+        setCoverageOperation((current) => {
+          if (
+            isDevCoverageOperationActive(current) &&
+            (!incomingOperation ||
+              incomingOperation.id !== current.id ||
+              incomingOperation.revision < current.revision)
+          ) {
+            return current
+          }
+          return incomingOperation
+        })
       } catch (_error) {
         if (
           controller.signal.aborted ||
@@ -689,6 +800,72 @@ export default function DevTestingPage() {
     loadCoverage()
     return () => controller.abort()
   }, [coverageReloadKey, isCoverageView])
+
+  const handleCoverageTerminal = React.useCallback((operation) => {
+    if (!operation || isDevCoverageOperationActive(operation)) return
+    const terminalKey = `${operation.id}:${operation.revision}`
+    if (handledCoverageTerminal.current === terminalKey) return
+    handledCoverageTerminal.current = terminalKey
+    coverageIdempotencyKey.current = ''
+    setCoverageReloadKey((current) => current + 1)
+    if (operation.status === 'completed' && operation.outcome === 'passed') {
+      message.success({ content: operation.message, key: 'coverage-collect' })
+    } else if (operation.status === 'completed') {
+      message.warning({ content: operation.message, key: 'coverage-collect' })
+    } else if (operation.status === 'failed') {
+      message.error({ content: operation.message, key: 'coverage-collect' })
+    } else {
+      message.warning({ content: operation.message, key: 'coverage-collect' })
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (!isCoverageView || !coverageOperationIsActive) {
+      return undefined
+    }
+    const operationId = coverageOperationId
+    const controller = new AbortController()
+    let timer = null
+
+    const poll = async () => {
+      try {
+        const nextOperation = await coverageOperationClient.read(operationId, {
+          signal: controller.signal,
+        })
+        if (controller.signal.aborted) return
+        setCoverageOperation((current) =>
+          current?.id === nextOperation.id &&
+          current.revision > nextOperation.revision
+            ? current
+            : nextOperation
+        )
+        setCoverageOperationError('')
+        if (isDevCoverageOperationActive(nextOperation)) {
+          timer = window.setTimeout(poll, 1200)
+        } else {
+          handleCoverageTerminal(nextOperation)
+        }
+      } catch (_error) {
+        if (controller.signal.aborted) return
+        setCoverageOperationError(
+          '进度读取暂时失败，后台任务可能仍在执行；请勿重复发起采集。'
+        )
+        timer = window.setTimeout(poll, 1800)
+      }
+    }
+
+    timer = window.setTimeout(poll, 800)
+    return () => {
+      controller.abort()
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [
+    coverageOperationId,
+    coverageOperationIsActive,
+    coverageOperationClient,
+    handleCoverageTerminal,
+    isCoverageView,
+  ])
 
   React.useEffect(() => {
     if (requestedView === view && requestedDocKey === canonicalDocKey) {
@@ -736,7 +913,47 @@ export default function DevTestingPage() {
     setCoverageReloadKey((current) => current + 1)
   }
 
-  const coverageToolbarText = coverageLoading
+  const collectCoverage = async () => {
+    if (
+      coverageStartInFlight.current ||
+      isDevCoverageOperationActive(coverageOperation)
+    ) {
+      return
+    }
+    coverageStartInFlight.current = true
+    setCoverageOperationStarting(true)
+    setCoverageOperationError('')
+    handledCoverageTerminal.current = ''
+    try {
+      if (!coverageIdempotencyKey.current) {
+        coverageIdempotencyKey.current = createDevCoverageIdempotencyKey()
+      }
+      const operation = await coverageOperationClient.start(
+        coverageIdempotencyKey.current
+      )
+      setCoverageOperation(operation)
+      if (!isDevCoverageOperationActive(operation)) {
+        handleCoverageTerminal(operation)
+      }
+    } catch (_error) {
+      setCoverageOperationError(
+        '采集请求暂时未确认；再次点击会复用同一请求，不会重复启动测试。'
+      )
+      message.error({
+        content: '一键采集暂时无法确认，请检查本地开发服务',
+        key: 'coverage-collect',
+      })
+    } finally {
+      coverageStartInFlight.current = false
+      setCoverageOperationStarting(false)
+    }
+  }
+
+  const coverageOperationPresentation =
+    getDevCoverageOperationPresentation(coverageOperation)
+  const coverageToolbarText = coverageOperationPresentation.active
+    ? coverageOperationPresentation.stageLabel
+    : coverageLoading
     ? '正在读取本地覆盖报告…'
     : coverageState?.report
       ? `${coverageState.report.generatedAt || '生成时间未记录'} · ${
@@ -890,6 +1107,10 @@ export default function DevTestingPage() {
             <CoverageReportView
               state={coverageState}
               loading={coverageLoading}
+              operation={coverageOperation}
+              operationError={coverageOperationError}
+              operationStarting={coverageOperationStarting}
+              onCollect={collectCoverage}
               onReload={reloadCoverage}
             />
           ) : null}

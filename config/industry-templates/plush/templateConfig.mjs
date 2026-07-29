@@ -140,8 +140,8 @@ export const plushIndustryTemplateConfig = Object.freeze({
         title: "财务业务",
         items: Object.freeze([
           "reconciliation",
-          "payables",
           "receivables",
+          "payables",
           "invoices",
         ]),
       },

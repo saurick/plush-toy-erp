@@ -99,7 +99,7 @@ export function getDevWorkbenchGitContext(repoRoot) {
   };
 }
 
-function getEnvironmentFingerprint(repoRoot) {
+export function getEnvironmentFingerprint(repoRoot) {
   const packageManager = run("pnpm", ["--version"], repoRoot);
   const goVersion = run("go", ["version"], repoRoot);
   return sha256(

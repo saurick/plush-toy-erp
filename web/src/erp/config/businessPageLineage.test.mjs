@@ -141,6 +141,7 @@ const NON_LINEAGE_CUSTOMER_CONFIG_ACTIONS = Object.freeze([
   // Revision management and explanation do not touch business records.
   // Process start and execute actions are deliberately not allowlisted.
   'activate_customer_config',
+  'apply_approval_settings',
   'check_customer_config_transition',
   'explain_module_status',
   'explain_process_definition',
@@ -1292,7 +1293,7 @@ test('business page lineage: workflow inboxes declare exact source task producer
     workflowDefinitions.map((definition) => definition.taskGroups[0]),
     [
       'production_scheduling',
-      'production_exception',
+      'production_exception_decision_approval',
       'shipment_finance_approval',
     ]
   )
@@ -1301,7 +1302,7 @@ test('business page lineage: workflow inboxes declare exact source task producer
     workflowDefinitions.map((definition) => definition.upstreamPageKeys),
     [
       ['production-orders'],
-      ['production-progress', 'quality-inspections'],
+      ['production-orders', 'quality-inspections'],
       ['shipments'],
     ]
   )
@@ -1309,13 +1310,20 @@ test('business page lineage: workflow inboxes declare exact source task producer
     workflowDefinitions.map((definition) => definition.producerActions),
     [
       ['release_production_order'],
-      ['post_production_fact', 'submit_production_exception'],
+      [
+        'submit_production_exception',
+        'start_production_exception_approval_process',
+      ],
       ['start_finished_goods_delivery_process'],
     ]
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.sourceTypes),
-    [['production-orders'], ['production-progress'], ['shipment']]
+    [
+      ['production-orders'],
+      ['production_exception_decision'],
+      ['shipment'],
+    ]
   )
   for (const definition of workflowDefinitions) {
     assert.equal(definition.taskGroups.length, 1)

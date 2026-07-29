@@ -312,6 +312,16 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
   const visibleMenuKeys = yoyoosunMenuConfig.desktopMenu.sections
     .flatMap((section) => section.items)
     .filter((key) => !hidden.has(key));
+  const financeMenu = yoyoosunMenuConfig.desktopMenu.sections.find(
+    (section) => section.title === "财务管理",
+  );
+  assert.deepEqual(financeMenu?.items, [
+    "reconciliation",
+    "receivables",
+    "payables",
+    "finance-payments",
+    "invoices",
+  ]);
 
   for (const key of visibleMenuKeys) {
     assert(

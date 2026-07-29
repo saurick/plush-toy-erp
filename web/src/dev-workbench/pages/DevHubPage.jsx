@@ -3,6 +3,7 @@ import {
   ApartmentOutlined,
   AppstoreOutlined,
   CodeOutlined,
+  DatabaseOutlined,
   DeploymentUnitOutlined,
   ExperimentOutlined,
   FileSearchOutlined,
@@ -33,6 +34,7 @@ const ICON_BY_KEY = {
   governance: <ExperimentOutlined />,
   docs: <FileSearchOutlined />,
   testing: <SafetyCertificateOutlined />,
+  'data-preparation': <DatabaseOutlined />,
   prototypes: <AppstoreOutlined />,
   'capability-ledger': <FundProjectionScreenOutlined />,
   'customer-config': <DeploymentUnitOutlined />,
@@ -144,7 +146,8 @@ export default function DevHubPage() {
             研发效能工作台 / Engineering Delivery Workbench
           </Title>
           <Text className="erp-dev-hub-summary">
-            统一进入产品工程、质量与交付证据；仅本地开发态，不进入正式菜单、RBAC 或生产构建。
+            统一进入产品工程、质量与交付证据；仅本地开发态，不进入正式菜单或生产构建，写操作受本机系统边界约束，不冒充
+            ERP RBAC。
           </Text>
         </div>
       </header>

@@ -36,7 +36,7 @@ import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
   getWorkflowTaskBoard,
-  listAllWorkflowRoleTasks,
+  listAllWorkflowWorkbenchRoleTasks,
   reassignWorkflowTask,
   rejectWorkflowTaskAction,
   resumeWorkflowTaskAction,
@@ -627,7 +627,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           workflowWorkbenchRoleKeys.flatMap((roleKey) =>
             ['todo', 'risk'].map(async (viewKey) => ({
               viewKey,
-              response: await listAllWorkflowRoleTasks({
+              response: await listAllWorkflowWorkbenchRoleTasks({
                 view_key: viewKey,
                 role_key: roleKey,
                 limit: 100,

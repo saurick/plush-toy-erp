@@ -151,8 +151,13 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     serverConfigDoc,
-    "不会生成 `demo_admin`、`demo_debug`",
-    "server config privileged demo account boundary",
+    "包括普通演示管理员 `demo_admin`",
+    "server config standard demo admin boundary",
+  );
+  assertIncludes(
+    serverConfigDoc,
+    "不会生成 `demo_debug`",
+    "server config debug demo account boundary",
   );
   assertIncludes(
     yoyoosunTrialAccountChecklist,
@@ -166,7 +171,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     yoyoosunTrialAccountChecklist,
-    "常用：`应付管理`、`应收管理`、`发票管理`；更多：`对账管理`、`收付款与核销`和来源核对页",
+    "常用：`应收管理`、`应付管理`、`发票管理`；更多：`对账管理`、`收付款核销`和来源核对页",
     "finance trial navigation priority",
   );
   assertIncludes(

@@ -75,6 +75,9 @@ status)
   ;;
 apply)
   atlas migrate apply --dir "file://internal/data/model/migrate" --url "$BOM_LOT_PG_DB_URL"
+  PLUSH_DATABASE_PROGRAMMABILITY_URL="$BOM_LOT_PG_DB_URL" \
+    node ../scripts/qa/database-programmability.mjs \
+    --database-url-env PLUSH_DATABASE_PROGRAMMABILITY_URL
   ;;
 test)
   BOM_LOT_PG_TEST=1 BOM_LOT_PG_TEST_DB_URL="$BOM_LOT_PG_DB_URL" go test ./internal/data -run TestInventoryLotPostgres -count=1

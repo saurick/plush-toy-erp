@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_COVERAGE_API_PATH,
+  DEV_TESTING_COVERAGE_COLLECT_COMMAND,
   DEV_TESTING_COVERAGE_REPORT_SCHEMA,
   DEV_TESTING_COVERAGE_WRITE_COMMAND,
   DEV_TESTING_CURRENT_DOC_PATHS,
@@ -154,6 +155,10 @@ test('devTesting: 只通过开发态独立路径暴露', () => {
   assert.equal(
     DEV_TESTING_COVERAGE_REPORT_SCHEMA,
     'plush-test-coverage-report/v1'
+  )
+  assert.equal(
+    DEV_TESTING_COVERAGE_COLLECT_COMMAND,
+    'node scripts/qa/test-coverage-collect.mjs --profile baseline --write'
   )
   assert.equal(
     DEV_TESTING_COVERAGE_WRITE_COMMAND,
@@ -1337,11 +1342,23 @@ test('devTesting: 覆盖接口缺失、失败和错误 schema 均 fail closed', 
   )
 })
 
-test('devTesting: 覆盖页只读取报告并提供复制生成命令', () => {
+test('devTesting: 覆盖页提供固定一键采集、备用命令和只读刷新边界', () => {
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
   assert.match(testingPageSource, /覆盖状态 \/ Coverage/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_API_PATH/)
-  assert.match(testingPageSource, /DEV_TESTING_COVERAGE_WRITE_COMMAND/)
+  assert.match(testingPageSource, /DEV_TESTING_COVERAGE_COLLECT_COMMAND/)
+  assert.match(testingPageSource, /createDevCoverageOperationClient/)
+  assert.match(testingPageSource, /一键采集覆盖率/)
+  assert.match(testingPageSource, /复制备用命令/)
+  assert.match(testingPageSource, /切换页面不会停止后台任务/)
+  assert.match(testingPageSource, /空值表示未采集，不是 0%/)
+  assert.match(testingPageSource, /固定运行真实本地 baseline/)
+  assert.match(
+    testingPageSource,
+    /不会执行数据库写入、真实业务浏览器、目标环境部署或客户\s+UAT/
+  )
+  assert.match(testingPageSource, /“重新读取”只读取本地报告/)
+  assert.match(testingPageSource, /请勿重复发起采集/)
   assert.match(testingPageSource, /method: 'GET'/)
   assert.doesNotMatch(testingPageSource, /error\?\.message/)
   assert.doesNotMatch(testingPageSource, /child_process|exec\(|spawn\(/)

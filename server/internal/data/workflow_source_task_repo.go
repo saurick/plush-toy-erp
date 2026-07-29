@@ -30,6 +30,14 @@ func ensureSourceWorkflowTaskWithClient(
 		state.SourceType != task.SourceType || state.SourceID != task.SourceID {
 		return nil, false, biz.ErrBadParam
 	}
+	if err := validateWorkflowTaskProcessAnchors(
+		ctx,
+		client,
+		task.ProcessInstanceID,
+		task.ProcessNodeInstanceID,
+	); err != nil {
+		return nil, false, err
+	}
 	intentHash, err := workflowSourceTaskIntentHash(task)
 	if err != nil {
 		return nil, false, err

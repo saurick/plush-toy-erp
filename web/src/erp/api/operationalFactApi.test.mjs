@@ -132,6 +132,8 @@ test('operationalFactApi: source-derived fact reads use strict complete paginati
     ['listAllProductionFacts', 'listProductionFacts', 'production_facts'],
     ['listAllShipments', 'listShipments', 'shipments'],
     ['listAllStockReservations', 'listStockReservations', 'stock_reservations'],
+    ['listAllFinanceFacts', 'listFinanceFacts', 'finance_facts'],
+    ['listAllSalesReturns', 'listSalesReturns', 'sales_returns'],
   ]) {
     assert.match(
       source,

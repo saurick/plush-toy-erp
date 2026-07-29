@@ -281,6 +281,30 @@ function purchaseReceiptMutationResult(attempts, scope, params, create) {
   return { data }
 }
 
+function workflowMockRoleTaskReadAllowed(
+  adminProfile,
+  effectiveSession,
+  method
+) {
+  if (
+    !workflowMockPermissionAllowed(
+      adminProfile,
+      effectiveSession,
+      'workflow.task.read'
+    )
+  ) {
+    return false
+  }
+  return (
+    method !== 'list_workbench_role_tasks' ||
+    workflowMockPermissionAllowed(
+      adminProfile,
+      effectiveSession,
+      'erp.workbench.read'
+    )
+  )
+}
+
 export async function installFactRpcMocks(page, context) {
   const { adminProfile, effectiveSession, nowUnix, resolveDelayFromReferer } =
     context
@@ -330,6 +354,7 @@ export async function installFactRpcMocks(page, context) {
       shipment_id: 1,
       sales_order_item_id: 1,
       product_id: 1,
+      product_sku_id: 1,
       warehouse_id: 1,
       unit_id: 1,
       lot_id: 1,
@@ -525,6 +550,7 @@ export async function installFactRpcMocks(page, context) {
             : 'CUSTOMER',
       counterparty_id: 1,
       amount: '1200',
+      outstanding_amount: '1200',
       fee_amount: '0',
       currency: 'CNY',
       source_type:
@@ -992,12 +1018,20 @@ export async function installFactRpcMocks(page, context) {
         break
       case 'list_shipments':
         {
+          const shipmentForQuery =
+            params.status === 'SHIPPED'
+              ? {
+                  ...shipment,
+                  status: 'SHIPPED',
+                  shipped_at: shipment.shipped_at || nowUnix(),
+                }
+              : shipment
           const shipments =
-            (params.status && params.status !== shipment.status) ||
+            (params.status && params.status !== shipmentForQuery.status) ||
             (params.source_id &&
-              Number(params.source_id) !== shipment.sales_order_id)
+              Number(params.source_id) !== shipmentForQuery.sales_order_id)
               ? []
-              : [shipment]
+              : [shipmentForQuery]
           data = stylePaginatedRpcData(shipments, 'shipments', params)
         }
         break
@@ -1097,7 +1131,7 @@ export async function installFactRpcMocks(page, context) {
               id: 41,
               payment_no: 'PAY-STYLE-L1',
               direction: 'RECEIPT',
-              status: 'DRAFT',
+              status: 'APPROVED',
               counterparty_type: 'CUSTOMER',
               counterparty_id: 1,
               amount: '1200.00',
@@ -1129,11 +1163,37 @@ export async function installFactRpcMocks(page, context) {
               id: 51,
               return_no: 'RMA-STYLE-L1',
               shipment_id: 1,
+              shipment_no: 'SHIP-STYLE-L1',
               customer_name: '暗色客户',
               status: 'APPROVED',
               reason: '客户验收后发现包装破损',
               version: 2,
-              items: [{ id: 511, quantity: '2' }],
+              items: [
+                {
+                  id: 511,
+                  shipment_item_id: 1,
+                  product_id: 1,
+                  product_code: 'P-STYLE-L1',
+                  product_name: '样式回归产品',
+                  product_sku_id: 1,
+                  product_sku_code: 'SKU-STYLE-L1',
+                  product_sku_name: '标准款',
+                  warehouse_id: 1,
+                  warehouse_code: 'WH-STYLE-L1',
+                  warehouse_name: '样式仓',
+                  unit_id: 1,
+                  unit_code: 'PCS',
+                  unit_name: '件',
+                  lot_id: 1,
+                  lot_no: 'RMA-51-1',
+                  current_quality_inspection_no: 'RMA-QI-51-1',
+                  current_quality_inspection_status: 'DRAFT',
+                  quantity: '2',
+                  source_shipped_quantity: '10',
+                  active_returned_quantity: '2',
+                  remaining_returnable_quantity: '8',
+                },
+              ],
               approved_at: nowUnix(),
             },
           ],
@@ -2319,12 +2379,13 @@ export async function installFactRpcMocks(page, context) {
         data = { process_context: cloneWorkflowTask(processContext) }
         break
       }
-      case 'list_role_tasks': {
+      case 'list_role_tasks':
+      case 'list_workbench_role_tasks': {
         if (
-          !workflowMockPermissionAllowed(
+          !workflowMockRoleTaskReadAllowed(
             adminProfile,
             effectiveSession,
-            'workflow.task.read'
+            method
           )
         ) {
           fail('当前账号缺少查看协同任务权限')

@@ -26,6 +26,7 @@ type SalesReturn struct {
 	ID                     int
 	ReturnNo               string
 	ShipmentID             int
+	ShipmentNo             string
 	CustomerID             int
 	CustomerNameSnapshot   string
 	Status                 string
@@ -58,16 +59,28 @@ type SalesReturnItem struct {
 	LineNo                         string
 	ShipmentItemID                 int
 	ProductID                      int
+	ProductCode                    string
+	ProductName                    string
 	ProductSkuID                   *int
+	ProductSkuCode                 *string
+	ProductSkuName                 *string
 	WarehouseID                    int
+	WarehouseCode                  string
+	WarehouseName                  string
 	UnitID                         int
+	UnitCode                       string
+	UnitName                       string
 	LotID                          *int
+	LotNo                          *string
 	QualityInspectionID            int
 	CurrentQualityInspectionID     int
 	CurrentQualityInspectionNo     string
 	CurrentQualityInspectionStatus string
 	CurrentQualityInspectionResult *string
 	Quantity                       decimal.Decimal
+	SourceShippedQuantity          decimal.Decimal
+	ActiveReturnedQuantity         decimal.Decimal
+	RemainingReturnableQuantity    decimal.Decimal
 	Condition                      string
 	Note                           *string
 }

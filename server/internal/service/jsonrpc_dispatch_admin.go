@@ -217,80 +217,87 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}),
 		}, nil
 
-	case "set_role_permissions":
+	case "set_role_settings":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRolePermissionManage); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownAdminParams(pm, "role_key", "permission_keys", "expected_version"); res != nil {
+		if res := rejectUnknownAdminParams(
+			pm,
+			"role_key",
+			"permission_keys",
+			"data_scopes",
+			"navigation_mode",
+			"primary_menu_paths",
+			"secondary_menu_paths",
+			"expected_version",
+		); res != nil {
 			return id, res, nil
 		}
 		permissionKeys, ok := getStrictStringSlice(pm, "permission_keys", true)
 		if !ok {
 			return id, invalidAdminParamResult(), nil
 		}
-		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
-		if !ok {
-			return id, invalidAdminParamResult(), nil
-		}
-		role, err := d.adminManageUC.SetRolePermissions(ctx, getString(pm, "role_key"), permissionKeys, expectedVersion)
-		if err != nil {
-			return id, d.mapAdminManageError(ctx, err), nil
-		}
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: errcode.OK.Message,
-			Data: newDataStruct(map[string]any{
-				"role": adminRoleToMap(*role, true),
-			}),
-		}, nil
-
-	case "set_role_data_scopes":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRolePermissionManage); res != nil {
-			return id, res, nil
-		}
-		if res := rejectUnknownAdminParams(pm, "role_key", "data_scopes", "expected_version"); res != nil {
-			return id, res, nil
-		}
 		dataScopes, ok := getStrictRoleDataScopes(pm, "data_scopes")
 		if !ok {
 			return id, invalidAdminParamResult(), nil
-		}
-		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
-		if !ok {
-			return id, invalidAdminParamResult(), nil
-		}
-		role, err := d.adminManageUC.SetRoleDataScopes(ctx, getString(pm, "role_key"), dataScopes, expectedVersion)
-		if err != nil {
-			return id, d.mapAdminManageError(ctx, err), nil
-		}
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: errcode.OK.Message,
-			Data: newDataStruct(map[string]any{
-				"role": adminRoleToMap(*role, true),
-			}),
-		}, nil
-
-	case "set_role_navigation":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRolePermissionManage); res != nil {
-			return id, res, nil
-		}
-		if res := rejectUnknownAdminParams(pm, "role_key", "mode", "primary_menu_paths", "expected_version"); res != nil {
-			return id, res, nil
 		}
 		primaryMenuPaths, ok := getStrictStringSlice(pm, "primary_menu_paths", true)
 		if !ok {
 			return id, invalidAdminParamResult(), nil
 		}
+		secondaryMenuPaths, ok := getStrictStringSlice(pm, "secondary_menu_paths", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
 		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
 		if !ok {
 			return id, invalidAdminParamResult(), nil
 		}
-		role, err := d.adminManageUC.SetRoleNavigation(
+		roleKey := getString(pm, "role_key")
+		navigation := biz.RoleNavigationSettings{
+			Mode:               biz.RoleNavigationMode(getString(pm, "navigation_mode")),
+			PrimaryMenuPaths:   primaryMenuPaths,
+			SecondaryMenuPaths: secondaryMenuPaths,
+		}
+		if navigation.Mode == biz.RoleNavigationModeCustom {
+			previewRole, err := d.adminManageUC.GetRoleForAccessPreview(ctx, roleKey, permissionKeys)
+			if err != nil {
+				return id, d.mapAdminManageError(ctx, err), nil
+			}
+			customerKey, err := runtimeCustomerKey("")
+			if err != nil {
+				return id, d.mapCustomerConfigError(ctx, err), nil
+			}
+			explanation, err := d.customerConfigUC.ExplainRoleEffectiveAccess(
+				ctx,
+				customerKey,
+				*previewRole,
+				runtimeCustomerConfigRequiresActiveRevision(),
+			)
+			if err != nil {
+				return id, d.mapCustomerConfigError(ctx, err), nil
+			}
+			if !explanation.IsFinal {
+				return id, d.mapCustomerConfigError(ctx, biz.ErrCustomerConfigActiveRevisionRequired), nil
+			}
+			effectivePagePaths := make([]string, 0, len(explanation.Pages))
+			for _, page := range explanation.Pages {
+				if page.Effective {
+					effectivePagePaths = append(effectivePagePaths, page.Path)
+				}
+			}
+			if err := biz.ValidateRoleNavigationPartition(navigation, effectivePagePaths); err != nil {
+				return id, d.mapAdminManageError(ctx, err), nil
+			}
+		}
+		role, err := d.adminManageUC.SetRoleSettings(
 			ctx,
-			getString(pm, "role_key"),
-			biz.RoleNavigationMode(getString(pm, "mode")),
+			roleKey,
+			permissionKeys,
+			dataScopes,
+			navigation.Mode,
 			primaryMenuPaths,
+			secondaryMenuPaths,
 			expectedVersion,
 		)
 		if err != nil {

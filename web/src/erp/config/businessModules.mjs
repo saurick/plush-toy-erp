@@ -428,13 +428,13 @@ export const businessModuleDefinitions = Object.freeze([
   {
     key: 'production-exceptions',
     sectionKey: 'production',
-    label: '生产异常',
-    title: '生产异常',
+    label: '生产异常处置',
+    title: '生产异常处置',
     path: '/erp/production/exceptions',
-    shortLabel: '异常',
+    shortLabel: '异常处置',
     pageKind: 'formal-v1',
     description:
-      '生产异常以报废、在制让步和超领申请为来源，经独立审批后由生产岗位执行或冲正；返工事项继续保留后续办理入口。',
+      '生产异常处置用于办理报废、在制让步和超领申请；审批只记录决定，报废和让步由生产岗位显式执行或冲正，超领额度由正式领料消费。',
     primaryEntity:
       'production_exception_decisions / production_wip_events / workflow_tasks',
     factSource:
@@ -451,10 +451,10 @@ export const businessModuleDefinitions = Object.freeze([
       'workflow_business_states',
     ],
     currentScope: [
-      '报废、在制让步和超领申请',
+      '报废、在制让步和超领处置申请',
       '提交审批、通过、退回、阻塞和恢复',
       '执行、冲正与来源记录核对',
-      '返工记录过账后生成的后续办理事项',
+      '处置申请生成正式审批任务，审批结果与执行结果核对',
     ],
   },
   {
@@ -559,32 +559,25 @@ export const businessModuleDefinitions = Object.freeze([
     ],
   },
   {
-    key: 'finance-payments',
+    key: 'receivables',
     sectionKey: 'finance',
-    label: '收付款与核销',
-    title: '收付款与核销',
-    path: '/erp/finance/payments',
-    shortLabel: '收付款',
+    label: '应收管理',
+    title: '应收管理',
+    path: '/erp/finance/receivables',
+    shortLabel: '应收',
     pageKind: 'formal-v1',
     description:
-      '登记真实收款或付款，并按同一往来方和币种对多张应收或应付进行核销。',
-    primaryEntity:
-      'finance_payments / finance_allocations / finance_credit_notes',
-    factSource:
-      'finance_payments, finance_allocations, finance_credit_notes, finance_facts',
+      '应收管理记录已出货业务产生的应收款项，可过账或取消；结清状态根据正式收款核销、红冲或冲正结果更新。',
+    primaryEntity: 'finance_facts.RECEIVABLE',
+    factSource: 'finance_facts',
     boundary:
-      '收付款过账才形成核销；冲销和红冲保留原记录及反向审计，不提供物理删除，也不替代总账凭证、税控或银行对账。',
-    sourceRefs: [
-      'finance_facts',
-      'finance_payments',
-      'finance_allocations',
-      'finance_credit_notes',
-    ],
+      '应收只从已出货出货单生成，不由销售订单、出货放行或任务完成直接生成；当前不代表收款核销、总账或税控已交付。',
+    sourceRefs: ['finance_facts', 'shipments'],
     currentScope: [
-      '真实收款和付款登记',
-      '同一往来方和币种的多单核销',
-      '已过账收付款冲销',
-      '应收 / 应付红冲及红冲撤销',
+      '从已出货出货单生成应收',
+      '过账',
+      '读取收款核销或红冲后的结清状态',
+      '取消',
     ],
   },
   {
@@ -611,25 +604,32 @@ export const businessModuleDefinitions = Object.freeze([
     ],
   },
   {
-    key: 'receivables',
+    key: 'finance-payments',
     sectionKey: 'finance',
-    label: '应收管理',
-    title: '应收管理',
-    path: '/erp/finance/receivables',
-    shortLabel: '应收',
+    label: '收付款核销',
+    title: '收付款与核销',
+    path: '/erp/finance/payments',
+    shortLabel: '收付款',
     pageKind: 'formal-v1',
     description:
-      '应收管理记录已出货业务产生的应收款项，可过账或取消；结清状态根据正式收款核销、红冲或冲正结果更新。',
-    primaryEntity: 'finance_facts.RECEIVABLE',
-    factSource: 'finance_facts',
+      '登记真实收款或付款，并按同一往来方和币种对多张应收或应付进行核销。',
+    primaryEntity:
+      'finance_payments / finance_allocations / finance_credit_notes',
+    factSource:
+      'finance_payments, finance_allocations, finance_credit_notes, finance_facts',
     boundary:
-      '应收只从已出货出货单生成，不由销售订单、出货放行或任务完成直接生成；当前不代表收款核销、总账或税控已交付。',
-    sourceRefs: ['finance_facts', 'shipments'],
+      '收付款过账才形成核销；冲销和红冲保留原记录及反向审计，不提供物理删除，也不替代总账凭证、税控或银行对账。',
+    sourceRefs: [
+      'finance_facts',
+      'finance_payments',
+      'finance_allocations',
+      'finance_credit_notes',
+    ],
     currentScope: [
-      '从已出货出货单生成应收',
-      '过账',
-      '读取收款核销或红冲后的结清状态',
-      '取消',
+      '真实收款和付款登记',
+      '同一往来方和币种的多单核销',
+      '已过账收付款冲销',
+      '应收 / 应付红冲及红冲撤销',
     ],
   },
   {

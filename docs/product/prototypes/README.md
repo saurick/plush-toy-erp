@@ -188,7 +188,7 @@
 | `core-menu-coverage-v1/index.html` | To Implement | Core | 产品核心菜单覆盖样板，把 20260611 参考规格中的 51 个二级菜单收口为可筛选内容矩阵，标注页面类型、事实源、关键字段、动作和边界。 |
 | `formal-menu-candidate-v1/index.html` | To Implement | Core | 正式菜单候选原型，把内部 51 项菜单覆盖压缩成 12 个高频主入口，说明哪些细项应进入 tab、筛选、动作或详情区。 |
 | `audit-log-page-v1/index.html` | To Implement | Core | 审计日志页原型，把系统控制面事件收敛为审计摘要、筛选分组、日志列表、事件详情、空态和风险事件态；只读追溯账号、角色、权限和初始化事件。 |
-| `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页样板，参照 `trade-erp` 的紧凑工作台结构，把筛选、页面动作和当前操作压缩到同一卡片；表头保留列顺序入口和排序箭头，不内置通用删除 / 回收站；页面只展示必要业务信息，协同入口不作为所有标准页的默认固定栏，架构边界说明收口到文档和轻提示。 |
+| `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页样板，参照 `trade-erp` 的紧凑工作台结构，把筛选、页面动作和当前操作压缩到同一卡片；表头保留列顺序入口和排序箭头，不内置通用删除 / 回收站；页面只展示必要业务信息，协同入口不作为所有标准页的默认固定栏。像生产异常处置这样同时存在两套同级、全量工作区的正式复合页使用页签隔离，不纵向堆表。 |
 | `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement | Core | 业务页协同入口组件样板，仅用于有真实 Workflow 关联的业务页，展示当前选中业务记录的待办；未选中记录或当前记录无待办时不显示固定栏，跨记录任务回到任务中心。 |
 | `print-template-center-v1/index.html` | To Implement | Core | 模板打印中心样板，覆盖模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。 |
 | `business-detail-page-standard-v1/index.html` | To Implement | Core | 业务详情页标准样板，覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。 |

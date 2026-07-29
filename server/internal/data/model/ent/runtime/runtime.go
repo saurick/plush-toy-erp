@@ -5582,12 +5582,16 @@ func init() {
 	roleDescPrimaryMenuPaths := roleFields[9].Descriptor()
 	// role.DefaultPrimaryMenuPaths holds the default value on creation for the primary_menu_paths field.
 	role.DefaultPrimaryMenuPaths = roleDescPrimaryMenuPaths.Default.([]string)
+	// roleDescSecondaryMenuPaths is the schema descriptor for secondary_menu_paths field.
+	roleDescSecondaryMenuPaths := roleFields[10].Descriptor()
+	// role.DefaultSecondaryMenuPaths holds the default value on creation for the secondary_menu_paths field.
+	role.DefaultSecondaryMenuPaths = roleDescSecondaryMenuPaths.Default.([]string)
 	// roleDescCreatedAt is the schema descriptor for created_at field.
-	roleDescCreatedAt := roleFields[10].Descriptor()
+	roleDescCreatedAt := roleFields[11].Descriptor()
 	// role.DefaultCreatedAt holds the default value on creation for the created_at field.
 	role.DefaultCreatedAt = roleDescCreatedAt.Default.(func() time.Time)
 	// roleDescUpdatedAt is the schema descriptor for updated_at field.
-	roleDescUpdatedAt := roleFields[11].Descriptor()
+	roleDescUpdatedAt := roleFields[12].Descriptor()
 	// role.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	role.DefaultUpdatedAt = roleDescUpdatedAt.Default.(func() time.Time)
 	// role.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

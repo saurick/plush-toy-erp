@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/financeallocation"
 	"server/internal/data/model/ent/financecreditnote"
+	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/supplier"
@@ -577,11 +578,15 @@ func (r *operationalFactRepo) CreateFinanceCreditNote(ctx context.Context, in *b
 			return nil, err
 		}
 	}
+	out, err := financeCreditNoteWithFact(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx.sqlTx = nil
-	return entFinanceCreditNoteToBiz(row), nil
+	return out, nil
 }
 
 func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *biz.FinanceCreditNoteReverse, actorID int, payloadHash string) (*biz.FinanceCreditNote, error) {
@@ -647,11 +652,15 @@ func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *
 	if err := setFinanceFactSettlement(ctx, tx, source.FinanceFactID, outstanding.IsZero(), actorID); err != nil {
 		return nil, err
 	}
+	out, err := financeCreditNoteWithFact(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx.sqlTx = nil
-	return entFinanceCreditNoteToBiz(row), nil
+	return out, nil
 }
 
 func validateFinancePaymentTarget(payment *ent.FinancePayment, fact *ent.FinanceFact) error {
@@ -667,36 +676,11 @@ func validateFinancePaymentTarget(payment *ent.FinancePayment, fact *ent.Finance
 	return nil
 }
 func financeFactOutstanding(ctx context.Context, client *ent.Client, factID int, amount decimal.Decimal) (decimal.Decimal, error) {
-	allocs, err := client.FinanceAllocation.Query().Where(financeallocation.FinanceFactID(factID)).All(ctx)
+	outstanding, err := financeFactOutstandingAmounts(ctx, client, []*ent.FinanceFact{{ID: factID, Amount: amount}})
 	if err != nil {
 		return decimal.Zero, err
 	}
-	used := decimal.Zero
-	for _, a := range allocs {
-		switch a.Status {
-		case biz.FinanceAllocationStatusPosted:
-			used = used.Add(a.Amount)
-		case biz.FinanceAllocationStatusReversed:
-			used = used.Sub(a.Amount)
-		}
-	}
-	credits, err := client.FinanceCreditNote.Query().Where(financecreditnote.FinanceFactID(factID)).All(ctx)
-	if err != nil {
-		return decimal.Zero, err
-	}
-	for _, c := range credits {
-		switch c.Status {
-		case "POSTED":
-			used = used.Add(c.Amount)
-		case "REVERSED":
-			used = used.Sub(c.Amount)
-		}
-	}
-	out := amount.Sub(used)
-	if out.IsNegative() {
-		return decimal.Zero, biz.ErrBadParam
-	}
-	return out, nil
+	return outstanding[factID], nil
 }
 func setFinanceFactSettlement(ctx context.Context, tx *inventoryDBTx, id int, settled bool, actorID int) error {
 	if tx == nil || id <= 0 || actorID <= 0 {
@@ -790,13 +774,9 @@ func (r *operationalFactRepo) ListFinancePayments(ctx context.Context, filter bi
 	if err != nil {
 		return nil, 0, err
 	}
-	out := make([]*biz.FinancePayment, 0, len(rows))
-	for _, row := range rows {
-		item, err := financePaymentWithAllocations(ctx, r.data.postgres, row)
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, item)
+	out, err := financePaymentsWithAllocations(ctx, r.data.postgres, rows)
+	if err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -805,7 +785,7 @@ func (r *operationalFactRepo) GetFinanceCreditNote(ctx context.Context, id int) 
 	if err != nil {
 		return nil, err
 	}
-	return entFinanceCreditNoteToBiz(row), nil
+	return financeCreditNoteWithFact(ctx, r.data.postgres, row)
 }
 func (r *operationalFactRepo) ListFinanceCreditNotes(ctx context.Context, filter biz.FinanceCreditNoteFilter) ([]*biz.FinanceCreditNote, int, error) {
 	query := r.data.postgres.FinanceCreditNote.Query()
@@ -823,9 +803,9 @@ func (r *operationalFactRepo) ListFinanceCreditNotes(ctx context.Context, filter
 	if err != nil {
 		return nil, 0, err
 	}
-	out := make([]*biz.FinanceCreditNote, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, entFinanceCreditNoteToBiz(row))
+	out, err := financeCreditNotesWithFacts(ctx, r.data.postgres, rows)
+	if err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -861,14 +841,167 @@ func (r *operationalFactRepo) findFinanceCreditReplayWithClient(ctx context.Cont
 	if row.IdempotencyPayloadHash != hash {
 		return nil, true, biz.ErrIdempotencyConflict
 	}
-	return entFinanceCreditNoteToBiz(row), true, nil
+	out, err := financeCreditNoteWithFact(ctx, client, row)
+	return out, true, err
 }
 func financePaymentWithAllocations(ctx context.Context, client *ent.Client, row *ent.FinancePayment) (*biz.FinancePayment, error) {
-	items, err := client.FinanceAllocation.Query().Where(financeallocation.PaymentID(row.ID)).Order(ent.Asc(financeallocation.FieldID)).All(ctx)
+	items, err := financePaymentsWithAllocations(ctx, client, []*ent.FinancePayment{row})
 	if err != nil {
 		return nil, err
 	}
-	return entFinancePaymentToBiz(row, items), nil
+	if len(items) != 1 {
+		return nil, biz.ErrBadParam
+	}
+	return items[0], nil
+}
+
+type financeFactReadProjection struct {
+	factNo            string
+	factType          string
+	originalAmount    decimal.Decimal
+	outstandingAmount decimal.Decimal
+}
+
+func financeFactReadProjections(
+	ctx context.Context,
+	client *ent.Client,
+	factIDs []int,
+) (map[int]financeFactReadProjection, error) {
+	uniqueIDs := make([]int, 0, len(factIDs))
+	seen := make(map[int]struct{}, len(factIDs))
+	for _, factID := range factIDs {
+		if factID <= 0 {
+			return nil, biz.ErrBadParam
+		}
+		if _, exists := seen[factID]; exists {
+			continue
+		}
+		seen[factID] = struct{}{}
+		uniqueIDs = append(uniqueIDs, factID)
+	}
+	if len(uniqueIDs) == 0 {
+		return map[int]financeFactReadProjection{}, nil
+	}
+	facts, err := client.FinanceFact.Query().
+		Where(financefact.IDIn(uniqueIDs...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(facts) != len(uniqueIDs) {
+		return nil, biz.ErrBadParam
+	}
+	outstanding, err := financeFactOutstandingAmounts(ctx, client, facts)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int]financeFactReadProjection, len(facts))
+	for _, fact := range facts {
+		out[fact.ID] = financeFactReadProjection{
+			factNo:            fact.FactNo,
+			factType:          fact.FactType,
+			originalAmount:    fact.Amount,
+			outstandingAmount: outstanding[fact.ID],
+		}
+	}
+	return out, nil
+}
+
+func financePaymentsWithAllocations(
+	ctx context.Context,
+	client *ent.Client,
+	rows []*ent.FinancePayment,
+) ([]*biz.FinancePayment, error) {
+	paymentIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		if row == nil || row.ID <= 0 {
+			return nil, biz.ErrBadParam
+		}
+		paymentIDs = append(paymentIDs, row.ID)
+	}
+	if len(paymentIDs) == 0 {
+		return []*biz.FinancePayment{}, nil
+	}
+	allocations, err := client.FinanceAllocation.Query().
+		Where(financeallocation.PaymentIDIn(paymentIDs...)).
+		Order(ent.Asc(financeallocation.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	allocationsByPayment := make(map[int][]*ent.FinanceAllocation, len(rows))
+	factIDs := make([]int, 0, len(allocations))
+	for _, allocation := range allocations {
+		allocationsByPayment[allocation.PaymentID] = append(allocationsByPayment[allocation.PaymentID], allocation)
+		factIDs = append(factIDs, allocation.FinanceFactID)
+	}
+	projections, err := financeFactReadProjections(ctx, client, factIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*biz.FinancePayment, 0, len(rows))
+	for _, row := range rows {
+		payment := entFinancePaymentToBiz(row, allocationsByPayment[row.ID])
+		for _, allocation := range payment.Allocations {
+			projection, exists := projections[allocation.FinanceFactID]
+			if !exists {
+				return nil, biz.ErrBadParam
+			}
+			allocation.FinanceFactNo = projection.factNo
+			allocation.FinanceFactType = projection.factType
+			allocation.FinanceFactOriginalAmount = projection.originalAmount
+			allocation.FinanceFactOutstandingAmount = projection.outstandingAmount
+		}
+		out = append(out, payment)
+	}
+	return out, nil
+}
+
+func financeCreditNoteWithFact(
+	ctx context.Context,
+	client *ent.Client,
+	row *ent.FinanceCreditNote,
+) (*biz.FinanceCreditNote, error) {
+	items, err := financeCreditNotesWithFacts(ctx, client, []*ent.FinanceCreditNote{row})
+	if err != nil {
+		return nil, err
+	}
+	if len(items) != 1 {
+		return nil, biz.ErrBadParam
+	}
+	return items[0], nil
+}
+
+func financeCreditNotesWithFacts(
+	ctx context.Context,
+	client *ent.Client,
+	rows []*ent.FinanceCreditNote,
+) ([]*biz.FinanceCreditNote, error) {
+	factIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		if row == nil || row.ID <= 0 || row.FinanceFactID <= 0 {
+			return nil, biz.ErrBadParam
+		}
+		factIDs = append(factIDs, row.FinanceFactID)
+	}
+	projections, err := financeFactReadProjections(ctx, client, factIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*biz.FinanceCreditNote, 0, len(rows))
+	for _, row := range rows {
+		projection, exists := projections[row.FinanceFactID]
+		if !exists {
+			return nil, biz.ErrBadParam
+		}
+		creditNote := entFinanceCreditNoteToBiz(row)
+		creditNote.FinanceFactNo = projection.factNo
+		creditNote.FinanceFactType = projection.factType
+		creditNote.FinanceFactOriginalAmount = projection.originalAmount
+		creditNote.FinanceFactOutstandingAmount = projection.outstandingAmount
+		out = append(out, creditNote)
+	}
+	return out, nil
 }
 func entFinancePaymentToBiz(row *ent.FinancePayment, items []*ent.FinanceAllocation) *biz.FinancePayment {
 	if row == nil {

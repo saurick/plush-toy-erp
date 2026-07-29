@@ -38,6 +38,8 @@ type Role struct {
 	NavigationMode role.NavigationMode `json:"navigation_mode,omitempty"`
 	// PrimaryMenuPaths holds the value of the "primary_menu_paths" field.
 	PrimaryMenuPaths []string `json:"primary_menu_paths,omitempty"`
+	// SecondaryMenuPaths holds the value of the "secondary_menu_paths" field.
+	SecondaryMenuPaths []string `json:"secondary_menu_paths,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -71,7 +73,7 @@ func (*Role) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case role.FieldPrimaryMenuPaths:
+		case role.FieldPrimaryMenuPaths, role.FieldSecondaryMenuPaths:
 			values[i] = new([]byte)
 		case role.FieldBuiltin, role.FieldDisabled:
 			values[i] = new(sql.NullBool)
@@ -164,6 +166,14 @@ func (_m *Role) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field primary_menu_paths: %w", err)
 				}
 			}
+		case role.FieldSecondaryMenuPaths:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field secondary_menu_paths", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.SecondaryMenuPaths); err != nil {
+					return fmt.Errorf("unmarshal field secondary_menu_paths: %w", err)
+				}
+			}
 		case role.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -246,6 +256,9 @@ func (_m *Role) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("primary_menu_paths=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PrimaryMenuPaths))
+	builder.WriteString(", ")
+	builder.WriteString("secondary_menu_paths=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SecondaryMenuPaths))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

@@ -54,7 +54,7 @@ test('dashboardStats: 保留大数和真实零，并给每个对象独立入口�
   })
   assert.deepEqual(findSource(rows, 'production-exceptions'), {
     key: 'production-exceptions',
-    label: '生产异常',
+    label: '生产异常处置',
     path: '/erp/production/exceptions',
     truthKind: DASHBOARD_TRUTH_KINDS.COLLABORATION,
     available: true,

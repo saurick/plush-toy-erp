@@ -4,9 +4,11 @@
 
 本项目使用 **Ent** 和 **Atlas** 进行版本化的数据库迁移。
 **严禁** 绕过 Atlas 直接创建或改写结构迁移，也严禁手动执行
-`ALTER TABLE` / `CREATE TABLE`。Ent 无法表达的一次性数据回填或
-PostgreSQL trigger 必须走下文的受控 Atlas custom migration，不得混入
-普通结构迁移或直接写目标数据库。
+`ALTER TABLE` / `CREATE TABLE`。Ent 无法表达的一次性数据回填或历史对象
+退出必须走下文的受控 Atlas custom migration，不得混入普通结构迁移或直接写
+目标数据库。本项目不接受自定义 PostgreSQL Function、Procedure 或非内部
+Trigger；业务规则必须收口到 Go repository/usecase 与声明式
+CHECK/UNIQUE/FK 约束。
 
 ## 🟢 正确的工作流 (HOW TO DO IT)
 
@@ -44,23 +46,30 @@ PostgreSQL trigger 必须走下文的受控 Atlas custom migration，不得混�
     `tx-mode=all` 执行，并在同一目标上读回 Atlas status 与 Ent /
     PostgreSQL schema 零差异。确认值只接受当前命令环境，`.env` 残值无效。
 
-4. **Ent 无法表达的 data / trigger migration**:
+4. **Ent 无法表达的一次性 data / cleanup migration**:
    先完成结构 schema 与 `make data`，再由单一 migration owner 创建空的
    Atlas migration：
    ```bash
    atlas migrate new <name> --dir file://internal/data/model/migrate
    ```
-   该 migration 只允许承载已评审的一次性 `UPDATE` / `DELETE` 数据转换或
-   Ent / Atlas schema provider 无法表达的 function / trigger；不得在这里
-   手写 `CREATE TABLE` / `ALTER TABLE` 来替代 Ent。完成后必须运行：
+   该 migration 只允许承载已评审的一次性 `UPDATE` / `DELETE` 数据转换，
+   或精确退出冻结历史对象的 `DROP`；不得在这里手写 `CREATE TABLE` /
+   `ALTER TABLE` 来替代 Ent，也不得新增 Function、Procedure、Trigger 或
+   `EXECUTE FUNCTION/PROCEDURE`。冻结历史 migration
+   `20260714055825_customer_config_append_only_and_role_backfill.sql`
+   不能改写；其对象由后续 forward migration 精确退出，不能复制为新做法。
+   完成后必须运行：
    ```bash
    make migrate_hash
    make data
    git diff --exit-code -- internal/data/model/ent internal/data/model/migrate
    ```
    并补 fresh、upgrade、失败数据 fail-closed 与数据库负向测试。Atlas OSS
-   schema inspect 不会覆盖 function / trigger，因此零结构漂移不能替代这些
-   PostgreSQL 行为测试。
+   schema inspect 不覆盖 Function / Trigger，因此零结构漂移之外还必须通过
+   `db-guard` 静态门禁和目标库目录读回：
+   `non-system-schema function=0 / procedure=0 / non-internal-trigger=0`。PostgreSQL 为
+   外键生成的 `tgisinternal=true` 内部 Trigger 属于约束内部实现，不在删除
+   范围。
 
 5.  **只补齐当前开发库已有迁移时的做法**:
     如果问题已经明确定位为“代码和迁移文件都已存在，但当前开发库还没 apply 到最新版本”，不要重新生成 migration，也不要手动改库；直接在 `server/` 目录执行：
@@ -92,6 +101,9 @@ PostgreSQL trigger 必须走下文的受控 Atlas custom migration，不得混�
     `make data`，上述 data / trigger 例外使用 `atlas migrate new` 并重新计算
     checksum。
 *   ❌ **绝对不要** 试图通过 `INSERT INTO` 或 `ALTER TABLE` 直接“修复”数据库结构而不走迁移流程。Atlas 会检测到结构漂移 (drift) 并报错。
+*   ❌ **绝对不要** 新增数据库 Function、Procedure、Trigger 或以
+    `EXECUTE FUNCTION/PROCEDURE` 把业务逻辑藏进数据库；测试故障注入也不得
+    创建这些对象。
 *   ❌ **绝对不要** 随意删除迁移文件，除非你完全理解后果（这会破坏迁移历史图谱）。
 
 ## 🛠 常见问题处理

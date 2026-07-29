@@ -4,6 +4,8 @@ import test from 'node:test'
 import {
   buildRoleGuidedNavigation,
   buildRoleGuidedNavigationPreview,
+  normalizeRoleNavigationSettings,
+  reconcileRoleNavigationPaths,
 } from './roleGuidedNavigation.mjs'
 
 const sections = [
@@ -57,15 +59,15 @@ test('roleGuidedNavigation: 看板统一前置，常用只保留三个业务且�
   )
 })
 
-test('roleGuidedNavigation: 财务系统推荐将应付、应收、发票和对账列为常用', () => {
+test('roleGuidedNavigation: 财务系统推荐将应收、应付、发票和对账列为常用', () => {
   const result = buildRoleGuidedNavigation({
     visibleSections: [
       {
         title: '财务管理',
         items: [
           { key: 'reconciliation', path: '/erp/finance/reconciliation' },
-          { key: 'payables', path: '/erp/finance/payables' },
           { key: 'receivables', path: '/erp/finance/receivables' },
+          { key: 'payables', path: '/erp/finance/payables' },
           { key: 'invoices', path: '/erp/finance/invoices' },
         ],
       },
@@ -77,8 +79,8 @@ test('roleGuidedNavigation: 财务系统推荐将应付、应收、发票和对�
   assert.deepEqual(
     result.primaryItems.map((item) => item.path),
     [
-      '/erp/finance/payables',
       '/erp/finance/receivables',
+      '/erp/finance/payables',
       '/erp/finance/invoices',
       '/erp/finance/reconciliation',
     ]
@@ -123,7 +125,7 @@ test('roleGuidedNavigation: 岗位自定义顺序只消费已授权页面且不�
   )
 })
 
-test('roleGuidedNavigation: 自定义入口全部失效时安全回退到岗位推荐', () => {
+test('roleGuidedNavigation: 自定义常用全部失效时不擅自恢复推荐且页面仍留在更多', () => {
   const result = buildRoleGuidedNavigation({
     visibleSections: sections,
     adminProfile: {
@@ -139,11 +141,81 @@ test('roleGuidedNavigation: 自定义入口全部失效时安全回退到岗位�
 
   assert.deepEqual(
     result.primaryItems.map((item) => item.path),
+    []
+  )
+  assert.deepEqual(
+    result.secondaryItems.map((item) => item.path),
     [
       '/erp/master/partners/customers',
       '/erp/sales/project-orders/sales-orders',
       '/erp/warehouse/shipments',
+      '/erp/warehouse/inventory',
+      '/erp/help-center',
     ]
+  )
+})
+
+test('roleGuidedNavigation: 单岗位自定义常用与更多都保持保存顺序并将帮助置底', () => {
+  const result = buildRoleGuidedNavigation({
+    visibleSections: sections,
+    adminProfile: {
+      effective_session: { roles: ['sales'] },
+      roles: [
+        {
+          role_key: 'sales',
+          navigation_mode: 'custom',
+          primary_menu_paths: ['/erp/warehouse/inventory'],
+          secondary_menu_paths: [
+            '/erp/warehouse/shipments',
+            '/erp/master/partners/customers',
+            '/erp/sales/project-orders/sales-orders',
+          ],
+        },
+      ],
+    },
+  })
+
+  assert.deepEqual(
+    result.primaryItems.map((item) => item.path),
+    ['/erp/warehouse/inventory']
+  )
+  assert.deepEqual(
+    result.secondaryItems.map((item) => item.path),
+    [
+      '/erp/warehouse/shipments',
+      '/erp/master/partners/customers',
+      '/erp/sales/project-orders/sales-orders',
+      '/erp/help-center',
+    ]
+  )
+})
+
+test('roleGuidedNavigation: 双列表标准化拒绝跨组重复并把新增有效页追加到更多', () => {
+  assert.equal(
+    normalizeRoleNavigationSettings({
+      navigation_mode: 'custom',
+      primary_menu_paths: ['/erp/warehouse/inventory'],
+      secondary_menu_paths: ['/erp/warehouse/inventory'],
+    }).mode,
+    'recommended'
+  )
+  assert.deepEqual(
+    reconcileRoleNavigationPaths({
+      effectivePaths: [
+        '/erp/warehouse/inventory',
+        '/erp/warehouse/shipments',
+        '/erp/master/partners/customers',
+      ],
+      primaryMenuPaths: ['/erp/warehouse/inventory'],
+      secondaryMenuPaths: ['/erp/warehouse/shipments'],
+    }),
+    {
+      primaryMenuPaths: ['/erp/warehouse/inventory'],
+      secondaryMenuPaths: [
+        '/erp/warehouse/shipments',
+        '/erp/master/partners/customers',
+      ],
+    }
   )
 })
 
@@ -205,8 +277,8 @@ test('roleGuidedNavigation: 多岗位按岗位轮流选择常用业务且不让�
           { key: 'suppliers', path: '/erp/master/partners/suppliers' },
           { key: 'purchase', path: '/erp/purchase/accessories' },
           { key: 'inbound', path: '/erp/warehouse/inbound' },
-          { key: 'payables', path: '/erp/finance/payables' },
           { key: 'receivables', path: '/erp/finance/receivables' },
+          { key: 'payables', path: '/erp/finance/payables' },
         ],
       },
     ],
@@ -224,7 +296,7 @@ test('roleGuidedNavigation: 多岗位按岗位轮流选择常用业务且不让�
     result.primaryItems.map((item) => item.path),
     [
       '/erp/master/partners/suppliers',
-      '/erp/finance/payables',
+      '/erp/finance/receivables',
       '/erp/purchase/accessories',
     ]
   )

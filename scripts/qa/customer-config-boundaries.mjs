@@ -434,6 +434,37 @@ function validateCustomerConfigRepositoryContract() {
       !repoSource.includes("ON CONFLICT (customer_key, revision) DO UPDATE"),
     `${repoPathName} publish must remain INSERT-only`,
   );
+
+  const protectedTables = [
+    ["customer_config_revisions", "CustomerConfigRevision"],
+    ["deployment_module_states", "DeploymentModuleState"],
+    ["role_profiles", "RoleProfile"],
+    ["access_entitlements", "AccessEntitlement"],
+    ["work_pools", "WorkPool"],
+    ["work_pool_memberships", "WorkPoolMembership"],
+  ];
+  const violations = [];
+  for (const relativePath of collectBackendProductCoreRuntimeFiles()) {
+    if (relativePath === repoPathName) continue;
+    const source = readFileSync(repoPath(relativePath), "utf8");
+    for (const [tableName, entClientName] of protectedTables) {
+      const rawWrite = new RegExp(
+        `\\b(?:INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+(?:"?public"?\\s*\\.\\s*)?"?${tableName}"?\\b`,
+        "iu",
+      );
+      const entWrite = new RegExp(
+        `\\.${entClientName}\\.(?:Create(?:Bulk)?|Update(?:One(?:ID)?)?|Delete(?:One(?:ID)?)?)\\s*\\(`,
+        "u",
+      );
+      if (rawWrite.test(source) || entWrite.test(source)) {
+        violations.push(`${relativePath}: ${tableName}`);
+      }
+    }
+  }
+  assert(
+    violations.length === 0,
+    `${repoPathName} must remain the only Product Core writer for compiled customer config tables:\n${violations.join("\n")}`,
+  );
 }
 
 function cloneJSON(value) {

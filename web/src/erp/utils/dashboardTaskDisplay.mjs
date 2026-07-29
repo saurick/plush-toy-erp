@@ -20,7 +20,7 @@ const TASK_SOURCE_TITLE_MAP = new Map([
   ['production-orders', '生产订单'],
   ['production-scheduling', '生产排程'],
   ['production-progress', '生产记录'],
-  ['production-exceptions', '生产异常'],
+  ['production-exceptions', '生产异常处置'],
   ['quality-inspections', '质量检验'],
   ['shipment', '出货单'],
   ['reconciliation', '财务对账'],

@@ -48,10 +48,10 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
         title: "财务管理",
         items: Object.freeze([
           "reconciliation",
-          "payables",
           "receivables",
-          "invoices",
+          "payables",
           "finance-payments",
+          "invoices",
         ]),
       }),
       Object.freeze({ title: "运营工具", items: Object.freeze(["print-center"]) }),

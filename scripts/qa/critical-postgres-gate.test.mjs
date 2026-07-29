@@ -216,7 +216,8 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   for (const testName of [
     'TestCustomerConfigPostgresSingleActiveIndexRejectsDuplicate',
     'TestCustomerConfigPostgresConcurrentActivationKeepsOneActive',
-    'TestCustomerConfigPostgresPublishedRevisionAndProjectionsRejectTampering',
+    'TestCustomerConfigPostgresPublishRevisionIsImmutableAndIdempotent',
+    'TestCustomerConfigPostgresConcurrentPublishHasOneImmutableContent',
   ]) {
     assert.match(
       customerConfigConcurrency,

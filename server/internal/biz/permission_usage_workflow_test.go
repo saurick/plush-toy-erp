@@ -31,3 +31,31 @@ func TestWorkflowTaskUpdateUsageIncludesEveryUpdateAction(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkflowWorkbenchRoleTaskUsageRequiresBothReadPermissions(t *testing.T) {
+	const method = "list_workbench_role_tasks"
+	for _, permissionKey := range []string{
+		PermissionERPWorkbenchRead,
+		PermissionWorkflowTaskRead,
+	} {
+		usage, ok := PermissionUsageFor(permissionKey)
+		if !ok {
+			t.Fatalf("permission usage %q is missing", permissionKey)
+		}
+		found := false
+		for _, surface := range usage.Surfaces {
+			for _, backendMethod := range surface.BackendMethods {
+				if backendMethod.Domain != "workflow" || backendMethod.Method != method {
+					continue
+				}
+				if surface.PageKey != "global-dashboard" {
+					t.Fatalf("%q is attached to unexpected page %q for %q", method, surface.PageKey, permissionKey)
+				}
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("permission %q does not project workflow.%s", permissionKey, method)
+		}
+	}
+}

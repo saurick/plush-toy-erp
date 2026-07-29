@@ -19,7 +19,10 @@ test('shipment source L1 keeps selection across the 20-row server page boundary'
     source.indexOf('return [')
   )
   assert.match(pickerContract, /failedPicker[\s\S]*ant-table-thead th/u)
-  assert.match(pickerContract, /failedPicker\.locator\('\.ant-table-container'\)/u)
+  assert.match(
+    pickerContract,
+    /failedPicker\.locator\('\.ant-table-container'\)/u
+  )
   assert.match(pickerContract, /sourceTable[\s\S]*SO-STYLE-L1/u)
   assert.match(pickerContract, /sourceTable[\s\S]*PROD-STYLE-L1-01/u)
   assert.doesNotMatch(pickerContract, /expectText\(page, expectedText\)/u)
@@ -80,8 +83,30 @@ test('workflow list failure assertion follows the current module title', () => {
 })
 
 test('production exception workflow scenario follows the current approval empty state', () => {
-  assert.match(source, /expectText\(page, '暂无待审批的生产异常处置。'\)/u)
+  assert.match(source, /expectText\(page, '暂无待审批的生产异常处置申请。'\)/u)
   assert.doesNotMatch(source, /expectText\(page, '暂无生产异常任务。'\)/u)
+  assert.match(source, /getByRole\('tab', \{\s*name: '处置申请'/u)
+  assert.match(source, /getByRole\('tab', \{\s*name: '待审批'/u)
+  assert.match(source, /暂无生产异常处置申请/u)
+  assert.match(source, /生产异常处置申请已刷新/u)
+  assert.match(source, /生产异常处置任务已刷新/u)
+  assert.match(source, /business-production-exceptions-decisions-tab\.png/u)
+  assert.match(source, /business-production-exceptions-tasks-tab\.png/u)
+  assert.match(source, /business-production-exception-tabs-desktop/u)
+  assert.match(
+    source,
+    /business-production-exceptions-decisions-tab-dark\.png/u
+  )
+  assert.match(
+    source,
+    /business-production-exceptions-decisions-tab-mobile\.png/u
+  )
+  assert.match(
+    source,
+    /business-production-exceptions-tasks-tab-mobile\.png/u
+  )
+  assert.match(source, /taskWorkspaceRowGap/u)
+  assert.match(source, /taskWorkspaceRenderedGap/u)
 })
 
 test('read-only shipment release mock preserves requested paging metadata', () => {
@@ -121,10 +146,7 @@ test('shipping release L1 scenarios use the formal finance approval process task
   assert.match(fixture, /task_group: 'shipment_finance_approval'/u)
   assert.match(fixture, /source_type: 'shipment'/u)
   assert.match(fixture, /owner_role_key: 'finance'/u)
-  assert.match(
-    fixture,
-    /required_capability_key: 'workflow\.task\.approve'/u
-  )
+  assert.match(fixture, /required_capability_key: 'workflow\.task\.approve'/u)
   assert.match(
     fixture,
     /task_code: `PROC-\$\{processInstanceID\}-NODE-\$\{processNodeInstanceID\}-A1`/u
@@ -135,14 +157,8 @@ test('shipping release L1 scenarios use the formal finance approval process task
   )
   assert.match(readonlyScenario, /role_key: 'finance', name: '财务'/u)
   assert.doesNotMatch(currentScenarios, /taskGroup: 'shipment_release'/u)
-  assert.doesNotMatch(
-    currentScenarios,
-    /出货放行(?:协同确认|刷新后协同确认)/u
-  )
-  assert.doesNotMatch(
-    readonlyScenario,
-    /role_key: 'warehouse', name: '仓库'/u
-  )
+  assert.doesNotMatch(currentScenarios, /出货放行(?:协同确认|刷新后协同确认)/u)
+  assert.doesNotMatch(readonlyScenario, /role_key: 'warehouse', name: '仓库'/u)
 })
 
 test('business-core detail and lineage checks are scoped to their surfaces', () => {
@@ -202,7 +218,10 @@ test('shipment cancellation selects the business row before invoking the action'
 
 test('business-core selection actions remain reachable through responsive overflow', () => {
   assert.match(source, /const findSelectionActionButton/u)
-  assert.match(source, /locator\('button'\)\.filter\(\{ hasText: actionName \}\)/u)
+  assert.match(
+    source,
+    /locator\('button'\)\.filter\(\{ hasText: actionName \}\)/u
+  )
   assert.match(source, /candidate\.innerText\(\)/u)
   assert.match(source, /getByRole\('button', \{ name: \/更多操作\/u \}\)/u)
   assert.match(source, /erp-business-selection-action-drawer:visible/u)
@@ -240,10 +259,7 @@ test('production draft cancellation uses the current reason-required modal', () 
 test('quality table assertion includes defect-rate and WIP lineage columns', () => {
   assert.match(source, /'估算不良比例'/u)
   assert.match(source, /'产品 \/ 材料 \/ 在制品'/u)
-  assert.match(
-    source,
-    /unsortableHeaders: \['估算不良比例', '判定备注'\]/u
-  )
+  assert.match(source, /unsortableHeaders: \['估算不良比例', '判定备注'\]/u)
   assert.doesNotMatch(source, /'检验对象 \/ 批次'/u)
 })
 

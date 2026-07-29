@@ -12,6 +12,12 @@ function dataOf(result) {
   return result?.data || {}
 }
 
+function invalidApprovalSettingsResponse(message) {
+  const error = new Error(message)
+  error.isInvalidResponse = true
+  return error
+}
+
 function requireApprovalSettings(value) {
   if (
     !value ||
@@ -25,7 +31,7 @@ function requireApprovalSettings(value) {
         typeof item.enabled !== 'boolean'
     )
   ) {
-    throw new Error('审批责任数据不完整，请刷新后重试')
+    throw invalidApprovalSettingsResponse('审批责任数据不完整，请刷新后重试')
   }
   return value
 }
@@ -39,9 +45,19 @@ function requirePublishedRevision(value) {
     !String(value.config_hash || '').trim() ||
     !String(value.product_version || '').trim()
   ) {
-    throw new Error('审批责任发布结果不完整，请刷新后重试')
+    throw invalidApprovalSettingsResponse(
+      '审批责任发布结果不完整，请刷新后重试'
+    )
   }
   return value
+}
+
+function requireAppliedRevision(value) {
+  const revision = requirePublishedRevision(value)
+  if (String(revision.status || '').trim() !== 'active') {
+    throw invalidApprovalSettingsResponse('审批责任生效回执不完整，请重新确认')
+  }
+  return revision
 }
 
 function requireText(value, label) {
@@ -108,4 +124,12 @@ export async function publishApprovalSettings(input = {}) {
     buildApprovalSettingsRevisionPayload(input)
   )
   return requirePublishedRevision(dataOf(result)?.revision)
+}
+
+export async function applyApprovalSettings(input = {}) {
+  const result = await customerConfigRpc.call(
+    'apply_approval_settings',
+    buildApprovalSettingsRevisionPayload(input)
+  )
+  return requireAppliedRevision(dataOf(result)?.revision)
 }

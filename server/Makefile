@@ -166,7 +166,7 @@ print_db_url:
 	@go run ./cmd/dburl -conf ./configs/dev/config.yaml -safe-target && echo
 
 .PHONY: seed_role_demo_admins
-# 生成开发/验收角色演示账号；无输入默认仅限登记的隔离 *_dev 库和普通业务角色。
+# 生成开发/验收角色演示账号；无输入默认仅限登记的 106 本地开发库族和十个 demo 角色。
 seed_role_demo_admins:
 	go run ./cmd/seed-role-demo-admins -conf ./configs/dev/config.yaml
 

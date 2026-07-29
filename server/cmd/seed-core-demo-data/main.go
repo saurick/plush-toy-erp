@@ -30,13 +30,18 @@ type bootstrapConfig struct {
 }
 
 var manualAcceptanceReferenceDatabasePattern = regexp.MustCompile(`^plush_erp_acceptance_([a-z0-9][a-z0-9_]{2,39})_dev$`)
+var scenarioDemoReferenceDatabases = map[string]struct{}{
+	"plush_erp":           {},
+	"plush_erp_simon_dev": {},
+}
 
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
 	prefix := flag.String("prefix", data.CoreDemoSeedPrefix, "simulated seed code prefix; must start with SIM-")
 	referencesOnly := flag.Bool("references-only", false, "seed only the exact V5 acceptance unit and four warehouses")
-	expectedDatabase := flag.String("expected-database", "", "exact dedicated acceptance database; required with --references-only")
-	confirmation := flag.String("confirm", "", "exact non-secret acceptance reference confirmation; required with --references-only")
+	scenarioReferences := flag.Bool("scenario-references", false, "seed only the exact V5 unit and four warehouses in a registered long-lived development database")
+	expectedDatabase := flag.String("expected-database", "", "exact guarded database; required with --references-only or --scenario-references")
+	confirmation := flag.String("confirm", "", "exact non-secret reference confirmation; required with --references-only or --scenario-references")
 	allowProd := flag.Bool("allow-prod", false, "allow seeding when config path or environment looks like production")
 	timeout := flag.Duration("timeout", 15*time.Second, "database operation timeout")
 	flag.Parse()
@@ -56,12 +61,19 @@ func main() {
 	if err := devdbguard.RequireLocalDevDSN(*confPath, dsn, os.Getenv); err != nil {
 		fail("%v", err)
 	}
+	if *referencesOnly && *scenarioReferences {
+		fail("--references-only and --scenario-references are mutually exclusive")
+	}
 	if *referencesOnly {
 		if err := validateManualAcceptanceReferenceTarget(dsn, *expectedDatabase, *confirmation); err != nil {
 			fail("%v", err)
 		}
+	} else if *scenarioReferences {
+		if err := validateScenarioDemoReferenceTarget(dsn, *expectedDatabase, *confirmation); err != nil {
+			fail("%v", err)
+		}
 	} else if strings.TrimSpace(*expectedDatabase) != "" || strings.TrimSpace(*confirmation) != "" {
-		fail("--expected-database and --confirm are only valid with --references-only")
+		fail("--expected-database and --confirm require --references-only or --scenario-references")
 	}
 
 	db, err := sql.Open("pgx", dsn)
@@ -76,7 +88,8 @@ func main() {
 		fail("ping postgres failed: %v", err)
 	}
 
-	result, err := seedCoreDemo(ctx, db, *prefix, *referencesOnly)
+	referenceMode := *referencesOnly || *scenarioReferences
+	result, err := seedCoreDemo(ctx, db, *prefix, referenceMode)
 	if err != nil {
 		fail("seed core demo data failed: %v", err)
 	}
@@ -91,8 +104,8 @@ func main() {
 		len(result.BOMHeaderIDs),
 	)
 	fmt.Println("simulated_only=true real_customer_import=false no_business_records=true no_direct_fact_posting=true")
-	if *referencesOnly {
-		fmt.Println("references_only=true exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0")
+	if referenceMode {
+		fmt.Println(referenceModeReadback(*referencesOnly, *scenarioReferences))
 		fmt.Printf("primary_unit_id=%d primary_warehouse_id=%d\n",
 			result.PrimaryUnitID,
 			result.PrimaryWarehouseID,
@@ -118,6 +131,48 @@ func main() {
 	printIDs("warehouse", result.WarehouseIDs)
 	printIDs("process", result.ProcessIDs)
 	printIDs("bom_header_by_product", result.BOMHeaderIDs)
+}
+
+func referenceModeReadback(referencesOnly, scenarioReferences bool) string {
+	return fmt.Sprintf(
+		"references_only=%t scenario_references=%t exact_allowlist=true materials=0 products=0 processes=0 bom_headers=0",
+		referencesOnly,
+		scenarioReferences,
+	)
+}
+
+func validateScenarioDemoReferenceTarget(dsn, expectedDatabase, confirmation string) error {
+	expectedDatabase = strings.TrimSpace(expectedDatabase)
+	if _, ok := scenarioDemoReferenceDatabases[expectedDatabase]; !ok {
+		return fmt.Errorf("scenario-references expected database must be a registered long-lived development database")
+	}
+	expectedConfirmation := "SEED_SCENARIO_DEMO_CORE_REFERENCES:scenario-demo:" + expectedDatabase + ":2026.07.16-v5:20260716-V5"
+	if confirmation != expectedConfirmation {
+		return fmt.Errorf("scenario-references confirmation must equal %s", expectedConfirmation)
+	}
+	parsed, err := url.Parse(strings.TrimSpace(dsn))
+	if err != nil || parsed == nil ||
+		(parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") ||
+		parsed.Opaque != "" || parsed.Fragment != "" ||
+		strings.TrimSpace(parsed.Hostname()) != devdbguard.CustomerConfigLocalTestHost ||
+		strings.TrimSpace(parsed.Port()) != fmt.Sprint(devdbguard.CustomerConfigLocalTestPort) ||
+		parsed.Path != "/"+expectedDatabase {
+		return fmt.Errorf("scenario-references DSN must target the declared registered development database")
+	}
+	query := parsed.Query()
+	sslModes, ok := query["sslmode"]
+	if len(query) != 1 || !ok || len(sslModes) != 1 || sslModes[0] != "disable" {
+		return fmt.Errorf("scenario-references DSN query must contain only sslmode=disable")
+	}
+	config, err := pgconn.ParseConfig(dsn)
+	if err != nil || config == nil ||
+		strings.TrimSpace(config.Host) != devdbguard.CustomerConfigLocalTestHost ||
+		config.Port != devdbguard.CustomerConfigLocalTestPort ||
+		strings.TrimSpace(config.Database) != expectedDatabase ||
+		len(config.Fallbacks) != 0 || config.TLSConfig != nil {
+		return fmt.Errorf("scenario-references resolved DSN must be the single declared registered development database")
+	}
+	return nil
 }
 
 func validateManualAcceptanceReferenceTarget(dsn, expectedDatabase, confirmation string) error {

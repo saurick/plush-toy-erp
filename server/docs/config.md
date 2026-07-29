@@ -142,12 +142,12 @@ bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
 
 该脚本可生成 `demo_boss`、`demo_sales`、`demo_purchase`、`demo_production`、`demo_warehouse`、`demo_quality`、`demo_finance`、`demo_pmc`、`demo_engineering` 和 `demo_admin`，每个账号只绑定对应内置角色，权限仍来自 `roles -> role_permissions` 真源。默认不生成 `debug_operator` 账号；如果确需调试权限账号，必须显式加 `--include-debug`。
 
-无显式密码时，脚本只允许连接登记的 `192.168.0.106:5432/plush_erp_*_dev` 隔离开发库，并以公开测试密码 `12345678` 生成九个普通业务角色账号；不会生成 `demo_admin`、`demo_debug`，也不会重置人工验收场景账号。`demo_admin`、调试账号、人工验收账号或完整角色回归必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。已有账号仍需加 `--reset-password` 才会重置密码。公开测试值一旦 seed 就是可登录凭据，不得写入共享、试用、staging 或生产目标。
+无显式密码时，脚本只允许连接登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev` 本地开发库，并以公开测试密码 `12345678` 生成十个角色演示账号，包括普通演示管理员 `demo_admin`；不会生成 `demo_debug`，也不会重置稳定超级管理员或人工验收场景账号。调试账号、人工验收账号或包含调试角色的完整回归必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。已有账号仍需加 `--reset-password` 才会重置密码。公开测试值一旦 seed 就是可登录凭据，不得写入 133、其他共享 / 试用、staging 或生产目标。
 
 安全边界：
 
 - 生产默认不应生成角色演示账号；脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`。
-- 显式传入的覆盖密码只通过 `ERP_ROLE_DEMO_PASSWORD` 或命令参数临时提供，脚本不会把覆盖值写入配置文件。公开测试值即使显式传入也只能用于登记的隔离 `*_dev` 库；使用 `--allow-prod` 时必须提供非默认密码。
+- 显式传入的覆盖密码只通过 `ERP_ROLE_DEMO_PASSWORD` 或命令参数临时提供，脚本不会把覆盖值写入配置文件。公开测试值即使显式传入也只能用于登记的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 本地开发库；使用 `--allow-prod` 时必须提供非默认密码。
 - 已有演示账号重跑时默认不重置密码，只恢复 `disabled=false`、`is_super_admin=false` 和单一角色绑定；如需重置必须显式加 `--reset-password`。
 
 ## debug seed / cleanup 环境变量

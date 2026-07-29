@@ -254,7 +254,7 @@ test('workflowApi: task board rejects malformed successful responses', async () 
   )
 })
 
-test('workflowApi: role task view uses the strict server cursor contract', async () => {
+test('workflowApi: mobile role task view uses the strict server cursor contract', async () => {
   const calls = []
   const response = {
     items: [
@@ -296,7 +296,40 @@ test('workflowApi: role task view uses the strict server cursor contract', async
   ])
 })
 
-test('workflowApi: all role task pages keep one snapshot and exceed the old 200 row cap', async () => {
+test('workflowApi: workbench role task view uses its dedicated read method', async () => {
+  const calls = []
+  const response = {
+    items: [],
+    next_cursor: '',
+    has_more: false,
+    server_time: 1_720_000_000,
+  }
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    return { data: response }
+  })
+
+  assert.equal(
+    await api.listWorkflowWorkbenchRoleTasks({
+      view_key: 'todo',
+      role_key: 'sales',
+      limit: 100,
+    }),
+    response
+  )
+  assert.deepEqual(calls, [
+    {
+      method: 'list_workbench_role_tasks',
+      params: {
+        view_key: 'todo',
+        role_key: 'sales',
+        limit: 100,
+      },
+    },
+  ])
+})
+
+test('workflowApi: all workbench role task pages use the dedicated method and keep one snapshot', async () => {
   const calls = []
   const pageSizes = [100, 100, 100, 50]
   const api = await loadWorkflowApi(async (method, params) => {
@@ -318,7 +351,7 @@ test('workflowApi: all role task pages keep one snapshot and exceed the old 200 
     }
   })
 
-  const result = await api.listAllWorkflowRoleTasks({
+  const result = await api.listAllWorkflowWorkbenchRoleTasks({
     view_key: 'todo',
     role_key: 'sales',
     limit: 100,
@@ -330,12 +363,17 @@ test('workflowApi: all role task pages keep one snapshot and exceed the old 200 
   assert.equal(result.server_time, 1_720_000_000)
   assert.equal(calls.length, 4)
   assert.deepEqual(
+    calls.map((call) => call.method),
+    Array.from({ length: 4 }, () => 'list_workbench_role_tasks')
+  )
+  assert.deepEqual(
     calls.map((call) => call.params.cursor || ''),
     ['', 'opaque-page-2', 'opaque-page-3', 'opaque-page-4']
   )
+  assert.equal(api.listAllWorkflowRoleTasks, undefined)
 })
 
-test('workflowApi: all role task pages fail closed on cursor or snapshot drift', async () => {
+test('workflowApi: all workbench role task pages fail closed on cursor or snapshot drift', async () => {
   let callCount = 0
   const repeatedCursorApi = await loadWorkflowApi(async () => {
     callCount += 1
@@ -355,7 +393,7 @@ test('workflowApi: all role task pages fail closed on cursor or snapshot drift',
     }
   })
   await assert.rejects(
-    repeatedCursorApi.listAllWorkflowRoleTasks({
+    repeatedCursorApi.listAllWorkflowWorkbenchRoleTasks({
       view_key: 'todo',
       role_key: 'sales',
       limit: 50,
@@ -382,7 +420,7 @@ test('workflowApi: all role task pages fail closed on cursor or snapshot drift',
     }
   })
   await assert.rejects(
-    driftedSnapshotApi.listAllWorkflowRoleTasks({
+    driftedSnapshotApi.listAllWorkflowWorkbenchRoleTasks({
       view_key: 'todo',
       role_key: 'sales',
       limit: 50,
@@ -391,32 +429,36 @@ test('workflowApi: all role task pages fail closed on cursor or snapshot drift',
   )
 })
 
-test('workflowApi: role task view rejects invalid queries before RPC', async () => {
+test('workflowApi: role task views share strict query validation before RPC', async () => {
   const calls = []
   const api = await loadWorkflowApi(async (method, params) => {
     calls.push({ method, params })
     return { data: {} }
   })
 
-  for (const params of [
-    {},
-    { view_key: 'all', role_key: 'pmc', limit: 50 },
-    { view_key: 'todo', role_key: '', limit: 50 },
-    { view_key: 'todo', role_key: 'pmc', limit: 101 },
-    { view_key: 'todo', role_key: 'pmc', limit: 50, cursor: '' },
-    { view_key: 'todo', role_key: 'pmc', limit: 50, offset: 0 },
+  for (const listRoleTasks of [
+    api.listWorkflowRoleTasks,
+    api.listWorkflowWorkbenchRoleTasks,
   ]) {
-    await assert.rejects(api.listWorkflowRoleTasks(params), /任务查询条件有误/u)
+    for (const params of [
+      {},
+      { view_key: 'all', role_key: 'pmc', limit: 50 },
+      { view_key: 'todo', role_key: '', limit: 50 },
+      { view_key: 'todo', role_key: 'pmc', limit: 101 },
+      { view_key: 'todo', role_key: 'pmc', limit: 50, cursor: '' },
+      { view_key: 'todo', role_key: 'pmc', limit: 50, offset: 0 },
+    ]) {
+      await assert.rejects(listRoleTasks(params), /任务查询条件有误/u)
+    }
   }
   assert.equal(calls.length, 0)
 })
 
-test('workflowApi: role task view rejects malformed successful responses', async () => {
+test('workflowApi: role task views share strict response validation', async () => {
   let response
   const api = await loadWorkflowApi(async () => ({ data: response }))
   const params = { view_key: 'todo', role_key: 'sales', limit: 50 }
-
-  for (const malformed of [
+  const malformedResponses = [
     null,
     {},
     { items: null, next_cursor: '', has_more: false, server_time: 1 },
@@ -462,12 +504,18 @@ test('workflowApi: role task view rejects malformed successful responses', async
         server_time: 1,
       })
     ),
+  ]
+  for (const listRoleTasks of [
+    api.listWorkflowRoleTasks,
+    api.listWorkflowWorkbenchRoleTasks,
   ]) {
-    response = malformed
-    await assert.rejects(
-      api.listWorkflowRoleTasks(params),
-      (error) => error.isInvalidResponse === true
-    )
+    for (const malformed of malformedResponses) {
+      response = malformed
+      await assert.rejects(
+        listRoleTasks(params),
+        (error) => error.isInvalidResponse === true
+      )
+    }
   }
 })
 
@@ -872,9 +920,10 @@ test('workflow dashboard consumes complete server role views without the old cap
   const statsSource = read('../utils/workflowDashboardStats.mjs')
   assert.match(statsSource, /effective_session\?\.roles/u)
   assert.match(statsSource, /hasEffectiveRoleProjection/u)
-  assert.match(source, /listAllWorkflowRoleTasks/u)
+  assert.match(source, /listAllWorkflowWorkbenchRoleTasks/u)
   assert.match(source, /\['todo', 'risk'\]/u)
   assert.match(source, /workflowRiskTaskIDs\.has\(task\.id\)/u)
+  assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)
   assert.doesNotMatch(source, /listWorkflowTasks/u)
   assert.doesNotMatch(source, /limit:\s*200/u)
   assert.doesNotMatch(source, /key:\s*'waiting'/u)
@@ -894,6 +943,21 @@ test('workflow browser and simulated closure fixtures submit idempotency keys', 
   )
   assert.match(styleScenario, /style-l1-dashboard-conflict/u)
   assert.match(simulatedClosure, /mobile-workflow-closure:/u)
+})
+
+test('workflow mocks support separate mobile and workbench role-task reads', () => {
+  for (const path of [
+    '../../mocks/jsonRpcMockServer.js',
+    '../../../scripts/style-l1/factRpcMocks.mjs',
+  ]) {
+    const source = read(path)
+    assert.match(source, /['"]list_role_tasks['"]/u)
+    assert.match(source, /['"]list_workbench_role_tasks['"]/u)
+    assert.match(
+      source,
+      /'workflow\.task\.read'[\s\S]{0,240}method !== 'list_workbench_role_tasks'[\s\S]{0,240}'erp\.workbench\.read'/u
+    )
+  }
 })
 
 test('workflow mocks enforce the formal task mutation contract', () => {

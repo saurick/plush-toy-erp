@@ -187,6 +187,39 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 	}
 }
 
+func TestWorkflowRepo_CreateRejectsCrossProcessNodeAnchor(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_anchor_ownership?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+
+	processA, _ := createWorkflowTaskRuntimeAnchorFixture(
+		t, ctx, client, "workflow-anchor-a", 2101,
+	)
+	_, nodeB := createWorkflowTaskRuntimeAnchorFixture(
+		t, ctx, client, "workflow-anchor-b", 2102,
+	)
+
+	_, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+		TaskCode:              "TASK-ANCHOR-MISMATCH",
+		TaskGroup:             "anchor-contract",
+		TaskName:              "跨流程锚点负例",
+		SourceType:            "workflow-anchor-test",
+		SourceID:              2101,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          biz.SalesRoleKey,
+		ProcessInstanceID:     &processA,
+		ProcessNodeInstanceID: &nodeB,
+		Payload:               map[string]any{},
+	}, 7)
+	if !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("cross-process anchor error = %v, want ErrBadParam", err)
+	}
+	if count := client.WorkflowTask.Query().CountX(ctx); count != 0 {
+		t.Fatalf("cross-process anchor created %d workflow tasks", count)
+	}
+}
+
 func TestWorkflowRepo_TaskStatusReasonEventAndCompletionCleanup(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_status_reason_cleanup?mode=memory&cache=shared&_fk=1")

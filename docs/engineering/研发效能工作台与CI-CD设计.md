@@ -42,15 +42,15 @@ flowchart LR
 
 各层职责：
 
-| 层 | 负责 | 不负责 |
-| --- | --- | --- |
-| `scripts/qa/` | affected、full、strict 及回执 | 发布和目标机变更 |
-| `scripts/deploy/` | 制品、manifest、promotion、smoke、rollback | 产品业务实现 |
-| GitHub workflow | 触发、权限、缓存、远端状态 | 复制脚本逻辑 |
-| GHCR / Release | 保存 digest、manifest、SBOM、checksum | 表示已经部署 |
-| 本地 Bridge | Provider 适配、固定动作、幂等、操作恢复 | 任意命令代理 |
-| 研发效能工作台 | 选择版本、展示证据、确认操作 | 持有秘密或直接 SSH |
-| 133 | 消费制品、migration、启动、检查 | 源码构建和通用 CI |
+| 层                | 负责                                       | 不负责             |
+| ----------------- | ------------------------------------------ | ------------------ |
+| `scripts/qa/`     | affected、full、strict 及回执              | 发布和目标机变更   |
+| `scripts/deploy/` | 制品、manifest、promotion、smoke、rollback | 产品业务实现       |
+| GitHub workflow   | 触发、权限、缓存、远端状态                 | 复制脚本逻辑       |
+| GHCR / Release    | 保存 digest、manifest、SBOM、checksum      | 表示已经部署       |
+| 本地 Bridge       | Provider 适配、固定动作、幂等、操作恢复    | 任意命令代理       |
+| 研发效能工作台    | 选择版本、展示证据、确认操作               | 持有秘密或直接 SSH |
+| 133               | 消费制品、migration、启动、检查            | 源码构建和通用 CI  |
 
 ## 一次验证、一次构建、多次部署
 
@@ -77,30 +77,30 @@ commit
 
 一个可部署版本至少包含：
 
-| 字段 | 约束 |
-| --- | --- |
-| `version` | 人可读名称，不作为唯一身份 |
-| `git_sha` | 40 位、可从默认分支到达 |
-| `gate_fingerprint` | SHA、profile、锁文件和门禁实现身份 |
-| `server_image_digest` | Server OCI digest |
-| `web_image_digest` | Web OCI digest |
-| `manifest_sha256` | provider-neutral manifest 完整性身份 |
-| `migration_sequence` | Atlas migration 序列和 head |
+| 字段                          | 约束                                             |
+| ----------------------------- | ------------------------------------------------ |
+| `version`                     | 人可读名称，不作为唯一身份                       |
+| `git_sha`                     | 40 位、可从默认分支到达                          |
+| `gate_fingerprint`            | SHA、profile、锁文件和门禁实现身份               |
+| `server_image_digest`         | Server OCI digest                                |
+| `web_image_digest`            | Web OCI digest                                   |
+| `manifest_sha256`             | provider-neutral manifest 完整性身份             |
+| `migration_sequence`          | Atlas migration 序列和 head                      |
 | `customer_config_fingerprint` | 配置源指纹，不冒充目标 active/effective readback |
-| `sbom` / `checksums` | 依赖与文件完整性 |
-| `strict_result` | exact-SHA 最终验证终态 |
-| `rehearsal_result` | 同一制品本地演练终态 |
-| `deployment_result` | 指定目标 promotion、readback 和 smoke 终态 |
+| `sbom` / `checksums`          | 依赖与文件完整性                                 |
+| `strict_result`               | exact-SHA 最终验证终态                           |
+| `rehearsal_result`            | 同一制品本地演练终态                             |
+| `deployment_result`           | 指定目标 promotion、readback 和 smoke 终态       |
 
 Actions run ID、job ID、可变 tag 和页面显示名称只作辅助信息。
 
 ## 门禁分层
 
-| 入口 | 反馈周期 | 原则 |
-| --- | --- | --- |
-| `affected` | 日常修改 | 显式影响面；未知路径 fail closed 到 full |
-| `full` | 集成候选 | 各测试组最多一次，不递归完整执行 fast |
-| `strict` | 发布候选 | exact SHA 最多一份有效终态，不递归完整执行 full |
+| 入口       | 反馈周期 | 原则                                            |
+| ---------- | -------- | ----------------------------------------------- |
+| `affected` | 日常修改 | 显式影响面；未知路径 fail closed 到 full        |
+| `full`     | 集成候选 | 各测试组最多一次，不递归完整执行 fast           |
+| `strict`   | 发布候选 | exact SHA 最多一份有效终态，不递归完整执行 full |
 
 每层先执行便宜的身份、语法、清单和配置 preflight，再进入 Web、Go、数据库、浏览器和制品等高成本阶段。失败写一条精确 blocker 后停止，不自行发起 fresh lifecycle。
 
@@ -142,6 +142,75 @@ Bridge 必须：
 Bridge 不接受任意 workflow、repo、target、路径、SSH 参数、环境变量、shell、SQL 或 Docker 子命令。
 
 浏览器永远不持有 Provider 和 SSH 秘密。GitHub 访问首版复用本机受控凭据或后续最小权限 GitHub App；SSH 只存在于服务端 Bridge 进程边界。
+
+## 测试数据 Bridge
+
+测试数据中心复用同一类 DEV-only loopback 安全边界，但与交付 Bridge 分开保存 operation 和执行固定动作。它不是正式 ERP 菜单，也不使用浏览器输入的命令、路径、DSN、后端地址、密码或环境变量。
+
+当前只登记三个 profile：
+
+| Profile           | 目标与内容                                                                                                                                                                                                                                                                                                                                    | 退出 / 清理                                                                                                                                                                                                                                            |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `core-demo`       | 仅允许登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev`，先确认 migration 已到 head，再复用角色演示账号和 Product Core 基础资料 seed；数据使用稳定编码 upsert，不生成客户、订单、Workflow、库存、出货或财务事实                                                                                                                      | 作为共享开发基线长期保留；不提供按 operation 删除按钮，账号、主数据和后续业务记录按正式生命周期退出                                                                                                                                                    |
+| `scenario-demo`   | 只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库，固定使用 `yoyoosun-manual-acceptance / 2026.07.16-v5 / 20260716-V5`。先只读核对仓库、目标、migration、runtime identity 和 tracked 客户配置，再通过正式 API 依次准备账号、Source Document、5 条可证明 ProcessRuntime、模拟岗位任务和来源驱动 Fact；直接业务 SQL、任意批次和任意目标均不开放 | `exact-create-or-readback`、长期保留、只向前补齐；同批半成品、字段漂移或身份变化直接阻断，不提供批次清理或重置。岗位到期时间是固定 V5 快照，不保证长期维持“今天 / 本周”相对语义；读回只证明 40 / 50 项数据前置，另 10 项浏览器检查和人工验收保持未完成 |
+| `full-acceptance` | 只接受 clean exact commit 和服务端已有的 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，复用统一 lifecycle 在按 run 隔离的数据库完成 migration、正式 Source / ProcessRuntime / Fact 数据、50 项浏览器验收和异常流                                                                                                                                      | 成功或失败都停服务、删除同批隔离库并读回残留；清理不完整时 operation 不能通过                                                                                                                                                                          |
+
+主路径固定为：
+
+```text
+读取预检
+  → 选择固定 profile
+  → 准备不可变 planHash / runId / 目标摘要
+  → scenario-demo 展示固定目标与批次并确认一次
+    / 其他 profile 手工输入完整确认串
+  → 异步执行
+  → 读取 operation 事件与领域 / 清理回执
+```
+
+`execute` 只消费已准备 operation 的 ID 和完整确认串；`scenario-demo` 的确认串由页面从当前 operation 内部带入，用户只核对可读的固定目标、V5 批次、数据范围和长期保留边界，不再复制长字符串。其他 profile 继续要求手工输入完整确认串。执行前必须重新核对仓库指纹、数据库目标、migration 和 profile 前置。任一身份变化都使原计划失效，不能继续执行或用 fresh operation 掩盖不明确结果。进程中断后的写入结果标记为 `not_proven`，先检查 operation 回执和目标读回，不自动重试。
+
+首页读取 `core-demo` 时会执行只读 schema / migration / 数据库对象预检；读取 `scenario-demo` 时还会执行未认证 runtime identity 读回。两者都不得在 plan / summary 阶段登录或写库。`scenario-demo` 只有在用户完成页面确认后，才在后台使用已证明固定本机目标的本地开发账号约定进行管理员认证、客户配置有效态核对和后续数据写入；显式 `MANUAL_ACCEPTANCE_*`、`ERP_ROLE_DEMO_PASSWORD` 或 `REAL_LOGIN_ADMIN_PASSWORD` 覆盖值仍优先，但凭据不会进入浏览器、命令参数或 operation 回执。目标未到 migration head 或守卫失败时直接显示阻断并禁用对应准备 / 生成按钮，不能等到写入阶段再绕过。
+
+日常生成不需要重启：开发服务已运行时，直接进入页面点击“生成业务场景测试数据”并确认即可。只有显式修改 Vite 进程的凭据覆盖环境时，才需要重启一次 `pnpm start` 载入新环境；`make dev_restart` 只负责后端，只有后端代码、配置或 migration 前置变化时才按正式启动流程使用。
+
+`core-demo` 的“稳定 upsert”不等于整批事务或可回滚批次：角色账号和核心资料仍由两个既有固定入口顺序执行，后一步失败时回执必须准确记录部分完成风险。`scenario-demo` 同样不是跨阶段数据库事务；任一阶段失败都保留 `not_proven / failed` 回执并要求先核对同一固定批次，不能清空后盲目重跑。只有 `full-acceptance` 具有专用数据库级自动清理。Workflow 展示投影、模拟岗位任务和 task done 都不能冒充 ProcessRuntime、Source Document 或 Fact 数据。
+
+工作台写入口的授权边界是本机开发进程、loopback、same-origin、CSRF 和固定 profile，不是 ERP RBAC。生产构建、远程访问和正式业务工作台均不可达。
+
+## 数据库迁移 Bridge
+
+`/__dev/database-migration` 将本地共享开发库的既有迁移守卫包装成两步交互，
+不创建通用数据库控制台。浏览器只能提交 `prepare`、`execute`、`restart`
+三种固定意图和幂等键 / operation ID / 当前完整确认串；目标固定为 application
+config 登记的 `192.168.0.106:5432/plush_erp`，不接受 DSN、SQL、shell、
+脚本路径、凭据或环境变量，也不支持 133、测试或生产数据库。
+
+执行顺序固定为：
+
+```text
+只读 status
+  → 停止本地后端
+  → plan 与事务回滚预演
+  → 备份恢复演练
+  → migration 真源与目标身份复核
+  → 用户输入当前完整确认串
+  → apply 一次
+  → 同目标 pending=0 读回
+  → 后端重启一次
+  → health / ready
+```
+
+operation 状态使用 `0600` 原子文件、幂等索引和跨 Vite 进程排他锁。migration /
+schema / guard / 备份编排文件组成独立 source fingerprint，避免无关工作区变更
+让计划失效；目标 migration 状态仍必须精确一致。相同 source fingerprint 和
+目标状态下，只有既有备份恢复报告通过且 dump 的常规文件身份、大小和 SHA-256
+再次读回一致时才允许复用；任何漂移都会重新准备备份。提交结果不明确时进入
+`not_proven`，先读回目标，不自动创建新 operation 或重试 apply。
+
+该入口不执行 affected、fast、full、strict、完整验收 lifecycle 或 CI。数据库
+已到 head 时不迁移、不备份、不重建；后端只在确认 apply 后重启一次。正式发布
+仍绑定不可变制品、目标备份、migration、health / ready、业务 smoke 和 rollback
+point，本地工作台结果不能冒充 133 promotion、岗位 UAT 或客户签收。
 
 ## 工作台交互
 

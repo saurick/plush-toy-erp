@@ -6,7 +6,7 @@ import {
   RedoOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Input, Modal, Space, Tag } from 'antd'
+import { Alert, Button, Input, Modal, Space, Tabs, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -39,7 +39,9 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
-import ProductionExceptionDecisionPanel from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
+import ProductionExceptionDecisionPanel, {
+  canReadProductionExceptionDecisions,
+} from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
@@ -103,6 +105,10 @@ const TASK_STATUS_OPTIONS = Object.freeze([
 const DUE_DATE_FILTER_OPTIONS = Object.freeze([
   { label: '到期日期', value: 'due_at' },
 ])
+const PRODUCTION_EXCEPTION_TAB_KEYS = Object.freeze({
+  DECISIONS: 'decisions',
+  TASKS: 'tasks',
+})
 
 const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-scheduling': {
@@ -121,13 +127,8 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
     taskGroup: 'production_exception_decision_approval',
     completionMessage:
       '异常审批已完成；生产岗位仍需在异常来源记录中执行或冲正，任务完成本身不写生产或库存事实。',
-    emptyText: '暂无待审批的生产异常处置。',
-    ownerRoleOptions: [
-      workflowRoleOption('production'),
-      workflowRoleOption('pmc'),
-      workflowRoleOption('quality'),
-      workflowRoleOption('warehouse'),
-    ],
+    emptyText: '暂无待审批的生产异常处置申请。',
+    ownerRoleOptions: [workflowRoleOption('boss')],
     payloadScope: 'production_exception_decision_process_approval',
   },
   'shipping-release': {
@@ -229,8 +230,81 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     adminProfile,
     'workflow.task.reject'
   )
+  const isProductionExceptionPage = moduleKey === 'production-exceptions'
+  const canReadProductionExceptionRecords =
+    isProductionExceptionPage &&
+    canReadProductionExceptionDecisions(adminProfile)
+  const linkedProductionExceptionID = Number(
+    searchParams.get('production_exception_id') || 0
+  )
+  const [activeProductionExceptionTab, setActiveProductionExceptionTab] =
+    useState(() =>
+      linkedProductionExceptionID > 0 && canReadProductionExceptionRecords
+        ? PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+        : linkedKeyword && canReadWorkflowTasks
+          ? PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+          : canReadProductionExceptionRecords
+            ? PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+            : PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+    )
+  const [productionExceptionSummary, setProductionExceptionSummary] = useState({
+    total: 0,
+    pageCount: 0,
+  })
+  const productionExceptionRefreshRef = useRef(null)
+  const productionExceptionTabKeys = useMemo(
+    () =>
+      [
+        canReadProductionExceptionRecords
+          ? PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+          : null,
+        canReadWorkflowTasks ? PRODUCTION_EXCEPTION_TAB_KEYS.TASKS : null,
+      ].filter(Boolean),
+    [canReadProductionExceptionRecords, canReadWorkflowTasks]
+  )
+  const effectiveProductionExceptionTab = productionExceptionTabKeys.includes(
+    activeProductionExceptionTab
+  )
+    ? activeProductionExceptionTab
+    : productionExceptionTabKeys[0] || PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+  const isWorkflowTaskWorkspaceActive =
+    !isProductionExceptionPage ||
+    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+
+  useEffect(() => {
+    if (!isProductionExceptionPage) return
+    setActiveProductionExceptionTab((current) => {
+      if (
+        linkedProductionExceptionID > 0 &&
+        canReadProductionExceptionRecords
+      ) {
+        return PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+      }
+      if (linkedKeyword && canReadWorkflowTasks) {
+        return PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+      }
+      return productionExceptionTabKeys.includes(current)
+        ? current
+        : productionExceptionTabKeys[0] || PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+    })
+  }, [
+    canReadProductionExceptionRecords,
+    canReadWorkflowTasks,
+    isProductionExceptionPage,
+    linkedKeyword,
+    linkedProductionExceptionID,
+    productionExceptionTabKeys,
+  ])
+
   const loadWorkflowTasks = useCallback(async () => {
     const request = beginLatestRequest('workflow-business-tasks')
+    if (!isWorkflowTaskWorkspaceActive) {
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
+      return false
+    }
     if (!config || !canReadWorkflowTasks) {
       if (request.isCurrent()) {
         setTasks([])
@@ -314,6 +388,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     dueFrom,
     dueTo,
     keyword,
+    isWorkflowTaskWorkspaceActive,
     moduleItem?.title,
     ownerRoleKey,
     pagination,
@@ -332,13 +407,30 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   useEffect(() => {
     if (!moduleItem) return undefined
     return outletContext?.registerPageRefresh?.(async () => {
+      if (
+        isProductionExceptionPage &&
+        effectiveProductionExceptionTab ===
+          PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+      ) {
+        const refreshed = await productionExceptionRefreshRef.current?.()
+        if (refreshed) {
+          message.success('生产异常处置申请已刷新')
+        }
+        return false
+      }
       const refreshed = await loadWorkflowTasks()
       if (refreshed) {
         message.success(`${moduleItem.title}任务已刷新`)
       }
       return false
     })
-  }, [loadWorkflowTasks, moduleItem, outletContext])
+  }, [
+    effectiveProductionExceptionTab,
+    isProductionExceptionPage,
+    loadWorkflowTasks,
+    moduleItem,
+    outletContext,
+  ])
 
   const selectedTasks = useMemo(
     () => tasks.filter((task) => selectedTaskKeys.includes(task.id)),
@@ -404,6 +496,26 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     () => buildWorkflowBusinessTaskStats({ total, pageCount: tasks.length }),
     [tasks.length, total]
   )
+  const productionExceptionStats = useMemo(
+    () => [
+      {
+        key: 'production-exception-total',
+        label: '异常记录',
+        value: productionExceptionSummary.total,
+      },
+      {
+        key: 'production-exception-page',
+        label: '当前显示',
+        value: productionExceptionSummary.pageCount,
+      },
+    ],
+    [productionExceptionSummary.pageCount, productionExceptionSummary.total]
+  )
+  const headerStats =
+    isProductionExceptionPage &&
+    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+      ? productionExceptionStats
+      : stats
 
   const selectedTaskLabel = selectedTask
     ? `${getWorkflowTaskCodeLabel(selectedTask)} / ${
@@ -425,7 +537,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const selectedTaskActionAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedTask,
-    enabled: Boolean(selectedTask && canReadWorkflowTasks),
+    enabled: Boolean(
+      selectedTask && canReadWorkflowTasks && isWorkflowTaskWorkspaceActive
+    ),
   })
   const selectedTaskReadonlyReason = selectedTaskActionAccess.loading
     ? '正在确认您是否可以处理当前任务。'
@@ -968,6 +1082,18 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     setDueTo('')
     resetBusinessPaginationCurrent(setPagination)
   }, [])
+  const handleProductionExceptionTabChange = useCallback((nextTab) => {
+    setActiveProductionExceptionTab(nextTab)
+    if (nextTab !== PRODUCTION_EXCEPTION_TAB_KEYS.TASKS) {
+      setDetailTask(null)
+      setTaskReasonModal(null)
+      setTaskReasonProcessContext(null)
+      setTaskReasonProcessContextState('idle')
+    }
+  }, [])
+  const handleProductionExceptionRefreshReady = useCallback((refresh) => {
+    productionExceptionRefreshRef.current = refresh
+  }, [])
 
   if (!moduleItem || !config) {
     return (
@@ -981,25 +1107,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     )
   }
 
-  return (
-    <BusinessPageLayout className="erp-workflow-business-page">
-      <PageHeaderCard
-        title={moduleItem.title}
-        description={moduleItem.description}
-        tags={
-          <Space size={6} wrap>
-            <Tag color="blue">待办任务</Tag>
-            <Tag color="gold">业务处理分开完成</Tag>
-          </Space>
-        }
-        stats={stats}
-        compact
-      />
-
-      {moduleKey === 'production-exceptions' ? (
-        <ProductionExceptionDecisionPanel adminProfile={adminProfile} />
-      ) : null}
-
+  const workflowTaskWorkspace = (
+    <>
       <BusinessOperationPanel
         compact
         onClearFilters={clearFilters}
@@ -1412,6 +1521,78 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           </>
         ) : null}
       </Modal>
+    </>
+  )
+  const productionExceptionTabItems = [
+    ...(canReadProductionExceptionRecords
+      ? [
+          {
+            key: PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS,
+            label: '处置申请',
+            children: (
+              <ProductionExceptionDecisionPanel
+                adminProfile={adminProfile}
+                onRefreshReady={handleProductionExceptionRefreshReady}
+                onSummaryChange={setProductionExceptionSummary}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(canReadWorkflowTasks
+      ? [
+          {
+            key: PRODUCTION_EXCEPTION_TAB_KEYS.TASKS,
+            label: '待审批',
+            children: (
+              <BusinessPageLayout className="erp-workflow-business-page__tab-workspace">
+                {workflowTaskWorkspace}
+              </BusinessPageLayout>
+            ),
+          },
+        ]
+      : []),
+  ]
+  const showingProductionExceptionDecisions =
+    isProductionExceptionPage &&
+    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+
+  return (
+    <BusinessPageLayout className="erp-workflow-business-page">
+      <PageHeaderCard
+        title={moduleItem.title}
+        description={moduleItem.description}
+        tags={
+          <Space size={6} wrap>
+            <Tag color="blue">
+              {showingProductionExceptionDecisions ? '处置申请' : '待审批'}
+            </Tag>
+            <Tag color="gold">业务处理分开完成</Tag>
+          </Space>
+        }
+        stats={headerStats}
+        compact
+      />
+
+      {isProductionExceptionPage ? (
+        productionExceptionTabItems.length > 0 ? (
+          <Tabs
+            aria-label="生产异常处置工作区"
+            activeKey={effectiveProductionExceptionTab}
+            destroyOnHidden
+            items={productionExceptionTabItems}
+            onChange={handleProductionExceptionTabChange}
+          />
+        ) : (
+          <Alert
+            type="warning"
+            showIcon
+            message="当前账号不能查看生产异常处置申请或待审批任务。"
+          />
+        )
+      ) : (
+        workflowTaskWorkspace
+      )}
     </BusinessPageLayout>
   )
 }

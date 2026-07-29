@@ -32,7 +32,7 @@ pnpm install
 | ------------- | ----------------------------------------------------------------- |
 | `src/common/` | 通用认证、组件、hooks、状态、常量与工具函数                       |
 | `src/erp/`    | 毛绒 ERP 桌面后台、业务页、岗位任务端页面和打印工作台             |
-| `src/erp/qa/` | 字段联动等前端 QA catalog 与报告生成依赖                         |
+| `src/erp/qa/` | 字段联动等前端 QA catalog 与报告生成依赖                          |
 | `src/pages/`  | 根路由重定向、登录、注册、管理员登录                              |
 | `scripts/`    | 前端本地服务、浏览器级回归和 smoke 脚本，详见 `scripts/README.md` |
 | `build/`      | 构建产物，不作为业务真源                                          |
@@ -83,13 +83,13 @@ http://127.0.0.1:5175/m/engineering/tasks
 
 正式前端文案统一站在当前使用账号和业务人员视角：本地 `pnpm start` / `start:yoyoosun`、`preview:yoyoosun` 与生产构建复用正式业务组件和文案；仅 `start:yoyoosun` 的 DEV fallback 壳显示开发诊断警示。`customer key`、`客户运行环境`、`Product Core`、配置投影和后端实现术语只保留在开发调试页、该 DEV 警示、无客户 Product Core 页面、日志或技术文档中，不出现在客户正式业务界面；交易主体“客户”和合同法律主体“甲方 / 委托方 / 订货方”仍按业务语义保留。
 
-| 场景                                                                       | 当前前端行为                                                                                                                                                                                                                                                                                                                                                                                | helper reason                                                               |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 正式客户 / 非前端 DEV 构建普通账号                                         | 正常 active revision 必须同时通过 RBAC 菜单路径和 active revision pages 交集；配置了部署 customer key 时，sync failure 且没有同 key cached effective session 会先进入客户运行态不可用页，不再挂载空投影业务壳；已有同 key cached effective session 时继续按缓存投影收窄，正式客户仍是强收窄。                                                                                               | `effective_session_page` / `effective_session_page_blocked`                 |
-| `local dev` 普通账号                                                       | 同 customer key 的 active revision 正常挂载；若成功读回 `builtin_rbac_fallback`，只允许带警示的桌面预览壳，不把 fallback 视为 customer runtime；工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端继续 fail closed。菜单仍按 RBAC 路径和 pages 规则收窄；sync failure、customer key 不匹配或缺失仍进入客户运行态不可用页。                                                        | `local_dev_customer_config_diagnostic` / `customer_runtime_missing`         |
-| `local dev` super admin                                                    | 第一层前端 RBAC 菜单路径不依赖 `allowedMenuPaths`；active revision 正常挂载客户运行态，同 key `builtin_rbac_fallback` 只挂载带警示的桌面预览壳且业务数据页保持 Product Core 审阅，无客户 key 时侧栏只使用 Product Core 控制面导航。隐藏 URL 始终按完整产品导航解析，未登记路径只得到显示 fallback，不得到授权 page key。                                                                                       | `super_admin_product_core`                                                  |
-| 正式 / 非前端 DEV 构建 super admin，正常 active revision                   | 前端菜单路径不依赖 `allowedMenuPaths`，也不再被 active pages / active actions / field policy 收窄；若 effective session 带有客户 key，则侧栏使用完整产品导航、`dataRuntimeScope=customer_runtime`、`canMountCustomerBusinessPages=true`，业务页仍按该客户运行环境读取当前部署数据库；后端写入口仍按模块状态、业务状态、Workflow / Fact 边界和审计门禁执行。                                 | `super_admin_product_core`                                                  |
-| 中性 Product Core 构建 super admin，`effective_session_sync_failed` 空投影 | 未配置静态 customer key 时，前端菜单路径不依赖 `allowedMenuPaths`，侧栏只显示 Product Core 控制面导航；此时 `dataRuntimeScope=sync_failed_diagnostic`、`canMountCustomerBusinessPages=false`，`/erp/dashboard` 显示产品核心总览，客户业务数据页可通过直达 URL 进入 Product Core 能力审阅页，不挂载真实业务 `Outlet`。已配置 customer key 的客户部署不走此分支，而是进入客户运行态不可用页。 | `super_admin_product_core`                                                  |
+| 场景                                                                       | 当前前端行为                                                                                                                                                                                                                                                                                                                                                                                | helper reason                                                       |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 正式客户 / 非前端 DEV 构建普通账号                                         | 正常 active revision 必须同时通过 RBAC 菜单路径和 active revision pages 交集；配置了部署 customer key 时，sync failure 且没有同 key cached effective session 会先进入客户运行态不可用页，不再挂载空投影业务壳；已有同 key cached effective session 时继续按缓存投影收窄，正式客户仍是强收窄。                                                                                               | `effective_session_page` / `effective_session_page_blocked`         |
+| `local dev` 普通账号                                                       | 同 customer key 的 active revision 正常挂载；若成功读回 `builtin_rbac_fallback`，只允许带警示的桌面预览壳，不把 fallback 视为 customer runtime；工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端继续 fail closed。菜单仍按 RBAC 路径和 pages 规则收窄；sync failure、customer key 不匹配或缺失仍进入客户运行态不可用页。                                         | `local_dev_customer_config_diagnostic` / `customer_runtime_missing` |
+| `local dev` super admin                                                    | 第一层前端 RBAC 菜单路径不依赖 `allowedMenuPaths`；active revision 正常挂载客户运行态，同 key `builtin_rbac_fallback` 只挂载带警示的桌面预览壳且业务数据页保持 Product Core 审阅，无客户 key 时侧栏只使用 Product Core 控制面导航。隐藏 URL 始终按完整产品导航解析，未登记路径只得到显示 fallback，不得到授权 page key。                                                                    | `super_admin_product_core`                                          |
+| 正式 / 非前端 DEV 构建 super admin，正常 active revision                   | 前端菜单路径不依赖 `allowedMenuPaths`，也不再被 active pages / active actions / field policy 收窄；若 effective session 带有客户 key，则侧栏使用完整产品导航、`dataRuntimeScope=customer_runtime`、`canMountCustomerBusinessPages=true`，业务页仍按该客户运行环境读取当前部署数据库；后端写入口仍按模块状态、业务状态、Workflow / Fact 边界和审计门禁执行。                                 | `super_admin_product_core`                                          |
+| 中性 Product Core 构建 super admin，`effective_session_sync_failed` 空投影 | 未配置静态 customer key 时，前端菜单路径不依赖 `allowedMenuPaths`，侧栏只显示 Product Core 控制面导航；此时 `dataRuntimeScope=sync_failed_diagnostic`、`canMountCustomerBusinessPages=false`，`/erp/dashboard` 显示产品核心总览，客户业务数据页可通过直达 URL 进入 Product Core 能力审阅页，不挂载真实业务 `Outlet`。已配置 customer key 的客户部署不走此分支，而是进入客户运行态不可用页。 | `super_admin_product_core`                                          |
 
 隐藏 URL 跳转也是 helper 判定，不是授权来源。直接打开已登记菜单路径但 RBAC 未授权、已登记页面被 active revision 隐藏，或 pages 判定不属于上述诊断例外时，`shouldRedirectFromCurrentNavigation` 只返回是否需要跳转；`ERPLayout` 只有在已过滤后的 `visibleSections[0].items[0].path` 存在时才 `replace` 到第一个可见入口。没有可见 fallback 时，只显示“当前账号暂无可见后台入口”并阻止业务 `Outlet`，不会跳到隐藏页、RBAC-only 页面或默认全量后台。当前 URL 的 RBAC 判断来自 `resolveMenuPermissionKey(location.pathname)` 解析出的 `currentMenuPath`，pages 判断来自 `resolveCurrentNavigationEntry` 对未过滤菜单定义的解析结果：已登记 exact / prefix 路径才返回 page key；未命中菜单定义时只返回工作台显示 fallback，`pageKey / menuPath` 为空。这个 fallback 只服务页头展示，不把原始 URL 升级为菜单入口、授权入口或业务页面准入；是否渲染业务内容仍由 React 路由、已过滤菜单是否为空、当前页面实际路由和对应后端权限共同决定。
 
@@ -333,26 +333,29 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 当前规则：
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- 桌面侧栏在权限过滤后附加 `使用帮助 / 岗位使用帮助`；该入口属于登录态壳层能力，不恢复 `erp.help_center.read` 或其他旧权限别名。客户配置可用 `desktopMenu.presentation = 'role_guided'` 依次显示“看板中心”、“常用工作”和“更多功能”：看板仅按最终页面权限固定在最前，岗位帮助固定折叠到更多功能；系统推荐通常选择 3 个岗位高频业务，财务推荐应付、应收、发票、对账 4 个。权限管理外层统一为“岗位设置 / 员工账号 / 审批责任”。“可用功能”消费后端 `menu_options` 与 `effective_role_access`：岗位列表、岗位摘要、保存状态和四类设置保持在同一双栏工作区；每条权限行直接标明“菜单入口 / 页内操作”，菜单入口同行展示页面是否出现及“看板中心 / 常用工作 / 更多功能”位置，页内操作同行展示所需入口，不再另设整组菜单结果卡。菜单与操作说明收进岗位头部问号浮层。桌面按业务分类提供吸顶直达和已选 / 总数，手机使用“跳到功能分类”下拉，保留“只看已选”用于复核，不提供低频全文搜索。未保存 `permission_keys` 只做客户有效范围预览，不持久化。主办理页面明确且入口唯一时会补齐该入口，但不会开启其他关联页面；关闭单一入口会移除仅在该页使用的操作，跨页面能力不自动删除。“页面与导航”可为业务岗位选择系统推荐，或从最终可进入页面中自定义并排序 1–5 个常用入口；角色保存的 `navigation_mode / primary_menu_paths` 只控制位置，不改变页面权限、操作权限、客户投影或直接路由。“关联账号”按当前 `admin.list` 与账号岗位关系只读列出会受该岗位设置影响的账号、状态和兼任岗位；账号分配、停用、重置与注销仍统一在外层“员工账号”办理，从岗位详情进入时仅按当前岗位预填现有账号搜索，不新增第二套账号管理或权限真源。“审批责任”复用同一员工与岗位真源，只展示三类已有正式 ProcessRuntime / 领域命令闭环的审批；具名员工必须启用且持有所选岗位，多岗位员工按真实岗位进入候选，主办、备用、升级按最低可用优先级串行生效。发布与启用分离，新设置只影响新流程；在途流程继续绑定冻结 revision，具名员工停用 / 注销时未结束待办退回该冻结责任池。
+- 桌面侧栏在权限过滤后附加 `使用帮助 / 岗位使用帮助`；该入口属于登录态壳层能力，不恢复 `erp.help_center.read` 或其他旧权限别名。客户配置可用 `desktopMenu.presentation = 'role_guided'` 依次显示“看板中心”、“常用工作”和“更多功能”：看板仅按最终页面权限固定在最前，岗位帮助固定在更多功能末尾；系统推荐通常选择 3 个岗位高频业务，财务推荐应收、应付、发票、对账 4 个。权限管理外层统一为“岗位设置 / 员工账号 / 审批责任”。“可用功能”消费后端 `menu_options` 与 `effective_role_access`：岗位列表、岗位摘要、保存状态和四类设置保持在同一双栏工作区；每条权限行直接标明“菜单入口 / 页内操作”，菜单入口同行展示页面是否出现及“看板中心 / 常用工作 / 更多功能”位置，页内操作同行展示所需入口，不再另设整组菜单结果卡。菜单与操作说明收进岗位头部问号浮层。桌面按业务分类提供吸顶直达和已选 / 总数，手机使用“跳到功能分类”下拉，保留“只看已选”用于复核，不提供低频全文搜索。未保存 `permission_keys` 只做客户有效范围预览，不持久化。主办理页面明确且入口唯一时会补齐该入口，但不会开启其他关联页面；关闭单一入口会移除仅在该页使用的操作，跨页面能力不自动删除。“页面与导航”可为业务岗位选择系统推荐，也可在双栏编辑器中把每个最终可进入页面放入“常用工作”或“更多功能”并分别排序；常用保留 1–5 项，撤销权限或失效页面会移出草稿，新出现的最终页面追加到更多功能。保存时前端通过一次 `set_role_settings` 整包提交权限、仓库范围与两组菜单路径，后端以一个角色 version CAS、一个事务和一条审计原子落库；并发冲突保留整份草稿。角色保存的 `navigation_mode / primary_menu_paths / secondary_menu_paths` 只控制位置，不改变页面权限、操作权限、客户投影或直接路由。“关联账号”按当前 `admin.list` 与账号岗位关系只读列出会受该岗位设置影响的账号、状态和兼任岗位；账号分配、停用、重置与注销仍统一在外层“员工账号”办理，从岗位详情进入时仅按当前岗位预填现有账号搜索，不新增第二套账号管理或权限真源。“审批责任”复用同一员工与岗位真源，只展示三类已有正式 ProcessRuntime / 领域命令闭环的审批；具名员工必须启用且持有所选岗位，多岗位员工按真实岗位进入候选，主办、备用、升级按最低可用优先级串行生效。常规操作通过一次“保存并生效”按 active revision/hash CAS 原子写入新 revision 和 active 切换，同时要求发布与激活权限；事务提交后新流程立即使用新设置，在途流程继续绑定冻结 revision。响应不确定时页面保留同一 intent 做权威回读确认，不另造 revision；具名员工停用 / 注销时未结束待办退回该冻结责任池。
+- “页面与导航”默认显示二级“菜单布局”，保留系统推荐 / 自定义模式、常用工作与更多功能双列表和导航预览；二级“页面可用范围”只读展示全部、可进入、不可进入三种筛选及最终原因，精确配置版本改为按需查看。切换二级 Tab 不清空未保存草稿、不重新请求权限解释，也不新增保存动作；所有岗位设置仍由岗位头部唯一的“保存岗位设置”整包提交。
 - `/erp/help-center` 根据当前有效岗位选择 `src/erp/config/roleHelpContent.mjs` 中的内容，多岗位账号可切换，单岗位账号不显示切换器，常用入口继续与当前可见菜单取交集。每岗帮助统一展示正常案例、完成标准、异常处理、退回对象和操作注意事项；未知岗位使用安全通用帮助。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径不再注册运行时路由、重定向或权限别名。
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
 
 ### 本地开发入口 / Dev-only surfaces
 
-下列页面只在开发构建中可访问，不进入侧栏、`seedData`、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单。
+下列页面只在开发构建中可访问，不进入侧栏、`seedData`、RBAC、产品内文档 registry、生产构建或 ERP 正式菜单。除本机 loopback Bridge 明确登记的客户配置、版本交付、测试数据和共享开发库迁移操作外，页面不直接写后端业务。
 
-| 路径                       | 职责                                     | 维护真源                                                    |
-| -------------------------- | ---------------------------------------- | ----------------------------------------------------------- |
-| `/__dev`                   | 开发态导航、搜索、分组和本地置顶         | `web/src/dev-workbench/config/devHub.mjs`                             |
-| `/__dev/governance`        | 项目治理地图只读可视化                   | `docs/项目治理地图.md`                                      |
-| `/__dev/status-flows`      | 分层状态机、流程编排与甲方差异只读观察   | 代码合同、正式状态文档与已登记客户配置包                    |
-| `/__dev/docs`              | 当前工作区 Markdown 查看器               | 仓库 Markdown 文件本身                                      |
-| `/__dev/testing`           | 验证层级、当前命令和预设查询             | `docs/product/自动化测试策略.md`                            |
-| `/__dev/prototypes`        | HTML / PNG / 截图原型资产预览            | `docs/product/prototypes/**`                                |
-| `/__dev/capability-ledger` | 产品能力与客户矩阵真源入口               | 两份正式 Markdown                                           |
-| `/__dev/customer-config`   | 已登记客户配置包预检、测试应用与发布门禁 | `config/customers/<customer-key>/*` 及 customer config 脚本 |
-| `/__dev/version-center`    | exact-SHA 发布、固定 133 部署与回滚      | GitHub Release、固定目标预检与 operation 回执               |
+| 路径                        | 职责                                     | 维护真源                                                      |
+| --------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| `/__dev`                    | 开发态导航、搜索、分组和本地置顶         | `web/src/dev-workbench/config/devHub.mjs`                     |
+| `/__dev/governance`         | 项目治理地图只读可视化                   | `docs/项目治理地图.md`                                        |
+| `/__dev/status-flows`       | 分层状态机、流程编排与甲方差异只读观察   | 代码合同、正式状态文档与已登记客户配置包                      |
+| `/__dev/docs`               | 当前工作区 Markdown 查看器               | 仓库 Markdown 文件本身                                        |
+| `/__dev/testing`            | 验证层级、当前命令和预设查询             | `docs/product/自动化测试策略.md`                              |
+| `/__dev/data-preparation`   | 固定档位测试数据计划、执行与回执         | 既有 Core seed、统一本地验收 lifecycle 与 operation store     |
+| `/__dev/database-migration` | 共享开发库迁移准备、执行、读回与重启     | `scripts/local-migration.mjs`、备份恢复脚本与 operation store |
+| `/__dev/prototypes`         | HTML / PNG / 截图原型资产预览            | `docs/product/prototypes/**`                                  |
+| `/__dev/capability-ledger`  | 产品能力与客户矩阵真源入口               | 两份正式 Markdown                                             |
+| `/__dev/customer-config`    | 已登记客户配置包预检、测试应用与发布门禁 | `config/customers/<customer-key>/*` 及 customer config 脚本   |
+| `/__dev/version-center`     | exact-SHA 发布、固定 133 部署与回滚      | GitHub Release、固定目标预检与 operation 回执                 |
 
 #### 开发导航 `/__dev`
 
@@ -360,7 +363,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 卡片显示用途、真源路径和边界摘要；重复“进入”链接使用页面专属可访问名称，实时搜索不再渲染无动作的搜索按钮。
 - 置顶只写浏览器本地偏好，不是后端配置。
 - 开发导航使用 `/favicon-dev.svg`；测试入口使用 `/favicon-testing.svg`，每个开发页同时提供独立浏览器标题，只用于区分本地开发页面。
-- 八个子页统一提供开发工作台全局菜单、当前页高亮、返回开发导航、复制当前深链和按需打开来源文档；开发人员可以在任意子页直接切换治理、流程状态、文档、测试、原型、能力、客户配置和版本中心，不再先返回首页寻找入口。“开发工作台”按钮是唯一返回总览的入口，不在菜单中重复放第二个“总览”。移动端全局菜单允许横向滚动，并保持单一当前页语义。
+- 十个子页统一提供开发工作台全局菜单、当前页高亮、返回开发导航、复制当前深链和按需打开来源文档；开发人员可以在任意子页直接切换治理、流程状态、文档、测试、数据准备、数据库迁移、原型、能力、客户配置和版本中心，不再先返回首页寻找入口。“开发工作台”按钮是唯一返回总览的入口，不在菜单中重复放第二个“总览”。移动端全局菜单允许横向滚动，并保持单一当前页语义。
 
 #### 项目治理地图 `/__dev/governance`
 
@@ -400,8 +403,27 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - `docs/reference/**` 和 `docs/archive/**` 默认不进入可复制命令来源，避免把历史或未来命令写成当前测试入口。
 - 多行命令会保留完整续行参数；不完整且以反斜杠结尾的命令不会进入复制结果。命令区按内容高度展示，不再被网格压缩裁切；筛选无结果时文档详情同步为空。
 - 覆盖视图从 dev-only `GET /__dev/api/qa/coverage` 读取固定 `output/qa/coverage/latest.json`，按 Go、Web、业务域、T0-T8、PostgreSQL、浏览器、readiness、目标环境和 UAT 分栏；未采集、过期、失败、跳过、阻塞和零执行不会折算为通过，也不会合并成一个总百分比。
-- 报告接口仅在 development serve 且请求来源与 Host 都是 loopback 时可用，返回 `no-store` 脱敏摘要；生产 build 不包含 `output/qa/**`，也不再从 `public/qa` 携带本机路径或覆盖报告。
-- 先运行 `node scripts/qa/erp-field-linkage.mjs`，再运行 `node scripts/qa/test-coverage-report.mjs --write` 刷新本地报告。字段联动 runner 会前后校验仓库指纹；仓库在运行期变动时 fail closed，不生成冒充当前的证据。页面复制按钮不会执行 shell，聚合命令也不会自动执行 full / strict、数据库或浏览器写入测试；`docs/product/自动化测试策略.md` 仍是测试选择和覆盖门槛真源。
+- 报告与操作接口仅在 development serve 且请求来源与 Host 都是 loopback 时可用，返回 `no-store` 脱敏摘要；生产 build 不包含 `output/qa/**`，也不再从 `public/qa` 携带本机路径或覆盖报告。
+- 「一键采集覆盖率」通过 dev-only session / action / operation API 发起异步固定 baseline。浏览器只提交 `collect + idempotencyKey`，不能传 shell、参数、路径、环境变量或 profile；服务端校验本机 Host、同源、CSRF、JSON 合同，解析项目锁定的 Node / pnpm，以持久化幂等索引和跨进程锁串行运行 `node scripts/qa/test-coverage-collect.mjs --profile baseline --write`。页面显示 10 个脱敏阶段并轮询持久化状态，切换视图不取消后台任务，回到页面后可恢复读回；按钮在运行期间原位禁用，终态自动刷新报告。
+- 运行期仓库变化、启动/服务中断或终态读回无法证明时 fail closed，上一份报告继续展示；真实测试完成但存在失败、缺失或零执行时会发布绑定当前身份的 issues 报告，防止旧绿色遮蔽。页面“重新读取”只读取报告，“复制备用命令”只在 DEV 操作接口不可用时供手工执行。baseline 不写 PostgreSQL、不运行真实业务浏览器、不部署或做客户 UAT，未实际采集的值显示为空而不是 `0%`；`docs/product/自动化测试策略.md` 仍是测试选择和覆盖门槛真源。
+
+#### 测试数据中心 `/__dev/data-preparation`
+
+- 页面只通过 development serve 的 loopback Bridge 使用三个固定 profile，不接受 shell、SQL、脚本路径、DSN、后端地址、密码或自定义环境变量。写入口的信任边界是本机开发进程、Host / Origin / `Sec-Fetch-Site`、CSRF 和 operation 确认，不冒充 ERP RBAC。
+- `共享开发基础数据 / core-demo` 只允许登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev`，先确认 migration 已到 head，再顺序复用角色演示账号和 Product Core 基础资料 seed。它只生成账号、单位、材料、产品、仓库、工序和 BOM 等稳定开发基线，不生成客户、订单、Workflow、库存、出货或财务事实；稳定 upsert 不等于整批事务，也不提供按 operation 删除。
+- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.07.16-v5 / 20260716-V5`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。它按正式 API 准备 Source Document、5 条可证明 ProcessRuntime、模拟岗位任务和来源驱动 Fact，同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。岗位到期时间是固定 V5 快照，不保证长期维持“今天 / 本周”相对语义；终态只证明 40 / 50 项数据前置，10 项浏览器检查和人工验收保持未完成。
+- `完整验收数据 / full-acceptance` 只接受 clean exact commit 和服务端已有的 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，复用统一 lifecycle 在同批专用库完成 migration、正式 Source / ProcessRuntime / Fact 数据、50 项页面验收和异常流；成功或失败都必须停服、删库并读回零残留。
+- `scenario-demo` 的页面操作固定为“读取预检 → 点击生成 → 自动准备并冻结 `planHash`、`runId`、仓库和目标摘要 → 核对固定目标 / V5 批次 / 数据范围 / 长期保留边界 → 确认生成 → 异步执行 → 读取回执”，不要求手输长确认串。其他 profile 继续使用完整确认串。执行前身份变化会使原计划失效；页面刷新可恢复最近 operation，进程中断或结果不明确时显示 `not_proven`，不自动重试。
+- `scenario-demo` 只在固定本机 8300、登记 106 长期开发库、migration 和 runtime identity 已证明后，由后台使用项目登记的本机开发账号约定；显式 Vite 进程环境覆盖值仍优先，但凭据不进入浏览器、命令参数或回执。日常直接在本页点击即可，不需要 `make dev_restart`；只有修改 Vite 凭据覆盖环境时才重启一次 `pnpm start`。后端代码、配置或 migration 变化时才按正式后端流程重启。
+- 页面不提供普通“重置全部数据”或 debug cleanup。共享基线按正式账号 / 主数据生命周期退出，已生效业务事实按取消、冲正或调整退出；只有专用验收库允许数据库级自动清理。Workflow task 完成不等于 Fact 已生成。
+
+#### 数据库迁移 `/__dev/database-migration`
+
+- 页面只操作 application config 已登记的 `192.168.0.106:5432/plush_erp` 共享开发库，不接受浏览器传入的 DSN、目标、命令、SQL、脚本路径、凭据或环境变量，也不支持 133、测试或生产数据库。
+- 默认只读显示当前 / 最新 migration、pending 数和后端 health / ready。存在 pending 时先点“检查并准备”：Bridge 固定执行同目标 status、停止后端、plan、备份恢复演练和最终身份复核；其它数据库客户端仍占用目标时按既有 guard 阻断，不代替用户强制断开。
+- 准备成功后，页面要求输入当前 operation 给出的完整确认串；随后同一 operation 只执行一次 apply、`pending=0` 读回、后端重启和 health / ready。提交结果无法证明时标为 `not_proven`，先读回，不自动重试。
+- operation 使用 `0600` 原子状态、幂等键和跨 Vite 进程排他锁。migration / schema / guard / 备份编排真源或目标状态变化会使旧计划失效；未变化且文件大小与 SHA-256 均读回一致的备份恢复报告可以复用，避免同一计划因非写入阻断反复 dump / restore。
+- 此入口不运行 `fast`、`full`、`strict`、完整验收 lifecycle 或发布构建。后端只在确认 apply 后重启一次；数据库已到 head 时不为了“证明绿色”重新迁移或重建。正式发布迁移继续使用受控发布制品、目标备份、串行锁、readback、smoke 和 rollback point。
 
 #### 客户配置包预检与发布 `/__dev/customer-config`
 
@@ -430,7 +452,8 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台继续只保留一个入口
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code。权限清单按后端 `module_name` 展示“物料清单（BOM）/ 客户退货 / 生产执行 / 敏感字段”等业务分类，不在前端重复维护模块翻译；仅对未知或缺失分类合并显示一个“未分类功能”，避免多个技术模块同时冒充“其他功能”。分类导航只负责页内定位，不改变勾选结果或权限真源
-- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、生产排程、生产异常、出货放行、出库管理和财务业务已分别接入正式 V1、Workflow V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、事务内聚合新建草稿、只读查看明细、显式提交放行、确认出货和已出货取消冲正。品质岗位可在提交放行前从 `DRAFT` 出货单按产品规格、仓库和批次发起出货前成品检验；一旦存在检验，未完成合格 / 让步判定时后端会阻止提交，提交成功后也不再允许补建检验。提交返回必须通过前端对任务编号、任务组、来源、责任岗位、状态、来源合同和意图摘要的完整校验，结构不可信时不冒充成功。没有发起检验仍按当前可选检验策略提交；创建检验不会启动 Workflow。放行任务完成只表示允许仓库执行，`SHIPPED` 才是真实出货事实。草稿逐行追加已退出，避免重复提交和多行半保存。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。生产排程、生产异常和出货放行由 Workflow V1 协同页承接读取、完成、阻塞和催办；任务分别由生产订单下达、返工事实过账和出货单显式提交放行生成，页面不提供通用新建入口。三类保留任务组和确定性任务编号不能由普通任务创建、流程节点或客户流程配置占用。任务终态只更新协同投影；来源随后关闭、取消或真实出货时，页面读取的来源投影可继续显示 `closed / cancelled / shipped`，但不改写任务处理结论。三者不读取或写入旧 `business_records`，也不提供删除、回收站、业务数据导出或生产 / 出货 / 库存 / 财务领域事实写入主路径。旧预览壳页、旧通用业务页、旧业务模块路由和旧入口退出页已删除。
+- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、生产排程、生产异常处置、出货放行、出库管理和财务业务已分别接入正式 V1、Workflow V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、事务内聚合新建草稿、只读查看明细、显式提交放行、确认出货和已出货取消冲正。品质岗位可在提交放行前从 `DRAFT` 出货单按产品规格、仓库和批次发起出货前成品检验；一旦存在检验，未完成合格 / 让步判定时后端会阻止提交，提交成功后也不再允许补建检验。提交返回必须通过前端对任务编号、任务组、来源、责任岗位、状态、来源合同和意图摘要的完整校验，结构不可信时不冒充成功。没有发起检验仍按当前可选检验策略提交；创建检验不会启动 Workflow。放行任务完成只表示允许仓库执行，`SHIPPED` 才是真实出货事实。草稿逐行追加已退出，避免重复提交和多行半保存。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。生产排程和出货放行由 Workflow V1 协同页承接读取、完成、阻塞和催办，任务分别由生产订单下达和出货单显式提交放行生成。生产异常处置页的待审批任务由正式处置申请启动的 `production_exception_approval` 生成；返工事实过账产生的 `production_exception` 来源提醒不进入该页待审批任务表。三类页面都不提供通用新建入口，其正式任务组和确定性任务编号不能由普通任务创建、流程节点或客户流程配置占用。任务终态只更新协同投影；来源随后关闭、取消或真实出货时，页面读取的来源投影可继续显示 `closed / cancelled / shipped`，但不改写任务处理结论。三者不读取或写入旧 `business_records`，也不提供删除、回收站、业务数据导出或生产 / 出货 / 库存 / 财务领域事实写入主路径。旧预览壳页、旧通用业务页、旧业务模块路由和旧入口退出页已删除。
+- `生产异常处置` 是上述 Workflow V1 页面中的正式复合变体：`处置申请` 页签读取 ProductionExceptionDecision 并承接审批后的执行 / 冲正，`待审批` 页签只读取 `production_exception_decision_approval` 任务。两个页签分别维护统计、刷新和操作区，每次只挂载当前页签；任务完成仍不代替报废 / 在制让步执行或超领额度消费。
 - 正式业务页的“相关单据”支持连续往返。每一跳都以目标页拥有的数值 ID 或来源类型 + 来源 ID 重新建立精确筛选，业务单号只用于筛选框回显，不参与精确请求。目标关系只有一条可确定记录时自动选中并回显目标单号，用户编辑或清空筛选后退出关联上下文；存在多条取消历史且无法唯一确定时不臆选。
 - 生产订单页的“工序办理”已接固定 `PLUSH_SEW_HAND_V1` v1：布料加工正常流整单外发且首道不可拆，只有裁片检验 `PASS` 转入车缝后才可按产品数量拆批；车缝和手工按“先车缝、后手工”分别选择本厂或外发。内部完成使用“车间移交 / WIP 转移”，外发完成返回才使用“外发回仓”。首道外发只允许选择逐条精确覆盖显式 `FABRIC_PROCESSING` 冻结材料需求的 MATERIAL 合同行，并在开始前核对已过账委外发料；FABRIC 返工再次外发改用新的 PRODUCT 合同行。生产、品质、业务和 PMC 分别按 WIP 执行、分段质检、包材业务确认和只读跟进权限进入对应入口，业务岗位可凭 `production.wip.read` 打开生产订单页，但新建、编辑、发布、关闭、取消和引用选项仍只认 PMC 计划权限。
 - 质量检验页已把生产 WIP 纳入独立读模型，按裁片、皮套、成品、针检、抽检和订单条件性客户验货逐关口展示；每张单只代表当前批次当前关口，生产路线当前只有 `PASS` 可推进，`CONCESSION` fail closed。包材版面 / 包装版本由业务独立确认，不替代正式品质检验；路线订单的完工入库入口会重新核对已验收包装 WIP 数量。
@@ -455,9 +478,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 ## 桌面业务弹窗约定
 
 - 项目弹窗默认上下左右居中：JSX 版 `antd Modal` 由根 `ConfigProvider` 统一启用 `centered`，命令式 `modal.confirm/info/success/warning/error` 由 `AntdAppBridge` 的消费层统一补齐居中配置；`AppModal` 复用 Ant Design 的遮罩、键盘、焦点圈定和触发点恢复，并只补充业务面板外观与可访问名称。
-- 业务记录的新建 / 编辑优先使用业务表单弹窗；详情抽屉只用于显式只读核对。生产排程、生产异常和出货放行页只读取并处理由生产订单下达、返工事实过账和出货单提交放行生成的 Workflow 协同任务，不提供通用任务创建弹窗，也不能把协同结果写成生产订单、生产异常事实、出货单、库存、财务或发票事实；来源、打印、删除等未接入真实 usecase 的动作不能写成真实业务动作。
+- 业务记录的新建 / 编辑优先使用业务表单弹窗；详情抽屉只用于显式只读核对。生产排程和出货放行页只读取并处理来源生成的 Workflow 协同任务；生产异常处置页以独立页签分开处置申请和待审批任务。三者都不提供通用任务创建弹窗，也不能把协同结果写成生产订单、生产异常执行、出货单、库存、财务或发票事实；来源、打印、删除等未接入真实 usecase 的动作不能写成真实业务动作。
 - 桌面端业务录入弹窗默认按紧凑自适应栅格排布：文本字段在可用宽度内多列展示，数量类短字段进一步收口，备注、边界说明和明细区保留整行。
-- V1 主数据和销售订单表单弹窗宽度基线为 `min(960px, calc(100vw - 96px))`；普通 Workflow V1 协同创建弹窗使用当前共享业务弹窗约束，不恢复 formal-shell 字段预览弹窗主路径。生产排程、生产异常和出货放行是来源生成页，不渲染该创建弹窗。
+- V1 主数据和销售订单表单弹窗宽度基线为 `min(960px, calc(100vw - 96px))`；普通 Workflow V1 协同创建弹窗使用当前共享业务弹窗约束，不恢复 formal-shell 字段预览弹窗主路径。生产排程、生产异常处置和出货放行是来源生成页，不渲染该创建弹窗。
 - 明细条目按共享列宽预算展示，长文本字段保留较宽输入，数量 / 单价 / 金额等短数字字段收窄；数量后缀读取当前行已填单位，金额类字段默认显示 `CNY` 后缀，但不把空单位强行保存成 `pcs`。
 - 单据级附件属于主对象证据字段，放在备注、交付、合同资料或凭证语义附近，并位于订单行、BOM 明细、出货明细等 item 区之前；未保存状态可先选择附件并在保存成功后自动上传绑定，单个附件上限 5MB，PNG / JPG / WEBP / GIF / PDF 可轻量预览，HEIC / HEIF、Office、ZIP、邮件证据和 WPS 文件下载后查看，无附件状态使用紧凑空态，不在弹窗末尾放置独立大区块，避免明细增多后必须滚到最后才看见上传入口。
 - 产品图不是普通证据附件：产品表单内固定显示两个紧凑图片位，选择、替换或清空先留在当前表单会话，产品保存成功后才调用产品媒体接口；取消或产品保存失败不写图片，已打开打印草稿也不随主档后续替换而变化。

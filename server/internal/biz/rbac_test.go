@@ -359,6 +359,18 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 			permissions: []string{PermissionFinanceReceivableRead},
 		},
 		{
+			key:         "payables",
+			label:       "应付管理",
+			path:        "/erp/finance/payables",
+			permissions: []string{PermissionFinancePayableRead},
+		},
+		{
+			key:         "finance-payments",
+			label:       "收付款核销",
+			path:        "/erp/finance/payments",
+			permissions: []string{PermissionFinancePaymentRead},
+		},
+		{
 			key:         "invoices",
 			label:       "发票管理",
 			path:        "/erp/finance/invoices",
@@ -395,6 +407,22 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 				t.Fatalf("expected %s permissions to contain %#v, got %#v", tt.key, tt.permissions, menuPermissions)
 			}
 		})
+	}
+	financeMenuKeys := []string{}
+	for _, menu := range BuiltinAdminMenus() {
+		if strings.HasPrefix(menu.Path, "/erp/finance/") {
+			financeMenuKeys = append(financeMenuKeys, menu.Key)
+		}
+	}
+	expectedFinanceMenuKeys := []string{
+		"reconciliation",
+		"receivables",
+		"payables",
+		"finance-payments",
+		"invoices",
+	}
+	if strings.Join(financeMenuKeys, "\x00") != strings.Join(expectedFinanceMenuKeys, "\x00") {
+		t.Fatalf("finance menu order = %#v, want %#v", financeMenuKeys, expectedFinanceMenuKeys)
 	}
 	if _, ok := menusByKey["exception-flow"]; ok {
 		t.Fatal("retired exception-flow menu must not remain registered")

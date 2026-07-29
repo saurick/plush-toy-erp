@@ -78,13 +78,18 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data: newDataStruct(map[string]any{"approval_settings": approvalSettingsExplanationToMap(settings)}),
 		}, nil
 
-	case "preview_approval_settings", "publish_approval_settings":
+	case "preview_approval_settings", "publish_approval_settings", "apply_approval_settings":
 		permission := biz.PermissionCustomerConfigRead
-		if method == "publish_approval_settings" {
+		if method == "publish_approval_settings" || method == "apply_approval_settings" {
 			permission = biz.PermissionCustomerConfigPublish
 		}
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
+		}
+		if method == "apply_approval_settings" {
+			if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigActivate); res != nil {
+				return id, res, nil
+			}
 		}
 		in, ok := approvalSettingsRevisionInputFromParams(pm)
 		if !ok {
@@ -101,6 +106,16 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}
 		settings, err := d.customerConfigUC.PreviewApprovalSettingsRevision(ctx, in)
 		if err != nil {
+			if method == "apply_approval_settings" && errors.Is(err, biz.ErrCustomerConfigTransitionBlocked) {
+				revision, applyErr := d.customerConfigUC.ApplyApprovalSettingsRevision(ctx, in, admin.ID)
+				if applyErr == nil {
+					return id, &v1.JsonrpcResult{
+						Code: errcode.OK.Code, Message: errcode.OK.Message,
+						Data: newDataStruct(map[string]any{"revision": customerConfigRevisionToMap(revision)}),
+					}, nil
+				}
+				return id, d.mapCustomerConfigError(ctx, applyErr), nil
+			}
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
 		if candidateResult := d.validateApprovalSettingsCandidate(ctx, settings, admin); candidateResult != nil {
@@ -112,7 +127,12 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 				Data: newDataStruct(map[string]any{"approval_settings": approvalSettingsExplanationToMap(settings)}),
 			}, nil
 		}
-		revision, err := d.customerConfigUC.PublishApprovalSettingsRevision(ctx, in, admin.ID)
+		var revision *biz.CustomerConfigRevision
+		if method == "apply_approval_settings" {
+			revision, err = d.customerConfigUC.ApplyApprovalSettingsRevision(ctx, in, admin.ID)
+		} else {
+			revision, err = d.customerConfigUC.PublishApprovalSettingsRevision(ctx, in, admin.ID)
+		}
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}

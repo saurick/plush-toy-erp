@@ -729,9 +729,7 @@ export default function ERPLayout() {
         key: ROLE_GUIDED_MORE_MENU_KEY,
         icon: <AppstoreOutlined />,
         label: `更多功能（${roleGuidedNavigation.secondaryItemCount}）`,
-        children: roleGuidedNavigation.secondarySections.map((section) =>
-          buildMenuGroup(section, 'role-more-group')
-        ),
+        children: roleGuidedNavigation.secondaryItems.map(buildMenuLeaf),
       })
     }
     return guidedItems
@@ -739,20 +737,15 @@ export default function ERPLayout() {
 
   const roleGuidedSecondaryContainsCurrent = useMemo(
     () =>
-      roleGuidedNavigation.secondarySections.some((section) =>
-        section.items.some((item) => item.path === currentMenuPath)
+      roleGuidedNavigation.secondaryItems.some(
+        (item) => item.path === currentMenuPath
       ),
-    [currentMenuPath, roleGuidedNavigation.secondarySections]
+    [currentMenuPath, roleGuidedNavigation.secondaryItems]
   )
 
   const roleGuidedSecondaryPaths = useMemo(
-    () =>
-      new Set(
-        roleGuidedNavigation.secondarySections.flatMap((section) =>
-          section.items.map((item) => item.path)
-        )
-      ),
-    [roleGuidedNavigation.secondarySections]
+    () => new Set(roleGuidedNavigation.secondaryItems.map((item) => item.path)),
+    [roleGuidedNavigation.secondaryItems]
   )
 
   useEffect(() => {

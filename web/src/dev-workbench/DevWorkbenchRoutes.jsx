@@ -45,6 +45,12 @@ const DevCustomerConfigPage = lazyRoute(
   () => import('./pages/DevCustomerConfigPage.jsx')
 )
 const DevTestingPage = lazyRoute(() => import('./pages/DevTestingPage.jsx'))
+const DevDataPreparationPage = lazyRoute(
+  () => import('./pages/DevDataPreparationPage.jsx')
+)
+const DevDatabaseMigrationPage = lazyRoute(
+  () => import('./pages/DevDatabaseMigrationPage.jsx')
+)
 const DevVersionCenterPage = lazyRoute(
   () => import('./pages/DevVersionCenterPage.jsx')
 )
@@ -62,8 +68,7 @@ function DevRouteLoadingFallback() {
 
 export default function DevWorkbenchRoutes() {
   const location = useLocation()
-  const appTitle =
-    import.meta.env.VITE_APP_TITLE || '毛绒玩具管理系统'
+  const appTitle = import.meta.env.VITE_APP_TITLE || '毛绒玩具管理系统'
   const documentTitle = resolveDevPageTitle(location.pathname, appTitle)
   const faviconHref = resolveDevPageFavicon(location.pathname)
 
@@ -90,9 +95,7 @@ export default function DevWorkbenchRoutes() {
           <Route
             path="quality"
             element={
-              <DevWorkbenchAreaPage
-                areaKey={DEV_WORKBENCH_AREA_KEYS.quality}
-              />
+              <DevWorkbenchAreaPage areaKey={DEV_WORKBENCH_AREA_KEYS.quality} />
             }
           />
           <Route
@@ -110,19 +113,18 @@ export default function DevWorkbenchRoutes() {
           />
           <Route path="docs" element={<DevDocsPage />} />
           <Route path="testing" element={<DevTestingPage />} />
+          <Route path="data-preparation" element={<DevDataPreparationPage />} />
           <Route path="prototypes" element={<DevPrototypesPage />} />
           <Route
             path="capability-ledger"
             element={<DevCapabilityLedgerPage />}
           />
+          <Route path="customer-config" element={<DevCustomerConfigPage />} />
           <Route
-            path="customer-config"
-            element={<DevCustomerConfigPage />}
+            path="database-migration"
+            element={<DevDatabaseMigrationPage />}
           />
-          <Route
-            path="version-center"
-            element={<DevVersionCenterPage />}
-          />
+          <Route path="version-center" element={<DevVersionCenterPage />} />
           <Route path="*" element={<Navigate to="/__dev" replace />} />
         </Routes>
       </Suspense>

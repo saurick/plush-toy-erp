@@ -245,6 +245,40 @@ test('field linkage wrapper rechecks identity and stores only sanitized TAP', as
   assert.deepEqual(JSON.parse(commands[1].args[expectedIndex + 1]), REPOSITORY)
 })
 
+test('field linkage wrapper can target an operation staging directory', async () => {
+  const outputDirectory = '/repo/output/qa/coverage/.staging/operation'
+  const nodeTapFile = `${outputDirectory}/field-linkage.tap`
+  const coverageReportFile = `${outputDirectory}/field-linkage.latest.json`
+  const removed = []
+  const directories = []
+  const commands = []
+  const writes = []
+  await runFieldLinkageQa({
+    repositoryReader: async () => ({ ...REPOSITORY }),
+    executeCommand: async (command) => {
+      commands.push(command)
+      return { stdout: 'ok 1 - FL_alpha__pass\n', stderr: '' }
+    },
+    makeDirectory: async (directory) => directories.push(directory),
+    removeFile: async (file) => removed.push(file),
+    writeTap: async (file) => writes.push(file),
+    outputDirectory,
+    nodeTapFile,
+    coverageReportFile,
+  })
+  assert.deepEqual(removed, [coverageReportFile, nodeTapFile])
+  assert.deepEqual(directories, [outputDirectory])
+  assert.deepEqual(writes, [nodeTapFile])
+  assert.equal(
+    commands[1].args[commands[1].args.indexOf('--node-tap') + 1],
+    nodeTapFile
+  )
+  assert.equal(
+    commands[1].args[commands[1].args.indexOf('--output') + 1],
+    coverageReportFile
+  )
+})
+
 test('field linkage wrapper stops before writing TAP when tests change the repository', async () => {
   const changedRepository = {
     ...REPOSITORY,

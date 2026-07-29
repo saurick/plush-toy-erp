@@ -124,9 +124,33 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
     );
   }
 
+  await runCommand(
+    "node",
+    [
+      path.join(repoRoot, "scripts/qa/database-programmability.mjs"),
+      "--database-url-env",
+      "PLUSH_DATABASE_PROGRAMMABILITY_URL",
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PLUSH_DATABASE_PROGRAMMABILITY_URL: databaseURL,
+      },
+      maxBuffer: 4 * 1024 * 1024,
+    },
+    runtime,
+    "开发数据库仍含自定义 Function、Procedure 或非内部 Trigger；请先完成受控 migration 清理",
+    { includeOutput: true },
+  );
+
   writeLine(
     runtime,
     `[local-preflight] 开发数据库 migration 已是最新版本（${result.currentVersion}，${result.appliedFiles}/${result.availableFiles}）`,
+  );
+  writeLine(
+    runtime,
+    "[local-preflight] non-system-schema function=0 procedure=0 non-internal-trigger=0",
   );
   return result;
 }

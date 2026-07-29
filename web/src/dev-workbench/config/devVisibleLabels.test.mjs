@@ -19,7 +19,7 @@ test('devVisibleLabels: 常见开发分类使用中文主体并保留英文锚�
   assert.equal(formatDevEnglishAnchor('HTML'), '网页原型 / HTML')
   assert.equal(formatDevEnglishAnchor('已经是中文'), '已经是中文')
 })
-test('devVisibleLabels: 八个开发页和共享导航不保留无说明纯英文 Text 或 Tag', () => {
+test('devVisibleLabels: 十一个开发页和共享导航不保留无说明纯英文 Text 或 Tag', () => {
   const sources = [
     'web/src/dev-workbench/pages/DevHubPage.jsx',
     'web/src/dev-workbench/pages/DevGovernancePage.jsx',
@@ -29,6 +29,9 @@ test('devVisibleLabels: 八个开发页和共享导航不保留无说明纯英�
     'web/src/dev-workbench/pages/DevPrototypesPage.jsx',
     'web/src/dev-workbench/pages/DevCapabilityLedgerPage.jsx',
     'web/src/dev-workbench/pages/DevCustomerConfigPage.jsx',
+    'web/src/dev-workbench/pages/DevVersionCenterPage.jsx',
+    'web/src/dev-workbench/pages/DevDataPreparationPage.jsx',
+    'web/src/dev-workbench/pages/DevDatabaseMigrationPage.jsx',
     'web/src/dev-workbench/components/DevPageNav.jsx',
     'web/src/dev-workbench/components/DevTaskNav.jsx',
   ]

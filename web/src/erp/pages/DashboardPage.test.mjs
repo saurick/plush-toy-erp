@@ -23,6 +23,12 @@ const desktopTaskActionSource = readFileSync(
   'utf8'
 )
 
+test('desktop workbench uses its dedicated role-task read projection', () => {
+  assert.match(source, /response:\s*await listAllWorkflowWorkbenchRoleTasks\(/u)
+  assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)
+  assert.doesNotMatch(source, /\blistWorkflowRoleTasks\b/u)
+})
+
 test('workbench keeps the explicit view button and opens plain rows on double-click', () => {
   assert.match(source, /openDashboardItemOnDoubleClick/u)
   assert.match(source, /erp-workbench-task-row--openable/u)

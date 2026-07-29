@@ -627,7 +627,13 @@ func (r *operationalFactRepo) GetFinanceFact(ctx context.Context, id int) (*biz.
 		}
 		return nil, err
 	}
-	return entFinanceFactToBiz(row), nil
+	outstanding, err := financeFactOutstandingAmounts(ctx, r.data.postgres, []*ent.FinanceFact{row})
+	if err != nil {
+		return nil, err
+	}
+	out := entFinanceFactToBiz(row)
+	out.OutstandingAmount = outstanding[row.ID]
+	return out, nil
 }
 
 func (r *operationalFactRepo) ListFinanceFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.FinanceFact, int, error) {
@@ -710,13 +716,78 @@ func (r *operationalFactRepo) listFinanceFacts(
 	if err != nil {
 		return nil, 0, err
 	}
+	outstanding, err := financeFactOutstandingAmounts(ctx, r.data.postgres, rows)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.FinanceFact, 0, len(rows))
 	for _, row := range rows {
 		item := entFinanceFactToBiz(row)
 		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
+		item.OutstandingAmount = outstanding[row.ID]
 		out = append(out, item)
 	}
 	return out, total, nil
+}
+
+func financeFactOutstandingAmounts(
+	ctx context.Context,
+	client *ent.Client,
+	facts []*ent.FinanceFact,
+) (map[int]decimal.Decimal, error) {
+	// Keep the read projection on the same netting rule used by payment and
+	// credit-note write guards: posted rows consume, reversing rows restore.
+	outstanding := make(map[int]decimal.Decimal, len(facts))
+	factIDs := make([]int, 0, len(facts))
+	for _, fact := range facts {
+		if fact == nil || fact.ID <= 0 {
+			continue
+		}
+		if _, exists := outstanding[fact.ID]; exists {
+			continue
+		}
+		outstanding[fact.ID] = fact.Amount
+		factIDs = append(factIDs, fact.ID)
+	}
+	if len(factIDs) == 0 {
+		return outstanding, nil
+	}
+
+	allocations, err := client.FinanceAllocation.Query().
+		Where(financeallocation.FinanceFactIDIn(factIDs...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, allocation := range allocations {
+		switch allocation.Status {
+		case biz.FinanceAllocationStatusPosted:
+			outstanding[allocation.FinanceFactID] = outstanding[allocation.FinanceFactID].Sub(allocation.Amount)
+		case biz.FinanceAllocationStatusReversed:
+			outstanding[allocation.FinanceFactID] = outstanding[allocation.FinanceFactID].Add(allocation.Amount)
+		}
+	}
+
+	creditNotes, err := client.FinanceCreditNote.Query().
+		Where(financecreditnote.FinanceFactIDIn(factIDs...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, creditNote := range creditNotes {
+		switch creditNote.Status {
+		case "POSTED":
+			outstanding[creditNote.FinanceFactID] = outstanding[creditNote.FinanceFactID].Sub(creditNote.Amount)
+		case "REVERSED":
+			outstanding[creditNote.FinanceFactID] = outstanding[creditNote.FinanceFactID].Add(creditNote.Amount)
+		}
+	}
+	for _, amount := range outstanding {
+		if amount.IsNegative() {
+			return nil, biz.ErrBadParam
+		}
+	}
+	return outstanding, nil
 }
 
 func (r *operationalFactRepo) changeFinanceFactStatus(ctx context.Context, in *biz.OperationalFactStatusMutation, status string) (*biz.FinanceFact, error) {
@@ -1003,5 +1074,5 @@ func entFinanceFactToBiz(row *ent.FinanceFact) *biz.FinanceFact {
 		name := canceller.Username
 		cancellerName = &name
 	}
-	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, SettledAt: row.SettledAt, SettledBy: row.SettledBy, SettledByName: settlerName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, OutstandingAmount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, SettledAt: row.SettledAt, SettledBy: row.SettledBy, SettledByName: settlerName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

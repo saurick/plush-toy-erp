@@ -1,4 +1,8 @@
 /* Extracted from src/erp/styles/app/print-responsive.css for DEV-only loading. */
+.erp-dev-hub-card--without-icon {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 @media screen and (max-width: 1023px) {
   .erp-dev-hub-pinned__grid {
     grid-template-columns: 1fr;
@@ -229,6 +233,7 @@
   }
 
   .erp-dev-testing-coverage-actions,
+  .erp-dev-testing-coverage-operation__head,
   .erp-dev-testing-coverage-section__head,
   .erp-dev-testing-coverage-card__head {
     align-items: stretch;

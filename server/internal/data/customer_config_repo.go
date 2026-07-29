@@ -30,11 +30,12 @@ func NewCustomerConfigRepo(d *Data, logger log.Logger) *customerConfigRepo {
 var _ biz.CustomerConfigRepo = (*customerConfigRepo)(nil)
 
 const (
-	customerConfigAuditActionActivate = "customer_config.activate"
-	customerConfigAuditActionRollback = "customer_config.rollback"
+	customerConfigAuditActionActivate              = "customer_config.activate"
+	customerConfigAuditActionRollback              = "customer_config.rollback"
+	customerConfigAuditActionApprovalSettingsApply = "customer_config.approval_settings.apply"
 	// customerConfigStatusBuilding is visible only inside the publication
-	// transaction. PostgreSQL projection guards accept inserts in this state and
-	// reject every mutation after the revision becomes published.
+	// transaction. The repository inserts every projection before publishing the
+	// revision and is the only supported writer for these six tables.
 	customerConfigStatusBuilding = "building"
 )
 
@@ -172,6 +173,248 @@ WHERE customer_key = $1 AND revision = $2 AND status = $5`,
 	}
 	tx = nil
 	return r.GetCustomerConfigRevision(ctx, in.CustomerKey, in.Revision)
+}
+
+func (r *customerConfigRepo) ApplyApprovalSettingsRevision(
+	ctx context.Context,
+	in biz.CustomerConfigPublishInput,
+	configHash string,
+	expectedActiveRevision string,
+	expectedActiveHash string,
+	actorID int,
+	appliedAt time.Time,
+) (*biz.CustomerConfigRevision, error) {
+	if actorID <= 0 ||
+		strings.TrimSpace(in.CustomerKey) == "" ||
+		strings.TrimSpace(in.Revision) == "" ||
+		strings.TrimSpace(configHash) == "" ||
+		strings.TrimSpace(expectedActiveRevision) == "" ||
+		strings.TrimSpace(expectedActiveHash) == "" {
+		return nil, biz.ErrBadParam
+	}
+	if err := biz.ValidateCustomerConfigModuleClosure(in.ModuleStates); err != nil {
+		return nil, err
+	}
+	snapshotJSON, err := json.Marshal(in.CompiledSnapshot)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackSQLTx(ctx, tx, r.log)
+
+	lockRows, err := tx.QueryContext(ctx, `
+SELECT id
+FROM customer_config_revisions
+WHERE customer_key = $1
+ORDER BY id
+FOR UPDATE`, in.CustomerKey)
+	if err != nil {
+		return nil, err
+	}
+	for lockRows.Next() {
+		var revisionID int
+		if err := lockRows.Scan(&revisionID); err != nil {
+			_ = lockRows.Close()
+			return nil, err
+		}
+	}
+	if err := lockRows.Err(); err != nil {
+		_ = lockRows.Close()
+		return nil, err
+	}
+	if err := lockRows.Close(); err != nil {
+		return nil, err
+	}
+
+	// The first locking statement can wait behind another apply transaction. A
+	// second statement is required under READ COMMITTED so this transaction sees
+	// the winner's newly inserted active revision before evaluating the CAS.
+	rows, err := tx.QueryContext(ctx, `
+SELECT id, customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot,
+       published_by, published_at, activated_by, activated_at, created_at, updated_at
+FROM customer_config_revisions
+WHERE customer_key = $1
+ORDER BY id
+FOR UPDATE`, in.CustomerKey)
+	if err != nil {
+		return nil, err
+	}
+	var target *biz.CustomerConfigRevision
+	var active *biz.CustomerConfigRevision
+	for rows.Next() {
+		item, scanErr := scanCustomerConfigRevision(rows)
+		if scanErr != nil {
+			_ = rows.Close()
+			return nil, scanErr
+		}
+		if item.Revision == in.Revision {
+			target = item
+		}
+		if item.Status == biz.CustomerConfigStatusActive {
+			active = item
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+
+	if target != nil {
+		if target.ConfigHash != configHash ||
+			target.ConfigHashVersion != biz.CustomerConfigHashVersion ||
+			strings.TrimSpace(target.ProductVersion) != strings.TrimSpace(in.ProductVersion) {
+			return nil, biz.ErrCustomerConfigRevisionImmutable
+		}
+		if target.PublishedBy == nil || *target.PublishedBy != actorID {
+			return nil, biz.ErrCustomerConfigRevisionImmutable
+		}
+		if target.Status == biz.CustomerConfigStatusActive {
+			if err := tx.Commit(); err != nil {
+				return nil, err
+			}
+			tx = nil
+			return target, nil
+		}
+		if target.Status != biz.CustomerConfigStatusPublished {
+			return nil, biz.ErrCustomerConfigActiveRevisionChanged
+		}
+	}
+	if active == nil {
+		return nil, biz.ErrCustomerConfigActiveRevisionRequired
+	}
+	if strings.TrimSpace(active.Revision) != strings.TrimSpace(expectedActiveRevision) ||
+		active.ConfigHash != strings.TrimSpace(expectedActiveHash) {
+		return nil, biz.ErrCustomerConfigActiveRevisionChanged
+	}
+
+	if target == nil {
+		target, err = scanCustomerConfigRevision(tx.QueryRowContext(ctx, `
+INSERT INTO customer_config_revisions
+  (customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot,
+   published_by, published_at, created_at, updated_at)
+VALUES
+  ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $9, $9)
+RETURNING id, customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot,
+          published_by, published_at, activated_by, activated_at, created_at, updated_at`,
+			in.CustomerKey,
+			in.Revision,
+			in.ProductVersion,
+			configHash,
+			biz.CustomerConfigHashVersion,
+			customerConfigStatusBuilding,
+			string(snapshotJSON),
+			actorID,
+			appliedAt,
+		))
+		if err != nil {
+			return nil, err
+		}
+		if err := insertCustomerConfigCompiledRows(ctx, tx, in, appliedAt); err != nil {
+			return nil, err
+		}
+	}
+	modules, err := listDeploymentModuleStatesTx(ctx, tx, in.CustomerKey, in.Revision)
+	if err != nil {
+		return nil, err
+	}
+	if err := biz.ValidateCustomerConfigModuleClosure(modules); err != nil {
+		return nil, err
+	}
+	if target.Status == customerConfigStatusBuilding {
+		result, err := tx.ExecContext(ctx, `
+UPDATE customer_config_revisions
+SET status = $3, updated_at = $4
+WHERE customer_key = $1 AND revision = $2 AND status = $5`,
+			in.CustomerKey,
+			in.Revision,
+			biz.CustomerConfigStatusPublished,
+			appliedAt,
+			customerConfigStatusBuilding,
+		)
+		if err != nil {
+			return nil, err
+		}
+		updated, err := result.RowsAffected()
+		if err != nil {
+			return nil, err
+		}
+		if updated != 1 {
+			return nil, biz.ErrCustomerConfigRevisionImmutable
+		}
+		target.Status = biz.CustomerConfigStatusPublished
+	}
+	if _, err := tx.ExecContext(ctx, `
+UPDATE customer_config_revisions
+SET status = $3, updated_at = $4
+WHERE customer_key = $1 AND status = $2 AND revision <> $5`,
+		in.CustomerKey,
+		biz.CustomerConfigStatusActive,
+		biz.CustomerConfigStatusSuperseded,
+		appliedAt,
+		in.Revision,
+	); err != nil {
+		return nil, err
+	}
+	result, err := tx.ExecContext(ctx, `
+UPDATE customer_config_revisions
+SET status = $3, activated_by = $4, activated_at = $5, updated_at = $5
+WHERE customer_key = $1 AND revision = $2 AND status = $6`,
+		in.CustomerKey,
+		in.Revision,
+		biz.CustomerConfigStatusActive,
+		actorID,
+		appliedAt,
+		biz.CustomerConfigStatusPublished,
+	)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if updated != 1 {
+		return nil, biz.ErrCustomerConfigRevisionImmutable
+	}
+	if err := writeCustomerConfigAudit(
+		ctx,
+		tx,
+		customerConfigAuditActionApprovalSettingsApply,
+		in.CustomerKey,
+		in.Revision,
+		actorID,
+		map[string]any{
+			"status":                      biz.CustomerConfigStatusActive,
+			"product_version":             in.ProductVersion,
+			"config_hash":                 configHash,
+			"config_hash_version":         biz.CustomerConfigHashVersion,
+			"expected_active_revision":    strings.TrimSpace(expectedActiveRevision),
+			"previous_active_revision":    active.Revision,
+			"previous_active_config_hash": active.ConfigHash,
+			"module_count":                len(in.ModuleStates),
+			"role_count":                  len(in.RoleProfiles),
+			"entitlement_count":           len(in.AccessEntitlements),
+			"work_pool_count":             len(in.WorkPools),
+			"membership_count":            len(in.WorkPoolMemberships),
+		},
+	); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	target.Status = biz.CustomerConfigStatusActive
+	target.ActivatedBy = &actorID
+	target.ActivatedAt = &appliedAt
+	target.UpdatedAt = appliedAt
+	return target, nil
 }
 
 func getCustomerConfigRevisionForUpdate(ctx context.Context, tx *sql.Tx, customerKey, revision string) (*biz.CustomerConfigRevision, error) {

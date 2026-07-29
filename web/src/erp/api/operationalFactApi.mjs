@@ -384,9 +384,25 @@ export async function releaseStockReservation(params = {}) {
   return dataOf(result)?.stock_reservation || null
 }
 
-export async function listFinanceFacts(params = {}) {
-  const result = await operationalFactRpc.call('list_finance_facts', params)
+export async function listFinanceFacts(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'list_finance_facts',
+    params,
+    options
+  )
   return dataOf(result)
+}
+
+export async function listAllFinanceFacts(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listFinanceFacts,
+    params,
+    'finance_facts',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的应收应付记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function createReceivableFromShipment(params = {}) {
@@ -457,6 +473,18 @@ export async function listSalesReturns(params = {}, options = {}) {
     options
   )
   return dataOf(result)
+}
+
+export async function listAllSalesReturns(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listSalesReturns,
+    params,
+    'sales_returns',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的客户退货记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function createSalesReturn(params = {}) {

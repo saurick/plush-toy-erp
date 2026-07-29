@@ -3,9 +3,12 @@ package biz
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
+	"time"
 )
 
 const (
@@ -78,6 +81,18 @@ type ApprovalSettingsExplanation struct {
 	PublishInput   *CustomerConfigPublishInput
 }
 
+type ApprovalSettingsApplyRepo interface {
+	ApplyApprovalSettingsRevision(
+		ctx context.Context,
+		in CustomerConfigPublishInput,
+		configHash string,
+		expectedActiveRevision string,
+		expectedActiveHash string,
+		actorID int,
+		appliedAt time.Time,
+	) (*CustomerConfigRevision, error)
+}
+
 type approvalSettingCatalogItem struct {
 	Key            string
 	Label          string
@@ -117,10 +132,10 @@ var approvalSettingCatalog = []approvalSettingCatalogItem{
 		FactBoundary:   "批准不等于收货；收货才写退回库存",
 	},
 	{
-		Key: "production_exception", Label: "生产异常决定", Domain: "生产 / 品质",
+		Key: "production_exception", Label: "生产异常处置", Domain: "生产 / 品质",
 		Configurable:   false,
 		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
-		DomainBoundary: "已登记生产异常 ProcessRuntime；老板决定与生产执行分离，责任池由流程合同固定",
+		DomainBoundary: "已登记生产异常处置 ProcessRuntime；老板决定与生产执行分离，责任池由流程合同固定",
 		FactBoundary:   "批准不执行 SCRAP、超领或 WIP 让步",
 	},
 	{
@@ -268,6 +283,128 @@ func (uc *CustomerConfigUsecase) PublishApprovalSettingsRevision(ctx context.Con
 		return nil, ErrBadParam
 	}
 	return uc.PublishCustomerConfig(ctx, *preview.PublishInput, actorID)
+}
+
+func (uc *CustomerConfigUsecase) ApplyApprovalSettingsRevision(
+	ctx context.Context,
+	in ApprovalSettingsRevisionInput,
+	actorID int,
+) (*CustomerConfigRevision, error) {
+	if uc == nil || uc.repo == nil || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	if existing, matched, err := uc.matchAppliedApprovalSettingsRevision(ctx, in, actorID); err != nil {
+		return nil, err
+	} else if matched {
+		return existing, nil
+	}
+	preview, err := uc.PreviewApprovalSettingsRevision(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range preview.Items {
+		if item.Configurable && item.Enabled && len(item.BlockedReasons) > 0 {
+			return nil, ErrCustomerConfigTransitionBlocked
+		}
+	}
+	if preview.PublishInput == nil {
+		return nil, ErrBadParam
+	}
+	validation, err := uc.ValidateCustomerConfig(ctx, *preview.PublishInput)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(ApprovalSettingsApplyRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.ApplyApprovalSettingsRevision(
+		ctx,
+		*preview.PublishInput,
+		validation.ConfigHash,
+		strings.TrimSpace(in.ExpectedActiveRevision),
+		strings.TrimSpace(in.ExpectedActiveHash),
+		actorID,
+		time.Now(),
+	)
+}
+
+func (uc *CustomerConfigUsecase) matchAppliedApprovalSettingsRevision(
+	ctx context.Context,
+	in ApprovalSettingsRevisionInput,
+	actorID int,
+) (*CustomerConfigRevision, bool, error) {
+	customerKey := NormalizeCustomerKey(in.CustomerKey)
+	if customerKey == "" {
+		customerKey = DefaultCustomerKey
+	}
+	revision := strings.TrimSpace(in.Revision)
+	if revision == "" {
+		return nil, false, ErrBadParam
+	}
+	normalizedItems, err := normalizeApprovalSettingItems(in.Items)
+	if err != nil {
+		return nil, false, err
+	}
+	existing, err := uc.repo.GetCustomerConfigRevision(ctx, customerKey, revision)
+	if err != nil {
+		if errors.Is(err, ErrCustomerConfigNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if existing.Status != CustomerConfigStatusActive {
+		return nil, false, nil
+	}
+	if existing.PublishedBy == nil || *existing.PublishedBy != actorID {
+		return nil, false, ErrCustomerConfigRevisionImmutable
+	}
+	memberships, err := uc.repo.ListWorkPoolMembershipsByPools(
+		ctx,
+		customerKey,
+		revision,
+		approvalSettingPoolKeyList(),
+	)
+	if err != nil {
+		return nil, false, err
+	}
+	explanation, err := uc.explainApprovalSettingsAtRevision(
+		ctx,
+		existing,
+		memberships,
+		nil,
+	)
+	if err != nil {
+		return nil, false, err
+	}
+	existingItems := make([]ApprovalSettingItemInput, 0, len(normalizedItems))
+	for _, item := range explanation.Items {
+		if !item.Configurable {
+			continue
+		}
+		members := make([]ApprovalSettingMemberInput, 0, len(item.Members))
+		for _, member := range item.Members {
+			members = append(members, ApprovalSettingMemberInput{
+				RoleKey:  member.RoleKey,
+				UserID:   member.UserID,
+				Strategy: member.Strategy,
+				Enabled:  member.Enabled,
+			})
+		}
+		existingItems = append(existingItems, ApprovalSettingItemInput{
+			ApprovalKey: item.ApprovalKey,
+			Enabled:     item.Enabled,
+			Members:     members,
+		})
+	}
+	normalizedExisting, err := normalizeApprovalSettingItems(existingItems)
+	if err != nil {
+		return nil, false, err
+	}
+	if !reflect.DeepEqual(normalizedExisting, normalizedItems) {
+		return nil, false, ErrCustomerConfigRevisionImmutable
+	}
+	return existing, true, nil
 }
 
 func (uc *CustomerConfigUsecase) buildApprovalSettingsRevision(ctx context.Context, in ApprovalSettingsRevisionInput) (CustomerConfigPublishInput, *CustomerConfigRevision, error) {

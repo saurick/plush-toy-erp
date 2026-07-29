@@ -166,15 +166,7 @@ func validateRoleDemoPasswordTarget(password, dsn string, includeDebug, includeM
 		return nil
 	}
 	if err := devdbguard.RequireLocalAdminResetDSN(dsn); err != nil {
-		return fmt.Errorf("the public role demo password is restricted to a registered isolated development database: %w", err)
-	}
-	u, err := url.Parse(strings.TrimSpace(dsn))
-	if err != nil {
-		return fmt.Errorf("parse postgres dsn for role demo password target failed: %w", err)
-	}
-	databaseName := strings.TrimPrefix(strings.TrimSpace(u.Path), "/")
-	if !strings.HasSuffix(databaseName, "_dev") {
-		return fmt.Errorf("the public role demo password requires an isolated development database ending in _dev")
+		return fmt.Errorf("the public role demo password is restricted to a registered local development database: %w", err)
 	}
 	return nil
 }
@@ -184,14 +176,14 @@ func roleDemoAccountsForPassword(password string, includeDebug bool) []data.Role
 	if data.RejectPublicRoleDemoPassword(password) == nil {
 		return accounts
 	}
-	businessAccounts := make([]data.RoleDemoAdminAccountSpec, 0, len(accounts))
+	defaultAccounts := make([]data.RoleDemoAdminAccountSpec, 0, len(accounts))
 	for _, account := range accounts {
-		if account.RoleKey == biz.AdminRoleKey || account.RoleKey == biz.DebugOperatorRoleKey {
+		if account.RoleKey == biz.DebugOperatorRoleKey {
 			continue
 		}
-		businessAccounts = append(businessAccounts, account)
+		defaultAccounts = append(defaultAccounts, account)
 	}
-	return businessAccounts
+	return defaultAccounts
 }
 
 func rejectStableAdminReset(requested bool, confirmation string) error {

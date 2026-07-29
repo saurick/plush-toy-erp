@@ -64,6 +64,12 @@ func (Role) Fields() []ent.Field {
 				dialect.Postgres: "'[]'::jsonb",
 				dialect.SQLite:   "'[]'",
 			})),
+		field.JSON("secondary_menu_paths", []string{}).
+			Default([]string{}).
+			Annotations(entsql.DefaultExprs(map[string]string{
+				dialect.Postgres: "'[]'::jsonb",
+				dialect.SQLite:   "'[]'",
+			})),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),

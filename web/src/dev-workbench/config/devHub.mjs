@@ -1,6 +1,8 @@
 import {
   DEV_CAPABILITY_LEDGER_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
+  DEV_DATABASE_MIGRATION_ROUTE,
+  DEV_DATA_PREPARATION_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_GOVERNANCE_ROUTE,
   DEV_HUB_ROUTE,
@@ -88,6 +90,26 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '汇总当前测试策略、QA 脚本和部署 / 前后端说明；pick validation commands without promoting reference docs.',
   }),
   Object.freeze({
+    key: 'data-preparation',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    title: '测试数据准备中心 / Data Preparation',
+    group: '验证治理 / QA',
+    route: DEV_DATA_PREPARATION_ROUTE,
+    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    truthSource: '计划回执、正式 Source / Fact API 与目标读回',
+    status: '本机受控写入 / Local controlled writes',
+    guardrails: Object.freeze([
+      '固定数据档位 / Fixed profiles',
+      '本机系统边界 / Local OS boundary',
+      '不可变计划确认 / Immutable plan confirmation',
+      '场景数据只向前补齐 / Forward-only scenario data',
+      '禁止任意目标或命令 / No arbitrary target or shell',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '先预检固定目标，再准备不可变计划并输入 exact confirmation；共享基础数据稳定 upsert，业务场景固定批次精确复用且长期保留，完整验收使用隔离库并自动清理。',
+  }),
+  Object.freeze({
     key: 'prototypes',
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     title: '产品原型 / Prototypes',
@@ -137,6 +159,26 @@ export const DEV_HUB_ITEMS = Object.freeze([
     ]),
     description:
       '读取已登记的 yoyoosun 客户配置包，完成预检、差异、Dry Run、当前代理后端测试应用和指定证据批次门禁；正式写入交给统一发布执行器。',
+  }),
+  Object.freeze({
+    key: 'database-migration',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    title: '数据库迁移 / Database Migration',
+    group: '交付治理 / Delivery',
+    route: DEV_DATABASE_MIGRATION_ROUTE,
+    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    truthSource: 'migration / schema 真源、固定目标身份、备份恢复与读回',
+    status: '本机受控写入 / Local controlled writes',
+    guardrails: Object.freeze([
+      '固定 shared-dev / Fixed shared-dev',
+      '准备与执行分离 / Prepare then execute',
+      '真实备份恢复 / Verified backup restore',
+      '结果未知不重试 / No retry when unknown',
+      '禁止任意目标或命令 / No arbitrary target or shell',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '用一次检查与准备收口 status、plan、备份恢复验证，再经明确确认执行一次 apply、读回和本地后端重启；无关工作区变化不会触发整套重建。',
   }),
   Object.freeze({
     key: 'version-center',
@@ -302,6 +344,6 @@ export function buildDevHubSummary(items = DEV_HUB_ITEMS) {
     guardrailCount: guardrailSet.size,
     devOnly: true,
     boundary:
-      'dev-only, no menu, no seedData, no RBAC, no backend business, no production build',
+      'DEV-only fixed local orchestration; local operating-system user boundary, not ERP RBAC; no formal menu, production build, arbitrary target, path, shell, SQL or credential input',
   }
 }

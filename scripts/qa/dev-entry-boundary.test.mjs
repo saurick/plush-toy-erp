@@ -14,7 +14,11 @@ import {
   buildImportToolingSummary,
   isDevCustomerConfigEnabled,
 } from "../../web/src/dev-workbench/config/devCustomerConfig.mjs";
-import { DEV_STATUS_FLOWS_ROUTE } from "../../web/src/dev-workbench/config/devRoutes.mjs";
+import {
+  DEV_DATABASE_MIGRATION_ROUTE,
+  DEV_DATA_PREPARATION_ROUTE,
+  DEV_STATUS_FLOWS_ROUTE,
+} from "../../web/src/dev-workbench/config/devRoutes.mjs";
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_CURRENT_DOC_PATHS,
@@ -95,6 +99,8 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   assert.equal(DEV_HUB_ROUTE, "/__dev");
   assert.equal(DEV_STATUS_FLOWS_ROUTE, "/__dev/status-flows");
   assert.equal(DEV_TESTING_ROUTE, "/__dev/testing");
+  assert.equal(DEV_DATA_PREPARATION_ROUTE, "/__dev/data-preparation");
+  assert.equal(DEV_DATABASE_MIGRATION_ROUTE, "/__dev/database-migration");
   assert.equal(DEV_CUSTOMER_CONFIG_ROUTE, "/__dev/customer-config");
   assert.equal(isDevHubEnabled({ DEV: true }), true);
   assert.equal(isDevHubEnabled({ DEV: false }), false);
@@ -133,6 +139,12 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   const customerConfigItem = DEV_HUB_ITEMS.find(
     (item) => item.key === "customer-config",
   );
+  const dataPreparationItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === "data-preparation",
+  );
+  const databaseMigrationItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === "database-migration",
+  );
   assert(
     (testingItem?.guardrails || []).some((guardrail) =>
       String(guardrail).includes("No reference commands"),
@@ -163,6 +175,35 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   assert.match(customerConfigItem?.title || "", /预检与发布/);
   assert.match(customerConfigItem?.truthSource || "", /已登记客户配置包/);
   assert.doesNotMatch(customerConfigItem?.title || "", /导入/);
+  assert.match(dataPreparationItem?.title || "", /测试数据准备中心/);
+  assert.match(
+    dataPreparationItem?.status || "",
+    /本机受控写入/,
+    "data preparation must not be described as a read-only page",
+  );
+  assert(
+    (dataPreparationItem?.guardrails || []).some((guardrail) =>
+      String(guardrail).includes("No arbitrary target or shell"),
+    ),
+    "data preparation entry must reject arbitrary targets and shell input",
+  );
+  assert.match(
+    devRoutesSource,
+    /path="data-preparation"[\s\S]{0,100}?<DevDataPreparationPage/u,
+    "the fixed data preparation page must remain under the DEV-only router",
+  );
+  assert.match(databaseMigrationItem?.title || "", /数据库迁移/);
+  assert(
+    (databaseMigrationItem?.guardrails || []).some((guardrail) =>
+      String(guardrail).includes("No arbitrary target or shell"),
+    ),
+    "database migration entry must reject arbitrary targets and shell input",
+  );
+  assert.match(
+    devRoutesSource,
+    /path="database-migration"[\s\S]{0,100}?<DevDatabaseMigrationPage/u,
+    "the fixed database migration page must remain under the DEV-only router",
+  );
 });
 
 test("dev entry boundary: dev testing indexes only current maintained docs", () => {

@@ -176,6 +176,131 @@ func TestCustomerConfigRecoverCompensatedProcessDomainCommandContract(t *testing
 	}
 }
 
+func TestCustomerConfigJSONRPCApplyApprovalSettingsRequiresPublishAndActivate(t *testing.T) {
+	tests := []struct {
+		name        string
+		permissions []string
+	}{
+		{
+			name:        "missing publish",
+			permissions: []string{biz.PermissionCustomerConfigActivate},
+		},
+		{
+			name:        "missing activate",
+			permissions: []string{biz.PermissionCustomerConfigPublish},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dispatcher := newCustomerConfigTestDispatcher(
+				&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+				[]string{biz.AdminRoleKey},
+			)
+			adminRepo, ok := dispatcher.adminReader.(*memAdminManageRepoForData)
+			if !ok {
+				t.Fatalf("admin reader = %T", dispatcher.adminReader)
+			}
+			adminRepo.rolePerms[biz.AdminRoleKey] = test.permissions
+			adminRepo.applyAdminRoles(adminRepo.admins[1], []string{biz.AdminRoleKey})
+			params, err := structpb.NewStruct(map[string]any{})
+			if err != nil {
+				t.Fatalf("NewStruct() error = %v", err)
+			}
+			_, result, err := dispatcher.handleCustomerConfig(
+				customerConfigAdminCtx(1, "admin"),
+				"apply_approval_settings",
+				"apply-permission",
+				params,
+			)
+			if err != nil {
+				t.Fatalf("handleCustomerConfig() error = %v", err)
+			}
+			if result == nil || result.Code != errcode.PermissionDenied.Code {
+				t.Fatalf("result = %#v, want permission denied", result)
+			}
+		})
+	}
+}
+
+func TestCustomerConfigJSONRPCApplyApprovalSettingsActivatesAndReplays(t *testing.T) {
+	dispatcher := newCustomerConfigTestDispatcher(
+		&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		[]string{biz.AdminRoleKey},
+	)
+	ctx := customerConfigAdminCtx(1, "admin")
+	publishAndActivateCustomerConfigUsecaseForTest(
+		t,
+		dispatcher,
+		customerConfigPublishParamsWithSalesOrderAcceptanceProcess(t),
+		1,
+	)
+	active, err := dispatcher.customerConfigUC.GetApprovalSettings(ctx, biz.DefaultCustomerKey)
+	if err != nil {
+		t.Fatalf("GetApprovalSettings() error = %v", err)
+	}
+	params, err := structpb.NewStruct(map[string]any{
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "approval-settings-service-v2",
+		"expected_active_revision": active.ConfigRevision,
+		"expected_active_hash":     active.ConfigHash,
+		"items": []any{
+			map[string]any{
+				"approval_key": biz.ApprovalSettingSalesOrder,
+				"enabled":      true,
+				"members": []any{
+					map[string]any{
+						"role_key": biz.BossRoleKey,
+						"user_id":  float64(0),
+						"strategy": biz.ApprovalMemberStrategyPrimary,
+						"enabled":  true,
+					},
+				},
+			},
+			map[string]any{
+				"approval_key": biz.ApprovalSettingPurchaseOrder,
+				"enabled":      false,
+				"members":      []any{},
+			},
+			map[string]any{
+				"approval_key": biz.ApprovalSettingShipmentFinance,
+				"enabled":      false,
+				"members":      []any{},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewStruct() error = %v", err)
+	}
+
+	for _, requestID := range []string{"apply", "replay"} {
+		_, result, err := dispatcher.handleCustomerConfig(
+			ctx,
+			"apply_approval_settings",
+			requestID,
+			params,
+		)
+		if err != nil {
+			t.Fatalf("%s handleCustomerConfig() error = %v", requestID, err)
+		}
+		if result == nil || result.Code != errcode.OK.Code {
+			t.Fatalf("%s result = %#v, want OK", requestID, result)
+		}
+		revision := jsonRPCNestedMap(t, result, "revision")
+		if revision["revision"] != "approval-settings-service-v2" ||
+			revision["status"] != biz.CustomerConfigStatusActive {
+			t.Fatalf("%s revision = %#v", requestID, revision)
+		}
+	}
+	readback, err := dispatcher.customerConfigUC.GetApprovalSettings(ctx, biz.DefaultCustomerKey)
+	if err != nil {
+		t.Fatalf("GetApprovalSettings() after apply error = %v", err)
+	}
+	if readback.ConfigRevision != "approval-settings-service-v2" ||
+		readback.Source != "active_customer_config" {
+		t.Fatalf("readback = %#v", readback)
+	}
+}
+
 type serviceCustomerConfigRepo struct {
 	activeErr    error
 	revisions    map[string]*biz.CustomerConfigRevision
@@ -1448,6 +1573,56 @@ func (r *serviceCustomerConfigRepo) PublishCustomerConfig(_ context.Context, in 
 	r.memberships[key] = append([]biz.WorkPoolMembershipInput(nil), in.WorkPoolMemberships...)
 	cloned := *item
 	return &cloned, nil
+}
+
+func (r *serviceCustomerConfigRepo) ApplyApprovalSettingsRevision(
+	ctx context.Context,
+	in biz.CustomerConfigPublishInput,
+	configHash string,
+	expectedActiveRevision string,
+	expectedActiveHash string,
+	actorID int,
+	appliedAt time.Time,
+) (*biz.CustomerConfigRevision, error) {
+	key := serviceCustomerConfigKey(in.CustomerKey, in.Revision)
+	if existing := r.revisions[key]; existing != nil {
+		if existing.ConfigHash != configHash ||
+			existing.ConfigHashVersion != biz.CustomerConfigHashVersion ||
+			existing.ProductVersion != in.ProductVersion ||
+			existing.PublishedBy == nil ||
+			*existing.PublishedBy != actorID {
+			return nil, biz.ErrCustomerConfigRevisionImmutable
+		}
+		if existing.Status == biz.CustomerConfigStatusActive {
+			cloned := *existing
+			return &cloned, nil
+		}
+		if existing.Status != biz.CustomerConfigStatusPublished {
+			return nil, biz.ErrCustomerConfigActiveRevisionChanged
+		}
+	}
+	active, err := r.GetActiveCustomerConfigRevision(ctx, in.CustomerKey)
+	if err != nil {
+		return nil, err
+	}
+	if active.Revision != expectedActiveRevision || active.ConfigHash != expectedActiveHash {
+		return nil, biz.ErrCustomerConfigActiveRevisionChanged
+	}
+	if r.revisions[key] == nil {
+		if _, err := r.PublishCustomerConfig(ctx, in, configHash, actorID, appliedAt); err != nil {
+			return nil, err
+		}
+	}
+	return r.switchActiveCustomerConfigRevision(
+		biz.CustomerConfigTransitionActivate,
+		in.CustomerKey,
+		in.Revision,
+		configHash,
+		in.ProductVersion,
+		expectedActiveRevision,
+		actorID,
+		appliedAt,
+	)
 }
 
 func (r *serviceCustomerConfigRepo) ActivateCustomerConfig(_ context.Context, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, activatedBy int, activatedAt time.Time) (*biz.CustomerConfigRevision, error) {

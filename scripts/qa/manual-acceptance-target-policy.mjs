@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { classifyDatabaseName } from "./database-target.mjs";
+import {
+  LONG_LIVED_DATABASE_NAMES,
+  classifyDatabaseName,
+} from "./database-target.mjs";
 
 const DEFAULT_LOCAL_BACKEND_URL = "http://127.0.0.1:8300";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
@@ -10,6 +13,8 @@ const SAFE_RUN_ID = /^[A-Z0-9][A-Z0-9_-]{0,31}$/u;
 const IMMUTABLE_RELEASE_SHA = /^[0-9a-f]{40}$/u;
 const ATLAS_MIGRATION_VERSION = /^[0-9]{14}$/u;
 export const LOCAL_DEV_TARGET = "local-dev";
+export const SCENARIO_DEMO_TARGET = "scenario-demo";
+export const SCENARIO_DEMO_ORIGIN = DEFAULT_LOCAL_BACKEND_URL;
 export const LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE =
   "plush_erp_acceptance_local_run_dev";
 export const CUSTOMER_TRIAL_133_TARGET = "customer-trial-133";
@@ -86,6 +91,30 @@ function registeredCustomerTrialDatasetIdentity(dataVersion, runId) {
   return { dataVersion: normalizedDataVersion, runId: normalizedRunId };
 }
 
+function registeredScenarioDemoDatasetIdentity(dataVersion, runId) {
+  const normalizedDataVersion = requiredIdentity(
+    dataVersion,
+    "dataVersion",
+    SAFE_DATA_VERSION,
+    "the current registered scenario demo data version",
+  );
+  const normalizedRunId = requiredIdentity(
+    runId,
+    "runId",
+    SAFE_RUN_ID,
+    "the current registered scenario demo run identifier",
+  );
+  if (
+    normalizedDataVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
+    normalizedRunId !== CURRENT_MANUAL_ACCEPTANCE_RUN_ID
+  ) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${SCENARIO_DEMO_TARGET} requires dataVersion=${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION} and runId=${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}`,
+    );
+  }
+  return { dataVersion: normalizedDataVersion, runId: normalizedRunId };
+}
+
 function optionalText(value) {
   const text = String(value ?? "").trim();
   return text || undefined;
@@ -111,6 +140,22 @@ export function assertLocalManualAcceptanceDatabaseName(value) {
   ) {
     throw new ManualAcceptanceTargetPolicyError(
       `${LOCAL_DEV_TARGET} requires databaseName=plush_erp_acceptance_<run-id>_dev`,
+    );
+  }
+  return databaseName;
+}
+
+export function assertScenarioDemoDatabaseName(value) {
+  const databaseName = optionalText(value);
+  const classification = classifyDatabaseName(databaseName);
+  if (
+    !databaseName ||
+    !LONG_LIVED_DATABASE_NAMES.includes(databaseName) ||
+    classification.disposable ||
+    !new Set(["development", "legacy-development"]).has(classification.profile)
+  ) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${SCENARIO_DEMO_TARGET} requires a registered non-disposable shared development database`,
     );
   }
   return databaseName;
@@ -158,6 +203,29 @@ export function resolveManualAcceptanceTarget({
     throw new ManualAcceptanceTargetPolicyError(
       `datasetKey must be ${MANUAL_ACCEPTANCE_DATASET_KEY}`,
     );
+  }
+
+  if (requestedTarget === SCENARIO_DEMO_TARGET) {
+    if (normalizedBackendURL !== SCENARIO_DEMO_ORIGIN) {
+      throw new ManualAcceptanceTargetPolicyError(
+        `${SCENARIO_DEMO_TARGET} requires backend URL ${SCENARIO_DEMO_ORIGIN}`,
+      );
+    }
+    const identity = registeredScenarioDemoDatasetIdentity(dataVersion, runId);
+    const scenarioDatabaseName = assertScenarioDemoDatabaseName(
+      requestedDatabaseName,
+    );
+    return Object.freeze({
+      target: SCENARIO_DEMO_TARGET,
+      datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+      backendURL: normalizedBackendURL,
+      origin: url.origin,
+      dataVersion: identity.dataVersion,
+      runId: identity.runId,
+      external: false,
+      transport: "loopback",
+      databaseName: scenarioDatabaseName,
+    });
   }
 
   if (
@@ -254,6 +322,15 @@ export function assertManualAcceptanceMutationTarget(
   { confirmation } = {},
 ) {
   const resolved = resolveManualAcceptanceTarget(policy);
+  if (resolved.target === SCENARIO_DEMO_TARGET) {
+    const expected = manualAcceptanceTargetConfirmation(resolved);
+    if (confirmation !== expected) {
+      throw new ManualAcceptanceTargetPolicyError(
+        `${SCENARIO_DEMO_TARGET} apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM=${expected}`,
+      );
+    }
+    return resolved;
+  }
   if (!resolved.external && !resolved.databaseName) {
     throw new ManualAcceptanceTargetPolicyError(
       "local manual acceptance apply requires an explicit dedicated databaseName",
@@ -465,11 +542,10 @@ export async function assertManualAcceptanceRuntimeIdentityPrecondition({
         /^plush_erp_uat_[a-z0-9_]+$/u,
         "the registered acceptance database identity",
       )
-    : assertLocalManualAcceptanceDatabaseName(resolved.databaseName);
-  const identityFields = [
-    scope,
-    databaseIdentity,
-  ];
+    : resolved.target === SCENARIO_DEMO_TARGET
+      ? assertScenarioDemoDatabaseName(resolved.databaseName)
+      : assertLocalManualAcceptanceDatabaseName(resolved.databaseName);
+  const identityFields = [scope, databaseIdentity];
   if (checkedAttestation) {
     identityFields.push(
       checkedAttestation.release,
@@ -523,7 +599,10 @@ export function assertManualAcceptanceCapabilitiesPolicy({
   const resolved = resolveManualAcceptanceTarget(policy);
   const environment = optionalText(capabilities?.environment);
 
-  if (resolved.target === LOCAL_DEV_TARGET) {
+  if (
+    resolved.target === LOCAL_DEV_TARGET ||
+    resolved.target === SCENARIO_DEMO_TARGET
+  ) {
     if (EXPLICIT_LOCAL_ENVIRONMENTS.has(environment)) {
       return Object.freeze({ resolved, environment });
     }
@@ -539,7 +618,7 @@ export function assertManualAcceptanceCapabilitiesPolicy({
         });
       }
       throw new ManualAcceptanceTargetPolicyError(
-        `local-dev environment=sql requires every debug mutation disabled; unsafe fields: ${unsafeDebugFields.join(", ")}`,
+        `${resolved.target} environment=sql requires every debug mutation disabled; unsafe fields: ${unsafeDebugFields.join(", ")}`,
       );
     }
     {

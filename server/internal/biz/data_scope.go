@@ -13,7 +13,6 @@ import (
 // capability explicitly and fail closed when it is unavailable.
 type RoleDataScopeRepo interface {
 	ListRoleDataScopesByRoleKeys(ctx context.Context, roleKeys []string) ([]RoleDataScope, error)
-	SetRoleDataScopesWithAudit(ctx context.Context, change *RoleDataScopesChangeCommand) (*AdminRole, error)
 }
 
 const (

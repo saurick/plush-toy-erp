@@ -185,8 +185,8 @@ test('roleHelpContent: 永绅岗位帮助只指导已开放且有权限的动作
   assert.deepEqual(
     financeGuide.priorities.slice(0, 4).map((priority) => priority.path),
     [
-      '/erp/finance/payables',
       '/erp/finance/receivables',
+      '/erp/finance/payables',
       '/erp/finance/invoices',
       '/erp/finance/reconciliation',
     ]

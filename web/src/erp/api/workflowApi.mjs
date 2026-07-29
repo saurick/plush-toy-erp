@@ -299,13 +299,13 @@ export async function getWorkflowTaskProcessContext(taskId, options = {}) {
   return requireWorkflowProcessContext(dataOf(result)?.process_context)
 }
 
-export async function listWorkflowRoleTasks(params = {}) {
+async function listWorkflowRoleTaskPage(method, params = {}) {
   const query = requireWorkflowRoleTaskQuery(params)
-  const result = await workflowRpc.call('list_role_tasks', query)
+  const result = await workflowRpc.call(method, query)
   return requireWorkflowRoleTaskResponse(result, query)
 }
 
-export async function listAllWorkflowRoleTasks(params = {}) {
+async function listAllWorkflowRoleTaskPages(method, params = {}) {
   const initialQuery = requireWorkflowRoleTaskQuery(params)
   const baseQuery = { ...initialQuery }
   delete baseQuery.cursor
@@ -320,7 +320,7 @@ export async function listAllWorkflowRoleTasks(params = {}) {
       if (seenCursors.has(cursor)) throw invalidWorkflowRoleTaskResponse()
       seenCursors.add(cursor)
     }
-    const response = await listWorkflowRoleTasks({
+    const response = await listWorkflowRoleTaskPage(method, {
       ...baseQuery,
       ...(cursor ? { cursor } : {}),
     })
@@ -343,6 +343,18 @@ export async function listAllWorkflowRoleTasks(params = {}) {
     }
     cursor = response.next_cursor
   }
+}
+
+export async function listWorkflowRoleTasks(params = {}) {
+  return listWorkflowRoleTaskPage('list_role_tasks', params)
+}
+
+export async function listWorkflowWorkbenchRoleTasks(params = {}) {
+  return listWorkflowRoleTaskPage('list_workbench_role_tasks', params)
+}
+
+export async function listAllWorkflowWorkbenchRoleTasks(params = {}) {
+  return listAllWorkflowRoleTaskPages('list_workbench_role_tasks', params)
 }
 
 export async function getWorkflowTaskBoard(params = {}) {

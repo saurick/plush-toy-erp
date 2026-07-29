@@ -725,7 +725,7 @@ export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
   return lines.join("\n");
 }
 
-function resolveProjectPnpm(root) {
+export function resolveProjectPnpm(root) {
   const packageJson = JSON.parse(
     fs.readFileSync(path.join(root, "web/package.json"), "utf8"),
   );

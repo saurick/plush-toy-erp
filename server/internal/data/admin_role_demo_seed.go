@@ -54,7 +54,7 @@ type ManualAcceptancePasswordRotationOperation struct {
 
 func RejectPublicRoleDemoPassword(password string) error {
 	if strings.TrimSpace(password) == PublicRoleDemoPassword {
-		return errors.New("the public role demo password is forbidden outside a registered isolated development database")
+		return errors.New("the public role demo password is forbidden outside a registered local development database")
 	}
 	return nil
 }

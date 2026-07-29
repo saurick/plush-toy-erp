@@ -67,7 +67,7 @@ export const customerPackageCatalog = Object.freeze({
     { key: "production-progress", label: "生产进度", requiredCapabilityKeys: ["production.fact.read"] },
     {
       key: "production-exceptions",
-      label: "生产异常",
+      label: "生产异常处置",
       requiredCapabilityKeys: [],
       requiredAnyCapabilityKeys: [
         "workflow.task.read",

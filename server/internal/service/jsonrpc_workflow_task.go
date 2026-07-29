@@ -18,6 +18,14 @@ import (
 const workflowBreakGlassMaxDuration = 2 * time.Hour
 const workflowTaskBoardMaxOffset = 2_147_483_647
 
+type workflowRoleTaskViewRequest struct {
+	ViewKey    string
+	RoleKey    string
+	Limit      int
+	BeforeID   int
+	SnapshotAt time.Time
+}
+
 var workflowTaskCreateProcessRuntimeAnchorKeys = []string{
 	"config_revision",
 	"process_instance_id",
@@ -123,73 +131,45 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor"); res != nil {
-			return id, res, nil
-		}
-		viewKey := strings.TrimSpace(getString(pm, "view_key"))
-		roleKey := biz.NormalizeRoleKey(getString(pm, "role_key"))
-		if viewKey == "" || roleKey == "" {
-			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "岗位任务视图参数不完整"}, nil
-		}
-		limit, limitRes := getWorkflowRoleTaskViewLimit(pm)
-		if limitRes != nil {
-			return id, limitRes, nil
-		}
-		cursor := ""
-		if rawCursor, exists := pm["cursor"]; exists {
-			value, ok := rawCursor.(string)
-			if !ok {
-				return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 必须是文本"}, nil
-			}
-			cursor = value
-		}
-		beforeID, snapshotAt, cursorRes := decodeWorkflowRoleTaskViewCursor(cursor)
-		if cursorRes != nil {
-			return id, cursorRes, nil
+		request, requestRes := parseWorkflowRoleTaskViewRequest(pm, method)
+		if requestRes != nil {
+			return id, requestRes, nil
 		}
 		admin, adminRes := d.CurrentAdmin(ctx)
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
-		if res := d.requireActiveMobileRoleAccess(ctx, admin, roleKey); res != nil {
+		if res := d.requireActiveMobileRoleAccess(ctx, admin, request.RoleKey); res != nil {
 			return id, res, nil
 		}
 		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
 		if visibilityErr != nil {
 			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
 		}
-		if !admin.IsSuperAdmin && (!biz.AdminHasRole(admin, roleKey) || !biz.WorkflowTaskVisibilityScopeIncludesRole(visibilityScope, roleKey)) {
+		if !admin.IsSuperAdmin && (!biz.AdminHasRole(admin, request.RoleKey) || !biz.WorkflowTaskVisibilityScopeIncludesRole(visibilityScope, request.RoleKey)) {
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 		}
-		crossRoleRisk := viewKey == biz.WorkflowRoleTaskViewRisk &&
-			(admin.IsSuperAdmin || biz.AdminHasRole(admin, biz.PMCRoleKey) || biz.AdminHasRole(admin, biz.BossRoleKey))
-		query := biz.WorkflowRoleTaskViewQuery{
-			ViewKey:              viewKey,
-			RoleKey:              roleKey,
-			Limit:                limit,
-			BeforeID:             beforeID,
-			CrossRoleRiskAllowed: crossRoleRisk,
-			SnapshotAt:           snapshotAt,
-			VisibilityScope:      visibilityScope,
+		return id, d.queryWorkflowRoleTaskView(ctx, request, admin, visibilityScope), nil
+	case "list_workbench_role_tasks":
+		if res := d.requireEffectiveWorkflowWorkbenchRead(ctx); res != nil {
+			return id, res, nil
 		}
-		page, err := d.workflowUC.ListRoleTaskView(ctx, query)
-		if err != nil {
-			return id, d.mapWorkflowError(ctx, err), nil
+		request, requestRes := parseWorkflowRoleTaskViewRequest(pm, method)
+		if requestRes != nil {
+			return id, requestRes, nil
 		}
-		nextCursor := ""
-		if page.HasMore && page.NextID > 0 {
-			nextCursor = encodeWorkflowRoleTaskViewCursor(page.NextID, page.SnapshotAt)
+		admin, adminRes := d.CurrentAdmin(ctx)
+		if adminRes != nil {
+			return id, adminRes, nil
 		}
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: errcode.OK.Message,
-			Data: newDataStruct(map[string]any{
-				"items":       workflowTasksToAny(page.Items),
-				"next_cursor": nextCursor,
-				"has_more":    page.HasMore,
-				"server_time": page.SnapshotAt.Unix(),
-			}),
-		}, nil
+		if res := d.requireEffectiveWorkflowWorkbenchRole(ctx, admin, request.RoleKey); res != nil {
+			return id, res, nil
+		}
+		visibilityScope, visibilityRes := d.workflowTaskReadVisibilityScope(ctx, admin)
+		if visibilityRes != nil {
+			return id, visibilityRes, nil
+		}
+		return id, d.queryWorkflowRoleTaskView(ctx, request, admin, visibilityScope), nil
 	case "get_task_board":
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
@@ -1038,6 +1018,48 @@ func rejectUnknownWorkflowTaskParams(pm map[string]any, method string, allowedKe
 	return nil
 }
 
+func parseWorkflowRoleTaskViewRequest(
+	pm map[string]any,
+	method string,
+) (workflowRoleTaskViewRequest, *v1.JsonrpcResult) {
+	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor"); res != nil {
+		return workflowRoleTaskViewRequest{}, res
+	}
+	request := workflowRoleTaskViewRequest{
+		ViewKey: strings.TrimSpace(getString(pm, "view_key")),
+		RoleKey: biz.NormalizeRoleKey(getString(pm, "role_key")),
+	}
+	if request.ViewKey == "" || request.RoleKey == "" {
+		return workflowRoleTaskViewRequest{}, &v1.JsonrpcResult{
+			Code:    errcode.InvalidParam.Code,
+			Message: "岗位任务视图参数不完整",
+		}
+	}
+	limit, limitRes := getWorkflowRoleTaskViewLimit(pm)
+	if limitRes != nil {
+		return workflowRoleTaskViewRequest{}, limitRes
+	}
+	request.Limit = limit
+	cursor := ""
+	if rawCursor, exists := pm["cursor"]; exists {
+		value, ok := rawCursor.(string)
+		if !ok {
+			return workflowRoleTaskViewRequest{}, &v1.JsonrpcResult{
+				Code:    errcode.InvalidParam.Code,
+				Message: "cursor 必须是文本",
+			}
+		}
+		cursor = value
+	}
+	beforeID, snapshotAt, cursorRes := decodeWorkflowRoleTaskViewCursor(cursor)
+	if cursorRes != nil {
+		return workflowRoleTaskViewRequest{}, cursorRes
+	}
+	request.BeforeID = beforeID
+	request.SnapshotAt = snapshotAt
+	return request, nil
+}
+
 func getWorkflowRoleTaskViewLimit(pm map[string]any) (int, *v1.JsonrpcResult) {
 	raw, exists := pm["limit"]
 	if !exists {
@@ -1077,6 +1099,42 @@ func decodeWorkflowRoleTaskViewCursor(cursor string) (int, time.Time, *v1.Jsonrp
 		return 0, time.Time{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 已失效，请重新加载"}
 	}
 	return beforeID, time.Unix(snapshotUnix, 0), nil
+}
+
+func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
+	ctx context.Context,
+	request workflowRoleTaskViewRequest,
+	admin *biz.AdminUser,
+	visibilityScope *biz.WorkflowTaskVisibilityScope,
+) *v1.JsonrpcResult {
+	crossRoleRisk := request.ViewKey == biz.WorkflowRoleTaskViewRisk &&
+		(admin.IsSuperAdmin || biz.AdminHasRole(admin, biz.PMCRoleKey) || biz.AdminHasRole(admin, biz.BossRoleKey))
+	page, err := d.workflowUC.ListRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
+		ViewKey:              request.ViewKey,
+		RoleKey:              request.RoleKey,
+		Limit:                request.Limit,
+		BeforeID:             request.BeforeID,
+		CrossRoleRiskAllowed: crossRoleRisk,
+		SnapshotAt:           request.SnapshotAt,
+		VisibilityScope:      visibilityScope,
+	})
+	if err != nil {
+		return d.mapWorkflowError(ctx, err)
+	}
+	nextCursor := ""
+	if page.HasMore && page.NextID > 0 {
+		nextCursor = encodeWorkflowRoleTaskViewCursor(page.NextID, page.SnapshotAt)
+	}
+	return &v1.JsonrpcResult{
+		Code:    errcode.OK.Code,
+		Message: errcode.OK.Message,
+		Data: newDataStruct(map[string]any{
+			"items":       workflowTasksToAny(page.Items),
+			"next_cursor": nextCursor,
+			"has_more":    page.HasMore,
+			"server_time": page.SnapshotAt.Unix(),
+		}),
+	}
 }
 
 func (d *jsonrpcDispatcher) settleLinkedProcessNodeAfterTask(ctx context.Context, task *biz.WorkflowTask, actorID int) *v1.JsonrpcResult {

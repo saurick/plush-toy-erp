@@ -14,26 +14,15 @@ type AdminRolesChange struct {
 	RoleKeys   []string
 }
 
-type RolePermissionsChange struct {
-	RoleKey         string
-	OperatorID      int
-	ExpectedVersion int
-	PermissionKeys  []string
-}
-
-type RoleNavigationChange struct {
-	RoleKey          string
-	OperatorID       int
-	ExpectedVersion  int
-	Mode             RoleNavigationMode
-	PrimaryMenuPaths []string
-}
-
-type RoleDataScopesChangeCommand struct {
-	RoleKey         string
-	OperatorID      int
-	ExpectedVersion int
-	Scopes          []RoleDataScope
+type RoleSettingsChangeCommand struct {
+	RoleKey            string
+	OperatorID         int
+	ExpectedVersion    int
+	PermissionKeys     []string
+	Scopes             []RoleDataScope
+	Mode               RoleNavigationMode
+	PrimaryMenuPaths   []string
+	SecondaryMenuPaths []string
 }
 
 type AdminPhoneChange struct {

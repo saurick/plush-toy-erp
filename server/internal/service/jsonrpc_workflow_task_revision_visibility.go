@@ -26,16 +26,7 @@ func (d *jsonrpcDispatcher) requireActiveMobileRoleAccess(
 	if d == nil || d.customerConfigUC == nil {
 		return nil
 	}
-	customerKey, err := runtimeCustomerKey("")
-	if err != nil {
-		return d.mapCustomerConfigError(ctx, err)
-	}
-	var session *biz.EffectiveSession
-	if runtimeCustomerConfigRequiresActiveRevision() {
-		session, err = d.customerConfigUC.GetEffectiveSessionRequiringActiveRevision(ctx, customerKey, admin)
-	} else {
-		session, err = d.customerConfigUC.GetEffectiveSession(ctx, customerKey, admin)
-	}
+	session, err := d.currentWorkflowEffectiveSession(ctx, admin)
 	if err != nil {
 		return d.mapCustomerConfigError(ctx, err)
 	}
@@ -45,6 +36,62 @@ func (d *jsonrpcDispatcher) requireActiveMobileRoleAccess(
 		}
 	}
 	return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+}
+
+func (d *jsonrpcDispatcher) requireEffectiveWorkflowWorkbenchRead(ctx context.Context) *v1.JsonrpcResult {
+	permissions, res := d.CurrentEffectiveAdminPermissions(ctx)
+	if res != nil {
+		return res
+	}
+	if !biz.PermissionSetHasAll(
+		biz.PermissionKeySet(permissions),
+		biz.PermissionERPWorkbenchRead,
+		biz.PermissionWorkflowTaskRead,
+	) {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	return nil
+}
+
+func (d *jsonrpcDispatcher) requireEffectiveWorkflowWorkbenchRole(
+	ctx context.Context,
+	admin *biz.AdminUser,
+	roleKey string,
+) *v1.JsonrpcResult {
+	roleKey = biz.NormalizeRoleKey(roleKey)
+	if roleKey == "" || admin == nil || !admin.IsActive() {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	if d == nil || d.customerConfigUC == nil {
+		if biz.AdminHasRole(admin, roleKey) {
+			return nil
+		}
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	session, err := d.currentWorkflowEffectiveSession(ctx, admin)
+	if err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	for _, effectiveRoleKey := range session.Roles {
+		if biz.NormalizeRoleKey(effectiveRoleKey) == roleKey {
+			return nil
+		}
+	}
+	return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+}
+
+func (d *jsonrpcDispatcher) currentWorkflowEffectiveSession(
+	ctx context.Context,
+	admin *biz.AdminUser,
+) (*biz.EffectiveSession, error) {
+	customerKey, err := runtimeCustomerKey("")
+	if err != nil {
+		return nil, err
+	}
+	if runtimeCustomerConfigRequiresActiveRevision() {
+		return d.customerConfigUC.GetEffectiveSessionRequiringActiveRevision(ctx, customerKey, admin)
+	}
+	return d.customerConfigUC.GetEffectiveSession(ctx, customerKey, admin)
 }
 
 func (d *jsonrpcDispatcher) workflowTaskQueryVisibilityScope(

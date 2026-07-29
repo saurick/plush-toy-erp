@@ -947,6 +947,7 @@
 [data-erp-theme='dark'] .erp-role-center-sidebar,
 [data-erp-theme='dark'] .erp-role-center-detail__head,
 [data-erp-theme='dark'] .erp-role-navigation-editor,
+[data-erp-theme='dark'] .erp-role-navigation-editor__column,
 [data-erp-theme='dark'] .erp-role-navigation-editor__order-item,
 [data-erp-theme='dark'] .erp-role-navigation-preview__group,
 [data-erp-theme='dark'] .erp-role-center-footer,
@@ -1043,21 +1044,30 @@
 }
 
 [data-erp-theme='dark'] .erp-permission-tabs > .ant-tabs-nav,
-[data-erp-theme='dark'] .erp-role-policy-tabs > .ant-tabs-nav {
+[data-erp-theme='dark'] .erp-role-policy-tabs > .ant-tabs-nav,
+[data-erp-theme='dark'] .erp-role-navigation-workspace-tabs > .ant-tabs-nav {
   border-color: var(--erp-border);
   background: var(--erp-surface);
 }
 
-[data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab {
+[data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab,
+[data-erp-theme='dark'] .erp-role-navigation-workspace-tabs .ant-tabs-tab {
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab-active {
+[data-erp-theme='dark'] .erp-permission-tabs .ant-tabs-tab-active,
+[data-erp-theme='dark']
+  .erp-role-navigation-workspace-tabs
+  .ant-tabs-tab-active {
   background: rgb(96 165 250 / 10%);
 }
 
 [data-erp-theme='dark']
   .erp-permission-tabs
+  .ant-tabs-tab-active
+  .ant-tabs-tab-btn,
+[data-erp-theme='dark']
+  .erp-role-navigation-workspace-tabs
   .ant-tabs-tab-active
   .ant-tabs-tab-btn {
   color: var(--erp-text);
@@ -1140,9 +1150,11 @@
 
 [data-erp-theme='dark']
   .erp-business-action-form
-  :where(.ant-input, .ant-input-number, .ant-picker), [data-erp-theme='dark']
+  :where(.ant-input, .ant-input-number, .ant-picker),
+[data-erp-theme='dark']
   .erp-business-action-form
-  :where(.ant-input-affix-wrapper), [data-erp-theme='dark'] :where(.erp-business-action-form) .ant-select-selector {
+  :where(.ant-input-affix-wrapper),
+[data-erp-theme='dark'] :where(.erp-business-action-form) .ant-select-selector {
   border-color: var(--erp-border-strong);
   background: #0f172a;
   color: var(--erp-text);
@@ -1174,7 +1186,8 @@
 
 [data-erp-theme='dark']
   .erp-business-action-form
-  :where(.ant-input[disabled], .ant-input-disabled), [data-erp-theme='dark']
+  :where(.ant-input[disabled], .ant-input-disabled),
+[data-erp-theme='dark']
   .erp-business-action-form
   :where(.ant-input-affix-wrapper-disabled) {
   border-color: var(--erp-border);
@@ -1322,7 +1335,12 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .ant-modal :is(.ant-input:focus, .ant-input-focused), [data-erp-theme='dark'] .ant-modal :is(.ant-input-affix-wrapper-focused), [data-erp-theme='dark'] .ant-modal .ant-input-number-focused, [data-erp-theme='dark'] .ant-modal .ant-picker-focused, [data-erp-theme='dark'] .ant-modal .ant-select-focused .ant-select-selector, [data-erp-theme='dark'] .ant-modal .ant-select-open .ant-select-selector {
+[data-erp-theme='dark'] .ant-modal :is(.ant-input:focus, .ant-input-focused),
+[data-erp-theme='dark'] .ant-modal :is(.ant-input-affix-wrapper-focused),
+[data-erp-theme='dark'] .ant-modal .ant-input-number-focused,
+[data-erp-theme='dark'] .ant-modal .ant-picker-focused,
+[data-erp-theme='dark'] .ant-modal .ant-select-focused .ant-select-selector,
+[data-erp-theme='dark'] .ant-modal .ant-select-open .ant-select-selector {
   border-color: var(--erp-interactive-border-focus);
   box-shadow: inset 0 0 0 2px var(--erp-focus-ring);
 }

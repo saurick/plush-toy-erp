@@ -263,6 +263,14 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 			return replayed, err
 		}
 	}
+	if err := validateWorkflowTaskProcessAnchors(
+		ctx,
+		tx.Client(),
+		in.ProcessInstanceID,
+		in.ProcessNodeInstanceID,
+	); err != nil {
+		return nil, err
+	}
 
 	builder := tx.WorkflowTask.Create().
 		SetTaskCode(in.TaskCode).
@@ -1461,6 +1469,14 @@ func ensureActiveWorkflowTaskInTx(
 	eventPayload map[string]any,
 	refreshExistingPayload bool,
 ) (*ent.WorkflowTask, bool, error) {
+	if err := validateWorkflowTaskProcessAnchors(
+		ctx,
+		tx.Client(),
+		in.ProcessInstanceID,
+		in.ProcessNodeInstanceID,
+	); err != nil {
+		return nil, false, err
+	}
 	existing, err := tx.WorkflowTask.Query().
 		Where(
 			workflowtask.SourceType(in.SourceType),

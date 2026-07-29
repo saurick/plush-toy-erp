@@ -56,8 +56,14 @@ test('first incoming rejection: keeps draft, post and cancellation distinct from
 
 test('RMA: uses shipment source, optimistic version and inventory-writing receive boundary', () => {
   assert.match(salesReturnsPage, /listSalesReturns/u)
+  assert.match(salesReturnsPage, /listAllSalesReturns/u)
   assert.match(salesReturnsPage, /listAllShipments/u)
-  assert.match(salesReturnsPage, /shipmentData\?\.shipments/u)
+  assert.match(salesReturnsPage, /source_shipped_quantity/u)
+  assert.match(salesReturnsPage, /active_returned_quantity/u)
+  assert.match(salesReturnsPage, /remaining_returnable_quantity/u)
+  assert.match(salesReturnsPage, /BusinessDataTable/u)
+  assert.match(salesReturnsPage, /BusinessFormModal/u)
+  assert.match(salesReturnsPage, /BusinessRecordDetailsModal/u)
   assert.match(salesReturnsPage, /expected_version:/u)
   assert.match(salesReturnsPage, /createSourceBusinessActionAttemptStore/u)
   assert.match(salesReturnsPage, /只有收货会写入退回库存/u)
@@ -68,7 +74,15 @@ test('RMA: uses shipment source, optimistic version and inventory-writing receiv
   assert.match(salesReturnsPage, />\s*核对审批流\s*</u)
   assert.match(
     salesReturnsPage,
-    /const sourceItems = Array\.isArray\(selectedShipment\?\.items\)[\s\S]*shipment_item_id: Number\(sourceItem\.id\)/u
+    /const sourceItems = selectedShipmentItems[\s\S]*shipment_item_id: Number\(sourceItem\.id\)/u
+  )
+  assert.match(
+    salesReturnsPage,
+    /listSalesReturns\([\s\S]*signal: request\.signal[\s\S]*listAllShipments/u
+  )
+  assert.doesNotMatch(
+    salesReturnsPage,
+    /Promise\.all\(\s*\[\s*listSalesReturns[\s\S]*listAllShipments/u
   )
   assert.doesNotMatch(
     salesReturnsPage,
@@ -79,8 +93,21 @@ test('RMA: uses shipment source, optimistic version and inventory-writing receiv
 
 test('finance V1: lists real payments, allocates multiple facts and preserves reversal audit', () => {
   assert.match(financePaymentsPage, /listFinancePayments/u)
-  assert.match(financePaymentsPage, /customerRows\?\.customers/u)
-  assert.match(financePaymentsPage, /supplierRows\?\.suppliers/u)
+  assert.match(financePaymentsPage, /listAllFinanceFacts/u)
+  assert.match(financePaymentsPage, /Promise\.allSettled/u)
+  assert.match(financePaymentsPage, /BusinessOperationPanel/u)
+  assert.match(financePaymentsPage, /BusinessDataTable/u)
+  assert.match(financePaymentsPage, /BusinessFormModal/u)
+  assert.match(financePaymentsPage, /BusinessRecordDetailsModal/u)
+  assert.match(financePaymentsPage, /createBusinessTablePagination/u)
+  assert.match(financePaymentsPage, /outstanding_amount/u)
+  assert.match(financePaymentsPage, /validateFinanceAllocationDraft/u)
+  assert.match(financePaymentsPage, /validateFinanceCreditDraft/u)
+  assert.match(financePaymentsPage, /compareNumeric20Scale6Values/u)
+  assert.doesNotMatch(
+    financePaymentsPage,
+    /Number\(credit\?\.amount\)\s*===\s*Number\(payload\.amount\)/u
+  )
   assert.match(financePaymentsPage, /Form\.List name="allocations"/u)
   assert.match(
     financePaymentsPage,
@@ -98,7 +125,7 @@ test('finance V1: lists real payments, allocates multiple facts and preserves re
   assert.match(financePaymentsPage, /reverseFinancePayment/u)
   assert.match(financePaymentsPage, /createFinanceCreditNote/u)
   assert.match(financePaymentsPage, /reverseFinanceCreditNote/u)
-  assert.match(financePaymentsPage, /不会删除原记录/u)
+  assert.match(financePaymentsPage, /不(?:会)?删除原记录/u)
   assert.match(financePaymentsPage, /getFinancePaymentApprovalProcess/u)
   assert.match(financePaymentsPage, /startFinancePaymentApprovalProcess/u)
   assert.match(financePaymentsPage, />\s*核对审批流\s*</u)

@@ -16,9 +16,10 @@ import (
 )
 
 type customerConfigAuditPayloadMatcher struct {
-	t                *testing.T
-	action           string
-	expectedAfterKey string
+	t                 *testing.T
+	action            string
+	expectedAfterKey  string
+	expectedTargetKey string
 }
 
 func (m customerConfigAuditPayloadMatcher) Match(value driver.Value) bool {
@@ -38,7 +39,11 @@ func (m customerConfigAuditPayloadMatcher) Match(value driver.Value) bool {
 		m.t.Fatalf("actor.id = %#v", actor["id"])
 	}
 	target, _ := decoded["target"].(map[string]any)
-	if target["type"] != "customer_config_revision" || target["key"] != "yoyoosun/rev-1" {
+	expectedTargetKey := m.expectedTargetKey
+	if expectedTargetKey == "" {
+		expectedTargetKey = "yoyoosun/rev-1"
+	}
+	if target["type"] != "customer_config_revision" || target["key"] != expectedTargetKey {
 		m.t.Fatalf("target = %#v", target)
 	}
 	after, _ := decoded["after"].(map[string]any)
@@ -356,6 +361,166 @@ func TestCustomerConfigRepoPublishRollsBackWhenExpandedRowsFail(t *testing.T) {
 
 	if _, err := repo.PublishCustomerConfig(context.Background(), in, "hash-1", 99, publishedAt); err == nil || err.Error() != "insert module failed" {
 		t.Fatalf("PublishCustomerConfig() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestCustomerConfigRepoApplyApprovalSettingsActivatesInOneTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	repo := NewCustomerConfigRepo(NewDataForTesting(nil, db), log.NewStdLogger(io.Discard))
+	appliedAt := time.Date(2026, 7, 29, 8, 0, 0, 0, time.UTC)
+	publishedAt := appliedAt.Add(-time.Hour)
+	in := biz.CustomerConfigPublishInput{
+		CustomerKey:      "yoyoosun",
+		Revision:         "rev-2",
+		ProductVersion:   "product-v1",
+		CompiledSnapshot: map[string]any{"customer": map[string]any{"key": "yoyoosun"}},
+		ModuleStates: []biz.DeploymentModuleStateInput{
+			{ModuleKey: "customers", ContractVersion: "v1", State: "enabled", Reason: "ready"},
+		},
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT id
+FROM customer_config_revisions
+WHERE customer_key = $1
+ORDER BY id
+FOR UPDATE`)).
+		WithArgs("yoyoosun").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT id, customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot,
+       published_by, published_at, activated_by, activated_at, created_at, updated_at
+FROM customer_config_revisions
+WHERE customer_key = $1
+ORDER BY id
+FOR UPDATE`)).
+		WithArgs("yoyoosun").
+		WillReturnRows(sqlmock.NewRows(customerConfigRevisionSQLMockColumns()).
+			AddRow(10, "yoyoosun", "rev-1", "product-v1", "hash-1", biz.CustomerConfigHashVersion, biz.CustomerConfigStatusActive, []byte(`{"customer":{"key":"yoyoosun"}}`), 98, publishedAt, 98, publishedAt, publishedAt, publishedAt))
+	mock.ExpectQuery("INSERT INTO customer_config_revisions").
+		WithArgs("yoyoosun", "rev-2", "product-v1", "hash-2", biz.CustomerConfigHashVersion, customerConfigStatusBuilding, `{"customer":{"key":"yoyoosun"}}`, 99, appliedAt).
+		WillReturnRows(sqlmock.NewRows(customerConfigRevisionSQLMockColumns()).
+			AddRow(11, "yoyoosun", "rev-2", "product-v1", "hash-2", biz.CustomerConfigHashVersion, customerConfigStatusBuilding, []byte(`{"customer":{"key":"yoyoosun"}}`), 99, appliedAt, nil, nil, appliedAt, appliedAt))
+	mock.ExpectExec("INSERT INTO deployment_module_states").
+		WithArgs("yoyoosun", "rev-2", "customers", "v1", "enabled", "ready", appliedAt, appliedAt).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+	SELECT module_key, contract_version, state, reason
+	FROM deployment_module_states
+	WHERE customer_key = $1 AND config_revision = $2
+	ORDER BY module_key ASC
+	FOR SHARE`)).
+		WithArgs("yoyoosun", "rev-2").
+		WillReturnRows(sqlmock.NewRows([]string{"module_key", "contract_version", "state", "reason"}).
+			AddRow("customers", "v1", "enabled", "ready"))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE customer_config_revisions
+SET status = $3, updated_at = $4
+WHERE customer_key = $1 AND revision = $2 AND status = $5`)).
+		WithArgs("yoyoosun", "rev-2", biz.CustomerConfigStatusPublished, appliedAt, customerConfigStatusBuilding).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE customer_config_revisions
+SET status = $3, updated_at = $4
+WHERE customer_key = $1 AND status = $2 AND revision <> $5`)).
+		WithArgs("yoyoosun", biz.CustomerConfigStatusActive, biz.CustomerConfigStatusSuperseded, appliedAt, "rev-2").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE customer_config_revisions
+SET status = $3, activated_by = $4, activated_at = $5, updated_at = $5
+WHERE customer_key = $1 AND revision = $2 AND status = $6`)).
+		WithArgs("yoyoosun", "rev-2", biz.CustomerConfigStatusActive, 99, appliedAt, biz.CustomerConfigStatusPublished).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)")).
+		WithArgs(
+			"customer_config_control_plane",
+			customerConfigAuditActionApprovalSettingsApply,
+			"customer_config",
+			customerConfigAuditPayloadMatcher{
+				t:                 t,
+				action:            customerConfigAuditActionApprovalSettingsApply,
+				expectedAfterKey:  "previous_active_revision",
+				expectedTargetKey: "yoyoosun/rev-2",
+			},
+			sqlmock.AnyArg(),
+		).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	item, err := repo.ApplyApprovalSettingsRevision(
+		context.Background(),
+		in,
+		"hash-2",
+		"rev-1",
+		"hash-1",
+		99,
+		appliedAt,
+	)
+	if err != nil {
+		t.Fatalf("ApplyApprovalSettingsRevision() error = %v", err)
+	}
+	if item.Revision != "rev-2" || item.Status != biz.CustomerConfigStatusActive || item.ActivatedAt == nil {
+		t.Fatalf("item = %#v", item)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestCustomerConfigRepoApplyApprovalSettingsRollsBackProjectionFailure(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	repo := NewCustomerConfigRepo(NewDataForTesting(nil, db), log.NewStdLogger(io.Discard))
+	appliedAt := time.Date(2026, 7, 29, 8, 0, 0, 0, time.UTC)
+	in := biz.CustomerConfigPublishInput{
+		CustomerKey:      "yoyoosun",
+		Revision:         "rev-2",
+		ProductVersion:   "product-v1",
+		CompiledSnapshot: map[string]any{"customer": map[string]any{"key": "yoyoosun"}},
+		ModuleStates: []biz.DeploymentModuleStateInput{
+			{ModuleKey: "customers", ContractVersion: "v1", State: "enabled", Reason: "ready"},
+		},
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("SELECT id FROM customer_config_revisions").
+		WithArgs("yoyoosun").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(10))
+	mock.ExpectQuery("SELECT id, customer_key, revision").
+		WithArgs("yoyoosun").
+		WillReturnRows(sqlmock.NewRows(customerConfigRevisionSQLMockColumns()).
+			AddRow(10, "yoyoosun", "rev-1", "product-v1", "hash-1", biz.CustomerConfigHashVersion, biz.CustomerConfigStatusActive, []byte(`{}`), 98, appliedAt, 98, appliedAt, appliedAt, appliedAt))
+	mock.ExpectQuery("INSERT INTO customer_config_revisions").
+		WillReturnRows(sqlmock.NewRows(customerConfigRevisionSQLMockColumns()).
+			AddRow(11, "yoyoosun", "rev-2", "product-v1", "hash-2", biz.CustomerConfigHashVersion, customerConfigStatusBuilding, []byte(`{"customer":{"key":"yoyoosun"}}`), 99, appliedAt, nil, nil, appliedAt, appliedAt))
+	mock.ExpectExec("INSERT INTO deployment_module_states").
+		WillReturnError(errors.New("insert module failed"))
+	mock.ExpectRollback()
+
+	_, err = repo.ApplyApprovalSettingsRevision(
+		context.Background(),
+		in,
+		"hash-2",
+		"rev-1",
+		"hash-1",
+		99,
+		appliedAt,
+	)
+	if err == nil || err.Error() != "insert module failed" {
+		t.Fatalf("ApplyApprovalSettingsRevision() error = %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)

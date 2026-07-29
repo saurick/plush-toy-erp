@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { evaluateMigrationStatus } from "./local-runtime-preflight-core.mjs";
+import { databaseProgrammabilityReceiptSQL } from "./qa/database-programmability.mjs";
 
 const execFileAsync = promisify(execFileCallback);
 const repoRoot = path.resolve(import.meta.dirname, "..");
@@ -47,6 +48,7 @@ function workflowFingerprint() {
     migrationScriptPath,
     path.join(serverRoot, "Makefile"),
     path.join(repoRoot, "scripts/local-runtime-preflight-core.mjs"),
+    path.join(repoRoot, "scripts/qa/database-programmability.mjs"),
     path.join(repoRoot, "scripts/qa/populated-upgrade-preflight.sh"),
     path.join(repoRoot, "scripts/qa/populated-upgrade-20260714055504.sql"),
     path.join(
@@ -538,6 +540,26 @@ async function runSchemaReadback(databaseURL) {
   process.stdout.write(
     "[migration] Ent / PostgreSQL schema 同目标读回零差异\n",
   );
+  const programmability = await runCommand(
+    "node",
+    [
+      path.join(repoRoot, "scripts/qa/database-programmability.mjs"),
+      "--database-url-env",
+      "PLUSH_DATABASE_PROGRAMMABILITY_URL",
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        PLUSH_DATABASE_PROGRAMMABILITY_URL: databaseURL,
+      },
+      failureMessage:
+        "apply 后数据库仍含自定义 Function、Procedure 或非内部 Trigger；migration 已可能提交，结果为 committed_unverified",
+    },
+  );
+  if (programmability.stdout) {
+    process.stdout.write(programmability.stdout);
+  }
 }
 
 function statusVersions(status) {
@@ -662,6 +684,7 @@ async function runRollbackRehearsal(databaseURL, snapshot, pendingVersions) {
     "SET LOCAL lock_timeout = '5s';",
     "SET LOCAL statement_timeout = '120s';",
     ...migrations,
+    databaseProgrammabilityReceiptSQL,
     "ROLLBACK;",
     "",
   ].join("\n");
@@ -678,6 +701,13 @@ async function runRollbackRehearsal(databaseURL, snapshot, pendingVersions) {
   if (!/\bROLLBACK\b/u.test(result.stdout || "")) {
     throw new MigrationCommandError(
       "migration 预演没有取得 ROLLBACK 回执；未执行正式 apply",
+    );
+  }
+  if (
+    !/database_programmability=0\|0\|0/u.test(result.stdout || "")
+  ) {
+    throw new MigrationCommandError(
+      "pending migration 预演后仍存在自定义 Function、Procedure 或非内部 Trigger；事务已回滚，未执行正式 apply",
     );
   }
   process.stdout.write(

@@ -859,6 +859,40 @@
     flex: 0 0 220px;
   }
 
+  .erp-role-navigation-workspace-tabs > .ant-tabs-nav .ant-tabs-nav-list {
+    width: 100%;
+  }
+
+  .erp-role-navigation-workspace-tabs > .ant-tabs-nav .ant-tabs-tab {
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    margin: 0;
+    padding-inline: 8px;
+  }
+
+  .erp-role-effective-access__toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-role-effective-access__toolbar .ant-segmented {
+    width: 100%;
+  }
+
+  .erp-role-effective-access__toolbar .ant-segmented-group {
+    width: 100%;
+  }
+
+  .erp-role-effective-access__toolbar .ant-segmented-item {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .erp-role-effective-access__toolbar .ant-segmented-item-label {
+    padding-inline: 4px;
+  }
+
   .erp-role-navigation-editor__head,
   .erp-role-navigation-editor__order-item {
     align-items: stretch;
@@ -876,6 +910,14 @@
 
   .erp-role-navigation-editor__head > .ant-select {
     width: 100%;
+  }
+
+  .erp-role-navigation-editor__columns {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-role-navigation-editor__order {
+    max-height: none;
   }
 
   .erp-role-navigation-editor__order-item > .ant-space {
@@ -928,7 +970,7 @@
       .ant-btn,
       .erp-business-date-range-filter
     ),
-      .erp-business-operation-panel__filters
+  .erp-business-operation-panel__filters
     > :where(
       .ant-input-affix-wrapper,
       .ant-select,

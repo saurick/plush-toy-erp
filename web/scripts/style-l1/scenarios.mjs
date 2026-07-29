@@ -178,7 +178,7 @@ export function createStyleL1Scenarios(deps) {
           node.querySelector('.erp-business-board-source-entry')
         ).length,
         customer: sourceCount('客户'),
-        productionException: sourceCount('生产异常'),
+        productionException: sourceCount('生产异常处置'),
         invoice: sourceCount('发票记录'),
         masterSummary: summaryCard('基础资料'),
         sourceSummary: summaryCard('业务单据'),
@@ -405,7 +405,7 @@ export function createStyleL1Scenarios(deps) {
       { timeout: 10_000 }
     )
     const focusMetrics = await page.evaluate(() => {
-      const activeElement = document.activeElement
+      const { activeElement } = document
       const expectedTrigger = Array.from(
         document.querySelectorAll('.erp-audit-event')
       ).find((event) => event.textContent?.includes('员工岗位变更'))
@@ -1005,7 +1005,11 @@ export function createStyleL1Scenarios(deps) {
   const customerRoleAdminProfile = (
     roleKey,
     username,
-    { navigationMode = 'recommended', primaryMenuPaths = [] } = {}
+    {
+      navigationMode = 'recommended',
+      primaryMenuPaths = [],
+      secondaryMenuPaths = [],
+    } = {}
   ) => {
     const role = yoyoosunRoleFlowMatrix.roles.find(
       (item) => item.roleKey === roleKey
@@ -1016,6 +1020,25 @@ export function createStyleL1Scenarios(deps) {
       assert(item, `缺少永绅页面映射: ${roleKey}.${pageKey}`)
       return { key: item.key, label: item.label, path: item.path }
     })
+    const resolvedSecondaryMenuPaths =
+      navigationMode === 'custom'
+        ? [
+            ...secondaryMenuPaths,
+            ...menus
+              .map((item) => item.path)
+              .filter(
+                (menuPath) =>
+                  !primaryMenuPaths.includes(menuPath) &&
+                  !secondaryMenuPaths.includes(menuPath) &&
+                  ![
+                    '/erp/dashboard',
+                    '/erp/task-board',
+                    '/erp/business-dashboard',
+                    '/erp/help-center',
+                  ].includes(menuPath)
+              ),
+          ]
+        : []
     return {
       id: 1,
       username,
@@ -1026,6 +1049,7 @@ export function createStyleL1Scenarios(deps) {
           name: role.displayName,
           navigation_mode: navigationMode,
           primary_menu_paths: primaryMenuPaths,
+          secondary_menu_paths: resolvedSecondaryMenuPaths,
         },
       ],
       permissions: [...role.capabilityKeys],
@@ -1120,7 +1144,47 @@ export function createStyleL1Scenarios(deps) {
   let purchaseOrderFullRefreshSettled = Promise.resolve()
   let releasePurchaseOrderInitialReference = () => {}
   let coverageFixtureEnvelopeStatus = 'current'
+  let coverageActionRequests = 0
   let releaseCoverageLoadingResponse = () => {}
+  const coverageOperationId = '123e4567-e89b-42d3-a456-426614174000'
+  const buildCoverageFixtureOperation = ({
+    status = 'running',
+    stage = 'go',
+    revision = 2,
+    outcome = null,
+    exitCode = null,
+    message = '正在采集 Go 测试与代码覆盖',
+  } = {}) => {
+    const terminal = ['completed', 'failed', 'not_proven'].includes(status)
+    return {
+      schemaVersion: 'plush.dev-qa-coverage-operation-public/v1',
+      id: coverageOperationId,
+      profile: 'baseline',
+      repository: {
+        commit: 'abcdef1234567890abcdef1234567890abcdef12',
+        dirty: false,
+        fingerprint:
+          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      },
+      status,
+      stage,
+      outcome,
+      exitCode,
+      revision,
+      createdAt: '2026-07-29T08:00:00.000Z',
+      updatedAt: '2026-07-29T08:00:03.000Z',
+      finishedAt: terminal ? '2026-07-29T08:00:03.000Z' : null,
+      message,
+      events: [
+        {
+          at: '2026-07-29T08:00:03.000Z',
+          status,
+          stage,
+          message,
+        },
+      ],
+    }
+  }
   const buildCoverageFixtureReport = () => ({
     schemaVersion: 'plush-test-coverage-report/v1',
     generatedAt: '2026-07-19T01:02:03.000Z',
@@ -1853,7 +1917,7 @@ export function createStyleL1Scenarios(deps) {
         await focusOrigin.focus()
         await page.evaluate(async () => {
           const { appAlert } = await import(
-            '/src/common/components/modal/alertBridge.js'
+            '../../../../../../../src/common/components/modal/alertBridge.js'
           )
           appAlert({
             title: '登录状态已失效',
@@ -1873,7 +1937,7 @@ export function createStyleL1Scenarios(deps) {
 
         await page.evaluate(async () => {
           const { appAlert } = await import(
-            '/src/common/components/modal/alertBridge.js'
+            '../../../../../../../src/common/components/modal/alertBridge.js'
           )
           window.__appAlertConfirmCount = 0
           appAlert({
@@ -3293,7 +3357,7 @@ export function createStyleL1Scenarios(deps) {
         menus: [
           {
             key: 'production-exceptions',
-            label: '生产异常',
+            label: '生产异常处置',
             path: '/erp/production/exceptions',
             required_any: ['quality.inspection.read'],
             required_all: [],
@@ -3326,7 +3390,7 @@ export function createStyleL1Scenarios(deps) {
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '生产异常')
+        await expectHeading(page, '生产异常处置')
         await expectText(page, '待办任务')
         assert.equal(
           permissionSafeProductionExceptionRequests,
@@ -3633,7 +3697,7 @@ export function createStyleL1Scenarios(deps) {
           .locator('.ant-menu-submenu-title')
           .filter({ hasText: '更多功能' })
           .click()
-        await expectText(page, '生产异常')
+        await expectText(page, '生产异常处置')
         await expectText(page, '岗位使用帮助')
         await page.screenshot({
           path: path.resolve(
@@ -3715,12 +3779,12 @@ export function createStyleL1Scenarios(deps) {
           [
             '工作台',
             '任务看板',
-            '应付管理',
             '应收管理',
+            '应付管理',
             '发票管理',
             '对账管理',
           ],
-          `财务系统推荐应突出应付、应收、发票和对账: ${JSON.stringify(visibleLeafTexts)}`
+          `财务系统推荐应突出应收、应付、发票和对账: ${JSON.stringify(visibleLeafTexts)}`
         )
         await page.screenshot({
           path: path.resolve(
@@ -3792,9 +3856,9 @@ export function createStyleL1Scenarios(deps) {
       adminProfile: customerRoleAdminProfile('finance', 'demo_finance', {
         navigationMode: 'custom',
         primaryMenuPaths: [
-          '/erp/finance/reconciliation',
-          '/erp/finance/invoices',
+          '/erp/finance/receivables',
           '/erp/finance/payables',
+          '/erp/finance/payments',
         ],
       }),
       effectiveSession: customerRoleRuntimeSession(
@@ -3811,13 +3875,13 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(
           visibleLeafTexts,
-          ['工作台', '任务看板', '对账管理', '发票管理', '应付管理'],
+          ['工作台', '任务看板', '应收管理', '应付管理', '收付款核销'],
           `财务自定义常用入口应按保存顺序显示且不自动补满: ${JSON.stringify(visibleLeafTexts)}`
         )
         assert.equal(
-          visibleLeafTexts.includes('应收管理'),
+          visibleLeafTexts.includes('收付款与核销'),
           false,
-          '未选为常用的应收管理应保留在更多功能'
+          '菜单名称不应继续显示页面标题“收付款与核销”'
         )
         await page.screenshot({
           path: path.resolve(
@@ -9115,10 +9179,12 @@ export function createStyleL1Scenarios(deps) {
         const groupDropdown = page.locator(
           '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
         )
-        await groupDropdown.locator('.rc-virtual-list-holder').evaluate((node) => {
-          node.scrollTop = 0
-          node.dispatchEvent(new Event('scroll', { bubbles: true }))
-        })
+        await groupDropdown
+          .locator('.rc-virtual-list-holder')
+          .evaluate((node) => {
+            node.scrollTop = 0
+            node.dispatchEvent(new Event('scroll', { bubbles: true }))
+          })
         await groupDropdown
           .locator('.ant-select-item-option')
           .filter({ hasText: '全部 / All' })
@@ -9376,6 +9442,124 @@ export function createStyleL1Scenarios(deps) {
             `开发页应统一提供移动端工作台导航、深链和来源入口: ${devPage.path} ${JSON.stringify(metrics)}`
           )
         }
+      },
+    },
+    {
+      name: 'dev-workbench-areas-dark-desktop',
+      path: '/__dev/product-engineering',
+      themeMode: 'dark',
+      viewport: { width: 1536, height: 900 },
+      verify: async (page) => {
+        const areaPages = [
+          {
+            path: '/__dev/product-engineering',
+            heading: '产品工程 / Product Engineering',
+            cardCount: 5,
+          },
+          {
+            path: '/__dev/quality',
+            heading: '质量 / Quality',
+            cardCount: 1,
+          },
+          {
+            path: '/__dev/delivery',
+            heading: '交付 / Delivery',
+            cardCount: 1,
+          },
+        ]
+
+        for (const areaPage of areaPages) {
+          await gotoScenarioPath(page, areaPage.path, {
+            waitUntil: 'domcontentloaded',
+          })
+          await expectHeading(page, areaPage.heading)
+
+          const metrics = await page.evaluate(() => {
+            const cards = Array.from(
+              document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
+            )
+
+            return {
+              scrollWidth: document.documentElement.scrollWidth,
+              clientWidth: document.documentElement.clientWidth,
+              cards: cards.map((card) => {
+                const body = card.querySelector('.erp-dev-hub-card__body')
+                const title = card.querySelector('.erp-dev-hub-card__title')
+                const cardRect = card.getBoundingClientRect()
+                const bodyRect = body?.getBoundingClientRect()
+                const titleRect = title?.getBoundingClientRect()
+                const cardStyle = getComputedStyle(card)
+                const titleStyle = title ? getComputedStyle(title) : null
+
+                return {
+                  hasWithoutIconModifier: card.classList.contains(
+                    'erp-dev-hub-card--without-icon'
+                  ),
+                  gridColumnCount: cardStyle.gridTemplateColumns
+                    .split(/\s+/u)
+                    .filter(Boolean).length,
+                  cardWidth: Math.round(cardRect.width),
+                  bodyWidth: Math.round(bodyRect?.width || 0),
+                  bodyClientWidth: body?.clientWidth || 0,
+                  bodyScrollWidth: body?.scrollWidth || 0,
+                  titleWidth: Math.round(titleRect?.width || 0),
+                  titleHeight: Math.round(titleRect?.height || 0),
+                  titleWritingMode: titleStyle?.writingMode || '',
+                }
+              }),
+            }
+          })
+
+          assert.equal(
+            metrics.cards.length,
+            areaPage.cardCount,
+            `工作台区域页入口数量异常: ${areaPage.path} ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.cards.every(
+              (card) =>
+                card.hasWithoutIconModifier &&
+                card.gridColumnCount === 1 &&
+                card.bodyWidth >= card.cardWidth - 26 &&
+                card.bodyClientWidth > 400 &&
+                card.bodyScrollWidth <= card.bodyClientWidth + 1 &&
+                card.titleWidth >= 120 &&
+                card.titleHeight <= 64 &&
+                card.titleWritingMode === 'horizontal-tb'
+            ),
+            `工作台无图标入口卡正文必须占满单列并保持横排: ${areaPage.path} ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.scrollWidth <= metrics.clientWidth + 1,
+            `工作台区域页不应出现横向溢出: ${areaPage.path} ${JSON.stringify(metrics)}`
+          )
+        }
+
+        await gotoScenarioPath(page, '/__dev/product-engineering', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '产品工程 / Product Engineering')
+        await page
+          .locator('.erp-dev-hub-grid .erp-dev-hub-card__link')
+          .first()
+          .focus()
+        assert.equal(
+          await page
+            .locator('.erp-dev-hub-grid .erp-dev-hub-card')
+            .first()
+            .evaluate((card) => card.matches(':focus-within')),
+          true,
+          '工作台区域入口聚焦后应保持明确的卡片反馈'
+        )
+        await assertERPThemeMode(page, {
+          scenarioName: 'dev-workbench-areas-dark-desktop',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertDarkThemeContrast(page, {
+          scenarioName: 'dev-workbench-areas-dark-desktop',
+          selector: '.erp-dev-hub-page',
+        })
       },
     },
     {
@@ -11023,7 +11207,10 @@ export function createStyleL1Scenarios(deps) {
           '覆盖报告等待接口时必须暴露 loading 状态'
         )
         releaseCoverageLoadingResponse()
-        await expectText(page, '当前没有可展示的覆盖报告 / No coverage report')
+        await expectText(
+          page,
+          '尚未采集可展示的覆盖证据；空值不是 0% / No coverage evidence collected'
+        )
         await assertNoHorizontalOverflow(
           page,
           'dev-testing-coverage-loading-desktop'
@@ -11036,23 +11223,79 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'light',
       viewport: { width: 390, height: 844 },
       beforeNavigate: async (page) => {
-        await page.route('**/__dev/api/qa/coverage', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              status: 'missing',
-              message: '尚未生成覆盖报告',
-            }),
-          })
-        })
+        coverageActionRequests = 0
+        const runningOperation = buildCoverageFixtureOperation()
+        await page.route(
+          /\/__dev\/api\/qa\/coverage(?:\/.*)?(?:\?.*)?$/u,
+          async (route) => {
+            const request = route.request()
+            const { pathname } = new URL(request.url())
+            let body
+            if (pathname.endsWith('/session')) {
+              body = {
+                schemaVersion: 'plush.dev-qa-coverage-session/v1',
+                apiPath: '/__dev/api/qa/coverage',
+                csrfToken: 's'.repeat(43),
+              }
+            } else if (pathname.endsWith('/actions')) {
+              coverageActionRequests += 1
+              assert.equal(request.method(), 'POST')
+              assert.deepEqual(request.postDataJSON(), {
+                action: 'collect',
+                payload: {
+                  idempotencyKey: request
+                    .postDataJSON()
+                    .payload.idempotencyKey,
+                },
+              })
+              body = {
+                schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+                action: 'collect',
+                reused: false,
+                operation: runningOperation,
+              }
+            } else if (pathname.includes('/operations/')) {
+              body = {
+                schemaVersion: 'plush.dev-qa-coverage-operation-result/v1',
+                operation: runningOperation,
+              }
+            } else {
+              body = {
+                status: 'missing',
+                message: '尚未生成覆盖报告',
+                operation: null,
+              }
+            }
+            await route.fulfill({
+              status: pathname.endsWith('/actions') ? 202 : 200,
+              contentType: 'application/json',
+              body: JSON.stringify(body),
+            })
+          }
+        )
       },
       verify: async (page) => {
         await expectText(page, '覆盖状态 / Coverage')
         await expectText(page, '尚未生成覆盖报告')
-        await expectText(page, '当前没有可展示的覆盖报告 / No coverage report')
-        await expectButton(page, '复制生成命令')
+        await expectText(
+          page,
+          '尚未采集可展示的覆盖证据；空值不是 0% / No coverage evidence collected'
+        )
+        await expectButton(page, '一键采集覆盖率')
+        await expectButton(page, '复制备用命令')
         await expectButton(page, '重新读取')
+        await page.getByRole('button', { name: '一键采集覆盖率' }).click()
+        await expectText(page, '第 3/10 阶段 · Go 测试与代码覆盖')
+        assert.equal(
+          coverageActionRequests,
+          1,
+          '连续运行状态只允许发起一个固定 coverage action'
+        )
+        assert.equal(
+          await page.getByRole('button', { name: '采集中…' }).isDisabled(),
+          true,
+          '采集运行期间主按钮必须留在原位并禁用'
+        )
         assert.equal(
           await page.locator('.erp-dev-testing-sidebar').count(),
           0,
@@ -11089,20 +11332,62 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1536, height: 900 },
       beforeNavigate: async (page) => {
         coverageFixtureEnvelopeStatus = 'current'
-        await page.route('**/__dev/api/qa/coverage', async (route) => {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              status: coverageFixtureEnvelopeStatus,
-              message:
-                coverageFixtureEnvelopeStatus === 'stale'
-                  ? 'fixture commit 与当前工作区不一致'
-                  : '',
-              report: buildCoverageFixtureReport(),
-            }),
-          })
-        })
+        coverageActionRequests = 0
+        let latestOperation = null
+        await page.route(
+          /\/__dev\/api\/qa\/coverage(?:\/.*)?(?:\?.*)?$/u,
+          async (route) => {
+            const request = route.request()
+            const { pathname } = new URL(request.url())
+            let status = 200
+            let body
+            if (pathname.endsWith('/session')) {
+              body = {
+                schemaVersion: 'plush.dev-qa-coverage-session/v1',
+                apiPath: '/__dev/api/qa/coverage',
+                csrfToken: 's'.repeat(43),
+              }
+            } else if (pathname.endsWith('/actions')) {
+              coverageActionRequests += 1
+              status = 202
+              latestOperation = buildCoverageFixtureOperation()
+              body = {
+                schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+                action: 'collect',
+                reused: false,
+                operation: latestOperation,
+              }
+            } else if (pathname.includes('/operations/')) {
+              latestOperation = buildCoverageFixtureOperation({
+                status: 'completed',
+                stage: 'finished',
+                revision: 3,
+                outcome: 'passed',
+                exitCode: 0,
+                message: '覆盖采集完成，报告已绑定当前仓库身份',
+              })
+              body = {
+                schemaVersion: 'plush.dev-qa-coverage-operation-result/v1',
+                operation: latestOperation,
+              }
+            } else {
+              body = {
+                status: coverageFixtureEnvelopeStatus,
+                message:
+                  coverageFixtureEnvelopeStatus === 'stale'
+                    ? 'fixture commit 与当前工作区不一致'
+                    : '',
+                report: buildCoverageFixtureReport(),
+                operation: latestOperation,
+              }
+            }
+            await route.fulfill({
+              status,
+              contentType: 'application/json',
+              body: JSON.stringify(body),
+            })
+          }
+        )
       },
       verify: async (page) => {
         await expectText(page, '报告与当前仓库指纹匹配')
@@ -11161,11 +11446,26 @@ export function createStyleL1Scenarios(deps) {
           0,
           'N/A 门禁不能显示百分比'
         )
-        await page.getByRole('button', { name: '复制生成命令' }).click()
+        await page.getByRole('button', { name: '一键采集覆盖率' }).click()
+        await expectText(page, '采集完成')
+        await expectText(page, '覆盖采集完成，报告已绑定当前仓库身份')
+        assert.equal(
+          coverageActionRequests,
+          1,
+          '一键采集完成前后只能提交一次固定 action'
+        )
+        assert.equal(
+          await page
+            .getByRole('button', { name: '一键采集覆盖率' })
+            .isEnabled(),
+          true,
+          '采集完成并读回终态后应恢复主按钮'
+        )
+        await page.getByRole('button', { name: '复制备用命令' }).click()
         assert.equal(
           await page.evaluate(() => navigator.clipboard.readText()),
-          'node scripts/qa/test-coverage-report.mjs --write',
-          '覆盖页只应复制报告生成命令'
+          'node scripts/qa/test-coverage-collect.mjs --profile baseline --write',
+          '覆盖页应保留真实 baseline 备用命令'
         )
 
         coverageFixtureEnvelopeStatus = 'stale'
@@ -11275,10 +11575,10 @@ export function createStyleL1Scenarios(deps) {
         await expectText(shipmentRow, '待设置')
         await expectText(shipmentRow, '主办 · 财务')
         await expectText(shipmentRow, '升级 · 老板')
-        await expectText(page, '推荐责任尚未发布')
-        await expectText(page, '发布前自动检查')
+        await expectText(page, '推荐责任等待保存')
+        await expectText(page, '保存前自动检查')
         await assertTextAbsent(page, '尚未发布审批责任')
-        await expectButton(page, '检查并发布')
+        await expectButton(page, '保存并生效')
         await assertNoHorizontalOverflow(
           page,
           'permission-center-approval-unconfigured'
@@ -11337,6 +11637,14 @@ export function createStyleL1Scenarios(deps) {
         await employeeOptions
           .getByText('multi-role-employee', { exact: true })
           .click()
+        const backupTier = dialog
+          .locator('.erp-approval-responsibility-form__tier')
+          .nth(1)
+        await backupTier.locator('.ant-select').first().click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .getByText('PMC', { exact: true })
+          .click({ force: true })
         await assertAntdModalCentered(
           page,
           dialog,
@@ -11345,13 +11653,52 @@ export function createStyleL1Scenarios(deps) {
         await dialog
           .getByRole('button', { name: '保存调整', exact: true })
           .click()
-        await expectButton(page, '检查并发布')
+        await expectText(
+          page.getByRole('row', { name: /销售订单审批/ }),
+          '备用 · PMC'
+        )
+        await expectButton(page, '保存并生效')
         await page
-          .getByRole('button', { name: '检查并发布', exact: true })
+          .getByRole('button', { name: '保存并生效', exact: true })
           .click()
-        await expectButton(page, '启用新设置')
+        await expectText(page, '已生效')
+        await assertTextAbsent(page, '确认并生效')
+      },
+    },
+    {
+      name: 'permission-center-approval-confirmation-recovery',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      approvalSettingsMode: 'confirmation_recovery',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '权限管理')
+        await page.getByRole('tab', { name: /审批责任/ }).click()
         await page
-          .getByRole('button', { name: '启用新设置', exact: true })
+          .getByRole('row', { name: /销售订单审批/ })
+          .getByRole('button', { name: '调整' })
+          .click()
+        const dialog = page
+          .getByRole('dialog')
+          .filter({ hasText: '调整销售订单审批' })
+        const backupTier = dialog
+          .locator('.erp-approval-responsibility-form__tier')
+          .nth(1)
+        await backupTier.locator('.ant-select').first().click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .getByText('PMC', { exact: true })
+          .click({ force: true })
+        await dialog
+          .getByRole('button', { name: '保存调整', exact: true })
+          .click()
+        await page
+          .getByRole('button', { name: '保存并生效', exact: true })
+          .click()
+        await expectText(page, '等待确认')
+        await expectButton(page, '确认并生效')
+        await page
+          .getByRole('button', { name: '确认并生效', exact: true })
           .click()
         await expectText(page, '已生效')
       },
@@ -11731,7 +12078,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '当前客户已启用版本')
         await expectText(page, '页面可进入，不等于页面内所有操作都可用')
         await expectText(page, '当前页面结果')
-        await expectText(page, '设置岗位常用入口')
+        await expectText(page, '设置岗位菜单布局')
         await expectText(page, '系统按岗位推荐高频页面')
         await expectText(page, '导航位置预览')
         await expectText(page, '看板中心')
@@ -11797,11 +12144,17 @@ export function createStyleL1Scenarios(deps) {
           .click()
         await page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '自定义常用' })
+          .filter({ hasText: '自定义布局' })
           .click()
         await page.keyboard.press('Escape')
         await page.waitForTimeout(350)
-        await expectText(page, '已选 3/5')
+        const moveToMore = page.getByRole('button', {
+          name: '移到更多 库存台账',
+        })
+        await moveToMore.focus()
+        await page.keyboard.press('Enter')
+        await page.getByRole('button', { name: '移到常用 库存台账' }).focus()
+        await page.keyboard.press('Enter')
         await page.getByRole('button', { name: '上移 库存台账' }).click()
         await page.getByRole('button', { name: '上移 库存台账' }).click()
         const customPrimaryOrder = await page.evaluate(() => {
@@ -11813,7 +12166,11 @@ export function createStyleL1Scenarios(deps) {
           )
           return Array.from(
             primaryGroup?.querySelectorAll('.ant-tag') || []
-          ).map((item) => String(item.textContent || '').trim())
+          ).map((item) =>
+            String(item.textContent || '')
+              .trim()
+              .replace(/^\d+\.\s*/u, '')
+          )
         })
         assert.deepEqual(
           customPrimaryOrder,
@@ -11825,7 +12182,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await page.getByRole('button', { name: '保存岗位设置' }).click()
         await expectText(page, '岗位设置已更新，相关账号刷新后生效')
-        await expectText(page, '自定义常用')
+        await expectText(page, '自定义布局')
         await expectText(page, '已保存')
         await page.waitForTimeout(350)
         await page.screenshot({
@@ -12094,6 +12451,256 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'permission-center-role-navigation-desktop',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      viewport: { width: 1486, height: 1058 },
+      verify: async (page) => {
+        let effectiveAccessRequestCount = 0
+        page.on('request', (request) => {
+          if (
+            request.url().includes('/rpc/admin') &&
+            request.postDataJSON()?.method === 'effective_role_access'
+          ) {
+            effectiveAccessRequestCount += 1
+          }
+        })
+        const readNavigationPreview = () =>
+          page.evaluate(() => {
+            return Array.from(
+              document.querySelectorAll('.erp-role-navigation-preview__group')
+            ).map((group) => ({
+              title: String(
+                group.querySelector('.ant-typography')?.textContent || ''
+              ).trim(),
+              items: Array.from(group.querySelectorAll('.ant-tag')).map(
+                (item) =>
+                  String(item.textContent || '')
+                    .trim()
+                    .replace(/^\d+\.\s*/u, '')
+              ),
+            }))
+          })
+
+        await expectHeading(page, '权限管理')
+        await page
+          .locator('.erp-role-template-card')
+          .filter({ hasText: '业务' })
+          .click()
+        await page.getByRole('tab', { name: '页面与导航' }).click()
+        assert.equal(
+          await page
+            .getByRole('tab', { name: '菜单布局' })
+            .getAttribute('aria-selected'),
+          'true',
+          '页面与导航应默认进入菜单布局'
+        )
+        await page.getByRole('tab', { name: /页面可用范围/u }).waitFor({
+          state: 'visible',
+        })
+        await expectText(page, '设置岗位菜单布局')
+        await expectText(page, '系统按岗位推荐高频页面')
+        await expectText(page, '导航位置预览')
+
+        await page
+          .locator(
+            '.erp-role-navigation-editor__head > .ant-select .ant-select-selector'
+          )
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '自定义布局' })
+          .click()
+        await page.keyboard.press('Escape')
+        await expectText(page, '常用工作需保留 1–5 项')
+
+        const customLayoutMetrics = await page.evaluate(() => {
+          const editor = document.querySelector('.erp-role-navigation-editor')
+          const columns = editor?.querySelector(
+            '.erp-role-navigation-editor__columns'
+          )
+          const columnItems = columns?.querySelectorAll(
+            '.erp-role-navigation-editor__column'
+          )
+          return {
+            columnCount: columnItems?.length || 0,
+            gridTemplateColumns: columns
+              ? window.getComputedStyle(columns).gridTemplateColumns
+              : '',
+            editorScrollWidth: editor?.scrollWidth || 0,
+            editorClientWidth: editor?.clientWidth || 0,
+          }
+        })
+        assert(
+          customLayoutMetrics.columnCount === 2 &&
+            customLayoutMetrics.gridTemplateColumns.split(' ').length === 2 &&
+            customLayoutMetrics.editorScrollWidth <=
+              customLayoutMetrics.editorClientWidth + 1,
+          `权限中心双列表桌面布局异常: ${JSON.stringify(customLayoutMetrics)}`
+        )
+
+        const moveInventoryToMore = page.getByRole('button', {
+          name: '移到更多 库存台账',
+        })
+        await moveInventoryToMore.focus()
+        await page.keyboard.press('Enter')
+        await page.getByRole('button', { name: '移到更多 销售订单' }).click()
+        await page.getByRole('button', { name: '上移 销售订单' }).click()
+        await page.getByRole('button', { name: '上移 销售订单' }).click()
+
+        const draftPreview = await readNavigationPreview()
+        assert.deepEqual(
+          draftPreview.map((group) => group.title),
+          ['看板中心', '常用工作', '更多功能（4）'],
+          `权限中心自定义预览分组异常: ${JSON.stringify(draftPreview)}`
+        )
+        assert.deepEqual(
+          draftPreview[1].items,
+          ['客户档案'],
+          `权限中心常用工作顺序异常: ${JSON.stringify(draftPreview)}`
+        )
+        assert.deepEqual(
+          draftPreview[2].items,
+          ['销售订单', '出货放行', '库存台账', '岗位使用帮助'],
+          `权限中心更多功能顺序异常: ${JSON.stringify(draftPreview)}`
+        )
+        await page.waitForTimeout(250)
+        const accessRequestsBeforeTabSwitch = effectiveAccessRequestCount
+        await page.getByRole('tab', { name: /页面可用范围/u }).click()
+        await expectText(page, '当前显示')
+        assert.equal(
+          await page.getByText(/yoyoosun-customer-pack/u).count(),
+          0,
+          '配置版本不应继续占据页面可用范围主视觉'
+        )
+        await page.getByRole('button', { name: '查看配置版本' }).click()
+        await expectText(page, '当前配置版本')
+        await page.keyboard.press('Escape')
+        await page
+          .locator('.erp-role-effective-access__toolbar .ant-segmented-item')
+          .filter({ hasText: '不可进入' })
+          .click()
+        const blockedRows = await page
+          .locator(
+            '.erp-role-effective-access__table .ant-table-tbody > tr.ant-table-row'
+          )
+          .evaluateAll((rows) =>
+            rows.map((row) => String(row.textContent || '').trim())
+          )
+        assert(
+          blockedRows.length > 0 &&
+            blockedRows.every((row) => row.includes('不可进入')),
+          `页面可用范围筛选没有只保留不可进入页面: ${JSON.stringify(blockedRows)}`
+        )
+        await page
+          .locator('.erp-role-effective-access')
+          .screenshot({
+            path: 'output/playwright/style-l1/permission-center-role-navigation-desktop-access.png',
+          })
+        await page.getByRole('tab', { name: '菜单布局' }).click()
+        await page.waitForTimeout(250)
+        assert.equal(
+          effectiveAccessRequestCount,
+          accessRequestsBeforeTabSwitch,
+          '菜单布局与页面可用范围切换不应重复请求权限解释'
+        )
+        const draftPreviewAfterTabSwitch = await readNavigationPreview()
+        assert.deepEqual(
+          draftPreviewAfterTabSwitch,
+          draftPreview,
+          `二级 Tab 切换后不应丢失菜单草稿: ${JSON.stringify(draftPreviewAfterTabSwitch)}`
+        )
+        await page.locator('.erp-role-navigation-editor').screenshot({
+          path: 'output/playwright/style-l1/permission-center-role-navigation-desktop-editor.png',
+        })
+
+        const saveRequestPromise = page.waitForRequest((request) => {
+          if (!request.url().includes('/rpc/admin')) return false
+          return request.postDataJSON()?.method === 'set_role_settings'
+        })
+        await page.getByRole('button', { name: '保存岗位设置' }).click()
+        const saveRequest = await saveRequestPromise
+        const saveParams = saveRequest.postDataJSON()?.params || {}
+        assert.equal(saveParams.role_key, 'sales')
+        assert.equal(saveParams.navigation_mode, 'custom')
+        assert.deepEqual(saveParams.primary_menu_paths, [
+          '/erp/master/partners/customers',
+        ])
+        assert.deepEqual(saveParams.secondary_menu_paths, [
+          '/erp/sales/project-orders/sales-orders',
+          '/erp/warehouse/shipping-release',
+          '/erp/warehouse/inventory',
+        ])
+        assert(
+          Array.isArray(saveParams.permission_keys) &&
+            saveParams.permission_keys.length > 0 &&
+            Array.isArray(saveParams.data_scopes) &&
+            saveParams.data_scopes.length === 1 &&
+            Number(saveParams.expected_version) > 0,
+          `岗位设置必须整包提交权限、范围、布局和版本: ${JSON.stringify(saveParams)}`
+        )
+        await expectText(page, '岗位设置已更新，相关账号刷新后生效')
+        await expectText(page, '已保存')
+
+        const reopenedRBACResponsePromise = page.waitForResponse((response) => {
+          if (!response.url().includes('/rpc/admin')) return false
+          return response.request().postDataJSON()?.method === 'rbac_options'
+        })
+        await page.reload()
+        const reopenedRBACResponse = await reopenedRBACResponsePromise
+        const reopenedRBACPayload = await reopenedRBACResponse.json()
+        const reopenedSalesRole =
+          reopenedRBACPayload?.result?.data?.roles?.find(
+            (role) => role?.role_key === 'sales'
+          ) || null
+        assert.equal(reopenedSalesRole?.navigation_mode, 'custom')
+        assert.deepEqual(reopenedSalesRole?.primary_menu_paths, [
+          '/erp/master/partners/customers',
+        ])
+        assert.deepEqual(reopenedSalesRole?.secondary_menu_paths, [
+          '/erp/sales/project-orders/sales-orders',
+          '/erp/warehouse/shipping-release',
+          '/erp/warehouse/inventory',
+        ])
+        await expectHeading(page, '权限管理')
+        await page
+          .locator('.erp-role-template-card')
+          .filter({ hasText: '业务' })
+          .click()
+        await page.getByRole('tab', { name: '页面与导航' }).click()
+        assert.equal(
+          await page
+            .getByRole('tab', { name: '菜单布局' })
+            .getAttribute('aria-selected'),
+          'true',
+          '整页刷新后页面与导航仍应默认进入菜单布局'
+        )
+        await page
+          .locator('.erp-role-navigation-preview__head .ant-tag')
+          .filter({ hasText: '自定义布局' })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const reopenedPreview = await readNavigationPreview()
+        assert.deepEqual(
+          reopenedPreview[1].items,
+          ['客户档案'],
+          `重新打开后常用工作顺序未读回: ${JSON.stringify(reopenedPreview)}`
+        )
+        assert.deepEqual(
+          reopenedPreview[2].items,
+          ['销售订单', '出货放行', '库存台账', '岗位使用帮助'],
+          `重新打开后更多功能顺序未读回: ${JSON.stringify(reopenedPreview)}`
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'permission-center-role-navigation-desktop'
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/permission-center-role-navigation-desktop-readback.png',
+          fullPage: true,
+        })
+      },
+    },
+    {
       name: 'permission-center-navigation-mobile-dark',
       path: '/erp/system/permissions',
       auth: 'admin',
@@ -12238,7 +12845,57 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '业务' })
           .click()
         await page.getByRole('tab', { name: '页面与导航' }).click()
-        await expectText(page, '设置岗位常用入口')
+        assert.equal(
+          await page
+            .getByRole('tab', { name: '菜单布局' })
+            .getAttribute('aria-selected'),
+          'true',
+          '移动端页面与导航应默认进入菜单布局'
+        )
+        await page.getByRole('tab', { name: /页面可用范围/u }).click()
+        await expectText(page, '当前显示')
+        await page
+          .locator('.erp-role-effective-access__toolbar .ant-segmented-item')
+          .filter({ hasText: /^可进入/u })
+          .first()
+          .click()
+        const mobileAccessMetrics = await page.evaluate(() => {
+          const nestedTabs = document.querySelector(
+            '.erp-role-navigation-workspace-tabs > .ant-tabs-nav'
+          )
+          const segmented = document.querySelector(
+            '.erp-role-effective-access__toolbar .ant-segmented'
+          )
+          const table = document.querySelector(
+            '.erp-role-effective-access__table .ant-table-content'
+          )
+          return {
+            tabsScrollWidth: nestedTabs?.scrollWidth || 0,
+            tabsClientWidth: nestedTabs?.clientWidth || 0,
+            segmentedScrollWidth: segmented?.scrollWidth || 0,
+            segmentedClientWidth: segmented?.clientWidth || 0,
+            tableScrollWidth: table?.scrollWidth || 0,
+            tableClientWidth: table?.clientWidth || 0,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            documentClientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          mobileAccessMetrics.tabsScrollWidth <=
+            mobileAccessMetrics.tabsClientWidth + 1 &&
+            mobileAccessMetrics.segmentedScrollWidth <=
+              mobileAccessMetrics.segmentedClientWidth + 1 &&
+            mobileAccessMetrics.tableScrollWidth >=
+              mobileAccessMetrics.tableClientWidth &&
+            mobileAccessMetrics.documentScrollWidth <=
+              mobileAccessMetrics.documentClientWidth + 1,
+          `页面可用范围移动端布局异常: ${JSON.stringify(mobileAccessMetrics)}`
+        )
+        await page.locator('.erp-role-effective-access').screenshot({
+          path: 'output/playwright/style-l1/permission-center-navigation-mobile-dark-access.png',
+        })
+        await page.getByRole('tab', { name: '菜单布局' }).click()
+        await expectText(page, '设置岗位菜单布局')
         await expectText(page, '导航位置预览')
         await expectText(page, '更多功能（2）')
         await expectText(page, '岗位使用帮助')
@@ -12249,11 +12906,11 @@ export function createStyleL1Scenarios(deps) {
           .click()
         await page
           .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '自定义常用' })
+          .filter({ hasText: '自定义布局' })
           .click()
         await page.keyboard.press('Escape')
         await page.waitForTimeout(350)
-        await expectText(page, '已选 3/5')
+        await expectText(page, '常用工作需保留 1–5 项')
         const metrics = await page.evaluate(() => {
           const preview = document.querySelector('.erp-role-navigation-preview')
           const editor = document.querySelector('.erp-role-navigation-editor')
@@ -17496,7 +18153,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '委外订单')
         await expectText(page, '生产管理')
         await expectText(page, '生产排程')
-        await expectText(page, '生产异常')
+        await expectText(page, '生产异常处置')
         await expectText(page, '出货管理')
         await expectText(page, '出货放行')
         await expectText(page, '财务管理')
@@ -18785,6 +19442,77 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, 'RMA-STYLE-L1')
         await expectText(page, 'SHIP-STYLE-L1')
         await expectButton(page, '新建客户退货')
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'exception-sales-return-mobile',
+        })
+        await assertBusinessMainTableHasNoOperationColumn(page, {
+          scenarioName: 'exception-sales-return-mobile',
+        })
+        await assertBusinessMainTableInitialSelectionEmpty(page, {
+          scenarioName: 'exception-sales-return-mobile',
+        })
+
+        const returnRow = page
+          .locator('.ant-table-tbody .ant-table-row')
+          .filter({ hasText: 'RMA-STYLE-L1' })
+          .first()
+        await returnRow.dblclick()
+        const detailDialog = page
+          .getByRole('dialog')
+          .filter({ hasText: '客户退货详情' })
+        await detailDialog.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(detailDialog, 'P-STYLE-L1')
+        await expectText(detailDialog, 'SKU-STYLE-L1')
+        await expectText(detailDialog, 'RMA-51-1')
+        await expectText(detailDialog, '累计有效退货')
+        await expectText(detailDialog, '当前可退数量')
+        await assertAntdModalCentered(
+          page,
+          detailDialog,
+          'exception-sales-return-mobile-detail'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-sales-return-mobile-detail.png'
+          ),
+          fullPage: true,
+        })
+        await page.keyboard.press('Escape')
+        await detailDialog.waitFor({ state: 'hidden', timeout: 10_000 })
+
+        await page
+          .getByRole('button', { name: '新建客户退货', exact: true })
+          .click()
+        const createDialog = page
+          .getByRole('dialog')
+          .filter({ hasText: '新建客户退货' })
+        await createDialog.waitFor({ state: 'visible', timeout: 10_000 })
+        await createDialog.locator('.ant-select').first().click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .getByText(/SHIP-STYLE-L1/)
+          .click()
+        await expectText(createDialog, '已核对来源出货与累计有效退货数量')
+        const productLabel = await createDialog
+          .getByLabel('产品 / SKU')
+          .inputValue()
+        assert.match(productLabel, /PROD-STYLE-L1.*样式产品/)
+        assert.match(productLabel, /SKU-STYLE-L1.*样式产品 SKU/)
+        assert.match(
+          await createDialog.getByLabel('退货单号').inputValue(),
+          /^RMA-SHIP-STYLE-L1-/
+        )
+        assert.equal(await createDialog.getByLabel('已出货').inputValue(), '10')
+        assert.equal(await createDialog.getByLabel('已退货').inputValue(), '2')
+        assert.equal(
+          await createDialog.getByLabel('当前可退').inputValue(),
+          '8'
+        )
+        await assertOperationalFactModalViewport(
+          page,
+          'exception-sales-return-mobile-create'
+        )
         await assertNoHorizontalOverflow(page, 'exception-sales-return-mobile')
       },
     },
@@ -18812,6 +19540,158 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, 'PAY-STYLE-L1')
         await expectText(page, '回单 STYLE-L1')
         await expectButton(page, '登记收付款')
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'exception-finance-payment-dark-desktop',
+        })
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'exception-finance-payment-dark-desktop',
+          expectedLabels: ['收付款记录', '本页显示'],
+        })
+        await assertBusinessMainTableHasNoOperationColumn(page, {
+          scenarioName: 'exception-finance-payment-dark-desktop',
+        })
+        await assertBusinessMainTableInitialSelectionEmpty(page, {
+          scenarioName: 'exception-finance-payment-dark-desktop',
+        })
+
+        const financeDataCard = page
+          .locator(
+            '.erp-finance-payments-page .erp-business-data-table-card'
+          )
+          .first()
+        const financeTabsNav = financeDataCard.locator('.ant-tabs-nav').first()
+        const financeTable = financeDataCard
+          .locator('.ant-table-wrapper')
+          .first()
+        assert.equal(
+          await page
+            .locator('.erp-finance-payments-page > .ant-tabs')
+            .count(),
+          0,
+          '收付款页签不应悬在业务页面卡片之外'
+        )
+        assert.equal(
+          await financeDataCard
+            .getByRole('tab', { name: '收付款记录', exact: true })
+            .count(),
+          1,
+          '收付款记录页签应位于数据表卡片内'
+        )
+        assert.equal(
+          await financeDataCard
+            .getByRole('tab', { name: '红冲记录', exact: true })
+            .count(),
+          1,
+          '红冲记录页签应位于数据表卡片内'
+        )
+        const [financeCardBox, financeTabsBox, financeTableBox] =
+          await Promise.all([
+            financeDataCard.boundingBox(),
+            financeTabsNav.boundingBox(),
+            financeTable.boundingBox(),
+          ])
+        assert(financeCardBox, '收付款数据表卡片应有可测量布局')
+        assert(financeTabsBox, '收付款页签应有可测量布局')
+        assert(financeTableBox, '收付款表格应有可测量布局')
+        assert(
+          financeTabsBox.x >= financeCardBox.x &&
+            financeTabsBox.x + financeTabsBox.width <=
+              financeCardBox.x + financeCardBox.width + 1,
+          '收付款页签不应横向溢出数据表卡片'
+        )
+        assert(
+          financeTabsBox.y >= financeCardBox.y &&
+            financeTabsBox.y + financeTabsBox.height <= financeTableBox.y + 1,
+          '收付款页签应位于数据表卡片顶部、表格之前'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-finance-payment-dark-desktop-payment-tab.png'
+          ),
+          fullPage: true,
+        })
+        await page
+          .getByRole('tab', { name: '红冲记录', exact: true })
+          .click()
+        assert.equal(
+          await page
+            .getByRole('tab', { name: '红冲记录', exact: true })
+            .getAttribute('aria-selected'),
+          'true',
+          '红冲记录页签应在切换后保持选中'
+        )
+        await expectButton(page, '登记红冲')
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'exception-finance-payment-dark-desktop-credit-tab',
+          expectedLabels: ['红冲记录', '本页显示'],
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'exception-finance-payment-dark-desktop-credit-tab'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-finance-payment-dark-desktop-credit-tab.png'
+          ),
+          fullPage: true,
+        })
+        await page
+          .getByRole('tab', { name: '收付款记录', exact: true })
+          .click()
+        await expectButton(page, '登记收付款')
+
+        const paymentRow = page
+          .locator('.ant-table-tbody .ant-table-row')
+          .filter({ hasText: 'PAY-STYLE-L1' })
+          .first()
+        await paymentRow.click()
+        await page
+          .getByRole('button', { name: '查看详情', exact: true })
+          .click()
+        const detailDialog = page
+          .getByRole('dialog')
+          .filter({ hasText: '收付款详情' })
+        await detailDialog.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(detailDialog, '银行账户尾号 6688')
+        await expectText(detailDialog, '当前收付款尚未形成核销明细')
+        await assertAntdModalCentered(
+          page,
+          detailDialog,
+          'exception-finance-payment-dark-desktop-detail'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-finance-payment-dark-desktop-detail.png'
+          ),
+          fullPage: true,
+        })
+        await page.keyboard.press('Escape')
+        await detailDialog.waitFor({ state: 'hidden', timeout: 10_000 })
+
+        await paymentRow.click()
+        await page
+          .getByRole('button', {
+            name: '选择应收 / 应付核销',
+            exact: true,
+          })
+          .click()
+        const allocationDialog = page
+          .getByRole('dialog')
+          .filter({ hasText: '选择核销记录' })
+        await allocationDialog.waitFor({ state: 'visible', timeout: 10_000 })
+        const allocationLabel = await allocationDialog
+          .getByLabel('应收 / 应付')
+          .inputValue()
+        assert.match(allocationLabel, /AR-STYLE-L1/)
+        assert.match(allocationLabel, /未核销 1200/)
+        await allocationDialog.getByLabel('本次核销金额').fill('1200')
+        await assertOperationalFactModalViewport(
+          page,
+          'exception-finance-payment-dark-desktop-allocation'
+        )
         await assertERPThemeMode(page, {
           scenarioName: 'exception-finance-payment-dark-desktop',
           expectedMode: 'dark',

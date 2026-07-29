@@ -22,14 +22,19 @@ import {
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
+  applyApprovalSettings,
   getApprovalSettings,
   previewApprovalSettings,
-  publishApprovalSettings,
 } from '../api/approvalSettingsApi.mjs'
 import {
-  activateCustomerConfig,
-  checkCustomerConfigTransition,
-} from '../api/customerConfigApi.mjs'
+  approvalSettingsMutationMayHaveSucceeded,
+  getApprovalSettingsBlockingItems,
+  verifyAppliedApprovalSettings,
+} from '../utils/approvalSettingsActivation.mjs'
+import {
+  freezeApprovalSettingsPayload,
+  nextApprovalSettingsRevision,
+} from '../utils/approvalSettingsDraft.mjs'
 import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 
 const { Text, Title } = Typography
@@ -63,6 +68,22 @@ const BLOCKER_LABELS = {
   approval_settings_not_published: '尚未发布审批责任',
   approval_disabled: '该审批事项已停用',
   no_eligible_approver: '没有符合岗位、账号和责任设置的办理人',
+}
+const APPROVAL_SETTINGS_RESULT_MESSAGE_KEY = 'approval-settings-result'
+
+function notifyApprovalSettingsApplied() {
+  message.success({
+    key: APPROVAL_SETTINGS_RESULT_MESSAGE_KEY,
+    content:
+      '审批责任已保存并生效；之后新发起审批使用新责任，在途审批继续按原责任办理',
+  })
+}
+
+function notifyApprovalSettingsConfirmation(content) {
+  message.warning({
+    key: APPROVAL_SETTINGS_RESULT_MESSAGE_KEY,
+    content,
+  })
 }
 
 function roleKeyOf(role = {}) {
@@ -187,16 +208,6 @@ function draftSignature(items = []) {
   )
 }
 
-function nextRevision(activeRevision) {
-  const base = String(activeRevision || 'approval').trim()
-  const stamp = new Date()
-    .toISOString()
-    .replaceAll('-', '')
-    .replaceAll(':', '')
-    .replace(/\.\d{3}Z$/, 'Z')
-  return `${base}.approval.${stamp}`.slice(0, 64)
-}
-
 function blockerLabel(code) {
   return BLOCKER_LABELS[code] || '当前设置不能启用'
 }
@@ -231,25 +242,29 @@ export default function ApprovalResponsibilityPanel({
   const [draftItems, setDraftItems] = useState([])
   const [revision, setRevision] = useState('')
   const [preview, setPreview] = useState(null)
-  const [published, setPublished] = useState(null)
+  const [appliedReceipt, setAppliedReceipt] = useState(null)
+  const [pendingPayload, setPendingPayload] = useState(null)
   const [editingKey, setEditingKey] = useState('')
   const [editorDirty, setEditorDirty] = useState(false)
   const [editorValues, setEditorValues] = useState({})
   const requestIDRef = useRef(0)
+  const mutationRef = useRef(false)
   const [form] = Form.useForm()
 
   const applySettings = useCallback((nextSettings) => {
     setSettings(nextSettings)
     setDraftItems(normalizeDraftItems(nextSettings.items))
-    setRevision(nextRevision(nextSettings.config_revision))
+    setRevision(nextApprovalSettingsRevision(nextSettings.config_revision))
     setPreview(null)
-    setPublished(null)
+    setAppliedReceipt(null)
+    setPendingPayload(null)
     setEditingKey('')
     setEditorDirty(false)
     setEditorValues({})
   }, [])
 
   const load = useCallback(async () => {
+    if (mutationRef.current) return false
     if (!canRead) {
       setSettings(null)
       setDraftItems([])
@@ -305,7 +320,9 @@ export default function ApprovalResponsibilityPanel({
       ),
     [settings]
   )
-  const pageDirty = canManage && (draftDirty || Boolean(published))
+  const pageDirty =
+    canManage &&
+    (draftDirty || Boolean(appliedReceipt) || Boolean(pendingPayload))
 
   useEffect(() => {
     onDirtyChange?.(pageDirty)
@@ -544,6 +561,10 @@ export default function ApprovalResponsibilityPanel({
   }, [selectableRoleOptions, selectedUnavailableRoles])
 
   const openEditor = (item) => {
+    if (saving || appliedReceipt || pendingPayload) {
+      message.info('请先完成当前设置生效，或刷新后重新调整')
+      return
+    }
     const draft = draftItems.find(
       (candidate) => candidate.approval_key === item.approval_key
     ) || { enabled: false, members: [] }
@@ -581,6 +602,10 @@ export default function ApprovalResponsibilityPanel({
   }
 
   const requestReload = () => {
+    if (mutationRef.current) {
+      message.info('审批责任正在保存，请稍候')
+      return
+    }
     if (!pageDirty && !editorDirty) {
       return load()
     }
@@ -588,7 +613,7 @@ export default function ApprovalResponsibilityPanel({
       centered: true,
       title: '刷新前要放弃审批责任调整吗？',
       content:
-        '刷新会重新读取当前生效设置，弹窗内尚未保存的选择、未发布调整或尚未启用的新设置都会丢失。',
+        '刷新会重新读取当前生效设置，弹窗内尚未保存的选择、未生效调整或等待确认的保存结果都会丢失。',
       okText: '放弃并刷新',
       cancelText: '继续处理',
       onOk: () => {
@@ -599,6 +624,7 @@ export default function ApprovalResponsibilityPanel({
   }
 
   const saveEditor = async () => {
+    if (mutationRef.current || appliedReceipt || pendingPayload) return
     let values
     try {
       values = await form.validateFields()
@@ -633,83 +659,114 @@ export default function ApprovalResponsibilityPanel({
       )
     )
     setPreview(null)
-    setPublished(null)
+    setAppliedReceipt(null)
+    setPendingPayload(null)
     closeEditor(true)
   }
 
-  const payload = () => ({
-    customer_key: settings.customer_key,
-    revision,
-    expected_active_revision: settings.config_revision,
-    expected_active_hash: settings.config_hash,
-    items: draftItems,
-  })
-
-  const checkAndPublish = async () => {
+  const saveAndActivate = async () => {
+    if (mutationRef.current || !settings) return
+    mutationRef.current = true
+    requestIDRef.current += 1
     setSaving(true)
+    const nextPayload =
+      pendingPayload ||
+      freezeApprovalSettingsPayload({
+        settings,
+        revision,
+        draftItems,
+      })
     try {
-      const checked = await previewApprovalSettings(payload())
-      const blocking = (checked.items || []).filter(
-        (item) =>
-          item.configurable &&
-          item.enabled &&
-          Array.isArray(item.blocked_reasons) &&
-          item.blocked_reasons.length > 0
-      )
-      setPreview(checked)
-      if (blocking.length > 0) {
-        throw new Error(
-          blocking
-            .map(
-              (item) =>
-                `${item.label}：${item.blocked_reasons
-                  .map(blockerLabel)
-                  .join('、')}`
+      if (appliedReceipt || pendingPayload) {
+        try {
+          const current = await getApprovalSettings({})
+          verifyAppliedApprovalSettings({
+            readback: current,
+            payload: nextPayload,
+            receipt: appliedReceipt,
+          })
+          applySettings(current)
+          notifyApprovalSettingsApplied()
+          return
+        } catch (readbackError) {
+          if (appliedReceipt) {
+            notifyApprovalSettingsConfirmation(
+              getActionErrorMessage(readbackError, '', {
+                fallback: '生效结果暂时无法确认，请稍后重新确认',
+              })
             )
-            .join('；')
+            return
+          }
+        }
+      }
+      if (!pendingPayload) {
+        const checked = await previewApprovalSettings(nextPayload)
+        const blocking = getApprovalSettingsBlockingItems(checked)
+        setPreview(checked)
+        if (blocking.length > 0) {
+          throw new Error(
+            blocking
+              .map(
+                (item) =>
+                  `${item.label}：${item.blocked_reasons
+                    .map(blockerLabel)
+                    .join('、')}`
+              )
+              .join('；')
+          )
+        }
+      }
+      let receipt
+      try {
+        receipt = await applyApprovalSettings(nextPayload)
+      } catch (error) {
+        if (!approvalSettingsMutationMayHaveSucceeded(error)) throw error
+        try {
+          const current = await getApprovalSettings({})
+          verifyAppliedApprovalSettings({
+            readback: current,
+            payload: nextPayload,
+          })
+          applySettings(current)
+          notifyApprovalSettingsApplied()
+          return
+        } catch {
+          setPendingPayload(nextPayload)
+          setAppliedReceipt(null)
+          notifyApprovalSettingsConfirmation(
+            '保存结果暂时无法确认，请点击“确认并生效”继续处理'
+          )
+          return
+        }
+      }
+      setAppliedReceipt(receipt)
+      setPendingPayload(nextPayload)
+      let readback
+      try {
+        readback = await getApprovalSettings({})
+        verifyAppliedApprovalSettings({
+          readback,
+          payload: nextPayload,
+          receipt,
+        })
+      } catch (error) {
+        notifyApprovalSettingsConfirmation(
+          getActionErrorMessage(error, '', {
+            fallback: '设置已提交，正在等待确认生效结果',
+          })
         )
-      }
-      const result = await publishApprovalSettings(payload())
-      setPublished(result)
-      message.success('新设置已发布，请确认启用')
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '检查并发布审批责任失败'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const activatePublished = async () => {
-    if (!published) return
-    setSaving(true)
-    try {
-      const transition = await checkCustomerConfigTransition({
-        action: 'activate',
-        customer_key: published.customer_key,
-        target_revision: published.revision,
-        expected_config_hash: published.config_hash,
-        expected_product_version: published.product_version,
-        expected_active_revision: settings.config_revision,
-      })
-      if (!transition?.allowed) {
-        throw new Error('当前生效设置已经变化，请刷新后重新检查')
-      }
-      await activateCustomerConfig({
-        customer_key: published.customer_key,
-        revision: published.revision,
-        expected_config_hash: published.config_hash,
-        expected_product_version: published.product_version,
-        expected_active_revision: settings.config_revision,
-      })
-      const readback = await getApprovalSettings({})
-      if (readback.config_revision !== published.revision) {
-        throw new Error('新设置已提交，但生效结果尚未确认，请刷新重试')
+        return
       }
       applySettings(readback)
-      message.success('审批责任已启用；在途审批继续按原责任办理')
+      notifyApprovalSettingsApplied()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '启用审批责任失败'))
+      message.error(
+        getActionErrorMessage(error, '', {
+          fallback: error?.message || '保存审批责任失败，请稍后重试',
+        })
+      )
     } finally {
+      mutationRef.current = false
       setSaving(false)
     }
   }
@@ -767,7 +824,7 @@ export default function ApprovalResponsibilityPanel({
           return <Text type="secondary">不参与流程</Text>
         }
         if (draftDirty && !preview) {
-          return <Text type="secondary">发布前自动检查</Text>
+          return <Text type="secondary">保存前自动检查</Text>
         }
         if (item.blocked_reasons?.length) {
           return (
@@ -788,7 +845,13 @@ export default function ApprovalResponsibilityPanel({
       width: 76,
       render: (_, item) =>
         canManage ? (
-          <Button type="link" onClick={() => openEditor(item)}>
+          <Button
+            type="link"
+            disabled={
+              saving || Boolean(appliedReceipt) || Boolean(pendingPayload)
+            }
+            onClick={() => openEditor(item)}
+          >
             调整
           </Button>
         ) : null,
@@ -811,6 +874,7 @@ export default function ApprovalResponsibilityPanel({
       className="erp-permission-section erp-permission-section--approvals"
       variant="borderless"
       loading={loading}
+      aria-busy={saving}
     >
       {loadError ? (
         <Alert
@@ -840,13 +904,21 @@ export default function ApprovalResponsibilityPanel({
               </Text>
             </div>
             <Space size={6} wrap>
-              <Tag color={published ? 'blue' : draftDirty ? 'orange' : 'green'}>
-                {published
-                  ? '待启用'
+              <Tag
+                color={
+                  appliedReceipt || pendingPayload
+                    ? 'blue'
+                    : draftDirty
+                      ? 'orange'
+                      : 'green'
+                }
+              >
+                {appliedReceipt || pendingPayload
+                  ? '等待确认'
                   : settingsNeedInitialization
                     ? '待初始化'
                     : draftDirty
-                      ? '有待发布调整'
+                      ? '有未生效调整'
                       : '已生效'}
               </Tag>
               <Popover
@@ -864,9 +936,6 @@ export default function ApprovalResponsibilityPanel({
                     <Text type="secondary">
                       审批通过只推进对应单据，不会代替库存、出货或财务入账。
                     </Text>
-                    <Text type="secondary">
-                      当前版本：{settings.config_revision}
-                    </Text>
                   </div>
                 }
               >
@@ -882,6 +951,7 @@ export default function ApprovalResponsibilityPanel({
                 shape="circle"
                 icon={<ReloadOutlined />}
                 aria-label="刷新审批责任"
+                disabled={saving}
                 onClick={requestReload}
               />
             </Space>
@@ -892,10 +962,7 @@ export default function ApprovalResponsibilityPanel({
               type="info"
               showIcon
               message="当前为只读"
-              description={
-                readOnlyReason ||
-                '调整审批责任需要同时具备账号、岗位、发布和启用权限。'
-              }
+              description={readOnlyReason || '调整审批责任需要相应的管理权限。'}
             />
           ) : null}
 
@@ -908,40 +975,31 @@ export default function ApprovalResponsibilityPanel({
             scroll={{ x: 880 }}
           />
 
-          {canManage && (draftDirty || published) ? (
-            <div className="erp-approval-responsibility__actions">
+          {canManage && (draftDirty || appliedReceipt || pendingPayload) ? (
+            <div
+              className="erp-approval-responsibility__actions"
+              aria-busy={saving}
+              role="status"
+              aria-live="polite"
+            >
               <div>
                 <Text strong>
-                  {published
-                    ? '新设置已发布，尚未启用'
+                  {appliedReceipt || pendingPayload
+                    ? '正在等待确认生效结果'
                     : settingsNeedInitialization
-                      ? '推荐责任尚未发布'
-                      : '调整尚未发布'}
+                      ? '推荐责任等待保存'
+                      : '调整尚未生效'}
                 </Text>
                 <br />
                 <Text type="secondary">
-                  {published
-                    ? '启用后只影响之后新启动的审批。'
-                    : '系统会先检查岗位、员工和责任顺序。'}
+                  {appliedReceipt || pendingPayload
+                    ? '继续后会核对同一次保存结果，不会重复创建配置。'
+                    : '保存后立即用于新发起审批；在途审批继续按原责任。'}
                 </Text>
               </div>
-              {published ? (
-                <Button
-                  type="primary"
-                  loading={saving}
-                  onClick={activatePublished}
-                >
-                  启用新设置
-                </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  loading={saving}
-                  onClick={checkAndPublish}
-                >
-                  检查并发布
-                </Button>
-              )}
+              <Button type="primary" loading={saving} onClick={saveAndActivate}>
+                {appliedReceipt || pendingPayload ? '确认并生效' : '保存并生效'}
+              </Button>
             </div>
           ) : null}
         </>

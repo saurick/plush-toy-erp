@@ -119,11 +119,14 @@ export const runFieldLinkageQa = async ({
   makeDirectory = mkdir,
   removeFile = rm,
   writeTap = writeFile,
+  outputDirectory = outputDir,
+  nodeTapFile = nodeTapPath,
+  coverageReportFile = reportPath,
 } = {}) => {
   const expectedRepository = await repositoryReader()
-  await removeFile(reportPath, { force: true })
-  await removeFile(nodeTapPath, { force: true })
-  await makeDirectory(outputDir, { recursive: true })
+  await removeFile(coverageReportFile, { force: true })
+  await removeFile(nodeTapFile, { force: true })
+  await makeDirectory(outputDirectory, { recursive: true })
 
   const nodeResult = await executeCommand({
     command: process.execPath,
@@ -131,16 +134,16 @@ export const runFieldLinkageQa = async ({
     cwd: path.join(rootDir, 'web'),
   })
   assertRepositoryIdentityEqual(expectedRepository, await repositoryReader())
-  await writeTap(nodeTapPath, sanitizeNodeTap(nodeResult.stdout), 'utf8')
+  await writeTap(nodeTapFile, sanitizeNodeTap(nodeResult.stdout), 'utf8')
 
   await executeCommand({
     command: process.execPath,
     args: [
       builderPath,
       '--node-tap',
-      nodeTapPath,
+      nodeTapFile,
       '--output',
-      reportPath,
+      coverageReportFile,
       '--command',
       commandLabel,
       '--expected-repository',

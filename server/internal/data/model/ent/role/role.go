@@ -35,6 +35,8 @@ const (
 	FieldNavigationMode = "navigation_mode"
 	// FieldPrimaryMenuPaths holds the string denoting the primary_menu_paths field in the database.
 	FieldPrimaryMenuPaths = "primary_menu_paths"
+	// FieldSecondaryMenuPaths holds the string denoting the secondary_menu_paths field in the database.
+	FieldSecondaryMenuPaths = "secondary_menu_paths"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -65,6 +67,7 @@ var Columns = []string{
 	FieldVersion,
 	FieldNavigationMode,
 	FieldPrimaryMenuPaths,
+	FieldSecondaryMenuPaths,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -100,6 +103,8 @@ var (
 	VersionValidator func(int) error
 	// DefaultPrimaryMenuPaths holds the default value on creation for the "primary_menu_paths" field.
 	DefaultPrimaryMenuPaths []string
+	// DefaultSecondaryMenuPaths holds the default value on creation for the "secondary_menu_paths" field.
+	DefaultSecondaryMenuPaths []string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.

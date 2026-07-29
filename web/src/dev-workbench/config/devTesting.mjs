@@ -3,6 +3,9 @@ export const DEV_TESTING_STRATEGY_SOURCE_PATH = 'docs/product/自动化测试策
 export const DEV_TESTING_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
 export const DEV_TESTING_COVERAGE_REPORT_SCHEMA =
   'plush-test-coverage-report/v1'
+export const DEV_TESTING_COVERAGE_COLLECT_COMMAND =
+  'node scripts/qa/test-coverage-collect.mjs --profile baseline --write'
+// 保留既有导出名；该命令只聚合采集器已经生成的证据。
 export const DEV_TESTING_COVERAGE_WRITE_COMMAND =
   'node scripts/qa/test-coverage-report.mjs --write'
 

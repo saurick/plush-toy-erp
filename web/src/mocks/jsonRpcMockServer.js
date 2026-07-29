@@ -22,6 +22,30 @@ const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
 const mockWorkflowMutationReceipts = new Map()
 
+function workflowMockRoleTaskReadAllowed(
+  adminProfile,
+  effectiveSession,
+  method
+) {
+  if (
+    !workflowMockPermissionAllowed(
+      adminProfile,
+      effectiveSession,
+      'workflow.task.read'
+    )
+  ) {
+    return false
+  }
+  return (
+    method !== 'list_workbench_role_tasks' ||
+    workflowMockPermissionAllowed(
+      adminProfile,
+      effectiveSession,
+      'erp.workbench.read'
+    )
+  )
+}
+
 function emptyWorkflowTaskUrgeFields() {
   return {
     urge_count: 0,
@@ -223,6 +247,14 @@ const mockRoles = [
   {
     role_key: 'admin',
     name: '系统管理员',
+    role_type: 'system',
+    version: 1,
+    disabled: false,
+    permissions_editable: false,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
+    secondary_menu_paths: [],
+    data_scopes: [],
     permissions: mockPermissions
       .map((item) => item.permission_key)
       .filter((key) => key.startsWith('system.')),
@@ -230,6 +262,16 @@ const mockRoles = [
   {
     role_key: 'sales',
     name: '业务',
+    role_type: 'business_default',
+    version: 1,
+    disabled: false,
+    permissions_editable: true,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
+    secondary_menu_paths: [],
+    data_scopes: [
+      { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
+    ],
     permissions: [
       'erp.workbench.read',
       'workflow.task.read',
@@ -239,6 +281,16 @@ const mockRoles = [
   {
     role_key: 'purchase',
     name: '采购',
+    role_type: 'business_default',
+    version: 1,
+    disabled: false,
+    permissions_editable: true,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
+    secondary_menu_paths: [],
+    data_scopes: [
+      { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
+    ],
     permissions: [
       'erp.workbench.read',
       'workflow.task.read',
@@ -248,6 +300,16 @@ const mockRoles = [
   {
     role_key: 'engineering',
     name: '工程',
+    role_type: 'business_default',
+    version: 1,
+    disabled: false,
+    permissions_editable: true,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
+    secondary_menu_paths: [],
+    data_scopes: [
+      { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
+    ],
     permissions: [
       'erp.workbench.read',
       'workflow.task.read',
@@ -296,6 +358,7 @@ const mockSuperAdminProfile = {
     config_hash: 'mock-workflow-hash',
     roles: ['sales'],
     actions: [
+      'erp.workbench.read',
       'workflow.task.read',
       'workflow.task.create',
       'workflow.task.update',
@@ -1117,10 +1180,38 @@ export function setupJsonRpcMockServer() {
           }),
           error: '',
         }
+      } else if (method === 'set_role_settings') {
+        const role = mockRoles.find((item) => item.role_key === params.role_key)
+        if (role) {
+          role.version += 1
+          role.permissions = Array.isArray(params.permission_keys)
+            ? [...params.permission_keys]
+            : role.permissions
+          role.data_scopes = Array.isArray(params.data_scopes)
+            ? structuredClone(params.data_scopes)
+            : role.data_scopes
+          role.navigation_mode =
+            params.navigation_mode === 'custom' ? 'custom' : 'recommended'
+          role.primary_menu_paths =
+            role.navigation_mode === 'custom' &&
+            Array.isArray(params.primary_menu_paths)
+              ? [...params.primary_menu_paths]
+              : []
+          role.secondary_menu_paths =
+            role.navigation_mode === 'custom' &&
+            Array.isArray(params.secondary_menu_paths)
+              ? [...params.secondary_menu_paths]
+              : []
+        }
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({ role: structuredClone(role) }),
+          error: '',
+        }
       } else if (
         method === 'create' ||
         method === 'set_roles' ||
-        method === 'set_role_permissions' ||
         method === 'set_phone' ||
         method === 'set_disabled' ||
         method === 'revoke' ||
@@ -1330,12 +1421,15 @@ export function setupJsonRpcMockServer() {
             error: '',
           }
         }
-      } else if (method === 'list_role_tasks') {
+      } else if (
+        method === 'list_role_tasks' ||
+        method === 'list_workbench_role_tasks'
+      ) {
         if (
-          !workflowMockPermissionAllowed(
+          !workflowMockRoleTaskReadAllowed(
             mockSuperAdminProfile,
             mockSuperAdminProfile.effective_session,
-            'workflow.task.read'
+            method
           )
         ) {
           responseBody = makeJsonRpcBizError(

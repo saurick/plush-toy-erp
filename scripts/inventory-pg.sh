@@ -75,6 +75,9 @@ status)
   ;;
 apply)
   atlas migrate apply --dir "file://internal/data/model/migrate" --url "$INVENTORY_PG_DB_URL"
+  PLUSH_DATABASE_PROGRAMMABILITY_URL="$INVENTORY_PG_DB_URL" \
+    node ../scripts/qa/database-programmability.mjs \
+    --database-url-env PLUSH_DATABASE_PROGRAMMABILITY_URL
   ;;
 test)
   INVENTORY_PG_TEST=1 INVENTORY_PG_TEST_DB_URL="$INVENTORY_PG_DB_URL" \

@@ -7,10 +7,17 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/processinstance"
+	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/salesreturn"
 	"server/internal/data/model/ent/salesreturnitem"
+	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/shipmentitem"
+	"server/internal/data/model/ent/unit"
+	"server/internal/data/model/ent/warehouse"
 
 	"github.com/shopspring/decimal"
 )
@@ -445,13 +452,9 @@ func (r *operationalFactRepo) ListSalesReturns(ctx context.Context, filter biz.S
 	if err != nil {
 		return nil, 0, err
 	}
-	out := make([]*biz.SalesReturn, 0, len(rows))
-	for _, row := range rows {
-		item, err := salesReturnWithItems(ctx, r.data.postgres, row)
-		if err != nil {
-			return nil, 0, err
-		}
-		out = append(out, item)
+	out, err := salesReturnsWithReadProjection(ctx, r.data.postgres, rows)
+	if err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -534,23 +537,250 @@ func currentLockedSalesReturnInspection(ctx context.Context, tx *inventoryDBTx, 
 }
 
 func salesReturnWithItems(ctx context.Context, client *ent.Client, row *ent.SalesReturn) (*biz.SalesReturn, error) {
-	items, err := client.SalesReturnItem.Query().Where(salesreturnitem.SalesReturnID(row.ID)).Order(ent.Asc(salesreturnitem.FieldID)).All(ctx)
+	items, err := salesReturnsWithReadProjection(ctx, client, []*ent.SalesReturn{row})
 	if err != nil {
 		return nil, err
 	}
-	out := entSalesReturnToBiz(row)
-	for _, item := range items {
-		current, err := currentSalesReturnInspection(ctx, client, item.QualityInspectionID, row.ID)
+	if len(items) != 1 {
+		return nil, biz.ErrBadParam
+	}
+	return items[0], nil
+}
+
+func salesReturnsWithReadProjection(
+	ctx context.Context,
+	client *ent.Client,
+	rows []*ent.SalesReturn,
+) ([]*biz.SalesReturn, error) {
+	returnIDs := make([]int, 0, len(rows))
+	shipmentIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		if row == nil || row.ID <= 0 || row.ShipmentID <= 0 {
+			return nil, biz.ErrBadParam
+		}
+		returnIDs = append(returnIDs, row.ID)
+		shipmentIDs = append(shipmentIDs, row.ShipmentID)
+	}
+	if len(rows) == 0 {
+		return []*biz.SalesReturn{}, nil
+	}
+	returnIDs = uniqueSalesReturnReadProjectionIDs(returnIDs)
+	shipmentIDs = uniqueSalesReturnReadProjectionIDs(shipmentIDs)
+
+	shipmentRows, err := client.Shipment.Query().
+		Where(shipment.IDIn(shipmentIDs...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	shipmentsByID := make(map[int]*ent.Shipment, len(shipmentRows))
+	for _, row := range shipmentRows {
+		shipmentsByID[row.ID] = row
+	}
+
+	itemRows, err := client.SalesReturnItem.Query().
+		Where(salesreturnitem.SalesReturnIDIn(returnIDs...)).
+		Order(ent.Asc(salesreturnitem.FieldSalesReturnID), ent.Asc(salesreturnitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	itemsByReturnID := make(map[int][]*ent.SalesReturnItem, len(rows))
+	shipmentItemIDs := make([]int, 0, len(itemRows))
+	productIDs := make([]int, 0, len(itemRows))
+	productSkuIDs := make([]int, 0, len(itemRows))
+	warehouseIDs := make([]int, 0, len(itemRows))
+	unitIDs := make([]int, 0, len(itemRows))
+	lotIDs := make([]int, 0, len(itemRows))
+	for _, item := range itemRows {
+		itemsByReturnID[item.SalesReturnID] = append(itemsByReturnID[item.SalesReturnID], item)
+		shipmentItemIDs = append(shipmentItemIDs, item.ShipmentItemID)
+		productIDs = append(productIDs, item.ProductID)
+		warehouseIDs = append(warehouseIDs, item.WarehouseID)
+		unitIDs = append(unitIDs, item.UnitID)
+		if item.ProductSkuID != nil {
+			productSkuIDs = append(productSkuIDs, *item.ProductSkuID)
+		}
+		if item.LotID != nil {
+			lotIDs = append(lotIDs, *item.LotID)
+		}
+	}
+	shipmentItemIDs = uniqueSalesReturnReadProjectionIDs(shipmentItemIDs)
+	productIDs = uniqueSalesReturnReadProjectionIDs(productIDs)
+	productSkuIDs = uniqueSalesReturnReadProjectionIDs(productSkuIDs)
+	warehouseIDs = uniqueSalesReturnReadProjectionIDs(warehouseIDs)
+	unitIDs = uniqueSalesReturnReadProjectionIDs(unitIDs)
+	lotIDs = uniqueSalesReturnReadProjectionIDs(lotIDs)
+
+	shipmentItemsByID, err := salesReturnShipmentItemsByID(ctx, client, shipmentItemIDs)
+	if err != nil {
+		return nil, err
+	}
+	productsByID, err := salesReturnProductsByID(ctx, client, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	productSkusByID, err := salesReturnProductSkusByID(ctx, client, productSkuIDs)
+	if err != nil {
+		return nil, err
+	}
+	warehousesByID, err := salesReturnWarehousesByID(ctx, client, warehouseIDs)
+	if err != nil {
+		return nil, err
+	}
+	unitsByID, err := salesReturnUnitsByID(ctx, client, unitIDs)
+	if err != nil {
+		return nil, err
+	}
+	lotsByID, err := salesReturnLotsByID(ctx, client, lotIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	activeReturnedByShipmentItemID := make(map[int]decimal.Decimal, len(shipmentItemIDs))
+	if len(shipmentItemIDs) > 0 {
+		// These are the same source-capacity-reserving states enforced when a
+		// return is created; rejected, cancelled, and reversed rows release it.
+		activeItems, err := client.SalesReturnItem.Query().
+			Where(
+				salesreturnitem.ShipmentItemIDIn(shipmentItemIDs...),
+				salesreturnitem.HasSalesReturnWith(salesreturn.StatusIn(
+					biz.SalesReturnStatusDraft,
+					biz.SalesReturnStatusApproved,
+					biz.SalesReturnStatusReceived,
+				)),
+			).
+			All(ctx)
 		if err != nil {
 			return nil, err
 		}
-		out.Items = append(out.Items, &biz.SalesReturnItem{ID: item.ID, SalesReturnID: item.SalesReturnID, LineNo: item.LineNo, ShipmentItemID: item.ShipmentItemID, ProductID: item.ProductID, ProductSkuID: item.ProductSkuID, WarehouseID: item.WarehouseID, UnitID: item.UnitID, LotID: item.LotID, QualityInspectionID: item.QualityInspectionID, CurrentQualityInspectionID: current.ID, CurrentQualityInspectionNo: current.InspectionNo, CurrentQualityInspectionStatus: current.Status, CurrentQualityInspectionResult: current.Result, Quantity: item.Quantity, Condition: item.Condition, Note: item.Note})
+		for _, item := range activeItems {
+			activeReturnedByShipmentItemID[item.ShipmentItemID] =
+				activeReturnedByShipmentItemID[item.ShipmentItemID].Add(item.Quantity)
+		}
+	}
+
+	inspectionRows, err := client.QualityInspection.Query().
+		Where(
+			qualityinspection.SourceType(biz.QualityInspectionSourceSalesReturn),
+			qualityinspection.SourceIDIn(returnIDs...),
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	inspectionsByID := make(map[int]*ent.QualityInspection, len(inspectionRows))
+	correctionByInspectionID := make(map[int]int, len(inspectionRows))
+	for _, inspection := range inspectionRows {
+		inspectionsByID[inspection.ID] = inspection
+		if inspection.CorrectionOfInspectionID == nil {
+			continue
+		}
+		if _, exists := correctionByInspectionID[*inspection.CorrectionOfInspectionID]; exists {
+			return nil, biz.ErrBadParam
+		}
+		correctionByInspectionID[*inspection.CorrectionOfInspectionID] = inspection.ID
+	}
+
+	out := make([]*biz.SalesReturn, 0, len(rows))
+	for _, row := range rows {
+		shipmentRow, exists := shipmentsByID[row.ShipmentID]
+		if !exists {
+			return nil, biz.ErrBadParam
+		}
+		parent := entSalesReturnToBiz(row)
+		parent.ShipmentNo = shipmentRow.ShipmentNo
+		for _, item := range itemsByReturnID[row.ID] {
+			source, sourceExists := shipmentItemsByID[item.ShipmentItemID]
+			productRow, productExists := productsByID[item.ProductID]
+			warehouseRow, warehouseExists := warehousesByID[item.WarehouseID]
+			unitRow, unitExists := unitsByID[item.UnitID]
+			if !sourceExists || !productExists || !warehouseExists || !unitExists ||
+				source.ShipmentID != row.ShipmentID ||
+				source.ProductID != item.ProductID ||
+				source.WarehouseID != item.WarehouseID ||
+				source.UnitID != item.UnitID ||
+				!optionalIntEqual(source.ProductSkuID, item.ProductSkuID) {
+				return nil, biz.ErrBadParam
+			}
+			current, err := currentSalesReturnInspectionFromProjection(
+				item.QualityInspectionID,
+				row.ID,
+				inspectionsByID,
+				correctionByInspectionID,
+			)
+			if err != nil {
+				return nil, err
+			}
+			activeReturned := activeReturnedByShipmentItemID[item.ShipmentItemID]
+			remaining := source.Quantity.Sub(activeReturned)
+			if remaining.IsNegative() {
+				return nil, biz.ErrBadParam
+			}
+			var skuCode *string
+			var skuName *string
+			if item.ProductSkuID != nil {
+				sku, exists := productSkusByID[*item.ProductSkuID]
+				if !exists || sku.ProductID != item.ProductID {
+					return nil, biz.ErrBadParam
+				}
+				code := sku.SkuCode
+				skuCode = &code
+				skuName = sku.SkuName
+			}
+			var lotNo *string
+			if item.LotID != nil {
+				lot, exists := lotsByID[*item.LotID]
+				if !exists {
+					return nil, biz.ErrBadParam
+				}
+				value := lot.LotNo
+				lotNo = &value
+			}
+			parent.Items = append(parent.Items, &biz.SalesReturnItem{
+				ID:                             item.ID,
+				SalesReturnID:                  item.SalesReturnID,
+				LineNo:                         item.LineNo,
+				ShipmentItemID:                 item.ShipmentItemID,
+				ProductID:                      item.ProductID,
+				ProductCode:                    productRow.Code,
+				ProductName:                    productRow.Name,
+				ProductSkuID:                   item.ProductSkuID,
+				ProductSkuCode:                 skuCode,
+				ProductSkuName:                 skuName,
+				WarehouseID:                    item.WarehouseID,
+				WarehouseCode:                  warehouseRow.Code,
+				WarehouseName:                  warehouseRow.Name,
+				UnitID:                         item.UnitID,
+				UnitCode:                       unitRow.Code,
+				UnitName:                       unitRow.Name,
+				LotID:                          item.LotID,
+				LotNo:                          lotNo,
+				QualityInspectionID:            item.QualityInspectionID,
+				CurrentQualityInspectionID:     current.ID,
+				CurrentQualityInspectionNo:     current.InspectionNo,
+				CurrentQualityInspectionStatus: current.Status,
+				CurrentQualityInspectionResult: current.Result,
+				Quantity:                       item.Quantity,
+				SourceShippedQuantity:          source.Quantity,
+				ActiveReturnedQuantity:         activeReturned,
+				RemainingReturnableQuantity:    remaining,
+				Condition:                      item.Condition,
+				Note:                           item.Note,
+			})
+		}
+		out = append(out, parent)
 	}
 	return out, nil
 }
 
-func currentSalesReturnInspection(ctx context.Context, client *ent.Client, rootID, salesReturnID int) (*ent.QualityInspection, error) {
-	if client == nil || rootID <= 0 || salesReturnID <= 0 {
+func currentSalesReturnInspectionFromProjection(
+	rootID int,
+	salesReturnID int,
+	inspectionsByID map[int]*ent.QualityInspection,
+	correctionByInspectionID map[int]int,
+) (*ent.QualityInspection, error) {
+	if rootID <= 0 || salesReturnID <= 0 {
 		return nil, biz.ErrBadParam
 	}
 	seen := map[int]struct{}{}
@@ -560,29 +790,133 @@ func currentSalesReturnInspection(ctx context.Context, client *ent.Client, rootI
 			return nil, biz.ErrBadParam
 		}
 		seen[currentID] = struct{}{}
-		current, err := client.QualityInspection.Get(ctx, currentID)
-		if err != nil {
-			return nil, err
-		}
-		if current.SourceType == nil || current.SourceID == nil ||
-			*current.SourceType != biz.QualityInspectionSourceSalesReturn || *current.SourceID != salesReturnID {
+		current, exists := inspectionsByID[currentID]
+		if !exists || current.SourceType == nil || current.SourceID == nil ||
+			*current.SourceType != biz.QualityInspectionSourceSalesReturn ||
+			*current.SourceID != salesReturnID {
 			return nil, biz.ErrBadParam
 		}
-		next, err := client.QualityInspection.Query().
-			Where(qualityinspection.CorrectionOfInspectionID(current.ID)).
-			Only(ctx)
-		if ent.IsNotFound(err) {
+		nextID, exists := correctionByInspectionID[current.ID]
+		if !exists {
 			if current.SupersededAt != nil {
 				return nil, biz.ErrBadParam
 			}
 			return current, nil
 		}
-		if err != nil {
-			return nil, err
-		}
-		currentID = next.ID
+		currentID = nextID
 	}
 }
+
+func salesReturnShipmentItemsByID(ctx context.Context, client *ent.Client, ids []int) (map[int]*ent.ShipmentItem, error) {
+	out := make(map[int]*ent.ShipmentItem, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := client.ShipmentItem.Query().Where(shipmentitem.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row
+	}
+	return out, nil
+}
+
+func salesReturnProductsByID(ctx context.Context, client *ent.Client, ids []int) (map[int]*ent.Product, error) {
+	out := make(map[int]*ent.Product, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := client.Product.Query().Where(product.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row
+	}
+	return out, nil
+}
+
+func salesReturnProductSkusByID(ctx context.Context, client *ent.Client, ids []int) (map[int]*ent.ProductSKU, error) {
+	out := make(map[int]*ent.ProductSKU, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := client.ProductSKU.Query().Where(productsku.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row
+	}
+	return out, nil
+}
+
+func salesReturnWarehousesByID(ctx context.Context, client *ent.Client, ids []int) (map[int]*ent.Warehouse, error) {
+	out := make(map[int]*ent.Warehouse, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := client.Warehouse.Query().Where(warehouse.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row
+	}
+	return out, nil
+}
+
+func salesReturnUnitsByID(ctx context.Context, client *ent.Client, ids []int) (map[int]*ent.Unit, error) {
+	out := make(map[int]*ent.Unit, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := client.Unit.Query().Where(unit.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row
+	}
+	return out, nil
+}
+
+func salesReturnLotsByID(ctx context.Context, client *ent.Client, ids []int) (map[int]*ent.InventoryLot, error) {
+	out := make(map[int]*ent.InventoryLot, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := client.InventoryLot.Query().Where(inventorylot.IDIn(ids...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row
+	}
+	return out, nil
+}
+
+func optionalIntEqual(left, right *int) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
+func uniqueSalesReturnReadProjectionIDs(values []int) []int {
+	out := make([]int, 0, len(values))
+	seen := make(map[int]struct{}, len(values))
+	for _, value := range values {
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
 func entSalesReturnToBiz(row *ent.SalesReturn) *biz.SalesReturn {
 	if row == nil {
 		return nil

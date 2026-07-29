@@ -80624,31 +80624,33 @@ func (m *QualityInspectionMutation) ResetEdge(name string) error {
 // RoleMutation represents an operation that mutates the Role nodes in the graph.
 type RoleMutation struct {
 	config
-	op                       Op
-	typ                      string
-	id                       *int
-	role_key                 *string
-	name                     *string
-	description              *string
-	builtin                  *bool
-	role_type                *role.RoleType
-	disabled                 *bool
-	sort_order               *int
-	addsort_order            *int
-	version                  *int
-	addversion               *int
-	navigation_mode          *role.NavigationMode
-	primary_menu_paths       *[]string
-	appendprimary_menu_paths []string
-	created_at               *time.Time
-	updated_at               *time.Time
-	clearedFields            map[string]struct{}
-	data_scopes              map[int]struct{}
-	removeddata_scopes       map[int]struct{}
-	cleareddata_scopes       bool
-	done                     bool
-	oldValue                 func(context.Context) (*Role, error)
-	predicates               []predicate.Role
+	op                         Op
+	typ                        string
+	id                         *int
+	role_key                   *string
+	name                       *string
+	description                *string
+	builtin                    *bool
+	role_type                  *role.RoleType
+	disabled                   *bool
+	sort_order                 *int
+	addsort_order              *int
+	version                    *int
+	addversion                 *int
+	navigation_mode            *role.NavigationMode
+	primary_menu_paths         *[]string
+	appendprimary_menu_paths   []string
+	secondary_menu_paths       *[]string
+	appendsecondary_menu_paths []string
+	created_at                 *time.Time
+	updated_at                 *time.Time
+	clearedFields              map[string]struct{}
+	data_scopes                map[int]struct{}
+	removeddata_scopes         map[int]struct{}
+	cleareddata_scopes         bool
+	done                       bool
+	oldValue                   func(context.Context) (*Role, error)
+	predicates                 []predicate.Role
 }
 
 var _ ent.Mutation = (*RoleMutation)(nil)
@@ -81164,6 +81166,57 @@ func (m *RoleMutation) ResetPrimaryMenuPaths() {
 	m.appendprimary_menu_paths = nil
 }
 
+// SetSecondaryMenuPaths sets the "secondary_menu_paths" field.
+func (m *RoleMutation) SetSecondaryMenuPaths(s []string) {
+	m.secondary_menu_paths = &s
+	m.appendsecondary_menu_paths = nil
+}
+
+// SecondaryMenuPaths returns the value of the "secondary_menu_paths" field in the mutation.
+func (m *RoleMutation) SecondaryMenuPaths() (r []string, exists bool) {
+	v := m.secondary_menu_paths
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSecondaryMenuPaths returns the old "secondary_menu_paths" field's value of the Role entity.
+// If the Role object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleMutation) OldSecondaryMenuPaths(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSecondaryMenuPaths is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSecondaryMenuPaths requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSecondaryMenuPaths: %w", err)
+	}
+	return oldValue.SecondaryMenuPaths, nil
+}
+
+// AppendSecondaryMenuPaths adds s to the "secondary_menu_paths" field.
+func (m *RoleMutation) AppendSecondaryMenuPaths(s []string) {
+	m.appendsecondary_menu_paths = append(m.appendsecondary_menu_paths, s...)
+}
+
+// AppendedSecondaryMenuPaths returns the list of values that were appended to the "secondary_menu_paths" field in this mutation.
+func (m *RoleMutation) AppendedSecondaryMenuPaths() ([]string, bool) {
+	if len(m.appendsecondary_menu_paths) == 0 {
+		return nil, false
+	}
+	return m.appendsecondary_menu_paths, true
+}
+
+// ResetSecondaryMenuPaths resets all changes to the "secondary_menu_paths" field.
+func (m *RoleMutation) ResetSecondaryMenuPaths() {
+	m.secondary_menu_paths = nil
+	m.appendsecondary_menu_paths = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *RoleMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -81324,7 +81377,7 @@ func (m *RoleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RoleMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 13)
 	if m.role_key != nil {
 		fields = append(fields, role.FieldRoleKey)
 	}
@@ -81354,6 +81407,9 @@ func (m *RoleMutation) Fields() []string {
 	}
 	if m.primary_menu_paths != nil {
 		fields = append(fields, role.FieldPrimaryMenuPaths)
+	}
+	if m.secondary_menu_paths != nil {
+		fields = append(fields, role.FieldSecondaryMenuPaths)
 	}
 	if m.created_at != nil {
 		fields = append(fields, role.FieldCreatedAt)
@@ -81389,6 +81445,8 @@ func (m *RoleMutation) Field(name string) (ent.Value, bool) {
 		return m.NavigationMode()
 	case role.FieldPrimaryMenuPaths:
 		return m.PrimaryMenuPaths()
+	case role.FieldSecondaryMenuPaths:
+		return m.SecondaryMenuPaths()
 	case role.FieldCreatedAt:
 		return m.CreatedAt()
 	case role.FieldUpdatedAt:
@@ -81422,6 +81480,8 @@ func (m *RoleMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldNavigationMode(ctx)
 	case role.FieldPrimaryMenuPaths:
 		return m.OldPrimaryMenuPaths(ctx)
+	case role.FieldSecondaryMenuPaths:
+		return m.OldSecondaryMenuPaths(ctx)
 	case role.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case role.FieldUpdatedAt:
@@ -81504,6 +81564,13 @@ func (m *RoleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPrimaryMenuPaths(v)
+		return nil
+	case role.FieldSecondaryMenuPaths:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSecondaryMenuPaths(v)
 		return nil
 	case role.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -81624,6 +81691,9 @@ func (m *RoleMutation) ResetField(name string) error {
 		return nil
 	case role.FieldPrimaryMenuPaths:
 		m.ResetPrimaryMenuPaths()
+		return nil
+	case role.FieldSecondaryMenuPaths:
+		m.ResetSecondaryMenuPaths()
 		return nil
 	case role.FieldCreatedAt:
 		m.ResetCreatedAt()

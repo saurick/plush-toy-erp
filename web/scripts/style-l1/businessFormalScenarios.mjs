@@ -124,13 +124,21 @@ export function createBusinessFormalScenarios(deps) {
       const metrics = await page.evaluate(() => ({
         selectedRows: Array.from(
           document.querySelectorAll('.ant-table-row-selected')
-        ).map((row) => String(row.textContent || '').replace(/\s+/gu, ' ').trim()),
+        ).map((row) =>
+          String(row.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim()
+        ),
         actionBars: Array.from(
           document.querySelectorAll('.erp-business-module-current-action')
         ).map((bar) => ({
-          text: String(bar.textContent || '').replace(/\s+/gu, ' ').trim(),
+          text: String(bar.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim(),
           buttons: Array.from(bar.querySelectorAll('button')).map((button) => ({
-            text: String(button.textContent || '').replace(/\s+/gu, ' ').trim(),
+            text: String(button.textContent || '')
+              .replace(/\s+/gu, ' ')
+              .trim(),
             disabled: button.disabled,
             visible: Boolean(button.offsetWidth || button.offsetHeight),
           })),
@@ -1309,10 +1317,14 @@ export function createBusinessFormalScenarios(deps) {
         await weightInput.fill('425')
         await modal
           .locator('#default_unit_id')
-          .locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]')
+          .locator(
+            'xpath=ancestor::div[contains(@class,"ant-select-selector")]'
+          )
           .click()
         await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option-content')
+          .locator(
+            '.ant-select-dropdown:visible .ant-select-item-option-content'
+          )
           .filter({ hasText: '千克（KG）' })
           .click()
         await page.keyboard.press('Tab')
@@ -1522,8 +1534,7 @@ export function createBusinessFormalScenarios(deps) {
           rowText: 'QI-STYLE-L1',
           titleText: '质量检验详情',
           scenarioName: 'business-row-double-click-quality-inspection',
-          screenshotName:
-            'business-v1-quality-inspection-double-click-details',
+          screenshotName: 'business-v1-quality-inspection-double-click-details',
           afterModalOpen: async (modal) => {
             await modal
               .getByText('PR-STYLE-L1', { exact: false })
@@ -1584,6 +1595,206 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     {
+      name: 'business-production-exception-tabs-desktop',
+      path: '/erp/production/exceptions',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        configRevision: 'style-l1-production-exception-tabs',
+        configHash: 'style-l1-production-exception-tabs-hash',
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'production.exception.approve',
+          'production.exception.submit',
+          'production.fact.post',
+          'workflow.task.read',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['production', 'boss'],
+        },
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const assertProductionExceptionTabGeometry = async (
+          scenarioName,
+          expectedTab
+        ) => {
+          const metrics = await page.evaluate(() => {
+            const visibleTables = Array.from(
+              document.querySelectorAll('.ant-table-wrapper')
+            ).filter((node) => {
+              const rect = node.getBoundingClientRect()
+              const style = window.getComputedStyle(node)
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                style.display !== 'none' &&
+                style.visibility !== 'hidden'
+              )
+            })
+            const tabs = document.querySelector(
+              '[aria-label="生产异常处置工作区"]'
+            )
+            const tabList = tabs?.querySelector('[role="tablist"]')
+            const activeTab = tabs?.querySelector(
+              '[role="tab"][aria-selected="true"]'
+            )
+            const taskWorkspace = document.querySelector(
+              '.erp-workflow-business-page__tab-workspace'
+            )
+            const operationPanel = taskWorkspace?.querySelector(
+              '.erp-business-operation-panel'
+            )
+            const tableCard = taskWorkspace?.querySelector(
+              '.erp-business-data-table-card'
+            )
+            const taskWorkspaceRowGap = taskWorkspace
+              ? Number.parseFloat(window.getComputedStyle(taskWorkspace).rowGap)
+              : null
+            const taskWorkspaceRenderedGap =
+              operationPanel && tableCard
+                ? tableCard.getBoundingClientRect().top -
+                  operationPanel.getBoundingClientRect().bottom
+                : null
+            return {
+              activeTab: String(activeTab?.textContent || '').trim(),
+              tabListClientWidth: tabList?.clientWidth || 0,
+              tabListScrollWidth: tabList?.scrollWidth || 0,
+              taskWorkspaceRenderedGap,
+              taskWorkspaceRowGap,
+              visibleTableCount: visibleTables.length,
+            }
+          })
+          assert.equal(
+            metrics.activeTab,
+            expectedTab,
+            `${scenarioName} 应只激活目标页签: ${JSON.stringify(metrics)}`
+          )
+          assert.equal(
+            metrics.visibleTableCount,
+            1,
+            `${scenarioName} 不应同时纵向挂载两张业务表: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert(
+            metrics.tabListScrollWidth <= metrics.tabListClientWidth + 1,
+            `${scenarioName} 页签栏不应横向溢出: ${JSON.stringify(metrics)}`
+          )
+          if (expectedTab === '待审批') {
+            assert.equal(
+              metrics.taskWorkspaceRowGap,
+              6,
+              `${scenarioName} 应复用业务页面标准模块间距: ${JSON.stringify(
+                metrics
+              )}`
+            )
+            assert(
+              Math.abs(metrics.taskWorkspaceRenderedGap - 6) <= 0.5,
+              `${scenarioName} 操作区与表格应保持 6px 间距: ${JSON.stringify(
+                metrics
+              )}`
+            )
+          }
+          await assertNoHorizontalOverflow(page, scenarioName)
+        }
+
+        await expectHeading(page, '生产异常处置')
+        await expectText(page, '暂无生产异常处置申请')
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-decisions-tab',
+          '处置申请'
+        )
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '生产异常处置申请已刷新')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab.png'
+          ),
+          fullPage: true,
+        })
+        await page
+          .getByText('生产异常处置申请已刷新', { exact: true })
+          .waitFor({ state: 'hidden', timeout: 6_000 })
+
+        await page.getByRole('tab', { name: '待审批' }).click()
+        await expectText(page, '暂无待审批的生产异常处置申请。')
+        await assertTextAbsent(page, '暂无生产异常处置申请')
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-tasks-tab',
+          '待审批'
+        )
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '生产异常处置任务已刷新')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-tasks-tab.png'
+          ),
+          fullPage: true,
+        })
+
+        await page.evaluate(() => {
+          window.localStorage.setItem('plush_erp_theme_mode', 'dark')
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectText(page, '暂无生产异常处置申请')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-production-exceptions-decisions-tab-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-decisions-tab-dark',
+          '处置申请'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab-dark.png'
+          ),
+          fullPage: true,
+        })
+
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.evaluate(() => {
+          window.localStorage.setItem('plush_erp_theme_mode', 'light')
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectText(page, '暂无生产异常处置申请')
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-decisions-tab-mobile',
+          '处置申请'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab-mobile.png'
+          ),
+          fullPage: true,
+        })
+        await page.getByRole('tab', { name: '待审批' }).click()
+        await expectText(page, '暂无待审批的生产异常处置申请。')
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-tasks-tab-mobile',
+          '待审批'
+        )
+        await page
+          .locator(
+            '.erp-workflow-business-page__tab-workspace .erp-business-data-table-card'
+          )
+          .scrollIntoViewIfNeeded()
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-tasks-tab-mobile.png'
+          ),
+          fullPage: true,
+        })
+      },
+    },
+    {
       name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
@@ -1598,12 +1809,7 @@ export function createBusinessFormalScenarios(deps) {
           'workflow.task.read',
         ],
         workflow_visible_owner_role_keys_by_capability: {
-          'workflow.task.read': [
-            'production',
-            'warehouse',
-            'sales',
-            'finance',
-          ],
+          'workflow.task.read': ['production', 'warehouse', 'sales', 'finance'],
         },
       },
       workflowTaskFixtures: [
@@ -2874,8 +3080,7 @@ export function createBusinessFormalScenarios(deps) {
           rowText: 'QI-STYLE-L1',
           titleText: '质量检验详情',
           scenarioName: 'business-v1-quality-inspections',
-          screenshotName:
-            'business-v1-quality-inspection-double-click-details',
+          screenshotName: 'business-v1-quality-inspection-double-click-details',
           afterModalOpen: async () => {
             await expectText(page, 'PR-STYLE-L1')
             await expectText(page, 'INV-LOT-001')
@@ -3374,19 +3579,91 @@ export function createBusinessFormalScenarios(deps) {
           },
         })
 
-        await verifyWorkflowV1Page({
-          path: '/erp/production/exceptions',
-          heading: '生产异常',
-          absentTexts: [
-            '登记异常协同',
-            '新建异常单',
-            '关闭异常单',
-            '生成异常处理',
-          ],
-          scenarioName: 'business-workflow-production-exceptions',
-          afterPageReady: async () => {
-            await expectText(page, '暂无待审批的生产异常处置。')
-          },
+        await gotoScenarioPath(page, '/erp/production/exceptions', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '生产异常处置')
+        const productionExceptionDecisionTab = page.getByRole('tab', {
+          name: '处置申请',
+        })
+        const productionExceptionTaskTab = page.getByRole('tab', {
+          name: '待审批',
+        })
+        await productionExceptionDecisionTab.waitFor({ state: 'visible' })
+        assert.equal(
+          await productionExceptionDecisionTab.getAttribute('aria-selected'),
+          'true',
+          '生产异常处置页默认应进入处置申请，不再同时纵向铺开待审批任务'
+        )
+        assert.equal(
+          await productionExceptionTaskTab.getAttribute('aria-selected'),
+          'false',
+          '待审批应作为独立未选中页签'
+        )
+        await expectText(page, '暂无生产异常处置申请')
+        await expectText(page, '异常记录')
+        await expectText(page, '当前显示')
+        assert.equal(
+          await page.getByLabel('搜索待办任务').count(),
+          0,
+          '处置申请页签不应挂载待审批任务筛选区'
+        )
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-production-exceptions-decisions-tab'
+        )
+        for (const text of [
+          '登记异常协同',
+          '新建异常单',
+          '关闭异常单',
+          '生成异常处理',
+          '打印单据',
+        ]) {
+          await assertTextAbsent(page, text)
+        }
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '生产异常处置申请已刷新')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-production-exceptions-decisions-tab'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab.png'
+          ),
+          fullPage: true,
+        })
+        await page
+          .getByText('生产异常处置申请已刷新', { exact: true })
+          .waitFor({ state: 'hidden', timeout: 6_000 })
+
+        await productionExceptionTaskTab.click()
+        await expectText(page, '暂无待审批的生产异常处置申请。')
+        assert.equal(
+          await productionExceptionTaskTab.getAttribute('aria-selected'),
+          'true',
+          '待审批页签点击后应成为唯一活动工作区'
+        )
+        await assertTextAbsent(page, '暂无生产异常处置申请')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-production-exceptions-tasks-tab',
+          exportDisabled: true,
+          exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
+        })
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '生产异常处置任务已刷新')
+        await expectNoButton(page, '删除')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-production-exceptions-tasks-tab'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-tasks-tab.png'
+          ),
+          fullPage: true,
         })
 
         await page.evaluate(async () => {
@@ -3626,7 +3903,9 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '幂等键')
         await assertTextAbsent(page, '内部引用')
         const productionDraftRow = page
-          .locator('.erp-business-data-table-card .ant-table-tbody .ant-table-row')
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
           .filter({ hasText: 'PROD-FACT-L1' })
           .first()
         await productionDraftRow.click()
@@ -3756,23 +4035,43 @@ export function createBusinessFormalScenarios(deps) {
         await gotoScenarioPath(page, '/erp/production/exceptions', {
           waitUntil: 'domcontentloaded',
         })
-        await expectHeading(page, '生产异常')
-        await expectText(page, '待办任务')
+        await expectHeading(page, '生产异常处置')
+        await expectText(page, '处置申请')
         await expectText(page, '业务处理分开完成')
         await assertBusinessCollaborationPanelAbsent(
           page,
           'business-workflow-production-exceptions-dark'
         )
         await assertTextAbsent(page, '登记异常协同')
-        await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-workflow-production-exceptions-dark',
-          exportDisabled: true,
-          exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
-        })
+        await expectText(page, '暂无生产异常处置申请')
         await assertTextAbsent(page, '新建异常单')
         await assertTextAbsent(page, '生成异常处理')
         await assertERPThemeMode(page, {
           scenarioName: 'business-workflow-production-exceptions-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-workflow-production-exceptions-dark'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab-dark.png'
+          ),
+          fullPage: true,
+        })
+
+        await page.getByRole('tab', { name: '待审批' }).click()
+        await expectText(page, '暂无待审批的生产异常处置申请。')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-workflow-production-exceptions-tasks-dark',
+          exportDisabled: true,
+          exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
+        })
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-workflow-production-exceptions-tasks-dark',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })

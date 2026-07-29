@@ -232,8 +232,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("permission-center", "approval-responsibility", "审批责任", "approval-member-roles", "可选业务岗位", permissionControlSection, "允许读取可配置的岗位候选", permissionMethods("admin", "rbac_options"), systemUsageConditions),
 	)
 	add(PermissionSystemRolePermissionManage,
-		menuPermissionSurface("permission-center", "role-templates", "角色模板", "save-role-permissions", "保存业务角色权限", permissionControlButton, "显示并允许保存可委派业务权限", permissionMethods("admin", "set_role_permissions"), systemUsageConditions),
-		menuPermissionSurface("permission-center", "role-templates", "角色模板", "save-role-navigation", "保存岗位菜单布局", permissionControlButton, "显示并允许保存岗位常用入口与顺序", permissionMethods("admin", "set_role_navigation"), systemUsageConditions),
+		menuPermissionSurface("permission-center", "role-templates", "角色模板", "save-role-settings", "保存岗位设置", permissionControlButton, "一次保存可委派业务权限、数据范围和菜单布局", permissionMethods("admin", "set_role_settings"), systemUsageConditions),
 	)
 	add(PermissionSystemPermissionRead,
 		menuPermissionSurface("permission-center", "role-templates", "角色模板", "permission-list", "功能权限和权限地图", permissionControlPage, "允许进入并查看", permissionMethods("admin", "rbac_options"), systemUsageConditions),
@@ -243,14 +242,14 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	// Customer configuration control plane.
 	addMenu(PermissionCustomerConfigRead, "permission-center", "approval-responsibility", "审批责任", "approval-settings-page", "审批责任与有效资格预览", permissionControlPage, "允许进入并查看", permissionMethods("customer_config", "get_approval_settings", "preview_approval_settings", "validate_customer_config", "get_effective_session", "explain_module_status", "explain_process_definition"), []string{"仍受部署固定客户和 active revision 边界限制"})
-	addBackend(PermissionCustomerConfigPublish, permissionMethods("customer_config", "publish_customer_config", "publish_approval_settings"), []string{"仍受配置校验、发布版本状态和禁止自我扩权限制"})
-	addBackend(PermissionCustomerConfigActivate, permissionMethods("customer_config", "activate_customer_config"), []string{"仍受发布版本状态和部署客户边界限制"})
+	addBackend(PermissionCustomerConfigPublish, permissionMethods("customer_config", "publish_customer_config", "publish_approval_settings", "apply_approval_settings"), []string{"仍受配置校验、发布版本状态和禁止自我扩权限制"})
+	addBackend(PermissionCustomerConfigActivate, permissionMethods("customer_config", "activate_customer_config", "apply_approval_settings"), []string{"仍受发布版本状态和部署客户边界限制"})
 	addBackend(PermissionCustomerConfigRollback, permissionMethods("customer_config", "rollback_customer_config"), []string{"仍受可回滚 revision 和部署客户边界限制"})
 	addBackend(PermissionProcessRuntimeRecover, permissionMethods("customer_config", "recover_compensated_process_domain_command"), []string{"仅允许对已补偿且无已生效下游事实的 domain_command 执行确定性终止与撤回"})
 
 	// Shared ERP entries.
 	add(PermissionERPWorkbenchRead,
-		menuPermissionSurface("global-dashboard", "role-workbench", "岗位工作台", "dashboard-content", "工作台内容", permissionControlPage, "允许进入并查看", nil, workflowUsageConditions),
+		menuPermissionSurface("global-dashboard", "role-workbench", "岗位工作台", "dashboard-content", "工作台内容", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_workbench_role_tasks"), workflowUsageConditions),
 	)
 	add(PermissionERPBusinessDashboardRead,
 		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "业务看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "dashboard_stats"), businessUsageConditions),
@@ -326,17 +325,25 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		}
 	}
 	workflowTaskReadSurfaces := workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment"))
+	for index := range workflowTaskReadSurfaces {
+		if workflowTaskReadSurfaces[index].PageKey == "global-dashboard" {
+			workflowTaskReadSurfaces[index].BackendMethods = append(
+				workflowTaskReadSurfaces[index].BackendMethods,
+				permissionMethods("workflow", "list_workbench_role_tasks")...,
+			)
+		}
+	}
 	workflowTaskReadSurfaces = append(
 		workflowTaskReadSurfaces,
 		menuPermissionSurface("production-scheduling", "production-scheduling", "生产排程", "production-scheduling-task-list", "生产排程任务列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
-		menuPermissionSurface("production-exceptions", "production-exceptions", "生产异常", "production-exception-task-list", "生产异常任务列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
+		menuPermissionSurface("production-exceptions", "production-exceptions", "生产异常处置", "production-exception-task-list", "生产异常处置任务列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 		menuPermissionSurface("shipping-release", "shipping-release", "出货放行", "shipping-release-task-list", "出货放行任务列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 	)
 	add(PermissionWorkflowTaskRead, workflowTaskReadSurfaces...)
 	add(PermissionWorkflowTaskSupervise,
 		menuPermissionSurface("task-board", "task-supervision", "协同任务", "cross-role-task-list", "跨岗位任务监督", permissionControlSection, "允许只读查看其他责任岗位任务", permissionMethods("workflow", "list_tasks", "get_task_board"), workflowUsageConditions),
 		menuPermissionSurface("production-scheduling", "task-supervision", "生产排程", "cross-role-scheduling-list", "跨岗位排程任务监督", permissionControlSection, "允许只读查看其他责任岗位排程任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
-		menuPermissionSurface("production-exceptions", "task-supervision", "生产异常", "cross-role-exception-list", "跨岗位异常任务监督", permissionControlSection, "允许只读查看其他责任岗位异常任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
+		menuPermissionSurface("production-exceptions", "task-supervision", "生产异常处置", "cross-role-exception-list", "跨岗位异常处置任务监督", permissionControlSection, "允许只读查看其他责任岗位异常任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 		menuPermissionSurface("shipping-release", "task-supervision", "出货放行", "cross-role-release-list", "跨岗位放行任务监督", permissionControlSection, "允许只读查看其他责任岗位放行任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
 	)
 	add(PermissionWorkflowTaskCreate, workflowSurfaces("create-task", "创建协同任务", permissionControlButton, "显示并允许创建", permissionMethods("workflow", "create_task"))...)
@@ -445,8 +452,8 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("production-exceptions", "quality-exceptions", "品质异常", "handle-quality-exception", "处理品质异常", permissionControlButton, "显示并允许处理", permissionMethods("quality", "correct_quality_inspection_result"), append(append([]string{}, businessUsageConditions...), "仅允许撤销无已生效下游事实的判定，并生成新的待检单")),
 		menuPermissionSurface("processing-contracts", "outsourcing-related-records", "委外订单", "create-outsourcing-return-disposition", "登记委外不合格返厂或返工处置", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "create_outsourcing_return_disposition"), businessUsageConditions),
 	)
-	addMenu(PermissionProductionExceptionSubmit, "production-exceptions", "production-risks", "生产风险", "submit-production-exception", "发起或撤回报废、超领和在制让步申请", permissionControlButton, "显示并允许处理", append(permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions", "submit_production_exception", "cancel_production_exception"), permissionMethods("customer_config", "start_production_exception_approval_process")...), businessUsageConditions)
-	addMenu(PermissionProductionExceptionApprove, "production-exceptions", "production-risks", "生产风险", "approve-production-exception", "审批或驳回报废、超领和在制让步申请", permissionControlButton, "显示并允许处理", append(permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions"), permissionMethods("workflow", "complete_task_action")...), businessUsageConditions)
+	addMenu(PermissionProductionExceptionSubmit, "production-exceptions", "production-risks", "生产异常处置", "submit-production-exception", "发起或撤回报废、超领和在制让步申请", permissionControlButton, "显示并允许处理", append(permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions", "submit_production_exception", "cancel_production_exception"), permissionMethods("customer_config", "start_production_exception_approval_process")...), businessUsageConditions)
+	addMenu(PermissionProductionExceptionApprove, "production-exceptions", "production-risks", "生产异常处置", "approve-production-exception", "审批或驳回报废、超领和在制让步申请", permissionControlButton, "显示并允许处理", append(permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions"), permissionMethods("workflow", "complete_task_action")...), businessUsageConditions)
 
 	// Finance.
 	addMenu(PermissionFinancePayableRead, "payables", "payables", "应付管理", "payable-list", "应付列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("operational_fact", "list_finance_facts"), permissionMethods("customer_config", "execute_finance_payment_post")...), businessUsageConditions)
@@ -469,7 +476,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		permissionMethods("operational_fact", "list_finance_payments", "get_finance_payment", "list_finance_credit_notes", "get_finance_credit_note"),
 		permissionMethods("customer_config", "start_finance_payment_approval_process", "get_finance_payment_approval_process", "execute_finance_payment_post")...,
 	)
-	addMenu(PermissionFinancePaymentRead, "finance-payments", "finance-payments", "收付款与核销", "finance-payment-list", "收付款单与红冲记录列表、详情", permissionControlPage, "允许进入并查看", financePaymentReadMethods, businessUsageConditions)
+	addMenu(PermissionFinancePaymentRead, "finance-payments", "finance-payments", "收付款核销", "finance-payment-list", "收付款单与红冲记录列表、详情", permissionControlPage, "允许进入并查看", financePaymentReadMethods, businessUsageConditions)
 	addMenu(PermissionFinancePaymentCreate, "finance-payments", "finance-payment-actions", "收付款动作", "create-finance-payment", "创建真实收付款单、启动审批或按生命周期约束取消", permissionControlButton, "显示并允许创建或取消", append(permissionMethods("operational_fact", "create_finance_payment", "cancel_finance_payment"), permissionMethods("customer_config", "start_finance_payment_approval_process")...), businessUsageConditions)
 	addMenu(PermissionFinancePaymentApprove, "finance-payments", "finance-payment-actions", "收付款动作", "approve-finance-payment", "审批或驳回收付款", permissionControlButton, "显示并允许审批", permissionMethods("workflow", "complete_task_action"), businessUsageConditions)
 	addMenu(PermissionFinancePaymentPost, "finance-payments", "finance-payment-actions", "收付款动作", "post-finance-payment", "审批后过账并进行多单核销", permissionControlButton, "显示并允许处理", permissionMethods("customer_config", "execute_finance_payment_post"), businessUsageConditions)
@@ -487,7 +494,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	add(PermissionProductionFactRead,
 		menuPermissionSurface("production-orders", "production-related-records", "关联生产记录", "production-fact-reference", "查看订单关联生产记录", permissionControlSection, "允许查看", append(permissionMethods("operational_fact", "list_production_facts"), permissionMethods("customer_config", "execute_production_exception_process")...), businessUsageConditions),
 		menuPermissionSurface("production-progress", "production-progress", "生产进度", "production-fact-list", "生产记录列表", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "list_production_facts"), businessUsageConditions),
-		menuPermissionSurface("production-exceptions", "production-risks", "生产风险", "production-exception-decision-list", "生产异常办理记录", permissionControlSection, "允许查看", permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions"), businessUsageConditions),
+		menuPermissionSurface("production-exceptions", "production-risks", "生产异常处置", "production-exception-decision-list", "生产异常处置申请", permissionControlSection, "允许查看", permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions"), businessUsageConditions),
 	)
 	productionWIPReadMethods := append(
 		permissionMethods("production_order", "get_production_order", "list_production_orders"),
@@ -504,8 +511,8 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionProductionReworkCreate, "production-progress", "production-fact-actions", "生产记录动作", "create-production-rework", "发起返工", permissionControlButton, "显示并允许发起", permissionMethods("operational_fact", "create_production_rework_from_completion"), businessUsageConditions)
 	addMenu(PermissionProductionFactPost, "production-progress", "production-fact-actions", "生产记录动作", "post-production-fact", "确认生产记录", permissionControlButton, "显示并允许确认", append(permissionMethods("operational_fact", "post_production_fact", "reverse_production_exception"), permissionMethods("customer_config", "execute_production_exception_process")...), businessUsageConditions)
 	addMenu(PermissionProductionFactCancel, "production-progress", "production-fact-actions", "生产记录动作", "cancel-production-fact", "取消生产记录", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_production_fact"), businessUsageConditions)
-	addMenu(PermissionPMCRiskRead, "production-exceptions", "production-risks", "生产风险", "production-risk-list", "生产风险和异常", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions"), businessUsageConditions)
-	addMenu(PermissionPMCRiskHandle, "production-exceptions", "production-risks", "生产风险", "handle-production-risk", "处理生产风险", permissionControlButton, "显示并允许处理", nil, businessUsageConditions)
+	addMenu(PermissionPMCRiskRead, "production-exceptions", "production-risks", "生产异常处置", "production-risk-list", "查看生产异常处置申请", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions"), businessUsageConditions)
+	addMenu(PermissionPMCRiskHandle, "production-exceptions", "production-risks", "生产异常处置", "handle-production-risk", "跟进生产异常处置", permissionControlButton, "显示并允许处理", nil, businessUsageConditions)
 
 	// Mobile role entry permissions use explicit routes, not string-derived paths.
 	addMobile := func(permissionKey string, roleKey string, pageLabel string, path string) {

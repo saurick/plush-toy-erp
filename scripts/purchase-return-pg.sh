@@ -89,6 +89,9 @@ status)
   ;;
 apply)
   atlas migrate apply --dir "file://internal/data/model/migrate" --url "$PURCHASE_RETURN_PG_DB_URL"
+  PLUSH_DATABASE_PROGRAMMABILITY_URL="$PURCHASE_RETURN_PG_DB_URL" \
+    node ../scripts/qa/database-programmability.mjs \
+    --database-url-env PLUSH_DATABASE_PROGRAMMABILITY_URL
   ;;
 test)
   run_verified_go_test TestPurchaseReturnPostgres \

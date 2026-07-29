@@ -105,6 +105,7 @@ type RuntimeAuditEventListResult struct {
 }
 
 type AdminManageRepo interface {
+	RoleSettingsRepo
 	GetAdminByID(ctx context.Context, id int) (*AdminUser, error)
 	GetAdminByUsername(ctx context.Context, username string) (*AdminUser, error)
 	GetAdminByPhone(ctx context.Context, phone string) (*AdminUser, error)
@@ -114,8 +115,6 @@ type AdminManageRepo interface {
 	ListRoles(ctx context.Context) ([]AdminRole, error)
 	ListPermissions(ctx context.Context) ([]AdminPermission, error)
 	GetRoleByKey(ctx context.Context, roleKey string) (*AdminRole, error)
-	SetRolePermissionsWithAudit(ctx context.Context, change *RolePermissionsChange) (*AdminRole, error)
-	SetRoleNavigationWithAudit(ctx context.Context, change *RoleNavigationChange) (*AdminRole, error)
 	UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error
 	SetAdminPhoneWithAudit(ctx context.Context, change *AdminPhoneChange) (*AdminUser, error)
 	ChangeAdminLifecycle(ctx context.Context, change *AdminLifecycleChange) (updated *AdminUser, releasedTaskCount int, err error)
@@ -321,15 +320,16 @@ func AdminAuditRoleSnapshot(role *AdminRole) map[string]any {
 		return nil
 	}
 	return map[string]any{
-		"role_key":           role.Key,
-		"name":               role.Name,
-		"role_type":          role.Type,
-		"version":            role.Version,
-		"disabled":           role.Disabled,
-		"navigation_mode":    role.NavigationMode,
-		"primary_menu_paths": append([]string(nil), role.PrimaryMenuPaths...),
-		"permission_keys":    NormalizePermissionKeys(role.Permissions),
-		"data_scopes":        role.DataScopes,
+		"role_key":             role.Key,
+		"name":                 role.Name,
+		"role_type":            role.Type,
+		"version":              role.Version,
+		"disabled":             role.Disabled,
+		"navigation_mode":      role.NavigationMode,
+		"primary_menu_paths":   append([]string(nil), role.PrimaryMenuPaths...),
+		"secondary_menu_paths": append([]string(nil), role.SecondaryMenuPaths...),
+		"permission_keys":      NormalizePermissionKeys(role.Permissions),
+		"data_scopes":          role.DataScopes,
 	}
 }
 
@@ -353,49 +353,6 @@ func (uc *AdminManageUsecase) EffectiveWarehouseDataScope(ctx context.Context, a
 		return WarehouseDataScope{}, err
 	}
 	return EffectiveWarehouseDataScope(false, scopes), nil
-}
-
-func (uc *AdminManageUsecase) SetRoleDataScopes(
-	ctx context.Context,
-	roleKey string,
-	scopes []RoleDataScope,
-	expectedVersion int,
-) (*AdminRole, error) {
-	operator, err := uc.requireActiveAdmin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	roleKey = NormalizeRoleKey(roleKey)
-	if roleKey == "" || expectedVersion <= 0 {
-		return nil, ErrBadParam
-	}
-	if !operator.IsSuperAdmin && AdminHasRole(operator, roleKey) {
-		return nil, ErrAdminSelfRolePermissionForbidden
-	}
-	role, err := uc.repo.GetRoleByKey(ctx, roleKey)
-	if err != nil {
-		return nil, err
-	}
-	if role == nil || role.Disabled {
-		return nil, ErrRoleNotFound
-	}
-	if IsSystemManagedRole(*role) {
-		return nil, ErrSystemRoleImmutable
-	}
-	if role.Version != expectedVersion {
-		return nil, ErrRoleVersionConflict
-	}
-	normalized, err := NormalizeRoleDataScopes(scopes)
-	if err != nil {
-		return nil, err
-	}
-	scopeRepo, ok := uc.repo.(RoleDataScopeRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
-	return scopeRepo.SetRoleDataScopesWithAudit(ctx, &RoleDataScopesChangeCommand{
-		RoleKey: roleKey, OperatorID: operator.ID, ExpectedVersion: expectedVersion, Scopes: normalized,
-	})
 }
 
 func (uc *AdminManageUsecase) RecordWorkflowBreakGlassAudit(
@@ -508,6 +465,8 @@ func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
 		return "密码重置", "high"
 	case "role.permissions.set":
 		return "角色权限变更", "high"
+	case "role.settings.set":
+		return "岗位设置变更", "high"
 	case "role.navigation.set":
 		return "岗位菜单布局变更", "warning"
 	case "customer_config.publish":
@@ -556,6 +515,8 @@ func runtimeAuditSummary(event RuntimeAuditEvent) string {
 		return actor + " 调整了 " + target + " 的账号角色"
 	case "role.permissions.set":
 		return actor + " 调整了 " + target + " 的角色权限"
+	case "role.settings.set":
+		return actor + " 调整了 " + target + " 的岗位设置"
 	case "role.navigation.set":
 		return actor + " 调整了 " + target + " 的岗位菜单布局"
 	case "customer_config.publish":
@@ -956,97 +917,6 @@ func (uc *AdminManageUsecase) ListPermissions(ctx context.Context) ([]AdminPermi
 		return nil, err
 	}
 	return uc.repo.ListPermissions(ctx)
-}
-
-func (uc *AdminManageUsecase) SetRolePermissions(
-	ctx context.Context,
-	roleKey string,
-	permissionKeys []string,
-	expectedVersion int,
-) (*AdminRole, error) {
-	operator, err := uc.requireActiveAdmin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	roleKey = NormalizeRoleKey(roleKey)
-	if roleKey == "" || expectedVersion <= 0 {
-		return nil, ErrBadParam
-	}
-	if !operator.IsSuperAdmin && AdminHasRole(operator, roleKey) {
-		return nil, ErrAdminSelfRolePermissionForbidden
-	}
-	role, err := uc.repo.GetRoleByKey(ctx, roleKey)
-	if err != nil {
-		return nil, err
-	}
-	if role == nil || role.Disabled {
-		return nil, ErrRoleNotFound
-	}
-	if IsSystemManagedRole(*role) {
-		return nil, ErrSystemRoleImmutable
-	}
-	if role.Version != expectedVersion {
-		return nil, ErrRoleVersionConflict
-	}
-	normalizedPermissionKeys, err := NormalizePermissionKeysStrict(permissionKeys)
-	if err != nil {
-		return nil, err
-	}
-	if err := ValidateAssignablePermissionKeys(normalizedPermissionKeys); err != nil {
-		return nil, err
-	}
-	updated, err := uc.repo.SetRolePermissionsWithAudit(ctx, &RolePermissionsChange{
-		RoleKey: roleKey, OperatorID: operator.ID, ExpectedVersion: expectedVersion,
-		PermissionKeys: normalizedPermissionKeys,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return updated, nil
-}
-
-func (uc *AdminManageUsecase) SetRoleNavigation(
-	ctx context.Context,
-	roleKey string,
-	mode RoleNavigationMode,
-	primaryMenuPaths []string,
-	expectedVersion int,
-) (*AdminRole, error) {
-	operator, err := uc.requireActiveAdmin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	roleKey = NormalizeRoleKey(roleKey)
-	if roleKey == "" || expectedVersion <= 0 {
-		return nil, ErrBadParam
-	}
-	if !operator.IsSuperAdmin && AdminHasRole(operator, roleKey) {
-		return nil, ErrAdminSelfRolePermissionForbidden
-	}
-	role, err := uc.repo.GetRoleByKey(ctx, roleKey)
-	if err != nil {
-		return nil, err
-	}
-	if role == nil || role.Disabled {
-		return nil, ErrRoleNotFound
-	}
-	if IsSystemManagedRole(*role) {
-		return nil, ErrSystemRoleImmutable
-	}
-	if role.Version != expectedVersion {
-		return nil, ErrRoleVersionConflict
-	}
-	settings, err := NormalizeRoleNavigationSettings(mode, primaryMenuPaths)
-	if err != nil {
-		return nil, err
-	}
-	return uc.repo.SetRoleNavigationWithAudit(ctx, &RoleNavigationChange{
-		RoleKey:          roleKey,
-		OperatorID:       operator.ID,
-		ExpectedVersion:  expectedVersion,
-		Mode:             settings.Mode,
-		PrimaryMenuPaths: settings.PrimaryMenuPaths,
-	})
 }
 
 func (uc *AdminManageUsecase) SetPhone(

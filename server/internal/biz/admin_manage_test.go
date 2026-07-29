@@ -21,6 +21,7 @@ type stubAdminManageRepo struct {
 	adminsByPhone        map[string]*AdminUser
 	customRoles          map[string]AdminRole
 	rolePerms            map[string][]string
+	roleScopes           map[string][]RoleDataScope
 	roleNavigation       map[string]RoleNavigationSettings
 	roleVersions         map[string]int
 	auditEvents          []RuntimeAuditEvent
@@ -31,6 +32,7 @@ type stubAdminManageRepo struct {
 }
 
 var _ AdminManageRepo = (*stubAdminManageRepo)(nil)
+var _ RoleSettingsRepo = (*stubAdminManageRepo)(nil)
 
 func newStubAdminManageRepo() *stubAdminManageRepo {
 	return &stubAdminManageRepo{
@@ -39,6 +41,7 @@ func newStubAdminManageRepo() *stubAdminManageRepo {
 		adminsByPhone:  map[string]*AdminUser{},
 		customRoles:    map[string]AdminRole{},
 		rolePerms:      map[string][]string{},
+		roleScopes:     map[string][]RoleDataScope{},
 		roleNavigation: map[string]RoleNavigationSettings{},
 		roleVersions:   map[string]int{},
 		auditEvents:    []RuntimeAuditEvent{},
@@ -66,24 +69,27 @@ func (r *stubAdminManageRepo) roleByKey(roleKey string) AdminRole {
 				permissions = role.Permissions
 			}
 			navigation := RoleNavigationSettings{
-				Mode:             RoleNavigationModeRecommended,
-				PrimaryMenuPaths: []string{},
+				Mode:               RoleNavigationModeRecommended,
+				PrimaryMenuPaths:   []string{},
+				SecondaryMenuPaths: []string{},
 			}
 			if configured, ok := r.roleNavigation[role.Key]; ok {
 				navigation = configured
 			}
 			return AdminRole{
-				Key:              role.Key,
-				Name:             role.Name,
-				Description:      role.Description,
-				Builtin:          role.Builtin,
-				Disabled:         role.Disabled,
-				SortOrder:        role.SortOrder,
-				Type:             role.Type,
-				Version:          max(role.Version, r.roleVersions[role.Key]),
-				NavigationMode:   navigation.Mode,
-				PrimaryMenuPaths: navigation.PrimaryMenuPaths,
-				Permissions:      NormalizePermissionKeys(permissions),
+				Key:                role.Key,
+				Name:               role.Name,
+				Description:        role.Description,
+				Builtin:            role.Builtin,
+				Disabled:           role.Disabled,
+				SortOrder:          role.SortOrder,
+				Type:               role.Type,
+				Version:            max(role.Version, r.roleVersions[role.Key]),
+				NavigationMode:     navigation.Mode,
+				PrimaryMenuPaths:   navigation.PrimaryMenuPaths,
+				SecondaryMenuPaths: navigation.SecondaryMenuPaths,
+				Permissions:        NormalizePermissionKeys(permissions),
+				DataScopes:         append([]RoleDataScope(nil), r.roleScopes[role.Key]...),
 			}
 		}
 	}
@@ -298,7 +304,7 @@ func (r *stubAdminManageRepo) GetRoleByKey(_ context.Context, roleKey string) (*
 	return &role, nil
 }
 
-func (r *stubAdminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, change *RolePermissionsChange) (*AdminRole, error) {
+func (r *stubAdminManageRepo) SetRoleSettingsWithAudit(ctx context.Context, change *RoleSettingsChangeCommand) (*AdminRole, error) {
 	if change == nil {
 		return nil, ErrBadParam
 	}
@@ -315,6 +321,20 @@ func (r *stubAdminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, c
 	}
 	before := AdminAuditRoleSnapshot(&role)
 	r.rolePerms[role.Key] = NormalizePermissionKeys(change.PermissionKeys)
+	scopes, err := NormalizeRoleDataScopes(change.Scopes)
+	if err != nil {
+		return nil, err
+	}
+	navigation, err := NormalizeRoleNavigationSettings(
+		change.Mode,
+		change.PrimaryMenuPaths,
+		change.SecondaryMenuPaths,
+	)
+	if err != nil {
+		return nil, err
+	}
+	r.roleScopes[role.Key] = scopes
+	r.roleNavigation[role.Key] = navigation
 	nextVersion := role.Version + 1
 	r.roleVersions[role.Key] = nextVersion
 	if customRole, ok := r.customRoles[role.Key]; ok {
@@ -330,7 +350,7 @@ func (r *stubAdminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, c
 	}
 	updated := r.roleByKey(role.Key)
 	event, err := BuildAdminControlAuditEvent(
-		operator, "role.permissions.set", "role", updated.ID, updated.Key,
+		operator, "role.settings.set", "role", updated.ID, updated.Key,
 		before, AdminAuditRoleSnapshot(&updated),
 	)
 	if err != nil {
@@ -339,33 +359,6 @@ func (r *stubAdminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, c
 	if err := r.RecordRuntimeAuditEvent(ctx, event); err != nil {
 		return nil, err
 	}
-	return &updated, nil
-}
-
-func (r *stubAdminManageRepo) SetRoleNavigationWithAudit(
-	_ context.Context,
-	change *RoleNavigationChange,
-) (*AdminRole, error) {
-	if change == nil || change.ExpectedVersion <= 0 {
-		return nil, ErrBadParam
-	}
-	role := r.roleByKey(change.RoleKey)
-	if role.Key == "" {
-		return nil, ErrRoleNotFound
-	}
-	if role.Version != change.ExpectedVersion {
-		return nil, ErrRoleVersionConflict
-	}
-	settings, err := NormalizeRoleNavigationSettings(
-		change.Mode,
-		change.PrimaryMenuPaths,
-	)
-	if err != nil {
-		return nil, err
-	}
-	r.roleNavigation[role.Key] = settings
-	r.roleVersions[role.Key] = role.Version + 1
-	updated := r.roleByKey(role.Key)
 	return &updated, nil
 }
 
@@ -929,7 +922,7 @@ func TestAdminManageUsecase_SetRolesRejectsMissingOrDisabledRole(t *testing.T) {
 	}
 }
 
-func TestAdminManageUsecase_SetRolePermissionsRecordsAudit(t *testing.T) {
+func TestAdminManageUsecase_SetRoleSettingsRecordsOneAggregateAudit(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 	repo.adminsByName["root"] = repo.adminsByID[1]
@@ -942,22 +935,38 @@ func TestAdminManageUsecase_SetRolePermissionsRecordsAudit(t *testing.T) {
 	})
 
 	role := repo.roleByKey(WarehouseRoleKey)
-	updated, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionWarehouseInventoryRead}, role.Version)
+	updated, err := uc.SetRoleSettings(
+		ctx,
+		WarehouseRoleKey,
+		[]string{PermissionWarehouseInventoryRead},
+		[]RoleDataScope{{
+			ResourceType: DataScopeResourceWarehouse,
+			Mode:         DataScopeModeNone,
+		}},
+		RoleNavigationModeCustom,
+		[]string{"/erp/warehouse/inventory"},
+		[]string{"/erp/warehouse/inbound"},
+		role.Version,
+	)
 	if err != nil {
-		t.Fatalf("SetRolePermissions() error = %v", err)
+		t.Fatalf("SetRoleSettings() error = %v", err)
 	}
-	if updated.Version != role.Version+1 {
-		t.Fatalf("role version = %d, want %d", updated.Version, role.Version+1)
+	if updated.Version != role.Version+1 ||
+		updated.NavigationMode != RoleNavigationModeCustom ||
+		!slices.Equal(updated.PrimaryMenuPaths, []string{"/erp/warehouse/inventory"}) ||
+		!slices.Equal(updated.SecondaryMenuPaths, []string{"/erp/warehouse/inbound"}) ||
+		len(updated.DataScopes) != 1 {
+		t.Fatalf("updated aggregate role = %#v", updated)
 	}
 	if len(repo.auditEvents) != 1 {
-		t.Fatalf("expected role permission audit event, got %d", len(repo.auditEvents))
+		t.Fatalf("expected one role settings audit event, got %d", len(repo.auditEvents))
 	}
-	if repo.auditEvents[0].EventKey != "role.permissions.set" {
+	if repo.auditEvents[0].EventKey != "role.settings.set" {
 		t.Fatalf("unexpected audit event key %q", repo.auditEvents[0].EventKey)
 	}
 }
 
-func TestAdminManageUsecase_SetRolePermissionsRejectsUnknownPermission(t *testing.T) {
+func TestAdminManageUsecase_SetRoleSettingsRejectsUnknownPermission(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 	repo.adminsByName["root"] = repo.adminsByID[1]
@@ -967,12 +976,24 @@ func TestAdminManageUsecase_SetRolePermissionsRejectsUnknownPermission(t *testin
 	before := append([]string(nil), repo.roleByKey(WarehouseRoleKey).Permissions...)
 
 	role := repo.roleByKey(WarehouseRoleKey)
-	_, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{
-		PermissionWarehouseInventoryRead,
-		"warehouse.inventory.unsupported_action",
-	}, role.Version)
+	_, err := uc.SetRoleSettings(
+		ctx,
+		WarehouseRoleKey,
+		[]string{
+			PermissionWarehouseInventoryRead,
+			"warehouse.inventory.unsupported_action",
+		},
+		[]RoleDataScope{{
+			ResourceType: DataScopeResourceWarehouse,
+			Mode:         DataScopeModeNone,
+		}},
+		RoleNavigationModeRecommended,
+		nil,
+		nil,
+		role.Version,
+	)
 	if !errors.Is(err, ErrPermissionNotFound) {
-		t.Fatalf("SetRolePermissions() error = %v, want ErrPermissionNotFound", err)
+		t.Fatalf("SetRoleSettings() error = %v, want ErrPermissionNotFound", err)
 	}
 	if got := repo.roleByKey(WarehouseRoleKey).Permissions; !slices.Equal(got, before) {
 		t.Fatalf("unknown permission changed role permissions: got %#v want %#v", got, before)
@@ -1158,24 +1179,55 @@ func TestAdminManageUsecase_DebugRoleAssignmentIsNonProductionOnly(t *testing.T)
 	}
 }
 
-func TestAdminManageUsecase_SetRolePermissionsEnforcesRoleBoundaryAndVersion(t *testing.T) {
+func TestAdminManageUsecase_SetRoleSettingsEnforcesRoleBoundaryAndVersion(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 	repo.adminsByName["root"] = repo.adminsByID[1]
 	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
 	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+	scopes := []RoleDataScope{{
+		ResourceType: DataScopeResourceWarehouse,
+		Mode:         DataScopeModeNone,
+	}}
 
 	adminRole := repo.roleByKey(AdminRoleKey)
-	if _, err := uc.SetRolePermissions(ctx, AdminRoleKey, []string{PermissionWarehouseInventoryRead}, adminRole.Version); !errors.Is(err, ErrSystemRoleImmutable) {
+	if _, err := uc.SetRoleSettings(
+		ctx,
+		AdminRoleKey,
+		[]string{PermissionWarehouseInventoryRead},
+		scopes,
+		RoleNavigationModeRecommended,
+		nil,
+		nil,
+		adminRole.Version,
+	); !errors.Is(err, ErrSystemRoleImmutable) {
 		t.Fatalf("system role mutation error = %v, want ErrSystemRoleImmutable", err)
 	}
 	warehouseRole := repo.roleByKey(WarehouseRoleKey)
 	for _, permissionKey := range []string{PermissionSystemUserRead, PermissionProcessRuntimeRecover} {
-		if _, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{permissionKey}, warehouseRole.Version); !errors.Is(err, ErrPermissionNotDelegable) {
+		if _, err := uc.SetRoleSettings(
+			ctx,
+			WarehouseRoleKey,
+			[]string{permissionKey},
+			scopes,
+			RoleNavigationModeRecommended,
+			nil,
+			nil,
+			warehouseRole.Version,
+		); !errors.Is(err, ErrPermissionNotDelegable) {
 			t.Fatalf("control-plane permission delegation error for %s = %v, want ErrPermissionNotDelegable", permissionKey, err)
 		}
 	}
-	if _, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionWarehouseInventoryRead}, warehouseRole.Version+1); !errors.Is(err, ErrRoleVersionConflict) {
+	if _, err := uc.SetRoleSettings(
+		ctx,
+		WarehouseRoleKey,
+		[]string{PermissionWarehouseInventoryRead},
+		scopes,
+		RoleNavigationModeRecommended,
+		nil,
+		nil,
+		warehouseRole.Version+1,
+	); !errors.Is(err, ErrRoleVersionConflict) {
 		t.Fatalf("stale role version error = %v, want ErrRoleVersionConflict", err)
 	}
 	if len(repo.auditEvents) != 0 {
@@ -1183,7 +1235,7 @@ func TestAdminManageUsecase_SetRolePermissionsEnforcesRoleBoundaryAndVersion(t *
 	}
 }
 
-func TestAdminManageUsecase_SetRolePermissionsRejectsOwnBusinessRole(t *testing.T) {
+func TestAdminManageUsecase_SetRoleSettingsRejectsOwnBusinessRole(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "operator"}
 	repo.applyAdminRoles(repo.adminsByID[1], []string{AdminRoleKey, WarehouseRoleKey})
@@ -1192,10 +1244,17 @@ func TestAdminManageUsecase_SetRolePermissionsRejectsOwnBusinessRole(t *testing.
 	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
 	warehouseRole := repo.roleByKey(WarehouseRoleKey)
 
-	if _, err := uc.SetRolePermissions(
+	if _, err := uc.SetRoleSettings(
 		ctx,
 		WarehouseRoleKey,
 		[]string{PermissionWarehouseInventoryRead, PermissionPurchaseOrderRead},
+		[]RoleDataScope{{
+			ResourceType: DataScopeResourceWarehouse,
+			Mode:         DataScopeModeNone,
+		}},
+		RoleNavigationModeRecommended,
+		nil,
+		nil,
 		warehouseRole.Version,
 	); !errors.Is(err, ErrAdminSelfRolePermissionForbidden) {
 		t.Fatalf("own business role permission change error = %v, want ErrAdminSelfRolePermissionForbidden", err)
@@ -1205,72 +1264,46 @@ func TestAdminManageUsecase_SetRolePermissionsRejectsOwnBusinessRole(t *testing.
 	}
 }
 
-func TestAdminManageUsecase_SetRoleNavigationEnforcesRoleBoundaryAndVersion(t *testing.T) {
+func TestAdminManageUsecase_SetRoleSettingsPersistsBothMenuOrders(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 	repo.adminsByName["root"] = repo.adminsByID[1]
 	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
 	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
 
-	adminRole := repo.roleByKey(AdminRoleKey)
-	if _, err := uc.SetRoleNavigation(
-		ctx,
-		AdminRoleKey,
-		RoleNavigationModeCustom,
-		[]string{"/erp/system/permissions"},
-		adminRole.Version,
-	); !errors.Is(err, ErrSystemRoleImmutable) {
-		t.Fatalf("system role navigation mutation error = %v, want ErrSystemRoleImmutable", err)
-	}
 	financeRole := repo.roleByKey(FinanceRoleKey)
-	if _, err := uc.SetRoleNavigation(
+	updated, err := uc.SetRoleSettings(
 		ctx,
 		FinanceRoleKey,
-		RoleNavigationModeCustom,
-		[]string{"/erp/finance/reconciliation"},
-		financeRole.Version+1,
-	); !errors.Is(err, ErrRoleVersionConflict) {
-		t.Fatalf("stale role navigation version error = %v, want ErrRoleVersionConflict", err)
-	}
-	updated, err := uc.SetRoleNavigation(
-		ctx,
-		FinanceRoleKey,
+		[]string{PermissionFinanceReconciliationRead},
+		[]RoleDataScope{{
+			ResourceType: DataScopeResourceWarehouse,
+			Mode:         DataScopeModeAll,
+		}},
 		RoleNavigationModeCustom,
 		[]string{
 			"/erp/finance/payables",
 			"/erp/finance/reconciliation",
 		},
+		[]string{
+			"/erp/finance/receivables",
+			"/erp/finance/invoices",
+		},
 		financeRole.Version,
 	)
 	if err != nil {
-		t.Fatalf("SetRoleNavigation() error = %v", err)
+		t.Fatalf("SetRoleSettings() error = %v", err)
 	}
 	if updated.NavigationMode != RoleNavigationModeCustom ||
 		!slices.Equal(updated.PrimaryMenuPaths, []string{
 			"/erp/finance/payables",
 			"/erp/finance/reconciliation",
+		}) ||
+		!slices.Equal(updated.SecondaryMenuPaths, []string{
+			"/erp/finance/receivables",
+			"/erp/finance/invoices",
 		}) {
 		t.Fatalf("updated role navigation = %#v", updated)
-	}
-}
-
-func TestAdminManageUsecase_SetRoleNavigationRejectsOwnBusinessRole(t *testing.T) {
-	repo := newStubAdminManageRepo()
-	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "operator"}
-	repo.applyAdminRoles(repo.adminsByID[1], []string{AdminRoleKey, FinanceRoleKey})
-	repo.adminsByName["operator"] = repo.adminsByID[1]
-	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
-	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
-	financeRole := repo.roleByKey(FinanceRoleKey)
-
-	if _, err := uc.SetRoleNavigation(
-		ctx,
-		FinanceRoleKey,
-		RoleNavigationModeCustom,
-		[]string{"/erp/finance/reconciliation"},
-		financeRole.Version,
-	); !errors.Is(err, ErrAdminSelfRolePermissionForbidden) {
-		t.Fatalf("own business role navigation change error = %v, want ErrAdminSelfRolePermissionForbidden", err)
 	}
 }
 

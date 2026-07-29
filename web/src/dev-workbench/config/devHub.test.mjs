@@ -30,9 +30,11 @@ const devPageSources = [
   'DevFlowStateObservatoryPage.jsx',
   'DevDocsPage.jsx',
   'DevTestingPage.jsx',
+  'DevDataPreparationPage.jsx',
   'DevPrototypesPage.jsx',
   'DevCapabilityLedgerPage.jsx',
   'DevCustomerConfigPage.jsx',
+  'DevDatabaseMigrationPage.jsx',
   'DevVersionCenterPage.jsx',
 ].map((fileName) =>
   readFileSync(new URL(`../pages/${fileName}`, import.meta.url), 'utf8')
@@ -70,10 +72,7 @@ test('devHub: every dev route exposes a distinct browser title', () => {
     '质量 · Plush Toy ERP'
   )
   assert.equal(resolveDevPageFavicon('/__dev'), '/favicon-dev.svg')
-  assert.equal(
-    resolveDevPageFavicon('/__dev/testing'),
-    '/favicon-testing.svg'
-  )
+  assert.equal(resolveDevPageFavicon('/__dev/testing'), '/favicon-testing.svg')
   assert.equal(
     resolveDevPageFavicon('/__dev/governance/'),
     '/favicon-governance.svg'
@@ -85,6 +84,22 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   assert.equal(
     resolveDevPageTitle('/__dev/version-center', 'Plush Toy ERP'),
     '版本发布与部署中心 · Plush Toy ERP'
+  )
+  assert.equal(
+    resolveDevPageTitle('/__dev/data-preparation', 'Plush Toy ERP'),
+    '测试数据准备中心 · Plush Toy ERP'
+  )
+  assert.equal(
+    resolveDevPageFavicon('/__dev/data-preparation'),
+    '/favicon-testing.svg'
+  )
+  assert.equal(
+    resolveDevPageTitle('/__dev/database-migration', 'Plush Toy ERP'),
+    '数据库迁移 · Plush Toy ERP'
+  )
+  assert.equal(
+    resolveDevPageFavicon('/__dev/database-migration'),
+    '/favicon-dev.svg'
   )
 })
 
@@ -117,13 +132,18 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     'product-engineering'
   )
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')
+  assert.equal(resolveDevWorkbenchAreaKey('/__dev/data-preparation'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/customer-config'), 'delivery')
+  assert.equal(
+    resolveDevWorkbenchAreaKey('/__dev/database-migration'),
+    'delivery'
+  )
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/version-center'), 'delivery')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/unknown'), '')
 })
 
-test('devHub: nine dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 9)
+test('devHub: eleven dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 11)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -138,9 +158,11 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/status-flows',
       '/__dev/docs',
       '/__dev/testing',
+      '/__dev/data-preparation',
       '/__dev/prototypes',
       '/__dev/capability-ledger',
       '/__dev/customer-config',
+      '/__dev/database-migration',
       '/__dev/version-center',
     ]
   )
@@ -168,17 +190,45 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
   assert.match(customerConfigItem?.title || '', /预检与发布/)
   assert.match(customerConfigItem?.truthSource || '', /已登记客户配置包/)
   assert.doesNotMatch(customerConfigItem?.title || '', /导入/)
+
+  const dataPreparationItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === 'data-preparation'
+  )
+  assert.match(dataPreparationItem?.title || '', /数据准备/)
+  assert.equal(
+    dataPreparationItem?.source,
+    'docs/engineering/研发效能工作台与CI-CD设计.md'
+  )
+  assert.match(dataPreparationItem?.truthSource || '', /Source \/ Fact API/)
+  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /本机系统边界/)
+  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /只向前补齐/)
+  assert.match(dataPreparationItem?.description || '', /业务场景固定批次/)
+  assert.match(dataPreparationItem?.description || '', /长期保留/)
+
+  const databaseMigrationItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === 'database-migration'
+  )
+  assert.match(databaseMigrationItem?.title || '', /数据库迁移/)
+  assert.match(databaseMigrationItem?.truthSource || '', /migration \/ schema/)
+  assert.match(
+    databaseMigrationItem?.guardrails?.join(' ') || '',
+    /No retry when unknown/
+  )
+  assert.match(databaseMigrationItem?.description || '', /无关工作区变化/)
 })
 
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 8)
+  assert.equal(summary.entryCount, 10)
   assert.equal(summary.groupCount, 7)
   assert(summary.guardrailCount >= 10)
   assert.equal(summary.devOnly, true)
-  assert.match(summary.boundary, /no menu/)
-  assert.match(summary.boundary, /no backend business/)
+  assert.match(summary.boundary, /no formal menu/)
+  assert.match(summary.boundary, /not ERP RBAC/)
+  assert.match(summary.boundary, /no formal menu, production build/)
+  assert.match(summary.boundary, /arbitrary target/)
+  assert.doesNotMatch(summary.boundary, /no backend business/)
 })
 
 test('devHub: filters by title, group, source and route', () => {

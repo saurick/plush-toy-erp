@@ -883,7 +883,7 @@ test("yoyoosun customer confirmation separates business decisions from system ev
   );
   assert.match(
     customerDeliveryMatrix,
-    /客户退货、收付款、库存调整和生产异常页面 \/ 权限已进入永绅跟踪 entitlement.*仍未整体进入 133 \/ 生产/u,
+    /客户退货、收付款、库存调整和生产异常处置页面 \/ 权限已进入永绅跟踪 entitlement.*仍未整体进入 133 \/ 生产/u,
   );
   for (const forbiddenTechnicalToken of [
     "workflow.task.approve",

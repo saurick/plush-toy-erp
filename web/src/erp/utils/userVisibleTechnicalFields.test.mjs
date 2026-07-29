@@ -731,27 +731,49 @@ test('权限中心按后端业务元数据收窄角色权限并保留并发冲�
   assert.match(content, /buildAssignableRoleOptions/u)
   assert.match(content, /filterAssignableBusinessPermissions/u)
   assert.match(content, /getRolePermissionReadOnlyReason/u)
-  assert.match(content, /expected_version: nextVersion/u)
+  assert.match(content, /expected_version: expectedVersion/u)
   assert.match(content, /RpcErrorCode\.RESOURCE_VERSION_CONFLICT/u)
   assert.match(content, /当前勾选已保留/u)
   assert.match(content, /刷新并保留当前勾选/u)
   assert.match(content, /roleSaveConflict\?\.roleKey === selectedRoleKey/u)
 })
 
-test('权限中心把岗位权限与常用入口分开管理并串行传递岗位版本', () => {
+test('权限中心以一个版本原子保存岗位权限、数据范围和双列表菜单布局', () => {
   const filePath = join(rootDir, 'pages/PermissionCenterPage.jsx')
   const content = readFileSync(filePath, 'utf8')
 
   assert.match(content, /页面和操作权限决定“能不能用”/u)
   assert.match(content, /系统推荐/u)
-  assert.match(content, /自定义常用/u)
+  assert.match(content, /自定义布局/u)
   assert.match(content, /MAX_ROLE_PRIMARY_LIMIT/u)
-  assert.match(content, /set_role_navigation/u)
+  assert.match(content, /ROLE_NAVIGATION_VIEW_KEYS\.LAYOUT/u)
+  assert.match(content, /label: '菜单布局'/u)
+  assert.match(content, /页面可用范围（\$\{effectiveRolePageCount\}）/u)
+  assert.match(content, /destroyOnHidden=\{false\}/u)
+  assert.match(content, /aria-label="筛选页面可用范围"/u)
+  assert.match(content, /label: `不可进入 \$\{blockedCount\}`/u)
+  assert.match(content, /查看配置版本/u)
+  assert.match(content, /set_role_settings/u)
   assert.match(content, /primary_menu_paths:/u)
+  assert.match(content, /secondary_menu_paths:/u)
   assert.match(content, /roleNavigationDirty/u)
   assert.match(content, /roleConfigurationDirty[\s\S]*roleNavigationDirty/u)
-  assert.match(content, /nextVersion = Number\(dataScopeResult/u)
-  assert.match(content, /nextVersion = Number\(navigationResult/u)
+  assert.match(
+    content,
+    /selectedRoleNavigationDraft\.roleKey === selectedRoleKey/u
+  )
+  assert.match(
+    content,
+    /selectedRoleNavigationDraft\.roleVersion === selectedRoleVersion/u
+  )
+  assert.match(
+    content,
+    /selectedRoleNavigationDraft\.roleVersion === selectedRoleVersion \|\|[\s\S]*roleSaveConflict\?\.roleKey === selectedRoleKey/u
+  )
+  assert.match(content, /nextVersion !== expectedVersion \+ 1/u)
+  assert.doesNotMatch(content, /set_role_permissions/u)
+  assert.doesNotMatch(content, /set_role_data_scopes/u)
+  assert.doesNotMatch(content, /set_role_navigation/u)
   assert.match(content, /岗位设置已更新，相关账号刷新后生效/u)
   assert.doesNotMatch(content, /位置变化会自动获得权限/u)
 })

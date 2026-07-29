@@ -3509,6 +3509,7 @@ var (
 		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "navigation_mode", Type: field.TypeEnum, Enums: []string{"recommended", "custom"}, Default: "recommended"},
 		{Name: "primary_menu_paths", Type: field.TypeJSON, Default: map[string]schema.Expr{"postgres": "'[]'::jsonb", "sqlite3": "'[]'"}},
+		{Name: "secondary_menu_paths", Type: field.TypeJSON, Default: map[string]schema.Expr{"postgres": "'[]'::jsonb", "sqlite3": "'[]'"}},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}

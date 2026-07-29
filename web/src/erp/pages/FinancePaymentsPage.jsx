@@ -1,20 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Alert,
-  Button,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Tabs,
-  Tag,
-} from 'antd'
+import { Alert, Button, Form, Input, Select, Space, Tabs, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
 import {
   cancelFinancePayment,
@@ -22,8 +11,8 @@ import {
   createFinancePayment,
   getFinanceCreditNote,
   getFinancePayment,
+  listAllFinanceFacts,
   listFinanceCreditNotes,
-  listFinanceFacts,
   listFinancePayments,
   reverseFinanceCreditNote,
   reverseFinancePayment,
@@ -40,13 +29,25 @@ import {
 } from '../api/masterDataOrderApi.mjs'
 import {
   BusinessActionTooltip,
+  BusinessDataTable,
+  BusinessOperationPanel,
   BusinessPageLayout,
   PageHeaderCard,
+  SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
+  ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
+  createBusinessTablePagination,
+  getBusinessPaginationParams,
+} from '../utils/businessPagination.mjs'
+import {
+  compactParams,
   formatUnixDateTime,
   hasActionPermission,
   trimOptional,
@@ -58,9 +59,14 @@ import {
   sourceBusinessActionUUID,
 } from '../utils/sourceBusinessAction.mjs'
 import {
+  compareNumeric20Scale6Values,
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
+import {
+  validateFinanceAllocationDraft,
+  validateFinanceCreditDraft,
+} from '../utils/financePaymentAllocation.mjs'
 
 const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
 const CURRENCY_OPTIONS = ['CNY', 'USD', 'HKD'].map((value) => ({
@@ -75,6 +81,27 @@ const PAYMENT_STATUS_META = Object.freeze({
   POSTED: ['已核销', 'green'],
   REVERSED: ['已冲销', 'magenta'],
 })
+const PAYMENT_STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
+  ...Object.entries(PAYMENT_STATUS_META).map(([value, [label]]) => ({
+    value,
+    label,
+  })),
+]
+const PAYMENT_DIRECTION_OPTIONS = [
+  { value: '', label: '全部方向' },
+  { value: 'RECEIPT', label: '收款' },
+  { value: 'DISBURSEMENT', label: '付款' },
+]
+const CREDIT_STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
+  { value: 'POSTED', label: '已红冲' },
+  { value: 'REVERSED', label: '冲销记录' },
+]
+const FINANCE_VIEW_ITEMS = [
+  { key: 'payments', label: '收付款记录' },
+  { key: 'credits', label: '红冲记录' },
+]
 
 function paymentStatus(value) {
   const [label, color] = PAYMENT_STATUS_META[value] || ['状态待核对', 'default']
@@ -115,6 +142,26 @@ export default function FinancePaymentsPage() {
   const [customers, setCustomers] = useState([])
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(false)
+  const [tableLoading, setTableLoading] = useState({
+    payments: false,
+    credits: false,
+  })
+  const [referenceLoading, setReferenceLoading] = useState(false)
+  const [paymentTotal, setPaymentTotal] = useState(0)
+  const [creditTotal, setCreditTotal] = useState(0)
+  const [paymentPagination, setPaymentPagination] = useState({
+    current: 1,
+    pageSize: 20,
+  })
+  const [creditPagination, setCreditPagination] = useState({
+    current: 1,
+    pageSize: 20,
+  })
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('')
+  const [paymentDirectionFilter, setPaymentDirectionFilter] = useState('')
+  const [creditStatusFilter, setCreditStatusFilter] = useState('')
+  const [paymentDetail, setPaymentDetail] = useState(null)
+  const [creditDetail, setCreditDetail] = useState(null)
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [allocationOpen, setAllocationOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -126,7 +173,7 @@ export default function FinancePaymentsPage() {
   const [reverseForm] = Form.useForm()
   const [creditForm] = Form.useForm()
   const attemptsRef = useRef(createSourceBusinessActionAttemptStore())
-  const listSequenceRef = useRef(0)
+  const beginLatestRequest = useLatestRequestCoordinator()
 
   const canCreatePayment = hasActionPermission(
     adminProfile,
@@ -187,49 +234,179 @@ export default function FinancePaymentsPage() {
     [rememberPayment]
   )
 
-  const loadReferences = useCallback(async () => {
-    const sequence = listSequenceRef.current + 1
-    listSequenceRef.current = sequence
-    setLoading(true)
+  const loadPaymentRows = useCallback(async () => {
+    const request = beginLatestRequest('finance-payment-list')
+    setTableLoading((current) => ({ ...current, payments: true }))
     try {
-      const [
-        paymentResult,
-        creditResult,
-        receivables,
-        payables,
-        customerRows,
-        supplierRows,
-      ] = await Promise.all([
-        listFinancePayments({ limit: 200, offset: 0 }),
-        listFinanceCreditNotes({ limit: 200, offset: 0 }),
-        listFinanceFacts({ fact_type: 'RECEIVABLE', limit: 200, offset: 0 }),
-        listFinanceFacts({ fact_type: 'PAYABLE', limit: 200, offset: 0 }),
-        listAllCustomers({ active_only: true }),
-        listAllSuppliers({ active_only: true }),
-      ])
-      if (listSequenceRef.current !== sequence) return
-      setPayments(paymentResult?.payments || [])
-      setCreditNotes(creditResult?.credit_notes || [])
-      setFinanceFacts([
-        ...(receivables?.finance_facts || []),
-        ...(payables?.finance_facts || []),
-      ])
-      setCustomers(
-        Array.isArray(customerRows?.customers) ? customerRows.customers : []
+      const result = await listFinancePayments(
+        compactParams({
+          status: paymentStatusFilter,
+          direction: paymentDirectionFilter,
+          ...getBusinessPaginationParams(paymentPagination),
+        }),
+        { signal: request.signal }
       )
-      setSuppliers(
-        Array.isArray(supplierRows?.suppliers) ? supplierRows.suppliers : []
+      if (!request.isCurrent()) return
+      const nextRows = Array.isArray(result?.payments) ? result.payments : []
+      setPayments(nextRows)
+      setPaymentTotal(Number(result?.total || 0))
+      setCurrentPayment((current) =>
+        current?.id
+          ? nextRows.find((item) => Number(item.id) === Number(current.id)) ||
+            current
+          : null
       )
     } catch (error) {
-      if (listSequenceRef.current !== sequence) return
-      message.error(getActionErrorMessage(error, '加载财务核销资料'))
+      if (!request.isCurrent() || isRpcAbortError(error)) return
+      message.error(getActionErrorMessage(error, '加载收付款记录'))
     } finally {
-      if (listSequenceRef.current === sequence) setLoading(false)
+      if (request.isCurrent()) {
+        setTableLoading((current) => ({ ...current, payments: false }))
+      }
+      request.finish()
     }
-  }, [])
+  }, [
+    beginLatestRequest,
+    paymentDirectionFilter,
+    paymentPagination,
+    paymentStatusFilter,
+  ])
+
+  const loadCreditRows = useCallback(async () => {
+    const request = beginLatestRequest('finance-credit-list')
+    setTableLoading((current) => ({ ...current, credits: true }))
+    try {
+      const result = await listFinanceCreditNotes(
+        compactParams({
+          status: creditStatusFilter,
+          ...getBusinessPaginationParams(creditPagination),
+        }),
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) return
+      const nextRows = Array.isArray(result?.credit_notes)
+        ? result.credit_notes
+        : []
+      setCreditNotes(nextRows)
+      setCreditTotal(Number(result?.total || 0))
+      setCurrentCredit((current) =>
+        current?.id
+          ? nextRows.find((item) => Number(item.id) === Number(current.id)) ||
+            current
+          : null
+      )
+    } catch (error) {
+      if (!request.isCurrent() || isRpcAbortError(error)) return
+      message.error(getActionErrorMessage(error, '加载红冲记录'))
+    } finally {
+      if (request.isCurrent()) {
+        setTableLoading((current) => ({ ...current, credits: false }))
+      }
+      request.finish()
+    }
+  }, [beginLatestRequest, creditPagination, creditStatusFilter])
+
+  const loadPartyReferences = useCallback(async () => {
+    const request = beginLatestRequest('finance-party-references')
+    setReferenceLoading(true)
+    try {
+      const [customerResult, supplierResult] = await Promise.allSettled([
+        listAllCustomers({ active_only: true }, { signal: request.signal }),
+        listAllSuppliers({ active_only: true }, { signal: request.signal }),
+      ])
+      if (!request.isCurrent()) return
+      if (customerResult.status === 'fulfilled') {
+        setCustomers(
+          Array.isArray(customerResult.value?.customers)
+            ? customerResult.value.customers
+            : []
+        )
+      }
+      if (supplierResult.status === 'fulfilled') {
+        setSuppliers(
+          Array.isArray(supplierResult.value?.suppliers)
+            ? supplierResult.value.suppliers
+            : []
+        )
+      }
+      const errorResult = [customerResult, supplierResult].find(
+        (result) =>
+          result.status === 'rejected' && !isRpcAbortError(result.reason)
+      )
+      if (errorResult) {
+        message.warning(
+          getActionErrorMessage(
+            errorResult.reason,
+            '部分客户或供应商资料暂未加载'
+          )
+        )
+      }
+    } finally {
+      if (request.isCurrent()) setReferenceLoading(false)
+      request.finish()
+    }
+  }, [beginLatestRequest])
+
+  const loadFinanceFactReferences = useCallback(
+    async ({ factType, counterpartyID, currency } = {}) => {
+      const request = beginLatestRequest('finance-fact-references')
+      setReferenceLoading(true)
+      const factTypes = factType ? [factType] : ['RECEIVABLE', 'PAYABLE']
+      try {
+        const results = await Promise.all(
+          factTypes.map((currentFactType) =>
+            listAllFinanceFacts(
+              compactParams({
+                fact_type: currentFactType,
+                status: 'POSTED',
+                counterparty_id: counterpartyID,
+              }),
+              { signal: request.signal }
+            )
+          )
+        )
+        if (!request.isCurrent()) return null
+        const rows = results.flatMap((result) =>
+          Array.isArray(result?.finance_facts) ? result.finance_facts : []
+        )
+        const scopedRows = currency
+          ? rows.filter((item) => item?.currency === currency)
+          : rows
+        setFinanceFacts(scopedRows)
+        return scopedRows
+      } catch (error) {
+        if (request.isCurrent() && !isRpcAbortError(error)) {
+          message.error(getActionErrorMessage(error, '加载可核销财务记录'))
+        }
+        return null
+      } finally {
+        if (request.isCurrent()) setReferenceLoading(false)
+        request.finish()
+      }
+    },
+    [beginLatestRequest]
+  )
+
+  const loadReferences = useCallback(
+    () =>
+      Promise.allSettled([
+        loadPaymentRows(),
+        loadCreditRows(),
+        loadPartyReferences(),
+      ]),
+    [loadCreditRows, loadPartyReferences, loadPaymentRows]
+  )
 
   useEffect(() => {
-    loadReferences()
+    loadPaymentRows()
+  }, [loadPaymentRows])
+  useEffect(() => {
+    loadCreditRows()
+  }, [loadCreditRows])
+  useEffect(() => {
+    loadPartyReferences()
+  }, [loadPartyReferences])
+  useEffect(() => {
     if (
       Number.isSafeInteger(linkedFinancePaymentID) &&
       linkedFinancePaymentID > 0
@@ -239,10 +416,7 @@ export default function FinancePaymentsPage() {
       const paymentID = Number(window.sessionStorage.getItem(storageKey) || 0)
       if (paymentID > 0) recoverPayment(paymentID, true)
     }
-    return () => {
-      listSequenceRef.current += 1
-    }
-  }, [linkedFinancePaymentID, loadReferences, recoverPayment, storageKey])
+  }, [linkedFinancePaymentID, recoverPayment, storageKey])
   useEffect(
     () => outletContext?.registerPageRefresh?.(loadReferences),
     [loadReferences, outletContext]
@@ -263,10 +437,13 @@ export default function FinancePaymentsPage() {
     return financeFacts.filter(
       (fact) =>
         fact.fact_type === factType &&
-        ['POSTED', 'SETTLED'].includes(fact.status) &&
+        fact.status === 'POSTED' &&
         Number(fact.counterparty_id || 0) ===
           Number(currentPayment.counterparty_id || 0) &&
-        fact.currency === currentPayment.currency
+        fact.currency === currentPayment.currency &&
+        isPositiveNumeric20Scale6Units(
+          numeric20Scale6Units(fact.outstanding_amount)
+        )
     )
   }, [currentPayment, financeFacts])
 
@@ -384,7 +561,15 @@ export default function FinancePaymentsPage() {
     }
   }
 
-  const openAllocation = () => {
+  const openAllocation = async () => {
+    if (!currentPayment) return
+    const rows = await loadFinanceFactReferences({
+      factType:
+        currentPayment.direction === 'RECEIPT' ? 'RECEIVABLE' : 'PAYABLE',
+      counterpartyID: Number(currentPayment.counterparty_id || 0),
+      currency: currentPayment.currency,
+    })
+    if (rows === null) return
     setAllocationOpen(true)
   }
   const initializeAllocationForm = (visible) => {
@@ -393,7 +578,10 @@ export default function FinancePaymentsPage() {
     allocationForm.setFieldsValue({
       allocations: allocationCandidates.map((fact) => ({
         finance_fact_id: fact.id,
-        label: `${fact.fact_no || '财务记录'} / ${fact.amount || '-'} ${fact.currency || ''}`,
+        label: `${fact.fact_no || '财务记录'} / 未核销 ${
+          fact.outstanding_amount || '0'
+        } / 原金额 ${fact.amount || '-'} ${fact.currency || ''}`,
+        outstanding_amount: fact.outstanding_amount,
         amount: '',
       })),
     })
@@ -482,8 +670,33 @@ export default function FinancePaymentsPage() {
         finance_fact_id: Number(item.finance_fact_id),
         amount: String(item.amount).trim(),
       }))
-    if (allocations.length === 0) {
+    const allocationCheck = validateFinanceAllocationDraft({
+      allocations,
+      candidates: allocationCandidates,
+      paymentAmount: currentPayment?.amount,
+    })
+    if (allocationCheck.reason === 'EMPTY') {
       message.warning('请至少填写一笔核销金额')
+      return
+    }
+    if (allocationCheck.reason === 'SOURCE_CHANGED') {
+      message.error('核销来源或未核销金额已变化，请重新打开核销窗口')
+      return
+    }
+    if (allocationCheck.reason === 'EXCEEDS_OUTSTANDING') {
+      message.warning(
+        `${
+          allocationCheck.financeFactNo || '财务记录'
+        }的本次核销金额超过未核销金额`
+      )
+      return
+    }
+    if (allocationCheck.reason === 'TOTAL_MISMATCH') {
+      message.warning(
+        `核销合计 ${allocationCheck.total || '0'} 必须等于本次收付款金额 ${
+          currentPayment?.amount || '-'
+        }`
+      )
       return
     }
     setLoading(true)
@@ -595,6 +808,20 @@ export default function FinancePaymentsPage() {
           amount: String(values.amount).trim(),
           reason: trimOptional(values.reason),
         }
+    if (!reverse) {
+      const creditCheck = validateFinanceCreditDraft({
+        amount: payload.amount,
+        outstandingAmount: source?.outstanding_amount,
+      })
+      if (!source || creditCheck.reason === 'SOURCE_CHANGED') {
+        message.error('来源应收或应付的未核销金额无法确认，请重新选择')
+        return
+      }
+      if (creditCheck.reason === 'EXCEEDS_OUTSTANDING') {
+        message.warning('红冲金额不能超过来源记录的当前未核销金额')
+        return
+      }
+    }
     const scope = `${reverse ? 'reverse-credit' : 'credit'}:${
       reverse ? currentCredit.id : payload.finance_fact_id
     }`
@@ -608,7 +835,7 @@ export default function FinancePaymentsPage() {
         !reverse &&
         Number(credit?.finance_fact_id) === Number(payload.finance_fact_id) &&
         credit?.status === 'POSTED' &&
-        Number(credit?.amount) === Number(payload.amount)
+        compareNumeric20Scale6Values(credit?.amount, payload.amount) === 0
       const validReverse =
         reverse &&
         Number(credit?.reversal_of_credit_note_id) ===
@@ -665,7 +892,11 @@ export default function FinancePaymentsPage() {
     }
   }
 
-  const openCredit = (reverse = false) => {
+  const openCredit = async (reverse = false) => {
+    if (!reverse) {
+      const rows = await loadFinanceFactReferences()
+      if (rows === null) return
+    }
     creditForm.resetFields()
     creditForm.setFieldsValue({
       credit_note_no: sourceBusinessActionNo(
@@ -692,6 +923,15 @@ export default function FinancePaymentsPage() {
       title: '往来方',
       key: 'counterparty',
       width: 200,
+      detailValue: (record) => {
+        const source =
+          record.counterparty_type === 'CUSTOMER' ? customers : suppliers
+        return (
+          source.find(
+            (item) => Number(item.id) === Number(record.counterparty_id)
+          )?.name || '往来方已关联'
+        )
+      },
       render: (_, record) => {
         const source =
           record.counterparty_type === 'CUSTOMER' ? customers : suppliers
@@ -703,6 +943,12 @@ export default function FinancePaymentsPage() {
       },
     },
     { title: '状态', dataIndex: 'status', width: 110, render: paymentStatus },
+    {
+      title: '核销明细',
+      dataIndex: 'allocations',
+      width: 110,
+      render: (items) => `${Array.isArray(items) ? items.length : 0} 笔`,
+    },
     { title: '账户摘要', dataIndex: 'account_ref', width: 200 },
     { title: '业务凭据', dataIndex: 'evidence_ref', width: 200 },
     {
@@ -712,6 +958,77 @@ export default function FinancePaymentsPage() {
       render: formatUnixDateTime,
     },
   ]
+  const creditColumns = [
+    { title: '红冲单号', dataIndex: 'credit_note_no', width: 200 },
+    {
+      title: '来源财务记录',
+      dataIndex: 'finance_fact_no',
+      width: 190,
+      render: (value) => value || '已关联财务记录',
+    },
+    {
+      title: '来源类型',
+      dataIndex: 'finance_fact_type',
+      width: 110,
+      render: (value) => (value === 'RECEIVABLE' ? '应收' : '应付'),
+    },
+    { title: '红冲金额', dataIndex: 'amount', width: 140 },
+    { title: '币种', dataIndex: 'currency', width: 90 },
+    {
+      title: '来源原金额',
+      dataIndex: 'finance_fact_original_amount',
+      width: 140,
+    },
+    {
+      title: '红冲后未核销',
+      dataIndex: 'finance_fact_outstanding_amount',
+      width: 150,
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 110,
+      render: (value) => (
+        <Tag color={value === 'REVERSED' ? 'magenta' : 'gold'}>
+          {value === 'REVERSED' ? '冲销记录' : '已红冲'}
+        </Tag>
+      ),
+    },
+    { title: '原因', dataIndex: 'reason', width: 260 },
+  ]
+  const paymentDetailLineItems = {
+    title: '核销明细',
+    items: Array.isArray(paymentDetail?.allocations)
+      ? paymentDetail.allocations
+      : [],
+    emptyDescription: '当前收付款尚未形成核销明细',
+    getItemKey: (item) => item?.id,
+    getItemLabel: (item, { index }) =>
+      item?.finance_fact_no || `核销明细 ${index + 1}`,
+    getItemSummary: (item) => `${item?.amount || '-'} ${item?.currency || ''}`,
+    getItemFields: (item) => [
+      {
+        key: 'type',
+        label: '来源类型',
+        value: item?.finance_fact_type === 'RECEIVABLE' ? '应收' : '应付',
+      },
+      {
+        key: 'original',
+        label: '来源原金额',
+        value: item?.finance_fact_original_amount || '-',
+      },
+      {
+        key: 'outstanding',
+        label: '当前未核销',
+        value: item?.finance_fact_outstanding_amount ?? '-',
+      },
+      {
+        key: 'status',
+        label: '核销状态',
+        value: item?.status === 'REVERSED' ? '已冲销' : '已过账',
+      },
+    ],
+  }
   const currentCreditHasReversal =
     Boolean(currentCredit?.id) &&
     creditNotes.some(
@@ -723,6 +1040,13 @@ export default function FinancePaymentsPage() {
     currentCredit.status === 'POSTED' &&
     !currentCredit.reversal_of_credit_note_id &&
     !currentCreditHasReversal
+  const financeViewTabs = (
+    <Tabs
+      activeKey={activeTab}
+      items={FINANCE_VIEW_ITEMS}
+      onChange={setActiveTab}
+    />
+  )
 
   return (
     <BusinessPageLayout className="erp-finance-payments-page">
@@ -741,329 +1065,383 @@ export default function FinancePaymentsPage() {
             冲销 / 红冲
           </Tag>,
         ]}
-      />
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={[
-          { key: 'payments', label: '收付款与核销' },
-          { key: 'credits', label: '红冲处理' },
+        stats={[
+          {
+            key: 'total',
+            label: activeTab === 'payments' ? '收付款记录' : '红冲记录',
+            value: activeTab === 'payments' ? paymentTotal : creditTotal,
+          },
+          {
+            key: 'page',
+            label: '本页显示',
+            value:
+              activeTab === 'payments' ? payments.length : creditNotes.length,
+          },
         ]}
       />
       {activeTab === 'payments' ? (
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <Space wrap>
-            {canCreatePayment ? (
-              <Button type="primary" onClick={openPayment}>
-                登记收付款
-              </Button>
-            ) : null}
-            <Button onClick={loadReferences} loading={loading}>
-              刷新核销资料
-            </Button>
-          </Space>
-          {currentPayment ? (
-            <Alert
-              type="info"
-              showIcon
-              message={`最近收付款：${currentPayment.payment_no || '已登记'} / ${
-                PAYMENT_STATUS_META[currentPayment.status]?.[0] || '状态待核对'
-              }`}
-              description={`金额 ${currentPayment.amount || '-'} ${currentPayment.currency || ''}；已关联 ${currentPayment.allocations?.length || 0} 笔核销。`}
-            />
-          ) : (
-            <Empty description="尚未登记或恢复收付款记录" />
-          )}
-          <SelectionActionBar
-            selectedCount={currentPayment ? 1 : 0}
-            selectedLabel={
-              currentPayment
-                ? `${currentPayment.payment_no || '收付款已登记'} / ${
-                    PAYMENT_STATUS_META[currentPayment.status]?.[0] ||
-                    '状态待核对'
-                  }`
-                : '请选择一条收付款记录'
+        <>
+          <BusinessOperationPanel
+            compact
+            filters={
+              <Space wrap>
+                <SelectFilter
+                  className="erp-business-filter-control--status"
+                  value={paymentStatusFilter}
+                  options={PAYMENT_STATUS_OPTIONS}
+                  onChange={(value) => {
+                    setPaymentStatusFilter(value || '')
+                    setPaymentPagination((current) => ({
+                      ...current,
+                      current: 1,
+                    }))
+                  }}
+                />
+                <SelectFilter
+                  className="erp-business-filter-control--status"
+                  value={paymentDirectionFilter}
+                  options={PAYMENT_DIRECTION_OPTIONS}
+                  onChange={(value) => {
+                    setPaymentDirectionFilter(value || '')
+                    setPaymentPagination((current) => ({
+                      ...current,
+                      current: 1,
+                    }))
+                  }}
+                />
+              </Space>
+            }
+            primaryAction={
+              canCreatePayment ? (
+                <ToolbarButton
+                  type="primary"
+                  className="erp-business-list-toolbar__primary-action"
+                  onClick={openPayment}
+                >
+                  登记收付款
+                </ToolbarButton>
+              ) : null
             }
           >
-            <SelectionClearAction
+            <SelectionActionBar
+              embedded
               selectedCount={currentPayment ? 1 : 0}
-              selectionLabel="收付款记录"
-              onClear={clearPaymentSelection}
-            />
-            {canPostPayment &&
-            (!currentPayment || currentPayment.status === 'APPROVED') ? (
+              selectedLabel={
+                currentPayment
+                  ? `${currentPayment.payment_no || '收付款已登记'} / ${
+                      PAYMENT_STATUS_META[currentPayment.status]?.[0] ||
+                      '状态待核对'
+                    }`
+                  : '请选择一条收付款记录'
+              }
+              boundaryText="审批仅确认收付款来源；过账时按同一往来方、方向和币种精确核销，已过账记录只能冲销。"
+            >
+              <SelectionClearAction
+                selectedCount={currentPayment ? 1 : 0}
+                selectionLabel="收付款记录"
+                onClear={clearPaymentSelection}
+              />
               <BusinessActionTooltip
-                disabled={
-                  !currentPayment ||
-                  currentPayment.status !== 'APPROVED' ||
-                  loading
-                }
-                disabledReason={
-                  !currentPayment
-                    ? '请先选择一条收付款记录'
-                    : currentPayment.status !== 'APPROVED'
-                      ? '只有审批通过的收付款可以办理核销'
-                      : loading
-                        ? '核销资料加载完成后可继续'
-                        : ''
-                }
+                disabled={!currentPayment}
+                disabledReason="请先选择一条收付款记录"
               >
                 <Button
-                  type="primary"
-                  className="erp-business-module-status-action"
+                  disabled={!currentPayment}
+                  onClick={() => setPaymentDetail(currentPayment)}
+                >
+                  查看详情
+                </Button>
+              </BusinessActionTooltip>
+              {canPostPayment &&
+              (!currentPayment || currentPayment.status === 'APPROVED') ? (
+                <BusinessActionTooltip
                   disabled={
                     !currentPayment ||
                     currentPayment.status !== 'APPROVED' ||
-                    loading
+                    loading ||
+                    referenceLoading
                   }
-                  onClick={openAllocation}
+                  disabledReason={
+                    !currentPayment
+                      ? '请先选择一条收付款记录'
+                      : currentPayment.status !== 'APPROVED'
+                        ? '只有审批通过的收付款可以办理核销'
+                        : '核销资料加载完成后可继续'
+                  }
                 >
-                  选择应收 / 应付核销
-                </Button>
-              </BusinessActionTooltip>
-            ) : null}
-            {canCreatePayment &&
-            (!currentPayment || currentPayment.status === 'DRAFT') ? (
-              <BusinessActionTooltip
-                disabled={
-                  !currentPayment ||
-                  currentPayment.status !== 'DRAFT' ||
-                  loading
-                }
-                disabledReason={
-                  !currentPayment
-                    ? '请先选择一条收付款记录'
-                    : currentPayment.status !== 'DRAFT'
-                      ? '只有待审批收付款可以核对审批流'
-                      : loading
-                        ? '当前操作完成后可核对审批流'
-                        : ''
-                }
-              >
-                <Button
+                  <Button
+                    type="primary"
+                    className="erp-business-module-status-action"
+                    disabled={
+                      !currentPayment ||
+                      currentPayment.status !== 'APPROVED' ||
+                      loading ||
+                      referenceLoading
+                    }
+                    onClick={openAllocation}
+                  >
+                    选择应收 / 应付核销
+                  </Button>
+                </BusinessActionTooltip>
+              ) : null}
+              {canCreatePayment &&
+              (!currentPayment || currentPayment.status === 'DRAFT') ? (
+                <BusinessActionTooltip
                   disabled={
                     !currentPayment ||
                     currentPayment.status !== 'DRAFT' ||
                     loading
                   }
-                  onClick={ensurePaymentApprovalProcess}
+                  disabledReason={
+                    !currentPayment
+                      ? '请先选择一条收付款记录'
+                      : currentPayment.status !== 'DRAFT'
+                        ? '只有待审批收付款可以核对审批流'
+                        : '当前操作完成后可核对审批流'
+                  }
                 >
-                  核对审批流
-                </Button>
-              </BusinessActionTooltip>
-            ) : null}
-            {canCancelPayment &&
-            (!currentPayment ||
-              ['DRAFT', 'APPROVED'].includes(currentPayment.status)) ? (
-                <BusinessActionTooltip
-                  disabled={
+                  <Button
+                    disabled={
+                      !currentPayment ||
+                      currentPayment.status !== 'DRAFT' ||
+                      loading
+                    }
+                    onClick={ensurePaymentApprovalProcess}
+                  >
+                    核对审批流
+                  </Button>
+                </BusinessActionTooltip>
+              ) : null}
+              {canCancelPayment &&
+              (!currentPayment ||
+                ['DRAFT', 'APPROVED'].includes(currentPayment.status)) ? (
+                  <BusinessActionTooltip
+                    disabled={
                     !currentPayment ||
                     !['DRAFT', 'APPROVED'].includes(currentPayment.status) ||
                     loading
                   }
-                  disabledReason={
+                    disabledReason={
                     !currentPayment
                       ? '请先选择一条收付款记录'
-                      : !['DRAFT', 'APPROVED'].includes(currentPayment.status)
-                        ? '只有尚未过账的收付款可以核对取消'
-                        : loading
-                          ? '当前操作完成后可核对取消'
-                          : ''
+                      : '只有尚未过账的收付款可以核对取消'
                   }
-                >
-                  <Button
-                    danger
-                    disabled={
+                  >
+                    <Button
+                      danger
+                      disabled={
                       !currentPayment ||
                       !['DRAFT', 'APPROVED'].includes(currentPayment.status) ||
                       loading
                     }
-                    onClick={openCancel}
-                  >
-                    核对并取消
-                  </Button>
-                </BusinessActionTooltip>
-            ) : null}
-            {canReversePayment &&
-            (!currentPayment || currentPayment.status === 'POSTED') ? (
-              <BusinessActionTooltip
-                disabled={
-                  !currentPayment ||
-                  currentPayment.status !== 'POSTED' ||
-                  loading
-                }
-                disabledReason={
-                  !currentPayment
-                    ? '请先选择一条收付款记录'
-                    : currentPayment.status !== 'POSTED'
-                      ? '只有已核销收付款可以冲销'
-                      : loading
-                        ? '当前操作完成后可冲销'
-                        : ''
-                }
-              >
-                <Button
-                  danger
-                  className="erp-business-module-status-action"
+                      onClick={openCancel}
+                    >
+                      核对并取消
+                    </Button>
+                  </BusinessActionTooltip>
+              ) : null}
+              {canReversePayment &&
+              (!currentPayment || currentPayment.status === 'POSTED') ? (
+                <BusinessActionTooltip
                   disabled={
                     !currentPayment ||
                     currentPayment.status !== 'POSTED' ||
                     loading
                   }
-                  onClick={() => {
-                    reverseForm.resetFields()
-                    setReverseOpen(true)
-                  }}
+                  disabledReason={
+                    !currentPayment
+                      ? '请先选择一条收付款记录'
+                      : '只有已核销收付款可以冲销'
+                  }
                 >
-                  冲销收付款
+                  <Button
+                    danger
+                    className="erp-business-module-status-action"
+                    disabled={
+                      !currentPayment ||
+                      currentPayment.status !== 'POSTED' ||
+                      loading
+                    }
+                    onClick={() => {
+                      reverseForm.resetFields()
+                      setReverseOpen(true)
+                    }}
+                  >
+                    冲销收付款
+                  </Button>
+                </BusinessActionTooltip>
+              ) : null}
+              <ExceptionProcessRecoveryButton
+                canRecover={canRecoverProcess}
+                disabled={!currentPayment || loading}
+                loadProcess={() =>
+                  getFinancePaymentApprovalProcess({
+                    ...(customerKey ? { customer_key: customerKey } : {}),
+                    finance_payment_id: currentPayment.id,
+                  })
+                }
+                onRecovered={async () => {
+                  await recoverPayment(currentPayment.id)
+                  await loadReferences()
+                }}
+              />
+              <BusinessActionTooltip
+                disabled={!currentPayment || loading}
+                disabledReason="请先选择一条收付款记录"
+              >
+                <Button
+                  disabled={!currentPayment || loading}
+                  onClick={() => recoverPayment(currentPayment?.id)}
+                >
+                  重新读取
                 </Button>
               </BusinessActionTooltip>
-            ) : null}
-            <ExceptionProcessRecoveryButton
-              canRecover={canRecoverProcess}
-              disabled={!currentPayment || loading}
-              loadProcess={() =>
-                getFinancePaymentApprovalProcess({
-                  ...(customerKey ? { customer_key: customerKey } : {}),
-                  finance_payment_id: currentPayment.id,
-                })
-              }
-              onRecovered={async () => {
-                await recoverPayment(currentPayment.id)
-                await loadReferences()
-              }}
-            />
-            <BusinessActionTooltip
-              disabled={!currentPayment || loading}
-              disabledReason={
-                !currentPayment
-                  ? '请先选择一条收付款记录'
-                  : '当前资料读取完成后可重新读取'
-              }
-            >
-              <Button
-                disabled={!currentPayment || loading}
-                onClick={() => recoverPayment(currentPayment?.id)}
-              >
-                重新读取
-              </Button>
-            </BusinessActionTooltip>
-          </SelectionActionBar>
-          <Table
+            </SelectionActionBar>
+          </BusinessOperationPanel>
+          <BusinessDataTable
+            tableHeader={financeViewTabs}
             rowKey="id"
+            loading={tableLoading.payments}
             columns={paymentColumns}
             dataSource={payments}
-            pagination={false}
-            scroll={{ x: 1200 }}
+            pagination={createBusinessTablePagination({
+              pagination: paymentPagination,
+              total: paymentTotal,
+              onChange: (current, pageSize) =>
+                setPaymentPagination({ current, pageSize }),
+            })}
+            scroll={{ x: 1450 }}
             rowSelection={{
               type: 'radio',
               selectedRowKeys: currentPayment?.id ? [currentPayment.id] : [],
               onChange: (_, rows) => rememberPayment(rows[0] || null),
             }}
-            locale={{ emptyText: '暂无收付款记录' }}
+            onRow={(record) => ({
+              onClick: () => rememberPayment(record),
+            })}
+            onOpenRecord={(record) => setPaymentDetail(record)}
+            emptyDescription="暂无收付款记录"
           />
-        </Space>
+        </>
       ) : (
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <Space wrap>
-            {canCreateCredit ? (
-              <Button type="primary" onClick={() => openCredit(false)}>
-                登记红冲
-              </Button>
-            ) : null}
-          </Space>
-          <Alert
-            type="warning"
-            showIcon
-            message="红冲只针对已过账或已结清的应收、应付业务记录；不会删除原记录，也不替代总账凭证或税控处理。"
-          />
-          <SelectionActionBar
-            selectedCount={currentCredit ? 1 : 0}
-            selectedLabel={
-              currentCredit
-                ? `${currentCredit.credit_note_no || '红冲已登记'} / ${
-                    currentCredit.status === 'REVERSED' ? '冲销记录' : '已红冲'
-                  }`
-                : '请选择一条红冲记录'
+        <>
+          <BusinessOperationPanel
+            compact
+            filters={
+              <SelectFilter
+                className="erp-business-filter-control--status"
+                value={creditStatusFilter}
+                options={CREDIT_STATUS_OPTIONS}
+                onChange={(value) => {
+                  setCreditStatusFilter(value || '')
+                  setCreditPagination((current) => ({
+                    ...current,
+                    current: 1,
+                  }))
+                }}
+              />
+            }
+            primaryAction={
+              canCreateCredit ? (
+                <ToolbarButton
+                  type="primary"
+                  className="erp-business-list-toolbar__primary-action"
+                  loading={referenceLoading}
+                  onClick={() => openCredit(false)}
+                >
+                  登记红冲
+                </ToolbarButton>
+              ) : null
             }
           >
-            <SelectionClearAction
+            <SelectionActionBar
+              embedded
               selectedCount={currentCredit ? 1 : 0}
-              selectionLabel="红冲记录"
-              onClear={() => setCurrentCredit(null)}
-            />
-            {canReverseCredit && (!currentCredit || currentCreditCanReverse) ? (
+              selectedLabel={
+                currentCredit
+                  ? `${currentCredit.credit_note_no || '红冲已登记'} / ${
+                      currentCredit.status === 'REVERSED'
+                        ? '冲销记录'
+                        : '已红冲'
+                    }`
+                  : '请选择一条红冲记录'
+              }
+              boundaryText="红冲只调整应收、应付未核销金额并保留独立审计；不删除原记录，也不替代总账凭证或税控处理。"
+            >
+              <SelectionClearAction
+                selectedCount={currentCredit ? 1 : 0}
+                selectionLabel="红冲记录"
+                onClear={() => setCurrentCredit(null)}
+              />
               <BusinessActionTooltip
-                disabled={!currentCreditCanReverse || loading}
-                disabledReason={
-                  !currentCredit
-                    ? '请先选择一条红冲记录'
-                    : currentCredit.reversal_of_credit_note_id
-                      ? '冲销记录不能再次冲销'
-                      : currentCredit.status !== 'POSTED'
-                        ? '只有已红冲记录可以冲销'
-                        : currentCreditHasReversal
-                          ? '当前红冲记录已经完成冲销'
-                          : loading
-                            ? '当前操作完成后可冲销'
-                            : ''
-                }
+                disabled={!currentCredit}
+                disabledReason="请先选择一条红冲记录"
               >
                 <Button
-                  danger
-                  className="erp-business-module-status-action"
-                  disabled={!currentCreditCanReverse || loading}
-                  onClick={() => openCredit(true)}
+                  disabled={!currentCredit}
+                  onClick={() => setCreditDetail(currentCredit)}
                 >
-                  冲销当前红冲
+                  查看详情
                 </Button>
               </BusinessActionTooltip>
-            ) : null}
-            <BusinessActionTooltip
-              disabled={loading}
-              disabledReason="当前资料读取完成后可刷新"
-            >
-              <Button disabled={loading} onClick={loadReferences}>
-                重新读取
-              </Button>
-            </BusinessActionTooltip>
-          </SelectionActionBar>
-          <Table
+              {canReverseCredit &&
+              (!currentCredit || currentCreditCanReverse) ? (
+                <BusinessActionTooltip
+                  disabled={!currentCreditCanReverse || loading}
+                  disabledReason={
+                    !currentCredit
+                      ? '请先选择一条红冲记录'
+                      : currentCredit.reversal_of_credit_note_id
+                        ? '冲销记录不能再次冲销'
+                        : currentCredit.status !== 'POSTED'
+                          ? '只有已红冲记录可以冲销'
+                          : currentCreditHasReversal
+                            ? '当前红冲记录已经完成冲销'
+                            : '当前操作完成后可冲销'
+                  }
+                >
+                  <Button
+                    danger
+                    className="erp-business-module-status-action"
+                    disabled={!currentCreditCanReverse || loading}
+                    onClick={() => openCredit(true)}
+                  >
+                    冲销当前红冲
+                  </Button>
+                </BusinessActionTooltip>
+              ) : null}
+            </SelectionActionBar>
+          </BusinessOperationPanel>
+          <BusinessDataTable
+            tableHeader={financeViewTabs}
             rowKey="id"
-            pagination={false}
+            loading={tableLoading.credits}
             dataSource={creditNotes}
+            columns={creditColumns}
+            pagination={createBusinessTablePagination({
+              pagination: creditPagination,
+              total: creditTotal,
+              onChange: (current, pageSize) =>
+                setCreditPagination({ current, pageSize }),
+            })}
             rowSelection={{
               type: 'radio',
               selectedRowKeys: currentCredit?.id ? [currentCredit.id] : [],
               onChange: (_, rows) => setCurrentCredit(rows[0] || null),
             }}
-            locale={{ emptyText: '暂无红冲记录' }}
-            columns={[
-              { title: '红冲单号', dataIndex: 'credit_note_no' },
-              {
-                title: '来源财务记录',
-                dataIndex: 'finance_fact_id',
-                render: (value) =>
-                  financeFacts.find((fact) => Number(fact.id) === Number(value))
-                    ?.fact_no || '已关联财务记录',
-              },
-              { title: '金额', dataIndex: 'amount' },
-              { title: '币种', dataIndex: 'currency' },
-              {
-                title: '状态',
-                dataIndex: 'status',
-                render: (value) => (
-                  <Tag>{value === 'REVERSED' ? '冲销记录' : '已红冲'}</Tag>
-                ),
-              },
-              { title: '原因', dataIndex: 'reason' },
-            ]}
+            onRow={(record) => ({
+              onClick: () => setCurrentCredit(record),
+            })}
+            onOpenRecord={(record) => setCreditDetail(record)}
+            scroll={{ x: 1450 }}
+            emptyDescription="暂无红冲记录"
           />
-        </Space>
+        </>
       )}
 
-      <Modal
+      <BusinessFormModal
         title="登记收付款"
+        description="登记实际发生的收款或付款；创建后须完成审批，过账时再选择应收或应付核销。"
         open={paymentOpen}
         width={760}
         okText="创建收付款记录"
@@ -1074,6 +1452,7 @@ export default function FinancePaymentsPage() {
       >
         <Form
           form={paymentForm}
+          className="erp-business-action-form"
           layout="vertical"
           preserve={false}
           disabled={loading}
@@ -1101,6 +1480,7 @@ export default function FinancePaymentsPage() {
             <Select
               showSearch
               optionFilterProp="label"
+              loading={referenceLoading}
               options={partyOptions}
             />
           </Form.Item>
@@ -1163,15 +1543,18 @@ export default function FinancePaymentsPage() {
             <Input maxLength={255} />
           </Form.Item>
         </Form>
-      </Modal>
+      </BusinessFormModal>
 
-      <Modal
+      <BusinessFormModal
+        className="erp-business-action-modal--operational-fact"
         title="选择核销记录"
+        description="本次核销合计必须精确等于收付款金额，且每笔不得超过来源记录的当前未核销金额。"
         open={allocationOpen}
         width={860}
         okText="过账并核销"
         cancelText="取消"
         confirmLoading={loading}
+        okButtonProps={{ disabled: allocationCandidates.length === 0 }}
         afterOpenChange={initializeAllocationForm}
         onCancel={() => !loading && setAllocationOpen(false)}
         onOk={postPayment}
@@ -1181,8 +1564,16 @@ export default function FinancePaymentsPage() {
           showIcon
           message="仅显示与当前收付款方向、往来方和币种一致的已过账应收或应付；实际可核销余额由系统再次校验。"
         />
+        {allocationCandidates.length === 0 ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="当前没有可核销的应收或应付记录"
+          />
+        ) : null}
         <Form
           form={allocationForm}
+          className="erp-business-action-form"
           layout="vertical"
           disabled={loading}
         >
@@ -1223,10 +1614,11 @@ export default function FinancePaymentsPage() {
             )}
           </Form.List>
         </Form>
-      </Modal>
+      </BusinessFormModal>
 
-      <Modal
+      <BusinessFormModal
         title="取消收付款"
+        description="取消不会删除收付款记录；已发生的流程效果仍保留恢复审计。"
         open={cancelOpen}
         okText="确认取消"
         cancelText="返回"
@@ -1242,6 +1634,7 @@ export default function FinancePaymentsPage() {
         />
         <Form
           form={cancelForm}
+          className="erp-business-action-form"
           layout="vertical"
           preserve={false}
           style={{ marginTop: 16 }}
@@ -1256,10 +1649,11 @@ export default function FinancePaymentsPage() {
             <Input.TextArea rows={3} maxLength={255} showCount />
           </Form.Item>
         </Form>
-      </Modal>
+      </BusinessFormModal>
 
-      <Modal
+      <BusinessFormModal
         title="冲销收付款"
+        description="冲销会恢复原核销金额并保留原收付款及核销记录。"
         open={reverseOpen}
         okText="确认冲销"
         cancelText="返回"
@@ -1268,7 +1662,12 @@ export default function FinancePaymentsPage() {
         onCancel={() => !loading && setReverseOpen(false)}
         onOk={reversePayment}
       >
-        <Form form={reverseForm} layout="vertical" preserve={false}>
+        <Form
+          form={reverseForm}
+          className="erp-business-action-form"
+          layout="vertical"
+          preserve={false}
+        >
           <Form.Item
             name="reason"
             label="冲销原因"
@@ -1279,10 +1678,15 @@ export default function FinancePaymentsPage() {
             <Input.TextArea rows={3} maxLength={255} showCount />
           </Form.Item>
         </Form>
-      </Modal>
+      </BusinessFormModal>
 
-      <Modal
+      <BusinessFormModal
         title={creditOpen === 'reverse' ? '冲销红冲记录' : '登记红冲'}
+        description={
+          creditOpen === 'reverse'
+            ? '冲销会恢复该红冲对未核销金额的影响。'
+            : '红冲金额不得超过来源应收或应付的当前未核销金额。'
+        }
         open={Boolean(creditOpen)}
         width={720}
         okText={creditOpen === 'reverse' ? '确认冲销' : '确认红冲'}
@@ -1293,6 +1697,7 @@ export default function FinancePaymentsPage() {
       >
         <Form
           form={creditForm}
+          className="erp-business-action-form"
           layout="vertical"
           preserve={false}
           disabled={loading}
@@ -1306,11 +1711,20 @@ export default function FinancePaymentsPage() {
               <Select
                 showSearch
                 optionFilterProp="label"
+                loading={referenceLoading}
                 options={financeFacts
-                  .filter((fact) => ['POSTED', 'SETTLED'].includes(fact.status))
+                  .filter(
+                    (fact) =>
+                      fact.status === 'POSTED' &&
+                      isPositiveNumeric20Scale6Units(
+                        numeric20Scale6Units(fact.outstanding_amount)
+                      )
+                  )
                   .map((fact) => ({
                     value: fact.id,
-                    label: `${fact.fact_no || '财务记录'} / ${fact.amount || '-'} ${fact.currency || ''}`,
+                    label: `${fact.fact_no || '财务记录'} / 未核销 ${
+                      fact.outstanding_amount || '0'
+                    } / 原金额 ${fact.amount || '-'} ${fact.currency || ''}`,
                   }))}
               />
             </Form.Item>
@@ -1351,7 +1765,24 @@ export default function FinancePaymentsPage() {
             <Input.TextArea rows={3} maxLength={255} showCount />
           </Form.Item>
         </Form>
-      </Modal>
+      </BusinessFormModal>
+      <BusinessRecordDetailsModal
+        open={Boolean(paymentDetail)}
+        title="收付款详情"
+        description="收付款来源、核销明细与当前状态均以系统最新记录为准。"
+        record={paymentDetail}
+        columns={paymentColumns}
+        lineItems={paymentDetailLineItems}
+        onClose={() => setPaymentDetail(null)}
+      />
+      <BusinessRecordDetailsModal
+        open={Boolean(creditDetail)}
+        title="红冲详情"
+        description="红冲保留来源应收或应付、原金额和当前未核销金额。"
+        record={creditDetail}
+        columns={creditColumns}
+        onClose={() => setCreditDetail(null)}
+      />
     </BusinessPageLayout>
   )
 }

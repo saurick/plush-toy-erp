@@ -70,6 +70,18 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
   )
   assert.deepEqual(
     ERP_MENU_PERMISSION_GROUPS.find(
+      (section) => section.title === '财务管理'
+    )?.items.map((item) => [item.key, item.label]),
+    [
+      ['/erp/finance/reconciliation', '对账管理'],
+      ['/erp/finance/receivables', '应收管理'],
+      ['/erp/finance/payables', '应付管理'],
+      ['/erp/finance/payments', '收付款核销'],
+      ['/erp/finance/invoices', '发票管理'],
+    ]
+  )
+  assert.deepEqual(
+    ERP_MENU_PERMISSION_GROUPS.find(
       (section) => section.title === '系统管理'
     )?.items.map((item) => item.key),
     [PERMISSION_CENTER_PATH, SYSTEM_AUDIT_LOGS_PATH]

@@ -642,6 +642,11 @@ export const businessPageFlowDefinitions = Object.freeze(
           'production-exceptions',
           'submit_production_exception',
         ],
+        [
+          'production-orders',
+          'production-exceptions',
+          'submit_production_exception',
+        ],
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({
           flowType: BUSINESS_FLOW_TYPES.DOMAIN_GENERATE,
@@ -1141,16 +1146,19 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
   },
   'production-exceptions': {
     pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,
-    upstreamPageKeys: ['production-progress', 'quality-inspections'],
-    producerActions: ['post_production_fact', 'submit_production_exception'],
-    sourceTypes: ['production-progress'],
-    downstreamPageKeys: [],
-    taskGroups: ['production_exception'],
+    upstreamPageKeys: ['production-orders', 'quality-inspections'],
+    producerActions: [
+      'submit_production_exception',
+      'start_production_exception_approval_process',
+    ],
+    sourceTypes: ['production_exception_decision'],
+    downstreamPageKeys: ['production-progress'],
+    taskGroups: ['production_exception_decision_approval'],
     allowsGenericPageCreate: false,
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.IMPLEMENTED,
     availabilityNote:
-      '返工生产记录过账可生成协同待办；报废、超领和在制让步由正式异常申请进入审批，审批不代替库存或在制办理，批准后仍须由对应生产入口确认执行。',
+      '报废、超领和在制让步由正式处置申请生成老板审批任务；审批不代替库存或在制办理，批准后仍须由对应生产入口确认执行。返工来源提醒由任务看板和岗位任务端独立承接。',
   },
   'shipping-release': {
     pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,

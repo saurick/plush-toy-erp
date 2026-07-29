@@ -1,0 +1,38 @@
+.erp-dev-database-migration-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.erp-dev-database-migration-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.erp-dev-database-migration-summary .ant-card {
+  height: 100%;
+}
+
+.erp-dev-database-migration-ready {
+  margin-top: 20px;
+}
+
+.erp-dev-database-migration-page .ant-steps-item-description {
+  max-width: 190px;
+}
+
+.erp-dev-database-migration-page .ant-table-cell {
+  vertical-align: top;
+}
+
+.erp-dev-database-migration-page .ant-typography-danger {
+  display: block;
+  max-width: 520px;
+  white-space: normal;
+}
+
+@media (max-width: 1100px) {
+  .erp-dev-database-migration-summary {
+    grid-template-columns: 1fr;
+  }
+}

@@ -78,8 +78,14 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/dev-workbench/DevWorkbenchRoutes.jsx",
     "web/src/dev-workbench/config/devRoutes.mjs",
     "web/src/dev-workbench/pages/DevHubPage.jsx",
+    "web/src/dev-workbench/pages/DevDataPreparationPage.jsx",
+    "web/src/dev-workbench/pages/DevDatabaseMigrationPage.jsx",
     "web/src/dev-workbench/components/DevPageNav.jsx",
     "web/src/dev-workbench/components/DevReceiptPanel.jsx",
+    "web/src/dev-workbench/config/devDataPreparation.mjs",
+    "web/src/dev-workbench/config/devDatabaseMigration.mjs",
+    "web/src/dev-workbench/styles/dev-data-preparation.css",
+    "web/src/dev-workbench/styles/dev-database-migration.css",
     "web/src/dev-workbench/styles/index.css",
   ]) {
     assert.equal(existsSync(path.join(repoRoot, requiredPath)), true, requiredPath);
@@ -92,6 +98,8 @@ test("dev workbench boundary: source and styles live outside product directories
     ".erp-dev-prototypes",
     ".erp-dev-hub",
     ".erp-dev-flow-state",
+    ".erp-dev-data-",
+    ".erp-dev-database-",
     ".erp-dev-workspace-nav",
   ];
   const productStyles = listFiles("web/src/erp/styles")
@@ -101,6 +109,21 @@ test("dev workbench boundary: source and styles live outside product directories
   for (const marker of forbiddenProductStyleMarkers) {
     assert.doesNotMatch(productStyles, new RegExp(marker.replace(".", "\\."), "u"));
   }
+
+  const workbenchStyles = listFiles("web/src/dev-workbench/styles")
+    .filter((file) => file.endsWith(".css"))
+    .map((file) => read(file))
+    .join("\n");
+  assert.doesNotMatch(
+    workbenchStyles,
+    /\.erp-login-/u,
+    "formal login styles must not live in the DEV-only workbench bundle",
+  );
+  assert.match(
+    read("web/src/erp/styles/app.css"),
+    /@import '\.\/app\/login\.css';/u,
+    "product app must import the formal login stylesheet",
+  );
 });
 
 test("dev workbench boundary: primary navigation is fixed to four areas", () => {
@@ -116,7 +139,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 8);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 10);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>

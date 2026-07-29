@@ -212,10 +212,10 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         actionLabel: '打开生产进度',
       },
       {
-        title: '处理生产异常',
-        description: '查看返工记录产生的异常待办和退回原因。',
+        title: '办理生产异常处置',
+        description: '查看报废、在制让步和超领申请，按审批结果执行或冲正。',
         path: '/erp/production/exceptions',
-        actionLabel: '打开生产异常',
+        actionLabel: '打开生产异常处置',
       },
       {
         title: '跟进委外订单',
@@ -318,16 +318,16 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     recommendedPrimaryLimit: 4,
     priorities: [
       {
-        title: '跟进应付',
-        description: '从已入库采购或合格委外回货生成应付。',
-        path: '/erp/finance/payables',
-        actionLabel: '打开应付管理',
-      },
-      {
         title: '跟进应收',
         description: '从已出货记录生成并办理应收。',
         path: '/erp/finance/receivables',
         actionLabel: '打开应收管理',
+      },
+      {
+        title: '跟进应付',
+        description: '从已入库采购或合格委外回货生成应付。',
+        path: '/erp/finance/payables',
+        actionLabel: '打开应付管理',
       },
       {
         title: '办理发票',
@@ -444,10 +444,10 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         actionLabel: '打开入库管理',
       },
       {
-        title: '跟进生产异常',
-        description: '查看返工来源产生的异常待办。',
+        title: '跟进生产异常处置',
+        description: '核对报废、在制让步和超领申请的审批与执行状态。',
         path: '/erp/production/exceptions',
-        actionLabel: '打开生产异常',
+        actionLabel: '打开生产异常处置',
       },
     ],
     workflow: [

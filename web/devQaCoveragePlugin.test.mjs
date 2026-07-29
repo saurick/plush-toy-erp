@@ -1,19 +1,26 @@
 import assert from 'node:assert/strict'
+import { EventEmitter } from 'node:events'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { PassThrough } from 'node:stream'
 import test from 'node:test'
 
 import {
+  DEV_QA_COVERAGE_ACTION_API_PATH,
   DEV_QA_COVERAGE_API_PATH,
+  DEV_QA_COVERAGE_OPERATION_API_PREFIX,
+  DEV_QA_COVERAGE_SESSION_API_PATH,
   QA_COVERAGE_REPORT_SCHEMA,
   buildRepositoryFingerprint,
   createDevQaCoverageMiddleware,
   createDevQaCoveragePlugin,
+  createDevQaCoverageService,
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
   resolveCoverageFreshness,
   resolveDevQaCoverageReportPath,
+  validateDevQaCoverageAction,
 } from './devQaCoveragePlugin.mjs'
 import { createERPViteConfig } from './vite.shared.mjs'
 
@@ -63,6 +70,7 @@ function requestMiddleware(
     host = '127.0.0.1:5175',
     remoteAddress = '127.0.0.1',
     headers = {},
+    body = '',
   } = {}
 ) {
   return new Promise((resolve, reject) => {
@@ -92,6 +100,9 @@ function requestMiddleware(
       method,
       headers: { ...headers, host },
       socket: { remoteAddress },
+      async *[Symbol.asyncIterator]() {
+        if (body) yield Buffer.from(body)
+      },
     }
     const next = () =>
       finish({
@@ -202,8 +213,295 @@ test('middleware returns 405 for non-GET loopback requests', async () => {
   assert.equal(response.headers['cache-control'], 'no-store')
   assert.deepEqual(JSON.parse(response.body), {
     status: 'failed',
-    message: '该开发接口仅支持 GET',
+    message: '该开发接口不支持当前请求方法',
   })
+})
+
+test('coverage action contract accepts only a fixed baseline idempotency intent', () => {
+  const valid = {
+    action: 'collect',
+    payload: {
+      idempotencyKey:
+        'coverage:collect:baseline:123e4567-e89b-42d3-a456-426614174000',
+    },
+  }
+  assert.deepEqual(validateDevQaCoverageAction(valid), valid)
+  for (const invalid of [
+    { ...valid, command: 'node arbitrary.mjs' },
+    {
+      action: 'collect',
+      payload: { ...valid.payload, profile: 'strict' },
+    },
+    {
+      action: 'collect',
+      payload: { ...valid.payload, path: '/private/report.json' },
+    },
+    {
+      action: 'shell',
+      payload: valid.payload,
+    },
+  ]) {
+    assert.throws(
+      () => validateDevQaCoverageAction(invalid),
+      /unsupported|allowlisted/u
+    )
+  }
+})
+
+test('coverage action middleware requires same-origin CSRF and exact JSON', async () => {
+  const csrfToken = 's'.repeat(43)
+  const operation = {
+    schemaVersion: 'plush.dev-qa-coverage-operation-public/v1',
+    id: '123e4567-e89b-42d3-a456-426614174000',
+    status: 'queued',
+  }
+  const calls = []
+  const service = {
+    latestOperation: () => null,
+    readOperation: () => operation,
+    async act(value) {
+      calls.push(value)
+      return {
+        schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+        action: 'collect',
+        reused: false,
+        operation,
+      }
+    },
+  }
+  const middleware = createDevQaCoverageMiddleware({
+    projectRoot: '/unused/project',
+    csrfToken,
+    service,
+  })
+  const session = await requestMiddleware(middleware, {
+    url: DEV_QA_COVERAGE_SESSION_API_PATH,
+  })
+  assert.equal(session.statusCode, 200)
+  assert.equal(JSON.parse(session.body).csrfToken, csrfToken)
+
+  const body = JSON.stringify({
+    action: 'collect',
+    payload: {
+      idempotencyKey:
+        'coverage:collect:baseline:123e4567-e89b-42d3-a456-426614174000',
+    },
+  })
+  const missingOrigin = await requestMiddleware(middleware, {
+    url: DEV_QA_COVERAGE_ACTION_API_PATH,
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    body,
+  })
+  assert.equal(missingOrigin.statusCode, 403)
+  assert.equal(calls.length, 0)
+
+  const valid = await requestMiddleware(middleware, {
+    url: DEV_QA_COVERAGE_ACTION_API_PATH,
+    method: 'POST',
+    headers: {
+      origin: 'http://127.0.0.1:5175',
+      'sec-fetch-site': 'same-origin',
+      'content-type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    body,
+  })
+  assert.equal(valid.statusCode, 202)
+  assert.equal(calls.length, 1)
+  assert.equal(JSON.parse(valid.body).operation.id, operation.id)
+
+  const injected = await requestMiddleware(middleware, {
+    url: DEV_QA_COVERAGE_ACTION_API_PATH,
+    method: 'POST',
+    headers: {
+      origin: 'http://127.0.0.1:5175',
+      'sec-fetch-site': 'same-origin',
+      'content-type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    body: JSON.stringify({
+      action: 'collect',
+      payload: {
+        idempotencyKey:
+          'coverage:collect:baseline:223e4567-e89b-42d3-a456-426614174000',
+        args: ['--strict'],
+      },
+    }),
+  })
+  assert.equal(injected.statusCode, 400)
+  assert.equal(calls.length, 1)
+
+  const queryInjected = await requestMiddleware(middleware, {
+    url: `${DEV_QA_COVERAGE_ACTION_API_PATH}?profile=strict`,
+    method: 'POST',
+    headers: {
+      origin: 'http://127.0.0.1:5175',
+      'sec-fetch-site': 'same-origin',
+      'content-type': 'application/json',
+      'x-csrf-token': csrfToken,
+    },
+    body,
+  })
+  assert.equal(queryInjected.statusCode, 400)
+  assert.equal(calls.length, 1)
+})
+
+test('operation GET reads only the fixed persisted operation projection', async () => {
+  const operation = {
+    schemaVersion: 'plush.dev-qa-coverage-operation-public/v1',
+    id: '123e4567-e89b-42d3-a456-426614174000',
+    status: 'running',
+  }
+  let receivedId = ''
+  const middleware = createDevQaCoverageMiddleware({
+    projectRoot: '/unused/project',
+    service: {
+      latestOperation: () => operation,
+      readOperation(operationId) {
+        receivedId = operationId
+        return operation
+      },
+      act: async () => null,
+    },
+  })
+  const response = await requestMiddleware(middleware, {
+    url: `${DEV_QA_COVERAGE_OPERATION_API_PREFIX}/${operation.id}?path=/private`,
+  })
+  assert.equal(response.statusCode, 200)
+  assert.equal(receivedId, operation.id)
+  assert.equal(JSON.parse(response.body).operation.status, 'running')
+})
+
+function createFakeChild(pid = 9876) {
+  const child = new EventEmitter()
+  child.pid = pid
+  child.stdout = new PassThrough()
+  child.stderr = new PassThrough()
+  return child
+}
+
+async function waitForOperation(service, operationId, expectedStatus) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const operation = service.readOperation(operationId)
+    if (operation.status === expectedStatus) return operation
+    await new Promise((resolve) => setTimeout(resolve, 2))
+  }
+  throw new Error(`operation did not reach ${expectedStatus}`)
+}
+
+test('coverage service spawns only the fixed collector and persists stages', async (t) => {
+  const projectRoot = await createProject(t)
+  const child = createFakeChild()
+  const spawns = []
+  let tick = 0
+  const service = createDevQaCoverageService({
+    projectRoot,
+    processId: 7654,
+    processAlive: (pid) => pid === 7654 || pid === child.pid,
+    now: () => new Date(Date.UTC(2026, 6, 29, 6, 0, tick++)),
+    readRepositoryState: async () => REPOSITORY,
+    readReport: async () => buildReport(),
+    resolveNodeRuntime: () => '/project-toolchain/node',
+    spawnProcess(command, args, options) {
+      spawns.push({ command, args, options })
+      return child
+    },
+  })
+  const intent = {
+    action: 'collect',
+    payload: {
+      idempotencyKey:
+        'coverage:collect:baseline:323e4567-e89b-42d3-a456-426614174000',
+    },
+  }
+  const started = await service.act(intent)
+  assert.equal(started.operation.status, 'running')
+  assert.equal(started.reused, false)
+  assert.equal(spawns.length, 1)
+  assert.equal(spawns[0].command, '/project-toolchain/node')
+  assert.deepEqual(spawns[0].args, [
+    'scripts/qa/test-coverage-collect.mjs',
+    '--profile',
+    'baseline',
+    '--write',
+  ])
+  assert.equal(spawns[0].options.cwd, projectRoot)
+  assert.equal(
+    spawns[0].options.env.PATH.split(path.delimiter)[0],
+    '/project-toolchain'
+  )
+  assert.equal(JSON.stringify(spawns[0]).includes(intent.payload.idempotencyKey), false)
+
+  const concurrent = await service.act({
+    action: 'collect',
+    payload: {
+      idempotencyKey:
+        'coverage:collect:baseline:423e4567-e89b-42d3-a456-426614174000',
+    },
+  })
+  assert.equal(concurrent.reused, true)
+  assert.equal(concurrent.operation.id, started.operation.id)
+  assert.equal(spawns.length, 1)
+
+  child.stderr.write('[qa:test-coverage-collect] stage=go\n')
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(service.readOperation(started.operation.id).stage, 'go')
+  child.stderr.write('[qa:test-coverage-collect] stage=aggregate\n')
+  child.stderr.end()
+  child.emit('close', 2)
+  const completed = await waitForOperation(
+    service,
+    started.operation.id,
+    'completed'
+  )
+  assert.equal(completed.outcome, 'issues')
+  assert.equal(completed.exitCode, 2)
+  assert.doesNotMatch(
+    JSON.stringify(completed),
+    /idempotency|childPid|ownerPid|stdout|stderr|scripts\/qa/u
+  )
+
+  const replay = await service.act(intent)
+  assert.equal(replay.reused, true)
+  assert.equal(replay.operation.id, started.operation.id)
+  assert.equal(spawns.length, 1)
+})
+
+test('coverage service fails closed when published report identity mismatches', async (t) => {
+  const projectRoot = await createProject(t)
+  const child = createFakeChild(8765)
+  const service = createDevQaCoverageService({
+    projectRoot,
+    processId: 6543,
+    processAlive: () => true,
+    readRepositoryState: async () => REPOSITORY,
+    readReport: async () =>
+      buildReport({
+        repository: { ...REPOSITORY, fingerprint: 'c'.repeat(64) },
+      }),
+    resolveNodeRuntime: () => '/project-toolchain/node',
+    spawnProcess: () => child,
+  })
+  const started = await service.act({
+    action: 'collect',
+    payload: {
+      idempotencyKey:
+        'coverage:collect:baseline:523e4567-e89b-42d3-a456-426614174000',
+    },
+  })
+  child.stderr.end()
+  child.emit('close', 0)
+  const failed = await waitForOperation(
+    service,
+    started.operation.id,
+    'failed'
+  )
+  assert.match(failed.message, /代码发生变化|报告未更新/u)
+  assert.equal(failed.outcome, null)
 })
 
 test('middleware reads only output/qa/coverage/latest.json', async () => {
@@ -265,6 +563,7 @@ test('middleware returns safe missing response for an absent fixed report', asyn
   assert.deepEqual(JSON.parse(response.body), {
     status: 'missing',
     message: '覆盖率报告尚未生成',
+    operation: null,
   })
 })
 
@@ -282,6 +581,7 @@ test('middleware fails closed for oversized and invalid-schema reports', async (
   assert.deepEqual(JSON.parse(oversized.body), {
     status: 'failed',
     message: '覆盖率报告不可用，请重新生成',
+    operation: null,
   })
 
   const invalidRoot = await createProject(t)

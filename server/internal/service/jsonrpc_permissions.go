@@ -344,6 +344,7 @@ func adminRoleToMap(item biz.AdminRole, includePermissions bool) map[string]any 
 	navigation := biz.NormalizePersistedRoleNavigationSettings(
 		item.NavigationMode,
 		item.PrimaryMenuPaths,
+		item.SecondaryMenuPaths,
 	)
 	out := map[string]any{
 		"id":                   item.ID,
@@ -357,6 +358,7 @@ func adminRoleToMap(item biz.AdminRole, includePermissions bool) map[string]any 
 		"version":              item.Version,
 		"navigation_mode":      string(navigation.Mode),
 		"primary_menu_paths":   toAnySliceString(navigation.PrimaryMenuPaths),
+		"secondary_menu_paths": toAnySliceString(navigation.SecondaryMenuPaths),
 		"data_scopes":          roleDataScopesToAny(item.DataScopes),
 		"permissions_editable": !item.Disabled && !isSystemRole,
 		"assignable":           !item.Disabled && (!isSystemRole || isDebugRole),

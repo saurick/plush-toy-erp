@@ -1675,6 +1675,40 @@ body
   padding: 12px 14px 16px;
 }
 
+.erp-role-navigation-workspace-tabs,
+.erp-role-navigation-workspace-tabs > .ant-tabs-content-holder,
+.erp-role-navigation-workspace-tabs
+  > .ant-tabs-content-holder
+  > .ant-tabs-content,
+.erp-role-navigation-workspace-tabs .ant-tabs-tabpane {
+  min-width: 0;
+}
+
+.erp-role-navigation-workspace-tabs > .ant-tabs-nav {
+  margin: 0 0 14px;
+}
+
+.erp-role-navigation-workspace-tabs > .ant-tabs-nav .ant-tabs-tab {
+  padding: 8px 14px;
+}
+
+.erp-role-effective-access__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.erp-role-effective-access__revision {
+  width: min(420px, calc(100vw - 80px));
+  overflow-wrap: anywhere;
+}
+
+.erp-role-effective-access__table {
+  min-width: 0;
+}
+
 .erp-role-associated-accounts {
   display: grid;
   gap: 12px;
@@ -1737,9 +1771,49 @@ body
   width: 180px;
 }
 
+.erp-role-navigation-editor__columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-role-navigation-editor__column {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dce8df;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.erp-role-navigation-editor__column-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-role-navigation-editor__column-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.erp-role-navigation-editor__column-head .ant-typography {
+  margin: 0;
+}
+
 .erp-role-navigation-editor__order {
   display: grid;
+  align-content: start;
   gap: 8px;
+  max-height: 430px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
 }
 
 .erp-role-navigation-editor__order-item {
@@ -1816,13 +1890,27 @@ body
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  max-height: 320px;
   min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .erp-role-navigation-preview__items .ant-tag {
   max-width: 100%;
   margin: 0;
   white-space: normal;
+}
+
+.erp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .erp-role-center-footer {

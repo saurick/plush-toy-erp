@@ -14,5 +14,8 @@ test('production DEV boundary browser smoke uses built static app and a bounded 
   assert.match(source, /page\.goto\(`\$\{baseURL\}\/__dev`/u)
   assert.match(source, /result\.pathname,\s*'\/admin-login'/u)
   assert.match(source, /favicon-dev\.svg/u)
+  assert.match(source, /result\.loginCardWidth\s*>=\s*520/u)
+  assert.match(source, /result\.loginCardCenterDelta\s*<=\s*2/u)
+  assert.match(source, /result\.loginPageHeight\s*>=\s*result\.viewportHeight/u)
   assert.doesNotMatch(source, /vite\s+--host/u)
 })

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -15,6 +16,8 @@ import {
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
   MANUAL_ACCEPTANCE_DATASET_KEY,
+  SCENARIO_DEMO_ORIGIN,
+  SCENARIO_DEMO_TARGET,
   assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
@@ -70,6 +73,15 @@ const safeLocalSession = Object.freeze({
   },
 });
 
+const scenarioPolicyInput = Object.freeze({
+  target: SCENARIO_DEMO_TARGET,
+  backendURL: SCENARIO_DEMO_ORIGIN,
+  datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+  dataVersion: "2026.07.16-v5",
+  runId: "20260716-V5",
+  databaseName: "plush_erp",
+});
+
 test("implicit shared loopback stays read-only and cannot pass the local apply guard", () => {
   const policy = resolveManualAcceptanceTarget({
     backendURL: "http://localhost:8300/",
@@ -87,6 +99,96 @@ test("implicit shared loopback stays read-only and cannot pass the local apply g
   assert.throws(
     () => assertManualAcceptanceMutationTarget(policy),
     /explicit dedicated databaseName/u,
+  );
+});
+
+test("scenario demo is fixed to loopback 8300 and registered long-lived development databases", () => {
+  const policy = resolveManualAcceptanceTarget(scenarioPolicyInput);
+  assert.deepEqual(policy, {
+    target: SCENARIO_DEMO_TARGET,
+    datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+    backendURL: SCENARIO_DEMO_ORIGIN,
+    origin: SCENARIO_DEMO_ORIGIN,
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+    external: false,
+    transport: "loopback",
+    databaseName: "plush_erp",
+  });
+  const expected =
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:scenario-demo:2026.07.16-v5:20260716-V5:plush_erp";
+  assert.equal(manualAcceptanceTargetConfirmation(policy), expected);
+  assert.equal(
+    assertManualAcceptanceMutationTarget(policy, {
+      confirmation: expected,
+    }).databaseName,
+    "plush_erp",
+  );
+  for (const patch of [
+    { backendURL: "http://localhost:8300" },
+    { backendURL: "http://127.0.0.1:8310" },
+    { databaseName: "plush_erp_acceptance_local_run_dev" },
+    { databaseName: "plush_erp_other_dev" },
+    { dataVersion: "2026.07.16-v6" },
+    { runId: "20260716-V6" },
+  ]) {
+    assert.throws(
+      () => resolveManualAcceptanceTarget({ ...scenarioPolicyInput, ...patch }),
+      /scenario-demo requires/u,
+    );
+  }
+  assert.throws(
+    () => assertManualAcceptanceMutationTarget(policy),
+    /scenario-demo apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM/u,
+  );
+});
+
+test("scenario demo runtime identity and active local customer config fail closed", async () => {
+  const expectedDigest = createHash("sha256")
+    .update("database-v1\nplush_erp")
+    .digest("hex");
+  const proof = await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy: scenarioPolicyInput,
+    fetchImpl: async (_url, init) => {
+      assert.equal(
+        init.headers["X-ERP-Expected-Runtime-Identity-SHA256"],
+        expectedDigest,
+      );
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        headers: {
+          get: (name) =>
+            name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+        },
+        async text() {
+          return "runtime identity matched";
+        },
+      };
+    },
+  });
+  assert.equal(proof.databaseName, "plush_erp");
+  assert.equal(
+    assertManualAcceptanceRuntimePolicy({
+      policy: scenarioPolicyInput,
+      capabilities: { environment: "dev" },
+      session: safeLocalSession,
+      requiredModules: ["customers", "workflow_tasks"],
+    }).target,
+    SCENARIO_DEMO_TARGET,
+  );
+  assert.throws(
+    () =>
+      assertManualAcceptanceRuntimePolicy({
+        policy: scenarioPolicyInput,
+        capabilities: { environment: "dev" },
+        session: {
+          ...safeLocalSession,
+          configRevision: "stale",
+        },
+      }),
+    /active local-test configuration identity/u,
   );
 });
 
@@ -190,8 +292,7 @@ test("local dedicated apply confirmation and runtime database identity are exact
     runId: "20260716-V5",
     databaseName: LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE,
   };
-  const confirmation =
-    `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:${LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE}`;
+  const confirmation = `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:${LOCAL_MANUAL_ACCEPTANCE_DATABASE_EXAMPLE}`;
   assert.equal(manualAcceptanceTargetConfirmation(localPolicy), confirmation);
   assert.throws(
     () => assertManualAcceptanceMutationTarget(localPolicy),
@@ -238,8 +339,7 @@ test("local dedicated apply confirmation and runtime database identity are exact
     () =>
       resolveManualAcceptanceTarget({
         ...localPolicy,
-        databaseName:
-          "plush_erp_acceptance_other_run_browser_actions_dev",
+        databaseName: "plush_erp_acceptance_other_run_browser_actions_dev",
       }),
     /requires databaseName=plush_erp_acceptance_<run-id>_dev/u,
   );

@@ -97,8 +97,12 @@ func TestValidateRoleDemoPasswordRequiresExplicitValueWithAllowProd(t *testing.T
 
 func TestValidateRoleDemoPasswordTargetRestrictsPublicDefault(t *testing.T) {
 	const isolatedDevDSN = "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable"
+	const registeredDevDSN = "postgres://test_user:secret@192.168.0.106:5432/plush_erp?sslmode=disable"
 	if err := validateRoleDemoPasswordTarget(defaultRoleDemoPassword, isolatedDevDSN, false, false); err != nil {
 		t.Fatalf("registered isolated development database must accept the public default: %v", err)
+	}
+	if err := validateRoleDemoPasswordTarget(defaultRoleDemoPassword, registeredDevDSN, false, false); err != nil {
+		t.Fatalf("registered development database must accept the public default: %v", err)
 	}
 
 	tests := []struct {
@@ -109,14 +113,14 @@ func TestValidateRoleDemoPasswordTargetRestrictsPublicDefault(t *testing.T) {
 		wantError     string
 	}{
 		{
-			name:      "shared development database",
-			dsn:       "postgres://test_user:secret@192.168.0.106:5432/plush_erp?sslmode=disable",
-			wantError: "isolated development database",
+			name:      "unregistered loopback database",
+			dsn:       "postgres://test_user:secret@127.0.0.1:5432/plush_erp?sslmode=disable",
+			wantError: "registered local development database",
 		},
 		{
 			name:      "remote test database",
 			dsn:       "postgres://test_user:secret@192.168.0.133:5435/plush_erp_trial_dev?sslmode=disable",
-			wantError: "registered isolated development database",
+			wantError: "registered local development database",
 		},
 		{
 			name:         "debug account",
@@ -150,15 +154,26 @@ func TestValidateRoleDemoPasswordTargetRestrictsPublicDefault(t *testing.T) {
 	}
 }
 
-func TestRoleDemoAccountsForPasswordExcludesPrivilegedDefaults(t *testing.T) {
+func TestRoleDemoAccountsForPasswordIncludesDemoAdminAndExcludesDebugByDefault(t *testing.T) {
 	defaultAccounts := roleDemoAccountsForPassword(defaultRoleDemoPassword, false)
-	if len(defaultAccounts) != 9 {
-		t.Fatalf("default role demo account count = %d, want 9 business roles", len(defaultAccounts))
+	if len(defaultAccounts) != 10 {
+		t.Fatalf("default role demo account count = %d, want 10 role demo accounts", len(defaultAccounts))
 	}
+	foundDemoAdmin := false
 	for _, account := range defaultAccounts {
-		if account.RoleKey == biz.AdminRoleKey || account.RoleKey == biz.DebugOperatorRoleKey {
-			t.Fatalf("default role demo accounts must not include privileged role %q", account.RoleKey)
+		if account.Username == "demo_admin" && account.RoleKey == biz.AdminRoleKey {
+			foundDemoAdmin = true
 		}
+		if account.RoleKey == biz.DebugOperatorRoleKey {
+			t.Fatalf("default role demo accounts must not include debug role %q", account.RoleKey)
+		}
+		switch account.Username {
+		case "admin", "demo_debug", "demo_uat_disabled", "demo_uat_sales_purchase", "demo_uat_no_entry":
+			t.Fatalf("default role demo accounts must not include protected account %q", account.Username)
+		}
+	}
+	if !foundDemoAdmin {
+		t.Fatal("default role demo accounts must include demo_admin with the admin role")
 	}
 
 	explicitAccounts := roleDemoAccountsForPassword("explicit-pass-123", true)

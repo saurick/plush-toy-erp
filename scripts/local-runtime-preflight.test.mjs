@@ -221,3 +221,74 @@ test("local runtime preflight: pending migration 指向只读 status 和 plan，
     ["bash", "go", "atlas"],
   );
 });
+
+test("local runtime preflight: migration 最新后仍强制数据库可编程对象为零", async () => {
+  const calls = [];
+  const output = [];
+  const result = await checkLocalDatabaseMigrations({
+    writeLine: (line) => output.push(line),
+    execFile: async (command, args, options) => {
+      calls.push([command, ...args]);
+      if (command === "bash") return { stdout: "", stderr: "" };
+      if (command === "go") {
+        return {
+          stdout:
+            "postgres://test_user:private-secret@192.168.0.106:5432/plush_erp",
+          stderr: "",
+        };
+      }
+      if (command === "atlas") {
+        return { stdout: JSON.stringify(currentMigrationStatus()), stderr: "" };
+      }
+      assert.equal(command, "node");
+      assert.equal(
+        options.env.PLUSH_DATABASE_PROGRAMMABILITY_URL,
+        "postgres://test_user:private-secret@192.168.0.106:5432/plush_erp",
+      );
+      return { stdout: "[db-programmability] clean\n", stderr: "" };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    calls.map(([command]) => command),
+    ["bash", "go", "atlas", "node"],
+  );
+  assert.match(output.join("\n"), /function=0.*procedure=0.*trigger=0/u);
+});
+
+test("local runtime preflight: 自定义数据库执行对象阻断启动且诊断不泄露 DSN", async () => {
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      writeLine: () => {},
+      execFile: async (command) => {
+        if (command === "bash") return { stdout: "", stderr: "" };
+        if (command === "go") {
+          return {
+            stdout:
+              "postgres://test_user:private-secret@192.168.0.106:5432/plush_erp",
+            stderr: "",
+          };
+        }
+        if (command === "atlas") {
+          return {
+            stdout: JSON.stringify(currentMigrationStatus()),
+            stderr: "",
+          };
+        }
+        const error = new Error("programmability check failed");
+        error.stderr =
+          "[db-programmability] ERROR: trigger: public.items.forbidden";
+        throw error;
+      },
+    }),
+    (error) => {
+      assert.match(
+        error.message,
+        /自定义 Function.*Procedure.*Trigger.*public\.items\.forbidden/su,
+      );
+      assert.doesNotMatch(error.message, /private-secret|postgres:\/\//u);
+      return true;
+    },
+  );
+});

@@ -34,13 +34,16 @@ test('approval settings API uses fixed strict revision contract', async () => {
     calls.push({ method, params })
     return {
       data:
-        method === 'publish_approval_settings'
+        method === 'publish_approval_settings' ||
+        method === 'apply_approval_settings'
           ? {
               revision: {
                 customer_key: params.customer_key,
                 revision: params.revision,
                 config_hash: 'hash-2',
                 product_version: 'v1',
+                status:
+                  method === 'apply_approval_settings' ? 'active' : 'published',
               },
             }
           : {
@@ -75,11 +78,17 @@ test('approval settings API uses fixed strict revision contract', async () => {
   }
   await api.previewApprovalSettings(input)
   await api.publishApprovalSettings(input)
+  await api.applyApprovalSettings(input)
   assert.deepEqual(
     calls.map((call) => call.method),
-    ['preview_approval_settings', 'publish_approval_settings']
+    [
+      'preview_approval_settings',
+      'publish_approval_settings',
+      'apply_approval_settings',
+    ]
   )
   assert.deepEqual(calls[0].params, input)
+  assert.deepEqual(calls[2].params, input)
 })
 
 test('approval settings API rejects missing CAS and invalid members locally', async () => {
@@ -162,25 +171,44 @@ test('approval settings API requires explicit configured state', async () => {
   await assert.rejects(() => api.getApprovalSettings(), /审批责任数据不完整/)
 })
 
-test('approval settings API rejects an incomplete publish receipt', async () => {
-  const api = await loadApi(async () => ({
-    data: { revision: { revision: 'r2' } },
+test('approval settings API marks incomplete mutation receipts as uncertain', async () => {
+  const api = await loadApi(async (method) => ({
+    data: {
+      revision:
+        method === 'apply_approval_settings'
+          ? {
+              customer_key: 'yoyoosun',
+              revision: 'r2',
+              config_hash: 'hash-2',
+              product_version: 'v1',
+              status: 'published',
+            }
+          : { revision: 'r2' },
+    },
   }))
+  const input = {
+    customer_key: 'yoyoosun',
+    revision: 'r2',
+    expected_active_revision: 'r1',
+    expected_active_hash: 'hash',
+    items: [
+      {
+        approval_key: 'sales_order',
+        enabled: true,
+        members: [],
+      },
+    ],
+  }
   await assert.rejects(
-    () =>
-      api.publishApprovalSettings({
-        customer_key: 'yoyoosun',
-        revision: 'r2',
-        expected_active_revision: 'r1',
-        expected_active_hash: 'hash',
-        items: [
-          {
-            approval_key: 'sales_order',
-            enabled: true,
-            members: [],
-          },
-        ],
-      }),
-    /审批责任发布结果不完整/
+    () => api.publishApprovalSettings(input),
+    (error) =>
+      error?.isInvalidResponse === true &&
+      /审批责任发布结果不完整/.test(error.message)
+  )
+  await assert.rejects(
+    () => api.applyApprovalSettings(input),
+    (error) =>
+      error?.isInvalidResponse === true &&
+      /审批责任生效回执不完整/.test(error.message)
   )
 })

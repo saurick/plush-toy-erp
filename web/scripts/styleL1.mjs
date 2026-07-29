@@ -3288,6 +3288,8 @@ async function assertBusinessPageRefreshEntrypoint(page, { scenarioName }) {
 
 async function assertAdminLoginLayout(page, { minCardWidth }) {
   const metrics = await page.evaluate(() => {
+    const loginPage = document.querySelector('.erp-login-page')
+    const background = document.querySelector('.erp-login-page__bg')
     const card = document.querySelector('.erp-login-card')
     const logo = document.querySelector('.erp-login-logo')
     const usernameInput = document.querySelector(
@@ -3295,13 +3297,31 @@ async function assertAdminLoginLayout(page, { minCardWidth }) {
     )
     const passwordInput = document.querySelector('.ant-input-affix-wrapper')
     const submitButton = document.querySelector('button[type="submit"]')
+    const loginPageRect = loginPage?.getBoundingClientRect?.()
+    const backgroundRect = background?.getBoundingClientRect?.()
+    const cardRect = card?.getBoundingClientRect?.()
+    const loginPageStyle = loginPage
+      ? window.getComputedStyle(loginPage)
+      : null
     const cardStyle = card ? window.getComputedStyle(card) : null
     const submitStyle = submitButton
       ? window.getComputedStyle(submitButton)
       : null
 
     return {
-      cardWidth: card?.getBoundingClientRect?.().width || 0,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      pageDisplay: loginPageStyle?.display || '',
+      pageAlignItems: loginPageStyle?.alignItems || '',
+      pageJustifyContent: loginPageStyle?.justifyContent || '',
+      pageWidth: loginPageRect?.width || 0,
+      pageHeight: loginPageRect?.height || 0,
+      backgroundWidth: backgroundRect?.width || 0,
+      backgroundHeight: backgroundRect?.height || 0,
+      cardWidth: cardRect?.width || 0,
+      cardCenterDelta: cardRect
+        ? Math.abs(cardRect.left + cardRect.width / 2 - window.innerWidth / 2)
+        : Number.POSITIVE_INFINITY,
       cardRadius: Number.parseFloat(cardStyle?.borderTopLeftRadius || '0'),
       logoWidth: logo?.getBoundingClientRect?.().width || 0,
       usernameHeight: usernameInput?.getBoundingClientRect?.().height || 0,
@@ -3325,6 +3345,42 @@ async function assertAdminLoginLayout(page, { minCardWidth }) {
   assert(
     metrics.cardWidth >= minCardWidth,
     `登录卡片宽度异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.cardWidth <= 622,
+    `登录卡片不应撑满桌面视口: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.pageDisplay,
+    'flex',
+    `登录页居中容器未生效: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.pageAlignItems,
+    'center',
+    `登录页垂直居中未生效: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.pageJustifyContent,
+    'center',
+    `登录页水平居中未生效: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.cardCenterDelta <= 2,
+    `登录卡片未水平居中: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.pageWidth >= metrics.viewportWidth,
+    `登录页未覆盖视口宽度: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.pageHeight >= metrics.viewportHeight,
+    `登录页未覆盖视口高度: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.backgroundWidth >= metrics.viewportWidth &&
+      metrics.backgroundHeight >= metrics.viewportHeight,
+    `登录页背景未覆盖视口: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.cardRadius >= 16,

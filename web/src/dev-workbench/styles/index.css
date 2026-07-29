@@ -5,4 +5,6 @@
 @import './dev-prototypes.css';
 @import './dev-flow-state-observatory.css';
 @import './dev-version-center.css';
+@import './dev-data-preparation.css';
+@import './dev-database-migration.css';
 @import './product-overrides.css';

@@ -331,79 +331,195 @@ func TestCustomerConfigPostgresPublishRevisionIsImmutableAndIdempotent(t *testin
 	}
 }
 
-func TestCustomerConfigPostgresPublishedRevisionAndProjectionsRejectTampering(t *testing.T) {
+func TestCustomerConfigPostgresApplyApprovalSettingsIsAtomicAndIdempotent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	data, _ := openPurchaseReceiptPostgresTestData(t)
 	repo := NewCustomerConfigRepo(data, log.NewStdLogger(io.Discard))
-	customerKey := "cc-immutable-" + strings.ToLower(postgresTestSuffix())
-	in := customerConfigPostgresPublishInput(customerKey, "rev-1", "immutable")
-	publishedAt := time.Now().UTC().Truncate(time.Microsecond)
-
-	if _, err := repo.PublishCustomerConfig(ctx, in, "hash-immutable", 10, publishedAt); err != nil {
-		t.Fatalf("publish immutable fixture: %v", err)
+	customerKey := "cc-approval-apply-" + strings.ToLower(postgresTestSuffix())
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	base := customerConfigPostgresPublishInput(customerKey, "rev-base", "base")
+	if _, err := repo.PublishCustomerConfig(ctx, base, "hash-base", 10, now); err != nil {
+		t.Fatalf("publish base revision: %v", err)
+	}
+	if _, err := repo.ActivateCustomerConfig(
+		ctx,
+		customerKey,
+		base.Revision,
+		"hash-base",
+		base.ProductVersion,
+		"",
+		10,
+		now.Add(time.Second),
+	); err != nil {
+		t.Fatalf("activate base revision: %v", err)
 	}
 
-	_, err := data.sqldb.ExecContext(ctx, `
-		UPDATE customer_config_revisions
-		SET compiled_snapshot = '{"tampered":true}'::jsonb
-		WHERE customer_key = $1 AND revision = $2`, customerKey, in.Revision)
-	assertCustomerConfigPostgresCheckViolation(t, err)
-	_, err = data.sqldb.ExecContext(ctx, `
-		DELETE FROM customer_config_revisions
-		WHERE customer_key = $1 AND revision = $2`, customerKey, in.Revision)
-	assertCustomerConfigPostgresCheckViolation(t, err)
-	_, err = data.sqldb.ExecContext(ctx, `
-		UPDATE customer_config_revisions
-		SET status = 'building', updated_at = NOW()
-		WHERE customer_key = $1 AND revision = $2`, customerKey, in.Revision)
-	assertCustomerConfigPostgresCheckViolation(t, err)
-	_, err = data.sqldb.ExecContext(ctx, `
-		UPDATE customer_config_revisions
-		SET status = 'preview', updated_at = NOW()
-		WHERE customer_key = $1 AND revision = $2`, customerKey, in.Revision)
-	assertCustomerConfigPostgresCheckViolation(t, err)
-
-	for _, tableName := range []string{
-		"deployment_module_states",
-		"role_profiles",
-		"access_entitlements",
-		"work_pools",
-		"work_pool_memberships",
-	} {
-		t.Run(tableName, func(t *testing.T) {
-			updateQuery := fmt.Sprintf(`UPDATE %s SET updated_at = NOW() WHERE customer_key = $1 AND config_revision = $2`, tableName)
-			_, err := data.sqldb.ExecContext(ctx, updateQuery, customerKey, in.Revision)
-			assertCustomerConfigPostgresCheckViolation(t, err)
-
-			deleteQuery := fmt.Sprintf(`DELETE FROM %s WHERE customer_key = $1 AND config_revision = $2`, tableName)
-			_, err = data.sqldb.ExecContext(ctx, deleteQuery, customerKey, in.Revision)
-			assertCustomerConfigPostgresCheckViolation(t, err)
-
-			insertQuery := fmt.Sprintf(`INSERT INTO %s SELECT * FROM %s WHERE customer_key = $1 AND config_revision = $2`, tableName, tableName)
-			_, err = data.sqldb.ExecContext(ctx, insertQuery, customerKey, in.Revision)
-			assertCustomerConfigPostgresCheckViolation(t, err)
-		})
+	candidate := customerConfigPostgresPublishInput(customerKey, "rev-applied", "approval-settings")
+	appliedAt := now.Add(2 * time.Second)
+	applied, err := repo.ApplyApprovalSettingsRevision(
+		ctx,
+		candidate,
+		"hash-applied",
+		base.Revision,
+		"hash-base",
+		20,
+		appliedAt,
+	)
+	if err != nil {
+		t.Fatalf("apply approval settings: %v", err)
+	}
+	if applied.Status != biz.CustomerConfigStatusActive ||
+		applied.Revision != candidate.Revision ||
+		applied.ConfigHash != "hash-applied" {
+		t.Fatalf("applied revision = %#v", applied)
 	}
 
-	if _, err := data.sqldb.ExecContext(ctx, `
-		UPDATE customer_config_revisions
-		SET status = 'active', activated_by = 10, activated_at = $3, updated_at = $3
-		WHERE customer_key = $1 AND revision = $2`, customerKey, in.Revision, publishedAt.Add(time.Second)); err != nil {
-		t.Fatalf("lifecycle-only revision update must remain allowed: %v", err)
+	replayed, err := repo.ApplyApprovalSettingsRevision(
+		ctx,
+		candidate,
+		"hash-applied",
+		base.Revision,
+		"hash-base",
+		20,
+		appliedAt.Add(time.Hour),
+	)
+	if err != nil {
+		t.Fatalf("exact apply replay: %v", err)
 	}
-	_, err = data.sqldb.ExecContext(ctx, `
-		UPDATE customer_config_revisions
-		SET status = 'building', updated_at = NOW()
-		WHERE customer_key = $1 AND revision = $2`, customerKey, in.Revision)
-	assertCustomerConfigPostgresCheckViolation(t, err)
+	if replayed.ID != applied.ID ||
+		replayed.Status != biz.CustomerConfigStatusActive ||
+		replayed.ActivatedAt == nil ||
+		applied.ActivatedAt == nil ||
+		!replayed.ActivatedAt.Equal(*applied.ActivatedAt) {
+		t.Fatalf("replay must return the original active revision: applied=%#v replayed=%#v", applied, replayed)
+	}
+
+	var totalCount, activeCount, intermediateCount int
+	if err := data.sqldb.QueryRowContext(ctx, `
+SELECT count(*),
+       count(*) FILTER (WHERE status = 'active'),
+       count(*) FILTER (WHERE status IN ('building', 'published'))
+FROM customer_config_revisions
+WHERE customer_key = $1`, customerKey).Scan(&totalCount, &activeCount, &intermediateCount); err != nil {
+		t.Fatalf("count applied revisions: %v", err)
+	}
+	if totalCount != 2 || activeCount != 1 || intermediateCount != 0 {
+		t.Fatalf("revision counts total/active/intermediate = %d/%d/%d, want 2/1/0", totalCount, activeCount, intermediateCount)
+	}
+	var baseStatus string
+	if err := data.sqldb.QueryRowContext(ctx, `
+SELECT status
+FROM customer_config_revisions
+WHERE customer_key = $1 AND revision = $2`, customerKey, base.Revision).Scan(&baseStatus); err != nil {
+		t.Fatalf("read base revision status: %v", err)
+	}
+	if baseStatus != biz.CustomerConfigStatusSuperseded {
+		t.Fatalf("base revision status = %q, want %q", baseStatus, biz.CustomerConfigStatusSuperseded)
+	}
+	if count := customerConfigPostgresApplyAuditCount(t, ctx, data, customerKey); count != 1 {
+		t.Fatalf("approval settings apply audit count = %d, want 1", count)
+	}
 }
 
-func assertCustomerConfigPostgresCheckViolation(t *testing.T, err error) {
-	t.Helper()
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != "23514" {
-		t.Fatalf("tamper error = %v, want PostgreSQL 23514", err)
+func TestCustomerConfigPostgresConcurrentApprovalSettingsApplyLeavesNoLoserRevision(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	data, _ := openPurchaseReceiptPostgresTestData(t)
+	repo := NewCustomerConfigRepo(data, log.NewStdLogger(io.Discard))
+	customerKey := "cc-approval-race-" + strings.ToLower(postgresTestSuffix())
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	base := customerConfigPostgresPublishInput(customerKey, "rev-base", "base")
+	if _, err := repo.PublishCustomerConfig(ctx, base, "hash-base", 30, now); err != nil {
+		t.Fatalf("publish base revision: %v", err)
+	}
+	if _, err := repo.ActivateCustomerConfig(
+		ctx,
+		customerKey,
+		base.Revision,
+		"hash-base",
+		base.ProductVersion,
+		"",
+		30,
+		now.Add(time.Second),
+	); err != nil {
+		t.Fatalf("activate base revision: %v", err)
+	}
+
+	candidates := []struct {
+		revision string
+		marker   string
+		hash     string
+	}{
+		{revision: "rev-a", marker: "candidate-a", hash: "hash-a"},
+		{revision: "rev-b", marker: "candidate-b", hash: "hash-b"},
+	}
+	start := make(chan struct{})
+	results := make(chan customerConfigPostgresPublishResult, len(candidates))
+	var wg sync.WaitGroup
+	for index, candidate := range candidates {
+		index, candidate := index, candidate
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			in := customerConfigPostgresPublishInput(customerKey, candidate.revision, candidate.marker)
+			item, err := repo.ApplyApprovalSettingsRevision(
+				ctx,
+				in,
+				candidate.hash,
+				base.Revision,
+				"hash-base",
+				40+index,
+				now.Add(time.Duration(index+2)*time.Second),
+			)
+			results <- customerConfigPostgresPublishResult{
+				marker: candidate.marker,
+				hash:   candidate.hash,
+				item:   item,
+				err:    err,
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+
+	successCount := 0
+	conflictCount := 0
+	var winner customerConfigPostgresPublishResult
+	for result := range results {
+		switch {
+		case result.err == nil:
+			successCount++
+			winner = result
+		case errors.Is(result.err, biz.ErrCustomerConfigActiveRevisionChanged):
+			conflictCount++
+		default:
+			t.Fatalf("unexpected concurrent approval settings apply error: %v", result.err)
+		}
+	}
+	if successCount != 1 || conflictCount != 1 {
+		t.Fatalf("apply success/conflict = %d/%d, want 1/1", successCount, conflictCount)
+	}
+	if winner.item == nil || winner.item.Status != biz.CustomerConfigStatusActive {
+		t.Fatalf("winner = %#v", winner)
+	}
+
+	var totalCount, activeCount, intermediateCount int
+	if err := data.sqldb.QueryRowContext(ctx, `
+SELECT count(*),
+       count(*) FILTER (WHERE status = 'active'),
+       count(*) FILTER (WHERE status IN ('building', 'published'))
+FROM customer_config_revisions
+WHERE customer_key = $1`, customerKey).Scan(&totalCount, &activeCount, &intermediateCount); err != nil {
+		t.Fatalf("count concurrent apply revisions: %v", err)
+	}
+	if totalCount != 2 || activeCount != 1 || intermediateCount != 0 {
+		t.Fatalf("revision counts total/active/intermediate = %d/%d/%d, want 2/1/0", totalCount, activeCount, intermediateCount)
+	}
+	if count := customerConfigPostgresApplyAuditCount(t, ctx, data, customerKey); count != 1 {
+		t.Fatalf("concurrent apply audit count = %d, want 1", count)
 	}
 }
 
@@ -589,6 +705,21 @@ func customerConfigPostgresPublishAuditCount(t *testing.T, ctx context.Context, 
 	  AND event_key = 'customer_config.publish'
 	  AND payload::jsonb->'target'->>'key' = $1`, customerKey+"/"+revision).Scan(&count); err != nil {
 		t.Fatalf("count publish audit events: %v", err)
+	}
+	return count
+}
+
+func customerConfigPostgresApplyAuditCount(t *testing.T, ctx context.Context, data *Data, customerKey string) int {
+	t.Helper()
+	var count int
+	if err := data.sqldb.QueryRowContext(ctx, `
+	SELECT count(*)
+	FROM runtime_audit_events
+	WHERE source = 'customer_config'
+	  AND event_type = 'customer_config_control_plane'
+	  AND event_key = 'customer_config.approval_settings.apply'
+	  AND payload::jsonb->'target'->>'key' LIKE $1`, customerKey+"/%").Scan(&count); err != nil {
+		t.Fatalf("count approval settings apply audit events: %v", err)
 	}
 	return count
 }

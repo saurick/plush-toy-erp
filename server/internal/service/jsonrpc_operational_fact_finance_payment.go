@@ -173,7 +173,7 @@ func financePaymentToMap(item *biz.FinancePayment) map[string]any {
 	}
 	allocations := make([]any, 0, len(item.Allocations))
 	for _, a := range item.Allocations {
-		allocations = append(allocations, map[string]any{"id": a.ID, "finance_fact_id": a.FinanceFactID, "amount": a.Amount.String(), "currency": a.Currency, "status": a.Status, "reversal_of_allocation_id": optionalIntValue(a.ReversalOfAllocationID)})
+		allocations = append(allocations, map[string]any{"id": a.ID, "finance_fact_id": a.FinanceFactID, "finance_fact_no": a.FinanceFactNo, "finance_fact_type": a.FinanceFactType, "finance_fact_original_amount": a.FinanceFactOriginalAmount.String(), "finance_fact_outstanding_amount": a.FinanceFactOutstandingAmount.String(), "amount": a.Amount.String(), "currency": a.Currency, "status": a.Status, "reversal_of_allocation_id": optionalIntValue(a.ReversalOfAllocationID)})
 	}
 	return map[string]any{
 		"id":                item.ID,
@@ -211,5 +211,5 @@ func financeCreditNoteToMap(item *biz.FinanceCreditNote) map[string]any {
 	if item == nil {
 		return nil
 	}
-	return map[string]any{"id": item.ID, "credit_note_no": item.CreditNoteNo, "finance_fact_id": item.FinanceFactID, "reversal_of_credit_note_id": optionalIntValue(item.ReversalOfCreditNoteID), "amount": item.Amount.String(), "currency": item.Currency, "status": item.Status, "reason": item.Reason}
+	return map[string]any{"id": item.ID, "credit_note_no": item.CreditNoteNo, "finance_fact_id": item.FinanceFactID, "finance_fact_no": item.FinanceFactNo, "finance_fact_type": item.FinanceFactType, "finance_fact_original_amount": item.FinanceFactOriginalAmount.String(), "finance_fact_outstanding_amount": item.FinanceFactOutstandingAmount.String(), "reversal_of_credit_note_id": optionalIntValue(item.ReversalOfCreditNoteID), "amount": item.Amount.String(), "currency": item.Currency, "status": item.Status, "reason": item.Reason}
 }

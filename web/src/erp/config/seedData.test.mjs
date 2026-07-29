@@ -109,6 +109,8 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   const navPaths = businessSections.flatMap((section) =>
     section.items.map((item) => item.path)
   )
+  const financeItems =
+    businessSections.find((section) => section.key === 'finance')?.items || []
 
   assert.equal(businessSections.length, 10)
   assert(navLabels.includes('客户档案'))
@@ -126,14 +128,29 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(navLabels.includes('生产订单'))
   assert(navLabels.includes('生产排程'))
   assert(navLabels.includes('生产进度'))
-  assert(navLabels.includes('生产异常'))
+  assert(navLabels.includes('生产异常处置'))
   assert(navLabels.includes('出货放行'))
   assert(navLabels.includes('出库管理'))
   assert(navLabels.includes('出货单'))
   assert(navLabels.includes('对账管理'))
   assert(navLabels.includes('应付管理'))
   assert(navLabels.includes('应收管理'))
+  assert(navLabels.includes('收付款核销'))
   assert(navLabels.includes('发票管理'))
+  assert.deepEqual(
+    financeItems.map((item) => [item.key, item.label]),
+    [
+      ['reconciliation', '对账管理'],
+      ['receivables', '应收管理'],
+      ['payables', '应付管理'],
+      ['finance-payments', '收付款核销'],
+      ['invoices', '发票管理'],
+    ]
+  )
+  assert.equal(
+    financeItems.find((item) => item.key === 'finance-payments')?.title,
+    '收付款与核销'
+  )
   assert(!navLabels.includes('客户/供应商'))
   assert(!navLabels.includes('订单/款式立项'))
   assert(!navLabels.includes('外销'))

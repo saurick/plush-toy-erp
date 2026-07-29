@@ -1,16 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Button,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Popconfirm,
-  Select,
-  Space,
-  Table,
-  Tag,
-} from 'antd'
+import { Alert, Button, Form, Input, Popconfirm, Select, Space, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -20,10 +9,18 @@ import {
   cancelSalesReturn,
   createSalesReturn,
   getSalesReturn,
+  listAllSalesReturns,
   listAllShipments,
   listSalesReturns,
   reverseSalesReturn,
 } from '../api/operationalFactApi.mjs'
+import {
+  listAllProducts,
+  listAllProductSKUs,
+  listAllUnits,
+  listAllWarehouses,
+} from '../api/masterDataOrderApi.mjs'
+import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import {
   executeSalesReturnReceive,
   findExceptionProcessActiveNode,
@@ -32,15 +29,19 @@ import {
 } from '../api/customerConfigApi.mjs'
 import {
   BusinessActionTooltip,
+  BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
   PageHeaderCard,
   SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
+  ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -58,8 +59,12 @@ import {
   sourceBusinessActionUUID,
 } from '../utils/sourceBusinessAction.mjs'
 import {
+  addNumeric20Scale6Units,
+  compareNumeric20Scale6Units,
   isPositiveNumeric20Scale6Units,
+  numeric20Scale6TextFromUnits,
   numeric20Scale6Units,
+  subtractNumeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
 
 const STATUS_OPTIONS = [
@@ -122,6 +127,20 @@ function shipmentOption(shipment) {
   }
 }
 
+function referenceLabel(record, codeKeys, nameKeys, fallback) {
+  const code = codeKeys
+    .map((key) => String(record?.[key] || '').trim())
+    .find(Boolean)
+  const name = nameKeys
+    .map((key) => String(record?.[key] || '').trim())
+    .find(Boolean)
+  return [code, name].filter(Boolean).join(' / ') || fallback
+}
+
+function referenceByID(records, id) {
+  return records.find((item) => Number(item?.id) === Number(id || 0)) || null
+}
+
 export default function SalesReturnsPage() {
   const [searchParams] = useSearchParams()
   const outletContext = useOutletContext()
@@ -141,9 +160,23 @@ export default function SalesReturnsPage() {
   const [reverseOpen, setReverseOpen] = useState(false)
   const [reverseReason, setReverseReason] = useState('')
   const [shipments, setShipments] = useState([])
+  const [referenceLoading, setReferenceLoading] = useState(false)
+  const [references, setReferences] = useState({
+    products: [],
+    productSKUs: [],
+    units: [],
+    warehouses: [],
+    lots: [],
+  })
+  const [returnUsage, setReturnUsage] = useState({
+    shipmentID: 0,
+    status: 'idle',
+    byShipmentItemID: {},
+  })
+  const [usageRetryKey, setUsageRetryKey] = useState(0)
   const [form] = Form.useForm()
-  const requestRef = useRef(0)
   const attemptsRef = useRef(createSourceBusinessActionAttemptStore())
+  const beginLatestRequest = useLatestRequestCoordinator()
   const selectedShipmentID = Form.useWatch('shipment_id', form)
   const linkedSalesReturnID = Number(searchParams.get('sales_return_id') || 0)
   const selectedShipment = useMemo(
@@ -153,6 +186,62 @@ export default function SalesReturnsPage() {
       ) || null,
     [selectedShipmentID, shipments]
   )
+  const selectedShipmentItems = useMemo(() => {
+    if (!selectedShipment) return []
+    return (selectedShipment.items || []).map((item, index) => {
+      const product = referenceByID(references.products, item.product_id)
+      const productSKU = referenceByID(
+        references.productSKUs,
+        item.product_sku_id
+      )
+      const warehouse = referenceByID(references.warehouses, item.warehouse_id)
+      const unit = referenceByID(references.units, item.unit_id)
+      const lot = referenceByID(references.lots, item.lot_id)
+      const sourceUnits = numeric20Scale6Units(item.quantity) || '0'
+      const returnedUnits =
+        returnUsage.shipmentID === Number(selectedShipment.id)
+          ? returnUsage.byShipmentItemID[item.id] || '0'
+          : '0'
+      const remainingUnits =
+        subtractNumeric20Scale6Units(sourceUnits, returnedUnits) || '0'
+      return {
+        ...item,
+        productLabel: referenceLabel(
+          product,
+          ['product_code', 'code'],
+          ['product_name', 'name'],
+          `产品明细 ${index + 1}`
+        ),
+        skuLabel: item.product_sku_id
+          ? referenceLabel(
+              productSKU,
+              ['sku_code', 'code'],
+              ['sku_name', 'name'],
+              'SKU 已关联'
+            )
+          : '未指定 SKU',
+        warehouseLabel: referenceLabel(
+          warehouse,
+          ['warehouse_code', 'code'],
+          ['warehouse_name', 'name'],
+          '仓库已关联'
+        ),
+        unitLabel: referenceLabel(
+          unit,
+          ['unit_code', 'code'],
+          ['unit_name', 'name'],
+          '单位'
+        ),
+        lotLabel: item.lot_id
+          ? referenceLabel(lot, ['lot_no'], [], '批次已关联')
+          : '未指定来源批次',
+        sourceQuantity: numeric20Scale6TextFromUnits(sourceUnits),
+        activeReturnedQuantity: numeric20Scale6TextFromUnits(returnedUnits),
+        remainingQuantity: numeric20Scale6TextFromUnits(remainingUnits),
+        remainingUnits,
+      }
+    })
+  }, [references, returnUsage, selectedShipment])
 
   const canCreate = hasActionPermission(adminProfile, 'sales_return.create')
   const canReceive = hasActionPermission(adminProfile, 'sales_return.receive')
@@ -164,27 +253,21 @@ export default function SalesReturnsPage() {
   )
 
   const loadRows = useCallback(async () => {
-    const sequence = requestRef.current + 1
-    requestRef.current = sequence
+    const request = beginLatestRequest('sales-return-list')
     setLoading(true)
     try {
-      const [data, shipmentData] = await Promise.all([
-        listSalesReturns(
-          compactParams({
-            status,
-            ...getBusinessPaginationParams(pagination),
-          })
-        ),
-        listAllShipments({}),
-      ])
-      if (requestRef.current !== sequence) return
+      const data = await listSalesReturns(
+        compactParams({
+          status,
+          ...getBusinessPaginationParams(pagination),
+        }),
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) return
       const nextRows = Array.isArray(data?.sales_returns)
         ? data.sales_returns
         : []
       setRows(nextRows)
-      setShipments(
-        Array.isArray(shipmentData?.shipments) ? shipmentData.shipments : []
-      )
       setTotal(Number(data?.total || 0))
       setSelected((current) =>
         current?.id
@@ -193,22 +276,94 @@ export default function SalesReturnsPage() {
           : null
       )
     } catch (error) {
-      if (requestRef.current !== sequence || isRpcAbortError(error)) return
+      if (!request.isCurrent() || isRpcAbortError(error)) return
       message.error(getActionErrorMessage(error, '加载客户退货记录'))
     } finally {
-      if (requestRef.current === sequence) setLoading(false)
+      if (request.isCurrent()) setLoading(false)
+      request.finish()
     }
-  }, [linkedSalesReturnID, pagination, status])
+  }, [beginLatestRequest, linkedSalesReturnID, pagination, status])
+
+  const loadReferences = useCallback(async () => {
+    const request = beginLatestRequest('sales-return-references')
+    setReferenceLoading(true)
+    try {
+      const results = await Promise.allSettled([
+        listAllShipments({ status: 'SHIPPED' }, { signal: request.signal }),
+        listAllProducts({}, { signal: request.signal }),
+        listAllProductSKUs({}, { signal: request.signal }),
+        listAllUnits({}, { signal: request.signal }),
+        listAllWarehouses({}, { signal: request.signal }),
+        listAllInventoryLots({}, { signal: request.signal }),
+      ])
+      if (!request.isCurrent()) return
+      const [
+        shipmentResult,
+        productResult,
+        skuResult,
+        unitResult,
+        warehouseResult,
+        lotResult,
+      ] = results
+      if (shipmentResult.status === 'fulfilled') {
+        setShipments(
+          Array.isArray(shipmentResult.value?.shipments)
+            ? shipmentResult.value.shipments
+            : []
+        )
+      } else if (!isRpcAbortError(shipmentResult.reason)) {
+        message.error(
+          getActionErrorMessage(shipmentResult.reason, '加载可退货出货记录')
+        )
+      }
+      const optionalResults = [
+        ['products', 'products', productResult],
+        ['productSKUs', 'product_skus', skuResult],
+        ['units', 'units', unitResult],
+        ['warehouses', 'warehouses', warehouseResult],
+        ['lots', 'inventory_lots', lotResult],
+      ]
+      setReferences((current) =>
+        optionalResults.reduce(
+          (next, [stateKey, responseKey, result]) => {
+            if (result.status === 'fulfilled') {
+              next[stateKey] = Array.isArray(result.value?.[responseKey])
+                ? result.value[responseKey]
+                : []
+            }
+            return next
+          },
+          { ...current }
+        )
+      )
+      if (
+        optionalResults.some(
+          ([, , result]) =>
+            result.status === 'rejected' && !isRpcAbortError(result.reason)
+        )
+      ) {
+        message.warning('部分产品、仓库或批次名称暂未加载，退货事实未受影响')
+      }
+    } finally {
+      if (request.isCurrent()) setReferenceLoading(false)
+      request.finish()
+    }
+  }, [beginLatestRequest])
+
+  const refreshPage = useCallback(
+    () => Promise.allSettled([loadRows(), loadReferences()]),
+    [loadReferences, loadRows]
+  )
 
   useEffect(() => {
     loadRows()
-    return () => {
-      requestRef.current += 1
-    }
   }, [loadRows])
+  useEffect(() => {
+    loadReferences()
+  }, [loadReferences])
   useEffect(
-    () => outletContext?.registerPageRefresh?.(loadRows),
-    [loadRows, outletContext]
+    () => outletContext?.registerPageRefresh?.(refreshPage),
+    [outletContext, refreshPage]
   )
   useEffect(() => {
     if (
@@ -308,7 +463,69 @@ export default function SalesReturnsPage() {
   }
 
   useEffect(() => {
-    if (!createOpen || !selectedShipment) return
+    const request = beginLatestRequest('sales-return-entitlement')
+    if (!createOpen || !selectedShipment?.id) {
+      setReturnUsage({
+        shipmentID: 0,
+        status: 'idle',
+        byShipmentItemID: {},
+      })
+      request.finish()
+      return
+    }
+    const shipmentID = Number(selectedShipment.id)
+    setReturnUsage({
+      shipmentID,
+      status: 'loading',
+      byShipmentItemID: {},
+    })
+    listAllSalesReturns({ shipment_id: shipmentID }, { signal: request.signal })
+      .then((result) => {
+        if (!request.isCurrent()) return
+        const byShipmentItemID = {}
+        for (const salesReturn of result?.sales_returns || []) {
+          if (!['DRAFT', 'APPROVED', 'RECEIVED'].includes(salesReturn.status)) {
+            continue
+          }
+          for (const item of salesReturn.items || []) {
+            const itemID = Number(item?.shipment_item_id || 0)
+            const quantityUnits = numeric20Scale6Units(item?.quantity)
+            if (!itemID || quantityUnits === null) {
+              throw new Error('历史退货数量无法确认')
+            }
+            byShipmentItemID[itemID] = addNumeric20Scale6Units(
+              byShipmentItemID[itemID] || '0',
+              quantityUnits
+            )
+          }
+        }
+        setReturnUsage({
+          shipmentID,
+          status: 'success',
+          byShipmentItemID,
+        })
+      })
+      .catch((error) => {
+        if (!request.isCurrent() || isRpcAbortError(error)) return
+        setReturnUsage({
+          shipmentID,
+          status: 'error',
+          byShipmentItemID: {},
+        })
+        message.error(getActionErrorMessage(error, '核对来源出货的可退数量'))
+      })
+      .finally(request.finish)
+  }, [beginLatestRequest, createOpen, selectedShipment, usageRetryKey])
+
+  useEffect(() => {
+    if (
+      !createOpen ||
+      !selectedShipment ||
+      returnUsage.shipmentID !== Number(selectedShipment.id) ||
+      returnUsage.status !== 'success'
+    ) {
+      return
+    }
     form.setFieldsValue({
       return_no: sourceBusinessActionNo(
         'RMA',
@@ -316,13 +533,19 @@ export default function SalesReturnsPage() {
         sourceBusinessActionUUID()
       ),
       reason: '',
-      items: (selectedShipment.items || []).map((item, index) => ({
-        label: `出货明细 ${index + 1} / 已出货 ${item.quantity || '-'}`,
+      items: selectedShipmentItems.map(() => ({
         quantity: '',
         note: '',
       })),
     })
-  }, [createOpen, form, selectedShipment])
+  }, [
+    createOpen,
+    form,
+    returnUsage.shipmentID,
+    returnUsage.status,
+    selectedShipment,
+    selectedShipmentItems,
+  ])
 
   const submitCreate = async () => {
     let values
@@ -331,9 +554,15 @@ export default function SalesReturnsPage() {
     } catch {
       return
     }
-    const sourceItems = Array.isArray(selectedShipment?.items)
-      ? selectedShipment.items
-      : []
+    if (
+      !selectedShipment?.id ||
+      returnUsage.shipmentID !== Number(selectedShipment.id) ||
+      returnUsage.status !== 'success'
+    ) {
+      message.error('来源出货的可退数量尚未核对完成，请稍后重试')
+      return
+    }
+    const sourceItems = selectedShipmentItems
     const requestedItems = (values.items || [])
       .map((item, index) => ({ item, sourceItem: sourceItems[index] }))
       .filter(({ item }) => String(item.quantity || '').trim())
@@ -343,12 +572,16 @@ export default function SalesReturnsPage() {
     }
     if (
       requestedItems.some(
-        ({ sourceItem }) =>
+        ({ item, sourceItem }) =>
           !Number.isSafeInteger(Number(sourceItem?.id)) ||
-          Number(sourceItem?.id) <= 0
+          Number(sourceItem?.id) <= 0 ||
+          compareNumeric20Scale6Units(
+            numeric20Scale6Units(item.quantity),
+            sourceItem.remainingUnits
+          ) === 1
       )
     ) {
-      message.error('来源出货明细暂时无法确认，请重新选择来源出货')
+      message.error('退货数量超过当前可退数量，请核对来源出货明细')
       return
     }
     const items = requestedItems.map(({ item, sourceItem }) => ({
@@ -525,9 +758,11 @@ export default function SalesReturnsPage() {
       key: 'shipment',
       width: 150,
       render: (_, record) =>
+        record.shipment_no ||
         shipments.find(
           (shipment) => Number(shipment.id) === Number(record.shipment_id)
-        )?.shipment_no || '已关联出货单',
+        )?.shipment_no ||
+        '已关联出货单',
     },
     { title: '状态', dataIndex: 'status', width: 150, render: statusTag },
     { title: '退货原因', dataIndex: 'reason', width: 300 },
@@ -556,6 +791,75 @@ export default function SalesReturnsPage() {
       render: formatUnixDateTime,
     },
   ]
+  const detailLineItems = {
+    title: '退货明细',
+    items: Array.isArray(detail?.items) ? detail.items : [],
+    emptyDescription: '当前退货单暂无明细',
+    getItemKey: (item) => item?.id,
+    getItemLabel: (item, { index }) =>
+      [
+        item?.product_code,
+        item?.product_name,
+        item?.product_sku_code,
+        item?.product_sku_name,
+      ]
+        .filter(Boolean)
+        .join(' / ') || `退货明细 ${index + 1}`,
+    getItemSummary: (item) =>
+      `${item?.quantity || '-'} ${item?.unit_code || item?.unit_name || ''}`,
+    getItemFields: (item) => [
+      {
+        key: 'warehouse',
+        label: '退回仓库',
+        value:
+          [item?.warehouse_code, item?.warehouse_name]
+            .filter(Boolean)
+            .join(' / ') || '仓库已关联',
+      },
+      {
+        key: 'lot',
+        label: '退货批次',
+        value: item?.lot_no || '退货批次已生成',
+      },
+      {
+        key: 'source',
+        label: '来源出货数量',
+        value:
+          item?.source_shipped_quantity ||
+          item?.shipment_quantity ||
+          item?.source_quantity ||
+          '-',
+      },
+      {
+        key: 'active-returned',
+        label: '累计有效退货',
+        value: item?.active_returned_quantity ?? '-',
+      },
+      {
+        key: 'remaining',
+        label: '当前可退数量',
+        value: item?.remaining_returnable_quantity ?? '-',
+      },
+      {
+        key: 'quality',
+        label: '退货质检',
+        value:
+          [
+            item?.current_quality_inspection_no,
+            item?.current_quality_inspection_status,
+            item?.current_quality_inspection_result,
+          ]
+            .filter(Boolean)
+            .join(' / ') || '待质检',
+      },
+      {
+        key: 'note',
+        label: '明细备注',
+        value: item?.note || '-',
+        wide: true,
+      },
+    ],
+  }
 
   return (
     <BusinessPageLayout className="erp-sales-returns-page">
@@ -583,6 +887,7 @@ export default function SalesReturnsPage() {
         compact
         filters={
           <SelectFilter
+            className="erp-business-filter-control--status"
             value={status}
             options={STATUS_OPTIONS}
             onChange={(value) => {
@@ -591,11 +896,15 @@ export default function SalesReturnsPage() {
             }}
           />
         }
-        actions={
+        primaryAction={
           canCreate ? (
-            <Button type="primary" onClick={openCreate}>
+            <ToolbarButton
+              type="primary"
+              className="erp-business-list-toolbar__primary-action"
+              onClick={openCreate}
+            >
               新建客户退货
-            </Button>
+            </ToolbarButton>
           ) : null
         }
       >
@@ -658,8 +967,8 @@ export default function SalesReturnsPage() {
               <BusinessActionTooltip
                 disabled={!selected || saving}
                 disabledReason={
-                  saving ? '当前操作完成后可取消' : '请先选择一条客户退货'
-                }
+                saving ? '当前操作完成后可取消' : '请先选择一条客户退货'
+              }
               >
                 <Button
                   danger
@@ -699,8 +1008,7 @@ export default function SalesReturnsPage() {
           />
         </SelectionActionBar>
       </BusinessOperationPanel>
-      <Table
-        className="erp-business-data-table-card"
+      <BusinessDataTable
         rowKey="id"
         loading={loading}
         columns={columns}
@@ -718,20 +1026,33 @@ export default function SalesReturnsPage() {
             setSelected(selectedRows[0] || null),
         }}
         onRow={(record) => ({ onClick: () => setSelected(record) })}
-        locale={{ emptyText: <Empty description="暂无客户退货记录" /> }}
+        onOpenRecord={(record) => setDetail(record)}
+        emptyDescription="暂无客户退货记录"
       />
-      <Modal
+      <BusinessFormModal
+        className="erp-business-action-modal--operational-fact"
         title="新建客户退货"
+        description="只允许选择已出货记录；系统会核对累计有效退货与当前可退数量。"
         open={createOpen}
         width={900}
         okText="提交退货申请"
         cancelText="取消"
         confirmLoading={saving}
+        okButtonProps={{
+          disabled:
+            Boolean(selectedShipment) && returnUsage.status !== 'success',
+        }}
         destroyOnHidden
         onCancel={() => !saving && setCreateOpen(false)}
         onOk={submitCreate}
       >
-        <Form form={form} layout="vertical" preserve={false} disabled={saving}>
+        <Form
+          form={form}
+          className="erp-business-action-form"
+          layout="vertical"
+          preserve={false}
+          disabled={saving}
+        >
           <Form.Item
             name="shipment_id"
             label="来源出货"
@@ -740,11 +1061,39 @@ export default function SalesReturnsPage() {
             <Select
               showSearch
               optionFilterProp="label"
-              options={shipments
-                .filter((shipment) => shipment.status === 'SHIPPED')
-                .map(shipmentOption)}
+              loading={referenceLoading}
+              options={shipments.map(shipmentOption)}
             />
           </Form.Item>
+          {selectedShipment ? (
+            <Alert
+              showIcon
+              type={
+                returnUsage.status === 'error'
+                  ? 'error'
+                  : returnUsage.status === 'success'
+                    ? 'success'
+                    : 'info'
+              }
+              message={
+                returnUsage.status === 'error'
+                  ? '可退数量核对失败，提交已停用'
+                  : returnUsage.status === 'success'
+                    ? '已核对来源出货与累计有效退货数量'
+                    : '正在核对来源出货的当前可退数量'
+              }
+              action={
+                returnUsage.status === 'error' ? (
+                  <Button
+                    size="small"
+                    onClick={() => setUsageRetryKey((value) => value + 1)}
+                  >
+                    重试
+                  </Button>
+                ) : null
+              }
+            />
+          ) : null}
           <Form.Item
             name="return_no"
             label="退货单号"
@@ -766,40 +1115,111 @@ export default function SalesReturnsPage() {
           <Form.List name="items">
             {(fields) => (
               <Space direction="vertical" style={{ width: '100%' }}>
-                {fields.map((field) => (
-                  <Space key={field.key} align="start" wrap>
-                    <Form.Item name={[field.name, 'label']} label="出货明细">
-                      <Input disabled style={{ width: 260 }} />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'quantity']}
-                      label="退货数量"
-                      rules={[
-                        {
-                          validator: (_, value) =>
-                            !String(value || '').trim() ||
-                            isPositiveNumeric20Scale6Units(
-                              numeric20Scale6Units(value)
-                            )
-                              ? Promise.resolve()
-                              : Promise.reject(new Error('数量必须大于 0')),
-                        },
-                      ]}
-                    >
-                      <Input inputMode="decimal" style={{ width: 140 }} />
-                    </Form.Item>
-                    <Form.Item name={[field.name, 'note']} label="明细备注">
-                      <Input maxLength={255} style={{ width: 220 }} />
-                    </Form.Item>
-                  </Space>
-                ))}
+                {fields.map((field) => {
+                  const sourceItem = selectedShipmentItems[field.name]
+                  const productLabel = [
+                    sourceItem?.productLabel,
+                    sourceItem?.skuLabel,
+                  ]
+                    .filter(Boolean)
+                    .join(' / ')
+                  return (
+                    <Space key={field.key} align="start" size={12} wrap>
+                      <Form.Item label="产品 / SKU">
+                        <Input
+                          aria-label="产品 / SKU"
+                          disabled
+                          value={productLabel}
+                          style={{ width: 300 }}
+                        />
+                      </Form.Item>
+                      <Form.Item label="来源仓库">
+                        <Input
+                          aria-label="来源仓库"
+                          disabled
+                          value={sourceItem?.warehouseLabel || ''}
+                          style={{ width: 180 }}
+                        />
+                      </Form.Item>
+                      <Form.Item label="来源批次">
+                        <Input
+                          aria-label="来源批次"
+                          disabled
+                          value={sourceItem?.lotLabel || ''}
+                          style={{ width: 180 }}
+                        />
+                      </Form.Item>
+                      <Form.Item label="已出货">
+                        <Input
+                          aria-label="已出货"
+                          disabled
+                          value={sourceItem?.sourceQuantity || ''}
+                          style={{ width: 110 }}
+                        />
+                      </Form.Item>
+                      <Form.Item label="已退货">
+                        <Input
+                          aria-label="已退货"
+                          disabled
+                          value={sourceItem?.activeReturnedQuantity || ''}
+                          style={{ width: 110 }}
+                        />
+                      </Form.Item>
+                      <Form.Item label="当前可退">
+                        <Input
+                          aria-label="当前可退"
+                          disabled
+                          value={sourceItem?.remainingQuantity || ''}
+                          style={{ width: 110 }}
+                        />
+                      </Form.Item>
+                      <Form.Item label="单位">
+                        <Input
+                          aria-label="单位"
+                          disabled
+                          value={sourceItem?.unitLabel || ''}
+                          style={{ width: 120 }}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        name={[field.name, 'quantity']}
+                        label="退货数量"
+                        rules={[
+                          {
+                            validator: (_, value) =>
+                              !String(value || '').trim() ||
+                              (isPositiveNumeric20Scale6Units(
+                                numeric20Scale6Units(value)
+                              ) &&
+                                compareNumeric20Scale6Units(
+                                  numeric20Scale6Units(value),
+                                  sourceItem?.remainingUnits
+                                ) !== 1)
+                                ? Promise.resolve()
+                                : Promise.reject(
+                                    new Error(
+                                      '数量须大于 0 且不超过当前可退数量'
+                                    )
+                                  ),
+                          },
+                        ]}
+                      >
+                        <Input inputMode="decimal" style={{ width: 140 }} />
+                      </Form.Item>
+                      <Form.Item name={[field.name, 'note']} label="明细备注">
+                        <Input maxLength={255} style={{ width: 220 }} />
+                      </Form.Item>
+                    </Space>
+                  )
+                })}
               </Space>
             )}
           </Form.List>
         </Form>
-      </Modal>
-      <Modal
+      </BusinessFormModal>
+      <BusinessFormModal
         title="冲正客户退货入库"
+        description="冲正会补偿库存事实并保留原退货与质检审计记录。"
         open={reverseOpen}
         okText="确认冲正"
         cancelText="返回"
@@ -822,9 +1242,10 @@ export default function SalesReturnsPage() {
           placeholder="请填写冲正原因"
           onChange={(event) => setReverseReason(event.target.value)}
         />
-      </Modal>
-      <Modal
+      </BusinessFormModal>
+      <BusinessFormModal
         title="取消客户退货"
+        description="取消不会删除退货单；已进入流程的记录仍保留审计。"
         open={cancelOpen}
         okText="确认取消"
         cancelText="返回"
@@ -847,13 +1268,14 @@ export default function SalesReturnsPage() {
           placeholder="请填写取消原因"
           onChange={(event) => setCancelReason(event.target.value)}
         />
-      </Modal>
+      </BusinessFormModal>
       <BusinessRecordDetailsModal
         open={Boolean(detail)}
         title="客户退货详情"
         description="明细来源于已出货记录；页面不显示内部关联编号。"
         record={detail}
         columns={columns}
+        lineItems={detailLineItems}
         onClose={() => setDetail(null)}
       />
     </BusinessPageLayout>

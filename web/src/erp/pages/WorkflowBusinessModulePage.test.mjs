@@ -29,6 +29,47 @@ test('workflow business page consumes the dashboard source keyword without mutat
   )
 })
 
+test('production exception disposition page separates applications and pending approvals into accessible tabs', () => {
+  assert.match(source, /import \{[^}]*Tabs[^}]*\} from 'antd'/u)
+  assert.match(source, /label: '处置申请'/u)
+  assert.match(source, /label: '待审批'/u)
+  assert.match(source, /aria-label="生产异常处置工作区"/u)
+  assert.match(
+    source,
+    /'production-exceptions': \{[\s\S]*ownerRoleOptions: \[workflowRoleOption\('boss'\)\]/u
+  )
+  assert.match(source, /destroyOnHidden/u)
+  assert.match(source, /activeKey=\{effectiveProductionExceptionTab\}/u)
+  assert.match(source, /onChange=\{handleProductionExceptionTabChange\}/u)
+  assert.match(
+    source,
+    /label: '待审批',[\s\S]*<BusinessPageLayout className="erp-workflow-business-page__tab-workspace">[\s\S]*\{workflowTaskWorkspace\}[\s\S]*<\/BusinessPageLayout>/u
+  )
+  assert.match(
+    source,
+    /linkedProductionExceptionID > 0[\s\S]*PRODUCTION_EXCEPTION_TAB_KEYS\.DECISIONS/u
+  )
+  assert.match(
+    source,
+    /linkedKeyword && canReadWorkflowTasks[\s\S]*PRODUCTION_EXCEPTION_TAB_KEYS\.TASKS/u
+  )
+})
+
+test('production exception disposition tabs refresh and summarize only the active workspace', () => {
+  assert.match(source, /生产异常处置申请已刷新/u)
+  assert.match(source, /productionExceptionRefreshRef\.current/u)
+  assert.match(source, /label: '异常记录'/u)
+  assert.match(source, /label: '当前显示'/u)
+  assert.match(
+    source,
+    /if \(!isWorkflowTaskWorkspaceActive\) \{[\s\S]*request\.finish\(\)[\s\S]*return false/u
+  )
+  assert.match(
+    source,
+    /selectedTask && canReadWorkflowTasks && isWorkflowTaskWorkspaceActive/u
+  )
+})
+
 test('workflow business page delegates filters and pagination to list_tasks', () => {
   assert.match(source, /buildWorkflowBusinessTaskQuery/u)
   assert.match(source, /taskGroup:\s*config\.taskGroup/u)
@@ -114,7 +155,13 @@ test('production exception decision reads expose only real decision-list permiss
   assert.doesNotMatch(productionExceptionPanel, /quality\.inspection\.read/u)
   assert.match(
     productionExceptionPanel,
-    /if \(!canRead\) \{\s*setRows\(\[\]\)\s*return \[\]\s*\}[\s\S]*listProductionExceptions/u
+    /if \(!canRead\) \{[\s\S]*setRows\(\[\]\)[\s\S]*return \[\][\s\S]*listProductionExceptions/u
   )
   assert.match(productionExceptionPanel, /if \(!canRead\) return null/u)
+  assert.match(
+    productionExceptionPanel,
+    /listProductionExceptions\([\s\S]*signal: request\.signal/u
+  )
+  assert.match(productionExceptionPanel, /isRpcAbortError/u)
+  assert.match(productionExceptionPanel, /onRefreshReady\?\.\(load\)/u)
 })

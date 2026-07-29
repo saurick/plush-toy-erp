@@ -209,7 +209,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'quality',
     label: '品质',
     description:
-      '可使用工作台、任务看板、业务看板、基础资料、入库、来料质检、生产异常和出货放行。',
+      '可使用工作台、任务看板、业务看板、基础资料、入库、来料质检、生产异常处置和出货放行。',
     mobileRolePermissions: buildMobileRolePreset(['quality']),
     permissions: buildPreset([
       '/erp/dashboard',

@@ -96,13 +96,11 @@ func TestAdminManageRepoRevokeIsTransactionalAndReleasesActiveTasks(t *testing.T
 		SetTaskCode("LEAVE-001").SetTaskGroup("sales").SetTaskName("待跟进订单").
 		SetSourceType("sales_order").SetSourceID(1).SetTaskStatusKey("ready").
 		SetOwnerRoleKey("sales").SetAssigneeID(target.ID).SaveX(ctx)
-	if _, err := sqldb.ExecContext(ctx, `
-CREATE TRIGGER reject_admin_lifecycle_audit
-BEFORE INSERT ON runtime_audit_events
-BEGIN
-  SELECT RAISE(ABORT, 'forced audit failure');
-END`); err != nil {
-		t.Fatalf("create audit failure trigger: %v", err)
+	if _, err := sqldb.ExecContext(
+		ctx,
+		"ALTER TABLE runtime_audit_events RENAME TO runtime_audit_events_unavailable_for_test",
+	); err != nil {
+		t.Fatalf("make audit table unavailable: %v", err)
 	}
 	if _, _, err := repo.ChangeAdminLifecycle(ctx, &biz.AdminLifecycleChange{
 		AdminID: target.ID, OperatorID: operator.ID, Disabled: true, Revoke: true,
@@ -116,8 +114,11 @@ END`); err != nil {
 	if rolledBackTask := client.WorkflowTask.GetX(ctx, task.ID); rolledBackTask.AssigneeID == nil || *rolledBackTask.AssigneeID != target.ID {
 		t.Fatalf("task change survived audit rollback: %#v", rolledBackTask)
 	}
-	if _, err := sqldb.ExecContext(ctx, "DROP TRIGGER reject_admin_lifecycle_audit"); err != nil {
-		t.Fatalf("drop audit failure trigger: %v", err)
+	if _, err := sqldb.ExecContext(
+		ctx,
+		"ALTER TABLE runtime_audit_events_unavailable_for_test RENAME TO runtime_audit_events",
+	); err != nil {
+		t.Fatalf("restore audit table: %v", err)
 	}
 
 	updated, released, err := repo.ChangeAdminLifecycle(ctx, &biz.AdminLifecycleChange{
