@@ -33,6 +33,8 @@ const themeOverrideStyleSource = readFileSync(
 
 test('desktop workbench uses its dedicated role-task read projection', () => {
   assert.match(source, /response:\s*await listAllWorkflowWorkbenchRoleTasks\(/u)
+  assert.doesNotMatch(source, /<WorkflowTaskOverview/u)
+  assert.doesNotMatch(source, /当前可见任务概览/u)
   assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)
   assert.doesNotMatch(source, /\blistWorkflowRoleTasks\b/u)
 })

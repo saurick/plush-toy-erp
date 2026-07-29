@@ -2217,6 +2217,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '阻塞/逾期')
         await expectText(page, '优先处理')
         await expectText(page, '任务详情')
+        await assertTextAbsent(page, '当前可见任务概览')
         await assertTextAbsent(page, '等待交接')
         for (const engineeringText of [
           'Product Core',
