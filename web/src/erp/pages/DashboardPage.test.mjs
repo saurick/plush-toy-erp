@@ -22,6 +22,14 @@ const desktopTaskActionSource = readFileSync(
   ),
   'utf8'
 )
+const taskCenterStyleSource = readFileSync(
+  fileURLToPath(new URL('../styles/app/task-center.css', import.meta.url)),
+  'utf8'
+)
+const themeOverrideStyleSource = readFileSync(
+  fileURLToPath(new URL('../styles/app/theme-overrides.css', import.meta.url)),
+  'utf8'
+)
 
 test('desktop workbench uses its dedicated role-task read projection', () => {
   assert.match(source, /response:\s*await listAllWorkflowWorkbenchRoleTasks\(/u)
@@ -53,6 +61,48 @@ test('task board keeps selection on click and opens the same detail surface on d
     source,
     /<Text strong className="erp-task-board-card-title">[\s\S]{0,100}task\.task_name/u
   )
+})
+
+test('task board metrics keep category tones separate from the active filter state', () => {
+  assert.match(
+    source,
+    /`erp-task-center-metric--tone-\$\{tone\}`[\s\S]{0,160}erp-task-center-metric--active/u
+  )
+  for (const tone of ['actionable', 'exception', 'due', 'finished']) {
+    assert.match(source, new RegExp(`tone="${tone}"`, 'u'))
+  }
+  assert.match(source, /aria-pressed=\{active\}/u)
+  assert.match(
+    taskCenterStyleSource,
+    /\.erp-task-center-metric::before\s*\{[\s\S]{0,240}background:\s*var\(--erp-task-center-metric-accent\)/u
+  )
+  assert.match(
+    taskCenterStyleSource,
+    /\.erp-task-center-metric\s*\{[\s\S]{0,160}--erp-task-center-metric-accent:\s*#2d64a7/u
+  )
+  for (const [tone, lightColor, darkColor] of [
+    ['actionable', '#2d64a7', '#71a7e0'],
+    ['exception', '#b42318', '#ff9aa3'],
+    ['due', '#b86b16', '#f4b55e'],
+    ['finished', '#667085', '#94a3b8'],
+  ]) {
+    if (tone !== 'actionable') {
+      assert.match(
+        taskCenterStyleSource,
+        new RegExp(
+          `\\.erp-task-center-metric--tone-${tone}\\s*\\{[^}]*--erp-task-center-metric-accent:\\s*${lightColor}`,
+          'u'
+        )
+      )
+    }
+    assert.match(
+      themeOverrideStyleSource,
+      new RegExp(
+        `\\.erp-task-center-metric--tone-${tone}\\s*\\{[^}]*--erp-task-center-metric-accent:\\s*${darkColor}`,
+        'u'
+      )
+    )
+  }
 })
 
 test('related document entry is gated by backend source access and menu projection on every path', () => {

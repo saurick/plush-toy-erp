@@ -432,12 +432,14 @@ function TaskMetricAction({
   danger = false,
   disabled = false,
   onClick,
+  tone = 'actionable',
 }) {
   return (
     <button
       type="button"
       className={[
         'erp-task-center-metric',
+        `erp-task-center-metric--tone-${tone}`,
         danger ? 'erp-task-center-metric--danger' : '',
         active ? 'erp-task-center-metric--active' : '',
       ]
@@ -1681,6 +1683,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 >
                   <TaskMetricAction
                     label="常规待办"
+                    tone="actionable"
                     value={
                       taskBoardReady ? taskBoardModel.counts.actionable : '-'
                     }
@@ -1690,6 +1693,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   />
                   <TaskMetricAction
                     label="阻塞"
+                    tone="exception"
                     value={
                       taskBoardReady ? taskBoardModel.counts.exception : '-'
                     }
@@ -1700,6 +1704,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   />
                   <TaskMetricAction
                     label="到期提醒"
+                    tone="due"
                     value={taskBoardReady ? taskBoardModel.counts.due : '-'}
                     actionLabel="查看到期提醒"
                     active={filters.lane === 'due'}
@@ -1708,6 +1713,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   />
                   <TaskMetricAction
                     label="已结束"
+                    tone="finished"
                     value={
                       taskBoardReady ? taskBoardModel.counts.finished : '-'
                     }

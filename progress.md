@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### 任务看板指标语义色条
+
+- 完成：任务看板顶部四个筛选指标不再把左侧色条与选中态混成同一种蓝色；常规待办、阻塞、到期提醒、已结束分别使用蓝、红、橙、中性灰的稳定类别色条，未选中时仍可辨认。选中态继续由浅色背景、加深外边框和 `aria-pressed` 表达；“已结束”包含完成与退回 / 拒绝，因此不使用代表全部成功的绿色。
+- 验证：仓库固定 Node `24.14.0` 下，Web lint、CSS 和全量 Node 测试 1979 / 1979 通过；`erp-task-board-desktop`、`erp-task-board-mobile`、`erp-task-board-dark-wide-desktop` 三个真实 Chromium 场景通过，浅色与暗色截图确认色条可辨、指标卡与相邻布局无挤压。指标语义样板和任务看板样板仍为 To Implement，本次仅修正运行态样式细节，未改变其结构、交互或阶段登记。
+- 下一步：本项无需 schema、migration、API、RBAC、菜单、Workflow / Fact、客户配置或部署变更；后续随当前共享工作区统一 Git 收口。
+- 阻塞 / 风险：共享 Local 仍包含 DEV 服务目录、数据准备、Workflow / 手机任务、导航与权限中心等其他未提交现场；本项只归属任务看板指标色条及其测试，不把本地绿色解释为目标环境 smoke 或客户 UAT。
+
 ### DEV-only 开发服务目录收口
 
 - 完成：把原先散落在 `web/` 根目录的 17 个 DEV-only Vite / Node Bridge 实现与测试集中到 `web/dev-server/`，抽出共享 loopback / Host 安全校验，并同步 Vite 注册、客户预览脚本、QA profile、迁移 source identity、测试入口和目录文档。新增边界测试，禁止同类模块重新散落到 `web/` 根目录；浏览器端 `/__dev` 仍独立位于 `web/src/dev-workbench/`，正式业务代码未迁入该目录。

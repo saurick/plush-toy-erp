@@ -28,6 +28,8 @@
 }
 
 .erp-task-center-metric {
+  --erp-task-center-metric-accent: #2d64a7;
+
   position: relative;
   display: grid;
   gap: 5px;
@@ -37,6 +39,7 @@
   border-radius: 10px;
   background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
   color: #1f2937;
+  overflow: hidden;
   padding: 11px 12px 10px;
   text-align: left;
   cursor: pointer;
@@ -45,6 +48,27 @@
     box-shadow 0.2s ease,
     transform 0.2s ease,
     background 0.2s ease;
+}
+
+.erp-task-center-metric::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--erp-task-center-metric-accent);
+  content: '';
+  pointer-events: none;
+}
+
+.erp-task-center-metric--tone-exception {
+  --erp-task-center-metric-accent: #b42318;
+}
+
+.erp-task-center-metric--tone-due {
+  --erp-task-center-metric-accent: #b86b16;
+}
+
+.erp-task-center-metric--tone-finished {
+  --erp-task-center-metric-accent: #667085;
 }
 
 .erp-task-center-metric:hover,
@@ -61,7 +85,6 @@
 .erp-task-center-metric--active {
   border-color: #2d64a7;
   background: #edf5ff;
-  box-shadow: inset 3px 0 0 #2d64a7;
 }
 
 .erp-task-center-metric:disabled {
