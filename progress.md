@@ -16,6 +16,8 @@
 
 验证与边界：定向 Node 合同 `8 / 8`、语法、Prettier 和 `git diff --check` 通过；首次失败演练已自动销毁专属 Compose 与数据库，容器残留为 0。该修正尚未形成新 clean SHA、构建新制品、推送、发布或部署 133；下一步只在新 clean SHA 上各执行一次本地 bundle / 演练、prepare-push、远端 CI 与不可变 Release，禁止重试 `2026.07.29-3` 或复用其失败演练回执。客户 UAT / 签收仍为独立关口。
 
+收口补充：`3eb8192d3532ee932985053457171abf40ef6853` 的唯一一次本地 bundle、checksum、load identity 均通过；随后演练在约 16 秒内于一次性管理员 SQL 读回处停止并完成零残留清理，没有进入健康、PDF 或备份阶段。原因是变量化 psql 读回误用了 `-c`，违反项目既有 stdin `-f -` 合同；现已让命令包装器显式承载 stdin，并新增参数、SQL 与 secret 不进入 argv 的合同。演练与正式生产 bootstrap 定向测试合计 `46 / 46` 通过。`3eb8192d` 不推送、不发布、不复用失败回执；待新 clean SHA 只构建和演练一次。
+
 ## 2026-07-29 133 扩容与不可变制品构建边界修正
 
 完成：用户确认虚拟机快照后，133 的 root LV 与 ext4 已从 100GiB 在线扩至 250GiB，当前根分区约 155GiB 可用；ERP 容器未重启。扩容后的目标只读前检已通过容量、环境、Compose、数据库身份、health / ready 与 migration lock，旧运行版本保持不变。

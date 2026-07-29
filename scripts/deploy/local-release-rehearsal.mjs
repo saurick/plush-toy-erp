@@ -55,12 +55,14 @@ export function runRehearsalCommand({
   args = [],
   cwd,
   env = process.env,
+  input,
   label,
 }) {
   const result = spawnSync(command, args, {
     cwd,
     env,
     encoding: "utf8",
+    input,
     maxBuffer: 64 * 1024 * 1024,
   });
   if (result.error) {
@@ -943,27 +945,34 @@ function readAdminBootstrapState(context) {
     "(SELECT count(*) FROM roles WHERE builtin IS TRUE)",
     "(SELECT count(*) FROM role_permissions)",
   ];
-  const output = dockerExec(
-    context,
-    [
-      "psql",
-      "-X",
-      "-A",
-      "-t",
-      "-q",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-v",
-      "admin_username=release_admin",
-      "-U",
-      "postgres",
-      "-d",
-      context.database,
-      "-c",
-      `SELECT ${sql.join(" || E'\\t' || ")};`,
-    ],
-    "read one-shot admin bootstrap state",
-  ).trim();
+  const output = context
+    .runCommand({
+      command: "docker",
+      args: [
+        "exec",
+        "-i",
+        context.postgresContainer,
+        "psql",
+        "-X",
+        "-A",
+        "-t",
+        "-q",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "admin_username=release_admin",
+        "-U",
+        "postgres",
+        "-d",
+        context.database,
+        "-f",
+        "-",
+      ],
+      cwd: context.repoRoot,
+      input: `SELECT ${sql.join(" || E'\\t' || ")};\n`,
+      label: "read one-shot admin bootstrap state",
+    })
+    .trim();
   const values = output.split("\t").map(Number);
   if (
     values.length !== 6 ||

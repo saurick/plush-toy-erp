@@ -10,6 +10,7 @@ import {
   buildRehearsalEnvironment,
   formatRehearsalEnv,
   parseLocalRehearsalArgs,
+  runRehearsalCommand,
   runtimeIdentityDigest,
 } from "./local-release-rehearsal.mjs";
 
@@ -88,6 +89,19 @@ test("local release rehearsal CLI requires explicit manifest inputs", () => {
     () => parseLocalRehearsalArgs(["--manifest"]),
     /missing value/u,
   );
+});
+
+test("local release rehearsal command wrapper carries SQL only through stdin", () => {
+  const output = runRehearsalCommand({
+    command: process.execPath,
+    args: [
+      "-e",
+      "process.stdin.setEncoding('utf8'); let value = ''; process.stdin.on('data', (chunk) => { value += chunk; }); process.stdin.on('end', () => process.stdout.write(value));",
+    ],
+    input: "SELECT 1;\n",
+    label: "stdin contract",
+  });
+  assert.equal(output, "SELECT 1;\n");
 });
 
 test("local release rehearsal environment binds isolated database fixed images and steady runtime", () => {
@@ -199,6 +213,14 @@ test("local release rehearsal bootstraps admin only through a verified no-port o
     ),
     false,
   );
+  const readbackCall = calls.find((item) => item.args?.[0] === "exec");
+  assert.ok(readbackCall);
+  assert.ok(readbackCall.args.includes("-i"));
+  assert.ok(readbackCall.args.includes("-f"));
+  assert.ok(readbackCall.args.includes("-"));
+  assert.equal(readbackCall.args.includes("-c"), false);
+  assert.match(readbackCall.input, /:'admin_username'/u);
+  assert.equal(readbackCall.input.includes(operationPassword), false);
 });
 
 test("local release rehearsal runtime identity binds database SHA and migration", () => {
