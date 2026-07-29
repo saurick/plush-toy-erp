@@ -41,6 +41,8 @@ const ADMIN_BOOTSTRAP_TIMEOUT_MS = 120_000;
 const ADMIN_BOOTSTRAP_OPERATION_LABEL =
   "erp.plush.local-release-admin-bootstrap.operation";
 const CONTAINER_ID_PATTERN = /^[a-f0-9]{64}$/u;
+const ROLE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/u;
+const REHEARSAL_ADMIN_USERNAME = "release_admin";
 
 class RehearsalError extends Error {
   constructor(stage, message) {
@@ -239,7 +241,7 @@ export function buildRehearsalEnvironment({
     ERP_PDF_WARMUP: "async",
     APP_JWT_SECRET: jwtSecret,
     APP_AUTH_SMS_MODE: "disabled",
-    APP_ADMIN_USERNAME: "release_admin",
+    APP_ADMIN_USERNAME: REHEARSAL_ADMIN_USERNAME,
     BOOTSTRAP_ADMIN_ONCE: "false",
     ERP_DEBUG_ENV: "prod",
     ERP_DEBUG_SEED_ENABLED: "false",
@@ -413,11 +415,10 @@ function bindReleaseRehearsalDatabaseIdentity(context, environment) {
   }
   environment.values.ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER =
     systemIdentifier;
-  writeFileSync(
-    context.envFile,
-    formatRehearsalEnv(environment.values),
-    { mode: 0o600 },
-  );
+  context.postgresSystemIdentifier = systemIdentifier;
+  writeFileSync(context.envFile, formatRehearsalEnv(environment.values), {
+    mode: 0o600,
+  });
 }
 
 async function runMigration(context, receipt) {
@@ -537,9 +538,16 @@ async function customerConfigRpc(appUrl, token, method, params) {
   });
   const parsed = await response.json();
   if (parsed?.result?.code !== 0) {
+    const code = Number(parsed?.result?.code);
+    const message = String(parsed?.result?.message || "unavailable")
+      .replace(/\s+/gu, " ")
+      .trim()
+      .slice(0, 160);
     throw new RehearsalError(
       "customer config readback",
-      `customer config ${method} failed`,
+      `customer config ${method} failed; code=${
+        Number.isSafeInteger(code) ? code : "unknown"
+      }; message=${message || "unavailable"}`,
     );
   }
   return parsed.result.data || {};
@@ -732,6 +740,174 @@ export async function activateRehearsalCustomerConfig(
       "get_effective_session",
     ],
     writesBusinessFacts: false,
+  };
+}
+
+function rehearsalApprovalRoleKeys(releaseManifest) {
+  if (releaseManifest.customer !== "yoyoosun") {
+    throw new RehearsalError(
+      "approval eligibility bootstrap",
+      "local rehearsal customer package is not registered",
+    );
+  }
+  const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
+  const roleKeys = [
+    ...new Set(
+      manifest.work_pool_memberships
+        .filter(
+          (item) =>
+            item.enabled === true &&
+            String(item.pool_key || "").startsWith("approval."),
+        )
+        .map((item) => String(item.role_key || "").trim()),
+    ),
+  ].sort();
+  if (
+    roleKeys.length === 0 ||
+    roleKeys.some((roleKey) => !ROLE_KEY_PATTERN.test(roleKey))
+  ) {
+    throw new RehearsalError(
+      "approval eligibility bootstrap",
+      "local rehearsal approval role identity is invalid",
+    );
+  }
+  return roleKeys;
+}
+
+function runRehearsalPostgresSQL(context, sql, label) {
+  return context
+    .runCommand({
+      command: "docker",
+      args: [
+        "exec",
+        "-i",
+        context.postgresContainer,
+        "psql",
+        "-X",
+        "-A",
+        "-t",
+        "-q",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-U",
+        "postgres",
+        "-d",
+        context.database,
+        "-f",
+        "-",
+      ],
+      cwd: context.repoRoot,
+      input: sql,
+      label,
+    })
+    .trim();
+}
+
+function parseApprovalEligibilityReadback(
+  output,
+  context,
+  expectedCounts,
+  stage,
+) {
+  const [database, systemIdentifier, ...counts] = output.split("\t");
+  const parsedCounts = counts.map(Number);
+  if (
+    database !== context.database ||
+    systemIdentifier !== context.postgresSystemIdentifier ||
+    parsedCounts.length !== expectedCounts.length ||
+    parsedCounts.some(
+      (item, index) =>
+        !Number.isSafeInteger(item) || item !== expectedCounts[index],
+    )
+  ) {
+    throw new RehearsalError(
+      "approval eligibility bootstrap",
+      `${stage} did not match the isolated database, cluster or approval roles`,
+    );
+  }
+  return parsedCounts;
+}
+
+export function bootstrapRehearsalApprovalEligibility(context) {
+  if (
+    !/^[0-9]{1,20}$/u.test(context.postgresSystemIdentifier || "") ||
+    !/^plush_erp_release_[a-z0-9_]+$/u.test(context.database || "")
+  ) {
+    throw new RehearsalError(
+      "approval eligibility bootstrap",
+      "isolated release database identity is not bound",
+    );
+  }
+  const roleKeys = rehearsalApprovalRoleKeys(context.manifest);
+  const roleList = roleKeys.map((roleKey) => `'${roleKey}'`).join(", ");
+  const preflight = runRehearsalPostgresSQL(
+    context,
+    `SELECT current_database() || E'\\t' ||
+  (SELECT system_identifier::text FROM pg_control_system()) || E'\\t' ||
+  (SELECT count(*) FROM admin_users
+    WHERE username = '${REHEARSAL_ADMIN_USERNAME}'
+      AND is_super_admin IS TRUE
+      AND disabled IS FALSE) || E'\\t' ||
+  (SELECT count(*) FROM roles
+    WHERE role_key IN (${roleList})
+      AND disabled IS FALSE) || E'\\t' ||
+  (SELECT count(DISTINCT roles.id)
+    FROM roles
+    JOIN role_permissions ON role_permissions.role_id = roles.id
+    JOIN permissions ON permissions.id = role_permissions.permission_id
+    WHERE roles.role_key IN (${roleList})
+      AND roles.disabled IS FALSE
+      AND permissions.permission_key = 'workflow.task.approve');\n`,
+    "preflight isolated approval eligibility",
+  );
+  parseApprovalEligibilityReadback(
+    preflight,
+    context,
+    [1, roleKeys.length, roleKeys.length],
+    "approval eligibility preflight",
+  );
+  const readback = runRehearsalPostgresSQL(
+    context,
+    `BEGIN;
+INSERT INTO admin_user_roles (admin_user_id, role_id, created_at)
+SELECT admin_users.id, roles.id, CURRENT_TIMESTAMP
+FROM admin_users
+CROSS JOIN roles
+WHERE admin_users.username = '${REHEARSAL_ADMIN_USERNAME}'
+  AND admin_users.is_super_admin IS TRUE
+  AND admin_users.disabled IS FALSE
+  AND roles.role_key IN (${roleList})
+  AND roles.disabled IS FALSE
+ON CONFLICT (admin_user_id, role_id) DO NOTHING;
+COMMIT;
+SELECT current_database() || E'\\t' ||
+  (SELECT system_identifier::text FROM pg_control_system()) || E'\\t' ||
+  (SELECT count(DISTINCT roles.id)
+    FROM admin_user_roles
+    JOIN admin_users ON admin_users.id = admin_user_roles.admin_user_id
+    JOIN roles ON roles.id = admin_user_roles.role_id
+    WHERE admin_users.username = '${REHEARSAL_ADMIN_USERNAME}'
+      AND admin_users.is_super_admin IS TRUE
+      AND admin_users.disabled IS FALSE
+      AND roles.role_key IN (${roleList})
+      AND roles.disabled IS FALSE);\n`,
+    "bind isolated approval eligibility",
+  );
+  const [bindingCount] = parseApprovalEligibilityReadback(
+    readback,
+    context,
+    [roleKeys.length],
+    "approval eligibility readback",
+  );
+  return {
+    status: "passed",
+    mode: "isolated-super-admin-role-binding",
+    roleKeys,
+    roleCount: roleKeys.length,
+    capableRoleCount: roleKeys.length,
+    bindingCount,
+    writesBusinessFacts: false,
+    retainedAfterCleanup: false,
   };
 }
 
@@ -1434,6 +1610,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     artifactVerification: null,
     migration: null,
     adminBootstrap: null,
+    approvalEligibilityBootstrap: null,
     runtime: {},
     customerConfig: null,
     pdf: null,
@@ -1511,6 +1688,8 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     receipt.environment.databaseIdentityBound = true;
     await runMigration(context, receipt);
     receipt.adminBootstrap = await bootstrapRehearsalAdmin(context);
+    receipt.approvalEligibilityBootstrap =
+      bootstrapRehearsalApprovalEligibility(context);
     composeCommand(
       context,
       ["up", "-d", "app-server", "web-desktop"],
@@ -1621,6 +1800,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
           "exact artifact image content IDs and embedded Git SHA matched",
           "fresh isolated release database was migrated and read back",
           "admin bootstrap used one-shot no-port execution and left no password in steady Compose",
+          "isolated approval roles were bound only to the ephemeral release admin",
           "health ready login customer config PDF backup restore and restart passed",
           "bootstrap secret was removed before steady-state restart",
           "isolated Compose and database were destroyed",
@@ -1628,6 +1808,8 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
         metrics: {
           adminBootstrapAuditCount:
             receipt.adminBootstrap?.completedAuditCount || 0,
+          approvalEligibilityRoleCount:
+            receipt.approvalEligibilityBootstrap?.roleCount || 0,
           backupSizeBytes: receipt.backupRestore?.backupSizeBytes || 0,
           cleanupResidualContainers: receipt.cleanup.residualContainers ?? -1,
           migrationLatest: receipt.migration?.latest || "",

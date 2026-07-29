@@ -16,6 +16,12 @@
 
 验证与边界：本地演练、生产管理员 bootstrap、migration 与 production preflight Node 合同 `182 / 182` 通过；Go 的 devdbguard、server 启动前检、JSON-RPC 门禁和 active-revision 启动读回四包通过，生产 Compose 可解析且 `git diff --check` 通过。`95d64e23` 不推送、不发布、不复用失败回执；下一步在新 clean SHA 上只构建并演练一次，成功后才执行一次 prepare-push、远端 CI、不可变 Release 与远端制品演练。当前 133 仍保持旧运行版本，未执行目标 migration / 岗位 smoke 或客户 UAT。
 
+## 2026-07-29 本地发布演练 fresh 审批岗位前置修正
+
+根因与修正：`f14532a2f948af990f05a464cbdc10ae44b6f224` 的唯一一次 full、bundle、checksum 和 load identity 均通过；唯一一次本地演练也已完成 migration、一次性管理员、RBAC / 审计、health / ready、登录和运行身份，但 fresh database 只有超级管理员，没有销售、老板、采购、财务岗位员工，客户配置因此在 `publish_customer_config` 的审批责任可办理性检查中失败。失败环境已清理为零残留，PDF、备份恢复和重启恢复未执行。现从实际 `local_test_apply` manifest 推导所需审批岗位，只在 exact run ID、同名 `plush_erp_release_*` 和相同 PostgreSQL cluster identity 的一次性数据库中，把这些岗位临时绑定到一次性超级管理员；写前核对岗位存在、启用且具备审批权限，写后读回精确绑定数，演练销毁时连同数据库删除，不创建可复用账号、不写业务事实，也不放宽 106 / 133 / 普通生产门禁。
+
+验证与边界：演练定向合同 `10 / 10`，与 production admin bootstrap、migration、production preflight 的组合回归 `183 / 183` 通过；SQL 只通过 stdin，数据库名、cluster identity、岗位与绑定数均 fail closed，密码不进入 argv 或回执。RPC 失败收据同时保留脱敏后的 code / message，后续不再靠重复演练猜原因。`f14532a2` 不推送、不发布、不复用旧 full 收据或失败演练回执；下一步为该修正形成新 clean SHA，再各执行一次 full / prepare-push、bundle、演练、远端 CI 与不可变 Release。133 仍保持旧运行版本，尚未执行目标 migration、岗位 smoke 或客户 UAT。
+
 ## 2026-07-29 本地不可变发布演练一次性管理员修正
 
 根因与修正：精确 SHA `1c9027dd501bc0535a08acd8beef0364721f986f` 的 GitHub CI、单次 `2026.07.29-3` Release、六件远端制品 checksum / manifest / SBOM / 镜像身份均已通过；首次本地制品演练在 migration 完成后被服务端生产安全门禁拒绝。演练脚本原先把一次性管理员密码只写入 Compose 替换 env，但生产 Compose 按设计不映射该 secret，同时又把常驻服务设为 `BOOTSTRAP_ADMIN_ONCE=true`；服务因此以退出码 2 反复退出。现改为 migration 后启动无端口、固定镜像的一次性容器，只通过当前进程环境注入符合 8–20 字符合同的临时密码，绑定 container / Compose project / service / image content ID / operation，读回 marker、管理员、completed audit 与内置 RBAC 后精确删除；稳态 env 从创建起始终为 `BOOTSTRAP_ADMIN_ONCE=false` 且不含密码。

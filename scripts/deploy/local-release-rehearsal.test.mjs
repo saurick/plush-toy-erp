@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   activateRehearsalCustomerConfig,
   bootstrapRehearsalAdmin,
+  bootstrapRehearsalApprovalEligibility,
   buildRehearsalAdminPassword,
   buildRehearsalEnvironment,
   formatRehearsalEnv,
@@ -124,10 +125,7 @@ test("local release rehearsal environment binds isolated database fixed images a
   assert.equal(built.values.ERP_DEBUG_ENV, "prod");
   assert.equal(built.values.ERP_DEBUG_SEED_ENABLED, "false");
   assert.equal(built.values.BOOTSTRAP_ADMIN_ONCE, "false");
-  assert.equal(
-    built.values.ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG,
-    "1",
-  );
+  assert.equal(built.values.ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG, "1");
   assert.equal(built.values.ERP_RELEASE_REHEARSAL_ID, "release_20260728");
   assert.equal(
     "ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER" in built.values,
@@ -243,6 +241,59 @@ test("local release rehearsal bootstraps admin only through a verified no-port o
   assert.equal(readbackCall.args.includes("-c"), false);
   assert.match(readbackCall.input, /:'admin_username'/u);
   assert.equal(readbackCall.input.includes(operationPassword), false);
+});
+
+test("local release rehearsal binds approval eligibility only inside the exact isolated database", () => {
+  const database = "plush_erp_release_release_20260728";
+  const systemIdentifier = "1234567890123456789";
+  const calls = [];
+  const context = {
+    repoRoot: "/private/tmp/release",
+    postgresContainer: "plush-release-example-postgres",
+    database,
+    postgresSystemIdentifier: systemIdentifier,
+    manifest,
+    runCommand(input) {
+      calls.push(input);
+      if (input.label === "preflight isolated approval eligibility") {
+        return `${database}\t${systemIdentifier}\t1\t4\t4\n`;
+      }
+      if (input.label === "bind isolated approval eligibility") {
+        return `${database}\t${systemIdentifier}\t4\n`;
+      }
+      throw new Error(`unexpected command: ${input.label}`);
+    },
+  };
+
+  const result = bootstrapRehearsalApprovalEligibility(context);
+  assert.deepEqual(result.roleKeys, ["boss", "finance", "purchase", "sales"]);
+  assert.equal(result.status, "passed");
+  assert.equal(result.mode, "isolated-super-admin-role-binding");
+  assert.equal(result.bindingCount, 4);
+  assert.equal(result.writesBusinessFacts, false);
+  assert.equal(result.retainedAfterCleanup, false);
+  assert.equal(calls.length, 2);
+  for (const call of calls) {
+    assert.equal(call.command, "docker");
+    assert.ok(call.args.includes("-i"));
+    assert.ok(call.args.includes("-f"));
+    assert.ok(call.args.includes("-"));
+    assert.equal(call.args.includes("-c"), false);
+    assert.equal(call.args.includes(database), true);
+    assert.equal(call.input.includes("postgres-password"), false);
+  }
+  assert.doesNotMatch(calls[0].input, /INSERT INTO admin_user_roles/u);
+  assert.match(calls[1].input, /INSERT INTO admin_user_roles/u);
+  assert.match(calls[1].input, /ON CONFLICT \(admin_user_id, role_id\)/u);
+  assert.match(calls[1].input, /'boss', 'finance', 'purchase', 'sales'/u);
+  assert.throws(
+    () =>
+      bootstrapRehearsalApprovalEligibility({
+        ...context,
+        database: "plush_erp",
+      }),
+    /identity is not bound/u,
+  );
 });
 
 test("local release rehearsal runtime identity binds database SHA and migration", () => {
