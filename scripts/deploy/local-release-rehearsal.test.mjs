@@ -5,6 +5,8 @@ import test from "node:test";
 
 import {
   activateRehearsalCustomerConfig,
+  bootstrapRehearsalAdmin,
+  buildRehearsalAdminPassword,
   buildRehearsalEnvironment,
   formatRehearsalEnv,
   parseLocalRehearsalArgs,
@@ -88,7 +90,7 @@ test("local release rehearsal CLI requires explicit manifest inputs", () => {
   );
 });
 
-test("local release rehearsal environment binds isolated database fixed images and safe runtime", () => {
+test("local release rehearsal environment binds isolated database fixed images and steady runtime", () => {
   const built = buildRehearsalEnvironment({
     manifest,
     runId: "release_20260728",
@@ -96,8 +98,6 @@ test("local release rehearsal environment binds isolated database fixed images a
     ports,
     postgresPassword: "postgres-password",
     jwtSecret: "jwt-secret",
-    adminPassword: "admin-password",
-    bootstrap: true,
   });
   assert.equal(built.database, "plush_erp_release_release_20260728");
   assert.equal(
@@ -109,20 +109,96 @@ test("local release rehearsal environment binds isolated database fixed images a
   assert.equal(built.values.JAEGER_IMAGE, "jaegertracing/all-in-one:1.76.0");
   assert.equal(built.values.ERP_DEBUG_ENV, "prod");
   assert.equal(built.values.ERP_DEBUG_SEED_ENABLED, "false");
-  assert.equal(built.values.BOOTSTRAP_ADMIN_ONCE, "true");
-  assert.equal(built.values.APP_ADMIN_PASSWORD, "admin-password");
-  const steady = buildRehearsalEnvironment({
+  assert.equal(built.values.BOOTSTRAP_ADMIN_ONCE, "false");
+  assert.equal("APP_ADMIN_PASSWORD" in built.values, false);
+});
+
+test("local release rehearsal creates a server-compatible ephemeral admin password", () => {
+  for (let index = 0; index < 32; index += 1) {
+    const password = buildRehearsalAdminPassword();
+    assert.ok([...password].length >= 8);
+    assert.ok([...password].length <= 20);
+    assert.ok(Buffer.byteLength(password, "utf8") <= 72);
+    assert.notEqual(password, "adminadmin");
+    assert.doesNotMatch(password, /\s/u);
+  }
+});
+
+test("local release rehearsal bootstraps admin only through a verified no-port one-shot container", async () => {
+  const containerId = "3".repeat(64);
+  const operationPassword = "Rel_admin_9aA";
+  const calls = [];
+  let containerStopped = false;
+  const context = {
+    repoRoot: "/private/tmp/release",
+    composeDir: "/private/tmp/release/server/deploy/compose/prod",
+    composeFile: "/private/tmp/release/server/deploy/compose/prod/compose.yml",
+    envFile: "/private/tmp/release/release.env",
+    project: "plush-release-example",
+    database: "plush_erp_release_example",
+    postgresContainer: "plush-release-example-postgres",
+    adminPassword: operationPassword,
     manifest,
-    runId: "release_20260728",
-    workspace: "/private/tmp/release",
-    ports,
-    postgresPassword: "postgres-password",
-    jwtSecret: "jwt-secret",
-    adminPassword: "admin-password",
-    bootstrap: false,
-  });
-  assert.equal(steady.values.BOOTSTRAP_ADMIN_ONCE, "false");
-  assert.equal("APP_ADMIN_PASSWORD" in steady.values, false);
+    runCommand(input) {
+      calls.push(input);
+      const args = input.args || [];
+      if (args[0] === "compose" && args.includes("run")) {
+        return `${containerId}\n`;
+      }
+      if (args[0] === "inspect") {
+        const runCall = calls.find(
+          (item) => item.args?.[0] === "compose" && item.args.includes("run"),
+        );
+        return [
+          containerId,
+          `/${runCall.args[runCall.args.indexOf("--name") + 1]}`,
+          context.project,
+          "app-server",
+          manifest.images.find((item) => item.kind === "server").ref,
+          manifest.images.find((item) => item.kind === "server").contentId,
+          runCall.args[runCall.args.indexOf("--label") + 1].split("=")[1],
+          "true",
+          "0",
+        ].join("\t");
+      }
+      if (args[0] === "exec") return "1\t1\t1\t12\t3\t20\n";
+      if (args[0] === "ps") {
+        return containerStopped ? "" : `${containerId}\n`;
+      }
+      if (args[0] === "rm") {
+        containerStopped = true;
+        return `${containerId}\n`;
+      }
+      throw new Error(`unexpected command: ${input.command} ${args.join(" ")}`);
+    },
+  };
+
+  const result = await bootstrapRehearsalAdmin(context);
+  assert.equal(result.status, "passed");
+  assert.equal(result.mode, "one-shot-no-ports");
+  assert.equal(result.passwordPersisted, false);
+  assert.equal(result.containerRemoved, true);
+  const runCall = calls.find(
+    (item) => item.args?.[0] === "compose" && item.args.includes("run"),
+  );
+  assert.ok(runCall);
+  assert.equal(runCall.env.APP_ADMIN_PASSWORD, operationPassword);
+  assert.ok(runCall.args.includes("--no-deps"));
+  assert.ok(runCall.args.includes("--rm"));
+  assert.ok(runCall.args.includes("--pull"));
+  assert.ok(runCall.args.includes("never"));
+  assert.ok(runCall.args.includes("APP_ADMIN_PASSWORD"));
+  assert.ok(runCall.args.includes("BOOTSTRAP_ADMIN_ONCE=true"));
+  assert.equal(
+    runCall.args.some((item) => String(item).includes(operationPassword)),
+    false,
+  );
+  assert.equal(
+    calls.some(
+      (item) => item.args?.[0] === "compose" && item.args.includes("up"),
+    ),
+    false,
+  );
 });
 
 test("local release rehearsal runtime identity binds database SHA and migration", () => {
@@ -254,6 +330,7 @@ test("local release rehearsal help documents teardown and evidence boundary", ()
   );
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /backup\+restore drill/u);
+  assert.match(result.stdout, /one-shot admin bootstrap/u);
   assert.match(result.stdout, /destroys the\s+Compose\/database/u);
-  assert.match(result.stdout, /does not contact or prove 133\/UAT/u);
+  assert.match(result.stdout, /does not contact or\s+prove 133\/UAT/u);
 });

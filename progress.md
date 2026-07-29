@@ -10,6 +10,12 @@
 - 133 当前 release、数据库、active config、镜像与回滚点必须在每次发布前从目标环境重新读回；历史记录只作定位，不得替代当前技术发布证据。客户 UAT / 签收始终是独立关口。
 - 本轮 Git 与发布收口只能由单一 owner 串行执行；clean HEAD 的 full / strict / prepare-push、exact-SHA 远端 CI、不可变制品、本地发布演练和 133 技术发布必须绑定同一最终 SHA，以 Git、CI、制品 manifest 和运行回执为准，不由本文件预写绿色结论。
 
+## 2026-07-29 本地不可变发布演练一次性管理员修正
+
+根因与修正：精确 SHA `1c9027dd501bc0535a08acd8beef0364721f986f` 的 GitHub CI、单次 `2026.07.29-3` Release、六件远端制品 checksum / manifest / SBOM / 镜像身份均已通过；首次本地制品演练在 migration 完成后被服务端生产安全门禁拒绝。演练脚本原先把一次性管理员密码只写入 Compose 替换 env，但生产 Compose 按设计不映射该 secret，同时又把常驻服务设为 `BOOTSTRAP_ADMIN_ONCE=true`；服务因此以退出码 2 反复退出。现改为 migration 后启动无端口、固定镜像的一次性容器，只通过当前进程环境注入符合 8–20 字符合同的临时密码，绑定 container / Compose project / service / image content ID / operation，读回 marker、管理员、completed audit 与内置 RBAC 后精确删除；稳态 env 从创建起始终为 `BOOTSTRAP_ADMIN_ONCE=false` 且不含密码。
+
+验证与边界：定向 Node 合同 `8 / 8`、语法、Prettier 和 `git diff --check` 通过；首次失败演练已自动销毁专属 Compose 与数据库，容器残留为 0。该修正尚未形成新 clean SHA、构建新制品、推送、发布或部署 133；下一步只在新 clean SHA 上各执行一次本地 bundle / 演练、prepare-push、远端 CI 与不可变 Release，禁止重试 `2026.07.29-3` 或复用其失败演练回执。客户 UAT / 签收仍为独立关口。
+
 ## 2026-07-29 133 扩容与不可变制品构建边界修正
 
 完成：用户确认虚拟机快照后，133 的 root LV 与 ext4 已从 100GiB 在线扩至 250GiB，当前根分区约 155GiB 可用；ERP 容器未重启。扩容后的目标只读前检已通过容量、环境、Compose、数据库身份、health / ready 与 migration lock，旧运行版本保持不变。

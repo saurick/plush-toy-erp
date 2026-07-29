@@ -37,6 +37,10 @@ const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{7,47}$/u;
 const COMPOSE_FILE = "server/deploy/compose/prod/compose.yml";
 const HTTP_TIMEOUT_MS = 10_000;
 const READY_TIMEOUT_MS = 180_000;
+const ADMIN_BOOTSTRAP_TIMEOUT_MS = 120_000;
+const ADMIN_BOOTSTRAP_OPERATION_LABEL =
+  "erp.plush.local-release-admin-bootstrap.operation";
+const CONTAINER_ID_PATTERN = /^[a-f0-9]{64}$/u;
 
 class RehearsalError extends Error {
   constructor(stage, message) {
@@ -73,6 +77,22 @@ export function runRehearsalCommand({
 
 function randomSecret(bytes = 32) {
   return crypto.randomBytes(bytes).toString("base64url");
+}
+
+export function buildRehearsalAdminPassword() {
+  const password = `Rel_${randomSecret(8)}_9aA`;
+  const characters = [...password].length;
+  if (
+    characters < 8 ||
+    characters > 20 ||
+    Buffer.byteLength(password, "utf8") > 72
+  ) {
+    throw new RehearsalError(
+      "preflight",
+      "release rehearsal admin password is outside the server contract",
+    );
+  }
+  return password;
 }
 
 function safeRunId(value) {
@@ -169,8 +189,6 @@ export function buildRehearsalEnvironment({
   ports,
   postgresPassword,
   jwtSecret,
-  adminPassword,
-  bootstrap = true,
 }) {
   assertReleaseArtifactManifest(manifest);
   const project = `plush-release-${safeRunId(runId).replaceAll("_", "-")}`;
@@ -221,7 +239,7 @@ export function buildRehearsalEnvironment({
     APP_JWT_SECRET: jwtSecret,
     APP_AUTH_SMS_MODE: "disabled",
     APP_ADMIN_USERNAME: "release_admin",
-    BOOTSTRAP_ADMIN_ONCE: bootstrap ? "true" : "false",
+    BOOTSTRAP_ADMIN_ONCE: "false",
     ERP_DEBUG_ENV: "prod",
     ERP_DEBUG_SEED_ENABLED: "false",
     ERP_DEBUG_CLEANUP_ENABLED: "false",
@@ -238,9 +256,6 @@ export function buildRehearsalEnvironment({
     WEB_MEM_LIMIT: "128m",
     WEB_MEM_RESERVATION: "48m",
   };
-  if (bootstrap) {
-    values.APP_ADMIN_PASSWORD = adminPassword;
-  }
   for (const [key, value] of Object.entries(values)) {
     assertEnvValue(value, key);
   }
@@ -283,11 +298,12 @@ function composeArgs(context, args) {
   ];
 }
 
-function composeCommand(context, args, label) {
+function composeCommand(context, args, label, env = process.env) {
   return context.runCommand({
     command: "docker",
     args: composeArgs(context, args),
     cwd: context.composeDir,
+    env,
     label,
   });
 }
@@ -781,6 +797,296 @@ function dockerExec(context, args, label) {
   });
 }
 
+function inspectAdminBootstrapContainer(context, containerId) {
+  const format = [
+    "{{.Id}}",
+    "{{.Name}}",
+    '{{index .Config.Labels "com.docker.compose.project"}}',
+    '{{index .Config.Labels "com.docker.compose.service"}}',
+    "{{.Config.Image}}",
+    "{{.Image}}",
+    `{{index .Config.Labels "${ADMIN_BOOTSTRAP_OPERATION_LABEL}"}}`,
+    "{{.State.Running}}",
+    "{{.State.ExitCode}}",
+  ].join("\t");
+  const values = context
+    .runCommand({
+      command: "docker",
+      args: ["inspect", "--format", format, containerId],
+      cwd: context.repoRoot,
+      label: "read one-shot admin bootstrap identity",
+    })
+    .trim()
+    .split("\t");
+  if (values.length !== 9) {
+    throw new RehearsalError(
+      "admin bootstrap identity",
+      "one-shot admin bootstrap identity readback was invalid",
+    );
+  }
+  return {
+    id: values[0],
+    name: values[1].replace(/^\/+/u, ""),
+    project: values[2],
+    service: values[3],
+    imageRef: values[4],
+    imageId: values[5],
+    operation: values[6],
+    running: values[7] === "true",
+    exitCode: values[8],
+  };
+}
+
+function assertAdminBootstrapContainerIdentity(
+  context,
+  containerId,
+  containerName,
+  operationId,
+) {
+  const serverImage = context.manifest.images.find(
+    (item) => item.kind === "server",
+  );
+  const actual = inspectAdminBootstrapContainer(context, containerId);
+  if (
+    !CONTAINER_ID_PATTERN.test(containerId) ||
+    actual.id !== containerId ||
+    actual.name !== containerName ||
+    actual.project !== context.project ||
+    actual.service !== "app-server" ||
+    actual.imageRef !== serverImage.ref ||
+    actual.imageId !== serverImage.contentId ||
+    actual.operation !== operationId
+  ) {
+    throw new RehearsalError(
+      "admin bootstrap identity",
+      "one-shot admin bootstrap container identity did not match",
+    );
+  }
+  return actual;
+}
+
+function listAdminBootstrapContainers(context, operationId) {
+  const containers = context
+    .runCommand({
+      command: "docker",
+      args: [
+        "ps",
+        "-aq",
+        "--no-trunc",
+        "--filter",
+        `label=${ADMIN_BOOTSTRAP_OPERATION_LABEL}=${operationId}`,
+        "--format",
+        "{{.ID}}",
+      ],
+      cwd: context.repoRoot,
+      label: "discover admin bootstrap containers",
+    })
+    .split(/\r?\n/u)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (
+    containers.length > 1 ||
+    containers.some((item) => !CONTAINER_ID_PATTERN.test(item))
+  ) {
+    throw new RehearsalError(
+      "admin bootstrap cleanup",
+      "one-shot admin bootstrap discovery was ambiguous",
+    );
+  }
+  return containers;
+}
+
+function removeAdminBootstrapContainer(
+  context,
+  containerId,
+  containerName,
+  operationId,
+) {
+  const containers = listAdminBootstrapContainers(context, operationId);
+  if (containers.length === 0) return;
+  if (containers[0] !== containerId) {
+    throw new RehearsalError(
+      "admin bootstrap cleanup",
+      "one-shot admin bootstrap container id drifted",
+    );
+  }
+  assertAdminBootstrapContainerIdentity(
+    context,
+    containerId,
+    containerName,
+    operationId,
+  );
+  try {
+    context.runCommand({
+      command: "docker",
+      args: ["rm", "--force", containerId],
+      cwd: context.repoRoot,
+      label: "remove one-shot admin bootstrap",
+    });
+  } catch {
+    // The verified --rm container may disappear between discovery and removal.
+  }
+  if (listAdminBootstrapContainers(context, operationId).length !== 0) {
+    throw new RehearsalError(
+      "admin bootstrap cleanup",
+      "one-shot admin bootstrap container was not removed",
+    );
+  }
+}
+
+function readAdminBootstrapState(context) {
+  const sql = [
+    "(SELECT count(*) FROM runtime_markers WHERE marker_key = 'admin_bootstrap.completed' AND marker_value::jsonb->>'username' = :'admin_username')",
+    "(SELECT count(*) FROM admin_users WHERE username = :'admin_username' AND is_super_admin IS TRUE AND disabled IS FALSE AND password_hash <> '')",
+    "(SELECT count(*) FROM runtime_audit_events WHERE event_type = 'admin_bootstrap.completed' AND event_key = 'admin_bootstrap.completed' AND source = 'server_bootstrap' AND payload::jsonb->>'username' = :'admin_username')",
+    "(SELECT count(*) FROM permissions WHERE builtin IS TRUE)",
+    "(SELECT count(*) FROM roles WHERE builtin IS TRUE)",
+    "(SELECT count(*) FROM role_permissions)",
+  ];
+  const output = dockerExec(
+    context,
+    [
+      "psql",
+      "-X",
+      "-A",
+      "-t",
+      "-q",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-v",
+      "admin_username=release_admin",
+      "-U",
+      "postgres",
+      "-d",
+      context.database,
+      "-c",
+      `SELECT ${sql.join(" || E'\\t' || ")};`,
+    ],
+    "read one-shot admin bootstrap state",
+  ).trim();
+  const values = output.split("\t").map(Number);
+  if (
+    values.length !== 6 ||
+    values.some((item) => !Number.isSafeInteger(item) || item < 0)
+  ) {
+    throw new RehearsalError(
+      "admin bootstrap readback",
+      "one-shot admin bootstrap readback was invalid",
+    );
+  }
+  return values;
+}
+
+export async function bootstrapRehearsalAdmin(context) {
+  const operationId = crypto.randomBytes(16).toString("hex");
+  const containerName = `${context.project}-admin-bootstrap-${operationId}`;
+  let containerId = "";
+  let result;
+  let failure;
+  try {
+    containerId = composeCommand(
+      context,
+      [
+        "run",
+        "-d",
+        "-T",
+        "--no-deps",
+        "--rm",
+        "--pull",
+        "never",
+        "--name",
+        containerName,
+        "--label",
+        `${ADMIN_BOOTSTRAP_OPERATION_LABEL}=${operationId}`,
+        "-e",
+        "APP_ADMIN_PASSWORD",
+        "-e",
+        "BOOTSTRAP_ADMIN_ONCE=true",
+        "app-server",
+      ],
+      "start one-shot admin bootstrap",
+      { ...process.env, APP_ADMIN_PASSWORD: context.adminPassword },
+    ).trim();
+    const deadline = Date.now() + ADMIN_BOOTSTRAP_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      const runtime = assertAdminBootstrapContainerIdentity(
+        context,
+        containerId,
+        containerName,
+        operationId,
+      );
+      if (!runtime.running) {
+        throw new RehearsalError(
+          "admin bootstrap runtime",
+          `one-shot admin bootstrap exited before readback; exitCode=${runtime.exitCode || "unknown"}`,
+        );
+      }
+      const [
+        markerCount,
+        eligibleAdminCount,
+        completedAuditCount,
+        builtinPermissionCount,
+        builtinRoleCount,
+        rolePermissionCount,
+      ] = readAdminBootstrapState(context);
+      if (markerCount === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
+        continue;
+      }
+      if (
+        markerCount !== 1 ||
+        eligibleAdminCount !== 1 ||
+        completedAuditCount !== 1 ||
+        builtinPermissionCount <= 0 ||
+        builtinRoleCount <= 0 ||
+        rolePermissionCount <= 0
+      ) {
+        throw new RehearsalError(
+          "admin bootstrap readback",
+          "one-shot admin bootstrap marker, admin, audit or RBAC counts did not match",
+        );
+      }
+      result = {
+        status: "passed",
+        mode: "one-shot-no-ports",
+        marker: "admin_bootstrap.completed",
+        eligibleAdminCount,
+        completedAuditCount,
+        builtinPermissionCount,
+        builtinRoleCount,
+        rolePermissionCount,
+        passwordPersisted: false,
+        steadyBootstrapFlag: false,
+        containerRemoved: true,
+      };
+      break;
+    }
+    if (!result) {
+      throw new RehearsalError(
+        "admin bootstrap runtime",
+        "one-shot admin bootstrap timed out",
+      );
+    }
+  } catch (error) {
+    failure = error;
+  }
+  try {
+    removeAdminBootstrapContainer(
+      context,
+      containerId,
+      containerName,
+      operationId,
+    );
+  } catch (error) {
+    throw new RehearsalError(
+      "admin bootstrap cleanup",
+      `${failure ? `${failure.message}; ` : ""}${error.message}`,
+    );
+  }
+  if (failure) throw failure;
+  return result;
+}
+
 function backupRestoreDrill(context) {
   const restoreDatabase = `plush_erp_restore_${context.runId}`;
   const dumpFile = `/tmp/${context.runId}.dump`;
@@ -1030,7 +1336,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
   const ports = await allocateRehearsalPorts();
   const postgresPassword = randomSecret(30);
   const jwtSecret = randomSecret(48);
-  const adminPassword = `Rel_${randomSecret(20)}_9aA`;
+  const adminPassword = buildRehearsalAdminPassword();
   const envFile = path.join(workspace, "release.env");
   const environment = buildRehearsalEnvironment({
     manifest,
@@ -1039,8 +1345,6 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     ports,
     postgresPassword,
     jwtSecret,
-    adminPassword,
-    bootstrap: true,
   });
   writeFileSync(envFile, formatRehearsalEnv(environment.values), {
     mode: 0o600,
@@ -1096,6 +1400,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     },
     artifactVerification: null,
     migration: null,
+    adminBootstrap: null,
     runtime: {},
     customerConfig: null,
     pdf: null,
@@ -1170,12 +1475,13 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
       return health === "healthy";
     }, "release PostgreSQL health");
     await runMigration(context, receipt);
+    receipt.adminBootstrap = await bootstrapRehearsalAdmin(context);
     composeCommand(
       context,
       ["up", "-d", "app-server", "web-desktop"],
       "start release application services",
     );
-    const initial = await runtimeSmoke(context, receipt, "bootstrap");
+    const initial = await runtimeSmoke(context, receipt, "initial");
     receipt.customerConfig = await activateRehearsalCustomerConfig(
       initial.appUrl,
       initial.token,
@@ -1184,19 +1490,6 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
     receipt.pdf = await pdfSmoke(initial.appUrl, initial.token);
     receipt.backupRestore = backupRestoreDrill(context);
 
-    const steadyEnvironment = buildRehearsalEnvironment({
-      manifest,
-      runId,
-      workspace,
-      ports,
-      postgresPassword,
-      jwtSecret,
-      adminPassword,
-      bootstrap: false,
-    });
-    writeFileSync(envFile, formatRehearsalEnv(steadyEnvironment.values), {
-      mode: 0o600,
-    });
     composeCommand(
       context,
       ["up", "-d", "--force-recreate", "app-server", "web-desktop"],
@@ -1292,11 +1585,14 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
         invariants: [
           "exact artifact image content IDs and embedded Git SHA matched",
           "fresh isolated release database was migrated and read back",
+          "admin bootstrap used one-shot no-port execution and left no password in steady Compose",
           "health ready login customer config PDF backup restore and restart passed",
           "bootstrap secret was removed before steady-state restart",
           "isolated Compose and database were destroyed",
         ],
         metrics: {
+          adminBootstrapAuditCount:
+            receipt.adminBootstrap?.completedAuditCount || 0,
           backupSizeBytes: receipt.backupRestore?.backupSizeBytes || 0,
           cleanupResidualContainers: receipt.cleanup.residualContainers ?? -1,
           migrationLatest: receipt.migration?.latest || "",
@@ -1390,9 +1686,11 @@ Usage:
 The command requires a clean HEAD matching the artifact. It verifies and loads the
 exact linux/amd64 image archives, starts the unique production Compose source with
 an isolated plush_erp_release_<run-id> database, validates/dry-runs/applies Atlas
-migrations, proves health/ready/runtime identity/login/effective config/PDF, performs
-a backup+restore drill, restarts without the bootstrap secret, then destroys the
-Compose/database. The receipt is redacted. This does not contact or prove 133/UAT.`;
+migrations, creates the first admin through a no-port one-shot admin bootstrap,
+proves health/ready/runtime identity/login/effective config/PDF, performs a
+backup+restore drill, restarts with the password-free steady environment, then
+destroys the Compose/database. The receipt is redacted. This does not contact or
+prove 133/UAT.`;
 
 function isMainModule() {
   try {
