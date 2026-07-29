@@ -102,6 +102,8 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
+node "$ROOT_DIR/scripts/qa/database-base-preflight.mjs"
+
 node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile "$full_profile"
 
 echo "[qa:full] 运行共享基础检查，不重复 Web/Go 全量稍后覆盖的 fast 子集"
@@ -162,10 +164,6 @@ trap - EXIT
 echo "[qa:full] 运行 server 全量检查"
 (
   cd "$ROOT_DIR/server"
-  if [[ -z "${DISPOSABLE_DATABASE_BASE_URL:-}" ]]; then
-    echo "[qa:full] status=incomplete reason=missing_database_base variable=DISPOSABLE_DATABASE_BASE_URL"
-    exit 2
-  fi
   PURCHASE_RECEIPT_PG_DB_URL="$DISPOSABLE_DATABASE_BASE_URL" \
     make populated_upgrade_pg_test
   node "$ROOT_DIR/scripts/qa/disposable-database-runner.mjs" \

@@ -225,6 +225,8 @@ const FAST_REQUIRED_FILES = Object.freeze([
 const FULL_REQUIRED_FILES = Object.freeze([
   "scripts/qa/fast.sh",
   "scripts/qa/full.sh",
+  "scripts/qa/database-base-preflight.mjs",
+  "scripts/qa/database-base-preflight.test.mjs",
   "scripts/purchase-receipt-pg.sh",
   "scripts/qa/fixtures/populated-upgrade-20260710150001.sql",
   "scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql",

@@ -22,6 +22,8 @@
 
 当前阻塞与边界：定向实现阶段没有在共享 dirty tree 运行 full / strict，也没有创建 GitHub Release、写入 GHCR / 133、执行目标 migration、岗位凭据 / PDF smoke、客户 UAT 或签收；后续 Git 收口状态只以实际 commit、远端 ref 和 CI 回执为准。133 只读预检显示当前可用空间约 `13.4GiB`，低于首次 promotion 的 `30GiB` 门槛；必须先完成 VM 快照、root LV 扩容和读回，再以唯一 clean candidate SHA 完成远端 exact-SHA 验证与不可变发布。production build 的本机 Web 目录默认 Node 为 `26.5.0`，仓库正式版本仍是 `24.14.0`；最终 GitHub Release workflow 固定使用正式 Node 版本，本地这次构建不替代远端 exact-SHA 证据。
 
+收口修正：首次 clean `prepare-push` 在 Node / Web / production build / Chromium 全绿后才发现缺少 disposable PostgreSQL 基线，暴露了昂贵 gate 前置检查过晚的问题。full 现会在任何 scripts、Web、浏览器或 Go 高成本阶段前，只读验证 loopback URL、psql 连通性和建库权限；凭据仅通过 libpq 环境传递，不进入命令参数或失败回执。缺变量、非 loopback、客户端缺失、连接失败和权限不足均精确 fail closed。定向编排、profile、显式测试清单和真实 PostgreSQL 前检已通过；最终 full、非强制推送与远端 CI 仍以随后实际回执为准。
+
 ## 2026-07-28 研发效能工作台与本地质量交付收口
 
 完成：状态合同收敛到服务端 canonical catalog，当前 34 类状态对象、初始 / 终止 / 返回边、守卫、动作、权限与 Fact 边界由正式领域合同生成，DEV 观察台只消费投影；状态漂移守卫覆盖 8 条代表业务路径。异常展示按阻塞、退回、恢复、取消 / 冲正和过期证据分类，不新增万能 `exception_status` 或第二棵状态树。Workflow 任务来源读取门禁与异常动作在解释和写入前均由后端重验，页面不能以菜单、标签或 payload 补造可读性，Workflow task done 仍不等于 Fact posted。

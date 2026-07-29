@@ -212,6 +212,9 @@ PATH=/usr/local/bin:$PATH node --test \
 6. strict 失败只返回 blocker，不自动修改并重启整套。
 7. 已有有效 receipt 直接复用。
 8. 身份不一致立即停止，不拼接历史证据判绿。
+9. full 在任何 scripts、Web、浏览器或 Go 高成本 gate 前，先只读验证
+   disposable PostgreSQL 基线的 URL、连通性和建库权限；前置不满足时数秒内
+   fail closed，不把缺配置拖到构建之后。
 
 ## 当前停止条件
 

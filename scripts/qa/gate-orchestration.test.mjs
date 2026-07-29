@@ -410,6 +410,43 @@ test("direct full rejects caller-supplied synthetic coverage before any gate", (
   assert.doesNotMatch(result.stdout, /先运行 fast 检查/u);
 });
 
+test("direct full validates its disposable database base before expensive gates", () => {
+  const missing = spawnSync("bash", ["scripts/qa/full.sh"], {
+    cwd: root,
+    encoding: "utf8",
+    env: cleanGateEnv({
+      DISPOSABLE_DATABASE_BASE_URL: "",
+    }),
+  });
+  assert.equal(missing.status, 2, missing.stderr || missing.stdout);
+  assert.match(
+    `${missing.stdout}\n${missing.stderr}`,
+    /reason=missing_database_base/u,
+  );
+  assert.doesNotMatch(
+    `${missing.stdout}\n${missing.stderr}`,
+    /\[qa:fast\]|运行 web 测试与构建/u,
+  );
+
+  const invalid = spawnSync("bash", ["scripts/qa/full.sh"], {
+    cwd: root,
+    encoding: "utf8",
+    env: cleanGateEnv({
+      DISPOSABLE_DATABASE_BASE_URL:
+        "postgres://tester:local-secret@192.168.0.133:5432/postgres",
+    }),
+  });
+  assert.equal(invalid.status, 2, invalid.stderr || invalid.stdout);
+  assert.match(
+    `${invalid.stdout}\n${invalid.stderr}`,
+    /reason=invalid_database_base/u,
+  );
+  assert.doesNotMatch(
+    `${invalid.stdout}\n${invalid.stderr}`,
+    /local-secret|\[qa:fast\]|运行 web 测试与构建/u,
+  );
+});
+
 test("local receipt has one repository-owned issuer while full and CI stay real", () => {
   const full = read("scripts/qa/full.sh");
   const strict = read("scripts/qa/strict.sh");
