@@ -13,6 +13,7 @@ import {
   parseLocalRehearsalArgs,
   runRehearsalCommand,
   runtimeIdentityDigest,
+  selectRehearsalWorkbenchArtifact,
 } from "./local-release-rehearsal.mjs";
 
 const commit = "a".repeat(40);
@@ -103,6 +104,38 @@ test("local release rehearsal command wrapper carries SQL only through stdin", (
     label: "stdin contract",
   });
   assert.equal(output, "SELECT 1;\n");
+});
+
+test("local release rehearsal keeps workbench artifact paths inside the repository", () => {
+  const repoRoot = path.resolve("/workspace/plush-toy-erp");
+  assert.deepEqual(
+    selectRehearsalWorkbenchArtifact({
+      repoRoot,
+      manifestPath: path.join(repoRoot, "output/releases/release-artifact.json"),
+      receiptPath: path.join(
+        repoRoot,
+        "output/dev-workbench/receipts/rehearsal.json",
+      ),
+    }),
+    {
+      artifactPath: "output/releases/release-artifact.json",
+      materializeReceiptFirst: false,
+    },
+  );
+  assert.deepEqual(
+    selectRehearsalWorkbenchArtifact({
+      repoRoot,
+      manifestPath: "/tmp/github-release/release-artifact.json",
+      receiptPath: path.join(
+        repoRoot,
+        "output/dev-workbench/receipts/rehearsal.json",
+      ),
+    }),
+    {
+      artifactPath: "output/dev-workbench/receipts/rehearsal.json",
+      materializeReceiptFirst: true,
+    },
+  );
 });
 
 test("local release rehearsal environment binds isolated database fixed images and steady runtime", () => {

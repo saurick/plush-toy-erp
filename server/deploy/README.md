@@ -4,7 +4,7 @@
 
 部署构建边界：目标服务器配置较低，只负责加载已构建镜像、启动 Compose、执行 migration 和部署后检查；服务端/前端镜像必须先在本地或 CI 构建完成，再上传到服务器。不要在服务器上执行 `docker build`、`pnpm build`、`go build`、`make build_server` 等重构建步骤。
 
-发布制品入口是仓库根目录的 `scripts/deploy/release-artifact-bundle.mjs` 与 `release-artifact-verify.mjs`：只接受 clean current HEAD 的 committed archive，两个镜像固定为 `linux/amd64` 并内置相同 40 位 `GIT_SHA`，manifest 同时记录 content ID、tar checksum、依赖 SBOM、migration 序列和客户配置源指纹。目标机只允许加载 / 拉取 manifest 中的固定制品。正式 promotion 前必须先用 `scripts/deploy/local-release-rehearsal.mjs` 在一次性数据库和本文件登记的唯一 Compose 上完成 migration、运行身份、登录、PDF、备份恢复与 steady-state restart；本地回执不能替代目标 preflight、active config、rollback 或 UAT。
+发布制品入口是仓库根目录的 `scripts/deploy/release-artifact-bundle.mjs` 与 `release-artifact-verify.mjs`：只接受 clean current HEAD 的 committed archive，两个镜像固定为 `linux/amd64` 并内置相同 40 位 `GIT_SHA`，manifest 同时记录 OCI config content ID、tar checksum、依赖 SBOM、migration 序列和客户配置源指纹。目标机只允许加载 / 拉取 manifest 中的固定制品；Docker `.Id` 因 classic / containerd image store 差异只允许读回为该 config digest 或同一 tar 的唯一 OCI manifest digest，不能放宽 tag、平台、`GIT_SHA` 或 tar checksum。正式 promotion 前必须先用 `scripts/deploy/local-release-rehearsal.mjs` 在一次性数据库和本文件登记的唯一 Compose 上完成 migration、运行身份、登录、PDF、备份恢复与 steady-state restart；本地回执不能替代目标 preflight、active config、rollback 或 UAT。
 
 普通 GitHub CI 只做 affected / full 验证；独立 `.github/workflows/release.yml` 才对默认分支可达的 exact SHA 运行或复用一次 strict，构建一次不可变制品并发布 GHCR / GitHub Release。固定 `test-133` 的 promotion 由 `scripts/deploy/promotion-controller.mjs` 与 `promotion-executor.mjs` 编排，代码回滚由对应 rollback controller / executor 编排；它们复用既有 digest，不在目标机重新构建。目标 registry、只读 preflight、operation 和安全边界见 `scripts/deploy/README.md` 与 `docs/engineering/研发效能工作台与CI-CD设计.md`。
 

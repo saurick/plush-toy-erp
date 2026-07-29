@@ -42,6 +42,25 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
   assert.match(source, /write_receipt not_proven/u);
   assert.match(source, /unknown prior target outcome; read back before retry/u);
   assert.match(source, /flock -n 9/u);
+  assert.match(
+    source,
+    /applyStarted: \(\$migrationApplyStarted == 1\)/u,
+  );
+});
+
+test("remote promotion accepts only OCI config or archive manifest image identities", () => {
+  assert.match(source, /portable_archive_manifest_digest/u);
+  assert.match(source, /manifest[.]json/u);
+  assert.match(source, /index[.]json/u);
+  assert.match(source, /[.]config[.]digest == \$configDigest/u);
+  assert.match(
+    source,
+    /actual_server_content_id" == "\$server_archive_manifest_digest/u,
+  );
+  assert.match(
+    source,
+    /actual_web_content_id" == "\$web_archive_manifest_digest/u,
+  );
 });
 
 test("remote promotion help is no-write and invalid input fails before target paths change", () => {

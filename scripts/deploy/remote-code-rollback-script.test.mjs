@@ -30,6 +30,25 @@ test("remote code rollback requires exact confirmation, lock and receipt", () =>
   assert.match(source, /rollback has an unknown prior target outcome/u);
   assert.match(source, /not_proven rollback_outcome_unknown/u);
   assert.match(source, /recover_previous/u);
+  assert.match(
+    source,
+    /serviceSwitchStarted: \(\$serviceSwitchStarted == 1\)/u,
+  );
+});
+
+test("remote code rollback accepts only OCI config or archive manifest image identities", () => {
+  assert.match(source, /portable_archive_manifest_digest/u);
+  assert.match(source, /manifest[.]json/u);
+  assert.match(source, /index[.]json/u);
+  assert.match(source, /[.]config[.]digest == \$configDigest/u);
+  assert.match(
+    source,
+    /actual_server_content_id" == "\$server_archive_manifest_digest/u,
+  );
+  assert.match(
+    source,
+    /actual_web_content_id" == "\$web_archive_manifest_digest/u,
+  );
 });
 
 test("remote code rollback script is valid Bash and exposes bounded help", () => {
