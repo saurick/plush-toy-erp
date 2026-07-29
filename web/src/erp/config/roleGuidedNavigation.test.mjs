@@ -411,7 +411,7 @@ test('roleGuidedNavigation: 权限中心预览使用尚未保存的自定义顺�
   )
 })
 
-test('roleGuidedNavigation: 更多功能固定按业务场景分组且保留原始配置成员合同', () => {
+test('roleGuidedNavigation: 更多功能沿用 Admin 菜单分组且保留原始配置成员合同', () => {
   const groupedSections = [
     {
       key: 'master',
@@ -434,6 +434,7 @@ test('roleGuidedNavigation: 更多功能固定按业务场景分组且保留原�
         {
           key: 'sales-orders',
           path: '/erp/sales/project-orders/sales-orders',
+          sectionTitle: '旧销售分组',
         },
       ],
     },
@@ -523,20 +524,28 @@ test('roleGuidedNavigation: 更多功能固定按业务场景分组且保留原�
   )
   assert.deepEqual(
     result.secondarySections.map((section) => section.title),
-    ['资料与单据', '品质与库存', '出货处理', '工具与帮助']
+    [
+      '基础资料',
+      '销售管理',
+      '质检管理',
+      '库存管理',
+      '出货管理',
+      '运营工具',
+      '使用帮助',
+    ]
   )
   assert.deepEqual(
     result.secondarySections.map((section) =>
       section.items.map((item) => item.path)
     ),
     [
-      [
-        '/erp/sales/project-orders/sales-orders',
-        '/erp/master/partners/suppliers',
-      ],
-      ['/erp/quality/inspections', '/erp/warehouse/inventory'],
+      ['/erp/master/partners/suppliers'],
+      ['/erp/sales/project-orders/sales-orders'],
+      ['/erp/quality/inspections'],
+      ['/erp/warehouse/inventory'],
       ['/erp/warehouse/shipments', '/erp/warehouse/shipping-release'],
-      ['/erp/print-center', '/erp/help-center'],
+      ['/erp/print-center'],
+      ['/erp/help-center'],
     ]
   )
   const groupedPaths = result.secondarySections.flatMap((section) =>
@@ -599,20 +608,20 @@ test('roleGuidedNavigation: 权限调整后页面进入对应更多分组且空�
 
   assert.deepEqual(
     result.secondarySections.map((section) => section.title),
-    ['资料与单据', '工具与帮助']
+    ['基础资料', '使用帮助']
   )
   assert.deepEqual(
     result.secondarySections[0].items.map((item) => item.path),
     ['/erp/master/partners/suppliers', '/erp/master/partners/customers'],
-    '同一业务分组继续保持权限中心保存的组内顺序'
+    '同一 Admin 菜单分组继续保持权限中心保存的组内顺序'
   )
   assert.equal(
-    result.secondarySections.some((section) => section.title === '品质管理'),
+    result.secondarySections.some((section) => section.title === '质检管理'),
     false
   )
 })
 
-test('roleGuidedNavigation: 客户扩展分组保留且工具帮助始终收尾', () => {
+test('roleGuidedNavigation: 客户扩展、工具和帮助保持各自 Admin 菜单分组', () => {
   const grouped = buildRoleGuidedSecondarySections([
     {
       key: 'customer-extension',
@@ -634,10 +643,10 @@ test('roleGuidedNavigation: 客户扩展分组保留且工具帮助始终收尾'
 
   assert.deepEqual(
     grouped.map((section) => section.title),
-    ['客户扩展', '工具与帮助']
+    ['客户扩展', '运营工具', '使用帮助']
   )
   assert.deepEqual(
     grouped.at(-1).items.map((item) => item.path),
-    ['/erp/print-center', '/erp/help-center']
+    ['/erp/help-center']
   )
 })

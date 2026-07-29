@@ -195,15 +195,16 @@ function buildRoleNavigationOptions(access = null, selectedPaths = []) {
   const navigationItems = [
     ...getNavigationSections(),
     ...getAuthenticatedNavigationSections(),
-  ].flatMap((section) =>
+  ].flatMap((section, sectionIndex) =>
     (Array.isArray(section?.items) ? section.items : []).map((item) => ({
       ...item,
       navigationSectionKey:
-        String(item?.navigationSectionKey || '').trim() ||
-        String(section?.key || '').trim(),
+        String(section?.key || '').trim() ||
+        String(item?.navigationSectionKey || item?.sectionKey || '').trim(),
       navigationSectionTitle:
-        String(item?.navigationSectionTitle || '').trim() ||
-        String(section?.title || '').trim(),
+        String(section?.title || '').trim() ||
+        String(item?.navigationSectionTitle || item?.sectionTitle || '').trim(),
+      navigationSectionOrder: sectionIndex,
     }))
   )
   const itemByPath = new Map(
@@ -458,7 +459,7 @@ function RoleNavigationEditor({
         <div>
           <Text strong>设置岗位菜单布局</Text>
           <Paragraph type="secondary">
-            页面和操作权限决定“能不能用”；这里把每个最终可进入页面放入常用工作或更多功能，更多功能按业务场景分组。
+            页面和操作权限决定“能不能用”；这里把每个最终可进入页面放入常用工作或更多功能，更多功能与管理员菜单使用相同模块分组。
           </Paragraph>
         </div>
         <Select
@@ -489,7 +490,7 @@ function RoleNavigationEditor({
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Text type="secondary">
             常用工作需保留 1–{MAX_ROLE_PRIMARY_LIMIT}{' '}
-            项；使用按钮可仅靠键盘完成跨区移动，更多功能只调整同一业务分组内的顺序。
+            项；使用按钮可仅靠键盘完成跨区移动，更多功能只调整同一菜单分组内的顺序。
           </Text>
           {unavailablePaths.length > 0 ? (
             <Alert
@@ -518,7 +519,7 @@ function RoleNavigationEditor({
             {renderOrderedList({
               key: 'secondary',
               title: '更多功能',
-              description: '其余页面按业务场景分组',
+              description: '其余页面沿用管理员菜单分组',
               paths: secondaryMenuPaths,
               onChange: updateSecondaryPaths,
               moveLabel: '移到常用',
@@ -930,7 +931,7 @@ function NavigationPlacementOverview({
     {
       key: 'more',
       title: `更多功能（${moreItems.length}）`,
-      description: '其余页面按业务场景分组，岗位帮助固定在最后',
+      description: '其余页面沿用管理员菜单分组，岗位帮助固定在最后',
       items: moreItems,
       sections: placement.secondarySections,
     },
@@ -947,7 +948,7 @@ function NavigationPlacementOverview({
         <div>
           <Text strong>导航位置预览</Text>
           <Paragraph type="secondary">
-            看板固定在最前；常用入口只从当前最终可进入页面中排列，更多功能按业务场景分组且不会增加权限。
+            看板固定在最前；常用入口只从当前最终可进入页面中排列，更多功能沿用管理员菜单分组且不会增加权限。
           </Paragraph>
         </div>
         <Tag

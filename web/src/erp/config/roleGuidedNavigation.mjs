@@ -17,150 +17,56 @@ const DASHBOARD_PATHS = Object.freeze([
 ])
 const DASHBOARD_PATH_SET = new Set(DASHBOARD_PATHS)
 const RESERVED_PATH_SET = new Set([...DASHBOARD_PATHS, HELP_CENTER_PATH])
-const SECONDARY_GROUP_DEFINITIONS = Object.freeze([
-  {
-    key: 'records',
-    title: '资料与单据',
-    sectionKeys: ['master', 'sales', 'engineering', 'purchase', 'outsourcing'],
-    sectionTitles: ['基础资料', '销售管理', '产品工程', '采购管理', '委外管理'],
-  },
-  {
-    key: 'manufacturing',
-    title: '生产、品质与库存',
-    sectionKeys: ['production', 'quality', 'warehouse'],
-    sectionTitles: ['生产管理', '质检管理', '库存管理'],
-  },
-  {
-    key: 'shipment-finance',
-    title: '出货与财务',
-    sectionKeys: ['shipment', 'finance'],
-    sectionTitles: ['出货管理', '财务管理'],
-  },
-  {
-    key: 'tools-help',
-    title: '工具与帮助',
-    sectionKeys: ['tools', 'system', 'help'],
-    sectionTitles: ['运营工具', '系统管理', '使用帮助'],
-  },
-])
 
 function normalizeSectionIdentity(value = '') {
   return String(value || '').trim()
 }
 
+function normalizeSectionOrder(value) {
+  const order = Number(value)
+  return Number.isInteger(order) && order >= 0 ? order : Number.MAX_SAFE_INTEGER
+}
+
 function getItemSectionIdentity(item = {}) {
   return {
     key: normalizeSectionIdentity(
-      item?.sectionKey || item?.navigationSectionKey
+      item?.navigationSectionKey || item?.sectionKey
     ),
     title: normalizeSectionIdentity(
-      item?.sectionTitle || item?.navigationSectionTitle
+      item?.navigationSectionTitle || item?.sectionTitle
     ),
+    order: normalizeSectionOrder(item?.navigationSectionOrder),
   }
-}
-
-function matchesSecondaryGroup(definition, item = {}) {
-  if (item?.path === HELP_CENTER_PATH) {
-    return definition.key === 'tools-help'
-  }
-  const section = getItemSectionIdentity(item)
-  return (
-    definition.sectionKeys.includes(section.key) ||
-    definition.sectionTitles.includes(section.title)
-  )
-}
-
-function resolveSecondaryGroupTitle(definition, items = []) {
-  const matchesSection = (sectionKey, sectionTitle) =>
-    items.some((item) => {
-      const section = getItemSectionIdentity(item)
-      return section.key === sectionKey || section.title === sectionTitle
-    })
-
-  if (definition.key === 'manufacturing') {
-    const hasProduction = matchesSection('production', '生产管理')
-    const hasQuality = matchesSection('quality', '质检管理')
-    const hasWarehouse = matchesSection('warehouse', '库存管理')
-    if (hasProduction && hasQuality && hasWarehouse) {
-      return '生产、品质与库存'
-    }
-    if (hasProduction && hasQuality) {
-      return '生产与品质'
-    }
-    if (hasProduction && hasWarehouse) {
-      return '生产与库存'
-    }
-    if (hasQuality && hasWarehouse) {
-      return '品质与库存'
-    }
-    if (hasProduction) {
-      return '生产管理'
-    }
-    if (hasQuality) {
-      return '品质管理'
-    }
-    if (hasWarehouse) {
-      return '库存管理'
-    }
-  }
-
-  if (definition.key === 'shipment-finance') {
-    const hasShipment = matchesSection('shipment', '出货管理')
-    const hasFinance = matchesSection('finance', '财务管理')
-    if (hasShipment && hasFinance) {
-      return '出货与财务'
-    }
-    if (hasShipment) {
-      return '出货处理'
-    }
-    if (hasFinance) {
-      return '财务业务'
-    }
-  }
-
-  return definition.title
 }
 
 export function buildRoleGuidedSecondarySections(items = []) {
   const normalizedItems = Array.isArray(items) ? items.filter(Boolean) : []
   const groups = new Map()
-  const fallbackGroupKeys = []
 
-  normalizedItems.forEach((item) => {
-    const definition = SECONDARY_GROUP_DEFINITIONS.find((candidate) =>
-      matchesSecondaryGroup(candidate, item)
-    )
+  normalizedItems.forEach((item, itemIndex) => {
     const section = getItemSectionIdentity(item)
-    const key =
-      definition?.key || `section:${section.key || section.title || 'other'}`
+    const identity = section.key || section.title || 'other'
+    const key = `section:${identity}`
     if (!groups.has(key)) {
       groups.set(key, {
         key,
-        definition,
-        fallbackTitle: section.title || '其他功能',
+        title: section.title || '其他功能',
+        order: section.order,
+        firstItemIndex: itemIndex,
         items: [],
       })
-      if (!definition) {
-        fallbackGroupKeys.push(key)
-      }
     }
     groups.get(key).items.push(item)
   })
 
-  return [
-    ...SECONDARY_GROUP_DEFINITIONS.filter(
-      (definition) => definition.key !== 'tools-help'
-    ).map((definition) => definition.key),
-    ...fallbackGroupKeys,
-    'tools-help',
-  ]
-    .map((key) => groups.get(key))
-    .filter(Boolean)
+  return [...groups.values()]
+    .sort(
+      (left, right) =>
+        left.order - right.order || left.firstItemIndex - right.firstItemIndex
+    )
     .map((group) => ({
       key: group.key,
-      title: group.definition
-        ? resolveSecondaryGroupTitle(group.definition, group.items)
-        : group.fallbackTitle,
+      title: group.title,
       items: group.items,
     }))
 }
@@ -175,7 +81,7 @@ function normalizeSections(sections = []) {
     return []
   }
   return sections
-    .map((section) => {
+    .map((section, sectionIndex) => {
       const navigationSectionKey = normalizeSectionIdentity(section?.key)
       const navigationSectionTitle = normalizeSectionIdentity(section?.title)
       return {
@@ -184,11 +90,14 @@ function normalizeSections(sections = []) {
           ? section.items.filter(Boolean).map((item) => ({
               ...item,
               navigationSectionKey:
+                navigationSectionKey ||
                 normalizeSectionIdentity(item?.navigationSectionKey) ||
-                navigationSectionKey,
+                normalizeSectionIdentity(item?.sectionKey),
               navigationSectionTitle:
+                navigationSectionTitle ||
                 normalizeSectionIdentity(item?.navigationSectionTitle) ||
-                navigationSectionTitle,
+                normalizeSectionIdentity(item?.sectionTitle),
+              navigationSectionOrder: sectionIndex,
             }))
           : [],
       }

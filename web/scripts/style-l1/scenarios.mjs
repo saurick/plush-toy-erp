@@ -3780,14 +3780,19 @@ export function createStyleL1Scenarios(deps) {
         const countMatch = moreFunctionsLabel.match(/^更多功能（(\d+)）$/u)
         assert(countMatch, `移动端更多功能数量格式异常: ${moreFunctionsLabel}`)
         await moreFunctions.click()
+        await page.waitForTimeout(250)
 
         const groupTitles = moreFunctionsRoot.locator(
           '.erp-role-guided-more-group > .ant-menu-item-group-title'
         )
         assert.deepEqual(await groupTitles.allTextContents(), [
-          '资料与单据',
-          '生产与库存',
-          '工具与帮助',
+          '基础资料',
+          '销售管理',
+          '库存管理',
+          '生产管理',
+          '运营工具',
+          '系统管理',
+          '使用帮助',
         ])
         const groupingMetrics = await moreFunctionsRoot.evaluate((node) => {
           const groupTitleNodes = Array.from(
@@ -3824,7 +3829,7 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          groupingMetrics.groupTitleCount === 3 &&
+          groupingMetrics.groupTitleCount === 7 &&
             groupingMetrics.leafCount === Number(countMatch[1]) &&
             groupingMetrics.leafTexts.at(-1) === '岗位使用帮助' &&
             groupingMetrics.interactiveGroupTitleCount === 0 &&
@@ -3976,7 +3981,16 @@ export function createStyleL1Scenarios(deps) {
           await moreFunctionsRoot
             .locator('.erp-role-guided-more-group > .ant-menu-item-group-title')
             .allTextContents(),
-          ['资料与单据', '生产、品质与库存', '出货与财务', '工具与帮助']
+          [
+            '质检管理',
+            '库存管理',
+            '委外管理',
+            '生产管理',
+            '出货管理',
+            '财务管理',
+            '运营工具',
+            '使用帮助',
+          ]
         )
         const bossMoreItems = await moreFunctionsRoot
           .locator('.ant-menu-item')
@@ -12981,7 +12995,13 @@ export function createStyleL1Scenarios(deps) {
         await moveSalesOrderToMore.focus()
         await page.keyboard.press('Enter')
         await page.getByRole('button', { name: '移到更多 客户档案' }).click()
-        await page.getByRole('button', { name: '上移 客户档案' }).click()
+        assert.equal(
+          await page
+            .getByRole('button', { name: '上移 客户档案' })
+            .isDisabled(),
+          true,
+          '不同管理员菜单分组之间不能通过组内排序按钮互换'
+        )
 
         const draftPreview = await readNavigationPreview()
         assert.deepEqual(
@@ -13003,19 +13023,23 @@ export function createStyleL1Scenarios(deps) {
           draftPreview[2].sections,
           [
             {
-              title: '资料与单据',
-              items: ['客户档案', '销售订单'],
+              title: '基础资料',
+              items: ['客户档案'],
             },
             {
-              title: '出货处理',
+              title: '销售管理',
+              items: ['销售订单'],
+            },
+            {
+              title: '出货管理',
               items: ['出货放行'],
             },
             {
-              title: '工具与帮助',
+              title: '使用帮助',
               items: ['岗位使用帮助'],
             },
           ],
-          `权限中心更多功能必须按业务场景预览: ${JSON.stringify(draftPreview)}`
+          `权限中心更多功能必须沿用管理员菜单分组预览: ${JSON.stringify(draftPreview)}`
         )
         await page.waitForTimeout(250)
         const accessRequestsBeforeTabSwitch = effectiveAccessRequestCount
