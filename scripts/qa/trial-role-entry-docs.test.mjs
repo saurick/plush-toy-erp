@@ -271,12 +271,12 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     scriptReadme,
-    "高频快速检查，包含正式前端客户配置投影、角色菜单 / seedData、开发入口、试用账号、客户导入、运行时 manifest、文档清单和模拟数据边界",
+    "高频快速检查；scripts Node 测试使用显式 `fast / database / browser / release` 清单",
     "scripts README fast QA summary",
   );
   assertIncludes(
     scriptReadme,
-    "严格检查，完整复用 full 并补 shell / YAML / 前端零 warning 与漏洞检查",
+    "严格检查；先运行独有 shell / YAML 静态检查，再以 strict profile 单次复用 full",
     "scripts README strict QA summary",
   );
   assertIncludes(

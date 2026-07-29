@@ -67,7 +67,8 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     )
   }
   assert.match(strict, /bash "\$ROOT_DIR\/scripts\/qa\/full\.sh"/u, 'strict must delegate to the complete full profile')
-  assert.match(strict, /GOVULNCHECK_STRICT=1/u, 'strict must finish with a blocking vulnerability scan')
+  assert.match(full, /GOVULNCHECK_STRICT=1/u, 'the shared full execution must include one blocking vulnerability scan')
+  assert.doesNotMatch(strict, /scripts\/qa\/govulncheck\.sh/u, 'strict must not repeat the full vulnerability scan')
 
   for (const name of [
     'INVENTORY',
@@ -431,18 +432,18 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
 
   const fastGates = profiles.slice(
     profiles.indexOf('const FAST_GATES'),
-    profiles.indexOf('const FULL_ONLY_GATES'),
+    profiles.indexOf('const FULL_GATES'),
   )
-  const fullOnlyGates = profiles.slice(
-    profiles.indexOf('const FULL_ONLY_GATES'),
-    profiles.indexOf('const STRICT_ONLY_GATES'),
+  const fullGates = profiles.slice(
+    profiles.indexOf('const FULL_GATES'),
+    profiles.indexOf('const STRICT_GATES'),
   )
   const fullRequiredFiles = profiles.slice(
     profiles.indexOf('const FULL_REQUIRED_FILES'),
     profiles.indexOf('const STRICT_REQUIRED_FILES'),
   )
   assert.doesNotMatch(fastGates, /populated-upgrade-postgres/u)
-  assert.match(fullOnlyGates, /populated-upgrade-postgres/u)
+  assert.match(fullGates, /populated-upgrade-postgres/u)
   assert.match(fullRequiredFiles, /fixtures\/populated-upgrade-20260710150001\.sql/u)
   assert.match(fullRequiredFiles, /fixtures\/net-weight-kg-to-g-20260714165115\.sql/u)
   assert.match(profiles, /customer-config-cutover-20260714055825\.sql/u)
