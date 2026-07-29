@@ -13,6 +13,7 @@
 - 当前前向修复同时收口三个合同：严格校验并接受同一 tar 唯一对应的 OCI config / manifest 双身份；promotion / rollback 回执输出真正 boolean；外部 Release manifest 的本地演练回执改用仓库内安全路径。不能手工绕过，也不能复用失败操作。
 - 前向修复 SHA `35d09c3856a5010b49c075d7d8009ad6a7e50ec7` 已完成一次 `prepare-push`、GitHub CI、strict、不可变 Release `2026.07.29-5`、远端制品下载与本地生产 Compose 演练。第二次 133 promotion 操作 `cfa26c47-7b13-48b1-8a18-e9f17accb174` 在 migration 前冻结为 `failed`；旧 SHA、health/ready/Web 均保持正常，fresh backup 已恢复校验。
 - 第二次失败根因是 `production-preflight.sh` 在无 `.git` 的不可变 release 目录中错误地用 SSH 调用者 `pwd` 作为仓库根，因而把随制品存在的 `deployments/yoyoosun/env/runtime.contract.json` 误判为 `/home/simon/deployments/...` 下缺失。修复必须从脚本自身位置推导 release 根；仍须形成新 SHA、新 Release 和新 operation，禁止复用两个历史失败操作。
+- 初版脚本根修复 SHA `b7ac32fda479ced59ec7adcc99c9decc2d503dc8` 的 `prepare-push` 在 full 中失败关闭，未推送或发布：直接固定脚本相对根会让仓库内 `output/` 下的受控测试副本错误寻找合同。最终规则必须优先取脚本所在 Git worktree 根，仅在不可变 release 确实没有 Git 元数据时回退到脚本相对根；该失败 SHA 不重跑。
 
 ### 发布停止条件
 

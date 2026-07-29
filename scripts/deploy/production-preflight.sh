@@ -139,7 +139,10 @@ path_mode() {
 }
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-root_dir="$(cd "$script_dir/../.." && pwd -P)"
+root_dir="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$root_dir" ]]; then
+  root_dir="$(cd "$script_dir/../.." && pwd -P)"
+fi
 compose_dir="server/deploy/compose/prod"
 compose_override=""
 env_file=""
