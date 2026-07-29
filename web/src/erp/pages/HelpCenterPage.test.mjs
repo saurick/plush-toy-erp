@@ -49,6 +49,11 @@ test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项'
     layoutSource,
     /roleGuidedSecondaryContainsCurrent[\s\S]*setRoleGuidedOpenKeys/u
   )
+  assert.match(layoutSource, /item\.path === currentNavigationEntry\.menuPath/u)
+  assert.doesNotMatch(
+    layoutSource,
+    /roleGuidedNavigation\.secondaryItems\.some\([\s\S]*item\.path === currentMenuPath/u
+  )
   assert.doesNotMatch(layoutSource, /defaultOpenKeys=/u)
   assert.match(
     layoutSource,

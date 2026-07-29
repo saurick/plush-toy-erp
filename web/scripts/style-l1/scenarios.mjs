@@ -3620,6 +3620,23 @@ export function createStyleL1Scenarios(deps) {
         const moreFunctions = menu
           .locator('.ant-menu-submenu-title')
           .filter({ hasText: '更多功能' })
+        const moreFunctionsRoot = moreFunctions.locator('..')
+        const readMoreFunctionsState = () =>
+          moreFunctionsRoot.evaluate((node) => {
+            const helpItem = Array.from(
+              node.querySelectorAll('.ant-menu-item')
+            ).find((item) =>
+              String(item.textContent || '').includes('岗位使用帮助')
+            )
+            const submenu = node.querySelector('.ant-menu-sub')
+            return {
+              open: node.classList.contains('ant-menu-submenu-open'),
+              submenuHeight: submenu?.getBoundingClientRect().height || 0,
+              helpHeight: helpItem?.getBoundingClientRect().height || 0,
+              helpSelected:
+                helpItem?.classList.contains('ant-menu-item-selected') === true,
+            }
+          })
         const moreFunctionsLabel = String(
           await moreFunctions.innerText()
         ).trim()
@@ -3644,6 +3661,13 @@ export function createStyleL1Scenarios(deps) {
           visibleLeafCount + Number(moreFunctionsCountMatch[1]),
           `更多功能数量应与展开后的页面一致：${moreFunctionsLabel}`
         )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-sales-role-guided-navigation-more-expanded.png'
+          ),
+          fullPage: true,
+        })
         const helpMenuItem = menu
           .locator('.ant-menu-item')
           .filter({ hasText: '岗位使用帮助' })
@@ -3654,6 +3678,65 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '遇到异常怎么办')
         await expectText(page, '退回对象')
         await helpMenuItem.scrollIntoViewIfNeeded()
+        const activeHelpState = await readMoreFunctionsState()
+        assert.equal(
+          activeHelpState.open &&
+            activeHelpState.submenuHeight > 0 &&
+            activeHelpState.helpHeight > 0 &&
+            activeHelpState.helpSelected,
+          true,
+          `进入岗位帮助后更多功能应保持展开并选中帮助入口: ${JSON.stringify(activeHelpState)}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-sales-role-guided-navigation-help-active.png'
+          ),
+          fullPage: true,
+        })
+
+        await page
+          .reload({ waitUntil: 'domcontentloaded' })
+          .then(() => page.waitForLoadState('networkidle').catch(() => {}))
+        await expectText(page, '正常办理案例')
+        await helpMenuItem.waitFor({ state: 'visible', timeout: 10_000 })
+        const reloadedHelpState = await readMoreFunctionsState()
+        assert.equal(
+          reloadedHelpState.open &&
+            reloadedHelpState.submenuHeight > 0 &&
+            reloadedHelpState.helpHeight > 0 &&
+            reloadedHelpState.helpSelected,
+          true,
+          `刷新岗位帮助后更多功能应保持展开并选中帮助入口: ${JSON.stringify(reloadedHelpState)}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-sales-role-guided-navigation-help-reloaded.png'
+          ),
+          fullPage: true,
+        })
+
+        await menu
+          .locator('.ant-menu-item')
+          .filter({ hasText: '工作台' })
+          .first()
+          .click()
+        await waitForPath(page, '/erp/dashboard')
+        await helpMenuItem.waitFor({ state: 'hidden', timeout: 10_000 })
+        const dashboardState = await readMoreFunctionsState()
+        assert.equal(
+          dashboardState.open || dashboardState.helpHeight > 0,
+          false,
+          `离开岗位帮助返回看板后更多功能应自动收起: ${JSON.stringify(dashboardState)}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-sales-role-guided-navigation-help-return-dashboard.png'
+          ),
+          fullPage: true,
+        })
         await assertNoHorizontalOverflow(
           page,
           'yoyoosun-sales-role-guided-navigation-help'

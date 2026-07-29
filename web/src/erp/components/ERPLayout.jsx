@@ -738,9 +738,9 @@ export default function ERPLayout() {
   const roleGuidedSecondaryContainsCurrent = useMemo(
     () =>
       roleGuidedNavigation.secondaryItems.some(
-        (item) => item.path === currentMenuPath
+        (item) => item.path === currentNavigationEntry.menuPath
       ),
-    [currentMenuPath, roleGuidedNavigation.secondaryItems]
+    [currentNavigationEntry.menuPath, roleGuidedNavigation.secondaryItems]
   )
 
   const roleGuidedSecondaryPaths = useMemo(
@@ -757,7 +757,7 @@ export default function ERPLayout() {
       roleGuidedSecondaryContainsCurrent ? [ROLE_GUIDED_MORE_MENU_KEY] : []
     )
   }, [
-    currentMenuPath,
+    currentNavigationEntry.menuPath,
     roleGuidedSecondaryContainsCurrent,
     useRoleGuidedNavigation,
   ])

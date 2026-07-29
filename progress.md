@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### 岗位使用帮助导航展开状态
+
+- 完成：岗位导航的“更多功能”展开判断改为读取路由导航真源 `currentNavigationEntry.menuPath`；进入或刷新 `/erp/help-center` 时继续显示并选中“岗位使用帮助”，返回看板或常用工作后仍自动收起。业务菜单权限继续使用 `resolveMenuPermissionKey`，未把登录态帮助入口并入 RBAC 菜单权限。
+- 验证：岗位帮助、菜单权限和岗位导航定向 Node 测试 27 / 27 通过；触达文件定向 ESLint 与 `git diff --check` 通过；`STYLE_L1_SCENARIOS=yoyoosun-sales-role-guided-navigation-help pnpm style:l1` 通过，真实 Chromium 已断言点击后展开、刷新后恢复、帮助项选中、返回看板收起和无横向溢出，并目检四张定向截图。
+- 下一步：本修复无需 schema、migration、API、RBAC、客户配置、原型或部署变更；后续发布仍按当前统一收口流程处理，不把本地浏览器绿色视为目标环境岗位 smoke 或客户 UAT。
+- 阻塞 / 风险：共享 Local 同时存在另一项 Workflow / 手机任务 / 工作台改动；全量 Web lint、CSS 和 Node 测试分别被该范围内的数组解构、样式选择器顺序及页面静态合同失败阻断。本轮不修改、不暂存也不提交这些并行现场；当前 Node 26.5.0 仍会提示项目要求 Node 24.14.x。
+
 ### 近期产品与研发能力统一收口
 
 - 当前共享 Local 已冻结为一个完整收口范围，共包含配置、正式文档、QA / 本地运行脚本、Go 服务端、Ent / Atlas、正式 Web 与 DEV-only 工作台改动。详细任务过程已归档到 `docs/archive/progress-2026-07-29-before-recent-task-closeout.md`。
