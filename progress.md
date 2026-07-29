@@ -10,6 +10,18 @@
 - 133 当前 release、数据库、active config、镜像与回滚点必须在每次发布前从目标环境重新读回；历史记录只作定位，不得替代当前技术发布证据。客户 UAT / 签收始终是独立关口。
 - 本轮 Git 与发布收口只能由单一 owner 串行执行；clean HEAD 的 full / strict / prepare-push、exact-SHA 远端 CI、不可变制品、本地发布演练和 133 技术发布必须绑定同一最终 SHA，以 Git、CI、制品 manifest 和运行回执为准，不由本文件预写绿色结论。
 
+## 2026-07-29 GitHub CI/CD 去重与版本中心
+
+完成：按 `docs/engineering/研发效能工作台与CI-CD实施计划.md` 收敛普通反馈、最终验证、制品发布和 133 promotion。普通 PR / push 只走 affected 或 full；strict 只由 clean exact SHA 的发布 workflow 触发，同 gate fingerprint 复用已有终态且失败不自动重启 lifecycle。GitHub-hosted Runner 负责一次 linux/amd64 Server / Web 构建并发布 GHCR digest、GitHub Release、manifest、SBOM 和 checksums；133 固定为 `test-133`，只允许 load、migration、启动和检查，不安装公开仓库 self-hosted runner，也不在目标机编译源码。
+
+交付控制：新增 provider-neutral release catalog、固定目标 registry、私有 operation store、promotion / code-only rollback controller 与执行器。本地 DEV Bridge 只接受固定 GitHub workflow、固定仓库、固定 `test-133` 和 allowlist 动作，要求 loopback、同源、CSRF、JSON content-type、幂等键和单目标串行；浏览器不能传入 shell、SSH、路径、仓库、workflow、SQL 或 Docker 参数。执行前重新核对容量、目标身份、运行 SHA、数据库、备份、migration/config 指纹与 rollback point；结果不明进入 `not_proven`，不自动重试或 down migration。
+
+工作台与交互：新增 `/__dev/version-center`，显示 clean/dirty HEAD、GitHub 不可变版本、133 当前 SHA、容量 blocker、版本新旧关系、准备部署 / 回滚、operation 详情和显式确认。真实 Chromium 已覆盖桌面、`390 × 844`、深色、无横向溢出、详情 Drawer、最近 100 条事件、确认 Modal、未输入完整确认文本时禁用执行、Escape 关闭与焦点回返；控制台错误 / 警告为 0，未提交确认文本，目标写请求为 0。验收时发现仅覆盖 Vite CLI `--port` 会让 HMR 仍连接旧端口；现增加 resolved listener / HMR 同端口启动门禁，错误配置在服务启动前失败，不再进入浏览器自动重载循环。
+
+验证：发布 / promotion / rollback 定向合同 `50 / 50`，affected、exact-SHA、pre-push receipt、CI / Release workflow、工作台和生产边界合同 `118 / 118` 通过；Bash 语法、ShellCheck、ESLint、Stylelint 通过。当前源码只执行一次最终 production build（3341 modules），随后生产制品扫描 `120` 个文件通过，built-app Chromium 直达 `/__dev` 会回到 `/admin-login`，没有工作台、Bridge、DEV favicon 或本机路径残留。本地 managed output 的 5GiB 保留预览约为 `5,345,977,158` bytes，状态 `within_budget`；预览列出约 3.56GB 历史候选但故意没有删除入口，本轮未删除历史证据。
+
+当前阻塞与边界：定向实现阶段没有在共享 dirty tree 运行 full / strict，也没有创建 GitHub Release、写入 GHCR / 133、执行目标 migration、岗位凭据 / PDF smoke、客户 UAT 或签收；后续 Git 收口状态只以实际 commit、远端 ref 和 CI 回执为准。133 只读预检显示当前可用空间约 `13.4GiB`，低于首次 promotion 的 `30GiB` 门槛；必须先完成 VM 快照、root LV 扩容和读回，再以唯一 clean candidate SHA 完成远端 exact-SHA 验证与不可变发布。production build 的本机 Web 目录默认 Node 为 `26.5.0`，仓库正式版本仍是 `24.14.0`；最终 GitHub Release workflow 固定使用正式 Node 版本，本地这次构建不替代远端 exact-SHA 证据。
+
 ## 2026-07-28 研发效能工作台与本地质量交付收口
 
 完成：状态合同收敛到服务端 canonical catalog，当前 34 类状态对象、初始 / 终止 / 返回边、守卫、动作、权限与 Fact 边界由正式领域合同生成，DEV 观察台只消费投影；状态漂移守卫覆盖 8 条代表业务路径。异常展示按阻塞、退回、恢复、取消 / 冲正和过期证据分类，不新增万能 `exception_status` 或第二棵状态树。Workflow 任务来源读取门禁与异常动作在解释和写入前均由后端重验，页面不能以菜单、标签或 payload 补造可读性，Workflow task done 仍不等于 Fact posted。

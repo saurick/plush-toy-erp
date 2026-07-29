@@ -33,6 +33,7 @@ const devPageSources = [
   'DevPrototypesPage.jsx',
   'DevCapabilityLedgerPage.jsx',
   'DevCustomerConfigPage.jsx',
+  'DevVersionCenterPage.jsx',
 ].map((fileName) =>
   readFileSync(new URL(`../pages/${fileName}`, import.meta.url), 'utf8')
 )
@@ -81,6 +82,10 @@ test('devHub: every dev route exposes a distinct browser title', () => {
     resolveDevPageFavicon('/__dev/customer-config'),
     '/favicon-customer-config.svg'
   )
+  assert.equal(
+    resolveDevPageTitle('/__dev/version-center', 'Plush Toy ERP'),
+    '版本发布与部署中心 · Plush Toy ERP'
+  )
 })
 
 test('devHub: shared workspace navigation exposes exactly four primary areas and keeps all deep links', () => {
@@ -113,11 +118,12 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/customer-config'), 'delivery')
+  assert.equal(resolveDevWorkbenchAreaKey('/__dev/version-center'), 'delivery')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/unknown'), '')
 })
 
-test('devHub: eight dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 8)
+test('devHub: nine dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 9)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -135,6 +141,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/prototypes',
       '/__dev/capability-ledger',
       '/__dev/customer-config',
+      '/__dev/version-center',
     ]
   )
   assert(
@@ -166,8 +173,8 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 7)
-  assert.equal(summary.groupCount, 6)
+  assert.equal(summary.entryCount, 8)
+  assert.equal(summary.groupCount, 7)
   assert(summary.guardrailCount >= 10)
   assert.equal(summary.devOnly, true)
   assert.match(summary.boundary, /no menu/)
@@ -215,6 +222,7 @@ test('devHub: filters by governance group and keyword together', () => {
       '产品设计 / Product Design',
       '产品治理 / Product Governance',
       '客户治理 / Customer Governance',
+      '交付治理 / Delivery',
     ]
   )
   assert.deepEqual(

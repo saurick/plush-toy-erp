@@ -24,6 +24,23 @@
 | `node scripts/deploy/release-artifact-verify.mjs`             | 校验制品 manifest、SBOM 和镜像 tar 的大小 / checksum；`--load` 进一步加载并读回 image content ID、平台和内置 `GIT_SHA`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 默认只读；`--load` 会加载本地镜像          |
 | `node scripts/deploy/local-release-rehearsal.mjs`             | 使用上述同一不可变制品和唯一生产 Compose，在一次性 `plush_erp_release_<run-id>` 完成 migration、health / ready / runtime identity、管理员登录、本地测试配置 validate / publish / activate / effective readback、PDF、备份恢复和移除 bootstrap secret 后的重启恢复；成功或失败均写脱敏回执并执行精确清理                                                                                                                                                                                                                                                                                                | 默认否；`--execute` 才启动本地隔离环境     |
 
+## GitHub 发布、固定目标与 Operation
+
+| 入口 | 职责 | 写入边界 |
+| --- | --- | --- |
+| `node scripts/qa/exact-sha-gate.mjs` | 为默认分支可达的 clean exact SHA 计算 gate fingerprint，并运行或复用唯一 strict 终态 | `--run` 只运行 strict，不发布或部署 |
+| `node scripts/deploy/github-release-publisher.mjs` | 读取已构建 bundle 与 strict 终态，推送固定 GHCR 镜像并生成 provider-neutral Release manifest | 只由固定 GitHub release workflow 使用 |
+| `node scripts/deploy/github-delivery-provider.mjs` | 固定仓库、`release.yml`、API 版本、Release assets 与下载根的 GitHub adapter | 不接受调用者 repo/workflow/path；错误不回显 CLI stderr |
+| `node scripts/deploy/target-preflight.mjs --target test-133 --json` | 通过固定 SSH 目标只读检查容量、Compose、容器、端口、数据库、当前 SHA、锁和 rollback point | 只读，不创建备份或切换版本 |
+| `node scripts/deploy/promotion-controller.mjs` | 校验不可变 manifest 与即时 preflight，创建或复用待确认 promotion operation | 不执行目标写入 |
+| `node scripts/deploy/promotion-executor.mjs` | 对已 ready operation 重新核对身份并执行固定 133 promotion | 只接受 operation 绑定的确认串 |
+| `node scripts/deploy/rollback-controller.mjs` | 比较当前/目标 manifest；migration 序列和客户配置源指纹不同即阻断 | 不执行目标写入 |
+| `node scripts/deploy/rollback-executor.mjs` | 对已 ready operation 执行代码和镜像回滚 | 不 down migration、不自动恢复数据库 |
+
+`delivery-operation-store.mjs` 在 ignored `output/dev-workbench/delivery-operations/` 使用随机 UUID、幂等键、`0600` 文件和原子 rename 保存状态。Bridge 进程重启时，仍处于 `launching / running` 的目标写操作一律冻结为 `not_proven`，先读回目标，不能自动重试。`remote-promotion.sh` 与 `remote-code-rollback.sh` 是上述 executor 传输后调用的固定目标实现，不是人工拼接参数的通用远程入口。
+
+DEV-only `/__dev/version-center` 只暴露五个动作：`dispatch-release`、`prepare-promotion`、`execute-promotion`、`prepare-rollback`、`execute-rollback`。浏览器不能提供 repo、workflow、target、路径、SSH、环境变量、shell、SQL 或 Docker 命令；同一时刻只允许一个 test-133 执行器。
+
 `source-archive-release-check.mjs` 始终从 committed tree 创建临时 archive，不把当前 dirty worktree 混入源码包。默认 plan 和 `--light` 只提供源码包结构诊断；`--execute` 仍要求 clean worktree，并通过 archive 内的 `scripts/lib/pnpm.sh` 解析与 `web/package.json` 锁定版本一致的 Node / pnpm，不直接信任 raw `PATH` 中的 pnpm。带 `--docker` 时两个镜像均固定构建为 `linux/amd64` 并写入同一 40 位 `GIT_SHA`。该入口是独立的 T8 source-package 检查，不替代 `fast.sh` / `full.sh` / `strict.sh`，也不证明目标环境发布、migration、smoke、release evidence 或人工签收已经完成。
 
 ```bash

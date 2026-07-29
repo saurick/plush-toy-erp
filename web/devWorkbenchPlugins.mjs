@@ -1,5 +1,6 @@
 import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
 import { createDevCustomerImportDryRunPlugin } from './devCustomerImportDryRunPlugin.mjs'
+import { createDevDeliveryBridgePlugin } from './devDeliveryBridgePlugin.mjs'
 import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
 import { createDevWorkbenchReceiptPlugin } from './devWorkbenchReceiptPlugin.mjs'
 
@@ -8,6 +9,7 @@ export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
   'plush-dev-customer-config',
   'plush-dev-qa-coverage',
   'plush-dev-workbench-receipts',
+  'plush-dev-delivery-bridge',
 ])
 
 export function createDevWorkbenchServePlugins({
@@ -27,5 +29,6 @@ export function createDevWorkbenchServePlugins({
     createDevCustomerConfigPlugin({ projectRoot }),
     createDevQaCoveragePlugin({ projectRoot }),
     createDevWorkbenchReceiptPlugin({ projectRoot }),
+    createDevDeliveryBridgePlugin({ projectRoot }),
   ].filter(Boolean)
 }

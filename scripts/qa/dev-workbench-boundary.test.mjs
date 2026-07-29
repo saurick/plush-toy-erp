@@ -116,7 +116,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 7);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 8);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>

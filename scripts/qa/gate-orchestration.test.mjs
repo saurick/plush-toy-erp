@@ -423,7 +423,8 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
   assert.doesNotMatch(full, /gate-coverage\.mjs|covered_by_|component_complete/u);
   assert.doesNotMatch(strict, /gate-coverage\.mjs|covered_by_|component_complete/u);
   assert.match(strict, /bash "\$ROOT_DIR\/scripts\/qa\/full\.sh"/u);
-  assert.match(strict, /GOVULNCHECK_STRICT=1/u);
+  assert.match(strict, /QA_FULL_PROFILE=strict/u);
+  assert.doesNotMatch(strict, /scripts\/qa\/govulncheck\.sh/u);
   assert.match(strict, /status=complete/u);
   assert.doesNotMatch(
     `${full}\n${strict}\n${ci}`,

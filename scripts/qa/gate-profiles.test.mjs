@@ -23,19 +23,36 @@ import {
   validateWebPackageTestContract,
 } from "./gate-profiles.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 }
 
-test("gate profiles prove strict is a full superset and full is a fast superset", () => {
+test("gate profiles prove coverage hierarchy without duplicate executions", () => {
   assert.doesNotThrow(() => assertProfileHierarchy());
   assert(GATE_PROFILES.full.length > GATE_PROFILES.fast.length);
   assert(GATE_PROFILES.strict.length > GATE_PROFILES.full.length);
   assert(GATE_PROFILES.strict.includes("yamllint-strict"));
+  assert(GATE_PROFILES.full.includes("scripts-node-tests-release"));
+  assert(!GATE_PROFILES.full.includes("web-contracts"));
+  assert(!GATE_PROFILES.full.includes("server-quick"));
+  assert(GATE_PROFILES.full.includes("web-test"));
+  assert(GATE_PROFILES.full.includes("server-all"));
+  assert(!GATE_PROFILES.strict.includes("web-lint"));
+  assert(!GATE_PROFILES.strict.includes("web-css"));
+  assert(GATE_PROFILES.strict.includes("web-zero-warnings"));
+  assert(!GATE_PROFILES.strict.includes("govulncheck-strict"));
   assert(PROFILE_REQUIRED_FILES.strict.includes("scripts/qa/yamllint.sh"));
-  assert(PROFILE_REQUIRED_EXECUTABLES.strict.includes("scripts/qa/yamllint.sh"));
+  assert(
+    PROFILE_REQUIRED_FILES.fast.includes("scripts/qa/node-test-groups.mjs"),
+  );
+  assert(
+    PROFILE_REQUIRED_EXECUTABLES.strict.includes("scripts/qa/yamllint.sh"),
+  );
   assert(PROFILE_REQUIRED_FILES.full.includes("scripts/purchase-return-pg.sh"));
   assert(
     PROFILE_REQUIRED_EXECUTABLES.full.includes("scripts/purchase-return-pg.sh"),
@@ -79,7 +96,9 @@ test("a deleted required test fails closed", () => {
   try {
     const result = validateProfileFiles("fast", emptyRoot);
     assert.equal(result.ok, false);
-    assert(result.missing.includes("scripts/qa/critical-postgres-gate.test.mjs"));
+    assert(
+      result.missing.includes("scripts/qa/critical-postgres-gate.test.mjs"),
+    );
     assert(result.missing.includes("scripts/qa/secrets.test.mjs"));
   } finally {
     rmSync(emptyRoot, { recursive: true, force: true });
@@ -88,10 +107,14 @@ test("a deleted required test fails closed", () => {
 
 test("profile required files remain cumulative", () => {
   assert(
-    PROFILE_REQUIRED_FILES.fast.every((file) => PROFILE_REQUIRED_FILES.full.includes(file)),
+    PROFILE_REQUIRED_FILES.fast.every((file) =>
+      PROFILE_REQUIRED_FILES.full.includes(file),
+    ),
   );
   assert(
-    PROFILE_REQUIRED_FILES.full.every((file) => PROFILE_REQUIRED_FILES.strict.includes(file)),
+    PROFILE_REQUIRED_FILES.full.every((file) =>
+      PROFILE_REQUIRED_FILES.strict.includes(file),
+    ),
   );
   assert(
     PROFILE_REQUIRED_EXECUTABLES.fast.every((file) =>
@@ -148,7 +171,9 @@ test("commit tree validation does not trust a restored worktree file", () => {
     });
     assert.equal(result.ok, false);
     assert(!result.missing.includes(".githooks/pre-push"));
-    assert(result.missing.includes("scripts/qa/critical-postgres-gate.test.mjs"));
+    assert(
+      result.missing.includes("scripts/qa/critical-postgres-gate.test.mjs"),
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -7,6 +7,7 @@ import {
   DEV_PROTOTYPES_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
   DEV_TESTING_ROUTE,
+  DEV_VERSION_CENTER_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
 } from './devRoutes.mjs'
 
@@ -136,6 +137,25 @@ export const DEV_HUB_ITEMS = Object.freeze([
     ]),
     description:
       '读取已登记的 yoyoosun 客户配置包，完成预检、差异、Dry Run、当前代理后端测试应用和指定证据批次门禁；正式写入交给统一发布执行器。',
+  }),
+  Object.freeze({
+    key: 'version-center',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    title: '版本发布与部署中心 / Version Center',
+    group: '交付治理 / Delivery',
+    route: DEV_VERSION_CENTER_ROUTE,
+    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    truthSource: 'GitHub 不可变制品、固定目标预检与 operation 回执',
+    status: '本地受控编排 / Local controlled actions',
+    guardrails: Object.freeze([
+      '固定 GitHub 仓库 / Fixed repository',
+      '固定 test-133 / Fixed target',
+      '明确确认 / Explicit confirmation',
+      '终态不重试 / No terminal retry',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '选择 exact-SHA 版本、查看 133 容量与运行身份、准备部署并追踪幂等操作；浏览器不能传入命令、路径、SSH 或任意目标。',
   }),
 ])
 

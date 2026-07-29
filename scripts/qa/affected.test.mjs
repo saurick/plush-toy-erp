@@ -134,6 +134,26 @@ test("affected: CI workflow changes run the repository CI contract", () => {
   assert.equal(plan.requiresFull, false);
 });
 
+test("affected: release workflow changes run the immutable release contract", () => {
+  const plan = buildAffectedPlan([".github/workflows/release.yml"], {
+    root: ROOT,
+  });
+
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/release-workflow.test.mjs"),
+    ),
+  );
+  assert.equal(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/ci-workflow.test.mjs"),
+    ),
+    false,
+  );
+  assert(plan.followUps.some((item) => item.id === "remote-ci-enforcement"));
+  assert.equal(plan.requiresFull, false);
+});
+
 test("affected: broad canonical audit is non-blocking and explicit", () => {
   const runtimePlan = buildAffectedPlan(["server/internal/biz/workflow.go"], {
     root: ROOT,

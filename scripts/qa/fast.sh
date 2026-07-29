@@ -7,17 +7,18 @@ print_help() {
   bash scripts/qa/fast.sh
 
 作用:
-  执行开发期高频检查。scripts/ 下的 Node 测试由统一入口递归发现，
-  新增 *.test.mjs / *.test.js / *.test.cjs 无需再维护 shell 文件清单。
+  执行开发期高频检查。scripts/ 下的 Node 测试按显式 fast/database/
+  browser/release 分组登记；本入口只运行 fast 组。
 
 检查内容:
   repository: AGENTS 体积、DB migration、错误码和项目边界守卫
-  scripts: 全部 Node 测试 + 关键可执行脚本语法/运行时边界
+  scripts: fast 显式测试组 + 关键可执行脚本语法/运行时边界
   web: 关键配置与 smoke 合同测试 -> lint -> css
   server: go test ./internal/... ./pkg/...（存在即测）
 
-环境变量:
-  SKIP_DB_GUARD=1  跳过 DB migration 守卫
+边界:
+  本入口不接受 SKIP_*；database/browser/release 组由 full/strict 或显式
+  profile 运行，避免开发期重复执行重型门禁。
 USAGE
 }
 
@@ -31,6 +32,16 @@ if [[ $# -gt 0 ]]; then
   print_help
   exit 1
 fi
+
+fast_scope="${QA_FAST_SCOPE:-complete}"
+node_test_profile="${QA_NODE_TEST_PROFILE:-fast}"
+case "$fast_scope:$node_test_profile" in
+complete:fast | base:full) ;;
+*)
+  echo "[qa:fast] status=incomplete reason=invalid_composition scope=$fast_scope node_profile=$node_test_profile"
+  exit 2
+  ;;
+esac
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
@@ -70,8 +81,8 @@ bash "$ROOT_DIR/scripts/qa/error-code-sync.sh"
 echo "[qa:fast] 运行错误码魔法数字检查"
 bash "$ROOT_DIR/scripts/qa/error-codes.sh"
 
-echo "[qa:fast] 自动发现并运行 scripts Node 测试"
-node "$ROOT_DIR/scripts/qa/run-node-tests.mjs"
+echo "[qa:fast] 运行 scripts Node 显式测试组 profile=$node_test_profile"
+node "$ROOT_DIR/scripts/qa/run-node-tests.mjs" --profile "$node_test_profile"
 
 echo "[qa:fast] 运行关键脚本语法检查"
 for script in \
@@ -109,6 +120,11 @@ node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
 
 echo "[qa:fast] 运行全部登记客户配置的 preview manifest 检查"
 node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --all --mode preview
+
+if [[ "$fast_scope" == "base" ]]; then
+  echo "[qa:fast] scope=base status=component_complete Web 全量与 server 全量由 full 同轮覆盖"
+  exit 0
+fi
 
 echo "[qa:fast] 运行 web 关键合同测试"
 web_tests=(

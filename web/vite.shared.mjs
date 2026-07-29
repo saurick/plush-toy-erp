@@ -47,6 +47,21 @@ export function resolveERPHMRClientPort(rawPort, serverPort) {
   return port
 }
 
+export function assertERPResolvedVitePorts({
+  hmrClientPort,
+  serverPort,
+} = {}) {
+  if (
+    !Number.isInteger(serverPort) ||
+    !Number.isInteger(hmrClientPort) ||
+    hmrClientPort !== serverPort
+  ) {
+    throw new Error(
+      `resolved Vite listener ${String(serverPort)} and HMR client ${String(hmrClientPort)} must match; set ERP_VITE_PORT and ERP_VITE_HMR_CLIENT_PORT to the same port instead of overriding only --port`
+    )
+  }
+}
+
 const createDevOrigin = (port) => `http://${DEV_HOST}:${port}`
 
 const normalizeDevLocalUrl = (url, port) => {
@@ -88,6 +103,23 @@ const createDevLocalhostOriginNormalizer = (port) => ({
   },
 })
 
+const createDevResolvedPortGuard = () => ({
+  name: 'plush-dev-resolved-port-guard',
+  apply: 'serve',
+  configResolved(config) {
+    const resolvedServerPort = config.server.port
+    const resolvedHmrClientPort =
+      typeof config.server.hmr === 'object' &&
+      Number.isInteger(config.server.hmr.clientPort)
+        ? config.server.hmr.clientPort
+        : resolvedServerPort
+    assertERPResolvedVitePorts({
+      serverPort: resolvedServerPort,
+      hmrClientPort: resolvedHmrClientPort,
+    })
+  },
+})
+
 export function createERPViteConfig(appId) {
   const app = getAppDefinition(appId)
   const serverPort = resolveERPDevServerPort(process.env.ERP_VITE_PORT)
@@ -113,6 +145,7 @@ export function createERPViteConfig(appId) {
       plugins: [
         // 本机开发统一用 IPv4 origin，避免 localhost 解析或代理链路导致源模块加载抖动。
         isDev ? createDevLocalhostOriginNormalizer(serverPort) : null,
+        isDev ? createDevResolvedPortGuard() : null,
         react(),
         ...createDevWorkbenchServePlugins({
           apiOrigin,

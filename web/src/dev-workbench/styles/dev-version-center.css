@@ -1,0 +1,30 @@
+.erp-dev-version-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.erp-dev-version-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.erp-dev-version-summary .ant-card {
+  height: 100%;
+}
+
+.erp-dev-version-table-card .ant-table-cell {
+  vertical-align: top;
+}
+
+.erp-dev-version-table-card .ant-typography-danger {
+  display: block;
+  max-width: 420px;
+  white-space: normal;
+}
+
+@media (max-width: 1100px) {
+  .erp-dev-version-summary {
+    grid-template-columns: 1fr;
+  }
+}

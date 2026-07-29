@@ -3,24 +3,35 @@ import { existsSync, lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const FAST_GATES = Object.freeze([
+const COMMON_GATES = Object.freeze([
   "diff-check",
   "agents-size",
   "db-guard",
   "error-codes",
-  "scripts-node-tests",
   "domain-boundaries",
   "customer-config",
   "import-isolation",
   "deployment-contracts",
+]);
+
+const FAST_GATES = Object.freeze([
+  ...COMMON_GATES,
+  "scripts-node-tests-fast",
   "web-contracts",
   "web-lint",
   "web-css",
   "server-quick",
 ]);
 
-const FULL_ONLY_GATES = Object.freeze([
+const FULL_GATES = Object.freeze([
+  ...COMMON_GATES,
+  "scripts-node-tests-fast",
+  "scripts-node-tests-database",
+  "scripts-node-tests-browser",
+  "scripts-node-tests-release",
   "secret-range",
+  "web-lint",
+  "web-css",
   "web-test",
   "web-build",
   "browser-smoke",
@@ -31,22 +42,38 @@ const FULL_ONLY_GATES = Object.freeze([
   "govulncheck",
 ]);
 
-const STRICT_ONLY_GATES = Object.freeze([
+const STRICT_GATES = Object.freeze([
+  ...COMMON_GATES,
+  "scripts-node-tests-fast",
+  "scripts-node-tests-database",
+  "scripts-node-tests-browser",
+  "scripts-node-tests-release",
+  "secret-range",
+  "web-zero-warnings",
+  "web-test",
+  "web-build",
+  "browser-smoke",
+  "populated-upgrade-postgres",
+  "critical-postgres",
+  "server-all",
+  "server-build",
+  "govulncheck",
   "shellcheck-strict",
   "shfmt-strict",
   "yamllint-strict",
-  "web-zero-warnings",
-  "govulncheck-strict",
 ]);
 
 export const GATE_PROFILES = Object.freeze({
   fast: FAST_GATES,
-  full: Object.freeze([...FAST_GATES, ...FULL_ONLY_GATES]),
-  strict: Object.freeze([
-    ...FAST_GATES,
-    ...FULL_ONLY_GATES,
-    ...STRICT_ONLY_GATES,
-  ]),
+  full: FULL_GATES,
+  strict: STRICT_GATES,
+});
+
+const SUPERSEDING_GATES = Object.freeze({
+  "web-contracts": Object.freeze(["web-test"]),
+  "web-lint": Object.freeze(["web-zero-warnings"]),
+  "web-css": Object.freeze(["web-zero-warnings"]),
+  "server-quick": Object.freeze(["server-all"]),
 });
 
 const FAST_REQUIRED_FILES = Object.freeze([
@@ -67,6 +94,9 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/qa/lib/git-range.test.mjs",
   "scripts/qa/error-code-sync.sh",
   "scripts/qa/error-codes.sh",
+  "scripts/qa/exact-sha-gate.mjs",
+  "scripts/qa/exact-sha-gate.test.mjs",
+  "scripts/qa/node-test-groups.mjs",
   "scripts/qa/run-node-tests.mjs",
   "scripts/qa/run-node-tests.test.mjs",
   "scripts/qa/run-test-gate.mjs",
@@ -78,8 +108,10 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/qa/gate-orchestration.test.mjs",
   "scripts/qa/pre-push-receipt.mjs",
   "scripts/qa/pre-push-receipt.test.mjs",
+  "scripts/qa/release-workflow.test.mjs",
   "scripts/qa/prepare-push.sh",
   ".github/workflows/ci.yml",
+  ".github/workflows/release.yml",
   "scripts/qa/ci-workflow-yaml-check.go",
   "scripts/qa/ci-workflow.test.mjs",
   "scripts/qa/affected.mjs",
@@ -131,6 +163,10 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/deploy/release-artifact-bundle.test.mjs",
   "scripts/deploy/release-artifact-verify.mjs",
   "scripts/deploy/release-artifact-verify.test.mjs",
+  "scripts/deploy/release-catalog.mjs",
+  "scripts/deploy/release-catalog.test.mjs",
+  "scripts/deploy/github-release-publisher.mjs",
+  "scripts/deploy/github-release-publisher.test.mjs",
   "scripts/deploy/local-release-rehearsal.mjs",
   "scripts/deploy/local-release-rehearsal.test.mjs",
   "scripts/qa/test-data-isolation-boundary.test.mjs",
@@ -265,9 +301,12 @@ export function assertProfileHierarchy() {
     ["full", "strict"],
   ]) {
     const superset = new Set(GATE_PROFILES[supersetName]);
-    const missing = GATE_PROFILES[subsetName].filter(
-      (gate) => !superset.has(gate),
-    );
+    const missing = GATE_PROFILES[subsetName].filter((gate) => {
+      if (superset.has(gate)) return false;
+      return !(SUPERSEDING_GATES[gate] || []).some((replacement) =>
+        superset.has(replacement),
+      );
+    });
     if (missing.length > 0) {
       throw new Error(
         `[qa:profiles] ${supersetName} is missing ${subsetName} gates: ${missing.join(", ")}`,

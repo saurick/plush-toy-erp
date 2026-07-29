@@ -343,7 +343,11 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
 
     if (file.startsWith(".github/workflows/")) {
-      directTests.add("scripts/qa/ci-workflow.test.mjs");
+      directTests.add(
+        file === ".github/workflows/release.yml"
+          ? "scripts/qa/release-workflow.test.mjs"
+          : "scripts/qa/ci-workflow.test.mjs",
+      );
       addFollowUp(
         state,
         "remote-ci-enforcement",

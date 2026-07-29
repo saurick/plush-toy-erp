@@ -49,7 +49,7 @@ pnpm start
 
 默认地址：`http://127.0.0.1:5175`。开发服务器会把 `http://localhost:5175` 自动规范到同一 IPv4 地址。
 
-本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供，Vite 主入口固定 `5175` 并启用 `strictPort`；被占用时应处理占用者或调整完整本机端口组，不能让主入口静默顺延。`API_ORIGIN` 仍可显式覆盖，否则代理从同一清单的 HTTP `8300` 推导。
+本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供，Vite 主入口固定 `5175` 并启用 `strictPort`；被占用时应处理占用者或调整完整本机端口组，不能让主入口静默顺延。临时使用辅助端口时必须把 `ERP_VITE_PORT` 与 `ERP_VITE_HMR_CLIENT_PORT` 设为同一个值；只覆盖 Vite CLI 的 `--port` 会在启动期被拒绝，避免 HMR 连接旧端口后形成自动重载循环。`API_ORIGIN` 仍可显式覆盖，否则代理从同一清单的 HTTP `8300` 推导。
 
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，但仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
@@ -352,6 +352,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 | `/__dev/prototypes`        | HTML / PNG / 截图原型资产预览            | `docs/product/prototypes/**`                                |
 | `/__dev/capability-ledger` | 产品能力与客户矩阵真源入口               | 两份正式 Markdown                                           |
 | `/__dev/customer-config`   | 已登记客户配置包预检、测试应用与发布门禁 | `config/customers/<customer-key>/*` 及 customer config 脚本 |
+| `/__dev/version-center`    | exact-SHA 发布、固定 133 部署与回滚      | GitHub Release、固定目标预检与 operation 回执               |
 
 #### 开发导航 `/__dev`
 
@@ -359,7 +360,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 卡片显示用途、真源路径和边界摘要；重复“进入”链接使用页面专属可访问名称，实时搜索不再渲染无动作的搜索按钮。
 - 置顶只写浏览器本地偏好，不是后端配置。
 - 开发导航使用 `/favicon-dev.svg`；测试入口使用 `/favicon-testing.svg`，每个开发页同时提供独立浏览器标题，只用于区分本地开发页面。
-- 七个子页统一提供开发工作台全局菜单、当前页高亮、返回开发导航、复制当前深链和按需打开来源文档；开发人员可以在任意子页直接切换治理、流程状态、文档、测试、原型、能力和客户配置，不再先返回首页寻找入口。“开发工作台”按钮是唯一返回总览的入口，不在菜单中重复放第二个“总览”。移动端全局菜单允许横向滚动，并保持单一当前页语义。
+- 八个子页统一提供开发工作台全局菜单、当前页高亮、返回开发导航、复制当前深链和按需打开来源文档；开发人员可以在任意子页直接切换治理、流程状态、文档、测试、原型、能力、客户配置和版本中心，不再先返回首页寻找入口。“开发工作台”按钮是唯一返回总览的入口，不在菜单中重复放第二个“总览”。移动端全局菜单允许横向滚动，并保持单一当前页语义。
 
 #### 项目治理地图 `/__dev/governance`
 
@@ -414,6 +415,15 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - release readiness 必须显式选择 `deployments/<customer-key>/evidence/releases/<release-batch>` 的已登记批次，不猜 `latest`、不接受父目录或路径穿越。页面只做只读门禁并复制 `customer-config-release-readiness.mjs --print-input-template` 或统一 `customer-config-release-execute.mjs --print-input-template`；备用命令不拼未替换的 `<release-batch>` 或旧 manifest 路径，不再从浏览器直接发布 / 激活“正式版”。正式执行器继续要求目标端点、令牌、确认短语、release report 和 authenticated readback。
 - `rollback_customer_config` 只回滚已发布 compiled revision 并记录独立审计，不是 raw 包回滚或业务导入失败恢复；页面不提供裸回滚按钮。
 - 维护真源是 `config/customers/<customer-key>/*`、`config/catalog/*`、`config/schemas/*`、`scripts/import/*` 和相关正式文档。
+
+#### 版本发布与部署中心 `/__dev/version-center`
+
+- 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitHub 不可变版本、固定 `test-133` 当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或 UAT 合并成一个绿色结论。
+- 发布只允许当前 clean exact SHA；GitHub adapter 固定公开仓库、`release.yml` 和 `yoyoosun`，同一 SHA 的 strict 与镜像构建可复用，不会因刷新或失败自动重发。
+- 版本列表按发布时间区分动作：比 133 当前 manifest 新的版本只允许准备部署，旧版本只允许检查回滚；发布时间、当前 manifest、migration 序列或客户配置源指纹不能证明时按钮禁用并说明原因。
+- 部署与回滚先创建或复用 operation，再要求完整确认串。同一目标只允许一个执行器；页面刷新从原子 operation store 恢复，`failed / blocked / not_proven` 终态不自动重试。
+- Operation 详情通过独立 GET 按需读取最近 100 条脱敏事件；浏览器不接收本机路径、repo/workflow/target/SSH/shell/SQL/Docker 输入，也不持有 GitHub 或 SSH 凭据。
+- 远端基础回执当前只证明制品、备份恢复检查、migration、Compose、health、ready、Web health 与运行 SHA；带凭据岗位矩阵、PDF、客户 UAT 和签收仍需独立完成。
 
 ## 当前前端边界
 

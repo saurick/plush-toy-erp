@@ -6,6 +6,15 @@ name: CI
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Quality scope
+        required: true
+        default: full
+        type: choice
+        options:
+          - affected
+          - full
 
 permissions:
   contents: read
@@ -19,8 +28,8 @@ env:
   DISPOSABLE_DATABASE_BASE_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/postgres?sslmode=disable
 
 jobs:
-  strict:
-    name: Strict repository gate
+  quality:
+    name: Affected or full repository gate
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     services:
@@ -93,6 +102,7 @@ jobs:
       - name: Resolve and validate the exact Git comparison range
         env:
           EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_MODE: ${{ inputs.mode }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
@@ -122,35 +132,56 @@ jobs:
           fi
           git diff --check "$range"
           git log --check --format= "$history_range"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            gate_mode=affected
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            gate_mode="$REQUESTED_MODE"
+          else
+            gate_mode=full
+          fi
+          if [[ "$gate_mode" != "affected" && "$gate_mode" != "full" ]]; then
+            echo "[ci] unsupported gate mode: $gate_mode"
+            exit 1
+          fi
           echo "QA_BASE_RANGE=$range" >> "$GITHUB_ENV"
+          echo "CI_GATE_MODE=$gate_mode" >> "$GITHUB_ENV"
           echo "comparison_range=$range"
-      - name: Prove Ent and Atlas generation has zero drift
-        working-directory: server
+          echo "gate_mode=$gate_mode"
+      - name: Prove generation drift only for a full candidate
         run: |
           set -euo pipefail
+          if [[ "$CI_GATE_MODE" != "full" ]]; then
+            echo "[ci] generation drift deferred to full candidate"
+            exit 0
+          fi
+          cd server
           make data
+          cd ..
           status="$(git status --porcelain --untracked-files=all)"
           if [[ -n "$status" ]]; then
             printf '%s\n' "$status"
             echo "[ci] make data changed the committed tree"
             exit 1
           fi
-      - name: Run the repository strict gate
-        run: node scripts/qa/run-gate-with-receipt.mjs --gate strict
-      - name: Validate the committed source archive
+      - name: Run the selected repository quality gate
         run: |
           set -euo pipefail
+          if [[ "$CI_GATE_MODE" == "affected" ]]; then
+            bash scripts/qa/affected.sh --base "$QA_BASE_RANGE" --run
+          else
+            node scripts/qa/run-gate-with-receipt.mjs --gate full
+          fi
+      - name: Validate the committed source archive for a full candidate
+        run: |
+          set -euo pipefail
+          if [[ "$CI_GATE_MODE" != "full" ]]; then
+            echo "[ci] source archive validation deferred to full candidate"
+            exit 0
+          fi
           node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD
           status="$(git status --porcelain --untracked-files=all)"
           if [[ -n "$status" ]]; then
             printf '%s\n' "$status"
-            echo "[ci] strict gate changed the committed tree"
+            echo "[ci] full gate changed the committed tree"
             exit 1
           fi
-      - name: Upload the sanitized exact-SHA quality receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: strict-receipt-${{ github.sha }}
-          path: output/dev-workbench/receipts/strict-latest.json
-          if-no-files-found: error
-          retention-days: 14

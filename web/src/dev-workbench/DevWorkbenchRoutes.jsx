@@ -45,6 +45,9 @@ const DevCustomerConfigPage = lazyRoute(
   () => import('./pages/DevCustomerConfigPage.jsx')
 )
 const DevTestingPage = lazyRoute(() => import('./pages/DevTestingPage.jsx'))
+const DevVersionCenterPage = lazyRoute(
+  () => import('./pages/DevVersionCenterPage.jsx')
+)
 
 function DevRouteLoadingFallback() {
   return (
@@ -115,6 +118,10 @@ export default function DevWorkbenchRoutes() {
           <Route
             path="customer-config"
             element={<DevCustomerConfigPage />}
+          />
+          <Route
+            path="version-center"
+            element={<DevVersionCenterPage />}
           />
           <Route path="*" element={<Navigate to="/__dev" replace />} />
         </Routes>

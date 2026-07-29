@@ -19,6 +19,7 @@
 | 改 Workflow、状态或 Fact 边界 | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 相关 architecture 评审、[server/README.md](../server/README.md)、usecase / schema / test |
 | 改客户资料、导入或交付资料 | [新增甲方客户实施流程](product/新增甲方客户实施流程.md)、[客户资料入口](customers/README.md) | [标准样例客户](customers/reference-customer/README.md)、目标客户 README / 客户交付矩阵、对应脚本说明；私密 manifest 与原件不在 Product Core |
 | 改部署、发布或低配运行口径 | [部署约定](部署约定.md) | [server/deploy/README.md](../server/deploy/README.md)、[prod Compose README](../server/deploy/compose/prod/README.md)、[scripts/README.md](../scripts/README.md) |
+| 改 CI、不可变制品、133 promotion、回滚或研发效能工作台 | [工程效能与交付自动化](engineering/README.md) | [CI/CD 设计](engineering/研发效能工作台与CI-CD设计.md)、[实施计划](engineering/研发效能工作台与CI-CD实施计划.md)、QA / deploy 脚本和 workflow |
 | 查全量 Markdown 在哪里 | [文档清单](文档清单.md) | 最近目录 README、`rg` 搜索和当前代码 |
 
 只改正文、措辞或局部说明时，通常不需要更新全量清单；新增、删除、重命名、重分类或改变文档职责时，必须同步更新 `docs/文档清单.md` 和最近目录 README。
@@ -33,6 +34,7 @@
 | 架构评审 | Workflow / Fact / MasterData / Source Document / 状态边界 | [architecture/README.md](architecture/README.md) |
 | 客户资料 | 客户资料、客户差异、导入准备、交付矩阵 | [customers/README.md](customers/README.md) |
 | 部署与运行 | 低配发布、Compose 主路径、迁移和发布门禁 | [部署约定](部署约定.md) |
+| 工程效能与交付自动化 | QA / CI 分层、不可变制品、测试环境 promotion、回滚和 DEV 工作台 | [engineering/README.md](engineering/README.md) |
 | 工作流 / 角色 / 财务 / 仓库 / 可观测性 | 专题设计和第一版业务说明 | [workflow](workflow/README.md)、[roles](roles/README.md)、[finance](finance/README.md)、[warehouse](warehouse/README.md)、[observability](observability/README.md) |
 | 参考与归档 | 外部输入、历史证据、旧过程记录 | [reference](reference/README.md)、[archive](archive/README.md) |
 
@@ -113,6 +115,7 @@
 - 产品与路线：[product/README.md](product/README.md)
 - 架构评审：[architecture/README.md](architecture/README.md)
 - 客户资料：[customers/README.md](customers/README.md)
+- 工程效能与交付自动化：[engineering/README.md](engineering/README.md)
 - 外部参考：[reference/README.md](reference/README.md)
 - 归档：[archive/README.md](archive/README.md)
 - 后端总览：[server/README.md](../server/README.md)

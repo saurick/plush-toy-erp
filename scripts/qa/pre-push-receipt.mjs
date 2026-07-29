@@ -1032,7 +1032,6 @@ export function preparePush(root, options, { env = process.env } = {}) {
   const releaseLock = acquireReceiptLock(state, "prepare");
   let receiptCandidate = "";
   try {
-    removeReceipt(state.receiptPath);
     assertNoForbiddenEnvironment(env);
     readSigningKey(state, { create: true });
     const before = readRepositorySnapshot(root);
@@ -1040,6 +1039,33 @@ export function preparePush(root, options, { env = process.env } = {}) {
     const initialPlan = resolvePreparationPlan(root, options);
     const initialGateContract = gateContractFingerprint(root, before.head);
     const initialEnvironment = environmentFingerprint(root, env);
+
+    if (existsSync(state.receiptPath)) {
+      try {
+        const existingReceipt = readReceipt(state.receiptPath);
+        validateReceipt({
+          receipt: existingReceipt,
+          root,
+          state,
+          snapshot: before,
+          pushPlan: initialPlan,
+          environment: env,
+          gateSha256: initialGateContract,
+          environmentSha256: initialEnvironment,
+        });
+        console.log(
+          `[qa:prepare-push] status=reused profile=full head=${before.head} aggregate_range=${initialPlan.aggregateRange} expires_at_ms=${existingReceipt.expiresAtMs}`,
+        );
+        return { receipt: existingReceipt, state, reused: true };
+      } catch (error) {
+        const reason =
+          error instanceof ReceiptError ? error.reason : "unexpected_error";
+        console.log(
+          `[qa:prepare-push] existing_receipt=invalid reason=${reason}; running a fresh full gate`,
+        );
+        removeReceipt(state.receiptPath);
+      }
+    }
 
     console.log(
       `[qa:prepare-push] 运行 full（HEAD=${before.head.slice(0, 12)} aggregate_range=${initialPlan.aggregateRange}）`,
@@ -1101,7 +1127,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
     console.log(
       `[qa:prepare-push] status=complete profile=full head=${after.head} aggregate_range=${finalPlan.aggregateRange} ttl_seconds=${PRE_PUSH_RECEIPT_TTL_MS / 1000}`,
     );
-    return { receipt, state };
+    return { receipt, state, reused: false };
   } catch (error) {
     removeReceipt(state.receiptPath);
     throw error;

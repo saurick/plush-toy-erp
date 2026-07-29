@@ -6,6 +6,8 @@
 
 发布制品入口是仓库根目录的 `scripts/deploy/release-artifact-bundle.mjs` 与 `release-artifact-verify.mjs`：只接受 clean current HEAD 的 committed archive，两个镜像固定为 `linux/amd64` 并内置相同 40 位 `GIT_SHA`，manifest 同时记录 content ID、tar checksum、依赖 SBOM、migration 序列和客户配置源指纹。目标机只允许加载 / 拉取 manifest 中的固定制品。正式 promotion 前必须先用 `scripts/deploy/local-release-rehearsal.mjs` 在一次性数据库和本文件登记的唯一 Compose 上完成 migration、运行身份、登录、PDF、备份恢复与 steady-state restart；本地回执不能替代目标 preflight、active config、rollback 或 UAT。
 
+普通 GitHub CI 只做 affected / full 验证；独立 `.github/workflows/release.yml` 才对默认分支可达的 exact SHA 运行或复用一次 strict，构建一次不可变制品并发布 GHCR / GitHub Release。固定 `test-133` 的 promotion 由 `scripts/deploy/promotion-controller.mjs` 与 `promotion-executor.mjs` 编排，代码回滚由对应 rollback controller / executor 编排；它们复用既有 digest，不在目标机重新构建。目标 registry、只读 preflight、operation 和安全边界见 `scripts/deploy/README.md` 与 `docs/engineering/研发效能工作台与CI-CD设计.md`。
+
 Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/bin/atlas`。不要拉起 `arigaio/atlas:*` 临时容器，也不要把 Atlas 增加到 Compose；迁移脚本应使用宿主机可达的 PostgreSQL 端口，并在同一个私有 `flock /run/lock/plush-toy-erp/atlas-migrate.lock` 锁内完成 `status -> populated upgrade 只读审计（含 20260714055504 与 WIP 20260717043625 切换边界） -> 20260714055825 客户配置切换只读审计 -> dry-run -> apply`，避免并发发布在步骤之间穿插。`--status-only` 只查看状态，不执行后续步骤。
 
 升级链跨越 `20260714055504`、WIP 委外分配切换 `20260717035245 -> 20260717043625` 或 `20260714055825` 时，必须在 apply 前分别通过 `scripts/qa/populated-upgrade-preflight.sh --audit populated-upgrade` 和 `--audit customer-config-cutover`。前者还会阻断旧 WIP 委外关联列中仍有数据的中间态，以及切换后缺少 allocation 的活动外发批次。两项审计只读检查现存行，不执行 migration，也不自动 `INSERT / UPDATE / DELETE`；发现阻断数据后应停止发布，按单独评审的人工治理方案处理并保留审计与回滚证据。fresh schema、静态 DDL 或空库 Atlas 通过只能证明迁移链可执行，不能替代 populated upgrade 证据；备份恢复演练也必须在 restored DB 上先审计、再 apply。

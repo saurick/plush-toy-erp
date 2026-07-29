@@ -1,0 +1,281 @@
+name: Immutable Release
+
+"on":
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact 40-character SHA reachable from main
+        required: true
+        type: string
+      version:
+        description: Human-readable release version
+        required: true
+        type: string
+      customer:
+        description: Product Core customer package
+        required: true
+        default: yoyoosun
+        type: choice
+        options:
+          - yoyoosun
+
+permissions:
+  actions: read
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ inputs.sha }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Exact-SHA strict and immutable artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    services:
+      postgres:
+        image: postgres:18.1
+        env:
+          POSTGRES_PASSWORD: ci-local-password
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      CI: "true"
+      DISPOSABLE_DATABASE_BASE_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/postgres?sslmode=disable
+    steps:
+      - name: Check out the requested exact SHA
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .n-node-version
+      - name: Validate identity and reuse an existing immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_SHA: ${{ inputs.sha }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+          REQUESTED_CUSTOMER: ${{ inputs.customer }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REQUESTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "[release] SHA must be 40 lowercase hexadecimal characters"
+            exit 1
+          fi
+          if [[ ! "$REQUESTED_VERSION" =~ ^[0-9A-Za-z]([0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$ ]]; then
+            echo "[release] version is invalid"
+            exit 1
+          fi
+          if [[ "$REQUESTED_CUSTOMER" != "yoyoosun" ]]; then
+            echo "[release] only the fixed yoyoosun customer package is allowed"
+            exit 1
+          fi
+          head_sha="$(git rev-parse HEAD)"
+          if [[ "$head_sha" != "$REQUESTED_SHA" ]]; then
+            echo "[release] checkout mismatch: head=$head_sha requested=$REQUESTED_SHA"
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$REQUESTED_SHA" origin/main; then
+            echo "[release] requested SHA is not reachable from origin/main"
+            exit 1
+          fi
+          release_tag="artifact-$REQUESTED_SHA"
+          echo "RELEASE_SHA=$REQUESTED_SHA" >> "$GITHUB_ENV"
+          echo "RELEASE_VERSION=$REQUESTED_VERSION" >> "$GITHUB_ENV"
+          echo "RELEASE_CUSTOMER=$REQUESTED_CUSTOMER" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
+          if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            asset_names="$(
+              gh release view "$release_tag" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[].name'
+            )"
+            required_assets=(
+              checksums.sha256
+              release-artifact.json
+              release-manifest.json
+              sbom.cdx.json
+              server-image.tar
+              web-image.tar
+            )
+            for required_asset in "${required_assets[@]}"; do
+              if ! grep -Fxq "$required_asset" <<< "$asset_names"; then
+                echo "[release] existing immutable release is incomplete: missing $required_asset"
+                exit 1
+              fi
+            done
+            mkdir -p output/releases/existing
+            gh release download "$release_tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern release-manifest.json \
+              --dir output/releases/existing
+            target="$(gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish)"
+            if [[ "$target" != "$REQUESTED_SHA" ]]; then
+              echo "[release] existing release target mismatch: $target"
+              exit 1
+            fi
+            node scripts/deploy/release-catalog.mjs verify \
+              --manifest output/releases/existing/release-manifest.json \
+              --sha "$REQUESTED_SHA" \
+              --version "$REQUESTED_VERSION"
+            echo "RELEASE_REUSED=true" >> "$GITHUB_ENV"
+            echo "[release] status=reused tag=$release_tag sha=$REQUESTED_SHA"
+          else
+            echo "RELEASE_REUSED=false" >> "$GITHUB_ENV"
+          fi
+      - name: Set up Go
+        if: env.RELEASE_REUSED != 'true'
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: Set up pinned Atlas
+        if: env.RELEASE_REUSED != 'true'
+        uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
+        with:
+          version: v0.38.0
+      - name: Install strict and release dependencies
+        if: env.RELEASE_REUSED != 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes lsof postgresql-client ripgrep shellcheck unzip yamllint
+          npm install --global pnpm@10.13.1
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Install Web dependencies and Chromium
+        if: env.RELEASE_REUSED != 'true'
+        working-directory: web
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          chrome_path="$(node -e 'const { chromium } = require("playwright"); process.stdout.write(chromium.executablePath())')"
+          if [[ ! -x "$chrome_path" ]]; then
+            echo "[release] Playwright Chromium is not executable: $chrome_path"
+            exit 1
+          fi
+          sandbox_source="$(dirname "$chrome_path")/chrome_sandbox"
+          sandbox_path="/usr/local/sbin/chrome-devel-sandbox"
+          if [[ ! -f "$sandbox_source" ]]; then
+            echo "[release] Chromium SUID sandbox helper is missing: $sandbox_source"
+            exit 1
+          fi
+          sudo install -o root -g root -m 4755 "$sandbox_source" "$sandbox_path"
+          echo "CHROME_DEVEL_SANDBOX=$sandbox_path" >> "$GITHUB_ENV"
+          echo "ERP_PDF_CHROME_PATH=$chrome_path" >> "$GITHUB_ENV"
+      - name: Recover an earlier terminal for the same exact SHA
+        if: env.RELEASE_REUSED != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          artifact_name="strict-terminal-$RELEASE_SHA"
+          artifact_id="$(
+            gh api -X GET "repos/$GITHUB_REPOSITORY/actions/artifacts" \
+              -f name="$artifact_name" \
+              -f per_page=100 \
+              --jq '.artifacts | map(select(.expired == false)) | sort_by(.created_at) | last | .id // empty'
+          )"
+          if [[ -z "$artifact_id" ]]; then
+            echo "[release] no earlier strict terminal"
+            exit 0
+          fi
+          mkdir -p "output/qa/exact-sha/$RELEASE_SHA"
+          archive="$RUNNER_TEMP/$artifact_name.zip"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > "$archive"
+          unzip -q "$archive" -d "output/qa/exact-sha/$RELEASE_SHA"
+          echo "[release] recovered strict terminal artifact_id=$artifact_id"
+      - name: Prove Ent and Atlas generation has zero drift
+        if: env.RELEASE_REUSED != 'true'
+        working-directory: server
+        run: |
+          set -euo pipefail
+          make data
+          status="$(git -C .. status --porcelain --untracked-files=all)"
+          if [[ -n "$status" ]]; then
+            printf '%s\n' "$status"
+            echo "[release] make data changed the committed tree"
+            exit 1
+          fi
+      - name: Run or reuse the exact-SHA strict terminal
+        if: env.RELEASE_REUSED != 'true'
+        run: node scripts/qa/exact-sha-gate.mjs --sha "$RELEASE_SHA" --main-ref origin/main --run
+      - name: Persist the exact-SHA terminal
+        if: always() && env.RELEASE_REUSED != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: strict-terminal-${{ inputs.sha }}
+          path: output/qa/exact-sha/${{ inputs.sha }}
+          if-no-files-found: error
+          retention-days: 90
+      - name: Build once, publish by digest, and create the immutable release
+        if: env.RELEASE_REUSED != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          node scripts/deploy/release-artifact-bundle.mjs \
+            --execute \
+            --ref "$RELEASE_SHA" \
+            --customer "$RELEASE_CUSTOMER" \
+            --out "output/releases/$RELEASE_SHA" \
+            --json
+          terminal="$(
+            find "output/qa/exact-sha/$RELEASE_SHA" \
+              -maxdepth 1 \
+              -type f \
+              -name '*.json' \
+              ! -name '*.receipt.json' \
+              -print \
+              -quit
+          )"
+          if [[ -z "$terminal" ]]; then
+            echo "[release] exact-SHA terminal is missing"
+            exit 1
+          fi
+          node scripts/deploy/github-release-publisher.mjs \
+            --artifact-dir "output/releases/$RELEASE_SHA" \
+            --strict-terminal "$terminal" \
+            --version "$RELEASE_VERSION" \
+            --repository "$GITHUB_REPOSITORY" \
+            --json
+          node scripts/deploy/release-catalog.mjs verify \
+            --manifest "output/releases/$RELEASE_SHA/release-manifest.json" \
+            --sha "$RELEASE_SHA" \
+            --version "$RELEASE_VERSION"
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$RELEASE_SHA" \
+            --title "$RELEASE_VERSION" \
+            --notes "Immutable exact-SHA release. Deployment, target migration, role smoke and customer UAT remain separate evidence." \
+            "output/releases/$RELEASE_SHA/release-manifest.json" \
+            "output/releases/$RELEASE_SHA/release-artifact.json" \
+            "output/releases/$RELEASE_SHA/sbom.cdx.json" \
+            "output/releases/$RELEASE_SHA/checksums.sha256" \
+            "output/releases/$RELEASE_SHA/server-image.tar" \
+            "output/releases/$RELEASE_SHA/web-image.tar"
+          verify_dir="$RUNNER_TEMP/release-verify"
+          mkdir -p "$verify_dir"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern release-manifest.json \
+            --dir "$verify_dir"
+          node scripts/deploy/release-catalog.mjs verify \
+            --manifest "$verify_dir/release-manifest.json" \
+            --sha "$RELEASE_SHA" \
+            --version "$RELEASE_VERSION"

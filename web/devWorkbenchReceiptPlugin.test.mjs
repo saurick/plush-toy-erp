@@ -228,6 +228,7 @@ test('development serve registry is exact and absent from all builds', async () 
     'plush-dev-customer-import-dry-run-api',
     'plush-dev-qa-coverage',
     'plush-dev-workbench-receipts',
+    'plush-dev-delivery-bridge',
   ])
   for (const config of [developmentBuild, productionBuild]) {
     assert.deepEqual(

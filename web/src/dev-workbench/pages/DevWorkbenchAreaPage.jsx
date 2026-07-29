@@ -67,7 +67,10 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
         ) : null}
         <section className="erp-dev-hub-grid" aria-label={`${presentation.title}入口`}>
           {items.map((item) => (
-            <article className="erp-dev-hub-card" key={item.key}>
+            <article
+              className="erp-dev-hub-card erp-dev-hub-card--without-icon"
+              key={item.key}
+            >
               <div className="erp-dev-hub-card__body">
                 <div className="erp-dev-hub-card__head">
                   <div>

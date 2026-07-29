@@ -10,6 +10,7 @@ export const DEV_PROTOTYPES_ROUTE = '/__dev/prototypes'
 export const DEV_CAPABILITY_LEDGER_ROUTE = '/__dev/capability-ledger'
 export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
 export const DEV_TESTING_ROUTE = '/__dev/testing'
+export const DEV_VERSION_CENTER_ROUTE = '/__dev/version-center'
 
 export const DEV_WORKBENCH_AREA_KEYS = Object.freeze({
   overview: 'overview',
@@ -88,6 +89,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     route: DEV_CUSTOMER_CONFIG_ROUTE,
     label: '客户配置',
   }),
+  Object.freeze({
+    key: 'version-center',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    route: DEV_VERSION_CENTER_ROUTE,
+    label: '版本中心',
+  }),
 ])
 
 export const DEV_PAGE_TITLE_BY_ROUTE = Object.freeze({
@@ -102,6 +109,7 @@ export const DEV_PAGE_TITLE_BY_ROUTE = Object.freeze({
   [DEV_PROTOTYPES_ROUTE]: '产品原型',
   [DEV_CAPABILITY_LEDGER_ROUTE]: '能力真源',
   [DEV_CUSTOMER_CONFIG_ROUTE]: '客户配置包预检与发布',
+  [DEV_VERSION_CENTER_ROUTE]: '版本发布与部署中心',
 })
 
 function normalizeDevPathname(pathname = '') {
@@ -122,6 +130,7 @@ export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_PROTOTYPES_ROUTE]: '/favicon-prototypes.svg',
   [DEV_CAPABILITY_LEDGER_ROUTE]: '/favicon-capability-ledger.svg',
   [DEV_CUSTOMER_CONFIG_ROUTE]: '/favicon-customer-config.svg',
+  [DEV_VERSION_CENTER_ROUTE]: '/favicon-dev.svg',
 })
 
 export function resolveDevWorkbenchAreaKey(pathname = '') {

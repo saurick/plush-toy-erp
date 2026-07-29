@@ -39,25 +39,32 @@ function collectUses(value, uses = []) {
 
 const workflowSource = read(".github/workflows/ci.yml");
 const workflow = parseWorkflow();
-const strictJob = workflow.jobs?.strict;
-const strictSteps = strictJob?.steps || [];
-const stepRuns = strictSteps.map((step) => step.run || "").join("\n");
+const qualityJob = workflow.jobs?.quality;
+const qualitySteps = qualityJob?.steps || [];
+const stepRuns = qualitySteps.map((step) => step.run || "").join("\n");
 
-test("CI YAML has one protected job, read-only permissions, and exact action pins", () => {
+test("CI YAML has one read-only quality job and exact action pins", () => {
   assert.deepEqual(Object.keys(workflow.on).sort(), [
     "pull_request",
     "push",
     "workflow_dispatch",
   ]);
   assert.deepEqual(workflow.on.push, { branches: ["main"] });
+  assert.deepEqual(workflow.on.workflow_dispatch.inputs.mode, {
+    default: "full",
+    description: "Quality scope",
+    options: ["affected", "full"],
+    required: true,
+    type: "choice",
+  });
   assert.deepEqual(workflow.permissions, { contents: "read" });
-  assert.deepEqual(Object.keys(workflow.jobs), ["strict"]);
-  assert.equal(strictJob["runs-on"], "ubuntu-24.04");
-  assert.equal(strictJob["timeout-minutes"], 90);
-  assert.equal(strictJob.if, undefined);
-  assert.equal(strictJob.permissions, undefined);
-  assert.equal(strictJob["continue-on-error"], undefined);
-  for (const step of strictSteps) {
+  assert.deepEqual(Object.keys(workflow.jobs), ["quality"]);
+  assert.equal(qualityJob["runs-on"], "ubuntu-24.04");
+  assert.equal(qualityJob["timeout-minutes"], 90);
+  assert.equal(qualityJob.if, undefined);
+  assert.equal(qualityJob.permissions, undefined);
+  assert.equal(qualityJob["continue-on-error"], undefined);
+  for (const step of qualitySteps) {
     assert.equal(step.if, undefined, `${step.name} must not conditionally skip`);
     assert.equal(step["continue-on-error"], undefined);
   }
@@ -66,7 +73,6 @@ test("CI YAML has one protected job, read-only permissions, and exact action pin
     "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
     "actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c",
     "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e",
-    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     "ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea",
   ];
   const actualUses = collectUses(workflow).sort();
@@ -75,8 +81,8 @@ test("CI YAML has one protected job, read-only permissions, and exact action pin
     assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
   }
 
-  assert.equal(strictSteps[0].with["fetch-depth"], 0);
-  assert.equal(strictSteps[0].with["persist-credentials"], false);
+  assert.equal(qualitySteps[0].with["fetch-depth"], 0);
+  assert.equal(qualitySteps[0].with["persist-credentials"], false);
   assert.doesNotMatch(workflowSource, /pull_request_target/u);
   assert.doesNotMatch(workflowSource, /^\s+paths(?:-ignore)?:/mu);
   assert.doesNotMatch(workflowSource, /continue-on-error/u);
@@ -128,16 +134,29 @@ test("CI versions and dependencies follow repository gate requirements", () => {
   assert.match(read("server/Dockerfile"), /^ARG GO_BUILDER_IMAGE=golang:1\.26\.5$/mu);
 });
 
-test("CI reuses strict instead of copying local gate families", () => {
+test("CI keeps ordinary feedback on affected/full and reserves strict for release", () => {
   assert.equal(
     (
       stepRuns.match(
-        /node scripts\/qa\/run-gate-with-receipt\.mjs --gate strict/gu,
+        /node scripts\/qa\/run-gate-with-receipt\.mjs --gate full/gu,
       ) || []
     ).length,
     1,
   );
-  assert.doesNotMatch(stepRuns, /scripts\/qa\/(?:fast|full)\.sh/u);
+  assert.equal(
+    (
+      stepRuns.match(
+        /bash scripts\/qa\/affected\.sh --base "\$QA_BASE_RANGE" --run/gu,
+      ) || []
+    ).length,
+    1,
+  );
+  assert.doesNotMatch(stepRuns, /--gate strict/u);
+  assert.match(stepRuns, /EVENT_NAME" == "pull_request"/u);
+  assert.match(stepRuns, /gate_mode=affected/u);
+  assert.match(stepRuns, /gate_mode=full/u);
+  assert.match(stepRuns, /REQUESTED_MODE/u);
+  assert.match(stepRuns, /CI_GATE_MODE=\$gate_mode/u);
   assert.doesNotMatch(
     stepRuns,
     /scripts\/qa\/(?:db-guard|secrets|govulncheck|shellcheck|shfmt|yamllint)\.sh/u,
@@ -149,15 +168,17 @@ test("CI reuses strict instead of copying local gate families", () => {
   );
   assert.doesNotMatch(stepRuns, /\bpnpm (?:test|lint|css|build|style:l1)\b/u);
 
-  const makeDataIndex = strictSteps.findIndex((step) => /\bmake data\b/u.test(step.run || ""));
-  const strictIndex = strictSteps.findIndex((step) =>
-    /run-gate-with-receipt\.mjs --gate strict/u.test(step.run || ""),
+  const makeDataIndex = qualitySteps.findIndex((step) =>
+    /\bmake data\b/u.test(step.run || ""),
   );
-  const archiveIndex = strictSteps.findIndex((step) =>
+  const qualityIndex = qualitySteps.findIndex((step) =>
+    /run-gate-with-receipt\.mjs --gate full/u.test(step.run || ""),
+  );
+  const archiveIndex = qualitySteps.findIndex((step) =>
     /source-archive-release-check\.mjs --light --ref HEAD/u.test(step.run || ""),
   );
-  assert.ok(makeDataIndex >= 0 && makeDataIndex < strictIndex);
-  assert.ok(strictIndex < archiveIndex);
+  assert.ok(makeDataIndex >= 0 && makeDataIndex < qualityIndex);
+  assert.ok(qualityIndex < archiveIndex);
 });
 
 test("CI comparison, schema generation, PostgreSQL, and archive evidence fail closed", () => {
@@ -177,7 +198,7 @@ test("CI comparison, schema generation, PostgreSQL, and archive evidence fail cl
   assert.match(stepRuns, /git status --porcelain --untracked-files=all/u);
   assert.match(stepRuns, /make data changed the committed tree/u);
   const disposableURL = new URL(workflow.env.DISPOSABLE_DATABASE_BASE_URL);
-  const postgres = strictJob.services.postgres;
+  const postgres = qualityJob.services.postgres;
   assert.equal(disposableURL.hostname, "127.0.0.1");
   assert.equal(disposableURL.port, "55432");
   assert.equal(disposableURL.pathname, "/postgres");
@@ -185,5 +206,5 @@ test("CI comparison, schema generation, PostgreSQL, and archive evidence fail cl
   assert.deepEqual(postgres.ports, ["55432:5432"]);
   assert.match(postgres.options, /--health-cmd "pg_isready -U postgres"/u);
   assert.match(stepRuns, /source-archive-release-check\.mjs --light --ref HEAD/u);
-  assert.match(stepRuns, /strict gate changed the committed tree/u);
+  assert.match(stepRuns, /full gate changed the committed tree/u);
 });

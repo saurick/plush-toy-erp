@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "plush.deployment-target-registry/v1",
+  "targets": [
+    {
+      "key": "test-133",
+      "enabled": true,
+      "purpose": "customer-trial",
+      "customer": "yoyoosun",
+      "trialTarget": "customer-trial-133",
+      "ssh": {
+        "host": "192.168.0.133",
+        "port": 22,
+        "user": "simon",
+        "expectedHostname": "simon"
+      },
+      "filesystem": {
+        "root": "/home/simon/plush-toy-erp-v5",
+        "current": "/home/simon/plush-toy-erp-v5/current",
+        "releases": "/home/simon/plush-toy-erp-v5/releases",
+        "runtimeEnv": "/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133",
+        "operationRoot": "/home/simon/plush-toy-erp-v5/operations"
+      },
+      "compose": {
+        "projectName": "plush-toy-erp-v5",
+        "directory": "server/deploy/compose/prod",
+        "baseFile": "compose.yml",
+        "overrideFile": "compose.customer-trial-133.yml",
+        "serverService": "app-server",
+        "webService": "web-desktop",
+        "postgresService": "postgres"
+      },
+      "database": {
+        "name": "plush_erp_uat_20260716_v5",
+        "migrationLock": "/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock"
+      },
+      "endpoints": {
+        "web": "http://127.0.0.1:5185",
+        "server": "http://127.0.0.1:8315"
+      },
+      "capacity": {
+        "minimumAvailableBytes": 32212254720
+      }
+    }
+  ]
+}

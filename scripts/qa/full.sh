@@ -10,9 +10,9 @@ print_help() {
   执行一次完整本地质量检查。最终推送准备由 prepare-push.sh 在建立远端连接前调用。
 
 检查内容:
-  fast: 先执行 scripts/qa/fast.sh，自动发现全部 scripts Node 测试并运行高频边界
+  shared: 复用 fast 的基础守卫，一次运行 scripts Node 的全部显式测试组
   secrets: 严格扫描 prepare-push 计算的聚合范围；真实 push hook 仍逐 ref 重新严格扫描
-  web: fast 已跑 lint/css，这里强制 pnpm test + 非零执行/零 skip summary -> pnpm build
+  web: lint/css -> pnpm test + 非零执行/零 skip summary -> pnpm build，同轮各执行一次
   browser: 动态独立端口自启当前 worktree Vite，再运行 Chromium 无写入 smoke
   server: 存量数据真实升级 -> 当前完整 Schema 关键 PostgreSQL 矩阵（含采购退货） -> 真实 Chromium PDF 安全集成 -> go test JSON 非零执行/零 skip -> make build
   govulncheck: 最后执行 Go 漏洞扫描，避免外部网络扰动本地 PostgreSQL 并发门禁
@@ -24,7 +24,8 @@ print_help() {
 
 结果边界:
   full/strict 拒绝 SKIP_*、STRICT_SKIP_* 与调用者提供的 coverage 变量。
-  full 始终真实执行全部固定 gate，只有全部成功才输出 complete；它不读取或签发回执。
+  full 不复跑会由 Web/Go 全量覆盖的 fast 子集，仍真实执行全部固定 gate；
+  只有全部成功才输出 complete；它不读取或签发回执。
   只有 prepare-push.sh 能在 full 通过且 HEAD/tree/环境/远端范围未变化后签发本地回执。
 USAGE
 }
@@ -39,6 +40,15 @@ if [[ $# -gt 0 ]]; then
   print_help
   exit 1
 fi
+
+full_profile="${QA_FULL_PROFILE:-full}"
+case "$full_profile" in
+full | strict) ;;
+*)
+  echo "[qa:full] status=incomplete reason=invalid_profile profile=$full_profile"
+  exit 2
+  ;;
+esac
 
 for variable in QA_GATE_COVERAGE_RECEIPT QA_GATE_ORCHESTRATOR; do
   if [[ -n "${!variable:-}" ]]; then
@@ -92,10 +102,11 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile full
+node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile "$full_profile"
 
-echo "[qa:full] 先运行 fast 检查"
-bash "$ROOT_DIR/scripts/qa/fast.sh"
+echo "[qa:full] 运行共享基础检查，不重复 Web/Go 全量稍后覆盖的 fast 子集"
+QA_FAST_SCOPE=base QA_NODE_TEST_PROFILE=full \
+  bash "$ROOT_DIR/scripts/qa/fast.sh"
 
 SECRETS_STRICT=1 bash "$ROOT_DIR/scripts/qa/secrets.sh"
 
@@ -103,6 +114,13 @@ echo "[qa:full] 运行 web 测试与构建"
 (
   cd "$ROOT_DIR/web"
   node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));if(typeof pkg?.scripts?.test!=='string'||!pkg.scripts.test.trim()){console.error('[qa:full] web/package.json 缺少 scripts.test');process.exit(1)}"
+  if [[ "$full_profile" == "strict" ]]; then
+    "$PNPM_BIN" exec eslint --max-warnings=0 --ext .js --ext .jsx src/
+    "$PNPM_BIN" exec stylelint "src/**/*.{css,scss,sass}" --max-warnings=0
+  else
+    "$PNPM_BIN" lint
+    "$PNPM_BIN" css
+  fi
   node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind node --label web-all -- \
     "$PNPM_BIN" test --test-reporter=tap
@@ -164,4 +182,4 @@ echo "[qa:full] 运行 server 全量检查"
 # 避免代理或系统网络异常占满本地端口时误报业务并发失败。
 GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
 
-echo "[qa:full] status=complete 全部门禁通过"
+echo "[qa:full] profile=$full_profile status=complete 全部门禁通过"

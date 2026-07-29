@@ -314,6 +314,27 @@ test("prepare runs full once before push and hook only runs live range gates", (
   }
 });
 
+test("a second prepare with the same fingerprint reuses the valid full receipt", () => {
+  const fixture = createFixture();
+  try {
+    const first = runPrepare(fixture.root);
+    assert.equal(first.status, 0, first.stderr || first.stdout);
+    assert.match(first.stdout, /status=complete profile=full/u);
+
+    const second = runPrepare(fixture.root);
+    assert.equal(second.status, 0, second.stderr || second.stdout);
+    assert.match(second.stdout, /status=reused profile=full/u);
+    assert.deepEqual(readLines(gitStateFile(fixture.root, "full-ranges.txt")), [
+      `${fixture.remoteSha}..${fixture.localSha}`,
+    ]);
+
+    const pushed = runHook(fixture);
+    assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("a real Git push PATH prefix preserves the prepared environment", () => {
   const fixture = createFixture();
   try {
