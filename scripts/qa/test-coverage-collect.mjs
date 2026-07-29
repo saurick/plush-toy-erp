@@ -316,8 +316,23 @@ export const FIELD_LINKAGE_PRINT_CASE_IDS = Object.freeze([
   "FL_print_templates_output_zero__does_not_use_falsy_fallback_for_paper_values",
 ]);
 
+function readCriticalPostgresTestPattern() {
+  const configPath = fileURLToPath(
+    new URL("./critical-postgres-tests.sh", import.meta.url),
+  );
+  const pattern = readFileSync(configPath, "utf8").match(
+    /^CRITICAL_POSTGRES_TEST_PATTERN='([^']+)'$/mu,
+  )?.[1];
+  if (!pattern) {
+    throw new Error(
+      "critical-postgres-tests.sh missing CRITICAL_POSTGRES_TEST_PATTERN",
+    );
+  }
+  return pattern;
+}
+
 export const CRITICAL_POSTGRES_TEST_PATTERN =
-  "^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestPurchaseReturnPostgres|TestPurchaseReturnFromQualityInspectionPostgres|TestQualityInspectionPostgres|TestQualityInspectionFromOutsourcingReturnPostgres|TestProductionWIPQualityInspectionPostgres|TestSourceFinanceSnapshotBackfillMigrationPostgres|TestWorkflowPostgres|TestCustomerConfigPostgres|TestMasterDataSchemaPostgres|TestProductionOrderSchemaPostgres|TestProductionOrderPostgres|TestProductionMaterialIssuePostgres|TestProductionReworkPostgres|TestSourceDocumentPostgres|TestInventoryPostgres|TestInventoryLotPostgres|TestBOMPostgres|TestOperationalFactPostgres|TestOutsourcingFactFromOrderPostgres|TestProcessRuntimePostgres|TestFinanceBusinessSourcesPostgres|TestOperationalFactRepoFinance.*Postgres|TestFinanceFactCancelAuditPostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)";
+  readCriticalPostgresTestPattern();
 export const BASELINE_GO_SKIP_PATTERN = `${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromiumSecurityIntegration$`;
 
 const IMPORT_TEST_FILES = Object.freeze([

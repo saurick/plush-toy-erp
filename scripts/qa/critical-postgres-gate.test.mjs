@@ -138,6 +138,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   assert.ok(patternSource, 'critical PostgreSQL shared pattern must be declared')
   const criticalPattern = new RegExp(patternSource, 'u')
   for (const testName of [
+    'TestAdminManagePostgresConcurrentRoleSettingsKeepsOneCompleteAggregate',
     'TestSourceDocumentPostgresShipmentCreateVsSalesCancelUsesOneSourceLock',
     'TestProcessRuntimePostgresSourceTransitionRace',
   ]) {
@@ -159,6 +160,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     'critical PostgreSQL gate must reuse the same guarded, migrated test database',
   )
   for (const testPrefix of [
+    'TestAdminManagePostgres',
     'TestPurchaseReceiptPostgres',
     'TestPurchaseReceiptAdjustmentPostgres',
     'TestPurchaseReturnPostgres',
