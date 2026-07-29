@@ -20,6 +20,10 @@ const (
 	CustomerConfigLocalTestProductVersion = "local-customer-package-test-apply"
 	CustomerConfigLocalTestAllowEnv       = "ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG"
 
+	CustomerConfigReleaseRehearsalAllowEnv            = "ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG"
+	CustomerConfigReleaseRehearsalIDEnv               = "ERP_RELEASE_REHEARSAL_ID"
+	CustomerConfigReleaseRehearsalSystemIdentifierEnv = "ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER"
+
 	CustomerConfigTrialApplyPurpose   = "customer_trial_test_apply"
 	CustomerConfigTrialDatasetVersion = "2026.07.16-v5"
 	CustomerConfigTrialProductVersion = "customer-trial-133-test-2026.07.16-v5"

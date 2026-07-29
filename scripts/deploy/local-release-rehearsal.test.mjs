@@ -124,7 +124,29 @@ test("local release rehearsal environment binds isolated database fixed images a
   assert.equal(built.values.ERP_DEBUG_ENV, "prod");
   assert.equal(built.values.ERP_DEBUG_SEED_ENABLED, "false");
   assert.equal(built.values.BOOTSTRAP_ADMIN_ONCE, "false");
+  assert.equal(
+    built.values.ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG,
+    "1",
+  );
+  assert.equal(built.values.ERP_RELEASE_REHEARSAL_ID, "release_20260728");
+  assert.equal(
+    "ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER" in built.values,
+    false,
+  );
+  assert.equal("ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG" in built.values, false);
   assert.equal("APP_ADMIN_PASSWORD" in built.values, false);
+  assert.throws(
+    () =>
+      buildRehearsalEnvironment({
+        manifest,
+        runId: `release_${"a".repeat(38)}`,
+        workspace: "/private/tmp/release",
+        ports,
+        postgresPassword: "postgres-password",
+        jwtSecret: "jwt-secret",
+      }),
+    /run id is invalid/u,
+  );
 });
 
 test("local release rehearsal creates a server-compatible ephemeral admin password", () => {

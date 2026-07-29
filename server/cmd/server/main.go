@@ -355,6 +355,9 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	if containsRuntimePlaceholder(dataCfg.Postgres.Dsn) {
 		return fmt.Errorf("production preflight failed: POSTGRES_DSN still contains placeholder")
 	}
+	if err := validateReleaseRehearsalCustomerConfig(dataCfg, getenv); err != nil {
+		return fmt.Errorf("production preflight failed: %w", err)
+	}
 	if dataCfg.Auth == nil || strings.TrimSpace(dataCfg.Auth.JwtSecret) == "" {
 		return fmt.Errorf("production preflight failed: APP_JWT_SECRET is required")
 	}
@@ -410,11 +413,54 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	return nil
 }
 
+func validateReleaseRehearsalCustomerConfig(dataCfg *conf.Data, getenv func(string) string) error {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	allow := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalAllowEnv))
+	runID := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalIDEnv))
+	systemIdentifier := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalSystemIdentifierEnv))
+	if allow == "" || allow == "0" {
+		if runID != "" || systemIdentifier != "" {
+			return fmt.Errorf("release rehearsal identity requires %s=1", biz.CustomerConfigReleaseRehearsalAllowEnv)
+		}
+		return nil
+	}
+	if allow != "1" {
+		return fmt.Errorf("%s must be 0, 1, or unset", biz.CustomerConfigReleaseRehearsalAllowEnv)
+	}
+	if dataCfg == nil || dataCfg.Postgres == nil || strings.TrimSpace(dataCfg.Postgres.Dsn) == "" {
+		return fmt.Errorf("release rehearsal customer config requires POSTGRES_DSN")
+	}
+	expectedDatabase := "plush_erp_release_" + runID
+	if err := devdbguard.RequireCustomerConfigReleaseRehearsalRuntime(
+		dataCfg.Postgres.Dsn,
+		runID,
+		expectedDatabase,
+		systemIdentifier,
+		systemIdentifier,
+	); err != nil {
+		return fmt.Errorf("release rehearsal customer config boundary failed: %w", err)
+	}
+	return nil
+}
+
 func validateCustomerConfigLocalTestDatabase(dataCfg *conf.Data, getenv func(string) string) error {
 	if getenv == nil {
 		getenv = os.Getenv
 	}
-	if strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv)) != "1" {
+	localAllow := strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv))
+	rehearsalAllow := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalAllowEnv))
+	if localAllow == "1" && rehearsalAllow == "1" {
+		return fmt.Errorf("customer config local-test and release rehearsal gates cannot both be enabled")
+	}
+	if rehearsalAllow == "1" {
+		if err := validateReleaseRehearsalCustomerConfig(dataCfg, getenv); err != nil {
+			return fmt.Errorf("customer config release rehearsal preflight failed: %w", err)
+		}
+		return nil
+	}
+	if localAllow != "1" {
 		return nil
 	}
 	if dataCfg == nil || dataCfg.Postgres == nil || strings.TrimSpace(dataCfg.Postgres.Dsn) == "" {

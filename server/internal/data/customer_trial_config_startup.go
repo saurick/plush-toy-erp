@@ -63,11 +63,28 @@ LIMIT 1`, customertrialconfig.ExpectedCustomerKey).Scan(
 		return fmt.Errorf("customer trial config startup check failed: %w", err)
 	}
 	if local {
-		if strings.TrimSpace(os.Getenv(biz.CustomerConfigLocalTestAllowEnv)) != "1" {
-			return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the exact registered runtime opt-in")
+		localAllow := strings.TrimSpace(os.Getenv(biz.CustomerConfigLocalTestAllowEnv))
+		rehearsalAllow := strings.TrimSpace(os.Getenv(biz.CustomerConfigReleaseRehearsalAllowEnv))
+		if localAllow == "1" && rehearsalAllow == "1" {
+			return fmt.Errorf("customer trial config startup check failed: local-test and release rehearsal runtime opt-ins cannot both be enabled")
 		}
-		if devdbguard.RequireCustomerConfigLocalTestRuntime(postgresDSN, databaseName, systemIdentifier) != nil {
-			return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the registered local development database family")
+		switch {
+		case localAllow == "1":
+			if devdbguard.RequireCustomerConfigLocalTestRuntime(postgresDSN, databaseName, systemIdentifier) != nil {
+				return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the registered local development database family")
+			}
+		case rehearsalAllow == "1":
+			if devdbguard.RequireCustomerConfigReleaseRehearsalRuntime(
+				postgresDSN,
+				strings.TrimSpace(os.Getenv(biz.CustomerConfigReleaseRehearsalIDEnv)),
+				databaseName,
+				systemIdentifier,
+				strings.TrimSpace(os.Getenv(biz.CustomerConfigReleaseRehearsalSystemIdentifierEnv)),
+			) != nil {
+				return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the exact release rehearsal database identity")
+			}
+		default:
+			return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the exact registered runtime opt-in")
 		}
 	}
 	trial, err := customertrialconfig.ClassifyActiveManifest(

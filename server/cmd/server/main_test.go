@@ -314,6 +314,92 @@ func TestValidateProductionBootstrapConfigRejectsLocalTestCustomerConfigFlag(t *
 	}
 }
 
+func TestValidateProductionBootstrapConfigAllowsExactReleaseRehearsalBoundary(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{
+			Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_release_release_95d64e23_20260729?sslmode=disable",
+		},
+		Auth: &conf.Data_Auth{
+			JwtSecret: productionConfigTestJWTSecret(),
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	env := productionConfigTestEnv(map[string]string{
+		biz.CustomerConfigReleaseRehearsalAllowEnv:            "1",
+		biz.CustomerConfigReleaseRehearsalIDEnv:               "release_95d64e23_20260729",
+		biz.CustomerConfigReleaseRehearsalSystemIdentifierEnv: "1234567890123456789",
+	})
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, env); err != nil {
+		t.Fatalf("expected exact release rehearsal boundary to pass, got %v", err)
+	}
+	if err := validateCustomerConfigLocalTestDatabase(cfg, env); err != nil {
+		t.Fatalf("expected release rehearsal local-test gate to pass, got %v", err)
+	}
+}
+
+func TestValidateProductionBootstrapConfigRejectsReleaseRehearsalEscape(t *testing.T) {
+	t.Parallel()
+
+	base := map[string]string{
+		biz.CustomerConfigReleaseRehearsalAllowEnv:            "1",
+		biz.CustomerConfigReleaseRehearsalIDEnv:               "release_95d64e23_20260729",
+		biz.CustomerConfigReleaseRehearsalSystemIdentifierEnv: "1234567890123456789",
+	}
+	for _, test := range []struct {
+		name      string
+		dsn       string
+		overrides map[string]string
+	}{
+		{
+			name: "ordinary production database",
+			dsn:  "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable",
+		},
+		{
+			name: "133 target",
+			dsn:  "postgres://postgres:runtime-password@192.168.0.133:5435/plush_erp?sslmode=disable",
+		},
+		{
+			name: "mismatched run id",
+			dsn:  "postgres://postgres:runtime-password@postgres:5432/plush_erp_release_release_other_20260729?sslmode=disable",
+		},
+		{
+			name: "missing cluster identity",
+			dsn:  "postgres://postgres:runtime-password@postgres:5432/plush_erp_release_release_95d64e23_20260729?sslmode=disable",
+			overrides: map[string]string{
+				biz.CustomerConfigReleaseRehearsalSystemIdentifierEnv: "",
+			},
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			values := map[string]string{}
+			for key, value := range base {
+				values[key] = value
+			}
+			for key, value := range test.overrides {
+				values[key] = value
+			}
+			cfg := &conf.Data{
+				Postgres: &conf.Data_Postgres{Dsn: test.dsn},
+				Auth: &conf.Data_Auth{
+					JwtSecret: productionConfigTestJWTSecret(),
+					Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+				},
+			}
+			if err := validateProductionBootstrapConfig(
+				"./configs/prod/config.yaml",
+				cfg,
+				productionConfigTestEnv(values),
+			); err == nil {
+				t.Fatal("expected release rehearsal escape to be rejected")
+			}
+		})
+	}
+}
+
 func TestValidateCustomerConfigLocalTestDatabaseBindsSharedDevelopmentDatabase(t *testing.T) {
 	t.Parallel()
 

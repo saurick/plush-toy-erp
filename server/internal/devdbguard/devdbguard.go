@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -16,7 +17,11 @@ const (
 	CustomerConfigLocalTestPort             = uint16(5432)
 	CustomerConfigLocalTestSystemIdentifier = "7572907083182862377"
 	localDevelopmentDatabaseName            = "plush_erp"
+	customerConfigReleaseRehearsalHost      = "postgres"
+	customerConfigReleaseRehearsalPort      = uint16(5432)
 )
+
+var customerConfigReleaseRehearsalIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_]{7,44}$`)
 
 func IsDevConfigPath(confPath string) bool {
 	normalized := filepath.ToSlash(filepath.Clean(strings.TrimSpace(confPath)))
@@ -85,6 +90,74 @@ func RequireCustomerConfigLocalTestRuntime(dsn string, currentDatabase string, s
 		return fmt.Errorf("customer config local-test runtime PostgreSQL cluster identity mismatch")
 	}
 	return nil
+}
+
+// RequireCustomerConfigReleaseRehearsalDSN keeps the release-only local-test
+// capability inside the disposable Compose database named by the exact run ID.
+// It is separate from the registered 106 development-family capability.
+func RequireCustomerConfigReleaseRehearsalDSN(dsn string, runID string) error {
+	runID = strings.TrimSpace(runID)
+	if !customerConfigReleaseRehearsalIDPattern.MatchString(runID) {
+		return fmt.Errorf("customer config release rehearsal run ID is invalid")
+	}
+	config, err := pgconn.ParseConfig(strings.TrimSpace(dsn))
+	if err != nil {
+		return fmt.Errorf("parse postgres dsn for customer config release rehearsal guard failed: %w", err)
+	}
+	expectedDatabase := "plush_erp_release_" + runID
+	if len(config.Fallbacks) != 0 ||
+		strings.TrimSpace(config.Host) != customerConfigReleaseRehearsalHost ||
+		config.Port != customerConfigReleaseRehearsalPort ||
+		strings.TrimSpace(config.Database) != expectedDatabase {
+		return fmt.Errorf(
+			"customer config release rehearsal gate requires %s:%d/%s with no fallback",
+			customerConfigReleaseRehearsalHost,
+			customerConfigReleaseRehearsalPort,
+			expectedDatabase,
+		)
+	}
+	return nil
+}
+
+// RequireCustomerConfigReleaseRehearsalRuntime binds the configured disposable
+// database to the live database and PostgreSQL cluster observed before startup.
+func RequireCustomerConfigReleaseRehearsalRuntime(
+	dsn string,
+	runID string,
+	currentDatabase string,
+	systemIdentifier string,
+	expectedSystemIdentifier string,
+) error {
+	if err := RequireCustomerConfigReleaseRehearsalDSN(dsn, runID); err != nil {
+		return err
+	}
+	expectedDatabase := "plush_erp_release_" + strings.TrimSpace(runID)
+	if strings.TrimSpace(currentDatabase) != expectedDatabase {
+		return fmt.Errorf(
+			"customer config release rehearsal runtime database mismatch: expected %s, connected %s",
+			expectedDatabase,
+			strings.TrimSpace(currentDatabase),
+		)
+	}
+	systemIdentifier = strings.TrimSpace(systemIdentifier)
+	expectedSystemIdentifier = strings.TrimSpace(expectedSystemIdentifier)
+	if len(systemIdentifier) == 0 ||
+		len(systemIdentifier) > 20 ||
+		expectedSystemIdentifier == "" ||
+		systemIdentifier != expectedSystemIdentifier ||
+		!allDecimalDigits(systemIdentifier) {
+		return fmt.Errorf("customer config release rehearsal PostgreSQL cluster identity mismatch")
+	}
+	return nil
+}
+
+func allDecimalDigits(value string) bool {
+	for _, character := range value {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return value != ""
 }
 
 func requireCustomerConfigLocalTestConfig(dsn string) (*pgconn.Config, error) {

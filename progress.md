@@ -10,6 +10,12 @@
 - 133 当前 release、数据库、active config、镜像与回滚点必须在每次发布前从目标环境重新读回；历史记录只作定位，不得替代当前技术发布证据。客户 UAT / 签收始终是独立关口。
 - 本轮 Git 与发布收口只能由单一 owner 串行执行；clean HEAD 的 full / strict / prepare-push、exact-SHA 远端 CI、不可变制品、本地发布演练和 133 技术发布必须绑定同一最终 SHA，以 Git、CI、制品 manifest 和运行回执为准，不由本文件预写绿色结论。
 
+## 2026-07-29 本地发布演练客户配置门禁修正
+
+根因与修正：`95d64e23eb7c10b6cfc966391504528ceb93978f` 的唯一一次本地 bundle、四项 checksum / load identity 和 migration、一次性管理员、RBAC / 审计、health / ready、登录、运行身份均通过；演练随后在 `validate_customer_config` fail closed，PDF 与备份恢复未执行，专属容器和数据库清理为零残留。原因是演练尝试应用 `local_test_apply` 配置，但该能力按既有安全合同只允许登记的 106 开发库，生产 Compose 也正确拒绝旧开关。现新增独立 release-rehearsal opt-in：只接受 exact run ID 对应的 `postgres:5432/plush_erp_release_<run-id>`，启动前写入实际 PostgreSQL system identifier，启动和 active revision 重启读回时再次核对同名数据库与相同 cluster identity；旧 106 门禁、133 和普通生产默认值均不放宽。
+
+验证与边界：本地演练、生产管理员 bootstrap、migration 与 production preflight Node 合同 `182 / 182` 通过；Go 的 devdbguard、server 启动前检、JSON-RPC 门禁和 active-revision 启动读回四包通过，生产 Compose 可解析且 `git diff --check` 通过。`95d64e23` 不推送、不发布、不复用失败回执；下一步在新 clean SHA 上只构建并演练一次，成功后才执行一次 prepare-push、远端 CI、不可变 Release 与远端制品演练。当前 133 仍保持旧运行版本，未执行目标 migration / 岗位 smoke 或客户 UAT。
+
 ## 2026-07-29 本地不可变发布演练一次性管理员修正
 
 根因与修正：精确 SHA `1c9027dd501bc0535a08acd8beef0364721f986f` 的 GitHub CI、单次 `2026.07.29-3` Release、六件远端制品 checksum / manifest / SBOM / 镜像身份均已通过；首次本地制品演练在 migration 完成后被服务端生产安全门禁拒绝。演练脚本原先把一次性管理员密码只写入 Compose 替换 env，但生产 Compose 按设计不映射该 secret，同时又把常驻服务设为 `BOOTSTRAP_ADMIN_ONCE=true`；服务因此以退出码 2 反复退出。现改为 migration 后启动无端口、固定镜像的一次性容器，只通过当前进程环境注入符合 8–20 字符合同的临时密码，绑定 container / Compose project / service / image content ID / operation，读回 marker、管理员、completed audit 与内置 RBAC 后精确删除；稳态 env 从创建起始终为 `BOOTSTRAP_ADMIN_ONCE=false` 且不含密码。

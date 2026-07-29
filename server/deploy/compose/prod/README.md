@@ -148,6 +148,9 @@ export ERP_DEBUG_CLEANUP_ENABLED=false
 export ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false
 export ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=0
 export ERP_CUSTOMER_TRIAL_TARGET=
+export ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG=0
+export ERP_RELEASE_REHEARSAL_ID=
+export ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER=
 export POSTGRES_BIND_ADDR=127.0.0.1
 export APP_HTTP_BIND_ADDR=127.0.0.1
 export APP_GRPC_BIND_ADDR=127.0.0.1
@@ -185,6 +188,7 @@ export JAEGER_BIND_ADDR=127.0.0.1
 - 前端宿主机端口由 `WEB_DESKTOP_BIND_ADDR` 明确控制：普通内网部署允许 `0.0.0.0` 或 `127.0.0.1`；`customer-trial-133` 必须为 `127.0.0.1`，只能通过 SSH tunnel 验收，不能直接暴露到办公网。
 - `POSTGRES_DSN` 是 URL，若 `POSTGRES_PASSWORD` 包含 `@`、`:`、`/`、`%`、`#` 等特殊字符，DSN 里的密码必须先 URL 编码；`POSTGRES_PASSWORD` 本身保持原值。
 - `ERP_ALLOW_CUSTOMER_TRIAL_CONFIG` 默认必须为 `0`，同时 `ERP_CUSTOMER_TRIAL_TARGET` 必须为空。只有 133 的隔离验收库可临时使用 `1` + `customer-trial-133`；启动门禁还会核对 `ERP_DEBUG_ENV=prod`、`WEB_DESKTOP_BIND_ADDR=127.0.0.1`，并按最终解析后的 DSN 精确要求单一 `postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable`。该模式还必须使用 `PROJECT_SLUG=plush-toy-erp-v5`、独立数据与 migration 锁目录、完整 V5 端口组，以及 `compose.customer-trial-133.yml`；任何一项缺失都不能启动。该开关只允许带独立 `customer_trial_test_apply` 标记的试用配置走标准 validate / publish / transition / activate / effective-session 链，不是正式发布能力；关闭开关后，若库中仍有该试用 revision 为 active，服务会拒绝启动，回滚时必须连同数据库目标一起恢复。
+- `ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG` 默认必须为 `0`，两个 rehearsal identity 必须为空。只有 `scripts/deploy/local-release-rehearsal.mjs` 创建的一次性环境会临时写入 `1`、精确 run ID 和启动前读到的 PostgreSQL system identifier；服务端同时要求 `postgres:5432/plush_erp_release_<run-id>`、连接后的同名数据库和相同 cluster identity。该能力只允许隔离发布演练应用 `local_test_apply` 配置，不允许普通生产、133 或登记开发库借用；演练结束会删除数据库、容器、identity 与 bootstrap secret。
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关只需把前端流量映射到 `5175`
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要先评审构建期 `VITE_BASE_URL`
 - `customer-trial-133` 的 Compose `web-desktop` 继续只绑定 loopback。当前 yoyoosun 公网域名如需映射到该栈，只允许使用 `deployments/yoyoosun/scripts/cutover-public-web.sh` 管理独立、可回滚的前端适配容器；脚本在切流前后都要求镜像 release、健康和 SMS provider capabilities 通过。不得临时手写 `docker run` 覆盖 5175，也不得把 PostgreSQL、后端或 Jaeger 改为公网绑定。

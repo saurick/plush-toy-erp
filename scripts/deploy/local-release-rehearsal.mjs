@@ -33,7 +33,7 @@ import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/custome
 const RECEIPT_SCHEMA = "plush-local-release-rehearsal/v1";
 const COMMIT_PATTERN = /^[a-f0-9]{40}$/u;
 const MIGRATION_PATTERN = /^[0-9]{14}$/u;
-const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{7,47}$/u;
+const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9_]{7,44}$/u;
 const COMPOSE_FILE = "server/deploy/compose/prod/compose.yml";
 const HTTP_TIMEOUT_MS = 10_000;
 const READY_TIMEOUT_MS = 180_000;
@@ -102,8 +102,7 @@ function safeRunId(value) {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/gu, "_")
-    .replace(/^_+|_+$/gu, "")
-    .slice(0, 48);
+    .replace(/^_+|_+$/gu, "");
   if (!RUN_ID_PATTERN.test(text)) {
     throw new RehearsalError(
       "preflight",
@@ -249,6 +248,8 @@ export function buildRehearsalEnvironment({
     ERP_DEBUG_CLEANUP_SCOPE: "debug_run",
     ERP_ALLOW_CUSTOMER_TRIAL_CONFIG: "0",
     ERP_CUSTOMER_TRIAL_TARGET: "",
+    ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG: "1",
+    ERP_RELEASE_REHEARSAL_ID: safeRunId(runId),
     POSTGRES_MEM_LIMIT: "384m",
     POSTGRES_MEM_RESERVATION: "128m",
     JAEGER_MEM_LIMIT: "128m",
@@ -395,6 +396,28 @@ function psql(context, databaseUrl, sql, label) {
       label,
     })
     .trim();
+}
+
+function bindReleaseRehearsalDatabaseIdentity(context, environment) {
+  const systemIdentifier = psql(
+    context,
+    context.databaseUrl,
+    "SELECT system_identifier::text FROM pg_control_system()",
+    "read release rehearsal PostgreSQL system identifier",
+  );
+  if (!/^[0-9]{1,20}$/u.test(systemIdentifier)) {
+    throw new RehearsalError(
+      "release rehearsal database identity",
+      "release rehearsal PostgreSQL system identifier is invalid",
+    );
+  }
+  environment.values.ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER =
+    systemIdentifier;
+  writeFileSync(
+    context.envFile,
+    formatRehearsalEnv(environment.values),
+    { mode: 0o600 },
+  );
 }
 
 async function runMigration(context, receipt) {
@@ -1400,6 +1423,7 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
       kind: "local-isolated-release-compose",
       project: environment.project,
       database: environment.database,
+      databaseIdentityBound: false,
       composeSource: COMPOSE_FILE,
       ports: {
         web: ports.web,
@@ -1483,6 +1507,8 @@ export async function runLocalReleaseRehearsal(options = {}, runtime = {}) {
       }).trim();
       return health === "healthy";
     }, "release PostgreSQL health");
+    bindReleaseRehearsalDatabaseIdentity(context, environment);
+    receipt.environment.databaseIdentityBound = true;
     await runMigration(context, receipt);
     receipt.adminBootstrap = await bootstrapRehearsalAdmin(context);
     composeCommand(

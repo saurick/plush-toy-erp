@@ -189,13 +189,35 @@ func resolveCustomerConfigLocalTestGate(c *conf.Data, getenv func(string) string
 	if getenv == nil {
 		getenv = func(string) string { return "" }
 	}
-	if strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv)) != "1" {
+	localAllow := strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv))
+	rehearsalAllow := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalAllowEnv))
+	if localAllow != "" && localAllow != "0" && localAllow != "1" {
+		return false, fmt.Errorf("%s must be 0, 1, or unset", biz.CustomerConfigLocalTestAllowEnv)
+	}
+	if rehearsalAllow != "" && rehearsalAllow != "0" && rehearsalAllow != "1" {
+		return false, fmt.Errorf("%s must be 0, 1, or unset", biz.CustomerConfigReleaseRehearsalAllowEnv)
+	}
+	if localAllow != "1" && rehearsalAllow != "1" {
 		return false, nil
 	}
 	if c == nil || c.Postgres == nil || strings.TrimSpace(c.Postgres.Dsn) == "" {
 		return false, fmt.Errorf("POSTGRES_DSN is required")
 	}
-	if err := devdbguard.RequireCustomerConfigLocalTestDSN(c.Postgres.Dsn); err != nil {
+	// Preserve the established local-development gate when older callers use a
+	// broad getenv stub. Production startup rejects this flag, and the exact
+	// registered development DSN remains mandatory.
+	if localAllow == "1" {
+		if err := devdbguard.RequireCustomerConfigLocalTestDSN(c.Postgres.Dsn); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	runID := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalIDEnv))
+	systemIdentifier := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalSystemIdentifierEnv))
+	if systemIdentifier == "" {
+		return false, fmt.Errorf("%s is required", biz.CustomerConfigReleaseRehearsalSystemIdentifierEnv)
+	}
+	if err := devdbguard.RequireCustomerConfigReleaseRehearsalDSN(c.Postgres.Dsn, runID); err != nil {
 		return false, err
 	}
 	return true, nil
