@@ -4,6 +4,14 @@
 
 ## 当前活跃事项
 
+### Codex App Git 收口队列治理
+
+- 完成：新增项目 Skill `$plush-git-closeout-queue`，把共享 Local 的唯一 writer、稳定 `event_id` + 精确 ACK、批次登记、热点文件继续排队、独立 push owner 和 fail-closed 边界收口为长期协议。AGENTS 只保留入口，动态查找同项目唯一置顶的 `Git 收口队列`，不保存易漂移的 task id、当前 owner、批次或 Git OID。
+- 完成：队列默认休眠，由任务消息事件唤醒；writer release 后可按已登记顺序放行下一任务，不要求各 worker 定时扫描。App 重启或旧任务漏报时只按用户明确的 `RECONCILE_REQUEST` 做一次只读盘点，不能因为“已无任务运行”就把全部本地修改提交。上下文过长时通过 compact snapshot 交给同项目空白新任务，确认接管后再归档旧队列，避免 fork 复制长历史或同时保留两个正式队列。
+- 验证：官方 Codex 手册确认任务历史可重新读取 / resume 和上下文压缩能力，但未提供 App 关闭期间跨任务离线投递保证；协议因此以 ACK 和幂等重发为准。项目 Skill validator、YAML / metadata、引用扫描、AGENTS 体积门禁和 scoped `git diff --check` 均纳入本次验证；不改变 runtime、schema、API 或测试行为。
+- 下一步：现有和未来顶层写任务在每次新轮次重新读取 AGENTS / Skill；已获提交授权的来源任务发送 `COMMIT_READY` 与 `CLOSEOUT_REQUEST` 后由队列精确本地收口，push 始终另行授权。需要更换队列时由用户明确触发 `QUEUE_ROTATE_REQUEST`。
+- 阻塞 / 风险：任务历史可恢复不等于跨任务消息必达，外部 GitHub Desktop / 终端也不受 Codex 协议预先锁定；无匹配 ACK、归属不明、index 污染、并发 Git 或 remote ref 漂移时均保留现场并停止，不自动 pull、merge、rebase、force、重试或猜测提交范围。
+
 ### 任务看板分类与翻页局部刷新
 
 - 完成：任务看板首次进入仍使用整卡加载；已有数据后切换四类指标、筛选或分页时，保留同一非分类筛选范围的顶部数量、选中指标和筛选摘要，只让下方目标泳道进入局部骨架并在当前请求返回后替换列表。切换绑定目标请求键并临时保持看板高度，避免泳道收缩使页面滚动位置回弹；严格请求键仍阻止旧列表进入新筛选。已移除的桌面 Overview、移动端优先事项和已提交的四色指标均未恢复或改写。

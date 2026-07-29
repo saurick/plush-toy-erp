@@ -42,6 +42,13 @@
 - Worktree 任务完成相关验证后只报告可以 Hand off，不自动 Hand off、合并、提交或推送。只有用户明确要求且 Local writer 已结束时，才把任务和代码带回 Local。
 - Git index、commit 和 push 始终由一个收口 owner 串行执行；收口前等待其他 writer 结束，并重新读取 `git status` 与相关 diff。
 
+#### Codex App Git 收口队列
+
+- 共享 Local 顶层写任务使用 `$plush-git-closeout-queue`：每个新任务轮次动态查找同项目唯一置顶且标题精确为 `Git 收口队列` 的任务，不硬编码 task id；subagent 只向所属主任务报告。
+- 首次写文件前发送 `WRITER_REQUEST` 并等待匹配 ACK 与明确 grant，最后写入后发送 `WRITER_RELEASED`；只读验证不占 writer。队列按登记顺序从 release 事件继续放行，无需 worker 轮询。
+- `BATCH_READY` / `COMMIT_READY` 只登记，热点文件继续排队；stage、commit 和 push 只由队列按用户授权串行执行，push 另行授权并对并发 Git / remote ref 变化 fail closed。
+- App 重启、漏报、无人认领修改和长上下文队列轮换按 Skill 的 reconcile / rotation 流程处理。队列是可恢复的任务消息协调，不是 daemon、仓库状态真源或有保证的离线邮箱；无匹配 ACK 或 owner 不清楚时不自动 Git 收口。
+
 ## 过程记录
 
 - 完成代码或正式文档改动后更新 `progress.md`，至少包含完成、下一步、阻塞/风险；仅讨论可跳过。
@@ -53,7 +60,8 @@
 - 项目 skills 位于 `.agents/skills/` 并随仓库管理；只承载 plush 专项 SOP。
 - 当前入口见 `.agents/skills/README.md`。默认只选一个主 skill，真实跨领域/页面/打印/测试/operations 时再组合。
 - 运行诊断、可观测/错误、安全隐私、发布和回滚统一使用 `$plush-operations-governance`。
-- 提示词整理仅在明确需要时显式使用全局 `$prompt-governance`；Git 收口使用 `$git-closeout-coordination`。
+- 提示词整理仅在明确需要时显式使用全局 `$prompt-governance`。
+- 共享 Local 的 writer、批次、遗留盘点和队列轮换使用 `$plush-git-closeout-queue`；真正执行复杂提交或推送时再使用全局 `$git-closeout-coordination`。
 - 修改 skill 时同步 README/metadata/引用，运行 validator、YAML/metadata 扫描和 `git diff --check`。
 
 ## Product Core 与客户差异

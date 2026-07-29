@@ -8,6 +8,7 @@
 | `$plush-code-review-governance` | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查 |
 | `$plush-docs-governance` | 当前真源、文档清单、中文文件名、读者路径和 `progress.md` |
 | `$plush-domain-boundary-governance` | Workflow / Fact、Product Core、客户差异、schema/usecase/API/RBAC 和字段真源 |
+| `$plush-git-closeout-queue` | 共享 Local 的唯一 writer、批次排队、遗留盘点、独立 push 和长上下文队列轮换 |
 | `$plush-page-design-governance` | 页面业务语义、字段/动作/状态、原型和浏览器回归 |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、模板意图、字段映射、编辑与 PDF/打印验证 |
 | `$plush-seed-import-governance` | seed、fixture、模拟试用、import dry-run、cleanup 和真实客户数据边界 |
@@ -18,6 +19,6 @@
 ## 选择规则
 
 - 简单任务只选一个最贴近主目标的 skill；跨边界时再补相邻 skill。
-- 提示词整理使用全局显式 `$prompt-governance`；提交推送并发收口使用 `$git-closeout-coordination`。
+- 提示词整理使用全局显式 `$prompt-governance`；共享 Local 顶层 writer、批次排队、遗留盘点和队列轮换使用上表对应的项目 Skill，实际复杂提交 / 推送由它转入全局 `$git-closeout-coordination`。
 - 项目 skill 不重复高内聚、低耦合等通用常识，只保留项目真源、判断流程、命令和验收。
 - 修改 skill 后同步 `agents/openai.yaml`，运行 validator、YAML/metadata 扫描、引用扫描和 `git diff --check`，并更新 `progress.md`。
