@@ -1816,6 +1816,31 @@ body
   scrollbar-width: thin;
 }
 
+.erp-role-navigation-editor__order-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-role-navigation-editor__order-group
+  + .erp-role-navigation-editor__order-group {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #e2ece4;
+}
+
+.erp-role-navigation-editor__order-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 2px;
+}
+
+.erp-role-navigation-editor__order-group-title .ant-typography {
+  margin: 0;
+}
+
 .erp-role-navigation-editor__order-item {
   display: flex;
   align-items: center;
@@ -1900,6 +1925,26 @@ body
   max-width: 100%;
   margin: 0;
   white-space: normal;
+}
+
+.erp-role-navigation-preview__subgroups {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.erp-role-navigation-preview__subgroup {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.erp-role-navigation-preview__subgroup > .ant-typography:first-child {
+  color: #4b6353;
+  font-size: 12px;
 }
 
 .erp-sr-only {

@@ -73,6 +73,7 @@ import {
 } from '../config/seedData.mjs'
 import {
   buildRoleGuidedNavigationPreview,
+  buildRoleGuidedSecondarySections,
   isRoleNavigationCustomizablePath,
   MAX_ROLE_PRIMARY_LIMIT,
   normalizeRoleNavigationSettings,
@@ -194,7 +195,17 @@ function buildRoleNavigationOptions(access = null, selectedPaths = []) {
   const navigationItems = [
     ...getNavigationSections(),
     ...getAuthenticatedNavigationSections(),
-  ].flatMap((section) => (Array.isArray(section?.items) ? section.items : []))
+  ].flatMap((section) =>
+    (Array.isArray(section?.items) ? section.items : []).map((item) => ({
+      ...item,
+      navigationSectionKey:
+        String(item?.navigationSectionKey || '').trim() ||
+        String(section?.key || '').trim(),
+      navigationSectionTitle:
+        String(item?.navigationSectionTitle || '').trim() ||
+        String(section?.title || '').trim(),
+    }))
+  )
   const itemByPath = new Map(
     navigationItems
       .filter((item) => isRoleNavigationCustomizablePath(item?.path))
@@ -214,6 +225,11 @@ function buildRoleNavigationOptions(access = null, selectedPaths = []) {
       value: path,
       label: item?.label || path,
       effective,
+      menuItem: item || {
+        path,
+        label: path,
+        navigationSectionTitle: '其他功能',
+      },
     }
   })
 }
@@ -237,16 +253,53 @@ function RoleNavigationEditor({
   const optionMap = new Map(options.map((option) => [option.value, option]))
   const customDisabled = disabled || mode !== ROLE_NAVIGATION_MODES.CUSTOM
   const [announcement, setAnnouncement] = useState('')
+  const buildSecondaryItem = (path) => {
+    const option = optionMap.get(path)
+    return {
+      ...(option?.menuItem || {}),
+      path,
+      label: option?.label || path,
+    }
+  }
+  const buildSecondaryPathGroups = (paths = []) =>
+    buildRoleGuidedSecondarySections(paths.map(buildSecondaryItem)).map(
+      (section) => ({
+        ...section,
+        paths: section.items.map((item) => item.path),
+      })
+    )
+  const secondaryPathGroups = buildSecondaryPathGroups(secondaryMenuPaths)
+  const normalizeSecondaryPaths = (paths = []) =>
+    buildSecondaryPathGroups(paths).flatMap((section) => section.paths)
+  const updateSecondaryPaths = (paths = []) =>
+    onSecondaryMenuPathsChange?.(normalizeSecondaryPaths(paths))
 
-  const moveWithin = (paths, onChange, path, offset, groupLabel) => {
+  const moveWithin = (
+    paths,
+    onChange,
+    path,
+    offset,
+    groupLabel,
+    groupPaths = paths
+  ) => {
+    const currentGroupIndex = groupPaths.indexOf(path)
+    const nextGroupIndex = currentGroupIndex + offset
+    if (
+      currentGroupIndex < 0 ||
+      nextGroupIndex < 0 ||
+      nextGroupIndex >= groupPaths.length
+    ) {
+      return
+    }
+    const targetPath = groupPaths[nextGroupIndex]
     const currentIndex = paths.indexOf(path)
-    const nextIndex = currentIndex + offset
-    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= paths.length) {
+    const targetIndex = paths.indexOf(targetPath)
+    if (currentIndex < 0 || targetIndex < 0) {
       return
     }
     const nextPaths = [...paths]
-    ;[nextPaths[currentIndex], nextPaths[nextIndex]] = [
-      nextPaths[nextIndex],
+    ;[nextPaths[currentIndex], nextPaths[targetIndex]] = [
+      nextPaths[targetIndex],
       nextPaths[currentIndex],
     ]
     onChange?.(nextPaths)
@@ -259,7 +312,7 @@ function RoleNavigationEditor({
       return
     }
     onPrimaryMenuPathsChange?.(primaryMenuPaths.filter((item) => item !== path))
-    onSecondaryMenuPathsChange?.([...secondaryMenuPaths, path])
+    updateSecondaryPaths([...secondaryMenuPaths, path])
     setAnnouncement(`${optionMap.get(path)?.label || path}已移到更多功能`)
   }
 
@@ -268,9 +321,7 @@ function RoleNavigationEditor({
       message.warning(`常用工作最多选择 ${MAX_ROLE_PRIMARY_LIMIT} 个页面`)
       return
     }
-    onSecondaryMenuPathsChange?.(
-      secondaryMenuPaths.filter((item) => item !== path)
-    )
+    updateSecondaryPaths(secondaryMenuPaths.filter((item) => item !== path))
     onPrimaryMenuPathsChange?.([...primaryMenuPaths, path])
     setAnnouncement(`${optionMap.get(path)?.label || path}已移到常用工作`)
   }
@@ -284,7 +335,12 @@ function RoleNavigationEditor({
     moveLabel,
     onMove,
     moveDisabled,
+    pathGroups = [],
   }) => {
+    const renderedGroups =
+      pathGroups.length > 0
+        ? pathGroups
+        : [{ key: `${key}-all`, title: '', paths }]
     return (
       <section
         className="erp-role-navigation-editor__column"
@@ -300,59 +356,91 @@ function RoleNavigationEditor({
         </div>
         <div className="erp-role-navigation-editor__order">
           {paths.length > 0 ? (
-            paths.map((path, index) => {
-              const option = optionMap.get(path)
-              const label = option?.label || path
-              return (
-                <div
-                  key={path}
-                  className="erp-role-navigation-editor__order-item"
-                  data-navigation-path={path}
-                >
-                  <span>
-                    <Text strong>{index + 1}</Text>
-                    <Text>{label}</Text>
-                    {option?.effective === false ? (
-                      <Tag color="orange">当前不可进入</Tag>
-                    ) : null}
-                  </span>
-                  <Space size={4}>
-                    <Button
-                      size="small"
-                      disabled={customDisabled || index === 0}
-                      aria-label={`上移 ${label}`}
-                      onClick={() =>
-                        moveWithin(paths, onChange, path, -1, title)
-                      }
+            renderedGroups.map((pathGroup) => (
+              <div
+                key={pathGroup.key}
+                className="erp-role-navigation-editor__order-group"
+                role={pathGroup.title ? 'group' : undefined}
+                aria-label={pathGroup.title || undefined}
+              >
+                {pathGroup.title ? (
+                  <div className="erp-role-navigation-editor__order-group-title">
+                    <Text strong>{pathGroup.title}</Text>
+                    <Text type="secondary">{pathGroup.paths.length} 项</Text>
+                  </div>
+                ) : null}
+                {pathGroup.paths.map((path, index) => {
+                  const option = optionMap.get(path)
+                  const label = option?.label || path
+                  return (
+                    <div
+                      key={path}
+                      className="erp-role-navigation-editor__order-item"
+                      data-navigation-path={path}
                     >
-                      上移
-                    </Button>
-                    <Button
-                      size="small"
-                      disabled={customDisabled || index === paths.length - 1}
-                      aria-label={`下移 ${label}`}
-                      onClick={() =>
-                        moveWithin(paths, onChange, path, 1, title)
-                      }
-                    >
-                      下移
-                    </Button>
-                    <Button
-                      size="small"
-                      disabled={
-                        customDisabled ||
-                        option?.effective === false ||
-                        moveDisabled
-                      }
-                      aria-label={`${moveLabel} ${label}`}
-                      onClick={() => onMove(path)}
-                    >
-                      {moveLabel}
-                    </Button>
-                  </Space>
-                </div>
-              )
-            })
+                      <span>
+                        <Text strong>{index + 1}</Text>
+                        <Text>{label}</Text>
+                        {option?.effective === false ? (
+                          <Tag color="orange">当前不可进入</Tag>
+                        ) : null}
+                      </span>
+                      <Space size={4}>
+                        <Button
+                          size="small"
+                          disabled={customDisabled || index === 0}
+                          aria-label={`上移 ${label}`}
+                          onClick={() =>
+                            moveWithin(
+                              paths,
+                              onChange,
+                              path,
+                              -1,
+                              pathGroup.title || title,
+                              pathGroup.paths
+                            )
+                          }
+                        >
+                          上移
+                        </Button>
+                        <Button
+                          size="small"
+                          disabled={
+                            customDisabled ||
+                            index === pathGroup.paths.length - 1
+                          }
+                          aria-label={`下移 ${label}`}
+                          onClick={() =>
+                            moveWithin(
+                              paths,
+                              onChange,
+                              path,
+                              1,
+                              pathGroup.title || title,
+                              pathGroup.paths
+                            )
+                          }
+                        >
+                          下移
+                        </Button>
+                        <Button
+                          size="small"
+                          disabled={
+                            customDisabled ||
+                            option?.effective === false ||
+                            moveDisabled
+                          }
+                          aria-label={`${moveLabel} ${label}`}
+                          onClick={() => onMove(path)}
+                        >
+                          {moveLabel}
+                        </Button>
+                      </Space>
+                    </div>
+                  )
+                })}
+              </div>
+            ))
           ) : (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -370,7 +458,7 @@ function RoleNavigationEditor({
         <div>
           <Text strong>设置岗位菜单布局</Text>
           <Paragraph type="secondary">
-            页面和操作权限决定“能不能用”；这里把每个最终可进入页面放入常用工作或更多功能，并分别排序。
+            页面和操作权限决定“能不能用”；这里把每个最终可进入页面放入常用工作或更多功能，更多功能按业务场景分组。
           </Paragraph>
         </div>
         <Select
@@ -401,7 +489,7 @@ function RoleNavigationEditor({
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Text type="secondary">
             常用工作需保留 1–{MAX_ROLE_PRIMARY_LIMIT}{' '}
-            项；使用按钮可仅靠键盘完成跨组移动和组内排序。
+            项；使用按钮可仅靠键盘完成跨区移动，更多功能只调整同一业务分组内的顺序。
           </Text>
           {unavailablePaths.length > 0 ? (
             <Alert
@@ -430,12 +518,13 @@ function RoleNavigationEditor({
             {renderOrderedList({
               key: 'secondary',
               title: '更多功能',
-              description: '其余最终可进入页面',
+              description: '其余页面按业务场景分组',
               paths: secondaryMenuPaths,
-              onChange: onSecondaryMenuPathsChange,
+              onChange: updateSecondaryPaths,
               moveLabel: '移到常用',
               onMove: moveToPrimary,
               moveDisabled: primaryMenuPaths.length >= MAX_ROLE_PRIMARY_LIMIT,
+              pathGroups: secondaryPathGroups,
             })}
           </div>
           <span className="erp-sr-only" aria-live="polite">
@@ -841,10 +930,16 @@ function NavigationPlacementOverview({
     {
       key: 'more',
       title: `更多功能（${moreItems.length}）`,
-      description: '其余已授权的低频页面和岗位帮助',
+      description: '其余页面按业务场景分组，岗位帮助固定在最后',
       items: moreItems,
+      sections: placement.secondarySections,
     },
   ]
+  const moreItemOrder = new Map(
+    placement.secondarySections
+      .flatMap((section) => section.items)
+      .map((item, index) => [item.path, index + 1])
+  )
 
   return (
     <div className="erp-role-navigation-preview">
@@ -852,7 +947,7 @@ function NavigationPlacementOverview({
         <div>
           <Text strong>导航位置预览</Text>
           <Paragraph type="secondary">
-            看板固定在最前，岗位帮助固定在更多功能；常用入口只从当前最终可进入页面中排列，不会增加权限。
+            看板固定在最前；常用入口只从当前最终可进入页面中排列，更多功能按业务场景分组且不会增加权限。
           </Paragraph>
         </div>
         <Tag
@@ -878,20 +973,38 @@ function NavigationPlacementOverview({
           <div key={group.key} className="erp-role-navigation-preview__group">
             <Text strong>{group.title}</Text>
             <Text type="secondary">{group.description}</Text>
-            <div className="erp-role-navigation-preview__items">
-              {group.items.length > 0 ? (
-                group.items.map((item, index) => (
-                  <Tag
-                    key={item.path}
-                    color={group.key === 'more' ? undefined : 'blue'}
+            {group.key === 'more' && group.sections.length > 0 ? (
+              <div className="erp-role-navigation-preview__subgroups">
+                {group.sections.map((section) => (
+                  <div
+                    key={section.key}
+                    className="erp-role-navigation-preview__subgroup"
+                    data-navigation-section={section.key}
                   >
-                    {index + 1}. {item.label}
-                  </Tag>
-                ))
-              ) : (
-                <Text type="secondary">当前没有可显示页面</Text>
-              )}
-            </div>
+                    <Text strong>{section.title}</Text>
+                    <div className="erp-role-navigation-preview__items">
+                      {section.items.map((item) => (
+                        <Tag key={item.path}>
+                          {moreItemOrder.get(item.path)}. {item.label}
+                        </Tag>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="erp-role-navigation-preview__items">
+                {group.items.length > 0 ? (
+                  group.items.map((item, index) => (
+                    <Tag key={item.path} color="blue">
+                      {index + 1}. {item.label}
+                    </Tag>
+                  ))
+                ) : (
+                  <Text type="secondary">当前没有可显示页面</Text>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -1924,7 +2037,8 @@ export default function PermissionCenterPage() {
           (item) => item.path
         ) || [],
       secondaryMenuPaths:
-        recommendedRoleNavigationPlacement?.secondaryItems
+        recommendedRoleNavigationPlacement?.secondarySections
+          .flatMap((section) => section.items)
           .map((item) => item.path)
           .filter(isRoleNavigationCustomizablePath) || [],
     }),
@@ -3584,8 +3698,7 @@ export default function PermissionCenterPage() {
                                     setSelectedRoleNavigationDraft(
                                       (current) => {
                                         const currentDraft =
-                                          current.roleKey ===
-                                            selectedRoleKey &&
+                                          current.roleKey === selectedRoleKey &&
                                           current.roleVersion ===
                                             selectedRoleVersion
                                             ? current
@@ -3624,8 +3737,7 @@ export default function PermissionCenterPage() {
                                     setSelectedRoleNavigationDraft(
                                       (current) => {
                                         const currentDraft =
-                                          current.roleKey ===
-                                            selectedRoleKey &&
+                                          current.roleKey === selectedRoleKey &&
                                           current.roleVersion ===
                                             selectedRoleVersion
                                             ? current
@@ -3652,8 +3764,7 @@ export default function PermissionCenterPage() {
                                     setSelectedRoleNavigationDraft(
                                       (current) => {
                                         const currentDraft =
-                                          current.roleKey ===
-                                            selectedRoleKey &&
+                                          current.roleKey === selectedRoleKey &&
                                           current.roleVersion ===
                                             selectedRoleVersion
                                             ? current
@@ -3718,9 +3829,7 @@ export default function PermissionCenterPage() {
                                     permissions={[
                                       ...permissionDetailMap.values(),
                                     ]}
-                                    permissionKeys={
-                                      selectedRolePermissionKeys
-                                    }
+                                    permissionKeys={selectedRolePermissionKeys}
                                   />
                                 </div>
                               </Space>

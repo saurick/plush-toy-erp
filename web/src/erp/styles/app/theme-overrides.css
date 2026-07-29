@@ -107,6 +107,13 @@
   color: var(--erp-text-subtle);
 }
 
+[data-erp-theme='dark']
+  .erp-admin-menu.ant-menu
+  .erp-role-guided-more-group
+  > .ant-menu-item-group-title {
+  color: var(--erp-text-muted);
+}
+
 [data-erp-theme='dark'] .erp-admin-menu.ant-menu .ant-menu-item,
 [data-erp-theme='dark'] .erp-admin-menu.ant-menu .ant-menu-submenu-title,
 [data-erp-theme='dark']
@@ -962,6 +969,18 @@
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
   color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-role-navigation-editor__order-group
+  + .erp-role-navigation-editor__order-group {
+  border-top-color: var(--erp-border);
+}
+
+[data-erp-theme='dark']
+  .erp-role-navigation-preview__subgroup
+  > .ant-typography:first-child {
+  color: var(--erp-text-muted);
 }
 
 [data-erp-theme='dark'] .erp-permission-category-nav {

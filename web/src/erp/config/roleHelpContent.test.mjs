@@ -64,7 +64,9 @@ test('roleHelpContent: 覆盖九个业务岗位和系统管理员且正文各不
     ROLE_HELP_GUIDES[0].questions.some(
       (item) =>
         item.question === '常用工作里没找到页面怎么办？' &&
-        item.answer.includes('更多功能')
+        item.answer.includes('更多功能') &&
+        item.answer.includes('按业务场景分组') &&
+        item.answer.includes('同一更多功能分组内的顺序')
     )
   )
 })

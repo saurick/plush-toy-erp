@@ -3744,6 +3744,193 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'yoyoosun-sales-role-guided-navigation-mobile-dark',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      themeMode: 'dark',
+      customerConfig: roleGuidedCustomerConfig,
+      adminProfile: {
+        is_super_admin: false,
+        roles: [{ role_key: 'sales', name: '销售' }],
+      },
+      effectiveSession: customerRoleRuntimeSession(
+        ['sales'],
+        'style-l1-role-guided-sales-mobile-dark'
+      ),
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await assertERPThemeMode(page, {
+          scenarioName: 'yoyoosun-sales-role-guided-navigation-mobile-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await page.getByRole('button', { name: '打开导航菜单' }).click()
+        const drawer = page.locator('.erp-admin-drawer:visible')
+        await drawer.waitFor({ state: 'visible', timeout: 10_000 })
+        const menu = drawer.locator('.erp-admin-menu')
+        const moreFunctions = menu
+          .locator('.ant-menu-submenu-title')
+          .filter({ hasText: '更多功能' })
+          .first()
+        const moreFunctionsRoot = moreFunctions.locator('..')
+        const moreFunctionsLabel = String(
+          await moreFunctions.innerText()
+        ).trim()
+        const countMatch = moreFunctionsLabel.match(/^更多功能（(\d+)）$/u)
+        assert(countMatch, `移动端更多功能数量格式异常: ${moreFunctionsLabel}`)
+        await moreFunctions.click()
+
+        const groupTitles = moreFunctionsRoot.locator(
+          '.erp-role-guided-more-group > .ant-menu-item-group-title'
+        )
+        assert.deepEqual(await groupTitles.allTextContents(), [
+          '资料与单据',
+          '生产与库存',
+          '工具与帮助',
+        ])
+        const groupingMetrics = await moreFunctionsRoot.evaluate((node) => {
+          const groupTitleNodes = Array.from(
+            node.querySelectorAll(
+              '.erp-role-guided-more-group > .ant-menu-item-group-title'
+            )
+          )
+          const leaves = Array.from(node.querySelectorAll('.ant-menu-item'))
+          const menu = node.closest('.erp-admin-menu')
+          return {
+            groupTitleCount: groupTitleNodes.length,
+            leafCount: leaves.length,
+            leafTexts: leaves.map((item) =>
+              String(item.textContent || '').trim()
+            ),
+            interactiveGroupTitleCount: groupTitleNodes.filter(
+              (item) =>
+                item.matches('a, button, [role="menuitem"]') ||
+                item.closest('a, button, [role="menuitem"]')
+            ).length,
+            focusableGroupTitleCount: groupTitleNodes.filter(
+              (item) => item.tabIndex >= 0
+            ).length,
+            groupTitleStyles: groupTitleNodes.map((item) => {
+              const style = window.getComputedStyle(item)
+              return {
+                color: style.color,
+                fontSize: Number.parseFloat(style.fontSize),
+                fontWeight: Number.parseInt(style.fontWeight, 10),
+              }
+            }),
+            menuScrollWidth: menu?.scrollWidth || 0,
+            menuClientWidth: menu?.clientWidth || 0,
+          }
+        })
+        assert(
+          groupingMetrics.groupTitleCount === 3 &&
+            groupingMetrics.leafCount === Number(countMatch[1]) &&
+            groupingMetrics.leafTexts.at(-1) === '岗位使用帮助' &&
+            groupingMetrics.interactiveGroupTitleCount === 0 &&
+            groupingMetrics.focusableGroupTitleCount === 0 &&
+            groupingMetrics.groupTitleStyles.every(
+              (style) =>
+                style.color === 'rgb(148, 163, 184)' &&
+                style.fontSize >= 11 &&
+                style.fontWeight >= 600
+            ) &&
+            groupingMetrics.menuScrollWidth <=
+              groupingMetrics.menuClientWidth + 1,
+          `移动端更多功能分组语义或布局异常: ${JSON.stringify(groupingMetrics)}`
+        )
+
+        const beforeGroupTitleClickURL = page.url()
+        await groupTitles.first().click()
+        assert.equal(
+          page.url(),
+          beforeGroupTitleClickURL,
+          '分组标题不可触发页面跳转'
+        )
+        assert.equal(
+          String(
+            (await moreFunctionsRoot.getAttribute('class')) || ''
+          ).includes('ant-menu-submenu-open'),
+          true,
+          '分组标题不可折叠更多功能'
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-sales-role-guided-navigation-mobile-dark-groups-top.png'
+          ),
+          fullPage: false,
+        })
+        const helpItem = moreFunctionsRoot
+          .locator('.ant-menu-item')
+          .filter({ hasText: '岗位使用帮助' })
+        await helpItem.scrollIntoViewIfNeeded()
+        await assertThemeReadable(page, {
+          scenarioName: 'yoyoosun-sales-role-guided-navigation-mobile-dark',
+          selector: '.erp-admin-drawer',
+        })
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-sales-role-guided-navigation-mobile-dark-groups-bottom.png'
+          ),
+          fullPage: false,
+        })
+
+        const productItem = moreFunctionsRoot
+          .locator('.ant-menu-item')
+          .filter({ hasText: '产品档案' })
+        await productItem.click()
+        await waitForPath(page, '/erp/master/products')
+        await page.getByRole('button', { name: '打开导航菜单' }).click()
+        await drawer.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForFunction(() =>
+          Array.from(
+            document.querySelectorAll(
+              '.erp-admin-drawer .ant-menu-item-selected'
+            )
+          ).some((item) => String(item.textContent || '').includes('产品档案'))
+        )
+        const selectedState = await moreFunctionsRoot.evaluate((node) => {
+          const selected = node.querySelector('.ant-menu-item-selected')
+          return {
+            open: node.classList.contains('ant-menu-submenu-open'),
+            selectedText: String(selected?.textContent || '').trim(),
+          }
+        })
+        assert.deepEqual(selectedState, {
+          open: true,
+          selectedText: '产品档案',
+        })
+
+        await page
+          .reload({ waitUntil: 'domcontentloaded' })
+          .then(() => page.waitForLoadState('networkidle').catch(() => {}))
+        await page.getByRole('button', { name: '打开导航菜单' }).click()
+        await drawer.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForFunction(() =>
+          Array.from(
+            document.querySelectorAll(
+              '.erp-admin-drawer .ant-menu-item-selected'
+            )
+          ).some((item) => String(item.textContent || '').includes('产品档案'))
+        )
+        const reloadedSelectedState = await moreFunctionsRoot.evaluate(
+          (node) => {
+            const selected = node.querySelector('.ant-menu-item-selected')
+            return {
+              open: node.classList.contains('ant-menu-submenu-open'),
+              selectedText: String(selected?.textContent || '').trim(),
+            }
+          }
+        )
+        assert.deepEqual(reloadedSelectedState, selectedState)
+        await assertNoHorizontalOverflow(
+          page,
+          'yoyoosun-sales-role-guided-navigation-mobile-dark'
+        )
+      },
+    },
+    {
       name: 'yoyoosun-boss-role-guided-navigation-desktop',
       path: '/erp/dashboard',
       auth: 'admin',
@@ -3758,7 +3945,7 @@ export function createStyleL1Scenarios(deps) {
         const menu = page.locator('.erp-admin-menu')
         await expectText(page, '看板中心')
         await expectText(page, '常用工作')
-        await expectText(page, '更多功能（14）')
+        await expectText(page, '更多功能（16）')
         const visibleLeafTexts = await menu.evaluate((node) =>
           Array.from(node.querySelectorAll('.ant-menu-item'))
             .filter((item) => item.getClientRects().length > 0)
@@ -3771,17 +3958,30 @@ export function createStyleL1Scenarios(deps) {
             '任务看板',
             '业务看板',
             '销售订单',
+            '客户退货（RMA）',
             '采购订单',
-            '质量检验',
           ],
           `老板电脑端应有三个看板和三个常用业务: ${JSON.stringify(visibleLeafTexts)}`
         )
-        await menu
+        const moreFunctionsRoot = menu
           .locator('.ant-menu-submenu-title')
           .filter({ hasText: '更多功能' })
-          .click()
+          .first()
+          .locator('..')
+        await moreFunctionsRoot.locator('.ant-menu-submenu-title').click()
         await expectText(page, '生产异常处置')
         await expectText(page, '岗位使用帮助')
+        assert.deepEqual(
+          await moreFunctionsRoot
+            .locator('.erp-role-guided-more-group > .ant-menu-item-group-title')
+            .allTextContents(),
+          ['资料与单据', '生产、品质与库存', '出货与财务', '工具与帮助']
+        )
+        const bossMoreItems = await moreFunctionsRoot
+          .locator('.ant-menu-item')
+          .allTextContents()
+        assert.equal(bossMoreItems.length, 16)
+        assert.equal(String(bossMoreItems.at(-1) || '').trim(), '岗位使用帮助')
         await page.screenshot({
           path: path.resolve(
             outputDir,
@@ -12556,6 +12756,19 @@ export function createStyleL1Scenarios(deps) {
               title: String(
                 group.querySelector('.ant-typography')?.textContent || ''
               ).trim(),
+              sections: Array.from(
+                group.querySelectorAll('.erp-role-navigation-preview__subgroup')
+              ).map((section) => ({
+                title: String(
+                  section.querySelector('.ant-typography')?.textContent || ''
+                ).trim(),
+                items: Array.from(section.querySelectorAll('.ant-tag')).map(
+                  (item) =>
+                    String(item.textContent || '')
+                      .trim()
+                      .replace(/^\d+\.\s*/u, '')
+                ),
+              })),
               items: Array.from(group.querySelectorAll('.ant-tag')).map(
                 (item) =>
                   String(item.textContent || '')
@@ -12622,14 +12835,13 @@ export function createStyleL1Scenarios(deps) {
           `权限中心双列表桌面布局异常: ${JSON.stringify(customLayoutMetrics)}`
         )
 
-        const moveInventoryToMore = page.getByRole('button', {
-          name: '移到更多 库存台账',
+        const moveSalesOrderToMore = page.getByRole('button', {
+          name: '移到更多 销售订单',
         })
-        await moveInventoryToMore.focus()
+        await moveSalesOrderToMore.focus()
         await page.keyboard.press('Enter')
-        await page.getByRole('button', { name: '移到更多 销售订单' }).click()
-        await page.getByRole('button', { name: '上移 销售订单' }).click()
-        await page.getByRole('button', { name: '上移 销售订单' }).click()
+        await page.getByRole('button', { name: '移到更多 客户档案' }).click()
+        await page.getByRole('button', { name: '上移 客户档案' }).click()
 
         const draftPreview = await readNavigationPreview()
         assert.deepEqual(
@@ -12639,13 +12851,31 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(
           draftPreview[1].items,
-          ['客户档案'],
+          ['库存台账'],
           `权限中心常用工作顺序异常: ${JSON.stringify(draftPreview)}`
         )
         assert.deepEqual(
           draftPreview[2].items,
-          ['销售订单', '出货放行', '库存台账', '岗位使用帮助'],
+          ['客户档案', '销售订单', '出货放行', '岗位使用帮助'],
           `权限中心更多功能顺序异常: ${JSON.stringify(draftPreview)}`
+        )
+        assert.deepEqual(
+          draftPreview[2].sections,
+          [
+            {
+              title: '资料与单据',
+              items: ['客户档案', '销售订单'],
+            },
+            {
+              title: '出货处理',
+              items: ['出货放行'],
+            },
+            {
+              title: '工具与帮助',
+              items: ['岗位使用帮助'],
+            },
+          ],
+          `权限中心更多功能必须按业务场景预览: ${JSON.stringify(draftPreview)}`
         )
         await page.waitForTimeout(250)
         const accessRequestsBeforeTabSwitch = effectiveAccessRequestCount
@@ -12707,12 +12937,12 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(saveParams.role_key, 'sales')
         assert.equal(saveParams.navigation_mode, 'custom')
         assert.deepEqual(saveParams.primary_menu_paths, [
-          '/erp/master/partners/customers',
+          '/erp/warehouse/inventory',
         ])
         assert.deepEqual(saveParams.secondary_menu_paths, [
+          '/erp/master/partners/customers',
           '/erp/sales/project-orders/sales-orders',
           '/erp/warehouse/shipping-release',
-          '/erp/warehouse/inventory',
         ])
         assert(
           Array.isArray(saveParams.permission_keys) &&
@@ -12738,12 +12968,12 @@ export function createStyleL1Scenarios(deps) {
           ) || null
         assert.equal(reopenedSalesRole?.navigation_mode, 'custom')
         assert.deepEqual(reopenedSalesRole?.primary_menu_paths, [
-          '/erp/master/partners/customers',
+          '/erp/warehouse/inventory',
         ])
         assert.deepEqual(reopenedSalesRole?.secondary_menu_paths, [
+          '/erp/master/partners/customers',
           '/erp/sales/project-orders/sales-orders',
           '/erp/warehouse/shipping-release',
-          '/erp/warehouse/inventory',
         ])
         await expectHeading(page, '权限管理')
         await page
@@ -12765,12 +12995,12 @@ export function createStyleL1Scenarios(deps) {
         const reopenedPreview = await readNavigationPreview()
         assert.deepEqual(
           reopenedPreview[1].items,
-          ['客户档案'],
+          ['库存台账'],
           `重新打开后常用工作顺序未读回: ${JSON.stringify(reopenedPreview)}`
         )
         assert.deepEqual(
           reopenedPreview[2].items,
-          ['销售订单', '出货放行', '库存台账', '岗位使用帮助'],
+          ['客户档案', '销售订单', '出货放行', '岗位使用帮助'],
           `重新打开后更多功能顺序未读回: ${JSON.stringify(reopenedPreview)}`
         )
         await assertNoHorizontalOverflow(

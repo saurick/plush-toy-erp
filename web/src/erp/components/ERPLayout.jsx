@@ -698,7 +698,9 @@ export default function ERPLayout() {
     })
     const buildMenuGroup = (section, keyPrefix = 'group') => ({
       type: 'group',
-      key: `${keyPrefix}-${section.title}`,
+      key: `${keyPrefix}-${section.key || section.title}`,
+      className:
+        keyPrefix === 'role-more' ? 'erp-role-guided-more-group' : undefined,
       label: section.title,
       children: section.items.map(buildMenuLeaf),
     })
@@ -729,7 +731,9 @@ export default function ERPLayout() {
         key: ROLE_GUIDED_MORE_MENU_KEY,
         icon: <AppstoreOutlined />,
         label: `更多功能（${roleGuidedNavigation.secondaryItemCount}）`,
-        children: roleGuidedNavigation.secondaryItems.map(buildMenuLeaf),
+        children: roleGuidedNavigation.secondarySections.map((section) =>
+          buildMenuGroup(section, 'role-more')
+        ),
       })
     }
     return guidedItems
@@ -1059,6 +1063,7 @@ export default function ERPLayout() {
             <Space align="start" size={16} className="erp-admin-header__left">
               <Button
                 icon={<MenuOutlined />}
+                aria-label="打开导航菜单"
                 className="erp-admin-header__menu-button"
                 onClick={() => setMobileNavOpen(true)}
               />

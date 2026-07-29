@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   buildRoleGuidedNavigation,
   buildRoleGuidedNavigationPreview,
+  buildRoleGuidedSecondarySections,
   normalizeRoleNavigationSettings,
   reconcileRoleNavigationPaths,
 } from './roleGuidedNavigation.mjs'
@@ -407,5 +408,236 @@ test('roleGuidedNavigation: 权限中心预览使用尚未保存的自定义顺�
       (item) => item.path === '/erp/warehouse/inventory'
     ),
     false
+  )
+})
+
+test('roleGuidedNavigation: 更多功能固定按业务场景分组且保留原始配置成员合同', () => {
+  const groupedSections = [
+    {
+      key: 'master',
+      title: '基础资料',
+      items: [
+        {
+          key: 'customers',
+          path: '/erp/master/partners/customers',
+        },
+        {
+          key: 'suppliers',
+          path: '/erp/master/partners/suppliers',
+        },
+      ],
+    },
+    {
+      key: 'sales',
+      title: '销售管理',
+      items: [
+        {
+          key: 'sales-orders',
+          path: '/erp/sales/project-orders/sales-orders',
+        },
+      ],
+    },
+    {
+      key: 'quality',
+      title: '质检管理',
+      items: [
+        {
+          key: 'quality-inspections',
+          path: '/erp/quality/inspections',
+        },
+      ],
+    },
+    {
+      key: 'warehouse',
+      title: '库存管理',
+      items: [
+        {
+          key: 'inventory',
+          path: '/erp/warehouse/inventory',
+        },
+      ],
+    },
+    {
+      key: 'shipment',
+      title: '出货管理',
+      items: [
+        {
+          key: 'shipping-release',
+          path: '/erp/warehouse/shipping-release',
+        },
+        {
+          key: 'shipments',
+          path: '/erp/warehouse/shipments',
+        },
+      ],
+    },
+    {
+      title: '运营工具',
+      items: [
+        {
+          key: 'print-center',
+          path: '/erp/print-center',
+        },
+      ],
+    },
+    {
+      key: 'help',
+      title: '使用帮助',
+      items: [
+        {
+          key: 'help-center',
+          path: '/erp/help-center',
+          access: 'authenticated',
+        },
+      ],
+    },
+  ]
+  const configuredSecondaryPaths = [
+    '/erp/warehouse/shipments',
+    '/erp/sales/project-orders/sales-orders',
+    '/erp/quality/inspections',
+    '/erp/master/partners/suppliers',
+    '/erp/warehouse/inventory',
+    '/erp/warehouse/shipping-release',
+    '/erp/print-center',
+  ]
+  const result = buildRoleGuidedNavigation({
+    visibleSections: groupedSections,
+    adminProfile: {
+      effective_session: { roles: ['sales'] },
+      roles: [
+        {
+          role_key: 'sales',
+          navigation_mode: 'custom',
+          primary_menu_paths: ['/erp/master/partners/customers'],
+          secondary_menu_paths: configuredSecondaryPaths,
+        },
+      ],
+    },
+  })
+
+  assert.deepEqual(
+    result.secondaryItems.map((item) => item.path),
+    [...configuredSecondaryPaths, '/erp/help-center'],
+    '成员合同继续保留已保存路径顺序，展示分组不得改写权限配置'
+  )
+  assert.deepEqual(
+    result.secondarySections.map((section) => section.title),
+    ['资料与单据', '品质与库存', '出货处理', '工具与帮助']
+  )
+  assert.deepEqual(
+    result.secondarySections.map((section) =>
+      section.items.map((item) => item.path)
+    ),
+    [
+      [
+        '/erp/sales/project-orders/sales-orders',
+        '/erp/master/partners/suppliers',
+      ],
+      ['/erp/quality/inspections', '/erp/warehouse/inventory'],
+      ['/erp/warehouse/shipments', '/erp/warehouse/shipping-release'],
+      ['/erp/print-center', '/erp/help-center'],
+    ]
+  )
+  const groupedPaths = result.secondarySections.flatMap((section) =>
+    section.items.map((item) => item.path)
+  )
+  assert.equal(groupedPaths.length, result.secondaryItemCount)
+  assert.equal(new Set(groupedPaths).size, result.secondaryItemCount)
+  assert.equal(groupedPaths.at(-1), '/erp/help-center')
+})
+
+test('roleGuidedNavigation: 权限调整后页面进入对应更多分组且空分组消失', () => {
+  const navigationSections = [
+    {
+      key: 'master',
+      title: '基础资料',
+      items: [
+        { key: 'customers', path: '/erp/master/partners/customers' },
+        { key: 'suppliers', path: '/erp/master/partners/suppliers' },
+      ],
+    },
+    {
+      key: 'quality',
+      title: '质检管理',
+      items: [
+        {
+          key: 'quality-inspections',
+          path: '/erp/quality/inspections',
+        },
+      ],
+    },
+    {
+      key: 'help',
+      title: '使用帮助',
+      items: [
+        {
+          key: 'help-center',
+          path: '/erp/help-center',
+          access: 'authenticated',
+        },
+      ],
+    },
+  ]
+  const result = buildRoleGuidedNavigation({
+    visibleSections: navigationSections,
+    adminProfile: {
+      effective_session: { roles: ['quality'] },
+      roles: [
+        {
+          role_key: 'quality',
+          navigation_mode: 'custom',
+          primary_menu_paths: ['/erp/quality/inspections'],
+          secondary_menu_paths: [
+            '/erp/master/partners/suppliers',
+            '/erp/master/partners/customers',
+          ],
+        },
+      ],
+    },
+  })
+
+  assert.deepEqual(
+    result.secondarySections.map((section) => section.title),
+    ['资料与单据', '工具与帮助']
+  )
+  assert.deepEqual(
+    result.secondarySections[0].items.map((item) => item.path),
+    ['/erp/master/partners/suppliers', '/erp/master/partners/customers'],
+    '同一业务分组继续保持权限中心保存的组内顺序'
+  )
+  assert.equal(
+    result.secondarySections.some((section) => section.title === '品质管理'),
+    false
+  )
+})
+
+test('roleGuidedNavigation: 客户扩展分组保留且工具帮助始终收尾', () => {
+  const grouped = buildRoleGuidedSecondarySections([
+    {
+      key: 'customer-extension',
+      path: '/erp/customer-extension',
+      navigationSectionKey: 'customer-extension',
+      navigationSectionTitle: '客户扩展',
+    },
+    {
+      key: 'print-center',
+      path: '/erp/print-center',
+      navigationSectionTitle: '运营工具',
+    },
+    {
+      key: 'help-center',
+      path: '/erp/help-center',
+      navigationSectionTitle: '使用帮助',
+    },
+  ])
+
+  assert.deepEqual(
+    grouped.map((section) => section.title),
+    ['客户扩展', '工具与帮助']
+  )
+  assert.deepEqual(
+    grouped.at(-1).items.map((item) => item.path),
+    ['/erp/print-center', '/erp/help-center']
   )
 })
