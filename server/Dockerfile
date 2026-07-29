@@ -29,16 +29,17 @@ RUN npm install -g pnpm@10.13.1 && \
 COPY web/src ./src
 COPY web/public ./public
 COPY web/index.html ./
-COPY web/vite*.mjs ./
-COPY web/devCustomerImportDryRunPlugin.mjs web/devCustomerConfigPlugin.mjs web/devQaCoveragePlugin.mjs web/devWorkbenchPlugins.mjs web/devWorkbenchReceiptPlugin.mjs ./
+# Vite config and its top-level plugin graph move together; avoid a manually
+# enumerated list drifting when a committed build plugin is added.
+COPY web/*.mjs ./
 COPY web/tailwind.config.js ./
 COPY web/postcss.config.js ./
 COPY config /config
-# 关键兜底：前端 prebuild 依赖服务端错误码真源与生成脚本，镜像构建时必须一并带入。
+# CI 已生成并校验 committed error-code projection；Node-only builder 不安装 Go。
+# scripts 仅用于在构建产物中叠加已登记的客户 Web 配置。
 COPY scripts /scripts
-COPY server/internal/errcode /server/internal/errcode
 ARG ERP_CUSTOMER_KEY=
-RUN pnpm run build && \
+RUN pnpm run build:committed && \
     node /scripts/build/apply-customer-web-config.mjs \
       --customer "${ERP_CUSTOMER_KEY}" \
       --config-root /config \

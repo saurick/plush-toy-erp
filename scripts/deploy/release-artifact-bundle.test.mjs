@@ -144,9 +144,13 @@ test("release artifact builds a non-empty CycloneDX dependency inventory", () =>
   assert(sbom.components.some((item) => item.name === "example.com/module"));
 });
 
-test("Web release image consumes the committed generated projection without a Go toolchain", () => {
-  const dockerfile = readFileSync(
+test("release image builders consume the committed generated projection without a Go toolchain", () => {
+  const webDockerfile = readFileSync(
     path.join(repoRoot, "web", "Dockerfile"),
+    "utf8",
+  );
+  const serverDockerfile = readFileSync(
+    path.join(repoRoot, "server", "Dockerfile"),
     "utf8",
   );
   const packageJson = JSON.parse(
@@ -157,9 +161,16 @@ test("Web release image consumes the committed generated projection without a Go
     packageJson.scripts["build:committed"],
     "vite build --config vite.config.mjs",
   );
-  assert.match(dockerfile, /RUN pnpm build:committed/u);
-  assert.doesNotMatch(dockerfile, /pnpm build:all|gen-error-codes/u);
-  assert.doesNotMatch(dockerfile, /COPY server\/internal\/errcode/u);
+  assert.match(webDockerfile, /RUN pnpm build:committed/u);
+  assert.match(serverDockerfile, /RUN pnpm run build:committed/u);
+  assert.match(serverDockerfile, /COPY web\/\*\.mjs \.\//u);
+  for (const dockerfile of [webDockerfile, serverDockerfile]) {
+    assert.doesNotMatch(
+      dockerfile,
+      /pnpm build:all|pnpm run build(?:\s|&&)|gen-error-codes/u,
+    );
+    assert.doesNotMatch(dockerfile, /COPY server\/internal\/errcode/u);
+  }
 });
 
 test("release artifact manifest rejects mismatched or incomplete image evidence", () => {

@@ -14,9 +14,11 @@
 
 完成：用户确认虚拟机快照后，133 的 root LV 与 ext4 已从 100GiB 在线扩至 250GiB，当前根分区约 155GiB 可用；ERP 容器未重启。扩容后的目标只读前检已通过容量、环境、Compose、数据库身份、health / ready 与 migration lock，旧运行版本保持不变。
 
-发布证据：对 `babd2393e6bf7d30acf2c4bc4ae600a52856c40e` 只触发一次 `2026.07.29-1` 不可变发布；exact-SHA strict 通过，但 Web 镜像构建因 Node-only builder 调用 Go 错误码生成器而失败，未生成可晋级制品，也没有自动重跑。Web Dockerfile 现只消费 CI 已校验的 committed error-code projection，并通过专用 `build:committed` 执行 Vite build；定向合同、production build、`git diff --check` 与真实 `linux/amd64` Docker 构建均通过。
+发布证据：`babd2393e6bf7d30acf2c4bc4ae600a52856c40e` 的单次 `2026.07.29-1` 发布在 strict 通过后，因独立 Web Dockerfile 的 Node-only builder 调用 Go 错误码生成器而失败。修正形成 `50c203ed51334f95089abccf81348eeed356bc18` 后，本地 full、非强制推送和远端 CI 均通过；其单次 `2026.07.29-2` 发布也通过 strict，但随后暴露 Server Dockerfile 内还有一份重复的 Web builder，仍调用带 prebuild 的旧命令。两次失败都没有生成 GitHub Release、tag 或可晋级制品，也没有自动重跑。
 
-下一步与边界：将本修正形成新的 clean SHA 后，从头完成该 SHA 的 prepare-push、远端 CI 与一次新的不可变发布，再校验 manifest / digest、执行本地发布演练并从版本中心晋级 133。当前尚未部署新版本、执行目标 migration / 岗位 smoke 或客户 UAT；失败的旧 SHA 不复用、不重跑。
+修正与验证：两份 Dockerfile 现在统一消费 CI 已校验的 committed error-code projection；Server 内嵌 Web builder 同时改为复制完整顶层 `.mjs` 构建图，避免手工插件清单再次漂移。定向合同、`git diff --check` 和真实 Server `linux/amd64` Docker 构建通过；镜像内三个二进制、正式 Web 入口、客户配置及内置 SHA 均已读回，临时镜像已精确移除。
+
+下一步与边界：将第二处修正形成新的 clean SHA 后，从头完成该 SHA 的 prepare-push、远端 CI 与一次 `2026.07.29-3` 不可变发布，再校验 manifest / digest、执行本地发布演练并从版本中心晋级 133。当前尚未部署新版本、执行目标 migration / 岗位 smoke 或客户 UAT；两个失败 SHA 均不复用、不重跑。
 
 ## 2026-07-29 GitHub CI/CD 去重与版本中心
 
