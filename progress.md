@@ -24,6 +24,8 @@
 
 收口修正：首次 clean `prepare-push` 在 Node / Web / production build / Chromium 全绿后才发现缺少 disposable PostgreSQL 基线，暴露了昂贵 gate 前置检查过晚的问题。full 现会在任何 scripts、Web、浏览器或 Go 高成本阶段前，只读验证 loopback URL、psql 连通性和建库权限；凭据仅通过 libpq 环境传递，不进入命令参数或失败回执。缺变量、非 loopback、客户端缺失、连接失败和权限不足均精确 fail closed。定向编排、profile、显式测试清单和真实 PostgreSQL 前检已通过；最终 full、非强制推送与远端 CI 仍以随后实际回执为准。
 
+远端回读：`41ec1314` 已由 clean full 回执完成非强制推送，本地、origin 与 GitHub ref 一致；本地 full 覆盖 scripts Node、Web、production build、Chromium、隔离 PostgreSQL、server `3164 / 3164`、build 和 govulncheck，零失败、零 skip，临时库与容器均已清理。首次 GitHub CI run `30420143063` 的 exact range 与 Ent / Atlas 零漂移通过，唯一失败是旧 `target-preflight` CLI 测试直接连接 133，GitHub-hosted runner 无目标网络而返回 SSH 255；现改为临时 fake SSH + marker 的 hermetic 测试，固定低磁盘报告和 streamed-script 合同不变，定向 `5 / 5` 通过。该修正尚未用新的远端 run 判绿，不把失败 run 包装为已完成 CI。
+
 ## 2026-07-28 研发效能工作台与本地质量交付收口
 
 完成：状态合同收敛到服务端 canonical catalog，当前 34 类状态对象、初始 / 终止 / 返回边、守卫、动作、权限与 Fact 边界由正式领域合同生成，DEV 观察台只消费投影；状态漂移守卫覆盖 8 条代表业务路径。异常展示按阻塞、退回、恢复、取消 / 冲正和过期证据分类，不新增万能 `exception_status` 或第二棵状态树。Workflow 任务来源读取门禁与异常动作在解释和写入前均由后端重验，页面不能以菜单、标签或 payload 补造可读性，Workflow task done 仍不等于 Fact posted。

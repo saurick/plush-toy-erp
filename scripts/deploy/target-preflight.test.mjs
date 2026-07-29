@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -71,9 +79,7 @@ test("target preflight parser fails closed on identity and blocker drift", () =>
   );
   assert.throws(
     () =>
-      parseRemoteTargetPreflight(
-        `${remoteReport()}UNEXPECTED=/private/path\n`,
-      ),
+      parseRemoteTargetPreflight(`${remoteReport()}UNEXPECTED=/private/path\n`),
     /key is invalid/u,
   );
 });
@@ -108,22 +114,64 @@ test("target preflight uses only fixed SSH destination and streamed script", () 
 });
 
 test("target preflight CLI reports current disk blocker without mutation", () => {
-  const result = spawnSync(
-    process.execPath,
-    [
-      path.join(import.meta.dirname, "target-preflight.mjs"),
-      "--target",
-      "test-133",
-      "--json",
-    ],
-    { encoding: "utf8", timeout: 30_000 },
+  const fixtureRoot = mkdtempSync(
+    path.join(tmpdir(), "plush-target-preflight-cli-"),
   );
-  assert.equal(result.status, 2, result.stderr);
-  const report = JSON.parse(result.stdout);
-  assert.equal(report.status, "blocked");
-  assert(report.blockers.includes("target_disk_capacity_low"));
-  assert(report.remote.capacity.availableBytes < 30 * 1024 ** 3);
-  assert.equal(report.notProven.includes("new release promotion and smoke"), true);
+  const fakeSSH = path.join(fixtureRoot, "ssh");
+  const marker = path.join(fixtureRoot, "ssh-invoked");
+  const blockedRemoteReport = remoteReport({
+    STATUS: "blocked",
+    ROOT_AVAILABLE_BYTES: String(14 * 1024 ** 3),
+    CAPACITY_STATUS: "blocked",
+    BLOCKERS: "target_disk_capacity_low",
+  });
+  writeFileSync(
+    fakeSSH,
+    `#!/bin/sh
+set -eu
+cat >/dev/null
+: > "$TARGET_PREFLIGHT_FAKE_SSH_MARKER"
+printf '%s' "$TARGET_PREFLIGHT_FAKE_SSH_REPORT"
+`,
+  );
+  chmodSync(fakeSSH, 0o755);
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(import.meta.dirname, "target-preflight.mjs"),
+        "--target",
+        "test-133",
+        "--json",
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${fixtureRoot}${path.delimiter}${process.env.PATH || ""}`,
+          TARGET_PREFLIGHT_FAKE_SSH_MARKER: marker,
+          TARGET_PREFLIGHT_FAKE_SSH_REPORT: blockedRemoteReport,
+        },
+        timeout: 30_000,
+      },
+    );
+    assert.equal(result.status, 2, result.stderr);
+    assert.equal(
+      existsSync(marker),
+      true,
+      "CLI must use the hermetic fake SSH",
+    );
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.status, "blocked");
+    assert(report.blockers.includes("target_disk_capacity_low"));
+    assert(report.remote.capacity.availableBytes < 30 * 1024 ** 3);
+    assert.equal(
+      report.notProven.includes("new release promotion and smoke"),
+      true,
+    );
+  } finally {
+    rmSync(fixtureRoot, { force: true, recursive: true });
+  }
 });
 
 test("remote target preflight script is read-only and contains no build command", () => {
@@ -135,6 +183,9 @@ test("remote target preflight script is read-only and contains no build command"
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
     /\b(?:rm|mv|cp|mkdir|touch|truncate|docker\s+load|docker\s+compose.+up|atlas\s+migrate\s+apply)\b/u,
   );
-  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /minimum_available_bytes=32212254720/u);
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /minimum_available_bytes=32212254720/u,
+  );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /fresh pre-migration/u);
 });
