@@ -1,5 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Select, Space, Tabs, Tag } from 'antd'
+import { QuestionCircleOutlined } from '@ant-design/icons'
+import {
+  Alert,
+  Button,
+  Form,
+  Input,
+  Popover,
+  Select,
+  Space,
+  Tabs,
+  Tag,
+  Typography,
+} from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -68,6 +80,7 @@ import {
   validateFinanceCreditDraft,
 } from '../utils/financePaymentAllocation.mjs'
 
+const { Text } = Typography
 const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
 const CURRENCY_OPTIONS = ['CNY', 'USD', 'HKD'].map((value) => ({
   value,
@@ -102,6 +115,56 @@ const FINANCE_VIEW_ITEMS = [
   { key: 'payments', label: '收付款记录' },
   { key: 'credits', label: '红冲记录' },
 ]
+
+function FinanceReversalTermHelp() {
+  const usesTouchInteraction =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(hover: none), (pointer: coarse)').matches
+
+  return (
+    <Popover
+      placement="bottomLeft"
+      trigger={usesTouchInteraction ? ['click'] : ['hover', 'focus', 'click']}
+      title="冲销与红冲有什么区别？"
+      content={
+        <Space
+          direction="vertical"
+          size={8}
+          style={{
+            width: usesTouchInteraction
+              ? 'min(260px, calc(100vw - 64px))'
+              : 'min(340px, calc(100vw - 56px))',
+          }}
+        >
+          <div>
+            <Text strong>冲销：</Text>
+            <Text>
+              撤销一笔已经核销的收款或付款。相应金额会恢复为未核销，原收付款和核销记录仍会保留。
+            </Text>
+          </div>
+          <div>
+            <Text strong>红冲：</Text>
+            <Text>
+              对某笔应收或应付登记反向金额调整，减少该笔账款的未核销金额。原单不会删除，系统会另外保留红冲记录。
+            </Text>
+          </div>
+          <Text type="secondary">
+            这里只调整本系统中的应收、应付余额，不代表税控红字发票、总账凭证或银行对账已经完成。
+          </Text>
+        </Space>
+      }
+    >
+      <Button
+        type="text"
+        shape="circle"
+        size="small"
+        icon={<QuestionCircleOutlined />}
+        aria-label="查看冲销和红冲说明"
+      />
+    </Popover>
+  )
+}
 
 function paymentStatus(value) {
   const [label, color] = PAYMENT_STATUS_META[value] || ['状态待核对', 'default']
@@ -1061,9 +1124,12 @@ export default function FinancePaymentsPage() {
           <Tag color="green" key="allocation">
             多单核销
           </Tag>,
-          <Tag color="gold" key="reversal">
-            冲销 / 红冲
-          </Tag>,
+          <Space key="reversal" size={2}>
+            <Tag color="gold" style={{ marginInlineEnd: 0 }}>
+              冲销 / 红冲
+            </Tag>
+            <FinanceReversalTermHelp />
+          </Space>,
         ]}
         stats={[
           {
