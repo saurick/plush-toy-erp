@@ -7,9 +7,10 @@
 ### Codex App Git 收口队列治理
 
 - 完成：新增项目 Skill `$plush-git-closeout-queue`，把共享 Local 的唯一 writer、稳定 `event_id` + 精确 ACK、批次登记、热点文件继续排队、独立 push owner 和 fail-closed 边界收口为长期协议。AGENTS 只保留入口，动态查找同项目唯一置顶的 `Git 收口队列`，不保存易漂移的 task id、当前 owner、批次或 Git OID。
-- 完成：队列默认休眠，由任务消息事件唤醒；writer release 后可按已登记顺序放行下一任务，不要求各 worker 定时扫描。App 重启或旧任务漏报时只按用户明确的 `RECONCILE_REQUEST` 做一次只读盘点，不能因为“已无任务运行”就把全部本地修改提交。上下文过长时通过 compact snapshot 交给同项目空白新任务，确认接管后再归档旧队列，避免 fork 复制长历史或同时保留两个正式队列。
+- 完成：协议升级为 revision 2。队列仍默认休眠并由 ready / release 消息唤醒，但安全批次现在默认 `auto_local`，只有用户明确“不提交 / 先别提交”才 `hold`；被唤醒后按登记顺序逐批精确本地提交，不等待并不存在的全局 idle 信号。升级治理批次必须先进入 HEAD 并确认 index 复空，随后协议 1 的 `commit_authorized:false` 才不再被误判为暂停；无明确禁止提交证据的旧批次重新排队，未知或 mixed hunk 无法证明归属时仍 fail closed。
+- 完成：App 重启或旧任务漏报时仍只按用户明确的 `RECONCILE_REQUEST` 做一次只读盘点，不能因为“已无任务运行”就盲目 `git add -A`。上下文过长时通过 compact snapshot 交给同项目空白新任务，确认接管后再归档旧队列，避免 fork 复制长历史或同时保留两个正式队列；push 始终独立明确授权。
 - 验证：官方 Codex 手册确认任务历史可重新读取 / resume 和上下文压缩能力，但未提供 App 关闭期间跨任务离线投递保证；协议因此以 ACK 和幂等重发为准。项目 Skill validator、YAML / metadata、引用扫描、AGENTS 体积门禁和 scoped `git diff --check` 均纳入本次验证；不改变 runtime、schema、API 或测试行为。
-- 下一步：现有和未来顶层写任务在每次新轮次重新读取 AGENTS / Skill；已获提交授权的来源任务发送 `COMMIT_READY` 与 `CLOSEOUT_REQUEST` 后由队列精确本地收口，push 始终另行授权。需要更换队列时由用户明确触发 `QUEUE_ROTATE_REQUEST`。
+- 下一步：现有和未来顶层写任务在每次新轮次重新读取 AGENTS / Skill，完成切片后发送带 exact scope 与验证的 `BATCH_READY`；队列在安全边界满足时自动本地收口，显式 `hold`、遗留 reconcile 和手动分组才需要额外解除或 `CLOSEOUT_REQUEST`。需要更换队列时由用户明确触发 `QUEUE_ROTATE_REQUEST`。
 - 阻塞 / 风险：任务历史可恢复不等于跨任务消息必达，外部 GitHub Desktop / 终端也不受 Codex 协议预先锁定；无匹配 ACK、归属不明、index 污染、并发 Git 或 remote ref 漂移时均保留现场并停止，不自动 pull、merge、rebase、force、重试或猜测提交范围。
 
 ### 任务看板分类与翻页局部刷新

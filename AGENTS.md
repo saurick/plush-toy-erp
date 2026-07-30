@@ -46,7 +46,8 @@
 
 - 共享 Local 顶层写任务使用 `$plush-git-closeout-queue`：每个新任务轮次动态查找同项目唯一置顶且标题精确为 `Git 收口队列` 的任务，不硬编码 task id；subagent 只向所属主任务报告。
 - 首次写文件前发送 `WRITER_REQUEST` 并等待匹配 ACK 与明确 grant，最后写入后发送 `WRITER_RELEASED`；只读验证不占 writer。队列按登记顺序从 release 事件继续放行，无需 worker 轮询。
-- `BATCH_READY` / `COMMIT_READY` 只登记，热点文件继续排队；stage、commit 和 push 只由队列按用户授权串行执行，push 另行授权并对并发 Git / remote ref 变化 fail closed。
+- `BATCH_READY` 默认进入 `auto_local`：每次 ready / release 唤醒后，队列在无 writer、归属与验证完整、热点释放且 index 安全时按序自动本地提交；只有用户明确“不提交 / 先别提交”才 `hold`。不要等待全局 idle，也不要盲目 `git add -A`。
+- 本地自动提交不包含 push；push 始终另行明确授权，并对并发 Git / remote ref 变化 fail closed。
 - App 重启、漏报、无人认领修改和长上下文队列轮换按 Skill 的 reconcile / rotation 流程处理。队列是可恢复的任务消息协调，不是 daemon、仓库状态真源或有保证的离线邮箱；无匹配 ACK 或 owner 不清楚时不自动 Git 收口。
 
 ## 过程记录
