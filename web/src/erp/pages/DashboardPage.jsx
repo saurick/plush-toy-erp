@@ -121,18 +121,13 @@ function scrollTaskBoardLanesToStart(lanesElement) {
 const PRODUCT_CORE_METRICS = Object.freeze([
   {
     label: '业务功能',
-    value: '11',
+    value: 11,
     note: '基础资料、销售、采购、物料清单、库存、质检、出货和财务',
   },
   {
     label: '系统设置',
-    value: '4',
+    value: 4,
     note: '员工权限、操作记录、打印模板和客户业务设置',
-  },
-  {
-    label: '业务数据',
-    value: '未连接',
-    note: '当前不读取客户订单、库存、待办任务或财务记录',
   },
 ])
 
@@ -222,7 +217,11 @@ function ProductCoreDashboard({ onNavigate }) {
 
       <div className="erp-product-core-dashboard__metrics">
         {PRODUCT_CORE_METRICS.map((metric) => (
-          <section key={metric.label} className="erp-product-core-metric">
+          <section
+            key={metric.label}
+            className="erp-product-core-metric erp-metric-readonly-card"
+            aria-label={`${metric.label} ${metric.value}，只读摘要`}
+          >
             <Text type="secondary">{metric.label}</Text>
             <strong>{metric.value}</strong>
             <span>{metric.note}</span>

@@ -70,6 +70,29 @@ test('businessPageHeader: 业务页头不再提供底部 summary 区域', () => 
   )
 })
 
+test('businessPageHeader: 共享页头只渲染规范化后的非负整数统计', () => {
+  const layoutPath = resolve(
+    erpSourceRoot,
+    'components/business-list/BusinessListLayout.jsx'
+  )
+  const layoutSource = readFileSync(layoutPath, 'utf8')
+  const pageHeaderSource = layoutSource.slice(
+    layoutSource.indexOf('export function PageHeaderCard'),
+    layoutSource.indexOf('export function BusinessFilterPanel')
+  )
+
+  assert.match(
+    layoutSource,
+    /import \{ normalizeBusinessPageHeaderStats \} from '\.\.\/\.\.\/utils\/businessPageHeader\.mjs'/u
+  )
+  assert.match(
+    pageHeaderSource,
+    /const numericStats = normalizeBusinessPageHeaderStats\(stats\)/u
+  )
+  assert.match(pageHeaderSource, /\{numericStats\.map\(\(item\) =>/u)
+  assert.doesNotMatch(pageHeaderSource, /\{stats\.map\(\(item\) =>/u)
+})
+
 test('businessPageHeader: 页面调用点不得向 PageHeaderCard 传 summary', () => {
   const offenders = []
 

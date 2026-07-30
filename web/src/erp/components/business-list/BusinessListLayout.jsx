@@ -34,6 +34,7 @@ import {
   parseDateInputValue,
 } from '../../utils/dateRange.mjs'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
+import { normalizeBusinessPageHeaderStats } from '../../utils/businessPageHeader.mjs'
 
 const { Text } = Typography
 
@@ -458,6 +459,8 @@ export function PageHeaderCard({
   stats = [],
   compact = false,
 }) {
+  const numericStats = normalizeBusinessPageHeaderStats(stats)
+
   return (
     <Card
       className={joinClassNames(
@@ -477,9 +480,9 @@ export function PageHeaderCard({
             </div>
           ) : null}
         </div>
-        {stats.length > 0 ? (
+        {numericStats.length > 0 ? (
           <div className="erp-business-page-header-card__stats erp-business-module-stats">
-            {stats.map((item) => (
+            {numericStats.map((item) => (
               <div
                 key={item.key || item.label}
                 className="erp-business-page-header-card__stat erp-metric-readonly-card"

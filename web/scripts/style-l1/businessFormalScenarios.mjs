@@ -1493,7 +1493,21 @@ export function createBusinessFormalScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '库存台账')
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-balance-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await assertTextAbsent(page, '查看内容')
+        await page.getByRole('tab', { name: '库存批次' }).click()
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-lots-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
         await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-transactions-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
         await expectText(page, '撤销调整')
         await assertTextAbsent(page, '库存流水')
         await assertTextAbsent(page, '流水')
@@ -1503,6 +1517,104 @@ export function createBusinessFormalScenarios(deps) {
           fullPage: true,
         })
         await assertNoHorizontalOverflow(page, 'inventory-visible-copy-desktop')
+      },
+    },
+    {
+      name: 'inventory-numeric-summary-dark-mobile',
+      path: '/erp/warehouse/inventory?view=balances',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '库存台账')
+        await page.getByRole('tab', { name: '库存余额' }).click()
+        await assertERPThemeMode(page, {
+          scenarioName: 'inventory-numeric-summary-dark-mobile',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-dark-mobile',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await assertTextAbsent(page, '查看内容')
+        await page
+          .locator('.erp-admin-content')
+          .evaluate((node) => node.scrollTo({ top: 0, behavior: 'auto' }))
+        const mobileHeaderMetrics = await page.evaluate(() => {
+          const content = document.querySelector('.erp-admin-content')
+          const header = document.querySelector(
+            '.erp-business-page-header-card'
+          )
+          const title = header?.querySelector('h1')
+          const values = Array.from(
+            header?.querySelectorAll(
+              '.erp-business-page-header-card__stat strong'
+            ) || []
+          )
+          const contentRect = content?.getBoundingClientRect()
+          const headerRect = header?.getBoundingClientRect()
+          const titleRect = title?.getBoundingClientRect()
+          return {
+            scrollTop: content?.scrollTop ?? null,
+            content: contentRect?.toJSON() || null,
+            header: headerRect?.toJSON() || null,
+            title: title
+              ? {
+                  text: title.textContent?.trim() || '',
+                  rect: titleRect?.toJSON() || null,
+                  color: window.getComputedStyle(title).color,
+                }
+              : null,
+            values: values.map((value) => ({
+              text: value.textContent?.trim() || '',
+              rect: value.getBoundingClientRect().toJSON(),
+              color: window.getComputedStyle(value).color,
+            })),
+          }
+        })
+        assert.equal(
+          mobileHeaderMetrics.scrollTop,
+          0,
+          `库存暗色手机页头截图前应回到内容顶部: ${JSON.stringify(
+            mobileHeaderMetrics
+          )}`
+        )
+        assert(
+          mobileHeaderMetrics.title?.text === '库存台账' &&
+            mobileHeaderMetrics.values.length === 2 &&
+            mobileHeaderMetrics.values.every(
+              (item) =>
+                item.rect.top >= mobileHeaderMetrics.content.top &&
+                item.rect.bottom <= mobileHeaderMetrics.content.bottom
+            ),
+          `库存暗色手机页头标题和数值应在可视内容区内: ${JSON.stringify(
+            mobileHeaderMetrics
+          )}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'inventory-numeric-summary-dark-mobile.png'
+          ),
+          fullPage: true,
+        })
+        await page.locator('.erp-business-page-header-card').screenshot({
+          path: path.join(
+            outputDir,
+            'inventory-numeric-summary-dark-mobile-header.png'
+          ),
+        })
+        await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-transactions-dark-mobile',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'inventory-numeric-summary-dark-mobile'
+        )
       },
     },
     {
@@ -1639,6 +1751,54 @@ export function createBusinessFormalScenarios(deps) {
             const activeTab = tabs?.querySelector(
               '[role="tab"][aria-selected="true"]'
             )
+            const tabCard = tabs?.closest('.erp-business-data-table-card')
+            const visibleTable = visibleTables[0]
+            const visibleTableCard = visibleTable?.closest(
+              '.erp-business-data-table-card'
+            )
+            const tabRect = tabs?.getBoundingClientRect()
+            const tableRect = visibleTable?.getBoundingClientRect()
+            const currentWorkspace = visibleTableCard?.closest(
+              '.erp-business-page-layout'
+            )
+            const currentOperationPanel = Array.from(
+              currentWorkspace?.children || []
+            ).find((node) =>
+              node.matches?.('.erp-business-operation-panel')
+            )
+            const currentOperationPanelRect =
+              currentOperationPanel?.getBoundingClientRect()
+            const currentWorkspaceRowGap = currentWorkspace
+              ? Number.parseFloat(
+                  window.getComputedStyle(currentWorkspace).rowGap
+                )
+              : null
+            const currentWorkspaceRenderedGap =
+              currentOperationPanelRect && visibleTableCard
+                ? visibleTableCard.getBoundingClientRect().top -
+                  currentOperationPanelRect.bottom
+                : null
+            const decisionFilterLabels = [
+              '异常类型',
+              '审批状态',
+              '业务状态',
+            ].filter((label) =>
+              currentOperationPanel?.querySelector(
+                `[aria-label="${label}"]`
+              )
+            )
+            const currentActionVisible = String(
+              currentOperationPanel?.textContent || ''
+            ).includes('当前操作')
+            const clearSelectionButton = Array.from(
+              currentOperationPanel?.querySelectorAll('button') || []
+            ).find(
+              (button) =>
+                String(button.textContent || '').trim() === '清空已选'
+            )
+            const selectionActionBar = currentOperationPanel?.querySelector(
+              '.erp-business-selection-action-bar'
+            )
             const taskWorkspace = document.querySelector(
               '.erp-workflow-business-page__tab-workspace'
             )
@@ -1658,8 +1818,23 @@ export function createBusinessFormalScenarios(deps) {
                 : null
             return {
               activeTab: String(activeTab?.textContent || '').trim(),
+              tabInsideCurrentTableCard:
+                Boolean(tabCard) && tabCard === visibleTableCard,
+              tabBeforeCurrentTable:
+                Boolean(tabRect && tableRect) &&
+                tabRect.bottom <= tableRect.top + 1,
               tabListClientWidth: tabList?.clientWidth || 0,
               tabListScrollWidth: tabList?.scrollWidth || 0,
+              currentActionVisible,
+              currentOperationPanelExists: Boolean(currentOperationPanel),
+              currentWorkspaceRenderedGap,
+              currentWorkspaceRowGap,
+              decisionFilterLabels,
+              clearSelectionDisabled:
+                clearSelectionButton?.disabled === true ||
+                selectionActionBar?.classList.contains(
+                  'erp-business-selection-action-bar--empty'
+                ) === true,
               taskWorkspaceRenderedGap,
               taskWorkspaceRowGap,
               visibleTableCount: visibleTables.length,
@@ -1677,10 +1852,63 @@ export function createBusinessFormalScenarios(deps) {
               metrics
             )}`
           )
+          assert.equal(
+            metrics.tabInsideCurrentTableCard,
+            true,
+            `${scenarioName} 页签应与当前表格共用数据卡片: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert.equal(
+            metrics.tabBeforeCurrentTable,
+            true,
+            `${scenarioName} 页签应位于当前表格上方: ${JSON.stringify(metrics)}`
+          )
           assert(
             metrics.tabListScrollWidth <= metrics.tabListClientWidth + 1,
             `${scenarioName} 页签栏不应横向溢出: ${JSON.stringify(metrics)}`
           )
+          assert.equal(
+            metrics.currentOperationPanelExists,
+            true,
+            `${scenarioName} 当前工作区应有筛选与操作区域: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert.equal(
+            metrics.currentWorkspaceRowGap,
+            6,
+            `${scenarioName} 应复用业务页面标准模块间距: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert(
+            Math.abs(metrics.currentWorkspaceRenderedGap - 6) <= 0.5,
+            `${scenarioName} 操作区与表格应保持 6px 间距: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          if (expectedTab === '处置申请') {
+            assert.deepEqual(
+              metrics.decisionFilterLabels,
+              ['异常类型', '审批状态', '业务状态'],
+              `${scenarioName} 应展示三项真实后端筛选: ${JSON.stringify(
+                metrics
+              )}`
+            )
+            assert.equal(
+              metrics.currentActionVisible,
+              true,
+              `${scenarioName} 应展示当前操作区: ${JSON.stringify(metrics)}`
+            )
+            assert.equal(
+              metrics.clearSelectionDisabled,
+              true,
+              `${scenarioName} 未选择记录时清空选择应禁用: ${JSON.stringify(
+                metrics
+              )}`
+            )
+          }
           if (expectedTab === '待审批') {
             assert.equal(
               metrics.taskWorkspaceRowGap,
@@ -1701,6 +1929,11 @@ export function createBusinessFormalScenarios(deps) {
 
         await expectHeading(page, '生产异常处置')
         await expectText(page, '暂无生产异常处置申请')
+        await expectText(page, '全部异常类型')
+        await expectText(page, '全部审批状态')
+        await expectText(page, '全部业务状态')
+        await expectText(page, '当前操作')
+        await expectText(page, '请选择一条记录')
         await assertProductionExceptionTabGeometry(
           'business-production-exceptions-decisions-tab',
           '处置申请'
@@ -2728,7 +2961,11 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '库存台账')
         await expectText(page, '余额只读')
-        await expectText(page, '查看内容')
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'business-standard-inventory',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await assertTextAbsent(page, '查看内容')
         await expectText(page, '12.5')
         await expectText(page, '已预留')
         await expectText(page, '4')

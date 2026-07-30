@@ -1244,11 +1244,10 @@ export default function V1InventoryLedgerPage() {
 
   const stats = useMemo(
     () => [
-      { key: 'view', label: '查看内容', value: activeLabel },
       { key: 'total', label: '筛选结果', value: total },
       { key: 'current', label: '本页显示', value: rows.length },
     ],
-    [activeLabel, rows.length, total]
+    [rows.length, total]
   )
 
   const columns = useMemo(() => {

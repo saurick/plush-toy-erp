@@ -71,6 +71,24 @@ test('inventory transaction lineage assertions use the visible business labels',
   assert.doesNotMatch(source, /expectText\(page, '已关联原流水'\)/u)
 })
 
+test('inventory header summary keeps view text in tabs and numeric values in cards', () => {
+  const startIndex = source.indexOf("name: 'inventory-visible-copy-desktop'")
+  const interaction = source.slice(startIndex, startIndex + 2_600)
+
+  assert.ok(startIndex >= 0)
+  assert.match(
+    interaction,
+    /expectedLabels:\s*\['筛选结果', '本页显示'\]/u
+  )
+  assert.match(interaction, /name: '库存批次'/u)
+  assert.match(interaction, /name: '库存变动记录'/u)
+  assert.match(interaction, /assertTextAbsent\(page, '查看内容'\)/u)
+  assert.doesNotMatch(interaction, /expectText\(page, '查看内容'\)/u)
+  assert.match(source, /name: 'inventory-numeric-summary-dark-mobile'/u)
+  assert.match(source, /inventory-numeric-summary-dark-mobile\.png/u)
+  assert.match(source, /inventory-numeric-summary-dark-mobile-header\.png/u)
+})
+
 test('quality page assertion preserves the visible incoming-inspection boundary', () => {
   assert.match(source, /首次到货检验不合格可按来源行和部分数量办理退厂或补换/u)
   assert.match(source, /已入库后的不合格仍生成采购退货/u)
@@ -93,6 +111,19 @@ test('production exception workflow scenario follows the current approval empty 
   assert.match(source, /business-production-exceptions-decisions-tab\.png/u)
   assert.match(source, /business-production-exceptions-tasks-tab\.png/u)
   assert.match(source, /business-production-exception-tabs-desktop/u)
+  assert.match(source, /tabInsideCurrentTableCard/u)
+  assert.match(source, /tabBeforeCurrentTable/u)
+  assert.match(source, /currentOperationPanelExists/u)
+  assert.match(source, /currentWorkspaceRenderedGap/u)
+  assert.match(source, /decisionFilterLabels/u)
+  assert.match(source, /\['异常类型', '审批状态', '业务状态'\]/u)
+  assert.match(source, /currentActionVisible/u)
+  assert.match(source, /clearSelectionDisabled/u)
+  assert.match(source, /expectText\(page, '全部异常类型'\)/u)
+  assert.match(source, /expectText\(page, '全部审批状态'\)/u)
+  assert.match(source, /expectText\(page, '全部业务状态'\)/u)
+  assert.match(source, /expectText\(page, '当前操作'\)/u)
+  assert.match(source, /expectText\(page, '请选择一条记录'\)/u)
   assert.match(
     source,
     /business-production-exceptions-decisions-tab-dark\.png/u
