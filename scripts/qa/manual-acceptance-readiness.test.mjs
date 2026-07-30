@@ -22,10 +22,13 @@ import {
   buildManualAcceptancePageDataContract,
 } from "./manual-acceptance-page-data-contract.mjs";
 import {
-  TASK_COPY_REVISION,
   TASK_CATALOG_SCENARIO_DIGEST,
   TASK_GROUP_BY_ROLE,
+  TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
+  TASK_PROFILE_LONG_LIVED_WORKBENCH,
   TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
+  LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE,
   buildManualAcceptanceTaskDataPlan,
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
@@ -509,6 +512,7 @@ test("readiness fact contract requires bound identity, runtime, exact references
 
 function taskReport(overrides = {}) {
   const runId = overrides.runId || CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
+  const taskProfile = overrides.taskProfile || TASK_PROFILE_ACCEPTANCE_SNAPSHOT;
   const target = overrides.target || "local-dev";
   const backendURL = overrides.backendURL || LOCAL_BACKEND_URL;
   const databaseName =
@@ -516,13 +520,16 @@ function taskReport(overrides = {}) {
     (target === CUSTOMER_TRIAL_133_TARGET
       ? CUSTOMER_TRIAL_133_DATABASE
       : LOCAL_DATABASE_NAME);
-  const batchIdentity = manualAcceptanceTaskBatchIdentity(runId);
+  const batchIdentity = manualAcceptanceTaskBatchIdentity(runId, {
+    taskProfile,
+  });
   const taskPlan = buildManualAcceptanceTaskDataPlan({
     target,
     backendURL,
     databaseName,
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId,
+    taskProfile,
   });
   const coverage = taskPlan.coverage;
   const runtimeEvidence = [
@@ -578,7 +585,8 @@ function taskReport(overrides = {}) {
     target,
     backendURL,
     databaseName,
-    copyRevision: TASK_COPY_REVISION,
+    taskProfile,
+    copyRevision: taskPlan.copyRevision,
     prefix: batchIdentity.prefix,
     sourceType: batchIdentity.sourceType,
     sourceID: batchIdentity.sourceID,
@@ -1011,7 +1019,7 @@ function createReadinessFetch(runtimeOptions = {}) {
                 ? factRefs.productionExceptions.find(
                     (item) => item.id === sourceID,
                   )
-              : factRefs.shipments.find((item) => item.id === sourceID);
+                : factRefs.shipments.find((item) => item.id === sourceID);
         const status =
           taskGroup === "production_scheduling" &&
           sourceRecord?.status === "RELEASED"
@@ -1022,7 +1030,7 @@ function createReadinessFetch(runtimeOptions = {}) {
             ? sourceRecord?.financeApprovalTaskCode
             : taskGroup === "production_exception_decision_approval"
               ? sourceRecord?.approvalTaskCode
-            : `source-${taskGroup.replaceAll("_", "-")}-${sourceID}`;
+              : `source-${taskGroup.replaceAll("_", "-")}-${sourceID}`;
         return okResponse({
           tasks: sourceRecord
             ? [
@@ -1037,13 +1045,14 @@ function createReadinessFetch(runtimeOptions = {}) {
                       ? "pmc"
                       : taskGroup === "production_exception"
                         ? "production"
-                        : taskGroup ===
-                            "production_exception_decision_approval"
+                        : taskGroup === "production_exception_decision_approval"
                           ? "boss"
                           : "finance",
                   task_status_key: status,
-                  ...(["shipment_finance_approval",
-                    "production_exception_decision_approval"].includes(taskGroup)
+                  ...([
+                    "shipment_finance_approval",
+                    "production_exception_decision_approval",
+                  ].includes(taskGroup)
                     ? {
                         process_instance_id:
                           taskGroup === "shipment_finance_approval"
@@ -1352,6 +1361,32 @@ test("default plan covers all 50 targets and never connects to a backend", async
   );
 });
 
+test("readiness binds the explicit long-lived workbench batch identity and prefixes", () => {
+  const report = taskReport({
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+  assert.equal(report.copyRevision, LONG_LIVED_WORKBENCH_TASK_COPY_REVISION);
+  const plan = buildManualAcceptanceReadinessPlan({
+    sourceReport: sourceReport(),
+    factReport: factReport(),
+    taskReport: report,
+  });
+  const byID = new Map(plan.probes.map((probe) => [probe.id, probe]));
+
+  assert.equal(
+    byID.get("boss-dashboard-tasks").exactTaskCodePrefix,
+    LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE.boss,
+  );
+  assert.equal(
+    byID.get("mobile-tasks:production").exactTaskCodePrefix,
+    LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE.production,
+  );
+  assert.equal(
+    byID.get("mobile-tasks:production").exactSourceID,
+    report.sourceID,
+  );
+});
+
 test("business dashboard projection proves the exact runtime module set", () => {
   const plan = buildManualAcceptanceReadinessPlan({
     sourceReport: sourceReport(),
@@ -1445,9 +1480,8 @@ test("apply reports may raise minimums while the shipment dataset stays exact", 
     false,
   );
   assert.deepEqual(
-    byId
-      .get("workflow-tasks:shipment_finance_approval")
-      .expectedReferences[0].expectedFields,
+    byId.get("workflow-tasks:shipment_finance_approval").expectedReferences[0]
+      .expectedFields,
     {
       task_group: "shipment_finance_approval",
       source_type: "shipment",

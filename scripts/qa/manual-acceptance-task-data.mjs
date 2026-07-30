@@ -7,6 +7,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
+import { SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES } from "./manual-acceptance-source-data.mjs";
 
 import {
   CUSTOMER_TRIAL_133_TARGET,
@@ -28,7 +29,11 @@ export const TASK_SOURCE_TYPE = "simulated-manual-acceptance-task-batch";
 export const TASK_SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT-TASK";
 const SOURCE_TYPE = TASK_SOURCE_TYPE;
 const SIMULATION_PREFIX = TASK_SIMULATION_PREFIX;
+export const TASK_PROFILE_ACCEPTANCE_SNAPSHOT = "acceptance-snapshot";
+export const TASK_PROFILE_LONG_LIVED_WORKBENCH = "long-lived-workbench";
 export const TASK_COPY_REVISION = "PLAIN5";
+export const LONG_LIVED_WORKBENCH_TASK_COPY_REVISION = "WORKBENCH1";
+export const LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE = 12;
 export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   boss: "YS-V5-LD",
   sales: "YS-V5-XS",
@@ -39,6 +44,31 @@ export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
   pmc: "YS-V5-JH",
   quality: "YS-V5-ZJ",
   engineering: "YS-V5-GC",
+});
+export const LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
+  boss: "YS-WB1-LD",
+  sales: "YS-WB1-XS",
+  purchase: "YS-WB1-CG",
+  production: "YS-WB1-SC",
+  warehouse: "YS-WB1-CK",
+  finance: "YS-WB1-CW",
+  pmc: "YS-WB1-JH",
+  quality: "YS-WB1-ZJ",
+  engineering: "YS-WB1-GC",
+});
+const TASK_PROFILE_CONTRACTS = Object.freeze({
+  [TASK_PROFILE_ACCEPTANCE_SNAPSHOT]: Object.freeze({
+    key: TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
+    copyRevision: TASK_COPY_REVISION,
+    visibleCodePrefixByRole: TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
+    stableActionablePerRole: 0,
+  }),
+  [TASK_PROFILE_LONG_LIVED_WORKBENCH]: Object.freeze({
+    key: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+    copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+    visibleCodePrefixByRole: LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE,
+    stableActionablePerRole: LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+  }),
 });
 const STABLE_ANCHOR_BASE_UNIX = Date.UTC(2024, 0, 1, 12, 0, 0) / 1000;
 const STABLE_ANCHOR_WINDOW_DAYS = 10 * 366;
@@ -683,16 +713,45 @@ function stablePositiveSourceID(runId) {
   return (hash % 2_000_000_000) + 1;
 }
 
-export function manualAcceptanceTaskBatchIdentity(runId) {
+export function getManualAcceptanceTaskProfileContract(
+  taskProfile = TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
+) {
+  const normalized = String(taskProfile || "").trim();
+  const contract = TASK_PROFILE_CONTRACTS[normalized];
+  if (!contract) {
+    throw new CliError(`unknown task profile ${normalized || "(empty)"}`, 2);
+  }
+  return contract;
+}
+
+export function getManualAcceptanceTaskVisibleCodePrefix(
+  roleKey,
+  taskProfile = TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
+) {
+  const prefix =
+    getManualAcceptanceTaskProfileContract(taskProfile).visibleCodePrefixByRole[
+      roleKey
+    ];
+  if (!prefix) {
+    throw new CliError(`unknown task role ${roleKey}`, 2);
+  }
+  return prefix;
+}
+
+export function manualAcceptanceTaskBatchIdentity(
+  runId,
+  { taskProfile = TASK_PROFILE_ACCEPTANCE_SNAPSHOT } = {},
+) {
   const normalizedRunID = sanitizeRunId(runId);
+  const profile = getManualAcceptanceTaskProfileContract(taskProfile);
   return Object.freeze({
     runId: normalizedRunID,
-    copyRevision: TASK_COPY_REVISION,
+    copyRevision: profile.copyRevision,
     sourceType: TASK_SOURCE_TYPE,
     sourceID: stablePositiveSourceID(
-      `${normalizedRunID}:${TASK_COPY_REVISION}`,
+      `${normalizedRunID}:${profile.copyRevision}`,
     ),
-    prefix: `${TASK_SIMULATION_PREFIX}-${normalizedRunID}-${TASK_COPY_REVISION}`,
+    prefix: `${TASK_SIMULATION_PREFIX}-${normalizedRunID}-${profile.copyRevision}`,
   });
 }
 
@@ -861,7 +920,53 @@ export function manualAcceptanceTaskDueAt(index, anchorUnix) {
   }
 }
 
-function actionFor(roleKey, targetStatus, runId, index, profile) {
+function taskDueForProfile(index, anchorUnix, taskProfile) {
+  const profile = getManualAcceptanceTaskProfileContract(taskProfile);
+  if (
+    profile.stableActionablePerRole > 0 &&
+    index <= profile.stableActionablePerRole
+  ) {
+    return { scenario: "no_due", value: null };
+  }
+  return manualAcceptanceTaskDueAt(index, anchorUnix);
+}
+
+function taskPriorityForProfile(
+  index,
+  targetStatus,
+  taskProfile = TASK_PROFILE_ACCEPTANCE_SNAPSHOT,
+) {
+  const profile = getManualAcceptanceTaskProfileContract(taskProfile);
+  if (profile.stableActionablePerRole > 0) {
+    if (index <= profile.stableActionablePerRole) {
+      return index % 3 === 0 ? 2 : 1;
+    }
+    if (new Set(["ready", "blocked"]).has(targetStatus)) return 3;
+  }
+  return index % 5 === 0 ? 3 : index % 3 === 0 ? 2 : 1;
+}
+
+function workbenchBucketForTask(index, targetStatus, taskProfile) {
+  const profile = getManualAcceptanceTaskProfileContract(taskProfile);
+  if (profile.stableActionablePerRole === 0) return undefined;
+  if (index <= profile.stableActionablePerRole) return "actionable";
+  return new Set(["ready", "blocked"]).has(targetStatus) ? "risk" : "history";
+}
+
+function taskIdempotencyNamespace(runId, taskProfile) {
+  const profile = getManualAcceptanceTaskProfileContract(taskProfile);
+  return profile.copyRevision === TASK_COPY_REVISION
+    ? runId
+    : `${runId}:${profile.copyRevision}`;
+}
+
+function actionFor(
+  roleKey,
+  targetStatus,
+  idempotencyNamespace,
+  index,
+  profile,
+) {
   const supportsAction =
     targetStatus === "blocked" ||
     (targetStatus === "done" && roleKey !== "boss") ||
@@ -880,7 +985,7 @@ function actionFor(roleKey, targetStatus, runId, index, profile) {
     actionKey,
     targetStatus,
     reason,
-    idempotencyKey: `manual-acceptance:${runId}:${roleKey}:${pad(index)}:${actionKey}`,
+    idempotencyKey: `manual-acceptance:${idempotencyNamespace}:${roleKey}:${pad(index)}:${actionKey}`,
     payload: targetStatus === "done" ? { feedback: reason } : {},
   };
 }
@@ -1034,15 +1139,29 @@ function summarizeTaskCoverage(tasks) {
   };
 }
 
-function buildRoleTask({ roleKey, index, runId, sourceID, nowSec }) {
+function buildRoleTask({
+  roleKey,
+  index,
+  runId,
+  sourceID,
+  nowSec,
+  taskProfile,
+}) {
   const profile = ROLE_SCENARIOS[roleKey];
   const targetStatus = targetStatusAt(roleKey, index);
-  const action = actionFor(roleKey, targetStatus, runId, index, profile);
-  const due = manualAcceptanceTaskDueAt(index, nowSec);
+  const idempotencyNamespace = taskIdempotencyNamespace(runId, taskProfile);
+  const action = actionFor(
+    roleKey,
+    targetStatus,
+    idempotencyNamespace,
+    index,
+    profile,
+  );
+  const due = taskDueForProfile(index, nowSec, taskProfile);
   const assignmentMode = index % 2 === 0 ? "role_account" : "owner_pool";
   const scenarioKey = taskScenarioAt(roleKey, index);
   const topic = taskTopicAt({ ...profile, roleKey }, scenarioKey, index);
-  const taskCode = `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${pad(index)}`;
+  const taskCode = `${getManualAcceptanceTaskVisibleCodePrefix(roleKey, taskProfile)}-${pad(index)}`;
   const sourceNo = `样例-${profile.label}-${pad(index)}`;
   const taskGroup = getManualAcceptanceTaskGroup(roleKey, scenarioKey);
   const businessStatus = getManualAcceptanceTaskBusinessStatus(
@@ -1074,6 +1193,7 @@ function buildRoleTask({ roleKey, index, runId, sourceID, nowSec }) {
     targetStatus,
     assignmentMode,
     dueScenario: due.scenario,
+    workbenchBucket: workbenchBucketForTask(index, targetStatus, taskProfile),
     action,
     createParams: {
       task_code: taskCode,
@@ -1085,11 +1205,11 @@ function buildRoleTask({ roleKey, index, runId, sourceID, nowSec }) {
       business_status_key: businessStatus,
       // create_task 只接受 ready；blocked/done/rejected 必须由正式动作产生。
       task_status_key: "ready",
-      idempotency_key: `manual-acceptance:${runId}:${roleKey}:${pad(index)}:create`,
+      idempotency_key: `manual-acceptance:${idempotencyNamespace}:${roleKey}:${pad(index)}:create`,
       owner_role_key: roleKey,
       owner_pool_key: roleKey,
       required_capability_key: profile.requiredCapability,
-      priority: index % 5 === 0 ? 3 : index % 3 === 0 ? 2 : 1,
+      priority: taskPriorityForProfile(index, targetStatus, taskProfile),
       due_at: due.value,
       payload,
     },
@@ -1103,6 +1223,8 @@ function summarizePlanTasks(tasks) {
   );
   const byTaskGroup = {};
   const dueScenarios = {};
+  const workbenchBuckets = {};
+  const workbenchBucketsByRole = {};
   let assigned = 0;
   let actionCount = 0;
   for (const task of tasks) {
@@ -1111,10 +1233,17 @@ function summarizePlanTasks(tasks) {
     const taskGroup = task.createParams.task_group;
     byTaskGroup[taskGroup] = (byTaskGroup[taskGroup] || 0) + 1;
     dueScenarios[task.dueScenario] = (dueScenarios[task.dueScenario] || 0) + 1;
+    if (task.workbenchBucket) {
+      workbenchBuckets[task.workbenchBucket] =
+        (workbenchBuckets[task.workbenchBucket] || 0) + 1;
+      workbenchBucketsByRole[task.roleKey] ||= {};
+      workbenchBucketsByRole[task.roleKey][task.workbenchBucket] =
+        (workbenchBucketsByRole[task.roleKey][task.workbenchBucket] || 0) + 1;
+    }
     if (task.assignmentMode === "role_account") assigned += 1;
     if (task.action) actionCount += 1;
   }
-  return {
+  const summary = {
     total: tasks.length,
     byRole,
     byStatus,
@@ -1124,6 +1253,11 @@ function summarizePlanTasks(tasks) {
     dueScenarios,
     actionCount,
   };
+  if (Object.keys(workbenchBuckets).length > 0) {
+    summary.workbenchBuckets = workbenchBuckets;
+    summary.workbenchBucketsByRole = workbenchBucketsByRole;
+  }
+  return summary;
 }
 
 function businessCopyStrings(task) {
@@ -1170,10 +1304,15 @@ export function validateManualAcceptanceTaskPlan(plan) {
   ) {
     throw new CliError("task plan source batch boundary is invalid");
   }
+  const taskProfile = getManualAcceptanceTaskProfileContract(plan.taskProfile);
+  const expectedBatchIdentity = manualAcceptanceTaskBatchIdentity(plan.runId, {
+    taskProfile: taskProfile.key,
+  });
   if (
     sanitizeRunId(plan.runId) !== plan.runId ||
-    plan.copyRevision !== TASK_COPY_REVISION ||
-    plan.prefix !== `${SIMULATION_PREFIX}-${plan.runId}-${TASK_COPY_REVISION}`
+    plan.copyRevision !== expectedBatchIdentity.copyRevision ||
+    plan.prefix !== expectedBatchIdentity.prefix ||
+    plan.sourceID !== expectedBatchIdentity.sourceID
   ) {
     throw new CliError("task plan run prefix is invalid");
   }
@@ -1217,13 +1356,14 @@ export function validateManualAcceptanceTaskPlan(plan) {
       }
       if (
         params.task_code !==
-        `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${pad(task.index)}`
+        `${getManualAcceptanceTaskVisibleCodePrefix(roleKey, taskProfile.key)}-${pad(task.index)}`
       ) {
         throw new CliError(`${task.key} visible task code is not canonical`);
       }
-      const expectedDue = manualAcceptanceTaskDueAt(
+      const expectedDue = taskDueForProfile(
         task.index,
         plan.schedule.anchorUnix,
+        taskProfile.key,
       );
       if (
         task.dueScenario !== expectedDue.scenario ||
@@ -1231,6 +1371,24 @@ export function validateManualAcceptanceTaskPlan(plan) {
       ) {
         throw new CliError(
           `${task.key} due schedule does not match the anchor`,
+        );
+      }
+      const expectedPriority = taskPriorityForProfile(
+        task.index,
+        task.targetStatus,
+        taskProfile.key,
+      );
+      if (params.priority !== expectedPriority) {
+        throw new CliError(`${task.key} priority does not match its profile`);
+      }
+      const expectedWorkbenchBucket = workbenchBucketForTask(
+        task.index,
+        task.targetStatus,
+        taskProfile.key,
+      );
+      if (task.workbenchBucket !== expectedWorkbenchBucket) {
+        throw new CliError(
+          `${task.key} workbench bucket does not match its profile`,
         );
       }
       statusCounts[task.targetStatus] += 1;
@@ -1308,9 +1466,22 @@ export function validateManualAcceptanceTaskPlan(plan) {
           `${task.key} create must include a bounded idempotency key`,
         );
       }
-      if (!Number.isSafeInteger(params.due_at) || params.due_at <= 0) {
+      if (
+        params.due_at !== null &&
+        (!Number.isSafeInteger(params.due_at) || params.due_at <= 0)
+      ) {
         throw new CliError(
-          `${task.key} due_at must be a positive Unix timestamp`,
+          `${task.key} due_at must be null or a positive Unix timestamp`,
+        );
+      }
+      if (
+        task.workbenchBucket === "actionable" &&
+        (task.targetStatus !== "ready" ||
+          params.due_at !== null ||
+          params.priority >= 3)
+      ) {
+        throw new CliError(
+          `${task.key} stable workbench task must stay ready, undated, and low risk`,
         );
       }
       if (params.task_status_key !== "ready") {
@@ -1392,11 +1563,18 @@ export function validateManualAcceptanceTaskPlan(plan) {
       "task plan coverage does not match its catalog scenarios",
     );
   }
+  const expectedSummary = summarizePlanTasks(plan.tasks);
+  if (JSON.stringify(plan.summary) !== JSON.stringify(expectedSummary)) {
+    throw new CliError("task plan summary does not match its tasks");
+  }
   return plan;
 }
 
 export function buildManualAcceptanceTaskDataPlan(options = {}) {
   const runId = sanitizeRunId(options.runId || timestampRunId());
+  const taskProfile = getManualAcceptanceTaskProfileContract(
+    options.taskProfile,
+  );
   const targetPolicy = resolveManualAcceptanceTarget({
     backendURL: options.backendURL || DEFAULT_BACKEND_URL,
     target: options.target,
@@ -1407,7 +1585,9 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
   const backendURL = targetPolicy.backendURL;
   const nowSec = runAnchorSeconds(runId, options.nowSec);
   const schedule = buildManualAcceptanceTaskSchedule(nowSec);
-  const batchIdentity = manualAcceptanceTaskBatchIdentity(runId);
+  const batchIdentity = manualAcceptanceTaskBatchIdentity(runId, {
+    taskProfile: taskProfile.key,
+  });
   const { prefix, sourceID } = batchIdentity;
   const tasks = TASK_ROLES.flatMap((roleKey) =>
     Array.from({ length: TASKS_PER_ROLE }, (_, offset) =>
@@ -1417,6 +1597,7 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
         runId,
         sourceID,
         nowSec,
+        taskProfile: taskProfile.key,
       }),
     ),
   );
@@ -1433,7 +1614,8 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
     backendURL,
     databaseName: targetPolicy.databaseName,
     runId,
-    copyRevision: TASK_COPY_REVISION,
+    taskProfile: taskProfile.key,
+    copyRevision: taskProfile.copyRevision,
     prefix,
     sourceType: SOURCE_TYPE,
     sourceID,
@@ -2101,26 +2283,39 @@ export function validateSalesOrderAcceptanceSourceReport(report, plan) {
   const candidates = report.referenceRecords?.salesOrderProcessCandidates;
   if (!Array.isArray(candidates) || candidates.length < 5) {
     throw new CliError(
-      "source report requires five DRAFT sales order process candidates",
+      "source report requires five sales order process candidates",
       2,
     );
   }
   const seen = new Set();
-  return candidates.slice(0, 5).map((candidate) => {
+  return candidates.slice(0, 5).map((candidate, index) => {
     const id = positiveSafeInteger(candidate?.id, "process candidate id");
     const orderNo = requiredText(
       candidate?.orderNo,
       "process candidate orderNo",
     );
-    if (candidate?.status !== "DRAFT" || seen.has(id) || seen.has(orderNo)) {
+    const status = String(candidate?.status || "").toUpperCase();
+    const allowedStatuses = SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES[index];
+    if (
+      JSON.stringify(candidate?.allowedStatuses) !==
+        JSON.stringify(allowedStatuses) ||
+      !allowedStatuses.includes(status) ||
+      seen.has(id) ||
+      seen.has(orderNo)
+    ) {
       throw new CliError(
-        "process candidates must be unique DRAFT sales orders",
+        "process candidates must be unique sales orders in their exact forward-only replay states",
         2,
       );
     }
     seen.add(id);
     seen.add(orderNo);
-    return { id, orderNo, status: "DRAFT" };
+    return {
+      id,
+      orderNo,
+      status,
+      allowedStatuses: [...allowedStatuses],
+    };
   });
 }
 
@@ -2228,7 +2423,7 @@ function requireSalesOrderAcceptanceStart(data, source) {
     instance.process_key !== "sales_order_acceptance" ||
     instance.business_ref_type !== "sales_order" ||
     Number(instance.business_ref_id) !== source.id ||
-    instance.status !== "active" ||
+    !new Set(["active", "blocked", "completed"]).has(instance.status) ||
     !Number.isSafeInteger(Number(node?.id)) ||
     Number(node.id) <= 0 ||
     !Number.isSafeInteger(Number(node?.version)) ||
@@ -2294,9 +2489,7 @@ async function mutateSalesOrderProcessTask({
   if (!method) {
     throw new CliError(`no formal task action contract exists for ${target}`);
   }
-  const candidates = [
-    ...new Set([task.owner_role_key, "boss", ...TASK_ROLES]),
-  ];
+  const candidates = [...new Set([task.owner_role_key, "boss", ...TASK_ROLES])];
   const actorDiagnostics = [];
   let selectedActor;
   for (const roleKey of candidates) {
@@ -2737,6 +2930,7 @@ export async function applyManualAcceptanceTaskData(
         : "simulated_display_only",
     provesProcessRuntime: runtimeEvidence.length > 0,
     runId: plan.runId,
+    taskProfile: plan.taskProfile,
     copyRevision: plan.copyRevision,
     datasetKey: plan.datasetKey,
     dataVersion: plan.dataVersion,
@@ -2808,15 +3002,30 @@ function assertLegacyTaskBatchRecord(task, legacyBatch, roleKey, accounts) {
   return task;
 }
 
-async function listLegacyTaskBatch({ legacyBatch, accounts, fetchImpl }) {
-  const tasks = [];
+async function listLegacyTaskBatch({
+  legacyBatch,
+  accounts,
+  allowAbsent = false,
+  fetchImpl,
+}) {
+  const tasksByRole = {};
   for (const roleKey of TASK_ROLES) {
-    const roleTasks = await listRoleBatch({
+    tasksByRole[roleKey] = await listRoleBatch({
       plan: legacyBatch,
       roleKey,
       account: accounts[roleKey],
       fetchImpl,
     });
+  }
+  const total = Object.values(tasksByRole).reduce(
+    (count, roleTasks) => count + roleTasks.length,
+    0,
+  );
+  if (allowAbsent && total === 0) return [];
+
+  const tasks = [];
+  for (const roleKey of TASK_ROLES) {
+    const roleTasks = tasksByRole[roleKey];
     if (roleTasks.length !== TASKS_PER_ROLE) {
       throw new CliError(
         `${roleKey} legacy batch expected ${TASKS_PER_ROLE}, got ${roleTasks.length}`,
@@ -2902,6 +3111,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     retireCopyRevision,
     password,
     adminPassword,
+    allowAbsent = false,
     confirmPhrase = process.env.MANUAL_ACCEPTANCE_TASK_RETIRE_CONFIRM,
     targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
     targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
@@ -2983,6 +3193,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
   const before = await listLegacyTaskBatch({
     legacyBatch,
     accounts,
+    allowAbsent,
     fetchImpl,
   });
   const reason = "旧样例已换新版。";
@@ -3039,6 +3250,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
   const after = await listLegacyTaskBatch({
     legacyBatch,
     accounts,
+    allowAbsent,
     fetchImpl,
   });
   if (
@@ -3060,11 +3272,13 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     datasetKey: keepPlan.datasetKey,
     dataVersion: keepPlan.dataVersion,
     runId: keepPlan.runId,
+    taskProfile: keepPlan.taskProfile,
     backendURL: keepPlan.backendURL,
     databaseName: keepPlan.databaseName,
     runtime,
     keepBatch: {
       runId: keepPlan.runId,
+      taskProfile: keepPlan.taskProfile,
       copyRevision: keepPlan.copyRevision,
       prefix: keepPlan.prefix,
       sourceType: keepPlan.sourceType,
@@ -3080,7 +3294,11 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     },
     summary: {
       total: after.length,
+      absent: before.length === 0,
       activeBefore: before.filter(
+        (task) => !new Set(["done", "rejected"]).has(task.task_status_key),
+      ).length,
+      activeAfter: after.filter(
         (task) => !new Set(["done", "rejected"]).has(task.task_status_key),
       ).length,
       alreadyTerminal,

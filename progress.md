@@ -34,6 +34,15 @@
 - 下一步：本项无需 schema、migration、API、RBAC、菜单、Workflow / Fact、客户配置或部署变更；后续随当前共享工作区统一 Git 收口。
 - 阻塞 / 风险：共享 Local 仍包含 DEV 服务目录、数据准备、Workflow / 手机任务、导航与权限中心等其他未提交现场；本项只归属任务看板指标色条及其测试，不把本地绿色解释为目标环境 smoke 或客户 UAT。
 
+### 业务场景一键造数运行态修复
+
+- 完成：`scenario-demo` 一键造数改用长期工作台档位 `long-lived-workbench / WORKBENCH1`；固定生成九岗位各 20 条模拟任务，其中每个岗位 12 条为无截止时间的稳定“待我处理”，总计 `actionable=108 / risk=40 / history=32`。同批重复执行只做精确创建或读回，不要求 `make dev restart`，也不会把 180 条继续叠加。
+- 完成：旧 `PLAIN5` 任务批次通过正式 Workflow 生命周期动作退出，不物理删除、不写 Fact；实际读回 180 条旧任务 `activeAfter=0`。旧批次整体不存在时允许幂等跳过，部分缺失或身份漂移继续 fail closed。
+- 完成：已在登记本地开发库 `192.168.0.106:5432/plush_erp`、本机后端 `8300` 完成真实固定 V5 执行，读回 `Source=27 / ProcessRuntime=5 / Fact=1634`；readiness 为 `40 / 50` 数据前置通过、0 失败、10 项浏览器证据待验。九个 `demo_<role>` 账号直查均证明新批次 `20 / role`、稳定“待我处理” `12 / role`；叠加原有业务任务后的页面实际数为老板 12、销售 22、采购 21、生产 12、仓库 12、财务 13、PMC 12、质检 12、工程 21。
+- 验证：造数、readiness、dataset runner 与 browser 合同定向 Node 测试 139 / 139 通过；成功运行绑定 plan digest `1460137a491a5e9bd641475d7cb49b8ab62ecd7c52869c7b4d3dbd776f5e054c`，岗位工作台 API 权威读回与 scoped `git diff --check` 通过。
+- 下一步：用户可直接刷新业务工作台或重新登录查看，无需重启开发服务；本轮没有自动代替岗位执行按钮、打印、移动端等 10 项真实浏览器人工验收。
+- 阻塞 / 风险：以上均为本地开发库的脱敏模拟数据和技术读回，不代表真实客户导入、目标环境发布或客户 UAT；共享 worktree 仍含其他并行改动，本项未 stage、commit 或 push。
+
 ### DEV-only 开发服务目录收口
 
 - 完成：把原先散落在 `web/` 根目录的 17 个 DEV-only Vite / Node Bridge 实现与测试集中到 `web/dev-server/`，抽出共享 loopback / Host 安全校验，并同步 Vite 注册、客户预览脚本、QA profile、迁移 source identity、测试入口和目录文档。新增边界测试，禁止同类模块重新散落到 `web/` 根目录；浏览器端 `/__dev` 仍独立位于 `web/src/dev-workbench/`，正式业务代码未迁入该目录。

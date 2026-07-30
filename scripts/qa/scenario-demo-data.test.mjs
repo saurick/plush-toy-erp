@@ -13,6 +13,7 @@ import {
   SCENARIO_DEMO_CATALOG_TARGET_COUNT,
   SCENARIO_DEMO_READBACK_SCHEMA_VERSION,
   SCENARIO_DEMO_REPLAY_MODE,
+  buildScenarioDemoCustomerConfigManifest,
   buildScenarioDemoPlan,
   buildScenarioDemoReadback,
   parseScenarioDemoArgs,
@@ -20,6 +21,12 @@ import {
   resolveLocalScenarioDemoCredentials,
   runScenarioDemoCli,
 } from "./scenario-demo-data.mjs";
+import {
+  LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+  LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  TASK_COPY_REVISION,
+  TASK_PROFILE_LONG_LIVED_WORKBENCH,
+} from "./manual-acceptance-task-data.mjs";
 
 const HASH = "a".repeat(64);
 const REPOSITORY = Object.freeze({
@@ -170,6 +177,28 @@ test("scenario-demo plan is fixed, long-lived, forward-only, and repository-boun
   assert.equal(plan.execution.replayMode, SCENARIO_DEMO_REPLAY_MODE);
   assert.equal(plan.execution.directBusinessSQL, false);
   assert.equal(plan.execution.manualAcceptanceCompleted, false);
+  assert.equal(plan.execution.auditMinimum, 30);
+  assert.equal(plan.taskPolicy.profile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+  assert.equal(
+    plan.taskPolicy.copyRevision,
+    LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  );
+  assert.equal(
+    plan.taskPolicy.stableActionablePerRole,
+    LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+  );
+  assert.equal(
+    plan.taskPolicy.supersededBatch.copyRevision,
+    TASK_COPY_REVISION,
+  );
+  assert.equal(plan.taskPolicy.physicalDelete, false);
+  assert.deepEqual(plan.execution.stageOrder.slice(0, 4), [
+    "core-references",
+    "role-accounts",
+    "customer-config",
+    "accounts",
+  ]);
+  assert.match(plan.componentDigests.customerConfig, /^[0-9a-f]{64}$/u);
   assert.match(plan.planDigest, /^[0-9a-f]{64}$/u);
   assert.equal(
     buildScenarioDemoPlan({
@@ -179,6 +208,20 @@ test("scenario-demo plan is fixed, long-lived, forward-only, and repository-boun
       runtime: RUNTIME,
     }).planDigest,
     plan.planDigest,
+  );
+});
+
+test("scenario-demo binds the current tracked local-test customer configuration", () => {
+  const manifest = buildScenarioDemoCustomerConfigManifest();
+  assert.equal(manifest.customer_key, "yoyoosun");
+  assert.equal(manifest.revision, LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION);
+  assert.equal(
+    manifest.product_version,
+    LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  );
+  assert.equal(
+    manifest.compiled_snapshot.applyPurpose,
+    LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
   );
 });
 
@@ -333,6 +376,8 @@ test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact
   };
   const taskReport = {
     ...batchIdentity(plan),
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+    copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
     provesProcessRuntime: true,
     runtimeEvidence: [{ caseKey: "active" }, { caseKey: "completed" }],
     displayOnlyTasks: { total: 180, provesProcessRuntime: false },
@@ -340,6 +385,41 @@ test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact
     sourceType: "simulated-manual-acceptance-task-batch",
     sourceID: 2026071605,
     coverage: { catalogScenarioDigest: "1".repeat(64) },
+    summary: {
+      workbenchBuckets: { actionable: 108, risk: 40, history: 32 },
+      workbenchBucketsByRole: Object.fromEntries(
+        [
+          "boss",
+          "sales",
+          "purchase",
+          "production",
+          "warehouse",
+          "finance",
+          "pmc",
+          "quality",
+          "engineering",
+        ].map((roleKey) => [roleKey, { actionable: 12 }]),
+      ),
+    },
+  };
+  const taskRetireReport = {
+    ...batchIdentity(plan),
+    mode: "retire",
+    keepBatch: {
+      copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+    },
+    retiredBatch: {
+      copyRevision: TASK_COPY_REVISION,
+      sourceID: plan.taskPolicy.supersededBatch.sourceID,
+    },
+    cleanup: { physicalDelete: false },
+    summary: {
+      total: 180,
+      absent: false,
+      activeBefore: 148,
+      activeAfter: 0,
+      actionsApplied: 175,
+    },
   };
   const factReport = {
     ...batchIdentity(plan),
@@ -393,9 +473,10 @@ test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact
       passedTargetData: 40,
       failedTargetData: 0,
       notProvenTargetData: 10,
+      queryChecksPassed: true,
       queryEvidenceComplete: false,
       browserChecksCompleted: 0,
-      browserChecksPending: 10,
+      browserChecksPending: 50,
       manualAcceptanceCompleted: false,
     },
   };
@@ -403,6 +484,7 @@ test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact
     plan,
     sourceReport,
     taskReport,
+    taskRetireReport,
     factReport,
     readinessReport,
   });
@@ -415,6 +497,18 @@ test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact
     runId: "20260716-V5",
     sourceDocumentCount: 4,
     processRuntimeCount: 2,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+    stableActionablePerRole: 12,
+    stableActionableTaskCount: 108,
+    supersededTaskBatch: {
+      copyRevision: TASK_COPY_REVISION,
+      total: 180,
+      absent: false,
+      activeBefore: 148,
+      activeAfter: 0,
+      actionsApplied: 175,
+      physicalDelete: false,
+    },
     factCount: 11,
     catalogReadyCount: 40,
     catalogTargetCount: 50,
@@ -430,6 +524,7 @@ test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact
         plan,
         sourceReport,
         taskReport,
+        taskRetireReport,
         factReport,
         readinessReport: {
           ...readinessReport,
@@ -447,6 +542,7 @@ test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact
         plan,
         sourceReport,
         taskReport,
+        taskRetireReport,
         factReport,
         readinessReport: {
           ...readinessReport,
@@ -481,7 +577,10 @@ test("scenario controller never routes business writes through legacy debug, mob
   }
   assert.match(source, /applyManualAcceptanceSourceData/u);
   assert.match(source, /applyManualAcceptanceTaskData/u);
+  assert.match(source, /retireLegacyManualAcceptanceTaskBatch/u);
   assert.match(source, /applyManualAcceptanceFactPlan/u);
+  assert.match(source, /applyManualAcceptanceCustomerConfig/u);
+  assert.match(source, /seed-role-demo-admins\.sh/u);
   assert.match(
     source,
     /assertReportIdentity\(accountReport, plan, "account"\)/u,

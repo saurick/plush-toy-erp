@@ -25,11 +25,11 @@ import {
 import { manualAcceptanceOutsourcingInventoryCoverageIsComplete } from "./manual-acceptance-fact-report-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import {
-  TASK_COPY_REVISION,
   TASK_CATALOG_SCENARIO_DIGEST,
   TASK_SOURCE_TYPE,
   TASK_STATUS_KEYS,
-  TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
+  getManualAcceptanceTaskProfileContract,
+  getManualAcceptanceTaskVisibleCodePrefix,
   getManualAcceptanceRoleTaskGroups,
   getManualAcceptanceTaskGroupCount,
   getManualAcceptanceTaskGroupScenarioCounts,
@@ -577,7 +577,11 @@ function normalizeFactReference(record, key, index) {
         `${name}.productionOrderID`,
       );
       normalized.production_order_item_id = reportPositiveID(
-        reportValue(record, "productionOrderItemID", "production_order_item_id"),
+        reportValue(
+          record,
+          "productionOrderItemID",
+          "production_order_item_id",
+        ),
         `${name}.productionOrderItemID`,
       );
       normalized.production_material_requirement_id = reportPositiveID(
@@ -588,7 +592,11 @@ function normalizeFactReference(record, key, index) {
         ),
         `${name}.productionMaterialRequirementID`,
       );
-      textField("requested_quantity", "requestedQuantity", "requested_quantity");
+      textField(
+        "requested_quantity",
+        "requestedQuantity",
+        "requested_quantity",
+      );
       textField("approved_quantity", "approvedQuantity", "approved_quantity");
       textField(
         "production_order_no",
@@ -603,11 +611,7 @@ function normalizeFactReference(record, key, index) {
         reportValue(record, "approvalTaskID", "approval_task_id"),
         `${name}.approvalTaskID`,
       );
-      textField(
-        "approval_task_code",
-        "approvalTaskCode",
-        "approval_task_code",
-      );
+      textField("approval_task_code", "approvalTaskCode", "approval_task_code");
       normalized.approval_process_node_id = reportPositiveID(
         reportValue(
           record,
@@ -939,8 +943,11 @@ function validateTaskReport(report) {
   if (!report) return null;
   const runId = String(report.runId || "").trim();
   const prefix = String(report.prefix || "").trim();
+  const taskProfile = String(report.taskProfile || "").trim();
+  const taskProfileContract =
+    getManualAcceptanceTaskProfileContract(taskProfile);
   const expectedIdentity = runId
-    ? manualAcceptanceTaskBatchIdentity(runId)
+    ? manualAcceptanceTaskBatchIdentity(runId, { taskProfile })
     : null;
   const byRole = report.summary?.byRole || {};
   const byStatus = report.summary?.byStatus || {};
@@ -1062,7 +1069,7 @@ function validateTaskReport(report) {
     !groupsAreExact ||
     !coverageIsExact ||
     !runId ||
-    report.copyRevision !== TASK_COPY_REVISION ||
+    report.copyRevision !== taskProfileContract.copyRevision ||
     prefix !== expectedIdentity?.prefix ||
     report.sourceType !== TASK_SOURCE_TYPE ||
     Number(report.sourceID) !== expectedIdentity?.sourceID
@@ -1214,9 +1221,7 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
     const expectedFields = Object.fromEntries(
       Object.entries(item).filter(
         ([key]) =>
-          key !== "id" &&
-          key !== businessField &&
-          !reportOnlyFields.has(key),
+          key !== "id" && key !== businessField && !reportOnlyFields.has(key),
       ),
     );
     return {
@@ -1309,9 +1314,7 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
       (item) => item.fact_type === "REWORK" && item.status === "CANCELLED",
     );
     expectedStatus = () => "done";
-  } else if (
-    taskGroup === "production_exception_decision_approval"
-  ) {
+  } else if (taskGroup === "production_exception_decision_approval") {
     sourceType = "production_exception_decision";
     ownerRoleKey = "boss";
     records = factReport.normalizedReferenceRecords.productionExceptions;
@@ -1380,10 +1383,11 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
     throw new CliError(`未知来源协同任务组 ${taskGroup}`, 2);
   }
   const expectedReferences = records.map((item) => {
-    const taskCode = {
-      production_exception_decision_approval: item.approval_task_code,
-      shipment_finance_approval: item.finance_approval_task_code,
-    }[taskGroup] || `source-${taskGroup.replaceAll("_", "-")}-${item.id}`;
+    const taskCode =
+      {
+        production_exception_decision_approval: item.approval_task_code,
+        shipment_finance_approval: item.finance_approval_task_code,
+      }[taskGroup] || `source-${taskGroup.replaceAll("_", "-")}-${item.id}`;
     const processAnchors =
       taskGroup === "production_exception_decision_approval"
         ? {
@@ -1392,10 +1396,8 @@ function sourceWorkflowTaskEvidence(taskGroup, factReport) {
           }
         : taskGroup === "shipment_finance_approval"
           ? {
-              process_instance_id:
-                item.finance_release_process_instance_id,
-              process_node_instance_id:
-                item.finance_approval_process_node_id,
+              process_instance_id: item.finance_release_process_instance_id,
+              process_node_instance_id: item.finance_approval_process_node_id,
             }
           : {};
     return {
@@ -1558,7 +1560,7 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
     exactSourceType: taskReport?.sourceType || null,
     exactSourceID: taskReport?.sourceID || null,
     exactTaskCodePrefix: taskReport
-      ? TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss
+      ? getManualAcceptanceTaskVisibleCodePrefix("boss", taskReport.taskProfile)
       : null,
     exactOwnerRoleKey: taskReport ? "boss" : null,
     exactTaskGroup: taskReport
@@ -1603,7 +1605,10 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       exactSourceType: taskReport?.sourceType || null,
       exactSourceID: taskReport?.sourceID || null,
       exactTaskCodePrefix: taskReport
-        ? TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]
+        ? getManualAcceptanceTaskVisibleCodePrefix(
+            roleKey,
+            taskReport.taskProfile,
+          )
         : null,
       exactOwnerRoleKey: taskReport ? roleKey : null,
       exactTaskGroup: null,
@@ -1636,12 +1641,7 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       "production_exception_decision_approval",
       ["done"],
     ],
-    [
-      "shipping-release",
-      "finance",
-      "shipment_finance_approval",
-      ["done"],
-    ],
+    ["shipping-release", "finance", "shipment_finance_approval", ["done"]],
   ]) {
     const sourceEvidence = sourceWorkflowTaskEvidence(taskGroup, factReport);
     probes.push({

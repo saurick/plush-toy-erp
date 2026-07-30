@@ -8,6 +8,8 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { applyManualAcceptanceCustomerConfig } from "./manual-acceptance-customer-config.mjs";
 import {
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
   applyManualAcceptanceAccountScenarios,
@@ -30,8 +32,15 @@ import {
 } from "./manual-acceptance-source-data.mjs";
 import {
   CONFIRM_PHRASE as MANUAL_ACCEPTANCE_TASK_CONFIRM_PHRASE,
+  LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+  LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  TASK_COPY_REVISION,
+  TASK_PROFILE_LONG_LIVED_WORKBENCH,
   applyManualAcceptanceTaskData,
+  buildLegacyManualAcceptanceTaskBatchReference,
   buildManualAcceptanceTaskDataPlan,
+  manualAcceptanceTaskRetireConfirmation,
+  retireLegacyManualAcceptanceTaskBatch,
 } from "./manual-acceptance-task-data.mjs";
 import {
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
@@ -49,6 +58,7 @@ import {
   manualAcceptanceTargetConfirmation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import { buildLocalTestApplyRuntimeManifest } from "./customer-config-runtime-manifest.mjs";
 import { classifyDatabaseName, parseDatabaseURL } from "./database-target.mjs";
 import {
   assertRepositoryIdentityEqual,
@@ -68,6 +78,7 @@ const LOCAL_ROLE_DEMO_PASSWORD = "12345678";
 const LOCAL_STABLE_ADMIN_PASSWORD = "adminadmin";
 const SCENARIO_DEMO_QUERY_READY_COUNT = 40;
 const SCENARIO_DEMO_BROWSER_ONLY_GAP_COUNT = 10;
+const SCENARIO_DEMO_AUDIT_MINIMUM = 30;
 const CUSTOMER_KEY = "yoyoosun";
 const ADMIN_USERNAME = "admin";
 const DEFAULT_OUTPUT_ROOT = path.join(
@@ -96,12 +107,34 @@ const REQUIRED_MODULES = Object.freeze([
   "purchase_receipts",
   "quality_inspections",
 ]);
+
+export function buildScenarioDemoCustomerConfigManifest() {
+  const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
+  if (
+    manifest.customer_key !== CUSTOMER_KEY ||
+    manifest.revision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
+    manifest.product_version !==
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
+    manifest.compiled_snapshot?.applyPurpose !==
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE
+  ) {
+    throw new ScenarioDemoError(
+      "scenario-demo tracked customer configuration identity drifted",
+      2,
+    );
+  }
+  return manifest;
+}
+
+const EXPECTED_CUSTOMER_CONFIG_MANIFEST =
+  buildScenarioDemoCustomerConfigManifest();
 const EXPECTED_RUNTIME = Object.freeze({
   target: SCENARIO_DEMO_TARGET,
   customerKey: CUSTOMER_KEY,
-  configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
-  configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
-  configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  configRevision: EXPECTED_CUSTOMER_CONFIG_MANIFEST.revision,
+  configProductVersion: EXPECTED_CUSTOMER_CONFIG_MANIFEST.product_version,
+  configApplyPurpose:
+    EXPECTED_CUSTOMER_CONFIG_MANIFEST.compiled_snapshot.applyPurpose,
   source: "active_customer_config_revision",
   requiredModules: REQUIRED_MODULES,
 });
@@ -374,11 +407,20 @@ export function buildScenarioDemoPlan({
       2,
     );
   }
-  const accountPlan = buildManualAcceptanceAccountScenarioPlan(policy);
+  const accountPlan = buildManualAcceptanceAccountScenarioPlan({
+    ...policy,
+    auditMinimum: SCENARIO_DEMO_AUDIT_MINIMUM,
+  });
   const sourcePlan = buildManualAcceptanceSourceDataPlan(policy);
   const taskPlan = buildManualAcceptanceTaskDataPlan({
     ...policy,
     scheduleAnchorUtc: SCENARIO_DEMO_SCHEDULE_ANCHOR_UTC,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+  const supersededTaskBatch = buildLegacyManualAcceptanceTaskBatchReference({
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    copyRevision: TASK_COPY_REVISION,
+    backendURL: policy.backendURL,
   });
   const plan = {
     schemaVersion: SCENARIO_DEMO_SCHEMA_VERSION,
@@ -405,7 +447,22 @@ export function buildScenarioDemoPlan({
       source: runtime.source,
       requiredModules: [...runtime.requiredModules],
     },
+    taskPolicy: {
+      profile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+      copyRevision: LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+      stableActionablePerRole: LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+      supersessionMode: "workflow-lifecycle",
+      physicalDelete: false,
+      supersededBatch: {
+        runId: supersededTaskBatch.runId,
+        copyRevision: supersededTaskBatch.copyRevision,
+        prefix: supersededTaskBatch.prefix,
+        sourceType: supersededTaskBatch.sourceType,
+        sourceID: supersededTaskBatch.sourceID,
+      },
+    },
     componentDigests: {
+      customerConfig: scenarioDemoDigest(EXPECTED_CUSTOMER_CONFIG_MANIFEST),
       accounts: scenarioDemoDigest(accountPlan),
       source: sourcePlan.semanticDigest,
       tasks: scenarioDemoDigest(taskPlan),
@@ -423,9 +480,12 @@ export function buildScenarioDemoPlan({
     execution: {
       stageOrder: [
         "core-references",
+        "role-accounts",
+        "customer-config",
         "accounts",
         "source-documents",
         "tasks-and-process-runtime",
+        "retire-superseded-task-batch",
         "facts",
         "catalog-readiness",
       ],
@@ -436,6 +496,7 @@ export function buildScenarioDemoPlan({
       directBusinessSQL: false,
       browserChecksRequired: true,
       manualAcceptanceCompleted: false,
+      auditMinimum: SCENARIO_DEMO_AUDIT_MINIMUM,
     },
   };
   return Object.freeze({
@@ -506,7 +567,10 @@ async function assertRepositoryUnchanged(
 async function writeStageReport(outputRoot, stage, report) {
   const directory = path.join(outputRoot, stage);
   await mkdir(directory, { recursive: true });
-  const file = path.join(directory, "apply-report.json");
+  const file = path.join(
+    directory,
+    report.mode === "retire" ? "retire-report.json" : "apply-report.json",
+  );
   await writeFile(file, `${JSON.stringify(report, null, 2)}\n`, {
     encoding: "utf8",
     mode: 0o600,
@@ -598,11 +662,18 @@ export function buildScenarioDemoReadback({
   plan,
   sourceReport,
   taskReport,
+  taskRetireReport,
   factReport,
   readinessReport,
 } = {}) {
   assertReportIdentity(sourceReport, plan, "source");
   assertReportIdentity(taskReport, plan, "task");
+  assertReportIdentity(
+    taskRetireReport,
+    plan,
+    "superseded task retirement",
+    "retire",
+  );
   assertReportIdentity(factReport, plan, "fact");
   assertReadinessReportCoupling(
     readinessReport,
@@ -613,6 +684,26 @@ export function buildScenarioDemoReadback({
   );
   if (
     sourceReport.semanticDigest !== plan.componentDigests.source ||
+    taskReport.taskProfile !== plan.taskPolicy.profile ||
+    taskReport.copyRevision !== plan.taskPolicy.copyRevision ||
+    taskReport.summary?.workbenchBuckets?.actionable !==
+      LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE * 9 ||
+    Object.values(taskReport.summary?.workbenchBucketsByRole || {}).some(
+      (counts) =>
+        counts?.actionable !== LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+    ) ||
+    Object.keys(taskReport.summary?.workbenchBucketsByRole || {}).length !==
+      9 ||
+    taskRetireReport.keepBatch?.copyRevision !== plan.taskPolicy.copyRevision ||
+    taskRetireReport.retiredBatch?.copyRevision !==
+      plan.taskPolicy.supersededBatch.copyRevision ||
+    taskRetireReport.retiredBatch?.sourceID !==
+      plan.taskPolicy.supersededBatch.sourceID ||
+    taskRetireReport.cleanup?.physicalDelete !== false ||
+    taskRetireReport.summary?.activeAfter !== 0 ||
+    ![0, 180].includes(taskRetireReport.summary?.total) ||
+    taskRetireReport.summary?.absent !==
+      (taskRetireReport.summary?.total === 0) ||
     taskReport.provesProcessRuntime !== true ||
     !Array.isArray(taskReport.runtimeEvidence) ||
     readinessReport?.mode !== "verify" ||
@@ -626,9 +717,10 @@ export function buildScenarioDemoReadback({
     readinessReport.summary.passedTargetData +
       readinessReport.summary.notProvenTargetData !==
       SCENARIO_DEMO_CATALOG_TARGET_COUNT ||
+    readinessReport.summary.queryChecksPassed !== true ||
     readinessReport.summary.browserChecksCompleted !== 0 ||
     readinessReport.summary.browserChecksPending !==
-      SCENARIO_DEMO_BROWSER_ONLY_GAP_COUNT ||
+      SCENARIO_DEMO_CATALOG_TARGET_COUNT ||
     readinessReport.summary.manualAcceptanceCompleted !== false
   ) {
     throw new ScenarioDemoError(
@@ -648,10 +740,22 @@ export function buildScenarioDemoReadback({
       "source report",
     ),
     processRuntimeCount: taskReport.runtimeEvidence.length,
+    taskProfile: taskReport.taskProfile,
+    stableActionablePerRole: LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+    stableActionableTaskCount: taskReport.summary.workbenchBuckets.actionable,
+    supersededTaskBatch: {
+      copyRevision: taskRetireReport.retiredBatch.copyRevision,
+      total: taskRetireReport.summary.total,
+      absent: taskRetireReport.summary.absent,
+      activeBefore: taskRetireReport.summary.activeBefore,
+      activeAfter: taskRetireReport.summary.activeAfter,
+      actionsApplied: taskRetireReport.summary.actionsApplied,
+      physicalDelete: false,
+    },
     factCount: countArrays(factReport, FACT_RECORD_KEYS, "fact report"),
     catalogReadyCount: readinessReport.summary.passedTargetData,
     catalogTargetCount: readinessReport.summary.totalTargets,
-    browserChecksPending: readinessReport.summary.browserChecksPending,
+    browserChecksPending: readinessReport.summary.notProvenTargetData,
     manualAcceptanceCompleted: false,
     cleanupSupported: false,
     replayMode: SCENARIO_DEMO_REPLAY_MODE,
@@ -702,26 +806,6 @@ async function applyScenarioDemo({
     await checkRepository();
     return result;
   };
-
-  const runtime = await preflightScenarioDemoRuntime({
-    policy,
-    rolePassword: credentials.rolePassword,
-    adminPassword: credentials.adminPassword,
-    fetchImpl,
-  });
-  if (
-    runtime.configRevision !== plan.runtime.configRevision ||
-    runtime.configProductVersion !== plan.runtime.configProductVersion ||
-    runtime.configApplyPurpose !== plan.runtime.configApplyPurpose ||
-    runtime.source !== plan.runtime.source ||
-    JSON.stringify(runtime.requiredModules) !==
-      JSON.stringify(plan.runtime.requiredModules)
-  ) {
-    throw new ScenarioDemoError(
-      "scenario-demo active customer configuration drifted from the prepared plan",
-      2,
-    );
-  }
   await checkRepository();
 
   await runStage(async () => {
@@ -764,7 +848,112 @@ async function applyScenarioDemo({
     }
   });
 
-  const accountPlan = buildManualAcceptanceAccountScenarioPlan(policy);
+  await runStage(async () => {
+    const result = await commandRunner(
+      "bash",
+      [path.join(projectRoot, "scripts", "seed-role-demo-admins.sh")],
+      {
+        cwd: projectRoot,
+        env: {
+          ...environment,
+          ERP_ROLE_DEMO_PASSWORD: credentials.rolePassword,
+        },
+      },
+    );
+    const accounts = Number(
+      String(result.stdout || "").match(
+        /role demo admin seed completed accounts=(\d+)\b/u,
+      )?.[1],
+    );
+    if (!Number.isSafeInteger(accounts) || accounts < 10) {
+      throw new ScenarioDemoError(
+        "scenario-demo role account bootstrap readback did not match",
+      );
+    }
+  });
+
+  const customerConfigManifest = buildScenarioDemoCustomerConfigManifest();
+  if (
+    scenarioDemoDigest(customerConfigManifest) !==
+    plan.componentDigests.customerConfig
+  ) {
+    throw new ScenarioDemoError(
+      "scenario-demo customer configuration plan drifted",
+      2,
+    );
+  }
+  const customerConfigApply = await runStage(() =>
+    applyManualAcceptanceCustomerConfig({
+      manifest: customerConfigManifest,
+      policy,
+      env: {
+        MANUAL_ACCEPTANCE_TARGET_CONFIRM: targetConfirmation,
+        MANUAL_ACCEPTANCE_ADMIN_USERNAME: ADMIN_USERNAME,
+        MANUAL_ACCEPTANCE_ADMIN_PASSWORD: credentials.adminPassword,
+        MANUAL_ACCEPTANCE_PASSWORD: credentials.rolePassword,
+      },
+      fetchImpl,
+    }),
+  );
+  const customerConfigReport = {
+    mode: "apply",
+    datasetKey: plan.datasetKey,
+    dataVersion: plan.dataVersion,
+    runId: plan.runId,
+    target: plan.profileKey,
+    backendURL: plan.backendURL,
+    databaseName: plan.databaseName,
+    customerKey: customerConfigApply.effectiveSession.customerKey,
+    configRevision: customerConfigApply.effectiveSession.configRevision,
+    configHash: customerConfigApply.effectiveSession.configHash,
+    configHashVersion: customerConfigApply.effectiveSession.configHashVersion,
+    configProductVersion:
+      customerConfigApply.effectiveSession.configProductVersion,
+    configApplyPurpose: customerConfigApply.effectiveSession.configApplyPurpose,
+    source: customerConfigApply.effectiveSession.source,
+    operations: customerConfigApply.operations,
+  };
+  assertReportIdentity(customerConfigReport, plan, "customer config");
+  if (
+    customerConfigReport.configRevision !== plan.runtime.configRevision ||
+    customerConfigReport.configProductVersion !==
+      plan.runtime.configProductVersion ||
+    customerConfigReport.configApplyPurpose !==
+      plan.runtime.configApplyPurpose ||
+    customerConfigReport.source !== plan.runtime.source
+  ) {
+    throw new ScenarioDemoError(
+      "scenario-demo customer configuration readback drifted",
+      2,
+    );
+  }
+  await writeStageReport(outputRoot, "customer-config", customerConfigReport);
+
+  const runtime = await preflightScenarioDemoRuntime({
+    policy,
+    rolePassword: credentials.rolePassword,
+    adminPassword: credentials.adminPassword,
+    fetchImpl,
+  });
+  if (
+    runtime.configRevision !== plan.runtime.configRevision ||
+    runtime.configProductVersion !== plan.runtime.configProductVersion ||
+    runtime.configApplyPurpose !== plan.runtime.configApplyPurpose ||
+    runtime.source !== plan.runtime.source ||
+    JSON.stringify(runtime.requiredModules) !==
+      JSON.stringify(plan.runtime.requiredModules)
+  ) {
+    throw new ScenarioDemoError(
+      "scenario-demo active customer configuration drifted from the prepared plan",
+      2,
+    );
+  }
+  await checkRepository();
+
+  const accountPlan = buildManualAcceptanceAccountScenarioPlan({
+    ...policy,
+    auditMinimum: SCENARIO_DEMO_AUDIT_MINIMUM,
+  });
   if (scenarioDemoDigest(accountPlan) !== plan.componentDigests.accounts) {
     throw new ScenarioDemoError("scenario-demo account plan drifted");
   }
@@ -804,6 +993,7 @@ async function applyScenarioDemo({
   const taskPlan = buildManualAcceptanceTaskDataPlan({
     ...policy,
     scheduleAnchorUtc: SCENARIO_DEMO_SCHEDULE_ANCHOR_UTC,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
   });
   if (scenarioDemoDigest(taskPlan) !== plan.componentDigests.tasks) {
     throw new ScenarioDemoError("scenario-demo task plan drifted");
@@ -820,6 +1010,38 @@ async function applyScenarioDemo({
   );
   assertReportIdentity(taskReport, plan, "task");
   await writeStageReport(outputRoot, "tasks", taskReport);
+
+  const supersededTaskBatch = buildLegacyManualAcceptanceTaskBatchReference({
+    runId: plan.taskPolicy.supersededBatch.runId,
+    copyRevision: plan.taskPolicy.supersededBatch.copyRevision,
+    backendURL: plan.backendURL,
+  });
+  const taskRetireReport = await runStage(() =>
+    retireLegacyManualAcceptanceTaskBatch(taskPlan, {
+      retireRunId: supersededTaskBatch.runId,
+      retireCopyRevision: supersededTaskBatch.copyRevision,
+      allowAbsent: true,
+      password: credentials.rolePassword,
+      adminPassword: credentials.adminPassword,
+      confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+        taskPlan,
+        supersededTaskBatch,
+      ),
+      targetConfirmation,
+      fetchImpl,
+    }),
+  );
+  assertReportIdentity(
+    taskRetireReport,
+    plan,
+    "superseded task retirement",
+    "retire",
+  );
+  await writeStageReport(
+    outputRoot,
+    "retire-superseded-tasks",
+    taskRetireReport,
+  );
 
   const factPlan = buildManualAcceptanceFactPlan(sourceReport);
   const factContractDigest = scenarioDemoDigest({
@@ -863,6 +1085,7 @@ async function applyScenarioDemo({
     plan,
     sourceReport,
     taskReport,
+    taskRetireReport,
     factReport,
     readinessReport,
   });

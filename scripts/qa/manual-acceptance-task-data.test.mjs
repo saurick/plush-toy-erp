@@ -16,9 +16,13 @@ import {
   manualAcceptanceTaskRetireConfirmation,
   manualAcceptanceLegacyTaskCode,
   ROLE_USERS,
+  LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE,
+  LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE,
   TASK_ROLES,
   TASK_COPY_REVISION,
   TASK_CATALOG_SCENARIO_DIGEST,
+  TASK_PROFILE_LONG_LIVED_WORKBENCH,
   TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
   TASKS_PER_ROLE,
   TOTAL_TASKS,
@@ -55,7 +59,7 @@ const SCRIPT_PATH = fileURLToPath(
 );
 const RUNTIME_ADMIN_ID = 100;
 
-test("manual acceptance runtime source report binds five DRAFT sales orders to the same simulated dataset", () => {
+test("manual acceptance runtime source report binds five exact forward-only sales order candidates to the same simulated dataset", () => {
   const plan = buildLocalTaskMutationPlan({
     dataVersion: "2026.07.16-v5",
     runId: "20260716-V5",
@@ -63,7 +67,13 @@ test("manual acceptance runtime source report binds five DRAFT sales orders to t
   const candidates = Array.from({ length: 5 }, (_, index) => ({
     id: 100 + index,
     orderNo: `SO-RUNTIME-${index + 1}`,
-    status: "DRAFT",
+    status: index === 4 ? "ACTIVE" : index === 0 ? "DRAFT" : "SUBMITTED",
+    allowedStatuses:
+      index === 0
+        ? ["DRAFT"]
+        : index === 4
+          ? ["DRAFT", "SUBMITTED", "ACTIVE"]
+          : ["DRAFT", "SUBMITTED"],
   }));
   const report = {
     mode: "apply",
@@ -96,6 +106,21 @@ test("manual acceptance runtime source report binds five DRAFT sales orders to t
         plan,
       ),
     /simulated task dataset/u,
+  );
+  assert.throws(
+    () =>
+      validateSalesOrderAcceptanceSourceReport(
+        {
+          ...report,
+          referenceRecords: {
+            salesOrderProcessCandidates: candidates.map((candidate, index) =>
+              index === 1 ? { ...candidate, status: "ACTIVE" } : candidate,
+            ),
+          },
+        },
+        plan,
+      ),
+    /exact forward-only replay states/u,
   );
 });
 
@@ -321,7 +346,10 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
       assert.equal(params.business_ref_no, source.orderNo);
       const record = recordForSource(source);
       return jsonResponse({
-        process_instance: clone(record.instance),
+        process_instance: {
+          ...clone(record.instance),
+          status: record.processStatus,
+        },
         started_node: clone(record.nodes[0]),
         nodes: clone(record.nodes),
       });
@@ -533,6 +561,59 @@ test("runtime evidence advances five simulated sales orders through the formal p
       ["submit_sales_order", "activate_sales_order"].includes(call.method),
     ),
     false,
+  );
+
+  const replay = await applySalesOrderAcceptanceRuntimeEvidence({
+    plan,
+    sources,
+    accounts: {
+      sales: { token: "token-sales" },
+      boss: { token: "token-boss" },
+      engineering: { token: "token-engineering" },
+      pmc: { token: "token-pmc" },
+    },
+    runtimeAdmin: { token: "token-runtime-admin" },
+    fetchImpl: mock.fetchImpl,
+  });
+  assert.deepEqual(
+    replay.map((item) => item.caseKey),
+    ["started_only", "active_ready", "task_blocked", "rejected", "completed"],
+  );
+  assert.equal(
+    replay.find((item) => item.caseKey === "rejected")?.processContext
+      ?.process_instance?.status,
+    "blocked",
+  );
+  assert.equal(
+    replay.find((item) => item.caseKey === "completed")?.processContext
+      ?.process_instance?.status,
+    "completed",
+  );
+  assert.equal(
+    mock.calls.filter(
+      (call) =>
+        call.domain === "customer_config" &&
+        call.method === "start_sales_order_acceptance_process",
+    ).length,
+    10,
+  );
+  assert.equal(
+    mock.calls.filter(
+      (call) =>
+        call.domain === "customer_config" &&
+        call.method === "execute_sales_order_acceptance_submit",
+    ).length,
+    4,
+  );
+  assert.equal(
+    mock.calls.filter((call) =>
+      [
+        "block_task_action",
+        "reject_task_action",
+        "complete_task_action",
+      ].includes(call.method),
+    ).length,
+    5,
   );
 });
 
@@ -1098,6 +1179,99 @@ test("uses short yoyoosun-style copy while keeping every task visibly synthetic"
       assert.equal(sourceSuppliers.has(payload.supplier_name), true);
     }
   }
+});
+
+test("long-lived workbench keeps twelve stable actionable tasks for every role", () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    runId: "WORKBENCH-STABLE",
+    nowSec: NOW_SEC,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+
+  assert.equal(plan.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+  assert.equal(plan.copyRevision, LONG_LIVED_WORKBENCH_TASK_COPY_REVISION);
+  assert.deepEqual(plan.summary.dueScenarios, {
+    no_due: 108,
+    overdue: 18,
+    due_soon: 18,
+    this_week: 18,
+    later: 18,
+  });
+  assert.deepEqual(plan.summary.workbenchBuckets, {
+    actionable: 108,
+    risk: 40,
+    history: 32,
+  });
+  for (const roleKey of TASK_ROLES) {
+    const roleTasks = plan.tasks.filter((task) => task.roleKey === roleKey);
+    const actionable = roleTasks.filter(
+      (task) => task.workbenchBucket === "actionable",
+    );
+    assert.equal(actionable.length, LONG_LIVED_WORKBENCH_ACTIONABLE_PER_ROLE);
+    assert(
+      actionable.every(
+        (task) =>
+          task.targetStatus === "ready" &&
+          task.createParams.due_at === null &&
+          task.createParams.priority < 3,
+      ),
+    );
+    assert(
+      roleTasks.every((task) =>
+        task.createParams.task_code.startsWith(
+          `${LONG_LIVED_WORKBENCH_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-`,
+        ),
+      ),
+    );
+    assert.deepEqual(plan.summary.workbenchBucketsByRole[roleKey], {
+      actionable: 12,
+      risk:
+        roleKey === "boss"
+          ? 6
+          : new Set([
+                "sales",
+                "purchase",
+                "production",
+                "pmc",
+                "engineering",
+              ]).has(roleKey)
+            ? 5
+            : 3,
+      history:
+        roleKey === "boss"
+          ? 2
+          : new Set([
+                "sales",
+                "purchase",
+                "production",
+                "pmc",
+                "engineering",
+              ]).has(roleKey)
+            ? 3
+            : 5,
+    });
+  }
+  assert(
+    plan.tasks.every((task) =>
+      task.createParams.idempotency_key.includes(
+        `:${LONG_LIVED_WORKBENCH_TASK_COPY_REVISION}:`,
+      ),
+    ),
+  );
+
+  const dueDrift = structuredClone(plan);
+  dueDrift.tasks[0].createParams.due_at = NOW_SEC;
+  assert.throws(
+    () => validateManualAcceptanceTaskPlan(dueDrift),
+    /due schedule/u,
+  );
+
+  const priorityDrift = structuredClone(plan);
+  priorityDrift.tasks[0].createParams.priority = 3;
+  assert.throws(
+    () => validateManualAcceptanceTaskPlan(priorityDrift),
+    /priority/u,
+  );
 });
 
 test("warehouse scenarios stay in the trial namespace and never fill the formal shipping release page", () => {
@@ -1724,7 +1898,9 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
 
   assert.deepEqual(report.summary, {
     total: 180,
+    absent: false,
     activeBefore: 148,
+    activeAfter: 0,
     alreadyTerminal: 32,
     resumed: 27,
     terminalized: 148,
@@ -1762,6 +1938,86 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
   assert.equal(replay.summary.alreadyTerminal, 180);
   assert.equal(replay.summary.actionsApplied, 0);
   assert.deepEqual(mock.counts(), countsAfterFirst);
+});
+
+test("long-lived workbench supersession is a no-op only when the whole legacy batch is absent", async () => {
+  const keepPlan = buildLocalTaskMutationPlan({
+    runId: "20260716-V5",
+    nowSec: NOW_SEC,
+    taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+  });
+  const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
+    runId: keepPlan.runId,
+    copyRevision: "PLAIN5",
+    backendURL: keepPlan.backendURL,
+  });
+  const mock = createMockRuntime();
+  for (const task of keepPlan.tasks) {
+    mock.seedPlannedTask(keepPlan, task, { final: true });
+  }
+
+  const report = await retireLegacyManualAcceptanceTaskBatch(
+    keepPlan,
+    localTaskMutationOptions(keepPlan, {
+      retireRunId: legacyBatch.runId,
+      retireCopyRevision: legacyBatch.copyRevision,
+      allowAbsent: true,
+      confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+        keepPlan,
+        legacyBatch,
+      ),
+      password: "local-password",
+      adminPassword: "admin-password",
+      fetchImpl: mock.fetchImpl,
+    }),
+  );
+
+  assert.equal(report.taskProfile, TASK_PROFILE_LONG_LIVED_WORKBENCH);
+  assert.equal(
+    report.keepBatch.copyRevision,
+    LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
+  );
+  assert.deepEqual(report.summary, {
+    total: 0,
+    absent: true,
+    activeBefore: 0,
+    activeAfter: 0,
+    alreadyTerminal: 0,
+    resumed: 0,
+    terminalized: 0,
+    actionsApplied: 0,
+    finalDone: 0,
+    finalRejected: 0,
+  });
+  assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
+
+  const partialLegacyTask = structuredClone(keepPlan.tasks[0]);
+  partialLegacyTask.createParams.task_code = manualAcceptanceLegacyTaskCode(
+    legacyBatch,
+    partialLegacyTask.roleKey,
+    partialLegacyTask.index,
+  );
+  partialLegacyTask.createParams.source_id = legacyBatch.sourceID;
+  mock.seedPlannedTask(keepPlan, partialLegacyTask, { final: true });
+  await assert.rejects(
+    () =>
+      retireLegacyManualAcceptanceTaskBatch(
+        keepPlan,
+        localTaskMutationOptions(keepPlan, {
+          retireRunId: legacyBatch.runId,
+          retireCopyRevision: legacyBatch.copyRevision,
+          allowAbsent: true,
+          confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+            keepPlan,
+            legacyBatch,
+          ),
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: mock.fetchImpl,
+        }),
+      ),
+    /legacy batch expected/u,
+  );
 });
 
 test("PLAIN5 legacy references retain the short visible code scheme for future retirement", () => {
