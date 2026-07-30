@@ -217,8 +217,11 @@ test('field linkage builder refuses identity drift and never promotes the TAP', 
 })
 
 test('field linkage wrapper rechecks identity and stores only sanitized TAP', async () => {
+  const stagingDirectory =
+    '/repo/output/qa/coverage/.field-linkage-staging-test'
   const writes = []
   const commands = []
+  const moves = []
   await runFieldLinkageQa({
     repositoryReader: async () => ({ ...REPOSITORY }),
     executeCommand: async (command) => {
@@ -230,6 +233,8 @@ test('field linkage wrapper rechecks identity and stores only sanitized TAP', as
       }
     },
     makeDirectory: async () => {},
+    makeTemporaryDirectory: async () => stagingDirectory,
+    moveFile: async (source, target) => moves.push([source, target]),
     removeFile: async () => {},
     writeTap: async (_target, content) => writes.push(content),
   })
@@ -243,15 +248,23 @@ test('field linkage wrapper rechecks identity and stores only sanitized TAP', as
   const expectedIndex = commands[1].args.indexOf('--expected-repository')
   assert(expectedIndex >= 0)
   assert.deepEqual(JSON.parse(commands[1].args[expectedIndex + 1]), REPOSITORY)
+  assert.equal(moves.length, 2)
+  assert(moves.every(([source]) => source.startsWith(stagingDirectory)))
+  assert(moves[0][1].endsWith('node-test.tap'))
+  assert(moves[1][1].endsWith('field-linkage.latest.json'))
 })
 
 test('field linkage wrapper can target an operation staging directory', async () => {
   const outputDirectory = '/repo/output/qa/coverage/.staging/operation'
   const nodeTapFile = `${outputDirectory}/field-linkage.tap`
   const coverageReportFile = `${outputDirectory}/field-linkage.latest.json`
+  const stagingDirectory = `${outputDirectory}/.field-linkage-staging-test`
+  const stagedTapFile = `${stagingDirectory}/node-test.tap`
+  const stagedReportFile = `${stagingDirectory}/field-linkage.latest.json`
   const removed = []
   const directories = []
   const commands = []
+  const moves = []
   const writes = []
   await runFieldLinkageQa({
     repositoryReader: async () => ({ ...REPOSITORY }),
@@ -260,22 +273,40 @@ test('field linkage wrapper can target an operation staging directory', async ()
       return { stdout: 'ok 1 - FL_alpha__pass\n', stderr: '' }
     },
     makeDirectory: async (directory) => directories.push(directory),
-    removeFile: async (file) => removed.push(file),
+    makeTemporaryDirectory: async (prefix) => {
+      assert.equal(
+        prefix,
+        path.join(outputDirectory, '.field-linkage-staging-')
+      )
+      return stagingDirectory
+    },
+    moveFile: async (source, target) => moves.push([source, target]),
+    removeFile: async (file, options) => removed.push([file, options]),
     writeTap: async (file) => writes.push(file),
     outputDirectory,
     nodeTapFile,
     coverageReportFile,
   })
-  assert.deepEqual(removed, [coverageReportFile, nodeTapFile])
-  assert.deepEqual(directories, [outputDirectory])
-  assert.deepEqual(writes, [nodeTapFile])
+  assert.deepEqual(removed, [
+    [stagingDirectory, { recursive: true, force: true }],
+  ])
+  assert.deepEqual(directories, [
+    outputDirectory,
+    outputDirectory,
+    outputDirectory,
+  ])
+  assert.deepEqual(writes, [stagedTapFile])
+  assert.deepEqual(moves, [
+    [stagedTapFile, nodeTapFile],
+    [stagedReportFile, coverageReportFile],
+  ])
   assert.equal(
     commands[1].args[commands[1].args.indexOf('--node-tap') + 1],
-    nodeTapFile
+    stagedTapFile
   )
   assert.equal(
     commands[1].args[commands[1].args.indexOf('--output') + 1],
-    coverageReportFile
+    stagedReportFile
   )
 })
 
@@ -295,6 +326,9 @@ test('field linkage wrapper stops before writing TAP when tests change the repos
         return { stdout: 'ok 1 - FL_alpha__pass\n', stderr: '' }
       },
       makeDirectory: async () => {},
+      makeTemporaryDirectory: async () =>
+        '/repo/output/qa/coverage/.field-linkage-staging-test',
+      moveFile: async () => {},
       removeFile: async () => {},
       writeTap: async () => {
         wroteTap = true

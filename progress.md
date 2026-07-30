@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### 夜间发布门禁与 test-133
+
+- 完成：为 exact-SHA fingerprint 改用 NUL-safe `git ls-tree -z` 读取中文路径；同步当前客户前端边界文案断言；按 schema-doc 唯一生成器刷新生产 / 委外数据库文档及权威计数；更新字段联动 staging / identity fixture、开发工作台二级导航合同和可见验证标签。没有删除测试、放宽门禁或改变业务 / migration 逻辑。
+- 验证：exact-SHA、客户前端边界与 schema-doc 定向 `8 / 8` 通过，字段联动与开发工作台相关定向 `56 / 56` 通过；`go run ./cmd/schema-doc --check` 读回 `missing=0 changed=0 stale=0 unexpected=0`。完整 fast、Web full 与最终 clean SHA 的 `prepare-push` 仍须在释放 writer、由收口队列本地提交后重新执行，不能复用旧 SHA 的绿色证据。
+- 下一步：释放本批 writer，按唯一 Git 收口队列精确本地提交；再绑定最新 clean SHA，普通非强制 push `main`，等待同 SHA GitHub CI 全绿并生成同 SHA 的不可变 release，最后只允许按固定 promotion 流程部署 `customer-trial-133`。
+- 阻塞 / 风险：目标身份、active env / Compose、磁盘、现有 health / ready、migration 锁和备份工具已完成只读预检，但本次 fresh backup / rollback point、Atlas current / pending、migration plan / apply、目标 runtime / digest、PDF / 关键业务 smoke 均未执行。若目标权威 status 显示数据重写、权限删除、删列或删除 trigger / function 的 migration 仍 pending，本次授权必须 fail closed，禁止 promotion / apply；生产保持 `NOT_RUN`，客户 UAT 保持 `NOT_CLAIMED`。
+
 ### 库存预留与采购入库权威投影
 
 - 完成：库存预留列表在同一服务端读快照中统一计数、分页、筛选和当前可读引用，按既有权限分别投影来源销售订单 / 行与产品 / SKU、仓库、单位、批次；出库管理页只展示业务可读字段，继续保留不可变“预留数量”，不增加独立消费动作。采购订单行新增无持久化余额的入库进度权威投影，按采购承诺、已过账入库 / 调整和 DRAFT 草稿占用返回剩余可收、剩余可生成及失败关闭原因；页面只消费服务端六位小数字符串，保存时仍由写事务重验。
@@ -33,7 +40,7 @@
 
 | 事项 | 当前结论 | 详细证据 |
 | --- | --- | --- |
-| 开发测试固定动作 | 本轮新增计划、fast、岗位巡检、字段联动和覆盖基线的固定入口；验证仍在释放 writer 后继续 | 下方独立小节 |
+| 开发测试固定动作 | 固定入口与证据 staging 已收口；本次发布候选的确定性门禁漂移已最小修正，完整门禁仍待最新 clean SHA 重跑 | 下方独立小节 |
 | 全局业务记录动作可发现性 | 14 类业务页面与九岗位动作入口已按“可做但未选时置灰、无权或终态隐藏”收口；保持 `hold` | 本轮完整 progress 归档 |
 | V1 主链验收计划口径修正 | 文档、脚本、报告、DEV 预设和清单已统一为 V1 计划边界；保持 `hold` | 本轮完整 progress 归档 |
 | 开发工作台主题切换 | 共享主题三态、刷新保持、窄屏入口与暗色 / 浅色浏览器回归已完成 | 本轮完整 progress 归档 |
@@ -56,16 +63,16 @@
 - 完成：新测试登记到 fast Node 分组和 `fast.sh` Web 固定清单，fast profile required files 同步覆盖 operation store、全局锁、runner、插件、client 和页面；`scripts/qa/README.md`、`web/README.md` 与自动化测试策略同步五项优先级、全局串行边界、11 个 coverage 阶段及证据不互相替代的口径。
 - 修正：writer 释放后的真实 Chromium 读回确认桌面、390px 移动端与暗色页面布局可读且无页面级横向溢出，同时暴露旧 Vite 进程未注册 testing API，以及 Vite / esbuild 配置打包会把带 shebang 的 `affected.mjs` 静态内联到非首位置。testing Bridge 已改为仅在 plan 请求时通过非字面量 file URL 动态导入，并新增 `loadConfigFromFile` development serve 回归；固定动作在 summary 尚未成功读回或读取失败时也改为 fail closed 禁用，避免告警与按钮状态相反。
 - 验证：全局锁、testing store、门禁回执、collector、字段联动、fast profile、两个 operation client、两个 Vite Bridge、插件注册、清单完整性与页面合同最终定向执行 `96 / 96` 通过；fast profile 读回 `13` 个 gates / `186` 个 required files，文档清单 `5 / 5` 通过，触达 ESLint、Prettier、全量 Stylelint、Vite development config 加载和 overall `git diff --check` 通过。
-- 验证边界：独立 `15201` 开发服务的真实 Chromium 已生成当前 `237` 个改动文件的验证计划，建议 T0 / T1 / T2 / T3 / T4 / T5 / T7 / T8；testing summary 成功读回前 P0 / P1 固定动作全部 fail closed 禁用。九岗位巡检在本地 `8300/healthz=200` 但两种演示密码均缺失时正确保持 `blocked`，字段联动动作通过并原子发布报告；1600px、390px 与暗色页面可读，390px 下 `scrollWidth = clientWidth = 390`，控制台 error 为 0。身份绑定 fast 已执行到 `69` 个 Node 文件，当前仓库 `530` 项中 `524` 通过、`6` 失败：exact-SHA fixture `4` 项、customer-config frontend boundary `1` 项、schema docs 漂移 `1` 项，未伪装为通过。
-- 下一步：coverage baseline 已在无 writer 的稳定检查点完成全部 `11` 个阶段并发布绑定当前 fingerprint 的 Current 报告，结果为 `issues`：Go `3311 / 3314` 通过、statements `13.21%`；Web `2065 / 2070` 通过、lines `80.8%` / branches `72.63%` / functions `86.63%`；import `81 / 81` 与 field-linkage 通过。先由对应批次修复上述 fast、Go、Web 与 schema 文档失败后重跑门禁；补齐演示凭据后再执行九岗位真实登录，并按 T2 / T7 / T8 分别补 migration、业务集成 / 浏览器和发布证据。
-- 阻塞 / 风险：本轮没有连接 PostgreSQL、运行真实业务浏览器写链、readiness、目标环境部署 / smoke 或客户 UAT；共享 dirty worktree 的固定动作只证明绑定 fingerprint 的本地证据，后续任何代码变化都会使其过期。当前 `commit_policy=hold`，未 stage、commit 或 push。
+- 验证边界：独立 `15201` 开发服务的真实 Chromium 已生成当时 `237` 个改动文件的验证计划，建议 T0 / T1 / T2 / T3 / T4 / T5 / T7 / T8；testing summary 成功读回前 P0 / P1 固定动作全部 fail closed 禁用。九岗位巡检在本地 `8300/healthz=200` 但演示凭据缺失时正确保持 `blocked`，字段联动动作通过并原子发布报告；1600px、390px 与暗色页面可读，390px 下 `scrollWidth = clientWidth = 390`，控制台 error 为 0。夜间发布初始 fast 为 `524 / 530`、Web full 为 `2066 / 2070`；已定位并最小修正全部确定性失败，当前只完成相关定向回归，尚未把它们描述为 full 全绿。
+- 下一步：旧 coverage baseline 绑定旧 fingerprint，结果原本即为 `issues`，不能复用为本次 clean SHA 证据。收口队列产生新提交后重跑 fast、Web full 与 `prepare-push`；演示凭据可用后才执行九岗位真实登录，并按 T2 / T7 / T8 分别补 migration、业务集成 / 浏览器和发布证据。
+- 阻塞 / 风险：本轮尚未连接 PostgreSQL、运行真实业务浏览器写链或目标环境部署 / smoke；后续任何代码变化都会使当前定向证据过期。本批由唯一 writer grant 管理，尚未 stage、commit 或 push。
 
 ## 下一步与停止条件
 
-1. 当前各批次保持 `hold`；没有用户明确授权时不 stage、commit、push、建分支、部署或代做 UAT。
-2. 开发测试固定动作在 writer 释放后完成只读文档 / diff 门禁、`fast.sh` 和真实 Chromium 页面验证；验证发现本批问题时重新申请 writer，不在只读阶段偷偷改文件。
-3. 进入统一 Git 收口前重新核对 shared worktree、路径 / hunk 归属、index 和活动 Git 进程；只对用户授权且可证明归属的批次精确处理。
-4. 对最终 clean exact SHA 才运行 `bash scripts/qa/prepare-push.sh`；后续发布必须重新确认 commit / image、backup、migration、health / ready、客户配置、岗位 smoke 和 rollback point。
+1. 本次一次性夜间任务已获最小门禁修复、本地提交、普通 push `main`、GitHub CI / release 和仅部署 test-133 的明确授权；生产、客户 UAT、force / 历史改写、CI 放宽及破坏性 migration / data change仍未授权。
+2. writer 释放后由唯一 Git 收口队列精确本地提交；重新核对 clean worktree、index、lock 和 latest SHA，只有该 SHA 才运行 `bash scripts/qa/prepare-push.sh`。
+3. push 前 fetch 并比对远端 OID；有远端并发漂移即 fail closed，禁止覆盖。CI / release 任一确定性失败只允许最小修复并从新 SHA 全链重走。
+4. promotion 前必须再次确认 target 身份、fresh backup / rollback point、Atlas status / plan、migration 性质和锁；任何受禁 pending migration、身份不明、备份失败或 digest / runtime 漂移都停止，不进入生产。
 
 ## 长期边界
 

@@ -427,7 +427,7 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
     <section className="erp-dev-testing-validation-plan">
       <div className="erp-dev-testing-validation-plan__head">
         <div>
-          <Tag color="blue">P0</Tag>
+          <Tag color="blue">验证计划</Tag>
           <Title level={3}>生成本轮验证计划</Title>
           <Paragraph>
             只读分析当前改动，冻结生成前后的仓库身份，列出受影响

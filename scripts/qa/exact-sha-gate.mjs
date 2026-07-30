@@ -98,8 +98,10 @@ function assertSafeRef(value) {
 }
 
 function readTreeEntry(root, sha, file) {
-  const raw = runGit(root, ["ls-tree", sha, "--", file]).trim();
-  const match = raw.match(/^(\d{6}) ([^ ]+) ([0-9a-f]{40})\t(.+)$/u);
+  const raw = runGit(root, ["ls-tree", "-z", sha, "--", file]);
+  const match = raw.match(
+    /^(\d{6}) ([^ ]+) ([0-9a-f]{40})\t([^\0]+)\0$/u,
+  );
   if (!match || match[4] !== file) {
     throw new Error(`strict fingerprint file is missing: ${file}`);
   }

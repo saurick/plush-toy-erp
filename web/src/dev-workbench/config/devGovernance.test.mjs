@@ -81,7 +81,7 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
   assert.match(devPageNavSource, /aria-current=\{isExact \? 'page'/)
   assert.match(devPageNavSource, /aria-current=\{isActive \? 'page'/)
   assert.match(devPageNavSource, /erp-dev-workspace-nav__route--context/)
-  assert.match(devPageNavSource, /currentWorkspaceItem\s*\?\s*\[\]\s*:/)
+  assert.doesNotMatch(devPageNavSource, /currentWorkspaceItem\s*\?\s*\[\]/u)
   assert.match(devPageNavSource, /scrollIntoView/)
   assert.match(devPageNavSource, /href=\{sourceHref\}/)
   assert.match(devPageNavSource, /aria-label="开发工作台页面"/)
