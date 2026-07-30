@@ -5950,6 +5950,26 @@ async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
     )
       .map((node) => rectOf(node))
       .filter(Boolean)
+    const laneVisuals = Array.from(
+      document.querySelectorAll('.erp-task-board-lane')
+    ).map((node) => {
+      const head = node.querySelector('.ant-card-head')
+      const laneStyle = window.getComputedStyle(node)
+      const headStyle =
+        head instanceof HTMLElement ? window.getComputedStyle(head) : null
+      const tone = Array.from(node.classList)
+        .find((className) =>
+          className.startsWith('erp-task-board-lane--')
+        )
+        ?.replace('erp-task-board-lane--', '')
+      return {
+        tone: tone || '',
+        cardBorderRadius: laneStyle.borderRadius,
+        cardOverflow: laneStyle.overflow,
+        headBackgroundColor: headStyle?.backgroundColor || '',
+        headBoxShadow: headStyle?.boxShadow || '',
+      }
+    })
     const overlappingLanePairs = []
     for (let i = 0; i < laneRects.length; i += 1) {
       for (let j = i + 1; j < laneRects.length; j += 1) {
@@ -5976,6 +5996,7 @@ async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
       lanes,
       filters,
       laneRects,
+      laneVisuals,
       overlappingLanePairs,
       tableCard,
       visiblePageHeads,
@@ -5993,6 +6014,32 @@ async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
   assert(
     metrics.laneRects.every((lane) => lane.width >= 180 && lane.height > 0),
     `${scenarioName} 任务看板泳道尺寸异常: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    metrics.laneVisuals.map(({ tone }) => tone).sort(),
+    ['actionable', 'due', 'exception', 'finished'],
+    `${scenarioName} 任务看板四个泳道应保留稳定语义色调: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    new Set(
+      metrics.laneVisuals.map(({ headBackgroundColor }) => headBackgroundColor)
+    ).size,
+    4,
+    `${scenarioName} 任务看板四个泳道标题背景应可区分: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.laneVisuals.every(
+      ({ headBoxShadow }) => headBoxShadow && headBoxShadow !== 'none'
+    ),
+    `${scenarioName} 任务看板泳道标题应保留轻量语义色条: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.laneVisuals.every(
+      ({ cardBorderRadius, cardOverflow }) =>
+        Number.parseFloat(cardBorderRadius || '0') >= 12 &&
+        cardOverflow === 'hidden'
+    ),
+    `${scenarioName} 任务看板泳道内容应按卡片外圆角裁切: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.overlappingLanePairs.length === 0,
@@ -6346,6 +6393,11 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
         'input[type="hidden"], input[type="checkbox"], input[type="radio"], input[type="file"], input[type="button"], input[type="submit"], input[type="reset"]'
       )
 
+    const hasMinimumRadius = (value) =>
+      Number.isFinite(value) && value >= minRadius
+    const hasSquareCorner = (value) =>
+      Number.isFinite(value) && Math.abs(value) <= 0.5
+
     const failures = []
     const candidates = Array.from(document.querySelectorAll(candidateSelector))
     for (const node of candidates) {
@@ -6370,8 +6422,66 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
         style.borderBottomRightRadius,
         style.borderBottomLeftRadius,
       ].map((value) => Number.parseFloat(value || '0'))
+      const searchControl = node.closest('.ant-input-search')
+      if (
+        searchControl instanceof HTMLElement &&
+        node.matches('.ant-input-affix-wrapper')
+      ) {
+        const searchButton = searchControl.querySelector(
+          '.ant-input-search-button'
+        )
+        const inputRect = node.getBoundingClientRect()
+        const buttonRect = searchButton?.getBoundingClientRect()
+        const buttonStyle =
+          searchButton instanceof HTMLElement
+            ? window.getComputedStyle(searchButton)
+            : null
+        const buttonRadii = [
+          buttonStyle?.borderTopLeftRadius,
+          buttonStyle?.borderTopRightRadius,
+          buttonStyle?.borderBottomRightRadius,
+          buttonStyle?.borderBottomLeftRadius,
+        ].map((value) => Number.parseFloat(value || '0'))
+        const hasConnectedSearchIssue =
+          !(searchButton instanceof HTMLElement) ||
+          !isVisible(searchButton) ||
+          !hasMinimumRadius(radii[0]) ||
+          !hasSquareCorner(radii[1]) ||
+          !hasSquareCorner(radii[2]) ||
+          !hasMinimumRadius(radii[3]) ||
+          !hasSquareCorner(buttonRadii[0]) ||
+          !hasMinimumRadius(buttonRadii[1]) ||
+          !hasMinimumRadius(buttonRadii[2]) ||
+          !hasSquareCorner(buttonRadii[3]) ||
+          !buttonRect ||
+          Math.abs(inputRect.right - buttonRect.left) > 1.5 ||
+          Math.abs(inputRect.top - buttonRect.top) > 1 ||
+          Math.abs(inputRect.bottom - buttonRect.bottom) > 1
+        if (hasConnectedSearchIssue) {
+          failures.push({
+            ...describe(node),
+            reason: 'connected-search-control',
+            width: Number(inputRect.width.toFixed(1)),
+            height: Number(inputRect.height.toFixed(1)),
+            borderRadius: style.borderRadius,
+            radii,
+            buttonRadii,
+            seamGap: buttonRect
+              ? Number((buttonRect.left - inputRect.right).toFixed(1))
+              : null,
+            topDelta: buttonRect
+              ? Number((buttonRect.top - inputRect.top).toFixed(1))
+              : null,
+            bottomDelta: buttonRect
+              ? Number((buttonRect.bottom - inputRect.bottom).toFixed(1))
+              : null,
+          })
+        }
+        continue
+      }
+
       const hasRadiusIssue = radii.some(
-        (value) => !Number.isFinite(value) || value < minRadius
+        (value) => !hasMinimumRadius(value)
       )
       if (hasRadiusIssue) {
         const rect = node.getBoundingClientRect()
@@ -6390,7 +6500,7 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
   assert.deepEqual(
     issues,
     [],
-    `${scenarioName} 可见输入控件圆角未达到 ERP 基线: ${JSON.stringify(issues)}`
+    `${scenarioName} 可见输入控件圆角或组合接缝未达到 ERP 基线: ${JSON.stringify(issues)}`
   )
 }
 

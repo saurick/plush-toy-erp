@@ -317,7 +317,7 @@ function TaskLane({
     <Card
       size="small"
       variant="borderless"
-      className="erp-task-board-lane"
+      className={`erp-task-board-lane erp-task-board-lane--${lane.key}`}
       loading={loading}
       aria-busy={loading}
       title={
@@ -1814,6 +1814,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     onClick={() => selectTaskBoardLane('finished')}
                   />
                 </div>
+                <Text type="secondary" className="erp-task-center-metrics-note">
+                  {taskBoardMetricsReady
+                    ? `当前筛选共 ${taskBoardTotal} 项；四类任务互不重复，点击指标可查看对应任务。`
+                    : '任务数量读取完成后，可点击指标查看对应任务。'}
+                </Text>
               </section>
 
               <section

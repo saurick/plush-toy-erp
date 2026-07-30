@@ -92,7 +92,16 @@
 
 @media (max-width: 960px) {
   .erp-task-board-filters {
-    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .erp-task-board-filters > .ant-input-search,
+  .erp-task-board-filters > .ant-select,
+  .erp-task-board-filters > .ant-btn {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
   }
 
   .erp-business-board-alert-grid {

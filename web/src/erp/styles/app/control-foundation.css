@@ -56,6 +56,27 @@ body
   border-end-end-radius: var(--erp-control-radius);
 }
 
+/* 组合搜索框只保留外侧圆角，避免基础控件圆角破坏输入与按钮的连接语义。 */
+body
+  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  .ant-input-search
+  .ant-input-affix-wrapper,
+#root .ant-input-search .ant-input-affix-wrapper {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+body
+  :is(.ant-modal, .ant-drawer, .ant-popover, .ant-dropdown)
+  .ant-input-search
+  .ant-input-search-button,
+#root .ant-input-search .ant-input-search-button {
+  border-start-start-radius: 0;
+  border-start-end-radius: var(--erp-control-radius);
+  border-end-start-radius: 0;
+  border-end-end-radius: var(--erp-control-radius);
+}
+
 #root
   :is(
     .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper),
