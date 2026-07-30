@@ -21,8 +21,8 @@
 关键边界：
 
 - `docs/product/产品完成路线图.md` 管长期路线，不替代当前实现真源。
-- `docs/reference/**` 是外部输入，`docs/archive/**` 和 `progress.md` 是历史/过程证据。
-- 历史 changes、GPT 规划、截图和客户样本不能单独证明当前 schema/API/UI/RBAC/部署能力。
+- 仓库不保存其他项目或 GPT/ChatGPT 导出的参考原文；有价值结论必须先按本项目真源复核，再转化为正式 docs、代码或测试。`docs/archive/**` 和 `progress.md` 只保留本项目历史/过程证据。
+- 历史 changes、外部规划、截图和客户样本不能单独证明当前 schema/API/UI/RBAC/部署能力。
 - 当前客户稳定 key 为 `yoyoosun`；不要恢复 `current` 客户目录或旧工作区别名。
 
 ## 任务组织与工作区
@@ -147,7 +147,7 @@
 - 新增/删除/重命名一级目录或长期关键子系统时同步相关 README。
 - `docs/` 长期且易误读的目录应有 README；新增、删除、重命名或重分类长期 Markdown 时同步 `docs/文档清单.md`、目录 README、引用、入口和测试。
 - 仅改正文且标题/职责/分类不变时通常不更新文档清单。
-- 长期文档默认中文文件名和中文主体 + English anchor；README/AGENTS/CHANGELOG、archive/reference、生成/外部稳定路径除外。
+- 长期文档默认中文文件名和中文主体 + English anchor；README/AGENTS/CHANGELOG、archive、生成/外部稳定路径除外。
 - 根 README 只管仓库导航，子目录 README 管内部职责。
 - 能力实现层级变化时同步当前真源、能力台账、客户交付/差异文档，明确已接层级和未闭环层级。
 
@@ -171,7 +171,7 @@
 ## 旧项目与外部规划
 
 - 旧项目只能作迁移背景，不是 plush 字段、流程、页面、测试或文案真源；运行时用户界面不出现旧项目名或“对齐旧项目”说明。
-- GPT/ChatGPT 会话只作输入。执行前核对本文件、README、正式 docs、代码、migration、测试和 worktree；冲突时按仓库真源收窄。
+- 旧项目、GPT/ChatGPT 会话和其他外部规划只作任务输入，不把原文或来源名称带入仓库。被采纳的结论必须改写为 plush 自有合同，并由本文件、README、正式 docs、代码、migration、测试和 worktree 复核。
 - 本项目是新系统。以前 AI 草稿、本地实验、未发布的 schema、API、状态、字段、别名、mock 或 fixture 都不是兼容对象，不能因代码、常量或测试曾经存在就进入正式设计。
 - 未进入正式目标设计的旧路径必须从代码、目标 Schema、seed/fixture、API、UI、文档和测试全链删除；已落库的 schema 或数据残留通过新的正式 migration 一次性清理，不改写已执行 migration。禁止保留 alias、fallback、双写、兼容读取、退出路径或仅为旧测试继续通过的分支。
 - 一次性 migration 或数据清理、正式业务事实与审计记录留存、网络重试和幂等 receipt replay 是当前系统正确性要求，不属于历史兼容；不得借“禁止兼容”绕过数据完整性、事务、迁移可追溯性和审计边界。

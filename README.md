@@ -16,12 +16,12 @@
 
 ## 当前边界
 
-- 文档入口：[docs/README.md](docs/README.md)；当前真源：[docs/当前真源与交接顺序.md](docs/当前真源与交接顺序.md)；项目治理地图：[docs/项目治理地图.md](docs/项目治理地图.md)。
+- 文档入口：[docs/README.md](docs/README.md)；当前真源：[docs/当前真源与交接顺序.md](docs/当前真源与交接顺序.md)；链与运行轨迹边界：[docs/architecture/业务链与运行轨迹边界.md](docs/architecture/业务链与运行轨迹边界.md)；项目治理地图：[docs/项目治理地图.md](docs/项目治理地图.md)。
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
 - 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库
 - 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单、BOM、产品 / SKU、工序、采购入库、质量检验、库存、委外订单、生产进度、出货、应收、应付、发票、单笔核对、真实收付款、多来源核销和红冲均已有对应 JSON-RPC / RBAC / V1 页面或正式来源入口；余额视图按 ACTIVE `stock_reservations` 返回已预留和可用量，显式 SKU 贯通销售订单行、批次、库存、生产 / 委外、出货与预留，并以产品 + SKU + 仓库 + 单位 + 批次作为精确库存 grain。历史 `product_sku_id=NULL` 不自动回填或与任一 SKU 共池；BOM SKU 粒度、受控导入创建 SKU 和旧库存人工重分类仍待评审；具体目标库是否已 apply 以 `make migrate_status` 为准
-- `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；品质岗位可在显式提交放行前，从 `DRAFT` 出货单按产品 / SKU、仓库、批次送检粒度生成出货前成品检验，一旦发起就必须合格或让步接收后才能提交放行。提交动作会锁定出货单、校验并冻结当时的检验集合，再生成仓库负责的出货放行任务；任务完成只表示 `shipping_released`，确认出货仍会在同一出货事务内重新核对可信的已完成放行任务、质检、来源数量、预留和可用库存，之后才写 `SHIPPED` 与库存 `OUT`。该可选质检侧链不启动 Workflow，也不替代生产完工质检主链；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`
+- `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；品质岗位可在启动财务放行前，从 `DRAFT` 出货单按产品 / SKU、仓库、批次送检粒度生成出货前成品检验，一旦发起就必须合格或让步接收后才能启动。`finished_goods_delivery` 启动事务锁定出货单并重验检验集合，随后直接创建 Shipment 财务 approval；审批通过后绑定领域命令只写版本化财务放行门禁并结束流程，不生成仓库放行任务。确认出货仍在独立事务重新核对 `APPROVED` 门禁、质检、来源数量、预留和可用库存，之后才写 `SHIPPED` 与库存 `OUT`。该可选质检侧链不启动 Workflow，也不替代生产完工质检主链；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`
 - 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本；加工环节 / processes 工序主数据只维护工序编号、名称、类别和可委外 / 可内制 / 需质检标记，不生成委外源单、生产任务、质检事实、库存流水或财务事实
 - Product Core 的来源动作已收口到正式源单或事实页：生产订单办理领料 / 完工 / 返工，委外合同办理发料 / 回货 / 质检 / 异常处置，采购入库办理退货 / 调整 / 应付；首次 IQC 拒绝可登记退回供应商 / 供应商补换处置并取消未入库收货，不写库存退货，补换新到货仍需独立来源。已出货来源生成应收 / 发票，真实收付款独立登记并按同往来方同币种分配到多条应收或应付，支持部分核销、冲正和红冲。来源、往来方、物料 / 产品、单位、批次和金额由后端派生，通用事实页不恢复无来源万能新增。yoyoosun 的本地跟踪配置与 133 较早 V5 技术试用必须和当前 HEAD 分开取证；当前财务岗位未获得收付款页面 / 权限，当前后续切片未整体重发，客户 UAT / 签收未完成
 - 生产排程、返工异常提醒和历史出货放行三类来源协同也已收口到真实 producer：生产订单从草稿下达时生成排程任务，返工事实过账时生成 `production_exception` 提醒任务；新出货不再生成历史仓库放行任务，而由正式 Shipment 财务 approval 写版本化门禁。正式生产异常申请另走 `ProductionExceptionDecision → production_exception_approval → production_exception_decision_approval`，老板审批只记录决定或超领额度，报废 / WIP 让步仍须生产显式执行，超领仍由正常领料消费。来源提醒与正式申请 / 审批不能互相冒充；任何 Workflow task done 都不代写生产、库存、质检、出货或财务事实
@@ -159,7 +159,6 @@ pnpm style:l1
 - 永绅 yoyoosun 客户能力、交付与差异矩阵：[docs/customers/yoyoosun/客户交付矩阵.md](docs/customers/yoyoosun/客户交付矩阵.md)
 - 状态 / Workflow / Fact 边界：[docs/architecture/状态工作流事实边界.md](docs/architecture/状态工作流事实边界.md)
 - 永绅 yoyoosun 客户资料边界：[docs/customers/yoyoosun/README.md](docs/customers/yoyoosun/README.md)
-- 外部参考资料：[docs/reference/README.md](docs/reference/README.md)
 - architecture 历史评审归档：[docs/archive/architecture-history/README.md](docs/archive/architecture-history/README.md)
 - 业务与协同流程地图：[docs/workflow/业务与协同流程地图.md](docs/workflow/业务与协同流程地图.md)
 - 通知 / 预警 v1：[docs/workflow/通知预警催办与升级第一版.md](docs/workflow/通知预警催办与升级第一版.md)

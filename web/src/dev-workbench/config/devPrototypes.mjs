@@ -128,7 +128,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'core-menu-coverage-v1/index.html',
     readmePath: 'core-menu-coverage-v1/README.md',
     description:
-      '把 20260611 参考规格中的 51 个二级菜单收口为可筛选内容矩阵，标注页面类型、事实源、关键字段、动作和边界。',
+      '把项目内 51 个二级菜单候选收口为可筛选内容矩阵，标注页面类型、事实源、关键字段、动作和边界。',
     appliesTo:
       '用于逐菜单核对页面内容覆盖，并映射到现有列表页、详情页、表单页、动作浮层、工作台、报表、导入和移动任务样板；不是正式菜单承诺。',
   },

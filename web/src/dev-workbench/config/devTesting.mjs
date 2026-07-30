@@ -342,7 +342,7 @@ const DEV_TESTING_TIER_COPY_FALLBACKS = Object.freeze({
     'git status --short',
     'git diff --stat',
     'git diff --check',
-    'grep -R "tenant_id" docs/customers docs/product docs/architecture docs/reference config deployments server web || true',
+    'grep -R "tenant_id" docs/customers docs/product docs/architecture config deployments server web || true',
     'grep -R "ChangeUsecase\\|change_records" server web docs || true',
   ],
   T7: [

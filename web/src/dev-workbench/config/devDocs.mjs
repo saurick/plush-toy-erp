@@ -97,7 +97,6 @@ function groupForPath(path = '') {
   if (path.startsWith('docs/finance/')) return '财务'
   if (path.startsWith('docs/roles/')) return '角色'
   if (path.startsWith('docs/observability/')) return '可观测'
-  if (path.startsWith('docs/reference/')) return '参考'
   if (path.startsWith('docs/archive/')) return '归档'
   if (path.startsWith('docs/')) return '文档'
   return '其他'

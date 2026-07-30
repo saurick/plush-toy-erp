@@ -4,6 +4,57 @@
 
 ## 当前活跃事项
 
+### 权限页操作生效说明
+
+- 完成：复用权限管理页现有“菜单与操作说明”问号，不新增重复帮助入口；帮助卡片新增“岗位可用操作 = 系统允许 ∩ 模块已启用 ∩ 当前版本已开放 − 岗位撤销”的业务语言解释，并说明交集、扣除、多岗位分别计算后合并，以及实际办理仍受数据范围、负责岗位、单据状态和前置审批约束。现有入口继续支持 hover、键盘聚焦和点击，不改权限计算、页面结构、后端、客户配置、Workflow / Fact、schema 或 migration。
+- 验证：用户可见技术字段与权限中心文案守卫 `63 / 63` 通过，Web 正式 `pnpm lint` 通过；现有 `permission-center-desktop` Chromium 场景已通过本次帮助入口的定位、文案、浮层尺寸和截图步骤，目检 `permission-center-help-popover-card.png` 与整页截图确认内容完整、自然换行且无横向溢出。该场景随后被本批范围外的旧“命中 3/6 个员工账号”断言阻断，因此不把整条场景记为通过。
+- 下一步：释放共享 Local writer 并按 `hold` 登记；等待用户决定是否本地提交，以及是否另行推送。
+- 阻塞 / 风险：浏览器证据使用 Style L1 mock，前端命令运行于 Node `26.5.0`，保留项目要求 `24.14.x` 的 engine warning；未部署、未执行目标岗位 smoke 或客户 UAT。无关账号计数断言漂移未在本批越界修改。
+
+### 数据库 74 表数据字典与零漂移门禁
+
+- 完成：新增 `server/cmd/schema-doc` 只读生成器和严格 `table-catalog.json`，从当前 Ent generated `migrate.Tables` 提取 74 张 Product Core 应用表的 1143 个字段、139 个外键、329 个显式索引（其中 29 个 partial index）和 247 个 CHECK，再结合人工审查的用途、领域分类、生命周期、写入边界、敏感字段与正式参考生成 1 份总入口和 7 份分域数据字典。每张应用表都有独立锚点与字段、主键、外键、索引、CHECK、schema source 和业务真源说明；截图中的 Atlas revision 表明确登记为非应用表。同步后端 / docs / scripts 导航、文档清单、fast required files 和 affected 映射，schema、migration、catalog、生成器或生成 Markdown 漂移都会触发定向检查。
+- 验证：服务端 `go test ./...` 全量通过；`go run ./cmd/schema-doc --check` 读回 `tables=74 catalog=74 columns=1143 foreignKeys=139 indexes=329 checks=247 outputs=8` 且 `missing / changed / stale / unexpected` 均为 0。`schema-docs + affected + docs-inventory + gate-profiles` 定向 Node 合并执行 `42 / 42` 通过，文档清单读回 325 份 Markdown，触达 JavaScript 均通过 `node --check`。完整 Node 分组唯一性门禁本轮另被并行批次新增但尚未登记的 `yoyoosun-role-business-action-projection.test.mjs` 阻断；本批新增的 `schema-docs.test.mjs` 已登记到 fast，未越界代改并行批次。
+- 下一步：按共享 Local 队列释放本批 writer；当前 `commit_policy=hold`，等待用户决定仅本地提交、提交并推送或继续保持未提交。本项不需要 `make data`、Atlas migration 生成、数据库 apply、部署或客户 UAT。
+- 阻塞 / 风险：数据字典是仓库当前 Ent generated migration descriptor 与人工 catalog 的生成投影，不是 PostgreSQL `COMMENT`，也不证明任一目标库已 apply 或无漂移；目标环境仍须独立执行 migration status 与结构读回。Ent 的 Go 侧 validator、`Default(time.Now)`、`UpdateDefault`、`Immutable` 和 `Sensitive` 不一定进入 descriptor，关键业务边界仍以 schema、usecase 和正式文档为准。本批没有修改 schema / migration 或连接数据库，未暂存、提交、推送、建分支、部署或代做 UAT。
+
+### 外部参考原文与相邻项目来源退役
+
+- 完成：删除 `docs/reference/**` 下 24 份已跟踪的其他项目 / GPT 参考原文，不迁入 `docs/archive/**`；仓库当前不再维护外部原文。把已被项目吸收的生命周期、流程边界、字段联动、来源选择、页面密度和 51 项菜单候选改写为 plush 自有正式口径，并从活跃文档、原型和开发工作台说明中移除相邻项目名称与已删除来源路径。`docs/archive/**` 继续只保留本项目历史证据，Git 历史不改写。
+- 完成：同步 `AGENTS.md`、docs 入口 / 清单 / 当前真源 / 治理地图、产品与架构专题、yoyoosun 决策日志 D-009、原型中心、DEV 文档 / 测试 / 原型配置和 `$plush-docs-governance`；新增文档门禁，阻止外部原文目录或退役相邻项目名重新进入活跃 Markdown。未新增 frontmatter 或 metadata，也未改 schema、migration、API、RBAC、Workflow / Fact 或正式菜单。
+- 验证：文档、DEV 入口、阶段命名、Skill 和原型定向 Node 测试 `65 / 65` 通过，文档清单读回 301 份当前维护 Markdown；触达 DEV 配置 ESLint、phase 全仓扫描、Skill health `3 / 3`、YAML、canonical Skill validator、AGENTS 体积 `15409 bytes` 和 `git diff --check` 通过。`dev-docs-dark-desktop`、`dev-testing-dark-desktop`、`dev-prototypes-dark-desktop` 三个真实 Chromium Style L1 场景 `3 / 3` 通过。全仓扫描确认活跃文档没有退役相邻项目名，已删除路径只剩防止重新索引 / 引入的负向测试守卫。
+- 下一步：释放共享 Local writer 并按 `hold` 登记本批；依 Codex App 规则，取得用户确认后才允许本地提交或推送。本项不需要 migration、后端重启、部署、目标环境 smoke 或客户 UAT。
+- 阻塞 / 风险：`docs/reference/` 下仍可能存在被 Git 忽略的系统元数据，但没有可维护文档；历史 commit 和 `docs/archive/**` 中的历史表述继续可追溯，不属于当前真源。本地文档与 Chromium 绿色只证明当前 worktree 的退役和入口闭环，不代表部署或客户验收。
+
+### 全页面业务动作可用性与角色投影收口
+
+- 完成：复核 14 个正式“选记录后操作”页面以及九个业务岗位，并补查管理员、收窄后的超级管理员、多角色并集和只读账号。业务动作统一收口为：无权限、结构上不适用、动作已完成或记录已终态时隐藏；未选择、仍可推进但前置条件未满足、正在处理时保留原位置并置灰，同时给出具体原因。收付款、销售退货、出货、生产异常四类状态矩阵已改用共享 helper；采购收货、质检、库存台账、业务事实和出货的“查看相关记录”也统一为无选择置灰、无关联记录隐藏；异常流程恢复按钮补齐统一禁用提示。出货审批的 `PENDING` 投影目前不能权威区分“尚未提交”与“审批进行中”，因此保留可安全重复执行的“核对出货审批”，没有在前端伪造流程状态。本项未改 API、后端 RBAC、Workflow / Fact、schema、migration、菜单或客户配置。
+- 验证：共享动作 helper、页面与既有合同定向 Node 测试 `73 / 73`，九岗位与特殊身份投影测试 `4 / 4`，Web 全量 Node 测试 `2015 / 2015`、lint、CSS 和 production build 通过。`affected.sh` 的 T0–T5 影响面门禁全部通过，包含文档清单 `13 / 13`、直接影响测试 `30 / 30`、Go T3 repository 与 T4 service / server。真实 Chromium 的财务岗位、收窄超级管理员、仓库退货 / 出货、生产异常和代表页面五个 Style L1 场景 `5 / 5` 通过；DOM 门禁覆盖动作稳定位置、可见 / 禁用状态、禁用原因和无横向溢出，并目检财务草稿、出货待审批、生产异常待审批和已收货退货截图。
+- 下一步：释放共享 Local writer 并按 `hold` 登记本批；根据 Codex App 的显式授权要求，取得用户确认后再本地提交或推送。本项无需 migration、后端重启或原型阶段晋级。
+- 阻塞 / 风险：浏览器使用 Style L1 mock，九岗位已做静态权限投影，代表岗位已进真实 Chromium，但没有机械执行九岗位乘十四页面的完整笛卡尔组合；本地自动化与浏览器绿色不等于目标环境部署、岗位 smoke 或客户 UAT。前端命令运行于 Node `26.5.0`，保留项目要求 `24.14.x` 的 engine warning；出货 `PENDING` 的更细粒度按钮文案仍需以后端权威流程投影为前提。
+
+### 收付款与核销列表工具收口
+
+- 完成：`收付款与核销` 的“收付款记录 / 红冲记录”两个正式财务事实页签均接入真实“导出筛选结果 / 列顺序”。两个页签使用独立账号列偏好；导出按当前页签筛选条件通过既有严格分页器逐页读取全部匹配记录，不只导出当前 20 条，并按当前列顺序输出业务可读方向、往来方、状态、核销摘要、来源类型和时间，不导出内部 ID。空结果和加载中明确禁用；旧请求取消或失效时不弹错误。未改列表分页、筛选本身、业务动作、RBAC、Workflow / Fact、schema、migration、菜单或客户配置。
+- 验证：API / 页面 / 严格分页定向 Node 测试 `18 / 18`、Web lint、CSS、全量 Node 测试 `2010 / 2010` 和 scoped `git diff --check` 通过；`STYLE_L1_PORT=15280 STYLE_L1_SCENARIOS=exception-finance-payment-dark-desktop pnpm --dir web style:l1` 通过 `1 / 1`，真实 Chromium 实际下载并读取收付款 CSV，验证列顺序保存 / 恢复、空红冲导出禁用、两个页签独立列顺序弹窗、暗色布局和无横向溢出，并目检 4 张相关截图。
+- 下一步：释放共享 Local writer 并登记 hold 批次；按 Codex App 显式授权要求，取得用户确认后再本地提交或推送。本项不需要原型晋级、后端重启、migration、部署或客户 UAT。
+- 阻塞 / 风险：浏览器场景使用 Style L1 mock，未以大于 200 条真实财务记录做运行态多页导出；完整分页由共享严格分页器和现有分页测试覆盖。本地自动化 / Chromium 绿色不等于目标环境部署或岗位验收。
+
+### 生产异常处置列表工具收口
+
+- 完成：`生产异常处置` 的“处置申请 / 待审批”两个页签现在都只展示真实可用的“列顺序”，不再显示“导出筛选结果”或不可用导出占位；处置申请复用共享账号列偏好与表头列设置，并使用独立 `production-exceptions-decisions` 偏好键，避免覆盖待审批任务列顺序。共享工具新增默认兼容的显隐开关，生产排程和出货放行等其他页面保持现状。未改筛选、选择、业务动作、API、RBAC、Workflow / Fact、schema、migration、菜单或客户配置。
+- 验证：Web 全量 Node 测试 `2005 / 2005`、`pnpm lint`、`pnpm css` 与 scoped `git diff --check` 通过；`STYLE_L1_SCENARIOS=business-production-exception-tabs-desktop pnpm style:l1` 通过 `1 / 1`，真实 Chromium 覆盖两个页签的列顺序弹窗、导出按钮缺席、筛选 / 当前操作相邻布局、暗色桌面和手机宽度，并目检 5 张截图无横向溢出或按钮残留。
+- 下一步：按共享 Local 队列释放 writer；根据 Codex App 的显式授权要求，取得用户确认后再本地提交或推送。本项不需要原型晋级、后端重启、migration、部署或客户 UAT。
+- 阻塞 / 风险：浏览器场景使用本地 Style L1 mock，前端命令运行于 Node `26.5.0` 并保留项目要求 `24.14.x` 的 engine warning；本地视觉与自动化绿色不等于目标环境部署或岗位验收。共享 Local 仍有其他任务修改，本项只归属所列前端、回归和本独立 progress 小节。
+
+### 已阻塞任务附件写权限
+
+- 完成：任务附件上传不再借用“转为 blocked”的 Workflow 状态动作判断，改为独立校验任务状态、后端 RBAC、责任岗位和精确指派人。`ready / blocked` 的合法责任人可补充任务附件；老板监督可见但不负责的任务、assigned-other、`done / rejected` 终态和未知状态继续拒绝。正式 ProcessRuntime 任务按自身不可变 config revision 解析责任范围，并把同一次授权产生的 `expected_version`、actor 与角色范围直接传入 repo；repo 锁行后再次校验版本、终态和责任归属。
+- 完成：已保存附件新增只读上传审计投影，列表和元数据按 `uploaded_by` 批量解析当前管理员账号，上传响应直接回显本次认证账号；即使账号已禁用或注销，历史附件仍显示原账号名。共享附件面板展示“上传账号 / 上传时间”，旧数据缺账号或时间时明确显示“未记录”，不把数值用户 ID、`uploaded_by` 字段名、MIME 或存储路径暴露给业务用户。未改附件表、Workflow 状态机、Fact、schema、migration、RBAC、客户配置或上传权限范围。
+- 验证：T4 service 定向回归覆盖 ready owner、缺后端 update 权限、截图对应的 blocked boss owner、blocked exact assignee、wrong owner、boss 监督只读、assigned-other、done、rejected、未知状态和正整数版本门禁；另覆盖 superseded task revision、不完整 runtime anchor、super admin 监督只读和上传审计 JSON 投影。T3 SQLite repo 覆盖 stale version、terminal、reassignment、零插入、禁用账号名称解析和旧附件缺上传者。独立 Chromium 在 1440 × 900 的真实出货放行任务附件弹窗确认 `demo_boss` 与上传时间可见，内部 ID / MIME 不可见，弹窗和附件行无横向溢出；截图为 `web/output/playwright/attachment-uploader-audit.png`。共享混合工作区的 affected 门禁最高 T5，T0 / T1 / T3 / T4 / T5、Web lint、CSS 和全量 Node 测试 `2008 / 2008` 通过。
+- 下一步：按共享 Local 队列释放 writer；根据 Codex App 的显式授权要求，取得用户确认后再本地提交。当前 `8300` 后端仍是修复前制品，提交后需用项目 `make dev_restart` 预检、重建并重启，再以 demo boss 对已阻塞任务补附件做本地运行态读写验证。
+- 阻塞 / 风险：完整 `business-core-pages-desktop` Style L1 在进入附件步骤前被共享 Workflow 页面已变化的“待办任务”旧锚点阻断；本项使用同一 RPC mock 与真实页面补做了独立附件浏览器验证，但未越界修改其他任务文件。本轮尚未执行真实附件写入、PostgreSQL 并发门禁、后端重启、目标环境发布或客户 UAT；本地 T3 / T4 / T5 与浏览器绿色不能替代这些证据。
+
 ### 开发工作台主题切换
 
 - 完成：研发效能工作台的共享侧栏新增“跟系统 / 浅色 / 暗色”主题入口，复用全站 `ERPThemeProvider`、`ERPThemeToggle` 和 `plush_erp_theme_mode`，所有 `/__dev/**` 页面同步生效且刷新后保持，不建立第二套主题状态。桌面侧栏显示当前模式并占满操作区，窄屏收为自适应按钮，手机端只保留图标；可访问名称始终带当前模式，点击区域不小于 40px。
@@ -177,6 +228,17 @@
 - 验证：仓库固定 Node `24.14.0` 下，移动任务组件与 Current 原型定向合同 36 / 36、Web lint、Style L1 脚本语法检查及本批代码 / 原型路径 `git diff --check` 通过；390px / 430px 的我的页、无锚点回执、暗色与无横向溢出浏览器回归在释放共享 writer 后只读执行。
 - 下一步：本项停止在本地 Current 页面与 T5 定向回归，不自动暂存、提交、推送、部署或执行客户 UAT。
 - 阻塞 / 风险：未改 API、RBAC、客户配置、Workflow / Fact、schema、migration、路由、分页或计数真源；正式文档原已限定“有 ProcessRuntime 锚点才展示流程位置”，本项只修正运行态空卡与用户文案。共享 Local 仍有其他任务的 mixed hunks，本项只归属上述 10 个路径的精确 hunks。
+
+### 链、流与 P0/P1 能力真源收口
+
+- 完成：新增“业务链与运行轨迹边界”唯一专题入口，集中区分流、业务链、ProcessRuntime 业务轨迹、本任务处理记录、审批处理链、状态历史、lineage、审计、Trace 和通知链，并同步流程地图、状态 / Fact、字段来源、动作责任权限、审计证据、文档路由、客户矩阵和手工验收口径。七条正式 ProcessRuntime 已按当前代码重核；Shipment 固定为财务 approval / 版本化放行门禁，真实 `SHIPPED + inventory OUT` 仍由独立领域事务写入。能力台账的库存人工调整审批矛盾已纠正，`8 个本地代码边界已闭环、4 个部分、1 个阻塞、1 个范围外` 的统计保持不变并明确排除审计 / 附件专项。
+- 完成：控制面 `runtime_audit_events` 新事件从服务端请求上下文关联非敏感 `request_id`，丢弃调用方伪造或大小写变体并避免修改输入 payload；没有上下文时不伪造。桌面 / 移动任务轨迹标签、采购节点和 Shipment 文案按真实流程收口，销售提交反馈不再写死老板责任；新增链 / 流 / Shipment / 库存调整 / 动作矩阵 / 审计矩阵合同守卫，Style L1 旧“成品交付”断言同步为“出货财务放行”。
+- 验证：`go test` 定向覆盖 runtime audit request_id、ProcessRuntime、任务轨迹 / 单任务事件、七流程异常合同、Shipment 财务放行、库存人工调整和库存预留基础合同；Node 定向覆盖 ProcessRuntime 展示、客户流程 API、桌面 Drawer、移动任务详情、销售订单、customer manifest、7 process key / 8 variants、页面 lineage、文档 inventory / 引用和新增 Workflow-Fact 守卫，均通过。`STYLE_L1_SCENARIOS=erp-task-board-desktop,erp-task-board-mobile pnpm style:l1` 2 / 2 通过并目检任务事件、审批箱和移动交互截图；触达文件 ESLint 与 `git diff --check` 通过。浏览器命令使用本机 Node `26.5.0`，保留项目声明 `24.14.x` 的 engine warning。
+- 下一步：按共享 Local 队列释放本任务 writer；本轮按用户要求保持 `commit_policy=hold`，不 stage、commit、push、建分支、部署或代做 UAT。没有 schema / migration 变更，因此未执行 `make data`、Atlas migration 生成或 `db-guard`。
+- 阻塞 / 风险：BOM SKU grain、采购需求真源 / 快照、在途与剩余量计算合同未确认，P1-A 保持 `blocked`；库存预留的产品 / SKU / 仓库可读专项投影、原 / 已消费 / 剩余数量和数据范围合同未冻结，P1-B 保持 `partial / blocked`，不改变原子预留消费。退款 / 换货 / 补发、真实客户数据写入、对象存储、通用审批链 / 状态历史链 / 通知链均未擅自实现。目标 migration / 结构读回、客户 revision 发布激活 / effective-session、真实岗位与移动 smoke、客户 UAT / 签收全部未执行；共享附件任务的代码和本文件顶部 hunk不属于本项。
+- 补充完成：为“实际动作”交集公式增加集合符号、单角色 / 多角色计算、最小示例和“有效动作权限不等于当前可执行动作”的说明；业务链文档只引用主定义，未复制第二套口径。
+- 补充验证与边界：文档 inventory、链接与 Workflow-Fact 合同守卫 `9 / 9` 通过，清单读回 325 份 Markdown；本补充不改 RBAC、API、客户配置、Workflow / Fact、schema 或 migration，下一步等待用户决定是否提交及推送，当前继续保持 hold。
+- 补充完成：在“业务主链路数据流向与字段来源规则”的主路径后增加面向业务与实施读者的通俗分层说明，集中解释 MasterData、Source Document、Workflow / ProcessRuntime、Domain Usecase、Fact / Ledger 和派生读模型，并以 Shipment 明确“审批通过只打开门禁、领域命令才写事实”；未改 runtime、schema、API、RBAC、客户配置或目标环境状态。
 
 ## 下一步与停止条件
 

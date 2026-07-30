@@ -1,0 +1,934 @@
+{
+  "version": 1,
+  "description": "plush-toy-erp 当前应用表的人工业务语义目录；机械结构由 schema-doc 从 Ent generated migrate.Tables 读取。",
+  "exclusions": [
+    {
+      "name": "atlas_schema_revisions.atlas_schema_revisions",
+      "reason": "Atlas migration 执行器自己的版本记录表，不属于 Product Core 业务 schema，也不由 Ent migrate.Tables 管理。"
+    }
+  ],
+  "domains": [
+    {
+      "key": "account-access-config",
+      "title": "账号、权限与配置",
+      "file": "账号权限与配置.md",
+      "order": 1,
+      "description": "后台账号、RBAC、客户配置版本及其运行时投影。",
+      "references": [
+        "docs/product/配置与权限策略.md",
+        "docs/roles/角色权限矩阵第一版.md",
+        "docs/product/多甲方角色能力与流程编排.md"
+      ]
+    },
+    {
+      "key": "master-data-bom",
+      "title": "主数据与 BOM",
+      "file": "主数据与BOM.md",
+      "order": 2,
+      "description": "客户、供应商、产品、物料、工序、仓库、单位和 BOM 等复用主数据。",
+      "references": [
+        "docs/architecture/客户供应商主数据评审.md",
+        "docs/architecture/产品款号物料清单边界评审.md",
+        "docs/architecture/生产工艺路线与在制品边界评审.md",
+        "docs/product/业务数据生命周期与页面动作规则.md"
+      ]
+    },
+    {
+      "key": "sales-purchase",
+      "title": "销售与采购",
+      "file": "销售与采购.md",
+      "order": 3,
+      "description": "销售订单与采购订单的来源单据聚合及其行项目。",
+      "references": [
+        "docs/architecture/主数据源单据事实边界评审.md",
+        "docs/architecture/订单采购边界评审.md",
+        "docs/product/业务数据生命周期与页面动作规则.md"
+      ]
+    },
+    {
+      "key": "inventory-quality",
+      "title": "库存与质检",
+      "file": "库存与质检.md",
+      "order": 4,
+      "description": "采购收退货、库存作业、批次、余额、流水、预留与质量判定。",
+      "references": [
+        "docs/warehouse/仓库与品质第一版.md",
+        "docs/architecture/业务事实扩展总评审.md",
+        "docs/product/业务数据生命周期与页面动作规则.md"
+      ]
+    },
+    {
+      "key": "production-outsourcing",
+      "title": "生产与委外",
+      "file": "生产与委外.md",
+      "order": 5,
+      "description": "生产订单、冻结需求与路线、WIP、生产事实、委外合同和委外事实。",
+      "references": [
+        "docs/architecture/生产订单源单边界评审.md",
+        "docs/architecture/生产工艺路线与在制品边界评审.md",
+        "docs/architecture/业务事实扩展总评审.md"
+      ]
+    },
+    {
+      "key": "shipping-finance",
+      "title": "出货、退货与财务",
+      "file": "出货与财务.md",
+      "order": 6,
+      "description": "出货、客户退货、财务事实、收付款、核销和红冲。",
+      "references": [
+        "docs/finance/财务第一版.md",
+        "docs/architecture/业务事实扩展总评审.md",
+        "docs/product/业务数据生命周期与页面动作规则.md"
+      ]
+    },
+    {
+      "key": "workflow-runtime",
+      "title": "流程运行时、协同与审计",
+      "file": "流程运行时.md",
+      "order": 7,
+      "description": "ProcessRuntime、Workflow task、协同状态、运行标记、审计和跨业务附件证据。",
+      "references": [
+        "docs/architecture/状态工作流事实边界.md",
+        "docs/workflow/业务与协同流程地图.md",
+        "docs/observability/日志链路追踪审计第一版.md",
+        "docs/architecture/业务附件证据边界评审.md"
+      ]
+    }
+  ],
+  "commonFields": [
+    {
+      "name": "id",
+      "note": "数据库主键；只用于内部关联，不等同于业务编号。"
+    },
+    {
+      "name": "created_at",
+      "note": "记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。"
+    },
+    {
+      "name": "updated_at",
+      "note": "记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。"
+    },
+    {
+      "name": "status",
+      "note": "对象生命周期状态；允许值和组合约束见本表 CHECK 与生命周期说明。"
+    },
+    {
+      "name": "version",
+      "note": "并发控制版本；写动作通常使用 CAS 校验，不能由调用方任意跳号。"
+    },
+    {
+      "name": "idempotency_key",
+      "note": "幂等意图键；必须与对应 payload hash、操作者或业务范围合同一起解释。"
+    },
+    {
+      "name": "idempotency_payload_hash",
+      "note": "幂等输入摘要；用于阻止同一幂等键承载不同业务意图。"
+    },
+    {
+      "name": "created_by",
+      "note": "创建该记录的管理员标识。"
+    },
+    {
+      "name": "note",
+      "note": "业务备注；不替代状态原因、审批意见或正式审计字段。"
+    }
+  ],
+  "tables": [
+    {
+      "name": "access_entitlements",
+      "title": "有效能力授权投影",
+      "domain": "account-access-config",
+      "kind": "Derived",
+      "purpose": "保存客户配置版本编译出的角色能力、范围和启用状态，供运行时授权判断。",
+      "boundary": "它是 revision-scoped 编译结果，不是权限目录、角色定义或客户配置源文件的真源。",
+      "lifecycle": "随客户配置发布事务生成；激活或回滚只切换有效 revision；不提供独立业务编辑和删除。",
+      "writeBoundary": "仅由 CustomerConfigUsecase 的发布事务写入，业务 usecase 只读。"
+    },
+    {
+      "name": "admin_sessions",
+      "title": "管理员会话",
+      "domain": "account-access-config",
+      "kind": "Fact",
+      "purpose": "保存可撤销管理员访问令牌的服务端会话真源。",
+      "boundary": "只表达认证会话及失效状态，不表达角色、权限或业务任务归属。",
+      "lifecycle": "签发后直到过期或 revoked；业务路径不物理删除，过期清理属于运行维护。",
+      "writeBoundary": "AdminAuthUsecase 签发；账号禁用、注销、密码重置等管理动作统一撤销。",
+      "sensitiveFields": [
+        "session_key"
+      ]
+    },
+    {
+      "name": "admin_users",
+      "title": "管理员账号",
+      "domain": "account-access-config",
+      "kind": "Config",
+      "purpose": "保存后台登录身份、认证版本、超级管理员标记和账号状态。",
+      "boundary": "账号身份不等于业务角色、任务处理人或客户租户；当前 customer_key 不是多租户隔离。",
+      "lifecycle": "启用、禁用、恢复和正式注销；注销通过 revoked_at 和 disabled 保留历史，不物理删除。",
+      "writeBoundary": "AdminManageUsecase、AdminAuthUsecase 和受控 bootstrap 写入。",
+      "sensitiveFields": [
+        "phone",
+        "password_hash"
+      ],
+      "fieldNotes": [
+        {
+          "name": "password_hash",
+          "note": "密码哈希敏感字段；不得记录到日志、错误响应或普通导出。"
+        },
+        {
+          "name": "auth_version",
+          "note": "认证版本；禁用、注销和重置密码时递增，使旧会话失效。"
+        }
+      ]
+    },
+    {
+      "name": "admin_user_roles",
+      "title": "管理员角色绑定",
+      "domain": "account-access-config",
+      "kind": "Config",
+      "purpose": "保存管理员账号与 RBAC 角色之间的多对多绑定。",
+      "boundary": "它只决定角色归属，不直接授予字段范围、任务所有权或客户配置能力。",
+      "lifecycle": "无独立状态；角色设置时按目标集合事务替换，可新增或移除绑定。",
+      "writeBoundary": "仅由 AdminManageUsecase 的角色设置事务维护。"
+    },
+    {
+      "name": "bom_headers",
+      "title": "BOM 版本",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存产品 BOM 的版本、有效期、状态及工程资料头信息。",
+      "boundary": "BOM 是产品结构和用量真源，不是采购、库存、生产领料或成本事实。",
+      "lifecycle": "DRAFT 可编辑；DRAFT 可转 ACTIVE 或 ARCHIVED；ACTIVE 可归档；ARCHIVED 可重新激活；正式版本不直接删除。",
+      "writeBoundary": "InventoryUsecase 的 BOM 聚合保存、复制、激活和归档动作写入。"
+    },
+    {
+      "name": "bom_items",
+      "title": "BOM 物料明细",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存一个 BOM 版本引用的物料、单位、用量、损耗率和显式工序归属。",
+      "boundary": "production_operation_code 必须显式绑定，不能从位置、名称或其他自由文本推断。",
+      "lifecycle": "仅所属 BOM 为 DRAFT 时可新增、修改、替换或移除；激活或归档后不得直接编辑。",
+      "writeBoundary": "InventoryUsecase 的 BOM 聚合保存事务维护；不允许独立绕过 BOM 状态写入。"
+    },
+    {
+      "name": "business_attachments",
+      "title": "业务附件证据",
+      "domain": "workflow-runtime",
+      "kind": "Fact",
+      "purpose": "保存挂接到业务对象的文件内容、元数据、哈希和上传人等证据。",
+      "boundary": "附件是 Evidence 层，不改变 Source Document、Fact、Workflow、库存、质检或财务状态。",
+      "lifecycle": "普通证据只追加、不提供常规物理删除；产品图片允许按固定 slot 替换或清空；debug cleanup 另行受控。",
+      "writeBoundary": "BusinessAttachmentUsecase 校验 owner、权限、大小、类型和哈希后写入。",
+      "notes": "现有六类 kind 未单列 Evidence，本目录暂归 Fact；不得据此把附件解释成领域过账事实。",
+      "sensitiveFields": [
+        "content"
+      ],
+      "references": [
+        "docs/architecture/业务附件证据边界评审.md"
+      ]
+    },
+    {
+      "name": "contacts",
+      "title": "联系人",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存客户或供应商联系人、联系方式、主联系人标记和启用状态。",
+      "boundary": "联系人通过 owner_type 和 owner_id 归属 CUSTOMER 或 SUPPLIER，不是交易单据参与方快照。",
+      "lifecycle": "启用或停用；主联系人切换按 owner 范围维护；不因主数据停用删除历史引用。",
+      "writeBoundary": "MasterDataUsecase 校验 owner 类型、归属和主联系人唯一性后写入。",
+      "notes": "owner 为多态引用，数据库没有跨两张 owner 表的普通外键，归属完整性主要由 usecase/repo 守住。",
+      "sensitiveFields": [
+        "phone",
+        "mobile",
+        "email"
+      ]
+    },
+    {
+      "name": "customers",
+      "title": "客户",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存销售、出货和应收等业务引用的客户主档。",
+      "boundary": "客户主档不记录销售承诺、出货发生或财务事实。",
+      "lifecycle": "启用或停用；停用只阻止新业务引用，不删除已有正式业务记录。",
+      "writeBoundary": "MasterDataUsecase 创建、修改和启停。",
+      "sensitiveFields": [
+        "tax_no"
+      ]
+    },
+    {
+      "name": "customer_config_revisions",
+      "title": "客户配置版本",
+      "domain": "account-access-config",
+      "kind": "Config",
+      "purpose": "保存规范化客户配置的版本、哈希、编译快照和发布状态。",
+      "boundary": "它是单客户私有化配置控制面，不是 tenant_id 多租户模型，也不保存 secret 或客户原始资料。",
+      "lifecycle": "building、published、active、superseded；激活和回滚以多 revision 事务切换，不删除历史版本。",
+      "writeBoundary": "CustomerConfigUsecase 负责发布、激活和回滚，repo 保证 hash、状态和投影原子一致。"
+    },
+    {
+      "name": "deployment_module_states",
+      "title": "模块状态投影",
+      "domain": "account-access-config",
+      "kind": "Derived",
+      "purpose": "保存客户配置版本编译出的模块 enabled、read_only 或 disabled 状态。",
+      "boundary": "它是 revision 投影，不是产品模块目录或部署成功证据。",
+      "lifecycle": "配置发布时生成；激活或回滚选择有效 revision；无独立业务编辑和删除。",
+      "writeBoundary": "仅由 CustomerConfigUsecase 发布事务写入。"
+    },
+    {
+      "name": "finance_allocations",
+      "title": "财务核销分配",
+      "domain": "shipping-finance",
+      "kind": "Fact",
+      "purpose": "保存一笔已过账收付款对一条财务事实的核销金额。",
+      "boundary": "它是实际核销分录，不是收付款审批状态或应收应付主事实。",
+      "lifecycle": "POSTED 后不可修改和删除；冲正通过新增 REVERSED 反向分配记录完成。",
+      "writeBoundary": "FinancePayment 的过账和冲正事务内由 OperationalFactUsecase/repo 写入。"
+    },
+    {
+      "name": "finance_credit_notes",
+      "title": "财务红冲",
+      "domain": "shipping-finance",
+      "kind": "Fact",
+      "purpose": "保存针对财务事实的红冲及反向红冲记录。",
+      "boundary": "红冲是新的会计调整记录，不改写原 finance_facts 行。",
+      "lifecycle": "POSTED 或 REVERSED 记录均不可修改、删除；反向动作创建新行并关联原行。",
+      "writeBoundary": "OperationalFactUsecase 的红冲和反向红冲命名动作写入。"
+    },
+    {
+      "name": "finance_facts",
+      "title": "业务财务事实",
+      "domain": "shipping-finance",
+      "kind": "Fact",
+      "purpose": "保存来源可追溯的应收、应付、发票和对账事实。",
+      "boundary": "Workflow 或出货放行不能直接代表财务事实已过账；来源和事实类型必须由领域 usecase 校验。",
+      "lifecycle": "DRAFT 转 POSTED；POSTED 可 SETTLED 或 CANCELLED；正式记录不物理删除。",
+      "writeBoundary": "OperationalFactUsecase 从出货、采购入库、委外回货或显式财务动作创建、过账、结清和取消。"
+    },
+    {
+      "name": "finance_payments",
+      "title": "收付款单",
+      "domain": "shipping-finance",
+      "kind": "SourceDocument",
+      "purpose": "保存收款或付款的登记、审批、过账、账户凭据和金额。",
+      "boundary": "审批只改变单据阶段；只有显式过账事务才创建核销分配，Workflow done 不等于 payment POSTED。",
+      "lifecycle": "DRAFT 可经 ProcessRuntime 转 APPROVED 或 REJECTED；DRAFT 或受控 APPROVED 可 CANCELLED；APPROVED 可 POSTED；POSTED 可 REVERSED；不物理删除。",
+      "writeBoundary": "OperationalFactUsecase 创建、取消和冲正；审批、拒绝与过账通过 ProcessRuntime 白名单领域命令执行。",
+      "notes": "clean schema 明确称其为 accounting source document；已过账收付款与不可变核销事实由 finance_allocations 分层承接。",
+      "sensitiveFields": [
+        "account_ref",
+        "evidence_ref"
+      ]
+    },
+    {
+      "name": "inventory_balances",
+      "title": "库存余额投影",
+      "domain": "inventory-quality",
+      "kind": "Derived",
+      "purpose": "按物料或产品、SKU、仓库、批次和单位保存当前库存余额。",
+      "boundary": "余额由库存流水事务派生，不能作为可独立编辑的原始库存事实。",
+      "lifecycle": "随 inventory_txns 原子增减或创建；无业务状态和独立删除动作。",
+      "writeBoundary": "仅由库存 repo 在创建、过账、取消或冲正 inventory_txns 的同一事务中更新。"
+    },
+    {
+      "name": "inventory_lots",
+      "title": "库存批次",
+      "domain": "inventory-quality",
+      "kind": "Fact",
+      "purpose": "保存库存批次身份、物料或产品粒度、供应商批号及质量可用状态。",
+      "boundary": "批次标识不等于余额；数量仍以 inventory_txns 和 inventory_balances 为准。",
+      "lifecycle": "ACTIVE 可转 HOLD；HOLD 可转 ACTIVE 或 REJECTED；REJECTED 可转 ACTIVE 或 HOLD；零余额时可 DISABLED；不删除。",
+      "writeBoundary": "InventoryUsecase 创建和受控改状态；采购、退货、质检及生产事务可按合同创建或联动状态。"
+    },
+    {
+      "name": "inventory_operations",
+      "title": "库存作业单",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存盘点、调拨和手工调整的来源作业、原因、明细与审批阶段。",
+      "boundary": "作业单本身不是库存余额；只有 POSTED 才由同一事务写 inventory_txns。",
+      "lifecycle": "普通盘点或调拨可由 DRAFT 直接 POSTED；手工调整经 DRAFT、SUBMITTED、APPROVED 或 REJECTED 后过账；允许受控 CANCELLED；不物理删除。",
+      "writeBoundary": "InventoryUsecase 创建、过账和取消；手工调整提交、审批、拒绝和过账由 ProcessRuntime 白名单命令执行。",
+      "notes": "schema 明确称其为 auditable source document；目录按“先承载作业意图、过账后另写 inventory_txns”归 Source Document。"
+    },
+    {
+      "name": "inventory_operation_items",
+      "title": "库存作业明细",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存库存作业的物料或产品、仓库、批次、账面数、实盘数或调整量。",
+      "boundary": "明细是库存作业输入，不是库存流水或余额。",
+      "lifecycle": "随作业创建后保持不可变；状态和取消由 inventory_operations 聚合控制，不独立删除。",
+      "writeBoundary": "InventoryUsecase/repo 创建库存作业聚合时一次写入。"
+    },
+    {
+      "name": "inventory_txns",
+      "title": "库存流水",
+      "domain": "inventory-quality",
+      "kind": "Fact",
+      "purpose": "保存入、出、调整、调拨和冲正的不可变库存数量变动。",
+      "boundary": "这是库存变动事实真源；Workflow、订单状态和余额缓存均不能替代它。",
+      "lifecycle": "只追加；原流水不可修改、删除，纠错通过新的 REVERSAL 流水。",
+      "writeBoundary": "InventoryUsecase 或 OperationalFactUsecase 的领域过账事务写入，repo 同事务维护余额。"
+    },
+    {
+      "name": "materials",
+      "title": "物料",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存 BOM、采购、库存和生产引用的物料主档。",
+      "boundary": "物料分类和默认单位不等于采购、在库数量或成本事实。",
+      "lifecycle": "启用或停用；停用阻止新业务引用但保留历史。",
+      "writeBoundary": "MasterDataUsecase 创建、修改和启停。"
+    },
+    {
+      "name": "outsourcing_facts",
+      "title": "委外收发事实",
+      "domain": "production-outsourcing",
+      "kind": "Fact",
+      "purpose": "保存委外发料和委外回货的真实发生记录。",
+      "boundary": "委外合同表达承诺，本表过账才产生真实库存 OUT 或 IN。",
+      "lifecycle": "DRAFT 转 POSTED；DRAFT 或 POSTED 可 CANCELLED，已过账取消通过库存冲正；不删除。",
+      "writeBoundary": "OperationalFactUsecase 从委外订单或 WIP 来源创建、过账和取消。"
+    },
+    {
+      "name": "outsourcing_orders",
+      "title": "委外加工合同",
+      "domain": "production-outsourcing",
+      "kind": "SourceDocument",
+      "purpose": "保存供应商或加工厂承担加工任务的合同承诺。",
+      "boundary": "合同确认不等于已发料、已回货、已质检、已入库或已产生应付。",
+      "lifecycle": "draft 转 submitted、confirmed，再 closed；允许按状态 canceled；不物理删除。",
+      "writeBoundary": "OutsourcingOrderUsecase 创建、草稿聚合保存、提交、确认、关闭和取消。"
+    },
+    {
+      "name": "outsourcing_order_items",
+      "title": "委外合同明细",
+      "domain": "production-outsourcing",
+      "kind": "SourceDocument",
+      "purpose": "保存委外合同的产品或物料、工序、数量、价格和预计回货信息。",
+      "boundary": "process_id 与工序快照表达签约时点合同内容，不是 WIP 执行或委外收发事实。",
+      "lifecycle": "随草稿合同可维护；行状态 open、closed 或 canceled；正式合同后不独立删除。",
+      "writeBoundary": "OutsourcingOrderUsecase 的合同聚合保存事务维护。"
+    },
+    {
+      "name": "outsourcing_return_dispositions",
+      "title": "委外回货不合格处置",
+      "domain": "production-outsourcing",
+      "kind": "SourceDocument",
+      "purpose": "保存委外回货质检不合格后的退回供应商或返工处置。",
+      "boundary": "处置不是质检判定本身；POSTED 后才按类型产生受控后续 WIP 或退回结果。",
+      "lifecycle": "DRAFT 转 POSTED；DRAFT 或 POSTED 可 CANCELLED；保留审计，不删除。",
+      "writeBoundary": "OperationalFactUsecase 创建、过账和取消，并校验质检、委外回货事实和 WIP 来源。"
+    },
+    {
+      "name": "permissions",
+      "title": "权限目录",
+      "domain": "account-access-config",
+      "kind": "Config",
+      "purpose": "保存系统正式 RBAC capability key、模块和动作描述。",
+      "boundary": "权限目录只定义能力，不直接说明某个用户已拥有该能力。",
+      "lifecycle": "由代码内置目录同步；废弃内置权限按受控 seed 清理，不提供普通业务 CRUD。",
+      "writeBoundary": "RBAC bootstrap/seed 与 AdminManage 控制面维护，权限 key 真源仍在代码合同。"
+    },
+    {
+      "name": "processes",
+      "title": "生产工序",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存可复用生产工序、路线位置绑定、内制或委外能力和质检要求。",
+      "boundary": "它是生产工序主数据，不是 ProcessRuntime 流程定义、流程实例或 Workflow 任务。",
+      "lifecycle": "启用或停用；停用不改写已发布生产订单的路线快照。",
+      "writeBoundary": "MasterDataUsecase 创建、修改和启停。",
+      "notes": "production_route_operation_code 是机器可读绑定，不能从工序名称、类别或排序推断。"
+    },
+    {
+      "name": "process_instances",
+      "title": "流程实例",
+      "domain": "workflow-runtime",
+      "kind": "Workflow",
+      "purpose": "保存一次业务来源流程的版本、客户配置快照、整体状态和幂等锚点。",
+      "boundary": "它是 ProcessRuntime 聚合，不是生产工序主数据，也不替代来源单据或领域 Fact。",
+      "lifecycle": "active 转 completed 或 blocked；无公开业务删除，结算和阻塞必须通过 ProcessRuntime。",
+      "writeBoundary": "ProcessRuntimeUsecase 从白名单流程合同创建、启动、推进、阻塞和结算。",
+      "notes": "当前 schema 未用通用 hook 阻止所有物理删除；“无业务删除”是 usecase 合同，不应写成数据库层强制不可删。"
+    },
+    {
+      "name": "process_node_instances",
+      "title": "流程节点实例",
+      "domain": "workflow-runtime",
+      "kind": "Workflow",
+      "purpose": "保存流程节点 attempt、状态、责任池、动作合同以及领域命令的持久结果和恢复证据。",
+      "boundary": "节点 completed 只表示该节点按合同结算，不能代替库存、质检、出货或财务事实。",
+      "lifecycle": "waiting 转 active，再 completed 或 blocked；重试使用新 attempt；无公开业务删除。",
+      "writeBoundary": "ProcessRuntimeUsecase/repo 通过 CAS、幂等 receipt、domain command 和恢复动作写入。",
+      "notes": "属于 ProcessRuntime 子层；当前 schema 未用通用 hook 阻止所有物理删除。"
+    },
+    {
+      "name": "products",
+      "title": "产品",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存产品或款号主档，供 SKU、BOM、订单、生产、库存和出货引用。",
+      "boundary": "产品主档不等于 SKU、BOM 版本、库存数量或订单事实。",
+      "lifecycle": "启用或停用；停用阻止新引用但保留历史。",
+      "writeBoundary": "MasterDataUsecase 创建、修改和启停。"
+    },
+    {
+      "name": "product_skus",
+      "title": "产品规格（SKU）",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存产品下的规格、颜色、尺码、条码和客户 SKU 等显式库存粒度。",
+      "boundary": "SKU 是主数据，不自动创建库存、BOM、销售行或生产事实。",
+      "lifecycle": "启用或停用；停用保留历史事实引用。",
+      "writeBoundary": "MasterDataUsecase 在产品边界内创建、修改和启停。"
+    },
+    {
+      "name": "production_exception_decisions",
+      "title": "生产异常申请与决策",
+      "domain": "production-outsourcing",
+      "kind": "SourceDocument",
+      "purpose": "保存报废、超领或 WIP 让步的申请、审批决定及后续执行状态。",
+      "boundary": "审批 APPROVED 只形成许可；必须由独立执行动作更新 WIP、需求或事件，不能用任务完成代替。",
+      "lifecycle": "SUBMITTED 转 APPROVED、REJECTED 或 CANCELLED；执行状态 PENDING 转 APPLIED，再可 REVERSED；不删除。",
+      "writeBoundary": "OperationalFactUsecase 创建和反向；审批、拒绝及执行由 ProcessRuntime 白名单领域命令驱动。",
+      "notes": "该表同时保存审批来源和执行审计；本目录按“先申请与决策、后显式执行”归 Source Document。"
+    },
+    {
+      "name": "production_facts",
+      "title": "生产事实",
+      "domain": "production-outsourcing",
+      "kind": "Fact",
+      "purpose": "保存生产领料、完工入库和返工等实际生产发生。",
+      "boundary": "生产订单、WIP 或 Workflow 完成都不等于本表已 POSTED。",
+      "lifecycle": "DRAFT 转 POSTED；DRAFT 或 POSTED 可 CANCELLED，已过账取消以 REVERSAL 冲正库存；不删除。",
+      "writeBoundary": "OperationalFactUsecase 从生产订单、冻结需求或已过账完工来源创建、过账和取消。"
+    },
+    {
+      "name": "production_orders",
+      "title": "生产订单",
+      "domain": "production-outsourcing",
+      "kind": "SourceDocument",
+      "purpose": "保存生产承诺、计划日期、产品行及来源销售订单或 BOM 引用。",
+      "boundary": "发布只冻结生产输入并初始化正式路线/WIP，不等于领料、完工、入库或财务事实。",
+      "lifecycle": "DRAFT 转 RELEASED，再 CLOSED；DRAFT 或 RELEASED 可在事实门禁允许时 CANCELLED；禁止物理删除。",
+      "writeBoundary": "ProductionOrderUsecase 创建和保存草稿，通过命名动作发布、关闭和取消。"
+    },
+    {
+      "name": "production_order_events",
+      "title": "生产订单命令回执",
+      "domain": "production-outsourcing",
+      "kind": "Fact",
+      "purpose": "保存生产订单 CREATE、SAVE、RELEASE、CLOSE、CANCEL 的版本和幂等回执。",
+      "boundary": "事件证明命令处理结果，不代表领料、WIP、完工或库存事实。",
+      "lifecycle": "只追加、不可修改、不可删除；每个 actor、command 和幂等 key 保持唯一。",
+      "writeBoundary": "ProductionOrderRepo 在生产订单命令事务中写入。"
+    },
+    {
+      "name": "production_order_items",
+      "title": "生产订单明细",
+      "domain": "production-outsourcing",
+      "kind": "SourceDocument",
+      "purpose": "保存生产订单的产品、SKU、数量、销售来源、BOM 和路线选择。",
+      "boundary": "订单行表达生产承诺，不记录实领、在制、完工或库存数量。",
+      "lifecycle": "DRAFT 聚合内可维护；RELEASED 后来源、BOM 和路线快照锁定；不独立删除正式行。",
+      "writeBoundary": "ProductionOrderUsecase 的草稿聚合保存和发布事务维护。"
+    },
+    {
+      "name": "production_order_material_requirements",
+      "title": "生产订单物料需求快照",
+      "domain": "production-outsourcing",
+      "kind": "Derived",
+      "purpose": "保存生产订单发布时从 BOM 冻结出的物料需求及明确工序归属。",
+      "boundary": "这是需求快照，不是采购需求、实际领料量或库存扣减。",
+      "lifecycle": "订单发布时生成后不可修改、不可删除；随生产订单历史永久保留。",
+      "writeBoundary": "ProductionOrderRepo 的 RELEASE 事务从选定 BOM 生成。"
+    },
+    {
+      "name": "production_order_operations",
+      "title": "生产订单工艺路线快照",
+      "domain": "production-outsourcing",
+      "kind": "Derived",
+      "purpose": "保存生产订单发布时冻结的路线、步骤、工序快照和质量门禁。",
+      "boundary": "它不是 processes 主档，也不是当前 ProcessRuntime 节点；主档变更不回写历史路线。",
+      "lifecycle": "订单发布时生成后不可修改、不可删除。",
+      "writeBoundary": "ProductionOrderRepo 的 RELEASE 事务根据显式路线合同生成。"
+    },
+    {
+      "name": "production_packaging_confirmations",
+      "title": "包材版本业务确认",
+      "domain": "production-outsourcing",
+      "kind": "Fact",
+      "purpose": "保存生产订单行在包装工序使用的包材图稿或版本确认。",
+      "boundary": "这是业务确认，不是包材 IQC、采购入库或库存事实。",
+      "lifecycle": "PENDING 转 CONFIRMED；确认后保留审计，不删除。",
+      "writeBoundary": "ProductionOrderUsecase 的 WIP 包材确认动作写入，repo 保证版本和幂等。"
+    },
+    {
+      "name": "production_wip_batches",
+      "title": "生产在制品批次",
+      "domain": "production-outsourcing",
+      "kind": "Fact",
+      "purpose": "保存生产订单行在显式工艺路线中的数量批次、当前工序和执行状态。",
+      "boundary": "WIP 是生产执行事实，但不等于成品库存、生产完工入库或质量判定。",
+      "lifecycle": "PLANNED 可拆分、安排内制或委外、取消；执行中可转 WAITING_QUALITY、ACCEPTED 或 REJECTED；返工产生受控新流转，不删除。",
+      "writeBoundary": "ProductionOrderUsecase 的命名 WIP 动作及质量、异常执行事务写入。"
+    },
+    {
+      "name": "production_wip_events",
+      "title": "在制品事件回执",
+      "domain": "production-outsourcing",
+      "kind": "Fact",
+      "purpose": "保存 WIP 拆批、安排、开始、完成、移交、回货、返工和异常执行的命令回执。",
+      "boundary": "事件用于幂等和审计，不替代 WIP 当前行、质检事实或库存流水。",
+      "lifecycle": "只追加、不可修改、不可删除。",
+      "writeBoundary": "Production WIP repo 在 ApplyProductionWIPCommand 事务内写入。"
+    },
+    {
+      "name": "production_wip_outsourcing_allocations",
+      "title": "在制品委外分配",
+      "domain": "production-outsourcing",
+      "kind": "Fact",
+      "purpose": "将一个 WIP 批次不可变地绑定到已确认委外合同行及分配数量。",
+      "boundary": "它只证明 WIP 与合同来源的数量分配，不代表已发料、已回货或已付款。",
+      "lifecycle": "分配创建后不可修改、不可删除；后续执行以新事件和事实表达。",
+      "writeBoundary": "ProductionOrderUsecase 的 WIP 委外安排事务写入。"
+    },
+    {
+      "name": "purchase_orders",
+      "title": "采购订单",
+      "domain": "sales-purchase",
+      "kind": "SourceDocument",
+      "purpose": "保存向供应商采购物料的业务承诺、日期、交付和结算条件。",
+      "boundary": "采购订单不是 BOM、入库、库存、质检或应付事实。",
+      "lifecycle": "draft 转 submitted、approved，再 closed；允许按状态 canceled；不物理删除。",
+      "writeBoundary": "PurchaseOrderUsecase 创建、草稿聚合保存、提交、审批、关闭和取消。"
+    },
+    {
+      "name": "purchase_order_items",
+      "title": "采购订单明细",
+      "domain": "sales-purchase",
+      "kind": "SourceDocument",
+      "purpose": "保存采购订单的物料、数量、单位、价格和预计到货信息。",
+      "boundary": "订单行是采购承诺，不代表已收货、已检验或已入库。",
+      "lifecycle": "草稿聚合内可维护；行状态 open、closed 或 canceled；正式行不独立物理删除。",
+      "writeBoundary": "PurchaseOrderUsecase 的采购订单聚合保存事务维护。"
+    },
+    {
+      "name": "purchase_receipts",
+      "title": "采购入库单",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存采购收货来源单，并在显式过账时形成库存入库事实。",
+      "boundary": "DRAFT 不是库存；只有 POSTED 才写 inventory_txns，质检完成也不自动代替入库过账。",
+      "lifecycle": "DRAFT 转 POSTED；DRAFT 可直接 CANCELLED，POSTED 取消通过 REVERSAL 后转 CANCELLED；不可物理删除。",
+      "writeBoundary": "InventoryUsecase 从采购订单或人工来源创建，显式过账和取消。"
+    },
+    {
+      "name": "purchase_receipt_adjustments",
+      "title": "采购入库调整单",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存采购入库数量、批次或仓库纠正的可审计调整来源单。",
+      "boundary": "调整不改写原采购入库单和原库存流水，而是显式过账后产生新的修正流水。",
+      "lifecycle": "DRAFT 转 POSTED；DRAFT 可 CANCELLED，POSTED 取消通过 REVERSAL 后转 CANCELLED；不可删除。",
+      "writeBoundary": "InventoryUsecase 从原采购入库创建、过账和取消。"
+    },
+    {
+      "name": "purchase_receipt_adjustment_items",
+      "title": "采购入库调整明细",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存每条入库调整引用的原入库行、物料、仓库、批次和调整数量。",
+      "boundary": "明细不直接修改原入库行，库存影响只能通过所属调整单过账。",
+      "lifecycle": "随调整草稿创建后保持受保护；正式后不修改、不删除。",
+      "writeBoundary": "InventoryUsecase/repo 创建调整聚合时写入。"
+    },
+    {
+      "name": "purchase_receipt_items",
+      "title": "采购入库明细",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存采购收货的物料、数量、仓库、批次、价格和采购订单行来源。",
+      "boundary": "明细 DRAFT 时仍不是库存；库存发生以所属入库单 POSTED 及对应 inventory_txns 为准。",
+      "lifecycle": "随入库草稿创建；受保护字段不可随意修改，正式后不删除。",
+      "writeBoundary": "InventoryUsecase/repo 创建采购入库聚合时写入。"
+    },
+    {
+      "name": "purchase_rejection_dispositions",
+      "title": "采购拒收处置",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存采购 IQC 不合格后的退回供应商或要求补货处置。",
+      "boundary": "它不是质检判定；REPLACE 产生新的待处理入库来源，不改写原拒收记录。",
+      "lifecycle": "DRAFT 转 POSTED；DRAFT 或 POSTED 可 CANCELLED；保留审计，不删除。",
+      "writeBoundary": "InventoryUsecase 校验被拒质量事实和原入库来源后创建、过账和取消。"
+    },
+    {
+      "name": "purchase_returns",
+      "title": "采购退货单",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存从采购入库或不合格质检来源退回供应商的来源单。",
+      "boundary": "DRAFT 不扣库存；POSTED 才写 OUT，取消已过账退货写 REVERSAL。",
+      "lifecycle": "DRAFT 转 POSTED；DRAFT 可 CANCELLED，POSTED 取消后转 CANCELLED；不可删除。",
+      "writeBoundary": "InventoryUsecase 从采购入库或质量检验创建、过账和取消。"
+    },
+    {
+      "name": "purchase_return_items",
+      "title": "采购退货明细",
+      "domain": "inventory-quality",
+      "kind": "SourceDocument",
+      "purpose": "保存采购退货引用的原入库行、物料、仓库、批次和退货数量。",
+      "boundary": "明细本身不扣库存，库存影响由所属退货单过账事务产生。",
+      "lifecycle": "随退货草稿创建；正式后受保护，不修改、不删除。",
+      "writeBoundary": "InventoryUsecase/repo 创建采购退货聚合时写入。"
+    },
+    {
+      "name": "quality_inspections",
+      "title": "质量检验",
+      "domain": "inventory-quality",
+      "kind": "Fact",
+      "purpose": "保存采购、委外、客户退货或生产 WIP 的质量检查、结论和纠正链。",
+      "boundary": "质检只改变质量或批次/WIP 可用状态，不直接增加或扣减库存数量。",
+      "lifecycle": "DRAFT 转 SUBMITTED，再 PASSED 或 REJECTED；DRAFT 或 SUBMITTED 可 CANCELLED；纠错以 superseding 新检验保留原记录；不可删除。",
+      "writeBoundary": "InventoryUsecase 创建、提交、判定和取消；ProcessRuntime 可调用受控质量领域命令。"
+    },
+    {
+      "name": "roles",
+      "title": "角色",
+      "domain": "account-access-config",
+      "kind": "Config",
+      "purpose": "保存 RBAC 角色定义、类型、导航模式、排序和禁用状态。",
+      "boundary": "角色定义不等于账号已绑定，也不自动取得任务 owner、assignee 或数据范围。",
+      "lifecycle": "创建或更新、启用或禁用，使用 version 做并发控制；系统角色由 seed 维护。",
+      "writeBoundary": "AdminManageUsecase 和受控 RBAC seed 写入。"
+    },
+    {
+      "name": "role_data_scopes",
+      "title": "角色数据范围",
+      "domain": "account-access-config",
+      "kind": "Config",
+      "purpose": "保存角色对 warehouse 等资源的 ALL、ASSIGNED 或 NONE 数据范围。",
+      "boundary": "数据范围补充 RBAC capability，不能替代权限校验或任务归属。",
+      "lifecycle": "无独立状态；保存角色设置时按资源类型事务替换。",
+      "writeBoundary": "AdminManageUsecase/DataScope 配置事务维护。"
+    },
+    {
+      "name": "role_permissions",
+      "title": "角色权限绑定",
+      "domain": "account-access-config",
+      "kind": "Config",
+      "purpose": "保存角色和正式权限目录之间的多对多绑定。",
+      "boundary": "绑定只提供角色能力候选，最终授权仍受账号状态、客户配置、数据范围和任务归属约束。",
+      "lifecycle": "无独立状态；角色保存时按目标集合事务替换。",
+      "writeBoundary": "AdminManageUsecase 和 RBAC seed 维护。"
+    },
+    {
+      "name": "role_profiles",
+      "title": "角色画像投影",
+      "domain": "account-access-config",
+      "kind": "Derived",
+      "purpose": "保存客户配置版本编译出的角色显示、岗位和启用画像。",
+      "boundary": "它不是核心 roles 表或用户角色绑定真源。",
+      "lifecycle": "客户配置发布时生成；激活或回滚选择 revision；无独立业务编辑和删除。",
+      "writeBoundary": "CustomerConfigUsecase 发布事务写入。"
+    },
+    {
+      "name": "runtime_audit_events",
+      "title": "运行时审计事件",
+      "domain": "workflow-runtime",
+      "kind": "Fact",
+      "purpose": "保存账号管理、客户配置、Workflow break-glass 和运行控制面的审计事件。",
+      "boundary": "它补充控制面审计，不替代领域 Fact、WorkflowTaskEvent 或完整外部日志链。",
+      "lifecycle": "只追加、不可修改、不可删除。",
+      "writeBoundary": "AdminManageUsecase、CustomerConfigUsecase、Workflow 管理动作和受控 bootstrap 写入。",
+      "sensitiveFields": [
+        "payload"
+      ]
+    },
+    {
+      "name": "runtime_markers",
+      "title": "运行时一次性标记",
+      "domain": "workflow-runtime",
+      "kind": "Fact",
+      "purpose": "记录受控初始化或一次性运行动作已经执行的稳定 marker。",
+      "boundary": "marker 不是业务配置、migration 状态或部署成功证据，payload 不保存密码和 token。",
+      "lifecycle": "创建后不可修改、不可删除，同一 marker_key 唯一。",
+      "writeBoundary": "受控 bootstrap、demo 角色初始化等运行管理流程写入。"
+    },
+    {
+      "name": "sales_orders",
+      "title": "销售订单",
+      "domain": "sales-purchase",
+      "kind": "SourceDocument",
+      "purpose": "保存客户订单承诺、交付计划、付款方式和销售责任信息。",
+      "boundary": "销售订单生效不等于已预留、已生产、已出货或已产生应收。",
+      "lifecycle": "draft 转 submitted、active，再 closed；允许按状态 canceled；不物理删除。",
+      "writeBoundary": "SalesOrderUsecase 创建、草稿聚合保存、提交、生效、关闭和取消。"
+    },
+    {
+      "name": "sales_order_items",
+      "title": "销售订单明细",
+      "domain": "sales-purchase",
+      "kind": "SourceDocument",
+      "purpose": "保存销售订单的产品、SKU、数量、价格和计划交付信息。",
+      "boundary": "订单行只表达客户承诺，不是库存、预留、生产、出货或财务事实。",
+      "lifecycle": "草稿聚合内可维护；行状态 open、closed 或 canceled；正式行不独立物理删除。",
+      "writeBoundary": "SalesOrderUsecase 的销售订单聚合保存事务维护。"
+    },
+    {
+      "name": "sales_returns",
+      "title": "客户退货单",
+      "domain": "shipping-finance",
+      "kind": "SourceDocument",
+      "purpose": "保存客户针对已出货明细发起的退货申请、审批、收货和反向处理。",
+      "boundary": "APPROVED 只表示允许退货；RECEIVED 才由事务创建退货库存及质量状态，Workflow done 不替代收货。",
+      "lifecycle": "DRAFT 转 APPROVED 或 REJECTED；DRAFT 或 APPROVED 可 CANCELLED；APPROVED 可 RECEIVED；RECEIVED 可 REVERSED；不删除。",
+      "writeBoundary": "OperationalFactUsecase 创建、收货、取消和冲正；审批与拒绝由 ProcessRuntime 白名单命令执行。",
+      "notes": "schema 明确称其为 auditable source document；本目录按“退货申请先行、显式 receive 才写库存事实”归 Source Document。"
+    },
+    {
+      "name": "sales_return_items",
+      "title": "客户退货明细",
+      "domain": "shipping-finance",
+      "kind": "SourceDocument",
+      "purpose": "保存客户退货引用的原出货明细、产品、SKU、仓库、批次和数量。",
+      "boundary": "退货明细是申请和收货输入，库存变化仍由 receive/reverse 事务的 inventory_txns 证明。",
+      "lifecycle": "随退货单创建后保持不可变；状态由 sales_returns 聚合控制，不独立删除。",
+      "writeBoundary": "OperationalFactUsecase/repo 创建客户退货聚合时写入。"
+    },
+    {
+      "name": "shipments",
+      "title": "出货单",
+      "domain": "shipping-finance",
+      "kind": "SourceDocument",
+      "purpose": "保存向客户出货的来源单、财务放行状态和显式出货时间。",
+      "boundary": "finance_release APPROVED 只允许发货，不等于 SHIPPED；只有 SHIPPED 才写库存 OUT。",
+      "lifecycle": "DRAFT 转 SHIPPED；DRAFT 可 CANCELLED，SHIPPED 取消通过 REVERSAL 后转 CANCELLED；财务放行为独立 PENDING、APPROVED、REJECTED 集合；不删除。",
+      "writeBoundary": "OperationalFactUsecase 创建、出货和取消；财务放行及正式出货可由 ProcessRuntime 白名单命令驱动。"
+    },
+    {
+      "name": "shipment_items",
+      "title": "出货明细",
+      "domain": "shipping-finance",
+      "kind": "SourceDocument",
+      "purpose": "保存出货对应的销售订单行、产品、SKU、仓库、批次、数量和商业快照。",
+      "boundary": "明细只有随 shipment SHIPPED 才产生库存出库事实，不可脱离主单独过账。",
+      "lifecycle": "随出货草稿创建后保持不可变；正式后不修改、不删除。",
+      "writeBoundary": "OperationalFactUsecase/repo 创建出货聚合时写入。"
+    },
+    {
+      "name": "stock_reservations",
+      "title": "库存预留",
+      "domain": "inventory-quality",
+      "kind": "Fact",
+      "purpose": "保存销售订单或显式需求对库存可用量的数量预留。",
+      "boundary": "ACTIVE 影响可用量但不产生 inventory_txns；只有出货消费才在同一事务扣减真实库存。",
+      "lifecycle": "ACTIVE 转 RELEASED、CONSUMED 或 CANCELLED；终态不重开，不物理删除。",
+      "writeBoundary": "OperationalFactUsecase 创建和释放；出货事务原子消费。"
+    },
+    {
+      "name": "suppliers",
+      "title": "供应商与加工厂",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存采购、委外和应付引用的供应商或加工厂主档。",
+      "boundary": "供应商类型和工序能力不等于采购订单、委外合同或财务事实。",
+      "lifecycle": "启用或停用；停用阻止新引用但保留历史。",
+      "writeBoundary": "MasterDataUsecase 创建、修改、启停并维护工序能力集合。",
+      "sensitiveFields": [
+        "tax_no"
+      ]
+    },
+    {
+      "name": "units",
+      "title": "计量单位",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存物料、产品、BOM、订单、库存和事实共用的计量单位。",
+      "boundary": "单位不负责换算或数量事实；当前引用必须使用明确单位。",
+      "lifecycle": "启用或停用；停用保留历史引用。",
+      "writeBoundary": "MasterDataUsecase 创建、修改和启停。"
+    },
+    {
+      "name": "warehouses",
+      "title": "仓库",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存库存、入库、调拨、出货和数据范围引用的仓库主档。",
+      "boundary": "仓库主档不保存库存数量；余额和流水仍在库存事实层。",
+      "lifecycle": "启用或停用；停用阻止新业务引用并保留历史。",
+      "writeBoundary": "MasterDataUsecase 创建、修改和启停。"
+    },
+    {
+      "name": "work_pools",
+      "title": "责任池投影",
+      "domain": "account-access-config",
+      "kind": "Derived",
+      "purpose": "保存客户配置版本编译出的流程责任池和模块归属。",
+      "boundary": "它是配置投影，不是当前 Workflow task、角色或用户绑定的事实。",
+      "lifecycle": "客户配置发布时生成；激活或回滚选择 revision；无独立业务编辑和删除。",
+      "writeBoundary": "CustomerConfigUsecase 发布事务写入。"
+    },
+    {
+      "name": "work_pool_memberships",
+      "title": "责任池成员投影",
+      "domain": "account-access-config",
+      "kind": "Derived",
+      "purpose": "保存客户配置版本下责任池与角色或用户的成员关系。",
+      "boundary": "成员投影只参与任务路由和归属判断，不绕过 capability、账号状态或任务状态。",
+      "lifecycle": "客户配置发布时生成；激活或回滚选择 revision；无独立业务编辑和删除。",
+      "writeBoundary": "CustomerConfigUsecase 发布事务写入。"
+    },
+    {
+      "name": "workflow_business_states",
+      "title": "业务协同进度投影",
+      "domain": "workflow-runtime",
+      "kind": "Derived",
+      "purpose": "保存业务来源对象当前对岗位展示的协同阶段。",
+      "boundary": "它不是统一业务状态机、ProcessRuntime 节点或库存、出货、财务事实真源。",
+      "lifecycle": "由受控任务动作、ProcessRuntime 或领域 usecase 按来源 key upsert；可被下一阶段覆盖，不保存完整历史。",
+      "writeBoundary": "WorkflowUsecase、ProcessRuntime 或明确登记的领域副作用写入；前端不得直接写。"
+    },
+    {
+      "name": "workflow_tasks",
+      "title": "协同任务",
+      "domain": "workflow-runtime",
+      "kind": "Workflow",
+      "purpose": "保存岗位任务箱、责任池、角色、处理人、状态、截止时间和来源引用。",
+      "boundary": "任务 done 只证明协同办理完成，不等于任何 Source Document 生效或 Fact 过账。",
+      "lifecycle": "创建固定 ready；ready 可转 blocked、done、rejected；blocked 可恢复到 ready；done 和 rejected 终态不重开；无业务删除。",
+      "writeBoundary": "WorkflowUsecase 创建和办理；ProcessRuntime 为 human_task 或 approval 节点创建并结算 linked task。"
+    },
+    {
+      "name": "workflow_task_events",
+      "title": "协同任务事件",
+      "domain": "workflow-runtime",
+      "kind": "Workflow",
+      "purpose": "保存任务创建、状态动作、催办、升级、转交、版本和幂等 replay receipt。",
+      "boundary": "事件只覆盖单个任务的处理记录，不是跨节点完整流程历史或领域 Fact。",
+      "lifecycle": "业务语义为只追加；状态变更和催办产生新事件，不改写历史。",
+      "writeBoundary": "WorkflowRepo 在任务创建、状态 CAS、催办和升级事务内写入。",
+      "notes": "当前 schema 没有像多张 Fact 表那样显式 reject update/delete hook；这里只声明业务语义只追加，不宣称数据库层已全面强制不可变。"
+    },
+    {
+      "name": "supplier_process_capabilities",
+      "title": "供应商工序能力关联",
+      "domain": "master-data-bom",
+      "kind": "MasterData",
+      "purpose": "保存供应商或加工厂能够承接哪些生产工序的多对多关系。",
+      "boundary": "能力关联只用于委外来源校验，不等于已签合同、已分配 WIP 或已发生委外事实。",
+      "lifecycle": "无独立状态；维护供应商能力集合时可新增或移除关联。",
+      "writeBoundary": "MasterDataUsecase 通过 Supplier 与 Process 的 Ent 边事务维护。",
+      "notes": "这是 Ent 多对多自动生成的 join table，没有独立 schema 文件；生成器不能仅按 schema 文件名枚举表。",
+      "schemaSources": [
+        "server/internal/data/model/schema/supplier.go",
+        "server/internal/data/model/schema/process.go"
+      ]
+    }
+  ]
+}

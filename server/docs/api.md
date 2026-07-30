@@ -158,15 +158,19 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 公开接口从既有单据 / 事实查询候选或派生下游对象时，必须同时通过目标动作权限、精确来源读权限和来源 / 目标模块状态。统一 registry 覆盖 BOM 复制、采购入库 / 退货 / 调整、四类质检来源、生产 / WIP / 委外 / 库存预留、出货、财务与 ProcessRuntime wrapper；未登记的新来源动作、无精确读权请求或不可读 / 不可写模块会在进入来源 repository / write usecase 前 fail closed。条件来源按请求实际绑定项加权；对账先以候选读权收窄可探测范围，再按服务端读回的 authoritative FactType 要求对应应付 / 应收 / 发票读权限，不做宽泛 any-of 授权。registry 同时生成 permission usage；测试会逐项删除来源读权并断言写用例未调用，AST handler guard 还会验证每个注册 action 的真实 handler 分支调用了来源读 guard。
 
-`customer_config` 公开启动只保留三条：
+`customer_config` 公开提供七条来源绑定启动入口；前三条使用客户 active revision 的可配置审批责任，后四条使用 Product Core 固定异常流程合同：
 
 | 方法 | 来源与新建状态 | 权限 |
 | --- | --- | --- |
 | `start_sales_order_acceptance_process` | `DRAFT` 销售订单 | `sales_order.submit + sales_order.read` |
 | `start_material_supply_purchase_order_process` | `DRAFT` 采购订单 | `purchase.order.update + purchase.order.read` |
 | `start_finished_goods_delivery_process` | `DRAFT` 出货单 | `shipment.create + shipment.read` |
+| `start_sales_return_acceptance_process` | `DRAFT` 客户退货申请 | `sales_return.create + sales_return.read` |
+| `start_finance_payment_approval_process` | `DRAFT` 收付款申请 | `finance.payment.create` 及来源读权限 |
+| `start_inventory_adjustment_approval_process` | `DRAFT` 人工库存调整 | `warehouse.adjustment.create` 及仓库数据范围 |
+| `start_production_exception_approval_process` | `SUBMITTED` 生产异常决定 | `production.exception.submit` 及来源读权限 |
 
-创建事务锁定真实来源，从来源派生 canonical 单号并复核状态；只有完全匹配的已创建流程可精确重放。销售与采购 start 只激活首个 domain command，页面还必须用同一业务意图调用对应 `execute_*_submit` 才提交 Source Document 并创建审批任务；start 成功本身不改变单据状态。旧 `start_material_supply_process` 和公开无来源 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 均按 unknown method 处理。
+创建事务锁定真实来源，从来源派生 canonical 单号并复核状态；只有完全匹配的已创建流程可精确重放。销售与采购 start 只激活首个 domain command，页面还必须用同一业务意图调用对应 `execute_*_submit` 才提交 Source Document 并创建审批任务；库存人工调整 start 后同样要显式执行 submit 命令。Shipment 首节点直接是财务 approval。客户退货、收付款和生产异常按已存在的来源状态进入固定 approval 节点。start 成功不等于任一 Fact 已写入；旧 `start_material_supply_process` 和公开无来源 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 均按 unknown method 处理。
 
 事实取消不是通用删除，状态与库存合同如下：
 

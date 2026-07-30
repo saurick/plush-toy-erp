@@ -2,8 +2,8 @@
 
 - 阶段：待实现 / To Implement
 - 类型：HTML 原型样板
-- 来源：`docs/reference/第二次20260611/产品核心菜单与页面功能规格.md`、`docs/product/正式产品入口与菜单配置计划.md`、`docs/product/菜单映射评审表.md`、当前运行时菜单截图与已有原型样板
-- 边界：Reference Only，不替代当前 `seedData.mjs`、客户菜单配置、路由、RBAC、schema、API、WorkflowUsecase 或 Fact usecase
+- 项目依据：`docs/product/正式产品入口与菜单配置计划.md`、`docs/product/菜单映射评审表.md`、当前运行时菜单配置、路由、RBAC 和已有原型样板
+- 边界：To Implement，不替代当前 `seedData.mjs`、客户菜单配置、路由、RBAC、schema、API、WorkflowUsecase 或 Fact usecase
 
 ## 目标
 

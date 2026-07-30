@@ -26,7 +26,8 @@ Use this skill to keep plush-toy-erp docs useful for humans and safe as project 
    - Read `docs/当前真源与交接顺序.md` before making current-state claims.
    - Read `docs/文档清单.md` when adding, deleting, renaming, reclassifying, or changing the stated purpose/title of long-lived Markdown.
    - Read the nearest directory `README.md` for the touched docs area when it exists.
-   - Treat `docs/reference/**` as external input and `docs/archive/**` plus `progress.md` as historical/process evidence, not current runtime truth.
+   - Do not store other-project or GPT/ChatGPT exported source documents in the repository. Review them outside the repo, then restate accepted conclusions as project-native formal docs, code, or tests.
+   - Treat `docs/archive/**` plus `progress.md` as project history/process evidence, not current runtime truth.
 
 3. Protect `AGENTS.md`.
    - Ordinary docs cleanup should read `AGENTS.md`, not edit it.
@@ -84,7 +85,7 @@ Use this skill to keep plush-toy-erp docs useful for humans and safe as project 
 
 9. Apply plush naming and inventory rules.
    - Active long-lived Markdown defaults to Chinese filenames. Keep English anchors in H1, metadata, body, or `docs/文档清单.md`.
-   - Do not mechanically rename `README.md`, `AGENTS.md`, `CHANGELOG.md`, `docs/reference/**`, `docs/archive/**`, generated files, externally stable links, code package names, API paths, table names, config keys, or status keys.
+   - Do not mechanically rename `README.md`, `AGENTS.md`, `CHANGELOG.md`, `docs/archive/**`, generated files, externally stable links, code package names, API paths, table names, config keys, or status keys.
    - When adding, deleting, renaming, or reclassifying long-lived Markdown, update `docs/文档清单.md` and relevant directory README files in the same round.
    - If only body wording changes and title/purpose/path/classification remain accurate, `docs/文档清单.md` usually does not need an update.
 
@@ -112,4 +113,4 @@ When answering, report:
 - Whether metadata/frontmatter was intentionally added, changed, or skipped.
 - Whether `docs/文档清单.md`, nearby README files, anchors, references, and `progress.md` needed updates, including whether `progress.md` size/archiving was checked.
 - Which scans or validation commands passed.
-- What remains intentionally out of scope, especially runtime behavior, schema, RBAC, deployment, customer raw evidence, archive/reference rewriting, and broad directory reorganization.
+- What remains intentionally out of scope, especially runtime behavior, schema, RBAC, deployment, customer raw evidence, archive-history rewriting, and broad directory reorganization.

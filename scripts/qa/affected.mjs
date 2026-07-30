@@ -13,6 +13,7 @@ const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
 const LEVEL_ORDER = ["T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"];
 const CUSTOMER_SOURCE_BOUNDARY_TEST =
   "scripts/qa/customer-source-repository-boundary.test.mjs";
+const SCHEMA_DOCS_TEST = "scripts/qa/schema-docs.test.mjs";
 const PRIVATE_SOURCE_EXTENSIONS = new Set([
   ".doc",
   ".docx",
@@ -322,8 +323,16 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     if (isCustomerPrivateSourcePath(file)) {
       addNodeTests(state, [CUSTOMER_SOURCE_BOUNDARY_TEST], file, "T6");
     }
+    if (file === "server/docs/database/table-catalog.json") {
+      addFixed(state, "docs", file);
+      directTests.add(SCHEMA_DOCS_TEST);
+      continue;
+    }
     if (isDocumentation(file)) {
       addFixed(state, "docs", file);
+      if (file.startsWith("server/docs/database/")) {
+        directTests.add(SCHEMA_DOCS_TEST);
+      }
       if (file.startsWith(".agents/skills/")) {
         addFixed(state, "skillHealth", file);
       }
@@ -389,6 +398,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     ) {
       addFixed(state, "dbGuard", file);
       addFixed(state, "serverData", file);
+      directTests.add(SCHEMA_DOCS_TEST);
       addFollowUp(
         state,
         "schema-generation",
@@ -396,6 +406,12 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         "在 server/ 运行 make data，并检查生成代码、Atlas migration 与目标库 apply 状态；affected 不自动执行会改写文件或连接目标库的步骤。",
         file,
       );
+      continue;
+    }
+
+    if (file.startsWith("server/cmd/schema-doc/") && file.endsWith(".go")) {
+      addFixed(state, "serverAll", file);
+      directTests.add(SCHEMA_DOCS_TEST);
       continue;
     }
 

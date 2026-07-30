@@ -31,7 +31,6 @@ const IGNORED_MARKDOWN_PREFIXES = [
 
 const LOCAL_LINK_SCAN_IGNORED_PREFIXES = [
   "docs/archive/",
-  "docs/reference/",
   "progress.md",
 ];
 
@@ -146,6 +145,53 @@ test("document inventory does not retain missing Markdown paths", () => {
     missing,
     [],
     `docs/文档清单.md contains missing Markdown paths:\n${missing.join("\n")}`,
+  );
+});
+
+test("repository does not retain external reference source documents", () => {
+  const maintainedReferenceFiles = [
+    ...new Set([
+      ...gitList(["ls-files", "-z", "--", "docs/reference/**"]),
+      ...gitList([
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "-z",
+        "--",
+        "docs/reference/**",
+      ]),
+    ]),
+  ]
+    .filter((file) => fs.existsSync(path.join(ROOT_DIR, file)))
+    .sort();
+
+  assert.deepEqual(
+    maintainedReferenceFiles,
+    [],
+    `external reference source documents must stay outside the repository:\n${maintainedReferenceFiles.join("\n")}`,
+  );
+});
+
+test("active Markdown does not name retired adjacent projects", () => {
+  const retiredProjectPattern = /trade[-_ ]erp/iu;
+  const matches = [];
+
+  for (const sourceFile of collectMarkdownFiles()) {
+    if (sourceFile === "progress.md" || sourceFile.startsWith("docs/archive/")) {
+      continue;
+    }
+    const lines = fs.readFileSync(path.join(ROOT_DIR, sourceFile), "utf8").split(/\r?\n/u);
+    lines.forEach((line, index) => {
+      if (retiredProjectPattern.test(line)) {
+        matches.push(`${sourceFile}:${index + 1}: ${line.trim()}`);
+      }
+    });
+  }
+
+  assert.deepEqual(
+    matches,
+    [],
+    `active Markdown names retired adjacent projects:\n${matches.join("\n")}`,
   );
 });
 

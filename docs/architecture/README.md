@@ -9,6 +9,7 @@
 | 设计状态顶层架构，或分别查询目标状态、实现证据和未来方向 | `状态字典与生命周期索引.md` | 对应代码、Schema、migration、tests 与正式演进评审 |
 | 判断 Workflow / Fact 边界 | `状态工作流事实边界.md` | `状态字典与生命周期索引.md`、`../workflow/业务与协同流程地图.md`、对应 usecase / tests |
 | 判断各类“流”如何按 plush 实际建模 | `各类流程建模边界评审.md` | `状态工作流事实边界.md`、`../workflow/业务与协同流程地图.md`、`业务主链路数据流向与字段来源规则.md` |
+| 判断业务链、ProcessRuntime 业务轨迹、单任务记录、审批链、状态历史、lineage、审计、Trace 或通知链 | `业务链与运行轨迹边界.md` | `各类流程建模边界评审.md`、`状态工作流事实边界.md`、对应 repo / service / UI tests |
 | 判断 MasterData / Source Document / Fact 分层 | `主数据源单据事实边界评审.md` | `docs/product/领域模型第一版.md`、当前 schema / repo |
 | 做库存、BOM、采购、质检相关实现 | `材料成品物料清单与库存专表模型评审.md`、`产品款号物料清单边界评审.md`、`订单采购边界评审.md` | Ent schema、Atlas migration、data / biz tests |
 | 做出货或放行相关实现 | `状态工作流事实边界.md` | `OperationalFactUsecase`、Inventory usecase、RBAC、UI 回归 |
@@ -21,7 +22,7 @@
 
 | 分组 | 文档 |
 | --- | --- |
-| 总边界 | `状态字典与生命周期索引.md`、`状态工作流事实边界.md`、`各类流程建模边界评审.md`、`主数据源单据事实边界评审.md`、`行业专表模型评审.md` |
+| 总边界 | `状态字典与生命周期索引.md`、`状态工作流事实边界.md`、`各类流程建模边界评审.md`、`业务链与运行轨迹边界.md`、`主数据源单据事实边界评审.md`、`行业专表模型评审.md` |
 | Workflow usecase | `仓库入库工作流用例评审.md`、`成品入库工作流用例评审.md`；通用编排以 `状态工作流事实边界.md` 和 workflow/product 专文为准 |
 | MasterData / Source Document | `客户供应商主数据评审.md`、`订单采购边界评审.md`、`生产订单源单边界评审.md`、`生产工艺路线与在制品边界评审.md` |
 | Inventory / BOM / Quality | `材料成品物料清单与库存专表模型评审.md`、`产品款号物料清单边界评审.md`、`生产工艺路线与在制品边界评审.md` |

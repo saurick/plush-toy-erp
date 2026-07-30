@@ -14,7 +14,6 @@ const SKIP_PARTS = new Set([
   "build",
   "coverage",
   "docs/archive",
-  "docs/reference",
   "docs/customers/yoyoosun/raw-source-files",
   "output",
   "server/bin",

@@ -321,3 +321,163 @@ test("status architecture is target-only and separates delivery evidence", () =>
   ]);
   requireUniqueLine("workflow data boundary", dataBoundary, "发布证据", ["未发布"]);
 });
+
+test("chain and runtime trajectory documentation keeps chain, flow and evidence layers separate", () => {
+  const chainBoundary = readFileSync(
+    path.join(repoRoot, "docs/architecture/业务链与运行轨迹边界.md"),
+    "utf8",
+  );
+  const workflowMap = readFileSync(
+    path.join(repoRoot, "docs/workflow/业务与协同流程地图.md"),
+    "utf8",
+  );
+  const presentation = readFileSync(
+    path.join(repoRoot, "web/src/erp/utils/processRuntimePresentation.mjs"),
+    "utf8",
+  );
+
+  for (const required of [
+    "“流”描述系统应该怎样运转",
+    "“链”是把一次真实运行中已经持久化的对象和事件",
+    "ProcessRuntime 业务轨迹",
+    "单任务处理记录",
+    "审批处理链",
+    "状态变化链",
+    "数据来源链",
+    "审计链",
+    "请求 / Trace 链",
+    "通知链",
+    "get_task_process_context",
+    "list_task_events",
+    "当前状态不是状态历史",
+    "失败关闭",
+    "前端隐藏不是安全边界",
+  ]) {
+    assert(
+      chainBoundary.includes(required),
+      `chain boundary must preserve ${required}`,
+    );
+  }
+
+  for (const processKey of [
+    "sales_order_acceptance",
+    "material_supply",
+    "finished_goods_delivery",
+    "sales_return_acceptance",
+    "finance_payment_approval",
+    "inventory_adjustment_approval",
+    "production_exception_approval",
+  ]) {
+    assert(
+      workflowMap.includes(processKey),
+      `workflow map must cover current ProcessRuntime ${processKey}`,
+    );
+  }
+
+  assert.match(
+    workflowMap,
+    /finished_goods_delivery[\s\S]*财务审批[\s\S]*财务放行/u,
+  );
+  assert.match(
+    workflowMap,
+    /业务轨迹[\s\S]*本任务处理记录/u,
+  );
+  assert.match(presentation, /finished_goods_delivery:\s*'出货财务放行'/u);
+  assert.match(presentation, /业务轨迹暂时无法确认/u);
+});
+
+test("current documentation rejects stale Shipment, inventory approval and task-position wording", () => {
+  const currentTruthFiles = [
+    "README.md",
+    "server/README.md",
+    "server/docs/api.md",
+    "web/README.md",
+    "docs/architecture/各类流程建模边界评审.md",
+    "docs/workflow/业务与协同流程地图.md",
+    "docs/product/产品能力进度台账.md",
+    "docs/product/页面来源生成入口规则.md",
+    "docs/customers/yoyoosun/客户交付矩阵.md",
+    "docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
+    "docs/product/prototypes/mobile-role-tasks-v2/README.md",
+    "docs/product/prototypes/workflow-task-action-flow-v1/README.md",
+  ];
+  const forbiddenPhrases = [
+    "生成仓库负责的出货放行任务",
+    "仓库出货放行任务",
+    "库存调整正式审批和预留专项读模型仍待补",
+    "当前没有独立库存调整审批 Source Document / ProcessRuntime",
+    "流程位置暂时无法确认",
+  ];
+
+  for (const relativePath of currentTruthFiles) {
+    const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
+    for (const forbidden of forbiddenPhrases) {
+      assert(
+        !source.includes(forbidden),
+        `${relativePath} must not restore stale wording ${forbidden}`,
+      );
+    }
+  }
+
+  const capabilityLedger = readFileSync(
+    path.join(repoRoot, "docs/product/产品能力进度台账.md"),
+    "utf8",
+  );
+  assert.match(
+    capabilityLedger,
+    /inventory_adjustment_approval[\s\S]*批准不改库存[\s\S]*显式 post/u,
+  );
+  assert.match(
+    capabilityLedger,
+    /8 个本地代码边界已闭环，4 个部分，1 个[\s\S]*阻塞，1 个[\s\S]*范围外/u,
+  );
+  assert.match(capabilityLedger, /该汇总不包含审计 \/ 附件专项/u);
+});
+
+test("action and audit governance documents retain authorization and evidence matrices", () => {
+  const actionMatrix = readFileSync(
+    path.join(repoRoot, "docs/product/多甲方角色能力与流程编排.md"),
+    "utf8",
+  );
+  const auditMatrix = readFileSync(
+    path.join(repoRoot, "docs/observability/日志链路追踪审计第一版.md"),
+    "utf8",
+  );
+
+  for (const required of [
+    "实际动作 = 后端 RBAC ∩ enabled 模块 ∩ active revision entitlement - 当前角色 revoke",
+    "页面 / 移动端入口",
+    "后端命令或 JSON-RPC",
+    "RBAC 权限码",
+    "owner role / 责任池 / assignee",
+    "版本 / CAS",
+    "幂等键",
+    "Source Document 变化",
+    "Workflow / ProcessRuntime 变化",
+    "Fact / Ledger 副作用",
+    "审计证据",
+    "目标环境证据",
+  ]) {
+    assert(actionMatrix.includes(required), `action matrix must preserve ${required}`);
+  }
+
+  for (const required of [
+    "模块级覆盖矩阵",
+    "Workflow 任务创建与状态动作",
+    "任务转交 / 退回责任池",
+    "库存",
+    "质检",
+    "出货",
+    "生产 / 委外",
+    "收付款 / 核销 / 财务",
+    "附件上传 / 下载",
+    "附件删除 / 作废",
+    "request_id",
+    "trace_id",
+    "密码、密码 hash",
+    "完整客户配置",
+    "当前没有对象存储部署合同",
+  ]) {
+    assert(auditMatrix.includes(required), `audit matrix must preserve ${required}`);
+  }
+});

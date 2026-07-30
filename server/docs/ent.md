@@ -45,6 +45,27 @@ make migrate_hash
 make migrate_set
 ```
 
+## 数据库表数据字典
+
+当前应用表的人工可读入口是
+[`server/docs/database/README.md`](database/README.md)。生成器只读取当前 Ent
+generated migration descriptor，不连接数据库：
+
+```bash
+cd /Users/simon/projects/plush-toy-erp/server
+
+# 校验 catalog 与 74 张应用表、生成 Markdown 是否一致
+go run ./cmd/schema-doc --check
+
+# 审查 table-catalog.json 后重新生成分域 Markdown
+go run ./cmd/schema-doc --write
+```
+
+机械结构仍以 Ent schema 和 Atlas migration 为真源，业务用途、边界和生命周期维护在
+`server/docs/database/table-catalog.json`。生成 Markdown 不接受手工修改，也不会写入
+PostgreSQL `COMMENT`。目标数据库是否已 apply、是否存在漂移，仍需按目标环境执行
+migration status 与结构读回；数据字典绿色不能替代这两项证据。
+
 ## 约束
 
 - 不要手写结构性 SQL 迁移文件

@@ -7,7 +7,7 @@
 | 任务 | 先读 | 再核对 |
 | --- | --- | --- |
 | 判断产品长期路线 | `产品完成路线图.md` | `docs/当前真源与交接顺序.md`、当前代码和测试 |
-| 判断多客户角色、字段、模块和流程边界 | `多甲方角色能力与流程编排.md` | `docs/reference/第四次20260627/README.md`、当前代码、migration 和测试 |
+| 判断多客户角色、字段、模块和流程边界 | `多甲方角色能力与流程编排.md` | `模块边界.md`、当前代码、migration 和测试 |
 | 判断流程编排 runtime / preview-only 完成度 | `产品能力进度台账.md` 的“流程运行时状态” | `../当前真源与交接顺序.md`、Workflow / ProcessRuntime / customer config 代码和测试 |
 | 判断能力成熟度 / 是否可交付 | `产品能力进度台账.md` | 客户交付矩阵、对应代码、migration、测试和环境 evidence |
 | 进入新模块实现 | `模块实施治理.md` | 对应 architecture 评审、schema / usecase / API / UI / 测试 |

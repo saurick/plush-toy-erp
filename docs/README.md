@@ -15,8 +15,9 @@
 | 判断当前能力是否可用 | [当前真源与交接顺序](当前真源与交接顺序.md) | [产品能力进度台账](product/产品能力进度台账.md)、相关代码、migration、测试 |
 | 判断治理维度与口径、职责边界、验证口径或文档真源层级 | [项目治理地图](项目治理地图.md) | [当前真源与交接顺序](当前真源与交接顺序.md)、[模块实施治理](product/模块实施治理.md)、[自动化测试策略](product/自动化测试策略.md)、[AGENTS.md](../AGENTS.md) |
 | 规划下一轮产品实现 | [产品完成路线图](product/产品完成路线图.md) | [产品能力进度台账](product/产品能力进度台账.md)、[模块实施治理](product/模块实施治理.md)、对应目录 README |
+| 查数据库表、字段和约束 | [数据库表数据字典](../server/docs/database/README.md) | [Ent + Atlas 说明](../server/docs/ent.md)、Ent schema、Atlas migration；目标库另做 status 与结构读回 |
 | 改菜单、页面、原型或信息密度 | [web/README.md](../web/README.md)、[产品原型资产](product/prototypes/README.md) | 对应原型 README、真实运行页、[正式产品入口与菜单配置计划](product/正式产品入口与菜单配置计划.md) |
-| 改 Workflow、状态或 Fact 边界 | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 相关 architecture 评审、[server/README.md](../server/README.md)、usecase / schema / test |
+| 改 Workflow、状态、链 / 轨迹或 Fact 边界 | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md)、[业务链与运行轨迹边界](architecture/业务链与运行轨迹边界.md) | 相关 architecture 评审、[server/README.md](../server/README.md)、usecase / schema / test |
 | 改客户资料、导入或交付资料 | [新增甲方客户实施流程](product/新增甲方客户实施流程.md)、[客户资料入口](customers/README.md) | [标准样例客户](customers/reference-customer/README.md)、目标客户 README / 客户交付矩阵、对应脚本说明；私密 manifest 与原件不在 Product Core |
 | 改部署、发布或低配运行口径 | [部署约定](部署约定.md) | [server/deploy/README.md](../server/deploy/README.md)、[prod Compose README](../server/deploy/compose/prod/README.md)、[scripts/README.md](../scripts/README.md) |
 | 改 CI、不可变制品、133 promotion、回滚或研发效能工作台 | [工程效能与交付自动化](engineering/README.md) | [CI/CD 设计](engineering/研发效能工作台与CI-CD设计.md)、[实施计划](engineering/研发效能工作台与CI-CD实施计划.md)、QA / deploy 脚本和 workflow |
@@ -34,11 +35,12 @@
 | 架构评审 | Workflow / Fact / MasterData / Source Document / 状态边界 | [architecture/README.md](architecture/README.md) |
 | 客户资料 | 客户资料、客户差异、导入准备、交付矩阵 | [customers/README.md](customers/README.md) |
 | 部署与运行 | 低配发布、Compose 主路径、迁移和发布门禁 | [部署约定](部署约定.md) |
+| 后端与数据字典 | 服务运行、API、Ent / Atlas、数据库表与约束投影 | [server/docs/README.md](../server/docs/README.md)、[数据库表数据字典](../server/docs/database/README.md) |
 | 工程效能与交付自动化 | QA / CI 分层、不可变制品、测试环境 promotion、回滚和 DEV 工作台 | [engineering/README.md](engineering/README.md) |
 | 工作流 / 角色 / 财务 / 仓库 / 可观测性 | 专题设计和第一版业务说明 | [workflow](workflow/README.md)、[roles](roles/README.md)、[finance](finance/README.md)、[warehouse](warehouse/README.md)、[observability](observability/README.md) |
-| 参考与归档 | 外部输入、历史证据、旧过程记录 | [reference](reference/README.md)、[archive](archive/README.md) |
+| 归档 | 本项目历史证据和旧过程记录 | [archive](archive/README.md) |
 
-`docs/reference/**` 只作为设计输入，`docs/archive/**` 和 `progress.md` 只作为历史 / 过程证据。两者都不能直接覆盖当前代码、正式文档、migration 或测试。
+其他项目、GPT/ChatGPT 和外部规划原文不保存在仓库；有价值结论必须先按本项目真源复核，再转化为正式文档、代码或测试。`docs/archive/**` 和 `progress.md` 只作为本项目历史 / 过程证据，不能覆盖当前代码、正式文档、migration 或测试。
 
 ## 可视化图索引 / Visual Diagram Index
 
@@ -49,8 +51,9 @@
 | 项目治理分流 / Governance Routing | [项目治理地图](项目治理地图.md) | 说明任务问题如何分流到 AGENTS、当前真源、模块实施治理、测试策略、客户 / 部署和页面原型等专题真源。 |
 | 产品核心与客户投影 / Product Core And Customer Projection | [模块边界](product/模块边界.md) | 区分 Product Core、客户投影、升级门禁和 Workflow / Fact 禁区。 |
 | yoyoosun 客户投影 / Yoyoosun Customer Projection | [yoyoosun 客户资料](customers/yoyoosun/README.md) | 说明 yoyoosun 原始资料、客户配置、模拟 seed、模板候选、Product Core、tenant 和事实表边界。 |
-| 出货放行边界 / Shipment Release Boundary | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 锁住 `shipment_release done -> shipping_released`，避免把放行误判成 shipment、inventory 或 finance facts。 |
-| 各类流程建模边界 / Flow Modeling Boundary | [各类流程建模边界评审](architecture/各类流程建模边界评审.md) | 将 reference 中的业务流、状态流、工作流、审批流、任务流、异常流、通知流和自动流转映射到 plush 当前 Product Core、Workflow / Fact、页面和客户配置边界。 |
+| 出货财务放行边界 / Shipment Finance Release Boundary | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 锁住 Shipment 财务 approval / 版本化门禁与真实 `SHIPPED + inventory OUT` 的边界。 |
+| 各类流程建模边界 / Flow Modeling Boundary | [各类流程建模边界评审](architecture/各类流程建模边界评审.md) | 将业务流、状态流、工作流、审批流、任务流、异常流、通知流和自动流转归入 plush 当前 Product Core、Workflow / Fact、页面和客户配置边界。 |
+| 业务链与运行轨迹 / Business Chain And Runtime Trajectory | [业务链与运行轨迹边界](architecture/业务链与运行轨迹边界.md) | 区分流程设计、ProcessRuntime 业务轨迹、本任务处理记录、审批链、状态历史、lineage、审计、Trace 和通知链。 |
 | 业务与协同流程 / Business and Collaboration Flow | [业务与协同流程地图](workflow/业务与协同流程地图.md) | 连接 Source Document、协同任务和事实 usecase，并避免与测试 T0-T8 混用。 |
 | 标准实施门禁 / Standard Delivery Gate | [模块实施治理](product/模块实施治理.md) | 说明从 docs-only review 到 schema、usecase、API、UI、测试、文档和交付的门禁。 |
 
@@ -65,7 +68,7 @@
 | 产品 / 架构设计 | 能力目标、领域边界、状态机、事实源、接口和测试证据 | 以主路径和归属关系为主，负面例子只用于防止已知高风险混淆 |
 | 原型 / 样板 | 资产用途、阶段、归属、吸收范围、正式实现入口 | 写“如何吸收”和“正式真源是谁”，少写无限扩张的“不替代”列表 |
 | 客户 / 交付资料 | 客户输入、配置草案、验收状态、交付边界和待确认项 | 客户差异优先写归属与处理路径；隐私、真实导入、事实写入等高风险项才写硬限制 |
-| 参考 / 归档 | 外部输入和历史追溯 | 入口 README 标注 Reference / Archive；正文保持原貌，避免改写历史证据 |
+| 归档 | 本项目历史追溯 | 入口 README 标注 Archive；正文保持原貌，避免改写历史证据 |
 
 写作时优先让读者能执行下一步：
 
@@ -92,7 +95,6 @@
 
 - `README.md`、`AGENTS.md`、`CHANGELOG.md` 等约定文件名。
 - `docs/archive/**` 中作为历史证据保留的旧文件。
-- `docs/reference/**` 中需要保持外部输入原貌的资料。
 - 被脚本、URL、原型查看器、生成流程或外部链接稳定引用，且尚未完成迁移评审的文件或目录。
 - 代码包名、API、表名、配置 key、状态 key 等必须保持英文稳定锚点的技术对象。
 
@@ -116,7 +118,6 @@
 - 架构评审：[architecture/README.md](architecture/README.md)
 - 客户资料：[customers/README.md](customers/README.md)
 - 工程效能与交付自动化：[engineering/README.md](engineering/README.md)
-- 外部参考：[reference/README.md](reference/README.md)
 - 归档：[archive/README.md](archive/README.md)
 - 后端总览：[server/README.md](../server/README.md)
 - 后端专题：[server/docs/README.md](../server/docs/README.md)

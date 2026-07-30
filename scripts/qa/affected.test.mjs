@@ -225,6 +225,11 @@ test("affected: schema changes select migration guard and data tests without aut
 
   assert(ids(plan).includes("db-guard"));
   assert(ids(plan).includes("server-data"));
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/schema-docs.test.mjs"),
+    ),
+  );
   assert(plan.followUps.some((item) => item.id === "schema-generation"));
   assert.equal(ids(plan).includes("full"), false);
 });
@@ -236,7 +241,44 @@ test("affected: generated Ent changes select DB proof and regeneration follow-up
 
   assert(ids(plan).includes("db-guard"));
   assert(ids(plan).includes("server-data"));
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/schema-docs.test.mjs"),
+    ),
+  );
   assert(plan.followUps.some((item) => item.id === "schema-generation"));
+});
+
+test("affected: schema catalog and generated data dictionary run drift checks", () => {
+  for (const file of [
+    "server/docs/database/table-catalog.json",
+    "server/docs/database/库存与质检.md",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    assert(ids(plan).includes("docs-inventory"), file);
+    assert(
+      plan.commands.some((item) =>
+        item.args.includes("scripts/qa/schema-docs.test.mjs"),
+      ),
+      file,
+    );
+    assert.equal(plan.requiresFull, false, file);
+    assert.equal(plan.highestLevel, "T1", file);
+  }
+});
+
+test("affected: schema-doc generator changes run server and projection tests", () => {
+  const plan = buildAffectedPlan(["server/cmd/schema-doc/main.go"], {
+    root: ROOT,
+  });
+
+  assert(ids(plan).includes("server-all"));
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/schema-docs.test.mjs"),
+    ),
+  );
+  assert.equal(plan.requiresFull, false);
 });
 
 test("affected: business fact repo changes include the local PostgreSQL transaction gate", () => {
