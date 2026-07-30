@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### 逾期任务相关单据入口
+
+- 完成：确认工作台的待处理、待审批和阻塞 / 逾期共用同一套任务详情与相关单据入口；截图中的模拟任务没有真实 Source Document / ProcessRuntime，继续不显示虚假入口，并在处理提示中明确“当前任务没有需要核对的相关单据”。补齐正式 ProcessRuntime 的客户退货、收付款与核销、库存调整、生产异常处置四类源单精确跳转；入口仍同时受后端 `source_access`、菜单投影和注册路由控制。
+- 验证：仓库 Node `24.14.0` 下，入口、权限与处理提示定向测试 23 / 23、Web 全量 Node 测试 1996 / 1996、四个触达文件 ESLint 和 scoped `git diff --check` 通过；真实 Chromium 工作台场景通过并目检模拟逾期任务无源单提示、长文案换行和相邻布局。
+- 下一步：本项无需 schema、migration、后端、RBAC、Workflow / Fact、客户配置或原型阶段变更；尚未暂存、提交、推送、部署、执行目标岗位 smoke 或客户 UAT。
+- 阻塞 / 风险：四类正式源单的路径、精确 ID 参数、后端 `source_access` 与菜单门禁已由合同测试覆盖；当前浏览器夹具只覆盖无权威源单的负向显示，未把本地合同绿色表述为目标环境正式源单点击验收。
+
 ### Codex App Git 收口队列治理
 
 - 完成：新增项目 Skill `$plush-git-closeout-queue`，把共享 Local 的唯一 writer、稳定 `event_id` + 精确 ACK、批次登记、热点文件继续排队、独立 push owner 和 fail-closed 边界收口为长期协议。AGENTS 只保留入口，动态查找同项目唯一置顶的 `Git 收口队列`，不保存易漂移的 task id、当前 owner、批次或 Git OID。

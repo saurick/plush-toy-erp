@@ -61,19 +61,29 @@ test('source access denial explains why handling and the related entry are unava
   )
 })
 
-test('tasks without an authoritative source link do not claim a source permission problem', () => {
+test('tasks without an authoritative source link explain that no related document is required', () => {
+  const sourceAccess = {
+    applicable: false,
+    resolved: true,
+    allowed: true,
+    reason: '当前任务没有需要核对的相关单据。',
+  }
+
   assert.equal(
     getWorkflowTaskProcessingHint({
       task: { task_status_key: 'ready' },
       allowedActionModes: ['urge'],
-      sourceAccess: {
-        applicable: false,
-        resolved: true,
-        allowed: true,
-        reason: '当前任务没有需要核对的相关单据。',
-      },
+      sourceAccess,
     }),
-    '当前仅可催办；催办只发送提醒，不代替负责人处理任务。'
+    '当前仅可催办；催办只发送提醒，不代替负责人处理任务。当前任务没有需要核对的相关单据。'
+  )
+  assert.equal(
+    getWorkflowTaskProcessingHint({
+      task: { task_status_key: 'ready' },
+      allowedActionModes: ['complete', 'block', 'reject', 'urge'],
+      sourceAccess,
+    }),
+    '可选择处理完成、标记阻塞、退回任务、催办；请按实际结果操作。当前任务没有需要核对的相关单据。'
   )
 })
 

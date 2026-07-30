@@ -10,23 +10,29 @@ import {
 const TASK_SOURCE_TITLE_MAP = new Map([
   ...dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.title]),
   ['project-orders', '销售订单'],
+  ['sales_order', '销售订单'],
+  ['sales_return', '客户退货'],
   ['material-bom', '工程资料'],
   ['accessories-purchase', '采购订单'],
+  ['purchase_order', '采购订单'],
   ['processing-contracts', '委外订单'],
   ['inbound', '入库任务'],
   ['inventory', '库存任务'],
+  ['inventory_operation', '库存调整'],
   ['shipping-release', '出货放行'],
   ['outbound', '出库任务'],
   ['production-orders', '生产订单'],
   ['production-scheduling', '生产排程'],
   ['production-progress', '生产记录'],
   ['production-exceptions', '生产异常处置'],
+  ['production_exception_decision', '生产异常处置'],
   ['quality-inspections', '质量检验'],
   ['shipment', '出货单'],
   ['reconciliation', '财务对账'],
   ['payables', '应付处理'],
   ['receivables', '应收与开票'],
   ['invoices', '发票处理'],
+  ['finance_payment', '收付款与核销'],
   ['shipments', '出货单'],
 ])
 const FORMAL_V1_TASK_ENTRY_MODULES = businessModuleDefinitions.filter(
@@ -54,6 +60,7 @@ const DIRECT_TASK_SOURCE_TARGETS = new Map([
   ['project-orders', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
   ['sales-orders', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
   ['sales_order', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
+  ['sales_return', [V1_ROUTE_PATHS.salesReturns, 'sales_return_id']],
   [
     'accessories-purchase',
     [V1_ROUTE_PATHS.purchaseOrders, 'purchase_order_id'],
@@ -63,6 +70,10 @@ const DIRECT_TASK_SOURCE_TARGETS = new Map([
   ['inbound', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
   ['purchase-receipt', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
   ['purchase_receipt', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
+  [
+    'inventory_operation',
+    [V1_ROUTE_PATHS.inventory, 'inventory_operation_id'],
+  ],
   [
     'processing-contracts',
     [V1_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
@@ -91,6 +102,13 @@ const DIRECT_TASK_SOURCE_TARGETS = new Map([
   ['production-fact', [V1_ROUTE_PATHS.productionProgress, 'fact_id']],
   ['production_fact', [V1_ROUTE_PATHS.productionProgress, 'fact_id']],
   [
+    'production_exception_decision',
+    [
+      TASK_SOURCE_PATH_MAP.get('production-exceptions'),
+      'production_exception_id',
+    ],
+  ],
+  [
     'quality-inspections',
     [V1_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
   ],
@@ -104,6 +122,7 @@ const DIRECT_TASK_SOURCE_TARGETS = new Map([
   ],
   ['shipments', [V1_ROUTE_PATHS.shipments, 'shipment_id']],
   ['shipment', [V1_ROUTE_PATHS.shipments, 'shipment_id']],
+  ['finance_payment', [V1_ROUTE_PATHS.financePayments, 'finance_payment_id']],
 ])
 const SOURCE_TASK_CONTRACT = 'workflow.source-task/v1'
 const SOURCE_TASK_INTENT_HASH_PATTERN = /^[0-9a-f]{64}$/
@@ -260,10 +279,15 @@ export function resolveWorkflowTaskSourceEntryPath(task = {}) {
     .toLowerCase()
   const sourceID = Number(task.source_id || 0)
   const target = DIRECT_TASK_SOURCE_TARGETS.get(sourceType)
-  if (!target || !Number.isSafeInteger(sourceID) || sourceID <= 0) {
+  const [path, queryKey] = target || []
+  if (
+    !ACTIVE_TASK_ENTRY_PATHS.has(path) ||
+    !queryKey ||
+    !Number.isSafeInteger(sourceID) ||
+    sourceID <= 0
+  ) {
     return ''
   }
-  const [path, queryKey] = target
   return routeWithQuery(path, {
     [queryKey]: sourceID,
     link_source: 'task-dashboard',

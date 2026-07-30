@@ -7,6 +7,7 @@ import {
   resolveWorkflowTaskEntryPath,
   resolveWorkflowTaskSourceEntryPath,
 } from './dashboardTaskDisplay.mjs'
+import { canOpenWorkflowTaskEntry } from './workflowTaskEntryAccess.mjs'
 
 test('formatWorkflowTaskSource marks simulated task catalog as display-only', () => {
   assert.equal(
@@ -30,6 +31,21 @@ test('dashboardTaskDisplay: 任务来源类型使用业务可读标签', () => {
     '生产记录'
   )
   assert.equal(getWorkflowTaskSourceTypeLabel('shipments'), '出货单')
+  assert.equal(getWorkflowTaskSourceTypeLabel('sales_order'), '销售订单')
+  assert.equal(getWorkflowTaskSourceTypeLabel('purchase_order'), '采购订单')
+  assert.equal(getWorkflowTaskSourceTypeLabel('sales_return'), '客户退货')
+  assert.equal(
+    getWorkflowTaskSourceTypeLabel('finance_payment'),
+    '收付款与核销'
+  )
+  assert.equal(
+    getWorkflowTaskSourceTypeLabel('inventory_operation'),
+    '库存调整'
+  )
+  assert.equal(
+    getWorkflowTaskSourceTypeLabel('production_exception_decision'),
+    '生产异常处置'
+  )
   assert.equal(getWorkflowTaskSourceTypeLabel('unknown_source_key'), '业务来源')
   assert.equal(getWorkflowTaskSourceTypeLabel('', '全部模块'), '全部模块')
 })
@@ -121,6 +137,68 @@ test('dashboardTaskDisplay: 流程运行态验证过的业务来源才使用 ID 
     '',
     'generic tasks cannot prove that source_id is a production order id'
   )
+})
+
+test('dashboardTaskDisplay: 正式逾期任务可精确打开后端已授权的相关单据', () => {
+  const tasks = [
+    [
+      'sales_return',
+      81,
+      '/erp/sales/customer-returns?sales_return_id=81&link_source=task-dashboard',
+    ],
+    [
+      'finance_payment',
+      82,
+      '/erp/finance/payments?finance_payment_id=82&link_source=task-dashboard',
+    ],
+    [
+      'inventory_operation',
+      83,
+      '/erp/warehouse/inventory?inventory_operation_id=83&link_source=task-dashboard',
+    ],
+    [
+      'production_exception_decision',
+      84,
+      '/erp/production/exceptions?production_exception_id=84&link_source=task-dashboard',
+    ],
+  ]
+  const sourceAccess = {
+    applicable: true,
+    resolved: true,
+    allowed: true,
+  }
+
+  for (const [sourceType, sourceID, expected] of tasks) {
+    const task = {
+      task_status_key: 'ready',
+      due_at: 1,
+      source_type: sourceType,
+      source_id: sourceID,
+      config_revision: 'customer-revision-1',
+      process_instance_id: 501,
+      process_node_instance_id: 701,
+    }
+    const entryPath = resolveWorkflowTaskSourceEntryPath(task)
+
+    assert.equal(entryPath, expected)
+    assert.equal(resolveWorkflowTaskEntryPath(task), expected)
+    assert.equal(
+      canOpenWorkflowTaskEntry(
+        { menus: [expected.split('?')[0]] },
+        entryPath,
+        sourceAccess
+      ),
+      true
+    )
+    assert.equal(
+      resolveWorkflowTaskSourceEntryPath({
+        source_type: sourceType,
+        source_id: sourceID,
+      }),
+      '',
+      'ordinary source_type/source_id pairs cannot create a related-document link'
+    )
+  }
 })
 
 test('dashboardTaskDisplay: 白名单来源任务不依赖流程实例也能精确返回源单', () => {

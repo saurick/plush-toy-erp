@@ -32,9 +32,21 @@ function normalizeAllowedActionModes(allowedActionModes = []) {
   return ACTION_ORDER.filter((mode) => allowedModeSet.has(mode))
 }
 
-function appendEntryHint(hint, canOpenEntry) {
-  if (!canOpenEntry) return hint
-  return `${hint}关联业务信息可在相关单据核对。`
+function appendEntryHint(hint, canOpenEntry, sourceAccess = {}) {
+  if (canOpenEntry) {
+    return `${hint}关联业务信息可在相关单据核对。`
+  }
+  if (
+    sourceAccess?.applicable === false &&
+    sourceAccess?.resolved === true &&
+    sourceAccess?.allowed === true
+  ) {
+    const noSourceReason =
+      String(sourceAccess?.reason || '').trim() ||
+      '当前任务没有需要核对的相关单据。'
+    return hint.includes(noSourceReason) ? hint : `${hint}${noSourceReason}`
+  }
+  return hint
 }
 
 function buildMultipleActionHint(task, actionModes) {
@@ -88,20 +100,34 @@ export function getWorkflowTaskProcessingHint({
     return sourceReason
   }
   if (actionModes.length === 1) {
-    return appendEntryHint(SINGLE_ACTION_HINTS[actionModes[0]], canOpenEntry)
+    return appendEntryHint(
+      SINGLE_ACTION_HINTS[actionModes[0]],
+      canOpenEntry,
+      sourceAccess
+    )
   }
   if (actionModes.length > 1) {
     return appendEntryHint(
       buildMultipleActionHint(task, actionModes),
-      canOpenEntry
+      canOpenEntry,
+      sourceAccess
     )
   }
 
   const normalizedReadonlyReason = String(readonlyReason || '').trim()
   if (normalizedReadonlyReason) {
-    return appendEntryHint(normalizedReadonlyReason, canOpenEntry)
+    return appendEntryHint(
+      normalizedReadonlyReason,
+      canOpenEntry,
+      sourceAccess
+    )
   }
-  return canOpenEntry
-    ? '当前没有可用的任务操作，可前往相关单据继续核对。'
-    : '当前没有可用的处理方式，只能查看任务详情。'
+  if (canOpenEntry) {
+    return '当前没有可用的任务操作，可前往相关单据继续核对。'
+  }
+  return appendEntryHint(
+    '当前没有可用的处理方式，只能查看任务详情。',
+    false,
+    sourceAccess
+  )
 }
