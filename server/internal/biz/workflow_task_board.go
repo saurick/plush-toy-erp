@@ -89,6 +89,7 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	query.LaneKey = strings.TrimSpace(query.LaneKey)
 	query.VisibleOwnerRoleKeys = normalizeWorkflowVisibleOwnerRoleKeys(query.VisibleOwnerRoleKeys)
 	query.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(query.VisibilityScope)
+	query.ApprovalVisibilityScopes = NormalizeWorkflowApprovalVisibilityScopes(query.ApprovalVisibilityScopes)
 
 	if query.OwnerRoleKey == "all" {
 		query.OwnerRoleKey = ""

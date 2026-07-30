@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import { requireWorkflowTaskExplainParams } from '../../src/erp/utils/workflowTaskActionAccess.mjs'
+import { isWorkflowApprovalTask } from '../../src/erp/utils/workflowTaskActionContract.mjs'
 import { requireWorkflowTaskCreateParams } from '../../src/erp/utils/workflowTaskCreateContract.mjs'
 import {
   workflowMockActionDecision,
@@ -306,8 +307,12 @@ function workflowMockRoleTaskReadAllowed(
 }
 
 export async function installFactRpcMocks(page, context) {
-  const { adminProfile, effectiveSession, nowUnix, resolveDelayFromReferer } =
-    context
+  const {
+    adminProfile,
+    effectiveSession,
+    nowUnix,
+    resolveDelayFromReferer,
+  } = context
   const createdProductionCompletions = []
   const createdProductionMaterialIssues = []
   const createdProductionReworks = []
@@ -2440,7 +2445,9 @@ export async function installFactRpcMocks(page, context) {
                 ? terminal
                 : viewKey === 'risk'
                   ? !terminal && isRiskTask(task)
-                  : !terminal
+                  : viewKey === 'approval'
+                    ? !terminal && isWorkflowApprovalTask(task)
+                    : !terminal
             return (
               roleMatched &&
               viewMatched &&
@@ -2478,10 +2485,11 @@ export async function installFactRpcMocks(page, context) {
           fail('当前账号缺少查看协同任务权限')
           break
         }
+        const taskBoardFailureURLMatched = page
+          .url()
+          .includes('__style_l1_business_dashboard_workflow_unavailable=1')
         if (
-          page
-            .url()
-            .includes('__style_l1_business_dashboard_workflow_unavailable=1') &&
+          taskBoardFailureURLMatched &&
           !businessDashboardWorkflowFailureServed
         ) {
           businessDashboardWorkflowFailureServed = true
@@ -2586,6 +2594,8 @@ export async function installFactRpcMocks(page, context) {
           business_status_key: createParams.business_status_key || '',
           task_status_key: createParams.task_status_key,
           owner_role_key: createParams.owner_role_key,
+          required_capability_key:
+            createParams.required_capability_key || '',
           assignee_id: createParams.assignee_id || '',
           priority: createParams.priority,
           due_at: createParams.due_at || null,

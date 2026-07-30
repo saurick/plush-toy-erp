@@ -19,7 +19,12 @@ func (r *workflowRepo) ListWorkflowRoleTaskView(ctx context.Context, query biz.W
 	if query.BeforeID > 0 {
 		dbQuery = dbQuery.Where(workflowtask.IDLT(query.BeforeID))
 	}
-	if query.VisibilityScope != nil {
+	if query.ViewKey == biz.WorkflowRoleTaskViewApproval && len(query.ApprovalVisibilityScopes) > 0 {
+		dbQuery = dbQuery.Where(workflowApprovalRoleTaskVisibilityPredicate(
+			query.ApprovalVisibilityScopes,
+			query.RoleKey,
+		))
+	} else if query.VisibilityScope != nil {
 		dbQuery = dbQuery.Where(workflowTaskRoleViewRevisionVisibilityPredicate(
 			query.VisibilityScope,
 			query.RoleKey,
@@ -36,6 +41,11 @@ func (r *workflowRepo) ListWorkflowRoleTaskView(ctx context.Context, query biz.W
 	switch query.ViewKey {
 	case biz.WorkflowRoleTaskViewTodo:
 		dbQuery = dbQuery.Where(workflowtask.TaskStatusKeyIn("ready", "blocked"))
+	case biz.WorkflowRoleTaskViewApproval:
+		dbQuery = dbQuery.Where(
+			workflowtask.TaskStatusKeyIn("ready", "blocked"),
+			workflowtask.RequiredCapabilityKeyIn(biz.WorkflowApprovalCapabilityKeys()...),
+		)
 	case biz.WorkflowRoleTaskViewHistory:
 		dbQuery = dbQuery.Where(workflowtask.TaskStatusKeyIn("done", "rejected"))
 	case biz.WorkflowRoleTaskViewRisk:

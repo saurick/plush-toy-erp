@@ -82,13 +82,16 @@ export function getWorkflowWorkbenchScopeKey(
 
 export function createWorkflowWorkbenchSnapshot(
   scopeKey = '',
-  { tasks = [], riskTaskIDs = [] } = {}
+  { tasks = [], riskTaskIDs = [], approvalTaskIDs = [] } = {}
 ) {
   return {
     scopeKey: String(scopeKey || ''),
     tasks: Array.isArray(tasks) ? tasks : [],
     riskTaskIDs: new Set(
       riskTaskIDs instanceof Set ? riskTaskIDs : riskTaskIDs
+    ),
+    approvalTaskIDs: new Set(
+      approvalTaskIDs instanceof Set ? approvalTaskIDs : approvalTaskIDs
     ),
   }
 }

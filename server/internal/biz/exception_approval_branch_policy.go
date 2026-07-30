@@ -13,17 +13,28 @@ const (
 	ProcessBranchPolicyProductionExceptionExecution = "production_exception.execution_route"
 )
 
+var workflowApprovalCapabilityKeys = []string{
+	PermissionWorkflowTaskApprove,
+	PermissionSalesReturnApprove,
+	PermissionFinancePaymentApprove,
+	PermissionWarehouseAdjustmentApprove,
+	PermissionProductionExceptionApprove,
+}
+
+func WorkflowApprovalCapabilityKeys() []string {
+	out := make([]string, len(workflowApprovalCapabilityKeys))
+	copy(out, workflowApprovalCapabilityKeys)
+	return out
+}
+
 func IsWorkflowApprovalCapabilityKey(capabilityKey string) bool {
-	switch strings.TrimSpace(capabilityKey) {
-	case PermissionWorkflowTaskApprove,
-		PermissionSalesReturnApprove,
-		PermissionFinancePaymentApprove,
-		PermissionWarehouseAdjustmentApprove,
-		PermissionProductionExceptionApprove:
-		return true
-	default:
-		return false
+	capabilityKey = strings.TrimSpace(capabilityKey)
+	for _, candidate := range workflowApprovalCapabilityKeys {
+		if capabilityKey == candidate {
+			return true
+		}
 	}
+	return false
 }
 
 type approvalOutcomeBranchPolicyHandler struct {

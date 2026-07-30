@@ -1,10 +1,14 @@
-const WORKFLOW_APPROVAL_CAPABILITY_KEYS = new Set([
+export const WORKFLOW_APPROVAL_CAPABILITY_KEYS = Object.freeze([
   'workflow.task.approve',
   'sales_return.approve',
   'finance.payment.approve',
   'warehouse.adjustment.approve',
   'production.exception.approve',
 ])
+
+const WORKFLOW_APPROVAL_CAPABILITY_KEY_SET = new Set(
+  WORKFLOW_APPROVAL_CAPABILITY_KEYS
+)
 
 const WORKFLOW_PROCESS_DECISION_PROFILE_BY_CAPABILITY = Object.freeze({
   'sales_return.approve': 'sales_return_approval',
@@ -17,7 +21,7 @@ export function isWorkflowApprovalTask(task = {}) {
   const requiredCapabilityKey = String(
     task?.required_capability_key || ''
   ).trim()
-  return WORKFLOW_APPROVAL_CAPABILITY_KEYS.has(requiredCapabilityKey)
+  return WORKFLOW_APPROVAL_CAPABILITY_KEY_SET.has(requiredCapabilityKey)
 }
 
 export function isWorkflowProcessDecisionTask(task = {}) {

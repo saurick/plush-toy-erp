@@ -1,4 +1,11 @@
-const WORKFLOW_ROLE_TASK_VIEW_KEYS = new Set(['todo', 'history', 'risk'])
+import { isWorkflowApprovalTask } from '../erp/utils/workflowTaskActionContract.mjs'
+
+const WORKFLOW_ROLE_TASK_VIEW_KEYS = new Set([
+  'todo',
+  'history',
+  'risk',
+  'approval',
+])
 const WORKFLOW_ROLE_TASK_QUERY_KEYS = new Set([
   'view_key',
   'role_key',
@@ -121,6 +128,12 @@ export function buildWorkflowRoleTaskPageMock({
       }
       if (query.viewKey === 'history') {
         return ['done', 'rejected'].includes(task.task_status_key)
+      }
+      if (query.viewKey === 'approval') {
+        return (
+          ['ready', 'blocked'].includes(task.task_status_key) &&
+          isWorkflowApprovalTask(task)
+        )
       }
       return (
         ['ready', 'blocked'].includes(task.task_status_key) &&

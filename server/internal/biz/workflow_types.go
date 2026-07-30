@@ -70,19 +70,20 @@ type WorkflowTaskFilter struct {
 }
 
 type WorkflowTaskBoardQuery struct {
-	Keyword              string
-	Status               string
-	OwnerRoleKey         string
-	Due                  string
-	SourceType           string
-	LaneKey              string
-	ApprovalOnly         bool
-	Limit                int
-	Offset               int
-	VisibleOwnerRoleKeys []string
-	VisibleAssigneeID    *int
-	VisibilityScope      *WorkflowTaskVisibilityScope
-	SnapshotAt           time.Time
+	Keyword                  string
+	Status                   string
+	OwnerRoleKey             string
+	Due                      string
+	SourceType               string
+	LaneKey                  string
+	ApprovalOnly             bool
+	Limit                    int
+	Offset                   int
+	VisibleOwnerRoleKeys     []string
+	VisibleAssigneeID        *int
+	VisibilityScope          *WorkflowTaskVisibilityScope
+	ApprovalVisibilityScopes []WorkflowApprovalVisibilityScope
+	SnapshotAt               time.Time
 }
 
 type WorkflowTaskBoardCounts struct {

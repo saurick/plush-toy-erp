@@ -4,6 +4,7 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 import { requireWorkflowProcessContext } from '../utils/processRuntimePresentation.mjs'
 import { requireWorkflowTaskMutationParams } from '../utils/workflowTaskMutation.mjs'
 import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'
+import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'
 
 const workflowRpc = new JsonRpc({
   url: 'workflow',
@@ -28,7 +29,12 @@ const WORKFLOW_TASK_ESCALATION_TARGET_BY_ACTION = Object.freeze({
   escalate_to_pmc: 'pmc',
   escalate_to_boss: 'boss',
 })
-const WORKFLOW_ROLE_TASK_VIEW_KEYS = new Set(['todo', 'history', 'risk'])
+const WORKFLOW_ROLE_TASK_VIEW_KEYS = new Set([
+  'todo',
+  'history',
+  'risk',
+  'approval',
+])
 const WORKFLOW_ROLE_TASK_QUERY_KEYS = new Set([
   'view_key',
   'role_key',
@@ -39,6 +45,7 @@ const WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW = Object.freeze({
   todo: new Set(['ready', 'blocked']),
   history: new Set(['done', 'rejected']),
   risk: new Set(['ready', 'blocked']),
+  approval: new Set(['ready', 'blocked']),
 })
 
 function dataOf(result) {
@@ -117,7 +124,8 @@ function requireWorkflowRoleTaskResponse(result, query) {
         !Number.isSafeInteger(task.version) ||
         task.version <= 0 ||
         !WORKFLOW_TASK_STATUS_KEYS.has(task.task_status_key) ||
-        !allowedStatusKeys.has(task.task_status_key)
+        !allowedStatusKeys.has(task.task_status_key) ||
+        (query.view_key === 'approval' && !isWorkflowApprovalTask(task))
     )
   ) {
     throw invalidWorkflowRoleTaskResponse()

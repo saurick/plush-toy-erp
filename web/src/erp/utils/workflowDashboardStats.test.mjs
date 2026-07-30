@@ -72,6 +72,7 @@ test('workflowDashboardStats: 工作台快照绑定客户、revision 和岗位�
   const snapshot = createWorkflowWorkbenchSnapshot(scopeKey, {
     tasks: [{ id: 1 }],
     riskTaskIDs: [1],
+    approvalTaskIDs: [1],
   })
   assert.equal(readWorkflowWorkbenchSnapshot(snapshot, scopeKey), snapshot)
 
@@ -99,6 +100,7 @@ test('workflowDashboardStats: 工作台快照绑定客户、revision 和岗位�
     const visible = readWorkflowWorkbenchSnapshot(snapshot, nextScopeKey)
     assert.deepEqual(visible.tasks, [])
     assert.equal(visible.riskTaskIDs.size, 0)
+    assert.equal(visible.approvalTaskIDs.size, 0)
   }
 })
 

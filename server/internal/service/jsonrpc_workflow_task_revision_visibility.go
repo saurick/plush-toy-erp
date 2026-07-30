@@ -152,6 +152,39 @@ func (d *jsonrpcDispatcher) workflowTaskQueryVisibilityScope(
 	return biz.NormalizeWorkflowTaskVisibilityScope(scope), nil
 }
 
+func (d *jsonrpcDispatcher) workflowApprovalTaskVisibilityScopes(
+	ctx context.Context,
+	admin *biz.AdminUser,
+) ([]biz.WorkflowApprovalVisibilityScope, *v1.JsonrpcResult) {
+	permissions, res := d.CurrentAdminPermissions(ctx)
+	if res != nil {
+		return nil, res
+	}
+	permissionSet := biz.PermissionKeySet(permissions)
+	scopes := make([]biz.WorkflowApprovalVisibilityScope, 0, len(biz.WorkflowApprovalCapabilityKeys()))
+	for _, capabilityKey := range biz.WorkflowApprovalCapabilityKeys() {
+		if !biz.PermissionSetHasAny(permissionSet, capabilityKey) {
+			continue
+		}
+		scope, err := d.workflowTaskQueryVisibilityScope(ctx, admin, capabilityKey)
+		if err != nil {
+			return nil, d.mapCustomerConfigError(ctx, err)
+		}
+		scopes = append(scopes, biz.WorkflowApprovalVisibilityScope{
+			CapabilityKey:   capabilityKey,
+			VisibilityScope: scope,
+		})
+	}
+	scopes = biz.NormalizeWorkflowApprovalVisibilityScopes(scopes)
+	if len(scopes) == 0 {
+		return nil, &v1.JsonrpcResult{
+			Code:    errcode.PermissionDenied.Code,
+			Message: errcode.PermissionDenied.Message,
+		}
+	}
+	return scopes, nil
+}
+
 func expandWorkflowTaskVisibilityForSupervision(
 	scope *biz.WorkflowTaskVisibilityScope,
 	canSupervise bool,

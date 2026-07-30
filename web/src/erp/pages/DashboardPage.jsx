@@ -90,11 +90,21 @@ import {
 import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
 import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
 import { getWorkflowTaskProcessingHint } from '../utils/workflowTaskProcessingHint.mjs'
+import {
+  canViewWorkflowApprovalInbox,
+  getWorkflowApprovalInboxCapabilityKeys,
+} from '../utils/workflowApprovalInbox.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
 const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
   { key: 'actionable', label: '待我处理', hint: '当前可推进' },
+  {
+    key: 'approval',
+    label: '待我审批',
+    hint: '当前审批事项',
+    requiresApproval: true,
+  },
   { key: 'risk', label: '阻塞/逾期', hint: '先补原因' },
 ])
 
@@ -557,6 +567,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const workflowApprovalInboxCapabilityKeys = useMemo(
+    () => getWorkflowApprovalInboxCapabilityKeys(adminProfile),
+    [adminProfile]
+  )
+  const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
   const effectiveSessionCustomerKey =
     typeof adminProfile?.effective_session?.customer?.key === 'string'
       ? adminProfile.effective_session.customer.key.trim()
@@ -570,8 +585,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [adminProfile]
   )
   const workflowWorkbenchScopeKey = useMemo(
-    () => getWorkflowWorkbenchScopeKey(adminProfile, workflowWorkbenchRoleKeys),
-    [adminProfile, workflowWorkbenchRoleKeys]
+    () =>
+      JSON.stringify([
+        getWorkflowWorkbenchScopeKey(adminProfile, workflowWorkbenchRoleKeys),
+        workflowApprovalInboxCapabilityKeys,
+      ]),
+    [
+      adminProfile,
+      workflowApprovalInboxCapabilityKeys,
+      workflowWorkbenchRoleKeys,
+    ]
   )
   const workflowWorkbenchScopeKeyRef = useRef(workflowWorkbenchScopeKey)
   workflowWorkbenchScopeKeyRef.current = workflowWorkbenchScopeKey
@@ -581,9 +604,18 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   )
   const workflowTasks = visibleWorkflowWorkbenchSnapshot.tasks
   const workflowRiskTaskIDs = visibleWorkflowWorkbenchSnapshot.riskTaskIDs
-  const filters = useMemo(
+  const workflowApprovalTaskIDs =
+    visibleWorkflowWorkbenchSnapshot.approvalTaskIDs
+  const requestedFilters = useMemo(
     () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
     [searchParams]
+  )
+  const filters = useMemo(
+    () =>
+      requestedFilters.mode === 'approval' && !canViewApprovalInbox
+        ? { ...requestedFilters, mode: 'all', page: 1 }
+        : requestedFilters,
+    [canViewApprovalInbox, requestedFilters]
   )
   const approvalInboxActive = filters.mode === 'approval'
   const isTaskBoardView = initialView === 'task-board'
@@ -655,9 +687,12 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           })
         }
       } else {
+        const viewKeys = canViewApprovalInbox
+          ? ['todo', 'risk', 'approval']
+          : ['todo', 'risk']
         const roleTaskViews = await Promise.all(
           workflowWorkbenchRoleKeys.flatMap((roleKey) =>
-            ['todo', 'risk'].map(async (viewKey) => ({
+            viewKeys.map(async (viewKey) => ({
               viewKey,
               response: await listAllWorkflowWorkbenchRoleTasks({
                 view_key: viewKey,
@@ -674,16 +709,19 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         ) {
           const tasksByID = new Map()
           const riskTaskIDs = new Set()
+          const approvalTaskIDs = new Set()
           for (const { response, viewKey } of roleTaskViews) {
             for (const task of response.items) {
               tasksByID.set(task.id, task)
               if (viewKey === 'risk') riskTaskIDs.add(task.id)
+              if (viewKey === 'approval') approvalTaskIDs.add(task.id)
             }
           }
           setWorkflowWorkbenchSnapshot(
             createWorkflowWorkbenchSnapshot(requestWorkbenchScopeKey, {
               tasks: [...tasksByID.values()],
               riskTaskIDs,
+              approvalTaskIDs,
             })
           )
         }
@@ -717,6 +755,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       }
     }
   }, [
+    canViewApprovalInbox,
     isTaskBoardView,
     preserveTaskBoardTransitionHeight,
     shouldShowProductCoreDashboard,
@@ -743,6 +782,27 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   useEffect(() => {
     setActiveView(initialView)
   }, [initialView])
+
+  useEffect(() => {
+    if (
+      !isTaskBoardView ||
+      canViewApprovalInbox ||
+      requestedFilters.mode !== 'approval'
+    ) {
+      return
+    }
+    setSearchParams(
+      writeWorkflowTaskBoardFiltersToSearch(searchParams, filters),
+      { replace: true }
+    )
+  }, [
+    canViewApprovalInbox,
+    filters,
+    isTaskBoardView,
+    requestedFilters.mode,
+    searchParams,
+    setSearchParams,
+  ])
 
   const hasActiveFilters = useMemo(
     () => hasActiveWorkflowTaskBoardFilters(filters),
@@ -957,6 +1017,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const workbenchQueueGroups = useMemo(() => {
     const groups = {
       actionable: [],
+      approval: [],
       risk: [],
     }
     workflowTasks.forEach((task) => {
@@ -965,6 +1026,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       const hasReason = Boolean(getWorkflowTaskReason(task))
       if (isTerminalWorkflowTask(task)) {
         return
+      }
+      if (workflowApprovalTaskIDs.has(task.id)) {
+        groups.approval.push(task)
       }
       if (
         workflowRiskTaskIDs.has(task.id) ||
@@ -991,15 +1055,22 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       })
     })
     return groups
-  }, [workflowRiskTaskIDs, workflowTasks])
+  }, [workflowApprovalTaskIDs, workflowRiskTaskIDs, workflowTasks])
+  const visibleWorkbenchQueueOptions = useMemo(
+    () =>
+      WORKBENCH_QUEUE_OPTIONS.filter(
+        (option) => !option.requiresApproval || canViewApprovalInbox
+      ),
+    [canViewApprovalInbox]
+  )
   const workbenchQueueTasks =
     workbenchQueueGroups[workbenchQueueKey] || workbenchQueueGroups.actionable
   const activeWorkbenchQueueOption =
-    WORKBENCH_QUEUE_OPTIONS.find(
+    visibleWorkbenchQueueOptions.find(
       (option) => option.key === workbenchQueueKey
-    ) || WORKBENCH_QUEUE_OPTIONS[0]
+    ) || visibleWorkbenchQueueOptions[0]
   const fallbackWorkbenchQueueOption =
-    WORKBENCH_QUEUE_OPTIONS.find(
+    visibleWorkbenchQueueOptions.find(
       (option) =>
         option.key !== workbenchQueueKey &&
         (workbenchQueueGroups[option.key]?.length || 0) > 0
@@ -1077,6 +1148,19 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         : actionDrawerAccess.allowedModes,
     [actionDrawerAccess.allowedModes, assignmentAccess.can_reassign]
   )
+
+  useEffect(() => {
+    if (
+      visibleWorkbenchQueueOptions.some(
+        (option) => option.key === workbenchQueueKey
+      )
+    ) {
+      return
+    }
+    setWorkbenchQueueKey('actionable')
+    setWorkbenchQueuePage(1)
+    setSelectedWorkbenchTaskId('')
+  }, [visibleWorkbenchQueueOptions, workbenchQueueKey])
 
   useEffect(() => {
     if (workbenchQueuePage === activeWorkbenchQueuePage) return
@@ -1502,7 +1586,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               className="erp-workbench-queue-filter-strip"
               aria-label="工作台任务筛选"
             >
-              {WORKBENCH_QUEUE_OPTIONS.map((option) => {
+              {visibleWorkbenchQueueOptions.map((option) => {
                 const count = workbenchQueueGroups[option.key]?.length || 0
                 const active = option.key === workbenchQueueKey
                 return (
@@ -1751,17 +1835,19 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     <Title level={3} className="erp-command-center-hero-title">
                       {approvalInboxActive ? '待我审批' : '任务看板'}
                     </Title>
-                    <Button
-                      type={approvalInboxActive ? 'primary' : 'default'}
-                      onClick={() =>
-                        updateFilter(
-                          'mode',
-                          approvalInboxActive ? 'all' : 'approval'
-                        )
-                      }
-                    >
-                      {approvalInboxActive ? '返回全部任务' : '待我审批'}
-                    </Button>
+                    {canViewApprovalInbox ? (
+                      <Button
+                        type={approvalInboxActive ? 'primary' : 'default'}
+                        onClick={() =>
+                          updateFilter(
+                            'mode',
+                            approvalInboxActive ? 'all' : 'approval'
+                          )
+                        }
+                      >
+                        {approvalInboxActive ? '返回全部任务' : '待我审批'}
+                      </Button>
+                    ) : null}
                   </Space>
                   <Paragraph className="erp-dashboard-summary">
                     {approvalInboxActive

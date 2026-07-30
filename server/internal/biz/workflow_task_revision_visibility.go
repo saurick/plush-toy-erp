@@ -40,6 +40,15 @@ type WorkflowTaskVisibilityScope struct {
 	VisibleAssigneeID              *int
 }
 
+// WorkflowApprovalVisibilityScope keeps one approval capability paired with
+// the immutable revision scope that authorized it. Flattening scopes from
+// different capabilities would allow one approval permission to borrow the
+// owner roles of another.
+type WorkflowApprovalVisibilityScope struct {
+	CapabilityKey   string
+	VisibilityScope *WorkflowTaskVisibilityScope
+}
+
 func (uc *CustomerConfigUsecase) WorkflowTaskRevisionRoleScopes(
 	ctx context.Context,
 	customerKey string,
@@ -310,6 +319,38 @@ func NormalizeWorkflowTaskVisibilityScope(scope *WorkflowTaskVisibilityScope) *W
 	sort.Strings(keys)
 	for _, revision := range keys {
 		out.RevisionRoleScopes = append(out.RevisionRoleScopes, byRevision[revision])
+	}
+	return out
+}
+
+func NormalizeWorkflowApprovalVisibilityScopes(scopes []WorkflowApprovalVisibilityScope) []WorkflowApprovalVisibilityScope {
+	if len(scopes) == 0 {
+		return nil
+	}
+	byCapability := make(map[string]*WorkflowTaskVisibilityScope, len(scopes))
+	for _, raw := range scopes {
+		capabilityKey := strings.TrimSpace(raw.CapabilityKey)
+		if !IsWorkflowApprovalCapabilityKey(capabilityKey) {
+			continue
+		}
+		scope := NormalizeWorkflowTaskVisibilityScope(raw.VisibilityScope)
+		if scope == nil {
+			continue
+		}
+		if _, exists := byCapability[capabilityKey]; !exists {
+			byCapability[capabilityKey] = scope
+		}
+	}
+	out := make([]WorkflowApprovalVisibilityScope, 0, len(byCapability))
+	for _, capabilityKey := range WorkflowApprovalCapabilityKeys() {
+		scope, ok := byCapability[capabilityKey]
+		if !ok {
+			continue
+		}
+		out = append(out, WorkflowApprovalVisibilityScope{
+			CapabilityKey:   capabilityKey,
+			VisibilityScope: scope,
+		})
 	}
 	return out
 }

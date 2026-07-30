@@ -82,3 +82,55 @@ func TestWorkflowRoleTaskViewPaginatesAll351TasksWithoutLegacyCap(t *testing.T) 
 		t.Fatalf("visible task count = %d, want 351", len(seenIDs))
 	}
 }
+
+func TestWorkflowRoleTaskApprovalViewUsesRegisteredCapabilitiesAndPairedScope(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_role_task_approval?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+
+	fixtures := []struct {
+		code       string
+		capability string
+		status     string
+	}{
+		{code: "GENERIC-VISIBLE", capability: biz.PermissionWorkflowTaskApprove, status: "ready"},
+		{code: "FINANCE-HIDDEN", capability: biz.PermissionFinancePaymentApprove, status: "ready"},
+		{code: "ORDINARY-HIDDEN", capability: biz.PermissionWorkflowTaskComplete, status: "ready"},
+		{code: "FINISHED-HIDDEN", capability: biz.PermissionWorkflowTaskApprove, status: "done"},
+	}
+	for index, fixture := range fixtures {
+		if _, err := client.WorkflowTask.Create().
+			SetTaskCode(fixture.code).
+			SetTaskGroup("role-approval").
+			SetTaskName(fixture.code).
+			SetSourceType("role-approval").
+			SetSourceID(index + 1).
+			SetTaskStatusKey(fixture.status).
+			SetOwnerRoleKey(biz.SalesRoleKey).
+			SetRequiredCapabilityKey(fixture.capability).
+			SetPayload(map[string]any{}).
+			Save(ctx); err != nil {
+			t.Fatalf("create fixture %s: %v", fixture.code, err)
+		}
+	}
+
+	page, err := repo.ListWorkflowRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
+		ViewKey:    biz.WorkflowRoleTaskViewApproval,
+		RoleKey:    biz.SalesRoleKey,
+		Limit:      20,
+		SnapshotAt: time.Now(),
+		ApprovalVisibilityScopes: []biz.WorkflowApprovalVisibilityScope{{
+			CapabilityKey: biz.PermissionWorkflowTaskApprove,
+			VisibilityScope: &biz.WorkflowTaskVisibilityScope{
+				StandaloneVisibleOwnerRoleKeys: []string{biz.SalesRoleKey},
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("list approval role view: %v", err)
+	}
+	if len(page.Items) != 1 || page.Items[0].TaskCode != "GENERIC-VISIBLE" {
+		t.Fatalf("unexpected approval role page=%#v", page.Items)
+	}
+}

@@ -1651,6 +1651,90 @@ test('style-l1 workflow role task view mock applies role, view and cursor bounda
   )
 })
 
+test('style-l1 workflow role task view mock keeps approval projection capability-driven', async () => {
+  const approvalCapability = 'finance.payment.approve'
+  const call = await workflowMockHarness(
+    {
+      id: 9,
+      is_super_admin: false,
+      roles: [{ role_key: 'boss' }],
+      permissions: [
+        'erp.workbench.read',
+        'workflow.task.create',
+        'workflow.task.read',
+        approvalCapability,
+      ],
+      effective_session: {
+        actions: [
+          'erp.workbench.read',
+          'workflow.task.create',
+          'workflow.task.read',
+          approvalCapability,
+        ],
+        workflow_visible_owner_role_keys_by_capability: workflowScopes(
+          'boss',
+          ['workflow.task.create', 'workflow.task.read', approvalCapability]
+        ),
+      },
+    },
+    {
+      workflowTaskFixtures: [
+        {
+          id: 302,
+          version: 1,
+          task_code: 'STYLE-L1-NORMAL-TODO',
+          task_group: 'workflow-contract',
+          task_name: '普通待办',
+          source_type: 'workflow-contract',
+          source_id: 302,
+          task_status_key: 'ready',
+          owner_role_key: 'boss',
+          payload: {},
+        },
+        {
+          id: 303,
+          version: 1,
+          task_code: 'STYLE-L1-APPROVAL-DONE',
+          task_group: 'finance_payment_approval',
+          task_name: '已办付款审批',
+          source_type: 'finance_payment',
+          source_id: 303,
+          task_status_key: 'done',
+          owner_role_key: 'boss',
+          required_capability_key: approvalCapability,
+          payload: {},
+        },
+      ],
+    }
+  )
+  const createdApproval = await call('create_task', {
+    task_code: 'STYLE-L1-APPROVAL-PAYMENT',
+    task_group: 'finance_payment_approval',
+    task_name: '付款审批',
+    source_type: 'finance_payment',
+    source_id: 301,
+    task_status_key: 'ready',
+    owner_role_key: 'boss',
+    required_capability_key: approvalCapability,
+  })
+  assert.equal(createdApproval.result.code, 0)
+  assert.equal(
+    createdApproval.result.data.task.required_capability_key,
+    approvalCapability
+  )
+
+  const approvalPage = await call('list_workbench_role_tasks', {
+    view_key: 'approval',
+    role_key: 'boss',
+    limit: 50,
+  })
+  assert.equal(approvalPage.result.code, 0)
+  assert.deepEqual(
+    approvalPage.result.data.items.map((task) => task.id),
+    [createdApproval.result.data.task.id]
+  )
+})
+
 test('style-l1 workflow mock serves the dedicated task board projection', async () => {
   const call = await workflowMockHarness()
   for (let index = 1; index <= 10; index += 1) {

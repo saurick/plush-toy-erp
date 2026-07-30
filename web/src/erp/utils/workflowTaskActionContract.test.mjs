@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  WORKFLOW_APPROVAL_CAPABILITY_KEYS,
   getWorkflowProcessDecisionApprovalProfile,
   getWorkflowTaskActionPermission,
   isWorkflowApprovalTask,
@@ -9,12 +10,29 @@ import {
   workflowTaskAllowsApprovedQuantity,
 } from './workflowTaskActionContract.mjs'
 
+const ALL_APPROVAL_CAPABILITIES = Object.freeze([
+  'workflow.task.approve',
+  'sales_return.approve',
+  'finance.payment.approve',
+  'warehouse.adjustment.approve',
+  'production.exception.approve',
+])
 const APPROVAL_CAPABILITIES = Object.freeze([
   'sales_return.approve',
   'finance.payment.approve',
   'warehouse.adjustment.approve',
   'production.exception.approve',
 ])
+
+test('workflow task action contract exports the complete ordered approval registry', () => {
+  assert.deepEqual(WORKFLOW_APPROVAL_CAPABILITY_KEYS, ALL_APPROVAL_CAPABILITIES)
+  for (const capability of ALL_APPROVAL_CAPABILITIES) {
+    assert.equal(
+      isWorkflowApprovalTask({ required_capability_key: capability }),
+      true
+    )
+  }
+})
 const PROFILE_BY_CAPABILITY = Object.freeze({
   'sales_return.approve': 'sales_return_approval',
   'finance.payment.approve': 'finance_payment_approval',

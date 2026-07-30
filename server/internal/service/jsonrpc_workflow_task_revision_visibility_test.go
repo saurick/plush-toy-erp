@@ -132,6 +132,45 @@ func TestWorkflowRoleTaskViewRequiresActiveMobileRoleEntitlement(t *testing.T) {
 	}
 }
 
+func TestWorkflowApprovalRoleViewsUseSpecializedCapabilityScope(t *testing.T) {
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.FinanceRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionERPWorkbenchRead,
+		biz.PermissionMobileFinanceAccess,
+		biz.PermissionFinancePaymentApprove,
+	)
+	repo := &recordingWorkflowRevisionJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.workflow_approval_role_view_test")),
+		adminReader: stubAdminAccountReader{admin: admin},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"view_key": biz.WorkflowRoleTaskViewApproval,
+		"role_key": biz.FinanceRoleKey,
+		"limit":    float64(20),
+	})
+	for _, method := range []string{"list_role_tasks", "list_workbench_role_tasks"} {
+		repo.roleQuery = biz.WorkflowRoleTaskViewQuery{}
+		_, result, err := dispatcher.handleWorkflow(
+			workflowJSONRPCAdminContext(),
+			method,
+			method+"-approval",
+			params,
+		)
+		if err != nil || result == nil || result.Code != errcode.OK.Code {
+			t.Fatalf("%s result=%#v err=%v", method, result, err)
+		}
+		if repo.roleQuery.ViewKey != biz.WorkflowRoleTaskViewApproval ||
+			repo.roleQuery.VisibilityScope == nil ||
+			len(repo.roleQuery.ApprovalVisibilityScopes) != 1 ||
+			repo.roleQuery.ApprovalVisibilityScopes[0].CapabilityKey != biz.PermissionFinancePaymentApprove {
+			t.Fatalf("%s approval query=%#v", method, repo.roleQuery)
+		}
+	}
+}
+
 func TestExpandWorkflowTaskVisibilityForSupervisionBroadensReadOnlyScope(t *testing.T) {
 	adminID := 7
 	base := &biz.WorkflowTaskVisibilityScope{

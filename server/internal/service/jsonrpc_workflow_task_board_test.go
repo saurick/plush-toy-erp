@@ -220,3 +220,67 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRequiresReadPermission(t *testing
 		t.Fatalf("permission denial must not reach repo, query=%#v", repo.query)
 	}
 }
+
+func TestJsonrpcDispatcher_WorkflowGetTaskBoardAcceptsSpecializedApprovalCapability(t *testing.T) {
+	repo := &recordingWorkflowTaskBoardJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(
+			log.NewStdLogger(io.Discard),
+			"module",
+			"service.workflow_task_board_test",
+		)),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.FinanceRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionFinancePaymentApprove,
+		)},
+		workflowUC: biz.NewWorkflowUsecase(repo),
+	}
+	_, res, err := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"get_task_board",
+		"specialized-approval",
+		mustJSONRPCStruct(t, map[string]any{"approval_only": true}),
+	)
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("specialized approval board response=%#v err=%v", res, err)
+	}
+	if repo.query.VisibilityScope != nil || len(repo.query.ApprovalVisibilityScopes) != 1 {
+		t.Fatalf("approval board must use capability-specific scopes, query=%#v", repo.query)
+	}
+	scope := repo.query.ApprovalVisibilityScopes[0]
+	if scope.CapabilityKey != biz.PermissionFinancePaymentApprove ||
+		scope.VisibilityScope == nil ||
+		len(scope.VisibilityScope.StandaloneVisibleOwnerRoleKeys) != 1 ||
+		scope.VisibilityScope.StandaloneVisibleOwnerRoleKeys[0] != biz.FinanceRoleKey {
+		t.Fatalf("unexpected specialized approval scope=%#v", scope)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowGetTaskBoardApprovalRequiresAnyRegisteredCapability(t *testing.T) {
+	repo := &recordingWorkflowTaskBoardJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(
+			log.NewStdLogger(io.Discard),
+			"module",
+			"service.workflow_task_board_test",
+		)),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.FinanceRoleKey},
+			biz.PermissionWorkflowTaskRead,
+		)},
+		workflowUC: biz.NewWorkflowUsecase(repo),
+	}
+	_, res, err := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"get_task_board",
+		"approval-denied",
+		mustJSONRPCStruct(t, map[string]any{"approval_only": true}),
+	)
+	if err != nil || res == nil || res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("approval board without approval capability response=%#v err=%v", res, err)
+	}
+	if !repo.query.SnapshotAt.IsZero() {
+		t.Fatalf("denied approval query must not reach repo, query=%#v", repo.query)
+	}
+}

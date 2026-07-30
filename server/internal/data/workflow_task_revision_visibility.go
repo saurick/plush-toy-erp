@@ -94,6 +94,51 @@ func workflowTaskRoleViewRevisionVisibilityPredicate(
 	return workflowtask.Or(branches...)
 }
 
+func workflowApprovalTaskVisibilityPredicate(
+	scopes []biz.WorkflowApprovalVisibilityScope,
+	ownerRoleKey string,
+) predicate.WorkflowTask {
+	scopes = biz.NormalizeWorkflowApprovalVisibilityScopes(scopes)
+	branches := make([]predicate.WorkflowTask, 0, len(scopes))
+	for _, scope := range scopes {
+		visibility := workflowTaskRevisionVisibilityPredicate(scope.VisibilityScope, ownerRoleKey)
+		if visibility == nil {
+			continue
+		}
+		branches = append(branches, workflowtask.And(
+			workflowtask.RequiredCapabilityKey(scope.CapabilityKey),
+			visibility,
+		))
+	}
+	if len(branches) == 0 {
+		return workflowtask.ID(0)
+	}
+	return workflowtask.Or(branches...)
+}
+
+func workflowApprovalRoleTaskVisibilityPredicate(
+	scopes []biz.WorkflowApprovalVisibilityScope,
+	roleKey string,
+) predicate.WorkflowTask {
+	scopes = biz.NormalizeWorkflowApprovalVisibilityScopes(scopes)
+	branches := make([]predicate.WorkflowTask, 0, len(scopes))
+	for _, scope := range scopes {
+		visibility := workflowTaskRoleViewRevisionVisibilityPredicate(
+			scope.VisibilityScope,
+			roleKey,
+			false,
+		)
+		branches = append(branches, workflowtask.And(
+			workflowtask.RequiredCapabilityKey(scope.CapabilityKey),
+			visibility,
+		))
+	}
+	if len(branches) == 0 {
+		return workflowtask.ID(0)
+	}
+	return workflowtask.Or(branches...)
+}
+
 func workflowTaskRuntimeOwnerPredicate(
 	ownerRoleKey string,
 	revision biz.WorkflowTaskRevisionRoleScope,

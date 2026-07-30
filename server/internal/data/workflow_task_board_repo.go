@@ -187,6 +187,12 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 }
 
 func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) *ent.WorkflowTaskQuery {
+	if filter.ApprovalOnly && len(filter.ApprovalVisibilityScopes) > 0 {
+		return query.Where(workflowApprovalTaskVisibilityPredicate(
+			filter.ApprovalVisibilityScopes,
+			filter.OwnerRoleKey,
+		))
+	}
 	if filter.VisibilityScope != nil {
 		return query.Where(workflowTaskRevisionVisibilityPredicate(filter.VisibilityScope, filter.OwnerRoleKey))
 	}
@@ -208,7 +214,7 @@ func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.Work
 	if filter.ApprovalOnly {
 		query = query.Where(
 			workflowtask.TaskStatusKeyIn("ready", "blocked"),
-			workflowtask.RequiredCapabilityKey(biz.PermissionWorkflowTaskApprove),
+			workflowtask.RequiredCapabilityKeyIn(biz.WorkflowApprovalCapabilityKeys()...),
 		)
 	}
 	if filter.Keyword != "" {

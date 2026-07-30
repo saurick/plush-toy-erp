@@ -172,7 +172,12 @@ func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_approval?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
 	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
-	approvalCapability := biz.PermissionWorkflowTaskApprove
+	genericApprovalCapability := biz.PermissionWorkflowTaskApprove
+	salesReturnApprovalCapability := biz.PermissionSalesReturnApprove
+	financePaymentApprovalCapability := biz.PermissionFinancePaymentApprove
+	warehouseAdjustmentApprovalCapability := biz.PermissionWarehouseAdjustmentApprove
+	productionExceptionApprovalCapability := biz.PermissionProductionExceptionApprove
+	unregisteredCapability := biz.PermissionWorkflowTaskComplete
 	fixtures := []struct {
 		code       string
 		group      string
@@ -181,10 +186,15 @@ func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *
 		capability *string
 		status     string
 	}{
-		{code: "APPROVAL-GENERIC", group: "shipment_finance_release", sourceType: "shipment", ownerRole: biz.FinanceRoleKey, capability: &approvalCapability, status: "ready"},
+		{code: "APPROVAL-GENERIC", group: "shipment_finance_release", sourceType: "shipment", ownerRole: biz.FinanceRoleKey, capability: &genericApprovalCapability, status: "ready"},
+		{code: "APPROVAL-SALES-RETURN", group: "sales_return_approval", sourceType: "sales-returns", ownerRole: biz.BossRoleKey, capability: &salesReturnApprovalCapability, status: "blocked"},
+		{code: "APPROVAL-FINANCE-PAYMENT", group: "finance_payment_approval", sourceType: "finance-payments", ownerRole: biz.FinanceRoleKey, capability: &financePaymentApprovalCapability, status: "ready"},
+		{code: "APPROVAL-WAREHOUSE-ADJUSTMENT", group: "inventory_adjustment_approval", sourceType: "inventory-adjustments", ownerRole: biz.WarehouseRoleKey, capability: &warehouseAdjustmentApprovalCapability, status: "ready"},
+		{code: "APPROVAL-PRODUCTION-EXCEPTION", group: "production_exception_approval", sourceType: "production-exceptions", ownerRole: biz.ProductionRoleKey, capability: &productionExceptionApprovalCapability, status: "ready"},
 		{code: "HUMAN-BOSS", group: "management_review", sourceType: "sales_order", ownerRole: biz.BossRoleKey, status: "ready"},
 		{code: "APPROVAL-LEGACY", group: "order_approval", sourceType: "project-orders", ownerRole: biz.BossRoleKey, status: "blocked"},
-		{code: "APPROVAL-FINISHED", group: "shipment_finance_release", sourceType: "shipment", ownerRole: biz.FinanceRoleKey, capability: &approvalCapability, status: "done"},
+		{code: "APPROVAL-FINISHED", group: "shipment_finance_release", sourceType: "shipment", ownerRole: biz.FinanceRoleKey, capability: &genericApprovalCapability, status: "done"},
+		{code: "ORDINARY-COMPLETION", group: "ordinary", sourceType: "ordinary", ownerRole: biz.FinanceRoleKey, capability: &unregisteredCapability, status: "ready"},
 	}
 	for index, fixture := range fixtures {
 		builder := client.WorkflowTask.Create().
@@ -207,8 +217,77 @@ func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *
 	if err != nil {
 		t.Fatalf("get approval board: %v", err)
 	}
-	if board.Total != 1 || board.Counts.Actionable != 1 || board.Counts.Exception != 0 || board.Counts.Finished != 0 {
+	if board.Total != 5 || board.Counts.Actionable != 4 || board.Counts.Exception != 1 || board.Counts.Finished != 0 {
 		t.Fatalf("approval board must contain only capability-backed active approvals, got total=%d counts=%#v", board.Total, board.Counts)
+	}
+}
+
+func TestWorkflowRepo_GetWorkflowTaskBoardKeepsApprovalCapabilityPairedWithVisibility(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_approval_scope?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+
+	fixtures := []struct {
+		code       string
+		ownerRole  string
+		capability string
+	}{
+		{code: "GENERIC-SALES-VISIBLE", ownerRole: biz.SalesRoleKey, capability: biz.PermissionWorkflowTaskApprove},
+		{code: "FINANCE-FINANCE-VISIBLE", ownerRole: biz.FinanceRoleKey, capability: biz.PermissionFinancePaymentApprove},
+		{code: "FINANCE-SALES-HIDDEN", ownerRole: biz.SalesRoleKey, capability: biz.PermissionFinancePaymentApprove},
+		{code: "GENERIC-FINANCE-HIDDEN", ownerRole: biz.FinanceRoleKey, capability: biz.PermissionWorkflowTaskApprove},
+	}
+	for index, fixture := range fixtures {
+		if _, err := client.WorkflowTask.Create().
+			SetTaskCode(fixture.code).
+			SetTaskGroup("approval-scope").
+			SetTaskName(fixture.code).
+			SetSourceType("approval-scope").
+			SetSourceID(index + 1).
+			SetTaskStatusKey("ready").
+			SetOwnerRoleKey(fixture.ownerRole).
+			SetRequiredCapabilityKey(fixture.capability).
+			SetPayload(map[string]any{}).
+			Save(ctx); err != nil {
+			t.Fatalf("create fixture %s: %v", fixture.code, err)
+		}
+	}
+
+	board, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{
+		ApprovalOnly: true,
+		Limit:        10,
+		SnapshotAt:   time.Now(),
+		ApprovalVisibilityScopes: []biz.WorkflowApprovalVisibilityScope{
+			{
+				CapabilityKey: biz.PermissionWorkflowTaskApprove,
+				VisibilityScope: &biz.WorkflowTaskVisibilityScope{
+					StandaloneVisibleOwnerRoleKeys: []string{biz.SalesRoleKey},
+				},
+			},
+			{
+				CapabilityKey: biz.PermissionFinancePaymentApprove,
+				VisibilityScope: &biz.WorkflowTaskVisibilityScope{
+					StandaloneVisibleOwnerRoleKeys: []string{biz.FinanceRoleKey},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("get scoped approval board: %v", err)
+	}
+	if board.Total != 2 {
+		t.Fatalf("capability-specific visibility must not be flattened, board=%#v", board)
+	}
+	codes := map[string]bool{}
+	for _, lane := range board.Lanes {
+		for _, task := range lane.Tasks {
+			codes[task.TaskCode] = true
+		}
+	}
+	if !codes["GENERIC-SALES-VISIBLE"] || !codes["FINANCE-FINANCE-VISIBLE"] ||
+		codes["FINANCE-SALES-HIDDEN"] || codes["GENERIC-FINANCE-HIDDEN"] {
+		t.Fatalf("unexpected scoped approval tasks=%v", codes)
 	}
 }
 

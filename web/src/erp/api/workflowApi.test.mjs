@@ -9,6 +9,7 @@ import {
 } from '../utils/workflowTaskMutation.mjs'
 import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'
 import { requireWorkflowProcessContext } from '../utils/processRuntimePresentation.mjs'
+import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'
 
 function read(relativePath) {
   return readFileSync(
@@ -24,6 +25,7 @@ async function loadWorkflowApi(call) {
     requireWorkflowTaskBoardResponse
   globalThis.__workflowApiTestRequireWorkflowProcessContext =
     requireWorkflowProcessContext
+  globalThis.__workflowApiTestIsApprovalTask = isWorkflowApprovalTask
   const transformed = read('./workflowApi.mjs')
     .replace(
       "import { AUTH_SCOPE } from '@/common/auth/auth'",
@@ -52,6 +54,10 @@ async function loadWorkflowApi(call) {
     .replace(
       "import { requireWorkflowProcessContext } from '../utils/processRuntimePresentation.mjs'",
       'const requireWorkflowProcessContext = globalThis.__workflowApiTestRequireWorkflowProcessContext'
+    )
+    .replace(
+      "import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'",
+      'const isWorkflowApprovalTask = globalThis.__workflowApiTestIsApprovalTask'
     )
   const encoded = Buffer.from(transformed).toString('base64')
   return import(`data:text/javascript;base64,${encoded}#${Date.now()}`)
@@ -294,6 +300,59 @@ test('workflowApi: mobile role task view uses the strict server cursor contract'
       },
     },
   ])
+})
+
+test('workflowApi: approval role view accepts only registered active approval tasks', async () => {
+  const approvalTask = {
+    id: 43,
+    version: 1,
+    task_name: '付款审批',
+    task_status_key: 'ready',
+    required_capability_key: 'finance.payment.approve',
+  }
+  const api = await loadWorkflowApi(async () => ({
+    data: {
+      items: [approvalTask],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1_720_000_000,
+    },
+  }))
+  assert.deepEqual(
+    await api.listWorkflowRoleTasks({
+      view_key: 'approval',
+      role_key: 'finance',
+      limit: 50,
+    }),
+    {
+      items: [approvalTask],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1_720_000_000,
+    }
+  )
+
+  const invalidApi = await loadWorkflowApi(async () => ({
+    data: {
+      items: [
+        {
+          ...approvalTask,
+          required_capability_key: 'workflow.task.complete',
+        },
+      ],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1_720_000_000,
+    },
+  }))
+  await assert.rejects(
+    invalidApi.listWorkflowRoleTasks({
+      view_key: 'approval',
+      role_key: 'finance',
+      limit: 50,
+    }),
+    (error) => error.isInvalidResponse === true
+  )
 })
 
 test('workflowApi: workbench role task view uses its dedicated read method', async () => {
@@ -921,8 +980,9 @@ test('workflow dashboard consumes complete server role views without the old cap
   assert.match(statsSource, /effective_session\?\.roles/u)
   assert.match(statsSource, /hasEffectiveRoleProjection/u)
   assert.match(source, /listAllWorkflowWorkbenchRoleTasks/u)
-  assert.match(source, /\['todo', 'risk'\]/u)
+  assert.match(source, /\['todo', 'risk', 'approval'\]/u)
   assert.match(source, /workflowRiskTaskIDs\.has\(task\.id\)/u)
+  assert.match(source, /workflowApprovalTaskIDs\.has\(task\.id\)/u)
   assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)
   assert.doesNotMatch(source, /listWorkflowTasks/u)
   assert.doesNotMatch(source, /limit:\s*200/u)

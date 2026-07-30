@@ -149,7 +149,21 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if !admin.IsSuperAdmin && (!biz.AdminHasRole(admin, request.RoleKey) || !biz.WorkflowTaskVisibilityScopeIncludesRole(visibilityScope, request.RoleKey)) {
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 		}
-		return id, d.queryWorkflowRoleTaskView(ctx, request, admin, visibilityScope), nil
+		var approvalVisibilityScopes []biz.WorkflowApprovalVisibilityScope
+		if request.ViewKey == biz.WorkflowRoleTaskViewApproval {
+			var approvalRes *v1.JsonrpcResult
+			approvalVisibilityScopes, approvalRes = d.workflowApprovalTaskVisibilityScopes(ctx, admin)
+			if approvalRes != nil {
+				return id, approvalRes, nil
+			}
+		}
+		return id, d.queryWorkflowRoleTaskView(
+			ctx,
+			request,
+			admin,
+			visibilityScope,
+			approvalVisibilityScopes,
+		), nil
 	case "list_workbench_role_tasks":
 		if res := d.requireEffectiveWorkflowWorkbenchRead(ctx); res != nil {
 			return id, res, nil
@@ -169,7 +183,21 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if visibilityRes != nil {
 			return id, visibilityRes, nil
 		}
-		return id, d.queryWorkflowRoleTaskView(ctx, request, admin, visibilityScope), nil
+		var approvalVisibilityScopes []biz.WorkflowApprovalVisibilityScope
+		if request.ViewKey == biz.WorkflowRoleTaskViewApproval {
+			var approvalRes *v1.JsonrpcResult
+			approvalVisibilityScopes, approvalRes = d.workflowApprovalTaskVisibilityScopes(ctx, admin)
+			if approvalRes != nil {
+				return id, approvalRes, nil
+			}
+		}
+		return id, d.queryWorkflowRoleTaskView(
+			ctx,
+			request,
+			admin,
+			visibilityScope,
+			approvalVisibilityScopes,
+		), nil
 	case "get_task_board":
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
@@ -197,24 +225,19 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
-		var visibilityScope *biz.WorkflowTaskVisibilityScope
 		if query.ApprovalOnly {
-			if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskApprove); res != nil {
-				return id, res, nil
+			approvalVisibilityScopes, approvalRes := d.workflowApprovalTaskVisibilityScopes(ctx, admin)
+			if approvalRes != nil {
+				return id, approvalRes, nil
 			}
-			var visibilityErr error
-			visibilityScope, visibilityErr = d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskApprove)
-			if visibilityErr != nil {
-				return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
-			}
+			query.ApprovalVisibilityScopes = approvalVisibilityScopes
 		} else {
-			var visibilityResult *v1.JsonrpcResult
-			visibilityScope, visibilityResult = d.workflowTaskReadVisibilityScope(ctx, admin)
+			visibilityScope, visibilityResult := d.workflowTaskReadVisibilityScope(ctx, admin)
 			if visibilityResult != nil {
 				return id, visibilityResult, nil
 			}
+			query.VisibilityScope = visibilityScope
 		}
-		query.VisibilityScope = visibilityScope
 		board, err := d.workflowUC.GetTaskBoard(ctx, query)
 		if err != nil {
 			return id, d.mapWorkflowError(ctx, err), nil
@@ -1106,17 +1129,19 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 	request workflowRoleTaskViewRequest,
 	admin *biz.AdminUser,
 	visibilityScope *biz.WorkflowTaskVisibilityScope,
+	approvalVisibilityScopes []biz.WorkflowApprovalVisibilityScope,
 ) *v1.JsonrpcResult {
 	crossRoleRisk := request.ViewKey == biz.WorkflowRoleTaskViewRisk &&
 		(admin.IsSuperAdmin || biz.AdminHasRole(admin, biz.PMCRoleKey) || biz.AdminHasRole(admin, biz.BossRoleKey))
 	page, err := d.workflowUC.ListRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
-		ViewKey:              request.ViewKey,
-		RoleKey:              request.RoleKey,
-		Limit:                request.Limit,
-		BeforeID:             request.BeforeID,
-		CrossRoleRiskAllowed: crossRoleRisk,
-		SnapshotAt:           request.SnapshotAt,
-		VisibilityScope:      visibilityScope,
+		ViewKey:                  request.ViewKey,
+		RoleKey:                  request.RoleKey,
+		Limit:                    request.Limit,
+		BeforeID:                 request.BeforeID,
+		CrossRoleRiskAllowed:     crossRoleRisk,
+		SnapshotAt:               request.SnapshotAt,
+		VisibilityScope:          visibilityScope,
+		ApprovalVisibilityScopes: approvalVisibilityScopes,
 	})
 	if err != nil {
 		return d.mapWorkflowError(ctx, err)

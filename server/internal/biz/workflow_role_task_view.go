@@ -7,20 +7,22 @@ import (
 )
 
 const (
-	WorkflowRoleTaskViewTodo    = "todo"
-	WorkflowRoleTaskViewHistory = "history"
-	WorkflowRoleTaskViewRisk    = "risk"
+	WorkflowRoleTaskViewTodo     = "todo"
+	WorkflowRoleTaskViewHistory  = "history"
+	WorkflowRoleTaskViewRisk     = "risk"
+	WorkflowRoleTaskViewApproval = "approval"
 )
 
 type WorkflowRoleTaskViewQuery struct {
-	ViewKey              string
-	RoleKey              string
-	Limit                int
-	BeforeID             int
-	VisibleAssigneeID    *int
-	VisibilityScope      *WorkflowTaskVisibilityScope
-	CrossRoleRiskAllowed bool
-	SnapshotAt           time.Time
+	ViewKey                  string
+	RoleKey                  string
+	Limit                    int
+	BeforeID                 int
+	VisibleAssigneeID        *int
+	VisibilityScope          *WorkflowTaskVisibilityScope
+	ApprovalVisibilityScopes []WorkflowApprovalVisibilityScope
+	CrossRoleRiskAllowed     bool
+	SnapshotAt               time.Time
 }
 
 type WorkflowRoleTaskViewPage struct {
@@ -45,11 +47,12 @@ func (uc *WorkflowUsecase) ListRoleTaskView(ctx context.Context, query WorkflowR
 	query.ViewKey = strings.TrimSpace(query.ViewKey)
 	query.RoleKey = NormalizeRoleKey(query.RoleKey)
 	query.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(query.VisibilityScope)
+	query.ApprovalVisibilityScopes = NormalizeWorkflowApprovalVisibilityScopes(query.ApprovalVisibilityScopes)
 	if query.RoleKey == "" || query.BeforeID < 0 {
 		return nil, ErrBadParam
 	}
 	switch query.ViewKey {
-	case WorkflowRoleTaskViewTodo, WorkflowRoleTaskViewHistory, WorkflowRoleTaskViewRisk:
+	case WorkflowRoleTaskViewTodo, WorkflowRoleTaskViewHistory, WorkflowRoleTaskViewRisk, WorkflowRoleTaskViewApproval:
 	default:
 		return nil, ErrBadParam
 	}
