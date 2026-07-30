@@ -7,6 +7,14 @@ const source = readFileSync(
   fileURLToPath(new URL('./WorkflowTaskActionDrawer.jsx', import.meta.url)),
   'utf8'
 )
+const processStageSource = readFileSync(
+  fileURLToPath(new URL('./WorkflowProcessStageTrack.jsx', import.meta.url)),
+  'utf8'
+)
+const taskEventTrailSource = readFileSync(
+  fileURLToPath(new URL('./WorkflowTaskEventTrail.jsx', import.meta.url)),
+  'utf8'
+)
 
 test('task action drawer exposes real clickable steps without using actions as navigation', () => {
   assert.match(source, /role="tablist"/u)
@@ -71,16 +79,17 @@ test('task action drawer only renders the explicitly authorized related document
   assert.doesNotMatch(source, />\s*去办理\s*<\/Button>/u)
 })
 
-test('task action drawer loads the canonical approval trajectory and uses approval language', () => {
+test('task action drawer separates business trajectory from current-task processing records', () => {
   assert.match(source, /listWorkflowTaskEvents\(task\.id/u)
-  assert.match(source, /审批轨迹/u)
-  assert.match(source, /最近审批记录/u)
-  assert.match(source, /最近 100 条/u)
-  assert.match(source, /!task\?\.id \|\| !approvalTask/u)
+  assert.match(source, /WorkflowTaskEventTrail/u)
+  assert.match(taskEventTrailSource, /本任务处理记录/u)
+  assert.match(taskEventTrailSource, /只代表当前任务/u)
+  assert.match(taskEventTrailSource, /不是来源单据的完整审批链/u)
+  assert.doesNotMatch(source, /!task\?\.id \|\| !approvalTask/u)
   assert.match(source, /limit: 100/u)
-  assert.match(source, /event\.event_type === 'status_changed'/u)
-  assert.match(source, /event\.to_status_key === 'done'/u)
-  assert.match(source, /加载审批轨迹失败/u)
+  assert.match(source, /加载本任务处理记录失败/u)
+  assert.match(source, /approvalTask=\{approvalTask\}/u)
+  assert.match(source, /activeStepKey === 'context'/u)
   assert.match(source, /getWorkflowTaskActionMeta\(task, actionMode\)/u)
   assert.match(source, /approvalTask \? '审批办理' : '任务处理'/u)
 })
@@ -88,11 +97,16 @@ test('task action drawer loads the canonical approval trajectory and uses approv
 test('task action drawer shows task-scoped process position and marks display-only tasks', () => {
   assert.match(source, /getWorkflowTaskProcessContext\(task\.id/u)
   assert.match(source, /业务流程/u)
-  assert.match(source, /流程位置/u)
+  assert.match(source, /aria-label="业务轨迹"/u)
   assert.match(source, /来源单据/u)
-  assert.match(source, /当前节点/u)
-  assert.match(source, /已完成节点/u)
-  assert.match(source, /最终状态/u)
+  assert.match(source, /流程状态/u)
+  assert.match(source, /WorkflowProcessStageTrack context=\{processContext\}/u)
+  assert.match(processStageSource, /执行轨迹/u)
+  assert.match(processStageSource, /aria-current=\{item\.current \? 'step'/u)
+  assert.match(processStageSource, /data-linked-task=/u)
+  assert.match(processStageSource, /item\.attemptLabel/u)
+  assert.match(source, /task\?\.process_node_instance_id/u)
+  assert.match(source, /task\?\.version/u)
   assert.match(source, /模拟展示数据/u)
   assert.match(source, /不计入流程闭环证据/u)
 })

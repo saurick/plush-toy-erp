@@ -85,7 +85,11 @@ HTTP 路由：
 
 `list_workbench_role_tasks` 只用于桌面岗位工作台，参数、游标和响应结构与 `list_role_tasks` 相同。服务端同时要求当前 effective `erp.workbench.read` 与 `workflow.task.read`，并要求 `role_key` 存在于当前 effective session 的桌面岗位投影；查询使用账号的任务只读可见范围，因此 `workflow.task.supervise` 和 super admin 可以保留跨岗位只读监督，但不会获得完成、阻塞、驳回或改派权限。该方法不替代也不放宽岗位任务端的 `mobile.<role>.access` 与真实业务岗位门禁。
 
-`get_task_process_context` 只接受 `task_id`。服务端先按当前账号、active / stored revision、owner / assignee 范围确认任务可见，再从任务的 `process_instance_id / process_node_instance_id` 锚点读取来源单据、流程实例、全部节点、当前节点和已完成节点；来源或节点锚点不一致时 fail closed。响应不暴露定义 hash、策略快照或内部权限解释。正式桌面任务抽屉和手机任务详情用该结果展示业务流程、来源单据、流程发起时间、当前节点、已完成节点和最终状态，不根据任务名称猜测起点或终点。
+两个岗位任务读取方法的 `view_key` 都只接受 `todo / approval / risk / history`。`approval` 只返回 `ready / blocked` 且 `required_capability_key` 命中服务端审批能力注册表的任务；账号必须至少持有一个已登记审批能力。查询会把每个审批能力与它在任务冻结 revision 中的责任岗位 / 责任池范围成对应用，不能把某一审批能力的岗位范围借给另一能力。`get_task_board(approval_only=true)` 复用同一注册表与成对可见性合同，不只识别通用 `workflow.task.approve`。
+
+`get_task_process_context` 只接受 `task_id`。服务端先按当前账号、active / stored revision、owner / assignee 范围确认任务可见，再从任务的 `process_instance_id / process_node_instance_id` 锚点读取来源单据、流程实例、全部节点、当前节点和已完成节点；来源或节点锚点不一致时 fail closed。响应不暴露定义 hash、edge、分支选择、策略快照或内部权限解释。正式桌面任务抽屉和手机任务详情用该结果展示业务流程、来源单据、流程发起时间、流程状态和已执行 / 当前 / 受阻执行轨迹，并保留本任务锚点与重试次数；`waiting` 节点可能属于未选分支，不作为确定未来步骤展示。
+
+`list_task_events` 只接受 `task_id` 和 `1..100` 的 `limit`，按当前任务可见范围校验后返回该任务最近事件，顺序为最新在前。响应保留任务版本、事件类型、状态变化、处理岗位、意见和时间，不返回操作者内部 ID。它只回答一条普通或审批任务如何被处理，不是来源单据的完整审批链；跨节点业务轨迹以 `get_task_process_context` 为准，库存、出货、质检和财务事实仍以各领域读模型为准。
 
 `get_task_assignment_options` 只接受 `task_id`，返回当前任务 version、状态、负责岗位、当前处理人、是否可退回岗位池以及服务端筛选后的接收人。`reassign_task` 只接受 `task_id / expected_version / idempotency_key / assignee_id / reason`；`assignee_id` 必须显式为正整数接收人或 `null` 岗位池，原因不能为空。当前默认只有 `boss` 获得 `workflow.task.assign`，super admin 可通过全权限执行，但不会自动成为业务岗位接收人；PMC 的 `workflow.task.supervise` 仍是只读。接收人必须是 active 账号、直接持有任务负责岗位，并在任务 revision 中具备读取、更新和完成 / 审批能力。成功只改变任务 `assignee_id / updated_by / version` 并写事件、幂等 receipt 与运行审计，不改变任务状态、责任池、流程锚点或 Fact。
 

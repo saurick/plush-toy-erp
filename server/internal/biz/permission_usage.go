@@ -324,7 +324,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 			menuPermissionSurface("task-board", "task-actions", "协同任务", controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions),
 		}
 	}
-	workflowTaskReadSurfaces := workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment"))
+	workflowTaskReadSurfaces := workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment", "get_task_process_context", "list_task_events"))
 	for index := range workflowTaskReadSurfaces {
 		if workflowTaskReadSurfaces[index].PageKey == "global-dashboard" {
 			workflowTaskReadSurfaces[index].BackendMethods = append(
@@ -516,7 +516,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	// Mobile role entry permissions use explicit routes, not string-derived paths.
 	addMobile := func(permissionKey string, roleKey string, pageLabel string, path string) {
-		add(permissionKey, explicitPermissionSurface("mobile-"+roleKey+"-tasks", pageLabel, path, "mobile-tasks", "岗位任务", "mobile-task-entry", pageLabel, permissionControlMobileEntry, "允许进入岗位任务端", permissionMethods("workflow", "list_tasks", "get_task_board", "explain_action_access"), []string{permissionKey}, nil, mobileUsageConditions))
+		add(permissionKey, explicitPermissionSurface("mobile-"+roleKey+"-tasks", pageLabel, path, "mobile-tasks", "岗位任务", "mobile-task-entry", pageLabel, permissionControlMobileEntry, "允许进入岗位任务端", permissionMethods("workflow", "list_tasks", "get_task_board", "explain_action_access", "get_task_process_context", "list_task_events"), []string{permissionKey}, nil, mobileUsageConditions))
 	}
 	addMobile(PermissionMobileBossAccess, BossRoleKey, "老板岗位任务端", "/m/boss/tasks")
 	addMobile(PermissionMobileSalesAccess, SalesRoleKey, "业务岗位任务端", "/m/sales/tasks")

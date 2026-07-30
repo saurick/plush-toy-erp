@@ -144,32 +144,42 @@ export function requireWorkflowProcessContext(value) {
     invalidProcessContext()
   }
   const nodeIDs = new Set(nodes.map((node) => node.id))
+  const matchesCanonicalNode = (node) => {
+    const canonicalNode = nodes.find((candidate) => candidate.id === node.id)
+    return (
+      canonicalNode &&
+      canonicalNode.node_key === node.node_key &&
+      canonicalNode.node_type === node.node_type &&
+      canonicalNode.attempt === node.attempt &&
+      canonicalNode.version === node.version &&
+      canonicalNode.status === node.status &&
+      canonicalNode.outcome === node.outcome
+    )
+  }
   if (
     nodeIDs.size !== nodes.length ||
     !currentNodes.every(
       (node) =>
         validateNode(node) &&
         nodeIDs.has(node.id) &&
+        matchesCanonicalNode(node) &&
         ['active', 'blocked'].includes(node.status)
     ) ||
     !completedNodes.every(
       (node) =>
         validateNode(node) &&
         nodeIDs.has(node.id) &&
+        matchesCanonicalNode(node) &&
         node.status === 'completed'
     )
   ) {
     invalidProcessContext()
   }
   if (linkedNode != null) {
-    if (!validateNode(linkedNode) || !nodeIDs.has(linkedNode.id)) {
-      invalidProcessContext()
-    }
-    const canonicalLinkedNode = nodes.find((node) => node.id === linkedNode.id)
     if (
-      !canonicalLinkedNode ||
-      canonicalLinkedNode.node_key !== linkedNode.node_key ||
-      canonicalLinkedNode.status !== linkedNode.status
+      !validateNode(linkedNode) ||
+      !nodeIDs.has(linkedNode.id) ||
+      !matchesCanonicalNode(linkedNode)
     ) {
       invalidProcessContext()
     }
@@ -213,6 +223,78 @@ export function getProcessNodeStatusLabel(node = {}) {
 
 export function getProcessStatusLabel(instance = {}) {
   return PROCESS_STATUS_LABELS[instance.status] || '状态待确认'
+}
+
+function getProcessNodeTone(node = {}) {
+  if (node.outcome === 'rejected') return 'rejected'
+  if (node.status === 'completed') return 'completed'
+  if (node.status === 'blocked') return 'blocked'
+  if (node.status === 'active') return 'active'
+  return 'waiting'
+}
+
+function formatProcessNodeAttemptLabel(node = {}) {
+  return Number(node.attempt) > 1 ? `第 ${node.attempt} 次` : ''
+}
+
+export function buildWorkflowProcessStageModel(value) {
+  const context = requireWorkflowProcessContext(value)
+  const currentNodeIDs = new Set(context.current_nodes.map((node) => node.id))
+  const completedNodeIDs = new Set(
+    context.completed_nodes.map((node) => node.id)
+  )
+  const linkedNodeID = Number(context.linked_node?.id || 0)
+  const items = [...context.nodes]
+    .sort((left, right) => left.id - right.id)
+    .filter((node) => node.status !== 'waiting')
+    .map((node) => ({
+      id: node.id,
+      key: `${node.id}:${node.version}`,
+      label: getProcessNodeLabel(node),
+      attemptLabel: formatProcessNodeAttemptLabel(node),
+      statusLabel: getProcessNodeStatusLabel(node),
+      tone: getProcessNodeTone(node),
+      current: currentNodeIDs.has(node.id),
+      completed: completedNodeIDs.has(node.id),
+      linked: linkedNodeID > 0 && linkedNodeID === node.id,
+    }))
+  const hasUndecidedRoute =
+    context.process_instance.status !== 'completed' &&
+    context.nodes.some((node) => node.status === 'waiting')
+  const counts = items.reduce(
+    (result, item) => {
+      if (item.completed) result.completed += 1
+      else if (item.current) result.current += 1
+      if (item.tone === 'blocked') result.blocked += 1
+      if (item.tone === 'rejected') result.rejected += 1
+      return result
+    },
+    { completed: 0, current: 0, blocked: 0, rejected: 0 }
+  )
+  const currentLabels = items
+    .filter((item) => item.current)
+    .map((item) => item.label)
+  let handoffLabel = ''
+  if (counts.blocked > 0) {
+    handoffLabel = `当前受阻阶段：${currentLabels.join('、')}`
+  } else if (currentLabels.length > 0) {
+    handoffLabel = `当前办理阶段：${currentLabels.join('、')}`
+  } else if (context.process_instance.status === 'completed') {
+    handoffLabel = counts.rejected > 0 ? '流程已退回结束。' : '流程已结束。'
+  } else {
+    handoffLabel = '当前等待后续条件或流程分支确认。'
+  }
+  const routeNote = hasUndecidedRoute ? ' · 后续路径待流程决定' : ''
+
+  return {
+    processLabel: getProcessLabel(context.process_instance),
+    statusLabel: getProcessStatusLabel(context.process_instance),
+    summaryLabel: `已结束步骤 ${counts.completed} · 当前步骤 ${counts.current}${routeNote}`,
+    handoffLabel,
+    hasUndecidedRoute,
+    counts,
+    items,
+  }
 }
 
 export function formatProcessStartedAt(value) {

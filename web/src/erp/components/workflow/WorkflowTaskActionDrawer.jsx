@@ -13,7 +13,6 @@ import {
   Select,
   Space,
   Tag,
-  Timeline,
   Typography,
 } from 'antd'
 import {
@@ -49,14 +48,13 @@ import {
 import {
   formatProcessStartedAt,
   getProcessLabel,
-  getProcessNodeLabel,
-  getProcessNodeStatusLabel,
   getProcessStatusLabel,
   isDisplayOnlyWorkflowTask,
 } from '../../utils/processRuntimePresentation.mjs'
-import { getRoleDisplayName } from '../../utils/roleKeys.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
+import WorkflowTaskEventTrail from './WorkflowTaskEventTrail.jsx'
 
 const { Paragraph, Title } = Typography
 const { TextArea } = Input
@@ -121,35 +119,6 @@ export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
     }
   }
   return base
-}
-
-const EVENT_LABELS = Object.freeze({
-  created: '审批已发起',
-  complete: '审批已通过',
-  block: '审批已阻塞',
-  reject: '审批已退回',
-  resume: '审批已恢复',
-  urge_task: '已催办',
-  urge_role: '已催办岗位',
-  urge_assignee: '已催办处理人',
-  reassigned: '已转交处理人',
-  unassigned: '已退回负责岗位共同待办',
-})
-
-function getApprovalEventLabel(event = {}) {
-  if (event.event_type === 'status_changed') {
-    if (event.to_status_key === 'done') return EVENT_LABELS.complete
-    if (event.to_status_key === 'rejected') return EVENT_LABELS.reject
-    if (event.to_status_key === 'blocked') return EVENT_LABELS.block
-    if (event.to_status_key === 'ready') return EVENT_LABELS.resume
-  }
-  return EVENT_LABELS[event.event_type] || '审批状态已更新'
-}
-
-function formatEventTime(value) {
-  const timestamp = Number(value || 0)
-  if (!Number.isFinite(timestamp) || timestamp <= 0) return '时间未记录'
-  return new Date(timestamp * 1000).toLocaleString('zh-CN', { hour12: false })
 }
 
 const TASK_DRAWER_STEPS = Object.freeze([
@@ -335,28 +304,31 @@ export default function WorkflowTaskActionDrawer({
   }, [task])
 
   React.useEffect(() => {
-    if (!task?.id || !approvalTask) {
+    if (!task?.id) {
       setTaskEvents([])
       setTaskEventsState('idle')
       setTaskEventsError('')
       return undefined
     }
     const controller = new AbortController()
+    setTaskEvents([])
     setTaskEventsState('loading')
     setTaskEventsError('')
     listWorkflowTaskEvents(task.id, { limit: 100, signal: controller.signal })
       .then((items) => {
-        setTaskEvents(items)
+        setTaskEvents(Array.isArray(items) ? items : [])
         setTaskEventsState('ready')
       })
       .catch((error) => {
         if (controller.signal.aborted) return
         setTaskEvents([])
         setTaskEventsState('error')
-        setTaskEventsError(getActionErrorMessage(error, '加载审批轨迹失败'))
+        setTaskEventsError(
+          getActionErrorMessage(error, '加载本任务处理记录失败')
+        )
       })
     return () => controller.abort()
-  }, [approvalTask, task?.id])
+  }, [task?.id, task?.version])
 
   React.useEffect(() => {
     if (!task?.id || !task?.process_instance_id) {
@@ -378,7 +350,12 @@ export default function WorkflowTaskActionDrawer({
         setProcessContextState('error')
       })
     return () => controller.abort()
-  }, [task?.id, task?.process_instance_id])
+  }, [
+    task?.id,
+    task?.process_instance_id,
+    task?.process_node_instance_id,
+    task?.version,
+  ])
 
   React.useEffect(() => {
     if (stepAvailability[activeStepKey]) return
@@ -647,67 +624,51 @@ export default function WorkflowTaskActionDrawer({
           {task.process_instance_id ? (
             <section
               className="erp-task-action-drawer__summary"
-              aria-label="流程位置"
+              aria-label="业务轨迹"
             >
-              <div className="erp-task-action-drawer__eyebrow">流程位置</div>
+              <div className="erp-task-action-drawer__eyebrow">业务轨迹</div>
               {processContextState === 'loading' ? (
-                <Alert type="info" showIcon message="正在读取流程位置" />
+                <Alert type="info" showIcon message="正在读取业务轨迹" />
               ) : processContextState === 'error' ? (
                 <Alert
                   type="error"
                   showIcon
-                  message="流程位置暂时无法确认"
+                  message="业务轨迹暂时无法确认"
                   description="请刷新后重试；系统不会根据任务文案猜测流程节点。"
                 />
               ) : processContext ? (
-                <div className="erp-task-action-drawer__meta-grid">
-                  <div>
-                    <span>业务流程</span>
-                    <strong>
-                      {getProcessLabel(processContext.process_instance)}
-                    </strong>
+                <>
+                  <div className="erp-task-action-drawer__meta-grid">
+                    <div>
+                      <span>业务流程</span>
+                      <strong>
+                        {getProcessLabel(processContext.process_instance)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>来源单据</span>
+                      <strong>
+                        {processContext.source.no ||
+                          formatWorkflowTaskSource(task)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>流程发起</span>
+                      <strong>
+                        {formatProcessStartedAt(
+                          processContext.process_instance.started_at
+                        )}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>流程状态</span>
+                      <strong>
+                        {getProcessStatusLabel(processContext.process_instance)}
+                      </strong>
+                    </div>
                   </div>
-                  <div>
-                    <span>来源单据</span>
-                    <strong>
-                      {processContext.source.no ||
-                        formatWorkflowTaskSource(task)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>流程发起</span>
-                    <strong>
-                      {formatProcessStartedAt(
-                        processContext.process_instance.started_at
-                      )}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>当前节点</span>
-                    <strong>
-                      {processContext.current_nodes
-                        .map(getProcessNodeLabel)
-                        .join('、') || '无待办节点'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>已完成节点</span>
-                    <strong>
-                      {processContext.completed_nodes
-                        .map(
-                          (node) =>
-                            `${getProcessNodeLabel(node)}（${getProcessNodeStatusLabel(node)}）`
-                        )
-                        .join('、') || '暂无'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>最终状态</span>
-                    <strong>
-                      {getProcessStatusLabel(processContext.process_instance)}
-                    </strong>
-                  </div>
-                </div>
+                  <WorkflowProcessStageTrack context={processContext} />
+                </>
               ) : null}
             </section>
           ) : null}
@@ -807,53 +768,14 @@ export default function WorkflowTaskActionDrawer({
                 description={readonlyReason || '当前账号不能直接处理该任务。'}
               />
             ) : null}
+            <WorkflowTaskEventTrail
+              approvalTask={approvalTask}
+              errorMessage={taskEventsError}
+              events={taskEvents}
+              state={taskEventsState}
+              task={task}
+            />
           </section>
-
-          {approvalTask ? (
-            <section
-              className="erp-task-action-drawer__step-panel"
-              aria-label="审批轨迹"
-            >
-              <div className="erp-task-action-drawer__action-prompt">
-                <strong>最近审批记录</strong>
-                <span>
-                  按时间倒序展示最近 100 条处理岗位、意见、状态和版本。
-                </span>
-              </div>
-              {taskEventsState === 'loading' ? (
-                <Alert type="info" showIcon message="正在加载审批轨迹" />
-              ) : taskEventsState === 'error' ? (
-                <Alert type="error" showIcon message={taskEventsError} />
-              ) : taskEvents.length > 0 ? (
-                <Timeline
-                  items={taskEvents.map((event) => ({
-                    color:
-                      event.to_status_key === 'rejected' ||
-                      event.to_status_key === 'blocked'
-                        ? 'red'
-                        : 'blue',
-                    children: (
-                      <div>
-                        <strong>{getApprovalEventLabel(event)}</strong>
-                        <Paragraph type="secondary">
-                          {getRoleDisplayName(event.actor_role_key, '系统')} ·{' '}
-                          {formatEventTime(event.created_at)}
-                          {event.task_version
-                            ? ` · 版本 ${event.task_version}`
-                            : ''}
-                        </Paragraph>
-                        {event.reason ? (
-                          <Paragraph>{event.reason}</Paragraph>
-                        ) : null}
-                      </div>
-                    ),
-                  }))}
-                />
-              ) : (
-                <Alert type="info" showIcon message="暂无可展示的审批轨迹" />
-              )}
-            </section>
-          ) : null}
 
           <section
             id="erp-task-action-step-action"

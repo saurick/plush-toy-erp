@@ -35,6 +35,7 @@ type stubWorkflowJSONRPCRepo struct {
 	upsertStateInput   *biz.WorkflowBusinessStateUpsert
 	upsertStateActorID int
 	currentTask        *biz.WorkflowTask
+	events             []*biz.WorkflowTaskEvent
 	listTaskFilter     biz.WorkflowTaskFilter
 	resolveMutation    func(taskID int, idempotencyKey string, intentHash string) (*biz.WorkflowTask, bool, error)
 }
@@ -123,6 +124,10 @@ func (s *stubWorkflowJSONRPCRepo) GetWorkflowTaskByTaskCode(_ context.Context, t
 func (s *stubWorkflowJSONRPCRepo) ListWorkflowTasks(_ context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
 	s.listTaskFilter = filter
 	return nil, 0, nil
+}
+
+func (s *stubWorkflowJSONRPCRepo) ListWorkflowTaskEvents(_ context.Context, _ int, _ int) ([]*biz.WorkflowTaskEvent, error) {
+	return s.events, nil
 }
 
 func (s *stubWorkflowJSONRPCRepo) CreateWorkflowTask(_ context.Context, in *biz.WorkflowTaskCreate, actorID int) (*biz.WorkflowTask, error) {
@@ -285,6 +290,78 @@ func TestJsonrpcDispatcher_WorkflowGetTaskProcessContextUsesTaskVisibility(t *te
 	_, denied, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_process_context", "2", params)
 	if err != nil || denied == nil || denied.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("out-of-scope task process context must stay hidden, res=%#v err=%v", denied, err)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowListTaskEventsSupportsNonApprovalTasksWithoutActorID(t *testing.T) {
+	taskVersion := 3
+	fromStatus := "ready"
+	toStatus := "blocked"
+	actorRole := biz.WarehouseRoleKey
+	actorID := 99
+	reason := "等待库位确认"
+	repo := &stubWorkflowJSONRPCRepo{
+		currentTask: &biz.WorkflowTask{
+			ID:            42,
+			TaskGroup:     "warehouse_inbound",
+			SourceType:    "purchase_receipt",
+			SourceID:      1001,
+			TaskStatusKey: "blocked",
+			OwnerRoleKey:  biz.WarehouseRoleKey,
+			Version:       taskVersion,
+		},
+		events: []*biz.WorkflowTaskEvent{
+			{
+				ID:            7,
+				TaskID:        42,
+				TaskVersion:   &taskVersion,
+				EventType:     "status_changed",
+				FromStatusKey: &fromStatus,
+				ToStatusKey:   &toStatus,
+				ActorRoleKey:  &actorRole,
+				ActorID:       &actorID,
+				Reason:        &reason,
+				Payload:       map[string]any{},
+				CreatedAt:     time.Unix(1_720_000_000, 0),
+			},
+		},
+	}
+	j := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+		)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params, _ := structpb.NewStruct(map[string]any{
+		"task_id": float64(42),
+		"limit":   float64(100),
+	})
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "list_task_events", "1", params)
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected non-approval task events OK, res=%#v err=%v", res, err)
+	}
+	items, ok := res.Data.AsMap()["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("unexpected task events %#v", res.Data.AsMap())
+	}
+	event, ok := items[0].(map[string]any)
+	if !ok || event["event_type"] != "status_changed" || event["actor_role_key"] != biz.WarehouseRoleKey {
+		t.Fatalf("unexpected task event %#v", items[0])
+	}
+	if _, exposed := event["actor_id"]; exposed {
+		t.Fatalf("task event read model must not expose actor_id: %#v", event)
+	}
+
+	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionWorkflowTaskRead,
+	)}
+	_, denied, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "list_task_events", "2", params)
+	if err != nil || denied == nil || denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("out-of-scope task events must stay hidden, res=%#v err=%v", denied, err)
 	}
 }
 

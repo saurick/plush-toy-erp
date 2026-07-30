@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  buildWorkflowProcessStageModel,
   getProcessLabel,
   getProcessNodeLabel,
   getProcessNodeStatusLabel,
@@ -175,6 +176,115 @@ test('process runtime presentation distinguishes rejected node from blocked proc
   assert.equal(getProcessStatusLabel({ status: 'blocked' }), '流程受阻')
 })
 
+test('process runtime presentation builds execution trail without inventing future stages or a percent', () => {
+  const value = context()
+  const [, currentNode] = value.nodes
+  value.linked_node = currentNode
+  value.nodes.push({
+    id: 13,
+    process_instance_id: 10,
+    node_key: 'activate_sales_order',
+    node_type: 'domain_command',
+    attempt: 1,
+    version: 1,
+    status: 'waiting',
+  })
+  const model = buildWorkflowProcessStageModel(value)
+
+  assert.deepEqual(
+    model.items.map((item) => item.label),
+    ['提交销售订单', '订单审批']
+  )
+  assert.deepEqual(model.counts, {
+    completed: 1,
+    current: 1,
+    blocked: 0,
+    rejected: 0,
+  })
+  assert.equal(model.items[1].linked, true)
+  assert.equal(model.hasUndecidedRoute, true)
+  assert.equal(model.handoffLabel, '当前办理阶段：订单审批')
+  assert.equal(
+    model.summaryLabel,
+    '已结束步骤 1 · 当前步骤 1 · 后续路径待流程决定'
+  )
+  assert.equal('percent' in model, false)
+})
+
+test('process runtime presentation keeps blocked and retried stages explicit', () => {
+  const value = context()
+  const [, currentNode] = value.nodes
+  currentNode.status = 'blocked'
+  currentNode.attempt = 2
+  value.current_nodes = [currentNode]
+  value.linked_node = currentNode
+
+  const model = buildWorkflowProcessStageModel(value)
+  assert.equal(model.items[1].tone, 'blocked')
+  assert.equal(model.items[1].attemptLabel, '第 2 次')
+  assert.equal(model.handoffLabel, '当前受阻阶段：订单审批')
+})
+
+test('process runtime presentation preserves canonical attempt order and unique keys', () => {
+  const value = context()
+  const firstAttempt = {
+    ...value.nodes[1],
+    id: 13,
+    attempt: 1,
+    status: 'completed',
+  }
+  const secondAttempt = {
+    ...value.nodes[1],
+    id: 14,
+    attempt: 2,
+  }
+  value.nodes = [secondAttempt, firstAttempt, value.nodes[0]]
+  value.current_nodes = [secondAttempt]
+  value.completed_nodes = [value.nodes[2], firstAttempt]
+  value.linked_node = secondAttempt
+
+  const model = buildWorkflowProcessStageModel(value)
+  assert.deepEqual(
+    model.items.map((item) => item.id),
+    [11, 13, 14]
+  )
+  assert.deepEqual(
+    model.items.map((item) => item.attemptLabel),
+    ['', '', '第 2 次']
+  )
+  assert.equal(new Set(model.items.map((item) => item.key)).size, 3)
+})
+
+test('completed rejected process does not present dormant branches as undecided future work', () => {
+  const value = context()
+  const rejectedNode = {
+    ...value.nodes[1],
+    status: 'completed',
+    outcome: 'rejected',
+  }
+  const dormantBranch = {
+    id: 13,
+    process_instance_id: 10,
+    node_key: 'activate_sales_order',
+    node_type: 'domain_command',
+    attempt: 1,
+    version: 1,
+    status: 'waiting',
+  }
+  value.process_instance.status = 'completed'
+  value.nodes = [value.nodes[0], rejectedNode, dormantBranch]
+  value.current_nodes = []
+  value.completed_nodes = [value.nodes[0], rejectedNode]
+  value.linked_node = rejectedNode
+
+  const model = buildWorkflowProcessStageModel(value)
+  assert.equal(model.hasUndecidedRoute, false)
+  assert.equal(model.items[1].tone, 'rejected')
+  assert.equal(model.items[1].statusLabel, '已退回')
+  assert.equal(model.handoffLabel, '流程已退回结束。')
+  assert.equal(model.summaryLabel, '已结束步骤 2 · 当前步骤 0')
+})
+
 test('process runtime presentation fails closed on foreign or invalid nodes', () => {
   assert.throws(
     () =>
@@ -205,6 +315,14 @@ test('process runtime presentation fails closed on foreign or invalid nodes', ()
           },
         })
       ),
+    /流程位置暂时无法确认/u
+  )
+  const canonicalDrift = context()
+  canonicalDrift.current_nodes = [
+    { ...canonicalDrift.current_nodes[0], version: 2 },
+  ]
+  assert.throws(
+    () => requireWorkflowProcessContext(canonicalDrift),
     /流程位置暂时无法确认/u
   )
 })

@@ -134,6 +134,62 @@ func TestWorkflowBusinessPagesRegisterTheirInitialTaskRead(t *testing.T) {
 	}
 }
 
+func TestTaskTrajectorySurfacesRegisterProcessContextAndTaskEvents(t *testing.T) {
+	requiredMethods := map[string]bool{
+		"get_task_process_context": false,
+		"list_task_events":         false,
+	}
+	assertMethods := func(t *testing.T, usage PermissionUsage, pageKey string) {
+		t.Helper()
+		found := make(map[string]bool, len(requiredMethods))
+		for _, surface := range usage.Surfaces {
+			if surface.PageKey != pageKey {
+				continue
+			}
+			for _, method := range surface.BackendMethods {
+				if method.Domain != "workflow" {
+					continue
+				}
+				if _, required := requiredMethods[method.Method]; required {
+					found[method.Method] = true
+				}
+			}
+		}
+		for method := range requiredMethods {
+			if !found[method] {
+				t.Errorf("page %q has no workflow.%s usage", pageKey, method)
+			}
+		}
+	}
+
+	taskReadUsage, ok := PermissionUsageFor(PermissionWorkflowTaskRead)
+	if !ok {
+		t.Fatal("workflow task read usage missing")
+	}
+	assertMethods(t, taskReadUsage, "global-dashboard")
+	assertMethods(t, taskReadUsage, "task-board")
+
+	mobilePermissions := map[string]string{
+		PermissionMobileBossAccess:        "mobile-boss-tasks",
+		PermissionMobileSalesAccess:       "mobile-sales-tasks",
+		PermissionMobilePurchaseAccess:    "mobile-purchase-tasks",
+		PermissionMobileProductionAccess:  "mobile-production-tasks",
+		PermissionMobileWarehouseAccess:   "mobile-warehouse-tasks",
+		PermissionMobileQualityAccess:     "mobile-quality-tasks",
+		PermissionMobileFinanceAccess:     "mobile-finance-tasks",
+		PermissionMobilePMCAccess:         "mobile-pmc-tasks",
+		PermissionMobileEngineeringAccess: "mobile-engineering-tasks",
+	}
+	for permissionKey, pageKey := range mobilePermissions {
+		usage, exists := PermissionUsageFor(permissionKey)
+		if !exists {
+			t.Errorf("mobile permission %q usage missing", permissionKey)
+			continue
+		}
+		assertMethods(t, usage, pageKey)
+	}
+}
+
 func TestPrimaryBackendReadPagePermissionsGuardTheirMenuEntries(t *testing.T) {
 	definitions := make(map[string]PermissionDefinition, len(AllPermissionDefinitions()))
 	for _, definition := range AllPermissionDefinitions() {
