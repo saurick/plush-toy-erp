@@ -79,17 +79,21 @@ func (r *stubAttachmentJSONRPCRepo) CreateBusinessAttachment(_ context.Context, 
 
 func (r *stubAttachmentJSONRPCRepo) ListBusinessAttachments(_ context.Context, ownerType string, ownerID int) ([]*biz.BusinessAttachment, error) {
 	r.listCalls++
+	uploaderID := 7
+	uploaderUsername := "demo_boss"
 	return []*biz.BusinessAttachment{
 		{
-			ID:             102,
-			OwnerType:      ownerType,
-			OwnerID:        ownerID,
-			AttachmentType: "evidence",
-			FileName:       "proof.pdf",
-			MimeType:       "application/pdf",
-			FileSize:       5,
-			SHA256:         "sha",
-			CreatedAt:      time.Unix(2, 0),
+			ID:                 102,
+			OwnerType:          ownerType,
+			OwnerID:            ownerID,
+			AttachmentType:     "evidence",
+			FileName:           "proof.pdf",
+			MimeType:           "application/pdf",
+			FileSize:           5,
+			SHA256:             "sha",
+			UploadedBy:         &uploaderID,
+			UploadedByUsername: &uploaderUsername,
+			CreatedAt:          time.Unix(2, 0),
 		},
 	}, nil
 }
@@ -174,6 +178,44 @@ func TestBusinessAttachmentProductOwnerPermissions(t *testing.T) {
 	}
 	if got := businessAttachmentWritePermissions(biz.BusinessAttachmentOwnerProductSKU); !reflect.DeepEqual(got, []string{biz.PermissionProductSKUCreate, biz.PermissionProductSKUUpdate}) {
 		t.Fatalf("product SKU attachment write permissions must remain unchanged: %#v", got)
+	}
+}
+
+func TestBusinessAttachmentToAnyIncludesReadableUploaderAuditMetadata(t *testing.T) {
+	uploaderID := 7
+	uploaderUsername := "demo_boss"
+	out := businessAttachmentToAny(&biz.BusinessAttachment{
+		ID:                 101,
+		OwnerType:          biz.BusinessAttachmentOwnerWorkflowTask,
+		OwnerID:            42,
+		AttachmentType:     "evidence",
+		FileName:           "proof.pdf",
+		MimeType:           "application/pdf",
+		FileSize:           5,
+		SHA256:             "sha",
+		UploadedBy:         &uploaderID,
+		UploadedByUsername: &uploaderUsername,
+		CreatedAt:          time.Unix(2, 0),
+	}, false)
+	if out["uploaded_by"] != uploaderID ||
+		out["uploaded_by_username"] != uploaderUsername ||
+		out["created_at"] != int64(2) {
+		t.Fatalf("attachment audit metadata = %#v", out)
+	}
+
+	legacy := businessAttachmentToAny(&biz.BusinessAttachment{
+		ID:             102,
+		OwnerType:      biz.BusinessAttachmentOwnerWorkflowTask,
+		OwnerID:        42,
+		AttachmentType: "evidence",
+		FileName:       "legacy.pdf",
+		MimeType:       "application/pdf",
+		FileSize:       5,
+		SHA256:         "sha",
+		CreatedAt:      time.Unix(3, 0),
+	}, false)
+	if legacy["uploaded_by"] != nil || legacy["uploaded_by_username"] != nil {
+		t.Fatalf("legacy attachment uploader metadata must remain missing: %#v", legacy)
 	}
 }
 
@@ -457,6 +499,74 @@ func TestJsonrpcDispatcher_WorkflowAttachmentEnforcesTaskRowScope(t *testing.T) 
 		"content_base64":   "cHJvb2Y=",
 	})
 
+	t.Run("ready owner may upload", func(t *testing.T) {
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, baseTask)
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		if uploadRes.Code != errcode.OK.Code || repo.createCalls != 1 {
+			t.Fatalf("ready owner upload must succeed, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+		if repo.created == nil || repo.created.WorkflowGuard == nil ||
+			repo.created.WorkflowGuard.ExpectedVersion != 1 ||
+			repo.created.WorkflowGuard.ActorID != admin.ID ||
+			repo.created.WorkflowGuard.ActorUsername != admin.Username {
+			t.Fatalf("ready owner upload must preserve the row guard, created=%#v", repo.created)
+		}
+	})
+
+	t.Run("owner missing backend update permission cannot upload", func(t *testing.T) {
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, baseTask)
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
+			t.Fatalf("owner without backend update permission must be denied, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+	})
+
+	t.Run("blocked boss owner may upload", func(t *testing.T) {
+		task := *baseTask
+		task.TaskStatusKey = "blocked"
+		task.OwnerRoleKey = biz.BossRoleKey
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.BossRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, &task)
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		if uploadRes.Code != errcode.OK.Code || repo.createCalls != 1 {
+			t.Fatalf("blocked boss owner upload must succeed, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+	})
+
+	t.Run("blocked exact assignee may upload", func(t *testing.T) {
+		task := *baseTask
+		task.TaskStatusKey = "blocked"
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.FinanceRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		assigneeID := admin.ID
+		task.AssigneeID = &assigneeID
+		repo := &stubAttachmentJSONRPCRepo{}
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, &task)
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		if uploadRes.Code != errcode.OK.Code || repo.createCalls != 1 {
+			t.Fatalf("blocked exact assignee upload must succeed, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+	})
+
 	t.Run("wrong owner cannot list or upload", func(t *testing.T) {
 		repo := &stubAttachmentJSONRPCRepo{}
 		admin := workflowJSONRPCAdmin(
@@ -475,6 +585,27 @@ func TestJsonrpcDispatcher_WorkflowAttachmentEnforcesTaskRowScope(t *testing.T) 
 		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
 		if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
 			t.Fatalf("wrong owner upload must be denied before create, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+	})
+
+	t.Run("boss supervisor may read another owner task but cannot upload", func(t *testing.T) {
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.BossRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, baseTask)
+		_, listRes, _ := dispatcher.handleBusinessAttachment(ctx, "list_attachments", "list", mustJSONRPCStruct(t, map[string]any{
+			"owner_type": biz.BusinessAttachmentOwnerWorkflowTask,
+			"owner_id":   42,
+		}))
+		if listRes.Code != errcode.OK.Code || repo.listCalls != 1 {
+			t.Fatalf("boss supervisor should retain read visibility, res=%#v calls=%d", listRes, repo.listCalls)
+		}
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
+			t.Fatalf("boss supervisor without row ownership must not upload, res=%#v calls=%d", uploadRes, repo.createCalls)
 		}
 	})
 
@@ -502,9 +633,80 @@ func TestJsonrpcDispatcher_WorkflowAttachmentEnforcesTaskRowScope(t *testing.T) 
 		}
 	})
 
-	t.Run("terminal task rejects attachment upload", func(t *testing.T) {
+	for _, statusKey := range []string{"done", "rejected", "unknown"} {
+		t.Run(statusKey+" task rejects attachment upload", func(t *testing.T) {
+			task := *baseTask
+			task.TaskStatusKey = statusKey
+			repo := &stubAttachmentJSONRPCRepo{}
+			admin := workflowJSONRPCAdmin(
+				[]string{biz.WarehouseRoleKey},
+				biz.PermissionWorkflowTaskRead,
+				biz.PermissionWorkflowTaskUpdate,
+			)
+			dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, &task)
+			_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+			if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
+				t.Fatalf("%s task upload must be denied, res=%#v calls=%d", statusKey, uploadRes, repo.createCalls)
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowAttachmentUsesTaskConfigRevisionWithoutSuperAdminWriteBypass(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	processID := 11
+	nodeID := 12
+	ownerPool := "warehouse"
+	revision := "rev-a"
+	baseTask := &biz.WorkflowTask{
+		ID:                    42,
+		TaskGroup:             "generic",
+		SourceType:            "generic-source",
+		SourceID:              1,
+		TaskStatusKey:         "blocked",
+		OwnerRoleKey:          biz.WarehouseRoleKey,
+		OwnerPoolKey:          &ownerPool,
+		ConfigRevision:        &revision,
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+		Version:               1,
+		Payload:               map[string]any{},
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"owner_type":       biz.BusinessAttachmentOwnerWorkflowTask,
+		"owner_id":         42,
+		"expected_version": 1,
+		"attachment_type":  "evidence",
+		"file_name":        "proof.pdf",
+		"mime_type":        "application/pdf",
+		"content_base64":   "cHJvb2Y=",
+	})
+
+	t.Run("superseded task revision remains authoritative", func(t *testing.T) {
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.WarehouseRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, baseTask)
+		dispatcher.customerConfigUC = workflowTaskRevisionCustomerConfigUC()
+
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(
+			workflowJSONRPCAdminContext(), "upload_attachment", "rev-a-upload", params,
+		)
+		if uploadRes.Code != errcode.OK.Code || repo.createCalls != 1 {
+			t.Fatalf("rev-a task upload must not be stranded by active rev-b, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+		if repo.created == nil || repo.created.WorkflowGuard == nil ||
+			!reflect.DeepEqual(repo.created.WorkflowGuard.VisibleOwnerRoleKeys, []string{biz.WarehouseRoleKey}) {
+			t.Fatalf("repo guard must reuse rev-a owner scope, created=%#v", repo.created)
+		}
+	})
+
+	t.Run("incomplete runtime anchor fails closed", func(t *testing.T) {
 		task := *baseTask
-		task.TaskStatusKey = "done"
+		task.ProcessNodeInstanceID = nil
 		repo := &stubAttachmentJSONRPCRepo{}
 		admin := workflowJSONRPCAdmin(
 			[]string{biz.WarehouseRoleKey},
@@ -512,9 +714,44 @@ func TestJsonrpcDispatcher_WorkflowAttachmentEnforcesTaskRowScope(t *testing.T) 
 			biz.PermissionWorkflowTaskUpdate,
 		)
 		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, &task)
-		_, uploadRes, _ := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "upload", params)
+		dispatcher.customerConfigUC = workflowTaskRevisionCustomerConfigUC()
+
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(
+			workflowJSONRPCAdminContext(), "upload_attachment", "incomplete-anchor-upload", params,
+		)
 		if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
-			t.Fatalf("terminal task upload must be denied, res=%#v calls=%d", uploadRes, repo.createCalls)
+			t.Fatalf("incomplete runtime anchor must deny upload, res=%#v calls=%d", uploadRes, repo.createCalls)
+		}
+	})
+
+	t.Run("super admin keeps read visibility without synthetic owner write", func(t *testing.T) {
+		repo := &stubAttachmentJSONRPCRepo{}
+		admin := workflowJSONRPCAdmin(
+			[]string{biz.AdminRoleKey},
+			biz.PermissionWorkflowTaskRead,
+			biz.PermissionWorkflowTaskUpdate,
+		)
+		admin.IsSuperAdmin = true
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, baseTask)
+		dispatcher.customerConfigUC = workflowTaskRevisionCustomerConfigUC()
+
+		_, listRes, _ := dispatcher.handleBusinessAttachment(
+			workflowJSONRPCAdminContext(),
+			"list_attachments",
+			"super-admin-list",
+			mustJSONRPCStruct(t, map[string]any{
+				"owner_type": biz.BusinessAttachmentOwnerWorkflowTask,
+				"owner_id":   42,
+			}),
+		)
+		if listRes.Code != errcode.OK.Code || repo.listCalls != 1 {
+			t.Fatalf("super admin should retain read visibility, res=%#v calls=%d", listRes, repo.listCalls)
+		}
+		_, uploadRes, _ := dispatcher.handleBusinessAttachment(
+			workflowJSONRPCAdminContext(), "upload_attachment", "super-admin-upload", params,
+		)
+		if uploadRes.Code != errcode.PermissionDenied.Code || repo.createCalls != 0 {
+			t.Fatalf("synthetic super-admin owner role must not authorize upload, res=%#v calls=%d", uploadRes, repo.createCalls)
 		}
 	})
 }

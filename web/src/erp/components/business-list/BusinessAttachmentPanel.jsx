@@ -23,6 +23,7 @@ import {
   listBusinessAttachments,
   uploadBusinessAttachment,
 } from '../../api/attachmentApi.mjs'
+import { resolveBusinessAttachmentAuditMeta } from '../../utils/businessAttachmentPresentation.mjs'
 import { resolveBusinessAttachmentPanelState } from '../../utils/businessAttachmentPanelState.mjs'
 
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
@@ -191,6 +192,22 @@ function downloadBlob(attachment) {
 function isPreviewableAttachment(item) {
   const mimeType = String(item?.mime_type || '').toLowerCase()
   return PREVIEWABLE_ATTACHMENT_MIME_TYPES.has(mimeType)
+}
+
+function SavedAttachmentAuditMeta({ item }) {
+  const { uploaderLabel, uploadedAtLabel } =
+    resolveBusinessAttachmentAuditMeta(item)
+
+  return (
+    <>
+      <Typography.Text type="secondary" title={uploaderLabel}>
+        {uploaderLabel}
+      </Typography.Text>
+      <Typography.Text type="secondary" title={uploadedAtLabel}>
+        {uploadedAtLabel}
+      </Typography.Text>
+    </>
+  )
 }
 
 const BusinessAttachmentPanel = forwardRef(
@@ -593,7 +610,9 @@ const BusinessAttachmentPanel = forwardRef(
                     <Tag>{formatFileSize(item.file_size)}</Tag>
                     {item.__kind === 'pending' ? (
                       <Tag color="blue">保存后上传</Tag>
-                    ) : null}
+                    ) : (
+                      <SavedAttachmentAuditMeta item={item} />
+                    )}
                   </Space>
                 }
               />

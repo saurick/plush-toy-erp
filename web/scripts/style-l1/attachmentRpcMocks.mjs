@@ -16,12 +16,16 @@ export async function installAttachmentRpcMocks(page, context) {
       sha256:
         '0000000000000000000000000000000000000000000000000000000000000000',
       uploaded_by: 1,
+      uploaded_by_username: 'demo_boss',
       note: null,
       created_at: nowUnix(),
     }
 
     const dataByMethod = {
-      list_attachments: { attachments: [] },
+      list_attachments: {
+        attachments:
+          attachment.owner_type === 'workflow_task' ? [attachment] : [],
+      },
       upload_attachment: { attachment },
       clear_product_image: { cleared: true },
       download_attachment: {

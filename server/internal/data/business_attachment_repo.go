@@ -4,10 +4,12 @@ import (
 	"context"
 	stdsql "database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/financefact"
@@ -256,7 +258,11 @@ func (r *businessAttachmentRepo) ListBusinessAttachments(ctx context.Context, ow
 	if err != nil {
 		return nil, err
 	}
-	return entBusinessAttachmentsToBiz(rows), nil
+	items := entBusinessAttachmentsToBiz(rows)
+	if err := r.resolveBusinessAttachmentUploaderUsernames(ctx, items); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 func (r *businessAttachmentRepo) GetBusinessAttachmentMetadata(ctx context.Context, id int) (*biz.BusinessAttachment, error) {
@@ -283,7 +289,11 @@ func (r *businessAttachmentRepo) GetBusinessAttachmentMetadata(ctx context.Conte
 		}
 		return nil, err
 	}
-	return entBusinessAttachmentToBiz(row), nil
+	item := entBusinessAttachmentToBiz(row)
+	if err := r.resolveBusinessAttachmentUploaderUsernames(ctx, []*biz.BusinessAttachment{item}); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func (r *businessAttachmentRepo) GetBusinessAttachmentContent(ctx context.Context, id int, ownerType string, ownerID int) ([]byte, error) {
@@ -381,4 +391,50 @@ func entBusinessAttachmentsToBiz(rows []*ent.BusinessAttachment) []*biz.Business
 		out = append(out, entBusinessAttachmentToBiz(row))
 	}
 	return out
+}
+
+func (r *businessAttachmentRepo) resolveBusinessAttachmentUploaderUsernames(
+	ctx context.Context,
+	items []*biz.BusinessAttachment,
+) error {
+	uploaderIDs := make(map[int]struct{})
+	for _, item := range items {
+		if item != nil && item.UploadedBy != nil && *item.UploadedBy > 0 {
+			uploaderIDs[*item.UploadedBy] = struct{}{}
+		}
+	}
+	if len(uploaderIDs) == 0 {
+		return nil
+	}
+	ids := make([]int, 0, len(uploaderIDs))
+	for id := range uploaderIDs {
+		ids = append(ids, id)
+	}
+	admins, err := r.data.postgres.AdminUser.Query().
+		Select(adminuser.FieldID, adminuser.FieldUsername).
+		Where(adminuser.IDIn(ids...)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	usernameByID := make(map[int]string, len(admins))
+	for _, admin := range admins {
+		if admin == nil {
+			continue
+		}
+		if username := strings.TrimSpace(admin.Username); username != "" {
+			usernameByID[admin.ID] = username
+		}
+	}
+	for _, item := range items {
+		if item == nil || item.UploadedBy == nil {
+			continue
+		}
+		username := usernameByID[*item.UploadedBy]
+		if username == "" {
+			continue
+		}
+		item.UploadedByUsername = &username
+	}
+	return nil
 }

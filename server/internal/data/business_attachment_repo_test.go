@@ -116,6 +116,71 @@ func TestBusinessAttachmentRepoListSelectsMetadataWithoutContent(t *testing.T) {
 	}
 }
 
+func TestBusinessAttachmentRepoResolvesUploaderUsernameAndKeepsLegacyMissing(t *testing.T) {
+	repo, closeRepo := newBusinessAttachmentRepoTest(t, "attachment_uploader_username")
+	defer closeRepo()
+	ctx := context.Background()
+	taskID := createAttachmentWorkflowTask(t, repo, "ready", 1, nil)
+	uploader, err := repo.data.postgres.AdminUser.Create().
+		SetUsername("demo_boss").
+		SetPasswordHash("test-password-hash").
+		SetDisabled(true).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create attachment uploader: %v", err)
+	}
+	withUploader, err := repo.data.postgres.BusinessAttachment.Create().
+		SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+		SetOwnerID(taskID).
+		SetAttachmentType("evidence").
+		SetFileName("with-uploader.pdf").
+		SetMimeType("application/pdf").
+		SetFileSize(5).
+		SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
+		SetContent([]byte("proof")).
+		SetUploadedBy(uploader.ID).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create attachment with uploader: %v", err)
+	}
+	_, err = repo.data.postgres.BusinessAttachment.Create().
+		SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+		SetOwnerID(taskID).
+		SetAttachmentType("evidence").
+		SetFileName("legacy.pdf").
+		SetMimeType("application/pdf").
+		SetFileSize(5).
+		SetSha256("abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789").
+		SetContent([]byte("proof")).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create legacy attachment: %v", err)
+	}
+
+	items, err := repo.ListBusinessAttachments(ctx, biz.BusinessAttachmentOwnerWorkflowTask, taskID)
+	if err != nil || len(items) != 2 {
+		t.Fatalf("list attachment uploader metadata: items=%d err=%v", len(items), err)
+	}
+	itemsByName := make(map[string]*biz.BusinessAttachment, len(items))
+	for _, item := range items {
+		itemsByName[item.FileName] = item
+	}
+	named := itemsByName["with-uploader.pdf"]
+	if named == nil || named.UploadedBy == nil || *named.UploadedBy != uploader.ID ||
+		named.UploadedByUsername == nil || *named.UploadedByUsername != "demo_boss" {
+		t.Fatalf("attachment uploader username must resolve by immutable account id: %#v", named)
+	}
+	legacy := itemsByName["legacy.pdf"]
+	if legacy == nil || legacy.UploadedBy != nil || legacy.UploadedByUsername != nil {
+		t.Fatalf("legacy attachment without uploader must remain explicitly missing: %#v", legacy)
+	}
+
+	metadata, err := repo.GetBusinessAttachmentMetadata(ctx, withUploader.ID)
+	if err != nil || metadata.UploadedByUsername == nil || *metadata.UploadedByUsername != "demo_boss" {
+		t.Fatalf("attachment metadata uploader username: item=%#v err=%v", metadata, err)
+	}
+}
+
 func TestBusinessAttachmentRepoRecognizesProductOwner(t *testing.T) {
 	repo, closeRepo := newBusinessAttachmentRepoTest(t, "attachment_product_owner")
 	defer closeRepo()

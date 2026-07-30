@@ -88,6 +88,25 @@ export function createBusinessAttachmentAssertions({
         modalMetrics
       )}`
     )
+    if (modalMetrics.panelText.includes('style-l1-evidence.txt')) {
+      assert(
+        modalMetrics.panelText.includes('上传账号：demo_boss') &&
+          modalMetrics.panelText.includes('上传时间：'),
+        `${scenarioName} 已保存附件应显示上传账号和上传时间: ${JSON.stringify(
+          modalMetrics
+        )}`
+      )
+      assert(
+        !modalMetrics.panelText.includes('text/plain') &&
+          !modalMetrics.panelText.includes('uploaded_by'),
+        `${scenarioName} 附件行不应暴露 MIME 或内部字段名: ${JSON.stringify(
+          modalMetrics
+        )}`
+      )
+      await page.screenshot({
+        path: `output/playwright/style-l1/${scenarioName}-saved-attachment-audit.png`,
+      })
+    }
 
     await modal.locator('.ant-modal-close').click({ force: true })
     await modal.waitFor({ state: 'hidden', timeout: 10_000 })

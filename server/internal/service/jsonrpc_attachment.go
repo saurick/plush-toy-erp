@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -37,7 +38,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, ownerType, false); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireWorkflowAttachmentTaskAccess(ctx, ownerType, ownerID, false); res != nil {
+		if _, res := d.authorizeWorkflowAttachmentTaskAccess(ctx, ownerType, ownerID, 0, false); res != nil {
 			return id, res, nil
 		}
 		items, err := d.attachmentUC.ListBusinessAttachments(ctx, ownerType, ownerID)
@@ -60,21 +61,22 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), ownerType); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireWorkflowAttachmentTaskAccess(ctx, ownerType, ownerID, true); res != nil {
-			return id, res, nil
+		workflowGuard, accessRes := d.authorizeWorkflowAttachmentTaskAccess(ctx, ownerType, ownerID, expectedVersion, true)
+		if accessRes != nil {
+			return id, accessRes, nil
 		}
-		admin, res := d.CurrentAdmin(ctx)
-		if res != nil {
-			return id, res, nil
-		}
-		uploadedBy := admin.ID
-		var workflowGuard *biz.WorkflowAttachmentWriteGuard
-		if ownerType == biz.BusinessAttachmentOwnerWorkflowTask {
-			workflowGuard = &biz.WorkflowAttachmentWriteGuard{
-				ExpectedVersion:      expectedVersion,
-				ActorID:              admin.ID,
-				VisibleOwnerRoleKeys: d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.PermissionWorkflowTaskUpdate),
+		uploadedBy := 0
+		uploadedByUsername := ""
+		if workflowGuard != nil {
+			uploadedBy = workflowGuard.ActorID
+			uploadedByUsername = workflowGuard.ActorUsername
+		} else {
+			admin, res := d.CurrentAdmin(ctx)
+			if res != nil {
+				return id, res, nil
 			}
+			uploadedBy = admin.ID
+			uploadedByUsername = admin.Username
 		}
 		item, err := d.attachmentUC.UploadBusinessAttachment(ctx, &biz.BusinessAttachmentUploadInput{
 			OwnerType:      ownerType,
@@ -90,6 +92,9 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		})
 		if err != nil {
 			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		if username := strings.TrimSpace(uploadedByUsername); item != nil && username != "" {
+			item.UploadedByUsername = &username
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"attachment": businessAttachmentToAny(item, false),
@@ -115,7 +120,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, false); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireWorkflowAttachmentTaskAccess(ctx, item.OwnerType, item.OwnerID, false); res != nil {
+		if _, res := d.authorizeWorkflowAttachmentTaskAccess(ctx, item.OwnerType, item.OwnerID, 0, false); res != nil {
 			return id, res, nil
 		}
 		content, err := d.attachmentUC.GetBusinessAttachmentContent(ctx, item)
@@ -146,36 +151,75 @@ func positiveSafeIntegerParam(pm map[string]any, key string) (int, bool) {
 	return int(value), true
 }
 
-func (d *jsonrpcDispatcher) requireWorkflowAttachmentTaskAccess(ctx context.Context, ownerType string, ownerID int, write bool) *v1.JsonrpcResult {
+func (d *jsonrpcDispatcher) authorizeWorkflowAttachmentTaskAccess(
+	ctx context.Context,
+	ownerType string,
+	ownerID int,
+	expectedVersion int,
+	write bool,
+) (*biz.WorkflowAttachmentWriteGuard, *v1.JsonrpcResult) {
 	if ownerType != biz.BusinessAttachmentOwnerWorkflowTask {
-		return nil
+		return nil, nil
 	}
-	if d.workflowUC == nil || ownerID <= 0 {
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	if d.workflowUC == nil || ownerID <= 0 || (write && expectedVersion <= 0) {
+		return nil, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
 	requiredPermission := biz.PermissionWorkflowTaskRead
 	if write {
 		requiredPermission = biz.PermissionWorkflowTaskUpdate
 	}
-	if res := d.RequireAdminPermission(ctx, requiredPermission); res != nil {
-		return res
+	if res := d.RequireAdminRBACPermission(ctx, requiredPermission); res != nil {
+		return nil, res
 	}
 	task, err := d.workflowUC.GetTask(ctx, ownerID)
 	if err != nil {
-		return d.mapWorkflowError(ctx, err)
+		return nil, d.mapWorkflowError(ctx, err)
 	}
 	admin, res := d.CurrentAdmin(ctx)
 	if res != nil {
-		return res
+		return nil, res
 	}
-	visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, requiredPermission)
-	if !workflowAdminCanViewTask(admin, task, visibleOwnerRoleKeys) {
-		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+
+	scopeAdmin := admin
+	if write && admin.IsSuperAdmin {
+		regularAdmin := *admin
+		regularAdmin.IsSuperAdmin = false
+		scopeAdmin = &regularAdmin
 	}
-	if write && !workflowAdminCanHandleTask(admin, task, "blocked", visibleOwnerRoleKeys) {
-		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	visibility := d.workflowTaskRoleVisibilityForTask(ctx, scopeAdmin, task, requiredPermission)
+	if !visibility.Valid || !workflowAdminCanViewTask(admin, task, visibility.RoleKeys) {
+		return nil, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	}
-	return nil
+	if !write {
+		return nil, nil
+	}
+	if !workflowAdminCanWriteTaskAttachment(scopeAdmin, task, visibility.RoleKeys) {
+		return nil, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	return &biz.WorkflowAttachmentWriteGuard{
+		ExpectedVersion:      expectedVersion,
+		ActorID:              admin.ID,
+		ActorUsername:        admin.Username,
+		VisibleOwnerRoleKeys: append([]string(nil), visibility.RoleKeys...),
+	}, nil
+}
+
+// workflowAdminCanWriteTaskAttachment checks the task's writable row scope without
+// coupling evidence uploads to a workflow status transition.
+func workflowAdminCanWriteTaskAttachment(admin *biz.AdminUser, task *biz.WorkflowTask, visibleOwnerRoleKeys []string) bool {
+	if admin == nil || admin.Disabled || task == nil ||
+		!biz.IsKnownWorkflowTaskState(task.TaskStatusKey) ||
+		biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
+		return false
+	}
+	if task.AssigneeID != nil {
+		return *task.AssigneeID == admin.ID &&
+			workflowAssignedRuntimeTaskScopeMatched(task, visibleOwnerRoleKeys)
+	}
+	if workflowReleasedAssigneeFallbackMatched(admin, task, visibleOwnerRoleKeys) {
+		return true
+	}
+	return workflowOwnerRoleVisible(task.OwnerRoleKey, visibleOwnerRoleKeys)
 }
 
 func optionalStringFromParams(pm map[string]any, key string) *string {
@@ -197,6 +241,13 @@ func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerModuleEnabled(ctx cont
 func (d *jsonrpcDispatcher) requireBusinessAttachmentOwnerPermission(ctx context.Context, ownerType string, write bool) *v1.JsonrpcResult {
 	if !biz.IsBusinessAttachmentOwnerTypeAllowed(ownerType) {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	if ownerType == biz.BusinessAttachmentOwnerWorkflowTask {
+		permission := biz.PermissionWorkflowTaskRead
+		if write {
+			permission = biz.PermissionWorkflowTaskUpdate
+		}
+		return d.RequireAdminRBACPermission(ctx, permission)
 	}
 	if write {
 		return d.RequireAdminAnyPermission(ctx, businessAttachmentWritePermissions(ownerType)...)
@@ -306,18 +357,19 @@ func businessAttachmentToAny(item *biz.BusinessAttachment, includeContent bool) 
 		return map[string]any{}
 	}
 	out := map[string]any{
-		"id":              item.ID,
-		"owner_type":      item.OwnerType,
-		"owner_id":        item.OwnerID,
-		"attachment_type": item.AttachmentType,
-		"slot_key":        optionalStringValue(item.SlotKey),
-		"file_name":       item.FileName,
-		"mime_type":       item.MimeType,
-		"file_size":       item.FileSize,
-		"sha256":          item.SHA256,
-		"uploaded_by":     optionalIntValue(item.UploadedBy),
-		"note":            optionalStringValue(item.Note),
-		"created_at":      item.CreatedAt.Unix(),
+		"id":                   item.ID,
+		"owner_type":           item.OwnerType,
+		"owner_id":             item.OwnerID,
+		"attachment_type":      item.AttachmentType,
+		"slot_key":             optionalStringValue(item.SlotKey),
+		"file_name":            item.FileName,
+		"mime_type":            item.MimeType,
+		"file_size":            item.FileSize,
+		"sha256":               item.SHA256,
+		"uploaded_by":          optionalIntValue(item.UploadedBy),
+		"uploaded_by_username": optionalStringValue(item.UploadedByUsername),
+		"note":                 optionalStringValue(item.Note),
+		"created_at":           item.CreatedAt.Unix(),
 	}
 	if includeContent {
 		out["content_base64"] = base64.StdEncoding.EncodeToString(item.Content)

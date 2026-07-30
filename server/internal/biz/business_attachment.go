@@ -120,19 +120,20 @@ var allowedBusinessAttachmentProductImageFileTypes = map[string]map[string]struc
 }
 
 type BusinessAttachment struct {
-	ID             int
-	OwnerType      string
-	OwnerID        int
-	AttachmentType string
-	SlotKey        *string
-	FileName       string
-	MimeType       string
-	FileSize       int
-	SHA256         string
-	Content        []byte
-	UploadedBy     *int
-	Note           *string
-	CreatedAt      time.Time
+	ID                 int
+	OwnerType          string
+	OwnerID            int
+	AttachmentType     string
+	SlotKey            *string
+	FileName           string
+	MimeType           string
+	FileSize           int
+	SHA256             string
+	Content            []byte
+	UploadedBy         *int
+	UploadedByUsername *string
+	Note               *string
+	CreatedAt          time.Time
 }
 
 type BusinessAttachmentUploadInput struct {
@@ -151,6 +152,7 @@ type BusinessAttachmentUploadInput struct {
 type WorkflowAttachmentWriteGuard struct {
 	ExpectedVersion      int
 	ActorID              int
+	ActorUsername        string
 	VisibleOwnerRoleKeys []string
 }
 
