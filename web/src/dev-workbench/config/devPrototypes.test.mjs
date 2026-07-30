@@ -348,6 +348,26 @@ test('devPrototypes: 岗位任务端当前参考不透出移动端旧动作和�
     html.includes('<strong>仓库</strong>'),
     'mobile role tasks Current reference should show readable role names in Mine tab'
   )
+  assert.doesNotMatch(
+    html,
+    /仓库任务端/u,
+    'mobile role tasks Current reference should not repeat the active role below the account name'
+  )
+  assert.doesNotMatch(
+    html,
+    /id="tabSummary"|已加载 \d+ 条(?:待处理|已办|消息)/u,
+    'mobile role tasks Current reference should not repeat loaded-count sentences above each tab'
+  )
+  assert.match(
+    html,
+    /class="count-tag">\$\{currentTodoTasks\.length\}<\/span>/u,
+    'mobile role tasks Current reference should keep todo counts in compact numeric tags'
+  )
+  assert.match(
+    html,
+    /class="panel-title"><h2>已办任务<\/h2><span class="count-tag">\$\{completedTasks\.length\}<\/span>/u,
+    'mobile role tasks Current reference should keep the done count beside its section heading'
+  )
   assert.match(
     html,
     /actionBar\.style\.gridTemplateColumns = `repeat\(\$\{columnCount\}, minmax\(0, 1fr\)\)`/u,
@@ -448,8 +468,11 @@ test('devPrototypes: 岗位任务端 v2 保持三类查询视图、统一任务�
   assert.match(html, /\['todo', '当前待办'/u)
   assert.match(html, /\['risk', '风险关注'/u)
   assert.match(html, /\['history', '已办回执'/u)
-  assert.match(html, /state\.filter === 'history'/u)
-  assert.match(html, /终态任务只读，不再显示处理动作/u)
+  assert.match(html, /String\(state\.filter === filter\[0\]\)/u)
+  assert.match(html, /state\.filter = filterButton\.dataset\.filter/u)
+  assert.doesNotMatch(html, /focus-strip/u)
+  assert.doesNotMatch(html, /先处理 .* 条超时任务/u)
+  assert.match(readme, /删除独立“优先事项”提示条/u)
   assert.match(html, /step === 'result' && !task\.receipt/u)
   assert.match(html, /unavailable = key === 'result' && !task\?\.receipt/u)
   assert.match(html, /task\.actions\.includes\('urge'\)/u)
@@ -479,13 +502,18 @@ test('devPrototypes: 岗位任务端 v2 保持三类查询视图、统一任务�
     html,
     /receipt\.actor|receipt\.time|actor: '仓库值班员'|time: now/u
   )
-  assert.match(readme, /todo \/ risk \/ history/u)
+  assert.doesNotMatch(
+    html,
+    /此回执只表示任务处理已提交或待确认；库存、出货、质检和财务结果仍以对应业务页面为准/u
+  )
+  assert.match(readme, /todo \/ approval \/ risk \/ history/u)
   assert.match(readme, /客户运行态 guard/u)
   assert.match(readme, /服务端游标分页/u)
   assert.match(readme, /真实附件组件/u)
   assert.match(readme, /多动作使用原生单选框/u)
   assert.match(readme, /本次操作：催办/u)
   assert.match(readme, /不由前端推断处理人或时间/u)
+  assert.match(readme, /无流程锚点不渲染空流程卡/u)
   assert.match(readme, /退出登录/u)
   assert.match(
     readme,

@@ -14,9 +14,49 @@ export function createMobileTaskAssertions(deps) {
     path,
   } = deps
 
+  function assertMobileTaskCompactCountTags(
+    metrics,
+    { expectedCount, expectedTestID = '', scenarioName, tabLabel }
+  ) {
+    assert.equal(
+      metrics.loadedSummaryText,
+      '',
+      `${scenarioName} ${tabLabel}不应保留“已加载 N 条”顶部摘要: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.countTags.length,
+      expectedCount,
+      `${scenarioName} ${tabLabel}数字标签数量异常: ${JSON.stringify(metrics)}`
+    )
+    if (expectedTestID) {
+      assert(
+        metrics.countTags.some((tag) => tag.testID === expectedTestID),
+        `${scenarioName} ${tabLabel}缺少目标数字标签: ${JSON.stringify(metrics)}`
+      )
+    }
+    metrics.countTags.forEach((tag) => {
+      assert(
+        /^\d+$/u.test(tag.text) &&
+          ['flex', 'inline-flex'].includes(tag.display) &&
+          tag.whiteSpace === 'nowrap' &&
+          Number.parseFloat(tag.borderRadius) >= 12 &&
+          tag.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+          tag.width >= 24 &&
+          tag.height >= 22 &&
+          tag.scrollWidth <= tag.clientWidth + 1,
+        `${scenarioName} ${tabLabel}数字标签应完整、可读且呈胶囊形: ${JSON.stringify(metrics)}`
+      )
+    })
+  }
+
   async function assertMobileTaskMainNavigation(page, { scenarioName }) {
     const todoMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(todoMetrics, scenarioName)
+    assertMobileTaskCompactCountTags(todoMetrics, {
+      expectedCount: 4,
+      scenarioName,
+      tabLabel: '待办页',
+    })
     assert.equal(
       todoMetrics.heading,
       '待办',
@@ -28,11 +68,13 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 退出登录不应出现在待办分区: ${JSON.stringify(todoMetrics)}`
     )
     assert(
-      !todoMetrics.sectionHeadings.includes('已加载任务进度') &&
+      todoMetrics.sectionHeadings.includes('已加载任务分布') &&
+        !todoMetrics.sectionHeadings.includes('已加载任务进度') &&
         !todoMetrics.sectionHeadings.includes('任务提醒') &&
         !todoMetrics.sectionHeadings.includes('预警'),
-      `${scenarioName} 待办分区仍混入进度/预警/提醒区块: ${JSON.stringify(todoMetrics)}`
+      `${scenarioName} 待办分区应展示已加载任务分布且不混入旧进度/预警/提醒区块: ${JSON.stringify(todoMetrics)}`
     )
+    await assertMobileTaskLoadedOverview(page, { scenarioName })
     await assertMobileTaskListToggle(page, {
       scenarioName,
       listKey: 'todo',
@@ -50,6 +92,11 @@ export function createMobileTaskAssertions(deps) {
     })
     const reminderMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(reminderMetrics, scenarioName)
+    assertMobileTaskCompactCountTags(reminderMetrics, {
+      expectedCount: 2,
+      scenarioName,
+      tabLabel: '提醒页',
+    })
     assert(
       reminderMetrics.sectionHeadings.includes('预警') &&
         !reminderMetrics.sectionHeadings.includes('任务提醒'),
@@ -65,12 +112,23 @@ export function createMobileTaskAssertions(deps) {
     })
     const doneMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(doneMetrics, scenarioName)
+    assertMobileTaskCompactCountTags(doneMetrics, {
+      expectedCount: 1,
+      expectedTestID: 'mobile-role-done-count',
+      scenarioName,
+      tabLabel: '已办页',
+    })
     assert(
-      doneMetrics.sectionHeadings.includes('已加载任务进度') &&
-        doneMetrics.sectionHeadings.includes('已办任务'),
-      `${scenarioName} 已办分区应承载进度和已办任务: ${JSON.stringify(doneMetrics)}`
+      doneMetrics.sectionHeadings.includes('已办任务') &&
+        !doneMetrics.sectionHeadings.includes('已加载任务分布') &&
+        !doneMetrics.sectionHeadings.includes('已加载任务进度'),
+      `${scenarioName} 已办分区应直接展示已办任务且不重复任务分布: ${JSON.stringify(doneMetrics)}`
     )
-    await assertMobileTaskProgressSummary(page, { scenarioName })
+    assert.equal(
+      await page.getByTestId('mobile-loaded-task-overview').count(),
+      0,
+      `${scenarioName} 已办分区不应保留待办页的已加载任务分布`
+    )
     await assertMobileTaskListToggle(page, {
       scenarioName,
       listKey: 'done',
@@ -85,11 +143,21 @@ export function createMobileTaskAssertions(deps) {
     })
     const mineMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(mineMetrics, scenarioName)
+    assertMobileTaskCompactCountTags(mineMetrics, {
+      expectedCount: 0,
+      scenarioName,
+      tabLabel: '我的页',
+    })
     assert(
       mineMetrics.logoutVisible,
       `${scenarioName} 退出登录应只在我的分区出现: ${JSON.stringify(mineMetrics)}`
     )
     await assertMobileMinePanelLayout(page, { scenarioName })
+    await page.screenshot({
+      path: path.join(outputDir, `${scenarioName}-mine-copy-cleanup.png`),
+      fullPage: true,
+      animations: 'disabled',
+    })
 
     await page.getByTestId('mobile-role-nav-todo').click()
     await page.waitForFunction(() => {
@@ -155,13 +223,67 @@ export function createMobileTaskAssertions(deps) {
     )
   }
 
-  async function assertMobileTaskProgressSummary(page, { scenarioName }) {
+  async function assertMobileTaskLoadedOverview(page, { scenarioName }) {
     const expectedToneByTestID = {
       'mobile-role-progress-ready': 'ready',
       'mobile-role-progress-blocked': 'blocked',
       'mobile-role-progress-rejected': 'rejected',
       'mobile-role-progress-done': 'done',
     }
+    const overviewMetrics = await page.evaluate(() => {
+      const overview = document.querySelector(
+        '[data-testid="mobile-loaded-task-overview"]'
+      )
+      const heading = overview?.querySelector('h2')
+      const statusHeading = document.querySelector(
+        '[data-testid="mobile-task-list-status-heading"]'
+      )
+      const statusHeadingStyle = statusHeading
+        ? window.getComputedStyle(statusHeading)
+        : null
+      const statusHeadingRect = statusHeading?.getBoundingClientRect()
+      return {
+        exists: Boolean(overview),
+        text: overview?.textContent?.replace(/\s+/g, ' ').trim() || '',
+        heading: heading?.textContent?.trim() || '',
+        paragraphCount: overview?.querySelectorAll('p').length || 0,
+        focusCardExists: Boolean(
+          document.querySelector('[data-testid="mobile-role-focus-card"]')
+        ),
+        pageText: document.body?.innerText?.replace(/\s+/g, ' ').trim() || '',
+        scrollWidth: overview?.scrollWidth || 0,
+        clientWidth: overview?.clientWidth || 0,
+        statusHeadingText:
+          statusHeading?.textContent?.replace(/\s+/g, ' ').trim() || '',
+        statusHeadingWhiteSpace: statusHeadingStyle?.whiteSpace || '',
+        statusHeadingHeight: statusHeadingRect?.height || 0,
+        statusHeadingLineHeight: Number.parseFloat(
+          statusHeadingStyle?.lineHeight || '0'
+        ),
+        statusHeadingScrollWidth: statusHeading?.scrollWidth || 0,
+        statusHeadingClientWidth: statusHeading?.clientWidth || 0,
+      }
+    })
+    assert(
+      overviewMetrics.exists &&
+        overviewMetrics.heading === '已加载任务分布' &&
+        overviewMetrics.paragraphCount === 0 &&
+        !overviewMetrics.text.includes('任务按页加载') &&
+        !overviewMetrics.text.includes('不代表岗位全量') &&
+        overviewMetrics.statusHeadingText === '状态 / 截止' &&
+        overviewMetrics.statusHeadingWhiteSpace === 'nowrap' &&
+        overviewMetrics.statusHeadingHeight <=
+          overviewMetrics.statusHeadingLineHeight + 1.5 &&
+        overviewMetrics.statusHeadingScrollWidth <=
+          overviewMetrics.statusHeadingClientWidth + 1 &&
+        !overviewMetrics.text.includes('%') &&
+        !overviewMetrics.focusCardExists &&
+        !overviewMetrics.pageText.includes('已加载任务优先事项') &&
+        !overviewMetrics.pageText.includes('当前优先事项') &&
+        overviewMetrics.scrollWidth <= overviewMetrics.clientWidth + 1,
+      `${scenarioName} 已加载任务分布、说明删除、列表表头或相邻布局异常: ${JSON.stringify(overviewMetrics)}`
+    )
+
     const metrics = await page.evaluate(() =>
       [
         'mobile-role-progress-ready',
@@ -175,6 +297,7 @@ export function createMobileTaskAssertions(deps) {
         const valueStyle = value ? window.getComputedStyle(value) : null
         const labelStyle = label ? window.getComputedStyle(label) : null
         const rect = node?.getBoundingClientRect()
+        const labelRect = label?.getBoundingClientRect()
         return {
           testID,
           tagName: node?.tagName || '',
@@ -185,6 +308,12 @@ export function createMobileTaskAssertions(deps) {
           valueText: value?.textContent?.trim() || '',
           valueColor: valueStyle?.color || '',
           labelColor: labelStyle?.color || '',
+          labelWhiteSpace: labelStyle?.whiteSpace || '',
+          labelHeight: labelRect?.height || 0,
+          labelLineHeight: Number.parseFloat(labelStyle?.lineHeight || '0'),
+          labelScrollWidth: label?.scrollWidth || 0,
+          labelClientWidth: label?.clientWidth || 0,
+          iconCount: label?.querySelectorAll('.anticon').length || 0,
           width: rect?.width || 0,
           height: rect?.height || 0,
           scrollWidth: node?.scrollWidth || 0,
@@ -196,27 +325,38 @@ export function createMobileTaskAssertions(deps) {
       assert.equal(
         item.tagName,
         'DIV',
-        `${scenarioName} 进度项应是只读摘要，不应继续作为按钮: ${JSON.stringify(metrics)}`
+        `${scenarioName} 分布项应是只读摘要，不应作为按钮: ${JSON.stringify(metrics)}`
       )
       assert.equal(
         item.ariaPressed,
         null,
-        `${scenarioName} 进度摘要不应暴露选中态: ${JSON.stringify(metrics)}`
+        `${scenarioName} 分布摘要不应暴露选中态: ${JSON.stringify(metrics)}`
       )
       assert(
         item.scrollWidth <= item.clientWidth + 1,
-        `${scenarioName} 进度摘要出现横向溢出: ${JSON.stringify(metrics)}`
+        `${scenarioName} 分布摘要出现横向溢出: ${JSON.stringify(metrics)}`
+      )
+      assert.equal(
+        item.iconCount,
+        0,
+        `${scenarioName} 分布摘要不应保留挤占窄屏宽度的装饰图标: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        item.labelWhiteSpace === 'nowrap' &&
+          item.labelHeight <= item.labelLineHeight + 1.5 &&
+          item.labelScrollWidth <= item.labelClientWidth + 1,
+        `${scenarioName} 分布摘要标签应保持单行且完整可见: ${JSON.stringify(metrics)}`
       )
       assert.match(
         item.valueText,
         /^\d+$/u,
-        `${scenarioName} 进度摘要必须显示服务端状态计数: ${JSON.stringify(metrics)}`
+        `${scenarioName} 分布摘要必须显示当前已加载状态计数: ${JSON.stringify(metrics)}`
       )
       assert(
         String(item.className).includes(
           `mobile-role-summary-metric--${expectedToneByTestID[item.testID]}`
         ),
-        `${scenarioName} 进度摘要缺少语义色 tone class: ${JSON.stringify(metrics)}`
+        `${scenarioName} 分布摘要缺少语义色 tone class: ${JSON.stringify(metrics)}`
       )
       assert(
         !isTransparentColor(item.valueColor) &&
@@ -230,8 +370,6 @@ export function createMobileTaskAssertions(deps) {
     page,
     { scenarioName }
   ) {
-    await assertMobileTaskFocusSummary(page, { scenarioName })
-
     await page.getByTestId('mobile-role-filter-risk').click()
     const visibleText = await readVisibleMobileTaskListText(page)
     await assertMobileTaskFilterSelected(page, 'mobile-role-filter-risk', {
@@ -313,72 +451,6 @@ export function createMobileTaskAssertions(deps) {
     })
   }
 
-  async function assertMobileTaskFocusSummary(page, { scenarioName }) {
-    const focusCard = page.getByTestId('mobile-role-focus-card')
-    await focusCard.waitFor({ state: 'visible', timeout: 10_000 })
-    const metrics = await focusCard.evaluate((node) => {
-      const rect = node.getBoundingClientRect()
-      const removedMetricTestIDs = [
-        'mobile-role-metric-alerts',
-        'mobile-role-metric-overdue',
-        'mobile-role-metric-due-soon',
-        'mobile-role-metric-risk',
-      ]
-      return {
-        tagName: node.tagName,
-        text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
-        width: rect.width,
-        height: rect.height,
-        scrollWidth: node.scrollWidth,
-        clientWidth: node.clientWidth,
-        removedMetricCount: removedMetricTestIDs.filter((testID) =>
-          document.querySelector(`[data-testid="${testID}"]`)
-        ).length,
-        documentScrollWidth: document.documentElement.scrollWidth,
-        documentClientWidth: document.documentElement.clientWidth,
-      }
-    })
-
-    assert.equal(
-      metrics.tagName,
-      'BUTTON',
-      `${scenarioName} 当前优先事项应是可操作的任务入口: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.text.includes('当前优先事项') &&
-        metrics.text.includes('先处理') &&
-        metrics.text.includes('超时任务') &&
-        metrics.text.includes('待办') &&
-        metrics.text.includes('风险') &&
-        metrics.text.includes('超时'),
-      `${scenarioName} 当前优先事项没有解释先做什么及原因: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.height >= 44 &&
-        metrics.scrollWidth <= metrics.clientWidth + 1 &&
-        metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
-      `${scenarioName} 当前优先事项点击区或长文布局异常: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.removedMetricCount,
-      0,
-      `${scenarioName} 待办首屏不应恢复已删除的四张统计指标: ${JSON.stringify(metrics)}`
-    )
-
-    await focusCard.click()
-    await assertMobileTaskFilterSelected(page, 'mobile-role-filter-overdue', {
-      scenarioName,
-      label: '当前优先事项跳转后的超时',
-    })
-    const visibleText = await readVisibleMobileTaskListText(page)
-    assert(
-      visibleText.includes('批量超时任务') &&
-        !visibleText.includes('批量待办任务 1'),
-      `${scenarioName} 当前优先事项没有进入超时任务: ${visibleText}`
-    )
-    await page.getByTestId('mobile-role-filter-all').click()
-  }
-
   async function assertMobileMinePanelLayout(page, { scenarioName }) {
     const metrics = await page.evaluate(() => {
       const scroll = document.querySelector(
@@ -435,8 +507,9 @@ export function createMobileTaskAssertions(deps) {
           (card) =>
             card.text.includes('账号岗位') && card.text.includes('可用范围')
         ) &&
-        metrics.cards.some((card) => card.text.includes('入口与安全')),
-      `${scenarioName} 我的页应聚焦账号岗位、可用范围和入口安全: ${JSON.stringify(metrics)}`
+        metrics.cards.some((card) => card.text.includes('入口与安全')) &&
+        metrics.cards.every((card) => !card.text.includes('任务端')),
+      `${scenarioName} 我的页应聚焦账号岗位、可用范围和入口安全且不重复任务端身份: ${JSON.stringify(metrics)}`
     )
     metrics.cards.forEach((card) => {
       assert(
@@ -447,9 +520,7 @@ export function createMobileTaskAssertions(deps) {
         `${scenarioName} 我的页信息卡布局或主题背景异常: ${JSON.stringify(metrics)}`
       )
     })
-    const actionButtonTexts = metrics.actionButtons.map(
-      (button) => button.text
-    )
+    const actionButtonTexts = metrics.actionButtons.map((button) => button.text)
     assert(
       actionButtonTexts.length === 2 &&
         ['进入电脑端', '切换工作入口'].includes(actionButtonTexts[0]) &&
@@ -1532,6 +1603,9 @@ export function createMobileTaskAssertions(deps) {
       const actionBarRect = actionBar?.getBoundingClientRect()
       return {
         steps,
+        handoffCount: screen.querySelectorAll(
+          '[data-testid="mobile-task-receipt-handoff"]'
+        ).length,
         screenBottom: screenRect.bottom,
         actionBarBottom: actionBarRect?.bottom || 0,
         text: screen.textContent?.replace(/\s+/g, ' ').trim() || '',
@@ -1545,6 +1619,10 @@ export function createMobileTaskAssertions(deps) {
         receiptMetrics.text.includes('完成') &&
         receiptMetrics.text.includes('暗色任务已完成并核对') &&
         !receiptMetrics.text.includes('历史处理线索') &&
+        receiptMetrics.handoffCount === 0 &&
+        !['结果边界', '流程锚点', '未来分支', '领域单据', '审计记录'].some(
+          (copy) => receiptMetrics.text.includes(copy)
+        ) &&
         Math.abs(
           receiptMetrics.screenBottom - receiptMetrics.actionBarBottom
         ) <= 1.5 &&
@@ -1552,6 +1630,9 @@ export function createMobileTaskAssertions(deps) {
           receiptMetrics.documentClientWidth + 1,
       `${scenarioName} 独立回执页的反馈或布局异常: ${JSON.stringify(receiptMetrics)}`
     )
+    await receiptScreen.screenshot({
+      path: path.join(outputDir, `${scenarioName}-receipt-copy-cleanup.png`),
+    })
     await receiptScreen
       .getByRole('button', { name: '返回列表', exact: true })
       .click()
@@ -1818,6 +1899,7 @@ export function createMobileTaskAssertions(deps) {
       return {
         scrollAriaBusy: scroll?.getAttribute('aria-busy') || '',
         ariaHidden: skeletonNode?.getAttribute('aria-hidden') || '',
+        filterCount: Number(skeletonNode?.dataset?.skeletonFilterCount || 0),
         rowCount: Number(skeletonNode?.dataset?.skeletonRowCount || 0),
         blockCount:
           skeletonNode?.querySelectorAll('.mobile-role-skeleton__block')
@@ -1865,6 +1947,11 @@ export function createMobileTaskAssertions(deps) {
       defaultMetrics.rowCount,
       4,
       `${scenarioName} 首屏骨架任务行数量应固定为 4 行: ${JSON.stringify(defaultMetrics)}`
+    )
+    assert.equal(
+      defaultMetrics.filterCount,
+      4,
+      `${scenarioName} 有审批权限时首屏骨架应预留四项筛选，避免加载后跳动: ${JSON.stringify(defaultMetrics)}`
     )
     assert(
       defaultMetrics.blockCount > 0 && defaultMetrics.blockCount <= 40,
@@ -1985,6 +2072,34 @@ export function createMobileTaskAssertions(deps) {
       const sectionHeadings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
+      const pageText =
+        document.body?.innerText?.replace(/\s+/g, ' ').trim() || ''
+      const loadedSummaryText =
+        pageText.match(
+          /已加载\s+\d+\s+条(?:待处理|待我审批|已办|风险提醒)/u
+        )?.[0] || ''
+      const countTags = Array.from(
+        document.querySelectorAll('.mobile-role-count-tag')
+      ).map((tag) => {
+        const rect = tag.getBoundingClientRect()
+        const style =
+          tag instanceof HTMLElement ? window.getComputedStyle(tag) : null
+        return {
+          testID:
+            tag.getAttribute('data-testid') ||
+            tag.closest('[data-testid]')?.getAttribute('data-testid') ||
+            '',
+          text: tag.textContent?.trim() || '',
+          display: style?.display || '',
+          whiteSpace: style?.whiteSpace || '',
+          borderRadius: style?.borderRadius || '',
+          backgroundColor: style?.backgroundColor || '',
+          width: rect.width,
+          height: rect.height,
+          scrollWidth: tag instanceof HTMLElement ? tag.scrollWidth : 0,
+          clientWidth: tag instanceof HTMLElement ? tag.clientWidth : 0,
+        }
+      })
 
       return {
         heading:
@@ -1992,6 +2107,8 @@ export function createMobileTaskAssertions(deps) {
             .querySelector('.mobile-role-tasks-page h1')
             ?.textContent?.trim() || '',
         sectionHeadings,
+        loadedSummaryText,
+        countTags,
         shell: shellRect
           ? {
               top: shellRect.top,
@@ -2139,13 +2256,43 @@ export function createMobileTaskAssertions(deps) {
         activeTab instanceof HTMLElement
           ? window.getComputedStyle(activeTab)
           : null
+      const filterItems = Array.from(
+        tabs?.querySelectorAll('.mobile-role-task-filter') || []
+      ).map((button) => {
+        const content = button.querySelector(
+          '.mobile-role-task-filter__content'
+        )
+        const label = button.querySelector('.mobile-role-task-filter__label')
+        const count = button.querySelector('.mobile-role-task-filter__count')
+        const contentStyle =
+          content instanceof HTMLElement
+            ? window.getComputedStyle(content)
+            : null
+        const contentRect = content?.getBoundingClientRect()
+        const buttonRect = button.getBoundingClientRect()
+        return {
+          testID: button.getAttribute('data-testid') || '',
+          ariaLabel: button.getAttribute('aria-label') || '',
+          label: label?.textContent?.trim() || '',
+          count: count?.textContent?.trim() || '',
+          textOverflow: contentStyle?.textOverflow || '',
+          whiteSpace: contentStyle?.whiteSpace || '',
+          height: contentRect?.height || 0,
+          lineHeight: Number.parseFloat(contentStyle?.lineHeight || '0'),
+          width: buttonRect.width,
+          scrollWidth: content?.scrollWidth || 0,
+          clientWidth: content?.clientWidth || 0,
+        }
+      })
       return {
         activeLabel: activeTab?.textContent?.replace(/\s+/g, '').trim() || '',
         buttonCount: tabs?.querySelectorAll('button').length || 0,
+        filterItems,
         tabsClassName: tabs?.className || '',
         tabsSticky: tabsStyle?.position === 'sticky',
         tabsThumbContent: tabsBeforeStyle?.content || '',
         tabsThumbTransform: tabsBeforeStyle?.transform || '',
+        tabsThumbWidth: Number.parseFloat(tabsBeforeStyle?.width || '0'),
         tabsThumbTransitionDuration: tabsBeforeStyle?.transitionDuration || '',
         activeTabTransitionDuration: activeTabStyle?.transitionDuration || '',
         scroll: scrollRect
@@ -2179,6 +2326,74 @@ export function createMobileTaskAssertions(deps) {
       metrics.buttonCount,
       4,
       `${scenarioName} 待办筛选 sticky tab 应保留四项: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.filterItems.map((item) => item.label),
+      ['全部', '审批', '风险', '超时'],
+      `${scenarioName} 待办筛选标签应完整显示: ${JSON.stringify(metrics)}`
+    )
+    metrics.filterItems.forEach((item) => {
+      assert.match(
+        item.count,
+        /^\d+$/u,
+        `${scenarioName} ${item.label} 筛选应使用纯数字胶囊完整显示数量: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        item.ariaLabel.includes(item.label) &&
+          item.whiteSpace === 'nowrap' &&
+          item.textOverflow !== 'ellipsis' &&
+          item.height <= item.lineHeight + 1.5 &&
+          item.scrollWidth <= item.clientWidth + 1,
+        `${scenarioName} ${item.label} 筛选不应换行、裁切或显示省略号: ${JSON.stringify(metrics)}`
+      )
+    })
+    const largeCountMetrics = await page.evaluate(() => {
+      const count = document.querySelector('.mobile-role-task-filter__count')
+      const content = count?.closest('.mobile-role-task-filter__content')
+      if (
+        !(count instanceof HTMLElement) ||
+        !(content instanceof HTMLElement)
+      ) {
+        return null
+      }
+      const originalText = count.textContent
+      count.textContent = '150'
+      const countRect = count.getBoundingClientRect()
+      const contentRect = content.getBoundingClientRect()
+      const result = {
+        countText: count.textContent,
+        countWidth: countRect.width,
+        countScrollWidth: count.scrollWidth,
+        countClientWidth: count.clientWidth,
+        contentHeight: contentRect.height,
+        contentScrollWidth: content.scrollWidth,
+        contentClientWidth: content.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        documentClientWidth: document.documentElement.clientWidth,
+      }
+      count.textContent = originalText
+      return result
+    })
+    assert(
+      largeCountMetrics &&
+        largeCountMetrics.countText === '150' &&
+        largeCountMetrics.countWidth >= 24 &&
+        largeCountMetrics.countScrollWidth <=
+          largeCountMetrics.countClientWidth + 1 &&
+        largeCountMetrics.contentScrollWidth <=
+          largeCountMetrics.contentClientWidth + 1 &&
+        largeCountMetrics.documentScrollWidth <=
+          largeCountMetrics.documentClientWidth + 1,
+      `${scenarioName} 三位数筛选数量标签不应被裁切或导致横向溢出: ${JSON.stringify(largeCountMetrics)}`
+    )
+    const expectedFilterWidth =
+      (metrics.tabs.clientWidth - 8) / metrics.buttonCount
+    assert(
+      Math.abs(metrics.tabsThumbWidth - expectedFilterWidth) <= 1.5 &&
+        metrics.filterItems.every(
+          (item) => Math.abs(item.width - expectedFilterWidth) <= 1.5
+        ),
+      `${scenarioName} 审批并入筛选行后按钮与滑块应保持等宽: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.activeLabel.includes('全部'),
@@ -2295,10 +2510,9 @@ export function createMobileTaskAssertions(deps) {
     assertMobileTaskMainNavigation,
     assertMobileTaskInitialSkeleton,
     readVisibleMobileTaskListText,
-    assertMobileTaskProgressSummary,
+    assertMobileTaskLoadedOverview,
     assertMobileTaskPrimaryFilterNavigation,
     assertMobileTaskBossDoneList,
-    assertMobileTaskFocusSummary,
     assertMobileMinePanelLayout,
     assertMobileTaskFilterSelected,
     assertMobileTaskListToggle,

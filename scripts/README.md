@@ -573,7 +573,7 @@ node /Users/simon/projects/plush-toy-erp/web/scripts/mobileAuthLoginRouteSmoke.m
 pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-auth-login-route
 ```
 
-该回归默认验证 `/m/<role>/tasks`，与当前生产 `web-desktop` 单容器主路径一致，使用 mock auth / admin / customer-config / workflow RPC 覆盖未登录拦截、`admin.me` 与 effective session 刷新、登录回跳、当前优先事项 / 风险提醒 / 已办进度和 phone / iPad 布局；preflight 只写本地 JSON，不证明真实后端 RBAC、customer config active revision 或真实账号可用。旧的 `mobile-*` 多实例 `/tasks` 路径已退出，不再作为本地兼容调试入口。
+该回归默认验证 `/m/<role>/tasks`，与当前生产 `web-desktop` 单容器主路径一致，使用 mock auth / admin / customer-config / workflow RPC 覆盖未登录拦截、`admin.me` 与 effective session 刷新、登录回跳、当前已加载任务分布 / 风险提醒 / 已办列表和 phone / iPad 布局；preflight 只写本地 JSON，不证明真实后端 RBAC、customer config active revision 或真实账号可用。旧的 `mobile-*` 多实例 `/tasks` 路径已退出，不再作为本地兼容调试入口。
 
 如需核对真实后端模拟任务在岗位任务端详情页可见，并可提交阻塞、退回、完成和跨角色催办动作，先确认本地后端和试用账号可用，再执行：
 
@@ -661,7 +661,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-mani
 
 该脚本不读取 raw 客户文件、不上传文件、不调用后端、不 activate、不 rollback、不导入业务数据，也不写 Workflow / Fact runtime。当前已跟踪包均为 draft / preview-only，不能直接生成正式发布 payload；只有完成受控评审并显式进入 `release_ready`、启用 runtime / publish 的配置输入，才允许走正式编译和后端发布链路。可重复传入 `--customer` 或使用 `--all` 预览全部登记包；`--out` 只能在单客户 `preview` 模式写入 ignored `output/`。页面、字段、权限、责任池和打印投影都必须来自 catalog 白名单并经后端再次校验；reference 仅用 `suppliers.default.supplier_type visible=false` 验证已有低风险列表/CSV consumer，不扩展到表单 label、editable 或 required。
 
-永绅本地联调不通过上述 CLI 放开 draft 包。`pnpm start:yoyoosun` 本身只预检并启动 Vite；登录后须在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认，dev-only middleware 才会为匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN` 生成内容寻址、长度不超过 64 的 `local_test_apply` revision，并沿现有 validate / publish / transition / active readback 链写入共享开发 PostgreSQL 客户配置控制面。后端默认拒绝该 manifest 及其切换，只有本地 `make run / make dev_restart` 显式开放 gate；gate 开启时按 pgx 最终连接配置只接受 `192.168.0.106:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，133、query override、multi-host fallback 和 loopback tunnel 均拒绝，production 配置携带此开关也会启动失败。active 切换对其他共享库使用者可见；正式 validator / executor 同样拒绝该 marker，正式 publish / activate、目标环境部署和客户签收仍需独立完成。
+永绅本地联调不通过上述 CLI 放开 draft 包。`pnpm start:yoyoosun` 本身只预检并启动 Vite；登录后须在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认，dev-only middleware 才会为匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN` 生成内容寻址、长度不超过 64 的 `local_test_apply` revision，并沿现有 validate / publish / transition check / activate or rollback / active readback 链写入共享开发 PostgreSQL 客户配置控制面。后端默认拒绝该 manifest 及其切换，只有本地 `make run / make dev_restart` 显式开放 gate；gate 开启时按 pgx 最终连接配置只接受 `192.168.0.106:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，133、query override、multi-host fallback 和 loopback tunnel 均拒绝，production 配置携带此开关也会启动失败。active 切换对其他共享库使用者可见；正式 validator / executor 同样拒绝该 marker，正式 publish / activate、目标环境部署和客户签收仍需独立完成。
 
 客户配置 revision 进入 release evidence 前，先生成 manifest fingerprint evidence：
 

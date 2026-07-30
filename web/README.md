@@ -236,7 +236,7 @@ pnpm start:yoyoosun
 
 本地后端的 `make run`、`make dev` 和 `make dev_restart` 默认使用 `ERP_CUSTOMER_KEY=yoyoosun`，避免未显式携带 customer key 的业务 RPC 回落到 demo；这些本地入口同时显式开放后端 local-test gate，gate 按 pgx 最终连接配置只接受 `192.168.0.106:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，production 配置会拒绝该开关。确需 demo 时使用 `ERP_CUSTOMER_KEY=demo make dev_restart` 显式覆盖。
 
-`start:yoyoosun` 同样从 `15200` 起在 `15200-15299` 辅助块内自动顺延端口，保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
+`start:yoyoosun` 同样从 `15200` 起在 `15200-15299` 辅助块内自动顺延端口，保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition check / activate or rollback / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
 
 未显式应用时，后端若只返回同 key 的 `builtin_rbac_fallback`，DEV 桌面端会进入带警示的本地预览壳，避免把成功登录误报成工作台故障；该 fallback 不视为 active revision，工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端仍 fail closed。页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`；静态包检查通过不等于 active revision 已就绪。
 
@@ -303,7 +303,7 @@ pnpm smoke:processing-contract-real-login
 - 管理员登录
 - 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色客户配置包预检页、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
 - 未登录访问桌面后台的重定向
-- 桌面工作台和任务看板，包括待我处理、阻塞 / 逾期风险队列、协同任务筛选、任务详情抽屉、阻塞 / 退回原因面板、催办、受控转交，以及基于 `complete_task_action` / `block_task_action` / `reject_task_action / reassign_task` 的任务动作
+- 桌面工作台和任务看板，包括待我处理、按有效审批能力显示的待我审批、阻塞 / 逾期风险队列、协同任务筛选、任务详情抽屉、阻塞 / 退回原因面板、催办、受控转交，以及基于 `complete_task_action` / `block_task_action` / `reject_task_action / reassign_task` 的任务动作
 - 桌面业务看板和模板打印中心
 - 当前正式业务页连续回归，包括客户档案、供应商档案、销售订单 V1 页面、采购订单日期筛选和出货单日期筛选（桌面 / 窄屏）
 - 当前正式业务页表格、筛选、列顺序账号偏好、弹窗布局和协同入口
@@ -313,7 +313,7 @@ pnpm smoke:processing-contract-real-login
 - 采购合同打印工作台
 - 加工合同打印工作台
 
-`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、`admin.me` 与客户 effective session 刷新、当前优先事项 / 风险提醒 / 已办进度展示、岗位任务端不显示技术说明，以及退出登录清空登录态。有真实电脑端菜单的账号会在任务端顶部和“我的”页看到“进入电脑端”；该入口继续以当前后端菜单投影为准，不按用户名或岗位名硬放行。
+`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、`admin.me` 与客户 effective session 刷新、待办页当前已加载任务分布 / 风险提醒 / 不重复整池分布的已办列表展示、岗位任务端不显示技术说明，以及退出登录清空登录态。有真实电脑端菜单的账号会在任务端顶部和“我的”页看到“进入电脑端”；该入口继续以当前后端菜单投影为准，不按用户名或岗位名硬放行。
 
 缺少浏览器运行条件或只想确认移动端认证回跳 smoke 的执行范围时，可先执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template`。该命令只打印岗位任务端角色、phone / iPad 视口、可选环境变量和真实回归命令，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。需要留下可保存的 no-write 前置记录时，执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json`；该报告只写本地 JSON，记录脚本存在性、岗位任务端路由计划、phone / iPad 视口计划和 mock RPC 覆盖口径，不调用后端 / JSON-RPC、不读取密码、不保存 token、不写数据库。真实 `pnpm smoke:mobile-auth-login-route` 使用 mock auth / admin / customer-config / workflow RPC 验证生产单端口 `/m/<role>/tasks` 路由、会话刷新和登录回跳，不证明真实后端 RBAC、真实账号或 customer config active revision。
 
@@ -413,9 +413,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 - 页面只通过 development serve 的 loopback Bridge 使用三个固定 profile，不接受 shell、SQL、脚本路径、DSN、后端地址、密码或自定义环境变量。写入口的信任边界是本机开发进程、Host / Origin / `Sec-Fetch-Site`、CSRF 和 operation 确认，不冒充 ERP RBAC。
 - `共享开发基础数据 / core-demo` 只允许登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev`，先确认 migration 已到 head，再顺序复用角色演示账号和 Product Core 基础资料 seed。它只生成账号、单位、材料、产品、仓库、工序和 BOM 等稳定开发基线，不生成客户、订单、Workflow、库存、出货或财务事实；稳定 upsert 不等于整批事务，也不提供按 operation 删除。
-- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.07.16-v5 / 20260716-V5`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。它按正式 API 准备 Source Document、5 条可证明 ProcessRuntime、模拟岗位任务和来源驱动 Fact，同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。岗位到期时间是固定 V5 快照，不保证长期维持“今天 / 本周”相对语义；终态只证明 40 / 50 项数据前置，10 项浏览器检查和人工验收保持未完成。
+- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.07.16-v5 / 20260716-V5`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。用户确认后先稳定准备本地岗位账号与至少 30 条由真实控制面操作产生的审计样例，再通过正式 `validate / publish / transition check / activate or rollback / effective-session readback` 对齐当前跟踪的 yoyoosun 本地测试配置，之后才准备 Source Document、5 条可证明 ProcessRuntime、模拟岗位任务和来源驱动 Fact。同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。岗位到期时间是固定 V5 快照，不保证长期维持“今天 / 本周”相对语义；终态只证明 40 / 50 项数据前置，另 10 项只能由浏览器证明。全部 50 项页面操作和人工验收均保持未完成。
 - `完整验收数据 / full-acceptance` 只接受 clean exact commit 和服务端已有的 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，复用统一 lifecycle 在同批专用库完成 migration、正式 Source / ProcessRuntime / Fact 数据、50 项页面验收和异常流；成功或失败都必须停服、删库并读回零残留。
-- `scenario-demo` 的页面操作固定为“读取预检 → 点击生成 → 自动准备并冻结 `planHash`、`runId`、仓库和目标摘要 → 核对固定目标 / V5 批次 / 数据范围 / 长期保留边界 → 确认生成 → 异步执行 → 读取回执”，不要求手输长确认串。其他 profile 继续使用完整确认串。执行前身份变化会使原计划失效；页面刷新可恢复最近 operation，进程中断或结果不明确时显示 `not_proven`，不自动重试。
+- `scenario-demo` 的页面操作固定为“读取预检 → 点击生成 → 自动准备并冻结 `planHash`、`runId`、仓库和目标摘要 → 核对固定目标 / V5 批次 / 数据范围 / 长期保留边界 → 确认生成 → 异步执行 → 读取回执”，不要求手输长确认串。其他 profile 继续使用完整确认串。执行前身份变化会使原计划失效；页面刷新可恢复最近 operation。进程中断或结果不明确时显示 `not_proven`，不会自动重试；用户可重新准备更晚的同目标 scenario plan 并再次确认，以同一固定批次显式补齐，其他 profile、不同目标或仍在运行的 operation 继续阻断。
 - `scenario-demo` 只在固定本机 8300、登记 106 长期开发库、migration 和 runtime identity 已证明后，由后台使用项目登记的本机开发账号约定；显式 Vite 进程环境覆盖值仍优先，但凭据不进入浏览器、命令参数或回执。日常直接在本页点击即可，不需要 `make dev_restart`；只有修改 Vite 凭据覆盖环境时才重启一次 `pnpm start`。后端代码、配置或 migration 变化时才按正式后端流程重启。
 - 页面不提供普通“重置全部数据”或 debug cleanup。共享基线按正式账号 / 主数据生命周期退出，已生效业务事实按取消、冲正或调整退出；只有专用验收库允许数据库级自动清理。Workflow task 完成不等于 Fact 已生成。
 
@@ -464,16 +464,18 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台已恢复 `使用帮助 / 岗位使用帮助` 分组，不恢复旧 `帮助中心`、`开发与验收` 或 `高级文档` 信息架构；前端仍不承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端本地和生产环境统一走 `5175` 的 `/m/<role>/tasks`；不再保留按角色拆端口入口，也不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
-- 岗位任务页读取真实 workflow API，采用有意组合的移动主路径：保留 v1 的待办 / 已办 / 提醒 / 我的列表、主筛选、服务端游标分页 / 分批展开和任务卡片；选中任务后进入 v2 独立全屏查看、处理和可信结果回执，结束后恢复原列表的筛选、已加载分页、滚动位置和焦点。`todo / risk / history` 仍是各自服务端查询视图，不在前端拼成第二套任务真源。完成 / 阻塞 / 退回分别走 `complete_task_action` / `block_task_action` / `reject_task_action`，均由服务端按当前管理员和任务责任推导角色。桌面任务看板、Workflow V1 页面、业务协同 Drawer 和岗位任务端提交前预检已消费 `explainWorkflowActionAccess` / `explainWorkflowTaskAssignment` 的后端只读原因；移动端不再回写 `business_records` 状态，附件上传和 Workflow done 都不代表业务 Fact 已生效
+- 岗位任务页读取真实 workflow API，采用有意组合的移动主路径：保留 v1 的待办 / 已办 / 提醒 / 我的四项主导航、服务端游标分页 / 分批展开和任务卡片。无审批权限时待办主筛选为“全部 / 风险 / 超时”；当前账号至少有一项有效审批能力时，同一分段行显示“全部 / 审批 / 风险 / 超时”，不增加独立审批卡或第五个底部导航。原“我负责”只按已加载待办做客户端近似计算，常与“全部”重复且没有完整服务端游标，现已移除。选中任务后进入 v2 独立全屏查看、处理和可信结果回执，结束后恢复原列表的筛选、已加载分页、滚动位置和焦点。`todo / approval / risk / history` 仍是各自服务端查询视图，不在前端拼成第二套任务真源。完成 / 阻塞 / 退回分别走 `complete_task_action` / `block_task_action` / `reject_task_action`，均由服务端按当前管理员和任务责任推导角色。桌面任务看板、Workflow V1 页面、业务协同 Drawer 和岗位任务端提交前预检已消费 `explainWorkflowActionAccess` / `explainWorkflowTaskAssignment` 的后端只读原因；移动端不再回写 `business_records` 状态，附件上传和 Workflow done 都不代表业务 Fact 已生效
+- 桌面任务抽屉与岗位任务详情统一把 `get_task_process_context` 展示为“业务轨迹”，把 `list_task_events` 展示为“本任务处理记录”。业务轨迹回答来源流程走到哪里；任务记录按最新在前显示当前任务的进度、异常 / 恢复、责任流转、处理岗位与意见。单条任务事件不是完整审批链，失败也不隐藏另一条读链；两者都不代替 Source Document 或领域 Fact。
 - 桌面 `/erp/task-board` 的任务详情抽屉通过 `get_task_assignment_options` 获取服务端筛选后的接收人，并以 `reassign_task` 提交接收人或岗位池、当前 version、幂等键和必填原因；前端不从管理员列表自行拼候选人。当前默认只有老板角色和 super admin 能看到转交动作，但 super admin 不会因全权限自动成为业务岗位接收人；PMC 仍只读监督。转交成功后抽屉关闭并刷新服务端任务投影，只改变个人归属，不改变任务状态或业务事实。`/m/<role>/tasks` 当前仍只提供既有完成 / 阻塞 / 退回 / 催办动作，不把桌面转交入口误写成岗位任务端已接能力
 - 正式完成 / 阻塞 / 退回 / 催办入口为一次用户 intent 冻结业务参数、`expected_version` 和安全 UUID `idempotency_key`；HTTPS 优先使用 `crypto.randomUUID()`，内网 HTTP 浏览器使用 `crypto.getRandomValues()` 生成 RFC 4122 v4 key，不允许退回 `Math.random()`。只有新 intent 执行 explain 预检；HTTP 408、网络中断、5xx 或结构不合法的 success response 都保留原 attempt、抽屉、原因、证据和同一 key，原样读取 / 重放 receipt，不刷新列表也不把未知结果误报为失败。后端在每次请求仍重新校验登录、RBAC、客户 scope、任务可见性和 receipt，前端跳过重复 explain 不构成授权绕过
 - Dashboard、Workflow V1 页面、岗位任务端、采购订单与委外订单协同入口共用 task 级同步 in-flight guard：同一 task 的首个动作在任何 await 前取得 lease，完成 / 阻塞 / 退回 / 催办跨动作双击不会发出第二个请求，`finally` 只释放本次持有的 lease。Go 与 JS 已共同消费 `scripts/qa/workflow-task-mutation-intent-v1.vectors.json`，锁住 mixed evidence 类型 / 顺序、raw whitespace key、mobile 精确重复 key 和 changed-intent relations；Node 24.14 定向 util + mobile + purchase / outsourcing guard 为 33/33，联合 Workflow API / caller 为 62/62，受影响 ESLint 0 error。该结果不代表 final full/strict/L1 或目标环境证据已经完成
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮
 - 模板打印当前由对应业务页选中记录后带值打开；产品页维护的 0–2 张产品图会在 BOM 生成物料明细 / 作业指导书时冻结到右上角，委外订单仅在全部有效产品行归属同一产品时自动带图。打印中心保留默认样例，并已按原型复核后的轻量两栏承接左侧模板导航、右侧纸面预览和打印窗口入口；字段和当前草稿图片编辑在独立打印窗口内完成。
 - 扩展硬件链路、PDA、条码枪、图片识别继续 deferred
-- `docs/product/prototypes/admin-command-center-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`/erp/dashboard` 是后台首页 / 工作台，并承接待我处理与阻塞 / 逾期风险队列；`/erp/task-board` 是任务看板，`/erp/business-dashboard` 是业务看板，`/erp/print-center` 是模板打印中心。工作台和业务看板保留后台运营中枢导航；不再提供重复的通用异常总控页。未获用户明确确认前，不能把该资产改成 Current。
+- `docs/product/prototypes/admin-command-center-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`/erp/dashboard` 是后台首页 / 工作台，并承接待我处理、按有效审批能力显示的待我审批与阻塞 / 逾期风险队列；`/erp/task-board` 是任务看板，`/erp/business-dashboard` 是业务看板，`/erp/print-center` 是模板打印中心。工作台和业务看板保留后台运营中枢导航；不再提供重复的通用异常总控页。未获用户明确确认前，不能把该资产改成 Current。
 - `docs/product/prototypes/print-template-center-v1/` 按 `待实现 / To Implement` 登记，补齐模板打印中心独立样板；当前运行时已按原型复核后的轻量两栏保留模板导航 / 预览和打印窗口入口，字段编辑回到独立打印窗口。该原型不新增样品确认单、字段映射配置、后端 API、RBAC、schema、migration 或 Fact 写入。
 - `/erp/task-board` 任务看板的关键词、状态、角色、到期、来源、泳道和页码使用 URL query 保存，支持复制链接、刷新恢复和一键清空。页面读取服务端 `get_task_board` 全量投影，顶部指标与下方“常规待办 / 阻塞与退回 / 到期提醒 / 已结束”四个互斥泳道一一对应，四项之和等于当前筛选的真实总数。首次进入看板才使用整卡加载；分类或翻页切换会保留同一筛选范围的顶部指标，只让下方泳道显示局部加载并在请求完成后替换结果。总览每栏最多展示 5 条并标明“已显示 / 共多少条”，单栏聚焦后按 8 条分页；不再把 `list_tasks(limit: 200)` 的当前页长度冒充全量统计，也不在前端循环拉取全部任务。这些筛选和投影只影响看板展示，不写用户偏好、Workflow 任务状态或 Fact 表。
+- 正式业务列表页的 `PageHeaderCard.stats` 只接受非负安全整数计数，`0` 表示已成功读取且确实为零；数字字符串、视图名、模式名、文字状态、负数和不可用占位不会渲染为页头指标。当前视图和状态文字放在页签、标签或说明中；请求失败 / 尚未读取等 unavailable 语义继续由看板自己的 `— / 暂不可用` 状态承接，不伪装成 `0`。
 - `docs/product/prototypes/business-module-page-standard-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已经由客户、供应商、产品、材料、SKU、BOM、销售订单、采购订单、采购入库、来料质检、委外订单和出货单等正式 V1 页面复用业务页骨架，收窄 Fact / Workflow 页面继续遵守各自事实边界；旧 `BusinessModulePage`、旧通用业务页路由和旧只读变体页已删除。`/__dev/prototypes` 仍保留待实现队列，未获用户明确确认前不清空队列、不晋级 Current。
 - 当前业务页、岗位任务端页面、桌面工作台、任务看板、异常闭环、业务看板和模板预览已经齐入口；业务数据分别落在领域专表、Source Document、Workflow 与 Fact 真源，不再存在通用 `business_records` 运行时真源。采购合同 / 加工合同已支持业务页带值打开，桌面任务看板只处理 Workflow 协同任务，不直接写库存、出货、应收、开票、付款或其他事实表；真实客户数据批量导入、打印留档回写和尚未接入的细分领域专表继续 deferred
 

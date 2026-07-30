@@ -3300,9 +3300,7 @@ async function assertAdminLoginLayout(page, { minCardWidth }) {
     const loginPageRect = loginPage?.getBoundingClientRect?.()
     const backgroundRect = background?.getBoundingClientRect?.()
     const cardRect = card?.getBoundingClientRect?.()
-    const loginPageStyle = loginPage
-      ? window.getComputedStyle(loginPage)
-      : null
+    const loginPageStyle = loginPage ? window.getComputedStyle(loginPage) : null
     const cardStyle = card ? window.getComputedStyle(card) : null
     const submitStyle = submitButton
       ? window.getComputedStyle(submitButton)
@@ -7585,6 +7583,7 @@ async function assertBusinessHeaderStatsSingleLine(
     ).map((tile) => {
       const rect = tile.getBoundingClientRect()
       const label = tile.querySelector('.ant-typography')
+      const value = tile.querySelector('strong')
       const labelRect = label?.getBoundingClientRect()
       const labelStyle = label ? window.getComputedStyle(label) : null
       const tileStyle = window.getComputedStyle(tile)
@@ -7593,6 +7592,8 @@ async function assertBusinessHeaderStatsSingleLine(
         role: tile.getAttribute('role'),
         cursor: tileStyle.cursor,
         text: tile.textContent?.replace(/\s+/g, ' ').trim() || '',
+        labelText: label?.textContent?.replace(/\s+/g, ' ').trim() || '',
+        valueText: value?.textContent?.replace(/\s+/g, ' ').trim() || '',
         ariaLabel: tile.getAttribute('aria-label') || '',
         hasButton: Boolean(tile.querySelector('button')),
         top: rect.top,
@@ -7677,9 +7678,13 @@ async function assertBusinessHeaderStatsSingleLine(
     `${scenarioName} formal 业务页统计项数量不符合当前口径: ${JSON.stringify(metrics)}`
   )
   assert.deepEqual(
-    metrics.tiles.map((tile) => tile.text.replace(/\d+$/u, '')),
+    metrics.tiles.map((tile) => tile.labelText),
     expectedLabels,
     `${scenarioName} 业务页头部统计项不符合当前口径: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.tiles.every((tile) => /^(0|[1-9]\d*)$/u.test(tile.valueText)),
+    `${scenarioName} 业务页头部统计主值必须是非负整数，文字上下文应放在页签、标签或说明中: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.tiles.every(

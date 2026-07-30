@@ -4,12 +4,9 @@ import {
   BellOutlined,
   CheckSquareOutlined,
   DesktopOutlined,
-  FileTextOutlined,
   InboxOutlined,
   LogoutOutlined,
-  PauseOutlined,
   ReloadOutlined,
-  RollbackOutlined,
   SwapOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -48,9 +45,9 @@ export default function MobileTaskListScreen({
   activeMessageTabKey,
   activeViewHasData,
   activeViewHasMore,
-  activeTasks,
   adminProfile,
   canEnterDesktop,
+  canViewApprovalInbox,
   doneTasks,
   filterItems,
   filteredTasks,
@@ -67,8 +64,6 @@ export default function MobileTaskListScreen({
   loadingMore,
   loggingOut,
   noticeTasks,
-  progressPercent,
-  riskTasks,
   roleLabel,
   serverDataTime,
   scrollContainerRef,
@@ -85,6 +80,10 @@ export default function MobileTaskListScreen({
   setVisibleListLimitsByKey,
   warningTasks,
 }) {
+  const activeTodoListKey =
+    activeFilterKey === MOBILE_TASK_FILTER_KEYS.APPROVAL
+      ? MOBILE_LIST_KEYS.APPROVAL
+      : MOBILE_LIST_KEYS.TODO
   const getCollapsedListLimit = (listKey) =>
     MOBILE_LIST_COLLAPSED_LIMITS[listKey] || Number.POSITIVE_INFINITY
 
@@ -184,7 +183,6 @@ export default function MobileTaskListScreen({
   const renderSummaryMetric = ({
     label,
     value,
-    Icon,
     tone = '',
     valueClassName = 'text-slate-950',
     testID,
@@ -202,52 +200,43 @@ export default function MobileTaskListScreen({
           {value}
         </div>
         <div className="mobile-role-metric-button__label mt-1 flex items-center justify-center gap-1 text-base">
-          {Icon ? <Icon aria-hidden="true" /> : null}
           <span>{label}</span>
         </div>
       </div>
     )
   }
 
-  const renderProgressPanel = () => (
-    <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-950">已加载任务进度</h2>
-        <span className="text-sm text-slate-500">{progressPercent}%</span>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-emerald-500"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
-      <div className="mt-4 grid grid-cols-4 divide-x divide-slate-200 rounded-xl border border-slate-100 bg-slate-50 py-3 text-center">
+  const renderLoadedTaskOverview = () => (
+    <section
+      className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+      data-testid="mobile-loaded-task-overview"
+    >
+      <h2 className="text-lg font-semibold text-slate-950">
+        已加载任务分布
+      </h2>
+      <div className="mt-3 grid grid-cols-4 divide-x divide-slate-200 rounded-xl border border-slate-100 bg-slate-50 py-3 text-center">
         {[
           {
             label: '待处理',
             value: taskSummary.ready,
-            Icon: FileTextOutlined,
             tone: 'ready',
             testID: 'mobile-role-progress-ready',
           },
           {
             label: '卡住',
             value: taskSummary.blocked,
-            Icon: PauseOutlined,
             tone: 'blocked',
             testID: 'mobile-role-progress-blocked',
           },
           {
             label: '已退回',
             value: taskSummary.rejected,
-            Icon: RollbackOutlined,
             tone: 'rejected',
             testID: 'mobile-role-progress-rejected',
           },
           {
             label: '完成',
             value: taskSummary.done,
-            Icon: CheckSquareOutlined,
             tone: 'done',
             testID: 'mobile-role-progress-done',
           },
@@ -318,108 +307,76 @@ export default function MobileTaskListScreen({
     )
   }
 
-  const renderTabSummary = () => {
-    const summaryByTab = {
-      [MOBILE_MAIN_TAB_KEYS.TODO]: `已加载 ${activeTasks.length} 条待处理`,
-      [MOBILE_MAIN_TAB_KEYS.DONE]: `已加载 ${doneTasks.length} 条已办`,
-      [MOBILE_MAIN_TAB_KEYS.MESSAGES]: `已加载 ${riskTasks.length} 条风险提醒`,
-      [MOBILE_MAIN_TAB_KEYS.MINE]: `${roleLabel}任务端`,
-    }
-    return summaryByTab[activeMainTabKey] || summaryByTab.todo
+  const renderTaskFilters = () => {
+    const filterCount = Math.max(1, filterItems.length)
+    const activeFilterIndex = Math.max(
+      0,
+      filterItems.findIndex((item) => item.key === activeFilterKey)
+    )
+
+    return (
+      <div
+        className={`mobile-role-task-filters mobile-role-task-filters--${activeFilterKey} mx-5 mt-4 grid rounded-2xl bg-slate-100 p-1 shadow-inner`}
+        style={{
+          '--mobile-role-task-filter-offset': `${activeFilterIndex * 100}%`,
+          '--mobile-role-task-filter-width': `calc((100% - 8px) / ${filterCount})`,
+          gridTemplateColumns: `repeat(${filterCount}, minmax(0, 1fr))`,
+        }}
+      >
+        {filterItems.map((item) => {
+          const active = item.key === activeFilterKey
+          return (
+            <button
+              key={item.key}
+              type="button"
+              data-testid={`mobile-role-filter-${item.key}`}
+              aria-pressed={active}
+              aria-label={`${item.ariaLabel || item.label}，已加载 ${item.count} 条`}
+              className={`mobile-role-task-filter min-w-0 rounded-xl px-1 py-3 text-base font-semibold transition ${
+                active ? 'mobile-role-task-filter--active' : 'text-slate-500'
+              }`}
+              onClick={() => {
+                setActiveFilterKey(item.key)
+                setSelectedTaskID(null)
+                setDetailAction(null)
+                resetVisibleListLimit(
+                  item.key === MOBILE_TASK_FILTER_KEYS.APPROVAL
+                    ? MOBILE_LIST_KEYS.APPROVAL
+                    : MOBILE_LIST_KEYS.TODO
+                )
+              }}
+            >
+              <span className="mobile-role-task-filter__content">
+                <span className="mobile-role-task-filter__label">
+                  {item.label}
+                </span>
+                <span className="mobile-role-count-tag mobile-role-task-filter__count">
+                  {item.count}
+                </span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    )
   }
-
-  const focusFilterKey =
-    taskSummary.overdue > 0
-      ? MOBILE_TASK_FILTER_KEYS.OVERDUE
-      : riskTasks.length > 0
-        ? MOBILE_TASK_FILTER_KEYS.RISK
-        : MOBILE_TASK_FILTER_KEYS.ALL
-  const focusTitle =
-    taskSummary.overdue > 0
-      ? `先处理 ${taskSummary.overdue} 条超时任务`
-      : riskTasks.length > 0
-        ? `优先确认 ${riskTasks.length} 条风险任务`
-        : activeTasks.length > 0
-          ? `当前有 ${activeTasks.length} 条任务待处理`
-          : '当前没有待处理任务'
-  const focusHint =
-    taskSummary.overdue > 0
-      ? '从已超时任务开始，避免继续影响后续岗位。'
-      : riskTasks.length > 0
-        ? '先看阻塞、预警和即将超时，再处理普通任务。'
-        : activeTasks.length > 0
-          ? '队列暂无强风险，按优先级和截止时间处理。'
-          : '可以查看已办结果，或刷新确认最新任务。'
-
-  const renderTaskFocusSummary = () => (
-    <button
-      type="button"
-      className="mobile-role-focus-card mx-5 mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-left shadow-sm"
-      data-testid="mobile-role-focus-card"
-      onClick={() => {
-        setActiveFilterKey(focusFilterKey)
-        resetVisibleListLimit(MOBILE_LIST_KEYS.TODO)
-      }}
-    >
-      <span className="block text-xs font-semibold text-emerald-700">
-        当前优先事项
-      </span>
-      <span className="mt-1 block text-xl font-semibold leading-tight text-slate-950">
-        {focusTitle}
-      </span>
-      <span className="mt-2 block text-sm leading-6 text-slate-600">
-        {focusHint}
-      </span>
-      <span className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
-        <span>待办 {activeTasks.length}</span>
-        <span>风险 {riskTasks.length}</span>
-        <span>超时 {taskSummary.overdue}</span>
-      </span>
-    </button>
-  )
-
-  const renderTaskFilters = () => (
-    <div
-      className={`mobile-role-task-filters mobile-role-task-filters--${activeFilterKey} mx-5 mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner`}
-    >
-      {filterItems.map((item) => {
-        const active = item.key === activeFilterKey
-        return (
-          <button
-            key={item.key}
-            type="button"
-            data-testid={`mobile-role-filter-${item.key}`}
-            aria-pressed={active}
-            className={`mobile-role-task-filter min-w-0 rounded-xl px-2 py-3 text-base font-semibold transition ${
-              active ? 'mobile-role-task-filter--active' : 'text-slate-500'
-            }`}
-            onClick={() => {
-              setActiveFilterKey(item.key)
-              setSelectedTaskID(null)
-              setDetailAction(null)
-              resetVisibleListLimit(MOBILE_LIST_KEYS.TODO)
-            }}
-          >
-            <span className="truncate">
-              {item.label}({item.count})
-            </span>
-          </button>
-        )
-      })}
-    </div>
-  )
 
   const renderTodoPanel = () =>
     initialLoading ? (
-      <MobileTaskListSkeleton />
+      <MobileTaskListSkeleton filterCount={canViewApprovalInbox ? 4 : 3} />
     ) : (
       <>
-        {renderTaskFocusSummary()}
+        <div className="mx-5 mt-4">{renderLoadedTaskOverview()}</div>
         {renderTaskFilters()}
         <section className="mx-5 mt-5 pb-5">
           <div className="grid grid-cols-[minmax(0,1fr)_112px] pb-2 text-base text-slate-500">
             <span>任务信息</span>
-            <span className="text-right">业务状态 / 截止时间</span>
+            <span
+              className="whitespace-nowrap text-right"
+              data-testid="mobile-task-list-status-heading"
+            >
+              状态 / 截止
+            </span>
           </div>
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
             {filteredTasks.length === 0 ? (
@@ -429,18 +386,18 @@ export default function MobileTaskListScreen({
                 </div>
                 {renderListLimitControl(
                   filteredTasks,
-                  MOBILE_LIST_KEYS.TODO,
+                  activeTodoListKey,
                   '条任务'
                 )}
               </>
             ) : (
               <div className="divide-y divide-slate-200">
-                {getVisibleListItems(filteredTasks, MOBILE_LIST_KEYS.TODO).map(
+                {getVisibleListItems(filteredTasks, activeTodoListKey).map(
                   renderTaskRow
                 )}
                 {renderListLimitControl(
                   filteredTasks,
-                  MOBILE_LIST_KEYS.TODO,
+                  activeTodoListKey,
                   '条任务'
                 )}
               </div>
@@ -493,9 +450,17 @@ export default function MobileTaskListScreen({
 
   const renderDonePanel = () => (
     <section className="mx-5 mt-5 space-y-4 pb-5">
-      {renderProgressPanel()}
       <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-950">已办任务</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-slate-950">已办任务</h2>
+          <span
+            className="mobile-role-count-tag mobile-role-section-count"
+            data-testid="mobile-role-done-count"
+            aria-label={`已加载 ${doneTasks.length} 条已办任务`}
+          >
+            {doneTasks.length}
+          </span>
+        </div>
         <div className="mt-3 space-y-3">
           {doneTasks.length === 0 ? (
             <>
@@ -559,7 +524,7 @@ export default function MobileTaskListScreen({
               onClick={() => setActiveMessageTabKey(item.key)}
             >
               <span>{item.label}</span>
-              <span className="mobile-role-message-tabs__count">
+              <span className="mobile-role-count-tag mobile-role-message-tabs__count">
                 {item.count}
               </span>
             </button>
@@ -693,9 +658,6 @@ export default function MobileTaskListScreen({
             <div className="min-w-0">
               <div className="truncate text-xl font-semibold text-slate-950">
                 {adminProfile?.username || '当前账号'}
-              </div>
-              <div className="mt-1 text-sm text-slate-500">
-                {roleLabel}任务端
               </div>
             </div>
           </div>
@@ -848,8 +810,6 @@ export default function MobileTaskListScreen({
           <span>数据时间：{serverDataTime}</span>
           <span className="text-slate-300">|</span>
           <span>任务最近更新：{latestTaskUpdate}</span>
-          <span className="text-slate-300">|</span>
-          <span>{renderTabSummary()}</span>
         </div>
 
         {loadError ? (

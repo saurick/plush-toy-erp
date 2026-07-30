@@ -18,8 +18,6 @@ import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.m
 import {
   formatProcessStartedAt,
   getProcessLabel,
-  getProcessNodeLabel,
-  getProcessNodeStatusLabel,
   getProcessStatusLabel,
   isDisplayOnlyWorkflowTask,
 } from '../../utils/processRuntimePresentation.mjs'
@@ -37,6 +35,8 @@ import {
 } from '../utils/mobileRoleTaskModel.mjs'
 import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
+import WorkflowProcessStageTrack from '../../components/workflow/WorkflowProcessStageTrack.jsx'
+import WorkflowTaskEventTrail from '../../components/workflow/WorkflowTaskEventTrail.jsx'
 
 function mobileFactValueText(value) {
   if (value === null || value === undefined) return '-'
@@ -59,34 +59,35 @@ export default function MobileTaskDetailScreen({
   selectedTask,
 }) {
   const approvalTask = isWorkflowApprovalTask(selectedTask)
-  const [approvalEvents, setApprovalEvents] = React.useState([])
-  const [approvalEventsState, setApprovalEventsState] = React.useState('idle')
+  const [taskEvents, setTaskEvents] = React.useState([])
+  const [taskEventsState, setTaskEventsState] = React.useState('idle')
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
 
   React.useEffect(() => {
-    if (!selectedTask?.id || !approvalTask) {
-      setApprovalEvents([])
-      setApprovalEventsState('idle')
+    if (!selectedTask?.id) {
+      setTaskEvents([])
+      setTaskEventsState('idle')
       return undefined
     }
     const controller = new AbortController()
-    setApprovalEventsState('loading')
+    setTaskEvents([])
+    setTaskEventsState('loading')
     listWorkflowTaskEvents(selectedTask.id, {
       limit: 100,
       signal: controller.signal,
     })
       .then((items) => {
-        setApprovalEvents(Array.isArray(items) ? items : [])
-        setApprovalEventsState('ready')
+        setTaskEvents(Array.isArray(items) ? items : [])
+        setTaskEventsState('ready')
       })
       .catch(() => {
         if (controller.signal.aborted) return
-        setApprovalEvents([])
-        setApprovalEventsState('error')
+        setTaskEvents([])
+        setTaskEventsState('error')
       })
     return () => controller.abort()
-  }, [approvalTask, selectedTask?.id])
+  }, [selectedTask?.id, selectedTask?.version])
 
   React.useEffect(() => {
     if (!selectedTask?.id || !selectedTask?.process_instance_id) {
@@ -110,7 +111,12 @@ export default function MobileTaskDetailScreen({
         setProcessContextState('error')
       })
     return () => controller.abort()
-  }, [selectedTask?.id, selectedTask?.process_instance_id])
+  }, [
+    selectedTask?.id,
+    selectedTask?.process_instance_id,
+    selectedTask?.process_node_instance_id,
+    selectedTask?.version,
+  ])
 
   if (!selectedTask || !selectedSeverity) return null
 
@@ -207,58 +213,6 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
-        {selectedTask.process_instance_id ? (
-          <section
-            className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-            data-testid="mobile-task-process-context"
-          >
-            <h2 className="text-xl font-semibold text-slate-950">流程位置</h2>
-            {processContextState === 'loading' ? (
-              <p className="mt-3 text-sm text-slate-500">正在读取流程位置</p>
-            ) : processContextState === 'error' ? (
-              <p className="mt-3 text-sm text-red-600">
-                流程位置暂时无法确认，请刷新后重试。
-              </p>
-            ) : processContext ? (
-              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-700">
-                <p>
-                  <strong>业务流程：</strong>
-                  {getProcessLabel(processContext.process_instance)}
-                </p>
-                <p>
-                  <strong>来源单据：</strong>
-                  {processContext.source.no || relatedSource}
-                </p>
-                <p>
-                  <strong>流程发起：</strong>
-                  {formatProcessStartedAt(
-                    processContext.process_instance.started_at
-                  )}
-                </p>
-                <p>
-                  <strong>当前节点：</strong>
-                  {processContext.current_nodes
-                    .map(getProcessNodeLabel)
-                    .join('、') || '无待办节点'}
-                </p>
-                <p>
-                  <strong>已完成节点：</strong>
-                  {processContext.completed_nodes
-                    .map(
-                      (node) =>
-                        `${getProcessNodeLabel(node)}（${getProcessNodeStatusLabel(node)}）`
-                    )
-                    .join('、') || '暂无'}
-                </p>
-                <p>
-                  <strong>最终状态：</strong>
-                  {getProcessStatusLabel(processContext.process_instance)}
-                </p>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
         {actionGuidance ? (
           <section
             className="mobile-role-action-guidance"
@@ -322,48 +276,65 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
-        {approvalTask ? (
+        {selectedTask.process_instance_id ? (
           <section
-            className="erp-mobile-card rounded-2xl border border-violet-200 bg-white p-4 shadow-sm"
-            data-testid="mobile-approval-trajectory"
+            className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            data-testid="mobile-task-process-context"
           >
-            <div className="text-sm font-semibold text-violet-700">
-              审批轨迹
-            </div>
-            {approvalEventsState === 'loading' ? (
-              <p className="mt-3 text-sm text-slate-500">正在加载审批轨迹…</p>
-            ) : approvalEventsState === 'error' ? (
+            <h2 className="text-xl font-semibold text-slate-950">业务轨迹</h2>
+            {processContextState === 'loading' ? (
+              <p className="mt-3 text-sm text-slate-500">正在读取业务轨迹</p>
+            ) : processContextState === 'error' ? (
               <p className="mt-3 text-sm text-red-600">
-                审批轨迹加载失败，请刷新后重试。
+                业务轨迹暂时无法确认，请刷新后重试。
               </p>
-            ) : approvalEvents.length > 0 ? (
-              <div className="mt-3 space-y-2">
-                {approvalEvents.map((event, index) => (
-                  <div
-                    key={event.id || `${event.event_type || 'event'}-${index}`}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
-                  >
-                    <div className="text-sm font-semibold text-slate-800">
-                      {event.event_label || event.action_label || '审批记录'}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {formatMobileTaskTime(
-                        event.created_at || event.occurred_at
-                      )}
-                    </div>
-                    {String(event.reason || event.note || '').trim() ? (
-                      <div className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">
-                        {String(event.reason || event.note).trim()}
-                      </div>
-                    ) : null}
+            ) : processContext ? (
+              <div className="mt-4 space-y-4 text-sm leading-6 text-slate-700">
+                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-slate-500">业务流程</dt>
+                    <dd className="font-semibold text-slate-900">
+                      {getProcessLabel(processContext.process_instance)}
+                    </dd>
                   </div>
-                ))}
+                  <div>
+                    <dt className="text-slate-500">来源单据</dt>
+                    <dd className="break-all font-semibold text-slate-900">
+                      {processContext.source.no || relatedSource}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">流程发起</dt>
+                    <dd className="font-semibold text-slate-900">
+                      {formatProcessStartedAt(
+                        processContext.process_instance.started_at
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">流程状态</dt>
+                    <dd className="font-semibold text-slate-900">
+                      {getProcessStatusLabel(processContext.process_instance)}
+                    </dd>
+                  </div>
+                </dl>
+                <WorkflowProcessStageTrack
+                  context={processContext}
+                  variant="mobile"
+                />
               </div>
-            ) : (
-              <p className="mt-3 text-sm text-slate-500">暂无审批轨迹。</p>
-            )}
+            ) : null}
           </section>
         ) : null}
+
+        <WorkflowTaskEventTrail
+          approvalTask={approvalTask}
+          errorMessage="本任务处理记录加载失败，请刷新后重试。"
+          events={taskEvents}
+          state={taskEventsState}
+          task={selectedTask}
+          variant="mobile"
+        />
 
         {selectedTask.mobile_exception_report ? (
           <section className="mobile-role-detail-exception rounded-2xl border border-orange-200 bg-orange-50 px-4 py-4 text-base text-orange-800">

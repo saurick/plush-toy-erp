@@ -289,36 +289,6 @@
         padding: 16px 14px calc(24px + env(safe-area-inset-bottom));
       }
 
-      .focus-strip {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-height: 54px;
-        margin-bottom: 14px;
-        padding: 12px 14px;
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        background: var(--surface);
-        color: var(--text-secondary);
-        font-size: 13px;
-      }
-
-      .focus-strip strong {
-        color: var(--text);
-        font-size: 15px;
-      }
-
-      .focus-strip__icon {
-        display: grid;
-        width: 32px;
-        height: 32px;
-        flex: none;
-        place-items: center;
-        border-radius: 10px;
-        background: var(--warning-soft);
-        color: var(--warning);
-      }
-
       .filter-scroller {
         display: flex;
         gap: 8px;
@@ -750,6 +720,103 @@
       .source-line strong,
       .activity-line strong {
         color: var(--text);
+      }
+
+      .execution-trail {
+        display: grid;
+        gap: 0;
+        margin: 14px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .execution-trail__item {
+        position: relative;
+        display: grid;
+        min-height: 54px;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 9px;
+        padding-bottom: 12px;
+      }
+
+      .execution-trail__item::after {
+        position: absolute;
+        top: 24px;
+        bottom: -1px;
+        left: 12px;
+        width: 2px;
+        background: var(--line);
+        content: "";
+      }
+
+      .execution-trail__item:last-child::after {
+        display: none;
+      }
+
+      .execution-trail__marker {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        width: 26px;
+        height: 26px;
+        place-items: center;
+        border: 2px solid var(--line-strong);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .execution-trail__item[data-state="completed"] .execution-trail__marker {
+        border-color: var(--success);
+        background: var(--success-soft);
+        color: var(--success);
+      }
+
+      .execution-trail__item[data-state="active"] .execution-trail__marker {
+        border-color: var(--brand);
+        background: var(--brand-soft);
+        color: var(--brand);
+      }
+
+      .execution-trail__item[data-state="blocked"] .execution-trail__marker {
+        border-color: var(--warning);
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+
+      .execution-trail__item[data-state="rejected"] .execution-trail__marker {
+        border-color: var(--danger);
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .execution-trail__copy {
+        display: grid;
+        gap: 3px;
+        padding-top: 2px;
+      }
+
+      .execution-trail__copy strong {
+        overflow-wrap: anywhere;
+        font-size: 13px;
+      }
+
+      .execution-trail__copy span {
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .execution-trail__note {
+        margin-top: 4px;
+        padding: 10px 12px;
+        border-left: 3px solid var(--brand);
+        border-radius: 8px;
+        background: var(--brand-soft);
+        color: var(--text-secondary);
+        font-size: 12px;
+        line-height: 1.55;
       }
 
       .screen-footer {
@@ -1374,6 +1441,10 @@
           ],
           guidance: '本岗位可完成、阻塞、退回或催办。选择处理方式后再填写对应信息。',
           latest: '采购已登记到货，等待仓库确认存放位置。',
+          trail: [
+            ['采购登记到货', 'completed', '已完成'],
+            ['确认来料存放位置', 'active', '办理中 · 本任务'],
+          ],
           receipt: null,
         },
         {
@@ -1397,6 +1468,10 @@
           ],
           guidance: '当前岗位不负责完成这条任务。第 2 步仅提供“催办”，不会出现完成、阻塞或退回。',
           latest: '品质岗位尚未提交检验结论。',
+          trail: [
+            ['成品送检', 'completed', '已完成'],
+            ['成品质检结论', 'active', '办理中 · 本任务'],
+          ],
           receipt: null,
         },
         {
@@ -1420,6 +1495,10 @@
           ],
           guidance: '任务已结束，第 2 步只解释只读原因；可直接进入第 3 步查看回执。',
           latest: '仓库已提交完成反馈并结束任务。',
+          trail: [
+            ['成品入库登记', 'completed', '已完成 · 本任务'],
+            ['流程结束', 'completed', '已完成'],
+          ],
           receipt: {
             status: 'confirmed',
             action: 'done',
@@ -1451,6 +1530,10 @@
           ],
           guidance: '本岗位可以继续处理。上次提交结果尚未确认，可先查看回执，再决定刷新结果或返回处理。',
           latest: '上次提交返回结果待确认，原因与留痕已保留，可返回第 2 步重试。',
+          trail: [
+            ['来料到货登记', 'completed', '已完成'],
+            ['核对混装来料', 'active', '当前状态待确认 · 本任务'],
+          ],
           receipt: {
             status: 'unknown',
             action: 'done',
@@ -1594,23 +1677,11 @@
 
       function renderList() {
         const visibleTasks = filterTasks();
-        const overdueCount = tasks.filter(function (task) {
-          return task.severity === 'danger';
-        }).length;
-        const attentionCount = tasks.filter(function (task) {
-          return task.severity === 'warning';
-        }).length;
         const filterDefinitions = [
           ['todo', '当前待办', tasks.filter(function (task) { return task.views.includes('todo'); }).length],
           ['risk', '风险关注', tasks.filter(function (task) { return task.views.includes('risk'); }).length],
           ['history', '已办回执', tasks.filter(function (task) { return task.views.includes('history'); }).length],
         ];
-        const focusCopy = state.filter === 'history'
-          ? '<div><strong>查看 ' + visibleTasks.length + ' 条已办回执</strong><br />终态任务只读，不再显示处理动作</div>'
-          : state.filter === 'risk'
-            ? '<div><strong>关注 ' + visibleTasks.length + ' 条风险任务</strong><br />先核对超时、阻塞和结果待确认事项</div>'
-            : '<div><strong>先处理 ' + overdueCount + ' 条超时任务</strong><br />另有 ' +
-              attentionCount + ' 条任务需要今天关注</div>';
         const cards = visibleTasks.length
           ? visibleTasks.map(taskCard).join('')
           : '<div class="empty-list"><strong>当前筛选下没有任务</strong><p class="helper">可切换其他筛选继续查看。</p></div>';
@@ -1627,10 +1698,6 @@
           '<div class="role-line"><span class="role-pill">仓库岗位</span><span class="sync-text">' + escapeHTML(state.lastSync) + ' · 当前视图 ' + visibleTasks.length + ' 条</span></div>' +
           '</header>' +
           '<main class="screen-main list-main">' +
-          '<div class="focus-strip">' +
-          '<span class="focus-strip__icon">' + icon('alert') + '</span>' +
-          focusCopy +
-          '</div>' +
           '<div class="filter-scroller" role="group" aria-label="任务筛选">' +
           filterDefinitions
             .map(function (filter) {
@@ -1651,6 +1718,37 @@
             ? 'notice-card--warning'
             : '';
         return '<div class="notice-card ' + tone + '">' + icon('info') + '<span>' + escapeHTML(task.guidance) + '</span></div>';
+      }
+
+      function renderExecutionTrail(task) {
+        const trail = Array.isArray(task.trail) ? task.trail : [];
+        if (!trail.length) return '';
+        return '<section class="content-card" aria-label="流程执行轨迹">' +
+          '<div class="section-heading"><h2>执行轨迹</h2><span class="section-heading__label">已执行 / 当前</span></div>' +
+          '<ol class="execution-trail">' +
+          trail
+            .map(function (item) {
+              const state = ['completed', 'blocked', 'rejected'].includes(item[1])
+                ? item[1]
+                : 'active';
+              const marker = state === 'completed'
+                ? '✓'
+                : state === 'blocked'
+                  ? '!'
+                  : state === 'rejected'
+                    ? '↩'
+                    : '●';
+              return '<li class="execution-trail__item" data-state="' + state + '"' +
+                (state === 'active' ? ' aria-current="step"' : '') + '>' +
+                '<span class="execution-trail__marker" aria-hidden="true">' +
+                marker + '</span>' +
+                '<span class="execution-trail__copy"><strong>' + escapeHTML(item[0]) +
+                '</strong><span>' + escapeHTML(item[2]) + '</span></span></li>';
+            })
+            .join('') +
+          '</ol>' +
+          '<p class="execution-trail__note">只显示系统已经执行和当前可确认的节点；等待节点可能属于未选分支，不画成确定的未来步骤。</p>' +
+          '</section>';
       }
 
       function renderDetail() {
@@ -1682,6 +1780,7 @@
           '<div class="fact-grid">' + facts + '</div>' +
           '</article>' +
           detailGuidance(task) +
+          renderExecutionTrail(task) +
           '<section class="content-card">' +
           '<div class="section-heading"><h2>关联来源</h2><span class="section-heading__label">只读</span></div>' +
           '<p class="source-line"><strong>' + escapeHTML(task.source) + '</strong><br />' + escapeHTML(task.summary) + '</p>' +
@@ -1874,7 +1973,7 @@
           escapeHTML(receipt.stateLabel) + '</span>' +
           '</div>' +
           '<section class="receipt-card" aria-label="处理回执明细">' + receiptRows(receipt) + '</section>' +
-          '<p class="receipt-note">此回执只表示任务处理已提交或待确认；库存、出货、质检和财务结果仍以对应业务页面为准。</p>' +
+          (needsConfirmation ? '' : renderExecutionTrail(task)) +
           '</main>' +
           footer +
           '</section>';
@@ -2009,6 +2108,7 @@
             task.severityLabel = '需关注';
             task.actions = ['done', 'blocked', 'urge'];
           }
+          updateTaskTrail(task, state.selectedAction);
           task.latest = task.receipt.message;
           state.submitting = false;
           state.errors = {};
@@ -2017,6 +2117,27 @@
           render();
           showToast('已生成处理回执');
         }, 700);
+      }
+
+      function updateTaskTrail(task, actionKey) {
+        if (!Array.isArray(task?.trail) || actionKey === 'urge') return;
+        const nextStateByAction = {
+          blocked: ['blocked', '已阻塞 · 本任务'],
+          done: ['completed', '已完成 · 本任务'],
+          rejected: ['rejected', '已退回 · 本任务'],
+          resume: ['active', '办理中 · 本任务'],
+        };
+        const nextState = nextStateByAction[actionKey];
+        if (!nextState) return;
+        const linkedIndex = task.trail.findIndex(function (item) {
+          return String(item?.[2] || '').includes('本任务');
+        });
+        if (linkedIndex < 0) return;
+        task.trail[linkedIndex] = [
+          task.trail[linkedIndex][0],
+          nextState[0],
+          nextState[1],
+        ];
       }
 
       function refreshPendingResult() {
@@ -2031,6 +2152,7 @@
         task.severityLabel = '已完成';
         task.actions = [];
         task.guidance = '结果已经确认，任务当前只读；可在第 3 步查看完整回执。';
+        updateTaskTrail(task, task.receipt.action);
         task.latest = task.receipt.message;
         setPendingFocus('[data-screen-heading]');
         render();

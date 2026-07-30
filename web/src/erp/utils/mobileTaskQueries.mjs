@@ -6,6 +6,7 @@ export const MOBILE_ROLE_TASK_VIEW_KEYS = Object.freeze({
   TODO: 'todo',
   HISTORY: 'history',
   RISK: 'risk',
+  APPROVAL: 'approval',
 })
 
 const MOBILE_ROLE_TASK_VIEW_KEY_SET = new Set(
@@ -307,6 +308,9 @@ export function resolveMobileRoleTaskViewKey({ mainTabKey, filterKey } = {}) {
   if (mainTabKey === 'done') {
     return MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY
   }
+  if (mainTabKey === 'todo' && filterKey === 'approval') {
+    return MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL
+  }
   if (mainTabKey === 'messages' || RISK_FILTER_KEYS.has(filterKey)) {
     return MOBILE_ROLE_TASK_VIEW_KEYS.RISK
   }
@@ -318,12 +322,14 @@ export function resolveMobileRoleTaskViewState({
   todoTasks = [],
   historyTasks = [],
   riskTasks = [],
+  approvalTasks = [],
   selectedTaskID = null,
 } = {}) {
   const tasksByView = {
     [MOBILE_ROLE_TASK_VIEW_KEYS.TODO]: todoTasks,
     [MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY]: historyTasks,
     [MOBILE_ROLE_TASK_VIEW_KEYS.RISK]: riskTasks,
+    [MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL]: approvalTasks,
   }
   const tasks = Array.isArray(tasksByView[viewKey]) ? tasksByView[viewKey] : []
   const selectedTask =

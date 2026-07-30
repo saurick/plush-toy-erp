@@ -7,14 +7,21 @@ function SkeletonBlock({ className = '' }) {
 }
 
 export default function MobileTaskListSkeleton({
+  filterCount = 3,
   rowCount = DEFAULT_ROW_COUNT,
 }) {
+  const normalizedFilterCount = filterCount === 4 ? 4 : 3
+  const filters = Array.from(
+    { length: normalizedFilterCount },
+    (_, index) => index
+  )
   const rows = Array.from({ length: rowCount }, (_, index) => index)
 
   return (
     <section
       className="mobile-role-skeleton mx-5 mt-5 pb-5"
       data-testid="mobile-role-task-skeleton"
+      data-skeleton-filter-count={filters.length}
       data-skeleton-row-count={rows.length}
       aria-hidden="true"
     >
@@ -25,8 +32,13 @@ export default function MobileTaskListSkeleton({
         <SkeletonBlock className="mobile-role-skeleton__focus-counts" />
       </div>
 
-      <div className="mobile-role-skeleton__filters mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner">
-        {[0, 1, 2, 3].map((item) => (
+      <div
+        className="mobile-role-skeleton__filters mt-4 grid rounded-2xl bg-slate-100 p-1 shadow-inner"
+        style={{
+          gridTemplateColumns: `repeat(${filters.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {filters.map((item) => (
           <div key={item} className="mobile-role-skeleton__filter">
             <SkeletonBlock />
           </div>

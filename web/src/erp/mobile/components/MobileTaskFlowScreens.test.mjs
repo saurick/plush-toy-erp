@@ -10,8 +10,30 @@ const detailScreenSource = readFileSync(
   new URL('./MobileTaskDetailScreen.jsx', import.meta.url),
   'utf8'
 )
+const listScreenSource = readFileSync(
+  new URL('./MobileTaskListScreen.jsx', import.meta.url),
+  'utf8'
+)
+const listSkeletonSource = readFileSync(
+  new URL('./MobileTaskListSkeleton.jsx', import.meta.url),
+  'utf8'
+)
 const flowHeaderSource = readFileSync(
   new URL('./MobileTaskFlowHeader.jsx', import.meta.url),
+  'utf8'
+)
+const processStageSource = readFileSync(
+  new URL(
+    '../../components/workflow/WorkflowProcessStageTrack.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+const taskEventTrailSource = readFileSync(
+  new URL(
+    '../../components/workflow/WorkflowTaskEventTrail.jsx',
+    import.meta.url
+  ),
   'utf8'
 )
 const receiptScreenSource = readFileSync(
@@ -163,14 +185,102 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
   )
 })
 
-test('mobile task flow keeps Workflow and business Fact semantics separate', () => {
+test('mobile task overview, list heading and loaded counts stay concise', () => {
+  assert.match(listScreenSource, />\s*已加载任务分布\s*</u)
+  assert.doesNotMatch(listScreenSource, /任务按页加载/u)
+  assert.doesNotMatch(listScreenSource, /不代表岗位全量/u)
+  assert.match(listScreenSource, /mobile-loaded-task-overview/u)
+  assert.match(
+    listScreenSource,
+    /data-testid="mobile-task-list-status-heading"/u
+  )
+  assert.match(listScreenSource, />\s*状态 \/ 截止\s*</u)
+  assert.match(listScreenSource, /whitespace-nowrap/u)
+  assert.equal(
+    (listScreenSource.match(/renderLoadedTaskOverview\(\)/gu) || []).length,
+    1
+  )
+  const donePanelSource = listScreenSource.slice(
+    listScreenSource.indexOf('const renderDonePanel'),
+    listScreenSource.indexOf('const renderMessageTabs')
+  )
+  assert.ok(donePanelSource)
+  assert.doesNotMatch(donePanelSource, /renderLoadedTaskOverview/u)
+  assert.match(donePanelSource, /data-testid="mobile-role-done-count"/u)
+  assert.match(
+    listScreenSource,
+    /mobile-role-count-tag mobile-role-task-filter__count">\s*\{item\.count\}/u
+  )
+  assert.match(
+    listScreenSource,
+    /mobile-role-count-tag mobile-role-message-tabs__count/u
+  )
+  assert.doesNotMatch(listScreenSource, /\(\{item\.count\}\)/u)
+  assert.doesNotMatch(listScreenSource, /const renderTabSummary/u)
+  assert.doesNotMatch(listScreenSource, /renderTabSummary\(\)/u)
+  assert.doesNotMatch(listScreenSource, /\{roleLabel\}任务端/u)
+  assert.match(
+    flowStyleSource,
+    /\.mobile-role-count-tag\s*\{[\s\S]*?border-radius:\s*999px;[\s\S]*?font-variant-numeric:\s*tabular-nums;/u
+  )
+  assert.match(
+    flowStyleSource,
+    /\[data-erp-theme='dark'\] \.mobile-role-count-tag\s*\{/u
+  )
+  assert.doesNotMatch(listScreenSource, /mobile-role-focus-card/u)
+  assert.doesNotMatch(listScreenSource, /已加载任务优先事项/u)
+  assert.doesNotMatch(listScreenSource, /progressPercent/u)
+  assert.doesNotMatch(roleTaskPageSource, /progressPercent/u)
+})
+
+test('mobile task list keeps approval in the primary filter row and gates it by the effective capability set', () => {
+  const filterKeySource = taskModelSource.slice(
+    taskModelSource.indexOf('export const MOBILE_TASK_FILTER_KEYS'),
+    taskModelSource.indexOf('export const MOBILE_LIST_KEYS')
+  )
+  assert.match(roleTaskPageSource, /canViewWorkflowApprovalInbox/u)
+  assert.match(roleTaskPageSource, /MOBILE_ROLE_TASK_VIEW_KEYS\.APPROVAL/u)
+  assert.match(roleTaskPageSource, /isWorkflowApprovalTask/u)
+  assert.match(
+    roleTaskPageSource,
+    /canViewApprovalInbox[\s\S]*MOBILE_TASK_FILTER_KEYS\.APPROVAL[\s\S]*label: '审批'[\s\S]*ariaLabel: '待我审批'/u
+  )
+  assert.match(
+    listScreenSource,
+    /data-testid=\{`mobile-role-filter-\$\{item\.key\}`\}/u
+  )
+  assert.match(listScreenSource, /item\.ariaLabel \|\| item\.label/u)
+  assert.match(
+    listScreenSource,
+    /filterCount=\{canViewApprovalInbox \? 4 : 3\}/u
+  )
+  assert.match(
+    listSkeletonSource,
+    /normalizedFilterCount = filterCount === 4 \? 4 : 3/u
+  )
+  assert.doesNotMatch(listScreenSource, /当前岗位的审批事项/u)
+  assert.doesNotMatch(roleTaskPageSource, /isMobileTaskMine/u)
+  assert.doesNotMatch(roleTaskPageSource, /label: '我负责'/u)
+  assert.doesNotMatch(filterKeySource, /\bMINE:\s*'mine'/u)
+  assert.equal(
+    (listScreenSource.match(/MOBILE_MAIN_TAB_ITEMS/u) || []).length > 0,
+    true
+  )
+  assert.doesNotMatch(
+    listScreenSource,
+    /MOBILE_MAIN_TAB_KEYS\.APPROVAL/u,
+    '审批不能扩成第五个移动端底部导航'
+  )
+})
+
+test('mobile task processing explains business boundaries before submit without repeating developer copy in the receipt', () => {
   assert.match(
     actionScreenSource,
     /这里仅提交本次办理说明；任务附件统一在详情页查看或管理。库存、质检、出货、开票和收付款仍需在对应单据中办理/u
   )
-  assert.match(
+  assert.doesNotMatch(
     receiptScreenSource,
-    /本页只展示这条任务的办理结果；库存、质检、出货、开票和收付款仍以对应单据的办理结果为准/u
+    /结果边界|流程锚点|未来分支|领域单据|业务事实|审计记录/u
   )
 })
 
@@ -183,13 +293,40 @@ test('mobile task detail keeps canonical completion feedback visible after reloa
 test('mobile task detail loads formal process position and marks display-only tasks', () => {
   assert.match(detailScreenSource, /getWorkflowTaskProcessContext/u)
   assert.match(detailScreenSource, /mobile-task-process-context/u)
+  assert.match(detailScreenSource, />\s*业务轨迹\s*</u)
   assert.match(detailScreenSource, /业务流程/u)
   assert.match(detailScreenSource, /流程发起/u)
-  assert.match(detailScreenSource, /当前节点/u)
-  assert.match(detailScreenSource, /已完成节点/u)
-  assert.match(detailScreenSource, /最终状态/u)
+  assert.match(detailScreenSource, /流程状态/u)
+  assert.match(detailScreenSource, /WorkflowProcessStageTrack/u)
+  assert.match(processStageSource, /data-testid="workflow-process-stage"/u)
+  assert.match(processStageSource, /aria-current=\{item\.current \? 'step'/u)
+  assert.match(processStageSource, /data-linked-task=/u)
   assert.match(detailScreenSource, /模拟展示数据/u)
   assert.match(detailScreenSource, /不计入流程闭环证据/u)
+})
+
+test('mobile task detail loads current-task records for every task and keeps the reading order', () => {
+  assert.match(detailScreenSource, /listWorkflowTaskEvents\(selectedTask\.id/u)
+  assert.match(detailScreenSource, /WorkflowTaskEventTrail/u)
+  assert.match(taskEventTrailSource, /本任务处理记录/u)
+  assert.match(taskEventTrailSource, /只代表当前任务/u)
+  assert.match(taskEventTrailSource, /不是来源单据的完整审批链/u)
+  assert.doesNotMatch(
+    detailScreenSource,
+    /!selectedTask\?\.id \|\| !approvalTask/u
+  )
+  assert.doesNotMatch(detailScreenSource, /mobile-approval-trajectory/u)
+
+  const keyInformationIndex = detailScreenSource.indexOf('任务关键信息')
+  const businessTrajectoryIndex = detailScreenSource.indexOf('>业务轨迹</h2>')
+  const taskEventTrailIndex = detailScreenSource.indexOf(
+    '<WorkflowTaskEventTrail'
+  )
+  const relatedSourceIndex = detailScreenSource.indexOf('关联来源（')
+  assert.ok(keyInformationIndex >= 0)
+  assert.ok(businessTrajectoryIndex > keyInformationIndex)
+  assert.ok(taskEventTrailIndex > businessTrajectoryIndex)
+  assert.ok(relatedSourceIndex > taskEventTrailIndex)
 })
 
 test('mobile task detail separates real attachments from historical text references', () => {
@@ -225,6 +362,21 @@ test('mobile task receipt has explicit outcomes without fabricated actor or time
   assert.match(receiptScreenSource, /本次返回状态/u)
   assert.match(receiptScreenSource, /正在恢复可重试任务/u)
   assert.match(receiptScreenSource, /重新载入任务/u)
+  assert.match(receiptScreenSource, /mobile-task-receipt-handoff/u)
+  assert.match(receiptScreenSource, /const hasProcessAnchor = Boolean/u)
+  assert.match(
+    receiptScreenSource,
+    /outcome === MOBILE_TASK_RECEIPT_OUTCOMES\.CONFIRMED &&[\s\S]*?hasProcessAnchor \? \(/u
+  )
+  assert.match(receiptScreenSource, />当前流程<\/h2>/u)
+  assert.match(receiptScreenSource, /正在读取当前流程/u)
+  assert.match(receiptScreenSource, /WorkflowProcessStageTrack/u)
+  assert.match(receiptScreenSource, /task\?\.process_node_instance_id/u)
+  assert.match(receiptScreenSource, /task\?\.version/u)
+  assert.doesNotMatch(
+    receiptScreenSource,
+    /确认后的流程位置|本次办理已确认；这里重新读取|结果边界/u
+  )
   assert.doesNotMatch(
     receiptScreenSource,
     /处理人|操作人|处理时间|Date\.now|new Date/u

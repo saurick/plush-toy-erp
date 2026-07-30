@@ -154,6 +154,13 @@ test('mobileTaskQueries: 主标签和风险筛选映射到独立服务端视图'
     MOBILE_ROLE_TASK_VIEW_KEYS.TODO
   )
   assert.equal(
+    resolveMobileRoleTaskViewKey({
+      mainTabKey: 'todo',
+      filterKey: 'approval',
+    }),
+    MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL
+  )
+  assert.equal(
     resolveMobileRoleTaskViewKey({ mainTabKey: 'done' }),
     MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY
   )
@@ -178,9 +185,15 @@ test('mobileTaskQueries: 主标签和风险筛选映射到独立服务端视图'
 
 test('mobileTaskQueries: 每个岗位视图持有独立初始分页槽', () => {
   const slots = createMobileRoleTaskSlots()
-  assert.deepEqual(Object.keys(slots).sort(), ['history', 'risk', 'todo'])
+  assert.deepEqual(Object.keys(slots).sort(), [
+    'approval',
+    'history',
+    'risk',
+    'todo',
+  ])
   assert.notEqual(slots.todo, slots.history)
   assert.notEqual(slots.history.items, slots.risk.items)
+  assert.notEqual(slots.approval.items, slots.todo.items)
   for (const slot of Object.values(slots)) {
     assert.deepEqual(slot, {
       items: [],
@@ -194,10 +207,11 @@ test('mobileTaskQueries: 每个岗位视图持有独立初始分页槽', () => {
   }
 })
 
-test('mobileTaskQueries: todo、risk、history 使用各自数据且历史详情只读', () => {
+test('mobileTaskQueries: todo、approval、risk、history 使用各自数据且历史详情只读', () => {
   const todoTasks = [{ id: 1, task_status_key: 'ready' }]
   const riskTasks = [{ id: 2, task_status_key: 'blocked' }]
   const historyTasks = [{ id: 3, task_status_key: 'done' }]
+  const approvalTasks = [{ id: 4, task_status_key: 'ready' }]
 
   assert.deepEqual(
     resolveMobileRoleTaskViewState({
@@ -205,6 +219,7 @@ test('mobileTaskQueries: todo、risk、history 使用各自数据且历史详情
       todoTasks,
       historyTasks,
       riskTasks,
+      approvalTasks,
       selectedTaskID: 1,
     }),
     { tasks: todoTasks, selectedTask: todoTasks[0], actionsEnabled: true }
@@ -215,9 +230,25 @@ test('mobileTaskQueries: todo、risk、history 使用各自数据且历史详情
       todoTasks,
       historyTasks,
       riskTasks,
+      approvalTasks,
       selectedTaskID: 2,
     }),
     { tasks: riskTasks, selectedTask: riskTasks[0], actionsEnabled: true }
+  )
+  assert.deepEqual(
+    resolveMobileRoleTaskViewState({
+      viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL,
+      todoTasks,
+      historyTasks,
+      riskTasks,
+      approvalTasks,
+      selectedTaskID: 4,
+    }),
+    {
+      tasks: approvalTasks,
+      selectedTask: approvalTasks[0],
+      actionsEnabled: true,
+    }
   )
   assert.deepEqual(
     resolveMobileRoleTaskViewState({
@@ -225,6 +256,7 @@ test('mobileTaskQueries: todo、risk、history 使用各自数据且历史详情
       todoTasks,
       historyTasks,
       riskTasks,
+      approvalTasks,
       selectedTaskID: 3,
     }),
     {

@@ -1,3 +1,4 @@
+import React from 'react'
 import {
   CheckCircleFilled,
   ClockCircleOutlined,
@@ -14,6 +15,8 @@ import {
 } from '../utils/mobileRoleTaskModel.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
+import { getWorkflowTaskProcessContext } from '../../api/workflowApi.mjs'
+import WorkflowProcessStageTrack from '../../components/workflow/WorkflowProcessStageTrack.jsx'
 
 const MOBILE_TASK_RECEIPT_OUTCOMES = Object.freeze({
   CONFIRMED: 'confirmed',
@@ -86,8 +89,45 @@ export default function MobileTaskReceiptScreen({
   const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
   const actionLabel = resolveReceiptActionLabel({ action, outcome, task })
   const approvalTask = isWorkflowApprovalTask(task)
+  const hasProcessAnchor = Boolean(
+    task?.id && task?.process_instance_id && task?.process_node_instance_id
+  )
   const canRetry =
     outcome !== MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED && onRetryConfirm
+  const [processContext, setProcessContext] = React.useState(null)
+  const [processContextState, setProcessContextState] = React.useState('idle')
+
+  React.useEffect(() => {
+    if (
+      outcome !== MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED ||
+      !hasProcessAnchor
+    ) {
+      setProcessContext(null)
+      setProcessContextState('idle')
+      return undefined
+    }
+    const controller = new AbortController()
+    setProcessContext(null)
+    setProcessContextState('loading')
+    getWorkflowTaskProcessContext(task.id, { signal: controller.signal })
+      .then((context) => {
+        setProcessContext(context)
+        setProcessContextState('ready')
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setProcessContext(null)
+        setProcessContextState('error')
+      })
+    return () => controller.abort()
+  }, [
+    hasProcessAnchor,
+    outcome,
+    task?.id,
+    task?.process_instance_id,
+    task?.process_node_instance_id,
+    task?.version,
+  ])
 
   return (
     <div
@@ -235,14 +275,30 @@ export default function MobileTaskReceiptScreen({
           </dl>
         </section>
 
-        <section className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm leading-6 text-blue-700">
-          <div className="font-semibold">结果边界</div>
-          <div className="mt-1 [overflow-wrap:anywhere]">
-            {approvalTask
-              ? '本页确认的是审批任务及审批意见；来源单据状态和后续业务事实仍以对应领域单据与审计记录为准。'
-              : '本页只展示这条任务的办理结果；库存、质检、出货、开票和收付款仍以对应单据的办理结果为准。'}
-          </div>
-        </section>
+        {outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED &&
+        hasProcessAnchor ? (
+          <section
+            className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            data-testid="mobile-task-receipt-handoff"
+          >
+            <h2 className="text-lg font-semibold text-slate-950">当前流程</h2>
+            {processContextState === 'error' ? (
+              <p className="mt-3 text-sm text-red-600">
+                当前流程暂时无法显示。
+              </p>
+            ) : processContext ? (
+              <WorkflowProcessStageTrack
+                className="mt-4"
+                context={processContext}
+                variant="mobile"
+              />
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">
+                正在读取当前流程
+              </p>
+            )}
+          </section>
+        ) : null}
       </main>
 
       <div className="mobile-role-action-bar shrink-0 space-y-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">

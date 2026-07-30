@@ -109,11 +109,11 @@ export const MOBILE_MESSAGE_TAB_KEYS = Object.freeze({
 
 export const MOBILE_TASK_FILTER_KEYS = Object.freeze({
   ALL: 'all',
+  APPROVAL: 'approval',
   RISK: 'risk',
   ALERT: 'alert',
   OVERDUE: 'overdue',
   DUE_SOON: 'due_soon',
-  MINE: 'mine',
   HIGH_PRIORITY: 'high_priority',
   BLOCKED: 'blocked',
   BLOCKED_OR_HIGH_PRIORITY: 'blocked_or_high_priority',
@@ -122,6 +122,7 @@ export const MOBILE_TASK_FILTER_KEYS = Object.freeze({
 
 export const MOBILE_LIST_KEYS = Object.freeze({
   TODO: 'todo',
+  APPROVAL: 'approval',
   DONE: 'done',
   WARNING: 'warning',
   NOTICE: 'notice',
@@ -129,6 +130,7 @@ export const MOBILE_LIST_KEYS = Object.freeze({
 
 export const MOBILE_LIST_COLLAPSED_LIMITS = Object.freeze({
   [MOBILE_LIST_KEYS.TODO]: 12,
+  [MOBILE_LIST_KEYS.APPROVAL]: 12,
   [MOBILE_LIST_KEYS.DONE]: 10,
   [MOBILE_LIST_KEYS.WARNING]: 8,
   [MOBILE_LIST_KEYS.NOTICE]: 8,

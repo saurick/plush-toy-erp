@@ -352,6 +352,10 @@
       }
 
       .filters {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .filters.filters--with-approval {
         grid-template-columns: repeat(4, minmax(0, 1fr));
       }
 
@@ -364,13 +368,18 @@
 
       .filter,
       .message-tab {
+        display: flex;
         min-width: 0;
         min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
         border: 0;
         border-radius: 12px;
         background: transparent;
         color: var(--muted);
         font-weight: 700;
+        white-space: nowrap;
       }
 
       .filter.active,
@@ -380,11 +389,43 @@
         box-shadow: 0 1px 5px rgb(15 23 42 / 8%);
       }
 
+      .count-tag {
+        display: inline-flex;
+        min-width: 24px;
+        height: 24px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: rgb(15 23 42 / 8%);
+        padding: 0 7px;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .filter.active .count-tag,
+      .message-tab.active .count-tag,
+      .panel-title .count-tag {
+        background: rgb(4 120 87 / 14%);
+      }
+
+      .panel-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
       .list-head {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 112px;
         padding: 20px 20px 8px;
         color: var(--muted);
+      }
+
+      .list-head > :last-child {
+        justify-self: end;
+        white-space: nowrap;
       }
 
       .task-list {
@@ -914,8 +955,7 @@
             <div class="sync">
               <span class="dot"></span>
               <span>最后同步：04/26 12:14</span>
-              <span>|</span>
-              <span id="tabSummary">共 18 条待处理</span>
+              <span id="refreshStatus" role="status" hidden></span>
             </div>
 
             <section id="tabContent"></section>
@@ -1167,6 +1207,7 @@
           status: "待处理",
           due: "04/29 11:00",
           mine: true,
+          approval: true,
           listView: "todo",
           accessMode: "actionable",
           actions: ["blocked", "done", "urge"],
@@ -1213,6 +1254,7 @@
       // 必须先于 tabData 赋值，避免浏览器触发 let 的暂时性死区。
       let activeTaskTrigger = null;
       let activeFilter = "all";
+      const canViewApprovalInbox = true;
       let visibleTaskLimit = 4;
       let activeActionButton = null;
       let activeTask = null;
@@ -1229,29 +1271,25 @@
       const tabData = {
         todo: {
           title: "待办",
-          summary: `共 ${todoTasks().length} 条待处理`,
           content: renderTodo(),
         },
         done: {
           title: "已办",
-          summary: `共 ${historyTasks().length} 条已办`,
           content: renderDone(),
         },
         messages: {
           title: "消息",
-          summary: "共 12 条消息",
           content: renderMessages(),
         },
         mine: {
           title: "我的",
-          summary: "仓库任务端",
           content: renderMine(),
         },
       };
 
       const tabContent = document.querySelector("#tabContent");
       const pageTitle = document.querySelector("#pageTitle");
-      const tabSummary = document.querySelector("#tabSummary");
+      const refreshStatus = document.querySelector("#refreshStatus");
       const listScreen = document.querySelector("#listScreen");
       const detailScreen = document.querySelector("#detailScreen");
       const mainScroll = document.querySelector("#mainScroll");
@@ -1360,8 +1398,8 @@
         if (activeFilter === "overdue") {
           return currentTodoTasks.filter((task) => task.tone === "overdue");
         }
-        if (activeFilter === "mine") {
-          return currentTodoTasks.filter((task) => task.mine);
+        if (activeFilter === "approval") {
+          return currentTodoTasks.filter((task) => task.approval);
         }
         return currentTodoTasks;
       }
@@ -1376,7 +1414,7 @@
         return `
           <div class="list-head">
             <span>任务信息</span>
-            <span style="text-align:right">业务状态 / 截止时间</span>
+            <span>状态 / 截止</span>
           </div>
           <div class="task-list">
             ${visibleTasks
@@ -1411,19 +1449,36 @@
         const overdueCount = currentTodoTasks.filter((task) => task.tone === "overdue").length;
         const blockedCount = currentTodoTasks.filter((task) => task.status === "已阻塞").length;
         return `
+          ${renderLoadedTaskOverview()}
           <section class="metrics">
             <div class="metric"><strong style="color:var(--orange)">${riskCount}</strong><span>风险</span></div>
             <div class="metric"><strong style="color:var(--red)">${overdueCount}</strong><span>已超时</span></div>
             <div class="metric"><strong>0</strong><span>即将超时</span></div>
             <div class="metric"><strong style="color:var(--red)">${blockedCount}</strong><span>阻塞/高优先</span></div>
           </section>
-          <div class="filters">
-            <button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">全部(${currentTodoTasks.length})</button>
-            <button class="filter ${activeFilter === "risk" ? "active" : ""}" data-filter="risk">风险(${currentTodoTasks.filter((task) => task.tone).length})</button>
-            <button class="filter ${activeFilter === "overdue" ? "active" : ""}" data-filter="overdue">超时(${currentTodoTasks.filter((task) => task.tone === "overdue").length})</button>
-            <button class="filter ${activeFilter === "mine" ? "active" : ""}" data-filter="mine">我负责(${currentTodoTasks.filter((task) => task.mine).length})</button>
+          <div class="filters ${canViewApprovalInbox ? "filters--with-approval" : ""}">
+            <button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all"><span>全部</span><span class="count-tag">${currentTodoTasks.length}</span></button>
+            ${canViewApprovalInbox ? `<button class="filter ${activeFilter === "approval" ? "active" : ""}" data-filter="approval" aria-label="待我审批"><span>审批</span><span class="count-tag">${currentTodoTasks.filter((task) => task.approval).length}</span></button>` : ""}
+            <button class="filter ${activeFilter === "risk" ? "active" : ""}" data-filter="risk"><span>风险</span><span class="count-tag">${currentTodoTasks.filter((task) => task.tone).length}</span></button>
+            <button class="filter ${activeFilter === "overdue" ? "active" : ""}" data-filter="overdue"><span>超时</span><span class="count-tag">${currentTodoTasks.filter((task) => task.tone === "overdue").length}</span></button>
           </div>
           ${renderTaskRows()}
+        `;
+      }
+
+      function renderLoadedTaskOverview() {
+        const loadedTodoTasks = todoTasks();
+        const loadedHistoryTasks = historyTasks();
+        return `
+          <section class="panel">
+            <h2>已加载任务分布</h2>
+            <section class="metrics" style="margin:12px 0 0">
+              <div class="metric"><strong>${loadedTodoTasks.filter((task) => task.status === "待处理").length}</strong><span>待处理</span></div>
+              <div class="metric"><strong style="color:var(--orange)">${loadedTodoTasks.filter((task) => task.status === "已阻塞").length}</strong><span>卡住</span></div>
+              <div class="metric"><strong style="color:var(--red)">${loadedHistoryTasks.filter((task) => task.status === "已退回").length}</strong><span>已退回</span></div>
+              <div class="metric"><strong style="color:var(--green)">${loadedHistoryTasks.filter((task) => task.status === "已完成").length}</strong><span>完成</span></div>
+            </section>
+          </section>
         `;
       }
 
@@ -1479,19 +1534,7 @@
         const completedTasks = historyTasks();
         return `
           <section class="panel">
-            <div style="display:flex;justify-content:space-between">
-              <h2>协同任务概览</h2><span style="color:var(--muted)">当前样例</span>
-            </div>
-            <div class="progress-bar"><span></span></div>
-            <section class="metrics" style="margin:16px 0 0">
-              <div class="metric"><strong>${todoTasks().length}</strong><span>待处理</span></div>
-              <div class="metric"><strong>${todoTasks().filter((task) => task.status === "已阻塞").length}</strong><span>已阻塞</span></div>
-              <div class="metric"><strong>${completedTasks.filter((task) => task.status === "已退回").length}</strong><span>已退回</span></div>
-              <div class="metric"><strong style="color:var(--green)">${completedTasks.filter((task) => task.status === "已完成").length}</strong><span>已完成</span></div>
-            </section>
-          </section>
-          <section class="panel">
-            <h2>已办任务</h2>
+            <div class="panel-title"><h2>已办任务</h2><span class="count-tag">${completedTasks.length}</span></div>
             ${completedTasks
               .map((task) => {
                 const taskIndex = tasks.indexOf(task);
@@ -1505,8 +1548,8 @@
       function renderMessages() {
         return `
           <section class="message-tabs">
-            <button class="message-tab active">预警 <span class="chip">9</span></button>
-            <button class="message-tab">通知 <span class="chip">3</span></button>
+            <button class="message-tab active">预警 <span class="count-tag">9</span></button>
+            <button class="message-tab">通知 <span class="count-tag">3</span></button>
           </section>
           <section class="panel">
             <h2>预警</h2>
@@ -1521,7 +1564,7 @@
           <section class="panel">
             <div style="display:flex;gap:12px;align-items:center">
               <span style="display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:var(--green-soft);color:var(--green);font-size:28px">♙</span>
-              <div><h2>仓库值班员</h2><p style="color:var(--muted)">仓库任务端</p></div>
+              <div><h2>仓库值班员</h2></div>
             </div>
             <div class="mine-card"><span style="color:var(--muted)">账号角色</span><br><strong>仓库</strong></div>
           </section>
@@ -1541,13 +1584,7 @@
       function setTab(tab, options = {}) {
         const data = tabData[tab] || tabData.todo;
         pageTitle.textContent = data.title;
-        tabSummary.textContent = options.loading
-          ? "正在加载任务"
-          : tab === "todo"
-            ? `共 ${todoTasks().length} 条待处理`
-            : tab === "done"
-              ? `共 ${historyTasks().length} 条已办`
-              : data.summary;
+        refreshStatus.hidden = true;
         tabContent.innerHTML = options.loading && tab === "todo"
           ? renderLoading()
           : tab === "todo"
@@ -1724,7 +1761,8 @@
           detailScreen.classList.remove("active");
           listScreen.classList.add("active");
           setTab("todo");
-          tabSummary.textContent = `${submittedActionLabel}已提交，任务列表已刷新`;
+          refreshStatus.textContent = `${submittedActionLabel}已提交，任务列表已刷新`;
+          refreshStatus.hidden = false;
           activeTask = null;
           activeActionButton = null;
           requestAnimationFrame(() =>

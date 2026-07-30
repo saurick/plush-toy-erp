@@ -793,8 +793,12 @@ async function runMobileAuthScenario(
   await expectText(page, '待办')
   await expectText(page, '风险')
   await expectText(page, '已超时')
-  await expectText(page, '当前优先事项')
-  await expectText(page, '先处理 1 条超时任务')
+  await expectText(page, '已加载任务分布')
+  await expectNoText(page, '任务按页加载')
+  await expectNoText(page, '不代表岗位全量')
+  await expectText(page, '状态 / 截止')
+  await expectNoText(page, '当前优先事项')
+  await expectNoText(page, '已加载任务优先事项')
   await expectText(page, '数据时间')
   await expectText(page, '任务最近更新')
   await expectText(page, 'STYLE-001')
@@ -807,12 +811,12 @@ async function runMobileAuthScenario(
   await expectNoText(page, 'Deferred')
 
   await clickMobileMainTab(page, 'done', '已办任务')
-  await expectText(page, '进度')
-  await expectText(page, '待处理')
-  await expectText(page, '卡住')
-  await expectText(page, '已退回')
-  await expectText(page, '完成')
   await expectText(page, '完成进度样本')
+  assert.equal(
+    await page.getByTestId('mobile-loaded-task-overview').count(),
+    0,
+    `${role.roleKey} 已办页不应重复显示已加载任务分布`
+  )
 
   await clickMobileMainTab(page, 'messages', '预警')
   await expectText(page, '提醒')

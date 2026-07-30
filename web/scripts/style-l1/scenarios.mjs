@@ -2104,7 +2104,11 @@ export function createStyleL1Scenarios(deps) {
           const table = document.querySelector('.ant-table')
           const metrics = Array.from(
             document.querySelectorAll('.erp-product-core-metric')
-          ).map((item) => item.textContent || '')
+          ).map((item) => ({
+            label:
+              item.querySelector('.ant-typography')?.textContent?.trim() || '',
+            value: item.querySelector('strong')?.textContent?.trim() || '',
+          }))
           const entries = Array.from(
             document.querySelectorAll('.erp-product-core-entry')
           ).map((item) => item.textContent || '')
@@ -2122,13 +2126,20 @@ export function createStyleL1Scenarios(deps) {
         })
         assert.equal(productCoreMetrics.hasDashboard, true)
         assert.equal(productCoreMetrics.hasTable, false)
+        assert.deepEqual(
+          productCoreMetrics.metrics,
+          [
+            { label: '业务功能', value: '11' },
+            { label: '系统设置', value: '4' },
+          ],
+          `Product Core 首页摘要应只保留数值指标: ${JSON.stringify(
+            productCoreMetrics
+          )}`
+        )
         assert(
-          productCoreMetrics.metrics.some((item) =>
-            item.includes('不读取客户订单')
-          ) &&
-            productCoreMetrics.entries.some((item) =>
-              item.startsWith('销售订单')
-            ),
+          productCoreMetrics.entries.some((item) =>
+            item.startsWith('销售订单')
+          ),
           `Product Core 首页应展示能力总览和审阅入口: ${JSON.stringify(
             productCoreMetrics
           )}`
@@ -2163,12 +2174,14 @@ export function createStyleL1Scenarios(deps) {
           'workflow.task.read',
           'workflow.task.update',
           'workflow.task.complete',
+          'workflow.task.approve',
           'sales_order.read',
         ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['boss'],
           'workflow.task.update': ['boss'],
           'workflow.task.complete': ['boss'],
+          'workflow.task.approve': ['boss'],
         },
         fieldPolicies: {},
         workPools: [],
@@ -2184,6 +2197,7 @@ export function createStyleL1Scenarios(deps) {
           'workflow.task.read',
           'workflow.task.update',
           'workflow.task.complete',
+          'workflow.task.approve',
           'sales_order.read',
         ],
         menus: [
@@ -2214,6 +2228,7 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '工作台')
         await expectText(page, '待我处理')
+        await expectText(page, '待我审批')
         await expectText(page, '阻塞/逾期')
         await expectText(page, '优先处理')
         await expectText(page, '任务详情')
@@ -2270,6 +2285,9 @@ export function createStyleL1Scenarios(deps) {
                   business_status_key: 'project_pending',
                   task_status_key: 'ready',
                   owner_role_key: 'boss',
+                  ...(index === 1 && !overdue
+                    ? { required_capability_key: 'workflow.task.approve' }
+                    : {}),
                   priority: overdue ? 90 : 1,
                   due_at: overdue
                     ? now - (10 - index) * 60
@@ -2337,6 +2355,9 @@ export function createStyleL1Scenarios(deps) {
         const actionableFilter = page.getByRole('button', {
           name: /待我处理，\d+ 项/,
         })
+        const approvalFilter = page.getByRole('button', {
+          name: /待我审批，\d+ 项/,
+        })
         const riskFilter = page.getByRole('button', {
           name: /阻塞\/逾期，\d+ 项/,
         })
@@ -2349,6 +2370,25 @@ export function createStyleL1Scenarios(deps) {
           actionableTotal >= 18,
           `工作台待处理队列应包含新建的 18 条样本: ${actionableLabel}`
         )
+        const approvalLabel = await approvalFilter.getAttribute('aria-label')
+        const approvalTotal = Number(
+          String(approvalLabel || '').match(/待我审批，(\d+) 项/u)?.[1] || 0
+        )
+        assert(
+          approvalTotal >= 1,
+          `工作台审批队列应包含显式审批任务: ${approvalLabel}`
+        )
+        await approvalFilter.click()
+        await queuePanel
+          .getByText('长队列待办 01', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-yoyo-global-dashboard-approval-inbox.png'
+          ),
+        })
+        await actionableFilter.click()
         assert.equal(
           await queuePanel.locator('.ant-table-tbody .ant-table-row').count(),
           8,
@@ -2495,9 +2535,11 @@ export function createStyleL1Scenarios(deps) {
             : 0
           const expectedStickyTop =
             (contentRect?.top || 0) + contentPaddingTop + 12
+          const sideStackTopBeforeScroll =
+            sideStack?.getBoundingClientRect().top || 0
           const stickyThreshold = Math.max(
             0,
-            (sideStack?.getBoundingClientRect().top || 0) - expectedStickyTop
+            sideStackTopBeforeScroll - expectedStickyTop
           )
           if (content) {
             content.scrollTop = stickyThreshold + 48
@@ -2537,15 +2579,18 @@ export function createStyleL1Scenarios(deps) {
             contentScrollHeight,
             contentPaddingTop,
             expectedStickyTop,
+            sideStackTopBeforeScroll,
             stickyThreshold,
             stickyTopAfterScroll,
             sideStackHeight,
             processingHintClientWidth: processingHint?.clientWidth || 0,
             processingHintScrollWidth: processingHint?.scrollWidth || 0,
-            stickyPinnedAfterScroll: Boolean(
+            stickyVisibleAfterScroll: Boolean(
               contentRect &&
                 contentScrollTop >= stickyThreshold &&
-                Math.abs(stickyTopAfterScroll - expectedStickyTop) <= 2
+                stickyTopAfterScroll >= expectedStickyTop - 2 &&
+                stickyTopAfterScroll < sideStackTopBeforeScroll &&
+                stickyTopAfterScroll + sideStackHeight <= contentRect.bottom + 2
             ),
             queueOverlapsDetail: Boolean(
               queueRect &&
@@ -2572,7 +2617,7 @@ export function createStyleL1Scenarios(deps) {
             metrics.processingHintScrollWidth <=
               metrics.processingHintClientWidth + 1 &&
             metrics.sideStackPosition === 'sticky' &&
-            metrics.stickyPinnedAfterScroll &&
+            metrics.stickyVisibleAfterScroll &&
             metrics.documentOverflowX <= 1,
           `永绅全局工作台队列与上下文不得重叠或推宽页面: ${JSON.stringify(
             metrics
@@ -4449,6 +4494,16 @@ export function createStyleL1Scenarios(deps) {
               started_at: 1_800_000_000,
               completed_at: null,
             },
+            linked_node: {
+              id: 702,
+              process_instance_id: 701,
+              node_key: 'shipment_finance_approval',
+              node_type: 'approval',
+              attempt: 1,
+              version: 1,
+              status: 'active',
+              outcome: '',
+            },
             nodes: [
               {
                 id: 700,
@@ -4581,16 +4636,66 @@ export function createStyleL1Scenarios(deps) {
           .getByRole('button', { name: '查看出货财务审批详情' })
           .click()
         await expectText(page, '核对审批事项')
-        await expectText(page, '最近审批记录')
+        await expectText(page, '本任务处理记录')
         await expectText(page, 'SHIP-L1-501')
         await expectText(page, '等待审批人核对来源单据与放行条件')
-        await expectText(page, '流程位置')
+        await expectText(page, '业务轨迹')
         await expectText(page, '成品交付')
-        await expectText(page, '当前节点')
-        await expectText(page, '出货财务审批')
-        await expectText(page, '成品质检（已完成）')
-        await expectText(page, '最终状态')
+        await expectText(page, '流程状态')
         await expectText(page, '办理中')
+        const taskEventTrail = page.getByTestId('workflow-task-event-trail')
+        await taskEventTrail.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(taskEventTrail, '审批已发起')
+        await expectText(taskEventTrail, '当前负责岗位')
+        await expectText(taskEventTrail, '财务')
+        await expectText(taskEventTrail, '不是来源单据的完整审批链')
+        const taskEventTrailMetrics = await taskEventTrail.evaluate(
+          (element) => ({
+            itemCount: element.querySelectorAll(
+              '.workflow-task-event-trail__item'
+            ).length,
+            responsibilityCount: element.querySelectorAll(
+              '.workflow-task-event-trail__responsibility > div'
+            ).length,
+            overflowX: element.scrollWidth - element.clientWidth,
+          })
+        )
+        assert(
+          taskEventTrailMetrics.itemCount === 1 &&
+            taskEventTrailMetrics.responsibilityCount >= 3 &&
+            taskEventTrailMetrics.overflowX <= 1,
+          `任务抽屉处理记录状态或布局不完整: ${JSON.stringify(
+            taskEventTrailMetrics
+          )}`
+        )
+        await taskEventTrail.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-task-event-trail.png'
+          ),
+        })
+        const executionTrail = page.getByTestId('workflow-process-stage')
+        await executionTrail.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(executionTrail, '执行轨迹')
+        await expectText(executionTrail, '成品质检')
+        await expectText(executionTrail, '出货财务审批')
+        const executionTrailMetrics = await executionTrail.evaluate(
+          (element) => ({
+            currentCount: element.querySelectorAll('[aria-current="step"]')
+              .length,
+            linkedCount: element.querySelectorAll('[data-linked-task="true"]')
+              .length,
+            completedCount: element.querySelectorAll(
+              '.workflow-process-stage__item--completed'
+            ).length,
+          })
+        )
+        assert(
+          executionTrailMetrics.currentCount === 1 &&
+            executionTrailMetrics.linkedCount === 1 &&
+            executionTrailMetrics.completedCount === 1,
+          `任务抽屉执行轨迹状态不完整: ${JSON.stringify(executionTrailMetrics)}`
+        )
         await page.waitForFunction(() => {
           const wrapper = document.querySelector('.ant-drawer-content-wrapper')
           const rect = wrapper?.getBoundingClientRect()
@@ -5368,11 +5473,35 @@ export function createStyleL1Scenarios(deps) {
             scrollWidth: element.scrollWidth,
             roleSelectCount: element.querySelectorAll('[aria-label="负责岗位"]')
               .length,
+            searchWidth:
+              element
+                .querySelector('.ant-input-search')
+                ?.getBoundingClientRect().width || 0,
+            selectWidths: [
+              ...element.querySelectorAll(':scope > .ant-select'),
+            ].map((node) => node.getBoundingClientRect().width),
+            clearButtonWidth:
+              [...element.querySelectorAll(':scope > .ant-btn')]
+                .find((node) => node.textContent?.includes('清空筛选'))
+                ?.getBoundingClientRect().width || 0,
           }))
         assert.equal(filterMetrics.roleSelectCount, 0)
         assert(
           filterMetrics.scrollWidth <= filterMetrics.clientWidth + 1,
           `单岗位筛选区不应溢出: ${JSON.stringify(filterMetrics)}`
+        )
+        assert(
+          filterMetrics.searchWidth >= 280 &&
+            filterMetrics.searchWidth <= 421 &&
+            filterMetrics.selectWidths.length === 3 &&
+            filterMetrics.selectWidths.every(
+              (width) => width >= 159 && width <= 161
+            ) &&
+            filterMetrics.clearButtonWidth >= 88 &&
+            filterMetrics.clearButtonWidth <= 120,
+          `桌面任务筛选控件应保持紧凑内容宽，不能被等分拉满: ${JSON.stringify(
+            filterMetrics
+          )}`
         )
         await page.screenshot({
           path: path.resolve(
@@ -5838,6 +5967,37 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'erp-task-board-mobile',
           expectTaskMetrics: true,
         })
+        const mobileFilterMetrics = await page
+          .locator('.erp-task-board-filters')
+          .evaluate((element) => ({
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            controlWidths: [
+              element.querySelector('.ant-input-search'),
+              ...element.querySelectorAll(':scope > .ant-select'),
+              [...element.querySelectorAll(':scope > .ant-btn')].find((node) =>
+                node.textContent?.includes('清空筛选')
+              ),
+            ]
+              .filter(Boolean)
+              .map((node) => node.getBoundingClientRect().width),
+          }))
+        assert(
+          mobileFilterMetrics.scrollWidth <=
+            mobileFilterMetrics.clientWidth + 1 &&
+            mobileFilterMetrics.controlWidths.length === 5 &&
+            mobileFilterMetrics.controlWidths.every(
+              (width) =>
+                width >= mobileFilterMetrics.clientWidth - 1 &&
+                width <= mobileFilterMetrics.clientWidth + 1
+            ),
+          `移动端任务筛选控件应保持整行触控且不溢出: ${JSON.stringify(
+            mobileFilterMetrics
+          )}`
+        )
+        await page.locator('.erp-task-board-filters').screenshot({
+          path: path.resolve(outputDir, 'erp-task-board-mobile-filters.png'),
+        })
         await page
           .locator('.erp-task-board-card')
           .filter({ hasText: '移动端任务处理回归' })
@@ -6279,6 +6439,16 @@ export function createStyleL1Scenarios(deps) {
               started_at: 1_800_000_000,
               completed_at: null,
             },
+            linked_node: {
+              id: 804,
+              process_instance_id: 801,
+              node_key: 'engineering_data',
+              node_type: 'human_task',
+              attempt: 1,
+              version: 1,
+              status: 'active',
+              outcome: '',
+            },
             nodes: [
               {
                 id: 802,
@@ -6286,6 +6456,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'submit_sales_order',
                 node_type: 'domain_command',
                 attempt: 1,
+                version: 1,
                 status: 'completed',
                 outcome: 'sales_order.submitted',
               },
@@ -6295,6 +6466,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'order_approval',
                 node_type: 'approval',
                 attempt: 1,
+                version: 1,
                 status: 'completed',
                 outcome: 'approved',
               },
@@ -6304,6 +6476,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'engineering_data',
                 node_type: 'human_task',
                 attempt: 1,
+                version: 1,
                 status: 'active',
                 outcome: '',
               },
@@ -6315,6 +6488,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'engineering_data',
                 node_type: 'human_task',
                 attempt: 1,
+                version: 1,
                 status: 'active',
                 outcome: '',
               },
@@ -6326,6 +6500,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'submit_sales_order',
                 node_type: 'domain_command',
                 attempt: 1,
+                version: 1,
                 status: 'completed',
                 outcome: 'sales_order.submitted',
               },
@@ -6335,6 +6510,7 @@ export function createStyleL1Scenarios(deps) {
                 node_key: 'order_approval',
                 node_type: 'approval',
                 attempt: 1,
+                version: 1,
                 status: 'completed',
                 outcome: 'approved',
               },
@@ -6421,6 +6597,61 @@ export function createStyleL1Scenarios(deps) {
           await waitForPath(page, `/m/${role.key}/tasks`)
           await expectText(page, role.label)
           await expectText(page, role.taskName)
+          if (role.key === 'engineering') {
+            const filterMetrics = await page.evaluate(() => {
+              const tabs = document.querySelector('.mobile-role-task-filters')
+              const tabsStyle =
+                tabs instanceof HTMLElement
+                  ? window.getComputedStyle(tabs, '::before')
+                  : null
+              const buttons = Array.from(
+                tabs?.querySelectorAll('.mobile-role-task-filter') || []
+              )
+              return {
+                labels: buttons.map(
+                  (button) =>
+                    button
+                      .querySelector('.mobile-role-task-filter__label')
+                      ?.textContent?.trim() || ''
+                ),
+                approvalCount: document.querySelectorAll(
+                  '[data-testid="mobile-role-filter-approval"]'
+                ).length,
+                mineCount: document.querySelectorAll(
+                  '[data-testid="mobile-role-filter-mine"]'
+                ).length,
+                standaloneApprovalCopy:
+                  document.body?.innerText?.includes('当前岗位的审批事项') ||
+                  false,
+                widths: buttons.map(
+                  (button) => button.getBoundingClientRect().width
+                ),
+                tabsClientWidth:
+                  tabs instanceof HTMLElement ? tabs.clientWidth : 0,
+                tabsScrollWidth:
+                  tabs instanceof HTMLElement ? tabs.scrollWidth : 0,
+                thumbWidth: Number.parseFloat(tabsStyle?.width || '0'),
+              }
+            })
+            const expectedFilterWidth = (filterMetrics.tabsClientWidth - 8) / 3
+            assert(
+              JSON.stringify(filterMetrics.labels) ===
+                JSON.stringify(['全部', '风险', '超时']) &&
+                filterMetrics.approvalCount === 0 &&
+                filterMetrics.mineCount === 0 &&
+                !filterMetrics.standaloneApprovalCopy &&
+                filterMetrics.tabsScrollWidth <=
+                  filterMetrics.tabsClientWidth + 1 &&
+                Math.abs(filterMetrics.thumbWidth - expectedFilterWidth) <=
+                  1.5 &&
+                filterMetrics.widths.every(
+                  (width) => Math.abs(width - expectedFilterWidth) <= 1.5
+                ),
+              `无审批权限的 430px 岗位页应仅显示全部 / 风险 / 超时三项等宽筛选: ${JSON.stringify(
+                filterMetrics
+              )}`
+            )
+          }
           const metrics = await page.evaluate(() => {
             const root = document.querySelector('.mobile-role-tasks-page')
             const scroller = document.querySelector(
@@ -6632,17 +6863,143 @@ export function createStyleL1Scenarios(deps) {
         })
         await expectText(processContextCard, '销售订单受理')
         await expectText(processContextCard, 'SO-L1-601')
-        await expectText(processContextCard, '当前节点：工程资料')
-        await expectText(
-          processContextCard,
-          '已完成节点：提交销售订单（已完成）、订单审批（已完成）'
+        await expectText(processContextCard, '流程状态')
+        await expectText(processContextCard, '办理中')
+        const mobileTaskEventTrail = page.getByTestId(
+          'workflow-task-event-trail'
         )
-        await expectText(processContextCard, '最终状态：办理中')
+        await mobileTaskEventTrail.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await expectText(mobileTaskEventTrail, '本任务处理记录')
+        await expectText(mobileTaskEventTrail, '任务已创建')
+        await expectText(mobileTaskEventTrail, '当前负责岗位')
+        await expectText(mobileTaskEventTrail, '工程')
+        await expectText(mobileTaskEventTrail, '不是来源单据的完整审批链')
+        const mobileExecutionTrail = processContextCard.getByTestId(
+          'workflow-process-stage'
+        )
+        await expectText(mobileExecutionTrail, '执行轨迹')
+        await expectText(mobileExecutionTrail, '提交销售订单')
+        await expectText(mobileExecutionTrail, '订单审批')
+        await expectText(mobileExecutionTrail, '工程资料')
+        const mobileExecutionTrailMetrics = await mobileExecutionTrail.evaluate(
+          (element) => ({
+            currentCount: element.querySelectorAll('[aria-current="step"]')
+              .length,
+            linkedCount: element.querySelectorAll('[data-linked-task="true"]')
+              .length,
+            renderedItems: element.querySelectorAll(
+              '.workflow-process-stage__item'
+            ).length,
+          })
+        )
+        assert(
+          mobileExecutionTrailMetrics.currentCount === 1 &&
+            mobileExecutionTrailMetrics.linkedCount === 1 &&
+            mobileExecutionTrailMetrics.renderedItems === 3,
+          `移动任务执行轨迹状态不完整: ${JSON.stringify(
+            mobileExecutionTrailMetrics
+          )}`
+        )
+        const collectMobileTrajectoryMetrics = () =>
+          page.getByTestId('mobile-task-detail-screen').evaluate((screen) => {
+            const sections = [...screen.querySelectorAll('section')]
+            const keyInformation = sections.find((section) =>
+              section.querySelector('h2')?.textContent?.includes('任务关键信息')
+            )
+            const processContext = screen.querySelector(
+              '[data-testid="mobile-task-process-context"]'
+            )
+            const taskEvents = screen.querySelector(
+              '[data-testid="workflow-task-event-trail"]'
+            )
+            const relatedSource = sections.find((section) =>
+              section.querySelector('h2')?.textContent?.includes('关联来源')
+            )
+            const main = screen.querySelector(
+              '.mobile-role-tasks-page__detail-main'
+            )
+            const sectionOrder = [
+              keyInformation,
+              processContext,
+              taskEvents,
+              relatedSource,
+            ].map((section) => sections.indexOf(section))
+            return {
+              documentOverflow:
+                document.documentElement.scrollWidth -
+                document.documentElement.clientWidth,
+              mainOverflow: main ? main.scrollWidth - main.clientWidth : null,
+              eventOverflow: taskEvents
+                ? taskEvents.scrollWidth - taskEvents.clientWidth
+                : null,
+              eventItemCount:
+                taskEvents?.querySelectorAll('.workflow-task-event-trail__item')
+                  .length || 0,
+              ordered: sectionOrder.every(
+                (value, index) =>
+                  value >= 0 && (index === 0 || value > sectionOrder[index - 1])
+              ),
+            }
+          })
+        const mobileTrajectoryMetrics430 =
+          await collectMobileTrajectoryMetrics()
+        assert(
+          mobileTrajectoryMetrics430.documentOverflow <= 1 &&
+            mobileTrajectoryMetrics430.mainOverflow <= 1 &&
+            mobileTrajectoryMetrics430.eventOverflow <= 1 &&
+            mobileTrajectoryMetrics430.eventItemCount === 1 &&
+            mobileTrajectoryMetrics430.ordered,
+          `430px 移动任务轨迹顺序或布局不完整: ${JSON.stringify(
+            mobileTrajectoryMetrics430
+          )}`
+        )
+        await mobileTaskEventTrail.screenshot({
+          path: path.join(
+            outputDir,
+            'mobile-yoyo-engineering-task-event-trail-430.png'
+          ),
+        })
         await processContextCard.screenshot({
           path: path.join(
             outputDir,
             'mobile-yoyo-engineering-process-context-430.png'
           ),
+        })
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'mobile-yoyo-engineering-task-trajectory-430.png'
+          ),
+          fullPage: true,
+        })
+        await page.setViewportSize({ width: 390, height: 844 })
+        const mobileTrajectoryMetrics390 =
+          await collectMobileTrajectoryMetrics()
+        assert(
+          mobileTrajectoryMetrics390.documentOverflow <= 1 &&
+            mobileTrajectoryMetrics390.mainOverflow <= 1 &&
+            mobileTrajectoryMetrics390.eventOverflow <= 1 &&
+            mobileTrajectoryMetrics390.eventItemCount === 1 &&
+            mobileTrajectoryMetrics390.ordered,
+          `390px 移动任务轨迹顺序或布局不完整: ${JSON.stringify(
+            mobileTrajectoryMetrics390
+          )}`
+        )
+        await mobileTaskEventTrail.screenshot({
+          path: path.join(
+            outputDir,
+            'mobile-yoyo-engineering-task-event-trail-390.png'
+          ),
+        })
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'mobile-yoyo-engineering-task-trajectory-390.png'
+          ),
+          fullPage: true,
         })
       },
     },
@@ -7510,12 +7867,14 @@ export function createStyleL1Scenarios(deps) {
           'workflow.task.update',
           'workflow.task.complete',
           'workflow.task.reject',
+          'workflow.task.approve',
         ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['sales', 'boss'],
           'workflow.task.update': ['sales', 'boss'],
           'workflow.task.complete': ['sales', 'boss'],
           'workflow.task.reject': ['sales', 'boss'],
+          'workflow.task.approve': ['sales', 'boss'],
         },
       },
       themeMode: 'dark',
@@ -7725,6 +8084,24 @@ export function createStyleL1Scenarios(deps) {
               ],
             },
           })
+          await createTask({
+            task_code: 'STYLE-L1-MOBILE-APPROVAL-001',
+            task_group: 'project-orders',
+            task_name: '暗色审批验证',
+            source_type: 'project-orders',
+            source_id: 9002,
+            source_no: 'STYLE-L1-MOBILE-APPROVAL-001',
+            business_status_key: 'project_pending',
+            task_status_key: 'ready',
+            owner_role_key: 'sales',
+            required_capability_key: 'workflow.task.approve',
+            priority: 8,
+            payload: {
+              customer_name: '暗色审批客户',
+              style_no: '深色审批款',
+              due_date: '2026-06-06',
+            },
+          })
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await page.getByTestId('mobile-role-nav-todo').click()
@@ -7757,6 +8134,64 @@ export function createStyleL1Scenarios(deps) {
         assert(
           todoUI.items.some((item) => item.includes('暗色任务验证')),
           `移动岗位待办投影未渲染到页面: ${JSON.stringify(todoUI)}`
+        )
+        const approvalFilter = page.getByTestId('mobile-role-filter-approval')
+        await approvalFilter.waitFor({ state: 'visible', timeout: 10_000 })
+        const approvalFilterMetrics = await page.evaluate(() => ({
+          labels: Array.from(
+            document.querySelectorAll('.mobile-role-task-filter__label')
+          ).map((label) => label.textContent?.trim() || ''),
+          approvalAriaLabel:
+            document
+              .querySelector('[data-testid="mobile-role-filter-approval"]')
+              ?.getAttribute('aria-label') || '',
+          standaloneApprovalCopy:
+            document.body?.innerText?.includes('当前岗位的审批事项') || false,
+          mineCount: document.querySelectorAll(
+            '[data-testid="mobile-role-filter-mine"]'
+          ).length,
+        }))
+        assert(
+          JSON.stringify(approvalFilterMetrics.labels) ===
+            JSON.stringify(['全部', '审批', '风险', '超时']) &&
+            approvalFilterMetrics.approvalAriaLabel.includes('待我审批') &&
+            !approvalFilterMetrics.standaloneApprovalCopy &&
+            approvalFilterMetrics.mineCount === 0,
+          `有审批权限的 390px 岗位页应把审批并入四项筛选且移除我负责: ${JSON.stringify(
+            approvalFilterMetrics
+          )}`
+        )
+        assert.equal(
+          await page.locator('[data-testid^="mobile-role-nav-"]').count(),
+          4,
+          '移动端增加待我审批筛选后仍应只保留 4 个底栏入口'
+        )
+        await approvalFilter.click()
+        await page.waitForFunction(
+          () =>
+            [...document.querySelectorAll('.erp-mobile-list-item')].some(
+              (item) => item.textContent?.includes('暗色审批验证')
+            ),
+          undefined,
+          { timeout: 10_000 }
+        )
+        assert.equal(
+          await approvalFilter.getAttribute('aria-pressed'),
+          'true',
+          '移动端待我审批筛选应进入选中态'
+        )
+        await page.screenshot({
+          path: path.resolve(outputDir, 'mobile-tasks-approval-dark.png'),
+          fullPage: true,
+        })
+        await page.getByTestId('mobile-role-filter-all').click()
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector('[data-testid="mobile-role-filter-all"]')
+              ?.getAttribute('aria-pressed') === 'true',
+          undefined,
+          { timeout: 10_000 }
         )
         await expectText(page, '阻塞原因')
         await assertERPThemeMode(page, {
