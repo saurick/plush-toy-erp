@@ -52,7 +52,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 		item, err := d.purchaseOrderUC.GetPurchaseOrder(ctx, getInt(pm, "id", 0))
 		return id, purchaseOrderMutationResult(ctx, d, item, err), nil
 	case "get_purchase_order_receipt_progress":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
+		if res := d.requireSourceActionReadPermissions(ctx, "purchase_order", method); res != nil {
 			return id, res, nil
 		}
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {
