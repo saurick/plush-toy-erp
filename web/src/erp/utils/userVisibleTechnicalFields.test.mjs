@@ -667,6 +667,19 @@ test('权限中心在权限行内区分菜单入口、页内操作、依赖和�
   assert.match(content, /placement === '常用工作'/u)
   assert.match(content, /placement === '看板中心'/u)
   assert.match(content, /aria-label="菜单与操作说明"/u)
+  assert.match(
+    content,
+    /岗位可用操作 = 系统允许 ∩ 模块已启用 ∩ 当前版本已开放 − 岗位撤销/u
+  )
+  assert.match(content, /“∩”表示这些条件必须同时满足/u)
+  assert.match(
+    content,
+    /员工有多个岗位时，系统先分别计算每个岗位，再合并结果/u
+  )
+  assert.match(
+    content,
+    /具体办理时还会继续检查数据范围、负责岗位、单据状态和前置审批等条件/u
+  )
   assert.match(content, /当前调整仅预览，保存岗位设置后生效/u)
   assert.doesNotMatch(content, /预计显示/u)
   assert.doesNotMatch(content, /先看菜单结果，再选择页内操作/u)

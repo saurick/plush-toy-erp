@@ -3501,6 +3501,19 @@ export default function PermissionCenterPage() {
                         <Text>
                           查看类功能决定菜单是否出现；办理类功能决定进入页面后能做什么。
                         </Text>
+                        <Text strong>操作如何生效</Text>
+                        <Text>
+                          岗位可用操作 = 系统允许 ∩ 模块已启用 ∩ 当前版本已开放 − 岗位撤销
+                        </Text>
+                        <Text type="secondary">
+                          “∩”表示这些条件必须同时满足，“−”表示从结果中明确扣除。
+                        </Text>
+                        <Text type="secondary">
+                          员工有多个岗位时，系统先分别计算每个岗位，再合并结果；某一岗位撤销的操作，不会删掉另一个岗位正式拥有的操作。
+                        </Text>
+                        <Text type="secondary">
+                          具体办理时还会继续检查数据范围、负责岗位、单据状态和前置审批等条件。
+                        </Text>
                         <Text type="secondary">
                           当前调整仅预览，保存岗位设置后生效。
                         </Text>
