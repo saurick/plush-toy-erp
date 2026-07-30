@@ -21,7 +21,10 @@ test('production route modal is a self-contained production-order surface', () =
   ]) {
     assert.match(source, new RegExp(`${permissionProp}\\s*=\\s*false`, 'u'))
   }
-  assert.match(source, /title="生产工序办理"/u)
+  assert.match(
+    source,
+    /title=\{orderStatus === 'CLOSED' \? '返工工序办理' : '生产工序办理'\}/u
+  )
 })
 
 test('route actions use separate business permissions and cancellation is assign-only', () => {
@@ -156,4 +159,19 @@ test('stale route reads are aborted and raw technical IDs are not visible labels
     /(?:label|title|message|description)=["'`][^"'`]*(?:ID|_id)[^"'`]*["'`]/u
   )
   assert.doesNotMatch(source, />\s*(?:订单|批次|工序|委外明细)\s*ID\s*</u)
+})
+
+test('closed orders keep normal batches read-only and continue only finished-goods rework', () => {
+  assert.match(source, /productionWipActionAllowedForOrder/u)
+  assert.match(source, /productionWipBatchLineageMeta/u)
+  assert.match(source, /orderStatus === 'CLOSED'/u)
+  assert.match(source, /origin_rework_fact_id/u)
+  assert.match(source, /成品返工补制/u)
+  assert.match(source, /原生产批次保持只读/u)
+  assert.match(source, /成品返工如需撤销，请回到返工记录办理/u)
+  assert.match(
+    source,
+    /actionButtonEnabled\([\s\S]*authoritativeOrder[\s\S]*actionForm\.validateFields/u
+  )
+  assert.doesNotMatch(source, />\s*origin_rework_fact_id\s*</u)
 })

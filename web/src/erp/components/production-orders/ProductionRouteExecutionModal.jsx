@@ -46,9 +46,11 @@ import {
   positiveSafeInteger,
   productionWipBatchForOperation,
   productionWipBatchLabel,
+  productionWipBatchLineageMeta,
   productionWipFabricMaterialRequirements,
   productionWipOperationLabel,
   productionWipOperationsForBatch,
+  productionWipActionAllowedForOrder,
   productionWipOrderItem,
   productionWipOutputLabel,
   productionWipPackagingConfirmationForBatch,
@@ -129,9 +131,17 @@ function actionButtonEnabled(
   operation,
   nextOperation,
   packagingConfirmation,
-  canAct
+  canAct,
+  order
 ) {
-  if (!canAct || !batch || !operation) return false
+  if (
+    !canAct ||
+    !batch ||
+    !operation ||
+    !productionWipActionAllowedForOrder(order, batch, action)
+  ) {
+    return false
+  }
   const status = String(batch.status || '').trim()
   switch (action) {
     case PRODUCTION_WIP_ACTION.SPLIT_BATCH:
@@ -239,6 +249,10 @@ export default function ProductionRouteExecutionModal({
     actionForm
   )
   const orderID = Number(productionOrder?.id || 0)
+  const authoritativeOrder = aggregate?.productionOrder || productionOrder
+  const orderStatus = String(authoritativeOrder?.status || '')
+    .trim()
+    .toUpperCase()
   const canRunAction = useCallback(
     (action) => {
       if (
@@ -366,7 +380,13 @@ export default function ProductionRouteExecutionModal({
       return
     }
     if (!aggregate.batches.some((batch) => batch.id === selectedBatchID)) {
-      const preferredBatch = [...aggregate.batches]
+      const selectableBatches =
+        orderStatus === 'CLOSED'
+          ? aggregate.batches.filter((batch) =>
+              positiveSafeInteger(batch.origin_rework_fact_id)
+            )
+          : aggregate.batches
+      const preferredBatch = [...selectableBatches]
         .reverse()
         .find((batch) =>
           [
@@ -376,12 +396,15 @@ export default function ProductionRouteExecutionModal({
             'WAITING_QUALITY',
             'REJECTED',
           ].includes(batch.status)
-        )
+      )
       setSelectedBatchID(
-        preferredBatch?.id || aggregate.batches.at(-1)?.id || null
+        preferredBatch?.id ||
+          selectableBatches.at(-1)?.id ||
+          aggregate.batches.at(-1)?.id ||
+          null
       )
     }
-  }, [aggregate, selectedBatchID])
+  }, [aggregate, orderStatus, selectedBatchID])
 
   const selectedBatch = useMemo(
     () =>
@@ -481,9 +504,21 @@ export default function ProductionRouteExecutionModal({
 
   const selectAction = (action) => {
     if (
-      action === PRODUCTION_WIP_ACTION.SPLIT_BATCH &&
-      currentOperation?.operation_code === 'FABRIC_PROCESSING'
+      !actionButtonEnabled(
+        action,
+        selectedBatch,
+        currentOperation,
+        nextOperation,
+        selectedPackagingConfirmation,
+        canRunAction(action),
+        authoritativeOrder
+      )
     ) {
+      message.warning(
+        orderStatus === 'CLOSED'
+          ? '已关闭订单只能继续办理成品返工补制批次'
+          : '当前批次状态已变化，暂不能办理该操作'
+      )
       return
     }
     actionAttemptRef.current = null
@@ -520,6 +555,22 @@ export default function ProductionRouteExecutionModal({
     if (!canRunAction(activeAction)) {
       message.warning('当前岗位没有办理该工序的权限')
       setActiveAction('')
+      return
+    }
+    if (
+      !actionButtonEnabled(
+        activeAction,
+        selectedBatch,
+        currentOperation,
+        nextOperation,
+        selectedPackagingConfirmation,
+        true,
+        authoritativeOrder
+      )
+    ) {
+      message.warning('当前订单或批次状态已变化，请重新选择后办理')
+      setActiveAction('')
+      actionForm.resetFields()
       return
     }
     let values
@@ -634,12 +685,21 @@ export default function ProductionRouteExecutionModal({
     {
       title: '在制批次',
       key: 'batch',
-      width: 260,
-      render: (_, batch) =>
-        productionWipBatchLabel(
-          batch,
-          productionWipOrderItem(aggregate, batch)
-        ),
+      width: 300,
+      render: (_, batch) => {
+        const lineage = productionWipBatchLineageMeta(batch)
+        return (
+          <Space size={4} wrap>
+            <span>
+              {productionWipBatchLabel(
+                batch,
+                productionWipOrderItem(aggregate, batch)
+              )}
+            </span>
+            {lineage ? <Tag color={lineage.color}>{lineage.label}</Tag> : null}
+          </Space>
+        )
+      },
     },
     {
       title: '数量',
@@ -1159,7 +1219,7 @@ export default function ProductionRouteExecutionModal({
     <BusinessFormModal
       open={open}
       width="min(1280px, calc(100vw - 48px))"
-      title="生产工序办理"
+      title={orderStatus === 'CLOSED' ? '返工工序办理' : '生产工序办理'}
       description="按在制批次依次办理布料加工、车缝、手工和包装；完工或回仓后由品质办理质量关口，合格后再转下道。"
       icon={<BranchesOutlined />}
       footer={
@@ -1183,6 +1243,14 @@ export default function ProductionRouteExecutionModal({
         message="本页只显示质量关口状态；检验判定仍由品质人员到“质量检验”办理。内部流转叫车间移交 / WIP 转移，外发完成返回才叫回仓。"
         style={{ marginTop: 12 }}
       />
+      {orderStatus === 'CLOSED' ? (
+        <Alert
+          showIcon
+          type="info"
+          message="当前订单已关闭，仅“成品返工补制”批次可以继续办理；原生产批次保持只读。成品返工如需撤销，请回到返工记录办理。"
+          style={{ marginTop: 12 }}
+        />
+      ) : null}
       <Descriptions
         size="small"
         column={{ xs: 1, md: 2 }}
@@ -1323,7 +1391,8 @@ export default function ProductionRouteExecutionModal({
                               currentOperation,
                               nextOperation,
                               selectedPackagingConfirmation,
-                              canAssign
+                              canAssign,
+                              authoritativeOrder
                             )
                           }
                           onClick={() =>
@@ -1343,7 +1412,8 @@ export default function ProductionRouteExecutionModal({
                             currentOperation,
                             nextOperation,
                             selectedPackagingConfirmation,
-                            canAssign
+                            canAssign,
+                            authoritativeOrder
                           )
                         }
                         onClick={() =>
@@ -1362,7 +1432,8 @@ export default function ProductionRouteExecutionModal({
                             currentOperation,
                             nextOperation,
                             selectedPackagingConfirmation,
-                            canAssign
+                            canAssign,
+                            authoritativeOrder
                           )
                         }
                         onClick={() =>
@@ -1384,7 +1455,8 @@ export default function ProductionRouteExecutionModal({
                             currentOperation,
                             nextOperation,
                             selectedPackagingConfirmation,
-                            canExecute
+                            canExecute,
+                            authoritativeOrder
                           )
                         }
                         onClick={() =>
@@ -1402,7 +1474,8 @@ export default function ProductionRouteExecutionModal({
                             currentOperation,
                             nextOperation,
                             selectedPackagingConfirmation,
-                            canExecute
+                            canExecute,
+                            authoritativeOrder
                           )
                         }
                         onClick={() => selectAction(completionAction)}
@@ -1419,7 +1492,8 @@ export default function ProductionRouteExecutionModal({
                             currentOperation,
                             nextOperation,
                             selectedPackagingConfirmation,
-                            canExecute
+                            canExecute,
+                            authoritativeOrder
                           )
                         }
                         onClick={() =>
@@ -1442,7 +1516,8 @@ export default function ProductionRouteExecutionModal({
                           currentOperation,
                           nextOperation,
                           selectedPackagingConfirmation,
-                          canConfirmPackaging
+                          canConfirmPackaging,
+                          authoritativeOrder
                         )
                       }
                       onClick={() =>
@@ -1465,7 +1540,8 @@ export default function ProductionRouteExecutionModal({
                           currentOperation,
                           nextOperation,
                           selectedPackagingConfirmation,
-                          canRework
+                          canRework,
+                          authoritativeOrder
                         )
                       }
                       onClick={() => selectAction(PRODUCTION_WIP_ACTION.REWORK)}

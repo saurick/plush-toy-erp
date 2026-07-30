@@ -56,6 +56,25 @@ test('purchase order inbound draft keeps unknown results in the current modal', 
   assert.doesNotMatch(inboundDraftHook, /idempotency_key/u)
 })
 
+test('purchase order inbound draft reads the authoritative receipt progress once', () => {
+  const load = functionSlice(
+    inboundDraftHook,
+    'const openInboundDraftModal',
+    'const createInboundDraftFromOrder'
+  )
+  assert.match(load, /getPurchaseOrderReceiptProgress\(\{\s*id: record\.id/u)
+  assert.match(load, /buildInboundDraftPreviewRows\(progress\)/u)
+  assert.match(load, /加载采购入库进度失败/u)
+  assert.doesNotMatch(
+    inboundDraftHook,
+    /listAllPurchaseReceipts|loadOrderItems\(record\)|remainingQuantity > 0/u
+  )
+  assert.match(
+    inboundDraftHook,
+    /inboundDraftPreviewRows\.some\(\(row\) => row\.canGenerate\)/u
+  )
+})
+
 test('purchase receipt page does not append source-less manual lines', () => {
   for (const retiredEntry of [
     'addPurchaseReceiptItem',

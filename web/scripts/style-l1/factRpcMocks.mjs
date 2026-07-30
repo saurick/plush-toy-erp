@@ -71,6 +71,7 @@ const PRODUCTION_COMPLETION_CREATE_KEYS = new Set([
   'fact_no',
   'production_order_id',
   'production_order_item_id',
+  'production_wip_batch_id',
   'warehouse_id',
   'lot_id',
   'new_lot_no',
@@ -338,6 +339,9 @@ export async function installFactRpcMocks(page, context) {
     source_type: 'PRODUCTION_ORDER',
     source_id: 71,
     source_line_id: 7100,
+    production_wip_batch_id: 91_004,
+    production_order_id: 71,
+    production_order_item_id: 7100,
     idempotency_key: 'PROD-FACT-L1',
     occurred_at: nowUnix(),
     note: '样式生产事实',
@@ -436,6 +440,9 @@ export async function installFactRpcMocks(page, context) {
       source_type: 'PRODUCTION_ORDER',
       source_id: 71,
       source_line_id: 7100,
+      production_wip_batch_id: 91_004,
+      production_order_id: 71,
+      production_order_item_id: 7100,
       idempotency_key: 'PROD-FG-POSTED-L1',
       note: '已过账成品入库',
     }
@@ -521,10 +528,22 @@ export async function installFactRpcMocks(page, context) {
       status: 'ACTIVE',
       sales_order_id: 1,
       sales_order_item_id: 1,
+      sales_order_no: 'SO-RESERVATION-STYLE-L1',
+      sales_order_line_no: 3,
       product_id: 1,
+      product_sku_id: 201,
+      product_code: 'PROD-RESERVATION-STYLE-L1',
+      product_name: '库存预留毛绒兔',
+      product_sku_code: 'SKU-RESERVATION-STYLE-L1',
+      product_sku_name: '蓝色规格',
       warehouse_id: 1,
+      warehouse_code: 'WH-RESERVATION-STYLE-L1',
+      warehouse_name: '成品仓',
       unit_id: 1,
+      unit_code: 'PCS',
+      unit_name: '件',
       lot_id: 1,
+      lot_no: 'LOT-RESERVATION-STYLE-L1',
       quantity: '4',
       idempotency_key: 'RSV-STYLE-L1',
       reserved_at: nowUnix(),
@@ -608,6 +627,7 @@ export async function installFactRpcMocks(page, context) {
             params.fact_no,
             params.production_order_id,
             params.production_order_item_id,
+            params.production_wip_batch_id,
             params.warehouse_id,
             params.quantity,
             params.idempotency_key,
@@ -618,8 +638,8 @@ export async function installFactRpcMocks(page, context) {
             ) ||
             requiredValues.some((value) => !String(value ?? '').trim()) ||
             Number(params.production_order_id) !== 71 ||
-            !Number.isSafeInteger(Number(params.production_order_item_id)) ||
-            Number(params.production_order_item_id) <= 0 ||
+            Number(params.production_order_item_id) !== 7100 ||
+            Number(params.production_wip_batch_id) !== 91_004 ||
             !Number.isFinite(Number(params.quantity)) ||
             Number(params.quantity) <= 0 ||
             !validInboundLotIntent(params, { allowNew: true })
@@ -657,6 +677,13 @@ export async function installFactRpcMocks(page, context) {
             source_type: 'PRODUCTION_ORDER',
             source_id: Number(params.production_order_id),
             source_line_id: Number(params.production_order_item_id),
+            production_wip_batch_id: Number(
+              params.production_wip_batch_id
+            ),
+            production_order_id: Number(params.production_order_id),
+            production_order_item_id: Number(
+              params.production_order_item_id
+            ),
             idempotency_key: params.idempotency_key,
             occurred_at: params.occurred_at
               ? Math.floor(new Date(params.occurred_at).getTime() / 1000)
@@ -728,6 +755,10 @@ export async function installFactRpcMocks(page, context) {
             source_type: 'PRODUCTION_FACT',
             source_id: postedProductionCompletion.id,
             source_line_id: postedProductionCompletion.source_line_id,
+            production_wip_batch_id: null,
+            production_order_id: postedProductionCompletion.production_order_id,
+            production_order_item_id:
+              postedProductionCompletion.production_order_item_id,
             idempotency_key: idempotencyKey,
             occurred_at: params.occurred_at
               ? Math.floor(new Date(params.occurred_at).getTime() / 1000)
@@ -2363,6 +2394,7 @@ export async function installFactRpcMocks(page, context) {
               created_at: Number(task.created_at || nowUnix()),
             },
           ],
+          truncated: false,
           total: 1,
           limit: Number(params.limit || 100),
           offset: 0,

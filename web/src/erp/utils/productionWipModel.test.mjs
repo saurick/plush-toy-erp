@@ -15,8 +15,10 @@ import {
   nextProductionWipOperation,
   normalizeProductionWipQuantity,
   partitionProductionCompletionItems,
+  productionWipActionAllowedForOrder,
   productionWipBatchForOperation,
   productionWipBatchLabel,
+  productionWipBatchLineageMeta,
   productionWipCompletionEligibility,
   productionWipFabricMaterialRequirements,
   productionWipMaterialOutsourcingCandidateMatches,
@@ -85,6 +87,7 @@ function aggregateFixture(patch = {}) {
         production_order_item_id: 11,
         production_order_operation_id: 41,
         source_batch_id: null,
+        origin_rework_fact_id: null,
         batch_no: 'WIP-001',
         flow_type: 'NORMAL',
         execution_mode: 'OUTSOURCED',
@@ -104,6 +107,7 @@ function aggregateFixture(patch = {}) {
         production_order_item_id: 11,
         production_order_operation_id: 42,
         source_batch_id: 31,
+        origin_rework_fact_id: null,
         batch_no: 'WIP-002',
         flow_type: 'NORMAL',
         execution_mode: 'IN_HOUSE',
@@ -850,11 +854,13 @@ test('routed completion requires accepted packaging and item-level packaging con
       },
     ],
   }
-  assert.deepEqual(productionWipCompletionEligibility(ready, item), {
-    eligible: true,
-    reason: '',
-    acceptedPackagingQuantity: '40',
-  })
+  const readyEligibility = productionWipCompletionEligibility(ready, item)
+  assert.equal(readyEligibility.eligible, true)
+  assert.equal(readyEligibility.acceptedPackagingQuantity, '40')
+  assert.deepEqual(
+    readyEligibility.acceptedPackagingBatches.map((batch) => batch.id),
+    [33, 34]
+  )
 
   const readyPartition = partitionProductionCompletionItems([item], ready)
   assert.equal(
@@ -869,4 +875,207 @@ test('routed completion requires accepted packaging and item-level packaging con
   )
   assert.deepEqual(partitioned.eligibleItems, [legacyItem])
   assert.equal(partitioned.blockedItems[0].item, item)
+})
+
+test('finished-goods rework lineage is explicit, inherited and business-labeled', () => {
+  const fixture = aggregateFixture()
+  const root = {
+    ...fixture.production_wip_batches[1],
+    id: 35,
+    production_order_operation_id: 43,
+    source_batch_id: null,
+    origin_rework_fact_id: 901,
+    batch_no: 'WIP-RW-901',
+    flow_type: 'REWORK',
+    execution_mode: null,
+    status: 'PLANNED',
+    version: 1,
+    quantity: '4',
+    rework_reason: '成品抽检不合格，补制处理',
+    started_at: null,
+    completed_at: null,
+  }
+  const child = {
+    ...root,
+    id: 36,
+    production_order_operation_id: 44,
+    source_batch_id: root.id,
+    origin_rework_fact_id: 901,
+    batch_no: 'WIP-RW-901-T40-001',
+    flow_type: 'NORMAL',
+    execution_mode: 'IN_HOUSE',
+    status: 'ACCEPTED',
+    version: 4,
+    rework_reason: null,
+  }
+  const valid = validateProductionWipAggregate({
+    ...fixture,
+    production_wip_batches: [
+      ...fixture.production_wip_batches,
+      root,
+      child,
+    ],
+  })
+  assert.equal(valid.batches.at(-1).origin_rework_fact_id, 901)
+  assert.deepEqual(productionWipBatchLineageMeta(valid.batches.at(-1)), {
+    key: 'finished-goods-rework',
+    label: '成品返工补制',
+    color: 'volcano',
+  })
+  assert.doesNotMatch(
+    productionWipBatchLineageMeta(valid.batches.at(-1)).label,
+    /901|origin|fact/iu
+  )
+
+  for (const brokenChild of [
+    { ...child, origin_rework_fact_id: null },
+    { ...child, origin_rework_fact_id: 902 },
+  ]) {
+    assert.throws(
+      () =>
+        validateProductionWipAggregate({
+          ...fixture,
+          production_wip_batches: [
+            ...fixture.production_wip_batches,
+            root,
+            brokenChild,
+          ],
+        }),
+      /生产工序信息不完整/u
+    )
+  }
+  assert.throws(
+    () =>
+      validateProductionWipAggregate({
+        ...fixture,
+        production_wip_batches: [
+          ...fixture.production_wip_batches,
+          {
+            ...root,
+            flow_type: 'NORMAL',
+            rework_reason: null,
+          },
+        ],
+      }),
+    /生产工序信息不完整/u
+  )
+  assert.throws(
+    () =>
+      validateProductionWipAggregate({
+        ...fixture,
+        production_wip_batches: [
+          ...fixture.production_wip_batches,
+          {
+            ...root,
+            origin_rework_fact_id: null,
+          },
+        ],
+      }),
+    /生产工序信息不完整/u
+  )
+})
+
+test('closed production orders expose only finished-goods rework lineage actions and completion', () => {
+  const originBatch = {
+    origin_rework_fact_id: 901,
+    flow_type: 'NORMAL',
+  }
+  const normalBatch = {
+    origin_rework_fact_id: null,
+    flow_type: 'NORMAL',
+  }
+  assert.equal(
+    productionWipActionAllowedForOrder(
+      { status: 'CLOSED' },
+      originBatch,
+      PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION
+    ),
+    true
+  )
+  assert.equal(
+    productionWipActionAllowedForOrder(
+      { status: 'CLOSED' },
+      originBatch,
+      PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL
+    ),
+    false
+  )
+  assert.equal(
+    productionWipActionAllowedForOrder(
+      { status: 'CLOSED' },
+      originBatch,
+      PRODUCTION_WIP_ACTION.CANCEL_BATCH
+    ),
+    false
+  )
+  assert.equal(
+    productionWipActionAllowedForOrder(
+      { status: 'CLOSED' },
+      normalBatch,
+      PRODUCTION_WIP_ACTION.START_OPERATION
+    ),
+    false
+  )
+
+  const aggregate = validateProductionWipAggregate(aggregateFixture())
+  const item = aggregate.items[0]
+  const ready = {
+    ...aggregate,
+    productionOrder: {
+      ...aggregate.productionOrder,
+      status: 'CLOSED',
+    },
+    batches: [
+      ...aggregate.batches,
+      {
+        ...aggregate.batches[1],
+        id: 33,
+        production_order_operation_id: 44,
+        source_batch_id: 32,
+        origin_rework_fact_id: 901,
+        batch_no: 'WIP-RW-PACK',
+        status: 'ACCEPTED',
+        quantity: '4',
+      },
+      {
+        ...aggregate.batches[1],
+        id: 34,
+        production_order_operation_id: 44,
+        source_batch_id: 32,
+        origin_rework_fact_id: null,
+        batch_no: 'WIP-NORMAL-PACK',
+        status: 'ACCEPTED',
+        quantity: '20',
+      },
+    ],
+    packagingConfirmations: [
+      {
+        ...aggregate.packagingConfirmations[0],
+        status: 'CONFIRMED',
+      },
+    ],
+  }
+  const eligibility = productionWipCompletionEligibility(ready, item, {
+    productionWipBatchID: 33,
+  })
+  assert.equal(eligibility.eligible, true)
+  assert.equal(eligibility.acceptedPackagingQuantity, '4')
+  assert.deepEqual(
+    eligibility.acceptedPackagingBatches.map((batch) => batch.id),
+    [33]
+  )
+  assert.match(
+    productionWipCompletionEligibility(ready, item, {
+      productionWipBatchID: 34,
+    }).reason,
+    /所选完工来源批次状态已变化/u
+  )
+  assert.equal(
+    productionWipCompletionEligibility(
+      ready,
+      { ...item, route_code: null },
+      { orderStatus: 'CLOSED' }
+    ).eligible,
+    false
+  )
 })

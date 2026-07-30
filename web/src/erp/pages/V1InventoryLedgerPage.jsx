@@ -22,6 +22,9 @@ import {
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
+  listAllInventoryBalances,
+  listAllInventoryLots,
+  listAllInventoryTxns,
   listInventoryBalances,
   cancelInventoryOperation,
   createInventoryOperation,
@@ -57,7 +60,6 @@ import {
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
-  downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
@@ -105,6 +107,7 @@ import {
   createSourceBusinessActionAttemptStore,
   isSourceBusinessActionResultUnknown,
 } from '../utils/sourceBusinessAction.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const VIEW_BALANCES = 'balances'
 const VIEW_LOTS = 'lots'
@@ -562,20 +565,9 @@ export default function V1InventoryLedgerPage() {
     }
   }, [recoverInventoryOperation, routeInventoryOperationID])
 
-  const loadRows = useCallback(async () => {
-    const request = beginLatestRequest('rows')
-    if (!canReadInventory) {
-      if (request.isCurrent()) {
-        setRows([])
-        setTotal(0)
-        setSelectedRow(null)
-      }
-      request.finish()
-      return
-    }
-    setLoading(true)
-    try {
-      const commonParams = compactParams({
+  const inventoryCommonParams = useMemo(
+    () =>
+      compactParams({
         subject_type: subjectType,
         subject_id: subjectID || undefined,
         product_sku_id: productSkuID || undefined,
@@ -590,11 +582,30 @@ export default function V1InventoryLedgerPage() {
             ),
           })
         ),
-        ...getBusinessPaginationParams(pagination),
-      })
-      let data
+      }),
+    [
+      keyword,
+      linkedKeyword,
+      lotID,
+      productSkuID,
+      routeLotID,
+      routeSourceID,
+      routeSourceType,
+      subjectID,
+      subjectType,
+      warehouseID,
+    ]
+  )
+
+  const loadInventoryList = useCallback(
+    ({ signal, all = false }) => {
+      const commonParams = {
+        ...inventoryCommonParams,
+        ...(all ? {} : getBusinessPaginationParams(pagination)),
+      }
       if (activeView === VIEW_LOTS) {
-        data = await listInventoryLots(
+        const list = all ? listAllInventoryLots : listInventoryLots
+        return list(
           compactParams({
             ...commonParams,
             status: lotStatus,
@@ -602,9 +613,10 @@ export default function V1InventoryLedgerPage() {
             date_from: dateFilterStart || undefined,
             date_to: dateFilterEnd || undefined,
           }),
-          { signal: request.signal }
+          { signal }
         )
-      } else if (activeView === VIEW_TXNS) {
+      }
+      if (activeView === VIEW_TXNS) {
         const localSourceType = trimOptional(sourceType)
         const routeSourceMatchesLocal =
           !localSourceType ||
@@ -612,7 +624,8 @@ export default function V1InventoryLedgerPage() {
             String(routeSourceType || '')
               .trim()
               .toUpperCase()
-        data = await listInventoryTxns(
+        const list = all ? listAllInventoryTxns : listInventoryTxns
+        return list(
           compactParams({
             ...commonParams,
             txn_type: txnType,
@@ -624,13 +637,40 @@ export default function V1InventoryLedgerPage() {
             date_from: dateFilterStart || undefined,
             date_to: dateFilterEnd || undefined,
           }),
-          { signal: request.signal }
+          { signal }
         )
-      } else {
-        data = await listInventoryBalances(commonParams, {
-          signal: request.signal,
-        })
       }
+      const list = all ? listAllInventoryBalances : listInventoryBalances
+      return list(commonParams, { signal })
+    },
+    [
+      activeView,
+      dateFilterEnd,
+      dateFilterStart,
+      inventoryCommonParams,
+      lotStatus,
+      pagination,
+      routeSourceID,
+      routeSourceType,
+      sourceType,
+      txnType,
+    ]
+  )
+
+  const loadRows = useCallback(async () => {
+    const request = beginLatestRequest('rows')
+    if (!canReadInventory) {
+      if (request.isCurrent()) {
+        setRows([])
+        setTotal(0)
+        setSelectedRow(null)
+      }
+      request.finish()
+      return
+    }
+    setLoading(true)
+    try {
+      const data = await loadInventoryList({ signal: request.signal })
       if (!request.isCurrent()) {
         return
       }
@@ -657,22 +697,7 @@ export default function V1InventoryLedgerPage() {
     activeView,
     beginLatestRequest,
     canReadInventory,
-    dateFilterEnd,
-    dateFilterStart,
-    keyword,
-    linkedKeyword,
-    lotStatus,
-    lotID,
-    pagination,
-    productSkuID,
-    routeLotID,
-    routeSourceID,
-    routeSourceType,
-    sourceType,
-    subjectID,
-    subjectType,
-    txnType,
-    warehouseID,
+    loadInventoryList,
   ])
 
   useEffect(() => {
@@ -1531,20 +1556,33 @@ export default function V1InventoryLedgerPage() {
     renderUnitReference,
     renderWarehouseReference,
   ])
-  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
-    useBusinessColumnOrder({
+  const {
+    tableColumns,
+    exportColumns,
+    visibleColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
       adminProfile,
       moduleKey: `inventory-${activeView}`,
       moduleTitle: `库存台账 / ${activeLabel}`,
       columns,
     })
-  const exportRows = useCallback(() => {
-    downloadBusinessListCSV({
-      filename: `库存明细-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: visibleColumns,
-      rows,
-    })
-  }, [rows, visibleColumns])
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      if (!canReadInventory) return []
+      const data = await loadInventoryList({ signal, all: true })
+      return getRowsFromData(activeView, data)
+    },
+    [activeView, canReadInventory, loadInventoryList]
+  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: `inventory-export:${activeView}`,
+    loadRows: loadExportRows,
+    filename: `库存明细-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: exportColumns,
+    recordLabel: `${activeLabel}记录`,
+  })
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
@@ -1968,7 +2006,16 @@ export default function V1InventoryLedgerPage() {
             <BusinessListToolbarActions
               moduleTitle="库存台账"
               onExport={exportRows}
-              exportDisabled={rows.length === 0}
+              exportDisabled={loading || exporting || total === 0}
+              exportDisabledReason={
+                exporting
+                  ? '正在准备导出，请稍候'
+                  : loading
+                    ? '库存台账加载完成后可导出'
+                    : total === 0
+                      ? `当前筛选没有可导出的${activeLabel}记录`
+                      : ''
+              }
               onOpenColumnOrder={openColumnOrder}
             />
           </Space>

@@ -97,7 +97,7 @@ test('业务动作可用性：状态不适用原因优先于保存中，避免�
   )
 })
 
-test('生命周期动作槽：未选择时展示潜在槽位，选中后只展示当前合法动作', () => {
+test('生命周期动作槽：未选择时展示全部已授权动作，选中后只展示当前合法动作', () => {
   const actions = [
     { key: 'submit', label: '提交', permission: 'order.submit' },
     { key: 'close', label: '关闭', permission: 'order.close' },
@@ -138,11 +138,12 @@ test('生命周期动作槽：未选择时展示潜在槽位，选中后只展�
   assert.equal(closed.showPrimarySlot, false)
   assert.equal(closed.showMoreSlot, false)
   assert.equal(empty.showPrimarySlot, true)
-  assert.equal(empty.showMoreSlot, false)
+  assert.equal(empty.showMoreSlot, true)
   assert.equal(draft.primaryAction.key, 'submit')
   assert.equal(active.primaryAction.key, 'close')
   assert.equal(closed.primaryAction, null)
-  assert.equal(empty.primaryAction, null)
+  assert.equal(empty.primaryAction.key, 'submit')
+  assert.deepEqual(empty.availableActions, [])
   assert.deepEqual(
     draft.secondaryActions.map((action) => action.key),
     ['cancel']
@@ -152,10 +153,13 @@ test('生命周期动作槽：未选择时展示潜在槽位，选中后只展�
     ['cancel']
   )
   assert.deepEqual(closed.secondaryActions, [])
-  assert.deepEqual(empty.secondaryActions, [])
+  assert.deepEqual(
+    empty.secondaryActions.map((action) => action.key),
+    ['close', 'cancel']
+  )
 })
 
-test('生命周期动作槽：完全无权限时不展示，只有危险动作权限时仍留在更多操作', () => {
+test('生命周期动作槽：所有角色按能力裁剪，未选择也不泄露未授权动作', () => {
   const actions = [
     { key: 'submit', permission: 'order.submit' },
     { key: 'cancel', permission: 'order.cancel', danger: true },
@@ -186,6 +190,33 @@ test('生命周期动作槽：完全无权限时不展示，只有危险动作�
     cancelOnly.secondaryActions.map((action) => action.key),
     ['cancel']
   )
+
+  const unselectedCancelOnly = resolveBusinessLifecycleActions({
+    actions,
+    selected: false,
+    hasPermission: (action) => action.key === 'cancel',
+    canRun: () => false,
+  })
+  assert.equal(unselectedCancelOnly.hasCapability, true)
+  assert.equal(unselectedCancelOnly.showPrimarySlot, false)
+  assert.equal(unselectedCancelOnly.showMoreSlot, true)
+  assert.equal(unselectedCancelOnly.primaryAction, null)
+  assert.deepEqual(unselectedCancelOnly.availableActions, [])
+  assert.deepEqual(
+    unselectedCancelOnly.secondaryActions.map((action) => action.key),
+    ['cancel']
+  )
+
+  const unselectedSubmitOnly = resolveBusinessLifecycleActions({
+    actions,
+    selected: false,
+    hasPermission: (action) => action.key === 'submit',
+    canRun: () => false,
+  })
+  assert.equal(unselectedSubmitOnly.showPrimarySlot, true)
+  assert.equal(unselectedSubmitOnly.showMoreSlot, false)
+  assert.equal(unselectedSubmitOnly.primaryAction.key, 'submit')
+  assert.deepEqual(unselectedSubmitOnly.secondaryActions, [])
 })
 
 test('窄屏动作排序：状态和 loading 只改变禁用态，不改变固定优先级与原始顺序', () => {

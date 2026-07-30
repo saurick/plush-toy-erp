@@ -200,7 +200,7 @@ function containsDeferredSelectionAction(action) {
   )
 }
 
-function ResponsiveSelectionActions({ children, hasSelection }) {
+function ResponsiveSelectionActions({ children }) {
   const screens = Grid.useBreakpoint()
   const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
   const moreActionsButtonRef = React.useRef(null)
@@ -218,8 +218,8 @@ function ResponsiveSelectionActions({ children, hasSelection }) {
   }, [])
 
   React.useEffect(() => {
-    if (!compact || !hasSelection) setMoreActionsOpen(false)
-  }, [compact, hasSelection])
+    if (!compact) setMoreActionsOpen(false)
+  }, [compact])
 
   if (!compact || overflow.length === 0) {
     return (
@@ -246,7 +246,6 @@ function ResponsiveSelectionActions({ children, hasSelection }) {
         <Button
           ref={moreActionsButtonRef}
           className="erp-business-selection-action-bar__compact-more"
-          disabled={!hasSelection}
           icon={<MoreOutlined />}
           aria-label={`更多操作，共 ${overflow.length} 项`}
           onClick={() => setMoreActionsOpen(true)}
@@ -269,7 +268,9 @@ function ResponsiveSelectionActions({ children, hasSelection }) {
           window.requestAnimationFrame(() => {
             if (open) {
               moreActionsListRef.current
-                ?.querySelector('button:not(:disabled)')
+                ?.querySelector(
+                  'button:not(:disabled), .erp-business-action-tooltip-anchor[tabindex="0"]'
+                )
                 ?.focus({ preventScroll: true })
               return
             }
@@ -854,9 +855,7 @@ export function SelectionActionBar({
           </div>
         ) : null}
       </div>
-      <ResponsiveSelectionActions hasSelection={hasSelection}>
-        {children}
-      </ResponsiveSelectionActions>
+      <ResponsiveSelectionActions>{children}</ResponsiveSelectionActions>
     </div>
   )
 

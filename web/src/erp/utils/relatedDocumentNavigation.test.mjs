@@ -107,7 +107,7 @@ test('quality type changes delegate source compatibility and outsourcing transla
   )
   assert.match(
     source,
-    /listOutsourcingReturnQualityInspections\([\s\S]{0,180}fact_id: routeSourceParams\.fact_id/u
+    /const list = all[\s\S]{0,120}listAllOutsourcingReturnQualityInspections[\s\S]{0,120}listOutsourcingReturnQualityInspections[\s\S]{0,240}fact_id: routeSourceParams\.fact_id/u
   )
   assert.match(source, /!isQualityInspectionRouteSourceCompatible\(/u)
   assert.match(

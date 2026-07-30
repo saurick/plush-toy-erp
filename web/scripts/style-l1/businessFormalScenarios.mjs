@@ -2061,6 +2061,51 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     {
+      name: 'business-production-orders-refresh-entrypoint',
+      path: '/erp/production/orders',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        configRevision: 'style-l1-business-production-order-refresh',
+        configHash: 'style-l1-business-production-order-refresh-hash',
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '生产订单')
+        await expectText(page, 'MO-STYLE-L1-20260713')
+        await expectText(page, '维护生产计划单')
+        await expectButton(page, '新建生产订单')
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-production-orders',
+        })
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '当前页面数据已刷新')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-orders-shell-refresh-only-desktop.png'
+          ),
+          fullPage: true,
+        })
+        await page.setViewportSize({ width: 520, height: 900 })
+        await page.waitForTimeout(160)
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-production-orders-narrow',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-production-orders-narrow'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-orders-shell-refresh-only-narrow.png'
+          ),
+          fullPage: true,
+        })
+      },
+    },
+    {
       name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
@@ -4221,6 +4266,13 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '出库管理')
         await expectText(page, 'RSV-STYLE-L1')
+        await expectText(page, 'SO-RESERVATION-STYLE-L1')
+        await expectText(page, '第 3 行')
+        await expectText(page, '库存预留毛绒兔')
+        await expectText(page, 'SKU-RESERVATION-STYLE-L1')
+        await expectText(page, '成品仓')
+        await expectText(page, 'LOT-RESERVATION-STYLE-L1')
+        await expectText(page, '件')
         await expectText(page, '库存预留仅在确认出货时随出库处理一并消耗')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-outbound-reservations',
@@ -4228,6 +4280,17 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '登记库存预留')
         await assertTextAbsent(page, '新建出货单')
         await assertTextAbsent(page, '生成出库')
+        for (const technicalField of [
+          'sales_order_id',
+          'sales_order_item_id',
+          'product_id',
+          'product_sku_id',
+          'warehouse_id',
+          'unit_id',
+          'lot_id',
+        ]) {
+          await assertTextAbsent(page, technicalField)
+        }
         await expectNoButton(page, '消耗')
         await assertNoHorizontalOverflow(page, 'business-v1-outbound')
 

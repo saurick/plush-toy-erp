@@ -67,20 +67,17 @@ export function resolveBusinessLifecycleActions({
   const availableActions = selected
     ? authorizedActions.filter((action) => canRun(action))
     : []
+  const visibleActions = selected ? availableActions : authorizedActions
   const primaryAction =
-    availableActions.find((action) => isPrimary(action)) || null
-  const potentialPrimaryAction =
-    authorizedActions.find((action) => isPrimary(action)) || null
-  const secondaryActions = availableActions.filter(
+    visibleActions.find((action) => isPrimary(action)) || null
+  const secondaryActions = visibleActions.filter(
     (action) => action.key !== primaryAction?.key
   )
 
   return {
     hasCapability: authorizedActions.length > 0,
-    showPrimarySlot: selected
-      ? Boolean(primaryAction)
-      : Boolean(potentialPrimaryAction),
-    showMoreSlot: selected && secondaryActions.length > 0,
+    showPrimarySlot: Boolean(primaryAction),
+    showMoreSlot: secondaryActions.length > 0,
     authorizedActions,
     availableActions,
     primaryAction,

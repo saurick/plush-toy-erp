@@ -1,9 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  CheckCircleOutlined,
-  QuestionCircleOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons'
+import { CheckCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -325,8 +321,8 @@ export default function ApprovalResponsibilityPanel({
     (draftDirty || Boolean(appliedReceipt) || Boolean(pendingPayload))
 
   useEffect(() => {
-    onDirtyChange?.(pageDirty)
-  }, [onDirtyChange, pageDirty])
+    onDirtyChange?.(pageDirty || editorDirty)
+  }, [editorDirty, onDirtyChange, pageDirty])
 
   const adminByID = useMemo(
     () =>
@@ -599,28 +595,6 @@ export default function ApprovalResponsibilityPanel({
     setEditorDirty(false)
     setEditorValues({})
     form.resetFields()
-  }
-
-  const requestReload = () => {
-    if (mutationRef.current) {
-      message.info('审批责任正在保存，请稍候')
-      return
-    }
-    if (!pageDirty && !editorDirty) {
-      return load()
-    }
-    modal.confirm({
-      centered: true,
-      title: '刷新前要放弃审批责任调整吗？',
-      content:
-        '刷新会重新读取当前生效设置，弹窗内尚未保存的选择、未生效调整或等待确认的保存结果都会丢失。',
-      okText: '放弃并刷新',
-      cancelText: '继续处理',
-      onOk: () => {
-        closeEditor(true)
-        return load()
-      },
-    })
   }
 
   const saveEditor = async () => {
@@ -946,14 +920,6 @@ export default function ApprovalResponsibilityPanel({
                   aria-label="审批责任说明"
                 />
               </Popover>
-              <Button
-                type="text"
-                shape="circle"
-                icon={<ReloadOutlined />}
-                aria-label="刷新审批责任"
-                disabled={saving}
-                onClick={requestReload}
-              />
             </Space>
           </div>
 

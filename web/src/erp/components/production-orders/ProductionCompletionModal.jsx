@@ -39,6 +39,7 @@ export default function ProductionCompletionModal({
   items = [],
   blockedItems = [],
   facts = [],
+  wipAggregate = null,
   warehouseOptions = [],
   lots = [],
   loading = false,
@@ -47,20 +48,40 @@ export default function ProductionCompletionModal({
 }) {
   const [form] = Form.useForm()
   const selectedItemID = Form.useWatch('production_order_item_id', form)
+  const selectedBatchID = Form.useWatch('production_wip_batch_id', form)
   const lotSelection = Form.useWatch('lot_selection', form)
   const choices = useMemo(
-    () => buildProductionCompletionChoices(items, facts),
-    [facts, items]
+    () => buildProductionCompletionChoices(items, facts, wipAggregate),
+    [facts, items, wipAggregate]
   )
   const selectedChoice = choiceByID(choices, selectedItemID)
+  const selectedBatchChoice = choiceByID(
+    selectedChoice?.batchChoices || [],
+    selectedBatchID
+  )
   const lotOptions = useMemo(
     () => buildProductionCompletionLotOptions(selectedChoice?.item, lots),
     [lots, selectedChoice]
   )
 
+  React.useEffect(() => {
+    if (!open || !selectedChoice?.requiresBatch || selectedBatchID) return
+    const firstBatch = selectedChoice.batchChoices.find(
+      (batch) => !batch.disabled
+    )
+    if (!firstBatch) return
+    form.setFieldsValue({
+      production_wip_batch_id: firstBatch.value,
+      quantity: firstBatch.remaining,
+    })
+  }, [form, open, selectedBatchID, selectedChoice])
+
   const initializeOpenForm = (visible) => {
     if (!visible) return
     const firstAvailable = choices.find((item) => !item.disabled)
+    const firstBatch = firstAvailable?.batchChoices?.find(
+      (batch) => !batch.disabled
+    )
     const firstLotOptions = buildProductionCompletionLotOptions(
       firstAvailable?.item,
       lots
@@ -70,7 +91,8 @@ export default function ProductionCompletionModal({
     form.resetFields()
     form.setFieldsValue({
       production_order_item_id: firstAvailable?.value,
-      quantity: firstAvailable?.remaining || '',
+      production_wip_batch_id: firstBatch?.value,
+      quantity: firstBatch?.remaining || firstAvailable?.remaining || '',
       warehouse_id: warehouseOptions[0]?.value,
       lot_selection: firstLotSelection,
       lot_id:
@@ -93,7 +115,9 @@ export default function ProductionCompletionModal({
 
   return (
     <Modal
-      title="登记完工入库"
+      title={
+        order?.status === 'CLOSED' ? '登记返工补完工' : '登记完工入库'
+      }
       open={open}
       okText="生成完工记录"
       cancelText="取消"
@@ -106,7 +130,11 @@ export default function ProductionCompletionModal({
       <Alert
         type="info"
         showIcon
-        message="系统会按生产订单明细核对完工数量、产品、规格和单位；过账后才会更新库存。"
+        message={
+          order?.status === 'CLOSED'
+            ? '当前订单已关闭，只能按已完成包装验收的成品返工补制批次登记补完工；过账后才会更新库存。'
+            : '系统会按生产订单明细和包装验收批次核对完工数量、产品、规格和单位；过账后才会更新库存。'
+        }
       />
       {blockedItems.length > 0 ? (
         <Alert
@@ -137,7 +165,12 @@ export default function ProductionCompletionModal({
           {
             key: 'status',
             label: '来源状态',
-            children: order?.status === 'RELEASED' ? '已发布' : '待核对',
+            children:
+              order?.status === 'RELEASED'
+                ? '已发布'
+                : order?.status === 'CLOSED'
+                  ? '已关闭，仅登记返工补完工'
+                  : '待核对',
           },
         ]}
       />
@@ -157,6 +190,9 @@ export default function ProductionCompletionModal({
             }))}
             onChange={(value) => {
               const choice = choiceByID(choices, value)
+              const nextBatch = choice?.batchChoices?.find(
+                (batch) => !batch.disabled
+              )
               const nextLotOptions = buildProductionCompletionLotOptions(
                 choice?.item,
                 lots
@@ -164,7 +200,8 @@ export default function ProductionCompletionModal({
               const nextLotSelection =
                 sourceInboundLotSelectionForOptions(nextLotOptions)
               form.setFieldsValue({
-                quantity: choice?.remaining || '',
+                production_wip_batch_id: nextBatch?.value,
+                quantity: nextBatch?.remaining || choice?.remaining || '',
                 lot_selection: nextLotSelection,
                 lot_id:
                   nextLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
@@ -175,11 +212,38 @@ export default function ProductionCompletionModal({
             }}
           />
         </Form.Item>
+        {selectedChoice?.requiresBatch ? (
+          <Form.Item
+            name="production_wip_batch_id"
+            label="完工来源批次"
+            rules={[{ required: true, message: '请选择对应的包装验收批次' }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={selectedChoice.batchChoices.map(
+                ({ value, label, disabled }) => ({
+                  value,
+                  label,
+                  disabled,
+                })
+              )}
+              placeholder="选择已完成包装验收的批次"
+              onChange={(value) => {
+                const batchChoice = choiceByID(
+                  selectedChoice.batchChoices,
+                  value
+                )
+                form.setFieldValue('quantity', batchChoice?.remaining || '')
+              }}
+            />
+          </Form.Item>
+        ) : null}
         {selectedChoice ? (
           <Text type="secondary">
-            计划 {selectedChoice.planned || '0'} / 当前可完工上限{' '}
-            {selectedChoice.acceptedPackaging || '0'} / 已过账{' '}
-            {selectedChoice.posted || '0'} / 草稿 {selectedChoice.draft || '0'}
+            {selectedBatchChoice
+              ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已过账 ${selectedBatchChoice.posted || '0'} / 草稿 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
+              : `计划 ${selectedChoice.planned || '0'} / 当前可完工上限 ${selectedChoice.acceptedPackaging || '0'} / 已过账 ${selectedChoice.posted || '0'} / 草稿 ${selectedChoice.draft || '0'}`}
           </Text>
         ) : null}
         <Form.Item
@@ -193,12 +257,14 @@ export default function ProductionCompletionModal({
                   if (
                     compareProductionCompletionQuantity(
                       value,
-                      selectedChoice?.remaining || '0'
+                      selectedBatchChoice?.remaining ||
+                        selectedChoice?.remaining ||
+                        '0'
                     ) > 0
                   ) {
                     return Promise.reject(
                       new Error(
-                        '本次数量不能超过当前可完工上限扣减已过账后的剩余数量'
+                        '本次数量不能超过所选包装验收批次扣减已过账和草稿后的剩余数量'
                       )
                     )
                   }

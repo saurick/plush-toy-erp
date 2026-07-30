@@ -38,3 +38,14 @@ test("production order browser E2E covers lifecycle, stale recovery and role bou
     );
   }
 });
+
+test("production order browser E2E refreshes from the ERP shell", () => {
+  assert.match(
+    source,
+    /\.locator\("\.erp-admin-header"\)\s*\.getByRole\("button", \{ name: "刷新当前页" \}\)/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /\.getByRole\("main"\)[\s\S]{0,160}name: "刷新当前页"/u,
+  );
+});

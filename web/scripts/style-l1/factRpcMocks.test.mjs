@@ -594,6 +594,27 @@ test('style-l1 source aggregate mocks preserve full-read paging and source filte
   assert.equal(reservations.result.data.limit, 200)
   assert.equal(reservations.result.data.offset, 0)
   assert.equal(reservations.result.data.stock_reservations.length, 1)
+  assert.deepEqual(
+    {
+      orderNo: reservations.result.data.stock_reservations[0].sales_order_no,
+      orderLine:
+        reservations.result.data.stock_reservations[0].sales_order_line_no,
+      product: reservations.result.data.stock_reservations[0].product_name,
+      sku: reservations.result.data.stock_reservations[0].product_sku_code,
+      warehouse: reservations.result.data.stock_reservations[0].warehouse_name,
+      lot: reservations.result.data.stock_reservations[0].lot_no,
+      unit: reservations.result.data.stock_reservations[0].unit_name,
+    },
+    {
+      orderNo: 'SO-RESERVATION-STYLE-L1',
+      orderLine: 3,
+      product: '库存预留毛绒兔',
+      sku: 'SKU-RESERVATION-STYLE-L1',
+      warehouse: '成品仓',
+      lot: 'LOT-RESERVATION-STYLE-L1',
+      unit: '件',
+    }
+  )
 
   const unrelatedReservations = await call('list_stock_reservations', {
     source_id: 999,
@@ -686,7 +707,8 @@ test('style-l1 operational fact mock enforces production completion lot intent',
     customer_key: 'yoyoosun',
     fact_no: 'PROD-FG-STYLE-L1',
     production_order_id: 71,
-    production_order_item_id: 7101,
+    production_order_item_id: 7100,
+    production_wip_batch_id: 91_004,
     warehouse_id: 1,
     new_lot_no: 'PROD-NEW-LOT-REREAD-L1',
     quantity: '2',
@@ -706,7 +728,7 @@ test('style-l1 operational fact mock enforces production completion lot intent',
     customer_key: 'yoyoosun',
     source_type: 'PRODUCTION_ORDER',
     source_id: 71,
-    source_line_id: 7101,
+    source_line_id: 7100,
     limit: 100,
     offset: 0,
   })
@@ -716,6 +738,15 @@ test('style-l1 operational fact mock enforces production completion lot intent',
   )
   assert.equal(reread.fact_type, 'FINISHED_GOODS_RECEIPT')
   assert.equal(reread.lot_id, 480)
+  assert.equal(
+    reread.production_wip_batch_id,
+    params.production_wip_batch_id
+  )
+  assert.equal(reread.production_order_id, params.production_order_id)
+  assert.equal(
+    reread.production_order_item_id,
+    params.production_order_item_id
+  )
 
   const replay = await call('create_production_completion_from_order', params)
   assert.equal(replay.result.code, 0)
@@ -734,6 +765,13 @@ test('style-l1 operational fact mock enforces production completion lot intent',
     new_lot_no: undefined,
   })
   assert.equal(missingLot.result.code, 40010)
+
+  const missingBatch = await call('create_production_completion_from_order', {
+    ...params,
+    idempotency_key: 'style-l1-production-completion-missing-batch',
+    production_wip_batch_id: undefined,
+  })
+  assert.equal(missingBatch.result.code, 40010)
 
   const changedIntent = await call('create_production_completion_from_order', {
     ...params,
@@ -785,6 +823,9 @@ test('style-l1 operational fact mock enforces source-bound production rework', a
   assert.equal(created.status, 'DRAFT')
   assert.equal(created.source_id, source.id)
   assert.equal(created.lot_id, source.lot_id)
+  assert.equal(created.production_wip_batch_id, null)
+  assert.equal(created.production_order_id, 71)
+  assert.equal(created.production_order_item_id, 7100)
 
   const replay = await call('create_production_rework_from_completion', params)
   assert.equal(replay.result.code, 0)
@@ -2151,6 +2192,11 @@ test('style-l1 workflow process context mock returns only visible task runtime t
   const visible = await call('get_task_process_context', { task_id: 83 })
   assert.equal(visible.result.code, 0)
   assert.deepEqual(visible.result.data.process_context, processContext)
+
+  const events = await call('list_task_events', { task_id: 83, limit: 100 })
+  assert.equal(events.result.code, 0)
+  assert.equal(events.result.data.items.length, 1)
+  assert.equal(events.result.data.truncated, false)
 
   const missing = await call('get_task_process_context', { task_id: 84 })
   assert.equal(missing.result.code, 40010)

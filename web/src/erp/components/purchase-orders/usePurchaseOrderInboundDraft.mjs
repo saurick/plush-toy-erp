@@ -2,10 +2,8 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import {
-  createPurchaseReceiptFromPurchaseOrder,
-  listAllPurchaseReceipts,
-} from '../../api/purchaseApi.mjs'
+import { getPurchaseOrderReceiptProgress } from '../../api/masterDataOrderApi.mjs'
+import { createPurchaseReceiptFromPurchaseOrder } from '../../api/purchaseApi.mjs'
 import { V1_ROUTE_PATHS } from '../../utils/masterDataOrderView.mjs'
 import {
   createPurchaseReceiptMutationAttemptStore,
@@ -19,11 +17,8 @@ import {
 
 export function usePurchaseOrderInboundDraft({
   form,
-  loadOrderItems,
-  materials = [],
   navigate,
   selectedOrder,
-  unitOptions = [],
 }) {
   const [generatingInboundDraft, setGeneratingInboundDraft] = useState(false)
   const [inboundDraftModalOpen, setInboundDraftModalOpen] = useState(false)
@@ -57,31 +52,18 @@ export function usePurchaseOrderInboundDraft({
       setInboundDraftModalOpen(true)
       setInboundDraftPreviewLoading(true)
       try {
-        const [orderItems, receiptData] = await Promise.all([
-          loadOrderItems(record),
-          listAllPurchaseReceipts({
-            purchase_order_id: record.id,
-          }),
-        ])
-        setInboundDraftPreviewRows(
-          buildInboundDraftPreviewRows({
-            orderItems,
-            receipts: receiptData?.purchase_receipts || [],
-            materialOptions: materials.map((item) => ({
-              value: item.id,
-              label: item.name || item.code || '材料已关联',
-            })),
-            unitOptions,
-          })
-        )
+        const progress = await getPurchaseOrderReceiptProgress({
+          id: record.id,
+        })
+        setInboundDraftPreviewRows(buildInboundDraftPreviewRows(progress))
       } catch (error) {
         setInboundDraftPreviewRows([])
-        message.warning(getActionErrorMessage(error, '加载采购来源明细失败'))
+        message.warning(getActionErrorMessage(error, '加载采购入库进度失败'))
       } finally {
         setInboundDraftPreviewLoading(false)
       }
     },
-    [form, loadOrderItems, materials, unitOptions]
+    [form]
   )
 
   const createInboundDraftFromOrder = useCallback(async () => {
@@ -131,7 +113,7 @@ export function usePurchaseOrderInboundDraft({
   }, [closeInboundDraftModal, form, navigate, selectedOrder])
 
   const hasInboundDraftRemaining = useMemo(
-    () => inboundDraftPreviewRows.some((row) => row.remainingQuantity > 0),
+    () => inboundDraftPreviewRows.some((row) => row.canGenerate),
     [inboundDraftPreviewRows]
   )
 

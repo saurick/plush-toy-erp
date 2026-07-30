@@ -3,6 +3,11 @@ import {
   cancelOutsourcingFact,
   cancelProductionFact,
   cancelShipment,
+  listAllFinanceFacts,
+  listAllOutsourcingFacts,
+  listAllProductionFacts,
+  listAllShipments,
+  listAllStockReservations,
   listFinanceFacts,
   listOutsourcingFacts,
   listProductionFacts,
@@ -192,6 +197,63 @@ function stockContextText(record = {}) {
   ].join(' / ')
 }
 
+function namedBusinessReference(name, code, fallback) {
+  const normalizedName = normalizeText(name)
+  const normalizedCode = normalizeText(code)
+  if (normalizedName && normalizedCode) {
+    return `${normalizedName}（${normalizedCode}）`
+  }
+  return normalizedName || normalizedCode || fallback
+}
+
+function reservationSalesOrderText(record = {}) {
+  return (
+    normalizeText(record.sales_order_no) ||
+    (record.sales_order_id ? '销售订单已关联' : '-')
+  )
+}
+
+function reservationSalesOrderLineText(record = {}) {
+  const lineNo = Number(record.sales_order_line_no || 0)
+  if (Number.isSafeInteger(lineNo) && lineNo > 0) {
+    return `第 ${lineNo} 行`
+  }
+  return record.sales_order_item_id ? '订单行已关联' : '-'
+}
+
+function reservationProductText(record = {}) {
+  const product = namedBusinessReference(
+    record.product_name,
+    record.product_code,
+    record.product_id ? '产品已关联' : '-'
+  )
+  const sku = namedBusinessReference(
+    record.product_sku_name,
+    record.product_sku_code,
+    record.product_sku_id ? '规格已关联' : ''
+  )
+  return [product, sku].filter(Boolean).join(' / ')
+}
+
+function reservationWarehouseLotText(record = {}) {
+  const warehouse = namedBusinessReference(
+    record.warehouse_name,
+    record.warehouse_code,
+    record.warehouse_id ? '仓库已关联' : '-'
+  )
+  const lot =
+    normalizeText(record.lot_no) || (record.lot_id ? '批次已关联' : '无批次')
+  return `${warehouse} / ${lot}`
+}
+
+function reservationUnitText(record = {}) {
+  return namedBusinessReference(
+    record.unit_name,
+    record.unit_code,
+    record.unit_id ? '单位已关联' : '-'
+  )
+}
+
 function supplierColumnText(record = {}) {
   return record.supplier_name || safeRefText('供应商', record.supplier_id)
 }
@@ -236,6 +298,7 @@ export function buildOperationalFactViewConfigs() {
       title: '生产记录',
       listKey: 'production_facts',
       list: listProductionFacts,
+      listAll: listAllProductionFacts,
       post: postProductionFact,
       cancel: cancelProductionFact,
       readPermissions: ACTION_PERMISSIONS.productionRead,
@@ -248,6 +311,7 @@ export function buildOperationalFactViewConfigs() {
       title: '委外记录',
       listKey: 'outsourcing_facts',
       list: listOutsourcingFacts,
+      listAll: listAllOutsourcingFacts,
       post: postOutsourcingFact,
       cancel: cancelOutsourcingFact,
       readPermissions: ACTION_PERMISSIONS.outsourcingRead,
@@ -260,6 +324,7 @@ export function buildOperationalFactViewConfigs() {
       title: '出货记录',
       listKey: 'shipments',
       list: listShipments,
+      listAll: listAllShipments,
       post: shipShipment,
       cancel: cancelShipment,
       writePermissions: ACTION_PERMISSIONS.shipmentWrite,
@@ -272,6 +337,7 @@ export function buildOperationalFactViewConfigs() {
       title: '库存预留',
       listKey: 'stock_reservations',
       list: listStockReservations,
+      listAll: listAllStockReservations,
       release: releaseStockReservation,
       releasePermissions: ACTION_PERMISSIONS.reservationRelease,
       dateOptions: RESERVED_DATE_FILTER_OPTIONS,
@@ -281,6 +347,7 @@ export function buildOperationalFactViewConfigs() {
       title: '财务记录',
       listKey: 'finance_facts',
       list: listFinanceFacts,
+      listAll: listAllFinanceFacts,
       post: postFinanceFact,
       settle: settleFinanceFact,
       cancel: cancelFinanceFact,
@@ -551,15 +618,63 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       ...baseColumns,
       {
         title: '销售订单',
-        dataIndex: 'sales_order_id',
-        width: 150,
-        sortType: 'number',
-        render: (value) => (value ? '销售订单已关联' : '-'),
-        exportValue: (record) =>
-          record?.sales_order_id ? '销售订单已关联' : '',
+        width: 190,
+        sortValue: reservationSalesOrderText,
+        render: (_, record) => reservationSalesOrderText(record),
+        exportValue: reservationSalesOrderText,
       },
-      ...quantityColumns,
-      ...sourceColumns,
+      {
+        title: '来源行',
+        width: 100,
+        sortValue: reservationSalesOrderLineText,
+        render: (_, record) => reservationSalesOrderLineText(record),
+        exportValue: reservationSalesOrderLineText,
+      },
+      {
+        title: '产品 / 规格',
+        width: 240,
+        sortValue: reservationProductText,
+        render: (_, record) => reservationProductText(record),
+        exportValue: reservationProductText,
+      },
+      {
+        title: '仓库 / 批次',
+        width: 240,
+        sortValue: reservationWarehouseLotText,
+        render: (_, record) => reservationWarehouseLotText(record),
+        exportValue: reservationWarehouseLotText,
+      },
+      {
+        title: '预留数量',
+        exportTitle: '预留数量',
+        dataIndex: 'quantity',
+        width: 120,
+        sorter: (left, right) =>
+          compareOperationalFactDecimalValues(left?.quantity, right?.quantity),
+        render: formatQuantity,
+        exportValue: (record) => formatQuantity(record?.quantity),
+      },
+      {
+        title: '单位',
+        width: 110,
+        sortValue: reservationUnitText,
+        render: (_, record) => reservationUnitText(record),
+        exportValue: reservationUnitText,
+      },
+      {
+        title: '预留日期',
+        dataIndex: 'reserved_at',
+        width: 120,
+        sortType: 'number',
+        render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record?.reserved_at),
+      },
+      {
+        title: '备注',
+        dataIndex: 'note',
+        width: 260,
+        sortable: false,
+      },
     ],
     finance: financeColumns,
   }

@@ -8,6 +8,7 @@ import {
   validateProductionOrderList,
   validateProductionOrderOptions,
 } from '../utils/productionOrderModel.mjs'
+import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const rpc = new JsonRpc({
   url: 'production_order',
@@ -41,6 +42,18 @@ async function aggregateMutation(method, params, expected) {
 export async function listProductionOrders(params = {}, options = {}) {
   const result = await rpc.call('list_production_orders', params, options)
   return validateProductionOrderList(dataOf(result))
+}
+
+export async function listAllProductionOrders(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listProductionOrders,
+    params,
+    'production_orders',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的生产订单列表不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function getProductionOrder(productionOrderID, options = {}) {

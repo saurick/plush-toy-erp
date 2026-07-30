@@ -314,7 +314,7 @@ export async function runProductionOrderBrowserE2E({
       .locator(".ant-modal-footer button:not(.ant-btn-primary)")
       .click();
     await page
-      .getByRole("main")
+      .locator(".erp-admin-header")
       .getByRole("button", { name: "刷新当前页" })
       .click();
     await selectOrder(page, lifecycleOrderNo);

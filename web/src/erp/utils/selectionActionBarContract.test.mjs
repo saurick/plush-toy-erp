@@ -30,14 +30,22 @@ test('当前操作条按手机和平板宽度收口动作，不为页面各写�
   )
 })
 
-test('当前操作条的更多面板使用现有 Drawer 契约并显式恢复触发点焦点', () => {
+test('当前操作条的更多面板在未选择时也可查看，并显式恢复触发点焦点', () => {
   assert.match(layoutSource, /<Drawer/u)
   assert.match(layoutSource, /open=\{moreActionsOpen\}/u)
   assert.match(layoutSource, /keyboard/u)
   assert.match(layoutSource, /maskClosable/u)
+  assert.doesNotMatch(
+    layoutSource,
+    /erp-business-selection-action-bar__compact-more[\s\S]*?disabled=\{!hasSelection\}/u
+  )
+  assert.doesNotMatch(
+    layoutSource,
+    /if \(!compact \|\| !hasSelection\) setMoreActionsOpen\(false\)/u
+  )
   assert.match(
     layoutSource,
-    /moreActionsListRef\.current[\s\S]*?button:not\(:disabled\)[\s\S]*?preventScroll: true/u
+    /moreActionsListRef\.current[\s\S]*?button:not\(:disabled\), \.erp-business-action-tooltip-anchor\[tabindex="0"\][\s\S]*?preventScroll: true/u
   )
   assert.match(layoutSource, /moreActionsButtonRef\.current\?\.focus/u)
   assert.doesNotMatch(layoutSource, /useState\(true\)/u)

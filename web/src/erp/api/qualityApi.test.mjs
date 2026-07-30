@@ -82,7 +82,15 @@ test('qualityApi: exposes dedicated outsourcing return quality commands', () => 
 test('qualityApi: source actions reread all related quality inspections', () => {
   assert.match(
     source,
+    /export async function listAllQualityInspections[\s\S]*?listAllPaginatedRecords\(\s*listQualityInspections,\s*params,\s*'quality_inspections'/u
+  )
+  assert.match(
+    source,
     /export async function listAllFinishedGoodsQualityInspections[\s\S]*?listAllPaginatedRecords\(\s*listFinishedGoodsQualityInspections,\s*params,\s*'quality_inspections'/u
+  )
+  assert.match(
+    source,
+    /export async function listAllProductionStageQualityInspections[\s\S]*?listAllPaginatedRecords\(\s*listProductionStageQualityInspections,\s*params,\s*'quality_inspections'/u
   )
   assert.match(
     source,

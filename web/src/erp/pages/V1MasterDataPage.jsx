@@ -37,7 +37,6 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import {
-  downloadBusinessCSV,
   getPreferredColumnOrder,
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
@@ -106,6 +105,7 @@ import {
   getRecordSearchPlaceholder,
   needsUnitDictionary,
 } from '../components/master-data/masterDataPageConfig.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 export default function V1MasterDataPage({ type }) {
   const isProductCatalogPage = type === 'product_skus'
@@ -499,6 +499,14 @@ export default function V1MasterDataPage({ type }) {
     }
   }, [beginLatestRequest, canReadProcesses, effectiveType])
 
+  const recordListParams = useMemo(
+    () => ({
+      keyword,
+      active_only: activeOnly,
+    }),
+    [activeOnly, keyword]
+  )
+
   const loadRecords = useCallback(async () => {
     const request = beginLatestRequest('records')
     if (!canReadCurrentRecord) {
@@ -514,8 +522,7 @@ export default function V1MasterDataPage({ type }) {
     try {
       const result = await config.list(
         {
-          keyword,
-          active_only: activeOnly,
+          ...recordListParams,
           ...getBusinessPaginationParams(pagination),
         },
         { signal: request.signal }
@@ -546,12 +553,11 @@ export default function V1MasterDataPage({ type }) {
       }
     }
   }, [
-    activeOnly,
     beginLatestRequest,
     canReadCurrentRecord,
     config,
-    keyword,
     pagination,
+    recordListParams,
   ])
 
   const refreshCurrentData = useCallback(async () => {
@@ -906,6 +912,21 @@ export default function V1MasterDataPage({ type }) {
     preferredRecordColumnOrder,
     recordColumns,
   ])
+  const loadExportRecords = useCallback(
+    async ({ signal }) => {
+      if (!canReadCurrentRecord) return []
+      const result = await config.listAll(recordListParams, { signal })
+      return result?.[config.recordKey]
+    },
+    [canReadCurrentRecord, config, recordListParams]
+  )
+  const { exporting, exportRows: exportRecords } = useBusinessListExport({
+    requestKey: `master-data-export:${effectiveType}`,
+    loadRows: loadExportRecords,
+    filename: `${config.title}-筛选结果-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: orderedRecordColumns,
+    recordLabel: `${entityLabel}记录`,
+  })
 
   const activeRecordCount = useMemo(
     () => records.filter((record) => record.is_active !== false).length,
@@ -929,14 +950,6 @@ export default function V1MasterDataPage({ type }) {
       getRecordCode(selectedRecord, effectiveType) || `${entityLabel}未编号`
     } / ${getRecordName(selectedRecord, effectiveType) || `未命名${entityLabel}`}`
   }, [effectiveType, entityLabel, selectedRecord])
-  const exportRecords = () => {
-    downloadBusinessCSV({
-      filename: `${config.title}-筛选结果-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: orderedRecordColumns,
-      rows: records,
-    })
-    message.success('已导出筛选结果')
-  }
   return (
     <BusinessPageLayout className="erp-v1-master-data-page">
       <PageHeaderCard
@@ -992,7 +1005,8 @@ export default function V1MasterDataPage({ type }) {
           <Space wrap>
             <ToolbarButton
               icon={<DownloadOutlined />}
-              disabled={records.length === 0}
+              loading={exporting}
+              disabled={loading || exporting || total === 0}
               onClick={exportRecords}
             >
               导出筛选结果

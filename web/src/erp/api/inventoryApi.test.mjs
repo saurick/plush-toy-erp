@@ -65,4 +65,8 @@ test('inventoryApi: source eligibility reads use strict complete pagination', ()
     source,
     /export async function listAllInventoryLots[\s\S]*?listAllPaginatedRecords\(\s*listInventoryLots,\s*params,\s*'inventory_lots'/u
   )
+  assert.match(
+    source,
+    /export async function listAllInventoryTxns[\s\S]*?listAllPaginatedRecords\(\s*listInventoryTxns,\s*params,\s*'inventory_txns'/u
+  )
 })

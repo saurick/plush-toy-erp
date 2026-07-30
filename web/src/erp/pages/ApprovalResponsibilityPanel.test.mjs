@@ -77,7 +77,7 @@ test('approval responsibility panel distinguishes unconfigured from disabled', (
 })
 
 test('approval responsibility panel protects modal and page drafts', () => {
-  assert.match(source, /onDirtyChange\?\.\(pageDirty\)/)
+  assert.match(source, /onDirtyChange\?\.\(pageDirty \|\| editorDirty\)/)
   assert.match(
     source,
     /draftDirty \|\| Boolean\(appliedReceipt\) \|\| Boolean\(pendingPayload\)/
@@ -97,8 +97,8 @@ test('approval responsibility panel protects modal and page drafts', () => {
   )
   assert.match(source, /放弃本次责任调整/)
   assert.match(source, /discardVersion/)
-  assert.match(source, /const requestReload = \(\) =>/)
-  assert.match(source, /if \(!pageDirty && !editorDirty\)/)
-  assert.match(source, /刷新前要放弃审批责任调整吗/)
-  assert.match(source, /onClick=\{requestReload\}/)
+  assert.match(source, /\[active, discardVersion, load, refreshVersion\]/)
+  assert.doesNotMatch(source, /const requestReload = \(\) =>/)
+  assert.doesNotMatch(source, /刷新审批责任/)
+  assert.doesNotMatch(source, /ReloadOutlined/)
 })

@@ -62,6 +62,10 @@ test('source-action reference loading exposes strict complete pagination', () =>
     source,
     /export async function listAllSalesOrders[\s\S]*?listAllPaginatedRecords\(\s*listSalesOrders,\s*params,\s*'sales_orders'/u
   )
+  assert.match(
+    source,
+    /export async function listAllPurchaseOrders[\s\S]*?listAllPaginatedRecords\(\s*listPurchaseOrders,\s*params,\s*'purchase_orders'/u
+  )
 })
 
 test('confirmed outsourcing candidate loading uses complete strict pagination', () => {
@@ -285,6 +289,24 @@ test('masterDataOrderApi: source-document previews use version fences without fo
       )
     )
   }
+})
+
+test('masterDataOrderApi: purchase receipt progress is a validated server-owned projection', () => {
+  const functionSource = exportedFunctionSource(
+    'getPurchaseOrderReceiptProgress'
+  )
+  assert.match(
+    functionSource,
+    /purchaseOrderRpc\.call\(\s*'get_purchase_order_receipt_progress'/u
+  )
+  assert.match(
+    functionSource,
+    /validatePurchaseOrderReceiptProgress\([\s\S]*?purchase_order_receipt_progress[\s\S]*?Number\(params\?\.id/u
+  )
+  assert.doesNotMatch(
+    functionSource,
+    /listPurchaseReceipts|listPurchaseOrderItems|subtract|Math\./u
+  )
 })
 
 test('source-document item preview requests exactly one first page of five items', async () => {

@@ -23,6 +23,7 @@ import {
   createReceivableFromShipment,
   createShipmentWithItems,
   getShipment,
+  listAllShipments,
   listShipmentSourceCandidates,
   listShipments,
   shipShipment,
@@ -55,7 +56,6 @@ import {
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
-  downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
@@ -148,6 +148,7 @@ import {
   buildShipmentQualityInspectionSources,
   requireMatchingShipmentQualityInspectionDraft,
 } from '../utils/shipmentQualityInspectionSource.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import {
   SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
   normalizeShipmentSourceCandidate,
@@ -596,6 +597,40 @@ export default function ShipmentsPage() {
     modalTitle: '出货单完整明细',
   })
 
+  const shipmentListParams = useMemo(
+    () =>
+      compactParams({
+        status: statusFilter,
+        keyword: trimOptional(
+          linkedDocumentRequestKeyword({
+            localKeyword: keyword,
+            linkedKeyword,
+            hasExactContext: Boolean(routeShipmentID || routeSalesOrderID),
+          })
+        ),
+        customer_id: customerFilter || undefined,
+        product_id: productFilter || undefined,
+        warehouse_id: warehouseFilter || undefined,
+        source_id: routeSalesOrderID || undefined,
+        date_field: dateFilterField,
+        date_from: dateFilterStart || undefined,
+        date_to: dateFilterEnd || undefined,
+      }),
+    [
+      customerFilter,
+      dateFilterEnd,
+      dateFilterField,
+      dateFilterStart,
+      keyword,
+      linkedKeyword,
+      productFilter,
+      routeSalesOrderID,
+      routeShipmentID,
+      statusFilter,
+      warehouseFilter,
+    ]
+  )
+
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
     setLoading(true)
@@ -603,24 +638,10 @@ export default function ShipmentsPage() {
       const routeSelectedID = Number(routeShipmentID || 0)
       const [data, routeShipment] = await Promise.all([
         listShipments(
-          compactParams({
-            status: statusFilter,
-            keyword: trimOptional(
-              linkedDocumentRequestKeyword({
-                localKeyword: keyword,
-                linkedKeyword,
-                hasExactContext: Boolean(routeShipmentID || routeSalesOrderID),
-              })
-            ),
-            customer_id: customerFilter || undefined,
-            product_id: productFilter || undefined,
-            warehouse_id: warehouseFilter || undefined,
-            source_id: routeSalesOrderID || undefined,
-            date_field: dateFilterField,
-            date_from: dateFilterStart || undefined,
-            date_to: dateFilterEnd || undefined,
+          {
+            ...shipmentListParams,
             ...getBusinessPaginationParams(pagination),
-          }),
+          },
           { signal: request.signal }
         ),
         routeSelectedID > 0
@@ -661,18 +682,9 @@ export default function ShipmentsPage() {
     }
   }, [
     beginLatestRequest,
-    dateFilterEnd,
-    dateFilterField,
-    dateFilterStart,
-    customerFilter,
-    keyword,
-    linkedKeyword,
     pagination,
-    productFilter,
-    routeSalesOrderID,
     routeShipmentID,
-    statusFilter,
-    warehouseFilter,
+    shipmentListParams,
   ])
 
   const clearRouteContext = useCallback(
@@ -1336,13 +1348,28 @@ export default function ShipmentsPage() {
       moduleTitle: '出货单',
       columns,
     })
-  const exportRows = useCallback(() => {
-    downloadBusinessListCSV({
-      filename: `出货单-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: exportColumns,
-      rows,
-    })
-  }, [exportColumns, rows])
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      const routeSelectedID = Number(routeShipmentID || 0)
+      if (routeSelectedID > 0) {
+        const shipment = await getShipment(
+          { id: routeSelectedID },
+          { signal }
+        )
+        return shipment ? [shipment] : []
+      }
+      const result = await listAllShipments(shipmentListParams, { signal })
+      return result?.shipments
+    },
+    [routeShipmentID, shipmentListParams]
+  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: 'shipments-export',
+    loadRows: loadExportRows,
+    filename: `出货单-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: exportColumns,
+    recordLabel: '出货单',
+  })
   const hasActiveFilters = Boolean(
     keyword.trim() ||
       statusFilter ||
@@ -1552,7 +1579,16 @@ export default function ShipmentsPage() {
           <BusinessListToolbarActions
             moduleTitle="出货单"
             onExport={exportRows}
-            exportDisabled={rows.length === 0}
+            exportDisabled={loading || exporting || total === 0}
+            exportDisabledReason={
+              exporting
+                ? '正在准备导出，请稍候'
+                : loading
+                  ? '出货单加载完成后可导出'
+                  : total === 0
+                    ? '当前筛选没有可导出的出货单'
+                    : ''
+            }
             onOpenColumnOrder={openColumnOrder}
           />
         }

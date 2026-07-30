@@ -113,3 +113,44 @@ test('quantity and finance decimal columns sort, display and export exactly', ()
   }
   assert.doesNotMatch(source, /decimalNumber/u)
 })
+
+test('stock reservation columns display readable references without exposing technical ids', () => {
+  const start = source.indexOf('    reservations: [')
+  const end = source.indexOf('    finance: financeColumns', start)
+  assert.ok(start >= 0 && end > start, 'missing stock reservation columns')
+  const reservationColumns = source.slice(start, end)
+
+  for (const title of [
+    '销售订单',
+    '来源行',
+    '产品 / 规格',
+    '仓库 / 批次',
+    '预留数量',
+    '单位',
+    '预留日期',
+    '备注',
+  ]) {
+    assert.match(reservationColumns, new RegExp(`title: '${title}'`, 'u'))
+  }
+  for (const projection of [
+    'reservationSalesOrderText',
+    'reservationSalesOrderLineText',
+    'reservationProductText',
+    'reservationWarehouseLotText',
+    'reservationUnitText',
+  ]) {
+    assert.match(reservationColumns, new RegExp(projection, 'u'))
+  }
+  assert.doesNotMatch(
+    reservationColumns,
+    /dataIndex:\s*'(?:sales_order_id|sales_order_item_id|product_id|product_sku_id|warehouse_id|unit_id|lot_id)'/u
+  )
+  assert.doesNotMatch(
+    reservationColumns,
+    /\.\.\.sourceColumns|\.\.\.quantityColumns/u
+  )
+  assert.match(source, /record\.sales_order_no/u)
+  assert.match(source, /record\.product_sku_code/u)
+  assert.match(source, /record\.warehouse_name/u)
+  assert.match(source, /record\.lot_no/u)
+})

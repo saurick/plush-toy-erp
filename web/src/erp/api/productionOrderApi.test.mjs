@@ -43,3 +43,10 @@ test('production order reference API binds response pagination to the request', 
   assert.match(source, /limit: params\.limit/u)
   assert.match(source, /offset: params\.offset/u)
 })
+
+test('production order export can read every filtered page strictly', () => {
+  assert.match(
+    source,
+    /export async function listAllProductionOrders[\s\S]*?listAllPaginatedRecords\(\s*listProductionOrders,\s*params,\s*'production_orders'/u
+  )
+})

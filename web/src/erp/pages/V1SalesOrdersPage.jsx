@@ -46,6 +46,7 @@ import {
   listAllContactsByOwner,
   listAllProductSKUs,
   listAllSalesOrderItems,
+  listAllSalesOrders,
   listSalesOrderItemsPreview,
   listSalesOrders,
   listAllUnits,
@@ -96,7 +97,6 @@ import {
 } from '../utils/moduleTableColumns.mjs'
 import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
 import {
-  downloadCSV,
   getPreferredColumnOrder,
   parseBusinessSortValue,
   writeStoredColumnOrder,
@@ -140,6 +140,7 @@ import {
   createSourceBusinessActionAttemptStore,
   sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const CUSTOMER_CONTACT_OWNER_TYPE = 'CUSTOMER'
 
@@ -524,27 +525,43 @@ export default function V1SalesOrdersPage() {
     }
   }, [])
 
+  const orderListParams = useMemo(() => {
+    const { sortBy, sortDirection } = parseBusinessSortValue(sortFilter)
+    return {
+      keyword: linkedDocumentRequestKeyword({
+        localKeyword: keyword,
+        linkedKeyword,
+        hasExactContext: Boolean(routeSalesOrderID),
+      }),
+      customer_id: customerFilter || undefined,
+      lifecycle_status: statusFilter,
+      date_field: dateFilterField,
+      date_from: dateFilterStart || undefined,
+      date_to: dateFilterEnd || undefined,
+      sort_by: sortBy,
+      sort_direction: sortDirection,
+    }
+  }, [
+    customerFilter,
+    dateFilterEnd,
+    dateFilterField,
+    dateFilterStart,
+    keyword,
+    linkedKeyword,
+    routeSalesOrderID,
+    sortFilter,
+    statusFilter,
+  ])
+
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
     setLoading(true)
     try {
-      const { sortBy, sortDirection } = parseBusinessSortValue(sortFilter)
       const routeSelectedID = Number(routeSalesOrderID || 0)
       const [result, routeOrder] = await Promise.all([
         listSalesOrders(
           {
-            keyword: linkedDocumentRequestKeyword({
-              localKeyword: keyword,
-              linkedKeyword,
-              hasExactContext: Boolean(routeSelectedID),
-            }),
-            customer_id: customerFilter || undefined,
-            lifecycle_status: statusFilter,
-            date_field: dateFilterField,
-            date_from: dateFilterStart || undefined,
-            date_to: dateFilterEnd || undefined,
-            sort_by: sortBy,
-            sort_direction: sortDirection,
+            ...orderListParams,
             ...getBusinessPaginationParams(pagination),
           },
           { signal: request.signal }
@@ -590,16 +607,9 @@ export default function V1SalesOrdersPage() {
     }
   }, [
     beginLatestRequest,
-    customerFilter,
-    dateFilterEnd,
-    dateFilterField,
-    dateFilterStart,
-    keyword,
-    linkedKeyword,
+    orderListParams,
     pagination,
     routeSalesOrderID,
-    sortFilter,
-    statusFilter,
   ])
 
   useEffect(() => {
@@ -1147,14 +1157,28 @@ export default function V1SalesOrdersPage() {
     ]
   )
 
-  const exportOrders = useCallback(() => {
-    if (orders.length === 0) return
-    downloadCSV({
-      filename: `销售订单-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: visibleOrderDataColumns,
-      rows: orders,
-    })
-  }, [orders, visibleOrderDataColumns])
+  const loadExportOrders = useCallback(
+    async ({ signal }) => {
+      const routeSelectedID = Number(routeSalesOrderID || 0)
+      if (routeSelectedID > 0) {
+        const order = await getSalesOrder(
+          { id: routeSelectedID },
+          { signal }
+        )
+        return order ? [order] : []
+      }
+      const result = await listAllSalesOrders(orderListParams, { signal })
+      return result?.sales_orders
+    },
+    [orderListParams, routeSalesOrderID]
+  )
+  const { exporting, exportRows: exportOrders } = useBusinessListExport({
+    requestKey: 'sales-orders-export',
+    loadRows: loadExportOrders,
+    filename: `销售订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: visibleOrderDataColumns,
+    recordLabel: '销售订单',
+  })
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
@@ -1220,8 +1244,12 @@ export default function V1SalesOrdersPage() {
     : saving
       ? '当前操作完成后可继续办理'
       : ''
-  const lifecycleMoreDisabled = saving
-  const lifecycleMoreDisabledReason = saving ? '当前操作完成后可继续办理' : ''
+  const lifecycleMoreDisabled = !selectedOrder || saving
+  const lifecycleMoreDisabledReason = !selectedOrder
+    ? '请先选择一条销售订单'
+    : saving
+      ? '当前操作完成后可继续办理'
+      : ''
   const relatedMenuItems = useMemo(
     () =>
       [
@@ -1348,7 +1376,8 @@ export default function V1SalesOrdersPage() {
           <Space wrap>
             <ToolbarButton
               icon={<DownloadOutlined />}
-              disabled={orders.length === 0}
+              loading={exporting}
+              disabled={loading || exporting || total === 0}
               onClick={exportOrders}
             >
               导出筛选结果

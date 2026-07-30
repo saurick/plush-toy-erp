@@ -392,6 +392,8 @@ function validateBatch(batch, productionOrderID) {
     !positiveSafeInteger(batch.production_order_item_id) ||
     !positiveSafeInteger(batch.production_order_operation_id) ||
     !optionalPositiveInteger(batch.source_batch_id) ||
+    !Object.hasOwn(batch, 'origin_rework_fact_id') ||
+    !optionalPositiveInteger(batch.origin_rework_fact_id) ||
     !requiredText(batch.batch_no) ||
     !Object.hasOwn(PRODUCTION_WIP_FLOW_TYPE, batch.flow_type) ||
     (batch.execution_mode != null &&
@@ -404,7 +406,10 @@ function validateBatch(batch, productionOrderID) {
     !canonicalQuantity(batch.quantity) ||
     !optionalText(batch.rework_reason) ||
     (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.REWORK &&
-      (!positiveSafeInteger(batch.source_batch_id) ||
+      (!(
+        positiveSafeInteger(batch.source_batch_id) ||
+        positiveSafeInteger(batch.origin_rework_fact_id)
+      ) ||
         !requiredText(batch.rework_reason))) ||
     (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.NORMAL &&
       batch.rework_reason != null)
@@ -678,7 +683,15 @@ export function validateProductionWipAggregate(data, expected = {}) {
         hasBatchLineageCycle(batch, batchByID) ||
         (sourceBatch &&
           sourceBatch.production_order_item_id !==
-            batch.production_order_item_id)
+            batch.production_order_item_id) ||
+        (sourceBatch &&
+          sourceBatch.origin_rework_fact_id !==
+            batch.origin_rework_fact_id) ||
+        (!sourceBatch &&
+          positiveSafeInteger(batch.origin_rework_fact_id) &&
+          (batch.flow_type !== PRODUCTION_WIP_FLOW_TYPE.REWORK ||
+            operation.operation_code !== 'HANDWORK' ||
+            !requiredText(batch.rework_reason)))
       )
     }) ||
     outsourcingAllocations.some((allocation) => {
@@ -1417,18 +1430,82 @@ export function productionWipQualityInspectionMeta(inspection = {}) {
   )
 }
 
-export function productionWipCompletionEligibility(aggregate, item = {}) {
+export function productionWipBatchLineageMeta(batch = {}) {
+  if (positiveSafeInteger(batch.origin_rework_fact_id)) {
+    return Object.freeze({
+      key: 'finished-goods-rework',
+      label: '成品返工补制',
+      color: 'volcano',
+    })
+  }
+  if (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.REWORK) {
+    return Object.freeze({
+      key: 'operation-rework',
+      label: '工序返工',
+      color: 'orange',
+    })
+  }
+  return null
+}
+
+export function productionWipActionAllowedForOrder(
+  order = {},
+  batch = {},
+  action = ''
+) {
+  if (!Object.values(PRODUCTION_WIP_ACTION).includes(action)) return false
+  const orderStatus = String(order?.status || '')
+    .trim()
+    .toUpperCase()
+  if (orderStatus === 'RELEASED') {
+    return !(
+      positiveSafeInteger(batch?.origin_rework_fact_id) &&
+      action === PRODUCTION_WIP_ACTION.CANCEL_BATCH
+    )
+  }
+  if (
+    orderStatus !== 'CLOSED' ||
+    !positiveSafeInteger(batch?.origin_rework_fact_id)
+  ) {
+    return false
+  }
+  return ![
+    PRODUCTION_WIP_ACTION.CANCEL_BATCH,
+    PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL,
+  ].includes(action)
+}
+
+export function productionWipCompletionEligibility(
+  aggregate,
+  item = {},
+  options = {}
+) {
+  const orderStatus = String(
+    options?.orderStatus || aggregate?.productionOrder?.status || ''
+  )
+    .trim()
+    .toUpperCase()
+  const selectedBatchID = Number(options?.productionWipBatchID || 0)
   if (item.route_code !== PRODUCTION_WIP_ROUTE_CODE) {
+    if (orderStatus === 'CLOSED') {
+      return Object.freeze({
+        eligible: false,
+        reason: '已关闭订单只能登记成品返工补制批次的完工入库',
+        acceptedPackagingBatches: Object.freeze([]),
+      })
+    }
     return Object.freeze({
       eligible: true,
       reason: '',
       acceptedPackagingQuantity: null,
+      acceptedPackagingBatches: Object.freeze([]),
     })
   }
   if (!aggregate?.initialized) {
     return Object.freeze({
       eligible: false,
       reason: '该生产明细尚未建立完整工序路线，暂不能登记完工入库',
+      acceptedPackagingBatches: Object.freeze([]),
     })
   }
   const packagingOperation = aggregate.operations.find(
@@ -1440,18 +1517,36 @@ export function productionWipCompletionEligibility(aggregate, item = {}) {
     return Object.freeze({
       eligible: false,
       reason: '该生产明细的包装工序尚未建立完整，暂不能登记完工入库',
+      acceptedPackagingBatches: Object.freeze([]),
     })
   }
   const packagingAcceptedBatches = aggregate.batches.filter(
     (batch) =>
       batch.production_order_item_id === item.id &&
       batch.production_order_operation_id === packagingOperation.id &&
-      batch.status === 'ACCEPTED'
+      batch.status === 'ACCEPTED' &&
+      (orderStatus !== 'CLOSED' ||
+        positiveSafeInteger(batch.origin_rework_fact_id))
   )
   if (packagingAcceptedBatches.length === 0) {
     return Object.freeze({
       eligible: false,
-      reason: '需先完成包装工序并通过工序质量关口，才能登记完工入库',
+      reason:
+        orderStatus === 'CLOSED'
+          ? '成品返工补制尚未完成包装验收，暂不能登记补完工'
+          : '需先完成包装工序并通过工序质量关口，才能登记完工入库',
+      acceptedPackagingBatches: Object.freeze([]),
+    })
+  }
+  const selectedBatch =
+    selectedBatchID > 0
+      ? packagingAcceptedBatches.find((batch) => batch.id === selectedBatchID)
+      : null
+  if (selectedBatchID > 0 && !selectedBatch) {
+    return Object.freeze({
+      eligible: false,
+      reason: '所选完工来源批次状态已变化，请重新选择',
+      acceptedPackagingBatches: Object.freeze(packagingAcceptedBatches),
     })
   }
   const packagingConfirmed = aggregate.packagingConfirmations.some(
@@ -1463,15 +1558,16 @@ export function productionWipCompletionEligibility(aggregate, item = {}) {
     return Object.freeze({
       eligible: false,
       reason: '需先确认包材版面和包装版本，才能登记完工入库',
+      acceptedPackagingBatches: Object.freeze(packagingAcceptedBatches),
     })
   }
   const scale = Math.max(
-    ...packagingAcceptedBatches.map(
+    ...(selectedBatch ? [selectedBatch] : packagingAcceptedBatches).map(
       (batch) => canonicalQuantity(batch.quantity).split('.')[1]?.length || 0
     )
   )
   const acceptedPackagingQuantity = quantityTextFromInteger(
-    packagingAcceptedBatches.reduce(
+    (selectedBatch ? [selectedBatch] : packagingAcceptedBatches).reduce(
       (total, batch) => total + quantityInteger(batch.quantity, scale),
       BigInt(0)
     ),
@@ -1481,17 +1577,23 @@ export function productionWipCompletionEligibility(aggregate, item = {}) {
     eligible: true,
     reason: '',
     acceptedPackagingQuantity,
+    acceptedPackagingBatches: Object.freeze(packagingAcceptedBatches),
   })
 }
 
 export function partitionProductionCompletionItems(
   items = [],
-  aggregate = null
+  aggregate = null,
+  options = {}
 ) {
   const eligibleItems = []
   const blockedItems = []
   for (const item of Array.isArray(items) ? items : []) {
-    const eligibility = productionWipCompletionEligibility(aggregate, item)
+    const eligibility = productionWipCompletionEligibility(
+      aggregate,
+      item,
+      options
+    )
     if (eligibility.eligible) {
       eligibleItems.push(
         eligibility.acceptedPackagingQuantity
@@ -1499,6 +1601,8 @@ export function partitionProductionCompletionItems(
               ...item,
               accepted_packaging_quantity:
                 eligibility.acceptedPackagingQuantity,
+              accepted_packaging_batches:
+                eligibility.acceptedPackagingBatches,
             })
           : item
       )

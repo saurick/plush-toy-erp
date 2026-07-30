@@ -38,6 +38,10 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import {
+  BusinessListToolbarActions,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
@@ -67,6 +71,7 @@ import {
   subtractNumeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
 import { resolveSalesReturnActionAvailability } from '../utils/operationalActionAvailability.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
@@ -117,6 +122,10 @@ function transitionReceiptMatches(item, previous, action, reason, actorID) {
 function statusTag(value) {
   const [label, color] = STATUS_META[value] || ['状态待核对', 'default']
   return <Tag color={color}>{label}</Tag>
+}
+
+function statusLabel(value) {
+  return STATUS_META[value]?.[0] || (value ? '状态待核对' : '')
 }
 
 function shipmentOption(shipment) {
@@ -746,52 +755,102 @@ export default function SalesReturnsPage() {
     }
   }
 
-  const columns = [
-    { title: '退货单号', dataIndex: 'return_no', width: 190 },
-    {
-      title: '客户',
-      dataIndex: 'customer_name',
-      width: 180,
-      render: (value) => value || '客户已关联',
+  const columns = useMemo(
+    () => [
+      { title: '退货单号', dataIndex: 'return_no', width: 190 },
+      {
+        title: '客户',
+        dataIndex: 'customer_name',
+        width: 180,
+        render: (value) => value || '客户已关联',
+        exportValue: (record) => record?.customer_name || '客户已关联',
+      },
+      {
+        title: '来源出货',
+        key: 'shipment',
+        width: 150,
+        render: (_, record) =>
+          record.shipment_no ||
+          shipments.find(
+            (shipment) => Number(shipment.id) === Number(record.shipment_id)
+          )?.shipment_no ||
+          '已关联出货单',
+        exportValue: (record) =>
+          record?.shipment_no ||
+          shipments.find(
+            (shipment) =>
+              Number(shipment.id) === Number(record?.shipment_id)
+          )?.shipment_no ||
+          '已关联出货单',
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        width: 150,
+        render: statusTag,
+        exportValue: (record) => statusLabel(record?.status),
+      },
+      { title: '退货原因', dataIndex: 'reason', width: 300 },
+      {
+        title: '退货明细',
+        dataIndex: 'items',
+        width: 120,
+        render: (items) => `${Array.isArray(items) ? items.length : 0} 项`,
+        exportValue: (record) =>
+          `${Array.isArray(record?.items) ? record.items.length : 0} 项`,
+      },
+      {
+        title: '批准时间',
+        dataIndex: 'approved_at',
+        width: 170,
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.approved_at),
+      },
+      {
+        title: '收货时间',
+        dataIndex: 'received_at',
+        width: 170,
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.received_at),
+      },
+      {
+        title: '冲正时间',
+        dataIndex: 'reversed_at',
+        width: 170,
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.reversed_at),
+      },
+    ],
+    [shipments]
+  )
+  const {
+    tableColumns,
+    exportColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: 'sales-returns',
+    moduleTitle: '客户退货',
+    columns,
+  })
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      const result = await listAllSalesReturns(
+        compactParams({ status }),
+        { signal }
+      )
+      return result?.sales_returns
     },
-    {
-      title: '来源出货',
-      key: 'shipment',
-      width: 150,
-      render: (_, record) =>
-        record.shipment_no ||
-        shipments.find(
-          (shipment) => Number(shipment.id) === Number(record.shipment_id)
-        )?.shipment_no ||
-        '已关联出货单',
-    },
-    { title: '状态', dataIndex: 'status', width: 150, render: statusTag },
-    { title: '退货原因', dataIndex: 'reason', width: 300 },
-    {
-      title: '退货明细',
-      dataIndex: 'items',
-      width: 120,
-      render: (items) => `${Array.isArray(items) ? items.length : 0} 项`,
-    },
-    {
-      title: '批准时间',
-      dataIndex: 'approved_at',
-      width: 170,
-      render: formatUnixDateTime,
-    },
-    {
-      title: '收货时间',
-      dataIndex: 'received_at',
-      width: 170,
-      render: formatUnixDateTime,
-    },
-    {
-      title: '冲正时间',
-      dataIndex: 'reversed_at',
-      width: 170,
-      render: formatUnixDateTime,
-    },
-  ]
+    [status]
+  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: 'sales-returns-export',
+    loadRows: loadExportRows,
+    filename: `客户退货-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: exportColumns,
+    recordLabel: '客户退货记录',
+  })
   const detailLineItems = {
     title: '退货明细',
     items: Array.isArray(detail?.items) ? detail.items : [],
@@ -923,6 +982,22 @@ export default function SalesReturnsPage() {
             }}
           />
         }
+        actions={
+          <BusinessListToolbarActions
+            onExport={exportRows}
+            exportDisabled={loading || exporting || total === 0}
+            exportDisabledReason={
+              exporting
+                ? '正在准备导出，请稍候'
+                : loading
+                  ? '客户退货记录加载完成后可导出'
+                  : total === 0
+                    ? '当前筛选没有可导出的客户退货记录'
+                    : ''
+            }
+            onOpenColumnOrder={openColumnOrder}
+          />
+        }
         primaryAction={
           canCreate ? (
             <ToolbarButton
@@ -1038,7 +1113,7 @@ export default function SalesReturnsPage() {
       <BusinessDataTable
         rowKey="id"
         loading={loading}
-        columns={columns}
+        columns={tableColumns}
         dataSource={rows}
         pagination={createBusinessTablePagination({
           pagination,
@@ -1305,6 +1380,7 @@ export default function SalesReturnsPage() {
         lineItems={detailLineItems}
         onClose={() => setDetail(null)}
       />
+      {columnOrderModal}
     </BusinessPageLayout>
   )
 }

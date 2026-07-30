@@ -41,14 +41,15 @@ import {
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
-  downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import ProductionReworkModal from '../components/production-facts/ProductionReworkModal.jsx'
+import ProductionReworkProgressModal from '../components/production-orders/ProductionReworkProgressModal.jsx'
 import {
+  routeWithQuery,
   searchParamPositiveInt,
   searchParamText,
 } from '../utils/routeQuery.mjs'
@@ -71,6 +72,7 @@ import {
   createReconciliationFromFinanceFact,
   listAllProductionFacts,
 } from '../api/operationalFactApi.mjs'
+import { getProductionWip } from '../api/productionWipApi.mjs'
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
   buildFinanceBusinessSourcePayload,
@@ -85,6 +87,7 @@ import {
   isSourceBusinessActionResultUnknown,
 } from '../utils/sourceBusinessAction.mjs'
 import { matchesOperationalFactLifecycleResult } from '../utils/operationalFactLifecycle.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   buildProductionReworkPayload,
@@ -149,6 +152,10 @@ export function OperationalFactWorkspace({
   const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
   const [productionReworkContext, setProductionReworkContext] = useState(null)
   const [productionReworkLoading, setProductionReworkLoading] = useState(false)
+  const [productionReworkProgressContext, setProductionReworkProgressContext] =
+    useState(null)
+  const [productionReworkProgressLoading, setProductionReworkProgressLoading] =
+    useState(false)
   const [rowsByKey, setRowsByKey] = useState({})
   const [totalByKey, setTotalByKey] = useState({})
   const [paginationByKey, setPaginationByKey] = useState({})
@@ -165,6 +172,7 @@ export function OperationalFactWorkspace({
   )
   const productionReworkInFlightRef = useRef(false)
   const productionReworkRequestRef = useRef(0)
+  const productionReworkProgressRequestRef = useRef(0)
   const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
     'sales_order_id'
@@ -197,6 +205,7 @@ export function OperationalFactWorkspace({
       mountedRef.current = false
       listRequestVersionRef.current += 1
       productionReworkRequestRef.current += 1
+      productionReworkProgressRequestRef.current += 1
     }
   }, [])
 
@@ -318,6 +327,9 @@ export function OperationalFactWorkspace({
     adminProfile,
     'production.rework.create'
   )
+  const canViewProductionReworkProgress =
+    hasActionPermission(adminProfile, 'production.fact.read') &&
+    hasActionPermission(adminProfile, 'production.wip.read')
 
   const resetPaginationForKey = useCallback(
     (key = currentActiveKey) => {
@@ -575,7 +587,7 @@ export function OperationalFactWorkspace({
         String(row.fact_type || '')
           .trim()
           .toUpperCase() === 'REWORK'
-        ? '返工记录已过账，生产异常任务已生成'
+        ? '返工记录已过账，返工补制批次和生产异常任务已生成'
         : resultUnknown
           ? `已重新读取并确认${actionLabel}完成`
           : `${actionLabel}已完成`
@@ -629,6 +641,72 @@ export function OperationalFactWorkspace({
     productionReworkRequestRef.current += 1
     setProductionReworkLoading(false)
     setProductionReworkContext(null)
+  }
+
+  const openProductionReworkProgress = async (source) => {
+    const orderID = Number(source?.production_order_id || 0)
+    if (!canViewProductionReworkProgress) {
+      message.warning('当前账号不能同时查看生产工序和生产记录')
+      return
+    }
+    if (
+      String(source?.fact_type || '').toUpperCase() !== 'REWORK' ||
+      !['POSTED', 'CANCELLED'].includes(
+        String(source?.status || '').toUpperCase()
+      ) ||
+      !Number.isSafeInteger(orderID) ||
+      orderID <= 0
+    ) {
+      message.warning('请选择已过账或已撤销且来源完整的返工记录')
+      return
+    }
+    const requestID = productionReworkProgressRequestRef.current + 1
+    productionReworkProgressRequestRef.current = requestID
+    setProductionReworkProgressLoading(true)
+    try {
+      const [aggregate, factData] = await Promise.all([
+        getProductionWip(orderID),
+        listAllProductionFacts({
+          source_type: 'PRODUCTION_ORDER',
+          source_id: orderID,
+        }),
+      ])
+      if (productionReworkProgressRequestRef.current !== requestID) return
+      const hasExactRoot = aggregate.batches.some(
+        (batch) =>
+          Number(batch?.origin_rework_fact_id || 0) === Number(source.id) &&
+          !Number(batch?.source_batch_id)
+      )
+      if (!hasExactRoot) {
+        message.warning('该返工记录尚未关联可核对的成品返工补制批次')
+        return
+      }
+      const facts = Array.isArray(factData?.production_facts)
+        ? factData.production_facts
+        : []
+      setProductionReworkProgressContext({
+        order: aggregate.productionOrder,
+        aggregate,
+        facts: facts.some((fact) => Number(fact?.id) === Number(source.id))
+          ? facts
+          : [source, ...facts],
+        focusReworkFactID: source.id,
+      })
+    } catch (error) {
+      if (productionReworkProgressRequestRef.current === requestID) {
+        message.error(getActionErrorMessage(error, '加载成品返工进度'))
+      }
+    } finally {
+      if (productionReworkProgressRequestRef.current === requestID) {
+        setProductionReworkProgressLoading(false)
+      }
+    }
+  }
+
+  const closeProductionReworkProgress = () => {
+    productionReworkProgressRequestRef.current += 1
+    setProductionReworkProgressLoading(false)
+    setProductionReworkProgressContext(null)
   }
 
   const submitProductionRework = async (values) => {
@@ -834,20 +912,90 @@ export function OperationalFactWorkspace({
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
     '当前操作由系统按业务规则校验和处理；不会直接修改其他业务页面的库存、出货、财务记录或待办任务。'
-  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
-    useBusinessColumnOrder({
+  const {
+    tableColumns,
+    exportColumns,
+    visibleColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: `${toolbarModuleKey}-${currentActiveKey}`,
+    moduleTitle: `${pageTitle} / ${activeConfig.title}`,
+    columns,
+  })
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      if (
+        Array.isArray(activeConfig.readPermissions) &&
+        activeConfig.readPermissions.length > 0 &&
+        !hasAnyPermission(adminProfile, activeConfig.readPermissions)
+      ) {
+        return []
+      }
+      const exactProductionFactID =
+        currentActiveKey === 'production' ? Number(routeFactID || 0) : 0
+      const exactRouteContext = Boolean(
+        routeFactID ||
+          routeSalesOrderID ||
+          (routeSourceType && routeSourceID)
+      )
+      const data =
+        exactProductionFactID > 0
+          ? await listAllProductionFacts(
+              { keyword: String(exactProductionFactID) },
+              { signal }
+            )
+          : await activeConfig.listAll(
+              compactParams({
+                status: statusFilter,
+                keyword: trimOptional(
+                  linkedDocumentRequestKeyword({
+                    localKeyword: keyword,
+                    linkedKeyword,
+                    hasExactContext: exactRouteContext,
+                  })
+                ),
+                date_field: activeDateField,
+                date_from:
+                  dateRangeByKey[currentActiveKey]?.[0] || undefined,
+                date_to:
+                  dateRangeByKey[currentActiveKey]?.[1] || undefined,
+                ...(activeConfig.listParams || {}),
+                ...routeListParamsForKey(currentActiveKey),
+              }),
+              { signal }
+            )
+      const exportRows = data?.[activeConfig.listKey]
+      return exactProductionFactID > 0 && Array.isArray(exportRows)
+        ? exportRows.filter(
+            (item) => Number(item?.id || 0) === exactProductionFactID
+          )
+        : exportRows
+    },
+    [
+      activeConfig,
+      activeDateField,
       adminProfile,
-      moduleKey: `${toolbarModuleKey}-${currentActiveKey}`,
-      moduleTitle: `${pageTitle} / ${activeConfig.title}`,
-      columns,
-    })
-  const exportRows = useCallback(() => {
-    downloadBusinessListCSV({
-      filename: `业务记录-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: visibleColumns,
-      rows: activeRows,
-    })
-  }, [activeRows, visibleColumns])
+      currentActiveKey,
+      dateRangeByKey,
+      keyword,
+      linkedKeyword,
+      routeFactID,
+      routeListParamsForKey,
+      routeSalesOrderID,
+      routeSourceID,
+      routeSourceType,
+      statusFilter,
+    ]
+  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: `operational-facts-export:${currentActiveKey}`,
+    loadRows: loadExportRows,
+    filename: `业务记录-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: exportColumns,
+    recordLabel: activeConfig.title,
+  })
   const canFinanceAction =
     currentActiveKey === 'finance'
       ? canConfirmFinanceFact(adminProfile, activeFinanceFactType)
@@ -876,6 +1024,14 @@ export function OperationalFactWorkspace({
   const selectedCanStartProductionRework =
     currentActiveKey === 'production' &&
     isProductionReworkEligible(activeSelectedRow, activeRows)
+  const selectedCanViewProductionReworkProgress =
+    currentActiveKey === 'production' &&
+    String(activeSelectedRow?.fact_type || '').toUpperCase() === 'REWORK' &&
+    ['POSTED', 'CANCELLED'].includes(
+      String(activeSelectedRow?.status || '').toUpperCase()
+    ) &&
+    Number.isSafeInteger(Number(activeSelectedRow?.production_order_id)) &&
+    Number(activeSelectedRow.production_order_id) > 0
   const selectedIsProductionReworkCandidate =
     currentActiveKey === 'production' &&
     String(activeSelectedRow?.fact_type || '').toUpperCase() ===
@@ -1196,7 +1352,16 @@ export function OperationalFactWorkspace({
           <BusinessListToolbarActions
             moduleTitle={pageTitle}
             onExport={exportRows}
-            exportDisabled={activeRows.length === 0}
+            exportDisabled={loading || exporting || activeTotal === 0}
+            exportDisabledReason={
+              exporting
+                ? '正在准备导出，请稍候'
+                : loading
+                  ? `${activeConfig.title}加载完成后可导出`
+                  : activeTotal === 0
+                    ? `当前筛选没有可导出的${activeConfig.title}`
+                    : ''
+            }
             onOpenColumnOrder={openColumnOrder}
           />
         }
@@ -1338,6 +1503,43 @@ export function OperationalFactWorkspace({
                       发起返工
                     </Button>
                   </BusinessActionTooltip>
+          ) : null}
+          {currentActiveKey === 'production' &&
+          canViewProductionReworkProgress &&
+          (!activeSelectedRow ||
+            String(activeSelectedRow.fact_type || '').toUpperCase() ===
+              'REWORK') ? (
+                <BusinessActionTooltip
+                  disabled={
+                    !activeSelectedRow ||
+                    !selectedCanViewProductionReworkProgress ||
+                    productionReworkProgressLoading
+                  }
+                  disabledReason={
+                    !activeSelectedRow
+                      ? '请先选择一条返工记录'
+                      : !selectedCanViewProductionReworkProgress
+                        ? '返工记录过账后可查看补制进度'
+                        : productionReworkProgressLoading
+                          ? '返工进度加载完成后可查看'
+                          : ''
+                  }
+                >
+                  <Button
+                    size="small"
+                    disabled={
+                      !activeSelectedRow ||
+                      !selectedCanViewProductionReworkProgress ||
+                      productionReworkProgressLoading
+                    }
+                    loading={productionReworkProgressLoading}
+                    onClick={() =>
+                      openProductionReworkProgress(activeSelectedRow)
+                    }
+                  >
+                    查看返工进度
+                  </Button>
+                </BusinessActionTooltip>
           ) : null}
           {currentActiveKey === 'finance' &&
           canFinanceAction &&
@@ -1841,6 +2043,31 @@ export function OperationalFactWorkspace({
         loading={productionReworkLoading}
         onCancel={closeProductionRework}
         onSubmit={submitProductionRework}
+      />
+      <ProductionReworkProgressModal
+        open={Boolean(productionReworkProgressContext)}
+        order={productionReworkProgressContext?.order}
+        aggregate={productionReworkProgressContext?.aggregate}
+        facts={productionReworkProgressContext?.facts}
+        focusReworkFactID={
+          productionReworkProgressContext?.focusReworkFactID
+        }
+        loading={productionReworkProgressLoading}
+        onCancel={closeProductionReworkProgress}
+        onContinue={
+          canOpenRelatedPath(V1_ROUTE_PATHS.productionOrders)
+            ? () => {
+                const orderID =
+                  productionReworkProgressContext?.order?.id
+                closeProductionReworkProgress()
+                navigate(
+                  routeWithQuery(V1_ROUTE_PATHS.productionOrders, {
+                    production_order_id: orderID,
+                  })
+                )
+              }
+            : undefined
+        }
       />
       <Modal
         title={

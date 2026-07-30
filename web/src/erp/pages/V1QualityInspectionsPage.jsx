@@ -35,6 +35,10 @@ import {
   cancelQualityInspection,
   createQualityInspectionDraft,
   getQualityInspection,
+  listAllFinishedGoodsQualityInspections,
+  listAllOutsourcingReturnQualityInspections,
+  listAllProductionStageQualityInspections,
+  listAllQualityInspections,
   listFinishedGoodsQualityInspections,
   listOutsourcingReturnQualityInspections,
   listProductionStageQualityInspections,
@@ -72,7 +76,6 @@ import {
 import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
-  getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
@@ -151,6 +154,7 @@ import {
   qualityInspectionRouteSourceParams,
 } from '../utils/qualityInspectionSourceAction.mjs'
 import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const EMPTY_ADMIN_PROFILE = Object.freeze({})
@@ -198,36 +202,6 @@ function getPreferredColumnOrder({
   const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
   if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
   return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
-}
-
-function csvEscape(value) {
-  const text = String(value ?? '')
-  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
-function downloadCSV({ filename, columns, rows }) {
-  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
-  const body = rows.map((row) =>
-    columns.map((column) => {
-      const rawValue =
-        typeof column.exportValue === 'function'
-          ? column.exportValue(row)
-          : row?.[column.dataIndex]
-      return csvEscape(rawValue)
-    })
-  )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
 }
 
 function findByPositiveID(id, records = []) {
@@ -816,11 +790,8 @@ export default function V1QualityInspectionsPage() {
     }
   }
 
-  const loadRows = useCallback(async () => {
-    const request = beginLatestRequest('rows')
-    setLoading(true)
-    try {
-      const routeSelectedID = Number(routeQualityInspectionID || 0)
+  const loadQualityInspectionList = useCallback(
+    ({ signal, all = false }) => {
       const baseParams = compactParams({
         status: statusFilter,
         result: resultFilter,
@@ -838,7 +809,7 @@ export default function V1QualityInspectionsPage() {
         ),
         date_from: dateFilterStart || undefined,
         date_to: dateFilterEnd || undefined,
-        ...getBusinessPaginationParams(pagination),
+        ...(all ? {} : getBusinessPaginationParams(pagination)),
       })
       const inventoryFilterParams = compactParams({
         ...baseParams,
@@ -855,29 +826,33 @@ export default function V1QualityInspectionsPage() {
         source_type: routeSourceParams.source_type,
         source_id: routeSourceParams.source_id,
       })
-      let listRequest
       if (inspectionTypeFilter === 'OUTSOURCING_RETURN') {
-        listRequest = listOutsourcingReturnQualityInspections(
+        const list = all
+          ? listAllOutsourcingReturnQualityInspections
+          : listOutsourcingReturnQualityInspections
+        return list(
           {
             ...inventoryFilterParams,
             customer_key: activeCustomerKey || undefined,
             fact_id: routeSourceParams.fact_id,
           },
-          { signal: request.signal }
+          { signal }
         )
-      } else if (inspectionTypeFilter === 'FINISHED_GOODS') {
-        listRequest = listFinishedGoodsQualityInspections(
-          inventorySourceParams,
-          {
-            signal: request.signal,
-          }
-        )
-      } else if (inspectionTypeFilter === 'PRODUCTION_STAGE') {
-        listRequest = listProductionStageQualityInspections(baseParams, {
-          signal: request.signal,
-        })
+      }
+      if (inspectionTypeFilter === 'FINISHED_GOODS') {
+        const list = all
+          ? listAllFinishedGoodsQualityInspections
+          : listFinishedGoodsQualityInspections
+        return list(inventorySourceParams, { signal })
+      }
+      let request
+      if (inspectionTypeFilter === 'PRODUCTION_STAGE') {
+        request = all
+          ? listAllProductionStageQualityInspections(baseParams, { signal })
+          : listProductionStageQualityInspections(baseParams, { signal })
       } else {
-        listRequest = listQualityInspections(
+        const list = all ? listAllQualityInspections : listQualityInspections
+        request = list(
           compactParams({
             ...inventorySourceParams,
             inspection_type: inspectionTypeFilter || undefined,
@@ -887,11 +862,41 @@ export default function V1QualityInspectionsPage() {
             purchase_order_id: routePurchaseOrderID || undefined,
             material_id: materialFilter || undefined,
           }),
-          { signal: request.signal }
+          { signal }
         )
       }
+      return request
+    },
+    [
+      activeCustomerKey,
+      dateFilterEnd,
+      dateFilterField,
+      dateFilterStart,
+      inspectionTypeFilter,
+      keyword,
+      linkedKeyword,
+      lotFilter,
+      materialFilter,
+      pagination,
+      purchaseReceiptFilter,
+      resultFilter,
+      routePurchaseOrderID,
+      routePurchaseReceiptID,
+      routeQualityInspectionID,
+      routeSourceID,
+      routeSourceType,
+      statusFilter,
+      warehouseFilter,
+    ]
+  )
+
+  const loadRows = useCallback(async () => {
+    const request = beginLatestRequest('rows')
+    setLoading(true)
+    try {
+      const routeSelectedID = Number(routeQualityInspectionID || 0)
       const [data, routeInspection] = await Promise.all([
-        listRequest,
+        loadQualityInspectionList({ signal: request.signal }),
         routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE'
           ? getQualityInspection({ id: routeSelectedID })
           : Promise.resolve(null),
@@ -938,26 +943,10 @@ export default function V1QualityInspectionsPage() {
       }
     }
   }, [
-    activeCustomerKey,
     beginLatestRequest,
-    dateFilterEnd,
-    dateFilterField,
-    dateFilterStart,
-    keyword,
-    linkedKeyword,
     inspectionTypeFilter,
-    lotFilter,
-    materialFilter,
-    pagination,
-    purchaseReceiptFilter,
-    routePurchaseOrderID,
-    routePurchaseReceiptID,
+    loadQualityInspectionList,
     routeQualityInspectionID,
-    routeSourceID,
-    routeSourceType,
-    resultFilter,
-    statusFilter,
-    warehouseFilter,
   ])
 
   useEffect(() => {
@@ -1564,14 +1553,38 @@ export default function V1QualityInspectionsPage() {
     ]
   )
 
-  const exportQualityInspections = useCallback(() => {
-    if (rows.length === 0) return
-    downloadCSV({
+  const loadExportQualityInspections = useCallback(
+    async ({ signal }) => {
+      const routeSelectedID = Number(routeQualityInspectionID || 0)
+      if (
+        routeSelectedID > 0 &&
+        inspectionTypeFilter !== 'PRODUCTION_STAGE'
+      ) {
+        const inspection = await getQualityInspection({ id: routeSelectedID })
+        return inspection ? [inspection] : []
+      }
+      const data = await loadQualityInspectionList({ signal, all: true })
+      const exportRows = data?.quality_inspections
+      return routeSelectedID > 0 && Array.isArray(exportRows)
+        ? exportRows.filter(
+            (item) => Number(item?.id || 0) === routeSelectedID
+          )
+        : exportRows
+    },
+    [
+      inspectionTypeFilter,
+      loadQualityInspectionList,
+      routeQualityInspectionID,
+    ]
+  )
+  const { exporting, exportRows: exportQualityInspections } =
+    useBusinessListExport({
+      requestKey: 'quality-inspections-export',
+      loadRows: loadExportQualityInspections,
       filename: `质量检验-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: exportColumns,
-      rows,
+      recordLabel: '质检单',
     })
-  }, [exportColumns, rows])
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
@@ -1841,7 +1854,8 @@ export default function V1QualityInspectionsPage() {
           <Space wrap>
             <ToolbarButton
               icon={<DownloadOutlined />}
-              disabled={rows.length === 0}
+              loading={exporting}
+              disabled={loading || exporting || total === 0}
               onClick={exportQualityInspections}
             >
               导出筛选结果

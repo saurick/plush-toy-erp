@@ -2,12 +2,18 @@ import {
   buildSourceInboundLotFields,
   normalizeSourceInboundLotRequestFields,
 } from './sourceInboundLotSelection.mjs'
+import {
+  PRODUCTION_WIP_ROUTE_CODE,
+  productionWipBatchLineageMeta,
+  productionWipCompletionEligibility,
+} from './productionWipModel.mjs'
 
 const CREATE_REQUEST_KEYS = new Set([
   'customer_key',
   'fact_no',
   'production_order_id',
   'production_order_item_id',
+  'production_wip_batch_id',
   'warehouse_id',
   'lot_id',
   'new_lot_no',
@@ -116,9 +122,70 @@ export function compareProductionCompletionQuantity(left, right) {
   return leftUnits === rightUnits ? 0 : leftUnits > rightUnits ? 1 : -1
 }
 
-export function buildProductionCompletionChoices(items = [], facts = []) {
+export function buildProductionCompletionChoices(
+  items = [],
+  facts = [],
+  wipAggregate = null
+) {
   const postedByLine = new Map()
   const draftByLine = new Map()
+  const postedByBatch = new Map()
+  const draftByBatch = new Map()
+  const normalizedItems = (Array.isArray(items) ? items : []).map((item) => {
+    const lineID = Number(item?.id || 0)
+    const routed = item?.route_code === PRODUCTION_WIP_ROUTE_CODE
+    let batches = Array.isArray(item?.accepted_packaging_batches)
+      ? item.accepted_packaging_batches
+      : []
+    if (routed && wipAggregate) {
+      const eligibility = productionWipCompletionEligibility(
+        wipAggregate,
+        item,
+        {
+          orderStatus: wipAggregate?.productionOrder?.status,
+        }
+      )
+      batches = eligibility.eligible
+        ? eligibility.acceptedPackagingBatches
+        : []
+    }
+    const batchIDs = new Set()
+    const acceptedPackagingBatches = batches.map((batch) => {
+      const batchID = Number(batch?.id || 0)
+      if (
+        !Number.isSafeInteger(batchID) ||
+        batchID <= 0 ||
+        Number(batch?.production_order_item_id || 0) !== lineID ||
+        String(batch?.status || '').toUpperCase() !== 'ACCEPTED' ||
+        batchIDs.has(batchID)
+      ) {
+        throw invalidContract('完工来源批次无法确认，请刷新后重试')
+      }
+      batchIDs.add(batchID)
+      return batch
+    })
+    return {
+      item,
+      lineID,
+      routed,
+      acceptedPackagingBatches,
+    }
+  })
+  const itemByLine = new Map(
+    normalizedItems.map((entry) => [entry.lineID, entry])
+  )
+  const knownBatchByID = new Map()
+  for (const batch of Array.isArray(wipAggregate?.batches)
+    ? wipAggregate.batches
+    : normalizedItems.flatMap((entry) => entry.acceptedPackagingBatches)) {
+    const batchID = Number(batch?.id || 0)
+    if (Number.isSafeInteger(batchID) && batchID > 0) {
+      if (knownBatchByID.has(batchID)) {
+        throw invalidContract('完工来源批次无法确认，请刷新后重试')
+      }
+      knownBatchByID.set(batchID, batch)
+    }
+  }
   for (const fact of Array.isArray(facts) ? facts : []) {
     if (
       fact?.fact_type !== 'FINISHED_GOODS_RECEIPT' ||
@@ -130,21 +197,91 @@ export function buildProductionCompletionChoices(items = [], facts = []) {
     const target = fact.status === 'POSTED' ? postedByLine : draftByLine
     if (!['POSTED', 'DRAFT'].includes(fact.status)) continue
     const lineID = Number(fact.source_line_id)
+    const itemEntry = itemByLine.get(lineID)
+    if (!itemEntry) continue
     const quantity = quantityUnits(fact.quantity)
+    if (itemEntry.routed) {
+      const batchID = Number(fact?.production_wip_batch_id || 0)
+      const batch = knownBatchByID.get(batchID)
+      if (
+        !Number.isSafeInteger(batchID) ||
+        batchID <= 0 ||
+        !batch ||
+        Number(batch?.production_order_item_id || 0) !== lineID
+      ) {
+        throw invalidContract(
+          '已有完工记录缺少可核对的来源批次，请联系管理员处理'
+        )
+      }
+      const target = fact.status === 'POSTED' ? postedByBatch : draftByBatch
+      target.set(batchID, (target.get(batchID) || zeroQuantityUnits()) + quantity)
+      continue
+    }
+    if (Number(fact?.production_wip_batch_id || 0) > 0) {
+      throw invalidContract('已有完工记录的来源批次与生产明细不一致')
+    }
     target.set(lineID, (target.get(lineID) || zeroQuantityUnits()) + quantity)
   }
 
-  return (Array.isArray(items) ? items : []).map((item, index) => {
-    const lineID = Number(item?.id || 0)
+  return normalizedItems.map((entry, index) => {
+    const { item, lineID, routed, acceptedPackagingBatches } = entry
     const planned = quantityUnits(item?.planned_quantity)
-    const acceptedPackaging = item?.accepted_packaging_quantity
-      ? quantityUnits(item.accepted_packaging_quantity)
-      : planned
-    const posted = postedByLine.get(lineID) || zeroQuantityUnits()
-    const draft = draftByLine.get(lineID) || zeroQuantityUnits()
-    const remaining =
-      acceptedPackaging > posted
-        ? acceptedPackaging - posted
+    const batchChoices = routed
+      ? acceptedPackagingBatches.map((batch) => {
+          const batchID = Number(batch.id)
+          const quantity = quantityUnits(batch.quantity)
+          const posted = postedByBatch.get(batchID) || zeroQuantityUnits()
+          const draft = draftByBatch.get(batchID) || zeroQuantityUnits()
+          const consumed = posted + draft
+          const remaining =
+            quantity > consumed ? quantity - consumed : zeroQuantityUnits()
+          const lineage = productionWipBatchLineageMeta(batch)
+          const batchNo = String(batch?.batch_no || '').trim()
+          return {
+            value: batchID,
+            label: [
+              batchNo || '包装验收批次',
+              lineage?.label,
+              `剩余 ${quantityTextFromUnits(remaining)}`,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+            batch,
+            quantity: quantityTextFromUnits(quantity),
+            posted: quantityTextFromUnits(posted),
+            draft: quantityTextFromUnits(draft),
+            remaining: quantityTextFromUnits(remaining),
+            disabled: remaining <= zeroQuantityUnits(),
+          }
+        })
+      : []
+    const acceptedPackaging = routed
+      ? batchChoices.reduce(
+          (total, choice) => total + quantityUnits(choice.quantity),
+          zeroQuantityUnits()
+        )
+      : item?.accepted_packaging_quantity
+        ? quantityUnits(item.accepted_packaging_quantity)
+        : planned
+    const posted = routed
+      ? batchChoices.reduce(
+          (total, choice) => total + quantityUnits(choice.posted, true),
+          zeroQuantityUnits()
+        )
+      : postedByLine.get(lineID) || zeroQuantityUnits()
+    const draft = routed
+      ? batchChoices.reduce(
+          (total, choice) => total + quantityUnits(choice.draft, true),
+          zeroQuantityUnits()
+        )
+      : draftByLine.get(lineID) || zeroQuantityUnits()
+    const remaining = routed
+      ? batchChoices.reduce(
+          (total, choice) => total + quantityUnits(choice.remaining, true),
+          zeroQuantityUnits()
+        )
+      : acceptedPackaging > posted + draft
+        ? acceptedPackaging - posted - draft
         : zeroQuantityUnits()
     const productText =
       [item?.product_code_snapshot, item?.product_name_snapshot]
@@ -162,7 +299,12 @@ export function buildProductionCompletionChoices(items = [], facts = []) {
       posted: quantityTextFromUnits(posted),
       draft: quantityTextFromUnits(draft),
       remaining: quantityTextFromUnits(remaining),
-      disabled: lineID <= 0 || remaining <= zeroQuantityUnits(),
+      requiresBatch: routed,
+      batchChoices,
+      disabled:
+        lineID <= 0 ||
+        remaining <= zeroQuantityUnits() ||
+        (routed && !batchChoices.some((choice) => !choice.disabled)),
     }
   })
 }
@@ -193,9 +335,14 @@ export function buildProductionCompletionLotOptions(item = {}, lots = []) {
     .filter((option) => Number.isSafeInteger(option.value) && option.value > 0)
 }
 
-export function buildProductionCompletionPayload(values = {}, order = {}) {
-  if (String(order?.status || '').toUpperCase() !== 'RELEASED') {
-    throw new Error('仅已发布生产订单可以登记完工入库')
+export function buildProductionCompletionPayload(
+  values = {},
+  order = {},
+  item = null
+) {
+  const orderStatus = String(order?.status || '').toUpperCase()
+  if (!['RELEASED', 'CLOSED'].includes(orderStatus)) {
+    throw new Error('当前生产订单状态不能登记完工入库')
   }
   const orderID = Number(order?.id || 0)
   const itemID = Number(values.production_order_item_id || 0)
@@ -203,6 +350,32 @@ export function buildProductionCompletionPayload(values = {}, order = {}) {
   const quantity = normalizedQuantity(values.quantity)
   if (orderID <= 0 || itemID <= 0 || warehouseID <= 0 || !quantity) {
     throw new Error('请完整填写完工入库信息')
+  }
+  const routed = item?.route_code === PRODUCTION_WIP_ROUTE_CODE
+  const productionWIPBatchID = Number(values.production_wip_batch_id || 0)
+  if (routed && (!Number.isSafeInteger(productionWIPBatchID) || productionWIPBatchID <= 0)) {
+    throw new Error('请选择本次完工对应的包装验收批次')
+  }
+  const selectedBatch = routed
+    ? (Array.isArray(item?.accepted_packaging_batches)
+        ? item.accepted_packaging_batches
+        : []
+      ).find((batch) => Number(batch?.id || 0) === productionWIPBatchID)
+    : null
+  if (
+    routed &&
+    Array.isArray(item?.accepted_packaging_batches) &&
+    item.accepted_packaging_batches.length > 0 &&
+    !selectedBatch
+  ) {
+    throw new Error('所选完工来源批次已变化，请重新选择')
+  }
+  if (
+    orderStatus === 'CLOSED' &&
+    (!routed || !Number.isSafeInteger(Number(selectedBatch?.origin_rework_fact_id)) ||
+      Number(selectedBatch.origin_rework_fact_id) <= 0)
+  ) {
+    throw new Error('已关闭订单只能登记成品返工补制批次的完工入库')
   }
   const occurredAtText = String(values.occurred_at || '').trim()
   const occurredAt = occurredAtText
@@ -216,6 +389,7 @@ export function buildProductionCompletionPayload(values = {}, order = {}) {
   return {
     production_order_id: orderID,
     production_order_item_id: itemID,
+    ...(routed ? { production_wip_batch_id: productionWIPBatchID } : {}),
     warehouse_id: warehouseID,
     ...lotFields,
     quantity,
@@ -245,6 +419,13 @@ export function normalizeProductionCompletionCreateRequest(params = {}) {
     fact_no: requiredText(source.fact_no),
     production_order_id: requiredID(source.production_order_id),
     production_order_item_id: requiredID(source.production_order_item_id),
+    ...(source.production_wip_batch_id == null
+      ? {}
+      : {
+          production_wip_batch_id: requiredID(
+            source.production_wip_batch_id
+          ),
+        }),
     warehouse_id: requiredID(source.warehouse_id),
     ...lotFields,
     quantity,
@@ -260,6 +441,8 @@ export function validateProductionCompletionResult(
   item = null
 ) {
   const expectedLotID = Number(request?.lot_id || 0)
+  const expectedWIPBatchID = Number(request?.production_wip_batch_id || 0)
+  const actualWIPBatchID = Number(result?.production_wip_batch_id || 0)
   const expectedProductID = Number(item?.product_id || 0)
   const expectedUnitID = Number(item?.unit_id || 0)
   if (
@@ -276,6 +459,9 @@ export function validateProductionCompletionResult(
       Number(request.production_order_id || 0) ||
     Number(result.source_line_id || 0) !==
       Number(request.production_order_item_id || 0) ||
+    (expectedWIPBatchID > 0
+      ? actualWIPBatchID !== expectedWIPBatchID
+      : actualWIPBatchID !== 0) ||
     (expectedLotID > 0 && Number(result.lot_id) !== expectedLotID) ||
     (expectedProductID > 0 &&
       Number(result.subject_id) !== expectedProductID) ||

@@ -7,6 +7,7 @@ import {
   mockSalesOrderItemsList,
 } from './orderRpcMocks.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
+import { validateProductionOrderAggregate } from '../../src/erp/utils/productionOrderModel.mjs'
 
 const salesOrderItem = Object.freeze({
   id: 7,
@@ -145,4 +146,60 @@ test('purchase order mocks preserve filters, total and requested slices', async 
   })
   assert.equal(unrelatedItems.result.data.total, 0)
   assert.equal(unrelatedItems.result.data.limit, 200)
+})
+
+test('production WIP mock always returns the nullable finished-goods rework lineage contract', async () => {
+  const call = await orderMockHarness('**/rpc/production_wip')
+  const initial = await call('get_production_wip', {
+    production_order_id: 71,
+  })
+  assert.equal(initial.result.code, 0)
+  assert.equal(
+    initial.result.data.production_wip_batches.every(
+      (batch) =>
+        Object.hasOwn(batch, 'origin_rework_fact_id') &&
+        (batch.origin_rework_fact_id === null ||
+          (Number.isSafeInteger(batch.origin_rework_fact_id) &&
+            batch.origin_rework_fact_id > 0))
+    ),
+    true
+  )
+
+  const split = await call('execute_production_wip_action', {
+    production_order_id: 71,
+    production_wip_batch_id: 91_012,
+    action: 'SPLIT_BATCH',
+    splits: [{ quantity: '8' }, { quantity: '12' }],
+  })
+  assert.equal(split.result.code, 0)
+  assert.equal(
+    split.result.data.production_wip_batches.every((batch) =>
+      Object.hasOwn(batch, 'origin_rework_fact_id')
+    ),
+    true
+  )
+})
+
+test('production order release mock satisfies the material requirement conservation contract', async () => {
+  const call = await orderMockHarness('**/rpc/production_order')
+  const released = await call('release_production_order', {
+    production_order_id: 71,
+    expected_version: 1,
+    idempotency_key: 'style-l1-production-release',
+  })
+  assert.equal(released.result.code, 0)
+
+  const aggregate = validateProductionOrderAggregate(released.result.data, {
+    id: 71,
+    status: 'RELEASED',
+  })
+  assert.equal(aggregate.materialRequirements.length, 4)
+  assert.equal(
+    aggregate.materialRequirements.every(
+      (requirement) =>
+        typeof requirement.approved_over_issue_quantity === 'string' &&
+        typeof requirement.effective_limit_quantity === 'string'
+    ),
+    true
+  )
 })

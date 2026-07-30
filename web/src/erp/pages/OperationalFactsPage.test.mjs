@@ -99,7 +99,10 @@ test('only posted rework feedback explains the atomic exception handoff', () => 
     source,
     /currentActiveKey === 'production'[\s\S]{0,180}actionKey === 'post'[\s\S]{0,180}row\.fact_type[\s\S]{0,180}'REWORK'/u
   )
-  assert.match(source, /返工记录已过账，生产异常任务已生成/u)
+  assert.match(
+    source,
+    /返工记录已过账，返工补制批次和生产异常任务已生成/u
+  )
   assert.doesNotMatch(source, /发起生产异常/u)
 })
 
@@ -173,4 +176,20 @@ test('production rework uses a source-bound retry-safe command and rereads unkno
   assert.match(source, /已重新读取并确认返工草稿，请核对后过账/u)
   assert.match(source, /setProductionReworkContext\(null\)/u)
   assert.match(source, /<ProductionReworkModal/u)
+})
+
+test('posted rework records open authoritative progress and link back to the production order', () => {
+  assert.match(source, /ProductionReworkProgressModal/u)
+  assert.match(source, /'production\.wip\.read'/u)
+  assert.match(source, /selectedCanViewProductionReworkProgress/u)
+  assert.match(source, /getProductionWip\(orderID\)/u)
+  assert.match(source, /origin_rework_fact_id/u)
+  assert.match(source, /focusReworkFactID:\s*source\.id/u)
+  assert.match(source, />\s*查看返工进度\s*</u)
+  assert.match(source, /V1_ROUTE_PATHS\.productionOrders/u)
+  assert.match(source, /production_order_id:\s*orderID/u)
+  assert.match(
+    source,
+    /该返工记录尚未关联可核对的成品返工补制批次/u
+  )
 })

@@ -33,7 +33,19 @@ test('production completion resets stale lot fields on open, line and mode chang
   assert.match(source, /form\.resetFields\(\)/u)
   assert.match(
     source,
-    /lot_id:[\s\S]*new_lot_no: undefined,[\s\S]*occurred_at/u
+    /production_wip_batch_id:\s*firstBatch\?\.value,[\s\S]*lot_id:[\s\S]*new_lot_no: undefined,[\s\S]*occurred_at/u
+  )
+  assert.match(
+    source,
+    /production_wip_batch_id:\s*nextBatch\?\.value,[\s\S]*lot_id:[\s\S]*new_lot_no: undefined/u
+  )
+  assert.match(
+    source,
+    /React\.useEffect\(\(\) => \{[\s\S]*selectedChoice\?\.requiresBatch[\s\S]*production_wip_batch_id:\s*firstBatch\.value,[\s\S]*quantity:\s*firstBatch\.remaining/u
+  )
+  assert.match(
+    source,
+    /name="production_wip_batch_id"[\s\S]*onChange=\{\(value\)[\s\S]*setFieldValue\('quantity'/u
   )
   assert.match(
     source,
@@ -50,11 +62,30 @@ test('production completion requires one bounded lot input and handles validatio
 })
 
 test('production completion defaults and validates against the current completion cap', () => {
-  assert.match(source, /quantity:\s*firstAvailable\?\.remaining/u)
-  assert.match(source, /当前可完工上限/u)
+  assert.match(
+    source,
+    /quantity:\s*firstBatch\?\.remaining\s*\|\|\s*firstAvailable\?\.remaining/u
+  )
+  assert.match(source, /完工来源批次/u)
+  assert.match(source, /所选批次/u)
+  assert.match(source, /已过账/u)
+  assert.match(source, /草稿/u)
   assert.match(source, /compareProductionCompletionQuantity/u)
-  assert.match(source, /不能超过当前可完工上限/u)
+  assert.match(source, /不能超过所选包装验收批次/u)
   assert.doesNotMatch(source, /包装已合格/u)
   assert.match(source, /maxLength=\{21\}/u)
   assert.doesNotMatch(source, /const quantity = Number\(value\)/u)
+})
+
+test('closed production orders expose only finished-goods rework completion wording', () => {
+  assert.match(source, /wipAggregate\s*=\s*null/u)
+  assert.match(
+    source,
+    /buildProductionCompletionChoices\(items,\s*facts,\s*wipAggregate\)/u
+  )
+  assert.match(source, /order\?\.status === 'CLOSED'/u)
+  assert.match(source, /登记返工补完工/u)
+  assert.match(source, /成品返工补制批次/u)
+  assert.doesNotMatch(source, />production_wip_batch_id</u)
+  assert.doesNotMatch(source, />origin_rework_fact_id</u)
 })

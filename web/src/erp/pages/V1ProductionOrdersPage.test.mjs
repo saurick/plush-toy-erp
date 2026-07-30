@@ -27,6 +27,13 @@ const completionModal = readFileSync(
   ),
   'utf8'
 )
+const reworkProgressModal = readFileSync(
+  new URL(
+    '../components/production-orders/ProductionReworkProgressModal.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
 const materialIssueModal = readFileSync(
   new URL(
     '../components/production-orders/ProductionMaterialIssueModal.jsx',
@@ -82,6 +89,12 @@ test('production order lifecycle keeps backend authority and separates refresh e
   assert.match(page, /getActionErrorMessage/u)
 })
 
+test('production order page reuses the ERP shell refresh entrypoint', () => {
+  assert.match(page, /registerPageRefresh\?\.\(loadOrders\)/u)
+  assert.doesNotMatch(page, />\s*刷新当前页\s*</u)
+  assert.doesNotMatch(page, /ReloadOutlined/u)
+})
+
 test('production order release explains the atomic scheduling handoff', () => {
   assert.match(page, /生产订单已发布，排程任务已进入 PMC 待办/u)
 })
@@ -103,11 +116,11 @@ test('closed production over-issue modal keeps its empty requirement null-safe',
   assert.match(overIssueModal, /当前可领上限/u)
 })
 
-test('released production orders create a source-bound completion draft', () => {
+test('released and closed production orders create a source-bound completion draft', () => {
   assert.match(page, /'production\.completion\.create'/u)
   assert.match(
     page,
-    /selected\?\.status !== PRODUCTION_ORDER_STATUS\.RELEASED/u
+    /PRODUCTION_ORDER_STATUS\.RELEASED,[\s\S]*PRODUCTION_ORDER_STATUS\.CLOSED/u
   )
   assert.match(page, /createProductionCompletionFromOrder\(params\)/u)
   assert.match(page, /source_type: 'PRODUCTION_ORDER'/u)
@@ -116,11 +129,12 @@ test('released production orders create a source-bound completion draft', () => 
   assert.match(page, /listAllInventoryLots\(\{ status: 'ACTIVE' \}\)/u)
   assert.match(page, /sourceBusinessActionNo/u)
   assert.match(page, /validateProductionCompletionResult/u)
-  assert.match(page, /完工记录草稿已生成，请到生产记录核对并过账/u)
+  assert.match(page, /返工补完工/u)
+  assert.match(page, /登记返工补完工/u)
   assert.doesNotMatch(page, /postProductionFact/u)
 })
 
-test('released production orders expose route execution through separate permissions', () => {
+test('released and closed production orders expose route execution through separate permissions', () => {
   assert.match(page, /ProductionRouteExecutionModal/u)
   for (const permission of [
     'production.wip.read',
@@ -138,9 +152,12 @@ test('released production orders expose route execution through separate permiss
   )
   assert.match(
     page,
-    /selected\.status !== PRODUCTION_ORDER_STATUS\.RELEASED/u
+    /PRODUCTION_ORDER_STATUS\.RELEASED,[\s\S]*PRODUCTION_ORDER_STATUS\.CLOSED/u
   )
-  assert.match(page, />\s*工序办理\s*</u)
+  assert.match(
+    page,
+    /\? '返工工序办理'\s*:\s*'工序办理'/u
+  )
 })
 
 test('WIP readers can open production orders without receiving PMC write permissions', () => {
@@ -196,8 +213,31 @@ test('routed completion fails closed until packaging is accepted and packaging m
   assert.match(page, /eligibleItems\.length === 0/u)
   assert.match(page, /暂不能登记完工入库/u)
   assert.match(page, /工序状态已变化/u)
+  assert.match(page, /productionWipBatchID:\s*payload\.production_wip_batch_id/u)
+  assert.match(
+    page,
+    /buildProductionCompletionPayload\([\s\S]*completionContext\.order,[\s\S]*orderItem/u
+  )
+  assert.match(
+    page,
+    /production-completion:\$\{completionContext\.order\.id\}:\$\{payload\.production_order_item_id\}:\$\{payload\.production_wip_batch_id \|\| 0\}/u
+  )
   assert.match(page, /当前账号没有查看生产工序的权限/u)
   assert.match(completionModal, /部分路线明细暂不可登记/u)
+  assert.match(completionModal, /name="production_wip_batch_id"/u)
+  assert.match(page, /wipAggregate=\{completionContext\.wipAggregate\}/u)
+})
+
+test('production order page exposes authoritative finished-goods rework progress', () => {
+  assert.match(page, /ProductionReworkProgressModal/u)
+  assert.match(page, /beginLatestRequest\('production-rework-progress'\)/u)
+  assert.match(page, /getProductionWip\(orderID/u)
+  assert.match(page, /origin_rework_fact_id/u)
+  assert.match(page, /当前生产订单暂无成品返工进度/u)
+  assert.match(page, /查看返工进度/u)
+  assert.match(page, /onContinue=\{\(\) => \{/u)
+  assert.match(reworkProgressModal, /成品返工进度/u)
+  assert.match(reworkProgressModal, /补完工已过账/u)
 })
 
 test('production page explains fixed sewing-before-handwork and layered facts', () => {

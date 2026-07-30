@@ -62,7 +62,7 @@ const pageCases = [
     path: '../pages/V1QualityInspectionsPage.jsx',
     loader: 'loadRows',
     requestKey: 'rows',
-    listFunction: 'listQualityInspections',
+    listFunction: 'loadQualityInspectionList',
   },
   {
     title: '物料清单',

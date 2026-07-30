@@ -33,6 +33,7 @@ import {
   listAllMaterials,
   listAllContactsByOwner,
   listAllPurchaseOrderItems,
+  listAllPurchaseOrders,
   listPurchaseOrderItemsPreview,
   listPurchaseOrders,
   getPurchaseOrder,
@@ -92,7 +93,6 @@ import {
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
 import {
-  downloadCSV,
   getPreferredColumnOrder,
   parseBusinessSortValue,
   writeStoredColumnOrder,
@@ -113,6 +113,7 @@ import {
   linkedDocumentRequestKeyword,
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
 import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../utils/printWorkspace.js'
@@ -367,27 +368,43 @@ export default function V1PurchaseOrdersPage() {
     }
   }, [beginLatestRequest])
 
+  const orderListParams = useMemo(() => {
+    const { sortBy, sortDirection } = parseBusinessSortValue(sortValue)
+    return {
+      keyword: linkedDocumentRequestKeyword({
+        localKeyword: keyword,
+        linkedKeyword,
+        hasExactContext: Boolean(routePurchaseOrderID),
+      }),
+      supplier_id: supplierFilter || undefined,
+      lifecycle_status: status,
+      date_field: dateFilterField,
+      date_from: dateFilterStart || undefined,
+      date_to: dateFilterEnd || undefined,
+      sort_by: sortBy,
+      sort_direction: sortDirection,
+    }
+  }, [
+    dateFilterEnd,
+    dateFilterField,
+    dateFilterStart,
+    keyword,
+    linkedKeyword,
+    routePurchaseOrderID,
+    sortValue,
+    status,
+    supplierFilter,
+  ])
+
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
     setLoading(true)
     try {
-      const { sortBy, sortDirection } = parseBusinessSortValue(sortValue)
       const routeSelectedID = Number(routePurchaseOrderID || 0)
       const [data, routeOrder] = await Promise.all([
         listPurchaseOrders(
           {
-            keyword: linkedDocumentRequestKeyword({
-              localKeyword: keyword,
-              linkedKeyword,
-              hasExactContext: Boolean(routeSelectedID),
-            }),
-            supplier_id: supplierFilter || undefined,
-            lifecycle_status: status,
-            date_field: dateFilterField,
-            date_from: dateFilterStart || undefined,
-            date_to: dateFilterEnd || undefined,
-            sort_by: sortBy,
-            sort_direction: sortDirection,
+            ...orderListParams,
             limit: pagination.pageSize,
             offset: (pagination.current - 1) * pagination.pageSize,
           },
@@ -443,16 +460,9 @@ export default function V1PurchaseOrdersPage() {
   }, [
     applySelectedRowKeys,
     beginLatestRequest,
-    dateFilterEnd,
-    dateFilterField,
-    dateFilterStart,
-    keyword,
-    linkedKeyword,
+    orderListParams,
     pagination,
     routePurchaseOrderID,
-    sortValue,
-    status,
-    supplierFilter,
   ])
 
   const loadWorkflowTasks = useCallback(
@@ -984,14 +994,28 @@ export default function V1PurchaseOrdersPage() {
     ]
   )
 
-  const exportOrders = useCallback(() => {
-    if (orders.length === 0) return
-    downloadCSV({
-      filename: `采购订单-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: visibleDataColumns,
-      rows: orders,
-    })
-  }, [orders, visibleDataColumns])
+  const loadExportOrders = useCallback(
+    async ({ signal }) => {
+      const routeSelectedID = Number(routePurchaseOrderID || 0)
+      if (routeSelectedID > 0) {
+        const order = await getPurchaseOrder(
+          { id: routeSelectedID },
+          { signal }
+        )
+        return order ? [order] : []
+      }
+      const result = await listAllPurchaseOrders(orderListParams, { signal })
+      return result?.purchase_orders
+    },
+    [orderListParams, routePurchaseOrderID]
+  )
+  const { exporting, exportRows: exportOrders } = useBusinessListExport({
+    requestKey: 'purchase-orders-export',
+    loadRows: loadExportOrders,
+    filename: `采购订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: visibleDataColumns,
+    recordLabel: '采购订单',
+  })
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
@@ -1242,6 +1266,8 @@ export default function V1PurchaseOrdersPage() {
         dateFilterEnd={dateFilterEnd}
         dateFilterField={dateFilterField}
         dateFilterStart={dateFilterStart}
+        exportDisabled={loading || exporting || total === 0}
+        exporting={exporting}
         exportOrders={exportOrders}
         generatingInboundDraft={generatingInboundDraft}
         hasActiveFilters={hasActiveFilters}

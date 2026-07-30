@@ -22,6 +22,18 @@ export async function listQualityInspections(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllQualityInspections(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listQualityInspections,
+    params,
+    'quality_inspections',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的质检记录不完整，请刷新后重试',
+    }
+  )
+}
+
 export async function listFinishedGoodsQualityInspections(
   params = {},
   options = {}
@@ -59,6 +71,22 @@ export async function listProductionStageQualityInspections(
     options
   )
   return dataOf(result)
+}
+
+export async function listAllProductionStageQualityInspections(
+  params = {},
+  options = {}
+) {
+  return listAllPaginatedRecords(
+    listProductionStageQualityInspections,
+    params,
+    'quality_inspections',
+    options,
+    {
+      invalidResponseMessage:
+        '服务器返回的生产分段质检记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function createFinishedGoodsQualityInspectionDraft(params = {}) {

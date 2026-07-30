@@ -214,6 +214,11 @@ export const businessPageFlowDefinitions = Object.freeze(
           'production-progress',
           'list_production_order_material_requirements',
         ],
+        [
+          'inbound',
+          'accessories-purchase',
+          'get_purchase_order_receipt_progress',
+        ],
         ['sales-orders', 'shipments', 'list_shipment_source_candidates'],
         [
           'processing-contracts',

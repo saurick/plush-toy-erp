@@ -823,8 +823,11 @@ test('BOM 页面导出和选中项不把内部 ID 当业务字段', () => {
   assert.doesNotMatch(content, /产品ID/u)
   assert.doesNotMatch(content, /`BOM \$\{record\.id\}`/u)
   assert.match(
-    content,
-    /referenceLabel\(productOptions, row\.product_id, '产品'\)/u
+    readFileSync(
+      join(rootDir, 'components/bom/BOMVersionColumns.jsx'),
+      'utf8'
+    ),
+    /exportValue: \(record\) =>\s*referenceLabel\(productOptions, record\?\.product_id, '产品'\)/u
   )
   assert.match(content, /BOM 已关联/u)
 })

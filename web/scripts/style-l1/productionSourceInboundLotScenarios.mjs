@@ -116,6 +116,16 @@ export function createProductionSourceInboundLotScenarios(deps) {
           true,
           '没有匹配的已有产品批次时应默认填写新批次号'
         )
+        const completionBatchField = modal
+          .locator('.ant-form-item')
+          .filter({ hasText: '完工来源批次' })
+          .first()
+        assert.match(
+          await completionBatchField
+            .locator('.ant-select-selection-item')
+            .innerText(),
+          /WIP-STYLE-91004/u
+        )
         await modal.getByLabel('本次完工数量').fill('2')
         await modal
           .getByRole('textbox', { name: /新批次号/u })
@@ -142,6 +152,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
           'fact_no',
           'production_order_id',
           'production_order_item_id',
+          'production_wip_batch_id',
           'warehouse_id',
           'new_lot_no',
           'quantity',
@@ -156,6 +167,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
         assert.equal(params.customer_key, 'yoyoosun')
         assert.equal(params.production_order_id, 71)
         assert.equal(params.production_order_item_id, 7100)
+        assert.equal(params.production_wip_batch_id, 91_004)
         assert.equal(params.warehouse_id, 1)
         assert.equal(params.new_lot_no, 'PROD-NEW-LOT-REREAD-L1')
         assert.equal(params.quantity, '2')

@@ -43,6 +43,8 @@ export default function PurchaseOrderOperationPanel({
   dateFilterEnd = '',
   dateFilterField = 'purchase_date',
   dateFilterStart = '',
+  exportDisabled = false,
+  exporting = false,
   exportOrders,
   generatingInboundDraft = false,
   hasActiveFilters = false,
@@ -98,10 +100,12 @@ export default function PurchaseOrderOperationPanel({
     : recordActionBusy
       ? '当前操作完成后可继续办理'
       : ''
-  const lifecycleMoreDisabled = recordActionBusy
-  const lifecycleMoreDisabledReason = recordActionBusy
-    ? '当前操作完成后可继续办理'
-    : ''
+  const lifecycleMoreDisabled = !hasSingleSelection || recordActionBusy
+  const lifecycleMoreDisabledReason = !hasSingleSelection
+    ? '请先选择一条采购订单'
+    : recordActionBusy
+      ? '当前操作完成后可继续办理'
+      : ''
 
   return (
     <BusinessOperationPanel
@@ -174,7 +178,8 @@ export default function PurchaseOrderOperationPanel({
         <Space wrap>
           <ToolbarButton
             icon={<DownloadOutlined />}
-            disabled={orders.length === 0}
+            loading={exporting}
+            disabled={exportDisabled || orders.length === 0}
             onClick={exportOrders}
           >
             导出筛选结果

@@ -845,6 +845,16 @@ test('business page lineage: carry-over, generation, WIP quality, and reversal s
     flowsForAction('list_production_order_material_requirements')[0]?.flowType,
     BUSINESS_FLOW_TYPES.SOURCE_QUERY
   )
+  const receiptProgressFlow = flowsForAction(
+    'get_purchase_order_receipt_progress'
+  )[0]
+  assert.equal(receiptProgressFlow?.flowType, BUSINESS_FLOW_TYPES.SOURCE_QUERY)
+  assert.equal(receiptProgressFlow?.fromPageKey, 'inbound')
+  assert.equal(receiptProgressFlow?.toPageKey, 'accessories-purchase')
+  assert.equal(
+    NON_LINEAGE_READ_ACTIONS.includes('get_purchase_order_receipt_progress'),
+    false
+  )
   assert.equal(
     flowsForAction('copy_bom_version')[0]?.flowType,
     BUSINESS_FLOW_TYPES.DOMAIN_GENERATE

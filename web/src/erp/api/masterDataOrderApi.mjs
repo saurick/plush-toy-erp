@@ -11,6 +11,7 @@ import {
   listAllPaginatedRecords,
   listAllReferenceRecords,
 } from '../utils/referencePagination.mjs'
+import { validatePurchaseOrderReceiptProgress } from '../utils/purchaseOrderInboundPreview.mjs'
 
 const masterDataRpc = new JsonRpc({
   url: 'masterdata',
@@ -415,6 +416,18 @@ export async function listPurchaseOrders(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllPurchaseOrders(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listPurchaseOrders,
+    params,
+    'purchase_orders',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的采购订单列表不完整，请刷新后重试',
+    }
+  )
+}
+
 export async function savePurchaseOrderWithItems(params = {}) {
   const result = await purchaseOrderRpc.call(
     'save_purchase_order_with_items',
@@ -435,6 +448,21 @@ export async function getPurchaseOrder(params = {}, options = {}) {
     options
   )
   return dataOf(result)?.purchase_order || null
+}
+
+export async function getPurchaseOrderReceiptProgress(
+  params = {},
+  options = {}
+) {
+  const result = await purchaseOrderRpc.call(
+    'get_purchase_order_receipt_progress',
+    params,
+    options
+  )
+  return validatePurchaseOrderReceiptProgress(
+    dataOf(result)?.purchase_order_receipt_progress,
+    Number(params?.id || 0)
+  )
 }
 
 export async function closePurchaseOrder(params = {}) {

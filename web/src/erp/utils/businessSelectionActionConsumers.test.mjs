@@ -28,6 +28,26 @@ const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
   'WorkflowBusinessModulePage.jsx': 'WorkflowBusinessModulePage.jsx',
 })
 
+const FORMAL_SELECTION_DISCOVERABILITY_EVIDENCE = Object.freeze({
+  'BOMVersionsPage.jsx':
+    /selectedRowKeys\.length !== 1|selectedRowKeys\.length === 0/u,
+  'FinancePaymentsPage.jsx': /resolveFinancePaymentActionAvailability/u,
+  'OperationalFactsPage.jsx': /!activeSelectedRow/u,
+  'SalesReturnsPage.jsx': /resolveSalesReturnActionAvailability/u,
+  'ShipmentsPage.jsx': /resolveShipmentActionAvailability/u,
+  'V1InventoryLedgerPage.jsx': /resolveRelatedRecordActionAvailability/u,
+  'V1MasterDataPage.jsx': /disabled=\{!selectedRecord \|\| saving\}/u,
+  'V1OutsourcingOrdersPage.jsx':
+    /!selectedRow \|\| canEditOutsourcingOrder\(selectedRow\)/u,
+  'V1ProductionOrdersPage.jsx': /!selected \|\| selected\.status/u,
+  'V1PurchaseOrdersPage.jsx':
+    /!singleSelectedOrder \|\| selectedLifecycleStatus/u,
+  'V1PurchaseReceiptsPage.jsx': /!selectedRow \|\|/u,
+  'V1QualityInspectionsPage.jsx': /!selectedRow \|\|/u,
+  'V1SalesOrdersPage.jsx': /!selectedOrder \|\| selectedOrderLifecycleStatus/u,
+  'WorkflowBusinessModulePage.jsx': /!selectedTask \|\|/u,
+})
+
 function pageSource(fileName) {
   return readFileSync(resolve(pagesDirectory, fileName), 'utf8')
 }
@@ -74,6 +94,30 @@ test('全部正式业务选择页复用稳定动作条、清空入口和禁用�
       source,
       /<BusinessActionTooltip/u,
       `${pageFile} 必须为临时不可用动作提供统一原因`
+    )
+  }
+})
+
+test('全部正式业务选择页保留未选中发现性，不允许把记录动作直接绑成选中后才渲染', () => {
+  assert.deepEqual(
+    Object.keys(FORMAL_SELECTION_DISCOVERABILITY_EVIDENCE).sort(),
+    Object.keys(FORMAL_SELECTION_PAGE_CONSUMERS).sort(),
+    '新增正式选择页时必须登记未选中动作发现性证据'
+  )
+
+  for (const [pageFile, consumerPath] of Object.entries(
+    FORMAL_SELECTION_PAGE_CONSUMERS
+  )) {
+    const source = consumerSource(consumerPath)
+    assert.match(
+      source,
+      FORMAL_SELECTION_DISCOVERABILITY_EVIDENCE[pageFile],
+      `${pageFile} 必须保留“未选择也渲染、按钮置灰”的动作分支`
+    )
+    assert.doesNotMatch(
+      source,
+      /\{\s*(?:selected(?:Order|Row|Task|Record)?|singleSelectedOrder|activeSelectedRow|hasSelection)\s*&&\s*\(?\s*<(?:BusinessActionTooltip|BusinessLifecyclePrimaryAction|BusinessLifecycleMoreAction|Button|Dropdown|Popconfirm)/u,
+      `${pageFile} 不得把动作入口直接写成选中后才渲染`
     )
   }
 })

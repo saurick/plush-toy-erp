@@ -56,6 +56,18 @@ export async function listInventoryTxns(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllInventoryTxns(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listInventoryTxns,
+    params,
+    'inventory_txns',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的库存流水不完整，请刷新后重试',
+    }
+  )
+}
+
 export async function createInventoryOperation(params = {}) {
   const result = await inventoryRpc.call('create_inventory_operation', params)
   return dataOf(result)?.inventory_operation || null

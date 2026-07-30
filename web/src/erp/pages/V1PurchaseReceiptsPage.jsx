@@ -21,6 +21,7 @@ import {
   createPurchaseReceiptAdjustmentFromReceipt,
   createPurchaseReturnFromReceipt,
   getPurchaseReceipt,
+  listAllPurchaseReceipts,
   listPurchaseReceipts,
   postPurchaseReceipt,
 } from '../api/purchaseApi.mjs'
@@ -46,7 +47,6 @@ import {
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
-  downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
@@ -109,6 +109,7 @@ import {
   linkedDocumentRequestKeyword,
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -456,6 +457,42 @@ export default function V1PurchaseReceiptsPage() {
     }
   }
 
+  const receiptListParams = useMemo(
+    () =>
+      compactParams({
+        status: statusFilter,
+        keyword: trimOptional(
+          linkedDocumentRequestKeyword({
+            localKeyword: keyword,
+            linkedKeyword,
+            hasExactContext: Boolean(routeReceiptID || routePurchaseOrderID),
+          })
+        ),
+        supplier_name: supplierFilter || undefined,
+        date_field: dateFilterField,
+        date_from: dateFilterStart || undefined,
+        date_to: dateFilterEnd || undefined,
+        material_id: materialFilter || undefined,
+        warehouse_id: warehouseFilter || undefined,
+        lot_id: lotFilter || undefined,
+        purchase_order_id: routePurchaseOrderID || undefined,
+      }),
+    [
+      dateFilterEnd,
+      dateFilterField,
+      dateFilterStart,
+      keyword,
+      linkedKeyword,
+      lotFilter,
+      materialFilter,
+      routePurchaseOrderID,
+      routeReceiptID,
+      statusFilter,
+      supplierFilter,
+      warehouseFilter,
+    ]
+  )
+
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
     setLoading(true)
@@ -463,27 +500,10 @@ export default function V1PurchaseReceiptsPage() {
       const routeSelectedID = Number(routeReceiptID || 0)
       const [data, routeReceipt] = await Promise.all([
         listPurchaseReceipts(
-          compactParams({
-            status: statusFilter,
-            keyword: trimOptional(
-              linkedDocumentRequestKeyword({
-                localKeyword: keyword,
-                linkedKeyword,
-                hasExactContext: Boolean(
-                  routeReceiptID || routePurchaseOrderID
-                ),
-              })
-            ),
-            supplier_name: supplierFilter || undefined,
-            date_field: dateFilterField,
-            date_from: dateFilterStart || undefined,
-            date_to: dateFilterEnd || undefined,
-            material_id: materialFilter || undefined,
-            warehouse_id: warehouseFilter || undefined,
-            lot_id: lotFilter || undefined,
-            purchase_order_id: routePurchaseOrderID || undefined,
+          {
+            ...receiptListParams,
             ...getBusinessPaginationParams(pagination),
-          }),
+          },
           { signal: request.signal }
         ),
         routeSelectedID > 0
@@ -529,19 +549,9 @@ export default function V1PurchaseReceiptsPage() {
     }
   }, [
     beginLatestRequest,
-    dateFilterEnd,
-    dateFilterField,
-    dateFilterStart,
-    keyword,
-    linkedKeyword,
-    lotFilter,
-    materialFilter,
     pagination,
-    routePurchaseOrderID,
+    receiptListParams,
     routeReceiptID,
-    statusFilter,
-    supplierFilter,
-    warehouseFilter,
   ])
 
   const clearRouteContext = useCallback(
@@ -934,13 +944,30 @@ export default function V1PurchaseReceiptsPage() {
     moduleTitle: '入库管理',
     columns,
   })
-  const exportRows = useCallback(() => {
-    downloadBusinessListCSV({
-      filename: `采购入库-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: exportColumns,
-      rows,
-    })
-  }, [exportColumns, rows])
+  const loadExportRows = useCallback(
+    async ({ signal }) => {
+      const routeSelectedID = Number(routeReceiptID || 0)
+      if (routeSelectedID > 0) {
+        const receipt = await getPurchaseReceipt(
+          { id: routeSelectedID },
+          { signal }
+        )
+        return receipt ? [receipt] : []
+      }
+      const result = await listAllPurchaseReceipts(receiptListParams, {
+        signal,
+      })
+      return result?.purchase_receipts
+    },
+    [receiptListParams, routeReceiptID]
+  )
+  const { exporting, exportRows } = useBusinessListExport({
+    requestKey: 'purchase-receipts-export',
+    loadRows: loadExportRows,
+    filename: `采购入库-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: exportColumns,
+    recordLabel: '采购入库单',
+  })
   const hasActiveFilters = Boolean(
     keyword.trim() ||
       statusFilter ||
@@ -1128,7 +1155,16 @@ export default function V1PurchaseReceiptsPage() {
           <BusinessListToolbarActions
             moduleTitle="入库管理"
             onExport={exportRows}
-            exportDisabled={rows.length === 0}
+            exportDisabled={loading || exporting || total === 0}
+            exportDisabledReason={
+              exporting
+                ? '正在准备导出，请稍候'
+                : loading
+                  ? '采购入库单加载完成后可导出'
+                  : total === 0
+                    ? '当前筛选没有可导出的采购入库单'
+                    : ''
+            }
             onOpenColumnOrder={openColumnOrder}
           />
         }

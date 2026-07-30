@@ -51,6 +51,7 @@ import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import BusinessLineItemsSection from '../components/business-list/BusinessLineItemsSection.jsx'
@@ -78,7 +79,6 @@ import {
 } from '../components/bom/BOMVersionForms.jsx'
 import {
   buildBOMItemSourceValuesFromMaterial,
-  formatUnixDate,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
 import {
@@ -156,60 +156,6 @@ function getPreferredColumnOrder({
   const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
   if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
   return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
-}
-
-function csvEscape(value) {
-  const text = String(value ?? '')
-  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
-}
-
-function downloadCSV({ filename, rows, productOptions = [] }) {
-  const header = [
-    '产品',
-    'BOM版本',
-    '状态',
-    '来源订单号',
-    '订单数量',
-    '备品',
-    '制表日期',
-    '设计师',
-    '制表',
-    '审核',
-    '毛向',
-    '生效开始',
-    '生效结束',
-    '备注',
-  ]
-  const body = rows.map((row) => [
-    referenceLabel(productOptions, row.product_id, '产品'),
-    row.version,
-    bomStatusText(row.status),
-    row.source_order_no || '',
-    row.quantity_text || '',
-    row.spare_text || '',
-    formatUnixDate(row.print_date),
-    row.designer || '',
-    row.maker || '',
-    row.auditor || '',
-    row.hair_direction || '',
-    formatUnixDate(row.effective_from),
-    formatUnixDate(row.effective_to),
-    row.note || '',
-  ])
-  const csv = [header, ...body]
-    .map((line) => line.map(csvEscape).join(','))
-    .join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
 }
 
 function createBlankBOMLine(headerID) {
@@ -700,6 +646,15 @@ export default function BOMVersionsPage() {
     [primeBOMItemsPreview]
   )
 
+  const bomListParams = useMemo(
+    () => ({
+      keyword,
+      status,
+      product_id: productID || undefined,
+    }),
+    [keyword, productID, status]
+  )
+
   const loadVersions = useCallback(async () => {
     const request = beginLatestRequest('versions')
     if (!canRead) {
@@ -714,9 +669,7 @@ export default function BOMVersionsPage() {
     try {
       const result = await listBOMVersions(
         {
-          keyword,
-          status,
-          product_id: productID || undefined,
+          ...bomListParams,
           ...getBusinessPaginationParams(pagination),
         },
         { signal: request.signal }
@@ -755,12 +708,10 @@ export default function BOMVersionsPage() {
   }, [
     applySelectedRowKeys,
     beginLatestRequest,
+    bomListParams,
     canRead,
-    keyword,
     loadDetail,
     pagination,
-    productID,
-    status,
   ])
 
   const loadReferenceOptions = useCallback(async () => {
@@ -1233,6 +1184,32 @@ export default function BOMVersionsPage() {
       preferredColumnOrder,
     ]
   )
+  const exportColumns = useMemo(
+    () => [
+      ...orderedDataColumns,
+      { title: '订单数量', dataIndex: 'quantity_text' },
+      { title: '备品', dataIndex: 'spare_text' },
+      { title: '制表', dataIndex: 'maker' },
+      { title: '审核', dataIndex: 'auditor' },
+      { title: '毛向', dataIndex: 'hair_direction' },
+    ],
+    [orderedDataColumns]
+  )
+  const loadExportVersions = useCallback(
+    async ({ signal }) => {
+      if (!canRead) return []
+      const result = await listAllBOMVersions(bomListParams, { signal })
+      return result?.bom_versions
+    },
+    [bomListParams, canRead]
+  )
+  const { exporting, exportRows: exportVersions } = useBusinessListExport({
+    requestKey: 'bom-versions-export',
+    loadRows: loadExportVersions,
+    filename: `物料清单-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: exportColumns,
+    recordLabel: '物料清单',
+  })
 
   const hasActiveFilters = Boolean(keyword.trim() || productID || status)
   const clearFilters = useCallback(() => {
@@ -1302,14 +1279,9 @@ export default function BOMVersionsPage() {
           <Space wrap>
             <ToolbarButton
               icon={<DownloadOutlined />}
-              disabled={versions.length === 0}
-              onClick={() =>
-                downloadCSV({
-                  filename: `物料清单-${new Date().toISOString().slice(0, 10)}.csv`,
-                  rows: versions,
-                  productOptions,
-                })
-              }
+              loading={exporting}
+              disabled={loading || exporting || total === 0}
+              onClick={exportVersions}
             >
               导出筛选结果
             </ToolbarButton>

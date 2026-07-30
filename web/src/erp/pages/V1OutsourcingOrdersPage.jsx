@@ -39,7 +39,6 @@ import {
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import {
-  downloadBusinessCSV,
   getPreferredColumnOrder,
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
@@ -62,6 +61,7 @@ import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSou
 import { buildOutsourcingOrderColumns } from '../components/outsourcing-orders/outsourcingOrderColumns.jsx'
 import {
   listAllOutsourcingOrderItems,
+  listAllOutsourcingOrders,
   getOutsourcingOrder,
   listOutsourcingOrderItemsPreview,
   listOutsourcingOrders,
@@ -92,6 +92,7 @@ import {
   createQualityInspectionFromOutsourcingReturn,
   listAllOutsourcingReturnQualityInspections,
 } from '../api/qualityApi.mjs'
+import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
@@ -433,6 +434,70 @@ export default function V1OutsourcingOrdersPage() {
     }
   }, [])
 
+  const outsourcingListParams = useMemo(() => {
+    const routeSelectedID = Number(routeOutsourcingOrderID || 0)
+    const routeFactID = Number(routeOutsourcingFactID || 0)
+    const { sortBy, sortDirection } = parseOutsourcingOrderSortValue(sortValue)
+    return {
+      keyword: linkedDocumentRequestKeyword({
+        localKeyword: keyword,
+        linkedKeyword,
+        hasExactContext: Boolean(routeSelectedID || routeFactID),
+      }),
+      supplier_id: supplierFilter || undefined,
+      lifecycle_status: statusFilter,
+      date_field: dateField,
+      date_from: dateRange?.[0] || undefined,
+      date_to: dateRange?.[1] || undefined,
+      sort_by: sortBy,
+      sort_direction: sortDirection,
+    }
+  }, [
+    dateField,
+    dateRange,
+    keyword,
+    linkedKeyword,
+    routeOutsourcingFactID,
+    routeOutsourcingOrderID,
+    sortValue,
+    statusFilter,
+    supplierFilter,
+  ])
+
+  const loadRouteOrder = useCallback(
+    async ({ signal }) => {
+      const routeSelectedID = Number(routeOutsourcingOrderID || 0)
+      if (routeSelectedID > 0) {
+        return getOutsourcingOrder({ id: routeSelectedID }, { signal })
+      }
+      const routeFactID = Number(routeOutsourcingFactID || 0)
+      if (routeFactID <= 0 || !canReadOutsourcingFacts) return null
+      const factData = await listAllOutsourcingFacts(
+        { keyword: String(routeFactID) },
+        { signal }
+      )
+      const sourceFact = (factData?.outsourcing_facts || []).find(
+        (fact) => Number(fact?.id || 0) === routeFactID
+      )
+      if (
+        String(sourceFact?.source_type || '').toUpperCase() !==
+          'OUTSOURCING_ORDER' ||
+        Number(sourceFact?.source_id || 0) <= 0
+      ) {
+        return null
+      }
+      return getOutsourcingOrder(
+        { id: Number(sourceFact.source_id) },
+        { signal }
+      )
+    },
+    [
+      canReadOutsourcingFacts,
+      routeOutsourcingFactID,
+      routeOutsourcingOrderID,
+    ]
+  )
+
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
     const routeSelectedID = Number(routeOutsourcingOrderID || 0)
@@ -441,56 +506,16 @@ export default function V1OutsourcingOrdersPage() {
     setResolvedLinkedContext({ routeKey: requestRouteKey, keyword: '' })
     setLoading(true)
     try {
-      const { sortBy, sortDirection } =
-        parseOutsourcingOrderSortValue(sortValue)
-      const loadRouteOrder = async () => {
-        if (routeSelectedID > 0) {
-          return getOutsourcingOrder(
-            { id: routeSelectedID },
-            { signal: request.signal }
-          )
-        }
-        if (routeFactID <= 0 || !canReadOutsourcingFacts) return null
-        const factData = await listAllOutsourcingFacts(
-          { keyword: String(routeFactID) },
-          { signal: request.signal }
-        )
-        const sourceFact = (factData?.outsourcing_facts || []).find(
-          (fact) => Number(fact?.id || 0) === routeFactID
-        )
-        if (
-          String(sourceFact?.source_type || '').toUpperCase() !==
-            'OUTSOURCING_ORDER' ||
-          Number(sourceFact?.source_id || 0) <= 0
-        ) {
-          return null
-        }
-        return getOutsourcingOrder(
-          { id: Number(sourceFact.source_id) },
-          { signal: request.signal }
-        )
-      }
       const [data, routeOrder] = await Promise.all([
         listOutsourcingOrders(
           {
-            keyword: linkedDocumentRequestKeyword({
-              localKeyword: keyword,
-              linkedKeyword,
-              hasExactContext: Boolean(routeSelectedID || routeFactID),
-            }),
-            supplier_id: supplierFilter || undefined,
-            lifecycle_status: statusFilter,
-            date_field: dateField,
-            date_from: dateRange?.[0] || undefined,
-            date_to: dateRange?.[1] || undefined,
-            sort_by: sortBy,
-            sort_direction: sortDirection,
+            ...outsourcingListParams,
             limit: pagination.pageSize,
             offset: (pagination.current - 1) * pagination.pageSize,
           },
           { signal: request.signal }
         ),
-        loadRouteOrder(),
+        loadRouteOrder({ signal: request.signal }),
       ])
       if (!request.isCurrent()) {
         return
@@ -532,17 +557,11 @@ export default function V1OutsourcingOrdersPage() {
     }
   }, [
     beginLatestRequest,
-    dateField,
-    dateRange,
-    keyword,
-    linkedKeyword,
+    loadRouteOrder,
+    outsourcingListParams,
     pagination,
-    canReadOutsourcingFacts,
     routeOutsourcingFactID,
     routeOutsourcingOrderID,
-    sortValue,
-    statusFilter,
-    supplierFilter,
   ])
 
   const loadOrderItems = useCallback(async (order, options = {}) => {
@@ -2125,14 +2144,31 @@ export default function V1OutsourcingOrdersPage() {
     ]
   )
 
-  const exportOrders = useCallback(() => {
-    if (rows.length === 0) return
-    downloadBusinessCSV({
-      filename: `委外订单-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: visibleDataColumns,
-      rows,
-    })
-  }, [rows, visibleDataColumns])
+  const loadExportOrders = useCallback(
+    async ({ signal }) => {
+      if (routeOutsourcingOrderID || routeOutsourcingFactID) {
+        const routeOrder = await loadRouteOrder({ signal })
+        return routeOrder ? [routeOrder] : []
+      }
+      const result = await listAllOutsourcingOrders(outsourcingListParams, {
+        signal,
+      })
+      return result?.outsourcing_orders
+    },
+    [
+      loadRouteOrder,
+      outsourcingListParams,
+      routeOutsourcingFactID,
+      routeOutsourcingOrderID,
+    ]
+  )
+  const { exporting, exportRows: exportOrders } = useBusinessListExport({
+    requestKey: 'outsourcing-orders-export',
+    loadRows: loadExportOrders,
+    filename: `委外订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    columns: visibleDataColumns,
+    recordLabel: '加工合同',
+  })
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
@@ -2210,8 +2246,12 @@ export default function V1OutsourcingOrdersPage() {
     : saving
       ? '当前操作完成后可继续办理'
       : ''
-  const lifecycleMoreDisabled = saving
-  const lifecycleMoreDisabledReason = saving ? '当前操作完成后可继续办理' : ''
+  const lifecycleMoreDisabled = !selectedRow || saving
+  const lifecycleMoreDisabledReason = !selectedRow
+    ? '请先选择一条加工合同'
+    : saving
+      ? '当前操作完成后可继续办理'
+      : ''
 
   return (
     <BusinessPageLayout className="erp-v1-outsourcing-orders-page">
@@ -2316,7 +2356,8 @@ export default function V1OutsourcingOrdersPage() {
           <Space wrap>
             <ToolbarButton
               icon={<DownloadOutlined />}
-              disabled={rows.length === 0}
+              loading={exporting}
+              disabled={loading || exporting || total === 0}
               onClick={exportOrders}
             >
               导出筛选结果

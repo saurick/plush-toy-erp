@@ -52,22 +52,34 @@ export default function PurchaseOrderInboundDraftModal({
       {
         title: '采购数量',
         dataIndex: 'purchasedQuantity',
-        width: 110,
+        width: 120,
         render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
       },
       {
-        title: '已入库',
-        dataIndex: 'receivedQuantity',
-        width: 110,
+        title: '已过账入库',
+        dataIndex: 'effectiveReceivedQuantity',
+        width: 130,
         render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
       },
       {
-        title: '剩余数量',
-        dataIndex: 'remainingQuantity',
-        width: 110,
+        title: '草稿占用',
+        dataIndex: 'draftReservedQuantity',
+        width: 120,
+        render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
+      },
+      {
+        title: '剩余可收',
+        dataIndex: 'remainingReceivableQuantity',
+        width: 120,
+        render: (value, row) => `${formatQuantity(value)} ${row.unit}`,
+      },
+      {
+        title: '剩余可生成',
+        dataIndex: 'remainingGeneratableQuantity',
+        width: 130,
         render: (value, row) => {
           const text = `${formatQuantity(value)} ${row.unit}`
-          return value > 0 ? (
+          return row.canGenerate ? (
             <Text strong>{text}</Text>
           ) : (
             <Text type="secondary">{text}</Text>
@@ -79,9 +91,9 @@ export default function PurchaseOrderInboundDraftModal({
         key: 'nextInbound',
         width: 120,
         render: (_, row) =>
-          row.remainingQuantity > 0 ? (
+          row.canGenerate ? (
             <Tag color="blue">
-              {`${formatQuantity(row.remainingQuantity)} ${row.unit}`}
+              {`${formatQuantity(row.remainingGeneratableQuantity)} ${row.unit}`}
             </Tag>
           ) : (
             <Tag>不生成</Tag>
@@ -103,7 +115,7 @@ export default function PurchaseOrderInboundDraftModal({
       title="生成采购入库草稿"
       open={open}
       centered
-      width={920}
+      width={1080}
       okText="生成草稿"
       cancelText="取消"
       confirmLoading={submitting}
@@ -121,7 +133,7 @@ export default function PurchaseOrderInboundDraftModal({
             loading
               ? '正在加载采购订单来源明细'
               : hasRemaining
-                ? '将按采购订单剩余数量生成入库草稿'
+                ? '将按服务端权威的剩余可生成数量生成入库草稿'
                 : '当前采购订单没有可生成的剩余明细'
           }
           description={
@@ -132,7 +144,7 @@ export default function PurchaseOrderInboundDraftModal({
                 )}；供应商：${resolveSupplierName(order)}`}
               </Text>
               <Text type="secondary">
-                下方仅供生成前核对；保存时系统会按采购订单状态、来源行和剩余数量再次校验，库存仅在入库过账后更新。
+                下方进度由采购订单、已过账入库及现有入库草稿统一计算；保存时系统仍会再次校验，库存仅在入库过账后更新。
               </Text>
             </Space>
           }
@@ -143,7 +155,7 @@ export default function PurchaseOrderInboundDraftModal({
           dataSource={rows}
           loading={loading}
           pagination={false}
-          scroll={{ x: 760 }}
+          scroll={{ x: 1160 }}
           size="small"
         />
       </Space>

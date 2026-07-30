@@ -809,6 +809,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           'edit',
           'reserve-stock',
           'lifecycle-primary',
+          'lifecycle-more',
         ])
         assert(
           emptyLayout.buttons.every((button) => button.disabled),
@@ -1707,7 +1708,11 @@ export function createBusinessActionStabilityScenarios(deps) {
         })
         const emptyLayout = await captureMobileActionLayout(page)
         assert.deepEqual(emptyLayout.visible, ['lifecycle-primary'])
-        assert.equal(emptyLayout.moreDisabled, true)
+        assert.equal(
+          emptyLayout.moreDisabled,
+          false,
+          '手机未选择记录时仍应允许查看全部已授权动作'
+        )
         assert.equal(emptyLayout.pageOverflow, 0)
         await screenshot(
           page,
@@ -1715,6 +1720,48 @@ export function createBusinessActionStabilityScenarios(deps) {
           outputDir,
           'business-action-stability-sales-none-mobile-dark.png'
         )
+        await openMobileActionDrawer(page)
+        const emptyDrawerKeys = await captureMobileDrawerKeys(page)
+        assert(
+          emptyDrawerKeys.includes('lifecycle-more'),
+          '手机未选择记录时应在更多抽屉保留低频状态动作入口'
+        )
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.classList.contains(
+              'erp-business-action-tooltip-anchor'
+            ) === true
+        )
+        const emptyDrawerState = await page
+          .locator('.erp-business-selection-action-drawer__list')
+          .evaluate((list) => ({
+            disabled: Array.from(list.querySelectorAll('button')).map(
+              (button) => button.disabled
+            ),
+            focusedOnDisabledReason:
+              document.activeElement?.classList.contains(
+                'erp-business-action-tooltip-anchor'
+              ) === true,
+          }))
+        assert(
+          emptyDrawerState.disabled.length > 0 &&
+            emptyDrawerState.disabled.every(Boolean),
+          `手机未选择记录时抽屉内业务动作必须全部置灰: ${JSON.stringify(
+            emptyDrawerState
+          )}`
+        )
+        assert.equal(
+          emptyDrawerState.focusedOnDisabledReason,
+          true,
+          '手机未选择记录时打开抽屉应把焦点交给首个禁用原因'
+        )
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-sales-none-drawer-mobile-dark.png'
+        )
+        await closeMobileActionDrawer(page)
 
         await selectBusinessRow(page, 'SO-ACTION-ACTIVE')
         const activeLayout = await captureMobileActionLayout(page)
