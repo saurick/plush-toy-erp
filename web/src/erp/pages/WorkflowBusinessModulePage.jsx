@@ -1107,6 +1107,37 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     )
   }
 
+  const productionExceptionTabItems = [
+    ...(canReadProductionExceptionRecords
+      ? [
+          {
+            key: PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS,
+            label: '处置申请',
+          },
+        ]
+      : []),
+    ...(canReadWorkflowTasks
+      ? [
+          {
+            key: PRODUCTION_EXCEPTION_TAB_KEYS.TASKS,
+            label: '待审批',
+          },
+        ]
+      : []),
+  ]
+  const productionExceptionViewTabs =
+    isProductionExceptionPage && productionExceptionTabItems.length > 0 ? (
+      <Tabs
+        aria-label="生产异常处置工作区"
+        activeKey={effectiveProductionExceptionTab}
+        items={productionExceptionTabItems}
+        onChange={handleProductionExceptionTabChange}
+      />
+    ) : null
+  const showingProductionExceptionDecisions =
+    isProductionExceptionPage &&
+    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+
   const workflowTaskWorkspace = (
     <>
       <BusinessOperationPanel
@@ -1371,6 +1402,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       </BusinessOperationPanel>
 
       <BusinessDataTable
+        tableHeader={
+          isProductionExceptionPage ? productionExceptionViewTabs : null
+        }
         rowKey="id"
         loading={loading}
         columns={tableColumns}
@@ -1523,39 +1557,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       </Modal>
     </>
   )
-  const productionExceptionTabItems = [
-    ...(canReadProductionExceptionRecords
-      ? [
-          {
-            key: PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS,
-            label: '处置申请',
-            children: (
-              <ProductionExceptionDecisionPanel
-                adminProfile={adminProfile}
-                onRefreshReady={handleProductionExceptionRefreshReady}
-                onSummaryChange={setProductionExceptionSummary}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(canReadWorkflowTasks
-      ? [
-          {
-            key: PRODUCTION_EXCEPTION_TAB_KEYS.TASKS,
-            label: '待审批',
-            children: (
-              <BusinessPageLayout className="erp-workflow-business-page__tab-workspace">
-                {workflowTaskWorkspace}
-              </BusinessPageLayout>
-            ),
-          },
-        ]
-      : []),
-  ]
-  const showingProductionExceptionDecisions =
-    isProductionExceptionPage &&
-    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
 
   return (
     <BusinessPageLayout className="erp-workflow-business-page">
@@ -1576,13 +1577,18 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
 
       {isProductionExceptionPage ? (
         productionExceptionTabItems.length > 0 ? (
-          <Tabs
-            aria-label="生产异常处置工作区"
-            activeKey={effectiveProductionExceptionTab}
-            destroyOnHidden
-            items={productionExceptionTabItems}
-            onChange={handleProductionExceptionTabChange}
-          />
+          showingProductionExceptionDecisions ? (
+            <ProductionExceptionDecisionPanel
+              adminProfile={adminProfile}
+              onRefreshReady={handleProductionExceptionRefreshReady}
+              onSummaryChange={setProductionExceptionSummary}
+              tableHeader={productionExceptionViewTabs}
+            />
+          ) : (
+            <BusinessPageLayout className="erp-workflow-business-page__tab-workspace">
+              {workflowTaskWorkspace}
+            </BusinessPageLayout>
+          )
         ) : (
           <Alert
             type="warning"

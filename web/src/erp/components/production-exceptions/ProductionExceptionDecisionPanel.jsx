@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Input, Modal, Space, Table, Tag } from 'antd'
+import { Alert, Button, Card, Input, Modal, Table, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -18,6 +18,13 @@ import {
   startProductionExceptionApprovalProcess,
 } from '../../api/customerConfigApi.mjs'
 import ExceptionProcessRecoveryButton from '../workflow/ExceptionProcessRecoveryButton.jsx'
+import {
+  BusinessActionTooltip,
+  BusinessOperationPanel,
+  SelectionActionBar,
+  SelectionClearAction,
+  SelectFilter,
+} from '../business-list/BusinessListLayout.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
@@ -38,6 +45,25 @@ const EXECUTION_LABELS = {
   APPLIED: '业务已执行',
   REVERSED: '业务已冲正',
 }
+const TYPE_FILTER_OPTIONS = [
+  { label: '全部异常类型', value: '' },
+  { label: TYPE_LABELS.SCRAP, value: 'SCRAP' },
+  { label: TYPE_LABELS.OVER_ISSUE, value: 'OVER_ISSUE' },
+  { label: TYPE_LABELS.WIP_CONCESSION, value: 'WIP_CONCESSION' },
+]
+const STATUS_FILTER_OPTIONS = [
+  { label: '全部审批状态', value: '' },
+  { label: STATUS_LABELS.SUBMITTED, value: 'SUBMITTED' },
+  { label: STATUS_LABELS.APPROVED, value: 'APPROVED' },
+  { label: STATUS_LABELS.REJECTED, value: 'REJECTED' },
+  { label: STATUS_LABELS.CANCELLED, value: 'CANCELLED' },
+]
+const EXECUTION_FILTER_OPTIONS = [
+  { label: '全部业务状态', value: '' },
+  { label: '待办理 / 额度生效', value: 'PENDING' },
+  { label: EXECUTION_LABELS.APPLIED, value: 'APPLIED' },
+  { label: EXECUTION_LABELS.REVERSED, value: 'REVERSED' },
+]
 const READ_PERMISSIONS = Object.freeze([
   'pmc.risk.read',
   'production.fact.read',
@@ -86,6 +112,7 @@ export default function ProductionExceptionDecisionPanel({
   adminProfile,
   onRefreshReady,
   onSummaryChange,
+  tableHeader,
 }) {
   const [searchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
@@ -94,6 +121,9 @@ export default function ProductionExceptionDecisionPanel({
   const [action, setAction] = useState(null)
   const [selectedID, setSelectedID] = useState(null)
   const [reason, setReason] = useState('')
+  const [decisionTypeFilter, setDecisionTypeFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [executionStatusFilter, setExecutionStatusFilter] = useState('')
   const canRead = canReadProductionExceptionDecisions(adminProfile)
   const canDecide = hasActionPermission(
     adminProfile,
@@ -114,6 +144,9 @@ export default function ProductionExceptionDecisionPanel({
   const linkedProductionExceptionID = Number(
     searchParams.get('production_exception_id') || 0
   )
+  const hasActiveFilters = Boolean(
+    decisionTypeFilter || statusFilter || executionStatusFilter
+  )
 
   const load = useCallback(async () => {
     const request = beginLatestRequest('production-exception-decisions')
@@ -130,7 +163,17 @@ export default function ProductionExceptionDecisionPanel({
     setLoading(true)
     try {
       const data = await listProductionExceptions(
-        { limit: 100, offset: 0 },
+        {
+          ...(decisionTypeFilter
+            ? { decision_type: decisionTypeFilter }
+            : {}),
+          ...(statusFilter ? { status: statusFilter } : {}),
+          ...(executionStatusFilter
+            ? { execution_status: executionStatusFilter }
+            : {}),
+          limit: 100,
+          offset: 0,
+        },
         { signal: request.signal }
       )
       if (!request.isCurrent()) return null
@@ -141,6 +184,7 @@ export default function ProductionExceptionDecisionPanel({
       }
       let nextRows = data.production_exceptions
       if (
+        !hasActiveFilters &&
         Number.isSafeInteger(linkedProductionExceptionID) &&
         linkedProductionExceptionID > 0
       ) {
@@ -159,9 +203,18 @@ export default function ProductionExceptionDecisionPanel({
           }
           nextRows = [linked, ...nextRows]
         }
-        setSelectedID(linkedProductionExceptionID)
       }
       setRows(nextRows)
+      setSelectedID((current) => {
+        if (
+          !hasActiveFilters &&
+          Number.isSafeInteger(linkedProductionExceptionID) &&
+          linkedProductionExceptionID > 0
+        ) {
+          return linkedProductionExceptionID
+        }
+        return nextRows.some((item) => item.id === current) ? current : null
+      })
       const total = Number(data?.total)
       onSummaryChange?.({
         total:
@@ -184,8 +237,12 @@ export default function ProductionExceptionDecisionPanel({
   }, [
     beginLatestRequest,
     canRead,
+    decisionTypeFilter,
+    executionStatusFilter,
+    hasActiveFilters,
     linkedProductionExceptionID,
     onSummaryChange,
+    statusFilter,
   ])
   useEffect(() => {
     onRefreshReady?.(load)
@@ -385,142 +442,279 @@ export default function ProductionExceptionDecisionPanel({
       ),
     },
     { title: '原因', dataIndex: 'reason' },
-    {
-      title: '办理',
-      key: 'actions',
-      fixed: 'right',
-      render: (_, record) => (
-        <Space wrap>
-          {record.status === 'SUBMITTED' &&
-          canCancel &&
-          Number(record.requested_by) === adminID ? (
-            <Button
-              size="small"
-              disabled={loading}
-              onClick={() => ensureApprovalProcess(record)}
-            >
-              核对审批流
-            </Button>
-          ) : null}
-          {record.status === 'SUBMITTED' && canDecide ? (
-            <Button size="small" type="primary" href="/erp/task-board">
-              去任务中心审批
-            </Button>
-          ) : null}
-          {record.status === 'SUBMITTED' &&
-          canCancel &&
-          Number(record.requested_by) === Number(adminProfile?.id) ? (
-            <Button size="small" onClick={() => openCancellation(record)}>
-              核对并撤回
-            </Button>
-          ) : null}
-          {record.status === 'APPROVED' &&
-          record.execution_status === 'PENDING' &&
-          record.decision_type !== 'OVER_ISSUE' &&
-          canExecute ? (
-            <Button
-              size="small"
-              type="primary"
-              onClick={() =>
-                setAction({
-                  record,
-                  kind: 'execute',
-                  success: '生产异常已执行',
-                  targetExecutionStatus: 'APPLIED',
-                  actorField: 'executed_by',
-                  reasonField: 'execution_reason',
-                })
-              }
-            >
-              确认执行
-            </Button>
-          ) : null}
-          {record.execution_status === 'APPLIED' && canExecute ? (
-            <Button
-              size="small"
-              danger
-              onClick={() =>
-                setAction({
-                  record,
-                  run: reverseProductionException,
-                  success: '生产异常已冲正',
-                  targetExecutionStatus: 'REVERSED',
-                  actorField: 'reversed_by',
-                  reasonField: 'reverse_reason',
-                })
-              }
-            >
-              确认冲正
-            </Button>
-          ) : null}
-          <ExceptionProcessRecoveryButton
-            canRecover={canRecoverProcess}
-            disabled={loading}
-            loadProcess={() =>
-              getProductionExceptionApprovalProcess({
-                ...(customerKey ? { customer_key: customerKey } : {}),
-                production_exception_id: record.id,
-              })
-            }
-            onRecovered={load}
-          />
-          {record.status === 'APPROVED' &&
-          record.decision_type === 'OVER_ISSUE' &&
-          record.execution_status === 'PENDING' ? (
-            <>
-              <Tag color="blue">到生产领料按批准额度办理</Tag>
-              {canExecute ? (
-                <Button
-                  size="small"
-                  danger
-                  onClick={() =>
-                    setAction({
-                      record,
-                      run: reverseProductionException,
-                      success: '未使用的超领额度已撤销',
-                      targetExecutionStatus: 'REVERSED',
-                      actorField: 'reversed_by',
-                      reasonField: 'reverse_reason',
-                    })
-                  }
-                >
-                  撤销额度
-                </Button>
-              ) : null}
-            </>
-          ) : null}
-        </Space>
-      ),
-    },
   ]
 
   if (!canRead) return null
 
+  const selectedRecord =
+    rows.find((item) => item.id === selectedID) || null
+  const selectedIsRequesterSubmitted = Boolean(
+    selectedRecord?.status === 'SUBMITTED' &&
+      Number(selectedRecord.requested_by) === adminID
+  )
+  const selectedIsSubmitted = selectedRecord?.status === 'SUBMITTED'
+  const selectedCanExecute = Boolean(
+    selectedRecord?.status === 'APPROVED' &&
+      selectedRecord.execution_status === 'PENDING' &&
+      selectedRecord.decision_type !== 'OVER_ISSUE'
+  )
+  const selectedCanReverse = selectedRecord?.execution_status === 'APPLIED'
+  const selectedCanRevokeQuota = Boolean(
+    selectedRecord?.status === 'APPROVED' &&
+      selectedRecord.decision_type === 'OVER_ISSUE' &&
+      selectedRecord.execution_status === 'PENDING'
+  )
+  const clearFilters = () => {
+    setDecisionTypeFilter('')
+    setStatusFilter('')
+    setExecutionStatusFilter('')
+    setSelectedID(null)
+  }
+
   return (
     <>
-      <Alert
-        type="info"
-        showIcon
-        message="审批只记录决定；报废和在制品让步须由生产岗位再次确认执行，超领仍在正式领料中按批准额度办理。"
-      />
-      <Table
-        style={{ marginTop: 12 }}
-        rowKey="id"
-        loading={loading}
-        columns={columns}
-        dataSource={rows}
-        rowSelection={{
-          type: 'radio',
-          selectedRowKeys: selectedID ? [selectedID] : [],
-          onChange: (keys) => setSelectedID(keys[0] || null),
-        }}
-        onRow={(record) => ({
-          onClick: () => setSelectedID(record.id),
-        })}
-        pagination={false}
-        scroll={{ x: 1100 }}
-        locale={{ emptyText: '暂无生产异常处置申请' }}
-      />
+      <BusinessOperationPanel
+        compact
+        filters={
+          <>
+            <SelectFilter
+              aria-label="异常类型"
+              value={decisionTypeFilter}
+              options={TYPE_FILTER_OPTIONS}
+              onChange={(value) => {
+                setDecisionTypeFilter(value || '')
+                setSelectedID(null)
+              }}
+            />
+            <SelectFilter
+              aria-label="审批状态"
+              value={statusFilter}
+              options={STATUS_FILTER_OPTIONS}
+              onChange={(value) => {
+                setStatusFilter(value || '')
+                setSelectedID(null)
+              }}
+            />
+            <SelectFilter
+              aria-label="业务状态"
+              value={executionStatusFilter}
+              options={EXECUTION_FILTER_OPTIONS}
+              onChange={(value) => {
+                setExecutionStatusFilter(value || '')
+                setSelectedID(null)
+              }}
+            />
+          </>
+        }
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRecord ? 1 : 0}
+          selectedLabel={
+            selectedRecord?.decision_no || '请选择生产异常处置申请'
+          }
+        >
+          <SelectionClearAction
+            selectedCount={selectedRecord ? 1 : 0}
+            selectionLabel="生产异常处置申请"
+            onClear={() => setSelectedID(null)}
+          />
+          {canCancel ? (
+            <BusinessActionTooltip
+              disabled={!selectedIsRequesterSubmitted || loading}
+              disabledReason={
+                loading
+                  ? '当前操作完成后可核对审批流'
+                  : selectedRecord
+                    ? '只有本人提交且待审批的申请可以核对审批流'
+                    : '请先选择一条生产异常处置申请'
+              }
+            >
+              <Button
+                size="small"
+                disabled={!selectedIsRequesterSubmitted || loading}
+                onClick={() => ensureApprovalProcess(selectedRecord)}
+              >
+                核对审批流
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canDecide ? (
+            <BusinessActionTooltip
+              disabled={!selectedIsSubmitted || loading}
+              disabledReason={
+                loading
+                  ? '当前操作完成后可前往审批'
+                  : selectedRecord
+                    ? '只有待审批申请可以前往任务中心审批'
+                    : '请先选择一条生产异常处置申请'
+              }
+            >
+              <Button
+                size="small"
+                type="primary"
+                href="/erp/task-board"
+                disabled={!selectedIsSubmitted || loading}
+              >
+                去任务中心审批
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canCancel ? (
+            <BusinessActionTooltip
+              disabled={!selectedIsRequesterSubmitted || loading}
+              disabledReason={
+                loading
+                  ? '当前操作完成后可核对撤回条件'
+                  : selectedRecord
+                    ? '只有本人提交且待审批的申请可以撤回'
+                    : '请先选择一条生产异常处置申请'
+              }
+            >
+              <Button
+                size="small"
+                danger
+                disabled={!selectedIsRequesterSubmitted || loading}
+                onClick={() => openCancellation(selectedRecord)}
+              >
+                核对并撤回
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canExecute ? (
+            <BusinessActionTooltip
+              disabled={!selectedCanExecute || loading}
+              disabledReason={
+                loading
+                  ? '当前操作完成后可确认执行'
+                  : selectedRecord
+                    ? '请选择已批准、待办理的报废或在制品让步申请'
+                    : '请先选择一条生产异常处置申请'
+              }
+            >
+              <Button
+                size="small"
+                type="primary"
+                disabled={!selectedCanExecute || loading}
+                onClick={() =>
+                  setAction({
+                    record: selectedRecord,
+                    kind: 'execute',
+                    success: '生产异常已执行',
+                    targetExecutionStatus: 'APPLIED',
+                    actorField: 'executed_by',
+                    reasonField: 'execution_reason',
+                  })
+                }
+              >
+                确认执行
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canExecute ? (
+            <BusinessActionTooltip
+              disabled={!selectedCanReverse || loading}
+              disabledReason={
+                loading
+                  ? '当前操作完成后可确认冲正'
+                  : selectedRecord
+                    ? '只有业务已执行的申请可以冲正'
+                    : '请先选择一条生产异常处置申请'
+              }
+            >
+              <Button
+                size="small"
+                danger
+                disabled={!selectedCanReverse || loading}
+                onClick={() =>
+                  setAction({
+                    record: selectedRecord,
+                    run: reverseProductionException,
+                    success: '生产异常已冲正',
+                    targetExecutionStatus: 'REVERSED',
+                    actorField: 'reversed_by',
+                    reasonField: 'reverse_reason',
+                  })
+                }
+              >
+                确认冲正
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canExecute ? (
+            <BusinessActionTooltip
+              disabled={!selectedCanRevokeQuota || loading}
+              disabledReason={
+                loading
+                  ? '当前操作完成后可撤销额度'
+                  : selectedRecord
+                    ? '只有已批准且尚未使用的超领额度可以撤销'
+                    : '请先选择一条生产异常处置申请'
+              }
+            >
+              <Button
+                size="small"
+                danger
+                disabled={!selectedCanRevokeQuota || loading}
+                onClick={() =>
+                  setAction({
+                    record: selectedRecord,
+                    run: reverseProductionException,
+                    success: '未使用的超领额度已撤销',
+                    targetExecutionStatus: 'REVERSED',
+                    actorField: 'reversed_by',
+                    reasonField: 'reverse_reason',
+                  })
+                }
+              >
+                撤销额度
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          <ExceptionProcessRecoveryButton
+            canRecover={canRecoverProcess}
+            disabled={!selectedRecord || loading}
+            loadProcess={() =>
+              getProductionExceptionApprovalProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                production_exception_id: selectedRecord.id,
+              })
+            }
+            onRecovered={load}
+          />
+        </SelectionActionBar>
+      </BusinessOperationPanel>
+      <Card className="erp-business-data-table-card erp-business-module-table-card">
+        {tableHeader}
+        <Alert
+          type="info"
+          showIcon
+          message="审批只记录决定；报废和在制品让步须由生产岗位再次确认执行，超领仍在正式领料中按批准额度办理。"
+        />
+        <Table
+          style={{ marginTop: 12 }}
+          rowKey="id"
+          loading={loading}
+          columns={columns}
+          dataSource={rows}
+          rowSelection={{
+            type: 'radio',
+            selectedRowKeys: selectedID ? [selectedID] : [],
+            onChange: (keys) => setSelectedID(keys[0] || null),
+          }}
+          onRow={(record) => ({
+            onClick: () => setSelectedID(record.id),
+          })}
+          rowClassName={(record) =>
+            record.id === selectedID ? 'ant-table-row-selected' : ''
+          }
+          pagination={false}
+          scroll={{ x: 960 }}
+          locale={{ emptyText: '暂无生产异常处置申请' }}
+        />
+      </Card>
       <Modal
         title="确认生产异常处置"
         open={Boolean(action)}

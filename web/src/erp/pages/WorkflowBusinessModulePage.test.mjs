@@ -38,12 +38,23 @@ test('production exception disposition page separates applications and pending a
     source,
     /'production-exceptions': \{[\s\S]*ownerRoleOptions: \[workflowRoleOption\('boss'\)\]/u
   )
-  assert.match(source, /destroyOnHidden/u)
   assert.match(source, /activeKey=\{effectiveProductionExceptionTab\}/u)
   assert.match(source, /onChange=\{handleProductionExceptionTabChange\}/u)
   assert.match(
     source,
-    /label: '待审批',[\s\S]*<BusinessPageLayout className="erp-workflow-business-page__tab-workspace">[\s\S]*\{workflowTaskWorkspace\}[\s\S]*<\/BusinessPageLayout>/u
+    /<BusinessDataTable[\s\S]*tableHeader=\{[\s\S]*isProductionExceptionPage \? productionExceptionViewTabs : null[\s\S]*\}/u
+  )
+  assert.match(
+    source,
+    /<ProductionExceptionDecisionPanel[\s\S]*tableHeader=\{productionExceptionViewTabs\}/u
+  )
+  assert.match(
+    productionExceptionPanel,
+    /<Card className="erp-business-data-table-card erp-business-module-table-card">[\s\S]*\{tableHeader\}[\s\S]*<Alert[\s\S]*<Table/u
+  )
+  assert.match(
+    source,
+    /showingProductionExceptionDecisions[\s\S]*<BusinessPageLayout className="erp-workflow-business-page__tab-workspace">[\s\S]*\{workflowTaskWorkspace\}[\s\S]*<\/BusinessPageLayout>/u
   )
   assert.match(
     source,
@@ -164,4 +175,34 @@ test('production exception decision reads expose only real decision-list permiss
   )
   assert.match(productionExceptionPanel, /isRpcAbortError/u)
   assert.match(productionExceptionPanel, /onRefreshReady\?\.\(load\)/u)
+})
+
+test('production exception applications use server-backed filters and a selected-record action bar', () => {
+  assert.match(productionExceptionPanel, /<BusinessOperationPanel/u)
+  assert.match(productionExceptionPanel, /<SelectionActionBar/u)
+  assert.match(productionExceptionPanel, /<SelectionClearAction/u)
+  assert.match(productionExceptionPanel, /aria-label="异常类型"/u)
+  assert.match(productionExceptionPanel, /aria-label="审批状态"/u)
+  assert.match(productionExceptionPanel, /aria-label="业务状态"/u)
+  assert.match(
+    productionExceptionPanel,
+    /decision_type:\s*decisionTypeFilter/u
+  )
+  assert.match(productionExceptionPanel, /status:\s*statusFilter/u)
+  assert.match(
+    productionExceptionPanel,
+    /execution_status:\s*executionStatusFilter/u
+  )
+  for (const actionLabel of [
+    '核对审批流',
+    '去任务中心审批',
+    '核对并撤回',
+    '确认执行',
+    '确认冲正',
+    '撤销额度',
+  ]) {
+    assert.match(productionExceptionPanel, new RegExp(actionLabel, 'u'))
+  }
+  assert.doesNotMatch(productionExceptionPanel, /title:\s*'办理'/u)
+  assert.doesNotMatch(productionExceptionPanel, /SearchInput|keyword/u)
 })
