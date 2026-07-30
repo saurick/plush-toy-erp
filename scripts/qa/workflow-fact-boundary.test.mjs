@@ -323,6 +323,10 @@ test("status architecture is target-only and separates delivery evidence", () =>
 });
 
 test("chain and runtime trajectory documentation keeps chain, flow and evidence layers separate", () => {
+  const flowBoundary = readFileSync(
+    path.join(repoRoot, "docs/architecture/各类流程建模边界评审.md"),
+    "utf8",
+  );
   const chainBoundary = readFileSync(
     path.join(repoRoot, "docs/architecture/业务链与运行轨迹边界.md"),
     "utf8",
@@ -335,6 +339,30 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
     path.join(repoRoot, "web/src/erp/utils/processRuntimePresentation.mjs"),
     "utf8",
   );
+  const taskEventService = readFileSync(
+    path.join(repoRoot, "server/internal/service/jsonrpc_workflow_task.go"),
+    "utf8",
+  );
+  const taskEventTrail = readFileSync(
+    path.join(repoRoot, "web/src/erp/components/workflow/WorkflowTaskEventTrail.jsx"),
+    "utf8",
+  );
+
+  for (const required of [
+    "单据流 / Document Flow",
+    "异常流是业务流、单据流、状态流和工作流的共同组成部分",
+    "驳回 / 拒绝",
+    "阻塞 / 恢复",
+    "取消",
+    "冲正",
+    "返工",
+    "补偿",
+    "Shipment 财务审批退回后",
+    "每个甲方可以编排到哪一层",
+    "链是持久化历史的查询结果，不可编排、编辑、补写或重新排序",
+  ]) {
+    assert(flowBoundary.includes(required), `flow boundary must preserve ${required}`);
+  }
 
   for (const required of [
     "“流”描述系统应该怎样运转",
@@ -352,6 +380,10 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
     "当前状态不是状态历史",
     "失败关闭",
     "前端隐藏不是安全边界",
+    "单据流",
+    "链不是可编排对象",
+    "truncated",
+    "cursor 合同尚未实现",
   ]) {
     assert(
       chainBoundary.includes(required),
@@ -382,8 +414,20 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
     workflowMap,
     /业务轨迹[\s\S]*本任务处理记录/u,
   );
+  assert.match(
+    workflowMap,
+    /七条正式流程的异常出口[\s\S]*没有显式业务拒绝分支[\s\S]*rejected_end/u,
+  );
+  assert.match(
+    workflowMap,
+    /Shipment[\s\S]*财务 approval 只决定门禁[\s\S]*SHIPPED[\s\S]*库存 `OUT`/u,
+  );
   assert.match(presentation, /finished_goods_delivery:\s*'出货财务放行'/u);
   assert.match(presentation, /业务轨迹暂时无法确认/u);
+  assert.match(taskEventService, /ListTaskEvents\(ctx, taskID, limit\+1\)/u);
+  assert.match(taskEventService, /"truncated": truncated/u);
+  assert.match(taskEventTrail, /仅显示最近/u);
+  assert.match(taskEventTrail, /请勿将本视图当作完整审批链/u);
 });
 
 test("current documentation rejects stale Shipment, inventory approval and task-position wording", () => {
@@ -396,7 +440,9 @@ test("current documentation rejects stale Shipment, inventory approval and task-
     "docs/workflow/业务与协同流程地图.md",
     "docs/product/产品能力进度台账.md",
     "docs/product/页面来源生成入口规则.md",
+    "docs/observability/日志链路追踪审计第一版.md",
     "docs/customers/yoyoosun/客户交付矩阵.md",
+    "config/README.md",
     "docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
     "docs/product/prototypes/mobile-role-tasks-v2/README.md",
     "docs/product/prototypes/workflow-task-action-flow-v1/README.md",
@@ -407,6 +453,10 @@ test("current documentation rejects stale Shipment, inventory approval and task-
     "库存调整正式审批和预留专项读模型仍待补",
     "当前没有独立库存调整审批 Source Document / ProcessRuntime",
     "流程位置暂时无法确认",
+    "当前附件授权 WIP",
+    "Workflow 附件授权存在其他任务未提交 WIP",
+    "Workflow 附件授权当前另有未提交 WIP",
+    "付款、库存调整和没有正式门禁的 PMC / 工程事项继续失败关闭",
   ];
 
   for (const relativePath of currentTruthFiles) {
@@ -457,6 +507,10 @@ test("action and audit governance documents retain authorization and evidence ma
     "Fact / Ledger 副作用",
     "审计证据",
     "目标环境证据",
+    "客户流程编排与链查询边界",
+    "七条已登记 ProcessRuntime",
+    "链是持久化历史的不可编辑投影",
+    "不能增加、删除或重排节点",
   ]) {
     assert(actionMatrix.includes(required), `action matrix must preserve ${required}`);
   }
@@ -477,6 +531,9 @@ test("action and audit governance documents retain authorization and evidence ma
     "密码、密码 hash",
     "完整客户配置",
     "当前没有对象存储部署合同",
+    "下载授权后重算长度 / SHA-256",
+    "返回 `truncated`",
+    "cursor 尚未实现",
   ]) {
     assert(auditMatrix.includes(required), `audit matrix must preserve ${required}`);
   }

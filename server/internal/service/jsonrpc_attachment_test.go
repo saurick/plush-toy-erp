@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 )
+
+const testAttachmentProofSHA256 = "c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"
 
 type stubAttachmentJSONRPCRepo struct {
 	created      *biz.BusinessAttachmentCreate
@@ -90,7 +93,7 @@ func (r *stubAttachmentJSONRPCRepo) ListBusinessAttachments(_ context.Context, o
 			FileName:           "proof.pdf",
 			MimeType:           "application/pdf",
 			FileSize:           5,
-			SHA256:             "sha",
+			SHA256:             testAttachmentProofSHA256,
 			UploadedBy:         &uploaderID,
 			UploadedByUsername: &uploaderUsername,
 			CreatedAt:          time.Unix(2, 0),
@@ -118,7 +121,7 @@ func (r *stubAttachmentJSONRPCRepo) GetBusinessAttachmentMetadata(_ context.Cont
 		FileName:       "proof.pdf",
 		MimeType:       "application/pdf",
 		FileSize:       5,
-		SHA256:         "sha",
+		SHA256:         testAttachmentProofSHA256,
 		CreatedAt:      time.Unix(3, 0),
 	}, nil
 }
@@ -288,6 +291,11 @@ func TestJsonrpcDispatcher_ProductImageMessagesDoNotChangeOrdinaryAttachmentErro
 	wantDimensionMessage := "产品图片尺寸过大，请将宽高压缩至 8192 像素以内且总像素不超过 2000 万"
 	if dimensionRes.Code != errcode.InvalidParam.Code || dimensionRes.Message != wantDimensionMessage {
 		t.Fatalf("product image dimension error mapped to %#v", dimensionRes)
+	}
+
+	integrityRes := dispatcher.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentIntegrity)
+	if integrityRes.Code != errcode.Internal.Code || integrityRes.Message != "附件内容校验失败，请联系管理员" {
+		t.Fatalf("stored attachment integrity error mapped to %#v", integrityRes)
 	}
 }
 
@@ -801,6 +809,31 @@ func TestJsonrpcDispatcher_DownloadAuthorizesBeforeLoadingContent(t *testing.T) 
 	}
 	if repo.getCalls != 1 || repo.contentCalls != 0 {
 		t.Fatalf("authorization may read metadata but must not load content: metadata=%d content=%d", repo.getCalls, repo.contentCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_DownloadFailsClosedOnStoredContentMismatch(t *testing.T) {
+	repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{
+		ID: 71, OwnerType: biz.BusinessAttachmentOwnerSalesOrder, OwnerID: 7,
+		FileName: "proof.pdf", MimeType: "application/pdf", FileSize: 5,
+		SHA256: strings.Repeat("0", 64), Content: []byte("proof"),
+	}}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderRead,
+	)
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, admin)
+	_, res, err := dispatcher.handleBusinessAttachment(
+		workflowJSONRPCAdminContext(),
+		"download_attachment",
+		"corrupt-download",
+		mustJSONRPCStruct(t, map[string]any{"id": 71}),
+	)
+	if err != nil || res.Code != errcode.Internal.Code || res.Message != "附件内容校验失败，请联系管理员" {
+		t.Fatalf("corrupt stored attachment must fail closed: res=%#v err=%v", res, err)
+	}
+	if repo.getCalls != 1 || repo.contentCalls != 1 {
+		t.Fatalf("authorized integrity check must load metadata and content once: metadata=%d content=%d", repo.getCalls, repo.contentCalls)
 	}
 }
 

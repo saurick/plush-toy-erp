@@ -110,7 +110,7 @@ func (r *workflowRepo) GetWorkflowTaskByTaskCode(ctx context.Context, taskCode s
 }
 
 func (r *workflowRepo) ListWorkflowTaskEvents(ctx context.Context, taskID int, limit int) ([]*biz.WorkflowTaskEvent, error) {
-	if r == nil || r.data == nil || r.data.postgres == nil || taskID <= 0 || limit < 1 || limit > 100 {
+	if r == nil || r.data == nil || r.data.postgres == nil || taskID <= 0 || limit < 1 || limit > biz.WorkflowTaskEventPageMaxLimit+1 {
 		return nil, biz.ErrBadParam
 	}
 	rows, err := r.data.postgres.WorkflowTaskEvent.Query().

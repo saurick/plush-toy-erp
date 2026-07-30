@@ -36,6 +36,7 @@ type stubWorkflowJSONRPCRepo struct {
 	upsertStateActorID int
 	currentTask        *biz.WorkflowTask
 	events             []*biz.WorkflowTaskEvent
+	taskEventLimit     int
 	listTaskFilter     biz.WorkflowTaskFilter
 	resolveMutation    func(taskID int, idempotencyKey string, intentHash string) (*biz.WorkflowTask, bool, error)
 }
@@ -126,7 +127,11 @@ func (s *stubWorkflowJSONRPCRepo) ListWorkflowTasks(_ context.Context, filter bi
 	return nil, 0, nil
 }
 
-func (s *stubWorkflowJSONRPCRepo) ListWorkflowTaskEvents(_ context.Context, _ int, _ int) ([]*biz.WorkflowTaskEvent, error) {
+func (s *stubWorkflowJSONRPCRepo) ListWorkflowTaskEvents(_ context.Context, _ int, limit int) ([]*biz.WorkflowTaskEvent, error) {
+	s.taskEventLimit = limit
+	if len(s.events) > limit {
+		return s.events[:limit], nil
+	}
 	return s.events, nil
 }
 
@@ -347,6 +352,9 @@ func TestJsonrpcDispatcher_WorkflowListTaskEventsSupportsNonApprovalTasksWithout
 	if !ok || len(items) != 1 {
 		t.Fatalf("unexpected task events %#v", res.Data.AsMap())
 	}
+	if res.Data.AsMap()["truncated"] != false || repo.taskEventLimit != biz.WorkflowTaskEventPageMaxLimit+1 {
+		t.Fatalf("task event page must use one-row lookahead without false truncation: data=%#v limit=%d", res.Data.AsMap(), repo.taskEventLimit)
+	}
 	event, ok := items[0].(map[string]any)
 	if !ok || event["event_type"] != "status_changed" || event["actor_role_key"] != biz.WarehouseRoleKey {
 		t.Fatalf("unexpected task event %#v", items[0])
@@ -362,6 +370,47 @@ func TestJsonrpcDispatcher_WorkflowListTaskEventsSupportsNonApprovalTasksWithout
 	_, denied, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "list_task_events", "2", params)
 	if err != nil || denied == nil || denied.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("out-of-scope task events must stay hidden, res=%#v err=%v", denied, err)
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowListTaskEventsSignalsTruncation(t *testing.T) {
+	events := make([]*biz.WorkflowTaskEvent, 0, biz.WorkflowTaskEventPageMaxLimit+1)
+	for id := biz.WorkflowTaskEventPageMaxLimit + 1; id >= 1; id-- {
+		events = append(events, &biz.WorkflowTaskEvent{
+			ID: id, TaskID: 42, EventType: "status_changed", Payload: map[string]any{},
+			CreatedAt: time.Unix(int64(id), 0),
+		})
+	}
+	repo := &stubWorkflowJSONRPCRepo{
+		currentTask: &biz.WorkflowTask{
+			ID: 42, TaskStatusKey: "ready", OwnerRoleKey: biz.SalesRoleKey, Version: 1,
+		},
+		events: events,
+	}
+	j := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+			[]string{biz.SalesRoleKey},
+			biz.PermissionWorkflowTaskRead,
+		)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params, _ := structpb.NewStruct(map[string]any{
+		"task_id": float64(42),
+		"limit":   float64(biz.WorkflowTaskEventPageMaxLimit),
+	})
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "list_task_events", "truncated", params)
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected task event page OK, res=%#v err=%v", res, err)
+	}
+	data := res.Data.AsMap()
+	items, ok := data["items"].([]any)
+	if !ok || len(items) != biz.WorkflowTaskEventPageMaxLimit || data["truncated"] != true {
+		t.Fatalf("bounded task event page must expose truncation, data=%#v", data)
+	}
+	if repo.taskEventLimit != biz.WorkflowTaskEventPageMaxLimit+1 {
+		t.Fatalf("task event page must request one-row lookahead, got %d", repo.taskEventLimit)
 	}
 }
 

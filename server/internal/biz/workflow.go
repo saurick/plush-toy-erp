@@ -8,6 +8,8 @@ import (
 	"unicode/utf8"
 )
 
+const WorkflowTaskEventPageMaxLimit = 100
+
 func (uc *WorkflowUsecase) Metadata() (taskStates, businessStates []WorkflowStateOption) {
 	return WorkflowTaskStates(), WorkflowBusinessStates()
 }
@@ -37,7 +39,7 @@ func (uc *WorkflowUsecase) GetTask(ctx context.Context, id int) (*WorkflowTask, 
 }
 
 func (uc *WorkflowUsecase) ListTaskEvents(ctx context.Context, taskID int, limit int) ([]*WorkflowTaskEvent, error) {
-	if uc == nil || uc.repo == nil || taskID <= 0 || limit < 1 || limit > 100 {
+	if uc == nil || uc.repo == nil || taskID <= 0 || limit < 1 || limit > WorkflowTaskEventPageMaxLimit+1 {
 		return nil, ErrBadParam
 	}
 	reader, ok := uc.repo.(WorkflowTaskEventReader)

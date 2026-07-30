@@ -60,6 +60,7 @@ export default function MobileTaskDetailScreen({
 }) {
   const approvalTask = isWorkflowApprovalTask(selectedTask)
   const [taskEvents, setTaskEvents] = React.useState([])
+  const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
   const [taskEventsState, setTaskEventsState] = React.useState('idle')
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
@@ -67,23 +68,27 @@ export default function MobileTaskDetailScreen({
   React.useEffect(() => {
     if (!selectedTask?.id) {
       setTaskEvents([])
+      setTaskEventsTruncated(false)
       setTaskEventsState('idle')
       return undefined
     }
     const controller = new AbortController()
     setTaskEvents([])
+    setTaskEventsTruncated(false)
     setTaskEventsState('loading')
     listWorkflowTaskEvents(selectedTask.id, {
       limit: 100,
       signal: controller.signal,
     })
-      .then((items) => {
-        setTaskEvents(Array.isArray(items) ? items : [])
+      .then(({ items, truncated }) => {
+        setTaskEvents(items)
+        setTaskEventsTruncated(truncated)
         setTaskEventsState('ready')
       })
       .catch(() => {
         if (controller.signal.aborted) return
         setTaskEvents([])
+        setTaskEventsTruncated(false)
         setTaskEventsState('error')
       })
     return () => controller.abort()
@@ -333,6 +338,7 @@ export default function MobileTaskDetailScreen({
           events={taskEvents}
           state={taskEventsState}
           task={selectedTask}
+          truncated={taskEventsTruncated}
           variant="mobile"
         />
 

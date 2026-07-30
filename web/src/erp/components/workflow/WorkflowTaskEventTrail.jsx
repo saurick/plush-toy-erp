@@ -17,6 +17,7 @@ export default function WorkflowTaskEventTrail({
   events = [],
   state = 'ready',
   task = {},
+  truncated = false,
   variant = 'desktop',
 }) {
   const model = buildWorkflowTaskEventTrailModel({
@@ -74,44 +75,56 @@ export default function WorkflowTaskEventTrail({
           {errorMessage || '本任务处理记录加载失败，请刷新后重试。'}
         </p>
       ) : model.items.length > 0 ? (
-        <ol
-          className="workflow-task-event-trail__list"
-          aria-label="本任务处理记录，按时间倒序"
-        >
-          {model.items.map((item) => (
-            <li
-              key={item.key}
-              className={`workflow-task-event-trail__item workflow-task-event-trail__item--${item.tone}`}
-            >
-              <span
-                className="workflow-task-event-trail__marker"
-                aria-hidden="true"
+        <>
+          <ol
+            className="workflow-task-event-trail__list"
+            aria-label="本任务处理记录，按时间倒序"
+          >
+            {model.items.map((item) => (
+              <li
+                key={item.key}
+                className={`workflow-task-event-trail__item workflow-task-event-trail__item--${item.tone}`}
               >
-                {EVENT_MARKERS[item.tone] || EVENT_MARKERS.neutral}
-              </span>
-              <div className="workflow-task-event-trail__content">
-                <div className="workflow-task-event-trail__item-head">
-                  <strong>{item.label}</strong>
-                  <span>{item.categoryLabel}</span>
+                <span
+                  className="workflow-task-event-trail__marker"
+                  aria-hidden="true"
+                >
+                  {EVENT_MARKERS[item.tone] || EVENT_MARKERS.neutral}
+                </span>
+                <div className="workflow-task-event-trail__content">
+                  <div className="workflow-task-event-trail__item-head">
+                    <strong>{item.label}</strong>
+                    <span>{item.categoryLabel}</span>
+                  </div>
+                  <p className="workflow-task-event-trail__meta">
+                    {item.actorLabel} · {item.timeLabel}
+                    {item.versionLabel ? ` · ${item.versionLabel}` : ''}
+                  </p>
+                  {item.transitionLabel ? (
+                    <p className="workflow-task-event-trail__transition">
+                      {item.transitionLabel}
+                    </p>
+                  ) : null}
+                  {item.reason ? (
+                    <p className="workflow-task-event-trail__reason">
+                      意见：{item.reason}
+                    </p>
+                  ) : null}
                 </div>
-                <p className="workflow-task-event-trail__meta">
-                  {item.actorLabel} · {item.timeLabel}
-                  {item.versionLabel ? ` · ${item.versionLabel}` : ''}
-                </p>
-                {item.transitionLabel ? (
-                  <p className="workflow-task-event-trail__transition">
-                    {item.transitionLabel}
-                  </p>
-                ) : null}
-                {item.reason ? (
-                  <p className="workflow-task-event-trail__reason">
-                    意见：{item.reason}
-                  </p>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+          {truncated ? (
+            <p
+              className="workflow-task-event-trail__state"
+              data-testid="workflow-task-event-trail-truncated"
+              role="status"
+            >
+              仅显示最近 {model.items.length}{' '}
+              条，更早记录未加载；请勿将本视图当作完整审批链。
+            </p>
+          ) : null}
+        </>
       ) : (
         <p className="workflow-task-event-trail__state">暂无本任务处理记录。</p>
       )}

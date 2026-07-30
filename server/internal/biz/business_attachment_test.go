@@ -3,11 +3,14 @@ package biz
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"image"
 	"image/jpeg"
 	"image/png"
+	"strings"
 	"testing"
 )
 
@@ -19,6 +22,7 @@ type stubBusinessAttachmentRepo struct {
 	clearCalls   int
 	clearProduct int
 	clearSlot    string
+	content      []byte
 }
 
 func (r *stubBusinessAttachmentRepo) CreateBusinessAttachment(_ context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error) {
@@ -57,6 +61,9 @@ func (r *stubBusinessAttachmentRepo) GetBusinessAttachmentMetadata(context.Conte
 
 func (r *stubBusinessAttachmentRepo) GetBusinessAttachmentContent(context.Context, int, string, int) ([]byte, error) {
 	r.contentCalls++
+	if r.content != nil {
+		return append([]byte(nil), r.content...), nil
+	}
 	return []byte("proof"), nil
 }
 
@@ -504,5 +511,66 @@ func TestBusinessAttachmentGetRejectsOrphanedAttachment(t *testing.T) {
 	_, err := NewBusinessAttachmentUsecase(repo).GetBusinessAttachmentMetadata(context.Background(), 9)
 	if !errors.Is(err, ErrBusinessAttachmentOwnerNotFound) {
 		t.Fatalf("orphaned attachment must not be returned, got %v", err)
+	}
+}
+
+func TestBusinessAttachmentGetContentVerifiesPersistedIntegrity(t *testing.T) {
+	content := []byte("proof")
+	sum := sha256.Sum256(content)
+	validMetadata := BusinessAttachment{
+		ID:        9,
+		OwnerType: BusinessAttachmentOwnerSalesOrder,
+		OwnerID:   42,
+		FileSize:  len(content),
+		SHA256:    hex.EncodeToString(sum[:]),
+	}
+
+	t.Run("matching metadata", func(t *testing.T) {
+		repo := &stubBusinessAttachmentRepo{content: content}
+		got, err := NewBusinessAttachmentUsecase(repo).GetBusinessAttachmentContent(
+			context.Background(),
+			&validMetadata,
+		)
+		if err != nil || !bytes.Equal(got, content) {
+			t.Fatalf("matching content must be returned, got=%q err=%v", got, err)
+		}
+	})
+
+	tests := []struct {
+		name   string
+		mutate func(*BusinessAttachment)
+	}{
+		{
+			name: "size mismatch",
+			mutate: func(metadata *BusinessAttachment) {
+				metadata.FileSize++
+			},
+		},
+		{
+			name: "hash mismatch",
+			mutate: func(metadata *BusinessAttachment) {
+				metadata.SHA256 = strings.Repeat("0", sha256.Size*2)
+			},
+		},
+		{
+			name: "malformed stored hash",
+			mutate: func(metadata *BusinessAttachment) {
+				metadata.SHA256 = "sha"
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metadata := validMetadata
+			tt.mutate(&metadata)
+			repo := &stubBusinessAttachmentRepo{content: content}
+			got, err := NewBusinessAttachmentUsecase(repo).GetBusinessAttachmentContent(
+				context.Background(),
+				&metadata,
+			)
+			if got != nil || !errors.Is(err, ErrBusinessAttachmentIntegrity) {
+				t.Fatalf("mismatched content must fail closed, got=%q err=%v", got, err)
+			}
+		})
 	}
 }

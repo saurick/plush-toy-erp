@@ -127,6 +127,35 @@ test('workflowApi: reads and validates task-scoped process context', async () =>
   )
 })
 
+test('workflowApi: task events require an explicit bounded projection', async () => {
+  const calls = []
+  const items = [{ id: 7, event_type: 'status_changed' }]
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    return { data: { items, truncated: true } }
+  })
+
+  assert.deepEqual(await api.listWorkflowTaskEvents(42, { limit: 25 }), {
+    items,
+    truncated: true,
+  })
+  assert.deepEqual(calls, [
+    { method: 'list_task_events', params: { task_id: 42, limit: 25 } },
+  ])
+  await assert.rejects(
+    api.listWorkflowTaskEvents(42, { limit: 101 }),
+    /任务轨迹参数无效/u
+  )
+
+  const malformedApi = await loadWorkflowApi(async () => ({
+    data: { items },
+  }))
+  await assert.rejects(
+    malformedApi.listWorkflowTaskEvents(42),
+    /本任务处理记录返回格式无效/u
+  )
+})
+
 const mutationCases = [
   {
     exportName: 'completeWorkflowTaskAction',

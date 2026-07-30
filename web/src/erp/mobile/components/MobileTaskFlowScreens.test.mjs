@@ -311,6 +311,9 @@ test('mobile task detail loads current-task records for every task and keeps the
   assert.match(taskEventTrailSource, /本任务处理记录/u)
   assert.match(taskEventTrailSource, /只代表当前任务/u)
   assert.match(taskEventTrailSource, /不是来源单据的完整审批链/u)
+  assert.match(detailScreenSource, /taskEventsTruncated/u)
+  assert.match(detailScreenSource, /truncated=\{taskEventsTruncated\}/u)
+  assert.match(taskEventTrailSource, /更早记录未加载/u)
   assert.doesNotMatch(
     detailScreenSource,
     /!selectedTask\?\.id \|\| !approvalTask/u

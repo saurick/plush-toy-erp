@@ -216,6 +216,7 @@ export default function WorkflowTaskActionDrawer({
     : ''
   const [activeStepKey, setActiveStepKey] = React.useState('context')
   const [taskEvents, setTaskEvents] = React.useState([])
+  const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
   const [taskEventsState, setTaskEventsState] = React.useState('idle')
   const [taskEventsError, setTaskEventsError] = React.useState('')
   const [processContext, setProcessContext] = React.useState(null)
@@ -306,22 +307,26 @@ export default function WorkflowTaskActionDrawer({
   React.useEffect(() => {
     if (!task?.id) {
       setTaskEvents([])
+      setTaskEventsTruncated(false)
       setTaskEventsState('idle')
       setTaskEventsError('')
       return undefined
     }
     const controller = new AbortController()
     setTaskEvents([])
+    setTaskEventsTruncated(false)
     setTaskEventsState('loading')
     setTaskEventsError('')
     listWorkflowTaskEvents(task.id, { limit: 100, signal: controller.signal })
-      .then((items) => {
-        setTaskEvents(Array.isArray(items) ? items : [])
+      .then(({ items, truncated }) => {
+        setTaskEvents(items)
+        setTaskEventsTruncated(truncated)
         setTaskEventsState('ready')
       })
       .catch((error) => {
         if (controller.signal.aborted) return
         setTaskEvents([])
+        setTaskEventsTruncated(false)
         setTaskEventsState('error')
         setTaskEventsError(
           getActionErrorMessage(error, '加载本任务处理记录失败')
@@ -774,6 +779,7 @@ export default function WorkflowTaskActionDrawer({
               events={taskEvents}
               state={taskEventsState}
               task={task}
+              truncated={taskEventsTruncated}
             />
           </section>
 

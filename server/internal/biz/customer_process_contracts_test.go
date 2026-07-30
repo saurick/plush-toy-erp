@@ -59,6 +59,149 @@ func TestNormalizeCustomerProcessContractsExpandsCanonicalSalesVariants(t *testi
 	}
 }
 
+func TestNormalizeCustomerProcessContractsKeepsEveryRegisteredCanonicalGraph(t *testing.T) {
+	type expectedNode struct {
+		key          string
+		nodeType     string
+		ownerPool    string
+		commandKey   string
+		branchPolicy string
+	}
+	tests := []struct {
+		processKey      string
+		variantKey      string
+		businessRefType string
+		nodes           []expectedNode
+	}{
+		{
+			processKey: ProcessKeySalesOrderAcceptance, variantKey: CustomerProcessVariantSalesApprovalPMC,
+			businessRefType: "sales_order",
+			nodes: []expectedNode{
+				{key: "submit_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderSubmit},
+				{key: "order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey},
+				{key: "activate_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderActivate},
+				{key: "order_review", nodeType: ProcessNodeTypeHumanTask, ownerPool: "order_review"},
+				{key: "end", nodeType: ProcessNodeTypeEnd},
+			},
+		},
+		{
+			processKey: ProcessKeySalesOrderAcceptance, variantKey: CustomerProcessVariantSalesApprovalEngineeringPMC,
+			businessRefType: "sales_order",
+			nodes: []expectedNode{
+				{key: "submit_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderSubmit},
+				{key: "order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey},
+				{key: "activate_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderActivate},
+				{key: "engineering_data", nodeType: ProcessNodeTypeHumanTask, ownerPool: "engineering_data"},
+				{key: "order_review", nodeType: ProcessNodeTypeHumanTask, ownerPool: "order_review"},
+				{key: "end", nodeType: ProcessNodeTypeEnd},
+			},
+		},
+		{
+			processKey: ProcessKeyMaterialSupply, variantKey: CustomerProcessVariantPurchaseOrderApproval,
+			businessRefType: "purchase_order",
+			nodes: []expectedNode{
+				{key: "submit_purchase_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandPurchaseOrderSubmit},
+				{key: "purchase_order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey},
+				{key: "approve_purchase_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandPurchaseOrderApprove},
+				{key: "end", nodeType: ProcessNodeTypeEnd},
+			},
+		},
+		{
+			processKey: ProcessKeyFinishedGoodsDelivery, variantKey: CustomerProcessVariantShipmentFinanceApproval,
+			businessRefType: "shipment",
+			nodes: []expectedNode{
+				{key: "shipment_finance_approval", nodeType: ProcessNodeTypeApproval, ownerPool: FinanceRoleKey},
+				{key: "shipment_finance_release", nodeType: ProcessNodeTypeDomainCommand, ownerPool: "shipment_finance_release", commandKey: ProcessDomainCommandShipmentFinanceRelease},
+				{key: "end", nodeType: ProcessNodeTypeEnd},
+			},
+		},
+		{
+			processKey: ProcessKeySalesReturnApproval, variantKey: CustomerProcessVariantSalesReturnApprovalReceipt,
+			businessRefType: "sales_return",
+			nodes: []expectedNode{
+				{key: "sales_return_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicySalesReturnApproval},
+				{key: "approve_sales_return", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesReturnApprove},
+				{key: "sales_return_receipt", nodeType: ProcessNodeTypeHumanTask, ownerPool: WarehouseRoleKey},
+				{key: "receive_sales_return", nodeType: ProcessNodeTypeDomainCommand, ownerPool: WarehouseRoleKey, commandKey: ProcessDomainCommandSalesReturnReceive},
+				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "reject_sales_return", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesReturnReject},
+				{key: "rejected_end", nodeType: ProcessNodeTypeEnd},
+			},
+		},
+		{
+			processKey: ProcessKeyFinancePaymentApproval, variantKey: CustomerProcessVariantFinancePaymentApprovalPost,
+			businessRefType: "finance_payment",
+			nodes: []expectedNode{
+				{key: "finance_payment_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicyFinancePaymentApproval},
+				{key: "approve_finance_payment", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandFinancePaymentApprove},
+				{key: "finance_payment_execution", nodeType: ProcessNodeTypeHumanTask, ownerPool: FinanceRoleKey},
+				{key: "post_finance_payment", nodeType: ProcessNodeTypeDomainCommand, ownerPool: FinanceRoleKey, commandKey: ProcessDomainCommandFinancePaymentPost},
+				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "reject_finance_payment", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandFinancePaymentReject},
+				{key: "rejected_end", nodeType: ProcessNodeTypeEnd},
+			},
+		},
+		{
+			processKey: ProcessKeyInventoryAdjustmentApproval, variantKey: CustomerProcessVariantInventoryAdjustmentApproval,
+			businessRefType: "inventory_operation",
+			nodes: []expectedNode{
+				{key: "submit_inventory_adjustment", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandInventoryAdjustmentSubmit},
+				{key: "inventory_adjustment_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicyInventoryAdjustmentApproval},
+				{key: "approve_inventory_adjustment", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandInventoryAdjustmentApprove},
+				{key: "inventory_adjustment_execution", nodeType: ProcessNodeTypeHumanTask, ownerPool: WarehouseRoleKey},
+				{key: "post_inventory_adjustment", nodeType: ProcessNodeTypeDomainCommand, ownerPool: WarehouseRoleKey, commandKey: ProcessDomainCommandInventoryAdjustmentPost},
+				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "reject_inventory_adjustment", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandInventoryAdjustmentReject},
+				{key: "rejected_end", nodeType: ProcessNodeTypeEnd},
+			},
+		},
+		{
+			processKey: ProcessKeyProductionExceptionApproval, variantKey: CustomerProcessVariantProductionExceptionApproval,
+			businessRefType: "production_exception_decision",
+			nodes: []expectedNode{
+				{key: "production_exception_decision_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicyProductionExceptionApproval},
+				{key: "approve_production_exception", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandProductionExceptionApprove, branchPolicy: ProcessBranchPolicyProductionExceptionExecution},
+				{key: "production_exception_execution", nodeType: ProcessNodeTypeHumanTask, ownerPool: ProductionRoleKey},
+				{key: "execute_production_exception", nodeType: ProcessNodeTypeDomainCommand, ownerPool: ProductionRoleKey, commandKey: ProcessDomainCommandProductionExceptionExecute},
+				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "reject_production_exception", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandProductionExceptionReject},
+				{key: "rejected_end", nodeType: ProcessNodeTypeEnd},
+				{key: "over_issue_end", nodeType: ProcessNodeTypeEnd},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.processKey+"/"+tt.variantKey, func(t *testing.T) {
+			normalized, err := normalizeCustomerProcessContracts(runtimeSelectionSnapshot(
+				tt.processKey, "v1", tt.variantKey, tt.businessRefType,
+			))
+			if err != nil {
+				t.Fatalf("normalizeCustomerProcessContracts error = %v", err)
+			}
+			definition := normalized["processDefinitions"].(map[string]any)[tt.processKey].(map[string]any)
+			rawNodes := definition["nodes"].([]any)
+			if len(rawNodes) != len(tt.nodes) {
+				t.Fatalf("nodes = %#v, want %#v", rawNodes, tt.nodes)
+			}
+			for index, want := range tt.nodes {
+				node := rawNodes[index].(map[string]any)
+				gotOwnerPool, _ := node["owner_pool_key"].(string)
+				policy, _ := node["policy_snapshot"].(map[string]any)
+				gotCommandKey, _ := policy["command_key"].(string)
+				gotBranchPolicy, _ := policy["branch_policy_key"].(string)
+				if node["node_key"] != want.key ||
+					node["node_type"] != want.nodeType ||
+					gotOwnerPool != want.ownerPool ||
+					gotCommandKey != want.commandKey ||
+					gotBranchPolicy != want.branchPolicy {
+					t.Fatalf("node %d = %#v, want %#v", index, node, want)
+				}
+			}
+		})
+	}
+}
+
 func TestNormalizeCustomerProcessContractsKeepsFactActionsOutsideApprovalRuntime(t *testing.T) {
 	tests := []struct {
 		processKey      string

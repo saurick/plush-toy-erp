@@ -54,6 +54,7 @@ var (
 	ErrBusinessAttachmentOwnerNotFound  = errors.New("business attachment owner not found")
 	ErrBusinessAttachmentOwnerInvalid   = errors.New("business attachment owner invalid")
 	ErrBusinessAttachmentContentInvalid = errors.New("business attachment content invalid")
+	ErrBusinessAttachmentIntegrity      = errors.New("business attachment integrity check failed")
 	ErrBusinessAttachmentTooLarge       = errors.New("business attachment too large")
 	ErrBusinessAttachmentMimeNotAllowed = errors.New("business attachment mime type not allowed")
 
@@ -301,7 +302,21 @@ func (uc *BusinessAttachmentUsecase) GetBusinessAttachmentContent(ctx context.Co
 	if uc == nil || uc.repo == nil || metadata == nil || metadata.ID <= 0 || metadata.OwnerID <= 0 || !IsBusinessAttachmentOwnerTypeAllowed(metadata.OwnerType) {
 		return nil, ErrBadParam
 	}
-	return uc.repo.GetBusinessAttachmentContent(ctx, metadata.ID, metadata.OwnerType, metadata.OwnerID)
+	content, err := uc.repo.GetBusinessAttachmentContent(ctx, metadata.ID, metadata.OwnerType, metadata.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	expectedSHA256 := strings.ToLower(strings.TrimSpace(metadata.SHA256))
+	if metadata.FileSize <= 0 ||
+		len(content) != metadata.FileSize ||
+		len(expectedSHA256) != sha256.Size*2 {
+		return nil, ErrBusinessAttachmentIntegrity
+	}
+	sum := sha256.Sum256(content)
+	if hex.EncodeToString(sum[:]) != expectedSHA256 {
+		return nil, ErrBusinessAttachmentIntegrity
+	}
+	return content, nil
 }
 
 func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (BusinessAttachmentUploadInput, error) {

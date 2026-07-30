@@ -285,13 +285,28 @@ export async function listWorkflowTaskEvents(taskId, options = {}) {
   if (!Number.isSafeInteger(normalizedTaskId) || normalizedTaskId <= 0) {
     throw new Error('任务轨迹参数无效')
   }
+  const { limit = 100, ...requestOptions } = options
+  const normalizedLimit = Number(limit)
+  if (
+    !Number.isSafeInteger(normalizedLimit) ||
+    normalizedLimit < 1 ||
+    normalizedLimit > 100
+  ) {
+    throw new Error('任务轨迹参数无效')
+  }
   const result = await workflowRpc.call(
     'list_task_events',
-    { task_id: normalizedTaskId, limit: 100 },
-    options
+    { task_id: normalizedTaskId, limit: normalizedLimit },
+    requestOptions
   )
   const data = dataOf(result)
-  return Array.isArray(data?.items) ? data.items : []
+  if (!Array.isArray(data?.items) || typeof data?.truncated !== 'boolean') {
+    throw new Error('本任务处理记录返回格式无效')
+  }
+  return {
+    items: data.items,
+    truncated: data.truncated,
+  }
 }
 
 export async function getWorkflowTaskProcessContext(taskId, options = {}) {

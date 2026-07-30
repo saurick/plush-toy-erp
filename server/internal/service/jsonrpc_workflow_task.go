@@ -256,7 +256,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		}
 		taskID := getInt(pm, "task_id", 0)
 		limit := getInt(pm, "limit", 50)
-		if taskID <= 0 || limit < 1 || limit > 100 {
+		if taskID <= 0 || limit < 1 || limit > biz.WorkflowTaskEventPageMaxLimit {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务轨迹参数不完整"}, nil
 		}
 		admin, adminRes := d.CurrentAdmin(ctx)
@@ -274,11 +274,18 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if !biz.WorkflowTaskVisibilityScopeIncludesTask(visibilityScope, task) {
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 		}
-		events, err := d.workflowUC.ListTaskEvents(ctx, taskID, limit)
+		events, err := d.workflowUC.ListTaskEvents(ctx, taskID, limit+1)
 		if err != nil {
 			return id, d.mapWorkflowError(ctx, err), nil
 		}
-		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": workflowTaskEventsToAny(events)})}, nil
+		truncated := len(events) > limit
+		if truncated {
+			events = events[:limit]
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+			"items":     workflowTaskEventsToAny(events),
+			"truncated": truncated,
+		})}, nil
 	case "get_task_process_context":
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
