@@ -351,7 +351,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 | `/__dev/governance`         | 项目治理地图只读可视化                   | `docs/项目治理地图.md`                                        |
 | `/__dev/status-flows`       | 分层状态机、流程编排与甲方差异只读观察   | 代码合同、正式状态文档与已登记客户配置包                      |
 | `/__dev/docs`               | 当前工作区 Markdown 查看器               | 仓库 Markdown 文件本身                                        |
-| `/__dev/testing`            | 验证层级、当前命令和预设查询             | `docs/product/自动化测试策略.md`                              |
+| `/__dev/testing`            | 验证层级、执行命令和覆盖证据             | `docs/product/自动化测试策略.md`                              |
 | `/__dev/data-preparation`   | 固定档位测试数据计划、执行与回执         | 既有 Core seed、统一本地验收 lifecycle 与 operation store     |
 | `/__dev/database-migration` | 共享开发库迁移准备、执行、读回与重启     | `scripts/local-migration.mjs`、备份恢复脚本与 operation store |
 | `/__dev/prototypes`         | HTML / PNG / 截图原型资产预览            | `docs/product/prototypes/**`                                  |
@@ -401,20 +401,23 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 #### 测试入口 `/__dev/testing`
 
-- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，展示 T0-T8、命令块、常用预设和独立的“覆盖状态 / Coverage”视图。
+- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，主视图固定为“验证层级 / T0–T8”“执行命令 / Commands”和“覆盖证据 / Coverage”。完整 Markdown 继续由独立的 `/__dev/docs` 查看器负责，不在测试入口复制第二个文档阅读器。
 - `docs/archive/**` 不进入可复制命令来源，避免把历史命令写成当前测试入口；其他项目或 GPT/ChatGPT 原文不保存在仓库。
-- 多行命令会保留完整续行参数；不完整且以反斜杠结尾的命令不会进入复制结果。命令区按内容高度展示，不再被网格压缩裁切；筛选无结果时文档详情同步为空。
+- “执行命令”只按同一条文档职责轴筛选来源：策略与口径、工程说明、执行脚本、部署与发布；搜索是独立的命令块关键词条件，“全部来源”只负责复位职责筛选。主视图、职责和关键词分别写入 `view`、`role`、`q` query，刷新、前进后退和从来源文档返回时可恢复。每个命令块可打开对应来源文档，文档职责、前后端技术域、脚本类型和部署阶段不再混成同一级分类。
+- 多行命令会保留完整续行参数；不完整且以反斜杠结尾的命令不会进入复制结果。命令区按内容高度展示，不再被网格压缩裁切；验证层级和覆盖证据视图不显示对当前内容无效的命令来源筛选。
+- “验证层级”顶部按收益优先展示五项独立能力：P0 只读生成本轮 affected 验证计划、P0 运行带稳定仓库身份回执的 fast 开发门禁、P1 九岗位权限与任务可见性巡检、P1 字段联动专项，以及覆盖视图中的本地覆盖基线。计划可随时重生；执行动作和覆盖基线共同使用全局 QA 锁，同一时间只允许一项运行。各项状态与终态独立展示，不合成为“全系统已通过”。
+- 固定动作通过 development-only `/__dev/api/qa/testing` 的 summary / plan / action / operation 合同运行。浏览器只能提交 `fast / role-access / field-linkage + idempotencyKey`，不能传 shell、参数、路径、环境变量、URL 或凭据；服务端固定映射仓库脚本，前后核对 repository identity，页面刷新后从私有 ignored operation store 恢复。岗位巡检只有本地后端与九岗位演示账号凭据就绪时才真实登录，凭据只从 Vite 服务端进程环境继承且不会返回浏览器；其预期业务写入为零，也不等于完整角色协同闭环。
 - 覆盖视图从 dev-only `GET /__dev/api/qa/coverage` 读取固定 `output/qa/coverage/latest.json`，按 Go、Web、业务域、T0-T8、PostgreSQL、浏览器、readiness、目标环境和 UAT 分栏；未采集、过期、失败、跳过、阻塞和零执行不会折算为通过，也不会合并成一个总百分比。
 - 报告与操作接口仅在 development serve 且请求来源与 Host 都是 loopback 时可用，返回 `no-store` 脱敏摘要；生产 build 不包含 `output/qa/**`，也不再从 `public/qa` 携带本机路径或覆盖报告。
-- 「一键采集覆盖率」通过 dev-only session / action / operation API 发起异步固定 baseline。浏览器只提交 `collect + idempotencyKey`，不能传 shell、参数、路径、环境变量或 profile；服务端校验本机 Host、同源、CSRF、JSON 合同，解析项目锁定的 Node / pnpm，以持久化幂等索引和跨进程锁串行运行 `node scripts/qa/test-coverage-collect.mjs --profile baseline --write`。页面显示 10 个脱敏阶段并轮询持久化状态，切换视图不取消后台任务，回到页面后可恢复读回；按钮在运行期间原位禁用，终态自动刷新报告。
-- 运行期仓库变化、启动/服务中断或终态读回无法证明时 fail closed，上一份报告继续展示；真实测试完成但存在失败、缺失或零执行时会发布绑定当前身份的 issues 报告，防止旧绿色遮蔽。页面“重新读取”只读取报告，“复制备用命令”只在 DEV 操作接口不可用时供手工执行。baseline 不写 PostgreSQL、不运行真实业务浏览器、不部署或做客户 UAT，未实际采集的值显示为空而不是 `0%`；`docs/product/自动化测试策略.md` 仍是测试选择和覆盖门槛真源。
+- 「采集本地覆盖基线」通过 dev-only session / action / operation API 发起异步固定 baseline。浏览器只提交 `collect + idempotencyKey`，不能传 shell、参数、路径、环境变量或 profile；服务端校验本机 Host、同源、CSRF、JSON 合同，解析项目锁定的 Node / pnpm，以持久化幂等索引和全局 QA 锁串行运行 `node scripts/qa/test-coverage-collect.mjs --profile baseline --write`。页面显示 11 个脱敏阶段，其中先以 error-code `--check` 证明生成物无漂移，再直接使用项目 Node 做 Web native coverage，不触发会改写 tracked 生成物的 package `pretest`。切换视图不取消后台任务，回到页面后可恢复读回；按钮在运行期间原位禁用，终态自动刷新报告。
+- 运行期仓库变化、启动/服务中断或终态读回无法证明时 fail closed，上一份报告继续展示；字段联动 TAP 与报告也先写 staging，只有测试、builder 和仓库身份复核均通过才原子替换，失败时保留上一份。真实 baseline 测试完成但存在失败、缺失或零执行时会发布绑定当前身份的 issues 报告，防止旧绿色遮蔽。页面“重新读取”只读取报告，“复制备用命令”只在 DEV 操作接口不可用时供手工执行。覆盖基线适合代码基本稳定、其它写任务结束的检查点，不必每次编辑后运行；它不写 PostgreSQL、不运行真实业务浏览器、不部署或做客户 UAT，未实际采集的值显示为空而不是 `0%`。`docs/product/自动化测试策略.md` 仍是测试选择和覆盖门槛真源。
 
 #### 测试数据中心 `/__dev/data-preparation`
 
 - 页面只通过 development serve 的 loopback Bridge 使用三个固定 profile，不接受 shell、SQL、脚本路径、DSN、后端地址、密码或自定义环境变量。写入口的信任边界是本机开发进程、Host / Origin / `Sec-Fetch-Site`、CSRF 和 operation 确认，不冒充 ERP RBAC。
 - `共享开发基础数据 / core-demo` 只允许登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev`，先确认 migration 已到 head，再顺序复用角色演示账号和 Product Core 基础资料 seed。它只生成账号、单位、材料、产品、仓库、工序和 BOM 等稳定开发基线，不生成客户、订单、Workflow、库存、出货或财务事实；稳定 upsert 不等于整批事务，也不提供按 operation 删除。
-- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.07.16-v5 / 20260716-V5`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。用户确认后先稳定准备本地岗位账号与至少 30 条由真实控制面操作产生的审计样例，再通过正式 `validate / publish / transition check / activate or rollback / effective-session readback` 对齐当前跟踪的 yoyoosun 本地测试配置，之后才准备 Source Document、5 条可证明 ProcessRuntime、模拟岗位任务和来源驱动 Fact。同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。岗位到期时间是固定 V5 快照，不保证长期维持“今天 / 本周”相对语义；终态只证明 40 / 50 项数据前置，另 10 项只能由浏览器证明。全部 50 项页面操作和人工验收均保持未完成。
-- `完整验收数据 / full-acceptance` 只接受 clean exact commit 和服务端已有的 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，复用统一 lifecycle 在同批专用库完成 migration、正式 Source / ProcessRuntime / Fact 数据、50 项页面验收和异常流；成功或失败都必须停服、删库并读回零残留。
+- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.07.16-v5 / 20260716-V5`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。用户确认后先稳定准备本地岗位账号与至少 30 条由真实控制面操作产生的审计样例，再通过正式 `validate / publish / transition check / activate or rollback / effective-session readback` 对齐当前跟踪的 yoyoosun 本地测试配置，之后才准备 Source Document、5 条可证明 ProcessRuntime、模拟岗位任务和来源驱动 Fact。同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。固定客户退货覆盖草稿、已批准、已收货、已冲正，收付款覆盖已批准、两笔已过账和已冲销，红冲覆盖一条有效红冲与一组原红冲 / 反向红冲。岗位到期时间是固定 V5 快照，不保证长期维持“今天 / 本周”相对语义；终态只证明 42 / 52 项数据前置，另 10 项只能由浏览器证明。全部 52 项页面操作和人工验收均保持未完成。
+- `完整验收数据 / full-acceptance` 只接受 clean exact commit 和服务端已有的 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，复用统一 lifecycle 在同批专用库完成 migration、正式 Source / ProcessRuntime / Fact 数据、52 项页面验收和异常流；成功或失败都必须停服、删库并读回零残留。
 - `scenario-demo` 的页面操作固定为“读取预检 → 点击生成 → 自动准备并冻结 `planHash`、`runId`、仓库和目标摘要 → 核对固定目标 / V5 批次 / 数据范围 / 长期保留边界 → 确认生成 → 异步执行 → 读取回执”，不要求手输长确认串。其他 profile 继续使用完整确认串。执行前身份变化会使原计划失效；页面刷新可恢复最近 operation。进程中断或结果不明确时显示 `not_proven`，不会自动重试；用户可重新准备更晚的同目标 scenario plan 并再次确认，以同一固定批次显式补齐，其他 profile、不同目标或仍在运行的 operation 继续阻断。
 - `scenario-demo` 只在固定本机 8300、登记 106 长期开发库、migration 和 runtime identity 已证明后，由后台使用项目登记的本机开发账号约定；显式 Vite 进程环境覆盖值仍优先，但凭据不进入浏览器、命令参数或回执。日常直接在本页点击即可，不需要 `make dev_restart`；只有修改 Vite 凭据覆盖环境时才重启一次 `pnpm start`。后端代码、配置或 migration 变化时才按正式后端流程重启。
 - 页面不提供普通“重置全部数据”或 debug cleanup。共享基线按正式账号 / 主数据生命周期退出，已生效业务事实按取消、冲正或调整退出；只有专用验收库允许数据库级自动清理。Workflow task 完成不等于 Fact 已生成。

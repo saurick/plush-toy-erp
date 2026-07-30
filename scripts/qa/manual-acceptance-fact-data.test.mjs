@@ -546,6 +546,81 @@ function factStage() {
           : [{ id: 19000 + offset, sales_order_item_id: 701 }],
     })),
     financeFacts: finance,
+    salesReturns: [
+      { id: 21_001, return_no: "TH-951", status: "DRAFT" },
+      { id: 21_002, return_no: "TH-952", status: "APPROVED" },
+      { id: 21_003, return_no: "TH-953", status: "RECEIVED" },
+      { id: 21_004, return_no: "TH-954", status: "REVERSED" },
+    ],
+    financePayments: [
+      {
+        id: 22_001,
+        payment_no: "SK-902",
+        status: "APPROVED",
+        allocations: [],
+      },
+      {
+        id: 22_002,
+        payment_no: "SK-901",
+        status: "POSTED",
+        allocations: [
+          {
+            id: 23_001,
+            status: "POSTED",
+            reversal_of_allocation_id: null,
+          },
+        ],
+      },
+      {
+        id: 22_003,
+        payment_no: "FK-901",
+        status: "POSTED",
+        allocations: [
+          {
+            id: 23_002,
+            status: "POSTED",
+            reversal_of_allocation_id: null,
+          },
+        ],
+      },
+      {
+        id: 22_004,
+        payment_no: "SK-903",
+        status: "REVERSED",
+        allocations: [
+          {
+            id: 23_003,
+            status: "POSTED",
+            reversal_of_allocation_id: null,
+          },
+          {
+            id: 23_004,
+            status: "REVERSED",
+            reversal_of_allocation_id: 23_003,
+          },
+        ],
+      },
+    ],
+    financeCreditNotes: [
+      {
+        id: 24_001,
+        credit_note_no: "YS-951",
+        status: "POSTED",
+        reversal_of_credit_note_id: null,
+      },
+      {
+        id: 24_002,
+        credit_note_no: "YS-952",
+        status: "POSTED",
+        reversal_of_credit_note_id: null,
+      },
+      {
+        id: 24_003,
+        credit_note_no: "YS-953",
+        status: "REVERSED",
+        reversal_of_credit_note_id: 24_002,
+      },
+    ],
   };
 }
 
@@ -593,6 +668,9 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
   assert.equal(plan.productionCandidates.length, 45);
   assert.equal(plan.outsourcingCandidates.length, 45);
   assert.equal(plan.expectedMinimums.shipments, 47);
+  assert.equal(plan.expectedMinimums.salesReturns, 4);
+  assert.equal(plan.expectedMinimums.financePayments, 4);
+  assert.equal(plan.expectedMinimums.financeCreditNotes, 3);
   assert.equal(plan.shipmentLineSample.items.length, 25);
   assert.ok(
     plan.outsourcingCandidates.every(
@@ -2400,6 +2478,9 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
     ),
   );
   assert.ok(result.referenceRecords.financeFacts.length >= 180);
+  assert.equal(result.referenceRecords.salesReturns.length, 4);
+  assert.equal(result.referenceRecords.financePayments.length, 4);
+  assert.equal(result.referenceRecords.financeCreditNotes.length, 3);
   assert.equal(result.financeFieldContract.complete, true);
   assert.equal(result.financeFieldContract.coveragePercent, 100);
   assert.equal(result.summary.financeFieldCoverage, 100);

@@ -693,6 +693,15 @@ test('page exposes one-click scenario preparation while retaining exact confirma
   assert.match(pageSource, /selectRecoverableDataPreparationOperation/u)
   assert.equal(pageSource.match(/<Input\b/gu)?.length, 1)
   assert.match(pageSource, /aria-label="不可变计划确认文本"/u)
+  assert.doesNotMatch(pageSource, /<label\b/u)
+  assert.match(
+    pageSource,
+    /function ProfileOption[\s\S]*?<div[\s\S]*?<Radio value=\{profile\.key\}>/u
+  )
+  assert.match(pageSource, /cancelButtonProps=\{\{ disabled: executing \}\}/u)
+  assert.match(pageSource, /closable=\{!executing\}/u)
+  assert.match(pageSource, /maskClosable=\{!executing\}/u)
+  assert.match(pageSource, /keyboard=\{!executing\}/u)
   assert.doesNotMatch(
     pageSource,
     /name=["'](?:host|target|path|command|sql|dsn|url|password)["']/iu

@@ -36,6 +36,7 @@ export const COVERAGE_OPERATION_STAGES = Object.freeze([
   "go",
   "web-lint",
   "web-css",
+  "web-error-codes",
   "web",
   "import",
   "field-linkage",

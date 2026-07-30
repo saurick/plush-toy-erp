@@ -4,6 +4,7 @@ import {
   CodeOutlined,
   CopyOutlined,
   FileSearchOutlined,
+  FileTextOutlined,
   PlayCircleOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
@@ -21,7 +22,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
@@ -32,14 +33,15 @@ import {
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   buildDevTestingDocs,
   buildDevTestingSummary,
+  filterDevTestingCommandBlocks,
   filterDevTestingDocs,
   formatDevTestingCoverageMetric,
-  getDevTestingCategoryOptions,
+  getDevTestingDocumentRoleOptions,
   getDevTestingCoverageStatusMeta,
   normalizeDevTestingCoverageEnvelope,
   parseDevTestingStrategyTiers,
-  resolveDevTestingSelectedDoc,
 } from '../config/devTesting.mjs'
+import { DEV_DOCS_ROUTE } from '../config/devRoutes.mjs'
 import {
   createDevCoverageIdempotencyKey,
   createDevCoverageOperationClient,
@@ -47,25 +49,36 @@ import {
   isDevCoverageOperationActive,
   normalizeOptionalDevCoverageOperation,
 } from '../config/devCoverageOperation.mjs'
+import {
+  DEV_TESTING_FIXED_ACTIONS,
+  createDevTestingIdempotencyKey,
+  createDevTestingOperationClient,
+  getDevTestingOperationPresentation,
+  isDevTestingOperationActive,
+} from '../config/devTestingOperation.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
 const VIEW_TIERS = 'tiers'
 const VIEW_COMMANDS = 'commands'
-const VIEW_DOCS = 'docs'
 const VIEW_COVERAGE = 'coverage'
 const VIEW_QUERY_KEY = 'view'
-const DOC_QUERY_KEY = 'doc'
+const DOCUMENT_ROLE_QUERY_KEY = 'role'
+const COMMAND_QUERY_KEY = 'q'
 
 const VIEW_OPTIONS = [
-  { label: '测试分层 / Tiers', value: VIEW_TIERS },
-  { label: '命令入口 / Commands', value: VIEW_COMMANDS },
-  { label: '相关文档 / Docs', value: VIEW_DOCS },
-  { label: '覆盖状态 / Coverage', value: VIEW_COVERAGE },
+  { label: '验证层级 / T0–T8', value: VIEW_TIERS },
+  { label: '执行命令 / Commands', value: VIEW_COMMANDS },
+  { label: '覆盖证据 / Coverage', value: VIEW_COVERAGE },
 ]
 const VIEW_VALUES = new Set(VIEW_OPTIONS.map((option) => option.value))
 
 const COPY_MESSAGE_KEY = 'dev-testing-command-copy'
+const EMPTY_TESTING_OPERATIONS = Object.freeze({
+  fast: null,
+  'role-access': null,
+  'field-linkage': null,
+})
 
 const markdownModules = import.meta.glob(
   [
@@ -173,7 +186,7 @@ function QuickPreset({ preset }) {
   )
 }
 
-function CommandBlock({ block }) {
+function CommandBlock({ block, onOpenSource }) {
   return (
     <article
       className="erp-dev-testing-command-block"
@@ -186,88 +199,28 @@ function CommandBlock({ block }) {
             {block.sourceLabel || block.title || '测试命令来源'}
           </div>
         </div>
-        <Button
-          size="small"
-          icon={<CodeOutlined />}
-          onClick={() => runCopy(block.commandText)}
-        >
-          复制
-        </Button>
+        <Space size={8} wrap>
+          <Button
+            size="small"
+            icon={<FileTextOutlined />}
+            aria-label={`打开来源文档 ${block.sourcePath}`}
+            onClick={() => onOpenSource(block.sourcePath)}
+          >
+            来源文档
+          </Button>
+          <Button
+            size="small"
+            icon={<CodeOutlined />}
+            onClick={() => runCopy(block.commandText)}
+          >
+            复制
+          </Button>
+        </Space>
       </div>
       <pre>
         <code>{block.commandText}</code>
       </pre>
     </article>
-  )
-}
-
-function TestingDocRow({ doc, active, onSelect }) {
-  return (
-    <button
-      type="button"
-      className={
-        active
-          ? 'erp-dev-testing-doc-row erp-dev-testing-doc-row--active'
-          : 'erp-dev-testing-doc-row'
-      }
-      aria-current={active ? 'true' : undefined}
-      onClick={() => onSelect(doc.key)}
-    >
-      <span className="erp-dev-testing-doc-row__top">
-        <span className="erp-dev-testing-doc-row__title">{doc.title}</span>
-        <Tag>{doc.category}</Tag>
-      </span>
-      <span className="erp-dev-testing-doc-row__path">{doc.path}</span>
-      <span className="erp-dev-testing-doc-row__meta">
-        命令 {doc.commandCount} / 命中 {doc.keywordHits}
-      </span>
-    </button>
-  )
-}
-
-function SelectedDocDetail({ doc }) {
-  if (!doc) {
-    return (
-      <div className="erp-dev-testing-empty">
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配文档 / No matching docs"
-        />
-      </div>
-    )
-  }
-
-  return (
-    <section className="erp-dev-testing-doc-detail">
-      <div className="erp-dev-testing-doc-detail__head">
-        <div>
-          <Title level={4}>{doc.title}</Title>
-          <Text className="erp-dev-testing-doc-detail__path">{doc.path}</Text>
-        </div>
-        <Tag>{doc.category}</Tag>
-      </div>
-      <div className="erp-dev-testing-doc-detail__stats">
-        <span>关键词命中 / Hits {doc.keywordHits}</span>
-        <span>命令 / Commands {doc.commandCount}</span>
-        <span>
-          {doc.path === DEV_TESTING_STRATEGY_SOURCE_PATH
-            ? '策略真源 / Strategy source'
-            : '测试相关 / Test related'}
-        </span>
-      </div>
-      {doc.commandBlocks.length > 0 ? (
-        <div className="erp-dev-testing-command-list">
-          {doc.commandBlocks.map((block) => (
-            <CommandBlock key={block.key} block={block} />
-          ))}
-        </div>
-      ) : (
-        <Paragraph className="erp-dev-testing-doc-detail__note">
-          该文档没有 fenced command block / no fenced command
-          block；更多验证口径请回到正文阅读。
-        </Paragraph>
-      )}
-    </section>
   )
 }
 
@@ -411,7 +364,7 @@ function coverageReportAlert(state) {
     title: '尚未生成覆盖报告',
     description: `${
       state?.message || '当前还没有可展示的覆盖证据'
-    }；空值表示未采集，不是 0%。可以直接一键采集；“重新读取”仍只读取本地报告。`,
+    }；空值表示未采集，不是 0%。请在代码基本稳定的检查点采集本地覆盖基线；“重新读取”仍只读取本地报告。`,
   }
 }
 
@@ -468,19 +421,247 @@ function CoverageOperationPanel({ operation, error }) {
   )
 }
 
+function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
+  const shortCommit = plan?.repository?.commit?.slice(0, 12) || '未生成'
+  return (
+    <section className="erp-dev-testing-validation-plan">
+      <div className="erp-dev-testing-validation-plan__head">
+        <div>
+          <Tag color="blue">P0</Tag>
+          <Title level={3}>生成本轮验证计划</Title>
+          <Paragraph>
+            只读分析当前改动，冻结生成前后的仓库身份，列出受影响
+            T0–T8、建议命令和必补证据。
+          </Paragraph>
+        </div>
+        <Button
+          type="primary"
+          icon={<FileSearchOutlined />}
+          loading={loading}
+          onClick={onGenerate}
+        >
+          {plan ? '重新生成计划' : '生成本轮验证计划'}
+        </Button>
+      </div>
+      {busy?.active ? (
+        <Alert
+          showIcon
+          type="info"
+          message="已有本地 QA 任务正在运行"
+          description={`当前类型：${
+            busy.kind === 'coverage' ? '覆盖基线' : '固定验证'
+          } · ${busy.profile}。计划仍可只读生成，但新的执行动作会保持禁用。`}
+        />
+      ) : null}
+      {error ? <Alert showIcon type="error" message={error} /> : null}
+      {plan ? (
+        <div className="erp-dev-testing-validation-plan__body">
+          <div className="erp-dev-testing-validation-plan__identity">
+            <span>
+              <small>改动文件</small>
+              <b>{plan.changedCount}</b>
+            </span>
+            <span>
+              <small>建议层级</small>
+              <b>{plan.levels.join(' · ')}</b>
+            </span>
+            <span>
+              <small>最高层级</small>
+              <b>{plan.highestLevel}</b>
+            </span>
+            <span>
+              <small>仓库身份</small>
+              <code>
+                {shortCommit} · {plan.repository.dirty ? 'Dirty' : 'Clean'}
+              </code>
+            </span>
+          </div>
+          {plan.requiresFull ? (
+            <Alert
+              showIcon
+              type="warning"
+              message="当前改动需要完整门禁"
+              description="计划只说明选择结果，不会替你执行 full、数据库、浏览器、发布或 UAT。"
+            />
+          ) : null}
+          <div className="erp-dev-testing-validation-plan__lists">
+            <div>
+              <strong>建议命令</strong>
+              {plan.commands.length > 0 ? (
+                <ol>
+                  {plan.commands.map((command) => (
+                    <li key={command.id}>
+                      <span>
+                        [{command.level}] {command.label}
+                      </span>
+                      <code>{command.command}</code>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p>当前只保留 T0 静态检查。</p>
+              )}
+            </div>
+            <div>
+              <strong>待补证据</strong>
+              {plan.followUps.length > 0 ? (
+                <ul>
+                  {plan.followUps.map((item, index) => (
+                    <li key={`${item.level}-${index}`}>
+                      [{item.level}] {item.text}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>计划未声明额外 follow-up。</p>
+              )}
+            </div>
+          </div>
+          <p className="erp-dev-testing-validation-plan__note">
+            计划生成后代码继续变化会使它失去当前性；执行前应重新生成。最终 clean
+            HEAD 仍需独立 prepare-push 回执。
+          </p>
+        </div>
+      ) : (
+        <p className="erp-dev-testing-validation-plan__empty">
+          尚未生成；该动作不运行测试、不写数据库，也不启动浏览器。
+        </p>
+      )}
+    </section>
+  )
+}
+
+function ValidationActionCard({
+  action,
+  operation,
+  disabled,
+  starting,
+  onRun,
+}) {
+  const presentation = getDevTestingOperationPresentation(operation)
+  const tagColor = {
+    primary: 'blue',
+    success: 'green',
+    warning: 'gold',
+    danger: 'red',
+  }[presentation.tone]
+  return (
+    <article
+      className={`erp-dev-testing-validation-action erp-dev-testing-validation-action--${presentation.tone}`}
+    >
+      <div className="erp-dev-testing-validation-action__head">
+        <div>
+          <Tag color={action.priority === 'P0' ? 'blue' : 'cyan'}>
+            {action.priority}
+          </Tag>
+          <Tag color={tagColor}>{presentation.label}</Tag>
+        </div>
+        {operation?.updatedAt ? (
+          <small>{formatCoverageGeneratedAt(operation.updatedAt)}</small>
+        ) : null}
+      </div>
+      <Title level={3}>{action.label}</Title>
+      <p>{action.description}</p>
+      {operation?.message ? (
+        <p className="erp-dev-testing-validation-action__message">
+          {operation.message}
+        </p>
+      ) : null}
+      <Button
+        type={action.priority === 'P0' ? 'primary' : 'default'}
+        icon={<PlayCircleOutlined />}
+        loading={starting || presentation.active}
+        disabled={disabled || presentation.active}
+        onClick={() => onRun(action.key)}
+      >
+        {presentation.active ? '运行中…' : action.label}
+      </Button>
+      <small className="erp-dev-testing-validation-action__boundary">
+        {action.boundary}
+      </small>
+    </article>
+  )
+}
+
+function ValidationWorkspace({
+  plan,
+  planLoading,
+  planError,
+  summary,
+  summaryError,
+  actionStarting,
+  onGeneratePlan,
+  onRunAction,
+}) {
+  const operations = summary?.operations || EMPTY_TESTING_OPERATIONS
+  const busy = summary?.busy || { active: false, kind: '', profile: '' }
+  const anyActive = Object.values(operations).some(isDevTestingOperationActive)
+  const actionsDisabled =
+    !summary ||
+    Boolean(summaryError) ||
+    busy.active ||
+    anyActive ||
+    Boolean(actionStarting)
+
+  return (
+    <section
+      className="erp-dev-testing-validation"
+      aria-label="本轮验证固定动作"
+    >
+      <div className="erp-dev-testing-validation__title">
+        <div>
+          <Title level={2}>本轮验证 / Validation</Title>
+          <Paragraph>
+            先只读生成计划，再按收益与前置条件运行固定动作；每项独立出结果，不合成一个“全系统已通过”。
+          </Paragraph>
+        </div>
+        {summaryError ? <Tag color="red">状态读取失败</Tag> : null}
+      </div>
+      <ValidationPlanPanel
+        plan={plan}
+        loading={planLoading}
+        error={planError}
+        busy={busy}
+        onGenerate={onGeneratePlan}
+      />
+      {summaryError ? (
+        <Alert
+          showIcon
+          type="error"
+          message={summaryError}
+          description="后台任务可能仍在运行；状态恢复前请勿重复发起。"
+        />
+      ) : null}
+      <div className="erp-dev-testing-validation__actions">
+        {DEV_TESTING_FIXED_ACTIONS.map((action) => (
+          <ValidationActionCard
+            key={action.key}
+            action={action}
+            operation={operations[action.key]}
+            disabled={actionsDisabled}
+            starting={actionStarting === action.key}
+            onRun={onRunAction}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function CoverageReportView({
   state,
   loading,
   operation,
   operationError,
   operationStarting,
+  qaBusy,
+  qaReady,
   onCollect,
   onReload,
 }) {
   const alert = coverageReportAlert(state)
   const report = state?.report || null
-  const operationPresentation =
-    getDevCoverageOperationPresentation(operation)
+  const operationPresentation = getDevCoverageOperationPresentation(operation)
   const repository = report?.repository || {}
   const shortCommit = repository.commit
     ? repository.commit.slice(0, 12)
@@ -499,20 +680,25 @@ function CoverageReportView({
           message={alert.title}
           description={alert.description}
         />
-        <CoverageOperationPanel
-          operation={operation}
-          error={operationError}
-        />
+        <CoverageOperationPanel operation={operation} error={operationError} />
         <div className="erp-dev-testing-coverage-actions">
           <code>{DEV_TESTING_COVERAGE_COLLECT_COMMAND}</code>
           <Button
             type="primary"
             icon={<PlayCircleOutlined />}
             loading={operationStarting || operationPresentation.active}
-            disabled={operationPresentation.active}
+            disabled={
+              operationPresentation.active || qaBusy?.active || !qaReady
+            }
             onClick={onCollect}
           >
-            {operationPresentation.active ? '采集中…' : '一键采集覆盖率'}
+            {operationPresentation.active
+              ? '采集中…'
+              : qaBusy?.active
+                ? '已有验证在运行'
+                : !qaReady
+                  ? '正在核对任务状态'
+                  : '采集本地覆盖基线'}
           </Button>
           <Button
             icon={<ReloadOutlined />}
@@ -529,11 +715,11 @@ function CoverageReportView({
           </Button>
         </div>
         <Paragraph className="erp-dev-testing-coverage-boundary">
-          空值表示未采集，不是
-          0%。一键采集固定运行真实本地 baseline
+          空值表示未采集，不是 0%。采集本地覆盖基线固定运行真实本地 baseline
           测试并自动聚合报告，但不会执行数据库写入、真实业务浏览器、目标环境部署或客户
           UAT；切换页面不会停止后台任务，“重新读取”只读取本地报告。指标口径不同，不合并为“全系统覆盖率”；skipped、blocked、missing、failed
-          和 0 tests executed 均不能算通过。备用命令用于开发接口不可用时手工执行同一采集器。
+          和 0 tests executed
+          均不能算通过。应在代码基本稳定的检查点运行，不必每次编辑后执行；备用命令用于开发接口不可用时手工执行同一采集器。
         </Paragraph>
       </div>
 
@@ -668,11 +854,22 @@ function CoverageReportView({
 }
 
 export default function DevTestingPage() {
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const testingSummaryRequestSequence = React.useRef(0)
+  const testingIdempotencyKeys = React.useRef({})
+  const handledTestingTerminals = React.useRef(new Set())
   const coverageRequestSequence = React.useRef(0)
   const coverageStartInFlight = React.useRef(false)
   const coverageIdempotencyKey = React.useRef('')
   const handledCoverageTerminal = React.useRef('')
+  const [testingSummaryReloadKey, setTestingSummaryReloadKey] = useState(0)
+  const [testingSummary, setTestingSummary] = useState(null)
+  const [testingSummaryError, setTestingSummaryError] = useState('')
+  const [testingPlan, setTestingPlan] = useState(null)
+  const [testingPlanLoading, setTestingPlanLoading] = useState(false)
+  const [testingPlanError, setTestingPlanError] = useState('')
+  const [testingActionStarting, setTestingActionStarting] = useState('')
   const [coverageReloadKey, setCoverageReloadKey] = useState(0)
   const [coverageLoading, setCoverageLoading] = useState(false)
   const [coverageState, setCoverageState] = useState(null)
@@ -682,6 +879,10 @@ export default function DevTestingPage() {
     useState(false)
   const coverageOperationClient = useMemo(
     () => createDevCoverageOperationClient(),
+    []
+  )
+  const testingOperationClient = useMemo(
+    () => createDevTestingOperationClient(),
     []
   )
   const docs = useMemo(() => buildDevTestingDocs(markdownModules), [])
@@ -696,30 +897,160 @@ export default function DevTestingPage() {
     () => buildDevTestingSummary({ tiers, docs }),
     [docs, tiers]
   )
-  const categoryOptions = useMemo(
-    () => getDevTestingCategoryOptions(docs),
+  const documentRoleOptions = useMemo(
+    () => getDevTestingDocumentRoleOptions(docs),
     [docs]
+  )
+  const documentRoleValues = useMemo(
+    () => new Set(documentRoleOptions.map((option) => option.value)),
+    [documentRoleOptions]
   )
   const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
   const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_TIERS
   const isCoverageView = view === VIEW_COVERAGE
-  const [keyword, setKeyword] = useState('')
-  const [category, setCategory] = useState('all')
-  const filteredDocs = useMemo(
-    () => filterDevTestingDocs(docs, { keyword, category }),
-    [category, docs, keyword]
+  const requestedDocumentRole =
+    searchParams.get(DOCUMENT_ROLE_QUERY_KEY) || 'all'
+  const documentRole = documentRoleValues.has(requestedDocumentRole)
+    ? requestedDocumentRole
+    : 'all'
+  const keyword = searchParams.get(COMMAND_QUERY_KEY) || ''
+  const roleFilteredDocs = useMemo(
+    () => filterDevTestingDocs(docs, { documentRole }),
+    [docs, documentRole]
   )
-  const requestedDocKey = searchParams.get(DOC_QUERY_KEY) || ''
-  const requestedDoc = resolveDevTestingSelectedDoc(docs, requestedDocKey)
-  const selectedDoc = resolveDevTestingSelectedDoc(
-    filteredDocs,
-    requestedDoc?.key || ''
+  const obsoleteDocKey = searchParams.get('doc') || ''
+  const allCommandBlocks = useMemo(
+    () =>
+      filterDevTestingCommandBlocks(roleFilteredDocs, {
+        keyword,
+      }),
+    [keyword, roleFilteredDocs]
   )
-  const canonicalDocKey = selectedDoc?.key || requestedDoc?.key || ''
-  const allCommandBlocks = filteredDocs.flatMap((doc) => doc.commandBlocks)
+  const matchedSourceCount = new Set(
+    allCommandBlocks.map((block) => block.sourcePath)
+  ).size
   const coverageOperationId = coverageOperation?.id || ''
   const coverageOperationIsActive =
     isDevCoverageOperationActive(coverageOperation)
+  const testingOperations =
+    testingSummary?.operations || EMPTY_TESTING_OPERATIONS
+  const testingActiveOperations = Object.values(testingOperations).filter(
+    isDevTestingOperationActive
+  )
+  const testingActiveOperationIds = testingActiveOperations
+    .map((operation) => operation.id)
+    .sort()
+    .join(',')
+  const testingHasActive = testingActiveOperations.length > 0
+  const testingBusy = testingSummary?.busy || {
+    active: false,
+    kind: '',
+    profile: '',
+  }
+
+  React.useEffect(() => {
+    const controller = new AbortController()
+    const requestSequence = testingSummaryRequestSequence.current + 1
+    testingSummaryRequestSequence.current = requestSequence
+
+    const loadTestingSummary = async () => {
+      try {
+        const nextSummary = await testingOperationClient.summary({
+          signal: controller.signal,
+        })
+        if (
+          controller.signal.aborted ||
+          requestSequence !== testingSummaryRequestSequence.current
+        ) {
+          return
+        }
+        setTestingSummary(nextSummary)
+        setTestingSummaryError('')
+      } catch (_error) {
+        if (
+          controller.signal.aborted ||
+          requestSequence !== testingSummaryRequestSequence.current
+        ) {
+          return
+        }
+        setTestingSummaryError('固定验证状态读取失败，请检查本地开发服务。')
+      }
+    }
+
+    loadTestingSummary()
+    return () => controller.abort()
+  }, [testingOperationClient, testingSummaryReloadKey])
+
+  const handleTestingTerminal = React.useCallback((operation) => {
+    if (!operation || isDevTestingOperationActive(operation)) return
+    const terminalKey = `${operation.id}:${operation.revision}`
+    if (handledTestingTerminals.current.has(terminalKey)) return
+    handledTestingTerminals.current.add(terminalKey)
+    delete testingIdempotencyKeys.current[operation.action]
+    setTestingSummaryReloadKey((current) => current + 1)
+    const toastKey = `dev-testing-${operation.action}`
+    if (operation.status === 'completed') {
+      message.success({ content: operation.message, key: toastKey })
+    } else if (operation.status === 'failed') {
+      message.error({ content: operation.message, key: toastKey })
+    } else {
+      message.warning({ content: operation.message, key: toastKey })
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (!testingActiveOperationIds) return undefined
+    const operationIds = testingActiveOperationIds.split(',')
+    const controller = new AbortController()
+    let timer = null
+
+    const poll = async () => {
+      try {
+        const nextOperations = await Promise.all(
+          operationIds.map((operationId) =>
+            testingOperationClient.read(operationId, {
+              signal: controller.signal,
+            })
+          )
+        )
+        if (controller.signal.aborted) return
+        setTestingSummary((current) => {
+          if (!current) return current
+          const operations = { ...current.operations }
+          for (const operation of nextOperations) {
+            const previous = operations[operation.action]
+            if (
+              !previous ||
+              previous.id !== operation.id ||
+              previous.revision <= operation.revision
+            ) {
+              operations[operation.action] = operation
+            }
+          }
+          return { ...current, operations }
+        })
+        setTestingSummaryError('')
+        for (const operation of nextOperations) {
+          handleTestingTerminal(operation)
+        }
+        if (nextOperations.some(isDevTestingOperationActive)) {
+          timer = window.setTimeout(poll, 1200)
+        }
+      } catch (_error) {
+        if (controller.signal.aborted) return
+        setTestingSummaryError(
+          '固定验证进度读取暂时失败，后台任务可能仍在执行。'
+        )
+        timer = window.setTimeout(poll, 1800)
+      }
+    }
+
+    timer = window.setTimeout(poll, 800)
+    return () => {
+      controller.abort()
+      if (timer !== null) window.clearTimeout(timer)
+    }
+  }, [handleTestingTerminal, testingActiveOperationIds, testingOperationClient])
 
   React.useEffect(() => {
     if (!isCoverageView) return undefined
@@ -808,6 +1139,7 @@ export default function DevTestingPage() {
     handledCoverageTerminal.current = terminalKey
     coverageIdempotencyKey.current = ''
     setCoverageReloadKey((current) => current + 1)
+    setTestingSummaryReloadKey((current) => current + 1)
     if (operation.status === 'completed' && operation.outcome === 'passed') {
       message.success({ content: operation.message, key: 'coverage-collect' })
     } else if (operation.status === 'completed') {
@@ -868,21 +1200,34 @@ export default function DevTestingPage() {
   ])
 
   React.useEffect(() => {
-    if (requestedView === view && requestedDocKey === canonicalDocKey) {
+    const hasNonCanonicalRole =
+      requestedDocumentRole !== documentRole ||
+      (documentRole === 'all' && searchParams.has(DOCUMENT_ROLE_QUERY_KEY))
+    const hasEmptyKeyword = searchParams.has(COMMAND_QUERY_KEY) && !keyword
+    if (
+      requestedView === view &&
+      !obsoleteDocKey &&
+      !hasNonCanonicalRole &&
+      !hasEmptyKeyword
+    ) {
       return
     }
 
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set(VIEW_QUERY_KEY, view)
-    if (canonicalDocKey) {
-      nextParams.set(DOC_QUERY_KEY, canonicalDocKey)
+    nextParams.delete('doc')
+    if (documentRole === 'all') {
+      nextParams.delete(DOCUMENT_ROLE_QUERY_KEY)
     } else {
-      nextParams.delete(DOC_QUERY_KEY)
+      nextParams.set(DOCUMENT_ROLE_QUERY_KEY, documentRole)
     }
+    if (!keyword) nextParams.delete(COMMAND_QUERY_KEY)
     setSearchParams(nextParams, { replace: true })
   }, [
-    canonicalDocKey,
-    requestedDocKey,
+    documentRole,
+    keyword,
+    obsoleteDocKey,
+    requestedDocumentRole,
     requestedView,
     searchParams,
     setSearchParams,
@@ -895,28 +1240,116 @@ export default function DevTestingPage() {
       VIEW_QUERY_KEY,
       VIEW_VALUES.has(nextView) ? nextView : VIEW_TIERS
     )
+    nextParams.delete('doc')
     setSearchParams(nextParams)
   }
 
-  const selectDoc = (nextDocKey) => {
+  const selectDocumentRole = (nextDocumentRole) => {
     const nextParams = new URLSearchParams(searchParams)
-    const nextDoc = resolveDevTestingSelectedDoc(docs, nextDocKey)
-    if (nextDoc?.key) {
-      nextParams.set(DOC_QUERY_KEY, nextDoc.key)
+    if (
+      nextDocumentRole === 'all' ||
+      !documentRoleValues.has(nextDocumentRole)
+    ) {
+      nextParams.delete(DOCUMENT_ROLE_QUERY_KEY)
     } else {
-      nextParams.delete(DOC_QUERY_KEY)
+      nextParams.set(DOCUMENT_ROLE_QUERY_KEY, nextDocumentRole)
     }
     setSearchParams(nextParams)
   }
 
+  const setCommandKeyword = (nextKeyword) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextKeyword) {
+      nextParams.set(COMMAND_QUERY_KEY, nextKeyword)
+    } else {
+      nextParams.delete(COMMAND_QUERY_KEY)
+    }
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  const openSourceDoc = (sourcePath) => {
+    if (!sourcePath) return
+    navigate(`${DEV_DOCS_ROUTE}?path=${encodeURIComponent(sourcePath)}`)
+  }
+
   const reloadCoverage = () => {
     setCoverageReloadKey((current) => current + 1)
+    setTestingSummaryReloadKey((current) => current + 1)
+  }
+
+  const generateTestingPlan = async () => {
+    if (testingPlanLoading) return
+    setTestingPlanLoading(true)
+    setTestingPlanError('')
+    try {
+      setTestingPlan(await testingOperationClient.plan())
+    } catch (_error) {
+      setTestingPlanError(
+        '本轮验证计划生成失败；代码可能正在变化，请稳定后重新生成。'
+      )
+    } finally {
+      setTestingPlanLoading(false)
+    }
+  }
+
+  const runTestingAction = async (action) => {
+    if (
+      testingActionStarting ||
+      !testingSummary ||
+      testingSummaryError ||
+      testingBusy.active ||
+      testingHasActive
+    ) {
+      return
+    }
+    setTestingActionStarting(action)
+    setTestingSummaryError('')
+    try {
+      if (!testingIdempotencyKeys.current[action]) {
+        testingIdempotencyKeys.current[action] =
+          createDevTestingIdempotencyKey(action)
+      }
+      const operation = await testingOperationClient.start(
+        action,
+        testingIdempotencyKeys.current[action]
+      )
+      setTestingSummary((current) => ({
+        ...(current || {
+          schemaVersion: 'plush.dev-qa-testing-summary/v1',
+          operations: { ...EMPTY_TESTING_OPERATIONS },
+        }),
+        busy: isDevTestingOperationActive(operation)
+          ? { active: true, kind: 'testing', profile: action }
+          : { active: false, kind: '', profile: '' },
+        operations: {
+          ...(current?.operations || EMPTY_TESTING_OPERATIONS),
+          [action]: operation,
+        },
+      }))
+      if (!isDevTestingOperationActive(operation)) {
+        handleTestingTerminal(operation)
+      }
+    } catch (_error) {
+      setTestingSummaryError(
+        '固定验证请求暂时未确认；再次点击会复用同一请求，不会重复启动。'
+      )
+      message.error({
+        content: '固定验证暂时无法确认，请检查本地开发服务',
+        key: `dev-testing-${action}`,
+      })
+    } finally {
+      setTestingActionStarting('')
+    }
   }
 
   const collectCoverage = async () => {
     if (
       coverageStartInFlight.current ||
-      isDevCoverageOperationActive(coverageOperation)
+      isDevCoverageOperationActive(coverageOperation) ||
+      !testingSummary ||
+      testingSummaryError ||
+      testingBusy.active ||
+      testingHasActive
     ) {
       return
     }
@@ -932,6 +1365,7 @@ export default function DevTestingPage() {
         coverageIdempotencyKey.current
       )
       setCoverageOperation(operation)
+      setTestingSummaryReloadKey((current) => current + 1)
       if (!isDevCoverageOperationActive(operation)) {
         handleCoverageTerminal(operation)
       }
@@ -940,7 +1374,7 @@ export default function DevTestingPage() {
         '采集请求暂时未确认；再次点击会复用同一请求，不会重复启动测试。'
       )
       message.error({
-        content: '一键采集暂时无法确认，请检查本地开发服务',
+        content: '覆盖基线采集暂时无法确认，请检查本地开发服务',
         key: 'coverage-collect',
       })
     } finally {
@@ -954,23 +1388,23 @@ export default function DevTestingPage() {
   const coverageToolbarText = coverageOperationPresentation.active
     ? coverageOperationPresentation.stageLabel
     : coverageLoading
-    ? '正在读取本地覆盖报告…'
-    : coverageState?.report
-      ? `${coverageState.report.generatedAt || '生成时间未记录'} · ${
-          coverageState.report.repository.commit?.slice(0, 12) ||
-          'commit 未记录'
-        }`
-      : getDevTestingCoverageStatusMeta(coverageState?.status).label
+      ? '正在读取本地覆盖报告…'
+      : coverageState?.report
+        ? `${coverageState.report.generatedAt || '生成时间未记录'} · ${
+            coverageState.report.repository.commit?.slice(0, 12) ||
+            'commit 未记录'
+          }`
+        : getDevTestingCoverageStatusMeta(coverageState?.status).label
+  const toolbarContext =
+    view === VIEW_COMMANDS
+      ? `${matchedSourceCount} 个来源 · ${allCommandBlocks.length} 个命令块`
+      : isCoverageView
+        ? coverageToolbarText
+        : DEV_TESTING_STRATEGY_SOURCE_PATH
 
   return (
     <div className="erp-dev-testing-page erp-dev-workspace-page">
-      <DevPageNav
-        sourcePath={
-          isCoverageView
-            ? DEV_TESTING_STRATEGY_SOURCE_PATH
-            : selectedDoc?.path || DEV_TESTING_STRATEGY_SOURCE_PATH
-        }
-      />
+      <DevPageNav sourcePath={DEV_TESTING_STRATEGY_SOURCE_PATH} />
       <header className="erp-dev-testing-header">
         <div className="erp-dev-testing-header__copy">
           <Space align="center" size={10}>
@@ -980,94 +1414,56 @@ export default function DevTestingPage() {
             </Title>
           </Space>
           <Paragraph className="erp-dev-testing-summary">
-            读取当前测试策略、QA 脚本和部署 / 前后端说明；index current
-            validation tiers and executable command references.
+            先生成本轮验证计划，再按优先级运行固定动作并核对独立证据；所有执行命令均由本地开发服务白名单固定。
           </Paragraph>
         </div>
         <div className="erp-dev-testing-header__stats">
           <MetricTile
             icon={<CheckCircleOutlined />}
-            label="测试层级 / Tiers"
+            label="验证层级 / T0–T8"
             value={summary.tierCount}
             note="来自自动化测试策略"
             tone="primary"
           />
           <MetricTile
             icon={<FileSearchOutlined />}
-            label="相关文档 / Docs"
+            label="命令来源 / Sources"
             value={summary.docCount}
-            note={`${summary.docsWithCommands} 篇含命令`}
+            note={`${summary.docsWithCommands} 个来源含命令`}
           />
           <MetricTile
             icon={<CodeOutlined />}
-            label="命令行 / Commands"
-            value={summary.commandCount}
-            note={`${summary.strategyCommandCount} 条来自策略`}
+            label="命令块 / Blocks"
+            value={summary.commandBlockCount}
+            note={`${summary.strategyCommandBlockCount} 个来自策略`}
           />
         </div>
       </header>
 
-      <main
-        className={`erp-dev-testing-shell${
-          isCoverageView ? ' erp-dev-testing-shell--coverage' : ''
-        }`}
-      >
-        {!isCoverageView ? (
-          <aside className="erp-dev-testing-sidebar">
-            <Input
-              allowClear
-              className="erp-dev-testing-search"
-              placeholder="搜索文档、命令、验收词"
-              prefix={<SearchOutlined aria-hidden="true" />}
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-            <div className="erp-dev-testing-filter" aria-label="文档分类筛选">
-              {categoryOptions.map((option) => (
-                <button
-                  type="button"
-                  key={option.value}
-                  className={
-                    option.value === category
-                      ? 'erp-dev-testing-filter__item erp-dev-testing-filter__item--active'
-                      : 'erp-dev-testing-filter__item'
-                  }
-                  aria-pressed={option.value === category}
-                  onClick={() => setCategory(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="erp-dev-testing-doc-list" aria-label="测试相关文档">
-              {filteredDocs.map((doc) => (
-                <TestingDocRow
-                  key={doc.key}
-                  doc={doc}
-                  active={doc.key === selectedDoc?.key}
-                  onSelect={selectDoc}
-                />
-              ))}
-            </div>
-          </aside>
-        ) : null}
-
+      <main className="erp-dev-testing-shell">
         <section className="erp-dev-testing-reader">
           <div className="erp-dev-testing-reader__toolbar">
             <Segmented
+              aria-label="测试工作区主视图"
               options={VIEW_OPTIONS}
               value={view}
               onChange={selectView}
             />
-            <Text type="secondary">
-              {isCoverageView
-                ? coverageToolbarText
-                : selectedDoc?.path || '无匹配文档 / No matching docs'}
-            </Text>
+            <Text type="secondary">{toolbarContext}</Text>
           </div>
 
           {view === VIEW_TIERS ? (
             <div className="erp-dev-testing-tier-view">
+              <ValidationWorkspace
+                plan={testingPlan}
+                planLoading={testingPlanLoading}
+                planError={testingPlanError}
+                summary={testingSummary}
+                summaryError={testingSummaryError}
+                actionStarting={testingActionStarting}
+                onGeneratePlan={generateTestingPlan}
+                onRunAction={runTestingAction}
+              />
               <div
                 className="erp-dev-testing-presets"
                 aria-label="常用测试命令预设"
@@ -1085,23 +1481,58 @@ export default function DevTestingPage() {
           ) : null}
 
           {view === VIEW_COMMANDS ? (
-            <div className="erp-dev-testing-command-list">
-              {allCommandBlocks.length > 0 ? (
-                allCommandBlocks.map((block) => (
-                  <CommandBlock key={block.key} block={block} />
-                ))
-              ) : (
-                <div className="erp-dev-testing-empty">
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="当前筛选没有命令块 / No command blocks"
-                  />
+            <div className="erp-dev-testing-command-view">
+              <div className="erp-dev-testing-command-tools">
+                <Input
+                  allowClear
+                  className="erp-dev-testing-search"
+                  placeholder="搜索命令、来源、验收词"
+                  prefix={<SearchOutlined aria-hidden="true" />}
+                  value={keyword}
+                  onChange={(event) => setCommandKeyword(event.target.value)}
+                />
+                <div
+                  className="erp-dev-testing-filter"
+                  role="group"
+                  aria-label="按文档职责筛选命令来源"
+                >
+                  {documentRoleOptions.map((option) => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      className={
+                        option.value === documentRole
+                          ? 'erp-dev-testing-filter__item erp-dev-testing-filter__item--active'
+                          : 'erp-dev-testing-filter__item'
+                      }
+                      aria-pressed={option.value === documentRole}
+                      onClick={() => selectDocumentRole(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
+              <div className="erp-dev-testing-command-list">
+                {allCommandBlocks.length > 0 ? (
+                  allCommandBlocks.map((block) => (
+                    <CommandBlock
+                      key={block.key}
+                      block={block}
+                      onOpenSource={openSourceDoc}
+                    />
+                  ))
+                ) : (
+                  <div className="erp-dev-testing-empty">
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description="当前筛选没有命令块 / No command blocks"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           ) : null}
-
-          {view === VIEW_DOCS ? <SelectedDocDetail doc={selectedDoc} /> : null}
 
           {view === VIEW_COVERAGE ? (
             <CoverageReportView
@@ -1110,6 +1541,8 @@ export default function DevTestingPage() {
               operation={coverageOperation}
               operationError={coverageOperationError}
               operationStarting={coverageOperationStarting}
+              qaBusy={testingBusy}
+              qaReady={Boolean(testingSummary) && !testingSummaryError}
               onCollect={collectCoverage}
               onReload={reloadCoverage}
             />

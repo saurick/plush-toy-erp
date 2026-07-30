@@ -239,9 +239,7 @@ function normalizeTransition(value, index) {
       value.fact_boundary,
       value.boundary
     ),
-    pathKinds: normalizeStringList(
-      value.pathKinds || value.path_kinds
-    ),
+    pathKinds: normalizeStringList(value.pathKinds || value.path_kinds),
     pathKindWhen: firstText(value.pathKindWhen, value.path_kind_when),
     automatic:
       typeof value.automatic === 'boolean'
@@ -578,13 +576,13 @@ function adaptCatalogModule(moduleValue) {
   const allowedPathKinds = new Set(pathKinds)
   const unknownPathKinds = flows.flatMap((flow) =>
     flow.transitions.flatMap((transition) =>
-      transition.pathKinds.filter(
-        (pathKind) => !allowedPathKinds.has(pathKind)
-      )
+      transition.pathKinds.filter((pathKind) => !allowedPathKinds.has(pathKind))
     )
   )
   if (unknownPathKinds.length > 0) {
-    throw new Error(`状态目录包含未知 pathKinds: ${unknownPathKinds.join('、')}`)
+    throw new Error(
+      `状态目录包含未知 pathKinds: ${unknownPathKinds.join('、')}`
+    )
   }
   const declaredScopes = asArray(raw.scopes).map(normalizeScope).filter(Boolean)
   return {
@@ -723,7 +721,9 @@ function graphTransitionLabel(transition, targetState) {
       transition.pathKinds
         .map((pathKind) => PATH_KIND_PRESENTATION[pathKind])
         .filter(Boolean)
-        .join(' / ') || targetState?.label || '流转'
+        .join(' / ') ||
+      targetState?.label ||
+      '流转'
     )
   }
   return targetState?.label || '流转'
@@ -814,10 +814,7 @@ function buildFlowMermaid(flow, layerKeys, pathMode = 'off', pathKind = '') {
   const visibleStateKeys =
     pathMode === 'only'
       ? new Set(
-          transitions.flatMap((transition) => [
-            transition.from,
-            transition.to,
-          ])
+          transitions.flatMap((transition) => [transition.from, transition.to])
         )
       : null
   const visibleStates = visibleStateKeys
@@ -1698,6 +1695,7 @@ function CustomerOrchestrationView({
             </Text>
           </div>
           <Select
+            aria-label="选择 Product Core 流程"
             value={selectedProcess?.key}
             placeholder="选择 Product Core 流程"
             notFoundContent="没有流程定义"
@@ -1724,6 +1722,7 @@ function CustomerOrchestrationView({
             </Text>
           </div>
           <Select
+            aria-label="选择甲方包"
             value={selectedOverlay?.key}
             placeholder="选择甲方包"
             notFoundContent="没有已登记甲方包"
@@ -2081,12 +2080,8 @@ export default function DevFlowStateObservatoryPage() {
   const requestedProcessKey = cleanText(searchParams.get(QUERY_KEYS.process))
   const requestedCustomerKey = cleanText(searchParams.get(QUERY_KEYS.customer))
   const keyword = cleanText(searchParams.get(QUERY_KEYS.search))
-  const requestedPathMode = cleanText(
-    searchParams.get(QUERY_KEYS.pathMode)
-  )
-  const requestedPathKind = cleanText(
-    searchParams.get(QUERY_KEYS.pathKind)
-  )
+  const requestedPathMode = cleanText(searchParams.get(QUERY_KEYS.pathMode))
+  const requestedPathKind = cleanText(searchParams.get(QUERY_KEYS.pathKind))
   const requestedPathObjects = cleanText(
     searchParams.get(QUERY_KEYS.pathObjects)
   )
@@ -2115,13 +2110,16 @@ export default function DevFlowStateObservatoryPage() {
   const scopeKey = requestedScopeKey || 'all'
   const viewIsValid = !requestedView || VIEW_KEYS.has(requestedView)
   const view = requestedView || DEFAULT_VIEW
+  const showsCatalogFilters = ['overview', 'machine', 'dictionary'].includes(
+    view
+  )
+  const showsFlowSelector = ['machine', 'dictionary'].includes(view)
+  const showsMachineControls = view === 'machine'
   const availableLayerKeys = new Set(
     (catalog?.flowLayers || []).map((layer) => layer.key)
   )
   const layerParamPresent = searchParams.has(QUERY_KEYS.layers)
-  const rawRequestedLayerKeys = cleanText(
-    searchParams.get(QUERY_KEYS.layers)
-  )
+  const rawRequestedLayerKeys = cleanText(searchParams.get(QUERY_KEYS.layers))
     .split(',')
     .map((key) => key.trim())
     .filter(Boolean)
@@ -2143,12 +2141,18 @@ export default function DevFlowStateObservatoryPage() {
   const pathObjectsAreValid =
     !requestedPathObjects || requestedPathObjects === 'with'
   const invalidFilterMessages = [
-    !scopeIsValid ? `未知状态域：${requestedScopeKey}` : '',
+    showsCatalogFilters && !scopeIsValid
+      ? `未知状态域：${requestedScopeKey}`
+      : '',
     !viewIsValid ? `未知视图：${requestedView}` : '',
-    !layersAreValid ? '叠加层参数包含未登记值' : '',
-    !pathModeIsValid ? `未知路径呈现模式：${requestedPathMode}` : '',
-    !pathKindIsValid ? `未知路径类型：${requestedPathKind}` : '',
-    !pathObjectsAreValid
+    showsMachineControls && !layersAreValid ? '叠加层参数包含未登记值' : '',
+    showsMachineControls && !pathModeIsValid
+      ? `未知路径呈现模式：${requestedPathMode}`
+      : '',
+    showsMachineControls && !pathKindIsValid
+      ? `未知路径类型：${requestedPathKind}`
+      : '',
+    showsMachineControls && !pathObjectsAreValid
       ? `未知对象路径筛选：${requestedPathObjects}`
       : '',
   ].filter(Boolean)
@@ -2162,12 +2166,10 @@ export default function DevFlowStateObservatoryPage() {
               (scopeKey === 'all' || flow.scopeKey === scopeKey) &&
               (!normalizedKeyword ||
                 flow.searchText.includes(normalizedKeyword)) &&
-              (requestedPathObjects !== 'with' ||
+              (!showsMachineControls ||
+                requestedPathObjects !== 'with' ||
                 flow.transitions.some((transition) =>
-                  transitionMatchesPathKind(
-                    transition,
-                    requestedPathKind
-                  )
+                  transitionMatchesPathKind(transition, requestedPathKind)
                 ))
           )
         : [],
@@ -2177,6 +2179,7 @@ export default function DevFlowStateObservatoryPage() {
       normalizedKeyword,
       requestedPathKind,
       requestedPathObjects,
+      showsMachineControls,
       scopeKey,
     ]
   )
@@ -2184,6 +2187,7 @@ export default function DevFlowStateObservatoryPage() {
     filteredFlows.find((flow) => flow.key === requestedFlowKey) ||
     (!requestedFlowKey ? filteredFlows[0] : null)
   const unknownFlow =
+    showsFlowSelector &&
     filtersAreValid &&
     Boolean(requestedFlowKey) &&
     !filteredFlows.some((flow) => flow.key === requestedFlowKey)
@@ -2310,150 +2314,10 @@ export default function DevFlowStateObservatoryPage() {
         </div>
       </header>
 
-      <section
-        className="erp-dev-flow-state-controls"
-        aria-label="观察范围和状态对象筛选"
-      >
-        <div className="erp-dev-flow-state-control">
-          <label htmlFor="dev-flow-state-scope">状态域</label>
-          <Select
-            id="dev-flow-state-scope"
-            value={scopeKey}
-            options={scopeOptions.map((scope) => ({
-              value: scope.key,
-              label: scope.label,
-              title: scope.description,
-            }))}
-            onChange={(nextScope) =>
-              updateSearchParams({
-                [QUERY_KEYS.scope]: nextScope,
-                [QUERY_KEYS.flow]: null,
-                [QUERY_KEYS.state]: null,
-              })
-            }
-          />
-        </div>
-        <div className="erp-dev-flow-state-control">
-          <label htmlFor="dev-flow-state-search">搜索</label>
-          <Input
-            id="dev-flow-state-search"
-            allowClear
-            prefix={<SearchOutlined />}
-            value={keyword}
-            placeholder="搜索业务流、状态、迁移或证据"
-            onChange={(event) =>
-              updateSearchParams(
-                { [QUERY_KEYS.search]: event.target.value || null },
-                { replace: true }
-              )
-            }
-          />
-        </div>
-        <div className="erp-dev-flow-state-control">
-          <label htmlFor="dev-flow-state-flow">业务流 / 状态对象</label>
-          <Select
-            id="dev-flow-state-flow"
-            showSearch
-            optionFilterProp="label"
-            value={selectedFlow?.key}
-            placeholder="选择状态对象"
-            notFoundContent="没有匹配的状态对象"
-            options={filteredFlows.map((flow) => ({
-              value: flow.key,
-              label: `${flow.label} · ${flow.key}`,
-            }))}
-            onChange={(flowKey) => openFlow(flowKey)}
-          />
-        </div>
-        <div className="erp-dev-flow-state-control">
-          <label htmlFor="dev-flow-state-path-mode">路径呈现</label>
-          <Select
-            id="dev-flow-state-path-mode"
-            value={pathModeIsValid ? pathMode : undefined}
-            status={pathModeIsValid ? undefined : 'error'}
-            options={PATH_MODE_ITEMS}
-            onChange={(nextMode) =>
-              updateSearchParams({
-                [QUERY_KEYS.pathMode]:
-                  nextMode === 'off' ? null : nextMode,
-              })
-            }
-          />
-        </div>
-        <div className="erp-dev-flow-state-control">
-          <label htmlFor="dev-flow-state-path-kind">路径类型</label>
-          <Select
-            id="dev-flow-state-path-kind"
-            value={pathKindIsValid ? requestedPathKind || 'all' : undefined}
-            status={pathKindIsValid ? undefined : 'error'}
-            options={[
-              { value: 'all', label: '全部已登记类型' },
-              ...(catalog?.pathKinds || []).map((pathKind) => ({
-                value: pathKind,
-                label: PATH_KIND_PRESENTATION[pathKind] || pathKind,
-              })),
-            ]}
-            onChange={(nextPathKind) =>
-              updateSearchParams({
-                [QUERY_KEYS.pathKind]:
-                  nextPathKind === 'all' ? null : nextPathKind,
-                [QUERY_KEYS.flow]:
-                  requestedPathObjects === 'with'
-                    ? null
-                    : requestedFlowKey || null,
-                [QUERY_KEYS.state]: null,
-              })
-            }
-          />
-        </div>
-        <div className="erp-dev-flow-state-control">
-          <span>对象派生筛选</span>
-          <Checkbox
-            checked={requestedPathObjects === 'with'}
-            onChange={(event) =>
-              updateSearchParams({
-                [QUERY_KEYS.pathObjects]: event.target.checked
-                  ? 'with'
-                  : null,
-                [QUERY_KEYS.flow]: null,
-                [QUERY_KEYS.state]: null,
-              })
-            }
-          >
-            仅显示包含命中路径的对象
-          </Checkbox>
-        </div>
-      </section>
-
-      <section
-        className="erp-dev-flow-state-layers"
-        aria-labelledby="dev-flow-state-layer-title"
-        data-flow-layer-controls
-      >
-        <div>
-          <Text strong id="dev-flow-state-layer-title">
-            叠加层
-          </Text>
-          <Text type="secondary">
-            默认只开业务与状态；叠加层只增加短提示，不把完整技术详情塞进图中。
-          </Text>
-        </div>
-        <Checkbox.Group value={layerKeys} onChange={handleLayerChange}>
-          {(catalog?.flowLayers || []).map((layer) => (
-            <Checkbox
-              value={layer.key}
-              key={layer.key}
-              title={layer.description}
-            >
-              {layer.label}
-            </Checkbox>
-          ))}
-        </Checkbox.Group>
-      </section>
-
       <section className="erp-dev-flow-state-view-nav">
         <DevTaskNav
           compact
+          level="primary"
           ariaLabel="流程状态观察视图"
           items={VIEW_ITEMS}
           value={view}
@@ -2463,6 +2327,161 @@ export default function DevFlowStateObservatoryPage() {
           }
         />
       </section>
+
+      {showsCatalogFilters ? (
+        <section
+          className="erp-dev-flow-state-controls"
+          aria-label="当前视图筛选"
+        >
+          <div className="erp-dev-flow-state-control">
+            <label htmlFor="dev-flow-state-scope">状态域</label>
+            <Select
+              id="dev-flow-state-scope"
+              value={scopeKey}
+              options={scopeOptions.map((scope) => ({
+                value: scope.key,
+                label: scope.label,
+                title: scope.description,
+              }))}
+              onChange={(nextScope) =>
+                updateSearchParams({
+                  [QUERY_KEYS.scope]: nextScope,
+                  [QUERY_KEYS.flow]: null,
+                  [QUERY_KEYS.state]: null,
+                })
+              }
+            />
+          </div>
+          <div className="erp-dev-flow-state-control">
+            <label htmlFor="dev-flow-state-search">搜索</label>
+            <Input
+              id="dev-flow-state-search"
+              allowClear
+              prefix={<SearchOutlined />}
+              value={keyword}
+              placeholder="搜索业务流、状态、迁移或证据"
+              onChange={(event) =>
+                updateSearchParams(
+                  { [QUERY_KEYS.search]: event.target.value || null },
+                  { replace: true }
+                )
+              }
+            />
+          </div>
+          {showsFlowSelector ? (
+            <div className="erp-dev-flow-state-control">
+              <label htmlFor="dev-flow-state-flow">业务流 / 状态对象</label>
+              <Select
+                id="dev-flow-state-flow"
+                showSearch
+                optionFilterProp="label"
+                value={selectedFlow?.key}
+                placeholder="选择状态对象"
+                notFoundContent="没有匹配的状态对象"
+                options={filteredFlows.map((flow) => ({
+                  value: flow.key,
+                  label: `${flow.label} · ${flow.key}`,
+                }))}
+                onChange={(flowKey) => openFlow(flowKey)}
+              />
+            </div>
+          ) : null}
+          {showsMachineControls ? (
+            <>
+              <div className="erp-dev-flow-state-control">
+                <label htmlFor="dev-flow-state-path-mode">路径呈现</label>
+                <Select
+                  id="dev-flow-state-path-mode"
+                  value={pathModeIsValid ? pathMode : undefined}
+                  status={pathModeIsValid ? undefined : 'error'}
+                  options={PATH_MODE_ITEMS}
+                  onChange={(nextMode) =>
+                    updateSearchParams({
+                      [QUERY_KEYS.pathMode]:
+                        nextMode === 'off' ? null : nextMode,
+                    })
+                  }
+                />
+              </div>
+              {pathMode !== 'off' || requestedPathObjects === 'with' ? (
+                <div className="erp-dev-flow-state-control">
+                  <label htmlFor="dev-flow-state-path-kind">路径类型</label>
+                  <Select
+                    id="dev-flow-state-path-kind"
+                    value={
+                      pathKindIsValid ? requestedPathKind || 'all' : undefined
+                    }
+                    status={pathKindIsValid ? undefined : 'error'}
+                    options={[
+                      { value: 'all', label: '全部已登记类型' },
+                      ...(catalog?.pathKinds || []).map((pathKind) => ({
+                        value: pathKind,
+                        label: PATH_KIND_PRESENTATION[pathKind] || pathKind,
+                      })),
+                    ]}
+                    onChange={(nextPathKind) =>
+                      updateSearchParams({
+                        [QUERY_KEYS.pathKind]:
+                          nextPathKind === 'all' ? null : nextPathKind,
+                        [QUERY_KEYS.flow]:
+                          requestedPathObjects === 'with'
+                            ? null
+                            : requestedFlowKey || null,
+                        [QUERY_KEYS.state]: null,
+                      })
+                    }
+                  />
+                </div>
+              ) : null}
+              <div className="erp-dev-flow-state-control">
+                <span>对象派生筛选</span>
+                <Checkbox
+                  checked={requestedPathObjects === 'with'}
+                  onChange={(event) =>
+                    updateSearchParams({
+                      [QUERY_KEYS.pathObjects]: event.target.checked
+                        ? 'with'
+                        : null,
+                      [QUERY_KEYS.flow]: null,
+                      [QUERY_KEYS.state]: null,
+                    })
+                  }
+                >
+                  仅显示包含命中路径的对象
+                </Checkbox>
+              </div>
+            </>
+          ) : null}
+        </section>
+      ) : null}
+
+      {showsMachineControls ? (
+        <section
+          className="erp-dev-flow-state-layers"
+          aria-labelledby="dev-flow-state-layer-title"
+          data-flow-layer-controls
+        >
+          <div>
+            <Text strong id="dev-flow-state-layer-title">
+              叠加层
+            </Text>
+            <Text type="secondary">
+              默认只开业务与状态；叠加层只增加短提示，不把完整技术详情塞进图中。
+            </Text>
+          </div>
+          <Checkbox.Group value={layerKeys} onChange={handleLayerChange}>
+            {(catalog?.flowLayers || []).map((layer) => (
+              <Checkbox
+                value={layer.key}
+                key={layer.key}
+                title={layer.description}
+              >
+                {layer.label}
+              </Checkbox>
+            ))}
+          </Checkbox.Group>
+        </section>
+      ) : null}
 
       <main className="erp-dev-flow-state-main" data-flow-state-view={view}>
         <CatalogState
@@ -2502,9 +2521,7 @@ export default function DevFlowStateObservatoryPage() {
             }
           />
         ) : null}
-        {catalogState.status === 'ready' &&
-        filtersAreValid &&
-        !unknownFlow
+        {catalogState.status === 'ready' && filtersAreValid && !unknownFlow
           ? renderView()
           : null}
       </main>

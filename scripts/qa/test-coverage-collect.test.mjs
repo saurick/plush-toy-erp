@@ -98,7 +98,7 @@ test("coverage collector requires the repository-pinned Node runtime", async () 
   );
 });
 
-test("baseline command plan uses the project-pinned pnpm and runs the web pretest", () => {
+test("baseline command plan checks generated error codes and bypasses mutating package pretest", () => {
   const pnpmBin = "/opt/homebrew/bin/pnpm";
   const plan = buildBaselineCommandPlan({
     projectRoot: ROOT,
@@ -112,9 +112,15 @@ test("baseline command plan uses the project-pinned pnpm and runs the web pretes
   const commands = Object.fromEntries(plan);
   assert.equal(commands["web-lint"].command, pnpmBin);
   assert.equal(commands["web-css"].command, pnpmBin);
-  assert.equal(commands.web.command, pnpmBin);
+  assert.equal(commands["web-error-codes"].command, process.execPath);
+  assert.deepEqual(commands["web-error-codes"].args, [
+    "scripts/gen-error-codes.mjs",
+    "--check",
+  ]);
+  assert.equal(commands["web-error-codes"].cwd, ROOT);
+  assert.equal(commands.web.command, process.execPath);
   assert.deepEqual(commands.web.args, [
-    "test",
+    "--test",
     "--experimental-test-coverage",
     "--test-reporter=tap",
   ]);

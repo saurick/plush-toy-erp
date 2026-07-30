@@ -184,7 +184,7 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
         passed: true,
         formalAccounts: 10,
         mobileAccounts: 9,
-        pages: 50,
+        pages: 52,
         report: "output/manual-browser.json",
       });
     },

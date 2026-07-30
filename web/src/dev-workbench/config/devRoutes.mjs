@@ -37,14 +37,14 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_QUALITY_ROUTE,
-    label: '质量',
+    label: '质量验证',
     description: '门禁、测试与稳定性',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.delivery,
     route: DEV_DELIVERY_ROUTE,
-    label: '交付',
-    description: '配置、发布与回执',
+    label: '交付运行',
+    description: '配置、版本与发布回执',
   }),
 ])
 
@@ -114,8 +114,8 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
 export const DEV_PAGE_TITLE_BY_ROUTE = Object.freeze({
   [DEV_HUB_ROUTE]: '研发效能工作台',
   [DEV_PRODUCT_ENGINEERING_ROUTE]: '产品工程',
-  [DEV_QUALITY_ROUTE]: '质量',
-  [DEV_DELIVERY_ROUTE]: '交付',
+  [DEV_QUALITY_ROUTE]: '质量验证',
+  [DEV_DELIVERY_ROUTE]: '交付运行',
   [DEV_GOVERNANCE_ROUTE]: '项目治理地图',
   [DEV_STATUS_FLOWS_ROUTE]: '流程与状态观察台',
   [DEV_DOCS_ROUTE]: '开发文档',

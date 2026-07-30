@@ -4669,10 +4669,7 @@ export function createStyleL1Scenarios(deps) {
           )}`
         )
         await taskEventTrail.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-task-board-task-event-trail.png'
-          ),
+          path: path.resolve(outputDir, 'erp-task-board-task-event-trail.png'),
         })
         const executionTrail = page.getByTestId('workflow-process-stage')
         await executionTrail.waitFor({ state: 'visible', timeout: 10_000 })
@@ -9158,7 +9155,7 @@ export function createStyleL1Scenarios(deps) {
         })
 
         await page
-          .getByRole('button', {
+          .getByRole('link', {
             name: /在开发文档中打开来源 config\/customers\/yoyoosun\/README\.md/,
           })
           .click()
@@ -9246,16 +9243,16 @@ export function createStyleL1Scenarios(deps) {
             enabledTags: moduleStateMetrics.enabledTags,
           },
           {
-            itemCount: 17,
+            itemCount: 19,
             hasCatalogDefaultCopy: true,
             hasInstallCopy: true,
             hasShipmentModuleLabel: true,
             hasProductionOrderModuleLabel: true,
             hasRawShipmentModuleKey: false,
             hasRawProductionOrderModuleKey: false,
-            enabledTags: 17,
+            enabledTags: 19,
           },
-          `客户配置控制台应展示 17 个模块状态预览项且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
+          `客户配置控制台应展示 19 个模块状态预览项且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
         )
         assert(
           moduleStateMetrics.panelWidth <= moduleStateMetrics.viewportWidth,
@@ -9330,7 +9327,7 @@ export function createStyleL1Scenarios(deps) {
 
         await page
           .locator('.erp-dev-customer-view-switch .erp-dev-task-nav__item')
-          .filter({ hasText: '界面配置' })
+          .filter({ hasText: '界面投影' })
           .click()
         await expectText(page, '客户编码')
         await expectText(page, '东莞市永绅玩具有限公司')
@@ -9416,7 +9413,7 @@ export function createStyleL1Scenarios(deps) {
 
         await page
           .locator('.erp-dev-customer-view-switch .erp-dev-task-nav__item')
-          .filter({ hasText: '执行发布' })
+          .filter({ hasText: '执行与发布门禁' })
           .click()
         await expectText(page, '配置预检与发布 / Config Preflight & Release')
         await expectText(
@@ -9578,7 +9575,7 @@ export function createStyleL1Scenarios(deps) {
         )
         await page.getByRole('button', { name: '运行测试试跑' }).click()
         await expectText(page, '试跑已生成')
-        await expectText(page, '重新运行试跑')
+        await expectText(page, '重新运行测试试跑')
         await expectText(page, '复制输出目录')
         await expectText(page, '复制报告路径')
         await expectText(page, '查看报告摘要')
@@ -9628,12 +9625,7 @@ export function createStyleL1Scenarios(deps) {
           },
           {
             metricCardCount: 4,
-            actionButtons: [
-              '重新运行试跑',
-              '复制输出目录',
-              '复制报告路径',
-              '收起报告摘要',
-            ],
+            actionButtons: ['复制输出目录', '复制报告路径', '收起报告摘要'],
           },
           `试跑结果区应提供后续操作组，而不是只有单个测试按钮: ${JSON.stringify(dryRunResultMetrics)}`
         )
@@ -9691,7 +9683,7 @@ export function createStyleL1Scenarios(deps) {
         assert(!switchedUrl.pathname.startsWith('/erp'))
         await page
           .locator('.erp-dev-customer-view-switch .erp-dev-task-nav__item')
-          .filter({ hasText: '界面配置' })
+          .filter({ hasText: '界面投影' })
           .click()
         await expectText(page, '东莞市永绅玩具有限公司')
         await assertNoHorizontalOverflow(
@@ -9778,7 +9770,7 @@ export function createStyleL1Scenarios(deps) {
         )
         await page
           .locator('.erp-dev-customer-view-switch .erp-dev-task-nav__item')
-          .filter({ hasText: '界面配置' })
+          .filter({ hasText: '界面投影' })
           .click()
         await expectText(page, '菜单分组 / Menu Groups')
         await expectText(page, '字段显示候选 / Field Candidates')
@@ -9879,17 +9871,17 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           defaultMetrics.cardCount,
-          7,
-          `开发导航应渲染 7 个入口: ${JSON.stringify(defaultMetrics)}`
+          10,
+          `开发导航应渲染 10 个入口: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
           defaultMetrics.descriptionCount,
-          7,
+          10,
           `开发导航每张入口卡都应说明用途与边界: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
           defaultMetrics.pinButtonCount,
-          7,
+          10,
           `开发导航应为每个入口提供置顶按钮: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
@@ -9907,8 +9899,8 @@ export function createStyleL1Scenarios(deps) {
           `开发导航不应保留无独立用途的搜索动作按钮: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
-          defaultMetrics.enterAriaLabels.length === 7 &&
-            new Set(defaultMetrics.enterAriaLabels).size === 7 &&
+          defaultMetrics.enterAriaLabels.length === 10 &&
+            new Set(defaultMetrics.enterAriaLabels).size === 10 &&
             defaultMetrics.enterAriaLabels.every(Boolean),
           `每个“进入”动作应有唯一可访问名称: ${JSON.stringify(defaultMetrics)}`
         )
@@ -10011,7 +10003,7 @@ export function createStyleL1Scenarios(deps) {
               .querySelector(
                 '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
               )
-              ?.textContent?.replace(/\s+/gu, '') === '1/7' &&
+              ?.textContent?.replace(/\s+/gu, '') === '1/10' &&
             document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
               .length === 1
         )
@@ -10037,7 +10029,7 @@ export function createStyleL1Scenarios(deps) {
           {
             cardCount: 1,
             onlyHref: '/__dev/capability-ledger',
-            countText: '1/7',
+            countText: '1/10',
             overflow: false,
           },
           `开发导航分组筛选应只保留能力真源入口: ${JSON.stringify(groupMetrics)}`
@@ -10068,7 +10060,7 @@ export function createStyleL1Scenarios(deps) {
               .querySelector(
                 '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
               )
-              ?.textContent?.replace(/\s+/gu, '') === '1/7' &&
+              ?.textContent?.replace(/\s+/gu, '') === '1/10' &&
             document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
               .length === 1
         )
@@ -10089,7 +10081,7 @@ export function createStyleL1Scenarios(deps) {
         assert.deepEqual(filteredMetrics, {
           cardCount: 1,
           onlyHref: '/__dev/testing',
-          countText: '1/7',
+          countText: '1/10',
         })
         await assertERPThemeMode(page, {
           scenarioName: 'dev-hub-dark-desktop',
@@ -10122,15 +10114,15 @@ export function createStyleL1Scenarios(deps) {
           },
           {
             path: '/__dev/quality',
-            heading: '质量 / Quality',
+            heading: '质量验证 / Quality Assurance',
             rootSelector: '.erp-dev-hub-page',
-            titlePrefix: '质量 · ',
+            titlePrefix: '质量验证 · ',
           },
           {
             path: '/__dev/delivery',
-            heading: '交付 / Delivery',
+            heading: '交付运行 / Delivery Operations',
             rootSelector: '.erp-dev-hub-page',
-            titlePrefix: '交付 · ',
+            titlePrefix: '交付运行 · ',
           },
           {
             path: '/__dev/governance',
@@ -10157,6 +10149,12 @@ export function createStyleL1Scenarios(deps) {
             titlePrefix: '测试入口 · ',
           },
           {
+            path: '/__dev/data-preparation',
+            heading: '测试数据准备中心',
+            rootSelector: '.erp-dev-data-page',
+            titlePrefix: '测试数据准备中心 · ',
+          },
+          {
             path: '/__dev/prototypes',
             heading: '产品原型与样板查看器 / Prototype Viewer',
             rootSelector: '.erp-dev-prototypes-page',
@@ -10174,6 +10172,18 @@ export function createStyleL1Scenarios(deps) {
               '客户配置包预检与发布控制台 / Package Preflight & Release Console',
             rootSelector: '.erp-dev-customer-page',
             titlePrefix: '客户配置包预检与发布 · ',
+          },
+          {
+            path: '/__dev/database-migration',
+            heading: '数据库迁移',
+            rootSelector: '.erp-dev-database-migration-page',
+            titlePrefix: '数据库迁移 · ',
+          },
+          {
+            path: '/__dev/version-center',
+            heading: '版本发布与部署中心',
+            rootSelector: '.erp-dev-version-page',
+            titlePrefix: '版本发布与部署中心 · ',
           },
         ]
 
@@ -10193,6 +10203,15 @@ export function createStyleL1Scenarios(deps) {
             const toolbar = document.querySelector('.erp-dev-hub-toolbar')
             const groupFilter = document.querySelector(
               '.erp-dev-hub-group-filter'
+            )
+            const workspaceRoutes = document.querySelector(
+              '.erp-dev-workspace-nav__routes'
+            )
+            const primaryNav = document.querySelector(
+              '.erp-dev-workspace-nav__primary'
+            )
+            const secondaryNav = document.querySelector(
+              '.erp-dev-workspace-nav__secondary'
             )
             const header = root?.querySelector(
               [
@@ -10228,19 +10247,34 @@ export function createStyleL1Scenarios(deps) {
                 'button[aria-label="复制当前开发页深链"]'
               ).length,
               sourceActionCount: document.querySelectorAll(
-                'button[aria-label^="在开发文档中打开来源"]'
+                '[aria-label^="在开发文档中打开来源"]'
               ).length,
               workspaceRouteCount: document.querySelectorAll(
                 '.erp-dev-workspace-nav__route'
               ).length,
               currentWorkspaceRouteCount: document.querySelectorAll(
+                '.erp-dev-workspace-nav [aria-current="page"]'
+              ).length,
+              currentPrimaryRouteCount: document.querySelectorAll(
                 '.erp-dev-workspace-nav__route[aria-current="page"]'
               ).length,
+              currentSecondaryRouteCount: document.querySelectorAll(
+                '.erp-dev-workspace-nav__secondary-route[aria-current="page"]'
+              ).length,
+              contextPrimaryRouteCount: document.querySelectorAll(
+                '.erp-dev-workspace-nav__route--context'
+              ).length,
+              secondaryNavCount: secondaryNav ? 1 : 0,
               workspacePageDisplay: root ? getComputedStyle(root).display : '',
-              workspaceRoutesOverflowX:
-                getComputedStyle(
-                  document.querySelector('.erp-dev-workspace-nav__routes')
-                ).overflowX || '',
+              workspaceRoutesOverflowX: workspaceRoutes
+                ? getComputedStyle(workspaceRoutes).overflowX
+                : '',
+              primaryNavOverflowX: primaryNav
+                ? getComputedStyle(primaryNav).overflowX
+                : '',
+              secondaryNavOverflowX: secondaryNav
+                ? getComputedStyle(secondaryNav).overflowX
+                : '',
               rootWidth: Math.round(rootRect?.width || 0),
               clientWidth: document.documentElement.clientWidth,
               scrollWidth: document.documentElement.scrollWidth,
@@ -10285,6 +10319,13 @@ export function createStyleL1Scenarios(deps) {
               `开发导航分组筛选应收敛为单行控件: ${JSON.stringify(metrics)}`
             )
           }
+          const isAreaLanding = [
+            '/__dev/',
+            '/__dev/product-engineering',
+            '/__dev/quality',
+            '/__dev/delivery',
+          ].includes(devPage.path)
+          const hasSecondaryNav = devPage.path !== '/__dev/'
           assert.deepEqual(
             {
               devNavCount: metrics.devNavCount,
@@ -10292,8 +10333,14 @@ export function createStyleL1Scenarios(deps) {
               sourceActionCount: metrics.sourceActionCount,
               workspaceRouteCount: metrics.workspaceRouteCount,
               currentWorkspaceRouteCount: metrics.currentWorkspaceRouteCount,
+              currentPrimaryRouteCount: metrics.currentPrimaryRouteCount,
+              currentSecondaryRouteCount: metrics.currentSecondaryRouteCount,
+              contextPrimaryRouteCount: metrics.contextPrimaryRouteCount,
+              secondaryNavCount: metrics.secondaryNavCount,
               workspacePageDisplay: metrics.workspacePageDisplay,
               workspaceRoutesOverflowX: metrics.workspaceRoutesOverflowX,
+              primaryNavOverflowX: metrics.primaryNavOverflowX,
+              secondaryNavOverflowX: metrics.secondaryNavOverflowX,
             },
             {
               devNavCount: 1,
@@ -10303,13 +10350,20 @@ export function createStyleL1Scenarios(deps) {
                 devPage.path === '/__dev/product-engineering' ||
                 devPage.path === '/__dev/quality' ||
                 devPage.path === '/__dev/delivery' ||
+                devPage.path === '/__dev/docs' ||
                 devPage.path === '/__dev/capability-ledger'
                   ? 0
                   : 1,
               workspaceRouteCount: 4,
               currentWorkspaceRouteCount: 1,
+              currentPrimaryRouteCount: isAreaLanding ? 1 : 0,
+              currentSecondaryRouteCount: isAreaLanding ? 0 : 1,
+              contextPrimaryRouteCount: isAreaLanding ? 0 : 1,
+              secondaryNavCount: hasSecondaryNav ? 1 : 0,
               workspacePageDisplay: 'block',
-              workspaceRoutesOverflowX: 'auto',
+              workspaceRoutesOverflowX: 'hidden',
+              primaryNavOverflowX: 'auto',
+              secondaryNavOverflowX: hasSecondaryNav ? 'auto' : '',
             },
             `开发页应统一提供移动端工作台导航、深链和来源入口: ${devPage.path} ${JSON.stringify(metrics)}`
           )
@@ -10330,13 +10384,13 @@ export function createStyleL1Scenarios(deps) {
           },
           {
             path: '/__dev/quality',
-            heading: '质量 / Quality',
-            cardCount: 1,
+            heading: '质量验证 / Quality Assurance',
+            cardCount: 2,
           },
           {
             path: '/__dev/delivery',
-            heading: '交付 / Delivery',
-            cardCount: 1,
+            heading: '交付运行 / Delivery Operations',
+            cardCount: 3,
           },
         ]
 
@@ -10549,13 +10603,7 @@ export function createStyleL1Scenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '开发测试入口 / Dev Test Entry')
-        const testingDoc = await readSurfaceStyle('.erp-dev-testing-doc-row')
         const testingPreset = await readSurfaceStyle('.erp-dev-testing-preset')
-        assert.equal(
-          testingDoc.cursor,
-          'pointer',
-          `测试文档行应明确是可选择入口: ${JSON.stringify(testingDoc)}`
-        )
         assert.equal(
           testingPreset.cursor,
           'pointer',
@@ -10717,17 +10765,29 @@ export function createStyleL1Scenarios(deps) {
         })
         await expectHeading(page, '开发测试入口 / Dev Test Entry')
         assertButtonGroup(
-          '测试文档筛选',
-          await readControlGroup(
-            '.erp-dev-testing-filter',
-            '.erp-dev-testing-filter__item'
-          )
-        )
-        assertButtonGroup(
-          '测试阅读器视图切换',
+          '测试工作区主视图切换',
           await readControlGroup(
             '.erp-dev-testing-reader__toolbar .ant-segmented',
             '.ant-segmented-item'
+          )
+        )
+        assert.equal(
+          await page.locator('.erp-dev-testing-filter').count(),
+          0,
+          '验证层级默认态不应显示与当前内容无关的命令来源筛选'
+        )
+        await page
+          .locator('.erp-dev-testing-reader__toolbar .ant-segmented-item')
+          .filter({ hasText: '执行命令 / Commands' })
+          .click()
+        await page
+          .locator('.erp-dev-testing-filter')
+          .waitFor({ state: 'visible' })
+        assertButtonGroup(
+          '命令来源文档职责筛选',
+          await readControlGroup(
+            '.erp-dev-testing-filter',
+            '.erp-dev-testing-filter__item'
           )
         )
 
@@ -11689,14 +11749,19 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '开发测试入口 / Dev Test Entry')
-        await expectText(page, '测试分层 / Tiers')
-        await expectText(page, '命令入口 / Commands')
+        await expectText(page, '验证层级 / T0–T8')
+        await expectText(page, '执行命令 / Commands')
+        await expectText(page, '覆盖证据 / Coverage')
         await expectText(page, 'docs/product/自动化测试策略.md')
         const defaultMetrics = await page.evaluate(() => {
           const root = document.querySelector('.erp-dev-testing-page')
+          const shell = document.querySelector('.erp-dev-testing-shell')
+          const reader = document.querySelector('.erp-dev-testing-reader')
           return {
             view: new URL(location.href).searchParams.get('view'),
             doc: new URL(location.href).searchParams.get('doc'),
+            role: new URL(location.href).searchParams.get('role'),
+            keyword: new URL(location.href).searchParams.get('q'),
             tierCount: document.querySelectorAll('.erp-dev-testing-tier')
               .length,
             tierCopyButtonCount: document.querySelectorAll(
@@ -11704,24 +11769,21 @@ export function createStyleL1Scenarios(deps) {
             ).length,
             presetCount: document.querySelectorAll('.erp-dev-testing-preset')
               .length,
-            docCount: document.querySelectorAll('.erp-dev-testing-doc-row')
-              .length,
-            docPaths: Array.from(
-              document.querySelectorAll('.erp-dev-testing-doc-row__path')
-            ).map((node) => node.textContent.trim()),
             presetTexts: Array.from(
               document.querySelectorAll('.erp-dev-testing-preset')
             ).map((node) => node.textContent.replace(/\s+/g, ' ').trim()),
-            activeDocAriaCurrent:
-              document
-                .querySelector('.erp-dev-testing-doc-row--active')
-                ?.getAttribute('aria-current') || '',
-            pressedCategoryCount: document.querySelectorAll(
-              '.erp-dev-testing-filter__item[aria-pressed="true"]'
+            sidebarCount: document.querySelectorAll('.erp-dev-testing-sidebar')
+              .length,
+            filterCount: document.querySelectorAll('.erp-dev-testing-filter')
+              .length,
+            viewCount: document.querySelectorAll(
+              '.erp-dev-testing-reader__toolbar .ant-segmented-item'
             ).length,
             overflow:
               root &&
               document.documentElement.scrollWidth > root.clientWidth + 1,
+            shellWidth: Math.round(shell?.getBoundingClientRect().width || 0),
+            readerWidth: Math.round(reader?.getBoundingClientRect().width || 0),
           }
         })
         assert.equal(
@@ -11729,37 +11791,29 @@ export function createStyleL1Scenarios(deps) {
           false,
           `测试入口默认态不应横向溢出: ${JSON.stringify(defaultMetrics)}`
         )
-        assert(
-          defaultMetrics.view === 'tiers' && Boolean(defaultMetrics.doc),
-          `测试入口默认视图和选中文档应写入 URL: ${JSON.stringify(defaultMetrics)}`
+        assert.equal(
+          defaultMetrics.view,
+          'tiers',
+          `测试入口默认视图应写入 URL: ${JSON.stringify(defaultMetrics)}`
+        )
+        assert.equal(
+          defaultMetrics.doc,
+          null,
+          `测试入口不应继续保留文档选择 query: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
-          defaultMetrics.activeDocAriaCurrent === 'true' &&
-            defaultMetrics.pressedCategoryCount === 1,
-          `测试文档和分类当前项应向读屏暴露选中状态: ${JSON.stringify(defaultMetrics)}`
+          defaultMetrics.sidebarCount === 0 &&
+            defaultMetrics.filterCount === 0 &&
+            defaultMetrics.viewCount === 3 &&
+            defaultMetrics.role === null &&
+            defaultMetrics.keyword === null &&
+            Math.abs(defaultMetrics.shellWidth - defaultMetrics.readerWidth) <=
+              2,
+          `验证层级默认态应全宽，只保留三个主视图且不显示无效来源筛选: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.tierCount >= 8,
-          `测试入口应渲染测试分层: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert.equal(
-          defaultMetrics.docCount,
-          9,
-          `测试入口只应渲染当前白名单文档: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert(
-          defaultMetrics.docPaths.includes('scripts/README.md') &&
-            defaultMetrics.docPaths.includes('web/scripts/README.md') &&
-            defaultMetrics.docPaths.includes('web/README.md'),
-          `测试入口应包含当前 QA、浏览器脚本和前端说明: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert(
-          defaultMetrics.docPaths.every(
-            (docPath) =>
-              !docPath.startsWith('docs/reference/') &&
-              !docPath.startsWith('docs/archive/')
-          ),
-          `测试入口不应把 reference/archive 作为命令来源: ${JSON.stringify(defaultMetrics)}`
+          `测试入口应渲染验证层级: ${JSON.stringify(defaultMetrics)}`
         )
         assert.equal(
           defaultMetrics.presetCount,
@@ -11775,7 +11829,7 @@ export function createStyleL1Scenarios(deps) {
             '试用账号 RBAC / Trial Account RBAC',
             '真实登录 smoke URL 边界 / Real Login Smoke URL Guard',
             '试用模拟数据 / Trial Simulated Data',
-            'MVP 本地闭环计划 / MVP Local Closure',
+            'V1 本地验收计划 / V1 Local Acceptance Plan',
             '移动端 Workflow smoke / Mobile Workflow Smoke',
             '客户配置控制台 / Customer Config Console',
             '原型登记与查看器 / Prototype Registry',
@@ -11790,7 +11844,7 @@ export function createStyleL1Scenarios(deps) {
           ].every((label) =>
             defaultMetrics.presetTexts.some((text) => text.includes(label))
           ),
-          `测试入口预设应覆盖前端、Workflow、试用角色、角色菜单与入口真源、试用账号 RBAC、真实登录 URL、试用模拟数据、MVP 本地闭环、移动端、客户配置、原型、文档治理、导入、错误提示、业务动作字段、提交和发版: ${JSON.stringify(defaultMetrics)}`
+          `测试入口预设应覆盖前端、Workflow、试用角色、角色菜单与入口真源、试用账号 RBAC、真实登录 URL、试用模拟数据、V1 本地验收计划、移动端、客户配置、原型、文档治理、导入、错误提示、业务动作字段、提交和发版: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.tierCopyButtonCount >= defaultMetrics.tierCount,
@@ -11872,26 +11926,28 @@ export function createStyleL1Scenarios(deps) {
         )
         await page
           .locator('.erp-dev-testing-preset')
-          .filter({ hasText: 'MVP 本地闭环计划 / MVP Local Closure' })
+          .filter({ hasText: 'V1 本地验收计划 / V1 Local Acceptance Plan' })
           .click()
-        const mvpLocalClosureClipboard = await page.evaluate(() =>
+        const v1LocalAcceptancePlanClipboard = await page.evaluate(() =>
           navigator.clipboard.readText()
         )
         assert(
-          mvpLocalClosureClipboard.includes('mvp-closure.test.mjs') &&
-            mvpLocalClosureClipboard.includes(
-              'mvp-closure.mjs --out output/customers/yoyoosun/mvp-closure'
+          v1LocalAcceptancePlanClipboard.includes(
+            'v1-acceptance-plan.test.mjs'
+          ) &&
+            v1LocalAcceptancePlanClipboard.includes(
+              'v1-acceptance-plan.mjs --out output/customers/yoyoosun/v1-acceptance-plan'
             ) &&
-            mvpLocalClosureClipboard.includes(
-              'mvp-closure.mjs --run-report-tools --out output/customers/yoyoosun/mvp-closure'
+            v1LocalAcceptancePlanClipboard.includes(
+              'v1-acceptance-plan.mjs --run-report-tools --out output/customers/yoyoosun/v1-acceptance-plan'
             ) &&
-            !mvpLocalClosureClipboard.includes('--with-postgres') &&
-            !mvpLocalClosureClipboard.includes(
+            !v1LocalAcceptancePlanClipboard.includes('--with-postgres') &&
+            !v1LocalAcceptancePlanClipboard.includes(
               'smoke:purchase-receipt-real-write'
             ) &&
-            !mvpLocalClosureClipboard.includes('--apply') &&
-            !mvpLocalClosureClipboard.includes('--execute'),
-          `MVP 本地闭环预设应只复制 plan-only、preflight 和 no-write report tools 命令: ${mvpLocalClosureClipboard}`
+            !v1LocalAcceptancePlanClipboard.includes('--apply') &&
+            !v1LocalAcceptancePlanClipboard.includes('--execute'),
+          `V1 本地验收计划预设应只复制 plan-only、preflight 和 no-write report tools 命令: ${v1LocalAcceptancePlanClipboard}`
         )
         await page
           .locator('.erp-dev-testing-preset')
@@ -11974,7 +12030,7 @@ export function createStyleL1Scenarios(deps) {
 
         await page
           .locator('.erp-dev-testing-reader__toolbar .ant-segmented-item')
-          .filter({ hasText: '命令入口 / Commands' })
+          .filter({ hasText: '执行命令 / Commands' })
           .click()
         await expectText(page, 'pnpm style:l1')
         assert.equal(
@@ -11986,6 +12042,8 @@ export function createStyleL1Scenarios(deps) {
           const blocks = [
             ...document.querySelectorAll('.erp-dev-testing-command-block'),
           ]
+          const shell = document.querySelector('.erp-dev-testing-shell')
+          const reader = document.querySelector('.erp-dev-testing-reader')
           const blockMetrics = blocks.map((block) => {
             const rect = block.getBoundingClientRect()
             const command =
@@ -11998,6 +12056,19 @@ export function createStyleL1Scenarios(deps) {
           })
           return {
             commandBlocks: blocks.length,
+            sidebarCount: document.querySelectorAll('.erp-dev-testing-sidebar')
+              .length,
+            sourceActionCount: document.querySelectorAll(
+              'button[aria-label^="打开来源文档"]'
+            ).length,
+            roleLabels: Array.from(
+              document.querySelectorAll('.erp-dev-testing-filter__item')
+            ).map((node) => node.textContent.trim()),
+            pressedRoleCount: document.querySelectorAll(
+              '.erp-dev-testing-filter__item[aria-pressed="true"]'
+            ).length,
+            shellWidth: Math.round(shell?.getBoundingClientRect().width || 0),
+            readerWidth: Math.round(reader?.getBoundingClientRect().width || 0),
             hasCommandPre: Boolean(
               document.querySelector('.erp-dev-testing-command-block pre')
             ),
@@ -12014,11 +12085,76 @@ export function createStyleL1Scenarios(deps) {
           commandMetrics.commandBlocks > 0 && commandMetrics.hasCommandPre,
           `测试入口命令视图应渲染命令块: ${JSON.stringify(commandMetrics)}`
         )
+        assert.deepEqual(
+          commandMetrics.roleLabels,
+          ['全部来源', '策略与口径', '工程说明', '执行脚本', '部署与发布'],
+          `命令来源必须只按一条文档职责轴筛选: ${JSON.stringify(commandMetrics)}`
+        )
+        assert(
+          commandMetrics.sidebarCount === 0 &&
+            commandMetrics.sourceActionCount === commandMetrics.commandBlocks &&
+            commandMetrics.pressedRoleCount === 1 &&
+            Math.abs(commandMetrics.shellWidth - commandMetrics.readerWidth) <=
+              2,
+          `执行命令视图应全宽且每个命令块都提供来源文档入口: ${JSON.stringify(commandMetrics)}`
+        )
         assert(
           commandMetrics.minimumHeight >= 80 &&
             commandMetrics.clippedCount === 0 &&
             commandMetrics.danglingContinuationCount === 0,
           `测试命令块必须完整可见且不能复制残缺续行: ${JSON.stringify(commandMetrics)}`
+        )
+        await page
+          .getByRole('button', { name: '执行脚本', exact: true })
+          .click()
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector(
+                '.erp-dev-testing-filter__item[aria-pressed="true"]'
+              )
+              ?.textContent.trim() === '执行脚本'
+        )
+        assert.equal(
+          new URL(page.url()).searchParams.get('role'),
+          '执行脚本',
+          '命令来源职责应写入 URL 供刷新和返回恢复'
+        )
+        const scriptRoleMetrics = await page.evaluate(() => ({
+          sourceLabels: Array.from(
+            document.querySelectorAll('.erp-dev-testing-command-block__path')
+          ).map((node) => node.textContent.trim()),
+          pressedText:
+            document.querySelector(
+              '.erp-dev-testing-filter__item[aria-pressed="true"]'
+            )?.textContent || '',
+        }))
+        assert(
+          scriptRoleMetrics.sourceLabels.length > 0 &&
+            scriptRoleMetrics.sourceLabels.every((label) =>
+              label.startsWith('执行脚本：')
+            ) &&
+            scriptRoleMetrics.pressedText.trim() === '执行脚本',
+          `文档职责筛选必须真实收窄命令来源: ${JSON.stringify(scriptRoleMetrics)}`
+        )
+        const commandSearch = page.getByPlaceholder('搜索命令、来源、验收词')
+        await commandSearch.fill('no-such-command-source-7f4a')
+        assert.equal(
+          new URL(page.url()).searchParams.get('q'),
+          'no-such-command-source-7f4a',
+          '命令关键词应写入 URL 供刷新和返回恢复'
+        )
+        await expectText(page, '当前筛选没有命令块 / No command blocks')
+        await commandSearch.clear()
+        await expectText(page, '执行脚本：')
+        assert.equal(
+          new URL(page.url()).searchParams.get('q'),
+          null,
+          '清空命令关键词时应移除空 query'
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-testing-dark-desktop:commands'
         )
         await assertERPThemeMode(page, {
           scenarioName: 'dev-testing-dark-desktop',
@@ -12029,6 +12165,60 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'dev-testing-dark-desktop',
           selector: '.erp-dev-testing-page',
         })
+        const sourceAction = page
+          .getByRole('button', { name: /^打开来源文档 /u })
+          .first()
+        const sourceActionName = await sourceAction.getAttribute('aria-label')
+        const expectedSourcePath = String(sourceActionName || '').replace(
+          /^打开来源文档\s+/u,
+          ''
+        )
+        await sourceAction.click()
+        await page.waitForURL((url) => url.pathname === '/__dev/docs')
+        assert.equal(
+          new URL(page.url()).searchParams.get('path'),
+          expectedSourcePath,
+          `来源文档入口应打开对应 Markdown: ${page.url()}`
+        )
+        await expectHeading(page, '开发文档查看器 / Dev Docs Viewer')
+        await expectText(page, expectedSourcePath)
+        await page.goBack({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '开发测试入口 / Dev Test Entry')
+        await expectText(page, '执行命令 / Commands')
+        await expectText(page, '执行脚本：')
+        assert.equal(
+          new URL(page.url()).searchParams.get('role'),
+          '执行脚本',
+          '从来源文档返回时应恢复命令来源职责'
+        )
+        assert.equal(
+          await page
+            .getByRole('button', { name: '执行脚本' })
+            .getAttribute('aria-pressed'),
+          'true',
+          '从来源文档返回时应恢复已选职责'
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-testing-commands-dark-desktop.png',
+          fullPage: true,
+        })
+        await gotoScenarioPath(
+          page,
+          '/__dev/testing?view=docs&doc=scripts%2FREADME.md',
+          { waitUntil: 'domcontentloaded' }
+        )
+        await expectText(page, '验证层级 / T0–T8')
+        const legacyUrlMetrics = await page.evaluate(() => ({
+          view: new URL(location.href).searchParams.get('view'),
+          doc: new URL(location.href).searchParams.get('doc'),
+          sidebarCount: document.querySelectorAll('.erp-dev-testing-sidebar')
+            .length,
+        }))
+        assert.deepEqual(
+          legacyUrlMetrics,
+          { view: 'tiers', doc: null, sidebarCount: 0 },
+          `退役 Docs 深链应规范化回验证层级且不恢复旧侧栏: ${JSON.stringify(legacyUrlMetrics)}`
+        )
       },
     },
     {
@@ -12038,14 +12228,115 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '开发测试入口 / Dev Test Entry')
-        await expectText(page, '测试分层 / Tiers')
-        await expectText(page, '命令入口 / Commands')
+        await expectText(page, '验证层级 / T0–T8')
+        await expectText(page, '执行命令 / Commands')
         await assertDevPageUsesGlobalThemeOnly(page, {
           scenarioName: 'dev-testing-light-desktop',
           selector: '.erp-dev-testing-page',
           expectedMode: 'light',
           expectedEffectiveTheme: 'light',
         })
+      },
+    },
+    {
+      name: 'dev-testing-commands-mobile',
+      path: '/__dev/testing?view=commands&role=%E6%89%A7%E8%A1%8C%E8%84%9A%E6%9C%AC',
+      themeMode: 'light',
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '开发测试入口 / Dev Test Entry')
+        await expectText(page, '执行脚本：')
+        const metrics = await page.evaluate(() => {
+          const shell = document.querySelector('.erp-dev-testing-shell')
+          const reader = document.querySelector('.erp-dev-testing-reader')
+          const tools = document.querySelector('.erp-dev-testing-command-tools')
+          const blocks = [
+            ...document.querySelectorAll('.erp-dev-testing-command-block'),
+          ]
+          const preNodes = [
+            ...document.querySelectorAll('.erp-dev-testing-command-block pre'),
+          ]
+          const actionButtons = [
+            ...document.querySelectorAll(
+              '.erp-dev-testing-command-block__head button'
+            ),
+          ]
+          const segmentedLabels = [
+            ...document.querySelectorAll(
+              '.erp-dev-testing-reader__toolbar .ant-segmented-item-label'
+            ),
+          ]
+          return {
+            blockCount: blocks.length,
+            sourceActionCount: document.querySelectorAll(
+              'button[aria-label^="打开来源文档"]'
+            ).length,
+            copyActionCount: actionButtons.filter(
+              (button) => button.textContent.trim() === '复制'
+            ).length,
+            visibleActionCount: actionButtons.filter((button) => {
+              const rect = button.getBoundingClientRect()
+              return rect.width > 0 && rect.height > 0
+            }).length,
+            actionsContained: actionButtons.every((button) => {
+              const rect = button.getBoundingClientRect()
+              const blockRect = button
+                .closest('.erp-dev-testing-command-block')
+                ?.getBoundingClientRect()
+              return (
+                blockRect &&
+                rect.left >= blockRect.left - 1 &&
+                rect.right <= blockRect.right + 1 &&
+                rect.top >= blockRect.top - 1 &&
+                rect.bottom <= blockRect.bottom + 1
+              )
+            }),
+            shellWidth: Math.round(shell?.getBoundingClientRect().width || 0),
+            readerWidth: Math.round(reader?.getBoundingClientRect().width || 0),
+            toolsColumns: tools
+              ? getComputedStyle(tools).gridTemplateColumns
+              : '',
+            clippedSegmentedLabelCount: segmentedLabels.filter(
+              (label) =>
+                label.scrollWidth > label.clientWidth + 1 ||
+                label.scrollHeight > label.clientHeight + 1
+            ).length,
+            pageScrollWidth: document.documentElement.scrollWidth,
+            pageClientWidth: document.documentElement.clientWidth,
+            preCount: preNodes.length,
+            preOverflowSafe: preNodes.every((pre) => {
+              const style = getComputedStyle(pre)
+              const block = pre.closest('.erp-dev-testing-command-block')
+              return (
+                ['auto', 'scroll'].includes(style.overflowX) &&
+                pre.getBoundingClientRect().width <=
+                  (block?.getBoundingClientRect().width || 0) + 1
+              )
+            }),
+          }
+        })
+        assert(
+          metrics.blockCount > 0 &&
+            metrics.sourceActionCount === metrics.blockCount &&
+            metrics.copyActionCount === metrics.blockCount &&
+            metrics.visibleActionCount === metrics.blockCount * 2 &&
+            metrics.actionsContained,
+          `移动端每个命令块都应显示来源与复制操作: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.preCount === metrics.blockCount &&
+            metrics.preOverflowSafe &&
+            metrics.toolsColumns.split(' ').length === 1 &&
+            metrics.clippedSegmentedLabelCount === 0 &&
+            Math.abs(metrics.shellWidth - metrics.readerWidth) <= 2 &&
+            metrics.pageScrollWidth <= metrics.pageClientWidth + 1,
+          `移动端命令视图应全宽单列，长命令只在自身横向滚动: ${JSON.stringify(metrics)}`
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-testing-commands-mobile.png',
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(page, 'dev-testing-commands-mobile')
       },
     },
     {
@@ -12083,6 +12374,18 @@ export function createStyleL1Scenarios(deps) {
           page,
           '尚未采集可展示的覆盖证据；空值不是 0% / No coverage evidence collected'
         )
+        const coverageLayout = await page.evaluate(() => {
+          const shell = document.querySelector('.erp-dev-testing-shell')
+          const reader = document.querySelector('.erp-dev-testing-reader')
+          return {
+            shellWidth: Math.round(shell?.getBoundingClientRect().width || 0),
+            readerWidth: Math.round(reader?.getBoundingClientRect().width || 0),
+          }
+        })
+        assert(
+          Math.abs(coverageLayout.shellWidth - coverageLayout.readerWidth) <= 2,
+          `覆盖证据桌面态应使用全宽阅读区: ${JSON.stringify(coverageLayout)}`
+        )
         await assertNoHorizontalOverflow(
           page,
           'dev-testing-coverage-loading-desktop'
@@ -12115,9 +12418,7 @@ export function createStyleL1Scenarios(deps) {
               assert.deepEqual(request.postDataJSON(), {
                 action: 'collect',
                 payload: {
-                  idempotencyKey: request
-                    .postDataJSON()
-                    .payload.idempotencyKey,
+                  idempotencyKey: request.postDataJSON().payload.idempotencyKey,
                 },
               })
               body = {
@@ -12147,7 +12448,7 @@ export function createStyleL1Scenarios(deps) {
         )
       },
       verify: async (page) => {
-        await expectText(page, '覆盖状态 / Coverage')
+        await expectText(page, '覆盖证据 / Coverage')
         await expectText(page, '尚未生成覆盖报告')
         await expectText(
           page,
@@ -12169,31 +12470,49 @@ export function createStyleL1Scenarios(deps) {
           '采集运行期间主按钮必须留在原位并禁用'
         )
         assert.equal(
-          await page.locator('.erp-dev-testing-sidebar').count(),
+          await page.locator('.erp-dev-testing-filter').count(),
           0,
-          '覆盖视图不应保留无关文档筛选侧栏'
+          '覆盖视图不应保留无关命令来源筛选'
         )
         const coverageMetrics = await page.evaluate(() => {
           const root = document.querySelector('.erp-dev-testing-coverage-view')
+          const shell = document.querySelector('.erp-dev-testing-shell')
+          const reader = document.querySelector('.erp-dev-testing-reader')
           const segmented = document.querySelector(
             '.erp-dev-testing-reader__toolbar .ant-segmented-group'
           )
+          const segmentedLabels = [
+            ...document.querySelectorAll(
+              '.erp-dev-testing-reader__toolbar .ant-segmented-item-label'
+            ),
+          ]
           return {
             rootScrollWidth: root?.scrollWidth || 0,
             rootClientWidth: root?.clientWidth || 0,
             segmentedColumns: segmented
               ? getComputedStyle(segmented).gridTemplateColumns
               : '',
+            clippedSegmentedLabelCount: segmentedLabels.filter(
+              (label) =>
+                label.scrollWidth > label.clientWidth + 1 ||
+                label.scrollHeight > label.clientHeight + 1
+            ).length,
+            shellWidth: Math.round(shell?.getBoundingClientRect().width || 0),
+            readerWidth: Math.round(reader?.getBoundingClientRect().width || 0),
           }
         })
         assert(
           coverageMetrics.rootScrollWidth <=
-            coverageMetrics.rootClientWidth + 1,
-          `覆盖缺失移动态不应横向溢出: ${JSON.stringify(coverageMetrics)}`
+            coverageMetrics.rootClientWidth + 1 &&
+            Math.abs(
+              coverageMetrics.shellWidth - coverageMetrics.readerWidth
+            ) <= 2,
+          `覆盖缺失移动态应全宽且不横向溢出: ${JSON.stringify(coverageMetrics)}`
         )
         assert(
-          coverageMetrics.segmentedColumns.split(' ').length === 2,
-          `四个覆盖视图按钮在移动端应使用两列: ${JSON.stringify(coverageMetrics)}`
+          coverageMetrics.segmentedColumns.split(' ').length === 3 &&
+            coverageMetrics.clippedSegmentedLabelCount === 0,
+          `三个测试主视图在移动端应使用三列: ${JSON.stringify(coverageMetrics)}`
         )
       },
     },
@@ -13504,11 +13823,9 @@ export function createStyleL1Scenarios(deps) {
             blockedRows.every((row) => row.includes('不可进入')),
           `页面可用范围筛选没有只保留不可进入页面: ${JSON.stringify(blockedRows)}`
         )
-        await page
-          .locator('.erp-role-effective-access')
-          .screenshot({
-            path: 'output/playwright/style-l1/permission-center-role-navigation-desktop-access.png',
-          })
+        await page.locator('.erp-role-effective-access').screenshot({
+          path: 'output/playwright/style-l1/permission-center-role-navigation-desktop-access.png',
+        })
         await page.getByRole('tab', { name: '菜单布局' }).click()
         await page.waitForTimeout(250)
         assert.equal(
@@ -19643,6 +19960,50 @@ export function createStyleL1Scenarios(deps) {
             created_at: nowUnix,
             updated_at: nowUnix,
           }
+          const purchaseOrderReceiptProgress = {
+            purchase_order_id: 1,
+            purchase_order_no: 'PO-STYLE-L1',
+            lifecycle_status: 'approved',
+            items: [
+              {
+                purchase_order_item_id: 1,
+                line_no: 1,
+                material_id: 1,
+                material_code: 'MAT-STYLE-L1',
+                material_name: '样式材料',
+                unit_id: 1,
+                unit_code: 'PCS',
+                unit_name: '件',
+                line_status: 'open',
+                purchased_quantity: '20',
+                effective_received_quantity: '5.000001',
+                draft_reserved_quantity: '2.000002',
+                remaining_receivable_quantity: '14.999999',
+                remaining_generatable_quantity: '12.999997',
+                can_generate: true,
+                disabled_reason: '',
+              },
+              {
+                purchase_order_item_id: 2,
+                line_no: 2,
+                material_id: 2,
+                material_code: 'MAT-STYLE-L1-OVER',
+                material_name: '草稿超占材料',
+                unit_id: 1,
+                unit_code: 'PCS',
+                unit_name: '件',
+                line_status: 'open',
+                purchased_quantity: '10',
+                effective_received_quantity: '8',
+                draft_reserved_quantity: '5',
+                remaining_receivable_quantity: '2',
+                remaining_generatable_quantity: '0',
+                can_generate: false,
+                disabled_reason:
+                  '现有入库草稿占用超过剩余可收数量，请先处理草稿',
+              },
+            ],
+          }
 
           let data = {}
           switch (method) {
@@ -19664,6 +20025,11 @@ export function createStyleL1Scenarios(deps) {
               break
             case 'get_purchase_order':
               data = { purchase_order: purchaseOrder }
+              break
+            case 'get_purchase_order_receipt_progress':
+              data = {
+                purchase_order_receipt_progress: purchaseOrderReceiptProgress,
+              }
               break
             default:
               await route.fallback()
@@ -19705,6 +20071,23 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '入库仓库')
         await expectText(page, '入库日期')
         await expectText(page, '备注')
+        for (const columnTitle of [
+          '已过账入库',
+          '草稿占用',
+          '剩余可收',
+          '剩余可生成',
+          '本次生成',
+          '不可生成原因',
+        ]) {
+          await expectText(page, columnTitle)
+        }
+        await expectText(page, '12.999997 件')
+        await expectText(page, '现有入库草稿占用超过剩余可收数量，请先处理草稿')
+        await assertTextAbsent(page, 'purchase_order_item_id')
+        await assertNoHorizontalOverflow(
+          page,
+          'purchase-order-inbound-draft-modal-controls-desktop'
+        )
       },
     },
     {
@@ -20484,9 +20867,8 @@ export function createStyleL1Scenarios(deps) {
         for await (const chunk of paymentExportStream) {
           paymentExportChunks.push(chunk)
         }
-        const paymentExportCSV = Buffer.concat(paymentExportChunks).toString(
-          'utf8'
-        )
+        const paymentExportCSV =
+          Buffer.concat(paymentExportChunks).toString('utf8')
         for (const text of [
           '收付款单号',
           '方向',
@@ -20517,18 +20899,14 @@ export function createStyleL1Scenarios(deps) {
         })
 
         const financeDataCard = page
-          .locator(
-            '.erp-finance-payments-page .erp-business-data-table-card'
-          )
+          .locator('.erp-finance-payments-page .erp-business-data-table-card')
           .first()
         const financeTabsNav = financeDataCard.locator('.ant-tabs-nav').first()
         const financeTable = financeDataCard
           .locator('.ant-table-wrapper')
           .first()
         assert.equal(
-          await page
-            .locator('.erp-finance-payments-page > .ant-tabs')
-            .count(),
+          await page.locator('.erp-finance-payments-page > .ant-tabs').count(),
           0,
           '收付款页签不应悬在业务页面卡片之外'
         )
@@ -20578,9 +20956,7 @@ export function createStyleL1Scenarios(deps) {
           heading: '收付款与核销',
           headerMenuTargetLabel: '方向',
         })
-        await page
-          .getByRole('tab', { name: '红冲记录', exact: true })
-          .click()
+        await page.getByRole('tab', { name: '红冲记录', exact: true }).click()
         assert.equal(
           await page
             .getByRole('tab', { name: '红冲记录', exact: true })
@@ -20649,9 +21025,7 @@ export function createStyleL1Scenarios(deps) {
           ),
           fullPage: true,
         })
-        await page
-          .getByRole('tab', { name: '收付款记录', exact: true })
-          .click()
+        await page.getByRole('tab', { name: '收付款记录', exact: true }).click()
         await expectButton(page, '登记收付款')
 
         const paymentRow = page

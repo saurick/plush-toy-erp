@@ -40,6 +40,9 @@ const APPLY_CONFIRMATION = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const RECEIPT_COUNT = 54;
 const FACT_RUN_COUNT = 45;
+const SALES_RETURN_REFERENCE_COUNT = 4;
+const FINANCE_PAYMENT_REFERENCE_COUNT = 4;
+const FINANCE_CREDIT_NOTE_REFERENCE_COUNT = 3;
 const REQUIRED_MODULES = Object.freeze([
   "purchase_orders",
   "outsourcing_orders",
@@ -83,6 +86,9 @@ const REFERENCE_KEYS = Object.freeze([
   "stockReservations",
   "shipments",
   "financeFacts",
+  "salesReturns",
+  "financePayments",
+  "financeCreditNotes",
 ]);
 
 class CliError extends Error {
@@ -146,6 +152,20 @@ const FINANCE_PAYMENT_NUMBER = Object.freeze({
   "PAYABLE-SETTLED": Object.freeze({ code: "FK", sequence: 901 }),
   "RECEIVABLE-SETTLED": Object.freeze({ code: "SK", sequence: 901 }),
   "RECEIVABLE-APPROVED": Object.freeze({ code: "SK", sequence: 902 }),
+  "RECEIVABLE-REVERSED": Object.freeze({ code: "SK", sequence: 903 }),
+});
+
+const SALES_RETURN_NUMBER = Object.freeze({
+  DRAFT: Object.freeze({ code: "TH", sequence: 951 }),
+  APPROVED: Object.freeze({ code: "TH", sequence: 952 }),
+  RECEIVED: Object.freeze({ code: "TH", sequence: 953 }),
+  REVERSED: Object.freeze({ code: "TH", sequence: 954 }),
+});
+
+const FINANCE_CREDIT_NOTE_NUMBER = Object.freeze({
+  ACTIVE: Object.freeze({ code: "YS", sequence: 951 }),
+  ORIGINAL: Object.freeze({ code: "YS", sequence: 952 }),
+  REVERSAL: Object.freeze({ code: "YS", sequence: 953 }),
 });
 
 function decimal(value, name) {
@@ -591,6 +611,9 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
       receivables: FACT_RUN_COUNT,
       invoices: FACT_RUN_COUNT,
       reconciliation: FACT_RUN_COUNT,
+      salesReturns: SALES_RETURN_REFERENCE_COUNT,
+      financePayments: FINANCE_PAYMENT_REFERENCE_COUNT,
+      financeCreditNotes: FINANCE_CREDIT_NOTE_REFERENCE_COUNT,
     }),
     boundary: "全部为模拟试用数据，不代表真实客户业务记录。",
   });
@@ -3383,7 +3406,7 @@ function replaceByID(items, value) {
   else items.push(value);
 }
 
-function financePaymentProcessNodes(data, operation) {
+function exceptionProcessNodes(data, operation) {
   const nodes = data?.process_context?.nodes || data?.nodes;
   if (!Array.isArray(nodes)) {
     throw new CliError(`${operation} response is missing process nodes`);
@@ -3391,8 +3414,8 @@ function financePaymentProcessNodes(data, operation) {
   return nodes;
 }
 
-function requireFinancePaymentProcessNode(data, nodeKey, statuses, operation) {
-  const node = financePaymentProcessNodes(data, operation).find(
+function requireExceptionProcessNode(data, nodeKey, statuses, operation) {
+  const node = exceptionProcessNodes(data, operation).find(
     (candidate) => candidate?.node_key === nodeKey,
   );
   if (
@@ -3426,7 +3449,7 @@ async function completeFinancePaymentHumanNode({
   processDecision,
   rpc,
 }) {
-  const node = requireFinancePaymentProcessNode(
+  const node = requireExceptionProcessNode(
     processData,
     nodeKey,
     ["active", "completed"],
@@ -3491,9 +3514,11 @@ async function completeFinancePaymentHumanNode({
 
 async function ensureFinancePaymentSpecimen({
   apply,
+  amountOverride,
   financeFact,
   plan,
   post,
+  reverse = false,
   rpc,
   specimenKey,
 }) {
@@ -3524,13 +3549,20 @@ async function ensureFinancePaymentSpecimen({
     financeFact.counterparty_id,
     `${specimenKey}.counterparty_id`,
   );
-  const amount = post
-    ? requiredText(financeFact.amount, `${specimenKey}.amount`, 64)
-    : "1";
+  const amount =
+    amountOverride != null
+      ? decimal(amountOverride, `${specimenKey}.amountOverride`)
+      : post
+        ? requiredText(financeFact.amount, `${specimenKey}.amount`, 64)
+        : "1";
   if (!apply) {
-    if (post && String(financeFact.status || "").toUpperCase() !== "SETTLED") {
+    const expectedSourceStatus = reverse ? "POSTED" : post ? "SETTLED" : null;
+    if (
+      expectedSourceStatus &&
+      String(financeFact.status || "").toUpperCase() !== expectedSourceStatus
+    ) {
       throw new CliError(
-        `${financeFact.fact_no} expected SETTLED from a posted FinancePayment allocation`,
+        `${financeFact.fact_no} expected ${expectedSourceStatus} from the FinancePayment specimen`,
       );
     }
     return financeFact;
@@ -3561,7 +3593,10 @@ async function ensureFinancePaymentSpecimen({
     "create_finance_payment",
   );
   let processData = await readFinancePaymentProcess(rpc, payment.id);
-  if (!processData?.process_context) {
+  if (
+    String(payment.status || "").toUpperCase() !== "REVERSED" &&
+    !processData?.process_context
+  ) {
     processData = await rpc({
       actor: "finance",
       domain: "customer_config",
@@ -3586,7 +3621,7 @@ async function ensureFinancePaymentSpecimen({
   }
   if (
     !currentPayment ||
-    !["APPROVED", "POSTED"].includes(
+    !["APPROVED", "POSTED", "REVERSED"].includes(
       String(currentPayment.status || "").toUpperCase(),
     )
   ) {
@@ -3598,7 +3633,7 @@ async function ensureFinancePaymentSpecimen({
     if (String(currentPayment.status).toUpperCase() !== "APPROVED") {
       throw new CliError(`${paymentNo} must remain APPROVED for browser flow`);
     }
-    requireFinancePaymentProcessNode(
+    requireExceptionProcessNode(
       processData,
       "finance_payment_execution",
       ["active"],
@@ -3615,7 +3650,7 @@ async function ensureFinancePaymentSpecimen({
       processDecision: false,
       rpc,
     });
-    const commandNode = requireFinancePaymentProcessNode(
+    const commandNode = requireExceptionProcessNode(
       processData,
       "post_finance_payment",
       ["active"],
@@ -3640,7 +3675,7 @@ async function ensureFinancePaymentSpecimen({
     });
     currentPayment = execution?.source_readback;
   }
-  const postedPayment = resultItem(
+  let currentReadback = resultItem(
     await rpc({
       actor: "finance",
       domain: "operational_fact",
@@ -3651,19 +3686,67 @@ async function ensureFinancePaymentSpecimen({
     "get_finance_payment",
   );
   if (
-    String(currentPayment?.status || "").toUpperCase() !== "POSTED" ||
-    String(postedPayment.status || "").toUpperCase() !== "POSTED" ||
-    !(postedPayment.allocations || []).some(
-      (allocation) =>
-        Number(allocation?.finance_fact_id) === factID &&
-        Number(allocation?.amount) === Number(amount),
-    )
+    reverse &&
+    String(currentReadback.status || "").toUpperCase() === "POSTED"
   ) {
-    throw new CliError(
-      `${paymentNo} post or allocation readback is incomplete`,
+    currentReadback = resultItem(
+      await rpc({
+        actor: "finance",
+        domain: "operational_fact",
+        method: "reverse_finance_payment",
+        params: {
+          id: currentReadback.id,
+          expected_version: positiveID(
+            currentReadback.version,
+            `${paymentNo}.version`,
+          ),
+          reason: "本地验收：冲销模拟收款并恢复原核销金额。",
+        },
+      }),
+      "payment",
+      "reverse_finance_payment",
     );
   }
-  const settled = await exactRequired({
+  const finalPayment = resultItem(
+    await rpc({
+      actor: "finance",
+      domain: "operational_fact",
+      method: "get_finance_payment",
+      params: { id: payment.id },
+    }),
+    "payment",
+    "get_finance_payment",
+  );
+  const originalAllocations = (finalPayment.allocations || []).filter(
+    (allocation) =>
+      Number(allocation?.finance_fact_id) === factID &&
+      Number(allocation?.amount) === Number(amount) &&
+      String(allocation?.status || "").toUpperCase() === "POSTED" &&
+      allocation?.reversal_of_allocation_id == null,
+  );
+  const reversedAllocations = (finalPayment.allocations || []).filter(
+    (allocation) =>
+      String(allocation?.status || "").toUpperCase() === "REVERSED" &&
+      originalAllocations.some(
+        (original) =>
+          Number(allocation?.reversal_of_allocation_id) ===
+          Number(original.id),
+      ),
+  );
+  const expectedPaymentStatus = reverse ? "REVERSED" : "POSTED";
+  if (
+    String(currentReadback?.status || "").toUpperCase() !==
+      expectedPaymentStatus ||
+    String(finalPayment.status || "").toUpperCase() !==
+      expectedPaymentStatus ||
+    originalAllocations.length !== 1 ||
+    (reverse && reversedAllocations.length !== 1)
+  ) {
+    throw new CliError(
+      `${paymentNo} ${expectedPaymentStatus} allocation readback is incomplete`,
+    );
+  }
+  const sourceReadback = await exactRequired({
     rpc,
     domain: "operational_fact",
     method: "list_finance_facts",
@@ -3671,12 +3754,15 @@ async function ensureFinancePaymentSpecimen({
     businessField: "fact_no",
     businessNo: financeFact.fact_no,
   });
-  if (String(settled.status || "").toUpperCase() !== "SETTLED") {
+  const expectedSourceStatus = reverse ? "POSTED" : "SETTLED";
+  if (
+    String(sourceReadback.status || "").toUpperCase() !== expectedSourceStatus
+  ) {
     throw new CliError(
-      `${financeFact.fact_no} did not settle from FinancePayment allocation`,
+      `${financeFact.fact_no} expected ${expectedSourceStatus} after ${paymentNo}`,
     );
   }
-  return settled;
+  return sourceReadback;
 }
 
 async function financeTransition(rpc, record, target, apply) {
@@ -4073,6 +4159,693 @@ export async function applyManualAcceptanceFinanceLifecycle({
   return dedupeByID(finance);
 }
 
+async function readSalesReturnProcess(rpc, salesReturnID) {
+  return rpc({
+    actor: "sales",
+    domain: "customer_config",
+    method: "get_sales_return_acceptance_process",
+    params: { sales_return_id: salesReturnID },
+  });
+}
+
+async function completeSalesReturnHumanNode({
+  actor,
+  nodeKey,
+  processData,
+  processDecision,
+  rpc,
+  salesReturn,
+}) {
+  const node = requireExceptionProcessNode(
+    processData,
+    nodeKey,
+    ["active", "completed"],
+    "sales return process",
+  );
+  if (String(node.status).toLowerCase() === "completed") {
+    return readSalesReturnProcess(rpc, salesReturn.id);
+  }
+  const taskData = await rpc({
+    actor,
+    domain: "workflow",
+    method: "list_tasks",
+    params: {
+      source_type: "sales_return",
+      source_id: salesReturn.id,
+      limit: 50,
+      offset: 0,
+    },
+  });
+  const task = (taskData?.tasks || []).find(
+    (candidate) =>
+      Number(candidate?.process_instance_id) ===
+        Number(node.process_instance_id) &&
+      Number(candidate?.process_node_instance_id) === Number(node.id),
+  );
+  if (
+    positiveID(task?.id, `${nodeKey}.task.id`) <= 0 ||
+    positiveID(task?.version, `${nodeKey}.task.version`) <= 0 ||
+    String(task?.task_status_key || "").toLowerCase() !== "ready"
+  ) {
+    throw new CliError(`${nodeKey} active task is missing or not ready`);
+  }
+  const reason =
+    nodeKey === "sales_return_approval"
+      ? "本地验收：批准模拟客户退货申请。"
+      : "本地验收：已核对模拟退货实物与来源出货。";
+  const completed = await rpc({
+    actor,
+    domain: "workflow",
+    method: "complete_task_action",
+    params: {
+      task_id: task.id,
+      expected_version: task.version,
+      idempotency_key: `manual-acceptance:sales-return:${salesReturn.id}:task:${task.id}:complete`,
+      action_key: "complete",
+      reason,
+      payload: {
+        surface_key:
+          nodeKey === "sales_return_approval"
+            ? "sales-return-approval"
+            : "sales-return-receipt",
+        ...(processDecision ? { process_decision: { reason } } : {}),
+      },
+    },
+  });
+  if (
+    Number(completed?.task?.id) !== Number(task.id) ||
+    String(completed?.task?.task_status_key || "").toLowerCase() !== "done" ||
+    Number(completed?.task?.version || 0) <= Number(task.version)
+  ) {
+    throw new CliError(`${nodeKey} task completion readback is incomplete`);
+  }
+  return readSalesReturnProcess(rpc, salesReturn.id);
+}
+
+async function exactSalesReturnForShipment(rpc, shipmentID, returnNo) {
+  const data = await rpc({
+    actor: "sales",
+    domain: "operational_fact",
+    method: "list_sales_returns",
+    params: { shipment_id: shipmentID, limit: 200, offset: 0 },
+  });
+  const items = Array.isArray(data?.sales_returns) ? data.sales_returns : [];
+  if (Number(data?.total ?? items.length) > items.length) {
+    throw new CliError(
+      `sales return ${returnNo} readback was truncated for shipment ${shipmentID}`,
+    );
+  }
+  const matches = items.filter(
+    (item) => String(item?.return_no || "") === returnNo,
+  );
+  if (matches.length > 1) {
+    throw new CliError(`${returnNo} has ${matches.length} conflicting records`);
+  }
+  return matches[0] || null;
+}
+
+async function readSalesReturnLinkedReferences(rpc, salesReturn) {
+  const inventoryLots = [];
+  const qualityInspections = [];
+  for (const item of salesReturn.items || []) {
+    const lotID = positiveID(item?.lot_id, `${salesReturn.return_no}.lot_id`);
+    const lotNo = requiredText(
+      item?.lot_no,
+      `${salesReturn.return_no}.lot_no`,
+      128,
+    );
+    const lot = await exactRequired({
+      rpc,
+      domain: "inventory",
+      method: "list_inventory_lots",
+      listKey: "inventory_lots",
+      businessField: "lot_no",
+      businessNo: lotNo,
+    });
+    if (Number(lot.id) !== lotID) {
+      throw new CliError(`${salesReturn.return_no} lot readback drifted`);
+    }
+    inventoryLots.push(lot);
+
+    const inspectionID = positiveID(
+      item?.current_quality_inspection_id,
+      `${salesReturn.return_no}.current_quality_inspection_id`,
+    );
+    const inspectionNo = requiredText(
+      item?.current_quality_inspection_no,
+      `${salesReturn.return_no}.current_quality_inspection_no`,
+      128,
+    );
+    const inspection = await exactRequired({
+      rpc,
+      domain: "quality",
+      method: "list_quality_inspections",
+      listKey: "quality_inspections",
+      businessField: "inspection_no",
+      businessNo: inspectionNo,
+    });
+    if (
+      Number(inspection.id) !== inspectionID ||
+      String(inspection.source_type || "").toUpperCase() !== "SALES_RETURN" ||
+      Number(inspection.source_id) !== Number(salesReturn.id)
+    ) {
+      throw new CliError(
+        `${salesReturn.return_no} quality inspection readback drifted`,
+      );
+    }
+    qualityInspections.push(inspection);
+  }
+  const txnData = await rpc({
+    actor: "warehouse",
+    domain: "inventory",
+    method: "list_inventory_txns",
+    params: {
+      source_type: "SALES_RETURN",
+      source_id: salesReturn.id,
+      limit: 200,
+      offset: 0,
+    },
+  });
+  const inventoryTxns = Array.isArray(txnData?.inventory_txns)
+    ? txnData.inventory_txns
+    : [];
+  if (Number(txnData?.total ?? inventoryTxns.length) > inventoryTxns.length) {
+    throw new CliError(
+      `${salesReturn.return_no} inventory transaction readback was truncated`,
+    );
+  }
+  const txnTypes = new Set(
+    inventoryTxns.map((item) => String(item?.txn_type || "").toUpperCase()),
+  );
+  const expectedStatus = String(salesReturn.status || "").toUpperCase();
+  if (
+    (expectedStatus === "RECEIVED" && !txnTypes.has("IN")) ||
+    (expectedStatus === "REVERSED" &&
+      (!txnTypes.has("IN") || !txnTypes.has("REVERSAL"))) ||
+    (["DRAFT", "APPROVED"].includes(expectedStatus) &&
+      inventoryTxns.length !== 0)
+  ) {
+    throw new CliError(
+      `${salesReturn.return_no} inventory transaction lifecycle is incomplete`,
+    );
+  }
+  return {
+    inventoryLots: dedupeByID(inventoryLots),
+    qualityInspections: dedupeByID(qualityInspections),
+  };
+}
+
+async function ensureSalesReturnSpecimen({
+  apply,
+  plan,
+  rpc,
+  shipment,
+  specimenKey,
+}) {
+  const number = SALES_RETURN_NUMBER[specimenKey];
+  if (!number) {
+    throw new CliError(`sales return specimen ${specimenKey} is not registered`);
+  }
+  const shipmentID = positiveID(
+    shipment?.id,
+    `${specimenKey}.shipment.id`,
+  );
+  const shipmentItem = (shipment?.items || [])[0];
+  const shipmentItemID = positiveID(
+    shipmentItem?.id,
+    `${specimenKey}.shipment_item.id`,
+  );
+  if (String(shipment?.status || "").toUpperCase() !== "SHIPPED") {
+    throw new CliError(
+      `${specimenKey} requires a formally shipped sales source`,
+    );
+  }
+  const returnNo = shortBusinessNo(plan, number.code, number.sequence);
+  let salesReturn = await exactSalesReturnForShipment(
+    rpc,
+    shipmentID,
+    returnNo,
+  );
+  if (!salesReturn && apply) {
+    salesReturn = resultItem(
+      await rpc({
+        actor: "sales",
+        domain: "operational_fact",
+        method: "create_sales_return",
+        params: {
+          return_no: returnNo,
+          shipment_id: shipmentID,
+          reason: `本地验收：模拟${specimenKey}客户退货。`,
+          idempotency_key: `manual-acceptance:${plan.dataVersion}:sales-return:${specimenKey.toLowerCase()}`,
+          items: [
+            {
+              shipment_item_id: shipmentItemID,
+              quantity: "1",
+              note: "模拟试用数据，不代表真实客户退货。",
+            },
+          ],
+        },
+      }),
+      "sales_return",
+      "create_sales_return",
+    );
+  }
+  if (!salesReturn) throw new CliError(`${returnNo} is missing`);
+  if (
+    Number(salesReturn.shipment_id) !== shipmentID ||
+    !(salesReturn.items || []).some(
+      (item) =>
+        Number(item?.shipment_item_id) === shipmentItemID &&
+        Number(item?.quantity) === 1,
+    )
+  ) {
+    throw new CliError(`${returnNo} source grain drifted`);
+  }
+
+  let processData = await readSalesReturnProcess(rpc, salesReturn.id);
+  if (!processData?.process_context) {
+    if (!apply) throw new CliError(`${returnNo} process is missing`);
+    processData = await rpc({
+      actor: "sales",
+      domain: "customer_config",
+      method: "start_sales_return_acceptance_process",
+      params: {
+        sales_return_id: salesReturn.id,
+        idempotency_key: `manual-acceptance:${plan.dataVersion}:sales-return:${returnNo}:process`,
+      },
+    });
+  }
+  let current = processData?.source_readback || salesReturn;
+  if (
+    specimenKey !== "DRAFT" &&
+    String(current.status || "").toUpperCase() === "DRAFT"
+  ) {
+    processData = await completeSalesReturnHumanNode({
+      actor: "boss",
+      nodeKey: "sales_return_approval",
+      processData,
+      processDecision: true,
+      rpc,
+      salesReturn: current,
+    });
+    current = processData?.source_readback;
+  }
+  if (
+    ["RECEIVED", "REVERSED"].includes(specimenKey) &&
+    String(current?.status || "").toUpperCase() === "APPROVED"
+  ) {
+    processData = await completeSalesReturnHumanNode({
+      actor: "warehouse",
+      nodeKey: "sales_return_receipt",
+      processData,
+      processDecision: false,
+      rpc,
+      salesReturn: current,
+    });
+    const commandNode = requireExceptionProcessNode(
+      processData,
+      "receive_sales_return",
+      ["active"],
+      "sales return receive",
+    );
+    const instance = processData?.process_context?.process_instance;
+    const execution = await rpc({
+      actor: "warehouse",
+      domain: "customer_config",
+      method: "execute_sales_return_receive",
+      params: {
+        process_instance_id: positiveID(
+          instance?.id,
+          `${returnNo}.process_instance_id`,
+        ),
+        process_node_instance_id: commandNode.id,
+        expected_version: commandNode.version,
+        sales_return_id: current.id,
+        idempotency_key: `manual-acceptance:${plan.dataVersion}:sales-return:${returnNo}:receive`,
+      },
+    });
+    current = execution?.source_readback;
+  }
+  if (
+    specimenKey === "REVERSED" &&
+    String(current?.status || "").toUpperCase() === "RECEIVED"
+  ) {
+    current = resultItem(
+      await rpc({
+        actor: "warehouse",
+        domain: "operational_fact",
+        method: "reverse_sales_return",
+        params: {
+          id: current.id,
+          expected_version: positiveID(current.version, `${returnNo}.version`),
+          reason: "本地验收：冲正模拟客户退货入库。",
+        },
+      }),
+      "sales_return",
+      "reverse_sales_return",
+    );
+  }
+  const final = resultItem(
+    await rpc({
+      actor: "sales",
+      domain: "operational_fact",
+      method: "get_sales_return",
+      params: { id: salesReturn.id },
+    }),
+    "sales_return",
+    "get_sales_return",
+  );
+  if (String(final.status || "").toUpperCase() !== specimenKey) {
+    throw new CliError(
+      `${returnNo} expected ${specimenKey}, got ${final.status || "missing"}`,
+    );
+  }
+  processData = await readSalesReturnProcess(rpc, final.id);
+  if (specimenKey === "DRAFT") {
+    requireExceptionProcessNode(
+      processData,
+      "sales_return_approval",
+      ["active"],
+      `${returnNo} draft process`,
+    );
+  } else if (specimenKey === "APPROVED") {
+    requireExceptionProcessNode(
+      processData,
+      "sales_return_approval",
+      ["completed"],
+      `${returnNo} approval process`,
+    );
+    requireExceptionProcessNode(
+      processData,
+      "sales_return_receipt",
+      ["active"],
+      `${returnNo} receipt process`,
+    );
+  } else {
+    requireExceptionProcessNode(
+      processData,
+      "receive_sales_return",
+      ["completed"],
+      `${returnNo} receive process`,
+    );
+  }
+  const linked = await readSalesReturnLinkedReferences(rpc, final);
+  return { salesReturn: final, ...linked };
+}
+
+function eligiblePostedFinanceFacts(financeFacts, factType) {
+  return stableFinanceRecords(financeFacts, factType).filter(
+    (item) =>
+      String(item?.status || "").toUpperCase() === "POSTED" &&
+      Number(item?.amount) > 1,
+  );
+}
+
+async function listAllFinancePageRecords(rpc, method, listKey) {
+  const data = await rpc({
+    actor: "finance",
+    domain: "operational_fact",
+    method,
+    params: { limit: 200, offset: 0 },
+  });
+  const items = Array.isArray(data?.[listKey]) ? data[listKey] : [];
+  if (Number(data?.total ?? items.length) > items.length) {
+    throw new CliError(`${method} readback was truncated`);
+  }
+  return items;
+}
+
+async function ensureFinanceCreditNoteSpecimens({
+  apply,
+  activeSource,
+  plan,
+  reversalSource,
+  rpc,
+}) {
+  const numberFor = (key) => {
+    const number = FINANCE_CREDIT_NOTE_NUMBER[key];
+    return shortBusinessNo(plan, number.code, number.sequence);
+  };
+  const ensurePosted = async (key, source) => {
+    const creditNoteNo = numberFor(key);
+    let record = (
+      await listAllFinancePageRecords(
+        rpc,
+        "list_finance_credit_notes",
+        "credit_notes",
+      )
+    ).find((item) => item?.credit_note_no === creditNoteNo);
+    if (!record && apply) {
+      record = resultItem(
+        await rpc({
+          actor: "finance",
+          domain: "operational_fact",
+          method: "create_finance_credit_note",
+          params: {
+            credit_note_no: creditNoteNo,
+            finance_fact_id: positiveID(
+              source?.id,
+              `${creditNoteNo}.finance_fact_id`,
+            ),
+            amount: "1",
+            reason: "本地验收：模拟财务红冲。",
+            idempotency_key: `manual-acceptance:${plan.dataVersion}:finance-credit-note:${key.toLowerCase()}`,
+          },
+        }),
+        "credit_note",
+        "create_finance_credit_note",
+      );
+    }
+    if (
+      !record ||
+      String(record.status || "").toUpperCase() !== "POSTED" ||
+      Number(record.finance_fact_id) !== Number(source.id) ||
+      record.reversal_of_credit_note_id != null ||
+      Number(record.amount) !== 1
+    ) {
+      throw new CliError(`${creditNoteNo} POSTED readback is incomplete`);
+    }
+    return record;
+  };
+
+  const active = await ensurePosted("ACTIVE", activeSource);
+  const original = await ensurePosted("ORIGINAL", reversalSource);
+  const reversalNo = numberFor("REVERSAL");
+  let reversal = (
+    await listAllFinancePageRecords(
+      rpc,
+      "list_finance_credit_notes",
+      "credit_notes",
+    )
+  ).find((item) => item?.credit_note_no === reversalNo);
+  if (!reversal && apply) {
+    reversal = resultItem(
+      await rpc({
+        actor: "finance",
+        domain: "operational_fact",
+        method: "reverse_finance_credit_note",
+        params: {
+          credit_note_id: original.id,
+          credit_note_no: reversalNo,
+          reason: "本地验收：反向红冲错误的模拟红冲单。",
+          idempotency_key: `manual-acceptance:${plan.dataVersion}:finance-credit-note:reversal`,
+        },
+      }),
+      "credit_note",
+      "reverse_finance_credit_note",
+    );
+  }
+  if (
+    !reversal ||
+    String(reversal.status || "").toUpperCase() !== "REVERSED" ||
+    Number(reversal.finance_fact_id) !== Number(reversalSource.id) ||
+    Number(reversal.reversal_of_credit_note_id) !== Number(original.id) ||
+    Number(reversal.amount) !== 1
+  ) {
+    throw new CliError(`${reversalNo} reversal linkage is incomplete`);
+  }
+  return [active, original, reversal];
+}
+
+function assertFinancePageReferenceMatrix({
+  financeCreditNotes,
+  financePayments,
+}) {
+  if (financePayments.length !== FINANCE_PAYMENT_REFERENCE_COUNT) {
+    throw new CliError(
+      `financePayments need exactly ${FINANCE_PAYMENT_REFERENCE_COUNT} references`,
+    );
+  }
+  const paymentStatuses = countBy(financePayments, "status");
+  if (
+    paymentStatuses.APPROVED !== 1 ||
+    paymentStatuses.POSTED !== 2 ||
+    paymentStatuses.REVERSED !== 1
+  ) {
+    throw new CliError(
+      `financePayments status matrix drifted: ${JSON.stringify(paymentStatuses)}`,
+    );
+  }
+  for (const payment of financePayments.filter(
+    (item) => item.status === "POSTED",
+  )) {
+    if (
+      !(payment.allocations || []).some(
+        (allocation) =>
+          String(allocation?.status || "").toUpperCase() === "POSTED" &&
+          allocation?.reversal_of_allocation_id == null,
+      )
+    ) {
+      throw new CliError(
+        `${payment.payment_no} is missing a posted allocation`,
+      );
+    }
+  }
+  const reversedPayment = financePayments.find(
+    (item) => item.status === "REVERSED",
+  );
+  const originalAllocations = (reversedPayment?.allocations || []).filter(
+    (item) =>
+      String(item?.status || "").toUpperCase() === "POSTED" &&
+      item?.reversal_of_allocation_id == null,
+  );
+  const linkedReversals = (reversedPayment?.allocations || []).filter(
+    (item) =>
+      String(item?.status || "").toUpperCase() === "REVERSED" &&
+      originalAllocations.some(
+        (original) =>
+          Number(item?.reversal_of_allocation_id) === Number(original.id),
+      ),
+  );
+  if (originalAllocations.length !== 1 || linkedReversals.length !== 1) {
+    throw new CliError(
+      `${reversedPayment?.payment_no || "reversed payment"} allocation reversal linkage is incomplete`,
+    );
+  }
+
+  if (financeCreditNotes.length !== FINANCE_CREDIT_NOTE_REFERENCE_COUNT) {
+    throw new CliError(
+      `financeCreditNotes need exactly ${FINANCE_CREDIT_NOTE_REFERENCE_COUNT} references`,
+    );
+  }
+  const creditStatuses = countBy(financeCreditNotes, "status");
+  if (creditStatuses.POSTED !== 2 || creditStatuses.REVERSED !== 1) {
+    throw new CliError(
+      `financeCreditNotes status matrix drifted: ${JSON.stringify(creditStatuses)}`,
+    );
+  }
+  const reversedCredit = financeCreditNotes.find(
+    (item) => item.status === "REVERSED",
+  );
+  const originalCredit = financeCreditNotes.find(
+    (item) => Number(item.id) === Number(reversedCredit?.reversal_of_credit_note_id),
+  );
+  const activeCredits = financeCreditNotes.filter(
+    (item) =>
+      item.status === "POSTED" &&
+      Number(item.id) !== Number(originalCredit?.id),
+  );
+  if (
+    !originalCredit ||
+    originalCredit.status !== "POSTED" ||
+    activeCredits.length !== 1
+  ) {
+    throw new CliError("finance credit-note reversal linkage is incomplete");
+  }
+}
+
+export async function applyManualAcceptanceExceptionPageLifecycle({
+  apply,
+  financeFacts,
+  plan,
+  rpc,
+  salesReadback,
+}) {
+  const salesSources =
+    salesReadback.length >= 14
+      ? salesReadback.slice(10, 14)
+      : salesReadback.slice(0, 4);
+  if (salesSources.length !== SALES_RETURN_REFERENCE_COUNT) {
+    throw new CliError(
+      `sales return lifecycle requires ${SALES_RETURN_REFERENCE_COUNT} shipped sources`,
+    );
+  }
+  const salesReturnResults = [];
+  for (const [index, specimenKey] of [
+    "DRAFT",
+    "APPROVED",
+    "RECEIVED",
+    "REVERSED",
+  ].entries()) {
+    salesReturnResults.push(
+      await ensureSalesReturnSpecimen({
+        apply,
+        plan,
+        rpc,
+        shipment: salesSources[index]?.shipment,
+        specimenKey,
+      }),
+    );
+  }
+
+  const receivableSources = eligiblePostedFinanceFacts(
+    financeFacts,
+    "RECEIVABLE",
+  );
+  const payableSources = eligiblePostedFinanceFacts(financeFacts, "PAYABLE");
+  if (receivableSources.length < 2 || payableSources.length < 1) {
+    throw new CliError(
+      "finance payment and credit-note specimens need stable posted sources above 1",
+    );
+  }
+  if (apply) {
+    await ensureFinancePaymentSpecimen({
+      apply: true,
+      amountOverride: "1",
+      financeFact: receivableSources[0],
+      plan,
+      post: true,
+      reverse: true,
+      rpc,
+      specimenKey: "RECEIVABLE-REVERSED",
+    });
+  }
+  const expectedPaymentNos = new Set(
+    Object.values(FINANCE_PAYMENT_NUMBER).map((number) =>
+      shortBusinessNo(plan, number.code, number.sequence),
+    ),
+  );
+  const financePayments = (
+    await listAllFinancePageRecords(
+      rpc,
+      "list_finance_payments",
+      "payments",
+    )
+  ).filter((item) => expectedPaymentNos.has(item?.payment_no));
+  const financeCreditNotes = await ensureFinanceCreditNoteSpecimens({
+    activeSource: receivableSources[1],
+    apply,
+    plan,
+    reversalSource: payableSources[0],
+    rpc,
+  });
+  assertFinancePageReferenceMatrix({
+    financeCreditNotes,
+    financePayments,
+  });
+  return {
+    salesReturns: salesReturnResults.map((item) => item.salesReturn),
+    qualityInspections: dedupeByID(
+      salesReturnResults.flatMap((item) => item.qualityInspections),
+    ),
+    inventoryLots: dedupeByID(
+      salesReturnResults.flatMap((item) => item.inventoryLots),
+    ),
+    financePayments,
+    financeCreditNotes,
+  };
+}
+
 async function applyLifecycleSpecimens({
   rpc,
   plan,
@@ -4433,6 +5206,14 @@ export async function runSourceDrivenFactStage(
     financeFacts: baseFinanceFacts,
     apply,
   });
+  const exceptionPageLifecycle =
+    await applyManualAcceptanceExceptionPageLifecycle({
+      rpc,
+      plan,
+      salesReadback,
+      financeFacts: lifecycle.financeFacts,
+      apply,
+    });
   const productionException =
     await ensureManualAcceptanceProductionExceptionApproval({
       rpc,
@@ -4458,12 +5239,14 @@ export async function runSourceDrivenFactStage(
     outsourcingFacts: dedupeByID(
       outsourcingReadback.flatMap((item) => item.facts),
     ),
-    qualityInspections: dedupeByID(
-      outsourcingReadback.map((item) => item.inspection),
-    ),
+    qualityInspections: dedupeByID([
+      ...outsourcingReadback.map((item) => item.inspection),
+      ...exceptionPageLifecycle.qualityInspections,
+    ]),
     inventoryLots: dedupeByID([
       ...productionReadback.map((item) => item.lot),
       ...outsourcingReadback.map((item) => item.lot),
+      ...exceptionPageLifecycle.inventoryLots,
     ]),
     inventoryBalances: dedupeByID([
       ...productionReadback.flatMap((item) => item.balances),
@@ -4488,6 +5271,11 @@ export async function runSourceDrivenFactStage(
       ...lifecycle.shipments,
     ]),
     financeFacts: dedupeByID(lifecycle.financeFacts),
+    salesReturns: dedupeByID(exceptionPageLifecycle.salesReturns),
+    financePayments: dedupeByID(exceptionPageLifecycle.financePayments),
+    financeCreditNotes: dedupeByID(
+      exceptionPageLifecycle.financeCreditNotes,
+    ),
   };
 }
 
@@ -4543,6 +5331,9 @@ function assertReferenceRecords(plan, records) {
     outsourcingFacts: FACT_RUN_COUNT * 2,
     stockReservations: plan.expectedMinimums.stockReservations,
     shipments: plan.expectedMinimums.shipments,
+    salesReturns: plan.expectedMinimums.salesReturns,
+    financePayments: plan.expectedMinimums.financePayments,
+    financeCreditNotes: plan.expectedMinimums.financeCreditNotes,
   };
   for (const [key, minimum] of Object.entries(minimums)) {
     if (records[key].length < minimum) {
@@ -4591,6 +5382,21 @@ function assertReferenceRecords(plan, records) {
   requireStatuses("productionExceptions", ["APPROVED"]);
   requireStatuses("stockReservations", ["ACTIVE", "RELEASED"]);
   requireStatuses("shipments", ["DRAFT", "SHIPPED", "CANCELLED"]);
+  requireStatuses("salesReturns", [
+    "DRAFT",
+    "APPROVED",
+    "RECEIVED",
+    "REVERSED",
+  ]);
+  if (records.salesReturns.length !== SALES_RETURN_REFERENCE_COUNT) {
+    throw new CliError(
+      `salesReturns has ${records.salesReturns.length} exact references; need exactly ${SALES_RETURN_REFERENCE_COUNT}`,
+    );
+  }
+  assertFinancePageReferenceMatrix({
+    financeCreditNotes: records.financeCreditNotes,
+    financePayments: records.financePayments,
+  });
   const longShipments = records.shipments.filter(
     (shipment) =>
       Array.isArray(shipment.items) &&
@@ -4775,6 +5581,9 @@ function buildFactReport({
     ),
     shipments: dedupeByID(facts.shipments),
     financeFacts: dedupeByID(facts.financeFacts),
+    salesReturns: dedupeByID(facts.salesReturns),
+    financePayments: dedupeByID(facts.financePayments),
+    financeCreditNotes: dedupeByID(facts.financeCreditNotes),
     outsourcingFacts: dedupeByID(facts.outsourcingFacts),
   });
   const outsourcingReturnInventoryCoverage =
@@ -4833,6 +5642,12 @@ function buildFactReport({
       stockReservations: countBy(referenceRecords.stockReservations, "status"),
       shipments: countBy(referenceRecords.shipments, "status"),
       financeFacts: countBy(referenceRecords.financeFacts, "status"),
+      salesReturns: countBy(referenceRecords.salesReturns, "status"),
+      financePayments: countBy(referenceRecords.financePayments, "status"),
+      financeCreditNotes: countBy(
+        referenceRecords.financeCreditNotes,
+        "status",
+      ),
     },
     typeCounts: {
       productionFacts: countBy(referenceRecords.productionFacts, "fact_type"),

@@ -60,31 +60,44 @@ const COVERAGE_POLICY_LABELS = Object.freeze({
   runtimeAcceptance: '运行态与验收',
 })
 
-export const DEV_TESTING_CURRENT_DOC_PATHS = Object.freeze([
-  DEV_TESTING_STRATEGY_SOURCE_PATH,
-  'README.md',
-  'web/README.md',
-  'web/scripts/README.md',
-  'server/README.md',
-  'scripts/README.md',
-  'docs/部署约定.md',
-  'server/deploy/README.md',
-  'server/deploy/compose/prod/README.md',
+const DEV_TESTING_CURRENT_DOCS = Object.freeze([
+  Object.freeze({
+    path: DEV_TESTING_STRATEGY_SOURCE_PATH,
+    documentRole: '策略与口径',
+  }),
+  Object.freeze({ path: 'README.md', documentRole: '工程说明' }),
+  Object.freeze({ path: 'web/README.md', documentRole: '工程说明' }),
+  Object.freeze({
+    path: 'web/scripts/README.md',
+    documentRole: '执行脚本',
+  }),
+  Object.freeze({ path: 'server/README.md', documentRole: '工程说明' }),
+  Object.freeze({ path: 'scripts/README.md', documentRole: '执行脚本' }),
+  Object.freeze({
+    path: 'docs/部署约定.md',
+    documentRole: '部署与发布',
+  }),
+  Object.freeze({
+    path: 'server/deploy/README.md',
+    documentRole: '部署与发布',
+  }),
+  Object.freeze({
+    path: 'server/deploy/compose/prod/README.md',
+    documentRole: '部署与发布',
+  }),
 ])
 
-export const DEV_TESTING_DOC_KEYWORDS = Object.freeze([
-  '测试',
-  '验收',
-  '回归',
-  '门禁',
-  '证据',
-  'QA',
-  'qa',
-  'test',
-  'smoke',
-  'style:l1',
-  'Playwright',
+export const DEV_TESTING_CURRENT_DOC_PATHS = Object.freeze(
+  DEV_TESTING_CURRENT_DOCS.map((item) => item.path)
+)
+
+const DEV_TESTING_DOCUMENT_ROLE_ORDER = Object.freeze([
+  ...new Set(DEV_TESTING_CURRENT_DOCS.map((item) => item.documentRole)),
 ])
+
+const DEV_TESTING_DOCUMENT_ROLE_BY_PATH = new Map(
+  DEV_TESTING_CURRENT_DOCS.map((item) => [item.path, item.documentRole])
+)
 
 export const DEV_TESTING_COPY_PRESETS = Object.freeze([
   {
@@ -186,17 +199,17 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     ],
   },
   {
-    key: 'mvp-local-closure',
-    label: 'MVP 本地闭环计划 / MVP Local Closure',
+    key: 'v1-local-acceptance-plan',
+    label: 'V1 本地验收计划 / V1 Local Acceptance Plan',
     description:
-      '试用前主链路验收口径或采购入库服务层真实写入 e2e 前置改动时复制；先打印真实写入输入模板，MVP closure 只生成本地 plan-only / no-write evidence，不替代领域测试、浏览器回归或部署 smoke。',
+      'V1 主链验收口径或采购入库服务层真实写入 e2e 前置改动时复制；先打印真实写入输入模板，V1 acceptance plan 只生成本地 plan-only / no-write evidence，不替代领域测试、浏览器回归、本地完整技术验收、目标发布或客户 UAT。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test scripts/qa/mvp-closure.test.mjs scripts/qa/purchase-receipt-real-write-e2e.test.mjs',
+      'PATH=/usr/local/bin:$PATH node --test scripts/qa/v1-acceptance-plan.test.mjs scripts/qa/purchase-receipt-real-write-e2e.test.mjs',
       'PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --print-input-template',
       'PATH=/usr/local/bin:$PATH node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/mvp-closure.mjs --out output/customers/yoyoosun/mvp-closure',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/mvp-closure.mjs --run-report-tools --out output/customers/yoyoosun/mvp-closure',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/v1-acceptance-plan.mjs --out output/customers/yoyoosun/v1-acceptance-plan',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/v1-acceptance-plan.mjs --run-report-tools --out output/customers/yoyoosun/v1-acceptance-plan',
     ],
   },
   {
@@ -655,41 +668,17 @@ export function extractDevTestingCommandBlocks(
   return blocks
 }
 
-function classifyTestingDoc(path = '') {
-  if (path === DEV_TESTING_STRATEGY_SOURCE_PATH) return '测试策略'
-  if (path === 'scripts/README.md') return 'QA 脚本'
-  if (path === 'web/scripts/README.md') return '前端脚本'
-  if (path === 'web/README.md') return '前端验证'
-  if (path === 'server/README.md') return '后端验证'
-  if (path === 'README.md') return '项目入口'
-  if (path === 'docs/部署约定.md' || path.startsWith('server/deploy/')) {
-    return '部署验证'
-  }
-  if (/release-evidence|target-release-evidence/i.test(path)) return '发布验收'
-  if (path.includes('/import-') || path.includes('/source-snapshot')) {
-    return '导入验收'
-  }
-  if (path.includes('/trial-') || path.includes('acceptance')) return '试用验收'
-  return /qa|test|测试|验收|回归|smoke|style:l1/i.test(path)
-    ? '测试资料'
-    : '当前文档'
+function resolveTestingDocumentRole(path = '') {
+  return DEV_TESTING_DOCUMENT_ROLE_BY_PATH.get(path) || '当前文档'
 }
 
 function devTestingSourceLabel(path = '', title = '') {
-  const category = classifyTestingDoc(path)
+  const documentRole = resolveTestingDocumentRole(path)
   const cleanTitle = stripMarkdownInline(title)
   if (cleanTitle && cleanTitle !== path) {
-    return `${category}：${cleanTitle}`
+    return `${documentRole}：${cleanTitle}`
   }
-  return category
-}
-
-function countKeywordHits(value = '') {
-  const normalized = String(value || '').toLowerCase()
-  return DEV_TESTING_DOC_KEYWORDS.reduce((total, keyword) => {
-    const target = keyword.toLowerCase()
-    return total + (normalized.includes(target) ? 1 : 0)
-  }, 0)
+  return documentRole
 }
 
 export function buildDevTestingDocs(markdownModules = {}) {
@@ -708,13 +697,11 @@ export function buildDevTestingDocs(markdownModules = {}) {
 
     const source = normalizeModuleValue(moduleValue)
     const title = titleFromMarkdown(source, path)
-    const haystack = [path, title, source].join('\n')
-    const keywordHits = countKeywordHits(haystack)
     const commandBlocks = extractDevTestingCommandBlocks(source, {
       sourcePath: path,
       title,
     })
-    const category = classifyTestingDoc(path, source)
+    const documentRole = resolveTestingDocumentRole(path)
     const sourceLabel = devTestingSourceLabel(path, title)
 
     byPath.set(path, {
@@ -722,17 +709,13 @@ export function buildDevTestingDocs(markdownModules = {}) {
       path,
       sourceLabel,
       title,
-      category,
-      keywordHits,
+      documentRole,
       commandCount: commandBlocks.reduce(
         (total, block) => total + block.commands.length,
         0
       ),
       commandBlocks,
       source,
-      searchText: [path, sourceLabel, title, category, source]
-        .join(' ')
-        .toLowerCase(),
     })
   })
 
@@ -744,46 +727,53 @@ export function buildDevTestingDocs(markdownModules = {}) {
     const leftOrder = pathOrder.get(left.path) ?? Number.MAX_SAFE_INTEGER
     const rightOrder = pathOrder.get(right.path) ?? Number.MAX_SAFE_INTEGER
     if (leftOrder !== rightOrder) return leftOrder - rightOrder
-    if (left.category !== right.category) {
-      return left.category.localeCompare(right.category, 'zh-Hans-CN')
-    }
-    if (left.keywordHits !== right.keywordHits) {
-      return right.keywordHits - left.keywordHits
+    if (left.documentRole !== right.documentRole) {
+      return left.documentRole.localeCompare(right.documentRole, 'zh-Hans-CN')
     }
     return left.path.localeCompare(right.path, 'zh-Hans-CN')
   })
 }
 
-export function getDevTestingCategoryOptions(docs = []) {
+export function getDevTestingDocumentRoleOptions(docs = []) {
+  const presentRoles = new Set(
+    docs.map((item) => item.documentRole).filter(Boolean)
+  )
   return [
-    { label: '全部', value: 'all' },
-    ...[...new Set(docs.map((item) => item.category).filter(Boolean))]
-      .sort((left, right) => left.localeCompare(right, 'zh-Hans-CN'))
-      .map((category) => ({ label: category, value: category })),
+    { label: '全部来源', value: 'all' },
+    ...DEV_TESTING_DOCUMENT_ROLE_ORDER.filter((role) =>
+      presentRoles.has(role)
+    ).map((role) => ({ label: role, value: role })),
   ]
 }
 
-export function filterDevTestingDocs(
+export function filterDevTestingDocs(docs = [], { documentRole = 'all' } = {}) {
+  return docs.filter((item) => {
+    if (documentRole !== 'all' && item.documentRole !== documentRole) {
+      return false
+    }
+    return true
+  })
+}
+
+export function filterDevTestingCommandBlocks(
   docs = [],
-  { keyword = '', category = 'all' } = {}
+  { keyword = '' } = {}
 ) {
   const query = String(keyword || '')
     .trim()
     .toLowerCase()
-  return docs.filter((item) => {
-    if (category !== 'all' && item.category !== category) return false
-    if (!query) return true
-    return item.searchText.includes(query)
-  })
-}
-
-export function resolveDevTestingSelectedDoc(docs = [], selectedKey = '') {
-  return docs.find((item) => item.key === selectedKey) || docs[0] || null
+  return docs
+    .flatMap((doc) => doc.commandBlocks)
+    .filter((block) => !query || block.searchText.includes(query))
 }
 
 export function buildDevTestingSummary({ tiers = [], docs = [] } = {}) {
   const commandCount = docs.reduce(
     (total, item) => total + item.commandCount,
+    0
+  )
+  const commandBlockCount = docs.reduce(
+    (total, item) => total + item.commandBlocks.length,
     0
   )
   const docsWithCommands = docs.filter((item) => item.commandCount > 0).length
@@ -794,8 +784,10 @@ export function buildDevTestingSummary({ tiers = [], docs = [] } = {}) {
     tierCount: tiers.length,
     docCount: docs.length,
     commandCount,
+    commandBlockCount,
     docsWithCommands,
     strategyCommandCount: strategyDoc?.commandCount || 0,
+    strategyCommandBlockCount: strategyDoc?.commandBlocks.length || 0,
   }
 }
 

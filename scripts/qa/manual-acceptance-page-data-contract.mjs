@@ -2,7 +2,7 @@ import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
 
 export const MANUAL_ACCEPTANCE_PAGE_DATA_CONTRACT =
   "manual-acceptance-page-data-ownership-v2";
-export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 50;
+export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 52;
 
 export const MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS = Object.freeze([
   "role",
@@ -50,6 +50,7 @@ export const MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE = Object.freeze({
   products: "product-skus",
   materials: "materials",
   "sales-orders": "sales-orders",
+  "sales-returns": "sales-returns",
   "material-bom": "bom-versions",
   processes: "processes",
   "accessories-purchase": "purchase-orders",
@@ -64,6 +65,7 @@ export const MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE = Object.freeze({
   reconciliation: "finance-reconciliation",
   payables: "finance-payables",
   receivables: "finance-receivables",
+  "finance-payments": "finance-payments",
   invoices: "finance-invoices",
   "system-audit-logs": "audit-events",
 });
@@ -106,10 +108,13 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
   "production-exceptions": "facts",
   "stock-reservations": "facts",
   shipments: "facts",
+  "sales-returns": "facts",
   "finance-reconciliation": "facts",
   "finance-payables": "facts",
   "finance-receivables": "facts",
   "finance-invoices": "facts",
+  "finance-payments": "facts",
+  "finance-credit-notes": "facts",
   "permission-accounts": "role",
   "permission-roles": "role",
   "audit-events": "role",
@@ -329,6 +334,15 @@ function targetEvidence(item) {
       combine: "minimum",
       browserRequired: true,
       reason: "余额、批次和流水分别核对，页面切换与相互对照仍需页面确认。",
+    };
+  }
+  if (item.key === "finance-payments") {
+    return {
+      probeIds: ["finance-payments", "finance-credit-notes"],
+      actualProbeId: "finance-payments",
+      browserRequired: true,
+      reason:
+        "收付款与红冲记录分别按固定编号、状态和反向关联核对；页面切换、详情与业务操作仍需页面确认。",
     };
   }
   if (item.key === "print-center") {

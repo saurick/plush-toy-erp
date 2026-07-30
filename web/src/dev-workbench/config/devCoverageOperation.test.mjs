@@ -32,8 +32,7 @@ function operation(overrides = {}) {
     },
     status,
     stage,
-    outcome:
-      overrides.outcome ?? (status === 'completed' ? 'passed' : null),
+    outcome: overrides.outcome ?? (status === 'completed' ? 'passed' : null),
     exitCode: overrides.exitCode ?? (status === 'completed' ? 0 : null),
     revision: 2,
     createdAt: NOW,
@@ -80,10 +79,10 @@ test('coverage operation presentation reports bounded baseline progress', () => 
     terminal: false,
     label: '正在采集',
     tone: 'primary',
-    stageLabel: '第 3/10 阶段 · Go 测试与代码覆盖',
+    stageLabel: '第 3/11 阶段 · Go 测试与代码覆盖',
     step: 3,
-    totalSteps: 10,
-    percentage: 30,
+    totalSteps: 11,
+    percentage: 27,
   })
   const issues = getDevCoverageOperationPresentation(
     operation({

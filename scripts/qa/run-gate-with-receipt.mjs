@@ -11,6 +11,10 @@ import {
   summarizeGateOutput,
   writeDevWorkbenchReceipt,
 } from "./dev-workbench-receipt.mjs";
+import {
+  readRepositoryIdentity,
+  repositoryIdentitiesEqual,
+} from "./lib/repository-identity.mjs";
 
 export const RECEIPT_GATE_COMMANDS = Object.freeze({
   fast: Object.freeze(["bash", "scripts/qa/fast.sh"]),
@@ -39,10 +43,16 @@ function parseArgs(argv) {
   return options;
 }
 
-export function evaluateReceiptGateRun({ childStatus, childError, summary }) {
+export function evaluateReceiptGateRun({
+  childStatus,
+  childError,
+  identityMatches = true,
+  summary,
+}) {
   const childPassed = !childError && childStatus === 0;
   const proofComplete =
     childPassed &&
+    identityMatches &&
     summary.executed > 0 &&
     summary.passed === summary.executed &&
     summary.failed === 0 &&
@@ -53,7 +63,7 @@ export function evaluateReceiptGateRun({ childStatus, childError, summary }) {
   });
 }
 
-function runCLI(argv) {
+async function runCLI(argv) {
   const repoRoot = path.resolve(import.meta.dirname, "../..");
   const options = parseArgs(argv);
   const [command, ...args] = RECEIPT_GATE_COMMANDS[options.gate];
@@ -66,6 +76,8 @@ function runCLI(argv) {
       "receipts",
       `${options.gate}-latest.json`,
     );
+  const expectedRepository = await readRepositoryIdentity(repoRoot);
+  const gitContext = getDevWorkbenchGitContext(repoRoot);
   const startedAt = Date.now();
   const child = spawnSync(command, args, {
     cwd: repoRoot,
@@ -80,25 +92,37 @@ function runCLI(argv) {
   const summary = summarizeGateOutput(
     `${child.stdout || ""}\n${child.stderr || ""}`,
   );
+  const currentRepository = await readRepositoryIdentity(repoRoot);
+  const identityMatches = repositoryIdentitiesEqual(
+    expectedRepository,
+    currentRepository,
+  );
   const outcome = evaluateReceiptGateRun({
     childError: child.error,
     childStatus: child.status,
+    identityMatches,
     summary,
   });
+  const notProven = defaultDevWorkbenchNotProven(options.gate);
+  if (!identityMatches) {
+    notProven.push("repository identity changed during gate");
+  }
   const receipt = buildDevWorkbenchReceipt({
     artifactPaths: [],
     durationMs: Date.now() - startedAt,
     finishedAt: Date.now(),
     gate: options.gate,
-    gitContext: getDevWorkbenchGitContext(repoRoot),
+    gitContext,
     metrics: {},
-    notProven: defaultDevWorkbenchNotProven(options.gate),
+    notProven,
     profile: options.gate,
     repoRoot,
     startedAt,
     status: outcome.status,
     summary,
-    invariants: [],
+    invariants: identityMatches
+      ? ["repository identity remained stable during gate"]
+      : [],
   });
   const writtenPath = writeDevWorkbenchReceipt(outPath, receipt);
   process.stderr.write(
@@ -112,10 +136,8 @@ const isDirectRun =
   pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isDirectRun) {
-  try {
-    runCLI(process.argv.slice(2));
-  } catch (error) {
+  runCLI(process.argv.slice(2)).catch((error) => {
     process.stderr.write(`[run-gate-with-receipt] ${error.message}\n`);
     process.exit(1);
-  }
+  });
 }

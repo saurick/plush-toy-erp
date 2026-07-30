@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import { CopyOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Button, theme } from 'antd'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import { message } from '@/common/utils/antdApp'
 import {
@@ -15,7 +15,6 @@ const COPY_MESSAGE_KEY = 'dev-page-nav-copy-deep-link'
 
 export default function DevPageNav({ sourcePath = '', navRef = null }) {
   const location = useLocation()
-  const navigate = useNavigate()
   const { token } = theme.useToken()
   const currentPathname =
     location.pathname === '/'
@@ -23,6 +22,7 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
       : location.pathname.replace(/\/+$/, '')
   const currentAreaKey = resolveDevWorkbenchAreaKey(currentPathname)
   const secondaryItems = getDevSecondaryNavItems(currentAreaKey)
+  const currentRouteRef = useRef(null)
   const currentDeepLink = useMemo(() => {
     const relativeLink = `${location.pathname}${location.search}${location.hash}`
     if (typeof window === 'undefined') return relativeLink
@@ -31,6 +31,13 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
   const sourceHref = sourcePath
     ? `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(sourcePath)}`
     : ''
+
+  useEffect(() => {
+    currentRouteRef.current?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    })
+  }, [currentPathname])
 
   const handleCopyDeepLink = () => {
     if (typeof navigator === 'undefined' || !navigator.clipboard) {
@@ -82,44 +89,51 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
         className="erp-dev-workspace-nav__routes"
         aria-label="开发工作台页面"
       >
-        {DEV_WORKSPACE_NAV_ITEMS.map((item) => {
-          const isActive = currentAreaKey === item.key
-          return (
-            <button
-              type="button"
-              key={item.route}
-              className={
-                isActive
-                  ? 'erp-dev-workspace-nav__route erp-dev-workspace-nav__route--active'
-                  : 'erp-dev-workspace-nav__route'
-              }
-              aria-current={isActive ? 'page' : undefined}
-              onClick={() => navigate(item.route)}
-            >
-              <span
-                className="erp-dev-workspace-nav__route-mark"
-                aria-hidden="true"
+        <div className="erp-dev-workspace-nav__primary">
+          {DEV_WORKSPACE_NAV_ITEMS.map((item) => {
+            const isExact = currentPathname === item.route
+            const isContext = currentAreaKey === item.key && !isExact
+            return (
+              <Link
+                ref={isExact ? currentRouteRef : undefined}
+                to={item.route}
+                key={item.route}
+                className={[
+                  'erp-dev-workspace-nav__route',
+                  isExact ? 'erp-dev-workspace-nav__route--active' : '',
+                  isContext ? 'erp-dev-workspace-nav__route--context' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                aria-current={isExact ? 'page' : undefined}
               >
-                {item.label.slice(0, 1)}
-              </span>
-              <span>{item.label}</span>
-              <small>{item.description}</small>
-            </button>
-          )
-        })}
+                <span
+                  className="erp-dev-workspace-nav__route-mark"
+                  aria-hidden="true"
+                >
+                  {item.label.slice(0, 1)}
+                </span>
+                <span>{item.label}</span>
+                <small>{item.description}</small>
+              </Link>
+            )
+          })}
+        </div>
         {secondaryItems.length > 0 ? (
           <div
             className="erp-dev-workspace-nav__secondary"
+            role="group"
             aria-label="当前区域二级入口"
           >
             <span className="erp-dev-workspace-nav__secondary-title">
-              二级入口
+              当前区域
             </span>
             {secondaryItems.map((item) => {
               const isActive = currentPathname === item.route
               return (
-                <button
-                  type="button"
+                <Link
+                  ref={isActive ? currentRouteRef : undefined}
+                  to={item.route}
                   key={item.route}
                   className={
                     isActive
@@ -127,10 +141,9 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
                       : 'erp-dev-workspace-nav__secondary-route'
                   }
                   aria-current={isActive ? 'page' : undefined}
-                  onClick={() => navigate(item.route)}
                 >
                   {item.label}
-                </button>
+                </Link>
               )
             })}
           </div>
@@ -153,9 +166,9 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
         {sourceHref ? (
           <Button
             block
+            href={sourceHref}
             icon={<FileTextOutlined />}
             aria-label={`在开发文档中打开来源 ${sourcePath}`}
-            onClick={() => navigate(sourceHref)}
           >
             来源文档
           </Button>

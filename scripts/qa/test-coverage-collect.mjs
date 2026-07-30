@@ -53,6 +53,7 @@ export const BASELINE_STAGE_KEYS = Object.freeze([
   "go",
   "web-lint",
   "web-css",
+  "web-error-codes",
   "web",
   "import",
   "field-linkage",
@@ -1323,11 +1324,19 @@ export function buildBaselineCommandPlan({
       },
     ],
     [
+      "web-error-codes",
+      {
+        command: process.execPath,
+        args: ["scripts/gen-error-codes.mjs", "--check"],
+        cwd: projectRoot,
+      },
+    ],
+    [
       "web",
       {
-        command: pnpmBin,
+        command: process.execPath,
         args: [
-          "test",
+          "--test",
           "--experimental-test-coverage",
           "--test-reporter=tap",
         ],
@@ -1440,6 +1449,10 @@ export async function collectBaselineEvidence({
       go: goCommandExecution(results.go, "Go baseline"),
       "web-lint": simpleCommandExecution(results["web-lint"], "Web lint"),
       "web-css": simpleCommandExecution(results["web-css"], "Web CSS"),
+      "web-error-codes": simpleCommandExecution(
+        results["web-error-codes"],
+        "Web error code generation check",
+      ),
       web: nodeCommandExecution(results.web, "Web Node coverage tests"),
       import: nodeCommandExecution(results.import, "Import contract tests"),
       "field-linkage": simpleCommandExecution(

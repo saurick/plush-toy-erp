@@ -316,8 +316,18 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "dev testing page command source label",
   );
   assert(
-    !devTestingPageSource.includes("{block.sourcePath}"),
-    "dev testing command blocks must not render raw sourcePath as primary copy",
+    !/>\s*\{block\.sourcePath\}\s*</u.test(devTestingPageSource),
+    "dev testing command blocks must not render raw sourcePath as primary visible copy",
+  );
+  assertIncludes(
+    devTestingPageSource,
+    "aria-label={`打开来源文档 ${block.sourcePath}`}",
+    "dev testing source action accessible label",
+  );
+  assertIncludes(
+    devTestingPageSource,
+    "onClick={() => onOpenSource(block.sourcePath)}",
+    "dev testing source action navigation",
   );
   const presetKeys = DEV_TESTING_COPY_PRESETS.map((item) => item.key);
   assert.deepEqual(
@@ -330,7 +340,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
       "trial-account-rbac",
       "real-login-smoke-shared",
       "trial-simulated-data",
-      "mvp-local-closure",
+      "v1-local-acceptance-plan",
       "mobile-workflow-smoke",
       "customer-config-dev-console",
       "dev-prototype-registry",
@@ -659,48 +669,53 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "不连接后端",
     "trial simulated data preset",
   );
-  const mvpLocalClosurePreset = DEV_TESTING_COPY_PRESETS.find(
-    (item) => item.key === "mvp-local-closure",
+  const v1LocalAcceptancePlanPreset = DEV_TESTING_COPY_PRESETS.find(
+    (item) => item.key === "v1-local-acceptance-plan",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
-    "mvp-closure.test.mjs",
-    "mvp local closure preset",
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    "v1-acceptance-plan.test.mjs",
+    "V1 local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
     "purchase-receipt-real-write-e2e.test.mjs",
-    "mvp local closure preset",
+    "V1 local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
     "purchase-receipt-real-write-e2e.mjs --print-input-template",
-    "mvp local closure preset",
+    "V1 local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
     "purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json",
-    "mvp local closure preset",
+    "V1 local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
-    "mvp-closure.mjs --out output/customers/yoyoosun/mvp-closure",
-    "mvp local closure preset",
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    "v1-acceptance-plan.mjs --out output/customers/yoyoosun/v1-acceptance-plan",
+    "V1 local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
-    "mvp-closure.mjs --run-report-tools --out",
-    "mvp local closure preset",
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    "v1-acceptance-plan.mjs --run-report-tools --out",
+    "V1 local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
     "no-write evidence",
-    "mvp local closure preset",
+    "V1 local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(mvpLocalClosurePreset),
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
     "真实写入输入模板",
-    "mvp local closure preset",
+    "V1 local acceptance plan preset",
+  );
+  assertIncludes(
+    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    "本地完整技术验收",
+    "V1 local acceptance plan preset",
   );
   const customerConfigPreset = DEV_TESTING_COPY_PRESETS.find(
     (item) => item.key === "customer-config-dev-console",

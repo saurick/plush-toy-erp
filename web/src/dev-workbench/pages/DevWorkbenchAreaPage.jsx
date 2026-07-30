@@ -22,13 +22,13 @@ const AREA_PRESENTATION = Object.freeze({
     icon: <BuildOutlined aria-hidden="true" />,
   }),
   [DEV_WORKBENCH_AREA_KEYS.quality]: Object.freeze({
-    title: '质量 / Quality',
+    title: '质量验证 / Quality Assurance',
     description:
       '选择与本轮影响面匹配的静态、单元、集成、浏览器和发布门禁，并保留可核验回执。',
     icon: <CheckCircleOutlined aria-hidden="true" />,
   }),
   [DEV_WORKBENCH_AREA_KEYS.delivery]: Object.freeze({
-    title: '交付 / Delivery',
+    title: '交付运行 / Delivery Operations',
     description:
       '核对客户配置、发布前置、制品身份和回滚边界；工作台只编排证据，不替代正式发布流程。',
     icon: <DeploymentUnitOutlined aria-hidden="true" />,
@@ -65,7 +65,10 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
         ].includes(areaKey) ? (
           <DevReceiptPanel areaKey={areaKey} />
         ) : null}
-        <section className="erp-dev-hub-grid" aria-label={`${presentation.title}入口`}>
+        <section
+          className="erp-dev-hub-grid"
+          aria-label={`${presentation.title}入口`}
+        >
           {items.map((item) => (
             <article
               className="erp-dev-hub-card erp-dev-hub-card--without-icon"
@@ -77,7 +80,9 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
                     <Title level={4} className="erp-dev-hub-card__title">
                       {item.title}
                     </Title>
-                    <Text className="erp-dev-hub-card__route">{item.route}</Text>
+                    <Text className="erp-dev-hub-card__route">
+                      {item.route}
+                    </Text>
                   </div>
                   <Tag>{item.status}</Tag>
                 </div>

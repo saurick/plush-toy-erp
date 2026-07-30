@@ -158,6 +158,11 @@ const FACT_REFERENCE_DATASETS = Object.freeze({
   "inventory-txns": Object.freeze({ referenceKey: "inventoryTxns" }),
   "stock-reservations": Object.freeze({ referenceKey: "stockReservations" }),
   shipments: Object.freeze({ referenceKey: "shipments" }),
+  "sales-returns": Object.freeze({ referenceKey: "salesReturns" }),
+  "finance-payments": Object.freeze({ referenceKey: "financePayments" }),
+  "finance-credit-notes": Object.freeze({
+    referenceKey: "financeCreditNotes",
+  }),
   "finance-reconciliation": Object.freeze({
     referenceKey: "financeFacts",
     factType: "RECONCILIATION",
@@ -407,6 +412,36 @@ const DATASET_BLUEPRINTS = Object.freeze({
     requiredStatuses: ["DRAFT", "SHIPPED", "CANCELLED"],
     batchReport: "fact",
     factReferenceKey: "shipments",
+  },
+  "sales-returns": {
+    roleKey: "sales",
+    domain: "operational_fact",
+    method: "list_sales_returns",
+    listKey: "sales_returns",
+    statusField: "status",
+    requiredStatuses: ["DRAFT", "APPROVED", "RECEIVED", "REVERSED"],
+    batchReport: "fact",
+    factReferenceKey: "salesReturns",
+  },
+  "finance-payments": {
+    roleKey: "finance",
+    domain: "operational_fact",
+    method: "list_finance_payments",
+    listKey: "payments",
+    statusField: "status",
+    requiredStatuses: ["APPROVED", "POSTED", "REVERSED"],
+    batchReport: "fact",
+    factReferenceKey: "financePayments",
+  },
+  "finance-credit-notes": {
+    roleKey: "finance",
+    domain: "operational_fact",
+    method: "list_finance_credit_notes",
+    listKey: "credit_notes",
+    statusField: "status",
+    requiredStatuses: ["POSTED", "REVERSED"],
+    batchReport: "fact",
+    factReferenceKey: "financeCreditNotes",
   },
   "finance-reconciliation": {
     roleKey: "finance",
@@ -739,6 +774,57 @@ function normalizeFactReference(record, key, index) {
         "financeApprovalProcessNodeID",
         "financeApprovalProcessNodeId",
         "finance_approval_process_node_id",
+      );
+      break;
+    case "salesReturns":
+      textField("return_no", "returnNo", "return_no");
+      textField("status", "status");
+      normalized.shipment_id = reportPositiveID(
+        reportValue(record, "shipmentID", "shipmentId", "shipment_id"),
+        `${name}.shipmentID`,
+      );
+      normalized.customer_id = reportPositiveID(
+        reportValue(record, "customerID", "customerId", "customer_id"),
+        `${name}.customerID`,
+      );
+      break;
+    case "financePayments":
+      textField("payment_no", "paymentNo", "payment_no");
+      textField("status", "status");
+      textField("direction", "direction");
+      textField(
+        "counterparty_type",
+        "counterpartyType",
+        "counterparty_type",
+      );
+      normalized.counterparty_id = reportPositiveID(
+        reportValue(
+          record,
+          "counterpartyID",
+          "counterpartyId",
+          "counterparty_id",
+        ),
+        `${name}.counterpartyID`,
+      );
+      textField("amount", "amount");
+      textField("currency", "currency");
+      break;
+    case "financeCreditNotes":
+      textField("credit_note_no", "creditNoteNo", "credit_note_no");
+      textField("status", "status");
+      normalized.finance_fact_id = reportPositiveID(
+        reportValue(record, "financeFactID", "financeFactId", "finance_fact_id"),
+        `${name}.financeFactID`,
+      );
+      textField("finance_fact_no", "financeFactNo", "finance_fact_no");
+      textField("finance_fact_type", "financeFactType", "finance_fact_type");
+      textField("amount", "amount");
+      textField("currency", "currency");
+      nullableID(
+        "reversal_of_credit_note_id",
+        "reversalOfCreditNoteID",
+        "reversalOfCreditNoteId",
+        "reversal_of_credit_note_id",
       );
       break;
     case "financeFacts":
@@ -1178,6 +1264,9 @@ const FACT_BUSINESS_FIELDS = Object.freeze({
   inventoryLots: "lot_no",
   stockReservations: "reservation_no",
   shipments: "shipment_no",
+  salesReturns: "return_no",
+  financePayments: "payment_no",
+  financeCreditNotes: "credit_note_no",
   financeFacts: "fact_no",
 });
 
@@ -1254,6 +1343,27 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
       params = {
         source_type: item.source_type,
         source_id: item.source_id,
+        limit: QUERY_LIMIT,
+        offset: 0,
+      };
+    } else if (referenceKey === "salesReturns") {
+      params = {
+        shipment_id: item.shipment_id,
+        limit: QUERY_LIMIT,
+        offset: 0,
+      };
+    } else if (referenceKey === "financePayments") {
+      params = {
+        status: item.status,
+        direction: item.direction,
+        counterparty_type: item.counterparty_type,
+        counterparty_id: item.counterparty_id,
+        limit: QUERY_LIMIT,
+        offset: 0,
+      };
+    } else if (referenceKey === "financeCreditNotes") {
+      params = {
+        finance_fact_id: item.finance_fact_id,
         limit: QUERY_LIMIT,
         offset: 0,
       };

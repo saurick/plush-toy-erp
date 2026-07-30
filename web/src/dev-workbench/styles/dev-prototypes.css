@@ -237,7 +237,7 @@
 
 .erp-dev-testing-shell {
   display: grid;
-  grid-template-columns: minmax(310px, 400px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   max-width: 1440px;
   height: calc(100vh - 132px);
@@ -245,10 +245,12 @@
   margin: 0 auto;
 }
 
-.erp-dev-testing-sidebar,
 .erp-dev-testing-reader {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   border: 1px solid #dce8dd;
   border-radius: 16px;
   background: rgb(255 255 255 / 0.96);
@@ -257,15 +259,8 @@
     0 12px 28px rgb(15 23 42 / 0.06);
 }
 
-.erp-dev-testing-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-}
-
 .erp-dev-testing-search {
-  flex: 0 0 auto;
+  width: 100%;
 }
 
 .erp-dev-testing-filter {
@@ -305,75 +300,12 @@
   box-shadow: inset 0 0 0 1px rgb(15 118 110 / 0.12);
 }
 
-.erp-dev-testing-doc-list {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 2px;
-}
-
-.erp-dev-testing-doc-row {
-  position: relative;
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  gap: 6px;
-  border: 1px solid #cddfd8;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #1f2937;
-  cursor: pointer;
-  padding: 10px;
-  text-align: left;
-  box-shadow: inset 3px 0 0 #d7f2ef;
-}
-
-.erp-dev-testing-doc-row:hover,
-.erp-dev-testing-doc-row:focus-visible,
-.erp-dev-testing-doc-row--active {
-  border-color: #7dbeb7;
-  background: #edf8f6;
-  box-shadow: inset 3px 0 0 #0f766e;
-  outline: none;
-}
-
-.erp-dev-testing-doc-row__top {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.erp-dev-testing-doc-row__title {
-  min-width: 0;
-  color: #172033;
-  font-weight: 750;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.erp-dev-testing-doc-row__path,
-.erp-dev-testing-doc-row__meta,
-.erp-dev-testing-command-block__path,
-.erp-dev-testing-doc-detail__path {
+.erp-dev-testing-command-block__path {
   color: #647067;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
-}
-
-.erp-dev-testing-doc-row__meta {
-  font-family: inherit;
-}
-
-.erp-dev-testing-reader {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .erp-dev-testing-reader__toolbar {
@@ -428,8 +360,7 @@
 }
 
 .erp-dev-testing-tier-view,
-.erp-dev-testing-command-list,
-.erp-dev-testing-doc-detail {
+.erp-dev-testing-command-view {
   min-height: 0;
   overflow: auto;
   padding: 14px;
@@ -439,6 +370,23 @@
   display: grid;
   align-content: start;
   gap: 12px;
+}
+
+.erp-dev-testing-command-view {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.erp-dev-testing-command-tools {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  border: 1px solid #dce8dd;
+  border-radius: 12px;
+  background: #f7fbf8;
+  padding: 12px;
 }
 
 .erp-dev-testing-presets {
@@ -498,8 +446,7 @@
 }
 
 .erp-dev-testing-tier,
-.erp-dev-testing-command-block,
-.erp-dev-testing-doc-detail {
+.erp-dev-testing-command-block {
   border: 1px solid #dce8dd;
   border-radius: 14px;
   background: #fbfdfc;
@@ -606,52 +553,10 @@
   white-space: pre;
 }
 
-.erp-dev-testing-doc-detail {
-  display: grid;
-  align-content: start;
-  gap: 12px;
-}
-
-.erp-dev-testing-doc-detail__head {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.erp-dev-testing-doc-detail__head .ant-typography {
-  margin: 0 0 4px;
-}
-
-.erp-dev-testing-doc-detail__stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.erp-dev-testing-doc-detail__stats span {
-  border: 1px solid #dce8dd;
-  border-radius: 999px;
-  background: #f7fbf8;
-  color: #475569;
-  font-weight: 650;
-  padding: 4px 9px;
-}
-
-.erp-dev-testing-doc-detail__note.ant-typography {
-  color: #647067;
-  margin: 0;
-}
-
 .erp-dev-testing-empty {
   display: grid;
   min-height: 240px;
   place-items: center;
-}
-
-.erp-dev-testing-shell--coverage {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .erp-dev-testing-coverage-view {
@@ -741,8 +646,7 @@
   line-height: 1.5;
 }
 
-.erp-dev-testing-coverage-operation
-  .erp-dev-testing-coverage-operation__error {
+.erp-dev-testing-coverage-operation .erp-dev-testing-coverage-operation__error {
   color: #b45309;
 }
 

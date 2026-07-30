@@ -172,7 +172,7 @@ export function createDevFlowStateObservatoryScenarios({
         const defaultBoxMetrics = await collectBoxMetrics(page)
 
         await page
-          .getByRole('button', { name: /单机状态图/u })
+          .getByRole('tab', { name: /单机状态图/u })
           .first()
           .click()
         await page
@@ -259,7 +259,7 @@ export function createDevFlowStateObservatoryScenarios({
         )
 
         await page
-          .getByRole('button', { name: /状态字典/u })
+          .getByRole('tab', { name: /状态字典/u })
           .first()
           .click()
         await page
@@ -288,7 +288,7 @@ export function createDevFlowStateObservatoryScenarios({
         assert.match(dictionaryLocation.search, /(?:\?|&)state=[^&]+/u)
 
         await page
-          .getByRole('button', { name: /运行轨迹/u })
+          .getByRole('tab', { name: /运行轨迹/u })
           .first()
           .click()
         await page
@@ -487,15 +487,18 @@ export function createDevFlowStateObservatoryScenarios({
           9,
           'overlay 模式必须保留完整迁移图和详情'
         )
-        const highlightedEdges = await machineView.evaluate((root) =>
-          [...root.querySelectorAll('.erp-markdown-mermaid__canvas svg path')]
-            .filter((path) => {
+        const highlightedEdges = await machineView.evaluate(
+          (root) =>
+            [
+              ...root.querySelectorAll(
+                '.erp-markdown-mermaid__canvas svg path'
+              ),
+            ].filter((path) => {
               const style = `${path.getAttribute('style') || ''} ${
                 path.getAttribute('stroke-width') || ''
               }`
               return /stroke-width:\s*3px|(?:^|\s)3px(?:\s|$)/u.test(style)
-            })
-            .length
+            }).length
         )
         assert(
           highlightedEdges >= 2,
@@ -630,7 +633,7 @@ export function createDevFlowStateObservatoryScenarios({
           )
           const workspaceNav = document.querySelector('.erp-dev-workspace-nav')
           const viewNav = document.querySelector(
-            'nav[aria-label="流程状态观察视图"]'
+            '[role="tablist"][aria-label="流程状态观察视图"]'
           )
           return {
             theme:
@@ -645,12 +648,24 @@ export function createDevFlowStateObservatoryScenarios({
               '.erp-dev-workspace-nav__route'
             ).length,
             currentWorkspaceRouteCount: document.querySelectorAll(
+              '.erp-dev-workspace-nav [aria-current="page"]'
+            ).length,
+            currentPrimaryRouteCount: document.querySelectorAll(
               '.erp-dev-workspace-nav__route[aria-current="page"]'
+            ).length,
+            currentSecondaryRouteCount: document.querySelectorAll(
+              '.erp-dev-workspace-nav__secondary-route[aria-current="page"]'
             ).length,
             layerToggleCount: document.querySelectorAll(
               '[data-flow-layer-controls] input[type="checkbox"]'
             ).length,
-            viewButtonCount: viewNav?.querySelectorAll('button').length || 0,
+            catalogControlCount: document.querySelectorAll(
+              '.erp-dev-flow-state-controls .erp-dev-flow-state-control'
+            ).length,
+            viewTabCount: viewNav?.querySelectorAll('[role="tab"]').length || 0,
+            selectedViewTabCount:
+              viewNav?.querySelectorAll('[role="tab"][aria-selected="true"]')
+                .length || 0,
             clientWidth: document.documentElement.clientWidth,
             scrollWidth: document.documentElement.scrollWidth,
           }
@@ -663,8 +678,12 @@ export function createDevFlowStateObservatoryScenarios({
             workspaceNavVisible: metrics.workspaceNavVisible,
             workspaceRouteCount: metrics.workspaceRouteCount,
             currentWorkspaceRouteCount: metrics.currentWorkspaceRouteCount,
+            currentPrimaryRouteCount: metrics.currentPrimaryRouteCount,
+            currentSecondaryRouteCount: metrics.currentSecondaryRouteCount,
             layerToggleCount: metrics.layerToggleCount,
-            viewButtonCount: metrics.viewButtonCount,
+            catalogControlCount: metrics.catalogControlCount,
+            viewTabCount: metrics.viewTabCount,
+            selectedViewTabCount: metrics.selectedViewTabCount,
           },
           {
             theme: 'dark',
@@ -672,10 +691,14 @@ export function createDevFlowStateObservatoryScenarios({
             workspaceNavVisible: true,
             workspaceRouteCount: 4,
             currentWorkspaceRouteCount: 1,
-            layerToggleCount: 9,
-            viewButtonCount: 5,
+            currentPrimaryRouteCount: 0,
+            currentSecondaryRouteCount: 1,
+            layerToggleCount: 0,
+            catalogControlCount: 2,
+            viewTabCount: 5,
+            selectedViewTabCount: 1,
           },
-          `移动端 dark 导航、九层开关和五个只读视图必须可用: ${JSON.stringify(
+          `移动端 dark 导航和五个只读视图必须按当前视图分级: ${JSON.stringify(
             metrics
           )}`
         )
@@ -685,10 +708,9 @@ export function createDevFlowStateObservatoryScenarios({
         )
         const overviewBoxMetrics = await collectBoxMetrics(page)
 
-        await page
-          .getByRole('button', { name: /单机状态图/u })
-          .first()
-          .click()
+        const overviewTab = page.getByRole('tab', { name: /总览/u }).first()
+        await overviewTab.focus()
+        await overviewTab.press('ArrowRight')
         const mobileMachineView = page.locator(
           '[data-flow-state-view="machine"]'
         )
@@ -696,6 +718,37 @@ export function createDevFlowStateObservatoryScenarios({
           state: 'visible',
           timeout: 10_000,
         })
+        const machineControlMetrics = await page.evaluate(() => ({
+          layerToggleCount: document.querySelectorAll(
+            '[data-flow-layer-controls] input[type="checkbox"]'
+          ).length,
+          catalogControlCount: document.querySelectorAll(
+            '.erp-dev-flow-state-controls .erp-dev-flow-state-control'
+          ).length,
+          pathModeCount: document.querySelectorAll('#dev-flow-state-path-mode')
+            .length,
+          pathKindCount: document.querySelectorAll('#dev-flow-state-path-kind')
+            .length,
+          selectedTabText:
+            document
+              .querySelector(
+                '[role="tablist"][aria-label="流程状态观察视图"] [role="tab"][aria-selected="true"]'
+              )
+              ?.textContent?.replace(/\s+/gu, '') || '',
+        }))
+        assert.deepEqual(
+          machineControlMetrics,
+          {
+            layerToggleCount: 9,
+            catalogControlCount: 5,
+            pathModeCount: 1,
+            pathKindCount: 0,
+            selectedTabText: '单机状态图一项状态对象的允许迁移',
+          },
+          `方向键切换到单机状态图后才应展示路径和叠加层控制: ${JSON.stringify(
+            machineControlMetrics
+          )}`
+        )
         const mobileEvidenceHierarchy = await page.evaluate(() => {
           const machineView = document.querySelector(
             '[data-flow-state-view="machine"]'
@@ -733,7 +786,7 @@ export function createDevFlowStateObservatoryScenarios({
         })
 
         const orchestrationButton = page
-          .getByRole('button', { name: /流程编排/u })
+          .getByRole('tab', { name: /流程编排/u })
           .first()
         await orchestrationButton.waitFor({
           state: 'visible',
@@ -784,6 +837,12 @@ export function createDevFlowStateObservatoryScenarios({
             viewportWidth,
             bodyScrollWidth: document.body.scrollWidth,
             documentScrollWidth: document.documentElement.scrollWidth,
+            catalogControlCount: document.querySelectorAll(
+              '.erp-dev-flow-state-controls .erp-dev-flow-state-control'
+            ).length,
+            layerToggleCount: document.querySelectorAll(
+              '[data-flow-layer-controls] input[type="checkbox"]'
+            ).length,
             overflowers,
           }
         })
@@ -793,6 +852,19 @@ export function createDevFlowStateObservatoryScenarios({
             orchestrationMetrics.documentScrollWidth <=
               orchestrationMetrics.viewportWidth + 1,
           `移动端客户差异视图不应横向溢出: ${JSON.stringify(
+            orchestrationMetrics
+          )}`
+        )
+        assert.deepEqual(
+          {
+            catalogControlCount: orchestrationMetrics.catalogControlCount,
+            layerToggleCount: orchestrationMetrics.layerToggleCount,
+          },
+          {
+            catalogControlCount: 0,
+            layerToggleCount: 0,
+          },
+          `流程编排视图不应保留状态机筛选或叠加层: ${JSON.stringify(
             orchestrationMetrics
           )}`
         )

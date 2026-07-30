@@ -1,8 +1,7 @@
 export const DEV_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
 export const DEV_COVERAGE_SESSION_API_PATH = `${DEV_COVERAGE_API_PATH}/session`
 export const DEV_COVERAGE_ACTION_API_PATH = `${DEV_COVERAGE_API_PATH}/actions`
-export const DEV_COVERAGE_OPERATION_API_PREFIX =
-  `${DEV_COVERAGE_API_PATH}/operations`
+export const DEV_COVERAGE_OPERATION_API_PREFIX = `${DEV_COVERAGE_API_PATH}/operations`
 
 export const DEV_COVERAGE_OPERATION_SCHEMA =
   'plush.dev-qa-coverage-operation-public/v1'
@@ -33,12 +32,13 @@ const STAGE_META = Object.freeze({
   go: Object.freeze({ step: 3, label: 'Go 测试与代码覆盖' }),
   'web-lint': Object.freeze({ step: 4, label: 'Web ESLint' }),
   'web-css': Object.freeze({ step: 5, label: 'Web Stylelint' }),
-  web: Object.freeze({ step: 6, label: 'Web 测试与代码覆盖' }),
-  import: Object.freeze({ step: 7, label: '导入合同' }),
-  'field-linkage': Object.freeze({ step: 8, label: '字段联动专项' }),
-  'identity-check': Object.freeze({ step: 9, label: '仓库身份核对' }),
-  aggregate: Object.freeze({ step: 10, label: '聚合覆盖报告' }),
-  finished: Object.freeze({ step: 10, label: '采集结束' }),
+  'web-error-codes': Object.freeze({ step: 6, label: '错误码生成一致性' }),
+  web: Object.freeze({ step: 7, label: 'Web 测试与代码覆盖' }),
+  import: Object.freeze({ step: 8, label: '导入合同' }),
+  'field-linkage': Object.freeze({ step: 9, label: '字段联动专项' }),
+  'identity-check': Object.freeze({ step: 10, label: '仓库身份核对' }),
+  aggregate: Object.freeze({ step: 11, label: '聚合覆盖报告' }),
+  finished: Object.freeze({ step: 11, label: '采集结束' }),
 })
 
 const STATUS_META = Object.freeze({
@@ -173,7 +173,8 @@ export function normalizeDevCoverageOperation(operation) {
     operation.status
   )
   if (
-    (terminal && (!isIsoDate(operation.finishedAt) || operation.stage !== 'finished')) ||
+    (terminal &&
+      (!isIsoDate(operation.finishedAt) || operation.stage !== 'finished')) ||
     (!terminal && operation.finishedAt !== null) ||
     (operation.status === 'completed' &&
       (!['passed', 'issues'].includes(operation.outcome) ||
@@ -226,7 +227,7 @@ export function getDevCoverageOperationPresentation(operation) {
       tone: 'default',
       stageLabel: '等待一键采集',
       step: 0,
-      totalSteps: 10,
+      totalSteps: 11,
       percentage: 0,
     }
   }
@@ -250,11 +251,11 @@ export function getDevCoverageOperationPresentation(operation) {
     tone,
     stageLabel:
       stage.step > 0
-        ? `第 ${stage.step}/10 阶段 · ${stage.label}`
+        ? `第 ${stage.step}/11 阶段 · ${stage.label}`
         : stage.label,
     step: stage.step,
-    totalSteps: 10,
-    percentage: Math.min(100, stage.step * 10),
+    totalSteps: 11,
+    percentage: Math.min(100, Math.round((stage.step / 11) * 100)),
   }
 }
 
@@ -340,8 +341,7 @@ export function createDevCoverageOperationClient({
         'coverage action result'
       )
       if (
-        payload.schemaVersion !==
-          'plush.dev-qa-coverage-action-result/v1' ||
+        payload.schemaVersion !== 'plush.dev-qa-coverage-action-result/v1' ||
         payload.action !== 'collect' ||
         typeof payload.reused !== 'boolean'
       ) {
@@ -371,8 +371,7 @@ export function createDevCoverageOperationClient({
         'coverage operation result'
       )
       if (
-        payload.schemaVersion !==
-        'plush.dev-qa-coverage-operation-result/v1'
+        payload.schemaVersion !== 'plush.dev-qa-coverage-operation-result/v1'
       ) {
         throw createRequestError()
       }

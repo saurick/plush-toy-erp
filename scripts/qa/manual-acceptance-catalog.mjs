@@ -18,14 +18,7 @@ import {
   isSupportedPrintWorkspaceTemplate,
 } from "../../web/src/erp/utils/printWorkspace.js";
 
-const EXPECTED_DESKTOP_PAGE_COUNT = 29;
-export const MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS = Object.freeze([
-  "sales-returns",
-  "finance-payments",
-]);
-const EXPECTED_FORMAL_DESKTOP_PAGE_COUNT =
-  EXPECTED_DESKTOP_PAGE_COUNT +
-  MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS.length;
+const EXPECTED_DESKTOP_PAGE_COUNT = 31;
 const EXPECTED_MOBILE_PAGE_COUNT = 9;
 const EXPECTED_PRINT_TEMPLATE_COUNT = 5;
 const FORMAL_TRIAL_ACCOUNT_COUNT = 10;
@@ -260,6 +253,20 @@ const DESKTOP_PLANS = Object.freeze({
     whatToSee: [
       "应看到客户、产品、数量、单位、交期和金额在列表、详情与编辑界面一致。",
       "应看到提交后的状态和可操作按钮符合当前进度，不会因为提交就显示已经出货或已经收款。",
+    ],
+  },
+  "sales-returns": {
+    isList: true,
+    minimumRecords: 4,
+    minimumRecordUnit: "客户退货记录",
+    keyStates: ["草稿待审批", "已批准待收货", "已收货", "已冲正"],
+    whatToDo: [
+      "你要按退货单号、来源出货和状态查找，依次打开草稿、已批准、已收货和已冲正记录。",
+      "你要核对来源出货、客户、产品、规格、退货数量、质检和退货批次，再查看已收货与已冲正记录的库存变化。",
+    ],
+    whatToSee: [
+      "应看到四种进度各有一条固定模拟记录，退货单号、来源出货、客户、产品、数量和原因前后一致。",
+      "应看到只有确认收货后才增加退货库存；冲正后保留原入库与相反记录，不能把审批完成误显示成已经收货。",
     ],
   },
   "material-bom": {
@@ -547,6 +554,20 @@ const DESKTOP_PLANS = Object.freeze({
     whatToSee: [
       "应看到客户、出货来源、金额、手续费、币种、收款分类、精确账期和状态清楚；历史缺值显示“历史未记录”，未出货记录不会被当成应收来源。",
       "应看到应收过账不等于已经收款；已结清样本能够回到正式收款核销，页面不提供直接结清旁路，取消保留明确时间与结果。",
+    ],
+  },
+  "finance-payments": {
+    isList: true,
+    minimumRecords: 4,
+    minimumRecordUnit: "收付款记录（另有 3 条红冲记录）",
+    keyStates: ["已批准待核销", "已收款", "已付款", "已冲销", "红冲", "反向红冲"],
+    whatToDo: [
+      "你要分别查看已批准待核销、已收款、已付款和已冲销记录，再切换到红冲记录。",
+      "你要核对往来单位、收付方向、金额、币种和核销明细，并打开一组原红冲与反向红冲记录。",
+    ],
+    whatToSee: [
+      "应看到四条固定收付款记录和三条固定红冲记录，原核销、冲销和恢复后的未核销金额可以相互核对。",
+      "应看到已批准不等于已经收付，已冲销记录保留原核销及相反记录；反向红冲通过关联单号回到原红冲，不覆盖历史。",
     ],
   },
   invoices: {
@@ -946,29 +967,8 @@ export function buildManualAcceptanceCatalog() {
   );
 
   assertSource(
-    formalDesktopItems.length === EXPECTED_FORMAL_DESKTOP_PAGE_COUNT,
-    `当前正式桌面路由应为 ${EXPECTED_FORMAL_DESKTOP_PAGE_COUNT} 个，实际为 ${formalDesktopItems.length} 个`,
-  );
-  const dedicatedExceptionPageKeys = new Set(
-    MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS,
-  );
-  const dedicatedExceptionItems = formalDesktopItems.filter((item) =>
-    dedicatedExceptionPageKeys.has(item.key),
-  );
-  assertSource(
-    dedicatedExceptionItems.length ===
-      MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS.length &&
-      dedicatedExceptionItems.every((item) =>
-        getRoleKeysForDesktopPage(item.key, roles).length > 0
-      ),
-    "客户退货与收付款页面必须由独立异常流真实写 companion 覆盖并保持岗位可达",
-  );
-  const baselineDesktopItems = formalDesktopItems.filter(
-    (item) => !dedicatedExceptionPageKeys.has(item.key),
-  );
-  assertSource(
-    baselineDesktopItems.length === EXPECTED_DESKTOP_PAGE_COUNT,
-    `基线只读桌面目录应为 ${EXPECTED_DESKTOP_PAGE_COUNT} 个，实际为 ${baselineDesktopItems.length} 个`,
+    formalDesktopItems.length === EXPECTED_DESKTOP_PAGE_COUNT,
+    `当前正式桌面路由应为 ${EXPECTED_DESKTOP_PAGE_COUNT} 个，实际为 ${formalDesktopItems.length} 个`,
   );
   assertSource(
     roleWorkbenches.length === EXPECTED_MOBILE_PAGE_COUNT,
@@ -1014,7 +1014,7 @@ export function buildManualAcceptanceCatalog() {
     createAcceptanceItem(item, ENTRY_PLANS[item.key], roleByKey),
   );
 
-  const desktopTechnical = baselineDesktopItems.map((item) => {
+  const desktopTechnical = formalDesktopItems.map((item) => {
     const plan = DESKTOP_PLANS[item.key];
     assertSource(plan, `桌面页 ${item.key} 缺少验收方案`);
     assertSource(

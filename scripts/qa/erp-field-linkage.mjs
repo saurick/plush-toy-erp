@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -117,6 +117,8 @@ export const runFieldLinkageQa = async ({
   repositoryReader = () => readRepositoryIdentity(rootDir),
   executeCommand = runCommand,
   makeDirectory = mkdir,
+  makeTemporaryDirectory = mkdtemp,
+  moveFile = rename,
   removeFile = rm,
   writeTap = writeFile,
   outputDirectory = outputDir,
@@ -124,34 +126,52 @@ export const runFieldLinkageQa = async ({
   coverageReportFile = reportPath,
 } = {}) => {
   const expectedRepository = await repositoryReader()
-  await removeFile(coverageReportFile, { force: true })
-  await removeFile(nodeTapFile, { force: true })
   await makeDirectory(outputDirectory, { recursive: true })
+  await makeDirectory(path.dirname(nodeTapFile), { recursive: true })
+  await makeDirectory(path.dirname(coverageReportFile), { recursive: true })
+  const stagingDirectory = await makeTemporaryDirectory(
+    path.join(path.dirname(coverageReportFile), '.field-linkage-staging-')
+  )
+  const stagedTapFile = path.join(stagingDirectory, 'node-test.tap')
+  const stagedReportFile = path.join(
+    stagingDirectory,
+    'field-linkage.latest.json'
+  )
 
-  const nodeResult = await executeCommand({
-    command: process.execPath,
-    args: ['--test', '--test-reporter=tap', ...testFiles],
-    cwd: path.join(rootDir, 'web'),
-  })
-  assertRepositoryIdentityEqual(expectedRepository, await repositoryReader())
-  await writeTap(nodeTapFile, sanitizeNodeTap(nodeResult.stdout), 'utf8')
+  try {
+    const nodeResult = await executeCommand({
+      command: process.execPath,
+      args: ['--test', '--test-reporter=tap', ...testFiles],
+      cwd: path.join(rootDir, 'web'),
+    })
+    assertRepositoryIdentityEqual(expectedRepository, await repositoryReader())
+    await writeTap(stagedTapFile, sanitizeNodeTap(nodeResult.stdout), 'utf8')
 
-  await executeCommand({
-    command: process.execPath,
-    args: [
-      builderPath,
-      '--node-tap',
-      nodeTapFile,
-      '--output',
-      coverageReportFile,
-      '--command',
-      commandLabel,
-      '--expected-repository',
-      JSON.stringify(expectedRepository),
-    ],
-    cwd: rootDir,
-  })
-  return expectedRepository
+    await executeCommand({
+      command: process.execPath,
+      args: [
+        builderPath,
+        '--node-tap',
+        stagedTapFile,
+        '--output',
+        stagedReportFile,
+        '--command',
+        commandLabel,
+        '--expected-repository',
+        JSON.stringify(expectedRepository),
+      ],
+      cwd: rootDir,
+    })
+    assertRepositoryIdentityEqual(expectedRepository, await repositoryReader())
+
+    // The report is authoritative and is promoted last. Any test, builder or
+    // identity failure before this point leaves the previous canonical pair.
+    await moveFile(stagedTapFile, nodeTapFile)
+    await moveFile(stagedReportFile, coverageReportFile)
+    return expectedRepository
+  } finally {
+    await removeFile(stagingDirectory, { recursive: true, force: true })
+  }
 }
 
 const main = async () => {

@@ -67,13 +67,13 @@ const VIEW_OPTIONS = [
     value: VIEW_DIFF,
   },
   {
-    label: '界面配置',
-    description: '菜单、字段与打印模板',
+    label: '界面投影',
+    description: '菜单、字段与打印模板只读预览',
     value: VIEW_ASSETS,
   },
   {
-    label: '执行发布',
-    description: 'Dry Run、测试应用与门禁',
+    label: '执行与发布门禁',
+    description: '试跑、测试应用与只读门禁',
     value: VIEW_IMPORT,
   },
 ]
@@ -402,7 +402,7 @@ function buildDryRunReportPreviewLines(result = {}) {
   ]
 }
 
-function DryRunSummary({ dryRunState, onRunDryRun }) {
+function DryRunSummary({ dryRunState }) {
   const [showReportPreview, setShowReportPreview] = useState(false)
 
   if (dryRunState.status === 'idle') {
@@ -454,13 +454,6 @@ function DryRunSummary({ dryRunState, onRunDryRun }) {
         description="测试版页面已生成证据；该结果仍不代表正式导入批准。"
       />
       <div className="erp-dev-customer-dry-run-actions">
-        <Button
-          type="primary"
-          loading={dryRunState.status === 'running'}
-          onClick={onRunDryRun}
-        >
-          重新运行试跑
-        </Button>
         <Button
           icon={<CopyOutlined />}
           onClick={() => copyText(result.outputPath || '')}
@@ -525,7 +518,6 @@ function TestApplySummary({
   applyState,
   canApplyTestConfig,
   unavailableReason,
-  onApplyTestConfig,
 }) {
   if (applyState.status === 'idle') {
     if (!canApplyTestConfig) {
@@ -587,14 +579,6 @@ function TestApplySummary({
       />
       <div className="erp-dev-customer-test-apply-actions">
         <Button
-          type="primary"
-          loading={applyState.status === 'running'}
-          disabled={!canApplyTestConfig}
-          onClick={onApplyTestConfig}
-        >
-          重新应用测试配置
-        </Button>
-        <Button
           icon={<CopyOutlined />}
           onClick={() => copyText(result.manifestPath || '')}
         >
@@ -648,12 +632,7 @@ function TestApplySummary({
   )
 }
 
-function ReleaseApplySummary({
-  releaseState,
-  releaseBatch,
-  executeTemplateCommand,
-  onCheckReleaseReadiness,
-}) {
+function ReleaseApplySummary({ releaseState, releaseBatch }) {
   if (releaseState.status === 'idle') {
     return (
       <Alert
@@ -696,7 +675,6 @@ function ReleaseApplySummary({
           ))}
         </div>
         <div className="erp-dev-customer-release-actions">
-          <Button onClick={onCheckReleaseReadiness}>重新检查发布门禁</Button>
           <Button
             icon={<CopyOutlined />}
             onClick={() =>
@@ -733,14 +711,6 @@ function ReleaseApplySummary({
         description="这只证明当前清单与所选证据批次满足只读门禁。页面不直接发布或激活正式配置；下一步由统一执行器显式确认目标端点、令牌、确认短语，并生成 release report 与 authenticated readback。"
       />
       <div className="erp-dev-customer-release-actions">
-        <Button onClick={onCheckReleaseReadiness}>重新检查发布门禁</Button>
-        <Button
-          type="primary"
-          icon={<CopyOutlined />}
-          onClick={() => copyText(executeTemplateCommand)}
-        >
-          复制正式执行器输入模板
-        </Button>
         <Button
           icon={<CopyOutlined />}
           onClick={() => copyText(result.manifestPath || '', '已复制清单路径')}
@@ -1023,8 +993,8 @@ function OverviewPanel({ overview, onNavigate }) {
           />
           <QuickAction
             icon={<DatabaseOutlined />}
-            title="看工具"
-            note="试跑和报告命令"
+            title="进入执行与发布门禁"
+            note="试跑、测试配置应用与正式发布门禁"
             status="blocked_by_design"
             onClick={() => onNavigate(VIEW_IMPORT)}
           />
@@ -1677,9 +1647,11 @@ function ImportPanel({
             disabled={!importSummary.canRunUiDryRun}
             onClick={onRunDryRun}
           >
-            运行测试试跑
+            {dryRunState.status === 'success'
+              ? '重新运行测试试跑'
+              : '运行测试试跑'}
           </Button>
-          <DryRunSummary dryRunState={dryRunState} onRunDryRun={onRunDryRun} />
+          <DryRunSummary dryRunState={dryRunState} />
         </section>
       ) : null}
       {activeAction === IMPORT_ACTION_TEST_APPLY ? (
@@ -1697,11 +1669,14 @@ function ImportPanel({
             <div className="erp-dev-customer-test-apply-primary">
               <Button
                 type="primary"
+                danger
                 loading={applyState.status === 'running'}
                 disabled={!importSummary.canApplyTestConfig}
                 onClick={onApplyTestConfig}
               >
-                应用到当前后端
+                {applyState.status === 'success'
+                  ? '重新应用到当前后端'
+                  : '应用到当前后端'}
               </Button>
               <Text type="secondary">
                 {importSummary.canApplyTestConfig
@@ -1713,7 +1688,6 @@ function ImportPanel({
               applyState={applyState}
               canApplyTestConfig={importSummary.canApplyTestConfig}
               unavailableReason={importSummary.testApply.note}
-              onApplyTestConfig={onApplyTestConfig}
             />
           </section>
           <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
@@ -1777,18 +1751,21 @@ function ImportPanel({
             ) : null}
             <div className="erp-dev-customer-release-primary">
               <Button
-                type="default"
+                type={releaseState.status === 'success' ? 'default' : 'primary'}
                 loading={releaseState.status === 'checking'}
                 disabled={
                   !importSummary.canCheckReleaseReadiness || !releaseBatch
                 }
                 onClick={onCheckReleaseReadiness}
               >
-                检查发布门禁
+                {['blocked', 'error', 'success'].includes(releaseState.status)
+                  ? '重新检查发布门禁'
+                  : '检查发布门禁'}
               </Button>
               <Button
-                type="primary"
+                type={releaseState.status === 'success' ? 'primary' : 'default'}
                 icon={<CopyOutlined />}
+                disabled={releaseState.status !== 'success'}
                 onClick={() => copyText(importSummary.releaseApply.command)}
               >
                 复制正式执行器输入模板
@@ -1800,8 +1777,6 @@ function ImportPanel({
             <ReleaseApplySummary
               releaseState={releaseState}
               releaseBatch={releaseBatch}
-              executeTemplateCommand={importSummary.releaseApply.command}
-              onCheckReleaseReadiness={onCheckReleaseReadiness}
             />
             <div className="erp-dev-customer-formal-gates">
               {importSummary.formalGates.map((gate) => (
@@ -2329,6 +2304,7 @@ export default function DevCustomerConfigPage() {
       content:
         '该操作会用当前管理员登录态，通过 Vite /rpc 的 loopback 后端向已登记的本地开发库写入客户配置控制面，并激活内容寻址的本地测试版本；不会导入客户业务数据，也不代表正式发布通过。',
       okText: '确认应用测试配置',
+      okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: handleApplyTestConfig,
     })
@@ -2457,6 +2433,7 @@ export default function DevCustomerConfigPage() {
           {isMissingCustomer ? null : (
             <DevTaskNav
               compact
+              level="primary"
               className="erp-dev-customer-view-switch"
               ariaLabel="客户配置工作任务"
               items={VIEW_OPTIONS}

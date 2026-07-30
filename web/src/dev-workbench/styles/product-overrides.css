@@ -3,6 +3,224 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.erp-dev-testing-validation {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  border: 1px solid #c8ddd2;
+  border-radius: 16px;
+  background: #f4faf7;
+  padding: 14px;
+}
+
+.erp-dev-testing-validation__title,
+.erp-dev-testing-validation-plan__head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.erp-dev-testing-validation__title .ant-typography,
+.erp-dev-testing-validation-plan__head .ant-typography {
+  margin-bottom: 0;
+}
+
+.erp-dev-testing-validation__title h2.ant-typography {
+  margin-top: 0;
+  font-size: 20px;
+}
+
+.erp-dev-testing-validation__title p.ant-typography,
+.erp-dev-testing-validation-plan__head p.ant-typography {
+  max-width: 760px;
+  margin-top: 5px;
+  color: #647067;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.erp-dev-testing-validation-plan,
+.erp-dev-testing-validation-action {
+  min-width: 0;
+  border: 1px solid #d5e4dc;
+  border-radius: 13px;
+  background: #ffffff;
+}
+
+.erp-dev-testing-validation-plan {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.erp-dev-testing-validation-plan__head > div {
+  min-width: 0;
+}
+
+.erp-dev-testing-validation-plan__head h3.ant-typography {
+  display: inline;
+  margin: 0 0 0 2px;
+  font-size: 16px;
+}
+
+.erp-dev-testing-validation-plan__body {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.erp-dev-testing-validation-plan__identity {
+  display: grid;
+  grid-template-columns:
+    minmax(100px, 0.7fr) minmax(130px, 1fr) minmax(100px, 0.7fr)
+    minmax(210px, 1.6fr);
+  gap: 8px;
+}
+
+.erp-dev-testing-validation-plan__identity > span {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 5px;
+  border: 1px solid #e4ede7;
+  border-radius: 9px;
+  background: #f8fbf9;
+  padding: 9px 10px;
+}
+
+.erp-dev-testing-validation-plan__identity small,
+.erp-dev-testing-validation-plan__note,
+.erp-dev-testing-validation-plan__empty {
+  color: #647067;
+  font-size: 12px;
+}
+
+.erp-dev-testing-validation-plan__identity code {
+  color: #475569;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-validation-plan__lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-dev-testing-validation-plan__lists > div {
+  min-width: 0;
+  border: 1px solid #e4ede7;
+  border-radius: 9px;
+  background: #fbfdfc;
+  padding: 10px 12px;
+}
+
+.erp-dev-testing-validation-plan__lists ol,
+.erp-dev-testing-validation-plan__lists ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.erp-dev-testing-validation-plan__lists li,
+.erp-dev-testing-validation-plan__lists p {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-validation-plan__lists li code {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 3px;
+  border-radius: 6px;
+  background: #eef7ef;
+  color: #173f2a;
+  padding: 3px 6px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-validation-plan__note,
+.erp-dev-testing-validation-plan__empty {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.erp-dev-testing-validation__actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-dev-testing-validation-action {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: 12px;
+  box-shadow: inset 3px 0 0 #0f766e;
+}
+
+.erp-dev-testing-validation-action--success {
+  box-shadow: inset 3px 0 0 #16a34a;
+}
+
+.erp-dev-testing-validation-action--warning {
+  box-shadow: inset 3px 0 0 #d97706;
+}
+
+.erp-dev-testing-validation-action--danger {
+  box-shadow: inset 3px 0 0 #dc2626;
+}
+
+.erp-dev-testing-validation-action__head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dev-testing-validation-action__head .ant-tag {
+  margin-inline-end: 4px;
+}
+
+.erp-dev-testing-validation-action__head small,
+.erp-dev-testing-validation-action__boundary {
+  color: #647067;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.erp-dev-testing-validation-action h3.ant-typography {
+  margin: 0;
+  font-size: 16px;
+}
+
+.erp-dev-testing-validation-action p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-validation-action__message {
+  border-radius: 8px;
+  background: #f4f7f5;
+  padding: 7px 8px;
+}
+
+.erp-dev-testing-validation-action .ant-btn {
+  width: 100%;
+  margin-top: auto;
+}
+
 @media screen and (max-width: 1023px) {
   .erp-dev-hub-pinned__grid {
     grid-template-columns: 1fr;
@@ -42,7 +260,6 @@
   .erp-dev-governance-main,
   .erp-dev-prototypes-sidebar,
   .erp-dev-prototypes-reader,
-  .erp-dev-testing-sidebar,
   .erp-dev-testing-reader {
     max-height: none;
   }
@@ -55,16 +272,20 @@
     max-height: 360px;
   }
 
-  .erp-dev-testing-doc-list {
-    max-height: 360px;
-  }
-
   .erp-dev-testing-tier-grid {
     grid-template-columns: 1fr;
   }
 
   .erp-dev-testing-presets {
     grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-validation__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-validation-plan__identity {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .erp-dev-testing-coverage-identity,
@@ -131,7 +352,6 @@
   .erp-dev-prototypes-sidebar,
   .erp-dev-prototypes-reader,
   .erp-dev-testing-header,
-  .erp-dev-testing-sidebar,
   .erp-dev-testing-reader {
     border-radius: 12px;
   }
@@ -213,6 +433,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .erp-dev-testing-command-tools {
+    grid-template-columns: 1fr;
+  }
+
   .erp-dev-testing-filter__item {
     width: 100%;
   }
@@ -223,24 +447,33 @@
 
   .erp-dev-testing-reader__toolbar .ant-segmented-group {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
   }
 
   .erp-dev-testing-reader__toolbar .ant-segmented-item-label {
-    min-height: 32px;
-    padding-inline: 6px;
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 6px;
+    line-height: 1.25;
+    white-space: normal;
   }
 
   .erp-dev-testing-coverage-actions,
   .erp-dev-testing-coverage-operation__head,
   .erp-dev-testing-coverage-section__head,
-  .erp-dev-testing-coverage-card__head {
+  .erp-dev-testing-coverage-card__head,
+  .erp-dev-testing-validation__title,
+  .erp-dev-testing-validation-plan__head,
+  .erp-dev-testing-validation-action__head {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .erp-dev-testing-coverage-actions .ant-btn {
+  .erp-dev-testing-coverage-actions .ant-btn,
+  .erp-dev-testing-validation-plan__head .ant-btn {
     width: 100%;
   }
 
@@ -255,6 +488,15 @@
     border-right: 0;
     border-bottom: 1px solid #e4ede7;
     padding: 0 0 8px;
+  }
+
+  .erp-dev-testing-validation {
+    padding: 10px;
+  }
+
+  .erp-dev-testing-validation-plan__identity,
+  .erp-dev-testing-validation-plan__lists {
+    grid-template-columns: 1fr;
   }
 
   .erp-dev-prototypes-reader__meta,
@@ -306,7 +548,6 @@
 
 /* Extracted from src/erp/styles/app/business-responsive.css for DEV-only loading. */
 @media screen and (max-width: 1200px) {
-
   .erp-dev-customer-decision-grid,
   .erp-dev-customer-quick-actions,
   .erp-dev-customer-review-list,
@@ -320,7 +561,6 @@
 }
 
 @media screen and (max-width: 980px) {
-
   .erp-dev-customer-header {
     flex-direction: column;
   }
@@ -373,7 +613,6 @@
 }
 
 @media screen and (max-width: 768px) {
-
   .erp-dev-capability-page {
     padding: 12px;
   }
@@ -1087,12 +1326,12 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-testing-header,
-[data-erp-theme='dark'] .erp-dev-testing-sidebar,
 [data-erp-theme='dark'] .erp-dev-testing-reader,
 [data-erp-theme='dark'] .erp-dev-testing-metric,
 [data-erp-theme='dark'] .erp-dev-testing-tier,
 [data-erp-theme='dark'] .erp-dev-testing-command-block,
-[data-erp-theme='dark'] .erp-dev-testing-doc-detail {
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan,
+[data-erp-theme='dark'] .erp-dev-testing-validation-action {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
   color: var(--erp-text);
@@ -1103,7 +1342,8 @@
 
 [data-erp-theme='dark'] .erp-dev-testing-reader__toolbar,
 [data-erp-theme='dark'] .erp-dev-testing-preset,
-[data-erp-theme='dark'] .erp-dev-testing-doc-detail__stats span {
+[data-erp-theme='dark'] .erp-dev-testing-command-tools,
+[data-erp-theme='dark'] .erp-dev-testing-validation {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text-muted);
@@ -1112,8 +1352,11 @@
 [data-erp-theme='dark'] .erp-dev-testing-title.ant-typography,
 [data-erp-theme='dark'] .erp-dev-testing-metric__value,
 [data-erp-theme='dark'] .erp-dev-testing-preset__label,
-[data-erp-theme='dark'] .erp-dev-testing-doc-row__title,
-[data-erp-theme='dark'] .erp-dev-testing-tier__title {
+[data-erp-theme='dark'] .erp-dev-testing-tier__title,
+[data-erp-theme='dark'] .erp-dev-testing-validation h2.ant-typography,
+[data-erp-theme='dark'] .erp-dev-testing-validation h3.ant-typography,
+[data-erp-theme='dark'] .erp-dev-testing-validation strong,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__identity b {
   color: var(--erp-text);
 }
 
@@ -1121,14 +1364,14 @@
 [data-erp-theme='dark'] .erp-dev-testing-metric__label,
 [data-erp-theme='dark'] .erp-dev-testing-metric__note,
 [data-erp-theme='dark'] .erp-dev-testing-preset__desc,
-[data-erp-theme='dark'] .erp-dev-testing-doc-row__path,
-[data-erp-theme='dark'] .erp-dev-testing-doc-row__meta,
 [data-erp-theme='dark'] .erp-dev-testing-command-block__path,
-[data-erp-theme='dark'] .erp-dev-testing-doc-detail__path,
 [data-erp-theme='dark'] .erp-dev-testing-tier__type,
 [data-erp-theme='dark'] .erp-dev-testing-tier__desc,
-[data-erp-theme='dark'] .erp-dev-testing-doc-detail__stats span,
-[data-erp-theme='dark'] .erp-dev-testing-doc-detail__note.ant-typography {
+[data-erp-theme='dark'] .erp-dev-testing-validation p,
+[data-erp-theme='dark'] .erp-dev-testing-validation small,
+[data-erp-theme='dark'] .erp-dev-testing-validation-action__boundary,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__note,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__empty {
   color: var(--erp-text-muted);
 }
 
@@ -1143,21 +1386,16 @@
   color: #99f6e4;
 }
 
-[data-erp-theme='dark'] .erp-dev-testing-doc-row,
 [data-erp-theme='dark'] .erp-dev-testing-filter__item {
   border-color: #334155;
   background: #111827;
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-dev-testing-doc-row,
 [data-erp-theme='dark'] .erp-dev-testing-preset {
   box-shadow: inset 3px 0 0 #134e4a;
 }
 
-[data-erp-theme='dark'] .erp-dev-testing-doc-row:hover,
-[data-erp-theme='dark'] .erp-dev-testing-doc-row:focus-visible,
-[data-erp-theme='dark'] .erp-dev-testing-doc-row--active,
 [data-erp-theme='dark'] .erp-dev-testing-preset:hover,
 [data-erp-theme='dark'] .erp-dev-testing-preset:focus-visible,
 [data-erp-theme='dark'] .erp-dev-testing-filter__item:hover,
@@ -1174,10 +1412,6 @@
   box-shadow: inset 3px 0 0 #5eead4;
 }
 
-[data-erp-theme='dark'] .erp-dev-testing-doc-row--active {
-  box-shadow: inset 3px 0 0 #5eead4;
-}
-
 [data-erp-theme='dark'] .erp-dev-testing-command-block__head {
   border-bottom-color: var(--erp-border);
 }
@@ -1185,6 +1419,24 @@
 [data-erp-theme='dark'] .erp-dev-testing-command-block pre {
   background: #020617;
   color: #dbeafe;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__identity > span,
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__lists > div {
+  border-color: var(--erp-border);
+  background: #0f172a;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__identity :where(code),
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__lists :where(li),
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__lists :where(p) {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-validation-plan__lists :where(li code),
+[data-erp-theme='dark'] .erp-dev-testing-validation-action__message {
+  background: var(--erp-interactive-bg-hover);
+  color: #99f6e4;
 }
 
 [data-erp-theme='dark'] .erp-dev-prototypes-page {

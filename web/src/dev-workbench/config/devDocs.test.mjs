@@ -52,9 +52,43 @@ test('devDocs: 只通过开发态独立路径暴露', () => {
   assert.equal(isDevDocsEnabled({}), false)
   assert(!DEV_DOCS_ROUTE.startsWith('/erp/'))
   assert.match(devDocsPageSource, /config\/customers\/\*\*\/\*\.md/u)
+  assert.match(devDocsPageSource, /'\.\.\/\.\.\/\.\.\/scripts\/README\.md'/u)
+  assert.match(
+    devDocsPageSource,
+    /'\.\.\/\.\.\/\.\.\/\.\.\/server\/deploy\/README\.md'/u
+  )
+  assert.match(
+    devDocsPageSource,
+    /'\.\.\/\.\.\/\.\.\/\.\.\/server\/deploy\/compose\/prod\/README\.md'/u
+  )
   assert.match(
     devDocsPageSource,
     /aria-current=\{active \? 'true' : undefined\}/u
+  )
+})
+
+test('devDocs: 搜索空结果不保留越界选中项或阅读动作', () => {
+  assert.match(
+    devDocsPageSource,
+    /const isSearching = trimmedKeyword\.length > 0/u
+  )
+  assert.match(
+    devDocsPageSource,
+    /isSearching[\s\S]*?visibleDocs\.find\(\(item\) => item\.key === selectedKey\)/u
+  )
+  assert.match(
+    devDocsPageSource,
+    /visibleDocs\[0\] \|\|[\s\S]*?\(isSearching \? undefined : docsWithPinnedState\[0\]\)/u
+  )
+  assert.match(devDocsPageSource, /<DevPageNav \/>/u)
+  assert.doesNotMatch(devDocsPageSource, /<DevPageNav sourcePath=/u)
+  assert.match(
+    devDocsPageSource,
+    /\{selectedDoc \? \([\s\S]*?erp-dev-docs-reader__toolbar[\s\S]*?\) : null\}/u
+  )
+  assert.match(
+    devDocsPageSource,
+    /description="没有匹配的文档，阅读操作已隐藏"/u
   )
 })
 
@@ -63,6 +97,7 @@ test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registr
     '../../../../README.md': '# 仓库 README',
     '../../../../AGENTS.md': '# 协作约定',
     '../../../README.md': '# 前端 README',
+    '../../../scripts/README.md': '# Web 脚本说明',
     '../../../../docs/当前真源与交接顺序.md': '# 当前真源与交接顺序',
     '../../../../docs/product/产品完成路线图.md': '# 产品完成路线图',
     '../../../../docs/archive/progress-2026-06-02-before-print-template-defer.md':
@@ -70,6 +105,8 @@ test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registr
     '../../../../docs/customers/yoyoosun/README.md': '# 永绅客户资料边界',
     '../../../../config/customers/yoyoosun/README.md':
       '# 永绅 yoyoosun 客户配置',
+    '../../../../server/deploy/README.md': '# 服务端部署说明',
+    '../../../../server/deploy/compose/prod/README.md': '# 生产 Compose 说明',
   })
 
   const keys = docs.map((item) => item.key)
@@ -83,6 +120,9 @@ test('devDocs: 当前工作区开发文档列表不恢复产品内文档 registr
   assert(paths.includes('README.md'))
   assert(paths.includes('AGENTS.md'))
   assert(paths.includes('web/README.md'))
+  assert(paths.includes('web/scripts/README.md'))
+  assert(paths.includes('server/deploy/README.md'))
+  assert(paths.includes('server/deploy/compose/prod/README.md'))
   assert(paths.includes('docs/当前真源与交接顺序.md'))
   assert(
     paths.includes(

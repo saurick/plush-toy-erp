@@ -269,23 +269,9 @@ export default function DevDatabaseMigrationPage() {
       title: '操作',
       key: 'action',
       align: 'right',
-      width: 180,
+      width: 96,
       render: (_value, record) => (
-        <Space>
-          <Button onClick={() => setOperationDetail(record)}>查看</Button>
-          {record.status === 'ready' ? (
-            <Button
-              type="primary"
-              danger
-              onClick={() => {
-                setConfirmationOperation(record)
-                setConfirmationText('')
-              }}
-            >
-              确认升级
-            </Button>
-          ) : null}
-        </Space>
+        <Button onClick={() => setOperationDetail(record)}>查看</Button>
       ),
     },
   ]
@@ -520,6 +506,14 @@ export default function DevDatabaseMigrationPage() {
         confirmLoading={
           actionKey === `execute:${confirmationOperation?.id || ''}`
         }
+        cancelButtonProps={{
+          disabled: actionKey === `execute:${confirmationOperation?.id || ''}`,
+        }}
+        closable={actionKey !== `execute:${confirmationOperation?.id || ''}`}
+        maskClosable={
+          actionKey !== `execute:${confirmationOperation?.id || ''}`
+        }
+        keyboard={actionKey !== `execute:${confirmationOperation?.id || ''}`}
         okButtonProps={{
           danger: true,
           disabled:
@@ -542,6 +536,9 @@ export default function DevDatabaseMigrationPage() {
           }
         }}
         onCancel={() => {
+          if (actionKey === `execute:${confirmationOperation?.id || ''}`) {
+            return
+          }
           setConfirmationOperation(null)
           setConfirmationText('')
         }}
@@ -574,6 +571,7 @@ export default function DevDatabaseMigrationPage() {
           </Text>
           <Input
             autoFocus
+            aria-label="数据库升级确认文本"
             value={confirmationText}
             maxLength={180}
             placeholder="粘贴完整确认文本"

@@ -20,6 +20,14 @@ import {
 } from './devDelivery.mjs'
 
 const SHA = 'a'.repeat(40)
+const versionCenterPageSource = readFileSync(
+  new URL('../pages/DevVersionCenterPage.jsx', import.meta.url),
+  'utf8'
+)
+const databaseMigrationPageSource = readFileSync(
+  new URL('../pages/DevDatabaseMigrationPage.jsx', import.meta.url),
+  'utf8'
+)
 
 function response(payload, ok = true) {
   return {
@@ -155,11 +163,7 @@ test('delivery client reuses one CSRF session and posts only the fixed action en
   })
   assert.equal((await client.summary()).versions.length, 1)
   assert.equal(
-    (
-      await client.operation(
-        '11111111-1111-4111-8111-111111111111'
-      )
-    ).status,
+    (await client.operation('11111111-1111-4111-8111-111111111111')).status,
     'passed'
   )
   await client.action('dispatch-release', {
@@ -173,9 +177,8 @@ test('delivery client reuses one CSRF session and posts only the fixed action en
     idempotencyKey: 'version-center:release:fixed-0001',
   })
   assert.equal(
-    requests.filter(
-      (request) => request.url === DEV_DELIVERY_SESSION_API_PATH
-    ).length,
+    requests.filter((request) => request.url === DEV_DELIVERY_SESSION_API_PATH)
+      .length,
     1
   )
   assert.equal(
@@ -242,10 +245,7 @@ test('version actions distinguish newer promotion from older rollback', () => {
   )
   assert.equal(deliveryVersionActionKind(current, current), 'current')
   assert.equal(
-    deliveryVersionActionKind(
-      { gitSha: SHA, publishedAt: '' },
-      current
-    ),
+    deliveryVersionActionKind({ gitSha: SHA, publishedAt: '' }, current),
     'blocked'
   )
   assert.equal(
@@ -255,10 +255,7 @@ test('version actions distinguish newer promotion from older rollback', () => {
 })
 
 test('version center page does not expose shell, SSH or arbitrary target inputs', () => {
-  const source = readFileSync(
-    new URL('../pages/DevVersionCenterPage.jsx', import.meta.url),
-    'utf8'
-  )
+  const source = versionCenterPageSource
   assert.match(source, /exact SHA/u)
   assert.match(source, /test-133/u)
   assert.match(source, /查看详情/u)
@@ -268,4 +265,40 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
     /(?:spawn|child_process|192[.]168|\/home\/simon)/iu
   )
   assert.doesNotMatch(source, /name=["'](?:host|path|command|target)["']/iu)
+})
+
+test('delivery pages expose one canonical dangerous action and lock concurrent mutations', () => {
+  assert.equal(
+    databaseMigrationPageSource.match(/确认升级并重启/gu)?.length,
+    2,
+    'one ready-state button and its confirmation modal may share the action label'
+  )
+  assert.equal(
+    databaseMigrationPageSource.match(/setConfirmationOperation\(record\)/gu)
+      ?.length || 0,
+    0,
+    'operation history must stay read-only'
+  )
+  assert.match(
+    databaseMigrationPageSource,
+    /cancelButtonProps=\{\{[\s\S]*?disabled:[\s\S]*?execute:/u
+  )
+  assert.match(databaseMigrationPageSource, /danger: true/u)
+
+  assert.match(versionCenterPageSource, /mutationInFlightRef/u)
+  assert.match(versionCenterPageSource, /hasOpenOperation/u)
+  assert.match(versionCenterPageSource, /POLLING_OPERATION_STATUSES/u)
+  assert.match(versionCenterPageSource, /setOperationPollError/u)
+  assert.match(
+    versionCenterPageSource,
+    /danger: confirmOperation\?\.action === 'rollback'/u
+  )
+  assert.doesNotMatch(
+    versionCenterPageSource,
+    /danger: confirmOperation\?\.action === 'promote'/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /cancelButtonProps=\{\{[\s\S]*?disabled: actionKey === 'dispatch-release'/u
+  )
 })

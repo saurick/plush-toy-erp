@@ -667,13 +667,18 @@ export default function DevPrototypesPage() {
         <aside className="erp-dev-prototypes-sidebar">
           <Input
             allowClear
+            aria-label="搜索产品原型"
             value={keyword}
             prefix={<SearchOutlined />}
             placeholder="搜索名称、目录、用途、参照范围"
             className="erp-dev-prototypes-search"
             onChange={(event) => updateKeyword(event.target.value)}
           />
-          <div className="erp-dev-prototypes-filter" aria-label="按状态筛选">
+          <div
+            className="erp-dev-prototypes-filter"
+            role="group"
+            aria-label="按状态筛选"
+          >
             {DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => (
               <button
                 key={option.value}

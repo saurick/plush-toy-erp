@@ -43,3 +43,14 @@ test("gate receipt runner preserves child failure", () => {
     { exitCode: 7, status: "failed" },
   );
 });
+
+test("gate receipt runner fails closed when repository identity changes", () => {
+  assert.deepEqual(
+    evaluateReceiptGateRun({
+      childStatus: 0,
+      identityMatches: false,
+      summary: { executed: 2, passed: 2, failed: 0, skipped: 0 },
+    }),
+    { exitCode: 2, status: "failed" },
+  );
+});

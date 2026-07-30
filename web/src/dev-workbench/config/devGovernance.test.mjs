@@ -28,6 +28,10 @@ const devPageNavSource = readFileSync(
   new URL('../components/DevPageNav.jsx', import.meta.url),
   'utf8'
 )
+const devTaskNavSource = readFileSync(
+  new URL('../components/DevTaskNav.jsx', import.meta.url),
+  'utf8'
+)
 const devNavigationStyles = readFileSync(
   new URL('../styles/dev-navigation.css', import.meta.url),
   'utf8'
@@ -44,8 +48,10 @@ test('devGovernance: route and dev gate stay dev-only', () => {
 
 test('devGovernance: shared dev page nav exposes workspace routes and unique deep-link actions', () => {
   assert.match(devPageNavSource, /useLocation/)
-  assert.match(devPageNavSource, /useNavigate/)
-  assert.match(devPageNavSource, /navigate\(item\.route\)/)
+  assert.match(devPageNavSource, /import \{ Link, useLocation \}/)
+  assert.match(devPageNavSource, /to=\{item\.route\}/)
+  assert.doesNotMatch(devPageNavSource, /useNavigate/)
+  assert.doesNotMatch(devPageNavSource, /navigate\(item\.route\)/)
   assert.match(
     devPageNavSource,
     /`\$\{DEV_DOCS_ROUTE\}\?path=\$\{encodeURIComponent\(sourcePath\)\}`/
@@ -72,7 +78,12 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
     devPageNavSource,
     /location\.pathname\.replace\(\/\\\/\+\$\/, ''\)/
   )
+  assert.match(devPageNavSource, /aria-current=\{isExact \? 'page'/)
   assert.match(devPageNavSource, /aria-current=\{isActive \? 'page'/)
+  assert.match(devPageNavSource, /erp-dev-workspace-nav__route--context/)
+  assert.match(devPageNavSource, /currentWorkspaceItem\s*\?\s*\[\]\s*:/)
+  assert.match(devPageNavSource, /scrollIntoView/)
+  assert.match(devPageNavSource, /href=\{sourceHref\}/)
   assert.match(devPageNavSource, /aria-label="开发工作台页面"/)
 
   for (const accessibleName of ['复制当前开发页深链', '在开发文档中打开来源']) {
@@ -101,6 +112,18 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
     devNavigationStyles,
     /@media \(max-width: 980px\)[\s\S]*?\.erp-dev-workspace-nav__theme-toggle\.erp-theme-menu-toggle\.ant-btn\s*\{\s*width:\s*auto;\s*\}/u
   )
+})
+
+test('devGovernance: task navigation is an accessible tab set rather than a false stepper', () => {
+  assert.match(devTaskNavSource, /role="tablist"/u)
+  assert.match(devTaskNavSource, /role="tab"/u)
+  assert.match(devTaskNavSource, /aria-selected=\{isActive\}/u)
+  assert.match(devTaskNavSource, /tabIndex=\{isActive \? 0 : -1\}/u)
+  assert.match(devTaskNavSource, /event\.key === 'ArrowRight'/u)
+  assert.match(devTaskNavSource, /event\.key === 'ArrowLeft'/u)
+  assert.match(devTaskNavSource, /event\.key === 'Home'/u)
+  assert.match(devTaskNavSource, /event\.key === 'End'/u)
+  assert.doesNotMatch(devTaskNavSource, /aria-current="step"/u)
 })
 
 test('devGovernance: axis and scope use canonical URL state for share and history restore', () => {

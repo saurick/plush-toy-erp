@@ -25,6 +25,12 @@ import {
   transitionCoverageOperation,
 } from '../../scripts/qa/dev-coverage-operation-store.mjs'
 import {
+  acquireDevQaExecutionLock,
+  attachDevQaExecutionChild,
+  readDevQaExecutionLock,
+  releaseDevQaExecutionLock,
+} from '../../scripts/qa/dev-qa-execution-lock.mjs'
+import {
   isLoopbackHostHeader,
   isLoopbackRemoteAddress,
 } from './devServerSecurity.mjs'
@@ -57,6 +63,7 @@ const COVERAGE_STAGE_MESSAGES = Object.freeze({
   go: '正在采集 Go 测试与代码覆盖',
   'web-lint': '正在执行 Web ESLint',
   'web-css': '正在执行 Web Stylelint',
+  'web-error-codes': '正在校验错误码生成一致性',
   web: '正在采集 Web 测试与代码覆盖',
   import: '正在执行导入合同',
   'field-linkage': '正在执行字段联动专项',
@@ -410,6 +417,23 @@ export function createDevQaCoverageService({
   const store = operationStore || resolveCoverageOperationStore(root)
   const active = new Map()
 
+  function releaseExecutionLocks(operationId) {
+    try {
+      releaseCoverageExecutionLock(store, operationId)
+    } catch {
+      // Preserve a mismatched coverage-specific lock.
+    }
+    try {
+      releaseDevQaExecutionLock(store, {
+        kind: 'coverage',
+        profile: 'baseline',
+        operationId,
+      })
+    } catch {
+      // Preserve a mismatched global QA lock.
+    }
+  }
+
   function transitionNotProven(operation, message) {
     if (!COVERAGE_OPERATION_ACTIVE_STATUSES.includes(operation.status)) {
       return operation
@@ -424,7 +448,43 @@ export function createDevQaCoverageService({
 
   function recoverInterruptedOperation() {
     const lock = readCoverageExecutionLock(store)
+    const sharedLock = readDevQaExecutionLock(store)
     if (!lock) {
+      if (sharedLock?.kind === 'coverage') {
+        let sharedOperation = null
+        try {
+          sharedOperation = readCoverageOperation(
+            store,
+            sharedLock.operationId
+          )
+        } catch {
+          sharedOperation = null
+        }
+        if (
+          processAlive(sharedLock.ownerPid) ||
+          (sharedLock.childPid !== null && processAlive(sharedLock.childPid))
+        ) {
+          return sharedOperation
+        }
+        if (
+          sharedOperation &&
+          COVERAGE_OPERATION_ACTIVE_STATUSES.includes(sharedOperation.status)
+        ) {
+          sharedOperation = transitionNotProven(
+            sharedOperation,
+            '开发服务或采集进程中断，结果无法证明，请重新采集'
+          )
+        }
+        try {
+          releaseDevQaExecutionLock(store, {
+            kind: 'coverage',
+            profile: 'baseline',
+            operationId: sharedLock.operationId,
+          })
+        } catch {
+          // Preserve an unknown shared lock.
+        }
+      }
       for (const operation of listCoverageOperations(store, { limit: 100 })) {
         if (COVERAGE_OPERATION_ACTIVE_STATUSES.includes(operation.status)) {
           transitionNotProven(
@@ -446,7 +506,7 @@ export function createDevQaCoverageService({
       operation &&
       !COVERAGE_OPERATION_ACTIVE_STATUSES.includes(operation.status)
     ) {
-      releaseCoverageExecutionLock(store, lock.operationId)
+      releaseExecutionLocks(lock.operationId)
       return null
     }
     if (
@@ -461,7 +521,7 @@ export function createDevQaCoverageService({
         '开发服务或采集进程中断，结果无法证明，请重新采集'
       )
     }
-    releaseCoverageExecutionLock(store, lock.operationId)
+    releaseExecutionLocks(lock.operationId)
     return operation
   }
 
@@ -539,11 +599,7 @@ export function createDevQaCoverageService({
           now: now().toISOString(),
         })
       } finally {
-        try {
-          releaseCoverageExecutionLock(store, operation.id)
-        } catch {
-          // A mismatched cross-process lock must remain fail-closed.
-        }
+        releaseExecutionLocks(operation.id)
       }
     })().catch(() => {
       try {
@@ -557,11 +613,7 @@ export function createDevQaCoverageService({
           })
         }
       } finally {
-        try {
-          releaseCoverageExecutionLock(store, operation.id)
-        } catch {
-          // Keep an unknown lock rather than deleting another process lock.
-        }
+        releaseExecutionLocks(operation.id)
       }
     })
     child.stdout?.resume?.()
@@ -597,6 +649,12 @@ export function createDevQaCoverageService({
         throw new Error('coverage child pid is unavailable')
       }
       attachCoverageExecutionChild(store, operation.id, child.pid)
+      attachDevQaExecutionChild(store, {
+        kind: 'coverage',
+        profile: 'baseline',
+        operationId: operation.id,
+        childPid: child.pid,
+      })
       operation = transitionCoverageOperation(store, operation.id, {
         status: 'running',
         stage: 'queued',
@@ -615,7 +673,7 @@ export function createDevQaCoverageService({
         message: '固定 baseline 采集器启动失败',
         now: now().toISOString(),
       })
-      releaseCoverageExecutionLock(store, operation.id)
+      releaseExecutionLocks(operation.id)
       return operation
     }
 
@@ -658,10 +716,22 @@ export function createDevQaCoverageService({
     }
 
     const operationId = randomOperationId()
-    acquireCoverageExecutionLock(store, operationId, {
+    acquireDevQaExecutionLock(store, {
+      kind: 'coverage',
+      profile: 'baseline',
+      operationId,
       ownerPid: processId,
       now: now().toISOString(),
     })
+    try {
+      acquireCoverageExecutionLock(store, operationId, {
+        ownerPid: processId,
+        now: now().toISOString(),
+      })
+    } catch (error) {
+      releaseExecutionLocks(operationId)
+      throw error
+    }
     let operation
     try {
       const racedExisting = readCoverageOperationByIdempotencyKey(
@@ -669,7 +739,7 @@ export function createDevQaCoverageService({
         payload.idempotencyKey
       )
       if (racedExisting) {
-        releaseCoverageExecutionLock(store, operationId)
+        releaseExecutionLocks(operationId)
         return {
           schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
           action: 'collect',
@@ -686,11 +756,7 @@ export function createDevQaCoverageService({
       }).operation
       operation = launchOperation(operation)
     } catch (error) {
-      try {
-        releaseCoverageExecutionLock(store, operationId)
-      } catch {
-        // Preserve a mismatched lock.
-      }
+      releaseExecutionLocks(operationId)
       throw error
     }
     return {
@@ -849,7 +915,14 @@ export function createDevQaCoverageMiddleware({
         { status: 'failed', message: '该开发接口不支持当前请求方法' },
         { allow }
       )
-    } catch {
+    } catch (error) {
+      if (error?.code === 'DEV_QA_EXECUTION_LOCKED') {
+        sendJson(response, 409, {
+          status: 'blocked',
+          message: '已有本地验证或覆盖采集正在运行',
+        })
+        return
+      }
       sendJson(response, 400, {
         status: 'failed',
         message: '覆盖采集请求无效或当前无法执行',

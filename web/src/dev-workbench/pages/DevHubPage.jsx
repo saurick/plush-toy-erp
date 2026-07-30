@@ -88,7 +88,8 @@ function EntryCard({ item, compact = false, pinned = false, onTogglePinned }) {
                 className="erp-dev-hub-card__pin"
                 icon={pinned ? <PushpinFilled /> : <PushpinOutlined />}
                 size="small"
-                type={pinned ? 'primary' : 'default'}
+                type="text"
+                aria-pressed={pinned}
                 onClick={() => onTogglePinned?.(item.route)}
               />
             </Tooltip>

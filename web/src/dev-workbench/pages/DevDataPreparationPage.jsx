@@ -65,15 +65,18 @@ function upsertOperation(operation, operations = []) {
   return [operation, ...nextOperations]
 }
 
-function ProfileOption({ profile, selected }) {
+function ProfileOption({ profile, selected, disabled, onSelect }) {
   const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
   return (
-    <label
+    <div
       className={
         selected
           ? 'erp-dev-data-profile erp-dev-data-profile--selected'
           : 'erp-dev-data-profile'
       }
+      onClick={() => {
+        if (!disabled) onSelect(profile.key)
+      }}
     >
       <Radio value={profile.key}>
         <span className="erp-dev-data-profile__radio-label">{copy.title}</span>
@@ -91,7 +94,7 @@ function ProfileOption({ profile, selected }) {
           <Tag key={requirement}>{requirement}</Tag>
         ))}
       </div>
-    </label>
+    </div>
   )
 }
 
@@ -518,6 +521,14 @@ export default function DevDataPreparationPage() {
         confirmation
       )
     : ''
+  const selectProfile = (profileKey) => {
+    if (preparing || executing) return
+    setSelectedProfileKey(profileKey)
+    currentOperationIdRef.current = ''
+    prepareIntentRef.current = null
+    setCurrentOperation(null)
+    setConfirmation('')
+  }
 
   const prepareBlockingReason = repositoryBlocked
     ? '完整验收只接受 clean exact commit'
@@ -737,19 +748,15 @@ export default function DevDataPreparationPage() {
                 className="erp-dev-data-profile-group"
                 value={selectedProfileKey}
                 disabled={preparing || executing}
-                onChange={(event) => {
-                  setSelectedProfileKey(event.target.value)
-                  currentOperationIdRef.current = ''
-                  prepareIntentRef.current = null
-                  setCurrentOperation(null)
-                  setConfirmation('')
-                }}
+                onChange={(event) => selectProfile(event.target.value)}
               >
                 {profiles.map((profile) => (
                   <ProfileOption
                     key={profile.key}
                     profile={profile}
                     selected={selectedProfileKey === profile.key}
+                    disabled={preparing || executing}
+                    onSelect={selectProfile}
                   />
                 ))}
               </Radio.Group>
@@ -871,6 +878,10 @@ export default function DevDataPreparationPage() {
         okText={currentIsScenarioDemo ? '确认生成' : '执行固定计划'}
         cancelText="取消"
         confirmLoading={executing}
+        cancelButtonProps={{ disabled: executing }}
+        closable={!executing}
+        maskClosable={!executing}
+        keyboard={!executing}
         okButtonProps={{
           danger: !currentIsScenarioDemo,
           disabled:
@@ -881,6 +892,7 @@ export default function DevDataPreparationPage() {
         }}
         onOk={handleExecute}
         onCancel={() => {
+          if (executing) return
           setConfirmOpen(false)
           setConfirmation('')
         }}

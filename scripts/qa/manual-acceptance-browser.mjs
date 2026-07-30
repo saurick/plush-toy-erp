@@ -14,7 +14,10 @@ import {
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
   buildManualAcceptanceCatalog,
 } from "./manual-acceptance-catalog.mjs";
-import { buildManualAcceptancePageDataContract } from "./manual-acceptance-page-data-contract.mjs";
+import {
+  MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
+  buildManualAcceptancePageDataContract,
+} from "./manual-acceptance-page-data-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import {
@@ -344,8 +347,8 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
   });
   assert.equal(
     targets.length,
-    50,
-    "手工验收浏览器计划必须覆盖当前 50 个正式目标",
+    MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
+    `手工验收浏览器计划必须覆盖当前 ${MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT} 个正式目标`,
   );
   return {
     scope: "manual-acceptance-browser-plan",

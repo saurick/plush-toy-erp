@@ -79,9 +79,9 @@ export const DEV_HUB_ITEMS = Object.freeze([
     route: DEV_TESTING_ROUTE,
     source: 'docs/product/自动化测试策略.md',
     truthSource: '测试策略文档 / Test strategy',
-    status: '策略索引 / Strategy index',
+    status: '策略与固定采集 / Strategy and fixed collection',
     guardrails: Object.freeze([
-      '不执行命令 / No shell execution',
+      '不执行任意命令，仅允许固定覆盖率采集器 / Fixed coverage collector only',
       '不替代测试结果 / Not test evidence',
       '不索引历史参考 / No reference commands',
       '不进生产构建 / No prod build',

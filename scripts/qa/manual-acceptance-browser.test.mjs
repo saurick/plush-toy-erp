@@ -404,7 +404,7 @@ async function datasetApplyEvidenceFixture() {
   };
 }
 
-test("manual acceptance browser plan covers all 50 catalog targets and ten formal accounts", () => {
+test("manual acceptance browser plan covers all 52 catalog targets and ten formal accounts", () => {
   const plan = buildManualAcceptanceBrowserPlan({
     baseURL: "http://127.0.0.1:15200",
     backendURL: "http://localhost:8300",
@@ -412,16 +412,16 @@ test("manual acceptance browser plan covers all 50 catalog targets and ten forma
 
   assert.equal(plan.writesDatabase, false);
   assert.equal(plan.clicksBusinessWriteActions, false);
-  assert.equal(plan.summary.totalTargets, 50);
+  assert.equal(plan.summary.totalTargets, 52);
   assert.deepEqual(plan.summary, {
     entryPages: 2,
-    desktopPages: 29,
+    desktopPages: 31,
     mobileRolePages: 9,
     printPreviewPages: 5,
     printWorkspacePages: 5,
-    totalTargets: 50,
+    totalTargets: 52,
   });
-  assert.equal(plan.targets.length, 50);
+  assert.equal(plan.targets.length, 52);
   assert.equal(plan.formalAccounts.length, 10);
   assert.equal(FORMAL_BROWSER_ACCOUNTS.length, 10);
   assert.equal(EXCEPTION_BROWSER_ACCOUNTS.length, 3);
@@ -431,7 +431,7 @@ test("manual acceptance browser plan covers all 50 catalog targets and ten forma
   );
   assert.equal(
     plan.targets.filter((item) => item.group === "desktop").length,
-    29,
+    31,
   );
   const productionOrders = plan.targets.find(
     (item) => item.group === "desktop" && item.key === "production-orders",
@@ -793,7 +793,7 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
     runtimeAttestation,
   };
   const targets = [
-    ...Array.from({ length: 40 }, (_, index) => ({
+    ...Array.from({ length: 42 }, (_, index) => ({
       id: `desktopPages:query-${index}`,
       catalogGroup: "desktopPages",
       dataStatus: "pass",
@@ -865,8 +865,8 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
       },
     },
     summary: {
-      totalTargets: 50,
-      passedTargetData: 40,
+      totalTargets: 52,
+      passedTargetData: 42,
       failedTargetData: 0,
       notProvenTargetData: 10,
       queryChecksPassed: true,
@@ -2322,7 +2322,7 @@ test("plan mode needs no password and starts no browser", () => {
   );
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.summary.totalTargets, 50);
+  assert.equal(plan.summary.totalTargets, 52);
   assert.equal(plan.writesDatabase, false);
   assert.equal(plan.formalAccounts.length, 10);
 });

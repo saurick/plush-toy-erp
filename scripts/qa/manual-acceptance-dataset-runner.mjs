@@ -190,10 +190,28 @@ export const MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES = Object.freeze(
       listKey: "shipments",
     },
     {
+      key: "salesReturns",
+      domain: "operational_fact",
+      method: "list_sales_returns",
+      listKey: "sales_returns",
+    },
+    {
       key: "financeFacts",
       domain: "operational_fact",
       method: "list_finance_facts",
       listKey: "finance_facts",
+    },
+    {
+      key: "financePayments",
+      domain: "operational_fact",
+      method: "list_finance_payments",
+      listKey: "payments",
+    },
+    {
+      key: "financeCreditNotes",
+      domain: "operational_fact",
+      method: "list_finance_credit_notes",
+      listKey: "credit_notes",
     },
     {
       key: "workflowTasks",

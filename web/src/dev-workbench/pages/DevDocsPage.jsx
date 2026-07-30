@@ -46,7 +46,10 @@ const markdownModules = import.meta.glob(
     '../../../../README.md',
     '../../../../AGENTS.md',
     '../../../README.md',
+    '../../../scripts/README.md',
     '../../../../server/README.md',
+    '../../../../server/deploy/README.md',
+    '../../../../server/deploy/compose/prod/README.md',
     '../../../../scripts/README.md',
     '../../../../config/customers/**/*.md',
     '../../../../docs/**/*.md',
@@ -351,9 +354,11 @@ export default function DevDocsPage() {
     allDirectoryKeys.every((key) => expandedKeys.has(key))
 
   const selectedDoc =
-    docsWithPinnedState.find((item) => item.key === selectedKey) ||
+    (isSearching
+      ? visibleDocs.find((item) => item.key === selectedKey)
+      : docsWithPinnedState.find((item) => item.key === selectedKey)) ||
     visibleDocs[0] ||
-    docsWithPinnedState[0]
+    (isSearching ? undefined : docsWithPinnedState[0])
   const selectedDocPinned = Boolean(selectedDoc?.pinned)
   const headings = useMemo(
     () => extractMarkdownHeadings(selectedDoc?.source || '', [1, 2, 3]),
@@ -635,7 +640,7 @@ export default function DevDocsPage() {
 
   return (
     <div className="erp-dev-docs-page erp-dev-workspace-page">
-      <DevPageNav sourcePath={selectedDoc?.path || ''} />
+      <DevPageNav />
       <header className="erp-dev-docs-header">
         <div className="erp-dev-docs-header__copy">
           <Space align="center" size={10} wrap>
@@ -657,6 +662,7 @@ export default function DevDocsPage() {
         <aside className="erp-dev-docs-sidebar">
           <Input
             allowClear
+            aria-label="搜索开发文档"
             value={keyword}
             prefix={<SearchOutlined />}
             placeholder="搜索标题、路径或正文；不搜索时按目录树浏览"
@@ -834,42 +840,48 @@ export default function DevDocsPage() {
         </aside>
 
         <section className="erp-dev-docs-reader">
-          <div className="erp-dev-docs-reader__toolbar">
-            <div className="erp-dev-docs-reader__title">
-              <Text strong>{selectedDoc?.title}</Text>
-              <Text type="secondary" className="erp-dev-docs-reader__path">
-                {selectedDoc?.path}
-              </Text>
-            </div>
-            <Space size={8} wrap>
-              <Tooltip title={selectedDocPinned ? '取消置顶' : '置顶文档'}>
+          {selectedDoc ? (
+            <div className="erp-dev-docs-reader__toolbar">
+              <div className="erp-dev-docs-reader__title">
+                <Text strong>{selectedDoc.title}</Text>
+                <Text type="secondary" className="erp-dev-docs-reader__path">
+                  {selectedDoc.path}
+                </Text>
+              </div>
+              <Space size={8} wrap>
+                <Tooltip title={selectedDocPinned ? '取消置顶' : '置顶文档'}>
+                  <Button
+                    type="text"
+                    shape="circle"
+                    className={
+                      selectedDocPinned
+                        ? 'erp-dev-docs-pin-button erp-dev-docs-pin-button--active'
+                        : 'erp-dev-docs-pin-button'
+                    }
+                    icon={
+                      selectedDocPinned ? (
+                        <PushpinFilled />
+                      ) : (
+                        <PushpinOutlined />
+                      )
+                    }
+                    aria-label={selectedDocPinned ? '取消置顶' : '置顶文档'}
+                    aria-pressed={selectedDocPinned}
+                    onClick={() => toggleDocPin(selectedDoc)}
+                  />
+                </Tooltip>
                 <Button
-                  type="text"
-                  shape="circle"
-                  className={
-                    selectedDocPinned
-                      ? 'erp-dev-docs-pin-button erp-dev-docs-pin-button--active'
-                      : 'erp-dev-docs-pin-button'
-                  }
-                  icon={
-                    selectedDocPinned ? <PushpinFilled /> : <PushpinOutlined />
-                  }
-                  aria-label={selectedDocPinned ? '取消置顶' : '置顶文档'}
-                  aria-pressed={selectedDocPinned}
-                  onClick={() => toggleDocPin(selectedDoc)}
-                />
-              </Tooltip>
-              <Button
-                icon={<VerticalAlignTopOutlined />}
-                onClick={scrollReaderToTop}
-              >
-                回到顶部 / Top
-              </Button>
-              <Button icon={<CopyOutlined />} onClick={copyPath}>
-                复制路径 / Copy Path
-              </Button>
-            </Space>
-          </div>
+                  icon={<VerticalAlignTopOutlined />}
+                  onClick={scrollReaderToTop}
+                >
+                  回到顶部 / Top
+                </Button>
+                <Button icon={<CopyOutlined />} onClick={copyPath}>
+                  复制路径 / Copy Path
+                </Button>
+              </Space>
+            </div>
+          ) : null}
 
           {headings.length > 0 ? (
             <div className="erp-dev-docs-toc-shell">
@@ -908,9 +920,18 @@ export default function DevDocsPage() {
             </div>
           ) : null}
 
-          <article className="erp-dev-docs-markdown" ref={markdownRef}>
-            <Markdown source={selectedDoc?.source || ''} />
-          </article>
+          {selectedDoc ? (
+            <article className="erp-dev-docs-markdown" ref={markdownRef}>
+              <Markdown source={selectedDoc.source} />
+            </article>
+          ) : (
+            <div className="erp-dev-docs-markdown">
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="没有匹配的文档，阅读操作已隐藏"
+              />
+            </div>
+          )}
         </section>
       </main>
     </div>

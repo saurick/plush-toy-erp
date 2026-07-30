@@ -39,6 +39,10 @@ const devPageSources = [
 ].map((fileName) =>
   readFileSync(new URL(`../pages/${fileName}`, import.meta.url), 'utf8')
 )
+const devPageNavSource = readFileSync(
+  new URL('../components/DevPageNav.jsx', import.meta.url),
+  'utf8'
+)
 
 test('devHub: route and dev gate stay dev-only', () => {
   assert.equal(DEV_HUB_ROUTE, '/__dev')
@@ -69,7 +73,7 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   )
   assert.equal(
     resolveDevPageTitle('/__dev/quality', 'Plush Toy ERP'),
-    '质量 · Plush Toy ERP'
+    '质量验证 · Plush Toy ERP'
   )
   assert.equal(resolveDevPageFavicon('/__dev'), '/favicon-dev.svg')
   assert.equal(resolveDevPageFavicon('/__dev/testing'), '/favicon-testing.svg')
@@ -113,6 +117,10 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       '/__dev/delivery',
     ]
   )
+  assert.deepEqual(
+    DEV_WORKSPACE_NAV_ITEMS.map((item) => item.label),
+    ['总览', '产品工程', '质量验证', '交付运行']
+  )
   assert.equal(
     new Set(DEV_WORKSPACE_NAV_ITEMS.map((item) => item.route)).size,
     DEV_WORKSPACE_NAV_ITEMS.length
@@ -140,6 +148,15 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/version-center'), 'delivery')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/unknown'), '')
+  assert.match(
+    devPageNavSource,
+    /const secondaryItems = getDevSecondaryNavItems\(currentAreaKey\)/u
+  )
+  assert.doesNotMatch(
+    devPageNavSource,
+    /currentWorkspaceItem\s*\?\s*\[\]/u,
+    'area landing pages must keep their secondary navigation visible'
+  )
 })
 
 test('devHub: eleven dev pages share the backend-style workspace shell', () => {
@@ -183,6 +200,17 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
   const docsItem = DEV_HUB_ITEMS.find((item) => item.key === 'docs')
   assert.match(docsItem?.truthSource || '', /当前工作区 Markdown/)
   assert.doesNotMatch(docsItem?.description || '', /tracked Markdown/)
+
+  const testingItem = DEV_HUB_ITEMS.find((item) => item.key === 'testing')
+  assert.equal(
+    testingItem?.status,
+    '策略与固定采集 / Strategy and fixed collection'
+  )
+  assert.match(testingItem?.guardrails?.join(' ') || '', /固定覆盖率采集器/)
+  assert.doesNotMatch(
+    testingItem?.guardrails?.join(' ') || '',
+    /No shell execution/
+  )
 
   const customerConfigItem = DEV_HUB_ITEMS.find(
     (item) => item.key === 'customer-config'

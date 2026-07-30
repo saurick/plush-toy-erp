@@ -74,6 +74,10 @@
   overflow-y: auto;
 }
 
+.erp-dev-workspace-nav__primary {
+  display: contents;
+}
+
 .erp-dev-workspace-nav__route {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
@@ -88,6 +92,7 @@
   text-align: left;
   background: transparent;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .erp-dev-workspace-nav__route:hover,
@@ -99,6 +104,11 @@
 .erp-dev-workspace-nav__route--active {
   border-color: var(--dev-nav-active-border);
   background: var(--dev-nav-active-bg);
+}
+
+.erp-dev-workspace-nav__route--context {
+  border-color: var(--dev-nav-border);
+  background: color-mix(in srgb, var(--dev-nav-active-bg) 58%, transparent);
 }
 
 .erp-dev-workspace-nav__route span {
@@ -151,6 +161,7 @@
   text-align: left;
   background: transparent;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .erp-dev-workspace-nav__secondary-route:hover,
@@ -207,12 +218,18 @@
 .erp-dev-task-nav__item:hover,
 .erp-dev-task-nav__item:focus-visible {
   border-color: var(--dev-task-active-border, #1677ff);
-  outline: none;
+  outline: 2px solid
+    color-mix(in srgb, var(--dev-task-active-border, #1677ff) 24%, transparent);
+  outline-offset: 1px;
 }
 
 .erp-dev-task-nav__item--active {
   border-color: var(--dev-task-active-border, #1677ff);
   background: var(--dev-task-active-bg, rgba(22, 119, 255, 0.08));
+}
+
+.erp-dev-task-nav--primary .erp-dev-task-nav__item--active {
+  box-shadow: inset 3px 0 0 var(--dev-task-active-border, #1677ff);
 }
 
 .erp-dev-task-nav__item:disabled {
@@ -274,12 +291,18 @@
   }
 
   .erp-dev-workspace-nav__routes {
+    display: grid;
+    gap: 0;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  .erp-dev-workspace-nav__primary {
     display: flex;
-    flex-direction: row;
     gap: 6px;
     padding: 8px;
     overflow-x: auto;
-    overflow-y: hidden;
     scroll-snap-type: x proximity;
   }
 
@@ -287,9 +310,11 @@
     display: flex;
     flex: 0 0 auto;
     margin: 0;
-    padding: 0 0 0 4px;
-    border-top: 0;
-    border-left: 1px solid var(--dev-nav-border);
+    padding: 7px 8px 8px;
+    overflow-x: auto;
+    border-top: 1px solid var(--dev-nav-border);
+    border-left: 0;
+    scroll-snap-type: x proximity;
   }
 
   .erp-dev-workspace-nav__secondary-title {

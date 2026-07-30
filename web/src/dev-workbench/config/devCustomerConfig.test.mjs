@@ -156,8 +156,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert(
     summary.sections.some(
       (section) =>
-        section.title === '销售管理' &&
-        section.items.includes('sales-returns')
+        section.title === '销售管理' && section.items.includes('sales-returns')
     )
   )
   assert(
@@ -308,10 +307,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
   assert.match(summary.testApply.note, /loopback/)
   assert.match(summary.testApply.note, /已登记的本地开发库/)
   assert.match(summary.testApply.note, /正式目标环境不接受/)
-  assert.equal(
-    summary.testApply.target,
-    '当前 Vite /rpc 代理后端'
-  )
+  assert.equal(summary.testApply.target, '当前 Vite /rpc 代理后端')
   assert.equal(summary.testApply.noBusinessDataImport, true)
   assert.deepEqual(summary.testApply.operations, [
     'compile_runtime_manifest',
@@ -541,8 +537,7 @@ test('devCustomerConfig: 本地测试应用仍对客户包边界失败关闭', (
   const packageSummary = buildCustomerPackagePreviewSummary()
   assert.equal(packageSummary.localTestApplyEnabled, true)
   assert.equal(
-    buildImportToolingSummary('yoyoosun', packageSummary)
-      .canApplyTestConfig,
+    buildImportToolingSummary('yoyoosun', packageSummary).canApplyTestConfig,
     true
   )
 
@@ -550,12 +545,11 @@ test('devCustomerConfig: 本地测试应用仍对客户包边界失败关闭', (
     ...packageSummary,
     boundaryOk: false,
   }
-  const boundaryResult = buildImportToolingSummary(
-    'yoyoosun',
-    unsafeBoundary
-  )
+  const boundaryResult = buildImportToolingSummary('yoyoosun', unsafeBoundary)
   assert.equal(boundaryResult.canApplyTestConfig, false)
-  assert(boundaryResult.testApply.blockedReasons.includes('package_boundary_invalid'))
+  assert(
+    boundaryResult.testApply.blockedReasons.includes('package_boundary_invalid')
+  )
 
   const disabled = {
     ...packageSummary,
@@ -948,6 +942,36 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
   assert.match(source, /item\.ruleItems\.map/)
   assert.match(source, /rule\.triggerLabel/)
   assert.match(source, /rule\.resultLabel/)
+})
+
+test('devCustomerConfig: 主工作任务与执行动作保持单一层级', async () => {
+  const source = await readFile(
+    new URL('../pages/DevCustomerConfigPage.jsx', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(source, /label: '界面投影'/u)
+  assert.match(source, /label: '执行与发布门禁'/u)
+  assert.match(source, /title="进入执行与发布门禁"/u)
+  assert.match(source, /level="primary"/u)
+  assert.doesNotMatch(source, /label: '界面配置'/u)
+  assert.doesNotMatch(source, /label: '执行发布'/u)
+  assert.doesNotMatch(source, /title="看工具"/u)
+
+  assert.equal(source.match(/onClick=\{onRunDryRun\}/gu)?.length, 1)
+  assert.equal(source.match(/onClick=\{onApplyTestConfig\}/gu)?.length, 1)
+  assert.equal(source.match(/onClick=\{onCheckReleaseReadiness\}/gu)?.length, 1)
+  assert.match(
+    source,
+    /type="primary"\s+danger[\s\S]*?onClick=\{onApplyTestConfig\}/u
+  )
+  assert.match(source, /重新运行测试试跑/u)
+  assert.match(source, /重新应用到当前后端/u)
+  assert.match(source, /重新检查发布门禁/u)
+  assert.match(
+    source,
+    /releaseState\.status === 'success' \? 'primary' : 'default'/u
+  )
 })
 
 test('devCustomerConfig: 打印模板字段只读进入客户配置控制台', () => {

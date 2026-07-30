@@ -17,20 +17,20 @@ import {
   buildDevTestingDocs,
   buildDevTestingSummary,
   extractDevTestingCommandBlocks,
+  filterDevTestingCommandBlocks,
   filterDevTestingDocs,
   formatDevTestingCoverageMetric,
-  getDevTestingCategoryOptions,
+  getDevTestingDocumentRoleOptions,
   getDevTestingCoverageStatusMeta,
   isDevTestingEnabled,
   normalizeDevTestingCoverageEnvelope,
   parseDevTestingStrategyTiers,
-  resolveDevTestingSelectedDoc,
 } from './devTesting.mjs'
 
 const strategyMarkdown = `
 # 自动化测试策略 / Test Strategy
 
-## 3. 测试分层
+## 验证层级 T0-T8
 
 | 层级 | 改动类型 | 必跑或优先命令 | 说明 |
 | --- | --- | --- | --- |
@@ -166,7 +166,7 @@ test('devTesting: 只通过开发态独立路径暴露', () => {
   )
 })
 
-test('devTesting: 解析测试策略分层表和命令', () => {
+test('devTesting: 解析验证层级表和命令', () => {
   const tiers = parseDevTestingStrategyTiers(strategyMarkdown)
 
   assert.equal(tiers.length, 3)
@@ -205,7 +205,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
       'trial-account-rbac',
       'real-login-smoke-shared',
       'trial-simulated-data',
-      'mvp-local-closure',
+      'v1-local-acceptance-plan',
       'mobile-workflow-smoke',
       'customer-config-dev-console',
       'dev-prototype-registry',
@@ -445,31 +445,41 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(getPreset('trial-simulated-data').description, /退回和催办/)
   assert.match(getPreset('trial-simulated-data').description, /不连接后端/)
-  assert.match(getPresetCopyText('mvp-local-closure'), /mvp-closure\.test\.mjs/)
   assert.match(
-    getPresetCopyText('mvp-local-closure'),
+    getPresetCopyText('v1-local-acceptance-plan'),
+    /v1-acceptance-plan\.test\.mjs/
+  )
+  assert.match(
+    getPresetCopyText('v1-local-acceptance-plan'),
     /purchase-receipt-real-write-e2e\.test\.mjs/
   )
   assert.match(
-    getPresetCopyText('mvp-local-closure'),
+    getPresetCopyText('v1-local-acceptance-plan'),
     /purchase-receipt-real-write-e2e\.mjs --print-input-template/
   )
   assert.match(
-    getPresetCopyText('mvp-local-closure'),
+    getPresetCopyText('v1-local-acceptance-plan'),
     /purchase-receipt-real-write-e2e\.mjs --preflight-report output\/qa\/purchase-receipt-real-write-e2e\/preflight\.json/
   )
   assert.match(
-    getPresetCopyText('mvp-local-closure'),
-    /mvp-closure\.mjs --out output\/customers\/yoyoosun\/mvp-closure/
+    getPresetCopyText('v1-local-acceptance-plan'),
+    /v1-acceptance-plan\.mjs --out output\/customers\/yoyoosun\/v1-acceptance-plan/
   )
   assert.match(
-    getPresetCopyText('mvp-local-closure'),
-    /mvp-closure\.mjs --run-report-tools --out/
+    getPresetCopyText('v1-local-acceptance-plan'),
+    /v1-acceptance-plan\.mjs --run-report-tools --out/
   )
-  assert.match(getPreset('mvp-local-closure').description, /真实写入输入模板/)
   assert.match(
-    getPreset('mvp-local-closure').description,
+    getPreset('v1-local-acceptance-plan').description,
+    /真实写入输入模板/
+  )
+  assert.match(
+    getPreset('v1-local-acceptance-plan').description,
     /plan-only \/ no-write evidence/
+  )
+  assert.match(
+    getPreset('v1-local-acceptance-plan').description,
+    /本地完整技术验收/
   )
   assert.match(
     getPresetCopyText('mobile-workflow-smoke'),
@@ -495,10 +505,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     getPresetCopyText('mobile-workflow-smoke'),
     /replace-with-local-demo-password/
   )
-  assert.doesNotMatch(
-    getPresetCopyText('mobile-workflow-smoke'),
-    /12345678/
-  )
+  assert.doesNotMatch(getPresetCopyText('mobile-workflow-smoke'), /12345678/)
   assert.match(getPreset('mobile-workflow-smoke').description, /无写入输入模板/)
   assert.match(
     getPreset('mobile-workflow-smoke').description,
@@ -777,7 +784,7 @@ test('devTesting: 提取 fenced command blocks 并保留章节上下文', () => 
   assert.equal(blocks[0].context, '6. 现有命令入口')
   assert.equal(
     blocks[0].sourceLabel,
-    '测试策略：自动化测试策略 / Test Strategy'
+    '策略与口径：自动化测试策略 / Test Strategy'
   )
   assert.deepEqual(blocks[0].commands, ['bash scripts/qa/fast.sh'])
   assert.deepEqual(blocks[1].commands.slice(-2), ['pnpm test', 'pnpm style:l1'])
@@ -807,15 +814,18 @@ test('devTesting: 只索引当前测试入口白名单文档', () => {
       'scripts/README.md',
     ]
   )
-  assert.equal(docs[0].category, '测试策略')
-  assert.equal(docs[0].sourceLabel, '测试策略：自动化测试策略 / Test Strategy')
-  assert.equal(docs[1].category, '项目入口')
-  assert.equal(docs[2].category, '前端验证')
-  assert.equal(docs[3].category, '前端脚本')
-  assert.equal(docs[3].sourceLabel, '前端脚本：web 脚本说明')
-  assert.equal(docs[3].commandBlocks[0].sourceLabel, '前端脚本：web 脚本说明')
+  assert.equal(docs[0].documentRole, '策略与口径')
+  assert.equal(
+    docs[0].sourceLabel,
+    '策略与口径：自动化测试策略 / Test Strategy'
+  )
+  assert.equal(docs[1].documentRole, '工程说明')
+  assert.equal(docs[2].documentRole, '工程说明')
+  assert.equal(docs[3].documentRole, '执行脚本')
+  assert.equal(docs[3].sourceLabel, '执行脚本：web 脚本说明')
+  assert.equal(docs[3].commandBlocks[0].sourceLabel, '执行脚本：web 脚本说明')
   assert.equal(docs[3].commandCount, 2)
-  assert.equal(docs[4].category, 'QA 脚本')
+  assert.equal(docs[4].documentRole, '执行脚本')
   assert.equal(docs[4].commandCount, 4)
 })
 
@@ -833,6 +843,10 @@ test('devTesting: 当前维护白名单中的真实文档都能进入索引', ()
     DEV_TESTING_CURRENT_DOC_PATHS
   )
   assert(docs.every((item) => item.source.trim().length > 0))
+  assert.deepEqual(
+    [...new Set(docs.map((item) => item.documentRole))],
+    ['策略与口径', '工程说明', '执行脚本', '部署与发布']
+  )
 })
 
 test('devTesting: reference 和 archive 不作为测试命令入口', () => {
@@ -859,7 +873,7 @@ test('devTesting: fenced block 只提取 shell 命令和续行', () => {
   })
 
   assert.equal(blocks.length, 1)
-  assert.equal(blocks[0].sourceLabel, 'QA 脚本：QA 脚本说明')
+  assert.equal(blocks[0].sourceLabel, '执行脚本：QA 脚本说明')
   assert.deepEqual(blocks[0].commands, [
     'node scripts/import/customerSourceExtract.mjs \\',
     '--manifest ../plush-toy-erp-customer-yoyoosun-private/manifests/source-manifest.json \\',
@@ -902,28 +916,14 @@ test('devTesting: fenced command 保留裸续行参数并丢弃不完整命令',
   assert.equal(blocks[0].commandText.trimEnd().endsWith('\\'), false)
 })
 
-test('devTesting: 空筛选结果不回退到未匹配文档', () => {
-  const docs = [
-    { key: 'one', title: '文档一' },
-    { key: 'two', title: '文档二' },
-  ]
-
-  assert.equal(resolveDevTestingSelectedDoc([], 'one'), null)
-  assert.equal(resolveDevTestingSelectedDoc(docs, 'two'), docs[1])
-  assert.equal(resolveDevTestingSelectedDoc(docs, 'missing'), docs[0])
-})
-
-test('devTesting: view 和 doc 由 canonical query 驱动并支持历史恢复', () => {
+test('devTesting: 主视图与命令筛选由 canonical query 驱动', () => {
   assert.match(testingPageSource, /useSearchParams\(\)/)
   assert.match(testingPageSource, /const VIEW_QUERY_KEY = 'view'/)
-  assert.match(testingPageSource, /const DOC_QUERY_KEY = 'doc'/)
+  assert.match(testingPageSource, /const DOCUMENT_ROLE_QUERY_KEY = 'role'/)
+  assert.match(testingPageSource, /const COMMAND_QUERY_KEY = 'q'/)
   assert.match(
     testingPageSource,
     /requestedView = searchParams\.get\(VIEW_QUERY_KEY\)/
-  )
-  assert.match(
-    testingPageSource,
-    /requestedDocKey = searchParams\.get\(DOC_QUERY_KEY\)/
   )
   assert.match(
     testingPageSource,
@@ -941,15 +941,16 @@ test('devTesting: view 和 doc 由 canonical query 驱动并支持历史恢复',
   )
   assert.match(
     testingPageSource,
-    /aria-current=\{active \? 'true' : undefined\}/u
+    /aria-pressed=\{option\.value === documentRole\}/u
   )
-  assert.match(
-    testingPageSource,
-    /aria-pressed=\{option\.value === category\}/u
-  )
+  assert.match(testingPageSource, /setCommandKeyword\(event\.target\.value\)/u)
+  assert.match(testingPageSource, /selectDocumentRole\(option\.value\)/u)
+  assert.match(testingPageSource, /nextParams\.delete\('doc'\)/u)
+  assert.doesNotMatch(testingPageSource, /VIEW_DOCS|SelectedDocDetail/u)
+  assert.doesNotMatch(testingPageSource, /erp-dev-testing-sidebar/u)
 })
 
-test('devTesting: 支持分类和关键词筛选并汇总', () => {
+test('devTesting: 按单一文档职责和关键词筛选命令来源并汇总', () => {
   const docs = buildDevTestingDocs({
     '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
     '../../../../scripts/README.md': scriptsReadmeMarkdown,
@@ -962,16 +963,20 @@ test('devTesting: 支持分类和关键词筛选并汇总', () => {
   assert.equal(summary.docCount, 3)
   assert.equal(summary.docsWithCommands, 3)
   assert.equal(summary.commandCount, 11)
+  assert.equal(summary.commandBlockCount, 4)
+  assert.equal(summary.strategyCommandBlockCount, 2)
   assert.deepEqual(
-    getDevTestingCategoryOptions(docs).map((item) => item.value),
-    ['all', '测试策略', '前端验证', 'QA 脚本']
+    getDevTestingDocumentRoleOptions(docs).map((item) => item.value),
+    ['all', '策略与口径', '工程说明', '执行脚本']
   )
   assert.deepEqual(
-    filterDevTestingDocs(docs, { keyword: 'trial' }).map((item) => item.path),
+    filterDevTestingCommandBlocks(docs, { keyword: 'trial' }).map(
+      (item) => item.sourcePath
+    ),
     ['web/README.md']
   )
   assert.deepEqual(
-    filterDevTestingDocs(docs, { category: '测试策略' }).map(
+    filterDevTestingDocs(docs, { documentRole: '策略与口径' }).map(
       (item) => item.path
     ),
     ['docs/product/自动化测试策略.md']
@@ -1342,13 +1347,21 @@ test('devTesting: 覆盖接口缺失、失败和错误 schema 均 fail closed', 
   )
 })
 
-test('devTesting: 覆盖页提供固定一键采集、备用命令和只读刷新边界', () => {
+test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界', () => {
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
-  assert.match(testingPageSource, /覆盖状态 \/ Coverage/)
+  assert.match(testingPageSource, /覆盖证据 \/ Coverage/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_API_PATH/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_COLLECT_COMMAND/)
   assert.match(testingPageSource, /createDevCoverageOperationClient/)
-  assert.match(testingPageSource, /一键采集覆盖率/)
+  assert.match(testingPageSource, /createDevTestingOperationClient/)
+  assert.match(testingPageSource, /生成本轮验证计划/)
+  assert.match(testingPageSource, /DEV_TESTING_FIXED_ACTIONS\.map/)
+  assert.match(testingPageSource, /runTestingAction/)
+  assert.match(
+    testingPageSource,
+    /const actionsDisabled =\s*!summary \|\|\s*Boolean\(summaryError\)/
+  )
+  assert.match(testingPageSource, /采集本地覆盖基线/)
   assert.match(testingPageSource, /复制备用命令/)
   assert.match(testingPageSource, /切换页面不会停止后台任务/)
   assert.match(testingPageSource, /空值表示未采集，不是 0%/)

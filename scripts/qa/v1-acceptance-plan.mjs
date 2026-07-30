@@ -6,14 +6,17 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const DEFAULT_OUT_DIR = "output/customers/yoyoosun/mvp-closure";
+const DEFAULT_OUT_DIR = "output/customers/yoyoosun/v1-acceptance-plan";
 
 const REQUIRED_PATHS = [
-  "docs/product/产品完成路线图.md",
+  "docs/当前真源与交接顺序.md",
+  "docs/product/产品能力进度台账.md",
   "docs/product/自动化测试策略.md",
+  "docs/product/ERP-V1主链验收计划与证据边界.md",
   "scripts/qa/trial-simulated-data.mjs",
   "scripts/qa/operational-fact-simulated-closure.mjs",
   "scripts/qa/mobile-workflow-simulated-closure.mjs",
+  "scripts/qa/local-acceptance-lifecycle.mjs",
   "scripts/qa/purchase-receipt-real-write-e2e.mjs",
   "scripts/qa/trial-account-rbac.mjs",
   "scripts/seed-role-demo-admins.sh",
@@ -29,7 +32,7 @@ const FORBIDDEN_RUNTIME_EFFECTS = [
   "不把 workflow task done 当成 fact posted",
 ];
 
-const MVP_PHASES = [
+const V1_ACCEPTANCE_PHASES = [
   {
     key: "preflight",
     title: "环境和真源预检",
@@ -42,7 +45,7 @@ const MVP_PHASES = [
     acceptance: [
       "确认命中的数据库和目标环境一致。",
       "确认本轮没有把并行现场误写成本轮结果。",
-      "确认 roadmap、测试策略和当前真源仍是验收口径。",
+      "确认当前真源、能力台账和测试策略仍是验收口径。",
     ],
   },
   {
@@ -61,7 +64,7 @@ const MVP_PHASES = [
   },
   {
     key: "source-document",
-    title: "MVP 源单据试用数据",
+    title: "V1 源单据试用数据",
     commands: [
       "node scripts/qa/trial-simulated-data.mjs --out output/customers/yoyoosun/trial-simulated-data",
       "TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA TRIAL_SIM_PASSWORD='replace-with-demo-password' node scripts/qa/trial-simulated-data.mjs --apply --backend-url http://127.0.0.1:8300 --product-id <product_id> --unit-id <unit_id> --out output/customers/yoyoosun/trial-simulated-data",
@@ -172,7 +175,7 @@ function parseArgs(argv) {
     }
     if (arg === "--apply" || arg === "--execute") {
       throw new Error(
-        `${arg} is not supported by mvp-closure. Run the specific simulated tool with its explicit confirmation instead.`,
+        `${arg} is not supported by v1-acceptance-plan. Run the specific simulated tool with its explicit confirmation instead.`,
       );
     }
     throw new Error(`Unsupported argument: ${arg}`);
@@ -190,17 +193,18 @@ function parsePositiveInt(value, flag) {
 
 function printHelp() {
   console.log(`Usage:
-  node scripts/qa/mvp-closure.mjs [--out <dir>]
-  node scripts/qa/mvp-closure.mjs --run-report-tools --product-id <id> --unit-id <id> --warehouse-id <id>
+  node scripts/qa/v1-acceptance-plan.mjs [--out <dir>]
+  node scripts/qa/v1-acceptance-plan.mjs --run-report-tools [--product-id <id>] [--unit-id <id>] [--warehouse-id <id>]
 
 Purpose:
-  Generate ERP MVP closure evidence and, optionally, run no-write report-only tools.
+  Generate the ERP V1 acceptance plan and, optionally, run no-write report-only tools.
 
 Boundaries:
-  - default mode writes local evidence only
+  - default mode writes local plan evidence only
   - --run-report-tools only runs report-only commands
   - does not support --apply or --execute
   - does not connect to DB or backend directly
+  - does not prove local technical acceptance, target release, or customer acceptance
 `);
 }
 
@@ -220,7 +224,7 @@ function createReport(options, rootDir, toolRuns = []) {
   return {
     generatedAt: new Date().toISOString(),
     host: os.hostname(),
-    scenario: "erp-mvp-closure",
+    scenario: "erp-v1-acceptance-plan",
     mode: options.runReportTools ? "report-with-no-write-tools" : "plan-only",
     simulatedOnly: true,
     realCustomerImport: false,
@@ -236,11 +240,12 @@ function createReport(options, rootDir, toolRuns = []) {
     requiredPaths,
     missingRequiredPaths,
     forbiddenRuntimeEffects: FORBIDDEN_RUNTIME_EFFECTS,
-    phases: MVP_PHASES,
+    phases: V1_ACCEPTANCE_PHASES,
     noWriteToolRuns: toolRuns,
     finalDecision: {
       canReplaceDomainTests: false,
       canReplaceBrowserRegression: false,
+      canProveLocalTechnicalAcceptance: false,
       canReplaceDeploymentSmoke: false,
       canExecuteRealImport: false,
       canProveCustomerAcceptance: false,
@@ -279,7 +284,7 @@ ${phase.acceptance.map((item) => `- ${item}`).join("\n")}
           )
           .join("\n");
 
-  return `# ERP MVP 闭环验收报告 / ERP MVP Closure Report
+  return `# ERP V1 主链验收计划报告 / ERP V1 Acceptance Plan Report
 
 ## 摘要
 
@@ -317,7 +322,8 @@ ${phaseSections}
 
 ## 结论
 
-- 本报告不能替代领域单测、PG 集成测试、浏览器回归或部署 smoke。
+- 本报告只证明验收计划可生成，不能替代领域单测、PG 集成测试、浏览器回归或本地完整技术验收。
+- 本报告不能证明目标环境已经发布或完成岗位 smoke。
 - 本报告不能证明客户真实验收通过。
 - 真正写入仍须使用当前未停用且来源合同完整的专用脚本；旧业务事实模拟 \`--apply\` 已停用，不得作为可执行指令或验收证据。
 `;
@@ -372,7 +378,12 @@ function runNoWriteToolReports(options, rootDir, outDir) {
     runCommand(
       rootDir,
       "mobile-workflow-simulated-closure",
-      [node, "scripts/qa/mobile-workflow-simulated-closure.mjs", "--out", mobileOut],
+      [
+        node,
+        "scripts/qa/mobile-workflow-simulated-closure.mjs",
+        "--out",
+        mobileOut,
+      ],
       mobileOut,
     ),
   );
@@ -382,16 +393,17 @@ function runNoWriteToolReports(options, rootDir, outDir) {
 
 function writeReport(report, outDir) {
   fs.mkdirSync(outDir, { recursive: true });
-  const jsonPath = path.join(outDir, "mvp-closure-report.json");
-  const mdPath = path.join(outDir, "mvp-closure-report.md");
+  const jsonPath = path.join(outDir, "v1-acceptance-plan-report.json");
+  const mdPath = path.join(outDir, "v1-acceptance-plan-report.md");
   fs.writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   fs.writeFileSync(mdPath, renderMarkdown(report));
   return { jsonPath, mdPath };
 }
 
-export function runMvpClosure(options = {}) {
+export function runV1AcceptancePlan(options = {}) {
   const rootDir =
-    options.rootDir || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+    options.rootDir ||
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
   const outDir = path.resolve(rootDir, options.out || DEFAULT_OUT_DIR);
   fs.mkdirSync(outDir, { recursive: true });
 
@@ -411,7 +423,7 @@ export function runMvpClosure(options = {}) {
 
   if (report.missingRequiredPaths.length > 0) {
     const error = new Error(
-      `missing required MVP closure paths: ${report.missingRequiredPaths.join(", ")}`,
+      `missing required V1 acceptance plan paths: ${report.missingRequiredPaths.join(", ")}`,
     );
     error.report = report;
     error.output = output;
@@ -434,12 +446,14 @@ if (isCli) {
       printHelp();
       process.exit(0);
     }
-    const result = runMvpClosure(options);
+    const result = runV1AcceptancePlan(options);
     console.log(
-      `[qa:mvp-closure] ${result.report.mode} complete. json=${result.jsonPath} md=${result.mdPath}`,
+      `[qa:v1-acceptance-plan] ${result.report.mode} complete. json=${result.jsonPath} md=${result.mdPath}`,
     );
   } catch (error) {
-    console.error(`[qa:mvp-closure][fatal] ${error?.stack || error?.message || error}`);
+    console.error(
+      `[qa:v1-acceptance-plan][fatal] ${error?.stack || error?.message || error}`,
+    );
     process.exit(1);
   }
 }

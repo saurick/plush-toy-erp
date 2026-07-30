@@ -8,7 +8,6 @@ import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlow
 import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 import { printTemplateCatalog } from "../../web/src/erp/config/printTemplates.mjs";
 import {
-  MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS,
   MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS,
   buildManualAcceptanceCatalog,
   parseManualAcceptanceCatalogArgs,
@@ -60,7 +59,7 @@ function routerLiteralPaths() {
   };
 }
 
-test("manual acceptance catalog keeps the 50-item read-only baseline separate from dedicated exception writes", () => {
+test("manual acceptance catalog covers all 52 formal read-only targets", () => {
   const catalog = buildManualAcceptanceCatalog();
   const expectedDesktopItems = getNavigationSections({
     ...yoyoosunMenuConfig,
@@ -71,27 +70,14 @@ test("manual acceptance catalog keeps the 50-item read-only baseline separate fr
   }).flatMap((section) => section.items);
 
   assert.equal(catalog.summary.entryPages, 2);
-  assert.equal(catalog.summary.desktopPages, 29);
+  assert.equal(catalog.summary.desktopPages, 31);
   assert.equal(catalog.summary.mobileRolePages, 9);
   assert.equal(catalog.summary.printPreviewPages, 5);
   assert.equal(catalog.summary.printWorkspacePages, 5);
-  assert.equal(catalog.summary.totalScenarios, 50);
+  assert.equal(catalog.summary.totalScenarios, 52);
   assert.deepEqual(
     catalog.technicalManifest.desktopPages.map((item) => item.key),
-    expectedDesktopItems
-      .map((item) => item.key)
-      .filter(
-        (key) =>
-          !MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS.includes(key),
-      ),
-  );
-  assert.deepEqual(
-    expectedDesktopItems
-      .map((item) => item.key)
-      .filter((key) =>
-        MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS.includes(key),
-      ),
-    [...MANUAL_ACCEPTANCE_DEDICATED_EXCEPTION_PAGE_KEYS],
+    expectedDesktopItems.map((item) => item.key),
   );
   assert.deepEqual(
     new Set(catalog.technicalManifest.mobileRolePages.map((item) => item.key)),
@@ -222,6 +208,7 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       products: 20,
       materials: 80,
       "sales-orders": 45,
+      "sales-returns": 4,
       "material-bom": 45,
       processes: 30,
       "accessories-purchase": 45,
@@ -239,6 +226,7 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       reconciliation: 45,
       payables: 45,
       receivables: 45,
+      "finance-payments": 4,
       invoices: 45,
       "print-center": 5,
       "permission-center": 10,
@@ -447,7 +435,7 @@ test("manual acceptance catalog separates fixed previews from business-filled wo
   assert.doesNotMatch(colorCard.whatToDo.join("\n"), /上传|更换.*图片/u);
 });
 
-test("formal customer checklist keeps all 50 targets and client-facing truth", () => {
+test("formal customer checklist keeps all 52 targets and client-facing truth", () => {
   const checklist = fs.readFileSync(
     new URL(
       "../../docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
@@ -461,7 +449,7 @@ test("formal customer checklist keeps all 50 targets and client-facing truth", (
     /^### (?:进入|桌面|岗位|预览|打印)-\d{2} /gmu,
   );
 
-  assert.equal(targetHeadings?.length, 50);
+  assert.equal(targetHeadings?.length, 52);
   assert.doesNotMatch(checklist, forbiddenCustomerCopy);
   assert.match(checklist, /10 个正式岗位试用账号/u);
   assert.doesNotMatch(checklist, /13 个(?:不同岗位组合的)?试用账号/u);
@@ -479,9 +467,12 @@ test("formal customer checklist keeps all 50 targets and client-facing truth", (
   assert.match(checklist, /老板账号当前至少 18 条本轮可见事项/u);
   assert.match(checklist, /有退回权限的岗位另覆盖退回/u);
   assert.match(checklist, /已处理清单查看已退回的记录/u);
-  assert.match(checklist, /\| 桌面页面\s+\|\s+29\s+\|/u);
-  assert.match(checklist, /\| 合计\s+\|\s+50\s+\|/u);
-  assert.match(checklist, /完成 50 项并不自动代表正式交付/u);
+  assert.match(checklist, /4 条客户退货记录/u);
+  assert.match(checklist, /4 条收付款记录/u);
+  assert.match(checklist, /3 条红冲记录/u);
+  assert.match(checklist, /\| 桌面页面\s+\|\s+31\s+\|/u);
+  assert.match(checklist, /\| 合计\s+\|\s+52\s+\|/u);
+  assert.match(checklist, /完成 52 项并不自动代表正式交付/u);
   assert.match(checklist, /本轮固定编号识别/u);
   assert.match(checklist, /名称保持简单易懂/u);
   assert.match(checklist, /180 条仅用于列表 \/ 办理交互的模拟任务/u);
@@ -499,7 +490,7 @@ test("formal customer checklist keeps all 50 targets and client-facing truth", (
   assert.doesNotMatch(checklist, /名称、单号或备注统一带/u);
 });
 
-test("active trial runbook keeps the exact 50-target and fresh-database evidence boundary", () => {
+test("active trial runbook keeps the exact 52-target and fresh-database evidence boundary", () => {
   const runbook = fs.readFileSync(
     new URL(
       "../../docs/customers/yoyoosun/试用环境执行手册.md",
@@ -510,7 +501,7 @@ test("active trial runbook keeps the exact 50-target and fresh-database evidence
 
   assert.match(
     runbook,
-    /50 项：2 个登录与入口、29 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台/u,
+    /52 项：2 个登录与入口、31 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台/u,
   );
   assert.match(runbook, /fresh 空库基线已记录/u);
   assert.match(runbook, /plush_erp_acceptance_<run-id>_dev/u);
@@ -570,7 +561,7 @@ test("manual acceptance catalog default run stays stdout-only and never calls a 
     );
     assert.equal(fetchCalled, false);
     assert.deepEqual(result.writtenPaths, []);
-    assert.equal(JSON.parse(stdout).summary.totalScenarios, 50);
+    assert.equal(JSON.parse(stdout).summary.totalScenarios, 52);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -582,7 +573,7 @@ test("manual acceptance catalog renders Chinese Markdown and JSON", () => {
   const json = renderManualAcceptanceJson(catalog);
 
   assert.match(markdown, /# 东莞市永绅玩具有限公司全页面手动验收目录/);
-  assert.match(markdown, /\| 桌面后台 \| 29 \|/);
+  assert.match(markdown, /\| 桌面后台 \| 31 \|/);
   assert.match(markdown, /你要做什么/);
   assert.match(markdown, /应看到什么/);
   assert.match(markdown, /采购合同预览/);
@@ -590,8 +581,8 @@ test("manual acceptance catalog renders Chinese Markdown and JSON", () => {
   assert.doesNotMatch(markdown, /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|甲方/i);
 
   const parsed = JSON.parse(json);
-  assert.equal(parsed.summary.totalScenarios, 50);
-  assert.equal(parsed.technicalManifest.desktopPages.length, 29);
+  assert.equal(parsed.summary.totalScenarios, 52);
+  assert.equal(parsed.technicalManifest.desktopPages.length, 31);
 });
 
 test("manual acceptance catalog CLI parses formats and writes local report artifacts", () => {

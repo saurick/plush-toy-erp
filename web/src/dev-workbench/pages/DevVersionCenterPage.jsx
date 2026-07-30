@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CloudDownloadOutlined,
   CloudUploadOutlined,
@@ -36,6 +36,26 @@ import {
 } from '../config/devDelivery.mjs'
 
 const { Paragraph, Text, Title } = Typography
+const OPERATION_POLL_INTERVAL_MS = 1500
+const POLLING_OPERATION_STATUSES = new Set([
+  'queued',
+  'running',
+  'launching',
+  'waiting',
+])
+const OPEN_OPERATION_STATUSES = new Set([
+  ...POLLING_OPERATION_STATUSES,
+  'ready',
+])
+
+function upsertOperation(operations, operation) {
+  const currentOperations = Array.isArray(operations) ? operations : []
+  if (!operation) return currentOperations
+  return [
+    operation,
+    ...currentOperations.filter((item) => item.id !== operation.id),
+  ]
+}
 
 function StatusTag({ status }) {
   const presentation = deliveryStatusPresentation(status)
@@ -54,14 +74,13 @@ export default function DevVersionCenterPage() {
   const [actionKey, setActionKey] = useState('')
   const [loadError, setLoadError] = useState('')
   const [releaseModalOpen, setReleaseModalOpen] = useState(false)
-  const [releaseVersion, setReleaseVersion] = useState(
-    defaultReleaseVersion()
-  )
+  const [releaseVersion, setReleaseVersion] = useState(defaultReleaseVersion())
   const [confirmOperation, setConfirmOperation] = useState(null)
   const [confirmationText, setConfirmationText] = useState('')
   const [operationDetail, setOperationDetail] = useState(null)
-  const [operationDetailLoading, setOperationDetailLoading] =
-    useState(false)
+  const [operationDetailLoading, setOperationDetailLoading] = useState(false)
+  const [operationPollError, setOperationPollError] = useState('')
+  const mutationInFlightRef = useRef(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -81,6 +100,8 @@ export default function DevVersionCenterPage() {
 
   const performAction = useCallback(
     async (key, action, payload) => {
+      if (mutationInFlightRef.current) return false
+      mutationInFlightRef.current = true
       setActionKey(key)
       try {
         await client.action(action, payload)
@@ -91,7 +112,7 @@ export default function DevVersionCenterPage() {
               ? '部署准备结果已登记'
               : action === 'prepare-rollback'
                 ? '回滚资格结果已登记'
-              : '部署执行器已启动，请按 operation 跟踪'
+                : '部署执行器已启动，请按 operation 跟踪'
         )
         await refresh()
         return true
@@ -100,6 +121,7 @@ export default function DevVersionCenterPage() {
         await refresh()
         return false
       } finally {
+        mutationInFlightRef.current = false
         setActionKey('')
       }
     },
@@ -110,12 +132,66 @@ export default function DevVersionCenterPage() {
   const target = summary?.target
   const versions = summary?.versions || []
   const operations = summary?.operations || []
+  const pollingOperation = operations.find((operation) =>
+    POLLING_OPERATION_STATUSES.has(operation.status)
+  )
+  const pollingOperationId = pollingOperation?.id || ''
+  const hasOpenOperation = operations.some((operation) =>
+    OPEN_OPERATION_STATUSES.has(operation.status)
+  )
+  const isMutationRunning = Boolean(actionKey)
   const currentTargetSha = target?.remote?.runtime?.serverSha || ''
   const currentTargetRelease = versions.find(
     (version) => version.gitSha === currentTargetSha
   )
   const targetPassed = target?.status === 'passed'
-  const canDispatch = Boolean(repository && !repository.dirty)
+  const canDispatch = Boolean(
+    repository && !repository.dirty && !hasOpenOperation && !isMutationRunning
+  )
+
+  useEffect(() => {
+    if (!pollingOperationId) {
+      setOperationPollError('')
+      return undefined
+    }
+
+    let cancelled = false
+    let timer = 0
+    const poll = async () => {
+      try {
+        const operation = await client.operation(pollingOperationId)
+        if (cancelled) return
+        setOperationPollError('')
+        setSummary((current) =>
+          current
+            ? {
+                ...current,
+                operations: upsertOperation(
+                  current.operations || [],
+                  operation
+                ),
+              }
+            : current
+        )
+        if (!POLLING_OPERATION_STATUSES.has(operation.status)) {
+          await refresh()
+          return
+        }
+      } catch (error) {
+        if (cancelled) return
+        setOperationPollError(error?.message || 'Operation 状态读取暂时失败')
+      }
+      if (!cancelled) {
+        timer = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS)
+      }
+    }
+
+    timer = window.setTimeout(poll, OPERATION_POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [client, pollingOperationId, refresh])
 
   const submitRelease = async () => {
     if (!repository) return
@@ -195,30 +271,33 @@ export default function DevVersionCenterPage() {
           record.status === 'published' &&
           record.completeAssets === true &&
           record.gitSha !== currentTargetSha &&
-          targetPassed
-        const promotionEligible =
-          baseEligible && actionKind === 'promote'
+          targetPassed &&
+          !hasOpenOperation &&
+          !isMutationRunning
+        const promotionEligible = baseEligible && actionKind === 'promote'
         const rollbackEligible =
           baseEligible &&
           actionKind === 'rollback' &&
           currentTargetRelease?.status === 'published' &&
           currentTargetRelease?.completeAssets === true
-        const promotionExplanation = !targetPassed
-          ? '133 只读预检未通过，先处理容量或运行态阻断'
-          : !record.completeAssets
-            ? '不可变发布制品不完整'
-            : record.gitSha === currentTargetSha
-              ? '该 exact SHA 已在 133 运行'
-              : actionKind === 'rollback'
-                ? '该版本早于 133 当前版本，应先检查回滚资格'
-                : actionKind === 'blocked'
-                  ? '版本发布时间顺序不可证明，禁止猜测部署或回滚'
-                  : ''
+        const promotionExplanation = isMutationRunning
+          ? '已有写操作正在提交，请等待当前请求完成'
+          : hasOpenOperation
+            ? '已有未结束的 operation，请先完成或核对该操作'
+            : !targetPassed
+              ? '133 只读预检未通过，先处理容量或运行态阻断'
+              : !record.completeAssets
+                ? '不可变发布制品不完整'
+                : record.gitSha === currentTargetSha
+                  ? '该 exact SHA 已在 133 运行'
+                  : actionKind === 'rollback'
+                    ? '该版本早于 133 当前版本，应先检查回滚资格'
+                    : actionKind === 'blocked'
+                      ? '版本发布时间顺序不可证明，禁止猜测部署或回滚'
+                      : ''
         return (
           <Space wrap>
-            <Tooltip
-              title={promotionEligible ? '' : promotionExplanation}
-            >
+            <Tooltip title={promotionEligible ? '' : promotionExplanation}>
               <Button
                 icon={<CloudDownloadOutlined />}
                 disabled={!promotionEligible}
@@ -231,8 +310,7 @@ export default function DevVersionCenterPage() {
                       gitSha: record.gitSha,
                       version: record.version,
                       target: 'test-133',
-                      idempotencyKey:
-                        createDeliveryIdempotencyKey('promote'),
+                      idempotencyKey: createDeliveryIdempotencyKey('promote'),
                     }
                   )
                 }
@@ -265,8 +343,7 @@ export default function DevVersionCenterPage() {
                       toGitSha: record.gitSha,
                       toVersion: record.version,
                       target: 'test-133',
-                      idempotencyKey:
-                        createDeliveryIdempotencyKey('rollback'),
+                      idempotencyKey: createDeliveryIdempotencyKey('rollback'),
                     }
                   )
                 }
@@ -344,6 +421,7 @@ export default function DevVersionCenterPage() {
               <Button
                 type="primary"
                 danger={record.action === 'rollback'}
+                disabled={isMutationRunning}
                 icon={
                   record.action === 'rollback' ? (
                     <RollbackOutlined />
@@ -356,9 +434,7 @@ export default function DevVersionCenterPage() {
                   setConfirmationText('')
                 }}
               >
-                {record.action === 'rollback'
-                  ? '确认回滚'
-                  : '确认部署'}
+                {record.action === 'rollback' ? '确认回滚' : '确认部署'}
               </Button>
             ) : (
               <Text type="secondary">
@@ -388,18 +464,18 @@ export default function DevVersionCenterPage() {
           </Paragraph>
         </div>
         <Space wrap>
-          <Button
-            icon={<ReloadOutlined />}
-            loading={loading}
-            onClick={refresh}
-          >
+          <Button icon={<ReloadOutlined />} loading={loading} onClick={refresh}>
             刷新状态
           </Button>
           <Tooltip
             title={
               canDispatch
                 ? ''
-                : '当前工作树不干净或仓库身份不可用，不能创建 exact-SHA 发布'
+                : isMutationRunning
+                  ? '已有写操作正在提交'
+                  : hasOpenOperation
+                    ? '已有未结束的 operation'
+                    : '当前工作树不干净或仓库身份不可用，不能创建 exact-SHA 发布'
             }
           >
             <Button
@@ -429,6 +505,14 @@ export default function DevVersionCenterPage() {
             showIcon
             message="部分状态未能证明"
             description={issueDescription(summary.issues)}
+          />
+        ) : null}
+        {operationPollError ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="Operation 状态刷新暂时中断"
+            description={`${operationPollError}；页面会继续有界重试，也可手动刷新状态。`}
           />
         ) : null}
         <Alert
@@ -474,9 +558,7 @@ export default function DevVersionCenterPage() {
               </Tag>
               <Text type="secondary">
                 可用空间{' '}
-                {formatDeliveryBytes(
-                  target?.remote?.capacity?.availableBytes
-                )}
+                {formatDeliveryBytes(target?.remote?.capacity?.availableBytes)}
                 {' / '}最低要求{' '}
                 {formatDeliveryBytes(
                   target?.remote?.capacity?.minimumAvailableBytes
@@ -494,9 +576,7 @@ export default function DevVersionCenterPage() {
             loading={loading}
             pagination={false}
             locale={{
-              emptyText: (
-                <Empty description="尚无完整 GitHub 不可变发布版本" />
-              ),
+              emptyText: <Empty description="尚无完整 GitHub 不可变发布版本" />,
             }}
             scroll={{ x: 760 }}
           />
@@ -523,14 +603,23 @@ export default function DevVersionCenterPage() {
         okText="触发 GitHub 发布"
         cancelText="取消"
         confirmLoading={actionKey === 'dispatch-release'}
+        cancelButtonProps={{
+          disabled: actionKey === 'dispatch-release',
+        }}
+        closable={actionKey !== 'dispatch-release'}
+        maskClosable={actionKey !== 'dispatch-release'}
+        keyboard={actionKey !== 'dispatch-release'}
         okButtonProps={{
-          disabled:
-            !/^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u.test(
-              releaseVersion.trim()
-            ),
+          disabled: !/^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u.test(
+            releaseVersion.trim()
+          ),
         }}
         onOk={submitRelease}
-        onCancel={() => setReleaseModalOpen(false)}
+        onCancel={() => {
+          if (actionKey !== 'dispatch-release') {
+            setReleaseModalOpen(false)
+          }
+        }}
         destroyOnHidden
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -544,6 +633,7 @@ export default function DevVersionCenterPage() {
           <Input
             id="dev-release-version"
             autoFocus
+            aria-label="发布版本号"
             value={releaseVersion}
             maxLength={64}
             onChange={(event) => setReleaseVersion(event.target.value)}
@@ -605,16 +695,18 @@ export default function DevVersionCenterPage() {
         }
         open={Boolean(confirmOperation)}
         okText={
-          confirmOperation?.action === 'rollback'
-            ? '开始回滚'
-            : '开始部署'
+          confirmOperation?.action === 'rollback' ? '开始回滚' : '开始部署'
         }
         cancelText="取消"
-        confirmLoading={
-          actionKey === `execute:${confirmOperation?.id || ''}`
-        }
+        confirmLoading={actionKey === `execute:${confirmOperation?.id || ''}`}
+        cancelButtonProps={{
+          disabled: actionKey === `execute:${confirmOperation?.id || ''}`,
+        }}
+        closable={actionKey !== `execute:${confirmOperation?.id || ''}`}
+        maskClosable={actionKey !== `execute:${confirmOperation?.id || ''}`}
+        keyboard={actionKey !== `execute:${confirmOperation?.id || ''}`}
         okButtonProps={{
-          danger: true,
+          danger: confirmOperation?.action === 'rollback',
           disabled:
             !confirmOperation ||
             confirmationText !== confirmOperation.confirmationRequired,
@@ -637,6 +729,9 @@ export default function DevVersionCenterPage() {
           }
         }}
         onCancel={() => {
+          if (actionKey === `execute:${confirmOperation?.id || ''}`) {
+            return
+          }
           setConfirmOperation(null)
           setConfirmationText('')
         }}
@@ -663,6 +758,11 @@ export default function DevVersionCenterPage() {
           </Text>
           <Input
             autoFocus
+            aria-label={
+              confirmOperation?.action === 'rollback'
+                ? '回滚确认文本'
+                : '部署确认文本'
+            }
             value={confirmationText}
             placeholder="粘贴完整确认文本"
             maxLength={200}

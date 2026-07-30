@@ -897,7 +897,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
 
 test("dataset runner accepts only the exact ten browser-only print gaps", () => {
   const targets = [
-    ...Array.from({ length: 40 }, (_, index) => ({
+    ...Array.from({ length: 42 }, (_, index) => ({
       id: `desktopPages:query-${index + 1}`,
       catalogGroup: "desktopPages",
       dataStatus: "pass",
@@ -920,8 +920,8 @@ test("dataset runner accepts only the exact ten browser-only print gaps", () => 
   ];
   const report = {
     summary: {
-      totalTargets: 50,
-      passedTargetData: 40,
+      totalTargets: 52,
+      passedTargetData: 42,
       failedTargetData: 0,
       notProvenTargetData: 10,
       queryChecksPassed: true,
@@ -937,7 +937,7 @@ test("dataset runner accepts only the exact ten browser-only print gaps", () => 
   });
 
   const wrongGap = structuredClone(report);
-  wrongGap.targets[40].catalogGroup = "desktopPages";
+  wrongGap.targets[42].catalogGroup = "desktopPages";
   assert.throws(
     () => assertManualAcceptanceDatasetReadinessBoundary(wrongGap, 1),
     (error) => error?.code === "readiness_component_failed",
@@ -2366,6 +2366,34 @@ test("empty baseline verifier binds runtime and config, proves exact core, and r
       error?.code === "empty_baseline_total_missing" &&
       error?.details?.objectKey === "products",
   );
+  for (const objectKey of [
+    "salesReturns",
+    "financePayments",
+    "financeCreditNotes",
+  ]) {
+    const existing = makeFetch({ nonEmptyKey: objectKey });
+    await assert.rejects(
+      () =>
+        verifyManualAcceptanceEmptyBaseline({
+          ...binding,
+          fetchImpl: existing.fetchImpl,
+        }),
+      (error) =>
+        error?.code === "empty_baseline_not_empty" &&
+        error?.details?.objectKey === objectKey,
+    );
+    const withoutTotal = makeFetch({ omitTotalKey: objectKey });
+    await assert.rejects(
+      () =>
+        verifyManualAcceptanceEmptyBaseline({
+          ...binding,
+          fetchImpl: withoutTotal.fetchImpl,
+        }),
+      (error) =>
+        error?.code === "empty_baseline_total_missing" &&
+        error?.details?.objectKey === objectKey,
+    );
+  }
   const configMismatch = makeFetch();
   await assert.rejects(
     () =>

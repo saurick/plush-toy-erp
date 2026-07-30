@@ -385,6 +385,95 @@ function factReferenceRecords(countOverrides = {}) {
           : [],
     })),
     financeFacts,
+    salesReturns: [
+      ["DRAFT", 0],
+      ["APPROVED", 1],
+      ["RECEIVED", 2],
+      ["REVERSED", 3],
+    ].map(([status, index]) => ({
+      id: 125_000 + index,
+      returnNo: `SIM-SDF-TH-${index + 1}`,
+      status,
+      shipmentID: 120_010 + index,
+      customerID: 10_001 + index,
+    })),
+    financePayments: [
+      {
+        id: 126_001,
+        paymentNo: "SIM-SDF-SK-902",
+        status: "APPROVED",
+        direction: "RECEIPT",
+        counterpartyType: "CUSTOMER",
+        counterpartyID: 10_001,
+        amount: "1",
+        currency: "CNY",
+      },
+      {
+        id: 126_002,
+        paymentNo: "SIM-SDF-SK-901",
+        status: "POSTED",
+        direction: "RECEIPT",
+        counterpartyType: "CUSTOMER",
+        counterpartyID: 10_002,
+        amount: "10",
+        currency: "CNY",
+      },
+      {
+        id: 126_003,
+        paymentNo: "SIM-SDF-FK-901",
+        status: "POSTED",
+        direction: "DISBURSEMENT",
+        counterpartyType: "SUPPLIER",
+        counterpartyID: 20_001,
+        amount: "10",
+        currency: "CNY",
+      },
+      {
+        id: 126_004,
+        paymentNo: "SIM-SDF-SK-903",
+        status: "REVERSED",
+        direction: "RECEIPT",
+        counterpartyType: "CUSTOMER",
+        counterpartyID: 10_003,
+        amount: "1",
+        currency: "CNY",
+      },
+    ],
+    financeCreditNotes: [
+      {
+        id: 127_001,
+        creditNoteNo: "SIM-SDF-YS-951",
+        status: "POSTED",
+        financeFactID: financeFacts[1].id,
+        financeFactNo: financeFacts[1].factNo,
+        financeFactType: financeFacts[1].factType,
+        amount: "1",
+        currency: "CNY",
+        reversalOfCreditNoteID: null,
+      },
+      {
+        id: 127_002,
+        creditNoteNo: "SIM-SDF-YS-952",
+        status: "POSTED",
+        financeFactID: financeFacts[5].id,
+        financeFactNo: financeFacts[5].factNo,
+        financeFactType: financeFacts[5].factType,
+        amount: "1",
+        currency: "CNY",
+        reversalOfCreditNoteID: null,
+      },
+      {
+        id: 127_003,
+        creditNoteNo: "SIM-SDF-YS-953",
+        status: "REVERSED",
+        financeFactID: financeFacts[5].id,
+        financeFactNo: financeFacts[5].factNo,
+        financeFactType: financeFacts[5].factType,
+        amount: "1",
+        currency: "CNY",
+        reversalOfCreditNoteID: 127_002,
+      },
+    ],
   };
   records.attachmentOwners = {
     productionFactId: productionFacts.find((item) => item.status === "POSTED")
@@ -811,6 +900,43 @@ function createReadinessFetch(runtimeOptions = {}) {
         cancel_reason: item.cancelReason,
       })),
     ],
+    list_sales_returns: [
+      "sales_returns",
+      factRefs.salesReturns.map((item) => ({
+        id: item.id,
+        return_no: item.returnNo,
+        status: item.status,
+        shipment_id: item.shipmentID,
+        customer_id: item.customerID,
+      })),
+    ],
+    list_finance_payments: [
+      "payments",
+      factRefs.financePayments.map((item) => ({
+        id: item.id,
+        payment_no: item.paymentNo,
+        status: item.status,
+        direction: item.direction,
+        counterparty_type: item.counterpartyType,
+        counterparty_id: item.counterpartyID,
+        amount: item.amount,
+        currency: item.currency,
+      })),
+    ],
+    list_finance_credit_notes: [
+      "credit_notes",
+      factRefs.financeCreditNotes.map((item) => ({
+        id: item.id,
+        credit_note_no: item.creditNoteNo,
+        status: item.status,
+        finance_fact_id: item.financeFactID,
+        finance_fact_no: item.financeFactNo,
+        finance_fact_type: item.financeFactType,
+        amount: item.amount,
+        currency: item.currency,
+        reversal_of_credit_note_id: item.reversalOfCreditNoteID,
+      })),
+    ],
   };
   const listSpecs = {
     list_customers: ["customers", 60, "is_active", [true, false], "code"],
@@ -1130,6 +1256,11 @@ function createReadinessFetch(runtimeOptions = {}) {
           "execution_status",
           "decision_type",
           "production_order_id",
+          "shipment_id",
+          "direction",
+          "counterparty_type",
+          "counterparty_id",
+          "finance_fact_id",
         ]) {
           if (
             body.params[key] != null &&
@@ -1176,7 +1307,7 @@ function createReadinessFetch(runtimeOptions = {}) {
   return { fetchImpl, calls };
 }
 
-test("all 50 formal targets are owned by shared generator stages", () => {
+test("all 52 formal targets are owned by shared generator stages", () => {
   const contract = buildManualAcceptancePageDataContract();
   const plan = buildManualAcceptanceReadinessPlan();
   const ownershipByID = new Map(
@@ -1189,7 +1320,7 @@ test("all 50 formal targets are owned by shared generator stages", () => {
     ]),
   );
 
-  assert.equal(contract.targets.length, 50);
+  assert.equal(contract.targets.length, 52);
   assert.deepEqual(
     Object.keys(contract.generatorStages).sort(),
     [...MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS].sort(),
@@ -1244,6 +1375,16 @@ test("all 50 formal targets are owned by shared generator stages", () => {
     ["facts"],
   );
   assert.deepEqual(
+    plan.targets.find((target) => target.id === "desktopPages:sales-returns")
+      .probeIds,
+    ["sales-returns"],
+  );
+  assert.deepEqual(
+    plan.targets.find((target) => target.id === "desktopPages:finance-payments")
+      .probeIds,
+    ["finance-payments", "finance-credit-notes"],
+  );
+  assert.deepEqual(
     plan.targets.find((target) => target.id === "desktopPages:print-center")
       .generatorStageKeys,
     ["catalog"],
@@ -1256,7 +1397,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   missingPage.targets.pop();
   assert.throws(
     () => assertManualAcceptancePageDataContract(missingPage),
-    /必须恰好覆盖 50 个正式目标/u,
+    /必须恰好覆盖 52 个正式目标/u,
   );
 
   const unknownProbe = structuredClone(contract);
@@ -1283,7 +1424,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   );
 });
 
-test("default plan covers all 50 targets and never connects to a backend", async () => {
+test("default plan covers all 52 targets and never connects to a backend", async () => {
   let fetchCalls = 0;
   const result = await runManualAcceptanceReadinessCli([], {
     fetchImpl: async () => {
@@ -1297,7 +1438,7 @@ test("default plan covers all 50 targets and never connects to a backend", async
   assert.equal(result.plan.callsBackend, false);
   assert.equal(result.plan.writesBackend, false);
   assert.equal(result.plan.directSQL, false);
-  assert.equal(result.plan.targets.length, 50);
+  assert.equal(result.plan.targets.length, 52);
   assert.equal(
     result.plan.targets.filter(
       (item) => item.catalogGroup === "mobileRolePages",
@@ -1349,7 +1490,7 @@ test("default plan covers all 50 targets and never connects to a backend", async
   assert.ok(businessDashboard.probeIds.includes("products"));
   assert.ok(businessDashboard.probeIds.includes("business-dashboard-stats"));
   assert.equal(businessDashboard.probeIds.includes("product-skus"), false);
-  assert.equal(result.plan.expected.targets, 50);
+  assert.equal(result.plan.expected.targets, 52);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
   const probesByID = new Map(
     result.plan.probes.map((probe) => [probe.id, probe]),
@@ -1959,10 +2100,10 @@ test("explicit verification reports page data, nine role totals, and honest manu
     }),
   );
 
-  assert.equal(report.summary.totalTargets, 50);
+  assert.equal(report.summary.totalTargets, 52);
   assert.equal(
     report.summary.passedTargetData,
-    40,
+    42,
     JSON.stringify(
       report.targets
         .filter((item) => item.dataStatus !== "pass")
@@ -2015,7 +2156,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
     new Set(Object.values(report.summary.mobileActualByRole)),
     new Set([20]),
   );
-  assert.equal(report.targets.length, 50);
+  assert.equal(report.targets.length, 52);
   assert.equal(report.runtimePreflight.environment, "local");
   assert.equal(report.runtimePreflight.customerKey, "yoyoosun");
   assert.equal(
@@ -2692,7 +2833,7 @@ test("customer-facing report uses ordinary business wording", async () => {
   assert.match(markdown, /九个岗位任务合计：180 \/ 180/u);
   assert.match(markdown, /尚未证明/u);
   assert.match(markdown, /人工验收：未完成/u);
-  assert.match(markdown, /页面操作已完成：0 \/ 50/u);
+  assert.match(markdown, /页面操作已完成：0 \/ 52/u);
   assert.doesNotMatch(
     markdown,
     /Workflow|Fact|JSON-RPC|RBAC|schema|raw\s*id|甲方/iu,
