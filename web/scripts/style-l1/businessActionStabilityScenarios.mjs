@@ -1,8 +1,13 @@
+import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
+
 const SALES_ORDER_PATH = '/erp/sales/project-orders/sales-orders'
 const PURCHASE_ORDER_PATH = '/erp/purchase/accessories'
 const PURCHASE_RECEIPT_PATH = '/erp/warehouse/inbound'
 const QUALITY_INSPECTION_PATH = '/erp/production/quality-inspections'
 const SHIPMENT_PATH = '/erp/warehouse/shipments'
+const FINANCE_PAYMENT_PATH = '/erp/finance/payments'
+const SALES_RETURN_PATH = '/erp/sales/customer-returns'
+const PRODUCTION_EXCEPTION_PATH = '/erp/production/exceptions'
 
 const SALES_ORDER_STATUSES = [
   ['draft', '草稿'],
@@ -143,14 +148,38 @@ function createQualityInspectionRows() {
       created_at: 1_784_000_000,
       updated_at: 1_784_000_004,
     },
+    {
+      id: 1_306,
+      inspection_no: 'QI-ACTION-PRODUCTION-WIP',
+      source_type: 'PRODUCTION_WIP',
+      source_id: 801,
+      inspection_type: 'PRODUCTION_STAGE',
+      subject_type: 'PRODUCT',
+      subject_id: 1,
+      status: 'SUBMITTED',
+      result: '',
+      original_lot_status: 'HOLD',
+      inspected_at: 0,
+      inspector_id: null,
+      decision_note: '在制品质检无独立关联单据入口',
+      created_at: 1_784_000_000,
+      updated_at: 1_784_000_005,
+    },
   ]
 }
 
 function createShipmentRows() {
-  return ['DRAFT', 'SHIPPED', 'CANCELLED'].map((status, index) => ({
+  return [
+    ['DRAFT', 'PENDING', 'DRAFT'],
+    ['DRAFT', 'APPROVED', 'DRAFT-APPROVED'],
+    ['DRAFT', 'REJECTED', 'DRAFT-REJECTED'],
+    ['SHIPPED', 'APPROVED', 'SHIPPED'],
+    ['CANCELLED', 'PENDING', 'CANCELLED'],
+  ].map(([status, financeReleaseStatus, suffix], index) => ({
     id: 1_401 + index,
-    shipment_no: `SHIP-ACTION-${status}`,
+    shipment_no: `SHIP-ACTION-${suffix}`,
     status,
+    finance_release_status: financeReleaseStatus,
     sales_order_id: 1,
     customer_id: 1,
     customer_snapshot: '稳定动作客户',
@@ -164,6 +193,80 @@ function createShipmentRows() {
   }))
 }
 
+function createFinancePaymentRows() {
+  return ['DRAFT', 'APPROVED', 'POSTED', 'REVERSED', 'CANCELLED'].map(
+    (status, index) => ({
+      id: 1_501 + index,
+      payment_no: `PAY-ACTION-${status}`,
+      direction: 'RECEIPT',
+      status,
+      counterparty_type: 'CUSTOMER',
+      counterparty_id: 1,
+      amount: '1200.00',
+      currency: 'CNY',
+      account_ref: '银行账户尾号 6688',
+      evidence_ref: `回单 ACTION-${status}`,
+      version: index + 1,
+      occurred_at: 1_784_000_000 + index,
+      allocations:
+        status === 'POSTED' || status === 'REVERSED'
+          ? [
+              {
+                id: 1_551 + index,
+                finance_fact_no: 'AR-ACTION-001',
+                finance_fact_type: 'RECEIVABLE',
+                amount: '1200.00',
+                currency: 'CNY',
+                status: status === 'REVERSED' ? 'REVERSED' : 'POSTED',
+              },
+            ]
+          : [],
+    })
+  )
+}
+
+function createSalesReturnRows() {
+  return ['DRAFT', 'APPROVED', 'RECEIVED', 'REVERSED', 'CANCELLED'].map(
+    (status, index) => ({
+      id: 1_601 + index,
+      return_no: `RMA-ACTION-${status}`,
+      shipment_id: 1,
+      shipment_no: 'SHIP-STYLE-L1',
+      customer_name: '稳定动作客户',
+      status,
+      reason: `动作稳定性 ${status}`,
+      version: index + 1,
+      items: [],
+      approved_at: ['APPROVED', 'RECEIVED', 'REVERSED'].includes(status)
+        ? 1_784_000_000
+        : null,
+      received_at: ['RECEIVED', 'REVERSED'].includes(status)
+        ? 1_784_000_100
+        : null,
+    })
+  )
+}
+
+function createProductionExceptionRows() {
+  return [
+    ['SUBMITTED-SCRAP', 'SCRAP', 'SUBMITTED', 'PENDING'],
+    ['APPROVED-SCRAP', 'SCRAP', 'APPROVED', 'PENDING'],
+    ['APPLIED-SCRAP', 'SCRAP', 'APPROVED', 'APPLIED'],
+    ['APPROVED-OVER-ISSUE', 'OVER_ISSUE', 'APPROVED', 'PENDING'],
+    ['CANCELLED-SCRAP', 'SCRAP', 'CANCELLED', 'PENDING'],
+  ].map(([suffix, decisionType, status, executionStatus], index) => ({
+    id: 1_701 + index,
+    decision_no: `PEX-ACTION-${suffix}`,
+    decision_type: decisionType,
+    requested_quantity: '2',
+    status,
+    execution_status: executionStatus,
+    requested_by: 1,
+    reason: `动作稳定性 ${suffix}`,
+    version: index + 1,
+  }))
+}
+
 async function installActionStabilityRpcRows(
   page,
   {
@@ -171,6 +274,9 @@ async function installActionStabilityRpcRows(
     includePurchase = false,
     includeQuality = false,
     includeShipments = false,
+    includeFinance = false,
+    includeSalesReturns = false,
+    includeProductionExceptions = false,
     delaySalesSubmit = false,
   } = {}
 ) {
@@ -178,6 +284,9 @@ async function installActionStabilityRpcRows(
   const purchaseOrders = createPurchaseOrderRows()
   const qualityInspections = createQualityInspectionRows()
   const shipments = createShipmentRows()
+  const financePayments = createFinancePaymentRows()
+  const salesReturns = createSalesReturnRows()
+  const productionExceptions = createProductionExceptionRows()
 
   if (includeSales) {
     await page.route('**/rpc/sales_order', async (route) => {
@@ -351,12 +460,52 @@ async function installActionStabilityRpcRows(
     })
   }
 
-  if (includeShipments) {
+  if (
+    includeShipments ||
+    includeFinance ||
+    includeSalesReturns ||
+    includeProductionExceptions
+  ) {
     await page.route('**/rpc/operational_fact', async (route) => {
       const body = route.request().postDataJSON() || {}
       const { id = 'action-stability-shipment', method, params = {} } = body
-      if (method === 'list_shipments') {
+      if (includeShipments && method === 'list_shipments') {
         await fulfillRpc(route, id, rpcPage(shipments, 'shipments', params))
+        return
+      }
+      if (includeFinance && method === 'list_finance_payments') {
+        await fulfillRpc(
+          route,
+          id,
+          rpcPage(financePayments, 'payments', params)
+        )
+        return
+      }
+      if (includeFinance && method === 'list_finance_credit_notes') {
+        await fulfillRpc(route, id, rpcPage([], 'credit_notes', params))
+        return
+      }
+      if (includeSalesReturns && method === 'list_sales_returns') {
+        await fulfillRpc(
+          route,
+          id,
+          rpcPage(salesReturns, 'sales_returns', params)
+        )
+        return
+      }
+      if (
+        includeProductionExceptions &&
+        method === 'list_production_exceptions'
+      ) {
+        await fulfillRpc(
+          route,
+          id,
+          rpcPage(
+            productionExceptions,
+            'production_exceptions',
+            params
+          )
+        )
         return
       }
       await route.fallback()
@@ -451,6 +600,31 @@ async function captureDesktopActionLayout(page) {
       ),
     }
   })
+}
+
+async function assertDesktopActionState(
+  page,
+  assert,
+  key,
+  { visible, disabled }
+) {
+  const action = page
+    .locator('.erp-business-module-current-action')
+    .first()
+    .locator(`[data-business-action-key="${key}"]`)
+  const count = await action.count()
+  assert.equal(
+    count > 0,
+    visible,
+    `${key} 可见性应为 ${visible ? '显示' : '隐藏'}`
+  )
+  if (visible && typeof disabled === 'boolean') {
+    assert.equal(
+      await action.isDisabled(),
+      disabled,
+      `${key} 禁用态应为 ${disabled}`
+    )
+  }
 }
 
 function assertStableDesktopLayout(assert, baseline, current, scenarioName) {
@@ -587,6 +761,30 @@ export function createBusinessActionStabilityScenarios(deps) {
     outputDir,
     path,
   } = deps
+  const roleIdentity = (roleKey) => {
+    const role = yoyoosunRoleFlowMatrix.roles.find(
+      (item) => item.roleKey === roleKey
+    )
+    if (!role) {
+      throw new Error(`未找到永绅角色：${roleKey}`)
+    }
+    return {
+      adminProfile: {
+        id: 1,
+        username: `style-l1-${roleKey}`,
+        is_super_admin: false,
+        roles: [{ role_key: role.roleKey, name: role.displayName }],
+        permissions: [...role.capabilityKeys],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: [...role.capabilityKeys],
+      },
+    }
+  }
+  const financeIdentity = roleIdentity('finance')
+  const warehouseIdentity = roleIdentity('warehouse')
+  const productionIdentity = roleIdentity('production')
 
   return [
     {
@@ -1005,6 +1203,16 @@ export function createBusinessActionStabilityScenarios(deps) {
             `business-action-stability-quality-${status.toLowerCase()}-desktop.png`
           )
         }
+        await selectBusinessRow(page, 'QI-ACTION-PRODUCTION-WIP')
+        await assertDesktopActionState(page, assert, 'related-records', {
+          visible: false,
+        })
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-quality-unrelated-desktop.png'
+        )
 
         await gotoScenarioPath(page, SHIPMENT_PATH)
         await waitForBusinessPage(page, '出货单')
@@ -1041,6 +1249,442 @@ export function createBusinessActionStabilityScenarios(deps) {
         await assertNoHorizontalOverflow(
           page,
           'business-action-stability-representative-pages-desktop'
+        )
+      },
+    },
+    {
+      name: 'business-action-stability-finance-payments-desktop',
+      path: FINANCE_PAYMENT_PATH,
+      auth: 'admin',
+      ...financeIdentity,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, {
+          includeSales: false,
+          includeFinance: true,
+        })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '收付款与核销')
+        for (const key of [
+          'payment-details',
+          'payment-allocation',
+          'payment-approval',
+          'payment-cancel',
+          'payment-reverse',
+          'payment-reload',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: true,
+            disabled: true,
+          })
+        }
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-finance-none-desktop.png'
+        )
+
+        await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
+        await assertDesktopActionState(page, assert, 'payment-allocation', {
+          visible: true,
+          disabled: true,
+        })
+        await assertDesktopActionState(page, assert, 'payment-approval', {
+          visible: true,
+          disabled: false,
+        })
+        await assertDesktopActionState(page, assert, 'payment-cancel', {
+          visible: true,
+          disabled: false,
+        })
+        await assertDesktopActionState(page, assert, 'payment-reverse', {
+          visible: true,
+          disabled: true,
+        })
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-finance-draft-desktop.png'
+        )
+
+        await selectBusinessRow(page, 'PAY-ACTION-APPROVED')
+        await assertDesktopActionState(page, assert, 'payment-allocation', {
+          visible: true,
+          disabled: false,
+        })
+        await assertDesktopActionState(page, assert, 'payment-approval', {
+          visible: false,
+        })
+        await assertDesktopActionState(page, assert, 'payment-reverse', {
+          visible: true,
+          disabled: true,
+        })
+
+        await selectBusinessRow(page, 'PAY-ACTION-POSTED')
+        for (const key of [
+          'payment-allocation',
+          'payment-approval',
+          'payment-cancel',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+        await assertDesktopActionState(page, assert, 'payment-reverse', {
+          visible: true,
+          disabled: false,
+        })
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-finance-posted-desktop.png'
+        )
+
+        await selectBusinessRow(page, 'PAY-ACTION-REVERSED')
+        for (const key of [
+          'payment-allocation',
+          'payment-approval',
+          'payment-cancel',
+          'payment-reverse',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+        await assertNoHorizontalOverflow(
+          page,
+          'business-action-stability-finance-payments-desktop'
+        )
+      },
+    },
+    {
+      name: 'business-action-stability-finance-superadmin-narrowed-desktop',
+      path: FINANCE_PAYMENT_PATH,
+      auth: 'admin',
+      adminProfile: {
+        id: 2,
+        username: 'style-l1-superadmin-read-only',
+        is_super_admin: true,
+        roles: [],
+        permissions: [],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: ['finance.payment.read'],
+      },
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, {
+          includeSales: false,
+          includeFinance: true,
+        })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '收付款与核销')
+        await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
+        for (const key of [
+          'payment-allocation',
+          'payment-approval',
+          'payment-cancel',
+          'payment-reverse',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+        await assertDesktopActionState(page, assert, 'payment-details', {
+          visible: true,
+          disabled: false,
+        })
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-finance-superadmin-narrowed-desktop.png'
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'business-action-stability-finance-superadmin-narrowed-desktop'
+        )
+      },
+    },
+    {
+      name: 'business-action-stability-warehouse-returns-shipments-desktop',
+      path: SALES_RETURN_PATH,
+      auth: 'admin',
+      ...warehouseIdentity,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, {
+          includeSales: false,
+          includeSalesReturns: true,
+          includeShipments: true,
+        })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '客户退货 / RMA')
+        for (const key of ['sales-return-receive', 'sales-return-reverse']) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: true,
+            disabled: true,
+          })
+        }
+        for (const key of ['sales-return-approval', 'sales-return-cancel']) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+
+        await selectBusinessRow(page, 'RMA-ACTION-DRAFT')
+        for (const key of ['sales-return-receive', 'sales-return-reverse']) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: true,
+            disabled: true,
+          })
+        }
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-return-draft-desktop.png'
+        )
+
+        await selectBusinessRow(page, 'RMA-ACTION-APPROVED')
+        await assertDesktopActionState(page, assert, 'sales-return-receive', {
+          visible: true,
+          disabled: false,
+        })
+        await assertDesktopActionState(page, assert, 'sales-return-reverse', {
+          visible: true,
+          disabled: true,
+        })
+
+        await selectBusinessRow(page, 'RMA-ACTION-RECEIVED')
+        await assertDesktopActionState(page, assert, 'sales-return-receive', {
+          visible: false,
+        })
+        await assertDesktopActionState(page, assert, 'sales-return-reverse', {
+          visible: true,
+          disabled: false,
+        })
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-return-received-desktop.png'
+        )
+
+        await selectBusinessRow(page, 'RMA-ACTION-REVERSED')
+        for (const key of ['sales-return-receive', 'sales-return-reverse']) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+
+        await gotoScenarioPath(page, SHIPMENT_PATH)
+        await waitForBusinessPage(page, '出货单')
+        await selectBusinessRow(page, 'SHIP-ACTION-DRAFT')
+        await assertDesktopActionState(page, assert, 'shipment-release', {
+          visible: true,
+          disabled: false,
+        })
+        await assertDesktopActionState(page, assert, 'shipment-ship', {
+          visible: true,
+          disabled: true,
+        })
+        await assertDesktopActionState(page, assert, 'shipment-cancel', {
+          visible: true,
+          disabled: false,
+        })
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-shipment-pending-desktop.png'
+        )
+
+        await selectBusinessRow(page, 'SHIP-ACTION-DRAFT-APPROVED')
+        await assertDesktopActionState(page, assert, 'shipment-release', {
+          visible: false,
+        })
+        await assertDesktopActionState(page, assert, 'shipment-ship', {
+          visible: true,
+          disabled: false,
+        })
+
+        await selectBusinessRow(page, 'SHIP-ACTION-DRAFT-REJECTED')
+        for (const key of ['shipment-release', 'shipment-ship']) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+        await assertDesktopActionState(page, assert, 'shipment-cancel', {
+          visible: true,
+          disabled: false,
+        })
+
+        await selectBusinessRow(page, 'SHIP-ACTION-SHIPPED')
+        await assertDesktopActionState(page, assert, 'shipment-ship', {
+          visible: false,
+        })
+        await assertDesktopActionState(page, assert, 'shipment-cancel', {
+          visible: true,
+          disabled: false,
+        })
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-shipment-shipped-desktop.png'
+        )
+        await assertNoHorizontalOverflow(
+          page,
+          'business-action-stability-warehouse-returns-shipments-desktop'
+        )
+      },
+    },
+    {
+      name: 'business-action-stability-production-exceptions-desktop',
+      path: PRODUCTION_EXCEPTION_PATH,
+      auth: 'admin',
+      ...productionIdentity,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await installActionStabilityRpcRows(page, {
+          includeSales: false,
+          includeProductionExceptions: true,
+        })
+      },
+      verify: async (page) => {
+        await waitForBusinessPage(page, '生产异常处置')
+        for (const key of [
+          'production-exception-approval',
+          'production-exception-withdraw',
+          'production-exception-execute',
+          'production-exception-reverse',
+          'production-exception-revoke-quota',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: true,
+            disabled: true,
+          })
+        }
+        await assertDesktopActionState(
+          page,
+          assert,
+          'production-exception-decide',
+          { visible: false }
+        )
+
+        await selectBusinessRow(page, 'PEX-ACTION-SUBMITTED-SCRAP')
+        for (const key of [
+          'production-exception-approval',
+          'production-exception-withdraw',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: true,
+            disabled: false,
+          })
+        }
+        for (const key of [
+          'production-exception-execute',
+          'production-exception-reverse',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: true,
+            disabled: true,
+          })
+        }
+        await assertDesktopActionState(
+          page,
+          assert,
+          'production-exception-revoke-quota',
+          { visible: false }
+        )
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-production-submitted-desktop.png'
+        )
+
+        await selectBusinessRow(page, 'PEX-ACTION-APPROVED-SCRAP')
+        for (const key of [
+          'production-exception-approval',
+          'production-exception-withdraw',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+        await assertDesktopActionState(
+          page,
+          assert,
+          'production-exception-execute',
+          { visible: true, disabled: false }
+        )
+        await assertDesktopActionState(
+          page,
+          assert,
+          'production-exception-reverse',
+          { visible: true, disabled: true }
+        )
+
+        await selectBusinessRow(page, 'PEX-ACTION-APPLIED-SCRAP')
+        await assertDesktopActionState(
+          page,
+          assert,
+          'production-exception-execute',
+          { visible: false }
+        )
+        await assertDesktopActionState(
+          page,
+          assert,
+          'production-exception-reverse',
+          { visible: true, disabled: false }
+        )
+
+        await selectBusinessRow(page, 'PEX-ACTION-APPROVED-OVER-ISSUE')
+        for (const key of [
+          'production-exception-execute',
+          'production-exception-reverse',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+        await assertDesktopActionState(
+          page,
+          assert,
+          'production-exception-revoke-quota',
+          { visible: true, disabled: false }
+        )
+        await screenshot(
+          page,
+          path,
+          outputDir,
+          'business-action-stability-production-quota-desktop.png'
+        )
+
+        await selectBusinessRow(page, 'PEX-ACTION-CANCELLED-SCRAP')
+        for (const key of [
+          'production-exception-approval',
+          'production-exception-withdraw',
+          'production-exception-execute',
+          'production-exception-reverse',
+          'production-exception-revoke-quota',
+        ]) {
+          await assertDesktopActionState(page, assert, key, {
+            visible: false,
+          })
+        }
+        await assertNoHorizontalOverflow(
+          page,
+          'business-action-stability-production-exceptions-desktop'
         )
       },
     },

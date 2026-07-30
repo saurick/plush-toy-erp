@@ -102,6 +102,7 @@ import {
   QUALITY_STATUS_OPTIONS,
 } from '../components/quality-inspections/qualityInspectionColumns.jsx'
 import { formatQuantity } from '../utils/businessLineItems.mjs'
+import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   compactParams,
   buildSequentialDraftCode,
@@ -532,6 +533,11 @@ export default function V1QualityInspectionsPage() {
     canOpenShipments,
     selectedSourceType,
   ])
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: hasRelatedCapability,
+    record: selectedRow,
+    itemCount: relatedMenuItems.length,
+  })
   const purchaseReceiptOptions = useMemo(
     () => uniqueReferenceOptions(purchaseReceipts, purchaseReceiptOption),
     [purchaseReceipts]
@@ -1878,19 +1884,19 @@ export default function V1QualityInspectionsPage() {
             selectionLabel="质检记录"
             onClear={() => setSelectedRow(null)}
           />
-          {hasRelatedCapability ? (
+          {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || relatedMenuItems.length === 0}
+              disabled={relatedActionAvailability.disabled}
               disabledReason={
                 !selectedRow
                   ? '请先选择一条质检记录'
-                  : '当前质检记录没有可打开的关联单据'
+                  : relatedActionAvailability.disabledReason
               }
             >
               <Dropdown
                 trigger={['click']}
                 destroyOnHidden
-                disabled={!selectedRow || relatedMenuItems.length === 0}
+                disabled={relatedActionAvailability.disabled}
                 menu={{
                   items: relatedMenuItems,
                   onClick: openRelatedTable,
@@ -1899,7 +1905,8 @@ export default function V1QualityInspectionsPage() {
                 <Button
                   size="small"
                   icon={<LinkOutlined />}
-                  disabled={!selectedRow || relatedMenuItems.length === 0}
+                  data-business-action-key="related-records"
+                  disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
                 </Button>

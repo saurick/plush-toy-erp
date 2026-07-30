@@ -547,6 +547,19 @@ export async function listFinancePayments(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllFinancePayments(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listFinancePayments,
+    params,
+    'payments',
+    options,
+    {
+      invalidResponseMessage:
+        '服务器返回的收付款记录不完整，请刷新后重试',
+    }
+  )
+}
+
 export async function createFinanceCreditNote(params = {}) {
   const result = await operationalFactRpc.call(
     'create_finance_credit_note',
@@ -571,6 +584,18 @@ export async function listFinanceCreditNotes(params = {}, options = {}) {
     options
   )
   return dataOf(result)
+}
+
+export async function listAllFinanceCreditNotes(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listFinanceCreditNotes,
+    params,
+    'credit_notes',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的红冲记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function reverseFinanceCreditNote(params = {}) {

@@ -66,6 +66,7 @@ import {
   numeric20Scale6Units,
   subtractNumeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
+import { resolveSalesReturnActionAvailability } from '../utils/operationalActionAvailability.mjs'
 
 const STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
@@ -860,6 +861,32 @@ export default function SalesReturnsPage() {
       },
     ],
   }
+  const actionAvailability = {
+    receive: resolveSalesReturnActionAvailability({
+      action: 'receive',
+      authorized: canReceive,
+      salesReturn: selected,
+      busy: saving,
+    }),
+    approval: resolveSalesReturnActionAvailability({
+      action: 'approval',
+      authorized: canCreate,
+      salesReturn: selected,
+      busy: saving,
+    }),
+    cancel: resolveSalesReturnActionAvailability({
+      action: 'cancel',
+      authorized: canCancel,
+      salesReturn: selected,
+      busy: saving,
+    }),
+    reverse: resolveSalesReturnActionAvailability({
+      action: 'reverse',
+      authorized: canReverse,
+      salesReturn: selected,
+      busy: saving,
+    }),
+  }
 
   return (
     <BusinessPageLayout className="erp-sales-returns-page">
@@ -923,72 +950,71 @@ export default function SalesReturnsPage() {
             disabled={!selected}
             disabledReason="请先选择一条客户退货记录"
           >
-            <Button disabled={!selected} onClick={() => setDetail(selected)}>
+            <Button
+              data-business-action-key="sales-return-details"
+              disabled={!selected}
+              onClick={() => setDetail(selected)}
+            >
               查看详情
             </Button>
           </BusinessActionTooltip>
-          {canReceive && (!selected || selected.status === 'APPROVED') ? (
+          {actionAvailability.receive.visible ? (
             <BusinessActionTooltip
-              disabled={!selected || saving}
-              disabledReason={
-                saving ? '当前操作完成后可确认收货' : '请先选择一条已批准退货'
-              }
+              disabled={actionAvailability.receive.disabled}
+              disabledReason={actionAvailability.receive.disabledReason}
             >
               <Popconfirm
                 title="确认已收到客户退货？"
                 description="确认后会按退货明细形成库存入库。"
                 onConfirm={() => transition('receive')}
               >
-                <Button disabled={!selected || saving}>确认收货</Button>
+                <Button
+                  data-business-action-key="sales-return-receive"
+                  disabled={actionAvailability.receive.disabled}
+                >
+                  确认收货
+                </Button>
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canCreate && (!selected || selected.status === 'DRAFT') ? (
+          {actionAvailability.approval.visible ? (
             <BusinessActionTooltip
-              disabled={!selected || saving}
-              disabledReason={
-                saving
-                  ? '当前操作完成后可核对审批流'
-                  : '请先选择一条待审批客户退货'
-              }
+              disabled={actionAvailability.approval.disabled}
+              disabledReason={actionAvailability.approval.disabledReason}
             >
               <Button
-                disabled={!selected || saving}
+                data-business-action-key="sales-return-approval"
+                disabled={actionAvailability.approval.disabled}
                 onClick={ensureApprovalProcess}
               >
                 核对审批流
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canCancel &&
-          (!selected ||
-            selected.status === 'DRAFT' ||
-            selected.status === 'APPROVED') ? (
-              <BusinessActionTooltip
-                disabled={!selected || saving}
-                disabledReason={
-                saving ? '当前操作完成后可取消' : '请先选择一条客户退货'
-              }
-              >
-                <Button
-                  danger
-                  disabled={!selected || saving}
-                  onClick={openCancel}
-                >
-                  核对并取消
-                </Button>
-              </BusinessActionTooltip>
-          ) : null}
-          {canReverse && (!selected || selected.status === 'RECEIVED') ? (
+          {actionAvailability.cancel.visible ? (
             <BusinessActionTooltip
-              disabled={!selected || saving}
-              disabledReason={
-                saving ? '当前操作完成后可冲正' : '请先选择一条已收货退货'
-              }
+              disabled={actionAvailability.cancel.disabled}
+              disabledReason={actionAvailability.cancel.disabledReason}
             >
               <Button
                 danger
-                disabled={!selected || saving}
+                data-business-action-key="sales-return-cancel"
+                disabled={actionAvailability.cancel.disabled}
+                onClick={openCancel}
+              >
+                核对并取消
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {actionAvailability.reverse.visible ? (
+            <BusinessActionTooltip
+              disabled={actionAvailability.reverse.disabled}
+              disabledReason={actionAvailability.reverse.disabledReason}
+            >
+              <Button
+                danger
+                data-business-action-key="sales-return-reverse"
+                disabled={actionAvailability.reverse.disabled}
                 onClick={() => setReverseOpen(true)}
               >
                 冲正退货入库
@@ -998,6 +1024,7 @@ export default function SalesReturnsPage() {
           <ExceptionProcessRecoveryButton
             canRecover={canRecoverProcess}
             disabled={!selected || saving}
+            disabledReason="请先选择一条客户退货记录"
             loadProcess={() =>
               getSalesReturnAcceptanceProcess({
                 ...(customerKey ? { customer_key: customerKey } : {}),

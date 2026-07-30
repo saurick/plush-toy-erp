@@ -15,18 +15,18 @@ test('shipped shipment finance actions require their exact confirm projections',
   assert.match(source, /canConfirmFinanceFact\(adminProfile, 'INVOICE'\)/u)
   assert.match(
     source,
-    /\{canCreateReceivable\s*&&[\s\S]{0,140}\['DRAFT', 'SHIPPED'\]/u
+    /action: 'receivable',[\s\S]{0,120}authorized: canCreateReceivable,[\s\S]{0,120}busy: saving \|\| financeSourceLoading/u
   )
   assert.match(
     source,
-    /\{canCreateInvoice\s*&&[\s\S]{0,140}\['DRAFT', 'SHIPPED'\]/u
+    /action: 'invoice',[\s\S]{0,120}authorized: canCreateInvoice,[\s\S]{0,120}busy: saving \|\| financeSourceLoading/u
   )
   assert.match(source, /action === 'receivable' \? canCreateReceivable/u)
   assert.match(source, />\s*生成应收\s*</u)
   assert.match(source, />\s*生成开票记录\s*</u)
   assert.match(
     source,
-    /selectedRow\.status !== 'SHIPPED' \|\|[\s\S]{0,80}saving \|\|[\s\S]{0,80}financeSourceLoading/u
+    /\{shipmentActionAvailability\.receivable\.visible \? \([\s\S]{0,240}disabled=\{shipmentActionAvailability\.receivable\.disabled\}/u
   )
 })
 
@@ -89,10 +89,13 @@ test('shipment related records are permission-filtered and fail closed without a
   }
   assert.match(source, /if \(!selectedRow\?\.id\) return \[\]/u)
   assert.match(source, /if \(!selectedRow\?\.id\) return/u)
-  assert.match(source, /\{hasRelatedCapability \? \(/u)
   assert.match(
     source,
-    /disabled=\{!selectedRow \|\| relatedMenuItems\.length === 0\}/u
+    /resolveRelatedRecordActionAvailability\(\{[\s\S]{0,160}authorized: hasRelatedCapability,[\s\S]{0,160}record: selectedRow,[\s\S]{0,160}itemCount: relatedMenuItems\.length/u
+  )
+  assert.match(
+    source,
+    /\{relatedActionAvailability\.visible \? \([\s\S]{0,220}disabled=\{relatedActionAvailability\.disabled\}/u
   )
 })
 
@@ -212,8 +215,15 @@ test('draft shipment can generate a source-bound finished-goods inspection', () 
 test('draft shipment starts the versioned finance approval process', () => {
   assert.match(source, /submitShipmentFinanceApprovalProcess\(\{/u)
   assert.match(source, /const canSubmitShipmentRelease = canRead && canCreate/u)
-  assert.match(source, />\s*提交出货审批\s*</u)
-  assert.match(source, /审批前不能确认出货/u)
+  assert.match(source, />\s*核对出货审批\s*</u)
+  assert.match(
+    source,
+    /action: 'release',[\s\S]{0,120}authorized: canSubmitShipmentRelease/u
+  )
+  assert.match(
+    source,
+    /action: 'ship',[\s\S]{0,120}authorized: canShip/u
+  )
   assert.match(source, /result\.process_instance\?\.id/u)
   assert.match(source, /成品质检仍由品质检验单独判定/u)
   assert.match(source, /审批通过也不等于已出货/u)
@@ -222,7 +232,7 @@ test('draft shipment starts the versioned finance approval process', () => {
 test('shipment cancellation distinguishes draft exit from shipped reversal', () => {
   assert.match(
     source,
-    /\['DRAFT', 'SHIPPED'\]\.includes\(selectedRow\.status\)/u
+    /action: 'cancel',[\s\S]{0,120}authorized: canCancel,[\s\S]{0,120}shipment: selectedRow/u
   )
   assert.match(source, /草稿作废不会扣减或恢复库存/u)
   assert.match(source, /如已提交放行，需先完成或退回放行待办/u)

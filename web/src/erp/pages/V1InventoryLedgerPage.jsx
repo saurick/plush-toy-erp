@@ -85,6 +85,7 @@ import {
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
+import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   inventoryLotOption,
   materialOption,
@@ -745,6 +746,11 @@ export default function V1InventoryLedgerPage() {
     ].some((sourceTypeValue) =>
       canOpenRelatedPath(sourceRouteFor(sourceTypeValue))
     )
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: hasRelatedCapability,
+    record: selectedRow,
+    itemCount: relatedMenuItems.length,
+  })
 
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
@@ -1748,6 +1754,7 @@ export default function V1InventoryLedgerPage() {
                     currentOperation.operation_type === 'MANUAL_ADJUSTMENT'
                   }
                   disabled={operationLoading}
+                  disabledReason="当前操作完成后可核对异常流程"
                   loadProcess={() =>
                     getInventoryAdjustmentApprovalProcess({
                       ...(customerKey ? { customer_key: customerKey } : {}),
@@ -1978,19 +1985,19 @@ export default function V1InventoryLedgerPage() {
             selectionLabel="库存记录"
             onClear={() => setSelectedRow(null)}
           />
-          {hasRelatedCapability ? (
+          {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || relatedMenuItems.length === 0}
+              disabled={relatedActionAvailability.disabled}
               disabledReason={
                 !selectedRow
                   ? '请先选择一条库存变动记录'
-                  : '当前库存变动没有可打开的来源单据'
+                  : relatedActionAvailability.disabledReason
               }
             >
               <Dropdown
                 trigger={['click']}
                 destroyOnHidden
-                disabled={!selectedRow || relatedMenuItems.length === 0}
+                disabled={relatedActionAvailability.disabled}
                 menu={{
                   items: relatedMenuItems,
                   onClick: openRelatedTable,
@@ -1999,7 +2006,8 @@ export default function V1InventoryLedgerPage() {
                 <Button
                   size="small"
                   icon={<LinkOutlined />}
-                  disabled={!selectedRow || relatedMenuItems.length === 0}
+                  data-business-action-key="related-records"
+                  disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
                 </Button>

@@ -91,6 +91,10 @@ import {
   numeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
 import {
+  resolveRelatedRecordActionAvailability,
+  resolveShipmentActionAvailability,
+} from '../utils/operationalActionAvailability.mjs'
+import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -1368,6 +1372,49 @@ export default function ShipmentsPage() {
         (selectedRow.customer_id ? '客户已关联' : '未指定客户')
       }`
     : '请先选择一张出货单'
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: hasRelatedCapability,
+    record: selectedRow,
+    itemCount: relatedMenuItems.length,
+  })
+  const shipmentActionAvailability = {
+    quality: resolveShipmentActionAvailability({
+      action: 'quality',
+      authorized: canCreateFinishedGoodsQualityInspection,
+      shipment: selectedRow,
+      busy: qualitySourceLoading || saving,
+    }),
+    release: resolveShipmentActionAvailability({
+      action: 'release',
+      authorized: canSubmitShipmentRelease,
+      shipment: selectedRow,
+      busy: saving,
+    }),
+    ship: resolveShipmentActionAvailability({
+      action: 'ship',
+      authorized: canShip,
+      shipment: selectedRow,
+      busy: saving,
+    }),
+    cancel: resolveShipmentActionAvailability({
+      action: 'cancel',
+      authorized: canCancel,
+      shipment: selectedRow,
+      busy: saving,
+    }),
+    receivable: resolveShipmentActionAvailability({
+      action: 'receivable',
+      authorized: canCreateReceivable,
+      shipment: selectedRow,
+      busy: saving || financeSourceLoading,
+    }),
+    invoice: resolveShipmentActionAvailability({
+      action: 'invoice',
+      authorized: canCreateInvoice,
+      shipment: selectedRow,
+      busy: saving || financeSourceLoading,
+    }),
+  }
 
   return (
     <BusinessPageLayout className="erp-v1-shipments-page">
@@ -1541,86 +1588,59 @@ export default function ShipmentsPage() {
             <Button
               size="small"
               icon={<EyeOutlined />}
+              data-business-action-key="shipment-details"
               disabled={!selectedRow || saving}
               onClick={() => openShipmentDetails(selectedRow)}
             >
               查看明细
             </Button>
           </BusinessActionTooltip>
-          {hasRelatedCapability ? (
+          {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || relatedMenuItems.length === 0}
+              disabled={relatedActionAvailability.disabled}
               disabledReason={
-                !selectedRow
-                  ? '请先选择一张出货单'
-                  : '当前出货单没有可打开的关联单据'
+                selectedRow
+                  ? relatedActionAvailability.disabledReason
+                  : '请先选择一张出货单'
               }
             >
               <Dropdown
                 trigger={['click']}
                 destroyOnHidden
-                disabled={!selectedRow || relatedMenuItems.length === 0}
+                disabled={relatedActionAvailability.disabled}
                 menu={{ items: relatedMenuItems, onClick: openRelatedRecord }}
               >
                 <Button
                   size="small"
                   icon={<LinkOutlined />}
-                  disabled={!selectedRow || relatedMenuItems.length === 0}
+                  data-business-action-key="related-records"
+                  disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
                 </Button>
               </Dropdown>
             </BusinessActionTooltip>
           ) : null}
-          {canCreateFinishedGoodsQualityInspection &&
-          (!selectedRow || selectedRow.status === 'DRAFT') ? (
+          {shipmentActionAvailability.quality.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !selectedRow ||
-                selectedRow.status !== 'DRAFT' ||
-                qualitySourceLoading ||
-                saving
-              }
-              disabledReason={
-                !selectedRow
-                  ? '请先选择一张出货单'
-                  : selectedRow.status !== 'DRAFT'
-                    ? '只有出货草稿可以发起出货前检验'
-                    : qualitySourceLoading || saving
-                      ? '当前操作完成后可发起检验'
-                      : ''
-              }
+              disabled={shipmentActionAvailability.quality.disabled}
+              disabledReason={shipmentActionAvailability.quality.disabledReason}
             >
               <Button
                 size="small"
                 loading={qualitySourceLoading && !qualitySourceContext}
-                disabled={
-                  !selectedRow ||
-                  selectedRow.status !== 'DRAFT' ||
-                  qualitySourceLoading ||
-                  saving
-                }
+                data-business-action-key="shipment-quality"
+                disabled={shipmentActionAvailability.quality.disabled}
                 onClick={openShipmentQualitySource}
               >
                 发起出货前检验
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canSubmitShipmentRelease &&
-          (!selectedRow || selectedRow.status === 'DRAFT') ? (
+          {shipmentActionAvailability.release.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !selectedRow || selectedRow.status !== 'DRAFT' || saving
-              }
-              disabledReason={
-                !selectedRow
-                  ? '请先选择一张出货单'
-                  : selectedRow.status !== 'DRAFT'
-                    ? '只有出货草稿可以提交审批'
-                    : saving
-                      ? '当前操作完成后可提交'
-                      : ''
-              }
+              disabled={shipmentActionAvailability.release.disabled}
+              disabledReason={shipmentActionAvailability.release.disabledReason}
             >
               <Popconfirm
                 title="提交后将启动版本化财务审批；品质检验仍由质检单独判定，审批通过也不等于已出货。是否继续？"
@@ -1631,34 +1651,18 @@ export default function ShipmentsPage() {
                 <Button
                   size="small"
                   className="erp-business-module-status-action"
-                  disabled={
-                    !selectedRow || selectedRow.status !== 'DRAFT' || saving
-                  }
+                  data-business-action-key="shipment-release"
+                  disabled={shipmentActionAvailability.release.disabled}
                 >
-                  提交出货审批
+                  核对出货审批
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canShip && (!selectedRow || selectedRow.status === 'DRAFT') ? (
+          {shipmentActionAvailability.ship.visible ? (
             <BusinessActionTooltip
-              disabled={
-                !selectedRow ||
-                selectedRow.status !== 'DRAFT' ||
-                selectedRow.finance_release_status !== 'APPROVED' ||
-                saving
-              }
-              disabledReason={
-                !selectedRow
-                  ? '请先选择一张出货单'
-                  : selectedRow.status !== 'DRAFT'
-                    ? '只有出货草稿可以确认出货'
-                    : selectedRow.finance_release_status !== 'APPROVED'
-                      ? '审批前不能确认出货'
-                    : saving
-                      ? '当前操作完成后可确认出货'
-                      : ''
-              }
+              disabled={shipmentActionAvailability.ship.disabled}
+              disabledReason={shipmentActionAvailability.ship.disabledReason}
             >
               <Popconfirm
                 title="确认出货并扣减相应库存？"
@@ -1673,44 +1677,26 @@ export default function ShipmentsPage() {
                   type="primary"
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
-                  disabled={
-                    !selectedRow ||
-                    selectedRow.status !== 'DRAFT' ||
-                    selectedRow.finance_release_status !== 'APPROVED' ||
-                    saving
-                  }
+                  data-business-action-key="shipment-ship"
+                  disabled={shipmentActionAvailability.ship.disabled}
                 >
                   确认出货
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canCancel &&
-          (!selectedRow ||
-            ['DRAFT', 'SHIPPED'].includes(selectedRow.status)) ? (
-              <BusinessActionTooltip
-                disabled={
-                !selectedRow ||
-                !['DRAFT', 'SHIPPED'].includes(selectedRow.status) ||
-                saving
-              }
-                disabledReason={
-                !selectedRow
-                  ? '请先选择一张出货单'
-                  : !['DRAFT', 'SHIPPED'].includes(selectedRow.status)
-                    ? '当前出货状态不能取消'
-                    : saving
-                      ? '当前操作完成后可继续'
-                      : ''
-              }
-              >
-                <Popconfirm
-                  title={
+          {shipmentActionAvailability.cancel.visible ? (
+            <BusinessActionTooltip
+              disabled={shipmentActionAvailability.cancel.disabled}
+              disabledReason={shipmentActionAvailability.cancel.disabledReason}
+            >
+              <Popconfirm
+                title={
                   selectedRow?.status === 'DRAFT'
                     ? '确认作废这张出货草稿？草稿作废不会扣减或恢复库存；如已提交放行，需先完成或退回放行待办。'
                     : '确认撤销已出货并恢复相应库存？'
                 }
-                  onConfirm={() =>
+                onConfirm={() =>
                   runShipmentAction(
                     selectedRow,
                     cancelShipment,
@@ -1719,88 +1705,53 @@ export default function ShipmentsPage() {
                       : '撤销已出货'
                   )
                 }
-                  okText="确认"
-                  cancelText="取消"
-                >
-                  <Button
-                    size="small"
-                    danger
-                    className="erp-business-module-status-action"
-                    icon={<CloseCircleOutlined />}
-                    disabled={
-                    !selectedRow ||
-                    !['DRAFT', 'SHIPPED'].includes(selectedRow.status) ||
-                    saving
-                  }
-                  >
-                    {selectedRow?.status === 'DRAFT' ? '作废草稿' : '撤销已出货'}
-                  </Button>
-                </Popconfirm>
-              </BusinessActionTooltip>
-          ) : null}
-          {canCreateReceivable &&
-          (!selectedRow ||
-            ['DRAFT', 'SHIPPED'].includes(selectedRow.status)) ? (
-              <BusinessActionTooltip
-                disabled={
-                !selectedRow ||
-                selectedRow.status !== 'SHIPPED' ||
-                saving ||
-                financeSourceLoading
-              }
-                disabledReason={
-                !selectedRow
-                  ? '请先选择一张出货单'
-                  : selectedRow.status !== 'SHIPPED'
-                    ? '确认出货后可生成应收'
-                    : '当前操作完成后可生成应收'
-              }
+                okText="确认"
+                cancelText="取消"
               >
                 <Button
                   size="small"
-                  disabled={
-                  !selectedRow ||
-                  selectedRow.status !== 'SHIPPED' ||
-                  saving ||
-                  financeSourceLoading
-                }
-                  onClick={() => openShipmentFinanceSource('receivable')}
+                  danger
+                  className="erp-business-module-status-action"
+                  icon={<CloseCircleOutlined />}
+                  data-business-action-key="shipment-cancel"
+                  disabled={shipmentActionAvailability.cancel.disabled}
                 >
-                  生成应收
+                  {selectedRow?.status === 'DRAFT' ? '作废草稿' : '撤销已出货'}
                 </Button>
-              </BusinessActionTooltip>
+              </Popconfirm>
+            </BusinessActionTooltip>
           ) : null}
-          {canCreateInvoice &&
-          (!selectedRow ||
-            ['DRAFT', 'SHIPPED'].includes(selectedRow.status)) ? (
-              <BusinessActionTooltip
-                disabled={
-                !selectedRow ||
-                selectedRow.status !== 'SHIPPED' ||
-                saving ||
-                financeSourceLoading
+          {shipmentActionAvailability.receivable.visible ? (
+            <BusinessActionTooltip
+              disabled={shipmentActionAvailability.receivable.disabled}
+              disabledReason={
+                shipmentActionAvailability.receivable.disabledReason
               }
-                disabledReason={
-                !selectedRow
-                  ? '请先选择一张出货单'
-                  : selectedRow.status !== 'SHIPPED'
-                    ? '确认出货后可生成开票记录'
-                    : '当前操作完成后可生成开票记录'
-              }
+            >
+              <Button
+                size="small"
+                data-business-action-key="shipment-receivable"
+                disabled={shipmentActionAvailability.receivable.disabled}
+                onClick={() => openShipmentFinanceSource('receivable')}
               >
-                <Button
-                  size="small"
-                  disabled={
-                  !selectedRow ||
-                  selectedRow.status !== 'SHIPPED' ||
-                  saving ||
-                  financeSourceLoading
-                }
-                  onClick={() => openShipmentFinanceSource('invoice')}
-                >
-                  生成开票记录
-                </Button>
-              </BusinessActionTooltip>
+                生成应收
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {shipmentActionAvailability.invoice.visible ? (
+            <BusinessActionTooltip
+              disabled={shipmentActionAvailability.invoice.disabled}
+              disabledReason={shipmentActionAvailability.invoice.disabledReason}
+            >
+              <Button
+                size="small"
+                data-business-action-key="shipment-invoice"
+                disabled={shipmentActionAvailability.invoice.disabled}
+                onClick={() => openShipmentFinanceSource('invoice')}
+              >
+                生成开票记录
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>

@@ -175,7 +175,11 @@ test('quality page names and filters the shared read model by business inspectio
   assert.match(source, /'warehouse\.inventory\.read'/u)
   assert.match(source, /'purchase\.receipt\.read'/u)
   assert.match(source, /hasRelatedCapability/u)
-  assert.match(source, /relatedMenuItems\.length === 0/u)
+  assert.match(
+    source,
+    /resolveRelatedRecordActionAvailability\(\{[\s\S]{0,160}authorized: hasRelatedCapability,[\s\S]{0,160}record: selectedRow,[\s\S]{0,160}itemCount: relatedMenuItems\.length/u
+  )
+  assert.match(source, /\{relatedActionAvailability\.visible \? \(/u)
   assert.doesNotMatch(source, /title="来料质检"/u)
 })
 

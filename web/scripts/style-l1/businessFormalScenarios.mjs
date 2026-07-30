@@ -1799,6 +1799,11 @@ export function createBusinessFormalScenarios(deps) {
             const selectionActionBar = currentOperationPanel?.querySelector(
               '.erp-business-selection-action-bar'
             )
+            const tableToolLabels = Array.from(
+              currentOperationPanel?.querySelectorAll(
+                '.erp-business-operation-panel__toolbar button'
+              ) || []
+            ).map((button) => String(button.textContent || '').trim())
             const taskWorkspace = document.querySelector(
               '.erp-workflow-business-page__tab-workspace'
             )
@@ -1830,6 +1835,7 @@ export function createBusinessFormalScenarios(deps) {
               currentWorkspaceRenderedGap,
               currentWorkspaceRowGap,
               decisionFilterLabels,
+              tableToolLabels,
               clearSelectionDisabled:
                 clearSelectionButton?.disabled === true ||
                 selectionActionBar?.classList.contains(
@@ -1888,6 +1894,13 @@ export function createBusinessFormalScenarios(deps) {
               metrics
             )}`
           )
+          assert.deepEqual(
+            metrics.tableToolLabels,
+            ['列顺序'],
+            `${scenarioName} 应只保留列顺序，不展示业务数据导出: ${JSON.stringify(
+              metrics
+            )}`
+          )
           if (expectedTab === '处置申请') {
             assert.deepEqual(
               metrics.decisionFilterLabels,
@@ -1938,6 +1951,16 @@ export function createBusinessFormalScenarios(deps) {
           'business-production-exceptions-decisions-tab',
           '处置申请'
         )
+        await page
+          .getByRole('button', { name: /列顺序/u })
+          .click()
+        const decisionColumnOrderDialog = page.getByRole('dialog', {
+          name: '调整列表列顺序',
+        })
+        await decisionColumnOrderDialog.waitFor({ state: 'visible' })
+        await expectText(page, '异常单号')
+        await decisionColumnOrderDialog.locator('.ant-modal-close').click()
+        await decisionColumnOrderDialog.waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '生产异常处置申请已刷新')
         await page.screenshot({
@@ -1958,6 +1981,16 @@ export function createBusinessFormalScenarios(deps) {
           'business-production-exceptions-tasks-tab',
           '待审批'
         )
+        await page
+          .getByRole('button', { name: /列顺序/u })
+          .click()
+        const taskColumnOrderDialog = page.getByRole('dialog', {
+          name: '调整列表列顺序',
+        })
+        await taskColumnOrderDialog.waitFor({ state: 'visible' })
+        await expectText(page, '任务编号')
+        await taskColumnOrderDialog.locator('.ant-modal-close').click()
+        await taskColumnOrderDialog.waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '生产异常处置任务已刷新')
         await page.screenshot({
@@ -3849,6 +3882,8 @@ export function createBusinessFormalScenarios(deps) {
           page,
           'business-production-exceptions-decisions-tab'
         )
+        await expectButton(page, '列顺序')
+        await expectNoButton(page, '导出筛选结果')
         for (const text of [
           '登记异常协同',
           '新建异常单',
@@ -3883,11 +3918,8 @@ export function createBusinessFormalScenarios(deps) {
           '待审批页签点击后应成为唯一活动工作区'
         )
         await assertTextAbsent(page, '暂无生产异常处置申请')
-        await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-production-exceptions-tasks-tab',
-          exportDisabled: true,
-          exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
-        })
+        await expectButton(page, '列顺序')
+        await expectNoButton(page, '导出筛选结果')
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '生产异常处置任务已刷新')
         await expectNoButton(page, '删除')

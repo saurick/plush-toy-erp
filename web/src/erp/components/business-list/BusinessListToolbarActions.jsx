@@ -256,6 +256,7 @@ function TooltipButton({ title, children }) {
 
 export function BusinessListToolbarActions({
   onExport,
+  showExport = true,
   exportDisabled = false,
   exportDisabledReason = '',
   onOpenColumnOrder,
@@ -270,15 +271,17 @@ export function BusinessListToolbarActions({
 
   return (
     <Space size={8} wrap>
-      <TooltipButton title={normalizedExportReason}>
-        <ToolbarButton
-          icon={<DownloadOutlined />}
-          disabled={exportDisabled || !onExport}
-          onClick={onExport}
-        >
-          导出筛选结果
-        </ToolbarButton>
-      </TooltipButton>
+      {showExport ? (
+        <TooltipButton title={normalizedExportReason}>
+          <ToolbarButton
+            icon={<DownloadOutlined />}
+            disabled={exportDisabled || !onExport}
+            onClick={onExport}
+          >
+            导出筛选结果
+          </ToolbarButton>
+        </TooltipButton>
+      ) : null}
       <TooltipButton title={normalizedColumnReason}>
         <ToolbarButton
           icon={<SettingOutlined />}

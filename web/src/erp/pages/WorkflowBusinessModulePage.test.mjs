@@ -16,6 +16,15 @@ const productionExceptionPanel = readFileSync(
   ),
   'utf8'
 )
+const businessListToolbarActions = readFileSync(
+  fileURLToPath(
+    new URL(
+      '../components/business-list/BusinessListToolbarActions.jsx',
+      import.meta.url
+    )
+  ),
+  'utf8'
+)
 
 test('workflow business page consumes the dashboard source keyword without mutating business data', () => {
   assert.match(source, /useSearchParams/u)
@@ -205,4 +214,30 @@ test('production exception applications use server-backed filters and a selected
   }
   assert.doesNotMatch(productionExceptionPanel, /title:\s*'办理'/u)
   assert.doesNotMatch(productionExceptionPanel, /SearchInput|keyword/u)
+})
+
+test('production exception tabs keep column order controls without exposing data export', () => {
+  assert.match(businessListToolbarActions, /showExport = true/u)
+  assert.match(
+    businessListToolbarActions,
+    /\{showExport \? \([\s\S]*导出筛选结果[\s\S]*\) : null\}/u
+  )
+  assert.match(
+    productionExceptionPanel,
+    /moduleKey:\s*'production-exceptions-decisions'/u
+  )
+  assert.match(
+    productionExceptionPanel,
+    /<BusinessListToolbarActions[\s\S]{0,180}showExport=\{false\}[\s\S]{0,180}onOpenColumnOrder=\{openColumnOrder\}/u
+  )
+  assert.match(productionExceptionPanel, /columns=\{tableColumns\}/u)
+  assert.match(productionExceptionPanel, /\{columnOrderModal\}/u)
+  assert.match(
+    source,
+    /<BusinessListToolbarActions[\s\S]{0,180}showExport=\{!isProductionExceptionPage\}[\s\S]{0,240}onOpenColumnOrder=\{openColumnOrder\}/u
+  )
+  assert.match(
+    source,
+    /exportDisabledReason="当前页面只用于处理任务，暂不提供业务数据导出。"/u
+  )
 })

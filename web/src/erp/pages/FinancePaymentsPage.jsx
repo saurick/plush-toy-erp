@@ -23,7 +23,9 @@ import {
   createFinancePayment,
   getFinanceCreditNote,
   getFinancePayment,
+  listAllFinanceCreditNotes,
   listAllFinanceFacts,
+  listAllFinancePayments,
   listFinanceCreditNotes,
   listFinancePayments,
   reverseFinanceCreditNote,
@@ -50,6 +52,11 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import {
+  BusinessListToolbarActions,
+  downloadBusinessListCSV,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
@@ -79,9 +86,12 @@ import {
   validateFinanceAllocationDraft,
   validateFinanceCreditDraft,
 } from '../utils/financePaymentAllocation.mjs'
+import { resolveFinancePaymentActionAvailability } from '../utils/operationalActionAvailability.mjs'
 
 const { Text } = Typography
 const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
+const FINANCE_PAYMENT_COLUMN_ORDER_KEY = 'finance-payments-records'
+const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY = 'finance-credit-notes-records'
 const CURRENCY_OPTIONS = ['CNY', 'USD', 'HKD'].map((value) => ({
   value,
   label: value === 'CNY' ? '人民币' : value === 'USD' ? '美元' : '港币',
@@ -171,6 +181,35 @@ function paymentStatus(value) {
   return <Tag color={color}>{label}</Tag>
 }
 
+function paymentStatusLabel(value) {
+  return PAYMENT_STATUS_META[value]?.[0] || '状态待核对'
+}
+
+function creditStatusLabel(value) {
+  return value === 'REVERSED' ? '冲销记录' : '已红冲'
+}
+
+function financeFactTypeLabel(value) {
+  return value === 'RECEIVABLE' ? '应收' : '应付'
+}
+
+function paymentAllocationExportValue(record) {
+  const allocations = Array.isArray(record?.allocations)
+    ? record.allocations
+    : []
+  if (allocations.length === 0) return '0 笔'
+
+  return allocations
+    .map((item, index) => {
+      const factNo = item?.finance_fact_no || `核销明细 ${index + 1}`
+      const currency = item?.currency || record?.currency || ''
+      const amount = item?.amount || '-'
+      const status = item?.status === 'REVERSED' ? '已冲销' : '已过账'
+      return `${factNo} / ${amount}${currency ? ` ${currency}` : ''} / ${status}`
+    })
+    .join('；')
+}
+
 function partyOption(record, fallback) {
   const code = String(
     record?.customer_code || record?.supplier_code || ''
@@ -205,6 +244,7 @@ export default function FinancePaymentsPage() {
   const [customers, setCustomers] = useState([])
   const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(false)
+  const [exportingTab, setExportingTab] = useState('')
   const [tableLoading, setTableLoading] = useState({
     payments: false,
     credits: false,
@@ -236,6 +276,7 @@ export default function FinancePaymentsPage() {
   const [reverseForm] = Form.useForm()
   const [creditForm] = Form.useForm()
   const attemptsRef = useRef(createSourceBusinessActionAttemptStore())
+  const exportInFlightRef = useRef(false)
   const beginLatestRequest = useLatestRequestCoordinator()
 
   const canCreatePayment = hasActionPermission(
@@ -972,93 +1013,206 @@ export default function FinancePaymentsPage() {
     setCreditOpen(reverse ? 'reverse' : 'create')
   }
 
-  const paymentColumns = [
-    { title: '收付款单号', dataIndex: 'payment_no', width: 200 },
-    {
-      title: '方向',
-      dataIndex: 'direction',
-      width: 100,
-      render: (value) => (value === 'RECEIPT' ? '收款' : '付款'),
-    },
-    { title: '金额', dataIndex: 'amount', width: 140 },
-    { title: '币种', dataIndex: 'currency', width: 90 },
-    {
-      title: '往来方',
-      key: 'counterparty',
-      width: 200,
-      detailValue: (record) => {
-        const source =
-          record.counterparty_type === 'CUSTOMER' ? customers : suppliers
-        return (
-          source.find(
-            (item) => Number(item.id) === Number(record.counterparty_id)
-          )?.name || '往来方已关联'
-        )
+  const paymentColumns = useMemo(() => {
+    const counterpartyLabel = (record) => {
+      const source =
+        record?.counterparty_type === 'CUSTOMER' ? customers : suppliers
+      return (
+        source.find(
+          (item) => Number(item.id) === Number(record?.counterparty_id)
+        )?.name || '往来方已关联'
+      )
+    }
+
+    return [
+      { title: '收付款单号', dataIndex: 'payment_no', width: 200 },
+      {
+        title: '方向',
+        dataIndex: 'direction',
+        width: 100,
+        render: (value) => (value === 'RECEIPT' ? '收款' : '付款'),
+        exportValue: (record) =>
+          record?.direction === 'RECEIPT' ? '收款' : '付款',
       },
-      render: (_, record) => {
-        const source =
-          record.counterparty_type === 'CUSTOMER' ? customers : suppliers
-        return (
-          source.find(
-            (item) => Number(item.id) === Number(record.counterparty_id)
-          )?.name || '往来方已关联'
-        )
+      { title: '金额', dataIndex: 'amount', width: 140 },
+      { title: '币种', dataIndex: 'currency', width: 90 },
+      {
+        title: '往来方',
+        key: 'counterparty',
+        width: 200,
+        detailValue: counterpartyLabel,
+        render: (_, record) => counterpartyLabel(record),
+        exportValue: counterpartyLabel,
       },
-    },
-    { title: '状态', dataIndex: 'status', width: 110, render: paymentStatus },
-    {
-      title: '核销明细',
-      dataIndex: 'allocations',
-      width: 110,
-      render: (items) => `${Array.isArray(items) ? items.length : 0} 笔`,
-    },
-    { title: '账户摘要', dataIndex: 'account_ref', width: 200 },
-    { title: '业务凭据', dataIndex: 'evidence_ref', width: 200 },
-    {
-      title: '发生时间',
-      dataIndex: 'occurred_at',
-      width: 170,
-      render: formatUnixDateTime,
-    },
-  ]
-  const creditColumns = [
-    { title: '红冲单号', dataIndex: 'credit_note_no', width: 200 },
-    {
-      title: '来源财务记录',
-      dataIndex: 'finance_fact_no',
-      width: 190,
-      render: (value) => value || '已关联财务记录',
-    },
-    {
-      title: '来源类型',
-      dataIndex: 'finance_fact_type',
-      width: 110,
-      render: (value) => (value === 'RECEIVABLE' ? '应收' : '应付'),
-    },
-    { title: '红冲金额', dataIndex: 'amount', width: 140 },
-    { title: '币种', dataIndex: 'currency', width: 90 },
-    {
-      title: '来源原金额',
-      dataIndex: 'finance_fact_original_amount',
-      width: 140,
-    },
-    {
-      title: '红冲后未核销',
-      dataIndex: 'finance_fact_outstanding_amount',
-      width: 150,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 110,
-      render: (value) => (
-        <Tag color={value === 'REVERSED' ? 'magenta' : 'gold'}>
-          {value === 'REVERSED' ? '冲销记录' : '已红冲'}
-        </Tag>
-      ),
-    },
-    { title: '原因', dataIndex: 'reason', width: 260 },
-  ]
+      {
+        title: '状态',
+        dataIndex: 'status',
+        width: 110,
+        render: paymentStatus,
+        exportValue: (record) => paymentStatusLabel(record?.status),
+      },
+      {
+        title: '核销明细',
+        dataIndex: 'allocations',
+        width: 110,
+        render: (items) => `${Array.isArray(items) ? items.length : 0} 笔`,
+        exportValue: paymentAllocationExportValue,
+      },
+      { title: '账户摘要', dataIndex: 'account_ref', width: 200 },
+      { title: '业务凭据', dataIndex: 'evidence_ref', width: 200 },
+      {
+        title: '发生时间',
+        dataIndex: 'occurred_at',
+        width: 170,
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.occurred_at),
+      },
+    ]
+  }, [customers, suppliers])
+  const creditColumns = useMemo(
+    () => [
+      { title: '红冲单号', dataIndex: 'credit_note_no', width: 200 },
+      {
+        title: '来源财务记录',
+        dataIndex: 'finance_fact_no',
+        width: 190,
+        render: (value) => value || '已关联财务记录',
+        exportValue: (record) =>
+          record?.finance_fact_no || '已关联财务记录',
+      },
+      {
+        title: '来源类型',
+        dataIndex: 'finance_fact_type',
+        width: 110,
+        render: financeFactTypeLabel,
+        exportValue: (record) =>
+          financeFactTypeLabel(record?.finance_fact_type),
+      },
+      { title: '红冲金额', dataIndex: 'amount', width: 140 },
+      { title: '币种', dataIndex: 'currency', width: 90 },
+      {
+        title: '来源原金额',
+        dataIndex: 'finance_fact_original_amount',
+        width: 140,
+      },
+      {
+        title: '红冲后未核销',
+        dataIndex: 'finance_fact_outstanding_amount',
+        width: 150,
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        width: 110,
+        render: (value) => (
+          <Tag color={value === 'REVERSED' ? 'magenta' : 'gold'}>
+            {creditStatusLabel(value)}
+          </Tag>
+        ),
+        exportValue: (record) => creditStatusLabel(record?.status),
+      },
+      { title: '原因', dataIndex: 'reason', width: 260 },
+    ],
+    []
+  )
+  const {
+    tableColumns: paymentTableColumns,
+    exportColumns: paymentExportColumns,
+    openColumnOrder: openPaymentColumnOrder,
+    columnOrderModal: paymentColumnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: FINANCE_PAYMENT_COLUMN_ORDER_KEY,
+    moduleTitle: '收付款与核销 / 收付款记录',
+    columns: paymentColumns,
+  })
+  const {
+    tableColumns: creditTableColumns,
+    exportColumns: creditExportColumns,
+    openColumnOrder: openCreditColumnOrder,
+    columnOrderModal: creditColumnOrderModal,
+  } = useBusinessColumnOrder({
+    adminProfile,
+    moduleKey: FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY,
+    moduleTitle: '收付款与核销 / 红冲记录',
+    columns: creditColumns,
+  })
+  const exportPaymentRows = useCallback(async () => {
+    if (exportInFlightRef.current) return
+    exportInFlightRef.current = true
+    setExportingTab('payments')
+    const request = beginLatestRequest('finance-payment-export')
+    try {
+      const result = await listAllFinancePayments(
+        compactParams({
+          status: paymentStatusFilter,
+          direction: paymentDirectionFilter,
+        }),
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) return
+      const rows = Array.isArray(result?.payments) ? result.payments : []
+      if (rows.length === 0) {
+        message.info('当前筛选没有可导出的收付款记录')
+        return
+      }
+      downloadBusinessListCSV({
+        filename: `收付款记录-${new Date().toISOString().slice(0, 10)}.csv`,
+        columns: paymentExportColumns,
+        rows,
+      })
+      message.success(`已导出 ${rows.length} 条收付款记录`)
+    } catch (error) {
+      if (!request.isCurrent() || isRpcAbortError(error)) return
+      message.error(getActionErrorMessage(error, '导出收付款记录'))
+    } finally {
+      if (request.isCurrent()) setExportingTab('')
+      exportInFlightRef.current = false
+      request.finish()
+    }
+  }, [
+    beginLatestRequest,
+    paymentDirectionFilter,
+    paymentExportColumns,
+    paymentStatusFilter,
+  ])
+  const exportCreditRows = useCallback(async () => {
+    if (exportInFlightRef.current) return
+    exportInFlightRef.current = true
+    setExportingTab('credits')
+    const request = beginLatestRequest('finance-credit-export')
+    try {
+      const result = await listAllFinanceCreditNotes(
+        compactParams({ status: creditStatusFilter }),
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) return
+      const rows = Array.isArray(result?.credit_notes)
+        ? result.credit_notes
+        : []
+      if (rows.length === 0) {
+        message.info('当前筛选没有可导出的红冲记录')
+        return
+      }
+      downloadBusinessListCSV({
+        filename: `红冲记录-${new Date().toISOString().slice(0, 10)}.csv`,
+        columns: creditExportColumns,
+        rows,
+      })
+      message.success(`已导出 ${rows.length} 条红冲记录`)
+    } catch (error) {
+      if (!request.isCurrent() || isRpcAbortError(error)) return
+      message.error(getActionErrorMessage(error, '导出红冲记录'))
+    } finally {
+      if (request.isCurrent()) setExportingTab('')
+      exportInFlightRef.current = false
+      request.finish()
+    }
+  }, [
+    beginLatestRequest,
+    creditExportColumns,
+    creditStatusFilter,
+  ])
   const paymentDetailLineItems = {
     title: '核销明细',
     items: Array.isArray(paymentDetail?.allocations)
@@ -1110,6 +1264,33 @@ export default function FinancePaymentsPage() {
       onChange={setActiveTab}
     />
   )
+  const paymentActionAvailability = {
+    allocation: resolveFinancePaymentActionAvailability({
+      action: 'allocation',
+      authorized: canPostPayment,
+      payment: currentPayment,
+      busy: loading,
+      referenceLoading,
+    }),
+    approval: resolveFinancePaymentActionAvailability({
+      action: 'approval',
+      authorized: canCreatePayment,
+      payment: currentPayment,
+      busy: loading,
+    }),
+    cancel: resolveFinancePaymentActionAvailability({
+      action: 'cancel',
+      authorized: canCancelPayment,
+      payment: currentPayment,
+      busy: loading,
+    }),
+    reverse: resolveFinancePaymentActionAvailability({
+      action: 'reverse',
+      authorized: canReversePayment,
+      payment: currentPayment,
+      busy: loading,
+    }),
+  }
 
   return (
     <BusinessPageLayout className="erp-finance-payments-page">
@@ -1177,6 +1358,29 @@ export default function FinancePaymentsPage() {
                 />
               </Space>
             }
+            actions={
+              <BusinessListToolbarActions
+                onExport={exportPaymentRows}
+                exportDisabled={
+                  tableLoading.payments ||
+                  referenceLoading ||
+                  paymentTotal === 0 ||
+                  Boolean(exportingTab)
+                }
+                exportDisabledReason={
+                  exportingTab
+                    ? '正在准备导出，请稍候'
+                    : tableLoading.payments
+                      ? '收付款记录加载完成后可导出'
+                      : referenceLoading
+                        ? '往来方资料加载完成后可导出'
+                        : paymentTotal === 0
+                          ? '当前筛选没有可导出的收付款记录'
+                          : ''
+                }
+                onOpenColumnOrder={openPaymentColumnOrder}
+              />
+            }
             primaryAction={
               canCreatePayment ? (
                 <ToolbarButton
@@ -1212,122 +1416,76 @@ export default function FinancePaymentsPage() {
                 disabledReason="请先选择一条收付款记录"
               >
                 <Button
+                  data-business-action-key="payment-details"
                   disabled={!currentPayment}
                   onClick={() => setPaymentDetail(currentPayment)}
                 >
                   查看详情
                 </Button>
               </BusinessActionTooltip>
-              {canPostPayment &&
-              (!currentPayment || currentPayment.status === 'APPROVED') ? (
+              {paymentActionAvailability.allocation.visible ? (
                 <BusinessActionTooltip
-                  disabled={
-                    !currentPayment ||
-                    currentPayment.status !== 'APPROVED' ||
-                    loading ||
-                    referenceLoading
-                  }
+                  disabled={paymentActionAvailability.allocation.disabled}
                   disabledReason={
-                    !currentPayment
-                      ? '请先选择一条收付款记录'
-                      : currentPayment.status !== 'APPROVED'
-                        ? '只有审批通过的收付款可以办理核销'
-                        : '核销资料加载完成后可继续'
+                    paymentActionAvailability.allocation.disabledReason
                   }
                 >
                   <Button
                     type="primary"
                     className="erp-business-module-status-action"
-                    disabled={
-                      !currentPayment ||
-                      currentPayment.status !== 'APPROVED' ||
-                      loading ||
-                      referenceLoading
-                    }
+                    data-business-action-key="payment-allocation"
+                    disabled={paymentActionAvailability.allocation.disabled}
                     onClick={openAllocation}
                   >
                     选择应收 / 应付核销
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
-              {canCreatePayment &&
-              (!currentPayment || currentPayment.status === 'DRAFT') ? (
+              {paymentActionAvailability.approval.visible ? (
                 <BusinessActionTooltip
-                  disabled={
-                    !currentPayment ||
-                    currentPayment.status !== 'DRAFT' ||
-                    loading
-                  }
+                  disabled={paymentActionAvailability.approval.disabled}
                   disabledReason={
-                    !currentPayment
-                      ? '请先选择一条收付款记录'
-                      : currentPayment.status !== 'DRAFT'
-                        ? '只有待审批收付款可以核对审批流'
-                        : '当前操作完成后可核对审批流'
+                    paymentActionAvailability.approval.disabledReason
                   }
                 >
                   <Button
-                    disabled={
-                      !currentPayment ||
-                      currentPayment.status !== 'DRAFT' ||
-                      loading
-                    }
+                    data-business-action-key="payment-approval"
+                    disabled={paymentActionAvailability.approval.disabled}
                     onClick={ensurePaymentApprovalProcess}
                   >
                     核对审批流
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
-              {canCancelPayment &&
-              (!currentPayment ||
-                ['DRAFT', 'APPROVED'].includes(currentPayment.status)) ? (
-                  <BusinessActionTooltip
-                    disabled={
-                    !currentPayment ||
-                    !['DRAFT', 'APPROVED'].includes(currentPayment.status) ||
-                    loading
-                  }
-                    disabledReason={
-                    !currentPayment
-                      ? '请先选择一条收付款记录'
-                      : '只有尚未过账的收付款可以核对取消'
-                  }
-                  >
-                    <Button
-                      danger
-                      disabled={
-                      !currentPayment ||
-                      !['DRAFT', 'APPROVED'].includes(currentPayment.status) ||
-                      loading
-                    }
-                      onClick={openCancel}
-                    >
-                      核对并取消
-                    </Button>
-                  </BusinessActionTooltip>
-              ) : null}
-              {canReversePayment &&
-              (!currentPayment || currentPayment.status === 'POSTED') ? (
+              {paymentActionAvailability.cancel.visible ? (
                 <BusinessActionTooltip
-                  disabled={
-                    !currentPayment ||
-                    currentPayment.status !== 'POSTED' ||
-                    loading
-                  }
+                  disabled={paymentActionAvailability.cancel.disabled}
                   disabledReason={
-                    !currentPayment
-                      ? '请先选择一条收付款记录'
-                      : '只有已核销收付款可以冲销'
+                    paymentActionAvailability.cancel.disabledReason
+                  }
+                >
+                  <Button
+                    danger
+                    data-business-action-key="payment-cancel"
+                    disabled={paymentActionAvailability.cancel.disabled}
+                    onClick={openCancel}
+                  >
+                    核对并取消
+                  </Button>
+                </BusinessActionTooltip>
+              ) : null}
+              {paymentActionAvailability.reverse.visible ? (
+                <BusinessActionTooltip
+                  disabled={paymentActionAvailability.reverse.disabled}
+                  disabledReason={
+                    paymentActionAvailability.reverse.disabledReason
                   }
                 >
                   <Button
                     danger
                     className="erp-business-module-status-action"
-                    disabled={
-                      !currentPayment ||
-                      currentPayment.status !== 'POSTED' ||
-                      loading
-                    }
+                    data-business-action-key="payment-reverse"
+                    disabled={paymentActionAvailability.reverse.disabled}
                     onClick={() => {
                       reverseForm.resetFields()
                       setReverseOpen(true)
@@ -1340,6 +1498,7 @@ export default function FinancePaymentsPage() {
               <ExceptionProcessRecoveryButton
                 canRecover={canRecoverProcess}
                 disabled={!currentPayment || loading}
+                disabledReason="请先选择一条收付款记录"
                 loadProcess={() =>
                   getFinancePaymentApprovalProcess({
                     ...(customerKey ? { customer_key: customerKey } : {}),
@@ -1353,9 +1512,14 @@ export default function FinancePaymentsPage() {
               />
               <BusinessActionTooltip
                 disabled={!currentPayment || loading}
-                disabledReason="请先选择一条收付款记录"
+                disabledReason={
+                  loading
+                    ? '当前操作完成后可重新读取'
+                    : '请先选择一条收付款记录'
+                }
               >
                 <Button
+                  data-business-action-key="payment-reload"
                   disabled={!currentPayment || loading}
                   onClick={() => recoverPayment(currentPayment?.id)}
                 >
@@ -1368,7 +1532,7 @@ export default function FinancePaymentsPage() {
             tableHeader={financeViewTabs}
             rowKey="id"
             loading={tableLoading.payments}
-            columns={paymentColumns}
+            columns={paymentTableColumns}
             dataSource={payments}
             pagination={createBusinessTablePagination({
               pagination: paymentPagination,
@@ -1405,6 +1569,26 @@ export default function FinancePaymentsPage() {
                     current: 1,
                   }))
                 }}
+              />
+            }
+            actions={
+              <BusinessListToolbarActions
+                onExport={exportCreditRows}
+                exportDisabled={
+                  tableLoading.credits ||
+                  creditTotal === 0 ||
+                  Boolean(exportingTab)
+                }
+                exportDisabledReason={
+                  exportingTab
+                    ? '正在准备导出，请稍候'
+                    : tableLoading.credits
+                      ? '红冲记录加载完成后可导出'
+                      : creditTotal === 0
+                        ? '当前筛选没有可导出的红冲记录'
+                        : ''
+                }
+                onOpenColumnOrder={openCreditColumnOrder}
               />
             }
             primaryAction={
@@ -1483,7 +1667,7 @@ export default function FinancePaymentsPage() {
             rowKey="id"
             loading={tableLoading.credits}
             dataSource={creditNotes}
-            columns={creditColumns}
+            columns={creditTableColumns}
             pagination={createBusinessTablePagination({
               pagination: creditPagination,
               total: creditTotal,
@@ -1504,6 +1688,9 @@ export default function FinancePaymentsPage() {
           />
         </>
       )}
+
+      {paymentColumnOrderModal}
+      {creditColumnOrderModal}
 
       <BusinessFormModal
         title="登记收付款"

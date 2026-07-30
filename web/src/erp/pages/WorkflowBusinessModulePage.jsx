@@ -1196,6 +1196,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         actions={
           <BusinessListToolbarActions
             moduleTitle={moduleItem.title}
+            showExport={!isProductionExceptionPage}
             exportDisabled
             exportDisabledReason="当前页面只用于处理任务，暂不提供业务数据导出。"
             onOpenColumnOrder={openColumnOrder}

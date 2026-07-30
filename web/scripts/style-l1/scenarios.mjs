@@ -20451,7 +20451,57 @@ export function createStyleL1Scenarios(deps) {
         await expectHeading(page, '收付款与核销')
         await expectText(page, 'PAY-STYLE-L1')
         await expectText(page, '回单 STYLE-L1')
+        await expectText(page, '暗色客户')
         await expectButton(page, '登记收付款')
+        await expectButton(page, '导出筛选结果')
+        await expectButton(page, '列顺序')
+        const paymentExportButton = page.getByRole('button', {
+          name: '导出筛选结果',
+        })
+        if (await paymentExportButton.isDisabled()) {
+          await paymentExportButton.locator('xpath=..').hover()
+          const disabledTooltip = page.locator('.ant-tooltip:visible').last()
+          await disabledTooltip.waitFor({ state: 'visible', timeout: 10_000 })
+          throw new Error(
+            `收付款导出按钮未进入可用态：${String(
+              await disabledTooltip.textContent()
+            ).trim()}`
+          )
+        }
+        await paymentExportButton.click({ trial: true })
+        const [paymentExportDownload] = await Promise.all([
+          page.waitForEvent('download'),
+          paymentExportButton.click(),
+        ])
+        assert.match(
+          paymentExportDownload.suggestedFilename(),
+          /^收付款记录-\d{4}-\d{2}-\d{2}\.csv$/u
+        )
+        const paymentExportStream =
+          await paymentExportDownload.createReadStream()
+        assert(paymentExportStream, '收付款筛选结果应产生可读取的 CSV 下载')
+        const paymentExportChunks = []
+        for await (const chunk of paymentExportStream) {
+          paymentExportChunks.push(chunk)
+        }
+        const paymentExportCSV = Buffer.concat(paymentExportChunks).toString(
+          'utf8'
+        )
+        for (const text of [
+          '收付款单号',
+          '方向',
+          '往来方',
+          '状态',
+          'PAY-STYLE-L1',
+          '收款',
+          '暗色客户',
+          '已批准待核销',
+        ]) {
+          assert(
+            paymentExportCSV.includes(text),
+            `收付款筛选结果缺少业务可读内容：${text}`
+          )
+        }
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'exception-finance-payment-dark-desktop',
         })
@@ -20523,6 +20573,11 @@ export function createStyleL1Scenarios(deps) {
           ),
           fullPage: true,
         })
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'finance-payments-records',
+          heading: '收付款与核销',
+          headerMenuTargetLabel: '方向',
+        })
         await page
           .getByRole('tab', { name: '红冲记录', exact: true })
           .click()
@@ -20534,6 +20589,51 @@ export function createStyleL1Scenarios(deps) {
           '红冲记录页签应在切换后保持选中'
         )
         await expectButton(page, '登记红冲')
+        await expectButton(page, '导出筛选结果')
+        await expectButton(page, '列顺序')
+        const creditToolbarActions = page
+          .locator('.erp-business-operation-panel__actions')
+          .first()
+        assert(
+          await creditToolbarActions
+            .getByRole('button', {
+              name: '导出筛选结果',
+            })
+            .isDisabled(),
+          '没有红冲记录时导出筛选结果应保持禁用'
+        )
+        await creditToolbarActions
+          .getByRole('button', { name: '列顺序' })
+          .click()
+        const creditColumnOrderDialog = page.locator(
+          '.erp-business-action-modal--columns:visible'
+        )
+        await creditColumnOrderDialog.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await page
+          .getByRole('list', {
+            name: '收付款与核销 / 红冲记录列顺序',
+            exact: true,
+          })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await assertAntdModalCentered(
+          page,
+          creditColumnOrderDialog,
+          'exception-finance-payment-dark-desktop-credit-column-order'
+        )
+        await creditColumnOrderDialog.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-finance-payment-dark-desktop-credit-column-order.png'
+          ),
+        })
+        await creditColumnOrderDialog.locator('.ant-modal-close').click()
+        await creditColumnOrderDialog.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'exception-finance-payment-dark-desktop-credit-tab',
           expectedLabels: ['红冲记录', '本页显示'],

@@ -89,6 +89,7 @@ import {
   resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
+import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   inventoryLotOption,
   materialOption,
@@ -300,6 +301,11 @@ export default function V1PurchaseReceiptsPage() {
     canOpenQualityInspections,
     selectedRow?.purchase_order_id,
   ])
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: hasRelatedCapability,
+    record: selectedRow,
+    itemCount: relatedMenuItems.length,
+  })
   const materialOptions = useMemo(
     () => uniqueReferenceOptions(materials, materialOption),
     [materials]
@@ -1138,19 +1144,19 @@ export default function V1PurchaseReceiptsPage() {
             selectionLabel="入库记录"
             onClear={() => setSelectedRow(null)}
           />
-          {hasRelatedCapability ? (
+          {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={!selectedRow || relatedMenuItems.length === 0}
+              disabled={relatedActionAvailability.disabled}
               disabledReason={
                 !selectedRow
                   ? '请先选择一条入库记录'
-                  : '当前入库记录没有可打开的关联单据'
+                  : relatedActionAvailability.disabledReason
               }
             >
               <Dropdown
                 trigger={['click']}
                 destroyOnHidden
-                disabled={!selectedRow || relatedMenuItems.length === 0}
+                disabled={relatedActionAvailability.disabled}
                 menu={{
                   items: relatedMenuItems,
                   onClick: openRelatedTable,
@@ -1159,7 +1165,8 @@ export default function V1PurchaseReceiptsPage() {
                 <Button
                   size="small"
                   icon={<LinkOutlined />}
-                  disabled={!selectedRow || relatedMenuItems.length === 0}
+                  data-business-action-key="related-records"
+                  disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
                 </Button>

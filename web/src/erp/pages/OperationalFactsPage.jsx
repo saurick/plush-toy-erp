@@ -85,6 +85,7 @@ import {
   isSourceBusinessActionResultUnknown,
 } from '../utils/sourceBusinessAction.mjs'
 import { matchesOperationalFactLifecycleResult } from '../utils/operationalFactLifecycle.mjs'
+import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
   buildProductionReworkPayload,
   findProductionReworkResult,
@@ -959,6 +960,11 @@ export function OperationalFactWorkspace({
       ].some((sourceTypeValue) =>
         canOpenRelatedPath(sourceRouteFor(sourceTypeValue))
       ))
+  const relatedActionAvailability = resolveRelatedRecordActionAvailability({
+    authorized: hasRelatedCapability,
+    record: activeSelectedRow,
+    itemCount: relatedMenuItems.length,
+  })
 
   const openRelatedTable = ({ key }) => {
     if (!activeSelectedRow) return
@@ -1206,19 +1212,19 @@ export function OperationalFactWorkspace({
             selectionLabel="业务记录"
             onClear={clearActiveSelection}
           />
-          {hasRelatedCapability ? (
+          {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
-              disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+              disabled={relatedActionAvailability.disabled}
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一条业务记录'
-                  : '当前业务记录没有可打开的关联单据'
+                  : relatedActionAvailability.disabledReason
               }
             >
               <Dropdown
                 trigger={['click']}
                 destroyOnHidden
-                disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+                disabled={relatedActionAvailability.disabled}
                 menu={{
                   items: relatedMenuItems,
                   onClick: openRelatedTable,
@@ -1227,7 +1233,8 @@ export function OperationalFactWorkspace({
                 <Button
                   size="small"
                   icon={<LinkOutlined />}
-                  disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+                  data-business-action-key="related-records"
+                  disabled={relatedActionAvailability.disabled}
                 >
                   相关单据 <DownOutlined />
                 </Button>

@@ -9,10 +9,12 @@ import {
   recoverCompensatedProcessDomainCommand,
 } from '../../api/customerConfigApi.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
+import { BusinessActionTooltip } from '../business-list/BusinessListLayout.jsx'
 
 export default function ExceptionProcessRecoveryButton({
   canRecover = false,
   disabled = false,
+  disabledReason = '',
   loadProcess,
   onRecovered,
   size = 'small',
@@ -101,18 +103,29 @@ export default function ExceptionProcessRecoveryButton({
   }, [loadProcess, modal, recover])
 
   if (!canRecover) return null
+  const actionDisabled = disabled || loading
+  const actionDisabledReason = loading
+    ? '当前操作完成后可核对异常流程'
+    : disabledReason
+
   return (
     <>
       {contextHolder}
-      <Button
-        danger
-        size={size}
-        disabled={disabled || loading}
-        loading={loading}
-        onClick={inspect}
+      <BusinessActionTooltip
+        disabled={actionDisabled}
+        disabledReason={actionDisabledReason}
       >
-        恢复异常流程
-      </Button>
+        <Button
+          danger
+          size={size}
+          data-business-action-key="exception-process-recovery"
+          disabled={actionDisabled}
+          loading={loading}
+          onClick={inspect}
+        >
+          恢复异常流程
+        </Button>
+      </BusinessActionTooltip>
     </>
   )
 }
