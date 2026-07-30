@@ -5,6 +5,7 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	"server/internal/errcode"
 )
 
 func (d *jsonrpcDispatcher) handleOperationalFactReservation(
@@ -42,18 +43,35 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		item, err := d.operationalFactUC.ReleaseStockReservation(ctx, getInt(pm, "id", 0))
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "list_stock_reservations":
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionWarehouseInventoryRead, biz.PermissionSalesOrderRead); res != nil {
+		permissions, res := d.CurrentEffectiveAdminPermissions(ctx)
+		if res != nil {
 			return id, res, nil
+		}
+		permissionSet := biz.PermissionKeySet(permissions)
+		scope := biz.StockReservationReadScope{
+			IncludeSalesOrderReferences: biz.PermissionSetHasAll(
+				permissionSet,
+				biz.PermissionSalesOrderRead,
+				biz.PermissionSalesOrderItemRead,
+			),
+			IncludeInventoryReferences: biz.PermissionSetHasAny(
+				permissionSet,
+				biz.PermissionWarehouseInventoryRead,
+			),
+		}
+		if !scope.IncludeInventoryReferences &&
+			!biz.PermissionSetHasAny(permissionSet, biz.PermissionSalesOrderRead) {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 		}
 		filter, ok := operationalFactFilterFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.operationalFactUC.ListStockReservations(ctx, filter)
+		items, total, err := d.operationalFactUC.ListStockReservationsForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
-		return id, okData(map[string]any{"stock_reservations": stockReservationsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
+		return id, okData(map[string]any{"stock_reservations": stockReservationsForAccessToAny(items, scope), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
 	default:
 		return id, unknownOperationalFactResult(method), nil
 	}
@@ -120,6 +138,30 @@ func stockReservationsToAny(items []*biz.StockReservation) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
 		out = append(out, stockReservationToAny(item))
+	}
+	return out
+}
+
+func stockReservationsForAccessToAny(items []*biz.StockReservation, scope biz.StockReservationReadScope) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		mapped := stockReservationToAny(item)
+		if item != nil && scope.IncludeSalesOrderReferences {
+			mapped["sales_order_no"] = optionalStringToAny(item.SalesOrderNo)
+			mapped["sales_order_line_no"] = optionalIntToAny(item.SalesOrderLineNo)
+		}
+		if item != nil && scope.IncludeInventoryReferences {
+			mapped["product_code"] = item.ProductCode
+			mapped["product_name"] = item.ProductName
+			mapped["product_sku_code"] = optionalStringToAny(item.ProductSkuCode)
+			mapped["product_sku_name"] = optionalStringToAny(item.ProductSkuName)
+			mapped["warehouse_code"] = item.WarehouseCode
+			mapped["warehouse_name"] = item.WarehouseName
+			mapped["unit_code"] = item.UnitCode
+			mapped["unit_name"] = item.UnitName
+			mapped["lot_no"] = optionalStringToAny(item.LotNo)
+		}
+		out = append(out, mapped)
 	}
 	return out
 }

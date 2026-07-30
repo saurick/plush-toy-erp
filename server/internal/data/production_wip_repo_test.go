@@ -719,8 +719,8 @@ func TestProductionWIPSplitTransferReworkPackagingAndCompletionGate(t *testing.T
 	flow := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-PACKAGING", 10, false)
 	flowItem := flow.ProductionOrderItems[0]
 	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
-	if _, err := factRepo.ResolveProductionCompletionSource(ctx, flow.ProductionOrderID, flowItem.ID); !errors.Is(err, biz.ErrProductionWIPInvalidTransition) {
-		t.Fatalf("completion source before final packaging error = %v", err)
+	if _, err := factRepo.ResolveProductionCompletionSource(ctx, flow.ProductionOrderID, flowItem.ID); err != nil {
+		t.Fatalf("completion source identity before exact batch selection: %v", err)
 	}
 	current := flow.Batches[0]
 	operationCodes := []string{

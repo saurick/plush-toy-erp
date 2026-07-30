@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
@@ -162,6 +163,20 @@ func (_c *ProductionFactCreate) SetSourceLineID(v int) *ProductionFactCreate {
 func (_c *ProductionFactCreate) SetNillableSourceLineID(v *int) *ProductionFactCreate {
 	if v != nil {
 		_c.SetSourceLineID(*v)
+	}
+	return _c
+}
+
+// SetProductionWipBatchID sets the "production_wip_batch_id" field.
+func (_c *ProductionFactCreate) SetProductionWipBatchID(v int) *ProductionFactCreate {
+	_c.mutation.SetProductionWipBatchID(v)
+	return _c
+}
+
+// SetNillableProductionWipBatchID sets the "production_wip_batch_id" field if the given value is not nil.
+func (_c *ProductionFactCreate) SetNillableProductionWipBatchID(v *int) *ProductionFactCreate {
+	if v != nil {
+		_c.SetProductionWipBatchID(*v)
 	}
 	return _c
 }
@@ -344,6 +359,26 @@ func (_c *ProductionFactCreate) SetNillableInventoryLotID(id *int) *ProductionFa
 // SetInventoryLot sets the "inventory_lot" edge to the InventoryLot entity.
 func (_c *ProductionFactCreate) SetInventoryLot(v *InventoryLot) *ProductionFactCreate {
 	return _c.SetInventoryLotID(v.ID)
+}
+
+// SetProductionWipBatch sets the "production_wip_batch" edge to the ProductionWIPBatch entity.
+func (_c *ProductionFactCreate) SetProductionWipBatch(v *ProductionWIPBatch) *ProductionFactCreate {
+	return _c.SetProductionWipBatchID(v.ID)
+}
+
+// AddOriginReworkBatchIDs adds the "origin_rework_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_c *ProductionFactCreate) AddOriginReworkBatchIDs(ids ...int) *ProductionFactCreate {
+	_c.mutation.AddOriginReworkBatchIDs(ids...)
+	return _c
+}
+
+// AddOriginReworkBatches adds the "origin_rework_batches" edges to the ProductionWIPBatch entity.
+func (_c *ProductionFactCreate) AddOriginReworkBatches(v ...*ProductionWIPBatch) *ProductionFactCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOriginReworkBatchIDs(ids...)
 }
 
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
@@ -549,6 +584,11 @@ func (_c *ProductionFactCreate) check() error {
 	if v, ok := _c.mutation.SourceLineID(); ok {
 		if err := productionfact.SourceLineIDValidator(v); err != nil {
 			return &ValidationError{Name: "source_line_id", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.source_line_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProductionWipBatchID(); ok {
+		if err := productionfact.ProductionWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "production_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "ProductionFact.production_wip_batch_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.IdempotencyKey(); !ok {
@@ -765,6 +805,39 @@ func (_c *ProductionFactCreate) createSpec() (*ProductionFact, *sqlgraph.CreateS
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.LotID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionWipBatchIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionfact.ProductionWipBatchTable,
+			Columns: []string{productionfact.ProductionWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProductionWipBatchID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OriginReworkBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.OriginReworkBatchesTable,
+			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.PosterIDs(); len(nodes) > 0 {

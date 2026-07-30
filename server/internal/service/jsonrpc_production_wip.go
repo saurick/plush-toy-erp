@@ -316,7 +316,8 @@ func productionWIPBatchToMap(value *biz.ProductionWIPBatch) map[string]any {
 	return map[string]any{
 		"id": value.ID, "production_order_id": value.ProductionOrderID, "production_order_item_id": value.ProductionOrderItemID,
 		"production_order_operation_id": value.ProductionOrderOperationID, "source_batch_id": optionalIntValue(value.SourceBatchID),
-		"batch_no": value.BatchNo, "flow_type": value.FlowType, "execution_mode": optionalStringValue(value.ExecutionMode),
+		"origin_rework_fact_id": optionalIntValue(value.OriginReworkFactID),
+		"batch_no":              value.BatchNo, "flow_type": value.FlowType, "execution_mode": optionalStringValue(value.ExecutionMode),
 		"status": value.Status, "version": value.Version, "quantity": value.Quantity.String(),
 		"rework_reason": optionalStringValue(value.ReworkReason),
 		"created_by":    value.CreatedBy, "started_at": optionalTimeUnix(value.StartedAt), "completed_at": optionalTimeUnix(value.CompletedAt),

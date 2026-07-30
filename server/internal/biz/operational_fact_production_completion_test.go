@@ -25,6 +25,7 @@ func TestOperationalFactUsecaseCreateProductionCompletionOwnsSourceFields(t *tes
 		FactNo:                " PF-BIZ-001 ",
 		ProductionOrderID:     21,
 		ProductionOrderItemID: 22,
+		ProductionWIPBatchID:  23,
 		WarehouseID:           44,
 		NewLotNo:              &lotNo,
 		Quantity:              decimal.NewFromInt(3),
@@ -42,6 +43,9 @@ func TestOperationalFactUsecaseCreateProductionCompletionOwnsSourceFields(t *tes
 	}
 	if created.SourceType == nil || *created.SourceType != ProductionOrderSourceType || created.SourceID == nil || *created.SourceID != 21 || created.SourceLineID == nil || *created.SourceLineID != 22 {
 		t.Fatalf("source linkage = %#v", created)
+	}
+	if created.ProductionWIPBatchID == nil || *created.ProductionWIPBatchID != 23 {
+		t.Fatalf("WIP batch linkage = %#v", created)
 	}
 	if repo.resolveCalls != 1 {
 		t.Fatalf("source resolver calls = %d", repo.resolveCalls)
@@ -109,6 +113,7 @@ func (r *productionCompletionRepoStub) CreateProductionFactDraft(_ context.Conte
 		FactNo: in.FactNo, FactType: in.FactType, SubjectType: in.SubjectType, SubjectID: in.SubjectID,
 		ProductSkuID: in.ProductSkuID, WarehouseID: in.WarehouseID, UnitID: in.UnitID, Quantity: in.Quantity,
 		SourceType: in.SourceType, SourceID: in.SourceID, SourceLineID: in.SourceLineID,
+		ProductionWIPBatchID: in.ProductionWIPBatchID,
 	}, nil
 }
 func (r *productionCompletionRepoStub) PostProductionFact(context.Context, *OperationalFactStatusMutation) (*ProductionFact, error) {

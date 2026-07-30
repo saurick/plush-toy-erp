@@ -51,6 +51,22 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 		}
 		item, err := d.purchaseOrderUC.GetPurchaseOrder(ctx, getInt(pm, "id", 0))
 		return id, purchaseOrderMutationResult(ctx, d, item, err), nil
+	case "get_purchase_order_receipt_progress":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "purchase_orders", "purchase_receipts"); res != nil {
+			return id, res, nil
+		}
+		purchaseOrderID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		progress, err := d.purchaseOrderUC.GetPurchaseOrderReceiptProgress(ctx, purchaseOrderID)
+		return id, purchaseOrderReceiptProgressResult(ctx, d, progress, err), nil
 	case "list_purchase_orders":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
 			return id, res, nil

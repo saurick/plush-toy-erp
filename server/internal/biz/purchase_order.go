@@ -31,6 +31,8 @@ var (
 	ErrPurchaseOrderCloseDraftReceiptDependency = errors.New("purchase order close blocked by draft receipt")
 	ErrPurchaseOrderCancelReceiptDependency     = errors.New("purchase order cancellation blocked by receipt")
 	ErrPurchaseOrderLifecycleProcessDependency  = errors.New("purchase order lifecycle blocked by active process")
+	ErrPurchaseOrderReceiptProgressInvalid      = errors.New("purchase order receipt progress invalid")
+	ErrPurchaseOrderReceiptProgressUnavailable  = errors.New("purchase order receipt progress unavailable")
 	ErrMaterialInactive                         = errors.New("material inactive")
 	ErrSupplierInactive                         = errors.New("supplier inactive")
 )
@@ -116,6 +118,34 @@ type PurchaseOrderWithItems struct {
 	Items []*PurchaseOrderItem
 }
 
+// PurchaseOrderReceiptProgress is a non-persisted, server-owned read
+// projection. Purchase orders and posted receipt facts remain the write truth.
+type PurchaseOrderReceiptProgress struct {
+	PurchaseOrderID int
+	PurchaseOrderNo string
+	LifecycleStatus string
+	Items           []*PurchaseOrderReceiptProgressItem
+}
+
+type PurchaseOrderReceiptProgressItem struct {
+	PurchaseOrderItemID          int
+	LineNo                       int
+	MaterialID                   int
+	MaterialCode                 string
+	MaterialName                 string
+	UnitID                       int
+	UnitCode                     string
+	UnitName                     string
+	LineStatus                   string
+	PurchasedQuantity            decimal.Decimal
+	EffectiveReceivedQuantity    decimal.Decimal
+	DraftReservedQuantity        decimal.Decimal
+	RemainingReceivableQuantity  decimal.Decimal
+	RemainingGeneratableQuantity decimal.Decimal
+	CanGenerate                  bool
+	DisabledReason               string
+}
+
 type PurchaseOrderFilter struct {
 	Keyword         string
 	SupplierID      int
@@ -153,6 +183,10 @@ type PurchaseOrderRepo interface {
 	SupplierIsActive(ctx context.Context, id int) (bool, error)
 	MaterialIsActive(ctx context.Context, id int) (bool, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
+}
+
+type PurchaseOrderReceiptProgressRepo interface {
+	GetPurchaseOrderReceiptProgress(ctx context.Context, id int) (*PurchaseOrderReceiptProgress, error)
 }
 
 type PurchaseOrderUsecase struct {
@@ -214,6 +248,17 @@ func (uc *PurchaseOrderUsecase) ListPurchaseOrders(ctx context.Context, filter P
 		return nil, 0, err
 	}
 	return uc.repo.ListPurchaseOrders(ctx, normalized)
+}
+
+func (uc *PurchaseOrderUsecase) GetPurchaseOrderReceiptProgress(ctx context.Context, id int) (*PurchaseOrderReceiptProgress, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(PurchaseOrderReceiptProgressRepo)
+	if !ok {
+		return nil, ErrPurchaseOrderReceiptProgressUnavailable
+	}
+	return repo.GetPurchaseOrderReceiptProgress(ctx, id)
 }
 
 func (uc *PurchaseOrderUsecase) SubmitPurchaseOrder(ctx context.Context, id int) (*PurchaseOrder, error) {

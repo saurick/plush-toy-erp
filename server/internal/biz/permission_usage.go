@@ -354,8 +354,9 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	add(PermissionWorkflowTaskComplete, workflowSurfaces("complete-task", "完成协同任务", permissionControlButton, "显示并允许完成", permissionMethods("workflow", "complete_task_action"))...)
 
 	// Purchase, outsourcing and inbound.
+	purchaseOrderReceiptProgressMethods := permissionMethods("purchase_order", "get_purchase_order_receipt_progress")
 	add(PermissionPurchaseOrderRead,
-		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "purchase-order-list", "采购订单列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("purchase_order", "get_purchase_order", "list_purchase_orders", "list_purchase_order_items"), businessUsageConditions),
+		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "purchase-order-list", "采购订单列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("purchase_order", "get_purchase_order", "list_purchase_orders", "list_purchase_order_items"), purchaseOrderReceiptProgressMethods...), businessUsageConditions),
 		menuPermissionSurface("inbound", "purchase-order-source", "采购订单来源", "purchase-receipt-source-reference", "采购入库可读取的采购订单与明细", permissionControlSection, "允许查看", append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item"), permissionMethods("customer_config", "start_material_supply_purchase_order_process")...), businessUsageConditions),
 	)
 	addMenu(PermissionPurchaseOrderCreate, "accessories-purchase", "purchase-orders", "采购订单", "create-purchase-order", "新建采购订单和表单", permissionControlButton, "显示并允许创建", permissionMethods("purchase_order", "save_purchase_order_with_items"), businessUsageConditions)
@@ -375,7 +376,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionOutsourcingFactPost, "processing-contracts", "outsourcing-fact-actions", "委外动作", "post-outsourcing-fact", "确认委外记录", permissionControlButton, "显示并允许确认", permissionMethods("operational_fact", "post_outsourcing_fact", "post_outsourcing_return_disposition"), businessUsageConditions)
 	addMenu(PermissionOutsourcingFactCancel, "processing-contracts", "outsourcing-fact-actions", "委外动作", "cancel-outsourcing-fact", "取消委外记录", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_outsourcing_fact", "cancel_outsourcing_return_disposition"), businessUsageConditions)
 
-	addMenu(PermissionPurchaseReceiptRead, "inbound", "purchase-receipts", "采购入库", "purchase-receipt-list", "采购入库列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("purchase", "get_purchase_receipt", "list_purchase_receipts"), businessUsageConditions)
+	addMenu(PermissionPurchaseReceiptRead, "inbound", "purchase-receipts", "采购入库", "purchase-receipt-list", "采购入库列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("purchase", "get_purchase_receipt", "list_purchase_receipts"), purchaseOrderReceiptProgressMethods...), businessUsageConditions)
 	purchaseReceiptCreateMethods := append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item", "post_purchase_receipt", "cancel_purchase_receipt"), permissionMethods("customer_config", "execute_material_supply_purchase_receipt_create")...)
 	addMenu(PermissionPurchaseReceiptCreate, "inbound", "purchase-receipts", "采购入库", "create-purchase-receipt", "创建和维护采购入库", permissionControlForm, "显示并允许创建和维护", purchaseReceiptCreateMethods, businessUsageConditions)
 	addBackend(PermissionPurchaseReceiptAdjustmentRead, permissionMethods("purchase", "get_purchase_receipt_adjustment", "list_purchase_receipt_adjustments"), businessUsageConditions)
@@ -394,7 +395,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	inventoryReadMethods := append(permissionMethods("inventory", "list_inventory_balances", "list_inventory_lots", "list_inventory_txns"), permissionMethods("operational_fact", "list_stock_reservations")...)
 	inventoryReadMethods = append(inventoryReadMethods, permissionMethods("customer_config", "start_inventory_adjustment_approval_process", "get_inventory_adjustment_approval_process", "execute_inventory_adjustment_submit", "execute_inventory_adjustment_post")...)
 	addMenu(PermissionWarehouseInventoryRead, "inventory", "inventory-ledger", "库存台账", "inventory-ledger-content", "库存余额、批次和流水", permissionControlPage, "允许进入并查看", inventoryReadMethods, businessUsageConditions)
-	addMenu(PermissionWarehouseInboundRead, "inbound", "purchase-receipts", "采购入库", "warehouse-inbound-list", "入库列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("purchase", "get_purchase_receipt", "list_purchase_receipts"), businessUsageConditions)
+	addMenu(PermissionWarehouseInboundRead, "inbound", "purchase-receipts", "采购入库", "warehouse-inbound-list", "入库列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("purchase", "get_purchase_receipt", "list_purchase_receipts"), purchaseOrderReceiptProgressMethods...), businessUsageConditions)
 	inboundConfirmMethods := append(permissionMethods("purchase", "post_purchase_receipt", "cancel_purchase_receipt"), permissionMethods("customer_config", "execute_material_supply_post_inbound")...)
 	addMenu(PermissionWarehouseInboundConfirm, "inbound", "purchase-receipt-actions", "入库动作", "confirm-inbound", "确认或取消入库", permissionControlButton, "显示并允许确认", inboundConfirmMethods, businessUsageConditions)
 	add(PermissionWarehouseOutboundRead,

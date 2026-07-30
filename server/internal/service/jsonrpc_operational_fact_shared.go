@@ -232,6 +232,8 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次返工数量将超过来源完工批次剩余可返工数量"}
 	case errors.Is(err, biz.ErrProductionReworkDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该完工记录已有未取消的返工，请先取消返工后再撤销完工"}
+	case errors.Is(err, biz.ErrProductionReworkExecutionDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工批次已经开始、拆分、流转、质检或补完工，不能再取消；请按当前返工进度继续办理"}
 	case errors.Is(err, biz.ErrOutsourcingFactNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外事实不存在"}
 	case errors.Is(err, biz.ErrOutsourcingDispositionNotFound):

@@ -5,6 +5,7 @@ package ent
 import (
 	"fmt"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionorderoperation"
@@ -30,6 +31,8 @@ type ProductionWIPBatch struct {
 	ProductionOrderOperationID int `json:"production_order_operation_id,omitempty"`
 	// SourceBatchID holds the value of the "source_batch_id" field.
 	SourceBatchID *int `json:"source_batch_id,omitempty"`
+	// OriginReworkFactID holds the value of the "origin_rework_fact_id" field.
+	OriginReworkFactID *int `json:"origin_rework_fact_id,omitempty"`
 	// BatchNo holds the value of the "batch_no" field.
 	BatchNo string `json:"batch_no,omitempty"`
 	// FlowType holds the value of the "flow_type" field.
@@ -72,6 +75,10 @@ type ProductionWIPBatchEdges struct {
 	ChildBatches []*ProductionWIPBatch `json:"child_batches,omitempty"`
 	// SourceBatch holds the value of the source_batch edge.
 	SourceBatch *ProductionWIPBatch `json:"source_batch,omitempty"`
+	// OriginReworkFact holds the value of the origin_rework_fact edge.
+	OriginReworkFact *ProductionFact `json:"origin_rework_fact,omitempty"`
+	// CompletionFacts holds the value of the completion_facts edge.
+	CompletionFacts []*ProductionFact `json:"completion_facts,omitempty"`
 	// Events holds the value of the events edge.
 	Events []*ProductionWIPEvent `json:"events,omitempty"`
 	// QualityInspections holds the value of the quality_inspections edge.
@@ -82,7 +89,7 @@ type ProductionWIPBatchEdges struct {
 	Creator *AdminUser `json:"creator,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [9]bool
+	loadedTypes [11]bool
 }
 
 // ProductionOrderOrErr returns the ProductionOrder value or an error if the edge
@@ -138,10 +145,30 @@ func (e ProductionWIPBatchEdges) SourceBatchOrErr() (*ProductionWIPBatch, error)
 	return nil, &NotLoadedError{edge: "source_batch"}
 }
 
+// OriginReworkFactOrErr returns the OriginReworkFact value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ProductionWIPBatchEdges) OriginReworkFactOrErr() (*ProductionFact, error) {
+	if e.OriginReworkFact != nil {
+		return e.OriginReworkFact, nil
+	} else if e.loadedTypes[5] {
+		return nil, &NotFoundError{label: productionfact.Label}
+	}
+	return nil, &NotLoadedError{edge: "origin_rework_fact"}
+}
+
+// CompletionFactsOrErr returns the CompletionFacts value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionWIPBatchEdges) CompletionFactsOrErr() ([]*ProductionFact, error) {
+	if e.loadedTypes[6] {
+		return e.CompletionFacts, nil
+	}
+	return nil, &NotLoadedError{edge: "completion_facts"}
+}
+
 // EventsOrErr returns the Events value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductionWIPBatchEdges) EventsOrErr() ([]*ProductionWIPEvent, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[7] {
 		return e.Events, nil
 	}
 	return nil, &NotLoadedError{edge: "events"}
@@ -150,7 +177,7 @@ func (e ProductionWIPBatchEdges) EventsOrErr() ([]*ProductionWIPEvent, error) {
 // QualityInspectionsOrErr returns the QualityInspections value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductionWIPBatchEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[8] {
 		return e.QualityInspections, nil
 	}
 	return nil, &NotLoadedError{edge: "quality_inspections"}
@@ -159,7 +186,7 @@ func (e ProductionWIPBatchEdges) QualityInspectionsOrErr() ([]*QualityInspection
 // OutsourcingAllocationsOrErr returns the OutsourcingAllocations value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductionWIPBatchEdges) OutsourcingAllocationsOrErr() ([]*ProductionWIPOutsourcingAllocation, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[9] {
 		return e.OutsourcingAllocations, nil
 	}
 	return nil, &NotLoadedError{edge: "outsourcing_allocations"}
@@ -170,7 +197,7 @@ func (e ProductionWIPBatchEdges) OutsourcingAllocationsOrErr() ([]*ProductionWIP
 func (e ProductionWIPBatchEdges) CreatorOrErr() (*AdminUser, error) {
 	if e.Creator != nil {
 		return e.Creator, nil
-	} else if e.loadedTypes[8] {
+	} else if e.loadedTypes[10] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "creator"}
@@ -183,7 +210,7 @@ func (*ProductionWIPBatch) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case productionwipbatch.FieldQuantity:
 			values[i] = new(decimal.Decimal)
-		case productionwipbatch.FieldID, productionwipbatch.FieldProductionOrderID, productionwipbatch.FieldProductionOrderItemID, productionwipbatch.FieldProductionOrderOperationID, productionwipbatch.FieldSourceBatchID, productionwipbatch.FieldVersion, productionwipbatch.FieldCreatedBy:
+		case productionwipbatch.FieldID, productionwipbatch.FieldProductionOrderID, productionwipbatch.FieldProductionOrderItemID, productionwipbatch.FieldProductionOrderOperationID, productionwipbatch.FieldSourceBatchID, productionwipbatch.FieldOriginReworkFactID, productionwipbatch.FieldVersion, productionwipbatch.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
 		case productionwipbatch.FieldBatchNo, productionwipbatch.FieldFlowType, productionwipbatch.FieldExecutionMode, productionwipbatch.FieldStatus, productionwipbatch.FieldReworkReason:
 			values[i] = new(sql.NullString)
@@ -234,6 +261,13 @@ func (_m *ProductionWIPBatch) assignValues(columns []string, values []any) error
 			} else if value.Valid {
 				_m.SourceBatchID = new(int)
 				*_m.SourceBatchID = int(value.Int64)
+			}
+		case productionwipbatch.FieldOriginReworkFactID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field origin_rework_fact_id", values[i])
+			} else if value.Valid {
+				_m.OriginReworkFactID = new(int)
+				*_m.OriginReworkFactID = int(value.Int64)
 			}
 		case productionwipbatch.FieldBatchNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -349,6 +383,16 @@ func (_m *ProductionWIPBatch) QuerySourceBatch() *ProductionWIPBatchQuery {
 	return NewProductionWIPBatchClient(_m.config).QuerySourceBatch(_m)
 }
 
+// QueryOriginReworkFact queries the "origin_rework_fact" edge of the ProductionWIPBatch entity.
+func (_m *ProductionWIPBatch) QueryOriginReworkFact() *ProductionFactQuery {
+	return NewProductionWIPBatchClient(_m.config).QueryOriginReworkFact(_m)
+}
+
+// QueryCompletionFacts queries the "completion_facts" edge of the ProductionWIPBatch entity.
+func (_m *ProductionWIPBatch) QueryCompletionFacts() *ProductionFactQuery {
+	return NewProductionWIPBatchClient(_m.config).QueryCompletionFacts(_m)
+}
+
 // QueryEvents queries the "events" edge of the ProductionWIPBatch entity.
 func (_m *ProductionWIPBatch) QueryEvents() *ProductionWIPEventQuery {
 	return NewProductionWIPBatchClient(_m.config).QueryEvents(_m)
@@ -403,6 +447,11 @@ func (_m *ProductionWIPBatch) String() string {
 	builder.WriteString(", ")
 	if v := _m.SourceBatchID; v != nil {
 		builder.WriteString("source_batch_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.OriginReworkFactID; v != nil {
+		builder.WriteString("origin_rework_fact_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

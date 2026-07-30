@@ -23,6 +23,8 @@ const (
 	FieldProductionOrderOperationID = "production_order_operation_id"
 	// FieldSourceBatchID holds the string denoting the source_batch_id field in the database.
 	FieldSourceBatchID = "source_batch_id"
+	// FieldOriginReworkFactID holds the string denoting the origin_rework_fact_id field in the database.
+	FieldOriginReworkFactID = "origin_rework_fact_id"
 	// FieldBatchNo holds the string denoting the batch_no field in the database.
 	FieldBatchNo = "batch_no"
 	// FieldFlowType holds the string denoting the flow_type field in the database.
@@ -57,6 +59,10 @@ const (
 	EdgeChildBatches = "child_batches"
 	// EdgeSourceBatch holds the string denoting the source_batch edge name in mutations.
 	EdgeSourceBatch = "source_batch"
+	// EdgeOriginReworkFact holds the string denoting the origin_rework_fact edge name in mutations.
+	EdgeOriginReworkFact = "origin_rework_fact"
+	// EdgeCompletionFacts holds the string denoting the completion_facts edge name in mutations.
+	EdgeCompletionFacts = "completion_facts"
 	// EdgeEvents holds the string denoting the events edge name in mutations.
 	EdgeEvents = "events"
 	// EdgeQualityInspections holds the string denoting the quality_inspections edge name in mutations.
@@ -96,6 +102,20 @@ const (
 	SourceBatchTable = "production_wip_batches"
 	// SourceBatchColumn is the table column denoting the source_batch relation/edge.
 	SourceBatchColumn = "source_batch_id"
+	// OriginReworkFactTable is the table that holds the origin_rework_fact relation/edge.
+	OriginReworkFactTable = "production_wip_batches"
+	// OriginReworkFactInverseTable is the table name for the ProductionFact entity.
+	// It exists in this package in order to avoid circular dependency with the "productionfact" package.
+	OriginReworkFactInverseTable = "production_facts"
+	// OriginReworkFactColumn is the table column denoting the origin_rework_fact relation/edge.
+	OriginReworkFactColumn = "origin_rework_fact_id"
+	// CompletionFactsTable is the table that holds the completion_facts relation/edge.
+	CompletionFactsTable = "production_facts"
+	// CompletionFactsInverseTable is the table name for the ProductionFact entity.
+	// It exists in this package in order to avoid circular dependency with the "productionfact" package.
+	CompletionFactsInverseTable = "production_facts"
+	// CompletionFactsColumn is the table column denoting the completion_facts relation/edge.
+	CompletionFactsColumn = "production_wip_batch_id"
 	// EventsTable is the table that holds the events relation/edge.
 	EventsTable = "production_wip_events"
 	// EventsInverseTable is the table name for the ProductionWIPEvent entity.
@@ -133,6 +153,7 @@ var Columns = []string{
 	FieldProductionOrderItemID,
 	FieldProductionOrderOperationID,
 	FieldSourceBatchID,
+	FieldOriginReworkFactID,
 	FieldBatchNo,
 	FieldFlowType,
 	FieldExecutionMode,
@@ -172,6 +193,8 @@ var (
 	ProductionOrderOperationIDValidator func(int) error
 	// SourceBatchIDValidator is a validator for the "source_batch_id" field. It is called by the builders before save.
 	SourceBatchIDValidator func(int) error
+	// OriginReworkFactIDValidator is a validator for the "origin_rework_fact_id" field. It is called by the builders before save.
+	OriginReworkFactIDValidator func(int) error
 	// BatchNoValidator is a validator for the "batch_no" field. It is called by the builders before save.
 	BatchNoValidator func(string) error
 	// DefaultFlowType holds the default value on creation for the "flow_type" field.
@@ -226,6 +249,11 @@ func ByProductionOrderOperationID(opts ...sql.OrderTermOption) OrderOption {
 // BySourceBatchID orders the results by the source_batch_id field.
 func BySourceBatchID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceBatchID, opts...).ToFunc()
+}
+
+// ByOriginReworkFactID orders the results by the origin_rework_fact_id field.
+func ByOriginReworkFactID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOriginReworkFactID, opts...).ToFunc()
 }
 
 // ByBatchNo orders the results by the batch_no field.
@@ -330,6 +358,27 @@ func BySourceBatchField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByOriginReworkFactField orders the results by origin_rework_fact field.
+func ByOriginReworkFactField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOriginReworkFactStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByCompletionFactsCount orders the results by completion_facts count.
+func ByCompletionFactsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newCompletionFactsStep(), opts...)
+	}
+}
+
+// ByCompletionFacts orders the results by completion_facts terms.
+func ByCompletionFacts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCompletionFactsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByEventsCount orders the results by events count.
 func ByEventsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -411,6 +460,20 @@ func newSourceBatchStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(Table, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, SourceBatchTable, SourceBatchColumn),
+	)
+}
+func newOriginReworkFactStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OriginReworkFactInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, OriginReworkFactTable, OriginReworkFactColumn),
+	)
+}
+func newCompletionFactsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CompletionFactsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, CompletionFactsTable, CompletionFactsColumn),
 	)
 }
 func newEventsStep() *sqlgraph.Step {

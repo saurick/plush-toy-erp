@@ -10,6 +10,7 @@ import (
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -25,6 +26,9 @@ type stubPurchaseOrderJSONRPCRepo struct {
 	lifecycleCalls int
 	saveErr        error
 	saveCalls      int
+	progress       *biz.PurchaseOrderReceiptProgress
+	progressErr    error
+	progressCalls  int
 }
 
 func newStubPurchaseOrderJSONRPCRepo() *stubPurchaseOrderJSONRPCRepo {
@@ -79,6 +83,14 @@ func (s *stubPurchaseOrderJSONRPCRepo) ListPurchaseOrders(_ context.Context, fil
 		out = append(out, order)
 	}
 	return out, len(out), nil
+}
+
+func (s *stubPurchaseOrderJSONRPCRepo) GetPurchaseOrderReceiptProgress(_ context.Context, _ int) (*biz.PurchaseOrderReceiptProgress, error) {
+	s.progressCalls++
+	if s.progressErr != nil {
+		return nil, s.progressErr
+	}
+	return s.progress, nil
 }
 
 func (s *stubPurchaseOrderJSONRPCRepo) UpdatePurchaseOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*biz.PurchaseOrder, error) {
@@ -368,6 +380,196 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions(t *testing.
 	}
 	if approveRes == nil || approveRes.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("workflow approval must not reopen the direct approval endpoint, got %#v", approveRes)
+	}
+}
+
+func TestJsonrpcDispatcher_PurchaseOrderReceiptProgressRequiresIntersectionAndSerializesExactProjection(t *testing.T) {
+	progress := &biz.PurchaseOrderReceiptProgress{
+		PurchaseOrderID: 7,
+		PurchaseOrderNo: "PO-PROGRESS-RPC",
+		LifecycleStatus: biz.PurchaseOrderStatusApproved,
+		Items: []*biz.PurchaseOrderReceiptProgressItem{{
+			PurchaseOrderItemID:          71,
+			LineNo:                       3,
+			MaterialID:                   81,
+			MaterialCode:                 "MAT-PROGRESS-RPC",
+			MaterialName:                 "短毛绒",
+			UnitID:                       91,
+			UnitCode:                     "KG",
+			UnitName:                     "千克",
+			LineStatus:                   biz.PurchaseOrderItemStatusOpen,
+			PurchasedQuantity:            decimal.RequireFromString("10.000006"),
+			EffectiveReceivedQuantity:    decimal.RequireFromString("5.000001"),
+			DraftReservedQuantity:        decimal.RequireFromString("2.000002"),
+			RemainingReceivableQuantity:  decimal.RequireFromString("5.000005"),
+			RemainingGeneratableQuantity: decimal.RequireFromString("3.000003"),
+			CanGenerate:                  true,
+		}},
+	}
+	tests := []struct {
+		name        string
+		roleKeys    []string
+		permissions []string
+		wantCode    int32
+		wantCalls   int
+	}{
+		{
+			name:        "purchase order read alone is denied",
+			roleKeys:    []string{biz.PurchaseRoleKey},
+			permissions: []string{biz.PermissionPurchaseOrderRead},
+			wantCode:    errcode.PermissionDenied.Code,
+		},
+		{
+			name:        "receipt read alone is denied",
+			roleKeys:    []string{biz.PurchaseRoleKey},
+			permissions: []string{biz.PermissionPurchaseReceiptRead},
+			wantCode:    errcode.PermissionDenied.Code,
+		},
+		{
+			name:     "purchase and receipt read are allowed",
+			roleKeys: []string{biz.PurchaseRoleKey},
+			permissions: []string{
+				biz.PermissionPurchaseOrderRead,
+				biz.PermissionPurchaseReceiptRead,
+			},
+			wantCode:  errcode.OK.Code,
+			wantCalls: 1,
+		},
+		{
+			name:     "warehouse inbound read satisfies receipt side",
+			roleKeys: []string{biz.PurchaseRoleKey, biz.WarehouseRoleKey},
+			permissions: []string{
+				biz.PermissionPurchaseOrderRead,
+				biz.PermissionWarehouseInboundRead,
+			},
+			wantCode:  errcode.OK.Code,
+			wantCalls: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newStubPurchaseOrderJSONRPCRepo()
+			repo.progress = progress
+			dispatcher := newPurchaseOrderJSONRPCTestData(
+				t,
+				repo,
+				workflowJSONRPCAdmin(tt.roleKeys, tt.permissions...),
+			)
+			_, result, err := dispatcher.handlePurchaseOrder(
+				workflowJSONRPCAdminContext(),
+				"get_purchase_order_receipt_progress",
+				"receipt-progress",
+				mustJSONRPCStruct(t, map[string]any{"id": float64(7)}),
+			)
+			if err != nil {
+				t.Fatalf("get_purchase_order_receipt_progress err = %v", err)
+			}
+			if result == nil || result.Code != tt.wantCode {
+				t.Fatalf("result = %#v, want code %d", result, tt.wantCode)
+			}
+			if repo.progressCalls != tt.wantCalls {
+				t.Fatalf("progress calls = %d, want %d", repo.progressCalls, tt.wantCalls)
+			}
+			if tt.wantCode != errcode.OK.Code {
+				return
+			}
+			mapped := jsonRPCNestedMap(t, result, "purchase_order_receipt_progress")
+			if mapped["purchase_order_no"] != "PO-PROGRESS-RPC" {
+				t.Fatalf("progress header = %#v", mapped)
+			}
+			rawItems, ok := mapped["items"].([]any)
+			if !ok || len(rawItems) != 1 {
+				t.Fatalf("progress items = %#v", mapped["items"])
+			}
+			item, ok := rawItems[0].(map[string]any)
+			if !ok {
+				t.Fatalf("progress item = %#v", rawItems[0])
+			}
+			for key, want := range map[string]any{
+				"purchased_quantity":             "10.000006",
+				"effective_received_quantity":    "5.000001",
+				"draft_reserved_quantity":        "2.000002",
+				"remaining_receivable_quantity":  "5.000005",
+				"remaining_generatable_quantity": "3.000003",
+				"can_generate":                   true,
+				"disabled_reason":                "",
+			} {
+				if item[key] != want {
+					t.Fatalf("%s = %#v, want %#v; item=%#v", key, item[key], want, item)
+				}
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_PurchaseOrderReceiptProgressFailsBeforeRepoOnInvalidInputOrModule(t *testing.T) {
+	repo := newStubPurchaseOrderJSONRPCRepo()
+	repo.progress = &biz.PurchaseOrderReceiptProgress{
+		PurchaseOrderID: 1,
+		PurchaseOrderNo: "PO-PROGRESS-GATE",
+		Items:           []*biz.PurchaseOrderReceiptProgressItem{},
+	}
+	dispatcher := newPurchaseOrderJSONRPCTestData(
+		t,
+		repo,
+		workflowJSONRPCAdmin(
+			[]string{biz.PurchaseRoleKey},
+			biz.PermissionPurchaseOrderRead,
+			biz.PermissionPurchaseReceiptRead,
+		),
+	)
+	_, invalid, err := dispatcher.handlePurchaseOrder(
+		workflowJSONRPCAdminContext(),
+		"get_purchase_order_receipt_progress",
+		"invalid-progress-id",
+		mustJSONRPCStruct(t, map[string]any{"id": float64(0)}),
+	)
+	if err != nil || invalid == nil || invalid.Code != errcode.InvalidParam.Code {
+		t.Fatalf("invalid id result=%#v err=%v", invalid, err)
+	}
+	if repo.progressCalls != 0 {
+		t.Fatalf("invalid id reached repo, calls=%d", repo.progressCalls)
+	}
+
+	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.07.30.purchase-receipt-progress-disabled",
+		"purchase_receipts",
+		"disabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, dispatcher, disabledConfig)
+	_, disabled, err := dispatcher.handlePurchaseOrder(
+		workflowJSONRPCAdminContext(),
+		"get_purchase_order_receipt_progress",
+		"disabled-progress",
+		mustJSONRPCStruct(t, map[string]any{"id": float64(1)}),
+	)
+	if err != nil || disabled == nil || disabled.Code != errcode.InvalidParam.Code {
+		t.Fatalf("disabled module result=%#v err=%v", disabled, err)
+	}
+	if repo.progressCalls != 0 {
+		t.Fatalf("disabled module reached repo, calls=%d", repo.progressCalls)
+	}
+
+	enabledDispatcher := newPurchaseOrderJSONRPCTestData(
+		t,
+		repo,
+		workflowJSONRPCAdmin(
+			[]string{biz.PurchaseRoleKey},
+			biz.PermissionPurchaseOrderRead,
+			biz.PermissionPurchaseReceiptRead,
+		),
+	)
+	repo.progressErr = biz.ErrPurchaseOrderReceiptProgressInvalid
+	_, failed, err := enabledDispatcher.handlePurchaseOrder(
+		workflowJSONRPCAdminContext(),
+		"get_purchase_order_receipt_progress",
+		"invalid-progress-invariant",
+		mustJSONRPCStruct(t, map[string]any{"id": float64(1)}),
+	)
+	if err != nil || failed == nil || failed.Code != errcode.Internal.Code {
+		t.Fatalf("invalid invariant result=%#v err=%v", failed, err)
 	}
 }
 

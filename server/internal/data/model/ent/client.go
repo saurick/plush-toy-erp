@@ -6559,6 +6559,38 @@ func (c *ProductionFactClient) QueryInventoryLot(_m *ProductionFact) *InventoryL
 	return query
 }
 
+// QueryProductionWipBatch queries the production_wip_batch edge of a ProductionFact.
+func (c *ProductionFactClient) QueryProductionWipBatch(_m *ProductionFact) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionfact.ProductionWipBatchTable, productionfact.ProductionWipBatchColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOriginReworkBatches queries the origin_rework_batches edge of a ProductionFact.
+func (c *ProductionFactClient) QueryOriginReworkBatches(_m *ProductionFact) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionfact.OriginReworkBatchesTable, productionfact.OriginReworkBatchesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryPoster queries the poster edge of a ProductionFact.
 func (c *ProductionFactClient) QueryPoster(_m *ProductionFact) *AdminUserQuery {
 	query := (&AdminUserClient{config: c.config}).Query()
@@ -8177,6 +8209,38 @@ func (c *ProductionWIPBatchClient) QuerySourceBatch(_m *ProductionWIPBatch) *Pro
 			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
 			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.SourceBatchTable, productionwipbatch.SourceBatchColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOriginReworkFact queries the origin_rework_fact edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryOriginReworkFact(_m *ProductionWIPBatch) *ProductionFactQuery {
+	query := (&ProductionFactClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionfact.Table, productionfact.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.OriginReworkFactTable, productionwipbatch.OriginReworkFactColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCompletionFacts queries the completion_facts edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryCompletionFacts(_m *ProductionWIPBatch) *ProductionFactQuery {
+	query := (&ProductionFactClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionfact.Table, productionfact.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionwipbatch.CompletionFactsTable, productionwipbatch.CompletionFactsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil

@@ -42,6 +42,7 @@ func productionWIPJSONRPCAggregate() *biz.ProductionWIPAggregate {
 	packagingVersion := "PKG-V3"
 	confirmedBy := 7
 	confirmedAt := now
+	originReworkFactID := 901
 	return &biz.ProductionWIPAggregate{
 		ProductionOrderID: 1,
 		ProductionOrder: &biz.ProductionOrder{
@@ -72,7 +73,8 @@ func productionWIPJSONRPCAggregate() *biz.ProductionWIPAggregate {
 			ID: 201, ProductionOrderID: 1, ProductionOrderItemID: 11, ProductionOrderOperationID: 101,
 			BatchNo: "WIP-1-11-20-001", FlowType: biz.ProductionWIPFlowNormal,
 			ExecutionMode: &mode, Status: biz.ProductionWIPStatusInProgress, Version: 3,
-			Quantity: decimal.RequireFromString("10.5"), CreatedBy: 7, CreatedAt: now, UpdatedAt: now,
+			Quantity: decimal.RequireFromString("10.5"), OriginReworkFactID: &originReworkFactID,
+			CreatedBy: 7, CreatedAt: now, UpdatedAt: now,
 		}},
 		PackagingConfirmations: []*biz.ProductionPackagingConfirmation{{
 			ID: 301, ProductionOrderID: 1, ProductionOrderItemID: 11,
@@ -119,6 +121,7 @@ func TestProductionWIPJSONRPCCanonicalReadCancelAndSplit(t *testing.T) {
 	if data["production_order"].(map[string]any)["order_no"] != "MO-WIP-001" ||
 		data["production_order_operations"].([]any)[0].(map[string]any)["operation_code"] != biz.ProductionWIPOperationSewing ||
 		data["production_wip_batches"].([]any)[0].(map[string]any)["quantity"] != "10.5" ||
+		data["production_wip_batches"].([]any)[0].(map[string]any)["origin_rework_fact_id"] != float64(901) ||
 		data["material_requirements"].([]any)[0].(map[string]any)["production_operation_code"] != biz.ProductionWIPOperationFabricProcessing {
 		t.Fatalf("unexpected aggregate=%#v", data)
 	}

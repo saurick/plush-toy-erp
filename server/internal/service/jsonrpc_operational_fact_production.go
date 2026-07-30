@@ -61,7 +61,14 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(
+			ctx,
+			getString(pm, "customer_key"),
+			"production",
+			"production_orders",
+			"quality_inspections",
+			workflowModuleKeyTasks,
+		); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
@@ -94,7 +101,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		}
 		modules := []string{"production"}
 		if requiresSourceTask {
-			modules = append(modules, "workflow_tasks")
+			modules = append(modules, "production_orders", "quality_inspections", workflowModuleKeyTasks)
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
 			return id, res, nil
@@ -119,7 +126,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		}
 		modules := []string{"production"}
 		if requiresSourceTask {
-			modules = append(modules, workflowModuleKeyTasks)
+			modules = append(modules, "production_orders", "quality_inspections", workflowModuleKeyTasks)
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
 			return id, res, nil
@@ -208,6 +215,7 @@ func productionCompletionFromOrderCreateFromParams(pm map[string]any) (*biz.Prod
 		"fact_no",
 		"production_order_id",
 		"production_order_item_id",
+		"production_wip_batch_id",
 		"warehouse_id",
 		"lot_id",
 		"new_lot_no",
@@ -230,6 +238,7 @@ func productionCompletionFromOrderCreateFromParams(pm map[string]any) (*biz.Prod
 		FactNo:                getString(pm, "fact_no"),
 		ProductionOrderID:     getInt(pm, "production_order_id", 0),
 		ProductionOrderItemID: getInt(pm, "production_order_item_id", 0),
+		ProductionWIPBatchID:  getInt(pm, "production_wip_batch_id", 0),
 		WarehouseID:           getInt(pm, "warehouse_id", 0),
 		LotID:                 getOptionalInt(pm, "lot_id"),
 		NewLotNo:              getWorkflowStringPtr(pm, "new_lot_no"),
@@ -330,5 +339,5 @@ func productionFactToAny(item *biz.ProductionFact) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "production_order_id": optionalIntToAny(item.ProductionOrderID), "production_order_item_id": optionalIntToAny(item.ProductionOrderItemID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

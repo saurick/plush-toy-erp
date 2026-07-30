@@ -35,6 +35,7 @@ const (
 
 var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionContract{
 	{Domain: "bom", Method: "copy_bom_version", Rules: sourceReadRules(PermissionBOMRead)},
+	{Domain: "purchase_order", Method: "get_purchase_order_receipt_progress", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
 	{Domain: "purchase", Method: "create_purchase_receipt_from_purchase_order", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
 	{Domain: "purchase", Method: "add_purchase_receipt_item", Rules: sourceReadRules(PermissionPurchaseOrderRead)},
 	{Domain: "purchase", Method: "create_purchase_return_from_receipt", Rules: sourceReadRules(PermissionPurchaseReceiptRead)},

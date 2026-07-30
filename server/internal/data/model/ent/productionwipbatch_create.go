@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionorderoperation"
@@ -56,6 +57,20 @@ func (_c *ProductionWIPBatchCreate) SetSourceBatchID(v int) *ProductionWIPBatchC
 func (_c *ProductionWIPBatchCreate) SetNillableSourceBatchID(v *int) *ProductionWIPBatchCreate {
 	if v != nil {
 		_c.SetSourceBatchID(*v)
+	}
+	return _c
+}
+
+// SetOriginReworkFactID sets the "origin_rework_fact_id" field.
+func (_c *ProductionWIPBatchCreate) SetOriginReworkFactID(v int) *ProductionWIPBatchCreate {
+	_c.mutation.SetOriginReworkFactID(v)
+	return _c
+}
+
+// SetNillableOriginReworkFactID sets the "origin_rework_fact_id" field if the given value is not nil.
+func (_c *ProductionWIPBatchCreate) SetNillableOriginReworkFactID(v *int) *ProductionWIPBatchCreate {
+	if v != nil {
+		_c.SetOriginReworkFactID(*v)
 	}
 	return _c
 }
@@ -239,6 +254,26 @@ func (_c *ProductionWIPBatchCreate) SetSourceBatch(v *ProductionWIPBatch) *Produ
 	return _c.SetSourceBatchID(v.ID)
 }
 
+// SetOriginReworkFact sets the "origin_rework_fact" edge to the ProductionFact entity.
+func (_c *ProductionWIPBatchCreate) SetOriginReworkFact(v *ProductionFact) *ProductionWIPBatchCreate {
+	return _c.SetOriginReworkFactID(v.ID)
+}
+
+// AddCompletionFactIDs adds the "completion_facts" edge to the ProductionFact entity by IDs.
+func (_c *ProductionWIPBatchCreate) AddCompletionFactIDs(ids ...int) *ProductionWIPBatchCreate {
+	_c.mutation.AddCompletionFactIDs(ids...)
+	return _c
+}
+
+// AddCompletionFacts adds the "completion_facts" edges to the ProductionFact entity.
+func (_c *ProductionWIPBatchCreate) AddCompletionFacts(v ...*ProductionFact) *ProductionWIPBatchCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddCompletionFactIDs(ids...)
+}
+
 // AddEventIDs adds the "events" edge to the ProductionWIPEvent entity by IDs.
 func (_c *ProductionWIPBatchCreate) AddEventIDs(ids ...int) *ProductionWIPBatchCreate {
 	_c.mutation.AddEventIDs(ids...)
@@ -390,6 +425,11 @@ func (_c *ProductionWIPBatchCreate) check() error {
 	if v, ok := _c.mutation.SourceBatchID(); ok {
 		if err := productionwipbatch.SourceBatchIDValidator(v); err != nil {
 			return &ValidationError{Name: "source_batch_id", err: fmt.Errorf(`ent: validator failed for field "ProductionWIPBatch.source_batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.OriginReworkFactID(); ok {
+		if err := productionwipbatch.OriginReworkFactIDValidator(v); err != nil {
+			return &ValidationError{Name: "origin_rework_fact_id", err: fmt.Errorf(`ent: validator failed for field "ProductionWIPBatch.origin_rework_fact_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.BatchNo(); !ok {
@@ -615,6 +655,39 @@ func (_c *ProductionWIPBatchCreate) createSpec() (*ProductionWIPBatch, *sqlgraph
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.SourceBatchID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OriginReworkFactIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionwipbatch.OriginReworkFactTable,
+			Columns: []string{productionwipbatch.OriginReworkFactColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.OriginReworkFactID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.CompletionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionwipbatch.CompletionFactsTable,
+			Columns: []string{productionwipbatch.CompletionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.EventsIDs(); len(nodes) > 0 {

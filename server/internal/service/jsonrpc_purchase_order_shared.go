@@ -155,6 +155,56 @@ func purchaseOrderWithItemsMutationResult(ctx context.Context, d *jsonrpcDispatc
 	})}
 }
 
+func purchaseOrderReceiptProgressResult(
+	ctx context.Context,
+	d *jsonrpcDispatcher,
+	progress *biz.PurchaseOrderReceiptProgress,
+	err error,
+) *v1.JsonrpcResult {
+	if err != nil {
+		return d.mapPurchaseOrderError(ctx, err)
+	}
+	return okData(map[string]any{
+		"purchase_order_receipt_progress": purchaseOrderReceiptProgressToMap(progress),
+	})
+}
+
+func purchaseOrderReceiptProgressToMap(progress *biz.PurchaseOrderReceiptProgress) map[string]any {
+	if progress == nil {
+		return map[string]any{}
+	}
+	items := make([]any, 0, len(progress.Items))
+	for _, item := range progress.Items {
+		if item == nil {
+			continue
+		}
+		items = append(items, map[string]any{
+			"purchase_order_item_id":         item.PurchaseOrderItemID,
+			"line_no":                        item.LineNo,
+			"material_id":                    item.MaterialID,
+			"material_code":                  item.MaterialCode,
+			"material_name":                  item.MaterialName,
+			"unit_id":                        item.UnitID,
+			"unit_code":                      item.UnitCode,
+			"unit_name":                      item.UnitName,
+			"line_status":                    item.LineStatus,
+			"purchased_quantity":             item.PurchasedQuantity.String(),
+			"effective_received_quantity":    item.EffectiveReceivedQuantity.String(),
+			"draft_reserved_quantity":        item.DraftReservedQuantity.String(),
+			"remaining_receivable_quantity":  item.RemainingReceivableQuantity.String(),
+			"remaining_generatable_quantity": item.RemainingGeneratableQuantity.String(),
+			"can_generate":                   item.CanGenerate,
+			"disabled_reason":                item.DisabledReason,
+		})
+	}
+	return map[string]any{
+		"purchase_order_id": progress.PurchaseOrderID,
+		"purchase_order_no": progress.PurchaseOrderNo,
+		"lifecycle_status":  progress.LifecycleStatus,
+		"items":             items,
+	}
+}
+
 func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
 	if item == nil {
 		return map[string]any{}

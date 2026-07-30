@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 
@@ -141,6 +142,164 @@ func TestFinanceReadProjectionsPreserveExactOutstandingAmount(t *testing.T) {
 		t.Fatalf("list credit notes=%#v total=%d err=%v", listedCredits, total, err)
 	}
 	assertFinanceCreditProjection(t, listedCredits[0], fact, wantOutstanding)
+}
+
+func TestStockReservationReadProjectionUsesOneScopedAuthoritativeSnapshot(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "stock_reservation_read_projection")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	product := client.Product.GetX(ctx, fixtures.productID)
+	warehouse := client.Warehouse.GetX(ctx, fixtures.warehouseID)
+	unit := client.Unit.GetX(ctx, fixtures.unitID)
+	sku := client.ProductSKU.Create().
+		SetProductID(product.ID).
+		SetSkuCode("SKU-RESERVATION-PROJECTION").
+		SetSkuName("蓝色规格").
+		SetDefaultUnitID(unit.ID).
+		SaveX(ctx)
+	customer := client.Customer.Create().
+		SetCode("C-RESERVATION-PROJECTION").
+		SetName("库存预留投影客户").
+		SetIsActive(true).
+		SaveX(ctx)
+	order := client.SalesOrder.Create().
+		SetOrderNo("SO-RESERVATION-PROJECTION").
+		SetCustomerID(customer.ID).
+		SetCustomerSnapshot(map[string]any{"name": customer.Name}).
+		SetOrderDate(time.Now()).
+		SetLifecycleStatus(biz.SalesOrderStatusActive).
+		SaveX(ctx)
+	orderItem := client.SalesOrderItem.Create().
+		SetSalesOrderID(order.ID).
+		SetLineNo(711).
+		SetProductID(product.ID).
+		SetProductSkuID(sku.ID).
+		SetUnitID(unit.ID).
+		SetOrderedQuantity(decimal.RequireFromString("1.000002")).
+		SetLineStatus(biz.SalesOrderItemStatusOpen).
+		SaveX(ctx)
+	lot := client.InventoryLot.Create().
+		SetSubjectType(biz.InventorySubjectProduct).
+		SetSubjectID(product.ID).
+		SetProductSkuID(sku.ID).
+		SetLotNo("LOT-RESERVATION-PROJECTION").
+		SetStatus(biz.InventoryLotActive).
+		SaveX(ctx)
+	first := client.StockReservation.Create().
+		SetReservationNo("RSV-PROJECTION-A").
+		SetStatus(biz.StockReservationStatusActive).
+		SetSalesOrderID(order.ID).
+		SetSalesOrderItemID(orderItem.ID).
+		SetProductID(product.ID).
+		SetProductSkuID(sku.ID).
+		SetWarehouseID(warehouse.ID).
+		SetUnitID(unit.ID).
+		SetInventoryLotID(lot.ID).
+		SetQuantity(decimal.RequireFromString("0.000001")).
+		SetIdempotencyKey("reservation-projection-a").
+		SaveX(ctx)
+	client.StockReservation.Create().
+		SetReservationNo("RSV-PROJECTION-B").
+		SetStatus(biz.StockReservationStatusReleased).
+		SetSalesOrderID(order.ID).
+		SetSalesOrderItemID(orderItem.ID).
+		SetProductID(product.ID).
+		SetProductSkuID(sku.ID).
+		SetWarehouseID(warehouse.ID).
+		SetUnitID(unit.ID).
+		SetInventoryLotID(lot.ID).
+		SetQuantity(decimal.RequireFromString("1.000001")).
+		SetIdempotencyKey("reservation-projection-b").
+		SetReleasedAt(time.Now()).
+		SaveX(ctx)
+
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	fullScope := biz.StockReservationReadScope{
+		IncludeSalesOrderReferences: true,
+		IncludeInventoryReferences:  true,
+	}
+	items, total, err := uc.ListStockReservationsForAccess(ctx, biz.OperationalFactFilter{
+		Status: biz.StockReservationStatusActive,
+		Limit:  20,
+	}, fullScope)
+	if err != nil || total != 1 || len(items) != 1 {
+		t.Fatalf("full projection items=%#v total=%d err=%v", items, total, err)
+	}
+	got := items[0]
+	if got.ID != first.ID ||
+		got.SalesOrderNo == nil || *got.SalesOrderNo != order.OrderNo ||
+		got.SalesOrderLineNo == nil || *got.SalesOrderLineNo != orderItem.LineNo ||
+		got.ProductCode != product.Code || got.ProductName != product.Name ||
+		got.ProductSkuCode == nil || *got.ProductSkuCode != sku.SkuCode ||
+		got.ProductSkuName == nil || *got.ProductSkuName != *sku.SkuName ||
+		got.WarehouseCode != warehouse.Code || got.WarehouseName != warehouse.Name ||
+		got.UnitCode != unit.Code || got.UnitName != unit.Name ||
+		got.LotNo == nil || *got.LotNo != lot.LotNo ||
+		!got.Quantity.Equal(decimal.RequireFromString("0.000001")) {
+		t.Fatalf("unexpected full stock reservation projection: %#v", got)
+	}
+
+	redacted, total, err := uc.ListStockReservationsForAccess(ctx, biz.OperationalFactFilter{
+		Status: biz.StockReservationStatusActive,
+		Limit:  20,
+	}, biz.StockReservationReadScope{})
+	if err != nil || total != 1 || len(redacted) != 1 {
+		t.Fatalf("redacted projection items=%#v total=%d err=%v", redacted, total, err)
+	}
+	if redacted[0].SalesOrderNo != nil ||
+		redacted[0].SalesOrderLineNo != nil ||
+		redacted[0].ProductCode != "" ||
+		redacted[0].ProductSkuCode != nil ||
+		redacted[0].WarehouseCode != "" ||
+		redacted[0].UnitCode != "" ||
+		redacted[0].LotNo != nil {
+		t.Fatalf("redacted projection leaked readable references: %#v", redacted[0])
+	}
+
+	for _, keyword := range []string{
+		order.OrderNo,
+		"711",
+		product.Code,
+		product.Name,
+		sku.SkuCode,
+		*sku.SkuName,
+		warehouse.Code,
+		warehouse.Name,
+		unit.Code,
+		unit.Name,
+		lot.LotNo,
+	} {
+		found, keywordTotal, keywordErr := uc.ListStockReservationsForAccess(ctx, biz.OperationalFactFilter{
+			Keyword: keyword,
+			Limit:   20,
+		}, fullScope)
+		if keywordErr != nil || keywordTotal != 2 || len(found) != 2 {
+			t.Fatalf("keyword %q items=%#v total=%d err=%v", keyword, found, keywordTotal, keywordErr)
+		}
+	}
+	for _, hiddenKeyword := range []string{order.OrderNo, product.Code, lot.LotNo} {
+		found, keywordTotal, keywordErr := uc.ListStockReservationsForAccess(ctx, biz.OperationalFactFilter{
+			Keyword: hiddenKeyword,
+			Limit:   20,
+		}, biz.StockReservationReadScope{})
+		if keywordErr != nil || keywordTotal != 0 || len(found) != 0 {
+			t.Fatalf("redacted keyword %q items=%#v total=%d err=%v", hiddenKeyword, found, keywordTotal, keywordErr)
+		}
+	}
+	empty, emptyTotal, err := uc.ListStockReservationsForAccess(ctx, biz.OperationalFactFilter{
+		Keyword: "NO-SUCH-RESERVATION",
+		Limit:   20,
+	}, fullScope)
+	if err != nil || emptyTotal != 0 || len(empty) != 0 {
+		t.Fatalf("empty projection items=%#v total=%d err=%v", empty, emptyTotal, err)
+	}
+	paged, pagedTotal, err := uc.ListStockReservationsForAccess(ctx, biz.OperationalFactFilter{
+		Limit:  1,
+		Offset: 1,
+	}, fullScope)
+	if err != nil || pagedTotal != 2 || len(paged) != 1 || paged[0].ID != first.ID {
+		t.Fatalf("paged projection items=%#v total=%d err=%v", paged, pagedTotal, err)
+	}
 }
 
 func assertFinanceAllocationProjection(

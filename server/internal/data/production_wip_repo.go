@@ -488,7 +488,17 @@ func validateProductionWIPAggregateShape(aggregate *biz.ProductionWIPAggregate) 
 	for _, batch := range aggregate.Batches {
 		if batch.SourceBatchID != nil {
 			parent := batchByID[*batch.SourceBatchID]
-			if parent == nil || parent.ProductionOrderItemID != batch.ProductionOrderItemID {
+			if parent == nil || parent.ProductionOrderItemID != batch.ProductionOrderItemID ||
+				!sameOptionalInt(parent.OriginReworkFactID, batch.OriginReworkFactID) {
+				return biz.ErrProductionWIPInvalidRoute
+			}
+			continue
+		}
+		if batch.OriginReworkFactID != nil {
+			operation := operationByID[batch.ProductionOrderOperationID]
+			if operation == nil || operation.OperationCode != biz.ProductionWIPOperationHandwork ||
+				batch.FlowType != biz.ProductionWIPFlowRework || batch.ReworkReason == nil ||
+				strings.TrimSpace(*batch.ReworkReason) == "" {
 				return biz.ErrProductionWIPInvalidRoute
 			}
 		}
@@ -529,7 +539,8 @@ func entProductionWIPBatchToBiz(row *ent.ProductionWIPBatch) *biz.ProductionWIPB
 	return &biz.ProductionWIPBatch{
 		ID: row.ID, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID,
 		ProductionOrderOperationID: row.ProductionOrderOperationID, SourceBatchID: row.SourceBatchID,
-		BatchNo: row.BatchNo, FlowType: row.FlowType, ExecutionMode: row.ExecutionMode, Status: row.Status,
+		OriginReworkFactID: row.OriginReworkFactID,
+		BatchNo:            row.BatchNo, FlowType: row.FlowType, ExecutionMode: row.ExecutionMode, Status: row.Status,
 		Version: row.Version, Quantity: row.Quantity,
 		ReworkReason: row.ReworkReason, CreatedBy: row.CreatedBy, StartedAt: row.StartedAt, CompletedAt: row.CompletedAt,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
@@ -645,7 +656,8 @@ func (r *productionOrderRepo) ApplyProductionWIPCommand(ctx context.Context, in 
 		}
 		return nil, err
 	}
-	if orderRow.Status != biz.ProductionOrderStatusReleased {
+	if orderRow.Status != biz.ProductionOrderStatusReleased &&
+		(orderRow.Status != biz.ProductionOrderStatusClosed || preflightBatch.OriginReworkFactID == nil) {
 		return nil, biz.ErrProductionWIPInvalidTransition
 	}
 	batchRow, err := tx.client.ProductionWIPBatch.Get(ctx, in.BatchID)
@@ -657,6 +669,14 @@ func (r *productionOrderRepo) ApplyProductionWIPCommand(ctx context.Context, in 
 	}
 	if batchRow.ProductionOrderID != in.ProductionOrderID || batchRow.ProductionOrderItemID != preflightBatch.ProductionOrderItemID || batchRow.Version != in.ExpectedVersion {
 		return nil, biz.ErrProductionWIPInvalidTransition
+	}
+	if batchRow.OriginReworkFactID != nil {
+		if in.Action == biz.ProductionWIPActionCancelBatch {
+			return nil, biz.ErrProductionWIPInvalidTransition
+		}
+		if err := validateProductionReworkOriginForBatch(ctx, tx.client, batchRow); err != nil {
+			return nil, err
+		}
 	}
 	operationRow, err := tx.client.ProductionOrderOperation.Get(ctx, batchRow.ProductionOrderOperationID)
 	if err != nil {
@@ -972,6 +992,7 @@ func createProductionWIPChildBatch(
 		SetProductionOrderItemID(parent.ProductionOrderItemID).
 		SetProductionOrderOperationID(targetOperationID).
 		SetSourceBatchID(parent.ID).
+		SetNillableOriginReworkFactID(parent.OriginReworkFactID).
 		SetBatchNo(batchNo).
 		SetFlowType(flowType).
 		SetStatus(biz.ProductionWIPStatusPlanned).

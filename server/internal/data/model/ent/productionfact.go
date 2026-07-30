@@ -7,6 +7,7 @@ import (
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
@@ -51,6 +52,8 @@ type ProductionFact struct {
 	SourceID *int `json:"source_id,omitempty"`
 	// SourceLineID holds the value of the "source_line_id" field.
 	SourceLineID *int `json:"source_line_id,omitempty"`
+	// ProductionWipBatchID holds the value of the "production_wip_batch_id" field.
+	ProductionWipBatchID *int `json:"production_wip_batch_id,omitempty"`
 	// IdempotencyKey holds the value of the "idempotency_key" field.
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 	// OccurredAt holds the value of the "occurred_at" field.
@@ -89,13 +92,17 @@ type ProductionFactEdges struct {
 	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// InventoryLot holds the value of the inventory_lot edge.
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
+	// ProductionWipBatch holds the value of the production_wip_batch edge.
+	ProductionWipBatch *ProductionWIPBatch `json:"production_wip_batch,omitempty"`
+	// OriginReworkBatches holds the value of the origin_rework_batches edge.
+	OriginReworkBatches []*ProductionWIPBatch `json:"origin_rework_batches,omitempty"`
 	// Poster holds the value of the poster edge.
 	Poster *AdminUser `json:"poster,omitempty"`
 	// Canceller holds the value of the canceller edge.
 	Canceller *AdminUser `json:"canceller,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [8]bool
 }
 
 // WarehouseOrErr returns the Warehouse value or an error if the edge
@@ -142,12 +149,32 @@ func (e ProductionFactEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	return nil, &NotLoadedError{edge: "inventory_lot"}
 }
 
+// ProductionWipBatchOrErr returns the ProductionWipBatch value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ProductionFactEdges) ProductionWipBatchOrErr() (*ProductionWIPBatch, error) {
+	if e.ProductionWipBatch != nil {
+		return e.ProductionWipBatch, nil
+	} else if e.loadedTypes[4] {
+		return nil, &NotFoundError{label: productionwipbatch.Label}
+	}
+	return nil, &NotLoadedError{edge: "production_wip_batch"}
+}
+
+// OriginReworkBatchesOrErr returns the OriginReworkBatches value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionFactEdges) OriginReworkBatchesOrErr() ([]*ProductionWIPBatch, error) {
+	if e.loadedTypes[5] {
+		return e.OriginReworkBatches, nil
+	}
+	return nil, &NotLoadedError{edge: "origin_rework_batches"}
+}
+
 // PosterOrErr returns the Poster value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e ProductionFactEdges) PosterOrErr() (*AdminUser, error) {
 	if e.Poster != nil {
 		return e.Poster, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[6] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "poster"}
@@ -158,7 +185,7 @@ func (e ProductionFactEdges) PosterOrErr() (*AdminUser, error) {
 func (e ProductionFactEdges) CancellerOrErr() (*AdminUser, error) {
 	if e.Canceller != nil {
 		return e.Canceller, nil
-	} else if e.loadedTypes[5] {
+	} else if e.loadedTypes[7] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "canceller"}
@@ -173,7 +200,7 @@ func (*ProductionFact) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case productionfact.FieldOccurredAtSpecified:
 			values[i] = new(sql.NullBool)
-		case productionfact.FieldID, productionfact.FieldVersion, productionfact.FieldSubjectID, productionfact.FieldProductSkuID, productionfact.FieldWarehouseID, productionfact.FieldUnitID, productionfact.FieldLotID, productionfact.FieldSourceID, productionfact.FieldSourceLineID, productionfact.FieldPostedBy, productionfact.FieldCancelledBy:
+		case productionfact.FieldID, productionfact.FieldVersion, productionfact.FieldSubjectID, productionfact.FieldProductSkuID, productionfact.FieldWarehouseID, productionfact.FieldUnitID, productionfact.FieldLotID, productionfact.FieldSourceID, productionfact.FieldSourceLineID, productionfact.FieldProductionWipBatchID, productionfact.FieldPostedBy, productionfact.FieldCancelledBy:
 			values[i] = new(sql.NullInt64)
 		case productionfact.FieldFactNo, productionfact.FieldFactType, productionfact.FieldStatus, productionfact.FieldSubjectType, productionfact.FieldSourceType, productionfact.FieldIdempotencyKey, productionfact.FieldCancelReason, productionfact.FieldNote:
 			values[i] = new(sql.NullString)
@@ -289,6 +316,13 @@ func (_m *ProductionFact) assignValues(columns []string, values []any) error {
 				_m.SourceLineID = new(int)
 				*_m.SourceLineID = int(value.Int64)
 			}
+		case productionfact.FieldProductionWipBatchID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field production_wip_batch_id", values[i])
+			} else if value.Valid {
+				_m.ProductionWipBatchID = new(int)
+				*_m.ProductionWipBatchID = int(value.Int64)
+			}
 		case productionfact.FieldIdempotencyKey:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field idempotency_key", values[i])
@@ -394,6 +428,16 @@ func (_m *ProductionFact) QueryInventoryLot() *InventoryLotQuery {
 	return NewProductionFactClient(_m.config).QueryInventoryLot(_m)
 }
 
+// QueryProductionWipBatch queries the "production_wip_batch" edge of the ProductionFact entity.
+func (_m *ProductionFact) QueryProductionWipBatch() *ProductionWIPBatchQuery {
+	return NewProductionFactClient(_m.config).QueryProductionWipBatch(_m)
+}
+
+// QueryOriginReworkBatches queries the "origin_rework_batches" edge of the ProductionFact entity.
+func (_m *ProductionFact) QueryOriginReworkBatches() *ProductionWIPBatchQuery {
+	return NewProductionFactClient(_m.config).QueryOriginReworkBatches(_m)
+}
+
 // QueryPoster queries the "poster" edge of the ProductionFact entity.
 func (_m *ProductionFact) QueryPoster() *AdminUserQuery {
 	return NewProductionFactClient(_m.config).QueryPoster(_m)
@@ -476,6 +520,11 @@ func (_m *ProductionFact) String() string {
 	builder.WriteString(", ")
 	if v := _m.SourceLineID; v != nil {
 		builder.WriteString("source_line_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ProductionWipBatchID; v != nil {
+		builder.WriteString("production_wip_batch_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

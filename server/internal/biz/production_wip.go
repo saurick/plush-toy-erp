@@ -132,6 +132,7 @@ type ProductionWIPBatch struct {
 	ProductionOrderItemID      int
 	ProductionOrderOperationID int
 	SourceBatchID              *int
+	OriginReworkFactID         *int
 	BatchNo                    string
 	FlowType                   string
 	ExecutionMode              *string

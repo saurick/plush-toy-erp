@@ -1163,13 +1163,37 @@ func purchaseOrderItemRemainingQuantities(ctx context.Context, client *ent.Clien
 		remaining[item.ID] = item.PurchasedQuantity
 		itemIDs = append(itemIDs, item.ID)
 	}
+	if len(itemIDs) == 0 {
+		return remaining, nil
+	}
 	receivedByItemID, err := purchaseOrderEffectiveReceivedQuantities(ctx, client, itemIDs, 0, 0)
 	if err != nil {
 		return nil, err
 	}
+	draftReservedByItemID, err := purchaseOrderDraftReservedQuantities(ctx, client, itemIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, itemID := range itemIDs {
+		remaining[itemID] = remaining[itemID].
+			Sub(receivedByItemID[itemID]).
+			Sub(draftReservedByItemID[itemID])
+	}
+	return remaining, nil
+}
+
+func purchaseOrderDraftReservedQuantities(
+	ctx context.Context,
+	client *ent.Client,
+	orderItemIDs []int,
+) (map[int]decimal.Decimal, error) {
+	reservedByItemID := make(map[int]decimal.Decimal, len(orderItemIDs))
+	if len(orderItemIDs) == 0 {
+		return reservedByItemID, nil
+	}
 	draftItems, err := client.PurchaseReceiptItem.Query().
 		Where(
-			purchasereceiptitem.PurchaseOrderItemIDIn(itemIDs...),
+			purchasereceiptitem.PurchaseOrderItemIDIn(orderItemIDs...),
 			purchasereceiptitem.HasReceiptWith(
 				purchasereceipt.Status(biz.PurchaseReceiptStatusDraft),
 			),
@@ -1183,12 +1207,9 @@ func purchaseOrderItemRemainingQuantities(ctx context.Context, client *ent.Clien
 			continue
 		}
 		itemID := *draftItem.PurchaseOrderItemID
-		receivedByItemID[itemID] = receivedByItemID[itemID].Add(draftItem.Quantity)
+		reservedByItemID[itemID] = reservedByItemID[itemID].Add(draftItem.Quantity)
 	}
-	for itemID, received := range receivedByItemID {
-		remaining[itemID] = remaining[itemID].Sub(received)
-	}
-	return remaining, nil
+	return reservedByItemID, nil
 }
 
 func validatePurchaseOrderReceiptQuantities(ctx context.Context, tx *inventoryDBTx, receiptID int, items []*ent.PurchaseReceiptItem) error {

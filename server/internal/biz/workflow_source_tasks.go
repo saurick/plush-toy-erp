@@ -178,7 +178,7 @@ func BuildProductionExceptionSourceTask(source ProductionExceptionSourceTaskInpu
 		"occurred_at":               source.OccurredAt.UTC().Unix(),
 		"handling_note":             source.Reason,
 		"business_status_reason":    source.Reason,
-		"complete_condition":        "记录异常处理结论；返工、报废或库存调整仍须在对应业务页面办理。",
+		"complete_condition":        "记录异常处理结论，并在生产订单中完成系统已创建的返工批次、质量检验、包装和补完工；完成任务本身不等于返工完成。",
 		"entry_path":                "/erp/production/progress",
 		"notification_type":         "task_created",
 		"alert_type":                "rework_pending",

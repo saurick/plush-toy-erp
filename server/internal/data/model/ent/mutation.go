@@ -48512,48 +48512,53 @@ func (m *ProductionExceptionDecisionMutation) ResetEdge(name string) error {
 // ProductionFactMutation represents an operation that mutates the ProductionFact nodes in the graph.
 type ProductionFactMutation struct {
 	config
-	op                    Op
-	typ                   string
-	id                    *int
-	fact_no               *string
-	fact_type             *string
-	status                *string
-	version               *int
-	addversion            *int
-	subject_type          *string
-	subject_id            *int
-	addsubject_id         *int
-	quantity              *decimal.Decimal
-	source_type           *string
-	source_id             *int
-	addsource_id          *int
-	source_line_id        *int
-	addsource_line_id     *int
-	idempotency_key       *string
-	occurred_at           *time.Time
-	occurred_at_specified *bool
-	posted_at             *time.Time
-	cancelled_at          *time.Time
-	cancel_reason         *string
-	note                  *string
-	created_at            *time.Time
-	updated_at            *time.Time
-	clearedFields         map[string]struct{}
-	warehouse             *int
-	clearedwarehouse      bool
-	unit                  *int
-	clearedunit           bool
-	product_sku           *int
-	clearedproduct_sku    bool
-	inventory_lot         *int
-	clearedinventory_lot  bool
-	poster                *int
-	clearedposter         bool
-	canceller             *int
-	clearedcanceller      bool
-	done                  bool
-	oldValue              func(context.Context) (*ProductionFact, error)
-	predicates            []predicate.ProductionFact
+	op                           Op
+	typ                          string
+	id                           *int
+	fact_no                      *string
+	fact_type                    *string
+	status                       *string
+	version                      *int
+	addversion                   *int
+	subject_type                 *string
+	subject_id                   *int
+	addsubject_id                *int
+	quantity                     *decimal.Decimal
+	source_type                  *string
+	source_id                    *int
+	addsource_id                 *int
+	source_line_id               *int
+	addsource_line_id            *int
+	idempotency_key              *string
+	occurred_at                  *time.Time
+	occurred_at_specified        *bool
+	posted_at                    *time.Time
+	cancelled_at                 *time.Time
+	cancel_reason                *string
+	note                         *string
+	created_at                   *time.Time
+	updated_at                   *time.Time
+	clearedFields                map[string]struct{}
+	warehouse                    *int
+	clearedwarehouse             bool
+	unit                         *int
+	clearedunit                  bool
+	product_sku                  *int
+	clearedproduct_sku           bool
+	inventory_lot                *int
+	clearedinventory_lot         bool
+	production_wip_batch         *int
+	clearedproduction_wip_batch  bool
+	origin_rework_batches        map[int]struct{}
+	removedorigin_rework_batches map[int]struct{}
+	clearedorigin_rework_batches bool
+	poster                       *int
+	clearedposter                bool
+	canceller                    *int
+	clearedcanceller             bool
+	done                         bool
+	oldValue                     func(context.Context) (*ProductionFact, error)
+	predicates                   []predicate.ProductionFact
 }
 
 var _ ent.Mutation = (*ProductionFactMutation)(nil)
@@ -49305,6 +49310,55 @@ func (m *ProductionFactMutation) ResetSourceLineID() {
 	delete(m.clearedFields, productionfact.FieldSourceLineID)
 }
 
+// SetProductionWipBatchID sets the "production_wip_batch_id" field.
+func (m *ProductionFactMutation) SetProductionWipBatchID(i int) {
+	m.production_wip_batch = &i
+}
+
+// ProductionWipBatchID returns the value of the "production_wip_batch_id" field in the mutation.
+func (m *ProductionFactMutation) ProductionWipBatchID() (r int, exists bool) {
+	v := m.production_wip_batch
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProductionWipBatchID returns the old "production_wip_batch_id" field's value of the ProductionFact entity.
+// If the ProductionFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionFactMutation) OldProductionWipBatchID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProductionWipBatchID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProductionWipBatchID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProductionWipBatchID: %w", err)
+	}
+	return oldValue.ProductionWipBatchID, nil
+}
+
+// ClearProductionWipBatchID clears the value of the "production_wip_batch_id" field.
+func (m *ProductionFactMutation) ClearProductionWipBatchID() {
+	m.production_wip_batch = nil
+	m.clearedFields[productionfact.FieldProductionWipBatchID] = struct{}{}
+}
+
+// ProductionWipBatchIDCleared returns if the "production_wip_batch_id" field was cleared in this mutation.
+func (m *ProductionFactMutation) ProductionWipBatchIDCleared() bool {
+	_, ok := m.clearedFields[productionfact.FieldProductionWipBatchID]
+	return ok
+}
+
+// ResetProductionWipBatchID resets all changes to the "production_wip_batch_id" field.
+func (m *ProductionFactMutation) ResetProductionWipBatchID() {
+	m.production_wip_batch = nil
+	delete(m.clearedFields, productionfact.FieldProductionWipBatchID)
+}
+
 // SetIdempotencyKey sets the "idempotency_key" field.
 func (m *ProductionFactMutation) SetIdempotencyKey(s string) {
 	m.idempotency_key = &s
@@ -49900,6 +49954,87 @@ func (m *ProductionFactMutation) ResetInventoryLot() {
 	m.clearedinventory_lot = false
 }
 
+// ClearProductionWipBatch clears the "production_wip_batch" edge to the ProductionWIPBatch entity.
+func (m *ProductionFactMutation) ClearProductionWipBatch() {
+	m.clearedproduction_wip_batch = true
+	m.clearedFields[productionfact.FieldProductionWipBatchID] = struct{}{}
+}
+
+// ProductionWipBatchCleared reports if the "production_wip_batch" edge to the ProductionWIPBatch entity was cleared.
+func (m *ProductionFactMutation) ProductionWipBatchCleared() bool {
+	return m.ProductionWipBatchIDCleared() || m.clearedproduction_wip_batch
+}
+
+// ProductionWipBatchIDs returns the "production_wip_batch" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProductionWipBatchID instead. It exists only for internal usage by the builders.
+func (m *ProductionFactMutation) ProductionWipBatchIDs() (ids []int) {
+	if id := m.production_wip_batch; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProductionWipBatch resets all changes to the "production_wip_batch" edge.
+func (m *ProductionFactMutation) ResetProductionWipBatch() {
+	m.production_wip_batch = nil
+	m.clearedproduction_wip_batch = false
+}
+
+// AddOriginReworkBatchIDs adds the "origin_rework_batches" edge to the ProductionWIPBatch entity by ids.
+func (m *ProductionFactMutation) AddOriginReworkBatchIDs(ids ...int) {
+	if m.origin_rework_batches == nil {
+		m.origin_rework_batches = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.origin_rework_batches[ids[i]] = struct{}{}
+	}
+}
+
+// ClearOriginReworkBatches clears the "origin_rework_batches" edge to the ProductionWIPBatch entity.
+func (m *ProductionFactMutation) ClearOriginReworkBatches() {
+	m.clearedorigin_rework_batches = true
+}
+
+// OriginReworkBatchesCleared reports if the "origin_rework_batches" edge to the ProductionWIPBatch entity was cleared.
+func (m *ProductionFactMutation) OriginReworkBatchesCleared() bool {
+	return m.clearedorigin_rework_batches
+}
+
+// RemoveOriginReworkBatchIDs removes the "origin_rework_batches" edge to the ProductionWIPBatch entity by IDs.
+func (m *ProductionFactMutation) RemoveOriginReworkBatchIDs(ids ...int) {
+	if m.removedorigin_rework_batches == nil {
+		m.removedorigin_rework_batches = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.origin_rework_batches, ids[i])
+		m.removedorigin_rework_batches[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedOriginReworkBatches returns the removed IDs of the "origin_rework_batches" edge to the ProductionWIPBatch entity.
+func (m *ProductionFactMutation) RemovedOriginReworkBatchesIDs() (ids []int) {
+	for id := range m.removedorigin_rework_batches {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// OriginReworkBatchesIDs returns the "origin_rework_batches" edge IDs in the mutation.
+func (m *ProductionFactMutation) OriginReworkBatchesIDs() (ids []int) {
+	for id := range m.origin_rework_batches {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetOriginReworkBatches resets all changes to the "origin_rework_batches" edge.
+func (m *ProductionFactMutation) ResetOriginReworkBatches() {
+	m.origin_rework_batches = nil
+	m.clearedorigin_rework_batches = false
+	m.removedorigin_rework_batches = nil
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by id.
 func (m *ProductionFactMutation) SetPosterID(id int) {
 	m.poster = &id
@@ -50014,7 +50149,7 @@ func (m *ProductionFactMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductionFactMutation) Fields() []string {
-	fields := make([]string, 0, 25)
+	fields := make([]string, 0, 26)
 	if m.fact_no != nil {
 		fields = append(fields, productionfact.FieldFactNo)
 	}
@@ -50056,6 +50191,9 @@ func (m *ProductionFactMutation) Fields() []string {
 	}
 	if m.source_line_id != nil {
 		fields = append(fields, productionfact.FieldSourceLineID)
+	}
+	if m.production_wip_batch != nil {
+		fields = append(fields, productionfact.FieldProductionWipBatchID)
 	}
 	if m.idempotency_key != nil {
 		fields = append(fields, productionfact.FieldIdempotencyKey)
@@ -50126,6 +50264,8 @@ func (m *ProductionFactMutation) Field(name string) (ent.Value, bool) {
 		return m.SourceID()
 	case productionfact.FieldSourceLineID:
 		return m.SourceLineID()
+	case productionfact.FieldProductionWipBatchID:
+		return m.ProductionWipBatchID()
 	case productionfact.FieldIdempotencyKey:
 		return m.IdempotencyKey()
 	case productionfact.FieldOccurredAt:
@@ -50185,6 +50325,8 @@ func (m *ProductionFactMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldSourceID(ctx)
 	case productionfact.FieldSourceLineID:
 		return m.OldSourceLineID(ctx)
+	case productionfact.FieldProductionWipBatchID:
+		return m.OldProductionWipBatchID(ctx)
 	case productionfact.FieldIdempotencyKey:
 		return m.OldIdempotencyKey(ctx)
 	case productionfact.FieldOccurredAt:
@@ -50313,6 +50455,13 @@ func (m *ProductionFactMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSourceLineID(v)
+		return nil
+	case productionfact.FieldProductionWipBatchID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProductionWipBatchID(v)
 		return nil
 	case productionfact.FieldIdempotencyKey:
 		v, ok := value.(string)
@@ -50487,6 +50636,9 @@ func (m *ProductionFactMutation) ClearedFields() []string {
 	if m.FieldCleared(productionfact.FieldSourceLineID) {
 		fields = append(fields, productionfact.FieldSourceLineID)
 	}
+	if m.FieldCleared(productionfact.FieldProductionWipBatchID) {
+		fields = append(fields, productionfact.FieldProductionWipBatchID)
+	}
 	if m.FieldCleared(productionfact.FieldPostedAt) {
 		fields = append(fields, productionfact.FieldPostedAt)
 	}
@@ -50533,6 +50685,9 @@ func (m *ProductionFactMutation) ClearField(name string) error {
 		return nil
 	case productionfact.FieldSourceLineID:
 		m.ClearSourceLineID()
+		return nil
+	case productionfact.FieldProductionWipBatchID:
+		m.ClearProductionWipBatchID()
 		return nil
 	case productionfact.FieldPostedAt:
 		m.ClearPostedAt()
@@ -50602,6 +50757,9 @@ func (m *ProductionFactMutation) ResetField(name string) error {
 	case productionfact.FieldSourceLineID:
 		m.ResetSourceLineID()
 		return nil
+	case productionfact.FieldProductionWipBatchID:
+		m.ResetProductionWipBatchID()
+		return nil
 	case productionfact.FieldIdempotencyKey:
 		m.ResetIdempotencyKey()
 		return nil
@@ -50641,7 +50799,7 @@ func (m *ProductionFactMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProductionFactMutation) AddedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 8)
 	if m.warehouse != nil {
 		edges = append(edges, productionfact.EdgeWarehouse)
 	}
@@ -50653,6 +50811,12 @@ func (m *ProductionFactMutation) AddedEdges() []string {
 	}
 	if m.inventory_lot != nil {
 		edges = append(edges, productionfact.EdgeInventoryLot)
+	}
+	if m.production_wip_batch != nil {
+		edges = append(edges, productionfact.EdgeProductionWipBatch)
+	}
+	if m.origin_rework_batches != nil {
+		edges = append(edges, productionfact.EdgeOriginReworkBatches)
 	}
 	if m.poster != nil {
 		edges = append(edges, productionfact.EdgePoster)
@@ -50683,6 +50847,16 @@ func (m *ProductionFactMutation) AddedIDs(name string) []ent.Value {
 		if id := m.inventory_lot; id != nil {
 			return []ent.Value{*id}
 		}
+	case productionfact.EdgeProductionWipBatch:
+		if id := m.production_wip_batch; id != nil {
+			return []ent.Value{*id}
+		}
+	case productionfact.EdgeOriginReworkBatches:
+		ids := make([]ent.Value, 0, len(m.origin_rework_batches))
+		for id := range m.origin_rework_batches {
+			ids = append(ids, id)
+		}
+		return ids
 	case productionfact.EdgePoster:
 		if id := m.poster; id != nil {
 			return []ent.Value{*id}
@@ -50697,19 +50871,30 @@ func (m *ProductionFactMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProductionFactMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 8)
+	if m.removedorigin_rework_batches != nil {
+		edges = append(edges, productionfact.EdgeOriginReworkBatches)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *ProductionFactMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case productionfact.EdgeOriginReworkBatches:
+		ids := make([]ent.Value, 0, len(m.removedorigin_rework_batches))
+		for id := range m.removedorigin_rework_batches {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProductionFactMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 8)
 	if m.clearedwarehouse {
 		edges = append(edges, productionfact.EdgeWarehouse)
 	}
@@ -50721,6 +50906,12 @@ func (m *ProductionFactMutation) ClearedEdges() []string {
 	}
 	if m.clearedinventory_lot {
 		edges = append(edges, productionfact.EdgeInventoryLot)
+	}
+	if m.clearedproduction_wip_batch {
+		edges = append(edges, productionfact.EdgeProductionWipBatch)
+	}
+	if m.clearedorigin_rework_batches {
+		edges = append(edges, productionfact.EdgeOriginReworkBatches)
 	}
 	if m.clearedposter {
 		edges = append(edges, productionfact.EdgePoster)
@@ -50743,6 +50934,10 @@ func (m *ProductionFactMutation) EdgeCleared(name string) bool {
 		return m.clearedproduct_sku
 	case productionfact.EdgeInventoryLot:
 		return m.clearedinventory_lot
+	case productionfact.EdgeProductionWipBatch:
+		return m.clearedproduction_wip_batch
+	case productionfact.EdgeOriginReworkBatches:
+		return m.clearedorigin_rework_batches
 	case productionfact.EdgePoster:
 		return m.clearedposter
 	case productionfact.EdgeCanceller:
@@ -50766,6 +50961,9 @@ func (m *ProductionFactMutation) ClearEdge(name string) error {
 		return nil
 	case productionfact.EdgeInventoryLot:
 		m.ClearInventoryLot()
+		return nil
+	case productionfact.EdgeProductionWipBatch:
+		m.ClearProductionWipBatch()
 		return nil
 	case productionfact.EdgePoster:
 		m.ClearPoster()
@@ -50792,6 +50990,12 @@ func (m *ProductionFactMutation) ResetEdge(name string) error {
 		return nil
 	case productionfact.EdgeInventoryLot:
 		m.ResetInventoryLot()
+		return nil
+	case productionfact.EdgeProductionWipBatch:
+		m.ResetProductionWipBatch()
+		return nil
+	case productionfact.EdgeOriginReworkBatches:
+		m.ResetOriginReworkBatches()
 		return nil
 	case productionfact.EdgePoster:
 		m.ResetPoster()
@@ -60415,6 +60619,11 @@ type ProductionWIPBatchMutation struct {
 	clearedchild_batches              bool
 	source_batch                      *int
 	clearedsource_batch               bool
+	origin_rework_fact                *int
+	clearedorigin_rework_fact         bool
+	completion_facts                  map[int]struct{}
+	removedcompletion_facts           map[int]struct{}
+	clearedcompletion_facts           bool
 	events                            map[int]struct{}
 	removedevents                     map[int]struct{}
 	clearedevents                     bool
@@ -60684,6 +60893,55 @@ func (m *ProductionWIPBatchMutation) SourceBatchIDCleared() bool {
 func (m *ProductionWIPBatchMutation) ResetSourceBatchID() {
 	m.source_batch = nil
 	delete(m.clearedFields, productionwipbatch.FieldSourceBatchID)
+}
+
+// SetOriginReworkFactID sets the "origin_rework_fact_id" field.
+func (m *ProductionWIPBatchMutation) SetOriginReworkFactID(i int) {
+	m.origin_rework_fact = &i
+}
+
+// OriginReworkFactID returns the value of the "origin_rework_fact_id" field in the mutation.
+func (m *ProductionWIPBatchMutation) OriginReworkFactID() (r int, exists bool) {
+	v := m.origin_rework_fact
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOriginReworkFactID returns the old "origin_rework_fact_id" field's value of the ProductionWIPBatch entity.
+// If the ProductionWIPBatch object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionWIPBatchMutation) OldOriginReworkFactID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOriginReworkFactID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOriginReworkFactID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOriginReworkFactID: %w", err)
+	}
+	return oldValue.OriginReworkFactID, nil
+}
+
+// ClearOriginReworkFactID clears the value of the "origin_rework_fact_id" field.
+func (m *ProductionWIPBatchMutation) ClearOriginReworkFactID() {
+	m.origin_rework_fact = nil
+	m.clearedFields[productionwipbatch.FieldOriginReworkFactID] = struct{}{}
+}
+
+// OriginReworkFactIDCleared returns if the "origin_rework_fact_id" field was cleared in this mutation.
+func (m *ProductionWIPBatchMutation) OriginReworkFactIDCleared() bool {
+	_, ok := m.clearedFields[productionwipbatch.FieldOriginReworkFactID]
+	return ok
+}
+
+// ResetOriginReworkFactID resets all changes to the "origin_rework_fact_id" field.
+func (m *ProductionWIPBatchMutation) ResetOriginReworkFactID() {
+	m.origin_rework_fact = nil
+	delete(m.clearedFields, productionwipbatch.FieldOriginReworkFactID)
 }
 
 // SetBatchNo sets the "batch_no" field.
@@ -61352,6 +61610,87 @@ func (m *ProductionWIPBatchMutation) ResetSourceBatch() {
 	m.clearedsource_batch = false
 }
 
+// ClearOriginReworkFact clears the "origin_rework_fact" edge to the ProductionFact entity.
+func (m *ProductionWIPBatchMutation) ClearOriginReworkFact() {
+	m.clearedorigin_rework_fact = true
+	m.clearedFields[productionwipbatch.FieldOriginReworkFactID] = struct{}{}
+}
+
+// OriginReworkFactCleared reports if the "origin_rework_fact" edge to the ProductionFact entity was cleared.
+func (m *ProductionWIPBatchMutation) OriginReworkFactCleared() bool {
+	return m.OriginReworkFactIDCleared() || m.clearedorigin_rework_fact
+}
+
+// OriginReworkFactIDs returns the "origin_rework_fact" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// OriginReworkFactID instead. It exists only for internal usage by the builders.
+func (m *ProductionWIPBatchMutation) OriginReworkFactIDs() (ids []int) {
+	if id := m.origin_rework_fact; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetOriginReworkFact resets all changes to the "origin_rework_fact" edge.
+func (m *ProductionWIPBatchMutation) ResetOriginReworkFact() {
+	m.origin_rework_fact = nil
+	m.clearedorigin_rework_fact = false
+}
+
+// AddCompletionFactIDs adds the "completion_facts" edge to the ProductionFact entity by ids.
+func (m *ProductionWIPBatchMutation) AddCompletionFactIDs(ids ...int) {
+	if m.completion_facts == nil {
+		m.completion_facts = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.completion_facts[ids[i]] = struct{}{}
+	}
+}
+
+// ClearCompletionFacts clears the "completion_facts" edge to the ProductionFact entity.
+func (m *ProductionWIPBatchMutation) ClearCompletionFacts() {
+	m.clearedcompletion_facts = true
+}
+
+// CompletionFactsCleared reports if the "completion_facts" edge to the ProductionFact entity was cleared.
+func (m *ProductionWIPBatchMutation) CompletionFactsCleared() bool {
+	return m.clearedcompletion_facts
+}
+
+// RemoveCompletionFactIDs removes the "completion_facts" edge to the ProductionFact entity by IDs.
+func (m *ProductionWIPBatchMutation) RemoveCompletionFactIDs(ids ...int) {
+	if m.removedcompletion_facts == nil {
+		m.removedcompletion_facts = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.completion_facts, ids[i])
+		m.removedcompletion_facts[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedCompletionFacts returns the removed IDs of the "completion_facts" edge to the ProductionFact entity.
+func (m *ProductionWIPBatchMutation) RemovedCompletionFactsIDs() (ids []int) {
+	for id := range m.removedcompletion_facts {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// CompletionFactsIDs returns the "completion_facts" edge IDs in the mutation.
+func (m *ProductionWIPBatchMutation) CompletionFactsIDs() (ids []int) {
+	for id := range m.completion_facts {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetCompletionFacts resets all changes to the "completion_facts" edge.
+func (m *ProductionWIPBatchMutation) ResetCompletionFacts() {
+	m.completion_facts = nil
+	m.clearedcompletion_facts = false
+	m.removedcompletion_facts = nil
+}
+
 // AddEventIDs adds the "events" edge to the ProductionWIPEvent entity by ids.
 func (m *ProductionWIPBatchMutation) AddEventIDs(ids ...int) {
 	if m.events == nil {
@@ -61588,7 +61927,7 @@ func (m *ProductionWIPBatchMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductionWIPBatchMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 17)
 	if m.production_order != nil {
 		fields = append(fields, productionwipbatch.FieldProductionOrderID)
 	}
@@ -61600,6 +61939,9 @@ func (m *ProductionWIPBatchMutation) Fields() []string {
 	}
 	if m.source_batch != nil {
 		fields = append(fields, productionwipbatch.FieldSourceBatchID)
+	}
+	if m.origin_rework_fact != nil {
+		fields = append(fields, productionwipbatch.FieldOriginReworkFactID)
 	}
 	if m.batch_no != nil {
 		fields = append(fields, productionwipbatch.FieldBatchNo)
@@ -61653,6 +61995,8 @@ func (m *ProductionWIPBatchMutation) Field(name string) (ent.Value, bool) {
 		return m.ProductionOrderOperationID()
 	case productionwipbatch.FieldSourceBatchID:
 		return m.SourceBatchID()
+	case productionwipbatch.FieldOriginReworkFactID:
+		return m.OriginReworkFactID()
 	case productionwipbatch.FieldBatchNo:
 		return m.BatchNo()
 	case productionwipbatch.FieldFlowType:
@@ -61694,6 +62038,8 @@ func (m *ProductionWIPBatchMutation) OldField(ctx context.Context, name string) 
 		return m.OldProductionOrderOperationID(ctx)
 	case productionwipbatch.FieldSourceBatchID:
 		return m.OldSourceBatchID(ctx)
+	case productionwipbatch.FieldOriginReworkFactID:
+		return m.OldOriginReworkFactID(ctx)
 	case productionwipbatch.FieldBatchNo:
 		return m.OldBatchNo(ctx)
 	case productionwipbatch.FieldFlowType:
@@ -61754,6 +62100,13 @@ func (m *ProductionWIPBatchMutation) SetField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSourceBatchID(v)
+		return nil
+	case productionwipbatch.FieldOriginReworkFactID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOriginReworkFactID(v)
 		return nil
 	case productionwipbatch.FieldBatchNo:
 		v, ok := value.(string)
@@ -61887,6 +62240,9 @@ func (m *ProductionWIPBatchMutation) ClearedFields() []string {
 	if m.FieldCleared(productionwipbatch.FieldSourceBatchID) {
 		fields = append(fields, productionwipbatch.FieldSourceBatchID)
 	}
+	if m.FieldCleared(productionwipbatch.FieldOriginReworkFactID) {
+		fields = append(fields, productionwipbatch.FieldOriginReworkFactID)
+	}
 	if m.FieldCleared(productionwipbatch.FieldExecutionMode) {
 		fields = append(fields, productionwipbatch.FieldExecutionMode)
 	}
@@ -61915,6 +62271,9 @@ func (m *ProductionWIPBatchMutation) ClearField(name string) error {
 	switch name {
 	case productionwipbatch.FieldSourceBatchID:
 		m.ClearSourceBatchID()
+		return nil
+	case productionwipbatch.FieldOriginReworkFactID:
+		m.ClearOriginReworkFactID()
 		return nil
 	case productionwipbatch.FieldExecutionMode:
 		m.ClearExecutionMode()
@@ -61947,6 +62306,9 @@ func (m *ProductionWIPBatchMutation) ResetField(name string) error {
 		return nil
 	case productionwipbatch.FieldSourceBatchID:
 		m.ResetSourceBatchID()
+		return nil
+	case productionwipbatch.FieldOriginReworkFactID:
+		m.ResetOriginReworkFactID()
 		return nil
 	case productionwipbatch.FieldBatchNo:
 		m.ResetBatchNo()
@@ -61990,7 +62352,7 @@ func (m *ProductionWIPBatchMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProductionWIPBatchMutation) AddedEdges() []string {
-	edges := make([]string, 0, 9)
+	edges := make([]string, 0, 11)
 	if m.production_order != nil {
 		edges = append(edges, productionwipbatch.EdgeProductionOrder)
 	}
@@ -62005,6 +62367,12 @@ func (m *ProductionWIPBatchMutation) AddedEdges() []string {
 	}
 	if m.source_batch != nil {
 		edges = append(edges, productionwipbatch.EdgeSourceBatch)
+	}
+	if m.origin_rework_fact != nil {
+		edges = append(edges, productionwipbatch.EdgeOriginReworkFact)
+	}
+	if m.completion_facts != nil {
+		edges = append(edges, productionwipbatch.EdgeCompletionFacts)
 	}
 	if m.events != nil {
 		edges = append(edges, productionwipbatch.EdgeEvents)
@@ -62047,6 +62415,16 @@ func (m *ProductionWIPBatchMutation) AddedIDs(name string) []ent.Value {
 		if id := m.source_batch; id != nil {
 			return []ent.Value{*id}
 		}
+	case productionwipbatch.EdgeOriginReworkFact:
+		if id := m.origin_rework_fact; id != nil {
+			return []ent.Value{*id}
+		}
+	case productionwipbatch.EdgeCompletionFacts:
+		ids := make([]ent.Value, 0, len(m.completion_facts))
+		for id := range m.completion_facts {
+			ids = append(ids, id)
+		}
+		return ids
 	case productionwipbatch.EdgeEvents:
 		ids := make([]ent.Value, 0, len(m.events))
 		for id := range m.events {
@@ -62075,9 +62453,12 @@ func (m *ProductionWIPBatchMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProductionWIPBatchMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 9)
+	edges := make([]string, 0, 11)
 	if m.removedchild_batches != nil {
 		edges = append(edges, productionwipbatch.EdgeChildBatches)
+	}
+	if m.removedcompletion_facts != nil {
+		edges = append(edges, productionwipbatch.EdgeCompletionFacts)
 	}
 	if m.removedevents != nil {
 		edges = append(edges, productionwipbatch.EdgeEvents)
@@ -62098,6 +62479,12 @@ func (m *ProductionWIPBatchMutation) RemovedIDs(name string) []ent.Value {
 	case productionwipbatch.EdgeChildBatches:
 		ids := make([]ent.Value, 0, len(m.removedchild_batches))
 		for id := range m.removedchild_batches {
+			ids = append(ids, id)
+		}
+		return ids
+	case productionwipbatch.EdgeCompletionFacts:
+		ids := make([]ent.Value, 0, len(m.removedcompletion_facts))
+		for id := range m.removedcompletion_facts {
 			ids = append(ids, id)
 		}
 		return ids
@@ -62125,7 +62512,7 @@ func (m *ProductionWIPBatchMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProductionWIPBatchMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 9)
+	edges := make([]string, 0, 11)
 	if m.clearedproduction_order {
 		edges = append(edges, productionwipbatch.EdgeProductionOrder)
 	}
@@ -62140,6 +62527,12 @@ func (m *ProductionWIPBatchMutation) ClearedEdges() []string {
 	}
 	if m.clearedsource_batch {
 		edges = append(edges, productionwipbatch.EdgeSourceBatch)
+	}
+	if m.clearedorigin_rework_fact {
+		edges = append(edges, productionwipbatch.EdgeOriginReworkFact)
+	}
+	if m.clearedcompletion_facts {
+		edges = append(edges, productionwipbatch.EdgeCompletionFacts)
 	}
 	if m.clearedevents {
 		edges = append(edges, productionwipbatch.EdgeEvents)
@@ -62170,6 +62563,10 @@ func (m *ProductionWIPBatchMutation) EdgeCleared(name string) bool {
 		return m.clearedchild_batches
 	case productionwipbatch.EdgeSourceBatch:
 		return m.clearedsource_batch
+	case productionwipbatch.EdgeOriginReworkFact:
+		return m.clearedorigin_rework_fact
+	case productionwipbatch.EdgeCompletionFacts:
+		return m.clearedcompletion_facts
 	case productionwipbatch.EdgeEvents:
 		return m.clearedevents
 	case productionwipbatch.EdgeQualityInspections:
@@ -62198,6 +62595,9 @@ func (m *ProductionWIPBatchMutation) ClearEdge(name string) error {
 	case productionwipbatch.EdgeSourceBatch:
 		m.ClearSourceBatch()
 		return nil
+	case productionwipbatch.EdgeOriginReworkFact:
+		m.ClearOriginReworkFact()
+		return nil
 	case productionwipbatch.EdgeCreator:
 		m.ClearCreator()
 		return nil
@@ -62223,6 +62623,12 @@ func (m *ProductionWIPBatchMutation) ResetEdge(name string) error {
 		return nil
 	case productionwipbatch.EdgeSourceBatch:
 		m.ResetSourceBatch()
+		return nil
+	case productionwipbatch.EdgeOriginReworkFact:
+		m.ResetOriginReworkFact()
+		return nil
+	case productionwipbatch.EdgeCompletionFacts:
+		m.ResetCompletionFacts()
 		return nil
 	case productionwipbatch.EdgeEvents:
 		m.ResetEvents()

@@ -3693,8 +3693,12 @@ func init() {
 	productionfactDescSourceLineID := productionfactFields[13].Descriptor()
 	// productionfact.SourceLineIDValidator is a validator for the "source_line_id" field. It is called by the builders before save.
 	productionfact.SourceLineIDValidator = productionfactDescSourceLineID.Validators[0].(func(int) error)
+	// productionfactDescProductionWipBatchID is the schema descriptor for production_wip_batch_id field.
+	productionfactDescProductionWipBatchID := productionfactFields[14].Descriptor()
+	// productionfact.ProductionWipBatchIDValidator is a validator for the "production_wip_batch_id" field. It is called by the builders before save.
+	productionfact.ProductionWipBatchIDValidator = productionfactDescProductionWipBatchID.Validators[0].(func(int) error)
 	// productionfactDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	productionfactDescIdempotencyKey := productionfactFields[14].Descriptor()
+	productionfactDescIdempotencyKey := productionfactFields[15].Descriptor()
 	// productionfact.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	productionfact.IdempotencyKeyValidator = func() func(string) error {
 		validators := productionfactDescIdempotencyKey.Validators
@@ -3712,35 +3716,35 @@ func init() {
 		}
 	}()
 	// productionfactDescOccurredAt is the schema descriptor for occurred_at field.
-	productionfactDescOccurredAt := productionfactFields[15].Descriptor()
+	productionfactDescOccurredAt := productionfactFields[16].Descriptor()
 	// productionfact.DefaultOccurredAt holds the default value on creation for the occurred_at field.
 	productionfact.DefaultOccurredAt = productionfactDescOccurredAt.Default.(func() time.Time)
 	// productionfactDescOccurredAtSpecified is the schema descriptor for occurred_at_specified field.
-	productionfactDescOccurredAtSpecified := productionfactFields[16].Descriptor()
+	productionfactDescOccurredAtSpecified := productionfactFields[17].Descriptor()
 	// productionfact.DefaultOccurredAtSpecified holds the default value on creation for the occurred_at_specified field.
 	productionfact.DefaultOccurredAtSpecified = productionfactDescOccurredAtSpecified.Default.(bool)
 	// productionfactDescPostedBy is the schema descriptor for posted_by field.
-	productionfactDescPostedBy := productionfactFields[18].Descriptor()
+	productionfactDescPostedBy := productionfactFields[19].Descriptor()
 	// productionfact.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
 	productionfact.PostedByValidator = productionfactDescPostedBy.Validators[0].(func(int) error)
 	// productionfactDescCancelledBy is the schema descriptor for cancelled_by field.
-	productionfactDescCancelledBy := productionfactFields[20].Descriptor()
+	productionfactDescCancelledBy := productionfactFields[21].Descriptor()
 	// productionfact.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
 	productionfact.CancelledByValidator = productionfactDescCancelledBy.Validators[0].(func(int) error)
 	// productionfactDescCancelReason is the schema descriptor for cancel_reason field.
-	productionfactDescCancelReason := productionfactFields[21].Descriptor()
+	productionfactDescCancelReason := productionfactFields[22].Descriptor()
 	// productionfact.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
 	productionfact.CancelReasonValidator = productionfactDescCancelReason.Validators[0].(func(string) error)
 	// productionfactDescNote is the schema descriptor for note field.
-	productionfactDescNote := productionfactFields[22].Descriptor()
+	productionfactDescNote := productionfactFields[23].Descriptor()
 	// productionfact.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	productionfact.NoteValidator = productionfactDescNote.Validators[0].(func(string) error)
 	// productionfactDescCreatedAt is the schema descriptor for created_at field.
-	productionfactDescCreatedAt := productionfactFields[23].Descriptor()
+	productionfactDescCreatedAt := productionfactFields[24].Descriptor()
 	// productionfact.DefaultCreatedAt holds the default value on creation for the created_at field.
 	productionfact.DefaultCreatedAt = productionfactDescCreatedAt.Default.(func() time.Time)
 	// productionfactDescUpdatedAt is the schema descriptor for updated_at field.
-	productionfactDescUpdatedAt := productionfactFields[24].Descriptor()
+	productionfactDescUpdatedAt := productionfactFields[25].Descriptor()
 	// productionfact.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	productionfact.DefaultUpdatedAt = productionfactDescUpdatedAt.Default.(func() time.Time)
 	// productionfact.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -4372,8 +4376,12 @@ func init() {
 	productionwipbatchDescSourceBatchID := productionwipbatchFields[3].Descriptor()
 	// productionwipbatch.SourceBatchIDValidator is a validator for the "source_batch_id" field. It is called by the builders before save.
 	productionwipbatch.SourceBatchIDValidator = productionwipbatchDescSourceBatchID.Validators[0].(func(int) error)
+	// productionwipbatchDescOriginReworkFactID is the schema descriptor for origin_rework_fact_id field.
+	productionwipbatchDescOriginReworkFactID := productionwipbatchFields[4].Descriptor()
+	// productionwipbatch.OriginReworkFactIDValidator is a validator for the "origin_rework_fact_id" field. It is called by the builders before save.
+	productionwipbatch.OriginReworkFactIDValidator = productionwipbatchDescOriginReworkFactID.Validators[0].(func(int) error)
 	// productionwipbatchDescBatchNo is the schema descriptor for batch_no field.
-	productionwipbatchDescBatchNo := productionwipbatchFields[4].Descriptor()
+	productionwipbatchDescBatchNo := productionwipbatchFields[5].Descriptor()
 	// productionwipbatch.BatchNoValidator is a validator for the "batch_no" field. It is called by the builders before save.
 	productionwipbatch.BatchNoValidator = func() func(string) error {
 		validators := productionwipbatchDescBatchNo.Validators
@@ -4391,7 +4399,7 @@ func init() {
 		}
 	}()
 	// productionwipbatchDescFlowType is the schema descriptor for flow_type field.
-	productionwipbatchDescFlowType := productionwipbatchFields[5].Descriptor()
+	productionwipbatchDescFlowType := productionwipbatchFields[6].Descriptor()
 	// productionwipbatch.DefaultFlowType holds the default value on creation for the flow_type field.
 	productionwipbatch.DefaultFlowType = productionwipbatchDescFlowType.Default.(string)
 	// productionwipbatch.FlowTypeValidator is a validator for the "flow_type" field. It is called by the builders before save.
@@ -4411,11 +4419,11 @@ func init() {
 		}
 	}()
 	// productionwipbatchDescExecutionMode is the schema descriptor for execution_mode field.
-	productionwipbatchDescExecutionMode := productionwipbatchFields[6].Descriptor()
+	productionwipbatchDescExecutionMode := productionwipbatchFields[7].Descriptor()
 	// productionwipbatch.ExecutionModeValidator is a validator for the "execution_mode" field. It is called by the builders before save.
 	productionwipbatch.ExecutionModeValidator = productionwipbatchDescExecutionMode.Validators[0].(func(string) error)
 	// productionwipbatchDescStatus is the schema descriptor for status field.
-	productionwipbatchDescStatus := productionwipbatchFields[7].Descriptor()
+	productionwipbatchDescStatus := productionwipbatchFields[8].Descriptor()
 	// productionwipbatch.DefaultStatus holds the default value on creation for the status field.
 	productionwipbatch.DefaultStatus = productionwipbatchDescStatus.Default.(string)
 	// productionwipbatch.StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -4435,25 +4443,25 @@ func init() {
 		}
 	}()
 	// productionwipbatchDescVersion is the schema descriptor for version field.
-	productionwipbatchDescVersion := productionwipbatchFields[8].Descriptor()
+	productionwipbatchDescVersion := productionwipbatchFields[9].Descriptor()
 	// productionwipbatch.DefaultVersion holds the default value on creation for the version field.
 	productionwipbatch.DefaultVersion = productionwipbatchDescVersion.Default.(int)
 	// productionwipbatch.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	productionwipbatch.VersionValidator = productionwipbatchDescVersion.Validators[0].(func(int) error)
 	// productionwipbatchDescReworkReason is the schema descriptor for rework_reason field.
-	productionwipbatchDescReworkReason := productionwipbatchFields[10].Descriptor()
+	productionwipbatchDescReworkReason := productionwipbatchFields[11].Descriptor()
 	// productionwipbatch.ReworkReasonValidator is a validator for the "rework_reason" field. It is called by the builders before save.
 	productionwipbatch.ReworkReasonValidator = productionwipbatchDescReworkReason.Validators[0].(func(string) error)
 	// productionwipbatchDescCreatedBy is the schema descriptor for created_by field.
-	productionwipbatchDescCreatedBy := productionwipbatchFields[11].Descriptor()
+	productionwipbatchDescCreatedBy := productionwipbatchFields[12].Descriptor()
 	// productionwipbatch.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	productionwipbatch.CreatedByValidator = productionwipbatchDescCreatedBy.Validators[0].(func(int) error)
 	// productionwipbatchDescCreatedAt is the schema descriptor for created_at field.
-	productionwipbatchDescCreatedAt := productionwipbatchFields[14].Descriptor()
+	productionwipbatchDescCreatedAt := productionwipbatchFields[15].Descriptor()
 	// productionwipbatch.DefaultCreatedAt holds the default value on creation for the created_at field.
 	productionwipbatch.DefaultCreatedAt = productionwipbatchDescCreatedAt.Default.(func() time.Time)
 	// productionwipbatchDescUpdatedAt is the schema descriptor for updated_at field.
-	productionwipbatchDescUpdatedAt := productionwipbatchFields[15].Descriptor()
+	productionwipbatchDescUpdatedAt := productionwipbatchFields[16].Descriptor()
 	// productionwipbatch.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	productionwipbatch.DefaultUpdatedAt = productionwipbatchDescUpdatedAt.Default.(func() time.Time)
 	// productionwipbatch.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

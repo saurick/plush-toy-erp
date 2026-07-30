@@ -126,6 +126,11 @@ func SourceLineID(v int) predicate.ProductionFact {
 	return predicate.ProductionFact(sql.FieldEQ(FieldSourceLineID, v))
 }
 
+// ProductionWipBatchID applies equality check predicate on the "production_wip_batch_id" field. It's identical to ProductionWipBatchIDEQ.
+func ProductionWipBatchID(v int) predicate.ProductionFact {
+	return predicate.ProductionFact(sql.FieldEQ(FieldProductionWipBatchID, v))
+}
+
 // IdempotencyKey applies equality check predicate on the "idempotency_key" field. It's identical to IdempotencyKeyEQ.
 func IdempotencyKey(v string) predicate.ProductionFact {
 	return predicate.ProductionFact(sql.FieldEQ(FieldIdempotencyKey, v))
@@ -836,6 +841,36 @@ func SourceLineIDNotNil() predicate.ProductionFact {
 	return predicate.ProductionFact(sql.FieldNotNull(FieldSourceLineID))
 }
 
+// ProductionWipBatchIDEQ applies the EQ predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDEQ(v int) predicate.ProductionFact {
+	return predicate.ProductionFact(sql.FieldEQ(FieldProductionWipBatchID, v))
+}
+
+// ProductionWipBatchIDNEQ applies the NEQ predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDNEQ(v int) predicate.ProductionFact {
+	return predicate.ProductionFact(sql.FieldNEQ(FieldProductionWipBatchID, v))
+}
+
+// ProductionWipBatchIDIn applies the In predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDIn(vs ...int) predicate.ProductionFact {
+	return predicate.ProductionFact(sql.FieldIn(FieldProductionWipBatchID, vs...))
+}
+
+// ProductionWipBatchIDNotIn applies the NotIn predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDNotIn(vs ...int) predicate.ProductionFact {
+	return predicate.ProductionFact(sql.FieldNotIn(FieldProductionWipBatchID, vs...))
+}
+
+// ProductionWipBatchIDIsNil applies the IsNil predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDIsNil() predicate.ProductionFact {
+	return predicate.ProductionFact(sql.FieldIsNull(FieldProductionWipBatchID))
+}
+
+// ProductionWipBatchIDNotNil applies the NotNil predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDNotNil() predicate.ProductionFact {
+	return predicate.ProductionFact(sql.FieldNotNull(FieldProductionWipBatchID))
+}
+
 // IdempotencyKeyEQ applies the EQ predicate on the "idempotency_key" field.
 func IdempotencyKeyEQ(v string) predicate.ProductionFact {
 	return predicate.ProductionFact(sql.FieldEQ(FieldIdempotencyKey, v))
@@ -1425,6 +1460,52 @@ func HasInventoryLot() predicate.ProductionFact {
 func HasInventoryLotWith(preds ...predicate.InventoryLot) predicate.ProductionFact {
 	return predicate.ProductionFact(func(s *sql.Selector) {
 		step := newInventoryLotStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductionWipBatch applies the HasEdge predicate on the "production_wip_batch" edge.
+func HasProductionWipBatch() predicate.ProductionFact {
+	return predicate.ProductionFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ProductionWipBatchTable, ProductionWipBatchColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductionWipBatchWith applies the HasEdge predicate on the "production_wip_batch" edge with a given conditions (other predicates).
+func HasProductionWipBatchWith(preds ...predicate.ProductionWIPBatch) predicate.ProductionFact {
+	return predicate.ProductionFact(func(s *sql.Selector) {
+		step := newProductionWipBatchStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasOriginReworkBatches applies the HasEdge predicate on the "origin_rework_batches" edge.
+func HasOriginReworkBatches() predicate.ProductionFact {
+	return predicate.ProductionFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OriginReworkBatchesTable, OriginReworkBatchesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOriginReworkBatchesWith applies the HasEdge predicate on the "origin_rework_batches" edge with a given conditions (other predicates).
+func HasOriginReworkBatchesWith(preds ...predicate.ProductionWIPBatch) predicate.ProductionFact {
+	return predicate.ProductionFact(func(s *sql.Selector) {
+		step := newOriginReworkBatchesStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

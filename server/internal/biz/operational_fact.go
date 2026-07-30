@@ -67,6 +67,7 @@ var (
 	ErrProductionReworkSourceState          = errors.New("production rework source state does not allow creation")
 	ErrProductionReworkQuantityExceeded     = errors.New("production rework quantity exceeds source completion")
 	ErrProductionReworkDependency           = errors.New("production completion has active rework")
+	ErrProductionReworkExecutionDependency  = errors.New("production rework WIP has execution dependencies")
 	ErrOperationalInboundLotRequired        = errors.New("source-driven inbound requires an existing or new lot")
 	ErrOutsourcingFactNotFound              = errors.New("outsourcing fact not found")
 	ErrOutsourcingOrderFactSourceInvalid    = errors.New("outsourcing order fact source invalid")
@@ -108,34 +109,37 @@ var (
 )
 
 type ProductionFact struct {
-	ID              int
-	FactNo          string
-	FactType        string
-	Status          string
-	Version         int
-	SubjectType     string
-	SubjectID       int
-	ProductSkuID    *int
-	WarehouseID     int
-	UnitID          int
-	LotID           *int
-	Quantity        decimal.Decimal
-	SourceType      *string
-	SourceID        *int
-	SourceNo        *string
-	SourceLineID    *int
-	IdempotencyKey  string
-	OccurredAt      time.Time
-	PostedAt        *time.Time
-	PostedBy        *int
-	PostedByName    *string
-	CancelledAt     *time.Time
-	CancelledBy     *int
-	CancelledByName *string
-	CancelReason    *string
-	Note            *string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                    int
+	FactNo                string
+	FactType              string
+	Status                string
+	Version               int
+	SubjectType           string
+	SubjectID             int
+	ProductSkuID          *int
+	WarehouseID           int
+	UnitID                int
+	LotID                 *int
+	Quantity              decimal.Decimal
+	SourceType            *string
+	SourceID              *int
+	SourceNo              *string
+	SourceLineID          *int
+	ProductionWIPBatchID  *int
+	ProductionOrderID     *int
+	ProductionOrderItemID *int
+	IdempotencyKey        string
+	OccurredAt            time.Time
+	PostedAt              *time.Time
+	PostedBy              *int
+	PostedByName          *string
+	CancelledAt           *time.Time
+	CancelledBy           *int
+	CancelledByName       *string
+	CancelReason          *string
+	Note                  *string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type OutsourcingFact struct {
@@ -223,11 +227,22 @@ type StockReservation struct {
 	Status           string
 	SalesOrderID     *int
 	SalesOrderItemID *int
+	SalesOrderNo     *string
+	SalesOrderLineNo *int
 	ProductID        int
 	ProductSkuID     *int
+	ProductCode      string
+	ProductName      string
+	ProductSkuCode   *string
+	ProductSkuName   *string
 	WarehouseID      int
+	WarehouseCode    string
+	WarehouseName    string
 	UnitID           int
+	UnitCode         string
+	UnitName         string
 	LotID            *int
+	LotNo            *string
 	Quantity         decimal.Decimal
 	IdempotencyKey   string
 	ReservedAt       time.Time
@@ -287,17 +302,18 @@ type OperationalFactMutation struct {
 	// NewLotNo is accepted only by source-driven inbound commands. The data
 	// layer resolves or creates the derived subject lot in the same transaction
 	// and persists only LotID on the fact.
-	NewLotNo            *string
-	Quantity            decimal.Decimal
-	SupplierID          *int
-	SupplierName        *string
-	SourceType          *string
-	SourceID            *int
-	SourceLineID        *int
-	IdempotencyKey      string
-	OccurredAt          time.Time
-	OccurredAtSpecified bool
-	Note                *string
+	NewLotNo             *string
+	Quantity             decimal.Decimal
+	SupplierID           *int
+	SupplierName         *string
+	SourceType           *string
+	SourceID             *int
+	SourceLineID         *int
+	ProductionWIPBatchID *int
+	IdempotencyKey       string
+	OccurredAt           time.Time
+	OccurredAtSpecified  bool
+	Note                 *string
 }
 
 // ProductionCompletionFromOrderCreate carries only operator-owned completion
@@ -307,6 +323,7 @@ type ProductionCompletionFromOrderCreate struct {
 	FactNo                string
 	ProductionOrderID     int
 	ProductionOrderItemID int
+	ProductionWIPBatchID  int
 	WarehouseID           int
 	LotID                 *int
 	NewLotNo              *string
@@ -521,6 +538,20 @@ type OperationalFactRepo interface {
 	ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error)
 }
 
+// StockReservationReadScope keeps the list endpoint's readable business
+// references inside the caller's effective permissions. Raw IDs remain part of
+// the stable API contract, but they are not a substitute for readable labels.
+type StockReservationReadScope struct {
+	IncludeSalesOrderReferences bool
+	IncludeInventoryReferences  bool
+}
+
+// StockReservationReadRepo is an optional projection contract. Adapters that
+// do not implement it keep the base list available without readable joins.
+type StockReservationReadRepo interface {
+	ListStockReservationsForAccess(ctx context.Context, filter OperationalFactFilter, scope StockReservationReadScope) ([]*StockReservation, int, error)
+}
+
 // OperationalFactCancellationActorRepo is the authenticated path for shipment
 // cancellation and, when already shipped, inventory compensation evidence.
 type OperationalFactCancellationActorRepo interface {
@@ -625,6 +656,11 @@ func (uc *OperationalFactUsecase) CreateProductionCompletionFromOrder(ctx contex
 	sourceType := ProductionOrderSourceType
 	sourceID := normalized.ProductionOrderID
 	sourceLineID := normalized.ProductionOrderItemID
+	var productionWIPBatchID *int
+	if normalized.ProductionWIPBatchID > 0 {
+		value := normalized.ProductionWIPBatchID
+		productionWIPBatchID = &value
+	}
 	occurredAt := normalized.OccurredAt
 	if !normalized.OccurredAtSpecified {
 		// CreateProductionFactDraft performs the shared normalization. Preserve
@@ -633,23 +669,24 @@ func (uc *OperationalFactUsecase) CreateProductionCompletionFromOrder(ctx contex
 		occurredAt = time.Time{}
 	}
 	return uc.CreateProductionFactDraft(ctx, &OperationalFactMutation{
-		FactNo:              normalized.FactNo,
-		FactType:            ProductionFactFinishedGoodsReceipt,
-		SubjectType:         InventorySubjectProduct,
-		SubjectID:           source.ProductID,
-		ProductSkuID:        source.ProductSKUID,
-		WarehouseID:         normalized.WarehouseID,
-		UnitID:              source.UnitID,
-		LotID:               normalized.LotID,
-		NewLotNo:            normalized.NewLotNo,
-		Quantity:            normalized.Quantity,
-		SourceType:          &sourceType,
-		SourceID:            &sourceID,
-		SourceLineID:        &sourceLineID,
-		IdempotencyKey:      normalized.IdempotencyKey,
-		OccurredAt:          occurredAt,
-		OccurredAtSpecified: normalized.OccurredAtSpecified,
-		Note:                normalized.Note,
+		FactNo:               normalized.FactNo,
+		FactType:             ProductionFactFinishedGoodsReceipt,
+		SubjectType:          InventorySubjectProduct,
+		SubjectID:            source.ProductID,
+		ProductSkuID:         source.ProductSKUID,
+		WarehouseID:          normalized.WarehouseID,
+		UnitID:               source.UnitID,
+		LotID:                normalized.LotID,
+		NewLotNo:             normalized.NewLotNo,
+		Quantity:             normalized.Quantity,
+		SourceType:           &sourceType,
+		SourceID:             &sourceID,
+		SourceLineID:         &sourceLineID,
+		ProductionWIPBatchID: productionWIPBatchID,
+		IdempotencyKey:       normalized.IdempotencyKey,
+		OccurredAt:           occurredAt,
+		OccurredAtSpecified:  normalized.OccurredAtSpecified,
+		Note:                 normalized.Note,
 	})
 }
 
@@ -1005,12 +1042,22 @@ func (uc *OperationalFactUsecase) ReleaseStockReservation(ctx context.Context, i
 }
 
 func (uc *OperationalFactUsecase) ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error) {
+	return uc.ListStockReservationsForAccess(ctx, filter, StockReservationReadScope{
+		IncludeSalesOrderReferences: true,
+		IncludeInventoryReferences:  true,
+	})
+}
+
+func (uc *OperationalFactUsecase) ListStockReservationsForAccess(ctx context.Context, filter OperationalFactFilter, scope StockReservationReadScope) ([]*StockReservation, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
 	normalized, err := normalizeStockReservationFilter(filter)
 	if err != nil {
 		return nil, 0, err
+	}
+	if repo, ok := uc.repo.(StockReservationReadRepo); ok {
+		return repo.ListStockReservationsForAccess(ctx, normalized, scope)
 	}
 	return uc.repo.ListStockReservations(ctx, normalized)
 }
@@ -1257,7 +1304,16 @@ func normalizeOperationalFactMutation(in *OperationalFactMutation, allowedTypes 
 	if out.SourceLineID != nil && *out.SourceLineID <= 0 {
 		out.SourceLineID = nil
 	}
+	if out.ProductionWIPBatchID != nil && *out.ProductionWIPBatchID <= 0 {
+		return nil, ErrBadParam
+	}
 	if _, ok := allowedTypes[out.FactType]; !ok {
+		return nil, ErrBadParam
+	}
+	if out.ProductionWIPBatchID != nil &&
+		(out.FactType != ProductionFactFinishedGoodsReceipt ||
+			out.SourceType == nil || *out.SourceType != ProductionOrderSourceType ||
+			out.SourceID == nil || out.SourceLineID == nil) {
 		return nil, ErrBadParam
 	}
 	if _, ok := inventorySubjectTypes[out.SubjectType]; !ok {
@@ -1295,7 +1351,7 @@ func normalizeProductionCompletionFromOrderCreate(in *ProductionCompletionFromOr
 	if out.NewLotNo != nil && (len([]rune(*out.NewLotNo)) > 64 || out.LotID != nil) {
 		return nil, ErrBadParam
 	}
-	if out.FactNo == "" || out.ProductionOrderID <= 0 || out.ProductionOrderItemID <= 0 || out.WarehouseID <= 0 {
+	if out.FactNo == "" || out.ProductionOrderID <= 0 || out.ProductionOrderItemID <= 0 || out.ProductionWIPBatchID < 0 || out.WarehouseID <= 0 {
 		return nil, ErrBadParam
 	}
 	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {

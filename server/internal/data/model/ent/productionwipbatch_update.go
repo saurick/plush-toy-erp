@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/productionwipevent"
 	"server/internal/data/model/ent/productionwipoutsourcingallocation"
@@ -147,6 +148,21 @@ func (_u *ProductionWIPBatchUpdate) AddChildBatches(v ...*ProductionWIPBatch) *P
 	return _u.AddChildBatchIDs(ids...)
 }
 
+// AddCompletionFactIDs adds the "completion_facts" edge to the ProductionFact entity by IDs.
+func (_u *ProductionWIPBatchUpdate) AddCompletionFactIDs(ids ...int) *ProductionWIPBatchUpdate {
+	_u.mutation.AddCompletionFactIDs(ids...)
+	return _u
+}
+
+// AddCompletionFacts adds the "completion_facts" edges to the ProductionFact entity.
+func (_u *ProductionWIPBatchUpdate) AddCompletionFacts(v ...*ProductionFact) *ProductionWIPBatchUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddCompletionFactIDs(ids...)
+}
+
 // AddEventIDs adds the "events" edge to the ProductionWIPEvent entity by IDs.
 func (_u *ProductionWIPBatchUpdate) AddEventIDs(ids ...int) *ProductionWIPBatchUpdate {
 	_u.mutation.AddEventIDs(ids...)
@@ -216,6 +232,27 @@ func (_u *ProductionWIPBatchUpdate) RemoveChildBatches(v ...*ProductionWIPBatch)
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveChildBatchIDs(ids...)
+}
+
+// ClearCompletionFacts clears all "completion_facts" edges to the ProductionFact entity.
+func (_u *ProductionWIPBatchUpdate) ClearCompletionFacts() *ProductionWIPBatchUpdate {
+	_u.mutation.ClearCompletionFacts()
+	return _u
+}
+
+// RemoveCompletionFactIDs removes the "completion_facts" edge to ProductionFact entities by IDs.
+func (_u *ProductionWIPBatchUpdate) RemoveCompletionFactIDs(ids ...int) *ProductionWIPBatchUpdate {
+	_u.mutation.RemoveCompletionFactIDs(ids...)
+	return _u
+}
+
+// RemoveCompletionFacts removes "completion_facts" edges to ProductionFact entities.
+func (_u *ProductionWIPBatchUpdate) RemoveCompletionFacts(v ...*ProductionFact) *ProductionWIPBatchUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveCompletionFactIDs(ids...)
 }
 
 // ClearEvents clears all "events" edges to the ProductionWIPEvent entity.
@@ -438,6 +475,51 @@ func (_u *ProductionWIPBatchUpdate) sqlSave(ctx context.Context) (_node int, err
 			Bidi:    true,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CompletionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionwipbatch.CompletionFactsTable,
+			Columns: []string{productionwipbatch.CompletionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedCompletionFactsIDs(); len(nodes) > 0 && !_u.mutation.CompletionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionwipbatch.CompletionFactsTable,
+			Columns: []string{productionwipbatch.CompletionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CompletionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionwipbatch.CompletionFactsTable,
+			Columns: []string{productionwipbatch.CompletionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -716,6 +798,21 @@ func (_u *ProductionWIPBatchUpdateOne) AddChildBatches(v ...*ProductionWIPBatch)
 	return _u.AddChildBatchIDs(ids...)
 }
 
+// AddCompletionFactIDs adds the "completion_facts" edge to the ProductionFact entity by IDs.
+func (_u *ProductionWIPBatchUpdateOne) AddCompletionFactIDs(ids ...int) *ProductionWIPBatchUpdateOne {
+	_u.mutation.AddCompletionFactIDs(ids...)
+	return _u
+}
+
+// AddCompletionFacts adds the "completion_facts" edges to the ProductionFact entity.
+func (_u *ProductionWIPBatchUpdateOne) AddCompletionFacts(v ...*ProductionFact) *ProductionWIPBatchUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddCompletionFactIDs(ids...)
+}
+
 // AddEventIDs adds the "events" edge to the ProductionWIPEvent entity by IDs.
 func (_u *ProductionWIPBatchUpdateOne) AddEventIDs(ids ...int) *ProductionWIPBatchUpdateOne {
 	_u.mutation.AddEventIDs(ids...)
@@ -785,6 +882,27 @@ func (_u *ProductionWIPBatchUpdateOne) RemoveChildBatches(v ...*ProductionWIPBat
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveChildBatchIDs(ids...)
+}
+
+// ClearCompletionFacts clears all "completion_facts" edges to the ProductionFact entity.
+func (_u *ProductionWIPBatchUpdateOne) ClearCompletionFacts() *ProductionWIPBatchUpdateOne {
+	_u.mutation.ClearCompletionFacts()
+	return _u
+}
+
+// RemoveCompletionFactIDs removes the "completion_facts" edge to ProductionFact entities by IDs.
+func (_u *ProductionWIPBatchUpdateOne) RemoveCompletionFactIDs(ids ...int) *ProductionWIPBatchUpdateOne {
+	_u.mutation.RemoveCompletionFactIDs(ids...)
+	return _u
+}
+
+// RemoveCompletionFacts removes "completion_facts" edges to ProductionFact entities.
+func (_u *ProductionWIPBatchUpdateOne) RemoveCompletionFacts(v ...*ProductionFact) *ProductionWIPBatchUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveCompletionFactIDs(ids...)
 }
 
 // ClearEvents clears all "events" edges to the ProductionWIPEvent entity.
@@ -1037,6 +1155,51 @@ func (_u *ProductionWIPBatchUpdateOne) sqlSave(ctx context.Context) (_node *Prod
 			Bidi:    true,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CompletionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionwipbatch.CompletionFactsTable,
+			Columns: []string{productionwipbatch.CompletionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedCompletionFactsIDs(); len(nodes) > 0 && !_u.mutation.CompletionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionwipbatch.CompletionFactsTable,
+			Columns: []string{productionwipbatch.CompletionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CompletionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionwipbatch.CompletionFactsTable,
+			Columns: []string{productionwipbatch.CompletionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -7,9 +7,17 @@ import (
 	"server/internal/biz"
 	"server/internal/core/calc"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
+	"server/internal/data/model/ent/salesorder"
+	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
+	"server/internal/data/model/ent/unit"
+	"server/internal/data/model/ent/warehouse"
 
 	"github.com/shopspring/decimal"
 )
@@ -374,7 +382,24 @@ func (r *operationalFactRepo) ReleaseStockReservation(ctx context.Context, id in
 }
 
 func (r *operationalFactRepo) ListStockReservations(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.StockReservation, int, error) {
-	q := r.data.postgres.StockReservation.Query()
+	return r.ListStockReservationsForAccess(ctx, filter, biz.StockReservationReadScope{
+		IncludeSalesOrderReferences: true,
+		IncludeInventoryReferences:  true,
+	})
+}
+
+func (r *operationalFactRepo) ListStockReservationsForAccess(
+	ctx context.Context,
+	filter biz.OperationalFactFilter,
+	scope biz.StockReservationReadScope,
+) ([]*biz.StockReservation, int, error) {
+	snapshot, err := beginReadSnapshot(ctx, r.data)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer snapshot.Rollback()
+
+	q := snapshot.client.StockReservation.Query()
 	if filter.Status != "" {
 		q = q.Where(stockreservation.Status(filter.Status))
 	}
@@ -394,19 +419,49 @@ func (r *operationalFactRepo) ListStockReservations(ctx context.Context, filter 
 		q = q.Where(stockreservation.SalesOrderID(filter.SourceID))
 	}
 	if filter.Keyword != "" {
-		q = q.Where(stockreservation.Or(
+		keywordPredicates := []predicate.StockReservation{
 			stockreservation.ReservationNoContainsFold(filter.Keyword),
 			stockreservation.StatusContainsFold(filter.Keyword),
 			stockreservation.IdempotencyKeyContainsFold(filter.Keyword),
 			stockreservation.NoteContainsFold(filter.Keyword),
 			stockreservation.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			stockreservation.SalesOrderIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			stockreservation.SalesOrderItemIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			stockreservation.ProductIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			stockreservation.ProductSkuIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			stockreservation.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-			stockreservation.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
-		))
+		}
+		numericKeyword := parsePositiveIntOrZero(filter.Keyword)
+		if scope.IncludeSalesOrderReferences {
+			keywordPredicates = append(keywordPredicates,
+				stockreservation.SalesOrderIDEQ(numericKeyword),
+				stockreservation.SalesOrderItemIDEQ(numericKeyword),
+				stockreservation.HasSalesOrderWith(salesorder.OrderNoContainsFold(filter.Keyword)),
+				stockreservation.HasSalesOrderItemWith(salesorderitem.LineNoEQ(numericKeyword)),
+			)
+		}
+		if scope.IncludeInventoryReferences {
+			keywordPredicates = append(keywordPredicates,
+				stockreservation.ProductIDEQ(numericKeyword),
+				stockreservation.ProductSkuIDEQ(numericKeyword),
+				stockreservation.WarehouseIDEQ(numericKeyword),
+				stockreservation.UnitIDEQ(numericKeyword),
+				stockreservation.LotIDEQ(numericKeyword),
+				stockreservation.HasProductWith(product.Or(
+					product.CodeContainsFold(filter.Keyword),
+					product.NameContainsFold(filter.Keyword),
+				)),
+				stockreservation.HasProductSkuWith(productsku.Or(
+					productsku.SkuCodeContainsFold(filter.Keyword),
+					productsku.SkuNameContainsFold(filter.Keyword),
+				)),
+				stockreservation.HasWarehouseWith(warehouse.Or(
+					warehouse.CodeContainsFold(filter.Keyword),
+					warehouse.NameContainsFold(filter.Keyword),
+				)),
+				stockreservation.HasUnitWith(unit.Or(
+					unit.CodeContainsFold(filter.Keyword),
+					unit.NameContainsFold(filter.Keyword),
+				)),
+				stockreservation.HasInventoryLotWith(inventorylot.LotNoContainsFold(filter.Keyword)),
+			)
+		}
+		q = q.Where(stockreservation.Or(keywordPredicates...))
 	}
 	if filter.DateFrom != nil {
 		q = q.Where(stockreservation.ReservedAtGTE(*filter.DateFrom))
@@ -418,6 +473,17 @@ func (r *operationalFactRepo) ListStockReservations(ctx context.Context, filter 
 	if err != nil {
 		return nil, 0, err
 	}
+	if scope.IncludeSalesOrderReferences {
+		q = q.WithSalesOrder().WithSalesOrderItem()
+	}
+	if scope.IncludeInventoryReferences {
+		q = q.
+			WithProduct().
+			WithProductSku().
+			WithWarehouse().
+			WithUnit().
+			WithInventoryLot()
+	}
 	rows, err := q.Order(ent.Desc(stockreservation.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -425,6 +491,9 @@ func (r *operationalFactRepo) ListStockReservations(ctx context.Context, filter 
 	out := make([]*biz.StockReservation, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, entStockReservationToBiz(row))
+	}
+	if err := snapshot.Commit(); err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -519,5 +588,31 @@ func entStockReservationToBiz(row *ent.StockReservation) *biz.StockReservation {
 	if row == nil {
 		return nil
 	}
-	return &biz.StockReservation{ID: row.ID, ReservationNo: row.ReservationNo, Status: row.Status, SalesOrderID: row.SalesOrderID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, IdempotencyKey: row.IdempotencyKey, ReservedAt: row.ReservedAt, ReleasedAt: row.ReleasedAt, ConsumedAt: row.ConsumedAt, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	out := &biz.StockReservation{ID: row.ID, ReservationNo: row.ReservationNo, Status: row.Status, SalesOrderID: row.SalesOrderID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, IdempotencyKey: row.IdempotencyKey, ReservedAt: row.ReservedAt, ReleasedAt: row.ReleasedAt, ConsumedAt: row.ConsumedAt, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	if row.Edges.SalesOrder != nil {
+		out.SalesOrderNo = &row.Edges.SalesOrder.OrderNo
+	}
+	if row.Edges.SalesOrderItem != nil {
+		out.SalesOrderLineNo = &row.Edges.SalesOrderItem.LineNo
+	}
+	if row.Edges.Product != nil {
+		out.ProductCode = row.Edges.Product.Code
+		out.ProductName = row.Edges.Product.Name
+	}
+	if row.Edges.ProductSku != nil {
+		out.ProductSkuCode = &row.Edges.ProductSku.SkuCode
+		out.ProductSkuName = row.Edges.ProductSku.SkuName
+	}
+	if row.Edges.Warehouse != nil {
+		out.WarehouseCode = row.Edges.Warehouse.Code
+		out.WarehouseName = row.Edges.Warehouse.Name
+	}
+	if row.Edges.Unit != nil {
+		out.UnitCode = row.Edges.Unit.Code
+		out.UnitName = row.Edges.Unit.Name
+	}
+	if row.Edges.InventoryLot != nil {
+		out.LotNo = &row.Edges.InventoryLot.LotNo
+	}
+	return out
 }

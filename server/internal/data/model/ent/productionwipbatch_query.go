@@ -9,6 +9,7 @@ import (
 	"math"
 	"server/internal/data/model/ent/adminuser"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionorderoperation"
@@ -35,6 +36,8 @@ type ProductionWIPBatchQuery struct {
 	withProductionOrderOperation *ProductionOrderOperationQuery
 	withChildBatches             *ProductionWIPBatchQuery
 	withSourceBatch              *ProductionWIPBatchQuery
+	withOriginReworkFact         *ProductionFactQuery
+	withCompletionFacts          *ProductionFactQuery
 	withEvents                   *ProductionWIPEventQuery
 	withQualityInspections       *QualityInspectionQuery
 	withOutsourcingAllocations   *ProductionWIPOutsourcingAllocationQuery
@@ -178,6 +181,50 @@ func (_q *ProductionWIPBatchQuery) QuerySourceBatch() *ProductionWIPBatchQuery {
 			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, selector),
 			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.SourceBatchTable, productionwipbatch.SourceBatchColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOriginReworkFact chains the current query on the "origin_rework_fact" edge.
+func (_q *ProductionWIPBatchQuery) QueryOriginReworkFact() *ProductionFactQuery {
+	query := (&ProductionFactClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, selector),
+			sqlgraph.To(productionfact.Table, productionfact.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.OriginReworkFactTable, productionwipbatch.OriginReworkFactColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryCompletionFacts chains the current query on the "completion_facts" edge.
+func (_q *ProductionWIPBatchQuery) QueryCompletionFacts() *ProductionFactQuery {
+	query := (&ProductionFactClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, selector),
+			sqlgraph.To(productionfact.Table, productionfact.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionwipbatch.CompletionFactsTable, productionwipbatch.CompletionFactsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -470,6 +517,8 @@ func (_q *ProductionWIPBatchQuery) Clone() *ProductionWIPBatchQuery {
 		withProductionOrderOperation: _q.withProductionOrderOperation.Clone(),
 		withChildBatches:             _q.withChildBatches.Clone(),
 		withSourceBatch:              _q.withSourceBatch.Clone(),
+		withOriginReworkFact:         _q.withOriginReworkFact.Clone(),
+		withCompletionFacts:          _q.withCompletionFacts.Clone(),
 		withEvents:                   _q.withEvents.Clone(),
 		withQualityInspections:       _q.withQualityInspections.Clone(),
 		withOutsourcingAllocations:   _q.withOutsourcingAllocations.Clone(),
@@ -532,6 +581,28 @@ func (_q *ProductionWIPBatchQuery) WithSourceBatch(opts ...func(*ProductionWIPBa
 		opt(query)
 	}
 	_q.withSourceBatch = query
+	return _q
+}
+
+// WithOriginReworkFact tells the query-builder to eager-load the nodes that are connected to
+// the "origin_rework_fact" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionWIPBatchQuery) WithOriginReworkFact(opts ...func(*ProductionFactQuery)) *ProductionWIPBatchQuery {
+	query := (&ProductionFactClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOriginReworkFact = query
+	return _q
+}
+
+// WithCompletionFacts tells the query-builder to eager-load the nodes that are connected to
+// the "completion_facts" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionWIPBatchQuery) WithCompletionFacts(opts ...func(*ProductionFactQuery)) *ProductionWIPBatchQuery {
+	query := (&ProductionFactClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withCompletionFacts = query
 	return _q
 }
 
@@ -657,12 +728,14 @@ func (_q *ProductionWIPBatchQuery) sqlAll(ctx context.Context, hooks ...queryHoo
 	var (
 		nodes       = []*ProductionWIPBatch{}
 		_spec       = _q.querySpec()
-		loadedTypes = [9]bool{
+		loadedTypes = [11]bool{
 			_q.withProductionOrder != nil,
 			_q.withProductionOrderItem != nil,
 			_q.withProductionOrderOperation != nil,
 			_q.withChildBatches != nil,
 			_q.withSourceBatch != nil,
+			_q.withOriginReworkFact != nil,
+			_q.withCompletionFacts != nil,
 			_q.withEvents != nil,
 			_q.withQualityInspections != nil,
 			_q.withOutsourcingAllocations != nil,
@@ -717,6 +790,21 @@ func (_q *ProductionWIPBatchQuery) sqlAll(ctx context.Context, hooks ...queryHoo
 	if query := _q.withSourceBatch; query != nil {
 		if err := _q.loadSourceBatch(ctx, query, nodes, nil,
 			func(n *ProductionWIPBatch, e *ProductionWIPBatch) { n.Edges.SourceBatch = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withOriginReworkFact; query != nil {
+		if err := _q.loadOriginReworkFact(ctx, query, nodes, nil,
+			func(n *ProductionWIPBatch, e *ProductionFact) { n.Edges.OriginReworkFact = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withCompletionFacts; query != nil {
+		if err := _q.loadCompletionFacts(ctx, query, nodes,
+			func(n *ProductionWIPBatch) { n.Edges.CompletionFacts = []*ProductionFact{} },
+			func(n *ProductionWIPBatch, e *ProductionFact) {
+				n.Edges.CompletionFacts = append(n.Edges.CompletionFacts, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -906,6 +994,71 @@ func (_q *ProductionWIPBatchQuery) loadSourceBatch(ctx context.Context, query *P
 	}
 	return nil
 }
+func (_q *ProductionWIPBatchQuery) loadOriginReworkFact(ctx context.Context, query *ProductionFactQuery, nodes []*ProductionWIPBatch, init func(*ProductionWIPBatch), assign func(*ProductionWIPBatch, *ProductionFact)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*ProductionWIPBatch)
+	for i := range nodes {
+		if nodes[i].OriginReworkFactID == nil {
+			continue
+		}
+		fk := *nodes[i].OriginReworkFactID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(productionfact.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "origin_rework_fact_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *ProductionWIPBatchQuery) loadCompletionFacts(ctx context.Context, query *ProductionFactQuery, nodes []*ProductionWIPBatch, init func(*ProductionWIPBatch), assign func(*ProductionWIPBatch, *ProductionFact)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductionWIPBatch)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionfact.FieldProductionWipBatchID)
+	}
+	query.Where(predicate.ProductionFact(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productionwipbatch.CompletionFactsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductionWipBatchID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "production_wip_batch_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "production_wip_batch_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
 func (_q *ProductionWIPBatchQuery) loadEvents(ctx context.Context, query *ProductionWIPEventQuery, nodes []*ProductionWIPBatch, init func(*ProductionWIPBatch), assign func(*ProductionWIPBatch, *ProductionWIPEvent)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[int]*ProductionWIPBatch)
@@ -1065,6 +1218,9 @@ func (_q *ProductionWIPBatchQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withSourceBatch != nil {
 			_spec.Node.AddColumnOnce(productionwipbatch.FieldSourceBatchID)
+		}
+		if _q.withOriginReworkFact != nil {
+			_spec.Node.AddColumnOnce(productionwipbatch.FieldOriginReworkFactID)
 		}
 		if _q.withCreator != nil {
 			_spec.Node.AddColumnOnce(productionwipbatch.FieldCreatedBy)

@@ -15,11 +15,15 @@ import (
 func TestProductionReworkPostgresConcurrentQuantityAndSourceCancellation(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderPGFixture(t)
+	createProductionWIPRouteProcesses(t, ctx, f.client)
 
 	newPostedCompletion := func(suffix string, quantity int64) (*biz.ProductionOrderAggregate, *biz.ProductionFact) {
 		t.Helper()
+		draft := f.draft("MO-PG-REWORK-" + suffix + "-" + f.suffix)
+		route := biz.ProductionWIPRoutePlushSewHandV1
+		draft.Items[0].RouteCode = &route
 		created, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{
-			Draft: f.draft("MO-PG-REWORK-" + suffix + "-" + f.suffix), ActorID: f.actorID,
+			Draft: draft, ActorID: f.actorID,
 			IdempotencyKey: "mo-pg-rework-create-" + suffix + "-" + f.suffix,
 		})
 		if err != nil {
@@ -32,12 +36,28 @@ func TestProductionReworkPostgresConcurrentQuantityAndSourceCancellation(t *test
 		if err != nil {
 			t.Fatalf("release rework source order %s: %v", suffix, err)
 		}
+		wip, err := f.uc.GetProductionWIP(ctx, released.Order.ID)
+		if err != nil {
+			t.Fatalf("get rework source WIP %s: %v", suffix, err)
+		}
+		_, packaging := acceptProductionPackagingBatchForReworkTest(
+			t,
+			ctx,
+			f.client,
+			f.uc,
+			f.actorID,
+			wip,
+			"pg-rework-"+suffix+"-"+f.suffix,
+		)
 		lotNo := "PG-REWORK-SOURCE-LOT-" + suffix + "-" + f.suffix
 		completion, err := f.factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 			FactNo:            "PF-PG-REWORK-SOURCE-" + suffix + "-" + f.suffix,
 			ProductionOrderID: released.Order.ID, ProductionOrderItemID: released.Items[0].ID,
-			WarehouseID: f.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(quantity),
-			IdempotencyKey: "pf-pg-rework-source-" + suffix + "-" + f.suffix,
+			ProductionWIPBatchID: packaging.ID,
+			WarehouseID:          f.warehouseID,
+			NewLotNo:             &lotNo,
+			Quantity:             decimal.NewFromInt(quantity),
+			IdempotencyKey:       "pf-pg-rework-source-" + suffix + "-" + f.suffix,
 		})
 		if err != nil {
 			t.Fatalf("create rework source completion %s: %v", suffix, err)

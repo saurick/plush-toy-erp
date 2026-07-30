@@ -81,6 +81,7 @@ func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
 		{name: "shipment cancellation task active", err: biz.ErrShipmentCancellationTaskActive, message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"},
 		{name: "outsourcing quality pending", err: biz.ErrOutsourcingReturnQualityPending, message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"},
 		{name: "outsourcing quality rejected", err: biz.ErrOutsourcingReturnQualityRejected, message: "该委外回货质检不合格，请先完成返工、退回等质量处置"},
+		{name: "production rework execution", err: biz.ErrProductionReworkExecutionDependency, message: "返工批次已经开始、拆分、流转、质检或补完工，不能再取消；请按当前返工进度继续办理"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1174,6 +1175,11 @@ func TestJsonrpcDispatcher_ProductionCompletionUsesDedicatedPermissionAndServerO
 	if created.FactType != biz.ProductionFactFinishedGoodsReceipt || created.SubjectType != biz.InventorySubjectProduct || created.SubjectID != 11 || created.ProductSkuID == nil || *created.ProductSkuID != 12 || created.UnitID != 13 {
 		t.Fatalf("completion did not derive product/SKU/unit from order item: %#v", created)
 	}
+	createdResultFact := createdRes.Data.AsMap()["production_fact"].(map[string]any)
+	if created.ProductionWIPBatchID == nil || *created.ProductionWIPBatchID != 23 ||
+		createdResultFact["production_wip_batch_id"] != float64(23) {
+		t.Fatalf("completion lost exact WIP batch binding: input=%#v result=%#v", created, createdRes)
+	}
 	if created.SourceType == nil || *created.SourceType != biz.ProductionOrderSourceType || created.SourceID == nil || *created.SourceID != 21 || created.SourceLineID == nil || *created.SourceLineID != 22 {
 		t.Fatalf("completion did not derive stable source: %#v", created)
 	}
@@ -2032,6 +2038,7 @@ func productionFactModuleGateParams(t *testing.T) *structpb.Struct {
 		"fact_no":                  "PROD-MODULE-GATE",
 		"production_order_id":      float64(21),
 		"production_order_item_id": float64(22),
+		"production_wip_batch_id":  float64(23),
 		"warehouse_id":             float64(1),
 		"new_lot_no":               "PROD-MODULE-GATE-LOT",
 		"quantity":                 "12",
@@ -2124,24 +2131,25 @@ func (r *productionModuleGateOperationalFactRepo) CreateProductionFactDraft(_ co
 	r.lastProductionFactCreate = &copy
 	now := time.Now()
 	return &biz.ProductionFact{
-		ID:             500,
-		FactNo:         in.FactNo,
-		FactType:       in.FactType,
-		Status:         biz.OperationalFactStatusDraft,
-		SubjectType:    in.SubjectType,
-		SubjectID:      in.SubjectID,
-		ProductSkuID:   in.ProductSkuID,
-		WarehouseID:    in.WarehouseID,
-		UnitID:         in.UnitID,
-		LotID:          in.LotID,
-		Quantity:       in.Quantity,
-		SourceType:     in.SourceType,
-		SourceID:       in.SourceID,
-		SourceLineID:   in.SourceLineID,
-		IdempotencyKey: in.IdempotencyKey,
-		OccurredAt:     in.OccurredAt,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:                   500,
+		FactNo:               in.FactNo,
+		FactType:             in.FactType,
+		Status:               biz.OperationalFactStatusDraft,
+		SubjectType:          in.SubjectType,
+		SubjectID:            in.SubjectID,
+		ProductSkuID:         in.ProductSkuID,
+		WarehouseID:          in.WarehouseID,
+		UnitID:               in.UnitID,
+		LotID:                in.LotID,
+		Quantity:             in.Quantity,
+		SourceType:           in.SourceType,
+		SourceID:             in.SourceID,
+		SourceLineID:         in.SourceLineID,
+		ProductionWIPBatchID: in.ProductionWIPBatchID,
+		IdempotencyKey:       in.IdempotencyKey,
+		OccurredAt:           in.OccurredAt,
+		CreatedAt:            now,
+		UpdatedAt:            now,
 	}, nil
 }
 

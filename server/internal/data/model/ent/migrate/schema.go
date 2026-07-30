@@ -1907,6 +1907,7 @@ var (
 		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "posted_by", Type: field.TypeInt, Nullable: true},
 		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
+		{Name: "production_wip_batch_id", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
 		{Name: "warehouse_id", Type: field.TypeInt},
 	}
@@ -1941,14 +1942,20 @@ var (
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "production_facts_units_production_facts",
+				Symbol:     "production_facts_production_wip_batches_completion_facts",
 				Columns:    []*schema.Column{ProductionFactsColumns[24]},
+				RefColumns: []*schema.Column{ProductionWipBatchesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_facts_units_production_facts",
+				Columns:    []*schema.Column{ProductionFactsColumns[25]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_facts_warehouses_production_facts",
-				Columns:    []*schema.Column{ProductionFactsColumns[25]},
+				Columns:    []*schema.Column{ProductionFactsColumns[26]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1975,6 +1982,11 @@ var (
 				Columns: []*schema.Column{ProductionFactsColumns[21]},
 			},
 			{
+				Name:    "productionfact_production_wip_batch_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionFactsColumns[24]},
+			},
+			{
 				Name:    "productionfact_source_type_source_id_source_line_id",
 				Unique:  false,
 				Columns: []*schema.Column{ProductionFactsColumns[8], ProductionFactsColumns[9], ProductionFactsColumns[10]},
@@ -1982,7 +1994,7 @@ var (
 			{
 				Name:    "productionfact_subject_type_subject_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionFactsColumns[5], ProductionFactsColumns[6], ProductionFactsColumns[25], ProductionFactsColumns[20]},
+				Columns: []*schema.Column{ProductionFactsColumns[5], ProductionFactsColumns[6], ProductionFactsColumns[26], ProductionFactsColumns[20]},
 			},
 		},
 	}
@@ -2443,6 +2455,7 @@ var (
 		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "origin_rework_fact_id", Type: field.TypeInt, Nullable: true},
 		{Name: "production_order_id", Type: field.TypeInt},
 		{Name: "production_order_item_id", Type: field.TypeInt},
 		{Name: "production_order_operation_id", Type: field.TypeInt},
@@ -2456,32 +2469,38 @@ var (
 		PrimaryKey: []*schema.Column{ProductionWipBatchesColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "production_wip_batches_production_orders_wip_batches",
+				Symbol:     "production_wip_batches_production_facts_origin_rework_batches",
 				Columns:    []*schema.Column{ProductionWipBatchesColumns[12]},
+				RefColumns: []*schema.Column{ProductionFactsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_wip_batches_production_orders_wip_batches",
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[13]},
 				RefColumns: []*schema.Column{ProductionOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_production_order_items_wip_batches",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[13]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[14]},
 				RefColumns: []*schema.Column{ProductionOrderItemsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_production_order_operations_wip_batches",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[14]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[15]},
 				RefColumns: []*schema.Column{ProductionOrderOperationsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_production_wip_batches_child_batches",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[15]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[16]},
 				RefColumns: []*schema.Column{ProductionWipBatchesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_admin_users_creator",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[16]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[17]},
 				RefColumns: []*schema.Column{AdminUsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2495,12 +2514,25 @@ var (
 			{
 				Name:    "productionwipbatch_production_order_item_id_production_order_operation_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionWipBatchesColumns[13], ProductionWipBatchesColumns[14]},
+				Columns: []*schema.Column{ProductionWipBatchesColumns[14], ProductionWipBatchesColumns[15]},
 			},
 			{
 				Name:    "productionwipbatch_source_batch_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionWipBatchesColumns[15]},
+				Columns: []*schema.Column{ProductionWipBatchesColumns[16]},
+			},
+			{
+				Name:    "productionwipbatch_origin_rework_fact_id",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionWipBatchesColumns[12]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "origin_rework_fact_id IS NOT NULL AND source_batch_id IS NULL",
+				},
+			},
+			{
+				Name:    "productionwipbatch_origin_rework_fact_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionWipBatchesColumns[12], ProductionWipBatchesColumns[4]},
 			},
 			{
 				Name:    "productionwipbatch_status_execution_mode",
@@ -4924,8 +4956,9 @@ func init() {
 	ProductionFactsTable.ForeignKeys[1].RefTable = ProductSkusTable
 	ProductionFactsTable.ForeignKeys[2].RefTable = AdminUsersTable
 	ProductionFactsTable.ForeignKeys[3].RefTable = AdminUsersTable
-	ProductionFactsTable.ForeignKeys[4].RefTable = UnitsTable
-	ProductionFactsTable.ForeignKeys[5].RefTable = WarehousesTable
+	ProductionFactsTable.ForeignKeys[4].RefTable = ProductionWipBatchesTable
+	ProductionFactsTable.ForeignKeys[5].RefTable = UnitsTable
+	ProductionFactsTable.ForeignKeys[6].RefTable = WarehousesTable
 	ProductionFactsTable.Annotation = &entsql.Annotation{}
 	ProductionFactsTable.Annotation.Checks = map[string]string{
 		"production_facts_quantity_positive":   "quantity > 0",
@@ -4935,6 +4968,7 @@ func init() {
 		"production_facts_subject_allowed":     "subject_type IN ('MATERIAL', 'PRODUCT')",
 		"production_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK')",
 		"production_facts_version_positive":    "version > 0",
+		"production_facts_wip_source_allowed":  "production_wip_batch_id IS NULL OR (fact_type = 'FINISHED_GOODS_RECEIPT' AND source_type = 'PRODUCTION_ORDER' AND source_id IS NOT NULL AND source_line_id IS NOT NULL)",
 	}
 	ProductionOrdersTable.ForeignKeys[0].RefTable = AdminUsersTable
 	ProductionOrdersTable.ForeignKeys[1].RefTable = AdminUsersTable
@@ -5025,18 +5059,19 @@ func init() {
 		"production_packaging_confirmations_status_allowed":   "status IN ('PENDING', 'CONFIRMED')",
 		"production_packaging_confirmations_version_positive": "version > 0",
 	}
-	ProductionWipBatchesTable.ForeignKeys[0].RefTable = ProductionOrdersTable
-	ProductionWipBatchesTable.ForeignKeys[1].RefTable = ProductionOrderItemsTable
-	ProductionWipBatchesTable.ForeignKeys[2].RefTable = ProductionOrderOperationsTable
-	ProductionWipBatchesTable.ForeignKeys[3].RefTable = ProductionWipBatchesTable
-	ProductionWipBatchesTable.ForeignKeys[4].RefTable = AdminUsersTable
+	ProductionWipBatchesTable.ForeignKeys[0].RefTable = ProductionFactsTable
+	ProductionWipBatchesTable.ForeignKeys[1].RefTable = ProductionOrdersTable
+	ProductionWipBatchesTable.ForeignKeys[2].RefTable = ProductionOrderItemsTable
+	ProductionWipBatchesTable.ForeignKeys[3].RefTable = ProductionOrderOperationsTable
+	ProductionWipBatchesTable.ForeignKeys[4].RefTable = ProductionWipBatchesTable
+	ProductionWipBatchesTable.ForeignKeys[5].RefTable = AdminUsersTable
 	ProductionWipBatchesTable.Annotation = &entsql.Annotation{}
 	ProductionWipBatchesTable.Annotation.Checks = map[string]string{
 		"production_wip_batches_execution_allowed": "execution_mode IS NULL OR execution_mode IN ('IN_HOUSE', 'OUTSOURCED')",
 		"production_wip_batches_flow_type_allowed": "flow_type IN ('NORMAL', 'REWORK')",
 		"production_wip_batches_order_positive":    "production_order_id > 0",
 		"production_wip_batches_quantity_positive": "quantity > 0",
-		"production_wip_batches_rework_bundle":     "((flow_type = 'NORMAL' AND rework_reason IS NULL) OR (flow_type = 'REWORK' AND source_batch_id IS NOT NULL AND rework_reason IS NOT NULL AND length(trim(rework_reason)) BETWEEN 1 AND 255))",
+		"production_wip_batches_rework_bundle":     "((flow_type = 'NORMAL' AND rework_reason IS NULL) OR (flow_type = 'REWORK' AND rework_reason IS NOT NULL AND length(trim(rework_reason)) BETWEEN 1 AND 255 AND (source_batch_id IS NOT NULL OR origin_rework_fact_id IS NOT NULL)))",
 		"production_wip_batches_status_allowed":    "status IN ('PLANNED', 'SPLIT', 'IN_PROGRESS', 'OUTSOURCED', 'WAITING_QUALITY', 'ACCEPTED', 'REJECTED', 'CANCELLED')",
 		"production_wip_batches_version_positive":  "version > 0",
 	}

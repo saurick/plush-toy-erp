@@ -43,6 +43,8 @@ const (
 	FieldSourceID = "source_id"
 	// FieldSourceLineID holds the string denoting the source_line_id field in the database.
 	FieldSourceLineID = "source_line_id"
+	// FieldProductionWipBatchID holds the string denoting the production_wip_batch_id field in the database.
+	FieldProductionWipBatchID = "production_wip_batch_id"
 	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
 	FieldIdempotencyKey = "idempotency_key"
 	// FieldOccurredAt holds the string denoting the occurred_at field in the database.
@@ -73,6 +75,10 @@ const (
 	EdgeProductSku = "product_sku"
 	// EdgeInventoryLot holds the string denoting the inventory_lot edge name in mutations.
 	EdgeInventoryLot = "inventory_lot"
+	// EdgeProductionWipBatch holds the string denoting the production_wip_batch edge name in mutations.
+	EdgeProductionWipBatch = "production_wip_batch"
+	// EdgeOriginReworkBatches holds the string denoting the origin_rework_batches edge name in mutations.
+	EdgeOriginReworkBatches = "origin_rework_batches"
 	// EdgePoster holds the string denoting the poster edge name in mutations.
 	EdgePoster = "poster"
 	// EdgeCanceller holds the string denoting the canceller edge name in mutations.
@@ -107,6 +113,20 @@ const (
 	InventoryLotInverseTable = "inventory_lots"
 	// InventoryLotColumn is the table column denoting the inventory_lot relation/edge.
 	InventoryLotColumn = "lot_id"
+	// ProductionWipBatchTable is the table that holds the production_wip_batch relation/edge.
+	ProductionWipBatchTable = "production_facts"
+	// ProductionWipBatchInverseTable is the table name for the ProductionWIPBatch entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipbatch" package.
+	ProductionWipBatchInverseTable = "production_wip_batches"
+	// ProductionWipBatchColumn is the table column denoting the production_wip_batch relation/edge.
+	ProductionWipBatchColumn = "production_wip_batch_id"
+	// OriginReworkBatchesTable is the table that holds the origin_rework_batches relation/edge.
+	OriginReworkBatchesTable = "production_wip_batches"
+	// OriginReworkBatchesInverseTable is the table name for the ProductionWIPBatch entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipbatch" package.
+	OriginReworkBatchesInverseTable = "production_wip_batches"
+	// OriginReworkBatchesColumn is the table column denoting the origin_rework_batches relation/edge.
+	OriginReworkBatchesColumn = "origin_rework_fact_id"
 	// PosterTable is the table that holds the poster relation/edge.
 	PosterTable = "production_facts"
 	// PosterInverseTable is the table name for the AdminUser entity.
@@ -140,6 +160,7 @@ var Columns = []string{
 	FieldSourceType,
 	FieldSourceID,
 	FieldSourceLineID,
+	FieldProductionWipBatchID,
 	FieldIdempotencyKey,
 	FieldOccurredAt,
 	FieldOccurredAtSpecified,
@@ -200,6 +221,8 @@ var (
 	SourceIDValidator func(int) error
 	// SourceLineIDValidator is a validator for the "source_line_id" field. It is called by the builders before save.
 	SourceLineIDValidator func(int) error
+	// ProductionWipBatchIDValidator is a validator for the "production_wip_batch_id" field. It is called by the builders before save.
+	ProductionWipBatchIDValidator func(int) error
 	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	IdempotencyKeyValidator func(string) error
 	// DefaultOccurredAt holds the default value on creation for the "occurred_at" field.
@@ -300,6 +323,11 @@ func BySourceLineID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceLineID, opts...).ToFunc()
 }
 
+// ByProductionWipBatchID orders the results by the production_wip_batch_id field.
+func ByProductionWipBatchID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductionWipBatchID, opts...).ToFunc()
+}
+
 // ByIdempotencyKey orders the results by the idempotency_key field.
 func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIdempotencyKey, opts...).ToFunc()
@@ -383,6 +411,27 @@ func ByInventoryLotField(field string, opts ...sql.OrderTermOption) OrderOption 
 	}
 }
 
+// ByProductionWipBatchField orders the results by production_wip_batch field.
+func ByProductionWipBatchField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductionWipBatchStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByOriginReworkBatchesCount orders the results by origin_rework_batches count.
+func ByOriginReworkBatchesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOriginReworkBatchesStep(), opts...)
+	}
+}
+
+// ByOriginReworkBatches orders the results by origin_rework_batches terms.
+func ByOriginReworkBatches(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOriginReworkBatchesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByPosterField orders the results by poster field.
 func ByPosterField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -422,6 +471,20 @@ func newInventoryLotStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(InventoryLotInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, InventoryLotTable, InventoryLotColumn),
+	)
+}
+func newProductionWipBatchStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductionWipBatchInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ProductionWipBatchTable, ProductionWipBatchColumn),
+	)
+}
+func newOriginReworkBatchesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OriginReworkBatchesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OriginReworkBatchesTable, OriginReworkBatchesColumn),
 	)
 }
 func newPosterStep() *sqlgraph.Step {

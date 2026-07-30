@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/warehouse"
@@ -490,6 +491,21 @@ func (_u *ProductionFactUpdate) SetInventoryLot(v *InventoryLot) *ProductionFact
 	return _u.SetInventoryLotID(v.ID)
 }
 
+// AddOriginReworkBatchIDs adds the "origin_rework_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_u *ProductionFactUpdate) AddOriginReworkBatchIDs(ids ...int) *ProductionFactUpdate {
+	_u.mutation.AddOriginReworkBatchIDs(ids...)
+	return _u
+}
+
+// AddOriginReworkBatches adds the "origin_rework_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionFactUpdate) AddOriginReworkBatches(v ...*ProductionWIPBatch) *ProductionFactUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOriginReworkBatchIDs(ids...)
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
 func (_u *ProductionFactUpdate) SetPosterID(id int) *ProductionFactUpdate {
 	_u.mutation.SetPosterID(id)
@@ -555,6 +571,27 @@ func (_u *ProductionFactUpdate) ClearProductSku() *ProductionFactUpdate {
 func (_u *ProductionFactUpdate) ClearInventoryLot() *ProductionFactUpdate {
 	_u.mutation.ClearInventoryLot()
 	return _u
+}
+
+// ClearOriginReworkBatches clears all "origin_rework_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionFactUpdate) ClearOriginReworkBatches() *ProductionFactUpdate {
+	_u.mutation.ClearOriginReworkBatches()
+	return _u
+}
+
+// RemoveOriginReworkBatchIDs removes the "origin_rework_batches" edge to ProductionWIPBatch entities by IDs.
+func (_u *ProductionFactUpdate) RemoveOriginReworkBatchIDs(ids ...int) *ProductionFactUpdate {
+	_u.mutation.RemoveOriginReworkBatchIDs(ids...)
+	return _u
+}
+
+// RemoveOriginReworkBatches removes "origin_rework_batches" edges to ProductionWIPBatch entities.
+func (_u *ProductionFactUpdate) RemoveOriginReworkBatches(v ...*ProductionWIPBatch) *ProductionFactUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOriginReworkBatchIDs(ids...)
 }
 
 // ClearPoster clears the "poster" edge to the AdminUser entity.
@@ -920,6 +957,51 @@ func (_u *ProductionFactUpdate) sqlSave(ctx context.Context) (_node int, err err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OriginReworkBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.OriginReworkBatchesTable,
+			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOriginReworkBatchesIDs(); len(nodes) > 0 && !_u.mutation.OriginReworkBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.OriginReworkBatchesTable,
+			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OriginReworkBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.OriginReworkBatchesTable,
+			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1461,6 +1543,21 @@ func (_u *ProductionFactUpdateOne) SetInventoryLot(v *InventoryLot) *ProductionF
 	return _u.SetInventoryLotID(v.ID)
 }
 
+// AddOriginReworkBatchIDs adds the "origin_rework_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_u *ProductionFactUpdateOne) AddOriginReworkBatchIDs(ids ...int) *ProductionFactUpdateOne {
+	_u.mutation.AddOriginReworkBatchIDs(ids...)
+	return _u
+}
+
+// AddOriginReworkBatches adds the "origin_rework_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionFactUpdateOne) AddOriginReworkBatches(v ...*ProductionWIPBatch) *ProductionFactUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOriginReworkBatchIDs(ids...)
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
 func (_u *ProductionFactUpdateOne) SetPosterID(id int) *ProductionFactUpdateOne {
 	_u.mutation.SetPosterID(id)
@@ -1526,6 +1623,27 @@ func (_u *ProductionFactUpdateOne) ClearProductSku() *ProductionFactUpdateOne {
 func (_u *ProductionFactUpdateOne) ClearInventoryLot() *ProductionFactUpdateOne {
 	_u.mutation.ClearInventoryLot()
 	return _u
+}
+
+// ClearOriginReworkBatches clears all "origin_rework_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionFactUpdateOne) ClearOriginReworkBatches() *ProductionFactUpdateOne {
+	_u.mutation.ClearOriginReworkBatches()
+	return _u
+}
+
+// RemoveOriginReworkBatchIDs removes the "origin_rework_batches" edge to ProductionWIPBatch entities by IDs.
+func (_u *ProductionFactUpdateOne) RemoveOriginReworkBatchIDs(ids ...int) *ProductionFactUpdateOne {
+	_u.mutation.RemoveOriginReworkBatchIDs(ids...)
+	return _u
+}
+
+// RemoveOriginReworkBatches removes "origin_rework_batches" edges to ProductionWIPBatch entities.
+func (_u *ProductionFactUpdateOne) RemoveOriginReworkBatches(v ...*ProductionWIPBatch) *ProductionFactUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOriginReworkBatchIDs(ids...)
 }
 
 // ClearPoster clears the "poster" edge to the AdminUser entity.
@@ -1921,6 +2039,51 @@ func (_u *ProductionFactUpdateOne) sqlSave(ctx context.Context) (_node *Producti
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OriginReworkBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.OriginReworkBatchesTable,
+			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOriginReworkBatchesIDs(); len(nodes) > 0 && !_u.mutation.OriginReworkBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.OriginReworkBatchesTable,
+			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OriginReworkBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.OriginReworkBatchesTable,
+			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
