@@ -35,7 +35,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
     nextStatus: 'submitted',
     run: submitSalesOrderAcceptanceProcess,
     returnsRecord: false,
-    successMessage: '销售订单已提交，已进入老板审批',
+    successMessage: '销售订单已提交，已进入审批流程',
   },
   {
     key: 'close',

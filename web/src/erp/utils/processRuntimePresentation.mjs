@@ -6,8 +6,8 @@ const PROCESS_STATUS_LABELS = Object.freeze({
 
 const PROCESS_LABELS = Object.freeze({
   sales_order_acceptance: '销售订单受理',
-  material_supply: '采购供料',
-  finished_goods_delivery: '成品交付',
+  material_supply: '采购订单提交与审批',
+  finished_goods_delivery: '出货财务放行',
   sales_return_acceptance: '客户退货受理',
   finance_payment_approval: '收付款审批',
   inventory_adjustment_approval: '人工库存调整',
@@ -27,8 +27,9 @@ const NODE_LABELS = Object.freeze({
   activate_sales_order: '销售订单生效',
   engineering_data: '工程资料',
   order_review: '订单复核',
+  submit_purchase_order: '提交采购订单',
   purchase_order_approval: '采购订单审批',
-  approve_purchase_order: '采购订单审批',
+  approve_purchase_order: '采购订单批准生效',
   purchase_receipt_source: '采购收货来源',
   incoming_qc: '来料质检',
   warehouse_inbound: '仓库入库',
@@ -58,6 +59,7 @@ const NODE_LABELS = Object.freeze({
   production_exception_execution: '生产异常执行交接',
   execute_production_exception: '执行生产异常处置',
   reject_production_exception: '退回生产异常申请',
+  over_issue_end: '超领审批结束',
   rejected_end: '流程退回结束',
   end: '流程结束',
 })
@@ -81,7 +83,7 @@ const NODE_TYPE_KEYS = new Set([
 ])
 
 function invalidProcessContext() {
-  throw new Error('流程位置暂时无法确认，请刷新后重试')
+  throw new Error('业务轨迹暂时无法确认，请刷新后重试')
 }
 
 export function isDisplayOnlyWorkflowTask(task = {}) {

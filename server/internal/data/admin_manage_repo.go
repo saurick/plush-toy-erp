@@ -20,6 +20,7 @@ import (
 	"server/internal/data/model/ent/runtimeauditevent"
 	"server/internal/data/model/ent/warehouse"
 	"server/internal/data/model/ent/workflowtask"
+	pkglogger "server/pkg/logger"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -1526,7 +1527,7 @@ func adminAuditSnapshotWithSessionRevocation(snapshot map[string]any, revokedSes
 }
 
 func (r *adminManageRepo) RecordRuntimeAuditEvent(ctx context.Context, event *biz.RuntimeAuditEventCreate) error {
-	eventType, eventKey, source, encodedPayload, err := normalizeRuntimeAuditEventCreate(event)
+	eventType, eventKey, source, encodedPayload, err := normalizeRuntimeAuditEventCreate(ctx, event)
 	if err != nil {
 		return err
 	}
@@ -1540,7 +1541,7 @@ func (r *adminManageRepo) RecordRuntimeAuditEvent(ctx context.Context, event *bi
 }
 
 func createRuntimeAuditEventInTx(ctx context.Context, tx *ent.Tx, event *biz.RuntimeAuditEventCreate) error {
-	eventType, eventKey, source, encodedPayload, err := normalizeRuntimeAuditEventCreate(event)
+	eventType, eventKey, source, encodedPayload, err := normalizeRuntimeAuditEventCreate(ctx, event)
 	if err != nil {
 		return err
 	}
@@ -1553,13 +1554,19 @@ func createRuntimeAuditEventInTx(ctx context.Context, tx *ent.Tx, event *biz.Run
 	return err
 }
 
-func normalizeRuntimeAuditEventCreate(event *biz.RuntimeAuditEventCreate) (string, string, string, string, error) {
+func normalizeRuntimeAuditEventCreate(ctx context.Context, event *biz.RuntimeAuditEventCreate) (string, string, string, string, error) {
 	if event == nil || strings.TrimSpace(event.EventType) == "" || strings.TrimSpace(event.Source) == "" {
 		return "", "", "", "", biz.ErrBadParam
 	}
-	payload := event.Payload
-	if payload == nil {
-		payload = map[string]any{}
+	payload := make(map[string]any, len(event.Payload)+1)
+	for key, value := range event.Payload {
+		if strings.EqualFold(strings.TrimSpace(key), "request_id") {
+			continue
+		}
+		payload[key] = value
+	}
+	if requestID := strings.TrimSpace(pkglogger.RequestIDFromContext(ctx)); requestID != "" {
+		payload["request_id"] = requestID
 	}
 	encodedPayload, err := json.Marshal(payload)
 	if err != nil {

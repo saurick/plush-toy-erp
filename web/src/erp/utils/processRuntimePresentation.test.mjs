@@ -56,10 +56,13 @@ test('process runtime presentation validates canonical task-scoped context', () 
 })
 
 test('process runtime presentation covers every current Product Core process', () => {
-  assert.equal(getProcessLabel({ process_key: 'material_supply' }), '采购供料')
+  assert.equal(
+    getProcessLabel({ process_key: 'material_supply' }),
+    '采购订单提交与审批'
+  )
   assert.equal(
     getProcessLabel({ process_key: 'finished_goods_delivery' }),
-    '成品交付'
+    '出货财务放行'
   )
   assert.equal(
     getProcessLabel({ process_key: 'sales_return_acceptance' }),
@@ -83,8 +86,9 @@ test('process runtime presentation covers every current Product Core process', (
     activate_sales_order: '销售订单生效',
     engineering_data: '工程资料',
     order_review: '订单复核',
+    submit_purchase_order: '提交采购订单',
     purchase_order_approval: '采购订单审批',
-    approve_purchase_order: '采购订单审批',
+    approve_purchase_order: '采购订单批准生效',
     purchase_receipt_source: '采购收货来源',
     incoming_qc: '来料质检',
     warehouse_inbound: '仓库入库',
@@ -114,6 +118,7 @@ test('process runtime presentation covers every current Product Core process', (
     production_exception_execution: '生产异常执行交接',
     execute_production_exception: '执行生产异常处置',
     reject_production_exception: '退回生产异常申请',
+    over_issue_end: '超领审批结束',
     rejected_end: '流程退回结束',
     end: '流程结束',
   }
@@ -164,7 +169,7 @@ test('process runtime presentation rejects approval form/profile drift', () => {
   }
   assert.throws(
     () => requireWorkflowProcessContext(value),
-    /流程位置暂时无法确认/u
+    /业务轨迹暂时无法确认/u
   )
 })
 
@@ -303,7 +308,7 @@ test('process runtime presentation fails closed on foreign or invalid nodes', ()
           ],
         })
       ),
-    /流程位置暂时无法确认/u
+    /业务轨迹暂时无法确认/u
   )
   assert.throws(
     () =>
@@ -315,7 +320,7 @@ test('process runtime presentation fails closed on foreign or invalid nodes', ()
           },
         })
       ),
-    /流程位置暂时无法确认/u
+    /业务轨迹暂时无法确认/u
   )
   const canonicalDrift = context()
   canonicalDrift.current_nodes = [
@@ -323,7 +328,7 @@ test('process runtime presentation fails closed on foreign or invalid nodes', ()
   ]
   assert.throws(
     () => requireWorkflowProcessContext(canonicalDrift),
-    /流程位置暂时无法确认/u
+    /业务轨迹暂时无法确认/u
   )
 })
 

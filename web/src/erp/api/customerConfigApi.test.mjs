@@ -763,7 +763,7 @@ test('V1SalesOrdersPage: sales order submit action enters acceptance workflow', 
   assert.match(salesOrderPageConfigSource, /submitSalesOrderAcceptanceProcess/)
   assert.match(
     salesOrderPageConfigSource,
-    /successMessage:\s*'销售订单已提交，已进入老板审批'/
+    /successMessage:\s*'销售订单已提交，已进入审批流程'/
   )
   assert.match(salesOrderPageConfigSource, /returnsRecord:\s*false/)
   assert.doesNotMatch(salesOrderPageConfigSource, /submitSalesOrder,/)

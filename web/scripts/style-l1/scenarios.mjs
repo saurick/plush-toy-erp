@@ -4640,7 +4640,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, 'SHIP-L1-501')
         await expectText(page, '等待审批人核对来源单据与放行条件')
         await expectText(page, '业务轨迹')
-        await expectText(page, '成品交付')
+        await expectText(page, '出货财务放行')
         await expectText(page, '流程状态')
         await expectText(page, '办理中')
         const taskEventTrail = page.getByTestId('workflow-task-event-trail')
