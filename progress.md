@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### 开发工作台主题切换
+
+- 完成：研发效能工作台的共享侧栏新增“跟系统 / 浅色 / 暗色”主题入口，复用全站 `ERPThemeProvider`、`ERPThemeToggle` 和 `plush_erp_theme_mode`，所有 `/__dev/**` 页面同步生效且刷新后保持，不建立第二套主题状态。桌面侧栏显示当前模式并占满操作区，窄屏收为自适应按钮，手机端只保留图标；可访问名称始终带当前模式，点击区域不小于 40px。
+- 验证：Node `26.5.0` 下，主题与开发工作台定向测试 46 / 46、Web 全量 Node 测试 1996 / 1996、Web lint、CSS、样式脚本语法和 scoped `git diff --check` 通过，包装命令保留仓库要求 Node `24.14.x` 的 engine 提示。显式使用 Node `24.14.0` 运行 `dev-testing-dark-desktop`、`dev-testing-light-desktop`、`dev-all-pages-mobile` 三个 Style L1 场景全部通过并目检截图；独立 Playwright 会话实际完成暗色切换、刷新持久化和切回浅色，控制台 0 error / 0 warning。
+- 下一步：本项无需原型阶段、schema、migration、API、RBAC、菜单、Workflow / Fact、客户配置、部署或客户 UAT；尚未暂存、提交或推送。
+- 阻塞 / 风险：共享 Local 仍包含财务帮助、任务看板、数据准备、Workflow 等其他任务现场；本项只归属共享开发导航主题入口、响应式样式、静态合同、Style L1 精确门禁、Web 主题说明及本独立小节，不格式化、暂存或提交其他 hunks。本地混合工作区的绿色验证不替代 clean exact SHA、目标环境 smoke 或发布证据。
+
 ### 逾期任务相关单据入口
 
 - 完成：确认工作台的待处理、待审批和阻塞 / 逾期共用同一套任务详情与相关单据入口；截图中的模拟任务没有真实 Source Document / ProcessRuntime，继续不显示虚假入口，并在处理提示中明确“当前任务没有需要核对的相关单据”。补齐正式 ProcessRuntime 的客户退货、收付款与核销、库存调整、生产异常处置四类源单精确跳转；入口仍同时受后端 `source_access`、菜单投影和注册路由控制。

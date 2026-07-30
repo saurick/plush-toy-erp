@@ -62,6 +62,14 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
   assert.match(devPageNavSource, /getDevSecondaryNavItems/)
   assert.match(
     devPageNavSource,
+    /import ERPThemeToggle from '@\/common\/components\/theme\/ERPThemeToggle'/
+  )
+  assert.match(
+    devPageNavSource,
+    /<ERPThemeToggle[\s\S]*?className="erp-dev-workspace-nav__theme-toggle"[\s\S]*?variant="menu"[\s\S]*?showLabel[\s\S]*?\/>/
+  )
+  assert.match(
+    devPageNavSource,
     /location\.pathname\.replace\(\/\\\/\+\$\/, ''\)/
   )
   assert.match(devPageNavSource, /aria-current=\{isActive \? 'page'/)
@@ -84,6 +92,14 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
   assert.match(
     devNavigationStyles,
     /\.erp-dev-workspace-page\s*\{[\s\S]*?display:\s*block/u
+  )
+  assert.match(
+    devNavigationStyles,
+    /\.erp-dev-workspace-nav__theme-toggle\.erp-theme-menu-toggle\.ant-btn\s*\{\s*width:\s*100%;\s*\}/u
+  )
+  assert.match(
+    devNavigationStyles,
+    /@media \(max-width: 980px\)[\s\S]*?\.erp-dev-workspace-nav__theme-toggle\.erp-theme-menu-toggle\.ant-btn\s*\{\s*width:\s*auto;\s*\}/u
   )
 })
 

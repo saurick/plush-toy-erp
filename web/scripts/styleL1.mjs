@@ -7707,12 +7707,56 @@ async function assertDevPageUsesGlobalThemeOnly(
     expectDarkContrast = false,
   }
 ) {
-  const toggleCount = await page.evaluate(
-    (targetSelector) =>
-      document.querySelectorAll(`${targetSelector} .erp-theme-toggle`).length,
-    selector
+  const themeToggleMetrics = await page.evaluate((targetSelector) => {
+    const root = document.querySelector(targetSelector)
+    const toggles = root
+      ? Array.from(
+          root.querySelectorAll(
+            '.erp-theme-toggle, .erp-theme-menu-toggle'
+          )
+        )
+      : []
+    const toggle = toggles[0]
+    const rect = toggle?.getBoundingClientRect()
+    const style = toggle ? window.getComputedStyle(toggle) : null
+    return {
+      count: toggles.length,
+      inSharedNavigationActions: Boolean(
+        toggle?.closest('.erp-dev-workspace-nav__actions')
+      ),
+      ariaLabel: toggle?.getAttribute('aria-label') || '',
+      width: rect ? Number(rect.width.toFixed(1)) : 0,
+      height: rect ? Number(rect.height.toFixed(1)) : 0,
+      visible: Boolean(
+        rect &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style?.display !== 'none' &&
+          style?.visibility !== 'hidden'
+      ),
+    }
+  }, selector)
+  assert.equal(
+    themeToggleMetrics.count,
+    1,
+    `${scenarioName} 开发页应只使用共享导航中的单个主题切换控件: ${JSON.stringify(themeToggleMetrics)}`
   )
-  assert.equal(toggleCount, 0, `${scenarioName} 开发页不应重复放置主题切换控件`)
+  assert.equal(
+    themeToggleMetrics.inSharedNavigationActions,
+    true,
+    `${scenarioName} 主题切换控件应位于共享导航操作区: ${JSON.stringify(themeToggleMetrics)}`
+  )
+  assert.match(
+    themeToggleMetrics.ariaLabel,
+    /^主题模式：(跟系统|浅色|暗色)$/u,
+    `${scenarioName} 主题切换控件缺少当前模式可访问名称: ${JSON.stringify(themeToggleMetrics)}`
+  )
+  assert(
+    themeToggleMetrics.visible &&
+      themeToggleMetrics.width >= 40 &&
+      themeToggleMetrics.height >= 40,
+    `${scenarioName} 主题切换控件应保持至少 40px 的可见点击区域: ${JSON.stringify(themeToggleMetrics)}`
+  )
   await assertERPThemeMode(page, {
     scenarioName,
     expectedMode,

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import { CopyOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Button, theme } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
+import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import { message } from '@/common/utils/antdApp'
 import {
   DEV_DOCS_ROUTE,
@@ -136,6 +137,11 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
         ) : null}
       </div>
       <div className="erp-dev-workspace-nav__actions">
+        <ERPThemeToggle
+          className="erp-dev-workspace-nav__theme-toggle"
+          variant="menu"
+          showLabel
+        />
         <Button
           block
           icon={<CopyOutlined />}

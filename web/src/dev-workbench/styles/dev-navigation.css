@@ -172,6 +172,10 @@
   border-top: 1px solid var(--dev-nav-border);
 }
 
+.erp-dev-workspace-nav__theme-toggle.erp-theme-menu-toggle.ant-btn {
+  width: 100%;
+}
+
 .erp-dev-workspace-nav__boundary {
   display: block;
   padding: 2px 4px 0;
@@ -311,6 +315,10 @@
   }
 
   .erp-dev-workspace-nav__actions .ant-btn {
+    width: auto;
+  }
+
+  .erp-dev-workspace-nav__theme-toggle.erp-theme-menu-toggle.ant-btn {
     width: auto;
   }
 

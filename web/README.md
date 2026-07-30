@@ -99,7 +99,7 @@ http://127.0.0.1:5175/m/engineering/tasks
 
 ### 主题模式 / Theme mode
 
-桌面后台、统一登录页和岗位任务端支持「跟系统 / 浅色 / 暗色」三种主题模式，默认跟随系统偏好。用户手动选择会写入浏览器 `localStorage` 的 `plush_erp_theme_mode`，刷新后保持；`跟系统` 只决定视觉主题，不影响入口选择、权限判断或最终路由。
+桌面后台、统一登录页、岗位任务端和开发工作台支持「跟系统 / 浅色 / 暗色」三种主题模式，默认跟随系统偏好。开发工作台在共享侧栏操作区提供主题入口，所有 `/__dev/**` 页面复用同一运行时状态；用户手动选择会写入浏览器 `localStorage` 的 `plush_erp_theme_mode`，刷新后保持。`跟系统` 只决定视觉主题，不影响入口选择、权限判断或最终路由。
 
 当前登录态 token 仍保存在浏览器侧认证存储中，并通过 `Authorization: Bearer` 发送，主要风险面是 XSS 后的 token 读取或泄露；不得把 token 写入 trace、日志、文档、截图或 QA 报告。生产侧已补基础 HTTP 安全响应头降低误嵌入、MIME sniff 和宽泛 referrer 风险，但这不等同于 HttpOnly Cookie 方案。当前内部系统不把 CSRF 作为近期安全待办；只有后续明确迁到浏览器自动携带的 Cookie 登录态时，才需要把 SameSite / CSRF、登录态刷新和前端 API client 改造放到同一轮专项评审。
 
