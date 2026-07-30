@@ -50,6 +50,7 @@ const REGISTERED_DEVELOPMENT_PORT = 5432
 const CORE_DEMO_PREFIX = 'SIM-PLUSH-CORE'
 const SCENARIO_DEMO_DATA_VERSION = '2026.07.16-v5'
 const SCENARIO_DEMO_RUN_ID = '20260716-V5'
+const INTERRUPTED_OPERATION_RECOVERY_GRACE_MS = 30_000
 const LOCAL_ACCEPTANCE_DATABASE_BASE_URL_ENV =
   'LOCAL_ACCEPTANCE_DATABASE_BASE_URL'
 const DATABASE_TARGET_MODULE_URL = pathToFileURL(
@@ -81,7 +82,8 @@ export const DEV_DATA_PREPARATION_PROFILES = Object.freeze([
   Object.freeze({
     key: 'scenario-demo',
     title: '长期共享库场景数据',
-    purpose: '按固定 V5 批次精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
+    purpose:
+      '先对齐当前跟踪的本地客户配置，再按固定 V5 批次精确创建或读回 Source、ProcessRuntime 与 Fact 场景',
     writesDatabase: true,
     dataRetention: 'long-lived',
     cleanupMode: 'forward-only',
@@ -320,7 +322,7 @@ export async function fullAcceptanceExecutionCommand(projectRoot, operation) {
 }
 
 function redactError(error) {
-  return String(error?.message || error || 'unknown failure')
+  const message = String(error?.message || error || 'unknown failure')
     .replace(
       /postgres(?:ql)?:\/\/[^:\s/@]+:[^@\s]+@/giu,
       'postgres://<redacted>@'
@@ -334,7 +336,11 @@ function redactError(error) {
       'credential'
     )
     .replace(/\/(?:Users|home|private|var|tmp)\/[^\s:]+/gu, '<local-path>')
+    .replace(/[\u0000-\u001f\u007f]+/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim()
     .slice(0, 400)
+  return message || 'unknown failure'
 }
 
 function validateRepositoryIdentity(repository) {
@@ -476,6 +482,7 @@ function scenarioDemoPlanFingerprint(stdout, repository, target) {
     plan.execution?.cleanupSupported !== false ||
     plan.execution?.cleanupMode !== 'forward-only' ||
     plan.execution?.directBusinessSQL !== false ||
+    plan.execution?.auditMinimum !== 30 ||
     plan.execution?.manualAcceptanceCompleted !== false ||
     !/^[0-9a-f]{64}$/u.test(String(plan.planDigest || ''))
   ) {
@@ -586,6 +593,49 @@ function publicOperation(operation) {
   }
 }
 
+function laterScenarioReadbackResolves(operation, operations) {
+  if (
+    operation.profileKey !== 'scenario-demo' ||
+    operation.status !== 'not_proven'
+  ) {
+    return false
+  }
+  return operations.some(
+    (candidate) =>
+      candidate.profileKey === 'scenario-demo' &&
+      candidate.status === 'passed' &&
+      candidate.targetSummary.targetFingerprint ===
+        operation.targetSummary.targetFingerprint &&
+      candidate.readback?.dataVersion === SCENARIO_DEMO_DATA_VERSION &&
+      candidate.readback?.runId === SCENARIO_DEMO_RUN_ID &&
+      Date.parse(candidate.updatedAt) > Date.parse(operation.updatedAt)
+  )
+}
+
+export function unresolvedDataPreparationOutcomeBlocksExecution(
+  operation,
+  operations
+) {
+  return operations.some((candidate) => {
+    if (
+      !['not_proven', 'launching', 'running'].includes(candidate.status) ||
+      candidate.id === operation.id
+    ) {
+      return false
+    }
+    if (['launching', 'running'].includes(candidate.status)) {
+      return true
+    }
+    return !(
+      operation.profileKey === 'scenario-demo' &&
+      candidate.profileKey === 'scenario-demo' &&
+      candidate.targetSummary.targetFingerprint ===
+        operation.targetSummary.targetFingerprint &&
+      Date.parse(candidate.updatedAt) < Date.parse(operation.createdAt)
+    )
+  })
+}
+
 function createRunId(now = new Date(), random = randomBytes) {
   const timestamp = now
     .toISOString()
@@ -620,13 +670,19 @@ export function createDevDataPreparationService({
   const store = operationStore || resolveDataPreparationOperationStore(root)
   const active = new Set()
 
-  const startupLock = readDataPreparationExecutionLock(store)
-  if (!startupLock || !isProcessAlive(startupLock.pid)) {
-    if (startupLock) {
-      releaseDataPreparationExecutionLock(store, startupLock.operationId)
+  function recoverOrphanedOperations() {
+    const executionLock = readDataPreparationExecutionLock(store)
+    if (executionLock && isProcessAlive(executionLock.pid)) {
+      return
     }
-    recoverInterruptedDataPreparationOperations(store, now().toISOString())
+    if (executionLock) {
+      releaseDataPreparationExecutionLock(store, executionLock.operationId)
+    }
+    recoverInterruptedDataPreparationOperations(store, now().toISOString(), {
+      minimumAgeMs: INTERRUPTED_OPERATION_RECOVERY_GRACE_MS,
+    })
   }
+  recoverOrphanedOperations()
 
   async function readCoreTarget() {
     const { parseDatabaseURL } = await loadDatabaseTargetModule()
@@ -767,6 +823,7 @@ export function createDevDataPreparationService({
   }
 
   async function getSummary() {
+    recoverOrphanedOperations()
     const issues = []
     const repositoryResult = await Promise.resolve(readRepositoryState(root))
       .then(validateRepositoryIdentity)
@@ -817,15 +874,24 @@ export function createDevDataPreparationService({
         })
       }
     }
-    if (
-      listDataPreparationOperations(store, { limit: 100 }).some(
-        (operation) => operation.status === 'not_proven'
+    const operations = listDataPreparationOperations(store, { limit: 100 })
+    const unresolvedOperations = operations.filter(
+      (operation) =>
+        operation.status === 'not_proven' &&
+        !laterScenarioReadbackResolves(operation, operations)
+    )
+    if (unresolvedOperations.length > 0) {
+      const scenarioReplayAvailable = unresolvedOperations.every(
+        (operation) => operation.profileKey === 'scenario-demo'
       )
-    ) {
       issues.push({
-        code: 'unresolved_operation_outcome',
-        severity: 'blocked',
-        message: '存在重启后结果未知的数据操作，核对前禁止再次执行',
+        code: scenarioReplayAvailable
+          ? 'scenario_demo_explicit_resume_available'
+          : 'unresolved_operation_outcome',
+        severity: scenarioReplayAvailable ? 'warning' : 'blocked',
+        message: scenarioReplayAvailable
+          ? '存在重启后结果未知的场景数据操作；可重新准备同目标计划并确认补齐，不会自动重试'
+          : '存在重启后结果未知的数据操作，核对前禁止再次执行',
       })
     }
     return {
@@ -1123,17 +1189,21 @@ export function createDevDataPreparationService({
     if (active.size > 0) {
       throw new Error('another data preparation operation is running')
     }
+    let operation = readDataPreparationOperation(store, payload.operationId)
+    const persistedOperations = listDataPreparationOperations(store, {
+      limit: 200,
+    })
     if (
-      listDataPreparationOperations(store, { limit: 200 }).some(
-        (item) =>
-          item.status === 'not_proven' ||
-          item.status === 'launching' ||
-          item.status === 'running'
+      unresolvedDataPreparationOutcomeBlocksExecution(
+        operation,
+        persistedOperations
       )
     ) {
       throw new Error('an unresolved data preparation outcome blocks execution')
     }
-    let operation = readDataPreparationOperation(store, payload.operationId)
+    if (operation.status === 'not_proven') {
+      throw new Error('an unresolved data preparation outcome blocks execution')
+    }
     if (operation.status !== 'ready') {
       throw new Error('data preparation operation is not ready')
     }
@@ -1224,6 +1294,7 @@ export function createDevDataPreparationService({
   return {
     summary: getSummary,
     readOperation(operationId) {
+      recoverOrphanedOperations()
       return publicOperation(readDataPreparationOperation(store, operationId))
     },
     async act(value) {

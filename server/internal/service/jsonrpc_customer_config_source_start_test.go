@@ -62,6 +62,7 @@ func TestCustomerConfigProcessSourceValidationUsesDomainTruth(t *testing.T) {
 			{name: "wrong state", order: &biz.SalesOrder{ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusClosed}, err: biz.ErrBadParam},
 			{name: "draft", order: &biz.SalesOrder{ID: 42, OrderNo: " SO-42 ", LifecycleStatus: biz.SalesOrderStatusDraft}, want: "SO-42"},
 			{name: "submitted replay", order: &biz.SalesOrder{ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusSubmitted}, want: "SO-42"},
+			{name: "active replay", order: &biz.SalesOrder{ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusActive}, want: "SO-42"},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
 				d := &jsonrpcDispatcher{salesOrderUC: biz.NewSalesOrderUsecase(&customerConfigSalesOrderSourceRepoStub{order: tt.order, err: func() error {

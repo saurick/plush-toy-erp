@@ -144,7 +144,7 @@ const READBACK_PRESENTATIONS = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.scenarioDemo]: (readback) => ({
     column: { xs: 1, sm: 2, lg: 3 },
     notice:
-      '本读回只证明固定批次业务场景已精确创建或读回；10 项浏览器检查与人工验收仍未完成，不代表完整验收。',
+      '本读回只证明固定批次业务场景已精确创建或读回：40 / 50 项已由数据查询证明，另 10 项只能在浏览器中确认。50 项页面操作与人工验收均未执行，不代表完整验收。',
     items: [
       {
         key: 'datasetKey',
@@ -198,8 +198,8 @@ const READBACK_PRESENTATIONS = Object.freeze({
       },
       {
         key: 'browserChecks',
-        label: '浏览器检查',
-        children: `${readback.browserChecksPending} 项待执行`,
+        label: '仅浏览器可证明项',
+        children: `${readback.browserChecksPending} 项`,
       },
       {
         key: 'manualAcceptance',

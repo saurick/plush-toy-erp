@@ -727,10 +727,23 @@ export function transitionDataPreparationOperation(
 export function recoverInterruptedDataPreparationOperations(
   store,
   now = new Date().toISOString(),
+  { minimumAgeMs = 0 } = {},
 ) {
+  const recoveryTime = Date.parse(now);
+  if (
+    Number.isNaN(recoveryTime) ||
+    !Number.isSafeInteger(minimumAgeMs) ||
+    minimumAgeMs < 0
+  ) {
+    throw new Error("operation recovery boundary is invalid");
+  }
   return listDataPreparationOperations(store, { limit: 200 }).map(
     (operation) => {
       if (!["launching", "running"].includes(operation.status)) {
+        return { operation, recovered: false };
+      }
+      const operationAgeMs = recoveryTime - Date.parse(operation.updatedAt);
+      if (operationAgeMs < minimumAgeMs) {
         return { operation, recovered: false };
       }
       return {

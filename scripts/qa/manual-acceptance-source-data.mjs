@@ -59,6 +59,13 @@ export const DEFAULT_SOURCE_DATA_SCALE = Object.freeze({
   outsourcingOrders: 45,
   bomVersions: 45,
 });
+export const SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES = Object.freeze([
+  Object.freeze(["DRAFT"]),
+  Object.freeze(["DRAFT", "SUBMITTED"]),
+  Object.freeze(["DRAFT", "SUBMITTED"]),
+  Object.freeze(["DRAFT", "SUBMITTED"]),
+  Object.freeze(["DRAFT", "SUBMITTED", "ACTIVE"]),
+]);
 
 export const ROLE_USERS = Object.freeze({
   seedAdmin: "admin",
@@ -190,10 +197,36 @@ function sourceSemanticDigest({
   runId,
   prefix,
   records,
+  salesOrderAcceptanceReplay,
 }) {
   return createHash("sha256")
-    .update(JSON.stringify({ datasetKey, dataVersion, runId, prefix, records }))
+    .update(
+      JSON.stringify({
+        datasetKey,
+        dataVersion,
+        runId,
+        prefix,
+        records,
+        salesOrderAcceptanceReplay,
+      }),
+    )
     .digest("hex");
+}
+
+function buildSalesOrderAcceptanceReplayContract(salesOrders) {
+  const candidates = salesOrders
+    .filter((record) => record.targetStatus === "DRAFT")
+    .slice(0, SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES.length);
+  if (candidates.length !== SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES.length) {
+    throw new CliError(
+      "sales order acceptance replay contract requires five DRAFT candidates",
+      2,
+    );
+  }
+  return candidates.map((record, index) => ({
+    orderNo: record.order_no,
+    allowedStatuses: [...SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES[index]],
+  }));
 }
 
 export function manualAcceptanceVisibleSourcePrefix(dataVersion) {
@@ -870,6 +903,8 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     outsourcingOrders,
     bomVersions,
   };
+  const salesOrderAcceptanceReplay =
+    buildSalesOrderAcceptanceReplayContract(salesOrders);
   const plan = {
     scope: "manual-acceptance-source-data",
     customerKey: CUSTOMER_KEY,
@@ -886,12 +921,14 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     databaseName: targetPolicy.databaseName,
     scale,
     records,
+    salesOrderAcceptanceReplay,
     semanticDigest: sourceSemanticDigest({
       datasetKey: targetPolicy.datasetKey,
       dataVersion: targetPolicy.dataVersion,
       runId,
       prefix,
       records,
+      salesOrderAcceptanceReplay,
     }),
     cleanup: {
       mode: "lifecycle-and-disable",
@@ -2065,6 +2102,15 @@ export async function advanceSalesOrderLifecycleThroughProcess({
   ).toUpperCase();
   let status = String(item?.lifecycle_status || "DRAFT").toUpperCase();
   if (status === target) return status;
+  const replay = plan.salesOrderAcceptanceReplay?.find(
+    (candidate) => candidate.orderNo === orderNo,
+  );
+  if (
+    target === "DRAFT" &&
+    replay?.allowedStatuses?.includes(status) === true
+  ) {
+    return status;
+  }
   if (new Set(["CLOSED", "CANCELED"]).has(status)) {
     throw new CliError(
       `sales_order id=${sourceID} is terminal ${status}, expected ${target}`,
@@ -3726,15 +3772,24 @@ export async function applyManualAcceptanceSourceData(
       .slice(0, 5)
       .map((record) => {
         const order = sourceDocuments.sales.get(record.order_no);
-        if (!order?.id || order.lifecycle_status !== "DRAFT") {
+        const replay = plan.salesOrderAcceptanceReplay.find(
+          (candidate) => candidate.orderNo === record.order_no,
+        );
+        const status = String(order?.lifecycle_status || "").toUpperCase();
+        if (
+          !order?.id ||
+          !replay ||
+          !replay.allowedStatuses.includes(status)
+        ) {
           throw new CliError(
-            `${record.order_no} process candidate is not a read-back DRAFT sales order`,
+            `${record.order_no} process candidate is outside its exact forward-only replay states`,
           );
         }
         return {
           id: order.id,
           orderNo: record.order_no,
-          status: order.lifecycle_status,
+          status,
+          allowedStatuses: [...replay.allowedStatuses],
         };
       }),
     purchaseOrders: plan.records.purchaseOrders

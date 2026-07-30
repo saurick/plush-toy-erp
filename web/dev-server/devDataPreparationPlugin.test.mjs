@@ -29,6 +29,7 @@ import {
   MAX_DEV_DATA_PREPARATION_REQUEST_BYTES,
   scenarioDemoExecutionCommand,
   scenarioDemoPlanCommand,
+  unresolvedDataPreparationOutcomeBlocksExecution,
   validateDevDataPreparationAction,
 } from './devDataPreparationPlugin.mjs'
 
@@ -402,6 +403,7 @@ test('scenario demo binds the fixed V5 plan, needs no browser credential input, 
             cleanupSupported: false,
             cleanupMode: 'forward-only',
             directBusinessSQL: false,
+            auditMinimum: 30,
             manualAcceptanceCompleted: false,
           },
           planDigest,
@@ -785,6 +787,106 @@ test('operation persistence recovers interrupted execution as not_proven and blo
   )
 })
 
+test('fresh Vite config reload keeps an in-flight operation inside the recovery grace window', (t) => {
+  const fixture = createFixture(t)
+  const targetSummary = {
+    safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+    targetFingerprint: 'c'.repeat(64),
+    preflightFingerprint: 'd'.repeat(64),
+    disposable: false,
+    automaticCleanup: false,
+  }
+  const runId = '20260729z_01020304'
+  const created = createOrReuseDataPreparationOperation(fixture.store, {
+    idempotencyKey: IDEMPOTENCY_KEY,
+    profileKey: 'scenario-demo',
+    repository: REPOSITORY,
+    runId,
+    targetSummary,
+    planHash: hashDataPreparationPlan({
+      profileKey: 'scenario-demo',
+      repository: REPOSITORY,
+      runId,
+      targetSummary,
+    }),
+    operationId: '123e4567-e89b-42d3-a456-426614174000',
+    now: '2026-07-29T02:03:04.000Z',
+  })
+  transitionDataPreparationOperation(fixture.store, created.operation.id, {
+    status: 'launching',
+    message: 'fixed profile executor is launching',
+    now: '2026-07-29T02:04:04.000Z',
+  })
+  const service = createDevDataPreparationService({
+    projectRoot: fixture.root,
+    operationStore: fixture.store,
+    commandRunner: successfulRunner([]),
+    readRepositoryState: async () => REPOSITORY,
+    environment: {},
+    now: () => new Date('2026-07-29T02:04:20.000Z'),
+  })
+  assert.equal(service.readOperation(created.operation.id).status, 'launching')
+})
+
+test('scenario-demo allows only a newer explicit same-target replay after an unknown outcome', () => {
+  const targetSummary = {
+    safeTarget: 'host=192.168.0.106 port=5432 database=plush_erp',
+    targetFingerprint: 'c'.repeat(64),
+    preflightFingerprint: 'd'.repeat(64),
+    disposable: false,
+    automaticCleanup: false,
+  }
+  const candidate = {
+    id: '223e4567-e89b-42d3-a456-426614174000',
+    profileKey: 'scenario-demo',
+    status: 'ready',
+    createdAt: '2026-07-29T02:06:04.000Z',
+    targetSummary,
+  }
+  const unknown = {
+    id: '123e4567-e89b-42d3-a456-426614174000',
+    profileKey: 'scenario-demo',
+    status: 'not_proven',
+    createdAt: '2026-07-29T02:03:04.000Z',
+    updatedAt: '2026-07-29T02:05:04.000Z',
+    targetSummary,
+  }
+  assert.equal(
+    unresolvedDataPreparationOutcomeBlocksExecution(candidate, [unknown]),
+    false
+  )
+  assert.equal(
+    unresolvedDataPreparationOutcomeBlocksExecution(candidate, [
+      {
+        ...unknown,
+        profileKey: 'core-demo',
+      },
+    ]),
+    true
+  )
+  assert.equal(
+    unresolvedDataPreparationOutcomeBlocksExecution(candidate, [
+      {
+        ...unknown,
+        targetSummary: {
+          ...targetSummary,
+          targetFingerprint: 'e'.repeat(64),
+        },
+      },
+    ]),
+    true
+  )
+  assert.equal(
+    unresolvedDataPreparationOutcomeBlocksExecution(candidate, [
+      {
+        ...unknown,
+        status: 'running',
+      },
+    ]),
+    true
+  )
+})
+
 test('failed command receipts redact credentials and full DSNs', async (t) => {
   const fixture = createFixture(t)
   let preflightCount = 0
@@ -797,7 +899,7 @@ test('failed command receipts redact credentials and full DSNs', async (t) => {
         preflightCount += 1
         if (preflightCount > 1) {
           throw new Error(
-            'password=hunter2 dsn=postgres://admin:secret@192.168.0.106:5432/plush_erp /tmp/seed.log /home/dev/config /private/tmp/a /var/run/service'
+            'Command failed:\npassword=hunter2\tdsn=postgres://admin:secret@192.168.0.106:5432/plush_erp\n/tmp/seed.log /home/dev/config /private/tmp/a /var/run/service'
           )
         }
         return {
@@ -838,6 +940,7 @@ test('failed command receipts redact credentials and full DSNs', async (t) => {
     serialized,
     /hunter2|admin:secret|password|postgres:\/\/admin|dsn=|\/(?:home|private|tmp|var)\//iu
   )
+  assert.doesNotMatch(failed.issues[0].message, /[\u0000-\u001f\u007f]/u)
   const persisted = readFileSync(
     path.join(fixture.store, 'operations', `${prepared.operation.id}.json`),
     'utf8'

@@ -20,6 +20,7 @@ import {
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
   LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
   MANUAL_ACCEPTANCE_DATASET_KEY,
+  SCENARIO_DEMO_TARGET,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceTargetAttestation,
@@ -379,7 +380,7 @@ function assertCurrentManualAcceptanceManifestIdentity(manifest, policy) {
   }
   const expected = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
   if (
-    policy.target !== LOCAL_DEV_TARGET ||
+    ![LOCAL_DEV_TARGET, SCENARIO_DEMO_TARGET].includes(policy.target) ||
     manifest?.customer_key !== CUSTOMER_CONFIG_CUSTOMER_KEY ||
     manifest?.revision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
     manifest?.product_version !==
@@ -543,12 +544,18 @@ function requireRevisionIdentity(
   return revision;
 }
 
-function requireTransition(data, manifest, identity, expectedActiveRevision) {
+function requireTransition(
+  data,
+  manifest,
+  identity,
+  expectedActiveRevision,
+  expectedAction,
+) {
   const transition = data?.transition;
   const blockers = transition?.blockers;
   if (
     !transition ||
-    transition.action !== "activate" ||
+    transition.action !== expectedAction ||
     transition.customer_key !== manifest.customer_key ||
     transition.target_revision !== manifest.revision ||
     normalizeHash(
@@ -726,7 +733,7 @@ export async function applyManualAcceptanceCustomerConfig({
     });
 
     const transitionParams = {
-      action: "activate",
+      action: published.status === "superseded" ? "rollback" : "activate",
       customer_key: manifest.customer_key,
       target_revision: manifest.revision,
       expected_config_hash: identity.configHash,
@@ -742,6 +749,7 @@ export async function applyManualAcceptanceCustomerConfig({
       manifest,
       identity,
       "",
+      transitionParams.action,
     );
     let transitionAttempts = 1;
     const observedActiveRevision = transition.observed_active_revision.trim();
@@ -759,6 +767,7 @@ export async function applyManualAcceptanceCustomerConfig({
         manifest,
         identity,
         observedActiveRevision,
+        transitionParams.action,
       );
       transitionAttempts += 1;
       if (transition.observed_active_revision !== observedActiveRevision) {
@@ -782,12 +791,18 @@ export async function applyManualAcceptanceCustomerConfig({
       configHash: identity.configHash,
     });
 
-    const activateData = await call({
+    const transitionMethod =
+      transitionParams.action === "rollback"
+        ? "rollback_customer_config"
+        : "activate_customer_config";
+    const transitionData = await call({
       domain: "customer_config",
-      method: "activate_customer_config",
+      method: transitionMethod,
       params: {
         customer_key: manifest.customer_key,
-        revision: manifest.revision,
+        ...(transitionParams.action === "rollback"
+          ? { target_revision: manifest.revision }
+          : { revision: manifest.revision }),
         expected_config_hash: identity.configHash,
         expected_product_version: identity.productVersion,
         expected_active_revision: transition.observed_active_revision,
@@ -795,14 +810,14 @@ export async function applyManualAcceptanceCustomerConfig({
       token,
     });
     const activated = requireRevisionIdentity(
-      activateData,
+      transitionData,
       manifest,
       identity,
-      "activate_customer_config",
+      transitionMethod,
       ["active"],
     );
     operations.push({
-      method: "activate_customer_config",
+      method: transitionMethod,
       status: activated.status,
       revision: activated.revision,
       configHash: identity.configHash,

@@ -321,7 +321,8 @@ func processSourceStatusAllowed(in *biz.ProcessInstanceCreate, status string, re
 	}
 	switch {
 	case in.ProcessKey == biz.ProcessKeySalesOrderAcceptance && in.BusinessRefType == "sales_order":
-		return status == biz.SalesOrderStatusDraft || (replay && status == biz.SalesOrderStatusSubmitted)
+		return status == biz.SalesOrderStatusDraft ||
+			(replay && (status == biz.SalesOrderStatusSubmitted || status == biz.SalesOrderStatusActive))
 	case in.ProcessKey == biz.ProcessKeyMaterialSupply && in.BusinessRefType == "purchase_order":
 		return status == biz.PurchaseOrderStatusDraft || (replay && status == biz.PurchaseOrderStatusSubmitted)
 	case in.ProcessKey == biz.ProcessKeyFinishedGoodsDelivery && in.BusinessRefType == "shipment":

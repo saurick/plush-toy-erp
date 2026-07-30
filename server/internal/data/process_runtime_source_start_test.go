@@ -62,6 +62,11 @@ func TestProcessRuntimeSourceCreateCanonicalizesAndLimitsAdvancedStateToReplay(t
 	if err != nil || replayed.ID != created.ID {
 		t.Fatalf("submitted exact replay = %#v, %v", replayed, err)
 	}
+	client.SalesOrder.UpdateOneID(order.ID).SetLifecycleStatus(biz.SalesOrderStatusActive).SaveX(ctx)
+	replayed, _, err = repo.CreateProcessInstanceFromSource(ctx, in, 7)
+	if err != nil || replayed.ID != created.ID {
+		t.Fatalf("active exact replay = %#v, %v", replayed, err)
+	}
 	changedKey := *in
 	changedKey.IdempotencyKey += "/changed"
 	if _, _, err := repo.CreateProcessInstanceFromSource(ctx, &changedKey, 7); !errors.Is(err, biz.ErrProcessInstanceExists) {
@@ -92,6 +97,7 @@ func TestProcessSourceStatusAllowedSeparatesNewStartFromReplay(t *testing.T) {
 	}{
 		{name: "sales draft", process: biz.ProcessKeySalesOrderAcceptance, refType: "sales_order", status: biz.SalesOrderStatusDraft, newStart: true, replay: true},
 		{name: "sales submitted replay", process: biz.ProcessKeySalesOrderAcceptance, refType: "sales_order", status: biz.SalesOrderStatusSubmitted, replay: true},
+		{name: "sales active replay", process: biz.ProcessKeySalesOrderAcceptance, refType: "sales_order", status: biz.SalesOrderStatusActive, replay: true},
 		{name: "purchase draft", process: biz.ProcessKeyMaterialSupply, refType: "purchase_order", status: biz.PurchaseOrderStatusDraft, newStart: true, replay: true},
 		{name: "purchase submitted replay", process: biz.ProcessKeyMaterialSupply, refType: "purchase_order", status: biz.PurchaseOrderStatusSubmitted, replay: true},
 		{name: "purchase approved", process: biz.ProcessKeyMaterialSupply, refType: "purchase_order", status: biz.PurchaseOrderStatusApproved},

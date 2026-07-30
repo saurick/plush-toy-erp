@@ -57,16 +57,16 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     badgeColor: 'default',
     prepareButtonLabel: '生成业务场景测试数据',
     prepareDescription:
-      '点击后自动准备固定计划并打开可读确认；确认一次即执行，无需重启或输入长确认文本。',
+      '点击后自动准备固定计划并打开可读确认；确认一次即对齐当前跟踪的本地客户配置并生成数据，无需重启或输入长确认文本。',
     confirmationDescription:
-      '只补齐固定业务场景，不清空已有数据；同一固定批次只能精确复用 / 读回，半批或漂移会阻断。',
+      '先通过正式配置 API 对齐当前跟踪的 yoyoosun 本地测试配置，再补齐固定业务场景；不清空已有数据，半批或漂移会阻断。',
     successDescription:
       '业务场景演示数据已精确读回并长期保留；人工验收仍未完成，本结果不是完整验收。',
     cleanupBoundary: '只向前补齐，不支持批次清理或重置',
     steps: Object.freeze([
       '确认共享开发库身份、migration 与固定场景目录',
-      '页面自动准备不可变计划；可读确认后通过正式 Source / ProcessRuntime / Fact 路径执行，无需重启',
-      '固定批次同批精确复用 / 读回；半批或漂移阻断，不清空已有数据',
+      '稳定准备本地岗位账号与审计样例，并通过 validate / publish / transition check / activate or rollback / effective-session 对齐当前跟踪客户配置',
+      '通过正式 Source / ProcessRuntime / Fact 路径执行；固定批次精确复用 / 读回，半批或漂移阻断',
     ]),
   }),
   [DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance]: Object.freeze({

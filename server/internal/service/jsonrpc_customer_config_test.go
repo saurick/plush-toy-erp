@@ -3850,6 +3850,32 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		boundary["writes_shipment_or_finance_fact"] != false {
 		t.Fatalf("runtime_boundary = %#v", boundary)
 	}
+	_, replayStartRes, err := dispatcher.handleCustomerConfig(ctx, "start_sales_order_acceptance_process", "start-after-submit", startParams)
+	if err != nil {
+		t.Fatalf("start after submit err = %v", err)
+	}
+	if replayStartRes.Code != errcode.OK.Code {
+		t.Fatalf("start after submit code = %d msg=%s", replayStartRes.Code, replayStartRes.Message)
+	}
+	replayStartData := replayStartRes.Data.AsMap()
+	replayStartedNode, ok := replayStartData["started_node"].(map[string]any)
+	if !ok {
+		t.Fatalf("replayed started_node missing: %#v", replayStartData)
+	}
+	if replayStartedNode["id"] != startedNode["id"] ||
+		replayStartedNode["status"] != biz.ProcessNodeStatusCompleted ||
+		replayStartedNode["outcome"] != biz.SalesOrderProcessCommandOutcomeSubmitted {
+		t.Fatalf("replayed started_node = %#v", replayStartedNode)
+	}
+	replayNodes, ok := replayStartData["nodes"].([]any)
+	if !ok || len(replayNodes) != 5 {
+		t.Fatalf("replayed nodes = %#v", replayStartData["nodes"])
+	}
+	replaySecondNode, ok := replayNodes[1].(map[string]any)
+	if !ok || replaySecondNode["node_key"] != "order_approval" ||
+		replaySecondNode["status"] != biz.ProcessNodeStatusActive {
+		t.Fatalf("replayed second node = %#v", replayNodes[1])
+	}
 	_, retryRes, err := dispatcher.handleCustomerConfig(ctx, "execute_sales_order_acceptance_submit", "execute-retry", executeParams)
 	if err != nil {
 		t.Fatalf("same fingerprint retry err = %v", err)

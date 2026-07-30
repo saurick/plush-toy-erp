@@ -95,7 +95,11 @@ function revision(status) {
   };
 }
 
-function buildFetch({ activeRevision = "", alter } = {}) {
+function buildFetch({
+  activeRevision = "",
+  publishedStatus = "published",
+  alter,
+} = {}) {
   const calls = [];
   const fetchImpl = async (url, init) => {
     if (!init.body) {
@@ -138,13 +142,13 @@ function buildFetch({ activeRevision = "", alter } = {}) {
         },
       };
     } else if (body.method === "publish_customer_config") {
-      data = { revision: revision("published") };
+      data = { revision: revision(publishedStatus) };
     } else if (body.method === "check_customer_config_transition") {
       const expected = body.params.expected_active_revision;
       const confirmed = !activeRevision || expected === activeRevision;
       data = {
         transition: {
-          action: "activate",
+          action: body.params.action,
           customer_key: "yoyoosun",
           target_revision: CUSTOMER_CONFIG_REVISION,
           target_config_hash: CONFIG_HASH,
@@ -158,7 +162,11 @@ function buildFetch({ activeRevision = "", alter } = {}) {
             : [{ code: "active_revision_confirmation_required" }],
         },
       };
-    } else if (body.method === "activate_customer_config") {
+    } else if (
+      ["activate_customer_config", "rollback_customer_config"].includes(
+        body.method,
+      )
+    ) {
       data = { revision: revision("active") };
     } else if (body.method === "get_effective_session") {
       const currentPreview = previewManifest();
@@ -327,6 +335,60 @@ test("local-test apply is bound to the fresh database and exact active-session i
     backendURL: "http://127.0.0.1:8310",
     databaseName,
     target: "local-dev",
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: CUSTOMER_CONFIG_DATA_VERSION,
+    runId: CUSTOMER_CONFIG_RUN_ID,
+  });
+  const manifest = buildLocalManualAcceptanceManifest(previewManifest());
+  const { calls, fetchImpl } = buildFetch({
+    alter(method, data) {
+      if (
+        ["publish_customer_config", "activate_customer_config"].includes(method)
+      ) {
+        data.revision.revision = manifest.revision;
+        data.revision.product_version = manifest.product_version;
+      }
+      if (method === "validate_customer_config") {
+        data.validation.revision = manifest.revision;
+      }
+      if (method === "check_customer_config_transition") {
+        data.transition.target_revision = manifest.revision;
+        data.transition.target_product_version = manifest.product_version;
+      }
+      if (method === "get_effective_session") {
+        data.session.configRevision = manifest.revision;
+        data.session.configProductVersion = manifest.product_version;
+        data.session.configApplyPurpose =
+          manifest.compiled_snapshot.applyPurpose;
+        data.session.configDatasetVersion = "";
+        data.session.configTarget = "";
+      }
+      return data;
+    },
+  });
+  const applied = await applyManualAcceptanceCustomerConfig({
+    manifest,
+    policy,
+    env: {
+      MANUAL_ACCEPTANCE_TARGET_CONFIRM:
+        manualAcceptanceTargetConfirmation(policy),
+      MANUAL_ACCEPTANCE_ADMIN_USERNAME: "admin",
+      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "admin-secret-distinct",
+      MANUAL_ACCEPTANCE_PASSWORD: "demo-secret-distinct",
+    },
+    fetchImpl,
+  });
+  assert.equal(applied.attestation, null);
+  assert.equal(applied.identity.revision, manifest.revision);
+  assert.equal(calls[0].method, "runtime_identity_precondition");
+  assert.equal(calls.filter((item) => item.method === "admin_login").length, 1);
+});
+
+test("scenario-demo may align the same tracked local-test manifest on the registered shared development database", async () => {
+  const policy = resolveManualAcceptanceTarget({
+    backendURL: "http://127.0.0.1:8300",
+    databaseName: "plush_erp",
+    target: "scenario-demo",
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion: CUSTOMER_CONFIG_DATA_VERSION,
     runId: CUSTOMER_CONFIG_RUN_ID,
@@ -620,6 +682,43 @@ test("non-empty active revision is confirmed by a second CAS check and bound to 
     CUSTOMER_CONFIG_PRODUCT_VERSION,
   );
   assert.equal(result.operations[2].attempts, 2);
+});
+
+test("a previously activated tracked revision is restored through the formal rollback transition", async () => {
+  const manifest = buildCustomerTrial133Manifest(previewManifest());
+  const mock = buildFetch({
+    activeRevision: "current-active-revision",
+    publishedStatus: "superseded",
+  });
+  const result = await applyCustomerTrial133Config({
+    manifest,
+    policy: remotePolicy(),
+    env: safeEnv(),
+    fetchImpl: mock.fetchImpl,
+  });
+  const checks = mock.calls.filter(
+    (call) => call.method === "check_customer_config_transition",
+  );
+  assert.equal(checks.length, 2);
+  assert.equal(checks[0].params.action, "rollback");
+  assert.equal(
+    checks[1].params.expected_active_revision,
+    "current-active-revision",
+  );
+  const rollback = mock.calls.find(
+    (call) => call.method === "rollback_customer_config",
+  );
+  assert.equal(rollback.params.target_revision, CUSTOMER_CONFIG_REVISION);
+  assert.equal(
+    rollback.params.expected_active_revision,
+    "current-active-revision",
+  );
+  assert.equal(
+    mock.calls.some((call) => call.method === "activate_customer_config"),
+    false,
+  );
+  assert.equal(result.operations[2].status, "allowed");
+  assert.equal(result.operations[3].method, "rollback_customer_config");
 });
 
 test("fails closed on hash, productVersion, transition, activation, or effective-session drift", async () => {

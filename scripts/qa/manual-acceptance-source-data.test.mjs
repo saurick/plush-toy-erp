@@ -1139,6 +1139,61 @@ test("sales source lifecycle uses the formal acceptance process instead of remov
   );
 });
 
+test("sales source replay accepts only the exact downstream ProcessRuntime lifecycle states", async () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    target: "scenario-demo",
+    backendURL: "http://127.0.0.1:8300",
+    databaseName: "plush_erp",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  });
+  const candidates = plan.records.salesOrders
+    .filter((record) => record.targetStatus === "DRAFT")
+    .slice(0, 6);
+  const report = { steps: [] };
+  const fetchImpl = async () => {
+    throw new Error("exact replay readback must not issue a lifecycle mutation");
+  };
+
+  assert.equal(
+    await advanceSalesOrderLifecycleThroughProcess({
+      plan,
+      record: candidates[1],
+      item: { id: 6, lifecycle_status: "SUBMITTED" },
+      token: "unused",
+      roleTokens: {},
+      fetchImpl,
+      report,
+    }),
+    "SUBMITTED",
+  );
+  assert.equal(
+    await advanceSalesOrderLifecycleThroughProcess({
+      plan,
+      record: candidates[4],
+      item: { id: 21, lifecycle_status: "ACTIVE" },
+      token: "unused",
+      roleTokens: {},
+      fetchImpl,
+      report,
+    }),
+    "ACTIVE",
+  );
+  await assert.rejects(
+    () =>
+      advanceSalesOrderLifecycleThroughProcess({
+        plan,
+        record: candidates[5],
+        item: { id: 26, lifecycle_status: "SUBMITTED" },
+        token: "unused",
+        roleTokens: {},
+        fetchImpl,
+        report,
+      }),
+    /unsupported sales order target status DRAFT/u,
+  );
+});
+
 test("persisted sales order lines retain exact IDs for linked reservations and shipments", () => {
   const input = {
     orderNo: "SIM-SO-001",

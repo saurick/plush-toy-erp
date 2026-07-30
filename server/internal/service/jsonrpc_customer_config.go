@@ -498,7 +498,14 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		startedNode, err := d.processRuntimeUC.StartProcessInstance(ctx, &biz.ProcessInstanceStart{ID: instance.ID}, admin.ID)
+		startedNode, err := d.startOrReplayProcessInstanceFirstNode(
+			ctx,
+			instance,
+			nodes,
+			"submit_sales_order",
+			biz.ProcessNodeTypeDomainCommand,
+			admin.ID,
+		)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -601,7 +608,14 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		startedNode, err := d.processRuntimeUC.StartProcessInstance(ctx, &biz.ProcessInstanceStart{ID: instance.ID}, admin.ID)
+		startedNode, err := d.startOrReplayProcessInstanceFirstNode(
+			ctx,
+			instance,
+			nodes,
+			"submit_purchase_order",
+			biz.ProcessNodeTypeDomainCommand,
+			admin.ID,
+		)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -711,7 +725,14 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		startedNode, err := d.processRuntimeUC.StartProcessInstance(ctx, &biz.ProcessInstanceStart{ID: instance.ID}, admin.ID)
+		startedNode, err := d.startOrReplayProcessInstanceFirstNode(
+			ctx,
+			instance,
+			nodes,
+			"shipment_finance_approval",
+			biz.ProcessNodeTypeApproval,
+			admin.ID,
+		)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -1009,6 +1030,43 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Code:    errcode.UnknownMethod.Code,
 			Message: fmt.Sprintf("unknown customer_config method: %s", method),
 		}, nil
+	}
+}
+
+func (d *jsonrpcDispatcher) startOrReplayProcessInstanceFirstNode(
+	ctx context.Context,
+	instance *biz.ProcessInstance,
+	nodes []*biz.ProcessNodeInstance,
+	expectedNodeKey string,
+	expectedNodeType string,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if d == nil || d.processRuntimeUC == nil || instance == nil || instance.ID <= 0 ||
+		len(nodes) == 0 || nodes[0] == nil || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	firstNode := nodes[0]
+	if firstNode.ProcessInstanceID != instance.ID ||
+		firstNode.NodeKey != expectedNodeKey ||
+		firstNode.NodeType != expectedNodeType {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	switch firstNode.Status {
+	case biz.ProcessNodeStatusWaiting, biz.ProcessNodeStatusActive:
+		return d.processRuntimeUC.StartProcessInstance(
+			ctx,
+			&biz.ProcessInstanceStart{ID: instance.ID},
+			actorID,
+		)
+	case biz.ProcessNodeStatusCompleted, biz.ProcessNodeStatusBlocked:
+		// CreateProcessInstanceFromSource has already proved that this request
+		// is the exact same source, definition, and idempotency key. Once the
+		// first node has settled, the public start endpoint is readback-only:
+		// re-running StartProcessInstance can conflict with downstream nodes
+		// that have legitimately advanced.
+		return firstNode, nil
+	default:
+		return nil, biz.ErrProcessNodeInstanceConflict
 	}
 }
 
@@ -1594,7 +1652,9 @@ func (d *jsonrpcDispatcher) salesOrderProcessSourceRefNo(ctx context.Context, sa
 		return nil, err
 	}
 	if order == nil || order.ID != salesOrderID ||
-		(order.LifecycleStatus != biz.SalesOrderStatusDraft && order.LifecycleStatus != biz.SalesOrderStatusSubmitted) {
+		(order.LifecycleStatus != biz.SalesOrderStatusDraft &&
+			order.LifecycleStatus != biz.SalesOrderStatusSubmitted &&
+			order.LifecycleStatus != biz.SalesOrderStatusActive) {
 		return nil, biz.ErrBadParam
 	}
 	return requiredProcessSourceRefNo(order.OrderNo)
