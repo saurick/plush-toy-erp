@@ -9,7 +9,6 @@ import {
   DEFAULT_NODE_TAP_PATH,
   DEFAULT_OUTPUT_PATH,
   buildFieldLinkageReport,
-  buildRepositoryState,
   buildRunContext,
   collectNodeTapStatuses,
   generateFieldLinkageReport,
@@ -111,7 +110,7 @@ test('field linkage report does not preserve arbitrary command secrets', () => {
 })
 
 test('field linkage run context excludes local paths and usernames', async () => {
-  const repository = await buildRepositoryState()
+  const repository = { ...REPOSITORY }
   const runContext = await buildRunContext(repository)
   assert.match(repository.commit, /^[0-9a-f]{40,64}$/u)
   assert.equal(typeof repository.dirty, 'boolean')
