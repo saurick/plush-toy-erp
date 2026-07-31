@@ -29,9 +29,12 @@ RUN npm install -g pnpm@10.13.1 && \
 COPY web/src ./src
 COPY web/public ./public
 COPY web/index.html ./
-# Vite config and its top-level plugin graph move together; avoid a manually
-# enumerated list drifting when a committed build plugin is added.
+# Vite config and its committed build-time dependency graph move together.
+# dev-server is copied only into this builder because Vite resolves its
+# serve-only plugin factory while loading the shared config; the runtime image
+# still receives only the generated static build.
 COPY web/*.mjs ./
+COPY web/dev-server ./dev-server
 COPY web/tailwind.config.js ./
 COPY web/postcss.config.js ./
 COPY config /config

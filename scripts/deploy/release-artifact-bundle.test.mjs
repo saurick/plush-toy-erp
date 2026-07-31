@@ -165,6 +165,7 @@ test("release image builders consume the committed generated projection without 
   assert.match(webDockerfile, /RUN pnpm build:committed/u);
   assert.match(serverDockerfile, /RUN pnpm run build:committed/u);
   assert.match(serverDockerfile, /COPY web\/\*\.mjs \.\//u);
+  assert.match(serverDockerfile, /COPY web\/dev-server \.\/dev-server/u);
   for (const dockerfile of [webDockerfile, serverDockerfile]) {
     assert.doesNotMatch(
       dockerfile,

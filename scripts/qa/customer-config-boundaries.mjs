@@ -614,17 +614,26 @@ function validateCustomerConfigReleaseOverlay() {
     repoPath("web/vite.shared.mjs"),
     "utf8",
   );
-  const viteRootImports = Array.from(
+  const viteRelativeImports = Array.from(
     viteSharedSource.matchAll(/from\s+['"]\.\/([^'"]+\.mjs)['"]/g),
     (match) => match[1],
-  ).filter(
+  );
+  const viteRootImports = viteRelativeImports.filter(
     (importPath) =>
       !importPath.startsWith("vite.") && !importPath.includes("/"),
+  );
+  const viteDevServerImports = viteRelativeImports.filter((importPath) =>
+    importPath.startsWith("dev-server/"),
   );
   const serverDockerfile = readFileSync(repoPath("server/Dockerfile"), "utf8");
   const copiesAllRootMjs = serverDockerfile
     .split(/\r?\n/u)
     .some((line) => /^\s*COPY\s+web\/\*\.mjs\s+\.\/\s*$/u.test(line));
+  const copiesDevServerGraph = serverDockerfile
+    .split(/\r?\n/u)
+    .some((line) =>
+      /^\s*COPY\s+web\/dev-server\s+\.\/dev-server\/?\s*$/u.test(line),
+    );
   for (const importPath of viteRootImports) {
     assert(
       existsSync(repoPath(path.join("web", importPath))),
@@ -633,6 +642,16 @@ function validateCustomerConfigReleaseOverlay() {
     assert(
       copiesAllRootMjs || serverDockerfile.includes(`web/${importPath}`),
       `server/Dockerfile must copy web/${importPath} because vite.shared.mjs imports it during the embedded frontend build`,
+    );
+  }
+  for (const importPath of viteDevServerImports) {
+    assert(
+      existsSync(repoPath(path.join("web", importPath))),
+      `web/vite.shared.mjs imports missing dev-server module ${importPath}`,
+    );
+    assert(
+      copiesDevServerGraph || serverDockerfile.includes(`web/${importPath}`),
+      `server/Dockerfile must copy web/dev-server because vite.shared.mjs imports ${importPath} while loading the committed build config`,
     );
   }
 }
