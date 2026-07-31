@@ -6,10 +6,10 @@
 
 ### 夜间发布门禁与 test-133
 
-- 完成：为 exact-SHA fingerprint 改用 NUL-safe `git ls-tree -z` 读取中文路径；同步当前客户前端边界文案断言；按 schema-doc 唯一生成器刷新生产 / 委外数据库文档及权威计数；更新字段联动 staging / identity fixture、开发工作台二级导航合同和可见验证标签。没有删除测试、放宽门禁或改变业务 / migration 逻辑。
-- 验证：exact-SHA、客户前端边界与 schema-doc 定向 `8 / 8` 通过，字段联动与开发工作台相关定向 `56 / 56` 通过；`go run ./cmd/schema-doc --check` 读回 `missing=0 changed=0 stale=0 unexpected=0`。完整 fast、Web full 与最终 clean SHA 的 `prepare-push` 仍须在释放 writer、由收口队列本地提交后重新执行，不能复用旧 SHA 的绿色证据。
-- 下一步：释放本批 writer，按唯一 Git 收口队列精确本地提交；再绑定最新 clean SHA，普通非强制 push `main`，等待同 SHA GitHub CI 全绿并生成同 SHA 的不可变 release，最后只允许按固定 promotion 流程部署 `customer-trial-133`。
-- 阻塞 / 风险：目标身份、active env / Compose、磁盘、现有 health / ready、migration 锁和备份工具已完成只读预检，但本次 fresh backup / rollback point、Atlas current / pending、migration plan / apply、目标 runtime / digest、PDF / 关键业务 smoke 均未执行。若目标权威 status 显示数据重写、权限删除、删列或删除 trigger / function 的 migration 仍 pending，本次授权必须 fail closed，禁止 promotion / apply；生产保持 `NOT_RUN`，客户 UAT 保持 `NOT_CLAIMED`。
+- 完成：门禁漂移修复已由收口队列提交为 `e385b0dd5225f8a6ae30bf186f52627474dbd20a`。恢复发布后只读复核 `customer-trial-133` 身份、active env / Compose、磁盘、现有 health / ready、migration 锁与备份工具；用户已确认并限于 test-133 授权执行 `20260728100514_remove_custom_database_execution_objects.sql` 中预期的 `DROP TRIGGER` / `DROP FUNCTION`，同时要求 fresh backup 与 restore rehearsal。生产、业务数据删除、跳过 migration、改写 Atlas revision、自动全库恢复及目标机源码构建仍未授权。
+- 门禁证据：在唯一的本地 PostgreSQL 18 隔离容器提供 disposable base 后，绑定 `e385b0dd5225f8a6ae30bf186f52627474dbd20a` 的 `prepare-push` 运行至 scripts Node full，结果为 `1582 / 1592`。十项失败同源于 `pre-push-receipt.test.mjs` 的临时仓库夹具未复制真实依赖 `scripts/qa/lib/repository-identity.mjs`；现已补齐依赖，并把仓库身份变化场景收紧为同时断言外层 `full_gate_failed`、内层 receipt 为 `failed` 且含 identity-change `notProven`。定向回归 `15 / 15` 通过，没有修改运行门禁、删除测试或放宽失败条件。
+- 下一步：释放本批 writer，按唯一 Git 收口队列精确本地提交；绑定新 clean SHA 从头重跑完整 `prepare-push`，成功后才申请普通非强制 push `main`，等待同 SHA GitHub CI / release 全绿，再按固定 promotion 流程只部署 `customer-trial-133`。
+- 阻塞 / 风险：本次 fresh backup / rollback point、restore rehearsal、Atlas plan / apply / 结构读回、目标 runtime SHA / digest、PDF / Web / 关键业务 smoke 均未执行。其余 pending migration 的静态审计未见业务数据删除或重写，但仍须以目标权威 status / plan、串行锁和执行收据为准；出现身份漂移、备份失败、未授权数据操作或不可逆变化即 fail closed。当前未 push、未运行 GitHub CI / release、未部署；生产保持 `NOT_RUN`，客户 UAT 保持 `NOT_CLAIMED`。
 
 ### 库存预留与采购入库权威投影
 

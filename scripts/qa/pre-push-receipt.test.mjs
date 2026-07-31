@@ -84,6 +84,7 @@ function installRealReceiptFiles(root) {
     "scripts/qa/pre-push-receipt.mjs",
     "scripts/qa/prepare-push.sh",
     "scripts/qa/run-gate-with-receipt.mjs",
+    "scripts/qa/lib/repository-identity.mjs",
     "scripts/git-hooks/pre-push.sh",
   ]) {
     const target = path.join(root, file);
@@ -450,17 +451,19 @@ test("new and existing refs bind one exact aggregate receipt and scan every live
 });
 
 test("failed or moving full never leaves a green receipt", () => {
-  for (const [name, overrides, reason] of [
+  for (const [name, overrides, reason, identityChanged = false] of [
     ["full failure", { FAIL_FULL: "1" }, "full_gate_failed"],
     [
       "dirty after full",
       { MUTATE_FULL_DIRTY: "1" },
-      "worktree_changed_during_full",
+      "full_gate_failed",
+      true,
     ],
     [
       "HEAD changed after full",
       { MUTATE_FULL_HEAD: "1" },
-      "head_changed_during_full",
+      "full_gate_failed",
+      true,
     ],
     [
       "remote changed after full",
@@ -478,6 +481,24 @@ test("failed or moving full never leaves a green receipt", () => {
       assert.notEqual(result.status, 0, name);
       assert.match(result.stderr, new RegExp(`reason=${reason}`, "u"), name);
       const state = resolveReceiptState(fixture.root);
+      if (identityChanged) {
+        const fullReceipt = JSON.parse(
+          readFileSync(
+            path.join(
+              state.stateDir,
+              `${state.worktreeKey}.full-receipt.json`,
+            ),
+            "utf8",
+          ),
+        );
+        assert.equal(fullReceipt.status, "failed", name);
+        assert.ok(
+          fullReceipt.notProven.includes(
+            "repository identity changed during gate",
+          ),
+          name,
+        );
+      }
       assert.equal(existsSync(state.receiptPath), false, name);
     } finally {
       fixture.cleanup();
