@@ -308,16 +308,30 @@ function validateWorkflowTaskRevisionVisibilityContract() {
   const visibilitySource = readFileSync(repoPath(visibilityPath), "utf8");
   assert(
     (serviceSource.match(/workflowTaskQueryVisibilityScope\(/g) || [])
-      .length === 2 &&
+      .length === 1 &&
       (serviceSource.match(/workflowTaskReadVisibilityScope\(/g) || [])
         .length === 5 &&
       serviceSource.includes(
-        "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskApprove)",
+        "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)",
       ) &&
+      (
+        serviceSource.match(
+          /workflowApprovalTaskVisibilityScopes\(ctx, admin\)/g,
+        ) || []
+      ).length === 3 &&
       visibilitySource.includes(
         "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)",
+      ) &&
+      visibilitySource.includes(
+        "for _, capabilityKey := range biz.WorkflowApprovalCapabilityKeys()",
+      ) &&
+      visibilitySource.includes(
+        "if !biz.PermissionSetHasAny(permissionSet, capabilityKey)",
+      ) &&
+      visibilitySource.includes(
+        "d.workflowTaskQueryVisibilityScope(ctx, admin, capabilityKey)",
       ),
-    `${servicePath} list, workbench role, ordinary board, event and process-context reads must use supervised read scope while mobile role-view and approval board use capability-specific revision-aware scope`,
+    `${servicePath} list, workbench role, ordinary board, event and process-context reads must use supervised read scope while mobile role-view and every registered approval capability use permission-filtered revision-aware scope`,
   );
   assert(
     visibilitySource.includes(
