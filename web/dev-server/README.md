@@ -12,7 +12,7 @@
 | `devQaCoveragePlugin.mjs` | 执行固定覆盖率采集并提供脱敏 operation 状态 |
 | `devWorkbenchReceiptPlugin.mjs` | 只读提供当前及历史质量回执 |
 | `devDataPreparationPlugin.mjs` | 执行登记的数据准备 profile |
-| `devDatabaseMigrationPlugin.mjs` | 提供本地共享开发库迁移的受控 HTTP/operation 层 |
+| `devDatabaseMigrationPlugin.mjs` | 提供本地共享开发库迁移的受控 operation service 和 HTTP 层，供页面与高层 CLI 复用 |
 | `devDatabaseMigrationRuntime.mjs` | 执行迁移 status、plan、备份恢复、apply、读回和重启 |
 | `devDeliveryBridgePlugin.mjs` | 提供不可变版本、固定目标 promotion 和受控 rollback Bridge |
 | `devServerSecurity.mjs` | 集中维护 loopback remote address 与 Host 校验 |
@@ -25,6 +25,6 @@
 - 正式 ERP、移动端、产品配置和 Server runtime 不得依赖本目录。
 - 浏览器不得提交任意命令、路径、DSN、目标、SSH 参数或环境变量；写操作必须使用固定动作、幂等、确认、审计和读回。
 - production build、production preview 和正式部署不包含本目录模块、`/__dev` 路由或本机私有路径。
-- `devDatabaseMigrationRuntime.mjs` 的 source identity 包含本目录的迁移 Bridge 与安全真源；路径或内容变化后，既有迁移 plan 必须失效并重新准备，不保留旧路径兼容。
+- `devDatabaseMigrationRuntime.mjs` 的 source identity 包含迁移 Bridge、高层 CLI 与安全真源；路径或内容变化后，既有迁移 plan 必须失效并重新准备，不保留旧路径兼容。execute 在 apply 前还必须重新验证 operation 绑定的备份文件身份。
 
 调整本目录后至少运行同目录 Node 测试、工作台源码边界测试、production build、制品零残留扫描和 production `/__dev` 浏览器 smoke。

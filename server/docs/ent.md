@@ -15,7 +15,7 @@
 
 1. 修改 schema
 2. 生成迁移和 ent 代码
-3. 应用迁移
+3. 通过受控高层入口准备、确认、应用并读回迁移
 
 常用命令：
 
@@ -25,9 +25,16 @@ cd /Users/simon/projects/plush-toy-erp/server
 # 生成 migration + ent 代码
 make data
 
-# 应用 migration（需要先设置 DB_URL）
-make migrate_apply
+# 登记共享开发库的人机交互入口
+make migrate
 ```
+
+非交互环境先运行 `make migrate_prepare`，再原样使用同一次 ready 输出的 operation
+ID 与确认串运行 `make migrate_execute`。prepare 成功固定表示 `writes=0 / ready`，
+不能冒充 migration 已 apply；`migrate_status` 只读。裸 `make migrate_plan` 兼容
+进入同一高层 prepare，裸 TTY `make migrate_apply` 恢复唯一 ready operation；
+找不到可恢复 operation 时会安全地重新准备并等待确认。只有携带完整内部确认的
+调用才进入高层服务复用的底层 plan / apply 守卫。
 
 ## 相关命令
 
@@ -41,9 +48,10 @@ make ent_generate
 # 重算 atlas.sum
 make migrate_hash
 
-# 手动标记某个 migration 已执行
-make migrate_set
 ```
+
+`migrate_set` 不是日常迁移或故障绕过入口；只有已证明 SQL 效果完整存在、具备
+专项备份和修复证据的 revision 对账才可评审使用。
 
 ## 数据库表数据字典
 

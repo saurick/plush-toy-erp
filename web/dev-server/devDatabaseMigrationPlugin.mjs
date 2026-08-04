@@ -123,6 +123,17 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
       message: '共享开发库仍有其它连接；关闭 DbGate 或其它写入会话后重新准备',
     }
   }
+  if (
+    /backup_restore_failed|备份.*(?:失效|缺失|变化|验证失败|校验失败)/iu.test(
+      diagnostic
+    )
+  ) {
+    return {
+      code: 'backup_restore_failed',
+      severity: 'blocked',
+      message: '准备阶段的备份或隔离恢复证据已失效，请重新准备',
+    }
+  }
   if (/docker|pg_dump|pg_restore|atlas.*not found|ENOENT/iu.test(diagnostic)) {
     return {
       code: 'migration_tool_unavailable',
@@ -338,6 +349,15 @@ export function createDevDatabaseMigrationService({
         throw new DatabaseMigrationActionError(
           '目标库状态已变化，旧计划不能执行',
           { code: 'database_state_changed' }
+        )
+      }
+      if (
+        typeof runtime.verifyBackup !== 'function' ||
+        !(await runtime.verifyBackup(operation.backup))
+      ) {
+        throw new DatabaseMigrationActionError(
+          '准备阶段的备份文件身份已失效，请重新准备',
+          { code: 'backup_restore_failed' }
         )
       }
       try {

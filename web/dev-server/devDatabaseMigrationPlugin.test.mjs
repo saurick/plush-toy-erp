@@ -239,6 +239,38 @@ test('database migration service never applies a stale source plan', async (t) =
   assert.equal(calls.filter((call) => call.startsWith('apply:')).length, 0)
 })
 
+test('database migration service re-verifies the prepared backup before apply', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.verifyBackup = async () => {
+    calls.push('verify-backup')
+    return false
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    apiOrigin: 'http://127.0.0.1:8300',
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const prepare = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const ready = await waitForOperation(service, prepare.operation.id, ['ready'])
+
+  await service.act({
+    action: 'execute',
+    operationId: ready.id,
+    confirmation: ready.confirmationPrompt,
+  })
+  const blocked = await waitForOperation(service, ready.id, ['blocked'])
+  assert.equal(blocked.issues[0].code, 'backup_restore_failed')
+  assert.match(blocked.issues[0].message, /请重新准备/u)
+  assert.equal(calls.filter((call) => call === 'verify-backup').length, 1)
+  assert.equal(calls.filter((call) => call.startsWith('apply:')).length, 0)
+})
+
 test('database migration service reuses an unchanged verified backup', async (t) => {
   const { root, store } = createProject(t)
   const calls = []

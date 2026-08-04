@@ -1,15 +1,19 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   applyConfirmation,
   classifyDevelopmentTarget,
   classifyFailedApply,
+  createMigrationTerminalReceipt,
   maintenanceConfirmation,
   migrationPlanID,
   normalizeSchemaDiffOutput,
+  redactMigrationDiagnostic,
   targetConfirmation,
   unsafeRehearsalReason,
 } from "./local-migration.mjs";
@@ -19,6 +23,17 @@ const identity = Object.freeze({
   user: "test_user",
   systemIdentifier: "7572907083182862377",
 });
+const cliPath = fileURLToPath(
+  new URL("./local-migration.mjs", import.meta.url),
+);
+
+function outputBuffer() {
+  let value = "";
+  return {
+    output: { write: (chunk) => (value += String(chunk)) },
+    read: () => value,
+  };
+}
 
 test("local migration: only the exact application-config 106 development family is shared-dev", () => {
   const registered = classifyDevelopmentTarget(
@@ -146,6 +161,141 @@ test("local migration: failed apply distinguishes no revision advance from unkno
       Applied: before.Available,
     }),
     "committed_unverified",
+  );
+});
+
+test("local migration: terminal receipt always emits a complete safe outcome exactly once", () => {
+  const buffer = outputBuffer();
+  const receipt = createMigrationTerminalReceipt({
+    command: "migrate_apply",
+    mode: "apply",
+    output: buffer.output,
+  });
+  receipt.update({
+    phase: "schema_readback",
+    target: {
+      scope: "shared-dev",
+      safeTarget: "host=192.168.0.106 port=5432 database=plush_erp",
+      currentVersion: "20260729043852",
+      latestVersion: "20260731124000",
+      appliedFiles: 105,
+      availableFiles: 107,
+      pendingFiles: 2,
+    },
+    status: {
+      currentVersion: "20260731124000",
+      latestVersion: "20260731124000",
+      appliedFiles: 107,
+      availableFiles: 107,
+      pendingFiles: 0,
+    },
+    runtime: {
+      health: { status: "passed" },
+      ready: { status: "passed" },
+    },
+  });
+  receipt.finish({
+    result: "passed",
+    writes: "committed",
+    apply: "executed_once",
+    nextAction: "none",
+  });
+  receipt.finish({ result: "failed" });
+
+  const output = buffer.read();
+  assert.equal(output.match(/^\[migration-summary\]/gmu)?.length, 7);
+  assert.match(
+    output,
+    /command=migrate_apply mode=apply phase=schema_readback/u,
+  );
+  assert.match(
+    output,
+    /target=shared-dev host=192\.168\.0\.106 port=5432 database=plush_erp/u,
+  );
+  assert.match(
+    output,
+    /current=20260731124000 latest=20260731124000 applied=107\/107 pending=0/u,
+  );
+  assert.match(
+    output,
+    /result=passed writes=committed apply=executed_once auto_retry=false/u,
+  );
+  assert.match(output, /error_code=none next_action=none/u);
+});
+
+test("local migration: unsafe receipt target falls back to unavailable", () => {
+  const buffer = outputBuffer();
+  const receipt = createMigrationTerminalReceipt({ output: buffer.output });
+  receipt.update({
+    target: {
+      key: "shared-dev",
+      safeTarget:
+        "host=192.168.0.106 port=5432 database=plush_erp\npassword=sentinel",
+    },
+  });
+  receipt.finish({
+    result: "failed",
+    errorCode: "target_resolution_failed",
+    nextAction: "fix_database_configuration",
+  });
+  assert.match(buffer.read(), /^\[migration-summary\] target=unavailable$/mu);
+  assert.match(
+    buffer.read(),
+    /current=unknown latest=unknown applied=unknown\/unknown pending=unknown/u,
+  );
+  assert.doesNotMatch(buffer.read(), /sentinel|password/iu);
+});
+
+test("local migration: diagnostics redact database credentials and confirmation values", () => {
+  const secrets = [
+    "postgres://admin:dsn-secret@192.168.0.106:5432/plush_erp",
+    "postgresql://admin:dsn-secret@localhost:5432/plush_erp",
+    "DB_URL='postgres://admin:db-url-secret@localhost/plush_erp'",
+    "POSTGRES_DSN=postgres://admin:postgres-dsn-secret@localhost/plush_erp",
+    "password=password-secret",
+    "MIGRATE_TARGET_CONFIRM=TRUST_SHARED_DEV_DATABASE:target-secret",
+    "MIGRATE_CONFIRM=APPLY_DEV_MIGRATIONS:apply-secret",
+    "MIGRATE_MAINTENANCE_CONFIRM=SHARED_DEV_MAINTENANCE_READY:maintenance-secret",
+    "MIGRATE_OPERATION_CONFIRM=升级共享开发库:20260731124000:operation-secret",
+    "LOCAL_MIGRATION_OPERATION_CONFIRM=升级共享开发库:20260731124000:local-operation-secret",
+  ];
+  const redacted = redactMigrationDiagnostic(secrets.join("\n"));
+  for (const sentinel of [
+    "dsn-secret",
+    "db-url-secret",
+    "postgres-dsn-secret",
+    "password-secret",
+    "target-secret",
+    "apply-secret",
+    "maintenance-secret",
+    "operation-secret",
+    "local-operation-secret",
+  ]) {
+    assert.doesNotMatch(redacted, new RegExp(sentinel, "u"));
+  }
+  assert.match(redacted, /<database-url-redacted>/u);
+  assert.match(redacted, /<confirmation-redacted>/u);
+});
+
+test("local migration: a direct CLI failure still emits a safe unavailable-target receipt", () => {
+  const secret = "cli-dsn-secret";
+  const result = spawnSync(
+    process.execPath,
+    [cliPath, `postgres://admin:${secret}@localhost:5432/plush_erp`],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout.match(/^\[migration-summary\]/gmu)?.length, 7);
+  assert.match(result.stdout, /target=unavailable/u);
+  assert.match(
+    result.stdout,
+    /result=failed writes=0 apply=not_started auto_retry=false/u,
+  );
+  assert.match(result.stdout, /error_code=migration_command_failed/u);
+  assert.match(result.stderr, /<database-url-redacted>/u);
+  assert.doesNotMatch(
+    `${result.stdout}\n${result.stderr}`,
+    new RegExp(secret, "u"),
   );
 });
 

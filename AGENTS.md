@@ -158,7 +158,7 @@
 - 发布前确认 commit/image、migration、config、rollback；线上 Atlas 使用项目文档指定的宿主机工具和串行锁。
 - 镜像清理先保留当前及项目要求的回滚版本，再按 `$plush-operations-governance` 和发布文档执行。
 - 修改 `server/internal/data/model/schema/**` 后，本轮收口前必须在 `server/` 执行 `make data`，审查并纳入由此产生的 Ent 生成物、新 Atlas migration 与 `atlas.sum`，再运行 `bash scripts/qa/db-guard.sh`；结构变更缺 migration 或生成零漂移证据时只能报告 `incomplete`。Git hook 只做 check-only，不自动生成或改写 migration。
-- `make migrate_apply` 只对已确认归属的本地/隔离开发库执行，并按 `migrate_status -> migrate_apply -> migrate_status / 结构读回` 验证；共享、测试、生产或归属不明数据库必须先确认，未 apply 必须明确报告。
+- 登记共享开发库的日常升级只走高层入口：交互终端使用 `make migrate`，非交互环境使用 `make migrate_prepare` 后按同一次 ready 输出执行 `make migrate_execute`；`migrate_status` 只读。为避免旧习惯落入缺 token 的死路，裸 `make migrate_plan` 安全路由到 prepare，裸 TTY `make migrate_apply` 恢复唯一 ready operation 或重新准备后确认；只有携带完整内部确认的调用才进入底层 plan / apply 守卫。隔离库继续使用对应 lifecycle；测试、生产或归属不明数据库必须走正式目标流程，未 execute / apply 必须明确报告。
 - 代码/正式文档改动完成后更新 progress；提交推送只精确 stage 本轮范围，push 前 fetch 并确认 upstream。
 
 ## 前端、原型与错误

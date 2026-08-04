@@ -19,6 +19,7 @@ const COMMAND_TIMEOUT_MS = 15 * 60 * 1000
 const RUNTIME_WAIT_TIMEOUT_MS = 90 * 1000
 export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/local-migration.mjs',
+  'scripts/local-migration-workflow.mjs',
   'scripts/local-runtime-preflight-core.mjs',
   'scripts/qa/database-programmability.mjs',
   'scripts/qa/populated-upgrade-preflight.sh',

@@ -178,12 +178,14 @@ pnpm style:l1
 
 - 禁止手写结构性 SQL
 - schema 变更必须通过 `make data`
-- `make data` 只生成 Ent / Atlas 产物，不会修改开发库。开发库升级固定使用
-  `make migrate_status → make migrate_plan → make migrate_apply`：plan 会对
-  pending SQL 做整批事务预演并 `ROLLBACK`，apply 使用 `tx-mode=all`，
-  只有同目标 status 读回 `pending=0` 且 Ent / PostgreSQL schema 零差异才
-  报告 `applied_verified`。登记的
-  `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 共享开发库还要求
-  备份、停后端与其它 writer，并使用 plan 输出的维护确认值；启动命令不会
-  自动 apply
+- `make data` 只生成 Ent / Atlas 产物，不会修改开发库。登记共享开发库在人机
+  终端使用 `make migrate` 完成准备、一次明确确认、apply、同目标读回和后端
+  重启；CI / Codex 等非交互环境先显式运行 `make migrate_prepare`，再原样使用
+  ready 输出的 operation ID 与确认串运行 `make migrate_execute`。准备成功只表示
+  `writes=0 / ready`，不能冒充迁移完成；只有 execute 读回 `pending=0`、Ent /
+  PostgreSQL schema 零差异且 health / ready 通过才报告成功。`migrate_status` 保留
+  为只读检查；裸 `migrate_plan` 兼容路由到 prepare，裸 TTY `migrate_apply`
+  恢复唯一 ready operation 或重新准备后确认，不会再直接因缺内部 token 失败。
+  只有携带完整内部确认的调用才进入高层服务复用的底层 plan / apply 守卫。启动
+  命令仍不会自动 apply，133 / 生产继续走正式发布流程
 - 工作流协同和通用业务记录已进入 Ent schema v1；后续细分业务专表仍必须先稳定字段关系，再改 `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/*.go`

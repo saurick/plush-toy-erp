@@ -78,6 +78,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/yoyoosun-role-jsonrpc-access.test.mjs",
   ]),
   database: Object.freeze([
+    "scripts/local-migration-workflow.test.mjs",
     "scripts/local-migration.test.mjs",
     "scripts/local-runtime-preflight.test.mjs",
     "scripts/qa/critical-postgres-gate.test.mjs",

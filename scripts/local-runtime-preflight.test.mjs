@@ -191,7 +191,7 @@ test("local runtime preflight: 数据库配置失败不回显 DSN 或密码", as
   assert.deepEqual(calls, ["bash", "go"]);
 });
 
-test("local runtime preflight: pending migration 指向只读 status 和 plan，不自动 apply", async () => {
+test("local runtime preflight: pending migration 指向高层迁移入口，不自动 apply", async () => {
   const calls = [];
   const pending = currentMigrationStatus();
   pending.Applied = pending.Applied.slice(0, 1);
@@ -214,7 +214,7 @@ test("local runtime preflight: pending migration 指向只读 status 和 plan，
         return { stdout: JSON.stringify(pending), stderr: "" };
       },
     }),
-    /make migrate_status.*make migrate_plan.*不会自动 apply/u,
+    /make migrate.*migrate_prepare \/ migrate_execute.*plan 与备份恢复验证.*不会自动 apply/u,
   );
   assert.deepEqual(
     calls.map(([command]) => command),

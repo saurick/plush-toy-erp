@@ -27,7 +27,201 @@ const targetConfirmPrefixes = Object.freeze({
 const applyConfirmPrefix = "APPLY_DEV_MIGRATIONS:";
 const maintenanceConfirmPrefix = "SHARED_DEV_MAINTENANCE_READY:";
 
-class MigrationCommandError extends Error {}
+class MigrationCommandError extends Error {
+  constructor(message, receipt = {}) {
+    super(message);
+    this.receipt = receipt;
+  }
+}
+
+const migrationReceiptResults = new Set([
+  "passed",
+  "up_to_date",
+  "ready",
+  "action_required",
+  "blocked",
+  "failed",
+  "not_proven",
+  "already_applied",
+]);
+const migrationReceiptWrites = new Set(["0", "committed", "unknown"]);
+const migrationReceiptApply = new Set([
+  "not_requested",
+  "not_started",
+  "skipped",
+  "attempted_once",
+  "executed_once",
+  "already_executed",
+  "unknown",
+]);
+const migrationReceiptTokenPattern = /^[a-z0-9][a-z0-9_-]{0,79}$/u;
+const migrationReceiptVersionPattern = /^\d{8,20}$/u;
+const migrationReceiptOperationPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
+function migrationReceiptToken(value, fallback) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  return migrationReceiptTokenPattern.test(normalized) ? normalized : fallback;
+}
+
+function migrationReceiptCount(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? String(value) : "unknown";
+}
+
+function migrationReceiptVersion(value, known) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return known ? "none" : "unknown";
+  return migrationReceiptVersionPattern.test(normalized)
+    ? normalized
+    : "unknown";
+}
+
+function migrationReceiptTarget(target) {
+  if (!target || typeof target !== "object") return null;
+  const scope = migrationReceiptToken(
+    target.key || target.scope,
+    "unavailable",
+  );
+  const safeTarget = String(target.safeTarget || "").trim();
+  const matched = safeTarget.match(
+    /^host=([A-Za-z0-9.:[\]_-]+) port=(\d{1,5}) database=([A-Za-z0-9][A-Za-z0-9_-]*)$/u,
+  );
+  if (!matched || scope === "unavailable") return null;
+  const port = Number(matched[2]);
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65535) return null;
+  return {
+    scope,
+    host: matched[1],
+    port: String(port),
+    database: matched[3],
+  };
+}
+
+/**
+ * Emit one stable, secret-free terminal receipt for a migration command.
+ * Progress and controlled confirmation lines may still precede this block.
+ */
+export function createMigrationTerminalReceipt({
+  command = "migration",
+  mode = command,
+  output = process.stdout,
+} = {}) {
+  if (!output || typeof output.write !== "function") {
+    throw new TypeError("migration receipt output must provide write()");
+  }
+  const state = {
+    command: migrationReceiptToken(command, "migration"),
+    mode: migrationReceiptToken(mode, "unknown"),
+    phase: "entry",
+    target: null,
+    status: null,
+    operation: "none",
+    runtime: null,
+    writes: "0",
+    apply: "not_started",
+    finished: false,
+  };
+
+  const update = (next = {}) => {
+    if (state.finished) return;
+    if (next.phase !== undefined) {
+      state.phase = migrationReceiptToken(next.phase, state.phase);
+    }
+    if (next.target !== undefined) state.target = next.target;
+    if (next.status !== undefined) state.status = next.status;
+    if (next.runtime !== undefined) state.runtime = next.runtime;
+    if (next.operation !== undefined) {
+      const operation = String(next.operation || "").trim();
+      state.operation = migrationReceiptOperationPattern.test(operation)
+        ? operation
+        : "none";
+    }
+    if (next.writes !== undefined && migrationReceiptWrites.has(next.writes)) {
+      state.writes = next.writes;
+    }
+    if (next.apply !== undefined && migrationReceiptApply.has(next.apply)) {
+      state.apply = next.apply;
+    }
+  };
+
+  const finish = (terminal = {}) => {
+    if (state.finished) return;
+    update(terminal);
+    const result = migrationReceiptResults.has(terminal.result)
+      ? terminal.result
+      : "failed";
+    const errorCode = migrationReceiptToken(terminal.errorCode, "none");
+    const nextAction = migrationReceiptToken(terminal.nextAction, "none");
+    const safeTarget = migrationReceiptTarget(state.target);
+    const status =
+      state.status && typeof state.status === "object" ? state.status : null;
+    const baseline =
+      state.target && typeof state.target === "object" ? state.target : null;
+    const knownStatus = Boolean(status);
+    const currentVersion = migrationReceiptVersion(
+      status?.currentVersion ?? baseline?.currentVersion,
+      knownStatus,
+    );
+    const latestVersion = migrationReceiptVersion(
+      status?.latestVersion ?? baseline?.latestVersion,
+      knownStatus,
+    );
+    const pendingValue = status?.pendingFiles ?? baseline?.pendingFiles;
+    const availableValue = status?.availableFiles ?? baseline?.availableFiles;
+    let appliedValue = status?.appliedFiles ?? baseline?.appliedFiles;
+    if (
+      !Number.isSafeInteger(appliedValue) &&
+      pendingValue === 0 &&
+      Number.isSafeInteger(availableValue)
+    ) {
+      appliedValue = availableValue;
+    }
+    const runtimeHealth = migrationReceiptToken(
+      state.runtime?.health?.status,
+      "unknown",
+    );
+    const runtimeReady = migrationReceiptToken(
+      state.runtime?.ready?.status,
+      "unknown",
+    );
+
+    output.write(
+      `[migration-summary] command=${state.command} mode=${state.mode} phase=${state.phase}\n`,
+    );
+    output.write(
+      safeTarget
+        ? `[migration-summary] target=${safeTarget.scope} host=${safeTarget.host} port=${safeTarget.port} database=${safeTarget.database}\n`
+        : "[migration-summary] target=unavailable\n",
+    );
+    output.write(
+      `[migration-summary] current=${currentVersion} latest=${latestVersion} applied=${migrationReceiptCount(appliedValue)}/${migrationReceiptCount(availableValue)} pending=${migrationReceiptCount(pendingValue)}\n`,
+    );
+    output.write(
+      `[migration-summary] result=${result} writes=${state.writes} apply=${state.apply} auto_retry=false\n`,
+    );
+    output.write(`[migration-summary] operation=${state.operation}\n`);
+    output.write(
+      `[migration-summary] runtime health=${runtimeHealth} ready=${runtimeReady}\n`,
+    );
+    output.write(
+      `[migration-summary] error_code=${errorCode} next_action=${nextAction}\n`,
+    );
+    state.finished = true;
+  };
+
+  return {
+    update,
+    finish,
+    get finished() {
+      return state.finished;
+    },
+    get phase() {
+      return state.phase;
+    },
+  };
+}
 
 function shortHash(value, length = 24) {
   return crypto
@@ -251,18 +445,28 @@ export function unsafeRehearsalReason(source) {
   return checks.find(([pattern]) => pattern.test(visible))?.[1] || "";
 }
 
-function redactDiagnostic(value) {
+export function redactMigrationDiagnostic(value) {
   return String(value || "")
+    .replace(/\bpostgres(?:ql)?:\/\/[^\s'"`]+/giu, "<database-url-redacted>")
     .replace(
-      /\bpostgres(?:ql)?:\/\/[^:\s/@]+:[^@\s]+@/giu,
-      "postgres://<redacted>@",
+      /\b(?:DB_URL|POSTGRES_DSN|SOURCE_POSTGRES_DSN|LOCAL_DATABASE_URL)\s*=\s*(?:'[^']*'|"[^"]*"|[^\s]+)/giu,
+      "<database-environment-redacted>",
     )
-    .replace(/\bpassword=[^\s&]+/giu, "password=<redacted>");
+    .replace(/\bpassword=[^\s&]+/giu, "password=<redacted>")
+    .replace(
+      /\b(?:MIGRATE_(?:TARGET_CONFIRM|CONFIRM|MAINTENANCE_CONFIRM|OPERATION_CONFIRM)|LOCAL_MIGRATION_(?:TARGET_CONFIRM|CONFIRM|MAINTENANCE_CONFIRM|OPERATION_CONFIRM))\s*=\s*(?:'[^']*'|"[^"]*"|[^\s]+)/giu,
+      "<confirmation-redacted>",
+    )
+    .replace(
+      /\b(?:TRUST_LOCAL_DATABASE|TRUST_SHARED_DEV_DATABASE|APPLY_DEV_MIGRATIONS|SHARED_DEV_MAINTENANCE_READY):[A-Za-z0-9_-]+/gu,
+      "<confirmation-redacted>",
+    )
+    .replace(/升级共享开发库:[^\s'"`]+/gu, "<operation-confirmation-redacted>");
 }
 
 function commandDetails(result) {
   return [result?.stdout, result?.stderr]
-    .map((value) => redactDiagnostic(value).trim())
+    .map((value) => redactMigrationDiagnostic(value).trim())
     .filter(Boolean)
     .join("\n");
 }
@@ -722,13 +926,16 @@ function assertTrustedTarget(target) {
   );
 }
 
-async function prepare(command) {
+async function prepare(command, receipt) {
+  receipt.update({ phase: "workspace_guard" });
   await runWorkspaceGuard();
+  receipt.update({ phase: "target_resolution" });
   const resolved = await resolveDatabaseURL();
   const target = classifyDevelopmentTarget(
     resolved.databaseURL,
     resolved.source,
   );
+  receipt.update({ target, phase: "target_identity" });
   const identity = await readIdentity(resolved.databaseURL);
   if (identity.database !== target.database) {
     throw new MigrationCommandError(
@@ -744,12 +951,14 @@ async function prepare(command) {
     );
   }
   const confirmation = targetConfirmation(target, identity);
+  receipt.update({ phase: "status" });
   const snapshot = snapshotMigrations();
   try {
     await validateSnapshot(snapshot);
     const status = await readMigrationStatus(resolved.databaseURL, snapshot);
     const evaluated = evaluateMigrationStatus(status);
     const versions = statusVersions(status);
+    receipt.update({ status: evaluated });
     process.stdout.write(
       `[migration] target=${target.scope} ${target.safeTarget}\n`,
     );
@@ -783,8 +992,9 @@ async function prepare(command) {
   }
 }
 
-async function runPreflight(context) {
+async function runPreflight(context, receipt) {
   const { resolved, target, snapshot, status, versions } = context;
+  receipt.update({ phase: "preflight" });
   await runExistingUpgradeAudits(resolved.databaseURL);
   await runLifecycleAudit(resolved.databaseURL, status);
   const otherSessions = await readOtherSessionCount(resolved.databaseURL);
@@ -802,28 +1012,50 @@ async function runPreflight(context) {
   );
 }
 
-async function runStatus() {
-  const context = await prepare("status");
+async function runStatus(receipt) {
+  const context = await prepare("status", receipt);
   removeSnapshot(context.snapshot);
+  receipt.finish({
+    phase: "status",
+    result: "passed",
+    writes: "0",
+    apply: "not_requested",
+    nextAction:
+      context.evaluated.pendingFiles === 0 ? "none" : "run_make_migrate",
+  });
 }
 
-async function runPlan() {
-  const context = await prepare("plan");
+async function runPlan(receipt) {
+  const context = await prepare("plan", receipt);
+  let terminal;
   try {
     assertTrustedTarget(context.target);
+    receipt.update({ phase: "confirmation" });
     const suppliedTargetConfirmation = String(
       process.env.LOCAL_MIGRATION_TARGET_CONFIRM || "",
     ).trim();
     if (suppliedTargetConfirmation !== context.confirmation.value) {
       throw new MigrationCommandError(
-        `缺少当前 status 对应的目标确认；请运行：\nMIGRATE_TARGET_CONFIRM='${context.confirmation.value}' make migrate_plan`,
+        "migrate_plan 是编排器使用的低层目标，缺少当前 status 对应的目标确认。共享开发库交互终端请运行 make migrate，非交互环境请运行 make migrate_prepare",
+        {
+          result: "action_required",
+          errorCode: "target_confirmation_required",
+          nextAction: "run_make_migrate_prepare",
+        },
       );
     }
     if (context.evaluated.pendingFiles === 0) {
       process.stdout.write("[migration] 数据库已是最新版本，无需 apply\n");
+      terminal = {
+        phase: "status",
+        result: "up_to_date",
+        writes: "0",
+        apply: "skipped",
+        nextAction: "none",
+      };
       return;
     }
-    await runPreflight(context);
+    await runPreflight(context, receipt);
     const planID = migrationPlanID({
       targetID: context.confirmation.targetID,
       migrationHash: `${context.snapshot.hash}\n${context.workflowHash}`,
@@ -842,20 +1074,37 @@ async function runPlan() {
         "[migration] apply 前必须完成备份，并保持本仓库后端、DbGate 与其它 writer 停止\n",
       );
     }
+    terminal = {
+      phase: "ready",
+      result: "ready",
+      writes: "0",
+      apply: "not_started",
+      nextAction: "run_make_migrate_execute",
+    };
   } finally {
     removeSnapshot(context.snapshot);
+    if (terminal) receipt.finish(terminal);
   }
 }
 
-async function runApply() {
-  const context = await prepare("apply");
+async function runApply(receipt) {
+  const context = await prepare("apply", receipt);
+  let terminal;
   try {
     assertTrustedTarget(context.target);
     if (context.evaluated.pendingFiles === 0) {
+      receipt.update({ phase: "schema_readback" });
       await runSchemaReadback(context.resolved.databaseURL);
       process.stdout.write(
         `[migration] applied_verified current=${context.evaluated.currentVersion} applied=${context.evaluated.appliedFiles}/${context.evaluated.availableFiles} pending=0\n`,
       );
+      terminal = {
+        phase: "schema_readback",
+        result: "up_to_date",
+        writes: "0",
+        apply: "skipped",
+        nextAction: "none",
+      };
       return;
     }
     const planID = migrationPlanID({
@@ -865,11 +1114,17 @@ async function runApply() {
       pendingVersions: context.versions.pendingVersions,
     });
     const expectedApply = applyConfirmation(planID);
+    receipt.update({ phase: "confirmation" });
     if (
       String(process.env.LOCAL_MIGRATION_CONFIRM || "").trim() !== expectedApply
     ) {
       throw new MigrationCommandError(
-        "缺少与当前目标、pending revisions 和 migration hash 完全一致的 MIGRATE_CONFIRM；请先运行 make migrate_status，再按输出运行 make migrate_plan",
+        "migrate_apply 是编排器使用的低层目标，缺少与当前目标、pending revisions 和 migration hash 完全一致的 MIGRATE_CONFIRM；共享开发库交互终端请运行 make migrate，非交互环境请运行 make migrate_prepare",
+        {
+          result: "action_required",
+          errorCode: "apply_confirmation_required",
+          nextAction: "run_make_migrate_prepare",
+        },
       );
     }
     if (
@@ -878,17 +1133,28 @@ async function runApply() {
         maintenanceConfirmation(planID)
     ) {
       throw new MigrationCommandError(
-        "共享开发库缺少当前 plan 的备份/停写维护确认；请复制 migrate_plan 输出的 MIGRATE_MAINTENANCE_CONFIRM",
+        "共享开发库低层 apply 缺少当前 plan 的备份/停写维护确认；日常请改用 make migrate，非交互环境使用 migrate_prepare / migrate_execute",
+        {
+          result: "action_required",
+          errorCode: "maintenance_confirmation_required",
+          nextAction: "run_make_migrate_prepare",
+        },
       );
     }
 
-    await runPreflight(context);
+    await runPreflight(context, receipt);
+    receipt.update({ phase: "source_verification" });
     if (workflowFingerprint() !== context.workflowHash) {
       throw new MigrationCommandError(
         "migration 包装器、Makefile 或只读审计在 apply 检查期间发生变化；未执行正式 apply，请重新 plan",
       );
     }
     try {
+      receipt.update({
+        phase: "apply",
+        writes: "unknown",
+        apply: "attempted_once",
+      });
       await runCommand(
         "atlas",
         [
@@ -924,8 +1190,30 @@ async function runApply() {
         : "";
       throw new MigrationCommandError(
         `${applyError.message}\n[migration] outcome=${outcome}${suffix}`,
+        outcome === "apply_failed_no_revision_advance"
+          ? {
+              phase: "apply",
+              result: "failed",
+              writes: "0",
+              apply: "attempted_once",
+              errorCode: "apply_failed_no_revision_advance",
+              nextAction: "run_status_then_reprepare",
+            }
+          : {
+              phase: "apply",
+              result: "not_proven",
+              writes: "unknown",
+              apply: "attempted_once",
+              errorCode: "migration_outcome_unknown",
+              nextAction: "run_status_no_auto_retry",
+            },
       );
     }
+    receipt.update({
+      phase: "status_readback",
+      writes: "committed",
+      apply: "executed_once",
+    });
     const postStatus = await readMigrationStatus(
       context.resolved.databaseURL,
       context.snapshot,
@@ -934,19 +1222,41 @@ async function runApply() {
     if (!post.ok) {
       throw new MigrationCommandError(
         `Atlas apply 返回后 status 未到最新版本（applied=${post.appliedFiles}/${post.availableFiles}, pending=${post.pendingFiles}）；不得视为完成`,
+        {
+          phase: "status_readback",
+          result: "not_proven",
+          writes: "committed",
+          apply: "executed_once",
+          errorCode: "migration_readback_failed",
+          nextAction: "run_status_no_auto_retry",
+        },
       );
     }
+    receipt.update({ status: post, phase: "schema_readback" });
     await runSchemaReadback(context.resolved.databaseURL);
     process.stdout.write(
       `[migration] applied_verified current=${post.currentVersion} applied=${post.appliedFiles}/${post.availableFiles} pending=0\n`,
     );
+    terminal = {
+      phase: "schema_readback",
+      result: "passed",
+      writes: "committed",
+      apply: "executed_once",
+      nextAction: "none",
+    };
   } finally {
     removeSnapshot(context.snapshot);
+    if (terminal) receipt.finish(terminal);
   }
 }
 
 function usage() {
   process.stdout.write(`用法:
+  cd server && make migrate                 # 共享开发库日常主入口
+  cd server && make migrate_prepare         # 非交互显式准备，成功仅表示 ready
+  cd server && MIGRATE_OPERATION_ID='<ready 输出>' MIGRATE_OPERATION_CONFIRM='<ready 输出>' make migrate_execute
+
+低层诊断 / 编排入口:
   node scripts/local-migration.mjs status
   node scripts/local-migration.mjs plan
   node scripts/local-migration.mjs apply
@@ -958,19 +1268,116 @@ Makefile 入口:
 `);
 }
 
+function migrationCommandFailure(error, receipt) {
+  if (error?.receipt && Object.keys(error.receipt).length > 0) {
+    return error.receipt;
+  }
+  const diagnostic = String(error?.message || "");
+  if (/其它 client session|other_client_sessions|DbGate/iu.test(diagnostic)) {
+    return {
+      phase: "preflight",
+      result: "blocked",
+      writes: "0",
+      apply: "not_started",
+      errorCode: "database_clients_active",
+      nextAction: "close_database_clients_and_retry",
+    };
+  }
+  if (/确认|MIGRATE_(?:TARGET_)?CONFIRM/iu.test(diagnostic)) {
+    return {
+      phase: "confirmation",
+      result: "action_required",
+      writes: "0",
+      apply: "not_started",
+      errorCode: "confirmation_required",
+      nextAction: "run_make_migrate_prepare",
+    };
+  }
+  const defaults = {
+    workspace_guard: [
+      "blocked",
+      "workspace_guard_failed",
+      "fix_workspace_and_retry",
+    ],
+    target_resolution: [
+      "failed",
+      "target_resolution_failed",
+      "fix_database_configuration",
+    ],
+    target_identity: [
+      "blocked",
+      "target_identity_failed",
+      "verify_database_identity",
+    ],
+    status: [
+      "blocked",
+      "migration_status_unavailable",
+      "check_database_connection",
+    ],
+    preflight: [
+      "blocked",
+      "migration_preflight_failed",
+      "resolve_preflight_blockers",
+    ],
+    source_verification: [
+      "blocked",
+      "migration_source_changed",
+      "run_make_migrate_prepare",
+    ],
+    apply: [
+      "not_proven",
+      "migration_outcome_unknown",
+      "run_status_no_auto_retry",
+    ],
+    status_readback: [
+      "not_proven",
+      "migration_readback_failed",
+      "run_status_no_auto_retry",
+    ],
+    schema_readback: [
+      "not_proven",
+      "schema_readback_failed",
+      "run_status_no_auto_retry",
+    ],
+  };
+  const [result, errorCode, nextAction] = defaults[receipt.phase] || [
+    "failed",
+    "migration_command_failed",
+    "review_error_and_retry",
+  ];
+  return { result, errorCode, nextAction };
+}
+
 async function main() {
   const command = process.argv[2] || "";
-  if (command === "status") {
-    await runStatus();
-  } else if (command === "plan") {
-    await runPlan();
-  } else if (command === "apply") {
-    await runApply();
-  } else if (command === "--help" || command === "-h") {
-    usage();
-  } else {
-    usage();
-    throw new MigrationCommandError(`未知 migration 命令：${command}`);
+  const mode = command === "--help" || command === "-h" ? "help" : command;
+  const receipt = createMigrationTerminalReceipt({
+    command: `migrate_${mode || "unknown"}`,
+    mode: mode || "unknown",
+  });
+  try {
+    if (command === "status") {
+      await runStatus(receipt);
+    } else if (command === "plan") {
+      await runPlan(receipt);
+    } else if (command === "apply") {
+      await runApply(receipt);
+    } else if (command === "--help" || command === "-h") {
+      usage();
+      receipt.finish({
+        phase: "help",
+        result: "passed",
+        writes: "0",
+        apply: "not_requested",
+        nextAction: "none",
+      });
+    } else {
+      usage();
+      throw new MigrationCommandError(`未知 migration 命令：${command}`);
+    }
+  } catch (error) {
+    receipt.finish(migrationCommandFailure(error, receipt));
+    throw error;
   }
 }
 
@@ -980,7 +1387,9 @@ const isDirectRun =
 
 if (isDirectRun) {
   main().catch((error) => {
-    process.stderr.write(`[migration] ERROR: ${error.message}\n`);
+    process.stderr.write(
+      `[migration] ERROR: ${redactMigrationDiagnostic(error.message)}\n`,
+    );
     process.exit(1);
   });
 }

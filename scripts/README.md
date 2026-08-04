@@ -22,7 +22,7 @@
 | `scripts/project-scan.sh`                                                                                                                                                                                          | 扫描项目名、默认密钥、部署地址和页面文案残留                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | 改名后 / 配置收口后                                                                                       |
 | `scripts/dev-ports.mjs` / `scripts/dev-listener-stop.sh`                                                                                                                                                           | 校验本地固定端口组，并只停止 cwd 属于本仓库的已登记后端 listener；拒绝对陌生进程按端口强杀                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `make run / dev / dev_stop / dev_restart` 与本机端口覆盖时                                                |
 | `scripts/local-runtime-preflight.mjs`                                                                                                                                                                              | 只读核对工作区 schema / versioned migration、当前 dev 库 Atlas status 与后端 health / ready；被 `make run / dev_restart`、`pnpm start / start:yoyoosun` 共用，不自动 apply migration                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | 启动本地后端或需要登录 / RPC 的前端前                                                                     |
-| `scripts/local-migration.mjs` / `scripts/local-migration.test.mjs`                                                                                                                                                 | 开发库 migration 的脱敏 status、目标确认、整批事务回滚预演、显式 apply 与同目标 status 读回；共享 106 开发库额外要求备份 / 停写确认                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `make migrate_status / migrate_plan / migrate_apply`                                                      |
+| `scripts/local-migration-workflow.mjs` / `scripts/local-migration.mjs` 及对应测试                                                                                                                                   | 登记共享开发库的高层 prepare / execute 编排，以及底层脱敏 status、事务回滚预演、apply 和同目标读回；高层入口统一加入真实备份恢复、执行前备份身份复核与后端重启；所有终态统一输出脱敏的 `[migration-summary]` 回执                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | 交互 `make migrate`；非交互 `make migrate_prepare / migrate_execute`；底层目标仅用于诊断                 |
 | `scripts/build/apply-customer-web-config.mjs`                                                                                                                                                                      | 本地 / CI 构建后按 `ERP_CUSTOMER_KEY` 发布经过审查的 `customer-config.js`，并且只复制客户 `public-assets/` 到前端静态产物                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 构建客户私有化前端或服务端镜像时                                                                          |
 | `scripts/seed-role-demo-admins.sh`                                                                                                                                                                                 | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | 需要多角色登录 / 岗位任务端验收                                                                           |
 | `scripts/seed-core-demo-data.sh`                                                                                                                                                                                   | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出试用模拟 / 业务事实模拟可复用 ID                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前                                                 |
@@ -953,40 +953,61 @@ bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/qa/strict.sh
 ```
 
-开发库 migration 不由启动命令自动执行。在 `server/` 中先运行：
+开发库 migration 不由启动命令自动执行。登记共享开发库在人机终端进入 `server/`
+后只运行：
 
 ```bash
-make migrate_status
-MIGRATE_TARGET_CONFIRM='<status 输出>' make migrate_plan
+make migrate
 ```
 
-plan / apply 先使用 Git 内部路径上的本机 `lockf` 串行锁。plan 只在
-loopback `plush_erp*` 隔离库，或 application config 精确登记的
-`192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 上运行。它会使用冻结的
-migration 快照完成 Atlas validate / `tx-mode=all` dry-run、存量只读审计和
-全部 pending SQL 的真实事务预演，最后强制 `ROLLBACK`。登记共享开发库必须
-先 `make dev_stop` 并关闭其它数据库客户端；plan 发现其它 client session 会
-停止。通过后按输出执行：
+CI / Codex 等非交互环境显式使用两阶段；准备成功只表示 `writes=0 / ready`，
+不表示 migration 已完成：
 
 ```bash
-MIGRATE_CONFIRM='<plan 输出>' \
-MIGRATE_MAINTENANCE_CONFIRM='<共享开发库 plan 输出>' \
-make migrate_apply
+make migrate_prepare
+MIGRATE_OPERATION_ID='<同一次 ready 输出>' \
+MIGRATE_OPERATION_CONFIRM='<同一次 ready 输出>' \
+make migrate_execute
 ```
 
-apply 前须为共享开发库完成备份并保持停写。确认值只接受当前命令环境，
-`.env` 残值无效；apply 会重跑全部门禁，用同一快照和 `tx-mode=all` 整批
-提交，再对同一目标读回 `pending=0` 与 Ent / PostgreSQL schema 零差异。
-apply 失败会继续读取 status，区分 revision 未前进与提交状态未知。
-operational fact lifecycle 审计失败时只报告 finance / production /
-outsourcing 的不兼容数，不会自动填充 actor。环境变量覆盖的远程库、133、
-生产或归属不明目标仍使用正式发布流程。
+裸 `make migrate` 在非交互环境以 exit 2 / `ACTION_REQUIRED` 停止且没有准备
+副作用。高层服务固定执行 status、停后端、冻结 migration 快照、存量只读审计、
+Atlas validate / `tx-mode=all` dry-run、全部 pending SQL 的同事务真实预演并
+`ROLLBACK`、真实备份与隔离恢复。execute 在写入前再次核对 source、目标状态和
+备份文件身份，再 apply 一次并读回 `pending=0`、Ent / PostgreSQL schema 零差异、
+后端 health / ready。结果未知时先读回且不自动重试。`migrate_status` 是只读诊断；
+裸 `migrate_plan` 兼容路由到同一高层 prepare；裸 TTY `migrate_apply` 会恢复
+唯一 ready operation，找不到时重新准备并等待完整确认。只有携带完整内部确认
+的调用才进入高层服务复用的低层 plan / apply 合同，因此旧命令不再因缺 token
+必然失败，也没有放宽目标、备份、停写或一次 apply 边界。环境变量覆盖的远程库、
+133、生产或归属不明目标仍使用正式发布流程。
+
+#### 共享开发库终端回执（Migration terminal receipt）
+
+上述六个共享开发库入口在成功、无需执行、等待确认、前置阻断、执行失败或结果无法证明时，都会在终端末尾输出恰好一组 `[migration-summary]`。旧的 `[migration]` / `[migration-workflow]` 进度与机器解析行暂时保留，新的稳定终态字段如下：
+
+| 字段 | 口径 |
+| --- | --- |
+| `command / mode / phase` | 本次入口、运行模式和停止阶段。 |
+| `target` | 仅输出 scope、host、port、database；目标尚未安全解析时明确为 `unavailable`。 |
+| `current / latest / applied / pending` | 已安全读到的同目标 Atlas 状态；读不到时明确为 `unknown`，不拿旧状态补造。 |
+| `result` | `passed / up_to_date / ready / action_required / blocked / failed / not_proven / already_applied`。 |
+| `writes` | `0` 表示已证明本次未写库；`committed` 表示一次正式 apply 已提交并完成读回；`unknown` 表示提交结果无法证明。 |
+| `apply` | `not_requested / not_started / skipped / attempted_once / executed_once / already_executed`，描述本次调用与正式 apply 的关系。 |
+| `operation` | 高层 operation UUID；尚未创建时为 `none`。 |
+| `runtime` | health / ready 状态；未检查或读不到时为 `unknown`。 |
+| `error_code / next_action` | 稳定错误分类和下一动作 token；成功时 `error_code=none`。 |
+
+`auto_retry=false` 是固定安全边界。尤其看到 `result=not_proven`、`writes=unknown` 或 `next_action=run_status_no_auto_retry` 时，只能重新运行只读 `make migrate_status` 并核对 operation，不得自动重试 apply 或执行 `migrate_set`。`make` 自身可能把子进程的 exit 1 / 2 都表现为 recipe 失败，自动化应同时读取 `result`，不能只看最外层 exit code。
+
+回执不会包含用户名、密码、完整 DSN、原始错误或确认值；原始人类可读错误另行脱敏输出到 stderr。为了让显式 `migrate_prepare → migrate_execute` 仍可操作，prepare 的受控 continuation 会在回执前单独给出本次 operation 的确认变量；低层 `migrate_status / plan` 为现有服务端 parser 保留的旧机器行也可能在回执前给出内部确认。它们都不是通用回执字段，不应复制进日志、工单或聊天。终端回执也不替代备份、隔离恢复、停写、目标 identity、一次 apply 和同目标读回证据。
 
 普通本地开发可从
 `http://127.0.0.1:5175/__dev/database-migration` 使用同一底层合同，不必手工
 复制 status / plan / apply 的临时确认值。页面只支持 application config 已
 登记的 `192.168.0.106:5432/plush_erp`：先点“检查并准备”，Bridge 固定完成
 status、停止后端、plan、备份恢复演练与身份复核；再输入页面给出的完整确认串，
+execute 写入前还会重新核对备份文件身份，
 同一 operation 只执行一次 apply、`pending=0` 读回、后端重启和 health /
 ready。migration / schema / guard / 备份编排真源或目标状态变化后旧计划失效，
 结果不明确时标记 `not_proven` 并先读回，不自动重试。

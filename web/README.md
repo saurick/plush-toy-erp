@@ -353,7 +353,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 | `/__dev/docs`               | 当前工作区 Markdown 查看器               | 仓库 Markdown 文件本身                                        |
 | `/__dev/testing`            | 验证层级、执行命令和覆盖证据             | `docs/product/自动化测试策略.md`                              |
 | `/__dev/data-preparation`   | 固定档位测试数据计划、执行与回执         | 既有 Core seed、统一本地验收 lifecycle 与 operation store     |
-| `/__dev/database-migration` | 共享开发库迁移准备、执行、读回与重启     | `scripts/local-migration.mjs`、备份恢复脚本与 operation store |
+| `/__dev/database-migration` | 共享开发库迁移准备、执行、读回与重启     | 高层 CLI、迁移 operation service、备份恢复与 operation store |
 | `/__dev/prototypes`         | HTML / PNG / 截图原型资产预览            | `docs/product/prototypes/**`                                  |
 | `/__dev/capability-ledger`  | 产品能力与客户矩阵真源入口               | 两份正式 Markdown                                             |
 | `/__dev/customer-config`    | 已登记客户配置包预检、测试应用与发布门禁 | `config/customers/<customer-key>/*` 及 customer config 脚本   |
@@ -426,8 +426,8 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 - 页面只操作 application config 已登记的 `192.168.0.106:5432/plush_erp` 共享开发库，不接受浏览器传入的 DSN、目标、命令、SQL、脚本路径、凭据或环境变量，也不支持 133、测试或生产数据库。
 - 默认只读显示当前 / 最新 migration、pending 数和后端 health / ready。存在 pending 时先点“检查并准备”：Bridge 固定执行同目标 status、停止后端、plan、备份恢复演练和最终身份复核；其它数据库客户端仍占用目标时按既有 guard 阻断，不代替用户强制断开。
-- 准备成功后，页面要求输入当前 operation 给出的完整确认串；随后同一 operation 只执行一次 apply、`pending=0` 读回、后端重启和 health / ready。提交结果无法证明时标为 `not_proven`，先读回，不自动重试。
-- operation 使用 `0600` 原子状态、幂等键和跨 Vite 进程排他锁。migration / schema / guard / 备份编排真源或目标状态变化会使旧计划失效；未变化且文件大小与 SHA-256 均读回一致的备份恢复报告可以复用，避免同一计划因非写入阻断反复 dump / restore。
+- 准备成功后，页面要求输入当前 operation 给出的完整确认串；execute 会再次核对 migration / schema 指纹、目标 revision 和准备阶段备份文件身份，随后同一 operation 只执行一次 apply、`pending=0` 读回、后端重启和 health / ready。提交结果无法证明时标为 `not_proven`，先读回，不自动重试。
+- operation 使用 `0600` 原子状态、幂等键和跨 Vite 进程排他锁。migration / schema / guard / 备份编排真源、目标状态或备份文件身份变化会使旧计划失效；未变化且文件大小与 SHA-256 均读回一致的备份恢复报告可以复用，避免同一计划因非写入阻断反复 dump / restore。命令行 `make migrate` 与该页面复用同一 service；非交互调用必须显式使用 prepare / execute 两阶段，prepare 成功不能冒充已迁移。
 - 此入口不运行 `fast`、`full`、`strict`、完整验收 lifecycle 或发布构建。后端只在确认 apply 后重启一次；数据库已到 head 时不为了“证明绿色”重新迁移或重建。正式发布迁移继续使用受控发布制品、目标备份、串行锁、readback、smoke 和 rollback point。
 
 #### 客户配置包预检与发布 `/__dev/customer-config`

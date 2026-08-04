@@ -22,6 +22,11 @@ const BACKUP_ID = 'br-yoyoosun-20260729T080000+0800'
 test('database migration source identity follows the centralized dev server paths', () => {
   assert(
     DEV_DATABASE_MIGRATION_SOURCE_FILES.includes(
+      'scripts/local-migration-workflow.mjs'
+    )
+  )
+  assert(
+    DEV_DATABASE_MIGRATION_SOURCE_FILES.includes(
       'web/dev-server/devDatabaseMigrationPlugin.mjs'
     )
   )

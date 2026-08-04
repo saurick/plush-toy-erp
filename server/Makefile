@@ -133,6 +133,8 @@ migrate_hash:
 MIGRATE_TARGET_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_TARGET_CONFIRM)
 MIGRATE_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_CONFIRM)
 MIGRATE_MAINTENANCE_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_MAINTENANCE_CONFIRM)
+MIGRATE_OPERATION_ID_FROM_COMMAND_ENV := $(MIGRATE_OPERATION_ID)
+MIGRATE_OPERATION_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_OPERATION_CONFIRM)
 
 ENV_FILE := .env
 
@@ -141,25 +143,60 @@ ifneq ("$(wildcard $(ENV_FILE))","")
   export
 endif	
 
-.PHONY: migrate_status migrate_plan migrate_apply
+.PHONY: migrate migrate_prepare migrate_execute migrate_status migrate_plan migrate_apply
+# 共享开发库交互主入口：编排 status、plan、备份恢复、确认、apply、读回和重启。
+migrate:
+	@LOCAL_MIGRATION_WORKFLOW_MODE=run \
+		LOCAL_MIGRATION_OPERATION_ID="" \
+		LOCAL_MIGRATION_OPERATION_CONFIRM="" \
+		node ../scripts/local-migration-workflow.mjs
+
+# 非交互环境显式准备；成功只表示 ready 且 writes=0，不表示已迁移。
+migrate_prepare:
+	@LOCAL_MIGRATION_WORKFLOW_MODE=prepare \
+		LOCAL_MIGRATION_OPERATION_ID="" \
+		LOCAL_MIGRATION_OPERATION_CONFIRM="" \
+		node ../scripts/local-migration-workflow.mjs
+
+# 非交互环境执行同一次 ready 操作；成功必须包含 apply、读回和后端重启。
+migrate_execute:
+	@LOCAL_MIGRATION_WORKFLOW_MODE=execute \
+		LOCAL_MIGRATION_OPERATION_ID="$(MIGRATE_OPERATION_ID_FROM_COMMAND_ENV)" \
+		LOCAL_MIGRATION_OPERATION_CONFIRM="$(MIGRATE_OPERATION_CONFIRM_FROM_COMMAND_ENV)" \
+		node ../scripts/local-migration-workflow.mjs
+
 # 只读检查工作区、目标身份和 Atlas revision；不执行 migration。
 migrate_status:
 	@node ../scripts/local-migration.mjs status
 
-# 对 pending migration 做 dry-run 和真实事务预演，最终强制 ROLLBACK。
+# 兼容旧习惯：裸目标进入高层 prepare；显式目标确认只供 operation service 复用低层 plan。
 migrate_plan:
-	@LOCK_FILE="$$(git rev-parse --git-path plush-local-migration.lock)"; \
-	mkdir -p "$$(dirname "$$LOCK_FILE")"; \
-	LOCAL_MIGRATION_TARGET_CONFIRM="$(MIGRATE_TARGET_CONFIRM_FROM_COMMAND_ENV)" \
-		lockf -t 0 "$$LOCK_FILE" node ../scripts/local-migration.mjs plan
+	@if [ -z "$(MIGRATE_TARGET_CONFIRM_FROM_COMMAND_ENV)" ]; then \
+		LOCAL_MIGRATION_WORKFLOW_MODE=prepare \
+			LOCAL_MIGRATION_OPERATION_ID="" \
+			LOCAL_MIGRATION_OPERATION_CONFIRM="" \
+			node ../scripts/local-migration-workflow.mjs; \
+	else \
+		LOCK_FILE="$$(git rev-parse --git-path plush-local-migration.lock)"; \
+		mkdir -p "$$(dirname "$$LOCK_FILE")"; \
+		LOCAL_MIGRATION_TARGET_CONFIRM="$(MIGRATE_TARGET_CONFIRM_FROM_COMMAND_ENV)" \
+			lockf -t 0 "$$LOCK_FILE" node ../scripts/local-migration.mjs plan; \
+	fi
 
-# 只接受当前命令环境中由 migrate_plan 输出的精确确认值；.env 残值无效。
+# 兼容旧习惯：裸目标在 TTY 中恢复 ready operation；完整低层确认只供 operation service 使用。
 migrate_apply:
-	@LOCK_FILE="$$(git rev-parse --git-path plush-local-migration.lock)"; \
-	mkdir -p "$$(dirname "$$LOCK_FILE")"; \
-	LOCAL_MIGRATION_CONFIRM="$(MIGRATE_CONFIRM_FROM_COMMAND_ENV)" \
-		LOCAL_MIGRATION_MAINTENANCE_CONFIRM="$(MIGRATE_MAINTENANCE_CONFIRM_FROM_COMMAND_ENV)" \
-		lockf -t 0 "$$LOCK_FILE" node ../scripts/local-migration.mjs apply
+	@if [ -z "$(MIGRATE_CONFIRM_FROM_COMMAND_ENV)" ] || [ -z "$(MIGRATE_MAINTENANCE_CONFIRM_FROM_COMMAND_ENV)" ]; then \
+		LOCAL_MIGRATION_WORKFLOW_MODE=resume \
+			LOCAL_MIGRATION_OPERATION_ID="" \
+			LOCAL_MIGRATION_OPERATION_CONFIRM="" \
+			node ../scripts/local-migration-workflow.mjs; \
+	else \
+		LOCK_FILE="$$(git rev-parse --git-path plush-local-migration.lock)"; \
+		mkdir -p "$$(dirname "$$LOCK_FILE")"; \
+		LOCAL_MIGRATION_CONFIRM="$(MIGRATE_CONFIRM_FROM_COMMAND_ENV)" \
+			LOCAL_MIGRATION_MAINTENANCE_CONFIRM="$(MIGRATE_MAINTENANCE_CONFIRM_FROM_COMMAND_ENV)" \
+			lockf -t 0 "$$LOCK_FILE" node ../scripts/local-migration.mjs apply; \
+	fi
 
 .PHONY: print_db_url
 print_db_url:

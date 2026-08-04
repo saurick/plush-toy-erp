@@ -89,11 +89,15 @@ go generate ./cmd/server
 
 # 数据模型与迁移
 make data
-make migrate_apply
+make migrate
 
 # 测试
 go test ./...
 ```
+
+`make migrate` 是登记共享开发库的人机交互入口。非交互执行必须先运行
+`make migrate_prepare`，再原样使用同一次 ready 输出运行 `make migrate_execute`；
+prepare 成功不表示数据库已经升级。133 与生产环境不使用这些本地目标。
 
 ## 后续扩展时建议确认
 

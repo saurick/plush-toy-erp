@@ -185,6 +185,11 @@ Bridge 不接受任意 workflow、repo、target、路径、SSH 参数、环境�
 config 登记的 `192.168.0.106:5432/plush_erp`，不接受 DSN、SQL、shell、
 脚本路径、凭据或环境变量，也不支持 133、测试或生产数据库。
 
+同一 operation service 也由 `scripts/local-migration-workflow.mjs` 复用：交互终端
+使用 `make migrate`，非交互环境显式使用 `make migrate_prepare` 后按同一次 ready
+输出运行 `make migrate_execute`。prepare 的 exit 0 只表示 `writes=0 / ready`；裸
+`make migrate` 在非交互环境以 exit 2 停止，不得把待确认状态写成迁移成功。
+
 执行顺序固定为：
 
 ```text
@@ -194,6 +199,7 @@ config 登记的 `192.168.0.106:5432/plush_erp`，不接受 DSN、SQL、shell、
   → 备份恢复演练
   → migration 真源与目标身份复核
   → 用户输入当前完整确认串
+  → 再次验证备份文件身份
   → apply 一次
   → 同目标 pending=0 读回
   → 后端重启一次
@@ -204,7 +210,8 @@ operation 状态使用 `0600` 原子文件、幂等索引和跨 Vite 进程排�
 schema / guard / 备份编排文件组成独立 source fingerprint，避免无关工作区变更
 让计划失效；目标 migration 状态仍必须精确一致。相同 source fingerprint 和
 目标状态下，只有既有备份恢复报告通过且 dump 的常规文件身份、大小和 SHA-256
-再次读回一致时才允许复用；任何漂移都会重新准备备份。提交结果不明确时进入
+再次读回一致时才允许复用；execute 在 apply 前还会再次验证 operation 绑定的
+备份文件身份，任何漂移都会阻断旧 operation 并要求重新准备。提交结果不明确时进入
 `not_proven`，先读回目标，不自动创建新 operation 或重试 apply。
 
 该入口不执行 affected、fast、full、strict、完整验收 lifecycle 或 CI。数据库

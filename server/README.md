@@ -88,7 +88,9 @@ linked ProcessRuntime 对账在任务已提交后失败时返回可重试未知�
 
 `20260711063237 / 20260711075355` 已在本地隔离 migration chain 执行并固定为不可变 revision；`20260711104729` 新增 portable receipt bundle CHECK；`20260711204000` 把本项目迁移前投影表里的 `shipment_release_pending` 规范为正式业务状态 `shipment_pending`，不改 payload 中同名提醒类型。本项目迁移前且无法证明准确版本的事件继续保存 `task_version=NULL`，不使用事件行号或当前任务版本伪造 backfill；这不是旧项目、旧客户端或旧 API 兼容路径。当前迁移链包含两项不同的存量门槛：`--audit populated-upgrade` 核对 `20260714055504` 的状态、审计束、生命周期、流程锚点和待删除时间字段；`--audit customer-config-cutover` 核对 `20260714055825` 前必须显式治理的流程运行态和任务配置锚点。两项都由 `scripts/qa/populated-upgrade-preflight.sh` 在只读事务中执行，任一失败即停止 apply；迁移和发布脚本不得自动 DML。fresh schema、静态 DDL、Ent 零漂移和 Atlas validate 仍只证明结构与迁移链，不替代存量数据升级证据。共享工作树的 migration chain 可能继续增长，必须按当前代码与 Atlas status 重查。目标环境是否已发布仍以绑定具体 commit / image、数据库 status 和发布证据为准，本地 latest 不代表目标环境已经发布。
 
-本地开发 migration 入口固定为 `make migrate_status → make migrate_plan → make migrate_apply`。status 只打印脱敏目标、revision 和绑定 PostgreSQL cluster identity 的目标确认；plan / apply 使用 Git 内部路径上的本机 `lockf` 串行锁，复制 migration 目录快照，依次执行 populated-upgrade / customer-config-cutover 与 operational fact lifecycle 只读审计、Atlas `tx-mode=all` dry-run，并把全部 pending SQL 放在同一个事务中真实执行后强制 `ROLLBACK`。预演还要求全部非系统 schema 为 `function=0 / procedure=0 / non-internal-trigger=0`；外键生成的 PostgreSQL 内部 Trigger 不计入。apply 重新核对相同目标、pending revisions、migration hash 与包装器 / 审计 / Ent schema 指纹，重跑 plan 门禁后才以 `tx-mode=all` 整批提交，并对同一 DSN 读回 `pending=0`、Ent / PostgreSQL schema 零差异和可编程对象 0/0/0；apply 异常会继续读 status 并区分 revision 未前进和提交状态未知，失败不得自动重试或 `migrate_set`。application config 精确命中的 `192.168.0.106:5432/plush_erp` / `plush_erp_*_dev` 属于登记共享开发库，但 plan 前必须停止本仓库后端和其它数据库客户端，apply 前还必须完成备份并提供 plan 输出的维护确认；环境变量覆盖的远程库、133、生产和归属不明目标仍走正式发布流程。`20260726173943` 审计发现旧 operational facts 缺少精确 actor 时只报告三张事实表的 blocker 数，不猜造操作者或自动 DML。
+登记共享开发库的日常 migration 入口是 `make migrate`：在交互终端内，它一次编排 status、停后端、plan、真实备份与隔离恢复验证、完整确认、apply、同目标读回和后端重启。CI / Codex 等非交互环境不会把 ready 当成功迁移，必须先运行 `make migrate_prepare`，再原样使用同一次 ready 输出的 `MIGRATE_OPERATION_ID / MIGRATE_OPERATION_CONFIRM` 执行 `make migrate_execute`。prepare 成功固定表示 `writes=0 / ready`；execute 成功才表示 `pending=0`、Ent / PostgreSQL schema 零差异、可编程对象 0/0/0 且 health / ready 通过。执行前会再次核对 migration / schema 指纹、目标 revision 和备份文件身份，任一变化都使旧计划失效。`migrate_status` 仍是只读诊断；为兼容旧习惯，裸 `make migrate_plan` 进入高层 prepare，裸 TTY `make migrate_apply` 恢复唯一 ready operation，找不到时重新准备并等待确认。只有携带完整内部确认的调用才进入低层 plan / apply 守卫，因此旧命令不再成为缺 token 的死路，也没有绕过确认。低层 plan / apply 仍使用 Git 内部路径上的本机 `lockf` 串行锁、冻结 migration 快照、存量只读审计、Atlas `tx-mode=all` dry-run 和全部 pending SQL 的事务回滚预演；apply 异常会继续读 status 并区分 revision 未前进和提交状态未知，失败不得自动重试或 `migrate_set`。环境变量覆盖的远程库、133、生产和归属不明目标仍走正式发布流程。`20260726173943` 审计发现旧 operational facts 缺少精确 actor 时只报告三张事实表的 blocker 数，不猜造操作者或自动 DML。
+
+共享开发库六个入口的每个终态都会在终端末尾输出一组 `[migration-summary]`：包括安全目标、current / latest、applied / pending、phase、result、writes、apply、operation、runtime、error_code 和 next_action。成功、已经最新、ready、需人工动作、前置阻断、失败和结果无法证明使用同一格式；未知目标或状态明确打印 `unavailable / unknown`，不静默、不复用旧值。摘要不含用户名、密码、完整 DSN、原始错误或确认值；显式 prepare 的受控 continuation，以及低层 status / plan 为服务端 parser 保留的内部确认行，只会出现在回执之前。`writes=0` 才能证明本次未写库，`writes=committed` 表示一次 apply 已提交并完成读回，`writes=unknown / result=not_proven` 必须只读 status 且禁止自动重试。完整字段合同见 `scripts/README.md` 的 “Migration terminal receipt”。
 
 `attachment` JSON-RPC 域承载业务附件证据层和窄版产品媒体槽，canonical 读取 / 上传方法为 `list_attachments / upload_attachment / download_attachment`；另提供 `clear_product_image`，且只接受已保存产品的 `primary / secondary` 图片槽。普通物理删除接口仍已退出；除产品图片同槽替换 / 清空外，已上传证据不能由页面无痕删除，后续如需纠错必须先完成受控撤销与持久审计设计。产品图片固定使用 `owner_type=product + attachment_type=product_image`，只接受 PNG / JPEG / WEBP，写入要求 `product.update` 和 `products=enabled`；上传或清空在同一事务内锁定 `products` 行，同槽替换失败会回滚并保留旧图，数据库 partial unique index 再约束每个产品 / 槽位最多一行。服务端在 base64 解码后按声明格式完整解码图片；宽高单边不得超过 8192px、总像素不得超过 2000 万，扩展名、声明 MIME、完整图片内容或尺寸不一致时都会拒绝。其它附件挂到既有业务对象的 `owner_type + owner_id`，读取内容前会再次确认 owner 存在；上传 repo 在同一事务内锁定 owner 行并创建附件，debug 清理会先清理附件再清理 owner，避免孤儿记录。单个附件上限为 5MB，HTTP `/rpc/attachment` 在 JSON / protobuf 解析前限制 7MB 编码请求体，业务层还会在 base64 解码分配前检查编码长度，并在解码后复核 5MB 上限。当前 JSON-RPC 下载仍会在内存中生成 base64 响应，因此 5MB 是低配宿主的收窄内存预算，不代表大文件流式能力已经交付。
 
@@ -207,7 +209,7 @@ make init
 make run
 ```
 
-`make run`、`make dev` 和 `make dev_restart` 会先校验仓库根目录 `config/dev-ports.env`，并把其中固定的 HTTP `8300`、gRPC `9300` 注入 dev 配置；生产配置不消费这组覆盖。随后共享本地启动预检运行 `db-guard` 核对 Ent schema、versioned migration 与“禁止新增数据库可编程对象”规则，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision、pending 为 0，且 `public` 下自定义 Function、Procedure、非内部 Trigger 均为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 `migrate apply`；pending 时应在 `server/` 先运行 `make migrate_status`，复制目标确认完成 `make migrate_plan`，再按 plan 输出决定是否 apply，不应绕过。
+`make run`、`make dev` 和 `make dev_restart` 会先校验仓库根目录 `config/dev-ports.env`，并把其中固定的 HTTP `8300`、gRPC `9300` 注入 dev 配置；生产配置不消费这组覆盖。随后共享本地启动预检运行 `db-guard` 核对 Ent schema、versioned migration 与“禁止新增数据库可编程对象”规则，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision、pending 为 0，且 `public` 下自定义 Function、Procedure、非内部 Trigger 均为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 migration；pending 时在交互终端运行 `make migrate`，非交互环境运行显式的 prepare / execute 两阶段，不应绕过。
 
 主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
 
@@ -232,7 +234,7 @@ make dev_restart_yoyoosun
 make api
 make all
 make data
-make migrate_apply
+make migrate
 make print_db_url
 make migrate_status
 make reset_local_admin_password
@@ -303,11 +305,11 @@ make purchase_return_pg_test
 
 ## 迁移说明
 
-- `make migrate_apply` 默认读取 `server/configs/dev/config.yaml`
+- `make migrate`、`make migrate_prepare` 和 `make migrate_execute` 默认读取 `server/configs/dev/config.yaml`，且只接受登记共享开发库
 - 若存在 `config.local.yaml`，会覆盖本地私有 DSN
 - dev 配置解析到 `192.168.0.133` 或 `5435` 会被防呆拦截，避免把测试 / 目标环境当成本地开发库迁移
 - 只有显式设置 `USE_ENV_DB_URL=1` 时才使用环境变量 `DB_URL`
-- `make migrate_apply` 是开发库 Atlas apply 入口，会在 Atlas apply 前自动运行 `--audit populated-upgrade`，覆盖 `20260714055504` 及 WIP 委外关联切换；`--audit customer-config-cutover` 仍需在跨越 `20260714055825` 前显式执行
+- 高层入口在 apply 前自动运行 populated-upgrade、customer-config-cutover 与 operational fact lifecycle 审计；裸 `migrate_plan / migrate_apply` 是高层兼容入口，携带完整内部确认时才进入低层诊断和服务实现合同
 - 生产 / 低配部署只走 `server/deploy/compose/prod/migrate_online.sh`，由同一锁串行执行 status、055504 审计、055825 审计、dry-run 和 apply
 - 发布依赖新 schema 的服务前，先确认目标库审计通过、migration 已落地并完成 status / 读回；fresh 或静态 DDL 结果不能替代存量升级证据
 

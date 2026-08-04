@@ -141,6 +141,8 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/qa/dev-testing-operation-store.test.mjs",
   "scripts/qa/dev-database-migration-operation-store.mjs",
   "scripts/qa/dev-database-migration-operation-store.test.mjs",
+  "scripts/local-migration-workflow.mjs",
+  "scripts/local-migration-workflow.test.mjs",
   "scripts/qa/test-coverage-collect.mjs",
   "scripts/qa/test-coverage-collect.test.mjs",
   "scripts/qa/erp-field-linkage.mjs",

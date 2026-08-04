@@ -120,7 +120,7 @@ export async function checkLocalDatabaseMigrations(runtime = {}) {
   const result = evaluateMigrationStatus(status);
   if (!result.ok) {
     throw new Error(
-      `开发数据库 migration 未到最新版本（applied=${result.appliedFiles}/${result.availableFiles}, pending=${result.pendingFiles}）；请在 server 目录运行 make migrate_status，再复制其目标确认值执行 make migrate_plan。启动预检不会自动 apply`,
+      `开发数据库 migration 未到最新版本（applied=${result.appliedFiles}/${result.availableFiles}, pending=${result.pendingFiles}）；请在 server 目录的交互终端运行 make migrate，非交互环境显式运行 migrate_prepare / migrate_execute。高层入口会先完成 plan 与备份恢复验证，再等待明确确认；启动预检本身不会自动 apply`,
     );
   }
 
