@@ -32,19 +32,38 @@
 
 ### 成品返工补制闭环
 
-- 当前状态：完工已绑定确切包装 WIP 批次；REWORK 过账原子创建来源根批次、事件和异常任务；CLOSED 仅允许该来源链办理和补完工。Go 核心包、Node 121 项、文档 17 项、db-guard、build 与 4 个生产 Style L1 场景已有本地绿色记录。
-- 下一步：先在明确授权的隔离 PostgreSQL 测试库验证，再评审 migration apply、发布和岗位 UAT。
-- 阻塞 / 风险：当前没有 opt-in PostgreSQL 测试库证据；migration 未 apply，未部署、未 UAT。
+- 当前状态：完工已绑定确切包装 WIP 批次；REWORK 过账原子创建来源根批次、事件和异常任务；CLOSED 仅允许该来源链办理和补完工。Go 核心包、Node 121 项、文档 17 项、db-guard、build 与 4 个生产 Style L1 场景已有本地绿色记录。登记共享开发库已应用 `20260730161955_migrate.sql`，新增 WIP 关联列、两个 CHECK、两个 FK 和三个索引均完成结构与存量数据读回。
+- 下一步：目标发布前仍须对对应不可变版本重做 migration / 配置 / 运行态门禁，再由真实岗位完成 smoke 与 UAT；共享开发库绿色不替代 133 或生产证据。
+- 阻塞 / 风险：本轮没有部署、生产变更或客户 UAT；真实高并发业务竞争仍按 T8 专项另行验证。
 
 ## 最近完成
 
 | 事项 | 当前结论 | 详细证据 |
 | --- | --- | --- |
+| 共享开发库迁移终态回执 | 本地共享开发库六个入口在成功、no-op、ready、需人工动作、阻断、失败和结果未知时统一输出完整脱敏摘要；真实只读 status 为 `107 / 107`、pending `0` | 下方独立小节 |
+| 共享开发库迁移主路径可操作性 | 裸旧命令已安全兼容到高层编排；登记共享库已由 `105 / 107` 一次升级到 `107 / 107`、pending `0`，备份恢复、schema / 数据 / 权限和后端运行读回均通过 | 下方独立小节 |
 | 开发测试固定动作 | 固定入口与证据 staging 已收口；本次发布候选的确定性门禁漂移已最小修正，完整门禁仍待最新 clean SHA 重跑 | 下方独立小节 |
 | 全局业务记录动作可发现性 | 14 类业务页面与九岗位动作入口已按“可做但未选时置灰、无权或终态隐藏”收口；保持 `hold` | 本轮完整 progress 归档 |
 | V1 主链验收计划口径修正 | 文档、脚本、报告、DEV 预设和清单已统一为 V1 计划边界；保持 `hold` | 本轮完整 progress 归档 |
 | 开发工作台主题切换 | 共享主题三态、刷新保持、窄屏入口与暗色 / 浅色浏览器回归已完成 | 本轮完整 progress 归档 |
 | 页面与移动岗位近期收口 | 页面刷新、任务看板、移动任务文案 / 计数 / 标签、角色进度等各批次的精确结论与盲区已归档 | 本轮完整 progress 归档 |
+
+### 共享开发库迁移主路径可操作性
+
+- 根因与修复：截图中的 Makefile 报错行由 `158` 漂移到 `181`，证明同一 Local checkout 在用户两次命令间被活动 writer 改写，而非 shell 缓存；旧 Makefile 又把公开的裸 `migrate_plan / migrate_apply` 直接接到必须携带内部 HMAC / 维护确认的低层 recipe，因此旧操作习惯必然走进缺 token 的死路。`.env` 在 include 前已捕获命令环境，本轮 shell 也没有 `MIGRATE_* / DB_URL / POSTGRES_DSN` 残值，不是缺确认根因。现在裸 `make migrate_plan` 安全进入高层 prepare，裸 TTY `make migrate_apply` 恢复唯一 ready operation；找不到可恢复 operation 时重新准备并等待确认，只有完整内部确认才进入低层 plan / apply。
+- 安全边界：CLI 与 `/__dev/database-migration` 继续复用同一 operation service、登记目标身份、0600 原子状态、幂等键、串行锁、其它 client / writer 拒绝、源码与 revision 指纹、真实备份和隔离恢复。非交互裸 apply 在构造 service 前固定以 `ACTION_REQUIRED` / exit 2 停止，明确引导同一次 `migrate_prepare / migrate_execute`，不会静默写库；备份缺失或身份变化、源码漂移、外部客户端、目标变化和结果未知仍 fail closed。133、测试、生产、任意 DSN / SQL / shell 和归属不明数据库均未放开。
+- 真实执行：源码冻结为 commit `72a60f8783fb290c983338316d65ab28b1e3abae`、fingerprint `cb704a3ace8d1f13f3a6563a88bc54ec2380c1cae14d1064e60788846c84d7b8`；裸非交互 `make migrate_plan` 完成零写 plan、事务回滚预演、PG18 备份 `br-yoyoosun-20260801T212920+0800` 和临时 PostgreSQL 18 恢复升级验证。随后裸 TTY `make migrate_apply` 只执行 operation `3b0a4b00-bb5e-43e2-bd35-b5fdcf7fe368` 一次，登记共享库 `192.168.0.106:5432/plush_erp` 由 `20260729043852`、`105 / 107`、pending `2` 升到 `20260731124000`、`107 / 107`、pending `0`；operation 最终 `passed` 且 health / ready 均为 HTTP 200。
+- 数据读回：`20260730161955` 与 `20260731124000` 的 Atlas revision 分别完整执行 `7 / 7`、`1 / 1` 且 error 为空；两个新增 bigint 列、两个 CHECK、两个已验证 FK 和三个索引全部存在。WIP source CHECK、rework bundle CHECK、两个 FK orphan 和局部唯一重复共五类存量违规均为 `0`。`workflow.task.approve` 在 `sales / purchase / finance` 三个 `business_default` 角色上恰好 `3 / 3`、重复 `0`；非系统 schema 的 function / procedure / 非内部 trigger 为 `0 / 0 / 0`。最终后端 `server/bin/server-dev` 从本仓库 cwd 监听 `8300 / 9300`，运行配置脱敏读回仍为同一共享目标，`/healthz=ok`、`/readyz=ready`。
+- 验证：迁移 workflow、低层守卫、启动预检和 Makefile 合同定向 Node `37 / 37`，审批权限 migration Go 定向测试通过；`db-guard`、Atlas validate、Node 语法、AGENTS `15925 bytes`、文档清单 `5 / 5` 和 `git diff --check` 通过。真实 smoke 同时覆盖非交互裸 plan 成功停在 ready、TTY 裸 apply 成功到 pending `0`，以及非交互裸 apply exit `2` 且 no-apply 后 status 仍为 `107 / 107`。
+- 未做 / 风险：本轮未部署、未修改 133 / 生产、未代做客户岗位 UAT，也未 stage、commit 或 push。备份和 operation 回执保留在本机 `output/dev-workbench`；后续目标发布仍须绑定对应不可变版本重新执行目标门禁，不能复用共享开发库证据冒充发布完成。
+
+### 共享开发库迁移终态回执
+
+- 完成：`make migrate / migrate_prepare / migrate_execute / migrate_status` 以及裸兼容 `migrate_plan / migrate_apply` 的高低层终态统一追加七行 `[migration-summary]`。回执固定包含 command / mode / phase、安全 target、current / latest、applied / pending、result、writes、apply、auto_retry、operation、runtime、error_code 和 next_action；状态尚不可读时明确使用 `unavailable / unknown`，不沉默也不复用旧输出。
+- 安全边界：回执只接受结构化安全目标和稳定枚举，不接收原始错误、DSN、路径或确认值；stderr 继续统一脱敏数据库 URL、环境变量密码和高低层确认值。旧 `[migration]` parser 行、显式 prepare continuation、HMAC、目标 identity、真实备份与隔离恢复、停写、source fingerprint、单次 apply 和同目标读回均保留。`not_proven / writes=unknown` 固定 `auto_retry=false` 且下一步只允许 status，不把错误包装成成功。
+- 真实只读 smoke：登记目标 `192.168.0.106:5432/plush_erp` 当前为 `20260731124000 / 20260731124000`、`107 / 107`、pending `0`；`make migrate_status` 回执为 `result=passed / writes=0 / apply=not_requested`。非交互 `make migrate` 与裸 `make migrate_apply` 均在 service 构造前以 exit 2 / `ACTION_REQUIRED` 停止，并分别输出 `target=unavailable / result=action_required / writes=0 / apply=not_started`；没有 plan、备份、停后端或写库。
+- 验证：低层 formatter / redactor、高层 workflow、operation store、runtime parser、DEV plugin、启动 preflight、Makefile 和文档合同共 `65 / 65` 通过；Node 语法、`db-guard`、文档清单 `5 / 5` 和触达路径 `git diff --check` 通过。额外 Prettier check 仅报告 `local-migration.mjs` 中本批之前保留的 rollback rehearsal 单行换行差异，本批新增 hunk 已符合 formatter 输出且未越权改写旧 hunk。
+- 边界 / 下一步：本批只覆盖登记共享开发库六个入口，不改变隔离业务库脚本或生产 `migrate_online.sh` 的专用合同；没有执行真实 apply、修改 schema / migration SQL、部署、stage、commit 或 push。后续本地开发仍以交互 `make migrate` 为主，非交互使用同一次 `migrate_prepare → migrate_execute`；提交与 push 需用户另行授权。
 
 ### 业务列表列顺序与全筛选导出
 
@@ -100,3 +119,21 @@
 - `docs/archive/progress-2026-07-29-before-recent-task-closeout.md`：近期产品、业务页面、数据库与 DEV-only 工作台统一 Git 收口前的完整过程记录。
 - `docs/archive/progress-2026-07-28-before-login-style-recovery.md`：登录页样式回归修正前的完整过程记录。
 - 更早记录见 `docs/archive/README.md` 与 `docs/文档清单.md`。
+
+### 本地与 133 验收数据重建闭环
+
+- 完成：本地与 `customer-trial-133` 继续复用同一套 source-driven 验收数据实现；为两个固定生产样本补齐 `PLUSH_SEW_HAND_V1` 四工序路线、工序主数据映射、在制批次办理、逐级质检、包装确认和完工批次引用，使返工样本来自正式关联 WIP 的完工事实。无路线普通完工仍保留，但不能作为返工来源；没有放宽后端路线、质检、包装、权限、幂等或事实过账合同。
+- 完成：新增固定 `test-133` 同逻辑库物理重建 controller / executor / remote lifecycle。执行前绑定已 promotion 的不可变 release、即时只读预检、逻辑库和 operation；目标端先做 fresh dump 与恢复校验，再保存旧 PostgreSQL 数据目录、初始化 fresh 物理数据代、执行 migration、一次性管理员 bootstrap、空业务基线及运行态读回。旧数据代和 backup 均保留，不自动删库、清表、down migration 或重试未知结果；migration 前恢复旧运行态须被证明，否则统一冻结为 `not_proven`。
+- 完成：一次性管理员 secret 不进入 checksum、回执、日志或 steady env；目标端校验后立即读入内存并删除，传输不完整或 SSH 结果不明时执行器仍尝试固定 secret-only 清理，清理无法证明时 operation 必须为 `not_proven`。部署与客户试用手册同步区分数据库重建、造数、浏览器/PDF、岗位 smoke 和客户 UAT 证据。
+- 验证：release Node 组 `945 / 945`、造数定向 `79 / 79`、数据库重建定向 `29 / 29`、pre-push receipt `16 / 16`、文档清单 `5 / 5` 通过；WIP / 返工相关 Go biz、service、data 包通过，`bash -n`、ShellCheck、严格秘密扫描（range 40 files）和 `git diff --check` 通过。`govulncheck -version` 仅获得 15 秒专用探针窗口，真实版本、可用状态、仓库或环境身份漂移仍 fail closed。
+- 下一步：当前修复尚未形成 clean exact commit，因此还未重跑修复后的本地 fresh lifecycle、52 项真实浏览器/PDF 与 4 条真实写链，也未生成不可变 release。取得提交与 push 授权后，先由唯一收口 owner 精确提交，再以该 clean SHA 重跑本地生命周期；随后才允许 CI / release、133 promotion、fresh backup / 物理重建、同源造数、readiness、52 项浏览器/PDF、凭据轮换和 11 账号 smoke 串行闭环。
+- 阻塞 / 风险：本批没有修改 133、没有部署、没有 stage / commit / push；现有 133 运行态和数据仍是旧版本事实。数据库重建 `passed` 也只证明 fresh 物理库、首个管理员、空业务基线和基础运行态，不证明造数、页面验收或客户签收；真实岗位客户 UAT 必须继续由人工执行并签收。
+
+### 业务列表动作入口全局稳定性（2026-08-03）
+
+- 完成：本小节记录当前动作稳定性口径，并替代上方“终态隐藏”的旧过程摘要。14 类正式业务选择页、生产异常子面板和共享生命周期组件统一为：同一页面 / 页签、同一角色权限下，已授权动作的目录、顺序与主动作槽位不因未选择、记录结构、业务状态、已完成、终态或保存中增删换位；不可执行项保留置灰并给出业务原因，窄屏“更多操作”可继续打开查看各动作原因。只有未授权动作，或不属于当前页面 / 页签 / 模块的动作隐藏；没有修改后端 RBAC、Workflow / Fact、schema、migration 或数据库。
+- 覆盖：正式选择页清单守卫覆盖 BOM、收付款、业务记录、客户退货、出货、库存台账、主数据、委外订单、生产订单、采购订单、采购入库、质量检验、销售订单和 Workflow 业务页；九个实际岗位能力投影验证空选择、可执行记录和终态记录始终保持各自固定的已授权动作目录。生产订单截图所示的编辑、登记完工、工序、生产记录、发布、关闭和取消等入口现在在空选择时即可看见，选择不同记录只改变启用状态与原因。
+- 自动验证：Web 全量 Node `2083 / 2083`、本批定向 Node `114 / 114`、全量 `src` ESLint、Vite build、文档清单 `5 / 5`、岗位投影 / 帮助手册 `14 / 14`、场景脚本语法和精确 `git diff --check` 通过。build 经 `pnpm` 运行时报告 Node `v26.5.0`，高于项目声明的 `24.14.x`，因此构建绿色不替代锁定版本发布门禁。
+- 浏览器：动作稳定性 Style L1 定向 `8 / 8` 通过，覆盖销售五状态与无能力账号、采购 / 入库 / 质检代表状态、收付款普通与超级管理员收窄权限、退货 / 出货、生产异常，以及手机暗色抽屉；已实际核对销售关闭、采购关闭、财务已过账与手机抽屉截图，选择、清空选择和终态切换均不再丢失已授权入口，页面无横向溢出。
+- 阻塞 / 风险：全量 Style L1 在任务外共享改动的 `dev-flow-state-observatory-workflow-graph-dark` 旧文案断言处提前失败，本批未越权修改；额外 `production-order-source-material-issue-desktop` 场景等待“生产领料”弹窗超时，但该链路使用本页第 790 行附近的领料加载和第 2055 行附近的弹窗挂载，本批生产订单改动仅位于第 1636 行之后的当前操作栏，未触碰该处理链，需作为独立浏览器盲区复核。`affected --plan` 还因共享 dirty worktree 纳入多个任务的 T8 范围，本批没有将其他任务现场包装为自身验证。
+- 下一步：待相关 writer 收口后，在锁定 Node 与干净 exact SHA 上补跑全量 Style L1，并独立复核生产领料场景；当前没有 stage、commit、push、部署或客户 UAT。若用户授权提交 / 推送，仍由唯一 Git 收口 owner 按本批精确路径处理，push 前重新 fetch 并核对远端。
