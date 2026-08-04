@@ -205,6 +205,17 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
     plan.records.processes.length,
     DEFAULT_SOURCE_DATA_SCALE.processes,
   );
+  assert.deepEqual(
+    plan.records.processes
+      .filter((item) => item.production_route_operation_code)
+      .map((item) => [item.name, item.production_route_operation_code]),
+    [
+      ["裁片", "FABRIC_PROCESSING"],
+      ["本体车缝", "SEWING"],
+      ["手工收口", "HANDWORK"],
+      ["包装", "PACKAGING"],
+    ],
+  );
   assert.equal(
     plan.records.salesOrders.length,
     DEFAULT_SOURCE_DATA_SCALE.salesOrders,

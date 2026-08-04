@@ -48,6 +48,11 @@ function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
       },
       bom: { id: 106, status: "ACTIVE" },
       plannedQuantity: "1",
+      route: {
+        code: "PLUSH_SEW_HAND_V1",
+        customerInspectionRequired: false,
+        packagingVersionSnapshot: "试用验收包装版",
+      },
       materialIssues: [
         {
           materialId: 201,
@@ -132,6 +137,49 @@ function createRPC({
   let shipmentFinanceApprovalTask;
   let deliveryProcess;
   let deliveryNodes;
+  let productionOrderItem;
+  const productionWIPOperations = [
+    [701, "FABRIC_PROCESSING"],
+    [702, "SEWING"],
+    [703, "HANDWORK"],
+    [704, "PACKAGING"],
+  ].map(([id, operationCode], index) => ({
+    id,
+    production_order_id: 600,
+    production_order_item_id: 601,
+    route_code: "PLUSH_SEW_HAND_V1",
+    route_version: 1,
+    step_no: (index + 1) * 10,
+    operation_code: operationCode,
+  }));
+  const qualityGatesByOperation = new Map([
+    ["FABRIC_PROCESSING", ["CUT_PIECE"]],
+    ["SEWING", ["SHELL"]],
+    ["HANDWORK", ["FINISHED_GOODS", "NEEDLE", "SAMPLING"]],
+    ["PACKAGING", []],
+  ]);
+  const productionWIPBatches = [];
+  const productionWIPQualities = new Map();
+  const packagingConfirmation = {
+    id: 720,
+    production_order_id: 600,
+    production_order_item_id: 601,
+    status: "PENDING",
+    version: 1,
+  };
+
+  const productionWIPAggregate = () => ({
+    production_order: { id: 600, status: "RELEASED", version: 2 },
+    production_order_items: productionOrderItem
+      ? [structuredClone(productionOrderItem)]
+      : [],
+    production_order_operations: structuredClone(productionWIPOperations),
+    production_wip_batches: structuredClone(productionWIPBatches),
+    packaging_confirmations: [structuredClone(packagingConfirmation)],
+    quality_inspections: [...productionWIPQualities.values()].flatMap(
+      (items) => structuredClone(items),
+    ),
+  });
 
   const createRecord = (key, extra = {}, method = "") => {
     const item = {
@@ -167,16 +215,38 @@ function createRPC({
           total: 1,
         };
       case "create_production_order":
+        productionOrderItem = {
+          id: 601,
+          production_order_id: 600,
+          ...structuredClone(params.items[0]),
+        };
+        if (
+          productionOrderItem.route_code === "PLUSH_SEW_HAND_V1" &&
+          productionWIPBatches.length === 0
+        ) {
+          productionWIPBatches.push({
+            id: 711,
+            production_order_id: 600,
+            production_order_item_id: 601,
+            production_order_operation_id: 701,
+            batch_no: "WIP-600-601-10-001",
+            flow_type: "NORMAL",
+            execution_mode: null,
+            status: "PLANNED",
+            version: 1,
+            quantity: params.items[0].planned_quantity,
+          });
+        }
         return {
           production_order: { id: 600, status: "DRAFT", version: 1 },
-          production_order_items: [{ id: 601 }],
+          production_order_items: [structuredClone(productionOrderItem)],
           production_material_requirements: [],
           material_requirements_state: "NOT_REQUIRED",
         };
       case "release_production_order":
         return {
           production_order: { id: 600, status: "RELEASED", version: 2 },
-          production_order_items: [{ id: 601 }],
+          production_order_items: [structuredClone(productionOrderItem)],
           production_material_requirements: [
             {
               id: 602,
@@ -187,10 +257,92 @@ function createRPC({
           ],
           material_requirements_state: "READY",
         };
+      case "get_production_wip":
+        assert.equal(domain, "production_wip");
+        assert.equal(params.production_order_id, 600);
+        return productionWIPAggregate();
+      case "execute_production_wip_action": {
+        assert.equal(domain, "production_wip");
+        assert.equal(params.production_order_id, 600);
+        if (params.action === "CONFIRM_PACKAGING_MATERIAL") {
+          assert.equal(params.production_order_item_id, 601);
+          assert.equal(params.expected_version, packagingConfirmation.version);
+          packagingConfirmation.status = "CONFIRMED";
+          packagingConfirmation.version += 1;
+          packagingConfirmation.packaging_version_snapshot =
+            params.packaging_version_snapshot;
+          return productionWIPAggregate();
+        }
+        const batch = productionWIPBatches.find(
+          (item) => item.id === params.production_wip_batch_id,
+        );
+        assert.ok(batch, `missing WIP batch ${params.production_wip_batch_id}`);
+        assert.equal(params.expected_version, batch.version);
+        const operation = productionWIPOperations.find(
+          (item) => item.id === batch.production_order_operation_id,
+        );
+        if (params.action === "ASSIGN_EXECUTION") {
+          assert.equal(batch.status, "PLANNED");
+          assert.equal(params.execution_mode, "IN_HOUSE");
+          batch.execution_mode = params.execution_mode;
+          batch.version += 1;
+        } else if (params.action === "START_OPERATION") {
+          assert.equal(batch.status, "PLANNED");
+          assert.equal(batch.execution_mode, "IN_HOUSE");
+          batch.status = "IN_PROGRESS";
+          batch.version += 1;
+        } else if (params.action === "COMPLETE_OPERATION") {
+          assert.equal(batch.status, "IN_PROGRESS");
+          const gates = qualityGatesByOperation.get(operation.operation_code);
+          batch.status = gates.length > 0 ? "WAITING_QUALITY" : "ACCEPTED";
+          batch.version += 1;
+          if (gates.length > 0) {
+            productionWIPQualities.set(batch.id, [
+              {
+                id: nextID++,
+                production_wip_batch_id: batch.id,
+                gate_code: gates[0],
+                status: "DRAFT",
+              },
+            ]);
+          }
+        } else if (params.action === "TRANSFER_TO_NEXT_OPERATION") {
+          assert.equal(batch.status, "ACCEPTED");
+          const target = productionWIPOperations.find(
+            (item) => item.id === params.target_operation_id,
+          );
+          assert.ok(target);
+          assert.equal(params.quantity, batch.quantity);
+          batch.version += 1;
+          productionWIPBatches.push({
+            id: 711 + productionWIPBatches.length,
+            production_order_id: 600,
+            production_order_item_id: 601,
+            production_order_operation_id: target.id,
+            batch_no: `WIP-600-601-${target.step_no}-001`,
+            flow_type: "NORMAL",
+            execution_mode: null,
+            status: "PLANNED",
+            version: 1,
+            quantity: params.quantity,
+          });
+        } else {
+          assert.fail(`unexpected production WIP action ${params.action}`);
+        }
+        return productionWIPAggregate();
+      }
       case "create_production_material_issue_from_order":
-      case "create_production_completion_from_order":
       case "create_production_rework_from_completion":
         return createRecord("production_fact", {}, method);
+      case "create_production_completion_from_order":
+        return createRecord(
+          "production_fact",
+          {
+            production_wip_batch_id:
+              params.production_wip_batch_id ?? null,
+          },
+          method,
+        );
       case "post_production_fact": {
         const record = records.get(params.id);
         assert.equal(record?.key, "production_fact");
@@ -217,10 +369,29 @@ function createRPC({
             : [],
           total: outsourcingQualityInspection ? 1 : 0,
         };
+      case "list_production_stage_quality_inspections": {
+        const inspections = productionWIPQualities.get(
+          params.production_wip_batch_id,
+        ) || [];
+        return {
+          quality_inspections: structuredClone(inspections),
+          total: inspections.length,
+        };
+      }
       case "create_quality_inspection_from_outsourcing_return":
         outsourcingQualityInspection = { id: nextID++, status: "DRAFT" };
         return { quality_inspection: outsourcingQualityInspection };
       case "submit_quality_inspection":
+        for (const inspections of productionWIPQualities.values()) {
+          const wipInspection = inspections.find(
+            (item) => item.id === params.id,
+          );
+          if (wipInspection) {
+            assert.equal(wipInspection.status, "DRAFT");
+            wipInspection.status = "SUBMITTED";
+            return { quality_inspection: structuredClone(wipInspection) };
+          }
+        }
         if (finishedGoodsQualityInspection?.id === params.id) {
           finishedGoodsQualityInspection.status = "SUBMITTED";
           return { quality_inspection: finishedGoodsQualityInspection };
@@ -229,8 +400,38 @@ function createRPC({
         return { quality_inspection: outsourcingQualityInspection };
       case "pass_quality_inspection":
         assert.equal(params.defect_rate_operator, "APPROX");
-        assert.equal(params.defect_rate_percent, "5");
         assert.equal(typeof params.defect_rate_percent, "string");
+        for (const [batchID, inspections] of productionWIPQualities) {
+          const wipInspection = inspections.find(
+            (item) => item.id === params.id,
+          );
+          if (!wipInspection) continue;
+          assert.equal(params.defect_rate_percent, "0");
+          assert.equal(wipInspection.status, "SUBMITTED");
+          wipInspection.status = "PASSED";
+          wipInspection.result = "PASS";
+          const batch = productionWIPBatches.find(
+            (item) => item.id === batchID,
+          );
+          const operation = productionWIPOperations.find(
+            (item) => item.id === batch.production_order_operation_id,
+          );
+          const gates = qualityGatesByOperation.get(operation.operation_code);
+          const nextGate = gates[inspections.length];
+          if (nextGate) {
+            inspections.push({
+              id: nextID++,
+              production_wip_batch_id: batch.id,
+              gate_code: nextGate,
+              status: "DRAFT",
+            });
+          } else {
+            batch.status = "ACCEPTED";
+            batch.version += 1;
+          }
+          return { quality_inspection: structuredClone(wipInspection) };
+        }
+        assert.equal(params.defect_rate_percent, "5");
         if (finishedGoodsQualityInspection?.id === params.id) {
           finishedGoodsQualityInspection.status = "PASSED";
           finishedGoodsQualityInspection.result = "PASS";
@@ -527,6 +728,7 @@ test("every allowlisted method is present in the current formal JSON-RPC dispatc
     [
       "../../server/internal/service/jsonrpc_inventory.go",
       "../../server/internal/service/jsonrpc_production_order.go",
+      "../../server/internal/service/jsonrpc_production_wip.go",
       "../../server/internal/service/jsonrpc_operational_fact_production.go",
       "../../server/internal/service/jsonrpc_operational_fact_exception.go",
       "../../server/internal/service/jsonrpc_operational_fact_outsourcing.go",
@@ -615,12 +817,78 @@ test("phase-scoped apply executes the formal production chain and returns exact 
   assert.equal(report.results.production.materialIssues.length, 1);
   assert.equal(report.results.production.materialIssues[0].status, "POSTED");
   assert.equal(report.results.production.completion.status, "POSTED");
+  assert.ok(report.results.production.completion.production_wip_batch_id > 0);
   assert.equal(report.results.production.rework.status, "POSTED");
   assert.ok(calls.some((call) => call.method === "create_production_order"));
   assert.equal(
     calls.some((call) => call.method === "create_shipment_with_items"),
     false,
   );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.method === "execute_production_wip_action")
+      .map((call) => call.params.action),
+    [
+      "ASSIGN_EXECUTION",
+      "START_OPERATION",
+      "COMPLETE_OPERATION",
+      "TRANSFER_TO_NEXT_OPERATION",
+      "ASSIGN_EXECUTION",
+      "START_OPERATION",
+      "COMPLETE_OPERATION",
+      "TRANSFER_TO_NEXT_OPERATION",
+      "ASSIGN_EXECUTION",
+      "START_OPERATION",
+      "COMPLETE_OPERATION",
+      "TRANSFER_TO_NEXT_OPERATION",
+      "CONFIRM_PACKAGING_MATERIAL",
+      "ASSIGN_EXECUTION",
+      "START_OPERATION",
+      "COMPLETE_OPERATION",
+    ],
+  );
+  assert.equal(
+    calls.filter(
+      (call) =>
+        call.method === "pass_quality_inspection" &&
+        call.params.defect_rate_percent === "0",
+    ).length,
+    5,
+  );
+});
+
+test("route-less production remains supported but cannot request a rework source", async () => {
+  const report = sourceReport();
+  delete report.referenceRecords.sourceDrivenFacts.production.route;
+  delete report.referenceRecords.sourceDrivenFacts.production.rework;
+  const plan = buildSourceDrivenFactPlan(report, {
+    instanceKey: "ROW-ROUTELESS",
+    enabledPhases: ["production"],
+  });
+  const { calls, rpc } = createRPC();
+  const applied = await applySourceDrivenFactPlan(plan, {
+    rpc,
+    confirmation: sourceDrivenFactConfirmation(plan),
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+  });
+  assert.equal(applied.results.production.completion.status, "POSTED");
+  assert.equal(
+    applied.results.production.completion.production_wip_batch_id,
+    null,
+  );
+  assert.equal(
+    calls.some((call) => call.domain === "production_wip"),
+    false,
+  );
+
+  const invalidReport = sourceReport();
+  delete invalidReport.referenceRecords.sourceDrivenFacts.production.route;
+  const invalid = buildSourceDrivenFactPlan(invalidReport, {
+    instanceKey: "ROW-INVALID-REWORK",
+    enabledPhases: ["production"],
+  });
+  assert.equal(invalid.phases.production.status, "blocked");
+  assert.match(invalid.phases.production.reason, /routed WIP completion/u);
 });
 
 test("outsourcing quality apply sends the required approximate defect-rate pair", async () => {

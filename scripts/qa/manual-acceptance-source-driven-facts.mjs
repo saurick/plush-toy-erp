@@ -23,6 +23,13 @@ export const SOURCE_DRIVEN_FACT_RUN_ID = "20260716-V5";
 
 const CUSTOMER_KEY = "yoyoosun";
 const SIMULATED_NOTE = "按订单办理。";
+const PRODUCTION_ROUTE_CODE = "PLUSH_SEW_HAND_V1";
+const PRODUCTION_ROUTE_OPERATIONS = Object.freeze([
+  "FABRIC_PROCESSING",
+  "SEWING",
+  "HANDWORK",
+  "PACKAGING",
+]);
 const DECIMAL_SCALE = 6;
 const DECIMAL_FACTOR = 10n ** BigInt(DECIMAL_SCALE);
 const POSITIVE_DECIMAL = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/u;
@@ -105,6 +112,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "fact_no",
     "production_order_id",
     "production_order_item_id",
+    "production_wip_batch_id",
     "warehouse_id",
     "new_lot_no",
     "quantity",
@@ -123,6 +131,22 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "customer_key",
     "id",
     "expected_version",
+  ]),
+  "production_wip.get_production_wip": Object.freeze([
+    "production_order_id",
+  ]),
+  "production_wip.execute_production_wip_action": Object.freeze([
+    "action",
+    "production_order_id",
+    "production_order_item_id",
+    "production_wip_batch_id",
+    "target_operation_id",
+    "expected_version",
+    "idempotency_key",
+    "execution_mode",
+    "quantity",
+    "packaging_version_snapshot",
+    "note",
   ]),
   "operational_fact.list_production_order_material_requirements":
     Object.freeze(["customer_key", "production_order_id"]),
@@ -188,6 +212,12 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
   "quality.list_outsourcing_return_quality_inspections": Object.freeze([
     "customer_key",
     "fact_id",
+    "limit",
+    "offset",
+  ]),
+  "quality.list_production_stage_quality_inspections": Object.freeze([
+    "customer_key",
+    "production_wip_batch_id",
     "limit",
     "offset",
   ]),
@@ -450,6 +480,33 @@ function normalizeProduction(source) {
     source?.plannedQuantity,
     "production.plannedQuantity",
   );
+  let route;
+  if (source?.route != null) {
+    const code = requiredText(
+      source.route.code,
+      "production.route.code",
+      64,
+    ).toUpperCase();
+    if (code !== PRODUCTION_ROUTE_CODE) {
+      throw new SourceDrivenFactError(
+        `production.route.code must be ${PRODUCTION_ROUTE_CODE}`,
+      );
+    }
+    if (typeof source.route.customerInspectionRequired !== "boolean") {
+      throw new SourceDrivenFactError(
+        "production.route.customerInspectionRequired must be boolean",
+      );
+    }
+    route = {
+      code,
+      customerInspectionRequired: source.route.customerInspectionRequired,
+      packagingVersionSnapshot: requiredText(
+        source.route.packagingVersionSnapshot,
+        "production.route.packagingVersionSnapshot",
+        128,
+      ),
+    };
+  }
   const completion = {
     warehouseId: positiveID(
       source?.completion?.warehouseId,
@@ -513,6 +570,11 @@ function normalizeProduction(source) {
   }
   let rework;
   if (source?.rework != null) {
+    if (!route) {
+      throw new SourceDrivenFactError(
+        "production rework requires a routed WIP completion source",
+      );
+    }
     rework = {
       quantity: quantity(source.rework.quantity, "production.rework.quantity"),
       reason: requiredText(
@@ -535,6 +597,7 @@ function normalizeProduction(source) {
     item,
     bom,
     plannedQuantity,
+    ...(route ? { route } : {}),
     completion,
     materialIssues,
     ...(rework ? { rework } : {}),
@@ -1793,7 +1856,297 @@ function matchProductionRequirements(data, source) {
     }
     return { budget, requirement };
   });
+  const routeCode = String(items[0]?.route_code || "").trim();
+  const customerInspectionRequired =
+    items[0]?.customer_inspection_required === true;
+  if (
+    (source.route &&
+      (routeCode !== source.route.code ||
+        customerInspectionRequired !==
+          source.route.customerInspectionRequired)) ||
+    (!source.route && (routeCode !== "" || customerInspectionRequired))
+  ) {
+    throw new SourceDrivenFactError(
+      "released production order route does not match the source plan",
+    );
+  }
   return { item: items[0], requirements: matched };
+}
+
+function productionWIPIdempotencyKey(identity, label) {
+  return `manual-acceptance:wip:${stableHash(
+    identity.order.idempotencyKey,
+    label,
+  )}`;
+}
+
+async function readProductionWIP(rpc, productionOrderID) {
+  const aggregate = await invoke(
+    rpc,
+    "production_wip",
+    "get_production_wip",
+    { production_order_id: productionOrderID },
+  );
+  const operations = Array.isArray(aggregate?.production_order_operations)
+    ? aggregate.production_order_operations
+    : [];
+  const batches = Array.isArray(aggregate?.production_wip_batches)
+    ? aggregate.production_wip_batches
+    : [];
+  const confirmations = Array.isArray(aggregate?.packaging_confirmations)
+    ? aggregate.packaging_confirmations
+    : [];
+  if (
+    operations.length !== PRODUCTION_ROUTE_OPERATIONS.length ||
+    operations.some(
+      (operation, index) =>
+        String(operation?.operation_code || "") !==
+        PRODUCTION_ROUTE_OPERATIONS[index],
+    )
+  ) {
+    throw new SourceDrivenFactError(
+      "production WIP readback does not contain the exact fixed route",
+    );
+  }
+  return { aggregate, operations, batches, confirmations };
+}
+
+function exactNormalProductionWIPBatch(state, operationID, { optional = false } = {}) {
+  const matches = state.batches.filter(
+    (batch) =>
+      Number(batch?.production_order_operation_id) === Number(operationID) &&
+      String(batch?.flow_type || "").toUpperCase() === "NORMAL" &&
+      String(batch?.status || "").toUpperCase() !== "CANCELLED",
+  );
+  if (matches.length === 0 && optional) return undefined;
+  if (matches.length !== 1) {
+    throw new SourceDrivenFactError(
+      `production operation ${operationID} expected one active normal WIP batch, got ${matches.length}`,
+    );
+  }
+  return matches[0];
+}
+
+async function executeProductionWIPAction(rpc, params) {
+  return invoke(
+    rpc,
+    "production_wip",
+    "execute_production_wip_action",
+    params,
+  );
+}
+
+async function passCurrentProductionWIPQualityGate(rpc, batchID) {
+  const data = await invoke(
+    rpc,
+    "quality",
+    "list_production_stage_quality_inspections",
+    customerParams({
+      production_wip_batch_id: batchID,
+      limit: 20,
+      offset: 0,
+    }),
+  );
+  const inspections = Array.isArray(data?.quality_inspections)
+    ? data.quality_inspections
+    : [];
+  const total = Number(data?.total ?? inspections.length);
+  if (!Number.isSafeInteger(total) || total !== inspections.length) {
+    throw new SourceDrivenFactError(
+      `production WIP batch ${batchID} quality readback is incomplete`,
+    );
+  }
+  const actionable = inspections.filter((inspection) =>
+    new Set(["DRAFT", "SUBMITTED"]).has(
+      String(inspection?.status || "").toUpperCase(),
+    ),
+  );
+  if (actionable.length !== 1) {
+    throw new SourceDrivenFactError(
+      `production WIP batch ${batchID} expected one current quality gate, got ${actionable.length}`,
+    );
+  }
+  let inspection = actionable[0];
+  if (String(inspection.status || "").toUpperCase() === "DRAFT") {
+    inspection = requireResult(
+      await invoke(
+        rpc,
+        "quality",
+        "submit_quality_inspection",
+        customerParams({ id: inspection.id }),
+      ),
+      "quality_inspection",
+      "SUBMITTED",
+      "submit_quality_inspection",
+    );
+  }
+  return requireResult(
+    await invoke(
+      rpc,
+      "quality",
+      "pass_quality_inspection",
+      customerParams({
+        id: inspection.id,
+        result: "PASS",
+        defect_rate_operator: "APPROX",
+        defect_rate_percent: "0",
+        decision_note: SIMULATED_NOTE,
+      }),
+    ),
+    "quality_inspection",
+    "PASSED",
+    "pass_quality_inspection",
+  );
+}
+
+async function advanceProductionWIPRoute({ rpc, order, item, source, identity }) {
+  if (!source.route) return undefined;
+  const orderID = positiveID(order?.id, "production WIP order.id");
+  const itemID = positiveID(item?.id, "production WIP item.id");
+  let state = await readProductionWIP(rpc, orderID);
+  for (let index = 0; index < state.operations.length; index += 1) {
+    const operation = state.operations[index];
+    let batch = exactNormalProductionWIPBatch(state, operation.id, {
+      optional: index > 0,
+    });
+    if (!batch) {
+      const previous = state.operations[index - 1];
+      const sourceBatch = exactNormalProductionWIPBatch(state, previous.id);
+      if (String(sourceBatch.status || "").toUpperCase() !== "ACCEPTED") {
+        throw new SourceDrivenFactError(
+          `production WIP ${previous.operation_code} must be accepted before transfer`,
+        );
+      }
+      await executeProductionWIPAction(rpc, {
+        action: "TRANSFER_TO_NEXT_OPERATION",
+        production_order_id: orderID,
+        production_wip_batch_id: sourceBatch.id,
+        target_operation_id: operation.id,
+        quantity: sourceBatch.quantity,
+        expected_version: positiveID(
+          sourceBatch.version,
+          "production WIP transfer version",
+        ),
+        idempotency_key: productionWIPIdempotencyKey(
+          identity,
+          `${previous.operation_code}:${operation.operation_code}:transfer`,
+        ),
+      });
+      state = await readProductionWIP(rpc, orderID);
+      batch = exactNormalProductionWIPBatch(state, operation.id);
+    }
+
+    if (String(operation.operation_code) === "PACKAGING") {
+      const confirmations = state.confirmations.filter(
+        (confirmation) =>
+          Number(confirmation?.production_order_item_id) === itemID,
+      );
+      if (confirmations.length !== 1) {
+        throw new SourceDrivenFactError(
+          "routed production item expected one packaging confirmation",
+        );
+      }
+      const confirmation = confirmations[0];
+      const confirmationStatus = String(
+        confirmation?.status || "",
+      ).toUpperCase();
+      if (confirmationStatus === "PENDING") {
+        await executeProductionWIPAction(rpc, {
+          action: "CONFIRM_PACKAGING_MATERIAL",
+          production_order_id: orderID,
+          production_order_item_id: itemID,
+          expected_version: positiveID(
+            confirmation.version,
+            "packaging confirmation version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            "packaging:confirm",
+          ),
+          packaging_version_snapshot:
+            source.route.packagingVersionSnapshot,
+          note: SIMULATED_NOTE,
+        });
+        state = await readProductionWIP(rpc, orderID);
+        batch = exactNormalProductionWIPBatch(state, operation.id);
+      } else if (confirmationStatus !== "CONFIRMED") {
+        throw new SourceDrivenFactError(
+          `packaging confirmation has unsupported status ${confirmationStatus || "missing"}`,
+        );
+      }
+    }
+
+    let accepted = false;
+    for (let attempt = 0; attempt < 16; attempt += 1) {
+      const status = String(batch?.status || "").toUpperCase();
+      if (status === "ACCEPTED") {
+        accepted = true;
+        break;
+      }
+      if (status === "PLANNED" && !batch.execution_mode) {
+        await executeProductionWIPAction(rpc, {
+          action: "ASSIGN_EXECUTION",
+          production_order_id: orderID,
+          production_wip_batch_id: batch.id,
+          execution_mode: "IN_HOUSE",
+          expected_version: positiveID(
+            batch.version,
+            "production WIP assignment version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            `${operation.operation_code}:assign`,
+          ),
+        });
+      } else if (
+        status === "PLANNED" &&
+        String(batch.execution_mode || "").toUpperCase() === "IN_HOUSE"
+      ) {
+        await executeProductionWIPAction(rpc, {
+          action: "START_OPERATION",
+          production_order_id: orderID,
+          production_wip_batch_id: batch.id,
+          expected_version: positiveID(
+            batch.version,
+            "production WIP start version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            `${operation.operation_code}:start`,
+          ),
+        });
+      } else if (status === "IN_PROGRESS") {
+        await executeProductionWIPAction(rpc, {
+          action: "COMPLETE_OPERATION",
+          production_order_id: orderID,
+          production_wip_batch_id: batch.id,
+          expected_version: positiveID(
+            batch.version,
+            "production WIP completion version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            `${operation.operation_code}:complete`,
+          ),
+        });
+      } else if (status === "WAITING_QUALITY") {
+        await passCurrentProductionWIPQualityGate(rpc, batch.id);
+      } else {
+        throw new SourceDrivenFactError(
+          `production WIP ${operation.operation_code} cannot advance from ${status || "missing"}`,
+        );
+      }
+      state = await readProductionWIP(rpc, orderID);
+      batch = exactNormalProductionWIPBatch(state, operation.id);
+    }
+    if (!accepted) {
+      throw new SourceDrivenFactError(
+        `production WIP ${operation.operation_code} did not reach ACCEPTED`,
+      );
+    }
+  }
+  const packaging = state.operations.at(-1);
+  return exactNormalProductionWIPBatch(state, packaging.id);
 }
 
 async function applyProduction(plan, rpc) {
@@ -1817,6 +2170,13 @@ async function applyProduction(plan, rpc) {
           planned_quantity: source.plannedQuantity,
           sales_order_item_id: source.item.id,
           bom_header_id: source.bom.id,
+          ...(source.route
+            ? {
+                route_code: source.route.code,
+                customer_inspection_required:
+                  source.route.customerInspectionRequired,
+              }
+            : {}),
           note: SIMULATED_NOTE,
         },
       ],
@@ -1873,6 +2233,13 @@ async function applyProduction(plan, rpc) {
       }),
     );
   }
+  const completionWIPBatch = await advanceProductionWIPRoute({
+    rpc,
+    order,
+    item: matched.item,
+    source,
+    identity,
+  });
   const completion = await createPostFact({
     rpc,
     createMethod: "create_production_completion_from_order",
@@ -1880,6 +2247,9 @@ async function applyProduction(plan, rpc) {
       fact_no: identity.completion.businessNo,
       production_order_id: order.id,
       production_order_item_id: matched.item.id,
+      ...(completionWIPBatch
+        ? { production_wip_batch_id: completionWIPBatch.id }
+        : {}),
       warehouse_id: source.completion.warehouseId,
       new_lot_no: source.completion.newLotNo,
       quantity: source.completion.quantity,

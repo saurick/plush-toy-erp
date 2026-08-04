@@ -525,8 +525,8 @@ function hashFileIfPresent(root, relativePath) {
   };
 }
 
-function toolFingerprint(command, args = ["--version"]) {
-  const result = commandResult(command, args, { timeout: 5_000 });
+function toolFingerprint(command, args = ["--version"], timeout = 5_000) {
+  const result = commandResult(command, args, { timeout });
   const version = `${result.stdout}\n${result.stderr}`
     .trim()
     .split("\n")[0];
@@ -580,7 +580,7 @@ export function environmentFingerprint(root, env = process.env) {
       toolFingerprint("go", ["version"]),
       toolFingerprint("pnpm"),
       toolFingerprint("gitleaks", ["version"]),
-      toolFingerprint("govulncheck", ["-version"]),
+      toolFingerprint("govulncheck", ["-version"], 15_000),
       toolFingerprint("psql"),
       toolFingerprint("atlas", ["version"]),
     ],

@@ -491,6 +491,12 @@ function buildProcesses(prefix, count) {
     "首件确认",
     "尾数清点",
   ];
+  const productionRouteOperationByName = new Map([
+    ["裁片", "FABRIC_PROCESSING"],
+    ["本体车缝", "SEWING"],
+    ["手工收口", "HANDWORK"],
+    ["包装", "PACKAGING"],
+  ]);
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const name = names[offset % names.length];
@@ -498,6 +504,12 @@ function buildProcesses(prefix, count) {
       code: `${prefix}-GX-${pad(index, 3)}`,
       name,
       category: name,
+      ...(productionRouteOperationByName.has(name)
+        ? {
+            production_route_operation_code:
+              productionRouteOperationByName.get(name),
+          }
+        : {}),
       outsourcing_enabled: ![
         "检针",
         "成品抽检",
@@ -1682,6 +1694,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
           "code",
           "name",
           "category",
+          "production_route_operation_code",
           "outsourcing_enabled",
           "inhouse_enabled",
           "quality_required",
@@ -1707,6 +1720,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
         "code",
         "name",
         "category",
+        "production_route_operation_code",
         "outsourcing_enabled",
         "inhouse_enabled",
         "quality_required",

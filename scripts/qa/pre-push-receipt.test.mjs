@@ -376,6 +376,37 @@ test("a real Git push PATH prefix preserves the prepared environment", () => {
   }
 });
 
+test(
+  "an unchanged govulncheck version survives one slow version probe",
+  { timeout: 30_000 },
+  (t) => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-env-"));
+    const bin = path.join(root, "bin");
+    const executable = path.join(bin, "govulncheck");
+    const originalPath = process.env.PATH;
+    mkdirSync(bin, { recursive: true });
+    t.after(() => {
+      process.env.PATH = originalPath;
+      rmSync(root, { recursive: true, force: true });
+    });
+    writeFileSync(
+      executable,
+      "#!/bin/sh\nsleep 6\nprintf '%s\\n' 'Go: stable-test-version'\n",
+      "utf8",
+    );
+    chmodSync(executable, 0o755);
+    process.env.PATH = `${bin}${path.delimiter}${originalPath}`;
+    const slow = environmentFingerprint(root, process.env);
+    writeFileSync(
+      executable,
+      "#!/bin/sh\nprintf '%s\\n' 'Go: stable-test-version'\n",
+      "utf8",
+    );
+    const fast = environmentFingerprint(root, process.env);
+    assert.equal(slow, fast);
+  },
+);
+
 test("hook without a receipt fails fast and never opens the full fallback", () => {
   const fixture = createFixture();
   try {

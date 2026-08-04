@@ -32,14 +32,38 @@
 | `node scripts/deploy/github-release-publisher.mjs` | 读取已构建 bundle 与 strict 终态，推送固定 GHCR 镜像并生成 provider-neutral Release manifest | 只由固定 GitHub release workflow 使用 |
 | `node scripts/deploy/github-delivery-provider.mjs` | 固定仓库、`release.yml`、API 版本、Release assets 与下载根的 GitHub adapter | 不接受调用者 repo/workflow/path；错误不回显 CLI stderr |
 | `node scripts/deploy/target-preflight.mjs --target test-133 --json` | 通过固定 SSH 目标只读检查容量、Compose、容器、端口、数据库、当前 SHA、锁和 rollback point | 只读，不创建备份或切换版本 |
+| `node scripts/deploy/database-rebuild-controller.mjs` | 把已 promotion 且正在 133 运行的不可变 release、即时只读 preflight、固定逻辑库和 fresh 物理数据代绑定为数据库重建 operation | 只生成资格计划，不停服务、不备份、不迁移 |
+| `node scripts/deploy/database-rebuild-executor.mjs` | 对 ready operation 再跑即时 preflight，以一次性确认串执行固定 133 数据库重建，并校验脱敏终态回执 | 是；会停固定栈、备份并切换 PostgreSQL 数据目录 |
 | `node scripts/deploy/promotion-controller.mjs` | 校验不可变 manifest 与即时 preflight，创建或复用待确认 promotion operation | 不执行目标写入 |
 | `node scripts/deploy/promotion-executor.mjs` | 对已 ready operation 重新核对身份并执行固定 133 promotion | 只接受 operation 绑定的确认串 |
 | `node scripts/deploy/rollback-controller.mjs` | 比较当前/目标 manifest；migration 序列和客户配置源指纹不同即阻断 | 不执行目标写入 |
 | `node scripts/deploy/rollback-executor.mjs` | 对已 ready operation 执行代码和镜像回滚 | 不 down migration、不自动恢复数据库 |
 
-`delivery-operation-store.mjs` 在 ignored `output/dev-workbench/delivery-operations/` 使用随机 UUID、幂等键、`0600` 文件和原子 rename 保存状态。Bridge 进程重启时，仍处于 `launching / running` 的目标写操作一律冻结为 `not_proven`，先读回目标，不能自动重试。`remote-promotion.sh` 与 `remote-code-rollback.sh` 是上述 executor 传输后调用的固定目标实现，不是人工拼接参数的通用远程入口。
+`delivery-operation-store.mjs` 在 ignored `output/dev-workbench/delivery-operations/` 使用随机 UUID、幂等键、`0600` 文件和原子 rename 保存状态。Bridge 进程重启时，仍处于 `launching / running` 的目标写操作一律冻结为 `not_proven`，先读回目标，不能自动重试。`remote-promotion.sh`、`remote-database-rebuild.sh` 与 `remote-code-rollback.sh` 是对应 executor 传输后调用的固定目标实现，不是人工拼接参数的通用远程入口。
 
 DEV-only `/__dev/version-center` 只暴露五个动作：`dispatch-release`、`prepare-promotion`、`execute-promotion`、`prepare-rollback`、`execute-rollback`。浏览器不能提供 repo、workflow、target、路径、SSH、环境变量、shell、SQL 或 Docker 命令；同一时刻只允许一个 test-133 执行器。
+
+### 133 同逻辑库物理重建
+
+数据库重建只用于已经完成不可变 release promotion、但需要从空业务基线重放 133 验收数据的受控窗口。它继续使用逻辑库 `plush_erp_uat_20260716_v5`，不新造运行时数据库别名：执行器先对旧库做 fresh `pg_dump` 和临时恢复校验，再停止固定 V5 栈，把旧 PostgreSQL 数据目录移到 operation 绑定的 rollback alias，初始化 fresh 物理数据目录，完成 migration、一次性管理员 bootstrap、空业务 SQL 基线和 release / health / ready 读回。旧数据目录和 dump 均保留，不自动删除，也不执行 down migration。
+
+先运行 plan-only controller；只有 `operation.status=ready` 才能复制其 UUID 组成精确确认串：
+
+```bash
+node scripts/deploy/database-rebuild-controller.mjs \
+  --release-manifest '<exact-release-manifest.json>' \
+  --target test-133 \
+  --idempotency-key 'rebuild-database:test-133:<release>:<change-id>' \
+  --json
+
+node scripts/deploy/database-rebuild-executor.mjs \
+  --operation-id '<ready-operation-uuid>' \
+  --release-manifest '<same-exact-release-manifest.json>' \
+  --confirmation 'REBUILD_DATABASE:test-133:<40-character-release>:<ready-operation-uuid>' \
+  --json
+```
+
+执行器返回 `failed` 只表示失败发生在已证明恢复的边界；返回 `not_proven` 表示服务恢复、物理切换或 migration 结果未被证明，必须先在目标读回数据目录、容器、migration 和运行 SHA，禁止自动重试或另起 operation 覆盖现场。`passed` 只证明 fresh 物理库、首个管理员、空业务基线和基础运行态；客户配置、core、九岗位数据、52 项浏览器/PDF、凭据轮换、11 账号 smoke 和客户 UAT 仍须逐层完成。成功回执返回的本地 bootstrap secret 文件只用于后续受控初始化，凭据轮换完成后必须删除，不能写入 steady env、日志或 evidence。
 
 `source-archive-release-check.mjs` 始终从 committed tree 创建临时 archive，不把当前 dirty worktree 混入源码包。默认 plan 和 `--light` 只提供源码包结构诊断；`--execute` 仍要求 clean worktree，并通过 archive 内的 `scripts/lib/pnpm.sh` 解析与 `web/package.json` 锁定版本一致的 Node / pnpm，不直接信任 raw `PATH` 中的 pnpm。带 `--docker` 时两个镜像均固定构建为 `linux/amd64` 并写入同一 40 位 `GIT_SHA`。该入口是独立的 T8 source-package 检查，不替代 `fast.sh` / `full.sh` / `strict.sh`，也不证明目标环境发布、migration、smoke、release evidence 或人工签收已经完成。
 
@@ -161,6 +185,10 @@ node --test scripts/deploy/bootstrap-production-admin.test.mjs
 node --test scripts/deploy/run-smoke-script.test.mjs
 node --test scripts/deploy/customer-config-release-readiness.test.mjs
 node --test scripts/deploy/source-archive-release-check.test.mjs
+node --test scripts/deploy/database-rebuild-manifest.test.mjs \
+  scripts/deploy/database-rebuild-controller.test.mjs \
+  scripts/deploy/database-rebuild-executor.test.mjs \
+  scripts/deploy/remote-database-rebuild-script.test.mjs
 ```
 
 涉及发布证据口径时，再补：

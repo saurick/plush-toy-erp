@@ -25,6 +25,7 @@ export const DELIVERY_OPERATION_ACTIONS = Object.freeze([
   "verify-strict",
   "release",
   "promote",
+  "rebuild-database",
   "smoke",
   "rollback",
 ]);

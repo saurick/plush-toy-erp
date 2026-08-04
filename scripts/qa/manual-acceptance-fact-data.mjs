@@ -140,6 +140,12 @@ const LIFECYCLE_SEQUENCE = Object.freeze({
   ACTIVE: 901,
   RELEASE: 902,
 });
+const ROUTED_PRODUCTION_SAMPLE_OFFSETS = new Set([3, 4]);
+const ROUTED_PRODUCTION_SAMPLE = Object.freeze({
+  code: "PLUSH_SEW_HAND_V1",
+  customerInspectionRequired: false,
+  packagingVersionSnapshot: "试用验收包装版",
+});
 
 const FINANCE_DRAFT_NUMBER = Object.freeze({
   "PAYABLE-DRAFT": Object.freeze({ code: "CGYF", sequence: 901 }),
@@ -452,7 +458,12 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     "production",
     (item) => Array.isArray(item?.bom?.items) && item.bom.items.length > 0,
     3,
-  );
+  ).map((candidate, offset) => ({
+    ...candidate,
+    ...(ROUTED_PRODUCTION_SAMPLE_OFFSETS.has(offset)
+      ? { route: ROUTED_PRODUCTION_SAMPLE }
+      : {}),
+  }));
   const outsourcingCandidates = allocateOutsourcingPairs(
     sourceCandidates.outsourcingCandidates,
     FACT_RUN_COUNT,
@@ -742,6 +753,7 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
   if (
     domain === "purchase_order" ||
     domain === "production_order" ||
+    domain === "production_wip" ||
     domain === "operational_fact"
   )
     return "admin";
@@ -2316,6 +2328,9 @@ export async function validateProductionPhasePartialRecords(
       planned_quantity: source.plannedQuantity,
       sales_order_item_id: source.item.id,
       bom_header_id: source.bom.id,
+      route_code: source.route?.code ?? null,
+      customer_inspection_required:
+        source.route?.customerInspectionRequired ?? false,
     },
     new Set(["planned_quantity"]),
   );
@@ -2357,6 +2372,17 @@ export async function validateProductionPhasePartialRecords(
   }
   const completion = records[1 + source.materialIssues.length];
   if (completion) {
+    if (source.route) {
+      positiveID(
+        completion.production_wip_batch_id,
+        `${identity.completion.businessNo}.production_wip_batch_id`,
+      );
+    } else if (completion.production_wip_batch_id != null) {
+      throw new CliError(
+        `${identity.completion.businessNo} has unexpected production_wip_batch_id`,
+        2,
+      );
+    }
     assertRecordGrain(
       identity.completion.businessNo,
       completion,
@@ -5016,6 +5042,7 @@ export async function runSourceDrivenFactStage(
       item: candidate.item,
       bom: { id: candidate.bom.id, status: candidate.bom.status },
       plannedQuantity,
+      ...(candidate.route ? { route: candidate.route } : {}),
       completion: {
         warehouseId: plan.productWarehouse.id,
         newLotNo: completionLotNo,

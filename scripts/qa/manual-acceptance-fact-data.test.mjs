@@ -72,6 +72,36 @@ test("runtime admin guard consumes the formal top-level auth.me profile", () => 
   }
 });
 
+test("routed WIP writes use the verified admin and keep customer_key out of the strict WIP contract", () => {
+  assert.equal(
+    manualAcceptanceFactRole(
+      "production_wip",
+      "execute_production_wip_action",
+    ),
+    "admin",
+  );
+  assert.deepEqual(
+    manualAcceptanceFactRPCParams(
+      "production_wip",
+      "execute_production_wip_action",
+      {
+        action: "START_OPERATION",
+        production_order_id: 1,
+        production_wip_batch_id: 2,
+        expected_version: 3,
+        idempotency_key: "wip-start",
+      },
+    ),
+    {
+      action: "START_OPERATION",
+      production_order_id: 1,
+      production_wip_batch_id: 2,
+      expected_version: 3,
+      idempotency_key: "wip-start",
+    },
+  );
+});
+
 test("RPC retries only bounded HTTP 429 responses and honors Retry-After", async () => {
   let calls = 0;
   const waits = [];
@@ -666,6 +696,22 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
     }),
   );
   assert.equal(plan.productionCandidates.length, 45);
+  assert.deepEqual(
+    plan.productionCandidates
+      .map((candidate, offset) => (candidate.route ? offset : null))
+      .filter((offset) => offset != null),
+    [3, 4],
+  );
+  assert.ok(
+    plan.productionCandidates
+      .filter((candidate) => candidate.route)
+      .every(
+        (candidate) =>
+          candidate.route.code === "PLUSH_SEW_HAND_V1" &&
+          candidate.route.customerInspectionRequired === false &&
+          candidate.route.packagingVersionSnapshot === "试用验收包装版",
+      ),
+  );
   assert.equal(plan.outsourcingCandidates.length, 45);
   assert.equal(plan.expectedMinimums.shipments, 47);
   assert.equal(plan.expectedMinimums.salesReturns, 4);
@@ -1423,6 +1469,9 @@ function productionResumeFixture() {
     planned_quantity: source.plannedQuantity,
     sales_order_item_id: source.item.id,
     bom_header_id: source.bom.id,
+    route_code: source.route?.code ?? null,
+    customer_inspection_required:
+      source.route?.customerInspectionRequired ?? false,
   };
   const requirements = source.materialIssues.map((item, index) => ({
     id: 12_001 + index,

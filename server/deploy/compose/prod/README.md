@@ -55,6 +55,14 @@ APP_ADMIN_PASSWORD='<8-to-20-character-ephemeral-secret>' \
 
 脚本成功后会删除一次性容器并确认 steady env 未变化。`status=complete` 只证明管理员、marker、audit 和内置 RBAC 已读回；之后仍须以无密码 steady env 启动服务，再单独完成客户配置、health / ready、smoke 和业务验收。
 
+### 133 同逻辑库物理重建
+
+133 fresh 验收库不允许手工清表或临时改 `POSTGRES_DB / POSTGRES_DATA_DIR`。先将同一不可变 release promotion 到固定 V5 栈，再从发布工作站依次运行 `scripts/deploy/database-rebuild-controller.mjs` 和 `scripts/deploy/database-rebuild-executor.mjs`。只有 controller 的即时只读资格为 `ready`，并显式提供 `REBUILD_DATABASE:test-133:<release>:<operation-id>`，executor 才会进入停服窗口。
+
+固定执行器会先对 `plush_erp_uat_20260716_v5` 创建并恢复校验 fresh dump；随后停止且只停止 `plush-toy-erp-v5` 的 app / web / PostgreSQL，把 `/home/simon/plush-toy-erp-v5/data/postgres` 移到 operation 绑定的 rollback alias，在原路径初始化 fresh PostgreSQL，执行 migration 和一次性管理员 bootstrap，最后读回空业务基线、两个 PostgreSQL system identifier、运行 SHA、health / ready / Web health。旧物理目录和 dump 都保留；脚本不执行自动删除、down migration 或未知结果重试，也不影响旧 `plush-toy-erp-prod` 栈。
+
+停服后但切换前失败时，执行器必须先恢复并预检旧运行态；物理目录已切换但 migration 尚未开始时，必须先恢复并预检旧数据代。只有恢复被证明才返回 `failed`；恢复失败、切换后结果不清楚或 migration 已开始后一律返回 `not_proven`，此时先人工读回目录、容器、migration 和 release，不得重新执行。完整命令和证据边界见 [部署脚本说明](../../../../scripts/deploy/README.md#133-同逻辑库物理重建)。
+
 ### 133 V5 基础资料 bootstrap
 
 只有已经部署当前固定 release、Atlas migration 和 `customer-trial-133` V5 active 配置的 133 独立验收库，才允许运行镜像内的一次性基础资料入口。该入口只创建或复用 `YS5-DW-01` 与 `YS5-CK-01..04`，写前要求材料、产品、工序和 BOM 为空；不会创建客户、订单、Workflow 或 Fact。

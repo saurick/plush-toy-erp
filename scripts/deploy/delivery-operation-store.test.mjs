@@ -11,6 +11,7 @@ import test from "node:test";
 
 import {
   createOrReuseDeliveryOperation,
+  DELIVERY_OPERATION_ACTIONS,
   listDeliveryOperations,
   readDeliveryOperation,
   recoverInterruptedDeliveryOperation,
@@ -22,6 +23,10 @@ import {
 const SHA = "a".repeat(40);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
 const IDEMPOTENCY_KEY = "deploy:test-133:123e4567-e89b-42d3-a456-426614174000";
+
+test("delivery operation registry includes the fixed database rebuild action", () => {
+  assert.equal(DELIVERY_OPERATION_ACTIONS.includes("rebuild-database"), true);
+});
 
 function createStore(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "delivery-operation-"));
