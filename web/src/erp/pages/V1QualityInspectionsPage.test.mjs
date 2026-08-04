@@ -118,7 +118,8 @@ test('quality page mounts the return modal and marks a successful source once', 
     source,
     /selectedDispositionCompleted[\s\S]*returnedInspectionIDs\.has\(selectedRow\.id\)/u
   )
-  assert.match(source, /!selectedDispositionCompleted/u)
+  assert.match(source, /selectedDispositionCompleted \|\|/u)
+  assert.match(source, /当前质检的不合格处置已完成/u)
   assert.doesNotMatch(source, />\s*已生成退货\s*</u)
 })
 
@@ -131,6 +132,10 @@ test('quality disposition separates mutation permissions from read-only access a
     source,
     /canReadOutsourcingDisposition\s*&&\s*!canManageOutsourcingDisposition/u
   )
+  assert.match(
+    source,
+    /const showQualityDispositionAction = hasAnyDispositionCapability/u
+  )
   assert.match(source, />\s*不合格处置\s*</u)
   assert.match(source, />\s*查看委外处置\s*</u)
   assert.doesNotMatch(source, />\s*委外返厂 \/ 返工\s*</u)
@@ -142,6 +147,31 @@ test('quality disposition separates mutation permissions from read-only access a
   ]) {
     assert.match(source, new RegExp(`'${dispositionKind}'`, 'u'))
   }
+})
+
+test('quality actions keep a permission-stable DOM across record states and sources', () => {
+  for (const actionKey of [
+    'related-records',
+    'view-details',
+    'submit',
+    'pass',
+    'reject',
+    'quality-disposition',
+    'outsourcing-disposition-view',
+    'cancel',
+  ]) {
+    assert.match(
+      source,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u')
+    )
+  }
+  assert.doesNotMatch(
+    source,
+    /\{canUpdate\s*&&\s*\(!selectedRow|\{canUpdate\s*&&\s*\n\s*\(!selectedRow/u
+  )
+  assert.match(source, /!selectedDispositionSourceSupported \|\|/u)
+  assert.match(source, /!selectedDispositionAuthorized \|\|/u)
+  assert.match(source, /!selectedIsOutsourcingInspection \|\|/u)
 })
 
 test('quality page preserves the source receipt numeric(20,6) quantity string', () => {

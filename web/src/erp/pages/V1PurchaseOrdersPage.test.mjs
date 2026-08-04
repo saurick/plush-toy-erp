@@ -165,3 +165,34 @@ test('purchase record mutations lock selection and every record-bound action', (
   assert.match(operationPanel, /当前订单操作完成后可查看相关单据/u)
   assert.match(operationPanel, /当前订单操作完成后可打印/u)
 })
+
+test('purchase selection actions keep one authorized catalog across record states', () => {
+  for (const actionKey of [
+    'purchase-edit',
+    'related-records',
+    'generate-inbound',
+    'print-contract',
+  ]) {
+    assert.match(
+      operationPanel,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u')
+    )
+  }
+  assert.match(page, /actionStates: lifecycleActionStates/u)
+  assert.match(
+    operationPanel,
+    /actionStates=\{lifecycleActionStates\}/u
+  )
+  assert.match(
+    operationPanel,
+    /disabled=\{primaryLifecycleState\.disabled\}/u
+  )
+  assert.doesNotMatch(
+    operationPanel,
+    /canUpdate\s*&&[\s\S]{0,100}selectedLifecycleStatus/u
+  )
+  assert.doesNotMatch(
+    operationPanel,
+    /canCreateInboundDraftAction\s*&&[\s\S]{0,140}selectedLifecycleStatus/u
+  )
+})

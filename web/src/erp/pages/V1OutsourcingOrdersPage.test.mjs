@@ -265,3 +265,28 @@ test('resolved related contract number is isolated by the exact route key', () =
     /setResolvedLinkedContext\(\{ routeKey: requestRouteKey, keyword: '' \}\)/u
   )
 })
+
+test('outsourcing selection actions keep one authorized catalog across record states', () => {
+  const actionBarSource = source.slice(
+    source.indexOf('<SelectionActionBar'),
+    source.indexOf('</SelectionActionBar>')
+  )
+  for (const actionKey of [
+    'outsourcing-edit',
+    'related-outsourcing-facts',
+    'processing-contract-print',
+    'work-instruction-print',
+  ]) {
+    assert.match(
+      source,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u')
+    )
+  }
+  assert.match(source, /actionStates: lifecycleActionStates/u)
+  assert.match(source, /actionStates=\{lifecycleActionStates\}/u)
+  assert.match(source, /disabled=\{primaryLifecycleState\.disabled\}/u)
+  assert.doesNotMatch(
+    actionBarSource,
+    /canUpdate\s*&&[\s\S]{0,100}canEditOutsourcingOrder/u
+  )
+})

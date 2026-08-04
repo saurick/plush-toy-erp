@@ -1633,6 +1633,7 @@ export default function V1ProductionOrdersPage() {
             }
           >
             <Button
+              data-business-action-key="view"
               disabled={!selected || detailLoading}
               icon={<EyeOutlined />}
               onClick={() => loadDetail(selected, 'view')}
@@ -1640,8 +1641,7 @@ export default function V1ProductionOrdersPage() {
               查看
             </Button>
           </BusinessActionTooltip>
-          {canUpdate &&
-          (!selected || selected.status === PRODUCTION_ORDER_STATUS.DRAFT) ? (
+          {canUpdate ? (
             <BusinessActionTooltip
               disabled={
                 !selected ||
@@ -1659,6 +1659,7 @@ export default function V1ProductionOrdersPage() {
               }
             >
               <Button
+                data-business-action-key="edit"
                 disabled={
                   !selected ||
                   selected.status !== PRODUCTION_ORDER_STATUS.DRAFT ||
@@ -1671,14 +1672,33 @@ export default function V1ProductionOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canCreateCompletion &&
-          (!selected ||
-            [
-              PRODUCTION_ORDER_STATUS.DRAFT,
-              PRODUCTION_ORDER_STATUS.RELEASED,
-              PRODUCTION_ORDER_STATUS.CLOSED,
-            ].includes(selected.status)) ? (
-              <BusinessActionTooltip
+          {canCreateCompletion ? (
+            <BusinessActionTooltip
+              disabled={
+                !selected ||
+                ![
+                  PRODUCTION_ORDER_STATUS.RELEASED,
+                  PRODUCTION_ORDER_STATUS.CLOSED,
+                ].includes(selected.status) ||
+                detailLoading ||
+                completionLoading
+              }
+              disabledReason={
+                !selected
+                  ? '请先选择一张生产订单'
+                  : ![
+                        PRODUCTION_ORDER_STATUS.RELEASED,
+                        PRODUCTION_ORDER_STATUS.CLOSED,
+                      ].includes(selected.status)
+                    ? '生产订单发布后可登记完工'
+                    : detailLoading || completionLoading
+                      ? '当前资料处理完成后可登记完工'
+                      : ''
+              }
+            >
+              <Button
+                data-business-action-key="completion"
+                type="primary"
                 disabled={
                   !selected ||
                   ![
@@ -1688,46 +1708,40 @@ export default function V1ProductionOrdersPage() {
                   detailLoading ||
                   completionLoading
                 }
-                disabledReason={
-                  !selected
-                    ? '请先选择一张生产订单'
-                    : ![
-                          PRODUCTION_ORDER_STATUS.RELEASED,
-                          PRODUCTION_ORDER_STATUS.CLOSED,
-                        ].includes(selected.status)
-                      ? '生产订单发布后可登记完工'
-                      : detailLoading || completionLoading
-                        ? '当前资料处理完成后可登记完工'
-                        : ''
-                }
+                onClick={openProductionCompletion}
               >
-                <Button
-                  type="primary"
-                  disabled={
-                    !selected ||
-                    ![
-                      PRODUCTION_ORDER_STATUS.RELEASED,
-                      PRODUCTION_ORDER_STATUS.CLOSED,
-                    ].includes(selected.status) ||
-                    detailLoading ||
-                    completionLoading
-                  }
-                  onClick={openProductionCompletion}
-                >
-                  {selected?.status === PRODUCTION_ORDER_STATUS.CLOSED
-                    ? '登记返工补完工'
-                    : '登记完工入库'}
-                </Button>
-              </BusinessActionTooltip>
+                {selected?.status === PRODUCTION_ORDER_STATUS.CLOSED
+                  ? '登记返工补完工'
+                  : '登记完工入库'}
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
-          {canReadProductionWip &&
-          (!selected ||
-            [
-              PRODUCTION_ORDER_STATUS.DRAFT,
-              PRODUCTION_ORDER_STATUS.RELEASED,
-              PRODUCTION_ORDER_STATUS.CLOSED,
-            ].includes(selected.status)) ? (
-              <BusinessActionTooltip
+          {canReadProductionWip ? (
+            <BusinessActionTooltip
+              disabled={
+                !selected ||
+                ![
+                  PRODUCTION_ORDER_STATUS.RELEASED,
+                  PRODUCTION_ORDER_STATUS.CLOSED,
+                ].includes(selected.status) ||
+                detailLoading ||
+                mutationLoading
+              }
+              disabledReason={
+                !selected
+                  ? '请先选择一张生产订单'
+                  : ![
+                        PRODUCTION_ORDER_STATUS.RELEASED,
+                        PRODUCTION_ORDER_STATUS.CLOSED,
+                      ].includes(selected.status)
+                    ? '生产订单发布后可办理工序'
+                    : detailLoading || mutationLoading
+                      ? '当前资料处理完成后可办理工序'
+                      : ''
+              }
+            >
+              <Button
+                data-business-action-key="route-execution"
                 disabled={
                   !selected ||
                   ![
@@ -1737,36 +1751,13 @@ export default function V1ProductionOrdersPage() {
                   detailLoading ||
                   mutationLoading
                 }
-                disabledReason={
-                  !selected
-                    ? '请先选择一张生产订单'
-                    : ![
-                          PRODUCTION_ORDER_STATUS.RELEASED,
-                          PRODUCTION_ORDER_STATUS.CLOSED,
-                        ].includes(selected.status)
-                      ? '生产订单发布后可办理工序'
-                      : detailLoading || mutationLoading
-                        ? '当前资料处理完成后可办理工序'
-                        : ''
-                }
+                onClick={() => setProductionRouteOpen(true)}
               >
-                <Button
-                  disabled={
-                    !selected ||
-                    ![
-                      PRODUCTION_ORDER_STATUS.RELEASED,
-                      PRODUCTION_ORDER_STATUS.CLOSED,
-                    ].includes(selected.status) ||
-                    detailLoading ||
-                    mutationLoading
-                  }
-                  onClick={() => setProductionRouteOpen(true)}
-                >
-                  {selected?.status === PRODUCTION_ORDER_STATUS.CLOSED
-                    ? '返工工序办理'
-                    : '工序办理'}
-                </Button>
-              </BusinessActionTooltip>
+                {selected?.status === PRODUCTION_ORDER_STATUS.CLOSED
+                  ? '返工工序办理'
+                  : '工序办理'}
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
           {canReadProductionWip && canReadProductionFacts ? (
             <BusinessActionTooltip
@@ -1793,6 +1784,7 @@ export default function V1ProductionOrdersPage() {
               }
             >
               <Button
+                data-business-action-key="rework-progress"
                 disabled={
                   !selected ||
                   ![
@@ -1817,6 +1809,7 @@ export default function V1ProductionOrdersPage() {
               }
             >
               <Button
+                data-business-action-key="production-records"
                 disabled={!selected || detailLoading}
                 onClick={() => viewProductionFacts(selected)}
               >
@@ -1824,8 +1817,7 @@ export default function V1ProductionOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdate &&
-          (!selected || selected.status === PRODUCTION_ORDER_STATUS.DRAFT) ? (
+          {canUpdate ? (
             <BusinessActionTooltip
               disabled={
                 !selected ||
@@ -1846,6 +1838,7 @@ export default function V1ProductionOrdersPage() {
               }
             >
               <Button
+                data-business-action-key="release"
                 className="erp-business-module-status-action"
                 disabled={
                   !selected ||
@@ -1866,20 +1859,15 @@ export default function V1ProductionOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdate &&
-          (!selected ||
-            [
-              PRODUCTION_ORDER_STATUS.DRAFT,
-              PRODUCTION_ORDER_STATUS.RELEASED,
-            ].includes(selected.status)) ? (
-              <BusinessActionTooltip
-                disabled={
+          {canUpdate ? (
+            <BusinessActionTooltip
+              disabled={
                 !selected ||
                 selected.status !== PRODUCTION_ORDER_STATUS.RELEASED ||
                 !aggregate ||
                 mutationLoading
               }
-                disabledReason={
+              disabledReason={
                 !selected
                   ? '请先选择一张生产订单'
                   : selected.status !== PRODUCTION_ORDER_STATUS.RELEASED
@@ -1890,29 +1878,25 @@ export default function V1ProductionOrdersPage() {
                         ? '当前操作完成后可关闭'
                         : ''
               }
-              >
-                <Button
-                  className="erp-business-module-status-action"
-                  disabled={
+            >
+              <Button
+                data-business-action-key="close"
+                className="erp-business-module-status-action"
+                disabled={
                   !selected ||
                   selected.status !== PRODUCTION_ORDER_STATUS.RELEASED ||
                   !aggregate ||
                   mutationLoading
                 }
-                  onClick={() => setReasonAction('close')}
-                >
-                  关闭
-                </Button>
-              </BusinessActionTooltip>
+                onClick={() => setReasonAction('close')}
+              >
+                关闭
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
-          {canUpdate &&
-          (!selected ||
-            [
-              PRODUCTION_ORDER_STATUS.DRAFT,
-              PRODUCTION_ORDER_STATUS.RELEASED,
-            ].includes(selected.status)) ? (
-              <BusinessActionTooltip
-                disabled={
+          {canUpdate ? (
+            <BusinessActionTooltip
+              disabled={
                 !selected ||
                 ![
                   PRODUCTION_ORDER_STATUS.DRAFT,
@@ -1921,7 +1905,7 @@ export default function V1ProductionOrdersPage() {
                 !aggregate ||
                 mutationLoading
               }
-                disabledReason={
+              disabledReason={
                 !selected
                   ? '请先选择一张生产订单'
                   : ![
@@ -1935,11 +1919,12 @@ export default function V1ProductionOrdersPage() {
                         ? '当前操作完成后可取消'
                         : ''
               }
-              >
-                <Button
-                  danger
-                  className="erp-business-module-status-action"
-                  disabled={
+            >
+              <Button
+                data-business-action-key="cancel"
+                danger
+                className="erp-business-module-status-action"
+                disabled={
                   !selected ||
                   ![
                     PRODUCTION_ORDER_STATUS.DRAFT,
@@ -1948,11 +1933,11 @@ export default function V1ProductionOrdersPage() {
                   !aggregate ||
                   mutationLoading
                 }
-                  onClick={() => setReasonAction('cancel')}
-                >
-                  取消订单
-                </Button>
-              </BusinessActionTooltip>
+                onClick={() => setReasonAction('cancel')}
+              >
+                取消订单
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>

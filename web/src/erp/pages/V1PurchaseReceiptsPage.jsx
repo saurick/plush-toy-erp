@@ -1214,6 +1214,7 @@ export default function V1PurchaseReceiptsPage() {
             disabledReason="请先选择一条入库记录"
           >
             <Button
+              data-business-action-key="view-details"
               size="small"
               icon={<EyeOutlined />}
               disabled={!selectedRow}
@@ -1232,6 +1233,7 @@ export default function V1PurchaseReceiptsPage() {
             canDelete={canCreate || canPost}
             disabled={!selectedRow}
             disabledReason="请先选择一条入库记录"
+            buttonProps={{ 'data-business-action-key': 'attachments' }}
           />
           {canReadReturn || canReadAdjustment ? (
             <BusinessActionTooltip
@@ -1241,6 +1243,7 @@ export default function V1PurchaseReceiptsPage() {
               }
             >
               <Button
+                data-business-action-key="exception-records"
                 size="small"
                 disabled={!selectedRow || saving}
                 onClick={() => setReceiptExceptionRecordsOpen(true)}
@@ -1249,8 +1252,7 @@ export default function V1PurchaseReceiptsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canCreateReturn &&
-          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
+          {canCreateReturn ? (
             <BusinessActionTooltip
               disabled={
                 !selectedRow || selectedRow.status !== 'POSTED' || saving
@@ -1266,6 +1268,7 @@ export default function V1PurchaseReceiptsPage() {
               }
             >
               <Button
+                data-business-action-key="create-return"
                 size="small"
                 disabled={
                   !selectedRow || selectedRow.status !== 'POSTED' || saving
@@ -1276,8 +1279,7 @@ export default function V1PurchaseReceiptsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canCreateAdjustment &&
-          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
+          {canCreateAdjustment ? (
             <BusinessActionTooltip
               disabled={
                 !selectedRow || selectedRow.status !== 'POSTED' || saving
@@ -1293,6 +1295,7 @@ export default function V1PurchaseReceiptsPage() {
               }
             >
               <Button
+                data-business-action-key="create-adjustment"
                 size="small"
                 disabled={
                   !selectedRow || selectedRow.status !== 'POSTED' || saving
@@ -1303,8 +1306,7 @@ export default function V1PurchaseReceiptsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canViewPayable &&
-          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
+          {canViewPayable ? (
             <BusinessActionTooltip
               disabled={
                 !selectedRow ||
@@ -1321,6 +1323,7 @@ export default function V1PurchaseReceiptsPage() {
               }
             >
               <Button
+                data-business-action-key="view-payable"
                 size="small"
                 disabled={
                   !selectedRow ||
@@ -1334,8 +1337,7 @@ export default function V1PurchaseReceiptsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canCreatePayable &&
-          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
+          {canCreatePayable ? (
             <BusinessActionTooltip
               disabled={
                 !selectedRow ||
@@ -1352,6 +1354,7 @@ export default function V1PurchaseReceiptsPage() {
               }
             >
               <Button
+                data-business-action-key="create-payable"
                 size="small"
                 disabled={
                   !selectedRow ||
@@ -1365,7 +1368,7 @@ export default function V1PurchaseReceiptsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canPost && (!selectedRow || selectedRow.status === 'DRAFT') ? (
+          {canPost ? (
             <BusinessActionTooltip
               disabled={
                 !selectedRow || selectedRow.status !== 'DRAFT' || saving
@@ -1393,6 +1396,7 @@ export default function V1PurchaseReceiptsPage() {
                 cancelText="取消"
               >
                 <Button
+                  data-business-action-key="post"
                   size="small"
                   type="primary"
                   className="erp-business-module-status-action"
@@ -1406,8 +1410,7 @@ export default function V1PurchaseReceiptsPage() {
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canPost &&
-          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (
+          {canPost ? (
             <BusinessActionTooltip
               disabled={
                 !selectedRow ||
@@ -1443,6 +1446,7 @@ export default function V1PurchaseReceiptsPage() {
                 cancelText="取消"
               >
                 <Button
+                  data-business-action-key="cancel"
                   size="small"
                   danger
                   className="erp-business-module-status-action"

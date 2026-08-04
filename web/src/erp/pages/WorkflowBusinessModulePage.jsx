@@ -554,11 +554,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('resume')
   const canUrgeSelected =
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('urge')
-  const shouldShowWorkflowAction = (actionMode) =>
-    !selectedTask ||
-    selectedTaskActionAccess.loading ||
-    selectedTaskActionAccess.failed ||
-    selectedTaskActionAccess.canRun(actionMode)
   const workflowActionDisabledReason = (actionMode, actionLabel) => {
     if (!selectedTask) return '请先选择一条任务'
     if (selectedTaskActionAccess.loading) {
@@ -1242,14 +1237,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             <Button
               size="small"
               icon={<EyeOutlined />}
+              data-business-action-key="workflow-task-details"
               disabled={!selectedTask}
               onClick={() => setDetailTask(selectedTask)}
             >
               查看任务
             </Button>
           </BusinessActionTooltip>
-          {canCompleteOrApproveWorkflowTasks &&
-          shouldShowWorkflowAction('complete') ? (
+          {canCompleteOrApproveWorkflowTasks ? (
             <BusinessActionTooltip
               disabled={
                 !canCompleteSelected ||
@@ -1268,6 +1263,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 type="primary"
                 className="erp-business-module-status-action"
                 icon={<CheckCircleOutlined />}
+                data-business-action-key="workflow-task-complete"
                 loading={taskActionLoadingID === selectedTask?.id}
                 disabled={
                   !canCompleteSelected ||
@@ -1286,7 +1282,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdateWorkflowTasks && shouldShowWorkflowAction('block') ? (
+          {canUpdateWorkflowTasks ? (
             <BusinessActionTooltip
               disabled={
                 !canBlockSelected || taskActionLoadingID > 0 || urgingTaskID > 0
@@ -1298,6 +1294,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 danger
                 className="erp-business-module-status-action"
                 icon={<ExclamationCircleOutlined />}
+                data-business-action-key="workflow-task-block"
                 disabled={
                   !canBlockSelected ||
                   taskActionLoadingID > 0 ||
@@ -1309,7 +1306,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canRejectWorkflowTasks && shouldShowWorkflowAction('reject') ? (
+          {canRejectWorkflowTasks ? (
             <BusinessActionTooltip
               disabled={
                 !canRejectSelected ||
@@ -1326,6 +1323,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 danger
                 className="erp-business-module-status-action"
                 icon={<ExclamationCircleOutlined />}
+                data-business-action-key="workflow-task-reject"
                 disabled={
                   !canRejectSelected ||
                   taskActionLoadingID > 0 ||
@@ -1337,7 +1335,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdateWorkflowTasks && shouldShowWorkflowAction('resume') ? (
+          {canUpdateWorkflowTasks ? (
             <BusinessActionTooltip
               disabled={
                 !canResumeSelected ||
@@ -1354,6 +1352,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 type="primary"
                 className="erp-business-module-status-action"
                 icon={<RedoOutlined />}
+                data-business-action-key="workflow-task-resume"
                 disabled={
                   !canResumeSelected ||
                   taskActionLoadingID > 0 ||
@@ -1365,7 +1364,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdateWorkflowTasks && shouldShowWorkflowAction('urge') ? (
+          {canUpdateWorkflowTasks ? (
             <BusinessActionTooltip
               disabled={
                 !canUrgeSelected || taskActionLoadingID > 0 || urgingTaskID > 0
@@ -1375,6 +1374,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               <Button
                 size="small"
                 icon={<SendOutlined />}
+                data-business-action-key="workflow-task-urge"
                 loading={urgingTaskID === selectedTask?.id}
                 disabled={
                   !canUrgeSelected ||
@@ -1398,6 +1398,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             canDelete={canUpdateWorkflowTasks}
             disabled={!selectedTask}
             disabledReason="请先选择一条任务"
+            buttonProps={{
+              'data-business-action-key': 'workflow-task-attachments',
+            }}
           />
         </SelectionActionBar>
       </BusinessOperationPanel>

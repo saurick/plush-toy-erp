@@ -1223,6 +1223,7 @@ export default function V1SalesOrdersPage() {
     return resolveBusinessLifecycleActions({
       actions: SALES_ORDER_LIFECYCLE_ACTIONS,
       selected: Boolean(selectedOrder),
+      busy: saving,
       hasPermission: (action) =>
         hasActionPermission(adminProfile, action.permission),
       canRun: (action) =>
@@ -1230,26 +1231,25 @@ export default function V1SalesOrdersPage() {
           selectedOrder?.lifecycle_status,
           action.nextStatus
         ),
+      selectionReason: '请先选择一条销售订单',
+      busyReason: '当前订单操作完成后可继续办理',
+      getUnavailableReason: (action) =>
+        `当前销售订单状态不能${action.label}`,
     })
-  }, [adminProfile, selectedOrder])
+  }, [adminProfile, saving, selectedOrder])
   const {
     showPrimarySlot: showLifecyclePrimary,
     showMoreSlot: showLifecycleMore,
     primaryAction: primaryLifecycleAction,
     secondaryActions: secondaryLifecycleActions,
+    actionStates: lifecycleActionStates,
   } = lifecycleActions
-  const lifecyclePrimaryDisabled = !selectedOrder || saving
-  const lifecyclePrimaryDisabledReason = !selectedOrder
-    ? '请先选择一条销售订单'
-    : saving
-      ? '当前操作完成后可继续办理'
-      : ''
-  const lifecycleMoreDisabled = !selectedOrder || saving
-  const lifecycleMoreDisabledReason = !selectedOrder
-    ? '请先选择一条销售订单'
-    : saving
-      ? '当前操作完成后可继续办理'
-      : ''
+  const primaryLifecycleState = lifecycleActionStates[
+    primaryLifecycleAction?.key
+  ] || {
+    disabled: true,
+    disabledReason: '请先选择一条销售订单',
+  }
   const relatedMenuItems = useMemo(
     () =>
       [
@@ -1465,8 +1465,7 @@ export default function V1SalesOrdersPage() {
               查看详情
             </Button>
           </BusinessActionTooltip>
-          {canUpdateOrder &&
-          (!selectedOrder || selectedOrderLifecycleStatus === 'draft') ? (
+          {canUpdateOrder ? (
             <BusinessActionTooltip
               disabled={!selectedOrderCanEdit || itemLoading || saving}
               disabledReason={
@@ -1491,17 +1490,15 @@ export default function V1SalesOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canCreateReservation &&
-          (!selectedOrder ||
-            !['closed', 'canceled'].includes(selectedOrderLifecycleStatus)) ? (
-              <BusinessActionTooltip
-                disabled={
+          {canCreateReservation ? (
+            <BusinessActionTooltip
+              disabled={
                 !selectedOrder ||
                 selectedOrderLifecycleStatus !== 'active' ||
                 reservationLoading ||
                 saving
               }
-                disabledReason={
+              disabledReason={
                 !selectedOrder
                   ? '请先选择一条销售订单'
                   : selectedOrderLifecycleStatus !== 'active'
@@ -1510,28 +1507,28 @@ export default function V1SalesOrdersPage() {
                       ? '当前操作完成后可继续预留库存'
                       : ''
               }
-              >
-                <Button
-                  data-business-action-key="reserve-stock"
-                  size="small"
-                  disabled={
+            >
+              <Button
+                data-business-action-key="reserve-stock"
+                size="small"
+                disabled={
                   !selectedOrder ||
                   selectedOrderLifecycleStatus !== 'active' ||
                   reservationLoading ||
                   saving
                 }
-                  loading={reservationLoading}
-                  onClick={openSalesOrderReservation}
-                >
-                  预留库存
-                </Button>
-              </BusinessActionTooltip>
+                loading={reservationLoading}
+                onClick={openSalesOrderReservation}
+              >
+                预留库存
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
           {showLifecyclePrimary ? (
             <BusinessLifecyclePrimaryAction
               action={primaryLifecycleAction}
-              disabled={lifecyclePrimaryDisabled}
-              disabledReason={lifecyclePrimaryDisabledReason}
+              disabled={primaryLifecycleState.disabled}
+              disabledReason={primaryLifecycleState.disabledReason}
               loading={saving && Boolean(primaryLifecycleAction)}
               onAction={(action) =>
                 requestLifecycleAction(action, selectedOrder)
@@ -1541,8 +1538,7 @@ export default function V1SalesOrdersPage() {
           {showLifecycleMore ? (
             <BusinessLifecycleMoreAction
               actions={secondaryLifecycleActions}
-              disabled={lifecycleMoreDisabled}
-              disabledReason={lifecycleMoreDisabledReason}
+              actionStates={lifecycleActionStates}
               onAction={(action) =>
                 requestLifecycleAction(action, selectedOrder)
               }

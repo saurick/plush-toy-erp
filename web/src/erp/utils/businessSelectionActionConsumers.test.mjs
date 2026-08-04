@@ -10,6 +10,10 @@ const purchasePanelPath = resolve(
   currentDirectory,
   '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
 )
+const productionExceptionPanelPath = resolve(
+  currentDirectory,
+  '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
+)
 
 const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
   'BOMVersionsPage.jsx': 'BOMVersionsPage.jsx',
@@ -28,24 +32,21 @@ const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
   'WorkflowBusinessModulePage.jsx': 'WorkflowBusinessModulePage.jsx',
 })
 
-const FORMAL_SELECTION_DISCOVERABILITY_EVIDENCE = Object.freeze({
-  'BOMVersionsPage.jsx':
-    /selectedRowKeys\.length !== 1|selectedRowKeys\.length === 0/u,
-  'FinancePaymentsPage.jsx': /resolveFinancePaymentActionAvailability/u,
-  'OperationalFactsPage.jsx': /!activeSelectedRow/u,
-  'SalesReturnsPage.jsx': /resolveSalesReturnActionAvailability/u,
-  'ShipmentsPage.jsx': /resolveShipmentActionAvailability/u,
-  'V1InventoryLedgerPage.jsx': /resolveRelatedRecordActionAvailability/u,
-  'V1MasterDataPage.jsx': /disabled=\{!selectedRecord \|\| saving\}/u,
-  'V1OutsourcingOrdersPage.jsx':
-    /!selectedRow \|\| canEditOutsourcingOrder\(selectedRow\)/u,
-  'V1ProductionOrdersPage.jsx': /!selected \|\| selected\.status/u,
-  'V1PurchaseOrdersPage.jsx':
-    /!singleSelectedOrder \|\| selectedLifecycleStatus/u,
-  'V1PurchaseReceiptsPage.jsx': /!selectedRow \|\|/u,
-  'V1QualityInspectionsPage.jsx': /!selectedRow \|\|/u,
-  'V1SalesOrdersPage.jsx': /!selectedOrder \|\| selectedOrderLifecycleStatus/u,
-  'WorkflowBusinessModulePage.jsx': /!selectedTask \|\|/u,
+const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
+  'BOMVersionsPage.jsx': /data-business-action-key="activate"/u,
+  'FinancePaymentsPage.jsx': /data-business-action-key="payment-allocation"/u,
+  'OperationalFactsPage.jsx': /data-business-action-key="operational-fact-post"/u,
+  'SalesReturnsPage.jsx': /data-business-action-key="sales-return-receive"/u,
+  'ShipmentsPage.jsx': /data-business-action-key="shipment-ship"/u,
+  'V1InventoryLedgerPage.jsx': /data-business-action-key="related-records"/u,
+  'V1MasterDataPage.jsx': /\{canUpdate \? \([\s\S]*?\{canDisable \? \(/u,
+  'V1OutsourcingOrdersPage.jsx': /actionStates=\{lifecycleActionStates\}/u,
+  'V1ProductionOrdersPage.jsx': /data-business-action-key="release"/u,
+  'V1PurchaseOrdersPage.jsx': /data-business-action-key="generate-inbound"/u,
+  'V1PurchaseReceiptsPage.jsx': /data-business-action-key="post"/u,
+  'V1QualityInspectionsPage.jsx': /data-business-action-key="submit"/u,
+  'V1SalesOrdersPage.jsx': /actionStates=\{lifecycleActionStates\}/u,
+  'WorkflowBusinessModulePage.jsx': /data-business-action-key="workflow-task-complete"/u,
 })
 
 function pageSource(fileName) {
@@ -98,11 +99,11 @@ test('全部正式业务选择页复用稳定动作条、清空入口和禁用�
   }
 })
 
-test('全部正式业务选择页保留未选中发现性，不允许把记录动作直接绑成选中后才渲染', () => {
+test('全部正式业务选择页保留稳定动作键，不允许选择或记录状态决定动作节点是否渲染', () => {
   assert.deepEqual(
-    Object.keys(FORMAL_SELECTION_DISCOVERABILITY_EVIDENCE).sort(),
+    Object.keys(FORMAL_SELECTION_STABLE_ACTION_EVIDENCE).sort(),
     Object.keys(FORMAL_SELECTION_PAGE_CONSUMERS).sort(),
-    '新增正式选择页时必须登记未选中动作发现性证据'
+    '新增正式选择页时必须登记稳定动作键证据'
   )
 
   for (const [pageFile, consumerPath] of Object.entries(
@@ -111,14 +112,44 @@ test('全部正式业务选择页保留未选中发现性，不允许把记录�
     const source = consumerSource(consumerPath)
     assert.match(
       source,
-      FORMAL_SELECTION_DISCOVERABILITY_EVIDENCE[pageFile],
-      `${pageFile} 必须保留“未选择也渲染、按钮置灰”的动作分支`
+      FORMAL_SELECTION_STABLE_ACTION_EVIDENCE[pageFile],
+      `${pageFile} 必须保留稳定动作目录证据`
     )
     assert.doesNotMatch(
       source,
       /\{\s*(?:selected(?:Order|Row|Task|Record)?|singleSelectedOrder|activeSelectedRow|hasSelection)\s*&&\s*\(?\s*<(?:BusinessActionTooltip|BusinessLifecyclePrimaryAction|BusinessLifecycleMoreAction|Button|Dropdown|Popconfirm)/u,
       `${pageFile} 不得把动作入口直接写成选中后才渲染`
     )
+    const actionBarStart = source.indexOf('<SelectionActionBar')
+    const actionBarEnd = source.indexOf('</SelectionActionBar>', actionBarStart)
+    assert.ok(actionBarStart >= 0 && actionBarEnd > actionBarStart)
+    const actionBarSource = source.slice(actionBarStart, actionBarEnd)
+    assert.doesNotMatch(
+      actionBarSource,
+      /\{\s*(?:\w+\s*&&\s*)?\(?\s*!?(?:selected(?:Order|Row|Task|Record)?|singleSelectedOrder|activeSelectedRow|hasSelection)\b[^{}]{0,180}\?\s*\(\s*<(?:BusinessActionTooltip|BusinessLifecyclePrimaryAction|BusinessLifecycleMoreAction|Button|Dropdown|Popconfirm)/u,
+      `${pageFile} 不得按选中记录增删当前操作节点`
+    )
+    assert.doesNotMatch(
+      actionBarSource,
+      /\{\s*(?:\w+\s*&&\s*)?\(?[^{}]{0,160}(?:\.status|lifecycleStatus)[^{}]{0,120}\?\s*\(\s*<(?:BusinessActionTooltip|BusinessLifecyclePrimaryAction|BusinessLifecycleMoreAction|Button|Dropdown|Popconfirm)/u,
+      `${pageFile} 不得按记录状态增删当前操作节点`
+    )
+  }
+})
+
+test('生产异常子面板也纳入稳定动作合同', () => {
+  const source = readFileSync(productionExceptionPanelPath, 'utf8')
+  assert.match(source, /<SelectionActionBar/u)
+  assert.match(source, /<SelectionClearAction/u)
+  for (const actionKey of [
+    'production-exception-approval',
+    'production-exception-decide',
+    'production-exception-withdraw',
+    'production-exception-execute',
+    'production-exception-reverse',
+    'production-exception-revoke-quota',
+  ]) {
+    assert.match(source, new RegExp(`data-business-action-key="${actionKey}"`, 'u'))
   }
 })
 

@@ -67,6 +67,24 @@ test('临时不可用动作使用共享提示，禁用按钮仍可触发原因�
   )
 })
 
+test('生命周期更多操作始终可打开，各动作在菜单内独立置灰并说明原因', () => {
+  const lifecycleMoreSource = layoutSource.slice(
+    layoutSource.indexOf('export function BusinessLifecycleMoreAction'),
+    layoutSource.indexOf('BusinessLifecycleMoreAction.selectionActionPriority')
+  )
+
+  assert.match(lifecycleMoreSource, /actionStates = \{\}/u)
+  assert.match(lifecycleMoreSource, /disabled: actionDisabled/u)
+  assert.match(lifecycleMoreSource, /actionDisabledReason/u)
+  assert.match(lifecycleMoreSource, /<Text type="secondary">/u)
+  assert.doesNotMatch(lifecycleMoreSource, /<Dropdown[\s\S]*?disabled=\{disabled\}/u)
+  assert.doesNotMatch(lifecycleMoreSource, /<Button[\s\S]*?disabled=\{disabled\}/u)
+  assert.match(
+    lifecycleMoreSource,
+    /if \(action && !\(actionState\.disabled \?\? disabled\)\) onAction\(action\)/u
+  )
+})
+
 test('窄屏动作保持可读触控尺寸，不再把全部按钮逐行撑满', () => {
   assert.match(
     responsiveCss,

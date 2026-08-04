@@ -1227,6 +1227,7 @@ export default function V1PurchaseOrdersPage() {
       resolveBusinessLifecycleActions({
         actions: PURCHASE_ORDER_LIFECYCLE_ACTIONS,
         selected: Boolean(singleSelectedOrder),
+        busy: recordActionBusy,
         hasPermission: (action) =>
           hasActionPermission(adminProfile, action.permission),
         canRun: (action) =>
@@ -1234,14 +1235,19 @@ export default function V1PurchaseOrdersPage() {
             singleSelectedOrder?.lifecycle_status,
             action.nextStatus
           ),
+        selectionReason: '请先选择一条采购订单',
+        busyReason: '当前订单操作完成后可继续办理',
+        getUnavailableReason: (action) =>
+          `当前采购订单状态不能${action.label}`,
       }),
-    [adminProfile, singleSelectedOrder]
+    [adminProfile, recordActionBusy, singleSelectedOrder]
   )
   const {
     showPrimarySlot: showLifecyclePrimary,
     showMoreSlot: showLifecycleMore,
     primaryAction: primaryLifecycleAction,
     secondaryActions: secondaryLifecycleActions,
+    actionStates: lifecycleActionStates,
   } = lifecycleActions
 
   return (
@@ -1283,6 +1289,7 @@ export default function V1PurchaseOrdersPage() {
         relatedMenuItems={relatedMenuItems}
         orders={orders}
         primaryLifecycleAction={primaryLifecycleAction}
+        lifecycleActionStates={lifecycleActionStates}
         printPurchaseContract={printPurchaseContract}
         printingContract={printingContract}
         requestLifecycleAction={requestLifecycleAction}

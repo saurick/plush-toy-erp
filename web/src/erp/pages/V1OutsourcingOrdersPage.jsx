@@ -2226,6 +2226,7 @@ export default function V1OutsourcingOrdersPage() {
   const lifecycleActions = resolveBusinessLifecycleActions({
     actions: OUTSOURCING_ORDER_LIFECYCLE_ACTIONS,
     selected: Boolean(selectedRow),
+    busy: saving,
     hasPermission: (action) =>
       hasActionPermission(adminProfile, action.permission),
     canRun: (action) =>
@@ -2233,25 +2234,24 @@ export default function V1OutsourcingOrdersPage() {
         selectedRow?.lifecycle_status,
         action.nextStatus
       ),
+    selectionReason: '请先选择一条加工合同',
+    busyReason: '当前合同操作完成后可继续办理',
+    getUnavailableReason: (action) =>
+      `当前加工合同状态不能${action.label}`,
   })
   const {
     showPrimarySlot: showLifecyclePrimary,
     showMoreSlot: showLifecycleMore,
     primaryAction: primaryLifecycleAction,
     secondaryActions: secondaryLifecycleActions,
+    actionStates: lifecycleActionStates,
   } = lifecycleActions
-  const lifecyclePrimaryDisabled = !selectedRow || saving
-  const lifecyclePrimaryDisabledReason = !selectedRow
-    ? '请先选择一条加工合同'
-    : saving
-      ? '当前操作完成后可继续办理'
-      : ''
-  const lifecycleMoreDisabled = !selectedRow || saving
-  const lifecycleMoreDisabledReason = !selectedRow
-    ? '请先选择一条加工合同'
-    : saving
-      ? '当前操作完成后可继续办理'
-      : ''
+  const primaryLifecycleState = lifecycleActionStates[
+    primaryLifecycleAction?.key
+  ] || {
+    disabled: true,
+    disabledReason: '请先选择一条加工合同',
+  }
 
   return (
     <BusinessPageLayout className="erp-v1-outsourcing-orders-page">
@@ -2411,8 +2411,7 @@ export default function V1OutsourcingOrdersPage() {
             label="清空"
             onClear={() => setSelectedRow(null)}
           />
-          {canUpdate &&
-          (!selectedRow || canEditOutsourcingOrder(selectedRow)) ? (
+          {canUpdate ? (
             <BusinessActionTooltip
               disabled={
                 !selectedRow ||
@@ -2430,6 +2429,7 @@ export default function V1OutsourcingOrdersPage() {
               }
             >
               <Button
+                data-business-action-key="outsourcing-edit"
                 size="small"
                 icon={<EditOutlined />}
                 loading={itemsLoading}
@@ -2454,6 +2454,7 @@ export default function V1OutsourcingOrdersPage() {
               }
             >
               <Button
+                data-business-action-key="related-outsourcing-facts"
                 size="small"
                 disabled={!selectedRow || returnRecordsLoading}
                 loading={returnRecordsLoading}
@@ -2466,8 +2467,8 @@ export default function V1OutsourcingOrdersPage() {
           {showLifecyclePrimary ? (
             <BusinessLifecyclePrimaryAction
               action={primaryLifecycleAction}
-              disabled={lifecyclePrimaryDisabled}
-              disabledReason={lifecyclePrimaryDisabledReason}
+              disabled={primaryLifecycleState.disabled}
+              disabledReason={primaryLifecycleState.disabledReason}
               loading={saving && Boolean(primaryLifecycleAction)}
               onAction={runLifecycleAction}
             />
@@ -2479,6 +2480,7 @@ export default function V1OutsourcingOrdersPage() {
             }
           >
             <Button
+              data-business-action-key="processing-contract-print"
               size="small"
               icon={<PrinterOutlined />}
               disabled={!selectedRow || printingAction !== ''}
@@ -2495,6 +2497,7 @@ export default function V1OutsourcingOrdersPage() {
             }
           >
             <Button
+              data-business-action-key="work-instruction-print"
               size="small"
               icon={<PrinterOutlined />}
               disabled={!selectedRow || printingAction !== ''}
@@ -2507,8 +2510,7 @@ export default function V1OutsourcingOrdersPage() {
           {showLifecycleMore ? (
             <BusinessLifecycleMoreAction
               actions={secondaryLifecycleActions}
-              disabled={lifecycleMoreDisabled}
-              disabledReason={lifecycleMoreDisabledReason}
+              actionStates={lifecycleActionStates}
               getPopupContainer={(triggerNode) =>
                 triggerNode.parentElement || document.body
               }

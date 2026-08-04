@@ -113,3 +113,25 @@ test('sales lifecycle mutation locks selection and duplicate intent synchronousl
   assert.match(page, /onChange: \(_keys, selectedRows\) => \{[\s\S]*if \(saving\) return/u)
   assert.match(page, /onOpenRecord=\{saving \? undefined : openSalesOrderRecord\}/u)
 })
+
+test('sales selection actions keep one authorized catalog across record states', () => {
+  for (const actionKey of [
+    'related-records',
+    'view-details',
+    'edit',
+    'reserve-stock',
+  ]) {
+    assert.match(page, new RegExp(`data-business-action-key="${actionKey}"`, 'u'))
+  }
+  assert.match(page, /actionStates: lifecycleActionStates/u)
+  assert.match(page, /actionStates=\{lifecycleActionStates\}/u)
+  assert.match(page, /disabled=\{primaryLifecycleState\.disabled\}/u)
+  assert.doesNotMatch(
+    page,
+    /canUpdateOrder\s*&&[\s\S]{0,100}!selectedOrder/u
+  )
+  assert.doesNotMatch(
+    page,
+    /canCreateReservation\s*&&[\s\S]{0,120}selectedOrderLifecycleStatus/u
+  )
+})

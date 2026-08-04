@@ -145,8 +145,26 @@ test('workflow business pages guard their initial task list with workflow task r
 
 test('workflow business module keeps stable task actions while submitting exact process decisions', () => {
   assert.match(source, /SelectionClearAction/u)
-  assert.match(source, /shouldShowWorkflowAction\('complete'\)/u)
   assert.match(source, /workflowActionDisabledReason/u)
+  assert.doesNotMatch(source, /shouldShowWorkflowAction/u)
+  for (const actionKey of [
+    'workflow-task-details',
+    'workflow-task-complete',
+    'workflow-task-block',
+    'workflow-task-reject',
+    'workflow-task-resume',
+    'workflow-task-urge',
+    'workflow-task-attachments',
+  ]) {
+    assert.match(
+      source,
+      new RegExp(`['"]data-business-action-key['"]?:?\\s*['"]${actionKey}['"]|data-business-action-key="${actionKey}"`, 'u'),
+      `${actionKey} must keep a stable task action slot`
+    )
+  }
+  assert.match(source, /\{canCompleteOrApproveWorkflowTasks \? \(/u)
+  assert.match(source, /\{canUpdateWorkflowTasks \? \(/u)
+  assert.match(source, /\{canRejectWorkflowTasks \? \(/u)
   assert.match(source, /isWorkflowProcessDecisionTask/u)
   assert.match(source, /process_decision/u)
   assert.match(source, /getWorkflowTaskProcessContext/u)

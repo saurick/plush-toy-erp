@@ -1423,7 +1423,7 @@ export default function FinancePaymentsPage() {
                   查看详情
                 </Button>
               </BusinessActionTooltip>
-              {paymentActionAvailability.allocation.visible ? (
+              {canPostPayment ? (
                 <BusinessActionTooltip
                   disabled={paymentActionAvailability.allocation.disabled}
                   disabledReason={
@@ -1441,7 +1441,7 @@ export default function FinancePaymentsPage() {
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
-              {paymentActionAvailability.approval.visible ? (
+              {canCreatePayment ? (
                 <BusinessActionTooltip
                   disabled={paymentActionAvailability.approval.disabled}
                   disabledReason={
@@ -1457,7 +1457,7 @@ export default function FinancePaymentsPage() {
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
-              {paymentActionAvailability.cancel.visible ? (
+              {canCancelPayment ? (
                 <BusinessActionTooltip
                   disabled={paymentActionAvailability.cancel.disabled}
                   disabledReason={
@@ -1474,7 +1474,7 @@ export default function FinancePaymentsPage() {
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
-              {paymentActionAvailability.reverse.visible ? (
+              {canReversePayment ? (
                 <BusinessActionTooltip
                   disabled={paymentActionAvailability.reverse.disabled}
                   disabledReason={
@@ -1487,6 +1487,7 @@ export default function FinancePaymentsPage() {
                     data-business-action-key="payment-reverse"
                     disabled={paymentActionAvailability.reverse.disabled}
                     onClick={() => {
+                      if (paymentActionAvailability.reverse.disabled) return
                       reverseForm.resetFields()
                       setReverseOpen(true)
                     }}
@@ -1628,14 +1629,14 @@ export default function FinancePaymentsPage() {
                 disabledReason="请先选择一条红冲记录"
               >
                 <Button
+                  data-business-action-key="credit-details"
                   disabled={!currentCredit}
                   onClick={() => setCreditDetail(currentCredit)}
                 >
                   查看详情
                 </Button>
               </BusinessActionTooltip>
-              {canReverseCredit &&
-              (!currentCredit || currentCreditCanReverse) ? (
+              {canReverseCredit ? (
                 <BusinessActionTooltip
                   disabled={!currentCreditCanReverse || loading}
                   disabledReason={
@@ -1653,8 +1654,12 @@ export default function FinancePaymentsPage() {
                   <Button
                     danger
                     className="erp-business-module-status-action"
+                    data-business-action-key="credit-reverse"
                     disabled={!currentCreditCanReverse || loading}
-                    onClick={() => openCredit(true)}
+                    onClick={() => {
+                      if (!currentCreditCanReverse || loading) return
+                      openCredit(true)
+                    }}
                   >
                     冲销当前红冲
                   </Button>

@@ -95,6 +95,34 @@ test('production order page reuses the ERP shell refresh entrypoint', () => {
   assert.doesNotMatch(page, /ReloadOutlined/u)
 })
 
+test('production order actions keep a permission-stable DOM across record states', () => {
+  for (const actionKey of [
+    'view',
+    'edit',
+    'completion',
+    'route-execution',
+    'rework-progress',
+    'production-records',
+    'release',
+    'close',
+    'cancel',
+  ]) {
+    assert.match(
+      page,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u')
+    )
+  }
+  assert.doesNotMatch(
+    page,
+    /\{canUpdate\s*&&\s*\(!selected|\{canCreateCompletion\s*&&\s*\(!selected|\{canReadProductionWip\s*&&\s*\(!selected/u
+  )
+  assert.match(
+    page,
+    /selected\.status !== PRODUCTION_ORDER_STATUS\.DRAFT/u
+  )
+  assert.match(page, /当前生产订单状态不能取消/u)
+})
+
 test('production order release explains the atomic scheduling handoff', () => {
   assert.match(page, /生产订单已发布，排程任务已进入 PMC 待办/u)
 })

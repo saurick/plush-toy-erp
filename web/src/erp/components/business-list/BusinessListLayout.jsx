@@ -957,6 +957,7 @@ BusinessLifecyclePrimaryAction.selectionActionPriority = 100
 
 export function BusinessLifecycleMoreAction({
   actions = [],
+  actionStates = {},
   disabled = false,
   disabledReason = '',
   getPopupContainer,
@@ -970,40 +971,59 @@ export function BusinessLifecycleMoreAction({
       key: 'status-transitions',
       label: '状态变更',
       type: 'group',
-      children: actions.map((action) => ({
-        key: action.key,
-        label: action.label,
-        danger: action.danger,
-      })),
+      children: actions.map((action) => {
+        const actionState = actionStates[action.key] || {}
+        const actionDisabled = actionState.disabled ?? disabled
+        const actionDisabledReason = actionDisabled
+          ? actionState.disabledReason || disabledReason
+          : ''
+        return {
+          key: action.key,
+          label: (
+            <span
+              title={actionDisabledReason || undefined}
+              aria-label={
+                actionDisabledReason
+                  ? `${action.label}，${actionDisabledReason}`
+                  : action.label
+              }
+            >
+              {action.label}
+              {actionDisabledReason ? (
+                <Text type="secondary">（{actionDisabledReason}）</Text>
+              ) : null}
+            </span>
+          ),
+          danger: action.danger,
+          disabled: actionDisabled,
+        }
+      }),
     },
   ]
 
   return (
-    <BusinessActionTooltip disabled={disabled} disabledReason={disabledReason}>
-      <Dropdown
-        trigger={['click']}
-        destroyOnHidden
-        disabled={disabled}
-        getPopupContainer={getPopupContainer}
-        menu={{
-          items: menuItems,
-          onClick: ({ key }) => {
-            const action = actions.find((item) => item.key === key)
-            if (action) onAction(action)
-          },
-        }}
+    <Dropdown
+      trigger={['click']}
+      destroyOnHidden
+      getPopupContainer={getPopupContainer}
+      menu={{
+        items: menuItems,
+        onClick: ({ key }) => {
+          const action = actions.find((item) => item.key === key)
+          const actionState = action ? actionStates[action.key] || {} : {}
+          if (action && !(actionState.disabled ?? disabled)) onAction(action)
+        },
+      }}
+    >
+      <Button
+        data-business-action-key="lifecycle-more"
+        className="erp-business-module-status-action erp-business-lifecycle-slot"
+        size="small"
+        aria-label={label}
       >
-        <Button
-          data-business-action-key="lifecycle-more"
-          className="erp-business-module-status-action erp-business-lifecycle-slot"
-          size="small"
-          aria-label={label}
-          disabled={disabled}
-        >
-          {label} <DownOutlined />
-        </Button>
-      </Dropdown>
-    </BusinessActionTooltip>
+        {label} <DownOutlined />
+      </Button>
+    </Dropdown>
   )
 }
 

@@ -7,17 +7,11 @@ export function resolveBusinessActionAvailability({
   busy = false,
   selectionReason = '请先选择一条记录',
   unavailableReason = '当前记录状态暂不支持此操作',
+  irrelevantReason = unavailableReason,
+  completedReason = '当前记录已完成此操作',
   busyReason = '当前操作完成后可继续',
 } = {}) {
   if (!authorized) {
-    return {
-      visible: false,
-      disabled: true,
-      disabledReason: '',
-    }
-  }
-
-  if (selected && (!relevant || completed)) {
     return {
       visible: false,
       disabled: true,
@@ -30,6 +24,23 @@ export function resolveBusinessActionAvailability({
       visible: true,
       disabled: true,
       disabledReason: selectionReason,
+    }
+  }
+
+  if (completed) {
+    return {
+      visible: true,
+      disabled: true,
+      disabledReason: completedReason || '当前记录已完成此操作',
+    }
+  }
+
+  if (!relevant) {
+    return {
+      visible: true,
+      disabled: true,
+      disabledReason:
+        irrelevantReason || unavailableReason || '当前记录不适用此操作',
     }
   }
 
@@ -59,19 +70,46 @@ export function resolveBusinessActionAvailability({
 export function resolveBusinessLifecycleActions({
   actions = [],
   selected = false,
+  busy = false,
   hasPermission = () => false,
   canRun = () => false,
   isPrimary = (action) => action?.danger !== true && action?.key !== 'cancel',
+  selectionReason = '请先选择一条记录',
+  busyReason = '当前操作完成后可继续办理',
+  getUnavailableReason = (action) =>
+    `当前记录状态不能${action?.label || '执行此操作'}`,
 } = {}) {
   const authorizedActions = actions.filter((action) => hasPermission(action))
   const availableActions = selected
     ? authorizedActions.filter((action) => canRun(action))
     : []
-  const visibleActions = selected ? availableActions : authorizedActions
   const primaryAction =
-    visibleActions.find((action) => isPrimary(action)) || null
-  const secondaryActions = visibleActions.filter(
+    authorizedActions.find((action) => isPrimary(action)) || null
+  const secondaryActions = authorizedActions.filter(
     (action) => action.key !== primaryAction?.key
+  )
+  const actionStates = Object.fromEntries(
+    authorizedActions.map((action) => {
+      const available = selected && canRun(action)
+      const unavailableReason =
+        getUnavailableReason(action) ||
+        `当前记录状态不能${action?.label || '执行此操作'}`
+      const disabledReason = !selected
+        ? selectionReason
+        : !available
+          ? unavailableReason
+          : busy
+            ? busyReason
+            : ''
+      return [
+        action.key,
+        {
+          available,
+          disabled: !available || busy,
+          disabledReason,
+        },
+      ]
+    })
   )
 
   return {
@@ -82,6 +120,7 @@ export function resolveBusinessLifecycleActions({
     availableActions,
     primaryAction,
     secondaryActions,
+    actionStates,
   }
 }
 

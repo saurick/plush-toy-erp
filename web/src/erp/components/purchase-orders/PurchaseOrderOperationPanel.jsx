@@ -50,6 +50,7 @@ export default function PurchaseOrderOperationPanel({
   hasActiveFilters = false,
   itemsLoading = false,
   keyword = '',
+  lifecycleActionStates = {},
   showLifecycleMore = false,
   showLifecyclePrimary = false,
   loadOrders,
@@ -94,18 +95,12 @@ export default function PurchaseOrderOperationPanel({
   ).toLowerCase()
   const recordActionBusy =
     saving || generatingInboundDraft || printingContract || itemsLoading
-  const lifecyclePrimaryDisabled = !hasSingleSelection || recordActionBusy
-  const lifecyclePrimaryDisabledReason = !hasSingleSelection
-    ? '请先选择一条采购订单'
-    : recordActionBusy
-      ? '当前操作完成后可继续办理'
-      : ''
-  const lifecycleMoreDisabled = !hasSingleSelection || recordActionBusy
-  const lifecycleMoreDisabledReason = !hasSingleSelection
-    ? '请先选择一条采购订单'
-    : recordActionBusy
-      ? '当前操作完成后可继续办理'
-      : ''
+  const primaryLifecycleState = lifecycleActionStates[
+    primaryLifecycleAction?.key
+  ] || {
+    disabled: true,
+    disabledReason: '请先选择一条采购订单',
+  }
 
   return (
     <BusinessOperationPanel
@@ -229,8 +224,7 @@ export default function PurchaseOrderOperationPanel({
             setSelectedOrder(null)
           }}
         />
-        {canUpdate &&
-        (!singleSelectedOrder || selectedLifecycleStatus === 'draft') ? (
+        {canUpdate ? (
           <BusinessActionTooltip
             disabled={
               !selectedOrderCanEdit ||
@@ -250,6 +244,7 @@ export default function PurchaseOrderOperationPanel({
             }
           >
             <Button
+              data-business-action-key="purchase-edit"
               size="small"
               icon={<EditOutlined />}
               loading={itemsLoading}
@@ -291,6 +286,7 @@ export default function PurchaseOrderOperationPanel({
               }}
             >
               <Button
+                data-business-action-key="related-records"
                 size="small"
                 icon={<LinkOutlined />}
                 disabled={
@@ -307,26 +303,24 @@ export default function PurchaseOrderOperationPanel({
         {showLifecyclePrimary ? (
           <BusinessLifecyclePrimaryAction
             action={primaryLifecycleAction}
-            disabled={lifecyclePrimaryDisabled}
-            disabledReason={lifecyclePrimaryDisabledReason}
+            disabled={primaryLifecycleState.disabled}
+            disabledReason={primaryLifecycleState.disabledReason}
             loading={saving && Boolean(primaryLifecycleAction)}
             onAction={(action) =>
               requestLifecycleAction(action, singleSelectedOrder)
             }
           />
         ) : null}
-        {canCreateInboundDraftAction &&
-        (!singleSelectedOrder ||
-          !['closed', 'canceled'].includes(selectedLifecycleStatus)) ? (
-            <BusinessActionTooltip
-              disabled={
+        {canCreateInboundDraftAction ? (
+          <BusinessActionTooltip
+            disabled={
               !canGenerateInboundDraft ||
               inboundReferenceDataState !== 'ready' ||
               !hasInboundWarehouse ||
               !hasSingleSelection ||
               recordActionBusy
             }
-              disabledReason={
+            disabledReason={
               !singleSelectedOrder
                 ? '请先选择一条采购订单'
                 : selectedLifecycleStatus !== 'approved'
@@ -337,28 +331,29 @@ export default function PurchaseOrderOperationPanel({
                       : '入库仓库资料加载失败，请刷新当前页后重试'
                     : !hasInboundWarehouse
                       ? '请先维护至少一个启用的入库仓库'
-                    : recordActionBusy
+                      : recordActionBusy
                         ? '入库草稿生成完成后可继续'
                         : ''
             }
-            >
-              <Button
-                size="small"
-                type="primary"
-                icon={<ImportOutlined />}
-                disabled={
+          >
+            <Button
+              data-business-action-key="generate-inbound"
+              size="small"
+              type="primary"
+              icon={<ImportOutlined />}
+              disabled={
                 !canGenerateInboundDraft ||
                 inboundReferenceDataState !== 'ready' ||
                 !hasInboundWarehouse ||
                 !hasSingleSelection ||
                 recordActionBusy
               }
-                loading={generatingInboundDraft}
-                onClick={() => openInboundDraftModal(singleSelectedOrder)}
-              >
-                生成入库
-              </Button>
-            </BusinessActionTooltip>
+              loading={generatingInboundDraft}
+              onClick={() => openInboundDraftModal(singleSelectedOrder)}
+            >
+              生成入库
+            </Button>
+          </BusinessActionTooltip>
         ) : null}
         <BusinessActionTooltip
           disabled={
@@ -373,6 +368,7 @@ export default function PurchaseOrderOperationPanel({
           }
         >
           <Button
+            data-business-action-key="print-contract"
             size="small"
             icon={<FileTextOutlined />}
             disabled={
@@ -389,8 +385,7 @@ export default function PurchaseOrderOperationPanel({
         {showLifecycleMore ? (
           <BusinessLifecycleMoreAction
             actions={secondaryLifecycleActions}
-            disabled={lifecycleMoreDisabled}
-            disabledReason={lifecycleMoreDisabledReason}
+            actionStates={lifecycleActionStates}
             onAction={(action) =>
               requestLifecycleAction(action, singleSelectedOrder)
             }

@@ -13,7 +13,7 @@ function state(result) {
   return [result.visible, result.disabled, result.disabledReason]
 }
 
-test('收付款动作：未选中保留槽位，前置条件不足置灰，终态和无权限隐藏', () => {
+test('收付款动作：只有无权限隐藏，未选中、前置不足和终态都保留槽位', () => {
   for (const action of ['allocation', 'approval', 'cancel', 'reverse']) {
     assert.deepEqual(
       state(
@@ -87,7 +87,7 @@ test('收付款动作：未选中保留槽位，前置条件不足置灰，终�
         payment: approved,
       })
     ),
-    [false, true, '']
+    [true, true, '只有待审批收付款可以核对审批流']
   )
 
   const posted = { status: 'POSTED' }
@@ -103,20 +103,19 @@ test('收付款动作：未选中保留槽位，前置条件不足置灰，终�
   )
   for (const status of ['REJECTED', 'CANCELLED', 'REVERSED']) {
     for (const action of ['allocation', 'approval', 'cancel', 'reverse']) {
-      assert.equal(
-        resolveFinancePaymentActionAvailability({
+      const result = resolveFinancePaymentActionAvailability({
           action,
           authorized: true,
           payment: { status },
-        }).visible,
-        false,
-        `${status}/${action} 应隐藏`
-      )
+        })
+      assert.equal(result.visible, true, `${status}/${action} 应保留`)
+      assert.equal(result.disabled, true, `${status}/${action} 应置灰`)
+      assert.ok(result.disabledReason, `${status}/${action} 应说明原因`)
     }
   }
 })
 
-test('客户退货动作：待审批保留后续动作置灰，已收货只保留冲正', () => {
+test('客户退货动作：待审批和终态均保留已授权动作并置灰不可用项', () => {
   const draft = { status: 'DRAFT' }
   assert.deepEqual(
     state(
@@ -154,7 +153,15 @@ test('客户退货动作：待审批保留后续动作置灰，已收货只保�
       authorized: true,
       salesReturn: received,
     }).visible,
-    false
+    true
+  )
+  assert.equal(
+    resolveSalesReturnActionAvailability({
+      action: 'receive',
+      authorized: true,
+      salesReturn: received,
+    }).disabled,
+    true
   )
   assert.deepEqual(
     state(
@@ -170,20 +177,19 @@ test('客户退货动作：待审批保留后续动作置灰，已收货只保�
 
   for (const status of ['REJECTED', 'CANCELLED', 'REVERSED']) {
     for (const action of ['receive', 'approval', 'cancel', 'reverse']) {
-      assert.equal(
-        resolveSalesReturnActionAvailability({
+      const result = resolveSalesReturnActionAvailability({
           action,
           authorized: true,
           salesReturn: { status },
-        }).visible,
-        false,
-        `${status}/${action} 应隐藏`
-      )
+        })
+      assert.equal(result.visible, true, `${status}/${action} 应保留`)
+      assert.equal(result.disabled, true, `${status}/${action} 应置灰`)
+      assert.ok(result.disabledReason, `${status}/${action} 应说明原因`)
     }
   }
 })
 
-test('出货动作：放行前置条件置灰，已完成、驳回或结构无关动作隐藏', () => {
+test('出货动作：放行前置、已完成和驳回都保留已授权动作并置灰', () => {
   const draftPending = {
     status: 'DRAFT',
     finance_release_status: 'PENDING',
@@ -218,7 +224,15 @@ test('出货动作：放行前置条件置灰，已完成、驳回或结构无�
       authorized: true,
       shipment: draftApproved,
     }).visible,
-    false
+    true
+  )
+  assert.equal(
+    resolveShipmentActionAvailability({
+      action: 'release',
+      authorized: true,
+      shipment: draftApproved,
+    }).disabled,
+    true
   )
   assert.equal(
     resolveShipmentActionAvailability({
@@ -234,15 +248,14 @@ test('出货动作：放行前置条件置灰，已完成、驳回或结构无�
     finance_release_status: 'REJECTED',
   }
   for (const action of ['release', 'ship', 'receivable', 'invoice']) {
-    assert.equal(
-      resolveShipmentActionAvailability({
+    const result = resolveShipmentActionAvailability({
         action,
         authorized: true,
         shipment: draftRejected,
-      }).visible,
-      false,
-      `${action} 在放行驳回后应隐藏`
-    )
+      })
+    assert.equal(result.visible, true, `${action} 在放行驳回后应保留`)
+    assert.equal(result.disabled, true, `${action} 在放行驳回后应置灰`)
+    assert.ok(result.disabledReason)
   }
   assert.equal(
     resolveShipmentActionAvailability({
@@ -260,7 +273,15 @@ test('出货动作：放行前置条件置灰，已完成、驳回或结构无�
       authorized: true,
       shipment: shipped,
     }).visible,
-    false
+    true
+  )
+  assert.equal(
+    resolveShipmentActionAvailability({
+      action: 'ship',
+      authorized: true,
+      shipment: shipped,
+    }).disabled,
+    true
   )
   for (const action of ['cancel', 'receivable', 'invoice']) {
     assert.equal(
@@ -288,7 +309,16 @@ test('生产异常动作：按异常类型、审批状态、执行状态和申�
       productionException: submittedScrap,
       requesterOwned: false,
     }).visible,
-    false
+    true
+  )
+  assert.equal(
+    resolveProductionExceptionActionAvailability({
+      action: 'approval',
+      authorized: true,
+      productionException: submittedScrap,
+      requesterOwned: false,
+    }).disabled,
+    true
   )
   assert.equal(
     resolveProductionExceptionActionAvailability({
@@ -353,7 +383,15 @@ test('生产异常动作：按异常类型、审批状态、执行状态和申�
       authorized: true,
       productionException: approvedQuota,
     }).visible,
-    false
+    true
+  )
+  assert.equal(
+    resolveProductionExceptionActionAvailability({
+      action: 'execute',
+      authorized: true,
+      productionException: approvedQuota,
+    }).disabled,
+    true
   )
   assert.equal(
     resolveProductionExceptionActionAvailability({
@@ -372,11 +410,22 @@ test('生产异常动作：按异常类型、审批状态、执行状态和申�
         execution_status: 'REVERSED',
       },
     }).visible,
-    false
+    true
+  )
+  assert.equal(
+    resolveProductionExceptionActionAvailability({
+      action: 'revokeQuota',
+      authorized: true,
+      productionException: {
+        ...approvedQuota,
+        execution_status: 'REVERSED',
+      },
+    }).disabled,
+    true
   )
 })
 
-test('相关单据动作：有能力但未选中时置灰，选中无关联时隐藏', () => {
+test('相关单据动作：有能力但未选中或无关联时都保留入口并说明原因', () => {
   assert.deepEqual(
     state(
       resolveRelatedRecordActionAvailability({
@@ -401,7 +450,7 @@ test('相关单据动作：有能力但未选中时置灰，选中无关联时�
         itemCount: 0,
       })
     ),
-    [false, true, '']
+    [true, true, '当前业务记录没有可打开的关联单据']
   )
   assert.deepEqual(
     state(

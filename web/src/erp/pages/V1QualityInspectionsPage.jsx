@@ -607,12 +607,7 @@ export default function V1QualityInspectionsPage() {
     canCreatePurchaseReturn ||
     canManageOutsourcingDisposition ||
     canSubmitProductionException
-  const showQualityDispositionAction =
-    hasAnyDispositionCapability &&
-    (!selectedRow ||
-      (selectedDispositionAuthorized &&
-        selectedDispositionSourceSupported &&
-        !selectedDispositionCompleted))
+  const showQualityDispositionAction = hasAnyDispositionCapability
   const selectedPurchaseReceiptStatus = String(
     selectedRowPurchaseReceipt?.status || ''
   ).toUpperCase()
@@ -629,6 +624,9 @@ export default function V1QualityInspectionsPage() {
         : ''
   const qualityDispositionDisabled =
     !selectedRow ||
+    !selectedDispositionSourceSupported ||
+    !selectedDispositionAuthorized ||
+    selectedDispositionCompleted ||
     selectedQualityStatus !== 'REJECTED' ||
     (selectedIsIncomingInspection && selectedRowPurchaseReceiptLoading) ||
     !selectedDispositionKind ||
@@ -641,32 +639,34 @@ export default function V1QualityInspectionsPage() {
     saving
   const qualityDispositionDisabledReason = !selectedRow
     ? '请先选择一条质检记录'
-    : selectedQualityStatus !== 'REJECTED'
-      ? '质检判定不合格后可办理处置'
-      : selectedIsIncomingInspection && selectedRowPurchaseReceiptLoading
-        ? '正在核对来源单据状态'
-        : !selectedDispositionKind
-          ? '当前来源单据状态暂不能办理不合格处置'
-          : selectedDispositionKind === 'incoming-rejection' &&
-              !selectedRowCanCreateRejectionDisposition
-            ? '首次来料不合格处置条件尚未满足'
-            : selectedDispositionKind === 'incoming-return' &&
-                referenceDataState !== 'ready'
-              ? referenceDataState === 'loading'
-                ? '正在加载质检来源资料'
-                : '质检来源资料加载失败，请刷新当前页后重试'
-              : selectedDispositionKind === 'incoming-return' &&
-                  !selectedRowCanCreatePurchaseReturn
-                ? '未能确认来源收货已入库，暂不能生成采购退货'
-                : purchaseReturnLoading || saving
-                  ? '当前操作完成后可继续处置'
-                  : ''
+    : !selectedDispositionSourceSupported
+      ? '当前质检来源不支持在此办理不合格处置'
+      : !selectedDispositionAuthorized
+        ? '当前账号不能办理该来源的不合格处置'
+        : selectedDispositionCompleted
+          ? '当前质检的不合格处置已完成'
+          : selectedQualityStatus !== 'REJECTED'
+            ? '质检判定不合格后可办理处置'
+            : selectedIsIncomingInspection && selectedRowPurchaseReceiptLoading
+              ? '正在核对来源单据状态'
+              : !selectedDispositionKind
+                ? '当前来源单据状态暂不能办理不合格处置'
+                : selectedDispositionKind === 'incoming-rejection' &&
+                    !selectedRowCanCreateRejectionDisposition
+                  ? '首次来料不合格处置条件尚未满足'
+                  : selectedDispositionKind === 'incoming-return' &&
+                      referenceDataState !== 'ready'
+                    ? referenceDataState === 'loading'
+                      ? '正在加载质检来源资料'
+                      : '质检来源资料加载失败，请刷新当前页后重试'
+                    : selectedDispositionKind === 'incoming-return' &&
+                        !selectedRowCanCreatePurchaseReturn
+                      ? '未能确认来源收货已入库，暂不能生成采购退货'
+                      : purchaseReturnLoading || saving
+                        ? '当前操作完成后可继续处置'
+                        : ''
   const showReadOnlyOutsourcingDisposition =
-    canReadOutsourcingDisposition &&
-    !canManageOutsourcingDisposition &&
-    (!selectedRow ||
-      (selectedIsOutsourcingInspection &&
-        !['PASSED', 'CANCELLED'].includes(selectedQualityStatus)))
+    canReadOutsourcingDisposition && !canManageOutsourcingDisposition
   const selectedPurchaseReceiptItem = useMemo(
     () =>
       findByPositiveID(selectedPurchaseReceiptItemID, purchaseReceiptItems) ||
@@ -1932,6 +1932,7 @@ export default function V1QualityInspectionsPage() {
             disabledReason="请先选择一条质检记录"
           >
             <Button
+              data-business-action-key="view-details"
               size="small"
               icon={<EyeOutlined />}
               disabled={!selectedRow}
@@ -1940,7 +1941,7 @@ export default function V1QualityInspectionsPage() {
               查看详情
             </Button>
           </BusinessActionTooltip>
-          {canUpdate && (!selectedRow || selectedQualityStatus === 'DRAFT') ? (
+          {canUpdate ? (
             <BusinessActionTooltip
               disabled={
                 !selectedRow || selectedRow.status !== 'DRAFT' || saving
@@ -1968,6 +1969,7 @@ export default function V1QualityInspectionsPage() {
                 cancelText="取消"
               >
                 <Button
+                  data-business-action-key="submit"
                   size="small"
                   className="erp-business-module-status-action"
                   icon={<FileDoneOutlined />}
@@ -1980,73 +1982,73 @@ export default function V1QualityInspectionsPage() {
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdate &&
-          (!selectedRow ||
-            ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)) ? (
-              <>
-                <BusinessActionTooltip
+          {canUpdate ? (
+            <>
+              <BusinessActionTooltip
+                disabled={
+                  !selectedRow ||
+                  selectedRow.status !== 'SUBMITTED' ||
+                  saving
+                }
+                disabledReason={
+                  !selectedRow
+                    ? '请先选择一条质检记录'
+                    : selectedRow.status !== 'SUBMITTED'
+                      ? '质检提交后可判定'
+                      : saving
+                        ? '当前操作完成后可判定'
+                        : ''
+                }
+              >
+                <Button
+                  data-business-action-key="pass"
+                  size="small"
+                  type="primary"
+                  className="erp-business-module-status-action"
+                  icon={<CheckCircleOutlined />}
                   disabled={
                     !selectedRow ||
                     selectedRow.status !== 'SUBMITTED' ||
                     saving
                   }
-                  disabledReason={
-                    !selectedRow
-                      ? '请先选择一条质检记录'
-                      : selectedRow.status !== 'SUBMITTED'
-                        ? '质检提交后可判定'
-                        : saving
-                          ? '当前操作完成后可判定'
-                          : ''
-                  }
+                  onClick={() => openDecision('pass', selectedRow)}
                 >
-                  <Button
-                    size="small"
-                    type="primary"
-                    className="erp-business-module-status-action"
-                    icon={<CheckCircleOutlined />}
-                    disabled={
-                      !selectedRow ||
-                      selectedRow.status !== 'SUBMITTED' ||
-                      saving
-                    }
-                    onClick={() => openDecision('pass', selectedRow)}
-                  >
-                    判定合格
-                  </Button>
-                </BusinessActionTooltip>
-                <BusinessActionTooltip
+                  判定合格
+                </Button>
+              </BusinessActionTooltip>
+              <BusinessActionTooltip
+                disabled={
+                  !selectedRow ||
+                  selectedRow.status !== 'SUBMITTED' ||
+                  saving
+                }
+                disabledReason={
+                  !selectedRow
+                    ? '请先选择一条质检记录'
+                    : selectedRow.status !== 'SUBMITTED'
+                      ? '质检提交后可判定'
+                      : saving
+                        ? '当前操作完成后可判定'
+                        : ''
+                }
+              >
+                <Button
+                  data-business-action-key="reject"
+                  size="small"
+                  danger
+                  className="erp-business-module-status-action"
+                  icon={<StopOutlined />}
                   disabled={
                     !selectedRow ||
                     selectedRow.status !== 'SUBMITTED' ||
                     saving
                   }
-                  disabledReason={
-                    !selectedRow
-                      ? '请先选择一条质检记录'
-                      : selectedRow.status !== 'SUBMITTED'
-                        ? '质检提交后可判定'
-                        : saving
-                          ? '当前操作完成后可判定'
-                          : ''
-                  }
+                  onClick={() => openDecision('reject', selectedRow)}
                 >
-                  <Button
-                    size="small"
-                    danger
-                    className="erp-business-module-status-action"
-                    icon={<StopOutlined />}
-                    disabled={
-                      !selectedRow ||
-                      selectedRow.status !== 'SUBMITTED' ||
-                      saving
-                    }
-                    onClick={() => openDecision('reject', selectedRow)}
-                  >
-                    判定不合格
-                  </Button>
-                </BusinessActionTooltip>
-              </>
+                  判定不合格
+                </Button>
+              </BusinessActionTooltip>
+            </>
           ) : null}
           {showQualityDispositionAction ? (
             <BusinessActionTooltip
@@ -2069,23 +2071,31 @@ export default function V1QualityInspectionsPage() {
           {showReadOnlyOutsourcingDisposition ? (
             <BusinessActionTooltip
               disabled={
-                !selectedRow || selectedQualityStatus !== 'REJECTED' || saving
+                !selectedRow ||
+                !selectedIsOutsourcingInspection ||
+                selectedQualityStatus !== 'REJECTED' ||
+                saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条委外回货质检记录'
-                  : selectedQualityStatus !== 'REJECTED'
-                    ? '质检判定不合格后可查看委外处置'
-                    : saving
-                      ? '当前操作完成后可查看委外处置'
-                      : ''
+                  : !selectedIsOutsourcingInspection
+                    ? '只有委外回货质检可以查看委外处置'
+                    : selectedQualityStatus !== 'REJECTED'
+                      ? '质检判定不合格后可查看委外处置'
+                      : saving
+                        ? '当前操作完成后可查看委外处置'
+                        : ''
               }
             >
               <Button
                 data-business-action-key="outsourcing-disposition-view"
                 size="small"
                 disabled={
-                  !selectedRow || selectedQualityStatus !== 'REJECTED' || saving
+                  !selectedRow ||
+                  !selectedIsOutsourcingInspection ||
+                  selectedQualityStatus !== 'REJECTED' ||
+                  saving
                 }
                 onClick={() => setOutsourcingDispositionOpen(true)}
               >
@@ -2093,16 +2103,14 @@ export default function V1QualityInspectionsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canUpdate &&
-          (!selectedRow ||
-            ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)) ? (
-              <BusinessActionTooltip
-                disabled={
+          {canUpdate ? (
+            <BusinessActionTooltip
+              disabled={
                 !selectedRow ||
                 !['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||
                 saving
               }
-                disabledReason={
+              disabledReason={
                 !selectedRow
                   ? '请先选择一条质检记录'
                   : !['DRAFT', 'SUBMITTED'].includes(selectedRow.status)
@@ -2110,22 +2118,23 @@ export default function V1QualityInspectionsPage() {
                     : saving
                       ? '当前操作完成后可取消'
                       : ''
+              }
+            >
+              <Button
+                data-business-action-key="cancel"
+                size="small"
+                className="erp-business-module-status-action"
+                icon={<CloseCircleOutlined />}
+                disabled={
+                  !selectedRow ||
+                  !['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||
+                  saving
                 }
+                onClick={() => openDecision('cancel', selectedRow)}
               >
-                <Button
-                  size="small"
-                  className="erp-business-module-status-action"
-                  icon={<CloseCircleOutlined />}
-                  disabled={
-                    !selectedRow ||
-                    !['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||
-                    saving
-                  }
-                  onClick={() => openDecision('cancel', selectedRow)}
-                >
-                  取消质检
-                </Button>
-              </BusinessActionTooltip>
+                取消质检
+              </Button>
+            </BusinessActionTooltip>
           ) : null}
         </SelectionActionBar>
       </BusinessOperationPanel>

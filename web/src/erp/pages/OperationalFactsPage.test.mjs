@@ -29,7 +29,11 @@ test('draft facts can exit without pretending an inventory reversal happened', (
   )
   assert.match(source, /草稿尚未过账，不会变更库存/u)
   assert.match(source, /草稿尚未确认，作废不会生成过账或库存变更/u)
-  assert.match(source, />\s*\{activeSelectedRow\?\.status === 'DRAFT' \? '作废草稿' : '取消'\}\s*</u)
+  assert.match(
+    source,
+    /const cancelButtonLabel\s*=\s*[\s\S]{0,100}activeSelectedRow\?\.status === 'DRAFT' \? '作废草稿' : '取消'/u
+  )
+  assert.match(source, />\s*\{cancelButtonLabel\}\s*</u)
 })
 
 test('finance draft actions fail closed when a historical row lacks a formal source', () => {
@@ -192,4 +196,59 @@ test('posted rework records open authoritative progress and link back to the pro
     source,
     /该返工记录尚未关联可核对的成品返工补制批次/u
   )
+})
+
+test('operational fact actions keep a stable authorized catalog across selection and status changes', () => {
+  for (const actionKey of [
+    'related-records',
+    'operational-fact-details',
+    'operational-fact-post',
+    'production-rework-start',
+    'production-rework-progress',
+    'finance-fact-confirm',
+    'finance-single-reconciliation',
+    'finance-fact-cancel',
+    'outsourcing-contract-print',
+    'outsourcing-payable',
+    'shipment-post',
+    'reservation-release',
+    'finance-reconciliation-settle',
+    'operational-fact-cancel',
+    'shipment-cancel',
+  ]) {
+    assert.match(
+      source,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u'),
+      `${actionKey} must keep a stable action slot`
+    )
+  }
+
+  assert.doesNotMatch(
+    source,
+    /canPostActive\s*&&\s*\(!activeSelectedRow/u
+  )
+  assert.doesNotMatch(
+    source,
+    /canCreateProductionRework\s*&&\s*\(!activeSelectedRow/u
+  )
+  assert.doesNotMatch(
+    source,
+    /canCreateSingleReconciliation\s*&&\s*\(!activeSelectedRow/u
+  )
+  assert.doesNotMatch(
+    source,
+    /canViewOutsourcingPayable\s*&&\s*\(!activeSelectedRow/u
+  )
+  assert.doesNotMatch(source, /selectedIsProductionReworkCandidate/u)
+  assert.doesNotMatch(source, /selectedIsSingleReconciliationCandidate/u)
+  assert.doesNotMatch(source, /selectedIsOutsourcingPayableCandidate/u)
+})
+
+test('related-record menu keeps permission-scoped slots and disables unavailable record links', () => {
+  assert.match(source, /const availableRelatedMenuItems = useMemo/u)
+  assert.match(source, /const relatedMenuItems = useMemo/u)
+  assert.match(source, /disabled: !available/u)
+  assert.match(source, /const hasRelatedCapability = relatedMenuItems\.length > 0/u)
+  assert.match(source, /\{hasRelatedCapability \? \(/u)
+  assert.doesNotMatch(source, /\{relatedActionAvailability\.visible \? \(/u)
 })

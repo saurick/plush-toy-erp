@@ -39,6 +39,35 @@ test('purchase receipt exception history reads every reversal page', () => {
   assert.doesNotMatch(exceptionRecordsSource, /limit:\s*100/u)
 })
 
+test('purchase receipt actions keep a permission-stable DOM across record states', () => {
+  for (const actionKey of [
+    'related-records',
+    'view-details',
+    'exception-records',
+    'create-return',
+    'create-adjustment',
+    'view-payable',
+    'create-payable',
+    'post',
+    'cancel',
+  ]) {
+    assert.match(
+      source,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u')
+    )
+  }
+  assert.match(
+    source,
+    /buttonProps=\{\{ 'data-business-action-key': 'attachments' \}\}/u
+  )
+  assert.doesNotMatch(
+    source,
+    /\{can(?:CreateReturn|CreateAdjustment|ViewPayable|CreatePayable|Post)\s*&&\s*\(!selectedRow/u
+  )
+  assert.match(source, /selectedRow\.status !== 'POSTED'/u)
+  assert.match(source, /已取消入库记录不能再次取消/u)
+})
+
 test('purchase receipt exception creation binds the customer and validates the returned draft', () => {
   assert.match(
     source,
