@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Git Closeout Queue"
-  short_description: "共享 Local 的 writer、自动本地提交、独立推送与队列轮换"
-  default_prompt: "Use $plush-git-closeout-queue 协调共享 Local 的 writer、默认自动本地提交、遗留盘点、独立推送或队列轮换。"
+  short_description: "共享 Local writer、无锁只读快照、集中锁恢复与 Git 收口"
+  default_prompt: "Use $plush-git-closeout-queue 协调共享 Local writer、无锁只读快照、集中锁恢复、本地提交、独立推送和队列轮换。"

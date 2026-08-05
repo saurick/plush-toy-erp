@@ -8,7 +8,7 @@
 | `$plush-code-review-governance` | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查 |
 | `$plush-docs-governance` | 当前真源、文档清单、中文文件名、读者路径和 `progress.md` |
 | `$plush-domain-boundary-governance` | Workflow / Fact、Product Core、客户差异、schema/usecase/API/RBAC 和字段真源 |
-| `$plush-git-closeout-queue` | 共享 Local 的唯一 writer、默认自动本地提交、遗留盘点、独立 push 和长上下文队列轮换 |
+| `$plush-git-closeout-queue` | 共享 Local 的唯一 writer、无锁只读快照、集中锁恢复、本地提交、独立 push 和队列轮换 |
 | `$plush-page-design-governance` | 页面业务语义、字段/动作/状态、原型和浏览器回归 |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、模板意图、字段映射、编辑与 PDF/打印验证 |
 | `$plush-seed-import-governance` | seed、fixture、模拟试用、import dry-run、cleanup 和真实客户数据边界 |

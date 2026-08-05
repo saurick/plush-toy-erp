@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -46,6 +46,32 @@ test("skill health: current repository skills satisfy the contract", () => {
   const result = validateSkillRoot(ROOT);
   assert.deepEqual(result.errors, []);
   assert(result.skills.length > 0);
+});
+
+test("skill health: Git closeout keeps read-only probes and lock recovery centralized", async () => {
+  const skillDir = path.join(
+    ROOT,
+    ".agents",
+    "skills",
+    "plush-git-closeout-queue",
+  );
+  const [agents, skill, snapshotScript] = await Promise.all([
+    readFile(path.join(ROOT, "AGENTS.md"), "utf8"),
+    readFile(path.join(skillDir, "SKILL.md"), "utf8"),
+    readFile(
+      path.join(skillDir, "scripts", "readonly-git-snapshot.sh"),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(agents, /GIT_OPTIONAL_LOCKS=0/u);
+  assert.match(agents, /收到 `WAIT_\*` 后结束当前 turn/u);
+  assert.match(skill, /协议版本为 `3`/u);
+  assert.match(skill, /`INDEX_LOCK_OBSERVED`/u);
+  assert.match(skill, /worker 发现锁时只发送一次/u);
+  assert.match(skill, /收到任何 `WAIT_\*` 后立即结束当前 turn/u);
+  assert.match(snapshotScript, /export GIT_OPTIONAL_LOCKS=0/u);
+  assert.doesNotMatch(snapshotScript, /\b(?:rm|unlink)\b/u);
 });
 
 test("skill health: parses the supported frontmatter and metadata subset", () => {

@@ -40,15 +40,15 @@
 - 同一 Local checkout 同时只允许一个独立顶层写任务；只读任务可以并存。额外顶层写任务必须等待，或使用 Worktree 隔离。
 - 用户明确要求并行分发多个独立编码任务时，保留一个 Local 顶层任务，其余顶层任务使用 Worktree；默认不因此创建分支。
 - Worktree 任务完成相关验证后只报告可以 Hand off，不自动 Hand off、合并、提交或推送。只有用户明确要求且 Local writer 已结束时，才把任务和代码带回 Local。
-- Git index、commit 和 push 始终由一个收口 owner 串行执行；收口前等待其他 writer 结束，并重新读取 `git status` 与相关 diff。
+- Git index、commit 和 push 始终由一个收口 owner 串行执行；收口前等待其他 writer 结束，并用 `GIT_OPTIONAL_LOCKS=0` 重新读取 status / diff，避免只读盘点刷新 index。
 
 #### Codex App Git 收口队列
 
-- 共享 Local 顶层写任务使用 `$plush-git-closeout-queue`：每个新任务轮次动态查找同项目唯一置顶且标题精确为 `Git 收口队列` 的任务，不硬编码 task id；subagent 只向所属主任务报告。
-- 首次写文件前发送 `WRITER_REQUEST` 并等待匹配 ACK 与明确 grant，最后写入后发送 `WRITER_RELEASED`；只读验证不占 writer。队列按登记顺序从 release 事件继续放行，无需 worker 轮询。
-- `BATCH_READY` 默认进入 `auto_local`：每次 ready / release 唤醒后，队列在无 writer、归属与验证完整、热点释放且 index 安全时按序自动本地提交；只有用户明确“不提交 / 先别提交”才 `hold`。不要等待全局 idle，也不要盲目 `git add -A`。
-- 本地自动提交不包含 push；push 始终另行明确授权，并对并发 Git / remote ref 变化 fail closed。
-- App 重启、漏报、无人认领修改和长上下文队列轮换按 Skill 的 reconcile / rotation 流程处理。队列是可恢复的任务消息协调，不是 daemon、仓库状态真源或有保证的离线邮箱；无匹配 ACK 或 owner 不清楚时不自动 Git 收口。
+- 共享 Local 顶层写任务使用 `$plush-git-closeout-queue`，动态查找同项目唯一置顶且标题精确为 `Git 收口队列` 的任务；Local 仍只有一个 writer，独立写任务要真并行时使用 Worktree，subagent 只向所属主任务报告。
+- 首次写入前发送 `WRITER_REQUEST` 并等待匹配 ACK / grant，最后写入后发送 `WRITER_RELEASED`；收到 `WAIT_*` 后结束当前 turn，不轮询或重复播报，由队列事件唤醒。
+- 只读 Git 盘点优先运行 Skill 的 `scripts/readonly-git-snapshot.sh`。文件 writer、Git index / commit 与 push 是独立租约；孤立 `index.lock` 默认只冻结 Git lane，不撤销文件 writer。worker 只发送一次 `INDEX_LOCK_OBSERVED`，不删除锁或各自询问；队列集中复核、询问一次并恢复。
+- `BATCH_READY` 默认 `auto_local`，只有用户明确“不提交 / 先别提交”才 `hold`；本地提交不含 push，push 仍须另行明确授权。不要等待全局 idle、盲目 `git add -A`，或从 writer grant 推导 Git 权限。
+- App 重启、漏报、无人认领修改和长上下文轮换按 Skill 的 reconcile / rotation 处理。队列不是 daemon、仓库状态真源或有保证的离线邮箱；无匹配 ACK 或 owner 不清楚时不自动 Git 收口。
 
 ## 过程记录
 

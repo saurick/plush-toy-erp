@@ -137,3 +137,10 @@
 - 浏览器：动作稳定性 Style L1 定向 `8 / 8` 通过，覆盖销售五状态与无能力账号、采购 / 入库 / 质检代表状态、收付款普通与超级管理员收窄权限、退货 / 出货、生产异常，以及手机暗色抽屉；已实际核对销售关闭、采购关闭、财务已过账与手机抽屉截图，选择、清空选择和终态切换均不再丢失已授权入口，页面无横向溢出。
 - 阻塞 / 风险：全量 Style L1 在任务外共享改动的 `dev-flow-state-observatory-workflow-graph-dark` 旧文案断言处提前失败，本批未越权修改；额外 `production-order-source-material-issue-desktop` 场景等待“生产领料”弹窗超时，但该链路使用本页第 790 行附近的领料加载和第 2055 行附近的弹窗挂载，本批生产订单改动仅位于第 1636 行之后的当前操作栏，未触碰该处理链，需作为独立浏览器盲区复核。`affected --plan` 还因共享 dirty worktree 纳入多个任务的 T8 范围，本批没有将其他任务现场包装为自身验证。
 - 下一步：待相关 writer 收口后，在锁定 Node 与干净 exact SHA 上补跑全量 Style L1，并独立复核生产领料场景；当前没有 stage、commit、push、部署或客户 UAT。若用户授权提交 / 推送，仍由唯一 Git 收口 owner 按本批精确路径处理，push 前重新 fetch 并核对远端。
+
+### Git 收口队列锁域与等待治理（2026-08-05）
+
+- 完成：Git 收口队列升级为 protocol 3，明确 Local 文件 writer、Git index / commit 与 push 为独立锁域；孤立 `index.lock` 默认只冻结 Git lane，不再自动暂停或撤销文件 writer。独立顶层写任务需要真并行时使用 Worktree，共享 Local 仍保持单 writer，避免热点文件互相覆盖。
+- 恢复：新增 optional-lock-free 只读快照脚本，统一以 `GIT_OPTIONAL_LOCKS=0` 报告 HEAD、worktree、index 和锁身份；worker 只上报一次 `INDEX_LOCK_OBSERVED` 并结束当前 turn，队列按 lock path / inode / mtime 去重，集中复核、询问一次并恢复原 owner 与队序。收到 `WAIT_*` 后不再轮询或持续播报，由 release / cancelled / ready 事件唤醒。
+- 验证：真实仓库无锁快照与隔离临时仓库锁存在合同通过，后者正确读回 inode、零字节大小和无 holder；`bash -n`、ShellCheck、affected T0 / T1、文档合同 `15 / 15`、Skill 合同 `4 / 4`、项目 Skill health、AGENTS 体积门禁和 `git diff --check` 全部通过。系统 Skill Creator 的 Python validator 因当前解释器缺少 PyYAML 未能启动，仓库自己的 metadata、索引和引用门禁已通过。
+- 边界 / 下一步：本批只修改协作规则、Git 收口 Skill、只读脚本、metadata、回归合同和本过程记录，不改业务代码、schema、migration、数据库或部署；protocol 3 只有精确本地提交进入 HEAD 后才正式生效。当前没有 stage、commit 或 push，提交与推送等待用户分别明确确认。
