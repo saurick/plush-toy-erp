@@ -112,6 +112,93 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"cleared": true,
 		})}, nil
+	case "withdraw_attachment":
+		attachmentID, attachmentIDOK := positiveSafeIntegerParam(pm, "id")
+		if !attachmentIDOK {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		item, err := d.attachmentUC.GetBusinessAttachmentMetadata(ctx, attachmentID)
+		if err != nil {
+			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		rawWithdrawalReason, reasonIsString := pm["reason"].(string)
+		if !reasonIsString {
+			return id, d.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentWithdrawalReasonInvalid), nil
+		}
+		withdrawalReason, err := biz.NormalizeBusinessAttachmentWithdrawalReason(rawWithdrawalReason)
+		if err != nil {
+			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		if item.WithdrawnAt != nil {
+			if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, false); res != nil {
+				return id, res, nil
+			}
+			if _, res := d.authorizeWorkflowAttachmentTaskAccess(ctx, item.OwnerType, item.OwnerID, 0, false); res != nil {
+				return id, res, nil
+			}
+			admin, res := d.CurrentAdmin(ctx)
+			if res != nil {
+				return id, res, nil
+			}
+			if item.WithdrawnBy == nil || *item.WithdrawnBy != admin.ID ||
+				item.WithdrawalReason == nil || *item.WithdrawalReason != withdrawalReason {
+				return id, d.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentWithdrawn), nil
+			}
+			if username := strings.TrimSpace(admin.Username); username != "" {
+				item.WithdrawnByUsername = &username
+			}
+			return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+				"attachment": businessAttachmentToAny(item, false),
+			})}, nil
+		}
+		expectedVersion, expectedVersionOK := positiveSafeIntegerParam(pm, "expected_version")
+		if item.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if res := d.requireBusinessAttachmentOwnerPermission(ctx, item.OwnerType, true); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), item.OwnerType); res != nil {
+			return id, res, nil
+		}
+		workflowGuard, accessRes := d.authorizeWorkflowAttachmentTaskAccess(
+			ctx,
+			item.OwnerType,
+			item.OwnerID,
+			expectedVersion,
+			true,
+		)
+		if accessRes != nil {
+			return id, accessRes, nil
+		}
+		withdrawnBy := 0
+		withdrawnByUsername := ""
+		if workflowGuard != nil {
+			withdrawnBy = workflowGuard.ActorID
+			withdrawnByUsername = workflowGuard.ActorUsername
+		} else {
+			admin, res := d.CurrentAdmin(ctx)
+			if res != nil {
+				return id, res, nil
+			}
+			withdrawnBy = admin.ID
+			withdrawnByUsername = admin.Username
+		}
+		item, err = d.attachmentUC.WithdrawBusinessAttachment(ctx, &biz.BusinessAttachmentWithdrawInput{
+			Attachment:    item,
+			Reason:        withdrawalReason,
+			WithdrawnBy:   withdrawnBy,
+			WorkflowGuard: workflowGuard,
+		})
+		if err != nil {
+			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		if username := strings.TrimSpace(withdrawnByUsername); username != "" {
+			item.WithdrawnByUsername = &username
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+			"attachment": businessAttachmentToAny(item, false),
+		})}, nil
 	case "download_attachment":
 		item, err := d.attachmentUC.GetBusinessAttachmentMetadata(ctx, getInt(pm, "id", 0))
 		if err != nil {
@@ -205,7 +292,7 @@ func (d *jsonrpcDispatcher) authorizeWorkflowAttachmentTaskAccess(
 }
 
 // workflowAdminCanWriteTaskAttachment checks the task's writable row scope without
-// coupling evidence uploads to a workflow status transition.
+// coupling attachment evidence mutations to a workflow status transition.
 func workflowAdminCanWriteTaskAttachment(admin *biz.AdminUser, task *biz.WorkflowTask, visibleOwnerRoleKeys []string) bool {
 	if admin == nil || admin.Disabled || task == nil ||
 		!biz.IsKnownWorkflowTaskState(task.TaskStatusKey) ||
@@ -357,19 +444,23 @@ func businessAttachmentToAny(item *biz.BusinessAttachment, includeContent bool) 
 		return map[string]any{}
 	}
 	out := map[string]any{
-		"id":                   item.ID,
-		"owner_type":           item.OwnerType,
-		"owner_id":             item.OwnerID,
-		"attachment_type":      item.AttachmentType,
-		"slot_key":             optionalStringValue(item.SlotKey),
-		"file_name":            item.FileName,
-		"mime_type":            item.MimeType,
-		"file_size":            item.FileSize,
-		"sha256":               item.SHA256,
-		"uploaded_by":          optionalIntValue(item.UploadedBy),
-		"uploaded_by_username": optionalStringValue(item.UploadedByUsername),
-		"note":                 optionalStringValue(item.Note),
-		"created_at":           item.CreatedAt.Unix(),
+		"id":                    item.ID,
+		"owner_type":            item.OwnerType,
+		"owner_id":              item.OwnerID,
+		"attachment_type":       item.AttachmentType,
+		"slot_key":              optionalStringValue(item.SlotKey),
+		"file_name":             item.FileName,
+		"mime_type":             item.MimeType,
+		"file_size":             item.FileSize,
+		"sha256":                item.SHA256,
+		"uploaded_by":           optionalIntValue(item.UploadedBy),
+		"uploaded_by_username":  optionalStringValue(item.UploadedByUsername),
+		"note":                  optionalStringValue(item.Note),
+		"withdrawn_at":          optionalTimeUnix(item.WithdrawnAt),
+		"withdrawn_by":          optionalIntValue(item.WithdrawnBy),
+		"withdrawn_by_username": optionalStringValue(item.WithdrawnByUsername),
+		"withdrawal_reason":     optionalStringValue(item.WithdrawalReason),
+		"created_at":            item.CreatedAt.Unix(),
 	}
 	if includeContent {
 		out["content_base64"] = base64.StdEncoding.EncodeToString(item.Content)
@@ -395,6 +486,14 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 	case errors.Is(err, biz.ErrBusinessAttachmentIntegrity):
 		d.log.WithContext(ctx).Errorf("business attachment integrity verification failed: %v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "附件内容校验失败，请联系管理员"}
+	case errors.Is(err, biz.ErrBusinessAttachmentWithdrawnContentUnavailable):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "附件已撤销，不能预览或下载"}
+	case errors.Is(err, biz.ErrBusinessAttachmentWithdrawn):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "附件已撤销，请刷新后查看撤销记录"}
+	case errors.Is(err, biz.ErrBusinessAttachmentWithdrawalReasonInvalid):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请填写撤销原因，最多 255 个字"}
+	case errors.Is(err, biz.ErrBusinessAttachmentProductImageWithdrawalUnsupported):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "产品图片请使用替换或清空，不支持撤销"}
 	case errors.Is(err, biz.ErrBusinessAttachmentProductImageMimeNotAllowed):
 		return &v1.JsonrpcResult{
 			Code:    errcode.InvalidParam.Code,

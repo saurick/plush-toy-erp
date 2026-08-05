@@ -79,8 +79,7 @@ function validTask(overrides = {}) {
   }
 }
 
-test('workflowApi: reads and validates task-scoped process context', async () => {
-  const calls = []
+function validProcessContext(overrides = {}) {
   const completedNode = {
     id: 19,
     process_instance_id: 10,
@@ -99,7 +98,7 @@ test('workflowApi: reads and validates task-scoped process context', async () =>
     version: 1,
     status: 'active',
   }
-  const processContext = {
+  return {
     source: { type: 'sales_order', id: 1001, no: 'SO-1001' },
     process_instance: {
       id: 10,
@@ -108,10 +107,18 @@ test('workflowApi: reads and validates task-scoped process context', async () =>
       status: 'active',
       started_at: 1_800_000_000,
     },
+    linked_node: currentNode,
+    approval_form: null,
     nodes: [completedNode, currentNode],
     current_nodes: [currentNode],
     completed_nodes: [completedNode],
+    ...overrides,
   }
+}
+
+test('workflowApi: reads and validates task-scoped process context', async () => {
+  const calls = []
+  const processContext = validProcessContext()
   const api = await loadWorkflowApi(async (method, params) => {
     calls.push({ method, params })
     return { data: { process_context: processContext } }
@@ -125,6 +132,36 @@ test('workflowApi: reads and validates task-scoped process context', async () =>
     api.getWorkflowTaskProcessContext(0),
     /任务流程参数无效/u
   )
+})
+
+test('workflowApi: reports sanitized process-context contract failures without weakening validation', async () => {
+  const diagnostics = []
+  const originalWarn = console.warn
+  console.warn = (...args) => diagnostics.push(args)
+  try {
+    const api = await loadWorkflowApi(async () => ({
+      data: {
+        process_context: validProcessContext({ approval_form: {} }),
+      },
+    }))
+
+    await assert.rejects(
+      api.getWorkflowTaskProcessContext(42),
+      /业务轨迹暂时无法确认/u
+    )
+  } finally {
+    console.warn = originalWarn
+  }
+
+  assert.deepEqual(diagnostics, [
+    [
+      '[workflow] 响应合同校验失败',
+      {
+        method: 'get_task_process_context',
+        reason: 'response_contract_invalid',
+      },
+    ],
+  ])
 })
 
 test('workflowApi: task events require an explicit bounded projection', async () => {

@@ -267,6 +267,9 @@ var (
 		{Name: "content", Type: field.TypeBytes},
 		{Name: "uploaded_by", Type: field.TypeInt, Nullable: true},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "withdrawn_at", Type: field.TypeTime, Nullable: true},
+		{Name: "withdrawn_by", Type: field.TypeInt, Nullable: true},
+		{Name: "withdrawal_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 	}
 	// BusinessAttachmentsTable holds the schema information for the "business_attachments" table.
@@ -283,7 +286,7 @@ var (
 			{
 				Name:    "businessattachment_owner_type_owner_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{BusinessAttachmentsColumns[1], BusinessAttachmentsColumns[2], BusinessAttachmentsColumns[12]},
+				Columns: []*schema.Column{BusinessAttachmentsColumns[1], BusinessAttachmentsColumns[2], BusinessAttachmentsColumns[15]},
 			},
 			{
 				Name:    "businessattachment_owner_type_owner_id_attachment_type_slot_key",
@@ -302,6 +305,11 @@ var (
 				Name:    "businessattachment_uploaded_by",
 				Unique:  false,
 				Columns: []*schema.Column{BusinessAttachmentsColumns[10]},
+			},
+			{
+				Name:    "businessattachment_withdrawn_by",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessAttachmentsColumns[13]},
 			},
 		},
 	}
@@ -4758,6 +4766,7 @@ func init() {
 		"business_attachments_file_size_positive":     "file_size > 0",
 		"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
 		"business_attachments_product_image_contract": "((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('primary', 'secondary') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))",
+		"business_attachments_withdrawal_contract":    "((withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawal_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_by > 0 AND withdrawal_reason IS NOT NULL AND length(trim(withdrawal_reason)) BETWEEN 1 AND 255 AND owner_type <> 'product' AND attachment_type <> 'product_image'))",
 	}
 	ContactsTable.Annotation = &entsql.Annotation{}
 	ContactsTable.Annotation.Checks = map[string]string{

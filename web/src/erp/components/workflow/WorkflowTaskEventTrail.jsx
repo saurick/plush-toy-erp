@@ -19,6 +19,7 @@ export default function WorkflowTaskEventTrail({
   task = {},
   truncated = false,
   variant = 'desktop',
+  showResponsibility = true,
 }) {
   const model = buildWorkflowTaskEventTrailModel({
     approvalTask,
@@ -44,24 +45,23 @@ export default function WorkflowTaskEventTrail({
           <h3 id={`workflow-task-event-trail-title-${task.id || 'current'}`}>
             本任务处理记录
           </h3>
-          <p>
-            按时间倒序显示这条任务的状态变更、处理岗位和意见；只代表当前任务，不是来源单据的完整审批链。
-          </p>
         </div>
         <span>{model.summaryLabel}</span>
       </div>
 
-      <dl
-        className="workflow-task-event-trail__responsibility"
-        aria-label="当前任务责任"
-      >
-        {model.responsibilityItems.map((item) => (
-          <div key={item.key}>
-            <dt>{item.label}</dt>
-            <dd>{item.value}</dd>
-          </div>
-        ))}
-      </dl>
+      {showResponsibility ? (
+        <dl
+          className="workflow-task-event-trail__responsibility"
+          aria-label="当前任务责任"
+        >
+          {model.responsibilityItems.map((item) => (
+            <div key={item.key}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
 
       {loading ? (
         <p className="workflow-task-event-trail__state" role="status">
@@ -121,7 +121,7 @@ export default function WorkflowTaskEventTrail({
               role="status"
             >
               仅显示最近 {model.items.length}{' '}
-              条，更早记录未加载；请勿将本视图当作完整审批链。
+              条，更早记录未加载。
             </p>
           ) : null}
         </>

@@ -1394,8 +1394,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             modalTitle="任务附件"
             panelTitle="任务附件"
             description="上传现场照片、异常截图或任务处理证据；附件不代表任务已完成，也不会改变相关业务记录。"
-            canUpload={canUpdateWorkflowTasks || canCompleteWorkflowTasks}
-            canDelete={canUpdateWorkflowTasks}
+            canUpload={canUpdateWorkflowTasks}
+            canWithdraw={canUpdateWorkflowTasks}
             disabled={!selectedTask}
             disabledReason="请先选择一条任务"
             buttonProps={{

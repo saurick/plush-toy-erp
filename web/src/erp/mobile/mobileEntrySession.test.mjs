@@ -72,7 +72,7 @@ test('mobile entry session: 岗位入口按账号权限直达且可退出', () =
   assert.match(source, /手机待办只向明确分配的业务岗位开放/u)
 })
 
-test('mobile entry session: 有电脑端菜单的岗位可从任务端直接进入电脑端', () => {
+test('entry session: 手机待办和电脑端都通过入口选择页对称切换', () => {
   const layoutSource = readSource('mobile', 'MobileAppLayout.jsx')
   const pageSource = readSource('mobile', 'pages', 'MobileRoleTasksPage.jsx')
   const screenSource = readSource(
@@ -80,20 +80,40 @@ test('mobile entry session: 有电脑端菜单的岗位可从任务端直接进�
     'components',
     'MobileTaskListScreen.jsx'
   )
+  const desktopSource = readSource('components', 'ERPLayout.jsx')
 
-  assert.match(
+  assert.doesNotMatch(layoutSource, /handleEnterDesktop/u)
+  assert.doesNotMatch(
     layoutSource,
-    /rememberEntryChoice\(ENTRY_TARGET\.DESKTOP\)[\s\S]*?navigate\('\/erp\/dashboard'\)/u
+    /rememberEntryChoice\(ENTRY_TARGET\.DESKTOP\)|navigate\('\/erp\/dashboard'\)/u
   )
-  assert.match(
-    layoutSource,
-    /canEnterDesktop,\s*handleEnterDesktop/u
-  )
+  assert.match(layoutSource, /adminProfile,\s*canEnterDesktop,\s*handleLogout/u)
   assert.match(pageSource, /canEnterDesktop=\{canEnterDesktop === true\}/u)
-  assert.match(pageSource, /handleEnterDesktop=\{handleEnterDesktop\}/u)
-  assert.match(screenSource, /data-testid="mobile-role-desktop-entry"/u)
-  assert.match(screenSource, /aria-label="进入电脑端"/u)
-  assert.match(screenSource, />\s*进入电脑端\s*</u)
+  assert.match(
+    pageSource,
+    /handleSwitchEntry=\{\(\) => navigate\('\/entry'\)\}/u
+  )
+  assert.doesNotMatch(pageSource, /handleEnterDesktop/u)
+  assert.match(screenSource, /data-testid="mobile-role-work-entry-switch"/u)
+  assert.match(screenSource, />\s*切换工作入口\s*</u)
+  assert.match(screenSource, />可用入口</u)
+  assert.match(
+    screenSource,
+    /canEnterDesktop\s*\? '电脑端 \/ 手机待办'\s*: '手机待办'/u
+  )
+  assert.doesNotMatch(screenSource, /mobile-role-desktop-entry|进入电脑端/u)
+  assert.match(desktopSource, /getAllowedMobileRoleKeys/u)
+  assert.match(desktopSource, /const canSwitchToMobileTasks = useMemo/u)
+  assert.match(desktopSource, /data-testid="desktop-account-menu-trigger"/u)
+  assert.match(desktopSource, /data-testid="desktop-work-entry-switch"/u)
+  assert.match(
+    desktopSource,
+    /key === 'switch-entry'[\s\S]*?handleNavigate\('\/entry'\)[\s\S]*?key === 'logout'[\s\S]*?handleLogout/u
+  )
+  assert.match(
+    desktopSource,
+    /key: 'switch-entry'[\s\S]*?切换工作入口[\s\S]*?key: 'logout'[\s\S]*?退出登录/u
+  )
 })
 
 test('mobile entry session: 多岗位账号可在手机待办内显式切换岗位', () => {

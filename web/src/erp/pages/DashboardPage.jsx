@@ -13,9 +13,7 @@ import {
   Card,
   Descriptions,
   Empty,
-  Input,
   Pagination,
-  Select,
   Space,
   Table,
   Tag,
@@ -32,6 +30,11 @@ import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
   getWorkflowTaskActionMeta,
 } from '../components/workflow/WorkflowTaskActionDrawer.jsx'
+import {
+  SearchInput,
+  SelectFilter,
+  ToolbarButton,
+} from '../components/business-list/BusinessListLayout.jsx'
 import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
@@ -90,6 +93,7 @@ import {
 import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
 import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
 import { getWorkflowTaskProcessingHint } from '../utils/workflowTaskProcessingHint.mjs'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import {
   canViewWorkflowApprovalInbox,
   getWorkflowApprovalInboxCapabilityKeys,
@@ -1136,6 +1140,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     actionDrawerEntryPath,
     actionDrawerAccess.sourceAccess
   )
+  const actionDrawerCanViewAttachments = hasActionPermission(
+    adminProfile,
+    'workflow.task.read'
+  )
+  const actionDrawerCanManageAttachments =
+    actionDrawerAccess.canHandle &&
+    hasActionPermission(adminProfile, 'workflow.task.update')
   const assignmentAccess = useWorkflowTaskAssignmentAccess({
     adminProfile,
     task: selectedTask,
@@ -2006,9 +2017,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             </div>
 
             <div className="erp-task-board-filters">
-              <Input.Search
-                allowClear
-                placeholder="搜索任务、单号、来源、处理原因"
+              <SearchInput
+                placeholder="搜索任务"
+                searchHint="可搜索：任务、单号、来源、处理原因"
                 value={taskBoardKeywordDraft}
                 onChange={(event) => {
                   const nextKeyword = event.target.value
@@ -2017,34 +2028,39 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     updateFilter('keyword', '')
                   }
                 }}
-                onSearch={(value) => updateFilter('keyword', value)}
+                onPressEnter={(event) =>
+                  updateFilter('keyword', event.currentTarget.value)
+                }
               />
-              <Select
+              <SelectFilter
                 value={filters.status}
                 options={TASK_BOARD_STATUS_OPTIONS}
                 onChange={(value) => updateFilter('status', value)}
               />
               {roleOptions.length > 1 ? (
-                <Select
+                <SelectFilter
                   aria-label="负责岗位"
                   value={filters.role}
                   options={roleOptions}
                   onChange={(value) => updateFilter('role', value)}
                 />
               ) : null}
-              <Select
+              <SelectFilter
                 value={filters.due}
                 options={TASK_BOARD_DUE_OPTIONS}
                 onChange={(value) => updateFilter('due', value)}
               />
-              <Select
+              <SelectFilter
                 value={filters.sourceType}
                 options={sourceOptions}
                 onChange={(value) => updateFilter('sourceType', value)}
               />
-              <Button disabled={!hasActiveFilters} onClick={clearFilters}>
+              <ToolbarButton
+                disabled={!hasActiveFilters}
+                onClick={clearFilters}
+              >
                 清空筛选
-              </Button>
+              </ToolbarButton>
               <div className="erp-task-board-filter-summary" aria-live="polite">
                 <Text type="secondary">
                   筛选结果 {taskBoardMetricsReady ? taskBoardTotal : '-'} 条
@@ -2118,6 +2134,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         assignmentAccess={assignmentAccess}
         assignmentTarget={assignmentTarget}
         canOpenEntry={actionDrawerCanOpenEntry}
+        canViewAttachments={actionDrawerCanViewAttachments}
+        canManageAttachments={actionDrawerCanManageAttachments}
         onActionModeChange={changeTaskActionMode}
         onActionReasonChange={setActionReason}
         onAssignmentTargetChange={setAssignmentTarget}

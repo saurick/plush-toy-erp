@@ -7,6 +7,7 @@ import {
   getProcessNodeLabel,
   getProcessNodeStatusLabel,
   getProcessStatusLabel,
+  getWorkflowTaskDisplayName,
   isDisplayOnlyWorkflowTask,
   requireWorkflowProcessContext,
 } from './processRuntimePresentation.mjs'
@@ -40,6 +41,7 @@ function context(overrides = {}) {
   return {
     source: { type: 'sales_order', id: 42, no: 'SO-42' },
     process_instance: instance,
+    approval_form: null,
     nodes: [completed, current],
     current_nodes: [current],
     completed_nodes: [completed],
@@ -53,6 +55,25 @@ test('process runtime presentation validates canonical task-scoped context', () 
   assert.equal(getProcessLabel(value.process_instance), '销售订单受理')
   assert.equal(getProcessStatusLabel(value.process_instance), '办理中')
   assert.equal(getProcessNodeLabel(value.current_nodes[0]), '订单审批')
+})
+
+test('process runtime presentation accepts no formal form as null and rejects an empty object', () => {
+  const withoutFormalForm = context()
+  assert.equal(withoutFormalForm.approval_form, null)
+  assert.equal(
+    requireWorkflowProcessContext(withoutFormalForm),
+    withoutFormalForm
+  )
+
+  assert.throws(
+    () =>
+      requireWorkflowProcessContext(
+        context({
+          approval_form: {},
+        })
+      ),
+    /业务轨迹暂时无法确认/u
+  )
 })
 
 test('process runtime presentation covers every current Product Core process', () => {
@@ -125,6 +146,22 @@ test('process runtime presentation covers every current Product Core process', (
   Object.entries(nodeLabels).forEach(([nodeKey, label]) => {
     assert.equal(getProcessNodeLabel({ node_key: nodeKey }), label)
   })
+})
+
+test('process runtime presentation uses business task names without exposing node keys', () => {
+  assert.equal(
+    getWorkflowTaskDisplayName({ task_name: 'engineering_data' }),
+    '工程资料'
+  )
+  assert.equal(
+    getWorkflowTaskDisplayName({ task_name: '客户确认样品' }),
+    '客户确认样品'
+  )
+  assert.equal(
+    getWorkflowTaskDisplayName({ task_name: 'unknown_internal_step' }),
+    '业务任务'
+  )
+  assert.equal(getWorkflowTaskDisplayName({}), '未命名任务')
 })
 
 test('process runtime presentation validates all exception approval form profiles', () => {

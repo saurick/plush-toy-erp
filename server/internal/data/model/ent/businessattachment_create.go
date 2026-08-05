@@ -118,6 +118,48 @@ func (_c *BusinessAttachmentCreate) SetNillableNote(v *string) *BusinessAttachme
 	return _c
 }
 
+// SetWithdrawnAt sets the "withdrawn_at" field.
+func (_c *BusinessAttachmentCreate) SetWithdrawnAt(v time.Time) *BusinessAttachmentCreate {
+	_c.mutation.SetWithdrawnAt(v)
+	return _c
+}
+
+// SetNillableWithdrawnAt sets the "withdrawn_at" field if the given value is not nil.
+func (_c *BusinessAttachmentCreate) SetNillableWithdrawnAt(v *time.Time) *BusinessAttachmentCreate {
+	if v != nil {
+		_c.SetWithdrawnAt(*v)
+	}
+	return _c
+}
+
+// SetWithdrawnBy sets the "withdrawn_by" field.
+func (_c *BusinessAttachmentCreate) SetWithdrawnBy(v int) *BusinessAttachmentCreate {
+	_c.mutation.SetWithdrawnBy(v)
+	return _c
+}
+
+// SetNillableWithdrawnBy sets the "withdrawn_by" field if the given value is not nil.
+func (_c *BusinessAttachmentCreate) SetNillableWithdrawnBy(v *int) *BusinessAttachmentCreate {
+	if v != nil {
+		_c.SetWithdrawnBy(*v)
+	}
+	return _c
+}
+
+// SetWithdrawalReason sets the "withdrawal_reason" field.
+func (_c *BusinessAttachmentCreate) SetWithdrawalReason(v string) *BusinessAttachmentCreate {
+	_c.mutation.SetWithdrawalReason(v)
+	return _c
+}
+
+// SetNillableWithdrawalReason sets the "withdrawal_reason" field if the given value is not nil.
+func (_c *BusinessAttachmentCreate) SetNillableWithdrawalReason(v *string) *BusinessAttachmentCreate {
+	if v != nil {
+		_c.SetWithdrawalReason(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *BusinessAttachmentCreate) SetCreatedAt(v time.Time) *BusinessAttachmentCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -253,6 +295,16 @@ func (_c *BusinessAttachmentCreate) check() error {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.note": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.WithdrawnBy(); ok {
+		if err := businessattachment.WithdrawnByValidator(v); err != nil {
+			return &ValidationError{Name: "withdrawn_by", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.withdrawn_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.WithdrawalReason(); ok {
+		if err := businessattachment.WithdrawalReasonValidator(v); err != nil {
+			return &ValidationError{Name: "withdrawal_reason", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.withdrawal_reason": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "BusinessAttachment.created_at"`)}
 	}
@@ -325,6 +377,18 @@ func (_c *BusinessAttachmentCreate) createSpec() (*BusinessAttachment, *sqlgraph
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(businessattachment.FieldNote, field.TypeString, value)
 		_node.Note = &value
+	}
+	if value, ok := _c.mutation.WithdrawnAt(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawnAt, field.TypeTime, value)
+		_node.WithdrawnAt = &value
+	}
+	if value, ok := _c.mutation.WithdrawnBy(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawnBy, field.TypeInt, value)
+		_node.WithdrawnBy = &value
+	}
+	if value, ok := _c.mutation.WithdrawalReason(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawalReason, field.TypeString, value)
+		_node.WithdrawalReason = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(businessattachment.FieldCreatedAt, field.TypeTime, value)

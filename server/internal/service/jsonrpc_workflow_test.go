@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	_ "github.com/mattn/go-sqlite3"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -290,11 +292,114 @@ func TestJsonrpcDispatcher_WorkflowGetTaskProcessContextUsesTaskVisibility(t *te
 	if _, exposed := instance["definition_hash"]; exposed {
 		t.Fatalf("business read model must not expose internal definition hash")
 	}
+	if approvalForm, exists := contextMap["approval_form"]; !exists || approvalForm != nil {
+		t.Fatalf("ordinary approval task must serialize approval_form as null, got %#v", approvalForm)
+	}
 
 	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskRead)}
 	_, denied, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_process_context", "2", params)
 	if err != nil || denied == nil || denied.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("out-of-scope task process context must stay hidden, res=%#v err=%v", denied, err)
+	}
+}
+
+func TestWorkflowProcessTaskContextJSONRPCSerializationKeepsApprovalFormContract(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		nodeType         string
+		formProfileKey   string
+		expectFormalForm bool
+		expectQuantity   bool
+	}{
+		{name: "ordinary human task", nodeType: biz.ProcessNodeTypeHumanTask},
+		{name: "ordinary approval task", nodeType: biz.ProcessNodeTypeApproval},
+		{name: "sales return decision", nodeType: biz.ProcessNodeTypeApproval, formProfileKey: "sales_return_approval", expectFormalForm: true},
+		{name: "finance payment decision", nodeType: biz.ProcessNodeTypeApproval, formProfileKey: "finance_payment_approval", expectFormalForm: true},
+		{name: "inventory adjustment decision", nodeType: biz.ProcessNodeTypeApproval, formProfileKey: "inventory_adjustment_approval", expectFormalForm: true},
+		{name: "production exception decision", nodeType: biz.ProcessNodeTypeApproval, formProfileKey: "production_exception_approval", expectFormalForm: true, expectQuantity: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var profileKey *string
+			if tt.formProfileKey != "" {
+				value := tt.formProfileKey
+				profileKey = &value
+			}
+			node := &biz.ProcessNodeInstance{
+				ID:                20,
+				ProcessInstanceID: 10,
+				NodeKey:           "current_task",
+				NodeType:          tt.nodeType,
+				Attempt:           1,
+				Status:            biz.ProcessNodeStatusActive,
+				FormProfileKey:    profileKey,
+				Version:           1,
+			}
+			data := newDataStruct(map[string]any{
+				"process_context": workflowProcessTaskContextToMap(&biz.ProcessTaskContext{
+					Task: &biz.WorkflowTask{ID: 42},
+					Instance: &biz.ProcessInstance{
+						ID:              10,
+						ProcessKey:      biz.ProcessKeySalesOrderAcceptance,
+						ProcessVersion:  "v1",
+						BusinessRefType: "sales_order",
+						BusinessRefID:   1001,
+						Status:          biz.ProcessStatusActive,
+						StartedAt:       time.Unix(1_800_000_000, 0),
+					},
+					LinkedNode:   node,
+					Nodes:        []*biz.ProcessNodeInstance{node},
+					CurrentNodes: []*biz.ProcessNodeInstance{node},
+				}),
+			})
+			if data == nil {
+				t.Fatal("process context response must remain serializable")
+			}
+			encoded, err := protojson.Marshal(data)
+			if err != nil {
+				t.Fatalf("marshal process context response: %v", err)
+			}
+			var decoded map[string]any
+			if err := json.Unmarshal(encoded, &decoded); err != nil {
+				t.Fatalf("decode process context response: %v", err)
+			}
+			contextMap, ok := decoded["process_context"].(map[string]any)
+			if !ok {
+				t.Fatalf("process_context = %#v", decoded["process_context"])
+			}
+			approvalForm, exists := contextMap["approval_form"]
+			if !exists {
+				t.Fatal("approval_form must remain an explicit JSON field")
+			}
+			if !tt.expectFormalForm {
+				if approvalForm != nil {
+					t.Fatalf("approval_form = %#v, want null", approvalForm)
+				}
+				return
+			}
+			form, ok := approvalForm.(map[string]any)
+			if !ok {
+				t.Fatalf("approval_form = %#v, want object", approvalForm)
+			}
+			if form["profile_key"] != tt.formProfileKey || form["reason_required"] != true {
+				t.Fatalf("approval_form = %#v", form)
+			}
+			quantity := form["approved_quantity"]
+			if !tt.expectQuantity {
+				if quantity != nil {
+					t.Fatalf("approved_quantity = %#v, want null", quantity)
+				}
+				return
+			}
+			quantityContract, ok := quantity.(map[string]any)
+			if !ok || quantityContract["required"] != false || quantityContract["precision"] != float64(20) || quantityContract["scale"] != float64(6) {
+				t.Fatalf("approved_quantity = %#v", quantity)
+			}
+		})
 	}
 }
 

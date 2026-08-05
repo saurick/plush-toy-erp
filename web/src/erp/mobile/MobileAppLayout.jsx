@@ -403,12 +403,6 @@ export default function MobileAppLayout() {
     navigate('/entry?reason=mobile-runtime-unavailable', { replace: true })
   }
 
-  const handleEnterDesktop = () => {
-    if (!canEnterDesktop) return
-    rememberEntryChoice(ENTRY_TARGET.DESKTOP)
-    navigate('/erp/dashboard')
-  }
-
   const handleSwitchMobileRole = (roleKey) => {
     if (!allowedMobileRoleKeys.includes(roleKey)) return
     const path = resolveMobileTasksPath(roleKey)
@@ -513,7 +507,6 @@ export default function MobileAppLayout() {
               context={{
                 adminProfile,
                 canEnterDesktop,
-                handleEnterDesktop,
                 handleLogout,
                 loggingOut,
               }}

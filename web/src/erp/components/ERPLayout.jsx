@@ -5,10 +5,12 @@ import {
   AppstoreOutlined,
   BarsOutlined,
   DashboardOutlined,
+  DownOutlined,
   FileSearchOutlined,
   FileTextOutlined,
   HomeOutlined,
   InboxOutlined,
+  LogoutOutlined,
   MenuOutlined,
   PrinterOutlined,
   QuestionCircleOutlined,
@@ -16,6 +18,8 @@ import {
   ScheduleOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
+  SwapOutlined,
+  UserOutlined,
   WalletOutlined,
 } from '@ant-design/icons'
 import {
@@ -23,6 +27,7 @@ import {
   Breadcrumb,
   Button,
   Drawer,
+  Dropdown,
   Layout,
   Menu,
   Space,
@@ -55,6 +60,10 @@ import {
   getActiveCustomerMenuConfig,
   getCustomerNavigationPresentation,
 } from '../config/customerMenuConfig.mjs'
+import {
+  getEnabledMobileRoleKeys,
+  getEntryConfig,
+} from '../config/entryConfig.mjs'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import { buildRoleGuidedNavigation } from '../config/roleGuidedNavigation.mjs'
 import {
@@ -80,6 +89,7 @@ import {
   shouldRedirectFromCurrentNavigation,
   shouldGuardCustomerBusinessPageRuntime,
 } from '../utils/adminProfileSync.mjs'
+import { getAllowedMobileRoleKeys } from '../utils/mobileRolePermissions.mjs'
 
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
@@ -257,6 +267,7 @@ export default function ERPLayout() {
   const location = useLocation()
   const tokenAdmin = getCurrentUser(AUTH_SCOPE.ADMIN)
   const activeBrand = useMemo(() => getActiveERPBrand(), [])
+  const entryConfig = useMemo(() => getEntryConfig(), [])
   const [loggingOut, setLoggingOut] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [profileLoading, setProfileLoading] = useState(!getStoredAdminProfile())
@@ -296,6 +307,14 @@ export default function ERPLayout() {
   )
 
   const isSuperAdmin = adminProfile?.is_super_admin === true
+  const canSwitchToMobileTasks = useMemo(
+    () =>
+      getAllowedMobileRoleKeys(
+        adminProfile,
+        getEnabledMobileRoleKeys(entryConfig)
+      ).length > 0,
+    [adminProfile, entryConfig]
+  )
   const configuredCustomerKey = resolveEffectiveSessionCustomerKey(activeBrand)
   const requiresConfiguredCustomerRuntime = Boolean(configuredCustomerKey)
   const effectiveSessionCustomerKey =
@@ -934,6 +953,16 @@ export default function ERPLayout() {
     setMobileNavOpen(false)
   }
 
+  const handleAccountMenuClick = ({ key }) => {
+    if (key === 'switch-entry') {
+      return handleNavigate('/entry')
+    }
+    if (key === 'logout') {
+      return handleLogout()
+    }
+    return undefined
+  }
+
   const sideNav = (
     <div className="erp-admin-sider__body">
       <div className="erp-admin-brand">
@@ -986,6 +1015,23 @@ export default function ERPLayout() {
         .join(' / ') || '普通管理员'
   const displayUsername =
     adminProfile?.username || tokenAdmin?.username || 'admin'
+  const accountMenuItems = [
+    canSwitchToMobileTasks
+      ? {
+          key: 'switch-entry',
+          icon: <SwapOutlined />,
+          label: (
+            <span data-testid="desktop-work-entry-switch">切换工作入口</span>
+          ),
+        }
+      : null,
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: loggingOut ? '退出中' : '退出登录',
+      disabled: loggingOut,
+    },
+  ].filter(Boolean)
   const noVisibleMenus = permissionGovernedVisibleSections.length === 0
   const shouldBlockOutlet = currentPageShouldRedirect
   const shouldGuardProductCoreBusinessData =
@@ -1086,12 +1132,25 @@ export default function ERPLayout() {
               />
               <div className="erp-admin-header__meta">
                 <Tag color={isSuperAdmin ? 'gold' : 'blue'}>{roleLabel}</Tag>
-                <Text className="erp-admin-header__user">
-                  {displayUsername}
-                </Text>
-                <Button loading={loggingOut} onClick={handleLogout}>
-                  退出
-                </Button>
+                <Dropdown
+                  destroyOnHidden
+                  placement="bottomRight"
+                  trigger={['click']}
+                  menu={{
+                    items: accountMenuItems,
+                    onClick: handleAccountMenuClick,
+                  }}
+                >
+                  <Button
+                    icon={<UserOutlined />}
+                    loading={loggingOut}
+                    data-testid="desktop-account-menu-trigger"
+                    aria-label={`账号菜单：${displayUsername}`}
+                  >
+                    <span>{displayUsername}</span>
+                    <DownOutlined />
+                  </Button>
+                </Dropdown>
               </div>
             </Space>
           </div>

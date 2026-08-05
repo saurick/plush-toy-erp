@@ -703,6 +703,31 @@
 }
 
 @media screen and (max-width: 768px) {
+  .erp-sales-return-create-form
+    .erp-sales-return-create-form__item-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .erp-sales-return-create-form
+    .erp-sales-return-create-form__item-grid
+    .erp-line-item-field.ant-form-item {
+    grid-column: auto;
+    width: auto;
+  }
+
+  .erp-sales-return-create-form
+    .erp-sales-return-create-form__item-grid
+    .erp-sales-return-create-form__field--product.ant-form-item,
+  .erp-sales-return-create-form
+    .erp-sales-return-create-form__item-grid
+    .erp-sales-return-create-form__field--quantity.ant-form-item,
+  .erp-sales-return-create-form
+    .erp-sales-return-create-form__item-grid
+    .erp-sales-return-create-form__field--note.ant-form-item {
+    grid-column: 1 / -1;
+  }
+
   .erp-admin-header__theme-toggle .ant-segmented-item,
   .mobile-app-layout__theme-toggle .ant-segmented-item {
     min-width: 40px;

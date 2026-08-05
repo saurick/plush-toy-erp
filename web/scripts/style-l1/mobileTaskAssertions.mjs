@@ -472,7 +472,7 @@ export function createMobileTaskAssertions(deps) {
       })
       const actionButtons = Array.from(scroll?.querySelectorAll('button') || [])
         .filter((button) =>
-          ['进入电脑端', '切换工作入口', '退出登录'].includes(
+          ['切换工作入口', '退出登录'].includes(
             button.textContent?.replace(/\s+/g, ' ').trim() || ''
           )
         )
@@ -491,6 +491,9 @@ export function createMobileTaskAssertions(deps) {
         removedMetricCount: document.querySelectorAll(
           '[data-testid^="mobile-role-mine-metric-"]'
         ).length,
+        duplicateHeaderEntryCount: document.querySelectorAll(
+          '[data-testid="mobile-role-desktop-entry"]'
+        ).length,
         documentScrollWidth: document.documentElement.scrollWidth,
         documentClientWidth: document.documentElement.clientWidth,
       }
@@ -505,11 +508,13 @@ export function createMobileTaskAssertions(deps) {
       metrics.cards.length === 2 &&
         metrics.cards.some(
           (card) =>
-            card.text.includes('账号岗位') && card.text.includes('可用范围')
+            card.text.includes('账号岗位') &&
+            card.text.includes('可用入口') &&
+            card.text.includes('电脑端 / 手机待办')
         ) &&
         metrics.cards.some((card) => card.text.includes('入口与安全')) &&
         metrics.cards.every((card) => !card.text.includes('任务端')),
-      `${scenarioName} 我的页应聚焦账号岗位、可用范围和入口安全且不重复任务端身份: ${JSON.stringify(metrics)}`
+      `${scenarioName} 我的页应展示真实可用入口和入口安全且不重复任务端身份: ${JSON.stringify(metrics)}`
     )
     metrics.cards.forEach((card) => {
       assert(
@@ -521,11 +526,15 @@ export function createMobileTaskAssertions(deps) {
       )
     })
     const actionButtonTexts = metrics.actionButtons.map((button) => button.text)
-    assert(
-      actionButtonTexts.length === 2 &&
-        ['进入电脑端', '切换工作入口'].includes(actionButtonTexts[0]) &&
-        actionButtonTexts[1] === '退出登录',
-      `${scenarioName} 我的页应保留可用入口与退出动作: ${JSON.stringify(metrics)}`
+    assert.deepEqual(
+      actionButtonTexts,
+      ['切换工作入口', '退出登录'],
+      `${scenarioName} 我的页应只保留一个工作入口切换与退出动作: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.duplicateHeaderEntryCount,
+      0,
+      `${scenarioName} 页头不应重复显示工作入口切换: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.actionButtons.every(
@@ -1127,13 +1136,11 @@ export function createMobileTaskAssertions(deps) {
     await page
       .locator('.mobile-role-tasks-page--detail')
       .waitFor({ state: 'visible', timeout: 10_000 })
-    await expectText(page, '任务关键信息')
-    await expectText(page, '关联来源')
-    await expectText(page, '任务附件')
+    await expectText(page, '业务信息')
     await expectText(page, '历史处理线索')
-    await expectText(page, '查看与补充附件')
-    await expectText(page, '当前办理状态')
+    await expectText(page, '附件（1）')
     await page
+      .locator('.mobile-role-action-bar')
       .getByRole('button', { name: '处理任务', exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
     await assertMobileTaskVisibleTextNoTechnicalFields(page, {
@@ -1153,6 +1160,11 @@ export function createMobileTaskAssertions(deps) {
       const shell = document.querySelector('.mobile-role-tasks-page--detail')
       const header = document.querySelector('.mobile-role-detail-header')
       const actionBar = document.querySelector('.mobile-role-action-bar')
+      const taskHero = document.querySelector('.mobile-task-detail-hero')
+      const attachmentAction = document.querySelector(
+        '[data-testid="mobile-task-attachment-action"]'
+      )
+      const attachmentButton = attachmentAction?.querySelector('button')
       const shellRect = shell?.getBoundingClientRect()
       const headerRect = header?.getBoundingClientRect()
       const actionBarRect = actionBar?.getBoundingClientRect()
@@ -1205,6 +1217,30 @@ export function createMobileTaskAssertions(deps) {
         actionGuidanceCount: document.querySelectorAll(
           '[data-testid="mobile-role-action-guidance"]'
         ).length,
+        attachmentActionInsideHero: Boolean(
+          taskHero && attachmentAction && taskHero.contains(attachmentAction)
+        ),
+        attachmentButton: attachmentButton
+          ? {
+              text:
+                attachmentButton.textContent?.replace(/\s+/g, ' ').trim() || '',
+              height: attachmentButton.getBoundingClientRect().height,
+            }
+          : null,
+        standaloneAttachmentSectionCount: [
+          ...shell.querySelectorAll('section'),
+        ].filter(
+          (section) =>
+            section.querySelector('h2')?.textContent?.trim() === '任务附件'
+        ).length,
+        summaryText:
+          document
+            .querySelector('[data-testid="mobile-task-detail-summary"]')
+            ?.textContent?.replace(/\s+/g, ' ')
+            .trim() || '',
+        redundantCopy: ['当前任务', '当前办理状态', '关联来源'].filter((copy) =>
+          shell?.textContent?.includes(copy)
+        ),
         buttons,
         flowSteps,
         scrollTopButtonCount: document.querySelectorAll(
@@ -1224,13 +1260,26 @@ export function createMobileTaskAssertions(deps) {
     assert(detailMetrics.actionBar, `${scenarioName} 详情页动作栏未渲染`)
     assert.equal(
       detailMetrics.buttons.length,
-      2,
-      `${scenarioName} 详情页动作栏应保留返回列表和唯一处理入口: ${JSON.stringify(detailMetrics)}`
+      1,
+      `${scenarioName} 详情页动作栏只应保留唯一处理入口: ${JSON.stringify(detailMetrics)}`
     )
     assert.deepEqual(
       detailMetrics.buttons.map((button) => button.text),
-      ['返回列表', '处理任务'],
+      ['处理任务'],
       `${scenarioName} 详情页不应继续平铺全部写动作: ${JSON.stringify(detailMetrics)}`
+    )
+    assert(
+      detailMetrics.summaryText.includes('负责：业务') &&
+        detailMetrics.summaryText.includes('截止：') &&
+        detailMetrics.redundantCopy.length === 0,
+      `${scenarioName} 详情页摘要缺失或仍有重复区块: ${JSON.stringify(detailMetrics)}`
+    )
+    assert(
+      detailMetrics.attachmentActionInsideHero &&
+        detailMetrics.attachmentButton?.text === '附件（1）' &&
+        detailMetrics.attachmentButton.height >= 44 &&
+        detailMetrics.standaloneAttachmentSectionCount === 0,
+      `${scenarioName} 任务附件应降级为摘要内的可触控次要动作: ${JSON.stringify(detailMetrics)}`
     )
     assert.deepEqual(
       detailMetrics.flowSteps.map((step) => step.key),
@@ -1266,7 +1315,7 @@ export function createMobileTaskAssertions(deps) {
     )
     detailMetrics.buttons.forEach((button) => {
       assert(
-        button.width >= 120 && button.height >= 48,
+        button.width >= 280 && button.height >= 48,
         `${scenarioName} 详情页主动作点击区不稳定: ${JSON.stringify(detailMetrics)}`
       )
     })
@@ -1275,8 +1324,112 @@ export function createMobileTaskAssertions(deps) {
       0,
       `${scenarioName} 本岗位可处理任务不应显示不可代办提示: ${JSON.stringify(detailMetrics)}`
     )
+    await page.locator('.mobile-task-detail-hero').screenshot({
+      path: path.resolve(
+        outputDir,
+        `${scenarioName}-task-summary-attachment.png`
+      ),
+    })
+    const attachmentButton = page
+      .getByTestId('mobile-task-attachment-action')
+      .getByRole('button', { name: '附件（1）', exact: true })
+    await attachmentButton.click()
+    const attachmentDialog = page.getByRole('dialog', {
+      name: '任务附件',
+      exact: true,
+    })
+    await attachmentDialog.waitFor({ state: 'visible', timeout: 10_000 })
+    await attachmentDialog.evaluate((dialog) => {
+      return new Promise((resolve, reject) => {
+        const deadline = performance.now() + 2_000
+        const waitForVisibleFrame = () => {
+          if (window.getComputedStyle(dialog).opacity === '1') {
+            resolve()
+            return
+          }
+          if (performance.now() >= deadline) {
+            reject(new Error('任务附件弹窗动画未进入可见态'))
+            return
+          }
+          window.requestAnimationFrame(waitForVisibleFrame)
+        }
+        waitForVisibleFrame()
+      })
+    })
+    await expectText(attachmentDialog, 'style-l1-evidence.txt')
+    const attachmentDialogMetrics = await attachmentDialog.evaluate(
+      (dialog) => {
+        const content = dialog.querySelector('.ant-modal-content')
+        const wrap = dialog.closest('.ant-modal-wrap')
+        const root = dialog.closest('.ant-modal-root')
+        const rect = dialog.getBoundingClientRect()
+        const styleOf = (element) =>
+          element
+            ? {
+                backgroundColor:
+                  window.getComputedStyle(element).backgroundColor,
+                opacity: window.getComputedStyle(element).opacity,
+                transform: window.getComputedStyle(element).transform,
+                visibility: window.getComputedStyle(element).visibility,
+              }
+            : null
+        return {
+          className: dialog.className,
+          dialog: styleOf(dialog),
+          content: styleOf(content),
+          wrap: styleOf(wrap),
+          root: styleOf(root),
+          rect: {
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            left: rect.left,
+          },
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+        }
+      }
+    )
+    attachmentDialogMetrics.text = (await attachmentDialog.innerText())
+      .replace(/\s+/g, ' ')
+      .trim()
+    attachmentDialogMetrics.uploadCopyCount = await attachmentDialog
+      .getByText('选择附件', { exact: true })
+      .count()
+    attachmentDialogMetrics.fileInputCount = await attachmentDialog
+      .locator('input[type="file"]')
+      .count()
+    assert(
+      attachmentDialogMetrics.dialog?.opacity === '1' &&
+        attachmentDialogMetrics.dialog?.visibility === 'visible' &&
+        attachmentDialogMetrics.content?.backgroundColor !==
+          'rgba(0, 0, 0, 0)' &&
+        attachmentDialogMetrics.rect.left >= 0 &&
+        attachmentDialogMetrics.rect.right <=
+          attachmentDialogMetrics.viewport.width,
+      `${scenarioName} 任务附件弹窗未在移动视口内稳定显示: ${JSON.stringify(
+        attachmentDialogMetrics
+      )}`
+    )
+    await attachmentDialog.screenshot({
+      path: path.resolve(outputDir, `${scenarioName}-task-attachment.png`),
+    })
+    assert(
+      attachmentDialogMetrics.uploadCopyCount === 1 &&
+        attachmentDialogMetrics.fileInputCount === 1,
+      `${scenarioName} 具备任务更新范围时应保留附件上传入口: ${JSON.stringify(
+        attachmentDialogMetrics
+      )}`
+    )
+    await attachmentDialog.locator('.ant-modal-close').click()
+    await attachmentDialog.waitFor({ state: 'hidden', timeout: 10_000 })
 
-    await page.getByRole('button', { name: '处理任务', exact: true }).click()
+    await page
+      .locator('.mobile-role-action-bar')
+      .getByRole('button', { name: '处理任务', exact: true })
+      .click()
     const actionScreen = page.getByTestId('mobile-task-action-screen')
     await actionScreen.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, '选择处理方式')
@@ -1463,6 +1616,11 @@ export function createMobileTaskAssertions(deps) {
           optionsCard && optionsCard.scrollWidth <= optionsCard.clientWidth + 1
         ),
         flowSteps,
+        footerButtons: Array.from(
+          screen.querySelectorAll('.mobile-role-action-bar button')
+        ).map(
+          (button) => button.textContent?.replace(/\s+/g, ' ').trim() || ''
+        ),
         documentScrollWidth: document.documentElement.scrollWidth,
         documentClientWidth: document.documentElement.clientWidth,
       }
@@ -1492,6 +1650,8 @@ export function createMobileTaskAssertions(deps) {
           ?.current === 'step' &&
         actionMetrics.flowSteps.find((step) => step.key === 'result')?.state ===
           'locked' &&
+        JSON.stringify(actionMetrics.footerButtons) ===
+          JSON.stringify(['确认完成']) &&
         actionMetrics.documentScrollWidth <=
           actionMetrics.documentClientWidth + 1,
       `${scenarioName} 独立处理页动作或布局异常: ${JSON.stringify(actionMetrics)}`
@@ -1501,6 +1661,7 @@ export function createMobileTaskAssertions(deps) {
     })
     await page.getByLabel('返回任务详情').click()
     await page
+      .locator('.mobile-role-action-bar')
       .getByRole('button', { name: '处理任务', exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
     await page.getByLabel('返回任务列表').click()
@@ -1526,6 +1687,7 @@ export function createMobileTaskAssertions(deps) {
       .locator('.mobile-role-tasks-page--detail')
       .waitFor({ state: 'visible', timeout: 10_000 })
     await page
+      .locator('.mobile-role-action-bar')
       .getByRole('button', { name: '处理任务', exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
     await assertMobileTaskVisibleTextNoTechnicalFields(page, {
@@ -1548,7 +1710,10 @@ export function createMobileTaskAssertions(deps) {
       '',
       `${scenarioName} 后端已授权的账号不应被移动端路径角色二次拦截: ${JSON.stringify(crossRoleDetailMetrics)}`
     )
-    await page.getByRole('button', { name: '处理任务', exact: true }).click()
+    await page
+      .locator('.mobile-role-action-bar')
+      .getByRole('button', { name: '处理任务', exact: true })
+      .click()
     await page
       .getByTestId('mobile-task-action-screen')
       .waitFor({ state: 'visible', timeout: 10_000 })
@@ -1603,6 +1768,11 @@ export function createMobileTaskAssertions(deps) {
       const actionBarRect = actionBar?.getBoundingClientRect()
       return {
         steps,
+        actionButtons: Array.from(
+          actionBar?.querySelectorAll('button') || []
+        ).map(
+          (button) => button.textContent?.replace(/\s+/g, ' ').trim() || ''
+        ),
         handoffCount: screen.querySelectorAll(
           '[data-testid="mobile-task-receipt-handoff"]'
         ).length,
@@ -1620,6 +1790,8 @@ export function createMobileTaskAssertions(deps) {
         receiptMetrics.text.includes('暗色任务已完成并核对') &&
         !receiptMetrics.text.includes('历史处理线索') &&
         receiptMetrics.handoffCount === 0 &&
+        JSON.stringify(receiptMetrics.actionButtons) ===
+          JSON.stringify(['返回列表']) &&
         !['结果边界', '流程锚点', '未来分支', '领域单据', '审计记录'].some(
           (copy) => receiptMetrics.text.includes(copy)
         ) &&
@@ -1774,7 +1946,10 @@ export function createMobileTaskAssertions(deps) {
     await page.route('**/rpc/workflow', deterministicFailureRoute)
     try {
       await deepTaskButton.click()
-      await page.getByRole('button', { name: '处理任务', exact: true }).click()
+      await page
+        .locator('.mobile-role-action-bar')
+        .getByRole('button', { name: '处理任务', exact: true })
+        .click()
       const recoveryActionScreen = page.getByTestId('mobile-task-action-screen')
       await recoveryActionScreen.waitFor({
         state: 'visible',
@@ -1832,6 +2007,7 @@ export function createMobileTaskAssertions(deps) {
       .waitFor({ state: 'visible', timeout: 10_000 })
     assert.equal(
       await confirmedDetail
+        .locator('.mobile-role-action-bar')
         .getByRole('button', { name: '处理任务', exact: true })
         .count(),
       0,

@@ -74,6 +74,22 @@ func workflowAttachmentCreate(taskID int, version int, actorID int, roles ...str
 	}
 }
 
+func workflowAttachmentWithdraw(attachmentID int, taskID int, version int, actorID int, reason string, roles ...string) *biz.BusinessAttachmentWithdraw {
+	return &biz.BusinessAttachmentWithdraw{
+		ID:             attachmentID,
+		OwnerType:      biz.BusinessAttachmentOwnerWorkflowTask,
+		OwnerID:        taskID,
+		AttachmentType: "evidence",
+		Reason:         reason,
+		WithdrawnBy:    actorID,
+		WorkflowGuard: &biz.WorkflowAttachmentWriteGuard{
+			ExpectedVersion:      version,
+			ActorID:              actorID,
+			VisibleOwnerRoleKeys: roles,
+		},
+	}
+}
+
 func productImageAttachmentCreate(productID int, slotKey string) *biz.BusinessAttachmentCreate {
 	return &biz.BusinessAttachmentCreate{
 		OwnerType:      biz.BusinessAttachmentOwnerProduct,
@@ -178,6 +194,120 @@ func TestBusinessAttachmentRepoResolvesUploaderUsernameAndKeepsLegacyMissing(t *
 	metadata, err := repo.GetBusinessAttachmentMetadata(ctx, withUploader.ID)
 	if err != nil || metadata.UploadedByUsername == nil || *metadata.UploadedByUsername != "demo_boss" {
 		t.Fatalf("attachment metadata uploader username: item=%#v err=%v", metadata, err)
+	}
+}
+
+func TestBusinessAttachmentRepoWithdrawsOnceAndKeepsReadableAuditMetadata(t *testing.T) {
+	repo, closeRepo := newBusinessAttachmentRepoTest(t, "attachment_withdrawal")
+	defer closeRepo()
+	ctx := context.Background()
+	actor, err := repo.data.postgres.AdminUser.Create().
+		SetUsername("demo_admin").
+		SetPasswordHash("test-password-hash").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create withdrawal actor: %v", err)
+	}
+	taskID := createAttachmentWorkflowTask(t, repo, "ready", 3, nil)
+	attachment, err := repo.data.postgres.BusinessAttachment.Create().
+		SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+		SetOwnerID(taskID).
+		SetAttachmentType("evidence").
+		SetFileName("wrong.pdf").
+		SetMimeType("application/pdf").
+		SetFileSize(5).
+		SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
+		SetContent([]byte("proof")).
+		SetUploadedBy(actor.ID).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create attachment: %v", err)
+	}
+
+	in := workflowAttachmentWithdraw(
+		attachment.ID,
+		taskID,
+		3,
+		actor.ID,
+		"上传了错误版本",
+		biz.WarehouseRoleKey,
+	)
+	withdrawnAt, err := repo.WithdrawBusinessAttachment(ctx, in)
+	if err != nil || withdrawnAt.IsZero() {
+		t.Fatalf("withdraw attachment: at=%v err=%v", withdrawnAt, err)
+	}
+	stored, err := repo.data.postgres.BusinessAttachment.Get(ctx, attachment.ID)
+	if err != nil || stored.WithdrawnAt == nil || stored.WithdrawnBy == nil || *stored.WithdrawnBy != actor.ID ||
+		stored.WithdrawalReason == nil || *stored.WithdrawalReason != "上传了错误版本" {
+		t.Fatalf("stored withdrawal audit = %#v, err=%v", stored, err)
+	}
+	items, err := repo.ListBusinessAttachments(ctx, biz.BusinessAttachmentOwnerWorkflowTask, taskID)
+	if err != nil || len(items) != 1 || items[0].WithdrawnByUsername == nil ||
+		*items[0].WithdrawnByUsername != "demo_admin" || items[0].WithdrawalReason == nil {
+		t.Fatalf("listed withdrawal audit = %#v, err=%v", items, err)
+	}
+	if _, err := repo.GetBusinessAttachmentContent(ctx, attachment.ID, biz.BusinessAttachmentOwnerWorkflowTask, taskID); !errors.Is(err, biz.ErrBusinessAttachmentNotFound) {
+		t.Fatalf("withdrawn content must fail closed, got %v", err)
+	}
+
+	replayedAt, err := repo.WithdrawBusinessAttachment(ctx, in)
+	if err != nil || !replayedAt.Equal(withdrawnAt) {
+		t.Fatalf("exact withdrawal retry must replay stored time: first=%v replay=%v err=%v", withdrawnAt, replayedAt, err)
+	}
+	changed := *in
+	changed.Reason = "不同的撤销原因"
+	if _, err := repo.WithdrawBusinessAttachment(ctx, &changed); !errors.Is(err, biz.ErrBusinessAttachmentWithdrawn) {
+		t.Fatalf("changed withdrawal retry must conflict, got %v", err)
+	}
+	storedAfterConflict, err := repo.data.postgres.BusinessAttachment.Get(ctx, attachment.ID)
+	if err != nil || storedAfterConflict.WithdrawalReason == nil || *storedAfterConflict.WithdrawalReason != "上传了错误版本" {
+		t.Fatalf("conflicting retry must preserve first audit: row=%#v err=%v", storedAfterConflict, err)
+	}
+}
+
+func TestBusinessAttachmentRepoWithdrawalRechecksLockedWorkflowTask(t *testing.T) {
+	other := 99
+	for index, tc := range []struct {
+		name       string
+		status     string
+		version    int
+		assigneeID *int
+		guard      *biz.BusinessAttachmentWithdraw
+		wantErr    error
+	}{
+		{name: "stale version", status: "ready", version: 2, guard: workflowAttachmentWithdraw(0, 0, 1, 7, "上传错误", biz.WarehouseRoleKey), wantErr: biz.ErrWorkflowTaskConflict},
+		{name: "terminal", status: "done", version: 1, guard: workflowAttachmentWithdraw(0, 0, 1, 7, "上传错误", biz.WarehouseRoleKey), wantErr: biz.ErrWorkflowTaskSettled},
+		{name: "reassigned", status: "ready", version: 1, assigneeID: &other, guard: workflowAttachmentWithdraw(0, 0, 1, 7, "上传错误", biz.WarehouseRoleKey), wantErr: biz.ErrForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, closeRepo := newBusinessAttachmentRepoTest(t, fmt.Sprintf("attachment_withdraw_guard_%d", index))
+			defer closeRepo()
+			ctx := context.Background()
+			taskID := createAttachmentWorkflowTask(t, repo, tc.status, tc.version, tc.assigneeID)
+			attachment, err := repo.data.postgres.BusinessAttachment.Create().
+				SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+				SetOwnerID(taskID).
+				SetAttachmentType("evidence").
+				SetFileName("proof.pdf").
+				SetMimeType("application/pdf").
+				SetFileSize(5).
+				SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
+				SetContent([]byte("proof")).
+				Save(ctx)
+			if err != nil {
+				t.Fatalf("create attachment: %v", err)
+			}
+			tc.guard.ID = attachment.ID
+			tc.guard.OwnerID = taskID
+			_, err = repo.WithdrawBusinessAttachment(ctx, tc.guard)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+			stored, readErr := repo.data.postgres.BusinessAttachment.Get(ctx, attachment.ID)
+			if readErr != nil || stored.WithdrawnAt != nil {
+				t.Fatalf("rejected workflow withdrawal must preserve active attachment: row=%#v err=%v", stored, readErr)
+			}
+		})
 	}
 }
 
@@ -364,6 +494,21 @@ func TestBusinessAttachmentSchemaDefinesProductImageContract(t *testing.T) {
 	} {
 		if !strings.Contains(productImageCheck, fragment) {
 			t.Errorf("product image check missing %q: %q", fragment, productImageCheck)
+		}
+	}
+	withdrawalCheck := checks["business_attachments_withdrawal_contract"]
+	for _, fragment := range []string{
+		"withdrawn_at IS NULL",
+		"withdrawn_by IS NULL",
+		"withdrawal_reason IS NULL",
+		"withdrawn_at IS NOT NULL",
+		"withdrawn_by > 0",
+		"length(trim(withdrawal_reason)) BETWEEN 1 AND 255",
+		"owner_type <> 'product'",
+		"attachment_type <> 'product_image'",
+	} {
+		if !strings.Contains(withdrawalCheck, fragment) {
+			t.Errorf("withdrawal check missing %q: %q", fragment, withdrawalCheck)
 		}
 	}
 }

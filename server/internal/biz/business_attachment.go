@@ -50,13 +50,23 @@ const (
 )
 
 var (
-	ErrBusinessAttachmentNotFound       = errors.New("business attachment not found")
-	ErrBusinessAttachmentOwnerNotFound  = errors.New("business attachment owner not found")
-	ErrBusinessAttachmentOwnerInvalid   = errors.New("business attachment owner invalid")
-	ErrBusinessAttachmentContentInvalid = errors.New("business attachment content invalid")
-	ErrBusinessAttachmentIntegrity      = errors.New("business attachment integrity check failed")
-	ErrBusinessAttachmentTooLarge       = errors.New("business attachment too large")
-	ErrBusinessAttachmentMimeNotAllowed = errors.New("business attachment mime type not allowed")
+	ErrBusinessAttachmentNotFound                    = errors.New("business attachment not found")
+	ErrBusinessAttachmentOwnerNotFound               = errors.New("business attachment owner not found")
+	ErrBusinessAttachmentOwnerInvalid                = errors.New("business attachment owner invalid")
+	ErrBusinessAttachmentContentInvalid              = errors.New("business attachment content invalid")
+	ErrBusinessAttachmentIntegrity                   = errors.New("business attachment integrity check failed")
+	ErrBusinessAttachmentTooLarge                    = errors.New("business attachment too large")
+	ErrBusinessAttachmentMimeNotAllowed              = errors.New("business attachment mime type not allowed")
+	ErrBusinessAttachmentWithdrawn                   = errors.New("business attachment withdrawn")
+	ErrBusinessAttachmentWithdrawnContentUnavailable = errors.New(
+		"business attachment withdrawn content unavailable",
+	)
+	ErrBusinessAttachmentWithdrawalReasonInvalid = errors.New(
+		"business attachment withdrawal reason invalid",
+	)
+	ErrBusinessAttachmentProductImageWithdrawalUnsupported = errors.New(
+		"product image withdrawal unsupported",
+	)
 
 	ErrBusinessAttachmentProductImageContentInvalid    = fmt.Errorf("product image content invalid: %w", ErrBusinessAttachmentContentInvalid)
 	ErrBusinessAttachmentProductImageMimeNotAllowed    = fmt.Errorf("product image mime type not allowed: %w", ErrBusinessAttachmentMimeNotAllowed)
@@ -121,20 +131,24 @@ var allowedBusinessAttachmentProductImageFileTypes = map[string]map[string]struc
 }
 
 type BusinessAttachment struct {
-	ID                 int
-	OwnerType          string
-	OwnerID            int
-	AttachmentType     string
-	SlotKey            *string
-	FileName           string
-	MimeType           string
-	FileSize           int
-	SHA256             string
-	Content            []byte
-	UploadedBy         *int
-	UploadedByUsername *string
-	Note               *string
-	CreatedAt          time.Time
+	ID                  int
+	OwnerType           string
+	OwnerID             int
+	AttachmentType      string
+	SlotKey             *string
+	FileName            string
+	MimeType            string
+	FileSize            int
+	SHA256              string
+	Content             []byte
+	UploadedBy          *int
+	UploadedByUsername  *string
+	Note                *string
+	WithdrawnAt         *time.Time
+	WithdrawnBy         *int
+	WithdrawnByUsername *string
+	WithdrawalReason    *string
+	CreatedAt           time.Time
 }
 
 type BusinessAttachmentUploadInput struct {
@@ -172,8 +186,26 @@ type BusinessAttachmentCreate struct {
 	WorkflowGuard  *WorkflowAttachmentWriteGuard
 }
 
+type BusinessAttachmentWithdrawInput struct {
+	Attachment    *BusinessAttachment
+	Reason        string
+	WithdrawnBy   int
+	WorkflowGuard *WorkflowAttachmentWriteGuard
+}
+
+type BusinessAttachmentWithdraw struct {
+	ID             int
+	OwnerType      string
+	OwnerID        int
+	AttachmentType string
+	Reason         string
+	WithdrawnBy    int
+	WorkflowGuard  *WorkflowAttachmentWriteGuard
+}
+
 type BusinessAttachmentRepo interface {
 	CreateBusinessAttachment(ctx context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error)
+	WithdrawBusinessAttachment(ctx context.Context, in *BusinessAttachmentWithdraw) (time.Time, error)
 	ClearProductImage(ctx context.Context, productID int, slotKey string) error
 	ListBusinessAttachments(ctx context.Context, ownerType string, ownerID int) ([]*BusinessAttachment, error)
 	GetBusinessAttachmentMetadata(ctx context.Context, id int) (*BusinessAttachment, error)
@@ -200,6 +232,14 @@ func IsBusinessAttachmentOwnerTypeAllowed(ownerType string) bool {
 
 func NormalizeBusinessAttachmentProductImageSlot(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+func NormalizeBusinessAttachmentWithdrawalReason(raw string) (string, error) {
+	reason := strings.TrimSpace(raw)
+	if reason == "" || len([]rune(reason)) > 255 {
+		return "", ErrBusinessAttachmentWithdrawalReasonInvalid
+	}
+	return reason, nil
 }
 
 func IsBusinessAttachmentProductImageSlotAllowed(slotKey string) bool {
@@ -280,6 +320,64 @@ func (uc *BusinessAttachmentUsecase) ClearProductImage(ctx context.Context, prod
 	return uc.repo.ClearProductImage(ctx, productID, normalizedSlotKey)
 }
 
+func (uc *BusinessAttachmentUsecase) WithdrawBusinessAttachment(
+	ctx context.Context,
+	in *BusinessAttachmentWithdrawInput,
+) (*BusinessAttachment, error) {
+	if uc == nil || uc.repo == nil || in == nil || in.Attachment == nil {
+		return nil, ErrBadParam
+	}
+	attachment := in.Attachment
+	ownerType := NormalizeBusinessAttachmentOwnerType(attachment.OwnerType)
+	attachmentType := strings.ToLower(strings.TrimSpace(attachment.AttachmentType))
+	if attachment.ID <= 0 || attachment.OwnerID <= 0 || !IsBusinessAttachmentOwnerTypeAllowed(ownerType) ||
+		attachmentType == "" || in.WithdrawnBy <= 0 {
+		return nil, ErrBadParam
+	}
+	if ownerType == BusinessAttachmentOwnerProduct || attachmentType == BusinessAttachmentTypeProductImage {
+		return nil, ErrBusinessAttachmentProductImageWithdrawalUnsupported
+	}
+	reason, err := NormalizeBusinessAttachmentWithdrawalReason(in.Reason)
+	if err != nil {
+		return nil, err
+	}
+	if attachment.WithdrawnAt != nil {
+		if attachment.WithdrawnBy != nil && *attachment.WithdrawnBy == in.WithdrawnBy &&
+			attachment.WithdrawalReason != nil && *attachment.WithdrawalReason == reason {
+			out := *attachment
+			out.Content = nil
+			return &out, nil
+		}
+		return nil, ErrBusinessAttachmentWithdrawn
+	}
+	if ownerType == BusinessAttachmentOwnerWorkflowTask &&
+		(in.WorkflowGuard == nil || in.WorkflowGuard.ExpectedVersion <= 0 ||
+			in.WorkflowGuard.ActorID <= 0 || in.WorkflowGuard.ActorID != in.WithdrawnBy) {
+		return nil, ErrBadParam
+	}
+
+	withdrawnAt, err := uc.repo.WithdrawBusinessAttachment(ctx, &BusinessAttachmentWithdraw{
+		ID:             attachment.ID,
+		OwnerType:      ownerType,
+		OwnerID:        attachment.OwnerID,
+		AttachmentType: attachmentType,
+		Reason:         reason,
+		WithdrawnBy:    in.WithdrawnBy,
+		WorkflowGuard:  in.WorkflowGuard,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := *attachment
+	out.OwnerType = ownerType
+	out.AttachmentType = attachmentType
+	out.Content = nil
+	out.WithdrawnAt = &withdrawnAt
+	out.WithdrawnBy = &in.WithdrawnBy
+	out.WithdrawalReason = &reason
+	return &out, nil
+}
+
 func (uc *BusinessAttachmentUsecase) GetBusinessAttachmentMetadata(ctx context.Context, id int) (*BusinessAttachment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
@@ -301,6 +399,9 @@ func (uc *BusinessAttachmentUsecase) GetBusinessAttachmentMetadata(ctx context.C
 func (uc *BusinessAttachmentUsecase) GetBusinessAttachmentContent(ctx context.Context, metadata *BusinessAttachment) ([]byte, error) {
 	if uc == nil || uc.repo == nil || metadata == nil || metadata.ID <= 0 || metadata.OwnerID <= 0 || !IsBusinessAttachmentOwnerTypeAllowed(metadata.OwnerType) {
 		return nil, ErrBadParam
+	}
+	if metadata.WithdrawnAt != nil {
+		return nil, ErrBusinessAttachmentWithdrawnContentUnavailable
 	}
 	content, err := uc.repo.GetBusinessAttachmentContent(ctx, metadata.ID, metadata.OwnerType, metadata.OwnerID)
 	if err != nil {

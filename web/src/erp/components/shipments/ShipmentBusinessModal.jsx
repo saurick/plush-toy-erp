@@ -649,6 +649,7 @@ function ShipmentItemsTable({
 
 export default function ShipmentBusinessModal({
   canCreate = false,
+  canShip = false,
   canImportSalesOrderSource = false,
   customerOptions = [],
   form,
@@ -733,7 +734,7 @@ export default function ShipmentBusinessModal({
           title="出货附件"
           description="上传装箱照片、物流单、签收回单、交付或出口凭证；上传附件后仍需单独确认出货。"
           canUpload={isCreateModal && canCreate}
-          canDelete={isCreateModal && canCreate}
+          canWithdraw={canCreate || canShip}
           variant="inline"
         />
         {isCreateModal ? (

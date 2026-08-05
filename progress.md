@@ -138,9 +138,101 @@
 - 阻塞 / 风险：全量 Style L1 在任务外共享改动的 `dev-flow-state-observatory-workflow-graph-dark` 旧文案断言处提前失败，本批未越权修改；额外 `production-order-source-material-issue-desktop` 场景等待“生产领料”弹窗超时，但该链路使用本页第 790 行附近的领料加载和第 2055 行附近的弹窗挂载，本批生产订单改动仅位于第 1636 行之后的当前操作栏，未触碰该处理链，需作为独立浏览器盲区复核。`affected --plan` 还因共享 dirty worktree 纳入多个任务的 T8 范围，本批没有将其他任务现场包装为自身验证。
 - 下一步：待相关 writer 收口后，在锁定 Node 与干净 exact SHA 上补跑全量 Style L1，并独立复核生产领料场景；当前没有 stage、commit、push、部署或客户 UAT。若用户授权提交 / 推送，仍由唯一 Git 收口 owner 按本批精确路径处理，push 前重新 fetch 并核对远端。
 
+### 客户退货创建弹窗布局修复（2026-08-05）
+
+- 完成：重排“新建客户退货”信息层级，桌面端将来源出货与退货单号同排，核对提示、退货原因和退货明细横跨内容区；退货明细改为有标题的分组卡片，去除所有固定像素字段宽度，桌面使用 12 列业务网格，手机使用 2 列并让产品、退货数量和备注独占整行。来源切换期间仅在当前出货核对成功后展示对应明细，避免旧来源明细短暂残留。
+- 验证：锁定 Node `24.14.0` 下 Web 全量 Node `2083 / 2083`、全量 ESLint、全量 CSS stylelint、错误码同步检查、Vite production build、场景脚本语法和 `git diff --check` 通过；`affected --plan` 判定为 T0 / T5。真实 Chromium Style L1 的 1280 × 800 桌面与 390 × 844 手机场景 `2 / 2` 通过，盒模型断言覆盖同排 / 单列、全宽区块、明细无非必要横向滚动、长内容正文滚动、末项可见、固定底栏与键盘焦点恢复，并人工复核最新顶部和滚动边界截图。
+- 边界 / 风险：本批只修 Web 运行态布局和回归合同，没有修改后端、schema、migration、RBAC、Workflow / Fact、原型状态或目标部署；自动化和本地浏览器证据不替代客户岗位 UAT。当前尚未 stage、commit 或 push，提交与推送等待用户确认。
+
+### 任务详情信息精简与来源可读化（2026-08-05）
+
+- 完成：任务详情抽屉收敛为单一“任务详情 / 审批详情”标题和来源单据、负责人、截止时间三项摘要；隐藏 `PROC-*` 技术任务号，将已知 ProcessRuntime 节点 key 转为岗位可读名称，未知技术 key 使用中性业务名称。来源统一显示为“业务类型 · 单号”，内部 ID 仍不作为单号回显。
+- 完成：保留顶部状态、三步办理、相关单据入口、业务进度和本任务处理记录；桌面记录区不再重复负责人，手机端原有责任摘要保持不变。业务进度读取失败改为抽屉内短提示和“重新读取”，成功后仍只读取服务端 ProcessRuntime，不根据任务文案猜测上游节点；有正式流程的任务继续展示进度，无流程任务不强行补造上游。
+- 验证：锁定 Node `24.14.0` 下 Web 全量 Node `2085 / 2085`、定向契约 `25 / 25`、全量 ESLint、全量 CSS stylelint、Vite production build、Prettier、脚本语法和精确 `git diff --check` 通过。真实 Chromium 的任务看板桌面、手机与暗色 Style L1 `3 / 3` 通过，最终桌面 / 手机回归 `2 / 2` 通过；已人工复核业务进度失败重试、成功进度、暗色处理步骤和 390px 手机端截图，无横向溢出。
+- 下一步：等待用户确认是否本地提交；只有用户同时明确授权推送后，唯一 Git 收口 owner 才能在 fetch 与远端核对后推送。本轮没有 stage、commit、push、部署或客户 UAT。
+- 边界 / 风险：本批未修改 API、RBAC、Workflow / Fact、schema、migration、数据库或部署；原型仍保持 `To Implement`，本轮运行态修正遵循其既有三步办理合同，没有把原型状态包装为正式验收。
+
+### 任务业务进度读取合同修复（2026-08-05）
+
+- 完成：修正 `get_task_process_context` 的 JSON-RPC 响应合同。普通人工任务和普通审批任务在没有正式审批表单时明确返回 `approval_form: null`，不再因 Go typed nil map 经 `structpb` 序列化为 `{}`；客户退货、财务付款、库存调整和生产异常四类正式决策审批仍返回各自审批表单对象。前端继续严格拒绝 `{}`，并以不含任务、来源或响应正文的静态信息记录“响应合同校验失败”，页面仍只显示岗位可理解的通俗提示。
+- 完成：删除“只代表当前任务，不是来源单据的完整审批链”常驻说明及截断状态中的同义警告；任务处理记录只保留标题、数量、事件和必要的“更早记录未加载”提示。没有根据任务名称猜测流程节点，也没有改变 Workflow、ProcessRuntime 或 Fact 边界。
+- 验证：后端真实 `protojson` 序列化测试覆盖普通人工、普通审批和四类正式决策审批；Web 定向 Node `61 / 61` 通过。共享 dirty worktree 的 affected T0 / T1 / T4 / T5 门禁通过，其中文档 `15 / 15`、Web Node `2087 / 2087`，服务端相关包、ESLint、CSS、Vite build、场景脚本语法和 `git diff --check` 均通过；任务看板桌面与手机 Style L1 `2 / 2` 通过。
+- 运行态：已重建并重启本地后端，`healthz` / `readyz` 均为 HTTP 200；启动按项目既有流程执行幂等 RBAC / 管理员初始化，没有执行 migration 或人工业务数据写入。真实 Chromium 已分别复核工程资料普通人工任务、订单普通审批和客户退货正式决策审批：重新读取后均显示服务端业务进度，页面不再出现合同错误或“完整审批链”常驻文案，且未提交任何任务处理动作。
+- 下一步 / 风险：当前证据仅覆盖本地 `yoyoosun` 配置和 admin 登录下的真实页面，其中四类正式审批已做后端合同覆盖、浏览器抽查客户退货一类；未部署、未做其他岗位或客户 UAT。当前没有 stage、commit 或 push，等待用户明确授权后再由唯一 Git 收口 owner 处理。
+
+### 执行轨迹连接线布局修复（2026-08-05）
+
+- 完成：修正任务业务进度中“执行轨迹”的桌面布局。节点圆点与连接线保留在同一行，标题和状态整体移到下一行，连接线不再穿过文字形成删除线错觉；手机端继续使用圆点在左、内容在右的竖向轨迹，没有改变节点状态、当前步骤、本任务锚点或 ProcessRuntime 展示语义。
+- 回归：任务看板桌面场景新增真实盒模型断言，逐节点确认连接线与圆点中心对齐、完全位于内容上方且标题处于圆点下方；手机岗位任务端继续覆盖 390px / 430px 竖向轨迹。真实 Chromium 的任务看板桌面、响应式抽屉和手机岗位任务端 `3 / 3` 通过，并人工复核最新桌面与手机截图，无文字穿线、错位或横向溢出。
+- 自动验证：定向组件 Node `9 / 9`、CSS stylelint、Prettier、场景脚本语法和 `git diff --check` 通过；共享 dirty worktree 的 affected T0 / T1 / T4 / T5 门禁通过，其中文档 `15 / 15`、服务端相关包和 Web Node `2087 / 2087` 均通过，Vite production build 完成 `3352` 个模块。
+- 边界 / 风险：本批只改共享轨迹 CSS、对应 Style L1 几何回归和过程记录；没有修改组件业务结构、API、RBAC、Workflow / Fact、schema、migration 或数据库。`workflow-task-action-flow-v1` 原型仍为 `To Implement`，此次是运行态局部样式纠正，不改原型承诺或状态；未部署、未做客户 UAT，且当前没有 stage、commit 或 push。
+
+### 移动任务三步页面信息精简（2026-08-05）
+
+- 完成：三步条只保留“查看任务 / 处理任务 / 结果回执”单行名称。详情页把状态、责任岗位和截止时间集中到任务摘要，“业务信息”只显示有值的独立业务字段，单数末项横跨整行；主来源不再复制成关联卡，只有额外单据存在时才显示“相关单据”，处理记录不重复责任摘要，只读页不再保留底部“返回列表”。
+- 完成：处理页只保留防止办错所需的任务名和来源；多动作保留原生单选，单动作只显示“本次操作”，移除选择说明、重复返回入口和长边界说明，底部只保留本次提交命令。回执页只展示可信结果、任务身份和必要留痕，步骤条负责回看任务，底部只保留“返回列表”；Current 原型和三步测试合同已同步。
+- 验证：定向 Node `118 / 118`、Web 全量 Node `2088 / 2088`、全量 ESLint / CSS stylelint、精确 Prettier、Vite production build（`3352` modules）和 `git diff --check` 通过。真实 Chromium Style L1 的九岗位投影、仅催办、只读和暗色 `4 / 4` 通过，覆盖 390 / 430、单动作 / 多动作、单数业务字段、底部唯一动作和暗色按钮宽度；已人工复核详情、处理、回执及暗色截图，无半格空白、按钮截断或横向溢出。
+- 边界 / 风险：本批未修改后端 API、RBAC、Workflow / Fact、schema、migration、数据库或部署；本地浏览器证据不替代客户岗位 UAT。构建使用本机 Node `v26.5.0`，高于项目声明的 `24.14.x`，绿色结果不替代锁定版本发布门禁；当前没有 stage、commit 或 push，等待用户明确授权。
+
+### 手机与电脑工作入口对称切换（2026-08-05）
+
+- 完成：移动端“我的”将笼统的“可用范围 / 按岗位开放”改为当前账号真实可用的工作入口；同时具备两类入口时显示“电脑端 / 手机待办”，仅有手机待办时显示“手机待办”。有电脑端权限的账号只在“入口与安全”保留一个带文字的“切换工作入口”，统一返回 `/entry` 选择页；页头重复的图标快捷方式和直达电脑端分支已删除。
+- 完成：电脑端页头对已获手机岗位入口权限的账号新增同名“切换工作入口”，复用既有离页保护后进入统一选择页；没有手机岗位入口权限时不显示无效按钮。Current 移动岗位原型说明与可直接打开的实现参考已同步同一口径，入口资格仍由现有菜单投影、岗位权限和运行配置决定，没有在前端放宽 RBAC。
+- 验证：锁定 Node `24.14.0` 下，入口配置 / 会话 / Current 原型定向 Node `37 / 37`、Web 全量 Node `2088 / 2088`、全量 ESLint、全量 CSS stylelint、Vite production build（`3352` modules）、场景脚本语法和 `git diff --check` 通过。真实 Chromium 的对称切换与暗色移动端场景 `2 / 2` 通过，实际完成“手机待办 → 统一选择页 → 电脑端 → 统一选择页 → 手机待办”往返；人工复核 390 × 844 移动端、1440 × 900 电脑端和暗色截图，无重复入口按钮、横向溢出或文字截断。
+- 边界 / 风险：affected 计划因全局电脑端壳判定为 T0 / T1 / T5 / T8；T0 已通过，相关 T5 已完成，但 T8 完整门禁在执行测试前因未配置隔离数据库基地址 `DISPOSABLE_DATABASE_BASE_URL` 按设计 fail closed，因此未形成完整发布回执。本批没有 schema、migration、数据库、部署或客户 UAT，也没有 stage、commit 或 push；提交与推送等待用户明确确认。
+
+### 电脑端工作入口收进账号菜单（2026-08-05）
+
+- 完成：电脑端页头移除常驻的“切换工作入口”和独立退出按钮，保留可识别当前账号的账号按钮；点击后统一展示低频的“切换工作入口”和“退出登录”。只有确实拥有手机岗位入口的账号才显示切换项，切换仍复用离页保护并返回 `/entry`，没有改变入口资格或 RBAC。
+- 交互：账号菜单支持点击与键盘 Enter 打开、Escape 关闭并把焦点还给触发按钮；1440 × 900 下菜单和账号按钮均在视口内且页面无横向溢出。移动端保持“我的 → 入口与安全”的完整文字按钮，不新增页头快捷切换，也不把低频功能缩成语义不清的单独图标。
+- 验证：锁定 Node `24.14.0` 下，本次四个受影响非过程文件的 T0 / T1 / T5 affected 门禁全部通过，其中文档合同 `15 / 15`、Web 全量 Node `2088 / 2088`；全量 ESLint、CSS stylelint、精确 Prettier、Vite production build（`3352` modules）、场景脚本语法和 `git diff --check` 通过。真实 Chromium 定向场景完成“手机待办 → 选择页 → 电脑端账号菜单 → 选择页 → 手机待办”往返，并人工复核最新桌面菜单展开态和 390 × 844 移动端截图。
+- 边界 / 风险：本次只调整电脑端入口呈现及其回归合同和 Current 原型说明，未修改移动端既有切换逻辑、后端、schema、migration、数据库、部署或客户 UAT；当前没有 stage、commit 或 push，提交与推送等待用户明确确认。
+
+### 任务附件入口统一与信息降噪（2026-08-05）
+
+- 完成：电脑端任务 / 审批详情抽屉补齐任务附件次要动作，移动端将独立“任务附件”大卡收进任务摘要。两端共用同一附件弹窗和权限入口：已有附件显示“附件（N）”，可上传空态显示“添加附件”，只读空态显示“查看附件”；附件更新后关闭弹窗会刷新数量，过期请求不会覆盖当前任务。
+- 降噪：弹窗外层保留“任务附件”，内层改为“附件内容”，说明只保留“上传 / 查看照片、异常截图或处理凭证”，删除重复标题和长边界文案。旧 `evidence_refs` 仍只作为“历史处理线索”单独只读展示，不与真实附件混称；Current 移动任务 v2 原型和人工评审路径已同步。
+- 验证：本批定向 Node `35 / 35`、Web 全量 Node `2090 / 2090`、全量 ESLint / CSS stylelint、Vite production build（`3352` modules）、原型内联脚本语法、场景脚本语法和 `git diff --check` 通过。真实 Chromium Style L1 的电脑任务看板、移动端仅催办只读角色和移动端暗色可上传任务 `3 / 3` 通过，已人工复核数量入口、桌面弹窗、移动只读弹窗和暗色上传弹窗，无重复标题、横向溢出或不可见交互。本机 Node `v26.5.0` 高于项目声明的 `24.14.x`，绿色结果不替代锁定版本发布门禁。
+- 存储边界：本批没有改变附件存储架构。当前任务附件仍以 `owner_type = workflow_task` / `owner_id = task.id` 绑定，元数据和文件字节共同保存在 PostgreSQL `business_attachments`，前端上传上限保持 5 MB；没有改为本地目录、NAS 或对象存储，也没有修改 schema / migration。
+- 阻塞 / 风险：额外执行的 `scripts/qa/workflow-fact-boundary.test.mjs` 为 `5 / 6`，唯一失败是既有守卫仍期待已按上一批需求删除的“请勿将本视图当作完整审批链”文案，不在本批精确路径内，本批未越权改写。当前未 stage、commit、push、部署或客户 UAT；提交与推送等待用户明确授权。
+
+### 任务看板空搜索框焦点边界修复（2026-08-05）
+
+- 完成：定位到 Ant Design 组合搜索框获得焦点时，左侧 affix 单独绘制 `2px inset` 焦点阴影，造成空值占位态出现矩形绿框和内部绿竖线。共享 `control-focus.css` 现在由整个 Search 外框绘制连续圆角焦点环，左侧 affix 不再单独绘制阴影或焦点色分隔；普通输入框继续沿用原有共享焦点规则。
+- 回归：任务看板 Style L1 新增空值聚焦 DOM / 盒模型 / 计算样式断言，以及空值聚焦和有值聚焦相邻筛选区截图；共享焦点扫描改为把 `.ant-input-search` 视为组合控件 owner，并读取其真实外层焦点环。真实 Chromium 的桌面、390px 移动端和暗色任务看板 `3 / 3` 通过，人工复核空值截图为完整圆角绿环、正常灰色按钮分隔，无内部绿竖线；输入内容后清空图标、搜索按钮和相邻筛选无错位。
+- 验证：锁定 Node `24.14.0` 下 Web 全量 Node `2090 / 2090`、全量源码 ESLint、全量 CSS stylelint、受影响 L1 脚本 ESLint、Prettier、脚本语法和精确 `git diff --check` 通过。修复前同一浏览器断言按预期失败，并明确读回左侧 affix 的独立 inset 阴影；修复后同场景通过。
+- 下一步 / 边界：本批只调整共享 Search 焦点呈现和浏览器回归，不修改页面业务语义、API、RBAC、菜单、Workflow / Fact、schema、migration、数据库或部署。`task-command-center-v1` 原型仍为 `To Implement`，本次局部焦点修复不改变其结构、交互承诺或状态，因此未改原型文件；当前未 stage、commit、push 或客户 UAT，等待用户明确确认后再处理提交或推送。
+
+### 任务看板搜索框共享控件纠正（2026-08-05）
+
+- 纠正：本节替代上一节关于“继续保留组合搜索框并给完整外框叠加焦点伪层”的结论。真实浏览器对照确认，任务看板是正式业务搜索中唯一直接使用 `Input.Search` 的页面，而其他业务列表统一使用共享 `SearchInput`：普通 `Input`、搜索前缀和单一 affix wrapper。上一版为 `.ant-input-search` 增加 `z-index: 2` 的 `::after` 覆盖层会遮到空值输入区域，已完整撤销；共享焦点扫描也恢复由 affix wrapper 作为 owner，不再为组合搜索框读取伪层。
+- 完成：任务筛选行改用现有 `SearchInput / SelectFilter / ToolbarButton`，可见占位缩短为“搜索任务”，完整范围保留在 `aria-label` 与 `title` 的“可搜索：任务、单号、来源、处理原因”；输入草稿、清空、Enter 搜索、URL 筛选和禁用状态保持原行为。搜索框不再生成右侧搜索按钮，并为不在 `.erp-business-page-layout` 内的任务筛选区映射现有业务控件变量，使搜索、下拉和清空按钮统一为 36px，桌面两行与手机整行布局均保持对齐。
+- 浏览器：锁定 Node `24.14.0` 下真实 Chromium 的任务看板桌面、单岗位桌面、390px 手机和暗色宽屏 `4 / 4` 通过，桌面空值场景随后单独复跑 `1 / 1`。断言确认输入为当前 active element、选区起点为 0、caret color 非透明，搜索前缀位于输入起点之前；DOM 不含 `.ant-input-search` 或搜索按钮，affix wrapper 直接绘制 inset 焦点环且没有 `::after` 内容，六个筛选控件均为 36px。已人工复核空值聚焦、输入后相邻筛选和手机筛选截图，无内部竖线、遮挡、错位或横向溢出。
+- 验证 / 边界：Web 全量 Node `2095 / 2095`、全量 ESLint、全量 CSS stylelint、Prettier、场景脚本语法和精确 `git diff --check` 通过；测试前置错误码生成没有内容差异。本批未修改后端、API、RBAC、菜单、Workflow / Fact、schema、migration、数据库、部署或原型文件；`task-command-center-v1` 仍为 `To Implement`。当前没有 stage、commit 或 push，提交与推送等待用户分别明确确认。
+
+### 移动待办筛选局部加载修复（2026-08-05）
+
+- 根因 / 完成：移动端“全部、审批、风险、超时”分别读取独立的服务端游标视图；旧实现却把每个未加载视图都当作整页首次加载，导致切换冷筛选时用全屏骨架替换概览、筛选栏和列表。现在仅真正首次进入页面使用整页骨架；任一视图已加载后，切换冷筛选会保留概览、筛选栏和底栏，只在任务列表框内显示对应加载提示与 `aria-busy`，切回已加载视图直接复用缓存。
+- 回归：新增源合同锁定首次加载与局部加载的分层，并在 `mobile-tasks-dark` 的 1300ms 延迟窗口内断言筛选立即选中、稳定 DOM 节点未重建、路径 / history / navigation entry 未变化、整页骨架未出现、仅任务列表忙碌、审批请求仅一次；审批完成后切回“全部”不重复请求 todo。真实 Chromium 的 390px 暗色与 430px 岗位投影 `2 / 2` 通过，人工复核加载中与完成截图无布局跳动、横向溢出或底栏遮挡。
+- 验证：锁定 Node `24.14.0` 下定向 Node `60 / 60`、受影响 T0 / T5、Web 全量 ESLint、Web 全量 Node `2097 / 2097`、Prettier、场景语法和 `git diff --check` 通过；测试前置错误码生成没有内容差异。Current 移动岗位原型已核对且本次行为修正符合既有局部更新合同，因此未改原型文件。
+- 边界 / 风险：本批只修移动端列表加载层级和回归合同，保留既有服务端独立视图、RBAC 与缓存语义；未修改 API、Workflow / Fact、schema、migration、数据库或部署，本地自动化和浏览器证据不替代客户岗位 UAT。当前没有 stage、commit 或 push，提交与推送等待用户分别明确确认。
+
+### 附件上传者文案业务化（2026-08-05）
+
+- 完成：附件审计元数据将“上传账号”统一改为“上传人”，有记录时显示服务端返回的真实账号（例如 `上传人：demo_boss`），历史缺失身份显示“上传人：未记录”；不根据账号推断角色，也未改变 `uploaded_by` / `uploaded_by_username`、上传时间或撤销审计字段。
+- 验证：锁定 Node `24.14.0` 下展示函数定向 Node `2 / 2`、共享浏览器断言语法、Prettier、精确 `git diff --check` 和“上传账号”残留扫描通过；附件撤销批次改写共享断言后已按最新 SHA 重跑同组静态验证。真实 Chromium 的任务看板桌面场景 `erp-task-board-desktop` 为 `1 / 1`，最新附件弹窗截图确认已保存的 `style-l1-evidence.txt` 显示“上传人：demo_boss”。
+- 边界 / 风险：`business-core-pages-desktop` 额外回归在进入附件步骤前因既有 Workflow 页面找不到“待办任务”而失败，未作为本批附件证据；本批已有更聚焦的任务附件场景和截图。未修改后端、API、RBAC、Workflow / Fact、schema、migration、数据库或角色语义，也未 stage、commit、push、部署或完成客户 UAT；提交与推送等待用户明确确认。
+
 ### Git 收口队列锁域与等待治理（2026-08-05）
 
 - 完成：Git 收口队列升级为 protocol 3，明确 Local 文件 writer、Git index / commit 与 push 为独立锁域；孤立 `index.lock` 默认只冻结 Git lane，不再自动暂停或撤销文件 writer。独立顶层写任务需要真并行时使用 Worktree，共享 Local 仍保持单 writer，避免热点文件互相覆盖。
 - 恢复：新增 optional-lock-free 只读快照脚本，统一以 `GIT_OPTIONAL_LOCKS=0` 报告 HEAD、worktree、index 和锁身份；worker 只上报一次 `INDEX_LOCK_OBSERVED` 并结束当前 turn，队列按 lock path / inode / mtime 去重，集中复核、询问一次并恢复原 owner 与队序。收到 `WAIT_*` 后不再轮询或持续播报，由 release / cancelled / ready 事件唤醒。
 - 验证：真实仓库无锁快照与隔离临时仓库锁存在合同通过，后者正确读回 inode、零字节大小和无 holder；`bash -n`、ShellCheck、affected T0 / T1、文档合同 `15 / 15`、Skill 合同 `4 / 4`、项目 Skill health、AGENTS 体积门禁和 `git diff --check` 全部通过。系统 Skill Creator 的 Python validator 因当前解释器缺少 PyYAML 未能启动，仓库自己的 metadata、索引和引用门禁已通过。
 - 边界 / 下一步：本批只修改协作规则、Git 收口 Skill、只读脚本、metadata、回归合同和本过程记录，不改业务代码、schema、migration、数据库或部署；protocol 3 只有精确本地提交进入 HEAD 后才正式生效。当前没有 stage、commit 或 push，提交与推送等待用户分别明确确认。
+
+### 业务附件受控撤销闭环（2026-08-05）
+
+- 完成：统一全部业务附件入口的纠错语义。尚未上传的本地文件继续使用“移除”，产品图片继续使用“替换 / 清空”；普通已保存证据统一提供必须填写原因的单向“撤销附件”，撤销后保留文件名、上传人 / 时间及首次撤销账号 / 时间 / 原因，不提供物理删除、恢复、预览或下载。桌面业务弹窗、Workflow 抽屉、手机任务及业务列表入口已按各自 RBAC 和业务状态接入，只有无权限时隐藏动作，已撤销时保持置灰。
+- 后端：`business_attachments` 新增 `withdrawn_at / withdrawn_by / withdrawal_reason` 字段束、约束和索引；受控 repository 事务锁定 owner 与附件，Workflow 撤销会复核任务版本、终态、责任岗位 / 经办人，精确同操作者同原因重试返回首次回执，其他重复撤销冲突。JSON-RPC 仅开放 `withdraw_attachment`，旧 `delete_attachment` 继续按未知方法拒绝；撤销内容读取 fail closed。已执行一次 `make data`，纳入 Ent 生成物、Atlas migration `20260805100506_migrate.sql`、`atlas.sum` 与 Schema 文档投影，没有 apply 数据库。
+- 验证：锁定 Node `24.14.0` 下 Web 全量 Node `2098 / 2098`、定向附件 Node `10 / 10`、全量 ESLint、Prettier、脚本语法和 `git diff --check` 通过；Go `internal/biz`、`internal/data`、`internal/service` 通过，`db-guard`、Schema 文档零漂移、Schema 测试和 Atlas migration validate 通过。真实 Chromium 定向完成“打开任务附件 → 填写原因 → 撤销 → 核对审计与禁用动作”，并人工复核撤销前、确认和撤销后三张截图；关联的移动任务、采购入库列控制及产品图片桌面 / 手机 / BOM 打印 Style L1 `5 / 5` 通过。
+- 下一步 / 边界：共享 `affected --run` 的 T0 检查均通过，但 T8 full 在测试前因缺少隔离库基地址 `DISPOSABLE_DATABASE_BASE_URL` 按设计 fail closed；四个 PostgreSQL 并发子测也因未配置 `PURCHASE_RECEIPT_PG_TEST=1` 与 `PURCHASE_RECEIPT_PG_TEST_DB_URL` 跳过。完整 `business-core` 与出货无权限共享场景在附件步骤前被既有“待办任务”文案断言阻断，不作为本批附件证据；定向真实浏览器链路已通过。后续需在隔离数据库补跑 full / PostgreSQL 并发测试并完成客户岗位 UAT；本批未连接或 apply 目标数据库、未部署，也未 stage、commit 或 push。

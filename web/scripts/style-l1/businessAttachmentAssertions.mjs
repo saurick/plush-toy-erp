@@ -90,9 +90,9 @@ export function createBusinessAttachmentAssertions({
     )
     if (modalMetrics.panelText.includes('style-l1-evidence.txt')) {
       assert(
-        modalMetrics.panelText.includes('上传账号：demo_boss') &&
+        modalMetrics.panelText.includes('上传人：demo_boss') &&
           modalMetrics.panelText.includes('上传时间：'),
-        `${scenarioName} 已保存附件应显示上传账号和上传时间: ${JSON.stringify(
+        `${scenarioName} 已保存附件应显示上传人和上传时间: ${JSON.stringify(
           modalMetrics
         )}`
       )
@@ -105,6 +105,85 @@ export function createBusinessAttachmentAssertions({
       )
       await page.screenshot({
         path: `output/playwright/style-l1/${scenarioName}-saved-attachment-audit.png`,
+      })
+
+      const withdrawButton = modal.getByRole('button', {
+        name: '撤销附件',
+      })
+      assert.equal(
+        await withdrawButton.count(),
+        1,
+        `${scenarioName} 已保存 Workflow 附件必须提供唯一撤销动作`
+      )
+      assert.equal(
+        await withdrawButton.first().isDisabled(),
+        false,
+        `${scenarioName} 可写 Workflow 附件的撤销动作必须可用`
+      )
+      await withdrawButton.first().click()
+      const withdrawalModal = page
+        .getByRole('dialog', { name: '撤销附件', exact: true })
+        .last()
+      await withdrawalModal.waitFor({ state: 'visible', timeout: 10_000 })
+      await assertAntdModalCentered(
+        page,
+        withdrawalModal,
+        `${scenarioName}-attachment-withdrawal`
+      )
+      await page.screenshot({
+        path: `output/playwright/style-l1/${scenarioName}-attachment-withdrawal-confirm.png`,
+      })
+      await withdrawalModal
+        .getByRole('textbox', { name: '撤销原因' })
+        .fill('浏览器验收：上传了错误版本')
+      await withdrawalModal.getByRole('button', { name: '确认撤销' }).click()
+      await withdrawalModal.waitFor({ state: 'hidden', timeout: 10_000 })
+      await modal.getByText('已撤销', { exact: true }).waitFor({
+        state: 'visible',
+        timeout: 10_000,
+      })
+      const withdrawnMetrics = await modal.evaluate((node) => ({
+        text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+        previewButtons: Array.from(node.querySelectorAll('button')).filter(
+          (button) => button.textContent?.trim() === '预览'
+        ).length,
+        downloadButtons: Array.from(node.querySelectorAll('button')).filter(
+          (button) => button.textContent?.trim() === '下载'
+        ).length,
+        withdrawDisabled: Array.from(node.querySelectorAll('button')).some(
+          (button) =>
+            button.textContent?.trim() === '撤销附件' && button.disabled
+        ),
+        overflowX: node.scrollWidth - node.clientWidth,
+      }))
+      assert(
+        withdrawnMetrics.text.includes('撤销账号：demo_boss') &&
+          withdrawnMetrics.text.includes('撤销时间：') &&
+          withdrawnMetrics.text.includes(
+            '撤销原因：浏览器验收：上传了错误版本'
+          ),
+        `${scenarioName} 撤销后应保留可读审计: ${JSON.stringify(
+          withdrawnMetrics
+        )}`
+      )
+      assert.equal(
+        withdrawnMetrics.previewButtons,
+        0,
+        `${scenarioName} 已撤销附件不应保留预览动作`
+      )
+      assert.equal(
+        withdrawnMetrics.downloadButtons,
+        0,
+        `${scenarioName} 已撤销附件不应保留下载动作`
+      )
+      assert(
+        withdrawnMetrics.withdrawDisabled && withdrawnMetrics.overflowX <= 1,
+        `${scenarioName} 已撤销动作应置灰且弹窗不横向溢出: ${JSON.stringify(
+          withdrawnMetrics
+        )}`
+      )
+      await page.screenshot({
+        path: `output/playwright/style-l1/${scenarioName}-withdrawn-attachment-audit.png`,
       })
     }
 

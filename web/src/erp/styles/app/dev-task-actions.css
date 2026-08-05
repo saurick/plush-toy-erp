@@ -95,7 +95,8 @@
     align-items: stretch;
   }
 
-  .erp-task-board-filters > .ant-input-search,
+  .erp-task-board-filters
+    > .erp-business-filter-control--search.ant-input-affix-wrapper,
   .erp-task-board-filters > .ant-select,
   .erp-task-board-filters > .ant-btn {
     flex: 1 1 100%;

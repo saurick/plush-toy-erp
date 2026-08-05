@@ -275,17 +275,13 @@ test('mobileRoleTaskModel: 缺少状态 label 时移动端仍展示中文状态'
     task_status_label: '',
     updated_at: 1_800_000_000,
   })
-  const factRowsText = buildTaskFactRows(readyTask)
-    .map(([label, value]) => `${label}：${value}`)
-    .join('\n')
   const unknownFactRowsText = buildTaskFactRows(unknownTask)
     .map(([label, value]) => `${label}：${value}`)
     .join('\n')
 
   assert.equal(resolveMobileTaskStatusLabel(readyTask), '可执行')
   assert.equal(resolveMobileTaskStatusLabel(unknownTask), '未知状态')
-  assert.match(factRowsText, /状态：可执行/u)
-  assert.match(unknownFactRowsText, /状态：未知状态/u)
+  assert.deepEqual(buildTaskFactRows(readyTask), [])
   assert.doesNotMatch(unknownFactRowsText, /unknown_task_status_key/u)
 })
 
@@ -335,11 +331,7 @@ test('mobileRoleTaskModel: 业务状态详情不信任 raw label 并按 key 回�
 
   assert.equal(resolveTaskBusinessStatusLabel(missingLabelTask), '待确认入库')
   assert.equal(resolveTaskBusinessChip(missingLabelTask), '待确认入库')
-  assert(
-    buildTaskFactRows(missingLabelTask).some(
-      ([label, value]) => label === '业务' && value === '待确认入库'
-    )
-  )
+  assert.deepEqual(buildTaskFactRows(missingLabelTask), [])
   assert.equal(resolveTaskBusinessStatusLabel(rawLabelTask), '未知业务状态')
   assert.equal(resolveTaskBusinessChip(rawLabelTask), '未知业务状态')
   assert.doesNotMatch(rawFactRowsText, /unknown_business_status_key/u)
@@ -383,7 +375,7 @@ test('mobileRoleTaskModel: 岗位标签复用共享角色显示口径', () => {
   assert.equal(getMobileRoleLabel('unknown_role'), '岗位')
 })
 
-test('mobileRoleTaskModel: 任务摘要和事实行不透出技术 task_group', () => {
+test('mobileRoleTaskModel: 任务摘要不透出技术 task_group，业务事实不重复任务元数据', () => {
   assert.equal(
     getMobileTaskGroupLabel('shipment_finance_approval'),
     '出货财务审批'
@@ -404,17 +396,31 @@ test('mobileRoleTaskModel: 任务摘要和事实行不透出技术 task_group', 
 
   assert.equal(listMeta.includes('unknown_task_group'), false)
   assert.equal(listMeta.includes('任务：业务任务'), true)
-  assert.equal(
-    factRows.some(([label]) => label === '分组'),
-    false
+  assert.deepEqual(factRows, [])
+})
+
+test('mobileRoleTaskModel: 详情只输出有值的独立业务字段，不拼接占位符', () => {
+  const rows = buildTaskFactRows(
+    task({
+      payload: {
+        customer_name: '东莞美悦礼品',
+        style_no: '',
+        product_name: '云朵小熊',
+        due_date: null,
+        quantity: 0,
+        unit: '只',
+      },
+    })
   )
-  assert(
-    factRows.some(
-      ([label, value]) =>
-        label === '任务类型' &&
-        value.includes('业务任务') &&
-        !value.includes('unknown_task_group')
-    )
+
+  assert.deepEqual(rows, [
+    ['客户', '东莞美悦礼品'],
+    ['产品', '云朵小熊'],
+    ['数量', '0只'],
+  ])
+  assert.equal(
+    rows.some(([, value]) => value.includes('-')),
+    false
   )
 })
 
@@ -458,7 +464,10 @@ test('mobileRoleTaskModel: 详情关联来源不把非订单任务误写成订�
     source_no: '',
   })
 
-  assert.equal(resolveTaskRelatedSourceLabel(inboundTask), '来源：IN-001')
+  assert.equal(
+    resolveTaskRelatedSourceLabel(inboundTask),
+    '来源：入库任务 · IN-001'
+  )
   assert.equal(
     resolveTaskRelatedSourceLabel(unknownSourceTask),
     '来源：已关联业务来源'
@@ -472,7 +481,7 @@ test('mobileRoleTaskModel: 详情关联来源不把非订单任务误写成订�
   )
 })
 
-test('mobileRoleTaskModel: 详情事实行保留财务金额字段', () => {
+test('mobileRoleTaskModel: 详情事实行把财务金额拆成独立字段', () => {
   const rows = buildTaskFactRows(
     task({
       task_status_label: '可执行',
@@ -490,10 +499,17 @@ test('mobileRoleTaskModel: 详情事实行保留财务金额字段', () => {
     })
   )
 
-  assert(
-    rows.some(
-      ([label, value]) => label === '金额/税率' && value.includes('113.00')
-    )
+  assert.deepEqual(
+    rows.filter(([label]) =>
+      ['金额', '税率', '税额', '含税金额', '未税金额'].includes(label)
+    ),
+    [
+      ['金额', '100.00'],
+      ['税率', '13%'],
+      ['税额', '13.00'],
+      ['含税金额', '113.00'],
+      ['未税金额', '100.00'],
+    ]
   )
 })
 
@@ -518,7 +534,7 @@ test('mobileRoleTaskModel: 移动端任务数量和金额保留显式 0 值', ()
       },
     })
   )
-  const amountRow = financeRows.find(([label]) => label === '金额/税率')
+  const financeValues = Object.fromEntries(financeRows)
 
   assert.equal(
     resolveTaskListMeta(quantityTask),
@@ -526,10 +542,25 @@ test('mobileRoleTaskModel: 移动端任务数量和金额保留显式 0 值', ()
   )
   assert(
     buildTaskFactRows(quantityTask).some(
-      ([label, value]) => label === '供应/物料/数量' && value.endsWith('/ 0kg')
+      ([label, value]) => label === '数量' && value === '0kg'
     )
   )
-  assert.equal(amountRow?.[1], '0 / 0% / 税额 0 / 含税 0 / 不含税 0')
+  assert.deepEqual(
+    {
+      amount: financeValues['金额'],
+      taxRate: financeValues['税率'],
+      taxAmount: financeValues['税额'],
+      amountWithTax: financeValues['含税金额'],
+      amountWithoutTax: financeValues['未税金额'],
+    },
+    {
+      amount: '0',
+      taxRate: '0%',
+      taxAmount: '0',
+      amountWithTax: '0',
+      amountWithoutTax: '0',
+    }
+  )
 })
 
 test('mobileRoleTaskModel: IQC 结果事实行不透出 raw qc result key', () => {

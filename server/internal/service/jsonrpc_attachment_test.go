@@ -17,17 +17,19 @@ import (
 const testAttachmentProofSHA256 = "c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"
 
 type stubAttachmentJSONRPCRepo struct {
-	created      *biz.BusinessAttachmentCreate
-	current      *biz.BusinessAttachment
-	ownerExists  bool
-	createCalls  int
-	listCalls    int
-	getCalls     int
-	contentCalls int
-	deleteCalls  int
-	clearCalls   int
-	clearProduct int
-	clearSlot    string
+	created       *biz.BusinessAttachmentCreate
+	current       *biz.BusinessAttachment
+	ownerExists   bool
+	createCalls   int
+	listCalls     int
+	getCalls      int
+	contentCalls  int
+	withdrawCalls int
+	withdrawn     *biz.BusinessAttachmentWithdraw
+	withdrawErr   error
+	clearCalls    int
+	clearProduct  int
+	clearSlot     string
 }
 
 func newAttachmentJSONRPCTestDispatcher(t *testing.T, repo *stubAttachmentJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
@@ -134,9 +136,16 @@ func (r *stubAttachmentJSONRPCRepo) GetBusinessAttachmentContent(_ context.Conte
 	return []byte("proof"), nil
 }
 
-func (r *stubAttachmentJSONRPCRepo) DeleteBusinessAttachment(context.Context, int) error {
-	r.deleteCalls++
-	return nil
+func (r *stubAttachmentJSONRPCRepo) WithdrawBusinessAttachment(
+	_ context.Context,
+	in *biz.BusinessAttachmentWithdraw,
+) (time.Time, error) {
+	r.withdrawCalls++
+	r.withdrawn = in
+	if r.withdrawErr != nil {
+		return time.Time{}, r.withdrawErr
+	}
+	return time.Unix(4, 0), nil
 }
 
 func (r *stubAttachmentJSONRPCRepo) BusinessAttachmentOwnerExists(context.Context, string, int) (bool, error) {
@@ -187,21 +196,33 @@ func TestBusinessAttachmentProductOwnerPermissions(t *testing.T) {
 func TestBusinessAttachmentToAnyIncludesReadableUploaderAuditMetadata(t *testing.T) {
 	uploaderID := 7
 	uploaderUsername := "demo_boss"
+	withdrawnAt := time.Unix(4, 0)
+	withdrawnBy := 8
+	withdrawnByUsername := "demo_admin"
+	withdrawalReason := "上传了错误版本"
 	out := businessAttachmentToAny(&biz.BusinessAttachment{
-		ID:                 101,
-		OwnerType:          biz.BusinessAttachmentOwnerWorkflowTask,
-		OwnerID:            42,
-		AttachmentType:     "evidence",
-		FileName:           "proof.pdf",
-		MimeType:           "application/pdf",
-		FileSize:           5,
-		SHA256:             "sha",
-		UploadedBy:         &uploaderID,
-		UploadedByUsername: &uploaderUsername,
-		CreatedAt:          time.Unix(2, 0),
+		ID:                  101,
+		OwnerType:           biz.BusinessAttachmentOwnerWorkflowTask,
+		OwnerID:             42,
+		AttachmentType:      "evidence",
+		FileName:            "proof.pdf",
+		MimeType:            "application/pdf",
+		FileSize:            5,
+		SHA256:              "sha",
+		UploadedBy:          &uploaderID,
+		UploadedByUsername:  &uploaderUsername,
+		WithdrawnAt:         &withdrawnAt,
+		WithdrawnBy:         &withdrawnBy,
+		WithdrawnByUsername: &withdrawnByUsername,
+		WithdrawalReason:    &withdrawalReason,
+		CreatedAt:           time.Unix(2, 0),
 	}, false)
 	if out["uploaded_by"] != uploaderID ||
 		out["uploaded_by_username"] != uploaderUsername ||
+		out["withdrawn_at"] != int64(4) ||
+		out["withdrawn_by"] != withdrawnBy ||
+		out["withdrawn_by_username"] != withdrawnByUsername ||
+		out["withdrawal_reason"] != withdrawalReason ||
 		out["created_at"] != int64(2) {
 		t.Fatalf("attachment audit metadata = %#v", out)
 	}
@@ -217,7 +238,9 @@ func TestBusinessAttachmentToAnyIncludesReadableUploaderAuditMetadata(t *testing
 		SHA256:         "sha",
 		CreatedAt:      time.Unix(3, 0),
 	}, false)
-	if legacy["uploaded_by"] != nil || legacy["uploaded_by_username"] != nil {
+	if legacy["uploaded_by"] != nil || legacy["uploaded_by_username"] != nil ||
+		legacy["withdrawn_at"] != nil || legacy["withdrawn_by"] != nil ||
+		legacy["withdrawn_by_username"] != nil || legacy["withdrawal_reason"] != nil {
 		t.Fatalf("legacy attachment uploader metadata must remain missing: %#v", legacy)
 	}
 }
@@ -473,6 +496,27 @@ func TestJsonrpcDispatcher_AttachmentWriteAPIRequiresOwnerModuleEnabled(t *testi
 		"disabled",
 	)
 	activateOperationalFactTestCustomerConfig(t, dispatcher, disabledConfig)
+	repo.current = &biz.BusinessAttachment{
+		ID:             101,
+		OwnerType:      biz.BusinessAttachmentOwnerSalesOrder,
+		OwnerID:        7,
+		AttachmentType: "evidence",
+		FileName:       "proof.pdf",
+		MimeType:       "application/pdf",
+		FileSize:       5,
+		SHA256:         testAttachmentProofSHA256,
+		CreatedAt:      time.Unix(3, 0),
+	}
+	_, withdrawRes, err := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "disabled-withdraw", mustJSONRPCStruct(t, map[string]any{
+		"id":     101,
+		"reason": "上传错误",
+	}))
+	if err != nil || withdrawRes == nil || withdrawRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("disabled owner module must reject attachment withdrawal: res=%#v err=%v", withdrawRes, err)
+	}
+	if repo.withdrawCalls != 0 {
+		t.Fatalf("disabled owner module must not withdraw attachment, got %d calls", repo.withdrawCalls)
+	}
 	_, deleteRes, err := dispatcher.handleBusinessAttachment(ctx, "delete_attachment", "disabled-delete", mustJSONRPCStruct(t, map[string]any{"id": 101}))
 	if err != nil {
 		t.Fatalf("expected nil err deleting with disabled owner module, got %v", err)
@@ -480,9 +524,136 @@ func TestJsonrpcDispatcher_AttachmentWriteAPIRequiresOwnerModuleEnabled(t *testi
 	if deleteRes == nil || deleteRes.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("ordinary attachment delete must remain unavailable, got %#v", deleteRes)
 	}
-	if repo.deleteCalls != 0 {
-		t.Fatalf("disabled owner module must not delete attachment, got %d calls", repo.deleteCalls)
+	if repo.withdrawCalls != 0 {
+		t.Fatalf("unknown delete method must not withdraw attachment, got %d calls", repo.withdrawCalls)
 	}
+}
+
+func TestJsonrpcDispatcher_WithdrawAttachmentUsesSessionActorAndReturnsAuditReceipt(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{
+		ID:             101,
+		OwnerType:      biz.BusinessAttachmentOwnerSalesOrder,
+		OwnerID:        7,
+		AttachmentType: "evidence",
+		FileName:       "wrong.pdf",
+		MimeType:       "application/pdf",
+		FileSize:       5,
+		SHA256:         testAttachmentProofSHA256,
+		CreatedAt:      time.Unix(3, 0),
+	}}
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderRead,
+		biz.PermissionSalesOrderUpdate,
+	))
+
+	_, res, err := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "withdraw", mustJSONRPCStruct(t, map[string]any{
+		"id":           101,
+		"reason":       "  上传了错误版本  ",
+		"withdrawn_by": 999,
+		"owner_type":   biz.BusinessAttachmentOwnerProduct,
+		"owner_id":     999,
+	}))
+	if err != nil || res == nil || res.Code != errcode.OK.Code || res.Data == nil {
+		t.Fatalf("withdraw attachment failed: res=%#v err=%v", res, err)
+	}
+	if repo.withdrawCalls != 1 || repo.withdrawn == nil || repo.withdrawn.WithdrawnBy != 7 ||
+		repo.withdrawn.Reason != "上传了错误版本" {
+		t.Fatalf("withdrawal must use session actor and normalized reason: calls=%d input=%#v", repo.withdrawCalls, repo.withdrawn)
+	}
+	out := res.Data.AsMap()["attachment"].(map[string]any)
+	if out["withdrawn_by"] != float64(7) || out["withdrawn_by_username"] != "admin" ||
+		out["withdrawal_reason"] != "上传了错误版本" || out["withdrawn_at"] != float64(4) {
+		t.Fatalf("withdrawal receipt = %#v", out)
+	}
+	withdrawnAt := time.Unix(4, 0)
+	withdrawnBy := 7
+	reason := "上传了错误版本"
+	repo.current.WithdrawnAt = &withdrawnAt
+	repo.current.WithdrawnBy = &withdrawnBy
+	repo.current.WithdrawalReason = &reason
+	_, replayRes, _ := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "withdraw-replay", mustJSONRPCStruct(t, map[string]any{
+		"id": 101, "reason": " 上传了错误版本 ",
+	}))
+	if replayRes.Code != errcode.OK.Code || repo.withdrawCalls != 1 {
+		t.Fatalf("exact retry must replay stored receipt: res=%#v calls=%d", replayRes, repo.withdrawCalls)
+	}
+	_, changedRes, _ := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "withdraw-changed", mustJSONRPCStruct(t, map[string]any{
+		"id": 101, "reason": "另一个原因",
+	}))
+	if changedRes.Code != errcode.ResourceVersionConflict.Code || repo.withdrawCalls != 1 {
+		t.Fatalf("changed retry must conflict without writing: res=%#v calls=%d", changedRes, repo.withdrawCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_WithdrawAttachmentFailsClosedAtBusinessBoundaries(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	base := &biz.BusinessAttachment{
+		ID:             101,
+		OwnerType:      biz.BusinessAttachmentOwnerSalesOrder,
+		OwnerID:        7,
+		AttachmentType: "evidence",
+		FileName:       "wrong.pdf",
+		MimeType:       "application/pdf",
+		FileSize:       5,
+		SHA256:         testAttachmentProofSHA256,
+		CreatedAt:      time.Unix(3, 0),
+	}
+
+	t.Run("read permission cannot withdraw", func(t *testing.T) {
+		repo := &stubAttachmentJSONRPCRepo{current: base}
+		dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+			[]string{biz.SalesRoleKey},
+			biz.PermissionSalesOrderRead,
+		))
+		_, res, _ := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "read-only", mustJSONRPCStruct(t, map[string]any{
+			"id": 101, "reason": "上传错误",
+		}))
+		if res.Code != errcode.PermissionDenied.Code || repo.withdrawCalls != 0 {
+			t.Fatalf("read-only withdrawal must fail before write: res=%#v calls=%d", res, repo.withdrawCalls)
+		}
+	})
+
+	for _, reason := range []any{
+		"   ",
+		strings.Repeat("错", 256),
+		123.0,
+		true,
+		map[string]any{"text": "上传错误"},
+		[]any{"上传错误"},
+	} {
+		t.Run("invalid reason", func(t *testing.T) {
+			repo := &stubAttachmentJSONRPCRepo{current: base}
+			dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+				[]string{biz.SalesRoleKey},
+				biz.PermissionSalesOrderUpdate,
+			))
+			_, res, _ := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "invalid-reason", mustJSONRPCStruct(t, map[string]any{
+				"id": 101, "reason": reason,
+			}))
+			if res.Code != errcode.InvalidParam.Code || res.Message != "请填写撤销原因，最多 255 个字" || repo.withdrawCalls != 0 {
+				t.Fatalf("invalid reason must fail closed: res=%#v calls=%d", res, repo.withdrawCalls)
+			}
+		})
+	}
+
+	t.Run("product images use replace or clear", func(t *testing.T) {
+		repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{
+			ID: 201, OwnerType: biz.BusinessAttachmentOwnerProduct, OwnerID: 7,
+			AttachmentType: biz.BusinessAttachmentTypeProductImage,
+		}}
+		dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+			[]string{biz.EngineeringRoleKey},
+			biz.PermissionProductUpdate,
+		))
+		_, res, _ := dispatcher.handleBusinessAttachment(ctx, "withdraw_attachment", "product-image", mustJSONRPCStruct(t, map[string]any{
+			"id": 201, "reason": "不再使用",
+		}))
+		if res.Code != errcode.InvalidParam.Code || res.Message != "产品图片请使用替换或清空，不支持撤销" || repo.withdrawCalls != 0 {
+			t.Fatalf("product image withdrawal must fail closed: res=%#v calls=%d", res, repo.withdrawCalls)
+		}
+	})
 }
 
 func TestJsonrpcDispatcher_WorkflowAttachmentEnforcesTaskRowScope(t *testing.T) {
@@ -791,6 +962,90 @@ func TestJsonrpcDispatcher_WorkflowAttachmentRequiresExactPositiveVersion(t *tes
 	}
 }
 
+func TestJsonrpcDispatcher_WorkflowAttachmentWithdrawalReusesTaskWriteGuard(t *testing.T) {
+	baseTask := &biz.WorkflowTask{
+		ID:            42,
+		TaskGroup:     "generic",
+		SourceType:    "generic-source",
+		SourceID:      1,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.WarehouseRoleKey,
+		Version:       3,
+		Payload:       map[string]any{},
+	}
+	newRepo := func() *stubAttachmentJSONRPCRepo {
+		return &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{
+			ID:             71,
+			OwnerType:      biz.BusinessAttachmentOwnerWorkflowTask,
+			OwnerID:        42,
+			AttachmentType: "evidence",
+			FileName:       "wrong.pdf",
+			MimeType:       "application/pdf",
+			FileSize:       5,
+			SHA256:         testAttachmentProofSHA256,
+			CreatedAt:      time.Unix(3, 0),
+		}}
+	}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskUpdate,
+	)
+
+	t.Run("ready owner withdraws with exact version", func(t *testing.T) {
+		repo := newRepo()
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, baseTask)
+		_, res, _ := dispatcher.handleBusinessAttachment(
+			workflowJSONRPCAdminContext(),
+			"withdraw_attachment",
+			"workflow-withdraw",
+			mustJSONRPCStruct(t, map[string]any{"id": 71, "reason": "附件传错", "expected_version": 3}),
+		)
+		if res.Code != errcode.OK.Code || repo.withdrawCalls != 1 || repo.withdrawn == nil ||
+			repo.withdrawn.WorkflowGuard == nil || repo.withdrawn.WorkflowGuard.ExpectedVersion != 3 ||
+			repo.withdrawn.WorkflowGuard.ActorID != admin.ID {
+			t.Fatalf("workflow withdrawal guard = %#v, res=%#v calls=%d", repo.withdrawn, res, repo.withdrawCalls)
+		}
+	})
+
+	t.Run("missing version fails before write", func(t *testing.T) {
+		repo := newRepo()
+		dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, admin, baseTask)
+		_, res, _ := dispatcher.handleBusinessAttachment(
+			workflowJSONRPCAdminContext(),
+			"withdraw_attachment",
+			"missing-version",
+			mustJSONRPCStruct(t, map[string]any{"id": 71, "reason": "附件传错"}),
+		)
+		if res.Code != errcode.InvalidParam.Code || repo.withdrawCalls != 0 {
+			t.Fatalf("missing workflow version must fail closed: res=%#v calls=%d", res, repo.withdrawCalls)
+		}
+	})
+
+	for _, tc := range []struct {
+		name  string
+		task  *biz.WorkflowTask
+		admin *biz.AdminUser
+	}{
+		{name: "terminal task", task: func() *biz.WorkflowTask { task := *baseTask; task.TaskStatusKey = "done"; return &task }(), admin: admin},
+		{name: "wrong owner", task: baseTask, admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskUpdate)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newRepo()
+			dispatcher := newWorkflowAttachmentJSONRPCTestDispatcher(t, repo, tc.admin, tc.task)
+			_, res, _ := dispatcher.handleBusinessAttachment(
+				workflowJSONRPCAdminContext(),
+				"withdraw_attachment",
+				tc.name,
+				mustJSONRPCStruct(t, map[string]any{"id": 71, "reason": "附件传错", "expected_version": 3}),
+			)
+			if res.Code != errcode.PermissionDenied.Code || repo.withdrawCalls != 0 {
+				t.Fatalf("%s must fail before write: res=%#v calls=%d", tc.name, res, repo.withdrawCalls)
+			}
+		})
+	}
+}
+
 func TestJsonrpcDispatcher_DownloadAuthorizesBeforeLoadingContent(t *testing.T) {
 	repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{
 		ID: 71, OwnerType: biz.BusinessAttachmentOwnerSalesOrder, OwnerID: 7,
@@ -809,6 +1064,34 @@ func TestJsonrpcDispatcher_DownloadAuthorizesBeforeLoadingContent(t *testing.T) 
 	}
 	if repo.getCalls != 1 || repo.contentCalls != 0 {
 		t.Fatalf("authorization may read metadata but must not load content: metadata=%d content=%d", repo.getCalls, repo.contentCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_DownloadRejectsWithdrawnAttachmentBeforeLoadingContent(t *testing.T) {
+	withdrawnAt := time.Unix(4, 0)
+	withdrawnBy := 7
+	reason := "上传错误"
+	repo := &stubAttachmentJSONRPCRepo{current: &biz.BusinessAttachment{
+		ID: 71, OwnerType: biz.BusinessAttachmentOwnerSalesOrder, OwnerID: 7,
+		FileName: "wrong.pdf", MimeType: "application/pdf", FileSize: 5,
+		WithdrawnAt: &withdrawnAt, WithdrawnBy: &withdrawnBy, WithdrawalReason: &reason,
+	}}
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderRead,
+	))
+	_, res, err := dispatcher.handleBusinessAttachment(
+		workflowJSONRPCAdminContext(),
+		"download_attachment",
+		"withdrawn-download",
+		mustJSONRPCStruct(t, map[string]any{"id": 71}),
+	)
+	if err != nil || res.Code != errcode.InvalidParam.Code ||
+		res.Message != "附件已撤销，不能预览或下载" {
+		t.Fatalf("withdrawn attachment download must fail clearly: res=%#v err=%v", res, err)
+	}
+	if repo.getCalls != 1 || repo.contentCalls != 0 {
+		t.Fatalf("withdrawn download must stop before content read: metadata=%d content=%d", repo.getCalls, repo.contentCalls)
 	}
 }
 
@@ -851,6 +1134,7 @@ func TestJsonrpcDispatcher_AttachmentMethodsAreCanonicalAndDeleteIsUnavailable(t
 		"getAttachmentContent",
 		"delete_attachment",
 		"deleteAttachment",
+		"withdrawAttachment",
 		"clearProductImage",
 	} {
 		_, res, err := dispatcher.handleBusinessAttachment(workflowJSONRPCAdminContext(), method, method, mustJSONRPCStruct(t, map[string]any{}))

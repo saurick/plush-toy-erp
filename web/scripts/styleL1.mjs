@@ -5956,9 +5956,7 @@ async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
       const headStyle =
         head instanceof HTMLElement ? window.getComputedStyle(head) : null
       const tone = Array.from(node.classList)
-        .find((className) =>
-          className.startsWith('erp-task-board-lane--')
-        )
+        .find((className) => className.startsWith('erp-task-board-lane--'))
         ?.replace('erp-task-board-lane--', '')
       return {
         tone: tone || '',
@@ -6079,7 +6077,6 @@ async function assertTaskActionDrawerLayout(
   if (expectedActionText) {
     await expectText(page, expectedActionText)
   }
-  await expectText(page, '处理范围：')
   await page.waitForFunction(
     ({ expectedTaskText: taskText }) => {
       const drawerElement = Array.from(
@@ -6098,7 +6095,7 @@ async function assertTaskActionDrawerLayout(
       return (
         drawerElement?.querySelectorAll(
           '.erp-task-action-drawer__footer button'
-        ).length >= 2
+        ).length >= 1
       )
     },
     { expectedTaskText },
@@ -6161,11 +6158,13 @@ async function assertTaskActionDrawerLayout(
         activeStepPanel instanceof HTMLElement
           ? rectOf(activeStepPanel.querySelector(selector))
           : null
-      const summary = rectInDrawer('.erp-task-action-drawer__summary')
-      const metaGrid = rectInDrawer('.erp-task-action-drawer__meta-grid')
+      const summary = rectInDrawer('.erp-task-action-drawer__summary--task')
+      const metaGrid = rectInDrawer('.erp-task-action-drawer__task-meta')
       const guide = rectInDrawer('.erp-task-action-drawer__guide')
       const guideSteps = rectInDrawer('.erp-task-action-drawer__guide-steps')
-      const guideNote = rectInDrawer('.erp-task-action-drawer__guide-note')
+      const guideNoteCount =
+        drawerElement?.querySelectorAll('.erp-task-action-drawer__guide-note')
+          .length || 0
       const actionPanel =
         rectInActiveStepPanel('.erp-task-action-drawer__action-panel') ||
         rectInActiveStepPanel('.erp-task-action-drawer__action-prompt') ||
@@ -6176,7 +6175,7 @@ async function assertTaskActionDrawerLayout(
       const textArea = rectInActiveStepPanel('textarea')
       const metaItems =
         drawerElement?.querySelectorAll(
-          '.erp-task-action-drawer__meta-grid > div'
+          '.erp-task-action-drawer__task-meta > div'
         ).length || 0
       const stepItems =
         drawerElement?.querySelectorAll('.erp-task-action-drawer__step')
@@ -6204,7 +6203,7 @@ async function assertTaskActionDrawerLayout(
         metaGrid,
         guide,
         guideSteps,
-        guideNote,
+        guideNoteCount,
         actionPanel,
         footer,
         body,
@@ -6232,15 +6231,19 @@ async function assertTaskActionDrawerLayout(
       metrics.metaGrid?.height > 0 &&
       metrics.guide?.height > 0 &&
       metrics.guideSteps?.height > 0 &&
-      metrics.guideNote?.height > 0 &&
       metrics.actionPanel?.height > 0 &&
       metrics.footer?.height > 0,
     `${scenarioName} 任务处理抽屉缺少关键分区: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.metaItems,
-    5,
-    `${scenarioName} 任务处理抽屉应展示 5 个任务摘要字段: ${JSON.stringify(metrics)}`
+    3,
+    `${scenarioName} 任务详情摘要应只展示来源、负责人和截止时间: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.guideNoteCount,
+    0,
+    `${scenarioName} 任务详情不应重复展示通用处理范围说明: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.stepItems,
@@ -6257,8 +6260,8 @@ async function assertTaskActionDrawerLayout(
     `${scenarioName} 任务处理步骤缺少可访问的 tablist: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.footerButtons >= 2,
-    `${scenarioName} 任务处理抽屉底部动作不足: ${JSON.stringify(metrics)}`
+    metrics.footerButtons >= 1,
+    `${scenarioName} 任务详情底部缺少当前步骤操作: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     Boolean(metrics.textArea),
@@ -6270,7 +6273,6 @@ async function assertTaskActionDrawerLayout(
       metrics.metaGrid.right <= metrics.scopeRect.right + 2 &&
       metrics.guide.right <= metrics.scopeRect.right + 2 &&
       metrics.guideSteps.right <= metrics.scopeRect.right + 2 &&
-      metrics.guideNote.right <= metrics.scopeRect.right + 2 &&
       metrics.actionPanel.right <= metrics.scopeRect.right + 2,
     `${scenarioName} 任务处理抽屉内容横向溢出: ${JSON.stringify(metrics)}`
   )
@@ -6478,9 +6480,7 @@ async function assertVisibleInputControlRadius(page, scenarioName) {
         continue
       }
 
-      const hasRadiusIssue = radii.some(
-        (value) => !hasMinimumRadius(value)
-      )
+      const hasRadiusIssue = radii.some((value) => !hasMinimumRadius(value))
       if (hasRadiusIssue) {
         const rect = node.getBoundingClientRect()
         failures.push({
@@ -6766,6 +6766,7 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         ) || owner.parentElement
       const containerRect = container?.getBoundingClientRect()
       const ownerStyle = window.getComputedStyle(owner)
+      const focusStyle = ownerStyle
       const nodeStyle = window.getComputedStyle(node)
       const classes =
         typeof owner.className === 'string'
@@ -6811,10 +6812,10 @@ async function assertVisibleInputFocusRingNotClipped(page, scenarioName) {
         containerRight: containerRect
           ? Number(containerRect.right.toFixed(1))
           : null,
-        borderColor: ownerStyle.borderColor,
-        boxShadow: ownerStyle.boxShadow,
-        outlineStyle: ownerStyle.outlineStyle,
-        outlineWidth: ownerStyle.outlineWidth,
+        borderColor: focusStyle.borderColor,
+        boxShadow: focusStyle.boxShadow,
+        outlineStyle: focusStyle.outlineStyle,
+        outlineWidth: focusStyle.outlineWidth,
         overflow: ownerStyle.overflow,
         overflowX: ownerStyle.overflowX,
         overflowY: ownerStyle.overflowY,
@@ -7826,9 +7827,7 @@ async function assertDevPageUsesGlobalThemeOnly(
     const root = document.querySelector(targetSelector)
     const toggles = root
       ? Array.from(
-          root.querySelectorAll(
-            '.erp-theme-toggle, .erp-theme-menu-toggle'
-          )
+          root.querySelectorAll('.erp-theme-toggle, .erp-theme-menu-toggle')
         )
       : []
     const toggle = toggles[0]

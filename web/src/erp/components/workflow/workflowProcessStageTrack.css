@@ -55,9 +55,13 @@
   display: grid;
   min-width: 132px;
   flex: 1 0 132px;
-  grid-template-columns: 26px minmax(0, 1fr);
+  grid-template-areas:
+    'marker'
+    'content';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 26px auto;
   align-items: start;
-  gap: 7px;
+  gap: 7px 0;
   padding-right: 14px;
 }
 
@@ -80,6 +84,7 @@
   position: relative;
   z-index: 1;
   display: inline-flex;
+  grid-area: marker;
   width: 26px;
   height: 26px;
   align-items: center;
@@ -95,9 +100,9 @@
 
 .workflow-process-stage__content {
   display: grid;
+  grid-area: content;
   min-width: 0;
   gap: 3px;
-  padding-top: 1px;
 }
 
 .workflow-process-stage__label {
@@ -198,7 +203,10 @@
 .workflow-process-stage--mobile .workflow-process-stage__item {
   min-width: 0;
   min-height: 58px;
+  grid-template-areas: 'marker content';
   grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-rows: auto;
+  gap: 0 7px;
   padding: 0 0 12px;
 }
 

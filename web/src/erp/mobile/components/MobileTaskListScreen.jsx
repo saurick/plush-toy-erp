@@ -3,7 +3,6 @@ import {
   ArrowUpOutlined,
   BellOutlined,
   CheckSquareOutlined,
-  DesktopOutlined,
   InboxOutlined,
   LogoutOutlined,
   ReloadOutlined,
@@ -53,7 +52,6 @@ export default function MobileTaskListScreen({
   filteredTasks,
   handleLogout,
   handleMainScroll,
-  handleEnterDesktop,
   handleSwitchEntry,
   initialLoading,
   latestTaskUpdate,
@@ -84,6 +82,9 @@ export default function MobileTaskListScreen({
     activeFilterKey === MOBILE_TASK_FILTER_KEYS.APPROVAL
       ? MOBILE_LIST_KEYS.APPROVAL
       : MOBILE_LIST_KEYS.TODO
+  const activeFilterLabel =
+    filterItems.find((item) => item.key === activeFilterKey)?.label || '当前'
+  const taskListLoading = loading && !activeViewHasData && !initialLoading
   const getCollapsedListLimit = (listKey) =>
     MOBILE_LIST_COLLAPSED_LIMITS[listKey] || Number.POSITIVE_INFINITY
 
@@ -211,9 +212,7 @@ export default function MobileTaskListScreen({
       className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
       data-testid="mobile-loaded-task-overview"
     >
-      <h2 className="text-lg font-semibold text-slate-950">
-        已加载任务分布
-      </h2>
+      <h2 className="text-lg font-semibold text-slate-950">已加载任务分布</h2>
       <div className="mt-3 grid grid-cols-4 divide-x divide-slate-200 rounded-xl border border-slate-100 bg-slate-50 py-3 text-center">
         {[
           {
@@ -316,6 +315,7 @@ export default function MobileTaskListScreen({
 
     return (
       <div
+        data-testid="mobile-role-task-filters"
         className={`mobile-role-task-filters mobile-role-task-filters--${activeFilterKey} mx-5 mt-4 grid rounded-2xl bg-slate-100 p-1 shadow-inner`}
         style={{
           '--mobile-role-task-filter-offset': `${activeFilterIndex * 100}%`,
@@ -378,8 +378,25 @@ export default function MobileTaskListScreen({
               状态 / 截止
             </span>
           </div>
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            {filteredTasks.length === 0 ? (
+          <div
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+            data-testid="mobile-role-task-list"
+            aria-busy={taskListLoading ? 'true' : 'false'}
+          >
+            {taskListLoading ? (
+              <div
+                className="flex min-h-40 flex-col items-center justify-center gap-3 px-5 py-8 text-center text-sm text-slate-500"
+                data-testid="mobile-role-task-list-loading"
+                role="status"
+                aria-live="polite"
+              >
+                <ReloadOutlined
+                  className="animate-spin text-xl text-emerald-600"
+                  aria-hidden="true"
+                />
+                <span>正在加载{activeFilterLabel}任务</span>
+              </div>
+            ) : filteredTasks.length === 0 ? (
               <>
                 <div className="px-5 py-8 text-center text-sm text-slate-500">
                   当前筛选下暂无任务
@@ -648,6 +665,9 @@ export default function MobileTaskListScreen({
       .map((role) => role?.name || getMobileRoleLabel(role?.role_key))
       .filter(Boolean)
       .join(' / ')
+    const availableEntryLabel = canEnterDesktop
+      ? '电脑端 / 手机待办'
+      : '手机待办'
     return (
       <section className="mx-5 mt-5 space-y-4 pb-5">
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -669,9 +689,9 @@ export default function MobileTaskListScreen({
               </div>
             </div>
             <div className="rounded-xl bg-slate-50 px-3 py-3">
-              <div className="text-slate-500">可用范围</div>
-              <div className="mt-1 font-semibold text-slate-950">
-                {adminProfile?.is_super_admin ? '全部功能' : '按岗位开放'}
+              <div className="text-slate-500">可用入口</div>
+              <div className="mt-1 min-w-0 break-words font-semibold text-slate-950">
+                {availableEntryLabel}
               </div>
             </div>
           </div>
@@ -682,22 +702,14 @@ export default function MobileTaskListScreen({
           {canEnterDesktop ? (
             <button
               type="button"
-              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
-              onClick={handleEnterDesktop}
-            >
-              <DesktopOutlined aria-hidden="true" />
-              进入电脑端
-            </button>
-          ) : (
-            <button
-              type="button"
+              data-testid="mobile-role-work-entry-switch"
               className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
               onClick={handleSwitchEntry}
             >
               <SwapOutlined aria-hidden="true" />
               切换工作入口
             </button>
-          )}
+          ) : null}
           <button
             type="button"
             data-testid="mobile-role-logout-button"
@@ -781,18 +793,6 @@ export default function MobileTaskListScreen({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <ERPThemeToggle size="small" variant="menu" />
-            {canEnterDesktop ? (
-              <button
-                type="button"
-                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-semibold text-slate-700"
-                aria-label="进入电脑端"
-                title="进入电脑端"
-                data-testid="mobile-role-desktop-entry"
-                onClick={handleEnterDesktop}
-              >
-                <SwapOutlined aria-hidden="true" />
-              </button>
-            ) : null}
             <button
               type="button"
               className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-emerald-700"

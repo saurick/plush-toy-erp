@@ -7,12 +7,22 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Button, List, Modal, Space, Tag, Typography } from 'antd'
+import {
+  Button,
+  Input,
+  List,
+  Modal,
+  Space,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd'
 import {
   DeleteOutlined,
   DownloadOutlined,
   EyeOutlined,
   PaperClipOutlined,
+  StopOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
 
@@ -22,8 +32,14 @@ import {
   downloadBusinessAttachment,
   listBusinessAttachments,
   uploadBusinessAttachment,
+  withdrawBusinessAttachment,
 } from '../../api/attachmentApi.mjs'
-import { resolveBusinessAttachmentAuditMeta } from '../../utils/businessAttachmentPresentation.mjs'
+import {
+  isBusinessAttachmentWithdrawn,
+  normalizeBusinessAttachmentWithdrawalReason,
+  resolveBusinessAttachmentAuditMeta,
+  resolveBusinessAttachmentWithdrawalMeta,
+} from '../../utils/businessAttachmentPresentation.mjs'
 import { resolveBusinessAttachmentPanelState } from '../../utils/businessAttachmentPanelState.mjs'
 
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024
@@ -197,6 +213,12 @@ function isPreviewableAttachment(item) {
 function SavedAttachmentAuditMeta({ item }) {
   const { uploaderLabel, uploadedAtLabel } =
     resolveBusinessAttachmentAuditMeta(item)
+  const {
+    withdrawn,
+    withdrawerLabel,
+    withdrawnAtLabel,
+    withdrawalReasonLabel,
+  } = resolveBusinessAttachmentWithdrawalMeta(item)
 
   return (
     <>
@@ -206,6 +228,24 @@ function SavedAttachmentAuditMeta({ item }) {
       <Typography.Text type="secondary" title={uploadedAtLabel}>
         {uploadedAtLabel}
       </Typography.Text>
+      {withdrawn ? (
+        <>
+          <Tag color="error">已撤销</Tag>
+          <Typography.Text type="secondary" title={withdrawerLabel}>
+            {withdrawerLabel}
+          </Typography.Text>
+          <Typography.Text type="secondary" title={withdrawnAtLabel}>
+            {withdrawnAtLabel}
+          </Typography.Text>
+          <Typography.Text
+            type="secondary"
+            title={withdrawalReasonLabel}
+            style={{ overflowWrap: 'anywhere' }}
+          >
+            {withdrawalReasonLabel}
+          </Typography.Text>
+        </>
+      ) : null}
     </>
   )
 }
@@ -221,6 +261,7 @@ const BusinessAttachmentPanel = forwardRef(
       attachmentType = 'evidence',
       slotKey,
       canUpload = true,
+      canWithdraw = false,
       className = '',
       variant = 'section',
       allowPendingAttachmentsWithoutOwner = true,
@@ -230,6 +271,7 @@ const BusinessAttachmentPanel = forwardRef(
     ref
   ) => {
     const inputRef = useRef(null)
+    const withdrawalReasonRef = useRef(null)
     const pendingAttachmentsRef = useRef([])
     const [attachments, setAttachments] = useState([])
     const [pendingAttachments, setPendingAttachments] = useState([])
@@ -237,6 +279,9 @@ const BusinessAttachmentPanel = forwardRef(
     const [uploading, setUploading] = useState(false)
     const [previewing, setPreviewing] = useState(false)
     const [previewAttachment, setPreviewAttachment] = useState(null)
+    const [withdrawalTarget, setWithdrawalTarget] = useState(null)
+    const [withdrawalReason, setWithdrawalReason] = useState('')
+    const [withdrawing, setWithdrawing] = useState(false)
 
     const {
       normalizedOwnerId,
@@ -498,6 +543,66 @@ const BusinessAttachmentPanel = forwardRef(
       )
     }
 
+    function openWithdrawal(item) {
+      setWithdrawalTarget(item)
+      setWithdrawalReason('')
+    }
+
+    const closeWithdrawal = useCallback(() => {
+      if (withdrawing) return
+      setWithdrawalTarget(null)
+      setWithdrawalReason('')
+    }, [withdrawing])
+
+    const handleConfirmWithdrawal = useCallback(async () => {
+      const normalized =
+        normalizeBusinessAttachmentWithdrawalReason(withdrawalReason)
+      if (!normalized.valid) {
+        message.warning(
+          normalized.length <= 0
+            ? '请填写撤销原因'
+            : '撤销原因最多填写 255 个字'
+        )
+        withdrawalReasonRef.current?.focus()
+        return
+      }
+      if (!withdrawalTarget?.id) return
+
+      setWithdrawing(true)
+      try {
+        const nextItem = await withdrawBusinessAttachment({
+          id: withdrawalTarget.id,
+          reason: normalized.reason,
+          ...(ownerType === 'workflow_task'
+            ? { expected_version: Number(ownerVersion || 0) }
+            : {}),
+        })
+        if (nextItem?.id) {
+          setAttachments((current) =>
+            current.map((item) =>
+              Number(item.id) === Number(nextItem.id) ? nextItem : item
+            )
+          )
+        } else {
+          await reload(normalizedOwnerId)
+        }
+        message.success('附件已撤销，撤销记录已保留')
+        setWithdrawalTarget(null)
+        setWithdrawalReason('')
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '撤销业务附件'))
+      } finally {
+        setWithdrawing(false)
+      }
+    }, [
+      normalizedOwnerId,
+      ownerType,
+      ownerVersion,
+      reload,
+      withdrawalReason,
+      withdrawalTarget,
+    ])
+
     const handleClosePreview = useCallback(() => {
       setPreviewAttachment((current) => {
         if (current?.url) {
@@ -522,6 +627,67 @@ const BusinessAttachmentPanel = forwardRef(
           预览
         </Button>
       )
+    }
+
+    function renderWithdrawalAction(item) {
+      if (!canWithdraw) return null
+      const withdrawn = isBusinessAttachmentWithdrawn(item)
+      const button = (
+        <Button
+          key="withdraw"
+          danger
+          type="link"
+          size="small"
+          aria-label="撤销附件"
+          icon={<StopOutlined />}
+          disabled={withdrawn}
+          onClick={() => openWithdrawal(item)}
+        >
+          撤销附件
+        </Button>
+      )
+      if (!withdrawn) return button
+      return (
+        <Tooltip key="withdraw" title="该附件已撤销，不能重复撤销">
+          <span>{button}</span>
+        </Tooltip>
+      )
+    }
+
+    function renderAttachmentActions(item) {
+      if (item.__kind === 'pending') {
+        return [
+          renderPreviewAction(item),
+          <Button
+            key="remove-pending"
+            danger
+            type="link"
+            size="small"
+            aria-label="移除待上传附件"
+            icon={<DeleteOutlined />}
+            onClick={() => handleRemovePending(item)}
+          >
+            移除
+          </Button>,
+        ].filter(Boolean)
+      }
+      if (isBusinessAttachmentWithdrawn(item)) {
+        return [renderWithdrawalAction(item)].filter(Boolean)
+      }
+      return [
+        renderPreviewAction(item),
+        <Button
+          key="download"
+          type="link"
+          size="small"
+          aria-label="下载附件"
+          icon={<DownloadOutlined />}
+          onClick={() => handleDownload(item)}
+        >
+          下载
+        </Button>,
+        renderWithdrawalAction(item),
+      ].filter(Boolean)
     }
 
     return (
@@ -570,38 +736,7 @@ const BusinessAttachmentPanel = forwardRef(
             ),
           }}
           renderItem={(item) => (
-            <List.Item
-              actions={
-                item.__kind === 'pending'
-                  ? [
-                      renderPreviewAction(item),
-                    <Button
-                      key="remove-pending"
-                      danger
-                      type="link"
-                      size="small"
-                      aria-label="移除待上传附件"
-                      icon={<DeleteOutlined />}
-                      onClick={() => handleRemovePending(item)}
-                    >
-                      移除
-                    </Button>,
-                    ].filter(Boolean)
-                  : [
-                      renderPreviewAction(item),
-                    <Button
-                      key="download"
-                      type="link"
-                      size="small"
-                      aria-label="下载附件"
-                      icon={<DownloadOutlined />}
-                      onClick={() => handleDownload(item)}
-                    >
-                      下载
-                    </Button>,
-                    ].filter(Boolean)
-              }
-            >
+            <List.Item actions={renderAttachmentActions(item)}>
               <List.Item.Meta
                 avatar={<PaperClipOutlined />}
                 title={item.file_name}
@@ -619,6 +754,42 @@ const BusinessAttachmentPanel = forwardRef(
             </List.Item>
           )}
         />
+        <Modal
+          centered
+          destroyOnHidden
+          open={Boolean(withdrawalTarget)}
+          title="撤销附件"
+          okText="确认撤销"
+          cancelText="取消"
+          confirmLoading={withdrawing}
+          okButtonProps={{ danger: true }}
+          maskClosable={!withdrawing}
+          keyboard={!withdrawing}
+          onCancel={closeWithdrawal}
+          onOk={handleConfirmWithdrawal}
+          afterOpenChange={(nextOpen) => {
+            if (nextOpen) withdrawalReasonRef.current?.focus()
+          }}
+        >
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Typography.Paragraph type="secondary">
+              撤销后不能再预览或下载；文件名、上传记录和撤销原因会继续保留。你可以另行上传正确附件。
+            </Typography.Paragraph>
+            <Typography.Text strong>
+              {withdrawalTarget?.file_name || '当前附件'}
+            </Typography.Text>
+            <Input.TextArea
+              ref={withdrawalReasonRef}
+              aria-label="撤销原因"
+              value={withdrawalReason}
+              maxLength={255}
+              showCount
+              autoSize={{ minRows: 3, maxRows: 6 }}
+              placeholder="请说明为什么撤销，例如：上传了错误版本"
+              onChange={(event) => setWithdrawalReason(event.target.value)}
+            />
+          </Space>
+        </Modal>
         <Modal
           open={Boolean(previewAttachment)}
           title={previewAttachment?.file_name || '附件预览'}

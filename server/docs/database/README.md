@@ -22,11 +22,11 @@ go run ./cmd/schema-doc --write
 | 项目 | 数量 |
 | --- | ---: |
 | 应用表 | 74 |
-| 字段 | 1145 |
+| 字段 | 1148 |
 | 外键 | 141 |
-| 显式索引 | 332 |
+| 显式索引 | 333 |
 | 其中 partial index | 30 |
-| 命名 / 表级 CHECK | 248 |
+| 命名 / 表级 CHECK | 249 |
 
 ## 分域入口
 
@@ -50,7 +50,7 @@ go run ./cmd/schema-doc --write
 | [`admin_users`](账号权限与配置.md#table-admin-users) | 管理员账号 | 账号、权限与配置 | Config / 配置 | 保存后台登录身份、认证版本、超级管理员标记和账号状态。 |
 | [`bom_headers`](主数据与BOM.md#table-bom-headers) | BOM 版本 | 主数据与 BOM | MasterData / 主数据 | 保存产品 BOM 的版本、有效期、状态及工程资料头信息。 |
 | [`bom_items`](主数据与BOM.md#table-bom-items) | BOM 物料明细 | 主数据与 BOM | MasterData / 主数据 | 保存一个 BOM 版本引用的物料、单位、用量、损耗率和显式工序归属。 |
-| [`business_attachments`](流程运行时.md#table-business-attachments) | 业务附件证据 | 流程运行时、协同与审计 | Fact / 事实 | 保存挂接到业务对象的文件内容、元数据、哈希和上传人等证据。 |
+| [`business_attachments`](流程运行时.md#table-business-attachments) | 业务附件证据 | 流程运行时、协同与审计 | Fact / 事实 | 保存挂接到业务对象的文件内容、元数据、哈希、上传审计和撤销审计等证据。 |
 | [`contacts`](主数据与BOM.md#table-contacts) | 联系人 | 主数据与 BOM | MasterData / 主数据 | 保存客户或供应商联系人、联系方式、主联系人标记和启用状态。 |
 | [`customer_config_revisions`](账号权限与配置.md#table-customer-config-revisions) | 客户配置版本 | 账号、权限与配置 | Config / 配置 | 保存规范化客户配置的版本、哈希、编译快照和发布状态。 |
 | [`customers`](主数据与BOM.md#table-customers) | 客户 | 主数据与 BOM | MasterData / 主数据 | 保存销售、出货和应收等业务引用的客户主档。 |

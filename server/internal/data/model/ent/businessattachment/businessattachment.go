@@ -35,6 +35,12 @@ const (
 	FieldUploadedBy = "uploaded_by"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
+	// FieldWithdrawnAt holds the string denoting the withdrawn_at field in the database.
+	FieldWithdrawnAt = "withdrawn_at"
+	// FieldWithdrawnBy holds the string denoting the withdrawn_by field in the database.
+	FieldWithdrawnBy = "withdrawn_by"
+	// FieldWithdrawalReason holds the string denoting the withdrawal_reason field in the database.
+	FieldWithdrawalReason = "withdrawal_reason"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// Table holds the table name of the businessattachment in the database.
@@ -55,6 +61,9 @@ var Columns = []string{
 	FieldContent,
 	FieldUploadedBy,
 	FieldNote,
+	FieldWithdrawnAt,
+	FieldWithdrawnBy,
+	FieldWithdrawalReason,
 	FieldCreatedAt,
 }
 
@@ -91,6 +100,10 @@ var (
 	UploadedByValidator func(int) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
+	// WithdrawnByValidator is a validator for the "withdrawn_by" field. It is called by the builders before save.
+	WithdrawnByValidator func(int) error
+	// WithdrawalReasonValidator is a validator for the "withdrawal_reason" field. It is called by the builders before save.
+	WithdrawalReasonValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -151,6 +164,21 @@ func ByUploadedBy(opts ...sql.OrderTermOption) OrderOption {
 // ByNote orders the results by the note field.
 func ByNote(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNote, opts...).ToFunc()
+}
+
+// ByWithdrawnAt orders the results by the withdrawn_at field.
+func ByWithdrawnAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWithdrawnAt, opts...).ToFunc()
+}
+
+// ByWithdrawnBy orders the results by the withdrawn_by field.
+func ByWithdrawnBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWithdrawnBy, opts...).ToFunc()
+}
+
+// ByWithdrawalReason orders the results by the withdrawal_reason field.
+func ByWithdrawalReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldWithdrawalReason, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

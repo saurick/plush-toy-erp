@@ -12,17 +12,22 @@ import (
 	"image/png"
 	"strings"
 	"testing"
+	"time"
 )
 
 type stubBusinessAttachmentRepo struct {
-	ownerExists  bool
-	created      *BusinessAttachmentCreate
-	current      *BusinessAttachment
-	contentCalls int
-	clearCalls   int
-	clearProduct int
-	clearSlot    string
-	content      []byte
+	ownerExists   bool
+	created       *BusinessAttachmentCreate
+	current       *BusinessAttachment
+	contentCalls  int
+	withdrawCalls int
+	withdrawn     *BusinessAttachmentWithdraw
+	withdrawErr   error
+	withdrawnAt   time.Time
+	clearCalls    int
+	clearProduct  int
+	clearSlot     string
+	content       []byte
 }
 
 func (r *stubBusinessAttachmentRepo) CreateBusinessAttachment(_ context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error) {
@@ -67,8 +72,19 @@ func (r *stubBusinessAttachmentRepo) GetBusinessAttachmentContent(context.Contex
 	return []byte("proof"), nil
 }
 
-func (r *stubBusinessAttachmentRepo) DeleteBusinessAttachment(context.Context, int) error {
-	return nil
+func (r *stubBusinessAttachmentRepo) WithdrawBusinessAttachment(
+	_ context.Context,
+	in *BusinessAttachmentWithdraw,
+) (time.Time, error) {
+	r.withdrawCalls++
+	r.withdrawn = in
+	if r.withdrawErr != nil {
+		return time.Time{}, r.withdrawErr
+	}
+	if r.withdrawnAt.IsZero() {
+		r.withdrawnAt = time.Unix(1_750_000_000, 0)
+	}
+	return r.withdrawnAt, nil
 }
 
 func (r *stubBusinessAttachmentRepo) BusinessAttachmentOwnerExists(context.Context, string, int) (bool, error) {
@@ -511,6 +527,132 @@ func TestBusinessAttachmentGetRejectsOrphanedAttachment(t *testing.T) {
 	_, err := NewBusinessAttachmentUsecase(repo).GetBusinessAttachmentMetadata(context.Background(), 9)
 	if !errors.Is(err, ErrBusinessAttachmentOwnerNotFound) {
 		t.Fatalf("orphaned attachment must not be returned, got %v", err)
+	}
+}
+
+func TestBusinessAttachmentWithdrawPersistsNormalizedAuditMetadata(t *testing.T) {
+	repo := &stubBusinessAttachmentRepo{ownerExists: true}
+	uc := NewBusinessAttachmentUsecase(repo)
+	item, err := uc.WithdrawBusinessAttachment(context.Background(), &BusinessAttachmentWithdrawInput{
+		Attachment: &BusinessAttachment{
+			ID:             9,
+			OwnerType:      BusinessAttachmentOwnerSalesOrder,
+			OwnerID:        42,
+			AttachmentType: "evidence",
+			FileName:       "wrong.pdf",
+			Content:        []byte("proof"),
+		},
+		Reason:      "  上传了错误版本，改传已签字文件  ",
+		WithdrawnBy: 7,
+	})
+	if err != nil {
+		t.Fatalf("withdraw attachment: %v", err)
+	}
+	if repo.withdrawCalls != 1 || repo.withdrawn == nil ||
+		repo.withdrawn.Reason != "上传了错误版本，改传已签字文件" ||
+		repo.withdrawn.WithdrawnBy != 7 {
+		t.Fatalf("withdrawal audit input = %#v, calls=%d", repo.withdrawn, repo.withdrawCalls)
+	}
+	if item.WithdrawnAt == nil || !item.WithdrawnAt.Equal(repo.withdrawnAt) ||
+		item.WithdrawnBy == nil || *item.WithdrawnBy != 7 ||
+		item.WithdrawalReason == nil || *item.WithdrawalReason != "上传了错误版本，改传已签字文件" ||
+		item.Content != nil {
+		t.Fatalf("withdrawn attachment metadata = %#v", item)
+	}
+}
+
+func TestBusinessAttachmentWithdrawExactReplayReturnsStoredReceipt(t *testing.T) {
+	withdrawnAt := time.Unix(1_750_000_000, 0)
+	withdrawnBy := 7
+	reason := "上传了错误版本"
+	repo := &stubBusinessAttachmentRepo{ownerExists: true}
+	item, err := NewBusinessAttachmentUsecase(repo).WithdrawBusinessAttachment(
+		context.Background(),
+		&BusinessAttachmentWithdrawInput{
+			Attachment: &BusinessAttachment{
+				ID:               9,
+				OwnerType:        BusinessAttachmentOwnerSalesOrder,
+				OwnerID:          42,
+				AttachmentType:   "evidence",
+				Content:          []byte("proof"),
+				WithdrawnAt:      &withdrawnAt,
+				WithdrawnBy:      &withdrawnBy,
+				WithdrawalReason: &reason,
+			},
+			Reason:      "  上传了错误版本  ",
+			WithdrawnBy: withdrawnBy,
+		},
+	)
+	if err != nil || item == nil || item.WithdrawnAt == nil || !item.WithdrawnAt.Equal(withdrawnAt) {
+		t.Fatalf("exact withdrawal replay = %#v, err=%v", item, err)
+	}
+	if item.Content != nil || repo.withdrawCalls != 0 {
+		t.Fatalf("exact replay must return stored metadata without writing: item=%#v calls=%d", item, repo.withdrawCalls)
+	}
+}
+
+func TestBusinessAttachmentWithdrawRejectsInvalidOrUnsupportedTransitions(t *testing.T) {
+	withdrawnAt := time.Unix(1_749_000_000, 0)
+	base := BusinessAttachment{
+		ID:             9,
+		OwnerType:      BusinessAttachmentOwnerSalesOrder,
+		OwnerID:        42,
+		AttachmentType: "evidence",
+	}
+	for _, tc := range []struct {
+		name       string
+		attachment BusinessAttachment
+		reason     string
+		actorID    int
+		guard      *WorkflowAttachmentWriteGuard
+		wantErr    error
+	}{
+		{name: "blank reason", attachment: base, reason: "  ", actorID: 7, wantErr: ErrBusinessAttachmentWithdrawalReasonInvalid},
+		{name: "reason too long", attachment: base, reason: strings.Repeat("错", 256), actorID: 7, wantErr: ErrBusinessAttachmentWithdrawalReasonInvalid},
+		{name: "invalid actor", attachment: base, reason: "上传错误", actorID: 0, wantErr: ErrBadParam},
+		{name: "already withdrawn", attachment: func() BusinessAttachment { item := base; item.WithdrawnAt = &withdrawnAt; return item }(), reason: "重复", actorID: 7, wantErr: ErrBusinessAttachmentWithdrawn},
+		{name: "product media", attachment: BusinessAttachment{ID: 9, OwnerType: BusinessAttachmentOwnerProduct, OwnerID: 42, AttachmentType: BusinessAttachmentTypeProductImage}, reason: "不适用", actorID: 7, wantErr: ErrBusinessAttachmentProductImageWithdrawalUnsupported},
+		{name: "workflow guard missing", attachment: BusinessAttachment{ID: 9, OwnerType: BusinessAttachmentOwnerWorkflowTask, OwnerID: 42, AttachmentType: "evidence"}, reason: "上传错误", actorID: 7, wantErr: ErrBadParam},
+		{name: "workflow actor mismatch", attachment: BusinessAttachment{ID: 9, OwnerType: BusinessAttachmentOwnerWorkflowTask, OwnerID: 42, AttachmentType: "evidence"}, reason: "上传错误", actorID: 7, guard: &WorkflowAttachmentWriteGuard{ExpectedVersion: 1, ActorID: 8}, wantErr: ErrBadParam},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubBusinessAttachmentRepo{ownerExists: true}
+			_, err := NewBusinessAttachmentUsecase(repo).WithdrawBusinessAttachment(
+				context.Background(),
+				&BusinessAttachmentWithdrawInput{
+					Attachment:    &tc.attachment,
+					Reason:        tc.reason,
+					WithdrawnBy:   tc.actorID,
+					WorkflowGuard: tc.guard,
+				},
+			)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("withdraw error = %v, want %v", err, tc.wantErr)
+			}
+			if repo.withdrawCalls != 0 {
+				t.Fatalf("invalid withdrawal must not reach repo, calls=%d", repo.withdrawCalls)
+			}
+		})
+	}
+}
+
+func TestBusinessAttachmentGetContentRejectsWithdrawnMetadataBeforeRepoRead(t *testing.T) {
+	withdrawnAt := time.Unix(1_750_000_000, 0)
+	repo := &stubBusinessAttachmentRepo{content: []byte("proof")}
+	content, err := NewBusinessAttachmentUsecase(repo).GetBusinessAttachmentContent(
+		context.Background(),
+		&BusinessAttachment{
+			ID:          9,
+			OwnerType:   BusinessAttachmentOwnerSalesOrder,
+			OwnerID:     42,
+			WithdrawnAt: &withdrawnAt,
+		},
+	)
+	if content != nil || !errors.Is(err, ErrBusinessAttachmentWithdrawnContentUnavailable) {
+		t.Fatalf("withdrawn content must fail closed: content=%q err=%v", content, err)
+	}
+	if repo.contentCalls != 0 {
+		t.Fatalf("withdrawn content must not reach repo, calls=%d", repo.contentCalls)
 	}
 }
 

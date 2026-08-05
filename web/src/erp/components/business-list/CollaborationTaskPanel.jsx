@@ -28,6 +28,7 @@ import {
   getWorkflowTaskStatusMeta,
 } from '../../utils/workflowTaskBoard.mjs'
 import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 
 const { Text } = Typography
 const COLLABORATION_PANEL_DEFAULT_HEIGHT = 260
@@ -191,6 +192,13 @@ export function CollaborationTaskPanel({
   const actionDrawerReadonlyReason = actionDrawerAccess.loading
     ? '正在确认您是否可以处理当前任务。'
     : actionDrawerAccess.readonlyReason
+  const actionDrawerCanViewAttachments = hasActionPermission(
+    adminProfile,
+    'workflow.task.read'
+  )
+  const actionDrawerCanManageAttachments =
+    actionDrawerAccess.canHandle &&
+    hasActionPermission(adminProfile, 'workflow.task.update')
   const taskPanelModel = React.useMemo(
     () => buildBusinessCollaborationTaskPanelModel({ tasks }),
     [tasks]
@@ -611,6 +619,8 @@ export function CollaborationTaskPanel({
         actionSaving={actionDrawerSaving}
         allowedActionModes={actionDrawerAllowedModes}
         readonlyReason={actionDrawerReadonlyReason}
+        canViewAttachments={actionDrawerCanViewAttachments}
+        canManageAttachments={actionDrawerCanManageAttachments}
         onActionModeChange={setActionDrawerMode}
         onActionReasonChange={setActionDrawerReason}
         onClose={closeActionDrawer}

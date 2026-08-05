@@ -32,7 +32,7 @@ test("schema docs cover every generated application table without drift", () => 
 
   assert.match(output, /mode=check/u);
   assert.match(output, /tables=74 catalog=74/u);
-  assert.match(output, /columns=1145 foreignKeys=141 indexes=332 checks=248/u);
+  assert.match(output, /columns=1148 foreignKeys=141 indexes=333 checks=249/u);
   assert.match(output, /outputs=8/u);
   assert.match(
     output,

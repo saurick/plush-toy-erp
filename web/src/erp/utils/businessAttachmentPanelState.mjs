@@ -36,3 +36,24 @@ export function resolveBusinessAttachmentPanelState({
     uploadButtonText,
   }
 }
+
+export function resolveBusinessAttachmentActionLabel({
+  attachmentCount,
+  canUpload = true,
+  fallbackLabel = '附件',
+  countLabel = '附件',
+  emptyUploadLabel = '添加附件',
+  emptyReadLabel = '查看附件',
+} = {}) {
+  const normalizedCount =
+    attachmentCount === null || attachmentCount === undefined
+      ? null
+      : Number(attachmentCount)
+  if (!Number.isSafeInteger(normalizedCount) || normalizedCount < 0) {
+    return fallbackLabel
+  }
+  if (normalizedCount > 0) {
+    return `${countLabel}（${normalizedCount}）`
+  }
+  return canUpload ? emptyUploadLabel : emptyReadLabel
+}

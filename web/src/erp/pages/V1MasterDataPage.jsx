@@ -1221,7 +1221,7 @@ export default function V1MasterDataPage({ type }) {
               title="产品规格附件"
               description="上传产品图、样品图、包装图或客户款式确认资料；附件不会改变产品规格的启用状态。"
               canUpload={canCreate || canUpdate}
-              canDelete={canUpdate}
+              canWithdraw={canCreate || canUpdate}
               variant="inline"
             />
           ) : null}

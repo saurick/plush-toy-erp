@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/predicate"
+	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -212,6 +213,73 @@ func (_u *BusinessAttachmentUpdate) ClearNote() *BusinessAttachmentUpdate {
 	return _u
 }
 
+// SetWithdrawnAt sets the "withdrawn_at" field.
+func (_u *BusinessAttachmentUpdate) SetWithdrawnAt(v time.Time) *BusinessAttachmentUpdate {
+	_u.mutation.SetWithdrawnAt(v)
+	return _u
+}
+
+// SetNillableWithdrawnAt sets the "withdrawn_at" field if the given value is not nil.
+func (_u *BusinessAttachmentUpdate) SetNillableWithdrawnAt(v *time.Time) *BusinessAttachmentUpdate {
+	if v != nil {
+		_u.SetWithdrawnAt(*v)
+	}
+	return _u
+}
+
+// ClearWithdrawnAt clears the value of the "withdrawn_at" field.
+func (_u *BusinessAttachmentUpdate) ClearWithdrawnAt() *BusinessAttachmentUpdate {
+	_u.mutation.ClearWithdrawnAt()
+	return _u
+}
+
+// SetWithdrawnBy sets the "withdrawn_by" field.
+func (_u *BusinessAttachmentUpdate) SetWithdrawnBy(v int) *BusinessAttachmentUpdate {
+	_u.mutation.ResetWithdrawnBy()
+	_u.mutation.SetWithdrawnBy(v)
+	return _u
+}
+
+// SetNillableWithdrawnBy sets the "withdrawn_by" field if the given value is not nil.
+func (_u *BusinessAttachmentUpdate) SetNillableWithdrawnBy(v *int) *BusinessAttachmentUpdate {
+	if v != nil {
+		_u.SetWithdrawnBy(*v)
+	}
+	return _u
+}
+
+// AddWithdrawnBy adds value to the "withdrawn_by" field.
+func (_u *BusinessAttachmentUpdate) AddWithdrawnBy(v int) *BusinessAttachmentUpdate {
+	_u.mutation.AddWithdrawnBy(v)
+	return _u
+}
+
+// ClearWithdrawnBy clears the value of the "withdrawn_by" field.
+func (_u *BusinessAttachmentUpdate) ClearWithdrawnBy() *BusinessAttachmentUpdate {
+	_u.mutation.ClearWithdrawnBy()
+	return _u
+}
+
+// SetWithdrawalReason sets the "withdrawal_reason" field.
+func (_u *BusinessAttachmentUpdate) SetWithdrawalReason(v string) *BusinessAttachmentUpdate {
+	_u.mutation.SetWithdrawalReason(v)
+	return _u
+}
+
+// SetNillableWithdrawalReason sets the "withdrawal_reason" field if the given value is not nil.
+func (_u *BusinessAttachmentUpdate) SetNillableWithdrawalReason(v *string) *BusinessAttachmentUpdate {
+	if v != nil {
+		_u.SetWithdrawalReason(*v)
+	}
+	return _u
+}
+
+// ClearWithdrawalReason clears the value of the "withdrawal_reason" field.
+func (_u *BusinessAttachmentUpdate) ClearWithdrawalReason() *BusinessAttachmentUpdate {
+	_u.mutation.ClearWithdrawalReason()
+	return _u
+}
+
 // Mutation returns the BusinessAttachmentMutation object of the builder.
 func (_u *BusinessAttachmentUpdate) Mutation() *BusinessAttachmentMutation {
 	return _u.mutation
@@ -296,6 +364,16 @@ func (_u *BusinessAttachmentUpdate) check() error {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.note": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.WithdrawnBy(); ok {
+		if err := businessattachment.WithdrawnByValidator(v); err != nil {
+			return &ValidationError{Name: "withdrawn_by", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.withdrawn_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.WithdrawalReason(); ok {
+		if err := businessattachment.WithdrawalReasonValidator(v); err != nil {
+			return &ValidationError{Name: "withdrawal_reason", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.withdrawal_reason": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -361,6 +439,27 @@ func (_u *BusinessAttachmentUpdate) sqlSave(ctx context.Context) (_node int, err
 	}
 	if _u.mutation.NoteCleared() {
 		_spec.ClearField(businessattachment.FieldNote, field.TypeString)
+	}
+	if value, ok := _u.mutation.WithdrawnAt(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawnAt, field.TypeTime, value)
+	}
+	if _u.mutation.WithdrawnAtCleared() {
+		_spec.ClearField(businessattachment.FieldWithdrawnAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.WithdrawnBy(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawnBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWithdrawnBy(); ok {
+		_spec.AddField(businessattachment.FieldWithdrawnBy, field.TypeInt, value)
+	}
+	if _u.mutation.WithdrawnByCleared() {
+		_spec.ClearField(businessattachment.FieldWithdrawnBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.WithdrawalReason(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawalReason, field.TypeString, value)
+	}
+	if _u.mutation.WithdrawalReasonCleared() {
+		_spec.ClearField(businessattachment.FieldWithdrawalReason, field.TypeString)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -567,6 +666,73 @@ func (_u *BusinessAttachmentUpdateOne) ClearNote() *BusinessAttachmentUpdateOne 
 	return _u
 }
 
+// SetWithdrawnAt sets the "withdrawn_at" field.
+func (_u *BusinessAttachmentUpdateOne) SetWithdrawnAt(v time.Time) *BusinessAttachmentUpdateOne {
+	_u.mutation.SetWithdrawnAt(v)
+	return _u
+}
+
+// SetNillableWithdrawnAt sets the "withdrawn_at" field if the given value is not nil.
+func (_u *BusinessAttachmentUpdateOne) SetNillableWithdrawnAt(v *time.Time) *BusinessAttachmentUpdateOne {
+	if v != nil {
+		_u.SetWithdrawnAt(*v)
+	}
+	return _u
+}
+
+// ClearWithdrawnAt clears the value of the "withdrawn_at" field.
+func (_u *BusinessAttachmentUpdateOne) ClearWithdrawnAt() *BusinessAttachmentUpdateOne {
+	_u.mutation.ClearWithdrawnAt()
+	return _u
+}
+
+// SetWithdrawnBy sets the "withdrawn_by" field.
+func (_u *BusinessAttachmentUpdateOne) SetWithdrawnBy(v int) *BusinessAttachmentUpdateOne {
+	_u.mutation.ResetWithdrawnBy()
+	_u.mutation.SetWithdrawnBy(v)
+	return _u
+}
+
+// SetNillableWithdrawnBy sets the "withdrawn_by" field if the given value is not nil.
+func (_u *BusinessAttachmentUpdateOne) SetNillableWithdrawnBy(v *int) *BusinessAttachmentUpdateOne {
+	if v != nil {
+		_u.SetWithdrawnBy(*v)
+	}
+	return _u
+}
+
+// AddWithdrawnBy adds value to the "withdrawn_by" field.
+func (_u *BusinessAttachmentUpdateOne) AddWithdrawnBy(v int) *BusinessAttachmentUpdateOne {
+	_u.mutation.AddWithdrawnBy(v)
+	return _u
+}
+
+// ClearWithdrawnBy clears the value of the "withdrawn_by" field.
+func (_u *BusinessAttachmentUpdateOne) ClearWithdrawnBy() *BusinessAttachmentUpdateOne {
+	_u.mutation.ClearWithdrawnBy()
+	return _u
+}
+
+// SetWithdrawalReason sets the "withdrawal_reason" field.
+func (_u *BusinessAttachmentUpdateOne) SetWithdrawalReason(v string) *BusinessAttachmentUpdateOne {
+	_u.mutation.SetWithdrawalReason(v)
+	return _u
+}
+
+// SetNillableWithdrawalReason sets the "withdrawal_reason" field if the given value is not nil.
+func (_u *BusinessAttachmentUpdateOne) SetNillableWithdrawalReason(v *string) *BusinessAttachmentUpdateOne {
+	if v != nil {
+		_u.SetWithdrawalReason(*v)
+	}
+	return _u
+}
+
+// ClearWithdrawalReason clears the value of the "withdrawal_reason" field.
+func (_u *BusinessAttachmentUpdateOne) ClearWithdrawalReason() *BusinessAttachmentUpdateOne {
+	_u.mutation.ClearWithdrawalReason()
+	return _u
+}
+
 // Mutation returns the BusinessAttachmentMutation object of the builder.
 func (_u *BusinessAttachmentUpdateOne) Mutation() *BusinessAttachmentMutation {
 	return _u.mutation
@@ -664,6 +830,16 @@ func (_u *BusinessAttachmentUpdateOne) check() error {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.note": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.WithdrawnBy(); ok {
+		if err := businessattachment.WithdrawnByValidator(v); err != nil {
+			return &ValidationError{Name: "withdrawn_by", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.withdrawn_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.WithdrawalReason(); ok {
+		if err := businessattachment.WithdrawalReasonValidator(v); err != nil {
+			return &ValidationError{Name: "withdrawal_reason", err: fmt.Errorf(`ent: validator failed for field "BusinessAttachment.withdrawal_reason": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -746,6 +922,27 @@ func (_u *BusinessAttachmentUpdateOne) sqlSave(ctx context.Context) (_node *Busi
 	}
 	if _u.mutation.NoteCleared() {
 		_spec.ClearField(businessattachment.FieldNote, field.TypeString)
+	}
+	if value, ok := _u.mutation.WithdrawnAt(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawnAt, field.TypeTime, value)
+	}
+	if _u.mutation.WithdrawnAtCleared() {
+		_spec.ClearField(businessattachment.FieldWithdrawnAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.WithdrawnBy(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawnBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedWithdrawnBy(); ok {
+		_spec.AddField(businessattachment.FieldWithdrawnBy, field.TypeInt, value)
+	}
+	if _u.mutation.WithdrawnByCleared() {
+		_spec.ClearField(businessattachment.FieldWithdrawnBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.WithdrawalReason(); ok {
+		_spec.SetField(businessattachment.FieldWithdrawalReason, field.TypeString, value)
+	}
+	if _u.mutation.WithdrawalReasonCleared() {
+		_spec.ClearField(businessattachment.FieldWithdrawalReason, field.TypeString)
 	}
 	_node = &BusinessAttachment{config: _u.config}
 	_spec.Assign = _node.assignValues

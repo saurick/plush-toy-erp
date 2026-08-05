@@ -1,15 +1,12 @@
 import React from 'react'
 import {
-  ClockCircleOutlined,
   ExclamationCircleFilled,
   FileTextOutlined,
   LinkOutlined,
   LoadingOutlined,
-  PaperClipOutlined,
   ReloadOutlined,
   RightOutlined,
 } from '@ant-design/icons'
-import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
 import {
   getWorkflowTaskProcessContext,
   listWorkflowTaskEvents,
@@ -25,12 +22,10 @@ import {
   buildTaskFactRows,
   getMobileRoleLabel,
   isTaskRisk,
-  resolveMobileTaskCompletionFeedback,
+  resolveMobileTaskDueLabel,
   resolveMobileTaskStatusLabel,
-  resolveTaskBusinessStatusLabel,
   resolveTaskReason,
   resolveTaskReasonLabel,
-  resolveTaskRelatedSourceLabel,
   resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
@@ -39,9 +34,10 @@ import WorkflowProcessStageTrack from '../../components/workflow/WorkflowProcess
 import WorkflowTaskEventTrail from '../../components/workflow/WorkflowTaskEventTrail.jsx'
 
 function mobileFactValueText(value) {
-  if (value === null || value === undefined) return '-'
-  if (typeof value === 'string' && value.trim() === '') return '-'
-  return value
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string' && value.trim() === '') return ''
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  return typeof value === 'string' ? value : ''
 }
 
 export default function MobileTaskDetailScreen({
@@ -49,7 +45,6 @@ export default function MobileTaskDetailScreen({
   onBack,
   onOpenAction,
   onViewReceipt,
-  roleLabel,
   savedEvidenceRefs,
   selectedCanManageAttachments,
   selectedHasActionCapability = false,
@@ -126,19 +121,24 @@ export default function MobileTaskDetailScreen({
   if (!selectedTask || !selectedSeverity) return null
 
   const factRows = buildTaskFactRows(selectedTask)
-  const relatedDocuments = Array.isArray(selectedTask.related_documents)
-    ? selectedTask.related_documents
-    : []
+  const relatedDocuments = Array.from(
+    new Set(
+      (Array.isArray(selectedTask.related_documents)
+        ? selectedTask.related_documents
+        : []
+      )
+        .map((document) => String(document || '').trim())
+        .filter(Boolean)
+    )
+  )
   const relatedSource = resolveTaskSourceLabel(selectedTask)
   const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
   const taskReason = resolveTaskReason(selectedTask)
   const taskReasonLabel = resolveTaskReasonLabel(selectedTask)
   const taskStatusLabel = resolveMobileTaskStatusLabel(selectedTask)
-  const completionFeedback = resolveMobileTaskCompletionFeedback(selectedTask)
-  const taskBusinessStatusLabel = resolveTaskBusinessStatusLabel(
-    selectedTask,
-    ''
-  )
+  const resolvedDueLabel = resolveMobileTaskDueLabel(selectedTask)
+  const taskDueLabel =
+    resolvedDueLabel === '-' ? '未设置截止' : resolvedDueLabel
   const canManageAttachments = selectedCanManageAttachments === true
   const canOpenProcess = selectedCanOperate || selectedCanUrge
   const canViewReceipt = typeof onViewReceipt === 'function'
@@ -198,8 +198,7 @@ export default function MobileTaskDetailScreen({
 
       <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
         <section className="mobile-task-detail-hero erp-mobile-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-semibold text-blue-600">当前任务</div>
-          <h2 className="mt-2 break-words text-2xl font-semibold leading-tight text-slate-950 [overflow-wrap:anywhere]">
+          <h2 className="break-words text-2xl font-semibold leading-tight text-slate-950 [overflow-wrap:anywhere]">
             {selectedTask.task_name}
           </h2>
           <div className="mt-3 flex min-w-0 items-start gap-2 text-sm leading-6 text-slate-500">
@@ -207,14 +206,53 @@ export default function MobileTaskDetailScreen({
             <span className="shrink-0">来源：</span>
             <span className="min-w-0 break-all">{relatedSource}</span>
           </div>
+          <div
+            className="mt-4 flex min-w-0 flex-wrap gap-2 text-sm"
+            data-testid="mobile-task-detail-summary"
+          >
+            <span className="rounded-lg bg-blue-50 px-3 py-2 font-semibold text-blue-700">
+              {taskStatusLabel}
+            </span>
+            <span className="rounded-lg bg-slate-100 px-3 py-2 font-medium text-slate-700">
+              负责：{ownerRoleLabel}
+            </span>
+            <span className="min-w-0 break-words rounded-lg bg-slate-100 px-3 py-2 font-medium text-slate-700">
+              截止：{taskDueLabel}
+            </span>
+          </div>
+          <div
+            className="mt-4 border-t border-slate-200 pt-4"
+            data-testid="mobile-task-attachment-action"
+          >
+            <BusinessAttachmentModalButton
+              ownerType="workflow_task"
+              ownerId={selectedTask.id}
+              ownerVersion={selectedTask.version}
+              buttonText="任务附件"
+              modalTitle="任务附件"
+              panelTitle="附件内容"
+              description={
+                canManageAttachments
+                  ? '上传照片、异常截图或处理凭证。'
+                  : '查看照片、异常截图或处理凭证。'
+              }
+              canUpload={canManageAttachments}
+              canWithdraw={canManageAttachments}
+              disabled={!selectedTask}
+              disabledReason="请先进入一条任务详情"
+              showAttachmentCount
+              buttonProps={{
+                className: 'min-h-11 w-full justify-center',
+                size: 'middle',
+              }}
+            />
+          </div>
         </section>
 
         {isDisplayOnlyWorkflowTask(selectedTask) ? (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
-            <strong>模拟展示数据</strong>
-            <p>
-              这条任务未接入真实流程，只用于检查列表和办理界面，不计入流程闭环证据。
-            </p>
+          <section className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
+            <strong>模拟任务：</strong>
+            仅用于界面检查，不计入业务流程。
           </section>
         ) : null}
 
@@ -228,36 +266,36 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
-        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
+        {factRows.length > 0 ? (
+          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
               <FileTextOutlined className="text-blue-500" aria-hidden="true" />
-              任务关键信息
+              业务信息
             </h2>
-            <span className="mobile-role-detail-meta text-xs font-semibold text-slate-400">
-              {roleLabel}
-            </span>
-          </div>
-          <div className="mobile-role-detail-fact-grid mt-4 grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 sm:grid-cols-2">
-            {factRows.map(([label, value]) => (
-              <div key={label} className="mobile-role-detail-fact-row p-4">
-                <div className="text-sm text-slate-500">{label}</div>
-                <div className="mt-1 break-words text-base font-medium leading-6 text-slate-950">
-                  {mobileFactValueText(value)}
+            <div className="mobile-role-detail-fact-grid mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200">
+              {factRows.map(([label, value], index) => (
+                <div
+                  key={label}
+                  className={`mobile-role-detail-fact-row p-4 ${
+                    index === factRows.length - 1 && factRows.length % 2 === 1
+                      ? 'col-span-2'
+                      : ''
+                  }`}
+                >
+                  <div className="text-sm text-slate-500">{label}</div>
+                  <div className="mt-1 break-words text-base font-medium leading-6 text-slate-950">
+                    {mobileFactValueText(value)}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-        {isTaskRisk(selectedTask) &&
-        (taskBusinessStatusLabel || taskReason || selectedSeverity.label) ? (
+        {isTaskRisk(selectedTask) && taskReason ? (
           <section className="mobile-role-detail-risk rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-base font-semibold leading-6 text-red-700">
             <ExclamationCircleFilled className="mr-2" aria-hidden="true" />
-            {taskBusinessStatusLabel || selectedSeverity.label}
-            {taskReason
-              ? ` · ${taskReasonLabel}：${taskReason}`
-              : ' · 请优先核对并处理'}
+            {taskReasonLabel}：{taskReason}
           </section>
         ) : null}
 
@@ -266,17 +304,6 @@ export default function MobileTaskDetailScreen({
             <div className="text-sm font-semibold text-blue-700">完成条件</div>
             <p className="mt-2 break-words text-base leading-7 text-slate-800">
               {selectedTask.complete_condition}
-            </p>
-          </section>
-        ) : null}
-
-        {completionFeedback ? (
-          <section className="erp-mobile-card rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-            <div className="text-sm font-semibold text-emerald-700">
-              完成反馈
-            </div>
-            <p className="mt-2 whitespace-pre-wrap break-words text-base leading-7 text-slate-800 [overflow-wrap:anywhere]">
-              {completionFeedback}
             </p>
           </section>
         ) : null}
@@ -300,12 +327,6 @@ export default function MobileTaskDetailScreen({
                     <dt className="text-slate-500">业务流程</dt>
                     <dd className="font-semibold text-slate-900">
                       {getProcessLabel(processContext.process_instance)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">来源单据</dt>
-                    <dd className="break-all font-semibold text-slate-900">
-                      {processContext.source.no || relatedSource}
                     </dd>
                   </div>
                   <div>
@@ -340,6 +361,7 @@ export default function MobileTaskDetailScreen({
           task={selectedTask}
           truncated={taskEventsTruncated}
           variant="mobile"
+          showResponsibility={false}
         />
 
         {selectedTask.mobile_exception_report ? (
@@ -351,186 +373,99 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
-        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
+        {relatedDocuments.length > 0 ? (
+          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
               <LinkOutlined className="text-purple-500" aria-hidden="true" />
-              关联来源（{relatedDocuments.length + 1}）
+              相关单据（{relatedDocuments.length}）
             </h2>
-          </div>
-          <div className="mt-4 space-y-2">
-            {[
-              resolveTaskRelatedSourceLabel(selectedTask),
-              ...relatedDocuments,
-            ].map((document, index) => (
-              <div
-                key={`${document}-${index}`}
-                className="mobile-role-detail-related-item rounded-xl border border-slate-200 px-4 py-3 text-sm leading-6 text-slate-600"
-              >
-                <span className="break-all">{document}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
-              <PaperClipOutlined
-                className="text-emerald-500"
-                aria-hidden="true"
-              />
-              任务附件
-            </h2>
-            <span className="text-xs font-semibold text-slate-400">
-              {canManageAttachments ? '可管理' : '只读'}
-            </span>
-          </div>
-          <p className="mt-3 text-sm leading-6 text-slate-500">
-            照片、异常截图和处理凭证统一在这里查看或管理；附件只记录任务办理情况。
-          </p>
-          {savedEvidenceRefs.length > 0 ? (
-            <div
-              data-testid="mobile-role-historical-evidence"
-              className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3"
-            >
-              <div className="text-sm font-semibold text-slate-600">
-                历史处理线索
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {savedEvidenceRefs.map((ref) => (
-                  <span
-                    key={ref}
-                    className="min-w-0 max-w-full break-all rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-600"
-                  >
-                    {ref}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          <div className="mt-4">
-            <BusinessAttachmentModalButton
-              ownerType="workflow_task"
-              ownerId={selectedTask.id}
-              ownerVersion={selectedTask.version}
-              buttonText={
-                canManageAttachments ? '查看与补充附件' : '查看任务附件'
-              }
-              modalTitle="任务附件"
-              panelTitle="任务附件"
-              description="照片、异常截图和处理凭证只用于记录任务办理情况，不会改变库存、质检、出货、开票或收付款结果。"
-              canUpload={canManageAttachments}
-              canDelete={false}
-              disabled={!selectedTask}
-              disabledReason="请先进入一条任务详情"
-              buttonProps={{
-                className: 'w-full min-h-11 justify-center',
-                size: 'large',
-              }}
-            />
-          </div>
-        </section>
-
-        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
-              <ClockCircleOutlined
-                className="text-orange-500"
-                aria-hidden="true"
-              />
-              当前办理状态
-            </h2>
-            <span className="mobile-role-detail-meta text-xs font-semibold text-slate-400">
-              {formatMobileTaskTime(selectedTask.updated_at)}
-            </span>
-          </div>
-          <div className="mobile-role-detail-event mt-4 rounded-xl bg-slate-50 px-4 py-4">
-            <div className="flex items-start gap-3">
-              <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-950">
-                  <span className="rounded-md bg-blue-100 px-2 py-1 text-blue-700">
-                    {taskStatusLabel}
-                  </span>
-                  {taskBusinessStatusLabel ? (
-                    <span className="text-slate-500">
-                      {taskBusinessStatusLabel}
-                    </span>
-                  ) : null}
+            <div className="mt-4 space-y-2">
+              {relatedDocuments.map((document, index) => (
+                <div
+                  key={`${document}-${index}`}
+                  className="mobile-role-detail-related-item rounded-xl border border-slate-200 px-4 py-3 text-sm leading-6 text-slate-600"
+                >
+                  <span className="break-all">{document}</span>
                 </div>
-                <p className="mt-2 break-words text-sm leading-6 text-slate-700">
-                  {taskReason
-                    ? `${taskReasonLabel}：${taskReason}`
-                    : `任务当前由${ownerRoleLabel}负责。`}
-                </p>
-              </div>
+              ))}
             </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
+
+        {savedEvidenceRefs.length > 0 ? (
+          <section
+            data-testid="mobile-role-historical-evidence"
+            className="rounded-xl border border-slate-200 bg-slate-100/70 p-3"
+          >
+            <h2 className="text-sm font-semibold text-slate-600">
+              历史处理线索
+            </h2>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {savedEvidenceRefs.map((ref) => (
+                <span
+                  key={ref}
+                  className="min-w-0 max-w-full break-all rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-600"
+                >
+                  {ref}
+                </span>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </main>
 
-      <div
-        className={`mobile-role-action-bar grid border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur ${
-          showFooterAction ? 'grid-cols-2 gap-3' : ''
-        }`}
-      >
-        <button
-          type="button"
-          className="mobile-role-action-bar__button min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700"
-          onClick={onBack}
-        >
-          返回列表
-        </button>
-        {canOpenProcess ? (
-          <button
-            type="button"
-            className="mobile-role-action-bar__button mobile-role-action-bar__button--done min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
-            onClick={() =>
-              onOpenAction?.(
-                selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
-              )
-            }
-          >
-            处理任务
-            <RightOutlined className="ml-2" aria-hidden="true" />
-          </button>
-        ) : canViewReceipt ? (
-          <button
-            type="button"
-            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-base font-semibold text-blue-700"
-            onClick={onViewReceipt}
-          >
-            查看结果回执
-          </button>
-        ) : retryAccess ? (
-          <button
-            type="button"
-            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
-            onClick={retryAccess}
-          >
-            <ReloadOutlined className="mr-2" aria-hidden="true" />
-            重新确认
-          </button>
-        ) : actionAccess?.loading ? (
-          <button
-            type="button"
-            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
-            disabled
-          >
-            <LoadingOutlined className="mr-2" spin aria-hidden="true" />
-            正在确认
-          </button>
-        ) : selectedHasActionCapability ? (
-          <button
-            type="button"
-            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
-            disabled
-          >
-            {processUnavailableLabel}
-          </button>
-        ) : null}
-      </div>
+      {showFooterAction ? (
+        <div className="mobile-role-action-bar border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+          {canOpenProcess ? (
+            <button
+              type="button"
+              className="mobile-role-action-bar__button mobile-role-action-bar__button--done min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
+              onClick={() =>
+                onOpenAction?.(
+                  selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
+                )
+              }
+            >
+              处理任务
+              <RightOutlined className="ml-2" aria-hidden="true" />
+            </button>
+          ) : canViewReceipt ? (
+            <button
+              type="button"
+              className="mobile-role-action-bar__button min-h-12 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-base font-semibold text-blue-700"
+              onClick={onViewReceipt}
+            >
+              查看结果回执
+            </button>
+          ) : retryAccess ? (
+            <button
+              type="button"
+              className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
+              onClick={retryAccess}
+            >
+              <ReloadOutlined className="mr-2" aria-hidden="true" />
+              重新确认
+            </button>
+          ) : actionAccess?.loading ? (
+            <button
+              type="button"
+              className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+              disabled
+            >
+              <LoadingOutlined className="mr-2" spin aria-hidden="true" />
+              正在确认
+            </button>
+          ) : selectedHasActionCapability ? (
+            <button
+              type="button"
+              className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+              disabled
+            >
+              {processUnavailableLabel}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

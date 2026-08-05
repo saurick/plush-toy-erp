@@ -592,28 +592,25 @@
         background: #fff7ed;
       }
 
-      .mine-grid {
+      .mine-account-grid {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
-        margin: 20px;
+        margin-top: 16px;
       }
 
-      .mine-metric {
-        min-height: 76px;
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        background: #fff;
-        text-align: center;
+      .mine-account-grid .mine-card {
+        min-width: 0;
+        margin-top: 0;
       }
 
-      .mine-metric strong {
+      .mine-account-grid .mine-card strong {
         display: block;
-        margin-top: 12px;
-        font-size: 24px;
+        margin-top: 6px;
+        overflow-wrap: anywhere;
       }
 
-      .mine-metric span {
+      .mine-account-grid .mine-card span {
         color: var(--muted);
         font-size: 13px;
       }
@@ -1566,17 +1563,15 @@
               <span style="display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:var(--green-soft);color:var(--green);font-size:28px">♙</span>
               <div><h2>仓库值班员</h2></div>
             </div>
-            <div class="mine-card"><span style="color:var(--muted)">账号角色</span><br><strong>仓库</strong></div>
-          </section>
-          <section class="mine-grid">
-            <button class="mine-metric"><strong>18</strong><span>待办</span></button>
-            <button class="mine-metric"><strong>6</strong><span>已办</span></button>
-            <button class="mine-metric"><strong>8</strong><span>超时</span></button>
-            <button class="mine-metric"><strong>9</strong><span>风险</span></button>
+            <div class="mine-account-grid">
+              <div class="mine-card"><span>账号岗位</span><strong>仓库</strong></div>
+              <div class="mine-card"><span>可用入口</span><strong>电脑端 / 手机待办</strong></div>
+            </div>
           </section>
           <section class="panel">
-            <h2>登录与安全</h2>
-            <button class="action block" style="width:100%;margin-top:14px">退出登录</button>
+            <h2>入口与安全</h2>
+            <button class="action block" style="width:100%;margin-top:14px">⇄ 切换工作入口</button>
+            <button class="action block" style="width:100%;margin-top:10px">退出登录</button>
           </section>
         `;
       }

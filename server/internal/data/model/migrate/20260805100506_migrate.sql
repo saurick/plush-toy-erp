@@ -1,0 +1,4 @@
+-- Modify "business_attachments" table
+ALTER TABLE "business_attachments" ADD CONSTRAINT "business_attachments_withdrawal_contract" CHECK (((withdrawn_at IS NULL) AND (withdrawn_by IS NULL) AND (withdrawal_reason IS NULL)) OR ((withdrawn_at IS NOT NULL) AND (withdrawn_by IS NOT NULL) AND (withdrawn_by > 0) AND (withdrawal_reason IS NOT NULL) AND ((length(TRIM(BOTH FROM withdrawal_reason)) >= 1) AND (length(TRIM(BOTH FROM withdrawal_reason)) <= 255)) AND ((owner_type)::text <> 'product'::text) AND ((attachment_type)::text <> 'product_image'::text))), ADD COLUMN "withdrawn_at" timestamptz NULL, ADD COLUMN "withdrawn_by" bigint NULL, ADD COLUMN "withdrawal_reason" character varying NULL;
+-- Create index "businessattachment_withdrawn_by" to table: "business_attachments"
+CREATE INDEX "businessattachment_withdrawn_by" ON "business_attachments" ("withdrawn_by");

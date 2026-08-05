@@ -7,6 +7,7 @@ const pageLevelAttachmentEntrypoints = [
   '../pages/V1PurchaseReceiptsPage.jsx',
   '../pages/OperationalFactsPage.jsx',
   '../mobile/components/MobileTaskDetailScreen.jsx',
+  '../components/workflow/WorkflowTaskActionDrawer.jsx',
 ]
 
 const formModalAttachmentEntrypoints = [
@@ -58,7 +59,10 @@ test('read-only attachment panels do not expose a fake upload control', () => {
     'utf8'
   )
 
-  assert.match(source, /\{canUpload \? \([\s\S]*<Button[\s\S]*<input[\s\S]*\) : null\}/u)
+  assert.match(
+    source,
+    /\{canUpload \? \([\s\S]*<Button[\s\S]*<input[\s\S]*\) : null\}/u
+  )
 })
 
 test('remaining direct attachment panels stay inside form-backed business modals', () => {
@@ -68,9 +72,9 @@ test('remaining direct attachment panels stay inside form-backed business modals
   ]
   for (const relativePath of formModalAttachmentEntrypoints) {
     const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
-    const panelIndexes = [
-      ...source.matchAll(/<BusinessAttachmentPanel/g),
-    ].map((match) => match.index)
+    const panelIndexes = [...source.matchAll(/<BusinessAttachmentPanel/g)].map(
+      (match) => match.index
+    )
 
     assert(
       panelIndexes.length > 0,
@@ -99,7 +103,9 @@ test('BusinessRecordDetailsModal remains a read-only BusinessFormModal wrapper',
     'utf8'
   )
 
-  assert(source.includes("import BusinessFormModal from './BusinessFormModal.jsx'"))
+  assert(
+    source.includes("import BusinessFormModal from './BusinessFormModal.jsx'")
+  )
   assert(source.includes('<BusinessFormModal'))
   assert(source.includes('<Button key="close" onClick={onClose}>'))
   assert(!source.includes('onOk='))

@@ -3,7 +3,6 @@ import {
   BellOutlined,
   CheckOutlined,
   ExclamationCircleFilled,
-  FileTextOutlined,
   LoadingOutlined,
   PauseOutlined,
   RedoOutlined,
@@ -150,7 +149,6 @@ export default function MobileTaskActionScreen({
   onActionChange = () => {},
   onApprovedQuantityChange = () => {},
   onBack = () => {},
-  onCancel = null,
   onReasonChange = () => {},
   onRetryAccess = null,
   onSubmit = () => {},
@@ -327,14 +325,6 @@ export default function MobileTaskActionScreen({
     onActionChange(action)
   }
 
-  const handleCancel = () => {
-    if (onCancel) {
-      onCancel()
-      return
-    }
-    onBack()
-  }
-
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!canSubmit || busy) return
@@ -412,24 +402,17 @@ export default function MobileTaskActionScreen({
         }
       />
 
-      <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-5">
-        <section className="mobile-task-detail-hero erp-mobile-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <FileTextOutlined />
-            </span>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-blue-600">
-                当前任务
-              </div>
-              <h2 className="mt-1 break-words text-xl font-semibold text-slate-950 [overflow-wrap:anywhere]">
-                {taskName}
-              </h2>
-              <div className="mt-2 break-words text-sm leading-6 text-slate-500 [overflow-wrap:anywhere]">
-                {taskSource}
-              </div>
-            </div>
-          </div>
+      <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
+        <section
+          className="erp-mobile-card rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+          data-testid="mobile-task-action-context"
+        >
+          <h2 className="break-words text-base font-semibold leading-6 text-slate-950 [overflow-wrap:anywhere]">
+            {taskName}
+          </h2>
+          <p className="mt-1 break-words text-sm leading-5 text-slate-500 [overflow-wrap:anywhere]">
+            {taskSource}
+          </p>
         </section>
 
         {accessCopy ? (
@@ -477,7 +460,7 @@ export default function MobileTaskActionScreen({
                     : '正在读取审批表单'}
                 </div>
                 <div className="mt-1">
-                  系统不会根据任务文案或岗位名称猜测审批字段。
+                  请重新读取后再办理，未确认前不能提交。
                 </div>
                 {processContextState === 'error' ? (
                   <button
@@ -502,18 +485,14 @@ export default function MobileTaskActionScreen({
                 >
                   选择处理方式
                 </h2>
-                <p
-                  id={`${fieldID}-action-help`}
-                  className="mt-1 text-sm leading-6 text-slate-500"
-                >
-                  请选择与现场处理情况一致的方式；提交前系统会再次确认您是否可以办理这条任务。
-                </p>
                 <div
                   className="mt-4 grid grid-cols-2 gap-3"
                   role="radiogroup"
-                  aria-describedby={`${fieldID}-action-help${
-                    validationErrors.action ? ` ${fieldID}-action-error` : ''
-                  }`}
+                  aria-describedby={
+                    validationErrors.action
+                      ? `${fieldID}-action-error`
+                      : undefined
+                  }
                   aria-invalid={Boolean(validationErrors.action)}
                   aria-labelledby={`${fieldID}-action-heading`}
                   aria-required="true"
@@ -565,26 +544,20 @@ export default function MobileTaskActionScreen({
                 className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
                 data-testid="mobile-task-single-action"
               >
-                <h2 className="text-lg font-semibold text-slate-950">
-                  本次操作
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  当前只可执行这一项，无需再次选择；填写办理信息后再确认提交。
-                </p>
-                <div
-                  className="mobile-task-single-action__value mt-4 flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                  data-testid="mobile-task-single-action-summary"
-                >
-                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-                    <SingleActionIcon aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-500">
-                      已确定的操作
-                    </div>
-                    <div className="break-words text-lg font-semibold text-slate-950">
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold text-slate-950">
+                    本次操作
+                  </h2>
+                  <div
+                    className="mobile-task-single-action__value inline-flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                    data-testid="mobile-task-single-action-summary"
+                  >
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                      <SingleActionIcon aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 break-words text-base font-semibold text-slate-950">
                       {effectiveActionLabel}
-                    </div>
+                    </span>
                   </div>
                 </div>
               </section>
@@ -695,61 +668,46 @@ export default function MobileTaskActionScreen({
               </section>
             ) : null}
 
-            <section className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm leading-6 text-blue-700">
-              <div className="font-semibold">业务边界</div>
-              <div className="mt-1 [overflow-wrap:anywhere]">
-                这里仅提交本次办理说明；任务附件统一在详情页查看或管理。库存、质检、出货、开票和收付款仍需在对应单据中办理。
-              </div>
-            </section>
+            <p className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm leading-6 text-blue-700 [overflow-wrap:anywhere]">
+              提交只更新当前任务；任务附件在详情页管理，库存、质检、出货及财务结果仍在对应单据办理。
+            </p>
           </>
         ) : null}
       </main>
 
-      <div
-        className={`mobile-role-action-bar grid shrink-0 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur ${
-          accessAllowsSubmit || showFooterRetry || showDisabledSubmit
-            ? 'grid-cols-2 gap-3'
-            : ''
-        }`}
-      >
-        <button
-          type="button"
-          className="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={busy}
-          onClick={handleCancel}
-        >
-          {accessAllowsSubmit ? '取消' : '返回任务'}
-        </button>
-        {accessAllowsSubmit ? (
-          <button
-            type="submit"
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={busy || !canSubmit || visibleActions.length === 0}
-          >
-            {busy ? <LoadingOutlined spin /> : null}
-            <span>{busy ? busySubmitLabel : submitLabel}</span>
-          </button>
-        ) : null}
-        {showFooterRetry ? (
-          <button
-            type="button"
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={busy}
-            onClick={onRetryAccess}
-          >
-            <ReloadOutlined />
-            重新确认
-          </button>
-        ) : showDisabledSubmit ? (
-          <button
-            type="button"
-            className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
-            disabled
-          >
-            暂不能提交
-          </button>
-        ) : null}
-      </div>
+      {accessAllowsSubmit || showFooterRetry || showDisabledSubmit ? (
+        <div className="mobile-role-action-bar shrink-0 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+          {accessAllowsSubmit ? (
+            <button
+              type="submit"
+              className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={busy || !canSubmit || visibleActions.length === 0}
+            >
+              {busy ? <LoadingOutlined spin /> : null}
+              <span>{busy ? busySubmitLabel : submitLabel}</span>
+            </button>
+          ) : null}
+          {showFooterRetry ? (
+            <button
+              type="button"
+              className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={busy}
+              onClick={onRetryAccess}
+            >
+              <ReloadOutlined />
+              重新确认
+            </button>
+          ) : showDisabledSubmit ? (
+            <button
+              type="button"
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+              disabled
+            >
+              暂不能提交
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </form>
   )
 }

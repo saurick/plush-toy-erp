@@ -58,6 +58,13 @@ test('dashboardTaskDisplay: 未知来源不透出 source_type 原始 key', () =>
     }),
     '已关联业务来源'
   )
+  assert.equal(
+    formatWorkflowTaskSource({
+      source_type: 'unknown_source_key',
+      source_no: 'BIZ-88',
+    }),
+    '业务单据 · BIZ-88'
+  )
 })
 
 test('dashboardTaskDisplay: 内部任务号或 source_id fallback 不作为来源号展示', () => {
@@ -83,7 +90,7 @@ test('dashboardTaskDisplay: 内部任务号或 source_id fallback 不作为来�
       source_id: 987,
       source_no: 'SO-987',
     }),
-    'SO-987'
+    '销售订单 · SO-987'
   )
 })
 

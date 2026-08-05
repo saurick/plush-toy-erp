@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PaperClipOutlined } from '@ant-design/icons'
 import { Button, Modal, Tooltip } from 'antd'
 
+import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
+import { resolveBusinessAttachmentActionLabel } from '../../utils/businessAttachmentPanelState.mjs'
 import BusinessAttachmentPanel from './BusinessAttachmentPanel.jsx'
 
 export default function BusinessAttachmentModalButton({
@@ -13,15 +15,59 @@ export default function BusinessAttachmentModalButton({
   panelTitle = '附件',
   description,
   canUpload = true,
-  canDelete = true,
+  canWithdraw = false,
   disabled = false,
   disabledReason = '请先选择一条记录',
   buttonProps = {},
+  showAttachmentCount = false,
+  countLabel = '附件',
+  emptyUploadLabel = '添加附件',
+  emptyReadLabel = '查看附件',
 }) {
   const [open, setOpen] = useState(false)
+  const [attachmentCount, setAttachmentCount] = useState(null)
+  const countRequestSeqRef = useRef(0)
   const normalizedOwnerId = Number(ownerId || 0)
   const missingOwner = !ownerType || normalizedOwnerId <= 0
   const actionDisabled = disabled || missingOwner
+  const loadAttachmentCount = useCallback(async () => {
+    const requestID = countRequestSeqRef.current + 1
+    countRequestSeqRef.current = requestID
+    setAttachmentCount(null)
+    if (!showAttachmentCount || missingOwner) return
+
+    try {
+      const items = await listBusinessAttachments({
+        owner_type: ownerType,
+        owner_id: normalizedOwnerId,
+      })
+      if (countRequestSeqRef.current === requestID) {
+        setAttachmentCount(Array.isArray(items) ? items.length : 0)
+      }
+    } catch {
+      if (countRequestSeqRef.current === requestID) {
+        setAttachmentCount(null)
+      }
+    }
+  }, [missingOwner, normalizedOwnerId, ownerType, showAttachmentCount])
+
+  useEffect(() => {
+    loadAttachmentCount()
+    return () => {
+      countRequestSeqRef.current += 1
+    }
+  }, [loadAttachmentCount])
+
+  const resolvedButtonText = showAttachmentCount
+    ? resolveBusinessAttachmentActionLabel({
+        attachmentCount,
+        canUpload,
+        fallbackLabel: buttonText,
+        countLabel,
+        emptyUploadLabel,
+        emptyReadLabel,
+      })
+    : buttonText
 
   const triggerButton = (
     <Button
@@ -36,7 +82,7 @@ export default function BusinessAttachmentModalButton({
         }
       }}
     >
-      {buttonText}
+      {resolvedButtonText}
     </Button>
   )
 
@@ -56,7 +102,10 @@ export default function BusinessAttachmentModalButton({
         open={open}
         title={modalTitle}
         width="min(880px, calc(100vw - 48px))"
-        onCancel={() => setOpen(false)}
+        onCancel={() => {
+          setOpen(false)
+          loadAttachmentCount()
+        }}
       >
         <BusinessAttachmentPanel
           ownerType={ownerType}
@@ -65,7 +114,7 @@ export default function BusinessAttachmentModalButton({
           title={panelTitle}
           description={description}
           canUpload={canUpload}
-          canDelete={canDelete}
+          canWithdraw={canWithdraw}
           allowPendingAttachmentsWithoutOwner={false}
           missingOwnerDescription={disabledReason}
           missingOwnerEmptyText={disabledReason}

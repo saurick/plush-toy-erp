@@ -109,6 +109,21 @@ func Note(v string) predicate.BusinessAttachment {
 	return predicate.BusinessAttachment(sql.FieldEQ(FieldNote, v))
 }
 
+// WithdrawnAt applies equality check predicate on the "withdrawn_at" field. It's identical to WithdrawnAtEQ.
+func WithdrawnAt(v time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEQ(FieldWithdrawnAt, v))
+}
+
+// WithdrawnBy applies equality check predicate on the "withdrawn_by" field. It's identical to WithdrawnByEQ.
+func WithdrawnBy(v int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEQ(FieldWithdrawnBy, v))
+}
+
+// WithdrawalReason applies equality check predicate on the "withdrawal_reason" field. It's identical to WithdrawalReasonEQ.
+func WithdrawalReason(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEQ(FieldWithdrawalReason, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.BusinessAttachment {
 	return predicate.BusinessAttachment(sql.FieldEQ(FieldCreatedAt, v))
@@ -757,6 +772,181 @@ func NoteEqualFold(v string) predicate.BusinessAttachment {
 // NoteContainsFold applies the ContainsFold predicate on the "note" field.
 func NoteContainsFold(v string) predicate.BusinessAttachment {
 	return predicate.BusinessAttachment(sql.FieldContainsFold(FieldNote, v))
+}
+
+// WithdrawnAtEQ applies the EQ predicate on the "withdrawn_at" field.
+func WithdrawnAtEQ(v time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEQ(FieldWithdrawnAt, v))
+}
+
+// WithdrawnAtNEQ applies the NEQ predicate on the "withdrawn_at" field.
+func WithdrawnAtNEQ(v time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNEQ(FieldWithdrawnAt, v))
+}
+
+// WithdrawnAtIn applies the In predicate on the "withdrawn_at" field.
+func WithdrawnAtIn(vs ...time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldIn(FieldWithdrawnAt, vs...))
+}
+
+// WithdrawnAtNotIn applies the NotIn predicate on the "withdrawn_at" field.
+func WithdrawnAtNotIn(vs ...time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNotIn(FieldWithdrawnAt, vs...))
+}
+
+// WithdrawnAtGT applies the GT predicate on the "withdrawn_at" field.
+func WithdrawnAtGT(v time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldGT(FieldWithdrawnAt, v))
+}
+
+// WithdrawnAtGTE applies the GTE predicate on the "withdrawn_at" field.
+func WithdrawnAtGTE(v time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldGTE(FieldWithdrawnAt, v))
+}
+
+// WithdrawnAtLT applies the LT predicate on the "withdrawn_at" field.
+func WithdrawnAtLT(v time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldLT(FieldWithdrawnAt, v))
+}
+
+// WithdrawnAtLTE applies the LTE predicate on the "withdrawn_at" field.
+func WithdrawnAtLTE(v time.Time) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldLTE(FieldWithdrawnAt, v))
+}
+
+// WithdrawnAtIsNil applies the IsNil predicate on the "withdrawn_at" field.
+func WithdrawnAtIsNil() predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldIsNull(FieldWithdrawnAt))
+}
+
+// WithdrawnAtNotNil applies the NotNil predicate on the "withdrawn_at" field.
+func WithdrawnAtNotNil() predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNotNull(FieldWithdrawnAt))
+}
+
+// WithdrawnByEQ applies the EQ predicate on the "withdrawn_by" field.
+func WithdrawnByEQ(v int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEQ(FieldWithdrawnBy, v))
+}
+
+// WithdrawnByNEQ applies the NEQ predicate on the "withdrawn_by" field.
+func WithdrawnByNEQ(v int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNEQ(FieldWithdrawnBy, v))
+}
+
+// WithdrawnByIn applies the In predicate on the "withdrawn_by" field.
+func WithdrawnByIn(vs ...int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldIn(FieldWithdrawnBy, vs...))
+}
+
+// WithdrawnByNotIn applies the NotIn predicate on the "withdrawn_by" field.
+func WithdrawnByNotIn(vs ...int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNotIn(FieldWithdrawnBy, vs...))
+}
+
+// WithdrawnByGT applies the GT predicate on the "withdrawn_by" field.
+func WithdrawnByGT(v int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldGT(FieldWithdrawnBy, v))
+}
+
+// WithdrawnByGTE applies the GTE predicate on the "withdrawn_by" field.
+func WithdrawnByGTE(v int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldGTE(FieldWithdrawnBy, v))
+}
+
+// WithdrawnByLT applies the LT predicate on the "withdrawn_by" field.
+func WithdrawnByLT(v int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldLT(FieldWithdrawnBy, v))
+}
+
+// WithdrawnByLTE applies the LTE predicate on the "withdrawn_by" field.
+func WithdrawnByLTE(v int) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldLTE(FieldWithdrawnBy, v))
+}
+
+// WithdrawnByIsNil applies the IsNil predicate on the "withdrawn_by" field.
+func WithdrawnByIsNil() predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldIsNull(FieldWithdrawnBy))
+}
+
+// WithdrawnByNotNil applies the NotNil predicate on the "withdrawn_by" field.
+func WithdrawnByNotNil() predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNotNull(FieldWithdrawnBy))
+}
+
+// WithdrawalReasonEQ applies the EQ predicate on the "withdrawal_reason" field.
+func WithdrawalReasonEQ(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEQ(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonNEQ applies the NEQ predicate on the "withdrawal_reason" field.
+func WithdrawalReasonNEQ(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNEQ(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonIn applies the In predicate on the "withdrawal_reason" field.
+func WithdrawalReasonIn(vs ...string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldIn(FieldWithdrawalReason, vs...))
+}
+
+// WithdrawalReasonNotIn applies the NotIn predicate on the "withdrawal_reason" field.
+func WithdrawalReasonNotIn(vs ...string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNotIn(FieldWithdrawalReason, vs...))
+}
+
+// WithdrawalReasonGT applies the GT predicate on the "withdrawal_reason" field.
+func WithdrawalReasonGT(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldGT(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonGTE applies the GTE predicate on the "withdrawal_reason" field.
+func WithdrawalReasonGTE(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldGTE(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonLT applies the LT predicate on the "withdrawal_reason" field.
+func WithdrawalReasonLT(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldLT(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonLTE applies the LTE predicate on the "withdrawal_reason" field.
+func WithdrawalReasonLTE(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldLTE(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonContains applies the Contains predicate on the "withdrawal_reason" field.
+func WithdrawalReasonContains(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldContains(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonHasPrefix applies the HasPrefix predicate on the "withdrawal_reason" field.
+func WithdrawalReasonHasPrefix(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldHasPrefix(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonHasSuffix applies the HasSuffix predicate on the "withdrawal_reason" field.
+func WithdrawalReasonHasSuffix(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldHasSuffix(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonIsNil applies the IsNil predicate on the "withdrawal_reason" field.
+func WithdrawalReasonIsNil() predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldIsNull(FieldWithdrawalReason))
+}
+
+// WithdrawalReasonNotNil applies the NotNil predicate on the "withdrawal_reason" field.
+func WithdrawalReasonNotNil() predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldNotNull(FieldWithdrawalReason))
+}
+
+// WithdrawalReasonEqualFold applies the EqualFold predicate on the "withdrawal_reason" field.
+func WithdrawalReasonEqualFold(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldEqualFold(FieldWithdrawalReason, v))
+}
+
+// WithdrawalReasonContainsFold applies the ContainsFold predicate on the "withdrawal_reason" field.
+func WithdrawalReasonContainsFold(v string) predicate.BusinessAttachment {
+	return predicate.BusinessAttachment(sql.FieldContainsFold(FieldWithdrawalReason, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

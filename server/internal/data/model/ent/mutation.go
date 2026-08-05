@@ -6566,28 +6566,32 @@ func (m *BOMItemMutation) ResetEdge(name string) error {
 // BusinessAttachmentMutation represents an operation that mutates the BusinessAttachment nodes in the graph.
 type BusinessAttachmentMutation struct {
 	config
-	op              Op
-	typ             string
-	id              *int
-	owner_type      *string
-	owner_id        *int
-	addowner_id     *int
-	attachment_type *string
-	slot_key        *string
-	file_name       *string
-	mime_type       *string
-	file_size       *int
-	addfile_size    *int
-	sha256          *string
-	content         *[]byte
-	uploaded_by     *int
-	adduploaded_by  *int
-	note            *string
-	created_at      *time.Time
-	clearedFields   map[string]struct{}
-	done            bool
-	oldValue        func(context.Context) (*BusinessAttachment, error)
-	predicates      []predicate.BusinessAttachment
+	op                Op
+	typ               string
+	id                *int
+	owner_type        *string
+	owner_id          *int
+	addowner_id       *int
+	attachment_type   *string
+	slot_key          *string
+	file_name         *string
+	mime_type         *string
+	file_size         *int
+	addfile_size      *int
+	sha256            *string
+	content           *[]byte
+	uploaded_by       *int
+	adduploaded_by    *int
+	note              *string
+	withdrawn_at      *time.Time
+	withdrawn_by      *int
+	addwithdrawn_by   *int
+	withdrawal_reason *string
+	created_at        *time.Time
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*BusinessAttachment, error)
+	predicates        []predicate.BusinessAttachment
 }
 
 var _ ent.Mutation = (*BusinessAttachmentMutation)(nil)
@@ -7184,6 +7188,174 @@ func (m *BusinessAttachmentMutation) ResetNote() {
 	delete(m.clearedFields, businessattachment.FieldNote)
 }
 
+// SetWithdrawnAt sets the "withdrawn_at" field.
+func (m *BusinessAttachmentMutation) SetWithdrawnAt(t time.Time) {
+	m.withdrawn_at = &t
+}
+
+// WithdrawnAt returns the value of the "withdrawn_at" field in the mutation.
+func (m *BusinessAttachmentMutation) WithdrawnAt() (r time.Time, exists bool) {
+	v := m.withdrawn_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWithdrawnAt returns the old "withdrawn_at" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldWithdrawnAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWithdrawnAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWithdrawnAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWithdrawnAt: %w", err)
+	}
+	return oldValue.WithdrawnAt, nil
+}
+
+// ClearWithdrawnAt clears the value of the "withdrawn_at" field.
+func (m *BusinessAttachmentMutation) ClearWithdrawnAt() {
+	m.withdrawn_at = nil
+	m.clearedFields[businessattachment.FieldWithdrawnAt] = struct{}{}
+}
+
+// WithdrawnAtCleared returns if the "withdrawn_at" field was cleared in this mutation.
+func (m *BusinessAttachmentMutation) WithdrawnAtCleared() bool {
+	_, ok := m.clearedFields[businessattachment.FieldWithdrawnAt]
+	return ok
+}
+
+// ResetWithdrawnAt resets all changes to the "withdrawn_at" field.
+func (m *BusinessAttachmentMutation) ResetWithdrawnAt() {
+	m.withdrawn_at = nil
+	delete(m.clearedFields, businessattachment.FieldWithdrawnAt)
+}
+
+// SetWithdrawnBy sets the "withdrawn_by" field.
+func (m *BusinessAttachmentMutation) SetWithdrawnBy(i int) {
+	m.withdrawn_by = &i
+	m.addwithdrawn_by = nil
+}
+
+// WithdrawnBy returns the value of the "withdrawn_by" field in the mutation.
+func (m *BusinessAttachmentMutation) WithdrawnBy() (r int, exists bool) {
+	v := m.withdrawn_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWithdrawnBy returns the old "withdrawn_by" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldWithdrawnBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWithdrawnBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWithdrawnBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWithdrawnBy: %w", err)
+	}
+	return oldValue.WithdrawnBy, nil
+}
+
+// AddWithdrawnBy adds i to the "withdrawn_by" field.
+func (m *BusinessAttachmentMutation) AddWithdrawnBy(i int) {
+	if m.addwithdrawn_by != nil {
+		*m.addwithdrawn_by += i
+	} else {
+		m.addwithdrawn_by = &i
+	}
+}
+
+// AddedWithdrawnBy returns the value that was added to the "withdrawn_by" field in this mutation.
+func (m *BusinessAttachmentMutation) AddedWithdrawnBy() (r int, exists bool) {
+	v := m.addwithdrawn_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearWithdrawnBy clears the value of the "withdrawn_by" field.
+func (m *BusinessAttachmentMutation) ClearWithdrawnBy() {
+	m.withdrawn_by = nil
+	m.addwithdrawn_by = nil
+	m.clearedFields[businessattachment.FieldWithdrawnBy] = struct{}{}
+}
+
+// WithdrawnByCleared returns if the "withdrawn_by" field was cleared in this mutation.
+func (m *BusinessAttachmentMutation) WithdrawnByCleared() bool {
+	_, ok := m.clearedFields[businessattachment.FieldWithdrawnBy]
+	return ok
+}
+
+// ResetWithdrawnBy resets all changes to the "withdrawn_by" field.
+func (m *BusinessAttachmentMutation) ResetWithdrawnBy() {
+	m.withdrawn_by = nil
+	m.addwithdrawn_by = nil
+	delete(m.clearedFields, businessattachment.FieldWithdrawnBy)
+}
+
+// SetWithdrawalReason sets the "withdrawal_reason" field.
+func (m *BusinessAttachmentMutation) SetWithdrawalReason(s string) {
+	m.withdrawal_reason = &s
+}
+
+// WithdrawalReason returns the value of the "withdrawal_reason" field in the mutation.
+func (m *BusinessAttachmentMutation) WithdrawalReason() (r string, exists bool) {
+	v := m.withdrawal_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWithdrawalReason returns the old "withdrawal_reason" field's value of the BusinessAttachment entity.
+// If the BusinessAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BusinessAttachmentMutation) OldWithdrawalReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWithdrawalReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWithdrawalReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWithdrawalReason: %w", err)
+	}
+	return oldValue.WithdrawalReason, nil
+}
+
+// ClearWithdrawalReason clears the value of the "withdrawal_reason" field.
+func (m *BusinessAttachmentMutation) ClearWithdrawalReason() {
+	m.withdrawal_reason = nil
+	m.clearedFields[businessattachment.FieldWithdrawalReason] = struct{}{}
+}
+
+// WithdrawalReasonCleared returns if the "withdrawal_reason" field was cleared in this mutation.
+func (m *BusinessAttachmentMutation) WithdrawalReasonCleared() bool {
+	_, ok := m.clearedFields[businessattachment.FieldWithdrawalReason]
+	return ok
+}
+
+// ResetWithdrawalReason resets all changes to the "withdrawal_reason" field.
+func (m *BusinessAttachmentMutation) ResetWithdrawalReason() {
+	m.withdrawal_reason = nil
+	delete(m.clearedFields, businessattachment.FieldWithdrawalReason)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *BusinessAttachmentMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -7254,7 +7426,7 @@ func (m *BusinessAttachmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BusinessAttachmentMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 15)
 	if m.owner_type != nil {
 		fields = append(fields, businessattachment.FieldOwnerType)
 	}
@@ -7287,6 +7459,15 @@ func (m *BusinessAttachmentMutation) Fields() []string {
 	}
 	if m.note != nil {
 		fields = append(fields, businessattachment.FieldNote)
+	}
+	if m.withdrawn_at != nil {
+		fields = append(fields, businessattachment.FieldWithdrawnAt)
+	}
+	if m.withdrawn_by != nil {
+		fields = append(fields, businessattachment.FieldWithdrawnBy)
+	}
+	if m.withdrawal_reason != nil {
+		fields = append(fields, businessattachment.FieldWithdrawalReason)
 	}
 	if m.created_at != nil {
 		fields = append(fields, businessattachment.FieldCreatedAt)
@@ -7321,6 +7502,12 @@ func (m *BusinessAttachmentMutation) Field(name string) (ent.Value, bool) {
 		return m.UploadedBy()
 	case businessattachment.FieldNote:
 		return m.Note()
+	case businessattachment.FieldWithdrawnAt:
+		return m.WithdrawnAt()
+	case businessattachment.FieldWithdrawnBy:
+		return m.WithdrawnBy()
+	case businessattachment.FieldWithdrawalReason:
+		return m.WithdrawalReason()
 	case businessattachment.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -7354,6 +7541,12 @@ func (m *BusinessAttachmentMutation) OldField(ctx context.Context, name string) 
 		return m.OldUploadedBy(ctx)
 	case businessattachment.FieldNote:
 		return m.OldNote(ctx)
+	case businessattachment.FieldWithdrawnAt:
+		return m.OldWithdrawnAt(ctx)
+	case businessattachment.FieldWithdrawnBy:
+		return m.OldWithdrawnBy(ctx)
+	case businessattachment.FieldWithdrawalReason:
+		return m.OldWithdrawalReason(ctx)
 	case businessattachment.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -7442,6 +7635,27 @@ func (m *BusinessAttachmentMutation) SetField(name string, value ent.Value) erro
 		}
 		m.SetNote(v)
 		return nil
+	case businessattachment.FieldWithdrawnAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWithdrawnAt(v)
+		return nil
+	case businessattachment.FieldWithdrawnBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWithdrawnBy(v)
+		return nil
+	case businessattachment.FieldWithdrawalReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWithdrawalReason(v)
+		return nil
 	case businessattachment.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -7466,6 +7680,9 @@ func (m *BusinessAttachmentMutation) AddedFields() []string {
 	if m.adduploaded_by != nil {
 		fields = append(fields, businessattachment.FieldUploadedBy)
 	}
+	if m.addwithdrawn_by != nil {
+		fields = append(fields, businessattachment.FieldWithdrawnBy)
+	}
 	return fields
 }
 
@@ -7480,6 +7697,8 @@ func (m *BusinessAttachmentMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedFileSize()
 	case businessattachment.FieldUploadedBy:
 		return m.AddedUploadedBy()
+	case businessattachment.FieldWithdrawnBy:
+		return m.AddedWithdrawnBy()
 	}
 	return nil, false
 }
@@ -7510,6 +7729,13 @@ func (m *BusinessAttachmentMutation) AddField(name string, value ent.Value) erro
 		}
 		m.AddUploadedBy(v)
 		return nil
+	case businessattachment.FieldWithdrawnBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWithdrawnBy(v)
+		return nil
 	}
 	return fmt.Errorf("unknown BusinessAttachment numeric field %s", name)
 }
@@ -7526,6 +7752,15 @@ func (m *BusinessAttachmentMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(businessattachment.FieldNote) {
 		fields = append(fields, businessattachment.FieldNote)
+	}
+	if m.FieldCleared(businessattachment.FieldWithdrawnAt) {
+		fields = append(fields, businessattachment.FieldWithdrawnAt)
+	}
+	if m.FieldCleared(businessattachment.FieldWithdrawnBy) {
+		fields = append(fields, businessattachment.FieldWithdrawnBy)
+	}
+	if m.FieldCleared(businessattachment.FieldWithdrawalReason) {
+		fields = append(fields, businessattachment.FieldWithdrawalReason)
 	}
 	return fields
 }
@@ -7549,6 +7784,15 @@ func (m *BusinessAttachmentMutation) ClearField(name string) error {
 		return nil
 	case businessattachment.FieldNote:
 		m.ClearNote()
+		return nil
+	case businessattachment.FieldWithdrawnAt:
+		m.ClearWithdrawnAt()
+		return nil
+	case businessattachment.FieldWithdrawnBy:
+		m.ClearWithdrawnBy()
+		return nil
+	case businessattachment.FieldWithdrawalReason:
+		m.ClearWithdrawalReason()
 		return nil
 	}
 	return fmt.Errorf("unknown BusinessAttachment nullable field %s", name)
@@ -7590,6 +7834,15 @@ func (m *BusinessAttachmentMutation) ResetField(name string) error {
 		return nil
 	case businessattachment.FieldNote:
 		m.ResetNote()
+		return nil
+	case businessattachment.FieldWithdrawnAt:
+		m.ResetWithdrawnAt()
+		return nil
+	case businessattachment.FieldWithdrawnBy:
+		m.ResetWithdrawnBy()
+		return nil
+	case businessattachment.FieldWithdrawalReason:
+		m.ResetWithdrawalReason()
 		return nil
 	case businessattachment.FieldCreatedAt:
 		m.ResetCreatedAt()

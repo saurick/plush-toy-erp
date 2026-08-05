@@ -2227,7 +2227,7 @@ export default function V1QualityInspectionsPage() {
           title="质检附件"
           description="查看不良照片、检验报告、让步说明或批次异常证据。"
           canUpload={false}
-          canDelete={false}
+          canWithdraw={false}
           variant="inline"
         />
       </BusinessRecordDetailsModal>
@@ -2359,7 +2359,7 @@ export default function V1QualityInspectionsPage() {
           title="质检附件"
           description="上传不良照片、检验报告、让步说明或批次异常证据；附件不能代替质检处理。"
           canUpload={canCreate || canUpdate}
-          canDelete={canUpdate}
+          canWithdraw={canCreate || canUpdate}
           variant="inline"
         />
       </BusinessFormModal>

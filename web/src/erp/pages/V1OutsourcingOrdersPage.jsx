@@ -2723,7 +2723,7 @@ export default function V1OutsourcingOrdersPage() {
               title="加工合同附件"
               description="上传纸样、图纸、签回合同、加工要求或报价结算依据；附件不会改变库存、质检或应付记录。"
               canUpload={canUpdate || canCreate}
-              canDelete={canUpdate}
+              canWithdraw={canUpdate || canCreate}
               variant="inline"
             />
           }

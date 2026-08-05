@@ -588,8 +588,16 @@ func init() {
 	businessattachmentDescNote := businessattachmentFields[10].Descriptor()
 	// businessattachment.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	businessattachment.NoteValidator = businessattachmentDescNote.Validators[0].(func(string) error)
+	// businessattachmentDescWithdrawnBy is the schema descriptor for withdrawn_by field.
+	businessattachmentDescWithdrawnBy := businessattachmentFields[12].Descriptor()
+	// businessattachment.WithdrawnByValidator is a validator for the "withdrawn_by" field. It is called by the builders before save.
+	businessattachment.WithdrawnByValidator = businessattachmentDescWithdrawnBy.Validators[0].(func(int) error)
+	// businessattachmentDescWithdrawalReason is the schema descriptor for withdrawal_reason field.
+	businessattachmentDescWithdrawalReason := businessattachmentFields[13].Descriptor()
+	// businessattachment.WithdrawalReasonValidator is a validator for the "withdrawal_reason" field. It is called by the builders before save.
+	businessattachment.WithdrawalReasonValidator = businessattachmentDescWithdrawalReason.Validators[0].(func(string) error)
 	// businessattachmentDescCreatedAt is the schema descriptor for created_at field.
-	businessattachmentDescCreatedAt := businessattachmentFields[11].Descriptor()
+	businessattachmentDescCreatedAt := businessattachmentFields[14].Descriptor()
 	// businessattachment.DefaultCreatedAt holds the default value on creation for the created_at field.
 	businessattachment.DefaultCreatedAt = businessattachmentDescCreatedAt.Default.(func() time.Time)
 	contactFields := schema.Contact{}.Fields()

@@ -672,10 +672,7 @@ test('权限中心在权限行内区分菜单入口、页内操作、依赖和�
     /岗位可用操作 = 系统允许 ∩ 模块已启用 ∩ 当前版本已开放 − 岗位撤销/u
   )
   assert.match(content, /“∩”表示这些条件必须同时满足/u)
-  assert.match(
-    content,
-    /员工有多个岗位时，系统先分别计算每个岗位，再合并结果/u
-  )
+  assert.match(content, /员工有多个岗位时，系统先分别计算每个岗位，再合并结果/u)
   assert.match(
     content,
     /具体办理时还会继续检查数据范围、负责岗位、单据状态和前置审批等条件/u
@@ -823,10 +820,7 @@ test('BOM 页面导出和选中项不把内部 ID 当业务字段', () => {
   assert.doesNotMatch(content, /产品ID/u)
   assert.doesNotMatch(content, /`BOM \$\{record\.id\}`/u)
   assert.match(
-    readFileSync(
-      join(rootDir, 'components/bom/BOMVersionColumns.jsx'),
-      'utf8'
-    ),
+    readFileSync(join(rootDir, 'components/bom/BOMVersionColumns.jsx'), 'utf8'),
     /exportValue: \(record\) =>\s*referenceLabel\(productOptions, record\?\.product_id, '产品'\)/u
   )
   assert.match(content, /BOM 已关联/u)
@@ -1620,16 +1614,18 @@ test('协同任务面板责任角色不把 owner_role_key 当用户可见 fallba
   )
 })
 
-test('移动端任务详情用来源口径，不把所有任务误称为订单或单号', () => {
+test('移动端任务详情集中展示主来源，只在存在额外单据时显示相关单据', () => {
   const filePath = join(rootDir, 'mobile/components/MobileTaskDetailScreen.jsx')
   const content = readFileSync(filePath, 'utf8')
 
-  assert.match(content, /resolveTaskRelatedSourceLabel\(selectedTask\)/u)
+  assert.match(content, /resolveTaskSourceLabel\(selectedTask\)/u)
   assert.match(content, /来源：/u)
-  assert.match(content, /关联来源（\{relatedDocuments\.length \+ 1\}）/u)
+  assert.match(content, /相关单据（\{relatedDocuments\.length\}）/u)
+  assert.match(content, /relatedDocuments\.length > 0/u)
   assert.doesNotMatch(content, /单号：/u)
   assert.doesNotMatch(content, /订单：\{relatedSource\}/u)
-  assert.doesNotMatch(content, /关联单据（/u)
+  assert.doesNotMatch(content, /resolveTaskRelatedSourceLabel/u)
+  assert.doesNotMatch(content, /relatedDocuments\.length \+ 1/u)
 })
 
 test('移动端任务办理与回执优先展示动作中文标签而不是 raw action key', () => {

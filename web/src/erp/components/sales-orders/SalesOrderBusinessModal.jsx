@@ -63,7 +63,7 @@ export default function SalesOrderBusinessModal({
           title="订单附件"
           description="上传客户 PO、合同、样品图或确认截图；附件不改变订单状态。"
           canUpload={canUpdateOrder || canCreateOrder}
-          canDelete={canUpdateOrder}
+          canWithdraw={canCreateOrder || canUpdateOrder}
           variant="inline"
         />
         <SalesOrderItemsFormSection

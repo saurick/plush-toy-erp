@@ -175,6 +175,144 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 	}, nil
 }
 
+func (r *businessAttachmentRepo) WithdrawBusinessAttachment(
+	ctx context.Context,
+	in *biz.BusinessAttachmentWithdraw,
+) (time.Time, error) {
+	if r == nil || r.data == nil || r.data.sqldb == nil || in == nil ||
+		in.ID <= 0 || in.OwnerID <= 0 || in.WithdrawnBy <= 0 {
+		return time.Time{}, biz.ErrBadParam
+	}
+	ownerTable, ok := businessAttachmentOwnerTable(in.OwnerType)
+	if !ok {
+		return time.Time{}, biz.ErrBusinessAttachmentOwnerInvalid
+	}
+	if in.OwnerType == biz.BusinessAttachmentOwnerProduct ||
+		in.AttachmentType == biz.BusinessAttachmentTypeProductImage {
+		return time.Time{}, biz.ErrBusinessAttachmentProductImageWithdrawalUnsupported
+	}
+	workflowGuard := in.WorkflowGuard
+	if in.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask &&
+		(workflowGuard == nil || workflowGuard.ExpectedVersion <= 0 || workflowGuard.ActorID <= 0 ||
+			workflowGuard.ActorID != in.WithdrawnBy) {
+		return time.Time{}, biz.ErrBadParam
+	}
+
+	tx, err := r.data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	ownerQuery := fmt.Sprintf("SELECT id FROM %s WHERE id = $1 FOR KEY SHARE", ownerTable)
+	if in.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask {
+		ownerQuery = "SELECT id, version, task_status_key, owner_role_key, assignee_id FROM workflow_tasks WHERE id = $1 FOR UPDATE"
+	}
+	if r.data.sqlDialect == "sqlite3" {
+		ownerQuery = fmt.Sprintf("SELECT id FROM %s WHERE id = ?", ownerTable)
+		if in.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask {
+			ownerQuery = "SELECT id, version, task_status_key, owner_role_key, assignee_id FROM workflow_tasks WHERE id = ?"
+		}
+	}
+	var ownerID int
+	var ownerErr error
+	if in.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask {
+		var version int
+		var statusKey, ownerRoleKey string
+		var assigneeID stdsql.NullInt64
+		ownerErr = tx.QueryRowContext(ctx, ownerQuery, in.OwnerID).Scan(
+			&ownerID,
+			&version,
+			&statusKey,
+			&ownerRoleKey,
+			&assigneeID,
+		)
+		if ownerErr == nil {
+			if version != workflowGuard.ExpectedVersion {
+				return time.Time{}, biz.ErrWorkflowTaskConflict
+			}
+			if biz.IsTerminalWorkflowTaskStatus(statusKey) {
+				return time.Time{}, biz.ErrWorkflowTaskSettled
+			}
+			allowed := assigneeID.Valid && int(assigneeID.Int64) == workflowGuard.ActorID
+			if !assigneeID.Valid {
+				for _, roleKey := range workflowGuard.VisibleOwnerRoleKeys {
+					if roleKey == ownerRoleKey {
+						allowed = true
+						break
+					}
+				}
+			}
+			if !allowed {
+				return time.Time{}, biz.ErrForbidden
+			}
+		}
+	} else {
+		ownerErr = tx.QueryRowContext(ctx, ownerQuery, in.OwnerID).Scan(&ownerID)
+	}
+	if ownerErr != nil {
+		if ownerErr == stdsql.ErrNoRows {
+			return time.Time{}, biz.ErrBusinessAttachmentOwnerNotFound
+		}
+		return time.Time{}, ownerErr
+	}
+
+	attachmentQuery := "SELECT owner_type, owner_id, attachment_type, withdrawn_at, withdrawn_by, withdrawal_reason FROM business_attachments WHERE id = $1 FOR UPDATE"
+	updateQuery := "UPDATE business_attachments SET withdrawn_at = CURRENT_TIMESTAMP, withdrawn_by = $1, withdrawal_reason = $2 WHERE id = $3 AND withdrawn_at IS NULL RETURNING withdrawn_at"
+	if r.data.sqlDialect == "sqlite3" {
+		attachmentQuery = "SELECT owner_type, owner_id, attachment_type, withdrawn_at, withdrawn_by, withdrawal_reason FROM business_attachments WHERE id = ?"
+		updateQuery = "UPDATE business_attachments SET withdrawn_at = CURRENT_TIMESTAMP, withdrawn_by = ?, withdrawal_reason = ? WHERE id = ? AND withdrawn_at IS NULL RETURNING withdrawn_at"
+	}
+	var persistedOwnerType, persistedAttachmentType string
+	var persistedOwnerID int
+	var persistedWithdrawnAt stdsql.NullTime
+	var persistedWithdrawnBy stdsql.NullInt64
+	var persistedWithdrawalReason stdsql.NullString
+	if err := tx.QueryRowContext(ctx, attachmentQuery, in.ID).Scan(
+		&persistedOwnerType,
+		&persistedOwnerID,
+		&persistedAttachmentType,
+		&persistedWithdrawnAt,
+		&persistedWithdrawnBy,
+		&persistedWithdrawalReason,
+	); err != nil {
+		if err == stdsql.ErrNoRows {
+			return time.Time{}, biz.ErrBusinessAttachmentNotFound
+		}
+		return time.Time{}, err
+	}
+	if persistedOwnerType != in.OwnerType || persistedOwnerID != in.OwnerID ||
+		persistedAttachmentType != in.AttachmentType {
+		return time.Time{}, biz.ErrBusinessAttachmentNotFound
+	}
+	if persistedOwnerType == biz.BusinessAttachmentOwnerProduct ||
+		persistedAttachmentType == biz.BusinessAttachmentTypeProductImage {
+		return time.Time{}, biz.ErrBusinessAttachmentProductImageWithdrawalUnsupported
+	}
+	if persistedWithdrawnAt.Valid {
+		if persistedWithdrawnBy.Valid && int(persistedWithdrawnBy.Int64) == in.WithdrawnBy &&
+			persistedWithdrawalReason.Valid && persistedWithdrawalReason.String == in.Reason {
+			if err := tx.Commit(); err != nil {
+				return time.Time{}, err
+			}
+			return persistedWithdrawnAt.Time, nil
+		}
+		return time.Time{}, biz.ErrBusinessAttachmentWithdrawn
+	}
+
+	var withdrawnAt time.Time
+	if err := tx.QueryRowContext(ctx, updateQuery, in.WithdrawnBy, in.Reason, in.ID).Scan(&withdrawnAt); err != nil {
+		if err == stdsql.ErrNoRows {
+			return time.Time{}, biz.ErrBusinessAttachmentWithdrawn
+		}
+		return time.Time{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return time.Time{}, err
+	}
+	return withdrawnAt, nil
+}
+
 func (r *businessAttachmentRepo) ClearProductImage(ctx context.Context, productID int, slotKey string) error {
 	if r == nil || r.data == nil || r.data.sqldb == nil || productID <= 0 {
 		return biz.ErrBadParam
@@ -247,6 +385,9 @@ func (r *businessAttachmentRepo) ListBusinessAttachments(ctx context.Context, ow
 			businessattachment.FieldSha256,
 			businessattachment.FieldUploadedBy,
 			businessattachment.FieldNote,
+			businessattachment.FieldWithdrawnAt,
+			businessattachment.FieldWithdrawnBy,
+			businessattachment.FieldWithdrawalReason,
 			businessattachment.FieldCreatedAt,
 		).
 		Where(
@@ -259,7 +400,7 @@ func (r *businessAttachmentRepo) ListBusinessAttachments(ctx context.Context, ow
 		return nil, err
 	}
 	items := entBusinessAttachmentsToBiz(rows)
-	if err := r.resolveBusinessAttachmentUploaderUsernames(ctx, items); err != nil {
+	if err := r.resolveBusinessAttachmentAuditUsernames(ctx, items); err != nil {
 		return nil, err
 	}
 	return items, nil
@@ -279,6 +420,9 @@ func (r *businessAttachmentRepo) GetBusinessAttachmentMetadata(ctx context.Conte
 			businessattachment.FieldSha256,
 			businessattachment.FieldUploadedBy,
 			businessattachment.FieldNote,
+			businessattachment.FieldWithdrawnAt,
+			businessattachment.FieldWithdrawnBy,
+			businessattachment.FieldWithdrawalReason,
 			businessattachment.FieldCreatedAt,
 		).
 		Where(businessattachment.ID(id)).
@@ -290,7 +434,7 @@ func (r *businessAttachmentRepo) GetBusinessAttachmentMetadata(ctx context.Conte
 		return nil, err
 	}
 	item := entBusinessAttachmentToBiz(row)
-	if err := r.resolveBusinessAttachmentUploaderUsernames(ctx, []*biz.BusinessAttachment{item}); err != nil {
+	if err := r.resolveBusinessAttachmentAuditUsernames(ctx, []*biz.BusinessAttachment{item}); err != nil {
 		return nil, err
 	}
 	return item, nil
@@ -307,10 +451,10 @@ func (r *businessAttachmentRepo) GetBusinessAttachmentContent(ctx context.Contex
 	}
 	defer func() { _ = tx.Rollback() }()
 	ownerQuery := fmt.Sprintf("SELECT id FROM %s WHERE id = $1 FOR KEY SHARE", ownerTable)
-	contentQuery := "SELECT content FROM business_attachments WHERE id = $1 AND owner_type = $2 AND owner_id = $3"
+	contentQuery := "SELECT content FROM business_attachments WHERE id = $1 AND owner_type = $2 AND owner_id = $3 AND withdrawn_at IS NULL"
 	if r.data.sqlDialect == "sqlite3" {
 		ownerQuery = fmt.Sprintf("SELECT id FROM %s WHERE id = ?", ownerTable)
-		contentQuery = "SELECT content FROM business_attachments WHERE id = ? AND owner_type = ? AND owner_id = ?"
+		contentQuery = "SELECT content FROM business_attachments WHERE id = ? AND owner_type = ? AND owner_id = ? AND withdrawn_at IS NULL"
 	}
 	var lockedOwnerID int
 	if err := tx.QueryRowContext(ctx, ownerQuery, ownerID).Scan(&lockedOwnerID); err != nil {
@@ -370,18 +514,21 @@ func entBusinessAttachmentToBiz(row *ent.BusinessAttachment) *biz.BusinessAttach
 		return nil
 	}
 	return &biz.BusinessAttachment{
-		ID:             row.ID,
-		OwnerType:      row.OwnerType,
-		OwnerID:        row.OwnerID,
-		AttachmentType: row.AttachmentType,
-		SlotKey:        row.SlotKey,
-		FileName:       row.FileName,
-		MimeType:       row.MimeType,
-		FileSize:       row.FileSize,
-		SHA256:         row.Sha256,
-		UploadedBy:     row.UploadedBy,
-		Note:           row.Note,
-		CreatedAt:      row.CreatedAt,
+		ID:               row.ID,
+		OwnerType:        row.OwnerType,
+		OwnerID:          row.OwnerID,
+		AttachmentType:   row.AttachmentType,
+		SlotKey:          row.SlotKey,
+		FileName:         row.FileName,
+		MimeType:         row.MimeType,
+		FileSize:         row.FileSize,
+		SHA256:           row.Sha256,
+		UploadedBy:       row.UploadedBy,
+		Note:             row.Note,
+		WithdrawnAt:      row.WithdrawnAt,
+		WithdrawnBy:      row.WithdrawnBy,
+		WithdrawalReason: row.WithdrawalReason,
+		CreatedAt:        row.CreatedAt,
 	}
 }
 
@@ -393,21 +540,24 @@ func entBusinessAttachmentsToBiz(rows []*ent.BusinessAttachment) []*biz.Business
 	return out
 }
 
-func (r *businessAttachmentRepo) resolveBusinessAttachmentUploaderUsernames(
+func (r *businessAttachmentRepo) resolveBusinessAttachmentAuditUsernames(
 	ctx context.Context,
 	items []*biz.BusinessAttachment,
 ) error {
-	uploaderIDs := make(map[int]struct{})
+	actorIDs := make(map[int]struct{})
 	for _, item := range items {
 		if item != nil && item.UploadedBy != nil && *item.UploadedBy > 0 {
-			uploaderIDs[*item.UploadedBy] = struct{}{}
+			actorIDs[*item.UploadedBy] = struct{}{}
+		}
+		if item != nil && item.WithdrawnBy != nil && *item.WithdrawnBy > 0 {
+			actorIDs[*item.WithdrawnBy] = struct{}{}
 		}
 	}
-	if len(uploaderIDs) == 0 {
+	if len(actorIDs) == 0 {
 		return nil
 	}
-	ids := make([]int, 0, len(uploaderIDs))
-	for id := range uploaderIDs {
+	ids := make([]int, 0, len(actorIDs))
+	for id := range actorIDs {
 		ids = append(ids, id)
 	}
 	admins, err := r.data.postgres.AdminUser.Query().
@@ -427,14 +577,19 @@ func (r *businessAttachmentRepo) resolveBusinessAttachmentUploaderUsernames(
 		}
 	}
 	for _, item := range items {
-		if item == nil || item.UploadedBy == nil {
+		if item == nil {
 			continue
 		}
-		username := usernameByID[*item.UploadedBy]
-		if username == "" {
-			continue
+		if item.UploadedBy != nil {
+			if username := usernameByID[*item.UploadedBy]; username != "" {
+				item.UploadedByUsername = &username
+			}
 		}
-		item.UploadedByUsername = &username
+		if item.WithdrawnBy != nil {
+			if username := usernameByID[*item.WithdrawnBy]; username != "" {
+				item.WithdrawnByUsername = &username
+			}
+		}
 	}
 	return nil
 }

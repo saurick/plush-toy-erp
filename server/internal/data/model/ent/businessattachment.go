@@ -39,6 +39,12 @@ type BusinessAttachment struct {
 	UploadedBy *int `json:"uploaded_by,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
+	// WithdrawnAt holds the value of the "withdrawn_at" field.
+	WithdrawnAt *time.Time `json:"withdrawn_at,omitempty"`
+	// WithdrawnBy holds the value of the "withdrawn_by" field.
+	WithdrawnBy *int `json:"withdrawn_by,omitempty"`
+	// WithdrawalReason holds the value of the "withdrawal_reason" field.
+	WithdrawalReason *string `json:"withdrawal_reason,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt    time.Time `json:"created_at,omitempty"`
 	selectValues sql.SelectValues
@@ -51,11 +57,11 @@ func (*BusinessAttachment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case businessattachment.FieldContent:
 			values[i] = new([]byte)
-		case businessattachment.FieldID, businessattachment.FieldOwnerID, businessattachment.FieldFileSize, businessattachment.FieldUploadedBy:
+		case businessattachment.FieldID, businessattachment.FieldOwnerID, businessattachment.FieldFileSize, businessattachment.FieldUploadedBy, businessattachment.FieldWithdrawnBy:
 			values[i] = new(sql.NullInt64)
-		case businessattachment.FieldOwnerType, businessattachment.FieldAttachmentType, businessattachment.FieldSlotKey, businessattachment.FieldFileName, businessattachment.FieldMimeType, businessattachment.FieldSha256, businessattachment.FieldNote:
+		case businessattachment.FieldOwnerType, businessattachment.FieldAttachmentType, businessattachment.FieldSlotKey, businessattachment.FieldFileName, businessattachment.FieldMimeType, businessattachment.FieldSha256, businessattachment.FieldNote, businessattachment.FieldWithdrawalReason:
 			values[i] = new(sql.NullString)
-		case businessattachment.FieldCreatedAt:
+		case businessattachment.FieldWithdrawnAt, businessattachment.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -147,6 +153,27 @@ func (_m *BusinessAttachment) assignValues(columns []string, values []any) error
 				_m.Note = new(string)
 				*_m.Note = value.String
 			}
+		case businessattachment.FieldWithdrawnAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field withdrawn_at", values[i])
+			} else if value.Valid {
+				_m.WithdrawnAt = new(time.Time)
+				*_m.WithdrawnAt = value.Time
+			}
+		case businessattachment.FieldWithdrawnBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field withdrawn_by", values[i])
+			} else if value.Valid {
+				_m.WithdrawnBy = new(int)
+				*_m.WithdrawnBy = int(value.Int64)
+			}
+		case businessattachment.FieldWithdrawalReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field withdrawal_reason", values[i])
+			} else if value.Valid {
+				_m.WithdrawalReason = new(string)
+				*_m.WithdrawalReason = value.String
+			}
 		case businessattachment.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -225,6 +252,21 @@ func (_m *BusinessAttachment) String() string {
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {
 		builder.WriteString("note=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.WithdrawnAt; v != nil {
+		builder.WriteString("withdrawn_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.WithdrawnBy; v != nil {
+		builder.WriteString("withdrawn_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.WithdrawalReason; v != nil {
+		builder.WriteString("withdrawal_reason=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

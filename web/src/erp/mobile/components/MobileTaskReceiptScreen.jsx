@@ -3,10 +3,8 @@ import {
   CheckCircleFilled,
   ClockCircleOutlined,
   CloseCircleFilled,
-  FileTextOutlined,
   LoadingOutlined,
   ReloadOutlined,
-  RightOutlined,
 } from '@ant-design/icons'
 import {
   resolveMobileActionDisplayLabel,
@@ -29,8 +27,7 @@ const OUTCOME_META = Object.freeze({
     icon: CheckCircleFilled,
     iconClass: 'bg-emerald-50 text-emerald-600',
     title: '任务办理已确认',
-    description:
-      '系统已确认本次办理结果；下方状态是本次确认时的结果，最新状态请返回列表刷新核对。',
+    description: '本次办理结果已记录；最新状态可返回列表刷新核对。',
   },
   [MOBILE_TASK_RECEIPT_OUTCOMES.UNKNOWN]: {
     icon: ClockCircleOutlined,
@@ -200,19 +197,11 @@ export default function MobileTaskReceiptScreen({
         ) : null}
 
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <FileTextOutlined />
-            </span>
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-slate-500">当前任务</div>
-              <div className="mt-1 break-words text-lg font-semibold text-slate-950 [overflow-wrap:anywhere]">
-                {taskName}
-              </div>
-            </div>
-          </div>
+          <h2 className="break-words text-lg font-semibold leading-7 text-slate-950 [overflow-wrap:anywhere]">
+            {taskName}
+          </h2>
 
-          <dl className="mt-4 divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200">
+          <dl className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200">
             <div className="mobile-task-receipt-row grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
               <dt className="text-sm font-medium text-slate-500">
                 {outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
@@ -293,9 +282,7 @@ export default function MobileTaskReceiptScreen({
                 variant="mobile"
               />
             ) : (
-              <p className="mt-3 text-sm text-slate-500">
-                正在读取当前流程
-              </p>
+              <p className="mt-3 text-sm text-slate-500">正在读取当前流程</p>
             )}
           </section>
         ) : null}
@@ -326,28 +313,14 @@ export default function MobileTaskReceiptScreen({
             {busy ? '正在确认' : '重新确认结果'}
           </button>
         ) : null}
-        <div className={`grid gap-3 ${onViewTask ? 'grid-cols-2' : ''}`}>
-          <button
-            type="button"
-            className="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={busy}
-            onClick={onBackToList}
-          >
-            返回列表
-          </button>
-          {onViewTask ? (
-            <button
-              type="button"
-              aria-label="查看任务"
-              className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-base font-semibold text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={busy}
-              onClick={onViewTask}
-            >
-              查看任务
-              <RightOutlined />
-            </button>
-          ) : null}
-        </div>
+        <button
+          type="button"
+          className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={busy}
+          onClick={onBackToList}
+        >
+          返回列表
+        </button>
       </div>
     </div>
   )

@@ -360,24 +360,20 @@
   background: var(--erp-surface-bg);
 }
 
-[data-erp-theme='dark'] .erp-task-action-drawer__title span,
-[data-erp-theme='dark'] .erp-task-action-drawer__eyebrow,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-head span,
 [data-erp-theme='dark'] .erp-task-action-drawer__meta-grid span,
 [data-erp-theme='dark'] .erp-task-action-drawer__reason span,
-[data-erp-theme='dark'] .erp-task-action-drawer__step small,
-[data-erp-theme='dark'] .erp-task-action-drawer__guide-note span,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-prompt span,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-option small,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-copy.ant-typography {
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-task-action-drawer__title strong,
+[data-erp-theme='dark'] .erp-task-action-drawer__title,
+[data-erp-theme='dark'] .erp-task-action-drawer__section-title,
 [data-erp-theme='dark'] .erp-task-action-drawer__task-title.ant-typography,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-head strong,
 [data-erp-theme='dark'] .erp-task-action-drawer__meta-grid strong,
-[data-erp-theme='dark'] .erp-task-action-drawer__guide-note strong,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-prompt strong,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-option strong,
 [data-erp-theme='dark'] .erp-task-action-drawer__confirm-head strong,
@@ -388,6 +384,11 @@
 [data-erp-theme='dark'] .erp-task-action-drawer__meta-grid div {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .erp-task-action-drawer__task-meta > div {
+  border-color: var(--erp-border);
+  background: transparent;
 }
 
 [data-erp-theme='dark'] .erp-task-action-drawer__reason,
@@ -453,16 +454,6 @@
   border-color: var(--erp-primary-strong);
   background: var(--erp-primary-strong);
   color: #082011;
-}
-
-[data-erp-theme='dark'] .erp-task-action-drawer__guide-note {
-  border-top-color: var(--erp-border);
-  background: var(--erp-surface-bg-soft);
-}
-
-[data-erp-theme='dark'] .erp-task-action-drawer__guide-note > .anticon {
-  background: rgb(74 222 128 / 0.14);
-  color: var(--erp-primary-strong);
 }
 
 [data-erp-theme='dark'] .erp-task-action-drawer__action-panel--success {
@@ -544,9 +535,7 @@
   background: rgb(255 154 163 / 0.09);
 }
 
-[data-erp-theme='dark']
-  .erp-task-board-lane--due.ant-card
-  > .ant-card-head {
+[data-erp-theme='dark'] .erp-task-board-lane--due.ant-card > .ant-card-head {
   background: rgb(244 181 94 / 0.09);
 }
 

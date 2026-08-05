@@ -61,7 +61,7 @@ test('task actions are selectable options and confirmation is separately gated',
 test('task action drawer explains loading and readonly access before action selection', () => {
   assert.match(source, /actionAvailabilityLoading/u)
   assert.match(source, /正在确认可用的处理方式/u)
-  assert.match(source, /确认完成后即可选择处理方式/u)
+  assert.doesNotMatch(source, /确认完成后即可选择处理方式/u)
   assert.doesNotMatch(source, /请稍候再进入下一步/u)
   assert.match(source, /当前只能查看任务/u)
   assert.match(source, /description=\{readonlyReason/u)
@@ -79,12 +79,27 @@ test('task action drawer only renders the explicitly authorized related document
   assert.doesNotMatch(source, />\s*去办理\s*<\/Button>/u)
 })
 
+test('task action drawer exposes the shared task attachment action as a secondary footer entry', () => {
+  assert.match(source, /BusinessAttachmentModalButton/u)
+  assert.match(source, /canViewAttachments = false/u)
+  assert.match(source, /canManageAttachments = false/u)
+  assert.match(source, /ownerType="workflow_task"/u)
+  assert.match(source, /ownerId=\{task\.id\}/u)
+  assert.match(source, /ownerVersion=\{task\.version\}/u)
+  assert.match(source, /showAttachmentCount/u)
+  assert.match(source, /canUpload=\{canManageAttachments\}/u)
+  assert.match(source, /workflow-task-attachment-action/u)
+  assert.match(source, /panelTitle="附件内容"/u)
+  assert.match(source, /上传照片、异常截图或处理凭证/u)
+  assert.match(source, /查看照片、异常截图或处理凭证/u)
+  assert.doesNotMatch(source, /不会改变库存/u)
+})
+
 test('task action drawer separates business trajectory from current-task processing records', () => {
   assert.match(source, /listWorkflowTaskEvents\(task\.id/u)
   assert.match(source, /WorkflowTaskEventTrail/u)
   assert.match(taskEventTrailSource, /本任务处理记录/u)
-  assert.match(taskEventTrailSource, /只代表当前任务/u)
-  assert.match(taskEventTrailSource, /不是来源单据的完整审批链/u)
+  assert.doesNotMatch(taskEventTrailSource, /完整审批链/u)
   assert.doesNotMatch(source, /!task\?\.id \|\| !approvalTask/u)
   assert.match(source, /limit: 100/u)
   assert.match(source, /taskEventsTruncated/u)
@@ -95,15 +110,19 @@ test('task action drawer separates business trajectory from current-task process
   assert.match(source, /approvalTask=\{approvalTask\}/u)
   assert.match(source, /activeStepKey === 'context'/u)
   assert.match(source, /getWorkflowTaskActionMeta\(task, actionMode\)/u)
-  assert.match(source, /approvalTask \? '审批办理' : '任务处理'/u)
+  assert.match(source, /approvalTask \? '审批详情' : '任务详情'/u)
+  assert.match(source, /showResponsibility=\{false\}/u)
 })
 
 test('task action drawer shows task-scoped process position and marks display-only tasks', () => {
   assert.match(source, /getWorkflowTaskProcessContext\(task\.id/u)
   assert.match(source, /业务流程/u)
-  assert.match(source, /aria-label="业务轨迹"/u)
+  assert.match(source, /业务进度/u)
   assert.match(source, /来源单据/u)
   assert.match(source, /流程状态/u)
+  assert.match(source, /暂时无法读取业务进度/u)
+  assert.match(source, /setProcessContextReloadKey/u)
+  assert.match(source, />\s*重新读取\s*<\/Button>/u)
   assert.match(source, /WorkflowProcessStageTrack context=\{processContext\}/u)
   assert.match(processStageSource, /执行轨迹/u)
   assert.match(processStageSource, /aria-current=\{item\.current \? 'step'/u)
@@ -113,6 +132,27 @@ test('task action drawer shows task-scoped process position and marks display-on
   assert.match(source, /task\?\.version/u)
   assert.match(source, /模拟展示数据/u)
   assert.match(source, /不计入流程闭环证据/u)
+})
+
+test('task action drawer keeps one compact business-facing task summary', () => {
+  assert.match(source, /getWorkflowTaskDisplayName\(task\)/u)
+  assert.match(
+    source,
+    /const taskSourceLabel = task\s+\? formatWorkflowTaskSource/u
+  )
+  assert.match(source, /erp-task-action-drawer__task-meta/u)
+  assert.match(source, /<span>来源单据<\/span>/u)
+  assert.match(source, /<span>负责人<\/span>/u)
+  assert.match(source, /<span>截止时间<\/span>/u)
+  assert.doesNotMatch(source, /getWorkflowTaskCodeLabel/u)
+  assert.doesNotMatch(source, /erp-task-action-drawer__eyebrow">当前任务/u)
+  assert.doesNotMatch(source, /<span>负责岗位<\/span>/u)
+  assert.doesNotMatch(source, /<span>当前处理人<\/span>/u)
+  assert.doesNotMatch(source, /<span>当前状态<\/span>/u)
+  assert.doesNotMatch(source, /step\.description/u)
+  assert.doesNotMatch(source, /erp-task-action-drawer__guide-note/u)
+  assert.doesNotMatch(source, /核对任务信息|核对审批事项|处理范围：/u)
+  assert.doesNotMatch(source, />\s*关闭\s*<\/Button>/u)
 })
 
 test('task action drawer submits formal approvals only from the authoritative runtime form', () => {

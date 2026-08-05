@@ -153,7 +153,7 @@ func workflowProcessTaskContextToMap(processContext *biz.ProcessTaskContext) map
 	if processContext == nil || processContext.Task == nil || processContext.Instance == nil {
 		return nil
 	}
-	return map[string]any{
+	result := map[string]any{
 		"source": map[string]any{
 			"type": processContext.Instance.BusinessRefType,
 			"id":   processContext.Instance.BusinessRefID,
@@ -161,11 +161,18 @@ func workflowProcessTaskContextToMap(processContext *biz.ProcessTaskContext) map
 		},
 		"process_instance": workflowProcessInstanceSummaryToMap(processContext.Instance),
 		"linked_node":      workflowProcessNodeToMap(processContext.LinkedNode),
-		"approval_form":    workflowProcessApprovalFormToMap(processContext.LinkedNode),
 		"nodes":            workflowProcessNodesToAny(processContext.Nodes),
 		"current_nodes":    workflowProcessNodesToAny(processContext.CurrentNodes),
 		"completed_nodes":  workflowProcessNodesToAny(processContext.CompletedNodes),
 	}
+	if approvalForm := workflowProcessApprovalFormToMap(processContext.LinkedNode); approvalForm != nil {
+		result["approval_form"] = approvalForm
+	} else {
+		// A typed nil map becomes {} when structpb serializes it. Keep the public
+		// JSON-RPC contract explicit: tasks without a formal approval form return null.
+		result["approval_form"] = nil
+	}
+	return result
 }
 
 func workflowProcessInstanceSummaryToMap(instance *biz.ProcessInstance) map[string]any {

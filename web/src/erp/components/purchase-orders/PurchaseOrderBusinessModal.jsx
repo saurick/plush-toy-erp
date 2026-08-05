@@ -51,7 +51,7 @@ export default function PurchaseOrderBusinessModal({
             title="采购附件"
             description="上传供应商报价、签回采购单、到货要求或价格确认资料；上传附件不会改变采购订单状态。"
             canUpload={canUpdate || canCreate}
-            canDelete={canUpdate}
+            canWithdraw={canCreate || canUpdate}
             variant="inline"
           />
         }

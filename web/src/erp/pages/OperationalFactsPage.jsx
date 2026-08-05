@@ -1757,7 +1757,7 @@ export function OperationalFactWorkspace({
               panelTitle={`${activeConfig.title}附件`}
               description="上传与当前记录相关的图片、票据、对账或确认资料；附件只作为证据，不改变当前记录状态。"
               canUpload={canWriteActive || canConfirmActive}
-              canDelete={canWriteActive || canConfirmActive}
+              canWithdraw={canWriteActive || canConfirmActive}
               disabled={!activeSelectedRow}
               disabledReason="请先选择一条记录"
               buttonProps={{

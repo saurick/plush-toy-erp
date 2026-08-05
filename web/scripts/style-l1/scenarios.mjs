@@ -129,6 +129,163 @@ export function createStyleL1Scenarios(deps) {
       `effective session 诊断模式应为 ${mode}`
     )
   }
+  const assertSalesReturnCreateLayout = async (
+    dialog,
+    { compact, scenarioName }
+  ) => {
+    const metrics = await dialog.evaluate((node) => {
+      const readRect = (selector) => {
+        const element = node.querySelector(selector)
+        if (!element) return null
+        const rect = element.getBoundingClientRect()
+        return {
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        }
+      }
+      const body = node.querySelector('.ant-modal-body')
+      const lineItems = node.querySelector(
+        '.erp-sales-return-create-form__items .erp-sales-order-lines-form__list'
+      )
+      return {
+        viewportHeight: window.innerHeight,
+        form: readRect('.erp-sales-return-create-form'),
+        source: readRect('.erp-sales-return-create-form__source'),
+        number: readRect('.erp-sales-return-create-form__number'),
+        status: readRect('.erp-sales-return-create-form__status'),
+        reason: readRect('.erp-sales-return-create-form__reason'),
+        items: readRect('.erp-sales-return-create-form__items'),
+        itemGrid: readRect('.erp-sales-return-create-form__item-grid'),
+        product: readRect('.erp-sales-return-create-form__field--product'),
+        quantity: readRect('.erp-sales-return-create-form__field--quantity'),
+        note: readRect('.erp-sales-return-create-form__field--note'),
+        body: body
+          ? {
+              ...readRect('.ant-modal-body'),
+              clientWidth: body.clientWidth,
+              scrollWidth: body.scrollWidth,
+              clientHeight: body.clientHeight,
+              scrollHeight: body.scrollHeight,
+            }
+          : null,
+        footer: readRect('.ant-modal-footer'),
+        lineItems: lineItems
+          ? {
+              clientWidth: lineItems.clientWidth,
+              scrollWidth: lineItems.scrollWidth,
+            }
+          : null,
+      }
+    })
+    const requiredRects = [
+      'form',
+      'source',
+      'number',
+      'status',
+      'reason',
+      'items',
+      'itemGrid',
+      'product',
+      'quantity',
+      'note',
+      'body',
+      'footer',
+    ]
+    for (const key of requiredRects) {
+      assert(metrics[key], `${scenarioName} 缺少布局节点 ${key}`)
+    }
+    const assertFullWidth = (rect, label) => {
+      assert(
+        Math.abs(rect.left - metrics.form.left) <= 2 &&
+          Math.abs(rect.right - metrics.form.right) <= 2,
+        `${scenarioName} ${label} 未横跨表单内容区: ${JSON.stringify(metrics)}`
+      )
+    }
+    const assertItemFullWidth = (rect, label) => {
+      assert(
+        Math.abs(rect.left - metrics.itemGrid.left) <= 2 &&
+          Math.abs(rect.right - metrics.itemGrid.right) <= 2,
+        `${scenarioName} ${label} 未横跨明细内容区: ${JSON.stringify(metrics)}`
+      )
+    }
+    for (const [rect, label] of [
+      [metrics.status, '核对提示'],
+      [metrics.reason, '退货原因'],
+      [metrics.items, '退货明细'],
+    ]) {
+      assertFullWidth(rect, label)
+    }
+    assert(
+      metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
+      `${scenarioName} modal body 横向溢出: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.lineItems.scrollWidth <= metrics.lineItems.clientWidth + 1,
+      `${scenarioName} 退货明细出现非必要横向滚动: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.footer.bottom <= metrics.viewportHeight + 1 &&
+        metrics.footer.top >= metrics.body.bottom - 2,
+      `${scenarioName} 固定底栏越界或覆盖正文: ${JSON.stringify(metrics)}`
+    )
+
+    if (compact) {
+      assert(
+        metrics.number.top >= metrics.source.bottom - 1,
+        `${scenarioName} 手机端基本信息未按单列排列: ${JSON.stringify(metrics)}`
+      )
+      assertItemFullWidth(metrics.product, '手机端产品 / SKU')
+      assertItemFullWidth(metrics.quantity, '手机端退货数量')
+      assertItemFullWidth(metrics.note, '手机端明细备注')
+      assert(
+        metrics.body.scrollHeight > metrics.body.clientHeight,
+        `${scenarioName} 手机端长表单未形成正文滚动: ${JSON.stringify(metrics)}`
+      )
+    } else {
+      assert(
+        Math.abs(metrics.source.top - metrics.number.top) <= 2 &&
+          metrics.source.right <= metrics.number.left + 1,
+        `${scenarioName} 桌面端来源出货与退货单号未同排: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        metrics.product.width >= metrics.itemGrid.width * 0.45 &&
+          metrics.quantity.width >= metrics.itemGrid.width * 0.25,
+        `${scenarioName} 桌面端明细字段宽度层级不正确: ${JSON.stringify(metrics)}`
+      )
+      assertItemFullWidth(metrics.note, '桌面端明细备注')
+    }
+    return metrics
+  }
+  const assertSalesReturnScrollBoundary = async (
+    dialog,
+    { footerTop, scenarioName }
+  ) => {
+    await dialog.getByLabel('明细备注').scrollIntoViewIfNeeded()
+    const metrics = await dialog.evaluate((node) => {
+      const rectFor = (selector) => {
+        const rect = node.querySelector(selector)?.getBoundingClientRect()
+        return rect ? { top: rect.top, bottom: rect.bottom } : null
+      }
+      return {
+        body: rectFor('.ant-modal-body'),
+        footer: rectFor('.ant-modal-footer'),
+        note: rectFor('.erp-sales-return-create-form__field--note'),
+      }
+    })
+    assert(
+      metrics.body &&
+        metrics.footer &&
+        metrics.note &&
+        metrics.note.top >= metrics.body.top - 1 &&
+        metrics.note.bottom <= metrics.body.bottom + 1 &&
+        Math.abs(metrics.footer.top - footerTop) <= 1,
+      `${scenarioName} 滚动后末项不可见或底栏漂移: ${JSON.stringify(metrics)}`
+    )
+  }
   const assertBusinessDashboardCountStates = async (page, scenarioName) => {
     await page
       .getByRole('button', { name: '查看客户', exact: true })
@@ -1662,7 +1819,7 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'demo-boss-mobile-direct-desktop-entry',
+      name: 'demo-boss-symmetric-work-entry-switch',
       path: '/m/boss/tasks',
       auth: 'admin',
       customerKey: 'yoyoosun',
@@ -1673,7 +1830,6 @@ export function createStyleL1Scenarios(deps) {
       ),
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        const desktopEntry = page.getByTestId('mobile-role-desktop-entry')
         await page.waitForFunction(
           () =>
             Boolean(
@@ -1709,54 +1865,165 @@ export function createStyleL1Scenarios(deps) {
           `demo_boss 应进入老板手机待办: ${JSON.stringify(entryEvidence)}`
         )
         assert.equal(
-          await desktopEntry.count(),
-          1,
-          `demo_boss 应显示电脑端入口: ${JSON.stringify(entryEvidence)}`
+          await page.getByTestId('mobile-role-desktop-entry').count(),
+          0,
+          `demo_boss 页头不应重复显示工作入口切换: ${JSON.stringify(entryEvidence)}`
         )
-        await desktopEntry.waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          await desktopEntry.getAttribute('aria-label'),
-          '进入电脑端'
+        await page.getByTestId('mobile-role-nav-mine').click()
+        const mobileEntrySwitch = page.getByTestId(
+          'mobile-role-work-entry-switch'
         )
-        const metrics = await desktopEntry.evaluate((node) => {
+        await mobileEntrySwitch.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '可用入口')
+        await expectText(page, '电脑端 / 手机待办')
+        const mobileMetrics = await mobileEntrySwitch.evaluate((node) => {
           const rect = node.getBoundingClientRect()
           return {
             width: rect.width,
             height: rect.height,
-            right: rect.right,
-            viewportWidth: window.innerWidth,
             scrollWidth: document.documentElement.scrollWidth,
             clientWidth: document.documentElement.clientWidth,
           }
         })
         assert(
-          metrics.width >= 44 &&
-            metrics.height >= 44 &&
-            metrics.right <= metrics.viewportWidth + 1 &&
-            metrics.scrollWidth <= metrics.clientWidth + 1,
-          `老板电脑端入口应保持触控尺寸且不溢出: ${JSON.stringify(metrics)}`
+          mobileMetrics.width >= 280 &&
+            mobileMetrics.height >= 44 &&
+            mobileMetrics.scrollWidth <= mobileMetrics.clientWidth + 1,
+          `老板手机待办的工作入口切换尺寸或横向布局异常: ${JSON.stringify(mobileMetrics)}`
         )
-        await page.getByTestId('mobile-role-nav-mine').click()
-        await page
-          .getByRole('heading', { name: '入口与安全' })
-          .locator('..')
-          .getByRole('button', { name: '进入电脑端' })
-          .waitFor({ state: 'visible', timeout: 10_000 })
         await page.screenshot({
           path: path.resolve(
             outputDir,
-            'demo-boss-mobile-direct-desktop-entry-mine.png'
+            'demo-boss-symmetric-work-entry-switch-mobile.png'
           ),
           fullPage: true,
         })
+        await mobileEntrySwitch.click()
+        await waitForPath(page, '/entry')
+        await page
+          .locator('.erp-entry-card')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const entrySelectorEvidence = await page.evaluate(() => ({
+          path: window.location.pathname,
+          text: String(document.body?.innerText || '')
+            .replace(/\s+/gu, ' ')
+            .trim(),
+          storedMenus: JSON.parse(
+            window.localStorage.getItem('admin_menus') || '[]'
+          ).map((item) => item?.path || item),
+          buttons: Array.from(document.querySelectorAll('button')).map(
+            (button) =>
+              String(button.textContent || '')
+                .replace(/\s+/gu, '')
+                .trim()
+          ),
+        }))
+        const desktopEntry = page
+          .locator('.erp-entry-card__button')
+          .filter({ hasText: '电脑端' })
+        assert.equal(
+          await desktopEntry.count(),
+          1,
+          `统一入口页应保留电脑端入口: ${JSON.stringify(entrySelectorEvidence)}`
+        )
         await desktopEntry.click()
         await waitForPath(page, '/erp/dashboard')
+        await page.setViewportSize({ width: 1440, height: 900 })
         await expectHeading(page, '工作台')
         assert.equal(
           await page.evaluate(() =>
             window.localStorage.getItem('erp:last_entry_target')
           ),
           'desktop'
+        )
+        assert.equal(
+          await page.getByTestId('desktop-work-entry-switch').count(),
+          0,
+          '电脑端页头不应常驻展示低频工作入口切换'
+        )
+        const accountMenuTrigger = page.getByTestId(
+          'desktop-account-menu-trigger'
+        )
+        await accountMenuTrigger.focus()
+        await page.keyboard.press('Enter')
+        const desktopEntrySwitch = page.getByTestId('desktop-work-entry-switch')
+        await desktopEntrySwitch.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '退出登录')
+        await page.keyboard.press('Escape')
+        await desktopEntrySwitch.waitFor({ state: 'hidden', timeout: 10_000 })
+        assert.equal(
+          await accountMenuTrigger.evaluate(
+            (node) => document.activeElement === node
+          ),
+          true,
+          '账号菜单关闭后应把焦点还给触发按钮'
+        )
+        await accountMenuTrigger.click()
+        await desktopEntrySwitch.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForFunction(
+          () => {
+            const switchLabel = document.querySelector(
+              '[data-testid="desktop-work-entry-switch"]'
+            )
+            const popup = switchLabel?.closest('.ant-dropdown')
+            return (
+              popup &&
+              Number.parseFloat(getComputedStyle(popup).opacity) >= 0.99
+            )
+          },
+          undefined,
+          { timeout: 10_000 }
+        )
+        const desktopMetrics = await desktopEntrySwitch.evaluate((node) => {
+          const menuItem = node.closest('[role="menuitem"]')
+          const rect = menuItem?.getBoundingClientRect()
+          const triggerRect = document
+            .querySelector('[data-testid="desktop-account-menu-trigger"]')
+            ?.getBoundingClientRect()
+          return {
+            menuItemWidth: rect?.width || 0,
+            menuItemHeight: rect?.height || 0,
+            triggerWidth: triggerRect?.width || 0,
+            triggerHeight: triggerRect?.height || 0,
+            triggerRight: triggerRect?.right || 0,
+            viewportWidth: window.innerWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          desktopMetrics.menuItemWidth >= 120 &&
+            desktopMetrics.menuItemHeight >= 31.5 &&
+            desktopMetrics.triggerWidth >= 100 &&
+            desktopMetrics.triggerHeight >= 32 &&
+            desktopMetrics.triggerRight <= desktopMetrics.viewportWidth + 1 &&
+            desktopMetrics.scrollWidth <= desktopMetrics.clientWidth + 1,
+          `电脑端账号菜单尺寸或布局异常: ${JSON.stringify(desktopMetrics)}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'demo-boss-symmetric-work-entry-switch-desktop.png'
+          ),
+          fullPage: false,
+        })
+        await desktopEntrySwitch.click()
+        await waitForPath(page, '/entry')
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page
+          .locator('.erp-entry-card')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page
+          .locator('.erp-entry-card__button')
+          .filter({ hasText: '手机待办' })
+          .click()
+        await waitForPath(page, '/m/boss/tasks')
+        await expectText(page, '待办')
+        assert.equal(
+          await page.evaluate(() =>
+            window.localStorage.getItem('erp:last_entry_target')
+          ),
+          'mobileTasks'
         )
       },
     },
@@ -4504,6 +4771,7 @@ export function createStyleL1Scenarios(deps) {
               status: 'active',
               outcome: '',
             },
+            approval_form: null,
             nodes: [
               {
                 id: 700,
@@ -4630,25 +4898,85 @@ export function createStyleL1Scenarios(deps) {
         await page.screenshot({
           path: path.resolve(outputDir, 'erp-task-board-approval-inbox.png'),
         })
-        await page
-          .locator('.erp-task-board-card')
-          .filter({ hasText: '出货财务审批' })
-          .getByRole('button', { name: '查看出货财务审批详情' })
-          .click()
-        await expectText(page, '核对审批事项')
+        let processContextRequestCount = 0
+        const transientProcessContextFailure = async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'get_task_process_context') {
+            await route.fallback()
+            return
+          }
+          processContextRequestCount += 1
+          if (processContextRequestCount > 1) {
+            await route.fallback()
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: body.id,
+              result: {
+                code: RpcErrorCode.INTERNAL,
+                message: '业务进度暂时不可用',
+                data: {},
+              },
+            }),
+          })
+        }
+        await page.route('**/rpc/workflow', transientProcessContextFailure)
+        try {
+          await page
+            .locator('.erp-task-board-card')
+            .filter({ hasText: '出货财务审批' })
+            .getByRole('button', { name: '查看出货财务审批详情' })
+            .click()
+          await expectText(page, '审批详情')
+          await expectText(page, '出货单 · SHIP-L1-501')
+          await expectText(page, '财务 · 共同待办')
+          await assertTextAbsent(page, 'PROC-701-NODE-702-A1')
+          await assertTextAbsent(page, '核对审批事项')
+          await assertTextAbsent(page, '当前状态')
+          await expectText(page, '暂时无法读取业务进度')
+          await expectButton(page, '重新读取')
+          await assertTextAbsent(page, '系统不会根据任务文案猜测流程节点')
+          await page.waitForFunction(() => {
+            const wrapper = document.querySelector(
+              '.ant-drawer-content-wrapper'
+            )
+            const rect = wrapper?.getBoundingClientRect()
+            return Boolean(
+              rect && rect.left >= 0 && rect.right <= window.innerWidth
+            )
+          })
+          await page.screenshot({
+            path: path.resolve(
+              outputDir,
+              'erp-task-board-approval-detail-retry.png'
+            ),
+          })
+          await page.getByRole('button', { name: '重新读取' }).click()
+          await expectText(page, '出货财务放行')
+          assert(
+            processContextRequestCount >= 2,
+            `业务进度重新读取没有发起第二次请求: ${processContextRequestCount}`
+          )
+        } finally {
+          await page.unroute('**/rpc/workflow', transientProcessContextFailure)
+        }
         await expectText(page, '本任务处理记录')
-        await expectText(page, 'SHIP-L1-501')
         await expectText(page, '等待审批人核对来源单据与放行条件')
-        await expectText(page, '业务轨迹')
+        await expectText(page, '业务进度')
         await expectText(page, '出货财务放行')
         await expectText(page, '流程状态')
         await expectText(page, '办理中')
         const taskEventTrail = page.getByTestId('workflow-task-event-trail')
         await taskEventTrail.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(taskEventTrail, '审批已发起')
-        await expectText(taskEventTrail, '当前负责岗位')
-        await expectText(taskEventTrail, '财务')
-        await expectText(taskEventTrail, '不是来源单据的完整审批链')
+        assert(
+          (await taskEventTrail.getByText('完整审批链').count()) === 0,
+          '本任务处理记录不应常驻显示完整审批链说明'
+        )
         const taskEventTrailMetrics = await taskEventTrail.evaluate(
           (element) => ({
             itemCount: element.querySelectorAll(
@@ -4662,7 +4990,7 @@ export function createStyleL1Scenarios(deps) {
         )
         assert(
           taskEventTrailMetrics.itemCount === 1 &&
-            taskEventTrailMetrics.responsibilityCount >= 3 &&
+            taskEventTrailMetrics.responsibilityCount === 0 &&
             taskEventTrailMetrics.overflowX <= 1,
           `任务抽屉处理记录状态或布局不完整: ${JSON.stringify(
             taskEventTrailMetrics
@@ -4677,20 +5005,75 @@ export function createStyleL1Scenarios(deps) {
         await expectText(executionTrail, '成品质检')
         await expectText(executionTrail, '出货财务审批')
         const executionTrailMetrics = await executionTrail.evaluate(
-          (element) => ({
-            currentCount: element.querySelectorAll('[aria-current="step"]')
-              .length,
-            linkedCount: element.querySelectorAll('[data-linked-task="true"]')
-              .length,
-            completedCount: element.querySelectorAll(
-              '.workflow-process-stage__item--completed'
-            ).length,
-          })
+          (element) => {
+            const items = [
+              ...element.querySelectorAll('.workflow-process-stage__item'),
+            ]
+            const geometry = items.map((item, index) => {
+              const marker = item.querySelector(
+                '.workflow-process-stage__marker'
+              )
+              const content = item.querySelector(
+                '.workflow-process-stage__content'
+              )
+              const itemRect = item.getBoundingClientRect()
+              const markerRect = marker?.getBoundingClientRect()
+              const contentRect = content?.getBoundingClientRect()
+              const connectorStyle = window.getComputedStyle(item, '::after')
+              const connectorTop =
+                itemRect.top +
+                Number.parseFloat(connectorStyle.top || '0') +
+                Number.parseFloat(connectorStyle.height || '0') / 2
+              const markerCenter = markerRect
+                ? markerRect.top + markerRect.height / 2
+                : Number.NaN
+
+              return {
+                connectorAligned:
+                  index === items.length - 1 ||
+                  Math.abs(connectorTop - markerCenter) <= 1,
+                connectorClearsContent:
+                  index === items.length - 1 ||
+                  Boolean(contentRect && connectorTop < contentRect.top - 1),
+                contentBelowMarker: Boolean(
+                  markerRect &&
+                    contentRect &&
+                    contentRect.top >= markerRect.bottom + 4
+                ),
+              }
+            })
+
+            return {
+              currentCount: element.querySelectorAll('[aria-current="step"]')
+                .length,
+              linkedCount: element.querySelectorAll('[data-linked-task="true"]')
+                .length,
+              completedCount: element.querySelectorAll(
+                '.workflow-process-stage__item--completed'
+              ).length,
+              itemCount: items.length,
+              connectorAlignedCount: geometry.filter(
+                (item) => item.connectorAligned
+              ).length,
+              connectorClearCount: geometry.filter(
+                (item) => item.connectorClearsContent
+              ).length,
+              contentBelowMarkerCount: geometry.filter(
+                (item) => item.contentBelowMarker
+              ).length,
+            }
+          }
         )
         assert(
           executionTrailMetrics.currentCount === 1 &&
             executionTrailMetrics.linkedCount === 1 &&
-            executionTrailMetrics.completedCount === 1,
+            executionTrailMetrics.completedCount === 1 &&
+            executionTrailMetrics.connectorAlignedCount ===
+              executionTrailMetrics.itemCount &&
+            executionTrailMetrics.connectorClearCount ===
+              executionTrailMetrics.itemCount &&
+            executionTrailMetrics.contentBelowMarkerCount ===
+              executionTrailMetrics.itemCount,
           `任务抽屉执行轨迹状态不完整: ${JSON.stringify(executionTrailMetrics)}`
         )
         await page.waitForFunction(() => {
@@ -4706,7 +5089,82 @@ export function createStyleL1Scenarios(deps) {
         await page.screenshot({
           path: path.resolve(outputDir, 'erp-task-board-approval-detail.png'),
         })
-        await page.keyboard.press('Escape')
+        const approvalDrawer = page.locator('.erp-task-action-drawer')
+        const taskAttachmentAction = approvalDrawer.getByTestId(
+          'workflow-task-attachment-action'
+        )
+        await taskAttachmentAction.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await expectText(taskAttachmentAction, '附件（1）')
+        const taskAttachmentActionMetrics = await taskAttachmentAction.evaluate(
+          (button) => ({
+            insideFooter: Boolean(
+              button.closest('.erp-task-action-drawer__footer-nav')
+            ),
+            height: button.getBoundingClientRect().height,
+          })
+        )
+        assert(
+          taskAttachmentActionMetrics.insideFooter &&
+            taskAttachmentActionMetrics.height >= 32,
+          `电脑端任务附件应是抽屉底部的次要动作: ${JSON.stringify(
+            taskAttachmentActionMetrics
+          )}`
+        )
+        await taskAttachmentAction.click()
+        const taskAttachmentDialog = page.getByRole('dialog', {
+          name: '任务附件',
+          exact: true,
+        })
+        await taskAttachmentDialog.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await taskAttachmentDialog.evaluate((dialog) => {
+          return new Promise((resolve, reject) => {
+            const deadline = performance.now() + 2_000
+            const waitForVisibleFrame = () => {
+              if (window.getComputedStyle(dialog).opacity === '1') {
+                resolve()
+                return
+              }
+              if (performance.now() >= deadline) {
+                reject(new Error('任务附件弹窗动画未进入可见态'))
+                return
+              }
+              window.requestAnimationFrame(waitForVisibleFrame)
+            }
+            waitForVisibleFrame()
+          })
+        })
+        await expectText(taskAttachmentDialog, 'style-l1-evidence.txt')
+        const taskAttachmentDialogMetrics = {
+          uploadCopyCount: await taskAttachmentDialog
+            .getByText('选择附件', { exact: true })
+            .count(),
+          fileInputCount: await taskAttachmentDialog
+            .locator('input[type="file"]')
+            .count(),
+        }
+        assert(
+          taskAttachmentDialogMetrics.uploadCopyCount === 1 &&
+            taskAttachmentDialogMetrics.fileInputCount === 1,
+          `电脑端具备任务更新能力时应保留附件上传入口: ${JSON.stringify(
+            taskAttachmentDialogMetrics
+          )}`
+        )
+        await page.screenshot({
+          path: path.resolve(outputDir, 'erp-task-board-task-attachment.png'),
+        })
+        await taskAttachmentDialog.locator('.ant-modal-close').click()
+        await taskAttachmentDialog.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
+        await approvalDrawer.locator('.ant-drawer-close').click()
+        await approvalDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
         await page
           .getByRole('button', { name: '返回全部任务', exact: true })
           .click()
@@ -5113,8 +5571,7 @@ export function createStyleL1Scenarios(deps) {
             document.querySelectorAll('.erp-task-board-lane').length === 4
           )
         })
-        const taskBoardSearch =
-          page.getByPlaceholder('搜索任务、单号、来源、处理原因')
+        const taskBoardSearch = page.getByPlaceholder('搜索任务')
         await taskBoardSearch.fill('OUT-DASH-NAV')
         await taskBoardSearch.press('Enter')
         await page.waitForFunction(() =>
@@ -5217,7 +5674,6 @@ export function createStyleL1Scenarios(deps) {
         await assertTaskActionDrawerLayout(page, {
           scenarioName: 'erp-task-board-desktop-context-drawer',
           expectedTaskText: '看板跳转测试任务',
-          expectedActionText: '核对任务信息',
           expectReasonInput: false,
         })
         const actionStep = taskDrawer.getByRole('tab', {
@@ -5289,7 +5745,6 @@ export function createStyleL1Scenarios(deps) {
         await assertTaskActionDrawerLayout(page, {
           scenarioName: 'erp-task-board-desktop-refreshed-context-drawer',
           expectedTaskText: '看板跳转测试任务',
-          expectedActionText: '核对任务信息',
           expectReasonInput: false,
         })
         await taskDrawer.getByRole('tab', { name: /选择处理/ }).click()
@@ -5348,7 +5803,7 @@ export function createStyleL1Scenarios(deps) {
           .waitFor({ state: 'visible', timeout: 10_000 })
         await taskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
         const restoredKeyword = await page
-          .getByPlaceholder('搜索任务、单号、来源、处理原因')
+          .getByPlaceholder('搜索任务')
           .inputValue()
         assert.equal(restoredKeyword, 'OUT-DASH-NAV')
         const taskBoardFilters = page.locator('.erp-task-board-filters')
@@ -5373,12 +5828,11 @@ export function createStyleL1Scenarios(deps) {
         )
         await page.waitForFunction(
           () =>
-            document.querySelector(
-              'input[placeholder="搜索任务、单号、来源、处理原因"]'
-            )?.value === ''
+            document.querySelector('input[placeholder="搜索任务"]')?.value ===
+            ''
         )
         const clearedKeyword = await page
-          .getByPlaceholder('搜索任务、单号、来源、处理原因')
+          .getByPlaceholder('搜索任务')
           .inputValue()
         assert.equal(clearedKeyword, '')
         assert.equal(
@@ -5386,7 +5840,182 @@ export function createStyleL1Scenarios(deps) {
           true,
           '任务看板回到默认筛选后清空按钮应禁用'
         )
+        await taskBoardSearch.focus()
+        const taskBoardSearchControl = page.locator(
+          '.erp-task-board-filters > .erp-business-filter-control--search.ant-input-affix-wrapper'
+        )
+        const emptySearchFocusMetrics = await taskBoardSearch.evaluate(
+          (input) => {
+            const affix = input.closest('.ant-input-affix-wrapper')
+            const filters = input.closest('.erp-task-board-filters')
+            const prefix = affix?.querySelector(
+              '.ant-input-prefix .anticon-search'
+            )
+            const clearButton = [
+              ...(filters?.querySelectorAll(':scope > .ant-btn') || []),
+            ].find((node) => node.textContent?.includes('清空筛选'))
+            const affixRect = affix?.getBoundingClientRect()
+            const inputRect = input.getBoundingClientRect()
+            const prefixRect = prefix?.getBoundingClientRect()
+            const affixStyle = affix ? window.getComputedStyle(affix) : null
+            const inputStyle = window.getComputedStyle(input)
+            const afterStyle = affix
+              ? window.getComputedStyle(affix, '::after')
+              : null
+            const controls = [
+              affix,
+              ...(filters?.querySelectorAll(':scope > .ant-select') || []),
+              clearButton,
+            ].filter(Boolean)
+            const controlRects = controls.map((node) => {
+              const rect = node.getBoundingClientRect()
+              return {
+                className: String(node.className || ''),
+                height: rect.height,
+                top: rect.top,
+              }
+            })
+            return {
+              activeElementIsInput: document.activeElement === input,
+              value: input.value,
+              selectionStart: input.selectionStart,
+              focusWithin: Boolean(affix?.matches(':focus-within')),
+              sharedWrapper: Boolean(
+                affix?.classList.contains('erp-business-filter-control') &&
+                  affix?.classList.contains(
+                    'erp-business-filter-control--search'
+                  )
+              ),
+              hasInputSearchAncestor: Boolean(
+                input.closest('.ant-input-search')
+              ),
+              searchButtonCount:
+                filters?.querySelectorAll('.ant-input-search-button').length ||
+                0,
+              prefixCount: prefix ? 1 : 0,
+              placeholder: input.getAttribute('placeholder') || '',
+              ariaLabel: input.getAttribute('aria-label') || '',
+              title: input.getAttribute('title') || '',
+              afterContent: afterStyle?.content || '',
+              affixBorderColor: affixStyle?.borderColor || '',
+              affixBoxShadow: affixStyle?.boxShadow || '',
+              caretColor: inputStyle.caretColor,
+              inputLineHeight:
+                Number.parseFloat(inputStyle.lineHeight || '') || 0,
+              inputPaddingBlockStart:
+                Number.parseFloat(inputStyle.paddingBlockStart || '') || 0,
+              inputPaddingBlockEnd:
+                Number.parseFloat(inputStyle.paddingBlockEnd || '') || 0,
+              affixRect: affixRect
+                ? {
+                    height: affixRect.height,
+                    bottom: affixRect.bottom,
+                    left: affixRect.left,
+                    right: affixRect.right,
+                    top: affixRect.top,
+                  }
+                : null,
+              inputRect: {
+                height: inputRect.height,
+                bottom: inputRect.bottom,
+                left: inputRect.left,
+                right: inputRect.right,
+                top: inputRect.top,
+              },
+              prefixRect: prefixRect
+                ? {
+                    height: prefixRect.height,
+                    bottom: prefixRect.bottom,
+                    left: prefixRect.left,
+                    right: prefixRect.right,
+                    top: prefixRect.top,
+                  }
+                : null,
+              controlRects,
+              controlRowCount: new Set(
+                controlRects.map(({ top }) => Math.round(top))
+              ).size,
+            }
+          }
+        )
+        await taskBoardSearchControl.screenshot({
+          caret: 'initial',
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-search-shared-empty-focused.png'
+          ),
+        })
+        assert(
+          emptySearchFocusMetrics.activeElementIsInput &&
+            emptySearchFocusMetrics.value === '' &&
+            emptySearchFocusMetrics.selectionStart === 0 &&
+            emptySearchFocusMetrics.focusWithin &&
+            emptySearchFocusMetrics.sharedWrapper &&
+            !emptySearchFocusMetrics.hasInputSearchAncestor &&
+            emptySearchFocusMetrics.searchButtonCount === 0 &&
+            emptySearchFocusMetrics.prefixCount === 1 &&
+            emptySearchFocusMetrics.placeholder === '搜索任务' &&
+            emptySearchFocusMetrics.ariaLabel ===
+              '可搜索：任务、单号、来源、处理原因' &&
+            emptySearchFocusMetrics.title ===
+              '可搜索：任务、单号、来源、处理原因' &&
+            ['none', 'normal', ''].includes(
+              emptySearchFocusMetrics.afterContent
+            ) &&
+            emptySearchFocusMetrics.affixBorderColor !== 'transparent' &&
+            emptySearchFocusMetrics.affixBoxShadow
+              .toLowerCase()
+              .includes('inset') &&
+            emptySearchFocusMetrics.caretColor !== 'transparent' &&
+            emptySearchFocusMetrics.affixRect &&
+            emptySearchFocusMetrics.inputRect &&
+            emptySearchFocusMetrics.prefixRect &&
+            emptySearchFocusMetrics.affixRect.height >= 35 &&
+            emptySearchFocusMetrics.affixRect.height <= 37 &&
+            emptySearchFocusMetrics.inputRect.height >= 33 &&
+            emptySearchFocusMetrics.inputRect.height <= 35 &&
+            emptySearchFocusMetrics.inputLineHeight >= 33 &&
+            emptySearchFocusMetrics.inputLineHeight <= 35 &&
+            emptySearchFocusMetrics.inputPaddingBlockStart === 0 &&
+            emptySearchFocusMetrics.inputPaddingBlockEnd === 0 &&
+            emptySearchFocusMetrics.prefixRect.right <=
+              emptySearchFocusMetrics.inputRect.left &&
+            emptySearchFocusMetrics.inputRect.left -
+              emptySearchFocusMetrics.prefixRect.right >=
+              2 &&
+            emptySearchFocusMetrics.inputRect.left -
+              emptySearchFocusMetrics.prefixRect.right <=
+              12 &&
+            Math.abs(
+              (emptySearchFocusMetrics.prefixRect.top +
+                emptySearchFocusMetrics.prefixRect.bottom) /
+                2 -
+                (emptySearchFocusMetrics.inputRect.top +
+                  emptySearchFocusMetrics.inputRect.bottom) /
+                  2
+            ) <= 1 &&
+            emptySearchFocusMetrics.controlRects.length === 6 &&
+            emptySearchFocusMetrics.controlRects.every(
+              ({ height }) => height >= 35 && height <= 37
+            ) &&
+            emptySearchFocusMetrics.controlRowCount >= 1 &&
+            emptySearchFocusMetrics.controlRowCount <= 2,
+          `空任务搜索框应复用单层业务筛选控件，前缀、光标、焦点边界和相邻控件节奏必须一致: ${JSON.stringify(
+            emptySearchFocusMetrics
+          )}`
+        )
         await taskBoardSearch.fill('OUT-DASH-NAV')
+        assert.equal(
+          await taskBoardSearchControl.locator('.ant-input-clear-icon').count(),
+          1,
+          '任务搜索框输入内容后应保留清空入口'
+        )
+        await taskBoardFilters.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-search-shared-filled-focused-adjacent.png'
+          ),
+        })
         await taskBoardSearch.press('Enter')
         await page
           .locator('.erp-task-board-card')
@@ -5472,7 +6101,7 @@ export function createStyleL1Scenarios(deps) {
               .length,
             searchWidth:
               element
-                .querySelector('.ant-input-search')
+                .querySelector('.erp-business-filter-control--search')
                 ?.getBoundingClientRect().width || 0,
             selectWidths: [
               ...element.querySelectorAll(':scope > .ant-select'),
@@ -5970,7 +6599,7 @@ export function createStyleL1Scenarios(deps) {
             clientWidth: element.clientWidth,
             scrollWidth: element.scrollWidth,
             controlWidths: [
-              element.querySelector('.ant-input-search'),
+              element.querySelector('.erp-business-filter-control--search'),
               ...element.querySelectorAll(':scope > .ant-select'),
               [...element.querySelectorAll(':scope > .ant-btn')].find((node) =>
                 node.textContent?.includes('清空筛选')
@@ -6150,12 +6779,8 @@ export function createStyleL1Scenarios(deps) {
         await assertDashboardTaskBoardLayout(page, {
           scenarioName: 'erp-task-board-dark-wide-desktop',
         })
-        await page
-          .getByPlaceholder('搜索任务、单号、来源、处理原因')
-          .fill('OUT-DASH-WIDE-LAYOUT')
-        await page
-          .getByPlaceholder('搜索任务、单号、来源、处理原因')
-          .press('Enter')
+        await page.getByPlaceholder('搜索任务').fill('OUT-DASH-WIDE-LAYOUT')
+        await page.getByPlaceholder('搜索任务').press('Enter')
         await expectText(page, '宽屏重叠回归任务')
         await expectText(page, '从下方任务卡选择一条任务')
         await page
@@ -6174,7 +6799,6 @@ export function createStyleL1Scenarios(deps) {
         await assertTaskActionDrawerLayout(page, {
           scenarioName: 'erp-task-board-dark-wide-context-drawer',
           expectedTaskText: '宽屏重叠回归任务',
-          expectedActionText: '核对任务信息',
           expectReasonInput: false,
         })
         await page
@@ -6190,6 +6814,12 @@ export function createStyleL1Scenarios(deps) {
           expectedTaskText: '宽屏重叠回归任务',
           expectedActionText: '提交后任务会进入已完成',
           expectReasonInput: false,
+        })
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-dark-wide-action-drawer.png'
+          ),
         })
         await page.locator('.erp-task-action-drawer .ant-drawer-close').click()
         await page
@@ -6446,6 +7076,7 @@ export function createStyleL1Scenarios(deps) {
               status: 'active',
               outcome: '',
             },
+            approval_form: null,
             nodes: [
               {
                 id: 802,
@@ -6744,10 +7375,12 @@ export function createStyleL1Scenarios(deps) {
                 : null,
             }
           }, role.taskName)
-          const processButton = page.getByRole('button', {
-            name: '处理任务',
-            exact: true,
-          })
+          const processButton = page
+            .locator('.mobile-role-action-bar')
+            .getByRole('button', {
+              name: '处理任务',
+              exact: true,
+            })
           await processButton
             .waitFor({ state: 'visible', timeout: 10_000 })
             .catch((error) => {
@@ -6859,7 +7492,7 @@ export function createStyleL1Scenarios(deps) {
           timeout: 10_000,
         })
         await expectText(processContextCard, '销售订单受理')
-        await expectText(processContextCard, 'SO-L1-601')
+        await expectText(page, 'SO-L1-601')
         await expectText(processContextCard, '流程状态')
         await expectText(processContextCard, '办理中')
         const mobileTaskEventTrail = page.getByTestId(
@@ -6871,9 +7504,15 @@ export function createStyleL1Scenarios(deps) {
         })
         await expectText(mobileTaskEventTrail, '本任务处理记录')
         await expectText(mobileTaskEventTrail, '任务已创建')
-        await expectText(mobileTaskEventTrail, '当前负责岗位')
-        await expectText(mobileTaskEventTrail, '工程')
-        await expectText(mobileTaskEventTrail, '不是来源单据的完整审批链')
+        assert.equal(
+          await mobileTaskEventTrail.locator('dl').count(),
+          0,
+          '手机任务处理记录不应重复任务摘要中的责任信息'
+        )
+        assert(
+          (await mobileTaskEventTrail.getByText('完整审批链').count()) === 0,
+          '手机任务处理记录不应常驻显示完整审批链说明'
+        )
         const mobileExecutionTrail = processContextCard.getByTestId(
           'workflow-process-stage'
         )
@@ -6903,8 +7542,8 @@ export function createStyleL1Scenarios(deps) {
         const collectMobileTrajectoryMetrics = () =>
           page.getByTestId('mobile-task-detail-screen').evaluate((screen) => {
             const sections = [...screen.querySelectorAll('section')]
-            const keyInformation = sections.find((section) =>
-              section.querySelector('h2')?.textContent?.includes('任务关键信息')
+            const taskSummary = screen.querySelector(
+              '[data-testid="mobile-task-detail-summary"]'
             )
             const processContext = screen.querySelector(
               '[data-testid="mobile-task-process-context"]'
@@ -6912,18 +7551,18 @@ export function createStyleL1Scenarios(deps) {
             const taskEvents = screen.querySelector(
               '[data-testid="workflow-task-event-trail"]'
             )
-            const relatedSource = sections.find((section) =>
-              section.querySelector('h2')?.textContent?.includes('关联来源')
+            const businessInformation = sections.find((section) =>
+              section.querySelector('h2')?.textContent?.includes('业务信息')
+            )
+            const relatedDocuments = sections.find((section) =>
+              section.querySelector('h2')?.textContent?.includes('相关单据')
             )
             const main = screen.querySelector(
               '.mobile-role-tasks-page__detail-main'
             )
-            const sectionOrder = [
-              keyInformation,
-              processContext,
-              taskEvents,
-              relatedSource,
-            ].map((section) => sections.indexOf(section))
+            const sectionOrder = [processContext, taskEvents].map((section) =>
+              sections.indexOf(section)
+            )
             return {
               documentOverflow:
                 document.documentElement.scrollWidth -
@@ -6935,6 +7574,10 @@ export function createStyleL1Scenarios(deps) {
               eventItemCount:
                 taskEvents?.querySelectorAll('.workflow-task-event-trail__item')
                   .length || 0,
+              summaryText:
+                taskSummary?.textContent?.replace(/\s+/g, ' ').trim() || '',
+              optionalBusinessInformationCount: businessInformation ? 1 : 0,
+              optionalRelatedDocumentsCount: relatedDocuments ? 1 : 0,
               ordered: sectionOrder.every(
                 (value, index) =>
                   value >= 0 && (index === 0 || value > sectionOrder[index - 1])
@@ -6948,6 +7591,10 @@ export function createStyleL1Scenarios(deps) {
             mobileTrajectoryMetrics430.mainOverflow <= 1 &&
             mobileTrajectoryMetrics430.eventOverflow <= 1 &&
             mobileTrajectoryMetrics430.eventItemCount === 1 &&
+            mobileTrajectoryMetrics430.summaryText.includes('负责：工程') &&
+            mobileTrajectoryMetrics430.summaryText.includes('截止：') &&
+            mobileTrajectoryMetrics430.optionalBusinessInformationCount === 0 &&
+            mobileTrajectoryMetrics430.optionalRelatedDocumentsCount === 0 &&
             mobileTrajectoryMetrics430.ordered,
           `430px 移动任务轨迹顺序或布局不完整: ${JSON.stringify(
             mobileTrajectoryMetrics430
@@ -6980,6 +7627,10 @@ export function createStyleL1Scenarios(deps) {
             mobileTrajectoryMetrics390.mainOverflow <= 1 &&
             mobileTrajectoryMetrics390.eventOverflow <= 1 &&
             mobileTrajectoryMetrics390.eventItemCount === 1 &&
+            mobileTrajectoryMetrics390.summaryText.includes('负责：工程') &&
+            mobileTrajectoryMetrics390.summaryText.includes('截止：') &&
+            mobileTrajectoryMetrics390.optionalBusinessInformationCount === 0 &&
+            mobileTrajectoryMetrics390.optionalRelatedDocumentsCount === 0 &&
             mobileTrajectoryMetrics390.ordered,
           `390px 移动任务轨迹顺序或布局不完整: ${JSON.stringify(
             mobileTrajectoryMetrics390
@@ -7398,8 +8049,11 @@ export function createStyleL1Scenarios(deps) {
           `仅催办场景的后端允许动作必须精确为 urge: ${JSON.stringify(actionDiagnostic)}`
         )
 
-        const viewTaskAttachments = page.getByRole('button', {
-          name: '查看任务附件',
+        const attachmentAction = page.getByTestId(
+          'mobile-task-attachment-action'
+        )
+        const viewTaskAttachments = attachmentAction.getByRole('button', {
+          name: '附件（1）',
           exact: true,
         })
         assert.equal(
@@ -7409,12 +8063,44 @@ export function createStyleL1Scenarios(deps) {
             await page.locator('button').allTextContents()
           )}`
         )
+        const attachmentActionMetrics = await attachmentAction.evaluate(
+          (element) => ({
+            insideHero: Boolean(element.closest('.mobile-task-detail-hero')),
+            buttonHeight:
+              element.querySelector('button')?.getBoundingClientRect().height ||
+              0,
+          })
+        )
+        assert(
+          attachmentActionMetrics.insideHero &&
+            attachmentActionMetrics.buttonHeight >= 44,
+          `仅催办角色的任务附件应保持为摘要内的可触控次要动作: ${JSON.stringify(
+            attachmentActionMetrics
+          )}`
+        )
         await viewTaskAttachments.click()
         const attachmentDialog = page.getByRole('dialog', {
           name: '任务附件',
           exact: true,
         })
         await attachmentDialog.waitFor({ state: 'visible', timeout: 10_000 })
+        await attachmentDialog.evaluate((dialog) => {
+          return new Promise((resolve, reject) => {
+            const deadline = performance.now() + 2_000
+            const waitForVisibleFrame = () => {
+              if (window.getComputedStyle(dialog).opacity === '1') {
+                resolve()
+                return
+              }
+              if (performance.now() >= deadline) {
+                reject(new Error('任务附件弹窗动画未进入可见态'))
+                return
+              }
+              window.requestAnimationFrame(waitForVisibleFrame)
+            }
+            waitForVisibleFrame()
+          })
+        })
         assert.equal(
           await attachmentDialog
             .getByRole('button', { name: '选择附件', exact: true })
@@ -7427,10 +8113,17 @@ export function createStyleL1Scenarios(deps) {
           0,
           '仅催办角色的任务附件弹窗不应渲染文件输入'
         )
+        await attachmentDialog.screenshot({
+          path: path.resolve(
+            outputDir,
+            'mobile-yoyo-boss-urge-only-task-attachment-390.png'
+          ),
+        })
         await attachmentDialog.locator('.ant-modal-close').click()
         await attachmentDialog.waitFor({ state: 'hidden', timeout: 10_000 })
 
         await page
+          .locator('.mobile-role-action-bar')
           .getByRole('button', { name: '处理任务', exact: true })
           .click()
         const actionScreen = page.getByTestId('mobile-task-action-screen')
@@ -7575,14 +8268,19 @@ export function createStyleL1Scenarios(deps) {
           .getByRole('button', { name: '确认催办', exact: true })
           .evaluate((button) => {
             const buttonRect = button.getBoundingClientRect()
+            const screenRect = button
+              .closest('[data-testid="mobile-task-action-screen"]')
+              ?.getBoundingClientRect()
             const textElement = button.querySelector('span:not(.anticon)')
             const textRect = textElement?.getBoundingClientRect() || null
             return {
+              actionScreenWidth: screenRect?.width || 0,
               buttonRect: {
                 bottom: buttonRect.bottom,
                 left: buttonRect.left,
                 right: buttonRect.right,
                 top: buttonRect.top,
+                width: buttonRect.width,
               },
               clientHeight: button.clientHeight,
               clientWidth: button.clientWidth,
@@ -7602,6 +8300,8 @@ export function createStyleL1Scenarios(deps) {
           })
         assert(
           darkSubmitMetrics.text === '确认催办' &&
+            darkSubmitMetrics.buttonRect.width >=
+              darkSubmitMetrics.actionScreenWidth - 24 - 1 &&
             darkSubmitMetrics.scrollWidth <= darkSubmitMetrics.clientWidth &&
             darkSubmitMetrics.scrollHeight <= darkSubmitMetrics.clientHeight &&
             darkSubmitMetrics.textRect?.width >= 56 &&
@@ -7615,7 +8315,8 @@ export function createStyleL1Scenarios(deps) {
               darkSubmitMetrics.buttonRect.bottom + 1,
           `深色模式不能截断真正的催办命令文案: ${JSON.stringify(darkSubmitMetrics)}`
         )
-        await actionScreen.screenshot({
+        await page.waitForTimeout(100)
+        await page.screenshot({
           path: path.join(
             outputDir,
             'mobile-yoyo-boss-urge-only-action-dark-390.png'
@@ -7824,14 +8525,13 @@ export function createStyleL1Scenarios(deps) {
             readonlyDiagnostic,
           })}`
         )
-        const readonlyActionBar = page.locator('.mobile-role-action-bar')
-        await readonlyActionBar
-          .getByRole('button', { name: '返回列表', exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
-          await readonlyActionBar.locator('button').count(),
-          1,
-          'effective-session 只读详情只应保留返回列表，不应渲染岗位写动作'
+          await page
+            .getByTestId('mobile-task-detail-screen')
+            .getByRole('button', { name: '返回列表', exact: true })
+            .count(),
+          0,
+          'effective-session 只读详情应使用顶部返回，不再重复底部返回列表'
         )
         assert.equal(
           await page
@@ -7839,6 +8539,24 @@ export function createStyleL1Scenarios(deps) {
             .getAttribute('data-state'),
           'locked',
           'effective-session 只读详情的处理步骤应保持锁定'
+        )
+        const factGridMetrics = await page.evaluate(() => {
+          const grid = document.querySelector('.mobile-role-detail-fact-grid')
+          const rows = Array.from(
+            grid?.querySelectorAll('.mobile-role-detail-fact-row') || []
+          )
+          const gridRect = grid?.getBoundingClientRect()
+          const lastRowRect = rows.at(-1)?.getBoundingClientRect()
+          return {
+            rowCount: rows.length,
+            gridWidth: gridRect?.width || 0,
+            lastRowWidth: lastRowRect?.width || 0,
+          }
+        })
+        assert(
+          factGridMetrics.rowCount === 1 &&
+            factGridMetrics.lastRowWidth >= factGridMetrics.gridWidth - 2,
+          `只读详情的单个业务字段不应留下半格空白: ${JSON.stringify(factGridMetrics)}`
         )
         await page.screenshot({
           path: path.join(
@@ -8163,7 +8881,139 @@ export function createStyleL1Scenarios(deps) {
           4,
           '移动端增加待我审批筛选后仍应只保留 4 个底栏入口'
         )
+        const roleTaskViewRequests = []
+        const captureRoleTaskViewRequest = (request) => {
+          if (!request.url().includes('/rpc/workflow')) return
+          let body
+          try {
+            body = request.postDataJSON()
+          } catch {
+            return
+          }
+          if (
+            !['list_role_tasks', 'list_workbench_role_tasks'].includes(
+              body?.method
+            )
+          ) {
+            return
+          }
+          roleTaskViewRequests.push({
+            method: body.method,
+            viewKey: String(body.params?.view_key || ''),
+          })
+        }
+        page.on('request', captureRoleTaskViewRequest)
+        await page.evaluate(() => {
+          window.__styleL1MobileTaskFilterMarker =
+            'mobile-task-filter-local-loading'
+          window.__styleL1MobileTaskFilterIdentity = {
+            bottomNav: document.querySelector(
+              '[data-testid="mobile-role-bottom-nav"]'
+            ),
+            filters: document.querySelector(
+              '[data-testid="mobile-role-task-filters"]'
+            ),
+            historyLength: window.history.length,
+            navigationEntryCount:
+              performance.getEntriesByType('navigation').length,
+            overview: document.querySelector(
+              '[data-testid="mobile-loaded-task-overview"]'
+            ),
+            path: `${window.location.pathname}${window.location.search}`,
+          }
+        })
         await approvalFilter.click()
+        const approvalLoading = page.getByTestId(
+          'mobile-role-task-list-loading'
+        )
+        await approvalLoading.waitFor({ state: 'visible', timeout: 10_000 })
+        const approvalLoadingMetrics = await page.evaluate(() => {
+          const identity = window.__styleL1MobileTaskFilterIdentity || {}
+          const overview = document.querySelector(
+            '[data-testid="mobile-loaded-task-overview"]'
+          )
+          const filters = document.querySelector(
+            '[data-testid="mobile-role-task-filters"]'
+          )
+          const bottomNav = document.querySelector(
+            '[data-testid="mobile-role-bottom-nav"]'
+          )
+          const scroll = document.querySelector(
+            '[data-testid="mobile-role-scroll"]'
+          )
+          const taskList = document.querySelector(
+            '[data-testid="mobile-role-task-list"]'
+          )
+          const loading = document.querySelector(
+            '[data-testid="mobile-role-task-list-loading"]'
+          )
+          return {
+            activeFilter: document
+              .querySelector('[data-testid="mobile-role-filter-approval"]')
+              ?.getAttribute('aria-pressed'),
+            bottomNavConnected: identity.bottomNav?.isConnected === true,
+            bottomNavStable: identity.bottomNav === bottomNav,
+            filtersConnected: identity.filters?.isConnected === true,
+            filtersStable: identity.filters === filters,
+            fullSkeletonCount: document.querySelectorAll(
+              '[data-testid="mobile-role-task-skeleton"]'
+            ).length,
+            globalBusy: scroll?.getAttribute('aria-busy') || '',
+            historyLengthStable:
+              identity.historyLength === window.history.length,
+            listBusy: taskList?.getAttribute('aria-busy') || '',
+            loadingInsideList: loading?.parentElement === taskList,
+            loadingText:
+              loading?.textContent?.replace(/\s+/g, ' ').trim() || '',
+            markerStable:
+              window.__styleL1MobileTaskFilterMarker ===
+              'mobile-task-filter-local-loading',
+            navigationEntryCountStable:
+              identity.navigationEntryCount ===
+              performance.getEntriesByType('navigation').length,
+            overviewConnected: identity.overview?.isConnected === true,
+            overviewStable: identity.overview === overview,
+            pathStable:
+              identity.path ===
+              `${window.location.pathname}${window.location.search}`,
+          }
+        })
+        assert(
+          approvalLoadingMetrics.activeFilter === 'true' &&
+            approvalLoadingMetrics.bottomNavConnected &&
+            approvalLoadingMetrics.bottomNavStable &&
+            approvalLoadingMetrics.filtersConnected &&
+            approvalLoadingMetrics.filtersStable &&
+            approvalLoadingMetrics.fullSkeletonCount === 0 &&
+            approvalLoadingMetrics.globalBusy === 'false' &&
+            approvalLoadingMetrics.historyLengthStable &&
+            approvalLoadingMetrics.listBusy === 'true' &&
+            approvalLoadingMetrics.loadingInsideList &&
+            approvalLoadingMetrics.loadingText === '正在加载审批任务' &&
+            approvalLoadingMetrics.markerStable &&
+            approvalLoadingMetrics.navigationEntryCountStable &&
+            approvalLoadingMetrics.overviewConnected &&
+            approvalLoadingMetrics.overviewStable &&
+            approvalLoadingMetrics.pathStable,
+          `移动筛选冷加载只能替换列表区域，不能刷新整页或重建稳定区域: ${JSON.stringify(
+            approvalLoadingMetrics
+          )}`
+        )
+        assert.equal(
+          roleTaskViewRequests.filter(({ viewKey }) => viewKey === 'approval')
+            .length,
+          1,
+          `首次切换审批筛选应且只应发起一个审批视图请求: ${JSON.stringify(
+            roleTaskViewRequests
+          )}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'mobile-tasks-approval-loading-dark.png'
+          ),
+          fullPage: true,
+        })
         await page.waitForFunction(
           () =>
             [...document.querySelectorAll('.erp-mobile-list-item')].some(
@@ -8176,6 +9026,13 @@ export function createStyleL1Scenarios(deps) {
           await approvalFilter.getAttribute('aria-pressed'),
           'true',
           '移动端待我审批筛选应进入选中态'
+        )
+        assert.equal(
+          await page
+            .getByTestId('mobile-role-task-list')
+            .getAttribute('aria-busy'),
+          'false',
+          '审批视图完成后应只解除任务列表忙碌态'
         )
         await page.screenshot({
           path: path.resolve(outputDir, 'mobile-tasks-approval-dark.png'),
@@ -8190,6 +9047,16 @@ export function createStyleL1Scenarios(deps) {
           undefined,
           { timeout: 10_000 }
         )
+        await page.waitForTimeout(100)
+        assert.equal(
+          roleTaskViewRequests.filter(({ viewKey }) => viewKey === 'todo')
+            .length,
+          0,
+          `切回已加载的全部筛选应复用缓存，不应重复请求 todo 视图: ${JSON.stringify(
+            roleTaskViewRequests
+          )}`
+        )
+        page.off('request', captureRoleTaskViewRequest)
         await expectText(page, '阻塞原因')
         await assertERPThemeMode(page, {
           scenarioName: 'mobile-tasks-dark',
@@ -20716,6 +21583,95 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'exception-sales-return-desktop-create',
+      path: '/erp/sales/customer-returns',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: [...customerRuntimeEffectiveSession.pages, 'sales-returns'],
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'sales_return.read',
+          'sales_return.create',
+          'sales_return.approve',
+          'sales_return.receive',
+          'sales_return.cancel',
+        ],
+      },
+      viewport: { width: 1280, height: 800 },
+      verify: async (page) => {
+        await expectHeading(page, '客户退货 / RMA')
+        const createButton = page.getByRole('button', {
+          name: '新建客户退货',
+          exact: true,
+        })
+        await createButton.click()
+        const createDialog = page
+          .getByRole('dialog')
+          .filter({ hasText: '新建客户退货' })
+        await createDialog.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await createDialog
+            .locator('.erp-sales-return-create-form__items')
+            .count(),
+          0,
+          'exception-sales-return-desktop-create 默认态不应显示旧明细'
+        )
+        await createDialog.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-sales-return-desktop-create-default.png'
+          ),
+        })
+
+        await createDialog.locator('.ant-select').first().click()
+        const shipmentDropdown = page.locator('.ant-select-dropdown:visible')
+        await shipmentDropdown.getByText(/SHIP-STYLE-L1/).click()
+        await shipmentDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
+        await expectText(createDialog, '已核对来源出货与累计有效退货数量')
+        await createDialog
+          .getByLabel('退货原因')
+          .fill('客户反馈包装破损，需要退回复核并保留完整处理记录。')
+        await createDialog
+          .getByLabel('明细备注')
+          .fill('外箱压痕明显，收货后请按来源批次隔离并交由品质复核。')
+        await createDialog.locator('.ant-modal-body').evaluate((node) => {
+          node.scrollTop = 0
+        })
+        const layoutMetrics = await assertSalesReturnCreateLayout(
+          createDialog,
+          {
+            compact: false,
+            scenarioName: 'exception-sales-return-desktop-create',
+          }
+        )
+        await createDialog.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-sales-return-desktop-create-selected.png'
+          ),
+        })
+
+        await assertSalesReturnScrollBoundary(createDialog, {
+          footerTop: layoutMetrics.footer.top,
+          scenarioName: 'exception-sales-return-desktop-create',
+        })
+        await assertOperationalFactModalViewport(
+          page,
+          'exception-sales-return-desktop-create-boundary'
+        )
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '新建客户退货',
+          titleText: '新建客户退货',
+          scenarioName: 'exception-sales-return-desktop-create',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'exception-sales-return-desktop-create'
+        )
+      },
+    },
+    {
       name: 'exception-sales-return-mobile',
       path: '/erp/sales/customer-returns',
       auth: 'admin',
@@ -20784,10 +21740,9 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '新建客户退货' })
         await createDialog.waitFor({ state: 'visible', timeout: 10_000 })
         await createDialog.locator('.ant-select').first().click()
-        await page
-          .locator('.ant-select-dropdown:visible')
-          .getByText(/SHIP-STYLE-L1/)
-          .click()
+        const shipmentDropdown = page.locator('.ant-select-dropdown:visible')
+        await shipmentDropdown.getByText(/SHIP-STYLE-L1/).click()
+        await shipmentDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
         await expectText(createDialog, '已核对来源出货与累计有效退货数量')
         const productLabel = await createDialog
           .getByLabel('产品 / SKU')
@@ -20804,6 +21759,32 @@ export function createStyleL1Scenarios(deps) {
           await createDialog.getByLabel('当前可退').inputValue(),
           '8'
         )
+        await createDialog
+          .getByLabel('退货原因')
+          .fill('手机端退货原因需要完整显示，并保持底部提交操作始终可用。')
+        await createDialog
+          .getByLabel('明细备注')
+          .fill('手机端长备注用于核对正文滚动、末项可见与固定底栏边界。')
+        await createDialog.locator('.ant-modal-body').evaluate((node) => {
+          node.scrollTop = 0
+        })
+        const layoutMetrics = await assertSalesReturnCreateLayout(
+          createDialog,
+          {
+            compact: true,
+            scenarioName: 'exception-sales-return-mobile-create',
+          }
+        )
+        await createDialog.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-sales-return-mobile-create-top.png'
+          ),
+        })
+        await assertSalesReturnScrollBoundary(createDialog, {
+          footerTop: layoutMetrics.footer.top,
+          scenarioName: 'exception-sales-return-mobile-create',
+        })
         await assertOperationalFactModalViewport(
           page,
           'exception-sales-return-mobile-create'

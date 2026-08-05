@@ -1648,7 +1648,7 @@ export default function BOMVersionsPage() {
             title="BOM 附件"
             description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不会改变库存、采购或成本记录。"
             canUpload={headerMode !== 'view' && (canCreate || canUpdate)}
-            canDelete={canUpdate}
+            canWithdraw={canCreate || canUpdate}
             variant="inline"
           />
           {headerMode === 'copy' ? (

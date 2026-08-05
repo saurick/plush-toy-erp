@@ -2,14 +2,24 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <meta name="color-scheme" content="light dark" />
     <title>岗位任务中心 v2 · Current</title>
     <style>
       :root {
         font-family:
-          Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+          Inter,
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Microsoft YaHei",
+          sans-serif;
         color-scheme: light;
         --viewport-height: 100dvh;
         --page: #eef2f7;
@@ -33,8 +43,7 @@
         --purple: #7657d7;
         --purple-soft: #f0edff;
         --shadow:
-          0 24px 72px rgba(15, 23, 42, 0.18),
-          0 2px 8px rgba(15, 23, 42, 0.08);
+          0 24px 72px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
         --footer-shadow: 0 -10px 26px rgba(15, 23, 42, 0.08);
       }
 
@@ -61,8 +70,7 @@
         --purple: #b9a6ff;
         --purple-soft: #2d2748;
         --shadow:
-          0 28px 78px rgba(0, 0, 0, 0.56),
-          0 2px 10px rgba(0, 0, 0, 0.4);
+          0 28px 78px rgba(0, 0, 0, 0.56), 0 2px 10px rgba(0, 0, 0, 0.4);
         --footer-shadow: 0 -10px 26px rgba(0, 0, 0, 0.34);
       }
 
@@ -147,10 +155,7 @@
       }
 
       .list-header {
-        padding:
-          max(16px, env(safe-area-inset-top))
-          18px
-          15px;
+        padding: max(16px, env(safe-area-inset-top)) 18px 15px;
       }
 
       .header-row,
@@ -455,10 +460,7 @@
         grid-template-columns: 48px minmax(0, 1fr) 48px;
         align-items: center;
         min-height: 68px;
-        padding:
-          max(8px, env(safe-area-inset-top))
-          10px
-          8px;
+        padding: max(8px, env(safe-area-inset-top)) 10px 8px;
       }
 
       .topbar__title {
@@ -489,7 +491,7 @@
         position: relative;
         display: grid;
         min-width: 0;
-        min-height: 58px;
+        min-height: 46px;
         grid-template-columns: 24px minmax(0, 1fr);
         align-items: center;
         gap: 6px;
@@ -503,7 +505,7 @@
 
       .step-button::after {
         position: absolute;
-        top: 29px;
+        top: 23px;
         right: -8px;
         width: 16px;
         height: 1px;
@@ -531,8 +533,7 @@
         min-width: 0;
       }
 
-      .step-copy strong,
-      .step-copy small {
+      .step-copy strong {
         display: block;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -541,12 +542,6 @@
 
       .step-copy strong {
         font-size: 12px;
-      }
-
-      .step-copy small {
-        margin-top: 2px;
-        font-size: 10px;
-        font-weight: 650;
       }
 
       .step-button:hover {
@@ -612,6 +607,23 @@
         overflow-wrap: anywhere;
       }
 
+      .hero-card__source,
+      .task-context__source {
+        margin-top: 8px;
+        overflow-wrap: anywhere;
+        color: var(--text-secondary);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .task-context {
+        margin-bottom: 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--surface);
+      }
+
       .status-row {
         display: flex;
         min-width: 0;
@@ -656,6 +668,12 @@
         font-size: 14px;
         font-weight: 720;
         line-height: 1.45;
+      }
+
+      .attachment-action {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
       }
 
       .notice-card {
@@ -906,7 +924,7 @@
         position: relative;
         display: block;
         min-width: 0;
-        min-height: 108px;
+        min-height: 76px;
         padding: 13px 42px 13px 13px;
         border: 1px solid var(--line);
         border-radius: 16px;
@@ -970,8 +988,7 @@
         color: var(--purple);
       }
 
-      .action-choice strong,
-      .action-choice span {
+      .action-choice strong {
         display: block;
       }
 
@@ -984,17 +1001,10 @@
         font-size: 15px;
       }
 
-      .action-choice span {
-        margin-top: 4px;
-        color: var(--text-secondary);
-        font-size: 12px;
-        line-height: 1.45;
-      }
-
       .single-action-summary {
         display: flex;
         min-width: 0;
-        align-items: flex-start;
+        align-items: center;
         gap: 12px;
         margin-top: 14px;
         padding: 13px;
@@ -1018,22 +1028,13 @@
         min-width: 0;
       }
 
-      .single-action-summary__copy strong,
-      .single-action-summary__copy span {
+      .single-action-summary__copy strong {
         display: block;
       }
 
       .single-action-summary__copy strong {
         font-size: 15px;
         line-height: 1.4;
-      }
-
-      .single-action-summary__copy span {
-        margin-top: 3px;
-        color: var(--text-secondary);
-        font-size: 12px;
-        line-height: 1.5;
-        overflow-wrap: anywhere;
       }
 
       .form-card {
@@ -1299,10 +1300,6 @@
           font-size: 11px;
         }
 
-        .step-copy small {
-          font-size: 9px;
-        }
-
         .hero-card__title {
           font-size: 20px;
         }
@@ -1314,10 +1311,6 @@
       }
 
       @media (max-width: 350px) {
-        .step-copy small {
-          display: none;
-        }
-
         .action-grid {
           grid-template-columns: minmax(0, 1fr);
         }
@@ -1335,307 +1328,356 @@
   </head>
   <body>
     <div class="prototype-shell" id="prototype" data-theme="light">
-      <main class="phone-frame" id="app" aria-label="岗位任务中心 v2 原型"></main>
+      <main
+        class="phone-frame"
+        id="app"
+        aria-label="岗位任务中心 v2 原型"
+      ></main>
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </div>
 
+    <!-- prettier-ignore -->
     <script>
       const ICON_PATHS = {
         back: '<path d="m15 18-6-6 6-6"></path>',
         moon: '<path d="M21 12.8A8.5 8.5 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8Z"></path>',
         sun: '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"></path>',
-        refresh: '<path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"></path>',
-        alert: '<path d="M10.3 3.6 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"></path><path d="M12 9v4M12 17h.01"></path>',
+        refresh:
+          '<path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"></path>',
+        alert:
+          '<path d="M10.3 3.6 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"></path><path d="M12 9v4M12 17h.01"></path>',
         arrow: '<path d="m9 18 6-6-6-6"></path>',
         check: '<path d="m20 6-11 11-5-5"></path>',
-        pause: '<rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect>',
+        pause:
+          '<rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect>',
         reject: '<path d="m15 18-6-6 6-6"></path><path d="M9 12h10"></path>',
-        resume: '<path d="M20 11a8 8 0 1 0-2.3 5.7"></path><path d="M20 4v7h-7"></path>',
+        resume:
+          '<path d="M20 11a8 8 0 1 0-2.3 5.7"></path><path d="M20 4v7h-7"></path>',
         bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"></path>',
         info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8h.01"></path>',
-        receipt: '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2Z"></path><path d="M9 8h6M9 12h6M9 16h4"></path>',
-        clock: '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
+        receipt:
+          '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2Z"></path><path d="M9 8h6M9 12h6M9 16h4"></path>',
+        clock:
+          '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
         spinner: '<path d="M21 12a9 9 0 1 1-6.2-8.6"></path>',
       };
 
       function icon(name) {
-        return '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">' + (ICON_PATHS[name] || '') + '</svg>';
+        return (
+          '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">' +
+          (ICON_PATHS[name] || "") +
+          "</svg>"
+        );
       }
 
       function escapeHTML(value) {
-        return String(value == null ? '' : value)
-          .replaceAll('&', '&amp;')
-          .replaceAll('<', '&lt;')
-          .replaceAll('>', '&gt;')
-          .replaceAll('"', '&quot;')
-          .replaceAll("'", '&#039;');
+        return String(value == null ? "" : value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
       }
 
       const ACTIONS = {
         done: {
-          label: '完成',
-          title: '完成任务',
-          description: '提交完成反馈，结束当前任务',
-          icon: 'check',
-          tone: 'success',
+          label: "完成",
+          title: "完成任务",
+          description: "提交完成反馈，结束当前任务",
+          icon: "check",
+          tone: "success",
           reasonRequired: true,
-          reasonLabel: '完成反馈',
+          reasonLabel: "完成反馈",
         },
         blocked: {
-          label: '阻塞',
-          title: '标记阻塞',
-          description: '记录卡点，等待责任岗位解除',
-          icon: 'pause',
-          tone: 'warning',
+          label: "阻塞",
+          title: "标记阻塞",
+          description: "记录卡点，等待责任岗位解除",
+          icon: "pause",
+          tone: "warning",
           reasonRequired: true,
-          reasonLabel: '阻塞原因',
+          reasonLabel: "阻塞原因",
         },
         rejected: {
-          label: '退回',
-          title: '退回任务',
-          description: '说明退回依据，交还上一步处理',
-          icon: 'reject',
-          tone: 'danger',
+          label: "退回",
+          title: "退回任务",
+          description: "说明退回依据，交还上一步处理",
+          icon: "reject",
+          tone: "danger",
           reasonRequired: true,
-          reasonLabel: '退回原因',
+          reasonLabel: "退回原因",
         },
         resume: {
-          label: '解除阻塞',
-          title: '解除阻塞',
-          description: '说明卡点已解决，恢复任务处理',
-          icon: 'resume',
-          tone: 'brand',
+          label: "解除阻塞",
+          title: "解除阻塞",
+          description: "说明卡点已解决，恢复任务处理",
+          icon: "resume",
+          tone: "brand",
           reasonRequired: true,
-          reasonLabel: '解除说明',
+          reasonLabel: "解除说明",
         },
         urge: {
-          label: '催办',
-          title: '发起催办',
-          description: '提醒责任岗位处理，不替代其完成任务',
-          icon: 'bell',
-          tone: 'purple',
+          label: "催办",
+          title: "发起催办",
+          description: "提醒责任岗位处理，不替代其完成任务",
+          icon: "bell",
+          tone: "purple",
           reasonRequired: true,
-          reasonLabel: '催办原因',
+          reasonLabel: "催办原因",
         },
       };
 
       const tasks = [
         {
-          title: '确认来料存放位置',
-          source: '采购入库单 PR-202607-028',
-          summary: 'PP棉 · 1kg/包 · 120包',
-          description: '来料已到厂，请核对采购入库单与包装标签，确认仓位后提交处理结果。',
-          status: '待处理',
-          accessLabel: '可处理',
-          owner: '仓库',
-          severity: 'warning',
-          severityLabel: '即将超时',
-          due: '今天 18:30',
+          title: "确认来料存放位置",
+          source: "采购入库单 PR-202607-028",
+          summary: "PP棉 · 1kg/包 · 120包",
+          description:
+            "来料已到厂，请核对采购入库单与包装标签，确认仓位后提交处理结果。",
+          status: "待处理",
+          accessLabel: "可处理",
+          owner: "仓库",
+          severity: "warning",
+          severityLabel: "即将超时",
+          due: "今天 18:30",
           views: ['todo'],
-          actions: ['done', 'blocked', 'rejected', 'urge'],
+          actions: ["done", "blocked", "rejected", "urge"],
           facts: [
-            ['负责岗位', '仓库'],
-            ['到货数量', '120包'],
-            ['建议仓区', '原料 A 区'],
-            ['截止时间', '今天 18:30'],
+            ["到货数量", "120包"],
+            ["建议仓区", "原料 A 区"],
           ],
-          guidance: '本岗位可完成、阻塞、退回或催办。选择处理方式后再填写对应信息。',
-          latest: '采购已登记到货，等待仓库确认存放位置。',
+          guidance:
+            "本岗位可完成、阻塞、退回或催办。选择处理方式后再填写对应信息。",
+          latest: "采购已登记到货，等待仓库确认存放位置。",
           trail: [
-            ['采购登记到货', 'completed', '已完成'],
-            ['确认来料存放位置', 'active', '办理中 · 本任务'],
+            ["采购登记到货", "completed", "已完成"],
+            ["确认来料存放位置", "active", "办理中 · 本任务"],
           ],
+          attachmentCount: 0,
           receipt: null,
         },
         {
-          title: '等待成品质检结论',
-          source: '生产订单 MO-202607-036',
-          summary: '毛绒兔 30cm · 500只 · 成品抽检',
-          description: '成品已送检。仓库可以查看任务进度并催办品质岗位，但不能代替品质提交检验结论。',
-          status: '等待品质',
-          accessLabel: '仅可催办',
-          owner: '品质',
-          severity: 'danger',
-          severityLabel: '已超时',
-          due: '昨天 16:00',
+          title: "等待成品质检结论",
+          source: "生产订单 MO-202607-036",
+          summary: "毛绒兔 30cm · 500只 · 成品抽检",
+          description:
+            "成品已送检。仓库可以查看任务进度并催办品质岗位，但不能代替品质提交检验结论。",
+          status: "等待品质",
+          accessLabel: "仅可催办",
+          owner: "品质",
+          severity: "danger",
+          severityLabel: "已超时",
+          due: "昨天 16:00",
           views: ['todo', 'risk'],
-          actions: ['urge'],
+          actions: ["urge"],
           facts: [
-            ['负责岗位', '品质'],
-            ['送检数量', '500只'],
-            ['检验类型', '成品抽检'],
-            ['截止时间', '昨天 16:00'],
+            ["送检数量", "500只"],
+            ["检验类型", "成品抽检"],
           ],
-          guidance: '当前岗位不负责完成这条任务。第 2 步仅提供“催办”，不会出现完成、阻塞或退回。',
-          latest: '品质岗位尚未提交检验结论。',
+          guidance:
+            "当前岗位不负责完成这条任务。第 2 步仅提供“催办”，不会出现完成、阻塞或退回。",
+          latest: "品质岗位尚未提交检验结论。",
           trail: [
-            ['成品送检', 'completed', '已完成'],
-            ['成品质检结论', 'active', '办理中 · 本任务'],
+            ["成品送检", "completed", "已完成"],
+            ["成品质检结论", "active", "办理中 · 本任务"],
           ],
+          attachmentCount: 1,
           receipt: null,
         },
         {
-          title: '查看上周成品入库结果',
-          source: '成品入库单 FG-202607-112',
-          summary: '泰迪熊 35cm · 800只 · 成品仓 B-03',
-          description: '该任务已由仓库完成。当前页面保留任务详情与处理回执，不能再次修改任务进度。',
-          status: '已完成',
-          accessLabel: '只读',
-          owner: '仓库',
-          severity: 'success',
-          severityLabel: '已完成',
-          due: '07/12 17:42',
+          title: "查看上周成品入库结果",
+          source: "成品入库单 FG-202607-112",
+          summary: "泰迪熊 35cm · 800只 · 成品仓 B-03",
+          description:
+            "该任务已由仓库完成。当前页面保留任务详情与处理回执，不能再次修改任务进度。",
+          status: "已完成",
+          accessLabel: "只读",
+          owner: "仓库",
+          severity: "success",
+          severityLabel: "已完成",
+          due: "07/12 17:42",
           views: ['history'],
           actions: [],
           facts: [
-            ['负责岗位', '仓库'],
-            ['入库数量', '800只'],
-            ['存放仓位', '成品仓 B-03'],
-            ['完成时间', '07/12 17:42'],
+            ["入库数量", "800只"],
+            ["存放仓位", "成品仓 B-03"],
           ],
-          guidance: '任务已结束，第 2 步只解释只读原因；可直接进入第 3 步查看回执。',
-          latest: '仓库已提交完成反馈并结束任务。',
+          guidance:
+            "任务已结束，第 2 步只解释只读原因；可直接进入第 3 步查看回执。",
+          latest: "仓库已提交完成反馈并结束任务。",
           trail: [
-            ['成品入库登记', 'completed', '已完成 · 本任务'],
-            ['流程结束', 'completed', '已完成'],
+            ["成品入库登记", "completed", "已完成 · 本任务"],
+            ["流程结束", "completed", "已完成"],
           ],
+          attachmentCount: 0,
           receipt: {
-            status: 'confirmed',
-            action: 'done',
-            actionLabel: '完成',
-            stateLabel: '任务已完成',
-            reason: '数量和包装核对无误，已放入成品仓 B-03。',
-            evidence: '现场照片：FG-112-A / 入库签收单：FG-112',
-            message: '处理已确认，任务列表已同步。',
+            status: "confirmed",
+            action: "done",
+            actionLabel: "完成",
+            stateLabel: "任务已完成",
+            reason: "数量和包装核对无误，已放入成品仓 B-03。",
+            evidence: "现场照片：FG-112-A / 入库签收单：FG-112",
+            message: "处理已确认，任务列表已同步。",
           },
         },
         {
-          title: '核对多批次混装来料并确认临时隔离区、复检安排与后续转运责任',
-          source: '采购入库单 PR-202607-041 / 供应商：华南纤维材料有限公司',
-          summary: '短毛绒与填充棉共 7 个批次 · 标签信息较长 · 到货数量待逐批复核',
-          description: '现场发现同车多批次混装，部分外箱标签被运输单覆盖。请先核对批次、数量与外观；信息不足时先标记阻塞，并写清等待事项。',
-          status: '结果待确认',
-          accessLabel: '可处理',
-          owner: '仓库',
-          severity: 'warning',
-          severityLabel: '需关注',
-          due: '今天 20:00',
+          title: "核对多批次混装来料并确认临时隔离区、复检安排与后续转运责任",
+          source: "采购入库单 PR-202607-041 / 供应商：华南纤维材料有限公司",
+          summary:
+            "短毛绒与填充棉共 7 个批次 · 标签信息较长 · 到货数量待逐批复核",
+          description:
+            "现场发现同车多批次混装，部分外箱标签被运输单覆盖。请先核对批次、数量与外观；信息不足时先标记阻塞，并写清等待事项。",
+          status: "结果待确认",
+          accessLabel: "可处理",
+          owner: "仓库",
+          severity: "warning",
+          severityLabel: "需关注",
+          due: "今天 20:00",
           views: ['todo', 'risk'],
-          actions: ['done', 'blocked', 'urge'],
+          actions: ["done", "blocked", "urge"],
           facts: [
-            ['负责岗位', '仓库'],
-            ['物料批次', '7个批次，待逐批核对'],
-            ['临时区域', '待检隔离区西侧长货架'],
-            ['截止时间', '今天 20:00'],
+            ["物料批次", "7个批次，待逐批核对"],
+            ["临时区域", "待检隔离区西侧长货架"],
           ],
-          guidance: '本岗位可以继续处理。上次提交结果尚未确认，可先查看回执，再决定刷新结果或返回处理。',
-          latest: '上次提交返回结果待确认，原因与留痕已保留，可返回第 2 步重试。',
+          guidance:
+            "本岗位可以继续处理。上次提交结果尚未确认，可先查看回执，再决定刷新结果或返回处理。",
+          latest:
+            "上次提交返回结果待确认，原因与留痕已保留，可返回第 2 步重试。",
           trail: [
-            ['来料到货登记', 'completed', '已完成'],
-            ['核对混装来料', 'active', '当前状态待确认 · 本任务'],
+            ["来料到货登记", "completed", "已完成"],
+            ["核对混装来料", "active", "当前状态待确认 · 本任务"],
           ],
+          attachmentCount: 2,
           receipt: {
-            status: 'unknown',
-            action: 'done',
-            actionLabel: '完成',
-            stateLabel: '提交结果待确认',
-            reason: '已核对 7 个批次，其中 2 个批次标签被运输单覆盖，按现场记录补录；临时放置在待检隔离区西侧长货架，等待复检确认后再转运。',
-            evidence: '照片：PR-041-01 至 PR-041-09 / 现场复核表：PR-041-CHECK',
-            message: '网络中断前已发起提交，系统尚未确认最终结果。请刷新结果或返回处理页重试。',
+            status: "unknown",
+            action: "done",
+            actionLabel: "完成",
+            stateLabel: "提交结果待确认",
+            reason:
+              "已核对 7 个批次，其中 2 个批次标签被运输单覆盖，按现场记录补录；临时放置在待检隔离区西侧长货架，等待复检确认后再转运。",
+            evidence: "照片：PR-041-01 至 PR-041-09 / 现场复核表：PR-041-CHECK",
+            message:
+              "网络中断前已发起提交，系统尚未确认最终结果。请刷新结果或返回处理页重试。",
           },
         },
       ];
 
       const state = {
-        screen: 'list',
+        screen: "list",
         selectedIndex: null,
         selectedAction: null,
         filter: 'todo',
-        theme: 'light',
+        theme: "light",
         drafts: {},
         errors: {},
         submitting: false,
-        pendingFocus: '',
+        pendingFocus: "",
         lastTaskIndex: null,
-        lastSync: '刚刚同步',
+        lastSync: "刚刚同步",
       };
 
-      const app = document.querySelector('#app');
-      const prototype = document.querySelector('#prototype');
-      const toast = document.querySelector('#toast');
+      const app = document.querySelector("#app");
+      const prototype = document.querySelector("#prototype");
+      const toast = document.querySelector("#toast");
       let toastTimer = null;
 
       function currentTask() {
-        return Number.isInteger(state.selectedIndex) ? tasks[state.selectedIndex] : null;
+        return Number.isInteger(state.selectedIndex)
+          ? tasks[state.selectedIndex]
+          : null;
       }
 
       function draftKey(actionKey) {
-        return String(state.selectedIndex) + ':' + String(actionKey || '');
+        return String(state.selectedIndex) + ":" + String(actionKey || "");
       }
 
       function currentDraft() {
         const key = draftKey(state.selectedAction);
         if (!state.drafts[key]) {
-          state.drafts[key] = { reason: '' };
+          state.drafts[key] = { reason: "" };
         }
         return state.drafts[key];
       }
 
       function setPendingFocus(selector) {
-        state.pendingFocus = selector || '[data-screen-heading]';
+        state.pendingFocus = selector || "[data-screen-heading]";
       }
 
       function showToast(message) {
         window.clearTimeout(toastTimer);
         toast.textContent = message;
-        toast.classList.add('visible');
+        toast.classList.add("visible");
         toastTimer = window.setTimeout(function () {
-          toast.classList.remove('visible');
+          toast.classList.remove("visible");
         }, 1800);
       }
 
       function themeButton() {
-        const dark = state.theme === 'dark';
-        return '<button class="icon-button" type="button" data-theme-toggle aria-label="' +
-          (dark ? '切换浅色模式' : '切换暗色模式') + '">' +
-          icon(dark ? 'sun' : 'moon') +
-          '</button>';
+        const dark = state.theme === "dark";
+        return (
+          '<button class="icon-button" type="button" data-theme-toggle aria-label="' +
+          (dark ? "切换浅色模式" : "切换暗色模式") +
+          '">' +
+          icon(dark ? "sun" : "moon") +
+          "</button>"
+        );
       }
 
       function stepNavigation(currentStep) {
         const task = currentTask();
         const definitions = [
-          ['detail', '1', '查看任务', '核对信息'],
-          ['process', '2', '处理任务', '选择动作'],
-          ['result', '3', '结果回执', '确认结果'],
+          ["detail", "1", "查看任务"],
+          ["process", "2", "处理任务"],
+          ["result", "3", "结果回执"],
         ];
-        return '<nav class="workflow-steps" aria-label="任务处理步骤">' +
+        return (
+          '<nav class="workflow-steps" aria-label="任务处理步骤">' +
           definitions
             .map(function (item) {
               const key = item[0];
               const current = key === currentStep;
               const unavailable = key === 'result' && !task?.receipt;
-              return '<button class="step-button" type="button" data-step="' + key + '"' +
-                (current ? ' aria-current="step"' : '') +
-                (unavailable ? ' disabled aria-disabled="true"' : '') +
-                ' aria-label="第 ' + item[1] + ' 步，' + item[2] + (unavailable ? '，提交后开放' : '') + '">' +
-                '<span class="step-number">' + item[1] + '</span>' +
-                '<span class="step-copy"><strong>' + item[2] + '</strong><small>' + item[3] + '</small></span>' +
-                '</button>';
+              return (
+                '<button class="step-button" type="button" data-step="' +
+                key +
+                '"' +
+                (current ? ' aria-current="step"' : "") +
+                (unavailable ? ' disabled aria-disabled="true"' : "") +
+                ' aria-label="第 ' +
+                item[1] +
+                " 步，" +
+                item[2] +
+                (unavailable ? "，提交后开放" : "") +
+                '">' +
+                '<span class="step-number">' +
+                item[1] +
+                "</span>" +
+                '<span class="step-copy"><strong>' +
+                item[2] +
+                "</strong></span>" +
+                "</button>"
+              );
             })
-            .join('') +
-          '</nav>';
+            .join("") +
+          "</nav>"
+        );
       }
 
       function flowHeader(currentStep, title) {
-        return '<header class="screen-header">' +
+        return (
+          '<header class="screen-header">' +
           '<div class="topbar">' +
-          '<button class="icon-button" type="button" data-back aria-label="返回">' + icon('back') + '</button>' +
-          '<div class="topbar__title">' + escapeHTML(title) + '</div>' +
+          '<button class="icon-button" type="button" data-back aria-label="返回">' +
+          icon("back") +
+          "</button>" +
+          '<div class="topbar__title">' +
+          escapeHTML(title) +
+          "</div>" +
           themeButton() +
-          '</div>' +
+          "</div>" +
           stepNavigation(currentStep) +
-          '</header>';
+          "</header>"
+        );
       }
 
       function filterTasks() {
@@ -1645,110 +1687,182 @@
       }
 
       function severityClass(task) {
-        if (task.severity === 'danger') return 'badge--danger';
-        if (task.severity === 'warning') return 'badge--warning';
-        if (task.severity === 'success') return 'badge--success';
-        return 'badge--purple';
+        if (task.severity === "danger") return "badge--danger";
+        if (task.severity === "warning") return "badge--warning";
+        if (task.severity === "success") return "badge--success";
+        return "badge--purple";
       }
 
       function dueClass(task) {
-        if (task.severity === 'danger') return 'due--danger';
-        if (task.severity === 'warning') return 'due--warning';
-        return '';
+        if (task.severity === "danger") return "due--danger";
+        if (task.severity === "warning") return "due--warning";
+        return "";
       }
 
       function taskCard(task) {
         const index = tasks.indexOf(task);
-        return '<button class="task-card" type="button" data-task-index="' + index + '" aria-label="打开任务：' +
-          escapeHTML(task.title) + '">' +
+        return (
+          '<button class="task-card" type="button" data-task-index="' +
+          index +
+          '" aria-label="打开任务：' +
+          escapeHTML(task.title) +
+          '">' +
           '<div class="task-card__top">' +
-          '<span class="badge ' + severityClass(task) + '">' + escapeHTML(task.severityLabel) + '</span>' +
-          '<span class="task-access">' + escapeHTML(task.accessLabel) + ' ' + icon('arrow') + '</span>' +
-          '</div>' +
-          '<div class="task-card__title">' + escapeHTML(task.title) + '</div>' +
-          '<div class="task-card__source">' + escapeHTML(task.source) + '</div>' +
-          '<div class="task-card__summary">' + escapeHTML(task.summary) + '</div>' +
+          '<span class="badge ' +
+          severityClass(task) +
+          '">' +
+          escapeHTML(task.severityLabel) +
+          "</span>" +
+          '<span class="task-access">' +
+          escapeHTML(task.accessLabel) +
+          " " +
+          icon("arrow") +
+          "</span>" +
+          "</div>" +
+          '<div class="task-card__title">' +
+          escapeHTML(task.title) +
+          "</div>" +
+          '<div class="task-card__source">' +
+          escapeHTML(task.source) +
+          "</div>" +
+          '<div class="task-card__summary">' +
+          escapeHTML(task.summary) +
+          "</div>" +
           '<div class="task-card__footer">' +
-          '<span>负责岗位：' + escapeHTML(task.owner) + '</span>' +
-          '<span class="' + dueClass(task) + '">' + escapeHTML(task.due) + '</span>' +
-          '</div>' +
-          '</button>';
+          "<span>负责岗位：" +
+          escapeHTML(task.owner) +
+          "</span>" +
+          '<span class="' +
+          dueClass(task) +
+          '">' +
+          escapeHTML(task.due) +
+          "</span>" +
+          "</div>" +
+          "</button>"
+        );
       }
 
       function renderList() {
         const visibleTasks = filterTasks();
         const filterDefinitions = [
-          ['todo', '当前待办', tasks.filter(function (task) { return task.views.includes('todo'); }).length],
-          ['risk', '风险关注', tasks.filter(function (task) { return task.views.includes('risk'); }).length],
-          ['history', '已办回执', tasks.filter(function (task) { return task.views.includes('history'); }).length],
+          ['todo', '当前待办', tasks.filter(function (task) {
+            return task.views.includes("todo");
+          }).length],
+          ['risk', '风险关注', tasks.filter(function (task) {
+            return task.views.includes("risk");
+          }).length],
+          ['history', '已办回执', tasks.filter(function (task) {
+            return task.views.includes("history");
+          }).length],
         ];
         const cards = visibleTasks.length
-          ? visibleTasks.map(taskCard).join('')
+          ? visibleTasks.map(taskCard).join("")
           : '<div class="empty-list"><strong>当前筛选下没有任务</strong><p class="helper">可切换其他筛选继续查看。</p></div>';
 
-        return '<section class="screen" data-screen="list">' +
+        return (
+          '<section class="screen" data-screen="list">' +
           '<header class="screen-header list-header">' +
           '<div class="header-row">' +
           '<div><p class="eyebrow">仓库岗位工作台</p><h1 tabindex="-1" data-screen-heading>任务中心</h1></div>' +
           '<div class="header-actions">' +
-          '<button class="icon-button" type="button" data-refresh aria-label="刷新任务">' + icon('refresh') + '</button>' +
+          '<button class="icon-button" type="button" data-refresh aria-label="刷新任务">' +
+          icon("refresh") +
+          "</button>" +
           themeButton() +
-          '</div>' +
-          '</div>' +
-          '<div class="role-line"><span class="role-pill">仓库岗位</span><span class="sync-text">' + escapeHTML(state.lastSync) + ' · 当前视图 ' + visibleTasks.length + ' 条</span></div>' +
-          '</header>' +
+          "</div>" +
+          "</div>" +
+          '<div class="role-line"><span class="role-pill">仓库岗位</span><span class="sync-text">' +
+          escapeHTML(state.lastSync) +
+          " · 当前视图 " +
+          visibleTasks.length +
+          " 条</span></div>" +
+          "</header>" +
           '<main class="screen-main list-main">' +
           '<div class="filter-scroller" role="group" aria-label="任务筛选">' +
           filterDefinitions
             .map(function (filter) {
-              return '<button class="filter-button" type="button" data-filter="' + filter[0] + '" aria-pressed="' +
-                String(state.filter === filter[0]) + '">' + filter[1] + ' ' + filter[2] + '</button>';
+              return (
+                '<button class="filter-button" type="button" data-filter="' +
+                filter[0] +
+                '" aria-pressed="' +
+                String(state.filter === filter[0]) +
+                '">' +
+                filter[1] +
+                " " +
+                filter[2] +
+                "</button>"
+              );
             })
-            .join('') +
-          '</div>' +
-          '<div class="task-list">' + cards + '</div>' +
-          '</main>' +
-          '</section>';
+            .join("") +
+          "</div>" +
+          '<div class="task-list">' +
+          cards +
+          "</div>" +
+          "</main>" +
+          "</section>"
+        );
       }
 
       function detailGuidance(task) {
-        const tone = task.actions.length === 0
-          ? 'notice-card--brand'
-          : task.actions.length === 1 && task.actions[0] === 'urge'
-            ? 'notice-card--warning'
-            : '';
-        return '<div class="notice-card ' + tone + '">' + icon('info') + '<span>' + escapeHTML(task.guidance) + '</span></div>';
+        const tone =
+          task.actions.length === 0
+            ? "notice-card--brand"
+            : task.actions.length === 1 && task.actions[0] === "urge"
+              ? "notice-card--warning"
+              : "";
+        return (
+          '<div class="notice-card ' +
+          tone +
+          '">' +
+          icon("info") +
+          "<span>" +
+          escapeHTML(task.guidance) +
+          "</span></div>"
+        );
       }
 
       function renderExecutionTrail(task) {
         const trail = Array.isArray(task.trail) ? task.trail : [];
-        if (!trail.length) return '';
-        return '<section class="content-card" aria-label="流程执行轨迹">' +
+        if (!trail.length) return "";
+        return (
+          '<section class="content-card" aria-label="流程执行轨迹">' +
           '<div class="section-heading"><h2>执行轨迹</h2><span class="section-heading__label">已执行 / 当前</span></div>' +
           '<ol class="execution-trail">' +
           trail
             .map(function (item) {
-              const state = ['completed', 'blocked', 'rejected'].includes(item[1])
+              const state = ["completed", "blocked", "rejected"].includes(
+                item[1],
+              )
                 ? item[1]
-                : 'active';
-              const marker = state === 'completed'
-                ? '✓'
-                : state === 'blocked'
-                  ? '!'
-                  : state === 'rejected'
-                    ? '↩'
-                    : '●';
-              return '<li class="execution-trail__item" data-state="' + state + '"' +
-                (state === 'active' ? ' aria-current="step"' : '') + '>' +
+                : "active";
+              const marker =
+                state === "completed"
+                  ? "✓"
+                  : state === "blocked"
+                    ? "!"
+                    : state === "rejected"
+                      ? "↩"
+                      : "●";
+              return (
+                '<li class="execution-trail__item" data-state="' +
+                state +
+                '"' +
+                (state === "active" ? ' aria-current="step"' : "") +
+                ">" +
                 '<span class="execution-trail__marker" aria-hidden="true">' +
-                marker + '</span>' +
-                '<span class="execution-trail__copy"><strong>' + escapeHTML(item[0]) +
-                '</strong><span>' + escapeHTML(item[2]) + '</span></span></li>';
+                marker +
+                "</span>" +
+                '<span class="execution-trail__copy"><strong>' +
+                escapeHTML(item[0]) +
+                "</strong><span>" +
+                escapeHTML(item[2]) +
+                "</span></span></li>"
+              );
             })
-            .join('') +
-          '</ol>' +
-          '<p class="execution-trail__note">只显示系统已经执行和当前可确认的节点；等待节点可能属于未选分支，不画成确定的未来步骤。</p>' +
-          '</section>';
+            .join("") +
+          "</ol>" +
+          "</section>"
+        );
       }
 
       function renderDetail() {
@@ -1756,102 +1870,203 @@
         if (!task) return renderList();
         const facts = task.facts
           .map(function (fact) {
-            return '<div class="fact"><div class="fact__label">' + escapeHTML(fact[0]) +
-              '</div><div class="fact__value">' + escapeHTML(fact[1]) + '</div></div>';
+            return (
+              '<div class="fact"><div class="fact__label">' +
+              escapeHTML(fact[0]) +
+              '</div><div class="fact__value">' +
+              escapeHTML(fact[1]) +
+              "</div></div>"
+            );
           })
-          .join('');
-        const nextLabel = task.actions.length === 0
-          ? '查看结果回执'
-          : task.actions.length === 1
-            ? '填写' + ACTIONS[task.actions[0]].label + '原因'
-            : '选择处理方式';
-        const nextStep = task.actions.length === 0 ? 'result' : 'process';
+          .join("");
+        const nextLabel =
+          task.actions.length === 0
+            ? "查看结果回执"
+            : task.actions.length === 1
+              ? "填写" + ACTIONS[task.actions[0]].label + "原因"
+              : "选择处理方式";
+        const nextStep = task.actions.length === 0 ? "result" : "process";
+        const attachmentCount = Number.isInteger(task.attachmentCount)
+          ? Math.max(0, task.attachmentCount)
+          : 0;
+        const attachmentLabel =
+          attachmentCount > 0
+            ? "附件（" + attachmentCount + "）"
+            : task.accessLabel === "可处理"
+              ? "添加附件"
+              : "查看附件";
 
-        return '<section class="screen" data-screen="detail">' +
-          flowHeader('detail', '任务详情') +
+        return (
+          '<section class="screen" data-screen="detail">' +
+          flowHeader("detail", "任务详情") +
           '<main class="screen-main detail-main">' +
           '<article class="hero-card">' +
-          '<div class="status-row"><span class="badge ' + severityClass(task) + '">' +
-          escapeHTML(task.severityLabel) + '</span><span class="task-status">' +
-          escapeHTML(task.status) + '</span><span class="task-access">' +
-          escapeHTML(task.accessLabel) + '</span></div>' +
-          '<h1 class="hero-card__title" tabindex="-1" data-screen-heading>' + escapeHTML(task.title) + '</h1>' +
-          '<p class="hero-card__description">' + escapeHTML(task.description) + '</p>' +
-          '<div class="fact-grid">' + facts + '</div>' +
-          '</article>' +
+          '<div class="status-row"><span class="badge ' +
+          severityClass(task) +
+          '">' +
+          escapeHTML(task.severityLabel) +
+          '</span><span class="task-status">' +
+          escapeHTML(task.status) +
+          '</span><span class="task-access">' +
+          escapeHTML(task.accessLabel) +
+          "</span></div>" +
+          '<h1 class="hero-card__title" tabindex="-1" data-screen-heading>' +
+          escapeHTML(task.title) +
+          "</h1>" +
+          '<p class="hero-card__source">来源：' +
+          escapeHTML(task.source) +
+          "</p>" +
+          '<p class="hero-card__description">' +
+          escapeHTML(task.description) +
+          "</p>" +
+          '<div class="task-card__footer"><span>负责：' +
+          escapeHTML(task.owner) +
+          '</span><span class="' +
+          dueClass(task) +
+          '">截止：' +
+          escapeHTML(task.due) +
+          "</span></div>" +
+          '<div class="fact-grid">' +
+          facts +
+          "</div>" +
+          '<div class="attachment-action">' +
+          '<button class="button button--secondary button--full" type="button" data-attachment-preview>' +
+          escapeHTML(attachmentLabel) +
+          "</button>" +
+          "</div>" +
+          "</article>" +
           detailGuidance(task) +
           renderExecutionTrail(task) +
-          '<section class="content-card">' +
-          '<div class="section-heading"><h2>关联来源</h2><span class="section-heading__label">只读</span></div>' +
-          '<p class="source-line"><strong>' + escapeHTML(task.source) + '</strong><br />' + escapeHTML(task.summary) + '</p>' +
-          '</section>' +
-          '<section class="content-card">' +
-          '<div class="section-heading"><h2>任务附件</h2><span class="section-heading__label">按权限</span></div>' +
-          '<p class="source-line">照片、异常截图和处理凭证统一在任务详情查看或管理，不在处理表单重复填写。</p>' +
           (task.receipt && task.receipt.evidence
-            ? '<p class="activity-line"><strong>历史处理线索</strong><br />' + escapeHTML(task.receipt.evidence) + '</p>'
-            : '') +
-          '<button class="button button--secondary button--full" type="button" data-attachment-preview>' +
-          (task.accessLabel === '可处理' ? '查看与补充附件' : '查看任务附件') + '</button>' +
-          '</section>' +
+            ? '<section class="content-card" aria-label="历史处理线索">' +
+              '<div class="section-heading"><h2>历史处理线索</h2></div>' +
+              '<p class="activity-line">' +
+              escapeHTML(task.receipt.evidence) +
+              "</p>" +
+              "</section>"
+            : "") +
           '<section class="content-card">' +
-          '<div class="section-heading"><h2>最近动态</h2><span class="section-heading__label">最近一条</span></div>' +
-          '<p class="activity-line"><strong>' + escapeHTML(task.status) + '</strong><br />' + escapeHTML(task.latest) + '</p>' +
-          '</section>' +
-          '<p class="receipt-note">完成本任务只更新任务进度；库存、出货、质检和财务结果仍需在对应业务页面办理。</p>' +
-          '</main>' +
-          '<footer class="screen-footer screen-footer--two">' +
-          '<button class="button button--secondary" type="button" data-return-list>返回列表</button>' +
-          '<button class="button button--primary" type="button" data-step="' + nextStep + '">' + nextLabel + '</button>' +
-          '</footer>' +
-          '</section>';
+          '<div class="section-heading"><h2>本任务处理记录</h2><span class="section-heading__label">最近一条</span></div>' +
+          '<p class="activity-line"><strong>' +
+          escapeHTML(task.status) +
+          "</strong><br />" +
+          escapeHTML(task.latest) +
+          "</p>" +
+          "</section>" +
+          "</main>" +
+          '<footer class="screen-footer">' +
+          '<button class="button button--primary" type="button" data-step="' +
+          nextStep +
+          '">' +
+          nextLabel +
+          "</button>" +
+          "</footer>" +
+          "</section>"
+        );
       }
 
       function actionChoice(actionKey) {
         const action = ACTIONS[actionKey];
         const selected = state.selectedAction === actionKey;
-        return '<label class="action-choice" data-tone="' + action.tone + '" data-selected="' +
-          String(selected) + '">' +
-          '<input class="action-choice__radio" type="radio" name="task-action" value="' + actionKey +
-          '" data-action-key="' + actionKey + '" ' + (selected ? 'checked' : '') + '>' +
-          '<span class="action-choice__icon">' + icon(action.icon) + '</span>' +
-          '<strong>' + escapeHTML(action.title) + '</strong>' +
-          '<span>' + escapeHTML(action.description) + '</span>' +
-          '</label>';
+        return (
+          '<label class="action-choice" data-tone="' +
+          action.tone +
+          '" data-selected="' +
+          String(selected) +
+          '">' +
+          '<input class="action-choice__radio" type="radio" name="task-action" value="' +
+          actionKey +
+          '" data-action-key="' +
+          actionKey +
+          '" ' +
+          (selected ? "checked" : "") +
+          ">" +
+          '<span class="action-choice__icon">' +
+          icon(action.icon) +
+          "</span>" +
+          "<strong>" +
+          escapeHTML(action.title) +
+          "</strong>" +
+          "</label>"
+        );
       }
 
       function singleActionSummary(action) {
-        return '<div class="single-action-summary" data-single-action-summary>' +
-          '<span class="single-action-summary__icon">' + icon(action.icon) + '</span>' +
-          '<span class="single-action-summary__copy"><strong>' + escapeHTML(action.label) + '</strong>' +
-          '<span>' + escapeHTML(action.description) + '</span></span>' +
-          '</div>';
+        return (
+          '<div class="single-action-summary" data-single-action-summary>' +
+          '<span class="single-action-summary__icon">' +
+          icon(action.icon) +
+          "</span>" +
+          '<span class="single-action-summary__copy"><strong>' +
+          escapeHTML(action.label) +
+          "</strong></span>" +
+          "</div>"
+        );
       }
 
       function formField(id, label, required, value, placeholder, error) {
-        return '<div class="form-field">' +
-          '<div class="form-label-row"><label class="form-label" for="' + id + '">' +
-          escapeHTML(label) + (required ? ' <span class="required">*</span>' : '') +
-          '</label><span class="optional">' + (required ? '必填' : '可选') + '</span></div>' +
-          '<textarea id="' + id + '" maxlength="500" data-field="' + id +
-          '" aria-invalid="' + String(Boolean(error)) + '" aria-describedby="' + id + '-meta" placeholder="' +
-          escapeHTML(placeholder) + '">' + escapeHTML(value) + '</textarea>' +
-          '<div class="field-meta" id="' + id + '-meta"><span class="' + (error ? 'field-error' : '') + '">' +
-          escapeHTML(error || (required ? '提交前需要填写' : '没有内容可留空')) +
-          '</span><span data-count-for="' + id + '">' + value.length + '/500</span></div>' +
-          '</div>';
+        return (
+          '<div class="form-field">' +
+          '<div class="form-label-row"><label class="form-label" for="' +
+          id +
+          '">' +
+          escapeHTML(label) +
+          (required ? ' <span class="required">*</span>' : "") +
+          '</label><span class="optional">' +
+          (required ? "必填" : "可选") +
+          "</span></div>" +
+          '<textarea id="' +
+          id +
+          '" maxlength="500" data-field="' +
+          id +
+          '" aria-invalid="' +
+          String(Boolean(error)) +
+          '" aria-describedby="' +
+          id +
+          '-meta" placeholder="' +
+          escapeHTML(placeholder) +
+          '">' +
+          escapeHTML(value) +
+          "</textarea>" +
+          '<div class="field-meta" id="' +
+          id +
+          '-meta"><span class="' +
+          (error ? "field-error" : "") +
+          '">' +
+          escapeHTML(
+            error || (required ? "提交前需要填写" : "没有内容可留空"),
+          ) +
+          '</span><span data-count-for="' +
+          id +
+          '">' +
+          value.length +
+          "/500</span></div>" +
+          "</div>"
+        );
       }
 
       function quickReasons() {
-        const reasons = ['材料不足', '等待上一步', '现场信息不清', '需要责任岗位确认'];
-        return '<div class="quick-reasons" aria-label="快捷原因">' +
+        const reasons = [
+          "材料不足",
+          "等待上一步",
+          "现场信息不清",
+          "需要责任岗位确认",
+        ];
+        return (
+          '<div class="quick-reasons" aria-label="快捷原因">' +
           reasons
             .map(function (reason) {
-              return '<button class="quick-reason" type="button" data-quick-reason="' + escapeHTML(reason) + '">' +
-                escapeHTML(reason) + '</button>';
+              return (
+                '<button class="quick-reason" type="button" data-quick-reason="' +
+                escapeHTML(reason) +
+                '">' +
+                escapeHTML(reason) +
+                "</button>"
+              );
             })
-            .join('') +
-          '</div>';
+            .join("") +
+          "</div>"
+        );
       }
 
       function renderProcess() {
@@ -1865,78 +2080,95 @@
         if (!hasActions) {
           state.selectedAction = null;
         }
-        const action = state.selectedAction ? ACTIONS[state.selectedAction] : null;
-        const draft = action ? currentDraft() : { reason: '' };
+        const action = state.selectedAction
+          ? ACTIONS[state.selectedAction]
+          : null;
+        const draft = action ? currentDraft() : { reason: "" };
         const hasMultipleActions = task.actions.length > 1;
         const actionPanel = hasMultipleActions
           ? '<section class="action-card" aria-labelledby="actionPanelHeading">' +
-            '<div class="action-card__heading"><h1 id="actionPanelHeading" tabindex="-1" data-screen-heading>选择处理方式</h1>' +
-            '<p>' + escapeHTML(task.title) + '；请选择与现场处理情况一致的方式。</p></div>' +
+            '<div class="action-card__heading"><h1 id="actionPanelHeading" tabindex="-1" data-screen-heading>选择处理方式</h1></div>' +
             '<div class="action-grid" role="radiogroup" aria-labelledby="actionPanelHeading">' +
-            task.actions.map(actionChoice).join('') + '</div></section>'
+            task.actions.map(actionChoice).join("") +
+            "</div></section>"
           : action
             ? '<section class="action-card" aria-labelledby="actionPanelHeading">' +
-              '<div class="action-card__heading"><h1 id="actionPanelHeading" tabindex="-1" data-screen-heading>本次操作</h1>' +
-              '<p>' + escapeHTML(task.title) + '；填写原因后再确认，不会代替责任岗位完成任务。</p></div>' +
-              singleActionSummary(action) + '</section>'
+              '<div class="action-card__heading"><h1 id="actionPanelHeading" tabindex="-1" data-screen-heading>本次操作</h1></div>' +
+              singleActionSummary(action) +
+              "</section>"
             : '<section class="action-card" aria-labelledby="actionPanelHeading">' +
               '<div class="action-card__heading"><h1 id="actionPanelHeading" tabindex="-1" data-screen-heading>处理任务</h1></div>' +
-              '<div class="notice-card notice-card--brand">' + icon('info') +
-              '<span>当前任务为只读状态，不能再次提交处理。步骤仍可直接切换，您可以回到详情或查看已有回执。</span></div></section>';
+              '<div class="notice-card notice-card--brand">' +
+              icon("info") +
+              "<span>当前任务只供查看，不能再次提交处理。</span></div></section>";
         const actionForm = action
-          ? '<section class="form-card" aria-label="' + escapeHTML(action.title) + '表单">' +
+          ? '<section class="form-card" aria-label="' +
+            escapeHTML(action.title) +
+            '表单">' +
             formField(
-              'reasonInput',
+              "reasonInput",
               action.reasonLabel,
               action.reasonRequired,
               draft.reason,
-              action.reasonRequired ? '请说明本次' + action.label + '的原因、影响范围和需要谁协助' : '可补充本次完成说明',
-              state.errors.reason
+              action.reasonRequired
+                ? "请说明本次" + action.label + "的原因、影响范围和需要谁协助"
+                : "可补充本次完成说明",
+              state.errors.reason,
             ) +
-            (action.reasonRequired ? quickReasons() : '') +
-            '</section>'
-          : '';
+            (action.reasonRequired ? quickReasons() : "") +
+            "</section>"
+          : "";
         const footer = action
-          ? '<footer class="screen-footer screen-footer--two">' +
-            '<button class="button button--secondary" type="button" data-step="detail" ' +
-            (state.submitting ? 'disabled' : '') + '>返回详情</button>' +
+          ? '<footer class="screen-footer">' +
             '<button class="button button--primary" type="button" data-submit ' +
-            (state.submitting ? 'disabled aria-busy="true"' : '') + '>' +
-            (state.submitting ? icon('spinner') + ' 确认中' : '确认' + escapeHTML(action.label)) +
-            '</button></footer>'
-          : '<footer class="screen-footer screen-footer--two">' +
-            '<button class="button button--secondary" type="button" data-step="detail">返回详情</button>' +
-            '<button class="button button--primary" type="button" data-step="result">查看回执</button>' +
-            '</footer>';
+            (state.submitting ? 'disabled aria-busy="true"' : "") +
+            ">" +
+            (state.submitting
+              ? icon("spinner") + " 确认中"
+              : '确认' + escapeHTML(action.label)) +
+            "</button></footer>"
+          : "";
 
-        return '<section class="screen" data-screen="process">' +
-          flowHeader('process', '处理任务') +
+        return (
+          '<section class="screen" data-screen="process">' +
+          flowHeader("process", "处理任务") +
           '<main class="screen-main process-main">' +
+          '<section class="task-context"><h2>' +
+          escapeHTML(task.title) +
+          '</h2><p class="task-context__source">' +
+          escapeHTML(task.source) +
+          "</p></section>" +
           actionPanel +
           actionForm +
           (task.actions.includes('urge')
             ? '<p class="receipt-note">催办只会提醒责任岗位，不会代替对方完成任务。</p>'
-            : '') +
-          '</main>' +
+            : "") +
+          "</main>" +
           footer +
-          '</section>';
+          "</section>"
+        );
       }
 
       function receiptRows(receipt) {
         const rows = [
-          ['处理动作', receipt.actionLabel],
-          ['当前结果', receipt.stateLabel],
-          ['处理说明', receipt.reason || '未填写'],
+          ["处理动作", receipt.actionLabel],
+          ["当前结果", receipt.stateLabel],
+          ["处理说明", receipt.reason || "未填写"],
         ];
         if (receipt.evidence) {
-          rows.push(['历史处理线索', receipt.evidence]);
+          rows.push(["历史处理线索", receipt.evidence]);
         }
         return rows
           .map(function (row) {
-            return '<div class="receipt-row"><span class="receipt-row__label">' + escapeHTML(row[0]) +
-              '</span><span class="receipt-row__value">' + escapeHTML(row[1]) + '</span></div>';
+            return (
+              '<div class="receipt-row"><span class="receipt-row__label">' +
+              escapeHTML(row[0]) +
+              '</span><span class="receipt-row__value">' +
+              escapeHTML(row[1]) +
+              "</span></div>"
+            );
           })
-          .join('');
+          .join("");
       }
 
       function renderResult() {
@@ -1952,47 +2184,66 @@
         const needsConfirmation = unknown || failed;
         const footer = needsConfirmation
           ? '<footer class="screen-footer screen-footer--two">' +
-            '<button class="button button--secondary" type="button" data-step="process">返回处理</button>' +
+            '<button class="button button--secondary" type="button" data-return-list>返回列表</button>' +
             '<button class="button button--primary" type="button" data-refresh-result>刷新结果</button>' +
-            '</footer>'
-          : '<footer class="screen-footer screen-footer--two">' +
-            '<button class="button button--secondary" type="button" data-step="detail">查看任务</button>' +
+            "</footer>"
+          : '<footer class="screen-footer">' +
             '<button class="button button--primary" type="button" data-return-list>返回列表</button>' +
-            '</footer>';
+            "</footer>";
 
-        return '<section class="screen" data-screen="result">' +
-          flowHeader('result', '结果回执') +
+        return (
+          '<section class="screen" data-screen="result">' +
+          flowHeader("result", "结果回执") +
           '<main class="screen-main result-main">' +
           '<div class="receipt-hero">' +
-          '<span class="receipt-mark ' + (needsConfirmation ? 'receipt-mark--warning' : '') + '">' +
-          icon(needsConfirmation ? 'clock' : 'check') + '</span>' +
+          '<span class="receipt-mark ' +
+          (needsConfirmation ? "receipt-mark--warning" : "") +
+          '">' +
+          icon(needsConfirmation ? "clock" : "check") +
+          "</span>" +
           '<h1 tabindex="-1" data-screen-heading>' +
-          escapeHTML(failed ? '结果确认失败' : unknown ? '提交结果待确认' : '处理已提交') + '</h1>' +
-          '<p>' + escapeHTML(receipt.message) + '</p>' +
-          '<span class="receipt-status ' + (needsConfirmation ? 'receipt-status--warning' : '') + '">' +
-          escapeHTML(receipt.stateLabel) + '</span>' +
-          '</div>' +
-          '<section class="receipt-card" aria-label="处理回执明细">' + receiptRows(receipt) + '</section>' +
-          (needsConfirmation ? '' : renderExecutionTrail(task)) +
-          '</main>' +
+          escapeHTML(
+            failed ? "结果确认失败" : unknown ? "提交结果待确认" : "处理已提交",
+          ) +
+          "</h1>" +
+          "<p>" +
+          escapeHTML(receipt.message) +
+          "</p>" +
+          '<span class="receipt-status ' +
+          (needsConfirmation ? "receipt-status--warning" : "") +
+          '">' +
+          escapeHTML(receipt.stateLabel) +
+          "</span>" +
+          "</div>" +
+          '<section class="task-context"><h2>' +
+          escapeHTML(task.title) +
+          '</h2><p class="task-context__source">' +
+          escapeHTML(task.source) +
+          "</p></section>" +
+          '<section class="receipt-card" aria-label="处理回执明细">' +
+          receiptRows(receipt) +
+          "</section>" +
+          (needsConfirmation ? "" : renderExecutionTrail(task)) +
+          "</main>" +
           footer +
-          '</section>';
+          "</section>"
+        );
       }
 
       function render() {
         prototype.dataset.theme = state.theme;
-        if (state.screen === 'detail') {
+        if (state.screen === "detail") {
           app.innerHTML = renderDetail();
-        } else if (state.screen === 'process') {
+        } else if (state.screen === "process") {
           app.innerHTML = renderProcess();
-        } else if (state.screen === 'result') {
+        } else if (state.screen === "result") {
           app.innerHTML = renderResult();
         } else {
           app.innerHTML = renderList();
         }
 
         const selector = state.pendingFocus;
-        state.pendingFocus = '';
+        state.pendingFocus = "";
         if (selector) {
           window.requestAnimationFrame(function () {
             app.querySelector(selector)?.focus({ preventScroll: true });
@@ -2006,49 +2257,54 @@
         state.lastTaskIndex = index;
         state.selectedAction = tasks[index].actions[0] || null;
         state.errors = {};
-        state.screen = 'detail';
-        setPendingFocus('[data-screen-heading]');
+        state.screen = "detail";
+        setPendingFocus("[data-screen-heading]");
         render();
       }
 
       function returnToList() {
         const lastIndex = state.lastTaskIndex;
-        state.screen = 'list';
+        state.screen = "list";
         state.selectedIndex = null;
         state.selectedAction = null;
         state.errors = {};
-        setPendingFocus(Number.isInteger(lastIndex) ? '[data-task-index="' + lastIndex + '"]' : '[data-screen-heading]');
+        setPendingFocus(
+          Number.isInteger(lastIndex)
+            ? '[data-task-index="' + lastIndex + '"]'
+            : "[data-screen-heading]",
+        );
         render();
       }
 
       function goToStep(step) {
         const task = currentTask();
         if (!task) return;
-        if (!['detail', 'process', 'result'].includes(step)) return;
+        if (!["detail", "process", "result"].includes(step)) return;
         if (step === 'result' && !task.receipt) {
-          showToast('提交处理后才会生成结果回执');
+          showToast("提交处理后才会生成结果回执");
           return;
         }
         state.errors = {};
         state.screen = step;
-        setPendingFocus('[data-screen-heading]');
+        setPendingFocus("[data-screen-heading]");
         render();
       }
 
       function handleBack() {
         if (state.submitting) return;
-        if (state.screen === 'detail') {
+        if (state.screen === "detail") {
           returnToList();
           return;
         }
-        if (state.screen === 'process' || state.screen === 'result') {
-          goToStep('detail');
+        if (state.screen === "process" || state.screen === "result") {
+          goToStep("detail");
         }
       }
 
       function selectAction(actionKey) {
         const task = currentTask();
-        if (!task || !task.actions.includes(actionKey) || state.submitting) return;
+        if (!task || !task.actions.includes(actionKey) || state.submitting)
+          return;
         state.selectedAction = actionKey;
         state.errors = {};
         setPendingFocus('[data-action-key="' + actionKey + '"]');
@@ -2062,13 +2318,13 @@
         const draft = currentDraft();
         const errors = {};
         if (action.reasonRequired && !draft.reason.trim()) {
-          errors.reason = '请先填写' + action.reasonLabel;
+          errors.reason = "请先填写" + action.reasonLabel;
         }
         state.errors = errors;
         if (errors.reason) {
-          setPendingFocus('#reasonInput');
+          setPendingFocus("#reasonInput");
           render();
-          showToast('请补全必填信息');
+          showToast("请补全必填信息");
           return;
         }
 
@@ -2076,61 +2332,65 @@
         render();
         window.setTimeout(function () {
           task.receipt = {
-            status: 'confirmed',
+            status: "confirmed",
             action: state.selectedAction,
             actionLabel: action.label,
-            stateLabel: state.selectedAction === 'urge' ? '催办已记录' : '任务状态已更新',
+            stateLabel:
+              state.selectedAction === "urge" ? "催办已记录" : "任务状态已更新",
             reason: draft.reason.trim(),
-            message: state.selectedAction === 'urge'
-              ? '催办已记录，责任岗位将收到提醒。'
-              : '处理已确认，任务列表已同步。',
+            message:
+              state.selectedAction === "urge"
+                ? "催办已记录，责任岗位将收到提醒。"
+                : "处理已确认，任务列表已同步。",
           };
-          if (state.selectedAction === 'done') {
-            task.status = '已完成';
-            task.accessLabel = '只读';
-            task.severity = 'success';
-            task.severityLabel = '已完成';
+          if (state.selectedAction === "done") {
+            task.status = "已完成";
+            task.accessLabel = "只读";
+            task.severity = "success";
+            task.severityLabel = "已完成";
             task.actions = [];
-            task.guidance = '任务已结束，第 2 步只解释只读原因；可直接进入第 3 步查看回执。';
-          } else if (state.selectedAction === 'blocked') {
-            task.status = '已阻塞';
-            task.severity = 'danger';
-            task.severityLabel = '阻塞';
-            task.actions = ['resume', 'urge'];
-          } else if (state.selectedAction === 'rejected') {
-            task.status = '已退回';
-            task.accessLabel = '只读';
+            task.guidance =
+              "任务已结束，第 2 步只解释只读原因；可直接进入第 3 步查看回执。";
+          } else if (state.selectedAction === "blocked") {
+            task.status = "已阻塞";
+            task.severity = "danger";
+            task.severityLabel = "阻塞";
+            task.actions = ["resume", "urge"];
+          } else if (state.selectedAction === "rejected") {
+            task.status = "已退回";
+            task.accessLabel = "只读";
             task.actions = [];
-            task.guidance = '任务已退回并结束当前处理，第 2 步只解释只读原因；可直接进入第 3 步查看回执。';
-          } else if (state.selectedAction === 'resume') {
-            task.status = '待处理';
-            task.severity = 'warning';
-            task.severityLabel = '需关注';
-            task.actions = ['done', 'blocked', 'urge'];
+            task.guidance =
+              "任务已退回并结束当前处理，第 2 步只解释只读原因；可直接进入第 3 步查看回执。";
+          } else if (state.selectedAction === "resume") {
+            task.status = "待处理";
+            task.severity = "warning";
+            task.severityLabel = "需关注";
+            task.actions = ["done", "blocked", "urge"];
           }
           updateTaskTrail(task, state.selectedAction);
           task.latest = task.receipt.message;
           state.submitting = false;
           state.errors = {};
-          state.screen = 'result';
-          setPendingFocus('[data-screen-heading]');
+          state.screen = "result";
+          setPendingFocus("[data-screen-heading]");
           render();
-          showToast('已生成处理回执');
+          showToast("已生成处理回执");
         }, 700);
       }
 
       function updateTaskTrail(task, actionKey) {
-        if (!Array.isArray(task?.trail) || actionKey === 'urge') return;
+        if (!Array.isArray(task?.trail) || actionKey === "urge") return;
         const nextStateByAction = {
-          blocked: ['blocked', '已阻塞 · 本任务'],
-          done: ['completed', '已完成 · 本任务'],
-          rejected: ['rejected', '已退回 · 本任务'],
-          resume: ['active', '办理中 · 本任务'],
+          blocked: ["blocked", "已阻塞 · 本任务"],
+          done: ["completed", "已完成 · 本任务"],
+          rejected: ["rejected", "已退回 · 本任务"],
+          resume: ["active", "办理中 · 本任务"],
         };
         const nextState = nextStateByAction[actionKey];
         if (!nextState) return;
         const linkedIndex = task.trail.findIndex(function (item) {
-          return String(item?.[2] || '').includes('本任务');
+          return String(item?.[2] || "").includes("本任务");
         });
         if (linkedIndex < 0) return;
         task.trail[linkedIndex] = [
@@ -2142,144 +2402,169 @@
 
       function refreshPendingResult() {
         const task = currentTask();
-        if (!task || !task.receipt || !['unknown', 'failed'].includes(task.receipt.status)) return;
+        if (
+          !task ||
+          !task.receipt ||
+          !["unknown", "failed"].includes(task.receipt.status)
+        )
+          return;
         task.receipt.status = 'confirmed';
-        task.receipt.stateLabel = '处理结果已确认';
-        task.receipt.message = '系统已确认上次提交，任务列表已同步。';
-        task.status = '已完成';
-        task.accessLabel = '只读';
-        task.severity = 'success';
-        task.severityLabel = '已完成';
+        task.receipt.stateLabel = "处理结果已确认";
+        task.receipt.message = "系统已确认上次提交，任务列表已同步。";
+        task.status = "已完成";
+        task.accessLabel = "只读";
+        task.severity = "success";
+        task.severityLabel = "已完成";
         task.actions = [];
-        task.guidance = '结果已经确认，任务当前只读；可在第 3 步查看完整回执。';
+        task.guidance = "结果已经确认，任务当前只读；可在第 3 步查看完整回执。";
         updateTaskTrail(task, task.receipt.action);
         task.latest = task.receipt.message;
-        setPendingFocus('[data-screen-heading]');
+        setPendingFocus("[data-screen-heading]");
         render();
-        showToast('结果已确认');
+        showToast("结果已确认");
       }
 
-      app.addEventListener('click', function (event) {
-        const taskButton = event.target.closest('[data-task-index]');
+      app.addEventListener("click", function (event) {
+        const taskButton = event.target.closest("[data-task-index]");
         if (taskButton) {
           openTask(Number(taskButton.dataset.taskIndex));
           return;
         }
-        if (event.target.closest('[data-theme-toggle]')) {
-          state.theme = state.theme === 'dark' ? 'light' : 'dark';
-          setPendingFocus('[data-theme-toggle]');
+        if (event.target.closest("[data-theme-toggle]")) {
+          state.theme = state.theme === "dark" ? "light" : "dark";
+          setPendingFocus("[data-theme-toggle]");
           render();
           return;
         }
-        if (event.target.closest('[data-refresh]')) {
-          state.lastSync = '刚刚刷新';
-          setPendingFocus('[data-refresh]');
+        if (event.target.closest("[data-refresh]")) {
+          state.lastSync = "刚刚刷新";
+          setPendingFocus("[data-refresh]");
           render();
-          showToast('任务已刷新');
+          showToast("任务已刷新");
           return;
         }
-        if (event.target.closest('[data-attachment-preview]')) {
-          showToast('正式页面会按当前账号权限打开任务附件');
+        if (event.target.closest("[data-attachment-preview]")) {
+          showToast("正式页面会按当前账号权限打开任务附件");
           return;
         }
-        const filterButton = event.target.closest('[data-filter]');
+        const filterButton = event.target.closest("[data-filter]");
         if (filterButton) {
           state.filter = filterButton.dataset.filter;
           setPendingFocus('[data-filter="' + state.filter + '"]');
           render();
           return;
         }
-        if (event.target.closest('[data-back]')) {
+        if (event.target.closest("[data-back]")) {
           handleBack();
           return;
         }
-        if (event.target.closest('[data-return-list]')) {
+        if (event.target.closest("[data-return-list]")) {
           returnToList();
           return;
         }
-        const stepButton = event.target.closest('[data-step]');
+        const stepButton = event.target.closest("[data-step]");
         if (stepButton) {
           goToStep(stepButton.dataset.step);
           return;
         }
-        const quickReason = event.target.closest('[data-quick-reason]');
+        const quickReason = event.target.closest("[data-quick-reason]");
         if (quickReason && state.selectedAction) {
           const draft = currentDraft();
           draft.reason = [draft.reason.trim(), quickReason.dataset.quickReason]
             .filter(Boolean)
-            .join('；')
+            .join("；")
             .slice(0, 500);
-          state.errors.reason = '';
-          setPendingFocus('#reasonInput');
+          state.errors.reason = "";
+          setPendingFocus("#reasonInput");
           render();
           return;
         }
-        if (event.target.closest('[data-submit]')) {
+        if (event.target.closest("[data-submit]")) {
           validateAndSubmit();
           return;
         }
-        if (event.target.closest('[data-refresh-result]')) {
+        if (event.target.closest("[data-refresh-result]")) {
           refreshPendingResult();
         }
       });
 
-      app.addEventListener('change', function (event) {
+      app.addEventListener("change", function (event) {
         if (event.target.matches('input[type="radio"][data-action-key]')) {
           selectAction(event.target.dataset.actionKey);
         }
       });
 
-      app.addEventListener('input', function (event) {
+      app.addEventListener("input", function (event) {
         if (!state.selectedAction) return;
         const draft = currentDraft();
-        if (event.target.id === 'reasonInput') {
+        if (event.target.id === "reasonInput") {
           draft.reason = event.target.value;
-          state.errors.reason = '';
+          state.errors.reason = "";
         } else {
           return;
         }
-        const counter = app.querySelector('[data-count-for="' + event.target.id + '"]');
-        if (counter) counter.textContent = event.target.value.length + '/500';
-        event.target.setAttribute('aria-invalid', 'false');
-        const meta = app.querySelector('#' + event.target.id + '-meta span:first-child');
-        if (meta && meta.classList.contains('field-error')) {
-          meta.classList.remove('field-error');
-          meta.textContent = '已填写，可继续提交';
+        const counter = app.querySelector(
+          '[data-count-for="' + event.target.id + '"]',
+        );
+        if (counter) counter.textContent = event.target.value.length + "/500";
+        event.target.setAttribute("aria-invalid", "false");
+        const meta = app.querySelector(
+          "#" + event.target.id + "-meta span:first-child",
+        );
+        if (meta && meta.classList.contains("field-error")) {
+          meta.classList.remove("field-error");
+          meta.textContent = "已填写，可继续提交";
         }
       });
 
-      app.addEventListener('focusin', function (event) {
-        if (event.target.matches('textarea')) {
+      app.addEventListener("focusin", function (event) {
+        if (event.target.matches("textarea")) {
           window.setTimeout(function () {
-            event.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            event.target.scrollIntoView({
+              block: "center",
+              behavior: "smooth",
+            });
           }, 120);
         }
       });
 
-      document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && state.screen !== 'list') {
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && state.screen !== "list") {
           event.preventDefault();
           handleBack();
           return;
         }
-        if (event.altKey && ['1', '2', '3'].includes(event.key) && currentTask()) {
+        if (
+          event.altKey &&
+          ["1", "2", "3"].includes(event.key) &&
+          currentTask()
+        ) {
           event.preventDefault();
-          goToStep({ '1': 'detail', '2': 'process', '3': 'result' }[event.key]);
+          goToStep({ 1: "detail", 2: "process", 3: "result" }[event.key]);
           return;
         }
-        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && state.screen === 'process') {
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          event.key === "Enter" &&
+          state.screen === "process"
+        ) {
           event.preventDefault();
           validateAndSubmit();
         }
       });
 
       function syncVisualViewport() {
-        const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        document.documentElement.style.setProperty('--viewport-height', Math.round(height) + 'px');
+        const height = window.visualViewport
+          ? window.visualViewport.height
+          : window.innerHeight;
+        document.documentElement.style.setProperty(
+          "--viewport-height",
+          Math.round(height) + "px",
+        );
       }
 
-      window.visualViewport?.addEventListener('resize', syncVisualViewport);
-      window.addEventListener('resize', syncVisualViewport);
+      window.visualViewport?.addEventListener("resize", syncVisualViewport);
+      window.addEventListener("resize", syncVisualViewport);
       syncVisualViewport();
       render();
     </script>

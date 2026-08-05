@@ -2005,3 +2005,85 @@ body
   display: grid;
   gap: 12px;
 }
+
+.erp-sales-return-create-form {
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  align-items: start;
+}
+
+.erp-sales-return-create-form__status {
+  min-width: 0;
+}
+
+.erp-sales-return-create-form__status
+  :where(.ant-alert-content, .ant-alert-message) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-sales-return-create-form__items {
+  grid-column: 1 / -1;
+}
+
+.erp-sales-return-create-form__item {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 14px;
+  border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
+  border-radius: 8px;
+  background: var(--erp-business-action-modal-bg, #ffffff);
+  padding: 14px;
+}
+
+.erp-sales-return-create-form
+  .erp-sales-return-create-form__item
+  > .erp-sales-order-lines-form__row-head
+  strong {
+  color: var(--erp-sales-order-lines-title, #172033);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.erp-sales-return-create-form__item-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  min-width: 0;
+  gap: 14px 16px;
+}
+
+.erp-sales-return-create-form
+  .erp-sales-return-create-form__item-grid
+  .ant-form-item {
+  grid-column: span 2;
+  width: auto;
+  min-width: 0;
+}
+
+.erp-sales-return-create-form
+  .erp-sales-return-create-form__item-grid
+  .erp-sales-return-create-form__field--product.ant-form-item {
+  grid-column: span 6;
+}
+
+.erp-sales-return-create-form
+  .erp-sales-return-create-form__item-grid
+  :where(
+    .erp-sales-return-create-form__field--warehouse,
+    .erp-sales-return-create-form__field--lot
+  ).ant-form-item {
+  grid-column: span 3;
+}
+
+.erp-sales-return-create-form
+  .erp-sales-return-create-form__item-grid
+  .erp-sales-return-create-form__field--quantity.ant-form-item {
+  grid-column: span 4;
+}
+
+.erp-sales-return-create-form
+  .erp-sales-return-create-form__item-grid
+  .erp-sales-return-create-form__field--note.ant-form-item {
+  grid-column: 1 / -1;
+  width: auto;
+}

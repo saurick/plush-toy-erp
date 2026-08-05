@@ -450,8 +450,7 @@ export function supportsRejectedAction(roleKey, task) {
         isOutsourceReturnQcTask(task) ||
         isFinishedGoodsQcTask(task))) ||
     (roleKey === 'warehouse' &&
-      (isWarehouseInboundTask(task) ||
-        isFinishedGoodsInboundTask(task))) ||
+      (isWarehouseInboundTask(task) || isFinishedGoodsInboundTask(task))) ||
     (roleKey === 'finance' &&
       (isShipmentReleaseTask(task) ||
         isReceivableRegistrationTask(task) ||
@@ -561,17 +560,6 @@ export function canUrgeTask(roleKey, task = {}) {
   )
 }
 
-function hasFinanceAmountPayload(task) {
-  const payload = task?.payload || {}
-  return [
-    'amount',
-    'tax_rate',
-    'tax_amount',
-    'amount_with_tax',
-    'amount_without_tax',
-  ].some((key) => payload[key] !== undefined && payload[key] !== '')
-}
-
 export function resolveTaskSourceLabel(task) {
   return formatWorkflowTaskSource(task)
 }
@@ -643,64 +631,34 @@ export function getTaskQueueTone(task) {
 
 export function buildTaskFactRows(task) {
   const payload = task.payload || {}
-  const rows = [
-    [
-      '状态',
-      `${resolveMobileTaskStatusLabel(task)} / ${formatMobileTaskTime(
-        task.updated_at
-      )}`,
-    ],
-    ['业务', resolveTaskBusinessStatusLabel(task)],
-    [
-      '任务类型',
-      `${getMobileTaskGroupLabel(task.task_group)} / 优先级 ${task.priority}`,
-    ],
-    ['截止', task.due_at_label || '-'],
-  ]
-
-  if (
-    hasVisiblePayloadValue(payload.customer_name) ||
-    hasVisiblePayloadValue(payload.style_no) ||
-    hasVisiblePayloadValue(payload.due_date)
-  ) {
-    rows.push([
-      '客户/款式/交期',
-      `${visiblePayloadValue(payload.customer_name)} / ${visiblePayloadValue(
-        payload.style_no || payload.product_name
-      )} / ${visiblePayloadValue(payload.due_date)}`,
-    ])
+  const rows = []
+  const pushVisibleRow = (label, value, suffix = '') => {
+    if (!hasVisiblePayloadValue(value)) return
+    rows.push([label, `${visiblePayloadValue(value, '')}${suffix}`])
   }
 
-  if (
-    hasVisiblePayloadValue(payload.supplier_name) ||
-    hasVisiblePayloadValue(payload.material_name) ||
-    hasVisiblePayloadValue(payload.quantity)
-  ) {
-    rows.push([
-      '供应/物料/数量',
-      `${visiblePayloadValue(payload.supplier_name)} / ${visiblePayloadValue(
-        payload.material_name || payload.product_name
-      )} / ${visiblePayloadValue(payload.quantity)}${visiblePayloadValue(
-        payload.unit,
-        ''
-      )}`,
-    ])
-  }
+  pushVisibleRow('客户', payload.customer_name)
+  pushVisibleRow('款式', payload.style_no)
+  pushVisibleRow('产品', payload.product_name)
+  pushVisibleRow('交期', payload.due_date)
+  pushVisibleRow('供应商', payload.supplier_name)
+  pushVisibleRow('物料', payload.material_name)
+  pushVisibleRow('规格', payload.spec)
+  pushVisibleRow(
+    '数量',
+    payload.quantity,
+    visiblePayloadValue(payload.unit, '')
+  )
 
   if (payload.qc_result) {
     rows.push(['IQC 结果', resolveQcResultLabel(payload.qc_result)])
   }
 
-  if (hasFinanceAmountPayload(task)) {
-    rows.push([
-      '金额/税率',
-      `${visiblePayloadValue(payload.amount)} / ${visiblePayloadValue(
-        payload.tax_rate
-      )} / 税额 ${visiblePayloadValue(payload.tax_amount)} / 含税 ${visiblePayloadValue(
-        payload.amount_with_tax
-      )} / 不含税 ${visiblePayloadValue(payload.amount_without_tax)}`,
-    ])
-  }
+  pushVisibleRow('金额', payload.amount)
+  pushVisibleRow('税率', payload.tax_rate)
+  pushVisibleRow('税额', payload.tax_amount)
+  pushVisibleRow('含税金额', payload.amount_with_tax)
+  pushVisibleRow('未税金额', payload.amount_without_tax)
 
   if (payload.payable_type) {
     rows.push(['应付类型', resolvePayableTypeLabel(payload.payable_type)])

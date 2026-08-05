@@ -1,20 +1,10 @@
 import React from 'react'
 import {
-  AlertOutlined,
   CheckCircleOutlined,
   LinkOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Drawer,
-  Input,
-  Select,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
+import { Alert, Button, Drawer, Input, Select, Tag, Typography } from 'antd'
 import {
   getWorkflowTaskProcessContext,
   listWorkflowTaskEvents,
@@ -22,7 +12,6 @@ import {
 import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
 import { isTerminalWorkflowTask } from '../../utils/workflowTaskLifecycle.mjs'
 import {
-  getWorkflowTaskCodeLabel,
   getWorkflowTaskDueLabel,
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskReason,
@@ -49,10 +38,12 @@ import {
   formatProcessStartedAt,
   getProcessLabel,
   getProcessStatusLabel,
+  getWorkflowTaskDisplayName,
   isDisplayOnlyWorkflowTask,
 } from '../../utils/processRuntimePresentation.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import BusinessAttachmentModalButton from '../business-list/BusinessAttachmentModalButton.jsx'
 import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
 import WorkflowTaskEventTrail from './WorkflowTaskEventTrail.jsx'
 
@@ -125,17 +116,14 @@ const TASK_DRAWER_STEPS = Object.freeze([
   {
     key: 'context',
     title: '核对任务',
-    description: '确认任务、来源、责任和截止时间。',
   },
   {
     key: 'action',
     title: '选择处理',
-    description: '选择当前账号可以执行的处理方式。',
   },
   {
     key: 'confirm',
     title: '确认与提交',
-    description: '核对本次操作后再提交。',
   },
 ])
 
@@ -191,6 +179,8 @@ export default function WorkflowTaskActionDrawer({
   assignmentAccess = {},
   assignmentTarget,
   canOpenEntry = false,
+  canViewAttachments = false,
+  canManageAttachments = false,
   onActionModeChange,
   onActionReasonChange,
   onAssignmentTargetChange,
@@ -205,6 +195,13 @@ export default function WorkflowTaskActionDrawer({
   const taskReason = task ? getWorkflowTaskReason(task) : ''
   const actionTone = getTaskActionTone(actionMode)
   const ownerRoleLabel = task ? getWorkflowTaskOwnerRoleLabel(task) : ''
+  const currentAssigneeLabel =
+    assignmentAccess.current_assignee?.username ||
+    (task?.assignee_id ? '已指定处理人' : '共同待办')
+  const responsibilityLabel = [ownerRoleLabel, currentAssigneeLabel]
+    .filter(Boolean)
+    .join(' · ')
+  const taskDisplayName = task ? getWorkflowTaskDisplayName(task) : ''
   const canOpenRelatedEntry = Boolean(task && canOpenEntry && onOpenEntry)
   const allowedActionModeSet = new Set(allowedActionModes)
   const canSubmitAction = Boolean(
@@ -221,6 +218,8 @@ export default function WorkflowTaskActionDrawer({
   const [taskEventsError, setTaskEventsError] = React.useState('')
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
+  const [processContextReloadKey, setProcessContextReloadKey] =
+    React.useState(0)
   const [approvedQuantity, setApprovedQuantity] = React.useState('')
   const previousTaskIdentityRef = React.useRef('')
   const stepButtonRefs = React.useRef(new Map())
@@ -237,6 +236,18 @@ export default function WorkflowTaskActionDrawer({
   const processDecisionReady =
     !processDecisionRequired ||
     (processContextState === 'ready' && Boolean(processApprovalForm))
+  const taskSourceLabel = task
+    ? formatWorkflowTaskSource(
+        processContext?.source
+          ? {
+              ...task,
+              source_type: processContext.source.type,
+              source_id: processContext.source.id,
+              source_no: processContext.source.no,
+            }
+          : task
+      )
+    : ''
   const approvedQuantityAllowed =
     processDecisionRequired &&
     workflowProcessDecisionAllowsApprovedQuantity(processApprovalForm)
@@ -360,6 +371,7 @@ export default function WorkflowTaskActionDrawer({
     task?.process_instance_id,
     task?.process_node_instance_id,
     task?.version,
+    processContextReloadKey,
   ])
 
   React.useEffect(() => {
@@ -476,13 +488,20 @@ export default function WorkflowTaskActionDrawer({
     requestAnimationFrame(() => actionOptionRefs.current.get(nextMode)?.focus())
   }
 
+  const showFooter = Boolean(
+    task &&
+      (activeStepKey !== 'context' ||
+        canOpenRelatedEntry ||
+        canViewAttachments ||
+        canChooseActions)
+  )
+
   return (
     <Drawer
       title={
-        <div className="erp-task-action-drawer__title">
-          <span>{approvalTask ? '审批办理' : '任务处理'}</span>
-          <strong>{actionMeta?.title || '查看任务详情'}</strong>
-        </div>
+        <strong className="erp-task-action-drawer__title">
+          {approvalTask ? '审批详情' : '任务详情'}
+        </strong>
       }
       width="min(640px, calc(100vw - 24px))"
       open={Boolean(task)}
@@ -495,22 +514,13 @@ export default function WorkflowTaskActionDrawer({
       destroyOnHidden
       className="erp-task-action-drawer"
       extra={
-        task ? (
-          <Space size={8} wrap>
-            <Tag>{getWorkflowTaskCodeLabel(task)}</Tag>
-            <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag>
-          </Space>
-        ) : null
+        task ? <Tag color={statusMeta?.color}>{statusMeta?.label}</Tag> : null
       }
       footer={
-        task ? (
+        showFooter ? (
           <div className="erp-task-action-drawer__footer">
             <div className="erp-task-action-drawer__footer-nav">
-              {activeStepKey === 'context' ? (
-                <Button disabled={actionSaving} onClick={onClose}>
-                  关闭
-                </Button>
-              ) : (
+              {activeStepKey !== 'context' ? (
                 <Button
                   disabled={actionSaving}
                   onClick={() =>
@@ -521,7 +531,7 @@ export default function WorkflowTaskActionDrawer({
                 >
                   上一步
                 </Button>
-              )}
+              ) : null}
               {canOpenRelatedEntry ? (
                 <Button
                   icon={<LinkOutlined />}
@@ -530,6 +540,30 @@ export default function WorkflowTaskActionDrawer({
                 >
                   查看相关单据
                 </Button>
+              ) : null}
+              {canViewAttachments ? (
+                <BusinessAttachmentModalButton
+                  ownerType="workflow_task"
+                  ownerId={task.id}
+                  ownerVersion={task.version}
+                  buttonText="任务附件"
+                  modalTitle="任务附件"
+                  panelTitle="附件内容"
+                  description={
+                    canManageAttachments
+                      ? '上传照片、异常截图或处理凭证。'
+                      : '查看照片、异常截图或处理凭证。'
+                  }
+                  canUpload={canManageAttachments}
+                  canWithdraw={canManageAttachments}
+                  disabled={actionSaving}
+                  disabledReason="任务正在提交，请稍候"
+                  showAttachmentCount
+                  buttonProps={{
+                    'data-testid': 'workflow-task-attachment-action',
+                    size: 'middle',
+                  }}
+                />
               ) : null}
             </div>
             <div className="erp-task-action-drawer__footer-primary">
@@ -580,34 +614,22 @@ export default function WorkflowTaskActionDrawer({
     >
       {task ? (
         <div className="erp-task-action-drawer__body" aria-busy={actionSaving}>
-          <section className="erp-task-action-drawer__summary">
-            <div className="erp-task-action-drawer__eyebrow">当前任务</div>
+          <section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">
             <Title level={4} className="erp-task-action-drawer__task-title">
-              {task.task_name || '未命名任务'}
+              {taskDisplayName}
             </Title>
-            <div className="erp-task-action-drawer__meta-grid">
+            <div className="erp-task-action-drawer__meta-grid erp-task-action-drawer__task-meta">
               <div>
-                <span>来源</span>
-                <strong>{formatWorkflowTaskSource(task)}</strong>
+                <span>来源单据</span>
+                <strong>{taskSourceLabel}</strong>
               </div>
               <div>
-                <span>负责岗位</span>
-                <strong>{ownerRoleLabel || '-'}</strong>
+                <span>负责人</span>
+                <strong>{responsibilityLabel || '-'}</strong>
               </div>
               <div>
-                <span>当前处理人</span>
-                <strong>
-                  {assignmentAccess.current_assignee?.username ||
-                    (task.assignee_id ? '已指定处理人' : '负责岗位共同待办')}
-                </strong>
-              </div>
-              <div>
-                <span>到期时间</span>
+                <span>截止时间</span>
                 <strong>{getWorkflowTaskDueLabel(task)}</strong>
-              </div>
-              <div>
-                <span>当前状态</span>
-                <strong>{statusMeta?.label || '-'}</strong>
               </div>
             </div>
             {taskReason ? (
@@ -629,21 +651,35 @@ export default function WorkflowTaskActionDrawer({
           {task.process_instance_id ? (
             <section
               className="erp-task-action-drawer__summary"
-              aria-label="业务轨迹"
+              aria-labelledby="erp-task-action-process-title"
             >
-              <div className="erp-task-action-drawer__eyebrow">业务轨迹</div>
+              <h3
+                id="erp-task-action-process-title"
+                className="erp-task-action-drawer__section-title"
+              >
+                业务进度
+              </h3>
               {processContextState === 'loading' ? (
-                <Alert type="info" showIcon message="正在读取业务轨迹" />
+                <Alert type="info" showIcon message="正在读取业务进度" />
               ) : processContextState === 'error' ? (
                 <Alert
                   type="error"
                   showIcon
-                  message="业务轨迹暂时无法确认"
-                  description="请刷新后重试；系统不会根据任务文案猜测流程节点。"
+                  message="暂时无法读取业务进度"
+                  action={
+                    <Button
+                      size="small"
+                      onClick={() =>
+                        setProcessContextReloadKey((current) => current + 1)
+                      }
+                    >
+                      重新读取
+                    </Button>
+                  }
                 />
               ) : processContext ? (
                 <>
-                  <div className="erp-task-action-drawer__meta-grid">
+                  <div className="erp-task-action-drawer__meta-grid erp-task-action-drawer__process-meta">
                     <div>
                       <span>业务流程</span>
                       <strong>
@@ -651,14 +687,7 @@ export default function WorkflowTaskActionDrawer({
                       </strong>
                     </div>
                     <div>
-                      <span>来源单据</span>
-                      <strong>
-                        {processContext.source.no ||
-                          formatWorkflowTaskSource(task)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>流程发起</span>
+                      <span>发起时间</span>
                       <strong>
                         {formatProcessStartedAt(
                           processContext.process_instance.started_at
@@ -728,20 +757,10 @@ export default function WorkflowTaskActionDrawer({
                     onKeyDown={(event) => handleStepKeyDown(event, step.key)}
                   >
                     <span>{index + 1}</span>
-                    <div>
-                      <strong>{step.title}</strong>
-                      <small>{step.description}</small>
-                    </div>
+                    <strong>{step.title}</strong>
                   </button>
                 )
               })}
-            </div>
-            <div className="erp-task-action-drawer__guide-note">
-              <AlertOutlined aria-hidden="true" />
-              <span>
-                <strong>处理范围：</strong>
-                完成、阻塞、解除阻塞、退回、催办和转交只更新当前任务；转交只改变指定处理人，库存、出货、应收、开票和付款仍需进入对应业务页面处理。
-              </span>
             </div>
           </section>
 
@@ -752,19 +771,8 @@ export default function WorkflowTaskActionDrawer({
             hidden={activeStepKey !== 'context'}
             className="erp-task-action-drawer__step-panel"
           >
-            <div className="erp-task-action-drawer__action-prompt">
-              <strong>{approvalTask ? '核对审批事项' : '核对任务信息'}</strong>
-              <span>
-                请确认任务、来源、负责岗位、截止时间和已有原因；查看本页不会修改任务或业务记录。
-              </span>
-            </div>
             {actionAvailabilityLoading ? (
-              <Alert
-                type="info"
-                showIcon
-                message="正在确认可用的处理方式"
-                description="确认完成前可以核对任务信息，确认完成后即可选择处理方式。"
-              />
+              <Alert type="info" showIcon message="正在确认可用的处理方式" />
             ) : !canChooseActions ? (
               <Alert
                 type="warning"
@@ -780,6 +788,7 @@ export default function WorkflowTaskActionDrawer({
               state={taskEventsState}
               task={task}
               truncated={taskEventsTruncated}
+              showResponsibility={false}
             />
           </section>
 
@@ -1021,7 +1030,7 @@ export default function WorkflowTaskActionDrawer({
                 <dl className="erp-task-action-drawer__confirm-list">
                   <div>
                     <dt>当前任务</dt>
-                    <dd>{task.task_name || '未命名任务'}</dd>
+                    <dd>{taskDisplayName}</dd>
                   </div>
                   <div>
                     <dt>处理方式</dt>

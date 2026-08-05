@@ -190,13 +190,8 @@ function createMobileRoleTaskViewCounters() {
 export default function MobileRoleTasksPage() {
   const navigate = useNavigate()
   const { activeRoleKey } = useERPWorkspace()
-  const {
-    adminProfile,
-    canEnterDesktop,
-    handleEnterDesktop,
-    handleLogout,
-    loggingOut,
-  } = useOutletContext() || {}
+  const { adminProfile, canEnterDesktop, handleLogout, loggingOut } =
+    useOutletContext() || {}
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
   const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
   const taskAccessIdentity =
@@ -870,8 +865,10 @@ export default function MobileRoleTasksPage() {
 
   const roleLabel = getMobileRoleLabel(activeRoleKey)
   const { loading } = activeTaskSlot
-  const initialLoading =
+  const activeViewInitialLoading =
     loading && !activeTaskSlot.loaded && activeTaskSlot.items.length === 0
+  const hasLoadedTaskView = Object.values(taskSlots).some((slot) => slot.loaded)
+  const initialLoading = activeViewInitialLoading && !hasLoadedTaskView
   const latestTaskUpdate = resolveLatestTaskTime([
     ...activeTasks,
     ...doneTasks,
@@ -1818,7 +1815,6 @@ export default function MobileRoleTasksPage() {
       filteredTasks={filteredTasks}
       handleLogout={handleLogout}
       handleMainScroll={handleMainScroll}
-      handleEnterDesktop={handleEnterDesktop}
       handleSwitchEntry={() => navigate('/entry')}
       initialLoading={initialLoading}
       latestTaskUpdate={latestTaskUpdate}

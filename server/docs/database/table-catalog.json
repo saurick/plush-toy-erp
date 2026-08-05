@@ -216,10 +216,10 @@
       "title": "业务附件证据",
       "domain": "workflow-runtime",
       "kind": "Fact",
-      "purpose": "保存挂接到业务对象的文件内容、元数据、哈希和上传人等证据。",
+      "purpose": "保存挂接到业务对象的文件内容、元数据、哈希、上传审计和撤销审计等证据。",
       "boundary": "附件是 Evidence 层，不改变 Source Document、Fact、Workflow、库存、质检或财务状态。",
-      "lifecycle": "普通证据只追加、不提供常规物理删除；产品图片允许按固定 slot 替换或清空；debug cleanup 另行受控。",
-      "writeBoundary": "BusinessAttachmentUsecase 校验 owner、权限、大小、类型和哈希后写入。",
+      "lifecycle": "普通证据 active / withdrawn 只由 withdrawn_at、withdrawn_by、withdrawal_reason 全空或全有值派生；允许带原因单向撤销，无恢复和常规物理删除。产品图片只按固定 slot 替换或清空；debug cleanup 另行受控。",
+      "writeBoundary": "BusinessAttachmentUsecase 校验 owner、权限、大小、类型和哈希后上传；撤销在事务内重验 owner 与附件行，并以 withdrawn_at IS NULL 一次性写入服务端操作者、时间和原因。",
       "notes": "现有六类 kind 未单列 Evidence，本目录暂归 Fact；不得据此把附件解释成领域过账事实。",
       "sensitiveFields": [
         "content"

@@ -270,6 +270,198 @@ func TestWorkflowPostgresAttachmentUploadRechecksTaskAfterConcurrentMutation(t *
 	}
 }
 
+func TestWorkflowPostgresAttachmentWithdrawalRechecksTaskAfterConcurrentMutation(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		updateSQL  string
+		updateArgs []any
+		wantErr    error
+	}{
+		{name: "completion", updateSQL: "UPDATE workflow_tasks SET task_status_key = 'done', version = version + 1 WHERE id = $1", wantErr: biz.ErrWorkflowTaskConflict},
+		{name: "reassignment", updateSQL: "UPDATE workflow_tasks SET assignee_id = $2 WHERE id = $1", updateArgs: []any{99}, wantErr: biz.ErrForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			data, client := openPurchaseReceiptPostgresTestData(t)
+			workflowRepo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
+			attachmentRepo := NewBusinessAttachmentRepo(data, log.NewStdLogger(io.Discard))
+			suffix := postgresTestSuffix()
+			task, err := workflowRepo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+				TaskCode:      "WF-ATTACHMENT-WITHDRAW-" + suffix,
+				TaskGroup:     "attachment_withdrawal_concurrency",
+				TaskName:      "附件撤销并发门禁",
+				SourceType:    "generic-source",
+				SourceID:      workflowPostgresSourceID(),
+				TaskStatusKey: "ready",
+				OwnerRoleKey:  biz.WarehouseRoleKey,
+				Payload:       map[string]any{},
+			}, 7)
+			if err != nil {
+				t.Fatalf("create workflow task: %v", err)
+			}
+			attachment, err := client.BusinessAttachment.Create().
+				SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+				SetOwnerID(task.ID).
+				SetAttachmentType("evidence").
+				SetFileName("proof.pdf").
+				SetMimeType("application/pdf").
+				SetFileSize(5).
+				SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
+				SetContent([]byte("proof")).
+				Save(ctx)
+			if err != nil {
+				t.Fatalf("create attachment: %v", err)
+			}
+
+			mutationTx, err := data.sqldb.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatalf("begin task mutation: %v", err)
+			}
+			defer func() { _ = mutationTx.Rollback() }()
+			var lockedID int
+			if err := mutationTx.QueryRowContext(ctx, "SELECT id FROM workflow_tasks WHERE id = $1 FOR UPDATE", task.ID).Scan(&lockedID); err != nil {
+				t.Fatalf("lock task: %v", err)
+			}
+
+			result := make(chan error, 1)
+			go func() {
+				_, withdrawErr := attachmentRepo.WithdrawBusinessAttachment(
+					ctx,
+					workflowAttachmentWithdraw(attachment.ID, task.ID, task.Version, 7, "上传错误", biz.WarehouseRoleKey),
+				)
+				result <- withdrawErr
+			}()
+			select {
+			case early := <-result:
+				t.Fatalf("withdrawal must wait for the task mutation lock, returned early: %v", early)
+			case <-time.After(100 * time.Millisecond):
+			}
+
+			args := []any{task.ID}
+			args = append(args, tc.updateArgs...)
+			if _, err := mutationTx.ExecContext(ctx, tc.updateSQL, args...); err != nil {
+				t.Fatalf("mutate locked task: %v", err)
+			}
+			if err := mutationTx.Commit(); err != nil {
+				t.Fatalf("commit task mutation: %v", err)
+			}
+			select {
+			case withdrawErr := <-result:
+				if !errors.Is(withdrawErr, tc.wantErr) {
+					t.Fatalf("expected %v after concurrent mutation, got %v", tc.wantErr, withdrawErr)
+				}
+			case <-ctx.Done():
+				t.Fatalf("wait for guarded withdrawal: %v", ctx.Err())
+			}
+			stored, err := client.BusinessAttachment.Get(ctx, attachment.ID)
+			if err != nil || stored.WithdrawnAt != nil || stored.WithdrawnBy != nil || stored.WithdrawalReason != nil ||
+				string(stored.Content) != "proof" || stored.Sha256 != attachment.Sha256 {
+				t.Fatalf("rejected withdrawal must preserve active evidence: row=%#v err=%v", stored, err)
+			}
+		})
+	}
+}
+
+func TestWorkflowPostgresConcurrentAttachmentWithdrawalsKeepFirstAudit(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		reasons    [2]string
+		actors     [2]int
+		wantErrors int
+	}{
+		{name: "same intent replays", reasons: [2]string{"上传错误", "上传错误"}, actors: [2]int{7, 7}, wantErrors: 0},
+		{name: "different intent conflicts", reasons: [2]string{"上传错误 A", "上传错误 B"}, actors: [2]int{7, 8}, wantErrors: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			data, client := openPurchaseReceiptPostgresTestData(t)
+			workflowRepo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
+			attachmentRepo := NewBusinessAttachmentRepo(data, log.NewStdLogger(io.Discard))
+			task, err := workflowRepo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+				TaskCode:      "WF-ATTACHMENT-WITHDRAW-RACE-" + postgresTestSuffix(),
+				TaskGroup:     "attachment_withdrawal_concurrency",
+				TaskName:      "附件双撤销并发门禁",
+				SourceType:    "generic-source",
+				SourceID:      workflowPostgresSourceID(),
+				TaskStatusKey: "ready",
+				OwnerRoleKey:  biz.WarehouseRoleKey,
+				Payload:       map[string]any{},
+			}, 7)
+			if err != nil {
+				t.Fatalf("create workflow task: %v", err)
+			}
+			attachment, err := client.BusinessAttachment.Create().
+				SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+				SetOwnerID(task.ID).
+				SetAttachmentType("evidence").
+				SetFileName("proof.pdf").
+				SetMimeType("application/pdf").
+				SetFileSize(5).
+				SetSha256("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef").
+				SetContent([]byte("proof")).
+				Save(ctx)
+			if err != nil {
+				t.Fatalf("create attachment: %v", err)
+			}
+
+			start := make(chan struct{})
+			type withdrawalResult struct {
+				at  time.Time
+				err error
+			}
+			results := make(chan withdrawalResult, 2)
+			for index := 0; index < 2; index++ {
+				index := index
+				go func() {
+					<-start
+					at, withdrawErr := attachmentRepo.WithdrawBusinessAttachment(
+						ctx,
+						workflowAttachmentWithdraw(
+							attachment.ID,
+							task.ID,
+							task.Version,
+							tc.actors[index],
+							tc.reasons[index],
+							biz.WarehouseRoleKey,
+						),
+					)
+					results <- withdrawalResult{at: at, err: withdrawErr}
+				}()
+			}
+			close(start)
+			first := <-results
+			second := <-results
+			errorCount := 0
+			for _, result := range []withdrawalResult{first, second} {
+				if result.err != nil {
+					errorCount++
+					if !errors.Is(result.err, biz.ErrBusinessAttachmentWithdrawn) {
+						t.Fatalf("concurrent withdrawal error = %v", result.err)
+					}
+				}
+			}
+			if errorCount != tc.wantErrors {
+				t.Fatalf("concurrent withdrawal errors=%d want=%d results=%#v/%#v", errorCount, tc.wantErrors, first, second)
+			}
+			if tc.wantErrors == 0 && (first.at.IsZero() || !first.at.Equal(second.at)) {
+				t.Fatalf("same intent must replay exact receipt: first=%v second=%v", first.at, second.at)
+			}
+			stored, err := client.BusinessAttachment.Get(ctx, attachment.ID)
+			if err != nil || stored.WithdrawnAt == nil || stored.WithdrawnBy == nil || stored.WithdrawalReason == nil ||
+				string(stored.Content) != "proof" || stored.Sha256 != attachment.Sha256 {
+				t.Fatalf("concurrent withdrawal must keep one complete audit and original evidence: row=%#v err=%v", stored, err)
+			}
+			validFirstAudit := (*stored.WithdrawnBy == tc.actors[0] && *stored.WithdrawalReason == tc.reasons[0]) ||
+				(*stored.WithdrawnBy == tc.actors[1] && *stored.WithdrawalReason == tc.reasons[1])
+			if !validFirstAudit {
+				t.Fatalf("stored audit must match one complete intent: row=%#v", stored)
+			}
+		})
+	}
+}
+
 func TestWorkflowPostgresConcurrentSameApprovalRetryIsIdempotentWithoutDomainSideEffects(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

@@ -6,19 +6,16 @@ const MOBILE_TASK_FLOW_STEPS = Object.freeze([
     key: 'detail',
     number: '1',
     title: '查看任务',
-    subtitle: '核对信息',
   },
   {
     key: 'process',
     number: '2',
     title: '处理任务',
-    subtitle: '选择动作',
   },
   {
     key: 'result',
     number: '3',
     title: '结果回执',
-    subtitle: '确认结果',
   },
 ])
 
@@ -90,18 +87,18 @@ export default function MobileTaskFlowHeader({
               : step.key === 'result'
                 ? receiptUnavailableLabel
                 : ''
-          const subtitle = current
-            ? '当前步骤'
+          const accessibilityLabel = current
+            ? `${step.title}，当前步骤`
             : available
-              ? step.subtitle
-              : unavailableLabel
+              ? step.title
+              : `${step.title}，${unavailableLabel}`
           return (
             <button
               key={step.key}
               type="button"
               className="mobile-task-flow-step"
               aria-current={current ? 'step' : undefined}
-              aria-label={`${step.title}，${subtitle}`}
+              aria-label={accessibilityLabel}
               data-state={
                 current ? 'current' : available ? 'available' : 'locked'
               }
@@ -115,9 +112,6 @@ export default function MobileTaskFlowHeader({
               <span className="mobile-task-flow-step__copy">
                 <span className="mobile-task-flow-step__title">
                   {step.title}
-                </span>
-                <span className="mobile-task-flow-step__subtitle">
-                  {subtitle}
                 </span>
               </span>
             </button>

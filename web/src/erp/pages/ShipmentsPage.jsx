@@ -1824,6 +1824,7 @@ export default function ShipmentsPage() {
 
       <ShipmentBusinessModal
         canCreate={canCreate}
+        canShip={canShip}
         canImportSalesOrderSource={canImportSalesOrderSource}
         customerOptions={customerOptions}
         form={shipmentForm}

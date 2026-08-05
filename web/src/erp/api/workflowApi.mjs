@@ -52,6 +52,13 @@ function dataOf(result) {
   return result?.data || {}
 }
 
+function reportWorkflowProcessContextContractFailure() {
+  console.warn('[workflow] 响应合同校验失败', {
+    method: 'get_task_process_context',
+    reason: 'response_contract_invalid',
+  })
+}
+
 function requireWorkflowMutationParams(operation, params = {}) {
   return requireWorkflowTaskMutationParams(operation, params, {
     requireIdempotencyKey: true,
@@ -319,7 +326,14 @@ export async function getWorkflowTaskProcessContext(taskId, options = {}) {
     { task_id: normalizedTaskId },
     options
   )
-  return requireWorkflowProcessContext(dataOf(result)?.process_context)
+  try {
+    return requireWorkflowProcessContext(dataOf(result)?.process_context)
+  } catch (error) {
+    // Keep diagnostics actionable without logging task/source identifiers or
+    // the response body. The caller still receives the business-facing error.
+    reportWorkflowProcessContextContractFailure()
+    throw error
+  }
 }
 
 async function listWorkflowRoleTaskPage(method, params = {}) {

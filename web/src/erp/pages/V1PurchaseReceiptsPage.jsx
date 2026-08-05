@@ -1230,7 +1230,7 @@ export default function V1PurchaseReceiptsPage() {
             panelTitle="入库附件"
             description="上传送货单、物流单、仓库收货照片或异常说明；附件不能代替入库确认。"
             canUpload={canCreate || canPost}
-            canDelete={canCreate || canPost}
+            canWithdraw={canCreate || canPost}
             disabled={!selectedRow}
             disabledReason="请先选择一条入库记录"
             buttonProps={{ 'data-business-action-key': 'attachments' }}

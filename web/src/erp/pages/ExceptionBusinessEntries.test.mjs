@@ -17,6 +17,8 @@ const rejectionModal = read(
 )
 const salesReturnsPage = read('./SalesReturnsPage.jsx')
 const financePaymentsPage = read('./FinancePaymentsPage.jsx')
+const businessModalStyles = read('../styles/app/business-modals.css')
+const businessResponsiveStyles = read('../styles/app/business-responsive.css')
 const productionExceptionPanel = read(
   '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
 )
@@ -87,6 +89,47 @@ test('RMA: uses shipment source, optimistic version and inventory-writing receiv
   assert.doesNotMatch(
     salesReturnsPage,
     /name=\{\[field\.name, 'shipment_item_id'\]\}/u
+  )
+  assert.match(
+    salesReturnsPage,
+    /className="erp-business-action-form erp-sales-return-create-form"/u
+  )
+  assert.match(
+    salesReturnsPage,
+    /className="erp-business-source-summary erp-sales-return-create-form__status"/u
+  )
+  assert.match(
+    salesReturnsPage,
+    /className="erp-business-action-form__field--full erp-sales-return-create-form__reason"/u
+  )
+  assert.match(
+    salesReturnsPage,
+    /<Form\.List name="items">[\s\S]*className="erp-sales-order-lines-form erp-sales-return-create-form__items"/u
+  )
+  assert.match(
+    salesReturnsPage,
+    /<Form\.List name="items">[\s\S]{0,320}returnUsage\.shipmentID === Number\(selectedShipment\.id\)[\s\S]{0,120}returnUsage\.status === 'success'/u
+  )
+  assert.doesNotMatch(salesReturnsPage, /<Space/u)
+  assert.doesNotMatch(
+    salesReturnsPage,
+    /style=\{\{ width: (?:110|120|140|180|220|300) \}\}/u
+  )
+  assert.match(
+    businessModalStyles,
+    /\.erp-sales-return-create-form\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1\.3fr\) minmax\(280px, 0\.7fr\)/u
+  )
+  assert.match(
+    businessModalStyles,
+    /\.erp-sales-return-create-form__item-grid\s*\{[^}]*grid-template-columns:\s*repeat\(12, minmax\(0, 1fr\)\)/u
+  )
+  assert.match(
+    businessResponsiveStyles,
+    /\.erp-sales-return-create-form__item-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/u
+  )
+  assert.doesNotMatch(
+    salesReturnsPage,
+    /className="erp-sales-order-lines-form__(?:row|grid) erp-sales-return-create-form__item/u
   )
   assert.doesNotMatch(salesReturnsPage, /客户ID|出货ID|明细ID/u)
 })

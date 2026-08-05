@@ -218,6 +218,14 @@ export function getProcessNodeLabel(node = {}) {
   return NODE_LABELS[node.node_key] || '流程步骤'
 }
 
+export function getWorkflowTaskDisplayName(task = {}) {
+  const taskName = String(task.task_name || '').trim()
+  if (!taskName) return '未命名任务'
+  if (NODE_LABELS[taskName]) return NODE_LABELS[taskName]
+  if (/^[a-z][a-z0-9_:-]*$/iu.test(taskName)) return '业务任务'
+  return taskName
+}
+
 export function getProcessNodeStatusLabel(node = {}) {
   if (node.outcome === 'rejected') return '已退回'
   return NODE_STATUS_LABELS[node.status] || '状态待确认'

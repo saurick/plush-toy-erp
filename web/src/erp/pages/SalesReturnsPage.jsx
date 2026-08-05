@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Popconfirm, Select, Space, Tag } from 'antd'
+import {
+  Alert,
+  Button,
+  Empty,
+  Form,
+  Input,
+  Popconfirm,
+  Select,
+  Tag,
+} from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -1150,12 +1159,13 @@ export default function SalesReturnsPage() {
       >
         <Form
           form={form}
-          className="erp-business-action-form"
+          className="erp-business-action-form erp-sales-return-create-form"
           layout="vertical"
           preserve={false}
           disabled={saving}
         >
           <Form.Item
+            className="erp-sales-return-create-form__source"
             name="shipment_id"
             label="来源出货"
             rules={[{ required: true, message: '请选择已出货记录' }]}
@@ -1167,8 +1177,19 @@ export default function SalesReturnsPage() {
               options={shipments.map(shipmentOption)}
             />
           </Form.Item>
+          <Form.Item
+            className="erp-sales-return-create-form__number"
+            name="return_no"
+            label="退货单号"
+            rules={[
+              { required: true, whitespace: true, message: '请填写退货单号' },
+            ]}
+          >
+            <Input maxLength={64} />
+          </Form.Item>
           {selectedShipment ? (
             <Alert
+              className="erp-business-source-summary erp-sales-return-create-form__status"
               showIcon
               type={
                 returnUsage.status === 'error'
@@ -1197,15 +1218,7 @@ export default function SalesReturnsPage() {
             />
           ) : null}
           <Form.Item
-            name="return_no"
-            label="退货单号"
-            rules={[
-              { required: true, whitespace: true, message: '请填写退货单号' },
-            ]}
-          >
-            <Input maxLength={64} />
-          </Form.Item>
-          <Form.Item
+            className="erp-business-action-form__field--full erp-sales-return-create-form__reason"
             name="reason"
             label="退货原因"
             rules={[
@@ -1215,107 +1228,160 @@ export default function SalesReturnsPage() {
             <Input.TextArea rows={2} maxLength={255} showCount />
           </Form.Item>
           <Form.List name="items">
-            {(fields) => (
-              <Space direction="vertical" style={{ width: '100%' }}>
-                {fields.map((field) => {
-                  const sourceItem = selectedShipmentItems[field.name]
-                  const productLabel = [
-                    sourceItem?.productLabel,
-                    sourceItem?.skuLabel,
-                  ]
-                    .filter(Boolean)
-                    .join(' / ')
-                  return (
-                    <Space key={field.key} align="start" size={12} wrap>
-                      <Form.Item label="产品 / SKU">
-                        <Input
-                          aria-label="产品 / SKU"
-                          disabled
-                          value={productLabel}
-                          style={{ width: 300 }}
-                        />
-                      </Form.Item>
-                      <Form.Item label="来源仓库">
-                        <Input
-                          aria-label="来源仓库"
-                          disabled
-                          value={sourceItem?.warehouseLabel || ''}
-                          style={{ width: 180 }}
-                        />
-                      </Form.Item>
-                      <Form.Item label="来源批次">
-                        <Input
-                          aria-label="来源批次"
-                          disabled
-                          value={sourceItem?.lotLabel || ''}
-                          style={{ width: 180 }}
-                        />
-                      </Form.Item>
-                      <Form.Item label="已出货">
-                        <Input
-                          aria-label="已出货"
-                          disabled
-                          value={sourceItem?.sourceQuantity || ''}
-                          style={{ width: 110 }}
-                        />
-                      </Form.Item>
-                      <Form.Item label="已退货">
-                        <Input
-                          aria-label="已退货"
-                          disabled
-                          value={sourceItem?.activeReturnedQuantity || ''}
-                          style={{ width: 110 }}
-                        />
-                      </Form.Item>
-                      <Form.Item label="当前可退">
-                        <Input
-                          aria-label="当前可退"
-                          disabled
-                          value={sourceItem?.remainingQuantity || ''}
-                          style={{ width: 110 }}
-                        />
-                      </Form.Item>
-                      <Form.Item label="单位">
-                        <Input
-                          aria-label="单位"
-                          disabled
-                          value={sourceItem?.unitLabel || ''}
-                          style={{ width: 120 }}
-                        />
-                      </Form.Item>
-                      <Form.Item
-                        name={[field.name, 'quantity']}
-                        label="退货数量"
-                        rules={[
-                          {
-                            validator: (_, value) =>
-                              !String(value || '').trim() ||
-                              (isPositiveNumeric20Scale6Units(
-                                numeric20Scale6Units(value)
-                              ) &&
-                                compareNumeric20Scale6Units(
-                                  numeric20Scale6Units(value),
-                                  sourceItem?.remainingUnits
-                                ) !== 1)
-                                ? Promise.resolve()
-                                : Promise.reject(
-                                    new Error(
-                                      '数量须大于 0 且不超过当前可退数量'
-                                    )
-                                  ),
-                          },
-                        ]}
-                      >
-                        <Input inputMode="decimal" style={{ width: 140 }} />
-                      </Form.Item>
-                      <Form.Item name={[field.name, 'note']} label="明细备注">
-                        <Input maxLength={255} style={{ width: 220 }} />
-                      </Form.Item>
-                    </Space>
-                  )
-                })}
-              </Space>
-            )}
+            {(fields) =>
+              selectedShipment &&
+              returnUsage.shipmentID === Number(selectedShipment.id) &&
+              returnUsage.status === 'success' ? (
+                <section className="erp-sales-order-lines-form erp-sales-return-create-form__items">
+                  <div className="erp-sales-order-lines-form__head">
+                    <div>
+                      <strong>退货明细</strong>
+                      <span>
+                        逐项填写本次退货数量；没有退货的来源行可留空。
+                      </span>
+                    </div>
+                  </div>
+                  {fields.length === 0 ? (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description="当前来源出货没有可退明细"
+                    />
+                  ) : (
+                    <div
+                      aria-label="退货明细"
+                      className="erp-sales-order-lines-form__list"
+                    >
+                      {fields.map((field, index) => {
+                        const sourceItem = selectedShipmentItems[field.name]
+                        const productLabel = [
+                          sourceItem?.productLabel,
+                          sourceItem?.skuLabel,
+                        ]
+                          .filter(Boolean)
+                          .join(' / ')
+                        return (
+                          <div
+                            key={field.key}
+                            className="erp-sales-return-create-form__item"
+                          >
+                            <div className="erp-sales-order-lines-form__row-head">
+                              <strong>来源明细 {index + 1}</strong>
+                            </div>
+                            <div className="erp-sales-return-create-form__item-grid">
+                              <Form.Item
+                                className="erp-line-item-field erp-sales-return-create-form__field--product"
+                                label="产品 / SKU"
+                              >
+                                <Input
+                                  aria-label="产品 / SKU"
+                                  disabled
+                                  value={productLabel}
+                                />
+                              </Form.Item>
+                              <Form.Item
+                                className="erp-line-item-field erp-sales-return-create-form__field--warehouse"
+                                label="来源仓库"
+                              >
+                                <Input
+                                  aria-label="来源仓库"
+                                  disabled
+                                  value={sourceItem?.warehouseLabel || ''}
+                                />
+                              </Form.Item>
+                              <Form.Item
+                                className="erp-line-item-field erp-sales-return-create-form__field--lot"
+                                label="来源批次"
+                              >
+                                <Input
+                                  aria-label="来源批次"
+                                  disabled
+                                  value={sourceItem?.lotLabel || ''}
+                                />
+                              </Form.Item>
+                              <Form.Item
+                                className="erp-line-item-field erp-sales-return-create-form__field--metric"
+                                label="已出货"
+                              >
+                                <Input
+                                  aria-label="已出货"
+                                  disabled
+                                  value={sourceItem?.sourceQuantity || ''}
+                                />
+                              </Form.Item>
+                              <Form.Item
+                                className="erp-line-item-field erp-sales-return-create-form__field--metric"
+                                label="已退货"
+                              >
+                                <Input
+                                  aria-label="已退货"
+                                  disabled
+                                  value={
+                                    sourceItem?.activeReturnedQuantity || ''
+                                  }
+                                />
+                              </Form.Item>
+                              <Form.Item
+                                className="erp-line-item-field erp-sales-return-create-form__field--metric"
+                                label="当前可退"
+                              >
+                                <Input
+                                  aria-label="当前可退"
+                                  disabled
+                                  value={sourceItem?.remainingQuantity || ''}
+                                />
+                              </Form.Item>
+                              <Form.Item
+                                className="erp-line-item-field erp-sales-return-create-form__field--unit"
+                                label="单位"
+                              >
+                                <Input
+                                  aria-label="单位"
+                                  disabled
+                                  value={sourceItem?.unitLabel || ''}
+                                />
+                              </Form.Item>
+                              <Form.Item
+                                className="erp-line-item-field erp-sales-return-create-form__field--quantity"
+                                name={[field.name, 'quantity']}
+                                label="退货数量"
+                                rules={[
+                                  {
+                                    validator: (_, value) =>
+                                      !String(value || '').trim() ||
+                                      (isPositiveNumeric20Scale6Units(
+                                        numeric20Scale6Units(value)
+                                      ) &&
+                                        compareNumeric20Scale6Units(
+                                          numeric20Scale6Units(value),
+                                          sourceItem?.remainingUnits
+                                        ) !== 1)
+                                        ? Promise.resolve()
+                                        : Promise.reject(
+                                            new Error(
+                                              '数量须大于 0 且不超过当前可退数量'
+                                            )
+                                          ),
+                                  },
+                                ]}
+                              >
+                                <Input inputMode="decimal" />
+                              </Form.Item>
+                              <Form.Item
+                                className="erp-sales-order-lines-form__field--full erp-line-item-field erp-line-item-field--note erp-sales-return-create-form__field--note"
+                                name={[field.name, 'note']}
+                                label="明细备注"
+                              >
+                                <Input maxLength={255} />
+                              </Form.Item>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              ) : null
+            }
           </Form.List>
         </Form>
       </BusinessFormModal>

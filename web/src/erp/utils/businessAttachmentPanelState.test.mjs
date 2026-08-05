@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { resolveBusinessAttachmentPanelState } from './businessAttachmentPanelState.mjs'
+import {
+  resolveBusinessAttachmentActionLabel,
+  resolveBusinessAttachmentPanelState,
+} from './businessAttachmentPanelState.mjs'
 
 test('businessAttachmentPanelState: 表单内缺 owner 时允许先选附件并随保存绑定', () => {
   const state = resolveBusinessAttachmentPanelState({
@@ -56,4 +59,29 @@ test('businessAttachmentPanelState: 已有 owner 时保持同一选择附件按�
   assert.equal(state.uploadButtonText, '选择附件')
   assert.equal(state.panelDescription, '上传现场证据')
   assert.equal(state.emptyDescription, '暂无附件')
+})
+
+test('businessAttachmentPanelState: 附件动作按未知、空态和已有数量生成低密度文案', () => {
+  assert.equal(
+    resolveBusinessAttachmentActionLabel({
+      attachmentCount: null,
+      fallbackLabel: '任务附件',
+    }),
+    '任务附件'
+  )
+  assert.equal(
+    resolveBusinessAttachmentActionLabel({ attachmentCount: 0 }),
+    '添加附件'
+  )
+  assert.equal(
+    resolveBusinessAttachmentActionLabel({
+      attachmentCount: 0,
+      canUpload: false,
+    }),
+    '查看附件'
+  )
+  assert.equal(
+    resolveBusinessAttachmentActionLabel({ attachmentCount: 3 }),
+    '附件（3）'
+  )
 })

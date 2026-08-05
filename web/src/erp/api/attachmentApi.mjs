@@ -29,6 +29,11 @@ export async function downloadBusinessAttachment(params = {}) {
   return dataOf(result)?.attachment || null
 }
 
+export async function withdrawBusinessAttachment(params = {}) {
+  const result = await attachmentRpc.call('withdraw_attachment', params)
+  return dataOf(result)?.attachment || null
+}
+
 export async function listProductImages(params = {}) {
   const { product_id: productID, ...rest } = params
   return listBusinessAttachments({

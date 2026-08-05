@@ -21,6 +21,7 @@ func (BusinessAttachment) Annotations() []schema.Annotation {
 				"business_attachments_owner_type_allowed":     "owner_type IN ('sales_order', 'purchase_order', 'outsourcing_order', 'purchase_receipt', 'quality_inspection', 'shipment', 'finance_fact', 'production_fact', 'outsourcing_fact', 'product', 'product_sku', 'bom_header', 'workflow_task')",
 				"business_attachments_file_size_positive":     "file_size > 0",
 				"business_attachments_product_image_contract": "((owner_type = 'product' AND attachment_type = 'product_image' AND slot_key IS NOT NULL AND slot_key IN ('primary', 'secondary') AND mime_type IN ('image/png', 'image/jpeg', 'image/webp')) OR (owner_type <> 'product' AND attachment_type <> 'product_image'))",
+				"business_attachments_withdrawal_contract":    "((withdrawn_at IS NULL AND withdrawn_by IS NULL AND withdrawal_reason IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND withdrawn_by > 0 AND withdrawal_reason IS NOT NULL AND length(trim(withdrawal_reason)) BETWEEN 1 AND 255 AND owner_type <> 'product' AND attachment_type <> 'product_image'))",
 			},
 		},
 	}
@@ -61,6 +62,17 @@ func (BusinessAttachment) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(255),
+		field.Time("withdrawn_at").
+			Optional().
+			Nillable(),
+		field.Int("withdrawn_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("withdrawal_reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),
@@ -76,5 +88,6 @@ func (BusinessAttachment) Indexes() []ent.Index {
 			Annotations(entsql.IndexWhere("owner_type = 'product' AND attachment_type = 'product_image'")),
 		index.Fields("sha256"),
 		index.Fields("uploaded_by"),
+		index.Fields("withdrawn_by"),
 	}
 }

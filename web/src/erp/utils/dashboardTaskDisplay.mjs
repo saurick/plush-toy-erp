@@ -70,10 +70,7 @@ const DIRECT_TASK_SOURCE_TARGETS = new Map([
   ['inbound', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
   ['purchase-receipt', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
   ['purchase_receipt', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
-  [
-    'inventory_operation',
-    [V1_ROUTE_PATHS.inventory, 'inventory_operation_id'],
-  ],
+  ['inventory_operation', [V1_ROUTE_PATHS.inventory, 'inventory_operation_id']],
   [
     'processing-contracts',
     [V1_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
@@ -169,13 +166,13 @@ export function formatWorkflowTaskSource(task = {}) {
   ) {
     return '模拟任务批次'
   }
-  const sourceNo = resolveReadableWorkflowSourceNo(task, ['source_no'])
-  if (sourceNo) {
-    return sourceNo
-  }
-
   const sourceType = String(task.source_type || '').trim()
   const sourceTitle = getWorkflowTaskSourceTypeLabel(sourceType, '')
+  const sourceNo = resolveReadableWorkflowSourceNo(task, ['source_no'])
+  if (sourceNo) {
+    return `${sourceTitle || '业务单据'} · ${sourceNo}`
+  }
+
   const hasLinkedSource = Boolean(
     task.source_id || isInternalWorkflowDocumentRef(task.source_no, task)
   )
