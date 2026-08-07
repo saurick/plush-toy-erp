@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   closeSync,
   existsSync,
@@ -14,6 +14,8 @@ import {
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+
+import { sha256File } from "../lib/file-digest.mjs";
 
 export const RELEASE_MANIFEST_CONTRACT = "plush.release-manifest/v1";
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
@@ -39,9 +41,7 @@ function stableStringify(value) {
   return JSON.stringify(stableValue(value));
 }
 
-export function sha256File(file) {
-  return createHash("sha256").update(readFileSync(file)).digest("hex");
-}
+export { sha256File };
 
 export function validateReleaseManifest(manifest) {
   if (
@@ -49,8 +49,20 @@ export function validateReleaseManifest(manifest) {
     manifest?.passed !== true ||
     !VERSION_PATTERN.test(String(manifest?.version || "")) ||
     !SHA_PATTERN.test(String(manifest?.gitSha || "")) ||
+    manifest?.strict?.contract !== "plush.exact-sha-strict/v2" ||
     manifest?.strict?.status !== "passed" ||
     !SHA256_PATTERN.test(String(manifest?.strict?.fingerprint || "")) ||
+    !SHA256_PATTERN.test(String(manifest?.strict?.receiptSha256 || "")) ||
+    manifest?.strict?.provenance?.source !== "github-actions" ||
+    !REGISTRY_REPOSITORY_PATTERN.test(
+      `ghcr.io/${String(manifest?.strict?.provenance?.repository || "")}`,
+    ) ||
+    !String(manifest?.strict?.provenance?.workflowRef || "").includes(
+      "/.github/workflows/release.yml@",
+    ) ||
+    !/^\d+$/u.test(String(manifest?.strict?.provenance?.runId || "")) ||
+    !/^\d+$/u.test(String(manifest?.strict?.provenance?.runAttempt || "")) ||
+    manifest?.strict?.provenance?.job !== "strict" ||
     !SHA256_PATTERN.test(String(manifest?.artifact?.manifestSha256 || "")) ||
     !/^[0-9]{14}$/u.test(String(manifest?.migration?.latest || "")) ||
     !SHA256_PATTERN.test(
@@ -128,6 +140,15 @@ export function buildReleaseManifest({
       profile: strictTerminal.profile,
       status: strictTerminal.status,
       fingerprint: strictTerminal.fingerprint,
+      receiptSha256: strictTerminal.receipt?.sha256,
+      provenance: {
+        source: strictTerminal.provenance?.source,
+        repository: strictTerminal.provenance?.repository,
+        workflowRef: strictTerminal.provenance?.workflowRef,
+        runId: strictTerminal.provenance?.runId,
+        runAttempt: strictTerminal.provenance?.runAttempt,
+        job: strictTerminal.provenance?.job,
+      },
     },
     artifact: {
       schemaVersion: artifactManifest.schemaVersion,

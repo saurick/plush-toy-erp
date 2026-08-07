@@ -17,10 +17,26 @@ import {
   PROFILE_REQUIRED_FILES,
 } from "./gate-profiles.mjs";
 import {
+  buildExactShaProvenance,
   buildExactShaPlan,
   readExactShaTerminal,
   runExactShaGate,
 } from "./exact-sha-gate.mjs";
+
+function writeReceipt(plan, status) {
+  mkdirSync(path.dirname(plan.receiptPath), { recursive: true });
+  writeFileSync(
+    plan.receiptPath,
+    `${JSON.stringify({
+      schemaVersion: "dev-workbench-receipt/v1",
+      gate: "strict",
+      profile: "strict",
+      gitCommit: plan.gitSha,
+      status,
+    })}\n`,
+    "utf8",
+  );
+}
 
 function git(root, args) {
   return execFileSync("git", args, {
@@ -109,8 +125,9 @@ test("exact-SHA passed terminal is reused without running strict again", () => {
   try {
     let runs = 0;
     const runtime = {
-      runStrict() {
+      runStrict(plan) {
         runs += 1;
+        writeReceipt(plan, "passed");
         return { status: 0 };
       },
     };
@@ -138,8 +155,9 @@ test("exact-SHA failed terminal is final for the same fingerprint", () => {
   try {
     let runs = 0;
     const runtime = {
-      runStrict() {
+      runStrict(plan) {
         runs += 1;
+        writeReceipt(plan, "failed");
         return { status: 7 };
       },
     };
@@ -184,7 +202,12 @@ test("exact-SHA rejects dirty, detached candidate, and tampered terminals", () =
     const result = runExactShaGate(
       fixture.root,
       { sha: fixture.sha },
-      { runStrict: () => ({ status: 0 }) },
+      {
+        runStrict: (plan) => {
+          writeReceipt(plan, "passed");
+          return { status: 0 };
+        },
+      },
     );
     const terminal = JSON.parse(
       readFileSync(result.plan.terminalPath, "utf8"),
@@ -198,6 +221,45 @@ test("exact-SHA rejects dirty, detached candidate, and tampered terminals", () =
     assert.throws(
       () => readExactShaTerminal(result.plan),
       /contract mismatch/u,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("exact-SHA terminal binds receipt content and GitHub provenance", () => {
+  const fixture = createFixture();
+  try {
+    const githubEnv = {
+      GITHUB_ACTIONS: "true",
+      GITHUB_REPOSITORY: "owner/repository",
+      GITHUB_WORKFLOW_REF: "owner/repository/.github/workflows/release.yml@refs/heads/main",
+      GITHUB_RUN_ID: "123",
+      GITHUB_RUN_ATTEMPT: "2",
+      GITHUB_JOB: "validate",
+    };
+    assert.deepEqual(buildExactShaProvenance(githubEnv), {
+      source: "github-actions",
+      repository: "owner/repository",
+      workflowRef: githubEnv.GITHUB_WORKFLOW_REF,
+      runId: "123",
+      runAttempt: "2",
+      job: "validate",
+    });
+    const result = runExactShaGate(
+      fixture.root,
+      { sha: fixture.sha },
+      {
+        runStrict(plan) {
+          writeReceipt(plan, "passed");
+          return { status: 0 };
+        },
+      },
+    );
+    writeFileSync(result.plan.receiptPath, "{}\n", "utf8");
+    assert.throws(
+      () => readExactShaTerminal(result.plan),
+      /receipt contract mismatch|receipt integrity mismatch/u,
     );
   } finally {
     fixture.cleanup();

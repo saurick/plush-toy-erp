@@ -30,9 +30,10 @@ import {
   validateReleaseManifest,
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 
 export const REMOTE_ROLLBACK_RECEIPT_CONTRACT =
-  "plush.remote-rollback-receipt/v1";
+  "plush.remote-rollback-receipt/v2";
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -41,6 +42,16 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const IMAGE_ID_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const ISSUE_PATTERN = /^(?:none|[a-z][a-z0-9_]{2,63})$/u;
 const MAX_RECEIPT_BYTES = 256 * 1024;
+const ROLLBACK_STAGE_IDS = Object.freeze([
+  "package_verification",
+  "target_identity_recheck",
+  "release_materialization",
+  "image_load_and_readback",
+  "static_preflight",
+  "service_switch",
+  "runtime_verified",
+  "current_source_switch",
+]);
 const TRANSFER_FILES = Object.freeze([
   "current-release-manifest.json",
   "release-artifact.json",
@@ -288,11 +299,19 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
   const webContentId = String(receipt?.images?.webContentId || "");
   const optionalImageId = (value) =>
     value === "unknown" || IMAGE_ID_PATTERN.test(value);
+  validateRemoteStageTimings({
+    timings: receipt?.timings,
+    status: receipt?.status,
+    stage: receipt?.stage,
+    durationMs: receipt?.durationMs,
+    requiredStages: ROLLBACK_STAGE_IDS,
+  });
   if (
     !hasExactKeys(receipt, [
       "checks",
       "currentManifestSha256",
       "database",
+      "durationMs",
       "finishedAt",
       "fromGitSha",
       "images",
@@ -304,9 +323,11 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
       "schemaVersion",
       "serviceSwitchStarted",
       "stage",
+      "startedAt",
       "status",
       "target",
       "targetManifestSha256",
+      "timings",
       "toGitSha",
       "toVersion",
     ]) ||
@@ -349,6 +370,9 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
     typeof receipt?.serviceSwitchStarted !== "boolean" ||
     typeof receipt?.finishedAt !== "string" ||
     Number.isNaN(Date.parse(receipt.finishedAt)) ||
+    typeof receipt?.startedAt !== "string" ||
+    Number.isNaN(Date.parse(receipt.startedAt)) ||
+    Date.parse(receipt.finishedAt) < Date.parse(receipt.startedAt) ||
     !Array.isArray(receipt?.notProven) ||
     receipt.notProven.length !== 2 ||
     !optionalImageId(serverContentId) ||
@@ -636,6 +660,7 @@ export function executeRollback(
         serverContentId: receipt.images.serverContentId,
         webContentId: receipt.images.webContentId,
         databaseChangedByExecutor: false,
+        remoteStageTimings: receipt.timings,
       },
       now: now(),
     });

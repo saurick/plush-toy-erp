@@ -18,13 +18,14 @@ import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
+import { sha256File } from "../lib/file-digest.mjs";
 import {
   GATE_PROFILES,
   PROFILE_REQUIRED_EXECUTABLES,
   PROFILE_REQUIRED_FILES,
 } from "./gate-profiles.mjs";
 
-export const EXACT_SHA_GATE_CONTRACT = "plush.exact-sha-strict/v1";
+export const EXACT_SHA_GATE_CONTRACT = "plush.exact-sha-strict/v2";
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const FINGERPRINT_PATTERN = /^[0-9a-f]{64}$/u;
 const TERMINAL_STATUSES = new Set(["passed", "failed"]);
@@ -204,6 +205,7 @@ export function buildExactShaPlan(
     fingerprint,
     terminalPath,
     receiptPath,
+    receiptRelativePath: path.relative(root, receiptPath).replaceAll(path.sep, "/"),
   };
 }
 
@@ -211,6 +213,72 @@ function assertPlainTerminalFile(file) {
   const stat = lstatSync(file);
   if (!stat.isFile() || stat.isSymbolicLink()) {
     throw new Error("exact-SHA terminal must be a plain file");
+  }
+}
+
+function readReceiptEvidence(plan) {
+  if (!existsSync(plan.receiptPath)) {
+    throw new Error("exact-SHA strict receipt is missing");
+  }
+  assertPlainTerminalFile(plan.receiptPath);
+  let receipt;
+  try {
+    receipt = JSON.parse(readFileSync(plan.receiptPath, "utf8"));
+  } catch {
+    throw new Error("exact-SHA strict receipt is invalid JSON");
+  }
+  if (
+    receipt?.schemaVersion !== "dev-workbench-receipt/v1" ||
+    receipt?.gate !== "strict" ||
+    receipt?.profile !== "strict" ||
+    receipt?.gitCommit !== plan.gitSha ||
+    !TERMINAL_STATUSES.has(receipt?.status)
+  ) {
+    throw new Error("exact-SHA strict receipt contract mismatch");
+  }
+  return {
+    status: receipt.status,
+    sha256: sha256File(plan.receiptPath),
+  };
+}
+
+export function buildExactShaProvenance(env = process.env) {
+  if (env.GITHUB_ACTIONS !== "true") {
+    return Object.freeze({ source: "local" });
+  }
+  const provenance = {
+    source: "github-actions",
+    repository: String(env.GITHUB_REPOSITORY || ""),
+    workflowRef: String(env.GITHUB_WORKFLOW_REF || ""),
+    runId: String(env.GITHUB_RUN_ID || ""),
+    runAttempt: String(env.GITHUB_RUN_ATTEMPT || ""),
+    job: String(env.GITHUB_JOB || ""),
+  };
+  if (
+    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(provenance.repository) ||
+    !provenance.workflowRef ||
+    !/^\d+$/u.test(provenance.runId) ||
+    !/^\d+$/u.test(provenance.runAttempt) ||
+    !/^[A-Za-z0-9_.-]+$/u.test(provenance.job)
+  ) {
+    throw new Error("GitHub Actions provenance is incomplete");
+  }
+  return Object.freeze(provenance);
+}
+
+function assertTerminalProvenance(provenance) {
+  if (provenance?.source === "local") return;
+  if (
+    provenance?.source !== "github-actions" ||
+    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(
+      String(provenance.repository || ""),
+    ) ||
+    !String(provenance.workflowRef || "") ||
+    !/^\d+$/u.test(String(provenance.runId || "")) ||
+    !/^\d+$/u.test(String(provenance.runAttempt || "")) ||
+    !/^[A-Za-z0-9_.-]+$/u.test(String(provenance.job || ""))
+  ) {
+    throw new Error("exact-SHA terminal provenance mismatch");
   }
 }
 
@@ -234,9 +302,19 @@ export function readExactShaTerminal(plan) {
     terminal.exitCode > 255 ||
     (terminal.status === "passed" && terminal.exitCode !== 0) ||
     (terminal.status === "failed" && terminal.exitCode === 0) ||
-    !FINGERPRINT_PATTERN.test(String(terminal?.fingerprint || ""))
+    !FINGERPRINT_PATTERN.test(String(terminal?.fingerprint || "")) ||
+    terminal?.receipt?.path !== plan.receiptRelativePath ||
+    !FINGERPRINT_PATTERN.test(String(terminal?.receipt?.sha256 || ""))
   ) {
     throw new Error("exact-SHA terminal contract mismatch");
+  }
+  assertTerminalProvenance(terminal.provenance);
+  const receipt = readReceiptEvidence(plan);
+  if (
+    receipt.status !== terminal.status ||
+    receipt.sha256 !== terminal.receipt.sha256
+  ) {
+    throw new Error("exact-SHA terminal receipt integrity mismatch");
   }
   return terminal;
 }
@@ -294,17 +372,26 @@ export function runExactShaGate(
   if (result?.error) throw result.error;
   const exitCode = Number.isInteger(result?.status) ? result.status : 1;
   assertCleanExactHead(root, plan.gitSha);
+  const receiptEvidence = readReceiptEvidence(plan);
+  const terminalStatus = exitCode === 0 ? "passed" : "failed";
+  if (receiptEvidence.status !== terminalStatus) {
+    throw new Error("exact-SHA strict result and receipt status differ");
+  }
   const terminal = {
     contract: EXACT_SHA_GATE_CONTRACT,
     profile: "strict",
     gitSha: plan.gitSha,
     mainRef: plan.mainRef,
     fingerprint: plan.fingerprint,
-    status: exitCode === 0 ? "passed" : "failed",
+    status: terminalStatus,
     exitCode,
     startedAt,
     finishedAt: now().toISOString(),
-    receiptPath: path.relative(root, plan.receiptPath).replaceAll(path.sep, "/"),
+    receipt: {
+      path: plan.receiptRelativePath,
+      sha256: receiptEvidence.sha256,
+    },
+    provenance: buildExactShaProvenance(),
     runtime: {
       node: process.version,
       platform: process.platform,

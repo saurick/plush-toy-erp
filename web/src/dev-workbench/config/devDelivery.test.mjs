@@ -15,8 +15,11 @@ import {
   deliveryStatusPresentation,
   deliveryVersionActionKind,
   formatDeliveryBytes,
+  formatDeliveryDuration,
   shortGitSha,
+  summarizePipelineTimings,
   validateDevDeliverySummary,
+  validatePipelineTimings,
 } from './devDelivery.mjs'
 import {
   clearDevSummarySnapshot,
@@ -80,12 +83,22 @@ function summaryFixture() {
         revision: 3,
         createdAt: '2026-07-29T01:00:00.000Z',
         updatedAt: '2026-07-29T01:02:00.000Z',
+        durationMs: 120_000,
+        stages: [
+          {
+            id: 'release_dispatch',
+            label: 'GitHub 发布调度',
+            status: 'passed',
+            durationMs: 10_000,
+          },
+        ],
         issues: [],
         events: [],
         confirmationRequired: '',
         terminal: true,
       },
     ],
+    timings: null,
     issues: [],
     boundaries: {
       provider: 'github',
@@ -222,7 +235,79 @@ test('delivery presentation helpers are deterministic and bounded', () => {
   assert.equal(shortGitSha(SHA), 'aaaaaaaaaaaa')
   assert.equal(shortGitSha('bad'), '未证明')
   assert.equal(formatDeliveryBytes(30 * 1024 ** 3), '30.0 GiB')
+  assert.equal(formatDeliveryDuration(950), '950 ms')
+  assert.equal(formatDeliveryDuration(5_400), '5.4 秒')
+  assert.equal(formatDeliveryDuration(125_000), '2 分 5 秒')
   assert.equal(deliveryStatusPresentation('not_proven').label, '结果未证明')
+})
+
+test('pipeline timings validate nested stages and identify the measured bottleneck', () => {
+  const timings = {
+    schemaVersion: 'plush.delivery-pipeline-timings/v1',
+    generatedAt: '2026-08-08T03:00:00.000Z',
+    runs: [
+      {
+        id: 321,
+        attempt: 1,
+        workflow: 'release',
+        event: 'workflow_dispatch',
+        status: 'completed',
+        conclusion: 'success',
+        gitSha: SHA,
+        createdAt: '2026-08-08T02:00:00.000Z',
+        startedAt: '2026-08-08T02:00:10.000Z',
+        finishedAt: '2026-08-08T02:10:10.000Z',
+        queueMs: 10_000,
+        durationMs: 600_000,
+        url: 'https://github.com/saurick/plush-toy-erp/actions/runs/321',
+        jobs: [
+          {
+            id: 654,
+            name: 'Publish immutable release',
+            status: 'completed',
+            conclusion: 'success',
+            startedAt: '2026-08-08T02:00:20.000Z',
+            finishedAt: '2026-08-08T02:10:00.000Z',
+            durationMs: 580_000,
+            steps: [
+              {
+                number: 1,
+                name: 'Build both images',
+                status: 'completed',
+                conclusion: 'success',
+                startedAt: '2026-08-08T02:00:30.000Z',
+                finishedAt: '2026-08-08T02:08:30.000Z',
+                durationMs: 480_000,
+              },
+              {
+                number: 2,
+                name: 'Publish assets',
+                status: 'completed',
+                conclusion: 'success',
+                startedAt: '2026-08-08T02:08:30.000Z',
+                finishedAt: '2026-08-08T02:10:00.000Z',
+                durationMs: 90_000,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+  assert.strictEqual(validatePipelineTimings(timings), timings)
+  const summary = summarizePipelineTimings(timings)
+  assert.equal(summary.sampleCount, 1)
+  assert.equal(summary.medianDurationMs, 600_000)
+  assert.equal(summary.bottleneck.name, 'Build both images')
+  assert.match(summary.optimizationHint, /耗时最长/u)
+  assert.throws(
+    () =>
+      validatePipelineTimings({
+        ...timings,
+        runs: [{ ...timings.runs[0], url: 'https://example.com/run/321' }],
+      }),
+    /run/u
+  )
 })
 
 test('dev summary snapshots stay in memory, deduplicate refreshes and retain the last good result', async () => {

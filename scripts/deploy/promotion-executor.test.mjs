@@ -12,6 +12,21 @@ import {
 const SHA = "a".repeat(40);
 const HASH = "b".repeat(64);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
+const PROMOTION_STAGES = [
+  "package_verification",
+  "capacity_recheck",
+  "release_materialization",
+  "image_load_and_readback",
+  "fresh_backup_and_restore_check",
+  "env_and_static_preflight",
+  "migration_plan",
+  "maintenance_window",
+  "migration_apply_started",
+  "migration_applied",
+  "compose_start",
+  "runtime_verified",
+  "current_source_switch",
+];
 
 function receipt(overrides = {}) {
   return {
@@ -57,7 +72,14 @@ function receipt(overrides = {}) {
       "credentialed role matrix and PDF smoke",
       "customer UAT and sign-off",
     ],
+    startedAt: "2026-07-29T03:59:40Z",
     finishedAt: "2026-07-29T04:00:00Z",
+    durationMs: 20_000,
+    timings: PROMOTION_STAGES.map((id) => ({
+      id,
+      status: "passed",
+      durationMs: 1_000,
+    })),
     ...overrides,
   };
 }
@@ -98,7 +120,13 @@ test("promotion executor accepts only an identity-bound redacted receipt", () =>
 test("failed and unknown receipts cannot masquerade as passed", () => {
   const failed = receipt({
     status: "failed",
+    stage: "capacity_recheck",
     issueCode: "promotion_failed_before_migration",
+    timings: PROMOTION_STAGES.slice(0, 2).map((id, index) => ({
+      id,
+      status: index === 1 ? "failed" : "passed",
+      durationMs: 1_000,
+    })),
     checks: {
       releaseIdentity: false,
       health: false,
@@ -109,7 +137,15 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
   assert.equal(validateRemotePromotionReceipt(failed, expected).status, "failed");
   const earlyFailure = receipt({
     status: "failed",
+    stage: "package_verification",
     issueCode: "promotion_failed_before_migration",
+    timings: [
+      {
+        id: "package_verification",
+        status: "failed",
+        durationMs: 1_000,
+      },
+    ],
     before: { runtimeSha: "unknown" },
     images: {
       serverContentId: "unknown",

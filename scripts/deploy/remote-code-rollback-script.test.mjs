@@ -26,7 +26,10 @@ test("remote code rollback requires exact confirmation, lock and receipt", () =>
     /ROLLBACK:\$target:\$from_sha:\$to_sha:\$operation_id/u,
   );
   assert.match(source, /flock -n 9/u);
-  assert.match(source, /plush[.]remote-rollback-receipt\/v1/u);
+  assert.match(source, /plush[.]remote-rollback-receipt\/v2/u);
+  assert.match(source, /enter_stage package_verification/u);
+  assert.match(source, /durationMs: \$durationMs/u);
+  assert.match(source, /timings: \$timings/u);
   assert.match(source, /rollback has an unknown prior target outcome/u);
   assert.match(source, /not_proven rollback_outcome_unknown/u);
   assert.match(source, /recover_previous/u);

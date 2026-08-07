@@ -6,6 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { sha256File } from "../lib/file-digest.mjs";
 import {
   assertReleaseArtifactManifest,
   runArtifactCommand,
@@ -14,13 +15,6 @@ import {
 class VerificationError extends Error {}
 
 const IMAGE_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
-
-function sha256File(filePath) {
-  return crypto
-    .createHash("sha256")
-    .update(readFileSync(filePath))
-    .digest("hex");
-}
 
 function sha256Text(value) {
   return crypto.createHash("sha256").update(value).digest("hex");

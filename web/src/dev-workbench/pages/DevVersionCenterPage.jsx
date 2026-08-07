@@ -23,6 +23,9 @@ import {
 } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevPipelineTimingPanel, {
+  DevTimingBars,
+} from '../components/DevPipelineTimingPanel.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import {
   DEV_DELIVERY_SOURCE_PATH,
@@ -32,6 +35,7 @@ import {
   deliveryStatusPresentation,
   deliveryVersionActionKind,
   formatDeliveryBytes,
+  formatDeliveryDuration,
   shortGitSha,
 } from '../config/devDelivery.mjs'
 import {
@@ -470,6 +474,20 @@ export default function DevVersionCenterPage() {
       ),
     },
     {
+      title: '耗时',
+      key: 'duration',
+      render: (_value, record) => (
+        <Space direction="vertical" size={2}>
+          <Text>{formatDeliveryDuration(record.durationMs)}</Text>
+          <Text type="secondary">
+            {record.stages.length > 0
+              ? `${String(record.stages.length)} 个可见环节`
+              : '暂无环节明细'}
+          </Text>
+        </Space>
+      ),
+    },
+    {
       title: '操作',
       key: 'actions',
       align: 'right',
@@ -650,6 +668,8 @@ export default function DevVersionCenterPage() {
           </Card>
         </section>
 
+        <DevPipelineTimingPanel timings={summary?.timings} />
+
         <Card title="可部署版本" className="erp-dev-version-table-card">
           <Table
             rowKey="gitSha"
@@ -660,7 +680,7 @@ export default function DevVersionCenterPage() {
             locale={{
               emptyText: <Empty description="尚无完整 GitHub 不可变发布版本" />,
             }}
-            scroll={{ x: 760 }}
+            scroll={{ x: 900 }}
           />
         </Card>
 
@@ -742,6 +762,18 @@ export default function DevVersionCenterPage() {
             <Text type="secondary" copyable>
               {operationDetail.id}
             </Text>
+            <Card size="small" title="Operation 环节耗时">
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Text strong>
+                  总耗时 {formatDeliveryDuration(operationDetail.durationMs)}
+                </Text>
+                <DevTimingBars
+                  stages={operationDetail.stages}
+                  totalDurationMs={operationDetail.durationMs}
+                  limit={100}
+                />
+              </Space>
+            </Card>
             {operationDetail.issues.length > 0 ? (
               <Alert
                 type="error"

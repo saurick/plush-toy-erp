@@ -23,6 +23,8 @@ import { validateReleaseManifest } from "./release-catalog.mjs";
 export const GITHUB_API_VERSION = "2022-11-28";
 export const GITHUB_DELIVERY_REPOSITORY = "saurick/plush-toy-erp";
 export const GITHUB_RELEASE_WORKFLOW = "release.yml";
+export const GITHUB_PIPELINE_TIMINGS_CONTRACT =
+  "plush.delivery-pipeline-timings/v1";
 export const GITHUB_RELEASE_ASSETS = Object.freeze([
   "checksums.sha256",
   "release-artifact.json",
@@ -34,6 +36,18 @@ export const GITHUB_RELEASE_ASSETS = Object.freeze([
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const MAX_GITHUB_OUTPUT_BYTES = 8 * 1024 * 1024;
+const TRACKED_WORKFLOWS = Object.freeze({
+  ".github/workflows/ci.yml": "ci",
+  ".github/workflows/release.yml": "release",
+});
+const RUN_STATUSES = new Set([
+  "queued",
+  "in_progress",
+  "completed",
+  "waiting",
+  "requested",
+  "pending",
+]);
 
 function runGh(runCommand, args, { cwd, timeout = 30_000 } = {}) {
   const result = runCommand("gh", args, {
@@ -127,6 +141,130 @@ function normalizeRun(raw, gitSha) {
   };
 }
 
+function normalizeLabel(value, field) {
+  const label = String(value || "").trim();
+  if (
+    !label ||
+    label.length > 160 ||
+    /[\u0000-\u001f\u007f]/u.test(label)
+  ) {
+    throw new Error(`GitHub ${field} label is invalid`);
+  }
+  return label;
+}
+
+function normalizeTimestamp(value, field, { optional = false } = {}) {
+  if ((value === null || value === undefined || value === "") && optional) {
+    return null;
+  }
+  const timestamp = String(value || "");
+  if (Number.isNaN(Date.parse(timestamp))) {
+    throw new Error(`GitHub ${field} timestamp is invalid`);
+  }
+  return timestamp;
+}
+
+function elapsedMs(startedAt, finishedAt) {
+  if (!startedAt || !finishedAt) return null;
+  return Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
+}
+
+function normalizePipelineStatus(value, field) {
+  const status = String(value || "");
+  if (!RUN_STATUSES.has(status)) {
+    throw new Error(`GitHub ${field} status is invalid`);
+  }
+  return status;
+}
+
+function normalizePipelineStep(raw) {
+  const startedAt = normalizeTimestamp(raw?.started_at, "step start", {
+    optional: true,
+  });
+  const finishedAt = normalizeTimestamp(raw?.completed_at, "step finish", {
+    optional: true,
+  });
+  if (!Number.isSafeInteger(raw?.number) || raw.number < 1) {
+    throw new Error("GitHub step number is invalid");
+  }
+  return {
+    number: raw.number,
+    name: normalizeLabel(raw?.name, "step"),
+    status: normalizePipelineStatus(raw?.status, "step"),
+    conclusion: String(raw?.conclusion || ""),
+    startedAt,
+    finishedAt,
+    durationMs: elapsedMs(startedAt, finishedAt),
+  };
+}
+
+function normalizePipelineJob(raw) {
+  if (!Number.isSafeInteger(raw?.id) || raw.id < 1) {
+    throw new Error("GitHub job identity is invalid");
+  }
+  const startedAt = normalizeTimestamp(raw?.started_at, "job start", {
+    optional: true,
+  });
+  const finishedAt = normalizeTimestamp(raw?.completed_at, "job finish", {
+    optional: true,
+  });
+  const steps = Array.isArray(raw?.steps)
+    ? raw.steps.map(normalizePipelineStep)
+    : [];
+  if (steps.length > 100) {
+    throw new Error("GitHub job step response is too large");
+  }
+  return {
+    id: raw.id,
+    name: normalizeLabel(raw?.name, "job"),
+    status: normalizePipelineStatus(raw?.status, "job"),
+    conclusion: String(raw?.conclusion || ""),
+    startedAt,
+    finishedAt,
+    durationMs: elapsedMs(startedAt, finishedAt),
+    steps,
+  };
+}
+
+function normalizePipelineRun(raw, jobs) {
+  const workflow = TRACKED_WORKFLOWS[String(raw?.path || "")];
+  if (
+    !workflow ||
+    !Number.isSafeInteger(raw?.id) ||
+    raw.id < 1 ||
+    !Number.isSafeInteger(raw?.run_attempt) ||
+    raw.run_attempt < 1 ||
+    !SHA_PATTERN.test(String(raw?.head_sha || ""))
+  ) {
+    throw new Error("GitHub pipeline run identity is invalid");
+  }
+  const createdAt = normalizeTimestamp(raw?.created_at, "run creation");
+  const startedAt = normalizeTimestamp(raw?.run_started_at, "run start", {
+    optional: true,
+  });
+  const finishedAt =
+    raw?.status === "completed"
+      ? normalizeTimestamp(raw?.updated_at, "run finish")
+      : null;
+  const url = parseGithubUrl(raw?.html_url, `/actions/runs/${raw.id}`);
+  return {
+    id: raw.id,
+    attempt: raw.run_attempt,
+    workflow,
+    event: normalizeLabel(raw?.event, "event"),
+    status: normalizePipelineStatus(raw?.status, "run"),
+    conclusion: String(raw?.conclusion || ""),
+    gitSha: raw.head_sha,
+    createdAt,
+    startedAt,
+    finishedAt,
+    queueMs: elapsedMs(createdAt, startedAt),
+    durationMs: elapsedMs(startedAt, finishedAt),
+    url,
+    jobs,
+  };
+}
+
 function assertDownloadDirectory(projectRoot, destination) {
   const outputRoot = path.join(realpathSync(projectRoot), "output");
   const candidate = path.resolve(destination);
@@ -150,6 +288,7 @@ function assertDownloadDirectory(projectRoot, destination) {
 export function createGithubDeliveryProvider({
   projectRoot = process.cwd(),
   runCommand = spawnSync,
+  now = () => new Date().toISOString(),
 } = {}) {
   const root = realpathSync(projectRoot);
   return {
@@ -187,6 +326,74 @@ export function createGithubDeliveryProvider({
           (left, right) =>
             Date.parse(right.publishedAt) - Date.parse(left.publishedAt),
         );
+    },
+
+    listPipelineTimings({ limit = 8 } = {}) {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) {
+        throw new Error("GitHub pipeline timing limit is invalid");
+      }
+      const runOutput = runGh(
+        runCommand,
+        [
+          "api",
+          "--method",
+          "GET",
+          "-H",
+          `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`,
+          `repos/${GITHUB_DELIVERY_REPOSITORY}/actions/runs?per_page=${Math.max(
+            20,
+            limit * 3,
+          )}&exclude_pull_requests=true`,
+        ],
+        { cwd: root, timeout: 60_000 },
+      );
+      const response = JSON.parse(runOutput);
+      if (
+        !response ||
+        !Array.isArray(response.workflow_runs) ||
+        response.workflow_runs.length > Math.max(20, limit * 3)
+      ) {
+        throw new Error("GitHub pipeline run response is invalid");
+      }
+      const selectedRuns = response.workflow_runs
+        .filter((run) => Object.hasOwn(TRACKED_WORKFLOWS, String(run?.path || "")))
+        .sort(
+          (left, right) =>
+            Date.parse(String(right?.created_at || "")) -
+            Date.parse(String(left?.created_at || "")),
+        )
+        .slice(0, limit);
+      const runs = selectedRuns.map((run) => {
+        const jobOutput = runGh(
+          runCommand,
+          [
+            "api",
+            "--method",
+            "GET",
+            "-H",
+            `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`,
+            `repos/${GITHUB_DELIVERY_REPOSITORY}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
+          ],
+          { cwd: root, timeout: 60_000 },
+        );
+        const jobResponse = JSON.parse(jobOutput);
+        if (
+          !jobResponse ||
+          !Array.isArray(jobResponse.jobs) ||
+          jobResponse.jobs.length > 100
+        ) {
+          throw new Error("GitHub pipeline job response is invalid");
+        }
+        return normalizePipelineRun(
+          run,
+          jobResponse.jobs.map(normalizePipelineJob),
+        );
+      });
+      return {
+        schemaVersion: GITHUB_PIPELINE_TIMINGS_CONTRACT,
+        generatedAt: normalizeTimestamp(now(), "timing generation"),
+        runs,
+      };
     },
 
     getReleaseStatus(gitSha) {

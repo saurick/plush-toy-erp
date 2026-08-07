@@ -464,10 +464,11 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 #### 版本发布与部署中心 `/__dev/version-center`
 
 - 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitHub 不可变版本、固定 `test-133` 当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或 UAT 合并成一个绿色结论。
+- “CI/CD 效能”直接读取固定 GitHub 仓库最近 CI / Release 的 run、对应 attempt、job 和 step 时间，显示最近完整运行、完整样本中位数、最长可见环节和建议复核点；全部 job / step 使用原生按需展开，不自动并发、重跑或复制 GitHub 状态。
 - 发布只允许当前 clean exact SHA；GitHub adapter 固定公开仓库、`release.yml` 和 `yoyoosun`，同一 SHA 的 strict 与镜像构建可复用，不会因刷新或失败自动重发。
 - 版本列表按发布时间区分动作：比 133 当前 manifest 新的版本只允许准备部署，旧版本只允许检查回滚；发布时间、当前 manifest、migration 序列或客户配置源指纹不能证明时按钮禁用并说明原因。
 - 部署与回滚先创建或复用 operation，再要求完整确认串。同一目标只允许一个执行器；页面刷新从原子 operation store 恢复，`failed / blocked / not_proven` 终态不自动重试。
-- Operation 详情通过独立 GET 按需读取最近 100 条脱敏事件；浏览器不接收本机路径、repo/workflow/target/SSH/shell/SQL/Docker 输入，也不持有 GitHub 或 SSH 凭据。
+- Operation 列表直接展示总耗时；详情通过独立 GET 按需读取最近 100 条脱敏事件，并把 promotion / rollback v2 回执的固定阶段耗时或本地生命周期耗时显示为可读比例条。浏览器不接收本机路径、repo/workflow/target/SSH/shell/SQL/Docker 输入，也不持有 GitHub 或 SSH 凭据。
 - 远端基础回执当前只证明制品、备份恢复检查、migration、Compose、health、ready、Web health 与运行 SHA；带凭据岗位矩阵、PDF、客户 UAT 和签收仍需独立完成。
 
 ## 当前前端边界

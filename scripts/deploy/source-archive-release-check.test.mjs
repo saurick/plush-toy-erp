@@ -443,7 +443,7 @@ test("release mode resolves pnpm through the repository-locked toolchain helper"
   }
 });
 
-test("release mode runs source scan Web Go overlay and optional Docker checks", async () => {
+test("Docker release mode compiles Web and Go once through one shared graph", async () => {
   const root = createFixtureRepo();
   const labels = [];
   const commandSpecs = [];
@@ -452,17 +452,12 @@ test("release mode runs source scan Web Go overlay and optional Docker checks", 
       { mode: "release", docker: true },
       {
         repoRoot: root,
-        resolveProjectPnpm: () => "/fixture/project-pnpm",
+        resolveProjectPnpm: () => {
+          throw new Error("Docker release must not resolve host pnpm");
+        },
         runBuildCommand: async (spec) => {
           labels.push(spec.label);
           commandSpecs.push(spec);
-          if (spec.label === "build production Web assets") {
-            mkdirSync(path.join(spec.cwd, "build"), { recursive: true });
-          }
-          if (spec.label === "build Go server binary") {
-            const outIndex = spec.args.indexOf("-o") + 1;
-            writeFileSync(spec.args[outIndex], "server\n");
-          }
           return { status: 0 };
         },
       },
@@ -472,28 +467,22 @@ test("release mode runs source scan Web Go overlay and optional Docker checks", 
     assert.equal(report.serverBinaryBuilt, true);
     assert.equal(report.dockerBuilt, true);
     assert.equal(report.dockerImages.length, 2);
+    assert.deepEqual(report.buildReuse, {
+      graph: "server/Dockerfile",
+      webCompileCount: 1,
+      goCompileCount: 1,
+    });
     assert.deepEqual(labels, [
       "strict source archive secret scan",
-      "install locked Web dependencies",
-      "build production Web assets",
-      "build Go server binary",
-      "build Web Docker image",
-      "build server Docker image",
+      "build shared Web runtime target",
+      "build shared Server runtime target",
     ]);
-    const pnpmSpecs = commandSpecs.filter((spec) =>
-      [
-        "install locked Web dependencies",
-        "build production Web assets",
-      ].includes(spec.label),
-    );
-    assert.equal(pnpmSpecs.length, 2);
-    assert(pnpmSpecs.every((spec) => spec.command === "/fixture/project-pnpm"));
-    assert(!commandSpecs.some((spec) => spec.command === "pnpm"));
+    assert(!commandSpecs.some((spec) => spec.command === "go"));
     const webDockerSpec = commandSpecs.find(
-      (spec) => spec.label === "build Web Docker image",
+      (spec) => spec.label === "build shared Web runtime target",
     );
     const serverDockerSpec = commandSpecs.find(
-      (spec) => spec.label === "build server Docker image",
+      (spec) => spec.label === "build shared Server runtime target",
     );
     for (const spec of [webDockerSpec, serverDockerSpec]) {
       assert.deepEqual(spec.args.slice(0, 3), [
@@ -510,6 +499,14 @@ test("release mode runs source scan Web Go overlay and optional Docker checks", 
       serverDockerSpec.args.includes(`GIT_SHA=${report.commit}`),
       "server image must embed the exact release SHA",
     );
+    assert.deepEqual(
+      [
+        webDockerSpec.args[webDockerSpec.args.indexOf("--target") + 1],
+        serverDockerSpec.args[serverDockerSpec.args.indexOf("--target") + 1],
+      ],
+      ["web-runtime", "server-runtime"],
+    );
+    assert(commandSpecs.every((spec) => !spec.args?.includes("web/Dockerfile")));
   } finally {
     removeFixtureRepo(root);
   }

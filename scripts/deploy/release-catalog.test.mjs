@@ -39,11 +39,21 @@ function fixtureManifest() {
 
 function strictTerminal(status = "passed") {
   return {
-    contract: "plush.exact-sha-strict/v1",
+    contract: "plush.exact-sha-strict/v2",
     profile: "strict",
     gitSha: SHA,
     fingerprint: "e".repeat(64),
     status,
+    receipt: { sha256: "f".repeat(64) },
+    provenance: {
+      source: "github-actions",
+      repository: "saurick/plush-toy-erp",
+      workflowRef:
+        "saurick/plush-toy-erp/.github/workflows/release.yml@refs/heads/main",
+      runId: "123",
+      runAttempt: "1",
+      job: "strict",
+    },
   };
 }
 

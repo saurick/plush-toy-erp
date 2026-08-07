@@ -3,7 +3,10 @@ import test from "node:test";
 
 import {
   RECEIPT_GATE_COMMANDS,
+  RECEIPT_GATE_STAGE_IDS,
   evaluateReceiptGateRun,
+  hasCompleteGateStageTimings,
+  parseGateStageTimings,
 } from "./run-gate-with-receipt.mjs";
 
 test("gate receipt runner exposes only the three registered repository gates", () => {
@@ -52,5 +55,31 @@ test("gate receipt runner fails closed when repository identity changes", () => 
       summary: { executed: 2, passed: 2, failed: 0, skipped: 0 },
     }),
     { exitCode: 2, status: "failed" },
+  );
+});
+
+test("gate receipt runner parses bounded stage timings and bottleneck", () => {
+  const lines = RECEIPT_GATE_STAGE_IDS.full.map(
+    (stage, index) =>
+      `[qa:stage] gate=full id=${stage} status=passed durationMs=${String(
+        (index + 1) * 100,
+      )}`,
+  );
+  const metrics = parseGateStageTimings(lines.join("\n"), "full");
+  assert.equal(metrics.stageTimings.length, RECEIPT_GATE_STAGE_IDS.full.length);
+  assert.equal(metrics.bottleneckStageId, "govulncheck");
+  assert.equal(metrics.measuredStageDurationMs, 2_800);
+  assert.equal(hasCompleteGateStageTimings("full", metrics.stageTimings), true);
+  assert.deepEqual(
+    evaluateReceiptGateRun({
+      childStatus: 0,
+      stageTimingComplete: false,
+      summary: { executed: 2, passed: 2, failed: 0, skipped: 0 },
+    }),
+    { exitCode: 2, status: "failed" },
+  );
+  assert.throws(
+    () => parseGateStageTimings(`${lines[0]}\n${lines[0]}`, "full"),
+    /duplicate/u,
   );
 });

@@ -133,6 +133,11 @@ server_content_id=unknown
 web_content_id=unknown
 server_ref=unknown
 web_ref=unknown
+operation_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+operation_started_epoch_ms="$(date +%s%3N)"
+stage_started_epoch_ms="$operation_started_epoch_ms"
+stage_finalized=0
+stage_timings='[]'
 
 mkdir -p "$operations_root" "$run_root"
 chmod 700 "$operations_root" "$run_root"
@@ -183,14 +188,47 @@ write_state() {
   mv -f "$next" "$state_file"
 }
 
+record_current_stage() {
+  local stage_status="$1"
+  local finished_epoch_ms
+  local stage_duration_ms
+  if [[ "$stage" == initial || "$stage" == passed || "$stage_finalized" -eq 1 ]]; then
+    return 0
+  fi
+  finished_epoch_ms="$(date +%s%3N)"
+  stage_duration_ms=$((finished_epoch_ms - stage_started_epoch_ms))
+  stage_timings="$(
+    jq -c \
+      --arg id "$stage" \
+      --arg status "$stage_status" \
+      --argjson durationMs "$stage_duration_ms" \
+      '. + [{id: $id, status: $status, durationMs: $durationMs}]' \
+      <<<"$stage_timings"
+  )"
+  stage_finalized=1
+}
+
+enter_stage() {
+  record_current_stage passed
+  stage="$1"
+  stage_started_epoch_ms="$(date +%s%3N)"
+  stage_finalized=0
+  write_state running
+}
+
 write_receipt() {
   local status="$1"
   local issue_code="$2"
   local next="$receipt.tmp"
   local finished_at
+  local finished_epoch_ms
+  local duration_ms
+  record_current_stage failed
   finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  finished_epoch_ms="$(date +%s%3N)"
+  duration_ms=$((finished_epoch_ms - operation_started_epoch_ms))
   jq -n \
-    --arg schemaVersion "plush.remote-promotion-receipt/v1" \
+    --arg schemaVersion "plush.remote-promotion-receipt/v2" \
     --arg status "$status" \
     --arg operationId "$operation_id" \
     --arg target "$target" \
@@ -206,7 +244,10 @@ write_receipt() {
     --arg backupSha256 "$backup_sha256" \
     --argjson backupSizeBytes "$backup_size_bytes" \
     --argjson migrationApplyStarted "$migration_apply_started" \
+    --arg startedAt "$operation_started_at" \
     --arg finishedAt "$finished_at" \
+    --argjson durationMs "$duration_ms" \
+    --argjson timings "$stage_timings" \
     '{
       schemaVersion: $schemaVersion,
       status: $status,
@@ -239,7 +280,10 @@ write_receipt() {
         ready: ($status == "passed"),
         basicSmoke: ($status == "passed")
       },
+      startedAt: $startedAt,
       finishedAt: $finishedAt,
+      durationMs: $durationMs,
+      timings: $timings,
       redaction: {
         containsSecrets: false,
         containsCredentials: false,
@@ -308,8 +352,7 @@ trap restore_database_cleanup EXIT
 chmod 600 "$log_file"
 write_state running
 
-stage=package_verification
-write_state running
+enter_stage package_verification
 [[ -d "$incoming" && ! -L "$incoming" ]] ||
   fail "incoming package directory is invalid"
 incoming_uid="$(stat -c '%u' "$incoming")"
@@ -416,15 +459,13 @@ web_archive_manifest_digest="$(
     "$incoming/web-image.tar" "$web_ref" "$web_content_id"
 )"
 
-stage=capacity_recheck
-write_state running
+enter_stage capacity_recheck
 available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
 [[ "$available_bytes" =~ ^[0-9]+$ &&
   "$available_bytes" -ge "$minimum_available_bytes" ]] ||
   fail "target disk capacity is below the fixed minimum"
 
-stage=release_materialization
-write_state running
+enter_stage release_materialization
 if [[ -e "$release_dir" ]]; then
   [[ -d "$release_dir" && ! -L "$release_dir" &&
     -f "$release_identity" && ! -L "$release_identity" ]] ||
@@ -471,8 +512,7 @@ cmp --silent \
   "$release_dir/scripts/deploy/remote-promotion.sh" ||
   fail "remote promotion script is not part of the exact source archive"
 
-stage=image_load_and_readback
-write_state running
+enter_stage image_load_and_readback
 docker load --input "$incoming/server-image.tar" >>"$log_file" 2>&1
 docker load --input "$incoming/web-image.tar" >>"$log_file" 2>&1
 actual_server_content_id="$(docker image inspect --format '{{.Id}}' "$server_ref")"
@@ -495,8 +535,7 @@ current_before_sha="$(docker inspect plush-toy-erp-v5-server --format '{{range .
 [[ "$current_before_sha" =~ $sha_pattern ]] ||
   fail "current runtime SHA is unavailable"
 
-stage=fresh_backup_and_restore_check
-write_state running
+enter_stage fresh_backup_and_restore_check
 postgres_cid="$(docker ps -q \
   --filter "label=com.docker.compose.project=$project" \
   --filter "label=com.docker.compose.service=postgres")"
@@ -550,8 +589,7 @@ update_env_image_refs() {
   ' "$source" >"$destination"
 }
 
-stage=env_and_static_preflight
-write_state running
+enter_stage env_and_static_preflight
 [[ -f "$runtime_env" && ! -L "$runtime_env" &&
   "$(stat -c '%u' "$runtime_env")" == "$(id -u)" &&
   "$(stat -c '%a' "$runtime_env")" == 600 ]] ||
@@ -595,8 +633,7 @@ compose=(
   --compose-override "$compose_override" \
   >>"$log_file" 2>&1
 
-stage=migration_plan
-write_state running
+enter_stage migration_plan
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
@@ -606,34 +643,29 @@ write_state running
   "COMPOSE_ENV_FILE=$runtime_env" \
   sh "$migrate_script" >>"$log_file" 2>&1
 
-stage=maintenance_window
-write_state running
+enter_stage maintenance_window
 "${clean_env[@]}" "${compose[@]}" stop app-server web-desktop \
   >>"$log_file" 2>&1
 
-stage=migration_apply_started
+enter_stage migration_apply_started
 migration_apply_started=1
-write_state running
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
   "MIGRATION_MAINTENANCE_CONFIRMED=1" \
   sh "$migrate_script" --apply >>"$log_file" 2>&1
 
-stage=migration_applied
-write_state running
+enter_stage migration_applied
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
   sh "$migrate_script" --status-only >>"$log_file" 2>&1
 
-stage=compose_start
-write_state running
+enter_stage compose_start
 "${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never \
   postgres jaeger app-server web-desktop >>"$log_file" 2>&1
 
-stage=runtime_verified
-write_state running
+enter_stage runtime_verified
 "${clean_env[@]}" bash "$preflight_script" \
   --env-file "$runtime_env" \
   --compose-dir "$compose_dir" \
@@ -655,8 +687,7 @@ runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range
 [[ "$runtime_server_sha" == "$release_sha" && "$runtime_web_sha" == "$release_sha" ]] ||
   fail "runtime release identity does not match"
 
-stage=current_source_switch
-write_state running
+enter_stage current_source_switch
 next_current=$root/.current-next-$operation_id
 [[ ! -e "$next_current" ]] || fail "next current directory already exists"
 cp -a --reflink=auto "$release_dir" "$next_current"
@@ -666,7 +697,7 @@ old_current=$root/current.rollback-${current_before_sha:0:8}-before-${release_sh
 mv "$current" "$old_current"
 mv "$next_current" "$current"
 
-stage=passed
+enter_stage passed
 env_changed=0
 write_receipt passed none
 cat "$receipt"

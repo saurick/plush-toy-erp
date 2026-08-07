@@ -102,18 +102,28 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-node "$ROOT_DIR/scripts/qa/database-base-preflight.mjs"
+# ROOT_DIR pins the timing helper; ShellCheck cannot resolve this dynamic path.
+# shellcheck source=scripts/qa/lib/stage-timing.sh
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/qa/lib/stage-timing.sh"
 
-node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile "$full_profile"
+qa_full_environment_profile() {
+  node "$ROOT_DIR/scripts/qa/database-base-preflight.mjs"
+  node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile "$full_profile"
+}
 
-echo "[qa:full] 运行共享基础检查，不重复 Web/Go 全量稍后覆盖的 fast 子集"
-QA_FAST_SCOPE=base QA_NODE_TEST_PROFILE=full \
-  bash "$ROOT_DIR/scripts/qa/fast.sh"
+qa_full_shared() {
+  echo "[qa:full] 运行共享基础检查，不重复 Web/Go 全量稍后覆盖的 fast 子集"
+  QA_FAST_SCOPE=base QA_NODE_TEST_PROFILE=full \
+    bash "$ROOT_DIR/scripts/qa/fast.sh"
+}
 
-SECRETS_STRICT=1 bash "$ROOT_DIR/scripts/qa/secrets.sh"
+qa_full_secrets() {
+  SECRETS_STRICT=1 bash "$ROOT_DIR/scripts/qa/secrets.sh"
+}
 
-echo "[qa:full] 运行 web 测试与构建"
-(
+qa_full_web() {
+  echo "[qa:full] 运行 web 测试与构建"
   cd "$ROOT_DIR/web"
   node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));if(typeof pkg?.scripts?.test!=='string'||!pkg.scripts.test.trim()){console.error('[qa:full] web/package.json 缺少 scripts.test');process.exit(1)}"
   if [[ "$full_profile" == "strict" ]]; then
@@ -129,40 +139,42 @@ echo "[qa:full] 运行 web 测试与构建"
   "$PNPM_BIN" build
   node "$ROOT_DIR/scripts/qa/dev-workbench-production-boundary.mjs" \
     --build-dir "$ROOT_DIR/web/build"
-)
+}
 
-echo "[qa:full] 实际启动 Chromium 运行无写入浏览器 smoke"
-# 同一 worktree 的浏览器证据必须串行；stale lock 保守失败，避免并发回收竞态。
-# shellcheck source=scripts/qa/browser-gate-lock.sh
-# shellcheck disable=SC1091
-source "$ROOT_DIR/scripts/qa/browser-gate-lock.sh"
-# shellcheck disable=SC2034
-BROWSER_GATE_LOCK_PATH="${TMPDIR:-/tmp}/plush-toy-erp-qa-browser.lock"
-trap browser_gate_lock_release EXIT
-browser_gate_lock_acquire
-browser_port="$(
-  node "$ROOT_DIR/scripts/dev-ports.mjs" \
-    --find-free-aux-port \
-    --project-root "$ROOT_DIR"
-)"
-node "$ROOT_DIR/web/scripts/productionDevBoundaryBrowserSmoke.mjs" \
-  --port "$browser_port" \
-  --build-dir "$ROOT_DIR/web/build"
-(
-  cd "$ROOT_DIR/web"
-  # styleL1.mjs 会派生 pnpm 启动 Vite；确保使用项目锁定的 pnpm 所在 PATH。
-  PNPM_BIN_DIR="$(dirname "$PNPM_BIN")"
-  export PATH="$PNPM_BIN_DIR:$PATH"
-  STYLE_L1_BASE_URL="" \
-    STYLE_L1_PORT="$browser_port" \
-    STYLE_L1_SCENARIOS="${QA_BROWSER_SCENARIOS:-root-redirect-desktop}" \
-    "$PNPM_BIN" style:l1
-)
-browser_gate_lock_release
-trap - EXIT
+qa_full_browser() {
+  echo "[qa:full] 实际启动 Chromium 运行无写入浏览器 smoke"
+  # 同一 worktree 的浏览器证据必须串行；stale lock 保守失败，避免并发回收竞态。
+  # shellcheck source=scripts/qa/browser-gate-lock.sh
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/scripts/qa/browser-gate-lock.sh"
+  # shellcheck disable=SC2034
+  BROWSER_GATE_LOCK_PATH="${TMPDIR:-/tmp}/plush-toy-erp-qa-browser.lock"
+  trap browser_gate_lock_release EXIT
+  browser_gate_lock_acquire
+  browser_port="$(
+    node "$ROOT_DIR/scripts/dev-ports.mjs" \
+      --find-free-aux-port \
+      --project-root "$ROOT_DIR"
+  )"
+  node "$ROOT_DIR/web/scripts/productionDevBoundaryBrowserSmoke.mjs" \
+    --port "$browser_port" \
+    --build-dir "$ROOT_DIR/web/build"
+  (
+    cd "$ROOT_DIR/web"
+    # styleL1.mjs 会派生 pnpm 启动 Vite；确保使用项目锁定的 pnpm 所在 PATH。
+    PNPM_BIN_DIR="$(dirname "$PNPM_BIN")"
+    export PATH="$PNPM_BIN_DIR:$PATH"
+    STYLE_L1_BASE_URL="" \
+      STYLE_L1_PORT="$browser_port" \
+      STYLE_L1_SCENARIOS="${QA_BROWSER_SCENARIOS:-root-redirect-desktop}" \
+      "$PNPM_BIN" style:l1
+  )
+  browser_gate_lock_release
+  trap - EXIT
+}
 
-echo "[qa:full] 运行 server 全量检查"
-(
+qa_full_server() {
+  echo "[qa:full] 运行 server 全量检查"
   cd "$ROOT_DIR/server"
   PURCHASE_RECEIPT_PG_DB_URL="$DISPOSABLE_DATABASE_BASE_URL" \
     make populated_upgrade_pg_test
@@ -174,10 +186,20 @@ echo "[qa:full] 运行 server 全量检查"
     --kind go --label server-all -- \
     go test -count=1 -json -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...
   make build
-)
+}
 
-# govulncheck 可能走外部网络，放在本地 PostgreSQL 门禁和编译之后，
-# 避免代理或系统网络异常占满本地端口时误报业务并发失败。
-GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
+qa_full_govulncheck() {
+  # govulncheck 可能走外部网络，放在本地 PostgreSQL 门禁和编译之后，
+  # 避免代理或系统网络异常占满本地端口时误报业务并发失败。
+  GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
+}
+
+qa_run_stage "$full_profile" environment_profile qa_full_environment_profile
+qa_run_stage "$full_profile" shared qa_full_shared
+qa_run_stage "$full_profile" secrets qa_full_secrets
+qa_run_stage "$full_profile" web qa_full_web
+qa_run_stage "$full_profile" browser qa_full_browser
+qa_run_stage "$full_profile" server qa_full_server
+qa_run_stage "$full_profile" govulncheck qa_full_govulncheck
 
 echo "[qa:full] profile=$full_profile status=complete 全部门禁通过"

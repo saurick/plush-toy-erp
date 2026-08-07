@@ -12,6 +12,16 @@ const OPERATION_ID = "11111111-1111-4111-8111-111111111111";
 const FROM_SHA = "a".repeat(40);
 const TO_SHA = "b".repeat(40);
 const HASH = "c".repeat(64);
+const ROLLBACK_STAGES = [
+  "package_verification",
+  "target_identity_recheck",
+  "release_materialization",
+  "image_load_and_readback",
+  "static_preflight",
+  "service_switch",
+  "runtime_verified",
+  "current_source_switch",
+];
 
 function expected() {
   return {
@@ -27,6 +37,9 @@ function expected() {
 
 function receipt(status = "passed") {
   const passed = status === "passed";
+  const visibleStages = passed
+    ? ROLLBACK_STAGES
+    : ROLLBACK_STAGES.slice(0, ROLLBACK_STAGES.indexOf("service_switch") + 1);
   return {
     schemaVersion: REMOTE_ROLLBACK_RECEIPT_CONTRACT,
     status,
@@ -58,7 +71,14 @@ function receipt(status = "passed") {
       basicSmoke: passed,
     },
     serviceSwitchStarted: true,
+    startedAt: "2026-07-29T00:59:40.000Z",
     finishedAt: "2026-07-29T01:00:00.000Z",
+    durationMs: 20_000,
+    timings: visibleStages.map((id, index) => ({
+      id,
+      status: !passed && index === visibleStages.length - 1 ? "failed" : "passed",
+      durationMs: 1_000,
+    })),
     redaction: {
       containsSecrets: false,
       containsCredentials: false,

@@ -118,4 +118,20 @@ test("report-only inventory may read only the registered development cluster", (
       "postgres://u:p@192.168.0.106:5432/plush_erp?sslmode=disable",
     ),
   );
+  const disposableURL =
+    "postgres://u:p@192.168.0.106:5432/plush_erp_ci_registered_fixture?sslmode=disable";
+  assert.throws(() =>
+    assertDisposableDatabaseTarget({
+      databaseURL: disposableURL,
+      profile: "ci",
+    }),
+  );
+  assert.equal(
+    assertDisposableDatabaseTarget({
+      allowRegisteredDevelopment: true,
+      databaseURL: disposableURL,
+      profile: "ci",
+    }).host,
+    "192.168.0.106",
+  );
 });

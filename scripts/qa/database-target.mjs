@@ -265,13 +265,16 @@ export function parseLoopbackDatabaseURL(value) {
 }
 
 export function assertDisposableDatabaseTarget({
+  allowRegisteredDevelopment = false,
   databaseName = "",
   databaseURL,
   profile,
   runID = "",
 }) {
   assertKnownProfile(profile);
-  const parsed = parseLoopbackDatabaseURL(databaseURL);
+  const parsed = parseDatabaseURL(databaseURL, {
+    allowRegisteredDevelopment,
+  });
   const declaredName = String(databaseName || parsed.databaseName).trim();
   if (parsed.databaseName !== declaredName) {
     throw new Error("database URL does not match the declared database name");

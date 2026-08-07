@@ -122,9 +122,9 @@ test("release artifact builds a non-empty CycloneDX dependency inventory", () =>
     "web/pnpm-lock.yaml":
       "lockfileVersion: '9.0'\npackages:\n\n  '@scope/pkg@2.0.0':\n    resolution: {}\n\n  plain@1.0.0:\n    resolution: {}\n\nsnapshots:\n",
     "server/Dockerfile":
-      "ARG GO_BUILDER_IMAGE=golang:1.26.5\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
+      "ARG NODE_BUILDER_IMAGE=node:24.14.0\nARG GO_BUILDER_IMAGE=golang:1.26.5\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
     "web/Dockerfile":
-      "ARG NODE_BUILDER_IMAGE=node:24.14.0\nARG RUNTIME_BASE_IMAGE=node:24.14.0-slim\n",
+      "ARG UNUSED_DEVELOPMENT_IMAGE=example.invalid/unused:1\n",
   };
   const sbom = buildDependencySbom({
     repoRoot: "/fixture",
@@ -143,6 +143,10 @@ test("release artifact builds a non-empty CycloneDX dependency inventory", () =>
     ),
   );
   assert(sbom.components.some((item) => item.name === "example.com/module"));
+  assert.equal(
+    sbom.components.some((item) => item.name === "example.invalid/unused:1"),
+    false,
+  );
 });
 
 test("release image builders consume the committed generated projection without a Go toolchain", () => {
@@ -235,6 +239,7 @@ test("release artifact builder normalizes the source hash and writes complete ch
     "config/customers/yoyoosun/roleFlowMatrix.mjs":
       "export const roles = [];\n",
     "server/go.sum": "example.com/module v1.2.3 h1:one\n",
+    "server/go.mod": "module example.com/release\n\ntoolchain go1.26.5\n",
     "web/pnpm-lock.yaml":
       "lockfileVersion: '9.0'\npackages:\n\n  plain@1.0.0:\n    resolution: {}\n\nsnapshots:\n",
     "server/Dockerfile":
@@ -283,9 +288,6 @@ test("release artifact builder normalizes the source hash and writes complete ch
       }
       if (args[0] === "version") return "27.5.1\n";
       if (args[0] === "buildx") return "github.com/docker/buildx v0.30.1\n";
-    }
-    if (command === "go" && args[0] === "version") {
-      return "go version go1.26.5 darwin/arm64\n";
     }
     throw new Error(`unexpected command ${command} ${args.join(" ")}`);
   };

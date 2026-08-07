@@ -12,6 +12,8 @@ import {
   DEV_WORKBENCH_RECEIPT_API_PATH,
   summarizeDevReceiptEvidence,
 } from '../config/devReceipts.mjs'
+import { formatDeliveryDuration } from '../config/devDelivery.mjs'
+import { DevTimingBars } from './DevPipelineTimingPanel.jsx'
 
 const { Text, Title } = Typography
 
@@ -31,6 +33,9 @@ function ReceiptCard({ item }) {
     DEV_RECEIPT_STATUS_PRESENTATION[receipt.status] ||
     DEV_RECEIPT_STATUS_PRESENTATION.blocked
   const current = item.freshness === 'current'
+  const stageTimings = Array.isArray(receipt.metrics?.stageTimings)
+    ? receipt.metrics.stageTimings
+    : []
 
   return (
     <article
@@ -55,7 +60,7 @@ function ReceiptCard({ item }) {
           {receipt.passed}/{receipt.executed} 通过
         </span>
         <span>{receipt.skipped} 跳过</span>
-        <span>{receipt.durationMs} ms</span>
+        <span>{formatDeliveryDuration(receipt.durationMs)}</span>
       </div>
       <Text className="erp-dev-receipt-card__identity">
         {receipt.gitCommit.slice(0, 12)} · {receipt.treeState} ·{' '}
@@ -65,6 +70,16 @@ function ReceiptCard({ item }) {
         <Text className="erp-dev-receipt-card__identity">
           DB run: {receipt.databaseRunIdentity}
         </Text>
+      ) : null}
+      {stageTimings.length > 0 ? (
+        <details className="erp-dev-receipt-card__timings">
+          <summary>查看 {stageTimings.length} 个门禁环节耗时</summary>
+          <DevTimingBars
+            stages={stageTimings}
+            totalDurationMs={receipt.durationMs}
+            limit={100}
+          />
+        </details>
       ) : null}
       {receipt.notProven.length > 0 ? (
         <Text type="secondary" className="erp-dev-receipt-card__boundary">

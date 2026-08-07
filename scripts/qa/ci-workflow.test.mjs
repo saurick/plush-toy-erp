@@ -3,9 +3,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const ROOT = path.resolve(import.meta.dirname, "../..");
 
 function read(relativePath) {
   return readFileSync(path.join(ROOT, relativePath), "utf8");
@@ -14,11 +13,7 @@ function read(relativePath) {
 function parseWorkflow() {
   const output = execFileSync(
     "go",
-    [
-      "run",
-      "../scripts/qa/ci-workflow-yaml-check.go",
-      "../.github/workflows/ci.yml",
-    ],
+    ["run", "../scripts/qa/ci-workflow-yaml-check.go", "../.github/workflows/ci.yml"],
     { cwd: path.join(ROOT, "server"), encoding: "utf8" },
   );
   return JSON.parse(output);
@@ -37,174 +32,113 @@ function collectUses(value, uses = []) {
   return uses;
 }
 
-const workflowSource = read(".github/workflows/ci.yml");
+const source = read(".github/workflows/ci.yml");
 const workflow = parseWorkflow();
-const qualityJob = workflow.jobs?.quality;
-const qualitySteps = qualityJob?.steps || [];
-const stepRuns = qualitySteps.map((step) => step.run || "").join("\n");
+const plan = workflow.jobs.plan;
+const quality = workflow.jobs.quality;
+const gate = workflow.jobs.ci_gate;
+const planRuns = plan.steps.map((step) => step.run || "").join("\n");
+const qualityRuns = quality.steps.map((step) => step.run || "").join("\n");
 
-test("CI YAML has one read-only quality job and exact action pins", () => {
-  assert.deepEqual(Object.keys(workflow.on).sort(), [
-    "pull_request",
-    "push",
-    "workflow_dispatch",
-  ]);
+test("CI exposes one stable aggregate check over trusted plan and quality jobs", () => {
+  assert.deepEqual(Object.keys(workflow.on).sort(), ["pull_request", "push", "workflow_dispatch"]);
   assert.deepEqual(workflow.on.push, { branches: ["main"] });
-  assert.deepEqual(workflow.on.workflow_dispatch.inputs.mode, {
-    default: "full",
-    description: "Quality scope",
-    options: ["affected", "full"],
-    required: true,
-    type: "choice",
-  });
   assert.deepEqual(workflow.permissions, { contents: "read" });
-  assert.deepEqual(Object.keys(workflow.jobs), ["quality"]);
-  assert.equal(qualityJob["runs-on"], "ubuntu-24.04");
-  assert.equal(qualityJob["timeout-minutes"], 90);
-  assert.equal(qualityJob.if, undefined);
-  assert.equal(qualityJob.permissions, undefined);
-  assert.equal(qualityJob["continue-on-error"], undefined);
-  for (const step of qualitySteps) {
-    assert.equal(step.if, undefined, `${step.name} must not conditionally skip`);
-    assert.equal(step["continue-on-error"], undefined);
-  }
+  assert.deepEqual(Object.keys(workflow.jobs).sort(), ["ci_gate", "plan", "quality"]);
+  assert.equal(plan.name, "Trusted range and affected plan");
+  assert.equal(quality.name, "Repository quality");
+  assert.equal(gate.name, "CI Gate");
+  assert.equal(gate.if, "always()");
+  assert.deepEqual(gate.needs, ["plan", "quality"]);
+  assert.match(gate.steps[0].run, /PLAN_RESULT.*QUALITY_RESULT/su);
+  assert.match(gate.steps[0].run, /!= "success"/u);
+  assert.doesNotMatch(source, /pull_request_target/u);
+  assert.doesNotMatch(source, /^\s+paths(?:-ignore)?:/mu);
+  assert.doesNotMatch(source, /continue-on-error|\|\|\s+true/u);
+});
 
-  const expectedUses = [
+test("CI scans the trusted history before executing candidate repository scripts", () => {
+  const scanIndex = plan.steps.findIndex((step) => /before repository scripts/u.test(step.name));
+  const nodeIndex = plan.steps.findIndex((step) => /after the trusted scan/u.test(step.name));
+  const candidateIndex = plan.steps.findIndex((step) => /ci-plan\.mjs/u.test(step.run || ""));
+  assert.ok(scanIndex > 0 && scanIndex < nodeIndex && nodeIndex < candidateIndex);
+  assert.match(planRuns, /trusted_config_sha="\$PR_BASE_SHA"/u);
+  assert.match(planRuns, /git show "\$trusted_config_sha:\.gitleaks\.toml"/u);
+  assert.match(planRuns, /gitleaks_8\.30\.1_linux_x64\.tar\.gz/u);
+  assert.match(
+    planRuns,
+    /551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb/u,
+  );
+  assert.match(planRuns, /sha256sum --check --strict/u);
+  assert.match(planRuns, /gitleaks" git[\s\S]*--log-opts "\$history_range"/u);
+  assert.match(planRuns, /git diff --check "\$range"/u);
+  assert.match(planRuns, /git log --check --format= "\$history_range"/u);
+});
+
+test("CI affected/full plan controls expensive setup without silent quality skips", () => {
+  assert.match(planRuns, /EVENT_NAME" == "pull_request"[\s\S]*gate_mode=affected/u);
+  assert.match(planRuns, /EVENT_NAME" == "push"[\s\S]*gate_mode=full/u);
+  assert.match(planRuns, /REQUESTED_MODE/u);
+  assert.match(planRuns, /ci-plan\.mjs/u);
+  assert.match(quality.steps.find((step) => step.name === "Set up Go when selected").if, /needs_go/u);
+  assert.match(
+    quality.steps.find((step) => step.name === "Install locked Web dependencies when selected").if,
+    /needs_web/u,
+  );
+  assert.match(
+    quality.steps.find((step) => step.name === "Install and verify Chromium only for full").if,
+    /needs_chromium/u,
+  );
+  assert.match(
+    quality.steps.find((step) => step.name === "Start PostgreSQL only when selected").if,
+    /needs_postgres/u,
+  );
+  assert.match(
+    quality.steps.find((step) => step.name === "Remove selected PostgreSQL runtime").if,
+    /always\(\).*needs_postgres/u,
+  );
+  assert.match(qualityRuns, /affected\.sh --base "\$QA_BASE_RANGE" --run/u);
+  assert.match(qualityRuns, /run-gate-with-receipt\.mjs --gate full/u);
+  assert.doesNotMatch(qualityRuns, /--gate strict/u);
+});
+
+test("CI pins actions, toolchains, database and Chromium sandbox", () => {
+  const uses = collectUses(workflow).sort();
+  assert.deepEqual(uses, [
+    "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
     "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
     "actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c",
     "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e",
+    "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e",
+    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
     "ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea",
-  ];
-  const actualUses = collectUses(workflow).sort();
-  assert.deepEqual(actualUses, expectedUses);
-  for (const use of actualUses) {
-    assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
-  }
-
-  assert.equal(qualitySteps[0].with["fetch-depth"], 0);
-  assert.equal(qualitySteps[0].with["persist-credentials"], false);
-  assert.doesNotMatch(workflowSource, /pull_request_target/u);
-  assert.doesNotMatch(workflowSource, /^\s+paths(?:-ignore)?:/mu);
-  assert.doesNotMatch(workflowSource, /continue-on-error/u);
-  assert.doesNotMatch(workflowSource, /\|\|\s+true/u);
-  assert.doesNotMatch(workflowSource, /\b(?:SKIP|STRICT_SKIP)_[A-Z0-9_]+/u);
+  ]);
+  for (const use of uses) assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
+  assert.match(source, /node-version-file: \.n-node-version/u);
+  assert.match(source, /go-version-file: server\/go\.mod/u);
+  assert.match(qualityRuns, /pnpm@10\.13\.1/u);
+  assert.match(qualityRuns, /govulncheck@v1\.6\.0/u);
+  assert.match(qualityRuns, /shfmt@v3\.13\.1/u);
+  assert.match(source, /version: v0\.38\.0/u);
+  assert.match(qualityRuns, /docker run --detach --rm[\s\S]*postgres:18\.1/u);
+  assert.match(qualityRuns, /playwright install --with-deps chromium/u);
+  assert.match(qualityRuns, /sudo install -o root -g root -m 4755/u);
+  assert.doesNotMatch(source, /--no-sandbox|--disable-setuid-sandbox/u);
 });
 
-test("CI versions and dependencies follow repository gate requirements", () => {
-  const nodeVersion = read(".n-node-version").trim();
-  const webPackage = JSON.parse(read("web/package.json"));
-  const goToolchain = read("server/go.mod").match(/^toolchain go([^\s]+)$/mu)?.[1];
-
-  assert.equal(nodeVersion, "24.14.0");
-  assert.equal(webPackage.packageManager, "pnpm@10.13.1");
-  assert.equal(goToolchain, "1.26.5");
-  assert.match(workflowSource, /node-version-file: \.n-node-version/u);
-  assert.match(workflowSource, /go-version-file: server\/go\.mod/u);
-  assert.match(stepRuns, /pnpm@10\.13\.1/u);
-  assert.match(stepRuns, /govulncheck@v1\.6\.0/u);
-  assert.match(stepRuns, /gitleaks\/v8@v8\.30\.1/u);
-  assert.match(stepRuns, /shfmt@v3\.13\.1/u);
-  assert.match(workflowSource, /version: v0\.38\.0/u);
-  assert.match(workflowSource, /image: postgres:18\.1/u);
-  assert.match(stepRuns, /postgresql-client/u);
-  assert.match(stepRuns, /\blsof\b/u);
-  assert.match(stepRuns, /\bripgrep\b/u);
-  assert.match(stepRuns, /\bshellcheck\b/u);
-  assert.match(stepRuns, /\byamllint\b/u);
-  assert.match(stepRuns, /playwright install --with-deps chromium/u);
-  assert.match(stepRuns, /chromium\.executablePath\(\)/u);
-  assert.match(stepRuns, /\[\[ ! -x "\$chrome_path" \]\]/u);
-  assert.match(stepRuns, /sandbox_source="\$\(dirname "\$chrome_path"\)\/chrome_sandbox"/u);
-  assert.match(stepRuns, /sandbox_path="\/usr\/local\/sbin\/chrome-devel-sandbox"/u);
-  assert.match(stepRuns, /\[\[ ! -f "\$sandbox_source" \]\]/u);
-  assert.match(
-    stepRuns,
-    /sudo install -o root -g root -m 4755 "\$sandbox_source" "\$sandbox_path"/u,
-  );
-  assert.match(stepRuns, /stat -c '%U:%G' "\$sandbox_path"/u);
-  assert.match(stepRuns, /stat -c '%a' "\$sandbox_path"/u);
-  assert.match(stepRuns, /"\$sandbox_owner" != "root:root"/u);
-  assert.match(stepRuns, /"\$sandbox_mode" != "4755"/u);
-  assert.match(stepRuns, /CHROME_DEVEL_SANDBOX=\$sandbox_path/u);
-  assert.match(stepRuns, /ERP_PDF_CHROME_PATH=\$chrome_path/u);
-  assert.match(stepRuns, /GITHUB_ENV/u);
-  assert.match(stepRuns, /GITHUB_PATH/u);
-  assert.doesNotMatch(workflowSource, /--no-sandbox|--disable-setuid-sandbox/u);
-  assert.match(read("server/Makefile"), /^GO_BUILDER_IMAGE \?= golang:1\.26\.5$/mu);
-  assert.match(read("server/Dockerfile"), /^ARG GO_BUILDER_IMAGE=golang:1\.26\.5$/mu);
-});
-
-test("CI keeps ordinary feedback on affected/full and reserves strict for release", () => {
-  assert.equal(
-    (
-      stepRuns.match(
-        /node scripts\/qa\/run-gate-with-receipt\.mjs --gate full/gu,
-      ) || []
-    ).length,
-    1,
-  );
-  assert.equal(
-    (
-      stepRuns.match(
-        /bash scripts\/qa\/affected\.sh --base "\$QA_BASE_RANGE" --run/gu,
-      ) || []
-    ).length,
-    1,
-  );
-  assert.doesNotMatch(stepRuns, /--gate strict/u);
-  assert.match(stepRuns, /EVENT_NAME" == "pull_request"/u);
-  assert.match(stepRuns, /gate_mode=affected/u);
-  assert.match(stepRuns, /gate_mode=full/u);
-  assert.match(stepRuns, /REQUESTED_MODE/u);
-  assert.match(stepRuns, /CI_GATE_MODE=\$gate_mode/u);
-  assert.doesNotMatch(
-    stepRuns,
-    /scripts\/qa\/(?:db-guard|secrets|govulncheck|shellcheck|shfmt|yamllint)\.sh/u,
-  );
-  assert.doesNotMatch(stepRuns, /\bgo test\b/u);
-  assert.doesNotMatch(
-    stepRuns,
-    /\bmake (?:build|critical_transactions_pg_test|purchase_(?:receipt|return)_[a-z_]+)\b/u,
-  );
-  assert.doesNotMatch(stepRuns, /\bpnpm (?:test|lint|css|build|style:l1)\b/u);
-
-  const makeDataIndex = qualitySteps.findIndex((step) =>
-    /\bmake data\b/u.test(step.run || ""),
-  );
-  const qualityIndex = qualitySteps.findIndex((step) =>
-    /run-gate-with-receipt\.mjs --gate full/u.test(step.run || ""),
-  );
-  const archiveIndex = qualitySteps.findIndex((step) =>
-    /source-archive-release-check\.mjs --light --ref HEAD/u.test(step.run || ""),
-  );
-  assert.ok(makeDataIndex >= 0 && makeDataIndex < qualityIndex);
-  assert.ok(qualityIndex < archiveIndex);
-});
-
-test("CI comparison, schema generation, PostgreSQL, and archive evidence fail closed", () => {
-  assert.match(workflowSource, /github\.event\.pull_request\.base\.sha/u);
-  assert.match(workflowSource, /github\.event\.before/u);
-  assert.match(stepRuns, /range="\$PUSH_BEFORE_SHA\.\.HEAD"/u);
-  assert.match(stepRuns, /history_range="\$\(git merge-base "\$PR_BASE_SHA" HEAD\)\.\.HEAD"/u);
-  assert.match(stepRuns, /empty_tree="\$\(git hash-object -t tree \/dev\/null\)"/u);
-  assert.match(stepRuns, /range="\$empty_tree\.\.HEAD"/u);
-  assert.match(stepRuns, /range="HEAD\^\.\.HEAD"/u);
-  assert.match(stepRuns, /push before SHA is unavailable/u);
-  assert.match(stepRuns, /git diff --check "\$range"/u);
-  assert.match(stepRuns, /git log --check --format= "\$history_range"/u);
-  assert.match(stepRuns, /QA_BASE_RANGE=\$range/u);
-
-  assert.match(stepRuns, /\bmake data\b/u);
-  assert.match(stepRuns, /git status --porcelain --untracked-files=all/u);
-  assert.match(stepRuns, /make data changed the committed tree/u);
+test("CI proves schema generation and source archive only when selected", () => {
+  const makeData = quality.steps.find((step) => /Ent and Atlas generation/u.test(step.name));
+  const archive = quality.steps.find((step) => /committed source archive/u.test(step.name));
+  assert.match(makeData.if, /make_data/u);
+  assert.match(makeData.run, /make data/u);
+  assert.match(makeData.run, /git -C \.\. status --porcelain --untracked-files=all/u);
+  assert.match(archive.if, /source_archive/u);
+  assert.match(archive.run, /source-archive-release-check\.mjs --light --ref HEAD/u);
   const disposableURL = new URL(workflow.env.DISPOSABLE_DATABASE_BASE_URL);
-  const postgres = qualityJob.services.postgres;
   assert.equal(disposableURL.hostname, "127.0.0.1");
   assert.equal(disposableURL.port, "55432");
-  assert.equal(disposableURL.pathname, "/postgres");
-  assert.equal(disposableURL.password, postgres.env.POSTGRES_PASSWORD);
-  assert.deepEqual(postgres.ports, ["55432:5432"]);
-  assert.match(postgres.options, /--health-cmd "pg_isready -U postgres"/u);
-  assert.match(stepRuns, /source-archive-release-check\.mjs --light --ref HEAD/u);
-  assert.match(stepRuns, /full gate changed the committed tree/u);
+  assert.equal(disposableURL.password, "ci-local-password");
+  assert.match(qualityRuns, /--publish 55432:5432/u);
+  assert.equal(Object.hasOwn(quality, "services"), false);
 });

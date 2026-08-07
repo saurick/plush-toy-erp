@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -16,16 +15,13 @@ import { pathToFileURL } from "node:url";
 
 import {
   classifyDatabaseName,
-  parseLoopbackDatabaseURL,
+  parseDatabaseURL,
 } from "./database-target.mjs";
 import { DATABASE_ARCHIVE_SCHEMA } from "./database-archive.mjs";
+import { sha256File } from "../lib/file-digest.mjs";
 
 export const DATABASE_CLEANUP_SCHEMA = "plush-database-cleanup/v1";
 export const DATABASE_CLEANUP_ADMIN_URL_ENV = "DATABASE_CLEANUP_ADMIN_URL";
-
-function sha256(value) {
-  return createHash("sha256").update(value).digest("hex");
-}
 
 function redact(value) {
   return String(value || "")
@@ -136,7 +132,7 @@ export function databaseCleanupConfirmation({
   const classification = classifyDatabaseName(databaseName);
   if (
     !/^plush_erp[a-z0-9_]*$/u.test(databaseName) ||
-    ["development", "legacy-development"].includes(classification.profile) ||
+    classification.disposable !== true ||
     !/^[0-9a-f]{64}$/u.test(backupHash) ||
     !/^[0-9a-f]{64}$/u.test(sourceFingerprint)
   ) {
@@ -158,6 +154,7 @@ function assertSameServer(adminTarget, sourceSafeTarget) {
 }
 
 export function runDatabaseCleanup({
+  allowRegisteredDevelopment = false,
   adminURL,
   confirmation,
   databaseName,
@@ -167,14 +164,16 @@ export function runDatabaseCleanup({
   manifestDir,
   runtime,
 }) {
-  const adminTarget = parseLoopbackDatabaseURL(adminURL);
+  const adminTarget = parseDatabaseURL(adminURL, {
+    allowRegisteredDevelopment,
+  });
   if (adminTarget.databaseName !== "postgres") {
     throw new Error("database cleanup admin URL must target postgres");
   }
   const classification = classifyDatabaseName(databaseName);
   if (
     !/^plush_erp[a-z0-9_]*$/u.test(databaseName) ||
-    ["development", "legacy-development"].includes(classification.profile)
+    classification.disposable !== true
   ) {
     throw new Error("database cleanup refuses a long-lived or non-project database");
   }
@@ -204,10 +203,9 @@ export function runDatabaseCleanup({
   if (!backupFile.startsWith(manifestRoot)) {
     throw new Error("database cleanup backup path escapes the manifest directory");
   }
-  const backup = readFileSync(backupFile);
   if (
     statSync(backupFile).size !== Number(manifest.backup?.sizeBytes) ||
-    sha256(backup) !== backupHash
+    sha256File(backupFile) !== backupHash
   ) {
     throw new Error("database cleanup backup hash or size does not match manifest");
   }
@@ -286,11 +284,16 @@ function parseArgs(argv) {
     manifest: "",
     out: "",
     printConfirmation: false,
+    allowRegisteredDevelopment: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--print-confirmation") {
       options.printConfirmation = true;
+      continue;
+    }
+    if (arg === "--allow-registered-development") {
+      options.allowRegisteredDevelopment = true;
       continue;
     }
     const value = argv[index + 1];
@@ -340,6 +343,7 @@ if (isDirectRun) {
         "database inventory",
       );
       const report = runDatabaseCleanup({
+        allowRegisteredDevelopment: options.allowRegisteredDevelopment,
         adminURL,
         confirmation: options.confirmation,
         databaseName: options.databaseName,

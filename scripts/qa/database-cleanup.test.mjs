@@ -163,3 +163,59 @@ test("cleanup fails closed on references, active connections, bad backup, and lo
     /identity is invalid|cleanup/u,
   );
 });
+
+test("cleanup requires an explicit flag for the registered development cluster", () => {
+  const base = fixture();
+  const remoteManifest = {
+    ...base.manifest,
+    source: {
+      ...base.manifest.source,
+      safeTarget: `host=192.168.0.106 port=5432 database=${databaseName}`,
+    },
+  };
+  const confirmation = databaseCleanupConfirmation({
+    backupHash: base.actualHash,
+    databaseName,
+    sourceFingerprint,
+  });
+  const request = {
+    adminURL:
+      "postgres://postgres:secret@192.168.0.106:5432/postgres?sslmode=disable",
+    confirmation,
+    databaseName,
+    inventory: base.inventory,
+    manifest: remoteManifest,
+    manifestDir: base.manifestDir,
+  };
+  assert.throws(
+    () =>
+      runDatabaseCleanup({
+        ...request,
+        runtime: {
+          databaseState: () => ({
+            exists: true,
+            owner: "postgres",
+            connections: 0,
+          }),
+          dropDatabase: () => {},
+        },
+      }),
+    /loopback/u,
+  );
+
+  let exists = true;
+  const report = runDatabaseCleanup({
+    ...request,
+    allowRegisteredDevelopment: true,
+    runtime: {
+      databaseState: () =>
+        exists
+          ? { exists: true, owner: "postgres", connections: 0 }
+          : { exists: false, owner: "", connections: 0 },
+      dropDatabase: () => {
+        exists = false;
+      },
+    },
+  });
+  assert.equal(report.dropped, true);
+});

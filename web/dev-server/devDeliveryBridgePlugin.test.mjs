@@ -275,6 +275,66 @@ test('release dispatch is idempotent and never writes the target', async (t) => 
   assert.equal(dispatchCount, 1)
 })
 
+test('delivery summary exposes cached GitHub timings and readable operation durations', async (t) => {
+  const { root, store } = createProject(t)
+  createOrReuseDeliveryOperation(store, {
+    action: 'release',
+    target: 'github-release',
+    gitSha: SHA,
+    version: '2026.07.29-1',
+    idempotencyKey: IDEMPOTENCY_KEY,
+    operationId: OPERATION_ID,
+    now: '2026-08-08T01:00:00.000Z',
+  })
+  transitionDeliveryOperation(store, OPERATION_ID, {
+    status: 'running',
+    message: 'release dispatch started',
+    now: '2026-08-08T01:00:05.000Z',
+  })
+  transitionDeliveryOperation(store, OPERATION_ID, {
+    status: 'waiting',
+    message: 'release workflow accepted',
+    now: '2026-08-08T01:00:15.000Z',
+  })
+  let timingReads = 0
+  const timingPayload = {
+    schemaVersion: 'plush.delivery-pipeline-timings/v1',
+    generatedAt: '2026-08-08T01:01:00.000Z',
+    runs: [],
+  }
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      listVersions: () => [],
+      listPipelineTimings() {
+        timingReads += 1
+        return timingPayload
+      },
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadRelease: () => {},
+    },
+    readRepositoryState: () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'b'.repeat(64),
+    }),
+    runPreflight: () => ({ status: 'passed' }),
+  })
+
+  const first = await service.summary()
+  const second = await service.summary()
+  assert.strictEqual(first.timings, timingPayload)
+  assert.strictEqual(second.timings, timingPayload)
+  assert.equal(timingReads, 1)
+  assert.equal(first.operations[0].durationMs, 15_000)
+  assert.deepEqual(
+    first.operations[0].stages.map((item) => item.durationMs),
+    [5_000, 10_000]
+  )
+})
+
 test('promotion executor is launched once and an unstarted child fails closed', async (t) => {
   const { root, store } = createProject(t)
   createOrReuseDeliveryOperation(store, {

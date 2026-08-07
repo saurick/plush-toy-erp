@@ -6,7 +6,6 @@ import {
   chmodSync,
   existsSync,
   mkdirSync,
-  readFileSync,
   renameSync,
   statSync,
   writeFileSync,
@@ -19,10 +18,11 @@ import {
   classifyDatabaseName,
   createDatabaseRunID,
   databaseNameForRun,
-  parseLoopbackDatabaseURL,
+  parseDatabaseURL,
   replaceDatabaseName,
 } from "./database-target.mjs";
 import { normalizeAtlasMigrationStatus } from "./database-inventory.mjs";
+import { sha256File } from "../lib/file-digest.mjs";
 
 export const DATABASE_ARCHIVE_SCHEMA = "plush-database-archive/v1";
 export const DATABASE_ARCHIVE_URL_ENV = "DATABASE_ARCHIVE_SOURCE_URL";
@@ -334,15 +334,21 @@ function defaultRuntime(repoRoot) {
   };
 }
 
-function assertArchivableSource(databaseURL, declaredDatabaseName) {
-  const target = parseLoopbackDatabaseURL(databaseURL);
+function assertArchivableSource(
+  databaseURL,
+  declaredDatabaseName,
+  { allowRegisteredDevelopment = false } = {},
+) {
+  const target = parseDatabaseURL(databaseURL, {
+    allowRegisteredDevelopment,
+  });
   if (target.databaseName !== declaredDatabaseName) {
     throw new Error("database archive source does not match --database-name");
   }
   const classification = classifyDatabaseName(declaredDatabaseName);
   if (
     !/^plush_erp[a-z0-9_]*$/u.test(declaredDatabaseName) ||
-    ["development", "legacy-development"].includes(classification.profile)
+    classification.disposable !== true
   ) {
     throw new Error("database archive only accepts an exact non-long-lived project database");
   }
@@ -350,6 +356,7 @@ function assertArchivableSource(databaseURL, declaredDatabaseName) {
 }
 
 export function runDatabaseArchiveLifecycle({
+  allowRegisteredDevelopment = false,
   databaseName,
   databaseURL,
   generatedAt = new Date(),
@@ -361,13 +368,17 @@ export function runDatabaseArchiveLifecycle({
   const { target, classification } = assertArchivableSource(
     databaseURL,
     databaseName,
+    { allowRegisteredDevelopment },
   );
   const restoreDatabaseName = databaseNameForRun("restore", runID);
   const restoreDatabaseURL = replaceDatabaseName(
     databaseURL,
     restoreDatabaseName,
+    { allowRegisteredDevelopment },
   );
-  const adminURL = replaceDatabaseName(databaseURL, "postgres");
+  const adminURL = replaceDatabaseName(databaseURL, "postgres", {
+    allowRegisteredDevelopment,
+  });
   const absoluteOut = path.resolve(outDir);
   const backupPath = path.join(absoluteOut, "database.dump");
   const executor = runtime || defaultRuntime(repoRoot);
@@ -401,9 +412,8 @@ export function runDatabaseArchiveLifecycle({
 
   executor.dump(databaseURL, backupPath);
   chmodSync(backupPath, 0o600);
-  const backup = readFileSync(backupPath);
   const backupSize = statSync(backupPath).size;
-  const backupHash = sha256(backup);
+  const backupHash = sha256File(backupPath);
   if (backupSize <= 0) throw new Error("database archive dump is empty");
   stage("backup", { backupHash, backupSize });
 
@@ -498,9 +508,17 @@ function writeManifest(outDir, report) {
 }
 
 function parseArgs(argv) {
-  const options = { databaseName: "", out: "" };
+  const options = {
+    allowRegisteredDevelopment: false,
+    databaseName: "",
+    out: "",
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === "--allow-registered-development") {
+      options.allowRegisteredDevelopment = true;
+      continue;
+    }
     const value = argv[index + 1];
     if (arg === "--database-name" || arg === "--out") {
       if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value`);
@@ -525,6 +543,7 @@ if (isDirectRun) {
     const databaseURL = String(process.env[DATABASE_ARCHIVE_URL_ENV] || "");
     if (!databaseURL) throw new Error(`${DATABASE_ARCHIVE_URL_ENV} is required`);
     const report = runDatabaseArchiveLifecycle({
+      allowRegisteredDevelopment: options.allowRegisteredDevelopment,
       databaseName: options.databaseName,
       databaseURL,
       outDir: options.out,

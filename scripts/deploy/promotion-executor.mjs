@@ -30,9 +30,10 @@ import {
   validateReleaseManifest,
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
+import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 
 export const REMOTE_PROMOTION_RECEIPT_CONTRACT =
-  "plush.remote-promotion-receipt/v1";
+  "plush.remote-promotion-receipt/v2";
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -41,6 +42,21 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const IMAGE_ID_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const ISSUE_PATTERN = /^(?:none|[a-z][a-z0-9_]{2,63})$/u;
 const MAX_RECEIPT_BYTES = 256 * 1024;
+const PROMOTION_STAGE_IDS = Object.freeze([
+  "package_verification",
+  "capacity_recheck",
+  "release_materialization",
+  "image_load_and_readback",
+  "fresh_backup_and_restore_check",
+  "env_and_static_preflight",
+  "migration_plan",
+  "maintenance_window",
+  "migration_apply_started",
+  "migration_applied",
+  "compose_start",
+  "runtime_verified",
+  "current_source_switch",
+]);
 const TRANSFER_FILES = Object.freeze([
   "promotion-manifest.json",
   "release-artifact.json",
@@ -295,10 +311,18 @@ export function validateRemotePromotionReceipt(receipt, expected) {
       Number.isSafeInteger(backupSizeBytes) &&
       backupSizeBytes > 0 &&
       receipt?.rollbackPoint?.restoreChecked === true);
+  validateRemoteStageTimings({
+    timings: receipt?.timings,
+    status: receipt?.status,
+    stage: receipt?.stage,
+    durationMs: receipt?.durationMs,
+    requiredStages: PROMOTION_STAGE_IDS,
+  });
   if (
     !hasExactKeys(receipt, [
       "before",
       "checks",
+      "durationMs",
       "finishedAt",
       "gitSha",
       "images",
@@ -312,8 +336,10 @@ export function validateRemotePromotionReceipt(receipt, expected) {
       "rollbackPoint",
       "schemaVersion",
       "stage",
+      "startedAt",
       "status",
       "target",
+      "timings",
       "version",
     ]) ||
     !hasExactKeys(receipt?.before, ["runtimeSha"]) ||
@@ -364,6 +390,9 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     ) ||
     typeof receipt?.finishedAt !== "string" ||
     Number.isNaN(Date.parse(receipt.finishedAt)) ||
+    typeof receipt?.startedAt !== "string" ||
+    Number.isNaN(Date.parse(receipt.startedAt)) ||
+    Date.parse(receipt.finishedAt) < Date.parse(receipt.startedAt) ||
     !optionalSha(beforeSha) ||
     !optionalImageId(serverContentId) ||
     !optionalImageId(webContentId) ||
@@ -630,6 +659,7 @@ export function executePromotion(
         backupSizeBytes: receipt.rollbackPoint.backupSizeBytes,
         serverContentId: receipt.images.serverContentId,
         webContentId: receipt.images.webContentId,
+        remoteStageTimings: receipt.timings,
       },
       now: now(),
     });

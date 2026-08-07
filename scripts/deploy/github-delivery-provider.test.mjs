@@ -55,6 +55,79 @@ test("GitHub provider lists only immutable exact-SHA releases", () => {
   );
 });
 
+test("GitHub provider returns bounded run, job and step timings", () => {
+  const calls = [];
+  const provider = createGithubDeliveryProvider({
+    projectRoot: process.cwd(),
+    now: () => "2026-08-08T02:05:00.000Z",
+    runCommand: (_command, args) => {
+      calls.push(args);
+      if (String(args.at(-1)).includes("/actions/runs?")) {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            total_count: 1,
+            workflow_runs: [
+              {
+                id: 321,
+                run_attempt: 2,
+                path: ".github/workflows/release.yml",
+                event: "workflow_dispatch",
+                status: "completed",
+                conclusion: "success",
+                head_sha: SHA,
+                created_at: "2026-08-08T02:00:00.000Z",
+                run_started_at: "2026-08-08T02:00:10.000Z",
+                updated_at: "2026-08-08T02:04:10.000Z",
+                html_url: `https://github.com/${GITHUB_DELIVERY_REPOSITORY}/actions/runs/321`,
+              },
+            ],
+          }),
+          stderr: "",
+        };
+      }
+      return {
+        status: 0,
+        stdout: JSON.stringify({
+          total_count: 1,
+          jobs: [
+            {
+              id: 654,
+              name: "Publish immutable release",
+              status: "completed",
+              conclusion: "success",
+              started_at: "2026-08-08T02:00:20.000Z",
+              completed_at: "2026-08-08T02:04:00.000Z",
+              steps: [
+                {
+                  number: 1,
+                  name: "Build both images",
+                  status: "completed",
+                  conclusion: "success",
+                  started_at: "2026-08-08T02:00:30.000Z",
+                  completed_at: "2026-08-08T02:03:30.000Z",
+                },
+              ],
+            },
+          ],
+        }),
+        stderr: "",
+      };
+    },
+  });
+
+  const timings = provider.listPipelineTimings({ limit: 1 });
+  assert.equal(timings.schemaVersion, "plush.delivery-pipeline-timings/v1");
+  assert.equal(timings.generatedAt, "2026-08-08T02:05:00.000Z");
+  assert.equal(timings.runs[0].workflow, "release");
+  assert.equal(timings.runs[0].queueMs, 10_000);
+  assert.equal(timings.runs[0].durationMs, 240_000);
+  assert.equal(timings.runs[0].jobs[0].durationMs, 220_000);
+  assert.equal(timings.runs[0].jobs[0].steps[0].durationMs, 180_000);
+  assert.equal(calls.length, 2);
+  assert.match(String(calls[1].at(-1)), /runs\/321\/attempts\/2\/jobs/u);
+});
+
 test("GitHub provider dispatch is fixed to main release workflow and customer", () => {
   let invocation;
   const provider = createGithubDeliveryProvider({

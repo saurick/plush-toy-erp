@@ -69,13 +69,31 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile strict
+# ROOT_DIR pins the timing helper; ShellCheck cannot resolve this dynamic path.
+# shellcheck source=scripts/qa/lib/stage-timing.sh
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/qa/lib/stage-timing.sh"
 
-SHELLCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/shellcheck.sh"
+qa_strict_profile() {
+  node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile strict
+}
 
-SHFMT_STRICT=1 SHFMT_CHECK=1 bash "$ROOT_DIR/scripts/qa/shfmt.sh"
+qa_strict_shellcheck() {
+  SHELLCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/shellcheck.sh"
+}
 
-YAMLLINT_STRICT=1 YAMLLINT_ALL=1 bash "$ROOT_DIR/scripts/qa/yamllint.sh"
+qa_strict_shfmt() {
+  SHFMT_STRICT=1 SHFMT_CHECK=1 bash "$ROOT_DIR/scripts/qa/shfmt.sh"
+}
+
+qa_strict_yamllint() {
+  YAMLLINT_STRICT=1 YAMLLINT_ALL=1 bash "$ROOT_DIR/scripts/qa/yamllint.sh"
+}
+
+qa_run_stage strict strict_profile qa_strict_profile
+qa_run_stage strict shellcheck qa_strict_shellcheck
+qa_run_stage strict shfmt qa_strict_shfmt
+qa_run_stage strict yamllint qa_strict_yamllint
 
 echo "[qa:strict] 单次运行 full 超集基线、零 warning 与扩展浏览器场景"
 QA_FULL_PROFILE=strict \

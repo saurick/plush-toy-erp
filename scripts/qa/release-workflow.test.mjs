@@ -5,22 +5,16 @@ import path from "node:path";
 import test from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const SOURCE = readFileSync(
-  path.join(ROOT, ".github/workflows/release.yml"),
-  "utf8",
-);
+const SOURCE = readFileSync(path.join(ROOT, ".github/workflows/release.yml"), "utf8");
 
 function parseWorkflow() {
-  const output = execFileSync(
-    "go",
-    [
-      "run",
-      "../scripts/qa/ci-workflow-yaml-check.go",
-      "../.github/workflows/release.yml",
-    ],
-    { cwd: path.join(ROOT, "server"), encoding: "utf8" },
+  return JSON.parse(
+    execFileSync(
+      "go",
+      ["run", "../scripts/qa/ci-workflow-yaml-check.go", "../.github/workflows/release.yml"],
+      { cwd: path.join(ROOT, "server"), encoding: "utf8" },
+    ),
   );
-  return JSON.parse(output);
 }
 
 function collectUses(value, uses = []) {
@@ -37,70 +31,70 @@ function collectUses(value, uses = []) {
 }
 
 const workflow = parseWorkflow();
-const job = workflow.jobs.release;
-const steps = job.steps;
-const runs = steps.map((step) => step.run || "").join("\n");
+const validate = workflow.jobs.validate;
+const strict = workflow.jobs.strict;
+const publish = workflow.jobs.publish;
+const validateRuns = validate.steps.map((step) => step.run || "").join("\n");
+const strictRuns = strict.steps.map((step) => step.run || "").join("\n");
+const publishRuns = publish.steps.map((step) => step.run || "").join("\n");
 
-test("release workflow is manual, GitHub-hosted, exact-SHA and non-cancelling", () => {
+test("release is manual, globally serialized and split by permission boundary", () => {
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
-  assert.deepEqual(
-    Object.keys(workflow.on.workflow_dispatch.inputs).sort(),
-    ["customer", "sha", "version"],
-  );
-  assert.deepEqual(workflow.on.workflow_dispatch.inputs.customer, {
-    description: "Product Core customer package",
-    required: true,
-    default: "yoyoosun",
-    type: "choice",
-    options: ["yoyoosun"],
-  });
-  assert.deepEqual(workflow.permissions, {
+  assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs).sort(), ["customer", "sha", "version"]);
+  assert.deepEqual(workflow.permissions, { actions: "read", contents: "read" });
+  assert.equal(workflow.concurrency.group, "release-catalog");
+  assert.equal(workflow.concurrency["cancel-in-progress"], false);
+  assert.deepEqual(Object.keys(workflow.jobs).sort(), ["publish", "strict", "validate"]);
+  assert.equal(validate.name, "Release trust and strict terminal");
+  assert.equal(strict.name, "Exact-SHA strict quality");
+  assert.equal(publish.name, "Publish immutable artifact set");
+  assert.deepEqual(publish.permissions, {
     actions: "read",
     contents: "write",
     packages: "write",
   });
-  assert.equal(job["runs-on"], "ubuntu-24.04");
-  assert.notEqual(job["runs-on"], "self-hosted");
-  assert.equal(workflow.concurrency.group, "release-${{ inputs.sha }}");
-  assert.equal(workflow.concurrency["cancel-in-progress"], false);
-  assert.doesNotMatch(SOURCE, /pull_request(?:_target)?|push:/u);
-  assert.match(runs, /\^\[0-9a-f\]\{40\}\$/u);
-  assert.match(runs, /git merge-base --is-ancestor "\$REQUESTED_SHA" origin\/main/u);
-  assert.match(
-    runs,
-    /\[\[ "\$REQUESTED_CUSTOMER" != "yoyoosun" \]\]/u,
-  );
+  assert.equal(publish.environment, "release");
+  assert.doesNotMatch(SOURCE, /pull_request(?:_target)?|^\s+push:/mu);
+  assert.doesNotMatch(SOURCE, /self-hosted/u);
 });
 
-test("release workflow reuses a persistent release before strict or build", () => {
-  const reuseIndex = steps.findIndex((step) =>
-    /reuse an existing immutable release/u.test(step.name),
-  );
-  const strictIndex = steps.findIndex((step) =>
-    /exact-SHA strict terminal/u.test(step.name),
-  );
-  const buildIndex = steps.findIndex((step) =>
-    /Build once, publish by digest/u.test(step.name),
-  );
-  assert.ok(reuseIndex >= 0 && reuseIndex < strictIndex);
-  assert.ok(strictIndex < buildIndex);
-  assert.match(runs, /gh release view "\$release_tag"/u);
-  assert.match(runs, /release-catalog\.mjs verify/u);
-  assert.match(runs, /RELEASE_REUSED=true/u);
-  assert.match(runs, /strict-terminal-\$RELEASE_SHA/u);
-  assert.match(runs, /exact-sha-gate\.mjs --sha "\$RELEASE_SHA".*--run/u);
-  assert.match(runs, /release-artifact-bundle\.mjs/u);
-  assert.match(runs, /github-release-publisher\.mjs/u);
-  assert.match(runs, /gh release create "\$RELEASE_TAG"/u);
-  assert.doesNotMatch(runs, /scripts\/qa\/(?:fast|full)\.sh/u);
+test("release identity is current workflow SHA and exact current main, not an ancestor", () => {
+  assert.match(validateRuns, /\^\[0-9a-f\]\{40\}\$/u);
+  assert.match(validateRuns, /head_sha.*REQUESTED_SHA/u);
+  assert.match(validateRuns, /WORKFLOW_SHA.*REQUESTED_SHA/u);
+  assert.match(validateRuns, /main_sha.*REQUESTED_SHA/u);
+  assert.doesNotMatch(validateRuns, /merge-base --is-ancestor/u);
+  assert.match(validateRuns, /github-release-asset-set\.mjs identity/u);
+  assert.match(validateRuns, /verify-existing/u);
+  assert.match(validateRuns, /release_reused=true/u);
+  assert.match(validateRuns, /only the fixed yoyoosun customer package/u);
 });
 
-test("release reuse requires every immutable recovery asset", () => {
-  assert.match(
-    runs,
-    /gh release view "\$release_tag"[\s\S]*--json assets[\s\S]*--jq '\.assets\[\]\.name'/u,
-  );
-  for (const file of [
+test("release recovers only provenance-bound strict evidence before starting the heavy job", () => {
+  const recoverIndex = validate.steps.findIndex((step) => /provenance-bound strict/u.test(step.name));
+  assert.ok(recoverIndex >= 0);
+  assert.match(validateRuns, /github-strict-terminal-reuse\.mjs/u);
+  assert.match(strict.if, /strict_reused != 'true'/u);
+  assert.match(strictRuns, /exact-sha-gate\.mjs --sha .* --run/u);
+  assert.match(strictRuns, /\bmake data\b/u);
+  assert.match(strictRuns, /git -C \.\. status --porcelain --untracked-files=all/u);
+  assert.match(SOURCE, /strict-terminal-current-\$\{\{ inputs\.sha \}\}/u);
+  assert.match(SOURCE, /strict-terminal-\$\{\{ inputs\.sha \}\}/u);
+});
+
+test("publish uses a verified resumable draft and exact six-asset set", () => {
+  assert.match(publish.if, /needs\.validate\.result == 'success'/u);
+  assert.match(publish.if, /needs\.strict\.result == 'success'/u);
+  assert.match(publishRuns, /release-artifact-bundle\.mjs/u);
+  assert.match(publishRuns, /github-release-publisher\.mjs/u);
+  assert.match(publishRuns, /github-release-asset-set\.mjs finalize/u);
+  assert.match(publishRuns, /gh release create "\$release_tag"[\s\S]*--draft/u);
+  assert.match(publishRuns, /gh release upload "\$release_tag"/u);
+  assert.doesNotMatch(publishRuns, /--clobber/u);
+  assert.match(publishRuns, /cmp --silent/u);
+  assert.match(publishRuns, /gh release edit "\$release_tag".*--draft=false/u);
+  assert.match(publishRuns, /github-release-asset-set\.mjs verify-published/u);
+  for (const asset of [
     "checksums.sha256",
     "release-artifact.json",
     "release-manifest.json",
@@ -108,47 +102,34 @@ test("release reuse requires every immutable recovery asset", () => {
     "server-image.tar",
     "web-image.tar",
   ]) {
-    assert.match(
-      runs,
-      new RegExp(
-        `required_assets=[\\s\\S]*${file.replace(".", "\\.")}`,
-        "u",
-      ),
-    );
+    assert.match(publishRuns, new RegExp(asset.replace(".", "\\."), "u"));
   }
-  assert.match(
-    runs,
-    /existing immutable release is incomplete: missing \$required_asset/u,
-  );
 });
 
-test("release workflow pins actions and never sends a secret to the browser", () => {
-  const uses = collectUses(workflow).sort();
-  assert.deepEqual(uses, [
-    "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
-    "actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c",
-    "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e",
-    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-    "ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea",
-  ]);
-  for (const use of uses) {
-    assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
-  }
-  assert.match(runs, /docker login ghcr\.io .* --password-stdin/u);
-  assert.doesNotMatch(SOURCE, /self-hosted|pull_request_target/u);
-  assert.doesNotMatch(runs, /echo "\$GH_TOKEN"/u);
+test("release pins every action and never passes a token to browser or arguments", () => {
+  const uses = collectUses(workflow);
+  assert.equal(uses.filter((value) => value.startsWith("actions/checkout@")).length, 3);
+  assert.equal(uses.filter((value) => value.startsWith("actions/setup-node@")).length, 3);
+  assert.equal(uses.filter((value) => value.startsWith("actions/setup-go@")).length, 1);
+  assert.equal(uses.filter((value) => value.startsWith("ariga/setup-atlas@")).length, 1);
+  assert.equal(uses.filter((value) => value.startsWith("actions/upload-artifact@")).length, 2);
+  assert.equal(uses.filter((value) => value.startsWith("actions/download-artifact@")).length, 2);
+  for (const use of uses) assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
+  assert.match(publishRuns, /docker login ghcr\.io .* --password-stdin/u);
+  assert.doesNotMatch(SOURCE, /echo "\$GH_TOKEN"|--token "?\$GH_TOKEN/u);
+  assert.doesNotMatch(strictRuns, /GH_TOKEN|github\.token/u);
 });
 
-test("release assets preserve provider-neutral recovery evidence", () => {
-  for (const file of [
-    "release-manifest.json",
-    "release-artifact.json",
-    "sbom.cdx.json",
-    "checksums.sha256",
-    "server-image.tar",
-    "web-image.tar",
-  ]) {
-    assert.match(runs, new RegExp(file.replace(".", "\\."), "u"));
-  }
-  assert.match(runs, /target migration, role smoke and customer UAT remain separate evidence/u);
+test("strict keeps pinned PostgreSQL, Atlas, tools and Chromium sandbox", () => {
+  assert.equal(strict["runs-on"], "ubuntu-24.04");
+  assert.match(SOURCE, /image: postgres:18\.1/u);
+  assert.match(SOURCE, /version: v0\.38\.0/u);
+  assert.match(strictRuns, /pnpm@10\.13\.1/u);
+  assert.match(strictRuns, /gitleaks_8\.30\.1_linux_x64\.tar\.gz/u);
+  assert.match(strictRuns, /551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb/u);
+  assert.match(strictRuns, /govulncheck@v1\.6\.0/u);
+  assert.match(strictRuns, /shfmt@v3\.13\.1/u);
+  assert.match(strictRuns, /playwright install --with-deps chromium/u);
+  assert.match(strictRuns, /sudo install -o root -g root -m 4755/u);
+  assert.doesNotMatch(SOURCE, /--no-sandbox|--disable-setuid-sandbox/u);
 });

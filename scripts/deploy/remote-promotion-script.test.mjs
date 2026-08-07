@@ -42,6 +42,10 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
   assert.match(source, /write_receipt not_proven/u);
   assert.match(source, /unknown prior target outcome; read back before retry/u);
   assert.match(source, /flock -n 9/u);
+  assert.match(source, /plush[.]remote-promotion-receipt\/v2/u);
+  assert.match(source, /enter_stage package_verification/u);
+  assert.match(source, /durationMs: \$durationMs/u);
+  assert.match(source, /timings: \$timings/u);
   assert.match(
     source,
     /applyStarted: \(\$migrationApplyStarted == 1\)/u,

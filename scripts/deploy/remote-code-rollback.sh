@@ -130,6 +130,11 @@ server_content_id=unknown
 web_content_id=unknown
 server_ref=unknown
 web_ref=unknown
+operation_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+operation_started_epoch_ms="$(date +%s%3N)"
+stage_started_epoch_ms="$operation_started_epoch_ms"
+stage_finalized=0
+stage_timings='[]'
 
 mkdir -p "$operations_root" "$run_root"
 chmod 700 "$operations_root" "$run_root"
@@ -180,12 +185,47 @@ write_state() {
   mv -f "$next" "$state_file"
 }
 
+record_current_stage() {
+  local stage_status="$1"
+  local finished_epoch_ms
+  local stage_duration_ms
+  if [[ "$stage" == initial || "$stage" == passed || "$stage_finalized" -eq 1 ]]; then
+    return 0
+  fi
+  finished_epoch_ms="$(date +%s%3N)"
+  stage_duration_ms=$((finished_epoch_ms - stage_started_epoch_ms))
+  stage_timings="$(
+    jq -c \
+      --arg id "$stage" \
+      --arg status "$stage_status" \
+      --argjson durationMs "$stage_duration_ms" \
+      '. + [{id: $id, status: $status, durationMs: $durationMs}]' \
+      <<<"$stage_timings"
+  )"
+  stage_finalized=1
+}
+
+enter_stage() {
+  record_current_stage passed
+  stage="$1"
+  stage_started_epoch_ms="$(date +%s%3N)"
+  stage_finalized=0
+  write_state running
+}
+
 write_receipt() {
   local status="$1"
   local issue_code="$2"
   local next="$receipt.tmp"
+  local finished_at
+  local finished_epoch_ms
+  local duration_ms
+  record_current_stage failed
+  finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  finished_epoch_ms="$(date +%s%3N)"
+  duration_ms=$((finished_epoch_ms - operation_started_epoch_ms))
   jq -n \
-    --arg schemaVersion "plush.remote-rollback-receipt/v1" \
+    --arg schemaVersion "plush.remote-rollback-receipt/v2" \
     --arg status "$status" \
     --arg operationId "$operation_id" \
     --arg target "$target" \
@@ -200,7 +240,10 @@ write_receipt() {
     --arg serverContentId "$server_content_id" \
     --arg webContentId "$web_content_id" \
     --argjson serviceSwitchStarted "$service_switch_started" \
-    --arg finishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg startedAt "$operation_started_at" \
+    --arg finishedAt "$finished_at" \
+    --argjson durationMs "$duration_ms" \
+    --argjson timings "$stage_timings" \
     '{
       schemaVersion: $schemaVersion,
       status: $status,
@@ -232,7 +275,10 @@ write_receipt() {
         basicSmoke: ($status == "passed")
       },
       serviceSwitchStarted: ($serviceSwitchStarted == 1),
+      startedAt: $startedAt,
       finishedAt: $finishedAt,
+      durationMs: $durationMs,
+      timings: $timings,
       redaction: {
         containsSecrets: false,
         containsCredentials: false,
@@ -299,8 +345,7 @@ trap on_error ERR
 chmod 600 "$log_file"
 write_state running
 
-stage=package_verification
-write_state running
+enter_stage package_verification
 [[ -d "$incoming" && ! -L "$incoming" &&
   "$(stat -c '%u' "$incoming")" == "$(id -u)" ]] ||
   fail "incoming rollback package is invalid"
@@ -396,8 +441,7 @@ web_archive_manifest_digest="$(
     "$incoming/web-image.tar" "$web_ref" "$web_content_id"
 )"
 
-stage=target_identity_recheck
-write_state running
+enter_stage target_identity_recheck
 available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
 [[ "$available_bytes" =~ ^[0-9]+$ &&
   "$available_bytes" -ge "$minimum_available_bytes" ]] ||
@@ -413,8 +457,7 @@ curl --fail --silent --show-error --max-time 10 \
 curl --fail --silent --show-error --max-time 10 \
   http://127.0.0.1:5185/healthz >/dev/null
 
-stage=release_materialization
-write_state running
+enter_stage release_materialization
 if [[ -e "$release_dir" ]]; then
   [[ -d "$release_dir" && ! -L "$release_dir" &&
     -f "$release_identity" && ! -L "$release_identity" ]] ||
@@ -454,8 +497,7 @@ cmp --silent \
   "$release_dir/scripts/deploy/remote-code-rollback.sh" ||
   fail "remote rollback script is not part of the target exact source"
 
-stage=image_load_and_readback
-write_state running
+enter_stage image_load_and_readback
 docker load --input "$incoming/server-image.tar" >>"$log_file" 2>&1
 docker load --input "$incoming/web-image.tar" >>"$log_file" 2>&1
 actual_server_content_id="$(docker image inspect --format '{{.Id}}' "$server_ref")"
@@ -485,8 +527,7 @@ update_env_image_refs() {
   ' "$source" >"$destination"
 }
 
-stage=static_preflight
-write_state running
+enter_stage static_preflight
 [[ -f "$runtime_env" && ! -L "$runtime_env" &&
   "$(stat -c '%u' "$runtime_env")" == "$(id -u)" &&
   "$(stat -c '%a' "$runtime_env")" == 600 ]] ||
@@ -519,16 +560,14 @@ compose=(
   --compose-override "$compose_override" \
   >>"$log_file" 2>&1
 
-stage=service_switch
+enter_stage service_switch
 service_switch_started=1
-write_state running
 "${clean_env[@]}" "${compose[@]}" stop app-server web-desktop \
   >>"$log_file" 2>&1
 "${clean_env[@]}" "${compose[@]}" up -d --no-build --pull never \
   postgres jaeger app-server web-desktop >>"$log_file" 2>&1
 
-stage=runtime_verified
-write_state running
+enter_stage runtime_verified
 "${clean_env[@]}" bash "$preflight_script" \
   --env-file "$runtime_env" \
   --compose-dir "$compose_dir" \
@@ -550,8 +589,7 @@ runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range
 [[ "$runtime_server_sha" == "$to_sha" && "$runtime_web_sha" == "$to_sha" ]] ||
   fail "rollback runtime release identity does not match"
 
-stage=current_source_switch
-write_state running
+enter_stage current_source_switch
 next_current=$root/.current-next-rollback-$operation_id
 [[ ! -e "$next_current" ]] || fail "next current directory already exists"
 cp -a --reflink=auto "$release_dir" "$next_current"
@@ -561,7 +599,7 @@ old_current=$root/current.before-rollback-${from_sha:0:8}-to-${to_sha:0:8}-${ope
 mv "$current" "$old_current"
 mv "$next_current" "$current"
 
-stage=passed
+enter_stage passed
 env_changed=0
 write_receipt passed none
 cat "$receipt"

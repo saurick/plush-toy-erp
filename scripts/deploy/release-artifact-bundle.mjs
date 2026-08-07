@@ -18,6 +18,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { sha256File } from "../lib/file-digest.mjs";
 import { runSourceArchiveReleaseCheck } from "./source-archive-release-check.mjs";
 
 const SCHEMA_VERSION = "plush-release-artifact/v1";
@@ -77,12 +78,6 @@ export function runArtifactCommand({
 
 function sha256Buffer(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
-}
-
-function sha256File(filePath) {
-  const hash = crypto.createHash("sha256");
-  hash.update(readFileSync(filePath));
-  return hash.digest("hex");
 }
 
 function normalizeSha256(value, field) {
@@ -361,11 +356,12 @@ export function buildDependencySbom({
     "server/Dockerfile",
     runCommand,
   );
-  const webDockerfile = gitShow(repoRoot, commit, "web/Dockerfile", runCommand);
   const components = [
     ...parseGoComponents(goSum),
     ...parsePnpmComponents(pnpmLock),
-    ...parseContainerComponents(serverDockerfile, webDockerfile),
+    // Formal Web and Server artifacts now share this one committed graph.
+    // Do not report bases from the independent development Web Dockerfile.
+    ...parseContainerComponents(serverDockerfile),
   ].sort((left, right) => left["bom-ref"].localeCompare(right["bom-ref"]));
   if (components.length === 0) {
     throw new ReleaseArtifactError("dependency SBOM is empty");
@@ -520,6 +516,15 @@ function toolVersion(command, args, repoRoot, runCommand) {
   })
     .split(/\r?\n/u)[0]
     .trim();
+}
+
+function declaredGoToolchain(repoRoot, commit, runCommand) {
+  const source = gitShow(repoRoot, commit, "server/go.mod", runCommand);
+  const version = source.match(/^toolchain go([^\s]+)$/mu)?.[1];
+  if (!version) {
+    throw new ReleaseArtifactError("committed Go toolchain is missing");
+  }
+  return `go${version}`;
 }
 
 export function assertReleaseArtifactManifest(manifest) {
@@ -698,7 +703,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
           repoRoot,
           runCommand,
         ),
-        go: toolVersion("go", ["version"], repoRoot, runCommand),
+        go: declaredGoToolchain(repoRoot, commit, runCommand),
         declaredPnpm: JSON.parse(
           gitShow(repoRoot, commit, "web/package.json", runCommand),
         ).packageManager,

@@ -95,8 +95,9 @@ Usage:
 Modes:
   plan       Default. Read Git metadata and print the committed-tree release plan.
   light      Create and inspect a temporary git archive, then run the customer Web overlay.
-  release    --execute only. Requires a clean worktree, then runs archive scan, strict secret
-             scan, pnpm install/build, customer overlay, Go build, and optional Docker builds.
+  release    --execute only. Requires a clean worktree, then runs archive scan and strict
+             secret scan. Without --docker it runs host Web/Go builds; with --docker it builds
+             the Web and Server runtime targets from one shared Dockerfile cache graph.
 
 Options:
   --customer <key>  Customer Web package key. Defaults to yoyoosun.
@@ -563,10 +564,17 @@ function buildPlan({ customer, gitState, docker }) {
     "extract into isolated temporary directory",
     "verify required build inputs and reject broken active Markdown links, symlinks, raw customer sources, private customer assets, and runtime env files",
     "run strict source-package secret scan",
-    "install locked Web dependencies and build production Web assets",
-    `apply reviewed ${customer} Web config and public assets`,
-    "build the Go server binary",
-    ...(docker ? ["build Web Docker image", "build server Docker image"] : []),
+    ...(docker
+      ? [
+          `apply reviewed ${customer} Web config contract in an isolated check directory`,
+          "build Web runtime target from the shared release Dockerfile",
+          "build Server runtime target from the same cached release Dockerfile graph",
+        ]
+      : [
+          "install locked Web dependencies and build production Web assets",
+          `apply reviewed ${customer} Web config and public assets`,
+          "build the Go server binary",
+        ]),
     `bind result to commit ${gitState.commit}`,
   ];
 }
@@ -588,8 +596,6 @@ async function runReleaseBuilds({
     });
     return result;
   };
-  const pnpmBin = resolvePnpm({ archiveRoot });
-
   await run({
     command: "bash",
     args: ["scripts/qa/secrets.sh"],
@@ -598,6 +604,66 @@ async function runReleaseBuilds({
     label: "strict source archive secret scan",
     stdio: "inherit",
   });
+
+  if (docker) {
+    const overlay = applyArchivedCustomerOverlay({
+      archiveRoot,
+      buildDir: path.join(archiveRoot, ".source-archive-overlay-check"),
+      customer,
+    });
+    const webImage = `plush-source-archive-web:${gitState.shortCommit}`;
+    const serverImage = `plush-source-archive-server:${gitState.shortCommit}`;
+    const sharedArgs = [
+      "build",
+      "--platform",
+      "linux/amd64",
+      "-f",
+      "server/Dockerfile",
+      "--build-arg",
+      `ERP_CUSTOMER_KEY=${customer}`,
+      "--build-arg",
+      `GIT_SHA=${gitState.commit}`,
+    ];
+    await run({
+      command: "docker",
+      args: [...sharedArgs, "--target", "web-runtime", "-t", webImage, "."],
+      cwd: archiveRoot,
+      label: "build shared Web runtime target",
+      stdio: "inherit",
+    });
+    await run({
+      command: "docker",
+      args: [
+        ...sharedArgs,
+        "--target",
+        "server-runtime",
+        "--build-arg",
+        `GIT_SHA_SHORT=${gitState.shortCommit}`,
+        "--build-arg",
+        `IMAGE_TAG=${gitState.shortCommit}`,
+        "-t",
+        serverImage,
+        ".",
+      ],
+      cwd: archiveRoot,
+      label: "build shared Server runtime target",
+      stdio: "inherit",
+    });
+    return {
+      commands,
+      overlay,
+      serverBinaryBuilt: true,
+      dockerBuilt: true,
+      dockerImages: [webImage, serverImage],
+      buildReuse: {
+        graph: "server/Dockerfile",
+        webCompileCount: 1,
+        goCompileCount: 1,
+      },
+    };
+  }
+
+  const pnpmBin = resolvePnpm({ archiveRoot });
   await run({
     command: pnpmBin,
     args: ["install", "--frozen-lockfile"],
@@ -638,63 +704,17 @@ async function runReleaseBuilds({
     throw new ReleaseCheckError("Go build did not create the server binary");
   }
 
-  const dockerImages = [];
-  if (docker) {
-    const webImage = `plush-source-archive-web:${gitState.shortCommit}`;
-    const serverImage = `plush-source-archive-server:${gitState.shortCommit}`;
-    await run({
-      command: "docker",
-      args: [
-        "build",
-        "--platform",
-        "linux/amd64",
-        "-f",
-        "web/Dockerfile",
-        "--build-arg",
-        `ERP_CUSTOMER_KEY=${customer}`,
-        "--build-arg",
-        `GIT_SHA=${gitState.commit}`,
-        "-t",
-        webImage,
-        ".",
-      ],
-      cwd: archiveRoot,
-      label: "build Web Docker image",
-      stdio: "inherit",
-    });
-    await run({
-      command: "docker",
-      args: [
-        "build",
-        "--platform",
-        "linux/amd64",
-        "-f",
-        "server/Dockerfile",
-        "--build-arg",
-        `ERP_CUSTOMER_KEY=${customer}`,
-        "--build-arg",
-        `GIT_SHA=${gitState.commit}`,
-        "--build-arg",
-        `GIT_SHA_SHORT=${gitState.shortCommit}`,
-        "--build-arg",
-        `IMAGE_TAG=${gitState.shortCommit}`,
-        "-t",
-        serverImage,
-        ".",
-      ],
-      cwd: archiveRoot,
-      label: "build server Docker image",
-      stdio: "inherit",
-    });
-    dockerImages.push(webImage, serverImage);
-  }
-
   return {
     commands,
     overlay,
     serverBinaryBuilt: true,
-    dockerBuilt: docker,
-    dockerImages,
+    dockerBuilt: false,
+    dockerImages: [],
+    buildReuse: {
+      graph: "host",
+      webCompileCount: 1,
+      goCompileCount: 1,
+    },
   };
 }
 

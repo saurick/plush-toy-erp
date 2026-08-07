@@ -43,6 +43,24 @@ const TERMINAL_STATUSES = new Set([
   'blocked',
   'not_proven',
 ])
+const REMOTE_STAGE_LABELS = Object.freeze({
+  package_verification: '制品包校验',
+  capacity_recheck: '容量复核',
+  release_materialization: '版本目录落盘',
+  image_load_and_readback: '镜像载入与身份读回',
+  fresh_backup_and_restore_check: '新备份与恢复演练',
+  env_and_static_preflight: '配置与静态预检',
+  migration_plan: '迁移计划',
+  maintenance_window: '维护窗口',
+  migration_apply_started: '数据库迁移',
+  migration_applied: '迁移后读回',
+  compose_start: '服务启动',
+  runtime_verified: '运行态与冒烟',
+  current_source_switch: '当前版本指针切换',
+  target_identity_recheck: '目标身份复核',
+  static_preflight: '静态预检',
+  service_switch: '服务切换',
+})
 
 function assertExactKeys(value, expected, field) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -153,6 +171,36 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
         : operation.action === 'rollback'
           ? `ROLLBACK:test-133:${operation.metadata.currentGitSha}:${operation.gitSha}:${operation.id}`
           : ''
+  const durationMs = Math.max(
+    0,
+    Date.parse(operation.updatedAt) - Date.parse(operation.createdAt)
+  )
+  const remoteStages = Array.isArray(operation.metadata?.remoteStageTimings)
+    ? operation.metadata.remoteStageTimings
+        .filter(
+          (item) =>
+            item &&
+            typeof item.id === 'string' &&
+            ['passed', 'failed'].includes(item.status) &&
+            Number.isSafeInteger(item.durationMs) &&
+            item.durationMs >= 0
+        )
+        .map((item) => ({
+          id: item.id,
+          label: REMOTE_STAGE_LABELS[item.id] || item.id,
+          status: item.status,
+          durationMs: item.durationMs,
+        }))
+    : []
+  const lifecycleStages = operation.events.slice(0, -1).map((event, index) => {
+    const next = operation.events[index + 1]
+    return {
+      id: `lifecycle_${String(index + 1)}`,
+      label: event.message,
+      status: next.status,
+      durationMs: Math.max(0, Date.parse(next.at) - Date.parse(event.at)),
+    }
+  })
   return {
     id: operation.id,
     action: operation.action,
@@ -163,6 +211,8 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
     revision: operation.revision,
     createdAt: operation.createdAt,
     updatedAt: operation.updatedAt,
+    durationMs,
+    stages: remoteStages.length > 0 ? remoteStages : lifecycleStages,
     issues: operation.issues,
     events: operation.events.slice(-eventLimit),
     confirmationRequired: readyConfirmation,
@@ -202,6 +252,7 @@ export function createDevDeliveryService({
   spawnProcess = spawn,
   now = () => new Date().toISOString(),
   preflightTtlMs = 30_000,
+  pipelineTimingTtlMs = 60_000,
 } = {}) {
   const root = path.resolve(projectRoot || process.cwd())
   const store =
@@ -210,6 +261,7 @@ export function createDevDeliveryService({
     provider || createGithubDeliveryProvider({ projectRoot: root })
   const children = new Map()
   let preflightCache = null
+  let pipelineTimingCache = null
 
   recoverInterruptedDeliveryOperations(store, now())
 
@@ -262,13 +314,31 @@ export function createDevDeliveryService({
     return value
   }
 
+  async function readPipelineTimings({ force = false } = {}) {
+    if (typeof deliveryProvider.listPipelineTimings !== 'function') return null
+    const currentTime = Date.now()
+    if (
+      !force &&
+      pipelineTimingCache &&
+      currentTime - pipelineTimingCache.readAt < pipelineTimingTtlMs
+    ) {
+      return pipelineTimingCache.value
+    }
+    const value = await Promise.resolve(
+      deliveryProvider.listPipelineTimings({ limit: 8 })
+    )
+    pipelineTimingCache = { readAt: currentTime, value }
+    return value
+  }
+
   async function getSummary({ forcePreflight = false } = {}) {
     await reconcileWaitingOperations()
-    const [repositoryResult, versionsResult, targetResult] =
+    const [repositoryResult, versionsResult, targetResult, timingsResult] =
       await Promise.allSettled([
         readRepositoryState(root),
         Promise.resolve(deliveryProvider.listVersions({ limit: 20 })),
         readTargetPreflight({ force: forcePreflight }),
+        readPipelineTimings(),
       ])
     const issues = []
     if (repositoryResult.status === 'rejected') {
@@ -290,6 +360,13 @@ export function createDevDeliveryService({
         message: '133 只读预检不可用；未启动任何目标写操作',
       })
     }
+    if (timingsResult.status === 'rejected') {
+      issues.push({
+        code: 'pipeline_timings_unavailable',
+        level: 'warning',
+        message: 'GitHub 流水线耗时暂不可用；发布与部署状态仍可独立核对',
+      })
+    }
     return {
       schemaVersion: 'plush.dev-delivery-summary/v1',
       status: issues.length === 0 ? 'success' : 'partial',
@@ -302,6 +379,8 @@ export function createDevDeliveryService({
         versionsResult.status === 'fulfilled' ? versionsResult.value : [],
       target:
         targetResult.status === 'fulfilled' ? targetResult.value : null,
+      timings:
+        timingsResult.status === 'fulfilled' ? timingsResult.value : null,
       operations: listDeliveryOperations(store, { limit: 50 }).map(
         publicOperation
       ),

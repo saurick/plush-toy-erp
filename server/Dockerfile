@@ -7,6 +7,7 @@ ARG GO_TARGETOS=linux
 ARG GO_TARGETARCH=amd64
 ARG NODE_BUILDER_IMAGE=node:24.14.0
 ARG GO_BUILDER_IMAGE=golang:1.26.5
+ARG WEB_RUNTIME_BASE_IMAGE=node:24.14.0-slim
 ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
 # Debian 12 的 Chromium 150.0.7871.46 在部分宿主运行时会 SIGTRAP。
 # 版本升级必须显式修改本参数，并重新通过容器启动与真实 PDF 发布烟测。
@@ -35,6 +36,7 @@ COPY web/index.html ./
 # still receives only the generated static build.
 COPY web/*.mjs ./
 COPY web/dev-server ./dev-server
+COPY web/scripts ./scripts
 COPY web/tailwind.config.js ./
 COPY web/postcss.config.js ./
 COPY config /config
@@ -49,9 +51,36 @@ RUN pnpm run build:committed && \
       --web-build-dir /web/build
 
 # ======================
-# 2) Builder 阶段
+# 2) 独立 Web runtime；正式发布与 Server 共用上面的唯一前端构建
 # ======================
-FROM --platform=$BUILDPLATFORM ${GO_BUILDER_IMAGE} AS builder
+FROM --platform=$RUNTIMEPLATFORM ${WEB_RUNTIME_BASE_IMAGE} AS web-runtime
+
+ARG GIT_SHA
+
+ENV NODE_ENV=production
+ENV GIT_SHA=${GIT_SHA}
+ENV HOST=0.0.0.0
+ENV APP_ID=desktop
+ENV PORT=5175
+ENV API_ORIGIN=
+ENV PROXY_PREFIXES=/rpc,/templates
+ENV PROXY_TIMEOUT_MS=30000
+
+WORKDIR /app
+
+COPY --from=web-builder /web/build ./build
+COPY --from=web-builder /web/scripts/serveStaticApp.mjs ./scripts/serveStaticApp.mjs
+
+USER node
+
+EXPOSE 5175
+
+CMD ["node", "scripts/serveStaticApp.mjs"]
+
+# ======================
+# 3) Go builder
+# ======================
+FROM --platform=$BUILDPLATFORM ${GO_BUILDER_IMAGE} AS go-builder
 
 ARG GO_TARGETOS
 ARG GO_TARGETARCH
@@ -91,9 +120,9 @@ RUN --mount=type=cache,id=plush-gomod,target=/go/pkg/mod \
       -o ./bin/rotate-manual-acceptance-passwords ./cmd/rotate-manual-acceptance-passwords
 
 # ======================
-# 3) Runtime 阶段
+# 4) Server runtime；复用同一 web-builder，不再次编译前端
 # ======================
-FROM --platform=$RUNTIMEPLATFORM ${RUNTIME_BASE_IMAGE}
+FROM --platform=$RUNTIMEPLATFORM ${RUNTIME_BASE_IMAGE} AS server-runtime
 
 ARG CHROMIUM_VERSION
 
@@ -132,10 +161,10 @@ ENV IMAGE_TAG=${IMAGE_TAG}
 
 WORKDIR /app
 
-COPY --from=builder /src/bin/server /app/server
-COPY --from=builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core
-COPY --from=builder /src/bin/rotate-manual-acceptance-passwords /app/rotate-manual-acceptance-passwords
-COPY --from=builder /src/configs/prod /app/configs
+COPY --from=go-builder /src/bin/server /app/server
+COPY --from=go-builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core
+COPY --from=go-builder /src/bin/rotate-manual-acceptance-passwords /app/rotate-manual-acceptance-passwords
+COPY --from=go-builder /src/configs/prod /app/configs
 COPY --from=web-builder /web/build /app/public
 
 EXPOSE 8300

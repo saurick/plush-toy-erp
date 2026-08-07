@@ -28,24 +28,122 @@ env:
   DISPOSABLE_DATABASE_BASE_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/postgres?sslmode=disable
 
 jobs:
+  plan:
+    name: Trusted range and affected plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      effective_mode: ${{ steps.plan.outputs.effective_mode }}
+      full: ${{ steps.plan.outputs.full }}
+      make_data: ${{ steps.plan.outputs.make_data }}
+      needs_atlas: ${{ steps.plan.outputs.needs_atlas }}
+      needs_chromium: ${{ steps.plan.outputs.needs_chromium }}
+      needs_go: ${{ steps.plan.outputs.needs_go }}
+      needs_postgres: ${{ steps.plan.outputs.needs_postgres }}
+      needs_system_tools: ${{ steps.plan.outputs.needs_system_tools }}
+      needs_web: ${{ steps.plan.outputs.needs_web }}
+      source_archive: ${{ steps.plan.outputs.source_archive }}
+      range: ${{ steps.range.outputs.range }}
+    steps:
+      - name: Check out complete comparison history without credentials
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve range and scan candidate history before repository scripts
+        id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          zero=0000000000000000000000000000000000000000
+          empty_tree="$(git hash-object -t tree /dev/null)"
+          trusted_config_sha=HEAD
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            range="$PR_BASE_SHA...HEAD"
+            history_range="$(git merge-base "$PR_BASE_SHA" HEAD)..HEAD"
+            trusted_config_sha="$PR_BASE_SHA"
+            gate_mode=affected
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            if [[ "$PUSH_BEFORE_SHA" == "$zero" ]]; then
+              range="$empty_tree..HEAD"
+            elif git cat-file -e "$PUSH_BEFORE_SHA^{commit}"; then
+              range="$PUSH_BEFORE_SHA..HEAD"
+            else
+              echo "[ci] push before SHA is unavailable: $PUSH_BEFORE_SHA"
+              exit 1
+            fi
+            history_range="$range"
+            gate_mode=full
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if git rev-parse --verify 'HEAD^' >/dev/null 2>&1; then
+              range="HEAD^..HEAD"
+            else
+              range="$empty_tree..HEAD"
+            fi
+            history_range="$range"
+            gate_mode="$REQUESTED_MODE"
+          else
+            echo "[ci] unsupported event: $EVENT_NAME"
+            exit 1
+          fi
+          if [[ "$gate_mode" != "affected" && "$gate_mode" != "full" ]]; then
+            echo "[ci] unsupported gate mode: $gate_mode"
+            exit 1
+          fi
+          git diff --check "$range"
+          git log --check --format= "$history_range"
+          trusted_config="$RUNNER_TEMP/trusted-gitleaks.toml"
+          git show "$trusted_config_sha:.gitleaks.toml" > "$trusted_config"
+          archive="$RUNNER_TEMP/gitleaks_8.30.1_linux_x64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$archive"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" \
+            | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/gitleaks-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
+          "$RUNNER_TEMP/gitleaks-bin/gitleaks" git \
+            --config "$trusted_config" \
+            --log-opts "$history_range" \
+            --no-banner \
+            --redact \
+            "$GITHUB_WORKSPACE"
+          echo "range=$range" >> "$GITHUB_OUTPUT"
+          echo "gate_mode=$gate_mode" >> "$GITHUB_OUTPUT"
+          echo "comparison_range=$range"
+          echo "gate_mode=$gate_mode"
+      - name: Set up repository Node.js after the trusted scan
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .n-node-version
+      - name: Build the executable CI plan
+        id: plan
+        run: |
+          set -euo pipefail
+          node scripts/qa/ci-plan.mjs \
+            --range "${{ steps.range.outputs.range }}" \
+            --mode "${{ steps.range.outputs.gate_mode }}" \
+            --github-output "$GITHUB_OUTPUT" \
+            --out output/ci/plan.json
+      - name: Persist the CI plan
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ci-plan-${{ github.sha }}
+          path: output/ci/plan.json
+          if-no-files-found: error
+          retention-days: 30
+
   quality:
-    name: Affected or full repository gate
+    name: Repository quality
+    needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    services:
-      postgres:
-        image: postgres:18.1
-        env:
-          POSTGRES_PASSWORD: ci-local-password
-        ports:
-          - 55432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
     steps:
-      - name: Check out the complete comparison history
+      - name: Check out the candidate without credentials
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           fetch-depth: 0
@@ -54,30 +152,74 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version-file: .n-node-version
-      - name: Set up Go
+      - name: Set up Go when selected
+        if: needs.plan.outputs.needs_go == 'true'
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
-      - name: Set up pinned Atlas
+      - name: Set up pinned Atlas when selected
+        if: needs.plan.outputs.needs_atlas == 'true'
         uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
         with:
           version: v0.38.0
-      - name: Install gate dependencies
+      - name: Start PostgreSQL only when selected
+        if: needs.plan.outputs.needs_postgres == 'true'
+        run: |
+          set -euo pipefail
+          docker run --detach --rm \
+            --name plush-ci-postgres \
+            --env POSTGRES_PASSWORD=ci-local-password \
+            --publish 55432:5432 \
+            --health-cmd 'pg_isready -U postgres' \
+            --health-interval 2s \
+            --health-timeout 5s \
+            --health-retries 30 \
+            postgres:18.1
+          for attempt in {1..30}; do
+            health="$(docker inspect --format '{{.State.Health.Status}}' plush-ci-postgres)"
+            if [[ "$health" == "healthy" ]]; then
+              echo "[ci] PostgreSQL is ready after attempt=$attempt"
+              exit 0
+            fi
+            if [[ "$health" == "unhealthy" ]]; then
+              echo "[ci] PostgreSQL became unhealthy"
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "[ci] PostgreSQL readiness timed out"
+          exit 1
+      - name: Install full-gate system and Go tools
+        if: needs.plan.outputs.needs_system_tools == 'true'
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes lsof postgresql-client ripgrep shellcheck yamllint
-          npm install --global pnpm@10.13.1
-          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          archive="$RUNNER_TEMP/gitleaks_8.30.1_linux_x64.tar.gz"
+          curl --fail --location --silent --show-error \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$archive"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" \
+            | sha256sum --check --strict
+          tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
+          chmod 0755 "$RUNNER_TEMP/gitleaks"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
           go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
           go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-      - name: Install Web dependencies and Chromium
+      - name: Install locked Web dependencies when selected
+        if: needs.plan.outputs.needs_web == 'true'
         working-directory: web
         run: |
           set -euo pipefail
+          npm install --global pnpm@10.13.1
           pnpm install --frozen-lockfile
+      - name: Install and verify Chromium only for full
+        if: needs.plan.outputs.needs_chromium == 'true'
+        working-directory: web
+        run: |
+          set -euo pipefail
           pnpm exec playwright install --with-deps chromium
           chrome_path="$(node -e 'const { chromium } = require("playwright"); process.stdout.write(chromium.executablePath())')"
           if [[ ! -x "$chrome_path" ]]; then
@@ -99,89 +241,72 @@ jobs:
           fi
           echo "CHROME_DEVEL_SANDBOX=$sandbox_path" >> "$GITHUB_ENV"
           echo "ERP_PDF_CHROME_PATH=$chrome_path" >> "$GITHUB_ENV"
-      - name: Resolve and validate the exact Git comparison range
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REQUESTED_MODE: ${{ inputs.mode }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
+      - name: Prove Ent and Atlas generation when selected
+        if: needs.plan.outputs.make_data == 'true'
+        working-directory: server
         run: |
           set -euo pipefail
-          zero=0000000000000000000000000000000000000000
-          empty_tree="$(git hash-object -t tree /dev/null)"
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            range="$PR_BASE_SHA...HEAD"
-            history_range="$(git merge-base "$PR_BASE_SHA" HEAD)..HEAD"
-          elif [[ "$EVENT_NAME" == "push" ]]; then
-            if [[ "$PUSH_BEFORE_SHA" == "$zero" ]]; then
-              range="$empty_tree..HEAD"
-              history_range="$range"
-            elif git cat-file -e "$PUSH_BEFORE_SHA^{commit}"; then
-              range="$PUSH_BEFORE_SHA..HEAD"
-              history_range="$range"
-            else
-              echo "[ci] push before SHA is unavailable: $PUSH_BEFORE_SHA"
-              exit 1
-            fi
-          elif git rev-parse --verify 'HEAD^' >/dev/null 2>&1; then
-            range="HEAD^..HEAD"
-            history_range="$range"
-          else
-            range="$empty_tree..HEAD"
-            history_range="$range"
-          fi
-          git diff --check "$range"
-          git log --check --format= "$history_range"
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            gate_mode=affected
-          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            gate_mode="$REQUESTED_MODE"
-          else
-            gate_mode=full
-          fi
-          if [[ "$gate_mode" != "affected" && "$gate_mode" != "full" ]]; then
-            echo "[ci] unsupported gate mode: $gate_mode"
-            exit 1
-          fi
-          echo "QA_BASE_RANGE=$range" >> "$GITHUB_ENV"
-          echo "CI_GATE_MODE=$gate_mode" >> "$GITHUB_ENV"
-          echo "comparison_range=$range"
-          echo "gate_mode=$gate_mode"
-      - name: Prove generation drift only for a full candidate
-        run: |
-          set -euo pipefail
-          if [[ "$CI_GATE_MODE" != "full" ]]; then
-            echo "[ci] generation drift deferred to full candidate"
-            exit 0
-          fi
-          cd server
           make data
-          cd ..
-          status="$(git status --porcelain --untracked-files=all)"
+          status="$(git -C .. status --porcelain --untracked-files=all)"
           if [[ -n "$status" ]]; then
             printf '%s\n' "$status"
             echo "[ci] make data changed the committed tree"
             exit 1
           fi
       - name: Run the selected repository quality gate
+        env:
+          QA_BASE_RANGE: ${{ needs.plan.outputs.range }}
         run: |
           set -euo pipefail
-          if [[ "$CI_GATE_MODE" == "affected" ]]; then
+          if [[ "${{ needs.plan.outputs.effective_mode }}" == "affected" ]]; then
             bash scripts/qa/affected.sh --base "$QA_BASE_RANGE" --run
           else
             node scripts/qa/run-gate-with-receipt.mjs --gate full
           fi
-      - name: Validate the committed source archive for a full candidate
+      - name: Validate committed source archive for full
+        if: needs.plan.outputs.source_archive == 'true'
         run: |
           set -euo pipefail
-          if [[ "$CI_GATE_MODE" != "full" ]]; then
-            echo "[ci] source archive validation deferred to full candidate"
-            exit 0
-          fi
           node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD
           status="$(git status --porcelain --untracked-files=all)"
           if [[ -n "$status" ]]; then
             printf '%s\n' "$status"
-            echo "[ci] full gate changed the committed tree"
+            echo "[ci] quality gate changed the committed tree"
             exit 1
           fi
+      - name: Persist full quality receipt
+        if: always() && needs.plan.outputs.full == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-receipt-${{ github.sha }}
+          path: output/dev-workbench/receipts/full-latest.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove selected PostgreSQL runtime
+        if: always() && needs.plan.outputs.needs_postgres == 'true'
+        run: |
+          set -euo pipefail
+          if docker inspect plush-ci-postgres >/dev/null 2>&1; then
+            docker rm --force plush-ci-postgres >/dev/null
+          fi
+
+  ci_gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - plan
+      - quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require planning and selected quality to complete
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$PLAN_RESULT" != "success" || "$QUALITY_RESULT" != "success" ]]; then
+            echo "[ci] plan=$PLAN_RESULT quality=$QUALITY_RESULT"
+            exit 1
+          fi
+          echo "[ci] status=complete plan=$PLAN_RESULT quality=$QUALITY_RESULT"

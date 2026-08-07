@@ -104,6 +104,21 @@ Actions run ID、job ID、可变 tag 和页面显示名称只作辅助信息。
 
 每层先执行便宜的身份、语法、清单和配置 preflight，再进入 Web、Go、数据库、浏览器和制品等高成本阶段。失败写一条精确 blocker 后停止，不自行发起 fresh lifecycle。
 
+普通 CI 先在不执行候选仓库脚本的 `plan` job 中确定可信比较范围，并用默认分支的扫描配置检查候选提交历史。随后才生成 affected 计划，按计划安装 Go、Atlas、Web、Chromium 和 PostgreSQL；文档等轻量变更不启动数据库。PR 触及 Ent schema、generated migration descriptor 或 Atlas 配置时，在 affected 测试前额外运行 `make data` 并要求 committed tree 零漂移。分支保护只绑定稳定的 `CI Gate`，该汇总 job 要求 plan 与实际选中的 quality job 都成功，不能用跳过重型准备换取误绿。
+
+正式 Release workflow 默认只读；只有受 `release` Environment 约束的 publish job 获得 Release / Package 写权限。候选必须同时等于 workflow SHA、checkout HEAD 和最新 `origin/main`。strict 终态复用同时绑定 artifact、workflow、SHA、run ID、run attempt、固定 strict job、门禁 fingerprint 和回执摘要；发布目录固定为六个 public assets，版本名与 SHA 全局一一对应，远端资产的 digest 与 size 必须逐项读回。
+
+## 效能计时与优化边界
+
+耗时证据沿用现有真源，不另建第二套流水线或时序数据库：
+
+- GitHub Provider 只读固定仓库最近的 CI / Release run，并读取对应 attempt 的 job 与 step 时间；Bridge 缓存 60 秒，GitHub 仍是远端时间真源。
+- `full` / `strict` 把环境、共享检查、敏感信息、Web、浏览器、服务端与数据库、漏洞扫描等阶段写入同一质量回执；passed 回执缺任一阶段时间即失败关闭。
+- promotion / rollback 的目标脚本把每个固定远端阶段及总耗时写入 v2 脱敏终态回执；失败回执保留已通过阶段和失败阶段，不保存原始日志或凭据。
+- 工作台首屏展示最近完整运行、完整样本中位数、最长环节和建议复核点；全部 job / step、质量门禁阶段和 operation 阶段按需展开，长列表保持横向滚动与移动端可读。
+
+耗时只用于定位瓶颈，不能自动把有共享数据库、浏览器锁、migration、promotion 或同一目标写入的步骤改成并发。优化前先确认等待时间、重复构建、重复安装或真实计算中的哪一类占主导；优化后用同口径多次运行比较，不能用单次偶然值宣布完成。
+
 ## 发布与回滚
 
 133 固定只做：
@@ -218,6 +233,12 @@ schema / guard / 备份编排文件组成独立 source fingerprint，避免无�
 已到 head 时不迁移、不备份、不重建；后端只在确认 apply 后重启一次。正式发布
 仍绑定不可变制品、目标备份、migration、health / ready、业务 smoke 和 rollback
 point，本地工作台结果不能冒充 133 promotion、岗位 UAT 或客户签收。
+
+## 临时数据库生命周期
+
+临时库只允许使用已登记的 disposable profile 和 run ID，不把长期开发库、133 逻辑库或无法分类的库伪装成可清理对象。日常治理固定为：只读 inventory → 确认零连接、归属和仓库引用 → archive → 临时 restore → migration / schema / table count 指纹读回 → 删除 restore 库并确认零残留 → 生成绑定备份哈希、数据库名和目标指纹的精确确认串 → drop → 再跑 inventory。
+
+archive 与 cleanup 默认只接受 loopback；登记的 `192.168.0.106:5432` 必须显式使用 `--allow-registered-development`。长期库和未分类库即使零连接也拒绝删除。备份、manifest 和 cleanup report 保留在 ignored evidence，源库删除不删除归档；测试 lifecycle 无论成功或失败都必须清理同批 disposable 数据库并读回零残留。
 
 ## 工作台交互
 
