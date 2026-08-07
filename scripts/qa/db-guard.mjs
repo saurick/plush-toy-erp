@@ -261,10 +261,10 @@ function pluralizeTableName(value) {
   return `${value}s`;
 }
 
-function currentOrBaselineSource(root, file) {
+function currentOrBaselineSource(root, file, range) {
   const target = path.join(root, file);
   if (existsSync(target)) return readFileSync(target, "utf8");
-  return runGit(root, ["show", `HEAD:${file}`]);
+  return baselineSource(root, file, range);
 }
 
 function baselineRevision(root, range) {
@@ -628,7 +628,7 @@ function dropIndexesRemovedWithTheirOnlyTrackedColumn(tokenOperations) {
 }
 
 function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
-  const source = currentOrBaselineSource(root, file);
+  const source = currentOrBaselineSource(root, file, range);
   const table = schemaTableName(source, file);
   const zeroContext = schemaDiffText(root, file, range, untrackedFiles);
   const changedLines = changedSchemaLines(zeroContext);

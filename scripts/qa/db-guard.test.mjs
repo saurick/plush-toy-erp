@@ -163,6 +163,22 @@ test("db guard sees a new ref schema change through empty-tree..HEAD", async () 
   });
 });
 
+test("db guard reads a deleted schema from the comparison baseline", async () => {
+  await withRepository(async (root) => {
+    await rm(path.join(root, "server/internal/data/model/schema/item.go"));
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql",
+      "DROP TABLE items;\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+    commitAll(root, "remove item schema");
+
+    const result = evaluateDbGuard({ root, range: "HEAD^..HEAD" });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  });
+});
+
 test("db guard requires a newly added migration for structural schema changes", async () => {
   await withRepository(async (root) => {
     await write(
