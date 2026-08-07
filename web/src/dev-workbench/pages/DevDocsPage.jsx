@@ -11,7 +11,7 @@ import {
   RightOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Space, Tag, Tooltip, Typography } from 'antd'
+import { Button, Empty, Segmented, Space, Tag, Tooltip, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
@@ -20,6 +20,8 @@ import DevPageNav from '../components/DevPageNav.jsx'
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
   DEV_DOCS_PINNED_STORAGE_KEY,
+  DEV_DOCS_SEARCH_SCOPE_ALL,
+  DEV_DOCS_SEARCH_SCOPE_TITLE,
   DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
   DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
   applyDevDocsPinnedState,
@@ -40,6 +42,10 @@ import {
 const { Paragraph, Text, Title } = Typography
 
 const DEFAULT_EXPANDED_DIR_KEYS = Object.freeze([])
+const SEARCH_SCOPE_OPTIONS = Object.freeze([
+  { label: '全部', value: DEV_DOCS_SEARCH_SCOPE_ALL },
+  { label: '仅标题', value: DEV_DOCS_SEARCH_SCOPE_TITLE },
+])
 
 const markdownModules = import.meta.glob(
   [
@@ -317,6 +323,7 @@ export default function DevDocsPage() {
     [docTree]
   )
   const [keyword, setKeyword] = useState('')
+  const [searchScope, setSearchScope] = useState(DEV_DOCS_SEARCH_SCOPE_ALL)
   const [selectedKey, setSelectedKey] = useState(() =>
     readSelectedKey(docsWithPinnedState, location.search)
   )
@@ -337,8 +344,10 @@ export default function DevDocsPage() {
 
   const visibleDocs = useMemo(
     () =>
-      sortDevDocsItemsByPinned(filterDevDocsItems(docsWithSearchText, keyword)),
-    [docsWithSearchText, keyword]
+      sortDevDocsItemsByPinned(
+        filterDevDocsItems(docsWithSearchText, keyword, searchScope)
+      ),
+    [docsWithSearchText, keyword, searchScope]
   )
   const pinnedDocs = useMemo(
     () =>
@@ -349,6 +358,7 @@ export default function DevDocsPage() {
   )
   const trimmedKeyword = keyword.trim()
   const isSearching = trimmedKeyword.length > 0
+  const isTitleOnlySearch = searchScope === DEV_DOCS_SEARCH_SCOPE_TITLE
   const allExpanded =
     allDirectoryKeys.length > 0 &&
     allDirectoryKeys.every((key) => expandedKeys.has(key))
@@ -673,10 +683,25 @@ export default function DevDocsPage() {
             aria-label="搜索开发文档"
             value={keyword}
             placeholder="搜索开发文档"
-            searchHint="可搜索：标题、路径或正文；不搜索时按目录树浏览"
+            searchHint={
+              isTitleOnlySearch
+                ? '当前仅搜索文档标题；切换“全部”可搜索路径和正文'
+                : '当前搜索标题、路径或正文；不搜索时按目录树浏览'
+            }
             onChange={(event) => setKeyword(event.target.value)}
             className="erp-dev-docs-search"
           />
+          <div className="erp-dev-docs-search-scope">
+            <Text type="secondary">搜索范围</Text>
+            <Segmented
+              size="small"
+              aria-label="开发文档搜索范围"
+              className="erp-dev-docs-search-scope__control"
+              options={SEARCH_SCOPE_OPTIONS}
+              value={searchScope}
+              onChange={setSearchScope}
+            />
+          </div>
 
           {pinnedDocs.length > 0 ? (
             <details className="erp-dev-docs-sidebar__section erp-dev-docs-pinned erp-dev-docs-pinned-disclosure">
@@ -810,7 +835,11 @@ export default function DevDocsPage() {
                 ) : (
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="没有匹配的文档"
+                    description={
+                      isTitleOnlySearch
+                        ? '标题中没有匹配文档，可切换到“全部”搜索路径和正文'
+                        : '没有匹配的文档'
+                    }
                   />
                 )}
               </div>

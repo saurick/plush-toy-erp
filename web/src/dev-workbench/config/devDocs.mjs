@@ -20,6 +20,9 @@ export const DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY =
 export const DEV_DOCS_TOC_EXPANDED_STORAGE_KEY =
   'plush_erp_dev_docs_toc_expanded'
 
+export const DEV_DOCS_SEARCH_SCOPE_ALL = 'all'
+export const DEV_DOCS_SEARCH_SCOPE_TITLE = 'title'
+
 export function isDevDocsEnabled(env = import.meta.env) {
   return env?.DEV === true
 }
@@ -286,7 +289,11 @@ export function buildDevDocsTree(items = []) {
   return root.children
 }
 
-export function filterDevDocsItems(items = [], keyword = '') {
+export function filterDevDocsItems(
+  items = [],
+  keyword = '',
+  scope = DEV_DOCS_SEARCH_SCOPE_ALL
+) {
   const query = String(keyword || '')
     .trim()
     .toLowerCase()
@@ -295,7 +302,10 @@ export function filterDevDocsItems(items = [], keyword = '') {
   }
 
   return items.filter((item) =>
-    [item.title, item.path, item.group, item.searchText]
+    (scope === DEV_DOCS_SEARCH_SCOPE_TITLE
+      ? [item.title]
+      : [item.title, item.path, item.group, item.searchText]
+    )
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(query))
   )

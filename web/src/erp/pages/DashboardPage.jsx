@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { ArrowRightOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, ArrowRightOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -94,10 +94,15 @@ import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mj
 import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
 import { getWorkflowTaskProcessingHint } from '../utils/workflowTaskProcessingHint.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
+import { canViewPermissionRelationshipGraph } from '../utils/permissionRelationshipGraph.mjs'
 import {
   canViewWorkflowApprovalInbox,
   getWorkflowApprovalInboxCapabilityKeys,
 } from '../utils/workflowApprovalInbox.mjs'
+
+const PermissionRelationshipGraphModal = React.lazy(
+  () => import('../components/PermissionRelationshipGraphModal.jsx')
+)
 
 const { Paragraph, Text, Title } = Typography
 
@@ -553,6 +558,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
   const [workbenchQueuePage, setWorkbenchQueuePage] = useState(1)
   const [selectedWorkbenchTaskId, setSelectedWorkbenchTaskId] = useState('')
+  const [permissionRelationshipOpen, setPermissionRelationshipOpen] =
+    useState(false)
   const [taskBoardTransitionMinHeight, setTaskBoardTransitionMinHeight] =
     useState(0)
   const mountedRef = useRef(false)
@@ -571,6 +578,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const canViewPermissionRelationship =
+    canViewPermissionRelationshipGraph(adminProfile)
   const workflowApprovalInboxCapabilityKeys = useMemo(
     () => getWorkflowApprovalInboxCapabilityKeys(adminProfile),
     [adminProfile]
@@ -1591,6 +1600,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   登录后先看今天该处理什么，再进入相关业务页面继续办理。
                 </Paragraph>
               </div>
+              {canViewPermissionRelationship ? (
+                <Button
+                  className="erp-workbench-permission-relationship-entry"
+                  icon={<ApartmentOutlined />}
+                  aria-label="权限关系图"
+                  onClick={() => setPermissionRelationshipOpen(true)}
+                >
+                  权限关系图
+                </Button>
+              ) : null}
             </div>
 
             <div
@@ -2113,6 +2132,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             )}
           </div>
         </Card>
+      ) : null}
+
+      {permissionRelationshipOpen && canViewPermissionRelationship ? (
+        <React.Suspense fallback={null}>
+          <PermissionRelationshipGraphModal
+            open
+            adminProfile={adminProfile}
+            onClose={() => setPermissionRelationshipOpen(false)}
+            onManagePermissions={() => {
+              setPermissionRelationshipOpen(false)
+              navigate('/erp/system/permissions')
+            }}
+          />
+        </React.Suspense>
       ) : null}
 
       <WorkflowTaskActionDrawer

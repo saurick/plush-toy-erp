@@ -2840,6 +2840,452 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'erp-permission-relationship-graph-desktop',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      adminProfile: {
+        id: 44,
+        username: '权限管理员',
+        is_super_admin: false,
+        account_status: 'active',
+        roles: [
+          { role_key: 'sales', name: '业务' },
+          { role_key: 'finance', name: '财务' },
+        ],
+        permissions: [
+          'erp.workbench.read',
+          'workflow.task.read',
+          'workflow.task.approve',
+          'sales_order.read',
+          'system.user.read',
+          'system.role.read',
+          'system.permission.read',
+          'customer_config.read',
+        ],
+        menus: [
+          {
+            key: 'global-dashboard',
+            label: '工作台',
+            path: '/erp/dashboard',
+            required_any: ['erp.workbench.read'],
+            required_all: [],
+          },
+          {
+            key: 'permission-center',
+            label: '权限配置',
+            path: '/erp/system/permissions',
+            required_any: ['system.permission.read'],
+            required_all: [],
+          },
+        ],
+      },
+      effectiveSession: {
+        configRevision: 'style-l1-permission-relationship',
+        configHash: 'style-l1-permission-relationship-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        roles: ['sales', 'finance'],
+        pages: ['global-dashboard', 'permission-center'],
+        actions: [
+          'erp.workbench.read',
+          'workflow.task.read',
+          'workflow.task.approve',
+          'sales_order.read',
+          'system.user.read',
+          'system.role.read',
+          'system.permission.read',
+          'customer_config.read',
+        ],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '工作台')
+        await page.waitForTimeout(1200)
+        const entryDiagnostic = await page.evaluate(() => ({
+          entryCount: document.querySelectorAll(
+            '.erp-workbench-permission-relationship-entry'
+          ).length,
+          workbenchCount: document.querySelectorAll(
+            '.erp-workbench-command-card'
+          ).length,
+          productCoreCount: document.querySelectorAll(
+            '[data-product-core-dashboard="true"]'
+          ).length,
+          buttons: [...document.querySelectorAll('button')]
+            .filter(
+              (button) => button.offsetWidth > 0 && button.offsetHeight > 0
+            )
+            .map((button) =>
+              String(button.textContent || '')
+                .replace(/\s+/gu, ' ')
+                .trim()
+            ),
+          storedPermissions: JSON.parse(
+            localStorage.getItem('admin_permissions') || '[]'
+          ),
+          bodyText: String(document.body.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim()
+            .slice(0, 500),
+        }))
+        assert.equal(
+          entryDiagnostic.entryCount,
+          1,
+          '具备完整只读权限的管理员应看到权限关系图入口: ' +
+            JSON.stringify(entryDiagnostic)
+        )
+        assert(
+          entryDiagnostic.buttons.includes('权限关系图'),
+          '权限关系图入口已渲染但当前不可见: ' +
+            JSON.stringify(entryDiagnostic)
+        )
+        const entry = page.getByRole('button', {
+          name: '权限关系图',
+          exact: true,
+        })
+        await entry.waitFor({ state: 'visible', timeout: 10_000 })
+        const entryMetrics = await page.evaluate(() => {
+          const header = document.querySelector('.erp-workbench-command-head')
+          const button = document.querySelector(
+            '.erp-workbench-permission-relationship-entry'
+          )
+          const headerRect = header?.getBoundingClientRect()
+          const buttonRect = button?.getBoundingClientRect()
+          return {
+            headerRight: headerRect?.right || 0,
+            buttonRight: buttonRect?.right || 0,
+            buttonTop: buttonRect?.top || 0,
+            headerTop: headerRect?.top || 0,
+            buttonWidth: buttonRect?.width || 0,
+            overflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          entryMetrics.buttonWidth >= 100 &&
+            Math.abs(entryMetrics.headerRight - entryMetrics.buttonRight) <=
+              2 &&
+            entryMetrics.buttonTop >= entryMetrics.headerTop - 1 &&
+            entryMetrics.overflow <= 1,
+          '权限关系图入口应位于工作台标题栏右侧且不造成溢出: ' +
+            JSON.stringify(entryMetrics)
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-permission-relationship-workbench-entry.png'
+          ),
+          fullPage: false,
+        })
+
+        await entry.click()
+        const modal = page.locator('.erp-permission-relationship-modal')
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(modal, '从账号到最终可用范围，一张图看清')
+        await expectText(modal, '关系图是只读结果')
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
+        await expectText(modal, '关联账号')
+        await expectText(modal, '关联岗位')
+        await expectText(modal, '最终可用功能')
+        await expectText(modal, '审批责任')
+        await assertTextAbsent(modal, '13800138000')
+        await assertTextAbsent(modal, 'sales_order.read')
+        await assertTextAbsent(modal, 'style-l1-active-revision')
+
+        const roleGraphMetrics = await page.evaluate(() => {
+          const modal = document.querySelector(
+            '.erp-permission-relationship-modal'
+          )
+          const body = modal?.querySelector('.ant-modal-body')
+          const graphViewport = modal?.querySelector(
+            '.erp-markdown-mermaid__viewport'
+          )
+          const summary = modal?.querySelector(
+            '.erp-permission-relationship__summary'
+          )
+          const modalRect = modal?.getBoundingClientRect()
+          const viewportRect = graphViewport?.getBoundingClientRect()
+          return {
+            modalLeft: modalRect?.left || 0,
+            modalRight: modalRect?.right || 0,
+            modalTop: modalRect?.top || 0,
+            modalBottom: modalRect?.bottom || 0,
+            modalBodyClientHeight: body?.clientHeight || 0,
+            modalBodyScrollHeight: body?.scrollHeight || 0,
+            graphWidth: viewportRect?.width || 0,
+            graphHeight: viewportRect?.height || 0,
+            summaryColumns: summary
+              ? window
+                  .getComputedStyle(summary)
+                  .gridTemplateColumns.split(' ').length
+              : 0,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+            documentOverflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          roleGraphMetrics.modalLeft >= 0 &&
+            roleGraphMetrics.modalRight <=
+              roleGraphMetrics.viewportWidth + 1 &&
+            roleGraphMetrics.modalTop >= 0 &&
+            roleGraphMetrics.modalBottom <=
+              roleGraphMetrics.viewportHeight + 1 &&
+            roleGraphMetrics.modalBodyClientHeight > 0 &&
+            roleGraphMetrics.modalBodyScrollHeight >=
+              roleGraphMetrics.modalBodyClientHeight &&
+            roleGraphMetrics.graphWidth > 600 &&
+            roleGraphMetrics.graphHeight >= 360 &&
+            roleGraphMetrics.summaryColumns === 6 &&
+            roleGraphMetrics.documentOverflow <= 1,
+          '权限关系图桌面浮层、摘要和图形尺寸异常: ' +
+            JSON.stringify(roleGraphMetrics)
+        )
+        await modal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-permission-relationship-role-desktop.png'
+          ),
+        })
+
+        const moduleSelect = modal.getByLabel('选择功能模块').first()
+        await moduleSelect.locator('.ant-select-selector').click()
+        const moduleDropdown = page.locator('.ant-select-dropdown:visible')
+        await moduleDropdown.waitFor({ state: 'visible', timeout: 5000 })
+        const moduleLabels = await moduleDropdown
+          .locator('.ant-select-item-option-content')
+          .allTextContents()
+        assert(
+          moduleLabels.some((label) => label.trim() === '仓储'),
+          '权限关系图功能范围缺少仓储: ' +
+            JSON.stringify(moduleLabels)
+        )
+        await moduleDropdown
+          .locator('.ant-select-item-option')
+          .filter({ hasText: '仓储' })
+          .click()
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
+        await expectText(modal, '查看库存')
+        await expectText(modal, '库存台账')
+        await modal.locator('.erp-permission-relationship__graph').screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-permission-relationship-module-detail.png'
+          ),
+        })
+
+        await modal.getByText('按员工', { exact: true }).click()
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
+        await expectText(modal, '权限管理员')
+        await expectText(modal, '业务')
+        await expectText(modal, '财务')
+        await modal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-permission-relationship-account-desktop.png'
+          ),
+        })
+
+        await modal
+          .getByRole('button', {
+            name: '全屏查看权限生效关系图',
+            exact: true,
+          })
+          .click()
+        const fullscreen = page.locator(
+          '.erp-markdown-mermaid--fullscreen'
+        )
+        await fullscreen.waitFor({ state: 'visible', timeout: 10_000 })
+        const fullscreenMetrics = await fullscreen.evaluate((node) => {
+          const rect = node.getBoundingClientRect()
+          return {
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+            viewportWidth: window.innerWidth,
+            viewportHeight: window.innerHeight,
+          }
+        })
+        assert(
+          Math.abs(fullscreenMetrics.left) <= 1 &&
+            Math.abs(fullscreenMetrics.top) <= 1 &&
+            Math.abs(
+              fullscreenMetrics.right - fullscreenMetrics.viewportWidth
+            ) <= 1 &&
+            Math.abs(
+              fullscreenMetrics.bottom - fullscreenMetrics.viewportHeight
+            ) <= 1,
+          '权限关系图全屏应覆盖完整浏览器视口: ' +
+            JSON.stringify(fullscreenMetrics)
+        )
+        await fullscreen.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-permission-relationship-fullscreen.png'
+          ),
+        })
+        await page.keyboard.press('Escape')
+        await fullscreen.waitFor({ state: 'detached', timeout: 10_000 })
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+
+        await modal.locator('.ant-modal-footer .ant-btn-primary').click()
+        await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+        await clickERPThemeOption(page, '暗色')
+        await assertERPThemeMode(page, {
+          scenarioName: 'erp-permission-relationship-graph-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await entry.click()
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
+        await assertDarkThemeContrast(page, {
+          scenarioName: 'erp-permission-relationship-graph-dark',
+          selector:
+            '.erp-permission-relationship-modal .ant-modal-content',
+        })
+        await modal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-permission-relationship-dark-desktop.png'
+          ),
+        })
+
+        await page.setViewportSize({ width: 700, height: 900 })
+        const narrowMetrics = await page.evaluate(() => {
+          const modal = document.querySelector(
+            '.erp-permission-relationship-modal'
+          )
+          const toolbar = modal?.querySelector(
+            '.erp-permission-relationship__toolbar'
+          )
+          const summary = modal?.querySelector(
+            '.erp-permission-relationship__summary'
+          )
+          const rect = modal?.getBoundingClientRect()
+          return {
+            modalLeft: rect?.left || 0,
+            modalRight: rect?.right || 0,
+            modalWidth: rect?.width || 0,
+            toolbarColumns: toolbar
+              ? window
+                  .getComputedStyle(toolbar)
+                  .gridTemplateColumns.split(' ').length
+              : 0,
+            summaryColumns: summary
+              ? window
+                  .getComputedStyle(summary)
+                  .gridTemplateColumns.split(' ').length
+              : 0,
+            viewportWidth: window.innerWidth,
+            documentOverflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          narrowMetrics.modalLeft >= 0 &&
+            narrowMetrics.modalRight <= narrowMetrics.viewportWidth + 1 &&
+            narrowMetrics.modalWidth > 0 &&
+            narrowMetrics.toolbarColumns === 1 &&
+            narrowMetrics.summaryColumns === 2 &&
+            narrowMetrics.documentOverflow <= 1,
+          '权限关系图窄屏应堆叠筛选并保持两列摘要: ' +
+            JSON.stringify(narrowMetrics)
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-permission-relationship-mobile-dark.png'
+          ),
+          fullPage: false,
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'erp-permission-relationship-mobile-dark'
+        )
+      },
+    },
+    {
+      name: 'erp-permission-relationship-entry-hidden',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      adminProfile: {
+        id: 45,
+        username: '普通业务员',
+        is_super_admin: false,
+        account_status: 'active',
+        roles: [{ role_key: 'sales', name: '业务' }],
+        permissions: [
+          'erp.workbench.read',
+          'workflow.task.read',
+          'system.user.read',
+          'system.role.read',
+          'system.permission.read',
+        ],
+        menus: [
+          {
+            key: 'global-dashboard',
+            label: '工作台',
+            path: '/erp/dashboard',
+            required_any: ['erp.workbench.read'],
+            required_all: [],
+          },
+        ],
+      },
+      effectiveSession: {
+        configRevision: 'style-l1-permission-relationship-hidden',
+        configHash: 'style-l1-permission-relationship-hidden-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        roles: ['sales'],
+        pages: ['global-dashboard'],
+        actions: [
+          'erp.workbench.read',
+          'workflow.task.read',
+          'system.user.read',
+          'system.role.read',
+          'system.permission.read',
+        ],
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      viewport: { width: 1280, height: 800 },
+      verify: async (page) => {
+        await expectHeading(page, '工作台')
+        await expectNoButton(page, '权限关系图')
+        await assertTextAbsent(page, '从账号到最终可用范围')
+        await assertNoHorizontalOverflow(
+          page,
+          'erp-permission-relationship-entry-hidden'
+        )
+      },
+    },
+    {
       name: 'erp-effective-session-super-admin-product-core',
       path: '/erp/warehouse/shipments',
       auth: 'admin',
@@ -9336,6 +9782,78 @@ export function createStyleL1Scenarios(deps) {
           null,
           '置顶文档默认应折叠，避免挤占搜索和目录'
         )
+        const searchInput = page.getByRole('textbox', {
+          name: '搜索开发文档',
+        })
+        const allSearchScope = page.getByRole('radio', { name: '全部' })
+        const titleSearchScope = page.getByRole('radio', { name: '仅标题' })
+        assert.equal(
+          await page
+            .getByRole('radiogroup', { name: '开发文档搜索范围' })
+            .count(),
+          1,
+          '开发文档搜索范围应使用单一可访问分段控件'
+        )
+        assert.equal(
+          await allSearchScope.isChecked(),
+          true,
+          '开发文档默认应保留标题、路径和正文的全部搜索'
+        )
+        await searchInput.fill('Governance Routing')
+        await page.waitForFunction(
+          () => document.querySelectorAll('[data-dev-doc-key]').length > 0
+        )
+        await allSearchScope.focus()
+        await page.keyboard.press('ArrowRight')
+        assert.equal(
+          await titleSearchScope.isChecked(),
+          true,
+          '搜索范围应支持键盘方向键切换到仅标题'
+        )
+        await expectText(
+          page,
+          '标题中没有匹配文档，可切换到“全部”搜索路径和正文'
+        )
+        assert.equal(
+          await page.locator('[data-dev-doc-key]').count(),
+          0,
+          '仅标题搜索不应保留正文命中结果'
+        )
+        await searchInput.fill('项目治理地图')
+        await page.waitForFunction(
+          () => document.querySelectorAll('[data-dev-doc-key]').length === 1
+        )
+        await expectText(page, '项目治理地图 / Project Governance Map')
+        const searchScopeMetrics = await page.evaluate(() => {
+          const scope = document.querySelector('.erp-dev-docs-search-scope')
+          const control = document.querySelector(
+            '.erp-dev-docs-search-scope__control'
+          )
+          const labels = [
+            ...document.querySelectorAll(
+              '.erp-dev-docs-search-scope__control .ant-segmented-item-label'
+            ),
+          ]
+          return {
+            scopeOverflow:
+              (scope?.scrollWidth || 0) - (scope?.clientWidth || 0),
+            controlOverflow:
+              (control?.scrollWidth || 0) - (control?.clientWidth || 0),
+            clippedLabelCount: labels.filter(
+              (label) => label.scrollWidth > label.clientWidth + 1
+            ).length,
+          }
+        })
+        assert.deepEqual(
+          searchScopeMetrics,
+          { scopeOverflow: 0, controlOverflow: 0, clippedLabelCount: 0 },
+          `开发文档搜索范围不应溢出或裁切标签: ${JSON.stringify(searchScopeMetrics)}`
+        )
+        await page
+          .locator('.erp-dev-docs-search-scope__control')
+          .getByText('全部', { exact: true })
+          .click()
+        await searchInput.fill('')
         await expectText(page, '按目录找')
         await expectText(page, '项目治理地图 / Project Governance Map')
         await expectText(page, '项目治理分流图 / Governance Routing')
@@ -10766,69 +11284,127 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'dev-hub-dark-desktop',
+      name: 'dev-workbench-wide-layout',
       path: '/__dev/',
-      themeMode: 'dark',
-      viewport: { width: 1536, height: 900 },
+      themeMode: 'light',
+      viewport: { width: 2048, height: 1024 },
       verify: async (page) => {
         await expectHeading(
           page,
           '研发效能工作台 / Engineering Delivery Workbench'
         )
-        await expectText(page, '项目治理地图 / Governance Map')
-        await expectText(page, '流程与状态观察台 / Flow & State Observatory')
-        await expectText(page, '开发文档 / Dev Docs')
-        await expectText(page, '测试入口 / Test Entry')
-        await expectText(page, '产品原型 / Prototypes')
-        await expectText(
-          page,
-          '客户配置包预检与发布 / Package Preflight & Release'
+        const metrics = await page.evaluate(() => {
+          const nav = document.querySelector('.erp-dev-workspace-nav')
+          const activeRoute = document.querySelector(
+            '.erp-dev-workspace-nav__route[aria-current="page"]'
+          )
+          const header = document.querySelector('.erp-dev-hub-header')
+          const shell = document.querySelector('.erp-dev-hub-shell')
+          const navRect = nav?.getBoundingClientRect()
+          const activeRouteRect = activeRoute?.getBoundingClientRect()
+          const headerRect = header?.getBoundingClientRect()
+          const shellRect = shell?.getBoundingClientRect()
+
+          return {
+            navWidth: navRect?.width || 0,
+            activeRouteWidth: activeRouteRect?.width || 0,
+            navToHeader:
+              headerRect && navRect ? headerRect.left - navRect.right : 0,
+            headerToRight: headerRect
+              ? document.documentElement.clientWidth - headerRect.right
+              : 0,
+            navToShell:
+              shellRect && navRect ? shellRect.left - navRect.right : 0,
+            shellToRight: shellRect
+              ? document.documentElement.clientWidth - shellRect.right
+              : 0,
+            headerMaxWidth: header ? getComputedStyle(header).maxWidth : '',
+            shellMaxWidth: shell ? getComputedStyle(shell).maxWidth : '',
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
+        })
+
+        assert(
+          metrics.navWidth - metrics.activeRouteWidth <= 16 &&
+            metrics.navToHeader <= 16 &&
+            metrics.headerToRight <= 16 &&
+            metrics.navToShell <= 16 &&
+            metrics.shellToRight <= 16 &&
+            metrics.headerMaxWidth === 'none' &&
+            metrics.shellMaxWidth === 'none' &&
+            metrics.scrollWidth <= metrics.clientWidth + 1,
+          `开发工作台宽屏内容应贴近导航和右边界，不能恢复居中宽度上限: ${JSON.stringify(metrics)}`
         )
-        await expectText(page, '仅本地开发态')
+      },
+    },
+    {
+      name: 'dev-hub-dark-desktop',
+      path: '/__dev/',
+      themeMode: 'dark',
+      viewport: { width: 1536, height: 900 },
+      verify: async (page) => {
+        await page.evaluate(() => {
+          localStorage.removeItem('plush_erp_dev_hub_pinned_routes')
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectHeading(
+          page,
+          '研发效能工作台 / Engineering Delivery Workbench'
+        )
         const defaultMetrics = await page.evaluate(() => ({
           path: location.pathname,
           documentTitle: document.title,
-          cardCount: document.querySelectorAll(
-            '.erp-dev-hub-grid .erp-dev-hub-card'
+          stageCount: document.querySelectorAll('.erp-dev-overview-stage')
+            .length,
+          stageTitles: Array.from(
+            document.querySelectorAll('.erp-dev-overview-stage h3')
+          ).map((heading) => heading.textContent?.trim() || ''),
+          stageActions: Array.from(
+            document.querySelectorAll('.erp-dev-overview-stage__action')
+          ).map((link) => link.textContent?.replace(/\s+/gu, ' ').trim() || ''),
+          stageHrefs: Array.from(
+            document.querySelectorAll('.erp-dev-overview-stage__action')
+          ).map((link) => link.getAttribute('href')),
+          stageToolHrefs: Array.from(
+            document.querySelectorAll('.erp-dev-overview-stage__link')
+          )
+            .map((link) => link.getAttribute('href'))
+            .filter(Boolean),
+          allToolHrefs: Array.from(
+            document.querySelectorAll('.erp-dev-overview-tool__open')
+          )
+            .map((link) => link.getAttribute('href'))
+            .filter(Boolean),
+          stageDetailsCount: document.querySelectorAll(
+            '.erp-dev-overview-stage__details'
           ).length,
-          descriptionCount: document.querySelectorAll(
-            '.erp-dev-hub-grid .erp-dev-hub-card__description'
+          openStageDetailsCount: document.querySelectorAll(
+            '.erp-dev-overview-stage__details[open]'
           ).length,
-          technicalDetailsCount: document.querySelectorAll(
-            '.erp-dev-hub-grid .erp-dev-entry-source-details'
-          ).length,
-          openTechnicalDetailsCount: document.querySelectorAll(
-            '.erp-dev-hub-grid .erp-dev-entry-source-details[open]'
-          ).length,
-          maxCardHeight: Math.max(
+          maxStageHeight: Math.max(
             0,
             ...Array.from(
-              document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
-            ).map((card) => Math.round(card.getBoundingClientRect().height))
+              document.querySelectorAll('.erp-dev-overview-stage')
+            ).map((stage) => Math.round(stage.getBoundingClientRect().height))
           ),
-          pinButtonCount: document.querySelectorAll(
-            '.erp-dev-hub-grid .erp-dev-hub-card__pin'
+          toolsOpen: Boolean(
+            document.querySelector('.erp-dev-overview-tools')?.open
+          ),
+          boundaryOpen: Boolean(
+            document.querySelector('.erp-dev-overview-boundary')?.open
+          ),
+          toolbarHeight: Math.round(
+            document
+              .querySelector('.erp-dev-hub-toolbar')
+              ?.getBoundingClientRect().height || 0
+          ),
+          visibleToolCount: Array.from(
+            document.querySelectorAll('.erp-dev-overview-tool')
+          ).filter((tool) => tool.checkVisibility()).length,
+          pinnedSectionCount: document.querySelectorAll(
+            '.erp-dev-overview-pinned'
           ).length,
-          searchActionButtonCount: document.querySelectorAll(
-            '.erp-dev-hub-toolbar .ant-input-search-button'
-          ).length,
-          enterAriaLabels: [
-            ...document.querySelectorAll(
-              '.erp-dev-hub-grid .erp-dev-hub-card__link'
-            ),
-          ].map((link) => link.getAttribute('aria-label') || ''),
-          firstHref: document
-            .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
-            ?.getAttribute('href'),
-          firstLinkText: document
-            .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
-            ?.textContent?.trim(),
-          hasGovernanceBanner: Boolean(
-            document.querySelector('.erp-dev-hub-governance')
-          ),
-          hasEmptyPinned: Boolean(
-            document.querySelector('.erp-dev-hub-pinned__empty')
-          ),
           faviconHref: document
             .querySelector('link[rel~="icon"]')
             ?.getAttribute('href'),
@@ -10849,64 +11425,168 @@ export function createStyleL1Scenarios(deps) {
           defaultMetrics.documentTitle.startsWith('研发效能工作台 · '),
           `开发导航应提供可区分的浏览器标题: ${JSON.stringify(defaultMetrics)}`
         )
+        assert.deepEqual(defaultMetrics.stageTitles, [
+          '先弄清楚怎么改',
+          '验证这次改动没有越界',
+          '确认配置、数据库和版本可以安全落地',
+        ])
+        assert.deepEqual(defaultMetrics.stageActions, [
+          '进入产品工程',
+          '开始验证',
+          '准备交付',
+        ])
+        assert.deepEqual(defaultMetrics.stageHrefs, [
+          '/__dev/product-engineering',
+          '/__dev/quality',
+          '/__dev/delivery',
+        ])
         assert.equal(
-          defaultMetrics.cardCount,
-          9,
-          `开发导航应渲染 9 个入口: ${JSON.stringify(defaultMetrics)}`
+          new Set(defaultMetrics.stageToolHrefs).size,
+          defaultMetrics.stageToolHrefs.length,
+          `每个具体入口只能出现在一个任务阶段: ${JSON.stringify(defaultMetrics)}`
         )
-        assert.equal(
-          defaultMetrics.descriptionCount,
-          9,
-          `开发导航每张入口卡都应说明用途与边界: ${JSON.stringify(defaultMetrics)}`
+        assert.deepEqual(
+          defaultMetrics.stageToolHrefs.toSorted(),
+          defaultMetrics.allToolHrefs.toSorted(),
+          `三段任务路径与完整工具区必须来自同一入口集合: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
-          defaultMetrics.technicalDetailsCount === 9 &&
-            defaultMetrics.openTechnicalDetailsCount === 0 &&
-            defaultMetrics.maxCardHeight <= 170,
-          `开发导航应保留路径与来源，但默认折叠并控制卡片高度: ${JSON.stringify(defaultMetrics)}`
+          defaultMetrics.stageCount === 3 &&
+            defaultMetrics.stageDetailsCount === 3 &&
+            defaultMetrics.openStageDetailsCount === 0 &&
+            defaultMetrics.maxStageHeight <= 205,
+          `总览首屏应是三段连续任务路径，技术入口默认折叠: ${JSON.stringify(defaultMetrics)}`
         )
-        assert.equal(
-          defaultMetrics.pinButtonCount,
-          9,
-          `开发导航应为每个入口提供置顶按钮: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert(
-          defaultMetrics.firstHref?.startsWith('/__dev/'),
-          `开发导航卡片链接应指向 /__dev 子路径: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert.equal(
-          defaultMetrics.firstLinkText,
-          '进入',
-          `开发导航卡片应提供清晰进入动作: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert.equal(
-          defaultMetrics.searchActionButtonCount,
-          0,
-          `开发导航不应保留无独立用途的搜索动作按钮: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert(
-          defaultMetrics.enterAriaLabels.length === 9 &&
-            new Set(defaultMetrics.enterAriaLabels).size === 9 &&
-            defaultMetrics.enterAriaLabels.every(Boolean),
-          `每个“进入”动作应有唯一可访问名称: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert.equal(
-          defaultMetrics.hasGovernanceBanner,
-          false,
-          `开发导航不应再用规则说明挤占首屏: ${JSON.stringify(defaultMetrics)}`
-        )
-        assert.equal(
-          defaultMetrics.hasEmptyPinned,
-          false,
-          `开发导航无置顶时不应显示空态说明: ${JSON.stringify(defaultMetrics)}`
+        assert.deepEqual(
+          {
+            toolsOpen: defaultMetrics.toolsOpen,
+            boundaryOpen: defaultMetrics.boundaryOpen,
+            toolbarHeight: defaultMetrics.toolbarHeight,
+            visibleToolCount: defaultMetrics.visibleToolCount,
+            pinnedSectionCount: defaultMetrics.pinnedSectionCount,
+          },
+          {
+            toolsOpen: false,
+            boundaryOpen: false,
+            toolbarHeight: 0,
+            visibleToolCount: 0,
+            pinnedSectionCount: 0,
+          },
+          `完整工具、筛选、开发边界和空置顶区都不应挤占默认首屏: ${JSON.stringify(defaultMetrics)}`
         )
         assert(
           defaultMetrics.scrollWidth <= defaultMetrics.clientWidth + 1,
           `开发导航默认态不应横向溢出: ${JSON.stringify(defaultMetrics)}`
         )
 
-        const firstSourceDetails = page
-          .locator('.erp-dev-hub-grid .erp-dev-entry-source-details')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-hub-overview-dark-default-desktop.png'
+          ),
+          fullPage: true,
+        })
+
+        const firstStageDetails = page
+          .locator('.erp-dev-overview-stage__details')
+          .first()
+        await firstStageDetails.locator('summary').focus()
+        await page.keyboard.press('Enter')
+        assert.equal(
+          await firstStageDetails.evaluate((details) => details.open),
+          true,
+          '阶段入口说明应支持键盘展开'
+        )
+        assert.equal(
+          (await firstStageDetails
+            .locator('.erp-dev-overview-stage__link')
+            .count()) > 0,
+          true,
+          '每个任务阶段都应保留至少一个具体入口'
+        )
+        await firstStageDetails
+          .locator('.erp-dev-overview-stage__link')
+          .first()
+          .waitFor({ state: 'visible' })
+        await page.keyboard.press('Enter')
+        assert.equal(
+          await firstStageDetails.evaluate((details) => details.open),
+          false,
+          '阶段入口说明应支持键盘收起'
+        )
+
+        const boundary = page.locator('.erp-dev-overview-boundary')
+        await boundary.locator('summary').focus()
+        await page.keyboard.press('Enter')
+        assert.equal(
+          await boundary.evaluate((details) => details.open),
+          true,
+          '开发态边界应支持键盘展开'
+        )
+        await expectText(page, '仅本地开发态')
+        await page.keyboard.press('Enter')
+        assert.equal(
+          await boundary.evaluate((details) => details.open),
+          false,
+          '开发态边界应支持键盘收起'
+        )
+
+        const toolsDisclosure = page.locator('.erp-dev-overview-tools')
+        await toolsDisclosure.locator(':scope > summary').focus()
+        await page.keyboard.press('Enter')
+        assert.equal(
+          await toolsDisclosure.evaluate((details) => details.open),
+          true,
+          '完整工具区应支持键盘展开'
+        )
+        await expectText(page, '改动指南 / Change Guide')
+        await expectText(page, '业务链观察 / Business Chain Observatory')
+        await expectText(page, '开发文档 / Dev Docs')
+        await expectText(page, '改动验证 / Change Validation')
+        await expectText(page, '测试数据 / Test Data')
+        await expectText(page, '产品原型 / Prototypes')
+        await expectText(page, '客户配置 / Customer Config')
+        await expectText(page, '数据库迁移 / Database Migration')
+        await expectText(page, '版本发布 / Release & Deployment')
+
+        const expandedMetrics = await page.evaluate(() => ({
+          toolCount: document.querySelectorAll('.erp-dev-overview-tool').length,
+          visibleToolCount: Array.from(
+            document.querySelectorAll('.erp-dev-overview-tool')
+          ).filter((tool) => tool.checkVisibility()).length,
+          sourceDetailsCount: document.querySelectorAll(
+            '.erp-dev-overview-tool .erp-dev-entry-source-details'
+          ).length,
+          openSourceDetailsCount: document.querySelectorAll(
+            '.erp-dev-overview-tool .erp-dev-entry-source-details[open]'
+          ).length,
+          pinButtonCount: document.querySelectorAll(
+            '.erp-dev-overview-tool__pin'
+          ).length,
+          searchActionButtonCount: document.querySelectorAll(
+            '.erp-dev-hub-toolbar .ant-input-search-button'
+          ).length,
+          openAriaLabels: Array.from(
+            document.querySelectorAll('.erp-dev-overview-tool__open')
+          ).map((link) => link.getAttribute('aria-label') || ''),
+        }))
+        const expectedToolCount = defaultMetrics.allToolHrefs.length
+        assert(
+          expandedMetrics.toolCount === expectedToolCount &&
+            expandedMetrics.visibleToolCount === expectedToolCount &&
+            expandedMetrics.sourceDetailsCount === expectedToolCount &&
+            expandedMetrics.openSourceDetailsCount === 0 &&
+            expandedMetrics.pinButtonCount === expectedToolCount &&
+            expandedMetrics.searchActionButtonCount === 0 &&
+            expandedMetrics.openAriaLabels.length === expectedToolCount &&
+            new Set(expandedMetrics.openAriaLabels).size ===
+              expectedToolCount &&
+            expandedMetrics.openAriaLabels.every(Boolean),
+          `展开后应完整保留全部入口、来源、置顶和唯一操作名称: ${JSON.stringify(expandedMetrics)}`
+        )
+
+        const firstSourceDetails = toolsDisclosure
+          .locator('.erp-dev-entry-source-details')
           .first()
         await firstSourceDetails.locator('summary').focus()
         await page.keyboard.press('Enter')
@@ -10927,6 +11607,11 @@ export function createStyleL1Scenarios(deps) {
           '路径与维护来源折叠区应支持键盘收起'
         )
 
+        await page.screenshot({
+          path: path.join(outputDir, 'dev-hub-overview-dark-tools-desktop.png'),
+          fullPage: true,
+        })
+
         await page.evaluate(() => {
           localStorage.setItem(
             'plush_erp_dev_hub_pinned_routes',
@@ -10938,15 +11623,13 @@ export function createStyleL1Scenarios(deps) {
           )
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
-        await expectText(page, '置顶 / Pinned')
+        await expectText(page, '常用入口')
         const pinnedMetrics = await page.evaluate(() => ({
           pinnedCount: document.querySelectorAll(
-            '.erp-dev-hub-pinned .erp-dev-hub-card'
+            '.erp-dev-overview-pinned__item'
           ).length,
           pinnedHrefs: Array.from(
-            document.querySelectorAll(
-              '.erp-dev-hub-pinned .erp-dev-hub-card__link'
-            )
+            document.querySelectorAll('.erp-dev-overview-pinned__link')
           ).map((link) => link.getAttribute('href')),
           hasRecentSection: Boolean(
             document.querySelector('.erp-dev-hub-recent')
@@ -10966,17 +11649,18 @@ export function createStyleL1Scenarios(deps) {
           `开发导航应只在已有置顶时显示置顶区并移除最近访问区: ${JSON.stringify(pinnedMetrics)}`
         )
 
+        await page.locator('.erp-dev-overview-tools > summary').click()
         await page
-          .locator('.erp-dev-hub-grid .erp-dev-hub-card')
-          .filter({ hasText: '测试入口 / Test Entry' })
-          .locator('.erp-dev-hub-card__pin')
+          .locator('.erp-dev-overview-tool')
+          .filter({ hasText: '改动验证 / Change Validation' })
+          .locator('.erp-dev-overview-tool__pin')
           .click()
         const pinnedAfterClick = await page.evaluate(() => ({
           storedRoutes: JSON.parse(
             localStorage.getItem('plush_erp_dev_hub_pinned_routes') || '[]'
           ),
           firstPinnedHref: document
-            .querySelector('.erp-dev-hub-pinned .erp-dev-hub-card__link')
+            .querySelector('.erp-dev-overview-pinned__link')
             ?.getAttribute('href'),
           overflow:
             document.documentElement.scrollWidth >
@@ -11011,16 +11695,17 @@ export function createStyleL1Scenarios(deps) {
               .querySelector(
                 '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
               )
-              ?.textContent?.replace(/\s+/gu, '') === '1/9' &&
-            document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
-              .length === 1
+              ?.textContent?.replace(/\s+/gu, '') === '匹配1个入口' &&
+            document.querySelectorAll(
+              '.erp-dev-overview-tool-list .erp-dev-overview-tool'
+            ).length === 1
         )
         const groupMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
-            '.erp-dev-hub-grid .erp-dev-hub-card'
+            '.erp-dev-overview-tool-list .erp-dev-overview-tool'
           ).length,
           onlyHref: document
-            .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
+            .querySelector('.erp-dev-overview-tool__open')
             ?.getAttribute('href'),
           countText:
             document
@@ -11037,7 +11722,7 @@ export function createStyleL1Scenarios(deps) {
           {
             cardCount: 1,
             onlyHref: '/__dev/customer-config',
-            countText: '1/9',
+            countText: '匹配1个入口',
             overflow: false,
           },
           `开发导航分组筛选应只保留客户配置入口: ${JSON.stringify(groupMetrics)}`
@@ -11061,23 +11746,27 @@ export function createStyleL1Scenarios(deps) {
           .locator('.ant-select-item-option')
           .filter({ hasText: '全部 / All' })
           .click()
-        await page.getByPlaceholder('搜索入口或路径').fill('测试入口')
+        await page.keyboard.press('Escape')
+        await groupDropdown.waitFor({ state: 'hidden' })
+        const toolSearch = page.getByPlaceholder('搜索具体工具或路径')
+        await toolSearch.fill('改动验证')
         await page.waitForFunction(
           () =>
             document
               .querySelector(
                 '.erp-dev-hub-toolbar > .erp-dev-hub-toolbar__note'
               )
-              ?.textContent?.replace(/\s+/gu, '') === '1/9' &&
-            document.querySelectorAll('.erp-dev-hub-grid .erp-dev-hub-card')
-              .length === 1
+              ?.textContent?.replace(/\s+/gu, '') === '匹配1个入口' &&
+            document.querySelectorAll(
+              '.erp-dev-overview-tool-list .erp-dev-overview-tool'
+            ).length === 1
         )
         const filteredMetrics = await page.evaluate(() => ({
           cardCount: document.querySelectorAll(
-            '.erp-dev-hub-grid .erp-dev-hub-card'
+            '.erp-dev-overview-tool-list .erp-dev-overview-tool'
           ).length,
           onlyHref: document
-            .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
+            .querySelector('.erp-dev-overview-tool__open')
             ?.getAttribute('href'),
           countText:
             document
@@ -11089,8 +11778,37 @@ export function createStyleL1Scenarios(deps) {
         assert.deepEqual(filteredMetrics, {
           cardCount: 1,
           onlyHref: '/__dev/testing',
-          countText: '1/9',
+          countText: '匹配1个入口',
         })
+
+        await toolSearch.fill('__qa_no_matching_dev_tool__')
+        await page
+          .getByText('没有匹配的工具，请清空搜索或切换分类', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page.locator('.erp-dev-overview-tool').count(),
+          0,
+          '无匹配时不应保留旧工具行'
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'dev-hub-overview-dark-empty-desktop.png'),
+          fullPage: true,
+        })
+        await toolSearch.clear()
+        await page.waitForFunction(
+          (toolCount) =>
+            document.querySelectorAll('.erp-dev-overview-tool').length ===
+              toolCount &&
+            document
+              .querySelector('.erp-dev-hub-toolbar__note')
+              ?.textContent?.replace(/\s+/gu, '') === `全部${toolCount}个入口`,
+          expectedToolCount
+        )
+        assert.equal(
+          await page.locator('.erp-dev-overview-tool').count(),
+          expectedToolCount,
+          '清空搜索后应恢复完整工具列表'
+        )
         await assertERPThemeMode(page, {
           scenarioName: 'dev-hub-dark-desktop',
           expectedMode: 'dark',
@@ -11107,6 +11825,9 @@ export function createStyleL1Scenarios(deps) {
       path: '/__dev/',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
+        await page.evaluate(() => {
+          localStorage.removeItem('plush_erp_dev_hub_pinned_routes')
+        })
         const devPages = [
           {
             path: '/__dev/',
@@ -11136,13 +11857,13 @@ export function createStyleL1Scenarios(deps) {
             path: '/__dev/governance',
             heading: '这次改动该怎么做？',
             rootSelector: '.erp-dev-governance-page',
-            titlePrefix: '项目治理地图 · ',
+            titlePrefix: '改动指南 · ',
           },
           {
             path: '/__dev/status-flows',
             heading: '业务链与运行观察台',
             rootSelector: '.erp-dev-flow-state-page',
-            titlePrefix: '流程与状态观察台 · ',
+            titlePrefix: '业务链观察 · ',
           },
           {
             path: '/__dev/docs',
@@ -11154,13 +11875,13 @@ export function createStyleL1Scenarios(deps) {
             path: '/__dev/testing',
             heading: '质量验证工作台',
             rootSelector: '.erp-dev-testing-page',
-            titlePrefix: '测试入口 · ',
+            titlePrefix: '改动验证 · ',
           },
           {
             path: '/__dev/data-preparation',
             heading: '准备测试数据',
             rootSelector: '.erp-dev-data-page',
-            titlePrefix: '测试数据准备中心 · ',
+            titlePrefix: '测试数据 · ',
           },
           {
             path: '/__dev/prototypes',
@@ -11173,7 +11894,7 @@ export function createStyleL1Scenarios(deps) {
             heading:
               '客户配置包预检与发布控制台 / Package Preflight & Release Console',
             rootSelector: '.erp-dev-customer-page',
-            titlePrefix: '客户配置包预检与发布 · ',
+            titlePrefix: '客户配置 · ',
           },
           {
             path: '/__dev/database-migration',
@@ -11185,7 +11906,7 @@ export function createStyleL1Scenarios(deps) {
             path: '/__dev/version-center',
             heading: '版本发布与部署中心',
             rootSelector: '.erp-dev-version-page',
-            titlePrefix: '版本发布与部署中心 · ',
+            titlePrefix: '版本发布 · ',
           },
         ]
 
@@ -11301,6 +12022,24 @@ export function createStyleL1Scenarios(deps) {
               groupFilterHeight: Math.round(
                 groupFilter?.getBoundingClientRect().height || 0
               ),
+              groupFilterVisible: Boolean(groupFilter?.checkVisibility()),
+              overviewStageCount: document.querySelectorAll(
+                '.erp-dev-overview-stage'
+              ).length,
+              overviewToolsOpen: Boolean(
+                document.querySelector('.erp-dev-overview-tools')?.open
+              ),
+              overviewToolsSummaryHeight: Math.round(
+                document
+                  .querySelector('.erp-dev-overview-tools > summary')
+                  ?.getBoundingClientRect().height || 0
+              ),
+              overviewOpenStageDetailsCount: document.querySelectorAll(
+                '.erp-dev-overview-stage__details[open]'
+              ).length,
+              overviewBoundaryOpen: Boolean(
+                document.querySelector('.erp-dev-overview-boundary')?.open
+              ),
               staticGuidanceCount: document.querySelectorAll(
                 '.erp-dev-static-guidance'
               ).length,
@@ -11348,13 +12087,23 @@ export function createStyleL1Scenarios(deps) {
           }
           if (devPage.path === '/__dev/') {
             assert(
-              metrics.toolbarHeight > 0 && metrics.toolbarHeight <= 140,
-              `开发导航移动端筛选区不应挤占首屏: ${JSON.stringify(metrics)}`
+              metrics.overviewStageCount === 3 &&
+                metrics.overviewToolsOpen === false &&
+                metrics.overviewOpenStageDetailsCount === 0 &&
+                metrics.overviewBoundaryOpen === false,
+              `开发导航移动端默认只展示三段任务路径: ${JSON.stringify(metrics)}`
             )
             assert(
-              metrics.groupFilterHeight > 0 && metrics.groupFilterHeight <= 42,
-              `开发导航分组筛选应收敛为单行控件: ${JSON.stringify(metrics)}`
+              metrics.toolbarHeight === 0 &&
+                metrics.groupFilterVisible === false &&
+                metrics.overviewToolsSummaryHeight >= 44 &&
+                metrics.overviewToolsSummaryHeight <= 70,
+              `完整工具筛选应默认折叠且保留可触达的展开入口: ${JSON.stringify(metrics)}`
             )
+            await page.screenshot({
+              path: path.join(outputDir, 'dev-hub-overview-mobile-default.png'),
+              fullPage: true,
+            })
           }
           const isAreaLanding = [
             '/__dev/',
@@ -11417,16 +12166,19 @@ export function createStyleL1Scenarios(deps) {
             path: '/__dev/product-engineering',
             heading: '产品工程 / Product Engineering',
             cardCount: 4,
+            secondaryLabels: ['改动指南', '业务链观察', '开发文档', '产品原型'],
           },
           {
             path: '/__dev/quality',
             heading: '质量验证 / Quality Assurance',
             cardCount: 2,
+            secondaryLabels: ['改动验证', '测试数据'],
           },
           {
             path: '/__dev/delivery',
             heading: '交付运行 / Delivery Operations',
             cardCount: 3,
+            secondaryLabels: ['客户配置', '数据库迁移', '版本发布'],
           },
         ]
 
@@ -11435,6 +12187,34 @@ export function createStyleL1Scenarios(deps) {
             waitUntil: 'domcontentloaded',
           })
           await expectHeading(page, areaPage.heading)
+          const navigationNames = await page.evaluate(() => ({
+            primary: Array.from(
+              document.querySelectorAll('.erp-dev-workspace-nav__route')
+            ).map(
+              (link) =>
+                link
+                  .querySelectorAll(':scope > span')[1]
+                  ?.textContent?.trim() || ''
+            ),
+            secondaryTitle:
+              document
+                .querySelector('.erp-dev-workspace-nav__secondary-title')
+                ?.textContent?.trim() || '',
+            secondary: Array.from(
+              document.querySelectorAll(
+                '.erp-dev-workspace-nav__secondary-route'
+              )
+            ).map((link) => link.textContent?.trim() || ''),
+          }))
+          assert.deepEqual(
+            navigationNames,
+            {
+              primary: ['总览', '产品工程', '质量验证', '交付运行'],
+              secondaryTitle: `${areaPage.heading.split(' / ')[0]}入口`,
+              secondary: areaPage.secondaryLabels,
+            },
+            `工作台一二级菜单名称应按责任域和任务对象保持一致: ${areaPage.path} ${JSON.stringify(navigationNames)}`
+          )
 
           if (areaPage.path === '/__dev/quality') {
             const qualityMetrics = await page.evaluate(() => {
@@ -11663,6 +12443,13 @@ export function createStyleL1Scenarios(deps) {
           page,
           '研发效能工作台 / Engineering Delivery Workbench'
         )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-hub-overview-light-default-desktop.png'
+          ),
+          fullPage: true,
+        })
         const workspaceLayout = await page.evaluate(() => {
           const root = document.querySelector('.erp-dev-workspace-page')
           const nav = document.querySelector('.erp-dev-workspace-nav')
@@ -11700,28 +12487,41 @@ export function createStyleL1Scenarios(deps) {
             workspaceLayout.headerLeft > workspaceLayout.navRight,
           `开发工作台桌面内容不应覆盖左侧栏: ${JSON.stringify(workspaceLayout)}`
         )
-        const hubCard = await readSurfaceStyle('.erp-dev-hub-card')
-        const hubAction = await readSurfaceStyle('.erp-dev-hub-card__link')
-        const hubPin = await readSurfaceStyle('.erp-dev-hub-card__pin')
-        assert.equal(
-          hubCard.cursor,
-          'auto',
-          `开发导航入口卡片本体应是阅读容器，主操作由进入按钮承担: ${JSON.stringify(hubCard)}`
+        const overviewStage = await readSurfaceStyle('.erp-dev-overview-stage')
+        const overviewAction = await readSurfaceStyle(
+          '.erp-dev-overview-stage__action'
+        )
+        const overviewToolsSummary = await readSurfaceStyle(
+          '.erp-dev-overview-tools > summary'
         )
         assert.equal(
-          hubAction.cursor,
+          overviewStage.cursor,
+          'auto',
+          `总览阶段本体应是阅读容器，主操作由阶段按钮承担: ${JSON.stringify(overviewStage)}`
+        )
+        assert.equal(
+          overviewAction.cursor,
           'pointer',
-          `开发导航进入动作应是明确可点击控件: ${JSON.stringify(hubAction)}`
+          `总览阶段动作应是明确可点击控件: ${JSON.stringify(overviewAction)}`
         )
         assert(
-          !transparentColors.has(hubAction.backgroundColor) &&
-            hubAction.borderStyle !== 'none',
-          `开发导航进入动作不能退回普通文字链接: ${JSON.stringify(hubAction)}`
+          !transparentColors.has(overviewAction.backgroundColor) &&
+            overviewAction.borderStyle !== 'none',
+          `总览阶段动作不能退回普通文字链接: ${JSON.stringify(overviewAction)}`
         )
         assert.equal(
-          hubPin.cursor,
+          overviewToolsSummary.cursor,
           'pointer',
-          `开发导航置顶图标仍应是次级操作按钮: ${JSON.stringify(hubPin)}`
+          `完整工具区摘要应明确可展开: ${JSON.stringify(overviewToolsSummary)}`
+        )
+        await page.locator('.erp-dev-overview-tools > summary').click()
+        const overviewPin = await readSurfaceStyle(
+          '.erp-dev-overview-tool__pin'
+        )
+        assert.equal(
+          overviewPin.cursor,
+          'pointer',
+          `完整工具区置顶图标应保持次级操作语义: ${JSON.stringify(overviewPin)}`
         )
 
         await gotoScenarioPath(page, '/__dev/governance', {

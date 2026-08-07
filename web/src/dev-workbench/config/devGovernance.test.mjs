@@ -225,6 +225,7 @@ test('devGovernance: parses explicit task-first routing without guessing relatio
   assert.deepEqual(
     tasks.map((item) => item.key),
     [
+      'product-core-boundary',
       'data-contract',
       'workflow-fact',
       'page-menu',
@@ -245,6 +246,21 @@ test('devGovernance: parses explicit task-first routing without guessing relatio
         item.syncCheck &&
         item.boundary
     )
+  )
+  assert.equal(
+    tasks.find((item) => item.key === 'product-core-boundary')?.task,
+    '判断需求是否进入产品内核'
+  )
+  assert(
+    tasks
+      .find((item) => item.key === 'product-core-boundary')
+      ?.firstHopLinks.some(
+        (link) => link.path === 'docs/product/客户差异策略.md'
+      )
+  )
+  assert.match(
+    tasks.find((item) => item.key === 'product-core-boundary')?.boundary || '',
+    /Product Core 不等于 server\/internal\/core/
   )
   assert.equal(
     tasks.find((item) => item.key === 'release-runtime')?.task,

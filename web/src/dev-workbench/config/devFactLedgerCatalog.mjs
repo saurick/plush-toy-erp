@@ -7,12 +7,25 @@ export const DEV_FACT_LEDGER_RUNTIME_QUERY = Object.freeze({
     '当前后端没有跨领域、按事实凭证 ID 读取 Fact/Ledger 的统一只读接口；观察台只展示定义和代码证据。',
 })
 
+export const DEV_FACT_LEDGER_DISPLAY_GROUPS = Object.freeze(
+  [
+    { key: 'procurement_quality', label: '采购与质量' },
+    { key: 'production_inventory', label: '生产与库存' },
+    { key: 'outsourcing_rework', label: '委外与返工' },
+    { key: 'shipping_finance', label: '出货与财务' },
+  ].map((group) => Object.freeze({ ...group, navigationOnly: true }))
+)
+
 const FACT_SCOPE_KEY = 'fact_ledger'
+const FACT_DISPLAY_GROUP_KEYS = new Set(
+  DEV_FACT_LEDGER_DISPLAY_GROUPS.map((group) => group.key)
+)
 
 const fact = (factKey, label, options) => ({
   factKey,
   label,
   machineKey: options.machineKey || factKey,
+  displayGroupKey: options.displayGroupKey,
   occurrenceCondition: options.occurrenceCondition,
   sourceDocument: options.sourceDocument,
   authority: options.authority,
@@ -25,6 +38,7 @@ const fact = (factKey, label, options) => ({
 
 const FACT_DEFINITIONS = [
   fact('fact.purchase_receipt', '采购入库', {
+    displayGroupKey: 'procurement_quality',
     occurrenceCondition: '采购收货确认并由采购入库领域用例完成正式过账。',
     sourceDocument: '采购订单与采购收货单',
     authority: 'purchase_receipts / purchase_receipt_items 与库存事务',
@@ -38,6 +52,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.purchase_return', '采购退货', {
+    displayGroupKey: 'procurement_quality',
     occurrenceCondition: '采购退货单满足可退数量并完成退货过账。',
     sourceDocument: '已过账采购入库与采购退货单',
     authority: 'purchase_returns / purchase_return_items 与库存事务',
@@ -51,6 +66,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.purchase_receipt_adjustment', '采购入库调整', {
+    displayGroupKey: 'procurement_quality',
     occurrenceCondition: '对已过账采购入库提交合法差异并完成调整过账。',
     sourceDocument: '已过账采购入库与采购入库调整单',
     authority: 'purchase_receipt_adjustments / items 与对应库存调整事务',
@@ -64,6 +80,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.quality_inspection', '质量检验', {
+    displayGroupKey: 'procurement_quality',
     occurrenceCondition: '检验单由质量领域用例作出并持久化正式判定。',
     sourceDocument: '采购收货、委外回货或生产批次',
     authority: 'quality_inspections',
@@ -77,6 +94,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.shipment', '出货事实', {
+    displayGroupKey: 'shipping_finance',
     occurrenceCondition: '出货单满足放行条件后，由出货领域用例记录真实出货。',
     sourceDocument: '销售订单与出货单',
     authority: 'shipments / shipment_items 与库存出库事务',
@@ -90,6 +108,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.production', '生产事实', {
+    displayGroupKey: 'production_inventory',
     occurrenceCondition: '生产领域用例确认投料、完工或返工等正式生产动作。',
     sourceDocument: '生产订单、在制批次与生产确认单',
     authority: '生产事实读模型与对应库存事务',
@@ -103,6 +122,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.outsourcing', '委外事实', {
+    displayGroupKey: 'outsourcing_rework',
     occurrenceCondition: '委外发料、回货或修正由委外领域用例正式确认。',
     sourceDocument: '委外订单、发料单与回货单',
     authority: '委外事实读模型与库存事务',
@@ -116,6 +136,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.stock_reservation', '库存预留', {
+    displayGroupKey: 'production_inventory',
     occurrenceCondition: '销售需求通过库存预留领域用例成功占用可用量。',
     sourceDocument: '销售订单行',
     authority: '库存预留记录',
@@ -129,6 +150,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.finance', '业务财务事实', {
+    displayGroupKey: 'shipping_finance',
     occurrenceCondition: '真实出货、采购入库等受支持来源满足财务生成条件。',
     sourceDocument: '真实业务来源单据',
     authority: 'finance_facts',
@@ -142,6 +164,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.inventory_lot', '库存批次', {
+    displayGroupKey: 'production_inventory',
     occurrenceCondition: '库存领域用例完成入库、出库、调整或反向事务。',
     sourceDocument: '对应采购、生产、委外、出货或调整来源单据',
     authority: 'inventory_txns / inventory_balances / inventory_lots',
@@ -155,6 +178,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.production_wip_batch', '生产在制批次', {
+    displayGroupKey: 'production_inventory',
     occurrenceCondition: '生产订单释放并由生产领域用例建立或推进在制批次。',
     sourceDocument: '生产订单',
     authority: '生产在制批次与操作记录',
@@ -168,6 +192,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.production_packaging_confirmation', '生产包材确认', {
+    displayGroupKey: 'production_inventory',
     occurrenceCondition: '生产批次在规定节点完成包材核对并提交确认。',
     sourceDocument: '生产在制批次与包材核对记录',
     authority: '生产包材确认记录',
@@ -181,6 +206,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.rework_intake', '返工回厂', {
+    displayGroupKey: 'outsourcing_rework',
     occurrenceCondition: '原出货来源通过返工回厂领域用例正式收回。',
     sourceDocument: '原出货单与返工回厂单',
     authority: '返工回厂单、明细及关联库存事务',
@@ -194,6 +220,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.production_exception_decision', '生产异常决策', {
+    displayGroupKey: 'production_inventory',
     occurrenceCondition: '异常审批完成后保存明确、版本一致的处置决策。',
     sourceDocument: '生产异常任务与受影响生产对象',
     authority: '生产异常决策记录',
@@ -207,6 +234,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.production_exception_execution', '生产异常执行状态', {
+    displayGroupKey: 'production_inventory',
     occurrenceCondition: '已批准的异常决策由命名领域命令实际执行并记录结果。',
     sourceDocument: '生产异常决策',
     authority: '生产异常执行记录及其领域事实',
@@ -221,6 +249,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.purchase_rejection_disposition', '采购拒收处置', {
+    displayGroupKey: 'procurement_quality',
     occurrenceCondition: '采购质检拒绝后保存并执行明确的退货、隔离或调整处置。',
     sourceDocument: '采购质检单与采购收货单',
     authority: '采购拒收处置记录',
@@ -234,6 +263,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.outsourcing_return_disposition', '委外回货处置', {
+    displayGroupKey: 'outsourcing_rework',
     occurrenceCondition: '委外回货质检拒绝后完成明确处置。',
     sourceDocument: '委外回货与质量检验单',
     authority: '委外回货处置记录',
@@ -247,6 +277,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.finance_payment', '收付款单', {
+    displayGroupKey: 'shipping_finance',
     occurrenceCondition: '收付款单批准后由财务领域用例完成正式过账。',
     sourceDocument: '收付款单与待核销财务事实',
     authority: 'finance_payments 与不可变核销记录',
@@ -260,6 +291,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.finance_allocation', '财务核销记录', {
+    displayGroupKey: 'shipping_finance',
     occurrenceCondition: '收付款过账时对指定应收/应付生成不可变核销分配。',
     sourceDocument: '已过账收付款单与待核销财务事实',
     authority: 'finance_allocations',
@@ -273,6 +305,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.finance_credit_note', '财务红冲单', {
+    displayGroupKey: 'shipping_finance',
     occurrenceCondition: '对已生效财务事实执行有理由、有权限的正式红冲。',
     sourceDocument: '原财务事实或已过账收付款单',
     authority: 'finance_credit_notes 与反向财务记录',
@@ -286,6 +319,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.shipment_finance_release', '出货财务放行', {
+    displayGroupKey: 'shipping_finance',
     occurrenceCondition: '出货财务审批节点通过并由出货领域命令记录版本化放行。',
     sourceDocument: '出货单与财务审批任务',
     authority: 'shipment 的版本化财务放行字段与审计记录',
@@ -299,6 +333,7 @@ const FACT_DEFINITIONS = [
     ],
   }),
   fact('fact.inventory_operation', '库存操作单', {
+    displayGroupKey: 'production_inventory',
     occurrenceCondition: '库存操作单批准后由库存领域用例完成正式过账。',
     sourceDocument: '库存操作单',
     authority: 'inventory_operations 与库存事务/余额/批次',
@@ -317,6 +352,7 @@ const requiredTextFields = Object.freeze([
   'factKey',
   'label',
   'machineKey',
+  'displayGroupKey',
   'occurrenceCondition',
   'sourceDocument',
   'authority',
@@ -351,6 +387,7 @@ export function buildDevFactLedgerCatalog({ flows } = {}) {
     FACT_DEFINITIONS.map((definition) => {
       if (
         requiredTextFields.some((field) => !exactText(definition[field])) ||
+        !FACT_DISPLAY_GROUP_KEYS.has(definition.displayGroupKey) ||
         !Array.isArray(definition.sourceRefs) ||
         definition.sourceRefs.length === 0 ||
         definition.sourceRefs.some((sourceRef) => !exactText(sourceRef))
@@ -363,6 +400,16 @@ export function buildDevFactLedgerCatalog({ flows } = {}) {
   const factKeys = definitions.map((definition) => definition.factKey)
   if (new Set(factKeys).size !== factKeys.length) {
     throw new Error('fact ledger catalog has duplicate fact keys')
+  }
+  if (
+    DEV_FACT_LEDGER_DISPLAY_GROUPS.some(
+      (group) =>
+        !definitions.some(
+          (definition) => definition.displayGroupKey === group.key
+        )
+    )
+  ) {
+    throw new Error('fact ledger catalog has an empty display group')
   }
 
   const unknownFactKeys = factKeys.filter((key) => !factFlowKeys.has(key))
@@ -380,6 +427,7 @@ export function buildDevFactLedgerCatalog({ flows } = {}) {
     readOnly: true,
     allowsActionExecution: false,
     runtimeQuery: DEV_FACT_LEDGER_RUNTIME_QUERY,
+    displayGroups: DEV_FACT_LEDGER_DISPLAY_GROUPS,
     definitions,
     coverage: Object.freeze({
       complete: true,

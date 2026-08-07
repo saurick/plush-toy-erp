@@ -41,6 +41,9 @@ const goConstContract = (path, prefix) =>
     prefix,
   })
 
+const schemaStatusRef = (path, field = 'status') =>
+  Object.freeze({ path, field })
+
 export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
   'source.sales_order': entCheckContract(
     'server/internal/data/model/schema/sales_order.go',
@@ -385,6 +388,32 @@ function freezeContractRef(value, ownerKey) {
   return Object.freeze({ ...value })
 }
 
+function freezeSchemaStatusRefs(ownerKey, values = []) {
+  if (!Array.isArray(values)) {
+    throw new Error(`${ownerKey} has invalid schemaStatusRefs`)
+  }
+  const identities = new Set()
+  return Object.freeze(
+    values.map((item) => {
+      if (
+        !item ||
+        !/^server\/internal\/data\/model\/schema\/[a-z0-9_]+\.go$/u.test(
+          item.path
+        ) ||
+        !/^[a-z][a-z0-9_]*$/u.test(item.field)
+      ) {
+        throw new Error(`${ownerKey} has an invalid schemaStatusRef`)
+      }
+      const identity = `${item.path}#${item.field}`
+      if (identities.has(identity)) {
+        throw new Error(`${ownerKey} has duplicate schemaStatusRef ${identity}`)
+      }
+      identities.add(identity)
+      return Object.freeze({ path: item.path, field: item.field })
+    })
+  )
+}
+
 function normalizeEvidence(items = [], ownerKey = '') {
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error(`${ownerKey} must declare evidence`)
@@ -424,6 +453,10 @@ function normalizeFlow(definition) {
   const contractRef = freezeContractRef(
     definition.contractRef || DEV_FLOW_STATUS_CONTRACT_REFS[definition.key],
     definition.key
+  )
+  const schemaStatusRefs = freezeSchemaStatusRefs(
+    definition.key,
+    definition.schemaStatusRefs
   )
   const rawStates = Array.isArray(definition.states) ? definition.states : []
   const stateKeys = rawStates.map((item) => item?.key)
@@ -608,6 +641,7 @@ function normalizeFlow(definition) {
     permission: freezeStrings(permissions),
     factBoundary: definition.factBoundary,
     contractRef,
+    schemaStatusRefs,
     sourceRefs,
     evidence: flowEvidence,
   })
@@ -1174,6 +1208,12 @@ const FLOW_DEFINITIONS = [
     linearLifecycle: false,
     guard: '只有受控任务动作、ProcessRuntime 或领域 usecase 可以生产投影。',
     factBoundary: 'read_only_projection',
+    schemaStatusRefs: [
+      schemaStatusRef(
+        'server/internal/data/model/schema/workflow_task.go',
+        'business_status_key'
+      ),
+    ],
     sourceRefs: [
       'server/internal/biz/workflow_metadata.go',
       'server/internal/data/model/schema/workflow_business_state.go',
@@ -1298,6 +1338,7 @@ const FLOW_DEFINITIONS = [
     {
       key: 'fact.purchase_receipt',
       label: '采购入库',
+      schemaPath: 'server/internal/data/model/schema/purchase_receipt.go',
       postAction: 'post_purchase_receipt',
       cancelAction: 'cancel_purchase_receipt',
       postPermission: ['purchase.receipt.create'],
@@ -1306,6 +1347,7 @@ const FLOW_DEFINITIONS = [
     {
       key: 'fact.purchase_return',
       label: '采购退货',
+      schemaPath: 'server/internal/data/model/schema/purchase_return.go',
       postAction: 'post_purchase_return',
       cancelAction: 'cancel_purchase_return',
       postPermission: ['purchase.return.post'],
@@ -1314,6 +1356,8 @@ const FLOW_DEFINITIONS = [
     {
       key: 'fact.purchase_receipt_adjustment',
       label: '采购入库调整',
+      schemaPath:
+        'server/internal/data/model/schema/purchase_receipt_adjustment.go',
       postAction: 'post_purchase_receipt_adjustment',
       cancelAction: 'cancel_purchase_receipt_adjustment',
       postPermission: ['purchase.receipt.adjustment.post'],
@@ -1354,6 +1398,7 @@ const FLOW_DEFINITIONS = [
     ],
     guard: '已过账记录不改回草稿、不物理删除。',
     factBoundary: 'fact_ledger',
+    schemaStatusRefs: [schemaStatusRef(item.schemaPath)],
     sourceRefs: [
       'server/internal/core/status/posting_document.go',
       'server/internal/biz/purchase_receipt.go',
@@ -1421,6 +1466,11 @@ const FLOW_DEFINITIONS = [
     ],
     guard: 'Workflow 质检任务完成不等于 Quality Fact 已判定。',
     factBoundary: 'fact_ledger',
+    schemaStatusRefs: [
+      schemaStatusRef(
+        'server/internal/data/model/schema/quality_inspection.go'
+      ),
+    ],
     sourceRefs: [
       'server/internal/core/status/quality_inspection.go',
       'server/internal/biz/quality_inspection.go',
@@ -1470,6 +1520,9 @@ const FLOW_DEFINITIONS = [
     ],
     guard: 'shipping_released 只是协同投影，不是 SHIPPED。',
     factBoundary: 'fact_ledger',
+    schemaStatusRefs: [
+      schemaStatusRef('server/internal/data/model/schema/shipment.go'),
+    ],
     sourceRefs: [
       'server/internal/core/status/shipment.go',
       'server/internal/biz/operational_fact.go',
@@ -1734,6 +1787,9 @@ const FLOW_DEFINITIONS = [
     ],
     guard: '未知状态或正余额停用请求一律失败关闭。',
     factBoundary: 'fact_ledger',
+    schemaStatusRefs: [
+      schemaStatusRef('server/internal/data/model/schema/inventory_lot.go'),
+    ],
     sourceRefs: [
       'server/internal/core/status/inventory_lot.go',
       'server/internal/biz/inventory.go',
@@ -3429,6 +3485,7 @@ export function buildDevFlowStateCatalog({
     flowLayers,
     processDefinitions,
     factLedgerCatalogVersion: factLedgerCatalog.version,
+    factDefinitionGroups: factLedgerCatalog.displayGroups,
     factDefinitions: factLedgerCatalog.definitions,
     factRuntimeQuery: factLedgerCatalog.runtimeQuery,
     factLedgerCoverage: factLedgerCatalog.coverage,

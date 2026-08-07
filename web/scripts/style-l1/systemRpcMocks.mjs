@@ -242,6 +242,18 @@ export async function installSystemRpcMocks(page, context) {
             is_final: true,
             is_preview: Array.isArray(params.permission_keys),
             config_revision: 'style-l1-active-revision',
+            permissions: permissionKeys.map((permissionKey) => {
+              const permission = mockPermissions.find(
+                (item) => item.permission_key === permissionKey
+              )
+              return {
+                permission_key: permissionKey,
+                class: permission?.permission_class || 'business',
+                rbac_granted: true,
+                effective: true,
+                reasons: [],
+              }
+            }),
             pages: mockMenus.map((menu) => {
               const requiredAny = Array.isArray(menu.required_any)
                 ? menu.required_any

@@ -25,7 +25,9 @@ import {
   processDefinitions,
 } from './devFlowStateCatalog.mjs'
 import {
+  collectObservedSchemaStatusOwners,
   readCanonicalProcessContractCatalog,
+  readCanonicalSchemaStatusOwners,
   readCanonicalStatusContract,
 } from '../../../../scripts/qa/dev-flow-state-canonical-contract.mjs'
 
@@ -469,7 +471,10 @@ test('devFlowStateCatalog: route 与只读边界使用唯一真源', () => {
     DEV_FLOW_STATE_CATALOG.businessChainOverview.runtimeAuthority,
     'design_projection_only'
   )
-  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.overviewComplete, true)
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.businessChainCoverage.overviewComplete,
+    true
+  )
 })
 
 test('devFlowStateCatalog: 覆盖清单固定为 34 个当前对象', () => {
@@ -521,6 +526,27 @@ test('devFlowStateCatalog: 34 个状态集合与后端 canonical contract 全等
       `${flow.key} status contract drift`
     )
   }
+})
+
+test('devFlowStateCatalog: 持久化状态所有者与观察台显式映射全等', () => {
+  const canonicalOwners = readCanonicalSchemaStatusOwners(repoRoot)
+  const observedOwners = collectObservedSchemaStatusOwners(
+    DEV_FLOW_STATE_CATALOG.flows
+  )
+  assert.deepEqual(
+    observedOwners.map(({ path, field }) => ({ path, field })),
+    canonicalOwners
+  )
+
+  const duplicateRef = canonicalOwners[0]
+  assert.throws(
+    () =>
+      collectObservedSchemaStatusOwners([
+        { key: 'first', schemaStatusRefs: [duplicateRef] },
+        { key: 'second', schemaStatusRefs: [duplicateRef] },
+      ]),
+    /is mapped by both first and second/u
+  )
 })
 
 test('devFlowStateCatalog: 高风险对象登记完整决策、过账、取消与冲正边', () => {
@@ -803,6 +829,10 @@ test('devFlowStateCatalog: Fact / Ledger 定义与状态对象一一对应且不
     (flow) => flow.scopeKey === 'fact_ledger'
   )
   assert.equal(DEV_FLOW_STATE_CATALOG.factLedgerCoverage.complete, true)
+  assert.deepEqual(
+    DEV_FLOW_STATE_CATALOG.factDefinitionGroups.map((group) => group.label),
+    ['采购与质量', '生产与库存', '委外与返工', '出货与财务']
+  )
   assert.equal(
     DEV_FLOW_STATE_CATALOG.factDefinitions.length,
     factMachines.length

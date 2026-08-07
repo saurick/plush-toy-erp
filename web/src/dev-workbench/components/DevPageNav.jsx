@@ -22,6 +22,9 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
       : location.pathname.replace(/\/+$/, '')
   const currentAreaKey = resolveDevWorkbenchAreaKey(currentPathname)
   const secondaryItems = getDevSecondaryNavItems(currentAreaKey)
+  const currentAreaLabel =
+    DEV_WORKSPACE_NAV_ITEMS.find((item) => item.key === currentAreaKey)
+      ?.label || ''
   const currentRouteRef = useRef(null)
   const currentDeepLink = useMemo(() => {
     const relativeLink = `${location.pathname}${location.search}${location.hash}`
@@ -123,10 +126,10 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
           <div
             className="erp-dev-workspace-nav__secondary"
             role="group"
-            aria-label="当前区域二级入口"
+            aria-label={`${currentAreaLabel}工作入口`}
           >
             <span className="erp-dev-workspace-nav__secondary-title">
-              当前区域
+              {currentAreaLabel}入口
             </span>
             {secondaryItems.map((item) => {
               const isActive = currentPathname === item.route

@@ -1,0 +1,419 @@
+.erp-workbench-permission-relationship-entry {
+  flex: 0 0 auto;
+}
+
+.erp-permission-relationship-modal .ant-modal-body {
+  max-height: calc(100vh - 190px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.erp-permission-relationship-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-permission-relationship {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-permission-relationship__intro,
+.erp-permission-relationship__section-head,
+.erp-permission-relationship__legend {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-permission-relationship__intro > div,
+.erp-permission-relationship__section-head > div {
+  min-width: 0;
+}
+
+.erp-permission-relationship__intro .ant-typography,
+.erp-permission-relationship__section-head .ant-typography {
+  margin: 0;
+}
+
+.erp-permission-relationship__intro .ant-typography + .ant-typography,
+.erp-permission-relationship__section-head .ant-typography + .ant-typography {
+  display: block;
+  margin-top: 4px;
+}
+
+.erp-permission-relationship__toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--erp-border, #d8e1ed);
+  border-radius: 12px;
+  background: var(--erp-surface-bg-soft, #f8fafc);
+  padding: 12px;
+}
+
+.erp-permission-relationship__control {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.erp-permission-relationship__control .ant-select {
+  width: 100%;
+}
+
+body
+  .ant-modal.ant-modal
+  .erp-permission-relationship
+  .ant-select.ant-select-focused
+  .ant-select-selector.ant-select-selector,
+body
+  .ant-modal.ant-modal
+  .erp-permission-relationship
+  .ant-select.ant-select-open
+  .ant-select-selector.ant-select-selector,
+body
+  .ant-modal.ant-modal
+  .erp-permission-relationship
+  .ant-select.ant-select:focus-within
+  .ant-select-selector.ant-select-selector {
+  border-color: var(--erp-control-focus-border);
+  box-shadow: inset 0 0 0 2px var(--erp-control-focus-ring);
+  outline: 0;
+}
+
+.erp-permission-relationship__summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-permission-relationship__summary .ant-statistic {
+  min-width: 0;
+  border: 1px solid var(--erp-border, #d8e1ed);
+  border-radius: 10px;
+  background: var(--erp-surface-bg, #ffffff);
+  padding: 10px 12px;
+}
+
+.erp-permission-relationship__summary .ant-statistic-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-permission-relationship__legend {
+  align-items: center;
+  justify-content: flex-start;
+  border-bottom: 1px solid var(--erp-border, #e2e8f0);
+  padding-bottom: 10px;
+}
+
+.erp-permission-relationship__graph,
+.erp-permission-relationship__details {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--erp-border, #d8e1ed);
+  border-radius: 14px;
+  background: var(--erp-surface-bg, #ffffff);
+  padding: 14px;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid {
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid var(--erp-border, #dce8dd);
+  border-radius: 12px;
+  background: var(--erp-surface-bg-soft, #f8fbf8);
+  padding: 12px;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid--fullscreen {
+  position: fixed;
+  z-index: 1300;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: #020617;
+  padding: 18px;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.erp-permission-relationship
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__toolbar {
+  flex: 0 0 auto;
+  margin-bottom: 14px;
+  border: 1px solid rgb(148 163 184 / 24%);
+  border-radius: 12px;
+  background: rgb(15 23 42 / 84%);
+  padding: 10px;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__tool {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--erp-border, #cfe0d2);
+  border-radius: 8px;
+  background: var(--erp-surface-bg, #ffffff);
+  color: var(--erp-text, #173f2a);
+  cursor: pointer;
+}
+
+.erp-permission-relationship
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__tool {
+  width: 40px;
+  height: 40px;
+  border-color: rgb(148 163 184 / 32%);
+  background: #111827;
+  color: #e5edf5;
+  font-size: 18px;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__tool:hover {
+  border-color: var(--erp-primary, #2b8a3e);
+  background: var(--erp-primary-soft, #eef7ef);
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__tool:focus-visible {
+  outline: 2px solid var(--erp-primary, #2b8a3e);
+  outline-offset: 2px;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__tool:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.erp-permission-relationship
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__tool:hover {
+  border-color: #86efac;
+  background: rgb(22 101 52 / 34%);
+  color: #bbf7d0;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__zoom-label {
+  min-width: 44px;
+  color: var(--erp-text-muted, #334155);
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
+}
+
+.erp-permission-relationship
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__zoom-label {
+  min-width: 56px;
+  color: #e5edf5;
+  font-size: 14px;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__viewport {
+  min-height: 360px;
+  overflow: auto;
+  border-radius: 10px;
+}
+
+.erp-permission-relationship
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid rgb(148 163 184 / 18%);
+  border-radius: 14px;
+  background: #020617;
+  overscroll-behavior: contain;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__canvas {
+  display: flex;
+  width: calc(var(--mermaid-zoom, 1) * 100%);
+  min-width: 0;
+  min-height: 360px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.erp-permission-relationship
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__canvas {
+  min-height: 100%;
+  padding: 28px 0;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__canvas svg {
+  display: block;
+  width: 100%;
+  /* Mermaid injects an inline max-width; zoom must override that generated cap. */
+  max-width: none !important;
+  height: auto;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.account {
+  --erp-permission-node-bg: #eff6ff;
+  --erp-permission-node-text: #1e3a8a;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.inactive {
+  --erp-permission-node-bg: #fff1f2;
+  --erp-permission-node-text: #881337;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.role {
+  --erp-permission-node-bg: #f5f3ff;
+  --erp-permission-node-text: #4c1d95;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.source {
+  --erp-permission-node-bg: #f8fafc;
+  --erp-permission-node-text: #334155;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.effective {
+  --erp-permission-node-bg: #ecfdf5;
+  --erp-permission-node-text: #065f46;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.blocked {
+  --erp-permission-node-bg: #fff7ed;
+  --erp-permission-node-text: #9a3412;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.scope {
+  --erp-permission-node-bg: #f0fdfa;
+  --erp-permission-node-text: #134e4a;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.approval {
+  --erp-permission-node-bg: #fefce8;
+  --erp-permission-node-text: #713f12;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid .node.system {
+  --erp-permission-node-bg: #fdf4ff;
+  --erp-permission-node-text: #701a75;
+}
+
+.erp-permission-relationship
+  .erp-markdown-mermaid
+  .node
+  :is(.nodeLabel, .nodeLabel p) {
+  background: var(--erp-permission-node-bg);
+  color: var(--erp-permission-node-text);
+}
+
+.erp-permission-relationship .erp-markdown-mermaid__loading,
+.erp-permission-relationship .erp-markdown-mermaid__error {
+  color: var(--erp-text-muted, #334155);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.erp-permission-relationship .erp-markdown-mermaid--error {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.erp-permission-relationship
+  .erp-markdown-mermaid--error
+  .erp-markdown-mermaid__error {
+  color: #991b1b;
+}
+
+[data-erp-theme='dark']
+  .erp-permission-relationship__summary
+  .ant-statistic-content,
+[data-erp-theme='dark']
+  .erp-permission-relationship__summary
+  .ant-statistic-title {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-permission-relationship
+  .erp-markdown-mermaid--error {
+  border-color: #7f1d1d;
+  background: #2a1519;
+}
+
+[data-erp-theme='dark']
+  .erp-permission-relationship
+  .erp-markdown-mermaid--error
+  .erp-markdown-mermaid__error {
+  color: #fecaca;
+}
+
+@media (max-width: 1100px) {
+  .erp-permission-relationship__summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .erp-workbench-permission-relationship-entry {
+    width: 100%;
+  }
+
+  .erp-permission-relationship-modal {
+    max-width: calc(100vw - 16px);
+    margin: 8px auto;
+    padding-bottom: 0;
+  }
+
+  .erp-permission-relationship-modal .ant-modal-body {
+    max-height: calc(100vh - 166px);
+  }
+
+  .erp-permission-relationship__intro,
+  .erp-permission-relationship__section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-permission-relationship__toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-permission-relationship__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-permission-relationship__legend {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .erp-permission-relationship__graph,
+  .erp-permission-relationship__details {
+    padding: 10px;
+  }
+
+  .erp-permission-relationship .erp-markdown-mermaid__viewport,
+  .erp-permission-relationship .erp-markdown-mermaid__canvas {
+    min-height: 300px;
+  }
+}

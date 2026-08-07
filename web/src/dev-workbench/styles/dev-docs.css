@@ -74,6 +74,29 @@
   flex: 0 0 auto;
 }
 
+.erp-dev-docs-search-scope {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dev-docs-search-scope > .ant-typography {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.erp-dev-docs-search-scope__control.ant-segmented {
+  max-width: 100%;
+}
+
+.erp-dev-docs-search-scope__control .ant-segmented-item-label {
+  min-width: 52px;
+  padding-inline: 10px;
+}
+
 .erp-dev-docs-sidebar__section {
   display: grid;
   gap: 8px;

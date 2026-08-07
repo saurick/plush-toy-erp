@@ -20,6 +20,11 @@ import {
   DEV_STATUS_FLOWS_ROUTE,
 } from "../../web/src/dev-workbench/config/devRoutes.mjs";
 import {
+  DEV_PRODUCT_CORE_ROUTE,
+  DEV_PRODUCT_CORE_SOURCE_PATH,
+  isDevProductCoreEnabled,
+} from "../../web/src/dev-workbench/config/devProductCore.mjs";
+import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_CURRENT_DOC_PATHS,
   DEV_TESTING_ROUTE,
@@ -96,7 +101,15 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
     "web/src/dev-workbench/DevWorkbenchRoutes.jsx",
   );
   const devDocsPageSource = read("web/src/dev-workbench/pages/DevDocsPage.jsx");
+  const devProductCorePageSource = read(
+    "web/src/dev-workbench/pages/DevProductCorePage.jsx",
+  );
   assert.equal(DEV_HUB_ROUTE, "/__dev");
+  assert.equal(DEV_PRODUCT_CORE_ROUTE, "/__dev/product-core");
+  assert.equal(
+    DEV_PRODUCT_CORE_SOURCE_PATH,
+    "docs/product/产品能力进度台账.md",
+  );
   assert.equal(DEV_STATUS_FLOWS_ROUTE, "/__dev/status-flows");
   assert.equal(DEV_TESTING_ROUTE, "/__dev/testing");
   assert.equal(DEV_DATA_PREPARATION_ROUTE, "/__dev/data-preparation");
@@ -104,6 +117,8 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   assert.equal(DEV_CUSTOMER_CONFIG_ROUTE, "/__dev/customer-config");
   assert.equal(isDevHubEnabled({ DEV: true }), true);
   assert.equal(isDevHubEnabled({ DEV: false }), false);
+  assert.equal(isDevProductCoreEnabled({ DEV: true }), true);
+  assert.equal(isDevProductCoreEnabled({ DEV: false }), false);
   assert.equal(isDevTestingEnabled({ DEV: true }), true);
   assert.equal(isDevTestingEnabled({ DEV: false }), false);
   assert.equal(isDevCustomerConfigEnabled({ DEV: true }), true);
@@ -135,6 +150,9 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
     "all dev hub child entries must stay under /__dev",
   );
   const testingItem = DEV_HUB_ITEMS.find((item) => item.key === "testing");
+  const productCoreItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === "product-core",
+  );
   const docsItem = DEV_HUB_ITEMS.find((item) => item.key === "docs");
   const customerConfigItem = DEV_HUB_ITEMS.find(
     (item) => item.key === "customer-config",
@@ -144,6 +162,24 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   );
   const databaseMigrationItem = DEV_HUB_ITEMS.find(
     (item) => item.key === "database-migration",
+  );
+  assert(
+    (productCoreItem?.guardrails || []).some((guardrail) =>
+      String(guardrail).includes("only status truth"),
+    ),
+    "Product Core dev entry must keep the capability ledger as its only status truth",
+  );
+  assert.match(productCoreItem?.title || "", /产品内核/);
+  assert.equal(productCoreItem?.source, DEV_PRODUCT_CORE_SOURCE_PATH);
+  assertIncludes(
+    devProductCorePageSource,
+    "进入 Product Core 不等于已发布或已验收",
+    "Product Core evidence boundary",
+  );
+  assert.match(
+    devRoutesSource,
+    /path="product-core"[\s\S]{0,100}?<DevProductCorePage/u,
+    "the Product Core inventory must remain under the DEV-only router",
   );
   assert(
     (testingItem?.guardrails || []).some((guardrail) =>
@@ -172,10 +208,14 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
     ),
     "customer config dev entry must reject real import",
   );
-  assert.match(customerConfigItem?.title || "", /预检与发布/);
+  assert.match(customerConfigItem?.title || "", /客户配置/);
+  assert.match(
+    `${customerConfigItem?.status || ""} ${customerConfigItem?.description || ""}`,
+    /预检.*发布/u,
+  );
   assert.match(customerConfigItem?.truthSource || "", /已登记客户配置包/);
   assert.doesNotMatch(customerConfigItem?.title || "", /导入/);
-  assert.match(dataPreparationItem?.title || "", /测试数据准备中心/);
+  assert.match(dataPreparationItem?.title || "", /测试数据/);
   assert.match(
     dataPreparationItem?.status || "",
     /本机受控写入/,
@@ -350,7 +390,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
       "frontend-customer-config-projection",
       "frontend-error-messages",
       "business-action-field-boundaries",
-      "pre-commit",
+      "full-local-gate",
       "release",
     ],
     "dev testing copy presets must expose current maintained entry points",

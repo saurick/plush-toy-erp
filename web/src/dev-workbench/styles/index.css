@@ -11,6 +11,7 @@
 @import './dev-customer-config.css';
 @import './dev-quality-workflow.css';
 @import './dev-product-engineering-workflow.css';
+@import './dev-overview-workflow.css';
 @import './dev-workbench-density.css';
 
 @media (min-width: 981px) {

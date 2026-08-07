@@ -215,7 +215,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
       'frontend-customer-config-projection',
       'frontend-error-messages',
       'business-action-field-boundaries',
-      'pre-commit',
+      'full-local-gate',
       'release',
     ]
   )
@@ -231,6 +231,8 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     buildDevTestingCopyText(getPreset(key).commands)
 
   assert.match(getPresetCopyText('frontend'), /pnpm style:l1/)
+  assert.match(getPreset('full-local-gate').description, /实际 pre-commit/)
+  assert.match(getPresetCopyText('full-local-gate'), /scripts\/qa\/full\.sh/)
   assert.match(
     getPresetCopyText('workflow-backend-actions'),
     /TestWorkflowRepo_/
@@ -1348,12 +1350,17 @@ test('devTesting: 覆盖接口缺失、失败和错误 schema 均 fail closed', 
 })
 
 test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界', () => {
+  assert.match(testingPageSource, /const VIEW_CLOSEOUT = 'closeout'/)
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
   assert.match(testingPageSource, /质量验证工作台/)
   assert.match(testingPageSource, /\{ label: '本轮验证', value: VIEW_TIERS \}/)
   assert.match(
     testingPageSource,
     /\{ label: '专项检查库', value: VIEW_COMMANDS \}/
+  )
+  assert.match(
+    testingPageSource,
+    /\{ label: 'Git 收口', value: VIEW_CLOSEOUT \}/
   )
   assert.match(
     testingPageSource,
@@ -1374,6 +1381,12 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /createDevTestingOperationClient/)
   assert.match(testingPageSource, /生成本轮验证计划/)
   assert.match(testingPageSource, /DEV_TESTING_FIXED_ACTIONS\.map/)
+  assert.match(testingPageSource, /DEV_TESTING_GIT_CLOSEOUT_STAGES\.map/)
+  assert.match(testingPageSource, /Hook 接线完整/)
+  assert.match(
+    testingPageSource,
+    /页面只复制仓库固定命令，不执行、不暂存、不提交/
+  )
   assert.match(testingPageSource, /runTestingAction/)
   assert.match(
     testingPageSource,

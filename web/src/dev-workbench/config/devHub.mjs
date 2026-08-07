@@ -5,6 +5,7 @@ import {
   DEV_DOCS_ROUTE,
   DEV_GOVERNANCE_ROUTE,
   DEV_HUB_ROUTE,
+  DEV_PRODUCT_CORE_ROUTE,
   DEV_PROTOTYPES_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
   DEV_TESTING_ROUTE,
@@ -19,9 +20,26 @@ export const DEV_HUB_ALL_GROUP = 'all'
 
 export const DEV_HUB_ITEMS = Object.freeze([
   Object.freeze({
+    key: 'product-core',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    title: '产品内核 / Product Core',
+    group: '产品治理 / Product Governance',
+    route: DEV_PRODUCT_CORE_ROUTE,
+    source: 'docs/product/产品能力进度台账.md',
+    truthSource: '唯一产品能力进度台账 / Product Capability Ledger',
+    status: '只读能力清单 / Read-only inventory',
+    guardrails: Object.freeze([
+      '台账是唯一状态真源 / Ledger is the only status truth',
+      '产品事实不等于发布或验收 / Product fact is not release or UAT',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '完整查看哪些能力已进入 Product Core、哪些只完成一部分，以及当前不纳入内核的范围；all status and boundaries derive from the current capability ledger.',
+  }),
+  Object.freeze({
     key: 'governance',
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '项目治理地图 / Governance Map',
+    title: '改动指南 / Change Guide',
     group: '文档治理 / Docs',
     route: DEV_GOVERNANCE_ROUTE,
     source: 'docs/项目治理地图.md',
@@ -38,20 +56,20 @@ export const DEV_HUB_ITEMS = Object.freeze([
   Object.freeze({
     key: 'status-flows',
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '流程与状态观察台 / Flow & State Observatory',
-    group: '流程治理 / Flow Governance',
+    title: '业务链观察 / Business Chain Observatory',
+    group: '业务链治理 / Business Chain Governance',
     route: DEV_STATUS_FLOWS_ROUTE,
-    source: 'docs/architecture/状态字典与生命周期索引.md',
-    truthSource: '代码合同、正式状态文档与已登记客户配置包',
+    source: 'docs/architecture/业务链与运行轨迹边界.md',
+    truthSource: '代码合同、业务链与运行轨迹文档及已登记客户配置包',
     status: '只读观察与差异检查 / Read-only inspection',
     guardrails: Object.freeze([
-      '状态分层 / Layered truth',
+      '来源、协同、运行与事实分层 / Layered chain truth',
       '客户配置只叠加 / Customer overlay only',
       '禁止通用改状态 / No generic status write',
       '不进生产构建 / No prod build',
     ]),
     description:
-      '一处查看 Product Core 状态机、双语状态树、流程编排、九类流覆盖、甲方 preview 差异与运行证据边界；inspect without creating a second runtime authority.',
+      '从 12 条业务链总图下钻来源单据、责任任务、运行路径、事实台账和状态规则；只读观察，不创建第二套运行真源。',
   }),
   Object.freeze({
     key: 'docs',
@@ -73,7 +91,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   Object.freeze({
     key: 'testing',
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
-    title: '测试入口 / Test Entry',
+    title: '改动验证 / Change Validation',
     group: '验证治理 / QA',
     route: DEV_TESTING_ROUTE,
     source: 'docs/product/自动化测试策略.md',
@@ -86,12 +104,12 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '汇总当前测试策略、QA 脚本和部署 / 前后端说明；pick validation commands without promoting reference docs.',
+      '按本轮影响面选择验证计划、固定检查和覆盖证据；不把局部绿色合并成完整交付结论。',
   }),
   Object.freeze({
     key: 'data-preparation',
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
-    title: '测试数据准备中心 / Data Preparation',
+    title: '测试数据 / Test Data',
     group: '验证治理 / QA',
     route: DEV_DATA_PREPARATION_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
@@ -128,7 +146,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   Object.freeze({
     key: 'customer-config',
     areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
-    title: '客户配置包预检与发布 / Package Preflight & Release',
+    title: '客户配置 / Customer Config',
     group: '客户治理 / Customer Governance',
     route: DEV_CUSTOMER_CONFIG_ROUTE,
     source: 'config/customers/yoyoosun',
@@ -165,7 +183,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
   Object.freeze({
     key: 'version-center',
     areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
-    title: '版本发布与部署中心 / Version Center',
+    title: '版本发布 / Release & Deployment',
     group: '交付治理 / Delivery',
     route: DEV_VERSION_CENTER_ROUTE,
     source: 'docs/engineering/研发效能工作台与CI-CD设计.md',

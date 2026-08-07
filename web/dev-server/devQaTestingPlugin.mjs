@@ -1,5 +1,6 @@
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { statSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
@@ -62,6 +63,86 @@ const ACTION_MESSAGES = Object.freeze({
     failed: '字段联动专项未通过，上一份报告保持不变',
   }),
 })
+
+const EXPECTED_GIT_HOOKS_PATH = '.githooks'
+const GIT_HOOK_FILE_CHECKS = Object.freeze([
+  Object.freeze({ key: 'pre-commit-entry', path: '.githooks/pre-commit' }),
+  Object.freeze({ key: 'commit-msg-entry', path: '.githooks/commit-msg' }),
+  Object.freeze({ key: 'pre-push-entry', path: '.githooks/pre-push' }),
+  Object.freeze({
+    key: 'pre-commit-runner',
+    path: 'scripts/git-hooks/pre-commit.sh',
+  }),
+  Object.freeze({
+    key: 'commit-msg-runner',
+    path: 'scripts/git-hooks/commit-msg.sh',
+  }),
+  Object.freeze({
+    key: 'pre-push-runner',
+    path: 'scripts/git-hooks/pre-push.sh',
+  }),
+  Object.freeze({ key: 'prepare-push', path: 'scripts/qa/prepare-push.sh' }),
+])
+
+function readConfiguredGitHooksPath(root) {
+  try {
+    return execFileSync('git', ['config', '--get', 'core.hooksPath'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return ''
+  }
+}
+
+function readExecutableFileStatus(root, sourcePath) {
+  try {
+    const stats = statSync(path.join(root, sourcePath))
+    if (!stats.isFile()) return 'invalid'
+    const permissions = stats.mode % 0o1000
+    const executable = [0o100, 0o010, 0o001].some(
+      (bit) => Math.floor(permissions / bit) % 2 === 1
+    )
+    return executable ? 'ready' : 'not_executable'
+  } catch (error) {
+    return error?.code === 'ENOENT' ? 'missing' : 'invalid'
+  }
+}
+
+export function readDevQaGitHookGovernance(
+  projectRoot,
+  {
+    readConfiguredPath = readConfiguredGitHooksPath,
+    readFileStatus = readExecutableFileStatus,
+  } = {}
+) {
+  const root = path.resolve(projectRoot || process.cwd())
+  const configuredPath = String(readConfiguredPath(root) || '').trim()
+  const pathReady = configuredPath === EXPECTED_GIT_HOOKS_PATH
+  const checks = [
+    {
+      key: 'hooks-path',
+      status: pathReady ? 'ready' : 'misconfigured',
+    },
+    ...GIT_HOOK_FILE_CHECKS.map((check) => ({
+      key: check.key,
+      status: readFileStatus(root, check.path),
+    })),
+  ]
+  return {
+    status: checks.every((check) => check.status === 'ready')
+      ? 'ready'
+      : 'blocked',
+    expectedHooksPath: EXPECTED_GIT_HOOKS_PATH,
+    configuredHooksPath: pathReady
+      ? EXPECTED_GIT_HOOKS_PATH
+      : configuredPath
+        ? '其他路径'
+        : '未配置',
+    checks,
+  }
+}
 
 function assertExactKeys(value, expected, field) {
   if (
@@ -240,6 +321,7 @@ export function createDevQaTestingService({
   readRepositoryState = readRepositoryIdentity,
   resolveNodeRuntime = resolveProjectNodeRuntime,
   collectPlan = collectAffectedValidationPlan,
+  readHookGovernance = readDevQaGitHookGovernance,
   launchProcess = (spec) => startFixedProcess(spec),
   now = () => new Date(),
 } = {}) {
@@ -513,8 +595,9 @@ export function createDevQaTestingService({
       recoverInterruptedOperation()
       const operations = listDevTestingOperations(store, { limit: 1000 })
       return {
-        schemaVersion: 'plush.dev-qa-testing-summary/v1',
+        schemaVersion: 'plush.dev-qa-testing-summary/v2',
         busy: busyProjection(readDevQaExecutionLock(store)),
+        hooks: readHookGovernance(root),
         operations: Object.fromEntries(
           DEV_TESTING_ACTIONS.map((action) => [
             action,

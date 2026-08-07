@@ -34,6 +34,103 @@ export const DEV_TESTING_FIXED_ACTIONS = Object.freeze([
   }),
 ])
 
+export const DEV_TESTING_GIT_HOOK_PATH_COMMAND =
+  'git config --get core.hooksPath'
+export const DEV_TESTING_PREPARE_PUSH_COMMAND =
+  'bash scripts/qa/prepare-push.sh'
+
+export const DEV_TESTING_GIT_HOOK_CHECKS = Object.freeze([
+  Object.freeze({
+    key: 'hooks-path',
+    label: 'Git Hook 入口目录',
+    sourcePath: 'git config core.hooksPath',
+  }),
+  Object.freeze({
+    key: 'pre-commit-entry',
+    label: '暂存检查入口',
+    sourcePath: '.githooks/pre-commit',
+  }),
+  Object.freeze({
+    key: 'commit-msg-entry',
+    label: '提交信息入口',
+    sourcePath: '.githooks/commit-msg',
+  }),
+  Object.freeze({
+    key: 'pre-push-entry',
+    label: '推送复核入口',
+    sourcePath: '.githooks/pre-push',
+  }),
+  Object.freeze({
+    key: 'pre-commit-runner',
+    label: '暂存检查实现',
+    sourcePath: 'scripts/git-hooks/pre-commit.sh',
+  }),
+  Object.freeze({
+    key: 'commit-msg-runner',
+    label: '提交信息实现',
+    sourcePath: 'scripts/git-hooks/commit-msg.sh',
+  }),
+  Object.freeze({
+    key: 'pre-push-runner',
+    label: '推送复核实现',
+    sourcePath: 'scripts/git-hooks/pre-push.sh',
+  }),
+  Object.freeze({
+    key: 'prepare-push',
+    label: '完整门禁与回执入口',
+    sourcePath: 'scripts/qa/prepare-push.sh',
+  }),
+])
+
+export const DEV_TESTING_GIT_CLOSEOUT_STAGES = Object.freeze([
+  Object.freeze({
+    key: 'pre-commit',
+    label: '暂存内容检查',
+    trigger: '提交时自动触发',
+    description:
+      '只核对本次暂存快照、快速门禁和相关静态合同，发现问题就阻止提交。',
+    boundary:
+      '这是 check-only 快速入口，不生成代码、不改 migration，也不等于完整 full 门禁。',
+    sources: Object.freeze([
+      '.githooks/pre-commit',
+      'scripts/git-hooks/pre-commit.sh',
+    ]),
+  }),
+  Object.freeze({
+    key: 'commit-msg',
+    label: '提交信息检查',
+    trigger: '写入提交信息时自动触发',
+    description: '检查提交信息是否符合仓库约定，让后续追踪和回滚能够读懂。',
+    boundary: '只检查提交信息，不证明代码、测试或发布已经完成。',
+    sources: Object.freeze([
+      '.githooks/commit-msg',
+      'scripts/git-hooks/commit-msg.sh',
+    ]),
+  }),
+  Object.freeze({
+    key: 'prepare-push',
+    label: '完整门禁与短期回执',
+    trigger: '准备推送前手动运行',
+    description:
+      '对干净且已提交的 HEAD 运行完整门禁，并生成与当前仓库身份绑定的短期回执。',
+    boundary:
+      '只准备推送证据，不执行 push，也不替代目标环境、发布回滚或客户 UAT。',
+    sources: Object.freeze(['scripts/qa/prepare-push.sh']),
+  }),
+  Object.freeze({
+    key: 'pre-push',
+    label: '推送范围与回执复核',
+    trigger: '更新远端引用前自动触发',
+    description: '复核将要推送的范围，并校验短期回执仍对应当前干净 HEAD。',
+    boundary:
+      '回执缺失、过期或仓库身份变化都会阻止推送；这里不会重新运行完整门禁。',
+    sources: Object.freeze([
+      '.githooks/pre-push',
+      'scripts/git-hooks/pre-push.sh',
+    ]),
+  }),
+])
+
 export const DEV_TESTING_OPERATION_ACTIVE_STATUSES = Object.freeze([
   'queued',
   'running',
@@ -60,6 +157,13 @@ const STATUS_META = Object.freeze({
   failed: Object.freeze({ label: '未通过', tone: 'danger' }),
   blocked: Object.freeze({ label: '前置未就绪', tone: 'warning' }),
   not_proven: Object.freeze({ label: '结果无法证明', tone: 'warning' }),
+})
+const HOOK_STATUS_META = Object.freeze({
+  ready: Object.freeze({ label: '接线完整', tone: 'success' }),
+  missing: Object.freeze({ label: '文件缺失', tone: 'danger' }),
+  not_executable: Object.freeze({ label: '不可执行', tone: 'warning' }),
+  misconfigured: Object.freeze({ label: '目录未接入', tone: 'danger' }),
+  invalid: Object.freeze({ label: '无法确认', tone: 'warning' }),
 })
 
 function assertExactKeys(value, expected, field) {
@@ -204,19 +308,62 @@ function normalizeBusy(busy) {
   return { ...busy }
 }
 
+function normalizeGitHookGovernance(hooks) {
+  assertExactKeys(
+    hooks,
+    ['checks', 'configuredHooksPath', 'expectedHooksPath', 'status'],
+    'testing hook governance'
+  )
+  if (
+    !['ready', 'blocked'].includes(hooks.status) ||
+    hooks.expectedHooksPath !== '.githooks' ||
+    !['.githooks', '未配置', '其他路径'].includes(hooks.configuredHooksPath) ||
+    !Array.isArray(hooks.checks) ||
+    hooks.checks.length !== DEV_TESTING_GIT_HOOK_CHECKS.length
+  ) {
+    throw new Error('testing hook governance is invalid')
+  }
+  const checks = hooks.checks.map((check, index) => {
+    assertExactKeys(check, ['key', 'status'], 'testing hook check')
+    const definition = DEV_TESTING_GIT_HOOK_CHECKS[index]
+    if (
+      check.key !== definition.key ||
+      !Object.hasOwn(HOOK_STATUS_META, check.status)
+    ) {
+      throw new Error('testing hook check is invalid')
+    }
+    return { ...definition, status: check.status }
+  })
+  const allReady = checks.every((check) => check.status === 'ready')
+  if (
+    (hooks.status === 'ready') !== allReady ||
+    (hooks.configuredHooksPath === '.githooks') !==
+      (checks[0].status === 'ready')
+  ) {
+    throw new Error('testing hook governance is inconsistent')
+  }
+  return {
+    status: hooks.status,
+    expectedHooksPath: hooks.expectedHooksPath,
+    configuredHooksPath: hooks.configuredHooksPath,
+    checks,
+  }
+}
+
 export function normalizeDevTestingSummary(summary) {
   assertExactKeys(
     summary,
-    ['busy', 'operations', 'schemaVersion'],
+    ['busy', 'hooks', 'operations', 'schemaVersion'],
     'testing summary'
   )
-  if (summary.schemaVersion !== 'plush.dev-qa-testing-summary/v1') {
+  if (summary.schemaVersion !== 'plush.dev-qa-testing-summary/v2') {
     throw new Error('testing summary is invalid')
   }
   assertExactKeys(summary.operations, ACTION_KEYS, 'testing operations')
   return {
     schemaVersion: summary.schemaVersion,
     busy: normalizeBusy(summary.busy),
+    hooks: normalizeGitHookGovernance(summary.hooks),
     operations: Object.fromEntries(
       ACTION_KEYS.map((action) => {
         const operation = normalizeOptionalDevTestingOperation(
@@ -229,6 +376,10 @@ export function normalizeDevTestingSummary(summary) {
       })
     ),
   }
+}
+
+export function getDevTestingGitHookStatusMeta(status) {
+  return HOOK_STATUS_META[status] || HOOK_STATUS_META.invalid
 }
 
 function normalizePlanCommand(command) {

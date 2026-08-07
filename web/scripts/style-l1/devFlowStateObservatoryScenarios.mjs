@@ -1,6 +1,5 @@
 const DEV_FLOW_STATE_OBSERVATORY_PATH = '/__dev/status-flows'
-const DEFAULT_CHAIN_PATH =
-  `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=chain&chain=all`
+const DEFAULT_CHAIN_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=chain&chain=all`
 const DELIVERY_CHAIN_PATH =
   `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=chain` +
   '&chain=delivery_to_settlement&node=shipment_draft'
@@ -123,6 +122,29 @@ async function waitForCatalog(page) {
     .waitFor({ state: 'visible', timeout: 10_000 })
 }
 
+async function waitForDefinitionSelectPopupSettled(page, expectedGroupCount) {
+  await page.waitForFunction(
+    ({ groupCount }) =>
+      Array.from(
+        document.querySelectorAll('.erp-dev-flow-definition-select-popup')
+      ).some((node) => {
+        const style = window.getComputedStyle(node)
+        const rect = node.getBoundingClientRect()
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          Number.parseFloat(style.opacity || '1') >= 0.99 &&
+          node.clientWidth > 0 &&
+          rect.width >= node.clientWidth - 1 &&
+          rect.height > 0 &&
+          node.querySelectorAll('.ant-select-item-group').length === groupCount
+        )
+      }),
+    { groupCount: expectedGroupCount },
+    { timeout: 10_000 }
+  )
+}
+
 async function collectBoxMetrics(page) {
   return page.evaluate(() => {
     const root = document.querySelector('[data-dev-flow-state-observatory]')
@@ -212,6 +234,38 @@ async function expectTaskID(page, taskId) {
   )
 }
 
+async function expectTaskScopedOutsideGlobalContext(
+  assert,
+  page,
+  taskId,
+  view
+) {
+  await expectTaskID(page, taskId)
+  const context = page.locator('.erp-dev-flow-context')
+  await context.waitFor({ state: 'visible', timeout: 10_000 })
+  const evidence = await context.evaluate((node) => {
+    const rect = node.getBoundingClientRect()
+    return {
+      text: node.innerText,
+      width: rect.width,
+      height: rect.height,
+      clientWidth: node.clientWidth,
+      scrollWidth: node.scrollWidth,
+    }
+  })
+  assert(
+    !evidence.text.includes('真实任务上下文') &&
+      !evidence.text.includes(`task_id ${taskId}`) &&
+      !evidence.text.includes(`任务 ${taskId}`),
+    `${view} Tab 的全局上下文不得重复展示任务 ${taskId}：${evidence.text}`
+  )
+  assert(
+    evidence.scrollWidth <= evidence.clientWidth + 1,
+    `${view} Tab 的全局上下文不得横向溢出`
+  )
+  return evidence
+}
+
 async function searchTask(page, query) {
   const input = page.getByPlaceholder(
     '粘贴完整任务名称、任务编号、来源单号或数字 task_id'
@@ -284,7 +338,7 @@ async function exerciseDefinitionSearchIME(page, search) {
   await page.waitForFunction(
     () =>
       document.querySelector(
-        'input[placeholder="例如：销售订单、销售 PMC、已提交、出货事实"]'
+        'input[placeholder="例如：销售订单、销售 PMC、已提交"]'
       )?.value === '销售'
   )
   await page
@@ -351,6 +405,7 @@ export function createDevFlowStateObservatoryScenarios({
         const conceptDetails = root.locator('.erp-dev-flow-concepts')
         const conceptSummary = conceptDetails.locator('summary')
         const definitionDetails = root.locator('.erp-dev-flow-definition-tools')
+        const definitionSummary = definitionDetails.locator('summary')
         assert.equal(
           await conceptDetails.evaluate((node) =>
             node.parentElement?.matches('.erp-dev-flow-header')
@@ -365,9 +420,48 @@ export function createDevFlowStateObservatoryScenarios({
         )
         assert.equal(
           await definitionDetails.getAttribute('open'),
-          '',
-          '全局定义搜索默认必须展开，仍允许按需收起'
+          null,
+          '全局定义搜索默认必须折叠，仍允许按需展开'
         )
+        const definitionIndexPlacement = await root.evaluate((node) => {
+          const headerNode = node.querySelector('.erp-dev-flow-header')
+          const indexNode = node.querySelector('.erp-dev-flow-definition-tools')
+          const navNode = node.querySelector('.erp-dev-flow-nav')
+          const headerRect = headerNode?.getBoundingClientRect()
+          const indexRect = indexNode?.getBoundingClientRect()
+          const navRect = navNode?.getBoundingClientRect()
+          return {
+            previousIsHeader: indexNode?.previousElementSibling === headerNode,
+            nextIsPrimaryNav: indexNode?.nextElementSibling === navNode,
+            headerBottom: headerRect?.bottom || 0,
+            indexTop: indexRect?.top || 0,
+            indexBottom: indexRect?.bottom || 0,
+            indexHeight: indexRect?.height || 0,
+            navTop: navRect?.top || 0,
+          }
+        })
+        assert.equal(
+          definitionIndexPlacement.previousIsHeader,
+          true,
+          '定义总索引必须紧跟页头'
+        )
+        assert.equal(
+          definitionIndexPlacement.nextIsPrimaryNav,
+          true,
+          '定义总索引必须位于五个主 Tab 之前'
+        )
+        assert(
+          definitionIndexPlacement.headerBottom <=
+            definitionIndexPlacement.indexTop + 1
+        )
+        assert(
+          definitionIndexPlacement.indexBottom <=
+            definitionIndexPlacement.navTop + 1
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-definition-index-collapsed-default.png',
+          animations: 'disabled',
+        })
         const collapsedHeaderMetrics = await header.evaluate((node) => ({
           height: node.getBoundingClientRect().height,
           summaryHeight:
@@ -390,7 +484,27 @@ export function createDevFlowStateObservatoryScenarios({
         await expectText(page, 'Fact / Ledger 管“账”')
         await expectText(page, '状态机管“规则”')
         await expectText(page, '业务链负责串起来')
-        await expectText(page, '跨视图查定义（不查具体任务）')
+        await expectText(page, '基础资料提供标准')
+        await expectText(page, '客户、供应商、产品、材料和仓库')
+        await expectText(page, '销售订单、采购订单、生产订单和加工合同')
+        await expectText(page, '不代表库存、出货或财务结果已经发生')
+        await expectText(page, '权限、客户配置与审计贯穿全部视图')
+        await expectText(page, '本页定义总索引')
+        await definitionSummary.focus()
+        await definitionSummary.press('Enter')
+        await page.waitForFunction(
+          () => document.querySelector('.erp-dev-flow-definition-tools')?.open
+        )
+        const expandedDefinitionHeight = await definitionDetails.evaluate(
+          (node) => node.getBoundingClientRect().height
+        )
+        assert(
+          expandedDefinitionHeight > definitionIndexPlacement.indexHeight,
+          '展开定义总索引后必须显示完整搜索内容'
+        )
+        await expectText(page, '跨视图查定义')
+        await expectText(page, '覆盖 5 个视图')
+        await expectText(page, '不属于当前 Tab')
         await expectText(page, '可以搜什么')
         await expectText(page, '去查真实任务')
 
@@ -411,10 +525,16 @@ export function createDevFlowStateObservatoryScenarios({
           animations: 'disabled',
         })
         const chainView = page.locator('[data-flow-state-view="chain"]')
-        const overviewView = chainView.locator(
-          '[data-business-chain-overview]'
+        const overviewView = chainView.locator('[data-business-chain-overview]')
+        const overviewGraph = overviewView.locator(
+          '.erp-dev-flow-overview-graph'
         )
-        await overviewView
+        assert.equal(
+          await overviewView.locator('.erp-dev-flow-graph-disclosure').count(),
+          0,
+          '业务总图不应提供 Mermaid 展开或收起动作'
+        )
+        await overviewGraph
           .locator('.erp-markdown-mermaid__canvas svg')
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
@@ -457,8 +577,18 @@ export function createDevFlowStateObservatoryScenarios({
           undefined,
           { timeout: 10_000 }
         )
-        await chainView
-          .locator('.erp-dev-flow-chain-graph .erp-markdown-mermaid__canvas svg')
+        const chainGraph = chainView.locator('.erp-dev-flow-chain-graph')
+        assert.equal(
+          await chainView.locator('.erp-dev-flow-graph-disclosure').count(),
+          0,
+          '单链不应提供 Mermaid 展开或收起动作'
+        )
+        await expectText(page, '这一步做什么')
+        await expectText(page, '谁来处理')
+        await expectText(page, '怎样算完成')
+        await expectText(page, '异常时怎么办')
+        await chainGraph
+          .locator('.erp-markdown-mermaid__canvas svg')
           .waitFor({ state: 'visible', timeout: 10_000 })
         const mermaidToolbar = chainView.locator(
           '.erp-dev-flow-chain-graph .erp-markdown-mermaid__toolbar'
@@ -625,12 +755,84 @@ export function createDevFlowStateObservatoryScenarios({
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await root.locator('.erp-dev-flow-definition-tools').count(),
-          0,
-          '状态规则 Tab 不得重复展示业务链定义搜索'
+          1,
+          '状态规则 Tab 必须继续共用页面级定义总索引'
         )
-        await page
-          .getByRole('combobox', { name: '选择状态对象' })
-          .waitFor({ state: 'visible', timeout: 10_000 })
+        const stateSelector = page.getByRole('combobox', {
+          name: '选择状态对象',
+        })
+        await stateSelector.waitFor({ state: 'visible', timeout: 10_000 })
+        await stateSelector
+          .locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+          )
+          .locator('.ant-select-selector')
+          .click()
+        const stateDropdown = page.locator(
+          '.erp-dev-flow-definition-select-popup:visible'
+        )
+        await stateDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await waitForDefinitionSelectPopupSettled(page, 10)
+        const stateGroupLabels = await stateDropdown
+          .locator('.ant-select-item-group')
+          .allTextContents()
+        assert.deepEqual(stateGroupLabels, [
+          '源单生命周期 · 5',
+          'MasterData 生命周期 · 2',
+          'Workflow 协同任务 · 1',
+          '业务进度投影 · 1',
+          'ProcessRuntime · 2',
+          'Fact / Ledger · 采购与质量 · 5',
+          'Fact / Ledger · 生产与库存 · 8',
+          'Fact / Ledger · 委外与返工 · 3',
+          'Fact / Ledger · 出货与财务 · 6',
+          '客户配置控制面 · 1',
+        ])
+        assert.equal(
+          await stateDropdown.locator('.ant-select-item-option').count(),
+          34,
+          '状态对象必须按正式 scope 与 Fact 导航分类精确覆盖 34 条定义'
+        )
+        const stateOptionMetrics = await stateDropdown
+          .locator('.ant-select-item-option')
+          .first()
+          .evaluate((node) => {
+            const label = node.querySelector(
+              '.erp-dev-flow-definition-option__label'
+            )
+            const key = node.querySelector(
+              '.erp-dev-flow-definition-option__key'
+            )
+            const labelStyle = label ? window.getComputedStyle(label) : null
+            const keyStyle = key ? window.getComputedStyle(key) : null
+            return {
+              groupCount: node
+                .closest('.ant-select-dropdown')
+                ?.querySelectorAll('.ant-select-item-group').length,
+              optionCount: node
+                .closest('.ant-select-dropdown')
+                ?.querySelectorAll('.ant-select-item-option').length,
+              labelColor: labelStyle?.color || '',
+              keyColor: keyStyle?.color || '',
+              labelWeight: Number(labelStyle?.fontWeight || 0),
+              keyWeight: Number(keyStyle?.fontWeight || 0),
+              labelFontSize: Number.parseFloat(labelStyle?.fontSize || '0'),
+              keyFontSize: Number.parseFloat(keyStyle?.fontSize || '0'),
+            }
+          })
+        assert.notEqual(
+          stateOptionMetrics.labelColor,
+          stateOptionMetrics.keyColor
+        )
+        assert(stateOptionMetrics.labelWeight > stateOptionMetrics.keyWeight)
+        assert(
+          stateOptionMetrics.labelFontSize > stateOptionMetrics.keyFontSize
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-state-definition-groups.png',
+        })
+        await stateSelector.press('Escape')
+        await stateDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
         await expectCollapsedGuidance(page, 'states')
         await expectText(page, '规则视图不是运行实例或事实凭证')
         await page.getByRole('button', { name: '返回业务链' }).click()
@@ -638,7 +840,7 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(
           await root.locator('.erp-dev-flow-definition-tools').count(),
           1,
-          '返回业务链后必须恢复业务链定义搜索'
+          '返回业务链后仍只能保留一个页面级定义总索引'
         )
 
         await chainView.locator('[data-chain-node="sales_acceptance"]').click()
@@ -650,12 +852,32 @@ export function createDevFlowStateObservatoryScenarios({
         await runtimeView.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await root.locator('.erp-dev-flow-definition-tools').count(),
-          0,
-          '运行路径 Tab 不得重复展示业务链定义搜索'
+          1,
+          '运行路径 Tab 必须继续共用页面级定义总索引'
         )
-        await page
-          .getByRole('combobox', { name: '选择流程定义' })
-          .waitFor({ state: 'visible', timeout: 10_000 })
+        const runtimeSelector = page.getByRole('combobox', {
+          name: '选择流程定义',
+        })
+        await runtimeSelector.waitFor({ state: 'visible', timeout: 10_000 })
+        await runtimeSelector
+          .locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+          )
+          .locator('.ant-select-selector')
+          .click()
+        const runtimeDropdown = page.locator('.ant-select-dropdown:visible')
+        await runtimeDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await runtimeDropdown.locator('.ant-select-item-group').count(),
+          0,
+          '只有 7 条的流程定义保持稳定业务顺序，不制造单项分组'
+        )
+        assert.equal(
+          await runtimeDropdown.locator('.ant-select-item-option').count(),
+          7
+        )
+        await runtimeSelector.press('Escape')
+        await runtimeDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
         await expectCollapsedGuidance(page, 'runtime')
         await expectCollapsedGuidance(page, 'process-definition')
         const runtimeURL = page.url()
@@ -685,6 +907,57 @@ export function createDevFlowStateObservatoryScenarios({
         const chainSelector = page.getByRole('combobox', {
           name: '选择业务链',
         })
+        await chainSelector
+          .locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+          )
+          .locator('.ant-select-selector')
+          .click()
+        const chainDropdown = page.locator(
+          '.erp-dev-flow-definition-select-popup:visible'
+        )
+        await chainDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await waitForDefinitionSelectPopupSettled(page, 4)
+        assert.deepEqual(
+          await chainDropdown
+            .locator('.ant-select-item-group')
+            .allTextContents(),
+          [
+            '履约主链 · 3',
+            '供给与库存支撑 · 3',
+            '异常与返工 · 4',
+            '冲正与纠正 · 2',
+          ]
+        )
+        assert.equal(
+          await chainDropdown.locator('.ant-select-item-option').count(),
+          13,
+          '业务总图固定在顶部，四个现有 lane 必须精确覆盖 12 条业务链'
+        )
+        const chainGroupMetrics = await chainDropdown.evaluate((node) => {
+          const rect = node.getBoundingClientRect()
+          return {
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            viewportWidth: window.innerWidth,
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+            groupCount: node.querySelectorAll('.ant-select-item-group').length,
+            optionCount: node.querySelectorAll('.ant-select-item-option')
+              .length,
+          }
+        })
+        assert(chainGroupMetrics.left >= 0)
+        assert(chainGroupMetrics.right <= chainGroupMetrics.viewportWidth + 1)
+        assert(
+          chainGroupMetrics.scrollWidth <= chainGroupMetrics.clientWidth + 1
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-business-chain-groups.png',
+        })
+        await chainSelector.press('Escape')
+        await chainDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
         await chainSelector
           .locator(
             'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
@@ -764,9 +1037,7 @@ export function createDevFlowStateObservatoryScenarios({
         if (!(await definitionDetails.evaluate((node) => node.open))) {
           await definitionDetails.locator('summary').click()
         }
-        const search = page.getByPlaceholder(
-          '例如：销售订单、销售 PMC、已提交、出货事实'
-        )
+        const search = page.getByPlaceholder('例如：销售订单、销售 PMC、已提交')
         const searchGuideTrigger = page.getByRole('button', {
           name: '可以搜什么',
         })
@@ -815,7 +1086,7 @@ export function createDevFlowStateObservatoryScenarios({
         await page.waitForFunction(
           () =>
             document.querySelector(
-              'input[placeholder="例如：销售订单、销售 PMC、已提交、出货事实"]'
+              'input[placeholder="例如：销售订单、销售 PMC、已提交"]'
             )?.value === '销售 PMC'
         )
         const searchPanel = page.locator('.erp-dev-flow-search-results')
@@ -933,7 +1204,8 @@ export function createDevFlowStateObservatoryScenarios({
             return (
               params.get('chain') === 'all' &&
               !params.has('node') &&
-              document.querySelectorAll('[data-overview-chain]').length === 12 &&
+              document.querySelectorAll('[data-overview-chain]').length ===
+                12 &&
               document.querySelectorAll('[data-chain-node]').length === 0
             )
           },
@@ -966,6 +1238,12 @@ export function createDevFlowStateObservatoryScenarios({
             collapsed: collapsedHeaderMetrics,
             expanded: expandedHeaderMetrics,
           },
+          definitionIndex: definitionIndexPlacement,
+          definitionSelects: {
+            chain: chainGroupMetrics,
+            state: stateOptionMetrics,
+            runtime: { groupCount: 0, optionCount: 7 },
+          },
           guidance: {
             overview: overviewGuidance.metrics,
             collapsed: chainGuidance.metrics,
@@ -986,7 +1264,31 @@ export function createDevFlowStateObservatoryScenarios({
       verify: async (page) => {
         await waitForCatalog(page)
         const chainView = page.locator('[data-flow-state-view="chain"]')
-        await chainView
+        const chainGraph = chainView.locator('.erp-dev-flow-chain-graph')
+        assert.equal(
+          await chainView.locator('.erp-dev-flow-graph-disclosure').count(),
+          0,
+          '单链不应提供 Mermaid 展开或收起动作'
+        )
+        for (const copy of [
+          '按步骤看业务链',
+          '这一步做什么',
+          '谁来处理',
+          '怎样算完成',
+          '异常时怎么办',
+          '查看开发者信息',
+        ]) {
+          await expectText(page, copy)
+        }
+        const defaultStableKeyVisible = await chainView
+          .locator('.erp-dev-flow-node-technical .erp-dev-flow-key-copy')
+          .evaluate((node) => node.checkVisibility())
+        assert.equal(
+          defaultStableKeyVisible,
+          false,
+          '稳定 key 必须留在默认折叠的开发者信息中'
+        )
+        await chainGraph
           .locator('.erp-markdown-mermaid__canvas svg')
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
@@ -1000,9 +1302,7 @@ export function createDevFlowStateObservatoryScenarios({
             new URLSearchParams(window.location.search).get('node') ===
             'shipped'
         )
-        await chainView
-          .getByRole('button', { name: /查看.*出货事实.*定义/u })
-          .click()
+        await chainView.getByRole('button', { name: /查看.*出货事实/u }).click()
         const factView = page.locator('[data-flow-state-view="facts"]')
         await factView.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '未提供运行凭证查询')
@@ -1114,11 +1414,21 @@ export function createDevFlowStateObservatoryScenarios({
       },
       verify: async (page) => {
         await waitForCatalog(page)
-        await expectText(page, '跨视图查定义（不查具体任务）')
-        await expectText(page, '可跨 5 个视图查业务链')
-        const definitionSearch = page.getByPlaceholder(
-          '例如：销售订单、销售 PMC、已提交、出货事实'
+        const definitionDetails = page.locator('.erp-dev-flow-definition-tools')
+        await expectText(page, '本页定义总索引')
+        assert.equal(
+          await definitionDetails.getAttribute('open'),
+          null,
+          '真实任务跳转场景进入页面时定义总索引必须默认折叠'
         )
+        await definitionDetails.locator('summary').click()
+        await page.waitForFunction(
+          () => document.querySelector('.erp-dev-flow-definition-tools')?.open
+        )
+        await expectText(page, '跨视图查定义')
+        await expectText(page, '覆盖 5 个视图')
+        const definitionSearch =
+          page.getByPlaceholder('例如：销售订单、销售 PMC、已提交')
         await definitionSearch.fill(DUPLICATE_TASK_NAME)
         await page.getByRole('button', { name: '去查真实任务' }).click()
         await page.waitForFunction((expected) => {
@@ -1132,8 +1442,13 @@ export function createDevFlowStateObservatoryScenarios({
         )
         assert.equal(
           await page.locator('.erp-dev-flow-definition-tools').count(),
-          0,
-          'Workflow Tab 不得重复展示业务链定义搜索'
+          1,
+          'Workflow Tab 必须继续共用页面级定义总索引'
+        )
+        assert.equal(
+          await definitionSearch.inputValue(),
+          '',
+          '把关键词交给真实任务查询后必须清空页面级定义搜索'
         )
         const workflowGuidance = await expectCollapsedGuidance(page, 'workflow')
         await page.screenshot({
@@ -1146,6 +1461,14 @@ export function createDevFlowStateObservatoryScenarios({
         await expectText(page, '当前账号可见范围')
         await searchTask(page, UNIQUE_TASK_NAME)
         await expectTaskID(page, 1901)
+        const taskContextEvidence = {
+          workflow: await expectTaskScopedOutsideGlobalContext(
+            assert,
+            page,
+            1901,
+            'Workflow'
+          ),
+        }
         await expectText(page, UNIQUE_TASK_NAME)
         await expectText(page, 'SO-RISK-19')
         await expectText(page, '协同事件')
@@ -1160,14 +1483,21 @@ export function createDevFlowStateObservatoryScenarios({
         await runtimeView.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await page.locator('.erp-dev-flow-definition-tools').count(),
-          0,
-          'ProcessRuntime Tab 不得重复展示业务链定义搜索'
+          1,
+          'ProcessRuntime Tab 必须继续共用页面级定义总索引'
         )
         const runtimeGuidance = await expectCollapsedGuidance(page, 'runtime')
         await expectCollapsedGuidance(page, 'process-definition')
         await expectText(page, '具体运行实例')
         await expectText(page, '7019')
         await expectText(page, '尚未证明业务事实已落账')
+        taskContextEvidence.runtime =
+          await expectTaskScopedOutsideGlobalContext(
+            assert,
+            page,
+            1901,
+            'ProcessRuntime'
+          )
         await runtimeView.screenshot({
           path: 'output/playwright/style-l1/dev-flow-state-observatory-runtime-instance.png',
           animations: 'disabled',
@@ -1179,7 +1509,7 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(
           await page.locator('.erp-dev-flow-definition-tools').count(),
           1,
-          '业务链 Tab 必须保留业务链定义搜索'
+          '业务链 Tab 仍只能保留一个页面级定义总索引'
         )
         const currentRuntimeChains = chainView.locator(
           '[data-overview-chain][data-runtime-current="true"]'
@@ -1200,8 +1530,44 @@ export function createDevFlowStateObservatoryScenarios({
           '总图运行定位不得展开或推断单链内部节点完成情况'
         )
         await expectText(page, '只证明定位到所属链；尚未证明上下游完成')
+        taskContextEvidence.chain = await expectTaskScopedOutsideGlobalContext(
+          assert,
+          page,
+          1901,
+          '业务链'
+        )
         await chainView.screenshot({
           path: 'output/playwright/style-l1/dev-flow-state-observatory-overview-runtime-highlight.png',
+          animations: 'disabled',
+        })
+
+        await page.getByRole('tab', { name: /看已生效结果/u }).click()
+        const factsView = page.locator('[data-flow-state-view="facts"]')
+        await factsView.waitFor({ state: 'visible', timeout: 10_000 })
+        taskContextEvidence.facts = await expectTaskScopedOutsideGlobalContext(
+          assert,
+          page,
+          1901,
+          'Fact / Ledger'
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-facts-with-preserved-task.png',
+          fullPage: true,
+          animations: 'disabled',
+        })
+
+        await page.getByRole('tab', { name: /查状态规则/u }).click()
+        const statesView = page.locator('[data-flow-state-view="states"]')
+        await statesView.waitFor({ state: 'visible', timeout: 10_000 })
+        taskContextEvidence.states = await expectTaskScopedOutsideGlobalContext(
+          assert,
+          page,
+          1901,
+          '状态规则'
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-states-with-preserved-task.png',
+          fullPage: true,
           animations: 'disabled',
         })
 
@@ -1279,6 +1645,7 @@ export function createDevFlowStateObservatoryScenarios({
             workflow: workflowGuidance.metrics,
             runtime: runtimeGuidance.metrics,
           },
+          taskContextEvidence,
           rpcMethods,
         })
       },
@@ -1298,8 +1665,12 @@ export function createDevFlowStateObservatoryScenarios({
         const mobileConceptDetails = mobileHeader.locator(
           ':scope > .erp-dev-flow-concepts'
         )
+        const mobileDefinitionDetails = page.locator(
+          '.erp-dev-flow-definition-tools'
+        )
         assert.equal(await mobileConceptDetails.count(), 1)
         assert.equal(await mobileConceptDetails.getAttribute('open'), null)
+        assert.equal(await mobileDefinitionDetails.getAttribute('open'), null)
         const mobileHeaderMetrics = await mobileHeader.evaluate((node) => {
           const summary = node.querySelector('.erp-dev-flow-concepts > summary')
           return {
@@ -1334,6 +1705,10 @@ export function createDevFlowStateObservatoryScenarios({
         assert(metrics.documentScrollWidth <= metrics.viewportWidth + 1)
         assert(metrics.bodyScrollWidth <= metrics.viewportWidth + 1)
         assert.deepEqual(metrics.nestedVerticalScrollers, [])
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-definition-index-mobile-dark-collapsed.png',
+          animations: 'disabled',
+        })
         const touchTargetHeight = await page
           .getByRole('tab', { name: /看业务链/u })
           .evaluate((node) => node.getBoundingClientRect().height)
@@ -1354,9 +1729,12 @@ export function createDevFlowStateObservatoryScenarios({
           animations: 'disabled',
         })
 
-        const definitionSearch = page.getByPlaceholder(
-          '例如：销售订单、销售 PMC、已提交、出货事实'
+        await mobileDefinitionDetails.locator('summary').click()
+        await page.waitForFunction(
+          () => document.querySelector('.erp-dev-flow-definition-tools')?.open
         )
+        const definitionSearch =
+          page.getByPlaceholder('例如：销售订单、销售 PMC、已提交')
         const mobileSearchGuideTrigger = page.getByRole('button', {
           name: '可以搜什么',
         })
@@ -1383,8 +1761,10 @@ export function createDevFlowStateObservatoryScenarios({
               '[data-definition-search-guide]'
             )
             const popover = guide?.closest('.ant-popover')
+            if (!popover) return false
+            const popoverStyle = window.getComputedStyle(popover)
             return (
-              popover && window.getComputedStyle(popover).transform === 'none'
+              popoverStyle.transform === 'none' && popoverStyle.opacity === '1'
             )
           },
           null,
@@ -1417,7 +1797,7 @@ export function createDevFlowStateObservatoryScenarios({
         assert(
           mobileSearchGuideMetrics.buttonHeights.every((height) => height >= 36)
         )
-        await mobileSearchGuide.screenshot({
+        await page.screenshot({
           path: 'output/playwright/style-l1/dev-flow-state-observatory-search-guide-mobile-dark.png',
           animations: 'allow',
         })
@@ -1462,12 +1842,71 @@ export function createDevFlowStateObservatoryScenarios({
         await factView.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await page.locator('.erp-dev-flow-definition-tools').count(),
-          0,
-          'Fact / Ledger Tab 不得重复展示业务链定义搜索'
+          1,
+          'Fact / Ledger Tab 必须继续共用页面级定义总索引'
         )
-        await page
-          .getByRole('combobox', { name: '选择事实定义' })
-          .waitFor({ state: 'visible', timeout: 10_000 })
+        const factSelector = page.getByRole('combobox', {
+          name: '选择事实定义',
+        })
+        await factSelector.waitFor({ state: 'visible', timeout: 10_000 })
+        await factSelector
+          .locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]'
+          )
+          .locator('.ant-select-selector')
+          .click()
+        const factDropdown = page.locator(
+          '.erp-dev-flow-definition-select-popup:visible'
+        )
+        await factDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await waitForDefinitionSelectPopupSettled(page, 4)
+        assert.deepEqual(
+          await factDropdown
+            .locator('.ant-select-item-group')
+            .allTextContents(),
+          [
+            '采购与质量 · 5',
+            '生产与库存 · 8',
+            '委外与返工 · 3',
+            '出货与财务 · 6',
+          ]
+        )
+        assert.equal(
+          await factDropdown.locator('.ant-select-item-option').count(),
+          22,
+          'Fact 下拉必须按四个导航分组精确覆盖全部定义'
+        )
+        assert.equal(
+          await factDropdown
+            .locator('.erp-dev-flow-definition-option__key')
+            .count(),
+          22,
+          '开发观察台必须保留全部机器键，但降低其视觉权重'
+        )
+        const factSelectMetrics = await factDropdown.evaluate((node) => {
+          const rect = node.getBoundingClientRect()
+          const firstOption = node.querySelector('.ant-select-item-option')
+          return {
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            viewportWidth: window.innerWidth,
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+            firstOptionHeight: firstOption?.getBoundingClientRect().height || 0,
+          }
+        })
+        assert(factSelectMetrics.left >= 0)
+        assert(factSelectMetrics.right <= factSelectMetrics.viewportWidth + 1)
+        assert(
+          factSelectMetrics.scrollWidth <= factSelectMetrics.clientWidth + 1
+        )
+        assert(factSelectMetrics.firstOptionHeight >= 44)
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-fact-groups-mobile-dark.png',
+        })
+        await factSelector.press('Escape')
+        await factDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
         const factGuidance = await expectCollapsedGuidance(page, 'facts', 92)
         await expectText(page, '未提供运行凭证查询')
         await assertNoHorizontalOverflow(
@@ -1490,6 +1929,7 @@ export function createDevFlowStateObservatoryScenarios({
           header: mobileHeaderMetrics,
           chain: metrics,
           definitionSearch: searchPanelMetrics,
+          factSelect: factSelectMetrics,
           guidance: factGuidance.metrics,
           facts: factMetrics,
           writeRequests,

@@ -1,5 +1,6 @@
 export const DEV_HUB_ROUTE = '/__dev'
 export const DEV_PRODUCT_ENGINEERING_ROUTE = '/__dev/product-engineering'
+export const DEV_PRODUCT_CORE_ROUTE = '/__dev/product-core'
 export const DEV_QUALITY_ROUTE = '/__dev/quality'
 export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 
@@ -20,6 +21,8 @@ export const DEV_WORKBENCH_AREA_KEYS = Object.freeze({
   delivery: 'delivery',
 })
 
+// 一级菜单使用稳定责任域；二级菜单使用开发者要完成的任务或查看的对象。
+// 路由和内部 key 不随可见名称调整，避免文案治理扩大为深链迁移。
 export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.overview,
@@ -31,40 +34,46 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
     key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_ENGINEERING_ROUTE,
     label: '产品工程',
-    description: '状态、流程与产品资产',
+    description: '规则、业务链、文档与原型',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_QUALITY_ROUTE,
     label: '质量验证',
-    description: '门禁、测试与稳定性',
+    description: '改动验证、测试数据与证据',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.delivery,
     route: DEV_DELIVERY_ROUTE,
     label: '交付运行',
-    description: '配置、版本与发布回执',
+    description: '配置、迁移与版本发布',
   }),
 ])
 
 export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
   Object.freeze({
+    key: 'product-core',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_PRODUCT_CORE_ROUTE,
+    label: '产品内核',
+  }),
+  Object.freeze({
     key: 'governance',
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_GOVERNANCE_ROUTE,
-    label: '治理地图',
+    label: '改动指南',
   }),
   Object.freeze({
     key: 'status-flows',
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_STATUS_FLOWS_ROUTE,
-    label: '流程状态',
+    label: '业务链观察',
   }),
   Object.freeze({
     key: 'docs',
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_DOCS_ROUTE,
-    label: '文档真源',
+    label: '开发文档',
   }),
   Object.freeze({
     key: 'prototypes',
@@ -76,13 +85,13 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     key: 'testing',
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_TESTING_ROUTE,
-    label: '测试入口',
+    label: '改动验证',
   }),
   Object.freeze({
     key: 'data-preparation',
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_DATA_PREPARATION_ROUTE,
-    label: '数据准备',
+    label: '测试数据',
   }),
   Object.freeze({
     key: 'customer-config',
@@ -100,24 +109,20 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     key: 'version-center',
     areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
     route: DEV_VERSION_CENTER_ROUTE,
-    label: '版本中心',
+    label: '版本发布',
   }),
 ])
 
 export const DEV_PAGE_TITLE_BY_ROUTE = Object.freeze({
   [DEV_HUB_ROUTE]: '研发效能工作台',
-  [DEV_PRODUCT_ENGINEERING_ROUTE]: '产品工程',
-  [DEV_QUALITY_ROUTE]: '质量验证',
-  [DEV_DELIVERY_ROUTE]: '交付运行',
-  [DEV_GOVERNANCE_ROUTE]: '项目治理地图',
-  [DEV_STATUS_FLOWS_ROUTE]: '流程与状态观察台',
-  [DEV_DOCS_ROUTE]: '开发文档',
-  [DEV_TESTING_ROUTE]: '测试入口',
-  [DEV_DATA_PREPARATION_ROUTE]: '测试数据准备中心',
-  [DEV_PROTOTYPES_ROUTE]: '产品原型',
-  [DEV_CUSTOMER_CONFIG_ROUTE]: '客户配置包预检与发布',
-  [DEV_DATABASE_MIGRATION_ROUTE]: '数据库迁移',
-  [DEV_VERSION_CENTER_ROUTE]: '版本发布与部署中心',
+  ...Object.fromEntries(
+    DEV_WORKSPACE_NAV_ITEMS.filter((item) => item.route !== DEV_HUB_ROUTE).map(
+      (item) => [item.route, item.label]
+    )
+  ),
+  ...Object.fromEntries(
+    DEV_SECONDARY_NAV_ITEMS.map((item) => [item.route, item.label])
+  ),
 })
 
 function normalizeDevPathname(pathname = '') {
@@ -129,6 +134,7 @@ function normalizeDevPathname(pathname = '') {
 export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_HUB_ROUTE]: '/favicon-dev.svg',
   [DEV_PRODUCT_ENGINEERING_ROUTE]: '/favicon-dev.svg',
+  [DEV_PRODUCT_CORE_ROUTE]: '/favicon-dev.svg',
   [DEV_QUALITY_ROUTE]: '/favicon-dev.svg',
   [DEV_DELIVERY_ROUTE]: '/favicon-dev.svg',
   [DEV_GOVERNANCE_ROUTE]: '/favicon-governance.svg',

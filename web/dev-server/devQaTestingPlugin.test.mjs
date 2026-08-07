@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -16,6 +16,7 @@ import {
   createDevQaTestingMiddleware,
   createDevQaTestingPlugin,
   createDevQaTestingService,
+  readDevQaGitHookGovernance,
   validateDevQaTestingAction,
 } from './devQaTestingPlugin.mjs'
 
@@ -43,6 +44,41 @@ function deferred() {
     resolve = done
   })
   return { promise, resolve }
+}
+
+const HOOK_FILES = Object.freeze([
+  '.githooks/pre-commit',
+  '.githooks/commit-msg',
+  '.githooks/pre-push',
+  'scripts/git-hooks/pre-commit.sh',
+  'scripts/git-hooks/commit-msg.sh',
+  'scripts/git-hooks/pre-push.sh',
+  'scripts/qa/prepare-push.sh',
+])
+const HOOK_CHECK_KEYS = Object.freeze([
+  'hooks-path',
+  'pre-commit-entry',
+  'commit-msg-entry',
+  'pre-push-entry',
+  'pre-commit-runner',
+  'commit-msg-runner',
+  'pre-push-runner',
+  'prepare-push',
+])
+const READY_HOOKS = Object.freeze({
+  status: 'ready',
+  expectedHooksPath: '.githooks',
+  configuredHooksPath: '.githooks',
+  checks: HOOK_CHECK_KEYS.map((key) => ({ key, status: 'ready' })),
+})
+
+async function writeExecutableHookFixture(root) {
+  for (const sourcePath of HOOK_FILES) {
+    const target = path.join(root, sourcePath)
+    await mkdir(path.dirname(target), { recursive: true })
+    await writeFile(target, '#!/bin/sh\nexit 0\n', 'utf8')
+    await chmod(target, 0o755)
+  }
 }
 
 test('testing action contract accepts only fixed allowlisted intent', () => {
@@ -101,6 +137,29 @@ test('testing command registry maps actions to fixed repository scripts', () => 
   )
 })
 
+test('testing hook governance reports wiring only and fails closed', async (t) => {
+  const root = await project(t)
+  await writeExecutableHookFixture(root)
+
+  const ready = readDevQaGitHookGovernance(root, {
+    readConfiguredPath: () => '.githooks',
+  })
+  assert.equal(ready.status, 'ready')
+  assert.equal(ready.configuredHooksPath, '.githooks')
+  assert.equal(ready.checks.length, 8)
+  assert(ready.checks.every((check) => check.status === 'ready'))
+
+  await chmod(path.join(root, 'scripts/qa/prepare-push.sh'), 0o644)
+  const blocked = readDevQaGitHookGovernance(root, {
+    readConfiguredPath: () => '/private/other-hooks',
+  })
+  assert.equal(blocked.status, 'blocked')
+  assert.equal(blocked.configuredHooksPath, '其他路径')
+  assert.equal(blocked.checks[0].status, 'misconfigured')
+  assert.equal(blocked.checks.at(-1).status, 'not_executable')
+  assert.equal(JSON.stringify(blocked).includes('/private/other-hooks'), false)
+})
+
 test('testing plan is read-only, relative and fails closed on identity drift', async (t) => {
   const root = await project(t)
   const affected = {
@@ -125,6 +184,7 @@ test('testing plan is read-only, relative and fails closed on identity drift', a
     projectRoot: root,
     readRepositoryState: async () => REPOSITORY,
     collectPlan: async () => affected,
+    readHookGovernance: () => READY_HOOKS,
     now: () => new Date('2026-07-30T10:00:00.000Z'),
   })
   const plan = await service.plan()
@@ -133,6 +193,7 @@ test('testing plan is read-only, relative and fails closed on identity drift', a
   assert.deepEqual(plan.followUps, [
     { level: 'T5', text: '运行真实浏览器回归' },
   ])
+  assert.deepEqual(service.summary().hooks, READY_HOOKS)
 
   let reads = 0
   const drifting = createDevQaTestingService({
@@ -255,8 +316,17 @@ test('testing middleware is loopback-only and plugin is serve-only', async () =>
   const middleware = createDevQaTestingMiddleware({
     service: {
       summary: () => ({
-        schemaVersion: 'plush.dev-qa-testing-summary/v1',
+        schemaVersion: 'plush.dev-qa-testing-summary/v2',
         busy: { active: false, kind: '', profile: '' },
+        hooks: {
+          status: 'blocked',
+          expectedHooksPath: '.githooks',
+          configuredHooksPath: '未配置',
+          checks: HOOK_CHECK_KEYS.map((key, index) => ({
+            key,
+            status: index === 0 ? 'misconfigured' : 'missing',
+          })),
+        },
         operations: {
           fast: null,
           'role-access': null,

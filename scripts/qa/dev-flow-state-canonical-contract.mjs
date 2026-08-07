@@ -1,10 +1,119 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+
+const ENT_SCHEMA_DIRECTORY = 'server/internal/data/model/schema'
+const ENT_FIELD_DECLARATION_PATTERN = /field\.(?:String|Enum)\(\s*"([^"]+)"/gu
+const STATUS_OWNER_FIELD_PATTERN = /(?:^status$|_status(?:_key)?$)/u
+const STATUS_SNAPSHOT_FIELD_PATTERN = /^(?:from|to|original|previous)_/u
 
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+}
+
+function isStatusOwnerField(field) {
+  return (
+    STATUS_OWNER_FIELD_PATTERN.test(field) &&
+    !STATUS_SNAPSHOT_FIELD_PATTERN.test(field)
+  )
+}
+
+function schemaStatusOwnerIdentity({ path, field }) {
+  return `${path}#${field}`
+}
+
+function normalizeSchemaStatusOwnerRef(value, context) {
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    typeof value.path !== 'string' ||
+    !value.path.startsWith(`${ENT_SCHEMA_DIRECTORY}/`) ||
+    typeof value.field !== 'string' ||
+    !isStatusOwnerField(value.field)
+  ) {
+    throw new Error(`${context} has an invalid schema status-owner reference`)
+  }
+  return Object.freeze({ path: value.path, field: value.field })
+}
+
+function collectEntSchemaStatusOwnerRefs(contractRef) {
+  if (!contractRef || typeof contractRef !== 'object') return []
+  if (contractRef.kind === 'ent_check_agreement') {
+    return (contractRef.refs || []).flatMap(collectEntSchemaStatusOwnerRefs)
+  }
+  if (
+    contractRef.kind !== 'ent_check' ||
+    typeof contractRef.path !== 'string' ||
+    !contractRef.path.startsWith(`${ENT_SCHEMA_DIRECTORY}/`) ||
+    !isStatusOwnerField(contractRef.field)
+  ) {
+    return []
+  }
+  return [{ path: contractRef.path, field: contractRef.field }]
+}
+
+export function readCanonicalSchemaStatusOwners(repoRoot) {
+  const schemaDirectory = resolve(repoRoot, ENT_SCHEMA_DIRECTORY)
+  const owners = new Map()
+  for (const entry of readdirSync(schemaDirectory, {
+    withFileTypes: true,
+  }).sort((left, right) => left.name.localeCompare(right.name))) {
+    if (!entry.isFile() || !entry.name.endsWith('.go')) continue
+    const path = `${ENT_SCHEMA_DIRECTORY}/${entry.name}`
+    const source = readFileSync(resolve(schemaDirectory, entry.name), 'utf8')
+    for (const match of source.matchAll(ENT_FIELD_DECLARATION_PATTERN)) {
+      const field = match[1]
+      if (!isStatusOwnerField(field)) continue
+      const owner = Object.freeze({ path, field })
+      const identity = schemaStatusOwnerIdentity(owner)
+      if (owners.has(identity)) {
+        throw new Error(`duplicate schema status-owner field: ${identity}`)
+      }
+      owners.set(identity, owner)
+    }
+  }
+  return Object.freeze(
+    [...owners.values()].sort((left, right) =>
+      schemaStatusOwnerIdentity(left).localeCompare(
+        schemaStatusOwnerIdentity(right)
+      )
+    )
+  )
+}
+
+export function collectObservedSchemaStatusOwners(flows) {
+  if (!Array.isArray(flows)) {
+    throw new Error('observer flows are required')
+  }
+  const owners = new Map()
+  for (const flow of flows) {
+    if (!flow || typeof flow.key !== 'string' || flow.key.length === 0) {
+      throw new Error('observer flow has no stable key')
+    }
+    const refs = [
+      ...collectEntSchemaStatusOwnerRefs(flow.contractRef),
+      ...(Array.isArray(flow.schemaStatusRefs) ? flow.schemaStatusRefs : []),
+    ]
+    for (const value of refs) {
+      const ref = normalizeSchemaStatusOwnerRef(value, flow.key)
+      const identity = schemaStatusOwnerIdentity(ref)
+      const existing = owners.get(identity)
+      if (existing) {
+        throw new Error(
+          `${identity} is mapped by both ${existing.flowKey} and ${flow.key}`
+        )
+      }
+      owners.set(identity, Object.freeze({ ...ref, flowKey: flow.key }))
+    }
+  }
+  return Object.freeze(
+    [...owners.values()].sort((left, right) =>
+      schemaStatusOwnerIdentity(left).localeCompare(
+        schemaStatusOwnerIdentity(right)
+      )
+    )
+  )
 }
 
 function readContractSource(repoRoot, contractRef) {

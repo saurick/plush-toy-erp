@@ -2,13 +2,18 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  DEV_TESTING_GIT_CLOSEOUT_STAGES,
+  DEV_TESTING_GIT_HOOK_CHECKS,
+  DEV_TESTING_GIT_HOOK_PATH_COMMAND,
   DEV_TESTING_OPERATION_ACTION_API_PATH,
   DEV_TESTING_OPERATION_API_PATH,
   DEV_TESTING_OPERATION_API_PREFIX,
   DEV_TESTING_OPERATION_PLAN_API_PATH,
   DEV_TESTING_OPERATION_SESSION_API_PATH,
+  DEV_TESTING_PREPARE_PUSH_COMMAND,
   createDevTestingIdempotencyKey,
   createDevTestingOperationClient,
+  getDevTestingGitHookStatusMeta,
   getDevTestingOperationPresentation,
   normalizeDevTestingPlan,
   normalizeDevTestingSummary,
@@ -19,6 +24,15 @@ const REPOSITORY = {
   commit: 'a'.repeat(40),
   dirty: true,
   fingerprint: 'b'.repeat(64),
+}
+const HOOKS = {
+  status: 'ready',
+  expectedHooksPath: '.githooks',
+  configuredHooksPath: '.githooks',
+  checks: DEV_TESTING_GIT_HOOK_CHECKS.map(({ key }) => ({
+    key,
+    status: 'ready',
+  })),
 }
 
 function operation(overrides = {}) {
@@ -49,10 +63,11 @@ function jsonResponse(payload, { ok = true } = {}) {
   }
 }
 
-test('testing summary keeps the three fixed results independent', () => {
+test('testing summary keeps fixed results and Git Hook wiring independent', () => {
   const summary = normalizeDevTestingSummary({
-    schemaVersion: 'plush.dev-qa-testing-summary/v1',
+    schemaVersion: 'plush.dev-qa-testing-summary/v2',
     busy: { active: true, kind: 'testing', profile: 'fast' },
+    hooks: HOOKS,
     operations: {
       fast: operation(),
       'role-access': null,
@@ -62,6 +77,43 @@ test('testing summary keeps the three fixed results independent', () => {
   assert.equal(summary.busy.profile, 'fast')
   assert.equal(summary.operations.fast.action, 'fast')
   assert.equal(summary.operations['role-access'], null)
+  assert.equal(summary.hooks.status, 'ready')
+  assert.equal(summary.hooks.checks[0].label, 'Git Hook 入口目录')
+  assert.equal(
+    summary.hooks.checks.at(-1).sourcePath,
+    'scripts/qa/prepare-push.sh'
+  )
+
+  assert.throws(
+    () =>
+      normalizeDevTestingSummary({
+        ...summary,
+        hooks: {
+          ...HOOKS,
+          configuredHooksPath: '其他路径',
+        },
+      }),
+    /inconsistent/u
+  )
+})
+
+test('testing Git closeout copy stays fixed and explains the four boundaries', () => {
+  assert.equal(
+    DEV_TESTING_GIT_HOOK_PATH_COMMAND,
+    'git config --get core.hooksPath'
+  )
+  assert.equal(
+    DEV_TESTING_PREPARE_PUSH_COMMAND,
+    'bash scripts/qa/prepare-push.sh'
+  )
+  assert.deepEqual(
+    DEV_TESTING_GIT_CLOSEOUT_STAGES.map((stage) => stage.key),
+    ['pre-commit', 'commit-msg', 'prepare-push', 'pre-push']
+  )
+  assert.match(DEV_TESTING_GIT_CLOSEOUT_STAGES[0].boundary, /不等于完整 full/)
+  assert.match(DEV_TESTING_GIT_CLOSEOUT_STAGES[2].boundary, /不执行 push/)
+  assert.equal(getDevTestingGitHookStatusMeta('ready').label, '接线完整')
+  assert.equal(getDevTestingGitHookStatusMeta('missing').tone, 'danger')
 })
 
 test('testing plan accepts only relative commands and frozen identity', () => {
@@ -118,8 +170,9 @@ test('testing client posts only action and idempotency key', async () => {
       }
       if (url === DEV_TESTING_OPERATION_API_PATH) {
         return jsonResponse({
-          schemaVersion: 'plush.dev-qa-testing-summary/v1',
+          schemaVersion: 'plush.dev-qa-testing-summary/v2',
           busy: { active: false, kind: '', profile: '' },
+          hooks: HOOKS,
           operations: {
             fast: operation(),
             'role-access': null,

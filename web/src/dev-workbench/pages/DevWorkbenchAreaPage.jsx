@@ -56,6 +56,14 @@ const QUALITY_ENTRY_PRESENTATION = Object.freeze({
 })
 
 const PRODUCT_ENGINEERING_ENTRY_PRESENTATION = Object.freeze({
+  'product-core': Object.freeze({
+    eyebrow: '当前产品事实',
+    title: '哪些能力已经进入产品内核？',
+    description:
+      '完整查看已进入、部分进入、尚未进入和当前不纳入的产品能力，并继续核对可用范围与边界。',
+    action: '查看产品内核',
+    boundary: '适合查当前产品事实；不能推出已发布或客户已验收',
+  }),
   governance: Object.freeze({
     eyebrow: '规则与边界',
     title: '这件事该按哪条规则做？',

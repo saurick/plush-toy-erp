@@ -81,8 +81,13 @@ function useCurrentERPTheme() {
 }
 
 /* eslint-disable react/no-danger */
-function MermaidDiagram({ chart }) {
+export function MermaidDiagram({
+  chart,
+  label = 'Mermaid 图表',
+  showSourceOnError = true,
+}) {
   const theme = useCurrentERPTheme()
+  const displayLabel = String(label || '').trim() || '图表'
   const diagramId = useMemo(() => {
     mermaidRenderSequence += 1
     return `erp-markdown-mermaid-${mermaidRenderSequence}`
@@ -117,15 +122,17 @@ function MermaidDiagram({ chart }) {
     document.body.style.overflow = 'hidden'
     const closeOnEscape = (event) => {
       if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
         setFullscreenOpen(false)
       }
     }
-    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('keydown', closeOnEscape, true)
     window.setTimeout(() => fullscreenExitRef.current?.focus(), 0)
 
     return () => {
       document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('keydown', closeOnEscape, true)
     }
   }, [fullscreenOpen])
 
@@ -211,25 +218,25 @@ function MermaidDiagram({ chart }) {
       data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}
       role={fullscreenOpen ? 'dialog' : undefined}
       aria-modal={fullscreenOpen ? 'true' : undefined}
-      aria-label={fullscreenOpen ? 'Mermaid 图表全屏查看' : undefined}
+      aria-label={fullscreenOpen ? `${displayLabel}全屏查看` : undefined}
     >
       {renderState.status === 'loading' ? (
         <div className="erp-markdown-mermaid__loading">
-          正在渲染 Mermaid 图表...
+          {`正在渲染 ${displayLabel}...`}
         </div>
       ) : null}
       {renderState.status === 'rendered' ? (
         <>
           <div
             className="erp-markdown-mermaid__toolbar"
-            aria-label="Mermaid 图表工具"
+            aria-label={`${displayLabel}工具`}
           >
             <button
               type="button"
               className="erp-markdown-mermaid__tool"
               data-mermaid-zoom-action="fit"
               title="适配宽度"
-              aria-label="适配 Mermaid 图表宽度"
+              aria-label={`适配${displayLabel}宽度`}
               onClick={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
             >
               <FullscreenOutlined />
@@ -239,7 +246,7 @@ function MermaidDiagram({ chart }) {
               className="erp-markdown-mermaid__tool"
               data-mermaid-zoom-action="zoom-out"
               title="缩小"
-              aria-label="缩小 Mermaid 图表"
+              aria-label={`缩小${displayLabel}`}
               disabled={activeZoom <= MERMAID_ZOOM.min}
               onClick={() => setNextZoom(activeZoom - MERMAID_ZOOM.step)}
             >
@@ -256,7 +263,7 @@ function MermaidDiagram({ chart }) {
               className="erp-markdown-mermaid__tool"
               data-mermaid-zoom-action="zoom-in"
               title="放大"
-              aria-label="放大 Mermaid 图表"
+              aria-label={`放大${displayLabel}`}
               disabled={activeZoom >= MERMAID_ZOOM.max}
               onClick={() => setNextZoom(activeZoom + MERMAID_ZOOM.step)}
             >
@@ -267,7 +274,7 @@ function MermaidDiagram({ chart }) {
               className="erp-markdown-mermaid__tool"
               data-mermaid-zoom-action="reset"
               title="重置 100%"
-              aria-label="重置 Mermaid 图表为 100%"
+              aria-label={`重置${displayLabel}为 100%`}
               onClick={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
             >
               <OneToOneOutlined />
@@ -279,7 +286,7 @@ function MermaidDiagram({ chart }) {
                 className="erp-markdown-mermaid__tool"
                 data-mermaid-fullscreen-action="close"
                 title="退出全屏"
-                aria-label="退出 Mermaid 图表全屏"
+                aria-label={`退出${displayLabel}全屏`}
                 onClick={() => setFullscreenOpen(false)}
               >
                 <FullscreenExitOutlined />
@@ -290,7 +297,7 @@ function MermaidDiagram({ chart }) {
                 className="erp-markdown-mermaid__tool"
                 data-mermaid-fullscreen-action="open"
                 title="全屏查看"
-                aria-label="全屏查看 Mermaid 图表"
+                aria-label={`全屏查看${displayLabel}`}
                 onClick={openFullscreen}
               >
                 <ArrowsAltOutlined />
@@ -311,11 +318,14 @@ function MermaidDiagram({ chart }) {
       {renderState.status === 'error' ? (
         <>
           <div className="erp-markdown-mermaid__error" role="alert">
-            Mermaid 图表渲染失败，已保留源码：{renderState.error}
+            {`${displayLabel}渲染失败${showSourceOnError ? '，已保留源码：' : '：'}`}
+            {renderState.error}
           </div>
-          <pre className="erp-markdown-mermaid__source">
-            <code>{String(chart || '')}</code>
-          </pre>
+          {showSourceOnError ? (
+            <pre className="erp-markdown-mermaid__source">
+              <code>{String(chart || '')}</code>
+            </pre>
+          ) : null}
         </>
       ) : null}
     </div>

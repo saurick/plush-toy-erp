@@ -48,9 +48,13 @@ import {
   normalizeOptionalDevCoverageOperation,
 } from '../config/devCoverageOperation.mjs'
 import {
+  DEV_TESTING_GIT_CLOSEOUT_STAGES,
+  DEV_TESTING_GIT_HOOK_PATH_COMMAND,
   DEV_TESTING_FIXED_ACTIONS,
+  DEV_TESTING_PREPARE_PUSH_COMMAND,
   createDevTestingIdempotencyKey,
   createDevTestingOperationClient,
+  getDevTestingGitHookStatusMeta,
   getDevTestingOperationPresentation,
   isDevTestingOperationActive,
 } from '../config/devTestingOperation.mjs'
@@ -59,6 +63,7 @@ const { Paragraph, Text, Title } = Typography
 
 const VIEW_TIERS = 'tiers'
 const VIEW_COMMANDS = 'commands'
+const VIEW_CLOSEOUT = 'closeout'
 const VIEW_COVERAGE = 'coverage'
 const VIEW_QUERY_KEY = 'view'
 const DOCUMENT_ROLE_QUERY_KEY = 'role'
@@ -67,6 +72,7 @@ const COMMAND_QUERY_KEY = 'q'
 const VIEW_OPTIONS = [
   { label: '本轮验证', value: VIEW_TIERS },
   { label: '专项检查库', value: VIEW_COMMANDS },
+  { label: 'Git 收口', value: VIEW_CLOSEOUT },
   { label: '证据与覆盖', value: VIEW_COVERAGE },
 ]
 const VIEW_VALUES = new Set(VIEW_OPTIONS.map((option) => option.value))
@@ -313,6 +319,193 @@ function CoverageSection({ title, description, status, children }) {
       </div>
       {children}
     </section>
+  )
+}
+
+function GitHookStatusTag({ status }) {
+  const meta = getDevTestingGitHookStatusMeta(status)
+  return <Tag color={coverageTagColor(meta.tone)}>{meta.label}</Tag>
+}
+
+function GitCloseoutView({ hooks, loading, error, onReload }) {
+  const readyCount =
+    hooks?.checks?.filter((check) => check.status === 'ready').length || 0
+  const checkCount = hooks?.checks?.length || 0
+  const ready = hooks?.status === 'ready'
+
+  return (
+    <div
+      className="erp-dev-testing-closeout-view"
+      aria-label="Git Hook 与推送收口治理"
+      aria-busy={loading}
+    >
+      <div className="erp-dev-testing-closeout-heading">
+        <div>
+          <Text className="erp-dev-testing-validation__eyebrow">
+            自动守住机械边界
+          </Text>
+          <Title level={2}>Git 收口</Title>
+          <Paragraph>
+            看清每一道检查何时触发、证明什么，再决定是否进入提交或推送。
+          </Paragraph>
+        </div>
+        <Tag>只读接线检查</Tag>
+      </div>
+
+      {loading ? (
+        <div className="erp-dev-testing-closeout-loading">
+          <Skeleton active paragraph={{ rows: 3 }} />
+        </div>
+      ) : null}
+
+      {!loading && error ? (
+        <Alert
+          showIcon
+          type="error"
+          message="暂时无法读取 Hook 接线"
+          description={`${error} 页面不会据此推断提交或推送已经安全。`}
+          action={
+            <Button icon={<ReloadOutlined />} onClick={onReload}>
+              重新读取
+            </Button>
+          }
+        />
+      ) : null}
+
+      {!loading && !error && hooks ? (
+        <>
+          <Alert
+            showIcon
+            type={ready ? 'success' : 'warning'}
+            message={ready ? 'Hook 接线完整' : 'Hook 接线未完整'}
+            description={`${readyCount}/${checkCount} 项接线完整；当前 core.hooksPath：${hooks.configuredHooksPath}。这只证明入口与可执行权限，不代表任何门禁已经运行。`}
+            action={
+              <Button icon={<ReloadOutlined />} onClick={onReload}>
+                重新读取
+              </Button>
+            }
+          />
+
+          <section
+            className="erp-dev-testing-closeout-section"
+            aria-labelledby="git-closeout-flow-title"
+          >
+            <div className="erp-dev-testing-closeout-section__head">
+              <div>
+                <Title level={3} id="git-closeout-flow-title">
+                  四道收口检查
+                </Title>
+                <Paragraph>从暂存快照到推送前复核，前后职责不重叠。</Paragraph>
+              </div>
+              <Text type="secondary">按触发顺序阅读</Text>
+            </div>
+            <ol className="erp-dev-testing-closeout-steps">
+              {DEV_TESTING_GIT_CLOSEOUT_STAGES.map((stage, index) => (
+                <li key={stage.key}>
+                  <span className="erp-dev-testing-closeout-step__number">
+                    {index + 1}
+                  </span>
+                  <div className="erp-dev-testing-closeout-step__copy">
+                    <div className="erp-dev-testing-closeout-step__title">
+                      <Title level={4}>{stage.label}</Title>
+                      <Tag>{stage.trigger}</Tag>
+                    </div>
+                    <p>{stage.description}</p>
+                    <small>{stage.boundary}</small>
+                    <div className="erp-dev-testing-closeout-step__sources">
+                      {stage.sources.map((sourcePath) => (
+                        <code key={sourcePath}>{sourcePath}</code>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+
+          <section
+            className="erp-dev-testing-closeout-section"
+            aria-labelledby="git-hook-wiring-title"
+          >
+            <div className="erp-dev-testing-closeout-section__head">
+              <div>
+                <Title level={3} id="git-hook-wiring-title">
+                  当前接线
+                </Title>
+                <Paragraph>
+                  缺失、不可执行或未接入都会单独显示，不用颜色代替结论。
+                </Paragraph>
+              </div>
+              <Text type="secondary">期望目录 {hooks.expectedHooksPath}</Text>
+            </div>
+            <div className="erp-dev-testing-hook-list" role="list">
+              {hooks.checks.map((check) => (
+                <div
+                  className="erp-dev-testing-hook-row"
+                  role="listitem"
+                  key={check.key}
+                >
+                  <div>
+                    <strong>{check.label}</strong>
+                    <code>{check.sourcePath}</code>
+                  </div>
+                  <GitHookStatusTag status={check.status} />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section
+            className="erp-dev-testing-closeout-section"
+            aria-labelledby="git-closeout-copy-title"
+          >
+            <div className="erp-dev-testing-closeout-section__head">
+              <div>
+                <Title level={3} id="git-closeout-copy-title">
+                  需要时再复制
+                </Title>
+                <Paragraph>
+                  页面只复制仓库固定命令，不执行、不暂存、不提交，也不推送。
+                </Paragraph>
+              </div>
+            </div>
+            <div className="erp-dev-testing-closeout-commands">
+              <article>
+                <div>
+                  <strong>核对 Hook 目录</strong>
+                  <code>{DEV_TESTING_GIT_HOOK_PATH_COMMAND}</code>
+                </div>
+                <Button
+                  icon={<CopyOutlined />}
+                  onClick={() => runCopy(DEV_TESTING_GIT_HOOK_PATH_COMMAND)}
+                >
+                  复制核对命令
+                </Button>
+              </article>
+              <article>
+                <div>
+                  <strong>准备推送门禁</strong>
+                  <code>{DEV_TESTING_PREPARE_PUSH_COMMAND}</code>
+                </div>
+                <Button
+                  icon={<CopyOutlined />}
+                  onClick={() => runCopy(DEV_TESTING_PREPARE_PUSH_COMMAND)}
+                >
+                  复制准备命令
+                </Button>
+              </article>
+            </div>
+          </section>
+
+          <Alert
+            showIcon
+            type="info"
+            message="提交、推送与发布仍是独立动作"
+            description="接线完整、Hook 通过或 prepare-push 有回执，都不能自动取得 Git 写入、远端推送、部署或客户验收授权。"
+          />
+        </>
+      ) : null}
+    </div>
   )
 }
 
@@ -909,6 +1102,7 @@ export default function DevTestingPage() {
   )
   const requestedView = searchParams.get(VIEW_QUERY_KEY) || ''
   const view = VIEW_VALUES.has(requestedView) ? requestedView : VIEW_TIERS
+  const isCloseoutView = view === VIEW_CLOSEOUT
   const isCoverageView = view === VIEW_COVERAGE
   const requestedDocumentRole =
     searchParams.get(DOCUMENT_ROLE_QUERY_KEY) || 'all'
@@ -1279,6 +1473,11 @@ export default function DevTestingPage() {
     setTestingSummaryReloadKey((current) => current + 1)
   }
 
+  const reloadTestingSummary = () => {
+    setTestingSummaryError('')
+    setTestingSummaryReloadKey((current) => current + 1)
+  }
+
   const generateTestingPlan = async () => {
     if (testingPlanLoading) return
     setTestingPlanLoading(true)
@@ -1317,7 +1516,7 @@ export default function DevTestingPage() {
       )
       setTestingSummary((current) => ({
         ...(current || {
-          schemaVersion: 'plush.dev-qa-testing-summary/v1',
+          schemaVersion: 'plush.dev-qa-testing-summary/v2',
           operations: { ...EMPTY_TESTING_OPERATIONS },
         }),
         busy: isDevTestingOperationActive(operation)
@@ -1397,12 +1596,23 @@ export default function DevTestingPage() {
             'commit 未记录'
           }`
         : getDevTestingCoverageStatusMeta(coverageState?.status).label
+  const hookReadyCount =
+    testingSummary?.hooks?.checks?.filter((check) => check.status === 'ready')
+      .length || 0
+  const hookCheckCount = testingSummary?.hooks?.checks?.length || 0
+  const closeoutToolbarText = testingSummaryError
+    ? 'Hook 接线读取失败'
+    : testingSummary?.hooks
+      ? `${hookReadyCount}/${hookCheckCount} 项接线完整`
+      : '正在读取 Hook 接线…'
   const toolbarContext =
     view === VIEW_COMMANDS
       ? `${matchedSourceCount} 个来源 · ${allCommandBlocks.length} 个命令块`
-      : isCoverageView
-        ? coverageToolbarText
-        : DEV_TESTING_STRATEGY_SOURCE_PATH
+      : isCloseoutView
+        ? closeoutToolbarText
+        : isCoverageView
+          ? coverageToolbarText
+          : DEV_TESTING_STRATEGY_SOURCE_PATH
 
   return (
     <div className="erp-dev-testing-page erp-dev-workspace-page">
@@ -1441,7 +1651,7 @@ export default function DevTestingPage() {
         <section className="erp-dev-testing-reader">
           <div className="erp-dev-testing-reader__toolbar">
             <Segmented
-              aria-label="测试工作区主视图"
+              aria-label="质量验证工作区主视图"
               options={VIEW_OPTIONS}
               value={view}
               onChange={selectView}
@@ -1551,6 +1761,15 @@ export default function DevTestingPage() {
                 )}
               </div>
             </div>
+          ) : null}
+
+          {view === VIEW_CLOSEOUT ? (
+            <GitCloseoutView
+              hooks={testingSummary?.hooks || null}
+              loading={!testingSummary && !testingSummaryError}
+              error={testingSummaryError}
+              onReload={reloadTestingSummary}
+            />
           ) : null}
 
           {view === VIEW_COVERAGE ? (

@@ -6,6 +6,8 @@ import test from 'node:test'
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
   DEV_DOCS_ROUTE,
+  DEV_DOCS_SEARCH_SCOPE_ALL,
+  DEV_DOCS_SEARCH_SCOPE_TITLE,
   DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
   DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
   applyDevDocsPinnedState,
@@ -186,7 +188,7 @@ test('devDocs: 按仓库路径生成目录树', () => {
   )
 })
 
-test('devDocs: 支持按标题、路径和正文索引筛选', () => {
+test('devDocs: 支持在全部与仅标题范围之间筛选', () => {
   const items = [
     {
       title: '当前真源',
@@ -202,12 +204,44 @@ test('devDocs: 支持按标题、路径和正文索引筛选', () => {
   ]
 
   assert.deepEqual(
-    filterDevDocsItems(items, 'truth').map((item) => item.title),
+    filterDevDocsItems(items, 'truth', DEV_DOCS_SEARCH_SCOPE_ALL).map(
+      (item) => item.title
+    ),
     ['当前真源']
   )
   assert.deepEqual(
-    filterDevDocsItems(items, 'phase').map((item) => item.title),
+    filterDevDocsItems(items, 'phase', DEV_DOCS_SEARCH_SCOPE_ALL).map(
+      (item) => item.title
+    ),
     ['路线图']
+  )
+  assert.deepEqual(
+    filterDevDocsItems(items, 'phase', DEV_DOCS_SEARCH_SCOPE_TITLE).map(
+      (item) => item.title
+    ),
+    []
+  )
+  assert.deepEqual(
+    filterDevDocsItems(items, '路线', DEV_DOCS_SEARCH_SCOPE_TITLE).map(
+      (item) => item.title
+    ),
+    ['路线图']
+  )
+})
+
+test('devDocs: 搜索范围切换有明确名称和无结果恢复提示', () => {
+  assert.match(devDocsPageSource, /aria-label="开发文档搜索范围"/u)
+  assert.match(
+    devDocsPageSource,
+    /\{ label: '全部', value: DEV_DOCS_SEARCH_SCOPE_ALL \}/u
+  )
+  assert.match(
+    devDocsPageSource,
+    /\{ label: '仅标题', value: DEV_DOCS_SEARCH_SCOPE_TITLE \}/u
+  )
+  assert.match(
+    devDocsPageSource,
+    /标题中没有匹配文档，可切换到“全部”搜索路径和正文/u
   )
 })
 

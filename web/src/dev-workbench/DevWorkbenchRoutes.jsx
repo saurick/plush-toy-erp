@@ -28,6 +28,9 @@ const DevHubPage = lazyRoute(() => import('./pages/DevHubPage.jsx'))
 const DevWorkbenchAreaPage = lazyRoute(
   () => import('./pages/DevWorkbenchAreaPage.jsx')
 )
+const DevProductCorePage = lazyRoute(
+  () => import('./pages/DevProductCorePage.jsx')
+)
 const DevDocsPage = lazyRoute(() => import('./pages/DevDocsPage.jsx'))
 const DevGovernancePage = lazyRoute(
   () => import('./pages/DevGovernancePage.jsx')
@@ -103,6 +106,7 @@ export default function DevWorkbenchRoutes() {
               />
             }
           />
+          <Route path="product-core" element={<DevProductCorePage />} />
           <Route path="governance" element={<DevGovernancePage />} />
           <Route
             path="status-flows"

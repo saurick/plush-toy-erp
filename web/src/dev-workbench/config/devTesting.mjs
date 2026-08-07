@@ -322,10 +322,10 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     ],
   },
   {
-    key: 'pre-commit',
-    label: '提交前 QA / Pre-commit QA',
+    key: 'full-local-gate',
+    label: '完整本地门禁 / Full local gate',
     description:
-      '提交或推送前复制 / copy before commit or push；具体范围仍按本轮改动判断。',
+      '需要完整本地门禁时复制；实际 pre-commit 只检查暂存快照，最终推送准备由 prepare-push 绑定干净 HEAD 回执。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'bash scripts/qa/full.sh',

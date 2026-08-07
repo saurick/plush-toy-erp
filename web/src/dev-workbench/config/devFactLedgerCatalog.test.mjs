@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
 import {
+  DEV_FACT_LEDGER_DISPLAY_GROUPS,
   DEV_FACT_LEDGER_RUNTIME_QUERY,
   buildDevFactLedgerCatalog,
 } from './devFactLedgerCatalog.mjs'
@@ -18,6 +19,11 @@ test('fact ledger catalog is complete, read-only, and source-backed', () => {
   assert.equal(catalog.readOnly, true)
   assert.equal(catalog.allowsActionExecution, false)
   assert.equal(catalog.coverage.complete, true)
+  assert.equal(catalog.displayGroups, DEV_FACT_LEDGER_DISPLAY_GROUPS)
+  assert.deepEqual(
+    catalog.displayGroups.map((group) => group.label),
+    ['采购与质量', '生产与库存', '委外与返工', '出货与财务']
+  )
   assert.equal(catalog.definitions.length, factFlows.length)
   assert.deepEqual(
     new Set(catalog.definitions.map((definition) => definition.factKey)),
@@ -32,6 +38,11 @@ test('fact ledger catalog is complete, read-only, and source-backed', () => {
     assert.equal(definition.readOnly, true)
     assert.equal(definition.runtimeProofQuery, 'unavailable')
     assert.equal(definition.machineKey, definition.factKey)
+    assert(
+      catalog.displayGroups.some(
+        (group) => group.key === definition.displayGroupKey
+      )
+    )
     for (const field of [
       'label',
       'occurrenceCondition',
@@ -49,7 +60,16 @@ test('fact ledger catalog is complete, read-only, and source-backed', () => {
   }
   assert(Object.isFrozen(catalog))
   assert(Object.isFrozen(catalog.definitions))
+  assert(Object.isFrozen(catalog.displayGroups))
+  assert(catalog.displayGroups.every(Object.isFrozen))
   assert(catalog.definitions.every(Object.isFrozen))
+  assert(
+    catalog.displayGroups.every((group) =>
+      catalog.definitions.some(
+        (definition) => definition.displayGroupKey === group.key
+      )
+    )
+  )
 })
 
 test('fact ledger catalog explicitly refuses unsupported runtime proof lookup', () => {
