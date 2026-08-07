@@ -13,6 +13,7 @@ import {
   readDeliveryOperation,
   resolveDeliveryOperationStore,
 } from "./delivery-operation-store.mjs";
+import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
 import { prepareRollback, readRollbackPlan } from "./rollback-controller.mjs";
 
 const FROM_SHA = "a".repeat(40);
@@ -25,7 +26,7 @@ function manifest(gitSha, migrationHash = HASH) {
     passed: true,
     version: gitSha === FROM_SHA ? "2026.07.29-2" : "2026.07.29-1",
     gitSha,
-    strict: { status: "passed", fingerprint: "d".repeat(64) },
+    strict: releaseManifestStrictEvidenceFixture(),
     artifact: {
       manifestSha256: "e".repeat(64),
       sourceArchiveSha256: "f".repeat(64),

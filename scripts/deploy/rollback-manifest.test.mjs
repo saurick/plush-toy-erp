@@ -5,6 +5,7 @@ import {
   buildRollbackManifest,
   validateRollbackManifest,
 } from "./rollback-manifest.mjs";
+import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
 
 const FROM_SHA = "a".repeat(40);
 const TO_SHA = "b".repeat(40);
@@ -17,7 +18,7 @@ function release(gitSha, overrides = {}) {
     passed: true,
     version: gitSha === FROM_SHA ? "2026.07.29-2" : "2026.07.29-1",
     gitSha,
-    strict: { status: "passed", fingerprint: "d".repeat(64) },
+    strict: releaseManifestStrictEvidenceFixture(),
     artifact: {
       manifestSha256: "e".repeat(64),
       sourceArchiveSha256: "f".repeat(64),

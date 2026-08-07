@@ -15,6 +15,7 @@ import {
   readPromotionPlan,
 } from "./promotion-controller.mjs";
 import { resolveDeliveryOperationStore } from "./delivery-operation-store.mjs";
+import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
 
 const SHA = "a".repeat(40);
 const CURRENT_SHA = "b".repeat(40);
@@ -28,7 +29,7 @@ function releaseManifest() {
     passed: true,
     version: "2026.07.29-1",
     gitSha: SHA,
-    strict: { status: "passed", fingerprint: "d".repeat(64) },
+    strict: releaseManifestStrictEvidenceFixture(),
     artifact: {
       manifestSha256: HASH,
       sourceArchiveSha256: "e".repeat(64),

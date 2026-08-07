@@ -14,6 +14,7 @@ import {
   validateDatabaseRebuildManifest,
   writeDatabaseRebuildManifest,
 } from "./database-rebuild-manifest.mjs";
+import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
 
 const SHA = "a".repeat(40);
 const HASH = "b".repeat(64);
@@ -25,7 +26,9 @@ function releaseManifest() {
     passed: true,
     version: "2026.08.03-1",
     gitSha: SHA,
-    strict: { status: "passed", fingerprint: "c".repeat(64) },
+    strict: releaseManifestStrictEvidenceFixture({
+      fingerprint: "c".repeat(64),
+    }),
     artifact: {
       manifestSha256: "d".repeat(64),
       sourceArchiveSha256: "e".repeat(64),

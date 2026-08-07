@@ -190,7 +190,12 @@ test("mobile task flow owner fallback hides raw owner role key", () => {
     "mobile detail must translate owner_role_key through the shared readable role label helper",
   );
   assert(
-    detailSource.includes(": `任务当前由${ownerRoleLabel}负责。`"),
+    detailSource.includes(
+      "? `这条任务由${ownerRoleLabel}办理，您可以查看并发起催办。`",
+    ) &&
+      detailSource.includes(
+        "`这条任务由${ownerRoleLabel}办理，当前页面只供查看。`",
+      ),
     "mobile detail current-owner fallback must render the readable owner role label",
   );
   for (const [fileName, source] of screenSources) {
@@ -453,10 +458,14 @@ test("desktop workflow task UI hides raw owner role key fallbacks", () => {
     actionDrawerSource,
     /const ownerRoleLabel = task \? getWorkflowTaskOwnerRoleLabel\(task\) : ''/u,
   );
-  assert.match(actionDrawerSource, /getWorkflowTaskCodeLabel\(task\)/u);
+  assert.match(
+    actionDrawerSource,
+    /const taskDisplayName = task \? getWorkflowTaskDisplayName\(task\) : ''/u,
+  );
   assert(
-    !actionDrawerSource.includes("`TASK-${task.id"),
-    "workflow task action drawer must not build visible task code from raw task id",
+    !actionDrawerSource.includes("`TASK-${task.id") &&
+      !actionDrawerSource.includes("getWorkflowTaskCodeLabel"),
+    "workflow task action drawer must show the readable task name instead of raw or technical task codes",
   );
   assert(
     !actionDrawerSource.includes("roleLabelMap") &&
@@ -1052,7 +1061,7 @@ test("sales order page keeps write buttons behind projected actions", () => {
   );
   assert(
     modalSource.includes("canUpload={canUpdateOrder || canCreateOrder}") &&
-      modalSource.includes("canDelete={canUpdateOrder}") &&
+      modalSource.includes("canWithdraw={canCreateOrder || canUpdateOrder}") &&
       modalSource.includes("canCreateItem={canCreateItem}") &&
       modalSource.includes("canUpdateItem={canUpdateItem}") &&
       modalSource.includes("canCancelItem={canCancelItem}"),
@@ -1109,19 +1118,19 @@ test("purchase order page keeps write buttons behind projected actions", () => {
   assert(
     panelSource.includes("canCreate ? (") &&
       panelSource.includes("disabled={!referenceDataReady}") &&
-      panelSource.includes("{canUpdate &&") &&
+      panelSource.includes("{canUpdate ? (") &&
       panelSource.includes("loading={itemsLoading}") &&
       panelSource.includes("const recordActionBusy =") &&
       panelSource.includes("!selectedOrderCanEdit ||") &&
       panelSource.includes("!referenceDataReady ||") &&
       panelSource.includes("recordActionBusy") &&
-      panelSource.includes("{canCreateInboundDraftAction &&") &&
+      panelSource.includes("{canCreateInboundDraftAction ? (") &&
       panelSource.includes("!canGenerateInboundDraft"),
     "purchase order create/edit/inbound draft controls must hide without projected actions and stay disabled while temporarily unavailable",
   );
   assert(
     modalSource.includes("canUpload={canUpdate || canCreate}") &&
-      modalSource.includes("canDelete={canUpdate}"),
+      modalSource.includes("canWithdraw={canCreate || canUpdate}"),
     "purchase order modal attachments must use projected create/update permissions",
   );
   assert(
@@ -1159,12 +1168,12 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
   );
   assert(
     pageSource.includes("primaryAction={\n          canCreate ? (") &&
-      pageSource.includes("{canUpdate &&") &&
+      pageSource.includes("{canUpdate ? (") &&
       /disabled=\{\s*!selectedRow\s*\|\|\s*!canEditOutsourcingOrder\(selectedRow\)\s*\|\|\s*itemsLoading\s*\}/u.test(
         pageSource,
       ) &&
       pageSource.includes("canUpload={canUpdate || canCreate}") &&
-      pageSource.includes("canDelete={canUpdate}"),
+      pageSource.includes("canWithdraw={canUpdate || canCreate}"),
     "outsourcing order create/edit controls must hide without projected actions while attachment writes keep projected permissions",
   );
   assert(
@@ -1228,12 +1237,17 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')",
         "canCreate || hasActionPermission(adminProfile, 'warehouse.inbound.confirm')",
         "canUpload={canCreate || canPost}",
-        "canDelete={canCreate || canPost}",
+        "canWithdraw={canCreate || canPost}",
         "页面不提供脱离采购来源的手工入库明细。",
-        "{canCreateReturn &&",
-        "{canCreateAdjustment &&",
-        "{canPost && (!selectedRow || selectedRow.status === 'DRAFT') ? (",
-        "{canPost &&\n          (!selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)) ? (",
+        "{canCreateReturn ? (",
+        "data-business-action-key=\"create-return\"",
+        "{canCreateAdjustment ? (",
+        "data-business-action-key=\"create-adjustment\"",
+        "{canPost ? (",
+        "data-business-action-key=\"post\"",
+        "!selectedRow || selectedRow.status !== 'DRAFT' || saving",
+        "data-business-action-key=\"cancel\"",
+        "!['DRAFT', 'POSTED'].includes(selectedRow.status)",
         "草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存",
       ],
       forbiddenTokens: [
@@ -1251,12 +1265,16 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "const selectedQualityStatus = String(selectedRow?.status || '').toUpperCase()",
         "primaryAction={\n          canCreate ? (",
         "disabled={referenceDataState !== 'ready'}",
-        "{canUpdate && (!selectedRow || selectedQualityStatus === 'DRAFT') ? (",
-        "{canUpdate &&\n          (!selectedRow ||\n            ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)) ? (",
+        "{canUpdate ? (",
+        "data-business-action-key=\"submit\"",
+        "selectedRow.status !== 'DRAFT'",
+        "data-business-action-key=\"pass\"",
+        "data-business-action-key=\"reject\"",
         "selectedRow.status !== 'SUBMITTED'",
+        "data-business-action-key=\"cancel\"",
         "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status)",
         "canUpload={canCreate || canUpdate}",
-        "canDelete={canUpdate}",
+        "canWithdraw={canCreate || canUpdate}",
         "不会绕过来源规则直接改写库存数量或生产事实",
       ],
     },

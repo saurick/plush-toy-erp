@@ -16,6 +16,7 @@ import {
   readDatabaseRebuildPlan,
 } from "./database-rebuild-controller.mjs";
 import { resolveDeliveryOperationStore } from "./delivery-operation-store.mjs";
+import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
 
 const SHA = "a".repeat(40);
 const IDEMPOTENCY_KEY =
@@ -27,7 +28,9 @@ function releaseManifest() {
     passed: true,
     version: "2026.08.03-1",
     gitSha: SHA,
-    strict: { status: "passed", fingerprint: "b".repeat(64) },
+    strict: releaseManifestStrictEvidenceFixture({
+      fingerprint: "b".repeat(64),
+    }),
     artifact: {
       manifestSha256: "c".repeat(64),
       sourceArchiveSha256: "d".repeat(64),

@@ -466,7 +466,7 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
   assert.match(workflowMap, /业务轨迹[\s\S]*本任务处理记录/u);
   assert.match(
     workflowMap,
-    /六条正式流程的异常出口[\s\S]*没有显式业务拒绝分支[\s\S]*rejected_end/u,
+    /六个正式流程 key 的异常出口[\s\S]*sales_order_rejected_end[\s\S]*purchase_order_rejected_end[\s\S]*shipment_finance_rejected_end[\s\S]*rejected_end/u,
   );
   assert.match(
     workflowMap,

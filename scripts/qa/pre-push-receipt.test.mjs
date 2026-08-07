@@ -109,6 +109,9 @@ if [[ "\${MUTATE_FULL_HEAD:-0}" == "1" ]]; then
   git -c user.name=Fixture -c user.email=fixture@example.invalid -c commit.gpgsign=false commit --allow-empty -qm moved-head
 fi
 if [[ "\${MUTATE_REMOTE:-0}" == "1" ]]; then git push --quiet origin HEAD:refs/heads/main; fi
+for stage in environment_profile shared secrets web browser server govulncheck; do
+  printf '%s\\n' "[qa:stage] gate=full id=\$stage status=passed durationMs=1"
+done
 printf '%s\\n' '[qa:test-gate] status=complete tests=1 pass=1 fail=0 skipped=0'
 `,
     "utf8",

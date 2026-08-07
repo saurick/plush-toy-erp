@@ -26,6 +26,7 @@ import {
   resolveDeliveryOperationStore,
 } from "./delivery-operation-store.mjs";
 import { sha256File } from "./release-catalog.mjs";
+import { releaseManifestStrictEvidenceFixture } from "./release-catalog-test-fixtures.mjs";
 
 const SHA = "a".repeat(40);
 const OPERATION_ID = "123e4567-e89b-42d3-a456-426614174000";
@@ -113,7 +114,9 @@ function releaseManifest() {
     passed: true,
     version: "2026.08.03-1",
     gitSha: SHA,
-    strict: { status: "passed", fingerprint: "1".repeat(64) },
+    strict: releaseManifestStrictEvidenceFixture({
+      fingerprint: "1".repeat(64),
+    }),
     artifact: {
       manifestSha256: "2".repeat(64),
       sourceArchiveSha256: "3".repeat(64),
