@@ -7,6 +7,27 @@ import test from "node:test";
 const script = path.join(import.meta.dirname, "remote-promotion.sh");
 const source = readFileSync(script, "utf8");
 
+function runEpochMillis(dateOutput) {
+  const functionSource = source.match(/epoch_millis\(\) \{[\s\S]*?\n\}/u)?.[0];
+  assert.ok(functionSource, "epoch_millis function is missing");
+  const result = spawnSync(
+    "bash",
+    [
+      "-c",
+      `fail() { return 1; }
+date() { printf '%s\\n' "$CLOCK_SAMPLE"; }
+${functionSource}
+epoch_millis`,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, CLOCK_SAMPLE: dateOutput },
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
 test("remote promotion accepts only the fixed target contract", () => {
   assert.match(source, /target=test-133/u);
   assert.match(source, /root=\/home\/simon\/plush-toy-erp-v5/u);
@@ -50,6 +71,12 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
     source,
     /applyStarted: \(\$migrationApplyStarted == 1\)/u,
   );
+});
+
+test("remote promotion normalizes full nanoseconds to portable milliseconds", () => {
+  assert.doesNotMatch(source, /date \+%s%3N/u);
+  assert.equal(runEpochMillis("1786145037 839556629"), "1786145037839");
+  assert.equal(runEpochMillis("1786145037 %N"), "1786145037000");
 });
 
 test("remote promotion accepts only OCI config or archive manifest image identities", () => {

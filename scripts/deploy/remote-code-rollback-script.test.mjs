@@ -6,6 +6,27 @@ import test from "node:test";
 const script = new URL("./remote-code-rollback.sh", import.meta.url);
 const source = readFileSync(script, "utf8");
 
+function runEpochMillis(dateOutput) {
+  const functionSource = source.match(/epoch_millis\(\) \{[\s\S]*?\n\}/u)?.[0];
+  assert.ok(functionSource, "epoch_millis function is missing");
+  const result = spawnSync(
+    "bash",
+    [
+      "-c",
+      `fail() { return 1; }
+date() { printf '%s\\n' "$CLOCK_SAMPLE"; }
+${functionSource}
+epoch_millis`,
+    ],
+    {
+      encoding: "utf8",
+      env: { ...process.env, CLOCK_SAMPLE: dateOutput },
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
 test("remote code rollback is fixed to test-133 and has no build or database mutation", () => {
   assert.match(source, /target=test-133/u);
   assert.match(source, /root=\/home\/simon\/plush-toy-erp-v5/u);
@@ -37,6 +58,12 @@ test("remote code rollback requires exact confirmation, lock and receipt", () =>
     source,
     /serviceSwitchStarted: \(\$serviceSwitchStarted == 1\)/u,
   );
+});
+
+test("remote code rollback normalizes full nanoseconds to portable milliseconds", () => {
+  assert.doesNotMatch(source, /date \+%s%3N/u);
+  assert.equal(runEpochMillis("1786145037 845647064"), "1786145037845");
+  assert.equal(runEpochMillis("1786145037 %N"), "1786145037000");
 });
 
 test("remote code rollback accepts only OCI config or archive manifest image identities", () => {

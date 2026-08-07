@@ -52,6 +52,18 @@ fail() {
   return 1
 }
 
+epoch_millis() {
+  local seconds
+  local nanoseconds
+  read -r seconds nanoseconds <<<"$(date '+%s %N' 2>/dev/null || date '+%s')"
+  [[ "$seconds" =~ ^[0-9]+$ ]] || fail "millisecond clock is unavailable"
+  if [[ "$nanoseconds" =~ ^[0-9]{9}$ ]]; then
+    printf '%s%s\n' "$seconds" "${nanoseconds:0:3}"
+  else
+    printf '%s000\n' "$seconds"
+  fi
+}
+
 portable_archive_manifest_digest() {
   local archive="$1"
   local image_ref="$2"
@@ -134,7 +146,7 @@ web_content_id=unknown
 server_ref=unknown
 web_ref=unknown
 operation_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-operation_started_epoch_ms="$(date +%s%3N)"
+operation_started_epoch_ms="$(epoch_millis)"
 stage_started_epoch_ms="$operation_started_epoch_ms"
 stage_finalized=0
 stage_timings='[]'
@@ -195,7 +207,7 @@ record_current_stage() {
   if [[ "$stage" == initial || "$stage" == passed || "$stage_finalized" -eq 1 ]]; then
     return 0
   fi
-  finished_epoch_ms="$(date +%s%3N)"
+  finished_epoch_ms="$(epoch_millis)"
   stage_duration_ms=$((finished_epoch_ms - stage_started_epoch_ms))
   stage_timings="$(
     jq -c \
@@ -211,7 +223,7 @@ record_current_stage() {
 enter_stage() {
   record_current_stage passed
   stage="$1"
-  stage_started_epoch_ms="$(date +%s%3N)"
+  stage_started_epoch_ms="$(epoch_millis)"
   stage_finalized=0
   write_state running
 }
@@ -225,7 +237,7 @@ write_receipt() {
   local duration_ms
   record_current_stage failed
   finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  finished_epoch_ms="$(date +%s%3N)"
+  finished_epoch_ms="$(epoch_millis)"
   duration_ms=$((finished_epoch_ms - operation_started_epoch_ms))
   jq -n \
     --arg schemaVersion "plush.remote-promotion-receipt/v2" \
