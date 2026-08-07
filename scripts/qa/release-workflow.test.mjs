@@ -89,6 +89,11 @@ test("publish uses a verified resumable draft and exact six-asset set", () => {
   assert.match(publishRuns, /github-release-publisher\.mjs/u);
   assert.match(publishRuns, /github-release-asset-set\.mjs finalize/u);
   assert.match(publishRuns, /gh release create "\$release_tag"[\s\S]*--draft/u);
+  assert.match(publishRuns, /wait_for_plan\(\)/u);
+  assert.match(publishRuns, /for attempt in 1 2 3 4 5 6/u);
+  assert.match(publishRuns, /wait_for_plan draft any/u);
+  assert.match(publishRuns, /wait_for_plan draft empty/u);
+  assert.match(publishRuns, /wait_for_plan published empty/u);
   assert.match(publishRuns, /gh release upload "\$release_tag"/u);
   assert.doesNotMatch(publishRuns, /--clobber/u);
   assert.match(publishRuns, /cmp --silent/u);

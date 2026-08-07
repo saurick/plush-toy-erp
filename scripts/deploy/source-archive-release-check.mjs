@@ -620,7 +620,7 @@ async function runReleaseBuilds({
       "-f",
       "server/Dockerfile",
       "--build-arg",
-      `ERP_CUSTOMER_KEY=${customer}`,
+      `ERP_CUSTOMER_PACKAGE=${customer}`,
       "--build-arg",
       `GIT_SHA=${gitState.commit}`,
     ];

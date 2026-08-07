@@ -24,13 +24,13 @@ COPY scripts ./scripts
 
 WORKDIR /app/web
 
-ARG ERP_CUSTOMER_KEY=
+ARG ERP_CUSTOMER_PACKAGE=
 
 # CI has already generated and checked the committed error-code projection.
 # The Web-only image builder consumes that projection and does not install Go.
 RUN pnpm build:committed && \
     node ../scripts/build/apply-customer-web-config.mjs \
-      --customer "${ERP_CUSTOMER_KEY}" \
+      --customer "${ERP_CUSTOMER_PACKAGE}" \
       --config-root /app/config \
       --web-build-dir /app/web/build
 

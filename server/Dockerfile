@@ -43,10 +43,10 @@ COPY config /config
 # CI 已生成并校验 committed error-code projection；Node-only builder 不安装 Go。
 # scripts 仅用于在构建产物中叠加已登记的客户 Web 配置。
 COPY scripts /scripts
-ARG ERP_CUSTOMER_KEY=
+ARG ERP_CUSTOMER_PACKAGE=
 RUN pnpm run build:committed && \
     node /scripts/build/apply-customer-web-config.mjs \
-      --customer "${ERP_CUSTOMER_KEY}" \
+      --customer "${ERP_CUSTOMER_PACKAGE}" \
       --config-root /config \
       --web-build-dir /web/build
 

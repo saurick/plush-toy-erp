@@ -490,6 +490,10 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
         "--platform",
         "linux/amd64",
       ]);
+      assert(
+        spec.args.includes(`ERP_CUSTOMER_PACKAGE=${report.customer}`),
+        "release image must select the public customer package without a secret-like build arg",
+      );
     }
     assert(
       webDockerSpec.args.includes(`GIT_SHA=${report.commit}`),

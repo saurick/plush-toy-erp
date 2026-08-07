@@ -222,13 +222,13 @@ GIT_SHA="$(git rev-parse HEAD)"
 
 docker build \
   --build-arg GIT_SHA="$GIT_SHA" \
-  --build-arg ERP_CUSTOMER_KEY=yoyoosun \
+  --build-arg ERP_CUSTOMER_PACKAGE=yoyoosun \
   -f server/Dockerfile \
   -t plush-toy-erp-server:yoyoosun-dev .
 
 docker build \
   --build-arg GIT_SHA="$GIT_SHA" \
-  --build-arg ERP_CUSTOMER_KEY=yoyoosun \
+  --build-arg ERP_CUSTOMER_PACKAGE=yoyoosun \
   -f web/Dockerfile \
   -t plush-toy-erp-web:yoyoosun-dev .
 ```

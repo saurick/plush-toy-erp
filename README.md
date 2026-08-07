@@ -94,7 +94,7 @@ yoyoosun 等客户私有化前端包必须在本地或 CI 构建时显式注入�
 
 ```bash
 docker build \
-  --build-arg ERP_CUSTOMER_KEY=yoyoosun \
+  --build-arg ERP_CUSTOMER_PACKAGE=yoyoosun \
   -f web/Dockerfile \
   -t plush-toy-erp-web:yoyoosun-dev .
 ```

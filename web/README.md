@@ -181,7 +181,7 @@ docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 
 ```bash
 docker build \
-  --build-arg ERP_CUSTOMER_KEY=yoyoosun \
+  --build-arg ERP_CUSTOMER_PACKAGE=yoyoosun \
   -f web/Dockerfile \
   -t plush-toy-erp-web:yoyoosun-dev .
 ```

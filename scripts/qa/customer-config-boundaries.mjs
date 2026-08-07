@@ -601,8 +601,8 @@ function validateCustomerConfigReleaseOverlay() {
   for (const dockerfile of ["web/Dockerfile", "server/Dockerfile"]) {
     const source = readFileSync(repoPath(dockerfile), "utf8");
     assert(
-      source.includes("ERP_CUSTOMER_KEY"),
-      `${dockerfile} must expose ERP_CUSTOMER_KEY build arg`,
+      source.includes("ERP_CUSTOMER_PACKAGE"),
+      `${dockerfile} must expose ERP_CUSTOMER_PACKAGE build arg`,
     );
     assert(
       source.includes("apply-customer-web-config.mjs"),

@@ -366,6 +366,25 @@ jobs:
               --github-output "$plan_file"
             source "$plan_file"
           }
+          wait_for_plan() {
+            expected_state="$1"
+            missing_mode="$2"
+            for attempt in 1 2 3 4 5 6; do
+              fetch_catalog
+              read_plan
+              if [[ "$state" == "$expected_state" ]]; then
+                if [[ "$missing_mode" == "any" || -z "$missing_assets" ]]; then
+                  return 0
+                fi
+              fi
+              if [[ "$attempt" != "6" ]]; then
+                echo "[release] waiting for GitHub release catalog state=$expected_state missing_mode=$missing_mode attempt=$attempt"
+                sleep 2
+              fi
+            done
+            echo "[release] GitHub release catalog did not converge: expected_state=$expected_state missing_mode=$missing_mode actual_state=$state missing_assets=$missing_assets"
+            return 1
+          }
           fetch_catalog
           read_plan
           if [[ "$state" == "missing" ]]; then
@@ -375,8 +394,7 @@ jobs:
               --title "$RELEASE_VERSION" \
               --notes "Immutable exact-SHA release. Target promotion, migration, role smoke and customer UAT remain separate evidence." \
               --draft
-            fetch_catalog
-            read_plan
+            wait_for_plan draft any
           fi
           if [[ "$state" == "published" ]]; then
             node scripts/deploy/github-release-asset-set.mjs verify-published \
@@ -396,12 +414,7 @@ jobs:
             esac
             gh release upload "$release_tag" "$artifact_dir/$asset" --repo "$GITHUB_REPOSITORY"
           done
-          fetch_catalog
-          read_plan
-          if [[ "$state" != "draft" || -n "$missing_assets" ]]; then
-            echo "[release] draft asset set is incomplete after upload"
-            exit 1
-          fi
+          wait_for_plan draft empty
           verify_dir="$RUNNER_TEMP/release-download-verify"
           mkdir -p "$verify_dir"
           gh release download "$release_tag" \
@@ -415,7 +428,7 @@ jobs:
             cmp --silent "$artifact_dir/$asset" "$verify_dir/$asset"
           done
           gh release edit "$release_tag" --repo "$GITHUB_REPOSITORY" --draft=false
-          fetch_catalog
+          wait_for_plan published empty
           node scripts/deploy/github-release-asset-set.mjs verify-published \
             --dir "$artifact_dir" \
             --catalog "$catalog" \
