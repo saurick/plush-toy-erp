@@ -125,7 +125,7 @@ func TestDockerfileBuildsAndCopiesOneShotBinaryWithReleaseVersion(t *testing.T) 
 	for _, required := range []string{
 		`-ldflags "-X main.Version=${GIT_SHA}" \
       -o ./bin/bootstrap-manual-acceptance-core ./cmd/bootstrap-manual-acceptance-core`,
-		`COPY --from=builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core`,
+		`COPY --from=go-builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core`,
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("Dockerfile is missing one-shot binary contract %q", required)

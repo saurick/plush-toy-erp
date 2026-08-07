@@ -161,7 +161,7 @@ func TestDockerfileBuildsAndCopiesRotateBinary(t *testing.T) {
 	content := string(raw)
 	for _, anchor := range []string{
 		"-o ./bin/rotate-manual-acceptance-passwords ./cmd/rotate-manual-acceptance-passwords",
-		"COPY --from=builder /src/bin/rotate-manual-acceptance-passwords /app/rotate-manual-acceptance-passwords",
+		"COPY --from=go-builder /src/bin/rotate-manual-acceptance-passwords /app/rotate-manual-acceptance-passwords",
 	} {
 		if !strings.Contains(content, anchor) {
 			t.Fatalf("Dockerfile missing rotate binary anchor %q", anchor)
