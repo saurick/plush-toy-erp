@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 import {
   DEV_BUSINESS_CHAIN_CROSS_CUTTING_EXCLUSIONS,
@@ -16,6 +17,8 @@ import {
   DEV_FLOW_STATE_CATALOG,
   processDefinitions,
 } from './devFlowStateCatalog.mjs'
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
 const EXPECTED_CHAIN_KEYS = [
   'sales_to_production',
@@ -123,7 +126,10 @@ test('business chain overview covers every real chain once with explicit read-on
     assert.ok(allowedRelationKinds.has(relation.kind), relation.key)
     assert.ok(relation.sourceRefs.length > 0, relation.key)
     relation.sourceRefs.forEach((sourceRef) => {
-      assert.ok(existsSync(resolve(sourceRef)), `${relation.key} missing ${sourceRef}`)
+      assert.ok(
+        existsSync(resolve(repoRoot, sourceRef)),
+        `${relation.key} missing ${sourceRef}`
+      )
     })
   }
 })
@@ -166,7 +172,7 @@ test('business chain nodes and edges remain connected, read-only, and source-bac
       }
       node.sourceRefs.forEach((sourceRef) => {
         assert.ok(
-          existsSync(resolve(sourceRef)),
+          existsSync(resolve(repoRoot, sourceRef)),
           `${chain.key}/${node.key} missing ${sourceRef}`
         )
       })
