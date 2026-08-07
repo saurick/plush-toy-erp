@@ -37,13 +37,13 @@ jobs:
       strict_reused: ${{ steps.recover.outputs.strict_reused }}
     steps:
       - name: Check out the requested exact SHA without credentials
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .n-node-version
       - name: Validate current-main identity and complete existing release
@@ -131,7 +131,7 @@ jobs:
           cat "$result"
       - name: Pass the recovered terminal to publish
         if: steps.recover.outputs.strict_reused == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: strict-terminal-current-${{ inputs.sha }}
           path: output/qa/exact-sha/${{ inputs.sha }}
@@ -161,17 +161,17 @@ jobs:
       DISPOSABLE_DATABASE_BASE_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/postgres?sslmode=disable
     steps:
       - name: Check out the exact SHA without credentials
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .n-node-version
       - name: Set up Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
@@ -242,7 +242,7 @@ jobs:
         run: node scripts/qa/exact-sha-gate.mjs --sha "${{ inputs.sha }}" --main-ref origin/main --run
       - name: Persist the canonical exact-SHA terminal
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: strict-terminal-${{ inputs.sha }}
           path: output/qa/exact-sha/${{ inputs.sha }}
@@ -268,24 +268,24 @@ jobs:
       packages: write
     steps:
       - name: Check out the exact SHA without credentials
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.sha }}
           fetch-depth: 0
           persist-credentials: false
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .n-node-version
       - name: Download the recovered strict terminal
         if: needs.validate.outputs.strict_reused == 'true'
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: strict-terminal-current-${{ inputs.sha }}
           path: output/qa/exact-sha/${{ inputs.sha }}
       - name: Download the newly executed strict terminal
         if: needs.validate.outputs.strict_reused != 'true'
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: strict-terminal-${{ inputs.sha }}
           path: output/qa/exact-sha/${{ inputs.sha }}
