@@ -172,7 +172,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 9);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 10);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
@@ -189,6 +189,8 @@ test("dev workbench boundary: imports from ERP stay on explicit read/API adapter
   const allowedERPImports = new Set([
     "@/erp/api/customerConfigApi.mjs",
     "@/erp/api/customerConfigTransition.mjs",
+    "@/erp/config/businessModules.mjs",
+    "@/erp/config/seedData.mjs",
     "@/erp/api/workflowApi.mjs",
     "@/erp/utils/processRuntimePresentation.mjs",
     "../../erp/config/printTemplates.mjs",
