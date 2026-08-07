@@ -1549,7 +1549,11 @@ test('审计日志页使用业务可读摘要，不展示原始事件结构', ()
     /return isTechnicalAuditValueKey\(key\) \? '已记录' : String\(value\)/u
   )
   assert.match(content, /<Text type="secondary">下一步<\/Text>/u)
-  assert.match(content, /placeholder="操作人、相关账号或岗位、操作类型或说明"/u)
+  assert.match(content, /placeholder="搜索操作记录"/u)
+  assert.match(
+    content,
+    /searchHint="可搜索：操作人、相关账号或岗位、操作类型或说明"/u
+  )
   assert.match(content, /<span>\{meta\.label\}<\/span>/u)
   assert.match(content, /event\.target_label \|\| event\.target_name/u)
   assert.match(content, /fieldLabelMap\[key\] \|\| '字段变更'/u)
