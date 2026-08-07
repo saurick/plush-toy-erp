@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"math"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,13 +17,36 @@ import (
 
 const workflowBreakGlassMaxDuration = 2 * time.Hour
 const workflowTaskBoardMaxOffset = 2_147_483_647
+const workflowRoleTaskViewCursorVersion = 2
+
+const (
+	workflowRoleTaskRiskScopeRole       = "role"
+	workflowRoleTaskRiskScopeSupervised = "supervised"
+)
 
 type workflowRoleTaskViewRequest struct {
-	ViewKey    string
-	RoleKey    string
-	Limit      int
-	BeforeID   int
-	SnapshotAt time.Time
+	Method          string
+	ViewKey         string
+	RoleKey         string
+	Limit           int
+	BeforeID        int
+	SnapshotAt      time.Time
+	ExpectedTotal   int
+	SeenTotal       int
+	CursorRiskScope string
+	HasCursor       bool
+}
+
+type workflowRoleTaskViewCursor struct {
+	Version       int    `json:"v"`
+	Method        string `json:"method"`
+	ViewKey       string `json:"view_key"`
+	RoleKey       string `json:"role_key"`
+	BeforeID      int    `json:"before_id"`
+	SnapshotUnix  int64  `json:"snapshot_unix"`
+	ExpectedTotal int    `json:"expected_total"`
+	SeenTotal     int    `json:"seen_total"`
+	RiskScope     string `json:"risk_scope"`
 }
 
 var workflowTaskCreateProcessRuntimeAnchorKeys = []string{
@@ -150,7 +173,16 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 		}
 		var approvalVisibilityScopes []biz.WorkflowApprovalVisibilityScope
-		if request.ViewKey == biz.WorkflowRoleTaskViewApproval {
+		if request.BeforeID == 0 {
+			var approvalRes *v1.JsonrpcResult
+			approvalVisibilityScopes, approvalRes = d.workflowAvailableApprovalTaskVisibilityScopes(ctx, admin)
+			if approvalRes != nil {
+				return id, approvalRes, nil
+			}
+			if request.ViewKey == biz.WorkflowRoleTaskViewApproval && len(approvalVisibilityScopes) == 0 {
+				return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+			}
+		} else if request.ViewKey == biz.WorkflowRoleTaskViewApproval {
 			var approvalRes *v1.JsonrpcResult
 			approvalVisibilityScopes, approvalRes = d.workflowApprovalTaskVisibilityScopes(ctx, admin)
 			if approvalRes != nil {
@@ -160,9 +192,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		return id, d.queryWorkflowRoleTaskView(
 			ctx,
 			request,
-			admin,
 			visibilityScope,
 			approvalVisibilityScopes,
+			request.BeforeID == 0,
 		), nil
 	case "list_workbench_role_tasks":
 		if res := d.requireEffectiveWorkflowWorkbenchRead(ctx); res != nil {
@@ -194,9 +226,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		return id, d.queryWorkflowRoleTaskView(
 			ctx,
 			request,
-			admin,
 			visibilityScope,
 			approvalVisibilityScopes,
+			false,
 		), nil
 	case "get_task_board":
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
@@ -1056,6 +1088,7 @@ func parseWorkflowRoleTaskViewRequest(
 		return workflowRoleTaskViewRequest{}, res
 	}
 	request := workflowRoleTaskViewRequest{
+		Method:  method,
 		ViewKey: strings.TrimSpace(getString(pm, "view_key")),
 		RoleKey: biz.NormalizeRoleKey(getString(pm, "role_key")),
 	}
@@ -1081,12 +1114,25 @@ func parseWorkflowRoleTaskViewRequest(
 		}
 		cursor = value
 	}
-	beforeID, snapshotAt, cursorRes := decodeWorkflowRoleTaskViewCursor(cursor)
-	if cursorRes != nil {
-		return workflowRoleTaskViewRequest{}, cursorRes
+	request.SnapshotAt = time.Now()
+	if cursor != "" {
+		cursorState, cursorRes := decodeWorkflowRoleTaskViewCursor(cursor)
+		if cursorRes != nil ||
+			cursorState.Method != request.Method ||
+			cursorState.ViewKey != request.ViewKey ||
+			cursorState.RoleKey != request.RoleKey {
+			if cursorRes != nil {
+				return workflowRoleTaskViewRequest{}, cursorRes
+			}
+			return workflowRoleTaskViewRequest{}, invalidWorkflowRoleTaskViewCursorResult()
+		}
+		request.BeforeID = cursorState.BeforeID
+		request.SnapshotAt = time.Unix(cursorState.SnapshotUnix, 0)
+		request.ExpectedTotal = cursorState.ExpectedTotal
+		request.SeenTotal = cursorState.SeenTotal
+		request.CursorRiskScope = cursorState.RiskScope
+		request.HasCursor = true
 	}
-	request.BeforeID = beforeID
-	request.SnapshotAt = snapshotAt
 	return request, nil
 }
 
@@ -1102,49 +1148,74 @@ func getWorkflowRoleTaskViewLimit(pm map[string]any) (int, *v1.JsonrpcResult) {
 	return int(value), nil
 }
 
-func encodeWorkflowRoleTaskViewCursor(beforeID int, snapshotAt time.Time) string {
-	if beforeID <= 0 || snapshotAt.IsZero() {
+func encodeWorkflowRoleTaskViewCursor(cursor workflowRoleTaskViewCursor) string {
+	if cursor.BeforeID <= 0 || cursor.SnapshotUnix <= 0 {
 		return ""
 	}
-	raw := strconv.Itoa(beforeID) + ":" + strconv.FormatInt(snapshotAt.Unix(), 10)
-	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+	cursor.Version = workflowRoleTaskViewCursorVersion
+	raw, err := json.Marshal(cursor)
+	if err != nil {
+		return ""
+	}
+	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
-func decodeWorkflowRoleTaskViewCursor(cursor string) (int, time.Time, *v1.JsonrpcResult) {
+func decodeWorkflowRoleTaskViewCursor(cursor string) (workflowRoleTaskViewCursor, *v1.JsonrpcResult) {
 	cursor = strings.TrimSpace(cursor)
 	if cursor == "" {
-		return 0, time.Now(), nil
+		return workflowRoleTaskViewCursor{}, invalidWorkflowRoleTaskViewCursorResult()
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(cursor)
 	if err != nil {
-		return 0, time.Time{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 已失效，请重新加载"}
+		return workflowRoleTaskViewCursor{}, invalidWorkflowRoleTaskViewCursorResult()
 	}
-	beforeRaw, snapshotRaw, ok := strings.Cut(string(raw), ":")
-	if !ok {
-		return 0, time.Time{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 已失效，请重新加载"}
+	var decoded workflowRoleTaskViewCursor
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return workflowRoleTaskViewCursor{}, invalidWorkflowRoleTaskViewCursorResult()
 	}
-	beforeID, beforeErr := strconv.Atoi(beforeRaw)
-	snapshotUnix, snapshotErr := strconv.ParseInt(snapshotRaw, 10, 64)
-	if beforeErr != nil || snapshotErr != nil || beforeID <= 0 || snapshotUnix <= 0 {
-		return 0, time.Time{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 已失效，请重新加载"}
+	if decoded.Version != workflowRoleTaskViewCursorVersion ||
+		(decoded.Method != "list_role_tasks" && decoded.Method != "list_workbench_role_tasks") ||
+		decoded.BeforeID <= 0 ||
+		decoded.SnapshotUnix <= 0 ||
+		decoded.ViewKey == "" ||
+		decoded.RoleKey == "" ||
+		decoded.SeenTotal < 0 ||
+		(decoded.Method == "list_role_tasks" && decoded.ExpectedTotal < 0) ||
+		(decoded.Method == "list_workbench_role_tasks" && decoded.ExpectedTotal != -1) ||
+		(decoded.RiskScope != workflowRoleTaskRiskScopeRole && decoded.RiskScope != workflowRoleTaskRiskScopeSupervised) {
+		return workflowRoleTaskViewCursor{}, invalidWorkflowRoleTaskViewCursorResult()
 	}
-	return beforeID, time.Unix(snapshotUnix, 0), nil
+	return decoded, nil
+}
+
+func invalidWorkflowRoleTaskViewCursorResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务列表已更新，请重新加载"}
 }
 
 func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 	ctx context.Context,
 	request workflowRoleTaskViewRequest,
-	admin *biz.AdminUser,
 	visibilityScope *biz.WorkflowTaskVisibilityScope,
 	approvalVisibilityScopes []biz.WorkflowApprovalVisibilityScope,
+	includeCounts bool,
 ) *v1.JsonrpcResult {
-	crossRoleRisk := request.ViewKey == biz.WorkflowRoleTaskViewRisk &&
-		(admin.IsSuperAdmin || biz.AdminHasRole(admin, biz.PMCRoleKey) || biz.AdminHasRole(admin, biz.BossRoleKey))
+	crossRoleRisk, permissionResult := d.AdminHasPermission(ctx, biz.PermissionWorkflowTaskSupervise)
+	if permissionResult != nil {
+		return permissionResult
+	}
+	riskScope := workflowRoleTaskRiskScopeRole
+	if crossRoleRisk {
+		riskScope = workflowRoleTaskRiskScopeSupervised
+	}
+	if request.HasCursor && request.CursorRiskScope != riskScope {
+		return invalidWorkflowRoleTaskViewCursorResult()
+	}
 	page, err := d.workflowUC.ListRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
 		ViewKey:                  request.ViewKey,
 		RoleKey:                  request.RoleKey,
 		Limit:                    request.Limit,
 		BeforeID:                 request.BeforeID,
+		IncludeCounts:            includeCounts,
 		CrossRoleRiskAllowed:     crossRoleRisk,
 		SnapshotAt:               request.SnapshotAt,
 		VisibilityScope:          visibilityScope,
@@ -1153,19 +1224,69 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 	if err != nil {
 		return d.mapWorkflowError(ctx, err)
 	}
+	if includeCounts && (page.Counts == nil || !page.Counts.IsConserved()) {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	expectedTotal := request.ExpectedTotal
+	if includeCounts {
+		var ok bool
+		expectedTotal, ok = page.Counts.ViewTotal(request.ViewKey)
+		if !ok {
+			return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		}
+	}
+	seenTotal := request.SeenTotal + len(page.Items)
+	if request.Method == "list_role_tasks" &&
+		(seenTotal > expectedTotal ||
+			(page.HasMore && seenTotal >= expectedTotal) ||
+			(!page.HasMore && seenTotal != expectedTotal)) {
+		return invalidWorkflowRoleTaskViewCursorResult()
+	}
 	nextCursor := ""
 	if page.HasMore && page.NextID > 0 {
-		nextCursor = encodeWorkflowRoleTaskViewCursor(page.NextID, page.SnapshotAt)
+		cursorExpectedTotal := expectedTotal
+		if request.Method == "list_workbench_role_tasks" {
+			cursorExpectedTotal = -1
+		}
+		nextCursor = encodeWorkflowRoleTaskViewCursor(workflowRoleTaskViewCursor{
+			Method:        request.Method,
+			ViewKey:       request.ViewKey,
+			RoleKey:       request.RoleKey,
+			BeforeID:      page.NextID,
+			SnapshotUnix:  page.SnapshotAt.Unix(),
+			ExpectedTotal: cursorExpectedTotal,
+			SeenTotal:     seenTotal,
+			RiskScope:     riskScope,
+		})
+		if nextCursor == "" {
+			return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		}
+	}
+	data := map[string]any{
+		"items":       workflowTasksToAny(page.Items),
+		"next_cursor": nextCursor,
+		"has_more":    page.HasMore,
+		"server_time": page.SnapshotAt.Unix(),
+	}
+	if page.Counts != nil {
+		data["counts"] = map[string]any{
+			"ready":    page.Counts.Ready,
+			"blocked":  page.Counts.Blocked,
+			"todo":     page.Counts.Todo,
+			"done":     page.Counts.Done,
+			"rejected": page.Counts.Rejected,
+			"history":  page.Counts.History,
+			"total":    page.Counts.Total,
+			"approval": page.Counts.Approval,
+			"risk":     page.Counts.Risk,
+			"overdue":  page.Counts.Overdue,
+		}
+		data["risk_scope"] = riskScope
 	}
 	return &v1.JsonrpcResult{
 		Code:    errcode.OK.Code,
 		Message: errcode.OK.Message,
-		Data: newDataStruct(map[string]any{
-			"items":       workflowTasksToAny(page.Items),
-			"next_cursor": nextCursor,
-			"has_more":    page.HasMore,
-			"server_time": page.SnapshotAt.Unix(),
-		}),
+		Data:    newDataStruct(data),
 	}
 }
 

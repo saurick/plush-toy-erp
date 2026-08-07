@@ -1,6 +1,5 @@
 export const WORKFLOW_APPROVAL_CAPABILITY_KEYS = Object.freeze([
   'workflow.task.approve',
-  'sales_return.approve',
   'finance.payment.approve',
   'warehouse.adjustment.approve',
   'production.exception.approve',
@@ -11,7 +10,6 @@ const WORKFLOW_APPROVAL_CAPABILITY_KEY_SET = new Set(
 )
 
 const WORKFLOW_PROCESS_DECISION_PROFILE_BY_CAPABILITY = Object.freeze({
-  'sales_return.approve': 'sales_return_approval',
   'finance.payment.approve': 'finance_payment_approval',
   'warehouse.adjustment.approve': 'inventory_adjustment_approval',
   'production.exception.approve': 'production_exception_approval',

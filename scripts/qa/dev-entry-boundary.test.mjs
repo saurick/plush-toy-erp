@@ -344,7 +344,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
       "mobile-workflow-smoke",
       "customer-config-dev-console",
       "dev-prototype-registry",
-      "dev-doc-governance-ledger",
+      "dev-doc-governance",
       "customer-config-package-runtime",
       "customer-import-tooling",
       "frontend-customer-config-projection",
@@ -763,43 +763,38 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "不改正式菜单",
     "dev prototype registry preset",
   );
-  const devDocGovernanceLedgerPreset = DEV_TESTING_COPY_PRESETS.find(
-    (item) => item.key === "dev-doc-governance-ledger",
+  const devDocGovernancePreset = DEV_TESTING_COPY_PRESETS.find(
+    (item) => item.key === "dev-doc-governance",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernanceLedgerPreset),
+    buildDevTestingCopyPresetSource(devDocGovernancePreset),
     "devDocs.test.mjs",
-    "dev docs governance ledger preset",
+    "dev docs governance preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernanceLedgerPreset),
+    buildDevTestingCopyPresetSource(devDocGovernancePreset),
     "devGovernance.test.mjs",
-    "dev docs governance ledger preset",
+    "dev docs governance preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernanceLedgerPreset),
-    "devCapabilityLedger.test.mjs",
-    "dev docs governance ledger preset",
-  );
-  assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernanceLedgerPreset),
+    buildDevTestingCopyPresetSource(devDocGovernancePreset),
     "dev-docs-dark-desktop",
-    "dev docs governance ledger preset",
+    "dev docs governance preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernanceLedgerPreset),
+    buildDevTestingCopyPresetSource(devDocGovernancePreset),
     "dev-governance-dark-desktop",
-    "dev docs governance ledger preset",
+    "dev docs governance preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernanceLedgerPreset),
+    buildDevTestingCopyPresetSource(devDocGovernancePreset),
     "不改正式文档真源",
-    "dev docs governance ledger preset",
+    "dev docs governance preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(devDocGovernanceLedgerPreset),
+    buildDevTestingCopyPresetSource(devDocGovernancePreset),
     "不进入正式菜单",
-    "dev docs governance ledger preset",
+    "dev docs governance preset",
   );
   const customerConfigRuntimePreset = DEV_TESTING_COPY_PRESETS.find(
     (item) => item.key === "customer-config-package-runtime",

@@ -156,6 +156,23 @@ func (d *jsonrpcDispatcher) workflowApprovalTaskVisibilityScopes(
 	ctx context.Context,
 	admin *biz.AdminUser,
 ) ([]biz.WorkflowApprovalVisibilityScope, *v1.JsonrpcResult) {
+	scopes, res := d.workflowAvailableApprovalTaskVisibilityScopes(ctx, admin)
+	if res != nil {
+		return nil, res
+	}
+	if len(scopes) == 0 {
+		return nil, &v1.JsonrpcResult{
+			Code:    errcode.PermissionDenied.Code,
+			Message: errcode.PermissionDenied.Message,
+		}
+	}
+	return scopes, nil
+}
+
+func (d *jsonrpcDispatcher) workflowAvailableApprovalTaskVisibilityScopes(
+	ctx context.Context,
+	admin *biz.AdminUser,
+) ([]biz.WorkflowApprovalVisibilityScope, *v1.JsonrpcResult) {
 	permissions, res := d.CurrentAdminPermissions(ctx)
 	if res != nil {
 		return nil, res
@@ -175,14 +192,7 @@ func (d *jsonrpcDispatcher) workflowApprovalTaskVisibilityScopes(
 			VisibilityScope: scope,
 		})
 	}
-	scopes = biz.NormalizeWorkflowApprovalVisibilityScopes(scopes)
-	if len(scopes) == 0 {
-		return nil, &v1.JsonrpcResult{
-			Code:    errcode.PermissionDenied.Code,
-			Message: errcode.PermissionDenied.Message,
-		}
-	}
-	return scopes, nil
+	return biz.NormalizeWorkflowApprovalVisibilityScopes(scopes), nil
 }
 
 func expandWorkflowTaskVisibilityForSupervision(

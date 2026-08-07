@@ -25,7 +25,7 @@ var productModuleCatalog = map[string]productModuleCatalogItem{
 	"processes":           {Name: "加工环节", Layer: "MasterData", Maturity: "runtime_v1", PageKeys: []string{"processes"}},
 	"material_bom":        {Name: "BOM 管理", Layer: "MasterData", Maturity: "runtime_v1", Dependencies: []string{"products", "materials"}, PageKeys: []string{"material-bom"}},
 	"sales_orders":        {Name: "销售订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"customers", "products"}, PageKeys: []string{"sales-orders"}},
-	"sales_returns":       {Name: "销售退货", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"shipments", "quality_inspections", "inventory"}, PageKeys: []string{"sales-returns"}},
+	"rework_intakes":      {Name: "返工回厂与补发", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"shipments", "production", "quality_inspections", "inventory"}, PageKeys: []string{"rework-intakes"}},
 	"purchase_orders":     {Name: "采购订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"suppliers", "materials"}, PageKeys: []string{"accessories-purchase"}},
 	"purchase_receipts":   {Name: "采购入库", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"purchase_orders", "quality_inspections", "inventory"}, PageKeys: []string{"inbound"}},
 	"quality_inspections": {Name: "质检", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"inventory"}, PageKeys: []string{"quality-inspections"}},

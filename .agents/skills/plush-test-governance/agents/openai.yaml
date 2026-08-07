@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Test Governance"
-  short_description: "测试治理 Test：影响面选择、执行完整性与证据分层门禁"
-  default_prompt: "Use $plush-test-governance 按影响面选择 T0-T8；开发期使用 affected，最终 clean HEAD 使用 prepare-push/full，报告实际执行数、skip、未跑项与盲区。"
+  short_description: "按改动影响面选择最小充分测试并准确说明验证与证据边界"
+  default_prompt: "Use $plush-test-governance 按改动影响面选择最小充分验证；内部 T0-T8 只作追踪键，报告实际命令、执行数、skip、未跑项与盲区。"

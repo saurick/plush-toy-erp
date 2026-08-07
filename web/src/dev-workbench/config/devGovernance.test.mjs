@@ -8,12 +8,11 @@ import {
   buildDevDocsHref,
   buildGovernanceSummary,
   extractGovernanceMermaid,
-  filterGovernanceTasks,
-  getRelatedGovernanceTasks,
   isDevGovernanceEnabled,
   parseGovernanceAxes,
   parseGovernanceTaskRoutes,
   parseMarkdownLinks,
+  parsePersonalDeliveryLoop,
 } from './devGovernance.mjs'
 
 const governanceSource = readFileSync(
@@ -34,6 +33,10 @@ const devTaskNavSource = readFileSync(
 )
 const devNavigationStyles = readFileSync(
   new URL('../styles/dev-navigation.css', import.meta.url),
+  'utf8'
+)
+const devWorkbenchDensityStyles = readFileSync(
+  new URL('../styles/dev-workbench-density.css', import.meta.url),
   'utf8'
 )
 
@@ -98,6 +101,11 @@ test('devGovernance: shared dev page nav exposes workspace routes and unique dee
     devNavigationStyles,
     /grid-template-columns:\s*232px minmax\(0, 1fr\)/u
   )
+  assert.match(
+    devWorkbenchDensityStyles,
+    /grid-template-columns:\s*216px minmax\(0, 1fr\)/u
+  )
+  assert.match(devWorkbenchDensityStyles, /width:\s*216px/u)
   assert.match(devNavigationStyles, /position:\s*sticky/u)
   assert.match(devNavigationStyles, /@media \(max-width: 980px\)/u)
   assert.match(
@@ -126,19 +134,19 @@ test('devGovernance: task navigation is an accessible tab set rather than a fals
   assert.doesNotMatch(devTaskNavSource, /aria-current="step"/u)
 })
 
-test('devGovernance: axis and scope use canonical URL state for share and history restore', () => {
+test('devGovernance: selected task uses canonical URL state for share and history restore', () => {
   assert.match(governancePageSource, /useSearchParams\(\)/)
   assert.match(
     governancePageSource,
-    /const requestedAxisKey = searchParams\.get\(AXIS_QUERY_KEY\)/
+    /const requestedTaskKey = searchParams\.get\(TASK_QUERY_KEY\)/
   )
   assert.match(
     governancePageSource,
-    /axes\.find\(\(axis\) => axis\.key === requestedAxisKey\) \|\| axes\[0\]/
+    /tasks\.find\(\(task\) => task\.key === requestedTaskKey\) \|\| tasks\[0\]/
   )
   assert.match(
     governancePageSource,
-    /const taskScopeMode = normalizeTaskScope\(requestedTaskScope\)/
+    /LEGACY_QUERY_KEYS\.forEach\(\(key\) => nextParams\.delete\(key\)\)/
   )
   assert.match(
     governancePageSource,
@@ -146,21 +154,17 @@ test('devGovernance: axis and scope use canonical URL state for share and histor
   )
   assert.match(
     governancePageSource,
-    /nextParams\.set\(AXIS_QUERY_KEY, axisKey\)[\s\S]*nextParams\.set\(SCOPE_QUERY_KEY, TASK_SCOPE_RELATED\)[\s\S]*setSearchParams\(nextParams\)/
-  )
-  assert.match(
-    governancePageSource,
-    /taskScopeMode === TASK_SCOPE_ALL \? TASK_SCOPE_RELATED : TASK_SCOPE_ALL/
+    /nextParams\.set\(TASK_QUERY_KEY, taskKey\)[\s\S]*setSearchParams\(nextParams\)/
   )
   assert.match(
     governancePageSource,
     /<DevPageNav sourcePath=\{DEV_GOVERNANCE_SOURCE_PATH\} \/>/
   )
-  assert.doesNotMatch(governancePageSource, /setSelectedAxisKey/)
-  assert.doesNotMatch(governancePageSource, /setTaskScopeMode/)
+  assert.doesNotMatch(governancePageSource, /AXIS_QUERY_KEY|SCOPE_QUERY_KEY/)
+  assert.doesNotMatch(governancePageSource, /setSelectedTaskKey/)
   assert.match(
     governancePageSource,
-    /aria-current=\{axis\.key === selectedKey \? 'true' : undefined\}/u
+    /aria-current=\{task\.key === selectedKey \? 'page' : undefined\}/u
   )
 })
 
@@ -190,36 +194,91 @@ test('devGovernance: parses governance axes and source links from Markdown', () 
   )
 })
 
-test('devGovernance: parses common task routing without inventing rules', () => {
+test('devGovernance: derives the five-step personal ToB delivery loop from Markdown', () => {
+  const loop = parsePersonalDeliveryLoop(governanceSource)
+
+  assert.deepEqual(
+    loop.steps.map((step) => step.step),
+    [
+      '甲方提出目标或痛点',
+      '负责人带回 Codex',
+      'Codex 补齐并实现最小闭环',
+      '明确授权后发布固定版本',
+      '甲方使用反馈后再迭代',
+    ]
+  )
+  assert.equal(loop.steps[0]?.owner, '甲方')
+  assert.match(loop.steps[2]?.outcome || '', /只采用当前需求所需复杂度/)
+  assert.match(loop.summary, /不跟随代码实现、内部层级或测试内部键逐级签认/)
+  assert.deepEqual(
+    loop.summaryLinks.map((link) => link.path),
+    ['AGENTS.md', 'docs/product/模块实施治理.md']
+  )
+  assert.match(governancePageSource, /parsePersonalDeliveryLoop/)
+  assert.match(governancePageSource, /erp-dev-governance-delivery-loop/)
+  assert.match(governancePageSource, />\s*个人 ToB 交付循环\s*</)
+})
+
+test('devGovernance: parses explicit task-first routing without guessing relationships', () => {
   const tasks = parseGovernanceTaskRoutes(governanceSource)
 
-  assert(tasks.length >= 6)
   assert.deepEqual(
-    filterGovernanceTasks(tasks, '部署').map((item) => item.task),
-    ['改部署、发布或低配运行口径']
+    tasks.map((item) => item.key),
+    [
+      'data-contract',
+      'workflow-fact',
+      'page-menu',
+      'test-acceptance',
+      'customer-delivery',
+      'release-runtime',
+      'docs',
+      'external-input',
+    ]
+  )
+  assert.equal(new Set(tasks.map((item) => item.key)).size, tasks.length)
+  assert(
+    tasks.every(
+      (item) =>
+        item.task &&
+        item.internalScope &&
+        item.firstHop &&
+        item.syncCheck &&
+        item.boundary
+    )
+  )
+  assert.equal(
+    tasks.find((item) => item.key === 'release-runtime')?.task,
+    '准备部署、发布或回滚'
+  )
+  assert.match(
+    tasks.find((item) => item.key === 'workflow-fact')?.boundary || '',
+    /协同任务完成不等于库存、出货或财务事实已经生效/
   )
   assert(
-    tasks.some((item) =>
-      item.firstHopLinks.some((link) => link.path === 'docs/部署约定.md')
-    )
+    tasks
+      .find((item) => item.key === 'release-runtime')
+      ?.firstHopLinks.some((link) => link.path === 'docs/部署约定.md')
+  )
+  assert.doesNotMatch(
+    tasks.map((item) => item.task).join(' '),
+    /schema|migration|repository|usecase|RBAC|T0-T8|GPT|Markdown/u
   )
 })
 
-test('devGovernance: derives related task routing from Markdown links', () => {
-  const axes = parseGovernanceAxes(governanceSource)
-  const tasks = parseGovernanceTaskRoutes(governanceSource)
-  const pageDesignAxis = axes.find((item) => item.axis.includes('页面设计治理'))
-  const customerAxis = axes.find((item) =>
-    item.axis.includes('产品化与客户差异')
+test('devGovernance: default page is task-first and keeps internal terminology collapsed', () => {
+  assert.match(governancePageSource, /这次改动该怎么做？/)
+  assert.match(governancePageSource, /你这次准备做什么？/)
+  assert.match(governancePageSource, /title="先看这些"/)
+  assert.match(governancePageSource, /title="同时检查"/)
+  assert.match(governancePageSource, /title="不要误判"/)
+  assert.match(
+    governancePageSource,
+    /<details className="erp-dev-governance-reference-details">/
   )
-
-  assert.deepEqual(
-    getRelatedGovernanceTasks(tasks, pageDesignAxis).map((item) => item.task),
-    ['改页面、菜单、原型或信息密度']
-  )
-  assert.deepEqual(
-    getRelatedGovernanceTasks(tasks, customerAxis).map((item) => item.task),
-    ['改客户资料、导入、客户配置或交付资料']
+  assert.match(governancePageSource, /查看完整工作方式和内部说明/)
+  assert.doesNotMatch(
+    governancePageSource,
+    /SearchInput|getRelatedGovernanceTasks|filterGovernanceTasks|第一跳|<Tag>分流<\/Tag>/
   )
 })
 
@@ -234,7 +293,7 @@ test('devGovernance: extracts Mermaid and summary from source Markdown', () => {
   assert.equal(summary.taskCount, tasks.length)
   assert.equal(summary.hasMermaid, true)
   assert(summary.sourceCount >= 10)
-  assert.match(summary.boundary, /Markdown remains the source of truth/)
+  assert.match(summary.boundary, /Markdown 是唯一维护来源/)
 })
 
 test('devGovernance: builds dev docs links only for supported Markdown paths', () => {

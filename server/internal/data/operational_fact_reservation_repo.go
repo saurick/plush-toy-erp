@@ -358,7 +358,10 @@ func validateStockReservationSourceQuantity(ctx context.Context, client *ent.Cli
 	shipped, err := client.ShipmentItem.Query().
 		Where(
 			shipmentitem.SalesOrderItemID(item.ID),
-			shipmentitem.HasShipmentWith(shipment.Status(biz.ShipmentStatusShipped)),
+			shipmentitem.HasShipmentWith(
+				shipment.Status(biz.ShipmentStatusShipped),
+				shipment.Purpose(biz.ShipmentPurposeSalesDelivery),
+			),
 		).
 		All(ctx)
 	if err != nil {

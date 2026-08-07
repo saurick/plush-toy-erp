@@ -59,6 +59,8 @@ import (
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/reworkintake"
+	"server/internal/data/model/ent/reworkintakeitem"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
@@ -67,8 +69,6 @@ import (
 	"server/internal/data/model/ent/runtimemarker"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
-	"server/internal/data/model/ent/salesreturn"
-	"server/internal/data/model/ent/salesreturnitem"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
@@ -197,6 +197,8 @@ func checkColumn(t, c string) error {
 			purchasereturn.Table:                     purchasereturn.ValidColumn,
 			purchasereturnitem.Table:                 purchasereturnitem.ValidColumn,
 			qualityinspection.Table:                  qualityinspection.ValidColumn,
+			reworkintake.Table:                       reworkintake.ValidColumn,
+			reworkintakeitem.Table:                   reworkintakeitem.ValidColumn,
 			role.Table:                               role.ValidColumn,
 			roledatascope.Table:                      roledatascope.ValidColumn,
 			rolepermission.Table:                     rolepermission.ValidColumn,
@@ -205,8 +207,6 @@ func checkColumn(t, c string) error {
 			runtimemarker.Table:                      runtimemarker.ValidColumn,
 			salesorder.Table:                         salesorder.ValidColumn,
 			salesorderitem.Table:                     salesorderitem.ValidColumn,
-			salesreturn.Table:                        salesreturn.ValidColumn,
-			salesreturnitem.Table:                    salesreturnitem.ValidColumn,
 			shipment.Table:                           shipment.ValidColumn,
 			shipmentitem.Table:                       shipmentitem.ValidColumn,
 			stockreservation.Table:                   stockreservation.ValidColumn,

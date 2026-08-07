@@ -221,7 +221,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     canCompleteWorkflowTasks ||
     canApproveWorkflowTasks ||
     [
-      'sales_return.approve',
       'finance.payment.approve',
       'warehouse.adjustment.approve',
       'production.exception.approve',

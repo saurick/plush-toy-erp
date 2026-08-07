@@ -53,12 +53,6 @@ export const yoyoosunCustomerPackage = Object.freeze({
       businessRefType: "shipment",
     }),
     Object.freeze({
-      processKey: "sales_return_acceptance",
-      processVersion: "v1",
-      variantKey: "approval_receipt",
-      businessRefType: "sales_return",
-    }),
-    Object.freeze({
       processKey: "finance_payment_approval",
       processVersion: "v1",
       variantKey: "approval_post",

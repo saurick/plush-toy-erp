@@ -79,6 +79,31 @@ function validTask(overrides = {}) {
   }
 }
 
+function roleTaskCounts({
+  ready = 0,
+  blocked = 0,
+  done = 0,
+  rejected = 0,
+  approval = 0,
+  risk = 0,
+  overdue = 0,
+} = {}) {
+  const todo = ready + blocked
+  const history = done + rejected
+  return {
+    approval,
+    blocked,
+    done,
+    history,
+    overdue,
+    ready,
+    rejected,
+    risk,
+    todo,
+    total: todo + history,
+  }
+}
+
 function validProcessContext(overrides = {}) {
   const completedNode = {
     id: 19,
@@ -382,6 +407,8 @@ test('workflowApi: approval role view accepts only registered active approval ta
       next_cursor: '',
       has_more: false,
       server_time: 1_720_000_000,
+      counts: roleTaskCounts({ ready: 8, approval: 1, risk: 3, overdue: 2 }),
+      risk_scope: 'role',
     },
   }))
   assert.deepEqual(
@@ -395,6 +422,8 @@ test('workflowApi: approval role view accepts only registered active approval ta
       next_cursor: '',
       has_more: false,
       server_time: 1_720_000_000,
+      counts: roleTaskCounts({ ready: 8, approval: 1, risk: 3, overdue: 2 }),
+      risk_scope: 'role',
     }
   )
 
@@ -409,6 +438,8 @@ test('workflowApi: approval role view accepts only registered active approval ta
       next_cursor: '',
       has_more: false,
       server_time: 1_720_000_000,
+      counts: roleTaskCounts({ ready: 8, approval: 1, risk: 3, overdue: 2 }),
+      risk_scope: 'role',
     },
   }))
   await assert.rejects(
@@ -417,6 +448,67 @@ test('workflowApi: approval role view accepts only registered active approval ta
       role_key: 'finance',
       limit: 50,
     }),
+    (error) => error.isInvalidResponse === true
+  )
+})
+
+test('workflowApi: initial mobile role page requires exact authoritative counts', async () => {
+  let response = {
+    items: [{ id: 42, version: 1, task_status_key: 'ready' }],
+    next_cursor: 'page-2',
+    has_more: true,
+    server_time: 1_720_000_000,
+    counts: roleTaskCounts({
+      ready: 348,
+      blocked: 3,
+      done: 5,
+      rejected: 2,
+      approval: 7,
+      risk: 93,
+      overdue: 61,
+    }),
+    risk_scope: 'supervised',
+  }
+  const api = await loadWorkflowApi(async () => ({ data: response }))
+  const params = { view_key: 'todo', role_key: 'sales', limit: 50 }
+
+  assert.equal((await api.listWorkflowRoleTasks(params)).counts.todo, 351)
+  for (const counts of [
+    undefined,
+    { ...roleTaskCounts({ ready: 1 }), history: 1 },
+    { ...roleTaskCounts({ ready: 1 }), ready: -1 },
+    { ...roleTaskCounts({ ready: 1 }), approval: '0' },
+    { ...roleTaskCounts({ ready: 1, risk: 1 }), overdue: 2 },
+    { ...roleTaskCounts({ ready: 1 }), loaded: 1 },
+  ]) {
+    response = {
+      items: [],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1_720_000_000,
+      ...(counts === undefined ? {} : { counts }),
+      risk_scope: 'role',
+    }
+    await assert.rejects(
+      api.listWorkflowRoleTasks(params),
+      (error) => error.isInvalidResponse === true
+    )
+  }
+
+  response = {
+    items: [],
+    next_cursor: '',
+    has_more: false,
+    server_time: 1_720_000_000,
+    counts: roleTaskCounts({ ready: 1 }),
+    risk_scope: 'role',
+  }
+  await assert.rejects(
+    api.listWorkflowRoleTasks({ ...params, cursor: 'page-2' }),
+    (error) => error.isInvalidResponse === true
+  )
+  await assert.rejects(
+    api.listWorkflowWorkbenchRoleTasks(params),
     (error) => error.isInvalidResponse === true
   )
 })
@@ -619,6 +711,16 @@ test('workflowApi: role task views share strict response validation', async () =
       items: [{ id: 42, version: 1, task_status_key: 'rejected' }],
       next_cursor: '',
       has_more: false,
+      server_time: 1,
+    },
+    {
+      items: Array.from({ length: 51 }, (_, index) => ({
+        id: index + 1,
+        version: 1,
+        task_status_key: 'ready',
+      })),
+      next_cursor: 'page-2',
+      has_more: true,
       server_time: 1,
     },
     ...['pending', 'processing', 'cancelled', 'closed'].map(

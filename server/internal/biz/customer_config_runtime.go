@@ -84,7 +84,6 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 	if processKey != ProcessKeySalesOrderAcceptance &&
 		processKey != ProcessKeyMaterialSupply &&
 		processKey != ProcessKeyFinishedGoodsDelivery &&
-		processKey != ProcessKeySalesReturnApproval &&
 		processKey != ProcessKeyFinancePaymentApproval &&
 		processKey != ProcessKeyInventoryAdjustmentApproval &&
 		processKey != ProcessKeyProductionExceptionApproval {
@@ -114,8 +113,7 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 	approvalKey := approvalSettingKeyForProcessKey(processKey)
 	if approvalKey == "" {
 		switch processKey {
-		case ProcessKeySalesReturnApproval,
-			ProcessKeyFinancePaymentApproval,
+		case ProcessKeyFinancePaymentApproval,
 			ProcessKeyInventoryAdjustmentApproval,
 			ProcessKeyProductionExceptionApproval:
 		default:

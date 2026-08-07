@@ -248,14 +248,14 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     ],
   },
   {
-    key: 'dev-doc-governance-ledger',
-    label: '文档治理与能力真源 / Docs Governance & Capability Sources',
+    key: 'dev-doc-governance',
+    label: '文档与治理地图 / Docs & Governance',
     description:
-      '仓库 Markdown 查看器、项目治理地图或能力真源入口改动时复制；只证明 dev-only 导航与只读查看，不改正式文档真源、不进入正式菜单。',
+      '仓库 Markdown 查看器或项目治理地图改动时复制；只证明 dev-only 导航与只读查看，不改正式文档真源、不进入正式菜单。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
-      'PATH=/usr/local/bin:$PATH node --test web/src/dev-workbench/config/devDocs.test.mjs web/src/dev-workbench/config/devGovernance.test.mjs web/src/dev-workbench/config/devCapabilityLedger.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-hub-dark-desktop,dev-docs-dark-desktop,dev-governance-dark-desktop,dev-capability-ledger-dark-desktop,dev-capability-sources-mobile pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH node --test web/src/dev-workbench/config/devDocs.test.mjs web/src/dev-workbench/config/devGovernance.test.mjs web/src/dev-workbench/config/devHub.test.mjs',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-hub-dark-desktop,dev-docs-dark-desktop,dev-governance-dark-desktop pnpm --dir web style:l1',
     ],
   },
   {

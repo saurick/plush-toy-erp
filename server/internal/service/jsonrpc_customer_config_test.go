@@ -118,9 +118,6 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 		if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
 			panic(err)
 		}
-		if err := biz.RegisterSalesReturnProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
-			panic(err)
-		}
 		if err := biz.RegisterFinancePaymentProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
 			panic(err)
 		}
@@ -131,7 +128,7 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 		// Start handlers still read the authoritative source document even when a
 		// focused runtime-command test intentionally omits command registrations.
 		operationalFactUC = biz.NewOperationalFactUsecase(&customerConfigShipmentOperationalFactRepo{
-			shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusDraft, FinanceReleaseStatus: biz.ShipmentFinanceReleaseStatusPending, FinanceReleaseVersion: 1},
+			shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Purpose: biz.ShipmentPurposeSalesDelivery, Status: biz.ShipmentStatusDraft, FinanceReleaseStatus: biz.ShipmentFinanceReleaseStatusPending, FinanceReleaseVersion: 1},
 		})
 	}
 	if err := biz.RegisterExceptionApprovalProcessBranchPolicyHandlers(processRuntimeUC); err != nil {
@@ -152,8 +149,11 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 
 func TestCustomerConfigRecoverCompensatedProcessDomainCommandContract(t *testing.T) {
 	dispatcher, repo := newCustomerConfigTestDispatcherWithRuntimeRepo(nil, []string{biz.AdminRoleKey})
-	repo.processes[31] = &biz.ProcessInstance{ID: 31, Status: biz.ProcessStatusBlocked}
-	repo.nodes[41] = &biz.ProcessNodeInstance{ID: 41, ProcessInstanceID: 31, NodeType: biz.ProcessNodeTypeDomainCommand, Status: biz.ProcessNodeStatusCompleted, Version: 7}
+	repo.processes[31] = &biz.ProcessInstance{
+		ID: 31, ProcessKey: biz.ProcessKeyFinancePaymentApproval, Status: biz.ProcessStatusBlocked,
+		BusinessRefType: "finance_payment", BusinessRefID: 301,
+	}
+	repo.nodes[41] = &biz.ProcessNodeInstance{ID: 41, ProcessInstanceID: 31, NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1, Status: biz.ProcessNodeStatusCompleted, Version: 7}
 	repo.nodesByProcess[31] = []int{41}
 	hashA := strings.Repeat("a", 64)
 	hashB := strings.Repeat("b", 64)
@@ -173,6 +173,31 @@ func TestCustomerConfigRecoverCompensatedProcessDomainCommandContract(t *testing
 	_, denied, err := forbidden.handleCustomerConfig(customerConfigAdminCtx(1, biz.QualityRoleKey), "recover_compensated_process_domain_command", "denied", params)
 	if err != nil || denied == nil || denied.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("denied=%#v err=%v", denied, err)
+	}
+}
+
+func TestCustomerConfigProcessRecoveryContextFailsClosedForBranchSnapshot(t *testing.T) {
+	dispatcher, repo := newCustomerConfigTestDispatcherWithRuntimeRepo(nil, []string{biz.AdminRoleKey})
+	repo.processes[31] = &biz.ProcessInstance{
+		ID: 31, ProcessKey: biz.ProcessKeyFinancePaymentApproval, Status: biz.ProcessStatusBlocked,
+		BusinessRefType: "finance_payment", BusinessRefID: 301,
+	}
+	repo.nodes[41] = &biz.ProcessNodeInstance{
+		ID: 41, ProcessInstanceID: 31, NodeType: biz.ProcessNodeTypeApproval, Attempt: 1,
+		Status: biz.ProcessNodeStatusCompleted, Version: 2,
+		PolicySnapshot: map[string]any{"branch_policy_key": biz.ProcessBranchPolicyFinancePaymentApproval},
+	}
+	repo.nodesByProcess[31] = []int{41}
+	params := mustJSONRPCStruct(t, map[string]any{"process_instance_id": float64(31)})
+
+	_, result, err := dispatcher.handleCustomerConfig(
+		customerConfigAdminCtx(1, biz.AdminRoleKey),
+		"get_process_recovery_context",
+		"branch-snapshot",
+		params,
+	)
+	if err != nil || result == nil || result.Code != errcode.ProcessDomainCommandRecoveryRequired.Code {
+		t.Fatalf("result=%#v err=%v", result, err)
 	}
 }
 
@@ -1843,9 +1868,10 @@ func customerConfigPublishParamsWithRevisionAndModuleState(t *testing.T, params 
 		"processes":           {"outsourcing_orders"},
 		"sales_orders":        {"shipments"},
 		"purchase_orders":     {"purchase_receipts"},
-		"quality_inspections": {"purchase_receipts", "sales_returns"},
-		"inventory":           {"purchase_receipts", "quality_inspections", "shipments", "sales_returns"},
-		"shipments":           {"sales_returns"},
+		"quality_inspections": {"purchase_receipts", "rework_intakes"},
+		"inventory":           {"purchase_receipts", "quality_inspections", "shipments", "rework_intakes"},
+		"shipments":           {"rework_intakes"},
+		"production":          {"rework_intakes"},
 		"finance":             {"finance_payments"},
 	}
 	queue := []string{moduleKey}
@@ -1859,6 +1885,11 @@ func customerConfigPublishParamsWithRevisionAndModuleState(t *testing.T, params 
 		seen[key] = struct{}{}
 		item := byKey[key]
 		if item == nil {
+			if key != moduleKey {
+				// An omitted dependent is disabled; do not invent a readable module
+				// merely to keep this test fixture's dependency closure valid.
+				continue
+			}
 			item = map[string]any{"module_key": key}
 			moduleStates = append(moduleStates, item)
 			byKey[key] = item
@@ -2593,7 +2624,7 @@ func TestCustomerConfigJSONRPCExplainProcessDefinitionFinishedGoodsDelivery(t *t
 		t.Fatalf("definition = %#v", definition)
 	}
 	nodes, ok := definition["nodes"].([]any)
-	if !ok || len(nodes) != 3 {
+	if !ok || len(nodes) != 5 {
 		t.Fatalf("nodes = %#v", definition["nodes"])
 	}
 	if reasons, ok := definition["execute_blocked_reasons"].([]any); !ok || len(reasons) != 0 {
@@ -2672,7 +2703,7 @@ func TestCustomerConfigJSONRPCStartFinishedGoodsDeliveryProcess(t *testing.T) {
 		t.Fatalf("started_node = %#v", data["started_node"])
 	}
 	nodes, ok := data["nodes"].([]any)
-	if !ok || len(nodes) != 3 {
+	if !ok || len(nodes) != 5 {
 		t.Fatalf("nodes = %#v", data["nodes"])
 	}
 	secondNode, ok := nodes[1].(map[string]any)
@@ -3171,7 +3202,7 @@ func createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t *testing.T, run
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegisteredHandler(t *testing.T) {
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
-		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusShipped},
+		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Purpose: biz.ShipmentPurposeSalesDelivery, Status: biz.ShipmentStatusShipped},
 	}
 	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
@@ -3236,7 +3267,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegist
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipUsesInstanceRevisionAfterActiveConfigChanges(t *testing.T) {
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
-		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusShipped},
+		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Purpose: biz.ShipmentPurposeSalesDelivery, Status: biz.ShipmentStatusShipped},
 	}
 	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
@@ -3516,6 +3547,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesD
 		shipment: &biz.Shipment{
 			ID:         9001,
 			CustomerID: &customerID,
+			Purpose:    biz.ShipmentPurposeSalesDelivery,
 			Status:     biz.ShipmentStatusShipped,
 		},
 	}
@@ -3704,7 +3736,7 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 		t.Fatalf("runtime_boundary = %#v", boundary)
 	}
 	nodes, ok := data["nodes"].([]any)
-	if !ok || len(nodes) != 5 {
+	if !ok || len(nodes) != 6 {
 		t.Fatalf("nodes = %#v", data["nodes"])
 	}
 	firstNode, ok := nodes[0].(map[string]any)
@@ -3827,7 +3859,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		t.Fatalf("completed_node = %#v", completedNode)
 	}
 	nodes, ok := executeData["nodes"].([]any)
-	if !ok || len(nodes) != 5 {
+	if !ok || len(nodes) != 6 {
 		t.Fatalf("nodes = %#v", executeData["nodes"])
 	}
 	firstNode, ok := nodes[0].(map[string]any)
@@ -3868,7 +3900,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		t.Fatalf("replayed started_node = %#v", replayStartedNode)
 	}
 	replayNodes, ok := replayStartData["nodes"].([]any)
-	if !ok || len(replayNodes) != 5 {
+	if !ok || len(replayNodes) != 6 {
 		t.Fatalf("replayed nodes = %#v", replayStartData["nodes"])
 	}
 	replaySecondNode, ok := replayNodes[1].(map[string]any)

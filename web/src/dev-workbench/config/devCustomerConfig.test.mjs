@@ -156,7 +156,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert(
     summary.sections.some(
       (section) =>
-        section.title === '销售管理' && section.items.includes('sales-returns')
+        section.title === '销售管理' && section.items.includes('rework-intakes')
     )
   )
   assert(

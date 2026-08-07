@@ -136,7 +136,6 @@ func TestApprovalSettingsCatalogReportsRegisteredFixedProcessResponsibilities(t 
 		t.Fatalf("GetApprovalSettings error = %v", err)
 	}
 	fixedProcessKeys := map[string]bool{
-		"sales_return":         false,
 		"production_exception": false,
 		"inventory_adjustment": false,
 		"payment":              false,

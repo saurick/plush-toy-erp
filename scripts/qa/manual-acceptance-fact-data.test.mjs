@@ -576,11 +576,11 @@ function factStage() {
           : [{ id: 19000 + offset, sales_order_item_id: 701 }],
     })),
     financeFacts: finance,
-    salesReturns: [
-      { id: 21_001, return_no: "TH-951", status: "DRAFT" },
-      { id: 21_002, return_no: "TH-952", status: "APPROVED" },
-      { id: 21_003, return_no: "TH-953", status: "RECEIVED" },
-      { id: 21_004, return_no: "TH-954", status: "REVERSED" },
+    reworkIntakes: [
+      { id: 21_001, intake_no: "HCF-951", status: "DRAFT" },
+      { id: 21_002, intake_no: "HCF-952", status: "RECEIVED" },
+      { id: 21_003, intake_no: "HCF-953", status: "REVERSED" },
+      { id: 21_004, intake_no: "HCF-954", status: "CANCELLED" },
     ],
     financePayments: [
       {
@@ -714,7 +714,7 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
   );
   assert.equal(plan.outsourcingCandidates.length, 45);
   assert.equal(plan.expectedMinimums.shipments, 47);
-  assert.equal(plan.expectedMinimums.salesReturns, 4);
+  assert.equal(plan.expectedMinimums.reworkIntakes, 4);
   assert.equal(plan.expectedMinimums.financePayments, 4);
   assert.equal(plan.expectedMinimums.financeCreditNotes, 3);
   assert.equal(plan.shipmentLineSample.items.length, 25);
@@ -2527,7 +2527,7 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
     ),
   );
   assert.ok(result.referenceRecords.financeFacts.length >= 180);
-  assert.equal(result.referenceRecords.salesReturns.length, 4);
+  assert.equal(result.referenceRecords.reworkIntakes.length, 4);
   assert.equal(result.referenceRecords.financePayments.length, 4);
   assert.equal(result.referenceRecords.financeCreditNotes.length, 3);
   assert.equal(result.financeFieldContract.complete, true);

@@ -15,10 +15,8 @@ const qualityPage = read('./V1QualityInspectionsPage.jsx')
 const rejectionModal = read(
   '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
 )
-const salesReturnsPage = read('./SalesReturnsPage.jsx')
+const reworkIntakesPage = read('./ReworkIntakesPage.jsx')
 const financePaymentsPage = read('./FinancePaymentsPage.jsx')
-const businessModalStyles = read('../styles/app/business-modals.css')
-const businessResponsiveStyles = read('../styles/app/business-responsive.css')
 const productionExceptionPanel = read(
   '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
 )
@@ -26,9 +24,9 @@ const processRecoveryButton = read(
   '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 )
 
-test('exception entries: router exposes formal RMA and payment pages', () => {
-  assert.match(router, /path="sales\/customer-returns"/u)
-  assert.match(router, /element=\{<SalesReturnsPage \/>\}/u)
+test('exception entries: router exposes formal rework-intake and payment pages', () => {
+  assert.match(router, /path="sales\/rework-intakes"/u)
+  assert.match(router, /element=\{<ReworkIntakesPage \/>\}/u)
   assert.match(router, /path="finance\/payments"/u)
   assert.match(router, /element=\{<FinancePaymentsPage \/>\}/u)
 })
@@ -56,82 +54,34 @@ test('first incoming rejection: keeps draft, post and cancellation distinct from
   assert.match(rejectionModal, /expected_version: record\.version/u)
 })
 
-test('RMA: uses shipment source, optimistic version and inventory-writing receive boundary', () => {
-  assert.match(salesReturnsPage, /listSalesReturns/u)
-  assert.match(salesReturnsPage, /listAllSalesReturns/u)
-  assert.match(salesReturnsPage, /listAllShipments/u)
-  assert.match(salesReturnsPage, /source_shipped_quantity/u)
-  assert.match(salesReturnsPage, /active_returned_quantity/u)
-  assert.match(salesReturnsPage, /remaining_returnable_quantity/u)
-  assert.match(salesReturnsPage, /BusinessDataTable/u)
-  assert.match(salesReturnsPage, /BusinessFormModal/u)
-  assert.match(salesReturnsPage, /BusinessRecordDetailsModal/u)
-  assert.match(salesReturnsPage, /expected_version:/u)
-  assert.match(salesReturnsPage, /createSourceBusinessActionAttemptStore/u)
-  assert.match(salesReturnsPage, /只有收货会写入退回库存/u)
-  assert.match(salesReturnsPage, /reverseSalesReturn/u)
-  assert.match(salesReturnsPage, /入库后只能冲正/u)
-  assert.match(salesReturnsPage, /getSalesReturnAcceptanceProcess/u)
-  assert.match(salesReturnsPage, /startSalesReturnAcceptanceProcess/u)
-  assert.match(salesReturnsPage, />\s*核对审批流\s*</u)
-  assert.match(
-    salesReturnsPage,
-    /const sourceItems = selectedShipmentItems[\s\S]*shipment_item_id: Number\(sourceItem\.id\)/u
-  )
-  assert.match(
-    salesReturnsPage,
-    /listSalesReturns\([\s\S]*signal: request\.signal[\s\S]*listAllShipments/u
-  )
-  assert.doesNotMatch(
-    salesReturnsPage,
-    /Promise\.all\(\s*\[\s*listSalesReturns[\s\S]*listAllShipments/u
-  )
-  assert.doesNotMatch(
-    salesReturnsPage,
-    /name=\{\[field\.name, 'shipment_item_id'\]\}/u
-  )
-  assert.match(
-    salesReturnsPage,
-    /className="erp-business-action-form erp-sales-return-create-form"/u
-  )
-  assert.match(
-    salesReturnsPage,
-    /className="erp-business-source-summary erp-sales-return-create-form__status"/u
-  )
-  assert.match(
-    salesReturnsPage,
-    /className="erp-business-action-form__field--full erp-sales-return-create-form__reason"/u
-  )
-  assert.match(
-    salesReturnsPage,
-    /<Form\.List name="items">[\s\S]*className="erp-sales-order-lines-form erp-sales-return-create-form__items"/u
-  )
-  assert.match(
-    salesReturnsPage,
-    /<Form\.List name="items">[\s\S]{0,320}returnUsage\.shipmentID === Number\(selectedShipment\.id\)[\s\S]{0,120}returnUsage\.status === 'success'/u
-  )
-  assert.doesNotMatch(salesReturnsPage, /<Space/u)
-  assert.doesNotMatch(
-    salesReturnsPage,
-    /style=\{\{ width: (?:110|120|140|180|220|300) \}\}/u
-  )
-  assert.match(
-    businessModalStyles,
-    /\.erp-sales-return-create-form\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1\.3fr\) minmax\(280px, 0\.7fr\)/u
-  )
-  assert.match(
-    businessModalStyles,
-    /\.erp-sales-return-create-form__item-grid\s*\{[^}]*grid-template-columns:\s*repeat\(12, minmax\(0, 1fr\)\)/u
-  )
-  assert.match(
-    businessResponsiveStyles,
-    /\.erp-sales-return-create-form__item-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/u
-  )
-  assert.doesNotMatch(
-    salesReturnsPage,
-    /className="erp-sales-order-lines-form__(?:row|grid) erp-sales-return-create-form__item/u
-  )
-  assert.doesNotMatch(salesReturnsPage, /客户ID|出货ID|明细ID/u)
+test('返工回厂：来源、收货、生产返工、质检完工和补发保持同一追溯链', () => {
+  for (const contract of [
+    'listReworkIntakes',
+    'listAllReworkIntakeSourceCandidates',
+    'createReworkIntake',
+    'receiveReworkIntake',
+    'reverseReworkIntake',
+    'createProductionReworkFromIntake',
+    'createReworkReshipment',
+  ]) {
+    assert.match(reworkIntakesPage, new RegExp(contract, 'u'))
+  }
+  assert.match(reworkIntakesPage, /expected_version:/u)
+  assert.match(reworkIntakesPage, /REWORK_RESHIPMENT|返工补发/u)
+  assert.match(reworkIntakesPage, /不产生新的销售应收或开票/u)
+  assert.match(reworkIntakesPage, /BusinessDataTable/u)
+  assert.match(reworkIntakesPage, /BusinessFormModal/u)
+  assert.match(reworkIntakesPage, /BusinessRecordDetailsModal/u)
+  for (const actionKey of [
+    'rework-intake-receive',
+    'rework-intake-create-rework',
+    'rework-intake-create-reshipment',
+    'rework-intake-cancel',
+    'rework-intake-reverse',
+  ]) {
+    assert.match(reworkIntakesPage, new RegExp(actionKey, 'u'))
+  }
+  assert.doesNotMatch(reworkIntakesPage, /客户ID|出货ID|明细ID/u)
 })
 
 test('finance V1: lists real payments, allocates multiple facts and preserves reversal audit', () => {
@@ -188,7 +138,6 @@ test('production exception: requester can reconcile a submitted source whose pro
 test('exception recovery: system permission gates one evidence-bound shared recovery action', () => {
   for (const source of [
     inventoryPage,
-    salesReturnsPage,
     financePaymentsPage,
     productionExceptionPanel,
   ]) {
@@ -196,6 +145,7 @@ test('exception recovery: system permission gates one evidence-bound shared reco
     assert.match(source, /process_runtime\.recover/u)
   }
   assert.match(processRecoveryButton, /findExceptionProcessRecoveryCandidate/u)
+  assert.match(processRecoveryButton, /getProcessRecoveryContext/u)
   assert.match(processRecoveryButton, /recoverCompensatedProcessDomainCommand/u)
   assert.match(
     processRecoveryButton,

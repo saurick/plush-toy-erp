@@ -20,6 +20,31 @@ import {
   settleMobileRoleTaskRequest,
 } from './mobileTaskQueries.mjs'
 
+function roleTaskCounts({
+  ready = 0,
+  blocked = 0,
+  done = 0,
+  rejected = 0,
+  approval = 0,
+  risk = 0,
+  overdue = 0,
+} = {}) {
+  const todo = ready + blocked
+  const history = done + rejected
+  return {
+    approval,
+    blocked,
+    done,
+    history,
+    overdue,
+    ready,
+    rejected,
+    risk,
+    todo,
+    total: todo + history,
+  }
+}
+
 test('mobileTaskQueries: 历史草稿只在完整访问范围一致时恢复', () => {
   const oldHistory = {
     mobileRoleTasksAction: 'done',
@@ -200,11 +225,16 @@ test('mobileTaskQueries: 每个岗位视图持有独立初始分页槽', () => {
       next_cursor: '',
       has_more: false,
       server_time: 0,
+      count_summary: null,
       loaded: false,
       loading: false,
       error: '',
     })
   }
+  assert.equal(
+    Object.hasOwn(createMobileRoleTaskScopeState('sales'), 'countSummary'),
+    false
+  )
 })
 
 test('mobileTaskQueries: todo、approval、risk、history 使用各自数据且历史详情只读', () => {
@@ -267,7 +297,7 @@ test('mobileTaskQueries: todo、approval、risk、history 使用各自数据且�
   )
 })
 
-test('mobileTaskQueries: 游标追加按任务 id 去重且不覆盖已加载项', () => {
+test('mobileTaskQueries: 游标追加遇到重复任务时拒绝混合快照', () => {
   const firstPage = mergeMobileRoleTaskPage(undefined, {
     items: [
       { id: 350, task_name: 'A' },
@@ -277,28 +307,23 @@ test('mobileTaskQueries: 游标追加按任务 id 去重且不覆盖已加载项
     has_more: true,
     server_time: 1_720_000_000,
   })
-  const secondPage = mergeMobileRoleTaskPage(
-    firstPage,
-    {
-      items: [
-        { id: 349, task_name: 'duplicate' },
-        { id: 348, task_name: 'C' },
-      ],
-      next_cursor: '',
-      has_more: false,
-      server_time: 1_720_000_000,
-    },
-    { append: true }
+  assert.throws(
+    () =>
+      mergeMobileRoleTaskPage(
+        firstPage,
+        {
+          items: [
+            { id: 349, task_name: 'duplicate' },
+            { id: 348, task_name: 'C' },
+          ],
+          next_cursor: '',
+          has_more: false,
+          server_time: 1_720_000_000,
+        },
+        { append: true }
+      ),
+    (error) => error.isInvalidResponse === true && /重复/u.test(error.message)
   )
-
-  assert.deepEqual(
-    secondPage.items.map((task) => task.id),
-    [350, 349, 348]
-  )
-  assert.equal(secondPage.items[1].task_name, 'B')
-  assert.equal(secondPage.has_more, false)
-  assert.equal(secondPage.loaded, true)
-  assert.equal(secondPage.error, '')
 })
 
 test('mobileTaskQueries: 多页可继续追加超过旧 200 条上限', () => {
@@ -323,6 +348,52 @@ test('mobileTaskQueries: 多页可继续追加超过旧 200 条上限', () => {
   assert.equal(slot.items.length, 350)
   assert.equal(slot.items.at(-1).id, 1)
   assert.equal(slot.has_more, false)
+})
+
+test('mobileTaskQueries: 权威总数约束首屏与终页完整闭合', () => {
+  const counts = roleTaskCounts({ ready: 2, blocked: 1, risk: 1 })
+  assert.throws(
+    () =>
+      mergeMobileRoleTaskPage(
+        undefined,
+        {
+          items: [{ id: 3 }],
+          next_cursor: '',
+          has_more: false,
+          server_time: 1_720_000_000,
+          counts,
+          risk_scope: 'role',
+        },
+        { viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO }
+      ),
+    (error) =>
+      error.isInvalidResponse === true && /分页结果异常/u.test(error.message)
+  )
+
+  const first = mergeMobileRoleTaskPage(
+    undefined,
+    {
+      items: [{ id: 3 }, { id: 2 }],
+      next_cursor: 'page-2',
+      has_more: true,
+      server_time: 1_720_000_000,
+      counts,
+      risk_scope: 'role',
+    },
+    { viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO }
+  )
+  const terminal = mergeMobileRoleTaskPage(
+    first,
+    {
+      items: [{ id: 1 }],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1_720_000_000,
+    },
+    { append: true, viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO }
+  )
+  assert.equal(terminal.items.length, counts.todo)
+  assert.deepEqual(terminal.count_summary, first.count_summary)
 })
 
 test('mobileTaskQueries: append 快照漂移时拒绝拼接并保留原分页槽', () => {
@@ -397,8 +468,7 @@ test('mobileTaskQueries: append 拒绝无新增任务的循环页', () => {
         },
         { append: true }
       ),
-    (error) =>
-      error.isInvalidResponse === true && /分页结果异常/u.test(error.message)
+    (error) => error.isInvalidResponse === true && /重复/u.test(error.message)
   )
 })
 
@@ -414,6 +484,11 @@ test('mobileTaskQueries: 已确认动作原位更新深分页缓存且保留游�
     next_cursor: 'page-6',
     has_more: true,
     server_time: 1_720_000_000,
+    count_summary: {
+      counts: roleTaskCounts({ ready: 249, blocked: 1, risk: 1 }),
+      risk_scope: 'role',
+      server_time: 1_720_000_000,
+    },
     loaded: true,
     loading: true,
     error: '旧错误',
@@ -421,6 +496,11 @@ test('mobileTaskQueries: 已确认动作原位更新深分页缓存且保留游�
   state.slots.risk = {
     ...state.slots.risk,
     items: [{ id: 230, task_name: '风险缓存旧版本' }],
+    count_summary: {
+      counts: roleTaskCounts({ ready: 249, blocked: 1, risk: 1 }),
+      risk_scope: 'role',
+      server_time: 1_720_000_000,
+    },
     loaded: true,
     loading: true,
   }
@@ -444,7 +524,9 @@ test('mobileTaskQueries: 已确认动作原位更新深分页缓存且保留游�
   assert.equal(updated.slots.todo.server_time, 1_720_000_000)
   assert.equal(updated.slots.todo.loading, false)
   assert.equal(updated.slots.todo.error, '')
+  assert.equal(updated.slots.todo.count_summary, null)
   assert.equal(updated.slots.risk.loaded, false)
+  assert.equal(updated.slots.risk.count_summary, null)
   assert.equal(updated.slots.risk.loading, false)
   assert.equal(updated.slots.risk.items[0].task_name, '任务 230 已阻塞')
 
@@ -535,6 +617,92 @@ test('mobileTaskQueries: 旧范围或旧序号响应不能回填当前范围', (
   assert.deepEqual(state.slots.todo.items, [])
 })
 
+test('mobileTaskQueries: 每个视图只保存自己的权威数量快照', () => {
+  const scopeKey = 'sales|customer-a|revision-1|ready'
+  const state = createMobileRoleTaskScopeState(scopeKey)
+  const todoCounts = roleTaskCounts({
+    ready: 348,
+    blocked: 3,
+    done: 5,
+    rejected: 2,
+    approval: 7,
+    risk: 93,
+    overdue: 61,
+  })
+  const first = settleMobileRoleTaskRequest(state, {
+    currentScopeKey: scopeKey,
+    requestScopeKey: scopeKey,
+    viewKey: 'todo',
+    currentRequestSeq: 1,
+    requestSeq: 1,
+    response: {
+      items: [{ id: 351 }],
+      next_cursor: 'page-2',
+      has_more: true,
+      server_time: 1_720_000_000,
+      counts: todoCounts,
+      risk_scope: 'role',
+    },
+  })
+  assert.deepEqual(first.slots.todo.count_summary, {
+    counts: todoCounts,
+    risk_scope: 'role',
+    server_time: 1_720_000_000,
+  })
+  assert.equal(first.slots.risk.count_summary, null)
+
+  const appended = settleMobileRoleTaskRequest(first, {
+    currentScopeKey: scopeKey,
+    requestScopeKey: scopeKey,
+    viewKey: 'todo',
+    currentRequestSeq: 2,
+    requestSeq: 2,
+    append: true,
+    response: {
+      items: [{ id: 350 }],
+      next_cursor: 'page-3',
+      has_more: true,
+      server_time: 1_720_000_000,
+    },
+  })
+  assert.deepEqual(
+    appended.slots.todo.count_summary,
+    first.slots.todo.count_summary
+  )
+
+  const riskCounts = roleTaskCounts({
+    ready: 4,
+    blocked: 1,
+    done: 2,
+    risk: 3,
+    overdue: 1,
+  })
+  const crossView = settleMobileRoleTaskRequest(appended, {
+    currentScopeKey: scopeKey,
+    requestScopeKey: scopeKey,
+    viewKey: 'risk',
+    currentRequestSeq: 1,
+    requestSeq: 1,
+    response: {
+      items: [{ id: 7 }, { id: 6 }, { id: 5 }],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1_719_999_999,
+      counts: riskCounts,
+      risk_scope: 'supervised',
+    },
+  })
+  assert.deepEqual(
+    crossView.slots.todo.count_summary,
+    first.slots.todo.count_summary
+  )
+  assert.deepEqual(crossView.slots.risk.count_summary, {
+    counts: riskCounts,
+    risk_scope: 'supervised',
+    server_time: 1_719_999_999,
+  })
+})
+
 test('mobileTaskQueries: 同范围刷新失败保留任务、游标和服务端时间', () => {
   const scopeKey = 'sales|customer-a|revision-1|ready'
   const state = createMobileRoleTaskScopeState(scopeKey)
@@ -563,4 +731,5 @@ test('mobileTaskQueries: 同范围刷新失败保留任务、游标和服务端�
   assert.equal(failed.slots.todo.loaded, true)
   assert.equal(failed.slots.todo.loading, false)
   assert.equal(failed.slots.todo.error, '刷新任务失败，已保留上次数据')
+  assert.equal(failed.slots.todo.count_summary, null)
 })

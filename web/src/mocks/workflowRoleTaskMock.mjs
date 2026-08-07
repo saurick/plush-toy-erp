@@ -92,6 +92,7 @@ export function buildWorkflowRoleTaskPageMock({
   snapshotAt,
   adminID = 0,
   crossRoleRiskAllowed = false,
+  includeCounts = false,
 } = {}) {
   const query = requireQuery(params)
   const initialSnapshotAt = Number(snapshotAt)
@@ -111,36 +112,40 @@ export function buildWorkflowRoleTaskPageMock({
     }
   }
 
-  const visible = normalizedTasks
-    .filter((task) => !cursor.beforeID || task.id < cursor.beforeID)
-    .filter((task) => {
-      if (query.viewKey === 'risk' && crossRoleRiskAllowed) return true
-      return (
-        normalizedText(task.owner_role_key) === query.roleKey ||
-        (Number.isSafeInteger(adminID) &&
-          adminID > 0 &&
-          Number(task.assignee_id || 0) === adminID)
-      )
-    })
-    .filter((task) => {
-      if (query.viewKey === 'todo') {
-        return ['ready', 'blocked'].includes(task.task_status_key)
-      }
-      if (query.viewKey === 'history') {
-        return ['done', 'rejected'].includes(task.task_status_key)
-      }
-      if (query.viewKey === 'approval') {
+  const visibleForView = (viewKey, beforeID = 0) =>
+    normalizedTasks
+      .filter((task) => !beforeID || task.id < beforeID)
+      .filter((task) => {
+        if (viewKey === 'risk' && crossRoleRiskAllowed) return true
+        return (
+          normalizedText(task.owner_role_key) === query.roleKey ||
+          (Number.isSafeInteger(adminID) &&
+            adminID > 0 &&
+            Number(task.assignee_id || 0) === adminID)
+        )
+      })
+      .filter((task) => {
+        if (viewKey === 'todo') {
+          return ['ready', 'blocked'].includes(task.task_status_key)
+        }
+        if (viewKey === 'history') {
+          return ['done', 'rejected'].includes(task.task_status_key)
+        }
+        if (viewKey === 'approval') {
+          return (
+            ['ready', 'blocked'].includes(task.task_status_key) &&
+            isWorkflowApprovalTask(task)
+          )
+        }
         return (
           ['ready', 'blocked'].includes(task.task_status_key) &&
-          isWorkflowApprovalTask(task)
+          isRiskTask(task, cursor.snapshotAt)
         )
-      }
-      return (
-        ['ready', 'blocked'].includes(task.task_status_key) &&
-        isRiskTask(task, cursor.snapshotAt)
-      )
-    })
-    .sort((left, right) => right.id - left.id)
+      })
+
+  const visible = visibleForView(query.viewKey, cursor.beforeID).sort(
+    (left, right) => right.id - left.id
+  )
 
   const hasMore = visible.length > query.limit
   const items = visible.slice(0, query.limit)
@@ -148,10 +153,62 @@ export function buildWorkflowRoleTaskPageMock({
     hasMore && items.length > 0
       ? encodeCursor(items.at(-1).id, cursor.snapshotAt)
       : ''
+  const counts =
+    includeCounts && !query.cursor
+      ? (() => {
+          const roleVisibleTasks = normalizedTasks.filter(
+            (task) =>
+              normalizedText(task.owner_role_key) === query.roleKey ||
+              (Number.isSafeInteger(adminID) &&
+                adminID > 0 &&
+                Number(task.assignee_id || 0) === adminID)
+          )
+          const ready = roleVisibleTasks.filter(
+            (task) => task.task_status_key === 'ready'
+          ).length
+          const blocked = roleVisibleTasks.filter(
+            (task) => task.task_status_key === 'blocked'
+          ).length
+          const done = roleVisibleTasks.filter(
+            (task) => task.task_status_key === 'done'
+          ).length
+          const rejected = roleVisibleTasks.filter(
+            (task) => task.task_status_key === 'rejected'
+          ).length
+          const todo = ready + blocked
+          const history = done + rejected
+          const riskTasks = visibleForView('risk')
+          return {
+            approval: visibleForView('approval').length,
+            blocked,
+            done,
+            history,
+            overdue: riskTasks.filter((task) => {
+              const dueAt = Number(task?.due_at || 0)
+              return (
+                Number.isSafeInteger(dueAt) &&
+                dueAt > 0 &&
+                dueAt < cursor.snapshotAt
+              )
+            }).length,
+            ready,
+            rejected,
+            risk: riskTasks.length,
+            todo,
+            total: todo + history,
+          }
+        })()
+      : null
   return {
     items,
     next_cursor: nextCursor,
     has_more: hasMore,
     server_time: cursor.snapshotAt,
+    ...(counts
+      ? {
+          counts,
+          risk_scope: crossRoleRiskAllowed ? 'supervised' : 'role',
+        }
+      : {}),
   }
 }

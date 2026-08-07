@@ -5,6 +5,7 @@ package ent
 import (
 	"fmt"
 	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/reworkintake"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/shipment"
 	"strings"
@@ -22,8 +23,12 @@ type Shipment struct {
 	ID int `json:"id,omitempty"`
 	// ShipmentNo holds the value of the "shipment_no" field.
 	ShipmentNo string `json:"shipment_no,omitempty"`
+	// Purpose holds the value of the "purpose" field.
+	Purpose string `json:"purpose,omitempty"`
 	// SalesOrderID holds the value of the "sales_order_id" field.
 	SalesOrderID *int `json:"sales_order_id,omitempty"`
+	// ReworkIntakeID holds the value of the "rework_intake_id" field.
+	ReworkIntakeID *int `json:"rework_intake_id,omitempty"`
 	// CustomerID holds the value of the "customer_id" field.
 	CustomerID *int `json:"customer_id,omitempty"`
 	// CustomerSnapshot holds the value of the "customer_snapshot" field.
@@ -70,13 +75,15 @@ type Shipment struct {
 type ShipmentEdges struct {
 	// SalesOrder holds the value of the sales_order edge.
 	SalesOrder *SalesOrder `json:"sales_order,omitempty"`
+	// ReworkIntake holds the value of the rework_intake edge.
+	ReworkIntake *ReworkIntake `json:"rework_intake,omitempty"`
 	// Customer holds the value of the customer edge.
 	Customer *Customer `json:"customer,omitempty"`
 	// Items holds the value of the items edge.
 	Items []*ShipmentItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // SalesOrderOrErr returns the SalesOrder value or an error if the edge
@@ -90,12 +97,23 @@ func (e ShipmentEdges) SalesOrderOrErr() (*SalesOrder, error) {
 	return nil, &NotLoadedError{edge: "sales_order"}
 }
 
+// ReworkIntakeOrErr returns the ReworkIntake value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ShipmentEdges) ReworkIntakeOrErr() (*ReworkIntake, error) {
+	if e.ReworkIntake != nil {
+		return e.ReworkIntake, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: reworkintake.Label}
+	}
+	return nil, &NotLoadedError{edge: "rework_intake"}
+}
+
 // CustomerOrErr returns the Customer value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e ShipmentEdges) CustomerOrErr() (*Customer, error) {
 	if e.Customer != nil {
 		return e.Customer, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: customer.Label}
 	}
 	return nil, &NotLoadedError{edge: "customer"}
@@ -104,7 +122,7 @@ func (e ShipmentEdges) CustomerOrErr() (*Customer, error) {
 // ItemsOrErr returns the Items value or an error if the edge
 // was not loaded in eager-loading.
 func (e ShipmentEdges) ItemsOrErr() ([]*ShipmentItem, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
@@ -117,9 +135,9 @@ func (*Shipment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case shipment.FieldTotalNetWeightG, shipment.FieldRequestedTotalNetWeightG:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
-		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldCustomerID, shipment.FieldFinanceReleaseVersion, shipment.FieldFinanceReleasedBy, shipment.FieldFinanceReleaseProcessInstanceID, shipment.FieldFinanceReleaseProcessNodeID:
+		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldReworkIntakeID, shipment.FieldCustomerID, shipment.FieldFinanceReleaseVersion, shipment.FieldFinanceReleasedBy, shipment.FieldFinanceReleaseProcessInstanceID, shipment.FieldFinanceReleaseProcessNodeID:
 			values[i] = new(sql.NullInt64)
-		case shipment.FieldShipmentNo, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldFinanceReleaseStatus, shipment.FieldFinanceReleaseNote, shipment.FieldIdempotencyKey, shipment.FieldNote:
+		case shipment.FieldShipmentNo, shipment.FieldPurpose, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldFinanceReleaseStatus, shipment.FieldFinanceReleaseNote, shipment.FieldIdempotencyKey, shipment.FieldNote:
 			values[i] = new(sql.NullString)
 		case shipment.FieldFinanceReleasedAt, shipment.FieldPlannedShipAt, shipment.FieldShippedAt, shipment.FieldCreatedAt, shipment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -150,12 +168,25 @@ func (_m *Shipment) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ShipmentNo = value.String
 			}
+		case shipment.FieldPurpose:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field purpose", values[i])
+			} else if value.Valid {
+				_m.Purpose = value.String
+			}
 		case shipment.FieldSalesOrderID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field sales_order_id", values[i])
 			} else if value.Valid {
 				_m.SalesOrderID = new(int)
 				*_m.SalesOrderID = int(value.Int64)
+			}
+		case shipment.FieldReworkIntakeID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field rework_intake_id", values[i])
+			} else if value.Valid {
+				_m.ReworkIntakeID = new(int)
+				*_m.ReworkIntakeID = int(value.Int64)
 			}
 		case shipment.FieldCustomerID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -295,6 +326,11 @@ func (_m *Shipment) QuerySalesOrder() *SalesOrderQuery {
 	return NewShipmentClient(_m.config).QuerySalesOrder(_m)
 }
 
+// QueryReworkIntake queries the "rework_intake" edge of the Shipment entity.
+func (_m *Shipment) QueryReworkIntake() *ReworkIntakeQuery {
+	return NewShipmentClient(_m.config).QueryReworkIntake(_m)
+}
+
 // QueryCustomer queries the "customer" edge of the Shipment entity.
 func (_m *Shipment) QueryCustomer() *CustomerQuery {
 	return NewShipmentClient(_m.config).QueryCustomer(_m)
@@ -331,8 +367,16 @@ func (_m *Shipment) String() string {
 	builder.WriteString("shipment_no=")
 	builder.WriteString(_m.ShipmentNo)
 	builder.WriteString(", ")
+	builder.WriteString("purpose=")
+	builder.WriteString(_m.Purpose)
+	builder.WriteString(", ")
 	if v := _m.SalesOrderID; v != nil {
 		builder.WriteString("sales_order_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ReworkIntakeID; v != nil {
+		builder.WriteString("rework_intake_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

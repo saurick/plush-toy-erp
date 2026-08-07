@@ -418,21 +418,17 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	)
 
 	shipmentReadMethods := append(permissionMethods("operational_fact", "get_shipment", "list_shipments"), permissionMethods("customer_config", "start_finished_goods_delivery_process")...)
-	shipmentCreateMethods := append(permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), permissionMethods("customer_config", "start_finished_goods_delivery_process")...)
+	shipmentCreateMethods := append(permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items", "create_rework_reshipment"), permissionMethods("customer_config", "start_finished_goods_delivery_process")...)
 	addMenu(PermissionShipmentRead, "shipments", "shipments", "出货单", "shipment-list", "出货单列表", permissionControlPage, "允许进入并查看", shipmentReadMethods, businessUsageConditions)
 	addMenu(PermissionShipmentCreate, "shipments", "shipments", "出货单", "create-shipment", "创建出货单或提交出货审批", permissionControlButton, "显示并允许办理", shipmentCreateMethods, businessUsageConditions)
 	addMenu(PermissionShipmentShip, "shipments", "shipment-actions", "出货动作", "ship-shipment", "确认出货", permissionControlButton, "显示并允许确认出货", permissionMethods("operational_fact", "ship_shipment"), businessUsageConditions)
 	addMenu(PermissionShipmentCancel, "shipments", "shipment-actions", "出货动作", "cancel-shipment", "取消出货单", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_shipment"), businessUsageConditions)
-	salesReturnReadMethods := append(
-		permissionMethods("operational_fact", "get_sales_return", "list_sales_returns"),
-		permissionMethods("customer_config", "start_sales_return_acceptance_process", "get_sales_return_acceptance_process", "execute_sales_return_receive")...,
-	)
-	addMenu(PermissionSalesReturnRead, "sales-returns", "sales-returns", "客户退货", "sales-return-list", "客户退货列表与详情", permissionControlPage, "允许进入并查看", salesReturnReadMethods, businessUsageConditions)
-	addMenu(PermissionSalesReturnCreate, "sales-returns", "sales-return-actions", "客户退货动作", "create-sales-return", "从已出货单发起客户退货并启动审批", permissionControlButton, "显示并允许创建", append(permissionMethods("operational_fact", "create_sales_return"), permissionMethods("customer_config", "start_sales_return_acceptance_process")...), businessUsageConditions)
-	addMenu(PermissionSalesReturnApprove, "sales-returns", "sales-return-actions", "客户退货动作", "approve-sales-return", "审批客户退货", permissionControlButton, "显示并允许审批", permissionMethods("workflow", "complete_task_action"), businessUsageConditions)
-	addMenu(PermissionSalesReturnReceive, "sales-returns", "sales-return-actions", "客户退货动作", "receive-sales-return", "确认退货入库", permissionControlButton, "显示并允许办理", permissionMethods("customer_config", "execute_sales_return_receive"), businessUsageConditions)
-	addMenu(PermissionSalesReturnCancel, "sales-returns", "sales-return-actions", "客户退货动作", "cancel-sales-return", "取消尚未入库的客户退货", permissionControlButton, "显示并允许办理", permissionMethods("operational_fact", "cancel_sales_return"), businessUsageConditions)
-	addMenu(PermissionSalesReturnReverse, "sales-returns", "sales-return-actions", "客户退货动作", "reverse-sales-return", "冲正已入库的客户退货并保留质检审计", permissionControlButton, "显示并允许办理", permissionMethods("operational_fact", "reverse_sales_return"), businessUsageConditions)
+	reworkIntakeReadMethods := permissionMethods("operational_fact", "get_rework_intake", "list_rework_intakes")
+	addMenu(PermissionReworkIntakeRead, "rework-intakes", "rework-intakes", "返工回厂与补发", "rework-intake-list", "返工回厂记录、返工进度与补发明细", permissionControlPage, "允许进入并查看", reworkIntakeReadMethods, businessUsageConditions)
+	addMenu(PermissionReworkIntakeCreate, "rework-intakes", "rework-intake-actions", "返工回厂动作", "create-rework-intake", "从已出货明细登记返工回厂", permissionControlButton, "显示并允许创建", permissionMethods("operational_fact", "list_rework_intake_source_candidates", "create_rework_intake"), businessUsageConditions)
+	addMenu(PermissionReworkIntakeReceive, "rework-intakes", "rework-intake-actions", "返工回厂动作", "receive-rework-intake", "确认返工件回厂并进入待返工库存", permissionControlButton, "显示并允许办理", permissionMethods("operational_fact", "receive_rework_intake"), businessUsageConditions)
+	addMenu(PermissionReworkIntakeCancel, "rework-intakes", "rework-intake-actions", "返工回厂动作", "cancel-rework-intake", "取消尚未收货的返工回厂登记", permissionControlButton, "显示并允许办理", permissionMethods("operational_fact", "cancel_rework_intake"), businessUsageConditions)
+	addMenu(PermissionReworkIntakeReverse, "rework-intakes", "rework-intake-actions", "返工回厂动作", "reverse-rework-intake", "在尚未进入生产返工前冲正回厂入库", permissionControlButton, "显示并允许办理", permissionMethods("operational_fact", "reverse_rework_intake"), businessUsageConditions)
 
 	// Quality.
 	qualityInspectionReadMethods := append(
@@ -509,7 +505,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionPackagingMaterialConfirm, "production-orders", "production-wip", "工序办理", "confirm-packaging-material", "确认包材版面与包装版本", permissionControlButton, "显示并允许业务确认", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
 	addMenu(PermissionProductionCompletionCreate, "production-orders", "production-order-actions", "生产动作", "create-production-completion", "登记完工入库", permissionControlButton, "显示并允许登记", permissionMethods("operational_fact", "create_production_completion_from_order"), businessUsageConditions)
 	addMenu(PermissionProductionMaterialIssueCreate, "production-orders", "production-order-actions", "生产动作", "create-production-material-issue", "登记生产领料", permissionControlButton, "显示并允许登记", permissionMethods("operational_fact", "create_production_material_issue_from_order"), businessUsageConditions)
-	addMenu(PermissionProductionReworkCreate, "production-progress", "production-fact-actions", "生产记录动作", "create-production-rework", "发起返工", permissionControlButton, "显示并允许发起", permissionMethods("operational_fact", "create_production_rework_from_completion"), businessUsageConditions)
+	addMenu(PermissionProductionReworkCreate, "production-progress", "production-fact-actions", "生产记录动作", "create-production-rework", "发起返工", permissionControlButton, "显示并允许发起", permissionMethods("operational_fact", "create_production_rework_from_completion", "create_production_rework_from_intake"), businessUsageConditions)
 	addMenu(PermissionProductionFactPost, "production-progress", "production-fact-actions", "生产记录动作", "post-production-fact", "确认生产记录", permissionControlButton, "显示并允许确认", append(permissionMethods("operational_fact", "post_production_fact", "reverse_production_exception"), permissionMethods("customer_config", "execute_production_exception_process")...), businessUsageConditions)
 	addMenu(PermissionProductionFactCancel, "production-progress", "production-fact-actions", "生产记录动作", "cancel-production-fact", "取消生产记录", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_production_fact"), businessUsageConditions)
 	addMenu(PermissionPMCRiskRead, "production-exceptions", "production-risks", "生产异常处置", "production-risk-list", "查看生产异常处置申请", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions"), businessUsageConditions)

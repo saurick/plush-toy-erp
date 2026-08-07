@@ -190,10 +190,10 @@ export const MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES = Object.freeze(
       listKey: "shipments",
     },
     {
-      key: "salesReturns",
+      key: "reworkIntakes",
       domain: "operational_fact",
-      method: "list_sales_returns",
-      listKey: "sales_returns",
+      method: "list_rework_intakes",
+      listKey: "rework_intakes",
     },
     {
       key: "financeFacts",

@@ -6,7 +6,7 @@ const PURCHASE_RECEIPT_PATH = '/erp/warehouse/inbound'
 const QUALITY_INSPECTION_PATH = '/erp/production/quality-inspections'
 const SHIPMENT_PATH = '/erp/warehouse/shipments'
 const FINANCE_PAYMENT_PATH = '/erp/finance/payments'
-const SALES_RETURN_PATH = '/erp/sales/customer-returns'
+const REWORK_INTAKE_PATH = '/erp/sales/rework-intakes'
 const PRODUCTION_EXCEPTION_PATH = '/erp/production/exceptions'
 
 const SALES_ORDER_STATUSES = [
@@ -225,21 +225,31 @@ function createFinancePaymentRows() {
   )
 }
 
-function createSalesReturnRows() {
-  return ['DRAFT', 'APPROVED', 'RECEIVED', 'REVERSED', 'CANCELLED'].map(
+function createReworkIntakeRows() {
+  return ['DRAFT', 'RECEIVED', 'REVERSED', 'CANCELLED'].map(
     (status, index) => ({
       id: 1_601 + index,
-      return_no: `RMA-ACTION-${status}`,
-      shipment_id: 1,
-      shipment_no: 'SHIP-STYLE-L1',
+      intake_no: `HCF-ACTION-${status}`,
+      original_shipment_id: 1,
+      original_shipment_no: 'SHIP-STYLE-L1',
       customer_name: '稳定动作客户',
       status,
-      reason: `动作稳定性 ${status}`,
+      progress_stage:
+        status === 'DRAFT'
+          ? 'WAITING_RECEIVE'
+          : status === 'RECEIVED'
+            ? 'WAITING_REWORK'
+            : status,
+      reason: `返工回厂动作稳定性 ${status}`,
       version: index + 1,
-      items: [],
-      approved_at: ['APPROVED', 'RECEIVED', 'REVERSED'].includes(status)
-        ? 1_784_000_000
-        : null,
+      items: [
+        {
+          id: 1_651 + index,
+          quantity: '2',
+          active_rework_quantity: '0',
+          completion_candidates: [],
+        },
+      ],
       received_at: ['RECEIVED', 'REVERSED'].includes(status)
         ? 1_784_000_100
         : null,
@@ -275,7 +285,7 @@ async function installActionStabilityRpcRows(
     includeQuality = false,
     includeShipments = false,
     includeFinance = false,
-    includeSalesReturns = false,
+    includeReworkIntakes = false,
     includeProductionExceptions = false,
     delaySalesSubmit = false,
   } = {}
@@ -285,7 +295,7 @@ async function installActionStabilityRpcRows(
   const qualityInspections = createQualityInspectionRows()
   const shipments = createShipmentRows()
   const financePayments = createFinancePaymentRows()
-  const salesReturns = createSalesReturnRows()
+  const reworkIntakes = createReworkIntakeRows()
   const productionExceptions = createProductionExceptionRows()
 
   if (includeSales) {
@@ -463,7 +473,7 @@ async function installActionStabilityRpcRows(
   if (
     includeShipments ||
     includeFinance ||
-    includeSalesReturns ||
+    includeReworkIntakes ||
     includeProductionExceptions
   ) {
     await page.route('**/rpc/operational_fact', async (route) => {
@@ -485,11 +495,11 @@ async function installActionStabilityRpcRows(
         await fulfillRpc(route, id, rpcPage([], 'credit_notes', params))
         return
       }
-      if (includeSalesReturns && method === 'list_sales_returns') {
+      if (includeReworkIntakes && method === 'list_rework_intakes') {
         await fulfillRpc(
           route,
           id,
-          rpcPage(salesReturns, 'sales_returns', params)
+          rpcPage(reworkIntakes, 'rework_intakes', params)
         )
         return
       }
@@ -1512,81 +1522,71 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
     },
     {
-      name: 'business-action-stability-warehouse-returns-shipments-desktop',
-      path: SALES_RETURN_PATH,
+      name: 'business-action-stability-warehouse-rework-intakes-shipments-desktop',
+      path: REWORK_INTAKE_PATH,
       auth: 'admin',
       ...warehouseIdentity,
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
         await installActionStabilityRpcRows(page, {
           includeSales: false,
-          includeSalesReturns: true,
+          includeReworkIntakes: true,
           includeShipments: true,
         })
       },
       verify: async (page) => {
-        await waitForBusinessPage(page, '客户退货 / RMA')
-        const returnEmpty = await captureDesktopActionLayout(page)
-        for (const key of ['sales-return-receive', 'sales-return-reverse']) {
+        await waitForBusinessPage(page, '返工回厂与补发')
+        const intakeEmpty = await captureDesktopActionLayout(page)
+        for (const key of ['rework-intake-receive', 'rework-intake-reverse']) {
           await assertDesktopActionState(page, assert, key, {
             visible: true,
             disabled: true,
           })
         }
-        for (const key of ['sales-return-approval', 'sales-return-cancel']) {
+        for (const key of [
+          'rework-intake-create-rework',
+          'rework-intake-create-reshipment',
+          'rework-intake-cancel',
+        ]) {
           await assertDesktopActionState(page, assert, key, {
             visible: false,
           })
         }
 
-        await selectBusinessRow(page, 'RMA-ACTION-DRAFT')
+        await selectBusinessRow(page, 'HCF-ACTION-DRAFT')
         assertStableDesktopLayout(
           assert,
-          returnEmpty,
+          intakeEmpty,
           await captureDesktopActionLayout(page),
-          '客户退货 DRAFT'
+          '返工回厂 DRAFT'
         )
-        for (const key of ['sales-return-receive', 'sales-return-reverse']) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
+        await assertDesktopActionState(page, assert, 'rework-intake-receive', {
+          visible: true,
+          disabled: false,
+        })
+        await assertDesktopActionState(page, assert, 'rework-intake-reverse', {
+          visible: true,
+          disabled: true,
+        })
         await screenshot(
           page,
           path,
           outputDir,
-          'business-action-stability-return-draft-desktop.png'
+          'business-action-stability-rework-intake-draft-desktop.png'
         )
 
-        await selectBusinessRow(page, 'RMA-ACTION-APPROVED')
+        await selectBusinessRow(page, 'HCF-ACTION-RECEIVED')
         assertStableDesktopLayout(
           assert,
-          returnEmpty,
+          intakeEmpty,
           await captureDesktopActionLayout(page),
-          '客户退货 APPROVED'
+          '返工回厂 RECEIVED'
         )
-        await assertDesktopActionState(page, assert, 'sales-return-receive', {
-          visible: true,
-          disabled: false,
-        })
-        await assertDesktopActionState(page, assert, 'sales-return-reverse', {
+        await assertDesktopActionState(page, assert, 'rework-intake-receive', {
           visible: true,
           disabled: true,
         })
-
-        await selectBusinessRow(page, 'RMA-ACTION-RECEIVED')
-        assertStableDesktopLayout(
-          assert,
-          returnEmpty,
-          await captureDesktopActionLayout(page),
-          '客户退货 RECEIVED'
-        )
-        await assertDesktopActionState(page, assert, 'sales-return-receive', {
-          visible: true,
-          disabled: true,
-        })
-        await assertDesktopActionState(page, assert, 'sales-return-reverse', {
+        await assertDesktopActionState(page, assert, 'rework-intake-reverse', {
           visible: true,
           disabled: false,
         })
@@ -1594,17 +1594,17 @@ export function createBusinessActionStabilityScenarios(deps) {
           page,
           path,
           outputDir,
-          'business-action-stability-return-received-desktop.png'
+          'business-action-stability-rework-intake-received-desktop.png'
         )
 
-        await selectBusinessRow(page, 'RMA-ACTION-REVERSED')
+        await selectBusinessRow(page, 'HCF-ACTION-REVERSED')
         assertStableDesktopLayout(
           assert,
-          returnEmpty,
+          intakeEmpty,
           await captureDesktopActionLayout(page),
-          '客户退货 REVERSED'
+          '返工回厂 REVERSED'
         )
-        for (const key of ['sales-return-receive', 'sales-return-reverse']) {
+        for (const key of ['rework-intake-receive', 'rework-intake-reverse']) {
           await assertDesktopActionState(page, assert, key, {
             visible: true,
             disabled: true,

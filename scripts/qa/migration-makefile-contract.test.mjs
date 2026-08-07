@@ -139,3 +139,23 @@ test("migration wrapper audits, rehearses, applies one transaction, and reads st
   assert.match(source, /"schema",\s*"diff"/u);
   assert.match(source, /applied_verified/u);
 });
+
+test("migration wrapper ignores passive idle clients and blocks dangerous session states", async () => {
+  const source = await readFile(migrationScriptURL, "utf8");
+  assert.match(source, /plush\.local-migration-clients\/v2/u);
+  assert.match(source, /activity\.xact_start IS NOT NULL/u);
+  assert.match(source, /activity\.backend_xmin IS NOT NULL/u);
+  assert.match(source, /held_lock\.locktype = 'advisory'/u);
+  assert.match(source, /state !== "idle"/u);
+  assert.match(source, /waitEventType !== "Client"/u);
+  assert.match(source, /const blocksMigration = blockerReason !== "none"/u);
+  assert.match(source, /passiveIdleCount/u);
+  assert.match(source, /blockingCount/u);
+  assert.doesNotMatch(source, /^\s+passiveIdle,$/mu);
+  assert.match(source, /enforceDatabaseClientBoundary\(context, "final"\)/u);
+  assert.match(source, /"--lock-timeout",\s*"10s"/u);
+  assert.match(source, /"-c lock_timeout=5s"/u);
+  assert.match(source, /"-c statement_timeout=120s"/u);
+  assert.doesNotMatch(source, /pg_terminate_backend/u);
+  assert.doesNotMatch(source, /DISCONNECT_LOCAL_IDLE_DBGATE/u);
+});

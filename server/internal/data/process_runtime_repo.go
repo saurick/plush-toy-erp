@@ -18,7 +18,6 @@ import (
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/salesorder"
-	"server/internal/data/model/ent/salesreturn"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/workflowtask"
 
@@ -242,19 +241,13 @@ func (r *processRuntimeRepo) lockProcessSourceInTx(
 			}
 			return "", "", err
 		}
+		if row.Purpose != biz.ShipmentPurposeSalesDelivery {
+			return "", "", biz.ErrBadParam
+		}
 		if err := validateProcessShipmentQualityGate(ctx, tx, row.ID); err != nil {
 			return "", "", err
 		}
 		return requiredProcessSourceNo(row.ShipmentNo, row.Status)
-	case in.ProcessKey == biz.ProcessKeySalesReturnApproval && in.BusinessRefType == "sales_return":
-		row, err := tx.SalesReturn.Query().Where(salesreturn.ID(in.BusinessRefID)).Where(lock).Only(ctx)
-		if err != nil {
-			if ent.IsNotFound(err) {
-				return "", "", biz.ErrBadParam
-			}
-			return "", "", err
-		}
-		return requiredProcessSourceNo(row.ReturnNo, row.Status)
 	case in.ProcessKey == biz.ProcessKeyFinancePaymentApproval && in.BusinessRefType == "finance_payment":
 		row, err := tx.FinancePayment.Query().Where(financepayment.ID(in.BusinessRefID)).Where(lock).Only(ctx)
 		if err != nil {
@@ -327,13 +320,6 @@ func processSourceStatusAllowed(in *biz.ProcessInstanceCreate, status string, re
 		return status == biz.PurchaseOrderStatusDraft || (replay && status == biz.PurchaseOrderStatusSubmitted)
 	case in.ProcessKey == biz.ProcessKeyFinishedGoodsDelivery && in.BusinessRefType == "shipment":
 		return status == biz.ShipmentStatusDraft || (replay && status == biz.ShipmentStatusShipped)
-	case in.ProcessKey == biz.ProcessKeySalesReturnApproval && in.BusinessRefType == "sales_return":
-		return status == biz.SalesReturnStatusDraft ||
-			(replay && (status == biz.SalesReturnStatusApproved ||
-				status == biz.SalesReturnStatusReceived ||
-				status == biz.SalesReturnStatusRejected ||
-				status == biz.SalesReturnStatusCancelled ||
-				status == biz.SalesReturnStatusReversed))
 	case in.ProcessKey == biz.ProcessKeyFinancePaymentApproval && in.BusinessRefType == "finance_payment":
 		return status == biz.FinancePaymentStatusDraft ||
 			(replay && (status == biz.FinancePaymentStatusApproved ||
@@ -1035,15 +1021,7 @@ func processRuntimeNodeUsesNonSequentialRouting(node *ent.ProcessNodeInstance) b
 	if node == nil {
 		return true
 	}
-	for _, key := range []string{
-		"branch_policy_key", "fan_out_node_keys", "join_node_key", "join_policy",
-		"join_source_node_keys", "return_to_node_key", "return_outcomes", "return_max_attempts",
-	} {
-		if _, exists := node.PolicySnapshot[key]; exists {
-			return true
-		}
-	}
-	return false
+	return biz.ProcessRuntimePolicyUsesNonSequentialRouting(node.PolicySnapshot)
 }
 
 func getProcessNodeInstanceWithClient(ctx context.Context, client *ent.Client, id int) (*biz.ProcessNodeInstance, error) {

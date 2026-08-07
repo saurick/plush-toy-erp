@@ -1439,9 +1439,6 @@ export function setupJsonRpcMockServer() {
           )
         } else {
           try {
-            const roleKeys = new Set(
-              (mockSuperAdminProfile.roles || []).map((role) => role.role_key)
-            )
             responseBody = {
               jsonrpc: '2.0',
               id,
@@ -1455,10 +1452,13 @@ export function setupJsonRpcMockServer() {
                       ? 0
                       : mockSuperAdminProfile.id,
                   crossRoleRiskAllowed:
-                    params.view_key === 'risk' &&
-                    (mockSuperAdminProfile.is_super_admin === true ||
-                      roleKeys.has('pmc') ||
-                      roleKeys.has('boss')),
+                    mockSuperAdminProfile.is_super_admin === true ||
+                    workflowMockPermissionAllowed(
+                      mockSuperAdminProfile,
+                      mockSuperAdminProfile.effective_session,
+                      'workflow.task.supervise'
+                    ),
+                  includeCounts: method === 'list_role_tasks' && !params.cursor,
                 })
               ),
               error: '',

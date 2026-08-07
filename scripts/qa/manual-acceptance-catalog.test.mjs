@@ -208,7 +208,7 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       products: 20,
       materials: 80,
       "sales-orders": 45,
-      "sales-returns": 4,
+      "rework-intakes": 4,
       "material-bom": 45,
       processes: 30,
       "accessories-purchase": 45,
@@ -433,82 +433,6 @@ test("manual acceptance catalog separates fixed previews from business-filled wo
   assert(colorCard);
   assert.match(colorCard.whatToSee.join("\n"), /线下贴.*不上传图片也能/u);
   assert.doesNotMatch(colorCard.whatToDo.join("\n"), /上传|更换.*图片/u);
-});
-
-test("formal customer checklist keeps all 52 targets and client-facing truth", () => {
-  const checklist = fs.readFileSync(
-    new URL(
-      "../../docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
-      import.meta.url,
-    ),
-    "utf8",
-  );
-  const forbiddenCustomerCopy =
-    /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|\b(?:key|route|system_admin)\b|岗位代码|甲方|\/erp\//i;
-  const targetHeadings = checklist.match(
-    /^### (?:进入|桌面|岗位|预览|打印)-\d{2} /gmu,
-  );
-
-  assert.equal(targetHeadings?.length, 52);
-  assert.doesNotMatch(checklist, forbiddenCustomerCopy);
-  assert.match(checklist, /10 个正式岗位试用账号/u);
-  assert.doesNotMatch(checklist, /13 个(?:不同岗位组合的)?试用账号/u);
-  assert.match(checklist, /54 条来料质检记录/u);
-  assert.match(checklist, /54 条采购入库记录/u);
-  assert.match(checklist, /45 张生产订单/u);
-  assert.match(checklist, /生产订单.*领料草稿.*完工草稿/su);
-  assert.match(checklist, /生产订单.*只有在生产记录中过账后才影响库存/su);
-  assert.match(checklist, /生产进度.*只读|本页不提供新建入口/su);
-  assert.match(checklist, /出库管理.*只读|本页不提供新建入口/su);
-  assert.match(checklist, /模板预览只检查系统提供的固定默认样例/u);
-  assert.match(checklist, /线下贴样/u);
-  assert.match(checklist, /不要求上传图片/u);
-  assert.match(checklist, /销售订单正常提交后生成的审批事项验收/u);
-  assert.match(checklist, /老板账号当前至少 18 条本轮可见事项/u);
-  assert.match(checklist, /有退回权限的岗位另覆盖退回/u);
-  assert.match(checklist, /已处理清单查看已退回的记录/u);
-  assert.match(checklist, /4 条客户退货记录/u);
-  assert.match(checklist, /4 条收付款记录/u);
-  assert.match(checklist, /3 条红冲记录/u);
-  assert.match(checklist, /\| 桌面页面\s+\|\s+31\s+\|/u);
-  assert.match(checklist, /\| 合计\s+\|\s+52\s+\|/u);
-  assert.match(checklist, /完成 52 项并不自动代表正式交付/u);
-  assert.match(checklist, /本轮固定编号识别/u);
-  assert.match(checklist, /名称保持简单易懂/u);
-  assert.match(checklist, /180 条仅用于列表 \/ 办理交互的模拟任务/u);
-  assert.match(
-    checklist,
-    /5 张同批模拟销售订单覆盖流程已启动、待办、阻塞、退回和完成/u,
-  );
-  assert.match(checklist, /模拟展示任务不冒充流程闭环/u);
-  assert.doesNotMatch(checklist, /订单摘要后同意一条/u);
-  assert.doesNotMatch(checklist, /已经同意的历史/u);
-  assert.doesNotMatch(checklist, /完成 48 项/u);
-  assert.doesNotMatch(checklist, /待处理、处理中/u);
-  assert.doesNotMatch(checklist, /待补资料、待提交、退回/u);
-  assert.doesNotMatch(checklist, /工程[\s\S]{0,240}退回一条/u);
-  assert.doesNotMatch(checklist, /名称、单号或备注统一带/u);
-});
-
-test("active trial runbook keeps the exact 52-target and fresh-database evidence boundary", () => {
-  const runbook = fs.readFileSync(
-    new URL(
-      "../../docs/customers/yoyoosun/试用环境执行手册.md",
-      import.meta.url,
-    ),
-    "utf8",
-  );
-
-  assert.match(
-    runbook,
-    /52 项：2 个登录与入口、31 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台/u,
-  );
-  assert.match(runbook, /fresh 空库基线已记录/u);
-  assert.match(runbook, /plush_erp_acceptance_<run-id>_dev/u);
-  assert.match(runbook, /plush_erp_uat_20260716_v5/u);
-  assert.match(runbook, /生产异常[\s\S]*1 条已批准超领申请/u);
-  assert.match(runbook, /出货放行[\s\S]*45 条/u);
-  assert.match(runbook, /出货管理[\s\S]*47 张/u);
 });
 
 test("manual acceptance catalog derives five preview and five fresh-workspace routes", () => {

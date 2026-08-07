@@ -165,3 +165,32 @@ test("backup restore rehearsal report shape stays compatible with release eviden
   assert.match(source, /information_schema\.tables/);
   assert.match(source, /docker rm -f "\$container_name"/);
 });
+
+test("backup restore rehearsal waits for the final postgres process before restore", () => {
+  const source = fs.readFileSync(scriptPath, "utf8");
+
+  assert.match(
+    source,
+    /docker inspect --format '\{\{\.State\.Running\}\}' "\$container_name"/,
+  );
+  assert.match(
+    source,
+    /docker exec "\$container_name" cat \/proc\/1\/comm/,
+  );
+  const finalPostgresGate = source.indexOf(
+    '[[ "$container_running" == "true" && "$pid1_comm" == "postgres" ]]',
+  );
+  const readyGate = source.indexOf(
+    'docker exec "$container_name" pg_isready -U postgres -d "$restore_db"',
+    finalPostgresGate,
+  );
+  const restore = source.indexOf(
+    'docker exec "$container_name" pg_restore',
+    readyGate,
+  );
+  assert(finalPostgresGate >= 0, "final postgres PID 1 gate must be explicit");
+  assert(readyGate > finalPostgresGate, "pg_isready must follow the PID 1 gate");
+  assert(restore > readyGate, "restore must follow the complete readiness gate");
+  assert.match(source, /docker logs --tail 80 "\$container_name"/);
+  assert.match(source, /gsub\(secret, "\[REDACTED\]"\)/);
+});

@@ -38,7 +38,6 @@ func TestWorkflowApprovalClassificationIgnoresSalesRoleAndNames(t *testing.T) {
 
 	for _, capability := range []string{
 		PermissionWorkflowTaskApprove,
-		PermissionSalesReturnApprove,
 		PermissionFinancePaymentApprove,
 		PermissionWarehouseAdjustmentApprove,
 		PermissionProductionExceptionApprove,

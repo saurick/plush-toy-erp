@@ -74,6 +74,28 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     assert.equal(firstRoleTaskPage.result.data.items.length, 20)
     assert.equal(firstRoleTaskPage.result.data.has_more, true)
     assert(firstRoleTaskPage.result.data.next_cursor)
+    assert.equal(firstRoleTaskPage.result.data.counts.todo > 20, true)
+    assert.equal(
+      firstRoleTaskPage.result.data.counts.todo,
+      firstRoleTaskPage.result.data.counts.ready +
+        firstRoleTaskPage.result.data.counts.blocked
+    )
+    assert.equal(
+      firstRoleTaskPage.result.data.counts.history,
+      firstRoleTaskPage.result.data.counts.done +
+        firstRoleTaskPage.result.data.counts.rejected
+    )
+    assert.equal(
+      firstRoleTaskPage.result.data.counts.total,
+      firstRoleTaskPage.result.data.counts.todo +
+        firstRoleTaskPage.result.data.counts.history
+    )
+    assert.equal(
+      firstRoleTaskPage.result.data.counts.overdue <=
+        firstRoleTaskPage.result.data.counts.risk,
+      true
+    )
+    assert.equal(firstRoleTaskPage.result.data.risk_scope, 'supervised')
     assert(
       firstRoleTaskPage.result.data.items.every(
         (task) =>
@@ -92,6 +114,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       secondRoleTaskPage.result.data.server_time,
       firstRoleTaskPage.result.data.server_time
     )
+    assert.equal(secondRoleTaskPage.result.data.counts, undefined)
     const firstPageIDs = new Set(
       firstRoleTaskPage.result.data.items.map((task) => task.id)
     )

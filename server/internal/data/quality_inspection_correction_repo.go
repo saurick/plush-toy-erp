@@ -10,7 +10,6 @@ import (
 	"server/internal/data/model/ent/outsourcingreturndisposition"
 	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/qualityinspection"
-	"server/internal/data/model/ent/salesreturnitem"
 )
 
 var _ biz.QualityInspectionCorrectionRepo = (*inventoryRepo)(nil)
@@ -91,31 +90,6 @@ func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, i
 }
 
 func validateQualityCorrectionDependencies(ctx context.Context, tx *inventoryDBTx, row *ent.QualityInspection) error {
-	if row.SourceType != nil && *row.SourceType == biz.QualityInspectionSourceSalesReturn {
-		if row.SourceID == nil || *row.SourceID <= 0 || row.InventoryLotID == nil {
-			return biz.ErrBadParam
-		}
-		parent, err := tx.client.SalesReturn.Get(ctx, *row.SourceID)
-		if err != nil {
-			return err
-		}
-		if parent.Status != biz.SalesReturnStatusReceived {
-			return biz.ErrBadParam
-		}
-		matched, err := tx.client.SalesReturnItem.Query().
-			Where(
-				salesreturnitem.SalesReturnID(parent.ID),
-				salesreturnitem.LotID(*row.InventoryLotID),
-			).
-			Exist(ctx)
-		if err != nil || !matched {
-			if err != nil {
-				return err
-			}
-			return biz.ErrBadParam
-		}
-		return nil
-	}
 	if row.PurchaseReceiptID != nil {
 		receipt, err := tx.client.PurchaseReceipt.Get(ctx, *row.PurchaseReceiptID)
 		if err != nil {

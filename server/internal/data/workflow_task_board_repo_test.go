@@ -173,7 +173,6 @@ func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *
 	defer mustCloseEntClient(t, client)
 	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
 	genericApprovalCapability := biz.PermissionWorkflowTaskApprove
-	salesReturnApprovalCapability := biz.PermissionSalesReturnApprove
 	financePaymentApprovalCapability := biz.PermissionFinancePaymentApprove
 	warehouseAdjustmentApprovalCapability := biz.PermissionWarehouseAdjustmentApprove
 	productionExceptionApprovalCapability := biz.PermissionProductionExceptionApprove
@@ -187,7 +186,6 @@ func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *
 		status     string
 	}{
 		{code: "APPROVAL-GENERIC", group: "shipment_finance_release", sourceType: "shipment", ownerRole: biz.FinanceRoleKey, capability: &genericApprovalCapability, status: "ready"},
-		{code: "APPROVAL-SALES-RETURN", group: "sales_return_approval", sourceType: "sales-returns", ownerRole: biz.BossRoleKey, capability: &salesReturnApprovalCapability, status: "blocked"},
 		{code: "APPROVAL-FINANCE-PAYMENT", group: "finance_payment_approval", sourceType: "finance-payments", ownerRole: biz.FinanceRoleKey, capability: &financePaymentApprovalCapability, status: "ready"},
 		{code: "APPROVAL-WAREHOUSE-ADJUSTMENT", group: "inventory_adjustment_approval", sourceType: "inventory-adjustments", ownerRole: biz.WarehouseRoleKey, capability: &warehouseAdjustmentApprovalCapability, status: "ready"},
 		{code: "APPROVAL-PRODUCTION-EXCEPTION", group: "production_exception_approval", sourceType: "production-exceptions", ownerRole: biz.ProductionRoleKey, capability: &productionExceptionApprovalCapability, status: "ready"},
@@ -217,7 +215,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *
 	if err != nil {
 		t.Fatalf("get approval board: %v", err)
 	}
-	if board.Total != 5 || board.Counts.Actionable != 4 || board.Counts.Exception != 1 || board.Counts.Finished != 0 {
+	if board.Total != 4 || board.Counts.Actionable != 4 || board.Counts.Exception != 0 || board.Counts.Finished != 0 {
 		t.Fatalf("approval board must contain only capability-backed active approvals, got total=%d counts=%#v", board.Total, board.Counts)
 	}
 }

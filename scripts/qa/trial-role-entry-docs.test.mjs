@@ -47,9 +47,6 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   const webScriptsReadme = read("web/scripts/README.md");
   const serverConfigDoc = read("server/docs/config.md");
   const testStrategyDoc = read("docs/product/自动化测试策略.md");
-  const yoyoosunTrialRunbook = read(
-    "docs/customers/yoyoosun/试用环境执行手册.md",
-  );
   const fastQa = read("scripts/qa/fast.sh");
   const strictQa = read("scripts/qa/strict.sh");
   const trialAccountAuditTest = read("scripts/qa/trial-account-rbac.test.mjs");
@@ -63,9 +60,6 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   const seedCommandSource = read("server/cmd/seed-role-demo-admins/main.go");
   const seedSource = read("server/internal/data/admin_role_demo_seed.go");
   const rbacSource = read("server/internal/biz/rbac.go");
-  const yoyoosunTrialAccountChecklist = read(
-    "docs/customers/yoyoosun/试用账号角色菜单核对清单.md",
-  );
 
   for (const [roleKey, username, permissionKey, mobilePath] of trialRoles) {
     assertIncludes(seedSource, username, "admin role demo seed");
@@ -158,31 +152,6 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     serverConfigDoc,
     "不会生成 `demo_debug`",
     "server config debug demo account boundary",
-  );
-  assertIncludes(
-    yoyoosunTrialAccountChecklist,
-    "账号名和凭据只在受控环境配置与授权交付渠道维护",
-    "yoyoosun trial role demo credential boundary",
-  );
-  assert.doesNotMatch(
-    yoyoosunTrialAccountChecklist,
-    /12345678|adminadmin/u,
-    "customer trial docs must not publish reusable demo or administrator passwords",
-  );
-  assertIncludes(
-    yoyoosunTrialAccountChecklist,
-    "常用：`应收管理`、`应付管理`、`发票管理`；更多：`对账管理`、`收付款核销`和来源核对页",
-    "finance trial navigation priority",
-  );
-  assertIncludes(
-    yoyoosunTrialAccountChecklist,
-    "顶部切换按钮和“我的 → 进入电脑端”均可直达",
-    "mobile to desktop entry guidance",
-  );
-  assert.doesNotMatch(
-    yoyoosunTrialAccountChecklist,
-    /`对账\/结算`|`待付款\/应付提醒`|`应收提醒`|`发票\/开票异常`/u,
-    "customer trial docs must not retain retired finance menu labels",
   );
   assertIncludes(
     trialAccountAudit,
@@ -389,31 +358,6 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "不保存密码、token、Authorization header、raw customer package 或 action 列表，也不证明目标环境发布、真实客户导入或 release evidence 已完成",
     "scripts README trial browser report redaction boundary",
   );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "trialDemoAccountBrowserSmoke.mjs",
-    "yoyoosun trial runbook browser smoke command",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "--preflight-report output/trial-demo-account-browser-smoke/preflight.json",
-    "yoyoosun trial runbook browser preflight command",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "不读密码、不登录、不调用 JSON-RPC、不启动浏览器、不启动 Vite、不读取客户配置脚本、不写数据库",
-    "yoyoosun trial runbook browser preflight no-write boundary",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__",
-    "yoyoosun trial runbook effective session diagnostic",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "不保存 token、Authorization header、config hash、raw id、action 列表或客户包 payload",
-    "yoyoosun trial runbook effective session redaction boundary",
-  );
   for (const [docSource, context] of [
     [webReadme, "web README yoyoosun entry verification boundary"],
     [
@@ -427,49 +371,10 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     assertIncludes(docSource, "verify customer config", context);
     assertIncludes(docSource, "verify customer asset", context);
   }
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "start:yoyoosun -- --print-plan",
-    "yoyoosun trial runbook pnpm pass-through start command",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "preview:yoyoosun -- --print-plan",
-    "yoyoosun trial runbook pnpm pass-through preview command",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "verify customer config",
-    "yoyoosun trial runbook entry verification customer config command",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "verify customer asset",
-    "yoyoosun trial runbook entry verification asset command",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "--silent audit:yoyoosun-entry -- --json",
-    "yoyoosun trial runbook entry audit command",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写数据库，报告也不得写入 `deployments/**/evidence/**`",
-    "yoyoosun trial runbook entry audit no-write boundary",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "上述命令只证明当前前端端口注入了 yoyoosun 静态配置和资产，不证明真实账号登录、后端 active revision、RBAC 投影或发布证据已经通过",
-    "yoyoosun trial runbook entry verification proof boundary",
-  );
   for (const [docSource, context] of [
     [scriptReadme, "scripts README effective session probe entry"],
     [qaReadme, "scripts qa README effective session probe entry"],
     [webReadme, "web README effective session probe command"],
-    [
-      yoyoosunTrialRunbook,
-      "yoyoosun trial runbook effective session probe command",
-    ],
   ]) {
     assertIncludes(
       docSource,
@@ -479,29 +384,9 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     assertIncludes(docSource, "40302 未登录", context);
   }
   assertIncludes(
-    yoyoosunTrialRunbook,
-    "不读取 token、不登录、不发布 / 激活 / 回滚客户配置、不写数据库、不证明 active revision、普通账号菜单投影或后端 RBAC",
-    "yoyoosun trial runbook effective session probe no-write boundary",
-  );
-  assertIncludes(
     webScriptsReadme,
     "验证通过只证明当前前端端口注入了 yoyoosun 静态配置和资产，不证明后端 active revision、真实 RBAC、真实登录或 release evidence 已完成",
     "web scripts README entry verification proof boundary",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "--report output/trial-demo-account-browser-smoke/report.json",
-    "yoyoosun trial runbook browser sanitized report command",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "不证明目标环境发布、真实客户导入、客户签收、备份恢复或 release evidence 已完成",
-    "yoyoosun trial runbook browser report release boundary",
-  );
-  assertIncludes(
-    yoyoosunTrialRunbook,
-    "模拟数据不等于真实 import",
-    "yoyoosun trial runbook simulated data boundary",
   );
   assertIncludes(
     fastQa,

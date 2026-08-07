@@ -12,13 +12,11 @@ import {
 
 const ALL_APPROVAL_CAPABILITIES = Object.freeze([
   'workflow.task.approve',
-  'sales_return.approve',
   'finance.payment.approve',
   'warehouse.adjustment.approve',
   'production.exception.approve',
 ])
 const APPROVAL_CAPABILITIES = Object.freeze([
-  'sales_return.approve',
   'finance.payment.approve',
   'warehouse.adjustment.approve',
   'production.exception.approve',
@@ -34,7 +32,6 @@ test('workflow task action contract exports the complete ordered approval regist
   }
 })
 const PROFILE_BY_CAPABILITY = Object.freeze({
-  'sales_return.approve': 'sales_return_approval',
   'finance.payment.approve': 'finance_payment_approval',
   'warehouse.adjustment.approve': 'inventory_adjustment_approval',
   'production.exception.approve': 'production_exception_approval',
@@ -79,7 +76,6 @@ test('workflow task action contract allows approved quantity only for production
     true
   )
   for (const capability of [
-    'sales_return.approve',
     'finance.payment.approve',
     'warehouse.adjustment.approve',
     'production.exception.execute',

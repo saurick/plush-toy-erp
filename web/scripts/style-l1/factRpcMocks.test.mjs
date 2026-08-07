@@ -738,15 +738,9 @@ test('style-l1 operational fact mock enforces production completion lot intent',
   )
   assert.equal(reread.fact_type, 'FINISHED_GOODS_RECEIPT')
   assert.equal(reread.lot_id, 480)
-  assert.equal(
-    reread.production_wip_batch_id,
-    params.production_wip_batch_id
-  )
+  assert.equal(reread.production_wip_batch_id, params.production_wip_batch_id)
   assert.equal(reread.production_order_id, params.production_order_id)
-  assert.equal(
-    reread.production_order_item_id,
-    params.production_order_item_id
-  )
+  assert.equal(reread.production_order_item_id, params.production_order_item_id)
 
   const replay = await call('create_production_completion_from_order', params)
   assert.equal(replay.result.code, 0)
@@ -1653,6 +1647,19 @@ test('style-l1 workflow role task view mock applies role, view and cursor bounda
   assert.equal(firstTodoPage.result.data.has_more, true)
   assert.equal(typeof firstTodoPage.result.data.next_cursor, 'string')
   assert.equal(firstTodoPage.result.data.server_time, 1_750_000_000)
+  assert.deepEqual(firstTodoPage.result.data.counts, {
+    approval: 0,
+    blocked: 0,
+    done: 1,
+    history: 1,
+    overdue: 0,
+    ready: 2,
+    rejected: 0,
+    risk: 1,
+    todo: 2,
+    total: 3,
+  })
+  assert.equal(firstTodoPage.result.data.risk_scope, 'supervised')
 
   const secondTodoPage = await call('list_role_tasks', {
     view_key: 'todo',
@@ -1670,6 +1677,7 @@ test('style-l1 workflow role task view mock applies role, view and cursor bounda
     secondTodoPage.result.data.server_time,
     firstTodoPage.result.data.server_time
   )
+  assert.equal(secondTodoPage.result.data.counts, undefined)
 
   const riskPage = await call('list_role_tasks', {
     view_key: 'risk',
@@ -1712,10 +1720,11 @@ test('style-l1 workflow role task view mock keeps approval projection capability
           'workflow.task.read',
           approvalCapability,
         ],
-        workflow_visible_owner_role_keys_by_capability: workflowScopes(
-          'boss',
-          ['workflow.task.create', 'workflow.task.read', approvalCapability]
-        ),
+        workflow_visible_owner_role_keys_by_capability: workflowScopes('boss', [
+          'workflow.task.create',
+          'workflow.task.read',
+          approvalCapability,
+        ]),
       },
     },
     {
@@ -1774,6 +1783,14 @@ test('style-l1 workflow role task view mock keeps approval projection capability
     approvalPage.result.data.items.map((task) => task.id),
     [createdApproval.result.data.task.id]
   )
+
+  const mobileApprovalPage = await call('list_role_tasks', {
+    view_key: 'approval',
+    role_key: 'boss',
+    limit: 50,
+  })
+  assert.equal(mobileApprovalPage.result.data.counts.approval, 1)
+  assert.equal(mobileApprovalPage.result.data.counts.todo, 2)
 })
 
 test('style-l1 workflow mock serves the dedicated task board projection', async () => {

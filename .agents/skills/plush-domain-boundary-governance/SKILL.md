@@ -1,6 +1,6 @@
 ---
 name: plush-domain-boundary-governance
-description: 项目业务边界治理（plush-toy-erp）。Use when work may change schema, migration, repo, usecase, API, RBAC, Workflow/Fact, Product Core, customer isolation, or field truth.
+description: 项目业务边界治理（plush-toy-erp）。Use when designing or implementing schema/migration changes, repo/usecase/API/RBAC contracts, Workflow/Fact boundaries, Product Core isolation, or field truth; use operations governance for live migration apply, release, and rollback.
 ---
 
 # Plush 业务边界治理 Domain Boundary Governance

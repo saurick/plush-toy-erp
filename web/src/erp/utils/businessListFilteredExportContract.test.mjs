@@ -64,9 +64,9 @@ const formalBusinessListCases = [
     completeList: /activeConfig\.listAll\(/u,
   },
   {
-    title: '客户退货',
-    path: '../pages/SalesReturnsPage.jsx',
-    completeList: /listAllSalesReturns\(/u,
+    title: '返工回厂与补发',
+    path: '../pages/ReworkIntakesPage.jsx',
+    completeList: /listAllReworkIntakes\(/u,
   },
   {
     title: '生产订单',

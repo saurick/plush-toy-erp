@@ -383,13 +383,6 @@ test("trial account RBAC docs keep preflight and real evidence boundary", () => 
         "utf8",
       ),
     ],
-    [
-      "yoyoosun trial runbook",
-      readFileSync(
-        path.join(repoRoot, "docs/customers/yoyoosun/试用环境执行手册.md"),
-        "utf8",
-      ),
-    ],
   ];
 
   for (const [context, source] of docs) {

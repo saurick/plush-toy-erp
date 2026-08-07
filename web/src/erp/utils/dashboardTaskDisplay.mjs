@@ -11,7 +11,7 @@ const TASK_SOURCE_TITLE_MAP = new Map([
   ...dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.title]),
   ['project-orders', '销售订单'],
   ['sales_order', '销售订单'],
-  ['sales_return', '客户退货'],
+  ['rework_intake', '返工回厂'],
   ['material-bom', '工程资料'],
   ['accessories-purchase', '采购订单'],
   ['purchase_order', '采购订单'],
@@ -60,7 +60,7 @@ const DIRECT_TASK_SOURCE_TARGETS = new Map([
   ['project-orders', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
   ['sales-orders', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
   ['sales_order', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
-  ['sales_return', [V1_ROUTE_PATHS.salesReturns, 'sales_return_id']],
+  ['rework_intake', [V1_ROUTE_PATHS.reworkIntakes, 'rework_intake_id']],
   [
     'accessories-purchase',
     [V1_ROUTE_PATHS.purchaseOrders, 'purchase_order_id'],

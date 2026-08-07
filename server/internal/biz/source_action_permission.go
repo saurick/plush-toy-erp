@@ -67,7 +67,10 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "operational_fact", Method: "create_stock_reservation_from_sales_order", Rules: sourceReadRules(PermissionSalesOrderRead, PermissionSalesOrderItemRead)},
 	{Domain: "operational_fact", Method: "create_receivable_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "operational_fact", Method: "create_invoice_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
-	{Domain: "operational_fact", Method: "create_sales_return", Rules: sourceReadRules(PermissionShipmentRead)},
+	{Domain: "operational_fact", Method: "list_rework_intake_source_candidates", Rules: sourceReadRules(PermissionShipmentRead, PermissionPMCPlanRead)},
+	{Domain: "operational_fact", Method: "create_rework_intake", Rules: sourceReadRules(PermissionShipmentRead, PermissionPMCPlanRead)},
+	{Domain: "operational_fact", Method: "create_production_rework_from_intake", Rules: sourceReadRules(PermissionReworkIntakeRead, PermissionPMCPlanRead)},
+	{Domain: "operational_fact", Method: "create_rework_reshipment", Rules: sourceReadRules(PermissionReworkIntakeRead, PermissionProductionFactRead)},
 	{Domain: "operational_fact", Method: "create_payable_from_purchase_receipt", Rules: sourceReadRules(PermissionPurchaseReceiptRead, PermissionPurchaseReturnRead, PermissionPurchaseReceiptAdjustmentRead)},
 	{Domain: "operational_fact", Method: "create_payable_from_outsourcing_return", Rules: sourceReadRules(PermissionOutsourcingFactRead, PermissionOutsourcingOrderRead, PermissionQualityInspectionRead)},
 	{
@@ -134,9 +137,6 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_quality_decide", Rules: sourceReadRules(PermissionShipmentRead, PermissionQualityInspectionRead)},
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_shipment_ship", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_receivable_lead", Rules: sourceReadRules(PermissionShipmentRead)},
-	{Domain: "customer_config", Method: "start_sales_return_acceptance_process", Rules: sourceReadRules(PermissionSalesReturnRead)},
-	{Domain: "customer_config", Method: "get_sales_return_acceptance_process", Rules: sourceReadRules(PermissionSalesReturnRead)},
-	{Domain: "customer_config", Method: "execute_sales_return_receive", Rules: sourceReadRules(PermissionSalesReturnRead)},
 	{Domain: "customer_config", Method: "start_finance_payment_approval_process", Rules: sourceReadRules(PermissionFinancePaymentRead)},
 	{Domain: "customer_config", Method: "get_finance_payment_approval_process", Rules: sourceReadRules(PermissionFinancePaymentRead)},
 	{

@@ -1,5 +1,4 @@
 import {
-  DEV_CAPABILITY_LEDGER_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
   DEV_DATABASE_MIGRATION_ROUTE,
   DEV_DATA_PREPARATION_ROUTE,
@@ -34,7 +33,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '把项目治理地图可视化成治理维度与口径、任务分流和文档跳转；navigate governance axes without creating a second truth source.',
+      '按这次要做的改动，直接找到第一份依据、同步检查项和容易误判的边界；task-first guidance without creating a second truth source.',
   }),
   Object.freeze({
     key: 'status-flows',
@@ -125,23 +124,6 @@ export const DEV_HUB_ITEMS = Object.freeze([
     ]),
     description:
       '浏览 HTML 原型、PNG 方案图和截图证据；review local prototype assets.',
-  }),
-  Object.freeze({
-    key: 'capability-ledger',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    title: '能力真源 / Capability Sources',
-    group: '产品治理 / Product Governance',
-    route: DEV_CAPABILITY_LEDGER_ROUTE,
-    source: 'docs/product/产品能力进度台账.md',
-    truthSource: '两份正式 Markdown / Two source documents',
-    status: '真源入口 / Source links',
-    guardrails: Object.freeze([
-      '只做导航 / Navigation only',
-      '不复制状态 / No duplicated status',
-      '不进生产构建 / No prod build',
-    ]),
-    description:
-      '先进入全局产品能力台账，再进入当前客户能力、交付与差异矩阵；open the two formal sources without maintaining a second dashboard.',
   }),
   Object.freeze({
     key: 'customer-config',

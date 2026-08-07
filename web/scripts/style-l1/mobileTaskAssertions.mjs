@@ -53,7 +53,7 @@ export function createMobileTaskAssertions(deps) {
     const todoMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(todoMetrics, scenarioName)
     assertMobileTaskCompactCountTags(todoMetrics, {
-      expectedCount: 4,
+      expectedCount: 5,
       scenarioName,
       tabLabel: '待办页',
     })
@@ -68,11 +68,11 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 退出登录不应出现在待办分区: ${JSON.stringify(todoMetrics)}`
     )
     assert(
-      todoMetrics.sectionHeadings.includes('已加载任务分布') &&
+      todoMetrics.sectionHeadings.includes('当前岗位任务状态') &&
         !todoMetrics.sectionHeadings.includes('已加载任务进度') &&
-        !todoMetrics.sectionHeadings.includes('任务提醒') &&
-        !todoMetrics.sectionHeadings.includes('预警'),
-      `${scenarioName} 待办分区应展示已加载任务分布且不混入旧进度/预警/提醒区块: ${JSON.stringify(todoMetrics)}`
+        !todoMetrics.sectionHeadings.includes('超时') &&
+        !todoMetrics.sectionHeadings.includes('跨岗风险'),
+      `${scenarioName} 待办分区应展示岗位任务状态且不混入风险/超时区块: ${JSON.stringify(todoMetrics)}`
     )
     await assertMobileTaskLoadedOverview(page, { scenarioName })
     await assertMobileTaskListToggle(page, {
@@ -88,19 +88,26 @@ export function createMobileTaskAssertions(deps) {
     await page.getByTestId('mobile-role-nav-messages').click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '提醒'
+      const counts = Array.from(
+        document.querySelectorAll('.mobile-role-message-tabs__count')
+      ).map((count) => count.textContent?.trim() || '')
+      return (
+        heading?.textContent?.trim() === '风险' &&
+        counts.length === 2 &&
+        counts.every((count) => /^\d+$/u.test(count))
+      )
     })
     const reminderMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(reminderMetrics, scenarioName)
     assertMobileTaskCompactCountTags(reminderMetrics, {
       expectedCount: 2,
       scenarioName,
-      tabLabel: '提醒页',
+      tabLabel: '风险页',
     })
     assert(
-      reminderMetrics.sectionHeadings.includes('预警') &&
-        !reminderMetrics.sectionHeadings.includes('任务提醒'),
-      `${scenarioName} 提醒分区默认应先显示预警且不把普通提醒压在预警列表后: ${JSON.stringify(reminderMetrics)}`
+      reminderMetrics.sectionHeadings.includes('跨岗风险') &&
+        !reminderMetrics.sectionHeadings.includes('超时'),
+      `${scenarioName} 风险分区默认应先显示当前账号可监督的跨岗风险: ${JSON.stringify(reminderMetrics)}`
     )
     await assertMobileTaskMessageTabsSwitch(page, { scenarioName })
     await assertMobileTaskDarkMessagesReadable(page, { scenarioName })
@@ -108,7 +115,12 @@ export function createMobileTaskAssertions(deps) {
     await page.getByTestId('mobile-role-nav-done').click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '已办'
+      const count = document
+        .querySelector('[data-testid="mobile-role-done-count"]')
+        ?.textContent?.trim()
+      return (
+        heading?.textContent?.trim() === '已办' && /^\d+$/u.test(count || '')
+      )
     })
     const doneMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(doneMetrics, scenarioName)
@@ -120,14 +132,14 @@ export function createMobileTaskAssertions(deps) {
     })
     assert(
       doneMetrics.sectionHeadings.includes('已办任务') &&
-        !doneMetrics.sectionHeadings.includes('已加载任务分布') &&
+        !doneMetrics.sectionHeadings.includes('当前岗位任务状态') &&
         !doneMetrics.sectionHeadings.includes('已加载任务进度'),
-      `${scenarioName} 已办分区应直接展示已办任务且不重复任务分布: ${JSON.stringify(doneMetrics)}`
+      `${scenarioName} 已办分区应直接展示已办任务且不重复岗位状态摘要: ${JSON.stringify(doneMetrics)}`
     )
     assert.equal(
       await page.getByTestId('mobile-loaded-task-overview').count(),
       0,
-      `${scenarioName} 已办分区不应保留待办页的已加载任务分布`
+      `${scenarioName} 已办分区不应保留待办页的岗位状态摘要`
     )
     await assertMobileTaskListToggle(page, {
       scenarioName,
@@ -242,10 +254,19 @@ export function createMobileTaskAssertions(deps) {
         ? window.getComputedStyle(statusHeading)
         : null
       const statusHeadingRect = statusHeading?.getBoundingClientRect()
+      const total = document.querySelector(
+        '[data-testid="mobile-role-total-count"]'
+      )
+      const conservationNote = document.querySelector(
+        '[data-testid="mobile-role-count-conservation-note"]'
+      )
       return {
         exists: Boolean(overview),
         text: overview?.textContent?.replace(/\s+/g, ' ').trim() || '',
         heading: heading?.textContent?.trim() || '',
+        totalText: total?.textContent?.trim() || '',
+        conservationNote:
+          conservationNote?.textContent?.replace(/\s+/g, ' ').trim() || '',
         paragraphCount: overview?.querySelectorAll('p').length || 0,
         focusCardExists: Boolean(
           document.querySelector('[data-testid="mobile-role-focus-card"]')
@@ -266,8 +287,15 @@ export function createMobileTaskAssertions(deps) {
     })
     assert(
       overviewMetrics.exists &&
-        overviewMetrics.heading === '已加载任务分布' &&
-        overviewMetrics.paragraphCount === 0 &&
+        overviewMetrics.heading === '当前岗位任务状态' &&
+        /^\d+$/u.test(overviewMetrics.totalText) &&
+        overviewMetrics.paragraphCount === 1 &&
+        overviewMetrics.conservationNote.includes(
+          '审批、风险、超时为可重叠关注项，不与全部相加。'
+        ) &&
+        overviewMetrics.conservationNote.includes(
+          '跨岗风险包含当前账号可监督的岗位。'
+        ) &&
         !overviewMetrics.text.includes('任务按页加载') &&
         !overviewMetrics.text.includes('不代表岗位全量') &&
         overviewMetrics.statusHeadingText === '状态 / 截止' &&
@@ -281,7 +309,7 @@ export function createMobileTaskAssertions(deps) {
         !overviewMetrics.pageText.includes('已加载任务优先事项') &&
         !overviewMetrics.pageText.includes('当前优先事项') &&
         overviewMetrics.scrollWidth <= overviewMetrics.clientWidth + 1,
-      `${scenarioName} 已加载任务分布、说明删除、列表表头或相邻布局异常: ${JSON.stringify(overviewMetrics)}`
+      `${scenarioName} 岗位任务状态、数量口径说明、列表表头或相邻布局异常: ${JSON.stringify(overviewMetrics)}`
     )
 
     const metrics = await page.evaluate(() =>
@@ -294,9 +322,11 @@ export function createMobileTaskAssertions(deps) {
         const node = document.querySelector(`[data-testid="${testID}"]`)
         const value = node?.querySelector('.mobile-role-metric-button__value')
         const label = node?.querySelector('.mobile-role-metric-button__label')
+        const nodeStyle = node ? window.getComputedStyle(node) : null
         const valueStyle = value ? window.getComputedStyle(value) : null
         const labelStyle = label ? window.getComputedStyle(label) : null
         const rect = node?.getBoundingClientRect()
+        const valueRect = value?.getBoundingClientRect()
         const labelRect = label?.getBoundingClientRect()
         return {
           testID,
@@ -305,6 +335,10 @@ export function createMobileTaskAssertions(deps) {
           ariaPressed: node?.getAttribute('aria-pressed'),
           className: node?.className || '',
           text: node?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          display: nodeStyle?.display || '',
+          flexDirection: nodeStyle?.flexDirection || '',
+          alignItems: nodeStyle?.alignItems || '',
+          justifyContent: nodeStyle?.justifyContent || '',
           valueText: value?.textContent?.trim() || '',
           valueColor: valueStyle?.color || '',
           labelColor: labelStyle?.color || '',
@@ -316,6 +350,10 @@ export function createMobileTaskAssertions(deps) {
           iconCount: label?.querySelectorAll('.anticon').length || 0,
           width: rect?.width || 0,
           height: rect?.height || 0,
+          topWhitespace:
+            rect && valueRect ? valueRect.top - rect.top : Number.NaN,
+          bottomWhitespace:
+            rect && labelRect ? rect.bottom - labelRect.bottom : Number.NaN,
           scrollWidth: node?.scrollWidth || 0,
           clientWidth: node?.clientWidth || 0,
         }
@@ -336,6 +374,17 @@ export function createMobileTaskAssertions(deps) {
         item.scrollWidth <= item.clientWidth + 1,
         `${scenarioName} 分布摘要出现横向溢出: ${JSON.stringify(metrics)}`
       )
+      assert(
+        item.display === 'flex' &&
+          item.flexDirection === 'column' &&
+          item.alignItems === 'center' &&
+          item.justifyContent === 'center' &&
+          Math.abs(item.height - 56) <= 1.5 &&
+          Number.isFinite(item.topWhitespace) &&
+          Number.isFinite(item.bottomWhitespace) &&
+          Math.abs(item.topWhitespace - item.bottomWhitespace) <= 1.5,
+        `${scenarioName} 分布摘要应以 56px 紧凑高度垂直居中并保持上下留白均衡: ${JSON.stringify(metrics)}`
+      )
       assert.equal(
         item.iconCount,
         0,
@@ -350,7 +399,7 @@ export function createMobileTaskAssertions(deps) {
       assert.match(
         item.valueText,
         /^\d+$/u,
-        `${scenarioName} 分布摘要必须显示当前已加载状态计数: ${JSON.stringify(metrics)}`
+        `${scenarioName} 状态摘要必须显示岗位权威计数: ${JSON.stringify(metrics)}`
       )
       assert(
         String(item.className).includes(
@@ -364,6 +413,19 @@ export function createMobileTaskAssertions(deps) {
         `${scenarioName} 进度摘要数字和标签应使用同一语义色: ${JSON.stringify(metrics)}`
       )
     })
+    const valueByTestID = Object.fromEntries(
+      metrics.map((item) => [item.testID, Number(item.valueText)])
+    )
+    const statusTotal =
+      valueByTestID['mobile-role-progress-ready'] +
+      valueByTestID['mobile-role-progress-blocked'] +
+      valueByTestID['mobile-role-progress-rejected'] +
+      valueByTestID['mobile-role-progress-done']
+    assert.equal(
+      statusTotal,
+      Number(overviewMetrics.totalText),
+      `${scenarioName} 岗位状态必须满足全部=待处理+卡住+已退回+完成: ${JSON.stringify({ overviewMetrics, metrics })}`
+    )
   }
 
   async function assertMobileTaskPrimaryFilterNavigation(
@@ -374,7 +436,7 @@ export function createMobileTaskAssertions(deps) {
     const visibleText = await readVisibleMobileTaskListText(page)
     await assertMobileTaskFilterSelected(page, 'mobile-role-filter-risk', {
       scenarioName,
-      label: '风险',
+      label: '跨岗风险',
     })
     assert(
       visibleText.includes('暗色任务验证') &&
@@ -916,6 +978,16 @@ export function createMobileTaskAssertions(deps) {
 
     await noticeTab.waitFor({ state: 'visible', timeout: 10_000 })
     await warningTab.waitFor({ state: 'visible', timeout: 10_000 })
+    const initialMetrics = await readMobileTaskMessageTabMetrics(page)
+    const initialCountByLabel = Object.fromEntries(
+      initialMetrics.tabItems.map((item) => [item.label, Number(item.count)])
+    )
+    assert(
+      Number.isSafeInteger(initialCountByLabel['跨岗风险']) &&
+        Number.isSafeInteger(initialCountByLabel['超时']) &&
+        initialCountByLabel['超时'] <= initialCountByLabel['跨岗风险'],
+      `${scenarioName} 超时必须是跨岗风险子集: ${JSON.stringify(initialMetrics)}`
+    )
     await assertMobileTaskListToggle(page, {
       scenarioName,
       listKey: 'warning',
@@ -928,17 +1000,17 @@ export function createMobileTaskAssertions(deps) {
       const headings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
-      return headings.includes('任务提醒') && !headings.includes('预警')
+      return headings.includes('超时') && !headings.includes('跨岗风险')
     })
 
     const noticeMetrics = await readMobileTaskMessageTabMetrics(page)
     assert(
-      noticeMetrics.activeTab === '提醒',
-      `${scenarioName} 点击提醒后未激活提醒 tab: ${JSON.stringify(noticeMetrics)}`
+      noticeMetrics.activeTab === '超时',
+      `${scenarioName} 点击超时后未激活超时 tab: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.tabsClassName.includes('mobile-role-message-tabs--notice'),
-      `${scenarioName} 提醒 tab 缺少滑动选中态类名: ${JSON.stringify(noticeMetrics)}`
+      `${scenarioName} 超时 tab 缺少滑动选中态类名: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.tabsThumbContent !== 'none' &&
@@ -949,26 +1021,26 @@ export function createMobileTaskAssertions(deps) {
         String(noticeMetrics.activeTabTransitionDuration)
           .split(',')
           .some((part) => Number.parseFloat(part) > 0),
-      `${scenarioName} 提醒 tab 缺少平滑选中态过渡: ${JSON.stringify(noticeMetrics)}`
+      `${scenarioName} 超时 tab 缺少平滑选中态过渡: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.sectionHeadings.length === 1 &&
-        noticeMetrics.sectionHeadings[0] === '任务提醒',
-      `${scenarioName} 提醒 tab 不应继续被预警列表挤到下方: ${JSON.stringify(noticeMetrics)}`
+        noticeMetrics.sectionHeadings[0] === '超时',
+      `${scenarioName} 超时 tab 不应混入跨岗风险列表: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.tabsSticky &&
         noticeMetrics.tabs &&
         noticeMetrics.tabs.width > 280 &&
         noticeMetrics.tabs.scrollWidth <= noticeMetrics.tabs.clientWidth + 1,
-      `${scenarioName} 提醒二级 tab 盒模型异常: ${JSON.stringify(noticeMetrics)}`
+      `${scenarioName} 风险二级 tab 盒模型异常: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.cards.length > 0 &&
         noticeMetrics.cards.every(
           (card) => card.width > 280 && card.scrollWidth <= card.clientWidth + 1
         ),
-      `${scenarioName} 提醒卡片出现横向溢出: ${JSON.stringify(noticeMetrics)}`
+      `${scenarioName} 超时卡片出现横向溢出: ${JSON.stringify(noticeMetrics)}`
     )
     await assertMobileTaskListToggle(page, {
       scenarioName,
@@ -982,15 +1054,15 @@ export function createMobileTaskAssertions(deps) {
       const headings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
-      return headings.includes('预警') && !headings.includes('任务提醒')
+      return headings.includes('跨岗风险') && !headings.includes('超时')
     })
     const warningMetrics = await readMobileTaskMessageTabMetrics(page)
     assert(
-      warningMetrics.activeTab === '预警' &&
+      warningMetrics.activeTab === '跨岗风险' &&
         warningMetrics.tabsClassName.includes(
           'mobile-role-message-tabs--warning'
         ),
-      `${scenarioName} 回到预警 tab 后滑动选中态未恢复: ${JSON.stringify(warningMetrics)}`
+      `${scenarioName} 回到跨岗风险 tab 后滑动选中态未恢复: ${JSON.stringify(warningMetrics)}`
     )
   }
 
@@ -1072,23 +1144,24 @@ export function createMobileTaskAssertions(deps) {
     assert.equal(
       metrics.effectiveTheme,
       'dark',
-      `${scenarioName} 提醒可读性断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
+      `${scenarioName} 风险可读性断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.sections.length === 1 && metrics.sections[0].heading === '预警',
-      `${scenarioName} 提醒页默认应只渲染当前预警区块: ${JSON.stringify(metrics)}`
+      metrics.sections.length === 1 &&
+        metrics.sections[0].heading === '跨岗风险',
+      `${scenarioName} 风险页默认应只渲染当前跨岗风险区块: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.cards.length >= 1,
-      `${scenarioName} 提醒页缺少可验证卡片或空态: ${JSON.stringify(metrics)}`
+      `${scenarioName} 风险页缺少可验证卡片或空态: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.cards.some((card) => card.isWarning),
-      `${scenarioName} 提醒页缺少预警卡片: ${JSON.stringify(metrics)}`
+      `${scenarioName} 风险页缺少风险卡片: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
-      `${scenarioName} 提醒页出现横向溢出: ${JSON.stringify(metrics)}`
+      `${scenarioName} 风险页出现横向溢出: ${JSON.stringify(metrics)}`
     )
 
     metrics.sections.forEach((section) => {
@@ -1106,23 +1179,23 @@ export function createMobileTaskAssertions(deps) {
     metrics.cards.forEach((card) => {
       assert(
         card.rect && card.rect.width > 280 && card.rect.height >= 40,
-        `${scenarioName} 提醒卡片尺寸异常: ${JSON.stringify(card)}`
+        `${scenarioName} 风险卡片尺寸异常: ${JSON.stringify(card)}`
       )
       assert(
         !isLightSurfaceColor(card.backgroundColor),
-        `${scenarioName} 提醒卡片仍是浅色背景: ${JSON.stringify(card)}`
+        `${scenarioName} 风险卡片仍是浅色背景: ${JSON.stringify(card)}`
       )
       assert(
         isDarkNeutralBorderColor(card.borderColor) ||
           isWarningBorderColor(card.borderColor),
-        `${scenarioName} 提醒卡片边框不够清楚: ${JSON.stringify(card)}`
+        `${scenarioName} 风险卡片边框不够清楚: ${JSON.stringify(card)}`
       )
       card.textNodes.forEach((node) => {
         if (!node.text) return
         assertReadableOnBackground(
           node.color,
           card.backgroundColor,
-          `${scenarioName} 提醒卡片文字对比度不足`
+          `${scenarioName} 风险卡片文字对比度不足`
         )
       })
     })
@@ -1676,7 +1749,7 @@ export function createMobileTaskAssertions(deps) {
     await page.getByTestId('mobile-role-nav-messages').click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '提醒'
+      return heading?.textContent?.trim() === '风险'
     })
     await expectText(page, '暗色任务验证')
     await page
@@ -1810,7 +1883,7 @@ export function createMobileTaskAssertions(deps) {
       .click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '提醒'
+      return heading?.textContent?.trim() === '风险'
     })
 
     await gotoScenarioPath(page, '/m/sales/tasks', {
@@ -2351,6 +2424,16 @@ export function createMobileTaskAssertions(deps) {
         activeTab instanceof HTMLElement
           ? window.getComputedStyle(activeTab)
           : null
+      const tabItems = Array.from(
+        document.querySelectorAll('.mobile-role-message-tabs__item')
+      ).map((item) => ({
+        label:
+          item.querySelector('span:first-child')?.textContent?.trim() || '',
+        count:
+          item
+            .querySelector('.mobile-role-message-tabs__count')
+            ?.textContent?.trim() || '',
+      }))
       const cards = Array.from(
         document.querySelectorAll(
           '.mobile-role-message-card, .mobile-role-message-empty'
@@ -2368,6 +2451,7 @@ export function createMobileTaskAssertions(deps) {
 
       return {
         activeTab: activeTab?.textContent?.replace(/\d+/g, '').trim() || '',
+        tabItems,
         tabsClassName: tabs?.className || '',
         sectionHeadings,
         tabsSticky: tabsStyle?.position === 'sticky',
@@ -2505,7 +2589,7 @@ export function createMobileTaskAssertions(deps) {
     )
     assert.deepEqual(
       metrics.filterItems.map((item) => item.label),
-      ['全部', '审批', '风险', '超时'],
+      ['全部', '审批', '跨岗风险', '超时'],
       `${scenarioName} 待办筛选标签应完整显示: ${JSON.stringify(metrics)}`
     )
     metrics.filterItems.forEach((item) => {

@@ -149,7 +149,7 @@ function actionButtonEnabled(
         status === 'PLANNED' && operation.operation_code !== 'FABRIC_PROCESSING'
       )
     case PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION:
-      return status === 'PLANNED'
+      return status === 'PLANNED' && !batch.execution_mode
     case PRODUCTION_WIP_ACTION.CANCEL_BATCH:
       return status === 'PLANNED'
     case PRODUCTION_WIP_ACTION.START_OPERATION:
@@ -217,6 +217,8 @@ async function loadConfirmedOutsourcingSources(options = {}) {
 export default function ProductionRouteExecutionModal({
   open,
   productionOrder,
+  assignmentOnly = false,
+  originReworkFactID = null,
   canAssign = false,
   canExecute = false,
   canRework = false,
@@ -253,8 +255,13 @@ export default function ProductionRouteExecutionModal({
   const orderStatus = String(authoritativeOrder?.status || '')
     .trim()
     .toUpperCase()
+  const batchScopeEnabled = originReworkFactID !== null
+  const scopedReworkFactID = Number(originReworkFactID || 0)
   const canRunAction = useCallback(
     (action) => {
+      if (assignmentOnly && action !== PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) {
+        return false
+      }
       if (
         [
           PRODUCTION_WIP_ACTION.SPLIT_BATCH,
@@ -280,7 +287,7 @@ export default function ProductionRouteExecutionModal({
       }
       return false
     },
-    [canAssign, canConfirmPackaging, canExecute, canRework]
+    [assignmentOnly, canAssign, canConfirmPackaging, canExecute, canRework]
   )
 
   const loadOutsourcingSources = useCallback(
@@ -374,18 +381,30 @@ export default function ProductionRouteExecutionModal({
     // route responses must not cross that boundary.
   }, [actionForm, loadCurrentRoute, open, orderID])
 
+  const displayedBatches = useMemo(() => {
+    const batches = Array.isArray(aggregate?.batches) ? aggregate.batches : []
+    if (!batchScopeEnabled) return batches
+    if (!positiveSafeInteger(scopedReworkFactID)) return []
+    return batches.filter(
+      (batch) => batch.origin_rework_fact_id === scopedReworkFactID
+    )
+  }, [aggregate, batchScopeEnabled, scopedReworkFactID])
+  const scopedBatchMissing = Boolean(
+    aggregate?.initialized && batchScopeEnabled && displayedBatches.length === 0
+  )
+
   useEffect(() => {
-    if (!aggregate?.batches?.length) {
+    if (displayedBatches.length === 0) {
       setSelectedBatchID(null)
       return
     }
-    if (!aggregate.batches.some((batch) => batch.id === selectedBatchID)) {
+    if (!displayedBatches.some((batch) => batch.id === selectedBatchID)) {
       const selectableBatches =
         orderStatus === 'CLOSED'
-          ? aggregate.batches.filter((batch) =>
+          ? displayedBatches.filter((batch) =>
               positiveSafeInteger(batch.origin_rework_fact_id)
             )
-          : aggregate.batches
+          : displayedBatches
       const preferredBatch = [...selectableBatches]
         .reverse()
         .find((batch) =>
@@ -396,24 +415,24 @@ export default function ProductionRouteExecutionModal({
             'WAITING_QUALITY',
             'REJECTED',
           ].includes(batch.status)
-      )
+        )
       setSelectedBatchID(
-        preferredBatch?.id ||
-          selectableBatches.at(-1)?.id ||
-          aggregate.batches.at(-1)?.id ||
-          null
+        preferredBatch?.id || selectableBatches.at(-1)?.id || null
       )
     }
-  }, [aggregate, orderStatus, selectedBatchID])
+  }, [displayedBatches, orderStatus, selectedBatchID])
 
   const selectedBatch = useMemo(
     () =>
-      aggregate?.batches?.find((batch) => batch.id === selectedBatchID) || null,
-    [aggregate, selectedBatchID]
+      displayedBatches.find((batch) => batch.id === selectedBatchID) || null,
+    [displayedBatches, selectedBatchID]
   )
   const currentOperation = useMemo(
     () => currentProductionWipOperation(aggregate, selectedBatch),
     [aggregate, selectedBatch]
+  )
+  const canSplitSelectedBatch = Boolean(
+    !assignmentOnly && currentOperation?.operation_code !== 'FABRIC_PROCESSING'
   )
   const selectedOrderItem = useMemo(
     () => productionWipOrderItem(aggregate, selectedBatch),
@@ -1218,9 +1237,23 @@ export default function ProductionRouteExecutionModal({
   return (
     <BusinessFormModal
       open={open}
-      width="min(1280px, calc(100vw - 48px))"
-      title={orderStatus === 'CLOSED' ? '返工工序办理' : '生产工序办理'}
-      description="按在制批次依次办理布料加工、车缝、手工和包装；完工或回仓后由品质办理质量关口，合格后再转下道。"
+      width={
+        assignmentOnly
+          ? 'min(760px, calc(100vw - 32px))'
+          : 'min(1280px, calc(100vw - 48px))'
+      }
+      title={
+        assignmentOnly
+          ? '安排本厂或外发加工'
+          : orderStatus === 'CLOSED'
+            ? '返工工序办理'
+            : '生产工序办理'
+      }
+      description={
+        assignmentOnly
+          ? '只为当前返工任务关联的在制批次选择生产方式。'
+          : '按在制批次依次办理布料加工、车缝、手工和包装；完工或回仓后由品质办理质量关口，合格后再转下道。'
+      }
       icon={<BranchesOutlined />}
       footer={
         <Button disabled={saving} onClick={onCancel}>
@@ -1232,17 +1265,27 @@ export default function ProductionRouteExecutionModal({
       onCancel={saving ? undefined : onCancel}
       destroyOnHidden
     >
-      <Alert
-        showIcon
-        type="info"
-        message="固定顺序：布料加工 → 车缝 → 手工 → 包装。正常首道布料加工固定按生产明细整单外发，裁片返工按返工批次处理；车缝、手工两道分别独立决定本厂或外发，包装在本厂完成；特别是先车缝、后手工。"
-      />
-      <Alert
-        showIcon
-        type="warning"
-        message="本页只显示质量关口状态；检验判定仍由品质人员到“质量检验”办理。内部流转叫车间移交 / WIP 转移，外发完成返回才叫回仓。"
-        style={{ marginTop: 12 }}
-      />
+      {assignmentOnly ? (
+        <Alert
+          showIcon
+          type="info"
+          message="保存后只更新生产批次的加工安排，不会自动完成当前任务，也不会登记完工、回仓、质检或库存。"
+        />
+      ) : (
+        <>
+          <Alert
+            showIcon
+            type="info"
+            message="固定顺序：布料加工 → 车缝 → 手工 → 包装。正常首道布料加工固定按生产明细整单外发，裁片返工按返工批次处理；车缝、手工两道分别独立决定本厂或外发，包装在本厂完成；特别是先车缝、后手工。"
+          />
+          <Alert
+            showIcon
+            type="warning"
+            message="本页只显示质量关口状态；检验判定仍由品质人员到“质量检验”办理。内部流转叫车间移交 / WIP 转移，外发完成返回才叫回仓。"
+            style={{ marginTop: 12 }}
+          />
+        </>
+      )}
       {orderStatus === 'CLOSED' ? (
         <Alert
           showIcon
@@ -1264,11 +1307,15 @@ export default function ProductionRouteExecutionModal({
               productionOrder?.order_no ||
               '生产订单待核对',
           },
-          {
-            key: 'route',
-            label: '工序路线',
-            children: '标准毛绒生产路线',
-          },
+          ...(!assignmentOnly
+            ? [
+                {
+                  key: 'route',
+                  label: '工序路线',
+                  children: '标准毛绒生产路线',
+                },
+              ]
+            : []),
           {
             key: 'batch',
             label: '当前在制批次',
@@ -1276,11 +1323,17 @@ export default function ProductionRouteExecutionModal({
               ? productionWipBatchLabel(selectedBatch, selectedOrderItem)
               : '尚未选择',
           },
-          {
-            key: 'packaging',
-            label: '包材要求',
-            children: packagingConfirmationText(selectedPackagingConfirmation),
-          },
+          ...(!assignmentOnly
+            ? [
+                {
+                  key: 'packaging',
+                  label: '包材要求',
+                  children: packagingConfirmationText(
+                    selectedPackagingConfirmation
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
 
@@ -1325,36 +1378,66 @@ export default function ProductionRouteExecutionModal({
             </Text>
           ) : null}
         </Empty>
+      ) : scopedBatchMissing ? (
+        <Empty
+          description="未找到与当前返工任务一致的在制批次"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        >
+          <Text type="secondary">
+            请返回任务详情刷新后重试；仍无法办理时，到电脑端生产订单核对返工进度。
+          </Text>
+        </Empty>
       ) : aggregate?.initialized ? (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <section>
-            <Title level={5}>在制批次</Title>
-            <Table
-              size="small"
-              rowKey="id"
-              columns={batchColumns}
-              dataSource={aggregate.batches}
-              pagination={false}
-              scroll={{ x: 800 }}
-              rowSelection={{
-                type: 'radio',
-                selectedRowKeys: selectedBatch ? [selectedBatch.id] : [],
-                onChange: (_, rows) => {
+            <Title level={5}>{assignmentOnly ? '返工批次' : '在制批次'}</Title>
+            {assignmentOnly ? (
+              <Select
+                value={selectedBatch?.id}
+                style={{ width: '100%' }}
+                options={displayedBatches.map((batch) => ({
+                  value: batch.id,
+                  label: productionWipBatchLabel(
+                    batch,
+                    productionWipOrderItem(aggregate, batch)
+                  ),
+                }))}
+                onChange={(batchID) => {
                   setActiveAction('')
                   actionForm.resetFields()
                   actionAttemptRef.current = null
-                  setSelectedBatchID(rows[0]?.id || null)
-                },
-              }}
-              onRow={(batch) => ({
-                onClick: () => {
-                  setActiveAction('')
-                  actionForm.resetFields()
-                  actionAttemptRef.current = null
-                  setSelectedBatchID(batch.id)
-                },
-              })}
-            />
+                  setSelectedBatchID(batchID)
+                }}
+                placeholder="选择当前返工批次"
+              />
+            ) : (
+              <Table
+                size="small"
+                rowKey="id"
+                columns={batchColumns}
+                dataSource={displayedBatches}
+                pagination={false}
+                scroll={{ x: 800 }}
+                rowSelection={{
+                  type: 'radio',
+                  selectedRowKeys: selectedBatch ? [selectedBatch.id] : [],
+                  onChange: (_, rows) => {
+                    setActiveAction('')
+                    actionForm.resetFields()
+                    actionAttemptRef.current = null
+                    setSelectedBatchID(rows[0]?.id || null)
+                  },
+                }}
+                onRow={(batch) => ({
+                  onClick: () => {
+                    setActiveAction('')
+                    actionForm.resetFields()
+                    actionAttemptRef.current = null
+                    setSelectedBatchID(batch.id)
+                  },
+                })}
+              />
+            )}
           </section>
 
           {selectedBatch ? (
@@ -1380,8 +1463,7 @@ export default function ProductionRouteExecutionModal({
                 <Space wrap>
                   {canAssign ? (
                     <>
-                      {currentOperation?.operation_code !==
-                      'FABRIC_PROCESSING' ? (
+                      {canSplitSelectedBatch ? (
                         <Button
                           disabled={
                             saving ||
@@ -1402,49 +1484,53 @@ export default function ProductionRouteExecutionModal({
                           拆分批次
                         </Button>
                       ) : null}
-                      <Button
-                        type="primary"
-                        disabled={
-                          saving ||
-                          !actionButtonEnabled(
-                            PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION,
-                            selectedBatch,
-                            currentOperation,
-                            nextOperation,
-                            selectedPackagingConfirmation,
-                            canAssign,
-                            authoritativeOrder
-                          )
-                        }
-                        onClick={() =>
-                          selectAction(PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION)
-                        }
-                      >
-                        安排加工
-                      </Button>
-                      <Button
-                        danger
-                        disabled={
-                          saving ||
-                          !actionButtonEnabled(
-                            PRODUCTION_WIP_ACTION.CANCEL_BATCH,
-                            selectedBatch,
-                            currentOperation,
-                            nextOperation,
-                            selectedPackagingConfirmation,
-                            canAssign,
-                            authoritativeOrder
-                          )
-                        }
-                        onClick={() =>
-                          selectAction(PRODUCTION_WIP_ACTION.CANCEL_BATCH)
-                        }
-                      >
-                        取消批次
-                      </Button>
+                      {canRunAction(PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) ? (
+                        <Button
+                          type="primary"
+                          disabled={
+                            saving ||
+                            !actionButtonEnabled(
+                              PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION,
+                              selectedBatch,
+                              currentOperation,
+                              nextOperation,
+                              selectedPackagingConfirmation,
+                              canAssign,
+                              authoritativeOrder
+                            )
+                          }
+                          onClick={() =>
+                            selectAction(PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION)
+                          }
+                        >
+                          安排加工
+                        </Button>
+                      ) : null}
+                      {!assignmentOnly ? (
+                        <Button
+                          danger
+                          disabled={
+                            saving ||
+                            !actionButtonEnabled(
+                              PRODUCTION_WIP_ACTION.CANCEL_BATCH,
+                              selectedBatch,
+                              currentOperation,
+                              nextOperation,
+                              selectedPackagingConfirmation,
+                              canAssign,
+                              authoritativeOrder
+                            )
+                          }
+                          onClick={() =>
+                            selectAction(PRODUCTION_WIP_ACTION.CANCEL_BATCH)
+                          }
+                        >
+                          取消批次
+                        </Button>
+                      ) : null}
                     </>
                   ) : null}
-                  {canExecute ? (
+                  {canExecute && !assignmentOnly ? (
                     <>
                       <Button
                         disabled={
@@ -1506,7 +1592,7 @@ export default function ProductionRouteExecutionModal({
                       </Button>
                     </>
                   ) : null}
-                  {canConfirmPackaging ? (
+                  {canConfirmPackaging && !assignmentOnly ? (
                     <Button
                       disabled={
                         saving ||
@@ -1529,7 +1615,7 @@ export default function ProductionRouteExecutionModal({
                       确认包材要求
                     </Button>
                   ) : null}
-                  {canRework ? (
+                  {canRework && !assignmentOnly ? (
                     <Button
                       danger
                       disabled={
@@ -1564,58 +1650,60 @@ export default function ProductionRouteExecutionModal({
                   message="裁片返工按当前返工批次关联一条产品加工合同明细，不重复生成布料发料要求。"
                 />
               ) : null}
-              <Steps
-                direction="vertical"
-                size="small"
-                current={Math.max(
-                  0,
-                  visibleOperations.findIndex(
-                    (operation) => operation.id === currentOperation?.id
-                  )
-                )}
-                items={visibleOperations.map((operation) => {
-                  const operationBatch = productionWipBatchForOperation(
-                    aggregate,
-                    selectedBatch,
-                    operation
-                  )
-                  const allowedModes = [
-                    operation.inhouse_allowed ? '本厂' : '',
-                    operation.outsourcing_allowed ? '外发' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' / ')
-                  return {
-                    key: operation.id,
-                    title: (
-                      <Space wrap>
-                        <span>{productionWipOperationLabel(operation)}</span>
-                        <Tag color="blue">{allowedModes}</Tag>
-                        {operation.required_quality_gates.length > 0 ? (
-                          <Tag color="gold">需品质检验</Tag>
-                        ) : null}
-                        {operation.business_confirmation_code ===
-                        'PACKAGING_MATERIAL' ? (
-                          <Tag color="purple">需业务确认包材</Tag>
-                        ) : null}
-                      </Space>
-                    ),
-                    description: [
-                      `产出：${productionWipOutputLabel(operation)}`,
-                      qualityGateText(aggregate, operation, operationBatch),
-                      `环节状态：${operationBatch ? productionWipStatusMeta(operationBatch.status).label : '尚未到达'}`,
+              {!assignmentOnly ? (
+                <Steps
+                  direction="vertical"
+                  size="small"
+                  current={Math.max(
+                    0,
+                    visibleOperations.findIndex(
+                      (operation) => operation.id === currentOperation?.id
+                    )
+                  )}
+                  items={visibleOperations.map((operation) => {
+                    const operationBatch = productionWipBatchForOperation(
+                      aggregate,
+                      selectedBatch,
+                      operation
+                    )
+                    const allowedModes = [
+                      operation.inhouse_allowed ? '本厂' : '',
+                      operation.outsourcing_allowed ? '外发' : '',
                     ]
                       .filter(Boolean)
-                      .join('；'),
-                    status: operationStepStatus(
-                      operationBatch,
-                      operation,
-                      currentOperation?.id
-                    ),
-                  }
-                })}
-                style={{ marginTop: 16 }}
-              />
+                      .join(' / ')
+                    return {
+                      key: operation.id,
+                      title: (
+                        <Space wrap>
+                          <span>{productionWipOperationLabel(operation)}</span>
+                          <Tag color="blue">{allowedModes}</Tag>
+                          {operation.required_quality_gates.length > 0 ? (
+                            <Tag color="gold">需品质检验</Tag>
+                          ) : null}
+                          {operation.business_confirmation_code ===
+                          'PACKAGING_MATERIAL' ? (
+                            <Tag color="purple">需业务确认包材</Tag>
+                          ) : null}
+                        </Space>
+                      ),
+                      description: [
+                        `产出：${productionWipOutputLabel(operation)}`,
+                        qualityGateText(aggregate, operation, operationBatch),
+                        `环节状态：${operationBatch ? productionWipStatusMeta(operationBatch.status).label : '尚未到达'}`,
+                      ]
+                        .filter(Boolean)
+                        .join('；'),
+                      status: operationStepStatus(
+                        operationBatch,
+                        operation,
+                        currentOperation?.id
+                      ),
+                    }
+                  })}
+                  style={{ marginTop: 16 }}
+                />
+              ) : null}
             </section>
           ) : null}
 

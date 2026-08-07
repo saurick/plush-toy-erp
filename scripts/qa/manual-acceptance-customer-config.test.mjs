@@ -232,54 +232,46 @@ test("help documents both dedicated local and registered 133 backends", async ()
   assert.doesNotMatch(result.usage, /Must be the registered/u);
 });
 
-test("active docs provide a complete local and 133 config-to-dataset chain", async () => {
-  const [qaReadme, runbook] = await Promise.all([
-    readFile(path.resolve("scripts/qa/README.md"), "utf8"),
-    readFile(
-      path.resolve("docs/customers/yoyoosun/试用环境执行手册.md"),
-      "utf8",
-    ),
-  ]);
-  for (const [source, context] of [
-    [qaReadme, "QA README"],
-    [runbook, "trial runbook"],
-  ]) {
-    assert.match(
-      source,
-      /customer-config-runtime-manifest\.mjs[\s\S]{0,240}yoyoosun-runtime-manifest-preview\.json/u,
-      `${context} must generate the preview manifest before apply`,
-    );
-    assert.match(
-      source,
-      /manual-acceptance-customer-config\.mjs[\s\S]{0,400}--target local-dev/u,
-      `${context} must document local customer-config apply`,
-    );
-    assert.match(
-      source,
-      /manual-acceptance-customer-config\.mjs[\s\S]{0,400}--target customer-trial-133/u,
-      `${context} must document 133 customer-config apply`,
-    );
-    assert.match(
-      source,
-      /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133/u,
-      `${context} must document the 133 top-level dataset runner`,
-    );
-    assert.doesNotMatch(
-      source,
-      /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133[\s\S]{0,240}--database-name plush_erp_uat_20260716_v5/u,
-      `${context} must let the registered 133 target policy supply the database identity`,
-    );
-    assert.match(
-      source,
-      /customer-trial-133\/dataset\/apply-report\.json/u,
-      `${context} must bind the canonical 133 dataset receipt`,
-    );
-    assert.match(
-      source,
-      /--resume-report/u,
-      `${context} must document safe same-batch resume`,
-    );
-  }
+test("QA README provides a complete local and 133 config-to-dataset chain", async () => {
+  const qaReadme = await readFile(
+    path.resolve("scripts/qa/README.md"),
+    "utf8",
+  );
+  assert.match(
+    qaReadme,
+    /customer-config-runtime-manifest\.mjs[\s\S]{0,240}yoyoosun-runtime-manifest-preview\.json/u,
+    "QA README must generate the preview manifest before apply",
+  );
+  assert.match(
+    qaReadme,
+    /manual-acceptance-customer-config\.mjs[\s\S]{0,400}--target local-dev/u,
+    "QA README must document local customer-config apply",
+  );
+  assert.match(
+    qaReadme,
+    /manual-acceptance-customer-config\.mjs[\s\S]{0,400}--target customer-trial-133/u,
+    "QA README must document 133 customer-config apply",
+  );
+  assert.match(
+    qaReadme,
+    /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133/u,
+    "QA README must document the 133 top-level dataset runner",
+  );
+  assert.doesNotMatch(
+    qaReadme,
+    /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133[\s\S]{0,240}--database-name plush_erp_uat_20260716_v5/u,
+    "QA README must let the registered 133 target policy supply the database identity",
+  );
+  assert.match(
+    qaReadme,
+    /customer-trial-133\/dataset\/apply-report\.json/u,
+    "QA README must bind the canonical 133 dataset receipt",
+  );
+  assert.match(
+    qaReadme,
+    /--resume-report/u,
+    "QA README must document safe same-batch resume",
+  );
 });
 
 test("builds a stable, explicit trial manifest without mutating preview input", () => {

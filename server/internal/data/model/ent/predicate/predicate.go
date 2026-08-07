@@ -162,6 +162,12 @@ type PurchaseReturnItem func(*sql.Selector)
 // QualityInspection is the predicate function for qualityinspection builders.
 type QualityInspection func(*sql.Selector)
 
+// ReworkIntake is the predicate function for reworkintake builders.
+type ReworkIntake func(*sql.Selector)
+
+// ReworkIntakeItem is the predicate function for reworkintakeitem builders.
+type ReworkIntakeItem func(*sql.Selector)
+
 // Role is the predicate function for role builders.
 type Role func(*sql.Selector)
 
@@ -185,12 +191,6 @@ type SalesOrder func(*sql.Selector)
 
 // SalesOrderItem is the predicate function for salesorderitem builders.
 type SalesOrderItem func(*sql.Selector)
-
-// SalesReturn is the predicate function for salesreturn builders.
-type SalesReturn func(*sql.Selector)
-
-// SalesReturnItem is the predicate function for salesreturnitem builders.
-type SalesReturnItem func(*sql.Selector)
 
 // Shipment is the predicate function for shipment builders.
 type Shipment func(*sql.Selector)

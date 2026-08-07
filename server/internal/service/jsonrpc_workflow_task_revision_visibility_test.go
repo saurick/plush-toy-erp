@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/errcode"
@@ -31,7 +32,35 @@ func (r *recordingWorkflowRevisionJSONRPCRepo) GetWorkflowTaskBoard(_ context.Co
 
 func (r *recordingWorkflowRevisionJSONRPCRepo) ListWorkflowRoleTaskView(_ context.Context, query biz.WorkflowRoleTaskViewQuery) (*biz.WorkflowRoleTaskViewPage, error) {
 	r.roleQuery = query
-	return &biz.WorkflowRoleTaskViewPage{SnapshotAt: query.SnapshotAt}, nil
+	page := &biz.WorkflowRoleTaskViewPage{SnapshotAt: query.SnapshotAt}
+	counts := biz.WorkflowRoleTaskViewCounts{
+		Ready: 8, Blocked: 4, Todo: 12,
+		Done: 2, Rejected: 1, History: 3, Total: 15,
+		Approval: 3, Risk: 4, Overdue: 2,
+	}
+	if query.IncludeCounts {
+		if len(query.ApprovalVisibilityScopes) == 0 {
+			counts.Approval = 0
+		}
+		page.Counts = &counts
+	}
+	viewTotal, _ := counts.ViewTotal(query.ViewKey)
+	for id := viewTotal; id > 0; id-- {
+		if query.BeforeID > 0 && id >= query.BeforeID {
+			continue
+		}
+		status := "ready"
+		if query.ViewKey == biz.WorkflowRoleTaskViewHistory {
+			status = "done"
+		}
+		page.Items = append(page.Items, &biz.WorkflowTask{ID: id, Version: 1, TaskStatusKey: status})
+	}
+	if len(page.Items) > query.Limit {
+		page.Items = page.Items[:query.Limit]
+		page.HasMore = true
+		page.NextID = page.Items[len(page.Items)-1].ID
+	}
+	return page, nil
 }
 
 type workflowTaskRevisionErrorCustomerConfigRepo struct {
@@ -85,6 +114,258 @@ func TestWorkflowTaskQueryVisibilityScopeKeepsRevisionPairsAcrossAllEntryPoints(
 		repo.boardQuery.VisibleOwnerRoleKeys != nil || repo.boardQuery.VisibleAssigneeID != nil ||
 		repo.roleQuery.VisibleAssigneeID != nil {
 		t.Fatal("entry points must pass paired revision scopes, not a flattened active-role union")
+	}
+}
+
+func TestWorkflowMobileRoleTaskFirstPageReturnsAuthoritativeCounts(t *testing.T) {
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionMobileSalesAccess,
+	)
+	repo := &recordingWorkflowRevisionJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.workflow_mobile_counts_test")),
+		adminReader: stubAdminAccountReader{admin: admin},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	params := mustJSONRPCStruct(t, map[string]any{
+		"view_key": biz.WorkflowRoleTaskViewTodo,
+		"role_key": biz.SalesRoleKey,
+		"limit":    float64(20),
+	})
+	_, result, err := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(), "list_role_tasks", "mobile-counts", params,
+	)
+	if err != nil || result == nil || result.Code != errcode.OK.Code {
+		t.Fatalf("first page result=%#v err=%v", result, err)
+	}
+	if !repo.roleQuery.IncludeCounts || len(repo.roleQuery.ApprovalVisibilityScopes) != 0 {
+		t.Fatalf("first page query=%#v", repo.roleQuery)
+	}
+	if repo.roleQuery.SnapshotAt.Nanosecond() != 0 || repo.roleQuery.SnapshotAt.Location() != time.UTC {
+		t.Fatalf("snapshot=%s, want whole UTC second", repo.roleQuery.SnapshotAt)
+	}
+	counts, ok := result.Data.AsMap()["counts"].(map[string]any)
+	if !ok || counts["ready"] != float64(8) || counts["blocked"] != float64(4) ||
+		counts["todo"] != float64(12) || counts["done"] != float64(2) ||
+		counts["rejected"] != float64(1) || counts["history"] != float64(3) ||
+		counts["total"] != float64(15) || counts["approval"] != float64(0) ||
+		counts["risk"] != float64(4) || counts["overdue"] != float64(2) {
+		t.Fatalf("counts=%#v", counts)
+	}
+	if result.Data.AsMap()["risk_scope"] != workflowRoleTaskRiskScopeRole {
+		t.Fatalf("risk_scope=%#v", result.Data.AsMap()["risk_scope"])
+	}
+
+	cursor := encodeWorkflowRoleTaskViewCursor(workflowRoleTaskViewCursor{
+		Method:        "list_role_tasks",
+		ViewKey:       biz.WorkflowRoleTaskViewTodo,
+		RoleKey:       biz.SalesRoleKey,
+		BeforeID:      1,
+		SnapshotUnix:  repo.roleQuery.SnapshotAt.Unix(),
+		ExpectedTotal: 12,
+		SeenTotal:     12,
+		RiskScope:     workflowRoleTaskRiskScopeRole,
+	})
+	cursorParams := mustJSONRPCStruct(t, map[string]any{
+		"view_key": biz.WorkflowRoleTaskViewTodo,
+		"role_key": biz.SalesRoleKey,
+		"limit":    float64(20),
+		"cursor":   cursor,
+	})
+	_, cursorResult, cursorErr := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(), "list_role_tasks", "mobile-counts-cursor", cursorParams,
+	)
+	if cursorErr != nil || cursorResult == nil || cursorResult.Code != errcode.OK.Code {
+		t.Fatalf("cursor result=%#v err=%v", cursorResult, cursorErr)
+	}
+	if repo.roleQuery.IncludeCounts {
+		t.Fatalf("cursor query unexpectedly requested counts: %#v", repo.roleQuery)
+	}
+	if _, exists := cursorResult.Data.AsMap()["counts"]; exists {
+		t.Fatalf("cursor response unexpectedly returned counts: %#v", cursorResult.Data.AsMap())
+	}
+
+	approvalParams := mustJSONRPCStruct(t, map[string]any{
+		"view_key": biz.WorkflowRoleTaskViewApproval,
+		"role_key": biz.SalesRoleKey,
+		"limit":    float64(20),
+	})
+	_, approvalResult, approvalErr := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(), "list_role_tasks", "mobile-counts-approval-denied", approvalParams,
+	)
+	if approvalErr != nil || approvalResult == nil || approvalResult.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("approval result=%#v err=%v", approvalResult, approvalErr)
+	}
+}
+
+func TestWorkflowMobileRoleTaskCountsKeepSupervisorRiskScopeOnTodoPage(t *testing.T) {
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.BossRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskSupervise,
+		biz.PermissionMobileBossAccess,
+	)
+	repo := &recordingWorkflowRevisionJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.workflow_mobile_supervisor_counts_test")),
+		adminReader: stubAdminAccountReader{admin: admin},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	_, result, err := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"list_role_tasks",
+		"mobile-supervisor-counts",
+		mustJSONRPCStruct(t, map[string]any{
+			"view_key": biz.WorkflowRoleTaskViewTodo,
+			"role_key": biz.BossRoleKey,
+			"limit":    float64(20),
+		}),
+	)
+	if err != nil || result == nil || result.Code != errcode.OK.Code {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if !repo.roleQuery.IncludeCounts || !repo.roleQuery.CrossRoleRiskAllowed {
+		t.Fatalf("supervisor count query=%#v", repo.roleQuery)
+	}
+	if result.Data.AsMap()["risk_scope"] != workflowRoleTaskRiskScopeSupervised {
+		t.Fatalf("risk_scope=%#v", result.Data.AsMap()["risk_scope"])
+	}
+}
+
+func TestWorkflowMobileRoleTaskRiskScopeUsesEffectiveSupervisePermission(t *testing.T) {
+	for _, testCase := range []struct {
+		name          string
+		roles         []string
+		permissions   []string
+		superAdmin    bool
+		wantSupervise bool
+	}{
+		{
+			name:        "boss role without permission stays role local",
+			roles:       []string{biz.BossRoleKey},
+			permissions: []string{biz.PermissionWorkflowTaskRead, biz.PermissionMobileBossAccess},
+		},
+		{
+			name:          "ordinary role with permission receives supervised risk",
+			roles:         []string{biz.SalesRoleKey},
+			permissions:   []string{biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskSupervise, biz.PermissionMobileSalesAccess},
+			wantSupervise: true,
+		},
+		{
+			name:          "super admin receives supervised risk",
+			roles:         []string{biz.BossRoleKey},
+			permissions:   []string{biz.PermissionWorkflowTaskRead, biz.PermissionMobileBossAccess},
+			superAdmin:    true,
+			wantSupervise: true,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			admin := workflowJSONRPCAdmin(testCase.roles, testCase.permissions...)
+			admin.IsSuperAdmin = testCase.superAdmin
+			repo := &recordingWorkflowRevisionJSONRPCRepo{}
+			dispatcher := &jsonrpcDispatcher{
+				log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.workflow_mobile_supervise_permission_test")),
+				adminReader: stubAdminAccountReader{admin: admin},
+				workflowUC:  biz.NewWorkflowUsecase(repo),
+			}
+			roleKey := testCase.roles[0]
+			_, result, err := dispatcher.handleWorkflow(
+				workflowJSONRPCAdminContext(),
+				"list_role_tasks",
+				"mobile-supervise-permission",
+				mustJSONRPCStruct(t, map[string]any{
+					"view_key": biz.WorkflowRoleTaskViewTodo,
+					"role_key": roleKey,
+					"limit":    float64(20),
+				}),
+			)
+			if err != nil || result == nil || result.Code != errcode.OK.Code {
+				t.Fatalf("result=%#v err=%v", result, err)
+			}
+			if repo.roleQuery.CrossRoleRiskAllowed != testCase.wantSupervise {
+				t.Fatalf("query=%#v want supervise=%t", repo.roleQuery, testCase.wantSupervise)
+			}
+			wantScope := workflowRoleTaskRiskScopeRole
+			if testCase.wantSupervise {
+				wantScope = workflowRoleTaskRiskScopeSupervised
+			}
+			if result.Data.AsMap()["risk_scope"] != wantScope {
+				t.Fatalf("risk_scope=%#v want=%s", result.Data.AsMap()["risk_scope"], wantScope)
+			}
+		})
+	}
+}
+
+func TestWorkflowMobileRoleTaskCursorBindsMethodRoleViewScopeAndExpectedTotal(t *testing.T) {
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionMobileSalesAccess,
+	)
+	repo := &recordingWorkflowRevisionJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.workflow_mobile_cursor_binding_test")),
+		adminReader: stubAdminAccountReader{admin: admin},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	_, first, err := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"list_role_tasks",
+		"mobile-cursor-first",
+		mustJSONRPCStruct(t, map[string]any{
+			"view_key": biz.WorkflowRoleTaskViewTodo,
+			"role_key": biz.SalesRoleKey,
+			"limit":    float64(5),
+		}),
+	)
+	if err != nil || first == nil || first.Code != errcode.OK.Code {
+		t.Fatalf("first=%#v err=%v", first, err)
+	}
+	cursor, _ := first.Data.AsMap()["next_cursor"].(string)
+	if cursor == "" {
+		t.Fatalf("first page missing cursor: %#v", first.Data.AsMap())
+	}
+	for name, params := range map[string]map[string]any{
+		"different view": {
+			"view_key": biz.WorkflowRoleTaskViewRisk,
+			"role_key": biz.SalesRoleKey,
+			"limit":    float64(20),
+			"cursor":   cursor,
+		},
+		"different role": {
+			"view_key": biz.WorkflowRoleTaskViewTodo,
+			"role_key": biz.WarehouseRoleKey,
+			"limit":    float64(20),
+			"cursor":   cursor,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, result, callErr := dispatcher.handleWorkflow(
+				workflowJSONRPCAdminContext(), "list_role_tasks", name, mustJSONRPCStruct(t, params),
+			)
+			if callErr != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+				t.Fatalf("result=%#v err=%v", result, callErr)
+			}
+		})
+	}
+	tampered := encodeWorkflowRoleTaskViewCursor(workflowRoleTaskViewCursor{
+		Method: "list_role_tasks", ViewKey: biz.WorkflowRoleTaskViewTodo, RoleKey: biz.SalesRoleKey,
+		BeforeID: 8, SnapshotUnix: time.Now().Unix(), ExpectedTotal: 13, SeenTotal: 5,
+		RiskScope: workflowRoleTaskRiskScopeRole,
+	})
+	_, drifted, driftErr := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(), "list_role_tasks", "cursor-drift",
+		mustJSONRPCStruct(t, map[string]any{
+			"view_key": biz.WorkflowRoleTaskViewTodo,
+			"role_key": biz.SalesRoleKey,
+			"limit":    float64(20),
+			"cursor":   tampered,
+		}),
+	)
+	if driftErr != nil || drifted == nil || drifted.Code != errcode.InvalidParam.Code {
+		t.Fatalf("drifted=%#v err=%v", drifted, driftErr)
 	}
 }
 

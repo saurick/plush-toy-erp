@@ -57,7 +57,7 @@ git -C /Users/simon/projects/plush-toy-erp diff --stat
 - 主路径优先：警惕为通过当前页面或当前测试而加入局部 fallback、重复派生、页面私有真源、宽松校验、隐藏兼容分支或后处理补丁。
 - 范围克制：实现如果把一个可验证切片扩张成 schema、RBAC、runtime、docs、deployment 多层大改，要检查是否越界、是否能拆小、是否缺少中间验收。
 - 可回归：功能、页面、文档或部署变化必须能说明验证层级；“测试通过”不能替代业务真源、权限、旧数据、浏览器状态、migration 和文档同步检查。
-- 视觉证据：涉及页面、打印/PDF、布局、焦点、选择、拖拽、插入/删除、hover、disabled、移动端或暗色态时，review 要检查是否有真实浏览器截图调试、DOM / box metrics、目标行/单元格/焦点断言和对应 L1 / Playwright 回归。
+- 视觉证据：涉及页面、打印/PDF、布局、焦点、选择、拖拽、插入/删除、hover、disabled、移动端或暗色态时，review 要检查是否有真实浏览器截图调试、DOM / box metrics、目标行/单元格/焦点断言和对应页面级浏览器回归（Style L1）/ Playwright 回归。
 - 截图证据充足性：review 不要求截图数量越多越好，但要能证明 exact changed / problem state、修复后状态、至少一个相关边界状态，以及目标行/单元格/按钮/焦点、overflow / clipping / adjacent layout 没有错。
 - 噪点判断：抗锯齿、字体渲染、截图压缩或 1px 内 subpixel 差异通常是 rendering noise；真实遮挡、溢出、误高亮、错误焦点、PDF 缺字或业务误导是 product defect，不能用“截图噪点”带过。
 - 可读可维护：代码和文档应简洁直接，命名和结构符合项目现有风格；明显难懂、重复、硬编码客户特例或让后续 AI 容易误判的实现，即使短期可运行，也应列为质量风险。

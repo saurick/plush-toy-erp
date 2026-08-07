@@ -8,3 +8,27 @@
 @import './dev-data-preparation.css';
 @import './dev-database-migration.css';
 @import './product-overrides.css';
+@import './dev-customer-config.css';
+@import './dev-quality-workflow.css';
+@import './dev-product-engineering-workflow.css';
+@import './dev-workbench-density.css';
+
+@media (min-width: 981px) {
+  .erp-dev-workspace-page {
+    column-gap: 12px;
+    padding-inline: 12px;
+  }
+
+  .erp-dev-workspace-page > :not(.erp-dev-workspace-nav) {
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .erp-dev-workspace-nav__routes {
+    padding-inline: 6px;
+  }
+
+  .erp-dev-workspace-nav__secondary {
+    padding-inline: 0;
+  }
+}

@@ -113,6 +113,20 @@ HTTP 路由：
 - `get_shipment`
 - `list_shipments`
 
+返工回厂与补发主路径包括：
+
+- `list_rework_intake_source_candidates`
+- `create_rework_intake`
+- `receive_rework_intake`
+- `cancel_rework_intake`
+- `reverse_rework_intake`
+- `get_rework_intake`
+- `list_rework_intakes`
+- `create_production_rework_from_intake`
+- `create_rework_reshipment`
+
+返工回厂单只能引用已真实出货的销售出货明细，并显式绑定同一销售订单行的原生产订单行。`DRAFT -> RECEIVED` 在同一事务创建 `HOLD` 批次与库存 `IN`；尚未建立有效生产返工时可 `RECEIVED -> REVERSED`，写相反库存流水并停用批次；尚未接收时可 `DRAFT -> CANCELLED`。接收后由 `create_production_rework_from_intake` 接入既有 `REWORK`、WIP、工序质检和完工链，只有已过账的返工完工余额才能建立 `REWORK_RESHIPMENT`。返工补发固定 `finance_release_status=NOT_REQUIRED`，不启动出货财务审批、不生成新应收或发票，但仍必须由 `ship_shipment` 真实扣减返工完工批次库存。
+
 用途：查询可出货销售订单行、创建出货草稿、确认真实出货、取消草稿或已出货单，以及按 ID 精确读取或列表查询出货单。`list_shipment_source_candidates` 与绑定销售订单或订单行的 `create_shipment_with_items` 都要求 `shipment.create + sales_order.read + sales_order_item.read`。`get_shipment` 与 `list_shipments` 均只读且要求 `shipment.read`。公开 `submit_shipment_release` 已退出；正式页面使用 `customer_config.start_finished_goods_delivery_process` 启动 active revision。启动事务重验已有成品质检后直接创建财务 approval，审批通过由绑定领域命令记录 Shipment 财务放行并结束流程；流程不判定质检、不确认出货、不创建应收。只有独立 `ship_shipment` 在门禁为 `APPROVED` 且质检、来源、预留、库存均通过时才写 `SHIPPED` 与库存 `OUT`。
 
 `cancel_shipment` 按原状态分支：`DRAFT -> CANCELLED` 只终止未出库草稿，不写库存；`SHIPPED -> CANCELLED` 才逐行写库存 `REVERSAL`。active `finished_goods_delivery` 流程、未结成品质检、active 出货放行任务或非取消应收 / 发票都会阻断取消；草稿已提交放行时，须先将任务完成或退回。重复取消依真实 `shipped_at` 判断是否曾出库，不会把草稿取消误写成库存冲正。
@@ -158,19 +172,18 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 公开接口从既有单据 / 事实查询候选或派生下游对象时，必须同时通过目标动作权限、精确来源读权限和来源 / 目标模块状态。统一 registry 覆盖 BOM 复制、采购入库 / 退货 / 调整、四类质检来源、生产 / WIP / 委外 / 库存预留、出货、财务与 ProcessRuntime wrapper；未登记的新来源动作、无精确读权请求或不可读 / 不可写模块会在进入来源 repository / write usecase 前 fail closed。条件来源按请求实际绑定项加权；对账先以候选读权收窄可探测范围，再按服务端读回的 authoritative FactType 要求对应应付 / 应收 / 发票读权限，不做宽泛 any-of 授权。registry 同时生成 permission usage；测试会逐项删除来源读权并断言写用例未调用，AST handler guard 还会验证每个注册 action 的真实 handler 分支调用了来源读 guard。
 
-`customer_config` 公开提供七条来源绑定启动入口；前三条使用客户 active revision 的可配置审批责任，后四条使用 Product Core 固定异常流程合同：
+`customer_config` 公开提供六条来源绑定启动入口；前三条使用客户 active revision 的可配置审批责任，后三条使用 Product Core 固定异常流程合同：
 
 | 方法 | 来源与新建状态 | 权限 |
 | --- | --- | --- |
 | `start_sales_order_acceptance_process` | `DRAFT` 销售订单 | `sales_order.submit + sales_order.read` |
 | `start_material_supply_purchase_order_process` | `DRAFT` 采购订单 | `purchase.order.update + purchase.order.read` |
 | `start_finished_goods_delivery_process` | `DRAFT` 出货单 | `shipment.create + shipment.read` |
-| `start_sales_return_acceptance_process` | `DRAFT` 客户退货申请 | `sales_return.create + sales_return.read` |
 | `start_finance_payment_approval_process` | `DRAFT` 收付款申请 | `finance.payment.create` 及来源读权限 |
 | `start_inventory_adjustment_approval_process` | `DRAFT` 人工库存调整 | `warehouse.adjustment.create` 及仓库数据范围 |
 | `start_production_exception_approval_process` | `SUBMITTED` 生产异常决定 | `production.exception.submit` 及来源读权限 |
 
-创建事务锁定真实来源，从来源派生 canonical 单号并复核状态；只有完全匹配的已创建流程可精确重放。销售与采购 start 只激活首个 domain command，页面还必须用同一业务意图调用对应 `execute_*_submit` 才提交 Source Document 并创建审批任务；库存人工调整 start 后同样要显式执行 submit 命令。Shipment 首节点直接是财务 approval。客户退货、收付款和生产异常按已存在的来源状态进入固定 approval 节点。start 成功不等于任一 Fact 已写入；旧 `start_material_supply_process` 和公开无来源 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 均按 unknown method 处理。
+创建事务锁定真实来源，从来源派生 canonical 单号并复核状态；只有完全匹配的已创建流程可精确重放。销售与采购 start 只激活首个 domain command，页面还必须用同一业务意图调用对应 `execute_*_submit` 才提交 Source Document 并创建审批任务；库存人工调整 start 后同样要显式执行 submit 命令。Shipment 首节点直接是财务 approval。收付款和生产异常按已存在的来源状态进入固定 approval 节点。返工回厂不属于审批流程入口，直接使用 `operational_fact` 的受控源单与事实方法。start 成功不等于任一 Fact 已写入；旧 `start_material_supply_process` 和公开无来源 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 均按 unknown method 处理。
 
 事实取消不是通用删除，状态与库存合同如下：
 
@@ -206,9 +219,9 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 三类任务 payload 都携带 `source_task_contract=workflow.source-task/v1`、固定 producer 和来源意图摘要。对应 task group 与任务编号前缀是保留命名空间；公开 `workflow.create_task`、ProcessRuntime 显式 / node-key 回退任务组和客户流程人工 / 审批节点均会拒绝占用。该约束防止普通任务冒充来源任务，不把 payload 变成 Production、Shipment、Inventory、Quality 或 Finance 真源。
 
-`customer_config.start_finished_goods_delivery_process` 是新的出货审批入口。请求绑定正整数 `shipment_id`、stable business ref 和幂等键；服务端只使用 active revision。新建图固定为 `shipment_finance_approval → shipment_finance_release → end`：启动前在来源事务内重验已有成品质检，流程只创建财务 `workflow.task.approve` 并写版本化放行门禁。正式质检、真实出货、库存 OUT、应收、发票与收付款继续由各自领域 API 办理，不能从公开 Shipment API 跳过财务放行。
+`customer_config.start_finished_goods_delivery_process` 是新的出货审批入口。请求绑定正整数 `shipment_id`、stable business ref 和幂等键；服务端只使用 active revision。新建图从 `shipment_finance_approval` 按审批结论分支：同意走 `shipment_finance_release → end`，拒绝走 `shipment_finance_reject → shipment_finance_rejected_end`。启动前在来源事务内重验已有成品质检，流程只创建财务 `workflow.task.approve`；同意分支把版本化放行门禁写为 `APPROVED`，拒绝分支写为 `REJECTED` 并保留原因和流程锚点。正式质检、真实出货、库存 OUT、应收、发票与收付款继续由各自领域 API 办理，不能从公开 Shipment API 跳过财务放行。
 
-财务审批 task 完成后，由自动领域命令写 `finance_release_status=APPROVED` 和流程锚点并结束 ProcessInstance；它不调用 `ship_shipment`，不写库存、应收或发票。`operational_fact.ship_shipment` 在独立出货事务内要求该门禁并重新校验质检、销售来源数量、库存预留和可用量；全部通过后才写 `SHIPPED` 与库存 `OUT`。真实出货 / 取消冲正会把来源业务投影继续推进到 `shipped / cancelled`，生产订单关闭 / 取消和返工事实取消同理推进到 `closed / cancelled`；这些来源投影不改写既有 task status。
+财务审批 task 结算后，由对应自动领域命令写 `finance_release_status=APPROVED / REJECTED` 和流程锚点，再进入各自 end；ProcessInstance `completed` 只表示该审批分支结束，不能单独解释为已放行。两条命令都不调用 `ship_shipment`，不写库存、应收或发票。`operational_fact.ship_shipment` 在独立出货事务内只接受 `APPROVED` 门禁，并重新校验质检、销售来源数量、库存预留和可用量；全部通过后才写 `SHIPPED` 与库存 `OUT`。真实出货 / 取消冲正会把来源业务投影继续推进到 `shipped / cancelled`，生产订单关闭 / 取消和返工事实取消同理推进到 `closed / cancelled`；这些来源投影不改写既有 task status。
 
 存量 `RELEASED` 生产订单与 `POSTED REWORK` 返工事实的缺失任务使用 `server/cmd/backfill-workflow-source-tasks` 受控修复，不属于 JSON-RPC API。命令默认事务 dry-run，apply 要求精确确认数据库名；它不推断历史任务 `done / rejected`，也不扫描或推断 `DRAFT` 出货单曾经提交。具体命令见 [`server/README.md`](../README.md#常用命令)。
 

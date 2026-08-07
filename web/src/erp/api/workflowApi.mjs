@@ -47,6 +47,28 @@ const WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW = Object.freeze({
   risk: new Set(['ready', 'blocked']),
   approval: new Set(['ready', 'blocked']),
 })
+const WORKFLOW_ROLE_TASK_COUNT_KEYS = Object.freeze([
+  'approval',
+  'blocked',
+  'done',
+  'history',
+  'overdue',
+  'ready',
+  'rejected',
+  'risk',
+  'todo',
+  'total',
+])
+const WORKFLOW_ROLE_TASK_RESPONSE_KEYS = Object.freeze([
+  'has_more',
+  'items',
+  'next_cursor',
+  'server_time',
+])
+const WORKFLOW_ROLE_TASK_INITIAL_RESPONSE_KEYS = Object.freeze(
+  [...WORKFLOW_ROLE_TASK_RESPONSE_KEYS, 'counts', 'risk_scope'].sort()
+)
+const WORKFLOW_ROLE_TASK_RISK_SCOPES = new Set(['role', 'supervised'])
 
 function dataOf(result) {
   return result?.data || {}
@@ -105,15 +127,60 @@ function invalidWorkflowRoleTaskResponse() {
   })
 }
 
-function requireWorkflowRoleTaskResponse(result, query) {
+function isWorkflowRoleTaskCountSummary(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  const keys = Object.keys(value).sort()
+  return Boolean(
+    keys.length === WORKFLOW_ROLE_TASK_COUNT_KEYS.length &&
+      keys.every(
+        (key, index) => key === WORKFLOW_ROLE_TASK_COUNT_KEYS[index]
+      ) &&
+      WORKFLOW_ROLE_TASK_COUNT_KEYS.every(
+        (key) => Number.isSafeInteger(value[key]) && value[key] >= 0
+      ) &&
+      value.todo === value.ready + value.blocked &&
+      value.history === value.done + value.rejected &&
+      value.total === value.todo + value.history &&
+      value.overdue <= value.risk
+  )
+}
+
+function workflowRoleTaskViewTotal(counts, viewKey) {
+  if (viewKey === 'todo') return counts.todo
+  if (viewKey === 'history') return counts.history
+  if (viewKey === 'risk') return counts.risk
+  if (viewKey === 'approval') return counts.approval
+  return -1
+}
+
+function requireWorkflowRoleTaskResponse(result, query, method) {
   const response = dataOf(result)
   const allowedStatusKeys =
     WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW[query.view_key]
+  const requiresCounts = method === 'list_role_tasks' && !query.cursor
+  const expectedResponseKeys = requiresCounts
+    ? WORKFLOW_ROLE_TASK_INITIAL_RESPONSE_KEYS
+    : WORKFLOW_ROLE_TASK_RESPONSE_KEYS
+  const responseKeys =
+    response && typeof response === 'object' && !Array.isArray(response)
+      ? Object.keys(response).sort()
+      : []
+  const itemIDs = Array.isArray(response?.items)
+    ? response.items.map((task) => task?.id)
+    : []
+  const expectedTotal = requiresCounts
+    ? workflowRoleTaskViewTotal(response?.counts || {}, query.view_key)
+    : -1
   if (
     !response ||
     typeof response !== 'object' ||
     Array.isArray(response) ||
+    responseKeys.length !== expectedResponseKeys.length ||
+    !responseKeys.every((key, index) => key === expectedResponseKeys[index]) ||
     !Array.isArray(response.items) ||
+    response.items.length > query.limit ||
     typeof response.next_cursor !== 'string' ||
     typeof response.has_more !== 'boolean' ||
     !Number.isSafeInteger(response.server_time) ||
@@ -121,6 +188,17 @@ function requireWorkflowRoleTaskResponse(result, query) {
     (response.has_more && !response.next_cursor) ||
     (response.has_more && response.items.length === 0) ||
     (!response.has_more && response.next_cursor) ||
+    (requiresCounts && !isWorkflowRoleTaskCountSummary(response.counts)) ||
+    (requiresCounts &&
+      !WORKFLOW_ROLE_TASK_RISK_SCOPES.has(response.risk_scope)) ||
+    new Set(itemIDs).size !== itemIDs.length ||
+    (requiresCounts && response.items.length > expectedTotal) ||
+    (requiresCounts &&
+      response.has_more &&
+      response.items.length >= expectedTotal) ||
+    (requiresCounts &&
+      !response.has_more &&
+      response.items.length !== expectedTotal) ||
     response.items.some(
       (task) =>
         !task ||
@@ -339,7 +417,7 @@ export async function getWorkflowTaskProcessContext(taskId, options = {}) {
 async function listWorkflowRoleTaskPage(method, params = {}) {
   const query = requireWorkflowRoleTaskQuery(params)
   const result = await workflowRpc.call(method, query)
-  return requireWorkflowRoleTaskResponse(result, query)
+  return requireWorkflowRoleTaskResponse(result, query, method)
 }
 
 async function listAllWorkflowRoleTaskPages(method, params = {}) {

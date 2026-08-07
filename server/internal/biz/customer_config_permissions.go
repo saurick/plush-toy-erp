@@ -149,11 +149,6 @@ func processDomainCommandRequiredPermission(commandKey string) string {
 		return PermissionFinanceReceivableConfirm
 	case ProcessDomainCommandShipmentShip:
 		return PermissionShipmentShip
-	case ProcessDomainCommandSalesReturnApprove,
-		ProcessDomainCommandSalesReturnReject:
-		return PermissionSalesReturnApprove
-	case ProcessDomainCommandSalesReturnReceive:
-		return PermissionSalesReturnReceive
 	case ProcessDomainCommandFinancePaymentApprove:
 		return PermissionFinancePaymentApprove
 	case ProcessDomainCommandFinancePaymentReject:

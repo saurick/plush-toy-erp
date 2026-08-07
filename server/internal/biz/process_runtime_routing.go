@@ -246,8 +246,6 @@ func automaticProcessDomainCommandPayload(instance *ProcessInstance) (map[string
 		return map[string]any{"purchase_order_id": instance.BusinessRefID}, nil
 	case "shipment":
 		return map[string]any{"shipment_id": instance.BusinessRefID}, nil
-	case "sales_return":
-		return map[string]any{"sales_return_id": instance.BusinessRefID}, nil
 	case "finance_payment":
 		return map[string]any{"finance_payment_id": instance.BusinessRefID}, nil
 	case "inventory_operation":

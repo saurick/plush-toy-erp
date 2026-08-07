@@ -322,6 +322,10 @@ export default function ShipmentsPage() {
     adminProfile,
     'sales_order_item.read'
   )
+  const canViewReworkIntakes = hasActionPermission(
+    adminProfile,
+    'rework_intake.read'
+  )
   const canImportSalesOrderSource =
     canCreate && canViewSalesOrders && canViewSalesOrderItems
   const canViewInventory = hasActionPermission(
@@ -338,6 +342,8 @@ export default function ShipmentsPage() {
   )
   const canOpenSalesOrders =
     canViewSalesOrders && canOpenRelatedPath(V1_ROUTE_PATHS.salesOrders)
+  const canOpenReworkIntakes =
+    canViewReworkIntakes && canOpenRelatedPath(V1_ROUTE_PATHS.reworkIntakes)
   const canOpenInventory =
     canViewInventory && canOpenRelatedPath(V1_ROUTE_PATHS.inventory)
   const canOpenReceivables =
@@ -349,6 +355,7 @@ export default function ShipmentsPage() {
     canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)
   const hasRelatedCapability =
     canOpenSalesOrders ||
+    canOpenReworkIntakes ||
     canOpenInventory ||
     canOpenReceivables ||
     canOpenInvoices ||
@@ -359,16 +366,26 @@ export default function ShipmentsPage() {
     if (canOpenSalesOrders && selectedRow.sales_order_id) {
       items.push({ key: 'sales-order', label: '来源销售订单' })
     }
+    if (
+      canOpenReworkIntakes &&
+      selectedRow.purpose === 'REWORK_RESHIPMENT' &&
+      selectedRow.rework_intake_id
+    ) {
+      items.push({ key: 'rework-intake', label: '来源返工回厂' })
+    }
     if (canOpenInventory) {
       items.push({ key: 'inventory', label: '库存记录' })
     }
-    if (canOpenReceivables) {
+    if (canOpenReceivables && selectedRow.purpose !== 'REWORK_RESHIPMENT') {
       items.push({ key: 'receivables', label: '应收记录' })
     }
-    if (canOpenInvoices) {
+    if (canOpenInvoices && selectedRow.purpose !== 'REWORK_RESHIPMENT') {
       items.push({ key: 'invoices', label: '开票记录' })
     }
-    if (canOpenQualityInspections) {
+    if (
+      canOpenQualityInspections &&
+      selectedRow.purpose !== 'REWORK_RESHIPMENT'
+    ) {
       items.push({ key: 'quality-inspections', label: '出货前检验' })
     }
     return items
@@ -377,6 +394,7 @@ export default function ShipmentsPage() {
     canOpenInvoices,
     canOpenQualityInspections,
     canOpenReceivables,
+    canOpenReworkIntakes,
     canOpenSalesOrders,
     selectedRow,
   ])
@@ -391,6 +409,15 @@ export default function ShipmentsPage() {
             keyword: selectedRow.sales_order_no,
             source: 'shipment',
             fields: ['sales_order_no'],
+          }
+        ),
+        'rework-intake': relatedDocumentRoute(
+          V1_ROUTE_PATHS.reworkIntakes,
+          { rework_intake_id: selectedRow.rework_intake_id },
+          {
+            keyword: selectedRow.shipment_no,
+            source: 'shipment',
+            fields: ['intake_no'],
           }
         ),
         inventory: businessRecordInventoryRouteFor(
@@ -1448,7 +1475,7 @@ export default function ShipmentsPage() {
       <PageHeaderCard
         compact
         title="出货单"
-        description="出货单维护出货信息和明细；草稿先提交财务审批，品质检验仍由质检单独判定，财务放行后仍需确认出货才会记录实际出货并更新库存。"
+        description="销售出货草稿需先完成品质检验与财务放行；返工补发沿用生产返工的质检与完工结果，不产生新的应收、开票或财务放行。两类单据都必须由仓库确认实际出货后才扣减库存。"
         tags={[
           <Tag color="gold" key="release">
             出货放行：财务审批
@@ -1458,6 +1485,9 @@ export default function ShipmentsPage() {
           </Tag>,
           <Tag color="green" key="inventory">
             出库管理：库存出库记录
+          </Tag>,
+          <Tag color="purple" key="rework-reshipment">
+            返工补发：不重复结算
           </Tag>,
         ]}
         stats={[

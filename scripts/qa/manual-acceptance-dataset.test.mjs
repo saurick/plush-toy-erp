@@ -2367,7 +2367,7 @@ test("empty baseline verifier binds runtime and config, proves exact core, and r
       error?.details?.objectKey === "products",
   );
   for (const objectKey of [
-    "salesReturns",
+    "reworkIntakes",
     "financePayments",
     "financeCreditNotes",
   ]) {

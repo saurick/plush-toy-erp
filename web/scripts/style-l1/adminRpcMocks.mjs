@@ -22,7 +22,7 @@ const mockMenuPermissionRequirements = Object.freeze({
   'business-dashboard': ['erp.business_dashboard.read'],
   customers: ['customer.read'],
   'sales-orders': ['sales_order.read'],
-  'sales-returns': ['sales_return.read'],
+  'rework-intakes': ['rework_intake.read'],
   'material-bom': ['bom.read'],
   'production-orders': ['production.wip.read'],
   inventory: ['warehouse.inventory.read'],
@@ -49,7 +49,7 @@ const mockPermissionModuleNames = Object.freeze({
   sales_order: '销售订单',
   workflow: '任务协同',
   warehouse: '仓储',
-  sales_return: '客户退货',
+  rework_intake: '返工回厂',
   finance: '财务',
   production: '生产执行',
   mobile: '手机待办',
@@ -264,9 +264,9 @@ export async function installAdminRpcMocks(
       module: 'sales_order',
     },
     {
-      permission_key: 'sales_return.read',
-      name: '查看客户退货',
-      module: 'sales_return',
+      permission_key: 'rework_intake.read',
+      name: '查看返工回厂单',
+      module: 'rework_intake',
     },
     {
       permission_key: 'bom.read',
@@ -769,7 +769,7 @@ export async function installAdminRpcMocks(
   })
   let activeApprovalSettings = buildApprovalSettingsMock({
     revision:
-      'yoyoosun-customer-package-v7.local-8ab8deaa7b7e9c6f.runtime-v1.a',
+      'yoyoosun-customer-package-v7.local-836368528c0b1c77.runtime-v1.a',
     configHash: 'style-l1-approval-config-hash',
     source: 'active_customer_config',
     items: approvalSettingsMode === 'unconfigured' ? [] : initialApprovalItems,

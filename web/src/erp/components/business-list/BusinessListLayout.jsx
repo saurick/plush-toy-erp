@@ -5,7 +5,6 @@ import {
   DownOutlined,
   MoreOutlined,
   RollbackOutlined,
-  SearchOutlined,
 } from '@ant-design/icons'
 import {
   Button,
@@ -15,7 +14,6 @@ import {
   Dropdown,
   Empty,
   Grid,
-  Input,
   Popconfirm,
   Popover,
   Select,
@@ -25,6 +23,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
+import SharedSearchInput from '@/common/components/SearchInput'
 import {
   DATE_INPUT_DISPLAY_FORMAT,
   DATE_INPUT_VALUE_FORMAT,
@@ -549,20 +548,15 @@ export function SearchInput({
   className = '',
   ...restProps
 }) {
-  const accessibleLabel = restProps['aria-label'] || searchHint || placeholder
-  const title = restProps.title || searchHint || undefined
-
   return (
-    <Input
+    <SharedSearchInput
       allowClear
       className={joinClassNames(
         'erp-business-filter-control erp-business-filter-control--search',
         className
       )}
-      prefix={<SearchOutlined />}
       placeholder={placeholder}
-      aria-label={accessibleLabel}
-      title={title}
+      searchHint={searchHint}
       value={value}
       onChange={onChange}
       onPressEnter={onPressEnter}

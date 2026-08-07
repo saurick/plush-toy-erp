@@ -181,21 +181,6 @@ function purchaseProcessExecutionData() {
 
 const EXCEPTION_PROCESS_TEST_CONTRACTS = Object.freeze([
   {
-    processKey: 'sales_return_acceptance',
-    businessRefType: 'sales_return',
-    idParam: 'sales_return_id',
-    sourceID: 91,
-    startMethod: 'start_sales_return_acceptance_process',
-    getMethod: 'get_sales_return_acceptance_process',
-    executeMethod: 'execute_sales_return_receive',
-    startExport: 'startSalesReturnAcceptanceProcess',
-    getExport: 'getSalesReturnAcceptanceProcess',
-    executeExport: 'executeSalesReturnReceive',
-    startNodeKey: 'sales_return_approval',
-    startNodeType: 'approval',
-    executeNodeKey: 'receive_sales_return',
-  },
-  {
     processKey: 'finance_payment_approval',
     businessRefType: 'finance_payment',
     idParam: 'finance_payment_id',
@@ -648,8 +633,8 @@ test('customerConfigApi: exception process readback and node mismatches fail clo
     return { data }
   })
   await assert.rejects(
-    api.startSalesReturnAcceptanceProcess({
-      sales_return_id: contract.sourceID,
+    api[contract.startExport]({
+      [contract.idParam]: contract.sourceID,
     }),
     /异常业务流程结果无法确认，请刷新后重试/
   )
@@ -660,8 +645,8 @@ test('customerConfigApi: exception process readback and node mismatches fail clo
       source_readback: { id: contract.sourceID, status: 'DRAFT' },
     },
   }))
-  const missing = await missingProcessApi.getSalesReturnAcceptanceProcess({
-    sales_return_id: contract.sourceID,
+  const missing = await missingProcessApi[contract.getExport]({
+    [contract.idParam]: contract.sourceID,
   })
   assert.equal(missing.process_context, null)
 })
@@ -672,7 +657,7 @@ test('customerConfigApi: compensated process recovery uses exact evidence and re
   const candidate = {
     id: 991,
     process_instance_id: 791,
-    node_key: 'sales_return_approval_command',
+    node_key: 'finance_payment_approval_command',
     node_type: 'domain_command',
     status: 'completed',
     version: 7,
@@ -688,7 +673,7 @@ test('customerConfigApi: compensated process recovery uses exact evidence and re
   const downstream = {
     id: 992,
     process_instance_id: 791,
-    node_key: 'receive_sales_return',
+    node_key: 'post_finance_payment',
     node_type: 'domain_command',
     status: 'active',
     version: 2,

@@ -20,6 +20,13 @@ type salesOrderRepoStub struct {
 	savedOrderID   int
 	savedItems     []*SalesOrderItemSaveMutation
 	nextStatus     string
+	processCommand *ProcessDomainCommandInput
+	processResult  *ProcessDomainCommandResult
+	processActorID int
+}
+
+type salesOrderRepoWithoutDurableSubmit struct {
+	SalesOrderRepo
 }
 
 type salesOrderAcceptanceProcessOwnerResolver struct{}
@@ -75,6 +82,20 @@ func (s *salesOrderRepoStub) ListSalesOrders(context.Context, SalesOrderFilter) 
 func (s *salesOrderRepoStub) UpdateSalesOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*SalesOrder, error) {
 	s.nextStatus = lifecycleStatus
 	return &SalesOrder{ID: id, LifecycleStatus: lifecycleStatus}, nil
+}
+
+func (s *salesOrderRepoStub) SubmitSalesOrderForProcessCommand(
+	_ context.Context,
+	salesOrderID int,
+	command *ProcessDomainCommandInput,
+	result *ProcessDomainCommandResult,
+	actorID int,
+) (*SalesOrder, error) {
+	s.processCommand = command
+	s.processResult = result
+	s.processActorID = actorID
+	s.nextStatus = SalesOrderStatusSubmitted
+	return &SalesOrder{ID: salesOrderID, LifecycleStatus: SalesOrderStatusSubmitted}, nil
 }
 
 func (s *salesOrderRepoStub) AddSalesOrderItem(_ context.Context, in *SalesOrderItemMutation) (*SalesOrderItem, error) {
@@ -288,11 +309,42 @@ func TestSalesOrderProcessDomainCommandSubmitBindsUsecase(t *testing.T) {
 	if salesOrderRepo.nextStatus != SalesOrderStatusSubmitted {
 		t.Fatalf("expected sales order submitted, got %s", salesOrderRepo.nextStatus)
 	}
+	if salesOrderRepo.processCommand == nil || salesOrderRepo.processResult == nil || salesOrderRepo.processActorID != 7 {
+		t.Fatalf("expected durable submit contract, command=%#v result=%#v actor=%d", salesOrderRepo.processCommand, salesOrderRepo.processResult, salesOrderRepo.processActorID)
+	}
 	if node == nil || node.Outcome == nil || *node.Outcome != SalesOrderProcessCommandOutcomeSubmitted {
 		t.Fatalf("expected submitted process outcome, got %#v", node)
 	}
 	if processRepo.completedNode == nil || processRepo.completedNode.Outcome != SalesOrderProcessCommandOutcomeSubmitted {
 		t.Fatalf("expected process node completed with sales order outcome, got %#v", processRepo.completedNode)
+	}
+}
+
+func TestSalesOrderProcessDomainCommandSubmitFailsClosedWithoutDurableRepo(t *testing.T) {
+	ctx := context.Background()
+	baseRepo := &salesOrderRepoStub{
+		orders: map[int]*SalesOrder{
+			1001: {ID: 1001, LifecycleStatus: SalesOrderStatusDraft},
+		},
+	}
+	handler := &salesOrderSubmitProcessCommandHandler{uc: NewSalesOrderUsecase(&salesOrderRepoWithoutDurableSubmit{SalesOrderRepo: baseRepo})}
+	_, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
+		ProcessInstance: &ProcessInstance{
+			ID:              10,
+			ProcessKey:      ProcessKeySalesOrderAcceptance,
+			BusinessRefType: salesOrderProcessCommandBusinessRefType,
+			BusinessRefID:   1001,
+		},
+		Node:           &ProcessNodeInstance{ID: 20},
+		CommandKey:     ProcessDomainCommandSalesOrderSubmit,
+		IdempotencyKey: "process:10:node:20:sales-order-submit",
+		Payload:        map[string]any{"sales_order_id": 1001},
+	}, 7)
+	if !errors.Is(err, ErrProcessDomainCommandHandlerNotFound) {
+		t.Fatalf("expected missing durable repo to fail closed, got %v", err)
+	}
+	if baseRepo.nextStatus != "" || baseRepo.processCommand != nil {
+		t.Fatalf("non-durable fallback must not mutate source, repo=%#v", baseRepo)
 	}
 }
 

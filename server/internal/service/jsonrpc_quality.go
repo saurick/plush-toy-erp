@@ -485,8 +485,6 @@ func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检来源与业务记录不一致，请刷新来源后重试"}
 	case errors.Is(err, biz.ErrQualityInspectionSourceState):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源业务记录当前状态不允许发起质检"}
-	case errors.Is(err, biz.ErrQualityInspectionSalesReturnLifecycle):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户退货质检不能单独取消，请从客户退货单执行取消或入库冲正"}
 	case errors.Is(err, biz.ErrProductionWIPInvalidRoute):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产路线或质量关口不完整，请刷新生产订单后核对"}
 	case errors.Is(err, biz.ErrProductionWIPInvalidTransition):

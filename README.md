@@ -9,7 +9,7 @@
 | `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择和生产单端口 `/m/<role>/tasks` 岗位任务端路径，内部目录职责见 [`web/README.md`](web/README.md) |
 | `server/` | Kratos + Ent + Atlas 后端，当前承载管理员账号、鉴权、错误码、工作流协同、领域 usecase、业务看板 `dashboard_stats`、客户配置版本 `customer_config` JSON-RPC 域、采购订单 `purchase_order` JSON-RPC 域、采购入库与采购更正 `purchase` JSON-RPC 域、库存台账只读 `inventory` JSON-RPC 域、质量检验 `quality` JSON-RPC 域、业务事实 `operational_fact` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
-| [`.agents/skills/`](.agents/skills/README.md) | Codex 项目专项 SOP：代码审查、文档、领域边界、页面、打印模板、seed/import、测试和统一 operations；通用提示词与 Git 收口使用全局 skills |
+| [`.agents/skills/`](.agents/skills/README.md) | Codex 项目专项 SOP：代码审查、文档、领域边界、页面、打印模板、seed/import、测试、operations，以及真实共享 Local 时的 writer 协调；复杂 Git 收口仍使用全局 skill |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
 | `config/` | 行业模板、客户配置包、客户配置 catalog / schema 和私有化复制模板落点；`demo` 是最小 smoke fixture，`reference-customer` 是 draft/preview 工程参考，`yoyoosun` 是当前真实客户配置；默认产品前端包不静态打包具体客户配置，后端只接收受控编译后的 revision 并生成 effective session，不代表 SaaS tenant，也不改变 Workflow / Fact 真源，内部目录职责见 [`config/README.md`](config/README.md) |
 | `deployments/` | 客户私有化部署实例资料落点；当前唯一部署真源仍在 `server/deploy/compose/prod`，私有化模板不创建第二套部署主路径 |
@@ -21,7 +21,7 @@
 - 当前后端统一走 `8300`
 - 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库
 - 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单、BOM、产品 / SKU、工序、采购入库、质量检验、库存、委外订单、生产进度、出货、应收、应付、发票、单笔核对、真实收付款、多来源核销和红冲均已有对应 JSON-RPC / RBAC / V1 页面或正式来源入口；余额视图按 ACTIVE `stock_reservations` 返回已预留和可用量，显式 SKU 贯通销售订单行、批次、库存、生产 / 委外、出货与预留，并以产品 + SKU + 仓库 + 单位 + 批次作为精确库存 grain。历史 `product_sku_id=NULL` 不自动回填或与任一 SKU 共池；BOM SKU 粒度、受控导入创建 SKU 和旧库存人工重分类仍待评审；具体目标库是否已 apply 以 `make migrate_status` 为准
-- `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；品质岗位可在启动财务放行前，从 `DRAFT` 出货单按产品 / SKU、仓库、批次送检粒度生成出货前成品检验，一旦发起就必须合格或让步接收后才能启动。`finished_goods_delivery` 启动事务锁定出货单并重验检验集合，随后直接创建 Shipment 财务 approval；审批通过后绑定领域命令只写版本化财务放行门禁并结束流程，不生成仓库放行任务。确认出货仍在独立事务重新核对 `APPROVED` 门禁、质检、来源数量、预留和可用库存，之后才写 `SHIPPED` 与库存 `OUT`。该可选质检侧链不启动 Workflow，也不替代生产完工质检主链；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`
+- `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；品质岗位可在启动财务放行前，从 `DRAFT` 出货单按产品 / SKU、仓库、批次送检粒度生成出货前成品检验，一旦发起就必须合格或让步接收后才能启动。`finished_goods_delivery` 启动事务锁定出货单并重验检验集合，随后直接创建 Shipment 财务 approval；审批同意由绑定领域命令写版本化 `APPROVED` 门禁，审批拒绝由命名领域命令写 `REJECTED` 门禁，两条分支分别结束流程且都不生成仓库放行任务。确认出货仍在独立事务重新核对 `APPROVED` 门禁、质检、来源数量、预留和可用库存，之后才写 `SHIPPED` 与库存 `OUT`。该可选质检侧链不启动 Workflow，也不替代生产完工质检主链；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`
 - 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本；加工环节 / processes 工序主数据只维护工序编号、名称、类别和可委外 / 可内制 / 需质检标记，不生成委外源单、生产任务、质检事实、库存流水或财务事实
 - Product Core 的来源动作已收口到正式源单或事实页：生产订单办理领料 / 完工 / 返工，委外合同办理发料 / 回货 / 质检 / 异常处置，采购入库办理退货 / 调整 / 应付；首次 IQC 拒绝可登记退回供应商 / 供应商补换处置并取消未入库收货，不写库存退货，补换新到货仍需独立来源。已出货来源生成应收 / 发票，真实收付款独立登记并按同往来方同币种分配到多条应收或应付，支持部分核销、冲正和红冲。来源、往来方、物料 / 产品、单位、批次和金额由后端派生，通用事实页不恢复无来源万能新增。yoyoosun 的本地跟踪配置与 133 较早 V5 技术试用必须和当前 HEAD 分开取证；当前财务岗位未获得收付款页面 / 权限，当前后续切片未整体重发，客户 UAT / 签收未完成
 - 生产排程、返工异常提醒和历史出货放行三类来源协同也已收口到真实 producer：生产订单从草稿下达时生成排程任务，返工事实过账时生成 `production_exception` 提醒任务；新出货不再生成历史仓库放行任务，而由正式 Shipment 财务 approval 写版本化门禁。正式生产异常申请另走 `ProductionExceptionDecision → production_exception_approval → production_exception_decision_approval`，老板审批只记录决定或超领额度，报废 / WIP 让步仍须生产显式执行，超领仍由正常领料消费。来源提醒与正式申请 / 审批不能互相冒充；任何 Workflow task done 都不代写生产、库存、质检、出货或财务事实
@@ -153,12 +153,9 @@ pnpm style:l1
 - 自动化测试策略：[docs/product/自动化测试策略.md](docs/product/自动化测试策略.md)
 - 正式产品入口与菜单配置计划：[docs/product/正式产品入口与菜单配置计划.md](docs/product/正式产品入口与菜单配置计划.md)
 - 产品能力进度台账（全局唯一）：[docs/product/产品能力进度台账.md](docs/product/产品能力进度台账.md)
-- 标准样例客户工程参考：[docs/customers/reference-customer/README.md](docs/customers/reference-customer/README.md)
-- 永绅甲方角色职责与业务流转确认表：[docs/customers/yoyoosun/甲方角色职责与业务流转确认表.md](docs/customers/yoyoosun/甲方角色职责与业务流转确认表.md)
-- 永绅角色、权限与协作流程手册：[docs/customers/yoyoosun/角色能力与流程矩阵.md](docs/customers/yoyoosun/角色能力与流程矩阵.md)
-- 永绅 yoyoosun 客户能力、交付与差异矩阵：[docs/customers/yoyoosun/客户交付矩阵.md](docs/customers/yoyoosun/客户交付矩阵.md)
+- 客户实施与资料边界：[docs/product/新增甲方客户实施流程.md](docs/product/新增甲方客户实施流程.md)、[docs/product/客户实例策略.md](docs/product/客户实例策略.md)
 - 状态 / Workflow / Fact 边界：[docs/architecture/状态工作流事实边界.md](docs/architecture/状态工作流事实边界.md)
-- 永绅 yoyoosun 客户资料边界：[docs/customers/yoyoosun/README.md](docs/customers/yoyoosun/README.md)
+- 永绅原件、交付矩阵、角色确认、UAT 与签收资料由受控客户资料仓和完整客户交付包维护，不属于 Product Core 源码包
 - architecture 历史评审归档：[docs/archive/architecture-history/README.md](docs/archive/architecture-history/README.md)
 - 业务与协同流程地图：[docs/workflow/业务与协同流程地图.md](docs/workflow/业务与协同流程地图.md)
 - 通知 / 预警 v1：[docs/workflow/通知预警催办与升级第一版.md](docs/workflow/通知预警催办与升级第一版.md)

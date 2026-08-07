@@ -14,7 +14,6 @@ import { useERPWorkspace } from '../../context/ERPWorkspaceProvider'
 import { listWorkflowRoleTasks } from '../../api/workflowApi.mjs'
 import {
   buildMobileTaskListForRole,
-  buildMobileTaskSummary,
   formatMobileTaskTime,
 } from '../../utils/mobileTaskView.mjs'
 import {
@@ -312,6 +311,10 @@ export default function MobileRoleTasksPage() {
       }),
     [activeMainTabKey, visibleActiveFilterKey]
   )
+  const activeTaskSlot = taskSlots[activeTaskViewKey]
+  const authoritativeCountSummary = activeTaskSlot.count_summary || null
+  const authoritativeTaskCounts = authoritativeCountSummary?.counts || null
+  const riskScope = authoritativeCountSummary?.risk_scope || 'role'
   const historyRestoreItemLimit = resolveMobileRoleTaskRestoreLimit({
     viewKey: activeTaskViewKey,
     loadedCounts: historyLoadedTaskCountsRef.current,
@@ -323,7 +326,8 @@ export default function MobileRoleTasksPage() {
     () =>
       buildMobileTaskListForRole(
         taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].items,
-        activeRoleKey
+        activeRoleKey,
+        { nowMs: taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].server_time * 1000 }
       ),
     [activeRoleKey, taskSlots]
   )
@@ -331,7 +335,11 @@ export default function MobileRoleTasksPage() {
     () =>
       buildMobileTaskListForRole(
         taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY].items,
-        activeRoleKey
+        activeRoleKey,
+        {
+          nowMs:
+            taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY].server_time * 1000,
+        }
       ),
     [activeRoleKey, taskSlots]
   )
@@ -339,7 +347,8 @@ export default function MobileRoleTasksPage() {
     () =>
       buildMobileTaskListForRole(
         taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.RISK].items,
-        activeRoleKey
+        activeRoleKey,
+        { nowMs: taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.RISK].server_time * 1000 }
       ),
     [activeRoleKey, taskSlots]
   )
@@ -347,7 +356,11 @@ export default function MobileRoleTasksPage() {
     () =>
       buildMobileTaskListForRole(
         taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL].items,
-        activeRoleKey
+        activeRoleKey,
+        {
+          nowMs:
+            taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL].server_time * 1000,
+        }
       ),
     [activeRoleKey, taskSlots]
   )
@@ -365,34 +378,21 @@ export default function MobileRoleTasksPage() {
       ),
     [historyTaskViews]
   )
-  const riskTasks = useMemo(
-    () =>
-      riskTaskViews.filter(
-        (task) => !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
-      ),
-    [riskTaskViews]
-  )
-  const approvalTasks = useMemo(
-    () =>
-      approvalTaskViews.filter(
-        (task) =>
-          !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key) &&
-          isWorkflowApprovalTask(task)
-      ),
-    [approvalTaskViews]
-  )
-  const warningTasks = useMemo(
-    () => riskTasks.filter((task) => isTaskAlerted(task)),
-    [riskTasks]
-  )
+  const riskTasks = riskTaskViews
+  const approvalTasks = approvalTaskViews
   const overdueTasks = useMemo(
     () => riskTasks.filter((task) => isTaskOverdue(task)),
     [riskTasks]
   )
-  const noticeTasks = useMemo(() => riskTasks, [riskTasks])
   const taskSummary = useMemo(
-    () => buildMobileTaskSummary([...activeTasks, ...doneTasks]),
-    [activeTasks, doneTasks]
+    () => ({
+      ready: authoritativeTaskCounts?.ready ?? '—',
+      blocked: authoritativeTaskCounts?.blocked ?? '—',
+      rejected: authoritativeTaskCounts?.rejected ?? '—',
+      done: authoritativeTaskCounts?.done ?? '—',
+      total: authoritativeTaskCounts?.total ?? null,
+    }),
+    [authoritativeTaskCounts]
   )
   const activeTaskViewState = useMemo(
     () =>
@@ -416,10 +416,10 @@ export default function MobileRoleTasksPage() {
   const filterSourceTasks = activeTaskViewState.tasks
   const filteredTasks = useMemo(() => {
     if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.APPROVAL) {
-      return filterSourceTasks.filter((task) => isWorkflowApprovalTask(task))
+      return filterSourceTasks
     }
     if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.RISK) {
-      return filterSourceTasks.filter((task) => isTaskRisk(task))
+      return filterSourceTasks
     }
     if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.ALERT) {
       return filterSourceTasks.filter((task) => isTaskAlerted(task))
@@ -454,7 +454,7 @@ export default function MobileRoleTasksPage() {
       {
         key: MOBILE_TASK_FILTER_KEYS.ALL,
         label: '全部',
-        count: activeTasks.length,
+        count: authoritativeTaskCounts?.todo ?? null,
       },
       ...(canViewApprovalInbox
         ? [
@@ -462,27 +462,28 @@ export default function MobileRoleTasksPage() {
               key: MOBILE_TASK_FILTER_KEYS.APPROVAL,
               label: '审批',
               ariaLabel: '待我审批',
-              count: approvalTasks.length,
+              count: authoritativeTaskCounts?.approval ?? null,
             },
           ]
         : []),
       {
         key: MOBILE_TASK_FILTER_KEYS.RISK,
-        label: '风险',
-        count: riskTasks.length,
+        label: riskScope === 'supervised' ? '跨岗风险' : '风险',
+        count: authoritativeTaskCounts?.risk ?? null,
       },
       {
         key: MOBILE_TASK_FILTER_KEYS.OVERDUE,
         label: '超时',
-        count: overdueTasks.length,
+        count: authoritativeTaskCounts?.overdue ?? null,
       },
     ],
     [
-      activeTasks.length,
-      approvalTasks.length,
+      authoritativeTaskCounts?.approval,
+      authoritativeTaskCounts?.overdue,
+      authoritativeTaskCounts?.risk,
+      authoritativeTaskCounts?.todo,
       canViewApprovalInbox,
-      overdueTasks.length,
-      riskTasks.length,
+      riskScope,
     ]
   )
   const { selectedTask } = activeTaskViewState
@@ -721,8 +722,6 @@ export default function MobileRoleTasksPage() {
     )
   }, [canMountCustomerTasks, initialHistoryScopeKey, taskScopeKey])
 
-  const activeTaskSlot = taskSlots[activeTaskViewKey]
-
   useEffect(() => {
     if (
       canMountCustomerTasks &&
@@ -759,11 +758,16 @@ export default function MobileRoleTasksPage() {
 
   const refreshTasksAfterMutation = useCallback(
     async (options = {}) => {
-      const currentState = readMobileRoleTaskScopeState(
+      let currentState = readMobileRoleTaskScopeState(
         taskScopeStateRef.current,
         taskScopeKey
       )
-      const currentSlots = currentState.slots
+      let currentSlots = currentState.slots
+      const activeLoadedCount = currentSlots[activeTaskViewKey].items.length
+      for (const viewKey of Object.values(MOBILE_ROLE_TASK_VIEW_KEYS)) {
+        taskLoadRequestSeqRef.current[viewKey] =
+          (taskLoadRequestSeqRef.current[viewKey] || 0) + 1
+      }
       const canonicalTask =
         options?.canonicalTask &&
         typeof options.canonicalTask === 'object' &&
@@ -791,10 +795,6 @@ export default function MobileRoleTasksPage() {
           [MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL]:
             !terminal && isWorkflowApprovalTask(canonicalTask),
         }
-        for (const viewKey of Object.values(MOBILE_ROLE_TASK_VIEW_KEYS)) {
-          taskLoadRequestSeqRef.current[viewKey] =
-            (taskLoadRequestSeqRef.current[viewKey] || 0) + 1
-        }
         const nextState = reconcileMobileRoleTaskMutation(currentState, {
           scopeKey: taskScopeKey,
           viewKey: activeTaskViewKey,
@@ -806,13 +806,15 @@ export default function MobileRoleTasksPage() {
         taskViewRestoreAppendCountRef.current[activeTaskViewKey] = 0
         taskScopeStateRef.current = nextState
         setTaskScopeState(nextState)
-        return true
+        currentState = nextState
+        currentSlots = nextState.slots
       }
       const restoreTarget = Math.min(
         MOBILE_TASK_RESTORE_ITEM_LIMIT,
         Math.max(
           MOBILE_ROLE_TASK_PAGE_LIMIT,
           historyRestoreItemLimit,
+          activeLoadedCount,
           Number(taskViewRestoreTargetRef.current[activeTaskViewKey] || 0)
         )
       )
@@ -1808,6 +1810,7 @@ export default function MobileRoleTasksPage() {
       activeTasks={activeTasks}
       adminProfile={adminProfile}
       approvalTasks={approvalTasks}
+      authoritativeTaskCounts={authoritativeTaskCounts}
       canViewApprovalInbox={canViewApprovalInbox}
       canEnterDesktop={canEnterDesktop === true}
       doneTasks={doneTasks}
@@ -1824,8 +1827,9 @@ export default function MobileRoleTasksPage() {
       loading={loading}
       loadingMore={loading && activeTaskSlot.items.length > 0}
       loggingOut={loggingOut}
-      noticeTasks={noticeTasks}
+      overdueTasks={overdueTasks}
       riskTasks={riskTasks}
+      riskScope={riskScope}
       roleLabel={roleLabel}
       serverDataTime={serverDataTime}
       scrollContainerRef={scrollContainerRef}
@@ -1840,7 +1844,6 @@ export default function MobileRoleTasksPage() {
       showScrollTopButton={showScrollTopButton}
       taskSummary={taskSummary}
       visibleListLimitsByKey={visibleListLimitsByKey}
-      warningTasks={warningTasks}
     />
   )
 }

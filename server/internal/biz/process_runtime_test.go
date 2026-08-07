@@ -28,8 +28,10 @@ type memProcessRuntimeRepo struct {
 	settleDuringClaim       bool
 	completeNodeFailures    int
 	completeNodeErr         error
+	completeNodeActor       int
 	completeProcessFailures int
 	completeProcessErr      error
+	completeProcessActor    int
 }
 
 type stubProcessOwnerRoleResolver struct {
@@ -68,6 +70,23 @@ type retryWorkflowRepo struct {
 	failureErr        error
 	createCalls       int
 	createdByCode     map[string]*WorkflowTask
+}
+
+type processSettlementWorkflowRepo struct {
+	stubWorkflowRepo
+	candidates []*WorkflowTask
+	listErr    error
+	afterID    int
+	limit      int
+}
+
+func (s *processSettlementWorkflowRepo) ListPendingLinkedWorkflowTaskSettlements(_ context.Context, afterWorkflowTaskID int, limit int) ([]*WorkflowTask, error) {
+	s.afterID = afterWorkflowTaskID
+	s.limit = limit
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
+	return s.candidates, nil
 }
 
 func processTestIntPtr(value int) *int {
@@ -447,6 +466,7 @@ func (r *memProcessRuntimeRepo) memProcessNode(id int) *ProcessNodeInstance {
 
 func (r *memProcessRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceComplete, actorID int) (*ProcessNodeInstance, error) {
 	r.completedNode = in
+	r.completeNodeActor = actorID
 	r.completedNodes = append(r.completedNodes, in)
 	if r.completeNodeFailures > 0 {
 		r.completeNodeFailures--
@@ -502,6 +522,7 @@ func (r *memProcessRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context,
 
 func (r *memProcessRuntimeRepo) CompleteProcessInstance(ctx context.Context, in *ProcessInstanceComplete, actorID int) (*ProcessInstance, error) {
 	r.completedProcess = in
+	r.completeProcessActor = actorID
 	if in == nil || in.ID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -2063,6 +2084,69 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectedPassesReasonToEx
 	}
 }
 
+func TestProcessRuntimeUsecaseStandardApprovalRejectionCompletesTerminalBranch(t *testing.T) {
+	tests := []struct {
+		name           string
+		processKey     string
+		approvalKey    string
+		policyKey      string
+		rejectedEndKey string
+	}{
+		{
+			name: "sales order", processKey: ProcessKeySalesOrderAcceptance,
+			approvalKey: "order_approval", policyKey: ProcessBranchPolicySalesOrderApproval,
+			rejectedEndKey: "sales_order_rejected_end",
+		},
+		{
+			name: "purchase order", processKey: ProcessKeyMaterialSupply,
+			approvalKey: "purchase_order_approval", policyKey: ProcessBranchPolicyPurchaseOrderApproval,
+			rejectedEndKey: "purchase_order_rejected_end",
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			processID := 10
+			approvalNodeID := 20
+			rejectedEndID := 21
+			reason := "审批依据不满足"
+			processRepo := &memProcessRuntimeRepo{
+				process: &ProcessInstance{ID: processID, ProcessKey: testCase.processKey, Status: ProcessStatusActive},
+				nodes: []*ProcessNodeInstance{
+					{
+						ID: approvalNodeID, ProcessInstanceID: processID, NodeKey: testCase.approvalKey,
+						NodeType: ProcessNodeTypeApproval, Attempt: 1, Status: ProcessNodeStatusActive, Version: 1,
+						PolicySnapshot: map[string]any{"branch_policy_key": testCase.policyKey},
+					},
+					{
+						ID: rejectedEndID, ProcessInstanceID: processID, NodeKey: testCase.rejectedEndKey,
+						NodeType: ProcessNodeTypeEnd, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1,
+					},
+				},
+			}
+			workflowRepo := &stubWorkflowRepo{currentTask: &WorkflowTask{
+				ID: 99, TaskStatusKey: "rejected", BlockedReason: &reason,
+				ProcessInstanceID: &processID, ProcessNodeInstanceID: &approvalNodeID,
+			}}
+			uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+			if err := RegisterExceptionApprovalProcessBranchPolicyHandlers(uc); err != nil {
+				t.Fatalf("register branch policies: %v", err)
+			}
+
+			if _, err := uc.CompleteLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCompletion{
+				WorkflowTaskID: 99,
+			}, 7); err != nil {
+				t.Fatalf("settle rejected approval: %v", err)
+			}
+			if processRepo.process.Status != ProcessStatusCompleted || processRepo.blockedProcess != nil {
+				t.Fatalf("rejection must terminate without blocking process=%#v blocked=%#v", processRepo.process, processRepo.blockedProcess)
+			}
+			if processRepo.nodes[1].Status != ProcessNodeStatusCompleted {
+				t.Fatalf("rejected end node=%#v", processRepo.nodes[1])
+			}
+		})
+	}
+}
+
 func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectedRetryIsIdempotent(t *testing.T) {
 	processID := 10
 	nodeID := 20
@@ -3247,6 +3331,91 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskCompletesEndNodeAndProce
 	}
 	if workflowRepo.createTaskInput != nil {
 		t.Fatalf("end node must not create a workflow task")
+	}
+}
+
+func TestProcessRuntimeUsecaseReconcilePendingLinkedWorkflowTasksUsesOriginalActorAndContinues(t *testing.T) {
+	processID := 10
+	nodeID := 20
+	endNodeID := 21
+	actorID := 17
+	task := &WorkflowTask{
+		ID:                    99,
+		TaskStatusKey:         "done",
+		ProcessInstanceID:     &processID,
+		ProcessNodeInstanceID: &nodeID,
+		UpdatedBy:             &actorID,
+		Payload:               map[string]any{"outcome": "APPROVED"},
+	}
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              processID,
+			Status:          ProcessStatusActive,
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			ConfigRevision:  "yoyoosun-rev-1",
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID:                nodeID,
+				ProcessInstanceID: processID,
+				NodeKey:           "engineering_release_approval",
+				NodeType:          ProcessNodeTypeApproval,
+				Status:            ProcessNodeStatusActive,
+				Version:           3,
+			},
+			{
+				ID:                endNodeID,
+				ProcessInstanceID: processID,
+				NodeKey:           "engineering_release_end",
+				NodeType:          ProcessNodeTypeEnd,
+				Status:            ProcessNodeStatusWaiting,
+				Version:           1,
+			},
+		},
+	}
+	workflowRepo := &processSettlementWorkflowRepo{
+		stubWorkflowRepo: stubWorkflowRepo{currentTask: task},
+		candidates:       []*WorkflowTask{nil, task},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+
+	result, err := uc.ReconcilePendingLinkedWorkflowTasks(context.Background(), 50, 10)
+	if err != nil {
+		t.Fatalf("reconcile pending linked workflow tasks: %v", err)
+	}
+	if result.Scanned != 2 || result.Reconciled != 1 || result.LastScannedWorkflowTaskID != task.ID ||
+		len(result.Failures) != 1 || !errors.Is(result.Failures[0].Err, ErrBadParam) {
+		t.Fatalf("unexpected reconciliation result %#v", result)
+	}
+	if workflowRepo.afterID != 50 || workflowRepo.limit != 10 {
+		t.Fatalf("candidate query after=%d limit=%d, want after=50 limit=10", workflowRepo.afterID, workflowRepo.limit)
+	}
+	if processRepo.completeNodeActor != actorID || processRepo.completeProcessActor != actorID {
+		t.Fatalf("settlement actor node=%d process=%d, want original updater %d", processRepo.completeNodeActor, processRepo.completeProcessActor, actorID)
+	}
+	if processRepo.process == nil || processRepo.process.Status != ProcessStatusCompleted {
+		t.Fatalf("expected reconciled process completion, got %#v", processRepo.process)
+	}
+}
+
+func TestProcessRuntimeRecoveryContextRequiresAllowlistedBusinessReference(t *testing.T) {
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              10,
+			ProcessKey:      ProcessKeyFinancePaymentApproval,
+			Status:          ProcessStatusActive,
+			BusinessRefType: "shipment",
+			BusinessRefID:   1001,
+		},
+		nodes: []*ProcessNodeInstance{
+			{ID: 20, ProcessInstanceID: 10, NodeType: ProcessNodeTypeDomainCommand, Attempt: 1},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, nil)
+	_, _, err := uc.GetProcessDomainCommandRecoveryContext(context.Background(), 10)
+	if !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+		t.Fatalf("expected mismatched business reference to fail closed, got %v", err)
 	}
 }
 

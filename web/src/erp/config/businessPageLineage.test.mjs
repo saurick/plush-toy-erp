@@ -70,7 +70,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'get_outsourcing_return_disposition',
   'get_production_exception',
   'get_purchase_rejection_disposition',
-  'get_sales_return',
+  'get_rework_intake',
   'get_sales_order',
   'get_shipment',
   'get_supplier',
@@ -104,7 +104,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_quality_inspections',
   'list_sales_order_items',
   'list_sales_orders',
-  'list_sales_returns',
+  'list_rework_intakes',
   'list_shipments',
   'list_stock_reservations',
   'list_suppliers',
@@ -160,9 +160,6 @@ const FORMAL_UI_PROCESS_RUNTIME_ACTIONS = Object.freeze([
   'start_material_supply_purchase_order_process',
   'execute_material_supply_purchase_order_submit',
   'start_finished_goods_delivery_process',
-  'start_sales_return_acceptance_process',
-  'get_sales_return_acceptance_process',
-  'execute_sales_return_receive',
   'start_finance_payment_approval_process',
   'get_finance_payment_approval_process',
   'execute_finance_payment_post',
@@ -490,13 +487,15 @@ test('business page lineage: source-driven producers match domain-generate flows
   assert.equal(shipment?.pageRole, BUSINESS_PAGE_ROLES.FACT_OWNER)
   assert.equal(shipment?.allowsGenericPageCreate, true)
   assert.deepEqual(shipment?.producerActions, ['create_shipment_with_items'])
-  assert.equal(
-    shipment?.incomingFlows.some(
-      (flowDefinition) =>
-        flowDefinition.flowType === BUSINESS_FLOW_TYPES.DOMAIN_GENERATE
-    ),
-    false,
-    '出货草稿是通用聚合保存并逐行保留销售订单来源，不是由销售订单直接生成的业务事实'
+  assert.deepEqual(
+    shipment?.incomingFlows
+      .filter(
+        (flowDefinition) =>
+          flowDefinition.flowType === BUSINESS_FLOW_TYPES.DOMAIN_GENERATE
+      )
+      .map((flowDefinition) => flowDefinition.action),
+    ['create_rework_reshipment'],
+    '普通出货草稿仍是通用聚合保存；只有返工补发由返工回厂记录定向生成'
   )
 })
 
@@ -705,8 +704,7 @@ test('business page lineage: legacy process commands never claim current formal 
   }
 
   const addItemFlows = businessPageFlowDefinitions.filter(
-    (flowDefinition) =>
-      flowDefinition.action === 'add_purchase_receipt_item'
+    (flowDefinition) => flowDefinition.action === 'add_purchase_receipt_item'
   )
   assert.equal(addItemFlows.length > 0, true)
   for (const flowDefinition of addItemFlows) {
@@ -1329,11 +1327,7 @@ test('business page lineage: workflow inboxes declare exact source task producer
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.sourceTypes),
-    [
-      ['production-orders'],
-      ['production_exception_decision'],
-      ['shipment'],
-    ]
+    [['production-orders'], ['production_exception_decision'], ['shipment']]
   )
   for (const definition of workflowDefinitions) {
     assert.equal(definition.taskGroups.length, 1)

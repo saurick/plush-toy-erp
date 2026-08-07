@@ -109,6 +109,8 @@ function createFixtureRepo({
     "docs/customers/yoyoosun/README.md",
     "# Customer docs\n",
   );
+  writeFixtureFile(root, "README.md", "[Guide](docs/product/guide.md)\n");
+  writeFixtureFile(root, "docs/product/guide.md", "# Guide\n");
   if (includePrivateSources) {
     writeFixtureFile(
       root,
@@ -238,10 +240,38 @@ test("light check extracts the committed tree and excludes private customer sour
     assert.equal(report.inventory.missingPaths.length, 0);
     assert.equal(report.inventory.forbiddenPaths.length, 0);
     assert.equal(report.inventory.symlinks.length, 0);
+    assert.equal(report.inventory.brokenMarkdownLinks.length, 0);
+    assert(report.inventory.markdownFileCount >= 2);
     assert.match(report.archiveSha256, /^sha256:[a-f0-9]{64}$/u);
     assert.equal(report.formalEvidenceEligible, false);
     assert.equal(report.repositoryBoundary.passed, true);
     assert.match(report.overlay.configPath, /customer-config\.js$/u);
+  } finally {
+    removeFixtureRepo(root);
+  }
+});
+
+test("light check rejects archive Markdown links to export-ignored customer docs", async () => {
+  const root = createFixtureRepo();
+  try {
+    writeFixtureFile(
+      root,
+      "README.md",
+      "[Customer delivery](docs/customers/yoyoosun/README.md)\n",
+    );
+    runGit(root, ["add", "README.md"]);
+    runGit(root, ["commit", "-qm", "link ignored customer docs"]);
+
+    await assert.rejects(
+      () => runSourceArchiveReleaseCheck({ mode: "light" }, { repoRoot: root }),
+      (error) => {
+        assert.match(error.message, /inventory check failed/u);
+        assert.deepEqual(error.details.brokenMarkdownLinks, [
+          "README.md -> docs/customers/yoyoosun/README.md",
+        ]);
+        return true;
+      },
+    );
   } finally {
     removeFixtureRepo(root);
   }

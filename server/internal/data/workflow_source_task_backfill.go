@@ -214,19 +214,15 @@ func buildProductionExceptionSourceTaskFromFact(
 	if client == nil || row == nil || !isProductionReworkLinkedFactRow(row) || row.SourceID == nil {
 		return nil, nil, biz.ErrProductionReworkSourceInvalid
 	}
-	source, err := client.ProductionFact.Get(ctx, *row.SourceID)
-	if err != nil {
-		return nil, nil, biz.ErrProductionReworkSourceInvalid
-	}
-	orderID, itemID, err := productionCompletionSourceCoordinates(source)
+	source, err := resolveProductionReworkRowSource(ctx, client, row, false)
 	if err != nil {
 		return nil, nil, err
 	}
-	order, err := client.ProductionOrder.Get(ctx, orderID)
+	order, err := client.ProductionOrder.Get(ctx, source.orderID)
 	if err != nil {
 		return nil, nil, err
 	}
-	item, err := client.ProductionOrderItem.Get(ctx, itemID)
+	item, err := client.ProductionOrderItem.Get(ctx, source.itemID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -242,17 +238,25 @@ func buildProductionExceptionSourceTaskFromFact(
 	if item.UnitNameSnapshot != nil {
 		unitName = strings.TrimSpace(*item.UnitNameSnapshot)
 	}
-	return biz.BuildProductionExceptionSourceTask(biz.ProductionExceptionSourceTaskInput{
-		FactID:                 row.ID,
-		FactNo:                 row.FactNo,
-		SourceCompletionFactID: source.ID,
-		ProductionOrderID:      order.ID,
-		ProductionOrderNo:      order.OrderNo,
-		ProductionOrderItemID:  item.ID,
-		ProductName:            productName,
-		UnitName:               unitName,
-		Quantity:               row.Quantity.String(),
-		Reason:                 reason,
-		OccurredAt:             row.OccurredAt,
-	})
+	input := biz.ProductionExceptionSourceTaskInput{
+		FactID:                row.ID,
+		FactNo:                row.FactNo,
+		ProductionOrderID:     order.ID,
+		ProductionOrderNo:     order.OrderNo,
+		ProductionOrderItemID: item.ID,
+		ProductName:           productName,
+		UnitName:              unitName,
+		Quantity:              row.Quantity.String(),
+		Reason:                reason,
+		OccurredAt:            row.OccurredAt,
+	}
+	if source.sourceCompletion != nil {
+		input.SourceCompletionFactID = source.sourceCompletion.ID
+	} else if source.intake != nil {
+		input.ReworkIntakeID = source.intake.ID
+		input.ReworkIntakeNo = source.intake.IntakeNo
+	} else {
+		return nil, nil, biz.ErrProductionReworkSourceInvalid
+	}
+	return biz.BuildProductionExceptionSourceTask(input)
 }

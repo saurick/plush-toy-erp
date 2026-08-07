@@ -75,7 +75,7 @@ function ReceiptCard({ item }) {
   )
 }
 
-export default function DevReceiptPanel({ areaKey }) {
+export default function DevReceiptPanel({ areaKey, summaryFirst = false }) {
   const [reloadKey, setReloadKey] = useState(0)
   const [state, setState] = useState({
     loading: true,
@@ -128,18 +128,48 @@ export default function DevReceiptPanel({ areaKey }) {
       : summary.currentPassed.length > 0
         ? 'passed'
         : 'empty'
+  const decision = state.loading
+    ? {
+        icon: <ClockCircleOutlined aria-hidden="true" />,
+        title: '正在读取最近结果',
+        description: '只读取本机门禁回执，不会启动新的验证。',
+      }
+    : summary.blockers.length > 0
+      ? {
+          icon: <ExclamationCircleOutlined aria-hidden="true" />,
+          title: `${summary.blockers.length} 项结果需要处理`,
+          description:
+            '先展开完整回执定位失败、过期或身份不一致项，再重新运行匹配的检查。',
+        }
+      : summary.currentPassed.length > 0
+        ? {
+            icon: <CheckCircleOutlined aria-hidden="true" />,
+            title: `当前回执中有 ${summary.currentPassed.length} 项通过`,
+            description:
+              '只证明下方列出的当前门禁，不代表发布、目标环境或客户验收已经完成。',
+          }
+        : {
+            icon: <ClockCircleOutlined aria-hidden="true" />,
+            title: '尚无当前可核验结果',
+            description: '没有回执不等于通过；请先进入“检查本轮改动”。',
+          }
 
   return (
     <section
       className={`erp-dev-receipt-panel erp-dev-receipt-panel--${tone}`}
       aria-label="最近质量回执"
+      aria-busy={state.loading}
     >
       <div className="erp-dev-receipt-panel__head">
         <div>
-          <Title level={3}>最近质量回执</Title>
-          <Text className="erp-dev-receipt-panel__repository">
-            {repositoryLabel}
-          </Text>
+          <Title level={3}>
+            {summaryFirst ? '最近验证结果' : '最近质量回执'}
+          </Title>
+          {!summaryFirst ? (
+            <Text className="erp-dev-receipt-panel__repository">
+              {repositoryLabel}
+            </Text>
+          ) : null}
         </div>
         <Button
           icon={<ReloadOutlined />}
@@ -158,7 +188,25 @@ export default function DevReceiptPanel({ areaKey }) {
           description={state.error}
         />
       ) : null}
-      {!state.error && !state.loading && summary.receipts.length === 0 ? (
+      {summaryFirst && !state.error ? (
+        <div
+          className={`erp-dev-receipt-panel__decision erp-dev-receipt-panel__decision--${tone}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="erp-dev-receipt-panel__decision-icon">
+            {decision.icon}
+          </span>
+          <span>
+            <strong>{decision.title}</strong>
+            <Text type="secondary">{decision.description}</Text>
+          </span>
+        </div>
+      ) : null}
+      {!summaryFirst &&
+      !state.error &&
+      !state.loading &&
+      summary.receipts.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description="当前区域尚无回执；没有回执不等于门禁通过。"
@@ -180,14 +228,33 @@ export default function DevReceiptPanel({ areaKey }) {
               历史 {summary.historical.length}
             </span>
           </div>
-          <div className="erp-dev-receipt-panel__grid">
-            {summary.receipts.map((item) => (
-              <ReceiptCard
-                key={`${item.receipt.gate}:${item.receipt.gitCommit}:${item.receipt.finishedAt}`}
-                item={item}
-              />
-            ))}
-          </div>
+          {summaryFirst ? (
+            <details className="erp-dev-receipt-panel__details">
+              <summary>
+                查看 {summary.receipts.length} 条完整回执与仓库身份
+              </summary>
+              <Text className="erp-dev-receipt-panel__repository">
+                {repositoryLabel}
+              </Text>
+              <div className="erp-dev-receipt-panel__grid">
+                {summary.receipts.map((item) => (
+                  <ReceiptCard
+                    key={`${item.receipt.gate}:${item.receipt.gitCommit}:${item.receipt.finishedAt}`}
+                    item={item}
+                  />
+                ))}
+              </div>
+            </details>
+          ) : (
+            <div className="erp-dev-receipt-panel__grid">
+              {summary.receipts.map((item) => (
+                <ReceiptCard
+                  key={`${item.receipt.gate}:${item.receipt.gitCommit}:${item.receipt.finishedAt}`}
+                  item={item}
+                />
+              ))}
+            </div>
+          )}
         </>
       ) : null}
     </section>

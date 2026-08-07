@@ -71,10 +71,10 @@
     },
     {
       "key": "shipping-finance",
-      "title": "出货、退货与财务",
+      "title": "出货、返工补发与财务",
       "file": "出货与财务.md",
       "order": 6,
-      "description": "出货、客户退货、财务事实、收付款、核销和红冲。",
+      "description": "销售出货、返工回厂、非商业补发、财务事实、收付款、核销和红冲。",
       "references": [
         "docs/finance/财务第一版.md",
         "docs/architecture/业务事实扩展总评审.md",
@@ -781,43 +781,42 @@
       "writeBoundary": "SalesOrderUsecase 的销售订单聚合保存事务维护。"
     },
     {
-      "name": "sales_returns",
-      "title": "客户退货单",
+      "name": "rework_intakes",
+      "title": "返工回厂单",
       "domain": "shipping-finance",
       "kind": "SourceDocument",
-      "purpose": "保存客户针对已出货明细发起的退货申请、审批、收货和反向处理。",
-      "boundary": "APPROVED 只表示允许退货；RECEIVED 才由事务创建退货库存及质量状态，Workflow done 不替代收货。",
-      "lifecycle": "DRAFT 转 APPROVED 或 REJECTED；DRAFT 或 APPROVED 可 CANCELLED；APPROVED 可 RECEIVED；RECEIVED 可 REVERSED；不删除。",
-      "writeBoundary": "OperationalFactUsecase 创建、收货、取消和冲正；审批与拒绝由 ProcessRuntime 白名单命令执行。",
-      "notes": "schema 明确称其为 auditable source document；本目录按“退货申请先行、显式 receive 才写库存事实”归 Source Document。"
+      "purpose": "保存已出货产品返工回厂的来源出货、客户快照、返工原因、接收状态和审计信息。",
+      "boundary": "返工回厂不是商业退货、退款或换货；只有 RECEIVED 才由受控事务创建 HOLD 库存，Workflow done 不替代接收。",
+      "lifecycle": "DRAFT 可转 RECEIVED 或 CANCELLED；RECEIVED 可转 REVERSED；不物理删除。",
+      "writeBoundary": "OperationalFactUsecase 创建、接收、取消和冲正返工回厂聚合。"
     },
     {
-      "name": "sales_return_items",
-      "title": "客户退货明细",
+      "name": "rework_intake_items",
+      "title": "返工回厂明细",
       "domain": "shipping-finance",
       "kind": "SourceDocument",
-      "purpose": "保存客户退货引用的原出货明细、产品、SKU、仓库、批次和数量。",
-      "boundary": "退货明细是申请和收货输入，库存变化仍由 receive/reverse 事务的 inventory_txns 证明。",
-      "lifecycle": "随退货单创建后保持不可变；状态由 sales_returns 聚合控制，不独立删除。",
-      "writeBoundary": "OperationalFactUsecase/repo 创建客户退货聚合时写入。"
+      "purpose": "保存原出货明细、目标生产订单行、产品、SKU、接收仓库、单位、数量和接收批次来源。",
+      "boundary": "明细是返工回厂来源行；库存变化由接收或冲正事务的 inventory_txns 证明，生产返工和补发仍由各自事实证明。",
+      "lifecycle": "随返工回厂单创建后来源字段保持不可变；received_lot_id 只由接收事务绑定；不独立删除。",
+      "writeBoundary": "OperationalFactUsecase/repo 创建返工回厂聚合，并在接收事务绑定 HOLD 批次。"
     },
     {
       "name": "shipments",
       "title": "出货单",
       "domain": "shipping-finance",
       "kind": "SourceDocument",
-      "purpose": "保存向客户出货的来源单、财务放行状态和显式出货时间。",
-      "boundary": "finance_release APPROVED 只允许发货，不等于 SHIPPED；只有 SHIPPED 才写库存 OUT。",
-      "lifecycle": "DRAFT 转 SHIPPED；DRAFT 可 CANCELLED，SHIPPED 取消通过 REVERSAL 后转 CANCELLED；财务放行为独立 PENDING、APPROVED、REJECTED 集合；不删除。",
-      "writeBoundary": "OperationalFactUsecase 创建、出货和取消；财务放行及正式出货可由 ProcessRuntime 白名单命令驱动。"
+      "purpose": "保存销售交付或返工补发的来源单、财务放行状态和显式出货时间。",
+      "boundary": "销售交付必须取得财务放行；返工补发必须关联返工回厂单且财务状态为 NOT_REQUIRED；只有 SHIPPED 才写库存 OUT。",
+      "lifecycle": "DRAFT 转 SHIPPED；DRAFT 可 CANCELLED，SHIPPED 通过 REVERSAL 后转 CANCELLED；销售交付使用 PENDING、APPROVED、REJECTED，返工补发固定 NOT_REQUIRED；不删除。",
+      "writeBoundary": "OperationalFactUsecase 创建、出货和取消；销售交付的财务放行及正式出货可由 ProcessRuntime 白名单命令驱动。"
     },
     {
       "name": "shipment_items",
       "title": "出货明细",
       "domain": "shipping-finance",
       "kind": "SourceDocument",
-      "purpose": "保存出货对应的销售订单行、产品、SKU、仓库、批次、数量和商业快照。",
-      "boundary": "明细只有随 shipment SHIPPED 才产生库存出库事实，不可脱离主单独过账。",
+      "purpose": "保存销售订单行或返工生产完成事实，以及产品、SKU、仓库、批次、数量和商业快照。",
+      "boundary": "销售交付明细引用销售订单行，返工补发明细引用生产完成事实；两者都只有随 shipment SHIPPED 才产生库存出库事实。",
       "lifecycle": "随出货草稿创建后保持不可变；正式后不修改、不删除。",
       "writeBoundary": "OperationalFactUsecase/repo 创建出货聚合时写入。"
     },

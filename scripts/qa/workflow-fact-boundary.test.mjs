@@ -7,13 +7,20 @@ const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
 const workflowSourceFiles = [
   ...readdirSync(path.join(repoRoot, "server/internal/biz"))
-    .filter((fileName) => fileName.startsWith("workflow") && fileName.endsWith(".go"))
+    .filter(
+      (fileName) => fileName.startsWith("workflow") && fileName.endsWith(".go"),
+    )
     .map((fileName) => `server/internal/biz/${fileName}`),
   ...readdirSync(path.join(repoRoot, "server/internal/data"))
-    .filter((fileName) => fileName.startsWith("workflow") && fileName.endsWith(".go"))
+    .filter(
+      (fileName) => fileName.startsWith("workflow") && fileName.endsWith(".go"),
+    )
     .map((fileName) => `server/internal/data/${fileName}`),
   ...readdirSync(path.join(repoRoot, "server/internal/service"))
-    .filter((fileName) => fileName.startsWith("jsonrpc_workflow") && fileName.endsWith(".go"))
+    .filter(
+      (fileName) =>
+        fileName.startsWith("jsonrpc_workflow") && fileName.endsWith(".go"),
+    )
     .map((fileName) => `server/internal/service/${fileName}`),
 ];
 
@@ -103,15 +110,31 @@ test("status architecture is target-only and separates delivery evidence", () =>
     return source.slice(contentStart, fenceEnd);
   }
 
-  function requireUniqueLine(scopeName, source, label, required, forbidden = []) {
+  function requireUniqueLine(
+    scopeName,
+    source,
+    label,
+    required,
+    forbidden = [],
+  ) {
     const matches = source.split("\n").filter((line) => line.includes(label));
-    assert.equal(matches.length, 1, `${scopeName} must contain one ${label} line`);
+    assert.equal(
+      matches.length,
+      1,
+      `${scopeName} must contain one ${label} line`,
+    );
     const line = matches[0];
     for (const token of required) {
-      assert(line.includes(token), `${scopeName} ${label} line must include ${token}`);
+      assert(
+        line.includes(token),
+        `${scopeName} ${label} line must include ${token}`,
+      );
     }
     for (const token of forbidden) {
-      assert(!line.includes(token), `${scopeName} ${label} line must exclude ${token}`);
+      assert(
+        !line.includes(token),
+        `${scopeName} ${label} line must exclude ${token}`,
+      );
     }
   }
 
@@ -119,7 +142,11 @@ test("status architecture is target-only and separates delivery evidence", () =>
     const matches = source
       .split("\n")
       .filter((line) => line.trimStart().startsWith(prefix));
-    assert.equal(matches.length, 1, `${scopeName} must contain one ${prefix} line`);
+    assert.equal(
+      matches.length,
+      1,
+      `${scopeName} must contain one ${prefix} line`,
+    );
     for (const token of required) {
       assert(
         matches[0].includes(token),
@@ -129,22 +156,20 @@ test("status architecture is target-only and separates delivery evidence", () =>
   }
 
   const chineseTree = extractTextTree(statusIndex, "中文状态字典树");
-  const englishTree = extractTextTree(statusIndex, "English Status Dictionary Tree");
-  requireUniqueLine(
-    "English tree",
-    englishTree,
-    "WIP batch:",
-    [
-      "PLANNED",
-      "SPLIT",
-      "IN_PROGRESS",
-      "OUTSOURCED",
-      "CANCELLED",
-      "WAITING_QUALITY",
-      "ACCEPTED",
-      "REJECTED",
-    ],
+  const englishTree = extractTextTree(
+    statusIndex,
+    "English Status Dictionary Tree",
   );
+  requireUniqueLine("English tree", englishTree, "WIP batch:", [
+    "PLANNED",
+    "SPLIT",
+    "IN_PROGRESS",
+    "OUTSOURCED",
+    "CANCELLED",
+    "WAITING_QUALITY",
+    "ACCEPTED",
+    "REJECTED",
+  ]);
   assert.equal(
     englishTree.match(/\bPLANNED\b/gu)?.length ?? 0,
     1,
@@ -161,13 +186,22 @@ test("status architecture is target-only and separates delivery evidence", () =>
     );
     const maturityMarkerScope =
       treeName === "English tree" ? tree.replace(/\bPLANNED\b/gu, "") : tree;
-    for (const term of ["current", "legacy", "compatibility", "planned", "deferred"]) {
+    for (const term of [
+      "current",
+      "legacy",
+      "compatibility",
+      "planned",
+      "deferred",
+    ]) {
       assert(
         !maturityMarkerScope.toLowerCase().includes(term),
         `${treeName} must exclude ${term} maturity markers`,
       );
     }
-    assert(!tree.includes("WorkflowReconcileJob"), `${treeName} must exclude draft jobs`);
+    assert(
+      !tree.includes("WorkflowReconcileJob"),
+      `${treeName} must exclude draft jobs`,
+    );
   }
 
   requireUniqueLine(
@@ -243,48 +277,58 @@ test("status architecture is target-only and separates delivery evidence", () =>
     "rejected",
   ]);
   requirePrefixedLine("task contract", taskContract, "blocked", ["ready"]);
-  requireUniqueLine(
-    "task contract",
-    taskContract,
-    "任务看板只接受",
-    ["all", "ready", "blocked", "rejected", "done", "overdue", "dueSoon"],
-  );
-  requireUniqueLine(
-    "task contract",
-    taskContract,
-    "`resume`",
-    ["blocked → ready", "business_status_key", "workflow_business_states", "保持 `blocked`"],
-  );
+  requireUniqueLine("task contract", taskContract, "任务看板只接受", [
+    "all",
+    "ready",
+    "blocked",
+    "rejected",
+    "done",
+    "overdue",
+    "dueSoon",
+  ]);
+  requireUniqueLine("task contract", taskContract, "`resume`", [
+    "blocked → ready",
+    "business_status_key",
+    "workflow_business_states",
+    "保持 `blocked`",
+  ]);
 
   const evidence = extractH2Section(
     statusIndex,
     "实现、迁移与发布证据 / Implementation, Migration And Release Evidence",
   );
-  requireUniqueLine(
-    "implementation evidence",
-    evidence,
-    "中央状态合同",
-    ["registry", "transition", "只证明中央允许集合与转换图"],
-  );
-  requireUniqueLine(
-    "implementation evidence",
-    evidence,
-    "跨层调用方与生成物",
-    ["已收口", "repo", "service", "API", "UI", "seed", "fixture", "tests", "Ent generated"],
-  );
+  requireUniqueLine("implementation evidence", evidence, "中央状态合同", [
+    "registry",
+    "transition",
+    "只证明中央允许集合与转换图",
+  ]);
+  requireUniqueLine("implementation evidence", evidence, "跨层调用方与生成物", [
+    "已收口",
+    "repo",
+    "service",
+    "API",
+    "UI",
+    "seed",
+    "fixture",
+    "tests",
+    "Ent generated",
+  ]);
   requireUniqueLine(
     "implementation evidence",
     evidence,
     "| versioned migration |",
     ["20260714055504", "不能证明", "目标数据库"],
   );
-  requireUniqueLine("implementation evidence", evidence, "| 目标环境 |", ["未发布"]);
-  requireUniqueLine(
-    "implementation evidence",
-    evidence,
-    "一次性转换完成后",
-    ["usecase", "repo", "API", "UI", "查询筛选"],
-  );
+  requireUniqueLine("implementation evidence", evidence, "| 目标环境 |", [
+    "未发布",
+  ]);
+  requireUniqueLine("implementation evidence", evidence, "一次性转换完成后", [
+    "usecase",
+    "repo",
+    "API",
+    "UI",
+    "查询筛选",
+  ]);
   requireUniqueLine(
     "implementation evidence",
     evidence,
@@ -296,12 +340,13 @@ test("status architecture is target-only and separates delivery evidence", () =>
     workflowBoundary,
     "数据、迁移与发布边界",
   );
-  requireUniqueLine(
-    "workflow data boundary",
-    dataBoundary,
-    "中央 registry",
-    ["transition", "跨层调用方", "Ent generated", "versioned migration", "本地 Product Core"],
-  );
+  requireUniqueLine("workflow data boundary", dataBoundary, "中央 registry", [
+    "transition",
+    "跨层调用方",
+    "Ent generated",
+    "versioned migration",
+    "本地 Product Core",
+  ]);
   requireUniqueLine(
     "workflow data boundary",
     dataBoundary,
@@ -314,12 +359,15 @@ test("status architecture is target-only and separates delivery evidence", () =>
     "一次性转换只服务迁移窗口",
     ["usecase", "repo", "API", "UI", "查询筛选"],
   );
-  requireUniqueLine("workflow data boundary", dataBoundary, "正式 Atlas migration", [
-    "20260714055504",
-    "不能证明",
-    "目标数据库已迁移",
+  requireUniqueLine(
+    "workflow data boundary",
+    dataBoundary,
+    "正式 Atlas migration",
+    ["20260714055504", "不能证明", "目标数据库已迁移"],
+  );
+  requireUniqueLine("workflow data boundary", dataBoundary, "发布证据", [
+    "未发布",
   ]);
-  requireUniqueLine("workflow data boundary", dataBoundary, "发布证据", ["未发布"]);
 });
 
 test("chain and runtime trajectory documentation keeps chain, flow and evidence layers separate", () => {
@@ -344,7 +392,10 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
     "utf8",
   );
   const taskEventTrail = readFileSync(
-    path.join(repoRoot, "web/src/erp/components/workflow/WorkflowTaskEventTrail.jsx"),
+    path.join(
+      repoRoot,
+      "web/src/erp/components/workflow/WorkflowTaskEventTrail.jsx",
+    ),
     "utf8",
   );
 
@@ -361,7 +412,10 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
     "每个甲方可以编排到哪一层",
     "链是持久化历史的查询结果，不可编排、编辑、补写或重新排序",
   ]) {
-    assert(flowBoundary.includes(required), `flow boundary must preserve ${required}`);
+    assert(
+      flowBoundary.includes(required),
+      `flow boundary must preserve ${required}`,
+    );
   }
 
   for (const required of [
@@ -395,7 +449,6 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
     "sales_order_acceptance",
     "material_supply",
     "finished_goods_delivery",
-    "sales_return_acceptance",
     "finance_payment_approval",
     "inventory_adjustment_approval",
     "production_exception_approval",
@@ -410,13 +463,10 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
     workflowMap,
     /finished_goods_delivery[\s\S]*财务审批[\s\S]*财务放行/u,
   );
+  assert.match(workflowMap, /业务轨迹[\s\S]*本任务处理记录/u);
   assert.match(
     workflowMap,
-    /业务轨迹[\s\S]*本任务处理记录/u,
-  );
-  assert.match(
-    workflowMap,
-    /七条正式流程的异常出口[\s\S]*没有显式业务拒绝分支[\s\S]*rejected_end/u,
+    /六条正式流程的异常出口[\s\S]*没有显式业务拒绝分支[\s\S]*rejected_end/u,
   );
   assert.match(
     workflowMap,
@@ -427,7 +477,7 @@ test("chain and runtime trajectory documentation keeps chain, flow and evidence 
   assert.match(taskEventService, /ListTaskEvents\(ctx, taskID, limit\+1\)/u);
   assert.match(taskEventService, /"truncated": truncated/u);
   assert.match(taskEventTrail, /仅显示最近/u);
-  assert.match(taskEventTrail, /请勿将本视图当作完整审批链/u);
+  assert.match(taskEventTrail, /更早记录未加载/u);
 });
 
 test("current documentation rejects stale Shipment, inventory approval and task-position wording", () => {
@@ -441,9 +491,7 @@ test("current documentation rejects stale Shipment, inventory approval and task-
     "docs/product/产品能力进度台账.md",
     "docs/product/页面来源生成入口规则.md",
     "docs/observability/日志链路追踪审计第一版.md",
-    "docs/customers/yoyoosun/客户交付矩阵.md",
     "config/README.md",
-    "docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
     "docs/product/prototypes/mobile-role-tasks-v2/README.md",
     "docs/product/prototypes/workflow-task-action-flow-v1/README.md",
   ];
@@ -475,18 +523,72 @@ test("current documentation rejects stale Shipment, inventory approval and task-
   );
   assert.match(
     capabilityLedger,
-    /inventory_adjustment_approval[\s\S]*批准不改库存[\s\S]*显式 post/u,
+    /独立领域动作才写库存、生产、出货或财务事实/u,
   );
-  assert.match(
+  assert.equal(
+    capabilityLedger.match(/^## 能力状态$/gmu)?.length,
+    1,
+    "capability ledger must keep one main status table",
+  );
+  assert.doesNotMatch(
     capabilityLedger,
-    /8 个本地代码边界已闭环，4 个部分，1 个[\s\S]*阻塞，1 个[\s\S]*范围外/u,
+    /^## (?:流程运行时状态|V1 主链审计汇总|高风险判定口径)$/gmu,
   );
-  assert.match(capabilityLedger, /该汇总不包含审计 \/ 附件专项/u);
+  const capabilityTable = capabilityLedger.match(
+    /^## 能力状态$[\s\S]*?^## 证据入口$/mu,
+  )?.[0];
+  assert(capabilityTable, "capability ledger must keep its main status table");
+  const capabilityRows = capabilityTable
+    .split("\n")
+    .filter(
+      (line) =>
+        line.startsWith("| ") &&
+        !line.startsWith("| 业务能力 ") &&
+        !line.startsWith("| --- "),
+    );
+  assert(
+    capabilityRows.length >= 12 && capabilityRows.length <= 15,
+    `capability ledger must stay aggregated to 12-15 rows, got ${capabilityRows.length}`,
+  );
+  for (const row of capabilityRows) {
+    const status = row.split("|")[2]?.trim();
+    assert(
+      ["待办", "实现中", "可试用", "暂不做"].includes(status),
+      `capability ledger must use a business status, got ${status}`,
+    );
+  }
+  assert.doesNotMatch(capabilityLedger, /已闭环/u);
+  assert.doesNotMatch(capabilityLedger, /L[0-8]/u);
+  assert.match(capabilityLedger, /财务放行不等于已出货/u);
+
+  const currentTruth = readFileSync(
+    path.join(repoRoot, "docs/当前真源与交接顺序.md"),
+    "utf8",
+  );
+  assert.doesNotMatch(
+    currentTruth,
+    /确认能力做到 schema、usecase、API、UI、测试还是交付哪一层/u,
+  );
+  assert.match(currentTruth, /待办、实现中、可试用或暂不做/u);
+
+  const capabilityAuditSkill = readFileSync(
+    path.join(
+      repoRoot,
+      ".agents/skills/plush-capability-evidence-audit/SKILL.md",
+    ),
+    "utf8",
+  );
+  assert.doesNotMatch(capabilityAuditSkill, /流程运行时状态/u);
+  assert.match(capabilityAuditSkill, /聚合能力行/u);
 });
 
-test("action and audit governance documents retain authorization and evidence matrices", () => {
-  const actionMatrix = readFileSync(
+test("role governance stays compact and audit documentation retains its evidence matrix", () => {
+  const roleGovernance = readFileSync(
     path.join(repoRoot, "docs/product/多甲方角色能力与流程编排.md"),
+    "utf8",
+  );
+  const configPermissionPolicy = readFileSync(
+    path.join(repoRoot, "docs/product/配置与权限策略.md"),
     "utf8",
   );
   const auditMatrix = readFileSync(
@@ -494,25 +596,69 @@ test("action and audit governance documents retain authorization and evidence ma
     "utf8",
   );
 
+  assert(
+    roleGovernance.split(/\r?\n/u).length <= 180,
+    "role governance must stay at or below 180 lines",
+  );
+  assert(
+    Buffer.byteLength(roleGovernance, "utf8") <= 20 * 1024,
+    "role governance must stay at or below 20 KiB",
+  );
+
   for (const required of [
+    "## 阅读路径与职责",
+    "## 角色、能力和责任池",
+    "## Product Core 角色模板与客户岗位",
+    "## 审批责任与流程选择",
+    "## 页面、动作和数据范围",
+    "## Workflow、事实与链",
     "实际动作 = 后端 RBAC ∩ enabled 模块 ∩ active revision entitlement - 当前角色 revoke",
-    "页面 / 移动端入口",
-    "后端命令或 JSON-RPC",
-    "RBAC 权限码",
-    "owner role / 责任池 / assignee",
-    "版本 / CAS",
-    "幂等键",
-    "Source Document 变化",
-    "Workflow / ProcessRuntime 变化",
-    "Fact / Ledger 副作用",
-    "审计证据",
-    "目标环境证据",
-    "客户流程编排与链查询边界",
-    "七条已登记 ProcessRuntime",
+    "状态字典与生命周期索引.md",
+    "配置与权限策略.md",
+    "客户差异策略.md",
+    "产品能力进度台账.md",
+    "六条已登记 ProcessRuntime",
     "链是持久化历史的不可编辑投影",
     "不能增加、删除或重排节点",
+    "返工回厂与补发",
+    "不进入 ProcessRuntime",
   ]) {
-    assert(actionMatrix.includes(required), `action matrix must preserve ${required}`);
+    assert(
+      roleGovernance.includes(required),
+      `role governance must preserve ${required}`,
+    );
+  }
+
+  for (const retiredSection of [
+    "## 目录设计与目的",
+    "### 动作、责任与证据矩阵",
+    "## 字段表面与读写边界",
+    "## 业务流与协同流",
+    "## Ent / SQL 设计原则",
+    "## 测试与部署门禁",
+  ]) {
+    assert(
+      !roleGovernance.includes(retiredSection),
+      `role governance must route instead of restoring ${retiredSection}`,
+    );
+  }
+
+  assert(
+    Buffer.byteLength(configPermissionPolicy, "utf8") <= 10 * 1024,
+    "config permission policy must stay at or below 10 KiB",
+  );
+  for (const required of [
+    "## 当前已经生效的客户配置",
+    "当前只支持 `visible`",
+    "不支持 `label / editable / required`",
+    "## 未来扩展必须先登记",
+    "## 客户不能配置",
+    "六条已登记 ProcessRuntime",
+  ]) {
+    assert(
+      configPermissionPolicy.includes(required),
+      `config permission policy must preserve ${required}`,
+    );
   }
 
   for (const required of [
@@ -535,6 +681,9 @@ test("action and audit governance documents retain authorization and evidence ma
     "返回 `truncated`",
     "cursor 尚未实现",
   ]) {
-    assert(auditMatrix.includes(required), `audit matrix must preserve ${required}`);
+    assert(
+      auditMatrix.includes(required),
+      `audit matrix must preserve ${required}`,
+    );
   }
 });

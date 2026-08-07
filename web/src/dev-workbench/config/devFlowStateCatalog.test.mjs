@@ -55,7 +55,7 @@ const EXPECTED_FLOW_KEYS = [
   'fact.inventory_lot',
   'fact.production_wip_batch',
   'fact.production_packaging_confirmation',
-  'fact.sales_return',
+  'fact.rework_intake',
   'fact.production_exception_decision',
   'fact.production_exception_execution',
   'fact.purchase_rejection_disposition',
@@ -89,13 +89,7 @@ const expectedProcessNodes = {
       'SalesOrderUsecase.SubmitSalesOrder',
       ['sales_order.submit'],
     ],
-    [
-      'order_approval',
-      'approval',
-      '订单审批',
-      null,
-      ['workflow.task.approve'],
-    ],
+    ['order_approval', 'approval', '订单审批', null, ['workflow.task.approve']],
     [
       'activate_sales_order',
       'domain_command',
@@ -111,6 +105,7 @@ const expectedProcessNodes = {
       ['workflow.task.complete'],
     ],
     ['end', 'end', '结束', null, []],
+    ['sales_order_rejected_end', 'end', '销售订单审批驳回结束', null, []],
   ],
   'sales_order_acceptance/approval_engineering_pmc': [
     [
@@ -120,13 +115,7 @@ const expectedProcessNodes = {
       'SalesOrderUsecase.SubmitSalesOrder',
       ['sales_order.submit'],
     ],
-    [
-      'order_approval',
-      'approval',
-      '订单审批',
-      null,
-      ['workflow.task.approve'],
-    ],
+    ['order_approval', 'approval', '订单审批', null, ['workflow.task.approve']],
     [
       'activate_sales_order',
       'domain_command',
@@ -149,6 +138,7 @@ const expectedProcessNodes = {
       ['workflow.task.complete'],
     ],
     ['end', 'end', '结束', null, []],
+    ['sales_order_rejected_end', 'end', '销售订单审批驳回结束', null, []],
   ],
   'material_supply/purchase_order_approval': [
     [
@@ -173,6 +163,7 @@ const expectedProcessNodes = {
       ['workflow.task.approve'],
     ],
     ['end', 'end', '结束', null, []],
+    ['purchase_order_rejected_end', 'end', '采购订单审批驳回结束', null, []],
   ],
   'finished_goods_delivery/shipment_finance_approval': [
     [
@@ -190,45 +181,14 @@ const expectedProcessNodes = {
       ['finance.receivable.confirm'],
     ],
     ['end', 'end', '结束', null, []],
-  ],
-  'sales_return_acceptance/approval_receipt': [
     [
-      'sales_return_approval',
-      'approval',
-      '客户退货审批',
-      null,
-      ['sales_return.approve'],
-    ],
-    [
-      'approve_sales_return',
+      'shipment_finance_reject',
       'domain_command',
-      '批准客户退货',
-      'OperationalFactUsecase.ApproveSalesReturnForProcessCommand',
-      ['workflow.task.approve'],
-    ],
-    [
-      'sales_return_receipt',
-      'human_task',
-      '客户退货收货',
-      null,
-      ['workflow.task.complete'],
-    ],
-    [
-      'receive_sales_return',
-      'domain_command',
-      '确认客户退货入库',
-      'OperationalFactUsecase.ReceiveSalesReturnForProcessCommand',
-      ['sales_return.receive'],
-    ],
-    ['end', 'end', '结束', null, []],
-    [
-      'reject_sales_return',
-      'domain_command',
-      '驳回客户退货',
-      'OperationalFactUsecase.RejectSalesReturnForProcessCommand',
+      '记录财务驳回',
+      'OperationalFactUsecase.RecordShipmentFinanceRejection',
       ['workflow.task.reject'],
     ],
-    ['rejected_end', 'end', '驳回结束', null, []],
+    ['shipment_finance_rejected_end', 'end', '出货财务驳回结束', null, []],
   ],
   'finance_payment_approval/approval_post': [
     [
@@ -361,12 +321,14 @@ const expectedProcessEdges = {
   'sales_order_acceptance/approval_pmc': [
     ['submit_sales_order', 'order_approval'],
     ['order_approval', 'activate_sales_order'],
+    ['order_approval', 'sales_order_rejected_end'],
     ['activate_sales_order', 'order_review'],
     ['order_review', 'end'],
   ],
   'sales_order_acceptance/approval_engineering_pmc': [
     ['submit_sales_order', 'order_approval'],
     ['order_approval', 'activate_sales_order'],
+    ['order_approval', 'sales_order_rejected_end'],
     ['activate_sales_order', 'engineering_data'],
     ['engineering_data', 'order_review'],
     ['order_review', 'end'],
@@ -374,19 +336,14 @@ const expectedProcessEdges = {
   'material_supply/purchase_order_approval': [
     ['submit_purchase_order', 'purchase_order_approval'],
     ['purchase_order_approval', 'approve_purchase_order'],
+    ['purchase_order_approval', 'purchase_order_rejected_end'],
     ['approve_purchase_order', 'end'],
   ],
   'finished_goods_delivery/shipment_finance_approval': [
     ['shipment_finance_approval', 'shipment_finance_release'],
+    ['shipment_finance_approval', 'shipment_finance_reject'],
     ['shipment_finance_release', 'end'],
-  ],
-  'sales_return_acceptance/approval_receipt': [
-    ['sales_return_approval', 'approve_sales_return'],
-    ['sales_return_approval', 'reject_sales_return'],
-    ['approve_sales_return', 'sales_return_receipt'],
-    ['sales_return_receipt', 'receive_sales_return'],
-    ['receive_sales_return', 'end'],
-    ['reject_sales_return', 'rejected_end'],
+    ['shipment_finance_reject', 'shipment_finance_rejected_end'],
   ],
   'finance_payment_approval/approval_post': [
     ['finance_payment_approval', 'approve_finance_payment'],
@@ -406,14 +363,8 @@ const expectedProcessEdges = {
     ['reject_inventory_adjustment', 'rejected_end'],
   ],
   'production_exception_approval/exception_decision_approval': [
-    [
-      'production_exception_decision_approval',
-      'approve_production_exception',
-    ],
-    [
-      'production_exception_decision_approval',
-      'reject_production_exception',
-    ],
+    ['production_exception_decision_approval', 'approve_production_exception'],
+    ['production_exception_decision_approval', 'reject_production_exception'],
     ['approve_production_exception', 'production_exception_execution'],
     ['approve_production_exception', 'over_issue_end'],
     ['production_exception_execution', 'execute_production_exception'],
@@ -507,14 +458,18 @@ test('devFlowStateCatalog: route 与只读边界使用唯一真源', () => {
   assert.equal(DEV_FLOW_STATE_ROUTE, DEV_STATUS_FLOWS_ROUTE)
   assert.equal(DEV_FLOW_STATE_CATALOG.route, DEV_STATUS_FLOWS_ROUTE)
   assert.equal(DEV_FLOW_STATE_CATALOG.readOnly, true)
-  assert.equal(
-    DEV_FLOW_STATE_CATALOG.runtimeAuthority,
-    'read_only_observation'
-  )
+  assert.equal(DEV_FLOW_STATE_CATALOG.runtimeAuthority, 'read_only_observation')
   assert.equal(DEV_FLOW_STATE_CATALOG.allowsActionExecution, false)
   assert.equal(DEV_FLOW_STATE_CATALOG.allowsGenericStatusWrite, false)
   assert.equal(DEV_FLOW_STATE_CATALOG.unknownStatePolicy, 'fail_closed')
   assert.deepEqual(DEV_FLOW_STATE_CATALOG.writeApis, [])
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.key, 'all')
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.readOnly, true)
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.businessChainOverview.runtimeAuthority,
+    'design_projection_only'
+  )
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.overviewComplete, true)
 })
 
 test('devFlowStateCatalog: 覆盖清单固定为 34 个当前对象', () => {
@@ -570,17 +525,10 @@ test('devFlowStateCatalog: 34 个状态集合与后端 canonical contract 全等
 
 test('devFlowStateCatalog: 高风险对象登记完整决策、过账、取消与冲正边', () => {
   assert.deepEqual(
-    getDevFlowStateMachine('fact.sales_return').transitions.map(
+    getDevFlowStateMachine('fact.rework_intake').transitions.map(
       (item) => item.key
     ),
-    [
-      'DRAFT->APPROVED',
-      'DRAFT->REJECTED',
-      'APPROVED->RECEIVED',
-      'DRAFT->CANCELLED',
-      'APPROVED->CANCELLED',
-      'RECEIVED->REVERSED',
-    ]
+    ['DRAFT->RECEIVED', 'DRAFT->CANCELLED', 'RECEIVED->REVERSED']
   )
   assert.deepEqual(
     getDevFlowStateMachine('fact.finance_payment').transitions.map(
@@ -595,6 +543,13 @@ test('devFlowStateCatalog: 高风险对象登记完整决策、过账、取消�
       'POSTED->REVERSED',
     ]
   )
+  assert.deepEqual(
+    getDevFlowStateMachine('fact.finance').transitions.map((item) => item.key),
+    ['DRAFT->POSTED', 'POSTED->SETTLED', 'SETTLED->POSTED', 'POSTED->CANCELLED']
+  )
+  assert.deepEqual(getDevFlowStateMachine('fact.finance').terminalStates, [
+    'CANCELLED',
+  ])
   assert.deepEqual(
     getDevFlowStateMachine('fact.inventory_operation').transitions.map(
       (item) => item.key
@@ -644,6 +599,7 @@ test('devFlowStateCatalog: pathKinds 仅来自受限 registry 且无孤儿边', 
     'returned',
     'rework',
     'resumed',
+    'reopened',
   ])
   const observedRegistry = {}
   for (const flow of DEV_FLOW_STATE_CATALOG.flows) {
@@ -681,7 +637,7 @@ test('canonical status contract reader: 未知 kind 与缺失 constraint fail cl
     () =>
       readCanonicalStatusContract(repoRoot, {
         kind: 'unknown',
-        path: 'server/internal/data/model/schema/sales_return.go',
+        path: 'server/internal/data/model/schema/rework_intake.go',
       }),
     /unsupported canonical status contract kind/u
   )
@@ -689,7 +645,7 @@ test('canonical status contract reader: 未知 kind 与缺失 constraint fail cl
     () =>
       readCanonicalStatusContract(repoRoot, {
         kind: 'ent_check',
-        path: 'server/internal/data/model/schema/sales_return.go',
+        path: 'server/internal/data/model/schema/rework_intake.go',
         constraint: 'missing_constraint',
         field: 'status',
       }),
@@ -755,7 +711,7 @@ test('devFlowStateCatalog: Process variant、节点、命令与分支边精确�
       definition,
     ])
   )
-  assert.equal(canonicalByKey.size, 8)
+  assert.equal(canonicalByKey.size, 7)
   assert.deepEqual(
     processDefinitions.map((definition) => definition.key),
     [...canonicalByKey.keys()]
@@ -775,25 +731,19 @@ test('devFlowStateCatalog: Process variant、节点、命令与分支边精确�
     )
     assert.deepEqual(
       projectCatalogProcessEdges(definition),
-      deriveCanonicalProcessEdges(
-        canonical,
-        canonicalCatalog.branchTargets
-      ),
+      deriveCanonicalProcessEdges(canonical, canonicalCatalog.branchTargets),
       `${definition.key} edge contract drift`
     )
   }
 })
 
-test('devFlowStateCatalog: Product Core 保持 7 process key / 8 variants', () => {
-  assert.equal(processDefinitions.length, 8)
+test('devFlowStateCatalog: Product Core 保持 6 process key / 7 variants', () => {
+  assert.equal(processDefinitions.length, 7)
   assert.equal(
     new Set(processDefinitions.map((item) => item.processKey)).size,
-    7
+    6
   )
-  assert.equal(
-    DEV_FLOW_STATE_CATALOG.processDefinitions,
-    processDefinitions
-  )
+  assert.equal(DEV_FLOW_STATE_CATALOG.processDefinitions, processDefinitions)
   assert.deepEqual(
     processDefinitions.map((definition) => definition.key),
     Object.keys(expectedProcessNodes)
@@ -809,10 +759,7 @@ test('devFlowStateCatalog: Product Core 保持 7 process key / 8 variants', () =
       expectedProcessEdges[definition.key]
     )
     assert.equal(definition.readOnly, true)
-    assert.equal(
-      definition.runtimeAuthority,
-      'backend_domain_contract'
-    )
+    assert.equal(definition.runtimeAuthority, 'backend_domain_contract')
     assert.equal(definition.allowsActionExecution, false)
     assert.equal(definition.initial, definition.nodes[0].key)
     assert(
@@ -849,6 +796,29 @@ test('devFlowStateCatalog: Product Core 保持 7 process key / 8 variants', () =
       assert(edge.evidence.length > 0)
     }
   }
+})
+
+test('devFlowStateCatalog: Fact / Ledger 定义与状态对象一一对应且不伪造运行查询', () => {
+  const factMachines = DEV_FLOW_STATE_CATALOG.flows.filter(
+    (flow) => flow.scopeKey === 'fact_ledger'
+  )
+  assert.equal(DEV_FLOW_STATE_CATALOG.factLedgerCoverage.complete, true)
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.factDefinitions.length,
+    factMachines.length
+  )
+  assert.deepEqual(
+    new Set(DEV_FLOW_STATE_CATALOG.factDefinitions.map((item) => item.factKey)),
+    new Set(factMachines.map((item) => item.key))
+  )
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.factRuntimeQuery.availability,
+    'unavailable'
+  )
+  assert.match(
+    DEV_FLOW_STATE_CATALOG.factRuntimeQuery.label,
+    /未提供运行凭证查询/u
+  )
 })
 
 test('devFlowStateCatalog: 客户 overlay 直接派生 registry 且只做预览', () => {
@@ -892,9 +862,7 @@ test('devFlowStateCatalog: 客户 overlay 直接派生 registry 且只做预览'
     (overlay) => overlay.customerKey === 'yoyoosun'
   )
   assert(
-    yoyoosun.stateMachines.every(
-      (item) => item.comparison.status === 'drift'
-    )
+    yoyoosun.stateMachines.every((item) => item.comparison.status === 'drift')
   )
 })
 
@@ -943,7 +911,10 @@ test('devFlowStateCatalog: 所有权限来自当前 RBAC 注册表', () => {
     ),
   ])
   for (const permission of permissions) {
-    assert.match(rbacSource, new RegExp(`"${permission.replaceAll('.', '\\.')}"`))
+    assert.match(
+      rbacSource,
+      new RegExp(`"${permission.replaceAll('.', '\\.')}"`)
+    )
   }
   assert(!permissions.has('warehouse.inventory.update'))
 })

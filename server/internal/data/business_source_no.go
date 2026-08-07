@@ -13,7 +13,7 @@ import (
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/purchasereceipt"
-	"server/internal/data/model/ent/salesreturn"
+	"server/internal/data/model/ent/reworkintake"
 	"server/internal/data/model/ent/shipment"
 )
 
@@ -130,13 +130,13 @@ func resolveBusinessSourceNos(
 			for _, row := range rows {
 				resolved[businessSourceKey{sourceType: sourceType, sourceID: row.ID}] = row.FactNo
 			}
-		case biz.SalesReturnSourceType:
-			rows, err := client.SalesReturn.Query().Where(salesreturn.IDIn(ids...)).Select(salesreturn.FieldID, salesreturn.FieldReturnNo).All(ctx)
+		case biz.ReworkIntakeSourceType:
+			rows, err := client.ReworkIntake.Query().Where(reworkintake.IDIn(ids...)).Select(reworkintake.FieldID, reworkintake.FieldIntakeNo).All(ctx)
 			if err != nil {
 				return nil, err
 			}
 			for _, row := range rows {
-				resolved[businessSourceKey{sourceType: sourceType, sourceID: row.ID}] = row.ReturnNo
+				resolved[businessSourceKey{sourceType: sourceType, sourceID: row.ID}] = row.IntakeNo
 			}
 		}
 	}
@@ -172,7 +172,7 @@ func resolvableBusinessSourceKey(sourceType *string, sourceID *int) (businessSou
 		biz.ShipmentSourceType,
 		biz.PurchaseReceiptSourceType,
 		biz.FinanceFactSourceType,
-		biz.SalesReturnSourceType:
+		biz.ReworkIntakeSourceType:
 		return businessSourceKey{sourceType: normalizedType, sourceID: *sourceID}, true
 	default:
 		return businessSourceKey{}, false

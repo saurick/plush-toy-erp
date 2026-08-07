@@ -138,13 +138,11 @@ func (h *salesOrderSubmitProcessCommandHandler) ExecuteProcessDomainCommand(ctx 
 		EffectState: ProcessDomainCommandEffectStateApplied,
 		EffectRef:   &ProcessBusinessRef{RefType: salesOrderProcessCommandBusinessRefType, RefID: orderID},
 	}
-	if repo, ok := h.uc.repo.(SalesOrderSubmitProcessCommandRepo); ok {
-		if _, err := repo.SubmitSalesOrderForProcessCommand(ctx, orderID, in, result, actorID); err != nil {
-			return nil, err
-		}
-		return result, nil
+	repo, ok := h.uc.repo.(SalesOrderSubmitProcessCommandRepo)
+	if !ok {
+		return nil, ErrProcessDomainCommandHandlerNotFound
 	}
-	if _, err := h.uc.SubmitSalesOrder(ctx, orderID); err != nil {
+	if _, err := repo.SubmitSalesOrderForProcessCommand(ctx, orderID, in, result, actorID); err != nil {
 		return nil, err
 	}
 	return result, nil

@@ -5,7 +5,7 @@ import {
   resolveFinancePaymentActionAvailability,
   resolveProductionExceptionActionAvailability,
   resolveRelatedRecordActionAvailability,
-  resolveSalesReturnActionAvailability,
+  resolveReworkIntakeActionAvailability,
   resolveShipmentActionAvailability,
 } from './operationalActionAvailability.mjs'
 
@@ -104,10 +104,10 @@ test('收付款动作：只有无权限隐藏，未选中、前置不足和终�
   for (const status of ['REJECTED', 'CANCELLED', 'REVERSED']) {
     for (const action of ['allocation', 'approval', 'cancel', 'reverse']) {
       const result = resolveFinancePaymentActionAvailability({
-          action,
-          authorized: true,
-          payment: { status },
-        })
+        action,
+        authorized: true,
+        payment: { status },
+      })
       assert.equal(result.visible, true, `${status}/${action} 应保留`)
       assert.equal(result.disabled, true, `${status}/${action} 应置灰`)
       assert.ok(result.disabledReason, `${status}/${action} 应说明原因`)
@@ -115,73 +115,123 @@ test('收付款动作：只有无权限隐藏，未选中、前置不足和终�
   }
 })
 
-test('客户退货动作：待审批和终态均保留已授权动作并置灰不可用项', () => {
-  const draft = { status: 'DRAFT' }
+test('返工回厂动作：按收货、生产返工和补发前置保留已授权动作槽位', () => {
+  const draft = { status: 'DRAFT', items: [] }
   assert.deepEqual(
     state(
-      resolveSalesReturnActionAvailability({
+      resolveReworkIntakeActionAvailability({
         action: 'receive',
         authorized: true,
-        salesReturn: draft,
+        reworkIntake: draft,
       })
     ),
-    [true, true, '审批通过后可确认收货']
+    [true, false, '']
   )
-  assert.deepEqual(
-    state(
-      resolveSalesReturnActionAvailability({
-        action: 'reverse',
-        authorized: true,
-        salesReturn: draft,
-      })
-    ),
-    [true, true, '确认收货后可冲正退货入库']
-  )
-  assert.equal(
-    resolveSalesReturnActionAvailability({
-      action: 'approval',
+  for (const action of ['rework', 'reship', 'reverse']) {
+    const result = resolveReworkIntakeActionAvailability({
+      action,
       authorized: true,
-      salesReturn: draft,
+      reworkIntake: draft,
+    })
+    assert.equal(result.visible, true)
+    assert.equal(result.disabled, true)
+    assert.ok(result.disabledReason)
+  }
+
+  const received = {
+    status: 'RECEIVED',
+    progress_stage: 'WAITING_REWORK',
+    items: [
+      {
+        quantity: '3',
+        active_rework_quantity: '0',
+        completion_candidates: [],
+      },
+    ],
+  }
+  assert.equal(
+    resolveReworkIntakeActionAvailability({
+      action: 'rework',
+      authorized: true,
+      reworkIntake: received,
     }).disabled,
     false
   )
 
-  const received = { status: 'RECEIVED' }
+  const preciseReceived = {
+    ...received,
+    items: [
+      {
+        quantity: '99999999999999.999999',
+        active_rework_quantity: '99999999999999.999998',
+        completion_candidates: [],
+      },
+    ],
+  }
   assert.equal(
-    resolveSalesReturnActionAvailability({
-      action: 'receive',
+    resolveReworkIntakeActionAvailability({
+      action: 'rework',
       authorized: true,
-      salesReturn: received,
-    }).visible,
-    true
-  )
-  assert.equal(
-    resolveSalesReturnActionAvailability({
-      action: 'receive',
-      authorized: true,
-      salesReturn: received,
+      reworkIntake: preciseReceived,
     }).disabled,
-    true
+    false
   )
-  assert.deepEqual(
-    state(
-      resolveSalesReturnActionAvailability({
-        action: 'reverse',
-        authorized: true,
-        salesReturn: received,
-        busy: true,
-      })
-    ),
-    [true, true, '当前操作完成后可冲正退货入库']
+  assert.equal(
+    resolveReworkIntakeActionAvailability({
+      action: 'reverse',
+      authorized: true,
+      reworkIntake: received,
+    }).disabled,
+    false
   )
 
-  for (const status of ['REJECTED', 'CANCELLED', 'REVERSED']) {
-    for (const action of ['receive', 'approval', 'cancel', 'reverse']) {
-      const result = resolveSalesReturnActionAvailability({
-          action,
-          authorized: true,
-          salesReturn: { status },
-        })
+  const reworking = {
+    ...received,
+    progress_stage: 'REWORKING',
+    items: [
+      {
+        quantity: '3',
+        active_rework_quantity: '3',
+        completion_candidates: [],
+      },
+    ],
+  }
+  assert.match(
+    resolveReworkIntakeActionAvailability({
+      action: 'reverse',
+      authorized: true,
+      reworkIntake: reworking,
+    }).disabledReason,
+    /已有返工记录/u
+  )
+
+  const readyToReship = {
+    ...received,
+    progress_stage: 'WAITING_RESHIP',
+    items: [
+      {
+        quantity: '3',
+        active_rework_quantity: '3',
+        completion_candidates: [{ selectable: true, remaining_quantity: '3' }],
+      },
+    ],
+  }
+  assert.equal(
+    resolveReworkIntakeActionAvailability({
+      action: 'reship',
+      authorized: true,
+      reworkIntake: readyToReship,
+    }).disabled,
+    false
+  )
+
+  for (const status of ['CANCELLED', 'REVERSED']) {
+    for (const action of ['receive', 'cancel', 'reverse', 'rework', 'reship']) {
+      const result = resolveReworkIntakeActionAvailability({
+        action,
+        authorized: true,
+        reworkIntake: { status, items: [] },
+      })
       assert.equal(result.visible, true, `${status}/${action} 应保留`)
       assert.equal(result.disabled, true, `${status}/${action} 应置灰`)
       assert.ok(result.disabledReason, `${status}/${action} 应说明原因`)
@@ -249,10 +299,10 @@ test('出货动作：放行前置、已完成和驳回都保留已授权动作�
   }
   for (const action of ['release', 'ship', 'receivable', 'invoice']) {
     const result = resolveShipmentActionAvailability({
-        action,
-        authorized: true,
-        shipment: draftRejected,
-      })
+      action,
+      authorized: true,
+      shipment: draftRejected,
+    })
     assert.equal(result.visible, true, `${action} 在放行驳回后应保留`)
     assert.equal(result.disabled, true, `${action} 在放行驳回后应置灰`)
     assert.ok(result.disabledReason)

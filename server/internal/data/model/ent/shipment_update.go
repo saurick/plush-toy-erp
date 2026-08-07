@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/reworkintake"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
@@ -46,6 +47,20 @@ func (_u *ShipmentUpdate) SetNillableShipmentNo(v *string) *ShipmentUpdate {
 	return _u
 }
 
+// SetPurpose sets the "purpose" field.
+func (_u *ShipmentUpdate) SetPurpose(v string) *ShipmentUpdate {
+	_u.mutation.SetPurpose(v)
+	return _u
+}
+
+// SetNillablePurpose sets the "purpose" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillablePurpose(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetPurpose(*v)
+	}
+	return _u
+}
+
 // SetSalesOrderID sets the "sales_order_id" field.
 func (_u *ShipmentUpdate) SetSalesOrderID(v int) *ShipmentUpdate {
 	_u.mutation.SetSalesOrderID(v)
@@ -63,6 +78,26 @@ func (_u *ShipmentUpdate) SetNillableSalesOrderID(v *int) *ShipmentUpdate {
 // ClearSalesOrderID clears the value of the "sales_order_id" field.
 func (_u *ShipmentUpdate) ClearSalesOrderID() *ShipmentUpdate {
 	_u.mutation.ClearSalesOrderID()
+	return _u
+}
+
+// SetReworkIntakeID sets the "rework_intake_id" field.
+func (_u *ShipmentUpdate) SetReworkIntakeID(v int) *ShipmentUpdate {
+	_u.mutation.SetReworkIntakeID(v)
+	return _u
+}
+
+// SetNillableReworkIntakeID sets the "rework_intake_id" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableReworkIntakeID(v *int) *ShipmentUpdate {
+	if v != nil {
+		_u.SetReworkIntakeID(*v)
+	}
+	return _u
+}
+
+// ClearReworkIntakeID clears the value of the "rework_intake_id" field.
+func (_u *ShipmentUpdate) ClearReworkIntakeID() *ShipmentUpdate {
+	_u.mutation.ClearReworkIntakeID()
 	return _u
 }
 
@@ -401,6 +436,11 @@ func (_u *ShipmentUpdate) SetSalesOrder(v *SalesOrder) *ShipmentUpdate {
 	return _u.SetSalesOrderID(v.ID)
 }
 
+// SetReworkIntake sets the "rework_intake" edge to the ReworkIntake entity.
+func (_u *ShipmentUpdate) SetReworkIntake(v *ReworkIntake) *ShipmentUpdate {
+	return _u.SetReworkIntakeID(v.ID)
+}
+
 // SetCustomer sets the "customer" edge to the Customer entity.
 func (_u *ShipmentUpdate) SetCustomer(v *Customer) *ShipmentUpdate {
 	return _u.SetCustomerID(v.ID)
@@ -429,6 +469,12 @@ func (_u *ShipmentUpdate) Mutation() *ShipmentMutation {
 // ClearSalesOrder clears the "sales_order" edge to the SalesOrder entity.
 func (_u *ShipmentUpdate) ClearSalesOrder() *ShipmentUpdate {
 	_u.mutation.ClearSalesOrder()
+	return _u
+}
+
+// ClearReworkIntake clears the "rework_intake" edge to the ReworkIntake entity.
+func (_u *ShipmentUpdate) ClearReworkIntake() *ShipmentUpdate {
+	_u.mutation.ClearReworkIntake()
 	return _u
 }
 
@@ -508,9 +554,19 @@ func (_u *ShipmentUpdate) check() error {
 			return &ValidationError{Name: "shipment_no", err: fmt.Errorf(`ent: validator failed for field "Shipment.shipment_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Purpose(); ok {
+		if err := shipment.PurposeValidator(v); err != nil {
+			return &ValidationError{Name: "purpose", err: fmt.Errorf(`ent: validator failed for field "Shipment.purpose": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SalesOrderID(); ok {
 		if err := shipment.SalesOrderIDValidator(v); err != nil {
 			return &ValidationError{Name: "sales_order_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.sales_order_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReworkIntakeID(); ok {
+		if err := shipment.ReworkIntakeIDValidator(v); err != nil {
+			return &ValidationError{Name: "rework_intake_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.rework_intake_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.CustomerID(); ok {
@@ -585,6 +641,9 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ShipmentNo(); ok {
 		_spec.SetField(shipment.FieldShipmentNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Purpose(); ok {
+		_spec.SetField(shipment.FieldPurpose, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.CustomerSnapshot(); ok {
 		_spec.SetField(shipment.FieldCustomerSnapshot, field.TypeString, value)
@@ -708,6 +767,35 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ReworkIntakeCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shipment.ReworkIntakeTable,
+			Columns: []string{shipment.ReworkIntakeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(reworkintake.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReworkIntakeIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shipment.ReworkIntakeTable,
+			Columns: []string{shipment.ReworkIntakeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(reworkintake.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.CustomerCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -816,6 +904,20 @@ func (_u *ShipmentUpdateOne) SetNillableShipmentNo(v *string) *ShipmentUpdateOne
 	return _u
 }
 
+// SetPurpose sets the "purpose" field.
+func (_u *ShipmentUpdateOne) SetPurpose(v string) *ShipmentUpdateOne {
+	_u.mutation.SetPurpose(v)
+	return _u
+}
+
+// SetNillablePurpose sets the "purpose" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillablePurpose(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetPurpose(*v)
+	}
+	return _u
+}
+
 // SetSalesOrderID sets the "sales_order_id" field.
 func (_u *ShipmentUpdateOne) SetSalesOrderID(v int) *ShipmentUpdateOne {
 	_u.mutation.SetSalesOrderID(v)
@@ -833,6 +935,26 @@ func (_u *ShipmentUpdateOne) SetNillableSalesOrderID(v *int) *ShipmentUpdateOne 
 // ClearSalesOrderID clears the value of the "sales_order_id" field.
 func (_u *ShipmentUpdateOne) ClearSalesOrderID() *ShipmentUpdateOne {
 	_u.mutation.ClearSalesOrderID()
+	return _u
+}
+
+// SetReworkIntakeID sets the "rework_intake_id" field.
+func (_u *ShipmentUpdateOne) SetReworkIntakeID(v int) *ShipmentUpdateOne {
+	_u.mutation.SetReworkIntakeID(v)
+	return _u
+}
+
+// SetNillableReworkIntakeID sets the "rework_intake_id" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableReworkIntakeID(v *int) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetReworkIntakeID(*v)
+	}
+	return _u
+}
+
+// ClearReworkIntakeID clears the value of the "rework_intake_id" field.
+func (_u *ShipmentUpdateOne) ClearReworkIntakeID() *ShipmentUpdateOne {
+	_u.mutation.ClearReworkIntakeID()
 	return _u
 }
 
@@ -1171,6 +1293,11 @@ func (_u *ShipmentUpdateOne) SetSalesOrder(v *SalesOrder) *ShipmentUpdateOne {
 	return _u.SetSalesOrderID(v.ID)
 }
 
+// SetReworkIntake sets the "rework_intake" edge to the ReworkIntake entity.
+func (_u *ShipmentUpdateOne) SetReworkIntake(v *ReworkIntake) *ShipmentUpdateOne {
+	return _u.SetReworkIntakeID(v.ID)
+}
+
 // SetCustomer sets the "customer" edge to the Customer entity.
 func (_u *ShipmentUpdateOne) SetCustomer(v *Customer) *ShipmentUpdateOne {
 	return _u.SetCustomerID(v.ID)
@@ -1199,6 +1326,12 @@ func (_u *ShipmentUpdateOne) Mutation() *ShipmentMutation {
 // ClearSalesOrder clears the "sales_order" edge to the SalesOrder entity.
 func (_u *ShipmentUpdateOne) ClearSalesOrder() *ShipmentUpdateOne {
 	_u.mutation.ClearSalesOrder()
+	return _u
+}
+
+// ClearReworkIntake clears the "rework_intake" edge to the ReworkIntake entity.
+func (_u *ShipmentUpdateOne) ClearReworkIntake() *ShipmentUpdateOne {
+	_u.mutation.ClearReworkIntake()
 	return _u
 }
 
@@ -1291,9 +1424,19 @@ func (_u *ShipmentUpdateOne) check() error {
 			return &ValidationError{Name: "shipment_no", err: fmt.Errorf(`ent: validator failed for field "Shipment.shipment_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Purpose(); ok {
+		if err := shipment.PurposeValidator(v); err != nil {
+			return &ValidationError{Name: "purpose", err: fmt.Errorf(`ent: validator failed for field "Shipment.purpose": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SalesOrderID(); ok {
 		if err := shipment.SalesOrderIDValidator(v); err != nil {
 			return &ValidationError{Name: "sales_order_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.sales_order_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReworkIntakeID(); ok {
+		if err := shipment.ReworkIntakeIDValidator(v); err != nil {
+			return &ValidationError{Name: "rework_intake_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.rework_intake_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.CustomerID(); ok {
@@ -1385,6 +1528,9 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 	}
 	if value, ok := _u.mutation.ShipmentNo(); ok {
 		_spec.SetField(shipment.FieldShipmentNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Purpose(); ok {
+		_spec.SetField(shipment.FieldPurpose, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.CustomerSnapshot(); ok {
 		_spec.SetField(shipment.FieldCustomerSnapshot, field.TypeString, value)
@@ -1501,6 +1647,35 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(salesorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ReworkIntakeCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shipment.ReworkIntakeTable,
+			Columns: []string{shipment.ReworkIntakeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(reworkintake.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReworkIntakeIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shipment.ReworkIntakeTable,
+			Columns: []string{shipment.ReworkIntakeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(reworkintake.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

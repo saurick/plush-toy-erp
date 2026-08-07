@@ -78,7 +78,16 @@ export default function DevTaskNav({
             onClick={() => onChange(item.value)}
             onKeyDown={(event) => moveSelection(event, index)}
           >
-            <span>{item.label}</span>
+            {item.englishLabel ? (
+              <span className="erp-dev-task-nav__label-with-anchor">
+                <span>{item.label}</span>
+                <small className="erp-dev-task-nav__english-label" lang="en">
+                  {item.englishLabel}
+                </small>
+              </span>
+            ) : (
+              <span>{item.label}</span>
+            )}
             {item.description ? <small>{item.description}</small> : null}
           </button>
         )

@@ -86,10 +86,6 @@ test('process runtime presentation covers every current Product Core process', (
     '出货财务放行'
   )
   assert.equal(
-    getProcessLabel({ process_key: 'sales_return_acceptance' }),
-    '客户退货受理'
-  )
-  assert.equal(
     getProcessLabel({ process_key: 'finance_payment_approval' }),
     '收付款审批'
   )
@@ -118,11 +114,6 @@ test('process runtime presentation covers every current Product Core process', (
     shipment_finance_release: '财务放行',
     shipment_execution: '执行出货',
     receivable_lead: '应收跟进',
-    sales_return_approval: '客户退货审批',
-    approve_sales_return: '确认客户退货申请',
-    sales_return_receipt: '客户退货收货交接',
-    receive_sales_return: '客户退货收货入库',
-    reject_sales_return: '退回客户退货申请',
     finance_payment_approval: '收付款审批',
     approve_finance_payment: '确认收付款申请',
     finance_payment_execution: '收付款执行交接',
@@ -166,7 +157,6 @@ test('process runtime presentation uses business task names without exposing nod
 
 test('process runtime presentation validates all exception approval form profiles', () => {
   for (const [processKey, profileKey] of [
-    ['sales_return_acceptance', 'sales_return_approval'],
     ['finance_payment_approval', 'finance_payment_approval'],
     ['inventory_adjustment_approval', 'inventory_adjustment_approval'],
     ['production_exception_approval', 'production_exception_approval'],

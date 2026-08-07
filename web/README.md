@@ -28,16 +28,16 @@ pnpm install
 
 ## 目录结构（简版）
 
-| 路径                 | 职责                                                                                     |
-| -------------------- | ---------------------------------------------------------------------------------------- |
-| `src/common/`        | 通用认证、组件、hooks、状态、常量与工具函数                                              |
-| `src/erp/`           | 毛绒 ERP 桌面后台、业务页、岗位任务端页面和打印工作台                                    |
-| `src/erp/qa/`        | 字段联动等前端 QA catalog 与报告生成依赖                                                 |
-| `src/dev-workbench/` | `/__dev` 浏览器端页面、配置、组件和样式，不进入 production build                         |
-| `src/pages/`         | 根路由重定向、登录、注册、管理员登录                                                     |
+| 路径                 | 职责                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| `src/common/`        | 通用认证、组件、hooks、状态、常量与工具函数                                                 |
+| `src/erp/`           | 毛绒 ERP 桌面后台、业务页、岗位任务端页面和打印工作台                                       |
+| `src/erp/qa/`        | 字段联动等前端 QA catalog 与报告生成依赖                                                    |
+| `src/dev-workbench/` | `/__dev` 浏览器端页面、配置、组件和样式，不进入 production build                            |
+| `src/pages/`         | 根路由重定向、登录、注册、管理员登录                                                        |
 | `dev-server/`        | Node/Vite development-serve Bridge、operation 适配器及合同测试，详见 `dev-server/README.md` |
-| `scripts/`           | 前端本地服务、浏览器级回归和 smoke 脚本，详见 `scripts/README.md`                        |
-| `build/`             | 构建产物，不作为业务真源                                                                 |
+| `scripts/`           | 前端本地服务、浏览器级回归和 smoke 脚本，详见 `scripts/README.md`                           |
+| `build/`             | 构建产物，不作为业务真源                                                                    |
 
 ## 启动命令
 
@@ -108,7 +108,7 @@ http://127.0.0.1:5175/m/engineering/tasks
 - 运行时状态由 `src/common/theme/erpTheme.jsx` 和 `src/common/theme/erpThemeMode.mjs` 维护。
 - Ant Design 组件通过根 `ConfigProvider` 在 `defaultAlgorithm / darkAlgorithm` 间切换。
 - 项目自定义壳层、岗位任务卡片和局部硬编码样式通过 `data-erp-theme` 与 `src/erp/styles/app.css` 入口及 `src/erp/styles/app/` 分区文件中的 ERP theme 变量覆盖。
-- 新增状态类组件时必须同步覆盖暗色主题，包括 loading / empty / alert / message / notification / tooltip / popover / tag / badge / progress / pagination / drawer / table placeholder；优先复用全局 token 和 L1 断言，避免组件只在浅色模式可读。
+- 新增状态类组件时必须同步覆盖暗色主题，包括 loading / empty / alert / message / notification / tooltip / popover / tag / badge / progress / pagination / drawer / table placeholder；优先复用全局 token 和页面级浏览器回归断言（Style L1），避免组件只在浅色模式可读。
 - 打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随暗色主题，避免污染导出物。
 
 ### 共享控件样式边界 / Shared control style boundary
@@ -313,7 +313,7 @@ pnpm smoke:processing-contract-real-login
 - 采购合同打印工作台
 - 加工合同打印工作台
 
-`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、`admin.me` 与客户 effective session 刷新、待办页当前已加载任务分布 / 风险提醒 / 不重复整池分布的已办列表展示、岗位任务端不显示技术说明，以及退出登录清空登录态。有真实电脑端菜单的账号会在任务端顶部和“我的”页看到“进入电脑端”；该入口继续以当前后端菜单投影为准，不按用户名或岗位名硬放行。
+`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、`admin.me` 与客户 effective session 刷新、服务端权威岗位状态 / 待办 / 已办 / 风险 / 超时数量展示、岗位任务端不显示技术说明，以及退出登录清空登录态。岗位状态满足 `total=ready+blocked+done+rejected`，已办使用 `history=done+rejected`，风险和超时是重叠关注项；有真实电脑端菜单的账号会在任务端顶部和“我的”页看到“进入电脑端”，该入口继续以当前后端菜单投影为准，不按用户名或岗位名硬放行。
 
 缺少浏览器运行条件或只想确认移动端认证回跳 smoke 的执行范围时，可先执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template`。该命令只打印岗位任务端角色、phone / iPad 视口、可选环境变量和真实回归命令，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。需要留下可保存的 no-write 前置记录时，执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json`；该报告只写本地 JSON，记录脚本存在性、岗位任务端路由计划、phone / iPad 视口计划和 mock RPC 覆盖口径，不调用后端 / JSON-RPC、不读取密码、不保存 token、不写数据库。真实 `pnpm smoke:mobile-auth-login-route` 使用 mock auth / admin / customer-config / workflow RPC 验证生产单端口 `/m/<role>/tasks` 路由、会话刷新和登录回跳，不证明真实后端 RBAC、真实账号或 customer config active revision。
 
@@ -345,19 +345,19 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 下列页面只在开发构建中可访问，不进入侧栏、`seedData`、RBAC、产品内文档 registry、生产构建或 ERP 正式菜单。除本机 loopback Bridge 明确登记的客户配置、版本交付、测试数据和共享开发库迁移操作外，页面不直接写后端业务。
 
-| 路径                        | 职责                                     | 维护真源                                                      |
-| --------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| `/__dev`                    | 开发态导航、搜索、分组和本地置顶         | `web/src/dev-workbench/config/devHub.mjs`                     |
-| `/__dev/governance`         | 项目治理地图只读可视化                   | `docs/项目治理地图.md`                                        |
-| `/__dev/status-flows`       | 分层状态机、流程编排与甲方差异只读观察   | 代码合同、正式状态文档与已登记客户配置包                      |
-| `/__dev/docs`               | 当前工作区 Markdown 查看器               | 仓库 Markdown 文件本身                                        |
-| `/__dev/testing`            | 验证层级、执行命令和覆盖证据             | `docs/product/自动化测试策略.md`                              |
-| `/__dev/data-preparation`   | 固定档位测试数据计划、执行与回执         | 既有 Core seed、统一本地验收 lifecycle 与 operation store     |
-| `/__dev/database-migration` | 共享开发库迁移准备、执行、读回与重启     | 高层 CLI、迁移 operation service、备份恢复与 operation store |
-| `/__dev/prototypes`         | HTML / PNG / 截图原型资产预览            | `docs/product/prototypes/**`                                  |
-| `/__dev/capability-ledger`  | 产品能力与客户矩阵真源入口               | 两份正式 Markdown                                             |
-| `/__dev/customer-config`    | 已登记客户配置包预检、测试应用与发布门禁 | `config/customers/<customer-key>/*` 及 customer config 脚本   |
-| `/__dev/version-center`     | exact-SHA 发布、固定 133 部署与回滚      | GitHub Release、固定目标预检与 operation 回执                 |
+| 路径                         | 职责                                       | 维护真源                                                     |
+| ---------------------------- | ------------------------------------------ | ------------------------------------------------------------ |
+| `/__dev`                     | 开发态导航、搜索、分组和本地置顶           | `web/src/dev-workbench/config/devHub.mjs`                    |
+| `/__dev/product-engineering` | 按问题进入规则、业务链、文档和原型         | `web/src/dev-workbench/config/devHub.mjs`                    |
+| `/__dev/governance`          | 项目治理地图只读可视化                     | `docs/项目治理地图.md`                                       |
+| `/__dev/status-flows`        | 业务链、协同、运行、事实与状态规则只读观察 | 代码合同、三类 dev-only 配置目录与正式架构文档               |
+| `/__dev/docs`                | 当前工作区 Markdown 查看器                 | 仓库 Markdown 文件本身                                       |
+| `/__dev/testing`             | 本轮验证、专项检查库和证据覆盖             | `docs/product/自动化测试策略.md`                             |
+| `/__dev/data-preparation`    | 固定数据范围检查、计划确认、执行与回执     | 既有 Core seed、统一本地验收 lifecycle 与 operation store    |
+| `/__dev/database-migration`  | 共享开发库迁移准备、执行、读回与重启       | 高层 CLI、迁移 operation service、备份恢复与 operation store |
+| `/__dev/prototypes`          | HTML / PNG / 截图原型资产预览              | `docs/product/prototypes/**`                                 |
+| `/__dev/customer-config`     | 已登记客户配置包预检、测试应用与发布门禁   | `config/customers/<customer-key>/*` 及 customer config 脚本  |
+| `/__dev/version-center`      | exact-SHA 发布、固定 133 部署与回滚        | GitHub Release、固定目标预检与 operation 回执                |
 
 #### 开发导航 `/__dev`
 
@@ -365,58 +365,55 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 卡片显示用途、真源路径和边界摘要；重复“进入”链接使用页面专属可访问名称，实时搜索不再渲染无动作的搜索按钮。
 - 置顶只写浏览器本地偏好，不是后端配置。
 - 开发导航使用 `/favicon-dev.svg`；测试入口使用 `/favicon-testing.svg`，每个开发页同时提供独立浏览器标题，只用于区分本地开发页面。
-- 十个子页统一提供开发工作台全局菜单、当前页高亮、返回开发导航、复制当前深链和按需打开来源文档；开发人员可以在任意子页直接切换治理、流程状态、文档、测试、数据准备、数据库迁移、原型、能力、客户配置和版本中心，不再先返回首页寻找入口。“开发工作台”按钮是唯一返回总览的入口，不在菜单中重复放第二个“总览”。移动端全局菜单允许横向滚动，并保持单一当前页语义。
+- 九个子页统一提供开发工作台全局菜单、当前页高亮、返回开发导航、复制当前深链和按需打开来源文档；开发人员可以在任意子页直接切换治理、流程状态、文档、测试、数据准备、数据库迁移、原型、客户配置和版本中心，不再先返回首页寻找入口。“开发工作台”按钮是唯一返回总览的入口，不在菜单中重复放第二个“总览”。移动端全局菜单允许横向滚动，并保持单一当前页语义。
+
+#### 产品工程入口 `/__dev/product-engineering`
+
+该页不再把治理、业务链、文档和原型作为四张技术资产卡平铺，而是按“判断规则、查看业务链、搜索文档、评审原型”四类用户问题组织连续任务列表。每项只在主路径展示用途、适用范围和下一步；工具名称、页面路径、维护来源和开发边界默认折叠。四个既有子路由、来源合同和 DEV-only 边界保持不变。
 
 #### 项目治理地图 `/__dev/governance`
 
-该页只读解析 `docs/项目治理地图.md`，展示治理维度、常见任务分流、Mermaid 图、文档跳转和路径复制。`axis` / `scope` 写入 URL，可刷新、前进后退和分享；非法值会规范化。页面不创建第二份治理真源。
+该页只读解析 `docs/项目治理地图.md`，主标题使用“这次改动该怎么做？”。默认按八类常见改动进入，不要求先理解架构层级、测试内部键或中英文工程术语；选中后只展示“先看这些、同时检查、不要误判”三步。任务名称、稳定 `task` 键、内部范围、依据、同步检查和边界均由 Markdown 明确维护，页面不再根据共享文档路径或关键词猜测相关任务。内部范围、个人 ToB 五步交付循环、治理维度解释、完整 Mermaid 关系图和维护来源统一放进“完整工作方式和内部说明”，默认折叠。`task` 写入 URL，可刷新、前进后退和分享；旧 `axis` / `scope` 参数会被清理，非法值回到第一项。该页继续保持 dev-only、只读和单一 Markdown 真源，不新增后端、数据库、RBAC 或正式菜单能力。
 
-#### 流程与状态观察台 `/__dev/status-flows`
+#### 业务链与运行观察台 `/__dev/status-flows`
 
-- 页面把 Source Document、Workflow task、Process Runtime、Fact / Ledger、MasterData lifecycle 和客户配置控制面分层展示，提供全局状态字典树、单对象合法转换图、Product Core 流程编排、九类流覆盖和证据详情。九类分别是业务、状态、工作流、审批、任务、异常、通知、自动流转与 Fact；默认图面只打开业务和状态，其他语义按需叠加。图内只使用状态名和受控短标签，不放源码路径、完整 Guard 或权限串；这些详情留在图下方，避免长边标签撑大画布或覆盖往返边。岗位与责任池在 Product Core 节点详情中单独显示。
-- `web/src/dev-workbench/config/devFlowStateCatalog.mjs` 是 dev-only 只读投影目录，不是新的状态真源。canonical key、合法转换、权限、领域动作和事实副作用仍回到后端 registry、lifecycle helper、Schema、usecase 与测试；目录中的每台机器和边必须携带来源证据，未知对象或状态 fail closed。
-- Product Core 与客户差异使用“核心合同 + 客户 overlay”表达。客户流程、状态机和策略直接从 `config/customers/index.mjs` 的已登记包派生；`demo`、`reference-customer` 和 `yoyoosun` 中的 `preview_only` 内容始终与 runtime authority 分开，漂移会显式显示，不会被观察台同步到正式状态机。
-- 页面只读且不导入通用 `set_status`、数据库写入或状态机编辑器。Workflow task `done`、Process node `completed` 和 Fact `POSTED` 继续是不同事实；取消、冲正、补偿和 return-to 只在正式领域合同显式存在时画边。
-- 视图、对象、甲方、搜索和叠加层写入 URL，便于刷新、前进后退和共享定位。业务轨迹只接受受后端登录态、精确 read permission 与任务可见性保护的 task-scoped 上下文；没有权限或没有实例时明确显示边界，不从任务标题、payload 或客户 preview 猜测业务轨迹。
+- 页面保留稳定 `view` 值，主导航使用“看业务链、查责任与任务、看运行路径、看已生效结果、查状态规则”五个用户问题。顶部“人、路、账、规则、链”概念解释默认折叠，全局定义搜索默认展开；当前选择上下文始终可见。业务链 Tab 默认进入 `view=chain&chain=all`：用 12 个链级节点按主链、供给支撑、异常返工和纠正冲正分区展示明确衔接，不展开各链内部节点，也不把总图登记成伪造的第 13 条业务链。点击或选择具体链后，一次只展示一条详细业务链；中文业务名称优先，稳定 key、内部规则与代码证据按需查看。桌面显示只读总图，移动端隐藏复杂图并保留纵向链级入口。
+- `devFlowStateCatalog.mjs` 汇总状态机和流程 variant，`devBusinessChainCatalog.mjs` 是业务链目录，`devFactLedgerCatalog.mjs` 是 Fact / Ledger 定义目录。三者都是 dev-only 只读投影，不是新的业务真源；构建器校验唯一 key、引用、覆盖和图可达，未知引用或缺失覆盖 fail closed。
+- 全局定义搜索按业务链、Workflow、ProcessRuntime、状态机和 Fact / Ledger 分组，搜索文字不写入 URL。`view / chain / node / flow / state / process / fact / task_id` 保存在 URL；刷新、前进后退、下钻和“返回业务链”保持上下文，未知、重复、过期参数或 `chain=all` 携带单链 `node` 时停止加载并提供恢复到业务总图的入口。
+- 真实查询只使用当前已有的 `workflow.list_tasks`、`workflow.list_task_events` 和 task-scoped `workflow.get_task_process_context`。可按任务名称、任务编号、来源单号或既有 `task_id` 定位；同名候选必须显式选择，分页结果不完整时不自动选择。可见任务若两个 ProcessRuntime 锚点都为空，页面直接显示普通未关联或 `simulated_only` 模拟展示摘要，不调用 context RPC，也不补造流程节点；后端返回“当前任务未关联正式流程”时使用同一正常边界。
+- 当前后端没有通用 ProcessRuntime 实例 ID 直查，也没有跨领域 Fact 凭证 ID 查询。运行实例只能从可见任务锚定；事实页只展示经代码核实的 22 个定义并标注“未提供运行凭证查询”，不放置伪造输入框或 mock 凭证。
+- 页面不导入库存过账、付款、冲正、流程推进、通用 `set_status` 或数据库写入。Workflow task `done`、ProcessRuntime node `completed` 和 Fact `POSTED` 使用不同说明；真实实例在总图最多高亮所属的一条业务链，在单链最多高亮一个 ProcessRuntime 节点，始终提示尚未证明上下游完成或业务事实已落账。
 
 #### 开发文档 `/__dev/docs`
 
 - Vite 在开发服务启动时收集仓库入口、`docs/**/*.md`、`config/customers/**/*.md` 和 `AGENTS.md`；客户配置页的“查看来源文档”因此会命中真实客户配置包说明。页面不校验 Git tracked 状态，因此不得将“能查看”解读为“已纳入版本管理”。
 - `?path=<markdown-path>#<section-anchor>` 可直达文档和章节；在页面选择文档或章节会同步 URL，浏览器前进后退和刷新可恢复。相对 Markdown 链接继续留在开发文档查看器，站外链接保持普通外链行为。
-- 搜索结果、目录树和置顶区都可快速置顶或取消置顶。章节标签支持展开换行、收起横向滚动、跳转和回到顶部。
+- 搜索结果、目录树和置顶区都可快速置顶或取消置顶。新用户默认收起目录、置顶区和多行章节，先保留搜索与当前文档；已有本地偏好继续恢复。章节标签支持展开换行、收起横向滚动、跳转和回到顶部。
 - Markdown fenced `mermaid` 代码块会只读渲染为图表，可在当前页面适配宽度、缩放、重置和全屏查看。
 
 #### 产品原型 `/__dev/prototypes`
 
-该页只浏览 `docs/product/prototypes` 下的 HTML、PNG 和截图证据，支持分类、分组折叠、当前资产和本地置顶恢复。筛选无结果时预览同步为空；每个资产可打开对应 README、复制仓库路径，并通过隔离 sandbox 预览。全屏预览进入弹窗焦点、圈定 Tab、Escape 关闭并恢复触发按钮。卡片参照范围不是正式菜单、路由、权限或 `seedData` 映射表。
-
-#### 能力真源 `/__dev/capability-ledger`
-
-该页不再解析、复制或统计台账内容，只提供下列两份正式真源的直接入口：
-
-- `docs/product/产品能力进度台账.md`
-- `docs/customers/yoyoosun/客户交付矩阵.md`
-
-使用顺序固定为：先看产品能力是否成立，再看当前客户是否可见、可试用或已验收；需要实现证据时继续进入专题文档、代码、migration 和测试。本页不维护第二套成熟度、客户状态或验收结论，也不把正式 Markdown 打入前端构建。
+该页只浏览 `docs/product/prototypes` 下的 HTML、PNG 和截图证据，支持分类、分组折叠、当前资产和本地置顶恢复。新用户默认只展开当前资产所在目录，状态说明、资产统计和技术来源按需展开；已有目录偏好继续恢复。筛选无结果时预览同步为空；每个资产可打开对应 README、复制仓库路径，并通过隔离 sandbox 预览。全屏预览进入弹窗焦点、圈定 Tab、Escape 关闭并恢复触发按钮。卡片参照范围不是正式菜单、路由、权限或 `seedData` 映射表。
 
 #### 测试入口 `/__dev/testing`
 
-- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，主视图固定为“验证层级 / T0–T8”“执行命令 / Commands”和“覆盖证据 / Coverage”。完整 Markdown 继续由独立的 `/__dev/docs` 查看器负责，不在测试入口复制第二个文档阅读器。
+- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，主视图按任务命名为“本轮验证”“专项检查库”和“证据与覆盖”，稳定 `view=tiers|commands|coverage` 不变。默认只展开“生成验证计划—运行匹配检查”主路径；19 组复制预设与内部 T0–T8 验证范围按需展开，T0–T8 不是完成进度或逐级验收。完整 Markdown 继续由独立的 `/__dev/docs` 查看器负责，不在测试入口复制第二个文档阅读器。
 - `docs/archive/**` 不进入可复制命令来源，避免把历史命令写成当前测试入口；其他项目或 GPT/ChatGPT 原文不保存在仓库。
 - “执行命令”只按同一条文档职责轴筛选来源：策略与口径、工程说明、执行脚本、部署与发布；搜索是独立的命令块关键词条件，“全部来源”只负责复位职责筛选。主视图、职责和关键词分别写入 `view`、`role`、`q` query，刷新、前进后退和从来源文档返回时可恢复。每个命令块可打开对应来源文档，文档职责、前后端技术域、脚本类型和部署阶段不再混成同一级分类。
 - 多行命令会保留完整续行参数；不完整且以反斜杠结尾的命令不会进入复制结果。命令区按内容高度展示，不再被网格压缩裁切；验证层级和覆盖证据视图不显示对当前内容无效的命令来源筛选。
-- “验证层级”顶部按收益优先展示五项独立能力：P0 只读生成本轮 affected 验证计划、P0 运行带稳定仓库身份回执的 fast 开发门禁、P1 九岗位权限与任务可见性巡检、P1 字段联动专项，以及覆盖视图中的本地覆盖基线。计划可随时重生；执行动作和覆盖基线共同使用全局 QA 锁，同一时间只允许一项运行。各项状态与终态独立展示，不合成为“全系统已通过”。
+- “本轮验证”按收益优先展示五项独立能力：只读生成本轮 affected 验证计划、运行带稳定仓库身份回执的 fast 开发门禁、九岗位权限与任务可见性巡检、字段联动专项，以及“证据与覆盖”中的本地覆盖基线。页面把 P0/P1、命令来源和证据边界降为追踪信息，先显示用户下一步；计划可随时重生，执行动作和覆盖基线共同使用全局 QA 锁，同一时间只允许一项运行。各项状态与终态独立展示，不合成为“全系统已通过”。
 - 固定动作通过 development-only `/__dev/api/qa/testing` 的 summary / plan / action / operation 合同运行。浏览器只能提交 `fast / role-access / field-linkage + idempotencyKey`，不能传 shell、参数、路径、环境变量、URL 或凭据；服务端固定映射仓库脚本，前后核对 repository identity，页面刷新后从私有 ignored operation store 恢复。岗位巡检只有本地后端与九岗位演示账号凭据就绪时才真实登录，凭据只从 Vite 服务端进程环境继承且不会返回浏览器；其预期业务写入为零，也不等于完整角色协同闭环。
-- 覆盖视图从 dev-only `GET /__dev/api/qa/coverage` 读取固定 `output/qa/coverage/latest.json`，按 Go、Web、业务域、T0-T8、PostgreSQL、浏览器、readiness、目标环境和 UAT 分栏；未采集、过期、失败、跳过、阻塞和零执行不会折算为通过，也不会合并成一个总百分比。
+- 覆盖视图从 dev-only `GET /__dev/api/qa/coverage` 读取固定 `output/qa/coverage/latest.json`，按 Go、Web、业务域、验证范围（内部键 T0-T8）、PostgreSQL、浏览器、readiness、目标环境和 UAT 分栏；未采集、过期、失败、跳过、阻塞和零执行不会折算为通过，也不会合并成一个总百分比。
 - 报告与操作接口仅在 development serve 且请求来源与 Host 都是 loopback 时可用，返回 `no-store` 脱敏摘要；生产 build 不包含 `output/qa/**`，也不再从 `public/qa` 携带本机路径或覆盖报告。
 - 「采集本地覆盖基线」通过 dev-only session / action / operation API 发起异步固定 baseline。浏览器只提交 `collect + idempotencyKey`，不能传 shell、参数、路径、环境变量或 profile；服务端校验本机 Host、同源、CSRF、JSON 合同，解析项目锁定的 Node / pnpm，以持久化幂等索引和全局 QA 锁串行运行 `node scripts/qa/test-coverage-collect.mjs --profile baseline --write`。页面显示 11 个脱敏阶段，其中先以 error-code `--check` 证明生成物无漂移，再直接使用项目 Node 做 Web native coverage，不触发会改写 tracked 生成物的 package `pretest`。切换视图不取消后台任务，回到页面后可恢复读回；按钮在运行期间原位禁用，终态自动刷新报告。
 - 运行期仓库变化、启动/服务中断或终态读回无法证明时 fail closed，上一份报告继续展示；字段联动 TAP 与报告也先写 staging，只有测试、builder 和仓库身份复核均通过才原子替换，失败时保留上一份。真实 baseline 测试完成但存在失败、缺失或零执行时会发布绑定当前身份的 issues 报告，防止旧绿色遮蔽。页面“重新读取”只读取报告，“复制备用命令”只在 DEV 操作接口不可用时供手工执行。覆盖基线适合代码基本稳定、其它写任务结束的检查点，不必每次编辑后运行；它不写 PostgreSQL、不运行真实业务浏览器、不部署或做客户 UAT，未实际采集的值显示为空而不是 `0%`。`docs/product/自动化测试策略.md` 仍是测试选择和覆盖门槛真源。
 
 #### 测试数据中心 `/__dev/data-preparation`
 
+- 页面默认按“检查目标是否可用 → 选择数据范围 → 核对计划并确认 → 查看结果”组织为一条连续工作流，不再把仓库身份、三个目标、三个档位、当前计划和历史回执并列堆成独立卡片。安全结论、阻断和主动作保持可见；SHA、目标指纹、plan hash、run id、固定步骤及历史事件按需展开。
 - 页面只通过 development serve 的 loopback Bridge 使用三个固定 profile，不接受 shell、SQL、脚本路径、DSN、后端地址、密码或自定义环境变量。写入口的信任边界是本机开发进程、Host / Origin / `Sec-Fetch-Site`、CSRF 和 operation 确认，不冒充 ERP RBAC。
 - `共享开发基础数据 / core-demo` 只允许登记的 `192.168.0.106:5432/plush_erp` 或 `plush_erp_*_dev`，先确认 migration 已到 head，再顺序复用角色演示账号和 Product Core 基础资料 seed。它只生成账号、单位、材料、产品、仓库、工序和 BOM 等稳定开发基线，不生成客户、订单、Workflow、库存、出货或财务事实；稳定 upsert 不等于整批事务，也不提供按 operation 删除。
-- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.07.16-v5 / 20260716-V5`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。用户确认后先稳定准备本地岗位账号与至少 30 条由真实控制面操作产生的审计样例，再通过正式 `validate / publish / transition check / activate or rollback / effective-session readback` 对齐当前跟踪的 yoyoosun 本地测试配置，之后才准备 Source Document、5 条可证明 ProcessRuntime、模拟岗位任务和来源驱动 Fact。同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。固定客户退货覆盖草稿、已批准、已收货、已冲正，收付款覆盖已批准、两笔已过账和已冲销，红冲覆盖一条有效红冲与一组原红冲 / 反向红冲。岗位到期时间是固定 V5 快照，不保证长期维持“今天 / 本周”相对语义；终态只证明 42 / 52 项数据前置，另 10 项只能由浏览器证明。全部 52 项页面操作和人工验收均保持未完成。
+- `业务场景演示数据 / scenario-demo` 固定使用 `yoyoosun-manual-acceptance / 2026.07.16-v5 / 20260716-V5`，只允许 `127.0.0.1:8300` 对应的登记 106 长期开发库。用户确认后先稳定准备本地岗位账号与至少 30 条由真实控制面操作产生的审计样例，再通过正式 `validate / publish / transition check / activate or rollback / effective-session readback` 对齐当前跟踪的 yoyoosun 本地测试配置，之后才准备 Source Document、已登记的 ProcessRuntime、模拟岗位任务和来源驱动 Fact。同批只允许精确创建或读回；半批、字段或身份漂移直接阻断，不提供清理或重置。返工回厂与补发的岗位验收应覆盖待接收、已接收、生产返工、工序质检与完工、非商业补发；收付款覆盖已批准、两笔已过账和已冲销，红冲覆盖一条有效红冲与一组原红冲 / 反向红冲。岗位到期时间是固定 V5 快照，不保证长期维持“今天 / 本周”相对语义；数据前置不替代浏览器验证和岗位人工验收。
 - `完整验收数据 / full-acceptance` 只接受 clean exact commit 和服务端已有的 `LOCAL_ACCEPTANCE_DATABASE_BASE_URL`，复用统一 lifecycle 在同批专用库完成 migration、正式 Source / ProcessRuntime / Fact 数据、52 项页面验收和异常流；成功或失败都必须停服、删库并读回零残留。
 - `scenario-demo` 的页面操作固定为“读取预检 → 点击生成 → 自动准备并冻结 `planHash`、`runId`、仓库和目标摘要 → 核对固定目标 / V5 批次 / 数据范围 / 长期保留边界 → 确认生成 → 异步执行 → 读取回执”，不要求手输长确认串。其他 profile 继续使用完整确认串。执行前身份变化会使原计划失效；页面刷新可恢复最近 operation。进程中断或结果不明确时显示 `not_proven`，不会自动重试；用户可重新准备更晚的同目标 scenario plan 并再次确认，以同一固定批次显式补齐，其他 profile、不同目标或仍在运行的 operation 继续阻断。
 - `scenario-demo` 只在固定本机 8300、登记 106 长期开发库、migration 和 runtime identity 已证明后，由后台使用项目登记的本机开发账号约定；显式 Vite 进程环境覆盖值仍优先，但凭据不进入浏览器、命令参数或回执。日常直接在本页点击即可，不需要 `make dev_restart`；只有修改 Vite 凭据覆盖环境时才重启一次 `pnpm start`。后端代码、配置或 migration 变化时才按正式后端流程重启。
@@ -433,8 +430,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 #### 客户配置包预检与发布 `/__dev/customer-config`
 
 - 页面通过 `customer`、`view`、`section`、`action`、`release` query 和客户包选择器读取 dev-only registry，当前只登记 `yoyoosun`。未选择或未登记 customer 时只显示状态与已登记列表，不 fallback 到 `yoyoosun`；视图、当前任务和证据批次均可通过 URL 恢复。
-- 页面一级任务固定为总览、配置预检、差异、界面配置和执行发布。配置预检不再一次渲染全部对象，而是通过 `section=package|runtime|flow|evidence` 分成包结构、运行投影、流程策略和验证证据；执行发布通过 `action=dry-run|test-apply|release` 分开试跑证据、测试配置应用和正式发布检查。默认值省略 query，非法或跨视图残留参数会被清理。
+- 页面一级任务的用户可见名称为总览、检查配置包、查看变化、页面配置预览和试跑与发布；稳定 `view` 值仍保持 `overview|preflight|diff|assets|import`。配置预检不再一次渲染全部对象，而是通过 `section=package|runtime|flow|evidence` 分成包结构、运行投影、流程策略和验证证据；执行发布通过 `action=dry-run|test-apply|release` 分开试跑证据、测试配置应用和正式发布检查。默认值省略 query，非法或跨视图残留参数会被清理。
 - 配置预检和执行发布的当前任务导航在长页面滚动时保持可见；每次只渲染当前任务对应模块，避免把边界、模块、流程、命令和发布操作堆在同一阅读流中。
+- 页面配置预览先按业务名称展示品牌和菜单目录，菜单内部键降为展开后的追踪信息；页面配置边界、字段候选、编号规则和打印模板使用互斥展开区，一次只阅读一类明细。
 - 页面只读取已登记 customer package，不提供 raw package、任意代码、SQL 或脚本上传。可视内容包括品牌 / 桌面菜单 runtime、字段和编号草案、流程 preview、`moduleStates`、打印模板字段、差异与版本门禁。
 - UI Dry Run 只调用 `scripts/import/customerImportDryRun.mjs` 生成 ignored `output/customers/<customer-key>/ui-import-dry-run` 证据，不写数据库。当前登记的 yoyoosun 包仍是 draft / preview-only，`runtimeEnabled / publishEnabled / activateEnabled` 均未开放，因此“测试配置应用”按钮和 handler 都失败关闭，只允许预览和试跑；页面不会把 preview manifest 送入正式编译或发布链路。
 - 只有受控配置包明确进入 `release_ready`，同时开放 runtime / publish / activate 后，测试配置应用才会用当前管理员登录态通过 Vite `/rpc` 固定代理 `http://127.0.0.1:8300` 调用后端校验、发布、切换检查、激活和有效配置读回接口。该路径不直写业务数据、不导入真实客户业务数据，也不绕过后端 RBAC；后端以 canonical hash 判断同 revision 幂等或冲突，前端不吞发布错误，并把同一 hash、产品版本和观测到的 active revision 作为 CAS 条件提交，最后按 customer、revision、hash、hash version 和来源读回确认。写入期间客户包和视图会锁定，离开页面不代表已发请求被撤销。
@@ -456,7 +454,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 - 桌面后台继续只保留一个入口
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
-- 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code。权限清单按后端 `module_name` 展示“物料清单（BOM）/ 客户退货 / 生产执行 / 敏感字段”等业务分类，不在前端重复维护模块翻译；仅对未知或缺失分类合并显示一个“未分类功能”，避免多个技术模块同时冒充“其他功能”。分类导航只负责页内定位，不改变勾选结果或权限真源
+- 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code。权限清单按后端 `module_name` 展示“物料清单（BOM）/ 返工回厂 / 生产执行 / 敏感字段”等业务分类，不在前端重复维护模块翻译；仅对未知或缺失分类合并显示一个“未分类功能”，避免多个技术模块同时冒充“其他功能”。分类导航只负责页内定位，不改变勾选结果或权限真源
 - 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。
 - 采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、生产排程、生产异常处置、出货放行、出库管理和财务业务已分别接入正式 V1、Workflow V1 或收窄 Operational Fact V1 页面。
 - 出货单页面支持状态 / 计划出货或实际出货日期范围筛选、事务内聚合新建草稿、只读查看明细、启动财务审批、确认出货和已出货取消冲正。品质岗位可在启动前从 `DRAFT` 出货单按产品规格、仓库和批次发起出货前成品检验；一旦存在检验，未完成合格 / 让步判定时后端会阻止启动，启动成功后也不再允许补建检验。前端必须校验返回的 ProcessInstance、财务 approval 节点和来源锚点，结构不可信时不冒充成功。没有发起检验仍按当前可选策略启动；创建检验不会启动 Workflow。财务审批通过后只写 Shipment 版本化放行门禁，仓库仍须显式确认出货；`SHIPPED + inventory OUT` 才是真实出货事实。草稿逐行追加已退出，避免重复提交和多行半保存。
@@ -466,15 +464,15 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 生产订单页的“工序办理”已接固定 `PLUSH_SEW_HAND_V1` v1：布料加工正常流整单外发且首道不可拆，只有裁片检验 `PASS` 转入车缝后才可按产品数量拆批；车缝和手工按“先车缝、后手工”分别选择本厂或外发。内部完成使用“车间移交 / WIP 转移”，外发完成返回才使用“外发回仓”。首道外发只允许选择逐条精确覆盖显式 `FABRIC_PROCESSING` 冻结材料需求的 MATERIAL 合同行，并在开始前核对已过账委外发料；FABRIC 返工再次外发改用新的 PRODUCT 合同行。生产、品质、业务和 PMC 分别按 WIP 执行、分段质检、包材业务确认和只读跟进权限进入对应入口，业务岗位可凭 `production.wip.read` 打开生产订单页，但新建、编辑、发布、关闭、取消和引用选项仍只认 PMC 计划权限。
 - 质量检验页已把生产 WIP 纳入独立读模型，按裁片、皮套、成品、针检、抽检和订单条件性客户验货逐关口展示；每张单只代表当前批次当前关口，生产路线当前只有 `PASS` 可推进，`CONCESSION` fail closed。包材版面 / 包装版本由业务独立确认，不替代正式品质检验；路线订单的完工入库入口会重新核对已验收包装 WIP 数量。
 - 上述生产路线、WIP、分段质检和岗位投影当前只证明本地源码与定向合同已经接入；完整 Atlas 迁移链已在一次性 PostgreSQL 18 隔离库 apply 并读回，登记的个人开发库仍有 `20260718110227` pending，目标客户数据库没有本轮 apply、部署、health / smoke 或客户 UAT 证据。
-- P0/P1 业务页已接入共享业务附件面板：销售订单、采购订单、委外订单、采购入库、来料质检、出货单、收窄财务 / 生产 / 委外事实、SKU、BOM、Workflow V1 桌面页和岗位任务端详情可上传、下载附件。待上传文件仍可在保存前“移除”；普通已保存证据不提供物理删除，只允许有所属对象写权限的账号填写原因后“撤销附件”。撤销后列表继续显示文件名、上传账号 / 时间和撤销账号 / 时间 / 原因，预览与下载动作退出且撤销动作保持置灰；正确文件需另行上传，不恢复或改写已撤销记录。产品基础信息页另提供 `产品图 1（主图）/ 产品图 2（辅图）` 两个可替换媒体槽，只允许 PNG / JPEG / WEBP；源图选择不设文件大小上限，超过打印快照预算时浏览器会自动优化为不超过 1MiB、长边不超过 2560px、总像素不超过 400 万的 WEBP。服务端仍对最终快照执行 5MB、单边 8192px 和总像素 2000 万的纵深门禁；同槽替换 / 清空是产品媒体的窄例外，不进入普通证据撤销。普通证据附件上限仍为 5MB，允许格式覆盖常见图片、HEIC / HEIF、PDF、Word、Excel、CSV、文本、ZIP、邮件证据和 WPS 文件；PNG / JPG / WEBP / GIF / PDF 支持轻量预览，其他格式下载后查看。单据编辑弹窗中的附件默认作为备注 / 交付 / 合同资料 / 凭证附近的紧凑证据行放在明细区之前，页面级选中记录附件仍可保留独立区块。附件必须挂到已保存业务记录，上传、预览、下载或撤销都不改变 Source Document、Fact、Workflow、库存、质检或财务状态。
+- 首批高优先级业务页已接入共享业务附件面板：销售订单、采购订单、委外订单、采购入库、来料质检、出货单、收窄财务 / 生产 / 委外事实、SKU、BOM、Workflow V1 桌面页和岗位任务端详情可上传、下载附件。待上传文件仍可在保存前“移除”；普通已保存证据不提供物理删除，只允许有所属对象写权限的账号填写原因后“撤销附件”。撤销后列表继续显示文件名、上传账号 / 时间和撤销账号 / 时间 / 原因，预览与下载动作退出且撤销动作保持置灰；正确文件需另行上传，不恢复或改写已撤销记录。产品基础信息页另提供 `产品图 1（主图）/ 产品图 2（辅图）` 两个可替换媒体槽，只允许 PNG / JPEG / WEBP；源图选择不设文件大小上限，超过打印快照预算时浏览器会自动优化为不超过 1MiB、长边不超过 2560px、总像素不超过 400 万的 WEBP。服务端仍对最终快照执行 5MB、单边 8192px 和总像素 2000 万的纵深门禁；同槽替换 / 清空是产品媒体的窄例外，不进入普通证据撤销。普通证据附件上限仍为 5MB，允许格式覆盖常见图片、HEIC / HEIF、PDF、Word、Excel、CSV、文本、ZIP、邮件证据和 WPS 文件；PNG / JPG / WEBP / GIF / PDF 支持轻量预览，其他格式下载后查看。单据编辑弹窗中的附件默认作为备注 / 交付 / 合同资料 / 凭证附近的紧凑证据行放在明细区之前，页面级选中记录附件仍可保留独立区块。附件必须挂到已保存业务记录，上传、预览、下载或撤销都不改变 Source Document、Fact、Workflow、库存、质检或财务状态。
 - 桌面后台已恢复 `使用帮助 / 岗位使用帮助` 分组，不恢复旧 `帮助中心`、`开发与验收` 或 `高级文档` 信息架构；前端仍不承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端本地和生产环境统一走 `5175` 的 `/m/<role>/tasks`；不再保留按角色拆端口入口，也不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
-- 岗位任务页读取真实 workflow API，采用有意组合的移动主路径：保留 v1 的待办 / 已办 / 提醒 / 我的四项主导航、服务端游标分页 / 分批展开和任务卡片。无审批权限时待办主筛选为“全部 / 风险 / 超时”；当前账号至少有一项有效审批能力时，同一分段行显示“全部 / 审批 / 风险 / 超时”，不增加独立审批卡或第五个底部导航。原“我负责”只按已加载待办做客户端近似计算，常与“全部”重复且没有完整服务端游标，现已移除。选中任务后进入 v2 独立全屏查看、处理和可信结果回执，结束后恢复原列表的筛选、已加载分页、滚动位置和焦点。`todo / approval / risk / history` 仍是各自服务端查询视图，不在前端拼成第二套任务真源。完成 / 阻塞 / 退回分别走 `complete_task_action` / `block_task_action` / `reject_task_action`，均由服务端按当前管理员和任务责任推导角色。桌面任务看板、Workflow V1 页面、业务协同 Drawer 和岗位任务端提交前预检已消费 `explainWorkflowActionAccess` / `explainWorkflowTaskAssignment` 的后端只读原因；移动端不再回写 `business_records` 状态，附件上传和 Workflow done 都不代表业务 Fact 已生效
+- 岗位任务页读取真实 workflow API，采用有意组合的移动主路径：保留 v1 的待办 / 已办 / 风险 / 我的四项主导航、服务端游标分页 / 分批展开和任务卡片。首次无游标 `list_role_tasks` 在同一读快照返回 `ready / blocked / todo / done / rejected / history / total / approval / risk / overdue`、`risk_scope` 和 `server_time`；`todo=ready+blocked`、`history=done+rejected`、`total=todo+history`、`overdue<=risk`，响应字段或公式不可信时失败关闭。待办筛选“全部”读取 `todo`，已办读取 `history`；审批、风险、超时可重叠，不与岗位 `total` 相加。有效 `workflow.task.supervise` 把风险扩为 `risk_scope=supervised` 并显示“跨岗风险”，不扩大当前岗位状态数量或任务办理权限。每个 `todo / approval / risk / history` 查询槽位分别保存数量和服务端时间，后续游标页不重复总数；任务处理成功后使全部槽位失效、重读首屏并恢复原已加载深度。筛选数字不再取本地数组长度，尚未读到可信总数时显示“—”而不是 0。无审批权限时待办筛选为“全部 / 风险 / 超时”，有任一有效审批能力时为“全部 / 审批 / 风险 / 超时”，不增加第五个底部导航；原“我负责”近似筛选已移除。选中任务后进入 v2 独立全屏查看、处理和可信结果回执，结束后恢复原列表的筛选、分页、滚动位置和焦点。完成 / 阻塞 / 退回分别走 `complete_task_action` / `block_task_action` / `reject_task_action`，均由服务端按当前管理员和任务责任推导角色。桌面任务看板、Workflow V1 页面、业务协同 Drawer 和岗位任务端提交前预检已消费 `explainWorkflowActionAccess` / `explainWorkflowTaskAssignment` 的后端只读原因；移动端不再回写 `business_records` 状态，附件上传和 Workflow done 都不代表业务 Fact 已生效
 - 桌面任务抽屉与岗位任务详情统一把 `get_task_process_context` 展示为“业务轨迹”，把 `list_task_events` 展示为“本任务处理记录”。业务轨迹回答来源流程走到哪里；任务记录按最新在前显示当前任务的进度、异常 / 恢复、责任流转、处理岗位与意见。单条任务事件不是完整审批链，失败也不隐藏另一条读链；两者都不代替 Source Document 或领域 Fact。
 - 桌面 `/erp/task-board` 的任务详情抽屉通过 `get_task_assignment_options` 获取服务端筛选后的接收人，并以 `reassign_task` 提交接收人或岗位池、当前 version、幂等键和必填原因；前端不从管理员列表自行拼候选人。当前默认只有老板角色和 super admin 能看到转交动作，但 super admin 不会因全权限自动成为业务岗位接收人；PMC 仍只读监督。转交成功后抽屉关闭并刷新服务端任务投影，只改变个人归属，不改变任务状态或业务事实。`/m/<role>/tasks` 当前仍只提供既有完成 / 阻塞 / 退回 / 催办动作，不把桌面转交入口误写成岗位任务端已接能力
 - 正式完成 / 阻塞 / 退回 / 催办入口为一次用户 intent 冻结业务参数、`expected_version` 和安全 UUID `idempotency_key`；HTTPS 优先使用 `crypto.randomUUID()`，内网 HTTP 浏览器使用 `crypto.getRandomValues()` 生成 RFC 4122 v4 key，不允许退回 `Math.random()`。只有新 intent 执行 explain 预检；HTTP 408、网络中断、5xx 或结构不合法的 success response 都保留原 attempt、抽屉、原因、证据和同一 key，原样读取 / 重放 receipt，不刷新列表也不把未知结果误报为失败。后端在每次请求仍重新校验登录、RBAC、客户 scope、任务可见性和 receipt，前端跳过重复 explain 不构成授权绕过
-- Dashboard、Workflow V1 页面、岗位任务端、采购订单与委外订单协同入口共用 task 级同步 in-flight guard：同一 task 的首个动作在任何 await 前取得 lease，完成 / 阻塞 / 退回 / 催办跨动作双击不会发出第二个请求，`finally` 只释放本次持有的 lease。Go 与 JS 已共同消费 `scripts/qa/workflow-task-mutation-intent-v1.vectors.json`，锁住 mixed evidence 类型 / 顺序、raw whitespace key、mobile 精确重复 key 和 changed-intent relations；Node 24.14 定向 util + mobile + purchase / outsourcing guard 为 33/33，联合 Workflow API / caller 为 62/62，受影响 ESLint 0 error。该结果不代表 final full/strict/L1 或目标环境证据已经完成
+- Dashboard、Workflow V1 页面、岗位任务端、采购订单与委外订单协同入口共用 task 级同步 in-flight guard：同一 task 的首个动作在任何 await 前取得 lease，完成 / 阻塞 / 退回 / 催办跨动作双击不会发出第二个请求，`finally` 只释放本次持有的 lease。Go 与 JS 已共同消费 `scripts/qa/workflow-task-mutation-intent-v1.vectors.json`，锁住 mixed evidence 类型 / 顺序、raw whitespace key、mobile 精确重复 key 和 changed-intent relations；Node 24.14 定向 util + mobile + purchase / outsourcing guard 为 33/33，联合 Workflow API / caller 为 62/62，受影响 ESLint 0 error。该结果不代表 final full/strict、页面级浏览器回归（Style L1）或目标环境证据已经完成。
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮
 - 模板打印当前由对应业务页选中记录后带值打开；产品页维护的 0–2 张产品图会在 BOM 生成物料明细 / 作业指导书时冻结到右上角，委外订单仅在全部有效产品行归属同一产品时自动带图。打印中心保留默认样例，并已按原型复核后的轻量两栏承接左侧模板导航、右侧纸面预览和打印窗口入口；字段和当前草稿图片编辑在独立打印窗口内完成。
 - 扩展硬件链路、PDA、条码枪、图片识别继续 deferred

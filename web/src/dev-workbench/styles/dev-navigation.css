@@ -241,11 +241,30 @@
   font-weight: 600;
 }
 
+.erp-dev-task-nav__label-with-anchor {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+}
+
+.erp-dev-task-nav__label-with-anchor > span {
+  min-width: 0;
+}
+
 .erp-dev-task-nav__item small {
   margin-top: 3px;
   color: var(--dev-task-secondary, #667085);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.erp-dev-task-nav__item .erp-dev-task-nav__english-label {
+  margin-top: 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .erp-dev-task-nav--compact {

@@ -5,6 +5,10 @@ export const NODE_TEST_GROUP_ORDER = Object.freeze([
   "release",
 ]);
 
+export const EXPLICIT_ONLY_NODE_TESTS = Object.freeze([
+  "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
+]);
+
 export const NODE_TEST_GROUPS = Object.freeze({
   fast: Object.freeze([
     "scripts/build/apply-customer-web-config.test.mjs",
@@ -74,7 +78,6 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/workflow-fact-boundary.test.mjs",
     "scripts/qa/workflow-ui-action-boundary.test.mjs",
     "scripts/qa/yoyoosun-role-business-action-projection.test.mjs",
-    "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
     "scripts/qa/yoyoosun-role-jsonrpc-access.test.mjs",
   ]),
   database: Object.freeze([

@@ -123,7 +123,7 @@ export function buildInputTemplate() {
       "MOBILE_AUTH_SMOKE_ROLE_KEY='boss' MOBILE_AUTH_SMOKE_BASE_URL='http://127.0.0.1:5175' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
     ],
     boundary:
-      'This template only prints mobile auth route smoke prerequisites. The preflight report only writes a local JSON route plan. Neither mode starts Vite, starts Playwright, calls a real backend, logs in to a real account, writes database rows, or proves real RBAC/customer-config active revision. The real smoke uses mocked auth/admin/customer-config/workflow RPC responses to verify mobile route guards, session refresh, login return paths, task UI, reminders, logout, phone/iPad layout, and production single-port /m/<role>/tasks routing.',
+      'This template only prints mobile auth route smoke prerequisites. The preflight report only writes a local JSON route plan. Neither mode starts Vite, starts Playwright, calls a real backend, logs in to a real account, writes database rows, or proves real RBAC/customer-config active revision. The real smoke uses mocked auth/admin/customer-config/workflow RPC responses to verify mobile route guards, session refresh, login return paths, authoritative task counts, risk and overdue views, logout, phone/iPad layout, and production single-port /m/<role>/tasks routing.',
   }
 }
 
@@ -410,7 +410,7 @@ async function runMobileAuthScenario(
               config_revision: 'mobile-auth-smoke-yoyoosun',
               customer: { key: 'yoyoosun', name: '永绅' },
               pages: ['global-dashboard'],
-              actions: ['workflow.task.read'],
+              actions: ['workflow.task.read', `mobile.${role.roleKey}.access`],
               work_pools: [role.roleKey],
               source: 'active_customer_config_revision',
             },
@@ -696,6 +696,19 @@ async function runMobileAuthScenario(
             next_cursor: '',
             has_more: false,
             server_time: serverTime,
+            counts: {
+              approval: 0,
+              blocked: 1,
+              done: 1,
+              history: 1,
+              overdue: 1,
+              ready: 1,
+              rejected: 0,
+              risk: 1,
+              todo: 2,
+              total: 3,
+            },
+            risk_scope: 'role',
           },
         },
       }),
@@ -792,8 +805,16 @@ async function runMobileAuthScenario(
   await expectText(page, '任务')
   await expectText(page, '待办')
   await expectText(page, '风险')
-  await expectText(page, '已超时')
-  await expectText(page, '已加载任务分布')
+  const overdueFilter = page.getByTestId('mobile-role-filter-overdue')
+  await overdueFilter.waitFor({ state: 'visible', timeout: 10_000 })
+  assert.equal(
+    await overdueFilter
+      .locator('.mobile-role-task-filter__count')
+      .textContent(),
+    '1'
+  )
+  assert.equal(await overdueFilter.getAttribute('aria-label'), '超时，共 1 条')
+  await expectText(page, '当前岗位任务状态')
   await expectNoText(page, '任务按页加载')
   await expectNoText(page, '不代表岗位全量')
   await expectText(page, '状态 / 截止')
@@ -810,16 +831,16 @@ async function runMobileAuthScenario(
   await expectNoText(page, '说明')
   await expectNoText(page, 'Deferred')
 
-  await clickMobileMainTab(page, 'done', '已办任务')
+  await clickMobileMainTab(page, 'done', '已办')
   await expectText(page, '完成进度样本')
   assert.equal(
     await page.getByTestId('mobile-loaded-task-overview').count(),
     0,
-    `${role.roleKey} 已办页不应重复显示已加载任务分布`
+    `${role.roleKey} 已办页不应重复显示岗位状态总览`
   )
 
-  await clickMobileMainTab(page, 'messages', '预警')
-  await expectText(page, '提醒')
+  await clickMobileMainTab(page, 'messages', '风险')
+  await expectText(page, '风险')
   await expectText(page, '供应商延期')
 
   await clickMobileMainTab(page, 'todo', '待办')

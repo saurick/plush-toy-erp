@@ -520,7 +520,6 @@ func TestWorkflowStatusActionPermissionMapsUpdateCompleteApproveReject(t *testin
 		t.Fatalf("generic approval node should require approve, got %s", got)
 	}
 	for _, specializedCapability := range []string{
-		PermissionSalesReturnApprove,
 		PermissionFinancePaymentApprove,
 		PermissionWarehouseAdjustmentApprove,
 		PermissionProductionExceptionApprove,

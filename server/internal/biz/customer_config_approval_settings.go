@@ -125,13 +125,6 @@ var approvalSettingCatalog = []approvalSettingCatalogItem{
 		FactBoundary:   "不等于 SHIPPED、库存 OUT、应收、开票或收付款",
 	},
 	{
-		Key: "sales_return", Label: "客户退货审批", Domain: "销售 / 仓库",
-		Configurable:   false,
-		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},
-		DomainBoundary: "已登记客户退货 ProcessRuntime；老板审批后由仓库责任池办理收货，责任池由流程合同固定",
-		FactBoundary:   "批准不等于收货；收货才写退回库存",
-	},
-	{
 		Key: "production_exception", Label: "生产异常处置", Domain: "生产 / 品质",
 		Configurable:   false,
 		BlockedReasons: []string{approvalResponsibilityFixedByProcessContract},

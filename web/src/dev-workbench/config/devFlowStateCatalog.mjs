@@ -4,6 +4,8 @@ import {
 } from '../../../../config/customers/index.mjs'
 import { DEV_STATUS_FLOWS_ROUTE } from './devRoutes.mjs'
 import { BUSINESS_STATUS_OPTIONS } from '../../erp/config/workflowStatus.mjs'
+import { buildDevBusinessChainCatalog } from './devBusinessChainCatalog.mjs'
+import { buildDevFactLedgerCatalog } from './devFactLedgerCatalog.mjs'
 
 export const DEV_FLOW_STATE_ROUTE = DEV_STATUS_FLOWS_ROUTE
 export const DEV_FLOW_STATE_CATALOG_VERSION = 'dev-flow-state-catalog/v2'
@@ -19,6 +21,7 @@ export const DEV_FLOW_PATH_KINDS = Object.freeze([
   'returned',
   'rework',
   'resumed',
+  'reopened',
 ])
 
 const PATH_KIND_SET = new Set(DEV_FLOW_PATH_KINDS)
@@ -153,9 +156,9 @@ export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
     'server/internal/data/model/schema/production_packaging_confirmation.go',
     'production_packaging_confirmations_status_allowed'
   ),
-  'fact.sales_return': entCheckContract(
-    'server/internal/data/model/schema/sales_return.go',
-    'sales_returns_status_allowed'
+  'fact.rework_intake': entCheckContract(
+    'server/internal/data/model/schema/rework_intake.go',
+    'rework_intakes_status_allowed'
   ),
   'fact.production_exception_decision': entCheckContract(
     'server/internal/data/model/schema/production_exception_decision.go',
@@ -233,9 +236,7 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
     'cancelled',
     'reversed',
   ]),
-  'fact.purchase_receipt_adjustment:DRAFT->POSTED': pathMetadata([
-    'adjusted',
-  ]),
+  'fact.purchase_receipt_adjustment:DRAFT->POSTED': pathMetadata(['adjusted']),
   'fact.purchase_receipt_adjustment:DRAFT->CANCELLED': pathMetadata([
     'cancelled',
   ]),
@@ -247,37 +248,22 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'fact.quality_inspection:SUBMITTED->REJECTED': pathMetadata(['rejected']),
   'fact.quality_inspection:SUBMITTED->CANCELLED': pathMetadata(['cancelled']),
   'fact.shipment:DRAFT->CANCELLED': pathMetadata(['cancelled']),
-  'fact.shipment:SHIPPED->CANCELLED': pathMetadata([
-    'cancelled',
-    'reversed',
-  ]),
+  'fact.shipment:SHIPPED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
   'fact.production:DRAFT->POSTED': pathMetadata(
     ['rework'],
     '仅当 production_fact.fact_type=REWORK；其它事实类型不是返工路径。'
   ),
-  'fact.production:POSTED->CANCELLED': pathMetadata([
-    'cancelled',
-    'reversed',
-  ]),
-  'fact.outsourcing:POSTED->CANCELLED': pathMetadata([
-    'cancelled',
-    'reversed',
-  ]),
-  'fact.finance:POSTED->CANCELLED': pathMetadata([
-    'cancelled',
-    'reversed',
-  ]),
-  'fact.production_wip_batch:PLANNED->CANCELLED': pathMetadata([
-    'cancelled',
-  ]),
+  'fact.production:POSTED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
+  'fact.outsourcing:POSTED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
+  'fact.finance:POSTED->CANCELLED': pathMetadata(['cancelled', 'reversed']),
+  'fact.finance:SETTLED->POSTED': pathMetadata(['reopened']),
+  'fact.production_wip_batch:PLANNED->CANCELLED': pathMetadata(['cancelled']),
   'fact.production_wip_batch:WAITING_QUALITY->REJECTED': pathMetadata([
     'rejected',
   ]),
-  'fact.sales_return:DRAFT->REJECTED': pathMetadata(['rejected']),
-  'fact.sales_return:APPROVED->RECEIVED': pathMetadata(['returned']),
-  'fact.sales_return:DRAFT->CANCELLED': pathMetadata(['cancelled']),
-  'fact.sales_return:APPROVED->CANCELLED': pathMetadata(['cancelled']),
-  'fact.sales_return:RECEIVED->REVERSED': pathMetadata(['reversed']),
+  'fact.rework_intake:DRAFT->RECEIVED': pathMetadata(['returned']),
+  'fact.rework_intake:DRAFT->CANCELLED': pathMetadata(['cancelled']),
+  'fact.rework_intake:RECEIVED->REVERSED': pathMetadata(['reversed']),
   'fact.production_exception_decision:SUBMITTED->REJECTED': pathMetadata([
     'rejected',
   ]),
@@ -392,8 +378,7 @@ function freezeContractRef(value, ownerKey) {
       (!exactNonEmptyString(value.constraint) ||
         !exactNonEmptyString(value.field))) ||
     (value.kind === 'go_const_prefix' && !exactNonEmptyString(value.prefix)) ||
-    (value.kind === 'markdown_inline_set' &&
-      !exactNonEmptyString(value.marker))
+    (value.kind === 'markdown_inline_set' && !exactNonEmptyString(value.marker))
   ) {
     throw new Error(`${ownerKey} has an invalid contractRef`)
   }
@@ -1619,7 +1604,7 @@ const FLOW_DEFINITIONS = [
     kind: 'state_machine',
     label: '业务财务事实',
     summary:
-      '财务事实从草稿过账或取消；对账可显式完成，应收应付只由收付款核销、红冲或冲正派生结清。',
+      '财务事实从草稿过账或取消；对账可显式完成，应收应付由收付款核销、红冲或冲正派生结清，也会在反向动作恢复未结余额后重开。',
     states: [
       state('DRAFT', '草稿'),
       state('POSTED', '已过账'),
@@ -1627,7 +1612,7 @@ const FLOW_DEFINITIONS = [
       state('CANCELLED', '已取消'),
     ],
     initialStates: ['DRAFT'],
-    terminalStates: ['SETTLED', 'CANCELLED'],
+    terminalStates: ['CANCELLED'],
     transitions: [
       transition('DRAFT', 'POSTED', {
         guard: '来源、往来方、币种和金额由后端事实 usecase 校验。',
@@ -1650,6 +1635,13 @@ const FLOW_DEFINITIONS = [
           'finance.payment.post',
           'finance.credit_note.create',
         ],
+        factBoundary: 'fact_ledger',
+      }),
+      transition('SETTLED', 'POSTED', {
+        guard:
+          '仅 RECEIVABLE / PAYABLE 在收付款冲正或反向红冲后重新出现未结余额时，由同一领域事务清空 settled_at / settled_by；不开放通用重开按钮。',
+        action: 'reverse_finance_payment / reverse_finance_credit_note',
+        permission: ['finance.payment.reverse', 'finance.credit_note.reverse'],
         factBoundary: 'fact_ledger',
       }),
       transition('POSTED', 'CANCELLED', {
@@ -1887,68 +1879,55 @@ const FLOW_DEFINITIONS = [
     ],
   },
   {
-    key: 'fact.sales_return',
+    key: 'fact.rework_intake',
     scopeKey: 'fact_ledger',
     kind: 'state_machine',
-    label: '客户退货',
-    summary: '客户退货从草稿审批或退回，经收货后只能走正式冲正。',
+    label: '返工回厂',
+    summary:
+      '返工回厂从待接收进入已接收；接收前可取消，尚未进入生产返工时可冲正收货。',
     states: [
-      state('DRAFT', '草稿'),
-      state('APPROVED', '已批准'),
-      state('REJECTED', '已退回'),
-      state('RECEIVED', '已收货'),
+      state('DRAFT', '待接收'),
+      state('RECEIVED', '已接收'),
       state('CANCELLED', '已取消'),
       state('REVERSED', '已冲正'),
     ],
     initialStates: ['DRAFT'],
-    terminalStates: ['REJECTED', 'CANCELLED', 'REVERSED'],
+    terminalStates: ['CANCELLED', 'REVERSED'],
     transitions: [
-      transition('DRAFT', 'APPROVED', {
-        guard: '审批人不得为创建人，且来源出货、退货明细和 version 必须匹配。',
-        action: 'approve_sales_return',
-        permission: ['sales_return.approve', 'workflow.task.approve'],
+      transition('DRAFT', 'RECEIVED', {
+        guard:
+          '来源出货、返工承接生产单、数量和 version 必须匹配；收货形成 HOLD 待返工批次。',
+        action: 'receive_rework_intake',
+        permission: ['rework_intake.receive'],
+        factBoundary: 'source_document_and_inventory',
+      }),
+      transition('DRAFT', 'CANCELLED', {
+        guard: '仅尚未接收的记录可取消，必须提供原因并匹配当前 version。',
+        action: 'cancel_rework_intake',
+        permission: ['rework_intake.cancel'],
         factBoundary: 'source_document_only',
       }),
-      transition('DRAFT', 'REJECTED', {
-        guard: '审批人不得为创建人，必须提供退回原因并匹配流程节点和 version。',
-        action: 'reject_sales_return',
-        permission: ['sales_return.approve', 'workflow.task.reject'],
-        factBoundary: 'source_document_only',
-      }),
-      transition('APPROVED', 'RECEIVED', {
-        guard: '收货同步写库存与质检草稿/提交状态。',
-        action: 'receive_sales_return',
-        permission: ['sales_return.receive'],
-        factBoundary: 'fact_ledger',
-      }),
-      ...['DRAFT', 'APPROVED'].map((from) =>
-        transition(from, 'CANCELLED', {
-          guard: '仅未收货退货单可取消，必须提供原因并匹配当前 version。',
-          action: 'cancel_sales_return',
-          permission: ['sales_return.cancel'],
-          factBoundary: 'source_document_only',
-        })
-      ),
       transition('RECEIVED', 'REVERSED', {
-        guard: '仅已收货退货单可冲正；必须反向库存影响并保留质检审计。',
-        action: 'reverse_sales_return',
-        permission: ['sales_return.reverse'],
-        factBoundary: 'fact_ledger',
+        guard: '仅尚未存在有效生产返工记录时可冲正，并以反向库存记录恢复。',
+        action: 'reverse_rework_intake',
+        permission: ['rework_intake.reverse'],
+        factBoundary: 'source_document_and_inventory',
       }),
     ],
-    guard: 'RECEIVED 后禁止取消，只能以正式冲正反向库存影响。',
+    guard:
+      '回厂批次只能由 REWORK 生产事实消费；返工完成后通过非结算补发单出货。',
     factBoundary: 'fact_ledger',
     sourceRefs: [
-      'server/internal/biz/sales_return.go',
-      'server/internal/data/operational_fact_sales_return_repo.go',
-      'server/internal/service/jsonrpc_operational_fact_sales_return.go',
+      'server/internal/biz/rework_intake.go',
+      'server/internal/data/operational_fact_rework_intake_repo.go',
+      'server/internal/service/jsonrpc_operational_fact_rework_intake.go',
     ],
     evidence: [
       ...factEvidence,
       evidence(
         'code',
-        'server/internal/data/operational_fact_sales_return_repo.go',
-        '客户退货 approve / receive / cancel 的精确前态门禁。'
+        'server/internal/data/operational_fact_rework_intake_repo.go',
+        '回厂接收、库存 HOLD、生产返工 lineage 与补发门禁。'
       ),
     ],
   },
@@ -2121,7 +2100,8 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'finance_fact',
       }),
     ],
-    guard: '审批不生成财务事实；只有批准后的过账命令写核销，过账后不允许取消或回到 DRAFT。',
+    guard:
+      '审批不生成财务事实；只有批准后的过账命令写核销，过账后不允许取消或回到 DRAFT。',
     factBoundary: 'finance_fact',
     sourceRefs: [
       'server/internal/biz/finance_payment.go',
@@ -2168,13 +2148,14 @@ const FLOW_DEFINITIONS = [
       state('PENDING', '待放行'),
       state('APPROVED', '已放行'),
       state('REJECTED', '已拒绝'),
+      state('NOT_REQUIRED', '无需财务放行'),
     ],
     initialStates: ['PENDING'],
-    terminalStates: ['APPROVED', 'REJECTED'],
+    terminalStates: ['APPROVED', 'REJECTED', 'NOT_REQUIRED'],
     transitions: [],
     transitionAuthority: 'object-specific',
     guard:
-      '当前 Product Core 只登记 PENDING 到 APPROVED 的流程命令写入；目录不为 REJECTED 猜测通用边。',
+      '普通商业出货由流程命令把 PENDING 写为 APPROVED；返工补发在创建时固定为 NOT_REQUIRED，目录不为 REJECTED 或 NOT_REQUIRED 猜测通用迁移边。',
     factBoundary: 'shipment_release_not_shipped',
     sourceRefs: [
       'server/internal/biz/process_runtime.go',
@@ -2209,31 +2190,29 @@ const FLOW_DEFINITIONS = [
     terminalStates: ['REJECTED', 'CANCELLED'],
     transitions: [
       transition('DRAFT', 'SUBMITTED', {
-        guard: '仅 MANUAL_ADJUSTMENT 可提交，且创建人、version 与流程节点必须匹配。',
+        guard:
+          '仅 MANUAL_ADJUSTMENT 可提交，且创建人、version 与流程节点必须匹配。',
         action: 'submit_inventory_adjustment',
         permission: ['warehouse.adjustment.create'],
         factBoundary: 'source_document_only',
       }),
       transition('SUBMITTED', 'APPROVED', {
-        guard: '仅 MANUAL_ADJUSTMENT 可批准，审批人不得为创建人并必须匹配 version。',
+        guard:
+          '仅 MANUAL_ADJUSTMENT 可批准，审批人不得为创建人并必须匹配 version。',
         action: 'approve_inventory_adjustment',
-        permission: [
-          'warehouse.adjustment.approve',
-          'workflow.task.approve',
-        ],
+        permission: ['warehouse.adjustment.approve', 'workflow.task.approve'],
         factBoundary: 'source_document_only',
       }),
       transition('SUBMITTED', 'REJECTED', {
-        guard: '仅 MANUAL_ADJUSTMENT 可退回，必须提供原因且审批人不得为创建人。',
+        guard:
+          '仅 MANUAL_ADJUSTMENT 可退回，必须提供原因且审批人不得为创建人。',
         action: 'reject_inventory_adjustment',
-        permission: [
-          'warehouse.adjustment.approve',
-          'workflow.task.reject',
-        ],
+        permission: ['warehouse.adjustment.approve', 'workflow.task.reject'],
         factBoundary: 'source_document_only',
       }),
       transition('DRAFT', 'POSTED', {
-        guard: '仅非 MANUAL_ADJUSTMENT 从草稿直接过账，并原子写库存交易与余额。',
+        guard:
+          '仅非 MANUAL_ADJUSTMENT 从草稿直接过账，并原子写库存交易与余额。',
         action: 'post_inventory_operation',
         permission: ['warehouse.adjustment.create'],
         factBoundary: 'inventory_fact',
@@ -2259,7 +2238,8 @@ const FLOW_DEFINITIONS = [
         factBoundary: 'inventory_fact',
       }),
     ],
-    guard: '提交或批准不写库存事实；POSTED 才改变库存，POSTED 后取消必须反向原影响。',
+    guard:
+      '提交或批准不写库存事实；POSTED 才改变库存，POSTED 后取消必须反向原影响。',
     factBoundary: 'source_and_inventory_fact',
     sourceRefs: [
       'server/internal/biz/inventory_operation.go',
@@ -2628,6 +2608,29 @@ const salesProcessNodes = (includeEngineering) => [
     factBoundary: 'orchestration_only',
   }),
   processNode('end', 'end', '结束'),
+  processNode('sales_order_rejected_end', 'end', '销售订单审批驳回结束'),
+]
+
+const salesProcessEdges = (includeEngineering) => [
+  processEdge('submit_sales_order', 'order_approval'),
+  processEdge(
+    'order_approval',
+    'activate_sales_order',
+    'sales_order.approval_outcome'
+  ),
+  processEdge(
+    'order_approval',
+    'sales_order_rejected_end',
+    'sales_order.approval_outcome'
+  ),
+  processEdge(
+    'activate_sales_order',
+    includeEngineering ? 'engineering_data' : 'order_review'
+  ),
+  ...(includeEngineering
+    ? [processEdge('engineering_data', 'order_review')]
+    : []),
+  processEdge('order_review', 'end'),
 ]
 
 export const processDefinitions = Object.freeze(
@@ -2642,6 +2645,7 @@ export const processDefinitions = Object.freeze(
       initial: 'submit_sales_order',
       terminal: 'end',
       nodes: salesProcessNodes(false),
+      edges: salesProcessEdges(false),
     },
     {
       key: 'sales_order_acceptance/approval_engineering_pmc',
@@ -2653,6 +2657,7 @@ export const processDefinitions = Object.freeze(
       initial: 'submit_sales_order',
       terminal: 'end',
       nodes: salesProcessNodes(true),
+      edges: salesProcessEdges(true),
     },
     {
       key: 'material_supply/purchase_order_approval',
@@ -2685,6 +2690,25 @@ export const processDefinitions = Object.freeze(
           }
         ),
         processNode('end', 'end', '结束'),
+        processNode(
+          'purchase_order_rejected_end',
+          'end',
+          '采购订单审批驳回结束'
+        ),
+      ],
+      edges: [
+        processEdge('submit_purchase_order', 'purchase_order_approval'),
+        processEdge(
+          'purchase_order_approval',
+          'approve_purchase_order',
+          'purchase_order.approval_outcome'
+        ),
+        processEdge(
+          'purchase_order_approval',
+          'purchase_order_rejected_end',
+          'purchase_order.approval_outcome'
+        ),
+        processEdge('approve_purchase_order', 'end'),
       ],
     },
     {
@@ -2714,80 +2738,31 @@ export const processDefinitions = Object.freeze(
           }
         ),
         processNode('end', 'end', '结束'),
-      ],
-    },
-    {
-      key: 'sales_return_acceptance/approval_receipt',
-      processKey: 'sales_return_acceptance',
-      processVersion: 'v1',
-      variantKey: 'approval_receipt',
-      businessRefType: 'sales_return',
-      label: '客户退货受理（审批 + 收货）',
-      initial: 'sales_return_approval',
-      terminal: 'end',
-      nodes: [
-        processNode('sales_return_approval', 'approval', '客户退货审批', {
-          ownerPool: 'boss',
-          permission: ['sales_return.approve'],
-          factBoundary: 'orchestration_only',
-        }),
         processNode(
-          'approve_sales_return',
+          'shipment_finance_reject',
           'domain_command',
-          '批准客户退货',
+          '记录财务驳回',
           {
-            action:
-              'OperationalFactUsecase.ApproveSalesReturnForProcessCommand',
-            permission: ['workflow.task.approve'],
-            factBoundary: 'source_document_only',
-          }
-        ),
-        processNode('sales_return_receipt', 'human_task', '客户退货收货', {
-          ownerPool: 'warehouse',
-          permission: ['workflow.task.complete'],
-          factBoundary: 'orchestration_only',
-        }),
-        processNode(
-          'receive_sales_return',
-          'domain_command',
-          '确认客户退货入库',
-          {
-            ownerPool: 'warehouse',
-            action:
-              'OperationalFactUsecase.ReceiveSalesReturnForProcessCommand',
-            permission: ['sales_return.receive'],
-            factBoundary: 'sales_return_inventory_via_domain_usecase',
-          }
-        ),
-        processNode('end', 'end', '结束'),
-        processNode(
-          'reject_sales_return',
-          'domain_command',
-          '驳回客户退货',
-          {
-            action:
-              'OperationalFactUsecase.RejectSalesReturnForProcessCommand',
+            action: 'OperationalFactUsecase.RecordShipmentFinanceRejection',
             permission: ['workflow.task.reject'],
-            factBoundary: 'source_document_only',
+            factBoundary: 'shipment_rejection_via_domain_usecase',
           }
         ),
-        processNode('rejected_end', 'end', '驳回结束'),
+        processNode('shipment_finance_rejected_end', 'end', '出货财务驳回结束'),
       ],
       edges: [
         processEdge(
-          'sales_return_approval',
-          'approve_sales_return',
-          'sales_return.approval_outcome'
+          'shipment_finance_approval',
+          'shipment_finance_release',
+          'shipment.finance_approval_outcome'
         ),
         processEdge(
-          'sales_return_approval',
-          'reject_sales_return',
-          'sales_return.approval_outcome'
+          'shipment_finance_approval',
+          'shipment_finance_reject',
+          'shipment.finance_approval_outcome'
         ),
-        processEdge('approve_sales_return', 'sales_return_receipt'),
-        processEdge('sales_return_receipt', 'receive_sales_return'),
-        processEdge('receive_sales_return', 'end'),
-        processEdge('reject_sales_return', 'rejected_end'),
+        processEdge('shipment_finance_release', 'end'),
+        processEdge('shipment_finance_reject', 'shipment_finance_rejected_end'),
       ],
     },
     {
@@ -2805,27 +2780,17 @@ export const processDefinitions = Object.freeze(
           permission: ['finance.payment.approve'],
           factBoundary: 'orchestration_only',
         }),
-        processNode(
-          'approve_finance_payment',
-          'domain_command',
-          '批准收付款',
-          {
-            action:
-              'OperationalFactUsecase.ApproveFinancePaymentForProcessCommand',
-            permission: ['workflow.task.approve'],
-            factBoundary: 'source_document_only',
-          }
-        ),
-        processNode(
-          'finance_payment_execution',
-          'human_task',
-          '收付款执行',
-          {
-            ownerPool: 'finance',
-            permission: ['workflow.task.complete'],
-            factBoundary: 'orchestration_only',
-          }
-        ),
+        processNode('approve_finance_payment', 'domain_command', '批准收付款', {
+          action:
+            'OperationalFactUsecase.ApproveFinancePaymentForProcessCommand',
+          permission: ['workflow.task.approve'],
+          factBoundary: 'source_document_only',
+        }),
+        processNode('finance_payment_execution', 'human_task', '收付款执行', {
+          ownerPool: 'finance',
+          permission: ['workflow.task.complete'],
+          factBoundary: 'orchestration_only',
+        }),
         processNode(
           'post_finance_payment',
           'domain_command',
@@ -2839,17 +2804,12 @@ export const processDefinitions = Object.freeze(
           }
         ),
         processNode('end', 'end', '结束'),
-        processNode(
-          'reject_finance_payment',
-          'domain_command',
-          '驳回收付款',
-          {
-            action:
-              'OperationalFactUsecase.RejectFinancePaymentForProcessCommand',
-            permission: ['workflow.task.reject'],
-            factBoundary: 'source_document_only',
-          }
-        ),
+        processNode('reject_finance_payment', 'domain_command', '驳回收付款', {
+          action:
+            'OperationalFactUsecase.RejectFinancePaymentForProcessCommand',
+          permission: ['workflow.task.reject'],
+          factBoundary: 'source_document_only',
+        }),
         processNode('rejected_end', 'end', '驳回结束'),
       ],
       edges: [
@@ -3448,6 +3408,12 @@ export function buildDevFlowStateCatalog({
         )
     )
   )
+  const factLedgerCatalog = buildDevFactLedgerCatalog({ flows })
+  const businessChainCatalog = buildDevBusinessChainCatalog({
+    flows,
+    processDefinitions,
+    factDefinitions: factLedgerCatalog.definitions,
+  })
 
   return Object.freeze({
     version: DEV_FLOW_STATE_CATALOG_VERSION,
@@ -3462,6 +3428,14 @@ export function buildDevFlowStateCatalog({
     scopes,
     flowLayers,
     processDefinitions,
+    factLedgerCatalogVersion: factLedgerCatalog.version,
+    factDefinitions: factLedgerCatalog.definitions,
+    factRuntimeQuery: factLedgerCatalog.runtimeQuery,
+    factLedgerCoverage: factLedgerCatalog.coverage,
+    businessChainCatalogVersion: businessChainCatalog.version,
+    businessChains: businessChainCatalog.chains,
+    businessChainOverview: businessChainCatalog.overview,
+    businessChainCoverage: businessChainCatalog.coverage,
     overlays,
     flows,
   })

@@ -466,49 +466,113 @@ export async function postFinanceFact(params = {}) {
   })
 }
 
-export async function listSalesReturns(params = {}, options = {}) {
+export async function listReworkIntakes(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_sales_returns',
+    'list_rework_intakes',
     params,
     options
   )
   return dataOf(result)
 }
 
-export async function listAllSalesReturns(params = {}, options = {}) {
+export async function listAllReworkIntakes(params = {}, options = {}) {
   return listAllPaginatedRecords(
-    listSalesReturns,
+    listReworkIntakes,
     params,
-    'sales_returns',
+    'rework_intakes',
     options,
     {
-      invalidResponseMessage: '服务器返回的客户退货记录不完整，请刷新后重试',
+      invalidResponseMessage: '服务器返回的返工回厂记录不完整，请刷新后重试',
     }
   )
 }
 
-export async function createSalesReturn(params = {}) {
-  const result = await operationalFactRpc.call('create_sales_return', params)
-  return dataOf(result)?.sales_return || null
-}
-
-export async function cancelSalesReturn(params = {}) {
-  const result = await operationalFactRpc.call('cancel_sales_return', params)
-  return dataOf(result)?.sales_return || null
-}
-
-export async function reverseSalesReturn(params = {}) {
-  const result = await operationalFactRpc.call('reverse_sales_return', params)
-  return dataOf(result)?.sales_return || null
-}
-
-export async function getSalesReturn(params = {}, options = {}) {
+export async function listReworkIntakeSourceCandidates(
+  params = {},
+  options = {}
+) {
   const result = await operationalFactRpc.call(
-    'get_sales_return',
+    'list_rework_intake_source_candidates',
     params,
     options
   )
-  return dataOf(result)?.sales_return || null
+  return dataOf(result)
+}
+
+export async function listAllReworkIntakeSourceCandidates(
+  params = {},
+  options = {}
+) {
+  return listAllPaginatedRecords(
+    async (pageParams, pageOptions) => {
+      const data = await listReworkIntakeSourceCandidates(
+        pageParams,
+        pageOptions
+      )
+      return {
+        ...data,
+        rework_intake_source_candidates: (
+          data?.rework_intake_source_candidates || []
+        ).map((item) => ({
+          ...item,
+          id: `${Number(item?.source_shipment_item_id || 0)}:${Number(
+            item?.target_production_order_item_id || 0
+          )}`,
+        })),
+      }
+    },
+    params,
+    'rework_intake_source_candidates',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的可返工出货明细不完整，请刷新后重试',
+    }
+  )
+}
+
+export async function createReworkIntake(params = {}) {
+  const result = await operationalFactRpc.call('create_rework_intake', params)
+  return dataOf(result)?.rework_intake || null
+}
+
+export async function receiveReworkIntake(params = {}) {
+  const result = await operationalFactRpc.call('receive_rework_intake', params)
+  return dataOf(result)?.rework_intake || null
+}
+
+export async function cancelReworkIntake(params = {}) {
+  const result = await operationalFactRpc.call('cancel_rework_intake', params)
+  return dataOf(result)?.rework_intake || null
+}
+
+export async function reverseReworkIntake(params = {}) {
+  const result = await operationalFactRpc.call('reverse_rework_intake', params)
+  return dataOf(result)?.rework_intake || null
+}
+
+export async function getReworkIntake(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'get_rework_intake',
+    params,
+    options
+  )
+  return dataOf(result)?.rework_intake || null
+}
+
+export async function createProductionReworkFromIntake(params = {}) {
+  const result = await operationalFactRpc.call(
+    'create_production_rework_from_intake',
+    params
+  )
+  return dataOf(result)?.production_fact || null
+}
+
+export async function createReworkReshipment(params = {}) {
+  const result = await operationalFactRpc.call(
+    'create_rework_reshipment',
+    params
+  )
+  return dataOf(result)?.shipment || null
 }
 
 export async function createFinancePayment(params = {}) {
@@ -554,8 +618,7 @@ export async function listAllFinancePayments(params = {}, options = {}) {
     'payments',
     options,
     {
-      invalidResponseMessage:
-        '服务器返回的收付款记录不完整，请刷新后重试',
+      invalidResponseMessage: '服务器返回的收付款记录不完整，请刷新后重试',
     }
   )
 }

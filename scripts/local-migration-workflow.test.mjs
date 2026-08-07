@@ -95,20 +95,22 @@ function createService({
     async act(action) {
       calls.push(action.action);
       if (action.action === "prepare") {
-        operation = blocked
-          ? {
-              ...readyOperation(),
-              status: "blocked",
-              message: "操作被安全停止",
-              issues: [
-                {
-                  code: "database_clients_active",
-                  severity: "blocked",
-                  message: "共享开发库仍有其它连接",
-                },
-              ],
-            }
-          : readyOperation();
+        if (blocked) {
+          operation = {
+            ...readyOperation(),
+            status: "blocked",
+            message: "操作被安全停止",
+            issues: [
+              {
+                code: "database_clients_active",
+                severity: "blocked",
+                message: "共享开发库仍有其它连接",
+              },
+            ],
+          };
+        } else {
+          operation = readyOperation();
+        }
         return {
           accepted: true,
           operation: { ...operation, status: "preparing" },

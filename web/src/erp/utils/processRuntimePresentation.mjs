@@ -8,7 +8,6 @@ const PROCESS_LABELS = Object.freeze({
   sales_order_acceptance: '销售订单受理',
   material_supply: '采购订单提交与审批',
   finished_goods_delivery: '出货财务放行',
-  sales_return_acceptance: '客户退货受理',
   finance_payment_approval: '收付款审批',
   inventory_adjustment_approval: '人工库存调整',
   production_exception_approval: '生产异常处置',
@@ -38,11 +37,6 @@ const NODE_LABELS = Object.freeze({
   shipment_finance_release: '财务放行',
   shipment_execution: '执行出货',
   receivable_lead: '应收跟进',
-  sales_return_approval: '客户退货审批',
-  approve_sales_return: '确认客户退货申请',
-  sales_return_receipt: '客户退货收货交接',
-  receive_sales_return: '客户退货收货入库',
-  reject_sales_return: '退回客户退货申请',
   finance_payment_approval: '收付款审批',
   approve_finance_payment: '确认收付款申请',
   finance_payment_execution: '收付款执行交接',
@@ -65,7 +59,6 @@ const NODE_LABELS = Object.freeze({
 })
 
 const APPROVAL_FORM_PROFILE_KEYS = new Set([
-  'sales_return_approval',
   'finance_payment_approval',
   'inventory_adjustment_approval',
   'production_exception_approval',

@@ -50,6 +50,9 @@ Use this skill to keep plush-toy-erp docs useful for humans and safe as project 
    - Make headings scannable. A reader should know what each section does from the H2/H3 list.
    - Prefer Chinese main headings with stable English anchors or technical terms where useful.
    - Avoid front-loading history, internal IDs, stage labels, or capability anchors when the document is meant for human scanning.
+   - Write ordinary prose with the human-readable state first, for example `可作为试用候选` or `领域逻辑验证（T3）`. Product capability status does not use an internal L-level code; readers must not memorize an identifier table before understanding the sentence.
+   - Definition and traceability tables may keep separate identifier and name columns. Exact commands, paths, environment variables, JSON keys, test fixture IDs, stable anchors, and archive filenames keep their machine-facing spelling.
+   - Do not leave bare identifiers or compressed ranges such as `T3-T5` or `F02-F05` in human-facing summaries. Spell out validation scopes, formulas, or flows and keep identifiers only as secondary traceability.
    - Use open-source and large-company documentation patterns as information architecture only: Quick start, Concepts, How-to, Reference, Troubleshooting, FAQ, Changelog. Keep the actual process lightweight for personal development.
    - When docs involve classification matrices, separate architecture layers, validation levels, test shapes, and evidence environments. Do not call `T0-T8` project architecture layers; treat them as validation levels. Keep detailed test selection in `docs/product/自动化测试策略.md` or the `plush-test-governance` skill, and link there instead of duplicating the full testing policy.
 

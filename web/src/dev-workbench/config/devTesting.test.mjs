@@ -209,7 +209,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
       'mobile-workflow-smoke',
       'customer-config-dev-console',
       'dev-prototype-registry',
-      'dev-doc-governance-ledger',
+      'dev-doc-governance',
       'customer-config-package-runtime',
       'customer-import-tooling',
       'frontend-customer-config-projection',
@@ -542,31 +542,27 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(getPreset('dev-prototype-registry').description, /不改正式菜单/)
   assert.match(
-    getPresetCopyText('dev-doc-governance-ledger'),
+    getPresetCopyText('dev-doc-governance'),
     /devDocs\.test\.mjs/
   )
   assert.match(
-    getPresetCopyText('dev-doc-governance-ledger'),
+    getPresetCopyText('dev-doc-governance'),
     /devGovernance\.test\.mjs/
   )
   assert.match(
-    getPresetCopyText('dev-doc-governance-ledger'),
-    /devCapabilityLedger\.test\.mjs/
-  )
-  assert.match(
-    getPresetCopyText('dev-doc-governance-ledger'),
+    getPresetCopyText('dev-doc-governance'),
     /dev-docs-dark-desktop/
   )
   assert.match(
-    getPresetCopyText('dev-doc-governance-ledger'),
+    getPresetCopyText('dev-doc-governance'),
     /dev-governance-dark-desktop/
   )
   assert.match(
-    getPreset('dev-doc-governance-ledger').description,
+    getPreset('dev-doc-governance').description,
     /不改正式文档真源/
   )
   assert.match(
-    getPreset('dev-doc-governance-ledger').description,
+    getPreset('dev-doc-governance').description,
     /不进入正式菜单/
   )
   assert.match(
@@ -937,7 +933,11 @@ test('devTesting: 主视图与命令筛选由 canonical query 驱动', () => {
   assert.doesNotMatch(testingPageSource, /<Input\.Search/u)
   assert.match(
     testingPageSource,
-    /<Input[\s\S]*prefix=\{<SearchOutlined aria-hidden="true" \/>\}/u
+    /import SearchInput from '@\/common\/components\/SearchInput'/u
+  )
+  assert.match(
+    testingPageSource,
+    /<SearchInput[\s\S]*className="erp-dev-testing-search"/u
   )
   assert.match(
     testingPageSource,
@@ -1349,7 +1349,25 @@ test('devTesting: 覆盖接口缺失、失败和错误 schema 均 fail closed', 
 
 test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界', () => {
   assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
-  assert.match(testingPageSource, /覆盖证据 \/ Coverage/)
+  assert.match(testingPageSource, /质量验证工作台/)
+  assert.match(testingPageSource, /\{ label: '本轮验证', value: VIEW_TIERS \}/)
+  assert.match(
+    testingPageSource,
+    /\{ label: '专项检查库', value: VIEW_COMMANDS \}/
+  )
+  assert.match(
+    testingPageSource,
+    /\{ label: '证据与覆盖', value: VIEW_COVERAGE \}/
+  )
+  assert.match(
+    testingPageSource,
+    /erp-dev-testing-disclosure--presets[\s\S]*?DEV_TESTING_COPY_PRESETS\.map/
+  )
+  assert.match(
+    testingPageSource,
+    /erp-dev-testing-disclosure--tiers[\s\S]*?tiers\.map/
+  )
+  assert.match(testingPageSource, /T0–T8 是内部选测键，不是完成进度/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_API_PATH/)
   assert.match(testingPageSource, /DEV_TESTING_COVERAGE_COLLECT_COMMAND/)
   assert.match(testingPageSource, /createDevCoverageOperationClient/)

@@ -21,9 +21,6 @@ func TestCustomerConfigExceptionProcessMethodContractsAreExact(t *testing.T) {
 		businessRefType string
 		idParam         string
 	}{
-		{"start_sales_return_acceptance_process", biz.ProcessKeySalesReturnApproval, "start", "", "sales_return", "sales_return_id"},
-		{"get_sales_return_acceptance_process", biz.ProcessKeySalesReturnApproval, "get", "", "sales_return", "sales_return_id"},
-		{"execute_sales_return_receive", biz.ProcessKeySalesReturnApproval, "execute", biz.ProcessDomainCommandSalesReturnReceive, "sales_return", "sales_return_id"},
 		{"start_finance_payment_approval_process", biz.ProcessKeyFinancePaymentApproval, "start", "", "finance_payment", "finance_payment_id"},
 		{"get_finance_payment_approval_process", biz.ProcessKeyFinancePaymentApproval, "get", "", "finance_payment", "finance_payment_id"},
 		{"execute_finance_payment_post", biz.ProcessKeyFinancePaymentApproval, "execute", biz.ProcessDomainCommandFinancePaymentPost, "finance_payment", "finance_payment_id"},
@@ -52,9 +49,6 @@ func TestCustomerConfigExceptionProcessMethodContractsAreExact(t *testing.T) {
 	}
 
 	for _, method := range []string{
-		"start_rma_process",
-		"get_rma_process",
-		"execute_sales_return_accept",
 		"post_finance_payment",
 		"execute_inventory_adjustment",
 		"approve_production_exception",
@@ -80,12 +74,6 @@ func TestExceptionProcessDomainCommandExecutionParamsAreStrict(t *testing.T) {
 		params     map[string]any
 		wantExtra  func(*testing.T, *biz.ProcessDomainCommandExecution)
 	}{
-		{
-			name:       "sales return receive",
-			processKey: biz.ProcessKeySalesReturnApproval,
-			commandKey: biz.ProcessDomainCommandSalesReturnReceive,
-			params:     exceptionProcessExecutionBase("sales_return_id", 31),
-		},
 		{
 			name:       "finance payment allocation canonicalized",
 			processKey: biz.ProcessKeyFinancePaymentApproval,
@@ -198,7 +186,6 @@ func TestCustomerConfigExceptionProcessStartPermissionsFailClosed(t *testing.T) 
 		method string
 		idKey  string
 	}{
-		{"start_sales_return_acceptance_process", "sales_return_id"},
 		{"start_finance_payment_approval_process", "finance_payment_id"},
 		{"start_inventory_adjustment_approval_process", "inventory_operation_id"},
 		{"start_production_exception_approval_process", "production_exception_id"},
@@ -256,131 +243,8 @@ func TestStartOrReadProcessFirstNodeReturnsSettledHumanNode(t *testing.T) {
 
 type exceptionProcessServiceOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
-	salesReturn         *biz.SalesReturn
 	financePayment      *biz.FinancePayment
 	productionException *biz.ProductionExceptionDecision
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) GetSalesReturn(_ context.Context, id int) (*biz.SalesReturn, error) {
-	if r.salesReturn == nil || r.salesReturn.ID != id {
-		return nil, biz.ErrBadParam
-	}
-	item := *r.salesReturn
-	return &item, nil
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) CreateSalesReturn(
-	context.Context,
-	*biz.SalesReturnCreate,
-	int,
-	string,
-) (*biz.SalesReturn, error) {
-	return nil, biz.ErrBadParam
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) ApproveSalesReturn(
-	context.Context,
-	*biz.SalesReturnTransition,
-	int,
-) (*biz.SalesReturn, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) ReceiveSalesReturn(
-	context.Context,
-	*biz.SalesReturnTransition,
-	int,
-) (*biz.SalesReturn, error) {
-	return nil, biz.ErrProcessRuntimeRequired
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) CancelSalesReturn(
-	context.Context,
-	*biz.SalesReturnTransition,
-	int,
-) (*biz.SalesReturn, error) {
-	return nil, biz.ErrBadParam
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) ReverseSalesReturn(
-	context.Context,
-	*biz.SalesReturnTransition,
-	int,
-) (*biz.SalesReturn, error) {
-	return nil, biz.ErrBadParam
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) ListSalesReturns(
-	context.Context,
-	biz.SalesReturnFilter,
-) ([]*biz.SalesReturn, int, error) {
-	if r.salesReturn == nil {
-		return nil, 0, nil
-	}
-	item := *r.salesReturn
-	return []*biz.SalesReturn{&item}, 1, nil
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) ApproveSalesReturnForProcessCommand(
-	_ context.Context,
-	id int,
-	_ *biz.ProcessDomainCommandInput,
-	_ *biz.ProcessDomainCommandResult,
-	actorID int,
-	reason string,
-) (*biz.SalesReturn, error) {
-	if r.salesReturn == nil || r.salesReturn.ID != id {
-		return nil, biz.ErrBadParam
-	}
-	now := time.Now()
-	r.salesReturn.Status = biz.SalesReturnStatusApproved
-	r.salesReturn.ApprovedAt = &now
-	r.salesReturn.ApprovedBy = &actorID
-	r.salesReturn.RejectReason = nil
-	r.salesReturn.Version++
-	item := *r.salesReturn
-	_ = reason
-	return &item, nil
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) RejectSalesReturnForProcessCommand(
-	_ context.Context,
-	id int,
-	_ *biz.ProcessDomainCommandInput,
-	_ *biz.ProcessDomainCommandResult,
-	actorID int,
-	reason string,
-) (*biz.SalesReturn, error) {
-	if r.salesReturn == nil || r.salesReturn.ID != id {
-		return nil, biz.ErrBadParam
-	}
-	now := time.Now()
-	r.salesReturn.Status = biz.SalesReturnStatusRejected
-	r.salesReturn.RejectedAt = &now
-	r.salesReturn.RejectedBy = &actorID
-	r.salesReturn.RejectReason = &reason
-	r.salesReturn.Version++
-	item := *r.salesReturn
-	return &item, nil
-}
-
-func (r *exceptionProcessServiceOperationalFactRepo) ReceiveSalesReturnForProcessCommand(
-	_ context.Context,
-	id int,
-	_ *biz.ProcessDomainCommandInput,
-	_ *biz.ProcessDomainCommandResult,
-	actorID int,
-) (*biz.SalesReturn, error) {
-	if r.salesReturn == nil || r.salesReturn.ID != id {
-		return nil, biz.ErrBadParam
-	}
-	now := time.Now()
-	r.salesReturn.Status = biz.SalesReturnStatusReceived
-	r.salesReturn.ReceivedAt = &now
-	r.salesReturn.ReceivedBy = &actorID
-	r.salesReturn.Version++
-	item := *r.salesReturn
-	return &item, nil
 }
 
 func (r *exceptionProcessServiceOperationalFactRepo) GetFinancePayment(_ context.Context, id int) (*biz.FinancePayment, error) {
@@ -777,11 +641,6 @@ func (r *exceptionProcessServiceInventoryRepo) PostInventoryOperationForProcessC
 func TestCustomerConfigExceptionProcessesStartReadAndReplay(t *testing.T) {
 	now := time.Now()
 	repo := &exceptionProcessServiceOperationalFactRepo{
-		salesReturn: &biz.SalesReturn{
-			ID: 101, ReturnNo: "RMA-101", ShipmentID: 901, CustomerID: 501,
-			Status: biz.SalesReturnStatusDraft, Reason: "客户退货",
-			Version: 1, CreatedBy: 2, CreatedAt: now, UpdatedAt: now,
-		},
 		financePayment: &biz.FinancePayment{
 			ID: 102, PaymentNo: "PAY-102", Direction: biz.FinancePaymentDirectionReceipt,
 			Status: biz.FinancePaymentStatusDraft, CounterpartyType: biz.FinanceCounterpartyCustomer,
@@ -806,7 +665,6 @@ func TestCustomerConfigExceptionProcessesStartReadAndReplay(t *testing.T) {
 		businessRefID   int
 		wantNodeCount   int
 	}{
-		{"sales return", biz.ProcessKeySalesReturnApproval, biz.CustomerProcessVariantSalesReturnApprovalReceipt, "sales_return", "start_sales_return_acceptance_process", "get_sales_return_acceptance_process", "sales_return_id", 101, 7},
 		{"finance payment", biz.ProcessKeyFinancePaymentApproval, biz.CustomerProcessVariantFinancePaymentApprovalPost, "finance_payment", "start_finance_payment_approval_process", "get_finance_payment_approval_process", "finance_payment_id", 102, 7},
 		{"production exception", biz.ProcessKeyProductionExceptionApproval, biz.CustomerProcessVariantProductionExceptionApproval, "production_exception_decision", "start_production_exception_approval_process", "get_production_exception_approval_process", "production_exception_id", 103, 8},
 	}
@@ -1111,7 +969,6 @@ func customerConfigPublishParamsWithExceptionProcess(
 		t.Fatalf("module_states missing: %#v", payload)
 	}
 	moduleStates = append(moduleStates,
-		map[string]any{"module_key": "sales_returns", "state": "enabled"},
 		map[string]any{"module_key": "production", "state": "enabled"},
 	)
 	payload["module_states"] = moduleStates

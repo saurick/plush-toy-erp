@@ -8,7 +8,6 @@ import (
 func TestWorkflowApprovalCapabilityKeysReturnsCompleteCopy(t *testing.T) {
 	want := []string{
 		PermissionWorkflowTaskApprove,
-		PermissionSalesReturnApprove,
 		PermissionFinancePaymentApprove,
 		PermissionWarehouseAdjustmentApprove,
 		PermissionProductionExceptionApprove,

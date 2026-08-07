@@ -198,30 +198,29 @@ test("exception-flow browser runner requires the exact stale-write error code", 
   }
 });
 
-test("sales return exception flow creates its source through the product UI", async () => {
+test("rework-intake flow creates its source through the product UI", async () => {
   const source = await import("node:fs/promises").then((module) =>
     module.readFile(
       new URL("./exception-flow-real-write-browser.mjs", import.meta.url),
       "utf8",
     ),
   );
-  const salesReturnSection = source.slice(
-    source.indexOf("async function createSalesReturnSourceInBrowser"),
+  const reworkIntakeSection = source.slice(
+    source.indexOf("async function createReworkIntakeSourceInBrowser"),
     source.indexOf("async function runFinancePaymentFlow"),
   );
   assert.match(
-    salesReturnSection,
-    /getByRole\("button", \{ name: "新建客户退货", exact: true \}\)/u,
+    reworkIntakeSection,
+    /getByRole\("button", \{ name: "新建返工回厂", exact: true \}\)/u,
   );
-  assert.match(salesReturnSection, /"提交退货申请"/u);
-  assert.match(salesReturnSection, /"browser_created_from_shipped_source"/u);
+  assert.match(reworkIntakeSection, /"建立回厂记录"/u);
+  assert.match(reworkIntakeSection, /"browser_created_from_shipped_source"/u);
   assert.match(
-    salesReturnSection,
-    /sourceNo: sourceSetup\.created\.return_no/u,
+    reworkIntakeSection,
+    /source\.intake_no/u,
   );
-  assert.doesNotMatch(salesReturnSection, /received sales return fixture/u);
   assert.doesNotMatch(
-    salesReturnSection,
+    reworkIntakeSection,
     /existing_isolated_dataset_approved_source/u,
   );
 });

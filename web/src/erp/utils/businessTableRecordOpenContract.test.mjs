@@ -15,7 +15,7 @@ const expectedBusinessDataTablePages = [
   'BOMVersionsPage.jsx',
   'FinancePaymentsPage.jsx',
   'OperationalFactsPage.jsx',
-  'SalesReturnsPage.jsx',
+  'ReworkIntakesPage.jsx',
   'ShipmentsPage.jsx',
   'V1MasterDataPage.jsx',
   'V1OutsourcingOrdersPage.jsx',

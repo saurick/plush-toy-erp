@@ -1009,16 +1009,10 @@ test("mobile workflow runtime browser smoke docs keep no-write and report bounda
     path.join(repoRoot, "docs/product/自动化测试策略.md"),
     "utf8",
   );
-  const trialRunbook = await readFile(
-    path.join(repoRoot, "docs/customers/yoyoosun/试用环境执行手册.md"),
-    "utf8",
-  );
-
   for (const [source, context] of [
     [scriptReadme, "scripts README"],
     [webReadme, "web README"],
     [testStrategyDoc, "automation test strategy"],
-    [trialRunbook, "yoyoosun trial runbook"],
   ]) {
     assert.match(
       source,
@@ -1072,7 +1066,6 @@ test("mobile workflow runtime browser smoke docs keep no-write and report bounda
     /只写本地脱敏报告，包含模拟任务计划 coverage 摘要和未证明项，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不进入 release evidence/u,
   );
   assert.match(testStrategyDoc, /external-base-url-not-yoyoosun-entry/u);
-  assert.match(trialRunbook, /external-base-url-not-yoyoosun-entry/u);
 });
 
 test("mobile workflow runtime browser smoke CLI preflight writes sanitized report without password", async () => {

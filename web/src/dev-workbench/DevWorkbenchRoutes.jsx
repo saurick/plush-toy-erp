@@ -38,9 +38,6 @@ const DevFlowStateObservatoryPage = lazyRoute(
 const DevPrototypesPage = lazyRoute(
   () => import('./pages/DevPrototypesPage.jsx')
 )
-const DevCapabilityLedgerPage = lazyRoute(
-  () => import('./pages/DevCapabilityLedgerPage.jsx')
-)
 const DevCustomerConfigPage = lazyRoute(
   () => import('./pages/DevCustomerConfigPage.jsx')
 )
@@ -115,10 +112,6 @@ export default function DevWorkbenchRoutes() {
           <Route path="testing" element={<DevTestingPage />} />
           <Route path="data-preparation" element={<DevDataPreparationPage />} />
           <Route path="prototypes" element={<DevPrototypesPage />} />
-          <Route
-            path="capability-ledger"
-            element={<DevCapabilityLedgerPage />}
-          />
           <Route path="customer-config" element={<DevCustomerConfigPage />} />
           <Route
             path="database-migration"

@@ -218,15 +218,25 @@ docker run -d --name "$container_name" \
   -v "$PWD/$run_dir:/work:ro" \
   "$postgres_image" >/dev/null
 
+restore_ready="0"
 for _ in $(seq 1 60); do
-  if docker exec "$container_name" pg_isready -U postgres -d "$restore_db" >/dev/null 2>&1; then
+  container_running="$(docker inspect --format '{{.State.Running}}' "$container_name" 2>/dev/null || true)"
+  pid1_comm=""
+  if [[ "$container_running" == "true" ]]; then
+    pid1_comm="$(docker exec "$container_name" cat /proc/1/comm 2>/dev/null || true)"
+  fi
+  if [[ "$container_running" == "true" && "$pid1_comm" == "postgres" ]] && \
+    docker exec "$container_name" pg_isready -U postgres -d "$restore_db" >/dev/null 2>&1; then
+    restore_ready="1"
     break
   fi
   sleep 1
 done
 
-if ! docker exec "$container_name" pg_isready -U postgres -d "$restore_db" >/dev/null 2>&1; then
+if [[ "$restore_ready" != "1" ]]; then
   echo "[backup-restore-rehearsal] restore container not ready" >&2
+  docker logs --tail 80 "$container_name" 2>&1 | \
+    awk -v secret="$restore_pass" '{gsub(secret, "[REDACTED]"); print}' >&2 || true
   exit 1
 fi
 

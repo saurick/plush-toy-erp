@@ -1035,6 +1035,66 @@ func TestOperationalFactRepo_ShipmentFinanceReleaseProcessCommandUsesExistingTra
 	}
 }
 
+func TestOperationalFactRepo_ShipmentFinanceRejectionUsesExistingTransaction(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "shipment_finance_rejection_process_command_tx")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	logger := log.NewStdLogger(io.Discard)
+	repo := NewOperationalFactRepo(data, logger)
+	processRepo := NewProcessRuntimeRepo(data, logger)
+	actor := client.AdminUser.Create().
+		SetUsername("shipment-finance-rejection-actor").
+		SetPasswordHash("test-password-hash").
+		SaveX(ctx)
+	shipmentRow, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo: "SHP-FINANCE-REJECT", IdempotencyKey: "shipment-finance-reject",
+		},
+		Items: []*biz.ShipmentItemCreate{{
+			ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+			UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create shipment: %v", err)
+	}
+	payload := map[string]any{"shipment_id": shipmentRow.ID, "reason": "信用额度不足"}
+	command := claimedPostgresProcessCommandForBusinessRef(
+		t, ctx, processRepo, biz.ProcessDomainCommandShipmentFinanceReject,
+		"shipment-finance-reject-command", payload, biz.ShipmentSourceType, shipmentRow.ID,
+	)
+	result := &biz.ProcessDomainCommandResult{
+		Outcome:     biz.ShipmentProcessCommandOutcomeFinanceRejected,
+		EffectState: biz.ProcessDomainCommandEffectStateApplied,
+		EffectRef:   &biz.ProcessBusinessRef{RefType: biz.ShipmentSourceType, RefID: shipmentRow.ID},
+	}
+
+	rejected, err := repo.RecordShipmentFinanceRejectionProcessCommand(
+		ctx, shipmentRow.ID, command, result, actor.ID, "信用额度不足",
+	)
+	if err != nil {
+		t.Fatalf("record shipment finance rejection: %v", err)
+	}
+	if rejected.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusRejected ||
+		rejected.FinanceReleaseVersion != shipmentRow.FinanceReleaseVersion+1 ||
+		rejected.FinanceReleasedAt != nil || rejected.FinanceReleasedBy != nil ||
+		rejected.FinanceReleaseProcessInstanceID == nil || *rejected.FinanceReleaseProcessInstanceID != command.ProcessInstance.ID ||
+		rejected.FinanceReleaseProcessNodeID == nil || *rejected.FinanceReleaseProcessNodeID != command.Node.ID ||
+		rejected.FinanceReleaseNote == nil || *rejected.FinanceReleaseNote != "信用额度不足" {
+		t.Fatalf("unexpected finance rejection %#v", rejected)
+	}
+	assertPostgresProcessEffect(
+		t, ctx, processRepo, command.Node.ID, biz.ProcessDomainCommandEffectStateApplied,
+		biz.ShipmentSourceType, shipmentRow.ID,
+	)
+	replayed, err := repo.RecordShipmentFinanceRejectionProcessCommand(
+		ctx, shipmentRow.ID, command, result, actor.ID, "信用额度不足",
+	)
+	if err != nil || replayed.FinanceReleaseVersion != rejected.FinanceReleaseVersion {
+		t.Fatalf("replay=%#v err=%v", replayed, err)
+	}
+}
+
 func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_net_weight")

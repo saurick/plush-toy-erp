@@ -385,16 +385,16 @@ function factReferenceRecords(countOverrides = {}) {
           : [],
     })),
     financeFacts,
-    salesReturns: [
+    reworkIntakes: [
       ["DRAFT", 0],
-      ["APPROVED", 1],
-      ["RECEIVED", 2],
-      ["REVERSED", 3],
+      ["RECEIVED", 1],
+      ["REVERSED", 2],
+      ["CANCELLED", 3],
     ].map(([status, index]) => ({
       id: 125_000 + index,
-      returnNo: `SIM-SDF-TH-${index + 1}`,
+      intakeNo: `SIM-SDF-HCF-${index + 1}`,
       status,
-      shipmentID: 120_010 + index,
+      sourceShipmentID: 120_010 + index,
       customerID: 10_001 + index,
     })),
     financePayments: [
@@ -900,13 +900,13 @@ function createReadinessFetch(runtimeOptions = {}) {
         cancel_reason: item.cancelReason,
       })),
     ],
-    list_sales_returns: [
-      "sales_returns",
-      factRefs.salesReturns.map((item) => ({
+    list_rework_intakes: [
+      "rework_intakes",
+      factRefs.reworkIntakes.map((item) => ({
         id: item.id,
-        return_no: item.returnNo,
+        intake_no: item.intakeNo,
         status: item.status,
-        shipment_id: item.shipmentID,
+        source_shipment_id: item.sourceShipmentID,
         customer_id: item.customerID,
       })),
     ],
@@ -1375,9 +1375,9 @@ test("all 52 formal targets are owned by shared generator stages", () => {
     ["facts"],
   );
   assert.deepEqual(
-    plan.targets.find((target) => target.id === "desktopPages:sales-returns")
+    plan.targets.find((target) => target.id === "desktopPages:rework-intakes")
       .probeIds,
-    ["sales-returns"],
+    ["rework-intakes"],
   );
   assert.deepEqual(
     plan.targets.find((target) => target.id === "desktopPages:finance-payments")

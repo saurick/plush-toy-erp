@@ -36,7 +36,6 @@ var (
 	ErrQualityInspectionSourceConflict       = errors.New("active quality inspection already exists for source")
 	ErrQualityInspectionSourceInvalid        = errors.New("quality inspection source is invalid")
 	ErrQualityInspectionSourceState          = errors.New("quality inspection source state does not allow creation")
-	ErrQualityInspectionSalesReturnLifecycle = errors.New("sales return quality inspection must be cancelled from the sales return")
 	ErrPurchaseReceiptQualityPending         = errors.New("purchase receipt quality inspection is not complete")
 	ErrPurchaseReceiptQualityRejected        = errors.New("purchase receipt quality inspection is rejected")
 	ErrInventoryInsufficientStock            = errors.New("inventory insufficient stock")

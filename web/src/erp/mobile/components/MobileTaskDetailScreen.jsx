@@ -1,5 +1,7 @@
 import React from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
+  BranchesOutlined,
   ExclamationCircleFilled,
   FileTextOutlined,
   LinkOutlined,
@@ -29,9 +31,12 @@ import {
   resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
+import ProductionRouteExecutionModal from '../../components/production-orders/ProductionRouteExecutionModal.jsx'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 import WorkflowProcessStageTrack from '../../components/workflow/WorkflowProcessStageTrack.jsx'
 import WorkflowTaskEventTrail from '../../components/workflow/WorkflowTaskEventTrail.jsx'
+import { resolveMobileProductionArrangementContext } from '../utils/mobileProductionArrangement.mjs'
 
 function mobileFactValueText(value) {
   if (value === null || value === undefined) return ''
@@ -53,12 +58,43 @@ export default function MobileTaskDetailScreen({
   selectedSeverity,
   selectedTask,
 }) {
+  const { adminProfile } = useOutletContext() || {}
   const approvalTask = isWorkflowApprovalTask(selectedTask)
   const [taskEvents, setTaskEvents] = React.useState([])
   const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
   const [taskEventsState, setTaskEventsState] = React.useState('idle')
   const [processContext, setProcessContext] = React.useState(null)
   const [processContextState, setProcessContextState] = React.useState('idle')
+  const [productionArrangementOpen, setProductionArrangementOpen] =
+    React.useState(false)
+  const productionArrangementContext = React.useMemo(
+    () => resolveMobileProductionArrangementContext(selectedTask),
+    [selectedTask]
+  )
+  const canReadProductionWip = hasActionPermission(
+    adminProfile,
+    'production.wip.read'
+  )
+  const canAssignProductionWip = hasActionPermission(
+    adminProfile,
+    'production.wip.assign'
+  )
+  const canReadOutsourcingContracts = hasActionPermission(
+    adminProfile,
+    'outsourcing.order.read'
+  )
+  const canOpenProductionArrangement = Boolean(
+    productionArrangementContext &&
+      selectedCanOperate &&
+      canReadProductionWip &&
+      canAssignProductionWip
+  )
+
+  React.useEffect(() => {
+    if (!canOpenProductionArrangement) {
+      setProductionArrangementOpen(false)
+    }
+  }, [canOpenProductionArrangement, selectedTask?.id])
 
   React.useEffect(() => {
     if (!selectedTask?.id) {
@@ -308,6 +344,28 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
 
+        {canOpenProductionArrangement ? (
+          <section
+            className="erp-mobile-card rounded-2xl border border-blue-200 bg-white p-4 shadow-sm"
+            data-testid="mobile-production-arrangement-entry"
+          >
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
+              <BranchesOutlined className="text-blue-500" aria-hidden="true" />
+              返工生产安排
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              为当前返工批次选择本厂生产或外发加工。保存安排后，再回到任务处理页记录本次处理结论。
+            </p>
+            <button
+              type="button"
+              className="mt-4 min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
+              onClick={() => setProductionArrangementOpen(true)}
+            >
+              安排本厂 / 外发
+            </button>
+          </section>
+        ) : null}
+
         {selectedTask.process_instance_id ? (
           <section
             className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
@@ -413,6 +471,22 @@ export default function MobileTaskDetailScreen({
           </section>
         ) : null}
       </main>
+
+      {productionArrangementContext ? (
+        <ProductionRouteExecutionModal
+          open={productionArrangementOpen}
+          productionOrder={{
+            id: productionArrangementContext.productionOrderID,
+            order_no: productionArrangementContext.productionOrderNo,
+          }}
+          assignmentOnly
+          originReworkFactID={productionArrangementContext.productionFactID}
+          canAssign={canAssignProductionWip}
+          canReadOutsourcingContracts={canReadOutsourcingContracts}
+          onChanged={() => setProductionArrangementOpen(false)}
+          onCancel={() => setProductionArrangementOpen(false)}
+        />
+      ) : null}
 
       {showFooterAction ? (
         <div className="mobile-role-action-bar border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">

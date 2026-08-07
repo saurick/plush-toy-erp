@@ -49,7 +49,7 @@ test('approval responsibility panel exposes only the three configurable approval
     /APPROVAL_KEYS = \['sales_order', 'purchase_order', 'shipment_finance'\]/
   )
   assert.match(source, /为三项可配置审批指定主办、备用和升级责任/)
-  assert.doesNotMatch(source, /付款审批|客户退货审批|暂不可配置/)
+  assert.doesNotMatch(source, /付款审批|暂不可配置/)
   assert.match(source, /保存并生效/)
   assert.match(source, /确认并生效/)
   assert.match(source, /审批责任加载失败/)

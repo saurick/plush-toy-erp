@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Capability Evidence Audit"
-  short_description: "分层审计产品能力、运行状态、发布证据与客户验收边界"
-  default_prompt: "Use $plush-capability-evidence-audit 只读核对能力、运行态、发布与客户验收证据，并按层级给出结论和缺口。"
+  short_description: "按问题核对产品事实、本地验证、目标运行态和客户结果"
+  default_prompt: "Use $plush-capability-evidence-audit 只读核对当前问题需要的证据，区分产品事实、本地验证、目标运行与客户结果，不展开无关层次。"

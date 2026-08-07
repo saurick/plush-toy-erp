@@ -315,7 +315,6 @@ func TestWorkflowProcessTaskContextJSONRPCSerializationKeepsApprovalFormContract
 	}{
 		{name: "ordinary human task", nodeType: biz.ProcessNodeTypeHumanTask},
 		{name: "ordinary approval task", nodeType: biz.ProcessNodeTypeApproval},
-		{name: "sales return decision", nodeType: biz.ProcessNodeTypeApproval, formProfileKey: "sales_return_approval", expectFormalForm: true},
 		{name: "finance payment decision", nodeType: biz.ProcessNodeTypeApproval, formProfileKey: "finance_payment_approval", expectFormalForm: true},
 		{name: "inventory adjustment decision", nodeType: biz.ProcessNodeTypeApproval, formProfileKey: "inventory_adjustment_approval", expectFormalForm: true},
 		{name: "production exception decision", nodeType: biz.ProcessNodeTypeApproval, formProfileKey: "production_exception_approval", expectFormalForm: true, expectQuantity: true},

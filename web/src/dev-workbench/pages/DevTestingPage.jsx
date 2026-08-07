@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react'
 import {
-  CheckCircleOutlined,
   CodeOutlined,
   CopyOutlined,
   FileSearchOutlined,
@@ -8,13 +7,11 @@ import {
   PlayCircleOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
-  SearchOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
   Button,
   Empty,
-  Input,
   Progress,
   Segmented,
   Skeleton,
@@ -23,6 +20,7 @@ import {
   Typography,
 } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
@@ -67,9 +65,9 @@ const DOCUMENT_ROLE_QUERY_KEY = 'role'
 const COMMAND_QUERY_KEY = 'q'
 
 const VIEW_OPTIONS = [
-  { label: '验证层级 / T0–T8', value: VIEW_TIERS },
-  { label: '执行命令 / Commands', value: VIEW_COMMANDS },
-  { label: '覆盖证据 / Coverage', value: VIEW_COVERAGE },
+  { label: '本轮验证', value: VIEW_TIERS },
+  { label: '专项检查库', value: VIEW_COMMANDS },
+  { label: '证据与覆盖', value: VIEW_COVERAGE },
 ]
 const VIEW_VALUES = new Set(VIEW_OPTIONS.map((option) => option.value))
 
@@ -98,19 +96,6 @@ const markdownModules = import.meta.glob(
     query: '?raw',
   }
 )
-
-function MetricTile({ icon, label, value, note, tone = 'default' }) {
-  return (
-    <div className={`erp-dev-testing-metric erp-dev-testing-metric--${tone}`}>
-      <span className="erp-dev-testing-metric__icon">{icon}</span>
-      <span className="erp-dev-testing-metric__copy">
-        <span className="erp-dev-testing-metric__label">{label}</span>
-        <span className="erp-dev-testing-metric__value">{value}</span>
-        <span className="erp-dev-testing-metric__note">{note}</span>
-      </span>
-    </div>
-  )
-}
 
 function runCopy(text) {
   if (!String(text || '').trim()) {
@@ -428,10 +413,9 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
       <div className="erp-dev-testing-validation-plan__head">
         <div>
           <Tag color="blue">验证计划</Tag>
-          <Title level={3}>生成本轮验证计划</Title>
+          <Title level={3}>先判断本轮需要验证什么</Title>
           <Paragraph>
-            只读分析当前改动，冻结生成前后的仓库身份，列出受影响
-            T0–T8、建议命令和必补证据。
+            只读分析当前改动，给出建议检查和待补证据；不会运行测试或写入数据。
           </Paragraph>
         </div>
         <Button
@@ -462,7 +446,7 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
               <b>{plan.changedCount}</b>
             </span>
             <span>
-              <small>建议层级</small>
+              <small>验证范围</small>
               <b>{plan.levels.join(' · ')}</b>
             </span>
             <span>
@@ -472,7 +456,8 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
             <span>
               <small>仓库身份</small>
               <code>
-                {shortCommit} · {plan.repository.dirty ? 'Dirty' : 'Clean'}
+                {shortCommit} ·{' '}
+                {plan.repository.dirty ? '有未提交改动' : '干净现场'}
               </code>
             </span>
           </div>
@@ -549,24 +534,32 @@ function ValidationActionCard({
     <article
       className={`erp-dev-testing-validation-action erp-dev-testing-validation-action--${presentation.tone}`}
     >
-      <div className="erp-dev-testing-validation-action__head">
-        <div>
-          <Tag color={action.priority === 'P0' ? 'blue' : 'cyan'}>
-            {action.priority}
-          </Tag>
-          <Tag color={tagColor}>{presentation.label}</Tag>
+      <div className="erp-dev-testing-validation-action__copy">
+        <div className="erp-dev-testing-validation-action__head">
+          <div>
+            <Tag color={action.priority === 'P0' ? 'blue' : 'cyan'}>
+              {action.priority === 'P0' ? '优先' : '按需'}
+            </Tag>
+            <Tag color={tagColor}>{presentation.label}</Tag>
+          </div>
+          {operation?.updatedAt ? (
+            <small>{formatCoverageGeneratedAt(operation.updatedAt)}</small>
+          ) : null}
         </div>
-        {operation?.updatedAt ? (
-          <small>{formatCoverageGeneratedAt(operation.updatedAt)}</small>
+        <Title level={3}>{action.label}</Title>
+        <p>{action.description}</p>
+        {operation?.message ? (
+          <p className="erp-dev-testing-validation-action__message">
+            {operation.message}
+          </p>
         ) : null}
+        <details className="erp-dev-testing-validation-action__details">
+          <summary>查看证据边界</summary>
+          <small className="erp-dev-testing-validation-action__boundary">
+            {action.priority} · {action.boundary}
+          </small>
+        </details>
       </div>
-      <Title level={3}>{action.label}</Title>
-      <p>{action.description}</p>
-      {operation?.message ? (
-        <p className="erp-dev-testing-validation-action__message">
-          {operation.message}
-        </p>
-      ) : null}
       <Button
         type={action.priority === 'P0' ? 'primary' : 'default'}
         icon={<PlayCircleOutlined />}
@@ -576,9 +569,6 @@ function ValidationActionCard({
       >
         {presentation.active ? '运行中…' : action.label}
       </Button>
-      <small className="erp-dev-testing-validation-action__boundary">
-        {action.boundary}
-      </small>
     </article>
   )
 }
@@ -610,9 +600,12 @@ function ValidationWorkspace({
     >
       <div className="erp-dev-testing-validation__title">
         <div>
-          <Title level={2}>本轮验证 / Validation</Title>
+          <Text className="erp-dev-testing-validation__eyebrow">
+            推荐主路径
+          </Text>
+          <Title level={2}>本轮验证</Title>
           <Paragraph>
-            先只读生成计划，再按收益与前置条件运行固定动作；每项独立出结果，不合成一个“全系统已通过”。
+            先生成建议，再只运行与改动匹配的检查。每项独立出结果，不合成“全系统已通过”。
           </Paragraph>
         </div>
         {summaryError ? <Tag color="red">状态读取失败</Tag> : null}
@@ -632,6 +625,15 @@ function ValidationWorkspace({
           description="后台任务可能仍在运行；状态恢复前请勿重复发起。"
         />
       ) : null}
+      <div className="erp-dev-testing-validation__action-intro">
+        <div>
+          <Text strong>运行匹配的固定检查</Text>
+          <Text type="secondary">
+            三项检查互相独立；若不匹配本轮改动，可以不运行。
+          </Text>
+        </div>
+        <Tag>固定白名单</Tag>
+      </div>
       <div className="erp-dev-testing-validation__actions">
         {DEV_TESTING_FIXED_ACTIONS.map((action) => (
           <ValidationActionCard
@@ -1407,36 +1409,31 @@ export default function DevTestingPage() {
       <DevPageNav sourcePath={DEV_TESTING_STRATEGY_SOURCE_PATH} />
       <header className="erp-dev-testing-header">
         <div className="erp-dev-testing-header__copy">
+          <Text className="erp-dev-testing-header__eyebrow">
+            本机开发工具 · Quality validation
+          </Text>
           <Space align="center" size={10}>
             <SafetyCertificateOutlined className="erp-dev-testing-header__icon" />
             <Title level={1} className="erp-dev-testing-title">
-              开发测试入口 / Dev Test Entry
+              质量验证工作台
             </Title>
           </Space>
           <Paragraph className="erp-dev-testing-summary">
-            先生成本轮验证计划，再按优先级运行固定动作并核对独立证据；所有执行命令均由本地开发服务白名单固定。
+            先判断本轮要验证什么，再运行固定检查并核对结果。页面不接受自定义命令、路径或凭据。
           </Paragraph>
         </div>
-        <div className="erp-dev-testing-header__stats">
-          <MetricTile
-            icon={<CheckCircleOutlined />}
-            label="验证层级 / T0–T8"
-            value={summary.tierCount}
-            note="来自自动化测试策略"
-            tone="primary"
-          />
-          <MetricTile
-            icon={<FileSearchOutlined />}
-            label="命令来源 / Sources"
-            value={summary.docCount}
-            note={`${summary.docsWithCommands} 个来源含命令`}
-          />
-          <MetricTile
-            icon={<CodeOutlined />}
-            label="命令块 / Blocks"
-            value={summary.commandBlockCount}
-            note={`${summary.strategyCommandBlockCount} 个来自策略`}
-          />
+        <div className="erp-dev-testing-header__context">
+          <div>
+            <Text strong>默认只看下一步</Text>
+            <Text type="secondary">验证范围和复制命令放在下方按需展开。</Text>
+          </div>
+          <details>
+            <summary>查看来源规模</summary>
+            <Text type="secondary">
+              {summary.tierCount} 个验证范围 · {summary.docCount} 个当前来源 ·{' '}
+              {summary.commandBlockCount} 个命令块
+            </Text>
+          </details>
         </div>
       </header>
 
@@ -1464,30 +1461,52 @@ export default function DevTestingPage() {
                 onGeneratePlan={generateTestingPlan}
                 onRunAction={runTestingAction}
               />
-              <div
-                className="erp-dev-testing-presets"
-                aria-label="常用测试命令预设"
-              >
-                {DEV_TESTING_COPY_PRESETS.map((preset) => (
-                  <QuickPreset key={preset.key} preset={preset} />
-                ))}
-              </div>
-              <div className="erp-dev-testing-tier-grid">
-                {tiers.map((tier) => (
-                  <TierCard key={tier.key} tier={tier} />
-                ))}
-              </div>
+              <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--presets">
+                <summary>
+                  <span>
+                    <strong>复制专项检查命令</strong>
+                    <small>
+                      {DEV_TESTING_COPY_PRESETS.length}{' '}
+                      组固定预设，按改动类型选择
+                    </small>
+                  </span>
+                  <span>按需展开</span>
+                </summary>
+                <div
+                  className="erp-dev-testing-presets"
+                  aria-label="常用测试命令预设"
+                >
+                  {DEV_TESTING_COPY_PRESETS.map((preset) => (
+                    <QuickPreset key={preset.key} preset={preset} />
+                  ))}
+                </div>
+              </details>
+              <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--tiers">
+                <summary>
+                  <span>
+                    <strong>了解验证范围</strong>
+                    <small>
+                      T0–T8 是内部选测键，不是完成进度，也不是逐级验收
+                    </small>
+                  </span>
+                  <span>按需展开</span>
+                </summary>
+                <div className="erp-dev-testing-tier-grid">
+                  {tiers.map((tier) => (
+                    <TierCard key={tier.key} tier={tier} />
+                  ))}
+                </div>
+              </details>
             </div>
           ) : null}
 
           {view === VIEW_COMMANDS ? (
             <div className="erp-dev-testing-command-view">
               <div className="erp-dev-testing-command-tools">
-                <Input
+                <SearchInput
                   allowClear
                   className="erp-dev-testing-search"
                   placeholder="搜索命令、来源、验收词"
-                  prefix={<SearchOutlined aria-hidden="true" />}
                   value={keyword}
                   onChange={(event) => setCommandKeyword(event.target.value)}
                 />

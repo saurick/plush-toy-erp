@@ -7,7 +7,6 @@ export const DEV_DOCS_ROUTE = '/__dev/docs'
 export const DEV_GOVERNANCE_ROUTE = '/__dev/governance'
 export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
 export const DEV_PROTOTYPES_ROUTE = '/__dev/prototypes'
-export const DEV_CAPABILITY_LEDGER_ROUTE = '/__dev/capability-ledger'
 export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
 export const DEV_DATABASE_MIGRATION_ROUTE = '/__dev/database-migration'
 export const DEV_TESTING_ROUTE = '/__dev/testing'
@@ -74,12 +73,6 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     label: '产品原型',
   }),
   Object.freeze({
-    key: 'capability-ledger',
-    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
-    route: DEV_CAPABILITY_LEDGER_ROUTE,
-    label: '能力真源',
-  }),
-  Object.freeze({
     key: 'testing',
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_TESTING_ROUTE,
@@ -122,7 +115,6 @@ export const DEV_PAGE_TITLE_BY_ROUTE = Object.freeze({
   [DEV_TESTING_ROUTE]: '测试入口',
   [DEV_DATA_PREPARATION_ROUTE]: '测试数据准备中心',
   [DEV_PROTOTYPES_ROUTE]: '产品原型',
-  [DEV_CAPABILITY_LEDGER_ROUTE]: '能力真源',
   [DEV_CUSTOMER_CONFIG_ROUTE]: '客户配置包预检与发布',
   [DEV_DATABASE_MIGRATION_ROUTE]: '数据库迁移',
   [DEV_VERSION_CENTER_ROUTE]: '版本发布与部署中心',
@@ -145,7 +137,6 @@ export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_TESTING_ROUTE]: '/favicon-testing.svg',
   [DEV_DATA_PREPARATION_ROUTE]: '/favicon-testing.svg',
   [DEV_PROTOTYPES_ROUTE]: '/favicon-prototypes.svg',
-  [DEV_CAPABILITY_LEDGER_ROUTE]: '/favicon-capability-ledger.svg',
   [DEV_CUSTOMER_CONFIG_ROUTE]: '/favicon-customer-config.svg',
   [DEV_DATABASE_MIGRATION_ROUTE]: '/favicon-dev.svg',
   [DEV_VERSION_CENTER_ROUTE]: '/favicon-dev.svg',

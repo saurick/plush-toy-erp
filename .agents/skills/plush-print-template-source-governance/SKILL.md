@@ -1,11 +1,11 @@
 ---
 name: plush-print-template-source-governance
-description: 项目打印模板源治理（plush-toy-erp）。Use when turning customer Excel, PDF, image, or screenshot sources into plush print templates or reviewing template editing and output fidelity.
+description: 项目打印模板源治理（plush-toy-erp）。Use when customer Excel/PDF/image sources, paper layout, template editing, or PDF/print fidelity are primary; use page-design governance for ordinary ERP page shells and non-print interaction work.
 ---
 
 # Plush Print Template Source Governance
 
-本 skill 负责 plush-toy-erp 打印模板从客户源文件到运行时模板的识别、边界、交互和验证治理。若只做通用判断，先用全局 `$erp-print-template-source-governance`；落到本仓库实现时使用本 skill。
+本 skill 负责 plush-toy-erp 打印模板从客户源文件到运行时模板的识别、纸张版式、编辑交互和 PDF/打印验证。普通 ERP 页面壳层与非打印交互使用 `$plush-page-design-governance`；若只做通用判断，先用全局 `$erp-print-template-source-governance`，落到本仓库实现时使用本 skill。
 
 ## Truth Chain / 必读真源
 
@@ -37,7 +37,7 @@ description: 项目打印模板源治理（plush-toy-erp）。Use when turning c
 - 提取或生成的 customer assets 必须保留 provenance：workbook path、sheet name、drawing file / id、row / column anchor、crop / layout、source dimensions、runtime URL，以及它是 customer sample 还是 editable runtime slot。
 - 图片尺寸和位置先按甲方源文件理解：产品图、色卡图、样板图、签章/签名或其他固定图片如果在源文件中有明确单元格、合并区域、坐标框或占位比例，运行时默认应落在同一语义区域并保持接近源文件的视觉尺寸；不能因为实现方便改放到文件末尾、通用上传条或任意缩略图区。
 - Product Core 默认样例应使用中性展示值；模板样例文字默认黑色，颜色/加粗是编辑能力，不是默认样式证据。
-- Product Core 默认样例不要按甲方长表塞满。若编号作业行、材料行、色卡行或合同明细行行为一致，默认只保留 2-5 条代表行；长清单、分页和性能用 fixture / L1 / PDF 回归覆盖，不靠默认样例复制所有源行。
+- Product Core 默认样例不要按甲方长表塞满。若编号作业行、材料行、色卡行或合同明细行行为一致，默认只保留 2-5 条代表行；长清单、分页和性能用 fixture、页面级浏览器回归（Style L1）和 PDF 回归覆盖，不靠默认样例复制所有源行。
 - 不要为了当前截图补页面私有真源、旧 `business_records` 链路、额外草稿 key、第二套 PDF HTML 或客户硬编码。
 - 模板质量同样是交付边界：不要为某个截图堆一批一次性 CSS/JS 补丁、无限 base64 图片快照、整页截图型模板、重复测高循环或第二套隐藏 PDF DOM；优先复用 `printWorkspace.js`、`PrintWorkspaceShell`、工程模板 normalizer、共享图片槽和 scoped CSS。
 - Official templates 需要等价于 trade QA catalog 的 coverage matrix，即使它存放在 plush-specific code / docs：template key、source workbook / page、field requirements、mapper、renderer、module gate、image slots、browser / PDF checks 和 blind spots 都要可追踪。
@@ -105,7 +105,7 @@ description: 项目打印模板源治理（plush-toy-erp）。Use when turning c
 - 职业任务文案要检查模板标题、按钮、导出/PDF、帮助提示和正式打印件，确认业务用户看到的是岗位任务语言，不是开发者术语。
 - Performance / quality 要检查本轮最高风险 bound：image count / size、DOM node growth、localStorage snapshot size、image load 后 layout settling、无 repeated measurement loop、编辑区域无明显 lag。
 - Source provenance 输出 manifest / checksum 结果、workbook / PDF 结构证据、real used range decision，涉及图片时输出 image-anchor provenance。
-- Official template coverage 要确认 `printTemplates.mjs`、server PDF module gate、docs、tests / L1 scenario 和 blind-spot notes 对齐。
+- Official template coverage 要确认 `printTemplates.mjs`、server PDF module gate、docs、tests、页面级浏览器回归场景（Style L1）和 blind-spot notes 对齐。
 - Skill-only / docs-only changes 要运行 skill validator、YAML parse、metadata scan、`git diff --check`，并更新 `progress.md`。
 - Runtime implementation changes 按 plush docs 和 touched files 选择检查；page / style work 通常需要相关 `style:l1` browser-level regression。
 

@@ -21,7 +21,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
       }),
       Object.freeze({
         title: "销售管理",
-        items: Object.freeze(["sales-orders", "sales-returns"]),
+        items: Object.freeze(["sales-orders", "rework-intakes"]),
       }),
       Object.freeze({
         title: "产品工程",

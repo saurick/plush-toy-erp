@@ -39,6 +39,8 @@ import {
   DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY,
   buildCustomerConfigDevOverviewFromSearch,
 } from '../config/devCustomerConfig.mjs'
+import { getBusinessModule } from '@/erp/config/businessModules.mjs'
+import { navigationItemRegistry } from '@/erp/config/seedData.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -53,30 +55,46 @@ const ACTIVE_REVISION_REQUIRED_REASON =
 const VIEW_OPTIONS = [
   {
     label: '总览',
-    description: '判断当前状态与下一步',
+    displayLabel: '总览',
+    description: '先看结论和推荐下一步',
+    guidance: '先确认当前配置包能否继续，再进入后面的核对与执行步骤。',
     value: VIEW_OVERVIEW,
   },
   {
     label: '配置预检',
-    description: '分组核对资产、运行态与流程',
+    displayLabel: '检查配置包',
+    description: '核对结构、运行配置和流程',
+    guidance: '按包结构、运行配置、流程和证据分组核对；一次只看一类问题。',
     value: VIEW_PREFLIGHT,
   },
   {
     label: '差异',
-    description: '只看当前值与候选变化',
+    displayLabel: '查看变化',
+    description: '对比当前值与候选差异',
+    guidance: '只看这次配置会改变什么，以及每项变化会影响哪里。',
     value: VIEW_DIFF,
   },
   {
     label: '界面投影',
-    description: '菜单、字段与打印模板只读预览',
+    displayLabel: '页面配置预览',
+    description: '菜单、字段和打印设置（界面投影）',
+    guidance:
+      '按业务名称预览客户会看到的菜单、字段和打印设置；内部键仅用于追踪。',
     value: VIEW_ASSETS,
   },
   {
     label: '执行与发布门禁',
-    description: '试跑、测试应用与只读门禁',
+    displayLabel: '试跑与发布',
+    description: '试跑、测试应用和发布检查（执行与发布门禁）',
+    guidance: '先生成试跑证据，再按环境选择测试应用或正式发布检查。',
     value: VIEW_IMPORT,
   },
 ]
+
+const VIEW_NAV_OPTIONS = VIEW_OPTIONS.map((item) => ({
+  ...item,
+  label: item.displayLabel,
+}))
 
 const PREFLIGHT_SECTION_QUERY_KEY = 'section'
 const PREFLIGHT_SECTION_PACKAGE = 'package'
@@ -233,6 +251,47 @@ function StatusTag({ status }) {
     <Tag color={colorByStatus[normalizedStatus] || 'default'}>
       {statusText(normalizedStatus)}
     </Tag>
+  )
+}
+
+function CustomerViewIntro({ activeView, primaryStatus }) {
+  const activeIndex = VIEW_OPTIONS.findIndex(
+    (item) => item.value === activeView
+  )
+  const item = VIEW_OPTIONS[activeIndex] || VIEW_OPTIONS[0]
+  const stepLabel = `第 ${activeIndex + 1} 步，共 ${VIEW_OPTIONS.length} 步`
+
+  return (
+    <section className="erp-dev-customer-view-intro" aria-live="polite">
+      <div className="erp-dev-customer-view-intro__step">{stepLabel}</div>
+      <div className="erp-dev-customer-view-intro__copy">
+        <Text strong>{item.displayLabel}</Text>
+        <Text type="secondary">{item.guidance}</Text>
+      </div>
+      {activeIndex === 0 ? <StatusTag status={primaryStatus} /> : null}
+    </section>
+  )
+}
+
+function resolveMenuItemPresentation(itemKey) {
+  const normalizedKey = String(itemKey || '').trim()
+  const item =
+    getBusinessModule(normalizedKey) || navigationItemRegistry[normalizedKey]
+
+  return {
+    key: normalizedKey,
+    label: item?.label || '未识别菜单项',
+  }
+}
+
+function MenuPreviewItem({ itemKey }) {
+  const item = resolveMenuItemPresentation(itemKey)
+
+  return (
+    <div className="erp-dev-customer-menu-item">
+      <Text strong>{item.label}</Text>
+      <code>{item.key}</code>
+    </div>
   )
 }
 
@@ -862,7 +921,7 @@ function CustomerPackageSelector({ overview, onChange, disabled = false }) {
 
   return (
     <div className="erp-dev-customer-selector">
-      <Text type="secondary">客户包选择</Text>
+      <Text strong>当前客户包</Text>
       <Select
         aria-label="客户包选择"
         value={matched ? overview.customerKey : undefined}
@@ -874,7 +933,7 @@ function CustomerPackageSelector({ overview, onChange, disabled = false }) {
       <Text type="secondary" className="erp-dev-customer-selector__note">
         {disabled
           ? '配置写操作进行中，客户包已锁定。离开页面不会撤销已经发出的写请求。'
-          : '只更新 URL，不写后端或正式运行配置。'}
+          : '切换只更新本页地址，不会应用配置。'}
       </Text>
     </div>
   )
@@ -1014,7 +1073,7 @@ function AssetsPanel({
       className="erp-dev-customer-panel-grid"
       data-dev-customer-view="菜单字段"
     >
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--brand">
+      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--brand">
         <div className="erp-dev-customer-brand-mark">
           {menuSummary.brand.brandMark || '客'}
         </div>
@@ -1030,134 +1089,191 @@ function AssetsPanel({
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <ApartmentOutlined />
-          <Text strong>菜单分组 / Menu Groups</Text>
+          <div>
+            <Text strong>菜单分组 / Menu Groups</Text>
+            <Text type="secondary" className="erp-dev-customer-panel__hint">
+              先看业务名称；展开后可查看对应内部键。
+            </Text>
+          </div>
         </div>
         <div className="erp-dev-customer-menu-groups">
           {menuSummary.sections.map((section) => (
-            <article
+            <details
               className="erp-dev-customer-menu-group"
               key={section.title}
             >
-              <div className="erp-dev-customer-menu-group__title">
-                <Text strong>{section.title}</Text>
-                <Tag>{section.items.length}</Tag>
-              </div>
+              <summary className="erp-dev-customer-menu-group__title">
+                <span>
+                  <Text strong>{section.title}</Text>
+                  <Text type="secondary">{section.items.length} 个页面</Text>
+                </span>
+                <span className="erp-dev-customer-menu-group__toggle">
+                  <span className="erp-dev-customer-menu-group__open-label">
+                    展开
+                  </span>
+                  <span className="erp-dev-customer-menu-group__close-label">
+                    收起
+                  </span>
+                </span>
+              </summary>
               <div className="erp-dev-customer-menu-group__items">
                 {section.items.map((item) => (
-                  <Tag key={item}>{item}</Tag>
+                  <MenuPreviewItem itemKey={item} key={item} />
                 ))}
               </div>
-            </article>
+            </details>
           ))}
         </div>
       </section>
-      <section className="erp-dev-customer-panel">
-        <div className="erp-dev-customer-panel__head">
+      <details
+        className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
+        name="customer-assets"
+      >
+        <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <SafetyCertificateOutlined />
-          <Text strong>边界守卫 / Boundary Guards</Text>
+          <div>
+            <Text strong>页面配置边界</Text>
+            <Text type="secondary" className="erp-dev-customer-panel__hint">
+              {fieldNumberingSummary.boundaries.length} 项保护规则，点击查看
+            </Text>
+          </div>
+        </summary>
+        <div className="erp-dev-customer-disclosure__body">
+          <div className="erp-dev-customer-guard-list">
+            {fieldNumberingSummary.boundaries.map((item) => (
+              <div className="erp-dev-customer-guard" key={item.key}>
+                <Text>{guardItemLabel(item, '字段编号边界')}</Text>
+                <Tag color={item.ok ? 'green' : 'red'}>
+                  {item.ok ? item.expectedLabel : item.valueLabel}
+                </Tag>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="erp-dev-customer-guard-list">
-          {fieldNumberingSummary.boundaries.map((item) => (
-            <div className="erp-dev-customer-guard" key={item.key}>
-              <Text>{guardItemLabel(item, '字段编号边界')}</Text>
-              <Tag color={item.ok ? 'green' : 'red'}>
-                {item.ok ? item.expectedLabel : item.valueLabel}
-              </Tag>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
+      </details>
+      <details
+        className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
+        name="customer-assets"
+      >
+        <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <SettingOutlined />
-          <Text strong>字段显示候选 / Field Candidates</Text>
+          <div>
+            <Text strong>字段显示候选 / Field Candidates</Text>
+            <Text type="secondary" className="erp-dev-customer-panel__hint">
+              {fieldNumberingSummary.fieldCandidates.length}{' '}
+              个候选字段，点击查看
+            </Text>
+          </div>
+        </summary>
+        <div className="erp-dev-customer-disclosure__body">
+          <div className="erp-dev-customer-field-list">
+            {fieldNumberingSummary.fieldCandidates.map((candidate) => (
+              <article
+                className="erp-dev-customer-field"
+                key={`${candidate.module}:${candidate.key}`}
+              >
+                <div className="erp-dev-customer-field__head">
+                  <Text strong>{candidate.label}</Text>
+                  <Tag>{candidate.moduleLabel}</Tag>
+                  <StatusTag status={candidate.decisionLabel} />
+                </div>
+                <Text className="erp-dev-customer-field__key">
+                  {candidate.fieldKeyLabel} / {candidate.sourceLabel}
+                </Text>
+                <Paragraph>{candidate.note}</Paragraph>
+              </article>
+            ))}
+          </div>
         </div>
-        <div className="erp-dev-customer-field-list">
-          {fieldNumberingSummary.fieldCandidates.map((candidate) => (
-            <article
-              className="erp-dev-customer-field"
-              key={`${candidate.module}:${candidate.key}`}
-            >
-              <div className="erp-dev-customer-field__head">
-                <Text strong>{candidate.label}</Text>
-                <Tag>{candidate.moduleLabel}</Tag>
-                <StatusTag status={candidate.decisionLabel} />
-              </div>
-              <Text className="erp-dev-customer-field__key">
-                {candidate.fieldKeyLabel} / {candidate.sourceLabel}
-              </Text>
-              <Paragraph>{candidate.note}</Paragraph>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
-        <div className="erp-dev-customer-panel__head">
+      </details>
+      <details
+        className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure"
+        name="customer-assets"
+      >
+        <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <CodeOutlined />
-          <Text strong>编号规则候选 / Numbering Candidates</Text>
+          <div>
+            <Text strong>编号规则候选 / Numbering Candidates</Text>
+            <Text type="secondary" className="erp-dev-customer-panel__hint">
+              {fieldNumberingSummary.numberingRules.length}{' '}
+              项待确认规则，点击查看
+            </Text>
+          </div>
+        </summary>
+        <div className="erp-dev-customer-disclosure__body">
+          <div className="erp-dev-customer-numbering-list">
+            {fieldNumberingSummary.numberingRules.map((rule) => (
+              <article className="erp-dev-customer-numbering" key={rule.key}>
+                <div>
+                  <Text strong>{rule.label}</Text>
+                  <Text type="secondary">{rule.domain}</Text>
+                </div>
+                <StatusTag status={rule.decisionLabel} />
+                <Paragraph>{rule.unresolvedQuestion}</Paragraph>
+              </article>
+            ))}
+          </div>
         </div>
-        <div className="erp-dev-customer-numbering-list">
-          {fieldNumberingSummary.numberingRules.map((rule) => (
-            <article className="erp-dev-customer-numbering" key={rule.key}>
-              <div>
-                <Text strong>{rule.label}</Text>
-                <Text type="secondary">{rule.domain}</Text>
-              </div>
-              <StatusTag status={rule.decisionLabel} />
-              <Paragraph>{rule.unresolvedQuestion}</Paragraph>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-templates">
-        <div className="erp-dev-customer-panel__head">
+      </details>
+      <details
+        className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-templates erp-dev-customer-disclosure"
+        name="customer-assets"
+      >
+        <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <FileTextOutlined />
-          <Text strong>打印模板字段 / Print Template Fields</Text>
+          <div>
+            <Text strong>打印模板字段 / Print Template Fields</Text>
+            <Text type="secondary" className="erp-dev-customer-panel__hint">
+              {printTemplateSummary.templates.length} 套模板，点击查看字段真源
+            </Text>
+          </div>
+        </summary>
+        <div className="erp-dev-customer-disclosure__body">
+          <Alert
+            type="info"
+            showIcon
+            message="当前展示合同和工程资料打印模板字段真源"
+            description="销售订单受理当前未接打印模板；客户抬头、签章和固定文案应留在客户配置或模板边界，不进入产品核心表单。"
+          />
+          <div className="erp-dev-customer-tool-list">
+            {printTemplateSummary.templates.map((template) => (
+              <article className="erp-dev-customer-tool" key={template.key}>
+                <div className="erp-dev-customer-tool__head">
+                  <Space wrap>
+                    <Text strong>{template.title}</Text>
+                    <Tag>{template.templateKeyLabel}</Tag>
+                    <Tag>{template.fieldTruthCountLabel}</Tag>
+                    <Tag>{template.fieldRequirementCountLabel}</Tag>
+                    <Tag>{template.factBoundaryLabel}</Tag>
+                  </Space>
+                  <StatusTag status={template.readiness} />
+                </div>
+                <Text type="secondary">{template.category}</Text>
+                <div className="erp-dev-customer-field-list">
+                  {template.fieldTruth.map((truth) => (
+                    <Text key={truth}>{truth}</Text>
+                  ))}
+                </div>
+                <div className="erp-dev-customer-tool-list mt-3">
+                  {template.fieldRequirementItems.map((requirement) => (
+                    <div
+                      className="erp-dev-customer-asset"
+                      key={`${template.key}-${requirement.label}`}
+                    >
+                      <Space wrap>
+                        <Text strong>{requirement.label}</Text>
+                        <Tag>{requirement.requirementKeyLabel}</Tag>
+                      </Space>
+                      <Text type="secondary">{requirement.sourceLabel}</Text>
+                      <Paragraph>{requirement.boundary}</Paragraph>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
-        <Alert
-          type="info"
-          showIcon
-          message="当前展示合同和工程资料打印模板字段真源"
-          description="销售订单受理当前未接打印模板；客户抬头、签章和固定文案应留在客户配置或模板边界，不进入产品核心表单。"
-        />
-        <div className="erp-dev-customer-tool-list">
-          {printTemplateSummary.templates.map((template) => (
-            <article className="erp-dev-customer-tool" key={template.key}>
-              <div className="erp-dev-customer-tool__head">
-                <Space wrap>
-                  <Text strong>{template.title}</Text>
-                  <Tag>{template.templateKeyLabel}</Tag>
-                  <Tag>{template.fieldTruthCountLabel}</Tag>
-                  <Tag>{template.fieldRequirementCountLabel}</Tag>
-                  <Tag>{template.factBoundaryLabel}</Tag>
-                </Space>
-                <StatusTag status={template.readiness} />
-              </div>
-              <Text type="secondary">{template.category}</Text>
-              <div className="erp-dev-customer-field-list">
-                {template.fieldTruth.map((truth) => (
-                  <Text key={truth}>{truth}</Text>
-                ))}
-              </div>
-              <div className="erp-dev-customer-tool-list mt-3">
-                {template.fieldRequirementItems.map((requirement) => (
-                  <div
-                    className="erp-dev-customer-asset"
-                    key={`${template.key}-${requirement.label}`}
-                  >
-                    <Space wrap>
-                      <Text strong>{requirement.label}</Text>
-                      <Tag>{requirement.requirementKeyLabel}</Tag>
-                    </Space>
-                    <Text type="secondary">{requirement.sourceLabel}</Text>
-                    <Paragraph>{requirement.boundary}</Paragraph>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      </details>
     </div>
   )
 }
@@ -1998,6 +2114,27 @@ export default function DevCustomerConfigPage() {
     return () => window.removeEventListener('beforeunload', warnBeforeUnload)
   }, [isMutationRunning])
 
+  useEffect(() => {
+    if (isMissingCustomer) return undefined
+
+    const frame = window.requestAnimationFrame(() => {
+      const journey = document.querySelector('.erp-dev-customer-journey')
+      const activeItem = journey?.querySelector(
+        '.erp-dev-task-nav__item--active'
+      )
+      if (!journey || !activeItem) return
+
+      const left = Math.max(
+        0,
+        activeItem.offsetLeft -
+          (journey.clientWidth - activeItem.offsetWidth) / 2
+      )
+      journey.scrollTo({ left, behavior: 'auto' })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeView, isMissingCustomer])
+
   const handleCustomerChange = (customerKey) => {
     if (isMutationRunning) return
     const nextParams = new URLSearchParams(searchParams)
@@ -2407,6 +2544,7 @@ export default function DevCustomerConfigPage() {
       />
     ),
   }[activeView]
+  const primaryStatus = overview.packageConsoleSummary?.primaryStatus
 
   return (
     <main className="erp-dev-customer-page erp-dev-workspace-page">
@@ -2415,15 +2553,21 @@ export default function DevCustomerConfigPage() {
       />
       <header className="erp-dev-customer-header">
         <div className="erp-dev-customer-header__copy">
+          <Text className="erp-dev-customer-eyebrow">交付运行 · 客户配置</Text>
           <Space align="center" size={10}>
             <SettingOutlined className="erp-dev-customer-header__icon" />
-            <Title className="erp-dev-customer-title" level={1}>
-              客户配置包预检与发布控制台 / Package Preflight & Release Console
+            <Title
+              aria-label="客户配置包预检与发布控制台 / Package Preflight & Release Console"
+              className="erp-dev-customer-title"
+              level={1}
+            >
+              <span>客户配置发布工作台</span>
+              <small aria-hidden="true">Package Preflight &amp; Release</small>
             </Title>
           </Space>
           <Text className="erp-dev-customer-summary">
-            dev-only，从已登记客户配置包读取候选配置；按预检、差异、Dry Run
-            证据、测试配置应用和发布门禁推进，不接收任意代码、SQL 或脚本。
+            选择客户包后，先看结论，再按“检查配置包 → 查看变化 → 页面配置预览 →
+            试跑与发布”推进。本页只读取已登记配置，不接收任意代码、SQL 或脚本。
           </Text>
           <CustomerPackageSelector
             overview={overview}
@@ -2434,25 +2578,39 @@ export default function DevCustomerConfigPage() {
             <DevTaskNav
               compact
               level="primary"
-              className="erp-dev-customer-view-switch"
+              className="erp-dev-customer-view-switch erp-dev-customer-journey"
               ariaLabel="客户配置工作任务"
-              items={VIEW_OPTIONS}
+              items={VIEW_NAV_OPTIONS}
               value={activeView}
               onChange={handleViewChange}
               disabled={isMutationRunning}
             />
           )}
         </div>
-        <div className="erp-dev-customer-source">
-          <Text type="secondary">当前 URL customer / Query</Text>
-          <Text strong>{overview.requestedCustomerKey}</Text>
+        <details className="erp-dev-customer-source">
+          <summary>
+            <Text type="secondary">当前 URL customer / Query</Text>
+            <Text strong>{overview.requestedCustomerKey}</Text>
+          </summary>
           <Text type="secondary">
             {overview.sourceLabel || '未登记客户配置包'}
           </Text>
-        </div>
+        </details>
       </header>
 
-      {isMissingCustomer ? <MissingCustomerPanel overview={overview} /> : panel}
+      <section className="erp-dev-customer-workspace">
+        {isMissingCustomer ? (
+          <MissingCustomerPanel overview={overview} />
+        ) : (
+          <>
+            <CustomerViewIntro
+              activeView={activeView}
+              primaryStatus={primaryStatus}
+            />
+            {panel}
+          </>
+        )}
+      </section>
     </main>
   )
 }

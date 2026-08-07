@@ -334,19 +334,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if processInstanceID <= 0 {
 			return id, invalidParamResult(), nil
 		}
-		instance, err := d.processRuntimeUC.GetProcessInstance(ctx, processInstanceID)
-		if err != nil {
-			return id, d.mapCustomerConfigError(ctx, err), nil
-		}
-		switch instance.ProcessKey {
-		case biz.ProcessKeySalesReturnApproval,
-			biz.ProcessKeyFinancePaymentApproval,
-			biz.ProcessKeyInventoryAdjustmentApproval,
-			biz.ProcessKeyProductionExceptionApproval:
-		default:
-			return id, invalidParamResult(), nil
-		}
-		nodes, err := d.processRuntimeUC.ListProcessNodeInstances(ctx, processInstanceID)
+		instance, nodes, err := d.processRuntimeUC.GetProcessDomainCommandRecoveryContext(ctx, processInstanceID)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -443,10 +431,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data:    newDataStruct(map[string]any{"process_definition": customerProcessDefinitionExplanationToMap(definition)}),
 		}, nil
 
-	case "start_sales_return_acceptance_process",
-		"get_sales_return_acceptance_process",
-		"execute_sales_return_receive",
-		"start_finance_payment_approval_process",
+	case "start_finance_payment_approval_process",
 		"get_finance_payment_approval_process",
 		"execute_finance_payment_post",
 		"start_inventory_adjustment_approval_process",

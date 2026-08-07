@@ -50,11 +50,6 @@ var formalWorkflowTaskSourceAccessRules = []formalWorkflowTaskSourceAccessRule{
 		SourceReadMethod: "start_finished_goods_delivery_process",
 	},
 	{
-		SourceType:       "sales_return",
-		SourceReadDomain: "customer_config",
-		SourceReadMethod: "get_sales_return_acceptance_process",
-	},
-	{
 		SourceType:       "finance_payment",
 		SourceReadDomain: "customer_config",
 		SourceReadMethod: "get_finance_payment_approval_process",

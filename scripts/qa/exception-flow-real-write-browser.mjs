@@ -542,7 +542,7 @@ function findRecord(items, predicate, label) {
   return item;
 }
 
-async function createSalesReturnSourceInBrowser(browser, options) {
+async function createReworkIntakeSourceInBrowser(browser, options) {
   const session = await login(browser, { ...options, roleKey: "sales" });
   try {
     const listed = await browserRpc(
@@ -557,70 +557,52 @@ async function createSalesReturnSourceInBrowser(browser, options) {
         item.status === "SHIPPED" &&
         Array.isArray(item.items) &&
         item.items.some((line) => Number(line.quantity) >= 1),
-      "shipped sales return source",
+      "shipped rework-intake source",
     );
-    const returnNo = `RMA-ACT-${String(Date.now()).slice(-10)}`;
+    const intakeNo = `HCF-ACT-${String(Date.now()).slice(-10)}`;
 
     await goto(
       session.page,
       options.baseURL,
-      "/erp/sales/customer-returns",
-      "客户退货 / RMA",
+      "/erp/sales/rework-intakes",
+      "返工回厂与补发",
     );
     await session.page
-      .getByRole("button", { name: "新建客户退货", exact: true })
+      .getByRole("button", { name: "新建返工回厂", exact: true })
       .click();
-    const modal = await visibleModal(session.page, "新建客户退货");
-    const shipmentField = modal
-      .locator(".ant-form-item")
-      .filter({ hasText: "来源出货" })
-      .first();
-    const shipmentCombobox = shipmentField.getByRole("combobox");
-    await shipmentField.locator(".ant-select-selector").click();
-    await shipmentCombobox.fill(shipment.shipment_no);
-    const shipmentOption = session.page
+    const modal = await visibleModal(session.page, "新建返工回厂");
+    await modal.getByLabel("返工回厂单号").fill(intakeNo);
+    await modal
+      .getByLabel("回厂返工原因")
+      .fill("真实浏览器验收：客户产品回厂返工后补发。");
+    await modal.getByLabel("原出货明细").click();
+    const sourceOption = session.page
       .locator(".ant-select-dropdown:visible .ant-select-item-option")
       .filter({ hasText: shipment.shipment_no })
       .first();
-    await shipmentOption.waitFor({ state: "visible" });
-    await shipmentOption.click();
-    await modal.getByLabel("退货单号").fill(returnNo);
-    await modal
-      .getByLabel("退货原因")
-      .fill("真实浏览器异常流验收客户退货");
-    const quantity = modal.getByLabel("退货数量").first();
+    await sourceOption.waitFor({ state: "visible" });
+    await sourceOption.click();
+    const quantity = modal.getByLabel("回厂数量").first();
     await quantity.waitFor({ state: "visible" });
     await quantity.fill("1");
     await modal
-      .getByRole("button", { name: "提交退货申请", exact: true })
+      .getByRole("button", { name: "建立回厂记录", exact: true })
       .click();
-    await waitMessage(session.page, "客户退货申请已生成，等待审批");
+    await waitMessage(session.page, "返工回厂记录已建立");
 
-    const returns = await browserRpc(
+    const intakes = await browserRpc(
       session.page,
       "operational_fact",
-      "list_sales_returns",
+      "list_rework_intakes",
       { status: "DRAFT", limit: 100, offset: 0 },
     );
     const created = findRecord(
-      returns.sales_returns,
-      (item) => item.return_no === returnNo && item.status === "DRAFT",
-      "browser-created sales return",
+      intakes.rework_intakes,
+      (item) => item.intake_no === intakeNo && item.status === "DRAFT",
+      "browser-created rework intake",
     );
-    const process = await browserRpc(
-      session.page,
-      "customer_config",
-      "get_sales_return_acceptance_process",
-      { customer_key: CUSTOMER_KEY, sales_return_id: created.id },
-    );
-    if (!process?.process_context) {
-      throw new AcceptanceError(
-        "browser-created sales return approval process is missing",
-      );
-    }
     return {
       created,
-      process,
       shipment: {
         id: shipment.id,
         no: shipment.shipment_no,
@@ -630,7 +612,6 @@ async function createSalesReturnSourceInBrowser(browser, options) {
     await session.context.close();
   }
 }
-
 async function verifyRuntimeIdentity({ backendURL, databaseName }) {
   const ready = await fetch(new URL("/readyz", `${backendURL}/`));
   if (!ready.ok || String(await ready.text()).trim() !== "ready") {
@@ -661,103 +642,65 @@ async function verifyRuntimeIdentity({ backendURL, databaseName }) {
   return { databaseName, proof: "matched-v1", scope: "database-v1" };
 }
 
-async function runSalesReturnFlow(browser, options, report) {
-  const sourceSetup = await createSalesReturnSourceInBrowser(browser, options);
-  const approvalTaskAction = await actOnTaskInBrowser(browser, options, {
-    roleKey: "boss",
-    sourceNo: sourceSetup.created.return_no,
-    actionTitle: "审批通过",
-    confirmLabel: "确认通过",
-    successMessage: "审批已通过",
-    reason: "真实浏览器异常流验收批准客户退货",
-  });
+async function runReworkIntakeFlow(browser, options, report) {
+  const sourceSetup = await createReworkIntakeSourceInBrowser(browser, options);
   const session = await login(browser, { ...options, roleKey: "warehouse" });
   const flow = {
-    key: "sales_return",
+    key: "rework_intake",
     sourceSetup: "browser_created_from_shipped_source",
     browserActions: [],
     readbacks: [],
   };
   try {
-    const listed = await browserRpc(
-      session.page,
-      "operational_fact",
-      "list_sales_returns",
-      { status: "APPROVED", limit: 100, offset: 0 },
-    );
-    const source = findRecord(
-      listed.sales_returns,
-      (item) => item.status === "APPROVED",
-      "approved sales return",
-    );
-    const process = await browserRpc(
-      session.page,
-      "customer_config",
-      "get_sales_return_acceptance_process",
-      { customer_key: CUSTOMER_KEY, sales_return_id: source.id },
-    );
+    const source = sourceSetup.created;
     flow.source = {
       id: source.id,
-      no: source.return_no,
+      no: source.intake_no,
       status: source.status,
       version: source.version,
     };
     flow.sourceShipment = sourceSetup.shipment;
-    flow.processBeforeApproval = summarizeProcess(sourceSetup.process);
-    flow.processBefore = summarizeProcess(process);
-    flow.taskActions = [
-      approvalTaskAction,
-      await actOnTaskInBrowser(browser, options, {
-        roleKey: "warehouse",
-        sourceNo: source.return_no,
-        actionTitle: "处理完成",
-        confirmLabel: "确认完成",
-        successMessage: "任务已处理完成",
-      }),
-    ];
 
     await goto(
       session.page,
       options.baseURL,
-      "/erp/sales/customer-returns",
-      "客户退货 / RMA",
+      "/erp/sales/rework-intakes",
+      "返工回厂与补发",
     );
-    await selectRow(session.page, source.return_no);
-    const lost = await installLostMutationResponse(
-      session.page,
-      "customer_config",
-      "execute_sales_return_receive",
-    );
-    await session.page.getByRole("button", { name: "确认收货", exact: true }).click();
-    await confirmPopover(session.page, "确认已收到客户退货？");
-    await waitRecoveryMessage(session.page, "已重新读取客户退货结果", lost);
-    await lost.remove();
-    assert.equal(lost.state.injected, true);
-    assert.equal(lost.state.backendResultCode, 0);
-    report.simulatedTransportFaults.push(lost.state);
+    await selectRow(session.page, source.intake_no);
+    await session.page
+      .getByRole("button", { name: "确认回厂收货", exact: true })
+      .click();
+    await confirmPopover(session.page, "确认实物已经回到仓库？");
+    await waitMessage(session.page, "已确认回厂收货");
     flow.browserActions.push("warehouse_receive_click");
 
     const received = (
       await browserRpc(
         session.page,
         "operational_fact",
-        "get_sales_return",
+        "get_rework_intake",
         { id: source.id },
       )
-    ).sales_return;
+    ).rework_intake;
     assert.equal(received.status, "RECEIVED");
     const receiptTxns = await browserRpc(
       session.page,
       "inventory",
       "list_inventory_txns",
       {
-        source_type: "SALES_RETURN",
+        source_type: "REWORK_INTAKE",
         source_id: source.id,
         limit: 100,
         offset: 0,
       },
     );
     assert.ok(receiptTxns.inventory_txns.length > 0);
+    assert.ok(
+      (received.items || []).every(
+        (item) => item.received_lot_id && item.received_lot_no,
+      ),
+    );
     flow.readbacks.push({
       stage: "received",
       status: received.status,
@@ -771,7 +714,7 @@ async function runSalesReturnFlow(browser, options, report) {
         await expectPermissionDenied(
           negative.page,
           "operational_fact",
-          "reverse_sales_return",
+          "reverse_rework_intake",
           {
             id: received.id,
             expected_version: received.version,
@@ -784,37 +727,41 @@ async function runSalesReturnFlow(browser, options, report) {
     }
 
     await session.page
-      .getByRole("button", { name: "冲正退货入库", exact: true })
+      .getByRole("button", { name: "冲正回厂收货", exact: true })
       .click();
-    const reverseModal = await visibleModal(session.page, "冲正客户退货入库");
+    const reverseModal = await visibleModal(session.page, "冲正回厂收货");
     await reverseModal
-      .getByPlaceholder("请填写冲正原因")
-      .fill("真实浏览器异常流验收冲正");
-    await reverseModal.getByRole("button", { name: "确认冲正", exact: true }).click();
-    await waitMessage(session.page, "客户退货入库已冲正");
+      .getByPlaceholder("请填写原因")
+      .fill("真实浏览器验收：尚未进入生产，冲正回厂收货。");
+    await reverseModal
+      .getByRole("button", { name: "确认冲正", exact: true })
+      .click();
+    await waitMessage(session.page, "回厂收货已冲正");
     flow.browserActions.push("warehouse_reverse_click");
 
     const reversed = (
       await browserRpc(
         session.page,
         "operational_fact",
-        "get_sales_return",
+        "get_rework_intake",
         { id: source.id },
       )
-    ).sales_return;
+    ).rework_intake;
     assert.equal(reversed.status, "REVERSED");
     const reversedTxns = await browserRpc(
       session.page,
       "inventory",
       "list_inventory_txns",
       {
-        source_type: "SALES_RETURN",
+        source_type: "REWORK_INTAKE",
         source_id: source.id,
         limit: 100,
         offset: 0,
       },
     );
-    assert.ok(reversedTxns.inventory_txns.length > receiptTxns.inventory_txns.length);
+    assert.ok(
+      reversedTxns.inventory_txns.length > receiptTxns.inventory_txns.length,
+    );
     flow.readbacks.push({
       stage: "reversed",
       status: reversed.status,
@@ -824,7 +771,7 @@ async function runSalesReturnFlow(browser, options, report) {
     flow.retry = await expectRetryRejected(
       session.page,
       "operational_fact",
-      "reverse_sales_return",
+      "reverse_rework_intake",
       {
         id: source.id,
         expected_version: received.version,
@@ -837,7 +784,6 @@ async function runSalesReturnFlow(browser, options, report) {
     await session.context.close();
   }
 }
-
 async function runFinancePaymentFlow(browser, options, report) {
   const authorizedLookup = await login(browser, {
     ...options,
@@ -1801,7 +1747,7 @@ export async function runExceptionFlowRealWriteBrowser(options) {
     report.runtimeIdentity = await verifyRuntimeIdentity(options);
     browser = await chromium.launch({ headless: !options.headed });
     const runners = [
-      runSalesReturnFlow,
+      runReworkIntakeFlow,
       runFinancePaymentFlow,
       runInventoryAdjustmentFlow,
       runProductionExceptionFlow,

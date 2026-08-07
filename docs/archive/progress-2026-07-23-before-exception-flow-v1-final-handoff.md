@@ -26,11 +26,9 @@
 
 完成：将 A01–A07 从笼统“审批节点”改为业务审批、业务评审 / 办理任务和候选放行节点，A05 保留强制门禁 / 风险提醒两种候选供 C05 拍板，提醒模式不带放行、退回或阻塞权；逐节点补齐阈值、会签、自审、代理和超时边界，逐岗卡补充数据可见、动作与敏感职责。P01–P09 拆为甲方业务 / 交付范围表和乙方状态附表，六轴独立且甲方不替实现、配置、发布或 UAT 背书；P04 只预填 D-006 高层范围。分项签认按具体 ID 覆盖已确认、有条件、待确认、不采用、本期不讨论和不适用，C01–C09 作为本期范围与后续决策的稳定编号。
 
-完成：首次 IQC 拒收的业务处置只保留退厂 / 补换，原未入账收货取消范围作为后续系统结果另行确认；H09 接单继续补到 H21 最终处置和 H22 补换新到货 / 独立 IQC，并明确仍是待确认目标。财务图删除“发票进入收付款分配”的错误关系，补齐应收 / 应付 / 发票先建 DRAFT、再独立 POSTED；流程矩阵拆开 FinanceFact、FinancePayment、FinanceAllocation 和 FinanceCreditNote，并标明贷项单服务端来源类型守卫缺口。WIP 文档保留已有隔离 PostgreSQL、真实事务和较早 133 V5 技术证据；客户交付矩阵分开固定 V5 出货主链与当前 HEAD RMA，并明确异常能力只部分进入永绅 entitlement，RMA / 收付款尚未进入，`20260722093233` 未发布且未 UAT。
 
 验证：`bash scripts/qa/affected.sh --run` 完成 T0 / T1 / T5 / T6 影响面：文档与角色合同 `12 / 12`、WIP / 角色 / 原型直接合同 `35 / 35`、客户配置与私有部署边界 `76 / 76`，全部 `0 fail / 0 skip`；Web ESLint 和 `git diff --check` 通过。角色手册测试会解析内部手册与甲方确认表的全部 Mermaid，并精确锁定 R01–R09、A01–A07、P01–P09 双表、H01–H22、X01–X12、C01–C09、六轴独立字段、状态基线和签认结构。
 
-下一步：会前在受控工作副本填入客户交付矩阵状态日期、目标环境证据编号和 R / A 卡预填内容；面谈后按 D / Q 分流到决策、问题，并把批准差异写入客户交付矩阵的差异分区，再评审是否配置永绅 RMA / 收付款 entitlement 及实现补换新来源。未做 / 风险：本轮未改运行时、RBAC、菜单、schema、migration 或客户私有原件，未连接 / 写入 / 发布 133，未完成 UAT，也未运行本轮 `full.sh` / `strict.sh`；新甲方确认表仍待获准提交时纳入 Git。
 
 ## 2026-07-22 永绅甲方角色职责与流程文档治理
 
@@ -46,9 +44,7 @@
 
 ## 2026-07-22 双 Worktree Handoff 与组合树审查
 
-完成：将审批任务 Worktree `019f88e2-f9a6-7531-b02b-13e480a163e6` 与异常业务 Worktree `019f88eb-04ca-7861-9bae-7066a995a4b6` 的 Git 改动带回本机并合入 `main`。审批箱按 `workflow.task.approve` capability、revision、责任范围和 `ready / blocked` 状态收口，审批节点由服务端统一识别，事件轨迹只读且限制 100 条。异常流补齐库存操作、来料 / 委外 / 生产异常、客户退货、收付款核销与贷项单；ProcessRuntime 补偿仅在可证明线性且无领域副作用时撤回下游。
 
-审查修复：修正任务事件 assignee 绕过 revision anchor、审批箱混入终态、销售退货路由不一致、ProcessRuntime 把触发节点误算为下游、财务 post / reverse exact replay 不可达、贷项单无读取链路，以及销售退货 / 财务页面误把分页对象当数组导致运行时崩溃。合并后客户配置边界守卫同步锁定普通读取、监督读取和审批 capability scope 的精确调用分工，没有放宽 RBAC、Workflow / Fact 或幂等边界。
 
 验证：`make data` 显示 Ent / Atlas 零漂移，`db-guard` 通过；Web 全量 `1721 / 1721`、异常页面 Style L1 `3 / 3`、一次性隔离 PostgreSQL 关键事务 `192 / 192` 均为零失败、零跳过。合并树从头执行 `full.sh`，scripts Node `1318 / 1318`、Web contract `209 / 209`、server all `2868 / 2868`、关键 PostgreSQL `192 / 192` 均为零失败、零跳过，fresh migration 为 91 executed、pending 0，最终输出 `full status=complete`。最终 `strict.sh` 又从头覆盖 full、ShellCheck、shfmt、YAML、Web 零 warning 和严格 govulncheck；相同测试计数保持零失败、零跳过，最终输出 `strict status=complete`。
 
@@ -58,13 +54,9 @@
 
 ## 2026-07-22 异常流 V1 本地闭环
 
-完成：在保持 Workflow / Fact 分层的前提下，补齐盘点、仓间调拨和受控人工调整；首次来料拒绝后的退厂 / 补换；委外不合格返厂 / 返工；生产报废、超领和 WIP 让步审批；客户退货 RMA；真实收付款、多单核销、冲正及应收 / 应付红冲。所有新写路径均使用来源锚点、状态机、权限、幂等 intent、version CAS、事务、防负数或下游依赖门禁；已过账事实不物理删除。
 
-完成：普通 `create_task` 纳入网络重放合同，`handleWorkflow` 补齐未登录、disabled 和非管理员负向表测。ProcessRuntime 对已补偿节点只允许 `terminate_and_withdraw_downstream`：仅撤回尚无领域副作用的 active / blocked 下游和关联任务，已完成或已有 effect ref 时 fail closed。质量结果更正保留原判定并生成新待检单；存在已生效处置、财务、出货或客户退货隔离库存下游时拒绝撤销。
 
-完成：库存、质检、客户退货和财务新增正式页面；九岗位端与共享 JSON-RPC wrapper 覆盖断网、408 / 5xx、非法 success、stale / 并发、无权限及失败恢复。客户退货收货进入独立 `HOLD` 批次和 `CUSTOMER_RETURN` 质检，不回写原出货批次。正式能力台账、证据详情、流程运行时台账和 yoyoosun 客户交付矩阵同步为“本地可验证、未发布、未 UAT”。
 
-验证：后端定向 biz / data / service 与 RMA 隔离质检测试已通过；前端本轮文件定向 Prettier、Node `185 / 185`、production build 和 Style L1 `3 / 3` 已通过。`make data` 已完成并确认生成物 / migration 同步，`db-guard` 通过；T0-T7 影响面门禁通过，其中一次性隔离 PostgreSQL 关键事务 `192 / 192`、零失败、零跳过。冻结树 `full.sh` 已输出 `status=complete`，server quick `2702 / 2702`、server all `2862 / 2862`，均为零失败、零跳过；本节写入后的最终整树以随后执行的 `strict.sh` 退出码和本轮交付报告为准，不能沿用历史绿色。
 
 下一步：冻结 schema 后运行最终生成 / migration 守卫和整树门禁；若全部通过，仅报告 `Hand off ready` 并等待用户决定是否提交推送。
 

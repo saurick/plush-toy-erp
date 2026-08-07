@@ -32,7 +32,6 @@ const devPageSources = [
   'DevTestingPage.jsx',
   'DevDataPreparationPage.jsx',
   'DevPrototypesPage.jsx',
-  'DevCapabilityLedgerPage.jsx',
   'DevCustomerConfigPage.jsx',
   'DevDatabaseMigrationPage.jsx',
   'DevVersionCenterPage.jsx',
@@ -41,6 +40,18 @@ const devPageSources = [
 )
 const devPageNavSource = readFileSync(
   new URL('../components/DevPageNav.jsx', import.meta.url),
+  'utf8'
+)
+const devEntrySourceDetailsSource = readFileSync(
+  new URL('../components/DevEntrySourceDetails.jsx', import.meta.url),
+  'utf8'
+)
+const devHubPageSource = readFileSync(
+  new URL('../pages/DevHubPage.jsx', import.meta.url),
+  'utf8'
+)
+const devWorkbenchAreaPageSource = readFileSync(
+  new URL('../pages/DevWorkbenchAreaPage.jsx', import.meta.url),
   'utf8'
 )
 
@@ -159,12 +170,36 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
 })
 
-test('devHub: eleven dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 11)
+test('devHub: ten dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 10)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
   })
+})
+
+test('devHub: entry cards keep technical paths behind an accessible disclosure', () => {
+  assert.match(
+    devEntrySourceDetailsSource,
+    /<details className="erp-dev-entry-source-details">/u
+  )
+  assert.match(
+    devEntrySourceDetailsSource,
+    /<summary>查看路径与维护来源<\/summary>/u
+  )
+  assert.match(devEntrySourceDetailsSource, /<dt>页面路径<\/dt>/u)
+  assert.match(devEntrySourceDetailsSource, /<dt>维护来源<\/dt>/u)
+
+  for (const pageSource of [devHubPageSource, devWorkbenchAreaPageSource]) {
+    assert.match(
+      pageSource,
+      /<DevEntrySourceDetails route=\{item\.route\} source=\{item\.source\} \/>/u
+    )
+    assert.doesNotMatch(
+      pageSource,
+      /<Text className="erp-dev-hub-card__(?:route|source)">/u
+    )
+  }
 })
 
 test('devHub: lists existing dev-only entry routes without backend assumptions', () => {
@@ -177,7 +212,6 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/testing',
       '/__dev/data-preparation',
       '/__dev/prototypes',
-      '/__dev/capability-ledger',
       '/__dev/customer-config',
       '/__dev/database-migration',
       '/__dev/version-center',
@@ -248,9 +282,9 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 10)
-  assert.equal(summary.groupCount, 7)
-  assert(summary.guardrailCount >= 10)
+  assert.equal(summary.entryCount, 9)
+  assert.equal(summary.groupCount, 6)
+  assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)
   assert.match(summary.boundary, /no formal menu/)
   assert.match(summary.boundary, /not ERP RBAC/)
@@ -263,12 +297,6 @@ test('devHub: filters by title, group, source and route', () => {
   assert.deepEqual(
     filterDevHubItems(DEV_HUB_ITEMS, '测试入口').map((item) => item.key),
     ['testing']
-  )
-  assert.deepEqual(
-    filterDevHubItems(DEV_HUB_ITEMS, 'capability-ledger').map(
-      (item) => item.key
-    ),
-    ['capability-ledger']
   )
   assert.deepEqual(
     filterDevHubItems(DEV_HUB_ITEMS, 'config/customers').map(
@@ -298,23 +326,22 @@ test('devHub: filters by governance group and keyword together', () => {
       '流程治理 / Flow Governance',
       '验证治理 / QA',
       '产品设计 / Product Design',
-      '产品治理 / Product Governance',
       '客户治理 / Customer Governance',
       '交付治理 / Delivery',
     ]
   )
   assert.deepEqual(
     filterDevHubItems(DEV_HUB_ITEMS, {
-      group: '产品治理 / Product Governance',
+      group: '客户治理 / Customer Governance',
     }).map((item) => item.key),
-    ['capability-ledger']
+    ['customer-config']
   )
   assert.deepEqual(
     filterDevHubItems(DEV_HUB_ITEMS, {
-      group: '产品治理 / Product Governance',
+      group: '客户治理 / Customer Governance',
       keyword: '测试',
-    }),
-    []
+    }).map((item) => item.key),
+    ['customer-config']
   )
   assert.equal(filterDevHubItems(DEV_HUB_ITEMS, { group: 'unknown' }).length, 0)
 })
@@ -327,7 +354,6 @@ test('devHub: pinned routes keep valid unique dev entries up to the pin limit', 
       '/__dev/docs',
       '/__dev/customer-config',
       '/__dev/prototypes',
-      '/__dev/capability-ledger',
       '/erp/dashboard',
       '/__dev/docs',
     ]),

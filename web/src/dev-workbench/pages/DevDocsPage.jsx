@@ -9,11 +9,11 @@ import {
   PushpinFilled,
   PushpinOutlined,
   RightOutlined,
-  SearchOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Input, Space, Tag, Tooltip, Typography } from 'antd'
+import { Button, Empty, Space, Tag, Tooltip, Typography } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
+import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
@@ -39,7 +39,7 @@ import {
 
 const { Paragraph, Text, Title } = Typography
 
-const DEFAULT_EXPANDED_DIR_KEYS = Object.freeze(['dir:docs'])
+const DEFAULT_EXPANDED_DIR_KEYS = Object.freeze([])
 
 const markdownModules = import.meta.glob(
   [
@@ -190,7 +190,7 @@ function readExpandedKeys(availableKeys = []) {
 
 function readTocExpanded() {
   if (typeof window === 'undefined') {
-    return true
+    return false
   }
 
   try {
@@ -198,11 +198,11 @@ function readTocExpanded() {
       DEV_DOCS_TOC_EXPANDED_STORAGE_KEY
     )
     if (rawValue === null) {
-      return true
+      return false
     }
     return rawValue !== 'false'
   } catch {
-    return true
+    return false
   }
 }
 
@@ -651,34 +651,42 @@ export default function DevDocsPage() {
             <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-docs-summary">
-            左侧按仓库目录树浏览当前工作区内已匹配的 Markdown / browse workspace
-            Markdown by directory tree；不保证文件已纳入 Git，也不进入 ERP
-            菜单、权限、seedData 或产品文档 registry。
+            输入业务词、标题或路径，直接阅读当前工作区中的说明；找不到时再展开目录。
           </Paragraph>
+          <details className="erp-dev-docs-boundary-details">
+            <summary>查看收录范围与维护边界</summary>
+            <Paragraph>
+              查看器只读加载当前工作区内已匹配的 Markdown；不保证文件已纳入
+              Git，也不进入 ERP 菜单、权限、seedData 或产品文档 registry。
+            </Paragraph>
+          </details>
         </div>
       </header>
 
       <main className="erp-dev-docs-shell">
         <aside className="erp-dev-docs-sidebar">
-          <Input
+          <Text className="erp-dev-docs-sidebar__hint">
+            先搜索；找不到再展开目录
+          </Text>
+          <SearchInput
             allowClear
             aria-label="搜索开发文档"
             value={keyword}
-            prefix={<SearchOutlined />}
-            placeholder="搜索标题、路径或正文；不搜索时按目录树浏览"
+            placeholder="搜索开发文档"
+            searchHint="可搜索：标题、路径或正文；不搜索时按目录树浏览"
             onChange={(event) => setKeyword(event.target.value)}
             className="erp-dev-docs-search"
           />
 
           {pinnedDocs.length > 0 ? (
-            <section className="erp-dev-docs-sidebar__section erp-dev-docs-pinned">
-              <div className="erp-dev-docs-sidebar__section-head">
-                <Text strong>
+            <details className="erp-dev-docs-sidebar__section erp-dev-docs-pinned erp-dev-docs-pinned-disclosure">
+              <summary>
+                <span>
                   <PushpinOutlined className="erp-dev-docs-sidebar__section-icon" />
-                  置顶 / Pinned
-                </Text>
-                <Text type="secondary">{pinnedDocs.length}</Text>
-              </div>
+                  置顶文档
+                </span>
+                <span>{pinnedDocs.length}</span>
+              </summary>
               <div className="erp-dev-docs-pinned__list">
                 {pinnedDocs.map((item) => (
                   <div
@@ -722,7 +730,7 @@ export default function DevDocsPage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </details>
           ) : null}
 
           {isSearching ? (
@@ -810,7 +818,7 @@ export default function DevDocsPage() {
           ) : (
             <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--tree">
               <div className="erp-dev-docs-sidebar__section-head">
-                <Text strong>目录树 / Directory Tree</Text>
+                <Text strong>按目录找</Text>
                 <Space size={6}>
                   <Text type="secondary">{docs.length} 篇</Text>
                   <Button
@@ -818,7 +826,7 @@ export default function DevDocsPage() {
                     type="text"
                     onClick={toggleAllDirectories}
                   >
-                    {allExpanded ? '收起 / Collapse' : '展开 / Expand'}
+                    {allExpanded ? '收起全部' : '展开全部'}
                   </Button>
                 </Space>
               </div>
@@ -886,7 +894,7 @@ export default function DevDocsPage() {
           {headings.length > 0 ? (
             <div className="erp-dev-docs-toc-shell">
               <div className="erp-dev-docs-toc-shell__head">
-                <Text strong>章节 / Sections</Text>
+                <Text strong>本页章节</Text>
                 <Button
                   size="small"
                   type="text"
@@ -894,7 +902,7 @@ export default function DevDocsPage() {
                   aria-expanded={tocExpanded}
                   onClick={() => setTocExpanded((current) => !current)}
                 >
-                  {tocExpanded ? '收起 / Scroll' : '展开 / Wrap'}
+                  {tocExpanded ? '收起为一行' : '展开全部'}
                 </Button>
               </div>
               <div

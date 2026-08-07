@@ -6,6 +6,8 @@ export const DEV_GOVERNANCE_SOURCE_PATH = 'docs/项目治理地图.md'
 const AXIS_TABLE_HEADING = '## 治理维度与口径速查'
 const TASK_ROUTING_TABLE_HEADING = '## 常见任务分流'
 const GOVERNANCE_MERMAID_HEADING = '## 项目治理分流图'
+const PERSONAL_DELIVERY_LOOP_HEADING =
+  '## 个人 ToB 交付循环 / Personal ToB Delivery Loop'
 
 const DOCS_VIEWER_SUPPORTED_ROOTS = Object.freeze([
   'README.md',
@@ -231,96 +233,50 @@ export function parseGovernanceAxes(source = '') {
   })
 }
 
+export function parsePersonalDeliveryLoop(source = '') {
+  const section = extractMarkdownSection(source, PERSONAL_DELIVERY_LOOP_HEADING)
+  const summaryRaw = section
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith('|') && !line.startsWith('```'))
+
+  return {
+    summary: stripMarkdownInline(summaryRaw || ''),
+    summaryLinks: parseMarkdownLinks(summaryRaw || ''),
+    steps: mapTableRows(source, PERSONAL_DELIVERY_LOOP_HEADING, {
+      步骤: 'step',
+      谁负责: 'owner',
+      本步完成标志: 'outcome',
+    }),
+  }
+}
+
 export function parseGovernanceTaskRoutes(source = '') {
+  const seenKeys = new Set()
+
   return mapTableRows(source, TASK_ROUTING_TABLE_HEADING, {
-    如果本轮要做: 'task',
-    第一跳: 'firstHop',
-    必须同步检查: 'syncCheck',
+    '页面键（内部）': 'taskKey',
+    你这次准备做什么: 'task',
+    内部范围: 'internalScope',
+    先看: 'firstHop',
+    同时检查: 'syncCheck',
+    不要误判: 'boundary',
   })
+    .map((task) => ({ ...task, key: task.taskKey }))
+    .filter((task) => {
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(task.key || '')) {
+        return false
+      }
+      if (seenKeys.has(task.key)) return false
+      seenKeys.add(task.key)
+      return true
+    })
 }
 
 export function extractGovernanceMermaid(source = '') {
   const section = extractMarkdownSection(source, GOVERNANCE_MERMAID_HEADING)
   const match = section.match(/```mermaid\s*([\s\S]*?)```/)
   return match ? match[1].trim() : ''
-}
-
-export function filterGovernanceTasks(tasks = [], keyword = '') {
-  const query = String(keyword || '')
-    .trim()
-    .toLowerCase()
-  if (!query) return tasks
-  return tasks.filter((task) => task.searchText?.includes(query))
-}
-
-function collectGovernanceLinkPaths(item = {}, linkFields = []) {
-  const paths = new Set()
-  linkFields.forEach((field) => {
-    const links = item[field] || []
-    links.forEach((link) => {
-      if (link.path) paths.add(link.path)
-    })
-  })
-  return paths
-}
-
-function normalizeGovernanceToken(value = '') {
-  return stripMarkdownInline(value)
-    .toLowerCase()
-    .replace(/[^\p{Letter}\p{Number}\u4e00-\u9fff]+/gu, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function collectGovernanceTextTokens(value = '') {
-  return normalizeGovernanceToken(value)
-    .split(' ')
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 2)
-    .filter((token) => !['md', 'docs', 'readme', 'skill'].includes(token))
-}
-
-function scoreGovernanceTaskForAxis(task = {}, axis = {}) {
-  if (!task || !axis) return 0
-
-  const axisPaths = collectGovernanceLinkPaths(axis, ['sourcesLinks'])
-  const taskPaths = collectGovernanceLinkPaths(task, [
-    'firstHopLinks',
-    'syncCheckLinks',
-  ])
-  let score = 0
-
-  axisPaths.forEach((path) => {
-    if (taskPaths.has(path)) score += 10
-  })
-
-  const taskText = normalizeGovernanceToken(task.searchText || '')
-  const axisTokens = [
-    ...collectGovernanceTextTokens(axis.axis),
-    ...collectGovernanceTextTokens(axis.question),
-  ]
-  const uniqueAxisTokens = [...new Set(axisTokens)]
-  uniqueAxisTokens.forEach((token) => {
-    if (taskText.includes(token)) score += 1
-  })
-
-  return score
-}
-
-export function getRelatedGovernanceTasks(tasks = [], axis = {}) {
-  const scoredTasks = tasks
-    .map((task, index) => ({
-      index,
-      score: scoreGovernanceTaskForAxis(task, axis),
-      task,
-    }))
-    .filter((item) => item.score > 0)
-    .sort((left, right) => {
-      if (right.score !== left.score) return right.score - left.score
-      return left.index - right.index
-    })
-
-  return scoredTasks.map((item) => item.task)
 }
 
 export function buildGovernanceSummary({
@@ -350,7 +306,6 @@ export function buildGovernanceSummary({
     sourceCount: uniqueSourcePaths.size,
     hasMermaid: Boolean(mermaid),
     sourcePath: DEV_GOVERNANCE_SOURCE_PATH,
-    boundary:
-      'Markdown remains the source of truth; this page is a dev-only read-only view.',
+    boundary: 'Markdown 是唯一维护来源；本页只在开发环境提供只读指引。',
   }
 }

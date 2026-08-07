@@ -347,9 +347,13 @@
 }
 
 .mobile-role-summary-metric {
+  display: flex;
+  min-height: 56px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
-  min-height: 66px;
   overflow: hidden;
 }
 
@@ -940,6 +944,22 @@
 }
 
 @media (max-width: 420px) {
+  .mobile-role-task-filter {
+    padding-inline: 0;
+    font-size: 13px;
+  }
+
+  .mobile-role-task-filter__content {
+    gap: 2px;
+  }
+
+  .mobile-role-task-filter__count {
+    min-width: 24px;
+    height: 22px;
+    padding-inline: 3px;
+    font-size: 12px;
+  }
+
   .mobile-task-flow-topbar {
     grid-template-columns: 44px minmax(0, 1fr) minmax(44px, auto);
     padding-inline: 8px;
@@ -1173,6 +1193,10 @@
   .mobile-role-message-tabs__item--active
   .mobile-role-message-tabs__count {
   background: rgb(110 231 183 / 0.18);
+}
+
+[data-erp-theme='dark'] .mobile-role-section-count {
+  color: #a7f3d0;
 }
 
 [data-erp-theme='dark'] .mobile-role-list-control__button {

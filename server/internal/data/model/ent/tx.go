@@ -116,6 +116,10 @@ type Tx struct {
 	PurchaseReturnItem *PurchaseReturnItemClient
 	// QualityInspection is the client for interacting with the QualityInspection builders.
 	QualityInspection *QualityInspectionClient
+	// ReworkIntake is the client for interacting with the ReworkIntake builders.
+	ReworkIntake *ReworkIntakeClient
+	// ReworkIntakeItem is the client for interacting with the ReworkIntakeItem builders.
+	ReworkIntakeItem *ReworkIntakeItemClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// RoleDataScope is the client for interacting with the RoleDataScope builders.
@@ -132,10 +136,6 @@ type Tx struct {
 	SalesOrder *SalesOrderClient
 	// SalesOrderItem is the client for interacting with the SalesOrderItem builders.
 	SalesOrderItem *SalesOrderItemClient
-	// SalesReturn is the client for interacting with the SalesReturn builders.
-	SalesReturn *SalesReturnClient
-	// SalesReturnItem is the client for interacting with the SalesReturnItem builders.
-	SalesReturnItem *SalesReturnItemClient
 	// Shipment is the client for interacting with the Shipment builders.
 	Shipment *ShipmentClient
 	// ShipmentItem is the client for interacting with the ShipmentItem builders.
@@ -341,6 +341,8 @@ func (tx *Tx) init() {
 	tx.PurchaseReturn = NewPurchaseReturnClient(tx.config)
 	tx.PurchaseReturnItem = NewPurchaseReturnItemClient(tx.config)
 	tx.QualityInspection = NewQualityInspectionClient(tx.config)
+	tx.ReworkIntake = NewReworkIntakeClient(tx.config)
+	tx.ReworkIntakeItem = NewReworkIntakeItemClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.RoleDataScope = NewRoleDataScopeClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
@@ -349,8 +351,6 @@ func (tx *Tx) init() {
 	tx.RuntimeMarker = NewRuntimeMarkerClient(tx.config)
 	tx.SalesOrder = NewSalesOrderClient(tx.config)
 	tx.SalesOrderItem = NewSalesOrderItemClient(tx.config)
-	tx.SalesReturn = NewSalesReturnClient(tx.config)
-	tx.SalesReturnItem = NewSalesReturnItemClient(tx.config)
 	tx.Shipment = NewShipmentClient(tx.config)
 	tx.ShipmentItem = NewShipmentItemClient(tx.config)
 	tx.StockReservation = NewStockReservationClient(tx.config)

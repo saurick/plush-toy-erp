@@ -48,11 +48,15 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'create_payable_from_outsourcing_return',
     'create_reconciliation_from_finance_fact',
     'cancel_finance_fact',
-    'list_sales_returns',
-    'create_sales_return',
-    'cancel_sales_return',
-    'reverse_sales_return',
-    'get_sales_return',
+    'list_rework_intake_source_candidates',
+    'list_rework_intakes',
+    'create_rework_intake',
+    'receive_rework_intake',
+    'cancel_rework_intake',
+    'reverse_rework_intake',
+    'get_rework_intake',
+    'create_production_rework_from_intake',
+    'create_rework_reshipment',
     'list_finance_payments',
     'get_finance_credit_note',
     'list_finance_credit_notes',
@@ -74,10 +78,7 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'post_finance_fact',
     'settle_finance_fact',
   ]) {
-    assert.match(
-      source,
-      new RegExp(`method:\\s*'${lifecycleMethodName}'`, 'u')
-    )
+    assert.match(source, new RegExp(`method:\\s*'${lifecycleMethodName}'`, 'u'))
   }
   assert.match(
     source,
@@ -102,8 +103,6 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'approve_production_exception',
     'reject_production_exception',
     'execute_production_exception',
-    'approve_sales_return',
-    'receive_sales_return',
     'post_finance_payment',
   ]) {
     assert.doesNotMatch(source, new RegExp(`call\\(\\s*'${retiredMethodName}'`))
@@ -134,12 +133,8 @@ test('operationalFactApi: source-derived fact reads use strict complete paginati
     ['listAllStockReservations', 'listStockReservations', 'stock_reservations'],
     ['listAllFinanceFacts', 'listFinanceFacts', 'finance_facts'],
     ['listAllFinancePayments', 'listFinancePayments', 'payments'],
-    [
-      'listAllFinanceCreditNotes',
-      'listFinanceCreditNotes',
-      'credit_notes',
-    ],
-    ['listAllSalesReturns', 'listSalesReturns', 'sales_returns'],
+    ['listAllFinanceCreditNotes', 'listFinanceCreditNotes', 'credit_notes'],
+    ['listAllReworkIntakes', 'listReworkIntakes', 'rework_intakes'],
   ]) {
     assert.match(
       source,
@@ -155,6 +150,13 @@ test('operationalFactApi: shipment source candidates use the typed server contra
   assert.match(
     source,
     /export async function listShipmentSourceCandidates[\s\S]*?'list_shipment_source_candidates'[\s\S]*?validateShipmentSourceCandidatePage/u
+  )
+})
+
+test('operationalFactApi: rework intake candidates keep source and production target identity', () => {
+  assert.match(
+    source,
+    /id:\s*`\$\{Number\(item\?\.source_shipment_item_id[\s\S]*?\$\{Number\([\s\S]*?item\?\.target_production_order_item_id/u
   )
 })
 

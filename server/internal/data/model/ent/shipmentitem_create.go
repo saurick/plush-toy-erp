@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
@@ -44,6 +45,20 @@ func (_c *ShipmentItemCreate) SetSalesOrderItemID(v int) *ShipmentItemCreate {
 func (_c *ShipmentItemCreate) SetNillableSalesOrderItemID(v *int) *ShipmentItemCreate {
 	if v != nil {
 		_c.SetSalesOrderItemID(*v)
+	}
+	return _c
+}
+
+// SetReworkCompletionFactID sets the "rework_completion_fact_id" field.
+func (_c *ShipmentItemCreate) SetReworkCompletionFactID(v int) *ShipmentItemCreate {
+	_c.mutation.SetReworkCompletionFactID(v)
+	return _c
+}
+
+// SetNillableReworkCompletionFactID sets the "rework_completion_fact_id" field if the given value is not nil.
+func (_c *ShipmentItemCreate) SetNillableReworkCompletionFactID(v *int) *ShipmentItemCreate {
+	if v != nil {
+		_c.SetReworkCompletionFactID(*v)
 	}
 	return _c
 }
@@ -208,6 +223,11 @@ func (_c *ShipmentItemCreate) SetSalesOrderItem(v *SalesOrderItem) *ShipmentItem
 	return _c.SetSalesOrderItemID(v.ID)
 }
 
+// SetReworkCompletionFact sets the "rework_completion_fact" edge to the ProductionFact entity.
+func (_c *ShipmentItemCreate) SetReworkCompletionFact(v *ProductionFact) *ShipmentItemCreate {
+	return _c.SetReworkCompletionFactID(v.ID)
+}
+
 // SetProduct sets the "product" edge to the Product entity.
 func (_c *ShipmentItemCreate) SetProduct(v *Product) *ShipmentItemCreate {
 	return _c.SetProductID(v.ID)
@@ -318,6 +338,11 @@ func (_c *ShipmentItemCreate) check() error {
 	if v, ok := _c.mutation.SalesOrderItemID(); ok {
 		if err := shipmentitem.SalesOrderItemIDValidator(v); err != nil {
 			return &ValidationError{Name: "sales_order_item_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.sales_order_item_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ReworkCompletionFactID(); ok {
+		if err := shipmentitem.ReworkCompletionFactIDValidator(v); err != nil {
+			return &ValidationError{Name: "rework_completion_fact_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.rework_completion_fact_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.ProductID(); !ok {
@@ -478,6 +503,23 @@ func (_c *ShipmentItemCreate) createSpec() (*ShipmentItem, *sqlgraph.CreateSpec)
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.SalesOrderItemID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReworkCompletionFactIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shipmentitem.ReworkCompletionFactTable,
+			Columns: []string{shipmentitem.ReworkCompletionFactColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ReworkCompletionFactID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ProductIDs(); len(nodes) > 0 {

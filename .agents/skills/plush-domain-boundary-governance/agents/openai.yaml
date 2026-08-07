@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Domain Boundary Governance"
   short_description: "业务边界与字段真源 Domain：工程质量和复杂度门禁"
-  default_prompt: "Use $plush-domain-boundary-governance 收敛 Workflow/Fact、schema/API/RBAC、字段真源与客户差异。"
+  default_prompt: "Use $plush-domain-boundary-governance 设计或实现 Workflow/Fact、schema/migration、API/RBAC、字段真源与客户差异；运行态 apply/release 转交 operations。"

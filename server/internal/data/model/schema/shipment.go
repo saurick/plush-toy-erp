@@ -18,12 +18,14 @@ type Shipment struct {
 }
 
 var shipmentLockedFields = map[string]struct{}{
-	"shipment_no":                   {},
-	"sales_order_id":                {},
-	"customer_id":                   {},
-	"status":                        {},
-	"idempotency_key":               {},
-	"shipped_at":                    {},
+	"shipment_no":                  {},
+	"purpose":                      {},
+	"sales_order_id":               {},
+	"rework_intake_id":             {},
+	"customer_id":                  {},
+	"status":                       {},
+	"idempotency_key":              {},
+	"shipped_at":                   {},
 	"total_net_weight_g":           {},
 	"requested_total_net_weight_g": {},
 }
@@ -49,9 +51,11 @@ func (Shipment) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"shipments_status_allowed":                         "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
-				"shipments_finance_release_status_allowed":         "finance_release_status IN ('PENDING', 'APPROVED', 'REJECTED')",
-				"shipments_finance_release_version_positive":       "finance_release_version > 0",
+				"shipments_status_allowed":                        "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
+				"shipments_purpose_allowed":                       "purpose IN ('SALES_DELIVERY', 'REWORK_RESHIPMENT')",
+				"shipments_finance_release_status_allowed":        "finance_release_status IN ('PENDING', 'APPROVED', 'REJECTED', 'NOT_REQUIRED')",
+				"shipments_purpose_source_bundle":                 "((purpose = 'SALES_DELIVERY' AND rework_intake_id IS NULL AND finance_release_status <> 'NOT_REQUIRED') OR (purpose = 'REWORK_RESHIPMENT' AND rework_intake_id IS NOT NULL AND sales_order_id IS NULL AND finance_release_status = 'NOT_REQUIRED'))",
+				"shipments_finance_release_version_positive":      "finance_release_version > 0",
 				"shipments_total_net_weight_g_positive":           "total_net_weight_g IS NULL OR total_net_weight_g > 0",
 				"shipments_requested_total_net_weight_g_positive": "requested_total_net_weight_g IS NULL OR requested_total_net_weight_g > 0",
 			},
@@ -62,7 +66,9 @@ func (Shipment) Annotations() []schema.Annotation {
 func (Shipment) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("shipment_no").NotEmpty().MaxLen(64),
+		field.String("purpose").NotEmpty().Default("SALES_DELIVERY").MaxLen(32),
 		field.Int("sales_order_id").Optional().Nillable().Positive(),
+		field.Int("rework_intake_id").Optional().Nillable().Positive(),
 		field.Int("customer_id").Optional().Nillable().Positive(),
 		// Snapshot preserves shipment-time display data; Customer remains the master truth.
 		field.String("customer_snapshot").Optional().Nillable().MaxLen(512),
@@ -89,6 +95,7 @@ func (Shipment) Fields() []ent.Field {
 func (Shipment) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("sales_order", SalesOrder.Type).Ref("shipments").Field("sales_order_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("rework_intake", ReworkIntake.Type).Field("rework_intake_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("customer", Customer.Type).Ref("shipments").Field("customer_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("items", ShipmentItem.Type),
 	}
@@ -99,6 +106,8 @@ func (Shipment) Indexes() []ent.Index {
 		index.Fields("shipment_no").Unique(),
 		index.Fields("idempotency_key").Unique(),
 		index.Fields("sales_order_id"),
+		index.Fields("rework_intake_id"),
+		index.Fields("purpose", "status"),
 		index.Fields("customer_id"),
 		index.Fields("status"),
 	}

@@ -63,56 +63,6 @@ func TestExceptionApprovalBranchPolicyHandlers(t *testing.T) {
 	}
 }
 
-func TestSalesReturnProcessCommandHandlersFailClosedAndExecute(t *testing.T) {
-	t.Parallel()
-	repo := &exceptionOperationalFactRepoStub{
-		salesReturn: &SalesReturn{ID: 41, Status: SalesReturnStatusDraft, CreatedBy: 5},
-	}
-	uc := NewOperationalFactUsecase(repo)
-	approve := &salesReturnProcessCommandHandler{uc: uc, commandKey: ProcessDomainCommandSalesReturnApprove}
-	input := exceptionProcessCommandInput(
-		ProcessDomainCommandSalesReturnApprove,
-		salesReturnProcessBusinessRefType,
-		41,
-		map[string]any{salesReturnProcessPayloadID: 41, processDecisionPayloadReason: "同意客户退货"},
-	)
-	result, err := approve.ExecuteProcessDomainCommand(context.Background(), input, 7)
-	if err != nil || result.Outcome != SalesReturnProcessCommandOutcomeApproved ||
-		repo.salesReturnMutation == nil || repo.salesReturnMutation.actorID != 7 ||
-		repo.salesReturnMutation.reason != "同意客户退货" {
-		t.Fatalf("result=%#v mutation=%#v err=%v", result, repo.salesReturnMutation, err)
-	}
-
-	for _, mutate := range []func(*ProcessDomainCommandInput){
-		func(in *ProcessDomainCommandInput) { in.ProcessInstance.BusinessRefID++ },
-		func(in *ProcessDomainCommandInput) { in.Payload["status"] = "APPROVED" },
-		func(in *ProcessDomainCommandInput) { in.Payload[processDecisionPayloadReason] = "" },
-	} {
-		invalid := cloneExceptionProcessCommandInput(input)
-		mutate(invalid)
-		if _, err := approve.ExecuteProcessDomainCommand(context.Background(), invalid, 7); !errors.Is(err, ErrBadParam) {
-			t.Fatalf("invalid sales return command error=%v", err)
-		}
-	}
-	if _, err := approve.ExecuteProcessDomainCommand(context.Background(), input, 5); !errors.Is(err, ErrBadParam) {
-		t.Fatalf("requester self approval error=%v", err)
-	}
-
-	repo.salesReturn = &SalesReturn{ID: 41, Status: SalesReturnStatusApproved, CreatedBy: 5}
-	receive := &salesReturnProcessCommandHandler{uc: uc, commandKey: ProcessDomainCommandSalesReturnReceive}
-	receiveInput := exceptionProcessCommandInput(
-		ProcessDomainCommandSalesReturnReceive,
-		salesReturnProcessBusinessRefType,
-		41,
-		map[string]any{salesReturnProcessPayloadID: 41},
-	)
-	result, err = receive.ExecuteProcessDomainCommand(context.Background(), receiveInput, 9)
-	if err != nil || result.Outcome != SalesReturnProcessCommandOutcomeReceived ||
-		repo.salesReturnMutation == nil || repo.salesReturnMutation.commandKey != ProcessDomainCommandSalesReturnReceive {
-		t.Fatalf("receive result=%#v mutation=%#v err=%v", result, repo.salesReturnMutation, err)
-	}
-}
-
 func TestFinancePaymentProcessCommandHandlersCanonicalizeAndExecute(t *testing.T) {
 	t.Parallel()
 	repo := &exceptionOperationalFactRepoStub{
@@ -307,59 +257,14 @@ type exceptionProcessMutation struct {
 
 type exceptionOperationalFactRepoStub struct {
 	OperationalFactRepo
-	SalesReturnRepo
 	FinancePaymentRepo
 	ProductionExceptionDecisionRepo
 	ProductionExceptionExecutionRepo
 
-	salesReturn         *SalesReturn
 	financePayment      *FinancePayment
 	productionException *ProductionExceptionDecision
-	salesReturnMutation *exceptionProcessMutation
 	financePaymentPost  *FinancePaymentPost
 	productionMutation  *ProductionExceptionMutation
-}
-
-func (r *exceptionOperationalFactRepoStub) GetSalesReturn(_ context.Context, id int) (*SalesReturn, error) {
-	if r.salesReturn == nil || r.salesReturn.ID != id {
-		return nil, ErrBadParam
-	}
-	copy := *r.salesReturn
-	return &copy, nil
-}
-
-func (r *exceptionOperationalFactRepoStub) ApproveSalesReturnForProcessCommand(
-	_ context.Context,
-	_ int,
-	command *ProcessDomainCommandInput,
-	_ *ProcessDomainCommandResult,
-	actorID int,
-	reason string,
-) (*SalesReturn, error) {
-	r.salesReturnMutation = &exceptionProcessMutation{commandKey: command.CommandKey, actorID: actorID, reason: reason}
-	return r.GetSalesReturn(context.Background(), r.salesReturn.ID)
-}
-
-func (r *exceptionOperationalFactRepoStub) RejectSalesReturnForProcessCommand(
-	ctx context.Context,
-	id int,
-	command *ProcessDomainCommandInput,
-	result *ProcessDomainCommandResult,
-	actorID int,
-	reason string,
-) (*SalesReturn, error) {
-	return r.ApproveSalesReturnForProcessCommand(ctx, id, command, result, actorID, reason)
-}
-
-func (r *exceptionOperationalFactRepoStub) ReceiveSalesReturnForProcessCommand(
-	_ context.Context,
-	_ int,
-	command *ProcessDomainCommandInput,
-	_ *ProcessDomainCommandResult,
-	actorID int,
-) (*SalesReturn, error) {
-	r.salesReturnMutation = &exceptionProcessMutation{commandKey: command.CommandKey, actorID: actorID}
-	return r.GetSalesReturn(context.Background(), r.salesReturn.ID)
 }
 
 func (r *exceptionOperationalFactRepoStub) GetFinancePayment(_ context.Context, id int) (*FinancePayment, error) {

@@ -7,15 +7,15 @@ import {
   DeploymentUnitOutlined,
   ExperimentOutlined,
   FileSearchOutlined,
-  FundProjectionScreenOutlined,
   PushpinFilled,
   PushpinOutlined,
   RightOutlined,
   SafetyCertificateOutlined,
-  SearchOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Input, Select, Tag, Tooltip, Typography } from 'antd'
+import { Button, Empty, Select, Tag, Tooltip, Typography } from 'antd'
 import { Link } from 'react-router-dom'
+import SearchInput from '@/common/components/SearchInput'
+import DevEntrySourceDetails from '../components/DevEntrySourceDetails.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
   DEV_HUB_ALL_GROUP,
@@ -36,7 +36,6 @@ const ICON_BY_KEY = {
   testing: <SafetyCertificateOutlined />,
   'data-preparation': <DatabaseOutlined />,
   prototypes: <AppstoreOutlined />,
-  'capability-ledger': <FundProjectionScreenOutlined />,
   'customer-config': <DeploymentUnitOutlined />,
   'status-flows': <ApartmentOutlined />,
 }
@@ -78,7 +77,6 @@ function EntryCard({ item, compact = false, pinned = false, onTogglePinned }) {
             <Title level={4} className="erp-dev-hub-card__title">
               {item.title}
             </Title>
-            <Text className="erp-dev-hub-card__route">{item.route}</Text>
           </div>
           <div className="erp-dev-hub-card__actions">
             <Tag>{item.group}</Tag>
@@ -95,10 +93,10 @@ function EntryCard({ item, compact = false, pinned = false, onTogglePinned }) {
             </Tooltip>
           </div>
         </div>
-        <Text className="erp-dev-hub-card__source">{item.source}</Text>
         <Text type="secondary" className="erp-dev-hub-card__description">
           {item.description}
         </Text>
+        <DevEntrySourceDetails route={item.route} source={item.source} />
         <div className="erp-dev-hub-card__foot">
           <span>{item.status}</span>
           <Link
@@ -138,7 +136,7 @@ export default function DevHubPage() {
   }
 
   return (
-    <div className="erp-dev-hub-page erp-dev-workspace-page">
+    <div className="erp-dev-hub-page erp-dev-hub-page--index erp-dev-workspace-page">
       <DevPageNav />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
@@ -175,11 +173,10 @@ export default function DevHubPage() {
         ) : null}
 
         <section className="erp-dev-hub-toolbar" aria-label="开发入口筛选">
-          <Input
+          <SearchInput
             allowClear
             placeholder="搜索入口或路径"
             value={keyword}
-            prefix={<SearchOutlined aria-hidden="true" />}
             onChange={(event) => setKeyword(event.target.value)}
           />
           <Select

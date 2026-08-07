@@ -225,9 +225,9 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 	case errors.Is(err, biz.ErrProductionOrderMaterialIssueQuantityExceeded):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次领料将超过生产订单物料需求剩余可领数量"}
 	case errors.Is(err, biz.ErrProductionReworkSourceInvalid):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工来源必须是已关联批次的生产完工记录，请刷新后重试"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工来源与原完工记录或返工回厂明细不一致，请刷新后重试"}
 	case errors.Is(err, biz.ErrProductionReworkSourceState):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源完工记录尚未确认或已取消，不能发起返工"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工来源尚未确认、已取消或已冲正，不能办理返工"}
 	case errors.Is(err, biz.ErrProductionReworkQuantityExceeded):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次返工数量将超过来源完工批次剩余可返工数量"}
 	case errors.Is(err, biz.ErrProductionReworkDependency):
@@ -274,8 +274,24 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"}
 	case errors.Is(err, biz.ErrShipmentFinanceDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未取消的应收或发票记录，请先取消相关财务记录"}
-	case errors.Is(err, biz.ErrShipmentSalesReturnDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未取消的客户退货，请先取消客户退货后再取消出货"}
+	case errors.Is(err, biz.ErrShipmentReworkIntakeDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未结束的返工回厂记录，请先取消或冲正返工回厂记录后再取消出货"}
+	case errors.Is(err, biz.ErrReworkIntakeNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工回厂记录不存在"}
+	case errors.Is(err, biz.ErrReworkIntakeSourceInvalid):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工回厂记录与原出货明细、产品或目标生产订单不一致，请刷新来源后重试"}
+	case errors.Is(err, biz.ErrReworkIntakeSourceState):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工回厂记录当前状态不允许执行该操作"}
+	case errors.Is(err, biz.ErrReworkIntakeQuantityExceeded):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次返工回厂数量超过原出货明细剩余可登记数量"}
+	case errors.Is(err, biz.ErrReworkIntakeProductionDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "返工件已经进入生产返工，不能冲正回厂入库；请继续完成返工和补发"}
+	case errors.Is(err, biz.ErrReworkReshipmentSourceInvalid):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "补发明细必须来自该返工回厂记录已确认的返工完工批次"}
+	case errors.Is(err, biz.ErrReworkReshipmentQuantityExceeded):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次补发数量超过返工完工批次剩余可补发数量"}
+	case errors.Is(err, biz.ErrReworkCompletionReshipmentDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该返工完工记录已用于补发，不能撤销；请先取消对应补发单"}
 	case errors.Is(err, biz.ErrShipmentQualityPending):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
 	case errors.Is(err, biz.ErrShipmentQualityRejected):

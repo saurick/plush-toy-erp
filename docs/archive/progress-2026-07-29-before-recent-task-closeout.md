@@ -84,7 +84,6 @@
 
 完成：将生产异常页原先上下堆叠的“异常办理记录 + Workflow 审批任务”改为同一页头下的“异常办理 / 审批任务”同级页签。页签按有效权限显示，异常记录或任务深链优先打开对应页签；只有当前页签挂载并请求数据，页头统计、全局刷新、任务筛选与动作也跟随当前工作区，避免隐藏表格继续加载或把两套数量混在一起。异常办理仍读取正式 `ProductionExceptionDecision` 并执行生产异常领域动作，审批任务仍读取 `production_exception_decision_approval`；没有改变 Workflow task done 与 Fact / Source Document 执行分离的边界，也没有修改 schema、migration、RBAC、菜单或后端合同。
 
-验证：Node `24.14.0` 下定向页面 / Style L1 合同 `25 / 25`、前端 ESLint、Stylelint 和 Vite production build（`3341 modules`）通过。真实 Chromium 定向场景 `1 / 1` 通过，覆盖桌面两页签、当前页签刷新、单表可见、深色、`390 × 844` 移动端和页面级无横向溢出；关键截图已人工复核。共享工作区 Web 全集为 `1913 / 1914`，唯一失败是非本轮 `FinancePaymentsPage.jsx`、`SalesReturnsPage.jsx` 已新增双击主表合同，但既有数量测试仍预期 11 个页面。既有 `business-core-pages-desktop` 大场景也在到达生产异常前，因出货草稿作废确认按钮文本识别失败而中止；本轮没有顺手修改这两个并行现场。
 
 边界：本轮没有提交、推送、部署、目标环境岗位实登或客户 UAT；浏览器证据来自本地自托管前端与受控 mock，只证明当前 Local 页面合同和交互。
 
@@ -106,7 +105,6 @@
 
 恢复与运行边界：前端在预览后冻结本次完整意图，提交结果不确定时先读取 authoritative active 配置，按 customer、revision、hash、product、status 和完整责任投影逐项确认；只有尚未生效时才使用完全相同的 revision 与 payload 重试，避免双写或把其他管理员的设置误认成成功。事务提交后新建业务流程使用新 active revision，已经创建且冻结配置的在途流程继续使用原 revision，不追改历史实例；日常调整写入运行时配置，不要求每次重新构建镜像。
 
-验证：Node `24.14.0` 下审批 API、恢复、页面与 lineage 定向测试 `42 / 42`、ESLint、production build 通过；真实 Chromium 的未配置、PMC 主办 / 备用保存生效、确认恢复和权限漂移场景 `4 / 4` 通过并人工复核截图。服务端 biz / data / service 三包测试通过；一次性 PostgreSQL 18 隔离库完成全部 104 个 migration 后，原子幂等与双并发竞争测试均通过，证明并发只产生一个 winner、loser 仅返回 CAS 冲突且不留下候选 revision 或中间状态，测试容器与数据库已删除。Web 全集为 `1897 / 1898`；唯一失败是共享 dirty worktree 中非本轮 `FinancePaymentsPage.jsx`、`SalesReturnsPage.jsx` 新增双击行为后，既有页面数量合同仍预期 11，未为本轮审批改动扩大范围。
 
 边界：本轮没有改 schema / migration，没有写共享 `plush_erp`，没有提交、推送、部署、目标环境岗位 smoke 或客户 UAT。`affected.sh --plan` 因当前 139 个文件的共享现场含其他任务 migration / 全站改动而保守升级到 T8，本轮只采用上述定向、三包、production build、Chromium 和隔离 PostgreSQL 证据，不把共享现场的全量失败包装成绿色。
 
@@ -124,15 +122,11 @@
 
 验证与边界：Node `24.14.0` 下前端菜单 / 岗位导航定向测试 `39 / 39`、客户配置 / 文档定向测试 `60 / 60` 通过，服务端内置菜单与权限说明定向 Go 测试、目标文件 Prettier、ESLint、Stylelint 和 `git diff --check` 通过。真实 Chromium 在隔离端口完成财务系统推荐与自定义导航 `2 / 2`，覆盖顺序、新菜单名和横向溢出，两张截图已人工复核。未运行全量测试、未提交、未推送、未部署，也未执行目标账号实登或客户 UAT。
 
-## 2026-07-29 客户退货与收付款通用 V1 页面收口
 
-完成：先核对永绅 private `derived` 与 manifest，确认其中没有直接出现客户退货 / RMA、真实收付款、多单核销或红冲需求，不能把本轮能力描述为“甲方已确认”。按当前正式 Product Core 台账和本轮用户授权，仅完善既有通用 V1：客户退货列表与来源参考资料解耦，新增服务端批量读回的来源出货、产品 / SKU、仓库、单位、退货隔离批次、来源已出货量、累计有效退货量和剩余可退量；新建时重新读取全部有效退货并精确限制可退数量。收付款与红冲改为独立服务端分页 / 筛选，精确读回应收应付未核销金额、核销来源和红冲来源，前端以六位小数精确校验核销合计、单笔未核销上限和红冲上限。
 
 页面：两页统一使用 `BusinessOperationPanel`、`SelectionActionBar`、`BusinessDataTable`、`BusinessFormModal` 和 `BusinessRecordDetailsModal`；支持单击选中、双击详情、稳定分页、操作边界提示、加载 / 空态 / 失败恢复。任一客户、供应商、产品、仓库或批次参考接口失败不再清空核心业务记录。没有改 Workflow / Fact 分层、Source 状态机、RBAC、schema / migration 或客户专属规则，也没有新增退款、换货、银行流水、总账或税控语义。
 
-验证：服务端 `go test ./internal/biz ./internal/data ./internal/service -count=1` 通过；Web 定向 API / 页面 / 六位小数测试 `21 / 21`、用户可见文案与分页合同 `74 / 74`、客户文档与异常流合同 `25 / 25`、ESLint 和 Vite production build 通过。真实 Chromium 受控 mock 场景 `2 / 2` 通过：`390 × 844` 客户退货覆盖双击详情、来源选择、累计有效退货与当前可退数量读回、长表单滚动和无横向溢出；`1280 × 800` 深色收付款覆盖选中详情、应收候选、未核销金额、本次核销金额、弹窗几何和主题。当前 Node 为 `26.5.0`，仓库声明 `24.14.x`，pnpm 给出 engine warning。`affected.sh --plan` 因共享 dirty worktree 的其他任务同时包含 migration、数据库与全站改动而升级到 T8，本轮没有把其他 writer 的现场混入 full / strict 结论。
 
-下一步与风险：private `derived` 仍只能作为客户资料的派生参考，RMA、收付款及后续退款 / 换货 / 银行能力须由甲方确认或 UAT 单独闭环；本轮没有执行目标环境、真实岗位登录、数据库 migration、客户 UAT、full / strict、提交、推送或部署。
 
 ## 2026-07-28 QA 证明循环收敛
 
@@ -228,7 +222,6 @@
 
 完成：正式业务列表页统一采用四类动作可用性合同：无权限、客户配置未开放或产品无能力时隐藏；有权限但未选择、临时前置条件不足或请求处理中时置灰并提供可聚焦原因；动作已完成、记录处于终态或当前来源结构不适用时隐藏并由状态表达结果；“更多操作”没有实际可用项时隐藏。`SelectionActionBar` 的桌面顺序、平板 / 手机固定优先级、更多操作 Drawer、键盘可聚焦禁用原因、生命周期主槽和更多操作槽已收敛到共享实现；不再出现没有原因的灰色按钮，也不再用只读权限显示写动作名称。
 
-覆盖：扫描并治理主数据、BOM、销售订单、采购订单、采购入库、生产订单、委外订单、质量检验、库存台账、出货单、客户退货、运营 / 财务事实、收付款与红冲、Workflow 任务共 14 类正式选择页。销售、采购、收货、生产、出货等页面在未选择时保留有权限动作的稳定入口，选择后只呈现当前记录仍可能办理的动作；终态、已完成动作和空“更多操作”均不占位。
 
 质量检验：写操作统一为“ 不合格处置 ”，按来源和来源单状态路由到首次来料退厂 / 补换、已入库采购退货、委外返厂 / 返工或生产异常处置。只有对应写能力才显示该入口；仅有委外读取权限的 demo_boss 不再看到永久置灰的“委外返厂 / 返工”，无选择时显示带原因的“查看委外处置”，选择不合格委外质检后可查看，选择来料、合格、已取消或其他不相关记录时隐藏。已生成采购退货后处置动作隐藏。浏览器同时发现并修正质检堆叠单元格在相同回退文案下的重复 React key。
 
@@ -240,15 +233,12 @@
 
 ## 2026-07-27 异常流完整收口与最终 Local 验收
 
-完成：79da Worktree 的异常流改动已按业务真源逐文件、逐 hunk 语义带回 Local，没有整树覆盖、merge、cherry-pick、rebase 或兼容兜底。Local 原有的正常流、审批责任、状态观察台和页面治理继续保留；异常流补齐客户退货、收付款、手工库存调整和生产异常四条正式 ProcessRuntime，以及对应 Source Document / Fact / Inventory / Allocation、RBAC、CAS、幂等、审计和前端动作。Workflow task done 仍不等于 Fact posted，四条流程的领域结果只由各自 usecase 写入。
 
-配置真源：当前 yoyoosun runtime manifest 选择七条正式流程：销售接单、采购供料、成品交付、客户退货、收付款、手工库存调整和生产异常。权限中心“审批责任”只允许配置销售、采购和 Shipment 财务放行三类日常责任模板；四条异常流程继续使用注册流程合同中的固定责任池，页面不再把已注册流程误报为“尚未接入”。没有新增别名、默认经办人、默认原因、默认数量、任务名猜测或测试专用业务旁路。
 
 迁移与生成：`make data` 连续执行保持 Ent / Atlas 零漂移；生成模型 diff 的 SHA-256 保持 `181ecc97c899c833cbaed5f3f6723abd2cb56f524a154fdf2b38f248c6680abf`。全新登记隔离库 `plush_erp_acceptance_local_browser_actions_20260727_v5_dev` 在 `192.168.0.106:5432` 完成 `migrate_status → migrate_apply → migrate_status`，populated preflight 通过，Atlas 为 `102 / 102`、最新 `20260726174057`、pending 0。没有对共享开发库、133、客户试用或生产数据库 apply。
 
 浏览器验收：当前 Local 源码后端固定在独立 `8324`，yoyoosun Vite 固定在 `15215`；管理员从真实客户配置控制台点击应用，读回 active revision `yoyoosun-customer-package-v7.local-931c8fda75bc4b6a.runtime-v1`，active snapshot 恰好包含上述七条流程。完整角色 smoke 为桌面 `10 / 10`、手机业务岗位 `9 / 9`、管理员手机拒绝 1 项通过，10 个账号的 effective-session 诊断均来自 active revision 且 blocker 为 0。
 
-四条异常流真实写入为 `4 / 4`：销售退货完成收货与入库冲正，收付款完成过账 / 核销与冲销恢复，库存调整完成新建 / 提交 / 老板审批 / 仓库执行 / 过账 / 取消冲正，生产超领完成额度消费、领料 Fact 过账、取消冲正和额度恢复。四条主 mutation 均由产品 UI 点击触发；另有四个结构合法的无权角色请求被服务端以 `40304` 拒绝，四次后端成功后丢弃响应均由页面权威读回恢复，四个重复或旧 version 请求均以 `40920` 拒绝。报告不保存密码、token 或 Authorization header。数据库额外读回四个对应 ProcessInstance 均为 `completed`，销售退货、收付款、库存调整的执行节点与 end 均完成；生产超领按审批决定的 `over_issue_end` 完成，不把后续领料 Fact 误写成审批任务结果。
 
 验证边界：定向 Go、Node、文档合同、`db-guard`、`go test ./...`、`go build ./...`、前端单测 / lint / CSS / production build、真实 Chromium、shell / YAML / 漏洞检查均已在当前实现阶段通过。最终仓库门禁固定为在本节落盘后的同一工作树执行 `bash scripts/qa/strict.sh`；本文件不预写该命令的绿色结果，最终交接以终端回执为准。当前没有提交、推送、部署或 Handoff 后 Git 收口，133 / 生产 migration、目标 readback、真实客户数据导入、甲方 UAT / 签收仍未执行。
 
@@ -288,7 +278,6 @@
 
 完成：收付款核销页不再把页签作为页面级独立横条悬在说明卡与操作区之间，改为复用 `BusinessDataTable.tableHeader` 放入数据表卡片顶部，与库存台账的视图归属保持一致。页面标题继续使用“收付款与核销”，两个视图页签收窄为“收付款记录 / 红冲记录”；筛选、当前记录动作、登记收付款、登记红冲、详情、核销、冲销和恢复逻辑均保持原有视图边界。本轮没有新增样式或页面壳，也没有修改 API、RBAC、菜单、Workflow、ProcessRuntime、Fact、schema、migration 或客户专属配置。现有通用业务列表原型仍能表达该结构，没有新增或改写原型资产。
 
-验证：目标页面与 style-l1 场景 ESLint、Stylelint、脚本语法和 scoped `git diff --check` 通过。真实 Chromium 定向场景 `1 / 1` 覆盖暗色桌面默认“收付款记录”、切换“红冲记录”、页签位于数据卡片内部、页签在表格之前、卡片内无横向溢出、视图按钮与标题统计同步，以及既有详情和核销弹窗流程；两张页签布局截图已人工检查。定向 Node 回归为 `16 / 17`：唯一失败是共享现场已把 `FinancePaymentsPage` 与 `SalesReturnsPage` 接入 `BusinessDataTable`，但既有“11 个正式页面”清单尚未登记这两个消费者，与本次页签移动无关。全量 Web ESLint 另被未跟踪的 `DevDatabaseMigrationPage.jsx` 两处既有 `no-void` 错误阻断；本轮未改这两个任务外现场。
 
 边界：浏览器证据来自本地自托管 React、受控 mock RPC 与 Chromium，只证明当前 Local 前端布局和交互合同，不是目标账号实登、部署或甲方 UAT。当前使用 Node `26.5.0`，仓库声明 `24.14.x`；本轮未提交、未推送、未部署。
 
@@ -304,7 +293,6 @@
 
 随后绑定 `7dfbd11235141b5d00e29acfd0f69aedcec4a37c` 的 fresh lifecycle 已走完九阶段数据、readiness 与浏览器启动，50 个页面中 49 个通过；唯一失败是“生产异常”仍用已取消返工事实生成的 `production_exception` 来源提醒任务作为页面证据，而当前页面只查询正式 `production_exception_decision_approval`。本轮没有恢复旧任务组兼容，而是让 V5 从已发布生产订单物料需求提交 1 条 `OVER_ISSUE` 正式异常申请，由老板完成 `production_exception_approval`，精确读回 8 个节点、确定性 `PROC-<process>-NODE-<approval>-A1` 任务码、`APPROVED / PENDING` 决定及 1 件可消费额度。Fact 报告、readiness、页面数据合同、浏览器检索、客户手册与当前真源已统一；返工来源提醒继续只服务其原协同语义，不能冒充正式申请或审批。受影响脚本测试和自动发现的 124 个脚本测试文件均已通过；新的最终 clean SHA lifecycle 与发布全链仍待执行。
 
-候选 `9bbf5ccca75983f9376b2027a09e2180e5bd9cca` 的 fresh lifecycle 已真实通过 migration、正式账号、客户配置、9 / 9 数据阶段、readiness 与 50 / 50 浏览器页面，证明上述生产异常正式链路已在隔离库闭环；随后在克隆 `browser_actions` 库启动四条真实写异常流前，生命周期把 `--report` 放在工作台目录，违反异常流只允许 `output/qa/manual-acceptance/**/*.json` 的证据根合同而失败。该运行自动停服务、删除两个数据库并读回零残留。当前修复把 companion 回执收口到同批 dataset lifecycle 根目录，并增加跨脚本路径合同测试；定向测试 13 / 13、自动发现的 124 个文件共 1438 / 1438 已复跑通过。路径修复候选 `9bb4b9c80f46159ce44931eec46df8709b751e5c` 再次通过 9 / 9 数据阶段和 50 / 50 页面，但异常流旧正则不接受生命周期真源生成的 `..._<run-id>_browser_actions_dev`，仍在四流写入前失败且清理零残留；现改为复用 `database-target` 分类并增加生成名到解析器的跨合同测试。第三候选 `e08d0e1ad49426884336bb9f7ddbc5ce0d9dbd91` 因出货页在 API 完成前采集到总数 0 而为 49 / 50，现要求精确总数 47 与至少一条已渲染行同时成立后再取证。第四候选 `eceaeabd371494fea9b60507184467d10855f67d` 已通过同批数据与账号，浏览器为 48 / 50；质量检验和入库页仅出现瞬态纯 HTTP 429，后续页面恢复。第五候选 `ec1facb65d05ea5262984d0168f852bf92ca8bef` 的 9 / 9 数据、readiness 和浏览器 50 / 50 已通过且未触发限流重试；异常流首次执行即发现正式 dataset 没有旧单独异常库曾预置的客户退货夹具，4 条流均未写入并清理零残留。现由 companion 从同库已出货来源经产品 UI 创建退货、启动 ProcessRuntime、老板审批、仓库任务、显式收货与冲正，不恢复隐藏夹具。第六候选 `3c386f9a536133b3cff022acecb5cf7364132b5d` 已完成 9 / 9 数据与 readiness，但并行任务随后占用预选的 `15200`，本轮 Vite 启动失败而旧 runner 误把外部页面判为 ready；运行已失败关闭并清理两个数据库为零残留。现于浏览器启动前重扫规范辅助端口，并把 readiness 绑定本轮子进程存活，提前退出或被信号终止均不能借外部服务转绿；定向测试 `15 / 15` 通过。第七候选 `8d16fd0172e8cdc640efeed1c8715f35ba6db621` 已真实完成 9 / 9、readiness 和浏览器 `50 / 50`，并在 `15200` 被占时由本轮 Vite 重选 `15201`；异常写链随后发现客户退货页面把隐藏表单明细 ID 读成 `null`，服务端按坏参数失败关闭。页面现从已选出货真源的同序明细提取 `shipment_item_id`，来源缺失则阻断提交，不再信任可丢失的隐藏字段；定向测试 `16 / 16` 与 Web ESLint 通过，失败运行清理两个数据库为零残留。最终 SHA 仍须从 fresh 库完整重跑，不能复用此前结果。
 
 发布身份预检发现 133 当前激活的 V5 revision hash 为 `cc60f2462936777125206f55416ed60b95d0a195152418f271ca8b43459b8b3d`，当前 V7 内容按正式归一化合同计算为 `17e504945d066fcca973ab9a8463e5e1e26f517fa4630f856b8e6e32f9cf83bc`；同名 revision 内容不同会按追加式门禁失败关闭。133 目标 revision 因此升级为独立的 `yoyoosun-customer-trial-133-package-v7.runtime-manifest-v1`，数据合同与运行批次继续保持 `2026.07.16-v5 / 20260716-V5`，并同步目标策略、服务端守卫、凭据轮换合同、测试和客户交付矩阵。相关 Node 合同 `31 / 31` 与 Go 定向包均已通过；最终提交仍须重新绑定 fresh lifecycle、全量门禁、精确 SHA CI、不可变制品、本机发布演练和 133 激活读回。
 

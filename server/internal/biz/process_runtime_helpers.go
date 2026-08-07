@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const processDecisionPayloadReason = "reason"
+
 func normalizeProcessLinkedWorkflowTaskCreate(in ProcessLinkedWorkflowTaskCreate) (ProcessLinkedWorkflowTaskCreate, error) {
 	in.TaskCode = strings.TrimSpace(in.TaskCode)
 	in.TaskGroup = strings.TrimSpace(in.TaskGroup)

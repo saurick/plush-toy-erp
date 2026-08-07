@@ -30,20 +30,26 @@ const customerDeliveryMatrix = readFileSync(
   new URL("../../docs/customers/yoyoosun/客户交付矩阵.md", import.meta.url),
   "utf8",
 );
-const rootReadme = readFileSync(
-  new URL("../../README.md", import.meta.url),
+const trialRunbook = readFileSync(
+  new URL("../../docs/customers/yoyoosun/试用环境执行手册.md", import.meta.url),
+  "utf8",
+);
+const fullPageChecklist = readFileSync(
+  new URL(
+    "../../docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const trialAccountChecklist = readFileSync(
+  new URL(
+    "../../docs/customers/yoyoosun/试用账号角色菜单核对清单.md",
+    import.meta.url,
+  ),
   "utf8",
 );
 const customerReadme = readFileSync(
   new URL("../../docs/customers/yoyoosun/README.md", import.meta.url),
-  "utf8",
-);
-const customersReadme = readFileSync(
-  new URL("../../docs/customers/README.md", import.meta.url),
-  "utf8",
-);
-const docsInventory = readFileSync(
-  new URL("../../docs/文档清单.md", import.meta.url),
   "utf8",
 );
 const requireFromWeb = createRequire(
@@ -167,9 +173,9 @@ test("yoyoosun role handbook lists the exact tracked role profiles", () => {
   assert.equal(
     new Set(yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.capabilityKeys))
       .size,
-    137,
+    136,
   );
-  assert.equal(registeredPermissionKeys.size, 165);
+  assert.equal(registeredPermissionKeys.size, 164);
   assert.deepEqual(
     [...handbook.matchAll(/<!-- role-profile:([^:]+):start -->/gu)].map(
       (match) => match[1],
@@ -648,15 +654,7 @@ test("yoyoosun role handbook Mermaid and privacy guards remain reviewable", asyn
   );
 });
 
-test("yoyoosun role handbook remains reachable from every maintained navigation entry", () => {
-  const handbookPath = "docs/customers/yoyoosun/角色能力与流程矩阵.md";
-  const confirmationPath =
-    "docs/customers/yoyoosun/甲方角色职责与业务流转确认表.md";
-  assert.ok(rootReadme.includes(handbookPath), "root README handbook link");
-  assert.ok(
-    rootReadme.includes(confirmationPath),
-    "root README customer confirmation link",
-  );
+test("yoyoosun role handbook remains reachable from its controlled customer index", () => {
   assert.ok(
     customerReadme.includes("角色能力与流程矩阵.md"),
     "customer README handbook link",
@@ -664,14 +662,6 @@ test("yoyoosun role handbook remains reachable from every maintained navigation 
   assert.ok(
     customerReadme.includes("甲方角色职责与业务流转确认表.md"),
     "customer README customer confirmation link",
-  );
-  assert.ok(
-    docsInventory.includes(handbookPath),
-    "docs inventory handbook entry",
-  );
-  assert.ok(
-    docsInventory.includes(confirmationPath),
-    "docs inventory customer confirmation entry",
   );
 
   const internalAnchors = [...handbook.matchAll(/\]\(#([a-z0-9-]+)\)/gu)].map(
@@ -773,7 +763,7 @@ test("yoyoosun customer confirmation separates business decisions from system ev
     ["A04", "业务审批"],
     ["A05", "放行门禁 / 风险提醒（待 C05）"],
     ["A06", "业务审批"],
-    ["A07", "业务审批"],
+    ["A07", "业务交接"],
   ]) {
     assert.ok(rowWithID(nodeSection, id).includes(`| ${type} |`), id);
   }
@@ -883,7 +873,7 @@ test("yoyoosun customer confirmation separates business decisions from system ev
   );
   assert.match(
     customerDeliveryMatrix,
-    /客户退货、收付款、库存调整和生产异常处置页面 \/ 权限已进入永绅跟踪 entitlement.*仍未整体进入 133 \/ 生产/u,
+    /返工回厂与补发、收付款、库存调整和生产异常处置页面 \/ 权限已进入永绅跟踪 entitlement.*尚未整体进入 133 \/ 生产/u,
   );
   for (const forbiddenTechnicalToken of [
     "workflow.task.approve",
@@ -910,12 +900,115 @@ test("yoyoosun customer confirmation separates business decisions from system ev
   assert.match(customerConfirmation, /客户专属受控资料库/u);
 });
 
+test("yoyoosun production governance keeps Core WIP runtime separate from preview-only customer flow config", () => {
+  for (const document of [customerDeliveryMatrix, flowClosureMatrix]) {
+    assert.doesNotMatch(
+      document,
+      /尚无可执行的生产路线、WIP、逐工序分流或分段质检链|Product Core 尚无 route step/u,
+    );
+    assert.match(document, /PLUSH_SEW_HAND_V1/u);
+    assert.match(document, /preview(?:_|-)only/u);
+    assert.match(document, /133.*V5.*技术/u);
+    assert.match(document, /客户.*UAT.*未/u);
+  }
+  assert.match(
+    customerDeliveryMatrix,
+    /Product Core 使用固定 `PLUSH_SEW_HAND_V1` v1.*客户 `businessFlows` 继续 preview-only/u,
+  );
+  assert.match(
+    flowClosureMatrix,
+    /Product Core 使用固定 `PLUSH_SEW_HAND_V1` 承接生产执行/u,
+  );
+});
+
+test("yoyoosun full-page checklist keeps its customer-facing 52-target boundary", () => {
+  const forbiddenCustomerCopy =
+    /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|\b(?:key|route|system_admin)\b|岗位代码|甲方|\/erp\//i;
+  const targetHeadings = fullPageChecklist.match(
+    /^### (?:进入|桌面|岗位|预览|打印)-\d{2} /gmu,
+  );
+
+  assert.equal(targetHeadings?.length, 52);
+  assert.doesNotMatch(fullPageChecklist, forbiddenCustomerCopy);
+  for (const expected of [
+    "10 个正式岗位试用账号",
+    "54 条来料质检记录",
+    "54 条采购入库记录",
+    "45 张生产订单",
+    "4 条返工回厂记录",
+    "4 条收付款记录",
+    "3 条红冲记录",
+    "完成 52 项并不自动代表正式交付",
+    "模拟展示任务不冒充流程闭环",
+  ]) {
+    assert.ok(fullPageChecklist.includes(expected), `missing ${expected}`);
+  }
+  assert.match(fullPageChecklist, /生产订单.*只有在生产记录中过账后才影响库存/su);
+  assert.match(fullPageChecklist, /生产进度.*只读|本页不提供新建入口/su);
+  assert.match(fullPageChecklist, /出库管理.*只读|本页不提供新建入口/su);
+  assert.match(fullPageChecklist, /\| 桌面页面\s+\|\s+31\s+\|/u);
+  assert.match(fullPageChecklist, /\| 合计\s+\|\s+52\s+\|/u);
+  assert.doesNotMatch(fullPageChecklist, /完成 48 项|13 个(?:不同岗位组合的)?试用账号/u);
+});
+
+test("yoyoosun trial runbook keeps config, RBAC and release evidence boundaries", () => {
+  assert.match(
+    trialRunbook,
+    /52 项：2 个登录与入口、31 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台/u,
+  );
+  assert.match(trialRunbook, /fresh 空库基线已记录/u);
+  assert.match(trialRunbook, /plush_erp_acceptance_<run-id>_dev/u);
+  assert.match(trialRunbook, /plush_erp_uat_20260716_v5/u);
+  assert.match(
+    trialRunbook,
+    /customer-config-runtime-manifest\.mjs[\s\S]{0,240}yoyoosun-runtime-manifest-preview\.json/u,
+  );
+  assert.match(
+    trialRunbook,
+    /manual-acceptance-customer-config\.mjs[\s\S]{0,400}--target customer-trial-133/u,
+  );
+  assert.match(
+    trialRunbook,
+    /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133/u,
+  );
+  assert.match(trialRunbook, /trialDemoAccountBrowserSmoke\.mjs/u);
+  assert.match(trialRunbook, /--preflight-report output\/trial-demo-account-browser-smoke\/preflight\.json/u);
+  assert.match(trialRunbook, /window\.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__/u);
+  assert.match(trialRunbook, /customer-config-effective-session-probe\.mjs/u);
+  assert.match(trialRunbook, /40302 未登录/u);
+  assert.match(trialRunbook, /external-base-url-not-yoyoosun-entry/u);
+  assert.match(trialRunbook, /模拟数据不等于真实 import/u);
+  assert.match(
+    trialRunbook,
+    /不证明目标环境发布、真实客户导入、客户签收、备份恢复或 release evidence 已完成/u,
+  );
+});
+
+test("yoyoosun trial account checklist protects credentials and current navigation", () => {
+  assert.match(
+    trialAccountChecklist,
+    /账号名和凭据只在受控环境配置与授权交付渠道维护/u,
+  );
+  assert.doesNotMatch(trialAccountChecklist, /12345678|adminadmin/u);
+  assert.match(
+    trialAccountChecklist,
+    /常用：`应收管理`、`应付管理`、`发票管理`；更多：`对账管理`、`收付款核销`和来源核对页/u,
+  );
+  assert.match(trialAccountChecklist, /顶部切换按钮和“我的 → 进入电脑端”均可直达/u);
+  assert.doesNotMatch(
+    trialAccountChecklist,
+    /`对账\/结算`|`待付款\/应付提醒`|`应收提醒`|`发票\/开票异常`/u,
+  );
+});
+
 test("yoyoosun customer documentation does not route readers to the retired delta register", () => {
   for (const document of [
-    rootReadme,
-    customersReadme,
     customerReadme,
-    docsInventory,
+    handbook,
+    customerConfirmation,
+    flowClosureMatrix,
+    customerDeliveryMatrix,
+    trialRunbook,
   ]) {
     assert.ok(!document.includes("docs/customers/yoyoosun/差异登记.md"));
     assert.ok(!document.includes("`差异登记.md`"));

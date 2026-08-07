@@ -62,8 +62,16 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"release_stock_reservation",
 		"list_stock_reservations":
 		return d.handleOperationalFactReservation(ctx, method, id, pm)
-	case "create_sales_return", "cancel_sales_return", "reverse_sales_return", "get_sales_return", "list_sales_returns":
-		return d.handleOperationalFactSalesReturn(ctx, method, id, pm, claims.UserID)
+	case "list_rework_intake_source_candidates",
+		"create_rework_intake",
+		"receive_rework_intake",
+		"cancel_rework_intake",
+		"reverse_rework_intake",
+		"get_rework_intake",
+		"list_rework_intakes",
+		"create_production_rework_from_intake",
+		"create_rework_reshipment":
+		return d.handleOperationalFactReworkIntake(ctx, method, id, pm, claims.UserID)
 	case "create_receivable_from_shipment",
 		"create_invoice_from_shipment",
 		"create_payable_from_purchase_receipt",

@@ -6,7 +6,9 @@ import (
 )
 
 const (
-	ProcessBranchPolicySalesReturnApproval          = "sales_return.approval_outcome"
+	ProcessBranchPolicySalesOrderApproval           = "sales_order.approval_outcome"
+	ProcessBranchPolicyPurchaseOrderApproval        = "purchase_order.approval_outcome"
+	ProcessBranchPolicyShipmentFinanceApproval      = "shipment.finance_approval_outcome"
 	ProcessBranchPolicyFinancePaymentApproval       = "finance_payment.approval_outcome"
 	ProcessBranchPolicyInventoryAdjustmentApproval  = "inventory_adjustment.approval_outcome"
 	ProcessBranchPolicyProductionExceptionApproval  = "production_exception.approval_outcome"
@@ -15,7 +17,6 @@ const (
 
 var workflowApprovalCapabilityKeys = []string{
 	PermissionWorkflowTaskApprove,
-	PermissionSalesReturnApprove,
 	PermissionFinancePaymentApprove,
 	PermissionWarehouseAdjustmentApprove,
 	PermissionProductionExceptionApprove,
@@ -92,11 +93,27 @@ type exceptionApprovalProcessBranchPolicyRegistration struct {
 func exceptionApprovalProcessBranchPolicyRegistrations() []exceptionApprovalProcessBranchPolicyRegistration {
 	return []exceptionApprovalProcessBranchPolicyRegistration{
 		{
-			key:          ProcessBranchPolicySalesReturnApproval,
-			nextNodeKeys: []string{"approve_sales_return", "reject_sales_return"},
+			key:          ProcessBranchPolicySalesOrderApproval,
+			nextNodeKeys: []string{"activate_sales_order", "sales_order_rejected_end"},
 			handler: approvalOutcomeBranchPolicyHandler{
-				approveNodeKey: "approve_sales_return",
-				rejectNodeKey:  "reject_sales_return",
+				approveNodeKey: "activate_sales_order",
+				rejectNodeKey:  "sales_order_rejected_end",
+			},
+		},
+		{
+			key:          ProcessBranchPolicyPurchaseOrderApproval,
+			nextNodeKeys: []string{"approve_purchase_order", "purchase_order_rejected_end"},
+			handler: approvalOutcomeBranchPolicyHandler{
+				approveNodeKey: "approve_purchase_order",
+				rejectNodeKey:  "purchase_order_rejected_end",
+			},
+		},
+		{
+			key:          ProcessBranchPolicyShipmentFinanceApproval,
+			nextNodeKeys: []string{"shipment_finance_release", "shipment_finance_reject"},
+			handler: approvalOutcomeBranchPolicyHandler{
+				approveNodeKey: "shipment_finance_release",
+				rejectNodeKey:  "shipment_finance_reject",
 			},
 		},
 		{

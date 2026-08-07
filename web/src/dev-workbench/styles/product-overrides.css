@@ -294,11 +294,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .erp-dev-governance-answer-grid,
-  .erp-dev-governance-task-grid {
-    grid-template-columns: 1fr;
-  }
-
   .erp-dev-testing-tier__head {
     flex-direction: column;
   }
@@ -345,9 +340,8 @@
   .erp-dev-docs-reader,
   .erp-dev-governance-header,
   .erp-dev-governance-sidebar,
-  .erp-dev-governance-main,
-  .erp-dev-governance-axis-detail,
-  .erp-dev-governance-section,
+  .erp-dev-governance-decision,
+  .erp-dev-governance-reference-details,
   .erp-dev-prototypes-header,
   .erp-dev-prototypes-sidebar,
   .erp-dev-prototypes-reader,
@@ -363,9 +357,8 @@
   .erp-dev-testing-header,
   .erp-dev-testing-reader__toolbar,
   .erp-dev-governance-header,
-  .erp-dev-governance-axis-detail__head,
-  .erp-dev-governance-section__head,
-  .erp-dev-governance-task__head,
+  .erp-dev-governance-decision__head,
+  .erp-dev-governance-reference-section__head,
   .erp-dev-prototypes-header,
   .erp-dev-prototypes-reader__toolbar,
   .erp-dev-prototypes-reader__info,
@@ -374,13 +367,6 @@
     flex-direction: column;
   }
 
-  .erp-dev-governance-header__metrics {
-    grid-template-columns: 1fr;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .erp-dev-governance-section__head .ant-input-affix-wrapper,
   .erp-dev-governance-source-card .ant-btn {
     width: 100%;
   }
@@ -613,10 +599,6 @@
 }
 
 @media screen and (max-width: 768px) {
-  .erp-dev-capability-page {
-    padding: 12px;
-  }
-
   .erp-dev-hub-page,
   .erp-dev-governance-page,
   .erp-dev-testing-page,
@@ -627,8 +609,7 @@
   .erp-dev-hub-page *,
   .erp-dev-governance-page *,
   .erp-dev-testing-page *,
-  .erp-dev-prototypes-page *,
-  .erp-dev-capability-page * {
+  .erp-dev-prototypes-page * {
     min-width: 0;
   }
 
@@ -649,7 +630,6 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-capability-header,
   .erp-dev-governance-header,
   .erp-dev-testing-header,
   .erp-dev-prototypes-header {
@@ -704,19 +684,6 @@
     overflow-wrap: anywhere;
   }
 
-  .erp-dev-capability-header__copy,
-  .erp-dev-capability-header__copy > .ant-space {
-    width: 100%;
-  }
-
-  .erp-dev-capability-header__copy > .ant-space {
-    flex-wrap: wrap;
-  }
-
-  .erp-dev-capability-summary.ant-typography {
-    max-width: 100%;
-  }
-
   .erp-dev-customer-page {
     padding: 12px;
   }
@@ -735,10 +702,6 @@
   .erp-dev-customer-asset,
   .erp-dev-customer-diff {
     min-width: 0;
-  }
-
-  .erp-dev-capability-header {
-    border-radius: 12px;
   }
 
   .erp-dev-customer-header,
@@ -971,13 +934,16 @@
 
 [data-erp-theme='dark']
   .erp-dev-docs-markdown
-  .erp-markdown-mermaid__tool:hover,
-[data-erp-theme='dark']
-  .erp-dev-docs-markdown
-  .erp-markdown-mermaid__tool:focus-visible {
+  .erp-markdown-mermaid__tool:hover {
   border-color: var(--erp-interactive-border-focus);
   background: var(--erp-interactive-bg-hover);
   color: #86efac;
+}
+
+[data-erp-theme='dark']
+  .erp-dev-docs-markdown
+  .erp-markdown-mermaid__tool:focus-visible {
+  outline-color: #86efac;
 }
 
 [data-erp-theme='dark']
@@ -1011,11 +977,6 @@
 [data-erp-theme='dark'] .erp-dev-docs-markdown blockquote {
   border-left-color: var(--erp-interactive-border-focus);
   background: var(--erp-surface-bg-soft);
-}
-
-[data-erp-theme='dark'] .erp-dev-capability-page {
-  background: var(--erp-page-bg);
-  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-page {

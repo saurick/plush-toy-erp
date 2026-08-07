@@ -305,6 +305,19 @@ function isBusinessFactPath(file) {
   );
 }
 
+function isWorkflowRoleTaskConservationPath(file) {
+  return [
+    /^server\/internal\/(?:biz\/workflow_role_task_view|data\/workflow_role_task_view_repo)(?:_test)?\.go$/u,
+    /^server\/internal\/data\/workflow_repo_postgres_concurrency_test\.go$/u,
+    /^server\/internal\/service\/jsonrpc_workflow_task(?:_revision_visibility_test)?\.go$/u,
+    /^web\/src\/erp\/api\/workflowApi(?:\.test)?\.mjs$/u,
+    /^web\/src\/erp\/utils\/mobileTaskQueries(?:\.test)?\.mjs$/u,
+    /^web\/src\/erp\/mobile\/(?:pages\/MobileRoleTasksPage\.jsx|components\/MobileTaskListScreen(?:\.jsx|\.test\.mjs)|hooks\/useMobileRoleTaskActions\.test\.mjs)$/u,
+    /^web\/src\/mocks\/(?:workflowRoleTaskMock|jsonRpcMockServer)(?:\.test)?\.(?:mjs|js)$/u,
+    /^web\/scripts\/(?:mobileAuthLoginRouteSmoke|style-l1\/(?:factRpcMocks(?:\.test)?|mobileTaskAssertions|scenarios))\.mjs$/u,
+  ].some((pattern) => pattern.test(file));
+}
+
 export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   const changedFiles = uniqueSorted(files);
   const state = {
@@ -337,6 +350,19 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         addFixed(state, "skillHealth", file);
       }
       continue;
+    }
+
+    if (isWorkflowRoleTaskConservationPath(file)) {
+      addFixed(state, "pgCreate", file);
+      addFixed(state, "pgMigrate", file);
+      addFixed(state, "pgTest", file);
+      addFollowUp(
+        state,
+        "browser-regression",
+        "T5",
+        "运行 mobile-tasks-dark 与 mobile-yoyo-role-task-projection 场景，核对岗位状态分区、跨岗风险和超时数量守恒。",
+        file,
+      );
     }
 
     if (

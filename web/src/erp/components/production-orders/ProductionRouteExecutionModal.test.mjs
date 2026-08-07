@@ -21,9 +21,11 @@ test('production route modal is a self-contained production-order surface', () =
   ]) {
     assert.match(source, new RegExp(`${permissionProp}\\s*=\\s*false`, 'u'))
   }
+  assert.match(source, /assignmentOnly\s*=\s*false/u)
+  assert.match(source, /originReworkFactID\s*=\s*null/u)
   assert.match(
     source,
-    /title=\{orderStatus === 'CLOSED' \? '返工工序办理' : '生产工序办理'\}/u
+    /assignmentOnly[\s\S]*?'安排本厂或外发加工'[\s\S]*?'返工工序办理'[\s\S]*?'生产工序办理'/u
   )
 })
 
@@ -31,13 +33,29 @@ test('route actions use separate business permissions and cancellation is assign
   assert.match(source, /canRunAction/u)
   assert.match(source, /PRODUCTION_WIP_ACTION\.CANCEL_BATCH/u)
   assert.match(source, /canAssign \? \(/u)
-  assert.match(source, /canExecute \? \(/u)
-  assert.match(source, /canConfirmPackaging \? \(/u)
-  assert.match(source, /canRework \? \(/u)
+  assert.match(source, /canExecute && !assignmentOnly \? \(/u)
+  assert.match(source, /canConfirmPackaging && !assignmentOnly \? \(/u)
+  assert.match(source, /canRework && !assignmentOnly \? \(/u)
   assert.match(source, /取消只终止当前尚未开工的批次/u)
   assert.match(source, /不会重新拆分数量/u)
   assert.match(source, /请填写取消原因/u)
   assert.doesNotMatch(source, /canManage/u)
+})
+
+test('assignment-only mode is scoped to the trusted rework batch and one mutation', () => {
+  assert.match(
+    source,
+    /assignmentOnly &&\s*action !== PRODUCTION_WIP_ACTION\.ASSIGN_EXECUTION/u
+  )
+  assert.match(source, /batch\.origin_rework_fact_id === scopedReworkFactID/u)
+  assert.match(source, /options=\{displayedBatches\.map/u)
+  assert.match(source, /dataSource=\{displayedBatches\}/u)
+  assert.match(source, /status === 'PLANNED' && !batch\.execution_mode/u)
+  assert.match(source, /只为当前返工任务关联的在制批次选择生产方式/u)
+  assert.match(source, /不会自动完成当前任务/u)
+  assert.match(source, /不会登记完工、回仓、质检或库存/u)
+  assert.match(source, /未找到与当前返工任务一致的在制批次/u)
+  assert.match(source, /!assignmentOnly \? \(\s*<Steps/u)
 })
 
 test('confirmed plush flow and internal versus external wording stay explicit', () => {

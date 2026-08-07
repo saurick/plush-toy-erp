@@ -185,7 +185,9 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
 })
 
 test('mobile task overview, list heading and loaded counts stay concise', () => {
-  assert.match(listScreenSource, />\s*已加载任务分布\s*</u)
+  assert.match(listScreenSource, />\s*当前岗位任务状态\s*</u)
+  assert.match(listScreenSource, /data-testid="mobile-role-total-count"/u)
+  assert.match(listScreenSource, /审批、风险、超时为可重叠关注项/u)
   assert.doesNotMatch(listScreenSource, /任务按页加载/u)
   assert.doesNotMatch(listScreenSource, /不代表岗位全量/u)
   assert.match(listScreenSource, /mobile-loaded-task-overview/u)
@@ -208,8 +210,10 @@ test('mobile task overview, list heading and loaded counts stay concise', () => 
   assert.match(donePanelSource, /data-testid="mobile-role-done-count"/u)
   assert.match(
     listScreenSource,
-    /mobile-role-count-tag mobile-role-task-filter__count">\s*\{item\.count\}/u
+    /mobile-role-count-tag mobile-role-task-filter__count">\s*\{countAvailable \? item\.count : '—'\}/u
   )
+  assert.match(listScreenSource, /countAvailable \? `共 \$\{item\.count\} 条`/u)
+  assert.match(listScreenSource, /'数量暂不可用'/u)
   assert.match(
     listScreenSource,
     /mobile-role-count-tag mobile-role-message-tabs__count/u
@@ -240,6 +244,11 @@ test('mobile task list keeps approval in the primary filter row and gates it by 
   assert.match(roleTaskPageSource, /canViewWorkflowApprovalInbox/u)
   assert.match(roleTaskPageSource, /MOBILE_ROLE_TASK_VIEW_KEYS\.APPROVAL/u)
   assert.match(roleTaskPageSource, /isWorkflowApprovalTask/u)
+  assert.match(roleTaskPageSource, /activeTaskSlot\.count_summary/u)
+  assert.doesNotMatch(
+    roleTaskPageSource,
+    /count:\s*(?:activeTasks|approvalTasks|riskTasks|overdueTasks)\.length/u
+  )
   assert.match(
     roleTaskPageSource,
     /canViewApprovalInbox[\s\S]*MOBILE_TASK_FILTER_KEYS\.APPROVAL[\s\S]*label: '审批'[\s\S]*ariaLabel: '待我审批'/u

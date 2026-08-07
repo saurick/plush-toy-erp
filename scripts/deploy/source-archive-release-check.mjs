@@ -18,6 +18,8 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { findBrokenLocalMarkdownLinks } from "../qa/lib/markdown-links.mjs";
+
 const DEFAULT_CUSTOMER = "yoyoosun";
 const DEFAULT_REF = "HEAD";
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -442,22 +444,34 @@ function scanArchiveInventory({ archiveRoot, customer }) {
     }
     return false;
   });
+  const markdownFiles = inventory.files.filter((relativePath) =>
+    relativePath.endsWith(".md"),
+  );
+  const brokenMarkdownLinks = findBrokenLocalMarkdownLinks({
+    rootDir: archiveRoot,
+    sourceFiles: markdownFiles,
+    ignoredPrefixes: ["docs/archive/", "progress.md"],
+  });
   if (
     missingPaths.length > 0 ||
     forbiddenPaths.length > 0 ||
-    inventory.symlinks.length > 0
+    inventory.symlinks.length > 0 ||
+    brokenMarkdownLinks.length > 0
   ) {
     throw new ReleaseCheckError("source archive inventory check failed", {
       missingPaths,
       forbiddenPaths,
       symlinks: inventory.symlinks,
+      brokenMarkdownLinks,
     });
   }
   return {
     fileCount: inventory.files.length,
+    markdownFileCount: markdownFiles.length,
     missingPaths,
     forbiddenPaths,
     symlinks: inventory.symlinks,
+    brokenMarkdownLinks,
   };
 }
 
@@ -547,7 +561,7 @@ function buildPlan({ customer, gitState, docker }) {
   return [
     "git archive committed tree",
     "extract into isolated temporary directory",
-    "verify required build inputs and reject symlinks, raw customer sources, private customer assets, and runtime env files",
+    "verify required build inputs and reject broken active Markdown links, symlinks, raw customer sources, private customer assets, and runtime env files",
     "run strict source-package secret scan",
     "install locked Web dependencies and build production Web assets",
     `apply reviewed ${customer} Web config and public assets`,

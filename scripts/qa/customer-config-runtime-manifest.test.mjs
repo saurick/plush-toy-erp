@@ -178,7 +178,6 @@ test("customer-config-runtime-manifest: formal payload publishes versions and se
       "sales_order_acceptance",
       "material_supply",
       "finished_goods_delivery",
-      "sales_return_acceptance",
       "finance_payment_approval",
       "inventory_adjustment_approval",
       "production_exception_approval",

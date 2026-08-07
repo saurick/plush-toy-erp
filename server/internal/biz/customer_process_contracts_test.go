@@ -16,7 +16,7 @@ func TestNormalizeCustomerProcessContractsExpandsCanonicalSalesVariants(t *testi
 		{
 			name:         "approval and PMC",
 			variant:      CustomerProcessVariantSalesApprovalPMC,
-			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end"},
+			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end", "sales_order_rejected_end"},
 			wantPoolIndex: map[int]string{
 				1: BossRoleKey,
 				3: "order_review",
@@ -25,7 +25,7 @@ func TestNormalizeCustomerProcessContractsExpandsCanonicalSalesVariants(t *testi
 		{
 			name:         "approval engineering and PMC",
 			variant:      CustomerProcessVariantSalesApprovalEngineeringPMC,
-			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "engineering_data", "order_review", "end"},
+			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "engineering_data", "order_review", "end", "sales_order_rejected_end"},
 			wantPoolIndex: map[int]string{
 				1: BossRoleKey,
 				3: "engineering_data",
@@ -78,10 +78,11 @@ func TestNormalizeCustomerProcessContractsKeepsEveryRegisteredCanonicalGraph(t *
 			businessRefType: "sales_order",
 			nodes: []expectedNode{
 				{key: "submit_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderSubmit},
-				{key: "order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey},
+				{key: "order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicySalesOrderApproval},
 				{key: "activate_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderActivate},
 				{key: "order_review", nodeType: ProcessNodeTypeHumanTask, ownerPool: "order_review"},
 				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "sales_order_rejected_end", nodeType: ProcessNodeTypeEnd},
 			},
 		},
 		{
@@ -89,11 +90,12 @@ func TestNormalizeCustomerProcessContractsKeepsEveryRegisteredCanonicalGraph(t *
 			businessRefType: "sales_order",
 			nodes: []expectedNode{
 				{key: "submit_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderSubmit},
-				{key: "order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey},
+				{key: "order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicySalesOrderApproval},
 				{key: "activate_sales_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesOrderActivate},
 				{key: "engineering_data", nodeType: ProcessNodeTypeHumanTask, ownerPool: "engineering_data"},
 				{key: "order_review", nodeType: ProcessNodeTypeHumanTask, ownerPool: "order_review"},
 				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "sales_order_rejected_end", nodeType: ProcessNodeTypeEnd},
 			},
 		},
 		{
@@ -101,31 +103,21 @@ func TestNormalizeCustomerProcessContractsKeepsEveryRegisteredCanonicalGraph(t *
 			businessRefType: "purchase_order",
 			nodes: []expectedNode{
 				{key: "submit_purchase_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandPurchaseOrderSubmit},
-				{key: "purchase_order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey},
+				{key: "purchase_order_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicyPurchaseOrderApproval},
 				{key: "approve_purchase_order", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandPurchaseOrderApprove},
 				{key: "end", nodeType: ProcessNodeTypeEnd},
+				{key: "purchase_order_rejected_end", nodeType: ProcessNodeTypeEnd},
 			},
 		},
 		{
 			processKey: ProcessKeyFinishedGoodsDelivery, variantKey: CustomerProcessVariantShipmentFinanceApproval,
 			businessRefType: "shipment",
 			nodes: []expectedNode{
-				{key: "shipment_finance_approval", nodeType: ProcessNodeTypeApproval, ownerPool: FinanceRoleKey},
+				{key: "shipment_finance_approval", nodeType: ProcessNodeTypeApproval, ownerPool: FinanceRoleKey, branchPolicy: ProcessBranchPolicyShipmentFinanceApproval},
 				{key: "shipment_finance_release", nodeType: ProcessNodeTypeDomainCommand, ownerPool: "shipment_finance_release", commandKey: ProcessDomainCommandShipmentFinanceRelease},
 				{key: "end", nodeType: ProcessNodeTypeEnd},
-			},
-		},
-		{
-			processKey: ProcessKeySalesReturnApproval, variantKey: CustomerProcessVariantSalesReturnApprovalReceipt,
-			businessRefType: "sales_return",
-			nodes: []expectedNode{
-				{key: "sales_return_approval", nodeType: ProcessNodeTypeApproval, ownerPool: BossRoleKey, branchPolicy: ProcessBranchPolicySalesReturnApproval},
-				{key: "approve_sales_return", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesReturnApprove},
-				{key: "sales_return_receipt", nodeType: ProcessNodeTypeHumanTask, ownerPool: WarehouseRoleKey},
-				{key: "receive_sales_return", nodeType: ProcessNodeTypeDomainCommand, ownerPool: WarehouseRoleKey, commandKey: ProcessDomainCommandSalesReturnReceive},
-				{key: "end", nodeType: ProcessNodeTypeEnd},
-				{key: "reject_sales_return", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandSalesReturnReject},
-				{key: "rejected_end", nodeType: ProcessNodeTypeEnd},
+				{key: "shipment_finance_reject", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandShipmentFinanceReject},
+				{key: "shipment_finance_rejected_end", nodeType: ProcessNodeTypeEnd},
 			},
 		},
 		{
@@ -212,12 +204,12 @@ func TestNormalizeCustomerProcessContractsKeepsFactActionsOutsideApprovalRuntime
 		{
 			processKey: ProcessKeyMaterialSupply, variantKey: CustomerProcessVariantPurchaseOrderApproval,
 			businessRefType: "purchase_order",
-			wantNodeKeys:    []string{"submit_purchase_order", "purchase_order_approval", "approve_purchase_order", "end"},
+			wantNodeKeys:    []string{"submit_purchase_order", "purchase_order_approval", "approve_purchase_order", "end", "purchase_order_rejected_end"},
 		},
 		{
 			processKey: ProcessKeyFinishedGoodsDelivery, variantKey: CustomerProcessVariantShipmentFinanceApproval,
 			businessRefType: "shipment",
-			wantNodeKeys:    []string{"shipment_finance_approval", "shipment_finance_release", "end"},
+			wantNodeKeys:    []string{"shipment_finance_approval", "shipment_finance_release", "end", "shipment_finance_reject", "shipment_finance_rejected_end"},
 		},
 	}
 	for _, testCase := range tests {
@@ -236,6 +228,54 @@ func TestNormalizeCustomerProcessContractsKeepsFactActionsOutsideApprovalRuntime
 			}
 			if !slices.Equal(got, testCase.wantNodeKeys) {
 				t.Fatalf("node keys = %#v, want %#v", got, testCase.wantNodeKeys)
+			}
+		})
+	}
+}
+
+func TestCurrentCustomerConfigProcessStartShapeRejectsApprovalGraphsWithoutRejectedEnd(t *testing.T) {
+	nodesFromKeys := func(keys ...string) []ProcessNodeInstanceCreate {
+		nodes := make([]ProcessNodeInstanceCreate, 0, len(keys))
+		for _, key := range keys {
+			nodes = append(nodes, ProcessNodeInstanceCreate{NodeKey: key})
+		}
+		return nodes
+	}
+	tests := []struct {
+		name       string
+		processKey string
+		nodes      []ProcessNodeInstanceCreate
+		want       bool
+	}{
+		{
+			name:       "sales current graph",
+			processKey: ProcessKeySalesOrderAcceptance,
+			nodes:      nodesFromKeys("submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end", "sales_order_rejected_end"),
+			want:       true,
+		},
+		{
+			name:       "sales legacy graph",
+			processKey: ProcessKeySalesOrderAcceptance,
+			nodes:      nodesFromKeys("submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end"),
+			want:       false,
+		},
+		{
+			name:       "purchase legacy graph",
+			processKey: ProcessKeyMaterialSupply,
+			nodes:      nodesFromKeys("submit_purchase_order", "purchase_order_approval", "approve_purchase_order", "end"),
+			want:       false,
+		},
+		{
+			name:       "shipment legacy graph",
+			processKey: ProcessKeyFinishedGoodsDelivery,
+			nodes:      nodesFromKeys("shipment_finance_approval", "shipment_finance_release", "end"),
+			want:       false,
+		},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := currentCustomerConfigProcessStartShape(testCase.processKey, testCase.nodes); got != testCase.want {
+				t.Fatalf("currentCustomerConfigProcessStartShape() = %v, want %v", got, testCase.want)
 			}
 		})
 	}

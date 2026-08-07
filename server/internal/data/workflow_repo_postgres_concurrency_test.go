@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -16,6 +17,8 @@ import (
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
 
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -708,6 +711,108 @@ func TestWorkflowPostgresConcurrentSameUrgeKeyIncrementsOnce(t *testing.T) {
 		All(ctx)
 	if err != nil || len(events) != 1 || events[0].IdempotencyKey == nil || events[0].MutationResult == nil {
 		t.Fatalf("same urge key must persist one complete receipt, events=%#v err=%v", events, err)
+	}
+}
+
+func TestWorkflowPostgresRoleTaskCountsAndRowsShareRepeatableReadSnapshot(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	data, _ := openPurchaseReceiptPostgresTestData(t)
+	repo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
+	suffix := postgresTestSuffix()
+	createTask := func(label string) *biz.WorkflowTask {
+		t.Helper()
+		task, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+			TaskCode:      "WF-ROLE-SNAPSHOT-" + strings.ToUpper(label) + "-" + suffix,
+			TaskGroup:     "role_task_snapshot",
+			TaskName:      "岗位数量快照验证-" + label,
+			SourceType:    "role-task-snapshot",
+			SourceID:      workflowPostgresSourceID(),
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.SalesRoleKey,
+			Payload:       map[string]any{},
+		}, 0)
+		if err != nil {
+			t.Fatalf("create %s role task: %v", label, err)
+		}
+		return task
+	}
+
+	baselineTask := createTask("baseline")
+	snapshotAt := time.Now().UTC().Truncate(time.Second)
+	query := biz.WorkflowRoleTaskViewQuery{
+		ViewKey:       biz.WorkflowRoleTaskViewTodo,
+		RoleKey:       biz.SalesRoleKey,
+		Limit:         100,
+		IncludeCounts: true,
+		SnapshotAt:    snapshotAt,
+	}
+	sqlTx, err := data.sqldb.BeginTx(ctx, &stdsql.TxOptions{
+		Isolation: stdsql.LevelRepeatableRead,
+		ReadOnly:  true,
+	})
+	if err != nil {
+		t.Fatalf("begin repeatable-read role task snapshot: %v", err)
+	}
+	defer func() { _ = sqlTx.Rollback() }()
+	snapshotClient := ent.NewClient(ent.Driver(entsql.NewDriver(
+		dialect.Postgres,
+		entsql.Conn{ExecQuerier: sqlTx},
+	)))
+
+	counts, err := countWorkflowRoleTaskViews(ctx, snapshotClient, query)
+	if err != nil {
+		t.Fatalf("count role tasks in snapshot: %v", err)
+	}
+	if !counts.IsConserved() || counts.Ready < 1 {
+		t.Fatalf("initial snapshot counts are invalid: %#v", counts)
+	}
+	insertedTask := createTask("concurrent")
+
+	rows, err := buildWorkflowRoleTaskEntQuery(
+		snapshotClient,
+		query,
+		biz.WorkflowRoleTaskViewTodo,
+		0,
+	).All(ctx)
+	if err != nil {
+		t.Fatalf("list role tasks in snapshot: %v", err)
+	}
+	if len(rows) != counts.Todo {
+		t.Fatalf("snapshot rows=%d, counted todo=%d", len(rows), counts.Todo)
+	}
+	foundBaseline := false
+	for _, row := range rows {
+		if row.ID == insertedTask.ID {
+			t.Fatalf("repeatable-read snapshot leaked concurrently inserted task %d", insertedTask.ID)
+		}
+		foundBaseline = foundBaseline || row.ID == baselineTask.ID
+	}
+	if !foundBaseline {
+		t.Fatalf("repeatable-read snapshot lost baseline task %d", baselineTask.ID)
+	}
+	if err := sqlTx.Commit(); err != nil {
+		t.Fatalf("commit repeatable-read role task snapshot: %v", err)
+	}
+
+	fresh, err := repo.ListWorkflowRoleTaskView(ctx, query)
+	if err != nil {
+		t.Fatalf("load fresh role task snapshot: %v", err)
+	}
+	if fresh.Counts == nil || !fresh.Counts.IsConserved() {
+		t.Fatalf("fresh counts are invalid: %#v", fresh.Counts)
+	}
+	if fresh.Counts.Ready != counts.Ready+1 ||
+		fresh.Counts.Todo != counts.Todo+1 ||
+		fresh.Counts.Total != counts.Total+1 {
+		t.Fatalf("fresh counts=%#v, previous snapshot=%#v", fresh.Counts, counts)
+	}
+	foundInserted := false
+	for _, task := range fresh.Items {
+		foundInserted = foundInserted || task.ID == insertedTask.ID
+	}
+	if !foundInserted {
+		t.Fatalf("fresh page did not include concurrently inserted task %d", insertedTask.ID)
 	}
 }
 

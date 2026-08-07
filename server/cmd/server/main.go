@@ -58,7 +58,8 @@ func init() {
 	flag.StringVar(&flagconf, "conf", "", "config path, eg: -conf ./server/configs/dev or -conf ./server/configs/prod")
 }
 
-func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server) *kratos.App {
+func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, processRuntimeUC *biz.ProcessRuntimeUsecase) *kratos.App {
+	workflowReconciler := newProcessRuntimeWorkflowReconciler(processRuntimeUC, logger)
 	return kratos.New(
 		kratos.ID(id),
 		kratos.Name(Name),
@@ -69,6 +70,8 @@ func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server) *kratos.App {
 			gs,
 			hs,
 		),
+		kratos.AfterStart(workflowReconciler.Start),
+		kratos.BeforeStop(workflowReconciler.Stop),
 	)
 }
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   DatabaseOutlined,
@@ -26,6 +26,7 @@ import {
 } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import {
   DEV_DATABASE_MIGRATION_SOURCE_PATH,
   createDatabaseMigrationIdempotencyKey,
@@ -35,9 +36,16 @@ import {
   isDatabaseMigrationOperationPolling,
   selectActiveDatabaseMigrationOperation,
 } from '../config/devDatabaseMigration.mjs'
+import {
+  formatDevSummaryCheckedAt,
+  loadDevSummarySnapshot,
+  readDevSummarySnapshot,
+  updateDevSummarySnapshot,
+} from '../config/devSummarySnapshot.mjs'
 
 const { Paragraph, Text, Title } = Typography
 const OPERATION_POLL_INTERVAL_MS = 1500
+const DATABASE_MIGRATION_SNAPSHOT_KEY = 'database-migration'
 
 function StatusTag({ status }) {
   const presentation = databaseMigrationStatusPresentation(status)
@@ -115,28 +123,70 @@ function operationStepStatus(operation, step) {
 
 export default function DevDatabaseMigrationPage() {
   const client = useMemo(() => createDevDatabaseMigrationClient(), [])
-  const [summary, setSummary] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const initialSnapshot = useMemo(
+    () => readDevSummarySnapshot(DATABASE_MIGRATION_SNAPSHOT_KEY),
+    []
+  )
+  const [summary, setSummary] = useState(initialSnapshot?.summary || null)
+  const summaryRef = useRef(initialSnapshot?.summary || null)
+  const [initialLoading, setInitialLoading] = useState(!initialSnapshot)
+  const [refreshing, setRefreshing] = useState(false)
+  const [summaryFresh, setSummaryFresh] = useState(false)
+  const [checkedAt, setCheckedAt] = useState(initialSnapshot?.checkedAt || '')
   const [loadError, setLoadError] = useState('')
   const [actionKey, setActionKey] = useState('')
   const [confirmationOperation, setConfirmationOperation] = useState(null)
   const [confirmationText, setConfirmationText] = useState('')
   const [operationDetail, setOperationDetail] = useState(null)
+  const mutationInFlightRef = useRef(false)
+  const refreshRequestRef = useRef(0)
+
+  const updateSummary = useCallback((update) => {
+    const { current } = summaryRef
+    const next = typeof update === 'function' ? update(current) : update
+    if (!next) return current
+    summaryRef.current = next
+    updateDevSummarySnapshot(DATABASE_MIGRATION_SNAPSHOT_KEY, () => next)
+    setSummary(next)
+    return next
+  }, [])
 
   const refresh = useCallback(async () => {
-    setLoading(true)
+    const requestId = refreshRequestRef.current + 1
+    refreshRequestRef.current = requestId
+    const hasVisibleSummary = Boolean(summaryRef.current)
+    setInitialLoading(!hasVisibleSummary)
+    setRefreshing(hasVisibleSummary)
+    setSummaryFresh(false)
     setLoadError('')
     try {
-      setSummary(await client.summary())
+      const snapshot = await loadDevSummarySnapshot(
+        DATABASE_MIGRATION_SNAPSHOT_KEY,
+        () => client.summary()
+      )
+      if (refreshRequestRef.current !== requestId) return false
+      summaryRef.current = snapshot.summary
+      setSummary(snapshot.summary)
+      setCheckedAt(snapshot.checkedAt)
+      setSummaryFresh(true)
+      return true
     } catch (error) {
+      if (refreshRequestRef.current !== requestId) return false
       setLoadError(error?.message || '数据库迁移状态读取失败')
+      return false
     } finally {
-      setLoading(false)
+      if (refreshRequestRef.current === requestId) {
+        setInitialLoading(false)
+        setRefreshing(false)
+      }
     }
   }, [client])
 
   useEffect(() => {
     refresh()
+    return () => {
+      refreshRequestRef.current += 1
+    }
   }, [refresh])
 
   const operations = summary?.operations || []
@@ -152,7 +202,7 @@ export default function DevDatabaseMigrationPage() {
       try {
         const operation = await client.operation(pollingOperation.id)
         if (cancelled) return
-        setSummary((current) =>
+        updateSummary((current) =>
           current
             ? {
                 ...current,
@@ -177,13 +227,16 @@ export default function DevDatabaseMigrationPage() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [client, pollingOperation, refresh])
+  }, [client, pollingOperation, refresh, updateSummary])
 
   const performAction = async (key, action) => {
+    if (!summaryFresh || mutationInFlightRef.current) return null
+    mutationInFlightRef.current = true
+    setSummaryFresh(false)
     setActionKey(key)
     try {
       const operation = await client.act(action)
-      setSummary((current) =>
+      updateSummary((current) =>
         current
           ? {
               ...current,
@@ -198,11 +251,14 @@ export default function DevDatabaseMigrationPage() {
             ? '已开始重启本地后端'
             : '已接受确认，开始升级数据库'
       )
+      refresh()
       return operation
     } catch (error) {
       message.error(error?.message || '数据库迁移操作提交失败')
+      await refresh()
       return null
     } finally {
+      mutationInFlightRef.current = false
       setActionKey('')
     }
   }
@@ -218,6 +274,8 @@ export default function DevDatabaseMigrationPage() {
   const readyOperation =
     activeOperation?.status === 'ready' ? activeOperation : null
   const canPrepare =
+    summaryFresh &&
+    !actionKey &&
     summary?.status === 'success' &&
     target?.key === 'shared-dev' &&
     Number.isSafeInteger(pendingFiles) &&
@@ -225,10 +283,22 @@ export default function DevDatabaseMigrationPage() {
     !hasRunningOperation &&
     !readyOperation
   const canRestart =
+    summaryFresh &&
+    !actionKey &&
     summary?.status === 'success' &&
     isLatest &&
     !runtime?.available &&
     !hasRunningOperation
+  const refreshBusy = initialLoading || refreshing
+  const refreshStatusText = initialLoading
+    ? '正在读取最新状态'
+    : refreshing
+      ? `正在后台核对，当前显示 ${formatDevSummaryCheckedAt(checkedAt)} 的结果`
+      : summaryFresh
+        ? `已核对 ${formatDevSummaryCheckedAt(checkedAt)}`
+        : summary
+          ? `显示 ${formatDevSummaryCheckedAt(checkedAt)} 的上次结果，写操作暂不可用`
+          : '尚未取得可用状态'
 
   const columns = [
     {
@@ -292,49 +362,64 @@ export default function DevDatabaseMigrationPage() {
             本地后端重启收口为一次可追踪操作。不会自动迁移，也不会自动重试。
           </Paragraph>
         </div>
-        <Space wrap>
-          <Button icon={<ReloadOutlined />} loading={loading} onClick={refresh}>
-            刷新状态
-          </Button>
-          <Tooltip
-            title={
-              canPrepare
-                ? ''
-                : isLatest
-                  ? '数据库已是最新版本'
-                  : readyOperation
-                    ? '已有准备完成的不可变计划，请确认或刷新状态'
-                    : hasRunningOperation
-                      ? '已有操作正在执行'
-                      : '当前目标或 migration 状态未通过检查'
-            }
-          >
+        <Space direction="vertical" size={4}>
+          <Space wrap>
             <Button
-              type="primary"
-              icon={<SafetyCertificateOutlined />}
-              disabled={!canPrepare}
-              loading={actionKey === 'prepare'}
-              onClick={() =>
-                performAction('prepare', {
-                  action: 'prepare',
-                  idempotencyKey:
-                    createDatabaseMigrationIdempotencyKey('prepare'),
-                })
+              icon={<ReloadOutlined />}
+              loading={refreshBusy}
+              onClick={refresh}
+            >
+              刷新状态
+            </Button>
+            <Tooltip
+              title={
+                canPrepare
+                  ? ''
+                  : !summaryFresh
+                    ? '正在核对最新状态；上次结果只供查看'
+                    : isLatest
+                      ? '数据库已是最新版本'
+                      : readyOperation
+                        ? '已有准备完成的不可变计划，请确认或刷新状态'
+                        : hasRunningOperation
+                          ? '已有操作正在执行'
+                          : '当前目标或 migration 状态未通过检查'
               }
             >
-              检查并准备
-            </Button>
-          </Tooltip>
+              <Button
+                type="primary"
+                icon={<SafetyCertificateOutlined />}
+                disabled={!canPrepare}
+                loading={actionKey === 'prepare'}
+                onClick={() =>
+                  performAction('prepare', {
+                    action: 'prepare',
+                    idempotencyKey:
+                      createDatabaseMigrationIdempotencyKey('prepare'),
+                  })
+                }
+              >
+                检查并准备
+              </Button>
+            </Tooltip>
+          </Space>
+          <Text type="secondary" role="status" aria-live="polite">
+            {refreshStatusText}
+          </Text>
         </Space>
       </header>
 
       <main className="erp-dev-hub-shell erp-dev-database-migration-shell">
         {loadError ? (
           <Alert
-            type="error"
+            type={summary ? 'warning' : 'error'}
             showIcon
-            message="数据库迁移页不可用"
-            description={loadError}
+            message={summary ? '最新状态核对失败' : '数据库迁移页不可用'}
+            description={
+              summary
+                ? `${loadError}；当前保留上次结果，写操作已停用。`
+                : loadError
+            }
           />
         ) : null}
         {summary?.issues?.length > 0 ? (
@@ -345,13 +430,10 @@ export default function DevDatabaseMigrationPage() {
             description={issueText(summary.issues)}
           />
         ) : null}
-        <Alert
-          type="info"
-          showIcon
-          icon={<SafetyCertificateOutlined />}
-          message="固定安全边界"
-          description="仅允许本机 DEV 页面和登记的 shared-dev；浏览器不能提交数据库地址、账号、SQL、命令、路径或生产目标。准备与执行分开，中断后只记录结果待核对，禁止自动重试。"
-        />
+        <DevStaticGuidance title="固定安全边界" hint="数据库目标与执行限制">
+          仅允许本机 DEV 页面和登记的
+          shared-dev；浏览器不能提交数据库地址、账号、SQL、命令、路径或生产目标。准备与执行分开，中断后只记录结果待核对，禁止自动重试。
+        </DevStaticGuidance>
 
         <section
           className="erp-dev-database-migration-summary"
@@ -456,6 +538,7 @@ export default function DevDatabaseMigrationPage() {
                   <Button
                     type="primary"
                     danger
+                    disabled={!summaryFresh || Boolean(actionKey)}
                     onClick={() => {
                       setConfirmationOperation(readyOperation)
                       setConfirmationText('')
@@ -488,7 +571,7 @@ export default function DevDatabaseMigrationPage() {
             rowKey="id"
             columns={columns}
             dataSource={operations}
-            loading={loading}
+            loading={initialLoading}
             pagination={{ pageSize: 8, hideOnSinglePage: true }}
             locale={{
               emptyText: <Empty description="尚无数据库迁移操作" />,
@@ -517,6 +600,7 @@ export default function DevDatabaseMigrationPage() {
         okButtonProps={{
           danger: true,
           disabled:
+            !summaryFresh ||
             !confirmationOperation ||
             confirmationText !== confirmationOperation.confirmationPrompt,
         }}

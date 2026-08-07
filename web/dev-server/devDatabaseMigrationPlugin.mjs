@@ -114,13 +114,30 @@ function normalizeTarget(status) {
   return publicTarget
 }
 
+function databaseClientDiagnosticMessage(diagnostic) {
+  const details = [
+    ...String(diagnostic || '').matchAll(/^\[migration-client\] (.+)$/gmu),
+  ]
+    .filter((match) => /\bblocks_migration=true\b/u.test(match[1]))
+    .slice(0, 4)
+    .map((match) => match[1])
+    .join('; ')
+  return details
+    ? `共享开发库存在会影响 migration 的连接（${details}）；普通无事务 idle/ClientRead 连接已忽略`
+    : '共享开发库存在活动查询、打开事务、持锁或状态不明的连接；处理后重新准备'
+}
+
 function publicIssue(error, fallbackCode = 'operation_blocked') {
   const diagnostic = String(error?.diagnostic || error?.message || '')
-  if (/其它 client session|other_client_sessions|DbGate/iu.test(diagnostic)) {
+  if (
+    /影响 migration 的 client session|\bblocks_migration=true\b|other_client_sessions(?:_final)?_blocking=[1-9]\d*/iu.test(
+      diagnostic
+    )
+  ) {
     return {
       code: 'database_clients_active',
       severity: 'blocked',
-      message: '共享开发库仍有其它连接；关闭 DbGate 或其它写入会话后重新准备',
+      message: databaseClientDiagnosticMessage(diagnostic),
     }
   }
   if (

@@ -7,6 +7,94 @@ import (
 	"strings"
 )
 
+const ProcessLinkedWorkflowTaskReconcileMaxLimit = 100
+
+type ProcessLinkedWorkflowTaskSettlementCandidateRepo interface {
+	ListPendingLinkedWorkflowTaskSettlements(ctx context.Context, afterWorkflowTaskID int, limit int) ([]*WorkflowTask, error)
+}
+
+type ProcessLinkedWorkflowTaskReconcileFailure struct {
+	WorkflowTaskID        int
+	ProcessInstanceID     int
+	ProcessNodeInstanceID int
+	Err                   error
+}
+
+type ProcessLinkedWorkflowTaskReconcileResult struct {
+	Scanned                   int
+	Reconciled                int
+	LastScannedWorkflowTaskID int
+	Failures                  []ProcessLinkedWorkflowTaskReconcileFailure
+}
+
+// ReconcilePendingLinkedWorkflowTasks closes only the durable gap where a
+// linked Workflow task is already terminal while its human/approval node is
+// still active. It reuses the original task actor and the existing idempotent
+// ProcessRuntime settlement path; it does not infer or replay domain facts.
+func (uc *ProcessRuntimeUsecase) ReconcilePendingLinkedWorkflowTasks(
+	ctx context.Context,
+	afterWorkflowTaskID int,
+	limit int,
+) (*ProcessLinkedWorkflowTaskReconcileResult, error) {
+	if uc == nil || uc.workflowRepo == nil || afterWorkflowTaskID < 0 || limit < 1 || limit > ProcessLinkedWorkflowTaskReconcileMaxLimit {
+		return nil, ErrBadParam
+	}
+	candidateRepo, ok := uc.workflowRepo.(ProcessLinkedWorkflowTaskSettlementCandidateRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	tasks, err := candidateRepo.ListPendingLinkedWorkflowTaskSettlements(ctx, afterWorkflowTaskID, limit)
+	if err != nil {
+		return nil, err
+	}
+	if len(tasks) > limit {
+		return nil, ErrBadParam
+	}
+
+	lastScannedWorkflowTaskID := afterWorkflowTaskID
+	for _, task := range tasks {
+		if task == nil {
+			continue
+		}
+		if task.ID <= lastScannedWorkflowTaskID {
+			return nil, ErrBadParam
+		}
+		lastScannedWorkflowTaskID = task.ID
+	}
+	result := &ProcessLinkedWorkflowTaskReconcileResult{
+		Scanned:                   len(tasks),
+		LastScannedWorkflowTaskID: lastScannedWorkflowTaskID,
+		Failures:                  make([]ProcessLinkedWorkflowTaskReconcileFailure, 0),
+	}
+	for _, task := range tasks {
+		failure := ProcessLinkedWorkflowTaskReconcileFailure{}
+		if task != nil {
+			failure.WorkflowTaskID = task.ID
+			if task.ProcessInstanceID != nil {
+				failure.ProcessInstanceID = *task.ProcessInstanceID
+			}
+			if task.ProcessNodeInstanceID != nil {
+				failure.ProcessNodeInstanceID = *task.ProcessNodeInstanceID
+			}
+		}
+		if task == nil || task.ID <= 0 || task.ProcessInstanceID == nil || task.ProcessNodeInstanceID == nil ||
+			task.UpdatedBy == nil || *task.UpdatedBy <= 0 {
+			failure.Err = ErrBadParam
+			result.Failures = append(result.Failures, failure)
+			continue
+		}
+		if _, err := uc.CompleteLinkedWorkflowTask(ctx, &ProcessLinkedWorkflowTaskCompletion{
+			WorkflowTaskID: task.ID,
+		}, *task.UpdatedBy); err != nil {
+			failure.Err = err
+			result.Failures = append(result.Failures, failure)
+			continue
+		}
+		result.Reconciled++
+	}
+	return result, nil
+}
+
 func (uc *ProcessRuntimeUsecase) CreateLinkedWorkflowTask(ctx context.Context, in *ProcessLinkedWorkflowTaskCreate, actorID int) (*WorkflowTask, error) {
 	if uc == nil || uc.repo == nil || uc.workflowRepo == nil || in == nil {
 		return nil, ErrBadParam
@@ -621,8 +709,7 @@ func workflowTaskProcessCommandPayload(
 	if node.FormProfileKey != nil {
 		profileKey = strings.TrimSpace(*node.FormProfileKey)
 	}
-	requiresDecision := profileKey == "sales_return_approval" ||
-		profileKey == "finance_payment_approval" ||
+	requiresDecision := profileKey == "finance_payment_approval" ||
 		profileKey == "inventory_adjustment_approval" ||
 		profileKey == "production_exception_approval"
 	rawDecision, hasDecision := task.Payload["process_decision"]

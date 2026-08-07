@@ -372,16 +372,6 @@ export async function submitShipmentFinanceApprovalProcess(params = {}) {
 }
 
 const EXCEPTION_PROCESS_CONTRACTS = Object.freeze({
-  sales_return_acceptance: Object.freeze({
-    businessRefType: 'sales_return',
-    idParam: 'sales_return_id',
-    startMethod: 'start_sales_return_acceptance_process',
-    getMethod: 'get_sales_return_acceptance_process',
-    startNodeKey: 'sales_return_approval',
-    executeMethods: Object.freeze({
-      execute_sales_return_receive: 'receive_sales_return',
-    }),
-  }),
   finance_payment_approval: Object.freeze({
     businessRefType: 'finance_payment',
     idParam: 'finance_payment_id',
@@ -767,17 +757,6 @@ export async function recoverCompensatedProcessDomainCommand(params = {}) {
   }
   return recoveredNode
 }
-
-export const startSalesReturnAcceptanceProcess = (params = {}) =>
-  startExceptionProcess('sales_return_acceptance', params)
-export const getSalesReturnAcceptanceProcess = (params = {}) =>
-  getExceptionProcess('sales_return_acceptance', params)
-export const executeSalesReturnReceive = (params = {}) =>
-  executeExceptionProcess(
-    'sales_return_acceptance',
-    'execute_sales_return_receive',
-    params
-  )
 
 export const startFinancePaymentApprovalProcess = (params = {}) =>
   startExceptionProcess('finance_payment_approval', params)

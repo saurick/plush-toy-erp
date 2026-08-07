@@ -229,7 +229,10 @@ func loadShipmentSourceLineQuantities(
 	}
 	rows, err := client.ShipmentItem.Query().
 		Where(
-			shipmentitem.HasShipmentWith(shipment.Status(biz.ShipmentStatusShipped)),
+			shipmentitem.HasShipmentWith(
+				shipment.Status(biz.ShipmentStatusShipped),
+				shipment.Purpose(biz.ShipmentPurposeSalesDelivery),
+			),
 			shipmentitem.Or(
 				shipmentitem.SalesOrderItemIDIn(lineIDs...),
 				shipmentitem.HasShipmentWith(shipment.SalesOrderIDIn(orderIDs...)),

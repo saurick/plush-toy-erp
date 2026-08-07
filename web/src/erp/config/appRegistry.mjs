@@ -24,7 +24,7 @@ export const mobileRoleDefinitions = Object.freeze([
     title: '业务手机待办',
     shortTitle: '业务手机待办',
     label: '业务',
-    description: '跟进客户、销售订单、交期、出货和客户退货事项。',
+    description: '跟进客户、销售订单、交期、出货和返工回厂事项。',
   },
   {
     roleKey: 'purchase',

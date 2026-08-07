@@ -6,6 +6,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   exceptionProcessRecoveryReadbackMatches,
   findExceptionProcessRecoveryCandidate,
+  getProcessRecoveryContext,
   recoverCompensatedProcessDomainCommand,
 } from '../../api/customerConfigApi.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
@@ -71,10 +72,16 @@ export default function ExceptionProcessRecoveryButton({
     setLoading(true)
     try {
       const processData = await loadProcess()
-      const candidate = findExceptionProcessRecoveryCandidate(processData)
+      const processInstanceID = Number(
+        processData?.process_context?.process_instance?.id || 0
+      )
+      const recoveryData = await getProcessRecoveryContext({
+        process_instance_id: processInstanceID,
+      })
+      const candidate = findExceptionProcessRecoveryCandidate(recoveryData)
       if (!candidate) {
         const alreadyRecovered =
-          processData?.process_context?.nodes?.some(
+          recoveryData?.process_context?.nodes?.some(
             (node) =>
               node?.domain_command_recovery_decision ===
               'terminate_and_withdraw_downstream'
@@ -93,7 +100,7 @@ export default function ExceptionProcessRecoveryButton({
         okText: '确认恢复',
         cancelText: '返回核对',
         okButtonProps: { danger: true },
-        onOk: () => recover(candidate, processData),
+        onOk: () => recover(candidate, recoveryData),
       })
     } catch (error) {
       message.error(getActionErrorMessage(error, '核对异常流程恢复条件'))

@@ -208,6 +208,72 @@ test('database migration service prepares once, applies once, reads back, and re
   )
 })
 
+test('database migration service does not misclassify passive client diagnostics', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.plan = async (confirmation) => {
+    calls.push(`plan:${confirmation}`)
+    const error = new Error('make migrate_plan 未完成')
+    error.diagnostic = [
+      '[migration-client] pid=123 application="DbGate" state="idle" passive_idle=true blocks_migration=false reason=none',
+      'atlas executable not found',
+    ].join('\n')
+    throw error
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    apiOrigin: 'http://127.0.0.1:8300',
+    operationStore: store,
+    dependencies: runtime,
+  })
+
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.issues[0].code, 'migration_tool_unavailable')
+  assert.equal(calls.filter((call) => call.startsWith('plan:')).length, 1)
+  assert.equal(calls.filter((call) => call.startsWith('backup:')).length, 0)
+})
+
+test('database migration service blocks active or transactional clients', async (t) => {
+  const { root, store } = createProject(t)
+  const calls = []
+  const runtime = dependencies(calls)
+  runtime.plan = async (confirmation) => {
+    calls.push(`plan:${confirmation}`)
+    const error = new Error('make migrate_plan 未完成')
+    error.diagnostic = [
+      '[migration-client] pid=456 application="DbGate" state="idle in transaction" passive_idle=false blocks_migration=true reason=open_transaction',
+      '[migration] other_client_sessions_blocking=1',
+      '共享开发库存在会影响 migration 的 client session',
+    ].join('\n')
+    throw error
+  }
+  const service = createDevDatabaseMigrationService({
+    projectRoot: root,
+    apiOrigin: 'http://127.0.0.1:8300',
+    operationStore: store,
+    dependencies: runtime,
+  })
+  const result = await service.act({
+    action: 'prepare',
+    idempotencyKey: PREPARE_KEY,
+  })
+  const blocked = await waitForOperation(service, result.operation.id, [
+    'blocked',
+  ])
+  assert.equal(blocked.confirmationPrompt, null)
+  assert.equal(blocked.issues[0].code, 'database_clients_active')
+  assert.match(blocked.issues[0].message, /open_transaction/u)
+  assert.equal(calls.filter((call) => call.startsWith('plan:')).length, 1)
+  assert.equal(calls.filter((call) => call.startsWith('backup:')).length, 0)
+})
+
 test('database migration service never applies a stale source plan', async (t) => {
   const { root, store } = createProject(t)
   const calls = []
@@ -426,6 +492,15 @@ test('database migration action rejects arbitrary targets, commands, and fields'
       action: 'prepare',
       idempotencyKey: PREPARE_KEY,
     }
+  )
+  assert.throws(
+    () =>
+      validateDevDatabaseMigrationAction({
+        action: 'prepare',
+        idempotencyKey: PREPARE_KEY,
+        disconnectClient: true,
+      }),
+    /unsupported fields/u
   )
   assert.throws(
     () =>

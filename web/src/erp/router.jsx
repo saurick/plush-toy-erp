@@ -74,7 +74,9 @@ const WorkflowBusinessModulePage = lazyRoute(
 )
 const BOMVersionsPage = lazyRoute(() => import('./pages/BOMVersionsPage.jsx'))
 const ShipmentsPage = lazyRoute(() => import('./pages/ShipmentsPage.jsx'))
-const SalesReturnsPage = lazyRoute(() => import('./pages/SalesReturnsPage.jsx'))
+const ReworkIntakesPage = lazyRoute(
+  () => import('./pages/ReworkIntakesPage.jsx')
+)
 const FinancePaymentsPage = lazyRoute(
   () => import('./pages/FinancePaymentsPage.jsx')
 )
@@ -349,8 +351,8 @@ export default function ERPRouter() {
             />
             <Route path="warehouse/shipments" element={<ShipmentsPage />} />
             <Route
-              path="sales/customer-returns"
-              element={<SalesReturnsPage />}
+              path="sales/rework-intakes"
+              element={<ReworkIntakesPage />}
             />
             <Route
               path="purchase/processing-contracts"

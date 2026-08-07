@@ -108,6 +108,14 @@ const REQUIRED_MODULES = Object.freeze([
   "quality_inspections",
 ]);
 
+export class ScenarioDemoError extends Error {
+  constructor(message, exitCode = 1) {
+    super(message);
+    this.name = "ScenarioDemoError";
+    this.exitCode = exitCode;
+  }
+}
+
 export function buildScenarioDemoCustomerConfigManifest() {
   const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
   if (
@@ -150,7 +158,7 @@ const FACT_RECORD_KEYS = Object.freeze([
   "stockReservations",
   "shipments",
   "financeFacts",
-  "salesReturns",
+  "reworkIntakes",
   "financePayments",
   "financeCreditNotes",
 ]);
@@ -160,14 +168,6 @@ const SOURCE_DOCUMENT_KEYS = Object.freeze([
   "outsourcingOrders",
 ]);
 const execFileAsync = promisify(execFile);
-
-export class ScenarioDemoError extends Error {
-  constructor(message, exitCode = 1) {
-    super(message);
-    this.name = "ScenarioDemoError";
-    this.exitCode = exitCode;
-  }
-}
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);

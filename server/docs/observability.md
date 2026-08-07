@@ -11,6 +11,7 @@
 - HTTP 层已内置 `request_id` 过滤器，日志会自动带上 `request_id`
 - 日志会额外输出 `trace_sampled`；只有 trace 真正被采样时才输出 `trace_link_id`，供 Loki 安全跳转 Jaeger
 - 关键鉴权与后台账号链路已保留成功 / 失败日志；匿名管理员登录失败只记录稳定 reason，不记录原始用户名、密码、token 或 session key
+- ProcessRuntime 的收窄后台对账使用 `component=process_runtime_workflow_reconciler`，只记录扫描 / 成功 / 失败数量、末次扫描 task ID，以及失败记录的 task / process / node ID，不记录任务 payload、审批意见或客户业务字段
 
 ### Trace 链路追踪 / Trace
 
@@ -54,6 +55,7 @@
 - `/readyz` 失败时虽然已有结构化日志，但响应体仍是简单文本
 - JSON-RPC 入口日志仍以文本 `Infof/Warnf` 为主，字段化程度一般
 - 当前 `request_id` 自动生成只覆盖 HTTP 链路，gRPC 和异步任务还没有统一 request id 策略
+- ProcessRuntime 后台对账没有 HTTP request_id；它依靠持久化 task / process / node ID 定位，当前也没有独立告警或 durable outbox 指标
 - HTTP / gRPC 已有服务级 BBR 限流，但密码登录尚无按账号 fingerprint 和可信来源的共享限速；多副本部署不能把单进程内存计数器当成完整防爆破能力
 
 ## 对当前部署路径的影响

@@ -111,10 +111,6 @@ func processDomainCommandReferencedModuleKeys(commandKey string) []string {
 		return []string{"shipments", "inventory", "workflow_tasks"}
 	case ProcessDomainCommandFinanceReceivableLead:
 		return []string{"shipments", "finance"}
-	case ProcessDomainCommandSalesReturnApprove,
-		ProcessDomainCommandSalesReturnReject,
-		ProcessDomainCommandSalesReturnReceive:
-		return []string{"sales_returns", "shipments", "quality_inspections", "inventory", "workflow_tasks"}
 	case ProcessDomainCommandFinancePaymentApprove,
 		ProcessDomainCommandFinancePaymentReject,
 		ProcessDomainCommandFinancePaymentPost:
@@ -187,8 +183,6 @@ func defaultProcessReferencedModuleKeys(processKey string, businessRefType strin
 		return []string{"purchase_orders", "workflow_tasks"}
 	case ProcessKeyFinishedGoodsDelivery:
 		return []string{"shipments", "workflow_tasks", "finance"}
-	case ProcessKeySalesReturnApproval:
-		return []string{"sales_returns", "shipments", "quality_inspections", "inventory", "workflow_tasks"}
 	case ProcessKeyFinancePaymentApproval:
 		return []string{"finance", "finance_payments", "customers", "suppliers", "workflow_tasks"}
 	case ProcessKeyInventoryAdjustmentApproval:
@@ -209,7 +203,6 @@ func customerConfigRuntimeProcessKeysForModule(moduleKey string) []string {
 		ProcessKeySalesOrderAcceptance,
 		ProcessKeyMaterialSupply,
 		ProcessKeyFinishedGoodsDelivery,
-		ProcessKeySalesReturnApproval,
 		ProcessKeyFinancePaymentApproval,
 		ProcessKeyInventoryAdjustmentApproval,
 		ProcessKeyProductionExceptionApproval,
@@ -293,12 +286,33 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			PolicySnapshot:        policySnapshot,
 		})
 	}
+	if processKey == ProcessKeySalesOrderAcceptance && businessRefType == "sales_order" {
+		if !processNodeKeysMatch(nodes, []string{
+			"submit_sales_order",
+			"order_approval",
+			"activate_sales_order",
+			"order_review",
+			"end",
+			"sales_order_rejected_end",
+		}) && !processNodeKeysMatch(nodes, []string{
+			"submit_sales_order",
+			"order_approval",
+			"activate_sales_order",
+			"engineering_data",
+			"order_review",
+			"end",
+			"sales_order_rejected_end",
+		}) {
+			return nil, ErrBadParam
+		}
+	}
 	if processKey == ProcessKeyMaterialSupply && businessRefType == "purchase_order" {
 		if !processNodeKeysMatch(nodes, []string{
 			"submit_purchase_order",
 			"purchase_order_approval",
 			"approve_purchase_order",
 			"end",
+			"purchase_order_rejected_end",
 		}) && !processNodeKeysMatch(nodes, []string{
 			"submit_purchase_order",
 			"purchase_order_approval",
@@ -307,6 +321,7 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			"incoming_qc",
 			"warehouse_inbound",
 			"end",
+			"purchase_order_rejected_end",
 		}) {
 			return nil, ErrBadParam
 		}
@@ -316,6 +331,8 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			"shipment_finance_approval",
 			"shipment_finance_release",
 			"end",
+			"shipment_finance_reject",
+			"shipment_finance_rejected_end",
 		}) && !processNodeKeysMatch(nodes, []string{
 			"finished_goods_quality",
 			"shipment_finance_approval",
@@ -323,6 +340,8 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			"shipment_execution",
 			"receivable_lead",
 			"end",
+			"shipment_finance_reject",
+			"shipment_finance_rejected_end",
 		}) {
 			return nil, ErrBadParam
 		}
@@ -344,18 +363,38 @@ func processNodeKeysMatch(nodes []ProcessNodeInstanceCreate, expected []string) 
 
 func currentCustomerConfigProcessStartShape(processKey string, nodes []ProcessNodeInstanceCreate) bool {
 	switch strings.TrimSpace(processKey) {
+	case ProcessKeySalesOrderAcceptance:
+		return processNodeKeysMatch(nodes, []string{
+			"submit_sales_order",
+			"order_approval",
+			"activate_sales_order",
+			"order_review",
+			"end",
+			"sales_order_rejected_end",
+		}) || processNodeKeysMatch(nodes, []string{
+			"submit_sales_order",
+			"order_approval",
+			"activate_sales_order",
+			"engineering_data",
+			"order_review",
+			"end",
+			"sales_order_rejected_end",
+		})
 	case ProcessKeyMaterialSupply:
 		return processNodeKeysMatch(nodes, []string{
 			"submit_purchase_order",
 			"purchase_order_approval",
 			"approve_purchase_order",
 			"end",
+			"purchase_order_rejected_end",
 		})
 	case ProcessKeyFinishedGoodsDelivery:
 		return processNodeKeysMatch(nodes, []string{
 			"shipment_finance_approval",
 			"shipment_finance_release",
 			"end",
+			"shipment_finance_reject",
+			"shipment_finance_rejected_end",
 		})
 	default:
 		return true
@@ -392,8 +431,6 @@ func customerConfigProcessBusinessRefAllowed(processKey, businessRefType string)
 		return businessRefType == "purchase_order"
 	case ProcessKeyFinishedGoodsDelivery:
 		return businessRefType == "shipment"
-	case ProcessKeySalesReturnApproval:
-		return businessRefType == "sales_return"
 	case ProcessKeyFinancePaymentApproval:
 		return businessRefType == "finance_payment"
 	case ProcessKeyInventoryAdjustmentApproval:
@@ -440,24 +477,12 @@ func customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey
 			return commandKey == ProcessDomainCommandFinishedGoodsQualityDecide
 		case "shipment_finance_release":
 			return commandKey == ProcessDomainCommandShipmentFinanceRelease
+		case "shipment_finance_reject":
+			return commandKey == ProcessDomainCommandShipmentFinanceReject
 		case "shipment_execution":
 			return commandKey == ProcessDomainCommandShipmentShip
 		case "receivable_lead":
 			return commandKey == ProcessDomainCommandFinanceReceivableLead
-		default:
-			return false
-		}
-	case ProcessKeySalesReturnApproval:
-		if businessRefType != "sales_return" {
-			return false
-		}
-		switch nodeKey {
-		case "approve_sales_return":
-			return commandKey == ProcessDomainCommandSalesReturnApprove
-		case "receive_sales_return":
-			return commandKey == ProcessDomainCommandSalesReturnReceive
-		case "reject_sales_return":
-			return commandKey == ProcessDomainCommandSalesReturnReject
 		default:
 			return false
 		}
@@ -600,7 +625,6 @@ func customerConfigRuntimeBuilderRegistered(processKey string) bool {
 	case ProcessKeySalesOrderAcceptance,
 		ProcessKeyMaterialSupply,
 		ProcessKeyFinishedGoodsDelivery,
-		ProcessKeySalesReturnApproval,
 		ProcessKeyFinancePaymentApproval,
 		ProcessKeyInventoryAdjustmentApproval,
 		ProcessKeyProductionExceptionApproval:

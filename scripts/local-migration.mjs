@@ -26,6 +26,7 @@ const targetConfirmPrefixes = Object.freeze({
 });
 const applyConfirmPrefix = "APPLY_DEV_MIGRATIONS:";
 const maintenanceConfirmPrefix = "SHARED_DEV_MAINTENANCE_READY:";
+const databaseClientSummarySchema = "plush.local-migration-clients/v2";
 
 class MigrationCommandError extends Error {
   constructor(message, receipt = {}) {
@@ -637,7 +638,93 @@ async function readIdentity(databaseURL) {
   return { database, user, systemIdentifier, serverAddress };
 }
 
-async function readOtherSessionCount(databaseURL) {
+function normalizeDatabaseClientApplicationName(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "<blank>";
+  return /^[A-Za-z0-9._ -]{1,64}$/u.test(normalized)
+    ? normalized
+    : "<unrecognized>";
+}
+
+function normalizeDatabaseClientState(value) {
+  const normalized = String(value || "").trim();
+  return [
+    "active",
+    "disabled",
+    "fastpath function call",
+    "idle",
+    "idle in transaction",
+    "idle in transaction (aborted)",
+  ].includes(normalized)
+    ? normalized
+    : "unknown";
+}
+
+function normalizeDatabaseClientAddress(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "local";
+  return /^[0-9A-Fa-f:./]{2,64}$/u.test(normalized)
+    ? normalized
+    : "unrecognized";
+}
+
+function normalizeDatabaseClientSession(value) {
+  const pid = Number(value?.pid);
+  const clientPort = Number(value?.clientPort || 0);
+  if (
+    !Number.isSafeInteger(pid) ||
+    pid < 1 ||
+    !Number.isSafeInteger(clientPort) ||
+    clientPort < 0 ||
+    clientPort > 65535
+  ) {
+    throw new MigrationCommandError("其它数据库会话明细无法识别");
+  }
+  const applicationName = normalizeDatabaseClientApplicationName(
+    value.applicationName,
+  );
+  const state = normalizeDatabaseClientState(value.state);
+  const waitEventType = normalizeDatabaseClientApplicationName(
+    value.waitEventType || "none",
+  );
+  const waitEvent = normalizeDatabaseClientApplicationName(
+    value.waitEvent || "none",
+  );
+  const localClient = value.localClient === true;
+  const transactionStarted = value.transactionStarted === true;
+  const snapshotHeld = value.snapshotHeld === true;
+  const advisoryLockHeld = value.advisoryLockHeld === true;
+  let blockerReason = "none";
+  if (transactionStarted) {
+    blockerReason = "open_transaction";
+  } else if (snapshotHeld) {
+    blockerReason = "snapshot_held";
+  } else if (advisoryLockHeld) {
+    blockerReason = "advisory_lock_held";
+  } else if (state !== "idle") {
+    blockerReason = state === "active" ? "active_query" : "unsafe_state";
+  } else if (waitEventType !== "Client" || waitEvent !== "ClientRead") {
+    blockerReason = "unsafe_idle_wait";
+  }
+  const blocksMigration = blockerReason !== "none";
+  return {
+    pid,
+    applicationName,
+    state,
+    clientAddress: normalizeDatabaseClientAddress(value.clientAddress),
+    clientPort,
+    localClient,
+    transactionStarted,
+    snapshotHeld,
+    advisoryLockHeld,
+    waitEventType,
+    waitEvent,
+    blocksMigration,
+    blockerReason,
+  };
+}
+
+async function readOtherClientSessions(databaseURL) {
   const result = await runCommand(
     "psql",
     [
@@ -647,18 +734,94 @@ async function readOtherSessionCount(databaseURL) {
       "--dbname",
       databaseURL,
       "-c",
-      "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND backend_type = 'client backend'",
+      `SELECT COALESCE(
+        json_agg(
+          json_build_object(
+            'pid', activity.pid,
+            'applicationName', activity.application_name,
+            'state', activity.state,
+            'clientAddress', COALESCE(activity.client_addr::text, ''),
+            'clientPort', COALESCE(activity.client_port, 0),
+            'localClient', activity.client_addr IS NOT NULL AND activity.client_addr = inet_client_addr(),
+            'transactionStarted', activity.xact_start IS NOT NULL,
+            'snapshotHeld', activity.backend_xmin IS NOT NULL,
+            'advisoryLockHeld', EXISTS (
+              SELECT 1
+              FROM pg_locks AS held_lock
+              WHERE held_lock.pid = activity.pid
+                AND held_lock.granted
+                AND held_lock.locktype = 'advisory'
+            ),
+            'waitEventType', COALESCE(activity.wait_event_type, ''),
+            'waitEvent', COALESCE(activity.wait_event, '')
+          ) ORDER BY activity.pid
+        ),
+        '[]'::json
+      )::text
+      FROM pg_stat_activity AS activity
+      WHERE activity.datname = current_database()
+        AND activity.pid <> pg_backend_pid()
+        AND activity.backend_type = 'client backend'`,
     ],
     {
       cwd: serverRoot,
       failureMessage: "无法读取其它数据库会话；未执行 migration",
     },
   );
-  const count = Number.parseInt(String(result.stdout || "").trim(), 10);
-  if (!Number.isInteger(count) || count < 0) {
-    throw new MigrationCommandError("其它数据库会话计数无法识别");
+  let rows;
+  try {
+    rows = JSON.parse(String(result.stdout || "").trim());
+  } catch {
+    throw new MigrationCommandError("其它数据库会话明细无法识别");
   }
-  return count;
+  if (!Array.isArray(rows) || rows.length > 100) {
+    throw new MigrationCommandError("其它数据库会话明细无法识别");
+  }
+  return rows.map(normalizeDatabaseClientSession);
+}
+
+function databaseClientSummary(sessions) {
+  const passiveIdleCount = sessions.filter(
+    (session) => !session.blocksMigration,
+  ).length;
+  const blockingCount = sessions.length - passiveIdleCount;
+  return {
+    schemaVersion: databaseClientSummarySchema,
+    total: sessions.length,
+    passiveIdleCount,
+    blockingCount,
+    clients: sessions,
+  };
+}
+
+function writeDatabaseClientSummary(summary) {
+  for (const session of summary.clients) {
+    process.stdout.write(
+      `[migration-client] pid=${session.pid} application=${JSON.stringify(session.applicationName)} state=${JSON.stringify(session.state)} origin=${session.localClient ? "local" : "other"} address=${session.clientAddress} port=${session.clientPort || "unknown"} transaction=${session.transactionStarted ? "open" : "none"} snapshot=${session.snapshotHeld ? "held" : "none"} advisory_lock=${session.advisoryLockHeld ? "held" : "none"} wait=${session.waitEventType}/${session.waitEvent} passive_idle=${!session.blocksMigration} blocks_migration=${session.blocksMigration} reason=${session.blockerReason}\n`,
+    );
+  }
+  process.stdout.write(`[migration-clients] ${JSON.stringify(summary)}\n`);
+}
+
+async function inspectDatabaseClients(context) {
+  const sessions = await readOtherClientSessions(context.resolved.databaseURL);
+  const summary = databaseClientSummary(sessions);
+  writeDatabaseClientSummary(summary);
+  return summary;
+}
+
+function databaseClientBlockerMessage(summary) {
+  const clients = summary.clients
+    .filter((session) => session.blocksMigration)
+    .slice(0, 4)
+    .map(
+      (session) =>
+        `pid=${session.pid} app=${session.applicationName} state=${session.state} reason=${session.blockerReason} origin=${session.localClient ? "local" : "other"}`,
+    )
+    .join("; ");
+  const suffix =
+    summary.blockingCount > 4 ? `; 另有 ${summary.blockingCount - 4} 个` : "";
+  return `共享开发库存在会影响 migration 的 client session（${clients}${suffix}）；普通无事务 idle/ClientRead 连接已忽略，只有活动查询、打开事务、持有快照/ advisory lock 或状态不明的会话会阻断`;
 }
 
 async function validateSnapshot(snapshot) {
@@ -907,9 +1070,7 @@ async function runRollbackRehearsal(databaseURL, snapshot, pendingVersions) {
       "migration 预演没有取得 ROLLBACK 回执；未执行正式 apply",
     );
   }
-  if (
-    !/database_programmability=0\|0\|0/u.test(result.stdout || "")
-  ) {
+  if (!/database_programmability=0\|0\|0/u.test(result.stdout || "")) {
     throw new MigrationCommandError(
       "pending migration 预演后仍存在自定义 Function、Procedure 或非内部 Trigger；事务已回滚，未执行正式 apply",
     );
@@ -992,24 +1153,37 @@ async function prepare(command, receipt) {
   }
 }
 
+async function enforceDatabaseClientBoundary(context, label) {
+  const { target } = context;
+  const clientSummary = await inspectDatabaseClients(context);
+  const countKey =
+    label === "initial"
+      ? "other_client_sessions"
+      : `other_client_sessions_${label}`;
+  process.stdout.write(`[migration] ${countKey}=${clientSummary.total}\n`);
+  process.stdout.write(
+    `[migration] ${countKey}_passive_idle=${clientSummary.passiveIdleCount} ${countKey}_blocking=${clientSummary.blockingCount}\n`,
+  );
+  if (target.scope === "shared-dev" && clientSummary.blockingCount > 0) {
+    throw new MigrationCommandError(
+      databaseClientBlockerMessage(clientSummary),
+    );
+  }
+}
+
 async function runPreflight(context, receipt) {
-  const { resolved, target, snapshot, status, versions } = context;
+  const { resolved, snapshot, status, versions } = context;
   receipt.update({ phase: "preflight" });
   await runExistingUpgradeAudits(resolved.databaseURL);
   await runLifecycleAudit(resolved.databaseURL, status);
-  const otherSessions = await readOtherSessionCount(resolved.databaseURL);
-  process.stdout.write(`[migration] other_client_sessions=${otherSessions}\n`);
-  if (target.scope === "shared-dev" && otherSessions > 0) {
-    throw new MigrationCommandError(
-      "共享开发库仍有其它 client session；先运行 make dev_stop，并关闭 DbGate/其它 writer 后重新 plan",
-    );
-  }
+  await enforceDatabaseClientBoundary(context, "initial");
   await runDryRun(resolved.databaseURL, snapshot);
   await runRollbackRehearsal(
     resolved.databaseURL,
     snapshot,
     versions.pendingVersions,
   );
+  await enforceDatabaseClientBoundary(context, "final");
 }
 
 async function runStatus(receipt) {
@@ -1023,6 +1197,27 @@ async function runStatus(receipt) {
     nextAction:
       context.evaluated.pendingFiles === 0 ? "none" : "run_make_migrate",
   });
+}
+
+async function runClients(receipt) {
+  const context = await prepare("clients", receipt);
+  let terminal;
+  try {
+    assertTrustedTarget(context.target);
+    receipt.update({ phase: "client_inspection" });
+    const summary = await inspectDatabaseClients(context);
+    terminal = {
+      phase: "client_inspection",
+      result: "passed",
+      writes: "0",
+      apply: "not_requested",
+      nextAction: "none",
+    };
+    return summary;
+  } finally {
+    removeSnapshot(context.snapshot);
+    if (terminal) receipt.finish(terminal);
+  }
 }
 
 async function runPlan(receipt) {
@@ -1071,7 +1266,7 @@ async function runPlan(receipt) {
         `[migration] MIGRATE_MAINTENANCE_CONFIRM=${maintenanceConfirmation(planID)}\n`,
       );
       process.stdout.write(
-        "[migration] apply 前必须完成备份，并保持本仓库后端、DbGate 与其它 writer 停止\n",
+        "[migration] apply 前必须完成备份，并保持本仓库后端与其它 writer 停止；普通无事务 idle/ClientRead 连接无需关闭\n",
       );
     }
     terminal = {
@@ -1160,6 +1355,8 @@ async function runApply(receipt) {
         [
           "migrate",
           "apply",
+          "--lock-timeout",
+          "10s",
           "--tx-mode",
           "all",
           "--dir",
@@ -1169,8 +1366,18 @@ async function runApply(receipt) {
         ],
         {
           cwd: serverRoot,
+          env: {
+            ...process.env,
+            PGOPTIONS: [
+              String(process.env.PGOPTIONS || "").trim(),
+              "-c lock_timeout=5s",
+              "-c statement_timeout=120s",
+            ]
+              .filter(Boolean)
+              .join(" "),
+          },
           failureMessage:
-            "Atlas migration apply 失败；tx-mode=all 已要求整批事务，禁止自动重试或 migrate_set",
+            "Atlas migration apply 失败；tx-mode=all、lock_timeout=5s、statement_timeout=120s 已限制整批事务和锁等待，禁止自动重试或 migrate_set",
         },
       );
     } catch (applyError) {
@@ -1258,6 +1465,7 @@ function usage() {
 
 低层诊断 / 编排入口:
   node scripts/local-migration.mjs status
+  node scripts/local-migration.mjs clients
   node scripts/local-migration.mjs plan
   node scripts/local-migration.mjs apply
 
@@ -1273,7 +1481,11 @@ function migrationCommandFailure(error, receipt) {
     return error.receipt;
   }
   const diagnostic = String(error?.message || "");
-  if (/其它 client session|other_client_sessions|DbGate/iu.test(diagnostic)) {
+  if (
+    /影响 migration 的 client session|other_client_sessions|blocks_migration=true/iu.test(
+      diagnostic,
+    )
+  ) {
     return {
       phase: "preflight",
       result: "blocked",
@@ -1358,6 +1570,8 @@ async function main() {
   try {
     if (command === "status") {
       await runStatus(receipt);
+    } else if (command === "clients") {
+      await runClients(receipt);
     } else if (command === "plan") {
       await runPlan(receipt);
     } else if (command === "apply") {

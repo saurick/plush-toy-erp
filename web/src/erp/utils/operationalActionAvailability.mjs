@@ -1,4 +1,9 @@
 import { resolveBusinessActionAvailability } from './businessActionAvailability.mjs'
+import {
+  compareNumeric20Scale6Values,
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from './numeric20Scale6.mjs'
 
 function resolveAction({
   authorized,
@@ -84,60 +89,110 @@ export function resolveFinancePaymentActionAvailability({
   }
 }
 
-export function resolveSalesReturnActionAvailability({
+function positiveDifference(left, right) {
+  return compareNumeric20Scale6Values(left, right) > 0
+}
+
+function hasPendingIntakeRework(intake) {
+  return (intake?.items || []).some((item) =>
+    positiveDifference(item?.quantity, item?.active_rework_quantity)
+  )
+}
+
+function hasActiveIntakeRework(intake) {
+  return (intake?.items || []).some((item) =>
+    isPositiveNumeric20Scale6Units(
+      numeric20Scale6Units(item?.active_rework_quantity) || '0'
+    )
+  )
+}
+
+function hasAvailableReworkCompletion(intake) {
+  return (intake?.items || []).some((item) =>
+    (item?.completion_candidates || []).some(
+      (candidate) =>
+        candidate?.selectable === true &&
+        isPositiveNumeric20Scale6Units(
+          numeric20Scale6Units(candidate?.remaining_quantity) || '0'
+        )
+    )
+  )
+}
+
+export function resolveReworkIntakeActionAvailability({
   action,
   authorized = false,
-  salesReturn = null,
+  reworkIntake = null,
   busy = false,
 } = {}) {
-  const status = salesReturn?.status
+  const status = reworkIntake?.status
   const common = {
     authorized,
-    record: salesReturn,
-    selectionReason: '请先选择一条客户退货记录',
+    record: reworkIntake,
+    selectionReason: '请先选择一条返工回厂记录',
   }
 
   switch (action) {
     case 'receive':
       return resolveAction({
         ...common,
-        relevant: ['DRAFT', 'APPROVED'].includes(status),
-        completed: ['RECEIVED', 'REVERSED'].includes(status),
-        applicable: status === 'APPROVED',
-        busy,
-        unavailableReason: '审批通过后可确认收货',
-        busyReason: '当前操作完成后可确认收货',
-      })
-    case 'approval':
-      return resolveAction({
-        ...common,
         relevant: status === 'DRAFT',
+        completed: ['RECEIVED', 'REVERSED'].includes(status),
         applicable: status === 'DRAFT',
         busy,
-        unavailableReason: '只有待审批客户退货可以核对审批流',
-        busyReason: '当前操作完成后可核对审批流',
+        unavailableReason: '只有待接收记录可以确认回厂收货',
+        busyReason: '当前操作完成后可确认回厂收货',
       })
     case 'cancel':
       return resolveAction({
         ...common,
-        relevant: ['DRAFT', 'APPROVED'].includes(status),
-        applicable: ['DRAFT', 'APPROVED'].includes(status),
+        relevant: status === 'DRAFT',
+        completed: status === 'CANCELLED',
+        applicable: status === 'DRAFT',
         busy,
-        unavailableReason: '只有入库前的客户退货可以取消',
-        busyReason: '当前操作完成后可核对取消',
+        unavailableReason: '只有尚未接收的返工回厂记录可以取消',
+        busyReason: '当前操作完成后可取消',
       })
     case 'reverse':
       return resolveAction({
         ...common,
-        relevant: ['DRAFT', 'APPROVED', 'RECEIVED'].includes(status),
+        relevant: status === 'RECEIVED',
         completed: status === 'REVERSED',
-        applicable: status === 'RECEIVED',
+        applicable:
+          status === 'RECEIVED' && !hasActiveIntakeRework(reworkIntake),
         busy,
-        unavailableReason: '确认收货后可冲正退货入库',
-        busyReason: '当前操作完成后可冲正退货入库',
+        unavailableReason: hasActiveIntakeRework(reworkIntake)
+          ? '已有返工记录，需先取消相关生产返工后才能冲正收货'
+          : '只有已接收且尚未进入返工的记录可以冲正收货',
+        busyReason: '当前操作完成后可冲正收货',
+      })
+    case 'rework':
+      return resolveAction({
+        ...common,
+        relevant: status === 'RECEIVED',
+        applicable:
+          status === 'RECEIVED' && hasPendingIntakeRework(reworkIntake),
+        busy,
+        unavailableReason:
+          status === 'RECEIVED'
+            ? '回厂数量已全部建立生产返工记录'
+            : '确认回厂收货后才能建立生产返工记录',
+        busyReason: '当前操作完成后可建立生产返工记录',
+      })
+    case 'reship':
+      return resolveAction({
+        ...common,
+        relevant: status === 'RECEIVED',
+        completed: reworkIntake?.progress_stage === 'CLOSED',
+        applicable:
+          status === 'RECEIVED' && hasAvailableReworkCompletion(reworkIntake),
+        busy,
+        unavailableReason:
+          '生产返工完成、工序质检通过并入库后，才能建立补发出货单',
+        busyReason: '当前操作完成后可建立补发出货单',
       })
     default:
-      throw new TypeError(`未知客户退货动作：${String(action || '')}`)
+      throw new TypeError(`未知返工回厂动作：${String(action || '')}`)
   }
 }
 
@@ -149,6 +204,7 @@ export function resolveShipmentActionAvailability({
 } = {}) {
   const status = shipment?.status
   const releaseStatus = shipment?.finance_release_status || 'PENDING'
+  const isReworkReshipment = shipment?.purpose === 'REWORK_RESHIPMENT'
   const common = {
     authorized,
     record: shipment,
@@ -159,19 +215,29 @@ export function resolveShipmentActionAvailability({
     case 'quality':
       return resolveAction({
         ...common,
-        relevant: status === 'DRAFT',
-        applicable: status === 'DRAFT',
+        relevant: status === 'DRAFT' && !isReworkReshipment,
+        applicable: status === 'DRAFT' && !isReworkReshipment,
         busy,
-        unavailableReason: '只有出货草稿可以发起出货前检验',
+        unavailableReason: isReworkReshipment
+          ? '返工补发沿用生产返工的工序质检与完工结果，不重复发起出货前检验'
+          : '只有出货草稿可以发起出货前检验',
         busyReason: '当前操作完成后可发起检验',
       })
     case 'release':
       return resolveAction({
         ...common,
-        relevant: status === 'DRAFT' && releaseStatus === 'PENDING',
-        applicable: status === 'DRAFT' && releaseStatus === 'PENDING',
+        relevant:
+          status === 'DRAFT' &&
+          releaseStatus === 'PENDING' &&
+          !isReworkReshipment,
+        applicable:
+          status === 'DRAFT' &&
+          releaseStatus === 'PENDING' &&
+          !isReworkReshipment,
         busy,
-        unavailableReason: '只有待放行的出货草稿可以核对审批',
+        unavailableReason: isReworkReshipment
+          ? '返工补发不产生销售结算，不需要财务放行'
+          : '只有待放行的出货草稿可以核对审批',
         busyReason: '当前操作完成后可核对出货审批',
       })
     case 'ship':
@@ -179,12 +245,17 @@ export function resolveShipmentActionAvailability({
         ...common,
         relevant:
           status === 'DRAFT' &&
-          ['PENDING', 'APPROVED'].includes(releaseStatus),
+          ['PENDING', 'APPROVED', 'NOT_REQUIRED'].includes(releaseStatus),
         completed: status === 'SHIPPED',
         applicable:
-          status === 'DRAFT' && releaseStatus === 'APPROVED',
+          status === 'DRAFT' &&
+          (isReworkReshipment
+            ? releaseStatus === 'NOT_REQUIRED'
+            : releaseStatus === 'APPROVED'),
         busy,
-        unavailableReason: '财务审批通过后可确认出货',
+        unavailableReason: isReworkReshipment
+          ? '返工补发单准备完成后可确认出货'
+          : '财务审批通过后可确认出货',
         busyReason: '当前操作完成后可确认出货',
       })
     case 'cancel':
@@ -201,24 +272,30 @@ export function resolveShipmentActionAvailability({
       return resolveAction({
         ...common,
         relevant:
-          status === 'SHIPPED' ||
-          (status === 'DRAFT' &&
-            ['PENDING', 'APPROVED'].includes(releaseStatus)),
-        applicable: status === 'SHIPPED',
+          !isReworkReshipment &&
+          (status === 'SHIPPED' ||
+            (status === 'DRAFT' &&
+              ['PENDING', 'APPROVED'].includes(releaseStatus))),
+        applicable: !isReworkReshipment && status === 'SHIPPED',
         busy,
-        unavailableReason: '确认出货后可生成应收',
+        unavailableReason: isReworkReshipment
+          ? '返工补发不产生新的应收'
+          : '确认出货后可生成应收',
         busyReason: '当前操作完成后可生成应收',
       })
     case 'invoice':
       return resolveAction({
         ...common,
         relevant:
-          status === 'SHIPPED' ||
-          (status === 'DRAFT' &&
-            ['PENDING', 'APPROVED'].includes(releaseStatus)),
-        applicable: status === 'SHIPPED',
+          !isReworkReshipment &&
+          (status === 'SHIPPED' ||
+            (status === 'DRAFT' &&
+              ['PENDING', 'APPROVED'].includes(releaseStatus))),
+        applicable: !isReworkReshipment && status === 'SHIPPED',
         busy,
-        unavailableReason: '确认出货后可生成开票记录',
+        unavailableReason: isReworkReshipment
+          ? '返工补发不产生新的开票记录'
+          : '确认出货后可生成开票记录',
         busyReason: '当前操作完成后可生成开票记录',
       })
     default:
@@ -273,11 +350,9 @@ export function resolveProductionExceptionActionAvailability({
     case 'execute':
       return resolveAction({
         ...common,
-        relevant:
-          !isQuota && ['SUBMITTED', 'APPROVED'].includes(status),
+        relevant: !isQuota && ['SUBMITTED', 'APPROVED'].includes(status),
         completed: ['APPLIED', 'REVERSED'].includes(executionStatus),
-        applicable:
-          status === 'APPROVED' && executionStatus === 'PENDING',
+        applicable: status === 'APPROVED' && executionStatus === 'PENDING',
         busy,
         unavailableReason: '审批通过后可确认执行报废或在制品让步',
         busyReason: '当前操作完成后可确认执行',
@@ -290,8 +365,7 @@ export function resolveProductionExceptionActionAvailability({
           ['SUBMITTED', 'APPROVED'].includes(status) &&
           ['PENDING', 'APPLIED'].includes(executionStatus),
         completed: executionStatus === 'REVERSED',
-        applicable:
-          status === 'APPROVED' && executionStatus === 'APPLIED',
+        applicable: status === 'APPROVED' && executionStatus === 'APPLIED',
         busy,
         unavailableReason: '业务执行后可确认冲正',
         busyReason: '当前操作完成后可确认冲正',
@@ -304,8 +378,7 @@ export function resolveProductionExceptionActionAvailability({
           ['SUBMITTED', 'APPROVED'].includes(status) &&
           executionStatus === 'PENDING',
         completed: executionStatus === 'REVERSED',
-        applicable:
-          status === 'APPROVED' && executionStatus === 'PENDING',
+        applicable: status === 'APPROVED' && executionStatus === 'PENDING',
         busy,
         unavailableReason: '审批通过后可撤销未使用的超领额度',
         busyReason: '当前操作完成后可撤销额度',

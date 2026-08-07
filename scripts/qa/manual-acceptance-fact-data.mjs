@@ -40,7 +40,7 @@ const APPLY_CONFIRMATION = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const RECEIPT_COUNT = 54;
 const FACT_RUN_COUNT = 45;
-const SALES_RETURN_REFERENCE_COUNT = 4;
+const REWORK_INTAKE_REFERENCE_COUNT = 4;
 const FINANCE_PAYMENT_REFERENCE_COUNT = 4;
 const FINANCE_CREDIT_NOTE_REFERENCE_COUNT = 3;
 const REQUIRED_MODULES = Object.freeze([
@@ -86,7 +86,7 @@ const REFERENCE_KEYS = Object.freeze([
   "stockReservations",
   "shipments",
   "financeFacts",
-  "salesReturns",
+  "reworkIntakes",
   "financePayments",
   "financeCreditNotes",
 ]);
@@ -161,11 +161,11 @@ const FINANCE_PAYMENT_NUMBER = Object.freeze({
   "RECEIVABLE-REVERSED": Object.freeze({ code: "SK", sequence: 903 }),
 });
 
-const SALES_RETURN_NUMBER = Object.freeze({
-  DRAFT: Object.freeze({ code: "TH", sequence: 951 }),
-  APPROVED: Object.freeze({ code: "TH", sequence: 952 }),
-  RECEIVED: Object.freeze({ code: "TH", sequence: 953 }),
-  REVERSED: Object.freeze({ code: "TH", sequence: 954 }),
+const REWORK_INTAKE_NUMBER = Object.freeze({
+  DRAFT: Object.freeze({ code: "HCF", sequence: 951 }),
+  RECEIVED: Object.freeze({ code: "HCF", sequence: 952 }),
+  REVERSED: Object.freeze({ code: "HCF", sequence: 953 }),
+  CANCELLED: Object.freeze({ code: "HCF", sequence: 954 }),
 });
 
 const FINANCE_CREDIT_NOTE_NUMBER = Object.freeze({
@@ -622,7 +622,7 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
       receivables: FACT_RUN_COUNT,
       invoices: FACT_RUN_COUNT,
       reconciliation: FACT_RUN_COUNT,
-      salesReturns: SALES_RETURN_REFERENCE_COUNT,
+      reworkIntakes: REWORK_INTAKE_REFERENCE_COUNT,
       financePayments: FINANCE_PAYMENT_REFERENCE_COUNT,
       financeCreditNotes: FINANCE_CREDIT_NOTE_REFERENCE_COUNT,
     }),
@@ -4185,119 +4185,41 @@ export async function applyManualAcceptanceFinanceLifecycle({
   return dedupeByID(finance);
 }
 
-async function readSalesReturnProcess(rpc, salesReturnID) {
-  return rpc({
-    actor: "sales",
-    domain: "customer_config",
-    method: "get_sales_return_acceptance_process",
-    params: { sales_return_id: salesReturnID },
-  });
-}
-
-async function completeSalesReturnHumanNode({
-  actor,
-  nodeKey,
-  processData,
-  processDecision,
-  rpc,
-  salesReturn,
-}) {
-  const node = requireExceptionProcessNode(
-    processData,
-    nodeKey,
-    ["active", "completed"],
-    "sales return process",
-  );
-  if (String(node.status).toLowerCase() === "completed") {
-    return readSalesReturnProcess(rpc, salesReturn.id);
-  }
-  const taskData = await rpc({
-    actor,
-    domain: "workflow",
-    method: "list_tasks",
-    params: {
-      source_type: "sales_return",
-      source_id: salesReturn.id,
-      limit: 50,
-      offset: 0,
-    },
-  });
-  const task = (taskData?.tasks || []).find(
-    (candidate) =>
-      Number(candidate?.process_instance_id) ===
-        Number(node.process_instance_id) &&
-      Number(candidate?.process_node_instance_id) === Number(node.id),
-  );
-  if (
-    positiveID(task?.id, `${nodeKey}.task.id`) <= 0 ||
-    positiveID(task?.version, `${nodeKey}.task.version`) <= 0 ||
-    String(task?.task_status_key || "").toLowerCase() !== "ready"
-  ) {
-    throw new CliError(`${nodeKey} active task is missing or not ready`);
-  }
-  const reason =
-    nodeKey === "sales_return_approval"
-      ? "本地验收：批准模拟客户退货申请。"
-      : "本地验收：已核对模拟退货实物与来源出货。";
-  const completed = await rpc({
-    actor,
-    domain: "workflow",
-    method: "complete_task_action",
-    params: {
-      task_id: task.id,
-      expected_version: task.version,
-      idempotency_key: `manual-acceptance:sales-return:${salesReturn.id}:task:${task.id}:complete`,
-      action_key: "complete",
-      reason,
-      payload: {
-        surface_key:
-          nodeKey === "sales_return_approval"
-            ? "sales-return-approval"
-            : "sales-return-receipt",
-        ...(processDecision ? { process_decision: { reason } } : {}),
-      },
-    },
-  });
-  if (
-    Number(completed?.task?.id) !== Number(task.id) ||
-    String(completed?.task?.task_status_key || "").toLowerCase() !== "done" ||
-    Number(completed?.task?.version || 0) <= Number(task.version)
-  ) {
-    throw new CliError(`${nodeKey} task completion readback is incomplete`);
-  }
-  return readSalesReturnProcess(rpc, salesReturn.id);
-}
-
-async function exactSalesReturnForShipment(rpc, shipmentID, returnNo) {
+async function exactReworkIntakeForShipment(rpc, shipmentID, intakeNo) {
   const data = await rpc({
     actor: "sales",
     domain: "operational_fact",
-    method: "list_sales_returns",
-    params: { shipment_id: shipmentID, limit: 200, offset: 0 },
+    method: "list_rework_intakes",
+    params: { source_shipment_id: shipmentID, limit: 200, offset: 0 },
   });
-  const items = Array.isArray(data?.sales_returns) ? data.sales_returns : [];
+  const items = Array.isArray(data?.rework_intakes)
+    ? data.rework_intakes
+    : [];
   if (Number(data?.total ?? items.length) > items.length) {
     throw new CliError(
-      `sales return ${returnNo} readback was truncated for shipment ${shipmentID}`,
+      `rework intake ${intakeNo} readback was truncated for shipment ${shipmentID}`,
     );
   }
   const matches = items.filter(
-    (item) => String(item?.return_no || "") === returnNo,
+    (item) => String(item?.intake_no || "") === intakeNo,
   );
   if (matches.length > 1) {
-    throw new CliError(`${returnNo} has ${matches.length} conflicting records`);
+    throw new CliError(`${intakeNo} has ${matches.length} conflicting records`);
   }
   return matches[0] || null;
 }
 
-async function readSalesReturnLinkedReferences(rpc, salesReturn) {
+async function readReworkIntakeLinkedReferences(rpc, reworkIntake) {
   const inventoryLots = [];
-  const qualityInspections = [];
-  for (const item of salesReturn.items || []) {
-    const lotID = positiveID(item?.lot_id, `${salesReturn.return_no}.lot_id`);
+  for (const item of reworkIntake.items || []) {
+    if (!item?.received_lot_id) continue;
+    const lotID = positiveID(
+      item.received_lot_id,
+      `${reworkIntake.intake_no}.received_lot_id`,
+    );
     const lotNo = requiredText(
-      item?.lot_no,
-      `${salesReturn.return_no}.lot_no`,
+      item.received_lot_no,
+      `${reworkIntake.intake_no}.received_lot_no`,
       128,
     );
     const lot = await exactRequired({
@@ -4309,45 +4231,18 @@ async function readSalesReturnLinkedReferences(rpc, salesReturn) {
       businessNo: lotNo,
     });
     if (Number(lot.id) !== lotID) {
-      throw new CliError(`${salesReturn.return_no} lot readback drifted`);
+      throw new CliError(`${reworkIntake.intake_no} lot readback drifted`);
     }
     inventoryLots.push(lot);
-
-    const inspectionID = positiveID(
-      item?.current_quality_inspection_id,
-      `${salesReturn.return_no}.current_quality_inspection_id`,
-    );
-    const inspectionNo = requiredText(
-      item?.current_quality_inspection_no,
-      `${salesReturn.return_no}.current_quality_inspection_no`,
-      128,
-    );
-    const inspection = await exactRequired({
-      rpc,
-      domain: "quality",
-      method: "list_quality_inspections",
-      listKey: "quality_inspections",
-      businessField: "inspection_no",
-      businessNo: inspectionNo,
-    });
-    if (
-      Number(inspection.id) !== inspectionID ||
-      String(inspection.source_type || "").toUpperCase() !== "SALES_RETURN" ||
-      Number(inspection.source_id) !== Number(salesReturn.id)
-    ) {
-      throw new CliError(
-        `${salesReturn.return_no} quality inspection readback drifted`,
-      );
-    }
-    qualityInspections.push(inspection);
   }
+
   const txnData = await rpc({
     actor: "warehouse",
     domain: "inventory",
     method: "list_inventory_txns",
     params: {
-      source_type: "SALES_RETURN",
-      source_id: salesReturn.id,
+      source_type: "REWORK_INTAKE",
+      source_id: reworkIntake.id,
       limit: 200,
       offset: 0,
     },
@@ -4357,40 +4252,42 @@ async function readSalesReturnLinkedReferences(rpc, salesReturn) {
     : [];
   if (Number(txnData?.total ?? inventoryTxns.length) > inventoryTxns.length) {
     throw new CliError(
-      `${salesReturn.return_no} inventory transaction readback was truncated`,
+      `${reworkIntake.intake_no} inventory transaction readback was truncated`,
     );
   }
   const txnTypes = new Set(
     inventoryTxns.map((item) => String(item?.txn_type || "").toUpperCase()),
   );
-  const expectedStatus = String(salesReturn.status || "").toUpperCase();
+  const expectedStatus = String(reworkIntake.status || "").toUpperCase();
   if (
     (expectedStatus === "RECEIVED" && !txnTypes.has("IN")) ||
     (expectedStatus === "REVERSED" &&
       (!txnTypes.has("IN") || !txnTypes.has("REVERSAL"))) ||
-    (["DRAFT", "APPROVED"].includes(expectedStatus) &&
+    (["DRAFT", "CANCELLED"].includes(expectedStatus) &&
       inventoryTxns.length !== 0)
   ) {
     throw new CliError(
-      `${salesReturn.return_no} inventory transaction lifecycle is incomplete`,
+      `${reworkIntake.intake_no} inventory transaction lifecycle is incomplete`,
     );
   }
   return {
     inventoryLots: dedupeByID(inventoryLots),
-    qualityInspections: dedupeByID(qualityInspections),
+    inventoryTxns: dedupeByID(inventoryTxns),
   };
 }
 
-async function ensureSalesReturnSpecimen({
+async function ensureReworkIntakeSpecimen({
   apply,
   plan,
   rpc,
   shipment,
   specimenKey,
 }) {
-  const number = SALES_RETURN_NUMBER[specimenKey];
+  const number = REWORK_INTAKE_NUMBER[specimenKey];
   if (!number) {
-    throw new CliError(`sales return specimen ${specimenKey} is not registered`);
+    throw new CliError(
+      `rework intake specimen ${specimenKey} is not registered`,
+    );
   }
   const shipmentID = positiveID(
     shipment?.id,
@@ -4406,179 +4303,160 @@ async function ensureSalesReturnSpecimen({
       `${specimenKey} requires a formally shipped sales source`,
     );
   }
-  const returnNo = shortBusinessNo(plan, number.code, number.sequence);
-  let salesReturn = await exactSalesReturnForShipment(
+
+  const candidateData = await rpc({
+    actor: "sales",
+    domain: "operational_fact",
+    method: "list_rework_intake_source_candidates",
+    params: { source_shipment_id: shipmentID, limit: 200, offset: 0 },
+  });
+  const candidates = Array.isArray(
+    candidateData?.rework_intake_source_candidates,
+  )
+    ? candidateData.rework_intake_source_candidates
+    : [];
+  const candidate = candidates.find(
+    (item) =>
+      Number(item?.source_shipment_item_id) === shipmentItemID &&
+      item?.selectable !== false,
+  );
+  if (!candidate) {
+    throw new CliError(
+      `${specimenKey} has no selectable rework-intake source candidate`,
+    );
+  }
+
+  const intakeNo = shortBusinessNo(plan, number.code, number.sequence);
+  let reworkIntake = await exactReworkIntakeForShipment(
     rpc,
     shipmentID,
-    returnNo,
+    intakeNo,
   );
-  if (!salesReturn && apply) {
-    salesReturn = resultItem(
+  if (!reworkIntake && apply) {
+    reworkIntake = resultItem(
       await rpc({
         actor: "sales",
         domain: "operational_fact",
-        method: "create_sales_return",
+        method: "create_rework_intake",
         params: {
-          return_no: returnNo,
-          shipment_id: shipmentID,
-          reason: `本地验收：模拟${specimenKey}客户退货。`,
-          idempotency_key: `manual-acceptance:${plan.dataVersion}:sales-return:${specimenKey.toLowerCase()}`,
+          intake_no: intakeNo,
+          source_shipment_id: shipmentID,
+          reason: `本地验收：模拟${specimenKey}返工回厂。`,
+          idempotency_key: `manual-acceptance:${plan.dataVersion}:rework-intake:${specimenKey.toLowerCase()}`,
           items: [
             {
-              shipment_item_id: shipmentItemID,
+              source_shipment_item_id: shipmentItemID,
+              target_production_order_item_id: positiveID(
+                candidate.target_production_order_item_id,
+                `${specimenKey}.target_production_order_item_id`,
+              ),
               quantity: "1",
-              note: "模拟试用数据，不代表真实客户退货。",
+              note: "模拟试用数据，不代表真实客户返工记录。",
             },
           ],
         },
       }),
-      "sales_return",
-      "create_sales_return",
+      "rework_intake",
+      "create_rework_intake",
     );
   }
-  if (!salesReturn) throw new CliError(`${returnNo} is missing`);
+  if (!reworkIntake) throw new CliError(`${intakeNo} is missing`);
   if (
-    Number(salesReturn.shipment_id) !== shipmentID ||
-    !(salesReturn.items || []).some(
+    Number(reworkIntake.source_shipment_id) !== shipmentID ||
+    !(reworkIntake.items || []).some(
       (item) =>
-        Number(item?.shipment_item_id) === shipmentItemID &&
+        Number(item?.source_shipment_item_id) === shipmentItemID &&
         Number(item?.quantity) === 1,
     )
   ) {
-    throw new CliError(`${returnNo} source grain drifted`);
+    throw new CliError(`${intakeNo} source grain drifted`);
   }
 
-  let processData = await readSalesReturnProcess(rpc, salesReturn.id);
-  if (!processData?.process_context) {
-    if (!apply) throw new CliError(`${returnNo} process is missing`);
-    processData = await rpc({
-      actor: "sales",
-      domain: "customer_config",
-      method: "start_sales_return_acceptance_process",
-      params: {
-        sales_return_id: salesReturn.id,
-        idempotency_key: `manual-acceptance:${plan.dataVersion}:sales-return:${returnNo}:process`,
-      },
-    });
-  }
-  let current = processData?.source_readback || salesReturn;
-  if (
-    specimenKey !== "DRAFT" &&
-    String(current.status || "").toUpperCase() === "DRAFT"
-  ) {
-    processData = await completeSalesReturnHumanNode({
-      actor: "boss",
-      nodeKey: "sales_return_approval",
-      processData,
-      processDecision: true,
-      rpc,
-      salesReturn: current,
-    });
-    current = processData?.source_readback;
-  }
+  let current = reworkIntake;
   if (
     ["RECEIVED", "REVERSED"].includes(specimenKey) &&
-    String(current?.status || "").toUpperCase() === "APPROVED"
-  ) {
-    processData = await completeSalesReturnHumanNode({
-      actor: "warehouse",
-      nodeKey: "sales_return_receipt",
-      processData,
-      processDecision: false,
-      rpc,
-      salesReturn: current,
-    });
-    const commandNode = requireExceptionProcessNode(
-      processData,
-      "receive_sales_return",
-      ["active"],
-      "sales return receive",
-    );
-    const instance = processData?.process_context?.process_instance;
-    const execution = await rpc({
-      actor: "warehouse",
-      domain: "customer_config",
-      method: "execute_sales_return_receive",
-      params: {
-        process_instance_id: positiveID(
-          instance?.id,
-          `${returnNo}.process_instance_id`,
-        ),
-        process_node_instance_id: commandNode.id,
-        expected_version: commandNode.version,
-        sales_return_id: current.id,
-        idempotency_key: `manual-acceptance:${plan.dataVersion}:sales-return:${returnNo}:receive`,
-      },
-    });
-    current = execution?.source_readback;
-  }
-  if (
-    specimenKey === "REVERSED" &&
-    String(current?.status || "").toUpperCase() === "RECEIVED"
+    String(current.status || "").toUpperCase() === "DRAFT"
   ) {
     current = resultItem(
       await rpc({
         actor: "warehouse",
         domain: "operational_fact",
-        method: "reverse_sales_return",
+        method: "receive_rework_intake",
         params: {
           id: current.id,
-          expected_version: positiveID(current.version, `${returnNo}.version`),
-          reason: "本地验收：冲正模拟客户退货入库。",
+          expected_version: positiveID(
+            current.version,
+            `${intakeNo}.version`,
+          ),
         },
       }),
-      "sales_return",
-      "reverse_sales_return",
+      "rework_intake",
+      "receive_rework_intake",
     );
   }
+  if (
+    specimenKey === "CANCELLED" &&
+    String(current.status || "").toUpperCase() === "DRAFT"
+  ) {
+    current = resultItem(
+      await rpc({
+        actor: "sales",
+        domain: "operational_fact",
+        method: "cancel_rework_intake",
+        params: {
+          id: current.id,
+          expected_version: positiveID(
+            current.version,
+            `${intakeNo}.version`,
+          ),
+          reason: "本地验收：取消尚未接收的模拟返工回厂记录。",
+        },
+      }),
+      "rework_intake",
+      "cancel_rework_intake",
+    );
+  }
+  if (
+    specimenKey === "REVERSED" &&
+    String(current.status || "").toUpperCase() === "RECEIVED"
+  ) {
+    current = resultItem(
+      await rpc({
+        actor: "warehouse",
+        domain: "operational_fact",
+        method: "reverse_rework_intake",
+        params: {
+          id: current.id,
+          expected_version: positiveID(
+            current.version,
+            `${intakeNo}.version`,
+          ),
+          reason: "本地验收：冲正尚未进入生产返工的模拟回厂收货。",
+        },
+      }),
+      "rework_intake",
+      "reverse_rework_intake",
+    );
+  }
+
   const final = resultItem(
     await rpc({
       actor: "sales",
       domain: "operational_fact",
-      method: "get_sales_return",
-      params: { id: salesReturn.id },
+      method: "get_rework_intake",
+      params: { id: reworkIntake.id },
     }),
-    "sales_return",
-    "get_sales_return",
+    "rework_intake",
+    "get_rework_intake",
   );
   if (String(final.status || "").toUpperCase() !== specimenKey) {
     throw new CliError(
-      `${returnNo} expected ${specimenKey}, got ${final.status || "missing"}`,
+      `${intakeNo} expected ${specimenKey}, got ${final.status || "missing"}`,
     );
   }
-  processData = await readSalesReturnProcess(rpc, final.id);
-  if (specimenKey === "DRAFT") {
-    requireExceptionProcessNode(
-      processData,
-      "sales_return_approval",
-      ["active"],
-      `${returnNo} draft process`,
-    );
-  } else if (specimenKey === "APPROVED") {
-    requireExceptionProcessNode(
-      processData,
-      "sales_return_approval",
-      ["completed"],
-      `${returnNo} approval process`,
-    );
-    requireExceptionProcessNode(
-      processData,
-      "sales_return_receipt",
-      ["active"],
-      `${returnNo} receipt process`,
-    );
-  } else {
-    requireExceptionProcessNode(
-      processData,
-      "receive_sales_return",
-      ["completed"],
-      `${returnNo} receive process`,
-    );
-  }
-  const linked = await readSalesReturnLinkedReferences(rpc, final);
-  return { salesReturn: final, ...linked };
+  const linked = await readReworkIntakeLinkedReferences(rpc, final);
+  return { reworkIntake: final, ...linked };
 }
-
 function eligiblePostedFinanceFacts(financeFacts, factType) {
   return stableFinanceRecords(financeFacts, factType).filter(
     (item) =>
@@ -4791,20 +4669,20 @@ export async function applyManualAcceptanceExceptionPageLifecycle({
     salesReadback.length >= 14
       ? salesReadback.slice(10, 14)
       : salesReadback.slice(0, 4);
-  if (salesSources.length !== SALES_RETURN_REFERENCE_COUNT) {
+  if (salesSources.length !== REWORK_INTAKE_REFERENCE_COUNT) {
     throw new CliError(
-      `sales return lifecycle requires ${SALES_RETURN_REFERENCE_COUNT} shipped sources`,
+      `rework intake lifecycle requires ${REWORK_INTAKE_REFERENCE_COUNT} shipped sources`,
     );
   }
-  const salesReturnResults = [];
+  const reworkIntakeResults = [];
   for (const [index, specimenKey] of [
     "DRAFT",
-    "APPROVED",
     "RECEIVED",
     "REVERSED",
+    "CANCELLED",
   ].entries()) {
-    salesReturnResults.push(
-      await ensureSalesReturnSpecimen({
+    reworkIntakeResults.push(
+      await ensureReworkIntakeSpecimen({
         apply,
         plan,
         rpc,
@@ -4860,12 +4738,12 @@ export async function applyManualAcceptanceExceptionPageLifecycle({
     financePayments,
   });
   return {
-    salesReturns: salesReturnResults.map((item) => item.salesReturn),
-    qualityInspections: dedupeByID(
-      salesReturnResults.flatMap((item) => item.qualityInspections),
-    ),
+    reworkIntakes: reworkIntakeResults.map((item) => item.reworkIntake),
     inventoryLots: dedupeByID(
-      salesReturnResults.flatMap((item) => item.inventoryLots),
+      reworkIntakeResults.flatMap((item) => item.inventoryLots),
+    ),
+    inventoryTxns: dedupeByID(
+      reworkIntakeResults.flatMap((item) => item.inventoryTxns),
     ),
     financePayments,
     financeCreditNotes,
@@ -5266,10 +5144,9 @@ export async function runSourceDrivenFactStage(
     outsourcingFacts: dedupeByID(
       outsourcingReadback.flatMap((item) => item.facts),
     ),
-    qualityInspections: dedupeByID([
-      ...outsourcingReadback.map((item) => item.inspection),
-      ...exceptionPageLifecycle.qualityInspections,
-    ]),
+    qualityInspections: dedupeByID(
+      outsourcingReadback.map((item) => item.inspection),
+    ),
     inventoryLots: dedupeByID([
       ...productionReadback.map((item) => item.lot),
       ...outsourcingReadback.map((item) => item.lot),
@@ -5282,6 +5159,7 @@ export async function runSourceDrivenFactStage(
     inventoryTxns: dedupeByID([
       ...productionReadback.flatMap((item) => item.txns),
       ...outsourcingReadback.flatMap((item) => item.txns),
+      ...exceptionPageLifecycle.inventoryTxns,
     ]),
     stockReservations: dedupeByID([
       ...salesReadback.map((item) => item.reservation),
@@ -5298,7 +5176,7 @@ export async function runSourceDrivenFactStage(
       ...lifecycle.shipments,
     ]),
     financeFacts: dedupeByID(lifecycle.financeFacts),
-    salesReturns: dedupeByID(exceptionPageLifecycle.salesReturns),
+    reworkIntakes: dedupeByID(exceptionPageLifecycle.reworkIntakes),
     financePayments: dedupeByID(exceptionPageLifecycle.financePayments),
     financeCreditNotes: dedupeByID(
       exceptionPageLifecycle.financeCreditNotes,
@@ -5358,7 +5236,7 @@ function assertReferenceRecords(plan, records) {
     outsourcingFacts: FACT_RUN_COUNT * 2,
     stockReservations: plan.expectedMinimums.stockReservations,
     shipments: plan.expectedMinimums.shipments,
-    salesReturns: plan.expectedMinimums.salesReturns,
+    reworkIntakes: plan.expectedMinimums.reworkIntakes,
     financePayments: plan.expectedMinimums.financePayments,
     financeCreditNotes: plan.expectedMinimums.financeCreditNotes,
   };
@@ -5409,15 +5287,15 @@ function assertReferenceRecords(plan, records) {
   requireStatuses("productionExceptions", ["APPROVED"]);
   requireStatuses("stockReservations", ["ACTIVE", "RELEASED"]);
   requireStatuses("shipments", ["DRAFT", "SHIPPED", "CANCELLED"]);
-  requireStatuses("salesReturns", [
+  requireStatuses("reworkIntakes", [
     "DRAFT",
-    "APPROVED",
     "RECEIVED",
     "REVERSED",
+    "CANCELLED",
   ]);
-  if (records.salesReturns.length !== SALES_RETURN_REFERENCE_COUNT) {
+  if (records.reworkIntakes.length !== REWORK_INTAKE_REFERENCE_COUNT) {
     throw new CliError(
-      `salesReturns has ${records.salesReturns.length} exact references; need exactly ${SALES_RETURN_REFERENCE_COUNT}`,
+      `reworkIntakes has ${records.reworkIntakes.length} exact references; need exactly ${REWORK_INTAKE_REFERENCE_COUNT}`,
     );
   }
   assertFinancePageReferenceMatrix({
@@ -5608,7 +5486,7 @@ function buildFactReport({
     ),
     shipments: dedupeByID(facts.shipments),
     financeFacts: dedupeByID(facts.financeFacts),
-    salesReturns: dedupeByID(facts.salesReturns),
+    reworkIntakes: dedupeByID(facts.reworkIntakes),
     financePayments: dedupeByID(facts.financePayments),
     financeCreditNotes: dedupeByID(facts.financeCreditNotes),
     outsourcingFacts: dedupeByID(facts.outsourcingFacts),
@@ -5669,7 +5547,7 @@ function buildFactReport({
       stockReservations: countBy(referenceRecords.stockReservations, "status"),
       shipments: countBy(referenceRecords.shipments, "status"),
       financeFacts: countBy(referenceRecords.financeFacts, "status"),
-      salesReturns: countBy(referenceRecords.salesReturns, "status"),
+      reworkIntakes: countBy(referenceRecords.reworkIntakes, "status"),
       financePayments: countBy(referenceRecords.financePayments, "status"),
       financeCreditNotes: countBy(
         referenceRecords.financeCreditNotes,

@@ -228,7 +228,7 @@ func workflowProcessApprovalFormToMap(node *biz.ProcessNodeInstance) map[string]
 	}
 	profileKey := strings.TrimSpace(*node.FormProfileKey)
 	switch profileKey {
-	case "sales_return_approval", "finance_payment_approval", "inventory_adjustment_approval":
+	case "finance_payment_approval", "inventory_adjustment_approval":
 		return map[string]any{
 			"profile_key":       profileKey,
 			"reason_required":   true,

@@ -34,7 +34,7 @@ import { mobileTheme } from '../theme'
 const MOBILE_MAIN_TAB_ITEMS = Object.freeze([
   { key: MOBILE_MAIN_TAB_KEYS.TODO, label: '待办', Icon: InboxOutlined },
   { key: MOBILE_MAIN_TAB_KEYS.DONE, label: '已办', Icon: CheckSquareOutlined },
-  { key: MOBILE_MAIN_TAB_KEYS.MESSAGES, label: '提醒', Icon: BellOutlined },
+  { key: MOBILE_MAIN_TAB_KEYS.MESSAGES, label: '风险', Icon: BellOutlined },
   { key: MOBILE_MAIN_TAB_KEYS.MINE, label: '我的', Icon: UserOutlined },
 ])
 
@@ -45,6 +45,7 @@ export default function MobileTaskListScreen({
   activeViewHasData,
   activeViewHasMore,
   adminProfile,
+  authoritativeTaskCounts,
   canEnterDesktop,
   canViewApprovalInbox,
   doneTasks,
@@ -61,7 +62,9 @@ export default function MobileTaskListScreen({
   loading,
   loadingMore,
   loggingOut,
-  noticeTasks,
+  overdueTasks,
+  riskTasks,
+  riskScope,
   roleLabel,
   serverDataTime,
   scrollContainerRef,
@@ -76,7 +79,6 @@ export default function MobileTaskListScreen({
   taskSummary,
   visibleListLimitsByKey,
   setVisibleListLimitsByKey,
-  warningTasks,
 }) {
   const activeTodoListKey =
     activeFilterKey === MOBILE_TASK_FILTER_KEYS.APPROVAL
@@ -212,7 +214,22 @@ export default function MobileTaskListScreen({
       className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
       data-testid="mobile-loaded-task-overview"
     >
-      <h2 className="text-lg font-semibold text-slate-950">已加载任务分布</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-950">
+          当前岗位任务状态
+        </h2>
+        <span
+          className="mobile-role-count-tag mobile-role-section-count"
+          data-testid="mobile-role-total-count"
+          aria-label={
+            taskSummary.total === null
+              ? '岗位任务总数暂不可用'
+              : `岗位任务共 ${taskSummary.total} 条`
+          }
+        >
+          {taskSummary.total ?? '—'}
+        </span>
+      </div>
       <div className="mt-3 grid grid-cols-4 divide-x divide-slate-200 rounded-xl border border-slate-100 bg-slate-50 py-3 text-center">
         {[
           {
@@ -246,6 +263,13 @@ export default function MobileTaskListScreen({
           })
         )}
       </div>
+      <p
+        className="mt-3 text-sm leading-6 text-slate-500"
+        data-testid="mobile-role-count-conservation-note"
+      >
+        审批、风险、超时为可重叠关注项，不与全部相加。
+        {riskScope === 'supervised' ? '跨岗风险包含当前账号可监督的岗位。' : ''}
+      </p>
     </section>
   )
 
@@ -325,13 +349,17 @@ export default function MobileTaskListScreen({
       >
         {filterItems.map((item) => {
           const active = item.key === activeFilterKey
+          const countAvailable =
+            Number.isSafeInteger(item.count) && item.count >= 0
           return (
             <button
               key={item.key}
               type="button"
               data-testid={`mobile-role-filter-${item.key}`}
               aria-pressed={active}
-              aria-label={`${item.ariaLabel || item.label}，已加载 ${item.count} 条`}
+              aria-label={`${item.ariaLabel || item.label}，${
+                countAvailable ? `共 ${item.count} 条` : '数量暂不可用'
+              }`}
               className={`mobile-role-task-filter min-w-0 rounded-xl px-1 py-3 text-base font-semibold transition ${
                 active ? 'mobile-role-task-filter--active' : 'text-slate-500'
               }`}
@@ -351,7 +379,7 @@ export default function MobileTaskListScreen({
                   {item.label}
                 </span>
                 <span className="mobile-role-count-tag mobile-role-task-filter__count">
-                  {item.count}
+                  {countAvailable ? item.count : '—'}
                 </span>
               </span>
             </button>
@@ -473,9 +501,13 @@ export default function MobileTaskListScreen({
           <span
             className="mobile-role-count-tag mobile-role-section-count"
             data-testid="mobile-role-done-count"
-            aria-label={`已加载 ${doneTasks.length} 条已办任务`}
+            aria-label={
+              authoritativeTaskCounts
+                ? `已办任务共 ${authoritativeTaskCounts.history} 条，当前已加载 ${doneTasks.length} 条`
+                : `已办任务总数暂不可用，当前已加载 ${doneTasks.length} 条`
+            }
           >
-            {doneTasks.length}
+            {authoritativeTaskCounts?.history ?? '—'}
           </span>
         </div>
         <div className="mt-3 space-y-3">
@@ -511,13 +543,13 @@ export default function MobileTaskListScreen({
     const items = [
       {
         key: MOBILE_MESSAGE_TAB_KEYS.WARNING,
-        label: '预警',
-        count: warningTasks.length,
+        label: riskScope === 'supervised' ? '跨岗风险' : '风险',
+        count: authoritativeTaskCounts?.risk ?? '—',
       },
       {
         key: MOBILE_MESSAGE_TAB_KEYS.NOTICE,
-        label: '提醒',
-        count: noticeTasks.length,
+        label: '超时',
+        count: authoritativeTaskCounts?.overdue ?? '—',
       },
     ]
 
@@ -553,22 +585,24 @@ export default function MobileTaskListScreen({
 
   const renderWarningMessages = () => (
     <section className="mobile-role-message-section mobile-role-message-section--warning erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-      <h2 className="text-lg font-semibold text-slate-950">预警</h2>
+      <h2 className="text-lg font-semibold text-slate-950">
+        {riskScope === 'supervised' ? '跨岗风险' : '风险'}
+      </h2>
       <div className="mt-3 space-y-2">
-        {warningTasks.length === 0 ? (
+        {riskTasks.length === 0 ? (
           <>
             <div className="mobile-role-message-empty rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
-              暂无预警任务
+              暂无风险任务
             </div>
             {renderListLimitControl(
-              warningTasks,
+              riskTasks,
               MOBILE_LIST_KEYS.WARNING,
-              '条预警'
+              '条风险'
             )}
           </>
         ) : (
           <>
-            {getVisibleListItems(warningTasks, MOBILE_LIST_KEYS.WARNING).map(
+            {getVisibleListItems(riskTasks, MOBILE_LIST_KEYS.WARNING).map(
               (task) => (
                 <button
                   key={task.id}
@@ -595,9 +629,9 @@ export default function MobileTaskListScreen({
               )
             )}
             {renderListLimitControl(
-              warningTasks,
+              riskTasks,
               MOBILE_LIST_KEYS.WARNING,
-              '条预警'
+              '条风险'
             )}
           </>
         )}
@@ -607,22 +641,22 @@ export default function MobileTaskListScreen({
 
   const renderNoticeMessages = () => (
     <section className="mobile-role-message-section mobile-role-message-section--notice erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
-      <h2 className="text-lg font-semibold text-slate-950">任务提醒</h2>
+      <h2 className="text-lg font-semibold text-slate-950">超时</h2>
       <div className="mt-3 space-y-2">
-        {noticeTasks.length === 0 ? (
+        {overdueTasks.length === 0 ? (
           <>
             <div className="mobile-role-message-empty rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
-              暂无任务提醒
+              暂无超时任务
             </div>
             {renderListLimitControl(
-              noticeTasks,
+              overdueTasks,
               MOBILE_LIST_KEYS.NOTICE,
-              '条提醒'
+              '条超时'
             )}
           </>
         ) : (
           <>
-            {getVisibleListItems(noticeTasks, MOBILE_LIST_KEYS.NOTICE).map(
+            {getVisibleListItems(overdueTasks, MOBILE_LIST_KEYS.NOTICE).map(
               (task) => (
                 <button
                   key={task.id}
@@ -641,9 +675,9 @@ export default function MobileTaskListScreen({
               )
             )}
             {renderListLimitControl(
-              noticeTasks,
+              overdueTasks,
               MOBILE_LIST_KEYS.NOTICE,
-              '条提醒'
+              '条超时'
             )}
           </>
         )}

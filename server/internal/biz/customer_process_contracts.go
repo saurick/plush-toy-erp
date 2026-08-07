@@ -13,7 +13,6 @@ const (
 	CustomerProcessVariantSalesApprovalEngineeringPMC = "approval_engineering_pmc"
 	CustomerProcessVariantPurchaseOrderApproval       = "purchase_order_approval"
 	CustomerProcessVariantShipmentFinanceApproval     = "shipment_finance_approval"
-	CustomerProcessVariantSalesReturnApprovalReceipt  = "approval_receipt"
 	CustomerProcessVariantFinancePaymentApprovalPost  = "approval_post"
 	CustomerProcessVariantInventoryAdjustmentApproval = "manual_adjustment_approval"
 	CustomerProcessVariantProductionExceptionApproval = "exception_decision_approval"
@@ -272,7 +271,6 @@ func builtinCustomerProcessContracts() []customerProcessContract {
 		newSalesOrderAcceptanceContract(CustomerProcessVariantSalesApprovalEngineeringPMC, true),
 		newMaterialSupplyContract(),
 		newFinishedGoodsDeliveryContract(),
-		newSalesReturnAcceptanceContract(),
 		newFinancePaymentApprovalContract(),
 		newInventoryAdjustmentApprovalContract(),
 		newProductionExceptionApprovalContract(),
@@ -293,6 +291,17 @@ func CanonicalCustomerProcessContractDefinitions() []map[string]any {
 }
 
 func newSalesOrderAcceptanceContract(variantKey string, includeEngineering bool) customerProcessContract {
+	approval := customerHumanProcessNode(
+		"order_approval",
+		ProcessNodeTypeApproval,
+		"boss",
+		PermissionWorkflowTaskApprove,
+		"sales_order_approval.default",
+		"sales_order_approval",
+	)
+	approval.PolicySnapshot = map[string]any{
+		"branch_policy_key": ProcessBranchPolicySalesOrderApproval,
+	}
 	nodes := []ProcessNodeInstanceCreate{
 		customerDomainCommandNode(
 			"submit_sales_order",
@@ -301,14 +310,7 @@ func newSalesOrderAcceptanceContract(variantKey string, includeEngineering bool)
 			ProcessDomainCommandSalesOrderSubmit,
 			"SalesOrderUsecase.SubmitSalesOrder",
 		),
-		customerHumanProcessNode(
-			"order_approval",
-			ProcessNodeTypeApproval,
-			"boss",
-			PermissionWorkflowTaskApprove,
-			"sales_order_approval.default",
-			"sales_order_approval",
-		),
+		approval,
 		customerDomainCommandNode(
 			"activate_sales_order",
 			"",
@@ -337,6 +339,7 @@ func newSalesOrderAcceptanceContract(variantKey string, includeEngineering bool)
 			"sales_order_review",
 		),
 		ProcessNodeInstanceCreate{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
+		ProcessNodeInstanceCreate{NodeKey: "sales_order_rejected_end", NodeType: ProcessNodeTypeEnd},
 	)
 	return customerProcessContract{
 		Selection: customerProcessSelection{
@@ -353,6 +356,17 @@ func newSalesOrderAcceptanceContract(variantKey string, includeEngineering bool)
 }
 
 func newMaterialSupplyContract() customerProcessContract {
+	approval := customerHumanProcessNode(
+		"purchase_order_approval",
+		ProcessNodeTypeApproval,
+		"boss",
+		PermissionWorkflowTaskApprove,
+		"purchase_order_approval.default",
+		"purchase_order_approval",
+	)
+	approval.PolicySnapshot = map[string]any{
+		"branch_policy_key": ProcessBranchPolicyPurchaseOrderApproval,
+	}
 	return customerProcessContract{
 		Selection: customerProcessSelection{
 			ProcessKey:      ProcessKeyMaterialSupply,
@@ -371,14 +385,7 @@ func newMaterialSupplyContract() customerProcessContract {
 				ProcessDomainCommandPurchaseOrderSubmit,
 				"PurchaseOrderUsecase.SubmitPurchaseOrderForProcessCommand",
 			),
-			customerHumanProcessNode(
-				"purchase_order_approval",
-				ProcessNodeTypeApproval,
-				"boss",
-				PermissionWorkflowTaskApprove,
-				"purchase_order_approval.default",
-				"purchase_order_approval",
-			),
+			approval,
 			customerDomainCommandNode(
 				"approve_purchase_order",
 				"",
@@ -387,11 +394,23 @@ func newMaterialSupplyContract() customerProcessContract {
 				"PurchaseOrderUsecase.ApprovePurchaseOrder",
 			),
 			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
+			{NodeKey: "purchase_order_rejected_end", NodeType: ProcessNodeTypeEnd},
 		},
 	}
 }
 
 func newFinishedGoodsDeliveryContract() customerProcessContract {
+	approval := customerHumanProcessNode(
+		"shipment_finance_approval",
+		ProcessNodeTypeApproval,
+		"finance",
+		PermissionWorkflowTaskApprove,
+		"shipment_finance_approval.default",
+		"shipment_finance_approval",
+	)
+	approval.PolicySnapshot = map[string]any{
+		"branch_policy_key": ProcessBranchPolicyShipmentFinanceApproval,
+	}
 	return customerProcessContract{
 		Selection: customerProcessSelection{
 			ProcessKey:      ProcessKeyFinishedGoodsDelivery,
@@ -403,14 +422,7 @@ func newFinishedGoodsDeliveryContract() customerProcessContract {
 		FactBoundary:   "no_fact_posting",
 		Guardrail:      "The ProcessRuntime owns only finance approval and the versioned finance-release marker. Finished-goods quality, shipment posting and receivable creation stay on their formal domain pages and transaction boundaries.",
 		Nodes: []ProcessNodeInstanceCreate{
-			customerHumanProcessNode(
-				"shipment_finance_approval",
-				ProcessNodeTypeApproval,
-				"finance",
-				PermissionWorkflowTaskApprove,
-				"shipment_finance_approval.default",
-				"shipment_finance_approval",
-			),
+			approval,
 			customerDomainCommandNode(
 				"shipment_finance_release",
 				"shipment_finance_release",
@@ -419,65 +431,14 @@ func newFinishedGoodsDeliveryContract() customerProcessContract {
 				"OperationalFactUsecase.RecordShipmentFinanceRelease",
 			),
 			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
-		},
-	}
-}
-
-func newSalesReturnAcceptanceContract() customerProcessContract {
-	approval := customerHumanProcessNode(
-		"sales_return_approval",
-		ProcessNodeTypeApproval,
-		"boss",
-		PermissionSalesReturnApprove,
-		"sales_return_approval",
-		"sales_return_approval",
-	)
-	approval.PolicySnapshot = map[string]any{
-		"branch_policy_key": ProcessBranchPolicySalesReturnApproval,
-	}
-	return customerProcessContract{
-		Selection: customerProcessSelection{
-			ProcessKey:      ProcessKeySalesReturnApproval,
-			ProcessVersion:  "v1",
-			VariantKey:      CustomerProcessVariantSalesReturnApprovalReceipt,
-			BusinessRefType: "sales_return",
-		},
-		DomainBoundary: "explicit_source_and_fact_commands",
-		FactBoundary:   "no_fact_posting",
-		Guardrail:      "The approval task changes only the sales-return source document. The warehouse receipt task merely activates the explicit receive command; only that command writes return inventory and submits the linked RMA quality inspection.",
-		Nodes: []ProcessNodeInstanceCreate{
-			approval,
 			customerDomainCommandNode(
-				"approve_sales_return",
-				"",
-				PermissionWorkflowTaskApprove,
-				ProcessDomainCommandSalesReturnApprove,
-				"OperationalFactUsecase.ApproveSalesReturnForProcessCommand",
-			),
-			customerHumanProcessNode(
-				"sales_return_receipt",
-				ProcessNodeTypeHumanTask,
-				"warehouse",
-				PermissionWorkflowTaskComplete,
-				"sales_return_receipt",
-				"sales_return_receipt",
-			),
-			customerDomainCommandNode(
-				"receive_sales_return",
-				"warehouse",
-				PermissionSalesReturnReceive,
-				ProcessDomainCommandSalesReturnReceive,
-				"OperationalFactUsecase.ReceiveSalesReturnForProcessCommand",
-			),
-			{NodeKey: "end", NodeType: ProcessNodeTypeEnd},
-			customerDomainCommandNode(
-				"reject_sales_return",
+				"shipment_finance_reject",
 				"",
 				PermissionWorkflowTaskReject,
-				ProcessDomainCommandSalesReturnReject,
-				"OperationalFactUsecase.RejectSalesReturnForProcessCommand",
+				ProcessDomainCommandShipmentFinanceReject,
+				"OperationalFactUsecase.RecordShipmentFinanceRejection",
 			),
-			{NodeKey: "rejected_end", NodeType: ProcessNodeTypeEnd},
+			{NodeKey: "shipment_finance_rejected_end", NodeType: ProcessNodeTypeEnd},
 		},
 	}
 }
@@ -696,8 +657,7 @@ func customerDomainCommandNode(nodeKey, ownerPoolKey, capabilityKey, commandKey,
 	if commandKey == ProcessDomainCommandSalesOrderActivate ||
 		commandKey == ProcessDomainCommandPurchaseOrderApprove ||
 		commandKey == ProcessDomainCommandShipmentFinanceRelease ||
-		commandKey == ProcessDomainCommandSalesReturnApprove ||
-		commandKey == ProcessDomainCommandSalesReturnReject ||
+		commandKey == ProcessDomainCommandShipmentFinanceReject ||
 		commandKey == ProcessDomainCommandFinancePaymentApprove ||
 		commandKey == ProcessDomainCommandFinancePaymentReject ||
 		commandKey == ProcessDomainCommandInventoryAdjustmentApprove ||

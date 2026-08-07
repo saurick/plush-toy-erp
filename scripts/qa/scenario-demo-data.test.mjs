@@ -439,7 +439,7 @@ test("scenario-demo readback counts only formal source, ProcessRuntime, and Fact
         "stockReservations",
         "shipments",
         "financeFacts",
-        "salesReturns",
+        "reworkIntakes",
         "financePayments",
         "financeCreditNotes",
       ].map((key, index) => [key, [{ id: index + 1 }]]),

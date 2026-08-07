@@ -12,10 +12,10 @@ import {
   PushpinFilled,
   PushpinOutlined,
   RightOutlined,
-  SearchOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Input, Space, Tag, Typography } from 'antd'
+import { Button, Empty, Space, Tag, Typography } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
@@ -335,6 +335,10 @@ export default function DevPrototypesPage() {
       }),
     [itemsWithPinnedState, keyword, statusFilter]
   )
+  const selectedItem =
+    visibleItems.find((item) => item.key === selectedKey) || visibleItems[0]
+  const canonicalSelectedKey = selectedItem?.key || selectedKey
+  const selectedGroupKey = selectedItem?.directory || ''
   const pinnedItems = useMemo(
     () => visibleItems.filter((item) => item.pinned),
     [visibleItems]
@@ -355,12 +359,14 @@ export default function DevPrototypesPage() {
     [items]
   )
   const expandedGroupKeys = useMemo(() => {
-    if (storedExpandedGroupKeys === null) return allGroupKeys
+    if (storedExpandedGroupKeys === null) {
+      return selectedGroupKey ? [selectedGroupKey] : []
+    }
     return normalizeDevPrototypeExpandedGroupKeys(
       storedExpandedGroupKeys,
       allGroupKeys
     )
-  }, [allGroupKeys, storedExpandedGroupKeys])
+  }, [allGroupKeys, selectedGroupKey, storedExpandedGroupKeys])
   const expandedGroupKeySet = useMemo(
     () => new Set(expandedGroupKeys),
     [expandedGroupKeys]
@@ -369,9 +375,6 @@ export default function DevPrototypesPage() {
     visibleGroupKeys.length > 0 &&
     visibleGroupKeys.every((groupKey) => expandedGroupKeySet.has(groupKey))
   const [fullscreenItem, setFullscreenItem] = useState(null)
-  const selectedItem =
-    visibleItems.find((item) => item.key === selectedKey) || visibleItems[0]
-  const canonicalSelectedKey = selectedItem?.key || selectedKey
 
   const copySelectedAssetPath = async () => {
     if (!selectedItem?.assetPath) return
@@ -458,7 +461,9 @@ export default function DevPrototypesPage() {
     setStoredExpandedGroupKeys((currentGroupKeys) => {
       const normalizedGroupKeys =
         currentGroupKeys === null
-          ? allGroupKeys
+          ? selectedGroupKey
+            ? [selectedGroupKey]
+            : []
           : normalizeDevPrototypeExpandedGroupKeys(
               currentGroupKeys,
               allGroupKeys
@@ -645,31 +650,44 @@ export default function DevPrototypesPage() {
             <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-prototypes-summary">
-            只查看 docs/product/prototypes 下的 HTML 样板、PNG
-            方案图和截图证据；参照范围只说明可借鉴的页面 /
-            菜单类型，不是正式菜单映射中心；不进入 ERP
-            菜单、权限、seedData、后端业务或正式文档入口。
+            先按状态找到要评审的方案，再查看用途、适用范围和实际画面；默认只展开当前方案所在目录。
           </Paragraph>
-        </div>
-        <div className="erp-dev-prototypes-header__stats">
-          <span>
-            网页原型 / HTML{' '}
-            {items.filter((item) => item.type === 'HTML').length}
-          </span>
-          <span>
-            图片方案 / PNG {items.filter((item) => item.type === 'PNG').length}
-          </span>
-          <span>总计 / Total {items.length}</span>
+          <details className="erp-dev-prototypes-boundary-details">
+            <summary>查看资产范围与状态边界</summary>
+            <div>
+              <Text>
+                只查看 docs/product/prototypes 下的 HTML 样板、PNG
+                方案图和截图证据。
+              </Text>
+              <Text type="secondary">
+                参照范围只说明可借鉴的页面或菜单类型，不代表正式实现，也不进入
+                ERP 菜单、权限、seedData、后端业务或正式文档入口。
+              </Text>
+              <div className="erp-dev-prototypes-header__stats">
+                <span>
+                  网页原型 / HTML{' '}
+                  {items.filter((item) => item.type === 'HTML').length}
+                </span>
+                <span>
+                  图片方案 / PNG{' '}
+                  {items.filter((item) => item.type === 'PNG').length}
+                </span>
+                <span>总计 / Total {items.length}</span>
+              </div>
+            </div>
+          </details>
         </div>
       </header>
 
       <main ref={pageMainRef} className="erp-dev-prototypes-shell">
         <aside className="erp-dev-prototypes-sidebar">
-          <Input
+          <Text className="erp-dev-prototypes-sidebar__hint">
+            先筛状态，再选当前要评审的方案
+          </Text>
+          <SearchInput
             allowClear
             aria-label="搜索产品原型"
             value={keyword}
-            prefix={<SearchOutlined />}
             placeholder="搜索名称、目录、用途、参照范围"
             className="erp-dev-prototypes-search"
             onChange={(event) => updateKeyword(event.target.value)}
@@ -695,9 +713,12 @@ export default function DevPrototypesPage() {
               </button>
             ))}
           </div>
-          <Paragraph className="erp-dev-prototypes-filter-note">
-            顶部筛选只用于判断当前、待实现和参考资料；起草阶段、截图证据和方案对比保留在卡片标签里。
-          </Paragraph>
+          <details className="erp-dev-prototypes-filter-details">
+            <summary>状态说明</summary>
+            <Paragraph className="erp-dev-prototypes-filter-note">
+              筛选只用于区分当前、待实现和参考资料；起草阶段、截图证据和方案对比仍以卡片标签为准。
+            </Paragraph>
+          </details>
           <div
             className="erp-dev-prototypes-group-controls"
             aria-label="目录分组操作"
@@ -708,7 +729,7 @@ export default function DevPrototypesPage() {
               disabled={visibleGroupKeys.length === 0}
               onClick={toggleAllDirectoryGroups}
             >
-              {visibleGroupsExpanded ? '收起' : '展开'}
+              {visibleGroupsExpanded ? '收起全部' : '展开全部'}
             </Button>
           </div>
 
@@ -863,12 +884,18 @@ export default function DevPrototypesPage() {
                   </Text>
                 ) : null}
                 <Text type="secondary">
-                  <FolderOpenOutlined /> {selectedItem.directory}
+                  状态标签只说明资产阶段；是否实现仍以当前代码和运行结果为准。
                 </Text>
-                <Text type="secondary">
-                  <FileMarkdownOutlined />{' '}
-                  {getPrototypeRepositoryPath(selectedItem.readmePath)}
-                </Text>
+                <details className="erp-dev-prototypes-reader__source-details">
+                  <summary>查看资产来源</summary>
+                  <span>
+                    <FolderOpenOutlined /> {selectedItem.directory}
+                  </span>
+                  <span>
+                    <FileMarkdownOutlined />{' '}
+                    {getPrototypeRepositoryPath(selectedItem.readmePath)}
+                  </span>
+                </details>
               </>
             ) : (
               <Text type="secondary">

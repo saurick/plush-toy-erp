@@ -104,23 +104,3 @@ func TestExceptionResponseKeepsAuditAndSourceFields(t *testing.T) {
 		t.Fatalf("response=%#v", got)
 	}
 }
-
-func TestSalesReturnResponseKeepsRejectionAudit(t *testing.T) {
-	rejectedAt := time.Unix(456, 0)
-	rejectedBy := 9
-	rejectReason := "退货申请与原出货事实不一致"
-	got := salesReturnToMap(&biz.SalesReturn{
-		ID:           1,
-		RejectedAt:   &rejectedAt,
-		RejectedBy:   &rejectedBy,
-		RejectReason: &rejectReason,
-	})
-	if got["rejected_at"] != int64(456) || got["rejected_by"] != rejectedBy || got["reject_reason"] != rejectReason {
-		t.Fatalf("rejection audit response=%#v", got)
-	}
-
-	empty := salesReturnToMap(&biz.SalesReturn{ID: 2})
-	if empty["rejected_at"] != nil || empty["rejected_by"] != nil || empty["reject_reason"] != nil {
-		t.Fatalf("empty rejection audit response=%#v", empty)
-	}
-}

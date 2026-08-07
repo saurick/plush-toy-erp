@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { SearchOutlined } from '@ant-design/icons'
 import {
   Button,
   Empty,
-  Input,
   Modal,
   Pagination,
   Popover,
@@ -11,6 +9,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import SearchInput from '@/common/components/SearchInput'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const { Text } = Typography
@@ -308,9 +307,8 @@ export default function SourceImportPickerModal({
       maskClosable={false}
     >
       <div className="erp-source-import-picker">
-        <Input
+        <SearchInput
           allowClear
-          prefix={<SearchOutlined />}
           value={keyword}
           onChange={handleKeywordChange}
           placeholder={searchPlaceholder}

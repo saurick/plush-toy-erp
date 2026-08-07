@@ -1,13 +1,13 @@
 ---
 name: plush-page-design-governance
-description: 项目页面治理（plush-toy-erp）。Use when designing, reviewing, or changing plush pages, fields, actions, states, layouts, prototypes, accessibility, or browser regression scope.
+description: 项目页面治理（plush-toy-erp）。Use when ordinary ERP pages, fields, actions, states, layouts, prototypes, accessibility, or browser regressions are primary; use print-template governance when customer source files or paper/PDF fidelity are primary.
 ---
 
 # Plush Page Design Governance
 
 Use this skill to turn "简洁易用、美观、低心智负担" into concrete implementation checks for plush-toy-erp pages. Do not treat it as a generic visual taste guide. Its purpose is to protect page meaning, feature semantics, information hierarchy, ERP task focus, Workflow / Fact boundaries, RBAC/menu truth, and regression quality.
 
-边界说明：本 skill 只负责页面可见能力、功能语义、信息层级、交互和页面回归治理；涉及 API / RBAC / schema / migration / Workflow / Fact 时，只做真实性核对和升级判断，不直接把后端实现纳入页面治理范围。若页面改动需要新增或修改后端能力，应切换到 `plush-domain-boundary-governance`，并按对应 test / security / release skill 补足验证。
+边界说明：本 skill 只负责普通页面的可见能力、功能语义、信息层级、交互和页面回归治理；客户 Excel/PDF/图片源、纸张版式和 PDF/打印保真由 `plush-print-template-source-governance` 负责。涉及 API / RBAC / schema / migration / Workflow / Fact 时，只做真实性核对和升级判断，不直接把后端实现纳入页面治理范围。若页面改动需要新增或修改后端能力，应切换到 `plush-domain-boundary-governance`，并按对应 test / security / release skill 补足验证。
 
 ## 项目页面门禁 Project Page Gates
 

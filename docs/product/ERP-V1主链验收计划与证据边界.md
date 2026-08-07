@@ -210,6 +210,6 @@ TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
 
 ## 7. 与测试分层的关系
 
-`v1-acceptance-plan.mjs` 本身属于 `T0 / T1` 的计划与静态入口编排：它只证明计划可生成、必需入口存在和 no-write 边界成立。计划中列出的命令各自提供 `T2-T7` 的领域、集成、API / RBAC、前端、导入和业务 E2E 证据，不能由本报告代替。
+`v1-acceptance-plan.mjs` 本身属于现场与静态检查（T0）以及文档与边界检查（T1）的计划入口编排：它只证明计划可生成、必需入口存在和 no-write 边界成立。计划中列出的命令分别提供数据结构与迁移（T2）、领域逻辑（T3）、API 与权限（T4）、页面与浏览器（T5）、配置与导入（T6）、业务集成与真实数据库（T7）证据，不能由本报告代替。
 
-clean exact SHA 的本地完整技术验收入口是 `scripts/qa/local-acceptance-lifecycle.mjs`。`T8` 目标部署 / 发布 / 回滚和客户岗位 UAT 仍是独立证据层，不能由本地绿色或历史发布记录替代。
+clean exact SHA 的本地完整技术验收入口是 `scripts/qa/local-acceptance-lifecycle.mjs`。发布、恢复与回滚验证（T8）以及客户岗位 UAT 仍是独立证据层，不能由本地绿色或历史发布记录替代。

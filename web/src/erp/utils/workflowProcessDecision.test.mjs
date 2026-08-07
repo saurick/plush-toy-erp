@@ -10,7 +10,6 @@ import {
 } from './workflowProcessDecision.mjs'
 
 const PROFILE_BY_CAPABILITY = Object.freeze({
-  'sales_return.approve': 'sales_return_approval',
   'finance.payment.approve': 'finance_payment_approval',
   'warehouse.adjustment.approve': 'inventory_adjustment_approval',
   'production.exception.approve': 'production_exception_approval',
@@ -129,9 +128,9 @@ test('approved quantity is accepted only from the production form and stays exac
   assert.throws(
     () =>
       buildWorkflowProcessDecision({
-        task: task('sales_return.approve'),
-        processContext: context('sales_return_approval'),
-        reason: '同意退货',
+        task: task('finance.payment.approve'),
+        processContext: context('finance_payment_approval'),
+        reason: '同意收付款',
         approvedQuantity: '1',
       }),
     /批准数量必须大于 0/u
@@ -166,9 +165,9 @@ test('submission guard rejects missing, drifted and non-canonical decisions with
   assert.throws(
     () =>
       requireWorkflowProcessDecisionSubmission(
-        task('sales_return.approve'),
-        { reason: '同意退货', approved_quantity: '1' },
-        { reason: '同意退货' }
+        task('finance.payment.approve'),
+        { reason: '同意收付款', approved_quantity: '1' },
+        { reason: '同意收付款' }
       ),
     /审批表单与当前流程节点不一致/u
   )

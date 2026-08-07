@@ -1336,8 +1336,9 @@ test('出货和入库正式页头不展示底层表名或状态 key', () => {
   }
 
   for (const readableShipmentHeaderText of [
-    '出货单维护出货信息和明细',
-    '库存出库记录',
+    '销售出货草稿需先完成品质检验与财务放行',
+    '返工补发沿用生产返工的质检与完工结果',
+    '两类单据都必须由仓库确认实际出货后才扣减库存',
   ]) {
     assert.match(
       shipmentPageContent,

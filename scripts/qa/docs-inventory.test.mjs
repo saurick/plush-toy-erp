@@ -5,8 +5,11 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { findBrokenLocalMarkdownLinks } from "./lib/markdown-links.mjs";
+
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const INVENTORY_PATH = path.join(ROOT_DIR, "docs/文档清单.md");
+const CURRENT_TRUTH_PATH = path.join(ROOT_DIR, "docs/当前真源与交接顺序.md");
 
 const MAINTAINED_MARKDOWN_PREFIXES = [
   "AGENTS.md",
@@ -33,17 +36,6 @@ const LOCAL_LINK_SCAN_IGNORED_PREFIXES = [
   "docs/archive/",
   "progress.md",
 ];
-
-const EXTERNAL_LINK_SCHEMES = new Set([
-  "app:",
-  "chatgpt-conversation:",
-  "data:",
-  "http:",
-  "https:",
-  "mailto:",
-  "sandbox:",
-  "tel:",
-]);
 
 function gitList(args) {
   const output = execFileSync("git", args, {
@@ -80,46 +72,6 @@ function collectInventoryMarkdownPaths(inventory) {
   return [...inventory.matchAll(/\|\s*`([^`]+\.md)`\s*\|/gu)].map(
     (match) => match[1],
   );
-}
-
-function stripFencedCode(markdown) {
-  return markdown.replace(/^\s*(```|~~~)[\s\S]*?^\s*\1\s*$/gmu, "");
-}
-
-function markdownLinkTargets(markdown) {
-  const targets = [];
-  const source = stripFencedCode(markdown);
-  const linkPattern = /!?\[[^\]]*\]\((<[^>]+>|[^\s)]+)(?:\s+["'][^)]*["'])?\)/gu;
-  for (const match of source.matchAll(linkPattern)) {
-    targets.push(match[1].replace(/^<|>$/gu, ""));
-  }
-  return targets;
-}
-
-function resolveLocalLink(sourceFile, rawTarget) {
-  const target = rawTarget.trim();
-  if (!target || target.startsWith("#") || target.startsWith("/")) {
-    return null;
-  }
-  try {
-    const url = new URL(target);
-    if (EXTERNAL_LINK_SCHEMES.has(url.protocol)) {
-      return null;
-    }
-  } catch {
-    // Relative repository links are not absolute URLs and are handled below.
-  }
-  const pathOnly = target.split(/[?#]/u, 1)[0];
-  if (!pathOnly) {
-    return null;
-  }
-  let decodedPath = pathOnly;
-  try {
-    decodedPath = decodeURIComponent(pathOnly);
-  } catch {
-    // Keep the original path so the failure reports the malformed target.
-  }
-  return path.resolve(ROOT_DIR, path.dirname(sourceFile), decodedPath);
 }
 
 test("document inventory lists maintained Markdown files", () => {
@@ -196,27 +148,58 @@ test("active Markdown does not name retired adjacent projects", () => {
 });
 
 test("active Markdown local links resolve to repository files", () => {
-  const activeMarkdownFiles = collectMarkdownFiles().filter(
-    (file) =>
-      !LOCAL_LINK_SCAN_IGNORED_PREFIXES.some(
-        (prefix) => file === prefix || file.startsWith(prefix),
-      ),
-  );
-  const broken = [];
-
-  for (const sourceFile of activeMarkdownFiles) {
-    const markdown = fs.readFileSync(path.join(ROOT_DIR, sourceFile), "utf8");
-    for (const rawTarget of markdownLinkTargets(markdown)) {
-      const resolved = resolveLocalLink(sourceFile, rawTarget);
-      if (resolved && !fs.existsSync(resolved)) {
-        broken.push(`${sourceFile} -> ${rawTarget}`);
-      }
-    }
-  }
+  const broken = findBrokenLocalMarkdownLinks({
+    rootDir: ROOT_DIR,
+    sourceFiles: collectMarkdownFiles(),
+    ignoredPrefixes: LOCAL_LINK_SCAN_IGNORED_PREFIXES,
+  });
 
   assert.deepEqual(
     broken,
     [],
     `active Markdown contains broken local links:\n${broken.join("\n")}`,
   );
+});
+
+test("current truth stays a compact routing document", () => {
+  const source = fs.readFileSync(CURRENT_TRUTH_PATH, "utf8");
+  const lineCount = source.split(/\r?\n/u).length;
+  const byteCount = Buffer.byteLength(source, "utf8");
+
+  assert(
+    lineCount <= 120,
+    `docs/当前真源与交接顺序.md must stay at or below 120 lines, got ${lineCount}`,
+  );
+  assert(
+    byteCount <= 20 * 1024,
+    `docs/当前真源与交接顺序.md must stay at or below 20 KiB, got ${byteCount} bytes`,
+  );
+
+  for (const required of [
+    "## 阅读顺序",
+    "## 真源层级",
+    "## 当前业务边界",
+    "## Workflow 与 Fact",
+    "## 前端入口",
+    "## 测试与发布",
+    "产品能力进度台账.md",
+    "自动化测试策略.md",
+    "server/deploy/README.md",
+  ]) {
+    assert(source.includes(required), `current truth missing routing anchor: ${required}`);
+  }
+
+  for (const volatileDetail of [
+    /customer-trial-133/u,
+    /workflow\.task-mutation-result\/v\d+/u,
+    /domain_command_compensated_by/u,
+    /2026\d{10}_migrate\.sql/u,
+    /\d+ 项只读浏览器/u,
+  ]) {
+    assert.doesNotMatch(
+      source,
+      volatileDetail,
+      `current truth must route to implementation evidence instead of copying ${volatileDetail}`,
+    );
+  }
 });

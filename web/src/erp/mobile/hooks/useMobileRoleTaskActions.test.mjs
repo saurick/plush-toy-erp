@@ -80,8 +80,8 @@ test('mobile task page keeps load failures explicit and invalidates inactive vie
     listSource,
     /taskSummary\.(?:pending|processing|blockedProgress)/u
   )
-  assert.match(listSource, /任务提醒/u)
-  assert.match(listSource, /条提醒/u)
+  assert.match(listSource, />超时</u)
+  assert.match(listSource, /条超时/u)
 })
 
 function createDeferred() {
@@ -237,7 +237,6 @@ module.exports = { useMobileRoleTaskActions }`,
         '../../utils/workflowTaskActionContract.mjs': {
           isWorkflowProcessDecisionTask: (task) =>
             [
-              'sales_return.approve',
               'finance.payment.approve',
               'warehouse.adjustment.approve',
               'production.exception.approve',

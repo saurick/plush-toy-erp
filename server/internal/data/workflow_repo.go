@@ -13,6 +13,8 @@ import (
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/processinstance"
+	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/workflowbusinessstate"
@@ -80,6 +82,7 @@ func NewWorkflowRepo(d *Data, logger log.Logger) *workflowRepo {
 }
 
 var _ biz.WorkflowRepo = (*workflowRepo)(nil)
+var _ biz.ProcessLinkedWorkflowTaskSettlementCandidateRepo = (*workflowRepo)(nil)
 
 func (r *workflowRepo) GetWorkflowTask(ctx context.Context, id int) (*biz.WorkflowTask, error) {
 	row, err := r.data.postgres.WorkflowTask.Get(ctx, id)
@@ -107,6 +110,36 @@ func (r *workflowRepo) GetWorkflowTaskByTaskCode(ctx context.Context, taskCode s
 		return nil, err
 	}
 	return entWorkflowTaskToBiz(row), nil
+}
+
+func (r *workflowRepo) ListPendingLinkedWorkflowTaskSettlements(ctx context.Context, afterWorkflowTaskID int, limit int) ([]*biz.WorkflowTask, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || afterWorkflowTaskID < 0 || limit < 1 || limit > biz.ProcessLinkedWorkflowTaskReconcileMaxLimit {
+		return nil, biz.ErrBadParam
+	}
+	rows, err := r.data.postgres.WorkflowTask.Query().
+		Where(
+			workflowtask.IDGT(afterWorkflowTaskID),
+			workflowtask.TaskStatusKeyIn("done", "rejected"),
+			workflowtask.ProcessInstanceIDNotNil(),
+			workflowtask.ProcessNodeInstanceIDNotNil(),
+			workflowtask.UpdatedByNotNil(),
+			workflowtask.HasProcessInstanceWith(processinstance.StatusEQ(biz.ProcessStatusActive)),
+			workflowtask.HasProcessNodeInstanceWith(
+				processnodeinstance.StatusEQ(biz.ProcessNodeStatusActive),
+				processnodeinstance.NodeTypeIn(biz.ProcessNodeTypeHumanTask, biz.ProcessNodeTypeApproval),
+			),
+		).
+		Order(ent.Asc(workflowtask.FieldID)).
+		Limit(limit).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tasks := make([]*biz.WorkflowTask, 0, len(rows))
+	for _, row := range rows {
+		tasks = append(tasks, entWorkflowTaskToBiz(row))
+	}
+	return tasks, nil
 }
 
 func (r *workflowRepo) ListWorkflowTaskEvents(ctx context.Context, taskID int, limit int) ([]*biz.WorkflowTaskEvent, error) {

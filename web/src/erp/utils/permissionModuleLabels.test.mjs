@@ -9,7 +9,7 @@ import {
 test('permissionModuleLabels: 展示后端给出的岗位语言分类名', () => {
   assert.equal(getPermissionModuleTitle('工作台与通用工具'), '工作台与通用工具')
   assert.equal(getPermissionModuleTitle('物料清单（BOM）'), '物料清单（BOM）')
-  assert.equal(getPermissionModuleTitle('客户退货'), '客户退货')
+  assert.equal(getPermissionModuleTitle('返工回厂'), '返工回厂')
   assert.equal(getPermissionModuleTitle('生产执行'), '生产执行')
 })
 

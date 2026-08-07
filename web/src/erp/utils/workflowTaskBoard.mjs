@@ -256,7 +256,6 @@ export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
     'workflow.task.update',
     'workflow.task.reject',
     'workflow.task.approve',
-    'sales_return.approve',
     'finance.payment.approve',
     'warehouse.adjustment.approve',
     'production.exception.approve',

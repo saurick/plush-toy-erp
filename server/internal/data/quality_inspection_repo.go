@@ -23,7 +23,6 @@ import (
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/qualityinspection"
-	"server/internal/data/model/ent/salesreturnitem"
 	"server/internal/data/model/ent/shipmentitem"
 
 	"entgo.io/ent/dialect"
@@ -142,9 +141,6 @@ func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionI
 	row, err := getLockedQualityInspection(ctx, tx, inspectionID)
 	if err != nil {
 		return nil, err
-	}
-	if row.SourceType != nil && *row.SourceType == biz.QualityInspectionSourceSalesReturn {
-		return nil, biz.ErrBadParam
 	}
 	transition, ok := corestatus.SubmitQualityInspection(row.Status)
 	if !ok {
@@ -274,9 +270,6 @@ func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionI
 	row, err := getLockedQualityInspection(ctx, tx, inspectionID)
 	if err != nil {
 		return nil, err
-	}
-	if row.SourceType != nil && *row.SourceType == biz.QualityInspectionSourceSalesReturn {
-		return nil, biz.ErrQualityInspectionSalesReturnLifecycle
 	}
 	transition, ok := corestatus.CancelQualityInspection(row.Status)
 	if !ok {
@@ -1389,28 +1382,9 @@ func validateQualityInspectionReferences(ctx context.Context, client *ent.Client
 		return validateOutsourcingReturnQualityInspectionReferences(ctx, client, in)
 	case biz.QualityInspectionSourceProductionWIP:
 		return validateProductionWIPQualityInspectionReferences(ctx, client, in)
-	case biz.QualityInspectionSourceSalesReturn:
-		return validateSalesReturnQualityInspectionReferences(ctx, client, in)
 	default:
 		return biz.ErrBadParam
 	}
-}
-
-func validateSalesReturnQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
-	if client == nil || in == nil || in.SourceID <= 0 || in.InventoryLotID <= 0 || in.WarehouseID <= 0 || in.SubjectID <= 0 ||
-		in.SourceType != biz.QualityInspectionSourceSalesReturn || in.InspectionType != biz.QualityInspectionTypeCustomerReturn ||
-		in.SubjectType != biz.QualityInspectionSubjectProduct || in.MaterialID != 0 || in.PurchaseReceiptID != 0 || in.PurchaseReceiptItemID != nil || in.ProductionWIPBatchID != 0 {
-		return biz.ErrBadParam
-	}
-	parent, err := client.SalesReturn.Get(ctx, in.SourceID)
-	if err != nil || (parent.Status != biz.SalesReturnStatusApproved && parent.Status != biz.SalesReturnStatusReceived) {
-		return biz.ErrBadParam
-	}
-	matched, err := client.SalesReturnItem.Query().Where(salesreturnitem.SalesReturnID(in.SourceID), salesreturnitem.LotID(in.InventoryLotID), salesreturnitem.ProductID(in.SubjectID), salesreturnitem.WarehouseID(in.WarehouseID)).Exist(ctx)
-	if err != nil || !matched {
-		return biz.ErrBadParam
-	}
-	return nil
 }
 
 func validateProductionWIPQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
@@ -1578,11 +1552,6 @@ func validateSubmittedQualityInspectionLot(lot *ent.InventoryLot, row *ent.Quali
 		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))
 	case biz.QualityInspectionSourceOutsourcingFact:
 		if optionalStringValueOrEmpty(row.InspectionType) != biz.QualityInspectionTypeOutsourcingReturn {
-			return biz.ErrBadParam
-		}
-		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))
-	case biz.QualityInspectionSourceSalesReturn:
-		if optionalStringValueOrEmpty(row.InspectionType) != biz.QualityInspectionTypeCustomerReturn {
 			return biz.ErrBadParam
 		}
 		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))

@@ -65,6 +65,29 @@ function upsertOperation(operation, operations = []) {
   return [operation, ...nextOperations]
 }
 
+function WorkflowStep({ number, title, description, extra, children }) {
+  return (
+    <section
+      className="erp-dev-data-workflow-step"
+      aria-labelledby={`dev-data-step-${number}`}
+    >
+      <span className="erp-dev-data-workflow-step__number" aria-hidden="true">
+        {number}
+      </span>
+      <div className="erp-dev-data-workflow-step__head">
+        <div>
+          <Title level={2} id={`dev-data-step-${number}`}>
+            {title}
+          </Title>
+          <Paragraph>{description}</Paragraph>
+        </div>
+        {extra}
+      </div>
+      <div className="erp-dev-data-workflow-step__body">{children}</div>
+    </section>
+  )
+}
+
 function ProfileOption({ profile, selected, disabled, onSelect }) {
   const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
   return (
@@ -86,14 +109,21 @@ function ProfileOption({ profile, selected, disabled, onSelect }) {
         <Tag color={copy.badgeColor}>{copy.badgeLabel}</Tag>
       </div>
       <Text>{copy.purpose}</Text>
-      <Text type="secondary">{copy.retention}</Text>
-      <Text type="secondary">{copy.cleanup}</Text>
-      <Text type="secondary">数据范围：{copy.scope}</Text>
-      <div className="erp-dev-data-profile__requirements">
-        {profile.requiredEnvironment.map((requirement) => (
-          <Tag key={requirement}>{requirement}</Tag>
-        ))}
-      </div>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- native disclosure clicks must not select the surrounding profile card. */}
+      <details
+        className="erp-dev-data-profile__details"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <summary>查看数据范围与退出方式</summary>
+        <Text type="secondary">数据范围：{copy.scope}</Text>
+        <Text type="secondary">{copy.retention}</Text>
+        <Text type="secondary">{copy.cleanup}</Text>
+        <div className="erp-dev-data-profile__requirements">
+          {profile.requiredEnvironment.map((requirement) => (
+            <Tag key={requirement}>{requirement}</Tag>
+          ))}
+        </div>
+      </details>
     </div>
   )
 }
@@ -275,80 +305,80 @@ function OperationReadback({ operation }) {
 
 function OperationDetail({ operation, compact = false }) {
   const profileCopy = DEV_DATA_PREPARATION_PROFILE_COPY[operation.profileKey]
+  const [technicalOpen, setTechnicalOpen] = useState(
+    compact && operation.status === 'ready'
+  )
   return (
     <div className="erp-dev-data-operation-detail">
-      <Descriptions
-        size="small"
-        column={{ xs: 1, md: 2 }}
-        items={[
-          {
-            key: 'profile',
-            label: '固定档位',
-            children: profileCopy.title,
-          },
-          {
-            key: 'status',
-            label: '状态',
-            children: <StatusTag status={operation.status} />,
-          },
-          {
-            key: 'planHash',
-            label: '不可变计划',
-            children: (
-              <Text code copyable>
-                {operation.planHash}
-              </Text>
-            ),
-          },
-          {
-            key: 'runId',
-            label: '运行批次',
-            children: (
-              <Text code copyable>
-                {operation.runId}
-              </Text>
-            ),
-          },
-          {
-            key: 'target',
-            label: '目标摘要',
-            children: operation.targetSummary.safeTarget,
-          },
-          {
-            key: 'preflightFingerprint',
-            label: '预检指纹',
-            children: (
-              <Text code copyable>
-                {operation.targetSummary.preflightFingerprint}
-              </Text>
-            ),
-          },
-          {
-            key: 'cleanup',
-            label: '清理边界',
-            children: profileCopy.cleanupBoundary,
-          },
-          {
-            key: 'createdAt',
-            label: '计划创建',
-            children: formatDataPreparationTimestamp(operation.createdAt),
-          },
-          {
-            key: 'updatedAt',
-            label: '最近更新',
-            children: formatDataPreparationTimestamp(operation.updatedAt),
-          },
-        ]}
-      />
+      <div className="erp-dev-data-operation-overview">
+        <div>
+          <Text strong>{profileCopy.title}</Text>
+          <StatusTag status={operation.status} />
+        </div>
+        <Text>{operation.targetSummary.safeTarget}</Text>
+        <Text type="secondary">
+          最近更新：{formatDataPreparationTimestamp(operation.updatedAt)}
+        </Text>
+      </div>
       <OperationIssues issues={operation.issues} />
-      <section aria-label="固定执行步骤">
-        <Text strong>固定执行步骤</Text>
-        <ol className="erp-dev-data-step-list">
-          {profileCopy.steps.map((step) => (
-            <li key={step}>{step}</li>
-          ))}
-        </ol>
-      </section>
+      <details
+        className="erp-dev-data-operation-technical"
+        open={technicalOpen}
+        onToggle={(event) => setTechnicalOpen(event.currentTarget.open)}
+      >
+        <summary>核对不可变计划、批次与固定步骤</summary>
+        <Descriptions
+          size="small"
+          column={{ xs: 1, md: 2 }}
+          items={[
+            {
+              key: 'planHash',
+              label: '不可变计划',
+              children: (
+                <Text code copyable>
+                  {operation.planHash}
+                </Text>
+              ),
+            },
+            {
+              key: 'runId',
+              label: '运行批次',
+              children: (
+                <Text code copyable>
+                  {operation.runId}
+                </Text>
+              ),
+            },
+            {
+              key: 'preflightFingerprint',
+              label: '预检指纹',
+              children: (
+                <Text code copyable>
+                  {operation.targetSummary.preflightFingerprint}
+                </Text>
+              ),
+            },
+            {
+              key: 'cleanup',
+              label: '清理边界',
+              children: profileCopy.cleanupBoundary,
+            },
+            {
+              key: 'createdAt',
+              label: '计划创建',
+              children: formatDataPreparationTimestamp(operation.createdAt),
+            },
+          ]}
+        />
+        <section aria-label="固定执行步骤">
+          <Text strong>固定执行步骤</Text>
+          <ol className="erp-dev-data-step-list">
+            {profileCopy.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </section>
+      </details>
       {!compact ? (
         <>
           <section aria-label="状态事件">
@@ -628,26 +658,34 @@ export default function DevDataPreparationPage() {
           <span className="erp-dev-hub-header__icon">
             <DatabaseOutlined aria-hidden="true" />
           </span>
-          <Title level={1} className="erp-dev-hub-title">
-            测试数据准备中心
-          </Title>
-          <Paragraph className="erp-dev-hub-summary">
-            只选择三类固定档位：共享开发基础数据、业务场景演示数据或专用隔离库完整验收。业务场景可直接点击生成并进行一次可读确认；其他高风险档位继续使用不可变计划确认。页面不接收自定义目标、命令或凭据。
-          </Paragraph>
+          <div>
+            <Text className="erp-dev-data-header__eyebrow">
+              测试数据准备中心
+            </Text>
+            <Title level={1} className="erp-dev-hub-title">
+              准备测试数据
+            </Title>
+            <Paragraph className="erp-dev-hub-summary">
+              按“检查目标—选择范围—核对计划—查看结果”完成一次受控准备。页面不接收自定义目标、命令或凭据。
+            </Paragraph>
+          </div>
         </div>
         <Button icon={<ReloadOutlined />} loading={loading} onClick={refresh}>
-          刷新预检
+          重新检查
         </Button>
       </header>
 
       <main className="erp-dev-hub-shell erp-dev-data-shell">
-        <Alert
-          type="info"
-          showIcon
-          icon={<SafetyCertificateOutlined />}
-          message="本机开发边界"
-          description="该入口仅由本机开发服务提供，以当前操作系统用户和固定后端目标为边界；它不进入正式 ERP 菜单，也不冒充 ERP RBAC 授权。"
-        />
+        <details className="erp-dev-data-local-boundary">
+          <summary>
+            <SafetyCertificateOutlined aria-hidden="true" />
+            仅用于本机开发环境
+          </summary>
+          <Paragraph>
+            该入口以当前操作系统用户和固定后端目标为边界；它不进入正式 ERP
+            菜单，也不冒充 ERP RBAC 授权。
+          </Paragraph>
+        </details>
 
         {loadError ? (
           <Alert
@@ -699,49 +737,79 @@ export default function DevDataPreparationPage() {
         ) : null}
 
         {summary ? (
-          <>
-            <section
-              className="erp-dev-data-preflight"
-              aria-label="数据准备预检摘要"
+          <div className="erp-dev-data-workflow">
+            <WorkflowStep
+              number="1"
+              title="检查目标是否可用"
+              description="先看结论；仓库 SHA、目标指纹等追踪信息按需展开。"
+              extra={
+                <Tag>
+                  {
+                    profiles.filter((profile) => {
+                      const copy =
+                        DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
+                      return (
+                        summary.target[copy.targetKey]?.status === 'available'
+                      )
+                    }).length
+                  }{' '}
+                  / {profiles.length} 个目标可用
+                </Tag>
+              }
             >
-              <Card title="仓库身份">
-                <Space direction="vertical" size={8}>
-                  <Text code>{shortHash(summary.repository?.commit)}</Text>
+              <div
+                className="erp-dev-data-preflight-list"
+                aria-label="数据准备预检摘要"
+              >
+                <div className="erp-dev-data-preflight-row">
+                  <div>
+                    <Text strong>当前代码现场</Text>
+                    <Text type="secondary">
+                      完整验收必须绑定干净且精确的提交；其他档位仍按各自固定边界执行。
+                    </Text>
+                  </div>
                   {summary.repository ? (
                     <Tag
                       color={summary.repository.dirty ? 'warning' : 'success'}
                     >
-                      {summary.repository.dirty
-                        ? '工作树有改动'
-                        : 'clean exact commit'}
+                      {summary.repository.dirty ? '有未提交改动' : '干净现场'}
                     </Tag>
                   ) : (
-                    <Tag color="error">仓库身份未证明</Tag>
+                    <Tag color="error">身份未证明</Tag>
                   )}
-                  <Text type="secondary">
-                    完整验收必须绑定 clean exact commit。
-                  </Text>
-                </Space>
-              </Card>
-              {profiles.map((profile) => {
-                const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
-                const target = summary.target[copy.targetKey]
-                return (
-                  <Card key={profile.key} title={copy.targetTitle}>
-                    <Space direction="vertical" size={8}>
+                  <details>
+                    <summary>查看提交身份</summary>
+                    <Text code>{shortHash(summary.repository?.commit)}</Text>
+                  </details>
+                </div>
+                {profiles.map((profile) => {
+                  const copy = DEV_DATA_PREPARATION_PROFILE_COPY[profile.key]
+                  const target = summary.target[copy.targetKey]
+                  return (
+                    <div
+                      className="erp-dev-data-preflight-row"
+                      key={profile.key}
+                    >
+                      <div>
+                        <Text strong>{copy.targetTitle}</Text>
+                        <Text type="secondary">{copy.purpose}</Text>
+                      </div>
                       <StatusTag status={target.status} />
-                      <Text>{target.safeTarget}</Text>
-                      <Text type="secondary" code>
-                        {shortHash(target.targetFingerprint)}
-                      </Text>
-                    </Space>
-                  </Card>
-                )
-              })}
-            </section>
+                      <details>
+                        <summary>查看目标与指纹</summary>
+                        <Text>{target.safeTarget}</Text>
+                        <Text code>{shortHash(target.targetFingerprint)}</Text>
+                      </details>
+                    </div>
+                  )
+                })}
+              </div>
+            </WorkflowStep>
 
-            <Card
-              title="选择固定数据档位"
+            <WorkflowStep
+              number="2"
+              title="选择数据范围"
+              description="只选择最小够用的固定范围；测试数据不是每次验证都要重新生成。"
               extra={<Text type="secondary">不支持自定义参数</Text>}
             >
               <Radio.Group
@@ -784,10 +852,12 @@ export default function DevDataPreparationPage() {
                   {selectedProfileCopy.prepareButtonLabel}
                 </Button>
               </div>
-            </Card>
+            </WorkflowStep>
 
-            <Card
-              title="当前不可变计划"
+            <WorkflowStep
+              number="3"
+              title="核对计划并确认"
+              description="先核对目标、数据范围、退出方式和固定步骤；只有确认后才会写入。"
               extra={
                 currentOperation?.status === 'ready' ? (
                   <Button
@@ -820,7 +890,11 @@ export default function DevDataPreparationPage() {
             >
               {currentOperation ? (
                 <>
-                  <OperationDetail operation={currentOperation} compact />
+                  <OperationDetail
+                    key={`${currentOperation.id}:${currentOperation.status}`}
+                    operation={currentOperation}
+                    compact
+                  />
                   {currentOperation.terminal &&
                   currentOperation.status !== 'passed' ? (
                     <Alert
@@ -849,22 +923,30 @@ export default function DevDataPreparationPage() {
               ) : (
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="选择固定档位后，在这里核对 plan hash、运行批次、目标摘要、步骤和阻断。业务场景按钮会自动准备计划并打开确认。"
+                  description="选择数据范围并准备计划后，在这里核对目标、批次、步骤和阻断。"
                 />
               )}
-            </Card>
+            </WorkflowStep>
 
-            <Card title="历史 operation 回执">
+            <WorkflowStep
+              number="4"
+              title="查看结果"
+              description="终态回执不会被自动重试；历史结果只证明对应计划与目标。"
+              extra={<Tag>{historyItems.length} 条回执</Tag>}
+            >
               {historyItems.length > 0 ? (
-                <Collapse items={historyItems} />
+                <details className="erp-dev-data-history">
+                  <summary>展开历史回执（{historyItems.length}）</summary>
+                  <Collapse items={historyItems} />
+                </details>
               ) : (
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description="尚无数据准备回执"
                 />
               )}
-            </Card>
-          </>
+            </WorkflowStep>
+          </div>
         ) : null}
       </main>
 

@@ -18,6 +18,13 @@ import {
   shortGitSha,
   validateDevDeliverySummary,
 } from './devDelivery.mjs'
+import {
+  clearDevSummarySnapshot,
+  formatDevSummaryCheckedAt,
+  loadDevSummarySnapshot,
+  readDevSummarySnapshot,
+  updateDevSummarySnapshot,
+} from './devSummarySnapshot.mjs'
 
 const SHA = 'a'.repeat(40)
 const versionCenterPageSource = readFileSync(
@@ -218,6 +225,53 @@ test('delivery presentation helpers are deterministic and bounded', () => {
   assert.equal(deliveryStatusPresentation('not_proven').label, '结果未证明')
 })
 
+test('dev summary snapshots stay in memory, deduplicate refreshes and retain the last good result', async () => {
+  const key = 'test-summary'
+  const checkedAt = '2026-08-07T03:04:05.000Z'
+  clearDevSummarySnapshot(key)
+  let loads = 0
+  const firstLoad = loadDevSummarySnapshot(
+    key,
+    async () => {
+      loads += 1
+      await Promise.resolve()
+      return { status: 'success', revision: 1 }
+    },
+    { now: () => checkedAt }
+  )
+  const repeatedLoad = loadDevSummarySnapshot(key, async () => {
+    throw new Error('同一缓存键不应重复读取')
+  })
+
+  assert.strictEqual(repeatedLoad, firstLoad)
+  const snapshot = await firstLoad
+  assert.equal(loads, 1)
+  assert.deepEqual(snapshot, {
+    summary: { status: 'success', revision: 1 },
+    checkedAt,
+  })
+  assert.strictEqual(readDevSummarySnapshot(key), snapshot)
+
+  const updated = updateDevSummarySnapshot(key, (summary) => ({
+    ...summary,
+    revision: 2,
+  }))
+  assert.equal(updated.checkedAt, checkedAt)
+  assert.equal(updated.summary.revision, 2)
+
+  await assert.rejects(
+    loadDevSummarySnapshot(key, async () => {
+      throw new Error('offline')
+    }),
+    /offline/u
+  )
+  assert.strictEqual(readDevSummarySnapshot(key), updated)
+  assert.equal(formatDevSummaryCheckedAt('not-a-date'), '尚未核对')
+  assert.notEqual(formatDevSummaryCheckedAt(checkedAt), '尚未核对')
+  clearDevSummarySnapshot(key)
+  assert.equal(readDevSummarySnapshot(key), null)
+})
+
 test('version actions distinguish newer promotion from older rollback', () => {
   const current = {
     gitSha: 'b'.repeat(40),
@@ -300,5 +354,29 @@ test('delivery pages expose one canonical dangerous action and lock concurrent m
   assert.match(
     versionCenterPageSource,
     /cancelButtonProps=\{\{[\s\S]*?disabled: actionKey === 'dispatch-release'/u
+  )
+})
+
+test('delivery pages keep cached summaries visible while rechecking and gate writes on fresh state', () => {
+  for (const source of [versionCenterPageSource, databaseMigrationPageSource]) {
+    assert.match(source, /readDevSummarySnapshot/u)
+    assert.match(source, /loadDevSummarySnapshot/u)
+    assert.match(source, /loading=\{initialLoading\}/u)
+    assert.match(source, /正在后台核对/u)
+    assert.match(source, /summaryFresh/u)
+    assert.match(source, /上次结果，写操作已停用/u)
+    assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB/u)
+  }
+  assert.match(
+    versionCenterPageSource,
+    /const canDispatch = Boolean\([\s\S]*?summaryFresh/u
+  )
+  assert.match(
+    databaseMigrationPageSource,
+    /const canPrepare =[\s\S]*?summaryFresh/u
+  )
+  assert.match(
+    databaseMigrationPageSource,
+    /disabled=\{!summaryFresh \|\| Boolean\(actionKey\)\}/u
   )
 })

@@ -1,2 +1,4 @@
+docs/customers export-ignore
 docs/customers/** export-ignore
+scripts/qa/yoyoosun-role-flow-handbook.test.mjs export-ignore
 config/customers/*/assets/** export-ignore

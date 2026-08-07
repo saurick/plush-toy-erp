@@ -6511,10 +6511,7 @@ async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
       context.font = font
       return context.measureText(text).width
     }
-    const selectors = [
-      '.erp-business-filter-control--search input',
-      '.erp-source-import-picker input.ant-input',
-    ].join(',')
+    const selectors = '.erp-search-input input.ant-input'
     const isVisible = (node) => {
       const rect = node.getBoundingClientRect()
       const style = window.getComputedStyle(node)
@@ -6578,7 +6575,7 @@ async function assertVisibleSearchPlaceholdersFit(page, scenarioName) {
   assert.deepEqual(
     issues,
     [],
-    `${scenarioName} 业务搜索框 placeholder 显示不全: ${JSON.stringify(issues)}`
+    `${scenarioName} 搜索框 placeholder 显示不全: ${JSON.stringify(issues)}`
   )
 }
 
@@ -6928,6 +6925,7 @@ async function assertVisibleInputTextVerticalRhythm(page, scenarioName) {
       '[data-server-pdf-root]',
     ].join(',')
     const scopeSelector = [
+      '.erp-search-input',
       '.erp-business-form',
       '.erp-business-action-form',
       '.erp-business-filter-panel',

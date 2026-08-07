@@ -1,21 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   DatabaseOutlined,
   ExclamationCircleOutlined,
+  InfoCircleOutlined,
   PartitionOutlined,
   ReloadOutlined,
-  SearchOutlined,
   SafetyCertificateOutlined,
+  SearchOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
   Button,
-  Checkbox,
   Empty,
-  Input,
+  Popover,
   Select,
   Space,
   Spin,
@@ -23,583 +23,320 @@ import {
   Typography,
 } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import SearchInput from '@/common/components/SearchInput'
 import { Markdown } from '@/common/components/markdown'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import DevPageNav from '../components/DevPageNav.jsx'
-import DevTaskNav from '../components/DevTaskNav.jsx'
-import { getWorkflowTaskProcessContext } from '@/erp/api/workflowApi.mjs'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import {
+  getWorkflowTaskProcessContext,
+  listWorkflowTaskEvents,
+  listWorkflowTasks,
+} from '@/erp/api/workflowApi.mjs'
 import {
   formatProcessStartedAt,
   getProcessLabel,
   getProcessNodeLabel,
   getProcessNodeStatusLabel,
   getProcessStatusLabel,
+  getWorkflowTaskDisplayName,
+  isDisplayOnlyWorkflowTask,
 } from '@/erp/utils/processRuntimePresentation.mjs'
+import { buildWorkflowTaskEventTrailModel } from '@/erp/utils/workflowTaskEventPresentation.mjs'
+import {
+  getWorkflowTaskOwnerRoleLabel,
+  getWorkflowTaskStatusMeta,
+} from '@/erp/utils/workflowTaskBoard.mjs'
+import { getRoleDisplayName } from '@/erp/utils/roleKeys.mjs'
+import DevPageNav from '../components/DevPageNav.jsx'
+import DevTaskNav from '../components/DevTaskNav.jsx'
+import {
+  DEV_FLOW_STATE_TASK_RUNTIME_ASSOCIATION,
+  buildDevFlowStateTaskLookupQuery,
+  getDevFlowStateTaskRuntimeAssociation,
+  isDevFlowStateTaskUnlinkedRuntimeError,
+  parseDevFlowStateTaskIDReference,
+  resolveDevFlowStateTaskLookupPage,
+} from './devFlowStateTaskLookup.mjs'
+import {
+  buildDevFlowDefinitionSearchGroups,
+  createDevFlowDefinitionOptionFilter,
+  normalizeDevFlowDefinitionSearchText,
+} from './devFlowDefinitionSearch.mjs'
 import '../styles/dev-flow-state-observatory.css'
 
 const { Paragraph, Text, Title } = Typography
 
-const SOURCE_PATH = 'docs/architecture/状态工作流事实边界.md'
+const SOURCE_PATH = 'docs/architecture/业务链与运行轨迹边界.md'
 const CATALOG_MODULE_PATH = '../config/devFlowStateCatalog.mjs'
 const CATALOG_MODULES = import.meta.glob('../config/devFlowStateCatalog.mjs')
 
 const QUERY_KEYS = Object.freeze({
-  scope: 'scope',
-  customer: 'customer',
-  process: 'process',
   view: 'view',
+  chain: 'chain',
+  node: 'node',
   flow: 'flow',
   state: 'state',
-  search: 'q',
-  layers: 'layers',
-  pathMode: 'path_mode',
-  pathKind: 'path_kind',
-  pathObjects: 'path_objects',
+  process: 'process',
+  fact: 'fact',
   taskId: 'task_id',
 })
 
+const KNOWN_QUERY_KEYS = new Set(Object.values(QUERY_KEYS))
+const DEFAULT_VIEW = 'chain'
+const ALL_BUSINESS_CHAINS_KEY = 'all'
 const VIEW_ITEMS = Object.freeze([
   {
-    value: 'overview',
-    label: '总览',
-    description: '边界、目录规模与阅读入口',
+    value: 'chain',
+    label: '看业务链',
+    englishLabel: 'Business Chain',
+    description: '把人、路、账和规则串在一条业务链里',
   },
   {
-    value: 'machine',
-    label: '单机状态图',
-    description: '一项状态对象的允许迁移',
-  },
-  {
-    value: 'dictionary',
-    label: '状态字典',
-    description: '状态、初终态与进出路径',
-  },
-  {
-    value: 'orchestration',
-    label: '流程编排 / 客户差异',
-    description: 'Product Core 定义与甲方预览',
+    value: 'workflow',
+    label: '查责任与任务',
+    englishLabel: 'Workflow / Task',
+    description: '谁负责、谁接棒、为什么阻塞或退回',
   },
   {
     value: 'runtime',
-    label: '运行轨迹 / 证据',
-    description: '按 task_id 读取真实流程位置',
+    label: '看运行路径',
+    englishLabel: 'ProcessRuntime',
+    description: '流程走到哪里、走过什么路径',
+  },
+  {
+    value: 'facts',
+    label: '看已生效结果',
+    englishLabel: 'Fact / Ledger',
+    description: '什么结果正式生效、凭证和纠正方式是什么',
+  },
+  {
+    value: 'states',
+    label: '查状态规则',
+    englishLabel: 'State Machine',
+    description: '对象有哪些状态、允许怎样转换',
   },
 ])
-
+const VIEW_META = Object.freeze(
+  Object.fromEntries(VIEW_ITEMS.map((item) => [item.value, item]))
+)
 const VIEW_KEYS = new Set(VIEW_ITEMS.map((item) => item.value))
-const DEFAULT_VIEW = VIEW_ITEMS[0].value
-const DEFAULT_LAYER_KEYS = Object.freeze(['business', 'state'])
-const PATH_MODE_ITEMS = Object.freeze([
-  { value: 'off', label: '关闭路径叠加' },
-  { value: 'overlay', label: '在完整图中高亮' },
-  { value: 'only', label: '仅看异常、纠正与恢复路径' },
-])
-const PATH_MODE_KEYS = new Set(PATH_MODE_ITEMS.map((item) => item.value))
-const PATH_KIND_PRESENTATION = Object.freeze({
-  blocked: '阻塞',
-  rejected: '退回 / 拒绝',
-  cancelled: '取消',
-  reversed: '冲正',
-  adjusted: '调整',
-  returned: '退货 / 退回',
-  rework: '返工',
-  resumed: '恢复',
+
+const CHAIN_KIND_PRESENTATION = Object.freeze({
+  primary: { label: '业务主链', color: 'green' },
+  supporting: { label: '支撑链', color: 'blue' },
+  exception: { label: '异常链', color: 'volcano' },
+  rework: { label: '返工链', color: 'purple' },
+  reversal: { label: '冲正链', color: 'gold' },
 })
 
-const LAYER_PRESENTATION = Object.freeze({
-  business: { label: '业务', description: '业务动作和对象语义' },
-  state: { label: '状态', description: '状态 key 与迁移方向' },
-  role: { label: '岗位', description: '责任岗位和权限边界' },
-  workflow: { label: 'Workflow', description: '协同任务和流程节点' },
-  approval: { label: '审批', description: '审批责任与通过条件' },
-  task: { label: '任务', description: '任务创建和办理位置' },
-  exception: {
-    label: '异常、纠正与恢复',
-    description: '仅使用已登记 pathKinds，不按文案猜测',
-  },
-  notification: { label: '通知', description: '通知和提醒证据' },
-  automation: { label: '自动', description: '受控自动动作' },
-  fact: { label: 'Fact', description: '事实写入边界' },
+const CHAIN_LAYER_PRESENTATION = Object.freeze({
+  source_document: { label: '来源单据', color: 'blue' },
+  masterdata_lifecycle: { label: '主数据', color: 'purple' },
+  process_runtime: { label: 'ProcessRuntime · 路', color: 'orange' },
+  workflow_task: { label: 'Workflow · 人', color: 'green' },
+  fact_ledger: { label: 'Fact / Ledger · 账', color: 'red' },
+  derived_result: { label: '派生结果', color: 'geekblue' },
 })
 
-const STATUS_TAG_COLOR = Object.freeze({
-  active: 'green',
+const CHAIN_EDGE_PRESENTATION = Object.freeze({
+  starts_process: '触发流程',
+  creates_task: '创建任务',
+  calls_domain_command: '调用领域命令',
+  requires: '需要前置结果',
+  creates_source: '创建来源单据',
+  posts_fact: '生成业务事实',
+  derives: '形成派生结果',
+  reverses: '冲正原影响',
+  returns: '退回或回货',
+  reworks: '进入返工',
+})
+
+const CHAIN_RELATION_PRESENTATION = Object.freeze({
+  continues: { label: '主线衔接', color: 'green' },
+  supplies: { label: '供给', color: 'blue' },
+  branches_to: { label: '异常分流', color: 'volcano' },
+  returns_to: { label: '返回主路径', color: 'purple' },
+  corrects: { label: '纠正', color: 'gold' },
+  cross_cuts: { label: '横切支撑', color: 'default' },
+  reworks: { label: '返工', color: 'magenta' },
+})
+
+const CHAIN_OVERVIEW_LANE_PRESENTATION = Object.freeze({
+  primary: { color: 'green' },
+  supply: { color: 'blue' },
+  exception: { color: 'volcano' },
+  correction: { color: 'gold' },
+})
+
+const PROCESS_STATUS_COLORS = Object.freeze({
+  active: 'orange',
   blocked: 'red',
   completed: 'blue',
   waiting: 'default',
 })
 
-function isRecord(value) {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+const MEMORY_ITEMS = Object.freeze([
+  {
+    key: 'workflow',
+    icon: TeamOutlined,
+    title: 'Workflow 管“人”',
+    text: '责任、审批、接棒和协同记录',
+  },
+  {
+    key: 'runtime',
+    icon: PartitionOutlined,
+    title: 'ProcessRuntime 管“路”',
+    text: '实例路径、等待、失败和重试',
+  },
+  {
+    key: 'fact',
+    icon: DatabaseOutlined,
+    title: 'Fact / Ledger 管“账”',
+    text: '正式生效的业务结果与凭证',
+  },
+  {
+    key: 'state',
+    icon: SafetyCertificateOutlined,
+    title: '状态机管“规则”',
+    text: '允许的状态和转换边界',
+  },
+  {
+    key: 'chain',
+    icon: SearchOutlined,
+    title: '业务链负责串起来',
+    text: '总图看衔接，单链看细节，不推断业务完成',
+  },
+])
+
+const DEFINITION_SEARCH_GUIDE_GROUPS = Object.freeze([
+  {
+    label: '业务对象或业务链',
+    examples: Object.freeze(['销售订单', '生产 入库']),
+  },
+  {
+    label: '流程或节点',
+    examples: Object.freeze(['销售 PMC', '财务放行']),
+  },
+  {
+    label: '状态',
+    examples: Object.freeze(['已提交', '阻塞']),
+  },
+  {
+    label: '事实定义',
+    examples: Object.freeze(['采购入库', '出货事实']),
+  },
+  {
+    label: '稳定 key（排障）',
+    examples: Object.freeze(['source.sales_order', 'fact.shipment']),
+  },
+])
+
+function cleanText(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function useDefinitionSelectSearch() {
+  const [searchValue, setSearchValue] = useState('')
+  const onOpenChange = useCallback((open) => {
+    if (!open) setSearchValue('')
+  }, [])
+  return {
+    searchValue,
+    onSearch: setSearchValue,
+    onOpenChange,
+  }
 }
 
 function asArray(value) {
   return Array.isArray(value) ? value : []
 }
 
-function cleanText(value) {
-  return typeof value === 'string' ? value.trim() : ''
+function uniqueKeys(items, keyOf) {
+  const keys = items.map(keyOf)
+  return keys.length === new Set(keys).size && keys.every(Boolean)
 }
 
-function firstText(...values) {
-  for (const value of values) {
-    const text = cleanText(value)
-    if (text) return text
-  }
-  return ''
-}
-
-function normalizeStringList(value) {
-  return [
-    ...new Set(
-      asArray(value)
-        .map((item) => cleanText(item))
-        .filter(Boolean)
-    ),
-  ]
-}
-
-function normalizeEvidenceItem(value, index, prefix = 'evidence') {
-  if (typeof value === 'string' && value.trim()) {
-    return {
-      key: `${prefix}-${index}-${value}`,
-      label: value.trim(),
-      path: value.trim(),
-      note: '',
-    }
-  }
-  if (!isRecord(value)) return null
-  const path = firstText(
-    value.path,
-    value.ref,
-    value.sourcePath,
-    value.source_path,
-    value.file
-  )
-  const note = firstText(
-    value.note,
-    value.summary,
-    value.description,
-    value.label
-  )
-  const label = firstText(value.label, value.title, path, note, value.key)
-  if (!label) return null
-  return {
-    key: firstText(value.key, `${prefix}-${index}-${label}`),
-    label,
-    path,
-    note: note === label ? '' : note,
-  }
-}
-
-function normalizeEvidence(...values) {
-  const items = values.flatMap((value) => asArray(value))
-  const seen = new Set()
-  return items
-    .map((item, index) => normalizeEvidenceItem(item, index))
-    .filter((item) => {
-      if (!item) return false
-      const identity = `${item.path}\u0000${item.label}\u0000${item.note}`
-      if (seen.has(identity)) return false
-      seen.add(identity)
-      return true
-    })
-}
-
-function uniqueEvidenceSources(...values) {
-  const seen = new Set()
-  return normalizeEvidence(...values).filter((item) => {
-    const identity = firstText(item.path, item.label, item.note, item.key)
-    if (!identity || seen.has(identity)) return false
-    seen.add(identity)
-    return true
-  })
-}
-
-function normalizeTransition(value, index) {
-  if (!isRecord(value)) return null
-  const from = firstText(value.from, value.fromState, value.from_state)
-  const to = firstText(value.to, value.toState, value.to_state)
-  if (!from || !to) return null
-  const key = firstText(value.key, `${from}-to-${to}-${index}`)
-  return {
-    key,
-    from,
-    to,
-    label: firstText(value.label, value.name, key),
-    guard: firstText(value.guard, value.condition),
-    action: firstText(value.action, value.command),
-    permission: normalizeStringList(
-      Array.isArray(value.permission)
-        ? value.permission
-        : [value.permission, value.permissionKey, value.permission_key]
-    ).join('、'),
-    factBoundary: firstText(
-      value.factBoundary,
-      value.fact_boundary,
-      value.boundary
-    ),
-    pathKinds: normalizeStringList(value.pathKinds || value.path_kinds),
-    pathKindWhen: firstText(value.pathKindWhen, value.path_kind_when),
-    automatic:
-      typeof value.automatic === 'boolean'
-        ? value.automatic
-        : typeof value.auto === 'boolean'
-          ? value.auto
-          : null,
-    evidence: normalizeEvidence(
-      value.sourceRefs,
-      value.source_refs,
-      value.evidence
-    ),
-  }
-}
-
-function normalizeState(value, index, initialStates, terminalStates) {
-  if (typeof value === 'string' && value.trim()) {
-    const key = value.trim()
-    return {
-      key,
-      label: key,
-      summary: '',
-      initial: initialStates.has(key),
-      terminal: terminalStates.has(key),
-      evidence: [],
-    }
-  }
-  if (!isRecord(value)) return null
-  const key = firstText(value.key, value.value, value.status, `state-${index}`)
-  if (!key) return null
-  return {
-    key,
-    label: firstText(value.label, value.name, key),
-    summary: firstText(value.summary, value.description),
-    initial: value.initial === true || initialStates.has(key),
-    terminal: value.terminal === true || terminalStates.has(key),
-    evidence: normalizeEvidence(
-      value.sourceRefs,
-      value.source_refs,
-      value.evidence
-    ),
-  }
-}
-
-function normalizeFlow(value, index) {
-  if (!isRecord(value)) return null
-  const key = firstText(value.key, `flow-${index}`)
-  const initialStates = new Set(
-    normalizeStringList(
-      value.initialStates || value.initial_states || value.initial
-    )
-  )
-  const terminalStates = new Set(
-    normalizeStringList(
-      value.terminalStates || value.terminal_states || value.terminal
-    )
-  )
-  const states = asArray(value.states)
-    .map((state, stateIndex) =>
-      normalizeState(state, stateIndex, initialStates, terminalStates)
-    )
-    .filter(Boolean)
-  states.forEach((state) => {
-    if (state.initial) initialStates.add(state.key)
-    if (state.terminal) terminalStates.add(state.key)
-  })
-  const transitions = asArray(value.transitions)
-    .map(normalizeTransition)
-    .filter(Boolean)
-  const evidence = normalizeEvidence(
-    value.sourceRefs,
-    value.source_refs,
-    value.evidence
-  )
-  const searchText = [
-    key,
-    value.label,
-    value.summary,
-    value.kind,
-    value.scopeKey,
-    ...states.flatMap((state) => [state.key, state.label, state.summary]),
-    ...transitions.flatMap((transition) => [
-      transition.key,
-      transition.label,
-      transition.from,
-      transition.to,
-      transition.guard,
-      transition.action,
-      transition.permission,
-      transition.factBoundary,
-      ...transition.pathKinds,
-      transition.pathKindWhen,
-    ]),
-    ...evidence.flatMap((item) => [item.label, item.path, item.note]),
-  ]
-    .filter(Boolean)
-    .join('\n')
-    .toLocaleLowerCase('zh-CN')
-  return {
-    key,
-    label: firstText(value.label, value.name, key),
-    scopeKey: firstText(value.scopeKey, value.scope_key, 'product-core'),
-    kind: firstText(value.kind, value.type, 'state_machine'),
-    summary: firstText(value.summary, value.description),
-    previewOnly: value.previewOnly === true || value.preview_only === true,
-    runtimeAuthority: firstText(
-      value.runtimeAuthority,
-      value.runtime_authority
-    ),
-    initialStates: [...initialStates],
-    terminalStates: [...terminalStates],
-    states,
-    transitions,
-    guard: firstText(value.guard),
-    action: firstText(value.action),
-    permission: normalizeStringList(
-      Array.isArray(value.permission) ? value.permission : [value.permission]
-    ).join('、'),
-    factBoundary: firstText(value.factBoundary, value.fact_boundary),
-    evidence,
-    allowsGenericStatusWrite: value.allowsGenericStatusWrite === true,
-    searchText,
-  }
-}
-
-function normalizeScope(value, index) {
-  if (typeof value === 'string' && value.trim()) {
-    return {
-      key: value.trim(),
-      label: value.trim(),
-      description: '',
-      kind: '',
-    }
-  }
-  if (!isRecord(value)) return null
-  const key = firstText(value.key, value.value, `scope-${index}`)
-  if (!key) return null
-  return {
-    key,
-    label: firstText(value.label, value.name, key),
-    description: firstText(value.description, value.summary),
-    kind: firstText(value.kind, value.type),
-  }
-}
-
-function normalizeFlowLayer(value, index) {
-  if (typeof value === 'string' && value.trim()) {
-    const key = value.trim()
-    return {
-      key,
-      label: LAYER_PRESENTATION[key]?.label || key,
-      description: LAYER_PRESENTATION[key]?.description || '',
-      boundary: '',
-    }
-  }
-  if (!isRecord(value)) return null
-  const key = firstText(value.key, value.value, `layer-${index}`)
-  if (!key) return null
-  return {
-    key,
-    label: firstText(
-      value.label,
-      value.name,
-      LAYER_PRESENTATION[key]?.label,
-      key
-    ),
-    description: firstText(
-      value.description,
-      value.summary,
-      LAYER_PRESENTATION[key]?.description
-    ),
-    boundary: firstText(value.boundary, value.guardrail),
-  }
-}
-
-function normalizeCustomerOverlay(value, index) {
-  if (!isRecord(value)) return null
-  const definition = isRecord(value.definition) ? value.definition : {}
-  const key = firstText(value.key, value.customerKey, `customer-${index}`)
-  return {
-    key,
-    label: firstText(value.label, value.name, value.customerLabel, key),
-    scopeKey: firstText(value.scopeKey, value.scope_key, value.customerKey),
-    summary: firstText(value.summary, value.description),
-    previewOnly: value.previewOnly !== false,
-    runtimeAuthority: firstText(
-      value.runtimeAuthority,
-      value.runtime_authority
-    ),
-    comparison: value.comparison,
-    definition,
-    businessFlows: asArray(value.businessFlows || value.business_flows),
-    stateMachines: asArray(value.stateMachines || value.state_machines),
-    processPolicies: asArray(value.processPolicies || value.process_policies),
-    runtimeProcessSelections: asArray(
-      value.runtimeProcessSelections || value.runtime_process_selections
-    ),
-    evidence: normalizeEvidence(
-      value.sourceRefs,
-      value.source_refs,
-      value.evidence,
-      definition.sourceRefs,
-      definition.source_refs,
-      definition.evidence
-    ),
-  }
-}
-
-function normalizeProcessNode(value, index) {
-  if (!isRecord(value)) return null
-  const key = firstText(value.key, `node-${index}`)
-  return {
-    key,
-    label: firstText(value.label, value.name, key),
-    type: firstText(value.type, value.nodeType, value.node_type),
-    ownerPool: firstText(
-      value.ownerPool,
-      value.owner_pool,
-      value.ownerRole,
-      value.owner_role
-    ),
-    action: firstText(value.action, value.command),
-    permission: normalizeStringList(
-      Array.isArray(value.permission) ? value.permission : [value.permission]
-    ).join('、'),
-    factBoundary: firstText(value.factBoundary, value.fact_boundary),
-    evidence: normalizeEvidence(
-      value.sourceRefs,
-      value.source_refs,
-      value.evidence
-    ),
-  }
-}
-
-function normalizeProcessDefinition(value, index) {
-  if (!isRecord(value)) return null
-  const processKey = firstText(
-    value.processKey,
-    value.process_key,
-    value.key,
-    `process-${index}`
-  )
-  const variantKey = firstText(value.variantKey, value.variant_key, 'default')
-  const key = firstText(value.key, `${processKey}:${variantKey}`)
-  const nodes = asArray(value.nodes).map(normalizeProcessNode).filter(Boolean)
-  const nodeKeys = new Set(nodes.map((node) => node.key))
-  const edges = asArray(value.edges)
-    .map((edge, edgeIndex) => {
-      if (!isRecord(edge)) return null
-      const from = firstText(edge.from, edge.fromNode, edge.from_node)
-      const to = firstText(edge.to, edge.toNode, edge.to_node)
-      if (!from || !to || !nodeKeys.has(from) || !nodeKeys.has(to)) {
-        return null
-      }
-      return {
-        key: firstText(edge.key, `${from}->${to}-${edgeIndex}`),
-        from,
-        to,
-      }
-    })
-    .filter(Boolean)
-  return {
-    key,
-    processKey,
-    processVersion: firstText(
-      value.processVersion,
-      value.process_version,
-      value.version
-    ),
-    variantKey,
-    businessRefType: firstText(value.businessRefType, value.business_ref_type),
-    label: firstText(value.label, value.name, processKey),
-    initial: firstText(value.initial, value.initialNode, value.initial_node),
-    terminal: firstText(
-      value.terminal,
-      value.terminalNode,
-      value.terminal_node
-    ),
-    nodes,
-    edges,
-    readOnly: value.readOnly === true,
-    runtimeAuthority: firstText(
-      value.runtimeAuthority,
-      value.runtime_authority
-    ),
-    evidence: normalizeEvidence(
-      value.sourceRefs,
-      value.source_refs,
-      value.evidence
-    ),
-  }
-}
-
-function deriveScopes(flows, customerOverlays) {
-  const keys = [
-    ...flows.map((flow) => flow.scopeKey),
-    ...customerOverlays.map((overlay) => overlay.scopeKey),
-  ].filter(Boolean)
-  return [...new Set(keys)].map((key) => ({
-    key,
-    label: key,
-    description: '',
-    kind: '',
-  }))
-}
-
-function adaptCatalogModule(moduleValue) {
-  const raw = moduleValue?.DEV_FLOW_STATE_CATALOG || moduleValue?.default
-  if (!isRecord(raw)) {
+function validateCatalog(moduleValue) {
+  const catalog = moduleValue?.DEV_FLOW_STATE_CATALOG || moduleValue?.default
+  if (!catalog || typeof catalog !== 'object' || Array.isArray(catalog)) {
     throw new Error('状态目录模块没有导出 DEV_FLOW_STATE_CATALOG')
   }
-  if (raw.readOnly !== true) {
-    throw new Error('状态目录没有声明只读边界')
+  if (
+    catalog.readOnly !== true ||
+    catalog.allowsActionExecution !== false ||
+    catalog.allowsGenericStatusWrite !== false
+  ) {
+    throw new Error('目录没有闭合只读边界')
   }
-  const flows = asArray(raw.flows).map(normalizeFlow).filter(Boolean)
-  if (flows.some((flow) => flow.allowsGenericStatusWrite)) {
-    throw new Error('状态目录包含通用状态写入能力，观察台已拒绝加载')
+
+  const flows = asArray(catalog.flows)
+  const processDefinitions = asArray(catalog.processDefinitions)
+  const businessChains = asArray(catalog.businessChains)
+  const { businessChainOverview } = catalog
+  const factDefinitions = asArray(catalog.factDefinitions)
+  if (
+    flows.length === 0 ||
+    processDefinitions.length === 0 ||
+    businessChains.length === 0 ||
+    factDefinitions.length === 0 ||
+    !uniqueKeys(flows, (flow) => flow.key) ||
+    !uniqueKeys(processDefinitions, (definition) => definition.key) ||
+    !uniqueKeys(businessChains, (chain) => chain.key) ||
+    !uniqueKeys(factDefinitions, (definition) => definition.factKey)
+  ) {
+    throw new Error('目录为空、存在重复 key 或结构不完整')
   }
-  const flowLayers = asArray(raw.flowLayers)
-    .map(normalizeFlowLayer)
-    .filter(Boolean)
-  const customerOverlays = asArray(raw.customerOverlays || raw.overlays)
-    .map(normalizeCustomerOverlay)
-    .filter(Boolean)
-  const processDefinitions = asArray(raw.processDefinitions)
-    .map(normalizeProcessDefinition)
-    .filter(Boolean)
-  const pathKinds = normalizeStringList(
-    raw.pathKinds || moduleValue?.DEV_FLOW_PATH_KINDS
-  )
-  if (pathKinds.length === 0) {
-    throw new Error('状态目录没有声明受限 pathKinds')
+  if (
+    catalog.businessChainCoverage?.complete !== true ||
+    catalog.businessChainCoverage?.overviewComplete !== true ||
+    catalog.factLedgerCoverage?.complete !== true ||
+    catalog.factRuntimeQuery?.availability !== 'unavailable'
+  ) {
+    throw new Error('业务链或事实目录覆盖门禁未闭合')
   }
-  const allowedPathKinds = new Set(pathKinds)
-  const unknownPathKinds = flows.flatMap((flow) =>
-    flow.transitions.flatMap((transition) =>
-      transition.pathKinds.filter((pathKind) => !allowedPathKinds.has(pathKind))
+  if (
+    businessChainOverview?.key !== ALL_BUSINESS_CHAINS_KEY ||
+    businessChainOverview?.readOnly !== true ||
+    businessChainOverview?.allowsActionExecution !== false ||
+    businessChainOverview?.runtimeAuthority !== 'design_projection_only' ||
+    !uniqueKeys(asArray(businessChainOverview.lanes), (lane) => lane.key) ||
+    !uniqueKeys(
+      asArray(businessChainOverview.relations),
+      (relation) => relation.key
+    ) ||
+    asArray(businessChainOverview.lanes).some(
+      (lane) => lane.readOnly !== true
+    ) ||
+    asArray(businessChainOverview.relations).some(
+      (relation) => relation.readOnly !== true
+    ) ||
+    businessChains.some(
+      (chain) =>
+        chain.readOnly !== true ||
+        chain.allowsActionExecution !== false ||
+        chain.runtimeAuthority !== 'design_projection_only' ||
+        !asArray(chain.nodes).every((node) => node.readOnly === true) ||
+        !asArray(chain.edges).every((edge) => edge.readOnly === true)
+    ) ||
+    factDefinitions.some(
+      (definition) =>
+        definition.readOnly !== true ||
+        definition.runtimeProofQuery !== 'unavailable'
     )
+  ) {
+    throw new Error('目录包含可执行能力或伪造的运行凭证查询')
+  }
+  const overviewChainKeys = asArray(businessChainOverview.lanes).flatMap(
+    (lane) => asArray(lane.chainKeys)
   )
-  if (unknownPathKinds.length > 0) {
-    throw new Error(
-      `状态目录包含未知 pathKinds: ${unknownPathKinds.join('、')}`
-    )
+  if (
+    overviewChainKeys.length !== businessChains.length ||
+    new Set(overviewChainKeys).size !== businessChains.length ||
+    businessChains.some((chain) => !overviewChainKeys.includes(chain.key))
+  ) {
+    throw new Error('业务总图没有精确覆盖全部业务链')
   }
-  const declaredScopes = asArray(raw.scopes).map(normalizeScope).filter(Boolean)
-  return {
-    version: firstText(raw.version, 'unknown'),
-    route: firstText(raw.route),
-    readOnly: true,
-    runtimeAuthority: firstText(raw.runtimeAuthority, raw.runtime_authority),
-    scopes:
-      declaredScopes.length > 0
-        ? declaredScopes
-        : deriveScopes(flows, customerOverlays),
-    flowLayers,
-    pathKinds,
-    customerOverlays,
-    processDefinitions,
-    flows,
-  }
+  return catalog
 }
 
 function useFlowStateCatalog() {
@@ -608,11 +345,11 @@ function useFlowStateCatalog() {
     catalog: null,
     error: '',
   })
+
   const reload = useCallback(() => {
     let active = true
     const loader =
-      CATALOG_MODULES[CATALOG_MODULE_PATH] ||
-      Object.values(CATALOG_MODULES).at(0)
+      CATALOG_MODULES[CATALOG_MODULE_PATH] || Object.values(CATALOG_MODULES)[0]
     setState({ status: 'loading', catalog: null, error: '' })
     if (typeof loader !== 'function') {
       setState({
@@ -629,7 +366,7 @@ function useFlowStateCatalog() {
         if (!active) return
         setState({
           status: 'ready',
-          catalog: adaptCatalogModule(moduleValue),
+          catalog: validateCatalog(moduleValue),
           error: '',
         })
       })
@@ -638,7 +375,7 @@ function useFlowStateCatalog() {
         setState({
           status: 'error',
           catalog: null,
-          error: getActionErrorMessage(error, '读取流程状态目录'),
+          error: cleanText(error?.message) || '目录加载失败',
         })
       })
     return () => {
@@ -652,1400 +389,211 @@ function useFlowStateCatalog() {
 
 function patchParams(searchParams, patch) {
   const next = new URLSearchParams(searchParams)
-  Object.entries(patch).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === '') {
-      next.delete(key)
-      return
-    }
-    next.set(key, String(value))
-  })
+  for (const [key, value] of Object.entries(patch)) {
+    const normalized = cleanText(value)
+    if (!normalized) next.delete(key)
+    else next.set(key, normalized)
+  }
   return next
 }
 
-function countEvidence(flows) {
-  return uniqueEvidenceSources(
-    ...flows.map((flow) => flow.evidence),
-    ...flows.flatMap((flow) => flow.states.map((state) => state.evidence)),
-    ...flows.flatMap((flow) =>
-      flow.transitions.map((transition) => transition.evidence)
-    )
-  ).length
+function evidenceRefs(value) {
+  const refs = [
+    ...asArray(value?.sourceRefs),
+    ...asArray(value?.evidence).map((item) => item?.ref),
+  ]
+    .map(cleanText)
+    .filter(Boolean)
+  return [...new Set(refs)]
 }
 
-function formatDefinitionValue(value) {
-  if (value === true) return '是'
-  if (value === false) return '否'
-  if (value === null || value === undefined || value === '') return '未声明'
-  if (Array.isArray(value)) {
-    return value.length > 0 ? value.join('、') : '未声明'
-  }
-  if (isRecord(value)) {
-    return Object.entries(value)
-      .map(([key, item]) => `${key}: ${formatDefinitionValue(item)}`)
-      .join('；')
-  }
-  return String(value)
-}
-
-function escapeMermaid(value) {
-  return String(value || '')
-    .replace(/[\r\n]+/gu, ' ')
-    .replace(/"/gu, "'")
-    .replace(/[{}[\]]/gu, '')
-    .trim()
-}
-
-function compactGraphText(value, maxLength = 16) {
-  const characters = Array.from(cleanText(value))
-  if (characters.length <= maxLength) return characters.join('')
-  return `${characters.slice(0, Math.max(1, maxLength - 1)).join('')}…`
-}
-
-function graphFactBoundaryLabel(value) {
-  const boundary = cleanText(value)
-  if (!boundary) return ''
-  if (/workflow/iu.test(boundary)) return '仅工作流'
-  if (/orchestration|process/iu.test(boundary)) return '仅编排'
-  if (/source[_\s-]?document|单据/iu.test(boundary)) return '仅单据'
-  if (/master[_\s-]?data|主数据/iu.test(boundary)) return '主数据'
-  if (/read[_\s-]?only|projection|投影/iu.test(boundary)) return '只读投影'
-  if (/inventory|库存/iu.test(boundary)) return '库存 Fact'
-  if (/finance|财务/iu.test(boundary)) return '财务 Fact'
-  if (/quality|质检/iu.test(boundary)) return '质检 Fact'
-  return '领域 Fact'
-}
-
-function graphTransitionLabel(transition, targetState) {
-  if (transition.pathKinds.length > 0) {
-    return (
-      transition.pathKinds
-        .map((pathKind) => PATH_KIND_PRESENTATION[pathKind])
-        .filter(Boolean)
-        .join(' / ') ||
-      targetState?.label ||
-      '流转'
-    )
-  }
-  return targetState?.label || '流转'
-}
-
-function transitionMatchesPathKind(transition, pathKind) {
+function EvidenceDisclosure({ value, label = '查看代码与文档证据' }) {
+  const refs = evidenceRefs(value)
+  if (refs.length === 0) return null
   return (
-    transition.pathKinds.length > 0 &&
-    (!pathKind || transition.pathKinds.includes(pathKind))
-  )
-}
-
-function transitionLayerValues(transition, activeLayers, statesByKey) {
-  const targetState = statesByKey.get(transition.to)
-  const transitionText = [
-    transition.key,
-    transition.action,
-    transition.permission,
-    transition.guard,
-    transition.from,
-    transition.to,
-  ].join(' ')
-  const primary = []
-  const semantic = []
-  const addUnique = (target, value) => {
-    const text = compactGraphText(value, 12)
-    if (text && !primary.includes(text) && !semantic.includes(text)) {
-      target.push(text)
-    }
-  }
-
-  if (activeLayers.has('business')) {
-    addUnique(primary, graphTransitionLabel(transition, targetState))
-  }
-  if (
-    activeLayers.has('approval') &&
-    /approve|approval|审批/iu.test(transitionText)
-  ) {
-    addUnique(semantic, '审批')
-  }
-  if (activeLayers.has('exception') && transition.pathKinds.length > 0) {
-    addUnique(
-      semantic,
-      transition.pathKinds
-        .map((pathKind) => PATH_KIND_PRESENTATION[pathKind])
-        .filter(Boolean)
-        .join('/')
-    )
-  }
-  if (activeLayers.has('fact')) {
-    addUnique(semantic, graphFactBoundaryLabel(transition.factBoundary))
-  }
-  if (activeLayers.has('automation') && transition.automatic !== null) {
-    addUnique(semantic, transition.automatic ? '自动' : '人工')
-  }
-  if (
-    activeLayers.has('notification') &&
-    transition.evidence.some((item) =>
-      /notification|notify|remind|通知|提醒/iu.test(
-        `${item.path} ${item.label} ${item.note}`
-      )
-    )
-  ) {
-    addUnique(semantic, '通知')
-  }
-  if (
-    (activeLayers.has('workflow') || activeLayers.has('task')) &&
-    /workflow|task|任务/iu.test(transitionText)
-  ) {
-    addUnique(semantic, '任务')
-  }
-
-  return [...primary, ...semantic].slice(0, 3)
-}
-
-function buildFlowMermaid(flow, layerKeys, pathMode = 'off', pathKind = '') {
-  if (!flow || flow.states.length === 0) return ''
-  const activeLayers = new Set(layerKeys)
-  const nodeIdByKey = new Map()
-  const statesByKey = new Map(flow.states.map((state) => [state.key, state]))
-  const transitions =
-    pathMode === 'only'
-      ? flow.transitions.filter((transition) =>
-          transitionMatchesPathKind(transition, pathKind)
-        )
-      : flow.transitions
-  if (pathMode === 'only' && transitions.length === 0) return ''
-  const visibleStateKeys =
-    pathMode === 'only'
-      ? new Set(
-          transitions.flatMap((transition) => [transition.from, transition.to])
-        )
-      : null
-  const visibleStates = visibleStateKeys
-    ? flow.states.filter((state) => visibleStateKeys.has(state.key))
-    : flow.states
-  const lines = ['flowchart LR']
-  visibleStates.forEach((state, index) => {
-    const nodeId = `state_${index}`
-    nodeIdByKey.set(state.key, nodeId)
-    const labelParts = [
-      compactGraphText(state.label, 12),
-      activeLayers.has('state') && state.key !== state.label
-        ? compactGraphText(state.key, 16)
-        : '',
-    ].filter(Boolean)
-    const label = escapeMermaid(labelParts.join(' · '))
-    if (state.initial) {
-      lines.push(`  ${nodeId}(["${label}"])`)
-    } else if (state.terminal) {
-      lines.push(`  ${nodeId}(("${label}"))`)
-    } else {
-      lines.push(`  ${nodeId}["${label}"]`)
-    }
-  })
-  const highlightedLinks = []
-  transitions.forEach((transition, linkIndex) => {
-    const from = nodeIdByKey.get(transition.from)
-    const to = nodeIdByKey.get(transition.to)
-    if (!from || !to) return
-    const label = escapeMermaid(
-      compactGraphText(
-        transitionLayerValues(transition, activeLayers, statesByKey).join(
-          ' · '
-        ),
-        28
-      )
-    )
-    lines.push(
-      label ? `  ${from} -->|"${label}"| ${to}` : `  ${from} --> ${to}`
-    )
-    if (
-      pathMode === 'overlay' &&
-      transitionMatchesPathKind(transition, pathKind)
-    ) {
-      highlightedLinks.push(linkIndex)
-    }
-  })
-  if (highlightedLinks.length > 0) {
-    lines.push(
-      `  linkStyle ${highlightedLinks.join(',')} stroke:#d4380d,stroke-width:3px`
-    )
-  }
-  return lines.join('\n')
-}
-
-function EvidenceList({ items, emptyText = '目录未声明来源证据' }) {
-  if (!items.length) {
-    return <Text type="secondary">{emptyText}</Text>
-  }
-  return (
-    <ul className="erp-dev-flow-state-evidence-list">
-      {items.map((item) => (
-        <li key={item.key}>
-          {item.path ? <code>{item.path}</code> : <span>{item.label}</span>}
-          {item.note ? <small>{item.note}</small> : null}
-        </li>
-      ))}
-    </ul>
-  )
-}
-
-function EvidenceDisclosure({
-  items,
-  label = '查看实现依据',
-  context = 'general',
-}) {
-  const uniqueItems = uniqueEvidenceSources(items)
-  if (!uniqueItems.length) return null
-  return (
-    <details
-      className="erp-dev-flow-state-evidence-disclosure"
-      data-evidence-disclosure={context}
-    >
+    <details className="erp-dev-flow-evidence" data-evidence-disclosure>
       <summary>
-        <span>{label}</span>
-        <small>{uniqueItems.length} 个来源，按需展开</small>
+        {label}（{refs.length}）
       </summary>
-      <EvidenceList items={uniqueItems} />
+      <ul>
+        {refs.map((ref) => (
+          <li key={ref}>
+            <code>{ref}</code>
+          </li>
+        ))}
+      </ul>
     </details>
   )
 }
 
-function DefinitionFacts({ flow }) {
-  if (!flow) return null
+function KeyValue({ children, value, copyable = true }) {
   return (
-    <dl className="erp-dev-flow-state-facts">
-      <div>
-        <dt>状态对象 key</dt>
-        <dd>
-          <code>{flow.key}</code>
-        </dd>
-      </div>
-      <div>
-        <dt>初态</dt>
-        <dd>{formatDefinitionValue(flow.initialStates)}</dd>
-      </div>
-      <div>
-        <dt>终态</dt>
-        <dd>{formatDefinitionValue(flow.terminalStates)}</dd>
-      </div>
-      <div>
-        <dt>Guard</dt>
-        <dd>{flow.guard || '由各迁移分别声明'}</dd>
-      </div>
-      <div>
-        <dt>Action</dt>
-        <dd>{flow.action || '由各迁移分别声明'}</dd>
-      </div>
-      <div>
-        <dt>Permission</dt>
-        <dd>{flow.permission || '由各迁移分别声明'}</dd>
-      </div>
-      <div>
-        <dt>Fact boundary</dt>
-        <dd>{flow.factBoundary || '目录未声明'}</dd>
-      </div>
-      <div>
-        <dt>运行权威</dt>
-        <dd>{flow.runtimeAuthority || '目录未声明'}</dd>
-      </div>
-    </dl>
+    <Text
+      copyable={copyable ? { text: value } : undefined}
+      className="erp-dev-flow-key-copy"
+    >
+      <code>{children || value}</code>
+    </Text>
   )
 }
 
-function TransitionCards({ transitions }) {
-  if (!transitions.length) {
-    return (
-      <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="当前状态对象没有登记迁移"
-      />
-    )
-  }
+function formatQueryTime(value) {
+  if (!value) return '未查询'
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+}
+
+function humanActionLabel(value) {
+  const action = cleanText(value)
+  const mappings = [
+    [/reverse|reversal|red[_-]?entry/iu, '冲正'],
+    [/cancel/iu, '取消'],
+    [/reject/iu, '退回或拒绝'],
+    [/resume|unblock/iu, '恢复'],
+    [/block/iu, '阻塞'],
+    [/submit/iu, '提交'],
+    [/activate/iu, '生效'],
+    [/approve|pass/iu, '批准或通过'],
+    [/release/iu, '放行'],
+    [/confirm/iu, '确认'],
+    [/post/iu, '过账'],
+    [/complete|finish/iu, '完成'],
+    [/ship/iu, '出货'],
+    [/return/iu, '退回'],
+    [/rework/iu, '返工'],
+    [/adjust/iu, '调整'],
+    [/close|settle/iu, '关闭或结清'],
+  ]
   return (
-    <div className="erp-dev-flow-state-transition-list">
-      {transitions.map((transition) => (
-        <article className="erp-dev-flow-state-transition" key={transition.key}>
-          <div className="erp-dev-flow-state-transition__head">
-            <span>
-              <strong>{transition.label}</strong>
-              {transition.pathKinds.map((pathKind) => (
-                <Tag color="volcano" key={pathKind}>
-                  {PATH_KIND_PRESENTATION[pathKind] || pathKind}
-                </Tag>
-              ))}
-            </span>
-            <code>
-              {transition.from} → {transition.to}
-            </code>
-          </div>
-          <dl>
-            <div>
-              <dt>Guard</dt>
-              <dd>{transition.guard || '未声明'}</dd>
-            </div>
-            <div>
-              <dt>Action</dt>
-              <dd>{transition.action || '未声明'}</dd>
-            </div>
-            <div>
-              <dt>Permission</dt>
-              <dd>{transition.permission || '未声明'}</dd>
-            </div>
-            <div>
-              <dt>Fact boundary</dt>
-              <dd>{transition.factBoundary || '未声明'}</dd>
-            </div>
-            {transition.pathKindWhen ? (
-              <div>
-                <dt>路径适用条件</dt>
-                <dd>{transition.pathKindWhen}</dd>
-              </div>
-            ) : null}
-          </dl>
-          <EvidenceDisclosure
-            context={`transition-${transition.key}`}
-            label="查看此迁移的 canonical 依据"
-            items={transition.evidence}
-          />
-        </article>
-      ))}
-    </div>
+    mappings.find(([pattern]) => pattern.test(action))?.[1] || '按登记规则转换'
   )
 }
 
-function OverviewView({ catalog, flows, onOpenFlow }) {
-  const stateCount = flows.reduce(
-    (count, flow) => count + flow.states.length,
-    0
-  )
-  const transitionCount = flows.reduce(
-    (count, flow) => count + flow.transitions.length,
-    0
-  )
-  return (
-    <div className="erp-dev-flow-state-view-stack">
-      <section className="erp-dev-flow-state-summary-grid">
-        <article>
-          <span>状态对象</span>
-          <strong>{flows.length}</strong>
-          <small>当前范围与搜索结果</small>
-        </article>
-        <article>
-          <span>状态</span>
-          <strong>{stateCount}</strong>
-          <small>不跨层合并同名状态</small>
-        </article>
-        <article>
-          <span>允许迁移</span>
-          <strong>{transitionCount}</strong>
-          <small>只读合同，不提供写按钮</small>
-        </article>
-        <article>
-          <span>来源证据</span>
-          <strong>{countEvidence(flows)}</strong>
-          <small>代码、文档和测试引用</small>
-        </article>
-      </section>
-
-      <Alert
-        showIcon
-        type="info"
-        message="一张观察台，多个状态真源"
-        description="Source Document、Workflow Task、ProcessRuntime 与 Fact/Ledger 各自保留唯一真源。本页只帮助定位和比较，不把它们压成万能状态字典。"
-      />
-
-      <section className="erp-dev-flow-state-layer-coverage">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text strong>九类流覆盖</Text>
-            <Text type="secondary">
-              这些是观察维度，不是九台同构状态机；岗位 / owner 在流程编排的
-              Product Core 节点详情中查看。
-            </Text>
-          </div>
-          <Tag>{catalog.flowLayers.length} 类</Tag>
-        </div>
-        <div>
-          {catalog.flowLayers.map((layer) => (
-            <article key={layer.key}>
-              <div>
-                <strong>{layer.label}</strong>
-                <code>{layer.key}</code>
-              </div>
-              <p>{layer.description || '目录未声明说明。'}</p>
-              <small>{layer.boundary || '目录未声明边界。'}</small>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {flows.length > 0 ? (
-        <section
-          className="erp-dev-flow-state-flow-grid"
-          aria-label="可观察状态对象"
-        >
-          {flows.map((flow) => (
-            <article key={flow.key}>
-              <div className="erp-dev-flow-state-flow-card__head">
-                <Tag color={flow.previewOnly ? 'cyan' : 'green'}>
-                  {flow.previewOnly ? '仅预览' : flow.kind}
-                </Tag>
-                <code>{flow.key}</code>
-              </div>
-              <h3>{flow.label}</h3>
-              <p>{flow.summary || '目录未补充说明。'}</p>
-              <div className="erp-dev-flow-state-flow-card__metrics">
-                <span>{flow.states.length} 个状态</span>
-                <span>{flow.transitions.length} 条迁移</span>
-              </div>
-              <Button
-                type="link"
-                onClick={() => onOpenFlow(flow.key, 'machine')}
-              >
-                打开单机状态图
-              </Button>
-            </article>
-          ))}
-        </section>
-      ) : (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配的状态机"
-        />
-      )}
-
-      <section className="erp-dev-flow-state-source-panel">
-        <div>
-          <DatabaseOutlined aria-hidden="true" />
-          <strong>目录版本</strong>
-        </div>
-        <code>{catalog.version}</code>
-        <span>
-          Catalog 不拥有运行态；运行轨迹必须通过后端命名只读 API 取得。
-        </span>
-      </section>
-    </div>
-  )
+function escapeMermaid(value) {
+  return cleanText(value)
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')
+    .replaceAll('\n', ' ')
 }
 
-function MachineView({ flow, layerKeys, pathMode, pathKind }) {
-  const visibleTransitions = useMemo(
-    () =>
-      pathMode === 'only'
-        ? flow?.transitions.filter((transition) =>
-            transitionMatchesPathKind(transition, pathKind)
-          ) || []
-        : flow?.transitions || [],
-    [flow, pathKind, pathMode]
-  )
-  const mermaid = useMemo(
-    () => buildFlowMermaid(flow, layerKeys, pathMode, pathKind),
-    [flow, layerKeys, pathKind, pathMode]
-  )
-  if (!flow) {
-    return (
-      <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="没有匹配的状态机"
-      />
-    )
-  }
-  return (
-    <div className="erp-dev-flow-state-view-stack">
-      <section className="erp-dev-flow-state-definition">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text className="erp-dev-flow-state-eyebrow">单机状态图</Text>
-            <Title level={2}>{flow.label}</Title>
-          </div>
-          <Space wrap>
-            {flow.previewOnly ? <Tag color="cyan">仅预览</Tag> : null}
-            <Tag color="green">只读合同</Tag>
-            {pathMode !== 'off' ? (
-              <Tag color="volcano">
-                {PATH_MODE_ITEMS.find((item) => item.value === pathMode)?.label}
-              </Tag>
-            ) : null}
-          </Space>
-        </div>
-        <DefinitionFacts flow={flow} />
-      </section>
-
-      <section className="erp-dev-flow-state-diagram">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text strong>允许迁移</Text>
-            <Text type="secondary">
-              图内只保留短状态名和短语义；完整条件、权限与来源在下方查看。
-            </Text>
-          </div>
-          <Tag>{flow.states.length} 个状态</Tag>
-        </div>
-        {mermaid ? (
-          <div className="erp-dev-flow-state-mermaid erp-dev-docs-markdown">
-            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
-          </div>
-        ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={
-              pathMode === 'only'
-                ? '当前对象没有命中的异常、纠正或恢复路径'
-                : '状态目录尚未提供可画的节点'
-            }
-          />
-        )}
-      </section>
-
-      <section className="erp-dev-flow-state-definition">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text strong>迁移详情</Text>
-            <Text type="secondary">
-              Guard、Action、Permission 与 Fact boundary 保持分列。
-            </Text>
-          </div>
-        </div>
-        <TransitionCards transitions={visibleTransitions} />
-        <EvidenceDisclosure
-          context="machine"
-          label="查看本状态机的实现依据"
-          items={uniqueEvidenceSources(
-            flow.evidence,
-            ...flow.states.map((state) => state.evidence),
-            ...flow.transitions.map((transition) => transition.evidence)
-          )}
-        />
-      </section>
-    </div>
-  )
-}
-
-function GlobalStateTree({
-  scopes,
-  flows,
-  selectedFlow,
-  selectedState,
-  onSelect,
-}) {
-  const groups = scopes
-    .map((scope) => ({
-      scope,
-      flows: flows.filter((flow) => flow.scopeKey === scope.key),
-    }))
-    .filter((group) => group.flows.length > 0)
-  if (!groups.length) {
-    return (
-      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="状态字典为空" />
-    )
-  }
-  return (
-    <div className="erp-dev-flow-state-global-tree" role="tree">
-      {groups.map((group) => (
-        <section
-          key={group.scope.key}
-          role="group"
-          aria-label={group.scope.label}
-        >
-          <div className="erp-dev-flow-state-global-tree__scope">
-            <strong>{group.scope.label}</strong>
-            <Tag>{group.flows.length} 个对象</Tag>
-          </div>
-          {group.flows.map((machine) => {
-            const machineSelected = machine.key === selectedFlow?.key
-            return (
-              <div
-                className="erp-dev-flow-state-global-tree__machine"
-                key={machine.key}
-              >
-                <button
-                  type="button"
-                  role="treeitem"
-                  aria-expanded={machineSelected}
-                  aria-selected={machineSelected && !selectedState}
-                  className={
-                    machineSelected
-                      ? 'erp-dev-flow-state-machine-item erp-dev-flow-state-machine-item--active'
-                      : 'erp-dev-flow-state-machine-item'
-                  }
-                  onClick={() => onSelect(machine.key, '')}
-                >
-                  <span>
-                    <strong>{machine.label}</strong>
-                    <code>{machine.key}</code>
-                  </span>
-                  <span>
-                    <Tag>{machine.states.length}</Tag>
-                    {machine.terminalStates.length === 0 ? (
-                      <Tag color="gold">无终态</Tag>
-                    ) : null}
-                  </span>
-                </button>
-                {machineSelected ? (
-                  <div role="group" aria-label={`${machine.label} 状态`}>
-                    {machine.states.map((state) => {
-                      const stateSelected = state.key === selectedState?.key
-                      return (
-                        <button
-                          type="button"
-                          role="treeitem"
-                          aria-selected={stateSelected}
-                          className={
-                            stateSelected
-                              ? 'erp-dev-flow-state-state-item erp-dev-flow-state-state-item--active'
-                              : 'erp-dev-flow-state-state-item'
-                          }
-                          key={state.key}
-                          onClick={() => onSelect(machine.key, state.key)}
-                        >
-                          <span>
-                            <strong>{state.label}</strong>
-                            <code>{state.key}</code>
-                          </span>
-                          <span>
-                            {state.initial ? (
-                              <Tag color="green">初态</Tag>
-                            ) : null}
-                            {state.terminal ? (
-                              <Tag color="blue">终态</Tag>
-                            ) : null}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            )
-          })}
-        </section>
-      ))}
-    </div>
-  )
-}
-
-function DictionaryView({
-  scopes,
-  flows,
-  flow,
-  requestedStateKey,
-  onSelectFlowState,
-}) {
-  const selectedState =
-    flow?.states.find((state) => state.key === requestedStateKey) ||
-    (!requestedStateKey ? flow?.states[0] : null)
-  if (!flow) {
-    return (
-      <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="没有匹配的状态对象"
-      />
-    )
-  }
-  const incoming = selectedState
-    ? flow.transitions.filter(
-        (transition) => transition.to === selectedState.key
-      )
-    : []
-  const outgoing = selectedState
-    ? flow.transitions.filter(
-        (transition) => transition.from === selectedState.key
-      )
-    : []
-  return (
-    <div className="erp-dev-flow-state-dictionary-layout">
-      <section className="erp-dev-flow-state-state-tree">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text strong>全局状态字典树</Text>
-            <Text type="secondary">状态域 → 状态对象 → 状态</Text>
-          </div>
-          <Tag>{flows.length} 个对象</Tag>
-        </div>
-        <GlobalStateTree
-          scopes={scopes}
-          flows={flows}
-          selectedFlow={flow}
-          selectedState={selectedState}
-          onSelect={onSelectFlowState}
-        />
-      </section>
-
-      <section className="erp-dev-flow-state-state-detail">
-        {requestedStateKey && !selectedState ? (
-          <Alert
-            showIcon
-            type="warning"
-            message="深链中的状态不存在"
-            description={
-              <Button
-                size="small"
-                onClick={() => onSelectFlowState(flow.key, '')}
-              >
-                返回第一个已登记状态
-              </Button>
-            }
-          />
-        ) : selectedState ? (
-          <>
-            <div className="erp-dev-flow-state-section-head">
-              <div>
-                <Text className="erp-dev-flow-state-eyebrow">状态详情</Text>
-                <Title level={2}>{selectedState.label}</Title>
-              </div>
-              <Space wrap>
-                {selectedState.initial ? <Tag color="green">初态</Tag> : null}
-                {selectedState.terminal ? <Tag color="blue">终态</Tag> : null}
-              </Space>
-            </div>
-            <dl className="erp-dev-flow-state-facts">
-              <div>
-                <dt>Key</dt>
-                <dd>
-                  <code>{selectedState.key}</code>
-                </dd>
-              </div>
-              <div>
-                <dt>初态</dt>
-                <dd>{selectedState.initial ? '是' : '否'}</dd>
-              </div>
-              <div>
-                <dt>终态</dt>
-                <dd>{selectedState.terminal ? '是' : '否'}</dd>
-              </div>
-              <div>
-                <dt>说明</dt>
-                <dd>{selectedState.summary || '目录未声明'}</dd>
-              </div>
-            </dl>
-            <div className="erp-dev-flow-state-state-paths">
-              <section>
-                <Text strong>进入此状态</Text>
-                <TransitionCards transitions={incoming} />
-              </section>
-              <section>
-                <Text strong>离开此状态</Text>
-                <TransitionCards transitions={outgoing} />
-              </section>
-            </div>
-            <EvidenceDisclosure
-              context="state"
-              label="查看当前状态的实现依据"
-              items={uniqueEvidenceSources(
-                flow.evidence,
-                selectedState.evidence,
-                ...incoming.map((transition) => transition.evidence),
-                ...outgoing.map((transition) => transition.evidence)
-              )}
-            />
-          </>
-        ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="请选择状态"
-          />
-        )}
-      </section>
-    </div>
-  )
-}
-
-function buildProcessMermaid(definition) {
-  if (!definition || definition.nodes.length === 0) return ''
-  const nodeIdByKey = new Map()
+function buildChainMermaid(chain, currentRuntimeNodeKey) {
+  if (!chain) return ''
+  const ids = new Map(chain.nodes.map((node, index) => [node.key, `N${index}`]))
   const lines = ['flowchart LR']
-  definition.nodes.forEach((node, index) => {
-    const nodeId = `process_node_${index}`
-    nodeIdByKey.set(node.key, nodeId)
-    const label = escapeMermaid(
-      [node.label, node.type ? `(${node.type})` : ''].filter(Boolean).join(' ')
+  for (const node of chain.nodes) {
+    lines.push(`  ${ids.get(node.key)}["${escapeMermaid(node.label)}"]`)
+  }
+  for (const edge of chain.edges) {
+    lines.push(
+      `  ${ids.get(edge.from)} -->|"${escapeMermaid(edge.label)}"| ${ids.get(edge.to)}`
     )
-    if (node.key === definition.initial) {
-      lines.push(`  ${nodeId}(["${label}"])`)
-    } else if (node.key === definition.terminal) {
-      lines.push(`  ${nodeId}(("${label}"))`)
-    } else {
-      lines.push(`  ${nodeId}["${label}"]`)
-    }
+  }
+  lines.push(
+    '  classDef source_document fill:#e6f4ff,stroke:#1677ff,color:#102a43',
+    '  classDef masterdata_lifecycle fill:#f9f0ff,stroke:#722ed1,color:#2d1648',
+    '  classDef process_runtime fill:#fff7e6,stroke:#d46b08,color:#452500',
+    '  classDef workflow_task fill:#f6ffed,stroke:#389e0d,color:#163300',
+    '  classDef fact_ledger fill:#fff1f0,stroke:#cf1322,color:#3d0b0b',
+    '  classDef derived_result fill:#f0f5ff,stroke:#2f54eb,color:#061b57',
+    '  classDef runtime_current fill:#fffbe6,stroke:#fa8c16,stroke-width:4px,color:#422006'
+  )
+  for (const node of chain.nodes) {
+    const classes = [node.layer]
+    if (node.key === currentRuntimeNodeKey) classes.push('runtime_current')
+    lines.push(`  class ${ids.get(node.key)} ${classes.join(',')}`)
+  }
+  return lines.join('\n')
+}
+
+function buildBusinessChainOverviewMermaid(
+  overview,
+  chains,
+  currentChainKey
+) {
+  if (!overview) return ''
+  const chainByKey = new Map(chains.map((chain) => [chain.key, chain]))
+  const ids = new Map(chains.map((chain, index) => [chain.key, `C${index}`]))
+  const lines = ['flowchart LR']
+
+  overview.lanes.forEach((lane, laneIndex) => {
+    lines.push(`  subgraph L${laneIndex}["${escapeMermaid(lane.label)}"]`)
+    lines.push('    direction LR')
+    lane.chainKeys.forEach((chainKey) => {
+      const chain = chainByKey.get(chainKey)
+      lines.push(
+        `    ${ids.get(chainKey)}["${escapeMermaid(chain?.label || chainKey)}"]`
+      )
+    })
+    lines.push('  end')
   })
-  definition.edges.forEach((edge) => {
-    const from = nodeIdByKey.get(edge.from)
-    const to = nodeIdByKey.get(edge.to)
-    if (from && to) lines.push(`  ${from} --> ${to}`)
+
+  overview.relations.forEach((relation) => {
+    lines.push(
+      `  ${ids.get(relation.fromChainKey)} -->|"${escapeMermaid(relation.label)}"| ${ids.get(relation.toChainKey)}`
+    )
+  })
+  lines.push(
+    '  classDef primary fill:#f6ffed,stroke:#389e0d,color:#163300',
+    '  classDef supporting fill:#e6f4ff,stroke:#1677ff,color:#102a43',
+    '  classDef exception fill:#fff2e8,stroke:#d4380d,color:#431407',
+    '  classDef rework fill:#f9f0ff,stroke:#722ed1,color:#2d1648',
+    '  classDef reversal fill:#fffbe6,stroke:#d48806,color:#3d2b00',
+    '  classDef overview_runtime_current fill:#fff7e6,stroke:#fa8c16,stroke-width:4px,color:#452500'
+  )
+  chains.forEach((chain) => {
+    const classes = [chain.kind]
+    if (chain.key === currentChainKey) classes.push('overview_runtime_current')
+    lines.push(`  class ${ids.get(chain.key)} ${classes.join(',')}`)
   })
   return lines.join('\n')
 }
 
-function ProcessDefinitionPanel({ definition }) {
-  const mermaid = useMemo(() => buildProcessMermaid(definition), [definition])
-  if (!definition) {
-    return (
-      <Empty
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-        description="Product Core 尚未登记流程定义"
-      />
+function buildProcessMermaid(definition) {
+  if (!definition) return ''
+  const ids = new Map(
+    definition.nodes.map((node, index) => [node.key, `P${index}`])
+  )
+  const lines = ['flowchart LR']
+  for (const node of definition.nodes) {
+    lines.push(`  ${ids.get(node.key)}["${escapeMermaid(node.label)}"]`)
+  }
+  for (const edge of definition.edges) {
+    const connector = edge.branchPolicy ? '-->|"按结果分支"|' : '-->'
+    lines.push(`  ${ids.get(edge.from)} ${connector} ${ids.get(edge.to)}`)
+  }
+  return lines.join('\n')
+}
+
+function buildStateMermaid(flow) {
+  if (!flow) return ''
+  const ids = new Map(
+    flow.states.map((state, index) => [state.key, `S${index}`])
+  )
+  const lines = ['stateDiagram-v2', '  direction LR']
+  for (const state of flow.states) {
+    lines.push(
+      `  state "${escapeMermaid(state.label)}" as ${ids.get(state.key)}`
     )
   }
-  return (
-    <div className="erp-dev-flow-state-process-layout">
-      <section className="erp-dev-flow-state-process-diagram">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text className="erp-dev-flow-state-eyebrow">
-              Product Core 编排
-            </Text>
-            <Title level={2}>{definition.label}</Title>
-            <Text type="secondary">
-              {definition.processKey} · {definition.variantKey}
-            </Text>
-          </div>
-          <Space wrap>
-            <Tag>{definition.processVersion || '版本未声明'}</Tag>
-            <Tag color="green">只读定义</Tag>
-          </Space>
-        </div>
-        <dl className="erp-dev-flow-state-facts">
-          <div>
-            <dt>Process key</dt>
-            <dd>
-              <code>{definition.processKey}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Variant</dt>
-            <dd>
-              <code>{definition.variantKey}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>初始节点</dt>
-            <dd>{definition.initial || '未声明'}</dd>
-          </div>
-          <div>
-            <dt>结束节点</dt>
-            <dd>{definition.terminal || '未声明'}</dd>
-          </div>
-          <div>
-            <dt>业务引用</dt>
-            <dd>{definition.businessRefType || '未声明'}</dd>
-          </div>
-          <div>
-            <dt>运行权威</dt>
-            <dd>{definition.runtimeAuthority || '未声明'}</dd>
-          </div>
-        </dl>
-        {mermaid ? (
-          <div className="erp-dev-flow-state-mermaid erp-dev-docs-markdown">
-            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
-          </div>
-        ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="当前定义没有可画的显式节点与边"
-          />
-        )}
-        <EvidenceDisclosure
-          context="process"
-          label="查看本流程的实现依据"
-          items={uniqueEvidenceSources(
-            definition.evidence,
-            ...definition.nodes.map((node) => node.evidence)
-          )}
-        />
-      </section>
-      <section className="erp-dev-flow-state-process-nodes">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text strong>节点责任与领域边界</Text>
-            <Text type="secondary">
-              Owner、Action、Permission 与 Fact boundary 分列。
-            </Text>
-          </div>
-          <Tag>{definition.nodes.length} 个节点</Tag>
-        </div>
-        <div className="erp-dev-flow-state-process-node-list">
-          {definition.nodes.map((node) => (
-            <article key={node.key}>
-              <div>
-                <strong>{node.label}</strong>
-                <Tag>{node.type || '类型未声明'}</Tag>
-              </div>
-              <code>{node.key}</code>
-              <dl>
-                <div>
-                  <dt>Owner</dt>
-                  <dd>{node.ownerPool || '未声明'}</dd>
-                </div>
-                <div>
-                  <dt>Action</dt>
-                  <dd>{node.action || '无写动作'}</dd>
-                </div>
-                <div>
-                  <dt>Permission</dt>
-                  <dd>{node.permission || '未声明'}</dd>
-                </div>
-                <div>
-                  <dt>Fact boundary</dt>
-                  <dd>{node.factBoundary || '未声明'}</dd>
-                </div>
-              </dl>
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function CustomerPreviewItems({ title, items, onOpenCanonical = null }) {
-  if (!items.length) return null
-  return (
-    <section className="erp-dev-flow-state-customer-preview-group">
-      <div className="erp-dev-flow-state-section-head">
-        <Text strong>{title}</Text>
-        <Tag>{items.length}</Tag>
-      </div>
-      <div>
-        {items.map((item, index) => {
-          const key = firstText(item.key, `${title}-${index}`)
-          const comparison = isRecord(item.comparison) ? item.comparison : null
-          const status = firstText(item.status, 'preview_only')
-          const statusLabel =
-            {
-              registered_preview_selection: '已登记选择',
-              unknown_process: '未知流程',
-              unknown_variant: '未知 variant',
-              identity_mismatch: '身份不匹配',
-              preview_only: '仅预览',
-            }[status] || status
-          const processLabel =
-            item.processKey && item.variantKey
-              ? `${item.processKey} · ${item.variantKey}`
-              : ''
-          const canonicalProcessKey = firstText(
-            item.canonicalProcessDefinition?.key
-          )
-          return (
-            <article key={key}>
-              <div>
-                <strong>
-                  {firstText(item.label, item.name, processLabel, key)}
-                </strong>
-                <Tag color="cyan" title={status}>
-                  {statusLabel}
-                </Tag>
-              </div>
-              <code>{key}</code>
-              {item.guardrail ? <p>{item.guardrail}</p> : null}
-              {comparison ? (
-                <small>
-                  与 Product Core：
-                  {firstText(comparison.status, '未比较')}
-                  {comparison.canonicalMachineKey
-                    ? ` · ${comparison.canonicalMachineKey}`
-                    : ''}
-                </small>
-              ) : null}
-              {onOpenCanonical ? (
-                <Button
-                  size="small"
-                  disabled={!canonicalProcessKey}
-                  onClick={() => onOpenCanonical(canonicalProcessKey)}
-                >
-                  {canonicalProcessKey
-                    ? '打开 Product Core 图'
-                    : '未匹配 Product Core 定义'}
-                </Button>
-              ) : null}
-            </article>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-function CustomerOrchestrationView({
-  processDefinitions,
-  requestedProcessKey,
-  onSelectProcess,
-  overlays,
-  requestedCustomerKey,
-  onSelectCustomer,
-}) {
-  const selectedProcess =
-    processDefinitions.find(
-      (definition) => definition.key === requestedProcessKey
-    ) || (!requestedProcessKey ? processDefinitions.at(0) : null)
-  const selectedOverlay =
-    overlays.find((overlay) => overlay.key === requestedCustomerKey) ||
-    (!requestedCustomerKey ? overlays.at(0) : null)
-  return (
-    <div className="erp-dev-flow-state-view-stack">
-      <Alert
-        showIcon
-        type="warning"
-        message="流程编排 / 客户差异只读"
-        description="Product Core 定义来自后端合同；甲方包只能选择已登记 variant 并比较 preview 差异，不能在这里增加节点、改顺序、提升权限或绕过领域动作。"
-      />
-
-      <section className="erp-dev-flow-state-orchestration-section">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text strong>Product Core 流程定义</Text>
-            <Text type="secondary">
-              只展示目录明确登记的 process variant 与显式边。
-            </Text>
-          </div>
-          <Select
-            aria-label="选择 Product Core 流程"
-            value={selectedProcess?.key}
-            placeholder="选择 Product Core 流程"
-            notFoundContent="没有流程定义"
-            options={processDefinitions.map((definition) => ({
-              value: definition.key,
-              label: `${definition.label} · ${definition.variantKey}`,
-            }))}
-            onChange={onSelectProcess}
-          />
-        </div>
-        {requestedProcessKey && !selectedProcess ? (
-          <Alert showIcon type="warning" message="深链中的流程定义不存在" />
-        ) : (
-          <ProcessDefinitionPanel definition={selectedProcess} />
-        )}
-      </section>
-
-      <section className="erp-dev-flow-state-orchestration-section">
-        <div className="erp-dev-flow-state-section-head">
-          <div>
-            <Text strong>甲方包选择与差异</Text>
-            <Text type="secondary">
-              runtimeProcessSelections、业务流、状态机与流程策略均来自登记包。
-            </Text>
-          </div>
-          <Select
-            aria-label="选择甲方包"
-            value={selectedOverlay?.key}
-            placeholder="选择甲方包"
-            notFoundContent="没有已登记甲方包"
-            options={overlays.map((overlay) => ({
-              value: overlay.key,
-              label: overlay.label,
-            }))}
-            onChange={onSelectCustomer}
-          />
-        </div>
-        {requestedCustomerKey && !selectedOverlay ? (
-          <Alert showIcon type="warning" message="深链中的甲方包不存在" />
-        ) : selectedOverlay ? (
-          <div className="erp-dev-flow-state-customer-grid">
-            <article key={selectedOverlay.key}>
-              <div className="erp-dev-flow-state-customer-card__head">
-                <div>
-                  <TeamOutlined aria-hidden="true" />
-                  <strong>{selectedOverlay.label}</strong>
-                </div>
-                <Tag color={selectedOverlay.previewOnly ? 'cyan' : 'green'}>
-                  {selectedOverlay.previewOnly ? '仅预览' : '已登记'}
-                </Tag>
-              </div>
-              <code>{selectedOverlay.key}</code>
-              <p>
-                {selectedOverlay.summary ||
-                  '目录未补充差异说明；以下内容直接来自已登记客户包。'}
-              </p>
-              <div className="erp-dev-flow-state-customer-metrics">
-                {[
-                  {
-                    label: '运行选择',
-                    value: selectedOverlay.runtimeProcessSelections.length,
-                  },
-                  {
-                    label: '业务流',
-                    value: selectedOverlay.businessFlows.length,
-                  },
-                  {
-                    label: '状态机',
-                    value: selectedOverlay.stateMachines.length,
-                  },
-                  {
-                    label: '流程策略',
-                    value: selectedOverlay.processPolicies.length,
-                  },
-                ].map((item) => (
-                  <span key={item.label}>
-                    <strong>{item.value}</strong>
-                    <small>{item.label}</small>
-                  </span>
-                ))}
-              </div>
-              <dl className="erp-dev-flow-state-customer-comparison">
-                <div>
-                  <dt>运行权威</dt>
-                  <dd>{selectedOverlay.runtimeAuthority || '仅用于比较'}</dd>
-                </div>
-                <div>
-                  <dt>实现依据</dt>
-                  <dd>
-                    {uniqueEvidenceSources(selectedOverlay.evidence).length}{' '}
-                    个来源
-                  </dd>
-                </div>
-              </dl>
-              <EvidenceDisclosure
-                context="customer"
-                label="查看客户包实现依据"
-                items={selectedOverlay.evidence}
-              />
-            </article>
-            <div className="erp-dev-flow-state-customer-preview-stack">
-              <CustomerPreviewItems
-                title="运行流程选择"
-                items={selectedOverlay.runtimeProcessSelections}
-                onOpenCanonical={onSelectProcess}
-              />
-              <CustomerPreviewItems
-                title="业务流预览"
-                items={selectedOverlay.businessFlows}
-              />
-              <CustomerPreviewItems
-                title="状态机比较"
-                items={selectedOverlay.stateMachines}
-              />
-              <CustomerPreviewItems
-                title="流程策略"
-                items={selectedOverlay.processPolicies}
-              />
-            </div>
-          </div>
-        ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="没有已登记的甲方差异"
-          />
-        )}
-      </section>
-    </div>
-  )
-}
-
-function useRuntimeContext(taskIdValue) {
-  const [state, setState] = useState({
-    status: 'idle',
-    context: null,
-    error: '',
-  })
-
-  useEffect(() => {
-    const text = cleanText(taskIdValue)
-    if (!text) {
-      setState({ status: 'idle', context: null, error: '' })
-      return undefined
-    }
-    const taskId = Number(text)
-    if (!Number.isSafeInteger(taskId) || taskId <= 0) {
-      setState({
-        status: 'error',
-        context: null,
-        error: 'task_id 必须是大于 0 的整数',
-      })
-      return undefined
-    }
-    const controller = new AbortController()
-    setState({ status: 'loading', context: null, error: '' })
-    getWorkflowTaskProcessContext(taskId, { signal: controller.signal })
-      .then((context) => {
-        if (controller.signal.aborted) return
-        setState({ status: 'ready', context, error: '' })
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return
-        setState({
-          status: 'error',
-          context: null,
-          error: getActionErrorMessage(error, '读取任务流程位置', {
-            fallback: '读取任务流程位置失败，请确认已登录且具备任务查看权限',
-          }),
-        })
-      })
-    return () => controller.abort()
-  }, [taskIdValue])
-
-  return state
-}
-
-function RuntimeView({
-  taskIdValue,
-  taskIdDraft,
-  onTaskIdDraftChange,
-  onSubmitTaskId,
-}) {
-  const runtime = useRuntimeContext(taskIdValue)
-  const { context } = runtime
-  const processInstance = context?.process_instance
-  const nodes = asArray(context?.nodes)
-  return (
-    <div className="erp-dev-flow-state-view-stack">
-      <Alert
-        showIcon
-        type="info"
-        message="只读取真实 ProcessRuntime 位置"
-        description="查询经过 workflow.get_task_process_context、管理员登录态、任务可见性和持久化锚点校验；不从任务标题、文案或 payload 猜节点。"
-      />
-      <form
-        className="erp-dev-flow-state-runtime-search"
-        onSubmit={(event) => {
-          event.preventDefault()
-          onSubmitTaskId()
-        }}
-      >
-        <label htmlFor="dev-flow-state-task-id">任务 task_id</label>
-        <Input
-          id="dev-flow-state-task-id"
-          inputMode="numeric"
-          prefix={<SearchOutlined />}
-          value={taskIdDraft}
-          placeholder="输入已有任务 ID"
-          onChange={(event) => onTaskIdDraftChange(event.target.value)}
-        />
-        <Button
-          htmlType="submit"
-          type="primary"
-          loading={runtime.status === 'loading'}
-        >
-          读取真实位置
-        </Button>
-      </form>
-
-      {runtime.status === 'idle' ? (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="输入 task_id 后读取运行轨迹与证据"
-        />
-      ) : null}
-      {runtime.status === 'loading' ? (
-        <div
-          className="erp-dev-flow-state-loading"
-          role="status"
-          aria-live="polite"
-        >
-          <Spin />
-          <span>正在读取真实流程位置…</span>
-        </div>
-      ) : null}
-      {runtime.status === 'error' ? (
-        <Alert
-          showIcon
-          type="error"
-          message="运行轨迹读取失败"
-          description={
-            <>
-              <p>{runtime.error}</p>
-              <p>
-                本页不会退回演示数据。请先登录管理员会话，并确认拥有该任务的查看权限。
-              </p>
-            </>
-          }
-        />
-      ) : null}
-      {runtime.status === 'ready' && context ? (
-        <>
-          <section className="erp-dev-flow-state-runtime-summary">
-            <div className="erp-dev-flow-state-section-head">
-              <div>
-                <Text className="erp-dev-flow-state-eyebrow">真实运行位置</Text>
-                <Title level={2}>{getProcessLabel(processInstance)}</Title>
-              </div>
-              <Tag color={STATUS_TAG_COLOR[processInstance.status]}>
-                {getProcessStatusLabel(processInstance)}
-              </Tag>
-            </div>
-            <dl className="erp-dev-flow-state-facts">
-              <div>
-                <dt>task_id</dt>
-                <dd>
-                  <code>{taskIdValue}</code>
-                </dd>
-              </div>
-              <div>
-                <dt>流程 key</dt>
-                <dd>
-                  <code>{processInstance.process_key}</code>
-                </dd>
-              </div>
-              <div>
-                <dt>流程版本</dt>
-                <dd>{processInstance.process_version}</dd>
-              </div>
-              <div>
-                <dt>发起时间</dt>
-                <dd>{formatProcessStartedAt(processInstance.started_at)}</dd>
-              </div>
-              <div>
-                <dt>来源类型</dt>
-                <dd>{context.source?.type || '未声明'}</dd>
-              </div>
-              <div>
-                <dt>来源单号</dt>
-                <dd>{context.source?.no || '未声明'}</dd>
-              </div>
-            </dl>
-          </section>
-          <section className="erp-dev-flow-state-runtime-nodes">
-            <div className="erp-dev-flow-state-section-head">
-              <div>
-                <Text strong>节点轨迹</Text>
-                <Text type="secondary">
-                  只按后端返回节点展示，不补造节点间连线。
-                </Text>
-              </div>
-              <Tag>{nodes.length} 个节点</Tag>
-            </div>
-            <ol>
-              {nodes.map((node) => (
-                <li
-                  key={node.id}
-                  data-node-status={node.status}
-                  aria-current={
-                    ['active', 'blocked'].includes(node.status)
-                      ? 'step'
-                      : undefined
-                  }
-                >
-                  <span className="erp-dev-flow-state-runtime-node__icon">
-                    {node.status === 'completed' ? (
-                      <CheckCircleOutlined />
-                    ) : node.status === 'blocked' ? (
-                      <ExclamationCircleOutlined />
-                    ) : (
-                      <ClockCircleOutlined />
-                    )}
-                  </span>
-                  <span>
-                    <strong>{getProcessNodeLabel(node)}</strong>
-                    <code>{node.node_key}</code>
-                  </span>
-                  <Tag color={STATUS_TAG_COLOR[node.status]}>
-                    {getProcessNodeStatusLabel(node)}
-                  </Tag>
-                </li>
-              ))}
-            </ol>
-          </section>
-        </>
-      ) : null}
-    </div>
-  )
+  for (const stateKey of flow.initialStates) {
+    lines.push(`  [*] --> ${ids.get(stateKey)}`)
+  }
+  for (const transition of flow.transitions) {
+    lines.push(
+      `  ${ids.get(transition.from)} --> ${ids.get(transition.to)}: ${escapeMermaid(humanActionLabel(transition.action))}`
+    )
+  }
+  for (const stateKey of flow.terminalStates) {
+    lines.push(`  ${ids.get(stateKey)} --> [*]`)
+  }
+  return lines.join('\n')
 }
 
 function CatalogState({ state, onRetry }) {
   if (state.status === 'loading') {
     return (
-      <div
-        className="erp-dev-flow-state-loading"
-        role="status"
-        aria-live="polite"
-      >
+      <div className="erp-dev-flow-loading" role="status" aria-live="polite">
         <Spin />
-        <span>正在加载流程状态目录…</span>
+        <span>正在加载业务链目录…</span>
       </div>
     )
   }
@@ -2054,9 +602,9 @@ function CatalogState({ state, onRetry }) {
       <Alert
         showIcon
         type="error"
-        message="流程状态目录不可用"
+        message="业务链目录不可用"
         description={
-          <Space direction="vertical" size={10}>
+          <Space direction="vertical">
             <span>{state.error}</span>
             <Button icon={<ReloadOutlined />} onClick={onRetry}>
               重新加载目录
@@ -2069,28 +617,2062 @@ function CatalogState({ state, onRetry }) {
   return null
 }
 
+function MemoryStrip() {
+  return (
+    <section className="erp-dev-flow-memory" aria-label="五层职责记忆">
+      {MEMORY_ITEMS.map((item) => {
+        const Icon = item.icon
+        return (
+          <article key={item.key} data-memory-layer={item.key}>
+            <Icon aria-hidden="true" />
+            <span>
+              <strong>{item.title}</strong>
+              <small>{item.text}</small>
+            </span>
+          </article>
+        )
+      })}
+    </section>
+  )
+}
+
+function GuidanceDisclosure({ guidanceKey, title, summary, description }) {
+  return (
+    <details className="erp-dev-flow-guidance" data-flow-guidance={guidanceKey}>
+      <summary>
+        <InfoCircleOutlined aria-hidden="true" />
+        <span>
+          <strong>{title}</strong>
+          <small>{summary}</small>
+        </span>
+      </summary>
+      <div className="erp-dev-flow-guidance__body">
+        <p>{description}</p>
+      </div>
+    </details>
+  )
+}
+
+function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
+  const [draftKeyword, setDraftKeyword] = useState('')
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [searchGuideOpen, setSearchGuideOpen] = useState(false)
+  const composingRef = useRef(false)
+  const normalized = normalizeDevFlowDefinitionSearchText(searchKeyword)
+  const groups = useMemo(
+    () => buildDevFlowDefinitionSearchGroups(catalog, searchKeyword),
+    [catalog, searchKeyword]
+  )
+  const resultCount = groups.reduce(
+    (count, group) => count + group.items.length,
+    0
+  )
+  const clearSearch = () => {
+    composingRef.current = false
+    setDraftKeyword('')
+    setSearchKeyword('')
+  }
+  const openResult = (item) => {
+    clearSearch()
+    onOpen(item)
+  }
+  const searchExample = (keyword) => {
+    composingRef.current = false
+    setDraftKeyword(keyword)
+    setSearchKeyword(keyword)
+    setSearchGuideOpen(false)
+  }
+
+  const searchGuide = (
+    <div
+      className="erp-dev-flow-search-guide"
+      id="dev-flow-definition-search-guide"
+      data-definition-search-guide
+    >
+      <p>这个框查目录定义，不查具体任务、运行实例或真实业务记录。</p>
+      <ul>
+        {DEFINITION_SEARCH_GUIDE_GROUPS.map((group) => (
+          <li key={group.label}>
+            <strong>{group.label}</strong>
+            <div className="erp-dev-flow-search-guide__examples">
+              {group.examples.map((example) => (
+                <Button
+                  key={example}
+                  size="small"
+                  onClick={() => searchExample(example)}
+                >
+                  {example}
+                </Button>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <small>多个词用空格组合；点击示例会直接带入并搜索。</small>
+    </div>
+  )
+
+  return (
+    <section
+      className="erp-dev-flow-global-search"
+      aria-labelledby="dev-flow-global-search-title"
+      data-search-composing={composingRef.current ? 'true' : 'false'}
+    >
+      <div className="erp-dev-flow-section-heading">
+        <div>
+          <Text strong id="dev-flow-global-search-title">
+            跨视图查定义（不查具体任务）
+          </Text>
+          <Text type="secondary">
+            可跨 5
+            个视图查业务链、Workflow、ProcessRuntime、状态和事实定义，不是页面全文搜索；多个词可用空格组合。
+          </Text>
+        </div>
+        <Space size={8} wrap>
+          <Popover
+            placement="bottomRight"
+            trigger="click"
+            open={searchGuideOpen}
+            title="这个框可以搜什么"
+            content={searchGuide}
+            onOpenChange={setSearchGuideOpen}
+          >
+            <Button
+              icon={<InfoCircleOutlined />}
+              aria-expanded={searchGuideOpen}
+              aria-controls="dev-flow-definition-search-guide"
+            >
+              可以搜什么
+            </Button>
+          </Popover>
+          <Button onClick={() => onOpenTaskLookup(draftKeyword)}>
+            去查真实任务
+          </Button>
+        </Space>
+      </div>
+      <SearchInput
+        allowClear
+        maxLength={500}
+        value={draftKeyword}
+        placeholder="例如：销售订单、销售 PMC、已提交、出货事实"
+        searchHint="跨 5 个视图搜索定义，不搜索具体任务、运行实例或真实业务记录；多个词可用空格组合"
+        aria-autocomplete="list"
+        aria-expanded={Boolean(normalized)}
+        aria-controls="dev-flow-definition-search-results"
+        onCompositionStart={() => {
+          composingRef.current = true
+        }}
+        onCompositionEnd={(event) => {
+          const { value } = event.currentTarget
+          composingRef.current = false
+          setDraftKeyword(value)
+          setSearchKeyword(value)
+        }}
+        onChange={(event) => {
+          const { value } = event.target
+          setDraftKeyword(value)
+          if (!composingRef.current && !event.nativeEvent.isComposing) {
+            setSearchKeyword(value)
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') clearSearch()
+        }}
+      />
+      {normalized ? (
+        <div
+          className="erp-dev-flow-search-results"
+          id="dev-flow-definition-search-results"
+          aria-label="定义搜索结果"
+        >
+          <div className="erp-dev-flow-search-result-summary">
+            <Tag>{resultCount} 个定义</Tag>
+          </div>
+          {resultCount > 0 ? (
+            <div className="erp-dev-flow-search-groups">
+              {groups.map((group) => (
+                <section key={group.key}>
+                  <h3>
+                    {group.label}
+                    <span>{group.items.length}</span>
+                  </h3>
+                  {group.items.length > 0 ? (
+                    <ul>
+                      {group.items.map((item) => (
+                        <li key={`${item.type}:${item.key}`}>
+                          <button
+                            type="button"
+                            onClick={() => openResult(item)}
+                          >
+                            <strong>{item.label}</strong>
+                            {item.matchContext ? (
+                              <small>{item.matchContext}</small>
+                            ) : null}
+                            <code>{item.key}</code>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <small>没有匹配定义</small>
+                  )}
+                </section>
+              ))}
+            </div>
+          ) : (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="没有匹配定义；具体任务请使用“去查真实任务”"
+            />
+          )}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function ContextStrip({ view, chain, node, taskId, selection, onReturnChain }) {
+  const overviewSelected = chain?.key === ALL_BUSINESS_CHAINS_KEY
+  return (
+    <section className="erp-dev-flow-context" aria-label="当前观察上下文">
+      <div>
+        <span>当前视图</span>
+        <strong>{VIEW_META[view]?.label}</strong>
+      </div>
+      <div>
+        <span>当前业务链</span>
+        <strong>{chain?.label || '未选择'}</strong>
+      </div>
+      <div>
+        <span>{overviewSelected ? '总图范围' : '当前链路节点'}</span>
+        <strong>
+          {overviewSelected
+            ? `${chain.chainKeys.length} 条业务链 · ${chain.relations.length} 条衔接`
+            : node?.label || '未选择'}
+        </strong>
+      </div>
+      {selection ? (
+        <div>
+          <span>当前专项选择</span>
+          <strong>{selection}</strong>
+        </div>
+      ) : null}
+      {taskId ? (
+        <div>
+          <span>真实任务上下文</span>
+          <KeyValue value={taskId}>task_id {taskId}</KeyValue>
+        </div>
+      ) : null}
+      {view !== 'chain' && chain ? (
+        <Button onClick={onReturnChain}>返回业务链</Button>
+      ) : null}
+    </section>
+  )
+}
+
+function TaskLookupResults({ lookup, onSelectTask }) {
+  if (lookup.status === 'loading') {
+    return (
+      <div className="erp-dev-flow-loading" role="status" aria-live="polite">
+        <Spin />
+        <span>正在当前账号可见任务中查找…</span>
+      </div>
+    )
+  }
+  if (lookup.status === 'error') {
+    return (
+      <Alert
+        showIcon
+        type="error"
+        message="任务查找失败"
+        description={lookup.error}
+      />
+    )
+  }
+  if (lookup.status !== 'ready') return null
+  if (lookup.candidates.length === 0) {
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description="没有找到名称、任务编号或来源单号相符的可见任务"
+      />
+    )
+  }
+  return (
+    <section className="erp-dev-flow-task-results" aria-label="任务查询结果">
+      <div className="erp-dev-flow-section-heading">
+        <div>
+          <Text strong>
+            {lookup.candidates.length > 1
+              ? `找到 ${lookup.candidates.length} 条同名或相关任务`
+              : '找到 1 条相关任务'}
+          </Text>
+          <Text type="secondary">
+            名称可能重复，请结合任务编号、来源单号、负责岗位和状态选择。
+          </Text>
+        </div>
+        <Tag>{lookup.serverMatchCount} 条后端匹配</Tag>
+      </div>
+      {!lookup.complete ? (
+        <Alert
+          showIcon
+          type="warning"
+          message={`当前只读取最新 ${lookup.loadedCount} 条匹配任务`}
+          description="结果不完整时不会自动选择；请补全任务名称、任务编号或来源单号。"
+        />
+      ) : null}
+      <ul>
+        {lookup.candidates.map((task) => {
+          const status = getWorkflowTaskStatusMeta(task)
+          const sourceNo = cleanText(task.source_no) || '未记录来源单号'
+          return (
+            <li key={task.id}>
+              <button
+                type="button"
+                onClick={() => onSelectTask(task)}
+                aria-label={`读取任务：${getWorkflowTaskDisplayName(task)}；任务编号：${task.task_code}；来源单号：${sourceNo}`}
+              >
+                <span>
+                  <strong>{getWorkflowTaskDisplayName(task)}</strong>
+                  <Tag color={status.color}>{status.label}</Tag>
+                </span>
+                <small>任务编号：{task.task_code}</small>
+                <small>来源单号：{sourceNo}</small>
+                <small>负责岗位：{getWorkflowTaskOwnerRoleLabel(task)}</small>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
+  )
+}
+
+function TaskFinder({
+  draft,
+  onDraftChange,
+  onClearTask,
+  onSelectTask,
+  taskId,
+}) {
+  const controllerRef = useRef(null)
+  const [lookup, setLookup] = useState({
+    status: 'idle',
+    candidates: [],
+    complete: true,
+    loadedCount: 0,
+    serverMatchCount: 0,
+    error: '',
+  })
+  useEffect(() => () => controllerRef.current?.abort(), [])
+
+  const selectTask = (task) => {
+    controllerRef.current?.abort()
+    setLookup((current) => ({
+      ...current,
+      status: 'selected',
+      candidates: [],
+      error: '',
+    }))
+    onDraftChange(task.task_name)
+    onSelectTask(task.id, task)
+  }
+
+  const submit = async () => {
+    const directTaskId = parseDevFlowStateTaskIDReference(draft)
+    if (directTaskId) {
+      controllerRef.current?.abort()
+      setLookup((current) => ({
+        ...current,
+        status: 'selected',
+        candidates: [],
+        error: '',
+      }))
+      onSelectTask(directTaskId, null)
+      return
+    }
+    let query
+    try {
+      query = buildDevFlowStateTaskLookupQuery(draft)
+    } catch (error) {
+      setLookup({
+        status: 'error',
+        candidates: [],
+        complete: true,
+        loadedCount: 0,
+        serverMatchCount: 0,
+        error: error.message,
+      })
+      return
+    }
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
+    setLookup({
+      status: 'loading',
+      candidates: [],
+      complete: true,
+      loadedCount: 0,
+      serverMatchCount: 0,
+      error: '',
+    })
+    onClearTask()
+    try {
+      const data = await listWorkflowTasks(query, { signal: controller.signal })
+      if (controller.signal.aborted) return
+      const resolved = resolveDevFlowStateTaskLookupPage(data, draft)
+      if (resolved.autoSelectedTask) {
+        selectTask(resolved.autoSelectedTask)
+        return
+      }
+      setLookup({ status: 'ready', error: '', ...resolved })
+    } catch (error) {
+      if (controller.signal.aborted || isRpcAbortError(error)) return
+      setLookup({
+        status: 'error',
+        candidates: [],
+        complete: true,
+        loadedCount: 0,
+        serverMatchCount: 0,
+        error: getActionErrorMessage(error, '查找任务', {
+          fallback: '查找任务失败，请确认已登录且具备任务查看权限',
+        }),
+      })
+    }
+  }
+
+  return (
+    <div className="erp-dev-flow-task-finder">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}
+      >
+        <label htmlFor="dev-flow-task-search">查找后台任务</label>
+        <SearchInput
+          id="dev-flow-task-search"
+          allowClear
+          maxLength={200}
+          value={draft}
+          placeholder="粘贴完整任务名称、任务编号、来源单号或数字 task_id"
+          searchHint="从电脑端后台「任务看板」复制完整任务名称；也支持任务编号、来源单号，数字 task_id 仅用于开发排障"
+          onChange={(event) => {
+            controllerRef.current?.abort()
+            setLookup((current) => ({
+              ...current,
+              status: 'idle',
+              candidates: [],
+              error: '',
+            }))
+            onDraftChange(event.target.value)
+          }}
+        />
+        <Button
+          type="primary"
+          htmlType="submit"
+          loading={lookup.status === 'loading'}
+        >
+          查找并读取
+        </Button>
+        {taskId ? <Button onClick={onClearTask}>清除当前任务</Button> : null}
+      </form>
+      <Text type="secondary">
+        从后台「任务看板」复制完整任务名称、任务编号或来源单号；数字 task_id
+        仅用于开发排障，查询结果受当前账号可见范围限制。
+      </Text>
+      <TaskLookupResults lookup={lookup} onSelectTask={selectTask} />
+    </div>
+  )
+}
+
+function useRuntimeContext(taskId, association) {
+  const [state, setState] = useState({
+    status: 'idle',
+    context: null,
+    error: '',
+    queriedAt: '',
+  })
+  useEffect(() => {
+    if (!taskId) {
+      setState({ status: 'idle', context: null, error: '', queriedAt: '' })
+      return undefined
+    }
+    if (association === DEV_FLOW_STATE_TASK_RUNTIME_ASSOCIATION.UNLINKED) {
+      setState({
+        status: 'unlinked',
+        context: null,
+        error: '',
+        queriedAt: new Date().toISOString(),
+      })
+      return undefined
+    }
+    if (association === DEV_FLOW_STATE_TASK_RUNTIME_ASSOCIATION.INVALID) {
+      setState({
+        status: 'error',
+        context: null,
+        error: '任务的 ProcessRuntime 锚点不完整，已拒绝猜测。',
+        queriedAt: new Date().toISOString(),
+      })
+      return undefined
+    }
+    const controller = new AbortController()
+    setState({ status: 'loading', context: null, error: '', queriedAt: '' })
+    getWorkflowTaskProcessContext(Number(taskId), { signal: controller.signal })
+      .then((context) => {
+        if (!controller.signal.aborted) {
+          setState({
+            status: 'ready',
+            context,
+            error: '',
+            queriedAt: new Date().toISOString(),
+          })
+        }
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || isRpcAbortError(error)) return
+        if (isDevFlowStateTaskUnlinkedRuntimeError(error)) {
+          setState({
+            status: 'unlinked',
+            context: null,
+            error: '',
+            queriedAt: new Date().toISOString(),
+          })
+          return
+        }
+        setState({
+          status: 'error',
+          context: null,
+          queriedAt: new Date().toISOString(),
+          error: getActionErrorMessage(error, '读取任务流程位置', {
+            fallback: '读取任务流程位置失败，请确认已登录且具备任务查看权限',
+          }),
+        })
+      })
+    return () => controller.abort()
+  }, [association, taskId])
+  return state
+}
+
+function useWorkflowEvents(taskId) {
+  const [state, setState] = useState({
+    status: 'idle',
+    items: [],
+    truncated: false,
+    error: '',
+    queriedAt: '',
+  })
+  useEffect(() => {
+    if (!taskId) {
+      setState({
+        status: 'idle',
+        items: [],
+        truncated: false,
+        error: '',
+        queriedAt: '',
+      })
+      return undefined
+    }
+    const controller = new AbortController()
+    setState({
+      status: 'loading',
+      items: [],
+      truncated: false,
+      error: '',
+      queriedAt: '',
+    })
+    listWorkflowTaskEvents(Number(taskId), {
+      limit: 100,
+      signal: controller.signal,
+    })
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setState({
+            status: 'ready',
+            items: result.items,
+            truncated: result.truncated,
+            error: '',
+            queriedAt: new Date().toISOString(),
+          })
+        }
+      })
+      .catch((error) => {
+        if (controller.signal.aborted || isRpcAbortError(error)) return
+        setState({
+          status: 'error',
+          items: [],
+          truncated: false,
+          queriedAt: new Date().toISOString(),
+          error: getActionErrorMessage(error, '读取任务协同记录', {
+            fallback: '读取任务协同记录失败，请确认已登录且具备任务查看权限',
+          }),
+        })
+      })
+    return () => controller.abort()
+  }, [taskId])
+  return state
+}
+
+function BusinessChainSelector({ catalog, value, onChange }) {
+  const searchProps = useDefinitionSelectSearch()
+  const chainOptionFilter = useMemo(
+    () => createDevFlowDefinitionOptionFilter(catalog, 'chains'),
+    [catalog]
+  )
+  const optionFilter = useCallback(
+    (keyword, option) => {
+      if (option?.value !== ALL_BUSINESS_CHAINS_KEY) {
+        return chainOptionFilter(keyword, option)
+      }
+      const normalized = normalizeDevFlowDefinitionSearchText(keyword)
+      if (!normalized) return true
+      const overviewText = normalizeDevFlowDefinitionSearchText(
+        [
+          catalog.businessChainOverview.label,
+          catalog.businessChainOverview.summary,
+          '全部业务链 总链 总图 设计总图',
+        ].join(' ')
+      )
+      return normalized
+        .split(/\s+/u)
+        .every((term) => overviewText.includes(term))
+    },
+    [catalog.businessChainOverview, chainOptionFilter]
+  )
+  const overviewSelected = value === ALL_BUSINESS_CHAINS_KEY
+  const selectedChain = catalog.businessChains.find(
+    (item) => item.key === value
+  )
+  const selectedKind = selectedChain
+    ? CHAIN_KIND_PRESENTATION[selectedChain.kind]
+    : null
+  return (
+    <div className="erp-dev-flow-chain-selector">
+      <label htmlFor="dev-flow-chain-select">选择业务链</label>
+      <Select
+        id="dev-flow-chain-select"
+        aria-label="选择业务链"
+        showSearch
+        virtual={false}
+        {...searchProps}
+        filterOption={optionFilter}
+        notFoundContent="没有匹配的业务链"
+        value={value}
+        options={[
+          {
+            value: catalog.businessChainOverview.key,
+            label: catalog.businessChainOverview.label,
+          },
+          ...catalog.businessChains.map((item) => ({
+            value: item.key,
+            label: `${item.label} · ${CHAIN_KIND_PRESENTATION[item.kind].label}`,
+          })),
+        ]}
+        onChange={onChange}
+      />
+      {overviewSelected ? (
+        <Tag color="geekblue">链级设计总图</Tag>
+      ) : selectedKind ? (
+        <Tag color={selectedKind.color}>{selectedKind.label}</Tag>
+      ) : null}
+    </div>
+  )
+}
+
+function useBusinessChainRuntime(catalog, taskId, selectedTask) {
+  const association = getDevFlowStateTaskRuntimeAssociation(selectedTask)
+  const runtime = useRuntimeContext(taskId, association)
+  const runtimeProcessKey = cleanText(
+    runtime.context?.process_instance?.process_key
+  )
+  const matchingChain = runtimeProcessKey
+    ? catalog.businessChains.find((item) =>
+        item.nodes.some((candidate) =>
+          candidate.processKeys.includes(runtimeProcessKey)
+        )
+      )
+    : null
+  return { runtime, runtimeProcessKey, matchingChain }
+}
+
+function BusinessChainOverviewView({
+  catalog,
+  taskId,
+  selectedTask,
+  onSelectChain,
+  onOpenView,
+}) {
+  const overview = catalog.businessChainOverview
+  const chainByKey = useMemo(
+    () => new Map(catalog.businessChains.map((chain) => [chain.key, chain])),
+    [catalog.businessChains]
+  )
+  const { runtime, matchingChain } = useBusinessChainRuntime(
+    catalog,
+    taskId,
+    selectedTask
+  )
+  const mermaid = useMemo(
+    () =>
+      buildBusinessChainOverviewMermaid(
+        overview,
+        catalog.businessChains,
+        matchingChain?.key
+      ),
+    [catalog.businessChains, matchingChain?.key, overview]
+  )
+  const connectionCountByChain = useMemo(() => {
+    const counts = new Map(catalog.businessChains.map((chain) => [chain.key, 0]))
+    overview.relations.forEach((relation) => {
+      counts.set(
+        relation.fromChainKey,
+        (counts.get(relation.fromChainKey) || 0) + 1
+      )
+      counts.set(
+        relation.toChainKey,
+        (counts.get(relation.toChainKey) || 0) + 1
+      )
+    })
+    return counts
+  }, [catalog.businessChains, overview.relations])
+
+  return (
+    <div
+      className="erp-dev-flow-view-stack"
+      data-business-chain-overview
+    >
+      <GuidanceDisclosure
+        guidanceKey="chain-overview"
+        title="总图只画链与链的衔接"
+        summary="点击一条链，再查看内部来源单据、人、路、账和规则"
+        description="这里的 12 个节点分别代表 12 条真实业务链，不会把每条链内部几十个来源单据、Workflow、ProcessRuntime 和 Fact 节点挤在同一张图里。总图是只读设计投影，不是一笔业务的完整运行历史。"
+      />
+
+      <section className="erp-dev-flow-chain-heading">
+        <div>
+          <Text className="erp-dev-flow-eyebrow">全部业务链 · 设计总图</Text>
+          <Title level={2}>{overview.label}</Title>
+          <Paragraph>{overview.summary}</Paragraph>
+        </div>
+        <BusinessChainSelector
+          catalog={catalog}
+          value={overview.key}
+          onChange={onSelectChain}
+        />
+      </section>
+
+      <section
+        className="erp-dev-flow-chain-runtime"
+        data-runtime-overlay={runtime.status}
+      >
+        <div className="erp-dev-flow-section-heading">
+          <div>
+            <Text strong>真实运行定位</Text>
+            <Text type="secondary">
+              数据来源：workflow.get_task_process_context；总图最多只高亮当前任务所属的一条业务链。
+            </Text>
+          </div>
+          <Button onClick={() => onOpenView(taskId ? 'runtime' : 'workflow')}>
+            {taskId ? '查看完整运行轨迹' : '查询真实任务'}
+          </Button>
+        </div>
+        {!taskId ? (
+          <p>
+            尚未查询运行数据。当前只展示允许怎样衔接，不表示任何业务实例已经发生。
+          </p>
+        ) : null}
+        {runtime.status === 'loading' ? (
+          <div className="erp-dev-flow-loading">
+            <Spin />
+            <span>正在定位任务所属业务链…</span>
+          </div>
+        ) : null}
+        {runtime.status === 'error' ? (
+          <Alert
+            showIcon
+            type="error"
+            message="所属业务链定位失败"
+            description={runtime.error}
+          />
+        ) : null}
+        {runtime.status === 'unlinked' ? (
+          <Alert
+            showIcon
+            type="info"
+            message="当前任务未关联正式流程"
+            description="没有 ProcessRuntime 锚点时，总图不会根据标题、payload 或相似名称猜测所属业务链。"
+          />
+        ) : null}
+        {runtime.status === 'ready' ? (
+          <div className="erp-dev-flow-runtime-proof">
+            {matchingChain ? (
+              <Tag color="orange">
+                当前实例所属链：{matchingChain.label}
+              </Tag>
+            ) : (
+              <Tag>当前流程未登记到业务总图</Tag>
+            )}
+            <dl>
+              <div>
+                <dt>实例 ID</dt>
+                <dd>
+                  <KeyValue value={String(runtime.context.process_instance.id)} />
+                </dd>
+              </div>
+              <div>
+                <dt>流程</dt>
+                <dd>{getProcessLabel(runtime.context.process_instance)}</dd>
+              </div>
+              <div>
+                <dt>来源单号</dt>
+                <dd>{runtime.context.source?.no || '未声明'}</dd>
+              </div>
+              <div>
+                <dt>查询时间</dt>
+                <dd>{formatQueryTime(runtime.queriedAt)}</dd>
+              </div>
+            </dl>
+            <strong>只证明定位到所属链；尚未证明上下游完成或业务事实已落账</strong>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="erp-dev-flow-overview-map">
+        <div className="erp-dev-flow-section-heading">
+          <div>
+            <Text strong>业务链级总图</Text>
+            <Text type="secondary">
+              12 条真实业务链、4 个业务分区、{overview.relations.length} 条明确衔接。
+            </Text>
+          </div>
+          <Space wrap>
+            {Object.entries(CHAIN_KIND_PRESENTATION).map(([key, item]) => (
+              <Tag color={item.color} key={key}>
+                {item.label}
+              </Tag>
+            ))}
+          </Space>
+        </div>
+        <div className="erp-dev-flow-overview-graph erp-dev-docs-markdown">
+          <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+        </div>
+
+        <div className="erp-dev-flow-overview-lanes">
+          {overview.lanes.map((lane) => {
+            const lanePresentation =
+              CHAIN_OVERVIEW_LANE_PRESENTATION[lane.key]
+            return (
+              <section data-overview-lane={lane.key} key={lane.key}>
+                <div>
+                  <div>
+                    <Tag color={lanePresentation.color}>{lane.label}</Tag>
+                    <small>{lane.summary}</small>
+                  </div>
+                  <strong>{lane.chainKeys.length} 条</strong>
+                </div>
+                <ul>
+                  {lane.chainKeys.map((chainKey) => {
+                    const chain = chainByKey.get(chainKey)
+                    const kind = CHAIN_KIND_PRESENTATION[chain.kind]
+                    return (
+                      <li key={chain.key}>
+                        <button
+                          type="button"
+                          aria-label={`查看业务链：${chain.label}`}
+                          data-overview-chain={chain.key}
+                          data-runtime-current={
+                            chain.key === matchingChain?.key || undefined
+                          }
+                          onClick={() => onSelectChain(chain.key)}
+                        >
+                          <span>
+                            <strong>{chain.label}</strong>
+                            <Tag color={kind.color}>{kind.label}</Tag>
+                          </span>
+                          <small>{chain.summary}</small>
+                          <span className="erp-dev-flow-overview-connections">
+                            {connectionCountByChain.get(chain.key)} 条链间衔接
+                            {chain.key === matchingChain?.key
+                              ? ' · 当前实例所属链'
+                              : ''}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            )
+          })}
+        </div>
+
+        <details className="erp-dev-flow-overview-relations">
+          <summary>查看全部链间衔接（{overview.relations.length}）</summary>
+          <ul>
+            {overview.relations.map((relation) => {
+              const presentation = CHAIN_RELATION_PRESENTATION[relation.kind]
+              return (
+                <li data-overview-relation={relation.key} key={relation.key}>
+                  <Tag color={presentation.color}>{presentation.label}</Tag>
+                  <strong>{relation.label}</strong>
+                  <span>
+                    {chainByKey.get(relation.fromChainKey)?.label} →{' '}
+                    {chainByKey.get(relation.toChainKey)?.label}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </details>
+        <EvidenceDisclosure value={overview} label="查看业务总图证据" />
+      </section>
+    </div>
+  )
+}
+
+function BusinessChainView({
+  catalog,
+  chain,
+  node,
+  taskId,
+  selectedTask,
+  onSelectChain,
+  onSelectNode,
+  onOpenView,
+}) {
+  const { runtime, runtimeProcessKey, matchingChain } = useBusinessChainRuntime(
+    catalog,
+    taskId,
+    selectedTask
+  )
+  const currentRuntimeNode = chain?.nodes.find((item) =>
+    item.processKeys.includes(runtimeProcessKey)
+  )
+  const relations = chain.edges.filter(
+    (edge) => edge.from === node.key || edge.to === node.key
+  )
+  const mermaid = useMemo(
+    () => buildChainMermaid(chain, currentRuntimeNode?.key),
+    [chain, currentRuntimeNode?.key]
+  )
+  const flowByKey = useMemo(
+    () => new Map(catalog.flows.map((flow) => [flow.key, flow])),
+    [catalog.flows]
+  )
+  const processByKey = useMemo(
+    () =>
+      new Map(
+        catalog.processDefinitions.map((definition) => [
+          definition.key,
+          definition,
+        ])
+      ),
+    [catalog.processDefinitions]
+  )
+  const layer = CHAIN_LAYER_PRESENTATION[node.layer]
+
+  return (
+    <div className="erp-dev-flow-view-stack">
+      <GuidanceDisclosure
+        guidanceKey="chain"
+        title="业务链是设计目录"
+        summary="真实运行只叠加一个 ProcessRuntime 区段"
+        description="查询到任务后，只叠加一个真实 ProcessRuntime 区段。其它来源单据、Workflow、Fact / Ledger 和派生结果仍以各自真源为准，不会因为流程走完而一起显示为完成。"
+      />
+      <section className="erp-dev-flow-chain-heading">
+        <div>
+          <Text className="erp-dev-flow-eyebrow">一次只看一条业务链</Text>
+          <Title level={2}>{chain.label}</Title>
+          <Paragraph>{chain.summary}</Paragraph>
+        </div>
+        <BusinessChainSelector
+          catalog={catalog}
+          value={chain.key}
+          onChange={onSelectChain}
+        />
+      </section>
+
+      <section
+        className="erp-dev-flow-chain-runtime"
+        data-runtime-overlay={runtime.status}
+      >
+        <div className="erp-dev-flow-section-heading">
+          <div>
+            <Text strong>真实运行叠加</Text>
+            <Text type="secondary">
+              数据来源：workflow.get_task_process_context；只高亮本实例对应的
+              ProcessRuntime 节点。
+            </Text>
+          </div>
+          <Button onClick={() => onOpenView('runtime')}>
+            {taskId ? '查看完整运行轨迹' : '查询真实任务'}
+          </Button>
+        </div>
+        {!taskId ? (
+          <p>
+            尚未查询运行数据；使用任务名称、任务编号或来源单号定位，无需数据库
+            ID。
+          </p>
+        ) : null}
+        {runtime.status === 'loading' ? (
+          <div className="erp-dev-flow-loading">
+            <Spin />
+            <span>正在读取真实流程位置…</span>
+          </div>
+        ) : null}
+        {runtime.status === 'error' ? (
+          <Alert
+            showIcon
+            type="error"
+            message="运行叠加查询失败"
+            description={runtime.error}
+          />
+        ) : null}
+        {runtime.status === 'unlinked' ? (
+          <Alert
+            showIcon
+            type={isDisplayOnlyWorkflowTask(selectedTask) ? 'warning' : 'info'}
+            message={
+              isDisplayOnlyWorkflowTask(selectedTask)
+                ? '模拟展示任务未关联正式 ProcessRuntime'
+                : '任务未关联正式 ProcessRuntime'
+            }
+            description="页面不会根据任务标题、payload 或相似流程补造节点。"
+          />
+        ) : null}
+        {runtime.status === 'ready' ? (
+          <div className="erp-dev-flow-runtime-proof">
+            {currentRuntimeNode ? (
+              <Tag color="orange">当前实例位于：{currentRuntimeNode.label}</Tag>
+            ) : matchingChain ? (
+              <Button
+                size="small"
+                onClick={() => onSelectChain(matchingChain.key)}
+              >
+                切换到所属业务链：{matchingChain.label}
+              </Button>
+            ) : (
+              <Tag>当前流程未登记到业务链</Tag>
+            )}
+            <dl>
+              <div>
+                <dt>实例 ID</dt>
+                <dd>
+                  <KeyValue
+                    value={String(runtime.context.process_instance.id)}
+                  />
+                </dd>
+              </div>
+              <div>
+                <dt>流程</dt>
+                <dd>{getProcessLabel(runtime.context.process_instance)}</dd>
+              </div>
+              <div>
+                <dt>来源单号</dt>
+                <dd>{runtime.context.source?.no || '未声明'}</dd>
+              </div>
+              <div>
+                <dt>查询时间</dt>
+                <dd>{formatQueryTime(runtime.queriedAt)}</dd>
+              </div>
+            </dl>
+            <strong>尚未证明业务事实已落账</strong>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="erp-dev-flow-chain-workspace">
+        <div className="erp-dev-flow-chain-map">
+          <div className="erp-dev-flow-section-heading">
+            <div>
+              <Text strong>分层业务链图</Text>
+              <Text type="secondary">
+                颜色同时配有文字标签；箭头只使用业务语言。
+              </Text>
+            </div>
+            <Space wrap>
+              {Object.entries(CHAIN_LAYER_PRESENTATION).map(([key, item]) => (
+                <Tag color={item.color} key={key}>
+                  {item.label}
+                </Tag>
+              ))}
+            </Space>
+          </div>
+          <div className="erp-dev-flow-chain-graph erp-dev-docs-markdown">
+            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+          </div>
+          <ol className="erp-dev-flow-chain-steps" aria-label="业务链分层步骤">
+            {chain.nodes.map((item, index) => (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  className={item.key === node.key ? 'is-selected' : ''}
+                  aria-current={item.key === node.key ? 'step' : undefined}
+                  data-chain-node={item.key}
+                  data-chain-layer={item.layer}
+                  data-runtime-current={
+                    item.key === currentRuntimeNode?.key || undefined
+                  }
+                  onClick={() => onSelectNode(item.key)}
+                >
+                  <span>{index + 1}</span>
+                  <span>
+                    <strong>{item.label}</strong>
+                    <small>{CHAIN_LAYER_PRESENTATION[item.layer].label}</small>
+                  </span>
+                  {item.key === currentRuntimeNode?.key ? (
+                    <Tag color="orange">实例所在</Tag>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <aside
+          className="erp-dev-flow-node-detail"
+          data-selected-chain-node={node.key}
+        >
+          <div className="erp-dev-flow-node-detail__title">
+            <Tag color={layer.color}>{layer.label}</Tag>
+            {node.key === currentRuntimeNode?.key ? (
+              <Tag color="orange">真实实例所在区段</Tag>
+            ) : null}
+            <Title level={2}>{node.label}</Title>
+            <KeyValue value={node.key} />
+          </div>
+          <Paragraph>
+            {node.summary ||
+              '这个节点只登记在业务链中的职责和下钻引用，详细规则由对应专项目录负责。'}
+          </Paragraph>
+          <div className="erp-dev-flow-node-actions">
+            {node.layer === 'workflow_task' ? (
+              <Button type="primary" onClick={() => onOpenView('workflow')}>
+                查看 Workflow 协同
+              </Button>
+            ) : null}
+            {node.processDefinitionKeys.map((key) => (
+              <Button
+                type="primary"
+                key={key}
+                onClick={() =>
+                  onOpenView('runtime', { [QUERY_KEYS.process]: key })
+                }
+              >
+                查看 {processByKey.get(key)?.label || key}
+              </Button>
+            ))}
+            {node.factKeys.map((key) => (
+              <Button
+                type="primary"
+                key={key}
+                onClick={() => onOpenView('facts', { [QUERY_KEYS.fact]: key })}
+              >
+                查看{' '}
+                {catalog.factDefinitions.find((fact) => fact.factKey === key)
+                  ?.label || key}
+                定义
+              </Button>
+            ))}
+            {node.machineKeys.map((key) => (
+              <Button
+                key={key}
+                onClick={() =>
+                  onOpenView('states', {
+                    [QUERY_KEYS.flow]: key,
+                    [QUERY_KEYS.state]: null,
+                  })
+                }
+              >
+                查看 {flowByKey.get(key)?.label || key}状态规则
+              </Button>
+            ))}
+          </div>
+          <section className="erp-dev-flow-node-relations">
+            <h3>与当前节点直接相连</h3>
+            {relations.length > 0 ? (
+              <ul>
+                {relations.map((edge) => {
+                  const peerKey = edge.from === node.key ? edge.to : edge.from
+                  const peer = chain.nodes.find((item) => item.key === peerKey)
+                  return (
+                    <li key={edge.key}>
+                      <Tag>{CHAIN_EDGE_PRESENTATION[edge.kind]}</Tag>
+                      <strong>{edge.label}</strong>
+                      <span>
+                        {edge.from === node.key ? '流向' : '来自'}：
+                        {peer?.label || peerKey}
+                      </span>
+                      <details>
+                        <summary>查看领域边界</summary>
+                        <p>{edge.factBoundary}</p>
+                        <EvidenceDisclosure value={edge} label="查看关系证据" />
+                      </details>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="当前节点没有直接关系"
+              />
+            )}
+          </section>
+          <EvidenceDisclosure value={node} label="查看节点证据" />
+        </aside>
+      </section>
+      <details className="erp-dev-flow-cross-cutting">
+        <summary>
+          查看不硬塞进线性业务链的横切对象（
+          {catalog.businessChainCoverage.excludedMachineKeys.length}）
+        </summary>
+        <dl>
+          {catalog.businessChainCoverage.excludedMachineKeys.map((key) => (
+            <div key={key}>
+              <dt>
+                <KeyValue value={key} />
+              </dt>
+              <dd>{catalog.businessChainCoverage.exclusionReasons[key]}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+    </div>
+  )
+}
+
+function WorkflowView({
+  taskId,
+  draft,
+  selectedTask,
+  onDraftChange,
+  onClearTask,
+  onSelectTask,
+}) {
+  const events = useWorkflowEvents(taskId)
+  const model = buildWorkflowTaskEventTrailModel({
+    events: events.items,
+    task: selectedTask || {},
+  })
+  const status = selectedTask ? getWorkflowTaskStatusMeta(selectedTask) : null
+  return (
+    <div className="erp-dev-flow-view-stack">
+      <GuidanceDisclosure
+        guidanceKey="workflow"
+        title="Workflow 管“人”"
+        summary="任务 done 不等于业务事实发生"
+        description="它回答谁负责、谁审批、谁接棒，以及为什么阻塞或退回。任务 done 只表示协同任务结束，不证明库存、出货、质检或财务事实已经发生。"
+      />
+      <TaskFinder
+        draft={draft}
+        onDraftChange={onDraftChange}
+        onClearTask={onClearTask}
+        onSelectTask={onSelectTask}
+        taskId={taskId}
+      />
+      {!taskId ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="尚未查询任务；请粘贴后台可见的任务名称、任务编号或来源单号"
+        />
+      ) : null}
+      {events.status === 'loading' ? (
+        <div className="erp-dev-flow-loading" role="status">
+          <Spin />
+          <span>正在读取任务协同记录…</span>
+        </div>
+      ) : null}
+      {events.status === 'error' ? (
+        <Alert
+          showIcon
+          type="error"
+          message="任务协同记录读取失败"
+          description={events.error}
+        />
+      ) : null}
+      {events.status === 'ready' ? (
+        <>
+          <section className="erp-dev-flow-specialist-summary">
+            <div className="erp-dev-flow-section-heading">
+              <div>
+                <Text className="erp-dev-flow-eyebrow">真实 Workflow 任务</Text>
+                <Title level={2}>
+                  {selectedTask
+                    ? getWorkflowTaskDisplayName(selectedTask)
+                    : `任务 ${taskId}`}
+                </Title>
+              </div>
+              {status ? (
+                <Tag color={status.color}>{status.label}</Tag>
+              ) : (
+                <Tag>状态见事件记录</Tag>
+              )}
+            </div>
+            <dl>
+              <div>
+                <dt>任务类型</dt>
+                <dd>
+                  {selectedTask ? (
+                    <>
+                      <span>{getWorkflowTaskDisplayName(selectedTask)}</span>
+                      <KeyValue value={selectedTask.task_group}>
+                        {selectedTask.task_group}
+                      </KeyValue>
+                    </>
+                  ) : (
+                    '请通过名称或编号查询以显示任务类型'
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>负责岗位</dt>
+                <dd>
+                  {selectedTask
+                    ? getWorkflowTaskOwnerRoleLabel(selectedTask)
+                    : '从可见任务结果确认'}
+                </dd>
+              </div>
+              <div>
+                <dt>处理人</dt>
+                <dd>
+                  {selectedTask?.assignee_id
+                    ? '已指定处理人'
+                    : selectedTask
+                      ? '岗位共同待办'
+                      : '从可见任务结果确认'}
+                </dd>
+              </div>
+              <div>
+                <dt>来源单号</dt>
+                <dd>{selectedTask?.source_no || '从可见任务结果确认'}</dd>
+              </div>
+              <div>
+                <dt>数据来源</dt>
+                <dd>workflow.list_task_events</dd>
+              </div>
+              <div>
+                <dt>查询时间</dt>
+                <dd>{formatQueryTime(events.queriedAt)}</dd>
+              </div>
+            </dl>
+          </section>
+          <Alert
+            showIcon
+            type="warning"
+            message="Workflow task done ≠ Fact posted"
+            description="即使任务显示“已完成”，仍必须到 Fact / Ledger 的权威真源确认业务结果和凭证。"
+          />
+          <section className="erp-dev-flow-responsibility">
+            <div className="erp-dev-flow-section-heading">
+              <div>
+                <Text strong>当前责任</Text>
+                <Text type="secondary">岗位、承接方式、状态和当前原因。</Text>
+              </div>
+            </div>
+            <dl>
+              {model.responsibilityItems.map((item) => (
+                <div key={item.key}>
+                  <dt>{item.label}</dt>
+                  <dd>{item.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+          <section className="erp-dev-flow-events">
+            <div className="erp-dev-flow-section-heading">
+              <div>
+                <Text strong>协同事件</Text>
+                <Text type="secondary">
+                  只回答这条任务如何被处理，不冒充来源单据完整审批链。
+                </Text>
+              </div>
+              <Tag>{model.summaryLabel}</Tag>
+            </div>
+            {events.truncated ? (
+              <Alert showIcon type="warning" message="只显示最近 100 条事件" />
+            ) : null}
+            {model.items.length > 0 ? (
+              <ol>
+                {model.items.map((item) => (
+                  <li key={item.key} data-event-tone={item.tone}>
+                    <span>{item.timeLabel}</span>
+                    <strong>{item.label}</strong>
+                    <p>
+                      {item.actorLabel}
+                      {item.transitionLabel ? ` · ${item.transitionLabel}` : ''}
+                    </p>
+                    {item.reason ? (
+                      <blockquote>{item.reason}</blockquote>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="该任务暂无可见协同事件"
+              />
+            )}
+          </section>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+function ProcessDefinitionCard({ definition }) {
+  const nodeByKey = new Map(definition.nodes.map((node) => [node.key, node]))
+  const mermaid = buildProcessMermaid(definition)
+  return (
+    <section className="erp-dev-flow-process-definition">
+      <div className="erp-dev-flow-section-heading">
+        <div>
+          <Text className="erp-dev-flow-eyebrow">流程定义与 variant</Text>
+          <Title level={2}>{definition.label}</Title>
+          <KeyValue value={definition.key} />
+        </div>
+        <Tag>{definition.processVersion}</Tag>
+      </div>
+      <GuidanceDisclosure
+        guidanceKey="process-definition"
+        title="这是流程定义"
+        summary="不是某次运行实例"
+        description={definition.guardrail}
+      />
+      <div className="erp-dev-flow-process-layout">
+        <div className="erp-dev-flow-process-graph erp-dev-docs-markdown">
+          <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+        </div>
+        <ol>
+          {definition.nodes.map((node, index) => (
+            <li key={node.key}>
+              <span>{index + 1}</span>
+              <div>
+                <strong>{node.label}</strong>
+                <small>
+                  {node.type === 'human_task' || node.type === 'approval'
+                    ? '人工协同节点'
+                    : node.type === 'domain_command'
+                      ? '领域命令节点'
+                      : '流程结束节点'}
+                </small>
+                {node.ownerPool ? (
+                  <Tag>
+                    负责岗位：
+                    {getRoleDisplayName(node.ownerPool, node.ownerPool)}
+                  </Tag>
+                ) : null}
+                <KeyValue value={node.key} />
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <details>
+        <summary>查看定义边与代码证据</summary>
+        <ul>
+          {definition.edges.map((edge) => (
+            <li key={edge.key}>
+              <strong>
+                {nodeByKey.get(edge.from)?.label || edge.from} →{' '}
+                {nodeByKey.get(edge.to)?.label || edge.to}
+              </strong>
+              <span>{edge.branchPolicy ? '按登记结果分支' : '顺序推进'}</span>
+            </li>
+          ))}
+        </ul>
+        <EvidenceDisclosure value={definition} />
+      </details>
+    </section>
+  )
+}
+
+function RuntimeUnlinkedTaskBoundary({ task, taskId }) {
+  const displayOnly = isDisplayOnlyWorkflowTask(task)
+  const status = task ? getWorkflowTaskStatusMeta(task) : null
+  return (
+    <section
+      className="erp-dev-flow-unlinked-task"
+      data-task-runtime-boundary={displayOnly ? 'display-only' : 'unlinked'}
+    >
+      <Alert
+        showIcon
+        type={displayOnly ? 'warning' : 'info'}
+        message={
+          displayOnly
+            ? '已找到任务，但它是模拟展示数据'
+            : '已找到任务，但它没有正式流程轨迹'
+        }
+        description={
+          displayOnly
+            ? '这个任务只用于演示任务列表，没有关联正式 ProcessRuntime。页面不会补造流程节点，也不能据此证明业务事实已经发生。'
+            : '任务记录真实存在，但未关联正式 ProcessRuntime。页面不会根据任务名称或 payload 补造流程节点。'
+        }
+      />
+      <div className="erp-dev-flow-section-heading">
+        <div>
+          <Text className="erp-dev-flow-eyebrow">已找到的任务</Text>
+          <Title level={2}>
+            {task ? getWorkflowTaskDisplayName(task) : `任务 ${taskId}`}
+          </Title>
+        </div>
+        {status ? (
+          <Tag color={status.color}>{status.label}</Tag>
+        ) : (
+          <Tag>未关联正式流程</Tag>
+        )}
+      </div>
+      <dl>
+        {task ? (
+          <>
+            <div>
+              <dt>任务编号</dt>
+              <dd>{task.task_code}</dd>
+            </div>
+            <div>
+              <dt>来源单号</dt>
+              <dd>{task.source_no || '未记录来源单号'}</dd>
+            </div>
+            <div>
+              <dt>负责岗位</dt>
+              <dd>{getWorkflowTaskOwnerRoleLabel(task)}</dd>
+            </div>
+          </>
+        ) : null}
+        <div>
+          <dt>内部 task_id</dt>
+          <dd>
+            <KeyValue value={taskId} />
+          </dd>
+        </div>
+        <div>
+          <dt>流程轨迹</dt>
+          <dd>未关联正式 ProcessRuntime</dd>
+        </div>
+      </dl>
+    </section>
+  )
+}
+
+function RuntimeView({
+  catalog,
+  definition,
+  taskId,
+  draft,
+  selectedTask,
+  onSelectDefinition,
+  onDraftChange,
+  onClearTask,
+  onSelectTask,
+}) {
+  const searchProps = useDefinitionSelectSearch()
+  const optionFilter = useMemo(
+    () => createDevFlowDefinitionOptionFilter(catalog, 'runtime'),
+    [catalog]
+  )
+  const association = getDevFlowStateTaskRuntimeAssociation(selectedTask)
+  const runtime = useRuntimeContext(taskId, association)
+  const nodes = asArray(runtime.context?.nodes)
+  return (
+    <div className="erp-dev-flow-view-stack">
+      <GuidanceDisclosure
+        guidanceKey="runtime"
+        title="ProcessRuntime 管“路”"
+        summary="completed 不等于事实落账"
+        description="它区分流程定义、流程 variant 和具体运行实例，回答走到哪里、走过什么、为何等待、失败或重试。ProcessRuntime completed 不等于业务事实已落账。"
+      />
+      <section className="erp-dev-flow-definition-selector">
+        <label htmlFor="dev-flow-process-select">选择流程定义</label>
+        <Select
+          id="dev-flow-process-select"
+          aria-label="选择流程定义"
+          showSearch
+          virtual={false}
+          {...searchProps}
+          filterOption={optionFilter}
+          notFoundContent="没有匹配的流程定义"
+          value={definition.key}
+          options={catalog.processDefinitions.map((item) => ({
+            value: item.key,
+            label: item.label,
+          }))}
+          onChange={onSelectDefinition}
+        />
+        <Text type="secondary">
+          当前登记{' '}
+          {
+            new Set(catalog.processDefinitions.map((item) => item.processKey))
+              .size
+          }{' '}
+          个流程 key、{catalog.processDefinitions.length} 个
+          variant；客户预览只代表设计选择。
+        </Text>
+      </section>
+      <ProcessDefinitionCard definition={definition} />
+      <section className="erp-dev-flow-runtime-query">
+        <div className="erp-dev-flow-section-heading">
+          <div>
+            <Text strong>定位具体运行实例</Text>
+            <Text type="secondary">
+              当前通用读取链只能从可见 Workflow 任务锚定实例。
+            </Text>
+          </div>
+        </div>
+        <Alert
+          showIcon
+          type="warning"
+          message="真实流程请先用任务信息定位"
+          description="粘贴任务名称、任务编号或来源单号即可，无需查询 ProcessRuntime 实例 ID。"
+        />
+        <TaskFinder
+          draft={draft}
+          onDraftChange={onDraftChange}
+          onClearTask={onClearTask}
+          onSelectTask={onSelectTask}
+          taskId={taskId}
+        />
+      </section>
+      {!taskId ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="无运行数据：尚未选择真实任务，当前只展示流程定义"
+        />
+      ) : null}
+      {runtime.status === 'loading' ? (
+        <div className="erp-dev-flow-loading" role="status">
+          <Spin />
+          <span>正在读取具体运行实例…</span>
+        </div>
+      ) : null}
+      {runtime.status === 'error' ? (
+        <Alert
+          showIcon
+          type="error"
+          message="运行实例读取失败"
+          description={runtime.error}
+        />
+      ) : null}
+      {runtime.status === 'unlinked' ? (
+        <RuntimeUnlinkedTaskBoundary task={selectedTask} taskId={taskId} />
+      ) : null}
+      {runtime.status === 'ready' ? (
+        <section className="erp-dev-flow-runtime-instance">
+          <div className="erp-dev-flow-section-heading">
+            <div>
+              <Text className="erp-dev-flow-eyebrow">具体运行实例</Text>
+              <Title level={2}>
+                {getProcessLabel(runtime.context.process_instance)}
+              </Title>
+            </div>
+            <Tag
+              color={
+                PROCESS_STATUS_COLORS[runtime.context.process_instance.status]
+              }
+            >
+              {getProcessStatusLabel(runtime.context.process_instance)}
+            </Tag>
+          </div>
+          <dl>
+            <div>
+              <dt>实例 ID</dt>
+              <dd>
+                <KeyValue value={String(runtime.context.process_instance.id)} />
+              </dd>
+            </div>
+            <div>
+              <dt>流程 key</dt>
+              <dd>
+                <KeyValue
+                  value={runtime.context.process_instance.process_key}
+                />
+              </dd>
+            </div>
+            <div>
+              <dt>流程版本</dt>
+              <dd>{runtime.context.process_instance.process_version}</dd>
+            </div>
+            <div>
+              <dt>来源单号</dt>
+              <dd>{runtime.context.source?.no || '未声明'}</dd>
+            </div>
+            <div>
+              <dt>发起时间</dt>
+              <dd>
+                {formatProcessStartedAt(
+                  runtime.context.process_instance.started_at
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>数据来源</dt>
+              <dd>workflow.get_task_process_context</dd>
+            </div>
+            <div>
+              <dt>查询时间</dt>
+              <dd>{formatQueryTime(runtime.queriedAt)}</dd>
+            </div>
+          </dl>
+          <Alert
+            showIcon
+            type="warning"
+            message="尚未证明业务事实已落账"
+            description="下面的 completed 只属于 ProcessRuntime 节点；不会把 Workflow 或 Fact / Ledger 节点一并标成完成。"
+          />
+          <ol className="erp-dev-flow-runtime-nodes">
+            {nodes.map((node) => (
+              <li
+                key={node.id}
+                data-node-status={node.status}
+                aria-current={
+                  ['active', 'blocked'].includes(node.status)
+                    ? 'step'
+                    : undefined
+                }
+              >
+                <span>
+                  {node.status === 'completed' ? (
+                    <CheckCircleOutlined />
+                  ) : node.status === 'blocked' ? (
+                    <ExclamationCircleOutlined />
+                  ) : (
+                    <ClockCircleOutlined />
+                  )}
+                </span>
+                <div>
+                  <strong>{getProcessNodeLabel(node)}</strong>
+                  <KeyValue value={node.node_key} />
+                  <small>尝试次数：{node.attempt || 1}</small>
+                </div>
+                <Tag color={PROCESS_STATUS_COLORS[node.status]}>
+                  {getProcessNodeStatusLabel(node)}
+                </Tag>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+    </div>
+  )
+}
+
+function FactsView({ catalog, fact, onSelectFact, onOpenState }) {
+  const searchProps = useDefinitionSelectSearch()
+  const optionFilter = useMemo(
+    () => createDevFlowDefinitionOptionFilter(catalog, 'facts'),
+    [catalog]
+  )
+  return (
+    <div className="erp-dev-flow-view-stack">
+      <GuidanceDisclosure
+        guidanceKey="facts"
+        title="Fact / Ledger 管“账”"
+        summary="流程完成不能替代事实凭证"
+        description="它回答什么业务结果已经正式生效、权威真源在哪里、凭证和纠正方式是什么。Workflow 或 ProcessRuntime 的完成状态都不能替代事实凭证。"
+      />
+      <Alert
+        showIcon
+        type="warning"
+        message={catalog.factRuntimeQuery.label}
+        description={catalog.factRuntimeQuery.reason}
+      />
+      <section className="erp-dev-flow-definition-selector">
+        <label htmlFor="dev-flow-fact-select">选择事实定义</label>
+        <Select
+          id="dev-flow-fact-select"
+          aria-label="选择事实定义"
+          showSearch
+          virtual={false}
+          {...searchProps}
+          filterOption={optionFilter}
+          notFoundContent="没有匹配的事实定义"
+          value={fact.factKey}
+          options={catalog.factDefinitions.map((item) => ({
+            value: item.factKey,
+            label: `${item.label} · ${item.factKey}`,
+          }))}
+          onChange={onSelectFact}
+        />
+        <Text type="secondary">
+          只展示当前代码核实的定义；不提供 mock 运行凭证或伪造凭证搜索。
+        </Text>
+      </section>
+      <section
+        className="erp-dev-flow-fact-detail"
+        data-selected-fact={fact.factKey}
+      >
+        <div className="erp-dev-flow-section-heading">
+          <div>
+            <Text className="erp-dev-flow-eyebrow">Fact / Ledger 定义</Text>
+            <Title level={2}>{fact.label}</Title>
+            <KeyValue value={fact.factKey} />
+          </div>
+          <Tag color="red">定义证据</Tag>
+        </div>
+        <dl>
+          <div>
+            <dt>正式发生条件</dt>
+            <dd>{fact.occurrenceCondition}</dd>
+          </div>
+          <div>
+            <dt>来源单据</dt>
+            <dd>{fact.sourceDocument}</dd>
+          </div>
+          <div>
+            <dt>权威真源</dt>
+            <dd>{fact.authority}</dd>
+          </div>
+          <div>
+            <dt>业务影响</dt>
+            <dd>{fact.businessImpact}</dd>
+          </div>
+          <div>
+            <dt>事实凭证</dt>
+            <dd>{fact.voucher}</dd>
+          </div>
+          <div>
+            <dt>幂等规则</dt>
+            <dd>{fact.idempotencyRule}</dd>
+          </div>
+          <div>
+            <dt>纠正方式</dt>
+            <dd>{fact.correction}</dd>
+          </div>
+        </dl>
+        <Button onClick={() => onOpenState(fact.machineKey)}>
+          查看对应状态规则
+        </Button>
+        <EvidenceDisclosure value={fact} />
+      </section>
+    </div>
+  )
+}
+
+function StateRulesView({ catalog, flow, state, onSelectFlow, onSelectState }) {
+  const searchProps = useDefinitionSelectSearch()
+  const optionFilter = useMemo(
+    () => createDevFlowDefinitionOptionFilter(catalog, 'stateOptions'),
+    [catalog]
+  )
+  const stateByKey = new Map(flow.states.map((item) => [item.key, item]))
+  const mermaid = buildStateMermaid(flow)
+  return (
+    <div className="erp-dev-flow-view-stack">
+      <GuidanceDisclosure
+        guidanceKey="states"
+        title="状态机管“规则”"
+        summary="规则视图不是运行实例或事实凭证"
+        description="它回答对象有哪些状态、允许怎样转换，以及拒绝、撤销、冲正或返工后到哪里。这里是规则视图，不是某次运行实例或事实凭证。"
+      />
+      <section className="erp-dev-flow-definition-selector">
+        <label htmlFor="dev-flow-state-select">选择状态对象</label>
+        <Select
+          id="dev-flow-state-select"
+          aria-label="选择状态对象"
+          showSearch
+          virtual={false}
+          {...searchProps}
+          filterOption={optionFilter}
+          notFoundContent="没有匹配的状态对象"
+          value={flow.key}
+          options={catalog.flows.map((item) => ({
+            value: item.key,
+            label: `${item.label} · ${item.key}`,
+          }))}
+          onChange={onSelectFlow}
+        />
+      </section>
+      <section
+        className="erp-dev-flow-state-rule"
+        data-selected-flow={flow.key}
+      >
+        <div className="erp-dev-flow-section-heading">
+          <div>
+            <Text className="erp-dev-flow-eyebrow">状态规则定义</Text>
+            <Title level={2}>{flow.label}</Title>
+            <KeyValue value={flow.key} />
+          </div>
+          <Tag>
+            {flow.states.length} 个状态 · {flow.transitions.length} 条转换
+          </Tag>
+        </div>
+        <Paragraph>{flow.summary}</Paragraph>
+        <div className="erp-dev-flow-state-layout">
+          <div className="erp-dev-flow-state-graph erp-dev-docs-markdown">
+            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+          </div>
+          <div className="erp-dev-flow-state-list">
+            <h3>状态</h3>
+            <ul>
+              {flow.states.map((item) => (
+                <li key={item.key}>
+                  <button
+                    type="button"
+                    className={item.key === state?.key ? 'is-selected' : ''}
+                    aria-pressed={item.key === state?.key}
+                    onClick={() => onSelectState(item.key)}
+                  >
+                    <strong>{item.label}</strong>
+                    <KeyValue value={item.key} copyable={false} />
+                    <span>
+                      {item.initial
+                        ? '初始状态'
+                        : item.terminal
+                          ? '终态'
+                          : '中间状态'}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        {state ? (
+          <section className="erp-dev-flow-selected-state">
+            <div>
+              <Text className="erp-dev-flow-eyebrow">当前选择</Text>
+              <h3>{state.label}</h3>
+              <KeyValue value={state.key} />
+            </div>
+            <p>
+              {state.summary ||
+                '目录未提供额外说明，请结合允许进入和离开的转换理解。'}
+            </p>
+            <EvidenceDisclosure value={state} />
+          </section>
+        ) : null}
+        <section className="erp-dev-flow-transitions">
+          <div className="erp-dev-flow-section-heading">
+            <div>
+              <Text strong>允许的生命周期转换</Text>
+              <Text type="secondary">
+                中文动作优先；内部 action、权限与代码证据按需展开。
+              </Text>
+            </div>
+          </div>
+          <ol>
+            {flow.transitions.map((transition) => (
+              <li key={transition.key}>
+                <div>
+                  <Tag>{humanActionLabel(transition.action)}</Tag>
+                  <strong>
+                    {stateByKey.get(transition.from)?.label || transition.from}{' '}
+                    → {stateByKey.get(transition.to)?.label || transition.to}
+                  </strong>
+                </div>
+                <p>{transition.guard || '按对应领域合同校验。'}</p>
+                <details>
+                  <summary>查看内部规则</summary>
+                  <dl>
+                    <div>
+                      <dt>action</dt>
+                      <dd>
+                        <KeyValue value={transition.action} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>事实边界</dt>
+                      <dd>{transition.factBoundary}</dd>
+                    </div>
+                    <div>
+                      <dt>权限</dt>
+                      <dd>
+                        {asArray(transition.permission).join('、') ||
+                          '无额外权限声明'}
+                      </dd>
+                    </div>
+                  </dl>
+                  <EvidenceDisclosure value={transition} />
+                </details>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <EvidenceDisclosure value={flow} label="查看状态机证据" />
+      </section>
+    </div>
+  )
+}
+
+function invalidQueryMessages(searchParams, catalog) {
+  const messages = []
+  for (const key of new Set(searchParams.keys())) {
+    if (!KNOWN_QUERY_KEYS.has(key)) messages.push(`未知 query 参数：${key}`)
+    if (searchParams.getAll(key).length > 1) {
+      messages.push(`query 参数重复：${key}`)
+    }
+  }
+  const view = cleanText(searchParams.get(QUERY_KEYS.view))
+  const chainKey = cleanText(searchParams.get(QUERY_KEYS.chain))
+  const nodeKey = cleanText(searchParams.get(QUERY_KEYS.node))
+  const flowKey = cleanText(searchParams.get(QUERY_KEYS.flow))
+  const stateKey = cleanText(searchParams.get(QUERY_KEYS.state))
+  const processKey = cleanText(searchParams.get(QUERY_KEYS.process))
+  const factKey = cleanText(searchParams.get(QUERY_KEYS.fact))
+  const taskId = cleanText(searchParams.get(QUERY_KEYS.taskId))
+  const chain = catalog.businessChains.find((item) => item.key === chainKey)
+  const overviewSelected = chainKey === catalog.businessChainOverview.key
+  const flow = catalog.flows.find((item) => item.key === flowKey)
+
+  if (view && !VIEW_KEYS.has(view)) messages.push(`未知视图：${view}`)
+  if (chainKey && !chain && !overviewSelected) {
+    messages.push(`未知或过期业务链：${chainKey}`)
+  }
+  if (nodeKey && !chainKey) messages.push('链路节点缺少所属业务链')
+  if (nodeKey && overviewSelected) {
+    messages.push('业务总图不接受单链节点参数')
+  }
+  if (nodeKey && chain && !chain.nodes.some((item) => item.key === nodeKey)) {
+    messages.push(`业务链中不存在节点：${nodeKey}`)
+  }
+  if (flowKey && !flow) messages.push(`未知状态对象：${flowKey}`)
+  if (stateKey && !flowKey) messages.push('状态 key 缺少所属状态对象')
+  if (stateKey && flow && !flow.states.some((item) => item.key === stateKey)) {
+    messages.push(`状态对象中不存在状态：${stateKey}`)
+  }
+  if (
+    processKey &&
+    !catalog.processDefinitions.some((item) => item.key === processKey)
+  ) {
+    messages.push(`未知流程 variant：${processKey}`)
+  }
+  if (
+    factKey &&
+    !catalog.factDefinitions.some((item) => item.factKey === factKey)
+  ) {
+    messages.push(`未知 Fact Key：${factKey}`)
+  }
+  if (taskId && !parseDevFlowStateTaskIDReference(taskId)) {
+    messages.push('task_id 必须是大于 0 的整数')
+  }
+  return [...new Set(messages)]
+}
+
 export default function DevFlowStateObservatoryPage() {
   const catalogState = useFlowStateCatalog()
   const { catalog } = catalogState
   const [searchParams, setSearchParams] = useSearchParams()
-  const requestedScopeKey = cleanText(searchParams.get(QUERY_KEYS.scope))
   const requestedView = cleanText(searchParams.get(QUERY_KEYS.view))
+  const view = requestedView || DEFAULT_VIEW
+  const requestedChainKey = cleanText(searchParams.get(QUERY_KEYS.chain))
+  const requestedNodeKey = cleanText(searchParams.get(QUERY_KEYS.node))
   const requestedFlowKey = cleanText(searchParams.get(QUERY_KEYS.flow))
   const requestedStateKey = cleanText(searchParams.get(QUERY_KEYS.state))
   const requestedProcessKey = cleanText(searchParams.get(QUERY_KEYS.process))
-  const requestedCustomerKey = cleanText(searchParams.get(QUERY_KEYS.customer))
-  const keyword = cleanText(searchParams.get(QUERY_KEYS.search))
-  const requestedPathMode = cleanText(searchParams.get(QUERY_KEYS.pathMode))
-  const requestedPathKind = cleanText(searchParams.get(QUERY_KEYS.pathKind))
-  const requestedPathObjects = cleanText(
-    searchParams.get(QUERY_KEYS.pathObjects)
-  )
-  const taskIdValue = cleanText(searchParams.get(QUERY_KEYS.taskId))
-  const [taskIdDraft, setTaskIdDraft] = useState(taskIdValue)
+  const requestedFactKey = cleanText(searchParams.get(QUERY_KEYS.fact))
+  const taskId = cleanText(searchParams.get(QUERY_KEYS.taskId))
+  const [taskDraft, setTaskDraft] = useState(taskId)
+  const [selectedTask, setSelectedTask] = useState(null)
+  const [taskLookupFocusRequest, setTaskLookupFocusRequest] = useState(0)
+  const taskSelectionRef = useRef(taskId)
 
-  useEffect(() => setTaskIdDraft(taskIdValue), [taskIdValue])
+  useEffect(() => {
+    if (taskSelectionRef.current === taskId) return
+    taskSelectionRef.current = taskId
+    setSelectedTask(null)
+    setTaskDraft(taskId)
+  }, [taskId])
 
-  const updateSearchParams = useCallback(
+  const updateParams = useCallback(
     (patch, options = {}) => {
       setSearchParams(patchParams(searchParams, patch), {
         replace: options.replace === true,
@@ -2099,184 +2681,207 @@ export default function DevFlowStateObservatoryPage() {
     [searchParams, setSearchParams]
   )
 
-  const scopes = catalog?.scopes || []
-  const scopeOptions = [
-    { key: 'all', label: '全部状态域', description: '按目录状态域分组查看' },
-    ...scopes,
-  ]
-  const scopeIsValid =
-    !requestedScopeKey ||
-    scopeOptions.some((scope) => scope.key === requestedScopeKey)
-  const scopeKey = requestedScopeKey || 'all'
-  const viewIsValid = !requestedView || VIEW_KEYS.has(requestedView)
-  const view = requestedView || DEFAULT_VIEW
-  const showsCatalogFilters = ['overview', 'machine', 'dictionary'].includes(
-    view
-  )
-  const showsFlowSelector = ['machine', 'dictionary'].includes(view)
-  const showsMachineControls = view === 'machine'
-  const availableLayerKeys = new Set(
-    (catalog?.flowLayers || []).map((layer) => layer.key)
-  )
-  const layerParamPresent = searchParams.has(QUERY_KEYS.layers)
-  const rawRequestedLayerKeys = cleanText(searchParams.get(QUERY_KEYS.layers))
-    .split(',')
-    .map((key) => key.trim())
-    .filter(Boolean)
-  const layersAreValid = rawRequestedLayerKeys.every((key) =>
-    availableLayerKeys.has(key)
-  )
-  const requestedLayerKeys = rawRequestedLayerKeys.filter((key) =>
-    availableLayerKeys.has(key)
-  )
-  const layerKeys = layerParamPresent
-    ? requestedLayerKeys
-    : DEFAULT_LAYER_KEYS.filter((key) => availableLayerKeys.has(key))
-  const pathModeIsValid =
-    !requestedPathMode || PATH_MODE_KEYS.has(requestedPathMode)
-  const pathMode = requestedPathMode || 'off'
-  const availablePathKinds = new Set(catalog?.pathKinds || [])
-  const pathKindIsValid =
-    !requestedPathKind || availablePathKinds.has(requestedPathKind)
-  const pathObjectsAreValid =
-    !requestedPathObjects || requestedPathObjects === 'with'
-  const invalidFilterMessages = [
-    showsCatalogFilters && !scopeIsValid
-      ? `未知状态域：${requestedScopeKey}`
-      : '',
-    !viewIsValid ? `未知视图：${requestedView}` : '',
-    showsMachineControls && !layersAreValid ? '叠加层参数包含未登记值' : '',
-    showsMachineControls && !pathModeIsValid
-      ? `未知路径呈现模式：${requestedPathMode}`
-      : '',
-    showsMachineControls && !pathKindIsValid
-      ? `未知路径类型：${requestedPathKind}`
-      : '',
-    showsMachineControls && !pathObjectsAreValid
-      ? `未知对象路径筛选：${requestedPathObjects}`
-      : '',
-  ].filter(Boolean)
-  const filtersAreValid = invalidFilterMessages.length === 0
-  const normalizedKeyword = keyword.toLocaleLowerCase('zh-CN')
-  const filteredFlows = useMemo(
-    () =>
-      filtersAreValid
-        ? (catalog?.flows || []).filter(
-            (flow) =>
-              (scopeKey === 'all' || flow.scopeKey === scopeKey) &&
-              (!normalizedKeyword ||
-                flow.searchText.includes(normalizedKeyword)) &&
-              (!showsMachineControls ||
-                requestedPathObjects !== 'with' ||
-                flow.transitions.some((transition) =>
-                  transitionMatchesPathKind(transition, requestedPathKind)
-                ))
-          )
-        : [],
-    [
-      catalog?.flows,
-      filtersAreValid,
-      normalizedKeyword,
-      requestedPathKind,
-      requestedPathObjects,
-      showsMachineControls,
-      scopeKey,
-    ]
-  )
-  const selectedFlow =
-    filteredFlows.find((flow) => flow.key === requestedFlowKey) ||
-    (!requestedFlowKey ? filteredFlows[0] : null)
-  const unknownFlow =
-    showsFlowSelector &&
-    filtersAreValid &&
-    Boolean(requestedFlowKey) &&
-    !filteredFlows.some((flow) => flow.key === requestedFlowKey)
+  const invalidMessages = catalog
+    ? invalidQueryMessages(searchParams, catalog)
+    : []
+  const valid = invalidMessages.length === 0
 
-  const openFlow = useCallback(
-    (flowKey, nextView = view) => {
-      updateSearchParams({
-        [QUERY_KEYS.flow]: flowKey,
-        [QUERY_KEYS.state]: null,
-        [QUERY_KEYS.view]: nextView,
-      })
-    },
-    [updateSearchParams, view]
-  )
+  useEffect(() => {
+    if (taskLookupFocusRequest === 0 || view !== 'workflow' || !valid) return
+    const input = document.getElementById('dev-flow-task-search')
+    if (!input) return
+    input.scrollIntoView({ behavior: 'auto', block: 'center' })
+    input.focus({ preventScroll: true })
+  }, [taskLookupFocusRequest, valid, view])
 
-  const handleLayerChange = (nextLayerKeys) => {
-    updateSearchParams({
-      [QUERY_KEYS.layers]: nextLayerKeys.join(','),
-    })
+  const overviewSelected = catalog
+    ? !requestedChainKey ||
+      requestedChainKey === catalog.businessChainOverview.key
+    : false
+  const chain = catalog
+    ? catalog.businessChains.find((item) => item.key === requestedChainKey) ||
+      null
+    : null
+  const node = chain
+    ? chain.nodes.find((item) => item.key === requestedNodeKey) ||
+      (!requestedNodeKey ? chain.nodes[0] : null)
+    : null
+  const flow = catalog
+    ? catalog.flows.find((item) => item.key === requestedFlowKey) ||
+      (!requestedFlowKey ? catalog.flows[0] : null)
+    : null
+  const state =
+    flow && requestedStateKey
+      ? flow.states.find((item) => item.key === requestedStateKey)
+      : null
+  const definition = catalog
+    ? catalog.processDefinitions.find(
+        (item) => item.key === requestedProcessKey
+      ) || (!requestedProcessKey ? catalog.processDefinitions[0] : null)
+    : null
+  const fact = catalog
+    ? catalog.factDefinitions.find(
+        (item) => item.factKey === requestedFactKey
+      ) || (!requestedFactKey ? catalog.factDefinitions[0] : null)
+    : null
+
+  useEffect(() => {
+    if (!catalog || !valid) return
+    const patch = {}
+    if (!requestedView) patch[QUERY_KEYS.view] = DEFAULT_VIEW
+    if (!requestedChainKey) {
+      patch[QUERY_KEYS.chain] = catalog.businessChainOverview.key
+    }
+    if (
+      view === 'chain' &&
+      !overviewSelected &&
+      !requestedNodeKey &&
+      node
+    ) {
+      patch[QUERY_KEYS.node] = node.key
+    }
+    if (view === 'states' && !requestedFlowKey && flow) {
+      patch[QUERY_KEYS.flow] = flow.key
+    }
+    if (view === 'runtime' && !requestedProcessKey && definition) {
+      patch[QUERY_KEYS.process] = definition.key
+    }
+    if (view === 'facts' && !requestedFactKey && fact) {
+      patch[QUERY_KEYS.fact] = fact.factKey
+    }
+    if (Object.keys(patch).length > 0) updateParams(patch, { replace: true })
+  }, [
+    catalog,
+    chain,
+    definition,
+    fact,
+    flow,
+    node,
+    overviewSelected,
+    requestedChainKey,
+    requestedFactKey,
+    requestedFlowKey,
+    requestedNodeKey,
+    requestedProcessKey,
+    requestedView,
+    updateParams,
+    valid,
+    view,
+  ])
+
+  const selectTask = (nextTaskId, task) => {
+    taskSelectionRef.current = String(nextTaskId)
+    setSelectedTask(task || null)
+    updateParams({ [QUERY_KEYS.taskId]: String(nextTaskId) })
   }
+  const clearTask = () => {
+    taskSelectionRef.current = ''
+    setSelectedTask(null)
+    updateParams({ [QUERY_KEYS.taskId]: null })
+  }
+  const openView = (nextView, patch = {}) =>
+    updateParams({ [QUERY_KEYS.view]: nextView, ...patch })
+  const specialistSelection =
+    view === 'runtime'
+      ? definition?.label
+      : view === 'facts'
+        ? fact?.label
+        : view === 'states'
+          ? flow?.label
+          : view === 'workflow' && taskId
+            ? `任务 ${taskId}`
+            : ''
 
   const renderView = () => {
-    if (!catalog) return null
-    if (view === 'overview') {
+    if (!catalog || !flow || !definition || !fact) {
+      return null
+    }
+    if (view === 'chain') {
+      if (overviewSelected) {
+        return (
+          <BusinessChainOverviewView
+            catalog={catalog}
+            taskId={taskId}
+            selectedTask={selectedTask}
+            onSelectChain={(key) =>
+              updateParams({
+                [QUERY_KEYS.chain]: key,
+                [QUERY_KEYS.node]: null,
+              })
+            }
+            onOpenView={openView}
+          />
+        )
+      }
+      if (!chain || !node) return null
       return (
-        <OverviewView
+        <BusinessChainView
           catalog={catalog}
-          flows={filteredFlows}
-          onOpenFlow={openFlow}
-        />
-      )
-    }
-    if (view === 'machine') {
-      return (
-        <MachineView
-          flow={selectedFlow}
-          layerKeys={layerKeys}
-          pathMode={pathMode}
-          pathKind={requestedPathKind}
-        />
-      )
-    }
-    if (view === 'dictionary') {
-      return (
-        <DictionaryView
-          scopes={scopes}
-          flows={filteredFlows}
-          flow={selectedFlow}
-          requestedStateKey={requestedStateKey}
-          onSelectFlowState={(flowKey, stateKey) =>
-            updateSearchParams({
-              [QUERY_KEYS.flow]: flowKey,
-              [QUERY_KEYS.state]: stateKey || null,
-            })
+          chain={chain}
+          node={node}
+          taskId={taskId}
+          selectedTask={selectedTask}
+          onSelectChain={(key) =>
+            updateParams({ [QUERY_KEYS.chain]: key, [QUERY_KEYS.node]: null })
           }
+          onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
+          onOpenView={openView}
         />
       )
     }
-    if (view === 'orchestration') {
+    if (view === 'workflow') {
       return (
-        <CustomerOrchestrationView
-          processDefinitions={catalog.processDefinitions}
-          requestedProcessKey={requestedProcessKey}
-          onSelectProcess={(processKey) =>
-            updateSearchParams({
-              [QUERY_KEYS.process]: processKey,
-            })
+        <WorkflowView
+          taskId={taskId}
+          draft={taskDraft}
+          selectedTask={selectedTask}
+          onDraftChange={setTaskDraft}
+          onClearTask={clearTask}
+          onSelectTask={selectTask}
+        />
+      )
+    }
+    if (view === 'runtime') {
+      return (
+        <RuntimeView
+          catalog={catalog}
+          definition={definition}
+          taskId={taskId}
+          draft={taskDraft}
+          selectedTask={selectedTask}
+          onSelectDefinition={(key) =>
+            updateParams({ [QUERY_KEYS.process]: key })
           }
-          overlays={catalog.customerOverlays}
-          requestedCustomerKey={requestedCustomerKey}
-          onSelectCustomer={(customerKey) =>
-            updateSearchParams({
-              [QUERY_KEYS.customer]: customerKey,
+          onDraftChange={setTaskDraft}
+          onClearTask={clearTask}
+          onSelectTask={selectTask}
+        />
+      )
+    }
+    if (view === 'facts') {
+      return (
+        <FactsView
+          catalog={catalog}
+          fact={fact}
+          onSelectFact={(key) => updateParams({ [QUERY_KEYS.fact]: key })}
+          onOpenState={(key) =>
+            openView('states', {
+              [QUERY_KEYS.flow]: key,
+              [QUERY_KEYS.state]: null,
             })
           }
         />
       )
     }
     return (
-      <RuntimeView
-        taskIdValue={taskIdValue}
-        taskIdDraft={taskIdDraft}
-        onTaskIdDraftChange={setTaskIdDraft}
-        onSubmitTaskId={() =>
-          updateSearchParams({
-            [QUERY_KEYS.taskId]: cleanText(taskIdDraft) || null,
-            [QUERY_KEYS.view]: 'runtime',
-          })
+      <StateRulesView
+        catalog={catalog}
+        flow={flow}
+        state={state}
+        onSelectFlow={(key) =>
+          updateParams({ [QUERY_KEYS.flow]: key, [QUERY_KEYS.state]: null })
         }
+        onSelectState={(key) => updateParams({ [QUERY_KEYS.state]: key })}
       />
     )
   }
@@ -2288,240 +2893,132 @@ export default function DevFlowStateObservatoryPage() {
       data-catalog-status={catalogState.status}
     >
       <DevPageNav sourcePath={SOURCE_PATH} />
-
-      <header className="erp-dev-flow-state-header">
-        <div className="erp-dev-flow-state-header__copy">
-          <Space align="center" size={10} wrap>
-            <PartitionOutlined className="erp-dev-flow-state-header__icon" />
-            <Title level={1} className="erp-dev-flow-state-title">
-              流程与状态观察台 / Flow &amp; State Observatory
-            </Title>
-            <Tag color="green">仅开发环境 / DEV ONLY</Tag>
-          </Space>
-          <Paragraph className="erp-dev-flow-state-summary">
-            只读观察，不改写任何业务状态。按 Product Core
-            与甲方差异定位状态合同、流程位置和来源证据。
-          </Paragraph>
+      <header className="erp-dev-flow-header">
+        <div className="erp-dev-flow-header__primary">
+          <div className="erp-dev-flow-header__intro">
+            <Space align="center" wrap>
+              <PartitionOutlined className="erp-dev-flow-header__icon" />
+              <Title level={1}>业务链与运行观察台</Title>
+              <Tag color="green">仅开发环境 · 只读</Tag>
+            </Space>
+            <Paragraph>
+              先从业务总图看 12 条链怎样衔接，再进入单链查看来源单据、人、路、账和规则。
+            </Paragraph>
+          </div>
+          <div className="erp-dev-flow-readonly">
+            <SafetyCertificateOutlined />
+            <span>
+              <strong>不执行真实业务动作</strong>
+              <small>无过账 · 无付款 · 无冲正 · 无流程推进</small>
+            </span>
+          </div>
         </div>
-        <div className="erp-dev-flow-state-readonly">
-          <SafetyCertificateOutlined aria-hidden="true" />
-          <span>
-            <strong>Read only</strong>
-            <small>
-              无状态写入 · 无任意跳转 · Workflow done 不等于 Fact posted
-            </small>
-          </span>
-        </div>
+        <details className="erp-dev-flow-concepts">
+          <summary>
+            <span>概念解释</span>
+            <small>人、路、账、规则和业务链各自负责什么</small>
+          </summary>
+          <MemoryStrip />
+        </details>
       </header>
-
-      <section className="erp-dev-flow-state-view-nav">
+      <section className="erp-dev-flow-nav">
+        <div className="erp-dev-flow-nav__intro">
+          <Text strong>你现在想看什么？</Text>
+          <Text type="secondary">
+            默认看业务总图；点击一条链看细节，需要责任、运行、事实或状态时再切换。
+          </Text>
+        </div>
         <DevTaskNav
           compact
           level="primary"
-          ariaLabel="流程状态观察视图"
+          ariaLabel="业务链与运行观察视图"
           items={VIEW_ITEMS}
           value={view}
           disabled={catalogState.status === 'loading'}
-          onChange={(nextView) =>
-            updateSearchParams({ [QUERY_KEYS.view]: nextView })
-          }
+          onChange={(nextView) => openView(nextView)}
         />
       </section>
-
-      {showsCatalogFilters ? (
-        <section
-          className="erp-dev-flow-state-controls"
-          aria-label="当前视图筛选"
-        >
-          <div className="erp-dev-flow-state-control">
-            <label htmlFor="dev-flow-state-scope">状态域</label>
-            <Select
-              id="dev-flow-state-scope"
-              value={scopeKey}
-              options={scopeOptions.map((scope) => ({
-                value: scope.key,
-                label: scope.label,
-                title: scope.description,
-              }))}
-              onChange={(nextScope) =>
-                updateSearchParams({
-                  [QUERY_KEYS.scope]: nextScope,
-                  [QUERY_KEYS.flow]: null,
-                  [QUERY_KEYS.state]: null,
-                })
-              }
-            />
-          </div>
-          <div className="erp-dev-flow-state-control">
-            <label htmlFor="dev-flow-state-search">搜索</label>
-            <Input
-              id="dev-flow-state-search"
-              allowClear
-              prefix={<SearchOutlined />}
-              value={keyword}
-              placeholder="搜索业务流、状态、迁移或证据"
-              onChange={(event) =>
-                updateSearchParams(
-                  { [QUERY_KEYS.search]: event.target.value || null },
-                  { replace: true }
-                )
-              }
-            />
-          </div>
-          {showsFlowSelector ? (
-            <div className="erp-dev-flow-state-control">
-              <label htmlFor="dev-flow-state-flow">业务流 / 状态对象</label>
-              <Select
-                id="dev-flow-state-flow"
-                showSearch
-                optionFilterProp="label"
-                value={selectedFlow?.key}
-                placeholder="选择状态对象"
-                notFoundContent="没有匹配的状态对象"
-                options={filteredFlows.map((flow) => ({
-                  value: flow.key,
-                  label: `${flow.label} · ${flow.key}`,
-                }))}
-                onChange={(flowKey) => openFlow(flowKey)}
-              />
-            </div>
-          ) : null}
-          {showsMachineControls ? (
-            <>
-              <div className="erp-dev-flow-state-control">
-                <label htmlFor="dev-flow-state-path-mode">路径呈现</label>
-                <Select
-                  id="dev-flow-state-path-mode"
-                  value={pathModeIsValid ? pathMode : undefined}
-                  status={pathModeIsValid ? undefined : 'error'}
-                  options={PATH_MODE_ITEMS}
-                  onChange={(nextMode) =>
-                    updateSearchParams({
-                      [QUERY_KEYS.pathMode]:
-                        nextMode === 'off' ? null : nextMode,
+      {catalogState.status === 'ready' && catalog ? (
+        <>
+          <ContextStrip
+            view={view}
+            chain={overviewSelected ? catalog.businessChainOverview : chain}
+            node={node}
+            taskId={taskId}
+            selection={specialistSelection}
+            onReturnChain={() => openView('chain')}
+          />
+          {view === 'chain' ? (
+            <details className="erp-dev-flow-definition-tools" open>
+              <summary>
+                <span>跨视图搜索定义</span>
+                <small>搜索范围不是页面全文；具体任务使用独立入口</small>
+              </summary>
+              <DefinitionSearch
+                catalog={catalog}
+                onOpenTaskLookup={(keyword) => {
+                  const nextDraft = cleanText(keyword)
+                  if (nextDraft) setTaskDraft(nextDraft)
+                  setTaskLookupFocusRequest((current) => current + 1)
+                  openView('workflow')
+                }}
+                onOpen={(item) => {
+                  if (item.type === 'chain') {
+                    openView('chain', {
+                      [QUERY_KEYS.chain]: item.key,
+                      [QUERY_KEYS.node]: item.nodeKey || null,
                     })
-                  }
-                />
-              </div>
-              {pathMode !== 'off' || requestedPathObjects === 'with' ? (
-                <div className="erp-dev-flow-state-control">
-                  <label htmlFor="dev-flow-state-path-kind">路径类型</label>
-                  <Select
-                    id="dev-flow-state-path-kind"
-                    value={
-                      pathKindIsValid ? requestedPathKind || 'all' : undefined
-                    }
-                    status={pathKindIsValid ? undefined : 'error'}
-                    options={[
-                      { value: 'all', label: '全部已登记类型' },
-                      ...(catalog?.pathKinds || []).map((pathKind) => ({
-                        value: pathKind,
-                        label: PATH_KIND_PRESENTATION[pathKind] || pathKind,
-                      })),
-                    ]}
-                    onChange={(nextPathKind) =>
-                      updateSearchParams({
-                        [QUERY_KEYS.pathKind]:
-                          nextPathKind === 'all' ? null : nextPathKind,
-                        [QUERY_KEYS.flow]:
-                          requestedPathObjects === 'with'
-                            ? null
-                            : requestedFlowKey || null,
-                        [QUERY_KEYS.state]: null,
-                      })
-                    }
-                  />
-                </div>
-              ) : null}
-              <div className="erp-dev-flow-state-control">
-                <span>对象派生筛选</span>
-                <Checkbox
-                  checked={requestedPathObjects === 'with'}
-                  onChange={(event) =>
-                    updateSearchParams({
-                      [QUERY_KEYS.pathObjects]: event.target.checked
-                        ? 'with'
-                        : null,
-                      [QUERY_KEYS.flow]: null,
+                  } else if (item.type === 'runtime') {
+                    openView('runtime', { [QUERY_KEYS.process]: item.key })
+                  } else if (item.type === 'facts') {
+                    openView('facts', { [QUERY_KEYS.fact]: item.key })
+                  } else if (item.type === 'states') {
+                    openView('states', {
+                      [QUERY_KEYS.flow]: item.key,
                       [QUERY_KEYS.state]: null,
                     })
-                  }
-                >
-                  仅显示包含命中路径的对象
-                </Checkbox>
-              </div>
-            </>
+                  } else openView('workflow')
+                }}
+              />
+            </details>
           ) : null}
-        </section>
+        </>
       ) : null}
-
-      {showsMachineControls ? (
-        <section
-          className="erp-dev-flow-state-layers"
-          aria-labelledby="dev-flow-state-layer-title"
-          data-flow-layer-controls
-        >
-          <div>
-            <Text strong id="dev-flow-state-layer-title">
-              叠加层
-            </Text>
-            <Text type="secondary">
-              默认只开业务与状态；叠加层只增加短提示，不把完整技术详情塞进图中。
-            </Text>
-          </div>
-          <Checkbox.Group value={layerKeys} onChange={handleLayerChange}>
-            {(catalog?.flowLayers || []).map((layer) => (
-              <Checkbox
-                value={layer.key}
-                key={layer.key}
-                title={layer.description}
-              >
-                {layer.label}
-              </Checkbox>
-            ))}
-          </Checkbox.Group>
-        </section>
-      ) : null}
-
-      <main className="erp-dev-flow-state-main" data-flow-state-view={view}>
-        <CatalogState
-          state={catalogState}
-          onRetry={() => catalogState.reload()}
-        />
-        {catalogState.status === 'ready' && catalog?.flows.length === 0 ? (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="流程状态目录为空"
-          />
-        ) : null}
-        {catalogState.status === 'ready' && !filtersAreValid ? (
+      <main className="erp-dev-flow-main" data-flow-state-view={view}>
+        <CatalogState state={catalogState} onRetry={catalogState.reload} />
+        {catalogState.status === 'ready' &&
+        catalog &&
+        invalidMessages.length > 0 ? (
           <Alert
             showIcon
             type="warning"
-            message="深链筛选参数未登记，已按 fail closed 拒绝放宽"
-            description={invalidFilterMessages.join('；')}
-          />
-        ) : null}
-        {catalogState.status === 'ready' && unknownFlow ? (
-          <Alert
-            showIcon
-            type="warning"
-            message="深链中的状态对象不存在或不在当前范围"
+            message="无效或过期深链接，已按 fail closed 停止加载"
             description={
-              filteredFlows[0] ? (
+              <Space direction="vertical">
+                <ul>
+                  {invalidMessages.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
                 <Button
-                  size="small"
-                  onClick={() => openFlow(filteredFlows[0].key)}
+                  type="primary"
+                  onClick={() => {
+                    setSearchParams(
+                      new URLSearchParams({
+                        view: 'chain',
+                        chain: catalog.businessChainOverview.key,
+                      }),
+                      { replace: true }
+                    )
+                  }}
                 >
-                  打开第一个匹配对象
+                  恢复到业务总图
                 </Button>
-              ) : (
-                '请切换范围或清除搜索条件。'
-              )
+              </Space>
             }
           />
         ) : null}
-        {catalogState.status === 'ready' && filtersAreValid && !unknownFlow
+        {catalogState.status === 'ready' && catalog && valid
           ? renderView()
           : null}
       </main>

@@ -308,12 +308,8 @@ function workflowMockRoleTaskReadAllowed(
 }
 
 export async function installFactRpcMocks(page, context) {
-  const {
-    adminProfile,
-    effectiveSession,
-    nowUnix,
-    resolveDelayFromReferer,
-  } = context
+  const { adminProfile, effectiveSession, nowUnix, resolveDelayFromReferer } =
+    context
   const createdProductionCompletions = []
   const createdProductionMaterialIssues = []
   const createdProductionReworks = []
@@ -677,13 +673,9 @@ export async function installFactRpcMocks(page, context) {
             source_type: 'PRODUCTION_ORDER',
             source_id: Number(params.production_order_id),
             source_line_id: Number(params.production_order_item_id),
-            production_wip_batch_id: Number(
-              params.production_wip_batch_id
-            ),
+            production_wip_batch_id: Number(params.production_wip_batch_id),
             production_order_id: Number(params.production_order_id),
-            production_order_item_id: Number(
-              params.production_order_item_id
-            ),
+            production_order_item_id: Number(params.production_order_item_id),
             idempotency_key: params.idempotency_key,
             occurred_at: params.occurred_at
               ? Math.floor(new Date(params.occurred_at).getTime() / 1000)
@@ -1192,45 +1184,76 @@ export async function installFactRpcMocks(page, context) {
           offset: Number(params.offset || 0),
         }
         break
-      case 'list_sales_returns':
+      case 'list_rework_intakes':
         data = {
-          sales_returns: [
+          rework_intakes: [
             {
               id: 51,
-              return_no: 'RMA-STYLE-L1',
-              shipment_id: 1,
-              shipment_no: 'SHIP-STYLE-L1',
-              customer_name: '暗色客户',
-              status: 'APPROVED',
-              reason: '客户验收后发现包装破损',
+              intake_no: 'HCF-STYLE-L1',
+              source_shipment_id: 1,
+              source_shipment_no: 'SHIP-STYLE-L1',
+              customer_snapshot: '暗色客户',
+              status: 'RECEIVED',
+              progress_stage: 'WAITING_REWORK',
+              reason: '客户产品回厂返工后补发',
               version: 2,
               items: [
                 {
                   id: 511,
-                  shipment_item_id: 1,
+                  source_shipment_item_id: 1,
                   product_id: 1,
                   product_code: 'P-STYLE-L1',
                   product_name: '样式回归产品',
                   product_sku_id: 1,
                   product_sku_code: 'SKU-STYLE-L1',
                   product_sku_name: '标准款',
-                  warehouse_id: 1,
-                  warehouse_code: 'WH-STYLE-L1',
-                  warehouse_name: '样式仓',
+                  target_production_order_item_id: 1,
+                  target_production_order_no: 'PO-STYLE-L1',
+                  receiving_warehouse_id: 1,
+                  receiving_warehouse_code: 'WH-STYLE-L1',
+                  receiving_warehouse_name: '样式仓',
                   unit_id: 1,
                   unit_code: 'PCS',
                   unit_name: '件',
-                  lot_id: 1,
-                  lot_no: 'RMA-51-1',
-                  current_quality_inspection_no: 'RMA-QI-51-1',
-                  current_quality_inspection_status: 'DRAFT',
+                  received_lot_id: 1,
+                  received_lot_no: 'HCF-51-1',
                   quantity: '2',
-                  source_shipped_quantity: '10',
-                  active_returned_quantity: '2',
-                  remaining_returnable_quantity: '8',
+                  active_rework_quantity: '0',
+                  completed_quantity: '0',
+                  reshipped_quantity: '0',
+                  progress_stage: 'WAITING_REWORK',
+                  completion_candidates: [],
                 },
               ],
-              approved_at: nowUnix(),
+              received_at: nowUnix(),
+              created_at: nowUnix(),
+            },
+          ],
+          total: 1,
+          limit: Number(params.limit || 50),
+          offset: Number(params.offset || 0),
+        }
+        break
+      case 'list_rework_intake_source_candidates':
+        data = {
+          rework_intake_source_candidates: [
+            {
+              id: 1,
+              source_shipment_id: 1,
+              source_shipment_no: 'SHIP-STYLE-L1',
+              source_shipment_item_id: 1,
+              product_id: 1,
+              product_code: 'P-STYLE-L1',
+              product_name: '样式回归产品',
+              product_sku_id: 1,
+              product_sku_code: 'SKU-STYLE-L1',
+              product_sku_name: '标准款',
+              unit_id: 1,
+              unit_code: 'PCS',
+              target_production_order_item_id: 1,
+              target_production_order_no: 'PO-STYLE-L1',
+              remaining_intake_quantity: '8',
+              selectable: true,
             },
           ],
           total: 1,
@@ -2445,48 +2468,54 @@ export async function installFactRpcMocks(page, context) {
             Number(nowUnix())
           : Number(nowUnix())
         const beforeID = cursor ? Number(cursor) : 0
-        const terminalStatuses = new Set([
-          'done',
-          'rejected',
-          'cancelled',
-          'closed',
-        ])
+        const terminalStatuses = new Set(['done', 'rejected'])
         const isRiskTask = (task) =>
           task.task_status_key === 'blocked' ||
-          (Number(task.due_at || 0) > 0 &&
-            Number(task.due_at) < Number(nowUnix())) ||
+          (Number(task.due_at || 0) > 0 && Number(task.due_at) < snapshotAt) ||
           Number(task.priority || 0) >= 3 ||
           task.critical_path === true ||
           Number(task.urge_count || 0) > 0 ||
           Boolean(task.escalated_at) ||
           task.payload?.critical_path === true
-        const crossRoleRisk =
-          viewKey === 'risk' && ['pmc', 'boss'].includes(roleKey)
+        const supervisorRiskAllowed =
+          adminProfile?.is_super_admin === true ||
+          workflowMockPermissionAllowed(
+            adminProfile,
+            effectiveSession,
+            'workflow.task.supervise'
+          )
+        const matchesView = (task, targetViewKey, targetBeforeID = 0) => {
+          const terminal = terminalStatuses.has(task.task_status_key)
+          const assignedToCurrentAdmin =
+            Number(task.assignee_id || 0) > 0 &&
+            Number(task.assignee_id) === Number(adminProfile?.id || 0)
+          const roleMatched =
+            (targetViewKey === 'risk' && supervisorRiskAllowed) ||
+            task.owner_role_key === roleKey ||
+            assignedToCurrentAdmin
+          const viewMatched =
+            targetViewKey === 'history'
+              ? terminal
+              : targetViewKey === 'risk'
+                ? !terminal && isRiskTask(task)
+                : targetViewKey === 'approval'
+                  ? !terminal &&
+                    isWorkflowApprovalTask(task) &&
+                    workflowMockPermissionAllowed(
+                      adminProfile,
+                      effectiveSession,
+                      task.required_capability_key
+                    )
+                  : !terminal
+          return (
+            roleMatched &&
+            viewMatched &&
+            (!targetBeforeID || task.id < targetBeforeID) &&
+            workflowMockCanViewTask(adminProfile, effectiveSession, task)
+          )
+        }
         const matchingTasks = workflowTasks
-          .filter((task) => {
-            const terminal = terminalStatuses.has(task.task_status_key)
-            const assignedToCurrentAdmin =
-              Number(task.assignee_id || 0) > 0 &&
-              Number(task.assignee_id) === Number(adminProfile?.id || 0)
-            const roleMatched =
-              crossRoleRisk ||
-              task.owner_role_key === roleKey ||
-              assignedToCurrentAdmin
-            const viewMatched =
-              viewKey === 'history'
-                ? terminal
-                : viewKey === 'risk'
-                  ? !terminal && isRiskTask(task)
-                  : viewKey === 'approval'
-                    ? !terminal && isWorkflowApprovalTask(task)
-                    : !terminal
-            return (
-              roleMatched &&
-              viewMatched &&
-              (!beforeID || task.id < beforeID) &&
-              workflowMockCanViewTask(adminProfile, effectiveSession, task)
-            )
-          })
+          .filter((task) => matchesView(task, viewKey, beforeID))
           .sort((left, right) => right.id - left.id)
         const items = matchingTasks.slice(0, limit)
         const hasMore = matchingTasks.length > limit
@@ -2503,6 +2532,54 @@ export async function installFactRpcMocks(page, context) {
           next_cursor: nextCursor,
           has_more: hasMore,
           server_time: snapshotAt,
+          ...(method === 'list_role_tasks' && !cursor
+            ? {
+                counts: (() => {
+                  const todoTasks = workflowTasks.filter((task) =>
+                    matchesView(task, 'todo')
+                  )
+                  const historyTasks = workflowTasks.filter((task) =>
+                    matchesView(task, 'history')
+                  )
+                  const ready = todoTasks.filter(
+                    (task) => task.task_status_key === 'ready'
+                  ).length
+                  const blocked = todoTasks.filter(
+                    (task) => task.task_status_key === 'blocked'
+                  ).length
+                  const done = historyTasks.filter(
+                    (task) => task.task_status_key === 'done'
+                  ).length
+                  const rejected = historyTasks.filter(
+                    (task) => task.task_status_key === 'rejected'
+                  ).length
+                  const todo = ready + blocked
+                  const history = done + rejected
+                  const riskTasks = workflowTasks.filter((task) =>
+                    matchesView(task, 'risk')
+                  )
+                  return {
+                    approval: workflowTasks.filter((task) =>
+                      matchesView(task, 'approval')
+                    ).length,
+                    blocked,
+                    done,
+                    history,
+                    overdue: riskTasks.filter(
+                      (task) =>
+                        Number(task.due_at || 0) > 0 &&
+                        Number(task.due_at) < snapshotAt
+                    ).length,
+                    ready,
+                    rejected,
+                    risk: riskTasks.length,
+                    todo,
+                    total: todo + history,
+                  }
+                })(),
+                risk_scope: supervisorRiskAllowed ? 'supervised' : 'role',
+              }
+            : {}),
         }
         break
       }
@@ -2626,8 +2703,7 @@ export async function installFactRpcMocks(page, context) {
           business_status_key: createParams.business_status_key || '',
           task_status_key: createParams.task_status_key,
           owner_role_key: createParams.owner_role_key,
-          required_capability_key:
-            createParams.required_capability_key || '',
+          required_capability_key: createParams.required_capability_key || '',
           assignee_id: createParams.assignee_id || '',
           priority: createParams.priority,
           due_at: createParams.due_at || null,

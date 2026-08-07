@@ -635,11 +635,14 @@
   font-size: 18px;
 }
 
-.erp-dev-docs-markdown .erp-markdown-mermaid__tool:hover,
-.erp-dev-docs-markdown .erp-markdown-mermaid__tool:focus-visible {
+.erp-dev-docs-markdown .erp-markdown-mermaid__tool:hover {
   border-color: #2b8a3e;
   background: #eef7ef;
-  outline: 0;
+}
+
+.erp-dev-docs-markdown .erp-markdown-mermaid__tool:focus-visible {
+  outline: 2px solid #2b8a3e;
+  outline-offset: 2px;
 }
 
 .erp-dev-docs-markdown .erp-markdown-mermaid__tool:disabled {
@@ -649,13 +652,16 @@
 
 .erp-dev-docs-markdown
   .erp-markdown-mermaid--fullscreen
-  .erp-markdown-mermaid__tool:hover,
-.erp-dev-docs-markdown
-  .erp-markdown-mermaid--fullscreen
-  .erp-markdown-mermaid__tool:focus-visible {
+  .erp-markdown-mermaid__tool:hover {
   border-color: #86efac;
   background: rgb(22 101 52 / 34%);
   color: #bbf7d0;
+}
+
+.erp-dev-docs-markdown
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__tool:focus-visible {
+  outline-color: #86efac;
 }
 
 .erp-dev-docs-markdown .erp-markdown-mermaid__zoom-label {

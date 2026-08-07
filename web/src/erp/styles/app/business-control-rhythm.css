@@ -1,3 +1,16 @@
+.erp-search-input.ant-input-affix-wrapper {
+  height: var(--erp-form-control-height);
+  min-height: var(--erp-form-control-height);
+  padding-block: 0;
+}
+
+.erp-search-input.ant-input-affix-wrapper :where(input.ant-input) {
+  height: auto;
+  min-height: 0;
+  padding-block: 0;
+  line-height: calc(var(--erp-form-control-height) - 2px);
+}
+
 body .ant-modal .erp-business-form,
 #root .erp-business-form {
   --erp-control-height: var(--erp-form-control-height);

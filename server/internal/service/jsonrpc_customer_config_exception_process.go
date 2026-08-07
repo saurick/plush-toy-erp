@@ -22,17 +22,6 @@ type customerConfigExceptionProcessContract struct {
 
 var customerConfigExceptionProcessContracts = []customerConfigExceptionProcessContract{
 	{
-		processKey:      biz.ProcessKeySalesReturnApproval,
-		businessRefType: "sales_return",
-		idParam:         "sales_return_id",
-		startMethod:     "start_sales_return_acceptance_process",
-		getMethod:       "get_sales_return_acceptance_process",
-		executeMethods: map[string]string{
-			"execute_sales_return_receive": biz.ProcessDomainCommandSalesReturnReceive,
-		},
-		startPermission: biz.PermissionSalesReturnCreate,
-	},
-	{
 		processKey:      biz.ProcessKeyFinancePaymentApproval,
 		businessRefType: "finance_payment",
 		idParam:         "finance_payment_id",
@@ -336,7 +325,6 @@ func contractBusinessRefID(in *biz.ProcessDomainCommandExecution) int {
 		return 0
 	}
 	for _, key := range []string{
-		"sales_return_id",
 		"finance_payment_id",
 		"inventory_operation_id",
 		"production_exception_id",
@@ -503,12 +491,6 @@ func (d *jsonrpcDispatcher) exceptionProcessSourceReadback(
 	businessRefID int,
 ) (any, *v1.JsonrpcResult) {
 	switch contract.processKey {
-	case biz.ProcessKeySalesReturnApproval:
-		item, err := d.operationalFactUC.GetSalesReturn(ctx, businessRefID)
-		if err != nil {
-			return nil, d.mapOperationalFactError(ctx, err)
-		}
-		return salesReturnToMap(item), nil
 	case biz.ProcessKeyFinancePaymentApproval:
 		item, err := d.operationalFactUC.GetFinancePayment(ctx, businessRefID)
 		if err != nil {
@@ -556,8 +538,7 @@ func (d *jsonrpcDispatcher) mapCustomerConfigExceptionProcessError(
 			errors.Is(err, biz.ErrInventoryInsufficientStock):
 			return d.mapInventoryError(ctx, err)
 		}
-	case biz.ProcessKeySalesReturnApproval,
-		biz.ProcessKeyFinancePaymentApproval,
+	case biz.ProcessKeyFinancePaymentApproval,
 		biz.ProcessKeyProductionExceptionApproval:
 		switch {
 		case errors.Is(err, biz.ErrProductionExceptionNotFound),

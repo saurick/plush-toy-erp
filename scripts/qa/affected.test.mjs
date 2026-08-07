@@ -306,6 +306,24 @@ test("affected: transactional workflow and customer repositories select critical
   }
 });
 
+test("affected: role task quantity contract always selects PostgreSQL and browser proof", () => {
+  for (const file of [
+    "server/internal/service/jsonrpc_workflow_task.go",
+    "web/src/erp/api/workflowApi.mjs",
+    "web/scripts/style-l1/mobileTaskAssertions.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    assert(ids(plan).includes("critical-pg-create"), file);
+    assert(ids(plan).includes("critical-pg-migrate"), file);
+    assert(ids(plan).includes("critical-pg-test"), file);
+    assert(
+      plan.followUps.some((item) => item.id === "browser-regression"),
+      file,
+    );
+    assert.equal(plan.highestLevel, "T7", file);
+  }
+});
+
 test("affected: customer config changes select the T6 boundary suite", () => {
   const plan = buildAffectedPlan(
     ["config/customers/yoyoosun/customerPackage.mjs"],

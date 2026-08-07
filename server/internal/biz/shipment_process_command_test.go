@@ -12,6 +12,7 @@ func TestShipmentProcessDomainCommandShipBindsUsecase(t *testing.T) {
 		shipment: &Shipment{
 			ID:         9001,
 			ShipmentNo: "SHIP-PROCESS-001",
+			Purpose:    ShipmentPurposeSalesDelivery,
 			Status:     ShipmentStatusShipped,
 		},
 	}
@@ -88,6 +89,7 @@ func TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase(t *testing.T) {
 		shipment: &Shipment{
 			ID:                   9001,
 			ShipmentNo:           "SHIP-PROCESS-001",
+			Purpose:              ShipmentPurposeSalesDelivery,
 			Status:               ShipmentStatusDraft,
 			FinanceReleaseStatus: ShipmentFinanceReleaseStatusPending,
 		},
@@ -165,7 +167,7 @@ func TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase(t *testing.T) {
 func TestShipmentProcessDomainCommandFinanceReleaseRequiresDraftShipment(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
 	}
 	handler := &shipmentFinanceReleaseProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
 
@@ -182,10 +184,61 @@ func TestShipmentProcessDomainCommandFinanceReleaseRequiresDraftShipment(t *test
 	}
 }
 
+func TestShipmentProcessDomainCommandFinanceRejectRecordsReasonAndCompletesBranch(t *testing.T) {
+	ctx := context.Background()
+	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
+		shipment: &Shipment{
+			ID: 9001, ShipmentNo: "SHIP-PROCESS-REJECT-001", Purpose: ShipmentPurposeSalesDelivery,
+			Status: ShipmentStatusDraft, FinanceReleaseStatus: ShipmentFinanceReleaseStatusPending,
+		},
+	}
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID: 10, ProcessKey: ProcessKeyFinishedGoodsDelivery, ProcessVersion: "v1",
+			BusinessRefType: "shipment", BusinessRefID: 9001, ConfigRevision: "yoyoosun-rev-1", Status: ProcessStatusActive,
+		},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID: 20, ProcessInstanceID: 10, NodeKey: "shipment_finance_reject",
+				NodeType: ProcessNodeTypeDomainCommand, Attempt: 1, Status: ProcessNodeStatusActive, Version: 1,
+				PolicySnapshot: map[string]any{"command_key": ProcessDomainCommandShipmentFinanceReject},
+			},
+			{
+				ID: 21, ProcessInstanceID: 10, NodeKey: "shipment_finance_rejected_end",
+				NodeType: ProcessNodeTypeEnd, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1,
+			},
+		},
+	}
+	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
+	if err := RegisterShipmentProcessDomainCommandHandlers(processRuntimeUC, NewOperationalFactUsecase(operationalFactRepo)); err != nil {
+		t.Fatalf("register shipment handlers: %v", err)
+	}
+
+	node, err := processRuntimeUC.ExecuteDomainCommandNode(ctx, &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 1,
+		CommandKey:     ProcessDomainCommandShipmentFinanceReject,
+		IdempotencyKey: "process:10:node:20:shipment-finance-reject",
+		Payload:        map[string]any{"shipment_id": float64(9001), "reason": "客户信用额度不足"},
+	}, 7)
+	if err != nil {
+		t.Fatalf("execute finance rejection: %v", err)
+	}
+	if operationalFactRepo.shipment.FinanceReleaseStatus != ShipmentFinanceReleaseStatusRejected ||
+		operationalFactRepo.financeRejectionReason != "客户信用额度不足" {
+		t.Fatalf("shipment decision=%#v reason=%q", operationalFactRepo.shipment, operationalFactRepo.financeRejectionReason)
+	}
+	if node == nil || node.Outcome == nil || *node.Outcome != ShipmentProcessCommandOutcomeFinanceRejected {
+		t.Fatalf("rejection node=%#v", node)
+	}
+	if processRepo.process.Status != ProcessStatusCompleted || processRepo.nodes[1].Status != ProcessNodeStatusCompleted {
+		t.Fatalf("rejection branch did not complete process=%#v nodes=%#v", processRepo.process, processRepo.nodes)
+	}
+}
+
 func TestShipmentProcessDomainCommandShipRejectsMismatchedBusinessRef(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
 	}
 	handler := &shipmentShipProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
 
@@ -232,7 +285,7 @@ func TestShipmentProcessDomainCommandShipRequiresShipment(t *testing.T) {
 func TestShipmentProcessDomainCommandShipRejectsLegacyID(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
 	}
 	handler := &shipmentShipProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
 
@@ -251,9 +304,10 @@ func TestShipmentProcessDomainCommandShipRejectsLegacyID(t *testing.T) {
 
 type shipmentProcessOperationalFactRepoStub struct {
 	OperationalFactRepo
-	shipment          *Shipment
-	fetchedShipmentID int
-	shippedShipmentID int
+	shipment               *Shipment
+	fetchedShipmentID      int
+	shippedShipmentID      int
+	financeRejectionReason string
 }
 
 func (r *shipmentProcessOperationalFactRepoStub) GetShipment(_ context.Context, shipmentID int) (*Shipment, error) {
@@ -280,6 +334,17 @@ func (r *shipmentProcessOperationalFactRepoStub) RecordShipmentFinanceReleasePro
 	}
 	r.shipment.FinanceReleaseStatus = ShipmentFinanceReleaseStatusApproved
 	r.shipment.FinanceReleaseVersion++
+	copied := *r.shipment
+	return &copied, nil
+}
+
+func (r *shipmentProcessOperationalFactRepoStub) RecordShipmentFinanceRejectionProcessCommand(_ context.Context, shipmentID int, _ *ProcessDomainCommandInput, _ *ProcessDomainCommandResult, _ int, reason string) (*Shipment, error) {
+	if r.shipment == nil || r.shipment.ID != shipmentID {
+		return nil, ErrShipmentNotFound
+	}
+	r.shipment.FinanceReleaseStatus = ShipmentFinanceReleaseStatusRejected
+	r.shipment.FinanceReleaseVersion++
+	r.financeRejectionReason = reason
 	copied := *r.shipment
 	return &copied, nil
 }

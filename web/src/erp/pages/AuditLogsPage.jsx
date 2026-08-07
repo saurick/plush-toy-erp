@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   KeyOutlined,
   SafetyCertificateOutlined,
-  SearchOutlined,
   StopOutlined,
   UserSwitchOutlined,
 } from '@ant-design/icons'
@@ -13,7 +12,6 @@ import {
   Drawer,
   Empty,
   Grid,
-  Input,
   Pagination,
   Segmented,
   Select,
@@ -21,6 +19,7 @@ import {
   Typography,
 } from 'antd'
 import { AUTH_SCOPE } from '@/common/auth/auth'
+import SearchInput from '@/common/components/SearchInput'
 import { Loading } from '@/common/components/loading'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
@@ -753,11 +752,11 @@ export default function AuditLogsPage() {
         </label>
         <label className="erp-audit-field erp-audit-field--search">
           <span>搜索</span>
-          <Input
+          <SearchInput
             allowClear
-            prefix={<SearchOutlined />}
             value={keyword}
-            placeholder="操作人、相关账号或岗位、操作类型或说明"
+            placeholder="搜索操作记录"
+            searchHint="可搜索：操作人、相关账号或岗位、操作类型或说明"
             onChange={(event) => {
               setKeyword(event.target.value)
               setPagination((prev) => ({ ...prev, current: 1 }))

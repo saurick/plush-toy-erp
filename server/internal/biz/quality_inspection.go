@@ -27,12 +27,10 @@ const (
 	QualityInspectionSourceShipment        = ShipmentSourceType
 	QualityInspectionSourceOutsourcingFact = OutsourcingFactSourceType
 	QualityInspectionSourceProductionWIP   = ProductionWIPQualitySourceType
-	QualityInspectionSourceSalesReturn     = SalesReturnSourceType
 	QualityInspectionTypeIncoming          = "INCOMING"
 	QualityInspectionTypeFinishedGoods     = "FINISHED_GOODS"
 	QualityInspectionTypeOutsourcingReturn = "OUTSOURCING_RETURN"
 	QualityInspectionTypeProductionStage   = ProductionWIPQualityInspectionType
-	QualityInspectionTypeCustomerReturn    = "CUSTOMER_RETURN"
 	QualityInspectionSubjectMaterial       = "MATERIAL"
 	QualityInspectionSubjectProduct        = InventorySubjectProduct
 	QualityInspectionSubjectWIP            = ProductionWIPQualitySubjectType

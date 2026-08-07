@@ -7,6 +7,7 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import {
+  EXPLICIT_ONLY_NODE_TESTS,
   NODE_TEST_GROUP_ORDER,
   NODE_TEST_GROUPS,
 } from "./node-test-groups.mjs";
@@ -58,7 +59,10 @@ export function catalogNodeTests(profile = "full") {
     );
   }
   const groups = profile === "full" ? NODE_TEST_GROUP_ORDER : [profile];
-  return groups.flatMap((group) => NODE_TEST_GROUPS[group]);
+  const groupedTests = groups.flatMap((group) => NODE_TEST_GROUPS[group]);
+  return profile === "full"
+    ? [...groupedTests, ...EXPLICIT_ONLY_NODE_TESTS]
+    : groupedTests;
 }
 
 export function validateNodeTestCatalog(groups = NODE_TEST_GROUPS) {
@@ -127,9 +131,12 @@ export async function resolveNodeTests({
       `invalid Node test catalog: invalid=${validation.invalid.join(",") || "none"} unsorted=${validation.unsorted.join(",") || "none"} duplicates=${validation.duplicates.join(",") || "none"}`,
     );
   }
-  const discovered = (await discoverNodeTests(DEFAULT_TEST_ROOT)).map((file) =>
-    path.relative(DEFAULT_REPO_ROOT, file).replaceAll(path.sep, "/"),
-  );
+  const explicitOnly = new Set(EXPLICIT_ONLY_NODE_TESTS);
+  const discovered = (await discoverNodeTests(DEFAULT_TEST_ROOT))
+    .map((file) =>
+      path.relative(DEFAULT_REPO_ROOT, file).replaceAll(path.sep, "/"),
+    )
+    .filter((file) => !explicitOnly.has(file));
   const cataloged = [...validation.tests].sort();
   const discoveredSet = new Set(discovered);
   const catalogedSet = new Set(cataloged);
@@ -140,9 +147,9 @@ export async function resolveNodeTests({
       `Node test catalog is incomplete: uncataloged=${uncataloged.join(",") || "none"} undiscovered=${undiscovered.join(",") || "none"}`,
     );
   }
-  const tests = catalogNodeTests(profile).map((file) =>
-    path.resolve(DEFAULT_REPO_ROOT, file),
-  );
+  const tests = catalogNodeTests(profile)
+    .filter((file) => !explicitOnly.has(file))
+    .map((file) => path.resolve(DEFAULT_REPO_ROOT, file));
   const missing = [];
   for (const file of tests) {
     try {

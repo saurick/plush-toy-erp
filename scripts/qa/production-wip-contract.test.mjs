@@ -13,8 +13,6 @@ function read(relativePath) {
 
 const review = read("docs/architecture/生产工艺路线与在制品边界评审.md");
 const customerPackage = read("config/customers/yoyoosun/customerPackage.mjs");
-const customerMatrix = read("docs/customers/yoyoosun/客户交付矩阵.md");
-const flowCoverage = read("docs/customers/yoyoosun/流程编排闭环矩阵.md");
 
 test("production route review fixes sewing before handwork and keeps every quality gate distinct", () => {
   assert.match(
@@ -89,25 +87,4 @@ test("yoyoosun customer package no longer claims production route runtime is abs
   );
   assert.match(customerPackage, /车缝完成并检验后再进入手工/u);
   assert.match(customerPackage, /车缝和手工分别由生产经理决定本厂或外发/u);
-});
-
-test("yoyoosun governance separates Product Core WIP runtime from preview-only customer flow config", () => {
-  for (const document of [customerMatrix, flowCoverage]) {
-    assert.doesNotMatch(
-      document,
-      /尚无可执行的生产路线、WIP、逐工序分流或分段质检链|Product Core 尚无 route step/u,
-    );
-    assert.match(document, /PLUSH_SEW_HAND_V1/u);
-    assert.match(document, /preview(?:_|-)only/u);
-    assert.match(document, /133.*V5.*技术/u);
-    assert.match(document, /客户.*UAT.*未/u);
-  }
-  assert.match(
-    customerMatrix,
-    /Product Core 使用固定 `PLUSH_SEW_HAND_V1` v1.*客户 `businessFlows` 继续 preview-only/u,
-  );
-  assert.match(
-    flowCoverage,
-    /Product Core 使用固定 `PLUSH_SEW_HAND_V1` 承接生产执行/u,
-  );
 });

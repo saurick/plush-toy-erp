@@ -18,18 +18,19 @@ type ShipmentItem struct {
 }
 
 var shipmentItemLockedFields = map[string]struct{}{
-	"shipment_id":                 {},
-	"sales_order_item_id":         {},
-	"product_id":                  {},
-	"product_sku_id":              {},
-	"warehouse_id":                {},
-	"unit_id":                     {},
-	"lot_id":                      {},
-	"quantity":                    {},
+	"shipment_id":                {},
+	"sales_order_item_id":        {},
+	"rework_completion_fact_id":  {},
+	"product_id":                 {},
+	"product_sku_id":             {},
+	"warehouse_id":               {},
+	"unit_id":                    {},
+	"lot_id":                     {},
+	"quantity":                   {},
 	"unit_net_weight_g_snapshot": {},
-	"unit_price_snapshot":         {},
-	"amount_snapshot":             {},
-	"currency_snapshot":           {},
+	"unit_price_snapshot":        {},
+	"amount_snapshot":            {},
+	"currency_snapshot":          {},
 }
 
 func (ShipmentItem) Hooks() []ent.Hook {
@@ -53,11 +54,12 @@ func (ShipmentItem) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"shipment_items_quantity_positive":                    "quantity > 0",
+				"shipment_items_quantity_positive":                   "quantity > 0",
 				"shipment_items_unit_net_weight_g_snapshot_positive": "unit_net_weight_g_snapshot IS NULL OR unit_net_weight_g_snapshot > 0",
-				"shipment_items_unit_price_snapshot_nonnegative":      "unit_price_snapshot IS NULL OR unit_price_snapshot >= 0",
-				"shipment_items_amount_snapshot_nonnegative":          "amount_snapshot IS NULL OR amount_snapshot >= 0",
-				"shipment_items_currency_snapshot_allowed":            "currency_snapshot IN ('USD', 'CNY', 'HKD')",
+				"shipment_items_unit_price_snapshot_nonnegative":     "unit_price_snapshot IS NULL OR unit_price_snapshot >= 0",
+				"shipment_items_amount_snapshot_nonnegative":         "amount_snapshot IS NULL OR amount_snapshot >= 0",
+				"shipment_items_currency_snapshot_allowed":           "currency_snapshot IN ('USD', 'CNY', 'HKD')",
+				"shipment_items_rework_completion_positive":          "rework_completion_fact_id IS NULL OR rework_completion_fact_id > 0",
 			},
 		},
 	}
@@ -67,6 +69,7 @@ func (ShipmentItem) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("shipment_id").Positive(),
 		field.Int("sales_order_item_id").Optional().Nillable().Positive(),
+		field.Int("rework_completion_fact_id").Optional().Nillable().Positive(),
 		// product_id remains required for shipment facts; SKU is optional traceability.
 		field.Int("product_id").Positive(),
 		field.Int("product_sku_id").Optional().Nillable().Positive(),
@@ -88,6 +91,7 @@ func (ShipmentItem) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("shipment", Shipment.Type).Ref("items").Field("shipment_id").Required().Unique(),
 		edge.From("sales_order_item", SalesOrderItem.Type).Ref("shipment_items").Field("sales_order_item_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("rework_completion_fact", ProductionFact.Type).Field("rework_completion_fact_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("product", Product.Type).Ref("shipment_items").Field("product_id").Required().Unique(),
 		edge.From("product_sku", ProductSKU.Type).Ref("shipment_items").Field("product_sku_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("warehouse", Warehouse.Type).Ref("shipment_items").Field("warehouse_id").Required().Unique(),
@@ -100,6 +104,7 @@ func (ShipmentItem) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("shipment_id"),
 		index.Fields("sales_order_item_id"),
+		index.Fields("rework_completion_fact_id"),
 		index.Fields("product_sku_id"),
 		index.Fields("product_id", "warehouse_id", "lot_id"),
 	}

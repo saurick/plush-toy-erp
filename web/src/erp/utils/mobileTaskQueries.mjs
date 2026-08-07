@@ -43,6 +43,7 @@ export function createMobileRoleTaskSlot() {
     next_cursor: '',
     has_more: false,
     server_time: 0,
+    count_summary: null,
     loaded: false,
     loading: false,
     error: '',
@@ -71,10 +72,7 @@ export function isMobileRoleTaskHistoryScope(historyState, scopeKey) {
   )
 }
 
-export function readMobileRoleTaskScopedHistoryState(
-  historyState,
-  scopeKey
-) {
+export function readMobileRoleTaskScopedHistoryState(historyState, scopeKey) {
   return isMobileRoleTaskHistoryScope(historyState, scopeKey)
     ? historyState
     : {}
@@ -226,6 +224,7 @@ export function reconcileMobileRoleTaskMutation(
             return keepInSlot ? [canonicalTask] : []
           }),
           loaded: slotKey === viewKey ? slot.loaded : false,
+          count_summary: null,
           loading: false,
           error: '',
         },
@@ -260,7 +259,7 @@ export function settleMobileRoleTaskRequest(
   const currentSlot = state.slots[viewKey]
   const nextSlot =
     errorMessage === undefined
-      ? mergeMobileRoleTaskPage(currentSlot, response, { append })
+      ? mergeMobileRoleTaskPage(currentSlot, response, { append, viewKey })
       : {
           ...currentSlot,
           loaded: currentSlot.loaded || currentSlot.items.length > 0,
@@ -349,7 +348,7 @@ export function resolveMobileRoleTaskViewState({
 export function mergeMobileRoleTaskPage(
   currentSlot = createMobileRoleTaskSlot(),
   response = {},
-  { append = false } = {}
+  { append = false, viewKey = '' } = {}
 ) {
   if (append && currentSlot.server_time !== response.server_time) {
     throw Object.assign(new Error('任务列表已更新，请刷新后重试'), {
@@ -365,19 +364,47 @@ export function mergeMobileRoleTaskPage(
 
   for (const task of Array.isArray(response.items) ? response.items : []) {
     const id = String(task?.id ?? '').trim()
-    if (!id || seenIDs.has(id)) continue
+    if (!id || seenIDs.has(id)) {
+      throw Object.assign(new Error('任务分页结果重复，请刷新后重试'), {
+        isInvalidResponse: true,
+      })
+    }
     seenIDs.add(id)
     items.push(task)
   }
 
   const nextCursor = String(response.next_cursor || '').trim()
   const hasMore = response.has_more === true
+  const countSummary = append
+    ? currentSlot.count_summary || null
+    : response?.counts
+      ? {
+          counts: response.counts,
+          risk_scope: response.risk_scope,
+          server_time: response.server_time,
+        }
+      : null
+  const expectedTotal = countSummary
+    ? viewKey === MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY
+      ? countSummary.counts.history
+      : viewKey === MOBILE_ROLE_TASK_VIEW_KEYS.RISK
+        ? countSummary.counts.risk
+        : viewKey === MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL
+          ? countSummary.counts.approval
+          : viewKey === MOBILE_ROLE_TASK_VIEW_KEYS.TODO
+            ? countSummary.counts.todo
+            : null
+    : null
   if (
-    append &&
-    hasMore &&
-    (!nextCursor ||
-      nextCursor === String(currentSlot.next_cursor || '').trim() ||
-      items.length === initialItemCount)
+    (append &&
+      hasMore &&
+      (!nextCursor ||
+        nextCursor === String(currentSlot.next_cursor || '').trim() ||
+        items.length === initialItemCount)) ||
+    (Number.isSafeInteger(expectedTotal) &&
+      (items.length > expectedTotal ||
+        (hasMore && items.length >= expectedTotal) ||
+        (!hasMore && items.length !== expectedTotal)))
   ) {
     throw Object.assign(new Error('任务分页结果异常，请刷新后重试'), {
       isInvalidResponse: true,
@@ -389,6 +416,7 @@ export function mergeMobileRoleTaskPage(
     next_cursor: nextCursor,
     has_more: hasMore,
     server_time: response.server_time || 0,
+    count_summary: countSummary,
     loaded: true,
     loading: false,
     error: '',

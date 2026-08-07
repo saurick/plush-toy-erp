@@ -21,6 +21,87 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func TestWorkflowRepoListsOnlyTerminalTasksWithActiveProcessNodes(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_process_settlement_candidates?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	data := &Data{postgres: client}
+	processRepo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
+	workflowRepo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
+	instance, nodes, err := processRepo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey:             "workflow-settlement-candidate",
+		ProcessVersion:         "v1",
+		ConfigRevision:         "test-revision",
+		DefinitionHash:         "sha256:workflow-settlement-candidate",
+		ModuleContractSnapshot: map[string]any{"workflow_tasks": "enabled"},
+		BusinessRefType:        "sales_order",
+		BusinessRefID:          1001,
+		IdempotencyKey:         "workflow-settlement-candidate-1001",
+		Status:                 biz.ProcessStatusActive,
+		Nodes: []biz.ProcessNodeInstanceCreate{
+			{
+				NodeKey:        "approval",
+				NodeType:       biz.ProcessNodeTypeApproval,
+				Attempt:        1,
+				Status:         biz.ProcessNodeStatusWaiting,
+				PolicySnapshot: map[string]any{},
+			},
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create process: %v", err)
+	}
+	node := activateProcessNodeForTest(t, ctx, processRepo, instance, nodes[0])
+	task, err := workflowRepo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+		TaskCode:              "WORKFLOW-SETTLEMENT-CANDIDATE-1",
+		TaskGroup:             "generic_approval",
+		TaskName:              "待结算审批",
+		SourceType:            "sales_order",
+		SourceID:              1001,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          biz.SalesRoleKey,
+		ProcessInstanceID:     &instance.ID,
+		ProcessNodeInstanceID: &node.ID,
+		Payload:               map[string]any{},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create linked task: %v", err)
+	}
+	task, err = workflowRepo.UpdateWorkflowTaskStatus(ctx, workflowRepoTestStatusMutation(
+		task.ID, task.Version, "workflow-settlement-candidate-done", &biz.WorkflowTaskStatusUpdate{
+			TaskStatusKey: "done",
+			Payload:       map[string]any{"outcome": "APPROVED"},
+		},
+	), 17, biz.SalesRoleKey)
+	if err != nil {
+		t.Fatalf("complete linked task without runtime settlement: %v", err)
+	}
+
+	candidates, err := workflowRepo.ListPendingLinkedWorkflowTaskSettlements(ctx, 0, 10)
+	if err != nil {
+		t.Fatalf("list pending settlements: %v", err)
+	}
+	if len(candidates) != 1 || candidates[0].ID != task.ID || candidates[0].UpdatedBy == nil || *candidates[0].UpdatedBy != 17 {
+		t.Fatalf("unexpected settlement candidates %#v", candidates)
+	}
+	candidates, err = workflowRepo.ListPendingLinkedWorkflowTaskSettlements(ctx, task.ID, 10)
+	if err != nil || len(candidates) != 0 {
+		t.Fatalf("cursor must exclude the last scanned task, candidates=%#v err=%v", candidates, err)
+	}
+	if _, err := processRepo.CompleteProcessNodeInstance(ctx, &biz.ProcessNodeInstanceComplete{
+		ID:                node.ID,
+		ProcessInstanceID: instance.ID,
+		ExpectedVersion:   node.Version,
+		Outcome:           "APPROVED",
+	}, 17); err != nil {
+		t.Fatalf("settle process node: %v", err)
+	}
+	candidates, err = workflowRepo.ListPendingLinkedWorkflowTaskSettlements(ctx, 0, 10)
+	if err != nil || len(candidates) != 0 {
+		t.Fatalf("settled node must leave candidate set, candidates=%#v err=%v", candidates, err)
+	}
+}
+
 func TestWorkflowRepo_PublicCreateTaskReplaysFirstSnapshot(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_create_replay?mode=memory&cache=shared&_fk=1&_busy_timeout=5000")
