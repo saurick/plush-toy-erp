@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import process from "node:process";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { getDeploymentTarget } from "./deployment-targets.mjs";
@@ -31,6 +31,11 @@ const REPORT_KEYS = Object.freeze([
   "SERVER_HEALTH",
   "SERVER_READY",
   "WEB_HEALTH",
+  "PUBLIC_ENTRY_STATUS",
+  "PUBLIC_CONTAINER",
+  "PUBLIC_SHA",
+  "PUBLIC_HEALTH",
+  "PUBLIC_PROVIDER",
   "MIGRATION_LOCK_STATUS",
   "BACKUP_TOOLING_STATUS",
   "LATEST_BACKUP_SHA256",
@@ -59,6 +64,8 @@ project=plush-toy-erp-v5
 database=plush_erp_uat_20260716_v5
 migration_lock=/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock
 minimum_available_bytes=32212254720
+public_endpoint=https://admin.yoyoosun.net
+public_network=plush-toy-erp-v5_default
 
 status=passed
 blockers=()
@@ -71,6 +78,11 @@ web_sha=unknown
 server_health=failed
 server_ready=failed
 web_health=failed
+public_entry_status=blocked
+public_container=unknown
+public_sha=unknown
+public_health=failed
+public_provider=failed
 migration_lock_status=free
 backup_tooling_status=passed
 latest_backup_sha256=none
@@ -235,6 +247,53 @@ curl --fail --silent --show-error --max-time 5 http://127.0.0.1:5185/healthz >/d
   web_health=passed ||
   block target_web_health_failed
 
+public_containers="$(
+  docker ps --format '{{.Names}}' 2>/dev/null |
+    sed -n '/^plush-toy-erp-web-public-[0-9a-f]\{8\}$/p'
+)"
+public_container_count="$(printf '%s\n' "$public_containers" | sed '/^$/d' | wc -l | tr -d ' ')"
+if [[ "$public_container_count" == 1 ]]; then
+  public_container="$public_containers"
+  public_sha="$(read_git_sha "$public_container")"
+  if ! docker inspect "$public_container" \
+    --format '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' 2>/dev/null |
+    grep -Fxq "$public_network"; then
+    block target_public_entry_network_mismatch
+  fi
+  if ! docker port "$public_container" 5175/tcp 2>/dev/null |
+    grep -Fxq '0.0.0.0:5175'; then
+    block target_public_entry_port_mismatch
+  fi
+  curl --fail --silent --show-error --max-time 5 \
+    http://127.0.0.1:5175/healthz >/dev/null 2>&1 &&
+    public_health=passed ||
+    block target_public_entry_health_failed
+  if curl -fsS --max-time 8 \
+    -H 'Content-Type: application/json' \
+    -d '{"jsonrpc":"2.0","id":"public-preflight","method":"capabilities","params":{}}' \
+    "$public_endpoint/rpc/auth" | python3 -c '
+import json
+import sys
+payload = json.load(sys.stdin)
+sms = payload.get("result", {}).get("data", {}).get("sms_login", {})
+ok = payload.get("result", {}).get("code") == 0 and sms.get("enabled") is True and sms.get("mode") == "provider" and sms.get("mock_delivery") is False
+raise SystemExit(0 if ok else 1)
+'; then
+    public_provider=passed
+  else
+    block target_public_entry_provider_failed
+  fi
+  if [[ ! "$public_sha" =~ ^[0-9a-f]{40}$ ]]; then
+    block target_public_entry_sha_invalid
+  elif [[ "$public_sha" != "$server_sha" || "$public_sha" != "$web_sha" ]]; then
+    block target_public_entry_sha_mismatch
+  elif [[ "$public_health" == passed && "$public_provider" == passed ]]; then
+    public_entry_status=passed
+  fi
+else
+  block target_public_entry_container_invalid
+fi
+
 if [[ -e "$migration_lock" ]]; then
   if command -v lslocks >/dev/null 2>&1 &&
     lslocks --noheadings --output PATH 2>/dev/null | grep -Fxq "$migration_lock"; then
@@ -282,6 +341,11 @@ printf '%s\n' \
   "SERVER_HEALTH=$server_health" \
   "SERVER_READY=$server_ready" \
   "WEB_HEALTH=$web_health" \
+  "PUBLIC_ENTRY_STATUS=$public_entry_status" \
+  "PUBLIC_CONTAINER=$public_container" \
+  "PUBLIC_SHA=$public_sha" \
+  "PUBLIC_HEALTH=$public_health" \
+  "PUBLIC_PROVIDER=$public_provider" \
   "MIGRATION_LOCK_STATUS=$migration_lock_status" \
   "BACKUP_TOOLING_STATUS=$backup_tooling_status" \
   "LATEST_BACKUP_SHA256=$latest_backup_sha256" \
@@ -403,6 +467,17 @@ export function parseRemoteTargetPreflight(raw) {
       serverReady: healthStatus("SERVER_READY"),
       webHealth: healthStatus("WEB_HEALTH"),
     },
+    publicEntry: {
+      status: checkStatus("PUBLIC_ENTRY_STATUS"),
+      container:
+        values.PUBLIC_CONTAINER === "unknown"
+          ? "unknown"
+          : values.PUBLIC_CONTAINER,
+      gitSha: sha(values.PUBLIC_SHA, "public entry SHA"),
+      health: healthStatus("PUBLIC_HEALTH"),
+      provider: healthStatus("PUBLIC_PROVIDER"),
+      endpoint: "https://admin.yoyoosun.net",
+    },
     locks: {
       migration: assertEnum(
         values.MIGRATION_LOCK_STATUS,
@@ -429,25 +504,24 @@ export function parseRemoteTargetPreflight(raw) {
   };
   if (
     report.capacity.minimumAvailableBytes !== 30 * 1024 ** 3 ||
-    (report.runtime.serverSha !== "unknown" &&
-      report.runtime.serverSha !== report.runtime.webSha)
+    (report.publicEntry.container !== "unknown" &&
+      !/^plush-toy-erp-web-public-[0-9a-f]{8}$/u.test(
+        report.publicEntry.container,
+      )) ||
+    (report.status === "passed" &&
+      (!SHA_PATTERN.test(report.runtime.serverSha) ||
+        report.runtime.serverSha !== report.runtime.webSha ||
+        report.publicEntry.status !== "passed" ||
+        report.publicEntry.gitSha !== report.runtime.serverSha))
   ) {
     throw new Error("remote target report contradicts the fixed contract");
   }
   return report;
 }
 
-export function runTargetPreflight(
-  targetKey,
-  {
-    runCommand = spawnSync,
-    timeoutMs = 30_000,
-    now = new Date().toISOString(),
-  } = {},
-) {
-  const target = getDeploymentTarget(targetKey);
+function targetSshArgs(target) {
   const sshDestination = `${target.ssh.user}@${target.ssh.host}`;
-  const args = [
+  return [
     "-o",
     "BatchMode=yes",
     "-o",
@@ -460,22 +534,9 @@ export function runTargetPreflight(
     "bash",
     "-s",
   ];
-  const result = runCommand("ssh", args, {
-    input: REMOTE_TARGET_PREFLIGHT_SCRIPT,
-    encoding: "utf8",
-    timeout: timeoutMs,
-    maxBuffer: 1024 * 1024,
-    env: process.env,
-  });
-  if (result.error) {
-    throw new Error(`target preflight SSH could not start: ${result.error.message}`);
-  }
-  if (result.status !== 0) {
-    throw new Error(
-      `target preflight SSH failed with exit ${String(result.status)}`,
-    );
-  }
-  const remote = parseRemoteTargetPreflight(String(result.stdout || ""));
+}
+
+function publicTargetPreflight(target, remote, now) {
   return {
     schemaVersion: TARGET_PREFLIGHT_CONTRACT,
     generatedAt: now,
@@ -488,12 +549,13 @@ export function runTargetPreflight(
     blockers: remote.blockers,
     nextAction:
       remote.status === "passed"
-        ? "prepare a fresh pre-migration backup and immutable promotion"
+        ? "prepare a fresh backup, immutable promotion and public entry cutover"
         : "resolve blockers and rerun this read-only preflight",
     notProven: [
       "fresh pre-migration backup for a new release",
       "new release migration plan/apply/readback",
       "new release promotion and smoke",
+      "new release public entry cutover and asset readback",
       "rollback rehearsal",
       "customer UAT and sign-off",
     ],
@@ -504,6 +566,118 @@ export function runTargetPreflight(
       containsAbsolutePaths: false,
     },
   };
+}
+
+export function runTargetPreflight(
+  targetKey,
+  {
+    runCommand = spawnSync,
+    timeoutMs = 30_000,
+    now = new Date().toISOString(),
+  } = {},
+) {
+  const target = getDeploymentTarget(targetKey);
+  const args = targetSshArgs(target);
+  const result = runCommand("ssh", args, {
+    input: REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    encoding: "utf8",
+    timeout: timeoutMs,
+    maxBuffer: 1024 * 1024,
+    env: process.env,
+  });
+  if (result.error) {
+    throw new Error(
+      `target preflight SSH could not start: ${result.error.message}`,
+    );
+  }
+  if (result.status !== 0) {
+    throw new Error(
+      `target preflight SSH failed with exit ${String(result.status)}`,
+    );
+  }
+  const remote = parseRemoteTargetPreflight(String(result.stdout || ""));
+  return publicTargetPreflight(target, remote, now);
+}
+
+export async function runTargetPreflightAsync(
+  targetKey,
+  {
+    spawnCommand = spawn,
+    timeoutMs = 30_000,
+    now = new Date().toISOString(),
+  } = {},
+) {
+  const target = getDeploymentTarget(targetKey);
+  const child = spawnCommand("ssh", targetSshArgs(target), {
+    env: process.env,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  return new Promise((resolve, reject) => {
+    let stdout = "";
+    let outputBytes = 0;
+    let settled = false;
+    let timer;
+    const finish = (callback) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      callback();
+    };
+    const collect = (chunk) => {
+      outputBytes += chunk.length;
+      if (outputBytes > 1024 * 1024) {
+        child.kill("SIGTERM");
+        finish(() => reject(new Error("target preflight output is too large")));
+        return;
+      }
+      stdout += chunk.toString("utf8");
+    };
+    child.stdout.on("data", collect);
+    child.stderr.on("data", (chunk) => {
+      outputBytes += chunk.length;
+      if (outputBytes > 1024 * 1024) child.kill("SIGTERM");
+    });
+    child.on("error", (error) => {
+      finish(() =>
+        reject(
+          new Error(`target preflight SSH could not start: ${error.message}`),
+        ),
+      );
+    });
+    child.on("close", (code) => {
+      finish(() => {
+        if (code !== 0) {
+          reject(
+            new Error(`target preflight SSH failed with exit ${String(code)}`),
+          );
+          return;
+        }
+        try {
+          resolve(
+            publicTargetPreflight(
+              target,
+              parseRemoteTargetPreflight(stdout),
+              now,
+            ),
+          );
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    child.stdin.on("error", (error) => {
+      finish(() =>
+        reject(
+          new Error(`target preflight SSH input failed: ${error.message}`),
+        ),
+      );
+    });
+    timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      finish(() => reject(new Error("target preflight SSH timed out")));
+    }, timeoutMs);
+    child.stdin.end(REMOTE_TARGET_PREFLIGHT_SCRIPT);
+  });
 }
 
 function parseArgs(argv) {

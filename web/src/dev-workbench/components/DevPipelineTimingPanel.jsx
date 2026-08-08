@@ -3,6 +3,7 @@ import { Card, Empty, Space, Tag, Typography } from 'antd'
 
 import {
   deliveryPipelinePresentation,
+  deliveryPipelineRunModePresentation,
   deliveryStatusPresentation,
   formatDeliveryBytes,
   formatDeliveryDuration,
@@ -22,6 +23,12 @@ function formatTimestamp(value) {
     timeStyle: 'medium',
     hour12: false,
   }).format(new Date(timestamp))
+}
+
+function formatJobDuration(job) {
+  if (!job) return '未证明'
+  if (['skipped', 'neutral'].includes(job.conclusion)) return '已复用'
+  return formatDeliveryDuration(job.durationMs)
 }
 
 export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
@@ -92,14 +99,30 @@ export default function DevPipelineTimingPanel({
   operations = [],
 }) {
   const summary = summarizePipelineTimings(timings)
-  const latestRun = summary.latest
-  const release = versions[0] || null
-  const transferOperation = operations.find(
+  const { latest: latestRun, analysisRun } = summary
+  const [release = null] = versions
+  const deploymentOperation = operations.find(
     (operation) =>
-      operation.action === 'promote' &&
-      operation.status === 'passed' &&
-      Number.isSafeInteger(operation.metrics?.transferBytesPerSecond)
+      operation.action === 'promote' && operation.status === 'passed'
   )
+  const strictJob = summary.latestFullRelease?.jobs.find(
+    (job) => job.name === 'Exact-SHA strict quality'
+  )
+  const publishJob = summary.latestFullRelease?.jobs.find(
+    (job) => job.name === 'Publish immutable artifact set'
+  )
+  const transferShare =
+    Number.isSafeInteger(deploymentOperation?.metrics?.transferDurationMs) &&
+    deploymentOperation.durationMs > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (deploymentOperation.metrics.transferDurationMs /
+              deploymentOperation.durationMs) *
+              100
+          )
+        )
+      : null
 
   return (
     <Card className="erp-dev-pipeline-timing" variant="borderless">
@@ -109,7 +132,7 @@ export default function DevPipelineTimingPanel({
             CI/CD 效能
           </Title>
           <Text type="secondary">
-            GitHub Actions 原始 run、job 与 step 时间；不另建流水线真源。
+            区分完整发布、持续集成与相同 SHA 复用；数据来自 GitHub 与部署回执。
           </Text>
         </div>
         <Text type="secondary">
@@ -120,69 +143,40 @@ export default function DevPipelineTimingPanel({
       {!latestRun ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="尚无可计算的完整 CI/CD 运行"
+          description="尚无可计算的 CI/CD 运行"
         />
       ) : (
         <section aria-labelledby="dev-pipeline-timing-title">
           <div className="erp-dev-pipeline-timing__summary">
             <div>
-              <Text type="secondary">最近完整运行</Text>
+              <Text type="secondary">最近动作</Text>
               <strong>{formatDeliveryDuration(latestRun.durationMs)}</strong>
               <Text>
-                {latestRun.workflow === 'release' ? '正式发布' : '持续集成'} ·{' '}
+                {deliveryPipelineRunModePresentation(summary.latestMode)} ·{' '}
                 {shortGitSha(latestRun.gitSha)}
               </Text>
-            </div>
-            <div>
-              <Text type="secondary">同类运行中位数</Text>
-              <strong>
-                {formatDeliveryDuration(summary.medianDurationMs)}
-              </strong>
-              <Text>{summary.sampleCount} 次同类完整运行</Text>
-            </div>
-            <div>
-              <Text type="secondary">观测关键路径</Text>
-              <strong>
-                {formatDeliveryDuration(summary.criticalPath?.durationMs)}
-              </strong>
-              <Text
-                title={summary.criticalPath?.jobs
-                  .map((job) => job.name)
-                  .join(' → ')}
-              >
-                {summary.criticalPath?.jobs
-                  .map((job) => deliveryPipelinePresentation(job.name).label)
-                  .join(' → ') || '尚未识别'}
-              </Text>
               <Text type="secondary">
-                可见环节{' '}
-                {formatDeliveryDuration(
-                  summary.criticalPath?.coveredDurationMs
-                )}{' '}
-                · 调度/等待{' '}
-                {formatDeliveryDuration(summary.criticalPath?.schedulingGapMs)}
+                同类型中位数 {formatDeliveryDuration(summary.medianDurationMs)}{' '}
+                · {summary.sampleCount} 次
               </Text>
             </div>
             <div>
-              <Text type="secondary">最长环节</Text>
-              <strong
-                title={
-                  summary.bottleneck
-                    ? deliveryPipelinePresentation(summary.bottleneck.name)
-                        .title
-                    : '尚未识别'
-                }
-              >
-                {summary.bottleneck
-                  ? deliveryPipelinePresentation(summary.bottleneck.name).label
-                  : '尚未识别'}
+              <Text type="secondary">最近完整发布</Text>
+              <strong>
+                {formatDeliveryDuration(summary.latestFullRelease?.durationMs)}
               </strong>
               <Text>
-                {formatDeliveryDuration(summary.bottleneck?.durationMs)}
+                严格门禁 {formatJobDuration(strictJob)} · 发布制品{' '}
+                {formatJobDuration(publishJob)}
+              </Text>
+              <Text type="secondary">
+                完整发布中位数{' '}
+                {formatDeliveryDuration(summary.fullReleaseMedianDurationMs)} ·{' '}
+                {summary.fullReleaseSampleCount} 次
               </Text>
             </div>
             <div>
-              <Text type="secondary">最新发布 BuildKit 命中</Text>
+              <Text type="secondary">构建缓存与制品</Text>
               <strong>
                 {formatDeliveryPercent(
                   release?.buildPerformance?.cacheHitRateBasisPoints
@@ -190,34 +184,41 @@ export default function DevPipelineTimingPanel({
               </strong>
               <Text>
                 {release?.buildPerformance
-                  ? `${release.buildPerformance.cacheHitCount}/${release.buildPerformance.completedVertexCount} 个完成节点`
-                  : '等待新版发布回执'}
+                  ? `${release.buildPerformance.cacheHitCount} 命中 / ${release.buildPerformance.cacheMissCount} 未命中，共 ${release.buildPerformance.completedVertexCount} 个完成节点`
+                  : '等待构建回执'}
+              </Text>
+              <Text type="secondary">
+                总计 {formatDeliveryBytes(release?.artifactSummary?.totalBytes)}{' '}
+                · Server{' '}
+                {formatDeliveryBytes(
+                  release?.artifactSummary?.serverImageBytes
+                )}{' '}
+                · Web{' '}
+                {formatDeliveryBytes(release?.artifactSummary?.webImageBytes)}
               </Text>
             </div>
             <div>
-              <Text type="secondary">最新不可变制品</Text>
+              <Text type="secondary">最近部署与传输</Text>
               <strong>
-                {formatDeliveryBytes(release?.artifactSummary?.totalBytes)}
+                {formatDeliveryDuration(deploymentOperation?.durationMs)}
               </strong>
               <Text>
-                {release
-                  ? `${release.version} · ${shortGitSha(release.gitSha)}`
-                  : '版本未证明'}
-              </Text>
-            </div>
-            <div>
-              <Text type="secondary">最近部署传输</Text>
-              <strong>
-                {formatDeliveryRate(
-                  transferOperation?.metrics?.transferBytesPerSecond
-                )}
-              </strong>
-              <Text>
-                {formatDeliveryBytes(transferOperation?.metrics?.transferBytes)}{' '}
+                传输{' '}
+                {formatDeliveryBytes(
+                  deploymentOperation?.metrics?.transferBytes
+                )}{' '}
                 ·{' '}
                 {formatDeliveryDuration(
-                  transferOperation?.metrics?.transferDurationMs
+                  deploymentOperation?.metrics?.transferDurationMs
                 )}
+              </Text>
+              <Text type="secondary">
+                {formatDeliveryRate(
+                  deploymentOperation?.metrics?.transferBytesPerSecond
+                )}
+                {transferShare === null
+                  ? ''
+                  : ` · 占总耗时 ${String(transferShare)}%`}
               </Text>
             </div>
           </div>
@@ -227,8 +228,8 @@ export default function DevPipelineTimingPanel({
               color={latestRun.conclusion === 'success' ? 'success' : 'error'}
             >
               {latestRun.conclusion === 'success'
-                ? '最近运行通过'
-                : '最近运行未通过'}
+                ? '最近动作通过'
+                : '最近动作未通过'}
             </Tag>
             <Text>{summary.optimizationHint}</Text>
             <Text
@@ -241,22 +242,38 @@ export default function DevPipelineTimingPanel({
             >
               {summary.failureReason
                 ? `失败原因：${deliveryPipelinePresentation(summary.failureReason.job).label} / ${deliveryPipelinePresentation(summary.failureReason.step).label}`
-                : '失败原因：最近运行无失败步骤'}
+                : '最近动作没有失败步骤'}
             </Text>
             <Link href={latestRun.url} target="_blank" rel="noreferrer">
               查看 GitHub 运行
             </Link>
           </div>
 
-          <DevTimingBars
-            stages={summary.stages}
-            totalDurationMs={latestRun.durationMs}
-          />
-
           <details className="erp-dev-pipeline-timing__details">
-            <summary>查看全部 job 与 step 时间</summary>
+            <summary>展开完整发布关键路径与全部环节</summary>
+            <div className="erp-dev-pipeline-timing__critical-path">
+              <Text strong>观测关键路径</Text>
+              <Text>
+                {formatDeliveryDuration(summary.criticalPath?.durationMs)} ·
+                可见环节{' '}
+                {formatDeliveryDuration(
+                  summary.criticalPath?.coveredDurationMs
+                )}{' '}
+                · 调度/等待{' '}
+                {formatDeliveryDuration(summary.criticalPath?.schedulingGapMs)}
+              </Text>
+              <Text type="secondary">
+                {summary.criticalPath?.jobs
+                  .map((job) => deliveryPipelinePresentation(job.name).label)
+                  .join(' → ') || '尚未识别'}
+              </Text>
+            </div>
+            <DevTimingBars
+              stages={summary.stages}
+              totalDurationMs={analysisRun?.durationMs}
+            />
             <div className="erp-dev-pipeline-timing__jobs">
-              {latestRun.jobs.map((job) => {
+              {(analysisRun?.jobs || []).map((job) => {
                 const jobName = deliveryPipelinePresentation(job.name)
                 const jobStatus = deliveryStatusPresentation(
                   job.conclusion || job.status
@@ -278,7 +295,7 @@ export default function DevPipelineTimingPanel({
                         id: `${String(job.id)}:${String(step.number)}`,
                         label: step.name,
                       }))}
-                      totalDurationMs={job.durationMs || latestRun.durationMs}
+                      totalDurationMs={job.durationMs || analysisRun.durationMs}
                       limit={100}
                     />
                   </article>

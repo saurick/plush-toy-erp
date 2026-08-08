@@ -3,7 +3,7 @@
 本目录是当前仓库唯一部署主路径，默认提供：
 
 - `compose.yml`：PostgreSQL + Jaeger + 业务服务 + 前端单入口静态服务
-- `compose.customer-trial-133.yml`：仅为 133 V5 独立验收栈覆盖 Compose project name，不允许修改服务
+- `compose.customer-trial-133.yml`：仅为 133 V5 独立验收栈覆盖 Compose project name，不允许修改服务；正式 promotion / rollback 在 Compose 外复用同一不可变 Web 镜像维护固定公网入口，并由交付回执验证两者 SHA 一致
 - `.env.example`：推荐环境变量
 - `migrate_online.sh`：通过宿主机 `/usr/local/bin/atlas` 执行 migration，并用同一个 `flock` 锁住完整 `status -> 055504 存量升级审计 -> 055825 客户配置切换审计 -> dry-run -> apply` 序列
 

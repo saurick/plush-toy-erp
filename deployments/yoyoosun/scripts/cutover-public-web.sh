@@ -78,20 +78,6 @@ candidate="plush-toy-erp-web-public-candidate-$short_release"
 next_container="plush-toy-erp-web-public-$short_release"
 confirm_text="PUBLIC_WEB_CUTOVER:$current_container:$release"
 
-echo "[cutover-public-web] plan current=$current_container next=$next_container image=$image network=$network endpoint=$endpoint api_origin=app-server:8300"
-if [[ "$execute" -eq 0 ]]; then
-  echo "[cutover-public-web] plan-only; execute confirmation: $confirm_text"
-  exit 0
-fi
-[[ "$confirmation" == "$confirm_text" ]] || fail "确认词不匹配"
-[[ -z "$(docker ps -aq --filter "name=^/${candidate}$")" ]] || fail "候选容器名已被占用: $candidate"
-[[ -z "$(docker ps -aq --filter "name=^/${next_container}$")" ]] || fail "目标容器名已被占用: $next_container"
-
-cleanup_candidate() {
-  docker rm -f "$candidate" >/dev/null 2>&1 || true
-}
-trap cleanup_candidate EXIT
-
 wait_http_health() {
   local url="$1"
   local http_code=""
@@ -103,20 +89,10 @@ wait_http_health() {
   return 1
 }
 
-docker run -d \
-  --name "$candidate" \
-  --network "$network" \
-  --memory 96m \
-  --restart no \
-  -e "API_ORIGIN=$api_origin" \
-  -p 127.0.0.1:15175:5175 \
-  "$image" >/dev/null
-
-wait_http_health "http://127.0.0.1:15175/healthz" || fail "候选前端未健康"
-
 assert_provider_capabilities() {
   local base_url="$1"
-  curl -kfsS \
+  curl -fsS \
+    --max-time 10 \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":"public-cutover","method":"capabilities","params":{}}' \
     "${base_url%/}/rpc/auth" | python3 -c '
@@ -129,11 +105,63 @@ raise SystemExit(0 if ok else 1)
 '
 }
 
+container_release() {
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$1" |
+    awk -F= '$1 == "GIT_SHA" { value=$0; sub(/^[^=]*=/, "", value); count++ } END { if (count == 1) print value }'
+}
+
+echo "[cutover-public-web] plan current=$current_container next=$next_container image=$image network=$network endpoint=$endpoint api_origin=app-server:8300"
+if [[ "$execute" -eq 0 ]]; then
+  echo "[cutover-public-web] plan-only; execute confirmation: $confirm_text"
+  exit 0
+fi
+[[ "$confirmation" == "$confirm_text" ]] || fail "确认词不匹配"
+
+current_release="$(container_release "$current_container")"
+[[ "$current_release" =~ ^[0-9a-f]{40}$ ]] || fail "当前公网容器没有可信 GIT_SHA"
+if [[ "$current_release" == "$release" ]]; then
+  wait_http_health "http://127.0.0.1:5175/healthz" || fail "当前公网入口未健康"
+  assert_provider_capabilities "$endpoint" || fail "当前公网入口未满足 provider 合同"
+  echo "[cutover-public-web] passed current=$current_container rollback=$current_container release=$release provider=true reused=true"
+  exit 0
+fi
+
+docker rm -f "$candidate" >/dev/null 2>&1 || true
+if docker inspect "$next_container" >/dev/null 2>&1; then
+  next_release="$(container_release "$next_container")"
+  next_image="$(docker inspect --format '{{.Config.Image}}' "$next_container")"
+  next_running="$(docker inspect --format '{{.State.Running}}' "$next_container")"
+  [[ "$next_release" == "$release" && "$next_image" == "$image" ]] ||
+    fail "既有目标公网容器身份不匹配"
+  [[ "$next_running" == false ]] || fail "目标公网容器已在运行但不是当前入口"
+  docker rm "$next_container" >/dev/null
+fi
+
+cleanup_candidate() {
+  docker rm -f "$candidate" >/dev/null 2>&1 || true
+}
+trap cleanup_candidate EXIT
+
+docker run -d \
+  --name "$candidate" \
+  --network "$network" \
+  --memory 96m \
+  --restart no \
+  --label io.plush-toy-erp.public-entry=candidate \
+  --label "io.plush-toy-erp.release=$release" \
+  -e "API_ORIGIN=$api_origin" \
+  -p 127.0.0.1:15175:5175 \
+  "$image" >/dev/null
+
+wait_http_health "http://127.0.0.1:15175/healthz" || fail "候选前端未健康"
+
 assert_provider_capabilities "http://127.0.0.1:15175" || fail "候选前端 SMS 能力未匹配 provider 合同"
+docker update --restart=no "$current_container" >/dev/null
 docker stop "$current_container" >/dev/null
 
 rollback_old() {
   docker rm -f "$next_container" >/dev/null 2>&1 || true
+  docker update --restart=always "$current_container" >/dev/null 2>&1 || true
   docker start "$current_container" >/dev/null 2>&1 || true
 }
 
@@ -142,6 +170,8 @@ if ! docker run -d \
   --network "$network" \
   --memory 96m \
   --restart always \
+  --label io.plush-toy-erp.public-entry=current \
+  --label "io.plush-toy-erp.release=$release" \
   -e "API_ORIGIN=$api_origin" \
   -p 0.0.0.0:5175:5175 \
   "$image" >/dev/null; then
@@ -155,4 +185,4 @@ if ! wait_http_health "http://127.0.0.1:5175/healthz" ||
   fail "公网切流后验证失败，已尝试恢复旧入口"
 fi
 
-echo "[cutover-public-web] passed current=$next_container rollback=$current_container release=$release provider=true"
+echo "[cutover-public-web] passed current=$next_container rollback=$current_container release=$release provider=true reused=false"

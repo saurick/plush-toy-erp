@@ -36,6 +36,8 @@ root=/home/simon/plush-toy-erp-v5
 incoming_root=$root/incoming
 releases_root=$root/releases
 runtime_env=$root/runtime/.env.customer-trial-133
+public_endpoint=https://admin.yoyoosun.net
+public_network=plush-toy-erp-v5_default
 operations_root=$root/operations
 run_root=$root/run
 current=$root/current
@@ -506,8 +508,8 @@ else
 fi
 cmp --silent \
   "$incoming/remote-code-rollback.sh" \
-  "$release_dir/scripts/deploy/remote-code-rollback.sh" ||
-  fail "remote rollback script is not part of the target exact source"
+  "$current/scripts/deploy/remote-code-rollback.sh" ||
+  fail "remote rollback script is not part of the live exact source"
 
 enter_stage image_load_and_readback
 docker load --input "$incoming/server-image.tar" >>"$log_file" 2>&1
@@ -600,6 +602,34 @@ runtime_web_sha="$(docker inspect plush-toy-erp-v5-web-desktop --format '{{range
   sed -n 's/^GIT_SHA=//p' | head -n1)"
 [[ "$runtime_server_sha" == "$to_sha" && "$runtime_web_sha" == "$to_sha" ]] ||
   fail "rollback runtime release identity does not match"
+
+enter_stage public_entry_switch
+public_cutover_script=$current/deployments/yoyoosun/scripts/cutover-public-web.sh
+[[ -f "$public_cutover_script" && ! -L "$public_cutover_script" ]] ||
+  fail "public entry cutover script is unavailable"
+public_containers="$(
+  docker ps --format '{{.Names}}' |
+    sed -n '/^plush-toy-erp-web-public-[0-9a-f]\{8\}$/p'
+)"
+public_container_count="$(printf '%s\n' "$public_containers" | sed '/^$/d' | wc -l | tr -d ' ')"
+[[ "$public_container_count" == 1 ]] || fail "public entry container is not unique"
+bash "$public_cutover_script" \
+  --image "$web_ref" \
+  --release "$to_sha" \
+  --current-container "$public_containers" \
+  --endpoint "$public_endpoint" \
+  --api-origin http://app-server:8300 \
+  --network "$public_network" \
+  --execute \
+  --confirm "PUBLIC_WEB_CUTOVER:$public_containers:$to_sha" \
+  >>"$log_file" 2>&1
+public_runtime_sha="$(
+  docker inspect "plush-toy-erp-web-public-${to_sha:0:8}" \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' |
+    sed -n 's/^GIT_SHA=//p' | head -n1
+)"
+[[ "$public_runtime_sha" == "$to_sha" ]] ||
+  fail "public entry rollback identity does not match"
 
 enter_stage current_source_switch
 next_current=$root/.current-next-rollback-$operation_id

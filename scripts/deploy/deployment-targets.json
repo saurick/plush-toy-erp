@@ -37,6 +37,13 @@
         "web": "http://127.0.0.1:5185",
         "server": "http://127.0.0.1:8315"
       },
+      "publicEntry": {
+        "endpoint": "https://admin.yoyoosun.net",
+        "containerPrefix": "plush-toy-erp-web-public-",
+        "network": "plush-toy-erp-v5_default",
+        "hostPort": 5175,
+        "apiOrigin": "http://app-server:8300"
+      },
       "capacity": {
         "minimumAvailableBytes": 32212254720
       }

@@ -37,20 +37,23 @@ test("remote code rollback is fixed to test-133 and has no build or database mut
   assert.match(source, /migration[.]sequenceSha256/u);
   assert.match(source, /customerConfig[.]sourceSha256/u);
   assert.doesNotMatch(source, /docker (?:build|compose build)/u);
-  assert.doesNotMatch(source, /\b(?:dropdb|createdb|pg_restore|atlas migrate apply)\b/u);
+  assert.doesNotMatch(
+    source,
+    /\b(?:dropdb|createdb|pg_restore|atlas migrate apply)\b/u,
+  );
   assert.doesNotMatch(source, /git (?:clone|pull|checkout)/u);
 });
 
 test("remote code rollback requires exact confirmation, lock and receipt", () => {
-  assert.match(
-    source,
-    /ROLLBACK:\$target:\$from_sha:\$to_sha:\$operation_id/u,
-  );
+  assert.match(source, /ROLLBACK:\$target:\$from_sha:\$to_sha:\$operation_id/u);
   assert.match(source, /flock -n 9/u);
   assert.match(source, /plush[.]remote-rollback-receipt\/v2/u);
   assert.match(source, /enter_stage package_verification/u);
   assert.match(source, /durationMs: \$durationMs/u);
   assert.match(source, /timings: \$timings/u);
+  assert.match(source, /enter_stage public_entry_switch/u);
+  assert.match(source, /PUBLIC_WEB_CUTOVER:\$public_containers:\$to_sha/u);
+  assert.match(source, /public entry rollback identity does not match/u);
   assert.match(source, /rollback has an unknown prior target outcome/u);
   assert.match(source, /not_proven rollback_outcome_unknown/u);
   assert.match(source, /recover_previous/u);

@@ -12,7 +12,10 @@ import {
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   defaultReleaseVersion,
+  deliveryOperationMessagePresentation,
   deliveryPipelinePresentation,
+  deliveryPipelineRunMode,
+  deliveryPipelineRunModePresentation,
   deliveryStatusPresentation,
   deliveryVersionActionKind,
   formatDeliveryBytes,
@@ -191,6 +194,62 @@ test('delivery summary requires provider, target and no-shell boundaries', () =>
       }),
     /version/u
   )
+  const deployed = {
+    ...summaryFixture(),
+    target: {
+      status: 'passed',
+      remote: {
+        runtime: { serverSha: SHA, webSha: SHA },
+        publicEntry: {
+          status: 'passed',
+          container: `plush-toy-erp-web-public-${SHA.slice(0, 8)}`,
+          gitSha: SHA,
+          health: 'passed',
+          provider: 'passed',
+          endpoint: 'https://admin.yoyoosun.net',
+        },
+      },
+    },
+  }
+  assert.equal(validateDevDeliverySummary(deployed).target.status, 'passed')
+  assert.throws(
+    () =>
+      validateDevDeliverySummary({
+        ...deployed,
+        target: {
+          ...deployed.target,
+          remote: {
+            ...deployed.target.remote,
+            publicEntry: {
+              ...deployed.target.remote.publicEntry,
+              gitSha: 'f'.repeat(40),
+            },
+          },
+        },
+      }),
+    /target evidence/u
+  )
+  const blockedTarget = {
+    ...deployed,
+    target: {
+      ...deployed.target,
+      status: 'blocked',
+      remote: {
+        runtime: { serverSha: SHA, webSha: 'unknown' },
+        publicEntry: {
+          ...deployed.target.remote.publicEntry,
+          status: 'blocked',
+          gitSha: 'unknown',
+          health: 'failed',
+          provider: 'failed',
+        },
+      },
+    },
+  }
+  assert.equal(
+    validateDevDeliverySummary(blockedTarget).target.status,
+    'blocked'
+  )
   assert.throws(
     () =>
       validateDevDeliverySummary({
@@ -298,6 +357,20 @@ test('delivery presentation helpers are deterministic and bounded', () => {
   assert.equal(formatDeliveryDuration(125_000), '2 分 5 秒')
   assert.equal(deliveryStatusPresentation('not_proven').label, '结果未证明')
   assert.equal(deliveryStatusPresentation('success').label, '成功')
+  assert.equal(
+    deliveryOperationMessagePresentation(
+      'target promotion and basic runtime verification passed'
+    ).label,
+    '133 部署与基础运行核验已通过'
+  )
+  assert.match(
+    deliveryOperationMessagePresentation('Future executor event').title,
+    /Future executor event/u
+  )
+  assert.equal(
+    deliveryPipelineRunModePresentation('exact_sha_reuse'),
+    '相同 SHA 幂等复用'
+  )
 })
 
 test('pipeline jobs and timing stages use Chinese-first presentation labels', () => {
@@ -402,6 +475,49 @@ test('pipeline timings validate nested stages and identify the measured bottlene
   )
   assert.equal(summary.failureReason, null)
   assert.match(summary.optimizationHint, /耗时最长/u)
+  const reuseRun = {
+    ...timings.runs[0],
+    id: 320,
+    durationMs: 24_000,
+    url: 'https://github.com/saurick/plush-toy-erp/actions/runs/320',
+    jobs: [
+      {
+        ...timings.runs[0].jobs[0],
+        id: 650,
+        name: 'Exact-SHA strict quality',
+        conclusion: 'skipped',
+        durationMs: 0,
+        steps: [],
+      },
+      {
+        ...timings.runs[0].jobs[0],
+        id: 651,
+        name: 'Publish immutable artifact set',
+        conclusion: 'skipped',
+        durationMs: 0,
+        steps: [],
+      },
+    ],
+  }
+  assert.equal(deliveryPipelineRunMode(reuseRun), 'exact_sha_reuse')
+  assert.equal(
+    deliveryPipelineRunMode({
+      ...reuseRun,
+      jobs: [
+        { ...reuseRun.jobs[0], conclusion: 'failure', durationMs: 0 },
+        reuseRun.jobs[1],
+      ],
+    }),
+    'full_release'
+  )
+  const reuseSummary = summarizePipelineTimings({
+    ...timings,
+    runs: [reuseRun, timings.runs[0]],
+  })
+  assert.equal(reuseSummary.latestMode, 'exact_sha_reuse')
+  assert.strictEqual(reuseSummary.analysisRun, timings.runs[0])
+  assert.equal(reuseSummary.fullReleaseSampleCount, 1)
+  assert.match(reuseSummary.optimizationHint, /不参与完整构建瓶颈判断/u)
   const mixedSummary = summarizePipelineTimings({
     ...timings,
     runs: [
@@ -541,6 +657,19 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /test-133/u)
   assert.match(source, /查看详情/u)
   assert.match(source, /确认回滚/u)
+  assert.match(source, /公网入口/u)
+  assert.match(source, /入口与 133 版本一致/u)
+  assert.match(source, /headAlreadyPublished/u)
+  assert.match(source, /当前 SHA 已发布并部署，无需重复发布/u)
+  assert.match(source, /deliveryOperationMessagePresentation/u)
+  assert.match(source, /查看发布当前 SHA 说明/u)
+  assert.match(source, /先发布制品，不会直接部署到 133/u)
+  assert.match(source, /“准备部署”和“确认部署”/u)
+  assert.match(source, /trigger=\{\['hover', 'click'\]\}/u)
+  assert.match(
+    source,
+    /发布当前 SHA[\s\S]*?查看发布当前 SHA 说明[\s\S]*?<\/header>/u
+  )
   assert.doesNotMatch(
     source,
     /(?:spawn|child_process|192[.]168|\/home\/simon)/iu

@@ -3,6 +3,7 @@ import {
   CloudDownloadOutlined,
   CloudUploadOutlined,
   DeploymentUnitOutlined,
+  QuestionCircleOutlined,
   ReloadOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
@@ -15,6 +16,7 @@ import {
   Input,
   List,
   Modal,
+  Popover,
   Space,
   Table,
   Tag,
@@ -32,6 +34,7 @@ import {
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   defaultReleaseVersion,
+  deliveryOperationMessagePresentation,
   deliveryStatusPresentation,
   deliveryVersionActionKind,
   formatDeliveryBytes,
@@ -46,7 +49,7 @@ import {
   updateDevSummarySnapshot,
 } from '../config/devSummarySnapshot.mjs'
 
-const { Paragraph, Text, Title } = Typography
+const { Link, Paragraph, Text, Title } = Typography
 const OPERATION_POLL_INTERVAL_MS = 1500
 const VERSION_CENTER_SNAPSHOT_KEY = 'version-center'
 const POLLING_OPERATION_STATUSES = new Set([
@@ -197,14 +200,36 @@ export default function DevVersionCenterPage() {
   const currentTargetRelease = versions.find(
     (version) => version.gitSha === currentTargetSha
   )
+  const currentHeadRelease = versions.find(
+    (version) => version.gitSha === repository?.commit
+  )
+  const publicEntry = target?.remote?.publicEntry
   const targetPassed = target?.status === 'passed'
+  const headAlreadyPublished = Boolean(
+    currentHeadRelease?.status === 'published' &&
+      currentHeadRelease?.completeAssets === true
+  )
   const canDispatch = Boolean(
     summaryFresh &&
       repository &&
       !repository.dirty &&
+      !headAlreadyPublished &&
       !hasOpenOperation &&
       !isMutationRunning
   )
+  const dispatchExplanation = isMutationRunning
+    ? '已有写操作正在提交'
+    : !summaryFresh
+      ? '正在核对最新状态；上次结果只供查看'
+      : hasOpenOperation
+        ? '已有未结束的操作'
+        : repository?.dirty
+          ? '当前工作树有改动，不能创建 exact-SHA 发布'
+          : headAlreadyPublished
+            ? repository?.commit === currentTargetSha
+              ? '当前 SHA 已发布并部署，无需重复发布'
+              : '当前 SHA 已有完整不可变制品，请在版本列表准备部署'
+            : '当前仓库身份不可用，不能创建 exact-SHA 发布'
   const refreshBusy = initialLoading || refreshing
   const refreshStatusText = initialLoading
     ? '正在读取最新状态'
@@ -490,8 +515,19 @@ export default function DevVersionCenterPage() {
           {record.issues.length > 0 ? (
             <Text type="danger">{issueDescription(record.issues)}</Text>
           ) : (
-            <Text type="secondary">
-              {record.events.at(-1)?.message || '等待状态'}
+            <Text
+              type="secondary"
+              title={
+                deliveryOperationMessagePresentation(
+                  record.events.at(-1)?.message
+                ).title
+              }
+            >
+              {
+                deliveryOperationMessagePresentation(
+                  record.events.at(-1)?.message
+                ).label
+              }
             </Text>
           )}
         </Space>
@@ -584,28 +620,47 @@ export default function DevVersionCenterPage() {
             >
               刷新状态
             </Button>
-            <Tooltip
-              title={
-                canDispatch
-                  ? ''
-                  : isMutationRunning
-                    ? '已有写操作正在提交'
-                    : !summaryFresh
-                      ? '正在核对最新状态；上次结果只供查看'
-                      : hasOpenOperation
-                        ? '已有未结束的 operation'
-                        : '当前工作树不干净或仓库身份不可用，不能创建 exact-SHA 发布'
-              }
-            >
-              <Button
-                type="primary"
-                icon={<CloudUploadOutlined />}
-                disabled={!canDispatch}
-                onClick={() => setReleaseModalOpen(true)}
+            <Space size={8}>
+              <Tooltip title={canDispatch ? '' : dispatchExplanation}>
+                <Button
+                  type="primary"
+                  icon={<CloudUploadOutlined />}
+                  disabled={!canDispatch}
+                  onClick={() => setReleaseModalOpen(true)}
+                >
+                  发布当前 SHA
+                </Button>
+              </Tooltip>
+              <Popover
+                placement="bottomRight"
+                trigger={['hover', 'click']}
+                content={
+                  <Space
+                    direction="vertical"
+                    size={4}
+                    style={{ maxWidth: 360 }}
+                  >
+                    <Text strong>先发布制品，不会直接部署到 133</Text>
+                    <Text>
+                      系统会将当前干净提交的 exact SHA 交给
+                      GitHub，执行严格质量门禁并生成不可变镜像、Release
+                      manifest、checksum 和 SBOM。
+                    </Text>
+                    <Text type="secondary">
+                      发布完成后，仍需在版本列表中依次执行“准备部署”和“确认部署”。
+                    </Text>
+                  </Space>
+                }
               >
-                发布当前 SHA
-              </Button>
-            </Tooltip>
+                <Button
+                  type="text"
+                  shape="circle"
+                  size="small"
+                  icon={<QuestionCircleOutlined />}
+                  aria-label="查看发布当前 SHA 说明"
+                />
+              </Popover>
+            </Space>
           </Space>
           <Text type="secondary" role="status" aria-live="polite">
             {refreshStatusText}
@@ -690,6 +745,30 @@ export default function DevVersionCenterPage() {
               </Text>
             </Space>
           </Card>
+          <Card title="公网入口">
+            <Space direction="vertical" size={8}>
+              <Text code>{shortGitSha(publicEntry?.gitSha)}</Text>
+              <Tag
+                color={publicEntry?.status === 'passed' ? 'success' : 'warning'}
+              >
+                {publicEntry?.status === 'passed'
+                  ? '入口与 133 版本一致'
+                  : '入口未完成证明'}
+              </Tag>
+              <Text type="secondary">
+                页面健康 {publicEntry?.health === 'passed' ? '通过' : '未通过'}
+                {' · '}短信 Provider{' '}
+                {publicEntry?.provider === 'passed' ? '通过' : '未通过'}
+              </Text>
+              <Link
+                href={publicEntry?.endpoint || 'https://admin.yoyoosun.net'}
+                target="_blank"
+                rel="noreferrer"
+              >
+                打开公网页面
+              </Link>
+            </Space>
+          </Card>
         </section>
 
         <DevPipelineTimingPanel
@@ -712,7 +791,7 @@ export default function DevVersionCenterPage() {
           />
         </Card>
 
-        <Card title="Operation 记录" className="erp-dev-version-table-card">
+        <Card title="发布与部署记录" className="erp-dev-version-table-card">
           <Table
             rowKey="id"
             columns={operationColumns}
@@ -774,7 +853,7 @@ export default function DevVersionCenterPage() {
       </Modal>
 
       <Drawer
-        title="Operation 详情"
+        title="操作详情"
         open={Boolean(operationDetail)}
         width={640}
         onClose={() => setOperationDetail(null)}
@@ -790,7 +869,7 @@ export default function DevVersionCenterPage() {
             <Text type="secondary" copyable>
               {operationDetail.id}
             </Text>
-            <Card size="small" title="Operation 环节耗时">
+            <Card size="small" title="操作环节耗时">
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Text strong>
                   总耗时 {formatDeliveryDuration(operationDetail.durationMs)}
@@ -884,7 +963,17 @@ export default function DevVersionCenterPage() {
                       <StatusTag status={event.status} />
                       <Text type="secondary">{event.at}</Text>
                     </Space>
-                    <Text>{event.message}</Text>
+                    <Text
+                      title={
+                        deliveryOperationMessagePresentation(event.message)
+                          .title
+                      }
+                    >
+                      {
+                        deliveryOperationMessagePresentation(event.message)
+                          .label
+                      }
+                    </Text>
                   </Space>
                 </List.Item>
               )}

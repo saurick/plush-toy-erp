@@ -324,6 +324,7 @@
 - 效能工作台：版本中心直接读取 GitHub run / job / step 与本地质量、promotion、rollback 脱敏回执，首屏展示最近完整运行、样本中位数、最长瓶颈和优化提示，全部阶段按需展开。真实 390px 浏览器检查发现展开入口点击区过小后，将流水线与 operation 耗时入口统一提升到至少 `44px`，阶段和瓶颈长名称在移动端换行并保留桌面悬停全文；桌面 / 移动均无页面级横向溢出。
 - 演练：同一不可变候选完成两次独立本地 release rehearsal，均覆盖 migration、管理员引导、health / ready、11 账号登录、V7 effective session、PDF、备份恢复、稳态重启和零残留清理。133 完成“升级 → 代码 / 镜像回滚 → 回滚后深度 smoke → 重新升级”，回滚不执行 down migration 或数据库 restore；远端 promotion / rollback 总耗时与 ISO 墙钟绑定，拒绝历史脚本或异常数量级计时。本轮最终版本目标为 `2026.08.08-5`，exact SHA、run、制品 digest 与 operation 以 GitHub Release 和 ignored delivery evidence 为准。
 - 数据库 / 边界：本地 full 与 rehearsal 结束后 disposable 数据库、演练容器和卷均为零；133 promotion 的临时恢复库已清理，正式数据库保持 `plush_erp_uat_20260716_v5`。另有迁移停在 `20260715161753` 的历史前身库，零连接但 schema 与当前不同，现有治理工具按长生命周期目标库拒绝删除；它作为受保护回滚资产保留，只有单独完成归档、恢复证明与唯一数据复核后才允许受控删除。发布与恢复演练不等于客户岗位 UAT 或签收。
+- 本轮续办：把先前独立维护的 `admin.yoyoosun.net` 入口正式纳入固定 `test-133` registry、只读 preflight、promotion 和 rollback 阶段，要求公网容器、健康、Provider 能力与 Compose `GIT_SHA` 一致；回滚控制器固定取当前 live exact SHA，旧版本只提供源码和制品。工作台改为四列环境摘要，分开比较完整发布、相同 SHA 复用与 CI，中文主标签覆盖阶段和状态事件，重复发布当前完整 SHA 时给出可执行引导。仍不新增流水线、数据库、指标服务或服务器构建路径。
 
 ### Writer turn 租约与漏释放恢复（2026-08-06）
 

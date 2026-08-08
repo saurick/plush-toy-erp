@@ -20,6 +20,7 @@ const ROLLBACK_STAGES = [
   "static_preflight",
   "service_switch",
   "runtime_verified",
+  "public_entry_switch",
   "current_source_switch",
 ];
 
@@ -76,7 +77,8 @@ function receipt(status = "passed") {
     durationMs: 20_000,
     timings: visibleStages.map((id, index) => ({
       id,
-      status: !passed && index === visibleStages.length - 1 ? "failed" : "passed",
+      status:
+        !passed && index === visibleStages.length - 1 ? "failed" : "passed",
       durationMs: 1_000,
     })),
     redaction: {
@@ -155,6 +157,18 @@ test("rollback uses the live release control script, not the historical target s
     source,
     /\$\{target[.]manifest[.]gitSha\}:scripts\/deploy\/remote-code-rollback[.]sh/u,
   );
+  const remoteSource = readFileSync(
+    new URL("./remote-code-rollback.sh", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    remoteSource,
+    /cmp --silent[\s\S]*?"\$incoming\/remote-code-rollback[.]sh"[\s\S]*?"\$current\/scripts\/deploy\/remote-code-rollback[.]sh"/u,
+  );
+  assert.match(
+    remoteSource,
+    /public_cutover_script=\$current\/deployments\/yoyoosun\/scripts\/cutover-public-web[.]sh/u,
+  );
 });
 
 test("rollback executor has explicit confirmation and no automatic retry path", () => {
@@ -176,10 +190,7 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
 test("rollback executor help states the code-only database boundary", () => {
   const result = spawnSync(
     process.execPath,
-    [
-      new URL("./rollback-executor.mjs", import.meta.url).pathname,
-      "--help",
-    ],
+    [new URL("./rollback-executor.mjs", import.meta.url).pathname, "--help"],
     { encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);

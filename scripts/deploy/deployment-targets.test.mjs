@@ -12,10 +12,7 @@ import {
 
 test("deployment registry exposes only the fixed test-133 target", () => {
   const registry = loadDeploymentTargetRegistry();
-  assert.equal(
-    registry.schemaVersion,
-    DEPLOYMENT_TARGET_REGISTRY_CONTRACT,
-  );
+  assert.equal(registry.schemaVersion, DEPLOYMENT_TARGET_REGISTRY_CONTRACT);
   assert.deepEqual(
     registry.targets.map((target) => target.key),
     ["test-133"],
@@ -25,6 +22,13 @@ test("deployment registry exposes only the fixed test-133 target", () => {
   assert.equal(target.filesystem.root, "/home/simon/plush-toy-erp-v5");
   assert.equal(target.compose.projectName, "plush-toy-erp-v5");
   assert.equal(target.database.name, "plush_erp_uat_20260716_v5");
+  assert.deepEqual(target.publicEntry, {
+    endpoint: "https://admin.yoyoosun.net",
+    containerPrefix: "plush-toy-erp-web-public-",
+    network: "plush-toy-erp-v5_default",
+    hostPort: 5175,
+    apiOrigin: "http://app-server:8300",
+  });
   assert.equal(target.capacity.minimumAvailableBytes, 30 * 1024 ** 3);
 });
 
@@ -71,5 +75,9 @@ test("deployment target CLI omits SSH and filesystem internals", () => {
   assert.equal(body.key, "test-133");
   assert.equal("ssh" in body, false);
   assert.equal("filesystem" in body, false);
+  assert.deepEqual(body.publicEntry, {
+    endpoint: "https://admin.yoyoosun.net",
+    hostPort: 5175,
+  });
   assert.doesNotMatch(result.stdout, /192\.168\.0\.133|\/home\/simon/u);
 });

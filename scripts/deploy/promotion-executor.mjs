@@ -56,6 +56,7 @@ const PROMOTION_STAGE_IDS = Object.freeze([
   "migration_applied",
   "compose_start",
   "runtime_verified",
+  "public_entry_switch",
   "current_source_switch",
 ]);
 const TRANSFER_FILES = Object.freeze([

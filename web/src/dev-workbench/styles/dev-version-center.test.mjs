@@ -33,13 +33,30 @@ test('mobile timing labels wrap and retain Chinese-first trace titles', () => {
     /deliveryPipelinePresentation\(\s*stage[.]name \|\| stage[.]label\s*\)/u
   )
   assert.match(component, /stagePresentation[.]title/u)
-  assert.match(
-    component,
-    /deliveryPipelinePresentation\(summary[.]bottleneck[.]name\)[\s\S]*[.]title/u
-  )
+  assert.match(component, /所属任务：\$\{groupPresentation[.]title\}/u)
 })
 
-test('artifact and transfer metrics collapse from three columns to one', () => {
+test('status, artifact and transfer metrics stay readable across breakpoints', () => {
+  assert.match(
+    css,
+    /[.]erp-dev-version-page > :not\([.]erp-dev-workspace-nav\) \{[\s\S]*width: auto;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/u
+  )
+  assert.match(
+    css,
+    /[.]erp-dev-version-shell \{[\s\S]*grid-template-columns: minmax\(0, 1fr\);/u
+  )
+  assert.match(
+    css,
+    /[.]erp-dev-version-shell > \* \{[\s\S]*min-width: 0;/u
+  )
+  assert.match(
+    css,
+    /[.]erp-dev-version-summary \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-version-summary \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
+  )
   assert.match(
     css,
     /[.]erp-dev-operation-metrics \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u
@@ -50,17 +67,24 @@ test('artifact and transfer metrics collapse from three columns to one', () => {
   )
   assert.match(
     css,
-    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-operation-metrics \{[\s\S]*grid-template-columns: 1fr;/u
+    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-operation-metrics \{[\s\S]*display: grid;[\s\S]*grid-template-columns: 1fr;/u
   )
-  assert.match(component, /最新发布 BuildKit 命中/u)
-  assert.match(component, /最近部署传输/u)
+  assert.match(
+    css,
+    /[.]erp-dev-version-page [.]erp-dev-version-summary \{[\s\S]*overflow-x: visible;[\s\S]*scroll-snap-type: none;/u
+  )
+  assert.match(component, /构建缓存与制品/u)
+  assert.match(component, /最近部署与传输/u)
+  assert.match(component, /最近完整发布/u)
+  assert.match(component, /相同 SHA 复用/u)
   assert.match(component, /失败原因/u)
+  assert.match(css, /[.]erp-dev-pipeline-timing__critical-path/u)
   assert.match(
     css,
     /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-pipeline-timing__summary \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
   )
   assert.match(
     css,
-    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-pipeline-timing__summary,[\s\S]*grid-template-columns: 1fr;/u
+    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-pipeline-timing__summary,[\s\S]*display: grid;[\s\S]*grid-template-columns: 1fr;/u
   )
 })

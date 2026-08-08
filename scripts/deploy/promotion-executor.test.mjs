@@ -25,6 +25,7 @@ const PROMOTION_STAGES = [
   "migration_applied",
   "compose_start",
   "runtime_verified",
+  "public_entry_switch",
   "current_source_switch",
 ];
 

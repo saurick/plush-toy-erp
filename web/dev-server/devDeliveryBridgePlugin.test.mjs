@@ -312,7 +312,7 @@ test('delivery summary exposes cached GitHub timings and readable operation dura
         cacheHitRateBasisPoints: 8_000,
       },
     },
-    now: '2026-08-08T01:00:15.000Z',
+    now: '2026-08-08T01:01:10.000Z',
   })
   let timingReads = 0
   const timingPayload = {
@@ -346,11 +346,12 @@ test('delivery summary exposes cached GitHub timings and readable operation dura
   assert.strictEqual(first.timings, timingPayload)
   assert.strictEqual(second.timings, timingPayload)
   assert.equal(timingReads, 1)
-  assert.equal(first.operations[0].durationMs, 15_000)
+  assert.equal(first.operations[0].durationMs, 70_000)
   assert.deepEqual(
     first.operations[0].stages.map((item) => item.durationMs),
-    [5_000, 10_000]
+    [65_000]
   )
+  assert.equal(first.operations[0].stages[0].label, '制品传输')
   assert.deepEqual(first.operations[0].metrics, {
     transferBytes: 1_265_345_566,
     transferDurationMs: 65_000,

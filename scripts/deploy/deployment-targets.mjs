@@ -52,11 +52,7 @@ function assertPattern(value, pattern, field) {
 }
 
 function assertInteger(value, { minimum, maximum }, field) {
-  if (
-    !Number.isSafeInteger(value) ||
-    value < minimum ||
-    value > maximum
-  ) {
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
     throw new Error(`${field} is invalid`);
   }
   return value;
@@ -110,6 +106,7 @@ export function validateDeploymentTarget(target) {
       "filesystem",
       "key",
       "purpose",
+      "publicEntry",
       "ssh",
       "trialTarget",
     ],
@@ -123,7 +120,10 @@ export function validateDeploymentTarget(target) {
     throw new Error("target must be the enabled customer-trial target");
   }
   assertPattern(target.customer, CUSTOMER_KEY_PATTERN, "target customer");
-  if (target.customer !== "yoyoosun" || target.trialTarget !== "customer-trial-133") {
+  if (
+    target.customer !== "yoyoosun" ||
+    target.trialTarget !== "customer-trial-133"
+  ) {
     throw new Error("target customer/trial identity is invalid");
   }
 
@@ -133,7 +133,11 @@ export function validateDeploymentTarget(target) {
     "target ssh",
   );
   assertPattern(target.ssh.host, HOST_PATTERN, "target ssh host");
-  assertInteger(target.ssh.port, { minimum: 1, maximum: 65535 }, "target ssh port");
+  assertInteger(
+    target.ssh.port,
+    { minimum: 1, maximum: 65535 },
+    "target ssh port",
+  );
   assertPattern(target.ssh.user, USER_PATTERN, "target ssh user");
   assertPattern(
     target.ssh.expectedHostname,
@@ -157,7 +161,9 @@ export function validateDeploymentTarget(target) {
       `${REQUIRED_ABSOLUTE_PREFIX}/runtime/.env.customer-trial-133` ||
     target.filesystem.operationRoot !== `${REQUIRED_ABSOLUTE_PREFIX}/operations`
   ) {
-    throw new Error("target filesystem paths differ from the fixed test-133 contract");
+    throw new Error(
+      "target filesystem paths differ from the fixed test-133 contract",
+    );
   }
 
   assertExactKeys(
@@ -181,7 +187,12 @@ export function validateDeploymentTarget(target) {
   ) {
     throw new Error("target Compose identity is invalid");
   }
-  for (const field of ["projectName", "serverService", "webService", "postgresService"]) {
+  for (const field of [
+    "projectName",
+    "serverService",
+    "webService",
+    "postgresService",
+  ]) {
     assertPattern(
       target.compose[field],
       field === "projectName" ? PROJECT_PATTERN : SERVICE_PATTERN,
@@ -196,7 +207,11 @@ export function validateDeploymentTarget(target) {
     );
   }
 
-  assertExactKeys(target.database, ["migrationLock", "name"], "target database");
+  assertExactKeys(
+    target.database,
+    ["migrationLock", "name"],
+    "target database",
+  );
   assertPattern(target.database.name, DATABASE_PATTERN, "target database name");
   if (target.database.name !== "plush_erp_uat_20260716_v5") {
     throw new Error("target database identity is invalid");
@@ -213,8 +228,27 @@ export function validateDeploymentTarget(target) {
   }
 
   assertExactKeys(target.endpoints, ["server", "web"], "target endpoints");
-  assertLoopbackHttpUrl(target.endpoints.server, 8315, "target server endpoint");
+  assertLoopbackHttpUrl(
+    target.endpoints.server,
+    8315,
+    "target server endpoint",
+  );
   assertLoopbackHttpUrl(target.endpoints.web, 5185, "target web endpoint");
+
+  assertExactKeys(
+    target.publicEntry,
+    ["apiOrigin", "containerPrefix", "endpoint", "hostPort", "network"],
+    "target public entry",
+  );
+  if (
+    target.publicEntry.endpoint !== "https://admin.yoyoosun.net" ||
+    target.publicEntry.containerPrefix !== "plush-toy-erp-web-public-" ||
+    target.publicEntry.network !== "plush-toy-erp-v5_default" ||
+    target.publicEntry.hostPort !== 5175 ||
+    target.publicEntry.apiOrigin !== "http://app-server:8300"
+  ) {
+    throw new Error("target public entry identity is invalid");
+  }
 
   assertExactKeys(
     target.capacity,
@@ -238,7 +272,9 @@ export function validateDeploymentTargetRegistry(registry) {
     !Array.isArray(registry.targets) ||
     registry.targets.length !== SUPPORTED_DEPLOYMENT_TARGET_KEYS.length
   ) {
-    throw new Error("target registry must contain the exact supported target set");
+    throw new Error(
+      "target registry must contain the exact supported target set",
+    );
   }
   const targets = registry.targets.map(validateDeploymentTarget);
   if (
@@ -252,9 +288,7 @@ export function validateDeploymentTargetRegistry(registry) {
 }
 
 export function defaultDeploymentTargetRegistryPath() {
-  return fileURLToPath(
-    new URL("./deployment-targets.json", import.meta.url),
-  );
+  return fileURLToPath(new URL("./deployment-targets.json", import.meta.url));
 }
 
 export function loadDeploymentTargetRegistry(
@@ -319,6 +353,10 @@ function publicTarget(target) {
     customer: target.customer,
     trialTarget: target.trialTarget,
     endpoints: target.endpoints,
+    publicEntry: {
+      endpoint: target.publicEntry.endpoint,
+      hostPort: target.publicEntry.hostPort,
+    },
     minimumAvailableBytes: target.capacity.minimumAvailableBytes,
   };
 }

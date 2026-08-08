@@ -29,10 +29,7 @@ import {
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
 import { readRollbackPlan } from "./rollback-controller.mjs";
 import { validateRollbackManifest } from "./rollback-manifest.mjs";
-import {
-  sha256File,
-  validateReleaseManifest,
-} from "./release-catalog.mjs";
+import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 
@@ -54,6 +51,7 @@ const ROLLBACK_STAGE_IDS = Object.freeze([
   "static_preflight",
   "service_switch",
   "runtime_verified",
+  "public_entry_switch",
   "current_source_switch",
 ]);
 const TRANSFER_FILES = Object.freeze([
@@ -340,10 +338,7 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
       "toGitSha",
       "toVersion",
     ]) ||
-    !hasExactKeys(receipt?.images, [
-      "serverContentId",
-      "webContentId",
-    ]) ||
+    !hasExactKeys(receipt?.images, ["serverContentId", "webContentId"]) ||
     !hasExactKeys(receipt?.database, [
       "changedByExecutor",
       "downMigrationAutomatic",
@@ -494,8 +489,7 @@ export function executeRollback(
   ) {
     throw new Error("rollback operation is not in the eligible ready state");
   }
-  const expectedConfirmation =
-    `ROLLBACK:test-133:${plan.from.gitSha}:${plan.to.gitSha}:${operation.id}`;
+  const expectedConfirmation = `ROLLBACK:test-133:${plan.from.gitSha}:${plan.to.gitSha}:${operation.id}`;
   if (confirmation !== expectedConfirmation) {
     throw new Error(
       `explicit rollback confirmation is required: ${expectedConfirmation}`,
@@ -603,8 +597,7 @@ export function executeRollback(
       "transfer immutable rollback package",
     );
     remoteStarted = true;
-    const remoteScript =
-      `${target.filesystem.root}/incoming/${operation.id}/remote-code-rollback.sh`;
+    const remoteScript = `${target.filesystem.root}/incoming/${operation.id}/remote-code-rollback.sh`;
     const result = runCommand(
       "ssh",
       [

@@ -34,10 +34,7 @@ test("remote promotion accepts only the fixed target contract", () => {
   assert.match(source, /project=plush-toy-erp-v5/u);
   assert.match(source, /database=plush_erp_uat_20260716_v5/u);
   assert.match(source, /minimum_available_bytes=32212254720/u);
-  assert.match(
-    source,
-    /PROMOTE:\$target:\$release_sha:\$operation_id/u,
-  );
+  assert.match(source, /PROMOTE:\$target:\$release_sha:\$operation_id/u);
   assert.doesNotMatch(
     source,
     /(?:--host|--path|--project|--database|--command|eval\s)/u,
@@ -67,10 +64,10 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
   assert.match(source, /enter_stage package_verification/u);
   assert.match(source, /durationMs: \$durationMs/u);
   assert.match(source, /timings: \$timings/u);
-  assert.match(
-    source,
-    /applyStarted: \(\$migrationApplyStarted == 1\)/u,
-  );
+  assert.match(source, /enter_stage public_entry_switch/u);
+  assert.match(source, /PUBLIC_WEB_CUTOVER:\$public_containers:\$release_sha/u);
+  assert.match(source, /public entry release identity does not match/u);
+  assert.match(source, /applyStarted: \(\$migrationApplyStarted == 1\)/u);
 });
 
 test("remote promotion normalizes full nanoseconds to portable milliseconds", () => {

@@ -14,7 +14,7 @@ import {
 import { createGithubDeliveryProvider } from '../../scripts/deploy/github-delivery-provider.mjs'
 import { preparePromotion } from '../../scripts/deploy/promotion-controller.mjs'
 import { prepareRollback } from '../../scripts/deploy/rollback-controller.mjs'
-import { runTargetPreflight } from '../../scripts/deploy/target-preflight.mjs'
+import { runTargetPreflightAsync } from '../../scripts/deploy/target-preflight.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
 import {
   isLoopbackHostHeader,
@@ -50,6 +50,7 @@ const REMOTE_STAGE_LABELS = Object.freeze({
   migration_applied: '迁移后读回',
   compose_start: '服务启动',
   runtime_verified: '运行态与冒烟',
+  public_entry_switch: '公网入口切换与回读',
   current_source_switch: '当前版本指针切换',
   target_identity_recheck: '目标身份复核',
   static_preflight: '静态预检',
@@ -169,6 +170,7 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
     0,
     Date.parse(operation.updatedAt) - Date.parse(operation.createdAt)
   )
+  const metadata = operation.metadata || {}
   const remoteStages = Array.isArray(operation.metadata?.remoteStageTimings)
     ? operation.metadata.remoteStageTimings
         .filter(
@@ -186,6 +188,22 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
           durationMs: item.durationMs,
         }))
     : []
+  const transferStage =
+    Number.isSafeInteger(metadata.transferDurationMs) &&
+    metadata.transferDurationMs >= 0
+      ? [
+          {
+            id: 'artifact_transfer',
+            label: '制品传输',
+            status:
+              remoteStages.length > 0 ||
+              ['passed', 'not_proven'].includes(operation.status)
+                ? 'passed'
+                : operation.status,
+            durationMs: metadata.transferDurationMs,
+          },
+        ]
+      : []
   const lifecycleStages = operation.events.slice(0, -1).map((event, index) => {
     const next = operation.events[index + 1]
     return {
@@ -195,7 +213,7 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
       durationMs: Math.max(0, Date.parse(next.at) - Date.parse(event.at)),
     }
   })
-  const metadata = operation.metadata || {}
+  const measuredStages = [...transferStage, ...remoteStages]
   const metricInteger = (key) =>
     Number.isSafeInteger(metadata[key]) && metadata[key] >= 0
       ? metadata[key]
@@ -238,7 +256,7 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
     createdAt: operation.createdAt,
     updatedAt: operation.updatedAt,
     durationMs,
-    stages: remoteStages.length > 0 ? remoteStages : lifecycleStages,
+    stages: measuredStages.length > 0 ? measuredStages : lifecycleStages,
     metrics: {
       transferBytes: metricInteger('transferBytes'),
       transferDurationMs: metricInteger('transferDurationMs'),
@@ -277,7 +295,7 @@ export function createDevDeliveryService({
   provider,
   operationStore,
   readRepositoryState = readRepositoryIdentity,
-  runPreflight = runTargetPreflight,
+  runPreflight = runTargetPreflightAsync,
   preparePromotionAction = preparePromotion,
   prepareRollbackAction = prepareRollback,
   spawnProcess = spawn,

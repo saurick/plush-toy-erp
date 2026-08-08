@@ -117,6 +117,74 @@ const PIPELINE_LABELS = Object.freeze({
   'Complete job': '完成任务并收尾',
 })
 
+const OPERATION_MESSAGE_LABELS = Object.freeze({
+  'operation accepted': '操作已受理',
+  'read-only fixed-target preflight started': '已开始固定目标只读预检',
+  'read-only rollback qualification started': '已开始只读回滚资格检查',
+  'promotion plan is eligible and requires explicit confirmation':
+    '部署资格已通过，等待明确确认',
+  'promotion plan is eligible; explicit confirmation is required':
+    '部署资格已通过，等待明确确认',
+  'rollback plan is eligible and requires explicit confirmation':
+    '回滚资格已通过，等待明确确认',
+  'code-only rollback is eligible; explicit confirmation is required':
+    '仅代码回滚资格已通过，等待明确确认',
+  'target write started with the fixed promotion contract':
+    '已按固定部署合同开始写入目标',
+  'code-only target rollback started with the fixed contract':
+    '已按固定合同开始仅代码回滚',
+  'target promotion and basic runtime verification passed':
+    '133 部署与基础运行核验已通过',
+  'code-only rollback and basic runtime verification passed':
+    '代码回滚与基础运行核验已通过',
+  'immutable GitHub release and complete assets are published':
+    'GitHub 不可变版本及完整制品已发布',
+  'GitHub immutable release dispatch started': '已开始触发 GitHub 不可变发布',
+  'GitHub immutable release workflow accepted': 'GitHub 不可变发布流水线已受理',
+  'GitHub release workflow accepted; waiting for terminal assets':
+    'GitHub 发布流水线已受理，正在等待完整制品',
+  'immutable release already exists with complete assets':
+    '该 SHA 已存在完整不可变制品，本次直接复用',
+  'requested exact SHA is already current and healthy':
+    '该 Exact-SHA 已在 133 健康运行',
+  'requested rollback SHA is already current': '目标回滚 SHA 已是当前版本',
+  'promotion is blocked by fixed-target preflight': '部署被固定目标预检阻断',
+  'code-only rollback is blocked by fixed qualification':
+    '仅代码回滚被固定资格检查阻断',
+  'promotion preparation failed without starting a target write':
+    '部署准备失败，未开始写入目标',
+  'rollback qualification failed without starting a target write':
+    '回滚资格检查失败，未开始写入目标',
+  'promotion executor child is launching': '部署执行器正在启动',
+  'rollback executor child is launching': '回滚执行器正在启动',
+  'promotion executor did not start a target write': '部署执行器未开始写入目标',
+  'promotion executor ended while target outcome was unknown':
+    '部署执行器已结束，但目标结果尚未证明',
+  'GitHub release workflow reached a failed terminal state':
+    'GitHub 发布流水线已失败结束',
+  'promotion was blocked by the immediate target preflight':
+    '部署被目标即时预检阻断',
+  'remote promotion result could not be proven; automatic retry is disabled':
+    '远端部署结果无法证明，已禁止自动重试',
+  'promotion package transfer failed before remote execution':
+    '部署包在远端执行前传输失败',
+  'rollback was blocked by the immediate target readback':
+    '回滚被目标即时读回阻断',
+  'rollback package preparation failed before target write':
+    '回滚包准备失败，未开始写入目标',
+  'target promotion failed before migration apply':
+    '目标部署在数据库迁移前失败',
+  'target promotion outcome requires readback': '目标部署结果需要重新读回确认',
+  'process restarted while target outcome was unknown; read back before retry':
+    '进程重启时目标结果未知，重试前必须先读回',
+})
+
+const PIPELINE_RUN_MODE_LABELS = Object.freeze({
+  exact_sha_reuse: '相同 SHA 幂等复用',
+  full_release: '完整不可变发布',
+  continuous_integration: '持续集成',
+})
+
 export function deliveryPipelinePresentation(value) {
   const original = String(value || '').trim()
   if (!original) {
@@ -136,6 +204,40 @@ export function deliveryPipelinePresentation(value) {
     title:
       label === original ? original : `${label}（GitHub 原名：${original}）`,
   }
+}
+
+export function deliveryOperationMessagePresentation(value) {
+  const original = String(value || '').trim()
+  if (!original) return { label: '等待状态更新', title: '等待状态更新' }
+  const label = OPERATION_MESSAGE_LABELS[original]
+  if (label) return { label, title: `${label}（原始回执：${original}）` }
+  if (/\p{Script=Han}/u.test(original)) {
+    return { label: original, title: original }
+  }
+  return {
+    label: '操作状态已更新',
+    title: `操作状态已更新（原始回执：${original}）`,
+  }
+}
+
+export function deliveryPipelineRunMode(run) {
+  if (!run) return null
+  if (run.workflow === 'ci') return 'continuous_integration'
+  const publishJob = (run.jobs || []).find(
+    (job) => job.name === 'Publish immutable artifact set'
+  )
+  const strictJob = (run.jobs || []).find(
+    (job) => job.name === 'Exact-SHA strict quality'
+  )
+  const jobWasSkipped = (job) =>
+    Boolean(job && ['skipped', 'neutral'].includes(job.conclusion))
+  return jobWasSkipped(publishJob) && jobWasSkipped(strictJob)
+    ? 'exact_sha_reuse'
+    : 'full_release'
+}
+
+export function deliveryPipelineRunModePresentation(mode) {
+  return PIPELINE_RUN_MODE_LABELS[mode] || '运行类型未识别'
 }
 
 function assertObject(value, field) {
@@ -207,6 +309,8 @@ function validateOperation(operation) {
     (operation.metrics.serverDigest !== null &&
       (!DIGEST_PATTERN.test(operation.metrics.serverDigest) ||
         !DIGEST_PATTERN.test(operation.metrics.webDigest))) ||
+    (operation.metrics.transferDurationMs !== null &&
+      operation.metrics.transferDurationMs > operation.durationMs) ||
     !validBuildPerformance(operation.metrics.buildPerformance)
   ) {
     throw new Error('delivery operation is invalid')
@@ -371,6 +475,35 @@ export function validateDevDeliverySummary(summary) {
       !/^[0-9a-f]{64}$/u.test(String(summary.repository?.fingerprint || '')))
   ) {
     throw new Error('delivery repository identity is invalid')
+  }
+  if (summary.target !== null) {
+    const runtime = summary.target?.remote?.runtime
+    const publicEntry = summary.target?.remote?.publicEntry
+    const validTargetSha = (value) =>
+      value === 'unknown' || SHA_PATTERN.test(String(value || ''))
+    if (
+      !['passed', 'blocked'].includes(summary.target?.status) ||
+      !validTargetSha(runtime?.serverSha) ||
+      !validTargetSha(runtime?.webSha) ||
+      !['passed', 'blocked'].includes(publicEntry?.status) ||
+      !['passed', 'failed'].includes(publicEntry?.health) ||
+      !['passed', 'failed'].includes(publicEntry?.provider) ||
+      typeof publicEntry?.container !== 'string' ||
+      (publicEntry.container !== 'unknown' &&
+        !/^plush-toy-erp-web-public-[0-9a-f]{8}$/u.test(
+          publicEntry.container
+        )) ||
+      (publicEntry.gitSha !== 'unknown' &&
+        !SHA_PATTERN.test(String(publicEntry.gitSha || ''))) ||
+      publicEntry?.endpoint !== 'https://admin.yoyoosun.net' ||
+      (summary.target.status === 'passed' &&
+        (!SHA_PATTERN.test(runtime.serverSha) ||
+          runtime.serverSha !== runtime.webSha ||
+          publicEntry.status !== 'passed' ||
+          publicEntry.gitSha !== runtime.serverSha))
+    ) {
+      throw new Error('delivery target evidence is invalid')
+    }
   }
   summary.versions.forEach(validateVersion)
   summary.operations.forEach(validateOperation)
@@ -635,22 +768,38 @@ export function summarizePipelineTimings(timings) {
     (run) => run.status === 'completed' && Number.isSafeInteger(run.durationMs)
   )
   const latest = completed[0] || null
+  const latestMode = deliveryPipelineRunMode(latest)
   const comparable = latest
-    ? completed.filter((run) => run.workflow === latest.workflow)
+    ? completed.filter((run) => deliveryPipelineRunMode(run) === latestMode)
     : []
-  const sortedDurations = comparable
-    .map((run) => run.durationMs)
-    .sort((left, right) => left - right)
-  const middle = Math.floor(sortedDurations.length / 2)
-  const medianDurationMs =
-    sortedDurations.length === 0
+  const median = (items) => {
+    const sortedDurations = items
+      .map((run) => run.durationMs)
+      .sort((left, right) => left - right)
+    const middle = Math.floor(sortedDurations.length / 2)
+    return sortedDurations.length === 0
       ? null
       : sortedDurations.length % 2 === 1
         ? sortedDurations[middle]
         : Math.round(
             (sortedDurations[middle - 1] + sortedDurations[middle]) / 2
           )
-  const candidates = (latest?.jobs || []).flatMap((job) => {
+  }
+  const latestFullRelease = completed.find(
+    (run) => deliveryPipelineRunMode(run) === 'full_release'
+  )
+  const latestReuse = completed.find(
+    (run) => deliveryPipelineRunMode(run) === 'exact_sha_reuse'
+  )
+  const analysisRun =
+    latestMode === 'exact_sha_reuse' && latestFullRelease
+      ? latestFullRelease
+      : latest
+  const analysisMode = deliveryPipelineRunMode(analysisRun)
+  const fullReleaseRuns = completed.filter(
+    (run) => deliveryPipelineRunMode(run) === 'full_release'
+  )
+  const candidates = (analysisRun?.jobs || []).flatMap((job) => {
     const steps = job.steps.filter((step) =>
       Number.isSafeInteger(step.durationMs)
     )
@@ -668,7 +817,7 @@ export function summarizePipelineTimings(timings) {
             {
               id: String(job.id),
               name: job.name,
-              group: latest.workflow,
+              group: analysisRun.workflow,
               durationMs: job.durationMs,
               status: job.status,
               conclusion: job.conclusion,
@@ -682,14 +831,21 @@ export function summarizePipelineTimings(timings) {
   const bottleneck = stages[0] || null
   return {
     latest,
+    latestMode,
+    analysisRun,
+    analysisMode,
+    latestFullRelease,
+    latestReuse,
     sampleCount: comparable.length,
-    medianDurationMs,
+    medianDurationMs: median(comparable),
+    fullReleaseSampleCount: fullReleaseRuns.length,
+    fullReleaseMedianDurationMs: median(fullReleaseRuns),
     bottleneck,
     stages,
-    criticalPath: observedCriticalPath(latest),
+    criticalPath: observedCriticalPath(analysisRun),
     failureReason: pipelineFailureReason(latest),
     optimizationHint: bottleneck
-      ? `先复核“${deliveryPipelinePresentation(bottleneck.name).label}”：它是最近一次完整流水线中耗时最长的可见环节。`
+      ? `${latestMode === 'exact_sha_reuse' ? '最近一次是幂等复用，不参与完整构建瓶颈判断。' : ''}先复核“${deliveryPipelinePresentation(bottleneck.name).label}”：它是最近一次${deliveryPipelineRunModePresentation(analysisMode)}中耗时最长的可见环节。`
       : '等待至少一次完整流水线后再决定优化点，避免凭感觉增加并发或缓存。',
   }
 }
