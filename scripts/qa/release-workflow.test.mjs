@@ -173,6 +173,16 @@ test("release pins every action and never passes a token to browser or arguments
   assert.match(SOURCE, /RELEASE_BUILDKIT_CACHE_MODE: gha/u);
   assert.match(SOURCE, /path: \$\{\{ runner\.temp \}\}\/pnpm-store/u);
   assert.match(SOURCE, /path: \$\{\{ runner\.temp \}\}\/ms-playwright/u);
+  assert.equal(Object.hasOwn(strict.env, "PNPM_STORE_PATH"), false);
+  assert.equal(Object.hasOwn(strict.env, "PLAYWRIGHT_BROWSERS_PATH"), false);
+  const cacheBinding = strict.steps.find(
+    (step) => step.name === "绑定 runner 本地依赖缓存路径",
+  );
+  assert.match(cacheBinding.run, /PNPM_STORE_PATH=\$RUNNER_TEMP\/pnpm-store/u);
+  assert.match(
+    cacheBinding.run,
+    /PLAYWRIGHT_BROWSERS_PATH=\$RUNNER_TEMP\/ms-playwright/u,
+  );
   assert.match(strictRuns, /pnpm config set store-dir "\$PNPM_STORE_PATH"/u);
   assert.match(strictRuns, /if \[\[ ! -x "\$go_bin\/govulncheck" \]\]/u);
   assert.match(publishRuns, /if \[\[ ! -f "\$archive" \]\]/u);

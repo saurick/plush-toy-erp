@@ -167,6 +167,15 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
   assert.match(source, /path: \$\{\{ runner\.temp \}\}\/pnpm-store/u);
   assert.match(source, /path: \$\{\{ runner\.temp \}\}\/ms-playwright/u);
   assert.match(source, /path: ~\/go\/bin/u);
+  assert.equal(Object.hasOwn(quality, "env"), false);
+  const cacheBinding = quality.steps.find(
+    (step) => step.name === "绑定 runner 本地依赖缓存路径",
+  );
+  assert.match(cacheBinding.run, /PNPM_STORE_PATH=\$RUNNER_TEMP\/pnpm-store/u);
+  assert.match(
+    cacheBinding.run,
+    /PLAYWRIGHT_BROWSERS_PATH=\$RUNNER_TEMP\/ms-playwright/u,
+  );
   assert.match(qualityRuns, /pnpm config set store-dir "\$PNPM_STORE_PATH"/u);
   assert.match(qualityRuns, /if \[\[ ! -x "\$go_bin\/govulncheck" \]\]/u);
   assert.match(qualityRuns, /if \[\[ ! -f "\$archive" \]\]/u);
