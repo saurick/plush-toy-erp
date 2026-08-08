@@ -3041,11 +3041,32 @@ export default function DevFlowStateObservatoryPage() {
     }
     updateParams(nextPatch)
   }
-  const printCustomerReview = () => {
+  const printCustomerReview = async () => {
     setCustomerReviewGeneratedAt(new Date().toISOString())
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => window.print())
+    await new Promise((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(resolve))
     })
+    await new Promise((resolve) => {
+      const startedAt = window.performance.now()
+      const checkDiagram = () => {
+        const status = document
+          .querySelector(
+            '[data-customer-review-print-root] [data-customer-review-diagram] .erp-markdown-mermaid'
+          )
+          ?.getAttribute('data-mermaid-status')
+        if (
+          status === 'rendered' ||
+          status === 'error' ||
+          window.performance.now() - startedAt >= 5_000
+        ) {
+          resolve()
+          return
+        }
+        window.requestAnimationFrame(checkDiagram)
+      }
+      checkDiagram()
+    })
+    window.print()
   }
   const specialistSelection =
     view === 'runtime'

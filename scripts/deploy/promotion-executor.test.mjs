@@ -214,6 +214,8 @@ test("promotion executor contains no target build or automatic retry path", () =
   );
   assert.doesNotMatch(source, /docker\s+build|buildx|pnpm|go\s+build/u);
   assert.doesNotMatch(source, /setTimeout|setInterval|fresh lifecycle/iu);
+  assert.match(source, /buildFixedTargetRsyncTransfer/u);
+  assert.doesNotMatch(source, /["']scp["']/u);
   assert.match(source, /targetWriteStarted: false/u);
   assert.match(source, /automatic retry is disabled/u);
 });

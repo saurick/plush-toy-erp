@@ -195,7 +195,9 @@ async function collectBoxMetrics(page) {
 async function collectCustomerReviewPrintMetrics(page) {
   return page.locator('[data-customer-review-print-root]').evaluate((root) => {
     const stepRects = [
-      ...root.querySelectorAll('.erp-dev-flow-customer-review__steps > li'),
+      ...root.querySelectorAll(
+        '.erp-dev-flow-customer-review__step-table tbody tr'
+      ),
     ].map((step) => {
       const rect = step.getBoundingClientRect()
       return {
@@ -208,6 +210,20 @@ async function collectCustomerReviewPrintMetrics(page) {
         scrollHeight: step.scrollHeight,
       }
     })
+    const diagram = root.querySelector(
+      '[data-customer-review-diagram] .erp-markdown-mermaid'
+    )
+    const diagramSVG = diagram?.querySelector(
+      '.erp-markdown-mermaid__canvas > svg'
+    )
+    const diagramRect = diagramSVG?.getBoundingClientRect()
+    const rootRect = root.getBoundingClientRect()
+    const toolbar = diagram?.querySelector('.erp-markdown-mermaid__toolbar')
+    const diagramText = diagramSVG
+      ? [...diagramSVG.querySelectorAll('text')]
+          .map((node) => node.textContent || '')
+          .join(' ')
+      : ''
     return {
       mode: root.getAttribute('data-review-mode') || '',
       backgroundColor: window.getComputedStyle(root).backgroundColor,
@@ -228,10 +244,31 @@ async function collectCustomerReviewPrintMetrics(page) {
         .slice(1)
         .filter((step, index) => step.top < stepRects[index].bottom - 1).length,
       overviewLaneCount: root.querySelectorAll(
-        '.erp-dev-flow-customer-review__lanes > section'
+        '.erp-dev-flow-customer-review__overview-index tbody tr'
       ).length,
       overviewChainCount: root.querySelectorAll(
-        '.erp-dev-flow-customer-review__lanes li'
+        '.erp-dev-flow-customer-review__overview-index tbody td:nth-child(2) span'
+      ).length,
+      diagramStatus: diagram?.getAttribute('data-mermaid-status') || '',
+      diagramTheme: diagram?.getAttribute('data-mermaid-theme') || '',
+      diagramHtmlLabels:
+        diagram?.getAttribute('data-mermaid-html-labels') || '',
+      diagramSVGCount: diagramSVG ? 1 : 0,
+      diagramForeignObjectCount:
+        diagramSVG?.querySelectorAll('foreignObject').length || 0,
+      diagramTextElementCount: diagramSVG?.querySelectorAll('text').length || 0,
+      diagramText,
+      diagramWidth: diagramRect?.width || 0,
+      diagramHeight: diagramRect?.height || 0,
+      diagramOverflow:
+        Boolean(diagramRect) &&
+        (diagramRect.left < rootRect.left - 1 ||
+          diagramRect.right > rootRect.right + 1),
+      diagramToolbarDisplay: toolbar
+        ? window.getComputedStyle(toolbar).display
+        : '',
+      diagramSourceCount: diagram?.querySelectorAll(
+        '.erp-markdown-mermaid__source'
       ).length,
     }
   })
@@ -244,8 +281,17 @@ async function triggerCustomerReviewPrint(page) {
     .getAttribute('data-review-generated-at')
   await page.evaluate(() => {
     window.__devBusinessChainPrintCalls = 0
+    window.__devBusinessChainPrintDiagramStatus = ''
+    window.__devBusinessChainPrintDiagramTheme = ''
     window.print = () => {
       window.__devBusinessChainPrintCalls += 1
+      const diagram = document.querySelector(
+        '[data-customer-review-print-root] [data-customer-review-diagram] .erp-markdown-mermaid'
+      )
+      window.__devBusinessChainPrintDiagramStatus =
+        diagram?.getAttribute('data-mermaid-status') || ''
+      window.__devBusinessChainPrintDiagramTheme =
+        diagram?.getAttribute('data-mermaid-theme') || ''
     }
   })
   await page.getByRole('button', { name: '导出甲方校对版' }).click()
@@ -253,7 +299,11 @@ async function triggerCustomerReviewPrint(page) {
   const afterGeneratedAt = await page
     .locator('[data-customer-review-print-root]')
     .getAttribute('data-review-generated-at')
-  return { beforeURL, beforeGeneratedAt, afterGeneratedAt }
+  const printState = await page.evaluate(() => ({
+    mermaidStatusAtPrint: window.__devBusinessChainPrintDiagramStatus,
+    mermaidThemeAtPrint: window.__devBusinessChainPrintDiagramTheme,
+  }))
+  return { beforeURL, beforeGeneratedAt, afterGeneratedAt, ...printState }
 }
 
 function startNoWriteAudit(page, store) {
@@ -663,6 +713,14 @@ export function createDevFlowStateObservatoryScenarios({
         const zoomInButton = mermaidToolbar.locator(
           '[data-mermaid-zoom-action="zoom-in"]'
         )
+        const fitHeightButton = mermaidToolbar.locator(
+          '[data-mermaid-zoom-action="fit-height"]'
+        )
+        assert.equal(await fitHeightButton.getAttribute('title'), '适配高度')
+        assert.equal(
+          await fitHeightButton.getAttribute('aria-label'),
+          '适配Mermaid 图表高度'
+        )
         await zoomInButton.click()
         await zoomInButton.click()
         await mermaidToolbar
@@ -725,6 +783,13 @@ export function createDevFlowStateObservatoryScenarios({
           )}`
         )
         assert.deepEqual(
+          mermaidToolbarInteraction.actions,
+          ['fit', 'fit-height', 'zoom-out', 'zoom-in', 'reset', 'open'],
+          `流程状态页 Mermaid 应明确区分适配宽度与适配高度：${JSON.stringify(
+            mermaidToolbarInteraction
+          )}`
+        )
+        assert.deepEqual(
           mermaidToolbarInteraction.centerHits,
           mermaidToolbarInteraction.actions,
           `流程状态页 Mermaid 工具按钮中心必须分别命中自身：${JSON.stringify(
@@ -756,6 +821,95 @@ export function createDevFlowStateObservatoryScenarios({
             mermaidToolbarInteraction
           )}`
         )
+        await mermaidToolbar
+          .locator('[data-mermaid-zoom-action="reset"]')
+          .click()
+        await mermaidToolbar
+          .locator('[data-mermaid-fullscreen-action="open"]')
+          .click()
+        await page.setViewportSize({ width: 900, height: 360 })
+        for (let index = 0; index < 7; index += 1) {
+          await mermaidToolbar
+            .locator('[data-mermaid-zoom-action="zoom-in"]')
+            .click()
+        }
+        const heightFitBefore = await mermaidToolbar.evaluate((toolbar) => {
+          const shell = toolbar.closest('.erp-markdown-mermaid')
+          const viewport = shell?.querySelector(
+            '.erp-markdown-mermaid__viewport'
+          )
+          const canvas = shell?.querySelector('.erp-markdown-mermaid__canvas')
+          const diagram = canvas?.querySelector('svg')
+          const canvasStyle = canvas ? window.getComputedStyle(canvas) : null
+          const availableHeight = Math.max(
+            0,
+            (viewport?.clientHeight || 0) -
+              (Number.parseFloat(canvasStyle?.paddingTop || '0') || 0) -
+              (Number.parseFloat(canvasStyle?.paddingBottom || '0') || 0)
+          )
+          return {
+            zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+            diagramHeight: diagram?.getBoundingClientRect().height || 0,
+            availableHeight,
+          }
+        })
+        assert.equal(heightFitBefore.zoom, '240')
+        assert(
+          heightFitBefore.diagramHeight > heightFitBefore.availableHeight + 2,
+          `适配高度回归必须先构造真实纵向溢出：${JSON.stringify(
+            heightFitBefore
+          )}`
+        )
+        await fitHeightButton.click()
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector(
+                '.erp-dev-flow-chain-graph .erp-markdown-mermaid__canvas'
+              )
+              ?.getAttribute('data-mermaid-zoom') !== '240'
+        )
+        const heightFitAfter = await mermaidToolbar.evaluate((toolbar) => {
+          const shell = toolbar.closest('.erp-markdown-mermaid')
+          const viewport = shell?.querySelector(
+            '.erp-markdown-mermaid__viewport'
+          )
+          const canvas = shell?.querySelector('.erp-markdown-mermaid__canvas')
+          const diagram = canvas?.querySelector('svg')
+          const canvasStyle = canvas ? window.getComputedStyle(canvas) : null
+          const availableHeight = Math.max(
+            0,
+            (viewport?.clientHeight || 0) -
+              (Number.parseFloat(canvasStyle?.paddingTop || '0') || 0) -
+              (Number.parseFloat(canvasStyle?.paddingBottom || '0') || 0)
+          )
+          return {
+            zoom: Number(canvas?.getAttribute('data-mermaid-zoom') || 0),
+            diagramHeight: diagram?.getBoundingClientRect().height || 0,
+            availableHeight,
+            viewportOverflowY: viewport
+              ? viewport.scrollHeight - viewport.clientHeight
+              : 0,
+          }
+        })
+        assert(
+          heightFitAfter.zoom >= 10 && heightFitAfter.zoom <= 100,
+          `适配高度应得到 10%-100% 的可恢复缩放：${JSON.stringify(
+            heightFitAfter
+          )}`
+        )
+        assert(
+          heightFitAfter.diagramHeight <= heightFitAfter.availableHeight + 2,
+          `适配高度后图表应进入可见高度：${JSON.stringify(heightFitAfter)}`
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-mermaid-fit-height-tight-fullscreen.png',
+          animations: 'disabled',
+        })
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await mermaidToolbar
+          .locator('[data-mermaid-fullscreen-action="close"]')
+          .click()
         await mermaidToolbar
           .locator('[data-mermaid-zoom-action="reset"]')
           .click()
@@ -1473,6 +1627,8 @@ export function createDevFlowStateObservatoryScenarios({
         const printRequest = await triggerCustomerReviewPrint(page)
         assert.equal(page.url(), printRequest.beforeURL)
         assert(printRequest.afterGeneratedAt)
+        assert.equal(printRequest.mermaidStatusAtPrint, 'rendered')
+        assert.equal(printRequest.mermaidThemeAtPrint, 'light')
 
         await page.emulateMedia({ media: 'print' })
         const printRoot = page.locator('[data-customer-review-print-root]')
@@ -1483,11 +1639,13 @@ export function createDevFlowStateObservatoryScenarios({
           '产品通用设计校对稿',
           '未绑定客户发布版本',
           '第 9 步',
+          '先看图：业务怎么走',
+          '再看表：每一步谁办、怎么办',
           '拒绝或取消后结束',
           '超领批准额度',
           '报废或在制让步执行任务',
-          '系统自动完成什么',
-          '人员需要办理什么',
+          '人员与系统怎么配合',
+          '异常时怎么走',
           '流程或任务完成不等于库存、出货、生产或财务事实已经生效',
           '本文件用于业务需求校对，不单独证明已经实现、发布或经甲方验收',
         ]) {
@@ -1507,12 +1665,29 @@ export function createDevFlowStateObservatoryScenarios({
             `甲方单链打印稿不得出现开发信息：${forbidden}`
           )
         }
+        assert(
+          !printText.includes('本步骤适用的异常路径'),
+          '甲方单链打印稿不得逐步骤重复异常说明'
+        )
         const metrics = await collectCustomerReviewPrintMetrics(page)
         assert.equal(metrics.mode, 'chain')
         assert.equal(metrics.backgroundColor, 'rgb(255, 255, 255)')
         assert.equal(metrics.stepCount, 9)
         assert.equal(metrics.stepOverflowCount, 0)
         assert.equal(metrics.stepOverlapCount, 0)
+        assert.equal(metrics.diagramStatus, 'rendered')
+        assert.equal(metrics.diagramTheme, 'light')
+        assert.equal(metrics.diagramHtmlLabels, 'false')
+        assert.equal(metrics.diagramSVGCount, 1)
+        assert.equal(metrics.diagramForeignObjectCount, 0)
+        assert(metrics.diagramTextElementCount > 0)
+        assert(metrics.diagramText.includes('生产异常决策单'))
+        assert(metrics.diagramText.includes('提交后启动审批'))
+        assert(metrics.diagramWidth > 0)
+        assert(metrics.diagramHeight > 0)
+        assert.equal(metrics.diagramOverflow, false)
+        assert.equal(metrics.diagramToolbarDisplay, 'none')
+        assert.equal(metrics.diagramSourceCount, 0)
         assert(metrics.scrollWidth <= metrics.clientWidth + 1)
         await page.screenshot({
           path: 'output/playwright/style-l1/dev-flow-state-observatory-customer-review-chain-print.png',
@@ -1552,16 +1727,19 @@ export function createDevFlowStateObservatoryScenarios({
         )
         const printRequest = await triggerCustomerReviewPrint(page)
         assert.equal(page.url(), printRequest.beforeURL)
+        assert.equal(printRequest.mermaidStatusAtPrint, 'rendered')
+        assert.equal(printRequest.mermaidThemeAtPrint, 'light')
 
         await page.emulateMedia({ media: 'print' })
         const printRoot = page.locator('[data-customer-review-print-root]')
         await printRoot.waitFor({ state: 'visible', timeout: 10_000 })
         const printText = await printRoot.innerText()
         assert(printText.includes('业务链甲方校对版｜业务链总览'))
+        assert(printText.includes('先看图：十二条业务链怎样衔接'))
         assert(printText.includes('不展开每条链的内部步骤'))
         assert.equal(
           await printRoot
-            .locator('.erp-dev-flow-customer-review__steps')
+            .locator('.erp-dev-flow-customer-review__step-table')
             .count(),
           0,
           '总览打印不得展开单链内部步骤'
@@ -1572,6 +1750,19 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(metrics.overviewLaneCount, 4)
         assert.equal(metrics.overviewChainCount, 12)
         assert.equal(metrics.stepCount, 0)
+        assert.equal(metrics.diagramStatus, 'rendered')
+        assert.equal(metrics.diagramTheme, 'light')
+        assert.equal(metrics.diagramHtmlLabels, 'false')
+        assert.equal(metrics.diagramSVGCount, 1)
+        assert.equal(metrics.diagramForeignObjectCount, 0)
+        assert(metrics.diagramTextElementCount > 0)
+        assert(metrics.diagramText.includes('销售受理到生产准备'))
+        assert(metrics.diagramText.includes('生产准备进入执行'))
+        assert(metrics.diagramWidth > 0)
+        assert(metrics.diagramHeight > 0)
+        assert.equal(metrics.diagramOverflow, false)
+        assert.equal(metrics.diagramToolbarDisplay, 'none')
+        assert.equal(metrics.diagramSourceCount, 0)
         assert(metrics.scrollWidth <= metrics.clientWidth + 1)
         await page.screenshot({
           path: 'output/playwright/style-l1/dev-flow-state-observatory-customer-review-overview-print.png',

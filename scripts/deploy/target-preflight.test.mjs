@@ -187,5 +187,10 @@ test("remote target preflight script is read-only and contains no build command"
     REMOTE_TARGET_PREFLIGHT_SCRIPT,
     /minimum_available_bytes=32212254720/u,
   );
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /\/usr\/bin\/rsync --version/u,
+  );
+  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /target_rsync_unavailable/u);
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /fresh pre-migration/u);
 });

@@ -41,6 +41,8 @@
 
 `delivery-operation-store.mjs` 在 ignored `output/dev-workbench/delivery-operations/` 使用随机 UUID、幂等键、`0600` 文件和原子 rename 保存状态。Bridge 进程重启时，仍处于 `launching / running` 的目标写操作一律冻结为 `not_proven`，先读回目标，不能自动重试。`remote-promotion.sh` 与 `remote-code-rollback.sh` 的 v2 终态回执同时记录固定阶段顺序、每阶段耗时和总耗时；失败时最后一项必须是实际失败阶段，passed 时不得缺阶段。`remote-promotion.sh`、`remote-database-rebuild.sh` 与 `remote-code-rollback.sh` 是对应 executor 传输后调用的固定目标实现，不是人工拼接参数的通用远程入口。
 
+固定 `test-133` 的 promotion、rollback 和数据库重建包统一使用 `rsync 3.x over SSH` 传输到 operation 专属 `incoming` 目录。传输仍固定目标、端口、远端 `/usr/bin/rsync`、严格 host key、精确文件白名单、私有文件权限与十分钟超时，不启用 `--delete` 或无收益的压缩；远端执行前继续校验完整 SHA-256。目标 preflight 会在缺少兼容 rsync 时阻断，不退回 SCP 或其他隐式路径。
+
 DEV-only `/__dev/version-center` 只暴露五个动作：`dispatch-release`、`prepare-promotion`、`execute-promotion`、`prepare-rollback`、`execute-rollback`。浏览器不能提供 repo、workflow、target、路径、SSH、环境变量、shell、SQL 或 Docker 命令；同一时刻只允许一个 test-133 执行器。页面的 CI/CD 效能区只读展示最近完整运行、中位数、瓶颈以及可展开的 job / step；operation Drawer 展示远端回执阶段或本地生命周期耗时，不建立第二套流水线状态。
 
 ### 133 同逻辑库物理重建

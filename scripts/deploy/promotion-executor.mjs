@@ -22,6 +22,10 @@ import {
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import {
+  assertLocalRsync,
+  buildFixedTargetRsyncTransfer,
+} from "./fixed-target-rsync.mjs";
 import { readPromotionPlan } from "./promotion-controller.mjs";
 import { validatePromotionManifest } from "./promotion-manifest.mjs";
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
@@ -552,6 +556,12 @@ export function executePromotion(
   );
   const target = getDeploymentTarget("test-133");
   const sshArgs = fixedSshArgs(target);
+  assertLocalRsync(runCommand);
+  const rsyncTransfer = buildFixedTargetRsyncTransfer({
+    target,
+    operationId: operation.id,
+    sourceFiles: transfer.files.map((file) => path.join(transferRoot, file)),
+  });
   operation = transitionDeliveryOperation(store, operation.id, {
     status: "running",
     message: "target write started with the fixed promotion contract",
@@ -579,24 +589,10 @@ export function executePromotion(
       },
       "prepare fixed remote incoming directory",
     );
-    const remoteDestination =
-      `${target.ssh.user}@${target.ssh.host}:` +
-      `${target.filesystem.root}/incoming/${operation.id}/`;
     runChecked(
       runCommand,
-      "scp",
-      [
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "ConnectTimeout=8",
-        "-o",
-        "StrictHostKeyChecking=yes",
-        "-P",
-        String(target.ssh.port),
-        ...transfer.files.map((file) => path.join(transferRoot, file)),
-        remoteDestination,
-      ],
+      rsyncTransfer.command,
+      rsyncTransfer.args,
       { timeout: 10 * 60_000 },
       "transfer immutable promotion package",
     );

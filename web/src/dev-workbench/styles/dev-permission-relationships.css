@@ -231,6 +231,7 @@ body
 .erp-permission-relationship .erp-markdown-mermaid__toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-bottom: 10px;

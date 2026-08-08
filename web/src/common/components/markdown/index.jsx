@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowsAltOutlined,
+  ColumnHeightOutlined,
   FullscreenOutlined,
   FullscreenExitOutlined,
   OneToOneOutlined,
@@ -9,6 +10,9 @@ import {
 } from '@ant-design/icons'
 import { Remarkable } from 'remarkable'
 import RemarkableReactRenderer from 'remarkable-react'
+
+const MERMAID_FONT_FAMILY =
+  '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
 const MERMAID_THEME_CONFIG = {
   light: {
@@ -20,7 +24,7 @@ const MERMAID_THEME_CONFIG = {
       lineColor: '#2f6f4e',
       secondaryColor: '#f8fbf8',
       tertiaryColor: '#ffffff',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontFamily: MERMAID_FONT_FAMILY,
     },
   },
   dark: {
@@ -32,18 +36,33 @@ const MERMAID_THEME_CONFIG = {
       lineColor: '#86efac',
       secondaryColor: '#0f172a',
       tertiaryColor: '#111827',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontFamily: MERMAID_FONT_FAMILY,
     },
   },
 }
 
 let mermaidRenderSequence = 0
+let mermaidRenderQueue = Promise.resolve()
+
+function enqueueMermaidRender(render) {
+  const queuedRender = mermaidRenderQueue.then(render, render)
+  mermaidRenderQueue = queuedRender.then(
+    () => undefined,
+    () => undefined
+  )
+  return queuedRender
+}
 
 const MERMAID_ZOOM = {
-  min: 0.6,
+  min: 0.1,
   max: 2.4,
   step: 0.2,
   defaultValue: 1,
+}
+
+const MERMAID_FIT_HEIGHT = {
+  minPageHeight: 240,
+  pageBottomGap: 24,
 }
 
 function getCurrentERPTheme() {
@@ -85,8 +104,13 @@ export function MermaidDiagram({
   chart,
   label = 'Mermaid 图表',
   showSourceOnError = true,
+  themeMode,
+  flowchartHtmlLabels = true,
 }) {
-  const theme = useCurrentERPTheme()
+  const currentTheme = useCurrentERPTheme()
+  const theme =
+    themeMode === 'light' || themeMode === 'dark' ? themeMode : currentTheme
+  const useFlowchartHtmlLabels = flowchartHtmlLabels !== false
   const displayLabel = String(label || '').trim() || '图表'
   const diagramId = useMemo(() => {
     mermaidRenderSequence += 1
@@ -98,6 +122,8 @@ export function MermaidDiagram({
   )
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
   const fullscreenExitRef = useRef(null)
+  const viewportRef = useRef(null)
+  const canvasRef = useRef(null)
   const [renderState, setRenderState] = useState({
     status: 'loading',
     svg: '',
@@ -152,17 +178,20 @@ export function MermaidDiagram({
         const mermaid = mermaidModule.default || mermaidModule
         const renderTheme =
           MERMAID_THEME_CONFIG[theme] || MERMAID_THEME_CONFIG.light
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: 'strict',
-          flowchart: {
-            htmlLabels: true,
-            curve: 'basis',
-          },
-          ...renderTheme,
+        const { svg } = await enqueueMermaidRender(async () => {
+          mermaid.initialize({
+            startOnLoad: false,
+            securityLevel: 'strict',
+            htmlLabels: useFlowchartHtmlLabels,
+            flowchart: {
+              htmlLabels: useFlowchartHtmlLabels,
+              curve: 'basis',
+            },
+            ...renderTheme,
+          })
+          const renderId = `${diagramId}-${theme}-${useFlowchartHtmlLabels ? 'html' : 'svg'}-${Date.now()}`
+          return mermaid.render(renderId, source)
         })
-        const renderId = `${diagramId}-${theme}-${Date.now()}`
-        const { svg } = await mermaid.render(renderId, source)
         if (!cancelled) {
           setRenderState({ status: 'rendered', svg, error: '' })
         }
@@ -181,16 +210,20 @@ export function MermaidDiagram({
     return () => {
       cancelled = true
     }
-  }, [chart, diagramId, theme])
+  }, [chart, diagramId, theme, useFlowchartHtmlLabels])
 
   if (renderState.status === 'empty') {
     return null
   }
 
   const setNextZoom = (nextZoom) => {
+    const numericZoom = Number(nextZoom)
+    const safeZoom = Number.isFinite(numericZoom)
+      ? numericZoom
+      : MERMAID_ZOOM.defaultValue
     const normalizedZoom = Math.min(
       MERMAID_ZOOM.max,
-      Math.max(MERMAID_ZOOM.min, Number(nextZoom) || MERMAID_ZOOM.defaultValue)
+      Math.max(MERMAID_ZOOM.min, safeZoom)
     )
     const nextValue = Number(normalizedZoom.toFixed(2))
     if (fullscreenOpen) {
@@ -198,6 +231,39 @@ export function MermaidDiagram({
       return
     }
     setZoom(nextValue)
+  }
+
+  const fitHeight = () => {
+    const viewport = viewportRef.current
+    const canvas = canvasRef.current
+    const diagram = canvas?.querySelector('svg')
+    if (!viewport || !canvas || !diagram || typeof window === 'undefined') {
+      return
+    }
+
+    const diagramHeight = diagram.getBoundingClientRect().height
+    if (!Number.isFinite(diagramHeight) || diagramHeight <= 0) {
+      return
+    }
+
+    const viewportRect = viewport.getBoundingClientRect()
+    const browserHeight = window.visualViewport?.height || window.innerHeight
+    const targetViewportHeight = fullscreenOpen
+      ? viewport.clientHeight
+      : Math.max(
+          MERMAID_FIT_HEIGHT.minPageHeight,
+          browserHeight -
+            Math.max(viewportRect.top, 0) -
+            MERMAID_FIT_HEIGHT.pageBottomGap
+        )
+    const canvasStyle = window.getComputedStyle(canvas)
+    const verticalPadding =
+      (Number.parseFloat(canvasStyle.paddingTop) || 0) +
+      (Number.parseFloat(canvasStyle.paddingBottom) || 0)
+    const availableHeight = Math.max(1, targetViewportHeight - verticalPadding)
+    const fittedZoom = (activeZoom * availableHeight) / diagramHeight
+
+    setNextZoom(Math.min(MERMAID_ZOOM.defaultValue, fittedZoom))
   }
 
   const openFullscreen = () => {
@@ -215,6 +281,8 @@ export function MermaidDiagram({
         .filter(Boolean)
         .join(' ')}
       data-mermaid-status={renderState.status}
+      data-mermaid-theme={theme}
+      data-mermaid-html-labels={useFlowchartHtmlLabels ? 'true' : 'false'}
       data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}
       role={fullscreenOpen ? 'dialog' : undefined}
       aria-modal={fullscreenOpen ? 'true' : undefined}
@@ -240,6 +308,16 @@ export function MermaidDiagram({
               onClick={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
             >
               <FullscreenOutlined />
+            </button>
+            <button
+              type="button"
+              className="erp-markdown-mermaid__tool"
+              data-mermaid-zoom-action="fit-height"
+              title="适配高度"
+              aria-label={`适配${displayLabel}高度`}
+              onClick={fitHeight}
+            >
+              <ColumnHeightOutlined />
             </button>
             <button
               type="button"
@@ -304,8 +382,9 @@ export function MermaidDiagram({
               </button>
             )}
           </div>
-          <div className="erp-markdown-mermaid__viewport">
+          <div ref={viewportRef} className="erp-markdown-mermaid__viewport">
             <div
+              ref={canvasRef}
               className="erp-markdown-mermaid__canvas"
               data-mermaid-zoom={zoomPercent}
               style={{ '--mermaid-zoom': activeZoom }}

@@ -168,6 +168,8 @@ test("rollback executor has explicit confirmation and no automatic retry path", 
   );
   assert.match(source, /automatic retry is disabled/u);
   assert.match(source, /databaseChangedByExecutor: false/u);
+  assert.match(source, /buildFixedTargetRsyncTransfer/u);
+  assert.doesNotMatch(source, /["']scp["']/u);
   assert.doesNotMatch(source, /docker build|compose build|git clone/u);
 });
 

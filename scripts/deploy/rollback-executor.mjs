@@ -22,6 +22,10 @@ import {
   transitionDeliveryOperation,
 } from "./delivery-operation-store.mjs";
 import { getDeploymentTarget } from "./deployment-targets.mjs";
+import {
+  assertLocalRsync,
+  buildFixedTargetRsyncTransfer,
+} from "./fixed-target-rsync.mjs";
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
 import { readRollbackPlan } from "./rollback-controller.mjs";
 import { validateRollbackManifest } from "./rollback-manifest.mjs";
@@ -564,6 +568,12 @@ export function executeRollback(
 
   const target = getDeploymentTarget("test-133");
   const sshArgs = fixedSshArgs(target);
+  assertLocalRsync(runCommand);
+  const rsyncTransfer = buildFixedTargetRsyncTransfer({
+    target,
+    operationId: operation.id,
+    sourceFiles: transfer.files.map((file) => path.join(transferRoot, file)),
+  });
   operation = transitionDeliveryOperation(store, operation.id, {
     status: "running",
     message: "code-only target rollback started with the fixed contract",
@@ -585,24 +595,10 @@ export function executeRollback(
       },
       "prepare fixed remote rollback directory",
     );
-    const remoteDestination =
-      `${target.ssh.user}@${target.ssh.host}:` +
-      `${target.filesystem.root}/incoming/${operation.id}/`;
     runChecked(
       runCommand,
-      "scp",
-      [
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "ConnectTimeout=8",
-        "-o",
-        "StrictHostKeyChecking=yes",
-        "-P",
-        String(target.ssh.port),
-        ...transfer.files.map((file) => path.join(transferRoot, file)),
-        remoteDestination,
-      ],
+      rsyncTransfer.command,
+      rsyncTransfer.args,
       { timeout: 10 * 60_000 },
       "transfer immutable rollback package",
     );

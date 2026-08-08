@@ -119,6 +119,11 @@ actual_hostname="$(hostname)"
 actual_user="$(id -un)"
 [[ "$actual_hostname" == "$expected_hostname" ]] || block target_hostname_mismatch
 [[ "$actual_user" == "$expected_user" ]] || block target_user_mismatch
+if [[ ! -x /usr/bin/rsync ]] ||
+  ! LC_ALL=C /usr/bin/rsync --version 2>/dev/null |
+    sed -n '1p' | grep -Eq '^rsync[[:space:]]+version[[:space:]]+3\.'; then
+  block target_rsync_unavailable
+fi
 
 for required_dir in "$root" "$current" "$releases" "$root/runtime" "$root/backups" "$root/run"; do
   plain_directory "$required_dir" || block target_directory_invalid

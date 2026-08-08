@@ -1,6 +1,8 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 
+import { MermaidDiagram } from '@/common/components/markdown'
+
 function formatGeneratedAt(value) {
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
@@ -32,15 +34,41 @@ function ReviewHeader({ review }) {
           <dd>{review.applicableScope}</dd>
         </div>
         <div>
-          <dt>客户发布范围</dt>
-          <dd>{review.customerBinding}</dd>
-        </div>
-        <div>
-          <dt>发布版本</dt>
-          <dd>{review.releaseVersion}</dd>
+          <dt>客户与版本</dt>
+          <dd>
+            {review.customerBinding}；{review.releaseVersion}
+          </dd>
         </div>
       </dl>
     </header>
+  )
+}
+
+function ReviewDiagram({ diagram, label }) {
+  return (
+    <section
+      className="erp-dev-flow-customer-review__diagram"
+      data-customer-review-diagram
+    >
+      <header>
+        <h2>{diagram.title}</h2>
+        <p>{diagram.description}</p>
+      </header>
+      <MermaidDiagram
+        chart={diagram.mermaidSource}
+        label={label}
+        showSourceOnError={false}
+        themeMode="light"
+        flowchartHtmlLabels={false}
+      />
+      <ul className="erp-dev-flow-customer-review__legend" aria-label="图例">
+        {diagram.legend.map((item) => (
+          <li key={item.tone} data-diagram-tone={item.tone}>
+            {item.label}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -50,29 +78,33 @@ function OverviewContent({ overview }) {
       <section className="erp-dev-flow-customer-review__summary">
         <h2>这份总览解决什么问题</h2>
         <p>{overview.purpose}</p>
-        <p>{overview.detailBoundary}</p>
       </section>
-      <div className="erp-dev-flow-customer-review__lanes">
-        {overview.lanes.map((lane) => (
-          <section key={lane.name}>
-            <header>
-              <h2>{lane.name}</h2>
-              <p>{lane.purpose}</p>
-            </header>
-            <ol>
-              {lane.chains.map((chain) => (
-                <li key={`${chain.number}-${chain.name}`}>
-                  <span>{chain.number}</span>
-                  <div>
-                    <h3>{chain.name}</h3>
-                    <p>{chain.purpose}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-        ))}
-      </div>
+      <ReviewDiagram diagram={overview.diagram} label="十二条业务链总览图" />
+      <section className="erp-dev-flow-customer-review__overview-index">
+        <h2>四个业务区</h2>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">业务区</th>
+              <th scope="col">包含哪些业务链</th>
+            </tr>
+          </thead>
+          <tbody>
+            {overview.lanes.map((lane) => (
+              <tr key={lane.name}>
+                <th scope="row">{lane.name}</th>
+                <td>
+                  {lane.chains.map((chain) => (
+                    <span key={`${chain.number}-${chain.name}`}>
+                      {chain.number}. {chain.name}
+                    </span>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
     </main>
   )
 }
@@ -95,52 +127,56 @@ function ChainContent({ chain }) {
         <h2>这条业务链解决什么问题</h2>
         <p>{chain.purpose}</p>
       </section>
-      <ol className="erp-dev-flow-customer-review__steps">
-        {chain.steps.map((step) => (
-          <li key={`${step.number}-${step.name}`}>
-            <header>
-              <span>第 {step.number} 步</span>
-              <h2>{step.name}</h2>
-            </header>
-            <p className="erp-dev-flow-customer-review__action">
-              {step.action}
-            </p>
-            <dl>
-              <div>
-                <dt>谁负责</dt>
-                <dd>{step.responsibleRole}</dd>
-              </div>
-              <div>
-                <dt>触发条件或前置条件</dt>
-                <dd>{step.trigger}</dd>
-              </div>
-              <div>
-                <dt>系统自动完成什么</dt>
-                <dd>{step.systemAction}</dd>
-              </div>
-              <div>
-                <dt>人员需要办理什么</dt>
-                <dd>{step.personAction}</dd>
-              </div>
-              <div>
-                <dt>怎样算完成</dt>
-                <dd>{step.completion}</dd>
-              </div>
-              <div>
-                <dt>下一步衔接到哪里</dt>
-                <dd>{step.next}</dd>
-              </div>
-            </dl>
-            <section>
-              <h3>本步骤适用的异常路径</h3>
-              <ExceptionList paths={step.exceptionPaths} />
-            </section>
-          </li>
-        ))}
-      </ol>
+      <ReviewDiagram
+        diagram={chain.diagram}
+        label={`${chain.chainName}关系图`}
+      />
+      <section className="erp-dev-flow-customer-review__step-table">
+        <h2>再看表：每一步谁办、怎么办</h2>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">步骤与进入条件</th>
+              <th scope="col">谁负责</th>
+              <th scope="col">人员与系统怎么配合</th>
+              <th scope="col">怎样算完成、接到哪里</th>
+            </tr>
+          </thead>
+          <tbody>
+            {chain.steps.map((step) => (
+              <tr key={`${step.number}-${step.name}`}>
+                <th scope="row">
+                  <span>第 {step.number} 步</span>
+                  <strong>{step.name}</strong>
+                  <small>进入：{step.trigger}</small>
+                </th>
+                <td>{step.responsibleRole}</td>
+                <td>
+                  <p>
+                    <strong>人员</strong>
+                    {step.personAction}
+                  </p>
+                  <p>
+                    <strong>系统</strong>
+                    {step.systemAction}
+                  </p>
+                </td>
+                <td>
+                  <p>{step.completion}</p>
+                  <p>
+                    <strong>下一步</strong>
+                    {step.next}
+                  </p>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
       <section className="erp-dev-flow-customer-review__all-exceptions">
-        <h2>整条业务链的异常与纠正路径</h2>
-        <ExceptionList paths={chain.exceptionPaths} />
+        <h2>异常时怎么走</h2>
+        <p>图中已标出主要分支；下列校对点只列一次，不在每一步重复。</p>
+        <ExceptionList paths={chain.displayExceptionPaths} />
       </section>
     </main>
   )

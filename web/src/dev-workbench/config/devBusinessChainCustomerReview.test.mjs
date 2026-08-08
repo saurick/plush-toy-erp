@@ -30,6 +30,9 @@ function visibleReviewText(review) {
       review.overview.overviewName,
       review.overview.purpose,
       review.overview.detailBoundary,
+      review.overview.diagram.title,
+      review.overview.diagram.description,
+      ...review.overview.diagram.legend.map((item) => item.label),
       ...review.overview.lanes.flatMap((lane) => [
         lane.name,
         lane.purpose,
@@ -42,6 +45,9 @@ function visibleReviewText(review) {
     review.chain.chainName,
     review.chain.chainKind,
     review.chain.purpose,
+    review.chain.diagram.title,
+    review.chain.diagram.description,
+    ...review.chain.diagram.legend.map((item) => item.label),
     ...review.chain.steps.flatMap((step) => [
       step.name,
       step.action,
@@ -55,6 +61,12 @@ function visibleReviewText(review) {
     ]),
     ...review.chain.exceptionPaths,
   ].join('\n')
+}
+
+function customerDiagramSources(review) {
+  return [review.overview?.diagram, review.chain?.diagram]
+    .filter(Boolean)
+    .map((diagram) => diagram.mermaidSource)
 }
 
 test('customer review exports only the selected business chain with complete business questions', () => {
@@ -94,12 +106,27 @@ test('customer review exports only the selected business chain with complete bus
       assert.notEqual(step[field].trim(), '', `${step.name}/${field}`)
     }
     assert(step.exceptionPaths.length > 0, step.name)
+    assert(step.systemAction.length <= 24, `${step.name}/systemAction too long`)
+    assert(step.personAction.length <= 24, `${step.name}/personAction too long`)
+    assert(step.completion.length <= 30, `${step.name}/completion too long`)
+    assert(
+      review.chain.diagram.mermaidSource.includes(
+        `${step.number}. ${step.name}`
+      ),
+      `diagram missing ${step.name}`
+    )
   }
 
   const exceptionText = review.chain.exceptionPaths.join('\n')
   for (const keyword of ['拒绝', '取消', '超领', '报废', '让步', '冲正']) {
     assert(exceptionText.includes(keyword), `missing exception ${keyword}`)
   }
+  assert(review.chain.displayExceptionPaths.length <= 6)
+  assert(
+    review.chain.displayExceptionPaths.length <
+      review.chain.exceptionPaths.length,
+    '客户版异常提示必须去重，完整合同仍留在共享模型中'
+  )
   assert(
     review.chain.steps.some(
       (step) =>
@@ -126,6 +153,11 @@ test('customer review overview stays one-level and never expands all chain inter
       .every((chain) => !Object.hasOwn(chain, 'steps'))
   )
   assert.match(review.overview.detailBoundary, /不展开每条链的内部步骤/u)
+  const overviewDiagram = review.overview.diagram.mermaidSource
+  for (const chain of review.overview.lanes.flatMap((lane) => lane.chains)) {
+    assert(overviewDiagram.includes(`${chain.number}. ${chain.name}`))
+  }
+  assert.doesNotMatch(overviewDiagram, /生产异常决策单/u)
 })
 
 test('customer review visible content excludes developer evidence and keeps completion layers separate', () => {
@@ -142,8 +174,9 @@ test('customer review visible content excludes developer evidence and keeps comp
   )
   assert.equal(review.footer, DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_FOOTER)
   assert.match(text, /流程或任务完成不等于库存、出货、生产或财务事实已经生效/u)
-  assert.match(text, /流程走完不代表业务结果已经生效/u)
-  assert.match(text, /任务完成不等于库存、出货、生产或财务结果已经生效/u)
+  assert.match(text, /当前流程步骤结束；业务结果未必生效/u)
+  assert.match(text, /岗位任务已有办理结果；业务结果未必生效/u)
+  assert.match(text, /正式业务结果已生效，可按规则纠正/u)
 
   for (const forbidden of [
     /ProcessRuntime/u,
@@ -171,6 +204,38 @@ test('customer review visible content excludes developer evidence and keeps comp
     salesText,
     /engineering_data|order_review|responsibility pool|责任池/iu
   )
+
+  const allReviews = [
+    DEV_FLOW_STATE_CATALOG.businessChainOverview.key,
+    ...DEV_FLOW_STATE_CATALOG.businessChains.map((chain) => chain.key),
+  ].map((chainKey) =>
+    buildDevBusinessChainCustomerReview({
+      catalog: DEV_FLOW_STATE_CATALOG,
+      chainKey,
+      generatedAt,
+    })
+  )
+  const allCustomerVisibleTexts = allReviews.map(visibleReviewText)
+  for (const projectionText of allCustomerVisibleTexts) {
+    for (const forbidden of [
+      /\b(?:variant|shipped|hold)\b/iu,
+      /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/iu,
+      /(?:task|process|workflow)_id/iu,
+      /(?:server|web|src)\//iu,
+    ]) {
+      assert.doesNotMatch(projectionText, forbidden)
+    }
+  }
+  for (const source of allReviews.flatMap(customerDiagramSources)) {
+    for (const forbidden of [
+      /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/iu,
+      /(?:server|web|src)\//iu,
+      /(?:task|process|workflow)_id/iu,
+      /fact\.[a-z_]+/iu,
+    ]) {
+      assert.doesNotMatch(source, forbidden)
+    }
+  }
 })
 
 test('customer review does not hardcode a customer and fails closed for an unknown chain', () => {
@@ -190,6 +255,16 @@ test('customer review does not hardcode a customer and fails closed for an unkno
     'utf8'
   )
   assert.doesNotMatch(`${moduleSource}\n${componentSource}`, /yoyoosun|永绅/iu)
+  assert.match(
+    componentSource,
+    /flowchartHtmlLabels=\{false\}/u,
+    '甲方打印图必须使用纯 SVG 文字，避免打印时丢失中文标签'
+  )
+  assert.doesNotMatch(
+    componentSource,
+    /step\.exceptionPaths/u,
+    '客户打印稿不得逐步骤重复异常清单'
+  )
   assert.throws(
     () =>
       buildDevBusinessChainCustomerReview({

@@ -162,7 +162,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'sales_acceptance',
         'sales_tasks',
-        '按 variant 创建岗位任务',
+        '按业务分支创建岗位任务',
         'creates_task',
         {
           action: 'ProcessRuntime materialize human_task / approval',
@@ -499,7 +499,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'delivery_to_settlement',
     '成品出货到应收结清',
     'primary',
-    '出货单经财务放行后才能真实出货；真实 shipped 再产生应收或发票，收款过账后形成核销与结清。',
+    '出货单经财务放行后才能执行真实出货；真实出货完成后再产生应收或发票，收款过账后形成核销与结清。',
     [
       chainNode('shipment_draft', '出货单', 'fact_ledger', {
         machineKeys: ['fact.shipment'],
@@ -1253,7 +1253,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'rework_return_and_reshipment',
     '返工回厂、生产返工与补发',
     'rework',
-    '原出货建立返工回厂单，接收形成 HOLD 批次；生产返工消费该批次，完成后只能生成非结算补发单。',
+    '原出货建立返工回厂单，接收形成待处理批次；生产返工消费该批次，完成后只能生成非结算补发单。',
     [
       chainNode('original_shipment', '原出货事实', 'fact_ledger', {
         machineKeys: ['fact.shipment'],
@@ -1263,7 +1263,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         machineKeys: ['fact.rework_intake'],
         sourceRefs: ['server/internal/biz/rework_intake.go'],
       }),
-      chainNode('rework_hold_lot', '返工 HOLD 批次', 'fact_ledger', {
+      chainNode('rework_hold_lot', '返工待处理批次', 'fact_ledger', {
         machineKeys: ['fact.inventory_lot'],
         sourceRefs: [
           'server/internal/biz/rework_intake.go',
@@ -1297,7 +1297,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'rework_intake',
         'rework_hold_lot',
-        '接收并形成 HOLD 批次',
+        '接收并形成待处理批次',
         'returns',
         {
           action: 'OperationalFactUsecase.ReceiveReworkIntake',

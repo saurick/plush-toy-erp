@@ -1,5 +1,6 @@
 .cursor/
 .DS_Store
+/tmp/
 
 # 本地私有 registry token 文件禁止入库；tracked web 配置只允许环境变量占位。
 .npmrc
@@ -15,6 +16,7 @@ config/dev-ports.local.env
 web/node_modules/
 web/build/
 web/.vite-cache/
+web/tmp/
 
 server/bin/
 output/

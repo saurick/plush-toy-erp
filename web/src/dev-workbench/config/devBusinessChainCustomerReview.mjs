@@ -14,6 +14,23 @@ export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_FOOTER =
 const EXCEPTION_PATTERN =
   /拒绝|驳回|退回|取消|返工|报废|让步|冲正|超领|拒收|隔离|调整|退货|失败|阻塞/u
 
+const EXCEPTION_GROUPS = Object.freeze([
+  /拒绝|驳回/u,
+  /退回/u,
+  /取消/u,
+  /返工/u,
+  /报废/u,
+  /让步/u,
+  /冲正/u,
+  /超领/u,
+  /拒收/u,
+  /隔离/u,
+  /调整/u,
+  /退货/u,
+  /失败/u,
+  /阻塞/u,
+])
+
 const CHAIN_KIND_LABELS = Object.freeze({
   primary: '业务主链',
   supporting: '支撑链',
@@ -24,42 +41,50 @@ const CHAIN_KIND_LABELS = Object.freeze({
 
 const LAYER_GUIDANCE = Object.freeze({
   source_document: Object.freeze({
-    systemAction:
-      '系统保存业务单据及其当前状态，但不会仅凭单据状态认定后续业务结果已经生效。',
-    personAction: '经办人员核对并办理这份业务单据允许的当前动作。',
-    completion:
-      '业务单据完成当前允许动作，并满足进入下一步的正式条件；单据状态不等于后续业务结果已经生效。',
+    systemAction: '保存单据和当前状态。',
+    personAction: '核对单据并办理当前动作。',
+    completion: '当前单据动作完成；后续业务结果是否生效另行判断。',
   }),
   masterdata_lifecycle: Object.freeze({
-    systemAction: '系统保存并校验可供后续引用的基础资料或有效版本。',
-    personAction: '获授权人员维护并确认基础资料完整、有效。',
-    completion:
-      '基础资料已经生效并满足后续引用条件；停用或缺少有效版本时不能继续。',
+    systemAction: '校验并保存可用资料或版本。',
+    personAction: '维护并确认资料完整、有效。',
+    completion: '资料有效，可以被后续业务引用。',
   }),
   process_runtime: Object.freeze({
-    systemAction: '系统按已登记路径推进，并在需要人工处理时创建对应岗位任务。',
-    personAction: '人员只办理收到的岗位任务，不直接修改系统保存的流程轨迹。',
-    completion:
-      '当前流程步骤按正式结果结束并进入已登记的下一步；流程走完不代表业务结果已经生效。',
+    systemAction: '按登记路线推进，必要时派发岗位任务。',
+    personAction: '办理收到的岗位任务。',
+    completion: '当前流程步骤结束；业务结果未必生效。',
   }),
   workflow_task: Object.freeze({
-    systemAction: '系统记录任务分派、办理结果和接棒关系。',
-    personAction: '责任岗位办理、退回或说明阻塞原因。',
-    completion:
-      '任务留下完成、退回或阻塞记录；任务完成不等于库存、出货、生产或财务结果已经生效。',
+    systemAction: '记录分派、退回、完成或阻塞结果。',
+    personAction: '责任岗位办理、退回或说明阻塞。',
+    completion: '岗位任务已有办理结果；业务结果未必生效。',
   }),
   fact_ledger: Object.freeze({
-    systemAction: '系统通过受控业务动作保存可以追溯和纠正的正式业务结果。',
-    personAction: '有权限人员通过对应业务操作核对并确认实际发生结果。',
-    completion: '正式业务凭证已经生效，并能按对应取消、调整或冲正规则纠正。',
+    systemAction: '保存可追溯、可纠正的正式业务结果。',
+    personAction: '核对并确认实际发生结果。',
+    completion: '正式业务结果已生效，可按规则纠正。',
   }),
   derived_result: Object.freeze({
-    systemAction: '系统根据已经生效的上游记录计算或汇总结果。',
-    personAction: '人员核对上游记录是否完整，不在计算结果上补造业务数据。',
-    completion:
-      '上游权威数据完整且计算结果已经更新；计算结果本身不会反写上游业务记录。',
+    systemAction: '按已生效的上游记录汇总。',
+    personAction: '核对上游记录是否完整。',
+    completion: '上游记录完整，计算结果已更新。',
   }),
 })
+
+const DIAGRAM_LEGEND = freezeList([
+  { tone: 'normal', label: '业务资料或系统步骤' },
+  { tone: 'person', label: '需要人员办理' },
+  { tone: 'attention', label: '异常或纠正分支' },
+  { tone: 'result', label: '正式业务结果' },
+])
+
+const OVERVIEW_DIAGRAM_LEGEND = freezeList([
+  { tone: 'normal', label: '履约主链' },
+  { tone: 'person', label: '供给与库存支撑' },
+  { tone: 'attention', label: '异常与返工' },
+  { tone: 'result', label: '冲正与纠正' },
+])
 
 const asArray = (value) => (Array.isArray(value) ? value : [])
 
@@ -154,19 +179,8 @@ function resolveResponsibleRole(catalog, chain, node) {
     : knownLabels.join('、')
 }
 
-function nodeAction(chain, node) {
-  if (node.summary) return node.summary
-  const outgoingLabels = uniqueStrings(
-    chain.edges
-      .filter((edge) => edge.from === node.key)
-      .map((edge) => edge.label)
-  )
-  if (outgoingLabels.length === 0) {
-    return `形成并核对“${node.label}”，作为这条业务链当前阶段的结果。`
-  }
-  return `核对并办理“${node.label}”，完成后按“${outgoingLabels.join(
-    '；'
-  )}”衔接。`
+function nodeAction(node) {
+  return `完成“${node.label}”对应的业务动作。`
 }
 
 function nodeTrigger(chain, node) {
@@ -175,12 +189,12 @@ function nodeTrigger(chain, node) {
   )
   const incoming = chain.edges.filter((edge) => edge.to === node.key)
   if (incoming.length === 0) {
-    return `以“${node.label}”满足本链正式进入条件为前提；统一触发条件当前正式合同未定义。`
+    return `“${node.label}”满足进入条件；其他统一条件${DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED}。`
   }
   return uniqueStrings(
     incoming.map((edge) => {
       const source = nodeByKey.get(edge.from)
-      return `“${source?.label || '上一步'}”完成“${edge.label}”后进入`
+      return `${source?.label || '上一步'}：${edge.label}`
     })
   ).join('；')
 }
@@ -191,14 +205,119 @@ function nodeNext(chain, node) {
   )
   const outgoing = chain.edges.filter((edge) => edge.from === node.key)
   if (outgoing.length === 0) {
-    return '本链在此结束；后续衔接由其他正式业务链或业务合同决定。'
+    return `本链在此结束；后续${DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED}。`
   }
   return uniqueStrings(
     outgoing.map((edge) => {
       const target = nodeByKey.get(edge.to)
-      return `${edge.label}，进入“${target?.label || '下一步'}”`
+      return `${edge.label} → ${target?.label || '下一步'}`
     })
   ).join('；')
+}
+
+function escapeMermaid(value) {
+  return String(value || '')
+    .trim()
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')
+    .replaceAll('\n', ' ')
+}
+
+function diagramToneForNode(node) {
+  if (node.layer === 'workflow_task') return 'person'
+  if (node.layer === 'fact_ledger' || node.layer === 'derived_result') {
+    return 'result'
+  }
+  if (EXCEPTION_PATTERN.test(node.label)) return 'attention'
+  return 'normal'
+}
+
+function appendDiagramStyles(lines) {
+  lines.push(
+    '  classDef normal fill:#edf8ef,stroke:#2b8a3e,color:#173f2a,stroke-width:1.5px',
+    '  classDef person fill:#eaf3ff,stroke:#2f6fbd,color:#17365d,stroke-width:1.5px',
+    '  classDef attention fill:#fff4e6,stroke:#c86b16,color:#6f3500,stroke-width:1.5px',
+    '  classDef result fill:#f3edff,stroke:#7654b4,color:#34205f,stroke-width:1.5px'
+  )
+}
+
+function buildChainDiagram(chain) {
+  const ids = new Map(
+    chain.nodes.map((node, index) => [node.key, `N${index + 1}`])
+  )
+  const lines = ['flowchart TB']
+  chain.nodes.forEach((node, index) => {
+    lines.push(
+      `  ${ids.get(node.key)}["${index + 1}. ${escapeMermaid(node.label)}"]`
+    )
+  })
+  chain.edges.forEach((edge, index) => {
+    lines.push(
+      `  ${ids.get(edge.from)} -->|"${escapeMermaid(edge.label)}"| ${ids.get(edge.to)}`
+    )
+    if (EXCEPTION_PATTERN.test(edge.label)) {
+      lines.push(
+        `  linkStyle ${index} stroke:#c86b16,stroke-width:2px,color:#6f3500`
+      )
+    }
+  })
+  appendDiagramStyles(lines)
+  chain.nodes.forEach((node) => {
+    lines.push(`  class ${ids.get(node.key)} ${diagramToneForNode(node)}`)
+  })
+  return Object.freeze({
+    title: '先看图：业务怎么走',
+    description: '按箭头看主路径；有分支时按箭头文字选择去向。',
+    mermaidSource: lines.join('\n'),
+    legend: DIAGRAM_LEGEND,
+  })
+}
+
+function buildOverviewDiagram(catalog) {
+  const chainByKey = new Map(
+    asArray(catalog.businessChains).map((chain) => [chain.key, chain])
+  )
+  const idByChainKey = new Map()
+  const lines = ['flowchart LR']
+  let sequence = 0
+
+  asArray(catalog.businessChainOverview?.lanes).forEach((lane, laneIndex) => {
+    lines.push(`  subgraph L${laneIndex + 1}["${escapeMermaid(lane.label)}"]`)
+    lines.push('    direction TB')
+    asArray(lane.chainKeys).forEach((chainKey) => {
+      const chain = chainByKey.get(chainKey)
+      sequence += 1
+      const id = `C${sequence}`
+      idByChainKey.set(chainKey, id)
+      lines.push(`    ${id}["${sequence}. ${escapeMermaid(chain?.label)}"]`)
+    })
+    lines.push('  end')
+  })
+
+  asArray(catalog.businessChainOverview?.relations).forEach((relation) => {
+    lines.push(
+      `  ${idByChainKey.get(relation.fromChainKey)} -->|"${escapeMermaid(relation.label)}"| ${idByChainKey.get(relation.toChainKey)}`
+    )
+  })
+  appendDiagramStyles(lines)
+  asArray(catalog.businessChains).forEach((chain) => {
+    const tone =
+      chain.kind === 'primary'
+        ? 'normal'
+        : chain.kind === 'supporting'
+          ? 'person'
+          : chain.kind === 'reversal'
+            ? 'result'
+            : 'attention'
+    lines.push(`  class ${idByChainKey.get(chain.key)} ${tone}`)
+  })
+
+  return Object.freeze({
+    title: '先看图：十二条业务链怎样衔接',
+    description: '四个分区只展示链与链的关系，不展开每条链的内部步骤。',
+    mermaidSource: lines.join('\n'),
+    legend: OVERVIEW_DIAGRAM_LEGEND,
+  })
 }
 
 function stateExceptionPaths(catalog, machineKeys) {
@@ -278,6 +397,26 @@ function exceptionPathsForNode(catalog, chain, node) {
     : Object.freeze([DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED])
 }
 
+function compactExceptionPaths(paths) {
+  const seenGroups = new Set()
+  const compact = []
+  for (const path of uniqueStrings(paths)) {
+    const groups = EXCEPTION_GROUPS.flatMap((pattern, index) =>
+      pattern.test(path) ? [index] : []
+    )
+    if (groups.length === 0 || groups.every((group) => seenGroups.has(group))) {
+      continue
+    }
+    compact.push(path)
+    groups.forEach((group) => seenGroups.add(group))
+  }
+  return Object.freeze(
+    compact.length > 0
+      ? compact
+      : [DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED]
+  )
+}
+
 function buildChainReview(catalog, chain) {
   const steps = chain.nodes.map((node, index) => {
     const layer = LAYER_GUIDANCE[node.layer]
@@ -289,7 +428,7 @@ function buildChainReview(catalog, chain) {
     return {
       number: index + 1,
       name: node.label,
-      action: nodeAction(chain, node),
+      action: nodeAction(node),
       responsibleRole: resolveResponsibleRole(catalog, chain, node),
       trigger: nodeTrigger(chain, node),
       systemAction: layer.systemAction,
@@ -309,17 +448,19 @@ function buildChainReview(catalog, chain) {
     ),
     ...processExceptionPaths(catalog, processKeys),
   ])
+  const normalizedExceptionPaths =
+    exceptionPaths.length > 0
+      ? exceptionPaths
+      : [DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED]
 
   return Object.freeze({
     chainName: chain.label,
     chainKind: CHAIN_KIND_LABELS[chain.kind] || '业务链',
     purpose: chain.summary,
+    diagram: buildChainDiagram(chain),
     steps: freezeList(steps),
-    exceptionPaths: Object.freeze(
-      exceptionPaths.length > 0
-        ? exceptionPaths
-        : [DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED]
-    ),
+    displayExceptionPaths: compactExceptionPaths(normalizedExceptionPaths),
+    exceptionPaths: Object.freeze(normalizedExceptionPaths),
   })
 }
 
@@ -355,6 +496,7 @@ function buildOverviewReview(catalog) {
     detailBoundary:
       '本页只列业务链名称、用途和分区，不展开每条链的内部步骤、系统规则或开发证据。',
     lanes: freezeList(lanes),
+    diagram: buildOverviewDiagram(catalog),
   })
 }
 

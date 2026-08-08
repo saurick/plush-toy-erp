@@ -368,7 +368,14 @@ test("database rebuild executor removes the remote secret after a partial transf
       sshInputs.push(String(options.input || ""));
       return { status: 0, stdout: "", stderr: "" };
     }
-    if (command === "scp") {
+    if (command === "rsync" && args[0] === "--version") {
+      return {
+        status: 0,
+        stdout: "rsync  version 3.4.4  protocol version 32\n",
+        stderr: "",
+      };
+    }
+    if (command === "rsync") {
       return { status: 1, stdout: "", stderr: "transfer interrupted" };
     }
     throw new Error(`unexpected command: ${command}`);
@@ -421,7 +428,14 @@ test("database rebuild executor freezes a partial transfer when secret cleanup i
         stderr: options.input ? "cleanup interrupted" : "",
       };
     }
-    if (command === "scp") {
+    if (command === "rsync" && args[0] === "--version") {
+      return {
+        status: 0,
+        stdout: "rsync  version 3.4.4  protocol version 32\n",
+        stderr: "",
+      };
+    }
+    if (command === "rsync") {
       return { status: 1, stdout: "", stderr: "transfer interrupted" };
     }
     throw new Error(`unexpected command: ${command}`);

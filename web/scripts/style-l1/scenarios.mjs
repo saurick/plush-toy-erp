@@ -9928,8 +9928,8 @@ export function createStyleL1Scenarios(deps) {
         })
         assert.deepEqual(
           mermaidZoomInitial.actions,
-          ['fit', 'zoom-out', 'zoom-in', 'reset'],
-          `Mermaid 工具条应提供适配、缩小、放大和重置按钮: ${JSON.stringify(
+          ['fit', 'fit-height', 'zoom-out', 'zoom-in', 'reset'],
+          `Mermaid 工具条应提供适配宽度、适配高度、缩小、放大和重置按钮: ${JSON.stringify(
             mermaidZoomInitial
           )}`
         )
@@ -9968,6 +9968,34 @@ export function createStyleL1Scenarios(deps) {
             after: mermaidZoomOut,
           })}`
         )
+        for (let index = 0; index < 4; index += 1) {
+          await page.locator('[data-mermaid-zoom-action="zoom-out"]').click()
+        }
+        const mermaidZoomMinimum = await page.evaluate(() => {
+          const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
+          const zoomOut = document.querySelector(
+            '[data-mermaid-zoom-action="zoom-out"]'
+          )
+          return {
+            label:
+              document
+                .querySelector('[data-mermaid-zoom-label]')
+                ?.textContent?.trim() || '',
+            zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+            zoomOutDisabled: Boolean(zoomOut?.disabled),
+          }
+        })
+        assert.deepEqual(
+          mermaidZoomMinimum,
+          { label: '10%', zoom: '10', zoomOutDisabled: true },
+          `Mermaid 最小缩放应停在可恢复的非零 10%: ${JSON.stringify(
+            mermaidZoomMinimum
+          )}`
+        )
+        await page.locator('.erp-markdown-mermaid').first().screenshot({
+          path: path.resolve(outputDir, 'dev-docs-mermaid-zoom-minimum.png'),
+          animations: 'disabled',
+        })
         await page.locator('[data-mermaid-zoom-action="reset"]').click()
         const mermaidZoomResetFromOut = await page.evaluate(() => {
           const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
@@ -10138,6 +10166,57 @@ export function createStyleL1Scenarios(deps) {
             mermaidFullscreenOpen
           )}`
         )
+        await page.setViewportSize({ width: 390, height: 844 })
+        const mermaidMobileFullscreen = await page.evaluate(() => {
+          const shell = document.querySelector(
+            '.erp-markdown-mermaid[data-mermaid-fullscreen="true"]'
+          )
+          const toolbar = shell?.querySelector(
+            '.erp-markdown-mermaid__toolbar'
+          )
+          const shellRect = shell?.getBoundingClientRect()
+          return {
+            shellWidth: shellRect?.width || 0,
+            viewportWidth: window.innerWidth,
+            toolbarVisible: toolbar?.checkVisibility() || false,
+            toolbarClientWidth: toolbar?.clientWidth || 0,
+            toolbarScrollWidth: toolbar?.scrollWidth || 0,
+            actionCount:
+              toolbar?.querySelectorAll('.erp-markdown-mermaid__tool').length ||
+              0,
+          }
+        })
+        assert.equal(
+          mermaidMobileFullscreen.toolbarVisible,
+          true,
+          `Mermaid 窄屏全屏工具条应保持可见: ${JSON.stringify(
+            mermaidMobileFullscreen
+          )}`
+        )
+        assert.equal(
+          mermaidMobileFullscreen.actionCount,
+          6,
+          `Mermaid 窄屏全屏工具条应保留全部操作: ${JSON.stringify(
+            mermaidMobileFullscreen
+          )}`
+        )
+        assert.ok(
+          mermaidMobileFullscreen.shellWidth <=
+            mermaidMobileFullscreen.viewportWidth + 1 &&
+            mermaidMobileFullscreen.toolbarScrollWidth <=
+              mermaidMobileFullscreen.toolbarClientWidth + 1,
+          `Mermaid 窄屏全屏工具条不得横向溢出: ${JSON.stringify(
+            mermaidMobileFullscreen
+          )}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'dev-docs-mermaid-toolbar-mobile-fullscreen.png'
+          ),
+          animations: 'disabled',
+        })
+        await page.setViewportSize({ width: 1536, height: 900 })
         await page.locator('[data-mermaid-fullscreen-action="close"]').click()
         const mermaidFullscreenClosed = await page.evaluate(() => {
           const shell = document.querySelector('.erp-markdown-mermaid')
@@ -13157,7 +13236,7 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(
           metrics.mermaidActions,
-          ['fit', 'zoom-out', 'zoom-in', 'reset'],
+          ['fit', 'fit-height', 'zoom-out', 'zoom-in', 'reset'],
           '治理关系图应复用统一缩放操作'
         )
         assert.equal(
