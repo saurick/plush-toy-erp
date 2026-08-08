@@ -62,22 +62,15 @@ export function readPromotionPlan(store, operationId) {
   return validatePromotionManifest(readPlainJson(file).value);
 }
 
-export function preparePromotion(
-  {
-    repoRoot,
-    releaseManifestPath,
-    targetKey,
-    idempotencyKey,
-    operationStore,
-  },
+export async function preparePromotion(
+  { repoRoot, releaseManifestPath, targetKey, idempotencyKey, operationStore },
   {
     runPreflight = runTargetPreflight,
     now = () => new Date().toISOString(),
   } = {},
 ) {
   const root = realpathSync(repoRoot || process.cwd());
-  const store =
-    operationStore || resolveDeliveryOperationStore(root);
+  const store = operationStore || resolveDeliveryOperationStore(root);
   const releaseInput = readPlainJson(releaseManifestPath);
   const releaseManifest = validateReleaseManifest(releaseInput.value);
   const releaseManifestSha256 = sha256File(releaseInput.absolute);
@@ -108,7 +101,7 @@ export function preparePromotion(
     now: now(),
   });
   try {
-    const targetPreflight = runPreflight(targetKey);
+    const targetPreflight = await runPreflight(targetKey);
     const plan = buildPromotionManifest({
       operationId: operation.id,
       releaseManifest,
@@ -142,7 +135,8 @@ export function preparePromotion(
     } else {
       operation = transitionDeliveryOperation(store, operation.id, {
         status: "ready",
-        message: "promotion plan is eligible; explicit confirmation is required",
+        message:
+          "promotion plan is eligible; explicit confirmation is required",
         metadata: {
           ...operation.metadata,
           promotionFingerprint: plan.fingerprint,
@@ -204,9 +198,9 @@ function parseArgs(argv) {
       options[
         token === "--release-manifest"
           ? "releaseManifest"
-          : token.slice(2).replace(/-([a-z])/gu, (_match, letter) =>
-              letter.toUpperCase(),
-            )
+          : token
+              .slice(2)
+              .replace(/-([a-z])/gu, (_match, letter) => letter.toUpperCase())
       ] = value;
       index += 1;
       continue;
@@ -249,7 +243,7 @@ This command prepares a fixed-target plan only. It never builds, transfers,
 migrates, deploys or retries a terminal operation.`);
       process.exit(0);
     }
-    const report = preparePromotion({
+    const report = await preparePromotion({
       repoRoot: process.cwd(),
       releaseManifestPath: options.releaseManifest,
       targetKey: options.target,

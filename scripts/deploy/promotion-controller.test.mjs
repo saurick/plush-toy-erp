@@ -112,7 +112,7 @@ function fixture(t) {
   };
 }
 
-test("promotion preparation becomes ready after one read-only preflight", (t) => {
+test("promotion preparation awaits one read-only preflight and becomes ready", async (t) => {
   const data = fixture(t);
   let preflightCalls = 0;
   const runtime = {
@@ -120,7 +120,7 @@ test("promotion preparation becomes ready after one read-only preflight", (t) =>
       let second = 0;
       return () => `2026-07-29T03:00:0${second++}.000Z`;
     })(),
-    runPreflight: () => {
+    runPreflight: async () => {
       preflightCalls += 1;
       return targetPreflight(false);
     },
@@ -132,16 +132,19 @@ test("promotion preparation becomes ready after one read-only preflight", (t) =>
     idempotencyKey: IDEMPOTENCY_KEY,
     operationStore: data.store,
   };
-  const first = preparePromotion(request, runtime);
-  const second = preparePromotion(request, runtime);
+  const first = await preparePromotion(request, runtime);
+  const second = await preparePromotion(request, runtime);
   assert.equal(first.operation.status, "ready");
   assert.equal(second.reused, true);
   assert.equal(second.operation.id, first.operation.id);
   assert.equal(preflightCalls, 1);
-  assert.equal(readPromotionPlan(data.store, first.operation.id).status, "eligible");
+  assert.equal(
+    readPromotionPlan(data.store, first.operation.id).status,
+    "eligible",
+  );
 });
 
-test("promotion preparation persists disk blocker as a terminal operation", (t) => {
+test("promotion preparation persists disk blocker as a terminal operation", async (t) => {
   const data = fixture(t);
   let preflightCalls = 0;
   const request = {
@@ -151,13 +154,13 @@ test("promotion preparation persists disk blocker as a terminal operation", (t) 
     idempotencyKey: IDEMPOTENCY_KEY,
     operationStore: data.store,
   };
-  const first = preparePromotion(request, {
+  const first = await preparePromotion(request, {
     runPreflight: () => {
       preflightCalls += 1;
       return targetPreflight(true);
     },
   });
-  const second = preparePromotion(request, {
+  const second = await preparePromotion(request, {
     runPreflight: () => {
       preflightCalls += 1;
       return targetPreflight(false);

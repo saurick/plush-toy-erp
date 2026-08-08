@@ -1,10 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -64,7 +59,9 @@ function manifest(gitSha, migrationHash = HASH) {
 }
 
 function createFixture(t, migrationHash = HASH) {
-  const root = mkdtempSync(path.join(os.tmpdir(), "plush-rollback-controller-"));
+  const root = mkdtempSync(
+    path.join(os.tmpdir(), "plush-rollback-controller-"),
+  );
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const currentManifest = path.join(root, "current.json");
   const targetManifest = path.join(root, "target.json");
@@ -99,7 +96,7 @@ function preflight(blockers = []) {
   };
 }
 
-test("rollback controller produces one idempotent ready operation", (t) => {
+test("rollback controller awaits preflight and produces one idempotent ready operation", async (t) => {
   const fixture = createFixture(t);
   const input = {
     repoRoot: fixture.root,
@@ -109,10 +106,10 @@ test("rollback controller produces one idempotent ready operation", (t) => {
     idempotencyKey: "rollback-controller:fixed:0001",
     operationStore: fixture.store,
   };
-  const first = prepareRollback(input, {
-    runPreflight: () => preflight(),
+  const first = await prepareRollback(input, {
+    runPreflight: async () => preflight(),
   });
-  const second = prepareRollback(input, {
+  const second = await prepareRollback(input, {
     runPreflight: () => {
       throw new Error("preflight must not rerun");
     },
@@ -120,12 +117,15 @@ test("rollback controller produces one idempotent ready operation", (t) => {
   assert.equal(first.operation.status, "ready");
   assert.equal(second.reused, true);
   assert.equal(second.operation.id, first.operation.id);
-  assert.equal(readRollbackPlan(fixture.store, first.operation.id).status, "eligible");
+  assert.equal(
+    readRollbackPlan(fixture.store, first.operation.id).status,
+    "eligible",
+  );
 });
 
-test("rollback controller persists incompatible schema as terminal blocked", (t) => {
+test("rollback controller persists incompatible schema as terminal blocked", async (t) => {
   const fixture = createFixture(t, "9".repeat(64));
-  const report = prepareRollback(
+  const report = await prepareRollback(
     {
       repoRoot: fixture.root,
       currentReleaseManifestPath: fixture.currentManifest,
@@ -144,11 +144,7 @@ test("rollback controller persists incompatible schema as terminal blocked", (t)
   );
   assert.doesNotMatch(
     readFileSync(
-      path.join(
-        fixture.store,
-        "plans",
-        `${report.operation.id}.rollback.json`,
-      ),
+      path.join(fixture.store, "plans", `${report.operation.id}.rollback.json`),
       "utf8",
     ),
     /\/tmp\/|password|token/iu,

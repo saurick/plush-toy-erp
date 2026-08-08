@@ -1,9 +1,4 @@
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  realpathSync,
-} from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -19,10 +14,7 @@ import {
   validateRollbackManifest,
   writeRollbackManifest,
 } from "./rollback-manifest.mjs";
-import {
-  sha256File,
-  validateReleaseManifest,
-} from "./release-catalog.mjs";
+import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
@@ -30,7 +22,11 @@ const MAX_MANIFEST_BYTES = 512 * 1024;
 function readReleaseManifest(file) {
   const absolute = realpathSync(file);
   const stat = lstatSync(absolute);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_MANIFEST_BYTES) {
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.size > MAX_MANIFEST_BYTES
+  ) {
     throw new Error("rollback release manifest is not a bounded plain file");
   }
   return {
@@ -65,13 +61,17 @@ export function readRollbackPlan(store, operationId) {
   const file = rollbackPlanFile(store, operationId);
   if (!existsSync(file)) return null;
   const stat = lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_MANIFEST_BYTES) {
+  if (
+    !stat.isFile() ||
+    stat.isSymbolicLink() ||
+    stat.size > MAX_MANIFEST_BYTES
+  ) {
     throw new Error("rollback plan is invalid");
   }
   return validateRollbackManifest(JSON.parse(readFileSync(file, "utf8")));
 }
 
-export function prepareRollback(
+export async function prepareRollback(
   {
     repoRoot,
     currentReleaseManifestPath,
@@ -124,7 +124,7 @@ export function prepareRollback(
     now: now(),
   });
   try {
-    const targetPreflight = runPreflight("test-133");
+    const targetPreflight = await runPreflight("test-133");
     const plan = buildRollbackManifest({
       operationId: operation.id,
       currentReleaseManifest: current.manifest,
@@ -160,7 +160,8 @@ export function prepareRollback(
     } else {
       operation = transitionDeliveryOperation(store, operation.id, {
         status: "ready",
-        message: "code-only rollback is eligible; explicit confirmation is required",
+        message:
+          "code-only rollback is eligible; explicit confirmation is required",
         metadata: {
           ...operation.metadata,
           rollbackFingerprint: plan.fingerprint,
@@ -179,7 +180,8 @@ export function prepareRollback(
     if (latest.status === "running") {
       transitionDeliveryOperation(store, operation.id, {
         status: "failed",
-        message: "rollback qualification failed without starting a target write",
+        message:
+          "rollback qualification failed without starting a target write",
         issues: [
           {
             code: "rollback_qualification_failed",
@@ -273,7 +275,7 @@ This command only prepares a code-and-images rollback plan. It never performs
 database down migration, backup restore, target writes or automatic retry.`);
       process.exit(0);
     }
-    const report = prepareRollback({
+    const report = await prepareRollback({
       repoRoot: process.cwd(),
       currentReleaseManifestPath: options.currentManifest,
       targetReleaseManifestPath: options.targetManifest,
