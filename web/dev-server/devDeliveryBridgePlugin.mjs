@@ -245,6 +245,45 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
     metadata.buildPerformance.cacheHitRateBasisPoints <= 10_000
       ? metadata.buildPerformance
       : null
+  const targetCacheHit =
+    typeof metadata.targetCacheHit === 'boolean'
+      ? metadata.targetCacheHit
+      : null
+  const targetImageCacheHit =
+    typeof metadata.targetImageCacheHit === 'boolean'
+      ? metadata.targetImageCacheHit
+      : null
+  const targetCacheSource = ['none', 'formal', 'retained_operation'].includes(
+    metadata.targetCacheSource
+  )
+    ? metadata.targetCacheSource
+    : null
+  const cacheBasisValues = [
+    'release_manifest_sha256',
+    'archive_sha256',
+    'registry_digest',
+    'docker_content_id',
+    'embedded_git_sha',
+  ]
+  const cacheBasis = Array.isArray(metadata.cacheBasis)
+    ? metadata.cacheBasis.every((item) => cacheBasisValues.includes(item))
+      ? [...metadata.cacheBasis]
+      : null
+    : []
+  const stillExecutedValues = [
+    'migration',
+    'migration_status',
+    'health',
+    'ready',
+    'public_entry',
+  ]
+  const stillExecutedChecks = Array.isArray(metadata.stillExecutedChecks)
+    ? metadata.stillExecutedChecks.every((item) =>
+        stillExecutedValues.includes(item)
+      )
+      ? [...metadata.stillExecutedChecks]
+      : null
+    : []
   return {
     id: operation.id,
     action: operation.action,
@@ -267,6 +306,22 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
       serverDigest: completeDigests ? serverDigest : null,
       webDigest: completeDigests ? webDigest : null,
       buildPerformance,
+      targetCacheHit,
+      targetImageCacheHit,
+      targetCacheSource,
+      avoidedTransferBytes: metricInteger('avoidedTransferBytes'),
+      avoidedTransferDurationMs: metricInteger('avoidedTransferDurationMs'),
+      avoidedTransferBaselineOperationId: UUID_V4_PATTERN.test(
+        String(metadata.avoidedTransferBaselineOperationId || '')
+      )
+        ? metadata.avoidedTransferBaselineOperationId
+        : null,
+      dockerLoadSkipped:
+        typeof metadata.dockerLoadSkipped === 'boolean'
+          ? metadata.dockerLoadSkipped
+          : null,
+      cacheBasis,
+      stillExecutedChecks,
     },
     issues: operation.issues,
     events: operation.events.slice(-eventLimit),

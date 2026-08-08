@@ -48,6 +48,9 @@ const DevCustomerConfigPage = lazyRoute(
   () => import('./pages/DevCustomerConfigPage.jsx')
 )
 const DevTestingPage = lazyRoute(() => import('./pages/DevTestingPage.jsx'))
+const DevQualityGatesPage = lazyRoute(
+  () => import('./pages/DevQualityGatesPage.jsx')
+)
 const DevDataPreparationPage = lazyRoute(
   () => import('./pages/DevDataPreparationPage.jsx')
 )
@@ -121,6 +124,7 @@ export default function DevWorkbenchRoutes() {
           />
           <Route path="docs" element={<DevDocsPage />} />
           <Route path="testing" element={<DevTestingPage />} />
+          <Route path="quality-gates" element={<DevQualityGatesPage />} />
           <Route path="data-preparation" element={<DevDataPreparationPage />} />
           <Route path="prototypes" element={<DevPrototypesPage />} />
           <Route path="customer-config" element={<DevCustomerConfigPage />} />

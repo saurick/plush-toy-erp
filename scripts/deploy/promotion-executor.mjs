@@ -17,6 +17,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import {
+  listDeliveryOperations,
   readDeliveryOperation,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
@@ -32,9 +33,16 @@ import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
 import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
+import {
+  buildTargetReleaseCacheIdentity,
+  cleanupPreparedTargetReleaseIncoming,
+  estimateAvoidedTransferDuration,
+  prepareTargetReleaseIncoming,
+  probeTargetReleaseCache,
+} from "./target-release-cache.mjs";
 
 export const REMOTE_PROMOTION_RECEIPT_CONTRACT =
-  "plush.remote-promotion-receipt/v2";
+  "plush.remote-promotion-receipt/v3";
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -133,7 +141,7 @@ function sourceFileAtCommit(repoRoot, gitSha, relativeFile, runCommand) {
 
 export function preparePromotionTransfer(
   { repoRoot, bundleDir, releaseManifestPath, promotionPlan, destination },
-  { runCommand = spawnSync } = {},
+  { runCommand = spawnSync, cachedPackage = false } = {},
 ) {
   const root = realpathSync(repoRoot);
   const bundle = realpathSync(bundleDir);
@@ -192,29 +200,31 @@ export function preparePromotionTransfer(
   }
   mkdirSync(destination, { recursive: true, mode: 0o700 });
   try {
-    copyBoundedFile(
-      releaseManifestFile,
-      path.join(destination, "release-manifest.json"),
-      512 * 1024,
-    );
-    copyBoundedFile(
-      artifactFile,
-      path.join(destination, "release-artifact.json"),
-      512 * 1024,
-    );
-    copyBoundedFile(
-      sbomSource,
-      path.join(destination, "sbom.cdx.json"),
-      32 * 1024 * 1024,
-    );
-    copyBoundedFile(
-      imageByKind.get("server"),
-      path.join(destination, "server-image.tar"),
-    );
-    copyBoundedFile(
-      imageByKind.get("web"),
-      path.join(destination, "web-image.tar"),
-    );
+    if (!cachedPackage) {
+      copyBoundedFile(
+        releaseManifestFile,
+        path.join(destination, "release-manifest.json"),
+        512 * 1024,
+      );
+      copyBoundedFile(
+        artifactFile,
+        path.join(destination, "release-artifact.json"),
+        512 * 1024,
+      );
+      copyBoundedFile(
+        sbomSource,
+        path.join(destination, "sbom.cdx.json"),
+        32 * 1024 * 1024,
+      );
+      copyBoundedFile(
+        imageByKind.get("server"),
+        path.join(destination, "server-image.tar"),
+      );
+      copyBoundedFile(
+        imageByKind.get("web"),
+        path.join(destination, "web-image.tar"),
+      );
+    }
     writeFileSync(
       path.join(destination, "promotion-manifest.json"),
       `${JSON.stringify(plan, null, 2)}\n`,
@@ -230,34 +240,56 @@ export function preparePromotionTransfer(
       ),
       { mode: 0o600 },
     );
-    runChecked(
-      runCommand,
-      "git",
-      [
-        "archive",
-        "--format=tar",
-        `--output=${path.join(destination, "source.tar")}`,
-        releaseManifest.gitSha,
-      ],
-      { cwd: root },
-      "create committed source archive",
-    );
-    if (
-      sha256File(path.join(destination, "source.tar")) !==
-      releaseManifest.artifact.sourceArchiveSha256
-    ) {
-      throw new Error(
-        "committed source archive checksum does not match release",
+    if (!cachedPackage) {
+      runChecked(
+        runCommand,
+        "git",
+        [
+          "archive",
+          "--format=tar",
+          `--output=${path.join(destination, "source.tar")}`,
+          releaseManifest.gitSha,
+        ],
+        { cwd: root },
+        "create committed source archive",
       );
+      if (
+        sha256File(path.join(destination, "source.tar")) !==
+        releaseManifest.artifact.sourceArchiveSha256
+      ) {
+        throw new Error(
+          "committed source archive checksum does not match release",
+        );
+      }
     }
-    const checksumLines = TRANSFER_FILES.map(
-      (file) => `${sha256File(path.join(destination, file))}  ${file}`,
-    );
+    const immutableChecksums = {
+      "release-manifest.json": sha256File(releaseManifestFile),
+      "release-artifact.json": sha256File(artifactFile),
+      "sbom.cdx.json": artifact.sbom.sha256,
+      "server-image.tar": artifact.images.find(
+        (image) => image.kind === "server",
+      ).archive.sha256,
+      "source.tar": releaseManifest.artifact.sourceArchiveSha256,
+      "web-image.tar": artifact.images.find((image) => image.kind === "web")
+        .archive.sha256,
+    };
+    const checksumLines = TRANSFER_FILES.map((file) => {
+      const digest =
+        immutableChecksums[file] || sha256File(path.join(destination, file));
+      return `${digest}  ${file}`;
+    });
     writeFileSync(
       path.join(destination, "transfer-checksums.sha256"),
       `${checksumLines.join("\n")}\n`,
       { mode: 0o600 },
     );
+    const files = cachedPackage
+      ? [
+          "promotion-manifest.json",
+          "remote-promotion.sh",
+          "transfer-checksums.sha256",
+        ]
+      : [...TRANSFER_FILES, "transfer-checksums.sha256"];
     return {
       schemaVersion: "plush.promotion-transfer/v1",
       gitSha: releaseManifest.gitSha,
@@ -270,8 +302,9 @@ export function preparePromotionTransfer(
         artifact.images.map((image) => [image.kind, image.archive.sizeBytes]),
       ),
       buildPerformance: artifact?.performance?.build || null,
-      files: [...TRANSFER_FILES, "transfer-checksums.sha256"],
-      totalBytes: [...TRANSFER_FILES, "transfer-checksums.sha256"].reduce(
+      cachedPackage,
+      files,
+      totalBytes: files.reduce(
         (total, file) => total + statSync(path.join(destination, file)).size,
         0,
       ),
@@ -316,6 +349,7 @@ export function validateRemotePromotionReceipt(receipt, expected) {
   if (
     !hasExactKeys(receipt, [
       "before",
+      "cache",
       "checks",
       "durationMs",
       "finishedAt",
@@ -338,6 +372,15 @@ export function validateRemotePromotionReceipt(receipt, expected) {
       "version",
     ]) ||
     !hasExactKeys(receipt?.before, ["runtimeSha"]) ||
+    !hasExactKeys(receipt?.cache, [
+      "avoidedBytes",
+      "basis",
+      "cacheSource",
+      "dockerLoadSkipped",
+      "imageHit",
+      "packageHit",
+      "stillExecuted",
+    ]) ||
     !hasExactKeys(receipt?.images, ["serverContentId", "webContentId"]) ||
     !hasExactKeys(receipt?.rollbackPoint, [
       "backupAlias",
@@ -352,6 +395,7 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     !hasExactKeys(receipt?.checks, [
       "basicSmoke",
       "health",
+      "publicEntry",
       "ready",
       "releaseIdentity",
     ]) ||
@@ -389,6 +433,28 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     !optionalImageId(serverContentId) ||
     !optionalImageId(webContentId) ||
     !optionalBackup ||
+    typeof receipt?.cache?.packageHit !== "boolean" ||
+    typeof receipt?.cache?.imageHit !== "boolean" ||
+    typeof receipt?.cache?.dockerLoadSkipped !== "boolean" ||
+    receipt.cache.dockerLoadSkipped !== receipt.cache.imageHit ||
+    !["none", "formal", "retained_operation"].includes(
+      receipt?.cache?.cacheSource,
+    ) ||
+    !Number.isSafeInteger(receipt?.cache?.avoidedBytes) ||
+    receipt.cache.avoidedBytes < 0 ||
+    !Array.isArray(receipt?.cache?.basis) ||
+    !Array.isArray(receipt?.cache?.stillExecuted) ||
+    receipt.cache.stillExecuted.join(",") !==
+      "migration,health,ready,public_entry" ||
+    (receipt.cache.packageHit
+      ? receipt.cache.avoidedBytes <= 0 ||
+        receipt.cache.cacheSource === "none" ||
+        receipt.cache.basis.join(",") !==
+          "release_manifest_sha256,archive_sha256,registry_digest,docker_content_id,embedded_git_sha"
+      : receipt.cache.imageHit ||
+        receipt.cache.avoidedBytes !== 0 ||
+        receipt.cache.basis.length !== 0 ||
+        receipt.cache.cacheSource !== "none") ||
     receipt?.migration?.automaticDownMigration !== false ||
     receipt?.redaction?.containsSecrets !== false ||
     receipt?.redaction?.containsCredentials !== false ||
@@ -411,7 +477,8 @@ export function validateRemotePromotionReceipt(receipt, expected) {
         receipt.checks?.releaseIdentity !== true ||
         receipt.checks?.health !== true ||
         receipt.checks?.ready !== true ||
-        receipt.checks?.basicSmoke !== true)) ||
+        receipt.checks?.basicSmoke !== true ||
+        receipt.checks?.publicEntry !== true)) ||
     (receipt.status !== "passed" && receipt.issueCode === "none")
   ) {
     throw new Error("remote promotion receipt status is inconsistent");
@@ -432,24 +499,6 @@ function fixedSshArgs(target) {
     `${target.ssh.user}@${target.ssh.host}`,
   ];
 }
-
-const PREPARE_REMOTE_INCOMING = String.raw`set -euo pipefail
-umask 077
-operation_id="$1"
-[[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
-root=/home/simon/plush-toy-erp-v5
-incoming_root=$root/incoming
-incoming=$incoming_root/$operation_id
-mkdir -p "$incoming_root"
-chmod 700 "$incoming_root"
-if [[ -e "$incoming" ]]; then
-  [[ -d "$incoming" && ! -L "$incoming" ]]
-  [[ -z "$(find "$incoming" -mindepth 1 -maxdepth 1 -print -quit)" ]]
-else
-  mkdir "$incoming"
-fi
-chmod 700 "$incoming"
-`;
 
 function terminalIssue(status) {
   if (status === "passed") return [];
@@ -480,6 +529,10 @@ export function executePromotion(
   {
     runCommand = spawnSync,
     runPreflight = runTargetPreflight,
+    buildCacheIdentity = buildTargetReleaseCacheIdentity,
+    cleanupCache = cleanupPreparedTargetReleaseIncoming,
+    probeCache = probeTargetReleaseCache,
+    prepareCache = prepareTargetReleaseIncoming,
     now = () => new Date().toISOString(),
   } = {},
 ) {
@@ -531,6 +584,15 @@ export function executePromotion(
     "transfers",
     `${operation.id}-${operation.requestFingerprint.slice(0, 12)}`,
   );
+  const cacheIdentity = buildCacheIdentity({
+    bundleDir,
+    releaseManifestPath,
+  });
+  const cacheProbe = probeCache(cacheIdentity, { runCommand });
+  const avoidedTransfer = estimateAvoidedTransferDuration(
+    cacheProbe.avoidedBytes,
+    listDeliveryOperations(store, { limit: 200 }),
+  );
   const transfer = preparePromotionTransfer(
     {
       repoRoot: root,
@@ -539,7 +601,7 @@ export function executePromotion(
       promotionPlan: plan,
       destination: transferRoot,
     },
-    { runCommand },
+    { runCommand, cachedPackage: cacheProbe.packageHit },
   );
   const target = getDeploymentTarget("test-133");
   const sshArgs = fixedSshArgs(target);
@@ -555,23 +617,28 @@ export function executePromotion(
     metadata: {
       ...operation.metadata,
       transferBytes: transfer.totalBytes,
+      targetCacheHit: cacheProbe.packageHit,
+      targetImageCacheHit: cacheProbe.imageHit,
+      targetCacheSource: cacheProbe.cacheSource,
+      avoidedTransferBytes: cacheProbe.avoidedBytes,
+      avoidedTransferDurationMs: avoidedTransfer.durationMs,
+      avoidedTransferBaselineOperationId: avoidedTransfer.baselineOperationId,
+      dockerLoadSkipped: cacheProbe.imageHit,
+      cacheBasis: cacheProbe.basis,
+      stillExecutedChecks: ["migration", "health", "ready", "public_entry"],
     },
     now: now(),
   });
   let remoteStarted = false;
+  let targetPrepared = false;
   let transferDurationMs = 0;
   let transferBytesPerSecond = 0;
   try {
-    runChecked(
-      runCommand,
-      "ssh",
-      [...sshArgs, "bash", "-s", "--", operation.id],
-      {
-        input: PREPARE_REMOTE_INCOMING,
-        timeout: 30_000,
-      },
-      "prepare fixed remote incoming directory",
+    prepareCache(
+      { operationId: operation.id, identity: cacheIdentity, probe: cacheProbe },
+      { runCommand },
     );
+    targetPrepared = true;
     const transferStartedAt = Date.now();
     try {
       runChecked(
@@ -657,6 +724,13 @@ export function executePromotion(
         serverDigest: transfer.imageDigests.server,
         webDigest: transfer.imageDigests.web,
         buildPerformance: transfer.buildPerformance,
+        targetCacheHit: receipt.cache.packageHit,
+        targetImageCacheHit: receipt.cache.imageHit,
+        targetCacheSource: receipt.cache.cacheSource,
+        avoidedTransferBytes: receipt.cache.avoidedBytes,
+        dockerLoadSkipped: receipt.cache.dockerLoadSkipped,
+        cacheBasis: receipt.cache.basis,
+        stillExecutedChecks: receipt.cache.stillExecuted,
       },
       now: now(),
     });
@@ -667,6 +741,17 @@ export function executePromotion(
       receipt,
     };
   } catch (error) {
+    let executionError = error;
+    if (!remoteStarted && targetPrepared) {
+      try {
+        cleanupCache(operation.id, { runCommand });
+      } catch (cleanupError) {
+        executionError = new Error(
+          `${error.message}; target incoming cleanup failed: ${cleanupError.message}`,
+          { cause: error },
+        );
+      }
+    }
     const current = readDeliveryOperation(store, operation.id);
     if (current.status === "running") {
       operation = transitionDeliveryOperation(store, operation.id, {
@@ -684,7 +769,9 @@ export function executePromotion(
         now: now(),
       });
     }
-    throw error;
+    throw executionError;
+  } finally {
+    rmSync(transferRoot, { recursive: true, force: true });
   }
 }
 

@@ -13,6 +13,7 @@ export const DEV_PROTOTYPES_ROUTE = '/__dev/prototypes'
 export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
 export const DEV_DATABASE_MIGRATION_ROUTE = '/__dev/database-migration'
 export const DEV_TESTING_ROUTE = '/__dev/testing'
+export const DEV_QUALITY_GATES_ROUTE = '/__dev/quality-gates'
 export const DEV_DATA_PREPARATION_ROUTE = '/__dev/data-preparation'
 export const DEV_VERSION_CENTER_ROUTE = '/__dev/version-center'
 
@@ -96,6 +97,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     label: '改动验证',
   }),
   Object.freeze({
+    key: 'quality-gates',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    route: DEV_QUALITY_GATES_ROUTE,
+    label: '质量门禁',
+  }),
+  Object.freeze({
     key: 'data-preparation',
     areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
     route: DEV_DATA_PREPARATION_ROUTE,
@@ -150,6 +157,7 @@ export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_STATUS_FLOWS_ROUTE]: '/favicon-dev.svg',
   [DEV_DOCS_ROUTE]: '/favicon-docs.svg',
   [DEV_TESTING_ROUTE]: '/favicon-testing.svg',
+  [DEV_QUALITY_GATES_ROUTE]: '/favicon-testing.svg',
   [DEV_DATA_PREPARATION_ROUTE]: '/favicon-testing.svg',
   [DEV_PROTOTYPES_ROUTE]: '/favicon-prototypes.svg',
   [DEV_CUSTOMER_CONFIG_ROUTE]: '/favicon-customer-config.svg',

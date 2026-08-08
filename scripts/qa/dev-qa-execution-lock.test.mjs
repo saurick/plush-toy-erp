@@ -14,6 +14,7 @@ import {
 
 const COVERAGE_ID = "123e4567-e89b-42d3-a456-426614174000";
 const TESTING_ID = "123e4567-e89b-42d3-a456-426614174001";
+const QUALITY_ID = "123e4567-e89b-42d3-a456-426614174002";
 
 async function stores(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "plush-qa-lock-"));
@@ -21,6 +22,7 @@ async function stores(t) {
   return {
     coverage: path.join(root, "coverage-operations"),
     testing: path.join(root, "testing-operations"),
+    quality: path.join(root, "quality-gate-operations"),
   };
 }
 
@@ -48,6 +50,35 @@ test("global QA lock is shared by coverage and fixed testing actions", async (t)
       }),
     (error) => error?.code === "DEV_QA_EXECUTION_LOCKED",
   );
+});
+
+test("global QA lock serializes full and strict with other local QA work", async (t) => {
+  const store = await stores(t);
+  acquireDevQaExecutionLock(store.quality, {
+    kind: "quality",
+    profile: "strict",
+    operationId: QUALITY_ID,
+    ownerPid: 401,
+  });
+  assert.equal(
+    resolveDevQaExecutionLockFile(store.quality),
+    resolveDevQaExecutionLockFile(store.testing),
+  );
+  assert.throws(
+    () =>
+      acquireDevQaExecutionLock(store.testing, {
+        kind: "testing",
+        profile: "fast",
+        operationId: TESTING_ID,
+        ownerPid: 402,
+      }),
+    (error) => error?.code === "DEV_QA_EXECUTION_LOCKED",
+  );
+  releaseDevQaExecutionLock(store.quality, {
+    kind: "quality",
+    profile: "strict",
+    operationId: QUALITY_ID,
+  });
 });
 
 test("global QA lock attaches only the matching child and releases exactly", async (t) => {

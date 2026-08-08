@@ -100,12 +100,32 @@ test("release recovers only provenance-bound strict evidence before starting the
   );
   assert.match(SOURCE, /strict-terminal-current-\$\{\{ inputs\.sha \}\}/u);
   assert.match(SOURCE, /strict-terminal-\$\{\{ inputs\.sha \}\}/u);
+  assert.match(validateRuns, /strict_artifact_digest/u);
+  assert.match(validateRuns, /refresh_checks/u);
+  const refresh = validate.steps.find((step) =>
+    /expired vulnerability database check/u.test(step.name),
+  );
+  assert.match(refresh.if, /strict_reused == 'true'/u);
+  assert.match(refresh.if, /vulnerabilityDatabase/u);
+  assert.match(refresh.run, /--refresh-check vulnerabilityDatabase/u);
 });
 
 test("publish uses a verified resumable draft and exact six-asset set", () => {
   assert.match(publish.if, /needs\.validate\.result == 'success'/u);
   assert.match(publish.if, /needs\.strict\.result == 'success'/u);
+  assert.match(publish.if, /strict_reused == 'true'/u);
   assert.match(publishRuns, /release-artifact-bundle\.mjs/u);
+  assert.equal(
+    (publishRuns.match(/release-artifact-bundle\.mjs/gu) || []).length,
+    1,
+  );
+  assert.equal(
+    publish.steps.filter(
+      (step) =>
+        step.name === "Build each runtime once and publish images by digest",
+    ).length,
+    1,
+  );
   assert.match(publishRuns, /github-release-publisher\.mjs/u);
   assert.match(publishRuns, /github-release-asset-set\.mjs finalize/u);
   assert.match(publishRuns, /gh release create "\$release_tag"[\s\S]*--draft/u);
@@ -143,7 +163,7 @@ test("release pins every action and never passes a token to browser or arguments
   );
   assert.equal(
     uses.filter((value) => value.startsWith("actions/setup-go@")).length,
-    1,
+    2,
   );
   assert.equal(
     uses.filter((value) => value.startsWith("ariga/setup-atlas@")).length,

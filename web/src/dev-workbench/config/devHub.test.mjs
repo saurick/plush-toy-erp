@@ -33,6 +33,7 @@ const devPageSources = [
   'DevFlowStateObservatoryPage.jsx',
   'DevDocsPage.jsx',
   'DevTestingPage.jsx',
+  'DevQualityGatesPage.jsx',
   'DevDataPreparationPage.jsx',
   'DevPrototypesPage.jsx',
   'DevCustomerConfigPage.jsx',
@@ -100,6 +101,14 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   assert.equal(resolveDevPageFavicon('/__dev'), '/favicon-dev.svg')
   assert.equal(resolveDevPageFavicon('/__dev/testing'), '/favicon-testing.svg')
   assert.equal(
+    resolveDevPageTitle('/__dev/quality-gates', 'Plush Toy ERP'),
+    '质量门禁 · Plush Toy ERP'
+  )
+  assert.equal(
+    resolveDevPageFavicon('/__dev/quality-gates'),
+    '/favicon-testing.svg'
+  )
+  assert.equal(
     resolveDevPageFavicon('/__dev/governance/'),
     '/favicon-governance.svg'
   )
@@ -153,6 +162,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['product-engineering', '开发文档'],
       ['product-engineering', '产品原型'],
       ['quality', '改动验证'],
+      ['quality', '质量门禁'],
       ['quality', '测试数据'],
       ['delivery', '客户配置'],
       ['delivery', '数据库迁移'],
@@ -192,6 +202,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     'product-engineering'
   )
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')
+  assert.equal(resolveDevWorkbenchAreaKey('/__dev/quality-gates'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/data-preparation'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/customer-config'), 'delivery')
   assert.equal(
@@ -257,8 +268,8 @@ test('devHub: every tool has one registered area and the overview derives stages
   assert.match(devHubPageSource, /item\.areaKey === stage\.key/u)
 })
 
-test('devHub: twelve dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 12)
+test('devHub: thirteen dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 13)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -299,6 +310,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/status-flows',
       '/__dev/docs',
       '/__dev/testing',
+      '/__dev/quality-gates',
       '/__dev/data-preparation',
       '/__dev/prototypes',
       '/__dev/customer-config',
@@ -328,12 +340,12 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     (item) => item.key === 'product-core'
   )
   assert.equal(productCoreItem?.title, '产品内核 / Product Core')
-  assert.equal(
-    productCoreItem?.source,
-    'docs/product/产品能力进度台账.md'
-  )
+  assert.equal(productCoreItem?.source, 'docs/product/产品能力进度台账.md')
   assert.match(productCoreItem?.truthSource || '', /唯一产品能力进度台账/u)
-  assert.match(productCoreItem?.guardrails?.join(' ') || '', /不等于发布或验收/u)
+  assert.match(
+    productCoreItem?.guardrails?.join(' ') || '',
+    /不等于发布或验收/u
+  )
 
   const permissionRelationshipsItem = DEV_HUB_ITEMS.find(
     (item) => item.key === 'permission-relationships'
@@ -364,6 +376,20 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
   assert.doesNotMatch(
     testingItem?.guardrails?.join(' ') || '',
     /No shell execution/
+  )
+
+  const qualityGatesItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === 'quality-gates'
+  )
+  assert.equal(qualityGatesItem?.title, '质量门禁 / Quality Gates')
+  assert.match(
+    qualityGatesItem?.truthSource || '',
+    /正式 full \/ strict runner/
+  )
+  assert.match(qualityGatesItem?.guardrails?.join(' ') || '', /唯一结果真源/)
+  assert.match(
+    qualityGatesItem?.guardrails?.join(' ') || '',
+    /No arbitrary input/
   )
 
   const customerConfigItem = DEV_HUB_ITEMS.find(
@@ -406,7 +432,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 11)
+  assert.equal(summary.entryCount, 12)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

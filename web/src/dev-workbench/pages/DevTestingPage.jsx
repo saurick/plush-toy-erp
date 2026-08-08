@@ -39,7 +39,10 @@ import {
   normalizeDevTestingCoverageEnvelope,
   parseDevTestingStrategyTiers,
 } from '../config/devTesting.mjs'
-import { DEV_DOCS_ROUTE } from '../config/devRoutes.mjs'
+import {
+  DEV_DOCS_ROUTE,
+  DEV_QUALITY_GATES_ROUTE,
+} from '../config/devRoutes.mjs'
 import {
   createDevCoverageIdempotencyKey,
   createDevCoverageOperationClient,
@@ -1670,6 +1673,25 @@ export default function DevTestingPage() {
                 actionStarting={testingActionStarting}
                 onGeneratePlan={generateTestingPlan}
                 onRunAction={runTestingAction}
+              />
+              <Alert
+                className="erp-dev-testing-quality-gate-link"
+                type="info"
+                showIcon
+                message="需要完整或严格门禁？"
+                description="full / strict 的主操作、正式回执、真实耗时和覆盖缺口已统一放在质量门禁。终端命令仍可在策略文档详情中查阅。"
+                action={
+                  <Button
+                    type="link"
+                    onClick={() =>
+                      navigate(
+                        `${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`
+                      )
+                    }
+                  >
+                    前往质量门禁
+                  </Button>
+                }
               />
               <details className="erp-dev-testing-disclosure erp-dev-testing-disclosure--presets">
                 <summary>

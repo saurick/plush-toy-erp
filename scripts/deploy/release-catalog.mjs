@@ -16,6 +16,7 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
+import { validateStrictReceiptEvidence } from "../qa/strict-receipt-identity.mjs";
 
 export const RELEASE_MANIFEST_CONTRACT = "plush.release-manifest/v1";
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
@@ -43,13 +44,69 @@ function stableStringify(value) {
 
 export { sha256File };
 
+function validateStrictManifestEvidence(manifest) {
+  const strict = manifest?.strict;
+  if (strict?.contract === "plush.exact-sha-strict/v2") {
+    if (
+      strict?.provenance?.source !== "github-actions" ||
+      !String(strict?.provenance?.workflowRef || "").includes(
+        "/.github/workflows/release.yml@",
+      ) ||
+      strict?.provenance?.job !== "strict"
+    ) {
+      throw new Error("legacy strict release provenance is invalid");
+    }
+    return strict;
+  }
+  validateStrictReceiptEvidence({
+    ...strict,
+    profile: "strict",
+    status: "passed",
+    exitCode: 0,
+  });
+  const ciProvenance =
+    strict.provenance?.eventName === "push" &&
+    strict.provenance?.job === "quality" &&
+    String(strict.provenance?.workflowRef || "").includes(
+      "/.github/workflows/ci.yml@",
+    );
+  const releaseFallbackProvenance =
+    strict.provenance?.eventName === "workflow_dispatch" &&
+    strict.provenance?.job === "strict" &&
+    String(strict.provenance?.workflowRef || "").includes(
+      "/.github/workflows/release.yml@",
+    );
+  if (
+    strict.identity.gitSha !== manifest.gitSha ||
+    strict.fingerprint !== strict.identity.policyFingerprint ||
+    strict.identity.repository !== strict.provenance?.repository ||
+    strict.identity.sourceArchiveSha256 !==
+      manifest.artifact?.sourceArchiveSha256 ||
+    strict.identity.migrationSequenceSha256 !==
+      manifest.migration?.sequenceSha256 ||
+    strict.identity.customerConfigFingerprint !==
+      manifest.customerConfig?.sourceSha256 ||
+    strict.provenance?.source !== "github-actions" ||
+    strict.provenance?.ref !== "refs/heads/main" ||
+    strict.provenance?.refName !== "main" ||
+    strict.provenance?.headRepository !== strict.provenance?.repository ||
+    strict.provenance?.conclusion !== "success" ||
+    (!ciProvenance && !releaseFallbackProvenance)
+  ) {
+    throw new Error("strict release identity or CI provenance is invalid");
+  }
+  return strict;
+}
+
 export function validateReleaseManifest(manifest) {
   if (
     manifest?.schemaVersion !== RELEASE_MANIFEST_CONTRACT ||
     manifest?.passed !== true ||
     !VERSION_PATTERN.test(String(manifest?.version || "")) ||
     !SHA_PATTERN.test(String(manifest?.gitSha || "")) ||
-    manifest?.strict?.contract !== "plush.exact-sha-strict/v2" ||
+    !["plush.exact-sha-strict/v2", "plush.exact-sha-strict/v3"].includes(
+      manifest?.strict?.contract,
+    ) ||
     manifest?.strict?.status !== "passed" ||
     !SHA256_PATTERN.test(String(manifest?.strict?.fingerprint || "")) ||
     !SHA256_PATTERN.test(String(manifest?.strict?.receiptSha256 || "")) ||
@@ -57,17 +114,11 @@ export function validateReleaseManifest(manifest) {
     !REGISTRY_REPOSITORY_PATTERN.test(
       `ghcr.io/${String(manifest?.strict?.provenance?.repository || "")}`,
     ) ||
-    !String(manifest?.strict?.provenance?.workflowRef || "").includes(
-      "/.github/workflows/release.yml@",
-    ) ||
     !/^\d+$/u.test(String(manifest?.strict?.provenance?.runId || "")) ||
     !/^\d+$/u.test(String(manifest?.strict?.provenance?.runAttempt || "")) ||
-    manifest?.strict?.provenance?.job !== "strict" ||
     !SHA256_PATTERN.test(String(manifest?.artifact?.manifestSha256 || "")) ||
     !/^[0-9]{14}$/u.test(String(manifest?.migration?.latest || "")) ||
-    !SHA256_PATTERN.test(
-      String(manifest?.migration?.sequenceSha256 || ""),
-    ) ||
+    !SHA256_PATTERN.test(String(manifest?.migration?.sequenceSha256 || "")) ||
     !SHA256_PATTERN.test(
       String(manifest?.customerConfig?.sourceSha256 || ""),
     ) ||
@@ -76,6 +127,7 @@ export function validateReleaseManifest(manifest) {
   ) {
     throw new Error("release manifest contract is invalid");
   }
+  validateStrictManifestEvidence(manifest);
   const kinds = new Set();
   for (const image of manifest.images) {
     if (
@@ -141,6 +193,13 @@ export function buildReleaseManifest({
       status: strictTerminal.status,
       fingerprint: strictTerminal.fingerprint,
       receiptSha256: strictTerminal.receipt?.sha256,
+      ...(strictTerminal.contract === "plush.exact-sha-strict/v3"
+        ? {
+            identity: strictTerminal.identity,
+            checks: strictTerminal.checks,
+            timeSensitiveChecks: strictTerminal.timeSensitiveChecks,
+          }
+        : {}),
       provenance: {
         source: strictTerminal.provenance?.source,
         repository: strictTerminal.provenance?.repository,
@@ -148,6 +207,15 @@ export function buildReleaseManifest({
         runId: strictTerminal.provenance?.runId,
         runAttempt: strictTerminal.provenance?.runAttempt,
         job: strictTerminal.provenance?.job,
+        ...(strictTerminal.contract === "plush.exact-sha-strict/v3"
+          ? {
+              eventName: strictTerminal.provenance?.eventName,
+              ref: strictTerminal.provenance?.ref,
+              refName: strictTerminal.provenance?.refName,
+              headRepository: strictTerminal.provenance?.headRepository,
+              conclusion: strictTerminal.provenance?.conclusion,
+            }
+          : {}),
       },
     },
     artifact: {

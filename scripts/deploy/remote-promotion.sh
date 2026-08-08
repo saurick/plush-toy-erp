@@ -31,6 +31,7 @@ confirmation="${7:-}"
 target=test-133
 root=/home/simon/plush-toy-erp-v5
 incoming_root=$root/incoming
+cache_root=$root/release-cache
 releases_root=$root/releases
 runtime_env=$root/runtime/.env.customer-trial-133
 public_endpoint=https://admin.yoyoosun.net
@@ -147,6 +148,15 @@ server_content_id=unknown
 web_content_id=unknown
 server_ref=unknown
 web_ref=unknown
+cache_package_hit=false
+cache_image_hit=false
+cache_source=none
+cache_avoided_bytes=0
+cache_basis='[]'
+cache_materializing=""
+cache_materializing_created=0
+release_materializing=""
+release_materializing_created=0
 operation_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 operation_started_epoch_ms="$(epoch_millis)"
 stage_started_epoch_ms="$operation_started_epoch_ms"
@@ -242,7 +252,7 @@ write_receipt() {
   finished_epoch_ms="$(epoch_millis)"
   duration_ms=$((finished_epoch_ms - operation_started_epoch_ms))
   jq -n \
-    --arg schemaVersion "plush.remote-promotion-receipt/v2" \
+    --arg schemaVersion "plush.remote-promotion-receipt/v3" \
     --arg status "$status" \
     --arg operationId "$operation_id" \
     --arg target "$target" \
@@ -262,6 +272,11 @@ write_receipt() {
     --arg finishedAt "$finished_at" \
     --argjson durationMs "$duration_ms" \
     --argjson timings "$stage_timings" \
+    --argjson cachePackageHit "$cache_package_hit" \
+    --argjson cacheImageHit "$cache_image_hit" \
+    --arg cacheSource "$cache_source" \
+    --argjson cacheAvoidedBytes "$cache_avoided_bytes" \
+    --argjson cacheBasis "$cache_basis" \
     '{
       schemaVersion: $schemaVersion,
       status: $status,
@@ -274,6 +289,15 @@ write_receipt() {
       stage: $stage,
       issueCode: $issueCode,
       before: { runtimeSha: $currentBeforeSha },
+      cache: {
+        packageHit: $cachePackageHit,
+        imageHit: $cacheImageHit,
+        cacheSource: $cacheSource,
+        avoidedBytes: $cacheAvoidedBytes,
+        dockerLoadSkipped: $cacheImageHit,
+        basis: $cacheBasis,
+        stillExecuted: ["migration", "health", "ready", "public_entry"]
+      },
       images: {
         serverContentId: $serverContentId,
         webContentId: $webContentId
@@ -292,7 +316,8 @@ write_receipt() {
         releaseIdentity: ($status == "passed"),
         health: ($status == "passed"),
         ready: ($status == "passed"),
-        basicSmoke: ($status == "passed")
+        basicSmoke: ($status == "passed"),
+        publicEntry: ($status == "passed")
       },
       startedAt: $startedAt,
       finishedAt: $finishedAt,
@@ -324,6 +349,30 @@ restore_database_cleanup() {
   fi
 }
 
+cleanup_transient_materialization() {
+  local candidate
+  if [[ "$cache_materializing_created" -eq 1 ]]; then
+    candidate="$cache_materializing"
+    if [[ "$candidate" == "$cache_root/.materializing-$operation_id" &&
+      -d "$candidate" && ! -L "$candidate" &&
+      "$(stat -c '%u' "$candidate" 2>/dev/null || true)" == "$(id -u)" ]]; then
+      rm -rf -- "$candidate" ||
+        printf '[remote-promotion] failed to clean cache materialization\n' >&2
+    fi
+    cache_materializing_created=0
+  fi
+  if [[ "$release_materializing_created" -eq 1 ]]; then
+    candidate="$release_materializing"
+    if [[ "$candidate" == "$releases_root/.materializing-$operation_id" &&
+      -d "$candidate" && ! -L "$candidate" &&
+      "$(stat -c '%u' "$candidate" 2>/dev/null || true)" == "$(id -u)" ]]; then
+      rm -rf -- "$candidate" ||
+        printf '[remote-promotion] failed to clean release materialization\n' >&2
+    fi
+    release_materializing_created=0
+  fi
+}
+
 recover_before_migration() {
   if [[ "$env_changed" -eq 1 && -n "$env_backup" && -f "$env_backup" ]]; then
     cp "$env_backup" "$runtime_env.recovering"
@@ -348,6 +397,7 @@ recover_before_migration() {
 on_error() {
   local exit_code=$?
   trap - ERR
+  cleanup_transient_materialization
   restore_database_cleanup
   if [[ "$migration_apply_started" -eq 0 ]]; then
     recover_before_migration
@@ -373,6 +423,7 @@ incoming_uid="$(stat -c '%u' "$incoming")"
 [[ "$incoming_uid" == "$(id -u)" ]] ||
   fail "incoming package ownership is invalid"
 required_files=(
+  .target-cache.json
   release-manifest.json
   release-artifact.json
   promotion-manifest.json
@@ -387,6 +438,29 @@ for required_file in "${required_files[@]}"; do
   [[ -f "$incoming/$required_file" && ! -L "$incoming/$required_file" ]] ||
     fail "incoming package is incomplete"
 done
+jq -e \
+  --arg operationId "$operation_id" \
+  --arg manifest "$release_manifest_sha256" \
+  '.schemaVersion == "plush.target-release-cache/v1" and
+   .operationId == $operationId and
+   .releaseManifestSha256 == $manifest and
+   (.packageHit | type == "boolean") and
+   (.imageHit | type == "boolean") and
+   (.avoidedBytes | type == "number") and .avoidedBytes >= 0 and
+   (.cacheSource == "none" or .cacheSource == "formal" or .cacheSource == "retained_operation") and
+   (.basis | type == "array") and
+   (if .packageHit then (
+      .avoidedBytes > 0 and
+      (.cacheSource == "formal" or .cacheSource == "retained_operation") and
+      .basis == ["release_manifest_sha256","archive_sha256","registry_digest","docker_content_id","embedded_git_sha"]
+    )
+    else (.imageHit == false and .avoidedBytes == 0 and .cacheSource == "none" and (.basis | length) == 0) end)' \
+  "$incoming/.target-cache.json" >/dev/null
+cache_package_hit="$(jq -r '.packageHit' "$incoming/.target-cache.json")"
+cache_image_hit="$(jq -r '.imageHit' "$incoming/.target-cache.json")"
+cache_source="$(jq -r '.cacheSource' "$incoming/.target-cache.json")"
+cache_avoided_bytes="$(jq -r '.avoidedBytes' "$incoming/.target-cache.json")"
+cache_basis="$(jq -c '.basis' "$incoming/.target-cache.json")"
 (
   cd "$incoming"
   sha256sum --check --strict transfer-checksums.sha256
@@ -473,6 +547,41 @@ web_archive_manifest_digest="$(
     "$incoming/web-image.tar" "$web_ref" "$web_content_id"
 )"
 
+mkdir -p "$cache_root"
+chmod 700 "$cache_root"
+formal_cache=$cache_root/$release_manifest_sha256
+immutable_cache_files=(
+  release-manifest.json
+  release-artifact.json
+  sbom.cdx.json
+  source.tar
+  server-image.tar
+  web-image.tar
+)
+if [[ -e "$formal_cache" ]]; then
+  [[ -d "$formal_cache" && ! -L "$formal_cache" &&
+    "$(stat -c '%u' "$formal_cache")" == "$(id -u)" ]] ||
+    fail "formal release cache is invalid"
+  for cache_file in "${immutable_cache_files[@]}"; do
+    [[ -f "$formal_cache/$cache_file" && ! -L "$formal_cache/$cache_file" &&
+      "$(stat -c '%u' "$formal_cache/$cache_file")" == "$(id -u)" ]] ||
+      fail "formal release cache is incomplete"
+    cmp --silent "$incoming/$cache_file" "$formal_cache/$cache_file" ||
+      fail "formal release cache identity conflicts with verified package"
+  done
+else
+  cache_materializing=$cache_root/.materializing-$operation_id
+  [[ ! -e "$cache_materializing" ]] || fail "stale release cache materialization exists"
+  mkdir "$cache_materializing"
+  cache_materializing_created=1
+  chmod 700 "$cache_materializing"
+  for cache_file in "${immutable_cache_files[@]}"; do
+    ln "$incoming/$cache_file" "$cache_materializing/$cache_file"
+  done
+  mv "$cache_materializing" "$formal_cache"
+  cache_materializing_created=0
+fi
+
 enter_stage capacity_recheck
 available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
 [[ "$available_bytes" =~ ^[0-9]+$ &&
@@ -491,10 +600,11 @@ if [[ -e "$release_dir" ]]; then
      .gitSha == $sha and .sourceArchiveSha256 == $sourceSha256' \
     "$release_identity" >/dev/null
 else
-  materializing="$releases_root/.materializing-$operation_id"
-  [[ ! -e "$materializing" ]] || fail "stale materialization directory exists"
-  mkdir "$materializing"
-  chmod 700 "$materializing"
+  release_materializing="$releases_root/.materializing-$operation_id"
+  [[ ! -e "$release_materializing" ]] || fail "stale materialization directory exists"
+  mkdir "$release_materializing"
+  release_materializing_created=1
+  chmod 700 "$release_materializing"
   if tar -tf "$incoming/source.tar" |
     awk '
       /^\// { exit 1 }
@@ -506,7 +616,7 @@ else
     fail "source archive contains an unsafe path"
   fi
   tar --extract --file "$incoming/source.tar" \
-    --directory "$materializing" --no-same-owner --no-same-permissions
+    --directory "$release_materializing" --no-same-owner --no-same-permissions
   jq -n \
     --arg schemaVersion "plush.target-release-identity/v1" \
     --arg gitSha "$release_sha" \
@@ -517,9 +627,10 @@ else
       gitSha: $gitSha,
       sourceArchiveSha256: $sourceArchiveSha256,
       releaseManifestSha256: $releaseManifestSha256
-    }' >"$materializing/.plush-release-identity.json"
-  chmod 600 "$materializing/.plush-release-identity.json"
-  mv "$materializing" "$release_dir"
+    }' >"$release_materializing/.plush-release-identity.json"
+  chmod 600 "$release_materializing/.plush-release-identity.json"
+  mv "$release_materializing" "$release_dir"
+  release_materializing_created=0
 fi
 cmp --silent \
   "$incoming/remote-promotion.sh" \
@@ -527,8 +638,10 @@ cmp --silent \
   fail "remote promotion script is not part of the exact source archive"
 
 enter_stage image_load_and_readback
-docker load --input "$incoming/server-image.tar" >>"$log_file" 2>&1
-docker load --input "$incoming/web-image.tar" >>"$log_file" 2>&1
+if [[ "$cache_image_hit" != true ]]; then
+  docker load --input "$incoming/server-image.tar" >>"$log_file" 2>&1
+  docker load --input "$incoming/web-image.tar" >>"$log_file" 2>&1
+fi
 actual_server_content_id="$(docker image inspect --format '{{.Id}}' "$server_ref")"
 actual_web_content_id="$(docker image inspect --format '{{.Id}}' "$web_ref")"
 [[ ("$actual_server_content_id" == "$server_content_id" ||
@@ -742,4 +855,16 @@ mv "$next_current" "$current"
 enter_stage passed
 env_changed=0
 write_receipt passed none
+rm -f \
+  "$incoming/.target-cache.json" \
+  "$incoming/promotion-manifest.json" \
+  "$incoming/release-artifact.json" \
+  "$incoming/release-manifest.json" \
+  "$incoming/remote-promotion.sh" \
+  "$incoming/sbom.cdx.json" \
+  "$incoming/server-image.tar" \
+  "$incoming/source.tar" \
+  "$incoming/transfer-checksums.sha256" \
+  "$incoming/web-image.tar"
+rmdir "$incoming"
 cat "$receipt"

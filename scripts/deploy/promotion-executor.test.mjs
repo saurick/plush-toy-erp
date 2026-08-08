@@ -42,6 +42,21 @@ function receipt(overrides = {}) {
     stage: "passed",
     issueCode: "none",
     before: { runtimeSha: "d".repeat(40) },
+    cache: {
+      packageHit: true,
+      imageHit: true,
+      cacheSource: "formal",
+      avoidedBytes: 1_325_933_239,
+      dockerLoadSkipped: true,
+      basis: [
+        "release_manifest_sha256",
+        "archive_sha256",
+        "registry_digest",
+        "docker_content_id",
+        "embedded_git_sha",
+      ],
+      stillExecuted: ["migration", "health", "ready", "public_entry"],
+    },
     images: {
       serverContentId: `sha256:${"e".repeat(64)}`,
       webContentId: `sha256:${"f".repeat(64)}`,
@@ -61,6 +76,7 @@ function receipt(overrides = {}) {
       health: true,
       ready: true,
       basicSmoke: true,
+      publicEntry: true,
     },
     redaction: {
       containsSecrets: false,
@@ -151,6 +167,7 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
       health: false,
       ready: false,
       basicSmoke: false,
+      publicEntry: false,
     },
   });
   assert.equal(
@@ -188,6 +205,7 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
       health: false,
       ready: false,
       basicSmoke: false,
+      publicEntry: false,
     },
   });
   assert.equal(
@@ -225,9 +243,7 @@ test("promotion executor contains no target build or automatic retry path", () =
   assert.doesNotMatch(source, /["']scp["']/u);
   assert.match(source, /targetWriteStarted: false/u);
   assert.match(source, /automatic retry is disabled/u);
-  const prepareIndex = source.indexOf(
-    '"prepare fixed remote incoming directory"',
-  );
+  const prepareIndex = source.indexOf("prepareCache(");
   const transferTimerIndex = source.indexOf(
     "const transferStartedAt = Date.now()",
   );
@@ -244,6 +260,8 @@ test("promotion executor contains no target build or automatic retry path", () =
     "serverDigest",
     "webDigest",
     "buildPerformance",
+    "avoidedTransferBytes",
+    "dockerLoadSkipped",
   ]) {
     assert.match(source, new RegExp(`\\b${metric}\\b`, "u"));
   }

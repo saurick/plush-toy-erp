@@ -60,7 +60,7 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
   assert.match(source, /write_receipt not_proven/u);
   assert.match(source, /unknown prior target outcome; read back before retry/u);
   assert.match(source, /flock -n 9/u);
-  assert.match(source, /plush[.]remote-promotion-receipt\/v2/u);
+  assert.match(source, /plush[.]remote-promotion-receipt\/v3/u);
   assert.match(source, /enter_stage package_verification/u);
   assert.match(source, /durationMs: \$durationMs/u);
   assert.match(source, /timings: \$timings/u);
@@ -68,6 +68,30 @@ test("remote promotion fixes backup migration identity and unknown-outcome behav
   assert.match(source, /PUBLIC_WEB_CUTOVER:\$public_containers:\$release_sha/u);
   assert.match(source, /public entry release identity does not match/u);
   assert.match(source, /applyStarted: \(\$migrationApplyStarted == 1\)/u);
+});
+
+test("remote promotion verifies content-addressed cache and skips only exact image load", () => {
+  assert.match(source, /plush[.]target-release-cache\/v1/u);
+  assert.match(source, /release_manifest_sha256/u);
+  assert.match(source, /cache_avoided_bytes/u);
+  assert.match(source, /dockerLoadSkipped: \$cacheImageHit/u);
+  assert.match(source, /if \[\[ "\$cache_image_hit" != true \]\]/u);
+  assert.match(source, /formal release cache identity conflicts/u);
+  assert.match(
+    source,
+    /stillExecuted: \["migration", "health", "ready", "public_entry"\]/u,
+  );
+});
+
+test("remote promotion cleans only materialization created by the current operation", () => {
+  assert.match(source, /cleanup_transient_materialization/u);
+  assert.match(source, /cache_materializing_created=1/u);
+  assert.match(source, /release_materializing_created=1/u);
+  assert.match(source, /cache_root\/\.materializing-\$operation_id/u);
+  assert.match(source, /releases_root\/\.materializing-\$operation_id/u);
+  assert.match(source, /! -L "\$candidate"/u);
+  assert.match(source, /stat -c '%u'/u);
+  assert.match(source, /rm -rf -- "\$candidate"/u);
 });
 
 test("remote promotion normalizes full nanoseconds to portable milliseconds", () => {

@@ -299,8 +299,10 @@ function normalizeBusy(busy) {
     typeof busy.kind !== 'string' ||
     typeof busy.profile !== 'string' ||
     (busy.active &&
-      (!['coverage', 'testing'].includes(busy.kind) ||
-        !['baseline', ...ACTION_KEYS].includes(busy.profile))) ||
+      (!['coverage', 'testing', 'quality'].includes(busy.kind) ||
+        !['baseline', ...ACTION_KEYS, 'full', 'strict'].includes(
+          busy.profile
+        ))) ||
     (!busy.active && (busy.kind || busy.profile))
   ) {
     throw new Error('testing busy state is invalid')

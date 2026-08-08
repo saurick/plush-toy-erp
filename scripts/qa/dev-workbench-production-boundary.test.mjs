@@ -1,10 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  mkdtempSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -43,7 +38,10 @@ test("production artifact boundary: accepts a product-only artifact", () => {
 test("production artifact boundary: rejects DEV routes, styles and private paths", () => {
   for (const marker of [
     "/__dev",
+    "/__dev/quality-gates",
     "erp-dev-workspace-nav",
+    "erp-dev-quality-gates",
+    "质量门禁",
     "erp-dev-permission-relationships",
     "权限关系 / Effective Access",
     "customer-yoyoosun-private",

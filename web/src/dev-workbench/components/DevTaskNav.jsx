@@ -10,6 +10,7 @@ export default function DevTaskNav({
   compact = false,
   level = 'secondary',
   className = '',
+  idPrefix = '',
 }) {
   const { token } = theme.useToken()
   const itemRefs = useRef([])
@@ -73,6 +74,10 @@ export default function DevTaskNav({
                 : 'erp-dev-task-nav__item'
             }
             aria-selected={isActive}
+            id={idPrefix ? `${idPrefix}-tab-${item.value}` : undefined}
+            aria-controls={
+              idPrefix ? `${idPrefix}-panel-${item.value}` : undefined
+            }
             tabIndex={isActive ? 0 : -1}
             disabled={disabled}
             onClick={() => onChange(item.value)}

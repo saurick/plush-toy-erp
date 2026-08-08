@@ -48,7 +48,7 @@ export function resolveDevAuxPort(
   return validateDevAuxPort(devPorts, bounds.start + offset, label);
 }
 
-function isWildcardPortAvailable(port) {
+function isHostPortAvailable(host, port) {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();
@@ -59,7 +59,7 @@ function isWildcardPortAvailable(port) {
       }
       reject(error);
     });
-    server.listen({ host: "0.0.0.0", port, exclusive: true }, () => {
+    server.listen({ host, port, exclusive: true }, () => {
       server.close((error) => {
         if (error) {
           reject(error);
@@ -71,12 +71,17 @@ function isWildcardPortAvailable(port) {
   });
 }
 
+async function isDevAuxPortAvailable(port) {
+  if (!(await isHostPortAvailable("127.0.0.1", port))) return false;
+  return isHostPortAvailable("0.0.0.0", port);
+}
+
 export async function findAvailableDevAuxPort(
   devPorts,
   {
     startOffset = 0,
     endOffset = auxPortRangeSize - 1,
-    isPortAvailable = isWildcardPortAvailable,
+    isPortAvailable = isDevAuxPortAvailable,
   } = {},
 ) {
   if (

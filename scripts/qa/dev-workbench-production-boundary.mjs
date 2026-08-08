@@ -1,10 +1,5 @@
 #!/usr/bin/env node
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-} from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -21,6 +16,7 @@ const textExtensions = new Set([
 
 export const productionArtifactForbiddenMarkers = Object.freeze([
   "/__dev",
+  "/__dev/quality-gates",
   "dev-workbench",
   "研发效能工作台",
   "Engineering Delivery Workbench",
@@ -32,6 +28,8 @@ export const productionArtifactForbiddenMarkers = Object.freeze([
   "erp-dev-flow-state",
   "erp-dev-workspace-nav",
   "erp-dev-permission-relationships",
+  "erp-dev-quality-gates",
+  "质量门禁",
   "权限关系 / Effective Access",
   "favicon-dev.svg",
   "plush_erp_dev_hub",
@@ -42,7 +40,9 @@ export const productionArtifactForbiddenMarkers = Object.freeze([
 function listArtifactFiles(rootDir) {
   return readdirSync(rootDir, { withFileTypes: true }).flatMap((entry) => {
     const absolutePath = path.join(rootDir, entry.name);
-    return entry.isDirectory() ? listArtifactFiles(absolutePath) : [absolutePath];
+    return entry.isDirectory()
+      ? listArtifactFiles(absolutePath)
+      : [absolutePath];
   });
 }
 
@@ -106,7 +106,9 @@ const isDirectRun =
 
 if (isDirectRun) {
   try {
-    const result = scanProductionArtifact(parseArgs(process.argv.slice(2)).buildDir);
+    const result = scanProductionArtifact(
+      parseArgs(process.argv.slice(2)).buildDir,
+    );
     process.stdout.write(
       `[dev-workbench-production-boundary] status=${result.status} files=${result.filesScanned} build=${result.buildDir}\n`,
     );

@@ -215,8 +215,6 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
       'frontend-customer-config-projection',
       'frontend-error-messages',
       'business-action-field-boundaries',
-      'full-local-gate',
-      'release',
     ]
   )
   const presetsByKey = new Map(
@@ -231,8 +229,10 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     buildDevTestingCopyText(getPreset(key).commands)
 
   assert.match(getPresetCopyText('frontend'), /pnpm style:l1/)
-  assert.match(getPreset('full-local-gate').description, /实际 pre-commit/)
-  assert.match(getPresetCopyText('full-local-gate'), /scripts\/qa\/full\.sh/)
+  assert.equal(presetsByKey.has('full-local-gate'), false)
+  assert.equal(presetsByKey.has('release'), false)
+  assert.match(testingPageSource, /前往质量门禁/u)
+  assert.match(testingPageSource, /view=run&profile=strict/u)
   assert.match(
     getPresetCopyText('workflow-backend-actions'),
     /TestWorkflowRepo_/
@@ -543,30 +543,18 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
     /不晋级 Current/
   )
   assert.match(getPreset('dev-prototype-registry').description, /不改正式菜单/)
-  assert.match(
-    getPresetCopyText('dev-doc-governance'),
-    /devDocs\.test\.mjs/
-  )
+  assert.match(getPresetCopyText('dev-doc-governance'), /devDocs\.test\.mjs/)
   assert.match(
     getPresetCopyText('dev-doc-governance'),
     /devGovernance\.test\.mjs/
   )
-  assert.match(
-    getPresetCopyText('dev-doc-governance'),
-    /dev-docs-dark-desktop/
-  )
+  assert.match(getPresetCopyText('dev-doc-governance'), /dev-docs-dark-desktop/)
   assert.match(
     getPresetCopyText('dev-doc-governance'),
     /dev-governance-dark-desktop/
   )
-  assert.match(
-    getPreset('dev-doc-governance').description,
-    /不改正式文档真源/
-  )
-  assert.match(
-    getPreset('dev-doc-governance').description,
-    /不进入正式菜单/
-  )
+  assert.match(getPreset('dev-doc-governance').description, /不改正式文档真源/)
+  assert.match(getPreset('dev-doc-governance').description, /不进入正式菜单/)
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
     /customer-package-lint\.test\.mjs/

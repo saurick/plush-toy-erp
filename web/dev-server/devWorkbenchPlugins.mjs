@@ -5,6 +5,7 @@ import { createDevDataPreparationPlugin } from './devDataPreparationPlugin.mjs'
 import { createDevDeliveryBridgePlugin } from './devDeliveryBridgePlugin.mjs'
 import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
 import { createDevQaTestingPlugin } from './devQaTestingPlugin.mjs'
+import { createDevQualityGatePlugin } from './devQualityGatePlugin.mjs'
 import { createDevWorkbenchReceiptPlugin } from './devWorkbenchReceiptPlugin.mjs'
 
 export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
@@ -13,6 +14,7 @@ export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
   'plush-dev-database-migration',
   'plush-dev-data-preparation',
   'plush-dev-qa-testing',
+  'plush-dev-quality-gates',
   'plush-dev-qa-coverage',
   'plush-dev-workbench-receipts',
   'plush-dev-delivery-bridge',
@@ -36,6 +38,7 @@ export function createDevWorkbenchServePlugins({
     createDevDatabaseMigrationPlugin({ projectRoot, apiOrigin }),
     createDevDataPreparationPlugin({ projectRoot }),
     createDevQaTestingPlugin({ projectRoot }),
+    createDevQualityGatePlugin({ projectRoot }),
     createDevQaCoveragePlugin({ projectRoot }),
     createDevWorkbenchReceiptPlugin({ projectRoot }),
     createDevDeliveryBridgePlugin({ projectRoot }),

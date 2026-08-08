@@ -97,6 +97,25 @@ test('testing summary keeps fixed results and Git Hook wiring independent', () =
   )
 })
 
+test('testing summary recognizes a quality gate holding the shared QA lock', () => {
+  const summary = normalizeDevTestingSummary({
+    schemaVersion: 'plush.dev-qa-testing-summary/v2',
+    busy: { active: true, kind: 'quality', profile: 'strict' },
+    hooks: HOOKS,
+    operations: {
+      fast: null,
+      'role-access': null,
+      'field-linkage': null,
+    },
+  })
+
+  assert.deepEqual(summary.busy, {
+    active: true,
+    kind: 'quality',
+    profile: 'strict',
+  })
+})
+
 test('testing Git closeout copy stays fixed and explains the four boundaries', () => {
   assert.equal(
     DEV_TESTING_GIT_HOOK_PATH_COMMAND,

@@ -21,6 +21,32 @@
   gap: 12px;
 }
 
+.erp-dev-version-quality-gate-summary {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-inline-start: 3px solid var(--ant-color-primary, #1677ff);
+  border-radius: 9px;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+.erp-dev-version-quality-gate-summary > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .erp-dev-version-quality-gate-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .erp-dev-version-summary .ant-card {
   height: 100%;
 }
@@ -37,6 +63,93 @@
   display: block;
   max-width: 420px;
   white-space: normal;
+}
+
+.erp-dev-version-current-operation {
+  overflow: hidden;
+  border-left: 3px solid var(--ant-color-primary, #1677ff);
+}
+
+.erp-dev-version-current-operation .ant-card-body {
+  padding: 12px 16px;
+}
+
+.erp-dev-version-current-operation__list {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-dev-version-current-operation__item {
+  display: grid;
+  grid-template-columns:
+    minmax(120px, 0.8fr) minmax(160px, 1fr) minmax(220px, 1.5fr)
+    auto;
+  gap: 16px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-radius: 10px;
+  background: var(--ant-color-fill-quaternary, #fafafa);
+}
+
+.erp-dev-version-current-operation__detail {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.erp-dev-version-current-operation__item .ant-typography {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-version-current-operation__actions {
+  justify-self: end;
+}
+
+.erp-dev-pipeline-status-strip .ant-card-body {
+  padding: 12px 16px;
+}
+
+.erp-dev-pipeline-status-strip__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-dev-pipeline-status-strip__metrics > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-radius: 8px;
+  background: var(--ant-color-fill-quaternary, #fafafa);
+}
+
+.erp-dev-pipeline-status-strip__metrics strong,
+.erp-dev-pipeline-status-strip__metrics .ant-typography {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-version-workspace,
+.erp-dev-version-tab {
+  min-width: 0;
+}
+
+.erp-dev-version-workspace,
+.erp-dev-version-tab--versions,
+.erp-dev-version-tab--history {
+  scroll-margin-top: 16px;
+}
+
+.erp-dev-version-workspace .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.erp-dev-version-table-card .ant-pagination {
+  row-gap: 8px;
 }
 
 .erp-dev-pipeline-timing .ant-card-body {
@@ -219,7 +332,9 @@
   outline-offset: 2px;
 }
 
+:root[data-erp-theme='dark'] .erp-dev-pipeline-status-strip__metrics > div,
 :root[data-erp-theme='dark'] .erp-dev-pipeline-timing__summary > div,
+:root[data-erp-theme='dark'] .erp-dev-version-current-operation__item,
 :root[data-erp-theme='dark'] .erp-dev-operation-metrics > div {
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
@@ -240,6 +355,18 @@
 @media (max-width: 1100px) {
   .erp-dev-version-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-pipeline-status-strip__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-version-current-operation__item {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-version-current-operation__actions {
+    justify-self: start;
   }
 
   .erp-dev-pipeline-timing__summary {
@@ -270,8 +397,10 @@
 
 @media (max-width: 620px) {
   .erp-dev-version-page .erp-dev-version-summary,
+  .erp-dev-pipeline-status-strip__metrics,
   .erp-dev-pipeline-timing__summary,
-  .erp-dev-operation-metrics {
+  .erp-dev-operation-metrics,
+  .erp-dev-version-current-operation__item {
     display: grid;
     grid-template-columns: 1fr;
   }
@@ -284,5 +413,14 @@
 
   .erp-dev-version-page .erp-dev-version-summary > .ant-card {
     flex: initial;
+  }
+
+  .erp-dev-version-workspace .ant-tabs-tab {
+    min-height: 44px;
+    padding-inline: 2px;
+  }
+
+  .erp-dev-version-table-card .ant-card-extra {
+    white-space: normal;
   }
 }

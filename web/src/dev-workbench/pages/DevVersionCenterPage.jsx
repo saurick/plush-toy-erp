@@ -20,26 +20,37 @@ import {
   Space,
   Table,
   Tag,
+  Tabs,
   Tooltip,
   Typography,
 } from 'antd'
+import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevPipelineTimingPanel, {
+  DevPipelineStatusStrip,
   DevTimingBars,
 } from '../components/DevPipelineTimingPanel.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import {
   DEV_DELIVERY_SOURCE_PATH,
+  DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+  DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
+  DEV_VERSION_CENTER_VIEW_HISTORY,
+  DEV_VERSION_CENTER_VIEW_PIPELINE,
+  DEV_VERSION_CENTER_VIEW_QUERY_KEY,
+  DEV_VERSION_CENTER_VIEW_VERSIONS,
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   defaultReleaseVersion,
   deliveryOperationMessagePresentation,
   deliveryStatusPresentation,
+  deliveryTargetCachePresentation,
   deliveryVersionActionKind,
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryRate,
+  resolveDevVersionCenterView,
   shortGitSha,
 } from '../config/devDelivery.mjs'
 import {
@@ -48,6 +59,11 @@ import {
   readDevSummarySnapshot,
   updateDevSummarySnapshot,
 } from '../config/devSummarySnapshot.mjs'
+import {
+  createDevQualityGateClient,
+  formatQualityGateDuration,
+} from '../config/devQualityGates.mjs'
+import { DEV_QUALITY_GATES_ROUTE } from '../config/devRoutes.mjs'
 
 const { Link, Paragraph, Text, Title } = Typography
 const OPERATION_POLL_INTERVAL_MS = 1500
@@ -82,8 +98,19 @@ function issueDescription(issues = []) {
   return issues.map((issue) => issue.message).join('；')
 }
 
+function operationActionLabel(action) {
+  if (action === 'release') return '发布制品'
+  if (action === 'promote') return '部署 133'
+  return '回滚'
+}
+
 export default function DevVersionCenterPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedView =
+    searchParams.get(DEV_VERSION_CENTER_VIEW_QUERY_KEY) || ''
+  const activeView = resolveDevVersionCenterView(requestedView)
   const client = useMemo(() => createDevDeliveryClient(), [])
+  const qualityGateClient = useMemo(() => createDevQualityGateClient(), [])
   const initialSnapshot = useMemo(
     () => readDevSummarySnapshot(VERSION_CENTER_SNAPSHOT_KEY),
     []
@@ -103,8 +130,42 @@ export default function DevVersionCenterPage() {
   const [operationDetail, setOperationDetail] = useState(null)
   const [operationDetailLoading, setOperationDetailLoading] = useState(false)
   const [operationPollError, setOperationPollError] = useState('')
+  const [versionPage, setVersionPage] = useState(1)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [qualityGateSummary, setQualityGateSummary] = useState(null)
+  const [qualityGateError, setQualityGateError] = useState('')
   const mutationInFlightRef = useRef(false)
   const refreshRequestRef = useRef(0)
+  const qualityGateRequestRef = useRef(0)
+  const workspaceRef = useRef(null)
+  const versionTableRef = useRef(null)
+  const historyTableRef = useRef(null)
+
+  useEffect(() => {
+    if (requestedView === activeView) return
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(DEV_VERSION_CENTER_VIEW_QUERY_KEY, activeView)
+    setSearchParams(nextParams, { replace: true })
+  }, [activeView, requestedView, searchParams, setSearchParams])
+
+  const selectView = useCallback(
+    (nextView) => {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set(
+        DEV_VERSION_CENTER_VIEW_QUERY_KEY,
+        resolveDevVersionCenterView(nextView)
+      )
+      setSearchParams(nextParams)
+    },
+    [searchParams, setSearchParams]
+  )
+
+  const openPipelineDetails = useCallback(() => {
+    selectView(DEV_VERSION_CENTER_VIEW_PIPELINE)
+    window.requestAnimationFrame(() => {
+      workspaceRef.current?.scrollIntoView({ block: 'start' })
+    })
+  }, [selectView])
 
   const updateSummary = useCallback((update) => {
     const { current } = summaryRef
@@ -116,7 +177,22 @@ export default function DevVersionCenterPage() {
     return next
   }, [])
 
+  const refreshQualityGate = useCallback(async () => {
+    const requestId = qualityGateRequestRef.current + 1
+    qualityGateRequestRef.current = requestId
+    try {
+      const next = await qualityGateClient.summary()
+      if (qualityGateRequestRef.current !== requestId) return
+      setQualityGateSummary(next)
+      setQualityGateError('')
+    } catch {
+      if (qualityGateRequestRef.current !== requestId) return
+      setQualityGateError('严格门禁摘要暂时不可用')
+    }
+  }, [qualityGateClient])
+
   const refresh = useCallback(async () => {
+    refreshQualityGate()
     const requestId = refreshRequestRef.current + 1
     refreshRequestRef.current = requestId
     const hasVisibleSummary = Boolean(summaryRef.current)
@@ -145,12 +221,13 @@ export default function DevVersionCenterPage() {
         setRefreshing(false)
       }
     }
-  }, [client])
+  }, [client, refreshQualityGate])
 
   useEffect(() => {
     refresh()
     return () => {
       refreshRequestRef.current += 1
+      qualityGateRequestRef.current += 1
     }
   }, [refresh])
 
@@ -188,6 +265,12 @@ export default function DevVersionCenterPage() {
   const target = summary?.target
   const versions = summary?.versions || []
   const operations = summary?.operations || []
+  const openOperations = operations.filter((operation) =>
+    OPEN_OPERATION_STATUSES.has(operation.status)
+  )
+  const historyOperations = operations.filter(
+    (operation) => !OPEN_OPERATION_STATUSES.has(operation.status)
+  )
   const pollingOperation = operations.find((operation) =>
     POLLING_OPERATION_STATUSES.has(operation.status)
   )
@@ -230,6 +313,28 @@ export default function DevVersionCenterPage() {
               ? '当前 SHA 已发布并部署，无需重复发布'
               : '当前 SHA 已有完整不可变制品，请在版本列表准备部署'
             : '当前仓库身份不可用，不能创建 exact-SHA 发布'
+  const strictProof = qualityGateSummary?.proofs?.strict
+  const qualityGateIdentityCurrent = Boolean(
+    repository &&
+      qualityGateSummary?.repository?.commit === repository.commit &&
+      qualityGateSummary.repository.dirty === repository.dirty
+  )
+  const strictSummaryLabel = qualityGateError
+    ? '摘要读取失败'
+    : strictProof?.releaseEligible && qualityGateIdentityCurrent
+      ? '当前 SHA 已通过'
+      : strictProof?.current &&
+          strictProof.status === 'passed' &&
+          qualityGateIdentityCurrent
+        ? '当前工作区已通过，不能作为发布证明'
+        : strictProof?.current && qualityGateIdentityCurrent
+          ? '当前 SHA 未通过'
+          : strictProof?.receipt
+            ? '最近结果属于旧版本'
+            : '尚未取得严格门禁结果'
+  const operationCachePresentation = deliveryTargetCachePresentation(
+    operationDetail?.metrics
+  )
   const refreshBusy = initialLoading || refreshing
   const refreshStatusText = initialLoading
     ? '正在读取最新状态'
@@ -240,6 +345,29 @@ export default function DevVersionCenterPage() {
         : summary
           ? `显示 ${formatDevSummaryCheckedAt(checkedAt)} 的上次结果，写操作暂不可用`
           : '尚未取得可用状态'
+
+  useEffect(() => {
+    const pageCount = Math.max(
+      1,
+      Math.ceil(versions.length / DEV_VERSION_CENTER_VERSION_PAGE_SIZE)
+    )
+    setVersionPage((current) => Math.min(current, pageCount))
+  }, [versions.length])
+
+  useEffect(() => {
+    const pageCount = Math.max(
+      1,
+      Math.ceil(historyOperations.length / DEV_VERSION_CENTER_HISTORY_PAGE_SIZE)
+    )
+    setHistoryPage((current) => Math.min(current, pageCount))
+  }, [historyOperations.length])
+
+  const changeTablePage = useCallback((setPage, tableRef, nextPage) => {
+    setPage(nextPage)
+    window.requestAnimationFrame(() => {
+      tableRef.current?.scrollIntoView({ block: 'start' })
+    })
+  }, [])
 
   useEffect(() => {
     if (!pollingOperationId) {
@@ -475,19 +603,53 @@ export default function DevVersionCenterPage() {
     },
   ]
 
+  const renderOperationActions = (record) => {
+    const readyToExecute =
+      record.status === 'ready' &&
+      ['promote', 'rollback'].includes(record.action)
+    const executable = summaryFresh && readyToExecute
+    return (
+      <Space wrap>
+        <Button onClick={() => openOperationDetail(record)}>查看详情</Button>
+        {executable ? (
+          <Button
+            type="primary"
+            danger={record.action === 'rollback'}
+            disabled={isMutationRunning}
+            icon={
+              record.action === 'rollback' ? (
+                <RollbackOutlined />
+              ) : (
+                <DeploymentUnitOutlined />
+              )
+            }
+            onClick={() => {
+              setConfirmOperation(record)
+              setConfirmationText('')
+            }}
+          >
+            {record.action === 'rollback' ? '确认回滚' : '确认部署'}
+          </Button>
+        ) : (
+          <Text type="secondary">
+            {readyToExecute && !summaryFresh
+              ? '等待最新状态核对'
+              : record.terminal
+                ? '终态不可重试'
+                : '等待状态更新'}
+          </Text>
+        )}
+      </Space>
+    )
+  }
+
   const operationColumns = [
     {
       title: '动作',
       key: 'action',
       render: (_value, record) => (
         <Space direction="vertical" size={2}>
-          <Text strong>
-            {record.action === 'release'
-              ? '发布制品'
-              : record.action === 'promote'
-                ? '部署 133'
-                : '回滚'}
-          </Text>
+          <Text strong>{operationActionLabel(record.action)}</Text>
           <Text type="secondary" code>
             {record.id.slice(0, 8)}
           </Text>
@@ -551,47 +713,103 @@ export default function DevVersionCenterPage() {
       title: '操作',
       key: 'actions',
       align: 'right',
-      render: (_value, record) => {
-        const readyToExecute =
-          record.status === 'ready' &&
-          ['promote', 'rollback'].includes(record.action)
-        const executable = summaryFresh && readyToExecute
-        return (
-          <Space wrap>
-            <Button onClick={() => openOperationDetail(record)}>
-              查看详情
-            </Button>
-            {executable ? (
-              <Button
-                type="primary"
-                danger={record.action === 'rollback'}
-                disabled={isMutationRunning}
-                icon={
-                  record.action === 'rollback' ? (
-                    <RollbackOutlined />
-                  ) : (
-                    <DeploymentUnitOutlined />
-                  )
-                }
-                onClick={() => {
-                  setConfirmOperation(record)
-                  setConfirmationText('')
-                }}
-              >
-                {record.action === 'rollback' ? '确认回滚' : '确认部署'}
-              </Button>
-            ) : (
-              <Text type="secondary">
-                {readyToExecute && !summaryFresh
-                  ? '等待最新状态核对'
-                  : record.terminal
-                    ? '终态不可重试'
-                    : '等待状态更新'}
-              </Text>
-            )}
-          </Space>
-        )
-      },
+      render: (_value, record) => renderOperationActions(record),
+    },
+  ]
+
+  const workspaceItems = [
+    {
+      key: DEV_VERSION_CENTER_VIEW_VERSIONS,
+      label: '版本与部署',
+      children: (
+        <section
+          ref={versionTableRef}
+          className="erp-dev-version-tab erp-dev-version-tab--versions"
+          aria-label="版本与部署"
+        >
+          <Card
+            title="可部署版本"
+            className="erp-dev-version-table-card"
+            extra={<Text type="secondary">最多展示最近 20 个</Text>}
+          >
+            <Table
+              rowKey="gitSha"
+              columns={versionColumns}
+              dataSource={versions}
+              loading={initialLoading}
+              pagination={{
+                current: versionPage,
+                pageSize: DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
+                hideOnSinglePage: true,
+                showSizeChanger: false,
+                showTotal: (total, range) =>
+                  `${String(range[0])}-${String(range[1])} / 共 ${String(total)} 个版本`,
+                onChange: (nextPage) =>
+                  changeTablePage(setVersionPage, versionTableRef, nextPage),
+              }}
+              locale={{
+                emptyText: (
+                  <Empty description="尚无完整 GitHub 不可变发布版本" />
+                ),
+              }}
+              scroll={{ x: 1120 }}
+            />
+          </Card>
+        </section>
+      ),
+    },
+    {
+      key: DEV_VERSION_CENTER_VIEW_PIPELINE,
+      label: 'CI/CD 效能',
+      children: (
+        <section
+          className="erp-dev-version-tab erp-dev-version-tab--pipeline"
+          aria-label="CI/CD 效能"
+        >
+          <DevPipelineTimingPanel
+            timings={summary?.timings}
+            versions={versions}
+            operations={operations}
+          />
+        </section>
+      ),
+    },
+    {
+      key: DEV_VERSION_CENTER_VIEW_HISTORY,
+      label: '操作记录',
+      children: (
+        <section
+          ref={historyTableRef}
+          className="erp-dev-version-tab erp-dev-version-tab--history"
+          aria-label="操作记录"
+        >
+          <Card
+            title="已结束的发布与部署"
+            className="erp-dev-version-table-card"
+          >
+            <Table
+              rowKey="id"
+              columns={operationColumns}
+              dataSource={historyOperations}
+              loading={initialLoading}
+              pagination={{
+                current: historyPage,
+                pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+                hideOnSinglePage: true,
+                showSizeChanger: false,
+                showTotal: (total, range) =>
+                  `${String(range[0])}-${String(range[1])} / 共 ${String(total)} 条记录`,
+                onChange: (nextPage) =>
+                  changeTablePage(setHistoryPage, historyTableRef, nextPage),
+              }}
+              locale={{
+                emptyText: <Empty description="尚无已结束的发布或部署操作" />,
+              }}
+              scroll={{ x: 760 }}
+            />
+          </Card>
+        </section>
+      ),
     },
   ]
 
@@ -702,6 +920,35 @@ export default function DevVersionCenterPage() {
           不构建、不接受浏览器传入的命令、目录、仓库或 SSH 目标。
         </DevStaticGuidance>
 
+        <section
+          className="erp-dev-version-quality-gate-summary"
+          aria-label="当前发布 SHA 严格门禁摘要"
+        >
+          <div>
+            <Space wrap size={8}>
+              <Text strong>当前发布 SHA 严格门禁</Text>
+              <Tag
+                color={
+                  strictProof?.releaseEligible && qualityGateIdentityCurrent
+                    ? 'success'
+                    : 'warning'
+                }
+              >
+                {strictSummaryLabel}
+              </Tag>
+            </Space>
+            <Text type="secondary">
+              实际耗时{' '}
+              {formatQualityGateDuration(strictProof?.receipt?.durationMs)}
+              {' · '}
+              {strictProof?.reused ? '可信复用' : '本地新执行或尚未执行'}
+            </Text>
+          </div>
+          <RouterLink to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}>
+            查看质量门禁详情
+          </RouterLink>
+        </section>
+
         <section className="erp-dev-version-summary" aria-label="发布状态摘要">
           <Card title="本地候选">
             <Space direction="vertical" size={8}>
@@ -771,39 +1018,76 @@ export default function DevVersionCenterPage() {
           </Card>
         </section>
 
-        <DevPipelineTimingPanel
+        {openOperations.length > 0 ? (
+          <Card
+            title="当前操作"
+            className="erp-dev-version-table-card erp-dev-version-current-operation"
+            extra={<Text type="secondary">未结束操作始终保持可见</Text>}
+          >
+            <div className="erp-dev-version-current-operation__list">
+              {openOperations.map((operation) => {
+                const statusMessage = deliveryOperationMessagePresentation(
+                  operation.events.at(-1)?.message
+                )
+                return (
+                  <article
+                    key={operation.id}
+                    className="erp-dev-version-current-operation__item"
+                    aria-label={`当前操作 ${operation.version}`}
+                  >
+                    <div className="erp-dev-version-current-operation__detail">
+                      <Text strong>
+                        {operationActionLabel(operation.action)}
+                      </Text>
+                      <Text type="secondary" code>
+                        {operation.id.slice(0, 8)}
+                      </Text>
+                    </div>
+                    <div className="erp-dev-version-current-operation__detail">
+                      <Text>{operation.version}</Text>
+                      <Text type="secondary" code>
+                        {shortGitSha(operation.gitSha)}
+                      </Text>
+                    </div>
+                    <div className="erp-dev-version-current-operation__detail">
+                      <Space size={6} wrap>
+                        <StatusTag status={operation.status} />
+                        <Text>
+                          {formatDeliveryDuration(operation.durationMs)}
+                        </Text>
+                      </Space>
+                      <Text type="secondary" title={statusMessage.title}>
+                        {statusMessage.label}
+                      </Text>
+                    </div>
+                    <div className="erp-dev-version-current-operation__actions">
+                      {renderOperationActions(operation)}
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          </Card>
+        ) : null}
+
+        <DevPipelineStatusStrip
           timings={summary?.timings}
           versions={versions}
           operations={operations}
+          onOpenDetails={openPipelineDetails}
         />
 
-        <Card title="可部署版本" className="erp-dev-version-table-card">
-          <Table
-            rowKey="gitSha"
-            columns={versionColumns}
-            dataSource={versions}
-            loading={initialLoading}
-            pagination={false}
-            locale={{
-              emptyText: <Empty description="尚无完整 GitHub 不可变发布版本" />,
-            }}
-            scroll={{ x: 1120 }}
+        <section
+          ref={workspaceRef}
+          className="erp-dev-version-workspace"
+          aria-label="版本发布工作区"
+        >
+          <Tabs
+            activeKey={activeView}
+            items={workspaceItems}
+            onChange={selectView}
           />
-        </Card>
-
-        <Card title="发布与部署记录" className="erp-dev-version-table-card">
-          <Table
-            rowKey="id"
-            columns={operationColumns}
-            dataSource={operations}
-            loading={initialLoading}
-            pagination={{ pageSize: 10, hideOnSinglePage: true }}
-            locale={{
-              emptyText: <Empty description="尚无发布或部署操作" />,
-            }}
-            scroll={{ x: 760 }}
-          />
-        </Card>
+        </section>
       </main>
 
       <Modal
@@ -929,7 +1213,54 @@ export default function DevVersionCenterPage() {
                     )}
                   </Text>
                 </div>
+                <div>
+                  <Text type="secondary">133 内容缓存</Text>
+                  <Text strong>{operationCachePresentation.status}</Text>
+                </div>
+                <div>
+                  <Text type="secondary">避免重复传输</Text>
+                  <Text strong>
+                    {formatDeliveryBytes(
+                      operationDetail.metrics.avoidedTransferBytes
+                    )}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">估算节省时间</Text>
+                  <Text strong>
+                    {formatDeliveryDuration(
+                      operationDetail.metrics.avoidedTransferDurationMs
+                    )}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">镜像加载</Text>
+                  <Text strong>
+                    {operationDetail.metrics.dockerLoadSkipped === null
+                      ? '未证明'
+                      : operationDetail.metrics.dockerLoadSkipped
+                        ? '已安全跳过 Docker load'
+                        : '已执行 Docker load'}
+                  </Text>
+                </div>
               </div>
+              {operationDetail.metrics.targetCacheHit != null ? (
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Text type="secondary">
+                    命中来源：{operationCachePresentation.source}
+                  </Text>
+                  <Text type="secondary">
+                    命中依据：
+                    {operationCachePresentation.basis.length > 0
+                      ? operationCachePresentation.basis.join('、')
+                      : '无（已执行冷路径）'}
+                  </Text>
+                  <Text type="secondary">
+                    缓存命中后仍执行：
+                    {operationCachePresentation.stillExecuted.join('、')}
+                  </Text>
+                </Space>
+              ) : null}
               {operationDetail.metrics.serverDigest ? (
                 <Space direction="vertical" size={4} style={{ width: '100%' }}>
                   <Text type="secondary" code copyable>

@@ -1,9 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  existsSync,
-  readdirSync,
-  readFileSync,
-} from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
@@ -74,7 +70,11 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/erp/utils/permissionRelationshipGraph.mjs",
     "web/src/erp/styles/app/permission-relationship-graph.css",
   ]) {
-    assert.equal(existsSync(path.join(repoRoot, legacyPath)), false, legacyPath);
+    assert.equal(
+      existsSync(path.join(repoRoot, legacyPath)),
+      false,
+      legacyPath,
+    );
   }
 
   for (const requiredPath of [
@@ -83,18 +83,25 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/dev-workbench/pages/DevHubPage.jsx",
     "web/src/dev-workbench/pages/DevDataPreparationPage.jsx",
     "web/src/dev-workbench/pages/DevDatabaseMigrationPage.jsx",
+    "web/src/dev-workbench/pages/DevQualityGatesPage.jsx",
     "web/src/dev-workbench/pages/DevPermissionRelationshipsPage.jsx",
     "web/src/dev-workbench/components/DevPageNav.jsx",
     "web/src/dev-workbench/components/DevReceiptPanel.jsx",
     "web/src/dev-workbench/config/devDataPreparation.mjs",
     "web/src/dev-workbench/config/devDatabaseMigration.mjs",
+    "web/src/dev-workbench/config/devQualityGates.mjs",
     "web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs",
     "web/src/dev-workbench/styles/dev-data-preparation.css",
     "web/src/dev-workbench/styles/dev-database-migration.css",
+    "web/src/dev-workbench/styles/dev-quality-gates.css",
     "web/src/dev-workbench/styles/dev-permission-relationships.css",
     "web/src/dev-workbench/styles/index.css",
   ]) {
-    assert.equal(existsSync(path.join(repoRoot, requiredPath)), true, requiredPath);
+    assert.equal(
+      existsSync(path.join(repoRoot, requiredPath)),
+      true,
+      requiredPath,
+    );
   }
 
   const forbiddenProductStyleMarkers = [
@@ -106,6 +113,7 @@ test("dev workbench boundary: source and styles live outside product directories
     ".erp-dev-flow-state",
     ".erp-dev-data-",
     ".erp-dev-database-",
+    ".erp-dev-quality-gates",
     ".erp-dev-workspace-nav",
     ".erp-dev-permission-relationships",
     ".erp-permission-relationship",
@@ -115,7 +123,10 @@ test("dev workbench boundary: source and styles live outside product directories
     .map((file) => read(file))
     .join("\n");
   for (const marker of forbiddenProductStyleMarkers) {
-    assert.doesNotMatch(productStyles, new RegExp(marker.replace(".", "\\."), "u"));
+    assert.doesNotMatch(
+      productStyles,
+      new RegExp(marker.replace(".", "\\."), "u"),
+    );
   }
 
   const workbenchStyles = listFiles("web/src/dev-workbench/styles")
@@ -140,7 +151,8 @@ test("dev workbench boundary: Node serve bridges are centralized outside browser
   })
     .filter(
       (entry) =>
-        entry.isFile() && /^dev[A-Z].*(?:Plugin|Plugins|Runtime).*\.mjs$/u.test(entry.name),
+        entry.isFile() &&
+        /^dev[A-Z].*(?:Plugin|Plugins|Runtime).*\.mjs$/u.test(entry.name),
     )
     .map((entry) => entry.name);
   assert.deepEqual(rootDevModules, []);
@@ -155,10 +167,15 @@ test("dev workbench boundary: Node serve bridges are centralized outside browser
     "web/dev-server/devDatabaseMigrationRuntime.mjs",
     "web/dev-server/devDeliveryBridgePlugin.mjs",
     "web/dev-server/devQaCoveragePlugin.mjs",
+    "web/dev-server/devQualityGatePlugin.mjs",
     "web/dev-server/devWorkbenchReceiptPlugin.mjs",
     "web/dev-server/devServerSecurity.mjs",
   ]) {
-    assert.equal(existsSync(path.join(repoRoot, requiredPath)), true, requiredPath);
+    assert.equal(
+      existsSync(path.join(repoRoot, requiredPath)),
+      true,
+      requiredPath,
+    );
   }
 
   assert.match(
@@ -180,7 +197,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 11);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 12);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
@@ -229,8 +246,7 @@ test("dev workbench boundary: imports from ERP stay on explicit read/API adapter
       /(?:from\s+|import\()['"]([^'"]*erp\/[^'"]+)['"]/gu,
     )) {
       assert(
-        allowedERPImports.has(match[1]) ||
-          fileScopedERPImports?.has(match[1]),
+        allowedERPImports.has(match[1]) || fileScopedERPImports?.has(match[1]),
         `${file} imports non-approved ERP internals: ${match[1]}`,
       );
     }

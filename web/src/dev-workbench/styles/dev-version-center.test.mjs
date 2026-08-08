@@ -10,6 +10,21 @@ const component = readFileSync(
   new URL('../components/DevPipelineTimingPanel.jsx', import.meta.url),
   'utf8'
 )
+const versionPage = readFileSync(
+  new URL('../pages/DevVersionCenterPage.jsx', import.meta.url),
+  'utf8'
+)
+
+test('version center keeps strict quality evidence as a compact summary and deep link', () => {
+  assert.match(versionPage, /当前发布 SHA 严格门禁/u)
+  assert.match(versionPage, /formatQualityGateDuration/u)
+  assert.match(versionPage, /view=run&profile=strict/u)
+  assert.doesNotMatch(
+    versionPage,
+    /qualityGateSummary[\s\S]{0,80}(?:stageTimings|complexity|categories)/u
+  )
+  assert.match(css, /[.]erp-dev-version-quality-gate-summary/u)
+})
 
 test('CI/CD timing details keep a touch-friendly keyboard-visible trigger', () => {
   assert.match(
@@ -64,7 +79,7 @@ test('status, artifact and transfer metrics stay readable across breakpoints', (
   )
   assert.match(
     css,
-    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-operation-metrics \{[\s\S]*display: grid;[\s\S]*grid-template-columns: 1fr;/u
+    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-operation-metrics,[\s\S]*display: grid;[\s\S]*grid-template-columns: 1fr;/u
   )
   assert.match(
     css,
@@ -76,7 +91,25 @@ test('status, artifact and transfer metrics stay readable across breakpoints', (
   assert.match(component, /最近完整发布/u)
   assert.match(component, /相同 SHA 复用/u)
   assert.match(component, /失败原因/u)
+  assert.match(component, /交付状态速览/u)
+  assert.match(component, /查看完整效能/u)
   assert.match(css, /[.]erp-dev-pipeline-timing__critical-path/u)
+  assert.match(
+    css,
+    /[.]erp-dev-pipeline-status-strip__metrics \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-pipeline-status-strip__metrics \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-pipeline-status-strip__metrics,[\s\S]*grid-template-columns: 1fr;/u
+  )
+  assert.match(
+    css,
+    /[.]erp-dev-version-workspace,[\s\S]*[.]erp-dev-version-tab \{[\s\S]*min-width: 0;/u
+  )
   assert.match(
     css,
     /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-pipeline-timing__summary \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
@@ -90,7 +123,7 @@ test('status, artifact and transfer metrics stay readable across breakpoints', (
 test('dark theme keeps timing surfaces and progress tracks readable', () => {
   assert.match(
     css,
-    /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-timing__summary > div,[\s\S]*[.]erp-dev-operation-metrics > div \{[\s\S]*border-color: rgba\(255, 255, 255, 0[.]16\);[\s\S]*background: rgba\(255, 255, 255, 0[.]06\);/u
+    /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-status-strip__metrics > div,[\s\S]*[.]erp-dev-pipeline-timing__summary > div,[\s\S]*[.]erp-dev-operation-metrics > div \{[\s\S]*border-color: rgba\(255, 255, 255, 0[.]16\);[\s\S]*background: rgba\(255, 255, 255, 0[.]06\);/u
   )
   assert.match(
     css,

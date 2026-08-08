@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import {
-  chmodSync,
-  mkdirSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -21,8 +16,7 @@ import { normalizeAtlasMigrationStatus } from "./database-inventory.mjs";
 
 export const DISPOSABLE_DATABASE_RUN_SCHEMA =
   "plush-disposable-database-run/v1";
-export const DISPOSABLE_DATABASE_BASE_URL_ENV =
-  "DISPOSABLE_DATABASE_BASE_URL";
+export const DISPOSABLE_DATABASE_BASE_URL_ENV = "DISPOSABLE_DATABASE_BASE_URL";
 export const DISPOSABLE_DATABASE_WORKFLOWS = Object.freeze({
   "critical-postgres": Object.freeze({
     allowedProfiles: Object.freeze(["ci"]),
@@ -40,6 +34,29 @@ export const DISPOSABLE_DATABASE_WORKFLOWS = Object.freeze({
     verify: "migration-status",
   }),
 });
+
+export function installDisposableDatabaseCancellationHandlers({
+  processRef = process,
+} = {}) {
+  let signal = "";
+  const onSigterm = () => {
+    signal ||= "SIGTERM";
+  };
+  const onSigint = () => {
+    signal ||= "SIGINT";
+  };
+  processRef.on("SIGTERM", onSigterm);
+  processRef.on("SIGINT", onSigint);
+  return Object.freeze({
+    get signal() {
+      return signal;
+    },
+    dispose() {
+      processRef.removeListener("SIGTERM", onSigterm);
+      processRef.removeListener("SIGINT", onSigint);
+    },
+  });
+}
 
 function redact(value) {
   return String(value || "")
@@ -164,7 +181,10 @@ function defaultRuntime(repoRoot) {
     verifyCriticalPostgres(databaseURL) {
       const output = commandResult(
         "bash",
-        [path.join(repoRoot, "scripts/purchase-receipt-pg.sh"), "test-critical"],
+        [
+          path.join(repoRoot, "scripts/purchase-receipt-pg.sh"),
+          "test-critical",
+        ],
         {
           cwd: serverRoot,
           env: { ...process.env, PURCHASE_RECEIPT_PG_DB_URL: databaseURL },
@@ -185,9 +205,12 @@ function safeError(error) {
 
 export function validateDisposableWorkflow(profile, workflow) {
   const contract = DISPOSABLE_DATABASE_WORKFLOWS[workflow];
-  if (!contract) throw new Error(`unknown disposable database workflow: ${workflow}`);
+  if (!contract)
+    throw new Error(`unknown disposable database workflow: ${workflow}`);
   if (!contract.allowedProfiles.includes(profile)) {
-    throw new Error(`${workflow} does not allow the ${profile} database profile`);
+    throw new Error(
+      `${workflow} does not allow the ${profile} database profile`,
+    );
   }
   return contract;
 }
@@ -232,7 +255,11 @@ export function runDisposableDatabaseLifecycle({
     executor.migrate(target.databaseURL);
     record("migration-apply", "passed");
     const after = executor.migrationStatus(target.databaseURL);
-    if (after.pending !== 0 || after.outOfOrder !== 0 || !after.currentVersion) {
+    if (
+      after.pending !== 0 ||
+      after.outOfOrder !== 0 ||
+      !after.currentVersion
+    ) {
       throw new Error("disposable database migration readback is incomplete");
     }
     record("migration-readback", "passed", {
@@ -308,7 +335,8 @@ export function runDisposableDatabaseLifecycle({
     cleanup: Object.freeze({
       attempted: created,
       residualDatabase: stages.some(
-        (stage) => stage.stage === "cleanup-readback" && stage.status === "failed",
+        (stage) =>
+          stage.stage === "cleanup-readback" && stage.status === "failed",
       )
         ? target.databaseName
         : "",
@@ -344,7 +372,8 @@ function parseArgs(argv) {
     const arg = argv[index];
     const value = argv[index + 1];
     if (["--out", "--profile", "--run-id", "--workflow"].includes(arg)) {
-      if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value`);
+      if (!value || value.startsWith("--"))
+        throw new Error(`${arg} requires a value`);
       options[
         {
           "--out": "out",
@@ -367,6 +396,7 @@ const isDirectRun =
   pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isDirectRun) {
+  const cancellation = installDisposableDatabaseCancellationHandlers();
   try {
     const options = parseArgs(process.argv.slice(2));
     const baseDatabaseURL = String(
@@ -392,9 +422,19 @@ if (isDirectRun) {
     process.stdout.write(
       `[disposable-database] status=${report.status} run=${report.databaseRunIdentity} cleanup=${report.cleanup.residualDatabase ? "failed" : "complete"} report=${path.relative(process.cwd(), outPath)}\n`,
     );
-    if (report.status !== "passed") process.exitCode = 1;
+    if (cancellation.signal) {
+      process.exitCode = cancellation.signal === "SIGINT" ? 130 : 143;
+    } else if (report.status !== "passed") {
+      process.exitCode = 1;
+    }
   } catch (error) {
     process.stderr.write(`[disposable-database] ${safeError(error)}\n`);
-    process.exitCode = 1;
+    process.exitCode = cancellation.signal
+      ? cancellation.signal === "SIGINT"
+        ? 130
+        : 143
+      : 1;
+  } finally {
+    cancellation.dispose();
   }
 }

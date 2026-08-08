@@ -136,6 +136,29 @@ test("auxiliary port discovery treats wildcard listeners as occupied", async (t)
   );
 });
 
+test("auxiliary port discovery treats loopback listeners as occupied", async (t) => {
+  const server = net.createServer();
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen({ host: "127.0.0.1", port: 0, exclusive: true }, resolve);
+  });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+
+  const address = server.address();
+  assert.equal(typeof address, "object");
+  const occupiedPort = address.port;
+  const auxStart = occupiedPort <= 65436 ? occupiedPort : occupiedPort - 99;
+  const offset = occupiedPort - auxStart;
+
+  await assert.rejects(
+    findAvailableDevAuxPort(
+      { auxStart },
+      { startOffset: offset, endOffset: offset },
+    ),
+    new RegExp(`inside ${occupiedPort}-${occupiedPort}`, "u"),
+  );
+});
+
 test("dev port CLI rejects a missing project root value", () => {
   for (const args of [["--project-root"], ["--project-root", "--check"]]) {
     const result = spawnSync(process.execPath, [scriptPath, ...args], {

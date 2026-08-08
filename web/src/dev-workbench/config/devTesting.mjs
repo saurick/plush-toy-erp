@@ -321,26 +321,6 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/workflowTaskActionAccess.test.mjs scripts/qa/workflow-ui-action-boundary.test.mjs scripts/qa/sales-order-field-chain-boundary.test.mjs web/src/erp/config/printTemplates.test.mjs',
     ],
   },
-  {
-    key: 'full-local-gate',
-    label: '完整本地门禁 / Full local gate',
-    description:
-      '需要完整本地门禁时复制；实际 pre-commit 只检查暂存快照，最终推送准备由 prepare-push 绑定干净 HEAD 回执。',
-    commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'bash scripts/qa/full.sh',
-    ],
-  },
-  {
-    key: 'release',
-    label: '发版前严格 QA / Release QA',
-    description:
-      '发版前复制 / copy before release；不代表部署、备份或回滚已自动完成。',
-    commands: [
-      'cd /Users/simon/projects/plush-toy-erp',
-      'bash scripts/qa/strict.sh',
-    ],
-  },
 ])
 
 const DEV_TESTING_TIER_HEADINGS = Object.freeze([

@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -15,13 +17,16 @@ import {
   buildExactShaPlan,
   readExactShaTerminal,
 } from "../qa/exact-sha-gate.mjs";
+import { evaluateStrictReceiptReuse } from "../qa/strict-receipt-identity.mjs";
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
 const TERMINAL_ENTRY_PATTERN = /^[0-9a-f]{64}\.json$/u;
 const RECEIPT_ENTRY_PATTERN = /^[0-9a-f]{64}\.receipt\.json$/u;
-const WORKFLOW_PATH = ".github/workflows/release.yml";
-const STRICT_JOB_NAME = "Exact-SHA strict quality";
+const WORKFLOW_PATH = ".github/workflows/ci.yml";
+const STRICT_JOB_NAME = "Repository quality";
+const AGGREGATE_JOB_NAME = "CI Gate";
+const ARTIFACT_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 
 function run(command, args, { cwd, binary = false } = {}) {
   const result = spawnSync(command, args, {
@@ -31,10 +36,14 @@ function run(command, args, { cwd, binary = false } = {}) {
     stdio: ["ignore", "pipe", "pipe"],
   });
   if (result.error || result.status !== 0) {
-    const detail = String(result.stderr || result.stdout || result.error?.message || "")
+    const detail = String(
+      result.stderr || result.stdout || result.error?.message || "",
+    )
       .trim()
       .split("\n")[0];
-    throw new Error(`${command} ${args[0] || ""} failed${detail ? `: ${detail}` : ""}`);
+    throw new Error(
+      `${command} ${args[0] || ""} failed${detail ? `: ${detail}` : ""}`,
+    );
   }
   return result.stdout;
 }
@@ -52,6 +61,7 @@ export function reusableStrictArtifactCandidate({
   run: workflowRun,
   repository,
   sha,
+  defaultBranch = "main",
 }) {
   const artifactRun = artifact?.workflow_run;
   return Boolean(
@@ -60,12 +70,18 @@ export function reusableStrictArtifactCandidate({
       artifact.name === `strict-terminal-${sha}` &&
       Number.isSafeInteger(Number(artifact.id)) &&
       Number.isSafeInteger(Number(artifactRun?.id)) &&
+      ARTIFACT_DIGEST_PATTERN.test(String(artifact.digest || "")) &&
       artifactRun.head_sha === sha &&
       Number(artifactRun.id) === Number(workflowRun?.id) &&
       workflowRun?.head_sha === sha &&
-      workflowRun?.event === "workflow_dispatch" &&
+      workflowRun?.status === "completed" &&
+      workflowRun?.conclusion === "success" &&
+      workflowRun?.event === "push" &&
       workflowRun?.path === WORKFLOW_PATH &&
+      workflowRun?.head_branch === defaultBranch &&
       normalizedRepository(workflowRun?.repository?.full_name) ===
+        normalizedRepository(repository) &&
+      normalizedRepository(workflowRun?.head_repository?.full_name) ===
         normalizedRepository(repository),
   );
 }
@@ -76,19 +92,62 @@ export function assertSuccessfulStrictAttempt(jobs) {
     throw new Error("strict artifact attempt jobs are invalid");
   }
   const strictJobs = values.filter((job) => job?.name === STRICT_JOB_NAME);
+  const aggregateJobs = values.filter(
+    (job) => job?.name === AGGREGATE_JOB_NAME,
+  );
   if (
     strictJobs.length !== 1 ||
+    aggregateJobs.length !== 1 ||
     strictJobs[0]?.status !== "completed" ||
-    strictJobs[0]?.conclusion !== "success"
+    strictJobs[0]?.conclusion !== "success" ||
+    aggregateJobs[0]?.status !== "completed" ||
+    aggregateJobs[0]?.conclusion !== "success"
   ) {
-    throw new Error("strict artifact attempt did not pass the fixed strict job");
+    throw new Error("strict artifact attempt did not pass quality and CI Gate");
   }
   return strictJobs[0];
 }
 
+export function assertProtectedDefaultBranch(
+  repositoryMetadata,
+  branchMetadata,
+  defaultBranch = "main",
+) {
+  const requiredStatusChecks =
+    branchMetadata?.protection?.required_status_checks;
+  const contexts = new Set(requiredStatusChecks?.contexts || []);
+  if (
+    repositoryMetadata?.default_branch !== defaultBranch ||
+    branchMetadata?.name !== defaultBranch ||
+    branchMetadata?.protected !== true ||
+    !["non_admins", "everyone"].includes(
+      requiredStatusChecks?.enforcement_level,
+    ) ||
+    !contexts.has(AGGREGATE_JOB_NAME)
+  ) {
+    throw new Error(
+      "strict artifact default branch is not protected by CI Gate",
+    );
+  }
+  return true;
+}
+
+export function assertArtifactArchiveDigest(archive, expectedDigest) {
+  if (!ARTIFACT_DIGEST_PATTERN.test(String(expectedDigest || ""))) {
+    throw new Error("strict artifact has no trusted GitHub digest");
+  }
+  const actual = `sha256:${createHash("sha256")
+    .update(readFileSync(archive))
+    .digest("hex")}`;
+  if (actual !== expectedDigest) {
+    throw new Error("strict artifact GitHub digest does not match download");
+  }
+  return actual;
+}
+
 export function assertReusableTerminalProvenance(
   terminal,
-  { repository, runId },
+  { repository, runId, runAttempt, defaultBranch = "main" },
 ) {
   const provenance = terminal?.provenance;
   if (
@@ -96,10 +155,19 @@ export function assertReusableTerminalProvenance(
     normalizedRepository(provenance.repository) !==
       normalizedRepository(repository) ||
     provenance.runId !== String(runId) ||
-    provenance.job !== "strict" ||
+    provenance.runAttempt !== String(runAttempt) ||
+    provenance.job !== "quality" ||
+    provenance.eventName !== "push" ||
+    provenance.ref !== `refs/heads/${defaultBranch}` ||
+    provenance.refName !== defaultBranch ||
+    normalizedRepository(provenance.headRepository) !==
+      normalizedRepository(repository) ||
+    provenance.conclusion !== "success" ||
     !String(provenance.workflowRef || "").includes(`/${WORKFLOW_PATH}@`)
   ) {
-    throw new Error("strict terminal GitHub provenance does not match its artifact run");
+    throw new Error(
+      "strict terminal GitHub provenance does not match its artifact run",
+    );
   }
   return terminal;
 }
@@ -113,7 +181,9 @@ function archiveEntries(archive, cwd) {
 
 function extractStrictPair(archive, out, cwd) {
   const entries = archiveEntries(archive, cwd);
-  const terminals = entries.filter((entry) => TERMINAL_ENTRY_PATTERN.test(entry));
+  const terminals = entries.filter((entry) =>
+    TERMINAL_ENTRY_PATTERN.test(entry),
+  );
   const receipts = entries.filter((entry) => RECEIPT_ENTRY_PATTERN.test(entry));
   if (
     entries.length !== 2 ||
@@ -121,7 +191,9 @@ function extractStrictPair(archive, out, cwd) {
     receipts.length !== 1 ||
     receipts[0] !== terminals[0].replace(/\.json$/u, ".receipt.json")
   ) {
-    throw new Error("strict artifact ZIP must contain exactly one terminal/receipt pair");
+    throw new Error(
+      "strict artifact ZIP must contain exactly one terminal/receipt pair",
+    );
   }
   mkdirSync(out, { recursive: true, mode: 0o700 });
   for (const entry of entries) {
@@ -138,23 +210,44 @@ export function parseStrictReuseArgs(argv) {
       options.json = true;
       continue;
     }
-    const mapping = { "--repository": "repository", "--sha": "sha", "--out": "out" };
+    const mapping = {
+      "--repository": "repository",
+      "--sha": "sha",
+      "--out": "out",
+    };
     if (mapping[arg]) {
       const value = argv[index + 1];
-      if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value`);
+      if (!value || value.startsWith("--"))
+        throw new Error(`${arg} requires a value`);
       options[mapping[arg]] = value;
       index += 1;
       continue;
     }
     throw new Error(`unknown argument: ${arg}`);
   }
-  if (!REPOSITORY_PATTERN.test(options.repository)) throw new Error("repository must be owner/name");
-  if (!SHA_PATTERN.test(options.sha)) throw new Error("sha must be 40 lowercase hexadecimal characters");
+  if (!REPOSITORY_PATTERN.test(options.repository))
+    throw new Error("repository must be owner/name");
+  if (!SHA_PATTERN.test(options.sha))
+    throw new Error("sha must be 40 lowercase hexadecimal characters");
   if (!options.out) throw new Error("--out is required");
   return options;
 }
 
-export function recoverGitHubStrictTerminal(options, { root = process.cwd() } = {}) {
+export function recoverGitHubStrictTerminal(
+  options,
+  { root = process.cwd() } = {},
+) {
+  const repositoryMetadata = ghJson(`repos/${options.repository}`, root);
+  const defaultBranch = String(repositoryMetadata.default_branch || "");
+  const branchMetadata = ghJson(
+    `repos/${options.repository}/branches/${encodeURIComponent(defaultBranch)}`,
+    root,
+  );
+  assertProtectedDefaultBranch(
+    repositoryMetadata,
+    branchMetadata,
+    defaultBranch,
+  );
   const response = ghJson(
     `repos/${options.repository}/actions/artifacts?name=strict-terminal-${options.sha}&per_page=100`,
     root,
@@ -166,35 +259,51 @@ export function recoverGitHubStrictTerminal(options, { root = process.cwd() } = 
   for (const artifact of candidates) {
     const runId = Number(artifact?.workflow_run?.id);
     if (!Number.isSafeInteger(runId)) continue;
-    const workflowRun = ghJson(`repos/${options.repository}/actions/runs/${runId}`, root);
+    const workflowRun = ghJson(
+      `repos/${options.repository}/actions/runs/${runId}`,
+      root,
+    );
     if (
       !reusableStrictArtifactCandidate({
         artifact,
         run: workflowRun,
         repository: options.repository,
         sha: options.sha,
+        defaultBranch,
       })
     ) {
       continue;
     }
-    const archive = path.join(process.env.RUNNER_TEMP || out, `strict-${artifact.id}.zip`);
+    const archive = path.join(
+      process.env.RUNNER_TEMP || out,
+      `strict-${artifact.id}.zip`,
+    );
     try {
       writeFileSync(
         archive,
         run(
           "gh",
-          ["api", `repos/${options.repository}/actions/artifacts/${artifact.id}/zip`],
+          [
+            "api",
+            `repos/${options.repository}/actions/artifacts/${artifact.id}/zip`,
+          ],
           { cwd: root, binary: true },
         ),
         { mode: 0o600 },
       );
+      assertArtifactArchiveDigest(archive, artifact.digest);
       rmSync(out, { recursive: true, force: true });
       extractStrictPair(archive, out, root);
-      const plan = buildExactShaPlan(root, { sha: options.sha, mainRef: "origin/main" });
+      const plan = buildExactShaPlan(root, {
+        sha: options.sha,
+        mainRef: "origin/main",
+      });
       const terminal = readExactShaTerminal(plan);
       assertReusableTerminalProvenance(terminal, {
         repository: options.repository,
         runId,
+        runAttempt: workflowRun.run_attempt,
+        defaultBranch,
       });
       const runAttempt = Number(terminal.provenance.runAttempt);
       if (!Number.isSafeInteger(runAttempt) || runAttempt < 1) {
@@ -205,7 +314,33 @@ export function recoverGitHubStrictTerminal(options, { root = process.cwd() } = 
         root,
       );
       assertSuccessfulStrictAttempt(jobs);
-      return { reused: true, artifactId: Number(artifact.id), runId, terminal };
+      const evaluation = evaluateStrictReceiptReuse({
+        terminal,
+        expectedIdentity: plan.identity,
+        trust: {
+          repository: true,
+          protectedDefaultBranch: true,
+          workflow: true,
+          artifactDigest: true,
+          run: true,
+          job: true,
+        },
+      });
+      if (!evaluation.reusable) {
+        throw new Error(
+          `strict terminal is not reusable: ${evaluation.reason}`,
+        );
+      }
+      return {
+        reused: true,
+        artifactId: Number(artifact.id),
+        artifactDigest: artifact.digest,
+        runId,
+        runAttempt,
+        terminal,
+        reuseReason: evaluation.reason,
+        refreshChecks: [...evaluation.refreshChecks],
+      };
     } catch (error) {
       rmSync(out, { recursive: true, force: true });
       process.stderr.write(
@@ -215,7 +350,16 @@ export function recoverGitHubStrictTerminal(options, { root = process.cwd() } = 
       if (existsSync(archive)) rmSync(archive, { force: true });
     }
   }
-  return { reused: false, artifactId: null, runId: null, terminal: null };
+  return {
+    reused: false,
+    artifactId: null,
+    artifactDigest: null,
+    runId: null,
+    runAttempt: null,
+    terminal: null,
+    reuseReason: "no_trusted_exact_identity_artifact",
+    refreshChecks: [],
+  };
 }
 
 function main() {
@@ -225,13 +369,22 @@ function main() {
     status: "passed",
     reused: result.reused,
     artifactId: result.artifactId,
+    artifactDigest: result.artifactDigest,
     runId: result.runId,
+    runAttempt: result.runAttempt,
+    reuseReason: result.reuseReason,
+    refreshChecks: result.refreshChecks,
   };
-  console.log(options.json ? JSON.stringify(output, null, 2) : `[strict-reuse] reused=${result.reused}`);
+  console.log(
+    options.json
+      ? JSON.stringify(output, null, 2)
+      : `[strict-reuse] reused=${result.reused}`,
+  );
 }
 
 const isDirectRun =
-  process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+  process.argv[1] &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 
 if (isDirectRun) {
   try {

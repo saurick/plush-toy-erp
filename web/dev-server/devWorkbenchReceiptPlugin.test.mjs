@@ -226,6 +226,7 @@ test('development serve registry is exact and absent from all builds', async () 
     'plush-dev-database-migration',
     'plush-dev-data-preparation',
     'plush-dev-qa-testing',
+    'plush-dev-quality-gates',
     'plush-dev-qa-coverage',
     'plush-dev-workbench-receipts',
     'plush-dev-delivery-bridge',

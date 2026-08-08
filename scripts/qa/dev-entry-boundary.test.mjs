@@ -435,8 +435,6 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
       "frontend-customer-config-projection",
       "frontend-error-messages",
       "business-action-field-boundaries",
-      "full-local-gate",
-      "release",
     ],
     "dev testing copy presets must expose current maintained entry points",
   );

@@ -9,6 +9,18 @@ export const DEV_DELIVERY_OPERATION_API_PREFIX =
   '/__dev/api/delivery/operations'
 export const DEV_DELIVERY_SOURCE_PATH =
   'docs/engineering/研发效能工作台与CI-CD设计.md'
+export const DEV_VERSION_CENTER_VIEW_QUERY_KEY = 'view'
+export const DEV_VERSION_CENTER_VIEW_VERSIONS = 'versions'
+export const DEV_VERSION_CENTER_VIEW_PIPELINE = 'pipeline'
+export const DEV_VERSION_CENTER_VIEW_HISTORY = 'history'
+export const DEV_VERSION_CENTER_VERSION_PAGE_SIZE = 6
+export const DEV_VERSION_CENTER_HISTORY_PAGE_SIZE = 10
+
+const DEV_VERSION_CENTER_VIEW_VALUES = new Set([
+  DEV_VERSION_CENTER_VIEW_VERSIONS,
+  DEV_VERSION_CENTER_VIEW_PIPELINE,
+  DEV_VERSION_CENTER_VIEW_HISTORY,
+])
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u
@@ -53,6 +65,8 @@ const PIPELINE_LABELS = Object.freeze({
     '可信扫描后准备仓库 Node.js',
   'Build the executable CI plan': '生成可执行 CI 计划',
   'Persist the CI plan': '保存 CI 计划',
+  'Record superseded same-ref CI identity': '记录同分支被替代的 CI 身份',
+  'Persist the CI supersession audit': '保存 CI 替代关系审计回执',
   'Check out the candidate without credentials': '无凭据检出候选提交',
   'Set up Node.js': '准备 Node.js 工具链',
   'Set up Go when selected': '按需准备 Go 工具链',
@@ -73,6 +87,8 @@ const PIPELINE_LABELS = Object.freeze({
   'Run the selected repository quality gate': '执行选定的仓库质量门禁',
   'Validate committed source archive for full': '完整门禁校验已提交源码包',
   'Persist full quality receipt': '保存完整质量回执',
+  'Persist the default-branch exact-SHA strict receipt':
+    '保存默认分支 Exact-SHA 严格回执',
   'Remove selected PostgreSQL runtime': '清理按需启动的 PostgreSQL',
   'Require planning and selected quality to complete':
     '确认计划与所选质量检查全部完成',
@@ -82,6 +98,10 @@ const PIPELINE_LABELS = Object.freeze({
     '校验当前主线身份与既有发布完整性',
   'Recover a provenance-bound strict terminal before heavy setup':
     '重型准备前恢复来源绑定的严格回执',
+  'Set up Go only for an expired vulnerability database receipt':
+    '仅在漏洞库回执过期时准备 Go 工具链',
+  'Refresh only the expired vulnerability database check':
+    '仅刷新已过期的漏洞数据库检查',
   'Pass the recovered terminal to publish': '传递已恢复的严格回执给发布任务',
   'Check out the exact SHA without credentials': '无凭据检出 Exact-SHA',
   'Set up Go': '准备 Go 工具链',
@@ -116,6 +136,13 @@ const PIPELINE_LABELS = Object.freeze({
   'Set up job': '准备任务运行环境',
   'Complete job': '完成任务并收尾',
 })
+
+export function resolveDevVersionCenterView(value) {
+  const normalized = String(value || '').trim()
+  return DEV_VERSION_CENTER_VIEW_VALUES.has(normalized)
+    ? normalized
+    : DEV_VERSION_CENTER_VIEW_VERSIONS
+}
 
 const OPERATION_MESSAGE_LABELS = Object.freeze({
   'operation accepted': '操作已受理',
@@ -268,6 +295,67 @@ function validBuildPerformance(value) {
   )
 }
 
+function validTargetCacheMetrics(metrics) {
+  const hit = metrics.targetCacheHit
+  if (hit === undefined || hit === null) {
+    return (
+      [undefined, null].includes(metrics.targetImageCacheHit) &&
+      [undefined, null].includes(metrics.targetCacheSource) &&
+      [undefined, null].includes(metrics.avoidedTransferBytes) &&
+      [undefined, null].includes(metrics.avoidedTransferDurationMs) &&
+      [undefined, null].includes(metrics.avoidedTransferBaselineOperationId) &&
+      [undefined, null].includes(metrics.dockerLoadSkipped) &&
+      (metrics.cacheBasis === undefined ||
+        (Array.isArray(metrics.cacheBasis) &&
+          metrics.cacheBasis.length === 0)) &&
+      (metrics.stillExecutedChecks === undefined ||
+        (Array.isArray(metrics.stillExecutedChecks) &&
+          metrics.stillExecutedChecks.length === 0))
+    )
+  }
+  const basis = [
+    'release_manifest_sha256',
+    'archive_sha256',
+    'registry_digest',
+    'docker_content_id',
+    'embedded_git_sha',
+  ]
+  const stillExecuted = [
+    ['migration', 'health', 'ready', 'public_entry'],
+    ['migration_status', 'health', 'ready', 'public_entry'],
+  ]
+  return (
+    typeof hit === 'boolean' &&
+    typeof metrics.targetImageCacheHit === 'boolean' &&
+    ['none', 'formal', 'retained_operation'].includes(
+      metrics.targetCacheSource
+    ) &&
+    Number.isSafeInteger(metrics.avoidedTransferBytes) &&
+    metrics.avoidedTransferBytes >= 0 &&
+    ((metrics.avoidedTransferDurationMs === null &&
+      metrics.avoidedTransferBaselineOperationId === null) ||
+      (Number.isSafeInteger(metrics.avoidedTransferDurationMs) &&
+        metrics.avoidedTransferDurationMs > 0 &&
+        OPERATION_ID_PATTERN.test(
+          metrics.avoidedTransferBaselineOperationId
+        ))) &&
+    metrics.dockerLoadSkipped === metrics.targetImageCacheHit &&
+    Array.isArray(metrics.cacheBasis) &&
+    Array.isArray(metrics.stillExecutedChecks) &&
+    stillExecuted.some(
+      (expected) => metrics.stillExecutedChecks.join(',') === expected.join(',')
+    ) &&
+    (hit
+      ? metrics.targetCacheSource !== 'none' &&
+        metrics.avoidedTransferBytes > 0 &&
+        metrics.cacheBasis.join(',') === basis.join(',')
+      : metrics.targetImageCacheHit === false &&
+        metrics.targetCacheSource === 'none' &&
+        metrics.avoidedTransferBytes === 0 &&
+        metrics.cacheBasis.length === 0)
+  )
+}
+
 function validateOperation(operation) {
   assertObject(operation, 'delivery operation')
   if (
@@ -311,7 +399,8 @@ function validateOperation(operation) {
         !DIGEST_PATTERN.test(operation.metrics.webDigest))) ||
     (operation.metrics.transferDurationMs !== null &&
       operation.metrics.transferDurationMs > operation.durationMs) ||
-    !validBuildPerformance(operation.metrics.buildPerformance)
+    !validBuildPerformance(operation.metrics.buildPerformance) ||
+    !validTargetCacheMetrics(operation.metrics)
   ) {
     throw new Error('delivery operation is invalid')
   }
@@ -678,6 +767,50 @@ export function formatDeliveryDuration(value) {
   if (minutes < 60) return `${String(minutes)} 分 ${String(seconds)} 秒`
   const hours = Math.floor(minutes / 60)
   return `${String(hours)} 小时 ${String(minutes % 60)} 分`
+}
+
+const TARGET_CACHE_BASIS_LABELS = Object.freeze({
+  release_manifest_sha256: '发布清单校验和',
+  archive_sha256: '制品归档校验和',
+  registry_digest: '镜像仓库摘要',
+  docker_content_id: 'Docker 内容标识',
+  embedded_git_sha: '镜像内完整 Git SHA',
+})
+const TARGET_STILL_EXECUTED_LABELS = Object.freeze({
+  migration: '数据库迁移',
+  migration_status: '迁移状态核对',
+  health: '健康检查',
+  ready: '就绪检查',
+  public_entry: '公网入口读回',
+})
+
+export function deliveryTargetCachePresentation(metrics) {
+  if (
+    metrics?.targetCacheHit === null ||
+    metrics?.targetCacheHit === undefined
+  ) {
+    return Object.freeze({
+      status: '尚无缓存回执',
+      source: '未证明',
+      basis: [],
+      stillExecuted: [],
+    })
+  }
+  const source = {
+    none: '目标无可用缓存',
+    formal: '正式保留版本缓存',
+    retained_operation: '历史演练保留制品',
+  }[metrics.targetCacheSource]
+  return Object.freeze({
+    status: metrics.targetCacheHit ? '目标缓存命中' : '目标缓存未命中',
+    source,
+    basis: metrics.cacheBasis.map(
+      (item) => TARGET_CACHE_BASIS_LABELS[item] || item
+    ),
+    stillExecuted: metrics.stillExecutedChecks.map(
+      (item) => TARGET_STILL_EXECUTED_LABELS[item] || item
+    ),
+  })
 }
 
 function observedCriticalPath(run) {

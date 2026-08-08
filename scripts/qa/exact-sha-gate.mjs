@@ -20,12 +20,22 @@ import { pathToFileURL } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
 import {
+  buildCustomerConfigEvidence,
+  buildMigrationEvidence,
+} from "../deploy/release-artifact-bundle.mjs";
+import {
   GATE_PROFILES,
   PROFILE_REQUIRED_EXECUTABLES,
   PROFILE_REQUIRED_FILES,
 } from "./gate-profiles.mjs";
+import {
+  refreshedTimeSensitiveCheck,
+  STRICT_RECEIPT_SCHEMA,
+  validateStrictReceiptEvidence,
+  validateStrictReceiptIdentity,
+} from "./strict-receipt-identity.mjs";
 
-export const EXACT_SHA_GATE_CONTRACT = "plush.exact-sha-strict/v2";
+export const EXACT_SHA_GATE_CONTRACT = STRICT_RECEIPT_SCHEMA;
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const FINGERPRINT_PATTERN = /^[0-9a-f]{64}$/u;
 const TERMINAL_STATUSES = new Set(["passed", "failed"]);
@@ -35,7 +45,27 @@ const EXTRA_FINGERPRINT_FILES = Object.freeze([
   "server/go.sum",
   "web/package.json",
   "web/pnpm-lock.yaml",
+  "scripts/qa/strict-receipt-identity.mjs",
+  "scripts/qa/strict-receipt-identity.test.mjs",
 ]);
+const WORKFLOW_FINGERPRINT_FILES = Object.freeze([
+  ".github/workflows/ci.yml",
+  ".github/workflows/release.yml",
+]);
+const TOOLCHAIN_FINGERPRINT_FILES = Object.freeze([
+  ".n-node-version",
+  "server/go.mod",
+  "server/go.sum",
+  "web/package.json",
+  "web/pnpm-lock.yaml",
+  "server/Dockerfile",
+  "web/Dockerfile",
+]);
+const DEPENDENCY_LOCK_FILES = Object.freeze([
+  "server/go.sum",
+  "web/pnpm-lock.yaml",
+]);
+const TIME_SENSITIVE_VALIDITY_MS = 24 * 60 * 60 * 1000;
 
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -77,6 +107,19 @@ function run(root, command, args, { acceptedStatuses = [0] } = {}) {
   return String(result.stdout || "");
 }
 
+function runBuffer(root, command, args) {
+  const result = spawnSync(command, args, {
+    cwd: root,
+    encoding: null,
+    maxBuffer: 256 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(`${command} ${args[0] || ""} failed`);
+  }
+  return result.stdout;
+}
+
 function runGit(root, args, options) {
   return run(root, "git", args, options);
 }
@@ -100,9 +143,7 @@ function assertSafeRef(value) {
 
 function readTreeEntry(root, sha, file) {
   const raw = runGit(root, ["ls-tree", "-z", sha, "--", file]);
-  const match = raw.match(
-    /^(\d{6}) ([^ ]+) ([0-9a-f]{40})\t([^\0]+)\0$/u,
-  );
+  const match = raw.match(/^(\d{6}) ([^ ]+) ([0-9a-f]{40})\t([^\0]+)\0$/u);
   if (!match || match[4] !== file) {
     throw new Error(`strict fingerprint file is missing: ${file}`);
   }
@@ -121,10 +162,7 @@ export function strictFingerprint(root, sha) {
   runGit(root, ["rev-parse", "--verify", `${sha}^{commit}`]);
   const executableFiles = new Set(PROFILE_REQUIRED_EXECUTABLES.strict);
   const files = [
-    ...new Set([
-      ...PROFILE_REQUIRED_FILES.strict,
-      ...EXTRA_FINGERPRINT_FILES,
-    ]),
+    ...new Set([...PROFILE_REQUIRED_FILES.strict, ...EXTRA_FINGERPRINT_FILES]),
   ]
     .sort()
     .map((file) => {
@@ -137,12 +175,66 @@ export function strictFingerprint(root, sha) {
   return sha256(
     stableStringify({
       contract: EXACT_SHA_GATE_CONTRACT,
-      gitSha: sha,
       profile: "strict",
       gates: GATE_PROFILES.strict,
       files,
     }),
   );
+}
+
+function committedFilesFingerprint(root, sha, label, files) {
+  return sha256(
+    stableStringify({
+      label,
+      files: [...files].sort().map((file) => readTreeEntry(root, sha, file)),
+    }),
+  );
+}
+
+function repositoryIdentity(env = process.env) {
+  const fromEnvironment = String(env.GITHUB_REPOSITORY || "");
+  if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(fromEnvironment)) {
+    return fromEnvironment;
+  }
+  return "local/repository";
+}
+
+export function buildStrictReceiptIdentity(root, sha, env = process.env) {
+  assertSha(sha);
+  const migration = buildMigrationEvidence({ repoRoot: root, commit: sha });
+  const customer = buildCustomerConfigEvidence({
+    repoRoot: root,
+    commit: sha,
+    customer: "yoyoosun",
+  });
+  return validateStrictReceiptIdentity({
+    repository: repositoryIdentity(env),
+    gitSha: sha,
+    sourceArchiveSha256: sha256(
+      runBuffer(root, "git", ["archive", "--format=tar", sha]),
+    ),
+    policyFingerprint: strictFingerprint(root, sha),
+    workflowFingerprint: committedFilesFingerprint(
+      root,
+      sha,
+      "github-workflows",
+      WORKFLOW_FINGERPRINT_FILES,
+    ),
+    toolchainFingerprint: committedFilesFingerprint(
+      root,
+      sha,
+      "toolchain",
+      TOOLCHAIN_FINGERPRINT_FILES,
+    ),
+    migrationSequenceSha256: migration.sequenceSha256,
+    dependencyLockFingerprint: committedFilesFingerprint(
+      root,
+      sha,
+      "dependency-locks",
+      DEPENDENCY_LOCK_FILES,
+    ),
+    customerConfigFingerprint: customer.sourceSha256,
+  });
 }
 
 function assertCleanExactHead(root, sha) {
@@ -175,12 +267,13 @@ function assertMainReachable(root, sha, mainRef) {
 
 export function buildExactShaPlan(
   root,
-  { sha, mainRef = "origin/main" } = {},
+  { sha, mainRef = "origin/main", env = process.env } = {},
 ) {
   assertSha(sha);
   assertCleanExactHead(root, sha);
   assertMainReachable(root, sha, mainRef);
-  const fingerprint = strictFingerprint(root, sha);
+  const identity = buildStrictReceiptIdentity(root, sha, env);
+  const fingerprint = identity.policyFingerprint;
   const terminalPath = path.join(
     root,
     "output",
@@ -203,9 +296,12 @@ export function buildExactShaPlan(
     gitSha: sha,
     mainRef,
     fingerprint,
+    identity,
     terminalPath,
     receiptPath,
-    receiptRelativePath: path.relative(root, receiptPath).replaceAll(path.sep, "/"),
+    receiptRelativePath: path
+      .relative(root, receiptPath)
+      .replaceAll(path.sep, "/"),
   };
 }
 
@@ -239,10 +335,14 @@ function readReceiptEvidence(plan) {
   return {
     status: receipt.status,
     sha256: sha256File(plan.receiptPath),
+    checks: receipt?.metrics?.categoryCounts || {},
   };
 }
 
-export function buildExactShaProvenance(env = process.env) {
+export function buildExactShaProvenance(
+  env = process.env,
+  conclusion = "success",
+) {
   if (env.GITHUB_ACTIONS !== "true") {
     return Object.freeze({ source: "local" });
   }
@@ -253,13 +353,25 @@ export function buildExactShaProvenance(env = process.env) {
     runId: String(env.GITHUB_RUN_ID || ""),
     runAttempt: String(env.GITHUB_RUN_ATTEMPT || ""),
     job: String(env.GITHUB_JOB || ""),
+    eventName: String(env.GITHUB_EVENT_NAME || ""),
+    ref: String(env.GITHUB_REF || ""),
+    refName: String(env.GITHUB_REF_NAME || ""),
+    headRepository: String(
+      env.GITHUB_HEAD_REPOSITORY || env.GITHUB_REPOSITORY || "",
+    ),
+    conclusion,
   };
   if (
     !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(provenance.repository) ||
     !provenance.workflowRef ||
     !/^\d+$/u.test(provenance.runId) ||
     !/^\d+$/u.test(provenance.runAttempt) ||
-    !/^[A-Za-z0-9_.-]+$/u.test(provenance.job)
+    !/^[A-Za-z0-9_.-]+$/u.test(provenance.job) ||
+    !provenance.eventName ||
+    !provenance.ref ||
+    !provenance.refName ||
+    provenance.headRepository !== provenance.repository ||
+    !["success", "failure"].includes(provenance.conclusion)
   ) {
     throw new Error("GitHub Actions provenance is incomplete");
   }
@@ -276,7 +388,12 @@ function assertTerminalProvenance(provenance) {
     !String(provenance.workflowRef || "") ||
     !/^\d+$/u.test(String(provenance.runId || "")) ||
     !/^\d+$/u.test(String(provenance.runAttempt || "")) ||
-    !/^[A-Za-z0-9_.-]+$/u.test(String(provenance.job || ""))
+    !/^[A-Za-z0-9_.-]+$/u.test(String(provenance.job || "")) ||
+    !String(provenance.eventName || "") ||
+    !String(provenance.ref || "") ||
+    !String(provenance.refName || "") ||
+    provenance.headRepository !== provenance.repository ||
+    !["success", "failure"].includes(provenance.conclusion)
   ) {
     throw new Error("exact-SHA terminal provenance mismatch");
   }
@@ -304,11 +421,13 @@ export function readExactShaTerminal(plan) {
     (terminal.status === "failed" && terminal.exitCode === 0) ||
     !FINGERPRINT_PATTERN.test(String(terminal?.fingerprint || "")) ||
     terminal?.receipt?.path !== plan.receiptRelativePath ||
-    !FINGERPRINT_PATTERN.test(String(terminal?.receipt?.sha256 || ""))
+    !FINGERPRINT_PATTERN.test(String(terminal?.receipt?.sha256 || "")) ||
+    stableStringify(terminal?.identity) !== stableStringify(plan.identity)
   ) {
     throw new Error("exact-SHA terminal contract mismatch");
   }
   assertTerminalProvenance(terminal.provenance);
+  validateStrictReceiptIdentity(terminal.identity);
   const receipt = readReceiptEvidence(plan);
   if (
     receipt.status !== terminal.status ||
@@ -316,6 +435,7 @@ export function readExactShaTerminal(plan) {
   ) {
     throw new Error("exact-SHA terminal receipt integrity mismatch");
   }
+  if (terminal.status === "passed") validateStrictReceiptEvidence(terminal);
   return terminal;
 }
 
@@ -356,9 +476,10 @@ export function runExactShaGate(
         { cwd: root, env: process.env, stdio: "inherit" },
       ),
     now = () => new Date(),
+    env = process.env,
   } = {},
 ) {
-  const plan = buildExactShaPlan(root, options);
+  const plan = buildExactShaPlan(root, { ...options, env });
   const existing = readExactShaTerminal(plan);
   if (existing) {
     console.log(
@@ -383,6 +504,7 @@ export function runExactShaGate(
     gitSha: plan.gitSha,
     mainRef: plan.mainRef,
     fingerprint: plan.fingerprint,
+    identity: plan.identity,
     status: terminalStatus,
     exitCode,
     startedAt,
@@ -391,13 +513,29 @@ export function runExactShaGate(
       path: plan.receiptRelativePath,
       sha256: receiptEvidence.sha256,
     },
-    provenance: buildExactShaProvenance(),
+    checks: receiptEvidence.checks,
+    timeSensitiveChecks: {
+      vulnerabilityDatabase: {
+        status: terminalStatus === "passed" ? "passed" : "failed",
+        checkedAt: startedAt,
+        validUntil: new Date(
+          Date.parse(startedAt) + TIME_SENSITIVE_VALIDITY_MS,
+        ).toISOString(),
+      },
+    },
+    provenance: buildExactShaProvenance(
+      env,
+      terminalStatus === "passed" ? "success" : "failure",
+    ),
     runtime: {
       node: process.version,
       platform: process.platform,
       arch: process.arch,
     },
   };
+  if (terminalStatus === "passed") {
+    validateStrictReceiptEvidence(terminal);
+  }
   atomicWriteJson(plan.terminalPath, terminal);
   console.log(
     `[qa:exact-sha] status=terminal result=${terminal.status} sha=${plan.gitSha} fingerprint=${plan.fingerprint}`,
@@ -405,8 +543,53 @@ export function runExactShaGate(
   return { plan, terminal, reused: false };
 }
 
+export function refreshExactShaTimeSensitiveCheck(
+  root,
+  { sha, mainRef = "origin/main", key },
+  {
+    runCheck = () =>
+      spawnSync("bash", ["scripts/qa/govulncheck.sh"], {
+        cwd: root,
+        env: { ...process.env, GOVULNCHECK_STRICT: "1" },
+        stdio: "inherit",
+      }),
+    now = () => new Date(),
+    env = process.env,
+  } = {},
+) {
+  if (key !== "vulnerabilityDatabase") {
+    throw new Error("unsupported time-sensitive strict check");
+  }
+  const plan = buildExactShaPlan(root, { sha, mainRef, env });
+  const terminal = readExactShaTerminal(plan);
+  if (!terminal || terminal.status !== "passed") {
+    throw new Error("passed exact-SHA terminal is required for refresh");
+  }
+  const result = runCheck();
+  if (result?.error) throw result.error;
+  if (result?.status !== 0)
+    throw new Error("time-sensitive strict check failed");
+  assertCleanExactHead(root, sha);
+  const checkedAt = now().toISOString();
+  const refreshed = refreshedTimeSensitiveCheck({
+    terminal,
+    key,
+    checkedAt,
+    validForMs: TIME_SENSITIVE_VALIDITY_MS,
+    provenance: buildExactShaProvenance(env, "success"),
+  });
+  atomicWriteJson(plan.terminalPath, refreshed);
+  return { plan, terminal: refreshed };
+}
+
 function parseArgs(argv) {
-  const options = { sha: "", mainRef: "origin/main", run: false, json: false };
+  const options = {
+    sha: "",
+    mainRef: "origin/main",
+    run: false,
+    json: false,
+    refreshCheck: "",
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--run") {
@@ -415,6 +598,15 @@ function parseArgs(argv) {
     }
     if (arg === "--json") {
       options.json = true;
+      continue;
+    }
+    if (arg === "--refresh-check") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error("--refresh-check requires a value");
+      }
+      options.refreshCheck = value;
+      index += 1;
       continue;
     }
     if (arg === "--sha" || arg === "--main-ref") {
@@ -439,6 +631,7 @@ function printHelp() {
   console.log(`Usage:
   node scripts/qa/exact-sha-gate.mjs --sha <40-char-sha> [--main-ref origin/main] [--json]
   node scripts/qa/exact-sha-gate.mjs --sha <40-char-sha> [--main-ref origin/main] --run
+  node scripts/qa/exact-sha-gate.mjs --sha <40-char-sha> [--main-ref origin/main] --refresh-check vulnerabilityDatabase
 
 Without --run the command prints the strict fingerprint and fixed terminal path.
 With --run it executes strict only when that fingerprint has no terminal. Passed
@@ -454,6 +647,22 @@ function main() {
   }
   const root = path.resolve(import.meta.dirname, "../..");
   const options = { sha: parsed.sha, mainRef: parsed.mainRef };
+  if (parsed.refreshCheck) {
+    const result = refreshExactShaTimeSensitiveCheck(root, {
+      ...options,
+      key: parsed.refreshCheck,
+    });
+    console.log(
+      parsed.json
+        ? JSON.stringify({
+            status: "passed",
+            refreshed: parsed.refreshCheck,
+            gitSha: result.terminal.gitSha,
+          })
+        : `[qa:exact-sha] status=refreshed check=${parsed.refreshCheck} sha=${result.terminal.gitSha}`,
+    );
+    return;
+  }
   if (!parsed.run) {
     const plan = buildExactShaPlan(root, options);
     const existing = readExactShaTerminal(plan);

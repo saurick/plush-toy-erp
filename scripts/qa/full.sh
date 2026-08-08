@@ -127,17 +127,22 @@ qa_full_web() {
   cd "$ROOT_DIR/web"
   node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));if(typeof pkg?.scripts?.test!=='string'||!pkg.scripts.test.trim()){console.error('[qa:full] web/package.json 缺少 scripts.test');process.exit(1)}"
   if [[ "$full_profile" == "strict" ]]; then
-    "$PNPM_BIN" exec eslint --max-warnings=0 --ext .js --ext .jsx src/
-    "$PNPM_BIN" exec stylelint "src/**/*.{css,scss,sass}" --max-warnings=0
+    qa_run_substep "$full_profile" web eslint \
+      "$PNPM_BIN" exec eslint --max-warnings=0 --ext .js --ext .jsx src/
+    qa_run_substep "$full_profile" web stylelint \
+      "$PNPM_BIN" exec stylelint "src/**/*.{css,scss,sass}" --max-warnings=0
   else
-    "$PNPM_BIN" lint
-    "$PNPM_BIN" css
+    qa_run_substep "$full_profile" web eslint "$PNPM_BIN" lint
+    qa_run_substep "$full_profile" web stylelint "$PNPM_BIN" css
   fi
-  node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
+  qa_run_substep "$full_profile" web web_test \
+    node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind node --label web-all -- \
     "$PNPM_BIN" test --test-reporter=tap
-  "$PNPM_BIN" build
-  node "$ROOT_DIR/scripts/qa/dev-workbench-production-boundary.mjs" \
+  qa_run_substep "$full_profile" web production_build \
+    env NODE_ENV=production "$PNPM_BIN" build
+  qa_run_substep "$full_profile" web production_boundary \
+    node "$ROOT_DIR/scripts/qa/dev-workbench-production-boundary.mjs" \
     --build-dir "$ROOT_DIR/web/build"
 }
 

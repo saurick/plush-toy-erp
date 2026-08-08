@@ -8,6 +8,7 @@ import {
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_PRODUCT_CORE_ROUTE,
   DEV_PROTOTYPES_ROUTE,
+  DEV_QUALITY_GATES_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
   DEV_TESTING_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
@@ -124,6 +125,25 @@ export const DEV_HUB_ITEMS = Object.freeze([
     ]),
     description:
       '按本轮影响面选择验证计划、固定检查和覆盖证据；不把局部绿色合并成完整交付结论。',
+  }),
+  Object.freeze({
+    key: 'quality-gates',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    title: '质量门禁 / Quality Gates',
+    group: '验证治理 / QA',
+    route: DEV_QUALITY_GATES_ROUTE,
+    source: 'scripts/qa/README.md',
+    truthSource: '正式 full / strict runner、门禁回执与本地 operation',
+    status: '本机受控运行 / Local controlled execution',
+    guardrails: Object.freeze([
+      '只运行固定 full / strict 动作 / Fixed actions only',
+      '门禁回执是唯一结果真源 / Receipt is the only result truth',
+      '一次性数据库与有界清理 / Disposable database and bounded cleanup',
+      '不接受命令、路径、凭据或任意目标 / No arbitrary input',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '运行完整或严格门禁，查看真实阶段、耗时和结果，并只读分析门禁复杂度与当前改动覆盖缺口。',
   }),
   Object.freeze({
     key: 'data-preparation',

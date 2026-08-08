@@ -33,6 +33,21 @@ function expected() {
     currentManifestSha256: "d".repeat(64),
     targetManifestSha256: "e".repeat(64),
     rollbackFingerprint: HASH,
+    cache: {
+      packageHit: true,
+      imageHit: true,
+      cacheSource: "formal",
+      avoidedBytes: 1_325_933_239,
+      dockerLoadSkipped: true,
+      basis: [
+        "release_manifest_sha256",
+        "archive_sha256",
+        "registry_digest",
+        "docker_content_id",
+        "embedded_git_sha",
+      ],
+      stillExecuted: ["migration_status", "health", "ready", "public_entry"],
+    },
   };
 }
 
@@ -70,6 +85,7 @@ function receipt(status = "passed") {
       health: passed,
       ready: passed,
       basicSmoke: passed,
+      publicEntry: passed,
     },
     serviceSwitchStarted: true,
     startedAt: "2026-07-29T00:59:40.000Z",
@@ -81,6 +97,7 @@ function receipt(status = "passed") {
         !passed && index === visibleStages.length - 1 ? "failed" : "passed",
       durationMs: 1_000,
     })),
+    cache: expected().cache,
     redaction: {
       containsSecrets: false,
       containsCredentials: false,

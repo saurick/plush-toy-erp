@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -45,19 +45,92 @@ export const RECEIPT_GATE_STAGE_IDS = Object.freeze({
     "govulncheck",
   ]),
 });
-const RECEIPT_GATE_STAGE_LABELS = Object.freeze({
-  environment_profile: "环境与门禁配置",
+export const RECEIPT_GATE_STAGE_LABELS = Object.freeze({
+  environment_profile: "环境与工具链准备",
   shared: "共享基础检查",
   secrets: "敏感信息扫描",
-  web: "Web 测试与构建",
-  browser: "浏览器回归",
-  server: "服务端与数据库",
+  web: "Web 测试与生产构建",
+  browser: "真实浏览器回归",
+  server: "隔离数据库、迁移与 Server 测试",
   govulncheck: "Go 漏洞扫描",
   strict_profile: "严格门禁配置",
   shellcheck: "Shell 静态检查",
   shfmt: "Shell 格式检查",
   yamllint: "YAML 静态检查",
 });
+export const RECEIPT_GATE_WEB_SUBSTEP_LABELS = Object.freeze({
+  eslint: "JavaScript 静态检查",
+  stylelint: "样式静态检查",
+  web_test: "Web 自动化测试",
+  production_build: "Web 生产构建",
+  production_boundary: "DEV 与生产隔离检查",
+});
+const MAX_CAPTURE_BYTES = 512 * 1024 * 1024;
+
+export function parseGateStageEvent(line) {
+  const match =
+    /^\[qa:stage\] gate=(full|strict) id=([a-z][a-z0-9_]{1,63}) status=(running|passed|failed)(?: durationMs=(\d+))?$/u.exec(
+      String(line || "").trim(),
+    );
+  if (!match) return null;
+  const terminal = match[3] !== "running";
+  if (
+    (terminal && match[4] === undefined) ||
+    (!terminal && match[4] !== undefined)
+  ) {
+    return null;
+  }
+  const durationMs = terminal ? Number(match[4]) : null;
+  if (
+    durationMs !== null &&
+    (!Number.isSafeInteger(durationMs) || durationMs < 0)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    gate: match[1],
+    id: match[2],
+    label: RECEIPT_GATE_STAGE_LABELS[match[2]] || "未登记阶段",
+    status: match[3],
+    durationMs,
+  });
+}
+
+export function parseGateSubstepEvent(line) {
+  const match =
+    /^\[qa:substep\] gate=(full|strict) stage=([a-z][a-z0-9_]{1,63}) id=([a-z][a-z0-9_]{1,63}) status=(running|passed|failed)(?: durationMs=(\d+))?$/u.exec(
+      String(line || "").trim(),
+    );
+  if (
+    !match ||
+    match[2] !== "web" ||
+    !Object.hasOwn(RECEIPT_GATE_WEB_SUBSTEP_LABELS, match[3])
+  ) {
+    return null;
+  }
+  const terminal = match[4] !== "running";
+  if (
+    (terminal && match[5] === undefined) ||
+    (!terminal && match[5] !== undefined)
+  ) {
+    return null;
+  }
+  const durationMs = terminal ? Number(match[5]) : null;
+  if (
+    durationMs !== null &&
+    (!Number.isSafeInteger(durationMs) || durationMs < 0)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    gate: match[1],
+    stage: match[2],
+    id: match[3],
+    label: RECEIPT_GATE_WEB_SUBSTEP_LABELS[match[3]],
+    status: match[4],
+    durationMs,
+  });
+}
 
 export function parseGateStageTimings(output, gate) {
   if (!Object.hasOwn(RECEIPT_GATE_STAGE_IDS, gate)) {
@@ -70,25 +143,18 @@ export function parseGateStageTimings(output, gate) {
   const stageTimings = [];
   const seen = new Set();
   for (const line of String(output).split(/\r?\n/u)) {
-    const match =
-      /^\[qa:stage\] gate=(full|strict) id=([a-z][a-z0-9_]{1,63}) status=(passed|failed) durationMs=(\d+)$/u.exec(
-        line,
-      );
-    if (!match || match[1] !== gate) continue;
-    if (seen.has(match[2])) {
-      throw new Error(`duplicate QA stage timing: ${match[2]}`);
+    const event = parseGateStageEvent(line);
+    if (!event || event.gate !== gate || event.status === "running") continue;
+    if (seen.has(event.id)) {
+      throw new Error(`duplicate QA stage timing: ${event.id}`);
     }
-    const durationMs = Number(match[4]);
-    if (!Number.isSafeInteger(durationMs) || durationMs < 0) {
-      throw new Error(`invalid QA stage duration: ${match[2]}`);
-    }
-    seen.add(match[2]);
+    seen.add(event.id);
     stageTimings.push(
       Object.freeze({
-        id: match[2],
-        label: RECEIPT_GATE_STAGE_LABELS[match[2]] || match[2],
-        status: match[3],
-        durationMs,
+        id: event.id,
+        label: event.label,
+        status: event.status,
+        durationMs: event.durationMs,
       }),
     );
   }
@@ -114,6 +180,47 @@ export function hasCompleteGateStageTimings(gate, stageTimings) {
     expected.every((stage) => actual.has(stage)) &&
     stageTimings.every((stage) => stage.status === "passed")
   );
+}
+
+function balancedCounts(executed, passed, failed = 0, skipped = 0) {
+  return Object.freeze({ executed, passed, failed, skipped });
+}
+
+function stageCounts(stageTimings, id, executedWhenPassed) {
+  const stage = stageTimings.find((item) => item.id === id);
+  if (!stage) return balancedCounts(0, 0, 0, 0);
+  return stage.status === "passed"
+    ? balancedCounts(executedWhenPassed, executedWhenPassed, 0, 0)
+    : balancedCounts(1, 0, 1, 0);
+}
+
+export function summarizeGateCategories(output, gate, stageTimings) {
+  const byLabel = new Map();
+  for (const match of String(output).matchAll(
+    /\[qa:test-gate\]\s+label=([^\s]+)[^\n]*status=complete[^\n]*(?:tests=(\d+)\s+pass=(\d+)\s+fail=(\d+)\s+skipped=(\d+)|run=(\d+)\s+pass=(\d+)\s+fail=(\d+)\s+skip=(\d+))/gu,
+  )) {
+    const counts = (match[2] ? match.slice(2, 6) : match.slice(6, 10)).map(
+      Number,
+    );
+    byLabel.set(match[1], balancedCounts(...counts));
+  }
+  const browserChecks = gate === "strict" ? 4 : 2;
+  return Object.freeze({
+    web: byLabel.get("web-all") || balancedCounts(0, 0, 0, 0),
+    server: byLabel.get("server-all") || balancedCounts(0, 0, 0, 0),
+    database: stageCounts(stageTimings, "server", 2),
+    browser: stageCounts(stageTimings, "browser", browserChecks),
+    security: (() => {
+      const secrets = stageCounts(stageTimings, "secrets", 1);
+      const vulnerability = stageCounts(stageTimings, "govulncheck", 1);
+      return balancedCounts(
+        secrets.executed + vulnerability.executed,
+        secrets.passed + vulnerability.passed,
+        secrets.failed + vulnerability.failed,
+        0,
+      );
+    })(),
+  });
 }
 
 function parseArgs(argv) {
@@ -159,37 +266,83 @@ export function evaluateReceiptGateRun({
   });
 }
 
-async function runCLI(argv) {
-  const repoRoot = path.resolve(import.meta.dirname, "../..");
-  const options = parseArgs(argv);
-  const [command, ...args] = RECEIPT_GATE_COMMANDS[options.gate];
-  const outPath =
-    options.out ||
+export async function runReceiptGate({
+  gate,
+  outPath = "",
+  repoRoot = path.resolve(import.meta.dirname, "../.."),
+  env = process.env,
+  spawnProcess = spawn,
+  stdout = process.stdout,
+  stderr = process.stderr,
+  onChild,
+} = {}) {
+  if (!Object.hasOwn(RECEIPT_GATE_COMMANDS, gate)) {
+    throw new Error("gate must be fast, full or strict");
+  }
+  const [command, ...args] = RECEIPT_GATE_COMMANDS[gate];
+  const receiptOutPath =
+    outPath ||
     path.join(
       repoRoot,
       "output",
       "dev-workbench",
       "receipts",
-      `${options.gate}-latest.json`,
+      `${gate}-latest.json`,
     );
   const expectedRepository = await readRepositoryIdentity(repoRoot);
   const gitContext = getDevWorkbenchGitContext(repoRoot);
   const startedAt = Date.now();
-  const child = spawnSync(command, args, {
+  const child = spawnProcess(command, args, {
     cwd: repoRoot,
-    encoding: "utf8",
-    env: process.env,
-    maxBuffer: 512 * 1024 * 1024,
+    env,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  process.stdout.write(child.stdout || "");
-  process.stderr.write(child.stderr || "");
+  if (!child || typeof child.once !== "function") {
+    throw new Error("gate child process is unavailable");
+  }
+  onChild?.(child);
 
-  const gateOutput = `${child.stdout || ""}\n${child.stderr || ""}`;
+  const captured = [];
+  let capturedBytes = 0;
+  let captureOverflow = false;
+  const consume = (chunk, target) => {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+    target?.write?.(buffer);
+    if (
+      !captureOverflow &&
+      capturedBytes + buffer.length <= MAX_CAPTURE_BYTES
+    ) {
+      captured.push(buffer);
+      capturedBytes += buffer.length;
+    } else {
+      captureOverflow = true;
+    }
+  };
+  child.stdout?.on?.("data", (chunk) => consume(chunk, stdout));
+  child.stderr?.on?.("data", (chunk) => consume(chunk, stderr));
+  const childResult = await new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+    child.once("error", (error) => finish({ status: null, signal: "", error }));
+    child.once("close", (status, signal) =>
+      finish({ status, signal: signal || "", error: null }),
+    );
+  });
+
+  const gateOutput = Buffer.concat(captured).toString("utf8");
   const summary = summarizeGateOutput(gateOutput);
-  const stageMetrics = parseGateStageTimings(gateOutput, options.gate);
+  const stageMetrics = parseGateStageTimings(gateOutput, gate);
+  const categoryCounts = summarizeGateCategories(
+    gateOutput,
+    gate,
+    stageMetrics.stageTimings,
+  );
   const stageTimingComplete = hasCompleteGateStageTimings(
-    options.gate,
+    gate,
     stageMetrics.stageTimings,
   );
   const currentRepository = await readRepositoryIdentity(repoRoot);
@@ -198,28 +351,39 @@ async function runCLI(argv) {
     currentRepository,
   );
   const outcome = evaluateReceiptGateRun({
-    childError: child.error,
-    childStatus: child.status,
+    childError:
+      childResult.error ||
+      (captureOverflow
+        ? new Error("gate output exceeded capture limit")
+        : null),
+    childStatus: childResult.status,
     identityMatches,
     stageTimingComplete,
     summary,
   });
-  const notProven = defaultDevWorkbenchNotProven(options.gate);
+  const notProven = defaultDevWorkbenchNotProven(gate);
   if (!identityMatches) {
     notProven.push("repository identity changed during gate");
   }
   if (!stageTimingComplete) {
     notProven.push("required stage timing evidence is incomplete");
   }
+  if (captureOverflow) {
+    notProven.push("gate output exceeded the bounded receipt capture");
+  }
+  if (childResult.signal) {
+    notProven.push("gate process ended after an external signal");
+  }
   const receipt = buildDevWorkbenchReceipt({
     artifactPaths: [],
     durationMs: Date.now() - startedAt,
     finishedAt: Date.now(),
-    gate: options.gate,
+    gate,
     gitContext,
-    metrics: options.gate === "fast" ? {} : stageMetrics,
+    metrics:
+      gate === "fast" ? {} : Object.freeze({ ...stageMetrics, categoryCounts }),
     notProven,
-    profile: options.gate,
+    profile: gate,
     repoRoot,
     startedAt,
     status: outcome.status,
@@ -233,11 +397,51 @@ async function runCLI(argv) {
         : []),
     ],
   });
-  const writtenPath = writeDevWorkbenchReceipt(outPath, receipt);
-  process.stderr.write(
-    `[run-gate-with-receipt] gate=${options.gate} status=${receipt.status} receipt=${path.relative(repoRoot, writtenPath)}\n`,
+  const writtenPath = writeDevWorkbenchReceipt(receiptOutPath, receipt);
+  stderr?.write?.(
+    `[run-gate-with-receipt] gate=${gate} status=${receipt.status} receipt=${path.relative(repoRoot, writtenPath)}\n`,
   );
-  process.exitCode = outcome.exitCode;
+  return Object.freeze({
+    childSignal: childResult.signal,
+    exitCode: outcome.exitCode,
+    receipt,
+    writtenPath,
+  });
+}
+
+async function runCLI(argv) {
+  const options = parseArgs(argv);
+  let child = null;
+  let interruptedSignal = "";
+  const interrupt = (signal) => {
+    interruptedSignal ||= signal;
+    try {
+      child?.kill?.(signal);
+    } catch {
+      // The process group may already be terminating.
+    }
+  };
+  const onSigterm = () => interrupt("SIGTERM");
+  const onSigint = () => interrupt("SIGINT");
+  process.once("SIGTERM", onSigterm);
+  process.once("SIGINT", onSigint);
+  try {
+    const result = await runReceiptGate({
+      gate: options.gate,
+      outPath: options.out,
+      onChild: (value) => {
+        child = value;
+      },
+    });
+    process.exitCode = interruptedSignal
+      ? interruptedSignal === "SIGINT"
+        ? 130
+        : 143
+      : result.exitCode;
+  } finally {
+    process.removeListener("SIGTERM", onSigterm);
+    process.removeListener("SIGINT", onSigint);
+  }
 }
 
 const isDirectRun =

@@ -269,6 +269,16 @@ test("full browser evidence is current-worktree self-hosted on an isolated port"
   assert.doesNotMatch(style, /killDevServerPortListeners/u);
 });
 
+test("full production build cannot inherit the DEV server environment", () => {
+  const full = read("scripts/qa/full.sh");
+
+  assert.match(
+    full,
+    /qa_run_substep "\$full_profile" web production_build \\\s+env NODE_ENV=production "\$PNPM_BIN" build\s+qa_run_substep "\$full_profile" web production_boundary/u,
+  );
+  assert.equal(full.match(/NODE_ENV=production/gu)?.length, 1);
+});
+
 test("style cleanup SIGKILLs a surviving owned group without touching an unrelated listener", async () => {
   const [ownedPort, unrelatedPort] = await reserveDistinctPorts(2);
   const ownedLeader = spawnLeaderWithStubbornListener(ownedPort);

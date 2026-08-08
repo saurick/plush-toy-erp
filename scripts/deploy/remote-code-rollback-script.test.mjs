@@ -47,7 +47,7 @@ test("remote code rollback is fixed to test-133 and has no build or database mut
 test("remote code rollback requires exact confirmation, lock and receipt", () => {
   assert.match(source, /ROLLBACK:\$target:\$from_sha:\$to_sha:\$operation_id/u);
   assert.match(source, /flock -n 9/u);
-  assert.match(source, /plush[.]remote-rollback-receipt\/v2/u);
+  assert.match(source, /plush[.]remote-rollback-receipt\/v3/u);
   assert.match(source, /enter_stage package_verification/u);
   assert.match(source, /durationMs: \$durationMs/u);
   assert.match(source, /timings: \$timings/u);
@@ -61,6 +61,33 @@ test("remote code rollback requires exact confirmation, lock and receipt", () =>
     source,
     /serviceSwitchStarted: \(\$serviceSwitchStarted == 1\)/u,
   );
+});
+
+test("remote rollback reuses only checksum-bound retained content", () => {
+  assert.match(source, /plush[.]target-release-cache\/v1/u);
+  assert.match(source, /target_manifest_sha256/u);
+  assert.match(source, /cache_avoided_bytes/u);
+  assert.match(source, /dockerLoadSkipped: \$cacheImageHit/u);
+  assert.match(source, /if \[\[ "\$cache_image_hit" != true \]\]/u);
+  assert.match(source, /formal rollback cache conflicts/u);
+  assert.match(
+    source,
+    /stillExecuted: \["migration_status", "health", "ready", "public_entry"\]/u,
+  );
+});
+
+test("remote rollback cleans only materialization created by the current operation", () => {
+  assert.match(source, /cleanup_transient_materialization/u);
+  assert.match(source, /cache_materializing_created=1/u);
+  assert.match(source, /release_materializing_created=1/u);
+  assert.match(source, /cache_root\/\.materializing-\$operation_id/u);
+  assert.match(
+    source,
+    /releases_root\/\.materializing-rollback-\$operation_id/u,
+  );
+  assert.match(source, /! -L "\$candidate"/u);
+  assert.match(source, /stat -c '%u'/u);
+  assert.match(source, /rm -rf -- "\$candidate"/u);
 });
 
 test("remote code rollback normalizes full nanoseconds to portable milliseconds", () => {

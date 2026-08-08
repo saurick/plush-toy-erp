@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
 
 import {
   DISPOSABLE_DATABASE_RUN_SCHEMA,
+  installDisposableDatabaseCancellationHandlers,
   runDisposableDatabaseLifecycle,
   validateDisposableWorkflow,
 } from "./disposable-database-runner.mjs";
@@ -104,7 +106,10 @@ test("disposable database lifecycle reports the exact residual database", () => 
     workflow: "migration-smoke",
   });
   assert.equal(report.status, "failed");
-  assert.equal(report.cleanup.residualDatabase, "plush_erp_restore_20260728_a1b2");
+  assert.equal(
+    report.cleanup.residualDatabase,
+    "plush_erp_restore_20260728_a1b2",
+  );
   assert.match(report.failure, /cleanup/u);
 });
 
@@ -113,4 +118,18 @@ test("disposable workflow registry rejects arbitrary commands and profile drift"
   assert.throws(() =>
     validateDisposableWorkflow("capacity", "critical-postgres"),
   );
+});
+
+test("disposable database runner keeps signal handling alive until cleanup can finish", () => {
+  const processRef = new EventEmitter();
+  const cancellation = installDisposableDatabaseCancellationHandlers({
+    processRef,
+  });
+  processRef.emit("SIGTERM");
+  assert.equal(cancellation.signal, "SIGTERM");
+  cancellation.dispose();
+  processRef.emit("SIGINT");
+  assert.equal(cancellation.signal, "SIGTERM");
+  assert.equal(processRef.listenerCount("SIGTERM"), 0);
+  assert.equal(processRef.listenerCount("SIGINT"), 0);
 });

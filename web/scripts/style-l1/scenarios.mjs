@@ -8,6 +8,8 @@ import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createBusinessActionStabilityScenarios } from './businessActionStabilityScenarios.mjs'
 import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
+import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
+import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliveryScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
@@ -1276,6 +1278,21 @@ export function createStyleL1Scenarios(deps) {
   })
 
   return [
+    ...createDevQualityGateScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      expectHeading,
+      outputDir,
+      path,
+    }),
+    ...createDevVersionCenterScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      clickERPThemeOption,
+      expectHeading,
+      outputDir,
+      path,
+    }),
     ...createDevFlowStateObservatoryScenarios({
       assert,
       assertNoHorizontalOverflow,

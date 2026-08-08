@@ -24,6 +24,7 @@ qa_run_stage() {
   local stage_status
   local command_status
   started_ns="$(qa_stage_monotonic_ns)"
+  echo "[qa:stage] gate=$gate id=$stage_id status=running"
 
   set +e
   (
@@ -41,5 +42,49 @@ qa_run_stage() {
     stage_status=failed
   fi
   echo "[qa:stage] gate=$gate id=$stage_id status=$stage_status durationMs=$duration_ms"
+  return "$command_status"
+}
+
+qa_run_substep() {
+  if [[ $# -lt 4 ]]; then
+    echo "[qa:substep] invalid substep invocation" >&2
+    return 2
+  fi
+
+  local gate="$1"
+  local stage_id="$2"
+  local substep_id="$3"
+  shift 3
+  if [[ ! "$gate" =~ ^(full|strict)$ ||
+    ! "$stage_id" =~ ^[a-z][a-z0-9_]{1,63}$ ||
+    ! "$substep_id" =~ ^[a-z][a-z0-9_]{1,63}$ ]]; then
+    echo "[qa:substep] invalid gate, stage or substep id" >&2
+    return 2
+  fi
+
+  local started_ns
+  local finished_ns
+  local duration_ms
+  local substep_status
+  local command_status
+  started_ns="$(qa_stage_monotonic_ns)"
+  echo "[qa:substep] gate=$gate stage=$stage_id id=$substep_id status=running"
+
+  set +e
+  (
+    set -euo pipefail
+    "$@"
+  )
+  command_status=$?
+  set -e
+
+  finished_ns="$(qa_stage_monotonic_ns)"
+  duration_ms=$(((finished_ns - started_ns) / 1000000))
+  if ((command_status == 0)); then
+    substep_status=passed
+  else
+    substep_status=failed
+  fi
+  echo "[qa:substep] gate=$gate stage=$stage_id id=$substep_id status=$substep_status durationMs=$duration_ms"
   return "$command_status"
 }

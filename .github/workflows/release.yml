@@ -35,6 +35,9 @@ jobs:
     outputs:
       release_reused: ${{ steps.identity.outputs.release_reused }}
       strict_reused: ${{ steps.recover.outputs.strict_reused }}
+      strict_run_id: ${{ steps.recover.outputs.strict_run_id }}
+      strict_artifact_digest: ${{ steps.recover.outputs.strict_artifact_digest }}
+      refresh_checks: ${{ steps.recover.outputs.refresh_checks }}
     steps:
       - name: Check out the requested exact SHA without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -128,7 +131,33 @@ jobs:
             exit 1
           fi
           echo "strict_reused=$strict_reused" >> "$GITHUB_OUTPUT"
+          echo "strict_run_id=$(jq -r '.runId // ""' "$result")" >> "$GITHUB_OUTPUT"
+          echo "strict_artifact_digest=$(jq -r '.artifactDigest // ""' "$result")" >> "$GITHUB_OUTPUT"
+          echo "refresh_checks=$(jq -r '.refreshChecks | join(",")' "$result")" >> "$GITHUB_OUTPUT"
           cat "$result"
+      - name: Set up Go only for an expired vulnerability database receipt
+        if: >-
+          steps.recover.outputs.strict_reused == 'true' &&
+          contains(steps.recover.outputs.refresh_checks, 'vulnerabilityDatabase')
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: Refresh only the expired vulnerability database check
+        if: >-
+          steps.recover.outputs.strict_reused == 'true' &&
+          contains(steps.recover.outputs.refresh_checks, 'vulnerabilityDatabase')
+        run: |
+          set -euo pipefail
+          go_bin="$(go env GOPATH)/bin"
+          if [[ ! -x "$go_bin/govulncheck" ]]; then
+            go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          fi
+          export PATH="$go_bin:$PATH"
+          node scripts/qa/exact-sha-gate.mjs \
+            --sha "$RELEASE_SHA" \
+            --main-ref origin/main \
+            --refresh-check vulnerabilityDatabase
       - name: Pass the recovered terminal to publish
         if: steps.recover.outputs.strict_reused == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

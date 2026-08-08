@@ -355,6 +355,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 | `/__dev/status-flows`             | 业务链、协同、运行、事实与状态规则只读观察         | 代码合同、三类 dev-only 配置目录与正式架构文档               |
 | `/__dev/docs`                     | 当前工作区 Markdown 查看器                         | 仓库 Markdown 文件本身                                       |
 | `/__dev/testing`                  | 本轮验证、专项检查、Git 收口和证据覆盖             | `docs/product/自动化测试策略.md`                             |
+| `/__dev/quality-gates`            | full / strict 运行、结果、耗时、治理与覆盖缺口     | 正式 QA runner、门禁回执、affected 与本地 operation          |
 | `/__dev/data-preparation`         | 固定数据范围检查、计划确认、执行与回执             | 既有 Core seed、统一本地验收 lifecycle 与 operation store    |
 | `/__dev/database-migration`       | 共享开发库迁移准备、执行、读回与重启               | 高层 CLI、迁移 operation service、备份恢复与 operation store |
 | `/__dev/prototypes`               | HTML / PNG / 截图原型资产预览                      | `docs/product/prototypes/**`                                 |
@@ -368,12 +369,12 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 开发态边界放在页头按需查看。具体入口继续显示用途、维护来源和状态，但不与用户的下一步争夺首屏注意力。
 - 置顶只写浏览器本地偏好，不是后端配置；路由、分组和入口登记仍以 `web/src/dev-workbench/config/devHub.mjs` 为真源。
 - 开发导航使用 `/favicon-dev.svg`；测试入口使用 `/favicon-testing.svg`，每个开发页同时提供独立浏览器标题，只用于区分本地开发页面。
-- 十一个子页统一提供开发工作台全局菜单、当前页高亮、复制当前深链和按需打开来源文档。一级菜单按稳定责任域命名为“总览、产品工程、质量验证、交付运行”；二级菜单按开发者要完成的任务或查看的对象命名，页面标题可在短名基础上补充完整职责，路由和内部 key 不随文案调整。
+- 十二个子页统一提供开发工作台全局菜单、当前页高亮、复制当前深链和按需打开来源文档。一级菜单按稳定责任域命名为“总览、产品工程、质量验证、交付运行”；二级菜单按开发者要完成的任务或查看的对象命名，页面标题可在短名基础上补充完整职责，路由和内部 key 不随文案调整。
 
 | 一级菜单 | 二级菜单                                                     |
 | -------- | ------------------------------------------------------------ |
 | 产品工程 | 产品内核、权限关系、改动指南、业务链观察、开发文档、产品原型 |
-| 质量验证 | 改动验证、测试数据                                           |
+| 质量验证 | 改动验证、质量门禁、测试数据                                 |
 | 交付运行 | 客户配置、数据库迁移、版本发布                               |
 
 移动端全局菜单允许横向滚动，并保持单一当前页语义。
@@ -423,7 +424,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 #### 测试入口 `/__dev/testing`
 
-- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，主视图按任务命名为“本轮验证”“专项检查库”“Git 收口”和“证据与覆盖”，稳定 `view=tiers|commands|closeout|coverage`。Git 收口只读展示 `core.hooksPath`、固定 Hook 文件与可执行权限，解释 pre-commit、commit-msg、prepare-push 和 pre-push 的职责；页面只能复制固定核对/准备命令，不执行、不暂存、不提交或推送。默认只展开“生成验证计划—运行匹配检查”主路径；19 组复制预设与内部 T0–T8 验证范围按需展开，T0–T8 不是完成进度或逐级验收。完整 Markdown 继续由独立的 `/__dev/docs` 查看器负责，不在测试入口复制第二个文档阅读器。
+- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，主视图按任务命名为“本轮验证”“专项检查库”“Git 收口”和“证据与覆盖”，稳定 `view=tiers|commands|closeout|coverage`。Git 收口只读展示 `core.hooksPath`、固定 Hook 文件与可执行权限，解释 pre-commit、commit-msg、prepare-push 和 pre-push 的职责；页面只能复制固定核对/准备命令，不执行、不暂存、不提交或推送。默认只展开“生成验证计划—运行匹配检查”主路径；17 组复制预设与内部 T0–T8 验证范围按需展开，T0–T8 不是完成进度或逐级验收。full / strict 不再作为主复制预设，页面以“前往质量门禁”深链进入固定 profile，终端入口仍在策略与脚本文档详情中保留。完整 Markdown 继续由独立的 `/__dev/docs` 查看器负责，不在测试入口复制第二个文档阅读器。
 - `docs/archive/**` 不进入可复制命令来源，避免把历史命令写成当前测试入口；其他项目或 GPT/ChatGPT 原文不保存在仓库。
 - “执行命令”只按同一条文档职责轴筛选来源：策略与口径、工程说明、执行脚本、部署与发布；搜索是独立的命令块关键词条件，“全部来源”只负责复位职责筛选。主视图、职责和关键词分别写入 `view`、`role`、`q` query，刷新、前进后退和从来源文档返回时可恢复。每个命令块可打开对应来源文档，文档职责、前后端技术域、脚本类型和部署阶段不再混成同一级分类。
 - 多行命令会保留完整续行参数；不完整且以反斜杠结尾的命令不会进入复制结果。命令区按内容高度展示，不再被网格压缩裁切；验证层级和覆盖证据视图不显示对当前内容无效的命令来源筛选。
@@ -433,6 +434,13 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 报告与操作接口仅在 development serve 且请求来源与 Host 都是 loopback 时可用，返回 `no-store` 脱敏摘要；生产 build 不包含 `output/qa/**`，也不再从 `public/qa` 携带本机路径或覆盖报告。
 - 「采集本地覆盖基线」通过 dev-only session / action / operation API 发起异步固定 baseline。浏览器只提交 `collect + idempotencyKey`，不能传 shell、参数、路径、环境变量或 profile；服务端校验本机 Host、同源、CSRF、JSON 合同，解析项目锁定的 Node / pnpm，以持久化幂等索引和全局 QA 锁串行运行 `node scripts/qa/test-coverage-collect.mjs --profile baseline --write`。页面显示 11 个脱敏阶段，其中先以 error-code `--check` 证明生成物无漂移，再直接使用项目 Node 做 Web native coverage，不触发会改写 tracked 生成物的 package `pretest`。切换视图不取消后台任务，回到页面后可恢复读回；按钮在运行期间原位禁用，终态自动刷新报告。
 - 运行期仓库变化、启动/服务中断或终态读回无法证明时 fail closed，上一份报告继续展示；字段联动 TAP 与报告也先写 staging，只有测试、builder 和仓库身份复核均通过才原子替换，失败时保留上一份。真实 baseline 测试完成但存在失败、缺失或零执行时会发布绑定当前身份的 issues 报告，防止旧绿色遮蔽。页面“重新读取”只读取报告，“复制备用命令”只在 DEV 操作接口不可用时供手工执行。覆盖基线适合代码基本稳定、其它写任务结束的检查点，不必每次编辑后运行；它不写 PostgreSQL、不运行真实业务浏览器、不部署或做客户 UAT，未实际采集的值显示为空而不是 `0%`。`docs/product/自动化测试策略.md` 仍是测试选择和覆盖门槛真源。
+
+#### 质量门禁 `/__dev/quality-gates`
+
+- 页面内部只保留 `run / governance / gaps` 三个 URL-backed 视图，复用 `DevTaskNav` 的 roving tabIndex、方向键、Home / End、焦点与主题合同。每个视图只接受固定 query；未知、重复、过期或跨视图参数 fail closed。切换视图会清理无关 query，不启动、不取消或清空 operation；公共仓库身份与当前 operation 摘要由页面级唯一状态源读取，只有活动 operation 启用一个 polling，治理与缺口请求在切换时取消并以请求序号防止旧结果覆盖。
+- “运行与结果”只通过固定 `full / strict + idempotencyKey` 动作异步调用正式 runner；支持刷新恢复、精确取消、有界超时、中文阶段、正式回执、可比环境耗时和最近 20 次脱敏记录。dirty 结果不会升级成发布证明，样本不足时不估算剩余时间；技术 ID、完整 SHA、指纹和原始 stage key 默认折叠。
+- “门禁治理”只读登记风险、触发条件、正式来源引用、唯一证据与退出条件；不复制命令或测试列表，不提供新增、编辑、跳过、禁用或删除。“覆盖缺口”复用 affected 与七类风险边界，按当前或 staged 改动展示应运行门禁、当前结果和仍缺证据。本地门禁通过不证明目标发布、回滚、客户 UAT 或签收。
+- 页面及 `/__dev/api/qa/quality-gates` 仅在 development serve 存在，生产构建和正式部署不包含路由、页面 chunk、operation bridge、本地回执或 DEV 文案。测试数据仍由独立测试数据页管理，版本发布只读当前 exact SHA 的 strict 摘要与深链，不复制阶段、历史、治理或缺口。
 
 #### 测试数据中心 `/__dev/data-preparation`
 
@@ -470,6 +478,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 #### 版本发布与部署中心 `/__dev/version-center`
 
 - 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitHub 不可变版本、固定 `test-133` 当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或 UAT 合并成一个绿色结论。
+- 页面顶部常驻四项关键状态、未结束 operation 与交付速览；下方以 URL 可恢复的 `版本与部署 / CI/CD 效能 / 操作记录` 三个视图分流阅读。最近最多 20 个不可变版本固定每页 6 条，已结束操作每页 10 条；切换视图不重新请求摘要，也不会停止未结束 operation 的轮询。
 - “CI/CD 效能”直接读取固定 GitHub 仓库最近 CI / Release 的 run、对应 attempt、job 和 step 时间，显示最近完整运行、完整样本中位数、最长可见环节和建议复核点；全部 job / step 使用原生按需展开，不自动并发、重跑或复制 GitHub 状态。
 - 发布只允许当前 clean exact SHA；GitHub adapter 固定公开仓库、`release.yml` 和 `yoyoosun`，同一 SHA 的 strict 与镜像构建可复用，不会因刷新或失败自动重发。
 - 版本列表按发布时间区分动作：比 133 当前 manifest 新的版本只允许准备部署，旧版本只允许检查回滚；发布时间、当前 manifest、migration 序列或客户配置源指纹不能证明时按钮禁用并说明原因。

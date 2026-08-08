@@ -10,6 +10,7 @@
 | `devCustomerConfigPlugin.mjs` | 为本地客户调试提供受控配置和公开资源 |
 | `devCustomerImportDryRunPlugin.mjs` | 提供客户配置预检、Dry Run、runtime manifest 和发布准备读回 |
 | `devQaCoveragePlugin.mjs` | 执行固定覆盖率采集并提供脱敏 operation 状态 |
+| `devQualityGatePlugin.mjs` | 复用正式 full / strict runner 与回执，提供异步运行、取消、超时、清理读回和只读治理 |
 | `devWorkbenchReceiptPlugin.mjs` | 只读提供当前及历史质量回执 |
 | `devDataPreparationPlugin.mjs` | 执行登记的数据准备 profile |
 | `devDatabaseMigrationPlugin.mjs` | 提供本地共享开发库迁移的受控 operation service 和 HTTP 层，供页面与高层 CLI 复用 |

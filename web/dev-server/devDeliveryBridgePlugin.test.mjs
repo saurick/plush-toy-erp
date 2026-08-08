@@ -370,6 +370,15 @@ test('delivery summary exposes cached GitHub timings and readable operation dura
       cacheMissCount: 4,
       cacheHitRateBasisPoints: 8_000,
     },
+    targetCacheHit: null,
+    targetImageCacheHit: null,
+    targetCacheSource: null,
+    avoidedTransferBytes: null,
+    avoidedTransferDurationMs: null,
+    avoidedTransferBaselineOperationId: null,
+    dockerLoadSkipped: null,
+    cacheBasis: [],
+    stillExecutedChecks: [],
   })
 })
 

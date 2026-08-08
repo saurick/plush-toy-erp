@@ -1,10 +1,11 @@
 import React from 'react'
-import { Card, Empty, Space, Tag, Typography } from 'antd'
+import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
 
 import {
   deliveryPipelinePresentation,
   deliveryPipelineRunModePresentation,
   deliveryStatusPresentation,
+  deliveryTargetCachePresentation,
   findLatestTransferredPromotion,
   formatDeliveryBytes,
   formatDeliveryDuration,
@@ -94,6 +95,114 @@ export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
   )
 }
 
+export function DevPipelineStatusStrip({
+  timings,
+  versions = [],
+  operations = [],
+  onOpenDetails,
+}) {
+  const summary = summarizePipelineTimings(timings)
+  const { latest: latestRun, latestFullRelease } = summary
+  const [release = null] = versions
+  const deploymentOperation = findLatestTransferredPromotion(operations)
+  const targetCache = deliveryTargetCachePresentation(
+    deploymentOperation?.metrics
+  )
+  const strictJob = latestFullRelease?.jobs.find(
+    (job) => job.name === 'Exact-SHA strict quality'
+  )
+  const publishJob = latestFullRelease?.jobs.find(
+    (job) => job.name === 'Publish immutable artifact set'
+  )
+
+  return (
+    <section aria-label="交付状态速览">
+      <Card
+        size="small"
+        className="erp-dev-pipeline-status-strip"
+        title="交付状态速览"
+        extra={
+          typeof onOpenDetails === 'function' ? (
+            <Button type="link" onClick={onOpenDetails}>
+              查看完整效能
+            </Button>
+          ) : null
+        }
+      >
+        <div className="erp-dev-pipeline-status-strip__metrics">
+          <div>
+            <Text type="secondary">最近 CI/CD</Text>
+            <Space size={8} wrap>
+              <Tag
+                color={
+                  !latestRun
+                    ? 'default'
+                    : latestRun.conclusion === 'success'
+                      ? 'success'
+                      : 'error'
+                }
+              >
+                {!latestRun
+                  ? '尚无运行'
+                  : latestRun.conclusion === 'success'
+                    ? '已通过'
+                    : '未通过'}
+              </Tag>
+              <Text strong>
+                {latestRun
+                  ? formatDeliveryDuration(latestRun.durationMs)
+                  : '未证明'}
+              </Text>
+            </Space>
+            <Text type="secondary">
+              {latestRun
+                ? deliveryPipelineRunModePresentation(summary.latestMode)
+                : '等待 GitHub 运行回执'}
+            </Text>
+          </div>
+          <div>
+            <Text type="secondary">最近完整发布</Text>
+            <Text strong>
+              {latestFullRelease
+                ? formatDeliveryDuration(latestFullRelease.durationMs)
+                : '未证明'}
+            </Text>
+            <Text type="secondary">
+              严格门禁 {formatJobDuration(strictJob)} · 发布制品{' '}
+              {formatJobDuration(publishJob)}
+            </Text>
+          </div>
+          <div>
+            <Text type="secondary">构建缓存</Text>
+            <Text strong>
+              {formatDeliveryPercent(
+                release?.buildPerformance?.cacheHitRateBasisPoints
+              )}
+            </Text>
+            <Text type="secondary">
+              制品总计{' '}
+              {formatDeliveryBytes(release?.artifactSummary?.totalBytes)}
+            </Text>
+          </div>
+          <div>
+            <Text type="secondary">最近真实部署</Text>
+            <Text strong>
+              {deploymentOperation
+                ? formatDeliveryDuration(deploymentOperation.durationMs)
+                : '尚无真实部署'}
+            </Text>
+            <Text type="secondary">
+              {deploymentOperation
+                ? `${targetCache.status} · 实传 ${formatDeliveryBytes(deploymentOperation.metrics.transferBytes)}`
+                : '等待包含制品传输的部署回执'}
+            </Text>
+          </div>
+        </div>
+      </Card>
+    </section>
+  )
+}
+
 export default function DevPipelineTimingPanel({
   timings,
   versions = [],
@@ -103,6 +212,9 @@ export default function DevPipelineTimingPanel({
   const { latest: latestRun, analysisRun } = summary
   const [release = null] = versions
   const deploymentOperation = findLatestTransferredPromotion(operations)
+  const targetCache = deliveryTargetCachePresentation(
+    deploymentOperation?.metrics
+  )
   const strictJob = summary.latestFullRelease?.jobs.find(
     (job) => job.name === 'Exact-SHA strict quality'
   )
@@ -168,9 +280,9 @@ export default function DevPipelineTimingPanel({
                 {formatJobDuration(publishJob)}
               </Text>
               <Text type="secondary">
-                完整发布中位数{' '}
-                {formatDeliveryDuration(summary.fullReleaseMedianDurationMs)} ·{' '}
-                {summary.fullReleaseSampleCount} 次
+                {['skipped', 'neutral'].includes(strictJob?.conclusion)
+                  ? 'CI strict 回执已可信复用；Release 未重复执行门禁'
+                  : `完整发布中位数 ${formatDeliveryDuration(summary.fullReleaseMedianDurationMs)} · ${String(summary.fullReleaseSampleCount)} 次`}
               </Text>
             </div>
             <div>
@@ -204,12 +316,14 @@ export default function DevPipelineTimingPanel({
               </strong>
               <Text>
                 {deploymentOperation
-                  ? `传输 ${formatDeliveryBytes(deploymentOperation.metrics.transferBytes)} · ${formatDeliveryDuration(deploymentOperation.metrics.transferDurationMs)}`
+                  ? `${targetCache.status} · 实传 ${formatDeliveryBytes(deploymentOperation.metrics.transferBytes)} · ${formatDeliveryDuration(deploymentOperation.metrics.transferDurationMs)}`
                   : '等待包含制品传输的部署回执'}
               </Text>
               <Text type="secondary">
                 {deploymentOperation
-                  ? `${formatDeliveryRate(deploymentOperation.metrics.transferBytesPerSecond)}${transferShare === null ? '' : ` · 占总耗时 ${String(transferShare)}%`}`
+                  ? deploymentOperation.metrics.targetCacheHit
+                    ? `避免传输 ${formatDeliveryBytes(deploymentOperation.metrics.avoidedTransferBytes)} · 估算节省 ${formatDeliveryDuration(deploymentOperation.metrics.avoidedTransferDurationMs)} · ${deploymentOperation.metrics.dockerLoadSkipped ? '已跳过 Docker load' : '仍执行 Docker load'}`
+                    : `${formatDeliveryRate(deploymentOperation.metrics.transferBytesPerSecond)}${transferShare === null ? '' : ` · 占总耗时 ${String(transferShare)}%`}`
                   : '相同 SHA 复用不计为目标写入'}
               </Text>
             </div>

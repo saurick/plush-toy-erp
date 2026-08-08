@@ -51,7 +51,10 @@ test("CI exposes one stable aggregate check over trusted plan and quality jobs",
     "workflow_dispatch",
   ]);
   assert.deepEqual(workflow.on.push, { branches: ["main"] });
-  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.deepEqual(workflow.permissions, {
+    actions: "read",
+    contents: "read",
+  });
   assert.deepEqual(Object.keys(workflow.jobs).sort(), [
     "ci_gate",
     "plan",
@@ -95,7 +98,7 @@ test("CI scans the trusted history before executing candidate repository scripts
   assert.match(planRuns, /git log --check --format= "\$history_range"/u);
 });
 
-test("CI affected/full plan controls expensive setup without silent quality skips", () => {
+test("CI affected/full plan controls setup and default main produces one strict receipt", () => {
   assert.match(
     planRuns,
     /EVENT_NAME" == "pull_request"[\s\S]*gate_mode=affected/u,
@@ -133,7 +136,17 @@ test("CI affected/full plan controls expensive setup without silent quality skip
   );
   assert.match(qualityRuns, /affected\.sh --base "\$QA_BASE_RANGE" --run/u);
   assert.match(qualityRuns, /run-gate-with-receipt\.mjs --gate full/u);
-  assert.doesNotMatch(qualityRuns, /--gate strict/u);
+  assert.match(
+    qualityRuns,
+    /EVENT_NAME" == "push".*REF_NAME" == "refs\/heads\/main"[\s\S]*exact-sha-gate\.mjs[\s\S]*--main-ref origin\/main[\s\S]*--run/u,
+  );
+  const strictUpload = quality.steps.find(
+    (step) =>
+      step.name === "Persist the default-branch exact-SHA strict receipt",
+  );
+  assert.match(strictUpload.if, /event_name == 'push'.*refs\/heads\/main/u);
+  assert.equal(strictUpload.with.name, "strict-terminal-${{ github.sha }}");
+  assert.match(strictUpload.with.path, /output\/qa\/exact-sha/u);
 });
 
 test("CI pins actions, toolchains, database and Chromium sandbox", () => {
@@ -149,6 +162,8 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
     "actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
     "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
     "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea",
@@ -180,6 +195,22 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
   assert.match(qualityRuns, /if \[\[ ! -x "\$go_bin\/govulncheck" \]\]/u);
   assert.match(qualityRuns, /if \[\[ ! -f "\$archive" \]\]/u);
   assert.doesNotMatch(source, /--no-sandbox|--disable-setuid-sandbox/u);
+});
+
+test("CI preserves an auditable supersession relation without cancelling release work", () => {
+  const audit = plan.steps.find(
+    (step) => step.name === "Record superseded same-ref CI identity",
+  );
+  const upload = plan.steps.find(
+    (step) => step.name === "Persist the CI supersession audit",
+  );
+  assert.match(audit.if, /event_name == 'push'.*refs\/heads\/main/u);
+  assert.match(audit.run, /same_ref_newer_sha/u);
+  assert.match(audit.run, /supersededSha/u);
+  assert.match(audit.run, /replacementSha/u);
+  assert.match(audit.run, /actions\/workflows\/ci\.yml\/runs/u);
+  assert.equal(upload.with.name, "ci-supersession-${{ github.sha }}");
+  assert.equal(workflow.concurrency["cancel-in-progress"], true);
 });
 
 test("CI proves schema generation and source archive only when selected", () => {

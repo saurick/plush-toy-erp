@@ -8,7 +8,12 @@ import {
   DEV_DELIVERY_SESSION_API_PATH,
   DEV_DELIVERY_SOURCE_PATH,
   DEV_DELIVERY_SUMMARY_API_PATH,
+  DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
   DEV_VERSION_CENTER_ROUTE,
+  DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
+  DEV_VERSION_CENTER_VIEW_HISTORY,
+  DEV_VERSION_CENTER_VIEW_PIPELINE,
+  DEV_VERSION_CENTER_VIEW_VERSIONS,
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   defaultReleaseVersion,
@@ -17,12 +22,14 @@ import {
   deliveryPipelineRunMode,
   deliveryPipelineRunModePresentation,
   deliveryStatusPresentation,
+  deliveryTargetCachePresentation,
   deliveryVersionActionKind,
   findLatestTransferredPromotion,
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryPercent,
   formatDeliveryRate,
+  resolveDevVersionCenterView,
   shortGitSha,
   summarizePipelineTimings,
   validateDevDeliverySummary,
@@ -196,6 +203,55 @@ test('latest transferred promotion ignores same-SHA no-op receipts', () => {
   )
   assert.equal(findLatestTransferredPromotion([alreadyCurrent]), null)
   assert.equal(findLatestTransferredPromotion(null), null)
+})
+
+test('target cache metrics require exact identity evidence and use Chinese presentation', () => {
+  const metrics = {
+    ...summaryFixture().operations[0].metrics,
+    targetCacheHit: true,
+    targetImageCacheHit: true,
+    targetCacheSource: 'formal',
+    avoidedTransferBytes: 1_325_933_239,
+    avoidedTransferDurationMs: 114_267,
+    avoidedTransferBaselineOperationId: '22222222-2222-4222-8222-222222222222',
+    dockerLoadSkipped: true,
+    cacheBasis: [
+      'release_manifest_sha256',
+      'archive_sha256',
+      'registry_digest',
+      'docker_content_id',
+      'embedded_git_sha',
+    ],
+    stillExecutedChecks: ['migration', 'health', 'ready', 'public_entry'],
+  }
+  const summary = summaryFixture()
+  summary.operations[0] = { ...summary.operations[0], metrics }
+  assert.equal(validateDevDeliverySummary(summary).status, 'success')
+  assert.deepEqual(deliveryTargetCachePresentation(metrics), {
+    status: '目标缓存命中',
+    source: '正式保留版本缓存',
+    basis: [
+      '发布清单校验和',
+      '制品归档校验和',
+      '镜像仓库摘要',
+      'Docker 内容标识',
+      '镜像内完整 Git SHA',
+    ],
+    stillExecuted: ['数据库迁移', '健康检查', '就绪检查', '公网入口读回'],
+  })
+  assert.throws(
+    () =>
+      validateDevDeliverySummary({
+        ...summary,
+        operations: [
+          {
+            ...summary.operations[0],
+            metrics: { ...metrics, cacheBasis: ['archive_sha256'] },
+          },
+        ],
+      }),
+    /operation/u
+  )
 })
 
 test('delivery summary requires provider, target and no-shell boundaries', () => {
@@ -705,6 +761,47 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
     /(?:spawn|child_process|192[.]168|\/home\/simon)/iu
   )
   assert.doesNotMatch(source, /name=["'](?:host|path|command|target)["']/iu)
+})
+
+test('version center keeps critical state visible and uses stable tab pagination contracts', () => {
+  assert.equal(
+    resolveDevVersionCenterView(''),
+    DEV_VERSION_CENTER_VIEW_VERSIONS
+  )
+  assert.equal(
+    resolveDevVersionCenterView('unexpected'),
+    DEV_VERSION_CENTER_VIEW_VERSIONS
+  )
+  assert.equal(
+    resolveDevVersionCenterView(DEV_VERSION_CENTER_VIEW_PIPELINE),
+    DEV_VERSION_CENTER_VIEW_PIPELINE
+  )
+  assert.equal(
+    resolveDevVersionCenterView(DEV_VERSION_CENTER_VIEW_HISTORY),
+    DEV_VERSION_CENTER_VIEW_HISTORY
+  )
+  assert.equal(DEV_VERSION_CENTER_VERSION_PAGE_SIZE, 6)
+  assert.equal(DEV_VERSION_CENTER_HISTORY_PAGE_SIZE, 10)
+
+  assert.match(versionCenterPageSource, /useSearchParams/u)
+  assert.match(versionCenterPageSource, /label: '版本与部署'/u)
+  assert.match(versionCenterPageSource, /label: 'CI\/CD 效能'/u)
+  assert.match(versionCenterPageSource, /label: '操作记录'/u)
+  assert.match(versionCenterPageSource, /openOperations[.]map/u)
+  assert.match(versionCenterPageSource, /dataSource=\{historyOperations\}/u)
+  assert.match(versionCenterPageSource, /DevPipelineStatusStrip/u)
+  assert.match(
+    versionCenterPageSource,
+    /pageSize: DEV_VERSION_CENTER_VERSION_PAGE_SIZE[\s\S]*showSizeChanger: false/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE[\s\S]*showSizeChanger: false/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /未结束操作始终保持可见[\s\S]*openOperations[.]map[\s\S]*DevPipelineStatusStrip[\s\S]*<Tabs/u
+  )
 })
 
 test('delivery pages expose one canonical dangerous action and lock concurrent mutations', () => {

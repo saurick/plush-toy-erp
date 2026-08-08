@@ -20,6 +20,7 @@ import {
   buildExactShaProvenance,
   buildExactShaPlan,
   readExactShaTerminal,
+  refreshExactShaTimeSensitiveCheck,
   runExactShaGate,
 } from "./exact-sha-gate.mjs";
 
@@ -33,6 +34,16 @@ function writeReceipt(plan, status) {
       profile: "strict",
       gitCommit: plan.gitSha,
       status,
+      metrics: {
+        categoryCounts: Object.fromEntries(
+          ["web", "server", "database", "browser", "security"].map((key) => [
+            key,
+            status === "passed"
+              ? { executed: 1, passed: 1, failed: 0, skipped: 0 }
+              : { executed: 1, passed: 0, failed: 1, skipped: 0 },
+          ]),
+        ),
+      },
     })}\n`,
     "utf8",
   );
@@ -73,17 +84,24 @@ function createFixture() {
     "server/go.sum",
     "web/package.json",
     "web/pnpm-lock.yaml",
+    "server/Dockerfile",
+    "web/Dockerfile",
+    "scripts/qa/strict-receipt-identity.mjs",
+    "scripts/qa/strict-receipt-identity.test.mjs",
+    "server/internal/data/model/migrate/20260101000000_init.sql",
+    "config/customers/yoyoosun/customerPackage.mjs",
+    "config/customers/yoyoosun/roleFlowMatrix.mjs",
   ]);
   for (const file of files) {
     const target = path.join(root, file);
     mkdirSync(path.dirname(target), { recursive: true });
-    writeFileSync(
-      target,
+    const content =
       file === "web/package.json"
         ? '{"scripts":{"test":"node --test"}}\n'
-        : `${file}\n`,
-      "utf8",
-    );
+        : file.endsWith("/customerPackage.mjs")
+          ? 'export default { packageKey: "yoyoosun-customer-package-test", status: "active", runtimeEnabled: true };\n'
+          : `${file}\n`;
+    writeFileSync(target, content, "utf8");
     if (executables.has(file)) chmodSync(target, 0o755);
   }
   writeFileSync(path.join(root, ".gitignore"), "output/\n", "utf8");
@@ -131,16 +149,8 @@ test("exact-SHA passed terminal is reused without running strict again", () => {
         return { status: 0 };
       },
     };
-    const first = runExactShaGate(
-      fixture.root,
-      { sha: fixture.sha },
-      runtime,
-    );
-    const second = runExactShaGate(
-      fixture.root,
-      { sha: fixture.sha },
-      runtime,
-    );
+    const first = runExactShaGate(fixture.root, { sha: fixture.sha }, runtime);
+    const second = runExactShaGate(fixture.root, { sha: fixture.sha }, runtime);
     assert.equal(first.reused, false);
     assert.equal(second.reused, true);
     assert.equal(second.terminal.status, "passed");
@@ -161,20 +171,46 @@ test("exact-SHA failed terminal is final for the same fingerprint", () => {
         return { status: 7 };
       },
     };
-    const first = runExactShaGate(
-      fixture.root,
-      { sha: fixture.sha },
-      runtime,
-    );
-    const second = runExactShaGate(
-      fixture.root,
-      { sha: fixture.sha },
-      runtime,
-    );
+    const first = runExactShaGate(fixture.root, { sha: fixture.sha }, runtime);
+    const second = runExactShaGate(fixture.root, { sha: fixture.sha }, runtime);
     assert.equal(first.terminal.status, "failed");
     assert.equal(first.terminal.exitCode, 7);
     assert.equal(second.reused, true);
     assert.equal(runs, 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("exact-SHA refuses a green child without complete category evidence", () => {
+  const fixture = createFixture();
+  try {
+    assert.throws(
+      () =>
+        runExactShaGate(
+          fixture.root,
+          { sha: fixture.sha },
+          {
+            runStrict(plan) {
+              mkdirSync(path.dirname(plan.receiptPath), { recursive: true });
+              writeFileSync(
+                plan.receiptPath,
+                `${JSON.stringify({
+                  schemaVersion: "dev-workbench-receipt/v1",
+                  gate: "strict",
+                  profile: "strict",
+                  gitCommit: plan.gitSha,
+                  status: "passed",
+                  metrics: { categoryCounts: {} },
+                })}\n`,
+                "utf8",
+              );
+              return { status: 0 };
+            },
+          },
+        ),
+      /category set/u,
+    );
   } finally {
     fixture.cleanup();
   }
@@ -209,9 +245,7 @@ test("exact-SHA rejects dirty, detached candidate, and tampered terminals", () =
         },
       },
     );
-    const terminal = JSON.parse(
-      readFileSync(result.plan.terminalPath, "utf8"),
-    );
+    const terminal = JSON.parse(readFileSync(result.plan.terminalPath, "utf8"));
     terminal.gitSha = "0".repeat(40);
     writeFileSync(
       result.plan.terminalPath,
@@ -233,10 +267,15 @@ test("exact-SHA terminal binds receipt content and GitHub provenance", () => {
     const githubEnv = {
       GITHUB_ACTIONS: "true",
       GITHUB_REPOSITORY: "owner/repository",
-      GITHUB_WORKFLOW_REF: "owner/repository/.github/workflows/release.yml@refs/heads/main",
+      GITHUB_WORKFLOW_REF:
+        "owner/repository/.github/workflows/release.yml@refs/heads/main",
       GITHUB_RUN_ID: "123",
       GITHUB_RUN_ATTEMPT: "2",
       GITHUB_JOB: "validate",
+      GITHUB_EVENT_NAME: "push",
+      GITHUB_REF: "refs/heads/main",
+      GITHUB_REF_NAME: "main",
+      GITHUB_HEAD_REPOSITORY: "owner/repository",
     };
     assert.deepEqual(buildExactShaProvenance(githubEnv), {
       source: "github-actions",
@@ -245,6 +284,11 @@ test("exact-SHA terminal binds receipt content and GitHub provenance", () => {
       runId: "123",
       runAttempt: "2",
       job: "validate",
+      eventName: "push",
+      ref: "refs/heads/main",
+      refName: "main",
+      headRepository: "owner/repository",
+      conclusion: "success",
     });
     const result = runExactShaGate(
       fixture.root,
@@ -260,6 +304,45 @@ test("exact-SHA terminal binds receipt content and GitHub provenance", () => {
     assert.throws(
       () => readExactShaTerminal(result.plan),
       /receipt contract mismatch|receipt integrity mismatch/u,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("time-sensitive refresh reruns only govulncheck and preserves deterministic identity", () => {
+  const fixture = createFixture();
+  try {
+    const first = runExactShaGate(
+      fixture.root,
+      { sha: fixture.sha },
+      {
+        runStrict(plan) {
+          writeReceipt(plan, "passed");
+          return { status: 0 };
+        },
+      },
+    );
+    let runs = 0;
+    const refreshed = refreshExactShaTimeSensitiveCheck(
+      fixture.root,
+      {
+        sha: fixture.sha,
+        key: "vulnerabilityDatabase",
+      },
+      {
+        runCheck() {
+          runs += 1;
+          return { status: 0 };
+        },
+        now: () => new Date("2026-08-10T01:00:00.000Z"),
+      },
+    );
+    assert.equal(runs, 1);
+    assert.deepEqual(refreshed.terminal.identity, first.terminal.identity);
+    assert.equal(
+      refreshed.terminal.timeSensitiveChecks.vulnerabilityDatabase.validUntil,
+      "2026-08-11T01:00:00.000Z",
     );
   } finally {
     fixture.cleanup();
