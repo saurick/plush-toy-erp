@@ -379,6 +379,40 @@ test("a real Git push PATH prefix preserves the prepared environment", () => {
   }
 });
 
+test("a wrapped Git exec-path prefix is normalized through the base PATH", (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-receipt-git-path-"));
+  const wrapperBin = path.join(root, "wrapper-bin");
+  const execPath = path.join(root, "git-exec-path");
+  mkdirSync(wrapperBin, { recursive: true });
+  mkdirSync(execPath, { recursive: true });
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(
+    path.join(wrapperBin, "git"),
+    "#!/bin/sh\n[ \"$1\" = --exec-path ] || exit 9\nprintf '%s\\n' \"$FAKE_GIT_EXEC_PATH\"\n",
+    "utf8",
+  );
+  writeFileSync(
+    path.join(execPath, "git"),
+    "#!/bin/sh\n[ \"$1\" = --exec-path ] || exit 9\nprintf '%s\\n' /broken/git-core\n",
+    "utf8",
+  );
+  chmodSync(path.join(wrapperBin, "git"), 0o755);
+  chmodSync(path.join(execPath, "git"), 0o755);
+
+  const baseEnvironment = cleanEnvironment({
+    FAKE_GIT_EXEC_PATH: execPath,
+    PATH: `${wrapperBin}${path.delimiter}${process.env.PATH}`,
+  });
+  const baseline = environmentFingerprint(root, baseEnvironment);
+  assert.equal(
+    environmentFingerprint(root, {
+      ...baseEnvironment,
+      PATH: `${execPath}${path.delimiter}${baseEnvironment.PATH}`,
+    }),
+    baseline,
+  );
+});
+
 test(
   "an unchanged govulncheck version survives one slow version probe",
   { timeout: 30_000 },

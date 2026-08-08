@@ -542,17 +542,26 @@ function normalizedEnvironmentValue(root, env, key) {
   const value = env[key] ?? null;
   if (key !== "PATH" || value === null) return value;
 
+  const entries = value.split(path.delimiter);
+  if (entries.length < 2 || !entries[0]) return value;
+  const pathWithoutCandidate = entries.slice(1).join(path.delimiter);
   const gitExecPath = commandResult("git", ["--exec-path"], {
     cwd: root,
-    env,
+    env: { ...env, PATH: pathWithoutCandidate },
     timeout: 5_000,
   });
   if (gitExecPath.error || gitExecPath.status !== 0) return value;
 
-  const injectedPrefix = gitExecPath.stdout.trim();
-  if (!injectedPrefix) return value;
-  const entries = value.split(path.delimiter);
-  while (entries[0] === injectedPrefix) entries.shift();
+  const expectedPrefix = gitExecPath.stdout.trim();
+  if (!expectedPrefix) return value;
+  const pathIdentity = (candidate) => {
+    try {
+      return realpathSync(candidate);
+    } catch {
+      return path.resolve(candidate);
+    }
+  };
+  if (pathIdentity(entries[0]) === pathIdentity(expectedPrefix)) entries.shift();
   return entries.join(path.delimiter);
 }
 
