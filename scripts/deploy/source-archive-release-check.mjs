@@ -591,14 +591,18 @@ export function summarizeBuildxRawJson(rawOutput) {
   const vertices = new Map();
   for (const line of String(rawOutput || "").split(/\r?\n/u)) {
     if (!line.trim().startsWith("{")) continue;
-    let entry;
+    let event;
     try {
-      entry = JSON.parse(line);
+      event = JSON.parse(line);
     } catch {
       continue;
     }
-    if (!entry?.id || typeof entry.name !== "string") continue;
-    vertices.set(entry.id, { ...(vertices.get(entry.id) || {}), ...entry });
+    const entries = Array.isArray(event?.vertexes) ? event.vertexes : [event];
+    for (const entry of entries) {
+      const id = entry?.digest || entry?.id;
+      if (!id || typeof entry.name !== "string") continue;
+      vertices.set(id, { ...(vertices.get(id) || {}), ...entry });
+    }
   }
   const completed = [...vertices.values()].filter((entry) => {
     if (!parseBuildTimestamp(entry.completed)) return false;

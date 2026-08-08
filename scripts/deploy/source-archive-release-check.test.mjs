@@ -216,27 +216,52 @@ test("runCommand reports bounded sanitized stderr on failure", () => {
 test("Buildx raw JSON summary counts completed build vertices and cache hits once", () => {
   const output = [
     JSON.stringify({
-      id: "load",
-      name: "[release-web internal] load build definition from Dockerfile",
-      completed: "2026-08-08T01:00:00Z",
-      cached: true,
+      vertexes: [
+        {
+          digest: "sha256:load",
+          name: "[release-web internal] load build definition from Dockerfile",
+          completed: "2026-08-08T01:00:00Z",
+          cached: true,
+        },
+      ],
     }),
     JSON.stringify({
-      id: "web-deps",
-      name: "[release-web web-builder 2/6] RUN pnpm install",
-      started: "2026-08-08T01:00:00Z",
+      vertexes: [
+        {
+          digest: "sha256:web-deps",
+          name: "[release-web web-builder 2/6] RUN pnpm install",
+          started: "2026-08-08T01:00:00Z",
+        },
+      ],
     }),
     JSON.stringify({
-      id: "web-deps",
-      name: "[release-web web-builder 2/6] RUN pnpm install",
-      completed: "2026-08-08T01:00:01Z",
-      cached: true,
+      vertexes: [
+        {
+          digest: "sha256:web-deps",
+          name: "[release-web web-builder 2/6] RUN pnpm install",
+          completed: "2026-08-08T01:00:01Z",
+          cached: true,
+        },
+      ],
     }),
     JSON.stringify({
-      id: "server-build",
-      name: "[release-server server-builder 8/8] RUN go build",
-      completed: "2026-08-08T01:00:02Z",
-      cached: false,
+      statuses: [
+        {
+          id: "compiling",
+          vertex: "sha256:web-deps",
+          current: 100,
+        },
+      ],
+    }),
+    JSON.stringify({
+      vertexes: [
+        {
+          digest: "sha256:server-build",
+          name: "[release-server server-builder 8/8] RUN go build",
+          completed: "2026-08-08T01:00:02Z",
+          cached: false,
+        },
+      ],
     }),
     "not-json",
   ].join("\n");
@@ -246,6 +271,22 @@ test("Buildx raw JSON summary counts completed build vertices and cache hits onc
     cacheMissCount: 1,
     cacheHitRateBasisPoints: 5_000,
   });
+  assert.deepEqual(
+    summarizeBuildxRawJson(
+      JSON.stringify({
+        id: "legacy-direct-entry",
+        name: "[release-web web-builder 2/6] RUN pnpm install",
+        completed: "2026-08-08T01:00:01Z",
+        cached: true,
+      }),
+    ),
+    {
+      completedVertexCount: 1,
+      cacheHitCount: 1,
+      cacheMissCount: 0,
+      cacheHitRateBasisPoints: 10_000,
+    },
+  );
 });
 
 test("plan reports a dirty worktree without claiming formal evidence", async () => {
@@ -505,16 +546,24 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
               status: 0,
               stdout: [
                 JSON.stringify({
-                  id: "web-deps",
-                  name: "[release-web web-builder 2/6] RUN pnpm install",
-                  completed: "2026-08-08T01:00:01Z",
-                  cached: true,
+                  vertexes: [
+                    {
+                      digest: "sha256:web-deps",
+                      name: "[release-web web-builder 2/6] RUN pnpm install",
+                      completed: "2026-08-08T01:00:01Z",
+                      cached: true,
+                    },
+                  ],
                 }),
                 JSON.stringify({
-                  id: "server-build",
-                  name: "[release-server server-builder 8/8] RUN go build",
-                  completed: "2026-08-08T01:00:02Z",
-                  cached: false,
+                  vertexes: [
+                    {
+                      digest: "sha256:server-build",
+                      name: "[release-server server-builder 8/8] RUN go build",
+                      completed: "2026-08-08T01:00:02Z",
+                      cached: false,
+                    },
+                  ],
                 }),
               ].join("\n"),
               stderr: "",
