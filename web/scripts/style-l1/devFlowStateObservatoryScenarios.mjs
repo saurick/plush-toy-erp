@@ -3,6 +3,9 @@ const DEFAULT_CHAIN_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=chain&chain=
 const DELIVERY_CHAIN_PATH =
   `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=chain` +
   '&chain=delivery_to_settlement&node=shipment_draft'
+const PRODUCTION_EXCEPTION_CHAIN_PATH =
+  `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=chain` +
+  '&chain=production_exception&node=production_exception_decision'
 const INVALID_DEEP_LINK_PATH =
   `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=facts` +
   '&chain=retired-chain&fact=fact.retired&task_id=abc&extra=1'
@@ -187,6 +190,70 @@ async function collectBoxMetrics(page) {
       nestedVerticalScrollers,
     }
   })
+}
+
+async function collectCustomerReviewPrintMetrics(page) {
+  return page.locator('[data-customer-review-print-root]').evaluate((root) => {
+    const stepRects = [
+      ...root.querySelectorAll('.erp-dev-flow-customer-review__steps > li'),
+    ].map((step) => {
+      const rect = step.getBoundingClientRect()
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        clientWidth: step.clientWidth,
+        scrollWidth: step.scrollWidth,
+        clientHeight: step.clientHeight,
+        scrollHeight: step.scrollHeight,
+      }
+    })
+    return {
+      mode: root.getAttribute('data-review-mode') || '',
+      backgroundColor: window.getComputedStyle(root).backgroundColor,
+      color: window.getComputedStyle(root).color,
+      width: root.getBoundingClientRect().width,
+      height: root.getBoundingClientRect().height,
+      clientWidth: root.clientWidth,
+      scrollWidth: root.scrollWidth,
+      clientHeight: root.clientHeight,
+      scrollHeight: root.scrollHeight,
+      stepCount: stepRects.length,
+      stepOverflowCount: stepRects.filter(
+        (step) =>
+          step.scrollWidth > step.clientWidth + 1 ||
+          step.scrollHeight > step.clientHeight + 1
+      ).length,
+      stepOverlapCount: stepRects
+        .slice(1)
+        .filter((step, index) => step.top < stepRects[index].bottom - 1).length,
+      overviewLaneCount: root.querySelectorAll(
+        '.erp-dev-flow-customer-review__lanes > section'
+      ).length,
+      overviewChainCount: root.querySelectorAll(
+        '.erp-dev-flow-customer-review__lanes li'
+      ).length,
+    }
+  })
+}
+
+async function triggerCustomerReviewPrint(page) {
+  const beforeURL = page.url()
+  const beforeGeneratedAt = await page
+    .locator('[data-customer-review-print-root]')
+    .getAttribute('data-review-generated-at')
+  await page.evaluate(() => {
+    window.__devBusinessChainPrintCalls = 0
+    window.print = () => {
+      window.__devBusinessChainPrintCalls += 1
+    }
+  })
+  await page.getByRole('button', { name: '导出甲方校对版' }).click()
+  await page.waitForFunction(() => window.__devBusinessChainPrintCalls === 1)
+  const afterGeneratedAt = await page
+    .locator('[data-customer-review-print-root]')
+    .getAttribute('data-review-generated-at')
+  return { beforeURL, beforeGeneratedAt, afterGeneratedAt }
 }
 
 function startNoWriteAudit(page, store) {
@@ -753,6 +820,18 @@ export function createDevFlowStateObservatoryScenarios({
         await page
           .locator('[data-flow-state-view="states"]')
           .waitFor({ state: 'visible', timeout: 10_000 })
+        {
+          const params = new URL(page.url()).searchParams
+          assert.equal(params.get('view'), 'states')
+          assert.equal(params.get('flow'), 'source.sales_order')
+          for (const key of ['chain', 'node', 'process', 'fact']) {
+            assert.equal(
+              params.has(key),
+              false,
+              `状态规则深链接不得保留 ${key}`
+            )
+          }
+        }
         assert.equal(
           await root.locator('.erp-dev-flow-definition-tools').count(),
           1,
@@ -777,13 +856,13 @@ export function createDevFlowStateObservatoryScenarios({
           .locator('.ant-select-item-group')
           .allTextContents()
         assert.deepEqual(stateGroupLabels, [
-          '源单生命周期 · 5',
+          '源单生命周期 · 6',
           'MasterData 生命周期 · 2',
           'Workflow 协同任务 · 1',
           '业务进度投影 · 1',
           'ProcessRuntime · 2',
           'Fact / Ledger · 采购与质量 · 5',
-          'Fact / Ledger · 生产与库存 · 8',
+          'Fact / Ledger · 生产与库存 · 7',
           'Fact / Ledger · 委外与返工 · 3',
           'Fact / Ledger · 出货与财务 · 6',
           '客户配置控制面 · 1',
@@ -850,6 +929,18 @@ export function createDevFlowStateObservatoryScenarios({
           .click()
         const runtimeView = page.locator('[data-flow-state-view="runtime"]')
         await runtimeView.waitFor({ state: 'visible', timeout: 10_000 })
+        {
+          const params = new URL(page.url()).searchParams
+          assert.equal(params.get('view'), 'runtime')
+          assert(params.get('process'))
+          for (const key of ['chain', 'node', 'flow', 'state', 'fact']) {
+            assert.equal(
+              params.has(key),
+              false,
+              `运行路径深链接不得保留 ${key}`
+            )
+          }
+        }
         assert.equal(
           await root.locator('.erp-dev-flow-definition-tools').count(),
           1,
@@ -1305,6 +1396,18 @@ export function createDevFlowStateObservatoryScenarios({
         await chainView.getByRole('button', { name: /查看.*出货事实/u }).click()
         const factView = page.locator('[data-flow-state-view="facts"]')
         await factView.waitFor({ state: 'visible', timeout: 10_000 })
+        {
+          const params = new URL(page.url()).searchParams
+          assert.equal(params.get('view'), 'facts')
+          assert.equal(params.get('fact'), 'fact.shipment')
+          for (const key of ['chain', 'node', 'flow', 'state', 'process']) {
+            assert.equal(
+              params.has(key),
+              false,
+              `事实定义深链接不得保留 ${key}`
+            )
+          }
+        }
         await expectText(page, '未提供运行凭证查询')
         await expectText(page, '出货事实')
         await factView.screenshot({
@@ -1352,6 +1455,147 @@ export function createDevFlowStateObservatoryScenarios({
       },
     },
     {
+      name: 'dev-flow-state-observatory-customer-review-chain-print',
+      path: PRODUCTION_EXCEPTION_CHAIN_PATH,
+      viewport: { width: 1440, height: 900 },
+      themeMode: 'dark',
+      beforeNavigate: async (page) => {
+        startNoWriteAudit(page, writeRequestsByPage)
+      },
+      verify: async (page) => {
+        await waitForCatalog(page)
+        const chainView = page.locator('[data-flow-state-view="chain"]')
+        assert.equal(
+          await chainView.locator('[data-chain-node]').count(),
+          9,
+          '生产异常链必须展示拒绝、超领和报废或让步执行分支'
+        )
+        const printRequest = await triggerCustomerReviewPrint(page)
+        assert.equal(page.url(), printRequest.beforeURL)
+        assert(printRequest.afterGeneratedAt)
+
+        await page.emulateMedia({ media: 'print' })
+        const printRoot = page.locator('[data-customer-review-print-root]')
+        await printRoot.waitFor({ state: 'visible', timeout: 10_000 })
+        const printText = await printRoot.innerText()
+        for (const copy of [
+          '业务链甲方校对版｜生产异常决策与执行',
+          '产品通用设计校对稿',
+          '未绑定客户发布版本',
+          '第 9 步',
+          '拒绝或取消后结束',
+          '超领批准额度',
+          '报废或在制让步执行任务',
+          '系统自动完成什么',
+          '人员需要办理什么',
+          '流程或任务完成不等于库存、出货、生产或财务事实已经生效',
+          '本文件用于业务需求校对，不单独证明已经实现、发布或经甲方验收',
+        ]) {
+          assert(printText.includes(copy), `甲方单链打印稿缺少：${copy}`)
+        }
+        for (const forbidden of [
+          'ProcessRuntime',
+          'Fact / Ledger',
+          'Source Document',
+          'RBAC',
+          'task_id',
+          'server/',
+          'fact.production_exception',
+        ]) {
+          assert(
+            !printText.includes(forbidden),
+            `甲方单链打印稿不得出现开发信息：${forbidden}`
+          )
+        }
+        const metrics = await collectCustomerReviewPrintMetrics(page)
+        assert.equal(metrics.mode, 'chain')
+        assert.equal(metrics.backgroundColor, 'rgb(255, 255, 255)')
+        assert.equal(metrics.stepCount, 9)
+        assert.equal(metrics.stepOverflowCount, 0)
+        assert.equal(metrics.stepOverlapCount, 0)
+        assert(metrics.scrollWidth <= metrics.clientWidth + 1)
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-customer-review-chain-print.png',
+          fullPage: true,
+          animations: 'disabled',
+        })
+        await page.pdf({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-customer-review-chain.pdf',
+          format: 'A4',
+          preferCSSPageSize: true,
+          printBackground: true,
+        })
+        await page.emulateMedia({ media: 'screen' })
+        assert.equal(await printRoot.isVisible(), false)
+        assert.equal(page.url(), printRequest.beforeURL)
+        const writeRequests = writeRequestsByPage.get(page) || []
+        assert.deepEqual(writeRequests, [], '甲方单链导出不得发出写请求')
+        reportScenarioEvidence(
+          'dev-flow-state-observatory-customer-review-chain-print',
+          { metrics, printRequest, writeRequests }
+        )
+      },
+    },
+    {
+      name: 'dev-flow-state-observatory-customer-review-overview-print',
+      path: DEFAULT_CHAIN_PATH,
+      viewport: { width: 1440, height: 900 },
+      themeMode: 'dark',
+      beforeNavigate: async (page) => {
+        startNoWriteAudit(page, writeRequestsByPage)
+      },
+      verify: async (page) => {
+        await waitForCatalog(page)
+        assert.equal(
+          await page.locator('[data-business-chain-overview]').count(),
+          1
+        )
+        const printRequest = await triggerCustomerReviewPrint(page)
+        assert.equal(page.url(), printRequest.beforeURL)
+
+        await page.emulateMedia({ media: 'print' })
+        const printRoot = page.locator('[data-customer-review-print-root]')
+        await printRoot.waitFor({ state: 'visible', timeout: 10_000 })
+        const printText = await printRoot.innerText()
+        assert(printText.includes('业务链甲方校对版｜业务链总览'))
+        assert(printText.includes('不展开每条链的内部步骤'))
+        assert.equal(
+          await printRoot
+            .locator('.erp-dev-flow-customer-review__steps')
+            .count(),
+          0,
+          '总览打印不得展开单链内部步骤'
+        )
+        const metrics = await collectCustomerReviewPrintMetrics(page)
+        assert.equal(metrics.mode, 'overview')
+        assert.equal(metrics.backgroundColor, 'rgb(255, 255, 255)')
+        assert.equal(metrics.overviewLaneCount, 4)
+        assert.equal(metrics.overviewChainCount, 12)
+        assert.equal(metrics.stepCount, 0)
+        assert(metrics.scrollWidth <= metrics.clientWidth + 1)
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-customer-review-overview-print.png',
+          fullPage: true,
+          animations: 'disabled',
+        })
+        await page.pdf({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-customer-review-overview.pdf',
+          format: 'A4',
+          preferCSSPageSize: true,
+          printBackground: true,
+        })
+        await page.emulateMedia({ media: 'screen' })
+        assert.equal(await printRoot.isVisible(), false)
+        assert.equal(page.url(), printRequest.beforeURL)
+        const writeRequests = writeRequestsByPage.get(page) || []
+        assert.deepEqual(writeRequests, [], '甲方总览导出不得发出写请求')
+        reportScenarioEvidence(
+          'dev-flow-state-observatory-customer-review-overview-print',
+          { metrics, printRequest, writeRequests }
+        )
+      },
+    },
+    {
       name: 'dev-flow-state-observatory-invalid-deep-link',
       path: INVALID_DEEP_LINK_PATH,
       viewport: { width: 1280, height: 800 },
@@ -1363,6 +1607,7 @@ export function createDevFlowStateObservatoryScenarios({
         await expectText(page, '无效或过期深链接')
         await expectText(page, '未知 query 参数：extra')
         await expectText(page, '未知或过期业务链：retired-chain')
+        await expectText(page, '看已生效结果视图不接受参数：chain')
         assert.equal(
           await page.locator('.erp-dev-flow-view-stack').count(),
           0,
@@ -1866,21 +2111,21 @@ export function createDevFlowStateObservatoryScenarios({
             .allTextContents(),
           [
             '采购与质量 · 5',
-            '生产与库存 · 8',
+            '生产与库存 · 7',
             '委外与返工 · 3',
             '出货与财务 · 6',
           ]
         )
         assert.equal(
           await factDropdown.locator('.ant-select-item-option').count(),
-          22,
+          21,
           'Fact 下拉必须按四个导航分组精确覆盖全部定义'
         )
         assert.equal(
           await factDropdown
             .locator('.erp-dev-flow-definition-option__key')
             .count(),
-          22,
+          21,
           '开发观察台必须保留全部机器键，但降低其视觉权重'
         )
         const factSelectMetrics = await factDropdown.evaluate((node) => {

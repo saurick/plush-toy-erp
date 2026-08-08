@@ -179,18 +179,3 @@ test('desktop task board preserves the drawer decision and refuses to invent app
   assert.match(source, /审批表单与当前流程节点不一致/u)
   assert.doesNotMatch(source, /process_decision:/u)
 })
-
-test('workbench exposes a gated and lazy-loaded permission relationship graph', () => {
-  assert.match(source, /canViewPermissionRelationshipGraph\(adminProfile\)/u)
-  assert.match(
-    source,
-    /const PermissionRelationshipGraphModal = React\.lazy\(/u
-  )
-  assert.match(
-    source,
-    /permissionRelationshipOpen && canViewPermissionRelationship/u
-  )
-  assert.match(source, />\s*权限关系图\s*</u)
-  assert.match(source, /navigate\('\/erp\/system\/permissions'\)/u)
-  assert.doesNotMatch(source, /^import PermissionRelationshipGraphModal/mu)
-})

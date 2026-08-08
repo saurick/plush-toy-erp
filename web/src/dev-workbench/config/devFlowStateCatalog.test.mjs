@@ -968,10 +968,13 @@ test('devFlowStateCatalog: 搜索和筛选返回新对象且不改原目录', ()
   })
   assert.deepEqual(
     result.flows.map((flow) => flow.key),
-    [
-      'fact.production_exception_decision',
-      'fact.production_exception_execution',
-    ]
+    ['fact.production_exception_execution']
+  )
+  assert.equal(
+    DEV_FLOW_STATE_CATALOG.flows.find(
+      (flow) => flow.key === 'fact.production_exception_decision'
+    )?.scopeKey,
+    'source_document'
   )
   assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 34)
 })

@@ -192,6 +192,38 @@ test('business chain nodes and edges remain connected, read-only, and source-bac
   }
 })
 
+test('production exception chain keeps the decision as a source document and exposes every approved or rejected branch', () => {
+  const chain = DEV_FLOW_STATE_CATALOG.businessChains.find(
+    (item) => item.key === 'production_exception'
+  )
+  const decision = chain.nodes.find(
+    (node) => node.key === 'production_exception_decision'
+  )
+  const branchLabels = chain.edges
+    .filter((edge) => edge.from === 'production_exception_task')
+    .map((edge) => edge.label)
+
+  assert.equal(decision.layer, 'source_document')
+  assert.deepEqual(decision.factKeys, [])
+  assert.deepEqual(branchLabels, [
+    '拒绝或取消后结束，不进入执行',
+    '批准超领额度，转正常领料路径使用',
+    '批准报废或在制让步后创建执行任务',
+  ])
+  assert(
+    chain.nodes.some(
+      (node) => node.key === 'production_exception_execution_task'
+    )
+  )
+  assert(
+    chain.edges.some(
+      (edge) =>
+        edge.from === 'production_exception_execution_task' &&
+        edge.to === 'production_exception_execution'
+    )
+  )
+})
+
 test('business chain catalog fails closed when a state machine or process definition is uncovered', () => {
   assert.throws(
     () =>

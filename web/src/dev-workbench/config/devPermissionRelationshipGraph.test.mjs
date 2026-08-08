@@ -2,14 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   PERMISSION_RELATIONSHIP_ALL_MODULES,
-  PERMISSION_RELATIONSHIP_REQUIRED_PERMISSIONS,
   PERMISSION_RELATIONSHIP_VIEW_MODE,
   buildPermissionRelationshipModel,
   buildPermissionRelationshipModuleOptions,
   buildPermissionRelationshipTargetOptions,
-  canViewPermissionRelationshipGraph,
   getPermissionRelationshipRoleKeys,
-} from './permissionRelationshipGraph.mjs'
+} from './devPermissionRelationshipGraph.mjs'
 
 const accounts = [
   {
@@ -192,25 +190,6 @@ const approvalSettings = {
     },
   ],
 }
-
-test('relationship graph requires the complete read-only permission set', () => {
-  assert.equal(
-    canViewPermissionRelationshipGraph({ is_super_admin: true }),
-    true
-  )
-  assert.equal(
-    canViewPermissionRelationshipGraph({
-      permissions: [...PERMISSION_RELATIONSHIP_REQUIRED_PERMISSIONS],
-    }),
-    true
-  )
-  assert.equal(
-    canViewPermissionRelationshipGraph({
-      permissions: PERMISSION_RELATIONSHIP_REQUIRED_PERMISSIONS.slice(0, -1),
-    }),
-    false
-  )
-})
 
 test('role view connects accounts, role, final permissions, pages, scope and approvals', () => {
   const model = buildPermissionRelationshipModel({

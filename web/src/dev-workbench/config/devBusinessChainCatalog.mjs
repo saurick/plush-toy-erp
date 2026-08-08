@@ -65,8 +65,7 @@ const RELATION_KIND_SET = new Set(DEV_BUSINESS_CHAIN_RELATION_KINDS)
 
 const ARCHITECTURE_REF = 'docs/architecture/业务链与运行轨迹边界.md'
 const WORKFLOW_MAP_REF = 'docs/workflow/业务与协同流程地图.md'
-const PRODUCT_FLOW_REF =
-  'docs/product/业务主链路数据流向与字段来源规则.md'
+const PRODUCT_FLOW_REF = 'docs/product/业务主链路数据流向与字段来源规则.md'
 const PROCESS_CONTRACT_REF = 'server/internal/biz/customer_process_contracts.go'
 const PROCESS_RUNTIME_REF = 'server/internal/biz/process_runtime.go'
 
@@ -85,6 +84,7 @@ const chainNode = (key, label, layer, options = {}) => ({
     options.factKeys ||
     (layer === 'fact_ledger' ? options.machineKeys || [] : []),
   processDefinitionKeys: options.processDefinitionKeys || [],
+  responsibleRoleKeys: options.responsibleRoleKeys || [],
   sourceRefs: options.sourceRefs || [],
 })
 
@@ -885,7 +885,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'production_exception',
     '生产异常决策与执行',
     'exception',
-    '生产异常先形成决策单，经审批分流后再由领域命令写执行状态，并回到对应在制或生产事实。',
+    '生产异常先形成决策单；拒绝或取消后结束，超领批准后由正常领料路径消费额度，只有报废或在制让步会进入独立执行任务和领域命令。',
     [
       chainNode(
         'production_exception_decision',
@@ -893,7 +893,6 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         'source_document',
         {
           machineKeys: ['fact.production_exception_decision'],
-          factKeys: ['fact.production_exception_decision'],
           sourceRefs: ['server/internal/biz/production_exception_decision.go'],
         }
       ),
@@ -909,8 +908,51 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         }
       ),
       chainNode('production_exception_task', '异常审批任务', 'workflow_task', {
-        sourceRefs: ['server/internal/biz/workflow_source_tasks.go'],
+        responsibleRoleKeys: ['boss'],
+        sourceRefs: [
+          'server/internal/biz/workflow_source_tasks.go',
+          'server/internal/biz/customer_process_contracts.go',
+        ],
       }),
+      chainNode(
+        'production_exception_rejected',
+        '拒绝或取消后结束',
+        'source_document',
+        {
+          machineKeys: ['fact.production_exception_decision'],
+          sourceRefs: [
+            'server/internal/biz/production_exception_decision.go',
+            'server/internal/biz/customer_process_contracts.go',
+          ],
+        }
+      ),
+      chainNode(
+        'production_exception_over_issue',
+        '超领批准额度',
+        'source_document',
+        {
+          machineKeys: ['fact.production_exception_decision'],
+          sourceRefs: [
+            'server/internal/biz/production_exception_decision.go',
+            'server/internal/biz/customer_process_contracts.go',
+          ],
+        }
+      ),
+      chainNode(
+        'production_exception_execution_task',
+        '报废或在制让步执行任务',
+        'workflow_task',
+        {
+          responsibleRoleKeys: ['production'],
+          processDefinitionKeys: [
+            'production_exception_approval/exception_decision_approval',
+          ],
+          sourceRefs: [
+            'server/internal/biz/workflow_source_tasks.go',
+            'server/internal/biz/customer_process_contracts.go',
+          ],
+        }
+      ),
       chainNode(
         'production_exception_execution',
         '异常执行状态',
@@ -959,22 +1001,69 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainEdge(
         'production_exception_task',
-        'production_exception_execution',
-        '审批分支写入执行状态',
-        'calls_domain_command',
+        'production_exception_rejected',
+        '拒绝或取消后结束，不进入执行',
+        'returns',
+        {
+          action:
+            'OperationalFactUsecase.RejectProductionExceptionForProcessCommand / CancelProductionExceptionDecision',
+          factBoundary: 'source_document_only',
+          sourceRefs: [
+            'server/internal/biz/production_exception_decision.go',
+            'server/internal/biz/customer_process_contracts.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'production_exception_task',
+        'production_exception_over_issue',
+        '批准超领额度，转正常领料路径使用',
+        'returns',
         {
           action:
             'OperationalFactUsecase.ApproveProductionExceptionForProcessCommand',
-          factBoundary: 'exception_decision_via_domain_usecase',
+          factBoundary: 'source_document_allowance_only',
+          sourceRefs: [
+            'server/internal/biz/production_exception_decision.go',
+            'server/internal/biz/customer_process_contracts.go',
+            'server/internal/biz/exception_approval_branch_policy.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'production_exception_task',
+        'production_exception_execution_task',
+        '批准报废或在制让步后创建执行任务',
+        'creates_task',
+        {
+          action:
+            'OperationalFactUsecase.ApproveProductionExceptionForProcessCommand',
+          factBoundary: 'workflow_and_source_document_only',
+          sourceRefs: [
+            'server/internal/biz/customer_process_contracts.go',
+            'server/internal/biz/exception_approval_branch_policy.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'production_exception_execution_task',
+        'production_exception_execution',
+        '人员办理后执行报废或在制让步',
+        'calls_domain_command',
+        {
+          action:
+            'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
+          factBoundary: 'production_exception_execution',
           sourceRefs: [
             'server/internal/biz/production_exception_process_command.go',
+            'server/internal/biz/customer_process_contracts.go',
           ],
         }
       ),
       chainEdge(
         'production_exception_execution',
         'affected_wip',
-        '执行返工或恢复分支',
+        '按报废或让步结果更新受影响在制',
         'reworks',
         {
           action:
@@ -1552,7 +1641,12 @@ function normalizeBusinessChainOverview(rawOverview, chains) {
   const lanes = Object.freeze(
     rawOverview.lanes.map((lane) => {
       const chainKeys = uniqueStrings(lane.chainKeys)
-      if (!lane?.key || !lane?.label || !lane?.summary || chainKeys.length === 0) {
+      if (
+        !lane?.key ||
+        !lane?.label ||
+        !lane?.summary ||
+        chainKeys.length === 0
+      ) {
         throw new Error('business chain overview has an invalid lane')
       }
       const unknownChainKeys = chainKeys.filter((key) => !chainByKey.has(key))
@@ -1599,7 +1693,9 @@ function normalizeBusinessChainOverview(rawOverview, chains) {
       })
     })
   )
-  if (new Set(relations.map((relation) => relation.key)).size !== relations.length) {
+  if (
+    new Set(relations.map((relation) => relation.key)).size !== relations.length
+  ) {
     throw new Error('business chain overview has duplicate relations')
   }
   return Object.freeze({
@@ -1627,6 +1723,7 @@ function normalizeNode(
   const machineKeys = uniqueStrings(rawNode.machineKeys)
   const referencedFactKeys = uniqueStrings(rawNode.factKeys)
   const processDefinitionKeys = uniqueStrings(rawNode.processDefinitionKeys)
+  const responsibleRoleKeys = uniqueStrings(rawNode.responsibleRoleKeys)
   const unknownMachineKeys = machineKeys.filter((key) => !flowKeys.has(key))
   if (unknownMachineKeys.length > 0) {
     throw new Error(
@@ -1662,6 +1759,7 @@ function normalizeNode(
     machineKeys,
     factKeys: referencedFactKeys,
     processDefinitionKeys,
+    responsibleRoleKeys,
     processKeys: uniqueStrings(
       processDefinitionKeys.map((key) => processByKey.get(key).processKey)
     ),

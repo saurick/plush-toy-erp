@@ -44,6 +44,8 @@ test("production artifact boundary: rejects DEV routes, styles and private paths
   for (const marker of [
     "/__dev",
     "erp-dev-workspace-nav",
+    "erp-dev-permission-relationships",
+    "权限关系 / Effective Access",
     "customer-yoyoosun-private",
     "/Users/simon/",
   ]) {

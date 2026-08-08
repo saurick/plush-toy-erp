@@ -1,13 +1,13 @@
 import {
   ADMIN_ACCOUNT_STATUS,
   getAdminAccountStatus,
-} from './permissionCenterSearch.mjs'
+} from '../../erp/utils/permissionCenterSearch.mjs'
 import {
   getPermissionCenterRoleKey,
   getPermissionCenterRoleName,
   normalizePermissionUsage,
-} from './permissionCenterAccess.mjs'
-import { getPermissionModuleTitle } from './permissionModuleLabels.mjs'
+} from '../../erp/utils/permissionCenterAccess.mjs'
+import { getPermissionModuleTitle } from '../../erp/utils/permissionModuleLabels.mjs'
 
 export const PERMISSION_RELATIONSHIP_VIEW_MODE = Object.freeze({
   ROLE: 'role',
@@ -15,13 +15,6 @@ export const PERMISSION_RELATIONSHIP_VIEW_MODE = Object.freeze({
 })
 
 export const PERMISSION_RELATIONSHIP_ALL_MODULES = 'all'
-
-export const PERMISSION_RELATIONSHIP_REQUIRED_PERMISSIONS = Object.freeze([
-  'system.user.read',
-  'system.role.read',
-  'system.permission.read',
-  'customer_config.read',
-])
 
 const ACCOUNT_STATUS_LABELS = Object.freeze({
   [ADMIN_ACCOUNT_STATUS.ACTIVE]: '启用',
@@ -79,22 +72,6 @@ function roleKeysOfAccount(account = {}) {
     normalizeList(account?.roles)
       .map(getPermissionCenterRoleKey)
       .filter(Boolean)
-  )
-}
-
-function permissionsOfProfile(profile = {}) {
-  return unique(
-    normalizeList(profile?.permissions).map(permissionKey).filter(Boolean)
-  )
-}
-
-export function canViewPermissionRelationshipGraph(profile = {}) {
-  if (profile?.is_super_admin === true) {
-    return true
-  }
-  const granted = new Set(permissionsOfProfile(profile))
-  return PERMISSION_RELATIONSHIP_REQUIRED_PERMISSIONS.every((key) =>
-    granted.has(key)
   )
 }
 
@@ -321,11 +298,7 @@ function approvalRoleKeys(item = {}) {
 function approvalAppliesToAccountRole(item = {}, account = {}, roleKey = '') {
   const targetID = Number(account?.id)
   const normalizedRoleKey = normalizeText(roleKey)
-  if (
-    !Number.isSafeInteger(targetID) ||
-    targetID <= 0 ||
-    !normalizedRoleKey
-  ) {
+  if (!Number.isSafeInteger(targetID) || targetID <= 0 || !normalizedRoleKey) {
     return false
   }
   return normalizeList(item?.members).some(
@@ -714,11 +687,10 @@ export function buildPermissionRelationshipModel({
 
     normalizeList(approvalSettings?.items)
       .filter((item) => item?.enabled === true)
-      .filter(
-        (item) =>
-          (selectedAccount
-            ? approvalAppliesToAccountRole(item, selectedAccount, roleKey)
-            : approvalRoleKeys(item).includes(roleKey))
+      .filter((item) =>
+        selectedAccount
+          ? approvalAppliesToAccountRole(item, selectedAccount, roleKey)
+          : approvalRoleKeys(item).includes(roleKey)
       )
       .forEach((item) => {
         const approvalName = normalizeText(item?.label) || '审批事项'

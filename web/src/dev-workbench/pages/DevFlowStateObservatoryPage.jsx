@@ -6,6 +6,7 @@ import {
   ExclamationCircleOutlined,
   InfoCircleOutlined,
   PartitionOutlined,
+  PrinterOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
@@ -46,9 +47,11 @@ import {
   getWorkflowTaskOwnerRoleLabel,
   getWorkflowTaskStatusMeta,
 } from '@/erp/utils/workflowTaskBoard.mjs'
-import { getRoleDisplayName } from '@/erp/utils/roleKeys.mjs'
+import { getPermissionCenterRoleName } from '../../erp/utils/permissionCenterAccess.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import { buildDevBusinessChainCustomerReview } from '../config/devBusinessChainCustomerReview.mjs'
+import DevBusinessChainCustomerReviewPrint from './DevBusinessChainCustomerReviewPrint.jsx'
 import {
   DEV_FLOW_STATE_TASK_RUNTIME_ASSOCIATION,
   buildDevFlowStateTaskLookupQuery,
@@ -126,6 +129,26 @@ const VIEW_META = Object.freeze(
   Object.fromEntries(VIEW_ITEMS.map((item) => [item.value, item]))
 )
 const VIEW_KEYS = new Set(VIEW_ITEMS.map((item) => item.value))
+const VIEW_SELECTION_QUERY_KEYS = Object.freeze({
+  chain: new Set([QUERY_KEYS.chain, QUERY_KEYS.node]),
+  workflow: new Set(),
+  runtime: new Set([QUERY_KEYS.process]),
+  facts: new Set([QUERY_KEYS.fact]),
+  states: new Set([QUERY_KEYS.flow, QUERY_KEYS.state]),
+})
+const SELECTION_QUERY_KEYS = Object.freeze([
+  QUERY_KEYS.chain,
+  QUERY_KEYS.node,
+  QUERY_KEYS.flow,
+  QUERY_KEYS.state,
+  QUERY_KEYS.process,
+  QUERY_KEYS.fact,
+])
+
+function getProcessOwnerPoolLabel(ownerPool) {
+  const label = getPermissionCenterRoleName({ role_key: ownerPool })
+  return label === '已配置岗位' ? ownerPool : label
+}
 
 const CHAIN_KIND_PRESENTATION = Object.freeze({
   primary: { label: '业务主链', color: 'green' },
@@ -928,7 +951,14 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
   )
 }
 
-function ContextStrip({ view, chain, node, selection, onReturnChain }) {
+function ContextStrip({
+  view,
+  chain,
+  node,
+  selection,
+  canReturnToChain,
+  onReturnChain,
+}) {
   const overviewSelected = chain?.key === ALL_BUSINESS_CHAINS_KEY
   return (
     <section className="erp-dev-flow-context" aria-label="当前观察上下文">
@@ -954,7 +984,7 @@ function ContextStrip({ view, chain, node, selection, onReturnChain }) {
           <strong>{selection}</strong>
         </div>
       ) : null}
-      {view !== 'chain' && chain ? (
+      {canReturnToChain ? (
         <Button onClick={onReturnChain}>返回业务链</Button>
       ) : null}
     </section>
@@ -1389,6 +1419,7 @@ function BusinessChainOverviewView({
   selectedTask,
   onSelectChain,
   onOpenView,
+  onPrintCustomerReview,
 }) {
   const overview = catalog.businessChainOverview
   const chainByKey = useMemo(
@@ -1441,11 +1472,20 @@ function BusinessChainOverviewView({
           <Title level={2}>{overview.label}</Title>
           <Paragraph>{overview.summary}</Paragraph>
         </div>
-        <BusinessChainSelector
-          catalog={catalog}
-          value={overview.key}
-          onChange={onSelectChain}
-        />
+        <div className="erp-dev-flow-chain-heading__actions">
+          <BusinessChainSelector
+            catalog={catalog}
+            value={overview.key}
+            onChange={onSelectChain}
+          />
+          <Button
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={onPrintCustomerReview}
+          >
+            导出甲方校对版
+          </Button>
+        </div>
       </section>
 
       <section
@@ -1639,6 +1679,7 @@ function BusinessChainView({
   onSelectChain,
   onSelectNode,
   onOpenView,
+  onPrintCustomerReview,
 }) {
   const { runtime, runtimeProcessKey, matchingChain } = useBusinessChainRuntime(
     catalog,
@@ -1695,11 +1736,20 @@ function BusinessChainView({
           <Title level={2}>{chain.label}</Title>
           <Paragraph>{chain.summary}</Paragraph>
         </div>
-        <BusinessChainSelector
-          catalog={catalog}
-          value={chain.key}
-          onChange={onSelectChain}
-        />
+        <div className="erp-dev-flow-chain-heading__actions">
+          <BusinessChainSelector
+            catalog={catalog}
+            value={chain.key}
+            onChange={onSelectChain}
+          />
+          <Button
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={onPrintCustomerReview}
+          >
+            导出甲方校对版
+          </Button>
+        </div>
       </section>
 
       <section
@@ -2206,7 +2256,7 @@ function ProcessDefinitionCard({ definition }) {
                 {node.ownerPool ? (
                   <Tag>
                     负责岗位：
-                    {getRoleDisplayName(node.ownerPool, node.ownerPool)}
+                    {getProcessOwnerPoolLabel(node.ownerPool)}
                   </Tag>
                 ) : null}
                 <KeyValue value={node.key} />
@@ -2765,8 +2815,17 @@ function invalidQueryMessages(searchParams, catalog) {
   const chain = catalog.businessChains.find((item) => item.key === chainKey)
   const overviewSelected = chainKey === catalog.businessChainOverview.key
   const flow = catalog.flows.find((item) => item.key === flowKey)
+  const activeView = view || DEFAULT_VIEW
 
   if (view && !VIEW_KEYS.has(view)) messages.push(`未知视图：${view}`)
+  if (VIEW_KEYS.has(activeView)) {
+    const allowedSelectionKeys = VIEW_SELECTION_QUERY_KEYS[activeView]
+    for (const key of SELECTION_QUERY_KEYS) {
+      if (cleanText(searchParams.get(key)) && !allowedSelectionKeys.has(key)) {
+        messages.push(`${VIEW_META[activeView].label}视图不接受参数：${key}`)
+      }
+    }
+  }
   if (chainKey && !chain && !overviewSelected) {
     messages.push(`未知或过期业务链：${chainKey}`)
   }
@@ -2816,7 +2875,14 @@ export default function DevFlowStateObservatoryPage() {
   const [taskDraft, setTaskDraft] = useState(taskId)
   const [selectedTask, setSelectedTask] = useState(null)
   const [taskLookupFocusRequest, setTaskLookupFocusRequest] = useState(0)
+  const [customerReviewGeneratedAt, setCustomerReviewGeneratedAt] = useState(
+    () => new Date().toISOString()
+  )
   const taskSelectionRef = useRef(taskId)
+  const chainReturnRef = useRef({
+    [QUERY_KEYS.chain]: requestedChainKey || ALL_BUSINESS_CHAINS_KEY,
+    [QUERY_KEYS.node]: requestedNodeKey || null,
+  })
 
   useEffect(() => {
     if (taskSelectionRef.current === taskId) return
@@ -2838,6 +2904,18 @@ export default function DevFlowStateObservatoryPage() {
     ? invalidQueryMessages(searchParams, catalog)
     : []
   const valid = invalidMessages.length === 0
+
+  useEffect(() => {
+    if (!catalog || !valid || view !== 'chain') return
+    chainReturnRef.current = {
+      [QUERY_KEYS.chain]:
+        requestedChainKey || catalog.businessChainOverview.key,
+      [QUERY_KEYS.node]:
+        requestedChainKey === catalog.businessChainOverview.key
+          ? null
+          : requestedNodeKey || null,
+    }
+  }, [catalog, requestedChainKey, requestedNodeKey, valid, view])
 
   useEffect(() => {
     if (taskLookupFocusRequest === 0 || view !== 'workflow' || !valid) return
@@ -2877,12 +2955,31 @@ export default function DevFlowStateObservatoryPage() {
         (item) => item.factKey === requestedFactKey
       ) || (!requestedFactKey ? catalog.factDefinitions[0] : null)
     : null
+  const customerReview = useMemo(() => {
+    if (!catalog || !valid || view !== 'chain') return null
+    const chainKey = overviewSelected
+      ? catalog.businessChainOverview.key
+      : chain?.key
+    if (!chainKey) return null
+    return buildDevBusinessChainCustomerReview({
+      catalog,
+      chainKey,
+      generatedAt: customerReviewGeneratedAt,
+    })
+  }, [
+    catalog,
+    chain?.key,
+    customerReviewGeneratedAt,
+    overviewSelected,
+    valid,
+    view,
+  ])
 
   useEffect(() => {
     if (!catalog || !valid) return
     const patch = {}
     if (!requestedView) patch[QUERY_KEYS.view] = DEFAULT_VIEW
-    if (!requestedChainKey) {
+    if (view === 'chain' && !requestedChainKey) {
       patch[QUERY_KEYS.chain] = catalog.businessChainOverview.key
     }
     if (view === 'chain' && !overviewSelected && !requestedNodeKey && node) {
@@ -2927,8 +3024,29 @@ export default function DevFlowStateObservatoryPage() {
     setSelectedTask(null)
     updateParams({ [QUERY_KEYS.taskId]: null })
   }
-  const openView = (nextView, patch = {}) =>
-    updateParams({ [QUERY_KEYS.view]: nextView, ...patch })
+  const openView = (nextView, patch = {}) => {
+    const allowedSelectionKeys =
+      VIEW_SELECTION_QUERY_KEYS[nextView] || new Set()
+    const nextPatch = Object.fromEntries(
+      SELECTION_QUERY_KEYS.map((key) => [key, null])
+    )
+    nextPatch[QUERY_KEYS.view] = nextView
+    if (nextView === 'chain') {
+      Object.assign(nextPatch, chainReturnRef.current)
+    }
+    for (const [key, value] of Object.entries(patch)) {
+      if (allowedSelectionKeys.has(key) || key === QUERY_KEYS.taskId) {
+        nextPatch[key] = value
+      }
+    }
+    updateParams(nextPatch)
+  }
+  const printCustomerReview = () => {
+    setCustomerReviewGeneratedAt(new Date().toISOString())
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => window.print())
+    })
+  }
   const specialistSelection =
     view === 'runtime'
       ? definition?.label
@@ -2956,6 +3074,7 @@ export default function DevFlowStateObservatoryPage() {
               })
             }
             onOpenView={openView}
+            onPrintCustomerReview={printCustomerReview}
           />
         )
       }
@@ -2972,6 +3091,7 @@ export default function DevFlowStateObservatoryPage() {
           }
           onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
           onOpenView={openView}
+          onPrintCustomerReview={printCustomerReview}
         />
       )
     }
@@ -3124,9 +3244,16 @@ export default function DevFlowStateObservatoryPage() {
       {catalogState.status === 'ready' && catalog ? (
         <ContextStrip
           view={view}
-          chain={overviewSelected ? catalog.businessChainOverview : chain}
-          node={node}
+          chain={
+            view === 'chain'
+              ? overviewSelected
+                ? catalog.businessChainOverview
+                : chain
+              : null
+          }
+          node={view === 'chain' ? node : null}
           selection={specialistSelection}
+          canReturnToChain={valid && view !== 'chain'}
           onReturnChain={() => openView('chain')}
         />
       ) : null}
@@ -3168,6 +3295,7 @@ export default function DevFlowStateObservatoryPage() {
           ? renderView()
           : null}
       </main>
+      <DevBusinessChainCustomerReviewPrint review={customerReview} />
     </div>
   )
 }

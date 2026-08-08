@@ -39,7 +39,7 @@ test('fact definition select uses four explicit navigation groups with exact cov
 
   assert.deepEqual(
     options.map((group) => group.label),
-    ['采购与质量 · 5', '生产与库存 · 8', '委外与返工 · 3', '出货与财务 · 6']
+    ['采购与质量 · 5', '生产与库存 · 7', '委外与返工 · 3', '出货与财务 · 6']
   )
   const items = flattenOptions(options)
   assert.deepEqual(
@@ -66,13 +66,13 @@ test('state definition select keeps scope boundaries and splits the long Fact gr
   assert.deepEqual(
     options.map((group) => group.label),
     [
-      '源单生命周期 · 5',
+      '源单生命周期 · 6',
       'MasterData 生命周期 · 2',
       'Workflow 协同任务 · 1',
       '业务进度投影 · 1',
       'ProcessRuntime · 2',
       'Fact / Ledger · 采购与质量 · 5',
-      'Fact / Ledger · 生产与库存 · 8',
+      'Fact / Ledger · 生产与库存 · 7',
       'Fact / Ledger · 委外与返工 · 3',
       'Fact / Ledger · 出货与财务 · 6',
       '客户配置控制面 · 1',

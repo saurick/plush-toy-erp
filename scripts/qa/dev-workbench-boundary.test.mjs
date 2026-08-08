@@ -70,6 +70,9 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/erp/pages/DevHubPage.jsx",
     "web/src/erp/components/dev/DevPageNav.jsx",
     "web/src/erp/styles/app/dev-navigation.css",
+    "web/src/erp/components/PermissionRelationshipGraphModal.jsx",
+    "web/src/erp/utils/permissionRelationshipGraph.mjs",
+    "web/src/erp/styles/app/permission-relationship-graph.css",
   ]) {
     assert.equal(existsSync(path.join(repoRoot, legacyPath)), false, legacyPath);
   }
@@ -80,12 +83,15 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/dev-workbench/pages/DevHubPage.jsx",
     "web/src/dev-workbench/pages/DevDataPreparationPage.jsx",
     "web/src/dev-workbench/pages/DevDatabaseMigrationPage.jsx",
+    "web/src/dev-workbench/pages/DevPermissionRelationshipsPage.jsx",
     "web/src/dev-workbench/components/DevPageNav.jsx",
     "web/src/dev-workbench/components/DevReceiptPanel.jsx",
     "web/src/dev-workbench/config/devDataPreparation.mjs",
     "web/src/dev-workbench/config/devDatabaseMigration.mjs",
+    "web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs",
     "web/src/dev-workbench/styles/dev-data-preparation.css",
     "web/src/dev-workbench/styles/dev-database-migration.css",
+    "web/src/dev-workbench/styles/dev-permission-relationships.css",
     "web/src/dev-workbench/styles/index.css",
   ]) {
     assert.equal(existsSync(path.join(repoRoot, requiredPath)), true, requiredPath);
@@ -101,6 +107,8 @@ test("dev workbench boundary: source and styles live outside product directories
     ".erp-dev-data-",
     ".erp-dev-database-",
     ".erp-dev-workspace-nav",
+    ".erp-dev-permission-relationships",
+    ".erp-permission-relationship",
   ];
   const productStyles = listFiles("web/src/erp/styles")
     .filter((file) => file.endsWith(".css"))
@@ -172,7 +180,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 10);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 11);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
@@ -189,23 +197,40 @@ test("dev workbench boundary: imports from ERP stay on explicit read/API adapter
   const allowedERPImports = new Set([
     "@/erp/api/customerConfigApi.mjs",
     "@/erp/api/customerConfigTransition.mjs",
-    "@/erp/config/businessModules.mjs",
-    "@/erp/config/seedData.mjs",
     "@/erp/api/workflowApi.mjs",
     "@/erp/utils/processRuntimePresentation.mjs",
-    "@/erp/utils/workflowTaskBoard.mjs",
-    "@/erp/utils/workflowTaskEventPresentation.mjs",
-    "@/erp/utils/roleKeys.mjs",
+    "../../erp/api/approvalSettingsApi.mjs",
+    "../../erp/utils/permissionCenterAccess.mjs",
+    "../../erp/utils/permissionCenterSearch.mjs",
+    "../../erp/utils/permissionModuleLabels.mjs",
     "../../erp/config/printTemplates.mjs",
     "../../erp/config/workflowStatus.mjs",
   ]);
+  const allowedERPImportsByFile = new Map([
+    [
+      "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
+      new Set([
+        "@/erp/config/businessModules.mjs",
+        "@/erp/config/seedData.mjs",
+      ]),
+    ],
+    [
+      "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
+      new Set([
+        "@/erp/utils/workflowTaskEventPresentation.mjs",
+        "@/erp/utils/workflowTaskBoard.mjs",
+      ]),
+    ],
+  ]);
 
   for (const { file, source } of workbenchSources) {
+    const fileScopedERPImports = allowedERPImportsByFile.get(file);
     for (const match of source.matchAll(
       /(?:from\s+|import\()['"]([^'"]*erp\/[^'"]+)['"]/gu,
     )) {
       assert(
-        allowedERPImports.has(match[1]),
+        allowedERPImports.has(match[1]) ||
+          fileScopedERPImports?.has(match[1]),
         `${file} imports non-approved ERP internals: ${match[1]}`,
       );
     }

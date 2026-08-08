@@ -1,6 +1,8 @@
 export const DEV_HUB_ROUTE = '/__dev'
 export const DEV_PRODUCT_ENGINEERING_ROUTE = '/__dev/product-engineering'
 export const DEV_PRODUCT_CORE_ROUTE = '/__dev/product-core'
+export const DEV_PERMISSION_RELATIONSHIPS_ROUTE =
+  '/__dev/permission-relationships'
 export const DEV_QUALITY_ROUTE = '/__dev/quality'
 export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 
@@ -34,7 +36,7 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
     key: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_ENGINEERING_ROUTE,
     label: '产品工程',
-    description: '规则、业务链、文档与原型',
+    description: '内核、权限、规则与业务链',
   }),
   Object.freeze({
     key: DEV_WORKBENCH_AREA_KEYS.quality,
@@ -56,6 +58,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_PRODUCT_CORE_ROUTE,
     label: '产品内核',
+  }),
+  Object.freeze({
+    key: 'permission-relationships',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_PERMISSION_RELATIONSHIPS_ROUTE,
+    label: '权限关系',
   }),
   Object.freeze({
     key: 'governance',
@@ -135,6 +143,7 @@ export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_HUB_ROUTE]: '/favicon-dev.svg',
   [DEV_PRODUCT_ENGINEERING_ROUTE]: '/favicon-dev.svg',
   [DEV_PRODUCT_CORE_ROUTE]: '/favicon-dev.svg',
+  [DEV_PERMISSION_RELATIONSHIPS_ROUTE]: '/favicon-dev.svg',
   [DEV_QUALITY_ROUTE]: '/favicon-dev.svg',
   [DEV_DELIVERY_ROUTE]: '/favicon-dev.svg',
   [DEV_GOVERNANCE_ROUTE]: '/favicon-governance.svg',

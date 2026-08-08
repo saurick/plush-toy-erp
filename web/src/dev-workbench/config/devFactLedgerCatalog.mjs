@@ -219,20 +219,6 @@ const FACT_DEFINITIONS = [
       'server/internal/data/operational_fact_rework_intake_repo.go',
     ],
   }),
-  fact('fact.production_exception_decision', '生产异常决策', {
-    displayGroupKey: 'production_inventory',
-    occurrenceCondition: '异常审批完成后保存明确、版本一致的处置决策。',
-    sourceDocument: '生产异常任务与受影响生产对象',
-    authority: '生产异常决策记录',
-    businessImpact: '只确定处置方向；决策本身不等于库存或生产动作已执行。',
-    voucher: '异常决策记录与审批证据。',
-    idempotencyRule: '同一异常对象和决策版本只允许一个有效结果。',
-    correction: '通过新的受控决策版本纠正，不删除原决策。',
-    sourceRefs: [
-      'server/internal/biz/production_exception_decision.go',
-      'server/internal/data/production_exception_decision_repo.go',
-    ],
-  }),
   fact('fact.production_exception_execution', '生产异常执行状态', {
     displayGroupKey: 'production_inventory',
     occurrenceCondition: '已批准的异常决策由命名领域命令实际执行并记录结果。',

@@ -173,7 +173,7 @@ test("dev flow state observatory: long definition selects are grouped without ch
   );
   assert.deepEqual(
     factOptions.map((group) => group.label),
-    ["采购与质量 · 5", "生产与库存 · 8", "委外与返工 · 3", "出货与财务 · 6"],
+    ["采购与质量 · 5", "生产与库存 · 7", "委外与返工 · 3", "出货与财务 · 6"],
   );
   assert.equal(
     stateOptions.flatMap((group) => group.options).length,
@@ -290,7 +290,7 @@ test("dev flow state observatory: pasted business text search is local, grouped,
   );
 });
 
-test("dev flow state observatory: deep links fail closed and keep chain return context", () => {
+test("dev flow state observatory: deep links fail closed, isolate each view, and keep chain return context", () => {
   const page = read(
     "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
   );
@@ -309,6 +309,8 @@ test("dev flow state observatory: deep links fail closed and keep chain return c
   }
   assert.doesNotMatch(page, /search: 'q'/u);
   assert.match(page, /function invalidQueryMessages/u);
+  assert.match(page, /VIEW_SELECTION_QUERY_KEYS/u);
+  assert.match(page, /SELECTION_QUERY_KEYS/u);
   assert.match(page, /未知 query 参数/u);
   assert.match(page, /query 参数重复/u);
   assert.match(page, /未知或过期业务链/u);
@@ -316,6 +318,9 @@ test("dev flow state observatory: deep links fail closed and keep chain return c
   assert.match(page, /task_id 必须是大于 0 的整数/u);
   assert.match(page, /无效或过期深链接，已按 fail closed 停止加载/u);
   assert.match(page, /业务总图不接受单链节点参数/u);
+  assert.match(page, /视图不接受参数/u);
+  assert.match(page, /SELECTION_QUERY_KEYS\.map\(\(key\) => \[key, null\]\)/u);
+  assert.match(page, /chainReturnRef\.current/u);
   assert.match(page, /恢复到业务总图/u);
   assert.match(page, /chain: catalog\.businessChainOverview\.key/u);
   assert.match(page, /<ContextStrip[\s\S]{0,420}?onReturnChain/u);
@@ -324,6 +329,51 @@ test("dev flow state observatory: deep links fail closed and keep chain return c
   assert.match(page, /data-business-chain-overview/u);
   assert.match(page, /data-overview-chain/u);
   assert.match(page, /data-overview-relation/u);
+});
+
+test("dev flow state observatory: customer review print is generated from the shared catalog and contains no second flow catalog", () => {
+  const page = read(
+    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
+  );
+  const model = read(
+    "web/src/dev-workbench/config/devBusinessChainCustomerReview.mjs",
+  );
+  const printView = read(
+    "web/src/dev-workbench/pages/DevBusinessChainCustomerReviewPrint.jsx",
+  );
+  const styles = read(
+    "web/src/dev-workbench/styles/dev-flow-state-observatory.css",
+  );
+
+  assert.match(page, /buildDevBusinessChainCustomerReview/u);
+  assert.match(page, /DevBusinessChainCustomerReviewPrint/u);
+  assert.match(page, /导出甲方校对版/u);
+  assert.match(page, /window\.print\(\)/u);
+  assert.match(page, /data-flow-state-view=\{view\}/u);
+  assert.match(model, /catalog\.businessChains/u);
+  assert.match(model, /catalog\.businessChainOverview/u);
+  assert.match(model, /catalog\?\.processDefinitions/u);
+  assert.match(model, /catalog\?\.flows/u);
+  assert.doesNotMatch(model, /const BUSINESS_CHAIN_DEFINITIONS/u);
+  assert.match(printView, /data-customer-review-print-root/u);
+  for (const copy of [
+    "生成时间",
+    "适用范围",
+    "谁负责",
+    "触发条件或前置条件",
+    "系统自动完成什么",
+    "人员需要办理什么",
+    "怎样算完成",
+    "下一步衔接到哪里",
+    "整条业务链的异常与纠正路径",
+  ]) {
+    assert(printView.includes(copy), `missing customer review copy: ${copy}`);
+  }
+  assert.match(styles, /@media print/u);
+  assert.match(styles, /size: A4 portrait/u);
+  assert.match(styles, /break-inside: avoid-page/u);
+  assert.match(styles, /color-scheme: light/u);
+  assert.doesNotMatch(`${model}\n${printView}`, /yoyoosun|永绅/iu);
 });
 
 test("dev flow state observatory: task selection stays in the URL without leaking into the global context strip", () => {
@@ -539,6 +589,10 @@ test("dev flow state observatory: responsive CSS uses a mobile step list and rem
   assert.match(
     css,
     /@media \(max-width: 640px\)[\s\S]*?\.erp-dev-flow-nav \.erp-dev-task-nav[\s\S]*?grid-template-columns: repeat\(2/u,
+  );
+  assert.match(
+    css,
+    /@media print[\s\S]*?body > :not\(\.erp-dev-flow-customer-review-print\)[\s\S]*?display: none !important/u,
   );
   const detailStart = css.indexOf(".erp-dev-flow-node-detail {");
   const detailEnd = css.indexOf("\n}", detailStart);

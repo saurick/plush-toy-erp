@@ -28,6 +28,7 @@ import {
 const devPageSources = [
   'DevHubPage.jsx',
   'DevProductCorePage.jsx',
+  'DevPermissionRelationshipsPage.jsx',
   'DevGovernancePage.jsx',
   'DevFlowStateObservatoryPage.jsx',
   'DevDocsPage.jsx',
@@ -71,6 +72,10 @@ test('devHub: every dev route exposes a distinct browser title', () => {
   assert.equal(
     resolveDevPageTitle('/__dev/product-core', 'Plush Toy ERP'),
     '产品内核 · Plush Toy ERP'
+  )
+  assert.equal(
+    resolveDevPageTitle('/__dev/permission-relationships', 'Plush Toy ERP'),
+    '权限关系 · Plush Toy ERP'
   )
   assert.equal(
     resolveDevPageTitle('/__dev/testing', 'Plush Toy ERP'),
@@ -142,6 +147,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     DEV_SECONDARY_NAV_ITEMS.map((item) => [item.areaKey, item.label]),
     [
       ['product-engineering', '产品内核'],
+      ['product-engineering', '权限关系'],
       ['product-engineering', '改动指南'],
       ['product-engineering', '业务链观察'],
       ['product-engineering', '开发文档'],
@@ -175,6 +181,10 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
   )
   assert.equal(
     resolveDevWorkbenchAreaKey('/__dev/product-core'),
+    'product-engineering'
+  )
+  assert.equal(
+    resolveDevWorkbenchAreaKey('/__dev/permission-relationships'),
     'product-engineering'
   )
   assert.equal(
@@ -247,8 +257,8 @@ test('devHub: every tool has one registered area and the overview derives stages
   assert.match(devHubPageSource, /item\.areaKey === stage\.key/u)
 })
 
-test('devHub: eleven dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 11)
+test('devHub: twelve dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 12)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -284,6 +294,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     DEV_HUB_ITEMS.map((item) => item.route),
     [
       '/__dev/product-core',
+      '/__dev/permission-relationships',
       '/__dev/governance',
       '/__dev/status-flows',
       '/__dev/docs',
@@ -323,6 +334,26 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
   )
   assert.match(productCoreItem?.truthSource || '', /唯一产品能力进度台账/u)
   assert.match(productCoreItem?.guardrails?.join(' ') || '', /不等于发布或验收/u)
+
+  const permissionRelationshipsItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === 'permission-relationships'
+  )
+  assert.equal(
+    permissionRelationshipsItem?.title,
+    '权限关系 / Effective Access'
+  )
+  assert.equal(
+    permissionRelationshipsItem?.source,
+    'docs/product/配置与权限策略.md'
+  )
+  assert.match(
+    permissionRelationshipsItem?.guardrails?.join(' ') || '',
+    /不在本页写权限/u
+  )
+  assert.match(
+    permissionRelationshipsItem?.guardrails?.join(' ') || '',
+    /不汇入任务、单据、流程或业务事实/u
+  )
 
   const testingItem = DEV_HUB_ITEMS.find((item) => item.key === 'testing')
   assert.equal(
@@ -375,8 +406,8 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 10)
-  assert.equal(summary.groupCount, 7)
+  assert.equal(summary.entryCount, 11)
+  assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)
   assert.match(summary.boundary, /no formal menu/)
@@ -416,6 +447,7 @@ test('devHub: filters by governance group and keyword together', () => {
     [
       'all',
       '产品治理 / Product Governance',
+      '权限治理 / Access Governance',
       '文档治理 / Docs',
       '业务链治理 / Business Chain Governance',
       '验证治理 / QA',

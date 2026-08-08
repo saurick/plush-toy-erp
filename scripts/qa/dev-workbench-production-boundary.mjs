@@ -31,6 +31,8 @@ export const productionArtifactForbiddenMarkers = Object.freeze([
   "erp-dev-hub",
   "erp-dev-flow-state",
   "erp-dev-workspace-nav",
+  "erp-dev-permission-relationships",
+  "权限关系 / Effective Access",
   "favicon-dev.svg",
   "plush_erp_dev_hub",
   "customer-yoyoosun-private",

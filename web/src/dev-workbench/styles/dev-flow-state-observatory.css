@@ -567,6 +567,16 @@
   gap: 6px;
 }
 
+.erp-dev-flow-chain-heading__actions,
+.erp-dev-flow-chain-selector {
+  display: grid;
+  gap: 6px;
+}
+
+.erp-dev-flow-chain-heading__actions > .ant-btn {
+  min-height: 42px;
+}
+
 .erp-dev-flow-chain-heading .ant-select,
 .erp-dev-flow-definition-selector .ant-select {
   width: 100%;
@@ -1457,6 +1467,352 @@
 
 [data-erp-theme='dark'] .erp-dev-flow-state-page :where(h1, h2, h3, strong) {
   color: var(--erp-text, #e7eee9);
+}
+
+.erp-dev-flow-customer-review-print {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 13mm 12mm 15mm;
+  }
+
+  html,
+  body {
+    color: #17221b !important;
+    background: #fff !important;
+  }
+
+  body > :not(.erp-dev-flow-customer-review-print) {
+    display: none !important;
+  }
+
+  .erp-dev-flow-customer-review-print {
+    display: block !important;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    color: #17221b;
+    background: #fff;
+    color-scheme: light;
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei',
+      sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .erp-dev-flow-customer-review-print *,
+  .erp-dev-flow-customer-review-print *::before,
+  .erp-dev-flow-customer-review-print *::after {
+    box-sizing: border-box;
+  }
+
+  .erp-dev-flow-customer-review-print h1,
+  .erp-dev-flow-customer-review-print h2,
+  .erp-dev-flow-customer-review-print h3,
+  .erp-dev-flow-customer-review-print p,
+  .erp-dev-flow-customer-review-print dl,
+  .erp-dev-flow-customer-review-print ol,
+  .erp-dev-flow-customer-review-print ul {
+    margin-top: 0;
+  }
+
+  .erp-dev-flow-customer-review-print h1,
+  .erp-dev-flow-customer-review-print h2,
+  .erp-dev-flow-customer-review-print h3 {
+    color: #173f2a !important;
+    break-after: avoid-page;
+  }
+
+  .erp-dev-flow-customer-review__header {
+    padding-bottom: 5mm;
+    border-bottom: 1.5pt solid #2b8a3e;
+  }
+
+  .erp-dev-flow-customer-review__header > p {
+    margin-bottom: 1.5mm;
+    color: #2b6d3f;
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .erp-dev-flow-customer-review__header h1 {
+    margin-bottom: 4mm;
+    font-size: 20pt;
+    line-height: 1.3;
+  }
+
+  .erp-dev-flow-customer-review__header dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2.5mm 6mm;
+    margin-bottom: 0;
+  }
+
+  .erp-dev-flow-customer-review__header dl > div,
+  .erp-dev-flow-customer-review__steps dl > div {
+    min-width: 0;
+  }
+
+  .erp-dev-flow-customer-review__header dt,
+  .erp-dev-flow-customer-review__steps dt {
+    margin-bottom: 0.5mm;
+    color: #53645a;
+    font-size: 8.5pt;
+    font-weight: 700;
+  }
+
+  .erp-dev-flow-customer-review__header dd,
+  .erp-dev-flow-customer-review__steps dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .erp-dev-flow-customer-review__summary {
+    padding: 4mm 4.5mm;
+    margin: 5mm 0;
+    border-left: 3pt solid #2b8a3e;
+    background: #f3f8f4;
+    break-inside: avoid-page;
+  }
+
+  .erp-dev-flow-customer-review__summary h2,
+  .erp-dev-flow-customer-review__summary p:last-child {
+    margin-bottom: 0;
+  }
+
+  .erp-dev-flow-customer-review__summary > p:first-child {
+    margin-bottom: 1mm;
+    color: #2b6d3f;
+    font-size: 9pt;
+    font-weight: 700;
+  }
+
+  .erp-dev-flow-customer-review__lanes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4mm;
+  }
+
+  .erp-dev-flow-customer-review__lanes > section {
+    padding: 3.5mm;
+    border: 0.75pt solid #bfd3c4;
+    border-radius: 2mm;
+    break-inside: avoid-page;
+  }
+
+  .erp-dev-flow-customer-review__lanes > section > header h2 {
+    margin-bottom: 1mm;
+    font-size: 12pt;
+  }
+
+  .erp-dev-flow-customer-review__lanes > section > header p {
+    margin-bottom: 2.5mm;
+    color: #53645a;
+    font-size: 8.5pt;
+  }
+
+  .erp-dev-flow-customer-review__lanes ol {
+    display: grid;
+    gap: 2mm;
+    padding: 0;
+    margin-bottom: 0;
+    list-style: none;
+  }
+
+  .erp-dev-flow-customer-review__lanes li {
+    display: grid;
+    grid-template-columns: 7mm minmax(0, 1fr);
+    gap: 2mm;
+    align-items: start;
+    break-inside: avoid-page;
+  }
+
+  .erp-dev-flow-customer-review__lanes li > span {
+    display: grid;
+    width: 6mm;
+    height: 6mm;
+    place-items: center;
+    border-radius: 50%;
+    color: #fff;
+    background: #2b8a3e;
+    font-size: 8pt;
+    font-weight: 700;
+  }
+
+  .erp-dev-flow-customer-review__lanes h3 {
+    margin-bottom: 0.5mm;
+    font-size: 9.5pt;
+  }
+
+  .erp-dev-flow-customer-review__lanes li p {
+    margin-bottom: 0;
+    color: #53645a;
+    font-size: 8pt;
+    line-height: 1.4;
+  }
+
+  .erp-dev-flow-customer-review__steps {
+    display: grid;
+    gap: 5mm;
+    padding: 0;
+    margin-bottom: 5mm;
+    list-style: none;
+  }
+
+  .erp-dev-flow-customer-review__steps > li {
+    padding: 4.5mm;
+    border: 0.75pt solid #bfd3c4;
+    border-radius: 2mm;
+    background: #fff;
+    break-inside: avoid-page;
+  }
+
+  .erp-dev-flow-customer-review__steps > li > header {
+    display: flex;
+    align-items: baseline;
+    gap: 3mm;
+    padding-bottom: 2mm;
+    margin-bottom: 3mm;
+    border-bottom: 0.75pt solid #d7e3da;
+  }
+
+  .erp-dev-flow-customer-review__steps > li > header span {
+    flex: 0 0 auto;
+    color: #2b6d3f;
+    font-size: 9pt;
+    font-weight: 700;
+  }
+
+  .erp-dev-flow-customer-review__steps h2 {
+    margin-bottom: 0;
+    font-size: 14pt;
+  }
+
+  .erp-dev-flow-customer-review__action {
+    margin-bottom: 3mm;
+    font-weight: 600;
+  }
+
+  .erp-dev-flow-customer-review__steps dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3mm 5mm;
+    margin-bottom: 3mm;
+  }
+
+  .erp-dev-flow-customer-review__steps > li > section {
+    padding-top: 2.5mm;
+    border-top: 0.75pt solid #d7e3da;
+  }
+
+  .erp-dev-flow-customer-review__steps h3,
+  .erp-dev-flow-customer-review__all-exceptions h2 {
+    margin-bottom: 1.5mm;
+    font-size: 10.5pt;
+  }
+
+  .erp-dev-flow-customer-review__exceptions {
+    display: grid;
+    gap: 1mm;
+    padding-left: 5mm;
+    margin-bottom: 0;
+  }
+
+  .erp-dev-flow-customer-review__exceptions li {
+    break-inside: avoid-page;
+    overflow-wrap: anywhere;
+  }
+
+  .erp-dev-flow-customer-review__all-exceptions,
+  .erp-dev-flow-customer-review__boundary {
+    padding: 4mm;
+    margin: 5mm 0;
+    border: 0.75pt solid #e6b85c;
+    border-radius: 2mm;
+    background: #fffaf0;
+    break-inside: avoid-page;
+  }
+
+  .erp-dev-flow-customer-review__boundary {
+    border-color: #d89b3c;
+  }
+
+  .erp-dev-flow-customer-review__boundary p {
+    margin: 1mm 0 0;
+  }
+
+  .erp-dev-flow-customer-review-print > footer {
+    padding-top: 3mm;
+    margin-top: 6mm;
+    border-top: 0.75pt solid #9bad9f;
+    color: #53645a;
+    font-size: 8.5pt;
+    text-align: center;
+    break-inside: avoid-page;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview'] {
+    font-size: 9.5pt;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__header {
+    padding-bottom: 4mm;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__header h1 {
+    margin-bottom: 3mm;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__header dl {
+    gap: 1.5mm 6mm;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__summary {
+    padding: 3mm 4mm;
+    margin: 3mm 0;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__lanes {
+    gap: 3mm;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__lanes > section {
+    padding: 3mm;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__lanes > section > header p {
+    margin-bottom: 1.5mm;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__lanes ol {
+    gap: 1.5mm;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview']
+    .erp-dev-flow-customer-review__boundary {
+    padding: 3mm;
+    margin: 3mm 0 0;
+  }
+
+  .erp-dev-flow-customer-review-print[data-review-mode='overview'] > footer {
+    padding-top: 2mm;
+    margin-top: 2mm;
+  }
 }
 
 [data-erp-theme='dark'] .erp-dev-flow-runtime-proof > strong {

@@ -2840,8 +2840,8 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'erp-permission-relationship-graph-desktop',
-      path: '/erp/dashboard',
+      name: 'dev-permission-relationships-desktop',
+      path: '/__dev/permission-relationships',
       auth: 'admin',
       adminProfile: {
         id: 44,
@@ -2901,91 +2901,29 @@ export function createStyleL1Scenarios(deps) {
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '工作台')
-        await page.waitForTimeout(1200)
-        const entryDiagnostic = await page.evaluate(() => ({
-          entryCount: document.querySelectorAll(
-            '.erp-workbench-permission-relationship-entry'
-          ).length,
-          workbenchCount: document.querySelectorAll(
-            '.erp-workbench-command-card'
-          ).length,
-          productCoreCount: document.querySelectorAll(
-            '[data-product-core-dashboard="true"]'
-          ).length,
-          buttons: [...document.querySelectorAll('button')]
-            .filter(
-              (button) => button.offsetWidth > 0 && button.offsetHeight > 0
-            )
-            .map((button) =>
-              String(button.textContent || '')
-                .replace(/\s+/gu, ' ')
-                .trim()
-            ),
-          storedPermissions: JSON.parse(
-            localStorage.getItem('admin_permissions') || '[]'
-          ),
-          bodyText: String(document.body.textContent || '')
-            .replace(/\s+/gu, ' ')
-            .trim()
-            .slice(0, 500),
-        }))
+        await expectHeading(page, '权限关系 / Effective Access')
+        const activeNav = page.locator(
+          '.erp-dev-workspace-nav__secondary-route--active'
+        )
+        await activeNav.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
-          entryDiagnostic.entryCount,
-          1,
-          '具备完整只读权限的管理员应看到权限关系图入口: ' +
-            JSON.stringify(entryDiagnostic)
+          (await activeNav.textContent())?.trim(),
+          '权限关系',
+          '权限关系页应在产品工程二级菜单中保持唯一当前项'
         )
-        assert(
-          entryDiagnostic.buttons.includes('权限关系图'),
-          '权限关系图入口已渲染但当前不可见: ' +
-            JSON.stringify(entryDiagnostic)
+        const modal = page.locator(
+          '.erp-dev-permission-relationships-shell'
         )
-        const entry = page.getByRole('button', {
-          name: '权限关系图',
-          exact: true,
-        })
-        await entry.waitFor({ state: 'visible', timeout: 10_000 })
-        const entryMetrics = await page.evaluate(() => {
-          const header = document.querySelector('.erp-workbench-command-head')
-          const button = document.querySelector(
-            '.erp-workbench-permission-relationship-entry'
-          )
-          const headerRect = header?.getBoundingClientRect()
-          const buttonRect = button?.getBoundingClientRect()
-          return {
-            headerRight: headerRect?.right || 0,
-            buttonRight: buttonRect?.right || 0,
-            buttonTop: buttonRect?.top || 0,
-            headerTop: headerRect?.top || 0,
-            buttonWidth: buttonRect?.width || 0,
-            overflow:
-              document.documentElement.scrollWidth -
-              document.documentElement.clientWidth,
-          }
-        })
-        assert(
-          entryMetrics.buttonWidth >= 100 &&
-            Math.abs(entryMetrics.headerRight - entryMetrics.buttonRight) <=
-              2 &&
-            entryMetrics.buttonTop >= entryMetrics.headerTop - 1 &&
-            entryMetrics.overflow <= 1,
-          '权限关系图入口应位于工作台标题栏右侧且不造成溢出: ' +
-            JSON.stringify(entryMetrics)
-        )
-        await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-permission-relationship-workbench-entry.png'
-          ),
-          fullPage: false,
-        })
-
-        await entry.click()
-        const modal = page.locator('.erp-permission-relationship-modal')
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(modal, '从账号到最终可用范围，一张图看清')
         await expectText(modal, '关系图是只读结果')
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'dev-permission-relationships-role-desktop.png'
+          ),
+          fullPage: true,
+        })
         await modal
           .locator(
             '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
@@ -3000,25 +2938,27 @@ export function createStyleL1Scenarios(deps) {
         await assertTextAbsent(modal, 'style-l1-active-revision')
 
         const roleGraphMetrics = await page.evaluate(() => {
-          const modal = document.querySelector(
-            '.erp-permission-relationship-modal'
+          const root = document.querySelector(
+            '.erp-dev-permission-relationships-page'
           )
-          const body = modal?.querySelector('.ant-modal-body')
-          const graphViewport = modal?.querySelector(
+          const nav = root?.querySelector('.erp-dev-workspace-nav')
+          const shell = root?.querySelector(
+            '.erp-dev-permission-relationships-shell'
+          )
+          const graphViewport = shell?.querySelector(
             '.erp-markdown-mermaid__viewport'
           )
-          const summary = modal?.querySelector(
+          const summary = shell?.querySelector(
             '.erp-permission-relationship__summary'
           )
-          const modalRect = modal?.getBoundingClientRect()
+          const navRect = nav?.getBoundingClientRect()
+          const shellRect = shell?.getBoundingClientRect()
           const viewportRect = graphViewport?.getBoundingClientRect()
           return {
-            modalLeft: modalRect?.left || 0,
-            modalRight: modalRect?.right || 0,
-            modalTop: modalRect?.top || 0,
-            modalBottom: modalRect?.bottom || 0,
-            modalBodyClientHeight: body?.clientHeight || 0,
-            modalBodyScrollHeight: body?.scrollHeight || 0,
+            navRight: navRect?.right || 0,
+            shellLeft: shellRect?.left || 0,
+            shellRight: shellRect?.right || 0,
+            shellWidth: shellRect?.width || 0,
             graphWidth: viewportRect?.width || 0,
             graphHeight: viewportRect?.height || 0,
             summaryColumns: summary
@@ -3034,33 +2974,68 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          roleGraphMetrics.modalLeft >= 0 &&
-            roleGraphMetrics.modalRight <=
+          roleGraphMetrics.shellLeft > roleGraphMetrics.navRight &&
+            roleGraphMetrics.shellRight <=
               roleGraphMetrics.viewportWidth + 1 &&
-            roleGraphMetrics.modalTop >= 0 &&
-            roleGraphMetrics.modalBottom <=
-              roleGraphMetrics.viewportHeight + 1 &&
-            roleGraphMetrics.modalBodyClientHeight > 0 &&
-            roleGraphMetrics.modalBodyScrollHeight >=
-              roleGraphMetrics.modalBodyClientHeight &&
+            roleGraphMetrics.shellWidth > 900 &&
             roleGraphMetrics.graphWidth > 600 &&
             roleGraphMetrics.graphHeight >= 360 &&
             roleGraphMetrics.summaryColumns === 6 &&
             roleGraphMetrics.documentOverflow <= 1,
-          '权限关系图桌面浮层、摘要和图形尺寸异常: ' +
+          '权限关系页桌面导航、摘要和图形尺寸异常: ' +
             JSON.stringify(roleGraphMetrics)
         )
         await modal.screenshot({
           path: path.resolve(
             outputDir,
-            'erp-permission-relationship-role-desktop.png'
+            'dev-permission-relationships-surface-desktop.png'
           ),
         })
 
+        const roleSelect = modal.getByLabel('选择要查看的岗位').first()
+        await roleSelect.locator('.ant-select-selector').click()
+        const roleDropdown = page.locator('.ant-select-dropdown:visible')
+        await roleDropdown.waitFor({ state: 'visible', timeout: 5000 })
+        await roleDropdown
+          .locator('.ant-select-item-option-content')
+          .filter({ hasText: /^业务$/u })
+          .waitFor({ state: 'visible', timeout: 5000 })
+        const roleLabels = await roleDropdown
+          .locator('.ant-select-item-option-content')
+          .allTextContents()
+        assert(
+          roleLabels.some((label) => label.trim() === '业务'),
+          '权限关系图岗位范围缺少业务: ' + JSON.stringify(roleLabels)
+        )
+        await roleDropdown
+          .locator('.ant-select-item-option')
+          .filter({ hasText: '业务' })
+          .click()
+        await roleSelect
+          .locator('.ant-select-selection-item')
+          .filter({ hasText: /^业务$/u })
+          .waitFor({ state: 'visible', timeout: 5000 })
+        await roleDropdown.waitFor({ state: 'hidden', timeout: 5000 })
+        await modal
+          .locator(
+            '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+          )
+          .waitFor({ state: 'visible', timeout: 15_000 })
+        await expectText(modal, '仓储')
+
         const moduleSelect = modal.getByLabel('选择功能模块').first()
+        await moduleSelect.evaluate((node) =>
+          node.scrollIntoView({ block: 'center', inline: 'nearest' })
+        )
         await moduleSelect.locator('.ant-select-selector').click()
-        const moduleDropdown = page.locator('.ant-select-dropdown:visible')
+        const moduleDropdown = page
+          .locator('.ant-select-dropdown:visible')
+          .filter({ hasText: '仓储' })
         await moduleDropdown.waitFor({ state: 'visible', timeout: 5000 })
+        await moduleDropdown
+          .locator('.ant-select-item-option-content')
+          .filter({ hasText: /^仓储$/u })
+          .waitFor({ state: 'visible', timeout: 5000 })
         const moduleLabels = await moduleDropdown
           .locator('.ant-select-item-option-content')
           .allTextContents()
@@ -3069,10 +3044,34 @@ export function createStyleL1Scenarios(deps) {
           '权限关系图功能范围缺少仓储: ' +
             JSON.stringify(moduleLabels)
         )
-        await moduleDropdown
+        const moduleOption = moduleDropdown
           .locator('.ant-select-item-option')
           .filter({ hasText: '仓储' })
-          .click()
+        const moduleOptionBox = await moduleOption.boundingBox()
+        const moduleViewport = page.viewportSize()
+        assert(
+          moduleOptionBox &&
+            moduleViewport &&
+            moduleOptionBox.width > 0 &&
+            moduleOptionBox.height > 0 &&
+            moduleOptionBox.x >= 0 &&
+            moduleOptionBox.y >= 0 &&
+            moduleOptionBox.x + moduleOptionBox.width <=
+              moduleViewport.width + 1 &&
+            moduleOptionBox.y + moduleOptionBox.height <=
+              moduleViewport.height + 1,
+          '仓储选项应完整位于当前视口内: ' +
+            JSON.stringify({ moduleOptionBox, moduleViewport })
+        )
+        await page.mouse.click(
+          moduleOptionBox.x + moduleOptionBox.width / 2,
+          moduleOptionBox.y + moduleOptionBox.height / 2
+        )
+        await moduleSelect
+          .locator('.ant-select-selection-item')
+          .filter({ hasText: /^仓储$/u })
+          .waitFor({ state: 'visible', timeout: 5000 })
+        await moduleDropdown.waitFor({ state: 'hidden', timeout: 5000 })
         await modal
           .locator(
             '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
@@ -3083,7 +3082,7 @@ export function createStyleL1Scenarios(deps) {
         await modal.locator('.erp-permission-relationship__graph').screenshot({
           path: path.resolve(
             outputDir,
-            'erp-permission-relationship-module-detail.png'
+            'dev-permission-relationships-module-detail.png'
           ),
         })
 
@@ -3099,7 +3098,7 @@ export function createStyleL1Scenarios(deps) {
         await modal.screenshot({
           path: path.resolve(
             outputDir,
-            'erp-permission-relationship-account-desktop.png'
+            'dev-permission-relationships-account-desktop.png'
           ),
         })
 
@@ -3141,56 +3140,54 @@ export function createStyleL1Scenarios(deps) {
         await fullscreen.screenshot({
           path: path.resolve(
             outputDir,
-            'erp-permission-relationship-fullscreen.png'
+            'dev-permission-relationships-fullscreen.png'
           ),
         })
         await page.keyboard.press('Escape')
         await fullscreen.waitFor({ state: 'detached', timeout: 10_000 })
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
 
-        await modal.locator('.ant-modal-footer .ant-btn-primary').click()
-        await modal.waitFor({ state: 'hidden', timeout: 10_000 })
         await clickERPThemeOption(page, '暗色')
         await assertERPThemeMode(page, {
-          scenarioName: 'erp-permission-relationship-graph-dark',
+          scenarioName: 'dev-permission-relationships-dark',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
-        await entry.click()
-        await modal.waitFor({ state: 'visible', timeout: 10_000 })
         await modal
           .locator(
             '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
           )
           .waitFor({ state: 'visible', timeout: 15_000 })
         await assertDarkThemeContrast(page, {
-          scenarioName: 'erp-permission-relationship-graph-dark',
-          selector:
-            '.erp-permission-relationship-modal .ant-modal-content',
+          scenarioName: 'dev-permission-relationships-dark',
+          selector: '.erp-permission-relationship',
         })
         await modal.screenshot({
           path: path.resolve(
             outputDir,
-            'erp-permission-relationship-dark-desktop.png'
+            'dev-permission-relationships-dark-desktop.png'
           ),
         })
 
         await page.setViewportSize({ width: 700, height: 900 })
         const narrowMetrics = await page.evaluate(() => {
-          const modal = document.querySelector(
-            '.erp-permission-relationship-modal'
+          const root = document.querySelector(
+            '.erp-dev-permission-relationships-page'
           )
-          const toolbar = modal?.querySelector(
+          const shell = root?.querySelector(
+            '.erp-dev-permission-relationships-shell'
+          )
+          const toolbar = shell?.querySelector(
             '.erp-permission-relationship__toolbar'
           )
-          const summary = modal?.querySelector(
+          const summary = shell?.querySelector(
             '.erp-permission-relationship__summary'
           )
-          const rect = modal?.getBoundingClientRect()
+          const rect = shell?.getBoundingClientRect()
           return {
-            modalLeft: rect?.left || 0,
-            modalRight: rect?.right || 0,
-            modalWidth: rect?.width || 0,
+            shellLeft: rect?.left || 0,
+            shellRight: rect?.right || 0,
+            shellWidth: rect?.width || 0,
             toolbarColumns: toolbar
               ? window
                   .getComputedStyle(toolbar)
@@ -3208,9 +3205,9 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          narrowMetrics.modalLeft >= 0 &&
-            narrowMetrics.modalRight <= narrowMetrics.viewportWidth + 1 &&
-            narrowMetrics.modalWidth > 0 &&
+          narrowMetrics.shellLeft >= 0 &&
+            narrowMetrics.shellRight <= narrowMetrics.viewportWidth + 1 &&
+            narrowMetrics.shellWidth > 0 &&
             narrowMetrics.toolbarColumns === 1 &&
             narrowMetrics.summaryColumns === 2 &&
             narrowMetrics.documentOverflow <= 1,
@@ -3220,19 +3217,19 @@ export function createStyleL1Scenarios(deps) {
         await page.screenshot({
           path: path.resolve(
             outputDir,
-            'erp-permission-relationship-mobile-dark.png'
+            'dev-permission-relationships-mobile-dark.png'
           ),
           fullPage: false,
         })
         await assertNoHorizontalOverflow(
           page,
-          'erp-permission-relationship-mobile-dark'
+          'dev-permission-relationships-mobile-dark'
         )
       },
     },
     {
-      name: 'erp-permission-relationship-entry-hidden',
-      path: '/erp/dashboard',
+      name: 'dev-permission-relationships-product-engineering-entry',
+      path: '/__dev/product-engineering',
       auth: 'admin',
       adminProfile: {
         id: 45,
@@ -3276,13 +3273,30 @@ export function createStyleL1Scenarios(deps) {
       },
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectHeading(page, '工作台')
-        await expectNoButton(page, '权限关系图')
-        await assertTextAbsent(page, '从账号到最终可用范围')
+        await expectHeading(page, '产品工程 / Product Engineering')
+        await expectText(page, '账号为什么能使用这些功能？')
+        const entry = page.getByRole('link', {
+          name: /核对权限关系/u,
+        })
+        await entry.waitFor({ state: 'visible', timeout: 10_000 })
+        await entry.click()
+        await page.waitForURL(
+          (url) => url.pathname === '/__dev/permission-relationships',
+          { timeout: 10_000 }
+        )
+        await expectHeading(page, '权限关系 / Effective Access')
+        await expectText(page, '只汇聚权限结果，不创建第二套权限真源')
         await assertNoHorizontalOverflow(
           page,
-          'erp-permission-relationship-entry-hidden'
+          'dev-permission-relationships-product-engineering-entry'
         )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'dev-permission-relationships-product-engineering-entry.png'
+          ),
+          fullPage: true,
+        })
       },
     },
     {
@@ -11854,6 +11868,12 @@ export function createStyleL1Scenarios(deps) {
             titlePrefix: '交付运行 · ',
           },
           {
+            path: '/__dev/permission-relationships',
+            heading: '权限关系 / Effective Access',
+            rootSelector: '.erp-dev-permission-relationships-page',
+            titlePrefix: '权限关系 · ',
+          },
+          {
             path: '/__dev/governance',
             heading: '这次改动该怎么做？',
             rootSelector: '.erp-dev-governance-page',
@@ -11945,6 +11965,7 @@ export function createStyleL1Scenarios(deps) {
             const header = root?.querySelector(
               [
                 '.erp-dev-hub-header',
+                '.erp-dev-permission-relationships-header',
                 '.erp-dev-governance-header',
                 '.erp-dev-flow-header',
                 '.erp-dev-docs-header',
@@ -11956,6 +11977,7 @@ export function createStyleL1Scenarios(deps) {
             const shell = root?.querySelector(
               [
                 '.erp-dev-hub-shell',
+                '.erp-dev-permission-relationships-shell',
                 '.erp-dev-governance-shell',
                 '.erp-dev-flow-main',
                 '.erp-dev-docs-shell',
@@ -12165,8 +12187,15 @@ export function createStyleL1Scenarios(deps) {
           {
             path: '/__dev/product-engineering',
             heading: '产品工程 / Product Engineering',
-            cardCount: 4,
-            secondaryLabels: ['改动指南', '业务链观察', '开发文档', '产品原型'],
+            cardCount: 6,
+            secondaryLabels: [
+              '产品内核',
+              '权限关系',
+              '改动指南',
+              '业务链观察',
+              '开发文档',
+              '产品原型',
+            ],
           },
           {
             path: '/__dev/quality',
@@ -12298,6 +12327,8 @@ export function createStyleL1Scenarios(deps) {
             assert.deepEqual(
               productMetrics.taskTitles,
               [
+                '哪些能力已经进入产品内核？',
+                '账号为什么能使用这些功能？',
                 '这件事该按哪条规则做？',
                 '这一步做完，业务真的完成了吗？',
                 '这项能力的正式说明写在哪里？',
@@ -12307,7 +12338,14 @@ export function createStyleL1Scenarios(deps) {
             )
             assert.deepEqual(
               productMetrics.actionNames,
-              ['判断规则', '查看业务链', '搜索文档', '评审原型'],
+              [
+                '查看产品内核',
+                '核对权限关系',
+                '判断规则',
+                '查看业务链',
+                '搜索文档',
+                '评审原型',
+              ],
               `产品工程首页应提供明确下一步: ${JSON.stringify(productMetrics)}`
             )
             assert(

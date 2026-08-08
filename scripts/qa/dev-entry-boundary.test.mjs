@@ -17,6 +17,7 @@ import {
 import {
   DEV_DATABASE_MIGRATION_ROUTE,
   DEV_DATA_PREPARATION_ROUTE,
+  DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
 } from "../../web/src/dev-workbench/config/devRoutes.mjs";
 import {
@@ -104,8 +105,16 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   const devProductCorePageSource = read(
     "web/src/dev-workbench/pages/DevProductCorePage.jsx",
   );
+  const devPermissionRelationshipsPageSource = read(
+    "web/src/dev-workbench/pages/DevPermissionRelationshipsPage.jsx",
+  );
+  const dashboardPageSource = read("web/src/erp/pages/DashboardPage.jsx");
   assert.equal(DEV_HUB_ROUTE, "/__dev");
   assert.equal(DEV_PRODUCT_CORE_ROUTE, "/__dev/product-core");
+  assert.equal(
+    DEV_PERMISSION_RELATIONSHIPS_ROUTE,
+    "/__dev/permission-relationships",
+  );
   assert.equal(
     DEV_PRODUCT_CORE_SOURCE_PATH,
     "docs/product/产品能力进度台账.md",
@@ -153,6 +162,9 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   const productCoreItem = DEV_HUB_ITEMS.find(
     (item) => item.key === "product-core",
   );
+  const permissionRelationshipsItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === "permission-relationships",
+  );
   const docsItem = DEV_HUB_ITEMS.find((item) => item.key === "docs");
   const customerConfigItem = DEV_HUB_ITEMS.find(
     (item) => item.key === "customer-config",
@@ -180,6 +192,39 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
     devRoutesSource,
     /path="product-core"[\s\S]{0,100}?<DevProductCorePage/u,
     "the Product Core inventory must remain under the DEV-only router",
+  );
+  assert.match(permissionRelationshipsItem?.title || "", /权限关系/);
+  assert(
+    (permissionRelationshipsItem?.guardrails || []).some((guardrail) =>
+      String(guardrail).includes("No permission writes"),
+    ),
+    "permission relationships must remain a read-only projection",
+  );
+  assert(
+    (permissionRelationshipsItem?.guardrails || []).some((guardrail) =>
+      String(guardrail).includes("No prod build"),
+    ),
+    "permission relationships must keep the production build boundary",
+  );
+  assert.match(
+    devRoutesSource,
+    /path="permission-relationships"[\s\S]{0,120}?<DevPermissionRelationshipsPage/u,
+    "permission relationships must remain under the DEV-only router",
+  );
+  assertIncludes(
+    devPermissionRelationshipsPageSource,
+    "关系图是只读结果，不是新的权限配置入口",
+    "permission relationship page read-only boundary",
+  );
+  assertIncludes(
+    devPermissionRelationshipsPageSource,
+    'href="/erp/system/permissions"',
+    "permission relationship formal configuration handoff",
+  );
+  assert.doesNotMatch(
+    dashboardPageSource,
+    /PermissionRelationship|权限关系图/u,
+    "the formal ERP dashboard must not retain the dev-only permission graph",
   );
   assert(
     (testingItem?.guardrails || []).some((guardrail) =>

@@ -1989,7 +1989,7 @@ const FLOW_DEFINITIONS = [
   },
   {
     key: 'fact.production_exception_decision',
-    scopeKey: 'fact_ledger',
+    scopeKey: 'source_document',
     kind: 'state_machine',
     label: '生产异常决策',
     summary: '异常申请经正式批准、拒绝或取消，和执行状态分开。',
@@ -2029,7 +2029,6 @@ const FLOW_DEFINITIONS = [
       'server/internal/service/jsonrpc_operational_fact_exception.go',
     ],
     evidence: [
-      ...factEvidence,
       evidence(
         'code',
         'server/internal/data/production_exception_decision_repo.go',

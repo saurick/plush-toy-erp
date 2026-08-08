@@ -31,6 +31,9 @@ const DevWorkbenchAreaPage = lazyRoute(
 const DevProductCorePage = lazyRoute(
   () => import('./pages/DevProductCorePage.jsx')
 )
+const DevPermissionRelationshipsPage = lazyRoute(
+  () => import('./pages/DevPermissionRelationshipsPage.jsx')
+)
 const DevDocsPage = lazyRoute(() => import('./pages/DevDocsPage.jsx'))
 const DevGovernancePage = lazyRoute(
   () => import('./pages/DevGovernancePage.jsx')
@@ -107,6 +110,10 @@ export default function DevWorkbenchRoutes() {
             }
           />
           <Route path="product-core" element={<DevProductCorePage />} />
+          <Route
+            path="permission-relationships"
+            element={<DevPermissionRelationshipsPage />}
+          />
           <Route path="governance" element={<DevGovernancePage />} />
           <Route
             path="status-flows"

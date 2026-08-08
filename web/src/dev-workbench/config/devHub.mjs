@@ -5,6 +5,7 @@ import {
   DEV_DOCS_ROUTE,
   DEV_GOVERNANCE_ROUTE,
   DEV_HUB_ROUTE,
+  DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_PRODUCT_CORE_ROUTE,
   DEV_PROTOTYPES_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
@@ -35,6 +36,24 @@ export const DEV_HUB_ITEMS = Object.freeze([
     ]),
     description:
       '完整查看哪些能力已进入 Product Core、哪些只完成一部分，以及当前不纳入内核的范围；all status and boundaries derive from the current capability ledger.',
+  }),
+  Object.freeze({
+    key: 'permission-relationships',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    title: '权限关系 / Effective Access',
+    group: '权限治理 / Access Governance',
+    route: DEV_PERMISSION_RELATIONSHIPS_ROUTE,
+    source: 'docs/product/配置与权限策略.md',
+    truthSource: '员工账号、岗位、最终权限解释、仓库范围与已启用审批设置',
+    status: '只读运行投影 / Read-only projection',
+    guardrails: Object.freeze([
+      '只读复用现有后端权限真源 / Existing backend truth only',
+      '不汇入任务、单据、流程或业务事实 / Permission relationships only',
+      '不在本页写权限 / No permission writes',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '按岗位或账号查看最终可用功能、页面、仓库数据范围和审批责任，定位为什么能用或为什么受限；配置仍回到正式权限页维护。',
   }),
   Object.freeze({
     key: 'governance',
