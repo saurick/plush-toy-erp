@@ -219,6 +219,24 @@
   outline-offset: 2px;
 }
 
+:root[data-erp-theme='dark'] .erp-dev-pipeline-timing__summary > div,
+:root[data-erp-theme='dark'] .erp-dev-operation-metrics > div {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:root[data-erp-theme='dark'] .erp-dev-timing-bars__track {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+:root[data-erp-theme='dark'] .erp-dev-pipeline-timing__critical-path {
+  background: rgba(22, 119, 255, 0.2);
+}
+
+:root[data-erp-theme='dark'] .erp-dev-pipeline-timing__jobs article {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
 @media (max-width: 1100px) {
   .erp-dev-version-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));

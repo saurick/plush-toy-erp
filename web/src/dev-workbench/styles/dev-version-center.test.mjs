@@ -45,10 +45,7 @@ test('status, artifact and transfer metrics stay readable across breakpoints', (
     css,
     /[.]erp-dev-version-shell \{[\s\S]*grid-template-columns: minmax\(0, 1fr\);/u
   )
-  assert.match(
-    css,
-    /[.]erp-dev-version-shell > \* \{[\s\S]*min-width: 0;/u
-  )
+  assert.match(css, /[.]erp-dev-version-shell > \* \{[\s\S]*min-width: 0;/u)
   assert.match(
     css,
     /[.]erp-dev-version-summary \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/u
@@ -86,5 +83,20 @@ test('status, artifact and transfer metrics stay readable across breakpoints', (
   assert.match(
     css,
     /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-pipeline-timing__summary,[\s\S]*display: grid;[\s\S]*grid-template-columns: 1fr;/u
+  )
+})
+
+test('dark theme keeps timing surfaces and progress tracks readable', () => {
+  assert.match(
+    css,
+    /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-timing__summary > div,[\s\S]*[.]erp-dev-operation-metrics > div \{[\s\S]*border-color: rgba\(255, 255, 255, 0[.]16\);[\s\S]*background: rgba\(255, 255, 255, 0[.]06\);/u
+  )
+  assert.match(
+    css,
+    /:root\[data-erp-theme='dark'\] [.]erp-dev-timing-bars__track \{[\s\S]*background: rgba\(255, 255, 255, 0[.]16\);/u
+  )
+  assert.match(
+    css,
+    /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-timing__critical-path \{[\s\S]*background: rgba\(22, 119, 255, 0[.]2\);/u
   )
 })
