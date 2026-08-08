@@ -18,6 +18,7 @@ import {
   deliveryPipelineRunModePresentation,
   deliveryStatusPresentation,
   deliveryVersionActionKind,
+  findLatestTransferredPromotion,
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryPercent,
@@ -166,6 +167,35 @@ test('version center uses fixed dev-only routes and engineering truth source', (
     DEV_DELIVERY_SOURCE_PATH,
     'docs/engineering/研发效能工作台与CI-CD设计.md'
   )
+})
+
+test('latest transferred promotion ignores same-SHA no-op receipts', () => {
+  const alreadyCurrent = {
+    action: 'promote',
+    status: 'passed',
+    durationMs: 2_650,
+    metrics: {
+      transferBytes: null,
+      transferDurationMs: null,
+    },
+  }
+  const targetWrite = {
+    action: 'promote',
+    status: 'passed',
+    durationMs: 187_869,
+    metrics: {
+      transferBytes: 1_325_933_237,
+      transferDurationMs: 114_267,
+      transferBytesPerSecond: 11_603_816,
+    },
+  }
+
+  assert.equal(
+    findLatestTransferredPromotion([alreadyCurrent, targetWrite]),
+    targetWrite
+  )
+  assert.equal(findLatestTransferredPromotion([alreadyCurrent]), null)
+  assert.equal(findLatestTransferredPromotion(null), null)
 })
 
 test('delivery summary requires provider, target and no-shell boundaries', () => {

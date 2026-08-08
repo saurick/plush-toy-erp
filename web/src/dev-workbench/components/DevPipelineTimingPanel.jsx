@@ -5,6 +5,7 @@ import {
   deliveryPipelinePresentation,
   deliveryPipelineRunModePresentation,
   deliveryStatusPresentation,
+  findLatestTransferredPromotion,
   formatDeliveryBytes,
   formatDeliveryDuration,
   formatDeliveryPercent,
@@ -101,10 +102,7 @@ export default function DevPipelineTimingPanel({
   const summary = summarizePipelineTimings(timings)
   const { latest: latestRun, analysisRun } = summary
   const [release = null] = versions
-  const deploymentOperation = operations.find(
-    (operation) =>
-      operation.action === 'promote' && operation.status === 'passed'
-  )
+  const deploymentOperation = findLatestTransferredPromotion(operations)
   const strictJob = summary.latestFullRelease?.jobs.find(
     (job) => job.name === 'Exact-SHA strict quality'
   )
@@ -198,27 +196,21 @@ export default function DevPipelineTimingPanel({
               </Text>
             </div>
             <div>
-              <Text type="secondary">最近部署与传输</Text>
+              <Text type="secondary">最近真实部署与传输</Text>
               <strong>
-                {formatDeliveryDuration(deploymentOperation?.durationMs)}
+                {deploymentOperation
+                  ? formatDeliveryDuration(deploymentOperation.durationMs)
+                  : '尚无真实部署'}
               </strong>
               <Text>
-                传输{' '}
-                {formatDeliveryBytes(
-                  deploymentOperation?.metrics?.transferBytes
-                )}{' '}
-                ·{' '}
-                {formatDeliveryDuration(
-                  deploymentOperation?.metrics?.transferDurationMs
-                )}
+                {deploymentOperation
+                  ? `传输 ${formatDeliveryBytes(deploymentOperation.metrics.transferBytes)} · ${formatDeliveryDuration(deploymentOperation.metrics.transferDurationMs)}`
+                  : '等待包含制品传输的部署回执'}
               </Text>
               <Text type="secondary">
-                {formatDeliveryRate(
-                  deploymentOperation?.metrics?.transferBytesPerSecond
-                )}
-                {transferShare === null
-                  ? ''
-                  : ` · 占总耗时 ${String(transferShare)}%`}
+                {deploymentOperation
+                  ? `${formatDeliveryRate(deploymentOperation.metrics.transferBytesPerSecond)}${transferShare === null ? '' : ` · 占总耗时 ${String(transferShare)}%`}`
+                  : '相同 SHA 复用不计为目标写入'}
               </Text>
             </div>
           </div>

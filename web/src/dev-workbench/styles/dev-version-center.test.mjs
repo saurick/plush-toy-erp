@@ -71,7 +71,8 @@ test('status, artifact and transfer metrics stay readable across breakpoints', (
     /[.]erp-dev-version-page [.]erp-dev-version-summary \{[\s\S]*overflow-x: visible;[\s\S]*scroll-snap-type: none;/u
   )
   assert.match(component, /构建缓存与制品/u)
-  assert.match(component, /最近部署与传输/u)
+  assert.match(component, /最近真实部署与传输/u)
+  assert.match(component, /相同 SHA 复用不计为目标写入/u)
   assert.match(component, /最近完整发布/u)
   assert.match(component, /相同 SHA 复用/u)
   assert.match(component, /失败原因/u)

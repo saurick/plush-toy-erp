@@ -762,6 +762,21 @@ function pipelineFailureReason(run) {
   return failedJob ? { job: failedJob.name, step: 'Job 未提供失败步骤' } : null
 }
 
+export function findLatestTransferredPromotion(operations) {
+  if (!Array.isArray(operations)) return null
+  return (
+    operations.find(
+      (operation) =>
+        operation?.action === 'promote' &&
+        operation.status === 'passed' &&
+        Number.isSafeInteger(operation.metrics?.transferBytes) &&
+        operation.metrics.transferBytes > 0 &&
+        Number.isSafeInteger(operation.metrics?.transferDurationMs) &&
+        operation.metrics.transferDurationMs > 0
+    ) || null
+  )
+}
+
 export function summarizePipelineTimings(timings) {
   const runs = timings?.runs || []
   const completed = runs.filter(
