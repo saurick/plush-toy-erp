@@ -115,6 +115,21 @@ test("promotion executor accepts only an identity-bound redacted receipt", () =>
       ),
     /contract/u,
   );
+  assert.throws(
+    () =>
+      validateRemotePromotionReceipt(
+        receipt({
+          durationMs: 20_000_000_000,
+          timings: PROMOTION_STAGES.map((id) => ({
+            id,
+            status: "passed",
+            durationMs: 1_000_000_000,
+          })),
+        }),
+        expected,
+      ),
+    /timing contract/u,
+  );
 });
 
 test("failed and unknown receipts cannot masquerade as passed", () => {

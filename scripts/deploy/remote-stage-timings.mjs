@@ -13,14 +13,23 @@ export function validateRemoteStageTimings({
   status,
   stage,
   durationMs,
+  startedAt,
+  finishedAt,
   requiredStages,
 }) {
+  const startedAtMs = Date.parse(String(startedAt || ""));
+  const finishedAtMs = Date.parse(String(finishedAt || ""));
+  const wallDurationMs = finishedAtMs - startedAtMs;
   if (
     !Array.isArray(timings) ||
     !Array.isArray(requiredStages) ||
     timings.length > requiredStages.length ||
     !Number.isSafeInteger(durationMs) ||
-    durationMs < 0
+    durationMs < 0 ||
+    !Number.isFinite(startedAtMs) ||
+    !Number.isFinite(finishedAtMs) ||
+    wallDurationMs < 0 ||
+    Math.abs(durationMs - wallDurationMs) > 2_000
   ) {
     throw new Error("remote stage timing contract is invalid");
   }

@@ -316,6 +316,8 @@ export function validateRemotePromotionReceipt(receipt, expected) {
     status: receipt?.status,
     stage: receipt?.stage,
     durationMs: receipt?.durationMs,
+    startedAt: receipt?.startedAt,
+    finishedAt: receipt?.finishedAt,
     requiredStages: PROMOTION_STAGE_IDS,
   });
   if (

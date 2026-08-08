@@ -124,6 +124,37 @@ test("rollback executor accepts only identity-bound redacted receipts", () => {
       ),
     /contract/u,
   );
+  assert.throws(
+    () =>
+      validateRemoteRollbackReceipt(
+        {
+          ...receipt(),
+          durationMs: 20_000_000_000,
+          timings: ROLLBACK_STAGES.map((id) => ({
+            id,
+            status: "passed",
+            durationMs: 1_000_000_000,
+          })),
+        },
+        expected(),
+      ),
+    /timing contract/u,
+  );
+});
+
+test("rollback uses the live release control script, not the historical target script", () => {
+  const source = readFileSync(
+    new URL("./rollback-executor.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /\$\{current[.]manifest[.]gitSha\}:scripts\/deploy\/remote-code-rollback[.]sh/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /\$\{target[.]manifest[.]gitSha\}:scripts\/deploy\/remote-code-rollback[.]sh/u,
+  );
 });
 
 test("rollback executor has explicit confirmation and no automatic retry path", () => {

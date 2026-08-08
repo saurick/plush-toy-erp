@@ -229,12 +229,15 @@ export function prepareRollbackTransfer(
       `${JSON.stringify(plan, null, 2)}\n`,
       { mode: 0o600 },
     );
+    // The control script belongs to the live release. The target release only
+    // supplies the source and images; importing its historical orchestrator can
+    // reintroduce an already-fixed rollback or receipt defect.
     const remoteScript = runChecked(
       runCommand,
       "git",
       [
         "show",
-        `${target.manifest.gitSha}:scripts/deploy/remote-code-rollback.sh`,
+        `${current.manifest.gitSha}:scripts/deploy/remote-code-rollback.sh`,
       ],
       { cwd: root },
       "read committed rollback script",
@@ -304,6 +307,8 @@ export function validateRemoteRollbackReceipt(receipt, expected) {
     status: receipt?.status,
     stage: receipt?.stage,
     durationMs: receipt?.durationMs,
+    startedAt: receipt?.startedAt,
+    finishedAt: receipt?.finishedAt,
     requiredStages: ROLLBACK_STAGE_IDS,
   });
   if (
