@@ -115,7 +115,29 @@ Actions run ID、job ID、可变 tag 和页面显示名称只作辅助信息。
 - GitHub Provider 只读固定仓库最近的 CI / Release run，并读取对应 attempt 的 job 与 step 时间；Bridge 缓存 60 秒，GitHub 仍是远端时间真源。
 - `full` / `strict` 把环境、共享检查、敏感信息、Web、浏览器、服务端与数据库、漏洞扫描等阶段写入同一质量回执；passed 回执缺任一阶段时间即失败关闭。
 - promotion / rollback 的目标脚本把每个固定远端阶段及总耗时写入 v2 脱敏终态回执；失败回执保留已通过阶段和失败阶段，不保存原始日志或凭据。
-- 工作台首屏展示最近完整运行、完整样本中位数、最长环节和建议复核点；全部 job / step、质量门禁阶段和 operation 阶段按需展开，长列表保持横向滚动与移动端可读。
+- 工作台首屏展示最近完整运行、同 workflow 样本中位数、观测关键路径、最长环节、BuildKit 缓存命中、制品大小、传输速率、版本和失败原因；全部 job / step 与 operation 阶段按需展开，长列表保持横向滚动与移动端可读。
+
+指标口径固定为：
+
+| 指标 | 真源与计算 | 明确边界 |
+| --- | --- | --- |
+| run / job / step 耗时 | GitHub Actions 当前 attempt 的原始时间戳 | CI 与 Release 分开计算中位数 |
+| 观测关键路径 | 在 run 窗口内按 job 时间区间连接可见覆盖链，并单列调度 / 等待空档 | GitHub API 未返回 workflow `needs` 图，因此不冒充静态依赖关键路径 |
+| 失败原因 | 最近完整运行中最早失败的 step；缺 step 时退到失败 job | 不把原始日志或异常正文带入浏览器 |
+| BuildKit 缓存命中 | Release Buildx `rawjson` 中去重后的完成构建节点；排除加载、缓存导入导出和镜像导出节点 | 是构建节点命中率，不是字节命中率 |
+| 制品大小 | GitHub Release 六项 asset 的公开 size，并分列 Server、Web 与 SBOM | 不以 Docker 展开后大小替代传输字节 |
+| 部署传输速率 | promotion 白名单文件总字节 ÷ 实际 rsync 调用耗时 | 是本次有效吞吐，不冒充链路带宽 |
+| 版本与 digest | exact SHA Release manifest、GHCR digest 和 promotion operation 回执 | 缺详情时显示“未证明”，不从 tag 猜测 |
+
+当前优化保持一条主路径：
+
+- CI / strict 缓存锁文件绑定的 pnpm store、Playwright Chromium、固定版本 Go 工具和经 SHA-256 复核的 gitleaks archive；缓存缺失或损坏时重新准备，命中从不替代安装合同、checksum 或测试。
+- Release 把 Server 与 Web 放入一次 Buildx Bake 共享图并允许并行调度；GitHub 使用按 target 隔离的 GHA BuildKit cache，本机使用 builder cache。两个 target 仍来自同一 committed archive、同一 Dockerfile 和同一 exact SHA。
+- Dockerfile 把 pnpm、Go、APT 与固定 Chromium / PDF 依赖保持在易复用的稳定层；易变化的源码、`GIT_SHA` 与 release 标签位于其后。缓存 mount 不进入最终镜像。
+- 已发布且六项 asset 完整的相同 SHA 继续通过既有 release identity 回执直接复用，不重建镜像；不同 SHA 即使源码看似相同也不猜测 digest，不跨身份复用发布结果。
+- cold / hot 对比使用同一 clean exact SHA、同一工具链和同一命令：先显式隔离本轮 builder cache 取得一次 cold，再连续执行三次 hot；每次均保留完整门禁、构建节点统计和零临时数据库残留读回。
+
+复杂度控制：本轮不新增流水线、数据库、指标服务、后台任务或生产管理入口；只在既有 Release artifact、Provider、operation 和 DEV-only 工作台合同上增加一组可选效能字段。Provider 仅富化最新 Release 的两个小型 JSON asset，旧版本与读取失败统一降为 `null / 未证明`，不会影响版本列表、发布资格或目标写入。关键路径由现有时间戳即时派生，不持久化第二份调度图。
 
 耗时只用于定位瓶颈，不能自动把有共享数据库、浏览器锁、migration、promotion 或同一目标写入的步骤改成并发。优化前先确认等待时间、重复构建、重复安装或真实计算中的哪一类占主导；优化后用同口径多次运行比较，不能用单次偶然值宣布完成。
 
@@ -251,6 +273,9 @@ archive 与 cleanup 默认只接受 loopback；登记的 `192.168.0.106:5432` �
 - 最严重 blocker。
 - 推荐下一步。
 - 证据入口和 `not_proven` 状态。
+- 当前版本 / exact SHA、不可变制品大小与镜像 digest。
+- 最近 CI/CD 分阶段耗时、同类中位数、观测关键路径、失败原因和 BuildKit 缓存命中。
+- 最近 promotion 的实际 rsync 耗时、有效传输速率、远端阶段与回滚备份大小。
 
 主路径固定为：
 

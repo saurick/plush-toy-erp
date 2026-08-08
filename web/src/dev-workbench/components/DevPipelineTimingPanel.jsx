@@ -2,7 +2,12 @@ import React from 'react'
 import { Card, Empty, Space, Tag, Typography } from 'antd'
 
 import {
+  deliveryPipelinePresentation,
+  deliveryStatusPresentation,
+  formatDeliveryBytes,
   formatDeliveryDuration,
+  formatDeliveryPercent,
+  formatDeliveryRate,
   shortGitSha,
   summarizePipelineTimings,
 } from '../config/devDelivery.mjs'
@@ -34,6 +39,12 @@ export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
   return (
     <ol className="erp-dev-timing-bars">
       {visibleStages.map((stage) => {
+        const stagePresentation = deliveryPipelinePresentation(
+          stage.name || stage.label
+        )
+        const groupPresentation = stage.group
+          ? deliveryPipelinePresentation(stage.group)
+          : null
         const percentage = Math.min(
           100,
           Math.max(2, Math.round((stage.durationMs / denominator) * 100))
@@ -41,10 +52,16 @@ export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
         return (
           <li key={stage.id} className="erp-dev-timing-bars__item">
             <div className="erp-dev-timing-bars__label">
-              <span title={stage.name || stage.label}>
-                <Text strong>{stage.name || stage.label}</Text>
-                {stage.group ? (
-                  <Text type="secondary"> · {stage.group}</Text>
+              <span
+                title={
+                  groupPresentation
+                    ? `${stagePresentation.title}；所属任务：${groupPresentation.title}`
+                    : stagePresentation.title
+                }
+              >
+                <Text strong>{stagePresentation.label}</Text>
+                {groupPresentation ? (
+                  <Text type="secondary"> · {groupPresentation.label}</Text>
                 ) : null}
               </span>
               <Text>{formatDeliveryDuration(stage.durationMs)}</Text>
@@ -52,7 +69,7 @@ export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
             <div
               className="erp-dev-timing-bars__track"
               role="progressbar"
-              aria-label={`${stage.name || stage.label}耗时占比`}
+              aria-label={`${stagePresentation.label}耗时占比`}
               aria-valuemin={0}
               aria-valuemax={denominator}
               aria-valuenow={stage.durationMs}
@@ -69,9 +86,20 @@ export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
   )
 }
 
-export default function DevPipelineTimingPanel({ timings }) {
+export default function DevPipelineTimingPanel({
+  timings,
+  versions = [],
+  operations = [],
+}) {
   const summary = summarizePipelineTimings(timings)
   const latestRun = summary.latest
+  const release = versions[0] || null
+  const transferOperation = operations.find(
+    (operation) =>
+      operation.action === 'promote' &&
+      operation.status === 'passed' &&
+      Number.isSafeInteger(operation.metrics?.transferBytesPerSecond)
+  )
 
   return (
     <Card className="erp-dev-pipeline-timing" variant="borderless">
@@ -106,19 +134,90 @@ export default function DevPipelineTimingPanel({ timings }) {
               </Text>
             </div>
             <div>
-              <Text type="secondary">最近样本中位数</Text>
+              <Text type="secondary">同类运行中位数</Text>
               <strong>
                 {formatDeliveryDuration(summary.medianDurationMs)}
               </strong>
-              <Text>{summary.sampleCount} 次完整运行样本</Text>
+              <Text>{summary.sampleCount} 次同类完整运行</Text>
             </div>
             <div>
-              <Text type="secondary">当前瓶颈</Text>
-              <strong title={summary.bottleneck?.name || '尚未识别'}>
-                {summary.bottleneck?.name || '尚未识别'}
+              <Text type="secondary">观测关键路径</Text>
+              <strong>
+                {formatDeliveryDuration(summary.criticalPath?.durationMs)}
+              </strong>
+              <Text
+                title={summary.criticalPath?.jobs
+                  .map((job) => job.name)
+                  .join(' → ')}
+              >
+                {summary.criticalPath?.jobs
+                  .map((job) => deliveryPipelinePresentation(job.name).label)
+                  .join(' → ') || '尚未识别'}
+              </Text>
+              <Text type="secondary">
+                可见环节{' '}
+                {formatDeliveryDuration(
+                  summary.criticalPath?.coveredDurationMs
+                )}{' '}
+                · 调度/等待{' '}
+                {formatDeliveryDuration(summary.criticalPath?.schedulingGapMs)}
+              </Text>
+            </div>
+            <div>
+              <Text type="secondary">最长环节</Text>
+              <strong
+                title={
+                  summary.bottleneck
+                    ? deliveryPipelinePresentation(summary.bottleneck.name)
+                        .title
+                    : '尚未识别'
+                }
+              >
+                {summary.bottleneck
+                  ? deliveryPipelinePresentation(summary.bottleneck.name).label
+                  : '尚未识别'}
               </strong>
               <Text>
                 {formatDeliveryDuration(summary.bottleneck?.durationMs)}
+              </Text>
+            </div>
+            <div>
+              <Text type="secondary">最新发布 BuildKit 命中</Text>
+              <strong>
+                {formatDeliveryPercent(
+                  release?.buildPerformance?.cacheHitRateBasisPoints
+                )}
+              </strong>
+              <Text>
+                {release?.buildPerformance
+                  ? `${release.buildPerformance.cacheHitCount}/${release.buildPerformance.completedVertexCount} 个完成节点`
+                  : '等待新版发布回执'}
+              </Text>
+            </div>
+            <div>
+              <Text type="secondary">最新不可变制品</Text>
+              <strong>
+                {formatDeliveryBytes(release?.artifactSummary?.totalBytes)}
+              </strong>
+              <Text>
+                {release
+                  ? `${release.version} · ${shortGitSha(release.gitSha)}`
+                  : '版本未证明'}
+              </Text>
+            </div>
+            <div>
+              <Text type="secondary">最近部署传输</Text>
+              <strong>
+                {formatDeliveryRate(
+                  transferOperation?.metrics?.transferBytesPerSecond
+                )}
+              </strong>
+              <Text>
+                {formatDeliveryBytes(transferOperation?.metrics?.transferBytes)}{' '}
+                ·{' '}
+                {formatDeliveryDuration(
+                  transferOperation?.metrics?.transferDurationMs
+                )}
               </Text>
             </div>
           </div>
@@ -132,6 +231,18 @@ export default function DevPipelineTimingPanel({ timings }) {
                 : '最近运行未通过'}
             </Tag>
             <Text>{summary.optimizationHint}</Text>
+            <Text
+              type={summary.failureReason ? 'danger' : 'secondary'}
+              title={
+                summary.failureReason
+                  ? `${summary.failureReason.job} / ${summary.failureReason.step}`
+                  : undefined
+              }
+            >
+              {summary.failureReason
+                ? `失败原因：${deliveryPipelinePresentation(summary.failureReason.job).label} / ${deliveryPipelinePresentation(summary.failureReason.step).label}`
+                : '失败原因：最近运行无失败步骤'}
+            </Text>
             <Link href={latestRun.url} target="_blank" rel="noreferrer">
               查看 GitHub 运行
             </Link>
@@ -145,30 +256,34 @@ export default function DevPipelineTimingPanel({ timings }) {
           <details className="erp-dev-pipeline-timing__details">
             <summary>查看全部 job 与 step 时间</summary>
             <div className="erp-dev-pipeline-timing__jobs">
-              {latestRun.jobs.map((job) => (
-                <article key={job.id}>
-                  <Space wrap>
-                    <Text strong>{job.name}</Text>
-                    <Tag
-                      color={job.conclusion === 'success' ? 'success' : 'error'}
-                    >
-                      {job.conclusion || job.status}
-                    </Tag>
-                    <Text type="secondary">
-                      {formatDeliveryDuration(job.durationMs)}
-                    </Text>
-                  </Space>
-                  <DevTimingBars
-                    stages={job.steps.map((step) => ({
-                      ...step,
-                      id: `${String(job.id)}:${String(step.number)}`,
-                      label: step.name,
-                    }))}
-                    totalDurationMs={job.durationMs || latestRun.durationMs}
-                    limit={100}
-                  />
-                </article>
-              ))}
+              {latestRun.jobs.map((job) => {
+                const jobName = deliveryPipelinePresentation(job.name)
+                const jobStatus = deliveryStatusPresentation(
+                  job.conclusion || job.status
+                )
+                return (
+                  <article key={job.id}>
+                    <Space wrap>
+                      <Text strong title={jobName.title}>
+                        {jobName.label}
+                      </Text>
+                      <Tag color={jobStatus.color}>{jobStatus.label}</Tag>
+                      <Text type="secondary">
+                        {formatDeliveryDuration(job.durationMs)}
+                      </Text>
+                    </Space>
+                    <DevTimingBars
+                      stages={job.steps.map((step) => ({
+                        ...step,
+                        id: `${String(job.id)}:${String(step.number)}`,
+                        label: step.name,
+                      }))}
+                      totalDurationMs={job.durationMs || latestRun.durationMs}
+                      limit={100}
+                    />
+                  </article>
+                )
+              })}
             </div>
           </details>
         </section>

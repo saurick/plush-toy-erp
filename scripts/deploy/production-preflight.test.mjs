@@ -528,10 +528,7 @@ test("production preflight resolves a packaged source root without Git metadata"
   fs.mkdirSync(path.dirname(packagedContract), { recursive: true });
   fs.copyFileSync(scriptPath, packagedScript);
   fs.copyFileSync(
-    path.join(
-      repoRoot,
-      "deployments/yoyoosun/env/runtime.contract.json",
-    ),
+    path.join(repoRoot, "deployments/yoyoosun/env/runtime.contract.json"),
     packagedContract,
   );
   fs.chmodSync(packagedScript, 0o755);
@@ -1295,10 +1292,7 @@ test("production preflight rejects migration locks in shared temporary directori
     const result = runPreflight(fixture);
 
     assert.notEqual(result.status, 0);
-    assert.match(
-      result.stderr,
-      /MIGRATION_LOCK_FILE 不得位于共享临时目录/u,
-    );
+    assert.match(result.stderr, /MIGRATION_LOCK_FILE 不得位于共享临时目录/u);
   }
 });
 
@@ -1655,6 +1649,19 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     dockerfile.includes(
       'test "$installed_chromium_common_version" = "$CHROMIUM_VERSION"',
     ),
+  );
+  assert.match(
+    dockerfile,
+    /RUN --mount=type=cache,id=plush-npm,target=\/root\/.npm,sharing=locked \\\n\s+--mount=type=cache,id=plush-pnpm,target=\/web\/.pnpm-store,sharing=locked/u,
+  );
+  assert.match(
+    dockerfile,
+    /RUN --mount=type=cache,id=plush-apt-lists,target=\/var\/lib\/apt\/lists,sharing=locked \\\n\s+--mount=type=cache,id=plush-apt-cache,target=\/var\/cache\/apt,sharing=locked/u,
+  );
+  assert(
+    dockerfile.indexOf('"chromium=${CHROMIUM_VERSION}"') <
+      dockerfile.lastIndexOf("ARG GIT_SHA"),
+    "Chromium/PDF runtime dependencies must remain above volatile release identity layers",
   );
   assert.match(dockerfile, /^USER app$/m);
   assert.match(

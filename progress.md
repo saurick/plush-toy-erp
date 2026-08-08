@@ -4,6 +4,13 @@
 
 ## 当前活跃事项
 
+### CI/CD 效能优化与最新代码部署到 test-133（2026-08-08）
+
+- 基线：GitHub 最近四次 CI 总耗时中位数为 `538.5s`，最近一次 `539s`，最长 quality job `501s`、主门禁 step `399s`；最近四次 Immutable Release 中位数为 `896.5s`，最近一次 `927s`，其中 strict job `542s`、publish job `362s`、镜像与制品阶段约 `264s`。当前公开 Release `2026.08.08-5 / 0e1dba7f8442e57ad59c11a3ce5541811e6c8f5d` 的 Server / Web tar 分别为 `1,029,740,032 / 235,604,992 bytes`。历史同正式 promotion 的 `1,328,210,048 bytes` 操作窗口约 `66.5s`，只作为旧口径传输下限参考；新实现改为计量实际 rsync 调用。
+- 当前实现：保持 Exact-SHA、strict provenance、六项 Release 与 promotion 门禁不变；CI / strict 增加 checksum 后可复用的 gitleaks、固定 Go 工具、pnpm store 和 Playwright Chromium cache；Release 以一次 Buildx Bake 共享图并行调度 Server / Web、按 target 使用 GHA cache，并把 pnpm / APT / 固定 Chromium 置于稳定 Docker 层。Release artifact、GitHub Provider、promotion operation 与 DEV-only 版本中心贯通构建命中、归档大小、digest、实际传输耗时 / 速率、观测关键路径、版本和失败原因。
+- 数据库边界：本轮基线 inventory 只发现长期 `plush_erp`；先前 disposable `plush_erp_ci_populated_6974_17055` 已按 archive / restore / drop 流程清理并读回零残留。后续 cold / hot 与本地 release rehearsal 继续复用统一隔离 lifecycle，临时库必须绑定 run ID 并在成功或失败后精确清理，不触碰长期库、133 逻辑库、当前版本或回滚数据代。
+- 当前状态：代码和合同测试正在当前 writer 范围内收口，尚未 stage、commit、push、生成新 immutable Release 或修改 133。当前 133 只读预检仍通过，但运行 Server / Web SHA 均为旧远端 `0e1dba7f8442e57ad59c11a3ce5541811e6c8f5d`；只有完成本地 cold + 三次 hot + 同 SHA 幂等演练、独立取得 Git 授权、正式 CI / Release、promotion、真实浏览器、新旧版本回滚 / 前滚和临时库零残留后才能改写为完成。
+
 ### 夜间发布门禁与 test-133
 
 - 完成：`acc4538e8374e6ff94cb06d892e2994e8f59f7ec` 已普通推送并完成 exact-SHA `prepare-push 5387 / 5387`、GitHub CI run `30602758373` 和 Immutable Release run `30603201549`；release `2026.07.31-2` / tag `artifact-acc4538e8374e6ff94cb06d892e2994e8f59f7ec` 的 Server / Web 不可变制品已按正式 promotion 流程部署到 `customer-trial-133`。operation `f6de0aa4-c9b4-441c-a6d0-45d418546ab8` 在 fresh backup、restore rehearsal、串行 Atlas 锁和已授权 trigger / function 移除后通过，目标读回 current migration `20260730161955`、pending `0`、runtime SHA 与 OCI image ID 精确匹配；基础 Web / health / ready、`11 / 11` 登录矩阵、SMS、active config 和 PDF 技术 smoke 共 `9 / 9` 通过。

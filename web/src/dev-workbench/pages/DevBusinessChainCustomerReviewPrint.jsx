@@ -136,10 +136,18 @@ function ChainContent({ chain }) {
         <table>
           <thead>
             <tr>
-              <th scope="col">步骤与进入条件</th>
+              <th scope="col">
+                步骤
+                <br />
+                触发条件或前置条件
+              </th>
               <th scope="col">谁负责</th>
               <th scope="col">人员与系统怎么配合</th>
-              <th scope="col">怎样算完成、接到哪里</th>
+              <th scope="col">
+                怎样算完成
+                <br />
+                下一步衔接到哪里
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -153,11 +161,11 @@ function ChainContent({ chain }) {
                 <td>{step.responsibleRole}</td>
                 <td>
                   <p>
-                    <strong>人员</strong>
+                    <strong>人员需要办理什么</strong>
                     {step.personAction}
                   </p>
                   <p>
-                    <strong>系统</strong>
+                    <strong>系统自动完成什么</strong>
                     {step.systemAction}
                   </p>
                 </td>
@@ -174,7 +182,7 @@ function ChainContent({ chain }) {
         </table>
       </section>
       <section className="erp-dev-flow-customer-review__all-exceptions">
-        <h2>异常时怎么走</h2>
+        <h2>整条业务链的异常与纠正路径</h2>
         <p>图中已标出主要分支；下列校对点只列一次，不在每一步重复。</p>
         <ExceptionList paths={chain.displayExceptionPaths} />
       </section>

@@ -123,8 +123,7 @@ test("release artifact builds a non-empty CycloneDX dependency inventory", () =>
       "lockfileVersion: '9.0'\npackages:\n\n  '@scope/pkg@2.0.0':\n    resolution: {}\n\n  plain@1.0.0:\n    resolution: {}\n\nsnapshots:\n",
     "server/Dockerfile":
       "ARG NODE_BUILDER_IMAGE=node:24.14.0\nARG GO_BUILDER_IMAGE=golang:1.26.5\nARG RUNTIME_BASE_IMAGE=debian:bookworm-slim\n",
-    "web/Dockerfile":
-      "ARG UNUSED_DEVELOPMENT_IMAGE=example.invalid/unused:1\n",
+    "web/Dockerfile": "ARG UNUSED_DEVELOPMENT_IMAGE=example.invalid/unused:1\n",
   };
   const sbom = buildDependencySbom({
     repoRoot: "/fixture",
@@ -215,6 +214,17 @@ test("release artifact manifest rejects mismatched or incomplete image evidence"
     sbom: {
       sha256: "1".repeat(64),
     },
+    performance: {
+      build: {
+        schemaVersion: "plush.release-build-performance/v1",
+        durationMs: 123_000,
+        cacheMode: "gha",
+        completedVertexCount: 10,
+        cacheHitCount: 8,
+        cacheMissCount: 2,
+        cacheHitRateBasisPoints: 8_000,
+      },
+    },
     images: [image("server"), image("web")],
   };
   assert.equal(assertReleaseArtifactManifest(manifest), manifest);
@@ -225,6 +235,19 @@ test("release artifact manifest rejects mismatched or incomplete image evidence"
         images: [image("server"), { ...image("web"), gitSha: "0".repeat(40) }],
       }),
     /image entry is invalid/u,
+  );
+  assert.throws(
+    () =>
+      assertReleaseArtifactManifest({
+        ...manifest,
+        performance: {
+          build: {
+            ...manifest.performance.build,
+            cacheHitCount: 9,
+          },
+        },
+      }),
+    /manifest is invalid/u,
   );
 });
 
@@ -314,6 +337,15 @@ test("release artifact builder normalizes the source hash and writes complete ch
           formalEvidenceEligible: true,
           dockerBuilt: true,
           dockerImages: [sourceImages.web, sourceImages.server],
+          buildPerformance: {
+            schemaVersion: "plush.release-build-performance/v1",
+            durationMs: 45_000,
+            cacheMode: "gha",
+            completedVertexCount: 20,
+            cacheHitCount: 15,
+            cacheMissCount: 5,
+            cacheHitRateBasisPoints: 7_500,
+          },
         }),
         runCommand,
       },
@@ -328,6 +360,13 @@ test("release artifact builder normalizes the source hash and writes complete ch
     );
 
     assert.equal(manifest.sourceArchive.sha256, "9".repeat(64));
+    assert.equal(manifest.performance.build.cacheHitRateBasisPoints, 7_500);
+    assert.equal(manifest.images.length, 2);
+    assert(
+      manifest.images.every((image) =>
+        Number.isSafeInteger(image.archive.saveDurationMs),
+      ),
+    );
     assert.equal(checksums.trim().split("\n").length, 4);
     assert.match(checksums, /^[a-f0-9]{64}  release-artifact\.json$/mu);
     assert.match(checksums, /^[a-f0-9]{64}  sbom\.cdx\.json$/mu);

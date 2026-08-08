@@ -78,6 +78,26 @@
   white-space: nowrap;
 }
 
+.erp-dev-pipeline-timing__summary > div > .ant-typography:last-child {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-operation-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.erp-dev-operation-metrics > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--ant-color-fill-quaternary, #fafafa);
+}
+
 .erp-dev-pipeline-timing__decision {
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -174,9 +194,12 @@
 }
 
 @media (max-width: 1100px) {
-  .erp-dev-version-summary,
-  .erp-dev-pipeline-timing__summary {
+  .erp-dev-version-summary {
     grid-template-columns: 1fr;
+  }
+
+  .erp-dev-pipeline-timing__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .erp-dev-pipeline-timing__head {
@@ -194,5 +217,16 @@
 
   .erp-dev-timing-bars__label {
     align-items: flex-start;
+  }
+
+  .erp-dev-operation-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .erp-dev-pipeline-timing__summary,
+  .erp-dev-operation-metrics {
+    grid-template-columns: 1fr;
   }
 }

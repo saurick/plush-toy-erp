@@ -12,10 +12,13 @@ import {
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   defaultReleaseVersion,
+  deliveryPipelinePresentation,
   deliveryStatusPresentation,
   deliveryVersionActionKind,
   formatDeliveryBytes,
   formatDeliveryDuration,
+  formatDeliveryPercent,
+  formatDeliveryRate,
   shortGitSha,
   summarizePipelineTimings,
   validateDevDeliverySummary,
@@ -37,6 +40,12 @@ const versionCenterPageSource = readFileSync(
 const databaseMigrationPageSource = readFileSync(
   new URL('../pages/DevDatabaseMigrationPage.jsx', import.meta.url),
   'utf8'
+)
+const workflowSources = ['ci.yml', 'release.yml'].map((name) =>
+  readFileSync(
+    new URL(`../../../../.github/workflows/${name}`, import.meta.url),
+    'utf8'
+  )
 )
 
 function response(payload, ok = true) {
@@ -68,6 +77,25 @@ function summaryFixture() {
         publishedAt: '2026-07-29T01:00:00.000Z',
         url: `https://github.com/saurick/plush-toy-erp/releases/tag/artifact-${SHA}`,
         assets: ['release-manifest.json'],
+        artifactSummary: {
+          totalBytes: 1_265_345_566,
+          serverImageBytes: 1_029_740_032,
+          webImageBytes: 235_604_992,
+          sbomBytes: 542,
+        },
+        buildPerformance: {
+          schemaVersion: 'plush.release-build-performance/v1',
+          durationMs: 240_000,
+          cacheMode: 'gha',
+          completedVertexCount: 20,
+          cacheHitCount: 16,
+          cacheMissCount: 4,
+          cacheHitRateBasisPoints: 8_000,
+        },
+        imageDigests: {
+          server: `sha256:${'c'.repeat(64)}`,
+          web: `sha256:${'d'.repeat(64)}`,
+        },
         completeAssets: true,
       },
     ],
@@ -92,6 +120,17 @@ function summaryFixture() {
             durationMs: 10_000,
           },
         ],
+        metrics: {
+          transferBytes: 1_265_345_566,
+          transferDurationMs: 65_000,
+          transferBytesPerSecond: 19_466_855,
+          serverArchiveBytes: 1_029_740_032,
+          webArchiveBytes: 235_604_992,
+          backupSizeBytes: 612_412,
+          serverDigest: `sha256:${'c'.repeat(64)}`,
+          webDigest: `sha256:${'d'.repeat(64)}`,
+          buildPerformance: null,
+        },
         issues: [],
         events: [],
         confirmationRequired: '',
@@ -147,6 +186,22 @@ test('delivery summary requires provider, target and no-shell boundaries', () =>
           {
             ...summaryFixture().versions[0],
             gitSha: 'not-a-sha',
+          },
+        ],
+      }),
+    /version/u
+  )
+  assert.throws(
+    () =>
+      validateDevDeliverySummary({
+        ...summaryFixture(),
+        versions: [
+          {
+            ...summaryFixture().versions[0],
+            buildPerformance: {
+              ...summaryFixture().versions[0].buildPerformance,
+              cacheHitCount: 19,
+            },
           },
         ],
       }),
@@ -235,10 +290,49 @@ test('delivery presentation helpers are deterministic and bounded', () => {
   assert.equal(shortGitSha(SHA), 'aaaaaaaaaaaa')
   assert.equal(shortGitSha('bad'), '未证明')
   assert.equal(formatDeliveryBytes(30 * 1024 ** 3), '30.0 GiB')
+  assert.equal(formatDeliveryBytes(512), '512 B')
+  assert.equal(formatDeliveryRate(20 * 1024 ** 2), '20.0 MiB/s')
+  assert.equal(formatDeliveryPercent(8_125), '81.3%')
   assert.equal(formatDeliveryDuration(950), '950 ms')
   assert.equal(formatDeliveryDuration(5_400), '5.4 秒')
   assert.equal(formatDeliveryDuration(125_000), '2 分 5 秒')
   assert.equal(deliveryStatusPresentation('not_proven').label, '结果未证明')
+  assert.equal(deliveryStatusPresentation('success').label, '成功')
+})
+
+test('pipeline jobs and timing stages use Chinese-first presentation labels', () => {
+  for (const source of workflowSources) {
+    const names = [...source.matchAll(/^(?: {4}name:| {6}- name:) (.+)$/gmu)]
+      .map((match) => match[1].trim())
+      .filter(Boolean)
+    assert.ok(names.length > 0)
+    for (const name of names) {
+      const presentation = deliveryPipelinePresentation(name)
+      assert.notEqual(
+        presentation.label,
+        '其他流水线环节',
+        `${name} must have a Chinese presentation label`
+      )
+      assert.match(presentation.label, /\p{Script=Han}/u)
+      assert.ok(presentation.title.includes(name))
+    }
+  }
+  assert.equal(
+    deliveryPipelinePresentation('Initialize containers').label,
+    '初始化测试容器'
+  )
+  assert.equal(
+    deliveryPipelinePresentation('Post Set up Node.js').label,
+    '清理：准备 Node.js 工具链'
+  )
+  assert.equal(
+    deliveryPipelinePresentation('Future GitHub step').label,
+    '其他流水线环节'
+  )
+  assert.match(
+    deliveryPipelinePresentation('Future GitHub step').title,
+    /Future GitHub step/u
+  )
 })
 
 test('pipeline timings validate nested stages and identify the measured bottleneck', () => {
@@ -299,7 +393,55 @@ test('pipeline timings validate nested stages and identify the measured bottlene
   assert.equal(summary.sampleCount, 1)
   assert.equal(summary.medianDurationMs, 600_000)
   assert.equal(summary.bottleneck.name, 'Build both images')
+  assert.equal(summary.criticalPath.durationMs, 600_000)
+  assert.equal(summary.criticalPath.coveredDurationMs, 580_000)
+  assert.equal(summary.criticalPath.schedulingGapMs, 20_000)
+  assert.deepEqual(
+    summary.criticalPath.jobs.map((job) => job.name),
+    ['Publish immutable release']
+  )
+  assert.equal(summary.failureReason, null)
   assert.match(summary.optimizationHint, /耗时最长/u)
+  const mixedSummary = summarizePipelineTimings({
+    ...timings,
+    runs: [
+      timings.runs[0],
+      {
+        ...timings.runs[0],
+        id: 322,
+        workflow: 'ci',
+        durationMs: 60_000,
+        url: 'https://github.com/saurick/plush-toy-erp/actions/runs/322',
+      },
+    ],
+  })
+  assert.equal(mixedSummary.sampleCount, 1)
+  assert.equal(mixedSummary.medianDurationMs, 600_000)
+  const failedRun = {
+    ...timings.runs[0],
+    conclusion: 'failure',
+    jobs: [
+      {
+        ...timings.runs[0].jobs[0],
+        conclusion: 'failure',
+        steps: [
+          {
+            ...timings.runs[0].jobs[0].steps[0],
+            conclusion: 'failure',
+          },
+          timings.runs[0].jobs[0].steps[1],
+        ],
+      },
+    ],
+  }
+  assert.deepEqual(
+    summarizePipelineTimings({ ...timings, runs: [failedRun] }).failureReason,
+    {
+      job: 'Publish immutable release',
+      step: 'Build both images',
+      startedAt: '2026-08-08T02:00:30.000Z',
+    }
+  )
   assert.throws(
     () =>
       validatePipelineTimings({

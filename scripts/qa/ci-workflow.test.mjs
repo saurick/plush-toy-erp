@@ -13,7 +13,11 @@ function read(relativePath) {
 function parseWorkflow() {
   const output = execFileSync(
     "go",
-    ["run", "../scripts/qa/ci-workflow-yaml-check.go", "../.github/workflows/ci.yml"],
+    [
+      "run",
+      "../scripts/qa/ci-workflow-yaml-check.go",
+      "../.github/workflows/ci.yml",
+    ],
     { cwd: path.join(ROOT, "server"), encoding: "utf8" },
   );
   return JSON.parse(output);
@@ -41,10 +45,18 @@ const planRuns = plan.steps.map((step) => step.run || "").join("\n");
 const qualityRuns = quality.steps.map((step) => step.run || "").join("\n");
 
 test("CI exposes one stable aggregate check over trusted plan and quality jobs", () => {
-  assert.deepEqual(Object.keys(workflow.on).sort(), ["pull_request", "push", "workflow_dispatch"]);
+  assert.deepEqual(Object.keys(workflow.on).sort(), [
+    "pull_request",
+    "push",
+    "workflow_dispatch",
+  ]);
   assert.deepEqual(workflow.on.push, { branches: ["main"] });
   assert.deepEqual(workflow.permissions, { contents: "read" });
-  assert.deepEqual(Object.keys(workflow.jobs).sort(), ["ci_gate", "plan", "quality"]);
+  assert.deepEqual(Object.keys(workflow.jobs).sort(), [
+    "ci_gate",
+    "plan",
+    "quality",
+  ]);
   assert.equal(plan.name, "Trusted range and affected plan");
   assert.equal(quality.name, "Repository quality");
   assert.equal(gate.name, "CI Gate");
@@ -58,10 +70,18 @@ test("CI exposes one stable aggregate check over trusted plan and quality jobs",
 });
 
 test("CI scans the trusted history before executing candidate repository scripts", () => {
-  const scanIndex = plan.steps.findIndex((step) => /before repository scripts/u.test(step.name));
-  const nodeIndex = plan.steps.findIndex((step) => /after the trusted scan/u.test(step.name));
-  const candidateIndex = plan.steps.findIndex((step) => /ci-plan\.mjs/u.test(step.run || ""));
-  assert.ok(scanIndex > 0 && scanIndex < nodeIndex && nodeIndex < candidateIndex);
+  const scanIndex = plan.steps.findIndex((step) =>
+    /before repository scripts/u.test(step.name),
+  );
+  const nodeIndex = plan.steps.findIndex((step) =>
+    /after the trusted scan/u.test(step.name),
+  );
+  const candidateIndex = plan.steps.findIndex((step) =>
+    /ci-plan\.mjs/u.test(step.run || ""),
+  );
+  assert.ok(
+    scanIndex > 0 && scanIndex < nodeIndex && nodeIndex < candidateIndex,
+  );
   assert.match(planRuns, /trusted_config_sha="\$PR_BASE_SHA"/u);
   assert.match(planRuns, /git show "\$trusted_config_sha:\.gitleaks\.toml"/u);
   assert.match(planRuns, /gitleaks_8\.30\.1_linux_x64\.tar\.gz/u);
@@ -76,25 +96,39 @@ test("CI scans the trusted history before executing candidate repository scripts
 });
 
 test("CI affected/full plan controls expensive setup without silent quality skips", () => {
-  assert.match(planRuns, /EVENT_NAME" == "pull_request"[\s\S]*gate_mode=affected/u);
+  assert.match(
+    planRuns,
+    /EVENT_NAME" == "pull_request"[\s\S]*gate_mode=affected/u,
+  );
   assert.match(planRuns, /EVENT_NAME" == "push"[\s\S]*gate_mode=full/u);
   assert.match(planRuns, /REQUESTED_MODE/u);
   assert.match(planRuns, /ci-plan\.mjs/u);
-  assert.match(quality.steps.find((step) => step.name === "Set up Go when selected").if, /needs_go/u);
   assert.match(
-    quality.steps.find((step) => step.name === "Install locked Web dependencies when selected").if,
+    quality.steps.find((step) => step.name === "Set up Go when selected").if,
+    /needs_go/u,
+  );
+  assert.match(
+    quality.steps.find(
+      (step) => step.name === "Install locked Web dependencies when selected",
+    ).if,
     /needs_web/u,
   );
   assert.match(
-    quality.steps.find((step) => step.name === "Install and verify Chromium only for full").if,
+    quality.steps.find(
+      (step) => step.name === "Install and verify Chromium only for full",
+    ).if,
     /needs_chromium/u,
   );
   assert.match(
-    quality.steps.find((step) => step.name === "Start PostgreSQL only when selected").if,
+    quality.steps.find(
+      (step) => step.name === "Start PostgreSQL only when selected",
+    ).if,
     /needs_postgres/u,
   );
   assert.match(
-    quality.steps.find((step) => step.name === "Remove selected PostgreSQL runtime").if,
+    quality.steps.find(
+      (step) => step.name === "Remove selected PostgreSQL runtime",
+    ).if,
     /always\(\).*needs_postgres/u,
   );
   assert.match(qualityRuns, /affected\.sh --base "\$QA_BASE_RANGE" --run/u);
@@ -105,6 +139,11 @@ test("CI affected/full plan controls expensive setup without silent quality skip
 test("CI pins actions, toolchains, database and Chromium sandbox", () => {
   const uses = collectUses(workflow).sort();
   assert.deepEqual(uses, [
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
     "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
     "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
     "actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
@@ -114,7 +153,8 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
     "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea",
   ]);
-  for (const use of uses) assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
+  for (const use of uses)
+    assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
   assert.match(source, /node-version-file: \.n-node-version/u);
   assert.match(source, /go-version-file: server\/go\.mod/u);
   assert.match(qualityRuns, /pnpm@10\.13\.1/u);
@@ -124,17 +164,33 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
   assert.match(qualityRuns, /docker run --detach --rm[\s\S]*postgres:18\.1/u);
   assert.match(qualityRuns, /playwright install --with-deps chromium/u);
   assert.match(qualityRuns, /sudo install -o root -g root -m 4755/u);
+  assert.match(source, /path: \$\{\{ runner\.temp \}\}\/pnpm-store/u);
+  assert.match(source, /path: \$\{\{ runner\.temp \}\}\/ms-playwright/u);
+  assert.match(source, /path: ~\/go\/bin/u);
+  assert.match(qualityRuns, /pnpm config set store-dir "\$PNPM_STORE_PATH"/u);
+  assert.match(qualityRuns, /if \[\[ ! -x "\$go_bin\/govulncheck" \]\]/u);
+  assert.match(qualityRuns, /if \[\[ ! -f "\$archive" \]\]/u);
   assert.doesNotMatch(source, /--no-sandbox|--disable-setuid-sandbox/u);
 });
 
 test("CI proves schema generation and source archive only when selected", () => {
-  const makeData = quality.steps.find((step) => /Ent and Atlas generation/u.test(step.name));
-  const archive = quality.steps.find((step) => /committed source archive/u.test(step.name));
+  const makeData = quality.steps.find((step) =>
+    /Ent and Atlas generation/u.test(step.name),
+  );
+  const archive = quality.steps.find((step) =>
+    /committed source archive/u.test(step.name),
+  );
   assert.match(makeData.if, /make_data/u);
   assert.match(makeData.run, /make data/u);
-  assert.match(makeData.run, /git -C \.\. status --porcelain --untracked-files=all/u);
+  assert.match(
+    makeData.run,
+    /git -C \.\. status --porcelain --untracked-files=all/u,
+  );
   assert.match(archive.if, /source_archive/u);
-  assert.match(archive.run, /source-archive-release-check\.mjs --light --ref HEAD/u);
+  assert.match(
+    archive.run,
+    /source-archive-release-check\.mjs --light --ref HEAD/u,
+  );
   const disposableURL = new URL(workflow.env.DISPOSABLE_DATABASE_BASE_URL);
   assert.equal(disposableURL.hostname, "127.0.0.1");
   assert.equal(disposableURL.port, "55432");

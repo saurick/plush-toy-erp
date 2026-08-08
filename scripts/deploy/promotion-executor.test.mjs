@@ -93,7 +93,10 @@ const expected = {
 };
 
 test("promotion executor accepts only an identity-bound redacted receipt", () => {
-  assert.equal(validateRemotePromotionReceipt(receipt(), expected).status, "passed");
+  assert.equal(
+    validateRemotePromotionReceipt(receipt(), expected).status,
+    "passed",
+  );
   assert.throws(
     () =>
       validateRemotePromotionReceipt(
@@ -149,7 +152,10 @@ test("failed and unknown receipts cannot masquerade as passed", () => {
       basicSmoke: false,
     },
   });
-  assert.equal(validateRemotePromotionReceipt(failed, expected).status, "failed");
+  assert.equal(
+    validateRemotePromotionReceipt(failed, expected).status,
+    "failed",
+  );
   const earlyFailure = receipt({
     status: "failed",
     stage: "package_verification",
@@ -218,4 +224,26 @@ test("promotion executor contains no target build or automatic retry path", () =
   assert.doesNotMatch(source, /["']scp["']/u);
   assert.match(source, /targetWriteStarted: false/u);
   assert.match(source, /automatic retry is disabled/u);
+  const prepareIndex = source.indexOf(
+    '"prepare fixed remote incoming directory"',
+  );
+  const transferTimerIndex = source.indexOf(
+    "const transferStartedAt = Date.now()",
+  );
+  const rsyncIndex = source.indexOf('"transfer immutable promotion package"');
+  assert(
+    prepareIndex < transferTimerIndex && transferTimerIndex < rsyncIndex,
+    "transfer timing must measure rsync without counting remote directory preparation",
+  );
+  for (const metric of [
+    "transferDurationMs",
+    "transferBytesPerSecond",
+    "serverArchiveBytes",
+    "webArchiveBytes",
+    "serverDigest",
+    "webDigest",
+    "buildPerformance",
+  ]) {
+    assert.match(source, new RegExp(`\\b${metric}\\b`, "u"));
+  }
 });

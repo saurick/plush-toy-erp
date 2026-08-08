@@ -23,14 +23,44 @@ test('CI/CD timing details keep a touch-friendly keyboard-visible trigger', () =
   assert.match(css, /summary:focus-visible/u)
 })
 
-test('mobile timing labels wrap and retain the full readable value', () => {
+test('mobile timing labels wrap and retain Chinese-first trace titles', () => {
   assert.match(
     css,
     /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-pipeline-timing__summary strong,[\s\S]*overflow-wrap: anywhere;[\s\S]*white-space: normal;/u
   )
-  assert.match(component, /title=\{stage[.]name \|\| stage[.]label\}/u)
   assert.match(
     component,
-    /title=\{summary[.]bottleneck\?\.name \|\| '尚未识别'\}/u
+    /deliveryPipelinePresentation\(\s*stage[.]name \|\| stage[.]label\s*\)/u
+  )
+  assert.match(component, /stagePresentation[.]title/u)
+  assert.match(
+    component,
+    /deliveryPipelinePresentation\(summary[.]bottleneck[.]name\)[\s\S]*[.]title/u
+  )
+})
+
+test('artifact and transfer metrics collapse from three columns to one', () => {
+  assert.match(
+    css,
+    /[.]erp-dev-operation-metrics \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-operation-metrics \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-operation-metrics \{[\s\S]*grid-template-columns: 1fr;/u
+  )
+  assert.match(component, /最新发布 BuildKit 命中/u)
+  assert.match(component, /最近部署传输/u)
+  assert.match(component, /失败原因/u)
+  assert.match(
+    css,
+    /@media \(max-width: 1100px\)[\s\S]*[.]erp-dev-pipeline-timing__summary \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-pipeline-timing__summary,[\s\S]*grid-template-columns: 1fr;/u
   )
 })

@@ -29,10 +29,7 @@ import {
 import { readPromotionPlan } from "./promotion-controller.mjs";
 import { validatePromotionManifest } from "./promotion-manifest.mjs";
 import { verifyReleaseArtifact } from "./release-artifact-verify.mjs";
-import {
-  sha256File,
-  validateReleaseManifest,
-} from "./release-catalog.mjs";
+import { sha256File, validateReleaseManifest } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { validateRemoteStageTimings } from "./remote-stage-timings.mjs";
 
@@ -82,13 +79,7 @@ function hasExactKeys(value, expected) {
   );
 }
 
-function runChecked(
-  runCommand,
-  command,
-  args,
-  options,
-  label,
-) {
+function runChecked(runCommand, command, args, options, label) {
   const result = runCommand(command, args, {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
@@ -140,13 +131,7 @@ function sourceFileAtCommit(repoRoot, gitSha, relativeFile, runCommand) {
 }
 
 export function preparePromotionTransfer(
-  {
-    repoRoot,
-    bundleDir,
-    releaseManifestPath,
-    promotionPlan,
-    destination,
-  },
+  { repoRoot, bundleDir, releaseManifestPath, promotionPlan, destination },
   { runCommand = spawnSync } = {},
 ) {
   const root = realpathSync(repoRoot);
@@ -260,7 +245,9 @@ export function preparePromotionTransfer(
       sha256File(path.join(destination, "source.tar")) !==
       releaseManifest.artifact.sourceArchiveSha256
     ) {
-      throw new Error("committed source archive checksum does not match release");
+      throw new Error(
+        "committed source archive checksum does not match release",
+      );
     }
     const checksumLines = TRANSFER_FILES.map(
       (file) => `${sha256File(path.join(destination, file))}  ${file}`,
@@ -275,14 +262,15 @@ export function preparePromotionTransfer(
       gitSha: releaseManifest.gitSha,
       version: releaseManifest.version,
       operationId: plan.operationId,
-      files: [
-        ...TRANSFER_FILES,
-        "transfer-checksums.sha256",
-      ],
-      totalBytes: [
-        ...TRANSFER_FILES,
-        "transfer-checksums.sha256",
-      ].reduce(
+      imageDigests: Object.fromEntries(
+        releaseManifest.images.map((image) => [image.kind, image.digest]),
+      ),
+      imageArchiveBytes: Object.fromEntries(
+        artifact.images.map((image) => [image.kind, image.archive.sizeBytes]),
+      ),
+      buildPerformance: artifact?.performance?.build || null,
+      files: [...TRANSFER_FILES, "transfer-checksums.sha256"],
+      totalBytes: [...TRANSFER_FILES, "transfer-checksums.sha256"].reduce(
         (total, file) => total + statSync(path.join(destination, file)).size,
         0,
       ),
@@ -349,10 +337,7 @@ export function validateRemotePromotionReceipt(receipt, expected) {
       "version",
     ]) ||
     !hasExactKeys(receipt?.before, ["runtimeSha"]) ||
-    !hasExactKeys(receipt?.images, [
-      "serverContentId",
-      "webContentId",
-    ]) ||
+    !hasExactKeys(receipt?.images, ["serverContentId", "webContentId"]) ||
     !hasExactKeys(receipt?.rollbackPoint, [
       "backupAlias",
       "backupSha256",
@@ -514,10 +499,11 @@ export function executePromotion(
   ) {
     throw new Error("promotion operation is not in the eligible ready state");
   }
-  const expectedConfirmation =
-    `PROMOTE:test-133:${operation.gitSha}:${operation.id}`;
+  const expectedConfirmation = `PROMOTE:test-133:${operation.gitSha}:${operation.id}`;
   if (confirmation !== expectedConfirmation) {
-    throw new Error(`explicit confirmation is required: ${expectedConfirmation}`);
+    throw new Error(
+      `explicit confirmation is required: ${expectedConfirmation}`,
+    );
   }
   const immediatePreflight = runPreflight("test-133");
   if (immediatePreflight.status !== "passed") {
@@ -572,33 +558,36 @@ export function executePromotion(
     now: now(),
   });
   let remoteStarted = false;
+  let transferDurationMs = 0;
+  let transferBytesPerSecond = 0;
   try {
     runChecked(
       runCommand,
       "ssh",
-      [
-        ...sshArgs,
-        "bash",
-        "-s",
-        "--",
-        operation.id,
-      ],
+      [...sshArgs, "bash", "-s", "--", operation.id],
       {
         input: PREPARE_REMOTE_INCOMING,
         timeout: 30_000,
       },
       "prepare fixed remote incoming directory",
     );
-    runChecked(
-      runCommand,
-      rsyncTransfer.command,
-      rsyncTransfer.args,
-      { timeout: 10 * 60_000 },
-      "transfer immutable promotion package",
-    );
+    const transferStartedAt = Date.now();
+    try {
+      runChecked(
+        runCommand,
+        rsyncTransfer.command,
+        rsyncTransfer.args,
+        { timeout: 10 * 60_000 },
+        "transfer immutable promotion package",
+      );
+    } finally {
+      transferDurationMs = Math.max(1, Date.now() - transferStartedAt);
+      transferBytesPerSecond = Math.round(
+        (transfer.totalBytes * 1000) / transferDurationMs,
+      );
+    }
     remoteStarted = true;
-    const remoteScript =
-      `${target.filesystem.root}/incoming/${operation.id}/remote-promotion.sh`;
+    const remoteScript = `${target.filesystem.root}/incoming/${operation.id}/remote-promotion.sh`;
     const result = runCommand(
       "ssh",
       [
@@ -630,7 +619,9 @@ export function executePromotion(
         promotionFingerprint: plan.fingerprint,
       });
     } catch (error) {
-      throw new Error(`remote receipt is unavailable or invalid: ${error.message}`);
+      throw new Error(
+        `remote receipt is unavailable or invalid: ${error.message}`,
+      );
     }
     if (result.error) {
       throw new Error(`remote promotion SSH failed: ${result.error.message}`);
@@ -658,6 +649,13 @@ export function executePromotion(
         serverContentId: receipt.images.serverContentId,
         webContentId: receipt.images.webContentId,
         remoteStageTimings: receipt.timings,
+        transferDurationMs,
+        transferBytesPerSecond,
+        serverArchiveBytes: transfer.imageArchiveBytes.server,
+        webArchiveBytes: transfer.imageArchiveBytes.web,
+        serverDigest: transfer.imageDigests.server,
+        webDigest: transfer.imageDigests.web,
+        buildPerformance: transfer.buildPerformance,
       },
       now: now(),
     });
@@ -676,6 +674,12 @@ export function executePromotion(
           ? "remote promotion result could not be proven; automatic retry is disabled"
           : "promotion package transfer failed before remote execution",
         issues: terminalIssue(remoteStarted ? "not_proven" : "failed"),
+        metadata: {
+          ...current.metadata,
+          ...(transferDurationMs > 0
+            ? { transferDurationMs, transferBytesPerSecond }
+            : {}),
+        },
         now: now(),
       });
     }

@@ -123,6 +123,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/deploy/delivery-operation-store.test.mjs",
     "scripts/deploy/deployment-package-lint.test.mjs",
     "scripts/deploy/deployment-targets.test.mjs",
+    "scripts/deploy/fixed-target-rsync.test.mjs",
     "scripts/deploy/github-delivery-provider.test.mjs",
     "scripts/deploy/github-release-asset-set.test.mjs",
     "scripts/deploy/github-release-publisher.test.mjs",

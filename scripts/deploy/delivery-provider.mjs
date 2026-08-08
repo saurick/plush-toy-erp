@@ -3,8 +3,29 @@ export const DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT =
   "plush.delivery-provider-release-status/v1";
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
-const VERSION_PATTERN =
-  /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
+const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u;
+const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+
+function validSize(value) {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+function validBuildPerformance(value) {
+  return (
+    value === null ||
+    (value?.schemaVersion === "plush.release-build-performance/v1" &&
+      validSize(value.durationMs) &&
+      ["builder", "gha"].includes(value.cacheMode) &&
+      validSize(value.completedVertexCount) &&
+      validSize(value.cacheHitCount) &&
+      validSize(value.cacheMissCount) &&
+      value.cacheHitCount + value.cacheMissCount ===
+        value.completedVertexCount &&
+      Number.isSafeInteger(value.cacheHitRateBasisPoints) &&
+      value.cacheHitRateBasisPoints >= 0 &&
+      value.cacheHitRateBasisPoints <= 10_000)
+  );
+}
 
 export function validateDeliveryReleaseVersion(version) {
   if (
@@ -31,6 +52,19 @@ export function validateDeliveryReleaseVersion(version) {
         ].includes(asset),
     ) ||
     new Set(version.assets).size !== version.assets.length ||
+    !version.artifactSummary ||
+    !validSize(version.artifactSummary.totalBytes) ||
+    !validSize(version.artifactSummary.serverImageBytes) ||
+    !validSize(version.artifactSummary.webImageBytes) ||
+    !validSize(version.artifactSummary.sbomBytes) ||
+    version.artifactSummary.serverImageBytes +
+      version.artifactSummary.webImageBytes +
+      version.artifactSummary.sbomBytes >
+      version.artifactSummary.totalBytes ||
+    !validBuildPerformance(version.buildPerformance) ||
+    (version.imageDigests !== null &&
+      (!DIGEST_PATTERN.test(String(version.imageDigests?.server || "")) ||
+        !DIGEST_PATTERN.test(String(version.imageDigests?.web || "")))) ||
     typeof version.url !== "string" ||
     !/^https:\/\/github\.com\/saurick\/plush-toy-erp\/releases\/tag\/artifact-[0-9a-f]{40}$/u.test(
       version.url,

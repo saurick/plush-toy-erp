@@ -482,6 +482,7 @@ function imageArtifact({
   const metadataSecretScan = scanImageMetadata(image);
   const tarFile = `${kind}-image.tar`;
   const tarPath = path.join(outputDir, tarFile);
+  const saveStartedAt = Date.now();
   runCommand({
     command: "docker",
     args: ["image", "save", "--output", tarPath, fixedRef],
@@ -491,6 +492,7 @@ function imageArtifact({
   if (!existsSync(tarPath) || statSync(tarPath).size === 0) {
     throw new ReleaseArtifactError(`${kind} image archive is empty`);
   }
+  const saveDurationMs = Math.max(0, Date.now() - saveStartedAt);
   return {
     kind,
     ref: fixedRef,
@@ -502,6 +504,7 @@ function imageArtifact({
       file: tarFile,
       sizeBytes: statSync(tarPath).size,
       sha256: sha256File(tarPath),
+      saveDurationMs,
     },
     metadataSecretScan,
   };
@@ -528,6 +531,24 @@ function declaredGoToolchain(repoRoot, commit, runCommand) {
 }
 
 export function assertReleaseArtifactManifest(manifest) {
+  const buildPerformance = manifest?.performance?.build;
+  const optionalBuildPerformance =
+    buildPerformance === undefined ||
+    (buildPerformance?.schemaVersion === "plush.release-build-performance/v1" &&
+      Number.isSafeInteger(buildPerformance.durationMs) &&
+      buildPerformance.durationMs >= 0 &&
+      ["builder", "gha"].includes(buildPerformance.cacheMode) &&
+      Number.isSafeInteger(buildPerformance.completedVertexCount) &&
+      buildPerformance.completedVertexCount >= 0 &&
+      Number.isSafeInteger(buildPerformance.cacheHitCount) &&
+      buildPerformance.cacheHitCount >= 0 &&
+      Number.isSafeInteger(buildPerformance.cacheMissCount) &&
+      buildPerformance.cacheMissCount >= 0 &&
+      buildPerformance.cacheHitCount + buildPerformance.cacheMissCount ===
+        buildPerformance.completedVertexCount &&
+      Number.isSafeInteger(buildPerformance.cacheHitRateBasisPoints) &&
+      buildPerformance.cacheHitRateBasisPoints >= 0 &&
+      buildPerformance.cacheHitRateBasisPoints <= 10_000);
   if (
     manifest?.schemaVersion !== SCHEMA_VERSION ||
     manifest?.passed !== true ||
@@ -545,7 +566,8 @@ export function assertReleaseArtifactManifest(manifest) {
     ) ||
     !SHA256_PATTERN.test(String(manifest?.sbom?.sha256 || "")) ||
     !Array.isArray(manifest?.images) ||
-    manifest.images.length !== 2
+    manifest.images.length !== 2 ||
+    !optionalBuildPerformance
   ) {
     throw new ReleaseArtifactError("release artifact manifest is invalid");
   }
@@ -557,6 +579,9 @@ export function assertReleaseArtifactManifest(manifest) {
       image?.gitSha !== manifest.git.commit ||
       image?.platform !== "linux/amd64" ||
       !SHA256_PATTERN.test(String(image?.archive?.sha256 || "")) ||
+      (image?.archive?.saveDurationMs !== undefined &&
+        (!Number.isSafeInteger(image.archive.saveDurationMs) ||
+          image.archive.saveDurationMs < 0)) ||
       image?.metadataSecretScan?.passed !== true
     ) {
       throw new ReleaseArtifactError(
@@ -710,6 +735,9 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
       },
       migration,
       customerConfig,
+      ...(sourceReport.buildPerformance
+        ? { performance: { build: sourceReport.buildPerformance } }
+        : {}),
       sbom: {
         format: "CycloneDX",
         specVersion: sbom.specVersion,

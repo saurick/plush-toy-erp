@@ -28,8 +28,7 @@ export const DEV_DELIVERY_ACTION_API_PATH = `${DEV_DELIVERY_API_PREFIX}/actions`
 export const MAX_DEV_DELIVERY_REQUEST_BYTES = 32 * 1024
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
-const VERSION_PATTERN =
-  /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u
+const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$/u
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
@@ -37,12 +36,7 @@ const OPERATION_PATH_PATTERN = new RegExp(
   `^${DEV_DELIVERY_API_PREFIX}/operations/([0-9a-f-]{36})$`,
   'u'
 )
-const TERMINAL_STATUSES = new Set([
-  'passed',
-  'failed',
-  'blocked',
-  'not_proven',
-])
+const TERMINAL_STATUSES = new Set(['passed', 'failed', 'blocked', 'not_proven'])
 const REMOTE_STAGE_LABELS = Object.freeze({
   package_verification: '制品包校验',
   capacity_recheck: '容量复核',
@@ -201,6 +195,38 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
       durationMs: Math.max(0, Date.parse(next.at) - Date.parse(event.at)),
     }
   })
+  const metadata = operation.metadata || {}
+  const metricInteger = (key) =>
+    Number.isSafeInteger(metadata[key]) && metadata[key] >= 0
+      ? metadata[key]
+      : null
+  const digest = (key) =>
+    /^sha256:[0-9a-f]{64}$/u.test(String(metadata[key] || ''))
+      ? metadata[key]
+      : null
+  const serverDigest = digest('serverDigest')
+  const webDigest = digest('webDigest')
+  const completeDigests = Boolean(serverDigest && webDigest)
+  const buildPerformance =
+    metadata.buildPerformance?.schemaVersion ===
+      'plush.release-build-performance/v1' &&
+    Number.isSafeInteger(metadata.buildPerformance.durationMs) &&
+    metadata.buildPerformance.durationMs >= 0 &&
+    ['builder', 'gha'].includes(metadata.buildPerformance.cacheMode) &&
+    Number.isSafeInteger(metadata.buildPerformance.completedVertexCount) &&
+    metadata.buildPerformance.completedVertexCount >= 0 &&
+    Number.isSafeInteger(metadata.buildPerformance.cacheHitCount) &&
+    metadata.buildPerformance.cacheHitCount >= 0 &&
+    Number.isSafeInteger(metadata.buildPerformance.cacheMissCount) &&
+    metadata.buildPerformance.cacheMissCount >= 0 &&
+    metadata.buildPerformance.cacheHitCount +
+      metadata.buildPerformance.cacheMissCount ===
+      metadata.buildPerformance.completedVertexCount &&
+    Number.isSafeInteger(metadata.buildPerformance.cacheHitRateBasisPoints) &&
+    metadata.buildPerformance.cacheHitRateBasisPoints >= 0 &&
+    metadata.buildPerformance.cacheHitRateBasisPoints <= 10_000
+      ? metadata.buildPerformance
+      : null
   return {
     id: operation.id,
     action: operation.action,
@@ -213,6 +239,17 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
     updatedAt: operation.updatedAt,
     durationMs,
     stages: remoteStages.length > 0 ? remoteStages : lifecycleStages,
+    metrics: {
+      transferBytes: metricInteger('transferBytes'),
+      transferDurationMs: metricInteger('transferDurationMs'),
+      transferBytesPerSecond: metricInteger('transferBytesPerSecond'),
+      serverArchiveBytes: metricInteger('serverArchiveBytes'),
+      webArchiveBytes: metricInteger('webArchiveBytes'),
+      backupSizeBytes: metricInteger('backupSizeBytes'),
+      serverDigest: completeDigests ? serverDigest : null,
+      webDigest: completeDigests ? webDigest : null,
+      buildPerformance,
+    },
     issues: operation.issues,
     events: operation.events.slice(-eventLimit),
     confirmationRequired: readyConfirmation,
@@ -224,13 +261,7 @@ function releaseDirectory(root, gitSha) {
   if (!SHA_PATTERN.test(String(gitSha || ''))) {
     throw new Error('release SHA is invalid')
   }
-  return path.join(
-    root,
-    'output',
-    'dev-workbench',
-    'releases',
-    gitSha
-  )
+  return path.join(root, 'output', 'dev-workbench', 'releases', gitSha)
 }
 
 function providerIssue(message) {
@@ -255,8 +286,7 @@ export function createDevDeliveryService({
   pipelineTimingTtlMs = 60_000,
 } = {}) {
   const root = path.resolve(projectRoot || process.cwd())
-  const store =
-    operationStore || resolveDeliveryOperationStore(root)
+  const store = operationStore || resolveDeliveryOperationStore(root)
   const deliveryProvider =
     provider || createGithubDeliveryProvider({ projectRoot: root })
   const children = new Map()
@@ -281,7 +311,8 @@ export function createDevDeliveryService({
         ) {
           transitionDeliveryOperation(store, operation.id, {
             status: 'passed',
-            message: 'immutable GitHub release and complete assets are published',
+            message:
+              'immutable GitHub release and complete assets are published',
             now: now(),
           })
         } else if (status.status === 'failed') {
@@ -349,9 +380,7 @@ export function createDevDeliveryService({
       })
     }
     if (versionsResult.status === 'rejected') {
-      issues.push(
-        providerIssue('GitHub 版本列表不可用；请检查 gh 登录和网络')
-      )
+      issues.push(providerIssue('GitHub 版本列表不可用；请检查 gh 登录和网络'))
     }
     if (targetResult.status === 'rejected') {
       issues.push({
@@ -372,13 +401,10 @@ export function createDevDeliveryService({
       status: issues.length === 0 ? 'success' : 'partial',
       generatedAt: now(),
       repository:
-        repositoryResult.status === 'fulfilled'
-          ? repositoryResult.value
-          : null,
+        repositoryResult.status === 'fulfilled' ? repositoryResult.value : null,
       versions:
         versionsResult.status === 'fulfilled' ? versionsResult.value : [],
-      target:
-        targetResult.status === 'fulfilled' ? targetResult.value : null,
+      target: targetResult.status === 'fulfilled' ? targetResult.value : null,
       timings:
         timingsResult.status === 'fulfilled' ? timingsResult.value : null,
       operations: listDeliveryOperations(store, { limit: 50 }).map(
@@ -446,18 +472,18 @@ export function createDevDeliveryService({
       )
       operation = transitionDeliveryOperation(store, operation.id, {
         status: 'waiting',
-        message: 'GitHub release workflow accepted; waiting for terminal assets',
+        message:
+          'GitHub release workflow accepted; waiting for terminal assets',
         now: now(),
       })
       return publicOperation(operation)
     } catch (error) {
       transitionDeliveryOperation(store, operation.id, {
         status: 'failed',
-        message: 'GitHub release dispatch failed without starting a target write',
+        message:
+          'GitHub release dispatch failed without starting a target write',
         issues: [
-          providerIssue(
-            'GitHub 发布未启动或身份不一致；未写入 133 测试服务器'
-          ),
+          providerIssue('GitHub 发布未启动或身份不一致；未写入 133 测试服务器'),
         ],
         now: now(),
       })
@@ -531,10 +557,7 @@ export function createDevDeliveryService({
     const targetDirectory = releaseDirectory(root, payload.toGitSha)
     const [currentDownload, targetDownload] = await Promise.all([
       Promise.resolve(
-        deliveryProvider.downloadRelease(
-          payload.fromGitSha,
-          currentDirectory
-        )
+        deliveryProvider.downloadRelease(payload.fromGitSha, currentDirectory)
       ),
       Promise.resolve(
         deliveryProvider.downloadRelease(payload.toGitSha, targetDirectory)
@@ -618,8 +641,7 @@ export function createDevDeliveryService({
     ) {
       throw new Error('promotion operation is not ready')
     }
-    const expected =
-      `PROMOTE:test-133:${operation.gitSha}:${operation.id}`
+    const expected = `PROMOTE:test-133:${operation.gitSha}:${operation.id}`
     if (payload.confirmation !== expected) {
       throw new Error('explicit promotion confirmation does not match')
     }
@@ -862,8 +884,7 @@ export function createDevDeliveryMiddleware({
   service,
   csrfToken = randomBytes(32).toString('base64url'),
 } = {}) {
-  const deliveryService =
-    service || createDevDeliveryService({ projectRoot })
+  const deliveryService = service || createDevDeliveryService({ projectRoot })
 
   return async (request, response, next) => {
     let requestPath
@@ -938,11 +959,7 @@ export function createDevDeliveryMiddleware({
         const result = await deliveryService.act(
           validateDevDeliveryAction(await readJsonBody(request))
         )
-        sendJson(
-          response,
-          result.accepted === true ? 202 : 200,
-          result
-        )
+        sendJson(response, result.accepted === true ? 202 : 200, result)
         return
       }
       sendJson(

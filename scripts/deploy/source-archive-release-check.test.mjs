@@ -4,6 +4,7 @@ import {
   copyFileSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -19,6 +20,7 @@ import {
   resolveProjectPnpm,
   runCommand,
   runSourceArchiveReleaseCheck,
+  summarizeBuildxRawJson,
 } from "./source-archive-release-check.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
@@ -209,6 +211,41 @@ test("runCommand reports bounded sanitized stderr on failure", () => {
       return true;
     },
   );
+});
+
+test("Buildx raw JSON summary counts completed build vertices and cache hits once", () => {
+  const output = [
+    JSON.stringify({
+      id: "load",
+      name: "[release-web internal] load build definition from Dockerfile",
+      completed: "2026-08-08T01:00:00Z",
+      cached: true,
+    }),
+    JSON.stringify({
+      id: "web-deps",
+      name: "[release-web web-builder 2/6] RUN pnpm install",
+      started: "2026-08-08T01:00:00Z",
+    }),
+    JSON.stringify({
+      id: "web-deps",
+      name: "[release-web web-builder 2/6] RUN pnpm install",
+      completed: "2026-08-08T01:00:01Z",
+      cached: true,
+    }),
+    JSON.stringify({
+      id: "server-build",
+      name: "[release-server server-builder 8/8] RUN go build",
+      completed: "2026-08-08T01:00:02Z",
+      cached: false,
+    }),
+    "not-json",
+  ].join("\n");
+  assert.deepEqual(summarizeBuildxRawJson(output), {
+    completedVertexCount: 2,
+    cacheHitCount: 1,
+    cacheMissCount: 1,
+    cacheHitRateBasisPoints: 5_000,
+  });
 });
 
 test("plan reports a dirty worktree without claiming formal evidence", async () => {
@@ -447,6 +484,7 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
   const root = createFixtureRepo();
   const labels = [];
   const commandSpecs = [];
+  let bakeDefinition;
   try {
     const report = await runSourceArchiveReleaseCheck(
       { mode: "release", docker: true },
@@ -458,8 +496,33 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
         runBuildCommand: async (spec) => {
           labels.push(spec.label);
           commandSpecs.push(spec);
-          return { status: 0 };
+          if (
+            spec.label === "build Web and Server runtime targets in parallel"
+          ) {
+            const file = spec.args[spec.args.indexOf("--file") + 1];
+            bakeDefinition = JSON.parse(readFileSync(file, "utf8"));
+            return {
+              status: 0,
+              stdout: [
+                JSON.stringify({
+                  id: "web-deps",
+                  name: "[release-web web-builder 2/6] RUN pnpm install",
+                  completed: "2026-08-08T01:00:01Z",
+                  cached: true,
+                }),
+                JSON.stringify({
+                  id: "server-build",
+                  name: "[release-server server-builder 8/8] RUN go build",
+                  completed: "2026-08-08T01:00:02Z",
+                  cached: false,
+                }),
+              ].join("\n"),
+              stderr: "",
+            };
+          }
+          return { status: 0, stdout: "", stderr: "" };
         },
+        environment: { RELEASE_BUILDKIT_CACHE_MODE: "gha" },
       },
     );
     assert.equal(report.releaseCheckPassed, true);
@@ -471,46 +534,49 @@ test("Docker release mode compiles Web and Go once through one shared graph", as
       graph: "server/Dockerfile",
       webCompileCount: 1,
       goCompileCount: 1,
+      targetsBuiltInParallel: true,
+    });
+    assert.deepEqual(report.buildPerformance, {
+      schemaVersion: "plush.release-build-performance/v1",
+      durationMs: report.buildPerformance.durationMs,
+      cacheMode: "gha",
+      completedVertexCount: 2,
+      cacheHitCount: 1,
+      cacheMissCount: 1,
+      cacheHitRateBasisPoints: 5_000,
     });
     assert.deepEqual(labels, [
       "strict source archive secret scan",
-      "build shared Web runtime target",
-      "build shared Server runtime target",
+      "build Web and Server runtime targets in parallel",
     ]);
     assert(!commandSpecs.some((spec) => spec.command === "go"));
-    const webDockerSpec = commandSpecs.find(
-      (spec) => spec.label === "build shared Web runtime target",
+    const bakeSpec = commandSpecs.find(
+      (spec) =>
+        spec.label === "build Web and Server runtime targets in parallel",
     );
-    const serverDockerSpec = commandSpecs.find(
-      (spec) => spec.label === "build shared Server runtime target",
+    assert.deepEqual(bakeSpec.args.slice(0, 2), ["buildx", "bake"]);
+    assert(bakeSpec.args.includes("rawjson"));
+    assert.deepEqual(bakeDefinition.group.default.targets, [
+      "release-web",
+      "release-server",
+    ]);
+    assert.equal(bakeDefinition.target["release-web"].target, "web-runtime");
+    assert.equal(
+      bakeDefinition.target["release-server"].target,
+      "server-runtime",
     );
-    for (const spec of [webDockerSpec, serverDockerSpec]) {
-      assert.deepEqual(spec.args.slice(0, 3), [
-        "build",
-        "--platform",
-        "linux/amd64",
+    for (const target of Object.values(bakeDefinition.target)) {
+      assert.deepEqual(target.platforms, ["linux/amd64"]);
+      assert.equal(target.args.ERP_CUSTOMER_PACKAGE, report.customer);
+      assert.equal(target.args.GIT_SHA, report.commit);
+      assert.equal(target.dockerfile, "server/Dockerfile");
+      assert.deepEqual(target["cache-from"], [
+        `type=gha,scope=plush-release-${target.target === "web-runtime" ? "web" : "server"}-v1`,
       ]);
-      assert(
-        spec.args.includes(`ERP_CUSTOMER_PACKAGE=${report.customer}`),
-        "release image must select the public customer package without a secret-like build arg",
-      );
+      assert.deepEqual(target["cache-to"], [
+        `type=gha,mode=max,scope=plush-release-${target.target === "web-runtime" ? "web" : "server"}-v1`,
+      ]);
     }
-    assert(
-      webDockerSpec.args.includes(`GIT_SHA=${report.commit}`),
-      "Web image must embed the exact release SHA",
-    );
-    assert(
-      serverDockerSpec.args.includes(`GIT_SHA=${report.commit}`),
-      "server image must embed the exact release SHA",
-    );
-    assert.deepEqual(
-      [
-        webDockerSpec.args[webDockerSpec.args.indexOf("--target") + 1],
-        serverDockerSpec.args[serverDockerSpec.args.indexOf("--target") + 1],
-      ],
-      ["web-runtime", "server-runtime"],
-    );
-    assert(commandSpecs.every((spec) => !spec.args?.includes("web/Dockerfile")));
   } finally {
     removeFixtureRepo(root);
   }

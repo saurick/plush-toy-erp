@@ -2,20 +2,16 @@ import { DEV_VERSION_CENTER_ROUTE } from './devRoutes.mjs'
 
 export { DEV_VERSION_CENTER_ROUTE }
 
-export const DEV_DELIVERY_SESSION_API_PATH =
-  '/__dev/api/delivery/session'
-export const DEV_DELIVERY_SUMMARY_API_PATH =
-  '/__dev/api/delivery/summary'
-export const DEV_DELIVERY_ACTION_API_PATH =
-  '/__dev/api/delivery/actions'
+export const DEV_DELIVERY_SESSION_API_PATH = '/__dev/api/delivery/session'
+export const DEV_DELIVERY_SUMMARY_API_PATH = '/__dev/api/delivery/summary'
+export const DEV_DELIVERY_ACTION_API_PATH = '/__dev/api/delivery/actions'
 export const DEV_DELIVERY_OPERATION_API_PREFIX =
   '/__dev/api/delivery/operations'
 export const DEV_DELIVERY_SOURCE_PATH =
   'docs/engineering/研发效能工作台与CI-CD设计.md'
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
-const VERSION_PATTERN =
-  /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u
+const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u
 const OPERATION_STATUSES = new Set([
   'queued',
   'running',
@@ -37,12 +33,137 @@ const PIPELINE_STATUSES = new Set([
   'requested',
   'pending',
 ])
+const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u
+const PIPELINE_LABELS = Object.freeze({
+  ci: '持续集成流水线',
+  release: '正式发布流水线',
+  'Trusted range and affected plan': '可信提交范围与影响计划',
+  'Repository quality': '仓库质量检查',
+  'CI Gate': '持续集成总门禁',
+  'Release trust and strict terminal': '发布可信校验与严格回执',
+  'Exact-SHA strict quality': 'Exact-SHA 严格质量检查',
+  'Publish immutable artifact set': '发布不可变制品集',
+  'Check out complete comparison history without credentials':
+    '无凭据检出完整对比历史',
+  'Restore the checksum-verified history scanner archive':
+    '恢复已校验和的历史扫描器',
+  'Resolve range and scan candidate history before repository scripts':
+    '解析提交范围并先扫描候选历史',
+  'Set up repository Node.js after the trusted scan':
+    '可信扫描后准备仓库 Node.js',
+  'Build the executable CI plan': '生成可执行 CI 计划',
+  'Persist the CI plan': '保存 CI 计划',
+  'Check out the candidate without credentials': '无凭据检出候选提交',
+  'Set up Node.js': '准备 Node.js 工具链',
+  'Set up Go when selected': '按需准备 Go 工具链',
+  'Set up pinned Atlas when selected': '按需准备固定版本 Atlas',
+  'Restore pinned full-gate Go tools': '恢复固定版本的完整门禁 Go 工具',
+  'Restore the checksum-verified full-gate scanner archive':
+    '恢复已校验和的完整门禁扫描器',
+  'Restore the locked pnpm store': '恢复锁文件对应的 pnpm 缓存',
+  'Restore the pinned Playwright Chromium bundle':
+    '恢复固定版本的 Playwright Chromium',
+  'Start PostgreSQL only when selected': '按需启动 PostgreSQL',
+  'Install full-gate system and Go tools': '安装完整门禁系统与 Go 工具',
+  'Install locked Web dependencies when selected': '按需安装锁定的 Web 依赖',
+  'Install and verify Chromium only for full':
+    '仅在完整门禁安装并校验 Chromium',
+  'Prove Ent and Atlas generation when selected':
+    '按需确认 Ent 与 Atlas 生成结果',
+  'Run the selected repository quality gate': '执行选定的仓库质量门禁',
+  'Validate committed source archive for full': '完整门禁校验已提交源码包',
+  'Persist full quality receipt': '保存完整质量回执',
+  'Remove selected PostgreSQL runtime': '清理按需启动的 PostgreSQL',
+  'Require planning and selected quality to complete':
+    '确认计划与所选质量检查全部完成',
+  'Check out the requested exact SHA without credentials':
+    '无凭据检出指定 Exact-SHA',
+  'Validate current-main identity and complete existing release':
+    '校验当前主线身份与既有发布完整性',
+  'Recover a provenance-bound strict terminal before heavy setup':
+    '重型准备前恢复来源绑定的严格回执',
+  'Pass the recovered terminal to publish': '传递已恢复的严格回执给发布任务',
+  'Check out the exact SHA without credentials': '无凭据检出 Exact-SHA',
+  'Set up Go': '准备 Go 工具链',
+  'Set up pinned Atlas': '准备固定版本 Atlas',
+  'Restore pinned strict-gate Go tools': '恢复固定版本的严格门禁 Go 工具',
+  'Restore the checksum-verified strict scanner archive':
+    '恢复已校验和的严格扫描器',
+  'Install strict dependencies': '安装严格门禁依赖',
+  'Install Web dependencies and Chromium': '安装 Web 依赖与 Chromium',
+  'Reconfirm exact current-main identity': '再次确认当前主线 Exact-SHA 身份',
+  'Prove Ent and Atlas generation has zero drift':
+    '确认 Ent 与 Atlas 生成结果零漂移',
+  'Run the exact-SHA strict terminal once': '执行一次 Exact-SHA 严格质量门禁',
+  'Persist the canonical exact-SHA terminal': '保存 Exact-SHA 权威严格回执',
+  'Set up pinned Buildx for the shared release graph':
+    '为共享发布图准备固定版本 Buildx',
+  'Restore the checksum-verified source scanner archive':
+    '恢复已校验和的源码扫描器',
+  'Download the recovered strict terminal': '下载已恢复的严格回执',
+  'Download the newly executed strict terminal': '下载本次执行的严格回执',
+  'Reverify exact identity and terminal integrity':
+    '复核 Exact-SHA 身份与严格回执完整性',
+  'Install the pinned source-package scanner': '安装固定版本的源码包扫描器',
+  'Build each runtime once and publish images by digest':
+    '各运行镜像只构建一次并按摘要发布',
+  'Create or resume a verified draft, then publish it':
+    '创建或恢复已校验草稿并发布',
+  'Publish immutable release': '发布不可变版本',
+  'Build both images': '并行构建服务端与 Web 镜像',
+  'Publish assets': '发布制品',
+  'Initialize containers': '初始化测试容器',
+  'Set up job': '准备任务运行环境',
+  'Complete job': '完成任务并收尾',
+})
+
+export function deliveryPipelinePresentation(value) {
+  const original = String(value || '').trim()
+  if (!original) {
+    return { label: '未命名环节', title: '未命名环节' }
+  }
+  let label = PIPELINE_LABELS[original]
+  if (!label && original.startsWith('Post ')) {
+    const base = original.slice('Post '.length)
+    label = PIPELINE_LABELS[base]
+      ? `清理：${PIPELINE_LABELS[base]}`
+      : '清理任务运行环境'
+  }
+  if (!label && /\p{Script=Han}/u.test(original)) label = original
+  if (!label) label = '其他流水线环节'
+  return {
+    label,
+    title:
+      label === original ? original : `${label}（GitHub 原名：${original}）`,
+  }
+}
 
 function assertObject(value, field) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${field} is invalid`)
   }
   return value
+}
+
+function validBuildPerformance(value) {
+  return (
+    value === null ||
+    (value?.schemaVersion === 'plush.release-build-performance/v1' &&
+      Number.isSafeInteger(value.durationMs) &&
+      value.durationMs >= 0 &&
+      ['builder', 'gha'].includes(value.cacheMode) &&
+      Number.isSafeInteger(value.completedVertexCount) &&
+      value.completedVertexCount >= 0 &&
+      Number.isSafeInteger(value.cacheHitCount) &&
+      value.cacheHitCount >= 0 &&
+      Number.isSafeInteger(value.cacheMissCount) &&
+      value.cacheMissCount >= 0 &&
+      value.cacheHitCount + value.cacheMissCount ===
+        value.completedVertexCount &&
+      Number.isSafeInteger(value.cacheHitRateBasisPoints) &&
+      value.cacheHitRateBasisPoints >= 0 &&
+      value.cacheHitRateBasisPoints <= 10_000)
+  )
 }
 
 function validateOperation(operation) {
@@ -66,7 +187,27 @@ function validateOperation(operation) {
         stage.durationMs < 0
     ) ||
     !Array.isArray(operation.issues) ||
-    !Array.isArray(operation.events)
+    !Array.isArray(operation.events) ||
+    !operation.metrics ||
+    [
+      'transferBytes',
+      'transferDurationMs',
+      'transferBytesPerSecond',
+      'serverArchiveBytes',
+      'webArchiveBytes',
+      'backupSizeBytes',
+    ].some(
+      (key) =>
+        operation.metrics[key] !== null &&
+        (!Number.isSafeInteger(operation.metrics[key]) ||
+          operation.metrics[key] < 0)
+    ) ||
+    (operation.metrics.serverDigest === null) !==
+      (operation.metrics.webDigest === null) ||
+    (operation.metrics.serverDigest !== null &&
+      (!DIGEST_PATTERN.test(operation.metrics.serverDigest) ||
+        !DIGEST_PATTERN.test(operation.metrics.webDigest))) ||
+    !validBuildPerformance(operation.metrics.buildPerformance)
   ) {
     throw new Error('delivery operation is invalid')
   }
@@ -185,7 +326,21 @@ function validateVersion(version) {
     version.tag !== `artifact-${version.gitSha}` ||
     !['published', 'draft', 'prerelease'].includes(version.status) ||
     typeof version.completeAssets !== 'boolean' ||
-    !Array.isArray(version.assets)
+    !Array.isArray(version.assets) ||
+    !version.artifactSummary ||
+    ['totalBytes', 'serverImageBytes', 'webImageBytes', 'sbomBytes'].some(
+      (key) =>
+        !Number.isSafeInteger(version.artifactSummary[key]) ||
+        version.artifactSummary[key] < 0
+    ) ||
+    version.artifactSummary.serverImageBytes +
+      version.artifactSummary.webImageBytes +
+      version.artifactSummary.sbomBytes >
+      version.artifactSummary.totalBytes ||
+    (version.imageDigests !== null &&
+      (!DIGEST_PATTERN.test(String(version.imageDigests?.server || '')) ||
+        !DIGEST_PATTERN.test(String(version.imageDigests?.web || '')))) ||
+    !validBuildPerformance(version.buildPerformance)
   ) {
     throw new Error('delivery version is invalid')
   }
@@ -213,9 +368,7 @@ export function validateDevDeliverySummary(summary) {
     summary.repository !== null &&
     (!SHA_PATTERN.test(String(summary.repository?.commit || '')) ||
       typeof summary.repository?.dirty !== 'boolean' ||
-      !/^[0-9a-f]{64}$/u.test(
-        String(summary.repository?.fingerprint || '')
-      ))
+      !/^[0-9a-f]{64}$/u.test(String(summary.repository?.fingerprint || '')))
   ) {
     throw new Error('delivery repository identity is invalid')
   }
@@ -242,9 +395,7 @@ async function readJson(response) {
   return payload
 }
 
-export function createDevDeliveryClient({
-  fetchImpl = globalThis.fetch,
-} = {}) {
+export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
   if (typeof fetchImpl !== 'function') {
     throw new Error('fetch is unavailable')
   }
@@ -290,20 +441,14 @@ export function createDevDeliveryClient({
         throw new Error('版本中心 operation ID 无效')
       }
       const payload = await readJson(
-        await fetchImpl(
-          `${DEV_DELIVERY_OPERATION_API_PREFIX}/${operationId}`,
-          {
-            method: 'GET',
-            cache: 'no-store',
-            credentials: 'same-origin',
-            headers: { accept: 'application/json' },
-          }
-        )
+        await fetchImpl(`${DEV_DELIVERY_OPERATION_API_PREFIX}/${operationId}`, {
+          method: 'GET',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: { accept: 'application/json' },
+        })
       )
-      if (
-        payload?.schemaVersion !==
-        'plush.dev-delivery-operation-result/v1'
-      ) {
+      if (payload?.schemaVersion !== 'plush.dev-delivery-operation-result/v1') {
         throw new Error('版本中心 operation 响应无效')
       }
       return validateOperation(payload.operation)
@@ -363,8 +508,31 @@ export function shortGitSha(value) {
 
 export function formatDeliveryBytes(value) {
   if (!Number.isSafeInteger(value) || value < 0) return '未证明'
-  const gib = value / 1024 ** 3
-  return `${gib.toFixed(gib >= 10 ? 1 : 2)} GiB`
+  if (value < 1024) return `${String(value)} B`
+  const units = ['KiB', 'MiB', 'GiB', 'TiB']
+  let amount = value / 1024
+  let unitIndex = 0
+  while (amount >= 1024 && unitIndex < units.length - 1) {
+    amount /= 1024
+    unitIndex += 1
+  }
+  return `${amount.toFixed(amount >= 10 ? 1 : 2)} ${units[unitIndex]}`
+}
+
+export function formatDeliveryRate(value) {
+  if (!Number.isSafeInteger(value) || value < 0) return '未证明'
+  return `${formatDeliveryBytes(value)}/s`
+}
+
+export function formatDeliveryPercent(basisPoints) {
+  if (
+    !Number.isSafeInteger(basisPoints) ||
+    basisPoints < 0 ||
+    basisPoints > 10_000
+  ) {
+    return '未证明'
+  }
+  return `${(basisPoints / 100).toFixed(1)}%`
 }
 
 export function formatDeliveryDuration(value) {
@@ -379,13 +547,98 @@ export function formatDeliveryDuration(value) {
   return `${String(hours)} 小时 ${String(minutes % 60)} 分`
 }
 
+function observedCriticalPath(run) {
+  if (!run?.startedAt || !run?.finishedAt) return null
+  const runStart = Date.parse(run.startedAt)
+  const runFinish = Date.parse(run.finishedAt)
+  const intervals = (run.jobs || [])
+    .map((job) => ({
+      id: String(job.id),
+      name: job.name,
+      startedAt: Date.parse(job.startedAt || ''),
+      finishedAt: Date.parse(job.finishedAt || ''),
+      durationMs: job.durationMs,
+    }))
+    .filter(
+      (job) =>
+        Number.isFinite(job.startedAt) &&
+        Number.isFinite(job.finishedAt) &&
+        job.finishedAt >= job.startedAt
+    )
+  if (!Number.isFinite(runStart) || !Number.isFinite(runFinish)) return null
+  const jobs = []
+  let coveredDurationMs = 0
+  let cursor = runStart
+  while (cursor < runFinish) {
+    let candidate = null
+    for (const job of intervals) {
+      if (
+        job.startedAt <= cursor &&
+        job.finishedAt > cursor &&
+        (!candidate || job.finishedAt > candidate.finishedAt)
+      ) {
+        candidate = job
+      }
+    }
+    if (candidate) {
+      const criticalDurationMs = candidate.finishedAt - cursor
+      coveredDurationMs += criticalDurationMs
+      if (jobs.at(-1)?.id !== candidate.id) {
+        jobs.push({ ...candidate, criticalDurationMs })
+      } else {
+        jobs.at(-1).criticalDurationMs += criticalDurationMs
+      }
+      cursor = candidate.finishedAt
+      continue
+    }
+    let next = null
+    for (const job of intervals) {
+      if (job.startedAt > cursor && (!next || job.startedAt < next.startedAt)) {
+        next = job
+      }
+    }
+    if (!next) break
+    cursor = next.startedAt
+  }
+  return {
+    durationMs: Math.max(0, runFinish - runStart),
+    coveredDurationMs,
+    schedulingGapMs: Math.max(0, runFinish - runStart - coveredDurationMs),
+    jobs,
+  }
+}
+
+function pipelineFailureReason(run) {
+  const failedSteps = (run?.jobs || []).flatMap((job) =>
+    job.steps
+      .filter((step) => step.conclusion === 'failure')
+      .map((step) => ({
+        job: job.name,
+        step: step.name,
+        startedAt: step.startedAt,
+      }))
+  )
+  const firstStep = failedSteps.sort(
+    (left, right) =>
+      Date.parse(left.startedAt || '') - Date.parse(right.startedAt || '')
+  )[0]
+  if (firstStep) return firstStep
+  const failedJob = (run?.jobs || []).find(
+    (job) => job.conclusion === 'failure'
+  )
+  return failedJob ? { job: failedJob.name, step: 'Job 未提供失败步骤' } : null
+}
+
 export function summarizePipelineTimings(timings) {
   const runs = timings?.runs || []
   const completed = runs.filter(
     (run) => run.status === 'completed' && Number.isSafeInteger(run.durationMs)
   )
   const latest = completed[0] || null
-  const sortedDurations = completed
+  const comparable = latest
+    ? completed.filter((run) => run.workflow === latest.workflow)
+    : []
+  const sortedDurations = comparable
     .map((run) => run.durationMs)
     .sort((left, right) => left - right)
   const middle = Math.floor(sortedDurations.length / 2)
@@ -398,7 +651,9 @@ export function summarizePipelineTimings(timings) {
             (sortedDurations[middle - 1] + sortedDurations[middle]) / 2
           )
   const candidates = (latest?.jobs || []).flatMap((job) => {
-    const steps = job.steps.filter((step) => Number.isSafeInteger(step.durationMs))
+    const steps = job.steps.filter((step) =>
+      Number.isSafeInteger(step.durationMs)
+    )
     return steps.length > 0
       ? steps.map((step) => ({
           id: `${String(job.id)}:${String(step.number)}`,
@@ -427,12 +682,14 @@ export function summarizePipelineTimings(timings) {
   const bottleneck = stages[0] || null
   return {
     latest,
-    sampleCount: completed.length,
+    sampleCount: comparable.length,
     medianDurationMs,
     bottleneck,
     stages,
+    criticalPath: observedCriticalPath(latest),
+    failureReason: pipelineFailureReason(latest),
     optimizationHint: bottleneck
-      ? `先复核“${bottleneck.name}”：它是最近一次完整流水线中耗时最长的可见环节。`
+      ? `先复核“${deliveryPipelinePresentation(bottleneck.name).label}”：它是最近一次完整流水线中耗时最长的可见环节。`
       : '等待至少一次完整流水线后再决定优化点，避免凭感觉增加并发或缓存。',
   }
 }
@@ -444,6 +701,15 @@ export function deliveryStatusPresentation(status) {
     ready: ['待确认', 'blue'],
     launching: ['正在启动', 'processing'],
     waiting: ['等待 GitHub', 'processing'],
+    requested: ['已请求', 'blue'],
+    pending: ['等待执行', 'default'],
+    in_progress: ['执行中', 'processing'],
+    completed: ['已完成', 'success'],
+    success: ['成功', 'success'],
+    failure: ['失败', 'error'],
+    cancelled: ['已取消', 'default'],
+    skipped: ['已跳过', 'warning'],
+    neutral: ['无状态', 'default'],
     passed: ['已通过', 'success'],
     failed: ['失败', 'error'],
     blocked: ['已阻断', 'warning'],

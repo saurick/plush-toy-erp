@@ -22,8 +22,7 @@ import {
 
 const SHA = 'a'.repeat(40)
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
-const ROLLBACK_OPERATION_ID =
-  '22222222-2222-4222-8222-222222222222'
+const ROLLBACK_OPERATION_ID = '22222222-2222-4222-8222-222222222222'
 const IDEMPOTENCY_KEY = 'version-center:fixed:0001'
 
 function createProject(t) {
@@ -294,6 +293,25 @@ test('delivery summary exposes cached GitHub timings and readable operation dura
   transitionDeliveryOperation(store, OPERATION_ID, {
     status: 'waiting',
     message: 'release workflow accepted',
+    metadata: {
+      transferBytes: 1_265_345_566,
+      transferDurationMs: 65_000,
+      transferBytesPerSecond: 19_466_855,
+      serverArchiveBytes: 1_029_740_032,
+      webArchiveBytes: 235_604_992,
+      backupSizeBytes: 612_412,
+      serverDigest: `sha256:${'c'.repeat(64)}`,
+      webDigest: `sha256:${'d'.repeat(64)}`,
+      buildPerformance: {
+        schemaVersion: 'plush.release-build-performance/v1',
+        durationMs: 240_000,
+        cacheMode: 'gha',
+        completedVertexCount: 20,
+        cacheHitCount: 16,
+        cacheMissCount: 4,
+        cacheHitRateBasisPoints: 8_000,
+      },
+    },
     now: '2026-08-08T01:00:15.000Z',
   })
   let timingReads = 0
@@ -333,6 +351,25 @@ test('delivery summary exposes cached GitHub timings and readable operation dura
     first.operations[0].stages.map((item) => item.durationMs),
     [5_000, 10_000]
   )
+  assert.deepEqual(first.operations[0].metrics, {
+    transferBytes: 1_265_345_566,
+    transferDurationMs: 65_000,
+    transferBytesPerSecond: 19_466_855,
+    serverArchiveBytes: 1_029_740_032,
+    webArchiveBytes: 235_604_992,
+    backupSizeBytes: 612_412,
+    serverDigest: `sha256:${'c'.repeat(64)}`,
+    webDigest: `sha256:${'d'.repeat(64)}`,
+    buildPerformance: {
+      schemaVersion: 'plush.release-build-performance/v1',
+      durationMs: 240_000,
+      cacheMode: 'gha',
+      completedVertexCount: 20,
+      cacheHitCount: 16,
+      cacheMissCount: 4,
+      cacheHitRateBasisPoints: 8_000,
+    },
+  })
 })
 
 test('promotion executor is launched once and an unstarted child fails closed', async (t) => {
@@ -519,8 +556,7 @@ test('rollback executor uses the operation-bound current and target versions', a
       return child
     },
   })
-  const confirmation =
-    `ROLLBACK:test-133:${currentSha}:${SHA}:${OPERATION_ID}`
+  const confirmation = `ROLLBACK:test-133:${currentSha}:${SHA}:${OPERATION_ID}`
   const accepted = await service.act({
     action: 'execute-rollback',
     payload: { operationId: OPERATION_ID, confirmation },
@@ -568,8 +604,5 @@ test('workbench startup freezes an interrupted launch as not_proven', (t) => {
       downloadRelease: () => {},
     },
   })
-  assert.equal(
-    readDeliveryOperation(store, OPERATION_ID).status,
-    'not_proven'
-  )
+  assert.equal(readDeliveryOperation(store, OPERATION_ID).status, 'not_proven')
 })

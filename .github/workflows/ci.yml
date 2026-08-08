@@ -50,6 +50,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Restore the checksum-verified history scanner archive
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/tool-cache/gitleaks_8.30.1_linux_x64.tar.gz
+          key: gitleaks-${{ runner.os }}-8.30.1
       - name: Resolve range and scan candidate history before repository scripts
         id: range
         env:
@@ -98,11 +103,19 @@ jobs:
           git log --check --format= "$history_range"
           trusted_config="$RUNNER_TEMP/trusted-gitleaks.toml"
           git show "$trusted_config_sha:.gitleaks.toml" > "$trusted_config"
-          archive="$RUNNER_TEMP/gitleaks_8.30.1_linux_x64.tar.gz"
-          curl --fail --location --silent --show-error \
-            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
-            --output "$archive"
-          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" \
+          archive="$RUNNER_TEMP/tool-cache/gitleaks_8.30.1_linux_x64.tar.gz"
+          expected_archive_sha=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          if [[ -f "$archive" ]] && ! echo "$expected_archive_sha  $archive" \
+            | sha256sum --check --strict >/dev/null 2>&1; then
+            rm -f "$archive"
+          fi
+          if [[ ! -f "$archive" ]]; then
+            mkdir -p "$(dirname "$archive")"
+            curl --fail --location --silent --show-error \
+              https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+              --output "$archive"
+          fi
+          echo "$expected_archive_sha  $archive" \
             | sha256sum --check --strict
           mkdir -p "$RUNNER_TEMP/gitleaks-bin"
           tar -xzf "$archive" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
@@ -142,6 +155,9 @@ jobs:
     needs: plan
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    env:
+      PNPM_STORE_PATH: ${{ runner.temp }}/pnpm-store
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/ms-playwright
     steps:
       - name: Check out the candidate without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -163,6 +179,30 @@ jobs:
         uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
         with:
           version: v0.38.0
+      - name: Restore pinned full-gate Go tools
+        if: needs.plan.outputs.needs_system_tools == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/go/bin
+          key: full-gate-go-tools-${{ runner.os }}-govulncheck-1.6.0-shfmt-3.13.1
+      - name: Restore the checksum-verified full-gate scanner archive
+        if: needs.plan.outputs.needs_system_tools == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/tool-cache/gitleaks_8.30.1_linux_x64.tar.gz
+          key: gitleaks-${{ runner.os }}-8.30.1
+      - name: Restore the locked pnpm store
+        if: needs.plan.outputs.needs_web == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/pnpm-store
+          key: pnpm-${{ runner.os }}-10.13.1-${{ hashFiles('web/pnpm-lock.yaml') }}
+      - name: Restore the pinned Playwright Chromium bundle
+        if: needs.plan.outputs.needs_chromium == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('web/pnpm-lock.yaml') }}
       - name: Start PostgreSQL only when selected
         if: needs.plan.outputs.needs_postgres == 'true'
         run: |
@@ -196,24 +236,38 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --yes lsof postgresql-client ripgrep shellcheck yamllint
-          archive="$RUNNER_TEMP/gitleaks_8.30.1_linux_x64.tar.gz"
-          curl --fail --location --silent --show-error \
-            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
-            --output "$archive"
-          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" \
+          archive="$RUNNER_TEMP/tool-cache/gitleaks_8.30.1_linux_x64.tar.gz"
+          expected_archive_sha=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          if [[ -f "$archive" ]] && ! echo "$expected_archive_sha  $archive" \
+            | sha256sum --check --strict >/dev/null 2>&1; then
+            rm -f "$archive"
+          fi
+          if [[ ! -f "$archive" ]]; then
+            mkdir -p "$(dirname "$archive")"
+            curl --fail --location --silent --show-error \
+              https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+              --output "$archive"
+          fi
+          echo "$expected_archive_sha  $archive" \
             | sha256sum --check --strict
           tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
           chmod 0755 "$RUNNER_TEMP/gitleaks"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
-          go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          go_bin="$(go env GOPATH)/bin"
+          if [[ ! -x "$go_bin/govulncheck" ]]; then
+            go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          fi
+          if [[ ! -x "$go_bin/shfmt" ]]; then
+            go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
+          fi
+          echo "$go_bin" >> "$GITHUB_PATH"
       - name: Install locked Web dependencies when selected
         if: needs.plan.outputs.needs_web == 'true'
         working-directory: web
         run: |
           set -euo pipefail
           npm install --global pnpm@10.13.1
+          pnpm config set store-dir "$PNPM_STORE_PATH"
           pnpm install --frozen-lockfile
       - name: Install and verify Chromium only for full
         if: needs.plan.outputs.needs_chromium == 'true'

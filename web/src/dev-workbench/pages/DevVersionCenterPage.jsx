@@ -36,6 +36,7 @@ import {
   deliveryVersionActionKind,
   formatDeliveryBytes,
   formatDeliveryDuration,
+  formatDeliveryRate,
   shortGitSha,
 } from '../config/devDelivery.mjs'
 import {
@@ -310,6 +311,29 @@ export default function DevVersionCenterPage() {
             {record.completeAssets
               ? `${record.assets.length} 项制品齐全`
               : '制品不完整'}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: '制品与缓存',
+      key: 'artifacts',
+      render: (_value, record) => (
+        <Space direction="vertical" size={2}>
+          <Text strong>
+            {formatDeliveryBytes(record.artifactSummary.totalBytes)}
+          </Text>
+          <Text type="secondary">
+            Server{' '}
+            {formatDeliveryBytes(record.artifactSummary.serverImageBytes)}
+            {' · '}Web{' '}
+            {formatDeliveryBytes(record.artifactSummary.webImageBytes)}
+          </Text>
+          <Text type="secondary">
+            BuildKit{' '}
+            {record.buildPerformance
+              ? `${(record.buildPerformance.cacheHitRateBasisPoints / 100).toFixed(1)}% 命中`
+              : '命中率未证明'}
           </Text>
         </Space>
       ),
@@ -668,7 +692,11 @@ export default function DevVersionCenterPage() {
           </Card>
         </section>
 
-        <DevPipelineTimingPanel timings={summary?.timings} />
+        <DevPipelineTimingPanel
+          timings={summary?.timings}
+          versions={versions}
+          operations={operations}
+        />
 
         <Card title="可部署版本" className="erp-dev-version-table-card">
           <Table
@@ -680,7 +708,7 @@ export default function DevVersionCenterPage() {
             locale={{
               emptyText: <Empty description="尚无完整 GitHub 不可变发布版本" />,
             }}
-            scroll={{ x: 900 }}
+            scroll={{ x: 1120 }}
           />
         </Card>
 
@@ -773,6 +801,68 @@ export default function DevVersionCenterPage() {
                   limit={100}
                 />
               </Space>
+            </Card>
+            <Card size="small" title="制品与传输效能">
+              <div className="erp-dev-operation-metrics">
+                <div>
+                  <Text type="secondary">传输制品</Text>
+                  <Text strong>
+                    {formatDeliveryBytes(operationDetail.metrics.transferBytes)}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">实际传输耗时</Text>
+                  <Text strong>
+                    {formatDeliveryDuration(
+                      operationDetail.metrics.transferDurationMs
+                    )}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">有效传输速率</Text>
+                  <Text strong>
+                    {formatDeliveryRate(
+                      operationDetail.metrics.transferBytesPerSecond
+                    )}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">Server 制品</Text>
+                  <Text strong>
+                    {formatDeliveryBytes(
+                      operationDetail.metrics.serverArchiveBytes
+                    )}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">Web 制品</Text>
+                  <Text strong>
+                    {formatDeliveryBytes(
+                      operationDetail.metrics.webArchiveBytes
+                    )}
+                  </Text>
+                </div>
+                <div>
+                  <Text type="secondary">回滚备份</Text>
+                  <Text strong>
+                    {formatDeliveryBytes(
+                      operationDetail.metrics.backupSizeBytes
+                    )}
+                  </Text>
+                </div>
+              </div>
+              {operationDetail.metrics.serverDigest ? (
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Text type="secondary" code copyable>
+                    Server {operationDetail.metrics.serverDigest}
+                  </Text>
+                  <Text type="secondary" code copyable>
+                    Web {operationDetail.metrics.webDigest}
+                  </Text>
+                </Space>
+              ) : (
+                <Text type="secondary">镜像 digest 等待新版部署回执</Text>
+              )}
             </Card>
             {operationDetail.issues.length > 0 ? (
               <Alert

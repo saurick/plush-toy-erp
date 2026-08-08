@@ -22,7 +22,9 @@ FROM --platform=$BUILDPLATFORM ${NODE_BUILDER_IMAGE} AS web-builder
 WORKDIR /web
 
 COPY web/package.json web/pnpm-lock.yaml ./
-RUN npm install -g pnpm@10.13.1 && \
+RUN --mount=type=cache,id=plush-npm,target=/root/.npm,sharing=locked \
+    --mount=type=cache,id=plush-pnpm,target=/web/.pnpm-store,sharing=locked \
+    npm install -g pnpm@10.13.1 && \
     pnpm config set store-dir /web/.pnpm-store && \
     pnpm config set registry https://registry.npmmirror.com && \
     pnpm install --frozen-lockfile
@@ -129,7 +131,10 @@ ARG CHROMIUM_VERSION
 ENV TZ=Asia/Shanghai
 ENV ERP_PDF_CHROME_PATH=/usr/bin/chromium
 
-RUN apt-get update && \
+RUN --mount=type=cache,id=plush-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,id=plush-apt-cache,target=/var/cache/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       tzdata \
       ca-certificates \
@@ -139,8 +144,7 @@ RUN apt-get update && \
     installed_chromium_version="$(dpkg-query -W -f='${Version}' chromium)" && \
     installed_chromium_common_version="$(dpkg-query -W -f='${Version}' chromium-common)" && \
     test "$installed_chromium_version" = "$CHROMIUM_VERSION" && \
-    test "$installed_chromium_common_version" = "$CHROMIUM_VERSION" && \
-    rm -rf /var/lib/apt/lists/*
+    test "$installed_chromium_common_version" = "$CHROMIUM_VERSION"
 
 RUN groupadd --system --gid 10001 app && \
     useradd --system --uid 10001 --gid app --create-home --home-dir /home/app --shell /usr/sbin/nologin app

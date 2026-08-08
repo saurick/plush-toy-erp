@@ -5,13 +5,20 @@ import path from "node:path";
 import test from "node:test";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const SOURCE = readFileSync(path.join(ROOT, ".github/workflows/release.yml"), "utf8");
+const SOURCE = readFileSync(
+  path.join(ROOT, ".github/workflows/release.yml"),
+  "utf8",
+);
 
 function parseWorkflow() {
   return JSON.parse(
     execFileSync(
       "go",
-      ["run", "../scripts/qa/ci-workflow-yaml-check.go", "../.github/workflows/release.yml"],
+      [
+        "run",
+        "../scripts/qa/ci-workflow-yaml-check.go",
+        "../.github/workflows/release.yml",
+      ],
       { cwd: path.join(ROOT, "server"), encoding: "utf8" },
     ),
   );
@@ -40,11 +47,19 @@ const publishRuns = publish.steps.map((step) => step.run || "").join("\n");
 
 test("release is manual, globally serialized and split by permission boundary", () => {
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
-  assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs).sort(), ["customer", "sha", "version"]);
+  assert.deepEqual(Object.keys(workflow.on.workflow_dispatch.inputs).sort(), [
+    "customer",
+    "sha",
+    "version",
+  ]);
   assert.deepEqual(workflow.permissions, { actions: "read", contents: "read" });
   assert.equal(workflow.concurrency.group, "release-catalog");
   assert.equal(workflow.concurrency["cancel-in-progress"], false);
-  assert.deepEqual(Object.keys(workflow.jobs).sort(), ["publish", "strict", "validate"]);
+  assert.deepEqual(Object.keys(workflow.jobs).sort(), [
+    "publish",
+    "strict",
+    "validate",
+  ]);
   assert.equal(validate.name, "Release trust and strict terminal");
   assert.equal(strict.name, "Exact-SHA strict quality");
   assert.equal(publish.name, "Publish immutable artifact set");
@@ -71,13 +86,18 @@ test("release identity is current workflow SHA and exact current main, not an an
 });
 
 test("release recovers only provenance-bound strict evidence before starting the heavy job", () => {
-  const recoverIndex = validate.steps.findIndex((step) => /provenance-bound strict/u.test(step.name));
+  const recoverIndex = validate.steps.findIndex((step) =>
+    /provenance-bound strict/u.test(step.name),
+  );
   assert.ok(recoverIndex >= 0);
   assert.match(validateRuns, /github-strict-terminal-reuse\.mjs/u);
   assert.match(strict.if, /strict_reused != 'true'/u);
   assert.match(strictRuns, /exact-sha-gate\.mjs --sha .* --run/u);
   assert.match(strictRuns, /\bmake data\b/u);
-  assert.match(strictRuns, /git -C \.\. status --porcelain --untracked-files=all/u);
+  assert.match(
+    strictRuns,
+    /git -C \.\. status --porcelain --untracked-files=all/u,
+  );
   assert.match(SOURCE, /strict-terminal-current-\$\{\{ inputs\.sha \}\}/u);
   assert.match(SOURCE, /strict-terminal-\$\{\{ inputs\.sha \}\}/u);
 });
@@ -113,14 +133,49 @@ test("publish uses a verified resumable draft and exact six-asset set", () => {
 
 test("release pins every action and never passes a token to browser or arguments", () => {
   const uses = collectUses(workflow);
-  assert.equal(uses.filter((value) => value.startsWith("actions/checkout@")).length, 3);
-  assert.equal(uses.filter((value) => value.startsWith("actions/setup-node@")).length, 3);
-  assert.equal(uses.filter((value) => value.startsWith("actions/setup-go@")).length, 1);
-  assert.equal(uses.filter((value) => value.startsWith("ariga/setup-atlas@")).length, 1);
-  assert.equal(uses.filter((value) => value.startsWith("actions/upload-artifact@")).length, 2);
-  assert.equal(uses.filter((value) => value.startsWith("actions/download-artifact@")).length, 2);
-  for (const use of uses) assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
+  assert.equal(
+    uses.filter((value) => value.startsWith("actions/checkout@")).length,
+    3,
+  );
+  assert.equal(
+    uses.filter((value) => value.startsWith("actions/setup-node@")).length,
+    3,
+  );
+  assert.equal(
+    uses.filter((value) => value.startsWith("actions/setup-go@")).length,
+    1,
+  );
+  assert.equal(
+    uses.filter((value) => value.startsWith("ariga/setup-atlas@")).length,
+    1,
+  );
+  assert.equal(
+    uses.filter((value) => value.startsWith("actions/upload-artifact@")).length,
+    2,
+  );
+  assert.equal(
+    uses.filter((value) => value.startsWith("actions/download-artifact@"))
+      .length,
+    2,
+  );
+  assert.equal(
+    uses.filter((value) => value.startsWith("actions/cache@")).length,
+    5,
+  );
+  assert.equal(
+    uses.filter((value) => value.startsWith("docker/setup-buildx-action@"))
+      .length,
+    1,
+  );
+  for (const use of uses)
+    assert.match(use, /^[a-z0-9_.-]+\/[a-z0-9_.-]+@[0-9a-f]{40}$/u);
   assert.match(publishRuns, /docker login ghcr\.io .* --password-stdin/u);
+  assert.match(SOURCE, /RELEASE_BUILDKIT_CACHE_MODE: gha/u);
+  assert.match(SOURCE, /path: \$\{\{ runner\.temp \}\}\/pnpm-store/u);
+  assert.match(SOURCE, /path: \$\{\{ runner\.temp \}\}\/ms-playwright/u);
+  assert.match(strictRuns, /pnpm config set store-dir "\$PNPM_STORE_PATH"/u);
+  assert.match(strictRuns, /if \[\[ ! -x "\$go_bin\/govulncheck" \]\]/u);
+  assert.match(publishRuns, /if \[\[ ! -f "\$archive" \]\]/u);
   assert.doesNotMatch(SOURCE, /echo "\$GH_TOKEN"|--token "?\$GH_TOKEN/u);
   assert.doesNotMatch(strictRuns, /GH_TOKEN|github\.token/u);
 });
@@ -131,7 +186,10 @@ test("strict keeps pinned PostgreSQL, Atlas, tools and Chromium sandbox", () => 
   assert.match(SOURCE, /version: v0\.38\.0/u);
   assert.match(strictRuns, /pnpm@10\.13\.1/u);
   assert.match(strictRuns, /gitleaks_8\.30\.1_linux_x64\.tar\.gz/u);
-  assert.match(strictRuns, /551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb/u);
+  assert.match(
+    strictRuns,
+    /551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb/u,
+  );
   assert.match(strictRuns, /govulncheck@v1\.6\.0/u);
   assert.match(strictRuns, /shfmt@v3\.13\.1/u);
   assert.match(strictRuns, /playwright install --with-deps chromium/u);

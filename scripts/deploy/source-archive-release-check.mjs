@@ -11,6 +11,7 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -25,6 +26,7 @@ const DEFAULT_REF = "HEAD";
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const MODES = new Set(["plan", "light", "release"]);
 const MAX_COMMAND_DIAGNOSTIC_CHARS = 4096;
+const BUILDKIT_CACHE_MODES = new Set(["builder", "gha"]);
 const ANSI_ESCAPE_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/gu;
 const CUSTOMER_SOURCE_EXTENSIONS = new Set([
   ".doc",
@@ -234,6 +236,7 @@ export function runCommand({
     label,
     command: commandDisplay(command, args),
     stdout: typeof result.stdout === "string" ? result.stdout : "",
+    stderr: typeof result.stderr === "string" ? result.stderr : "",
   };
 }
 
@@ -567,8 +570,8 @@ function buildPlan({ customer, gitState, docker }) {
     ...(docker
       ? [
           `apply reviewed ${customer} Web config contract in an isolated check directory`,
-          "build Web runtime target from the shared release Dockerfile",
-          "build Server runtime target from the same cached release Dockerfile graph",
+          "build Web and Server runtime targets in one parallel Buildx Bake graph",
+          "record BuildKit cache hits without weakening exact-SHA identity",
         ]
       : [
           "install locked Web dependencies and build production Web assets",
@@ -579,6 +582,110 @@ function buildPlan({ customer, gitState, docker }) {
   ];
 }
 
+function parseBuildTimestamp(value) {
+  const timestamp = Date.parse(String(value || ""));
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+export function summarizeBuildxRawJson(rawOutput) {
+  const vertices = new Map();
+  for (const line of String(rawOutput || "").split(/\r?\n/u)) {
+    if (!line.trim().startsWith("{")) continue;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!entry?.id || typeof entry.name !== "string") continue;
+    vertices.set(entry.id, { ...(vertices.get(entry.id) || {}), ...entry });
+  }
+  const completed = [...vertices.values()].filter((entry) => {
+    if (!parseBuildTimestamp(entry.completed)) return false;
+    return !/(?:^|\])\s*(?:load build definition|load metadata|load build context|resolve image config|importing cache manifest|exporting cache|exporting to image)/iu.test(
+      entry.name,
+    );
+  });
+  const cacheHitCount = completed.filter(
+    (entry) => entry.cached === true,
+  ).length;
+  const cacheMissCount = completed.length - cacheHitCount;
+  return Object.freeze({
+    completedVertexCount: completed.length,
+    cacheHitCount,
+    cacheMissCount,
+    cacheHitRateBasisPoints:
+      completed.length === 0
+        ? 0
+        : Math.round((cacheHitCount * 10_000) / completed.length),
+  });
+}
+
+function releaseBuildCacheMode(environment) {
+  const requested = String(
+    environment.RELEASE_BUILDKIT_CACHE_MODE ||
+      (environment.GITHUB_ACTIONS === "true" ? "gha" : "builder"),
+  );
+  if (!BUILDKIT_CACHE_MODES.has(requested)) {
+    throw new ReleaseCheckError(
+      `unsupported RELEASE_BUILDKIT_CACHE_MODE: ${requested}`,
+    );
+  }
+  return requested;
+}
+
+function buildBakeDefinition({
+  archiveRoot,
+  customer,
+  gitState,
+  webImage,
+  serverImage,
+  cacheMode,
+}) {
+  const shared = {
+    context: archiveRoot,
+    dockerfile: "server/Dockerfile",
+    platforms: ["linux/amd64"],
+    output: ["type=docker"],
+    args: {
+      ERP_CUSTOMER_PACKAGE: customer,
+      GIT_SHA: gitState.commit,
+    },
+  };
+  const withCache = (target, scope) => ({
+    ...shared,
+    target,
+    ...(cacheMode === "gha"
+      ? {
+          "cache-from": [`type=gha,scope=${scope}`],
+          "cache-to": [`type=gha,mode=max,scope=${scope}`],
+        }
+      : {}),
+  });
+  return {
+    group: {
+      default: {
+        targets: ["release-web", "release-server"],
+      },
+    },
+    target: {
+      "release-web": {
+        ...withCache("web-runtime", "plush-release-web-v1"),
+        tags: [webImage],
+      },
+      "release-server": {
+        ...withCache("server-runtime", "plush-release-server-v1"),
+        tags: [serverImage],
+        args: {
+          ...shared.args,
+          GIT_SHA_SHORT: gitState.shortCommit,
+          IMAGE_TAG: gitState.shortCommit,
+        },
+      },
+    },
+  };
+}
+
 async function runReleaseBuilds({
   archiveRoot,
   customer,
@@ -586,6 +693,7 @@ async function runReleaseBuilds({
   docker,
   buildCommand,
   resolvePnpm,
+  environment,
 }) {
   const commands = [];
   const run = async (spec) => {
@@ -600,7 +708,7 @@ async function runReleaseBuilds({
     command: "bash",
     args: ["scripts/qa/secrets.sh"],
     cwd: archiveRoot,
-    env: { ...process.env, SECRETS_STRICT: "1" },
+    env: { ...environment, SECRETS_STRICT: "1" },
     label: "strict source archive secret scan",
     stdio: "inherit",
   });
@@ -613,42 +721,54 @@ async function runReleaseBuilds({
     });
     const webImage = `plush-source-archive-web:${gitState.shortCommit}`;
     const serverImage = `plush-source-archive-server:${gitState.shortCommit}`;
-    const sharedArgs = [
-      "build",
-      "--platform",
-      "linux/amd64",
-      "-f",
-      "server/Dockerfile",
-      "--build-arg",
-      `ERP_CUSTOMER_PACKAGE=${customer}`,
-      "--build-arg",
-      `GIT_SHA=${gitState.commit}`,
-    ];
-    await run({
-      command: "docker",
-      args: [...sharedArgs, "--target", "web-runtime", "-t", webImage, "."],
-      cwd: archiveRoot,
-      label: "build shared Web runtime target",
-      stdio: "inherit",
-    });
-    await run({
-      command: "docker",
-      args: [
-        ...sharedArgs,
-        "--target",
-        "server-runtime",
-        "--build-arg",
-        `GIT_SHA_SHORT=${gitState.shortCommit}`,
-        "--build-arg",
-        `IMAGE_TAG=${gitState.shortCommit}`,
-        "-t",
-        serverImage,
-        ".",
-      ],
-      cwd: archiveRoot,
-      label: "build shared Server runtime target",
-      stdio: "inherit",
-    });
+    const cacheMode = releaseBuildCacheMode(environment);
+    const bakePath = path.join(
+      path.dirname(archiveRoot),
+      "release-buildx-bake.json",
+    );
+    writeFileSync(
+      bakePath,
+      `${JSON.stringify(
+        buildBakeDefinition({
+          archiveRoot,
+          customer,
+          gitState,
+          webImage,
+          serverImage,
+          cacheMode,
+        }),
+        null,
+        2,
+      )}\n`,
+      { mode: 0o600 },
+    );
+    const buildStartedAt = Date.now();
+    let bakeResult;
+    try {
+      bakeResult = await run({
+        command: "docker",
+        args: [
+          "buildx",
+          "bake",
+          "--file",
+          bakePath,
+          "--progress",
+          "rawjson",
+          ...(environment.RELEASE_BUILDX_BUILDER
+            ? ["--builder", environment.RELEASE_BUILDX_BUILDER]
+            : []),
+        ],
+        cwd: archiveRoot,
+        label: "build Web and Server runtime targets in parallel",
+        stdio: "pipe",
+      });
+    } finally {
+      rmSync(bakePath, { force: true });
+    }
+    const buildDurationMs = Math.max(0, Date.now() - buildStartedAt);
+    const cache = summarizeBuildxRawJson(
+      `${String(bakeResult?.stdout || "")}\n${String(bakeResult?.stderr || "")}`,
+    );
     return {
       commands,
       overlay,
@@ -659,6 +779,13 @@ async function runReleaseBuilds({
         graph: "server/Dockerfile",
         webCompileCount: 1,
         goCompileCount: 1,
+        targetsBuiltInParallel: true,
+      },
+      buildPerformance: {
+        schemaVersion: "plush.release-build-performance/v1",
+        durationMs: buildDurationMs,
+        cacheMode,
+        ...cache,
       },
     };
   }
@@ -714,7 +841,9 @@ async function runReleaseBuilds({
       graph: "host",
       webCompileCount: 1,
       goCompileCount: 1,
+      targetsBuiltInParallel: false,
     },
+    buildPerformance: null,
   };
 }
 
@@ -827,6 +956,7 @@ export async function runSourceArchiveReleaseCheck(options = {}, runtime = {}) {
       docker: normalized.docker,
       buildCommand,
       resolvePnpm: runtime.resolveProjectPnpm || resolveProjectPnpm,
+      environment: runtime.environment || process.env,
     });
     return {
       ...baseReport,

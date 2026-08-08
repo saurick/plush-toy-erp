@@ -35,7 +35,9 @@ export const GITHUB_RELEASE_ASSETS = Object.freeze([
 ]);
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const MAX_GITHUB_OUTPUT_BYTES = 8 * 1024 * 1024;
+const MAX_RELEASE_DETAIL_BYTES = 512 * 1024;
 const TRACKED_WORKFLOWS = Object.freeze({
   ".github/workflows/ci.yml": "ci",
   ".github/workflows/release.yml": "release",
@@ -78,7 +80,9 @@ function runGh(runCommand, args, { cwd, timeout = 30_000 } = {}) {
 
 function parseGithubUrl(value, expectedSuffix) {
   const text = String(value || "");
-  if (text !== `https://github.com/${GITHUB_DELIVERY_REPOSITORY}${expectedSuffix}`) {
+  if (
+    text !== `https://github.com/${GITHUB_DELIVERY_REPOSITORY}${expectedSuffix}`
+  ) {
     throw new Error("GitHub response URL is outside the fixed repository");
   }
   return text;
@@ -90,10 +94,22 @@ function normalizeRelease(raw) {
   if (!match || raw?.target_commitish !== match[1]) {
     throw new Error("GitHub release identity is invalid");
   }
-  const assets = (Array.isArray(raw.assets) ? raw.assets : [])
+  const rawAssets = Array.isArray(raw.assets) ? raw.assets : [];
+  const assets = rawAssets
     .map((asset) => String(asset?.name || ""))
     .filter((name) => GITHUB_RELEASE_ASSETS.includes(name))
     .sort();
+  const assetByName = new Map(
+    rawAssets
+      .filter((asset) =>
+        GITHUB_RELEASE_ASSETS.includes(String(asset?.name || "")),
+      )
+      .map((asset) => [String(asset.name), asset]),
+  );
+  const sizeOf = (name) => {
+    const size = assetByName.get(name)?.size;
+    return Number.isSafeInteger(size) && size >= 0 ? size : 0;
+  };
   return validateDeliveryReleaseVersion({
     schemaVersion: "plush.delivery-version/v1",
     status: raw.draft ? "draft" : raw.prerelease ? "prerelease" : "published",
@@ -103,9 +119,26 @@ function normalizeRelease(raw) {
     publishedAt: String(raw.published_at || ""),
     url: parseGithubUrl(raw.html_url, `/releases/tag/${tag}`),
     assets,
+    artifactSummary: {
+      totalBytes: [...assetByName.values()].reduce(
+        (total, asset) =>
+          total +
+          (Number.isSafeInteger(asset?.size) && asset.size >= 0
+            ? asset.size
+            : 0),
+        0,
+      ),
+      serverImageBytes: sizeOf("server-image.tar"),
+      webImageBytes: sizeOf("web-image.tar"),
+      sbomBytes: sizeOf("sbom.cdx.json"),
+    },
+    buildPerformance: null,
+    imageDigests: null,
     completeAssets:
       assets.length === GITHUB_RELEASE_ASSETS.length &&
-      assets.every((asset, index) => asset === [...GITHUB_RELEASE_ASSETS].sort()[index]),
+      assets.every(
+        (asset, index) => asset === [...GITHUB_RELEASE_ASSETS].sort()[index],
+      ),
   });
 }
 
@@ -143,11 +176,7 @@ function normalizeRun(raw, gitSha) {
 
 function normalizeLabel(value, field) {
   const label = String(value || "").trim();
-  if (
-    !label ||
-    label.length > 160 ||
-    /[\u0000-\u001f\u007f]/u.test(label)
-  ) {
+  if (!label || label.length > 160 || /[\u0000-\u001f\u007f]/u.test(label)) {
     throw new Error(`GitHub ${field} label is invalid`);
   }
   return label;
@@ -273,7 +302,9 @@ function assertDownloadDirectory(projectRoot, destination) {
       `${path.join(outputRoot, "dev-workbench", "releases")}${path.sep}`,
     )
   ) {
-    throw new Error("GitHub release download must remain in the fixed output root");
+    throw new Error(
+      "GitHub release download must remain in the fixed output root",
+    );
   }
   let cursor = candidate;
   while (cursor !== outputRoot) {
@@ -291,6 +322,72 @@ export function createGithubDeliveryProvider({
   now = () => new Date().toISOString(),
 } = {}) {
   const root = realpathSync(projectRoot);
+  const releaseDetailCache = new Map();
+
+  function readReleaseDetail(rawRelease, version) {
+    const cached = releaseDetailCache.get(version.gitSha);
+    if (cached) return cached;
+    const assets = Array.isArray(rawRelease?.assets) ? rawRelease.assets : [];
+    const readAsset = (name) => {
+      const asset = assets.find((item) => item?.name === name);
+      if (
+        !Number.isSafeInteger(asset?.id) ||
+        asset.id <= 0 ||
+        !Number.isSafeInteger(asset?.size) ||
+        asset.size <= 0 ||
+        asset.size > MAX_RELEASE_DETAIL_BYTES
+      ) {
+        throw new Error("GitHub release detail asset is invalid");
+      }
+      const output = runGh(
+        runCommand,
+        [
+          "api",
+          "--method",
+          "GET",
+          "-H",
+          `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`,
+          "-H",
+          "Accept: application/octet-stream",
+          `repos/${GITHUB_DELIVERY_REPOSITORY}/releases/assets/${asset.id}`,
+        ],
+        { cwd: root },
+      );
+      if (Buffer.byteLength(output) > MAX_RELEASE_DETAIL_BYTES) {
+        throw new Error("GitHub release detail response is too large");
+      }
+      return JSON.parse(output);
+    };
+    const artifact = readAsset("release-artifact.json");
+    const manifest = validateReleaseManifest(
+      readAsset("release-manifest.json"),
+    );
+    if (
+      artifact?.schemaVersion !== "plush-release-artifact/v1" ||
+      artifact?.git?.commit !== version.gitSha ||
+      manifest.gitSha !== version.gitSha ||
+      manifest.version !== version.version
+    ) {
+      throw new Error("GitHub release detail identity is invalid");
+    }
+    const imageDigests = Object.fromEntries(
+      manifest.images.map((image) => [image.kind, image.digest]),
+    );
+    if (
+      !SHA256_DIGEST_PATTERN.test(String(imageDigests.server || "")) ||
+      !SHA256_DIGEST_PATTERN.test(String(imageDigests.web || ""))
+    ) {
+      throw new Error("GitHub release image digests are invalid");
+    }
+    const detail = validateDeliveryReleaseVersion({
+      ...version,
+      buildPerformance: artifact?.performance?.build || null,
+      imageDigests,
+    });
+    releaseDetailCache.set(version.gitSha, detail);
+    return detail;
+  }
+
   return {
     schemaVersion: DELIVERY_PROVIDER_CONTRACT,
     provider: "github",
@@ -317,15 +414,30 @@ export function createGithubDeliveryProvider({
       if (!Array.isArray(releases) || releases.length > limit) {
         throw new Error("GitHub release list response is invalid");
       }
-      return releases
+      const normalized = releases
         .filter((release) =>
           /^artifact-[0-9a-f]{40}$/u.test(String(release?.tag_name || "")),
         )
-        .map(normalizeRelease)
+        .map((release) => ({
+          raw: release,
+          version: normalizeRelease(release),
+        }))
         .sort(
           (left, right) =>
-            Date.parse(right.publishedAt) - Date.parse(left.publishedAt),
+            Date.parse(right.version.publishedAt) -
+            Date.parse(left.version.publishedAt),
         );
+      if (normalized[0]) {
+        try {
+          normalized[0].version = readReleaseDetail(
+            normalized[0].raw,
+            normalized[0].version,
+          );
+        } catch {
+          // Asset names and byte sizes remain usable; detail metrics fail closed as null.
+        }
+      }
+      return normalized.map((item) => item.version);
     },
 
     listPipelineTimings({ limit = 8 } = {}) {
@@ -356,7 +468,9 @@ export function createGithubDeliveryProvider({
         throw new Error("GitHub pipeline run response is invalid");
       }
       const selectedRuns = response.workflow_runs
-        .filter((run) => Object.hasOwn(TRACKED_WORKFLOWS, String(run?.path || "")))
+        .filter((run) =>
+          Object.hasOwn(TRACKED_WORKFLOWS, String(run?.path || "")),
+        )
         .sort(
           (left, right) =>
             Date.parse(String(right?.created_at || "")) -
@@ -445,14 +559,13 @@ export function createGithubDeliveryProvider({
       const run = normalizedRuns[0] || null;
       return {
         schemaVersion: DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
-        status:
-          !run
-            ? "missing"
-            : run.status !== "completed"
-              ? "running"
-              : run.conclusion === "success"
-                ? "awaiting_release"
-                : "failed",
+        status: !run
+          ? "missing"
+          : run.status !== "completed"
+            ? "running"
+            : run.conclusion === "success"
+              ? "awaiting_release"
+              : "failed",
         gitSha,
         release: null,
         run,
@@ -505,8 +618,7 @@ export function createGithubDeliveryProvider({
         if (
           files.length === GITHUB_RELEASE_ASSETS.length &&
           files.every(
-            (file, index) =>
-              file === [...GITHUB_RELEASE_ASSETS].sort()[index],
+            (file, index) => file === [...GITHUB_RELEASE_ASSETS].sort()[index],
           )
         ) {
           const releaseManifest = validateReleaseManifest(
