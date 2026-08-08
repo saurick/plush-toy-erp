@@ -128,7 +128,11 @@
 }
 
 .erp-dev-pipeline-timing__details > summary {
+  display: inline-flex;
+  align-items: center;
   width: fit-content;
+  min-height: 44px;
+  padding: 8px 4px;
   cursor: pointer;
   color: var(--ant-color-primary, #1677ff);
 }
@@ -152,10 +156,21 @@
 }
 
 .erp-dev-receipt-card__timings > summary {
+  display: inline-flex;
+  align-items: center;
   width: fit-content;
+  min-height: 44px;
+  padding: 8px 4px;
   margin-bottom: 10px;
   cursor: pointer;
   color: var(--ant-color-primary, #1677ff);
+}
+
+.erp-dev-pipeline-timing__details > summary:focus-visible,
+.erp-dev-receipt-card__timings > summary:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid var(--ant-color-primary, #1677ff);
+  outline-offset: 2px;
 }
 
 @media (max-width: 1100px) {
@@ -167,5 +182,17 @@
   .erp-dev-pipeline-timing__head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .erp-dev-pipeline-timing__summary strong,
+  .erp-dev-timing-bars__label > span:first-child {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .erp-dev-timing-bars__label {
+    align-items: flex-start;
   }
 }

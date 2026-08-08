@@ -311,6 +311,13 @@
 - 修正边界：沿用采购收货的受控 repository 模式，在同一收货事务内用 `received_lot_id IS NULL` 条件完成一次性绑定；影响行数不是 `1` 时失败关闭。Ent 通用更新继续禁止该字段及全部来源字段 / 边的修改，补测 repository 重绑、Ent 改绑和清空均被拒绝。没有改 Workflow / ProcessRuntime、API、RBAC、前端、迁移 SQL 或数据库数据。
 - 验证：返工相关 `internal/biz` / `internal/data`、完整 `internal/biz` / `internal/data` / `internal/service` / `cmd/server`、`make data`、`scripts/qa/db-guard.sh` 和精确 `git diff --check` 通过；Atlas 报告 migration 目录与目标 schema 同步，未生成新 DDL。服务端全包 `go test ./...` 仅剩独立的数据字典门禁红项：`cmd/schema-doc` 的旧指标快照仍期待 `74 / 1148 / 141 / 333 / 30 / 249`，当前生成 schema 为 `74 / 1144 / 152 / 338 / 30 / 250`，需在下一切片完成人工数据字典审查后同步，不能在本修正里盲改数字。尚未连接或 apply 数据库，未部署、未做客户 UAT，也未 stage、commit 或 push。
 
+### CI/CD 精确发布、效能观测与 133 恢复演练（2026-08-08）
+
+- 完成：继续以 GitHub Actions 为唯一 CI / Release 真源，可信 plan 决定 affected / full 范围，稳定 `CI Gate` 作为分支保护入口；正式 Release 只接受当前 `main` 的 exact SHA，复用或执行同一 strict 终态，以共享构建图各构建一次 Server / Web，并发布固定六件制品、checksums、SBOM 和不可变 manifest。133 仍只 load 制品、串行 migration、启动与检查，不在低配目标机构建，也没有新增第二套流水线、时序数据库或自动重试控制面。
+- 效能工作台：版本中心直接读取 GitHub run / job / step 与本地质量、promotion、rollback 脱敏回执，首屏展示最近完整运行、样本中位数、最长瓶颈和优化提示，全部阶段按需展开。真实 390px 浏览器检查发现展开入口点击区过小后，将流水线与 operation 耗时入口统一提升到至少 `44px`，阶段和瓶颈长名称在移动端换行并保留桌面悬停全文；桌面 / 移动均无页面级横向溢出。
+- 演练：同一不可变候选完成两次独立本地 release rehearsal，均覆盖 migration、管理员引导、health / ready、11 账号登录、V7 effective session、PDF、备份恢复、稳态重启和零残留清理。133 完成“升级 → 代码 / 镜像回滚 → 回滚后深度 smoke → 重新升级”，回滚不执行 down migration 或数据库 restore；远端 promotion / rollback 总耗时与 ISO 墙钟绑定，拒绝历史脚本或异常数量级计时。本轮最终版本目标为 `2026.08.08-5`，exact SHA、run、制品 digest 与 operation 以 GitHub Release 和 ignored delivery evidence 为准。
+- 数据库 / 边界：本地 full 与 rehearsal 结束后 disposable 数据库、演练容器和卷均为零；133 promotion 的临时恢复库已清理，正式数据库保持 `plush_erp_uat_20260716_v5`。另有迁移停在 `20260715161753` 的历史前身库，零连接但 schema 与当前不同，现有治理工具按长生命周期目标库拒绝删除；它作为受保护回滚资产保留，只有单独完成归档、恢复证明与唯一数据复核后才允许受控删除。发布与恢复演练不等于客户岗位 UAT 或签收。
+
 ### Writer turn 租约与漏释放恢复（2026-08-06）
 
 - 根因：共享 Local 中曾有任务完成文件写入并结束 turn，却漏发 `WRITER_RELEASED`；队列继续把旧 grant 当作活动 writer，造成后续任务错误等待。现场 index 为空、无 `index.lock`，因此不是 Git 锁故障。

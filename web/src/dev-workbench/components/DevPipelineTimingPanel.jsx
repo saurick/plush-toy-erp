@@ -22,7 +22,9 @@ function formatTimestamp(value) {
 export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
   const visibleStages = stages.slice(0, limit)
   if (visibleStages.length === 0) {
-    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无环节耗时" />
+    return (
+      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无环节耗时" />
+    )
   }
   const denominator = Math.max(
     totalDurationMs,
@@ -39,7 +41,7 @@ export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
         return (
           <li key={stage.id} className="erp-dev-timing-bars__item">
             <div className="erp-dev-timing-bars__label">
-              <span>
+              <span title={stage.name || stage.label}>
                 <Text strong>{stage.name || stage.label}</Text>
                 {stage.group ? (
                   <Text type="secondary"> · {stage.group}</Text>
@@ -105,12 +107,16 @@ export default function DevPipelineTimingPanel({ timings }) {
             </div>
             <div>
               <Text type="secondary">最近样本中位数</Text>
-              <strong>{formatDeliveryDuration(summary.medianDurationMs)}</strong>
+              <strong>
+                {formatDeliveryDuration(summary.medianDurationMs)}
+              </strong>
               <Text>{summary.sampleCount} 次完整运行样本</Text>
             </div>
             <div>
               <Text type="secondary">当前瓶颈</Text>
-              <strong>{summary.bottleneck?.name || '尚未识别'}</strong>
+              <strong title={summary.bottleneck?.name || '尚未识别'}>
+                {summary.bottleneck?.name || '尚未识别'}
+              </strong>
               <Text>
                 {formatDeliveryDuration(summary.bottleneck?.durationMs)}
               </Text>
@@ -118,8 +124,12 @@ export default function DevPipelineTimingPanel({ timings }) {
           </div>
 
           <div className="erp-dev-pipeline-timing__decision" role="status">
-            <Tag color={latestRun.conclusion === 'success' ? 'success' : 'error'}>
-              {latestRun.conclusion === 'success' ? '最近运行通过' : '最近运行未通过'}
+            <Tag
+              color={latestRun.conclusion === 'success' ? 'success' : 'error'}
+            >
+              {latestRun.conclusion === 'success'
+                ? '最近运行通过'
+                : '最近运行未通过'}
             </Tag>
             <Text>{summary.optimizationHint}</Text>
             <Link href={latestRun.url} target="_blank" rel="noreferrer">
@@ -139,7 +149,9 @@ export default function DevPipelineTimingPanel({ timings }) {
                 <article key={job.id}>
                   <Space wrap>
                     <Text strong>{job.name}</Text>
-                    <Tag color={job.conclusion === 'success' ? 'success' : 'error'}>
+                    <Tag
+                      color={job.conclusion === 'success' ? 'success' : 'error'}
+                    >
                       {job.conclusion || job.status}
                     </Tag>
                     <Text type="secondary">
