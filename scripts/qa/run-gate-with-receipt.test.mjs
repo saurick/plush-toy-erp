@@ -37,6 +37,7 @@ test("strict receipt records Web, Server, database, browser and security counts"
   ].join("\n");
   const stageTimings = [
     { id: "server", status: "passed", durationMs: 10 },
+    { id: "critical_postgres", status: "passed", durationMs: 10 },
     { id: "browser", status: "passed", durationMs: 10 },
     { id: "secrets", status: "passed", durationMs: 10 },
     { id: "govulncheck", status: "passed", durationMs: 10 },
@@ -104,8 +105,8 @@ test("gate receipt runner parses bounded stage timings and bottleneck", () => {
   const metrics = parseGateStageTimings(lines.join("\n"), "full");
   assert.equal(metrics.stageTimings.length, RECEIPT_GATE_STAGE_IDS.full.length);
   assert.equal(metrics.bottleneckStageId, "govulncheck");
-  assert.equal(metrics.measuredStageDurationMs, 3_600);
-  assert.equal(metrics.observedCriticalPathDurationMs, 3_150);
+  assert.equal(metrics.measuredStageDurationMs, 4_500);
+  assert.equal(metrics.observedCriticalPathDurationMs, 4_050);
   assert.equal(metrics.parallelStageGroups.length, 1);
   assert.equal(hasCompleteGateStageTimings("full", metrics.stageTimings), true);
   assert.equal(

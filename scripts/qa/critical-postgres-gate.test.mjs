@@ -44,6 +44,11 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     /PURCHASE_RECEIPT_PG_DB_URL="\$DISPOSABLE_DATABASE_BASE_URL"[\s\S]*make populated_upgrade_pg_test[\s\S]*disposable-database-runner\.mjs"[\s\S]*--profile ci[\s\S]*--workflow critical-postgres/u,
     'full must create, migrate, test, and clean a per-run PostgreSQL database',
   )
+  const serverBody = full.match(/qa_full_server\(\) \{([\s\S]*?)\n\}/u)?.[1] || ''
+  const criticalBody =
+    full.match(/qa_full_critical_postgres\(\) \{([\s\S]*?)\n\}/u)?.[1] || ''
+  assert.doesNotMatch(serverBody, /--workflow critical-postgres/u)
+  assert.match(criticalBody, /--workflow critical-postgres/u)
   assert.doesNotMatch(full, /test-critical-disposable/u)
   assert.doesNotMatch(
     full,
@@ -279,6 +284,18 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert(
     populatedIndex < criticalIndex,
     'full must finish the historical populated upgrade before current-schema PostgreSQL gates',
+  )
+  const serverStageIndex = full.lastIndexOf('server qa_full_server')
+  const resourceSensitiveStageIndex = full.lastIndexOf('resource_sensitive_node')
+  const criticalStageIndex = full.lastIndexOf(
+    'qa_run_stage "$full_profile" critical_postgres',
+  )
+  const browserStageIndex = full.lastIndexOf('browser qa_full_browser')
+  assert(
+    serverStageIndex < resourceSensitiveStageIndex &&
+      resourceSensitiveStageIndex < criticalStageIndex &&
+      criticalStageIndex < browserStageIndex,
+    'full must run the critical PostgreSQL stage after the parallel join and before browser evidence',
   )
   assert.match(
     strict,

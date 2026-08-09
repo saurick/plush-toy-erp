@@ -14,9 +14,10 @@ print_help() {
   secrets: 严格扫描 prepare-push 计算的聚合范围；真实 push hook 仍逐 ref 重新严格扫描
   web: lint/css -> pnpm test + 非零执行/零 skip summary -> pnpm build，同轮各执行一次
   browser: 动态独立端口自启当前 worktree Vite，再运行 Chromium 无写入 smoke
-  server: 存量数据真实升级 -> 当前完整 Schema 关键 PostgreSQL 矩阵（含采购退货） -> 真实 Chromium PDF 安全集成 -> go test JSON 非零执行/零 skip -> make build
+  server: 存量数据真实升级 -> 真实 Chromium PDF 安全集成 -> go test JSON 非零执行/零 skip -> make build
   shared / web / server: 环境与 secrets 通过后并行运行；浏览器仍等待 Web 产物
   resource_sensitive_node: shared / web / server 汇合后单独运行资源敏感发布合同，不放宽超时
+  critical_postgres: 汇合后单独运行当前完整 Schema 关键 PostgreSQL 矩阵（含采购退货），不放宽超时
   govulncheck: 最后执行 Go 漏洞扫描，避免外部网络扰动本地 PostgreSQL 并发门禁
 
 环境变量:
@@ -191,14 +192,19 @@ qa_full_server() {
   cd "$ROOT_DIR/server"
   PURCHASE_RECEIPT_PG_DB_URL="$DISPOSABLE_DATABASE_BASE_URL" \
     make populated_upgrade_pg_test
-  node "$ROOT_DIR/scripts/qa/disposable-database-runner.mjs" \
-    --profile ci \
-    --workflow critical-postgres
   ERP_PDF_CHROMIUM_INTEGRATION=1 \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind go --label server-all -- \
     go test -count=1 -json -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...
   make build
+}
+
+qa_full_critical_postgres() {
+  echo "[qa:full] 串行运行关键 PostgreSQL 合同"
+  cd "$ROOT_DIR/server"
+  node "$ROOT_DIR/scripts/qa/disposable-database-runner.mjs" \
+    --profile ci \
+    --workflow critical-postgres
 }
 
 qa_full_govulncheck() {
@@ -218,6 +224,7 @@ qa_run_stage \
   "$full_profile" \
   resource_sensitive_node \
   qa_full_resource_sensitive_node
+qa_run_stage "$full_profile" critical_postgres qa_full_critical_postgres
 qa_run_stage "$full_profile" browser qa_full_browser
 qa_run_stage "$full_profile" govulncheck qa_full_govulncheck
 

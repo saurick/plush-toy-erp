@@ -29,6 +29,7 @@ export const RECEIPT_GATE_STAGE_IDS = Object.freeze({
     "web",
     "server",
     "resource_sensitive_node",
+    "critical_postgres",
     "browser",
     "govulncheck",
   ]),
@@ -43,6 +44,7 @@ export const RECEIPT_GATE_STAGE_IDS = Object.freeze({
     "web",
     "server",
     "resource_sensitive_node",
+    "critical_postgres",
     "browser",
     "govulncheck",
   ]),
@@ -54,6 +56,7 @@ export const RECEIPT_GATE_STAGE_LABELS = Object.freeze({
   web: "Web 测试与生产构建",
   server: "隔离数据库、迁移与 Server 测试",
   resource_sensitive_node: "资源敏感发布合同",
+  critical_postgres: "关键 PostgreSQL 合同",
   browser: "真实浏览器回归",
   govulncheck: "Go 漏洞扫描",
   strict_profile: "严格门禁配置",
@@ -311,6 +314,15 @@ function stageCounts(stageTimings, id, executedWhenPassed) {
     : balancedCounts(1, 0, 1, 0);
 }
 
+function addCounts(...counts) {
+  return balancedCounts(
+    counts.reduce((total, item) => total + item.executed, 0),
+    counts.reduce((total, item) => total + item.passed, 0),
+    counts.reduce((total, item) => total + item.failed, 0),
+    counts.reduce((total, item) => total + item.skipped, 0),
+  );
+}
+
 export function summarizeGateCategories(output, gate, stageTimings) {
   const byLabel = new Map();
   for (const match of String(output).matchAll(
@@ -325,7 +337,10 @@ export function summarizeGateCategories(output, gate, stageTimings) {
   return Object.freeze({
     web: byLabel.get("web-all") || balancedCounts(0, 0, 0, 0),
     server: byLabel.get("server-all") || balancedCounts(0, 0, 0, 0),
-    database: stageCounts(stageTimings, "server", 2),
+    database: addCounts(
+      stageCounts(stageTimings, "server", 1),
+      stageCounts(stageTimings, "critical_postgres", 1),
+    ),
     browser: stageCounts(stageTimings, "browser", browserChecks),
     security: (() => {
       const secrets = stageCounts(stageTimings, "secrets", 1);
