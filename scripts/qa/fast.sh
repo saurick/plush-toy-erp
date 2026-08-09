@@ -8,7 +8,7 @@ print_help() {
 
 作用:
   执行开发期高频检查。scripts/ 下的 Node 测试按显式 fast/database/
-  browser/release 分组登记；本入口只运行 fast 组。
+  browser/release/resource_sensitive 分组登记；本入口只运行 fast 组。
 
 检查内容:
   repository: AGENTS 体积、DB migration、错误码和项目边界守卫
@@ -17,8 +17,8 @@ print_help() {
   server: go test ./internal/... ./pkg/...（存在即测）
 
 边界:
-  本入口不接受 SKIP_*；database/browser/release 组由 full/strict 或显式
-  profile 运行，避免开发期重复执行重型门禁。
+  本入口不接受 SKIP_*；database/browser/release/resource_sensitive 组由
+  full/strict 或显式 profile 运行，避免开发期重复执行重型门禁。
 USAGE
 }
 
@@ -36,7 +36,7 @@ fi
 fast_scope="${QA_FAST_SCOPE:-complete}"
 node_test_profile="${QA_NODE_TEST_PROFILE:-fast}"
 case "$fast_scope:$node_test_profile" in
-complete:fast | base:full) ;;
+complete:fast | base:parallel_safe) ;;
 *)
   echo "[qa:fast] status=incomplete reason=invalid_composition scope=$fast_scope node_profile=$node_test_profile"
   exit 2

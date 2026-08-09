@@ -104,8 +104,8 @@ test("gate receipt runner parses bounded stage timings and bottleneck", () => {
   const metrics = parseGateStageTimings(lines.join("\n"), "full");
   assert.equal(metrics.stageTimings.length, RECEIPT_GATE_STAGE_IDS.full.length);
   assert.equal(metrics.bottleneckStageId, "govulncheck");
-  assert.equal(metrics.measuredStageDurationMs, 2_800);
-  assert.equal(metrics.observedCriticalPathDurationMs, 2_250);
+  assert.equal(metrics.measuredStageDurationMs, 3_600);
+  assert.equal(metrics.observedCriticalPathDurationMs, 3_150);
   assert.equal(metrics.parallelStageGroups.length, 1);
   assert.equal(hasCompleteGateStageTimings("full", metrics.stageTimings), true);
   assert.equal(
@@ -284,7 +284,10 @@ test("gate receipt runner streams one formal execution and writes its receipt", 
   });
   assert.equal(result.exitCode, 0);
   assert.equal(result.receipt.status, "passed");
-  assert.equal(result.receipt.metrics.stageTimings.length, 7);
+  assert.equal(
+    result.receipt.metrics.stageTimings.length,
+    RECEIPT_GATE_STAGE_IDS.full.length,
+  );
   assert.equal(result.receipt.metrics.parallelStageGroups.length, 1);
   const written = JSON.parse(await readFile(outPath, "utf8"));
   assert.equal(written.gate, "full");

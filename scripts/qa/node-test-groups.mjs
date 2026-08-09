@@ -3,6 +3,7 @@ export const NODE_TEST_GROUP_ORDER = Object.freeze([
   "database",
   "browser",
   "release",
+  "resource_sensitive",
 ]);
 
 export const EXPLICIT_ONLY_NODE_TESTS = Object.freeze([
@@ -115,7 +116,6 @@ export const NODE_TEST_GROUPS = Object.freeze({
   ]),
   release: Object.freeze([
     "scripts/deploy/backup-restore-rehearsal-script.test.mjs",
-    "scripts/deploy/bootstrap-production-admin.test.mjs",
     "scripts/deploy/collect-evidence-script.test.mjs",
     "scripts/deploy/customer-config-activation-gate.test.mjs",
     "scripts/deploy/customer-config-manifest-evidence.test.mjs",
@@ -186,5 +186,8 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/test-coverage-report.test.mjs",
     "scripts/qa/yoyoosun-customer-closure.test.mjs",
     "scripts/qa/yoyoosun-release-readiness.test.mjs",
+  ]),
+  resource_sensitive: Object.freeze([
+    "scripts/deploy/bootstrap-production-admin.test.mjs",
   ]),
 });

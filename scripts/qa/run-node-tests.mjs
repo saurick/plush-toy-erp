@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { lstat, readdir } from "node:fs/promises";
+import { lstat, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -20,7 +20,15 @@ const NODE_TEST_SUFFIXES = Object.freeze([
   ".test.js",
   ".test.mjs",
 ]);
-const NODE_TEST_PROFILES = Object.freeze([...NODE_TEST_GROUP_ORDER, "full"]);
+const RESOURCE_SENSITIVE_NODE_TEST_GROUP = "resource_sensitive";
+const NODE_TEST_PROFILES = Object.freeze([
+  ...NODE_TEST_GROUP_ORDER,
+  "parallel_safe",
+  "full",
+]);
+const NODE_TEST_DIAGNOSTIC_SCHEMA = "plush.node-test-failure-diagnostic/v1";
+const MAX_DIAGNOSTIC_FAILURES = 100;
+const MAX_DIAGNOSTIC_TEXT_LENGTH = 512;
 
 export async function discoverNodeTests(rootDir = DEFAULT_TEST_ROOT) {
   const resolvedRoot = path.resolve(rootDir);
@@ -58,7 +66,14 @@ export function catalogNodeTests(profile = "full") {
       `unknown profile: ${profile}; expected ${NODE_TEST_PROFILES.join("|")}`,
     );
   }
-  const groups = profile === "full" ? NODE_TEST_GROUP_ORDER : [profile];
+  const groups =
+    profile === "full"
+      ? NODE_TEST_GROUP_ORDER
+      : profile === "parallel_safe"
+        ? NODE_TEST_GROUP_ORDER.filter(
+            (group) => group !== RESOURCE_SENSITIVE_NODE_TEST_GROUP,
+          )
+        : [profile];
   const groupedTests = groups.flatMap((group) => NODE_TEST_GROUPS[group]);
   return profile === "full"
     ? [...groupedTests, ...EXPLICIT_ONLY_NODE_TESTS]
@@ -219,13 +234,145 @@ export function classifyNodeTestResult(result) {
   if (result.error) {
     throw result.error;
   }
-  if (result.status !== 0) {
-    return { exitCode: result.status ?? 1, summary: null };
-  }
   const summary = verifyNodeTestSummary(
     `${result.stdout || ""}\n${result.stderr || ""}`,
   );
+  if (result.status !== 0) {
+    const completeSummary =
+      summary.missing.length === 0 && summary.duplicate.length === 0;
+    return {
+      exitCode: result.status ?? 1,
+      summary: completeSummary ? summary : null,
+    };
+  }
   return { exitCode: summary.ok ? 0 : 1, summary };
+}
+
+function stripAnsi(value) {
+  return String(value).replace(/\x1B\[[0-?]*[ -/]*[@-~]/gu, "");
+}
+
+export function redactNodeTestDiagnosticText(value) {
+  return stripAnsi(value)
+    .replace(/\b(?:postgres(?:ql)?|mysql):\/\/[^\s'"`]+/giu, "[REDACTED_DSN]")
+    .replace(/\b(https?:\/\/)[^/\s:@]+:[^@\s/]+@/giu, "$1[REDACTED]@")
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/giu, "Bearer [REDACTED]")
+    .replace(
+      /((?:authorization|password|passwd|token|secret|dsn)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/giu,
+      "$1[REDACTED]",
+    )
+    .slice(0, MAX_DIAGNOSTIC_TEXT_LENGTH);
+}
+
+function diagnosticScalar(value) {
+  const trimmed = String(value || "").trim();
+  const unquoted =
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+      ? trimmed.slice(1, -1)
+      : trimmed;
+  return redactNodeTestDiagnosticText(
+    unquoted.replaceAll(DEFAULT_REPO_ROOT, "<repo>"),
+  );
+}
+
+export function extractNodeTestFailures(output) {
+  const lines = stripAnsi(output).split(/\r?\n/u);
+  const failures = [];
+  const terminalTestLine = /^\s*(?:ok|not ok)\s+\d+\s+-\s+/u;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const failed = /^\s*not ok\s+(\d+)\s+-\s+(.+?)\s*$/u.exec(lines[index]);
+    if (!failed) continue;
+
+    const failure = {
+      index: Number(failed[1]),
+      test: diagnosticScalar(failed[2]),
+    };
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      if (terminalTestLine.test(lines[cursor])) break;
+      const field =
+        /^\s*(duration_ms|location|failureType|code|name|operator):\s*(.*?)\s*$/u.exec(
+          lines[cursor],
+        );
+      if (!field || field[2] === "|-" || field[2] === ">-") continue;
+      if (field[1] === "duration_ms") {
+        const durationMs = Number(field[2]);
+        if (Number.isFinite(durationMs) && durationMs >= 0) {
+          failure.durationMs = durationMs;
+        }
+        continue;
+      }
+      failure[field[1]] = diagnosticScalar(field[2]);
+    }
+    failures.push(Object.freeze(failure));
+    if (failures.length === MAX_DIAGNOSTIC_FAILURES) break;
+  }
+
+  return Object.freeze(failures);
+}
+
+export function buildNodeTestFailureDiagnostic({ profile, result, outcome }) {
+  const output = `${result.stdout || ""}\n${result.stderr || ""}`;
+  const durationMatch = /^\s*# duration_ms ([\d.]+)\s*$/mu.exec(output);
+  const durationMs = durationMatch ? Number(durationMatch[1]) : null;
+  const failures = extractNodeTestFailures(output);
+  const summary = outcome.summary
+    ? Object.freeze({
+        tests: outcome.summary.tests,
+        pass: outcome.summary.pass,
+        fail: outcome.summary.fail,
+        cancelled: outcome.summary.cancelled,
+        skipped: outcome.summary.skipped,
+        todo: outcome.summary.todo,
+      })
+    : null;
+
+  return Object.freeze({
+    schemaVersion: NODE_TEST_DIAGNOSTIC_SCHEMA,
+    status: "failed",
+    profile,
+    process: Object.freeze({
+      exitCode: Number.isInteger(result.status) ? result.status : null,
+      signal: diagnosticScalar(result.signal || ""),
+    }),
+    summary,
+    durationMs:
+      Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : null,
+    failures,
+    failuresTruncated:
+      Number.isInteger(summary?.fail) && summary.fail > failures.length,
+  });
+}
+
+export function nodeTestFailureDiagnosticPath(
+  profile,
+  repoRoot = DEFAULT_REPO_ROOT,
+) {
+  if (!NODE_TEST_PROFILES.includes(profile)) {
+    throw new Error(`unknown diagnostic profile: ${profile}`);
+  }
+  return path.join(
+    repoRoot,
+    "output",
+    "qa",
+    "node-tests",
+    `${profile}-latest-failure.json`,
+  );
+}
+
+export async function writeNodeTestFailureDiagnostic(filePath, diagnostic) {
+  await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify(diagnostic, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    await rename(temporaryPath, filePath);
+  } finally {
+    await rm(temporaryPath, { force: true });
+  }
 }
 
 export function buildNodeTestArgs(tests) {
@@ -236,10 +383,10 @@ function printHelp() {
   console.log(`Repository scripts Node test runner
 
 Usage:
-  node scripts/qa/run-node-tests.mjs [--profile fast|database|browser|release|full] [--list]
+  node scripts/qa/run-node-tests.mjs [--profile fast|database|browser|release|resource_sensitive|parallel_safe|full] [--list]
 
 Options:
-  --profile <name>  Run one explicit group; full runs every group once.
+  --profile <name>  Run one explicit group; parallel_safe excludes the resource-sensitive group; full runs every group once.
   --list            List selected tests without running them.
   --root <dir>      Override the discovery root (used by self-tests).
   -h, --help        Show this help.
@@ -284,6 +431,26 @@ async function main() {
   process.stdout.write(result.stdout || "");
   process.stderr.write(result.stderr || "");
   const outcome = classifyNodeTestResult(result);
+  const diagnosticPath = nodeTestFailureDiagnosticPath(options.profile);
+  if (outcome.exitCode === 0) {
+    await rm(diagnosticPath, { force: true });
+  } else {
+    const diagnostic = buildNodeTestFailureDiagnostic({
+      profile: options.profile,
+      result,
+      outcome,
+    });
+    try {
+      await writeNodeTestFailureDiagnostic(diagnosticPath, diagnostic);
+      console.error(
+        `[qa:node-tests] failure_diagnostic=${path.relative(DEFAULT_REPO_ROOT, diagnosticPath).replaceAll(path.sep, "/")}`,
+      );
+    } catch (error) {
+      console.error(
+        `[qa:node-tests] failure_diagnostic_write_failed=${diagnosticScalar(error instanceof Error ? error.message : error)}`,
+      );
+    }
+  }
   if (!outcome.summary?.ok) {
     console.error(
       `[qa:node-tests] status=incomplete tests=${outcome.summary?.tests ?? "missing"} pass=${outcome.summary?.pass ?? "missing"} fail=${outcome.summary?.fail ?? "missing"} skipped=${outcome.summary?.skipped ?? "missing"}`,

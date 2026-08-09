@@ -546,7 +546,9 @@ test("full overlaps only independent shared, Web and Server stages", () => {
   const full = read("scripts/qa/full.sh");
   assert.match(
     full,
-    /qa_run_stage "\$full_profile" environment_profile qa_full_environment_profile\s+qa_run_stage "\$full_profile" secrets qa_full_secrets\s+qa_run_parallel_stages \\\s+"\$full_profile" \\\s+shared qa_full_shared \\\s+web qa_full_web \\\s+server qa_full_server\s+qa_run_stage "\$full_profile" browser qa_full_browser\s+qa_run_stage "\$full_profile" govulncheck qa_full_govulncheck/u,
+    /qa_run_stage "\$full_profile" environment_profile qa_full_environment_profile\s+qa_run_stage "\$full_profile" secrets qa_full_secrets\s+qa_run_parallel_stages \\\s+"\$full_profile" \\\s+shared qa_full_shared \\\s+web qa_full_web \\\s+server qa_full_server\s+qa_run_stage \\\s+"\$full_profile" \\\s+resource_sensitive_node \\\s+qa_full_resource_sensitive_node\s+qa_run_stage "\$full_profile" browser qa_full_browser\s+qa_run_stage "\$full_profile" govulncheck qa_full_govulncheck/u,
   );
+  assert.match(full, /QA_NODE_TEST_PROFILE=parallel_safe/u);
+  assert.match(full, /run-node-tests\.mjs" --profile resource_sensitive/u);
   assert.match(full, /QA_FAST_GATE_PROFILE="\$full_profile"/u);
 });
