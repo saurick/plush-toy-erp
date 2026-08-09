@@ -29,6 +29,8 @@ const (
 	FieldCustomerSnapshot = "customer_snapshot"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldVersion holds the string denoting the version field in the database.
+	FieldVersion = "version"
 	// FieldFinanceReleaseStatus holds the string denoting the finance_release_status field in the database.
 	FieldFinanceReleaseStatus = "finance_release_status"
 	// FieldFinanceReleaseVersion holds the string denoting the finance_release_version field in the database.
@@ -109,6 +111,7 @@ var Columns = []string{
 	FieldCustomerID,
 	FieldCustomerSnapshot,
 	FieldStatus,
+	FieldVersion,
 	FieldFinanceReleaseStatus,
 	FieldFinanceReleaseVersion,
 	FieldFinanceReleasedAt,
@@ -161,6 +164,10 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultVersion holds the default value on creation for the "version" field.
+	DefaultVersion int
+	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	VersionValidator func(int) error
 	// DefaultFinanceReleaseStatus holds the default value on creation for the "finance_release_status" field.
 	DefaultFinanceReleaseStatus string
 	// FinanceReleaseStatusValidator is a validator for the "finance_release_status" field. It is called by the builders before save.
@@ -230,6 +237,11 @@ func ByCustomerSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByVersion orders the results by the version field.
+func ByVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVersion, opts...).ToFunc()
 }
 
 // ByFinanceReleaseStatus orders the results by the finance_release_status field.

@@ -150,6 +150,7 @@ type PurchaseOrderFilter struct {
 	Keyword         string
 	SupplierID      int
 	LifecycleStatus string
+	LifecycleScope  string
 	DateField       string
 	DateFrom        *time.Time
 	DateTo          *time.Time
@@ -581,10 +582,23 @@ func normalizePurchaseOrderItemFields(in PurchaseOrderItemMutation) (PurchaseOrd
 func normalizePurchaseOrderFilter(in PurchaseOrderFilter) (PurchaseOrderFilter, error) {
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	in.LifecycleStatus = strings.ToLower(strings.TrimSpace(in.LifecycleStatus))
+	var scopeOK bool
+	in.LifecycleScope, scopeOK = NormalizeLifecycleScope(in.LifecycleScope)
+	if !scopeOK {
+		return PurchaseOrderFilter{}, ErrBadParam
+	}
 	in.DateField = strings.TrimSpace(in.DateField)
 	in.SortBy = strings.TrimSpace(in.SortBy)
 	in.SortDirection = strings.ToLower(strings.TrimSpace(in.SortDirection))
 	if in.LifecycleStatus != "" && !IsValidPurchaseOrderStatus(in.LifecycleStatus) {
+		return PurchaseOrderFilter{}, ErrBadParam
+	}
+	if !LifecycleScopeAllowsStatus(
+		in.LifecycleScope,
+		in.LifecycleStatus,
+		[]string{PurchaseOrderStatusDraft, PurchaseOrderStatusSubmitted, PurchaseOrderStatusApproved},
+		[]string{PurchaseOrderStatusClosed, PurchaseOrderStatusCanceled},
+	) {
 		return PurchaseOrderFilter{}, ErrBadParam
 	}
 	if in.SupplierID < 0 {

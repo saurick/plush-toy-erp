@@ -26,13 +26,13 @@ import {
 } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
   DEV_DATA_PREPARATION_SOURCE_PATH,
   createDevDataPreparationClient,
   dataPreparationStatusPresentation,
-  formatDataPreparationTimestamp,
   resolveDataPreparationExecutionConfirmation,
   resolveDataPreparationPrepareIntent,
   selectRecoverableDataPreparationOperation,
@@ -51,6 +51,10 @@ function shortHash(value) {
 function StatusTag({ status }) {
   const presentation = dataPreparationStatusPresentation(status)
   return <Tag color={presentation.color}>{presentation.label}</Tag>
+}
+
+function operationUpdateAction(operation) {
+  return operation?.terminal ? '完成于' : '更新于'
 }
 
 function issueText(issues = []) {
@@ -316,9 +320,18 @@ function OperationDetail({ operation, compact = false }) {
           <StatusTag status={operation.status} />
         </div>
         <Text>{operation.targetSummary.safeTarget}</Text>
-        <Text type="secondary">
-          最近更新：{formatDataPreparationTimestamp(operation.updatedAt)}
-        </Text>
+        <Space wrap size={[12, 4]}>
+          <DevTimestamp
+            value={operation.createdAt}
+            action="开始于"
+            missing="开始时间未证明"
+          />
+          <DevTimestamp
+            value={operation.updatedAt}
+            action={operationUpdateAction(operation)}
+            missing="更新时间未证明"
+          />
+        </Space>
       </div>
       <OperationIssues issues={operation.issues} />
       <details
@@ -366,7 +379,12 @@ function OperationDetail({ operation, compact = false }) {
             {
               key: 'createdAt',
               label: '计划创建',
-              children: formatDataPreparationTimestamp(operation.createdAt),
+              children: (
+                <DevTimestamp
+                  value={operation.createdAt}
+                  missing="计划创建时间未证明"
+                />
+              ),
             },
           ]}
         />
@@ -392,9 +410,7 @@ function OperationDetail({ operation, compact = false }) {
                   <Space direction="vertical" size={2}>
                     <Space wrap>
                       <Tag>{event.status}</Tag>
-                      <Text type="secondary">
-                        {formatDataPreparationTimestamp(event.at)}
-                      </Text>
+                      <DevTimestamp value={event.at} missing="事件时间未证明" />
                     </Space>
                     <Text>{event.message}</Text>
                   </Space>
@@ -635,9 +651,11 @@ export default function DevDataPreparationPage() {
         <Text type="secondary" code>
           {shortHash(operation.planHash)}
         </Text>
-        <Text type="secondary">
-          {formatDataPreparationTimestamp(operation.updatedAt)}
-        </Text>
+        <DevTimestamp
+          value={operation.updatedAt}
+          action={operationUpdateAction(operation)}
+          missing="更新时间未证明"
+        />
       </div>
     ),
     children: <OperationDetail operation={operation} />,
@@ -670,9 +688,16 @@ export default function DevDataPreparationPage() {
             </Paragraph>
           </div>
         </div>
-        <Button icon={<ReloadOutlined />} loading={loading} onClick={refresh}>
-          重新检查
-        </Button>
+        <Space direction="vertical" align="end" size={4}>
+          <Button icon={<ReloadOutlined />} loading={loading} onClick={refresh}>
+            重新检查
+          </Button>
+          <DevTimestamp
+            value={summary?.generatedAt}
+            action="预检读取于"
+            missing="预检时间未证明"
+          />
+        </Space>
       </header>
 
       <main className="erp-dev-hub-shell erp-dev-data-shell">

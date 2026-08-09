@@ -48,6 +48,28 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		}
 		item, err := d.operationalFactUC.CreateOutsourcingReturnReceiptFromOrder(ctx, in)
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
+	case "save_outsourcing_material_issue_draft", "save_outsourcing_return_receipt_draft":
+		in, ok := outsourcingFactDraftSaveFromParams(pm, method)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		permission := biz.PermissionOutsourcingMaterialIssueCreate
+		save := d.operationalFactUC.SaveOutsourcingMaterialIssueDraft
+		if method == "save_outsourcing_return_receipt_draft" {
+			permission = biz.PermissionOutsourcingReturnReceiptCreate
+			save = d.operationalFactUC.SaveOutsourcingReturnReceiptDraft
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
+			return id, res, nil
+		}
+		item, err := save(ctx, in)
+		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "post_outsourcing_fact":
 		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
@@ -134,6 +156,30 @@ func outsourcingFactFromOrderCreateFromParams(pm map[string]any) (*biz.Outsourci
 		IdempotencyKey:         getString(pm, "idempotency_key"),
 		OccurredAt:             optionalTimeValue(occurredAt),
 		Note:                   getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func outsourcingFactDraftSaveFromParams(pm map[string]any, method string) (*biz.OutsourcingFactDraftSave, bool) {
+	keys := []string{"customer_key", "id", "expected_version", "warehouse_id", "lot_id", "quantity", "occurred_at", "note"}
+	if method == "save_outsourcing_return_receipt_draft" {
+		keys = append(keys, "new_lot_no")
+	}
+	if !productionCompletionAllowsOnly(pm, keys...) {
+		return nil, false
+	}
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
+	if !ok {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok || occurredAt == nil {
+		return nil, false
+	}
+	return &biz.OutsourcingFactDraftSave{
+		ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0),
+		WarehouseID: getInt(pm, "warehouse_id", 0), LotID: getOptionalInt(pm, "lot_id"),
+		NewLotNo: getWorkflowStringPtr(pm, "new_lot_no"), Quantity: quantity,
+		OccurredAt: optionalTimeValue(occurredAt), Note: getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 

@@ -1,6 +1,6 @@
 ---
 name: plush-git-closeout-queue
-description: "协调 plush-toy-erp 共享 Local checkout 的唯一 writer、无 optional-lock Git 快照、集中 index.lock 恢复、批次登记、显式授权的 Git 收口、遗留盘点与队列轮换。Use when 多个 Codex 顶层任务共享 dirty worktree、热点文件排队、Git 锁异常、App 重启恢复或轮换长上下文队列；独立写任务真并行应使用 Worktree，不用于单一 writer 的普通个人开发。"
+description: "协调 plush-toy-erp 共享 Local checkout 的唯一 writer、非阻塞远端发布等待、可恢复任务续跑、集中 index.lock 恢复、批次登记、显式授权的 Git 收口、遗留盘点与队列轮换。Use when 多个 Codex 顶层任务共享 dirty worktree、热点文件排队、Git 锁异常、App 重启恢复或轮换长上下文队列；独立写任务真并行应使用 Worktree，不用于单一 writer 的普通个人开发。"
 ---
 
 # Plush Git 收口队列
@@ -23,6 +23,8 @@ description: "协调 plush-toy-erp 共享 Local checkout 的唯一 writer、无 
 - `commit_authorized` 默认且缺省为 `false`；不能从 `BATCH_READY`、`WRITER_RELEASED`、验证绿色、历史策略或“任务均已 idle”推导 stage / commit 权限。
 - stage、commit 和 push 都需要当前可追溯的用户明确授权；push 仍是独立授权，不能从本地 commit 推导。
 - 所有跨任务事件都要得到匹配 ACK；发送成功、任务历史存在或 App 恢复都不能代替 ACK。
+- 远端 CI / Release / 部署等待是非阻塞证据 lane，不是 Local 锁域；不得因此持有或冻结文件 writer、index、commit 或 push owner。
+- `EXACT_CLEAN_FREEZE`、`PUSH_FREEZE`、`CLOSEOUT_FREEZE` 不是协议事件。除正在执行的 stage / commit 临界区外，任何全工作树冻结请求都返回 `UNSUPPORTED_LOCK_DOMAIN`，不得转发或服从。
 
 ## 发现唯一队列
 
@@ -77,7 +79,7 @@ worker 发现锁时只发送一次 `INDEX_LOCK_OBSERVED`，附 compact snapshot�
 
 `GRANT_WRITER` 只授权接收该 grant 的当前 turn 中一段连续文件写入。发生以下任一情况时租约立即失效：收到 `WRITER_RELEASED` / `WRITER_CANCELLED`；进入确认不会写非 ignored 文件的测试、浏览器检查或 diff 审查；给出最终回复；任务成为 `idle` / `notLoaded`；接收 grant 的 turn 变为 `completed` / `error` / `cancelled`；任务在后续新 turn 恢复。
 
-最后一次文件写入后立即停止写入并发送 `WRITER_RELEASED`，包含最后写入时间和实际路径；不要为只读验证继续占 writer。验证失败需要修复文件时重新发送 `WRITER_REQUEST`，旧任务恢复或新 turn 开始时也必须重新发现队列并申请，不能沿用历史 grant。任务取消时发送 `WRITER_CANCELLED`。
+最后一次文件写入后立即停止写入并发送 `WRITER_RELEASED`，包含最后写入时间、实际路径、`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`。checkpoint 至少记录原目标、下一安全动作、待验证项和是否还需 writer；不要为只读验证继续占 writer。发送后无需等待 ACK 即继续只读验证或最终收口，但不得继续写文件，也不得在匹配 ACK 前假定 release / batch 已登记；未收到 ACK 时在下一轮幂等重发。验证失败需要修复文件时重新发送 `WRITER_REQUEST`，旧任务恢复或新 turn 开始时也必须重新发现队列并申请，不能沿用历史 grant。任务取消时发送 `WRITER_CANCELLED`。
 
 队列每次准备返回 `WAIT_WRITER` 或授予下一 writer 时，在同一 wake 内使用任务工具核对当前 owner：
 
@@ -89,7 +91,20 @@ worker 发现锁时只发送一次 `INDEX_LOCK_OBSERVED`，附 compact snapshot�
 
 队列收到 release / cancelled 后，登记批次的最新状态，再按顺序处理下一项 writer 请求，不要求各 worker 定时轮询或反复询问。等待 Git 授权或被阻塞的批次不能阻塞无重叠的后续 writer。授予 writer 或经授权的 Git owner 前一次性重读 HEAD、index、lock / 活动 Git 进程和请求路径；热点仍在写、请求已漂移或 owner 不清楚时返回 `WAIT_WRITER` / `WAIT_HOT_FILE` 并保留队列项。
 
-worker 收到任何 `WAIT_*` 后立即结束当前 turn，保留现场和 event_id；不得持续运行等待循环、反复读取队列或发送“仍在等待”。队列在前序 release / cancelled / ready 后主动唤醒下一项。只读分析可以完成并报告，但不能占用一个长期 in-progress turn 模拟后台任务。
+worker 收到任何 `WAIT_*` 后立即结束当前 turn，保留现场、event_id 和 continuation checkpoint；不得持续运行等待循环、反复读取队列或发送“仍在等待”。只读分析可以完成并报告，但不能占用一个长期 in-progress turn 模拟后台任务。
+
+### WAIT 恢复触发
+
+队列把每个 WAIT 登记为 `external` 或 `self_actionable`，并保存 `wait_event_id`、`blocker_identity`、`resume_action` 和 `resume_on`：
+
+- `external` 表示仍需活动 writer / Git owner 释放、远端事件、用户选择或授权、依赖完成、额度恢复等外部变化；在匹配 `resume_on` 到来前不发送自助恢复，也不轮询。
+- `self_actionable` 表示无需新的外部决定即可继续，包括可从实时 diff 与已声明归属重建有界请求的 `WAIT_SCOPE`、原请求已授权只读归属审计的 `WAIT_RECONCILE`，以及无活动 writer、只剩 stale / unreported identity 的 `WAIT_HOT_FILE`。需要用户选择的 scope、未获授权的 reconcile 或真实 ownership 冲突仍归 `external`。
+
+对 `self_actionable` WAIT，队列在 ACK 后至多做一次必要的 optional-lock-free 身份审计，并使用会触发后续 turn 的任务 follow-up 能力投递一次 `RESUME_FROM_WAIT`；WAIT 所在 turn 必须先结束，插入当前 turn 的普通消息或 ACK 不算 fresh-turn trigger。`resume_token` 绑定 `wait_event_id + blocker_identity`，同一 token 最多发送一次，不能靠新 revision 制造自动唤醒循环。外部 blocker 的匹配 clear / release / ready 事件到达后也执行同一条一次性触发；若 `GRANT_WRITER` 本身已创建新 turn，它就是该 trigger。
+
+任务工具无法确认 follow-up 会创建或排入新 turn 时，队列返回 `WAIT_RESUME_TRIGGER`，报告具体工具或额度阻塞并保留 checkpoint；不得静默宣称已唤醒。新 turn 收到 `RESUME_FROM_WAIT` 后先 ACK 并重验现场，再继续原目标：只读阶段直接做到终态，需要写入则申请新 writer，仍受外部条件阻塞才发送带新证据的 WAIT revision；未完成任务不得只回复 ACK 后结束。
+
+额度耗尽时模型不能继续推理、调用工具或发送消息，协议不得承诺离线 daemon 式完成。任务因此成为 `idle` / `notLoaded` 或 turn 结束时，writer 租约按 `TURN_ENDED` 自动失效，队列继续放行其他任务；任务历史中的 checkpoint 保留。额度恢复并获得新 turn 后，任务重新发现队列、核对 HEAD / index / 路径身份，从 checkpoint 续做，不能复活旧 writer，也不能把“零额度期间没有执行”描述成已完成。
 
 ## 批次登记与显式 Git 收口
 
@@ -120,6 +135,8 @@ push 使用独立事件 `PUSH_REQUEST`、`PUSH_STARTED`、`PUSH_FINISHED`、`PUS
 
 普通 push 自身会拒绝非 fast-forward，但这不是提前并发锁。无法阻止外部客户端时，只报告已观察到的 Git / remote 状态，不声称拥有全局排他锁。
 
+push 临界区只覆盖 fetch、push 与远端 ref 回读；发出 `PUSH_FINISHED` 或 `PUSH_FAILED` 后立即释放 push owner 及临时暂停的 Local lane。等待远端 CI / Release / 部署结果不得维持 clean-worktree freeze。若发布策略要求同一 remote / branch 在本次 CI 结束前不再推送，只登记绑定 exact commit 的同目标 remote release reservation；它只阻止该目标的新 push，不阻止文件 writer、本地 index / commit 或其他目标操作。需要精确源码的本地发布控制器使用绑定 SHA 的临时 worktree 或 archive，不占共享 Local。
+
 ## 遗留修改盘点
 
 App 重启、旧任务没有发 ready/release、队列丢失或本地留有无人认领修改时，只有用户明确的 `RECONCILE_REQUEST` 才做一次只读盘点：
@@ -149,6 +166,7 @@ App 重启、旧任务没有发 ready/release、队列丢失或本地留有无�
 - 不假定 App 关闭期间存在有保证的跨任务离线邮箱。无匹配 ACK 的消息按未交付处理，App 恢复后的下一轮再幂等重发。
 - 仓库不得保存当前 task id、writer、batch、ACK 日志、HEAD / index / OID 或 queue snapshot。这些值会漂移，也会制造第二状态真源。
 - 队列默认休眠，任务消息是唤醒信号；被唤醒后只执行消息已明确授权的动作。它不是持续运行的 daemon，也不会凭任务状态或脏文件数量自行扫描或提交。
+- checkpoint 只保证任务在再次获得可执行 turn 后可恢复，不保证 App 关闭或额度为零时自动运行；远端 CI / Release 观察者也不得借等待结果冻结共享 Local。
 
 ## 精简输出
 

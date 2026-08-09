@@ -2593,15 +2593,21 @@ const {
   isAcceptedFocusBorder,
 })
 
-async function assertOperationalFactModalViewport(page, scenarioName) {
-  const modal = page
-    .locator('.erp-business-action-modal--operational-fact.ant-modal:visible')
-    .last()
+async function assertOperationalFactModalViewport(
+  page,
+  scenarioName,
+  visibleModal = null
+) {
+  const modal =
+    visibleModal ||
+    page
+      .locator('.erp-business-action-modal--operational-fact.ant-modal:visible')
+      .last()
   await modal.waitFor({ state: 'visible', timeout: 10_000 })
   await assertAntdModalCentered(page, modal, `${scenarioName}-centered`)
   const metrics = await modal.evaluate((node) => {
     const body = node.querySelector('.ant-modal-body')
-    const form = node.querySelector('.erp-business-action-form')
+    const form = node.querySelector('.erp-business-action-form, form.ant-form')
     const modalRect = node.getBoundingClientRect()
     const bodyStyle = body ? window.getComputedStyle(body) : null
     return {

@@ -168,6 +168,7 @@ test('menuPermissions: 打印预览子路由按打印中心权限归属', () => 
 test('menuPermissions: 岗位帮助不新增业务权限，旧文档和验收路径不再映射', () => {
   assert.equal(resolveMenuPermissionKey('/erp/mobile-workbenches'), '')
   assert.equal(resolveMenuPermissionKey('/erp/help-center'), '')
+  assert.equal(resolveMenuPermissionKey('/erp/history'), '')
   assert.equal(resolveMenuPermissionKey('/erp/docs/mobile-roles'), '')
   assert.equal(resolveMenuPermissionKey('/erp/qa/reports'), '')
 })
@@ -255,6 +256,7 @@ test('menuPermissions: 当前权限项不包含通用帮助、前端文档或开
   assert(!permissionKeys.some((key) => key.startsWith('/erp/docs/')))
   assert(!permissionKeys.some((key) => key.startsWith('/erp/qa/')))
   assert(!permissionKeys.includes('/erp/help-center'))
+  assert(!permissionKeys.includes('/erp/history'))
 })
 
 test('menuPermissions: 旧入口不保留路由重定向', () => {
@@ -295,6 +297,10 @@ test('menuPermissions: 岗位帮助恢复为单一已登录路由且不恢复旧
   assert.match(
     routerSource,
     /<Route path="help-center" element=\{<HelpCenterPage \/>\} \/>/u
+  )
+  assert.match(
+    routerSource,
+    /<Route path="history" element=\{<HistoryRecordsPage \/>\} \/>/u
   )
   assert.equal(routerSource.includes('path="docs/*"'), false)
   assert.equal(routerSource.includes('path="qa/*"'), false)

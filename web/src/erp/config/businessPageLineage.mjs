@@ -72,9 +72,7 @@ export const BUSINESS_FLOW_TYPES = Object.freeze({
   PRINT_SNAPSHOT: 'print_snapshot',
 })
 
-const BACKEND_ONLY_FORMAL_UI_ACTIONS = new Set([
-  'add_purchase_receipt_item',
-])
+const BACKEND_ONLY_FORMAL_UI_ACTIONS = new Set(['add_purchase_receipt_item'])
 
 const LEGACY_PROCESS_RUNTIME_ACTIONS = new Set([
   'execute_material_supply_purchase_receipt_create',
@@ -223,11 +221,7 @@ export const businessPageFlowDefinitions = Object.freeze(
           'get_purchase_order_receipt_progress',
         ],
         ['sales-orders', 'shipments', 'list_shipment_source_candidates'],
-        [
-          'shipments',
-          'rework-intakes',
-          'list_rework_intake_source_candidates',
-        ],
+        ['shipments', 'rework-intakes', 'list_rework_intake_source_candidates'],
         [
           'processing-contracts',
           'quality-inspections',
@@ -335,11 +329,7 @@ export const businessPageFlowDefinitions = Object.freeze(
           'production-progress',
           'create_production_rework_from_intake',
         ],
-        [
-          'rework-intakes',
-          'shipments',
-          'create_rework_reshipment',
-        ],
+        ['rework-intakes', 'shipments', 'create_rework_reshipment'],
         [
           'production-progress',
           'quality-inspections',
@@ -611,11 +601,7 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['reconciliation', 'reconciliation', 'cancel_finance_fact'],
         ['rework-intakes', 'rework-intakes', 'cancel_rework_intake'],
         ['rework-intakes', 'rework-intakes', 'reverse_rework_intake'],
-        [
-          'finance-payments',
-          'finance-payments',
-          'cancel_finance_payment',
-        ],
+        ['finance-payments', 'finance-payments', 'cancel_finance_payment'],
         ['inventory', 'inventory', 'execute_inventory_adjustment_submit'],
         ['inventory', 'inventory', 'cancel_inventory_operation'],
         [
@@ -681,7 +667,40 @@ export const businessPageFlowDefinitions = Object.freeze(
     )
     .concat(
       [
+        ['rework-intakes', 'rework-intakes', 'save_rework_intake_draft'],
+        ['shipments', 'shipments', 'save_shipment_draft'],
         ['inventory', 'inventory', 'create_inventory_operation'],
+        ['inventory', 'inventory', 'save_inventory_operation_draft'],
+        [
+          'production-progress',
+          'production-progress',
+          'save_production_material_issue_draft',
+        ],
+        [
+          'production-progress',
+          'production-progress',
+          'save_production_completion_draft',
+        ],
+        [
+          'production-progress',
+          'production-progress',
+          'save_production_rework_from_completion_draft',
+        ],
+        [
+          'production-progress',
+          'production-progress',
+          'save_production_rework_from_intake_draft',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'save_outsourcing_material_issue_draft',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'save_outsourcing_return_receipt_draft',
+        ],
         ['finance-payments', 'finance-payments', 'create_finance_payment'],
         ['finance-payments', 'finance-payments', 'create_finance_credit_note'],
         [

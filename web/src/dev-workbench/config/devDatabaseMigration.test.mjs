@@ -49,7 +49,13 @@ function operation(status = 'ready') {
     readback: null,
     confirmationPrompt: `升级共享开发库:20260729043852:${OPERATION_ID}`,
     issues: [],
-    events: [],
+    events: [
+      {
+        at: '2026-07-29T08:01:00.000Z',
+        status,
+        message: '迁移状态已经更新',
+      },
+    ],
   }
 }
 
@@ -107,6 +113,47 @@ test('database migration client rejects hidden confirmations and arbitrary targe
   assert.throws(
     () => validateDatabaseMigrationSummary(unsafe),
     /数据库目标返回结构无效/u
+  )
+})
+
+test('database migration client rejects missing or ambiguous evidence timestamps', () => {
+  assert.throws(
+    () =>
+      validateDatabaseMigrationOperation({
+        ...operation(),
+        createdAt: '2026-07-29T08:00:00',
+      }),
+    /迁移操作返回结构无效/u
+  )
+  assert.throws(
+    () =>
+      validateDatabaseMigrationOperation({
+        ...operation(),
+        plan: { ...operation().plan, preparedAt: 'not-a-date' },
+      }),
+    /迁移计划返回结构无效/u
+  )
+  assert.throws(
+    () =>
+      validateDatabaseMigrationOperation({
+        ...operation(),
+        backup: { ...operation().backup, verifiedAt: null },
+      }),
+    /备份验证返回结构无效/u
+  )
+  assert.throws(
+    () =>
+      validateDatabaseMigrationOperation({
+        ...operation(),
+        events: [
+          {
+            at: '2026-07-29T08:01:00',
+            status: 'ready',
+            message: '迁移状态已经更新',
+          },
+        ],
+      }),
+    /迁移状态事件返回结构无效/u
   )
 })
 

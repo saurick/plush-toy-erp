@@ -30,6 +30,10 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 	case "create_production_completion_from_order",
 		"create_production_material_issue_from_order",
 		"create_production_rework_from_completion",
+		"save_production_material_issue_draft",
+		"save_production_completion_draft",
+		"save_production_rework_from_completion_draft",
+		"save_production_rework_from_intake_draft",
 		"submit_production_exception",
 		"cancel_production_exception",
 		"reverse_production_exception",
@@ -42,6 +46,8 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		return d.handleOperationalFactProduction(ctx, method, id, pm, claims.UserID)
 	case "create_outsourcing_material_issue_from_order",
 		"create_outsourcing_return_receipt_from_order",
+		"save_outsourcing_material_issue_draft",
+		"save_outsourcing_return_receipt_draft",
 		"create_outsourcing_return_disposition",
 		"post_outsourcing_return_disposition",
 		"cancel_outsourcing_return_disposition",
@@ -52,6 +58,7 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"list_outsourcing_facts":
 		return d.handleOperationalFactOutsourcing(ctx, method, id, pm, claims.UserID)
 	case "create_shipment_with_items",
+		"save_shipment_draft",
 		"get_shipment",
 		"list_shipment_source_candidates",
 		"ship_shipment",
@@ -64,6 +71,7 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		return d.handleOperationalFactReservation(ctx, method, id, pm)
 	case "list_rework_intake_source_candidates",
 		"create_rework_intake",
+		"save_rework_intake_draft",
 		"receive_rework_intake",
 		"cancel_rework_intake",
 		"reverse_rework_intake",

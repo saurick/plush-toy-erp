@@ -264,15 +264,17 @@ func TestPermissionUsageForReturnsDefensiveCopy(t *testing.T) {
 	}
 }
 
-func TestProductionMaterialIssuePermissionUsageNamesExactSourceDrivenMethod(t *testing.T) {
+func TestProductionMaterialIssuePermissionUsageNamesExactSourceDrivenMethods(t *testing.T) {
 	usage, ok := PermissionUsageFor(PermissionProductionMaterialIssueCreate)
 	if !ok || usage.BackendOnly || len(usage.Surfaces) != 1 {
 		t.Fatalf("production material issue usage=%#v ok=%v", usage, ok)
 	}
 	surface := usage.Surfaces[0]
-	if surface.ControlKey != "create-production-material-issue" || len(surface.BackendMethods) != 1 ||
+	if surface.ControlKey != "create-production-material-issue" || len(surface.BackendMethods) != 2 ||
 		surface.BackendMethods[0].Domain != "operational_fact" ||
-		surface.BackendMethods[0].Method != "create_production_material_issue_from_order" {
+		surface.BackendMethods[0].Method != "create_production_material_issue_from_order" ||
+		surface.BackendMethods[1].Domain != "operational_fact" ||
+		surface.BackendMethods[1].Method != "save_production_material_issue_draft" {
 		t.Fatalf("production material issue usage surface=%#v", surface)
 	}
 }

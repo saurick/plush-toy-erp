@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -410,6 +411,128 @@ func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in
 		return nil, err
 	}
 	return outsourcingFactWithSourceSKUProjection(ctx, r.data.postgres, row)
+}
+
+func (r *operationalFactRepo) SaveOutsourcingFactDraft(ctx context.Context, in *biz.OutsourcingFactDraftSave) (*biz.OutsourcingFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	preview, err := r.data.postgres.OutsourcingFact.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrOutsourcingFactNotFound
+		}
+		return nil, err
+	}
+	orderID, itemID, err := outsourcingOrderSourceIDsFromFact(preview)
+	if err != nil {
+		return nil, err
+	}
+	if preview.FactType != in.FactType {
+		return nil, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", orderID, biz.ErrOutsourcingOrderNotFound); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_order_items", itemID, biz.ErrOutsourcingOrderItemNotFound); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", in.ID, biz.ErrOutsourcingFactNotFound); err != nil {
+		return nil, err
+	}
+	current, err := tx.client.OutsourcingFact.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrOutsourcingFactNotFound
+		}
+		return nil, err
+	}
+	if current.Version != in.ExpectedVersion {
+		return nil, biz.ErrOperationalFactVersionConflict
+	}
+	if current.Status != biz.OperationalFactStatusDraft || current.FactType != in.FactType {
+		return nil, biz.ErrBadParam
+	}
+	resolved, item, err := resolveOutsourcingOrderFactMutation(ctx, tx.client, in.FactType, &biz.OutsourcingFactFromOrderCreate{
+		FactNo: current.FactNo, OutsourcingOrderID: orderID, OutsourcingOrderItemID: itemID,
+		WarehouseID: in.WarehouseID, LotID: in.LotID, NewLotNo: in.NewLotNo,
+		Quantity: in.Quantity, IdempotencyKey: current.IdempotencyKey,
+		OccurredAt: in.OccurredAt, OccurredAtSpecified: true, Note: in.Note,
+	}, true)
+	if err != nil {
+		return nil, err
+	}
+	if !outsourcingFactImmutableSourceMatches(current, resolved) {
+		return nil, biz.ErrOutsourcingOrderFactSourceInvalid
+	}
+	if err := validateOutsourcingOrderFactQuantity(ctx, tx.client, item, in.FactType, in.Quantity); err != nil {
+		return nil, err
+	}
+	if err := resolveOrCreateSourceInboundLot(ctx, tx, resolved); err != nil {
+		return nil, err
+	}
+	if err := validateOperationalFactSKUAndLot(ctx, tx.client, resolved.SubjectType, resolved.SubjectID, resolved.ProductSkuID, resolved.LotID); err != nil {
+		return nil, err
+	}
+	in.LotID = resolved.LotID
+	in.NewLotNo = nil
+	if err := updateOutsourcingFactDraft(ctx, tx, current, in); err != nil {
+		return nil, err
+	}
+	updated, err := tx.client.OutsourcingFact.Query().Where(outsourcingfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return commitOutsourcingFact(ctx, tx, updated)
+}
+
+func outsourcingFactImmutableSourceMatches(row *ent.OutsourcingFact, resolved *biz.OperationalFactMutation) bool {
+	if row == nil || resolved == nil {
+		return false
+	}
+	return row.FactNo == resolved.FactNo && row.FactType == resolved.FactType &&
+		row.SubjectType == resolved.SubjectType && row.SubjectID == resolved.SubjectID &&
+		sameOptionalInt(row.ProductSkuID, resolved.ProductSkuID) && row.UnitID == resolved.UnitID &&
+		sameOptionalInt(row.SupplierID, resolved.SupplierID) && sameOptionalString(row.SupplierName, resolved.SupplierName) &&
+		sameOptionalString(row.SourceType, resolved.SourceType) && sameOptionalInt(row.SourceID, resolved.SourceID) &&
+		sameOptionalInt(row.SourceLineID, resolved.SourceLineID) && row.IdempotencyKey == resolved.IdempotencyKey
+}
+
+func updateOutsourcingFactDraft(ctx context.Context, tx *inventoryDBTx, row *ent.OutsourcingFact, in *biz.OutsourcingFactDraftSave) error {
+	if tx == nil || tx.sqlTx == nil || row == nil || in == nil {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 9)
+	query := fmt.Sprintf(`UPDATE outsourcing_facts SET warehouse_id = %s, lot_id = %s, quantity = %s, occurred_at = %s, occurred_at_specified = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8])
+	result, err := tx.sqlTx.ExecContext(
+		ctx,
+		query,
+		in.WarehouseID,
+		optionalIntSQLValue(in.LotID),
+		in.Quantity,
+		in.OccurredAt,
+		true,
+		optionalStringSQLValue(in.Note),
+		time.Now(),
+		row.ID,
+		in.ExpectedVersion,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return biz.ErrOperationalFactVersionConflict
+	}
+	return nil
 }
 
 func (r *operationalFactRepo) PostOutsourcingFact(ctx context.Context, in *biz.OperationalFactStatusMutation) (*biz.OutsourcingFact, error) {

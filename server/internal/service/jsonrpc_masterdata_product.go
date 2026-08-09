@@ -166,11 +166,12 @@ func productSKUMutationFromParams(pm map[string]any) (*biz.ProductSKUMutation, b
 
 func productSKUFilterFromParams(pm map[string]any) biz.ProductSKUFilter {
 	return biz.ProductSKUFilter{
-		ProductID:  getInt(pm, "product_id", 0),
-		Keyword:    getString(pm, "keyword"),
-		ActiveOnly: getBool(pm, "active_only", false),
-		Limit:      getInt(pm, "limit", 50),
-		Offset:     getInt(pm, "offset", 0),
+		ProductID:      getInt(pm, "product_id", 0),
+		Keyword:        getString(pm, "keyword"),
+		ActiveOnly:     getBool(pm, "active_only", false),
+		LifecycleScope: getString(pm, "lifecycle_scope"),
+		Limit:          getInt(pm, "limit", 50),
+		Offset:         getInt(pm, "offset", 0),
 	}
 }
 

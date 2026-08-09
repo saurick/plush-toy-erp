@@ -92174,6 +92174,8 @@ type ShipmentMutation struct {
 	purpose                                *string
 	customer_snapshot                      *string
 	status                                 *string
+	version                                *int
+	addversion                             *int
 	finance_release_status                 *string
 	finance_release_version                *int
 	addfinance_release_version             *int
@@ -92608,6 +92610,62 @@ func (m *ShipmentMutation) OldStatus(ctx context.Context) (v string, err error) 
 // ResetStatus resets all changes to the "status" field.
 func (m *ShipmentMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *ShipmentMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *ShipmentMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *ShipmentMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *ShipmentMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *ShipmentMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
 }
 
 // SetFinanceReleaseStatus sets the "finance_release_status" field.
@@ -93532,7 +93590,7 @@ func (m *ShipmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShipmentMutation) Fields() []string {
-	fields := make([]string, 0, 22)
+	fields := make([]string, 0, 23)
 	if m.shipment_no != nil {
 		fields = append(fields, shipment.FieldShipmentNo)
 	}
@@ -93553,6 +93611,9 @@ func (m *ShipmentMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, shipment.FieldStatus)
+	}
+	if m.version != nil {
+		fields = append(fields, shipment.FieldVersion)
 	}
 	if m.finance_release_status != nil {
 		fields = append(fields, shipment.FieldFinanceReleaseStatus)
@@ -93621,6 +93682,8 @@ func (m *ShipmentMutation) Field(name string) (ent.Value, bool) {
 		return m.CustomerSnapshot()
 	case shipment.FieldStatus:
 		return m.Status()
+	case shipment.FieldVersion:
+		return m.Version()
 	case shipment.FieldFinanceReleaseStatus:
 		return m.FinanceReleaseStatus()
 	case shipment.FieldFinanceReleaseVersion:
@@ -93674,6 +93737,8 @@ func (m *ShipmentMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCustomerSnapshot(ctx)
 	case shipment.FieldStatus:
 		return m.OldStatus(ctx)
+	case shipment.FieldVersion:
+		return m.OldVersion(ctx)
 	case shipment.FieldFinanceReleaseStatus:
 		return m.OldFinanceReleaseStatus(ctx)
 	case shipment.FieldFinanceReleaseVersion:
@@ -93761,6 +93826,13 @@ func (m *ShipmentMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case shipment.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
 		return nil
 	case shipment.FieldFinanceReleaseStatus:
 		v, ok := value.(string)
@@ -93875,6 +93947,9 @@ func (m *ShipmentMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *ShipmentMutation) AddedFields() []string {
 	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, shipment.FieldVersion)
+	}
 	if m.addfinance_release_version != nil {
 		fields = append(fields, shipment.FieldFinanceReleaseVersion)
 	}
@@ -93895,6 +93970,8 @@ func (m *ShipmentMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *ShipmentMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case shipment.FieldVersion:
+		return m.AddedVersion()
 	case shipment.FieldFinanceReleaseVersion:
 		return m.AddedFinanceReleaseVersion()
 	case shipment.FieldFinanceReleasedBy:
@@ -93912,6 +93989,13 @@ func (m *ShipmentMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *ShipmentMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case shipment.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
 	case shipment.FieldFinanceReleaseVersion:
 		v, ok := value.(int)
 		if !ok {
@@ -94074,6 +94158,9 @@ func (m *ShipmentMutation) ResetField(name string) error {
 		return nil
 	case shipment.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case shipment.FieldVersion:
+		m.ResetVersion()
 		return nil
 	case shipment.FieldFinanceReleaseStatus:
 		m.ResetFinanceReleaseStatus()

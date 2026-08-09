@@ -25,14 +25,33 @@ test('fact ledger catalog is complete, read-only, and source-backed', () => {
     ['采购与质量', '生产与库存', '委外与返工', '出货与财务']
   )
   assert.equal(catalog.definitions.length, factFlows.length)
-  assert.equal(
-    catalog.definitions.some(
-      (definition) =>
-        definition.factKey === 'fact.production_exception_decision'
-    ),
-    false,
-    '生产异常决策是来源单据，不得进入 Fact / Ledger 目录'
+  assert.equal(catalog.definitions.length, 20)
+  assert.deepEqual(
+    catalog.displayGroups.map((group) => [
+      group.key,
+      catalog.definitions.filter(
+        (definition) => definition.displayGroupKey === group.key
+      ).length,
+    ]),
+    [
+      ['procurement_quality', 5],
+      ['production_inventory', 6],
+      ['outsourcing_rework', 3],
+      ['shipping_finance', 6],
+    ]
   )
+  for (const sourceKey of [
+    'source.production_exception_decision',
+    'source.production_exception_execution',
+  ]) {
+    assert.equal(
+      catalog.definitions.some(
+        (definition) => definition.factKey === sourceKey
+      ),
+      false,
+      `${sourceKey} 是来源单据状态，不得进入 Fact / Ledger 目录`
+    )
+  }
   assert.deepEqual(
     new Set(catalog.definitions.map((definition) => definition.factKey)),
     new Set(factFlows.map((flow) => flow.key))

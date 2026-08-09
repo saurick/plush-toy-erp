@@ -321,7 +321,7 @@ test("mobile task visibility copy stays readable and role task query uses server
   );
 });
 
-test("desktop workbench and mobile task page use separate role-task read methods", () => {
+test("desktop workbench uses a bounded snapshot while mobile tasks keep role-task cursor reads", () => {
   const workflowApiSource = readFileSync(
     path.join(erpSourceRoot, "api/workflowApi.mjs"),
     "utf8",
@@ -337,22 +337,24 @@ test("desktop workbench and mobile task page use separate role-task read methods
 
   assert.match(
     workflowApiSource,
-    /export async function listWorkflowWorkbenchRoleTasks\(params = \{\}\) \{\s*return listWorkflowRoleTaskPage\('list_workbench_role_tasks', params\)\s*\}/u,
-  );
-  assert.match(
-    workflowApiSource,
-    /export async function listAllWorkflowWorkbenchRoleTasks\(params = \{\}\) \{\s*return listAllWorkflowRoleTaskPages\('list_workbench_role_tasks', params\)\s*\}/u,
+    /export async function getWorkflowWorkbench\(params = \{\}, options = \{\}\) \{\s*const query = requireWorkflowWorkbenchQuery\(params\)\s*const result = await workflowRpc\.call\('get_workbench', query, options\)\s*return requireWorkflowWorkbenchResponse\(result, query\)\s*\}/u,
   );
   assert.doesNotMatch(
     workflowApiSource,
     /export async function listAllWorkflowRoleTasks\b/u,
   );
-  assert.match(dashboardSource, /\blistAllWorkflowWorkbenchRoleTasks\b/u);
-  assert.doesNotMatch(dashboardSource, /\blistAllWorkflowRoleTasks\b/u);
+  assert.match(
+    dashboardSource,
+    /const workbenchResult = await getWorkflowWorkbench\(workbenchRequest,\s*\{\s*signal: request\.signal,\s*\}\)/u,
+  );
+  assert.doesNotMatch(
+    dashboardSource,
+    /\blist(?:All)?WorkflowWorkbenchRoleTasks\b/u,
+  );
   assert.match(mobileRoleTasksSource, /\blistWorkflowRoleTasks\b/u);
   assert.doesNotMatch(
     mobileRoleTasksSource,
-    /\blistWorkflowWorkbenchRoleTasks\b/u,
+    /\b(?:getWorkflowWorkbench|list(?:All)?WorkflowWorkbenchRoleTasks)\b/u,
   );
 });
 

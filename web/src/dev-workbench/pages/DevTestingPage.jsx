@@ -23,6 +23,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS,
@@ -50,6 +51,7 @@ import {
   isDevCoverageOperationActive,
   normalizeOptionalDevCoverageOperation,
 } from '../config/devCoverageOperation.mjs'
+import { formatDevTimestamp } from '../config/devTimestamp.mjs'
 import {
   DEV_TESTING_GIT_CLOSEOUT_STAGES,
   DEV_TESTING_GIT_HOOK_PATH_COMMAND,
@@ -549,11 +551,8 @@ function coverageReportAlert(state) {
   }
 }
 
-function formatCoverageGeneratedAt(value) {
-  if (!value) return '未记录'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', { hour12: false })
+function operationUpdateAction(operation) {
+  return operation?.finishedAt ? '完成于' : '更新于'
 }
 
 function CoverageOperationPanel({ operation, error }) {
@@ -584,8 +583,19 @@ function CoverageOperationPanel({ operation, error }) {
           <Tag color={tagColor}>{presentation.label}</Tag>
           <strong>{presentation.stageLabel}</strong>
         </div>
-        {operation?.updatedAt ? (
-          <small>{formatCoverageGeneratedAt(operation.updatedAt)}</small>
+        {operation ? (
+          <Space direction="vertical" size={2}>
+            <DevTimestamp
+              value={operation?.createdAt}
+              action="开始于"
+              missing="开始时间未证明"
+            />
+            <DevTimestamp
+              value={operation.finishedAt || operation.updatedAt}
+              action={operationUpdateAction(operation)}
+              missing="更新时间未证明"
+            />
+          </Space>
         ) : null}
       </div>
       <Progress
@@ -595,6 +605,20 @@ function CoverageOperationPanel({ operation, error }) {
         size="small"
       />
       {operation?.message ? <p>{operation.message}</p> : null}
+      {operation?.events?.length ? (
+        <details>
+          <summary>查看 {operation.events.length} 条采集事件</summary>
+          <ol>
+            {operation.events.map((event, index) => (
+              <li key={`${event.at}:${event.stage}:${index}`}>
+                <DevTimestamp value={event.at} missing="事件时间未证明" />
+                {' · '}
+                {event.message}
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
       {error ? (
         <p className="erp-dev-testing-coverage-operation__error">{error}</p>
       ) : null}
@@ -655,6 +679,13 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
                 {shortCommit} ·{' '}
                 {plan.repository.dirty ? '有未提交改动' : '干净现场'}
               </code>
+            </span>
+            <span>
+              <small>计划生成</small>
+              <DevTimestamp
+                value={plan.generatedAt}
+                missing="计划生成时间未证明"
+              />
             </span>
           </div>
           {plan.requiresFull ? (
@@ -738,8 +769,19 @@ function ValidationActionCard({
             </Tag>
             <Tag color={tagColor}>{presentation.label}</Tag>
           </div>
-          {operation?.updatedAt ? (
-            <small>{formatCoverageGeneratedAt(operation.updatedAt)}</small>
+          {operation ? (
+            <Space direction="vertical" size={2}>
+              <DevTimestamp
+                value={operation?.createdAt}
+                action="开始于"
+                missing="开始时间未证明"
+              />
+              <DevTimestamp
+                value={operation.finishedAt || operation.updatedAt}
+                action={operationUpdateAction(operation)}
+                missing="更新时间未证明"
+              />
+            </Space>
           ) : null}
         </div>
         <Title level={3}>{action.label}</Title>
@@ -948,7 +990,11 @@ function CoverageReportView({
             </span>
             <span>
               <small>生成时间</small>
-              <b>{formatCoverageGeneratedAt(report.generatedAt)}</b>
+              <DevTimestamp
+                value={report.generatedAt}
+                missing="生成时间未证明"
+                strong
+              />
             </span>
             <span>
               <small>Commit</small>
@@ -1594,7 +1640,9 @@ export default function DevTestingPage() {
     : coverageLoading
       ? '正在读取本地覆盖报告…'
       : coverageState?.report
-        ? `${coverageState.report.generatedAt || '生成时间未记录'} · ${
+        ? `${formatDevTimestamp(coverageState.report.generatedAt, {
+            missing: '生成时间未证明',
+          })} · ${
             coverageState.report.repository.commit?.slice(0, 12) ||
             'commit 未记录'
           }`

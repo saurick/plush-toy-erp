@@ -168,7 +168,16 @@ test("release image builders consume the committed generated projection without 
   assert.match(webDockerfile, /RUN pnpm build:committed/u);
   assert.match(serverDockerfile, /RUN pnpm run build:committed/u);
   assert.match(serverDockerfile, /COPY web\/\*\.mjs \.\//u);
-  assert.match(serverDockerfile, /COPY web\/dev-server \.\/dev-server/u);
+  assert.doesNotMatch(serverDockerfile, /COPY web\/dev-server/u);
+  assert.doesNotMatch(serverDockerfile, /COPY scripts \/scripts/u);
+  assert.match(
+    serverDockerfile,
+    /COPY scripts\/dev-ports\.mjs scripts\/local-runtime-preflight-core\.mjs \/scripts\//u,
+  );
+  assert.match(
+    serverDockerfile,
+    /COPY scripts\/build\/apply-customer-web-config\.mjs \/scripts\/build\/apply-customer-web-config\.mjs/u,
+  );
   for (const dockerfile of [webDockerfile, serverDockerfile]) {
     assert.doesNotMatch(
       dockerfile,
@@ -228,6 +237,22 @@ test("release artifact manifest rejects mismatched or incomplete image evidence"
     images: [image("server"), image("web")],
   };
   assert.equal(assertReleaseArtifactManifest(manifest), manifest);
+  assert.equal(
+    assertReleaseArtifactManifest({
+      ...manifest,
+      images: manifest.images.map((entry) => ({
+        ...entry,
+        archive: {
+          ...entry.archive,
+          compression: "zstd",
+          compressionLevel: 3,
+          compressionDurationMs: 12,
+          uncompressedSizeBytes: 2,
+        },
+      })),
+    }).images[0].archive.compression,
+    "zstd",
+  );
   assert.throws(
     () =>
       assertReleaseArtifactManifest({
@@ -248,6 +273,26 @@ test("release artifact manifest rejects mismatched or incomplete image evidence"
         },
       }),
     /manifest is invalid/u,
+  );
+  assert.throws(
+    () =>
+      assertReleaseArtifactManifest({
+        ...manifest,
+        images: [
+          {
+            ...image("server"),
+            archive: {
+              ...image("server").archive,
+              compression: "zstd",
+              compressionLevel: 9,
+              compressionDurationMs: 1,
+              uncompressedSizeBytes: 1,
+            },
+          },
+          image("web"),
+        ],
+      }),
+    /image entry is invalid/u,
   );
 });
 
@@ -312,6 +357,14 @@ test("release artifact builder normalizes the source hash and writes complete ch
       if (args[0] === "version") return "27.5.1\n";
       if (args[0] === "buildx") return "github.com/docker/buildx v0.30.1\n";
     }
+    if (command === "zstd") {
+      if (args[0] === "--version") return "*** Zstandard CLI (64-bit) v1.5.7\n";
+      const outputIndex = args.indexOf("--output");
+      const target = args[outputIndex + 1];
+      const source = args.at(-1);
+      writeFileSync(target, `zstd:${readFileSync(source, "utf8")}`);
+      return "";
+    }
     throw new Error(`unexpected command ${command} ${args.join(" ")}`);
   };
 
@@ -367,6 +420,16 @@ test("release artifact builder normalizes the source hash and writes complete ch
         Number.isSafeInteger(image.archive.saveDurationMs),
       ),
     );
+    assert(
+      manifest.images.every(
+        (image) =>
+          image.archive.compression === "zstd" &&
+          image.archive.compressionLevel === 3 &&
+          Number.isSafeInteger(image.archive.compressionDurationMs) &&
+          Number.isSafeInteger(image.archive.uncompressedSizeBytes),
+      ),
+    );
+    assert.match(manifest.toolchain.zstd, /Zstandard CLI/u);
     assert.equal(checksums.trim().split("\n").length, 4);
     assert.match(checksums, /^[a-f0-9]{64}  release-artifact\.json$/mu);
     assert.match(checksums, /^[a-f0-9]{64}  sbom\.cdx\.json$/mu);

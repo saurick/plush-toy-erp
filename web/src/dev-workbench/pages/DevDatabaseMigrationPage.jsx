@@ -27,12 +27,12 @@ import {
 import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
+import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   DEV_DATABASE_MIGRATION_SOURCE_PATH,
   createDatabaseMigrationIdempotencyKey,
   createDevDatabaseMigrationClient,
   databaseMigrationStatusPresentation,
-  formatDatabaseMigrationTimestamp,
   isDatabaseMigrationOperationPolling,
   selectActiveDatabaseMigrationOperation,
 } from '../config/devDatabaseMigration.mjs'
@@ -50,6 +50,14 @@ const DATABASE_MIGRATION_SNAPSHOT_KEY = 'database-migration'
 function StatusTag({ status }) {
   const presentation = databaseMigrationStatusPresentation(status)
   return <Tag color={presentation.color}>{presentation.label}</Tag>
+}
+
+function operationUpdateAction(operation) {
+  return ['passed', 'failed', 'blocked', 'not_proven'].includes(
+    operation?.status
+  )
+    ? '完成于'
+    : '更新于'
 }
 
 function shortHash(value) {
@@ -303,10 +311,22 @@ export default function DevDatabaseMigrationPage() {
   const columns = [
     {
       title: '时间',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      width: 176,
-      render: (value) => formatDatabaseMigrationTimestamp(value),
+      key: 'time',
+      width: 220,
+      render: (_, record) => (
+        <Space direction="vertical" size={2}>
+          <DevTimestamp
+            value={record.createdAt}
+            action="开始于"
+            missing="开始时间未证明"
+          />
+          <DevTimestamp
+            value={record.updatedAt}
+            action={operationUpdateAction(record)}
+            missing="更新时间未证明"
+          />
+        </Space>
+      ),
     },
     {
       title: '类型',
@@ -679,6 +699,18 @@ export default function DevDatabaseMigrationPage() {
                 {operationDetail.id}
               </Text>
             </Space>
+            <Space wrap size={[12, 4]}>
+              <DevTimestamp
+                value={operationDetail.createdAt}
+                action="开始于"
+                missing="开始时间未证明"
+              />
+              <DevTimestamp
+                value={operationDetail.updatedAt}
+                action={operationUpdateAction(operationDetail)}
+                missing="更新时间未证明"
+              />
+            </Space>
             <Paragraph>{operationDetail.message}</Paragraph>
             {operationDetail.issues.length > 0 ? (
               <Alert
@@ -687,6 +719,21 @@ export default function DevDatabaseMigrationPage() {
                 message="已记录问题"
                 description={issueText(operationDetail.issues)}
               />
+            ) : null}
+            {operationDetail.plan ? (
+              <Descriptions size="small" column={1} bordered>
+                <Descriptions.Item label="计划哈希">
+                  <Text code copyable>
+                    {operationDetail.plan.hash}
+                  </Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="计划准备">
+                  <DevTimestamp
+                    value={operationDetail.plan.preparedAt}
+                    missing="计划准备时间未证明"
+                  />
+                </Descriptions.Item>
+              </Descriptions>
             ) : null}
             {operationDetail.backup ? (
               <Descriptions size="small" column={1} bordered>
@@ -706,6 +753,12 @@ export default function DevDatabaseMigrationPage() {
                     ? `${operationDetail.backup.migrationBefore} → ${operationDetail.backup.migrationAfter}`
                     : '未证明'}
                 </Descriptions.Item>
+                <Descriptions.Item label="恢复验证完成">
+                  <DevTimestamp
+                    value={operationDetail.backup.verifiedAt}
+                    missing="恢复验证时间未证明"
+                  />
+                </Descriptions.Item>
               </Descriptions>
             ) : null}
             {operationDetail.source ? (
@@ -723,9 +776,7 @@ export default function DevDatabaseMigrationPage() {
                   <Space direction="vertical" size={2}>
                     <Space wrap>
                       <StatusTag status={event.status} />
-                      <Text type="secondary">
-                        {formatDatabaseMigrationTimestamp(event.at)}
-                      </Text>
+                      <DevTimestamp value={event.at} missing="事件时间未证明" />
                     </Space>
                     <Text>{event.message}</Text>
                   </Space>

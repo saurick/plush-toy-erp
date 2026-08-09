@@ -26,6 +26,7 @@ import {
 } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
   getWorkflowTaskActionMeta,
@@ -38,8 +39,8 @@ import {
 import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
+  getWorkflowWorkbench,
   getWorkflowTaskBoard,
-  listAllWorkflowWorkbenchRoleTasks,
   reassignWorkflowTask,
   rejectWorkflowTaskAction,
   resumeWorkflowTaskAction,
@@ -47,17 +48,15 @@ import {
 } from '../api/workflowApi.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
 import useWorkflowTaskAssignmentAccess from '../hooks/useWorkflowTaskAssignmentAccess.js'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   formatWorkflowTaskSource,
   getWorkflowTaskSourceTypeLabel,
   resolveWorkflowTaskEntryPath,
 } from '../utils/dashboardTaskDisplay.mjs'
 import {
-  createWorkflowWorkbenchSnapshot,
   getWorkflowTaskDueStatus,
-  getWorkflowWorkbenchRoleKeys,
   getWorkflowWorkbenchScopeKey,
-  readWorkflowWorkbenchSnapshot,
 } from '../utils/workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
@@ -74,7 +73,6 @@ import {
   buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
   buildWorkflowTaskBoardRequest,
-  getTaskStatusKey,
   getWorkflowTaskDueLabel,
   getWorkflowTaskBoardRequestKey,
   getWorkflowTaskBoardSummaryRequestKey,
@@ -535,9 +533,8 @@ function TaskProcessingHint({ task, access = {}, canOpenEntry = false }) {
 
 export default function DashboardPage({ initialView = 'workbench' }) {
   const [loading, setLoading] = useState(false)
-  const [workflowWorkbenchSnapshot, setWorkflowWorkbenchSnapshot] = useState(
-    () => createWorkflowWorkbenchSnapshot()
-  )
+  const [workbenchResponseState, setWorkbenchResponseState] = useState(null)
+  const [workbenchCountsState, setWorkbenchCountsState] = useState(null)
   const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
   const [taskBoardSummaryState, setTaskBoardSummaryState] = useState(null)
   const [taskBoardKeywordDraft, setTaskBoardKeywordDraft] = useState('')
@@ -556,7 +553,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [taskBoardTransitionMinHeight, setTaskBoardTransitionMinHeight] =
     useState(0)
   const mountedRef = useRef(false)
-  const dashboardLoadRequestSeqRef = useRef(0)
+  const beginLatestRequest = useLatestRequestCoordinator()
   const taskBoardLanesRef = useRef(null)
   const pendingTaskBoardPageScrollRef = useRef(null)
   const pendingTaskBoardTransitionRequestKeyRef = useRef('')
@@ -584,32 +581,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     initialView === 'workbench' &&
     adminProfile?.is_super_admin === true &&
     !effectiveSessionCustomerKey
-  const workflowWorkbenchRoleKeys = useMemo(
-    () => getWorkflowWorkbenchRoleKeys(adminProfile),
-    [adminProfile]
-  )
   const workflowWorkbenchScopeKey = useMemo(
     () =>
       JSON.stringify([
-        getWorkflowWorkbenchScopeKey(adminProfile, workflowWorkbenchRoleKeys),
+        getWorkflowWorkbenchScopeKey(adminProfile),
         workflowApprovalInboxCapabilityKeys,
       ]),
-    [
-      adminProfile,
-      workflowApprovalInboxCapabilityKeys,
-      workflowWorkbenchRoleKeys,
-    ]
+    [adminProfile, workflowApprovalInboxCapabilityKeys]
   )
   const workflowWorkbenchScopeKeyRef = useRef(workflowWorkbenchScopeKey)
   workflowWorkbenchScopeKeyRef.current = workflowWorkbenchScopeKey
-  const visibleWorkflowWorkbenchSnapshot = readWorkflowWorkbenchSnapshot(
-    workflowWorkbenchSnapshot,
-    workflowWorkbenchScopeKey
-  )
-  const workflowTasks = visibleWorkflowWorkbenchSnapshot.tasks
-  const workflowRiskTaskIDs = visibleWorkflowWorkbenchSnapshot.riskTaskIDs
-  const workflowApprovalTaskIDs =
-    visibleWorkflowWorkbenchSnapshot.approvalTaskIDs
   const requestedFilters = useMemo(
     () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
     [searchParams]
@@ -635,6 +616,18 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => getWorkflowTaskBoardSummaryRequestKey(taskBoardRequest),
     [taskBoardRequest]
   )
+  const workbenchRequest = useMemo(
+    () => ({
+      queue_key: workbenchQueueKey,
+      limit: WORKBENCH_QUEUE_PAGE_SIZE,
+      offset: (workbenchQueuePage - 1) * WORKBENCH_QUEUE_PAGE_SIZE,
+    }),
+    [workbenchQueueKey, workbenchQueuePage]
+  )
+  const workbenchRequestKey = useMemo(
+    () => JSON.stringify([workflowWorkbenchScopeKey, workbenchRequest]),
+    [workflowWorkbenchScopeKey, workbenchRequest]
+  )
   const preserveTaskBoardTransitionHeight = useCallback(
     (nextRequest = taskBoardRequest) => {
       pendingTaskBoardTransitionRequestKeyRef.current =
@@ -651,14 +644,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   )
 
   const loadDashboardStats = useCallback(async () => {
-    const requestSeq = dashboardLoadRequestSeqRef.current + 1
-    dashboardLoadRequestSeqRef.current = requestSeq
+    const request = beginLatestRequest('dashboard-load')
     const requestWorkbenchScopeKey = workflowWorkbenchScopeKey
     if (shouldShowProductCoreDashboard) {
-      setWorkflowWorkbenchSnapshot(
-        createWorkflowWorkbenchSnapshot(requestWorkbenchScopeKey)
-      )
+      setWorkbenchResponseState(null)
+      setWorkbenchCountsState(null)
       setLoading(false)
+      request.finish()
       return true
     }
     if (isTaskBoardView && mountedRef.current) {
@@ -671,13 +663,26 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         response: null,
         error: '',
       })
+    } else if (mountedRef.current) {
+      setWorkbenchResponseState((current) => ({
+        scopeKey: requestWorkbenchScopeKey,
+        requestKey: workbenchRequestKey,
+        response:
+          current?.scopeKey === requestWorkbenchScopeKey &&
+          current?.response?.queue_key === workbenchRequest.queue_key
+            ? current.response
+            : null,
+        error: '',
+      }))
     }
     try {
       if (isTaskBoardView) {
-        const taskBoardResult = await getWorkflowTaskBoard(taskBoardRequest)
+        const taskBoardResult = await getWorkflowTaskBoard(taskBoardRequest, {
+          signal: request.signal,
+        })
         if (
           mountedRef.current &&
-          dashboardLoadRequestSeqRef.current === requestSeq &&
+          request.isCurrent() &&
           workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
         ) {
           setTaskBoardResponseState({
@@ -691,50 +696,34 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           })
         }
       } else {
-        const viewKeys = canViewApprovalInbox
-          ? ['todo', 'risk', 'approval']
-          : ['todo', 'risk']
-        const roleTaskViews = await Promise.all(
-          workflowWorkbenchRoleKeys.flatMap((roleKey) =>
-            viewKeys.map(async (viewKey) => ({
-              viewKey,
-              response: await listAllWorkflowWorkbenchRoleTasks({
-                view_key: viewKey,
-                role_key: roleKey,
-                limit: 100,
-              }),
-            }))
-          )
-        )
+        const workbenchResult = await getWorkflowWorkbench(workbenchRequest, {
+          signal: request.signal,
+        })
         if (
           mountedRef.current &&
-          dashboardLoadRequestSeqRef.current === requestSeq &&
+          request.isCurrent() &&
           workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
         ) {
-          const tasksByID = new Map()
-          const riskTaskIDs = new Set()
-          const approvalTaskIDs = new Set()
-          for (const { response, viewKey } of roleTaskViews) {
-            for (const task of response.items) {
-              tasksByID.set(task.id, task)
-              if (viewKey === 'risk') riskTaskIDs.add(task.id)
-              if (viewKey === 'approval') approvalTaskIDs.add(task.id)
-            }
-          }
-          setWorkflowWorkbenchSnapshot(
-            createWorkflowWorkbenchSnapshot(requestWorkbenchScopeKey, {
-              tasks: [...tasksByID.values()],
-              riskTaskIDs,
-              approvalTaskIDs,
-            })
-          )
+          setWorkbenchResponseState({
+            scopeKey: requestWorkbenchScopeKey,
+            requestKey: workbenchRequestKey,
+            response: workbenchResult,
+            error: '',
+          })
+          setWorkbenchCountsState({
+            scopeKey: requestWorkbenchScopeKey,
+            counts: workbenchResult.counts,
+          })
         }
       }
       return true
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return false
+      }
       if (
         mountedRef.current &&
-        dashboardLoadRequestSeqRef.current === requestSeq &&
+        request.isCurrent() &&
         workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
       ) {
         const fallback = isTaskBoardView ? '加载任务看板失败' : '加载工作台失败'
@@ -745,6 +734,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             response: null,
             error: errorMessage,
           })
+        } else {
+          setWorkbenchResponseState({
+            scopeKey: requestWorkbenchScopeKey,
+            requestKey: workbenchRequestKey,
+            response: null,
+            error: errorMessage,
+          })
         }
         message.error(errorMessage)
       }
@@ -752,21 +748,23 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     } finally {
       if (
         mountedRef.current &&
-        dashboardLoadRequestSeqRef.current === requestSeq &&
+        request.isCurrent() &&
         workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
       ) {
         setLoading(false)
       }
+      request.finish()
     }
   }, [
-    canViewApprovalInbox,
+    beginLatestRequest,
     isTaskBoardView,
     preserveTaskBoardTransitionHeight,
     shouldShowProductCoreDashboard,
     taskBoardRequest,
     taskBoardRequestKey,
     taskBoardSummaryRequestKey,
-    workflowWorkbenchRoleKeys,
+    workbenchRequest,
+    workbenchRequestKey,
     workflowWorkbenchScopeKey,
   ])
 
@@ -775,7 +773,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     loadDashboardStats()
     return () => {
       mountedRef.current = false
-      dashboardLoadRequestSeqRef.current += 1
     }
   }, [loadDashboardStats])
 
@@ -1018,48 +1015,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     taskBoardResponse,
   ])
 
-  const workbenchQueueGroups = useMemo(() => {
-    const groups = {
-      actionable: [],
-      approval: [],
-      risk: [],
-    }
-    workflowTasks.forEach((task) => {
-      const statusKey = getTaskStatusKey(task)
-      const dueStatus = getWorkflowTaskDueStatus(task)
-      const hasReason = Boolean(getWorkflowTaskReason(task))
-      if (isTerminalWorkflowTask(task)) {
-        return
-      }
-      if (workflowApprovalTaskIDs.has(task.id)) {
-        groups.approval.push(task)
-      }
-      if (
-        workflowRiskTaskIDs.has(task.id) ||
-        statusKey === 'blocked' ||
-        dueStatus === 'overdue' ||
-        hasReason
-      ) {
-        groups.risk.push(task)
-        return
-      }
-      if (statusKey === 'ready') {
-        groups.actionable.push(task)
-      }
-    })
-
-    Object.values(groups).forEach((items) => {
-      items.sort((left, right) => {
-        const leftDue = Number(left.due_at || Number.MAX_SAFE_INTEGER)
-        const rightDue = Number(right.due_at || Number.MAX_SAFE_INTEGER)
-        if (leftDue !== rightDue) return leftDue - rightDue
-        return String(left.task_name || '').localeCompare(
-          String(right.task_name || '')
-        )
-      })
-    })
-    return groups
-  }, [workflowApprovalTaskIDs, workflowRiskTaskIDs, workflowTasks])
+  const workbenchResponse =
+    workbenchResponseState?.scopeKey === workflowWorkbenchScopeKey &&
+    workbenchResponseState?.requestKey === workbenchRequestKey
+      ? workbenchResponseState.response
+      : null
+  const workbenchLoadError =
+    workbenchResponseState?.scopeKey === workflowWorkbenchScopeKey &&
+    workbenchResponseState?.requestKey === workbenchRequestKey
+      ? workbenchResponseState.error
+      : ''
+  const workbenchCounts =
+    workbenchCountsState?.scopeKey === workflowWorkbenchScopeKey
+      ? workbenchCountsState.counts
+      : null
   const visibleWorkbenchQueueOptions = useMemo(
     () =>
       WORKBENCH_QUEUE_OPTIONS.filter(
@@ -1067,8 +1036,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ),
     [canViewApprovalInbox]
   )
-  const workbenchQueueTasks =
-    workbenchQueueGroups[workbenchQueueKey] || workbenchQueueGroups.actionable
+  const workbenchQueueTotal = Number(workbenchCounts?.[workbenchQueueKey] || 0)
   const activeWorkbenchQueueOption =
     visibleWorkbenchQueueOptions.find(
       (option) => option.key === workbenchQueueKey
@@ -1077,20 +1045,27 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     visibleWorkbenchQueueOptions.find(
       (option) =>
         option.key !== workbenchQueueKey &&
-        (workbenchQueueGroups[option.key]?.length || 0) > 0
+        Number(workbenchCounts?.[option.key] || 0) > 0
     ) || null
   const workbenchQueuePageCount = Math.max(
     1,
-    Math.ceil(workbenchQueueTasks.length / WORKBENCH_QUEUE_PAGE_SIZE)
+    Math.ceil(workbenchQueueTotal / WORKBENCH_QUEUE_PAGE_SIZE)
   )
   const activeWorkbenchQueuePage = Math.min(
     workbenchQueuePage,
     workbenchQueuePageCount
   )
-  const workbenchQueuePageTasks = useMemo(() => {
-    const start = (activeWorkbenchQueuePage - 1) * WORKBENCH_QUEUE_PAGE_SIZE
-    return workbenchQueueTasks.slice(start, start + WORKBENCH_QUEUE_PAGE_SIZE)
-  }, [activeWorkbenchQueuePage, workbenchQueueTasks])
+  const workbenchQueuePageTasks = useMemo(
+    () => workbenchResponse?.items || [],
+    [workbenchResponse]
+  )
+  useEffect(() => {
+    if (!workbenchResponse || workbenchQueuePage <= workbenchQueuePageCount) {
+      return
+    }
+    setWorkbenchQueuePage(workbenchQueuePageCount)
+    setSelectedWorkbenchTaskId('')
+  }, [workbenchQueuePage, workbenchQueuePageCount, workbenchResponse])
   const selectedWorkbenchTask = useMemo(() => {
     if (workbenchQueuePageTasks.length === 0) {
       return null
@@ -1562,7 +1537,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         aria-hidden="true"
         data-testid="dashboard-workflow-task-evidence"
       >
-        {workflowTasks.map((task) => (
+        {workbenchQueuePageTasks.map((task) => (
           <span
             key={task.id || task.task_code}
             data-task-code={task.task_code || undefined}
@@ -1579,7 +1554,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         <Card
           className="erp-dashboard-card erp-workbench-command-card"
           variant="borderless"
-          loading={loading}
         >
           <div className="erp-workbench-command">
             <div className="erp-workbench-command-head">
@@ -1598,7 +1572,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               aria-label="工作台任务筛选"
             >
               {visibleWorkbenchQueueOptions.map((option) => {
-                const count = workbenchQueueGroups[option.key]?.length || 0
+                const count = workbenchCounts?.[option.key]
+                const countReady = Number.isSafeInteger(count)
                 const active = option.key === workbenchQueueKey
                 return (
                   <button
@@ -1607,18 +1582,22 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     className={[
                       'erp-workbench-queue-filter',
                       active ? 'erp-workbench-queue-filter--active' : '',
-                      option.key === 'risk' && count > 0
+                      option.key === 'risk' && countReady && count > 0
                         ? 'erp-workbench-queue-filter--danger'
                         : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
                     aria-pressed={active}
-                    aria-label={`${option.label}，${count} 项，${option.hint}`}
+                    aria-label={
+                      countReady
+                        ? `${option.label}，${count} 项，${option.hint}`
+                        : `${option.label}，数量读取中，${option.hint}`
+                    }
                     onClick={() => selectWorkbenchQueue(option.key)}
                   >
                     <span>{option.label}</span>
-                    <strong>{count}</strong>
+                    <strong>{countReady ? count : '—'}</strong>
                   </button>
                 )
               })}
@@ -1628,6 +1607,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               <section
                 className="erp-workbench-panel erp-workbench-queue-panel"
                 aria-label="优先处理"
+                aria-busy={loading}
               >
                 <div className="erp-workbench-panel-head">
                   <div>
@@ -1636,24 +1616,36 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       单击任务可在右侧查看；电脑端双击可直接打开详情。
                     </Text>
                   </div>
-                  <Tag
-                    color={workbenchQueueTasks.length > 0 ? 'blue' : 'default'}
-                  >
+                  <Tag color={workbenchQueueTotal > 0 ? 'blue' : 'default'}>
                     {activeWorkbenchQueueOption.label}{' '}
-                    {workbenchQueueTasks.length}
+                    {workbenchCounts ? workbenchQueueTotal : '—'}
                   </Tag>
                 </div>
+                {workbenchLoadError ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="工作台任务加载失败"
+                    description={workbenchLoadError}
+                    action={
+                      <Button size="small" onClick={loadDashboardStats}>
+                        重新加载
+                      </Button>
+                    }
+                  />
+                ) : null}
                 <Table
                   size="small"
                   rowKey={(record) => record.id || record.task_code}
                   columns={workbenchTaskColumns}
-                  dataSource={workbenchQueueTasks}
+                  dataSource={workbenchQueuePageTasks}
+                  loading={{ spinning: loading, delay: 120 }}
                   pagination={
-                    workbenchQueueTasks.length > WORKBENCH_QUEUE_PAGE_SIZE
+                    workbenchQueueTotal > WORKBENCH_QUEUE_PAGE_SIZE
                       ? {
                           current: activeWorkbenchQueuePage,
                           pageSize: WORKBENCH_QUEUE_PAGE_SIZE,
-                          total: workbenchQueueTasks.length,
+                          total: workbenchQueueTotal,
                           showLessItems: true,
                           showSizeChanger: false,
                           showTotal: (total, [start, end]) =>

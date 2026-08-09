@@ -2288,7 +2288,7 @@ export function createStyleL1Scenarios(deps) {
     },
     {
       name: 'erp-yoyo-global-dashboard-desktop',
-      path: '/erp/dashboard',
+      path: '/erp/dashboard?__style_l1_workbench_delay=2000',
       auth: 'admin',
       effectiveSession: {
         configRevision: 'style-l1-yoyo-global-dashboard',
@@ -2359,6 +2359,59 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '阻塞/逾期')
         await expectText(page, '优先处理')
         await expectText(page, '任务详情')
+        await page
+          .locator(
+            '.erp-workbench-queue-panel[aria-busy="true"] .ant-spin-spinning'
+          )
+          .waitFor({ state: 'visible', timeout: 5_000 })
+        const loadingShell = await page.evaluate(() => {
+          const card = document.querySelector('.erp-workbench-command-card')
+          const queue = document.querySelector('.erp-workbench-queue-panel')
+          const detail = document.querySelector('.erp-workbench-task-detail')
+          const cardRect = card?.getBoundingClientRect()
+          return {
+            cardWidth: cardRect?.width || 0,
+            cardHeight: cardRect?.height || 0,
+            queueVisible: Boolean(queue?.getBoundingClientRect().height),
+            detailVisible: Boolean(detail?.getBoundingClientRect().height),
+            queueBusy: queue?.getAttribute('aria-busy'),
+            spinnerVisible: Boolean(queue?.querySelector('.ant-spin-spinning')),
+            cardSkeletonCount:
+              card?.querySelectorAll('.ant-skeleton').length || 0,
+            filterLabels: [
+              ...(card?.querySelectorAll('.erp-workbench-queue-filter') || []),
+            ].map((item) => item.getAttribute('aria-label') || ''),
+          }
+        })
+        assert(
+          loadingShell.cardWidth > 0 &&
+            loadingShell.cardHeight > 0 &&
+            loadingShell.queueVisible &&
+            loadingShell.detailVisible &&
+            loadingShell.queueBusy === 'true' &&
+            loadingShell.spinnerVisible &&
+            loadingShell.cardSkeletonCount === 0 &&
+            loadingShell.filterLabels.every((label) =>
+              label.includes('数量读取中')
+            ),
+          `工作台慢响应时应先显示完整页面外壳，只让任务表局部加载: ${JSON.stringify(
+            loadingShell
+          )}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-yoyo-global-dashboard-loading-shell.png'
+          ),
+        })
+        await page
+          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.evaluate(() => {
+          const url = new URL(window.location.href)
+          url.searchParams.delete('__style_l1_workbench_delay')
+          window.history.replaceState({}, '', url)
+        })
         await assertTextAbsent(page, '当前可见任务概览')
         await assertTextAbsent(page, '等待交接')
         for (const engineeringText of [
@@ -2475,10 +2528,50 @@ export function createStyleL1Scenarios(deps) {
           return 27
         })
         assert.equal(seededTaskCount, 27, '工作台长队列样本应完整创建')
+        const workbenchReadMethods = []
+        const recordWorkbenchRead = (request) => {
+          if (!request.url().includes('/rpc/workflow')) return
+          try {
+            const method = request.postDataJSON()?.method
+            if (
+              ['get_workbench', 'list_workbench_role_tasks'].includes(method)
+            ) {
+              workbenchReadMethods.push(method)
+            }
+          } catch {
+            // Non-JSON requests are outside this RPC assertion.
+          }
+        }
+        page.on('request', recordWorkbenchRead)
         await page.getByRole('button', { name: '刷新当前页' }).click()
+        await page
+          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        page.off('request', recordWorkbenchRead)
+        assert.deepEqual(
+          workbenchReadMethods,
+          ['get_workbench'],
+          `刷新工作台应只有一条有界读取，不再按岗位和视图扇出: ${JSON.stringify(
+            workbenchReadMethods
+          )}`
+        )
 
         const queuePanel = page.locator('.erp-workbench-queue-panel')
         const detailPanel = page.locator('.erp-workbench-task-detail')
+        const waitForWorkbenchRead = (queueKey, offset = 0) =>
+          page.waitForResponse((response) => {
+            if (!response.url().includes('/rpc/workflow')) return false
+            try {
+              const body = response.request().postDataJSON()
+              return (
+                body?.method === 'get_workbench' &&
+                body?.params?.queue_key === queueKey &&
+                body?.params?.offset === offset
+              )
+            } catch {
+              return false
+            }
+          })
         const actionableFilter = page.getByRole('button', {
           name: /待我处理，\d+ 项/,
         })
@@ -2505,7 +2598,9 @@ export function createStyleL1Scenarios(deps) {
           approvalTotal >= 1,
           `工作台审批队列应包含显式审批任务: ${approvalLabel}`
         )
+        const approvalRead = waitForWorkbenchRead('approval')
         await approvalFilter.click()
+        await approvalRead
         await queuePanel
           .getByText('长队列待办 01', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
@@ -2515,16 +2610,200 @@ export function createStyleL1Scenarios(deps) {
             'erp-yoyo-global-dashboard-approval-inbox.png'
           ),
         })
+        const actionableRead = waitForWorkbenchRead('actionable')
         await actionableFilter.click()
+        await actionableRead
+        await page
+          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await queuePanel
+          .locator('.ant-table-tbody .ant-table-row')
+          .first()
+          .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await queuePanel.locator('.ant-table-tbody .ant-table-row').count(),
           8,
           '工作台长队列首屏应只展示 8 项'
         )
-        await queuePanel.locator('.ant-pagination-item-2').click()
+        const readWorkbenchPaginationLayout = () =>
+          page.evaluate(() => {
+            const readRect = (selector) => {
+              const element = document.querySelector(selector)
+              if (!(element instanceof HTMLElement)) return null
+              const rect = element.getBoundingClientRect()
+              return {
+                top: Number(rect.top.toFixed(2)),
+                left: Number(rect.left.toFixed(2)),
+                width: Number(rect.width.toFixed(2)),
+                height: Number(rect.height.toFixed(2)),
+              }
+            }
+            const content = document.querySelector('.erp-admin-content')
+            const firstRow = document.querySelector(
+              '.erp-workbench-queue-panel .ant-table-tbody .ant-table-row'
+            )
+            const detailTitle = document.querySelector(
+              '.erp-workbench-task-detail .erp-workbench-detail-title'
+            )
+            return {
+              commandCard: readRect('.erp-workbench-command-card'),
+              mainGrid: readRect('.erp-workbench-main-grid'),
+              queuePanel: readRect('.erp-workbench-queue-panel'),
+              table: readRect(
+                '.erp-workbench-queue-panel .ant-table-wrapper'
+              ),
+              pagination: readRect(
+                '.erp-workbench-queue-panel .ant-pagination'
+              ),
+              detailPanel: readRect('.erp-workbench-task-detail'),
+              content: {
+                rect: readRect('.erp-admin-content'),
+                clientHeight: content?.clientHeight || 0,
+                scrollHeight: content?.scrollHeight || 0,
+                scrollTop: content?.scrollTop || 0,
+              },
+              rowCount: document.querySelectorAll(
+                '.erp-workbench-queue-panel .ant-table-tbody .ant-table-row'
+              ).length,
+              firstRowText: String(firstRow?.textContent || '')
+                .replace(/\s+/gu, ' ')
+                .trim(),
+              detailTitle: String(detailTitle?.textContent || '').trim(),
+            }
+          })
+        const assertWorkbenchPaginationGeometryStable = (
+          before,
+          after,
+          label
+        ) => {
+          const tolerance = 2
+          for (const key of [
+            'commandCard',
+            'mainGrid',
+            'queuePanel',
+            'table',
+            'pagination',
+            'detailPanel',
+          ]) {
+            assert(before[key], `${label}: 缺少翻页前 ${key} 几何信息`)
+            assert(after[key], `${label}: 缺少翻页后 ${key} 几何信息`)
+            for (const metric of ['top', 'left', 'width', 'height']) {
+              const delta = Math.abs(before[key][metric] - after[key][metric])
+              assert(
+                delta <= tolerance,
+                `${label}: ${key}.${metric} 位移 ${delta}px 超过 ${tolerance}px；before=${JSON.stringify(
+                  before[key]
+                )} after=${JSON.stringify(after[key])}`
+              )
+            }
+          }
+          for (const metric of ['clientHeight', 'scrollHeight', 'scrollTop']) {
+            const delta = Math.abs(
+              before.content[metric] - after.content[metric]
+            )
+            assert(
+              delta <= tolerance,
+              `${label}: content.${metric} 变化 ${delta}px 超过 ${tolerance}px；before=${JSON.stringify(
+                before.content
+              )} after=${JSON.stringify(after.content)}`
+            )
+          }
+        }
+        const actionableSecondPageButton = queuePanel.locator(
+          '.ant-pagination-item-2'
+        )
+        await actionableSecondPageButton.scrollIntoViewIfNeeded()
+        await page.evaluate(
+          () =>
+            new Promise((resolve) => {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => resolve())
+              })
+            })
+        )
+        const firstPageLayout = await readWorkbenchPaginationLayout()
+        await page.evaluate(() => {
+          const url = new URL(window.location.href)
+          url.searchParams.set('__style_l1_workbench_delay', '1200')
+          window.history.replaceState({}, '', url)
+        })
+        const actionableSecondPageRead = waitForWorkbenchRead(
+          'actionable',
+          8
+        ).then(
+          () => null,
+          (error) => error
+        )
+        await actionableSecondPageButton.click()
+        await queuePanel
+          .locator('.ant-spin-spinning')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const loadingSecondPageLayout =
+          await readWorkbenchPaginationLayout()
+        assert.equal(
+          loadingSecondPageLayout.rowCount,
+          firstPageLayout.rowCount,
+          '工作台翻页加载中应保留当前 8 行，而不是先清空表格'
+        )
+        assert.equal(
+          loadingSecondPageLayout.firstRowText,
+          firstPageLayout.firstRowText,
+          '工作台翻页加载中应保留当前页首行'
+        )
+        assert.equal(
+          loadingSecondPageLayout.detailTitle,
+          firstPageLayout.detailTitle,
+          '工作台翻页加载中应保留当前任务详情'
+        )
+        assertWorkbenchPaginationGeometryStable(
+          firstPageLayout,
+          loadingSecondPageLayout,
+          '工作台翻页加载中'
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-yoyo-global-dashboard-pagination-loading-stable.png'
+          ),
+        })
+        const actionableSecondPageReadError = await actionableSecondPageRead
+        if (actionableSecondPageReadError) {
+          throw actionableSecondPageReadError
+        }
+        await page
+          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
         await queuePanel
           .locator('.ant-pagination-item-2.ant-pagination-item-active')
           .waitFor({ state: 'visible', timeout: 10_000 })
+        const settledSecondPageLayout =
+          await readWorkbenchPaginationLayout()
+        assert.equal(
+          settledSecondPageLayout.rowCount,
+          8,
+          '工作台第二页完成后仍应展示 8 行'
+        )
+        assert.notEqual(
+          settledSecondPageLayout.firstRowText,
+          firstPageLayout.firstRowText,
+          '工作台第二页完成后应原子替换为新页数据'
+        )
+        assertWorkbenchPaginationGeometryStable(
+          firstPageLayout,
+          settledSecondPageLayout,
+          '工作台翻页完成后'
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-yoyo-global-dashboard-pagination-settled.png'
+          ),
+        })
+        await page.evaluate(() => {
+          const url = new URL(window.location.href)
+          url.searchParams.delete('__style_l1_workbench_delay')
+          window.history.replaceState({}, '', url)
+        })
 
         const riskLabel = await riskFilter.getAttribute('aria-label')
         const riskTotal = Number(
@@ -2534,7 +2813,9 @@ export function createStyleL1Scenarios(deps) {
           riskTotal >= 9,
           `工作台风险队列应包含新建的 9 条样本: ${riskLabel}`
         )
+        const riskRead = waitForWorkbenchRead('risk')
         await riskFilter.click()
+        await riskRead
         await queuePanel
           .locator('.ant-table-tbody .ant-table-row')
           .first()
@@ -2587,7 +2868,12 @@ export function createStyleL1Scenarios(deps) {
             'erp-yoyo-global-dashboard-status-risk-desktop.png'
           ),
         })
+        const actionableLayoutRead = waitForWorkbenchRead('actionable')
         await actionableFilter.click()
+        await actionableLayoutRead
+        await page
+          .locator('.erp-workbench-queue-panel[aria-busy="false"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
 
         const queueRows = queuePanel.locator('.ant-table-tbody .ant-table-row')
         const queueRowCount = await queueRows.count()
@@ -2751,7 +3037,9 @@ export function createStyleL1Scenarios(deps) {
           )}`
         )
 
+        const mobileRiskRead = waitForWorkbenchRead('risk')
         await riskFilter.click()
+        await mobileRiskRead
         await queuePanel
           .getByText('长队列阻塞逾期 01', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
@@ -23001,6 +23289,14 @@ export function createStyleL1Scenarios(deps) {
           .getByRole('dialog')
           .filter({ hasText: '新建返工回厂' })
         await createDialog.waitFor({ state: 'visible', timeout: 10_000 })
+        await assertAntdModalCentered(
+          page,
+          createDialog,
+          'rework-intake-desktop-create-default'
+        )
+        await createDialog
+          .locator('.ant-select-loading')
+          .waitFor({ state: 'hidden', timeout: 10_000 })
         assert.equal(
           await createDialog.locator('.erp-rework-intake-line-card').count(),
           0,
@@ -23013,9 +23309,14 @@ export function createStyleL1Scenarios(deps) {
           ),
         })
 
-        await createDialog.getByLabel('原出货明细').click()
+        await createDialog
+          .locator('.ant-form-item')
+          .filter({ hasText: '原出货明细' })
+          .locator('.ant-select-selector')
+          .click()
         const sourceDropdown = page.locator('.ant-select-dropdown:visible')
         await sourceDropdown.getByText(/SHIP-STYLE-L1/).click()
+        await page.keyboard.press('Escape')
         await sourceDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
         await expectText(createDialog, '生产单 PO-STYLE-L1')
         await createDialog
@@ -23040,7 +23341,8 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertOperationalFactModalViewport(
           page,
-          'rework-intake-desktop-create'
+          'rework-intake-desktop-create',
+          createDialog
         )
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建返工回厂',
@@ -23117,9 +23419,22 @@ export function createStyleL1Scenarios(deps) {
           .getByRole('dialog')
           .filter({ hasText: '新建返工回厂' })
         await createDialog.waitFor({ state: 'visible', timeout: 10_000 })
-        await createDialog.getByLabel('原出货明细').click()
+        await assertAntdModalCentered(
+          page,
+          createDialog,
+          'rework-intake-mobile-create'
+        )
+        await createDialog
+          .locator('.ant-select-loading')
+          .waitFor({ state: 'hidden', timeout: 10_000 })
+        await createDialog
+          .locator('.ant-form-item')
+          .filter({ hasText: '原出货明细' })
+          .locator('.ant-select-selector')
+          .click()
         const sourceDropdown = page.locator('.ant-select-dropdown:visible')
         await sourceDropdown.getByText(/SHIP-STYLE-L1/).click()
+        await page.keyboard.press('Escape')
         await sourceDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
         await expectText(createDialog, '生产单 PO-STYLE-L1')
         assert.match(
@@ -23141,7 +23456,8 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertOperationalFactModalViewport(
           page,
-          'rework-intake-mobile-create'
+          'rework-intake-mobile-create',
+          createDialog
         )
         await assertNoHorizontalOverflow(page, 'rework-intake-mobile')
       },

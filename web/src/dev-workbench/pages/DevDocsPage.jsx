@@ -11,7 +11,16 @@ import {
   RightOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Segmented, Space, Tag, Tooltip, Typography } from 'antd'
+import {
+  Button,
+  Empty,
+  Segmented,
+  Space,
+  Spin,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
@@ -19,6 +28,10 @@ import { message } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
+  DEV_DOCS_LIFECYCLE_ARCHIVE,
+  DEV_DOCS_LIFECYCLE_CURRENT,
+  DEV_DOCS_LIFECYCLE_REVIEW,
+  DEV_DOCS_LIFECYCLE_STORAGE_KEY,
   DEV_DOCS_PINNED_STORAGE_KEY,
   DEV_DOCS_SEARCH_SCOPE_ALL,
   DEV_DOCS_SEARCH_SCOPE_TITLE,
@@ -27,8 +40,11 @@ import {
   applyDevDocsPinnedState,
   buildDevDocsItems,
   buildDevDocsTree,
+  filterDevDocsByLifecycle,
   filterDevDocsItems,
+  getDevDocsTitle,
   getDefaultDevDocsPinnedPaths,
+  normalizeDevDocsLifecycle,
   normalizeDevDocsExpandedDirKeys,
   normalizeDevDocsPinnedPaths,
   normalizeDevDocsSelectedPath,
@@ -46,8 +62,18 @@ const SEARCH_SCOPE_OPTIONS = Object.freeze([
   { label: '全部', value: DEV_DOCS_SEARCH_SCOPE_ALL },
   { label: '仅标题', value: DEV_DOCS_SEARCH_SCOPE_TITLE },
 ])
+const LIFECYCLE_OPTIONS = Object.freeze([
+  { label: '当前', value: DEV_DOCS_LIFECYCLE_CURRENT },
+  { label: '评审与参考', value: DEV_DOCS_LIFECYCLE_REVIEW },
+  { label: '历史', value: DEV_DOCS_LIFECYCLE_ARCHIVE },
+])
+const LIFECYCLE_LABELS = Object.freeze({
+  [DEV_DOCS_LIFECYCLE_CURRENT]: '当前文档',
+  [DEV_DOCS_LIFECYCLE_REVIEW]: '评审与参考',
+  [DEV_DOCS_LIFECYCLE_ARCHIVE]: '历史归档',
+})
 
-const markdownModules = import.meta.glob(
+const currentMarkdownModules = import.meta.glob(
   [
     '../../../../README.md',
     '../../../../AGENTS.md',
@@ -59,6 +85,7 @@ const markdownModules = import.meta.glob(
     '../../../../scripts/README.md',
     '../../../../config/customers/**/*.md',
     '../../../../docs/**/*.md',
+    '!../../../../docs/archive/**/*.md',
   ],
   {
     eager: true,
@@ -66,6 +93,19 @@ const markdownModules = import.meta.glob(
     query: '?raw',
   }
 )
+
+const archiveMarkdownModules = import.meta.glob(
+  '../../../../docs/archive/**/*.md',
+  {
+    import: 'default',
+    query: '?raw',
+  }
+)
+
+const markdownModules = Object.freeze({
+  ...currentMarkdownModules,
+  ...archiveMarkdownModules,
+})
 
 function readSelectedPathFromSearch(search = '') {
   try {
@@ -86,6 +126,29 @@ function readHeadingIdFromHash(hash = '') {
     return decodeURIComponent(rawHash)
   } catch {
     return rawHash
+  }
+}
+
+function readLifecycle(docs = [], search = '') {
+  const querySelectedPath = normalizeDevDocsSelectedPath(
+    readSelectedPathFromSearch(search),
+    docs
+  )
+  const queryLifecycle = docs.find(
+    (item) => item.path === querySelectedPath
+  )?.lifecycle
+  if (queryLifecycle) {
+    return normalizeDevDocsLifecycle(queryLifecycle)
+  }
+  if (typeof window === 'undefined') {
+    return DEV_DOCS_LIFECYCLE_CURRENT
+  }
+  try {
+    return normalizeDevDocsLifecycle(
+      window.localStorage.getItem(DEV_DOCS_LIFECYCLE_STORAGE_KEY)
+    )
+  } catch {
+    return DEV_DOCS_LIFECYCLE_CURRENT
   }
 }
 
@@ -309,14 +372,39 @@ export default function DevDocsPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const docs = useMemo(() => buildDevDocsItems(markdownModules), [])
+  const [sourceLoadState, setSourceLoadState] = useState({})
+  const [sourceReloadToken, setSourceReloadToken] = useState(0)
+  const sourceLoadRequestedRef = useRef(new Set())
+  const docsWithSources = useMemo(
+    () =>
+      docs.map((item) => {
+        const loaded = sourceLoadState[item.path]
+        if (loaded?.status !== 'ready') {
+          return item
+        }
+        return {
+          ...item,
+          source: loaded.source,
+          title: getDevDocsTitle(loaded.source, item.path),
+        }
+      }),
+    [docs, sourceLoadState]
+  )
   const [pinnedPaths, setPinnedPaths] = useState(() => readPinnedPaths(docs))
   const docsWithPinnedState = useMemo(
-    () => applyDevDocsPinnedState(docs, pinnedPaths),
-    [docs, pinnedPaths]
+    () => applyDevDocsPinnedState(docsWithSources, pinnedPaths),
+    [docsWithSources, pinnedPaths]
+  )
+  const [lifecycle, setLifecycle] = useState(() =>
+    readLifecycle(docs, location.search)
+  )
+  const lifecycleDocs = useMemo(
+    () => filterDevDocsByLifecycle(docsWithPinnedState, lifecycle),
+    [docsWithPinnedState, lifecycle]
   )
   const docTree = useMemo(
-    () => buildDevDocsTree(docsWithPinnedState),
-    [docsWithPinnedState]
+    () => buildDevDocsTree(lifecycleDocs),
+    [lifecycleDocs]
   )
   const allDirectoryKeys = useMemo(
     () => collectDirectoryKeys(docTree),
@@ -325,7 +413,13 @@ export default function DevDocsPage() {
   const [keyword, setKeyword] = useState('')
   const [searchScope, setSearchScope] = useState(DEV_DOCS_SEARCH_SCOPE_ALL)
   const [selectedKey, setSelectedKey] = useState(() =>
-    readSelectedKey(docsWithPinnedState, location.search)
+    readSelectedKey(
+      filterDevDocsByLifecycle(
+        docs,
+        readLifecycle(docs, location.search)
+      ),
+      location.search
+    )
   )
   const [expandedKeys, setExpandedKeys] = useState(
     () => new Set(readExpandedKeys(allDirectoryKeys))
@@ -335,11 +429,11 @@ export default function DevDocsPage() {
 
   const docsWithSearchText = useMemo(
     () =>
-      docsWithPinnedState.map((item) => ({
+      lifecycleDocs.map((item) => ({
         ...item,
         searchText: item.source,
       })),
-    [docsWithPinnedState]
+    [lifecycleDocs]
   )
 
   const visibleDocs = useMemo(
@@ -352,9 +446,9 @@ export default function DevDocsPage() {
   const pinnedDocs = useMemo(
     () =>
       sortDevDocsItemsByPinned(
-        docsWithPinnedState.filter((item) => item.pinned)
+        lifecycleDocs.filter((item) => item.pinned)
       ),
-    [docsWithPinnedState]
+    [lifecycleDocs]
   )
   const trimmedKeyword = keyword.trim()
   const isSearching = trimmedKeyword.length > 0
@@ -366,13 +460,21 @@ export default function DevDocsPage() {
   const selectedDoc =
     (isSearching
       ? visibleDocs.find((item) => item.key === selectedKey)
-      : docsWithPinnedState.find((item) => item.key === selectedKey)) ||
+      : lifecycleDocs.find((item) => item.key === selectedKey)) ||
     visibleDocs[0] ||
-    (isSearching ? undefined : docsWithPinnedState[0])
+    (isSearching ? undefined : lifecycleDocs[0])
+  const {
+    path: selectedDocPath,
+    source: selectedDocSource,
+    loadSource: loadSelectedDocSource,
+  } = selectedDoc || {}
   const selectedDocPinned = Boolean(selectedDoc?.pinned)
+  const selectedSourceLoadState = selectedDocPath
+    ? sourceLoadState[selectedDocPath]
+    : undefined
   const headings = useMemo(
-    () => extractMarkdownHeadings(selectedDoc?.source || '', [1, 2, 3]),
-    [selectedDoc?.source]
+    () => extractMarkdownHeadings(selectedDocSource || '', [1, 2, 3]),
+    [selectedDocSource]
   )
 
   useEffect(() => {
@@ -388,6 +490,69 @@ export default function DevDocsPage() {
       // 本地偏好写入失败时不影响 dev docs 主路径浏览。
     }
   }, [docs, pinnedPaths])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      window.localStorage.setItem(
+        DEV_DOCS_LIFECYCLE_STORAGE_KEY,
+        normalizeDevDocsLifecycle(lifecycle)
+      )
+    } catch {
+      // 文档层级偏好写入失败时仍保持当前会话可浏览。
+    }
+  }, [lifecycle])
+
+  useEffect(() => {
+    if (
+      !selectedDocPath ||
+      !loadSelectedDocSource ||
+      selectedDocSource ||
+      sourceLoadRequestedRef.current.has(selectedDocPath)
+    ) {
+      return
+    }
+
+    const path = selectedDocPath
+    sourceLoadRequestedRef.current.add(path)
+    setSourceLoadState((current) => ({
+      ...current,
+      [path]: { status: 'loading' },
+    }))
+
+    Promise.resolve(loadSelectedDocSource())
+      .then((value) => {
+        const source =
+          typeof value === 'string'
+            ? value
+            : typeof value?.default === 'string'
+              ? value.default
+              : ''
+        if (!source) {
+          throw new Error('文档内容为空')
+        }
+        setSourceLoadState((current) => ({
+          ...current,
+          [path]: { status: 'ready', source },
+        }))
+      })
+      .catch((error) => {
+        setSourceLoadState((current) => ({
+          ...current,
+          [path]: {
+            status: 'error',
+            message: error instanceof Error ? error.message : '加载失败',
+          },
+        }))
+      })
+  }, [
+    loadSelectedDocSource,
+    selectedDocPath,
+    selectedDocSource,
+    sourceReloadToken,
+  ])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !selectedDoc?.path) {
@@ -439,11 +604,17 @@ export default function DevDocsPage() {
       docsWithPinnedState
     )
     if (querySelectedPath) {
-      const querySelectedKey = docsWithPinnedState.find(
+      const querySelectedDoc = docsWithPinnedState.find(
         (item) => item.path === querySelectedPath
-      )?.key
-      if (querySelectedKey && querySelectedKey !== selectedKey) {
-        setSelectedKey(querySelectedKey)
+      )
+      if (
+        querySelectedDoc?.lifecycle &&
+        querySelectedDoc.lifecycle !== lifecycle
+      ) {
+        setLifecycle(querySelectedDoc.lifecycle)
+      }
+      if (querySelectedDoc?.key && querySelectedDoc.key !== selectedKey) {
+        setSelectedKey(querySelectedDoc.key)
       }
       return
     }
@@ -462,6 +633,7 @@ export default function DevDocsPage() {
     docsWithPinnedState,
     location.pathname,
     location.search,
+    lifecycle,
     navigate,
     selectedDoc?.path,
     selectedKey,
@@ -506,6 +678,10 @@ export default function DevDocsPage() {
         message.warning(`当前查看器未加载文档：${target.path}`)
         return
       }
+      const targetDoc = docs.find((item) => item.path === targetPath)
+      if (targetDoc?.lifecycle && targetDoc.lifecycle !== lifecycle) {
+        setLifecycle(targetDoc.lifecycle)
+      }
 
       const currentPath = normalizeDevDocsSelectedPath(
         readSelectedPathFromSearch(location.search),
@@ -538,6 +714,7 @@ export default function DevDocsPage() {
     location.hash,
     location.pathname,
     location.search,
+    lifecycle,
     navigate,
     selectedDoc?.path,
   ])
@@ -602,6 +779,9 @@ export default function DevDocsPage() {
     if (!doc?.path) {
       return
     }
+    if (doc.lifecycle !== lifecycle) {
+      setLifecycle(doc.lifecycle)
+    }
     setSelectedKey(docKey)
     navigate(
       buildDevDocsLocation({
@@ -610,6 +790,36 @@ export default function DevDocsPage() {
         path: doc.path,
       })
     )
+  }
+
+  const selectLifecycle = (value) => {
+    const nextLifecycle = normalizeDevDocsLifecycle(value)
+    if (nextLifecycle === lifecycle) {
+      return
+    }
+    setKeyword('')
+    const nextDoc = filterDevDocsByLifecycle(
+      docsWithPinnedState,
+      nextLifecycle
+    )[0]
+    if (nextDoc) {
+      selectDoc(nextDoc.key)
+      return
+    }
+    setLifecycle(nextLifecycle)
+  }
+
+  const retrySelectedSource = () => {
+    if (!selectedDoc?.path) {
+      return
+    }
+    sourceLoadRequestedRef.current.delete(selectedDoc.path)
+    setSourceLoadState((current) => {
+      const next = { ...current }
+      delete next[selectedDoc.path]
+      return next
+    })
+    setSourceReloadToken((current) => current + 1)
   }
 
   const scrollReaderToTop = () => {
@@ -661,13 +871,13 @@ export default function DevDocsPage() {
             <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-docs-summary">
-            输入业务词、标题或路径，直接阅读当前工作区中的说明；找不到时再展开目录。
+            默认只看当前合同；评审参考与历史证据分层浏览，避免旧结论混入当前搜索。
           </Paragraph>
           <details className="erp-dev-docs-boundary-details">
             <summary>查看收录范围与维护边界</summary>
             <Paragraph>
-              查看器只读加载当前工作区内已匹配的 Markdown；不保证文件已纳入
-              Git，也不进入 ERP 菜单、权限、seedData 或产品文档 registry。
+              查看器只读加载当前工作区内已匹配的 Markdown；历史正文仅在打开时加载。
+              文件可见不代表已经纳入 Git，也不代表内容是 runtime、schema、权限、发布或客户验收真源。
             </Paragraph>
           </details>
         </div>
@@ -678,6 +888,21 @@ export default function DevDocsPage() {
           <Text className="erp-dev-docs-sidebar__hint">
             先搜索；找不到再展开目录
           </Text>
+          <div className="erp-dev-docs-lifecycle">
+            <Text type="secondary">文档层级</Text>
+            <Segmented
+              size="small"
+              block
+              aria-label="开发文档层级"
+              className="erp-dev-docs-lifecycle__control"
+              options={LIFECYCLE_OPTIONS}
+              value={lifecycle}
+              onChange={selectLifecycle}
+            />
+            <Text type="secondary" className="erp-dev-docs-lifecycle__count">
+              {lifecycleDocs.length} / {docs.length} 篇
+            </Text>
+          </div>
           <SearchInput
             allowClear
             aria-label="搜索开发文档"
@@ -686,7 +911,9 @@ export default function DevDocsPage() {
             searchHint={
               isTitleOnlySearch
                 ? '当前仅搜索文档标题；切换“全部”可搜索路径和正文'
-                : '当前搜索标题、路径或正文；不搜索时按目录树浏览'
+                : lifecycle === DEV_DOCS_LIFECYCLE_ARCHIVE
+                  ? '历史正文按需加载；未打开的历史文档先按标题和路径搜索'
+                  : '当前层级搜索标题、路径或正文；不搜索时按目录树浏览'
             }
             onChange={(event) => setKeyword(event.target.value)}
             className="erp-dev-docs-search"
@@ -763,7 +990,7 @@ export default function DevDocsPage() {
               <div className="erp-dev-docs-sidebar__section-head">
                 <Text strong>搜索结果 / Search Results</Text>
                 <Text type="secondary">
-                  {visibleDocs.length} / {docs.length}
+                  {visibleDocs.length} / {lifecycleDocs.length}
                 </Text>
               </div>
               <div className="erp-dev-docs-list">
@@ -802,6 +1029,9 @@ export default function DevDocsPage() {
                               {item.group}
                             </Tag>
                           ) : null}
+                          <Tag className="erp-dev-docs-list__tag">
+                            {LIFECYCLE_LABELS[item.lifecycle]}
+                          </Tag>
                         </span>
                         <span className="erp-dev-docs-list__path">
                           {item.path}
@@ -849,7 +1079,9 @@ export default function DevDocsPage() {
               <div className="erp-dev-docs-sidebar__section-head">
                 <Text strong>按目录找</Text>
                 <Space size={6}>
-                  <Text type="secondary">{docs.length} 篇</Text>
+                  <Text type="secondary">
+                    {lifecycleDocs.length} / {docs.length} 篇
+                  </Text>
                   <Button
                     size="small"
                     type="text"
@@ -880,7 +1112,10 @@ export default function DevDocsPage() {
           {selectedDoc ? (
             <div className="erp-dev-docs-reader__toolbar">
               <div className="erp-dev-docs-reader__title">
-                <Text strong>{selectedDoc.title}</Text>
+                <Space size={6} wrap>
+                  <Text strong>{selectedDoc.title}</Text>
+                  <Tag>{LIFECYCLE_LABELS[selectedDoc.lifecycle]}</Tag>
+                </Space>
                 <Text type="secondary" className="erp-dev-docs-reader__path">
                   {selectedDoc.path}
                 </Text>
@@ -957,10 +1192,28 @@ export default function DevDocsPage() {
             </div>
           ) : null}
 
-          {selectedDoc ? (
+          {selectedDoc?.source ? (
             <article className="erp-dev-docs-markdown" ref={markdownRef}>
               <Markdown source={selectedDoc.source} />
             </article>
+          ) : selectedDoc && selectedSourceLoadState?.status === 'error' ? (
+            <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={`历史正文加载失败：${selectedSourceLoadState.message}`}
+              >
+                <Button onClick={retrySelectedSource}>重新加载</Button>
+              </Empty>
+            </div>
+          ) : selectedDoc ? (
+            <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">
+              <Space direction="vertical" align="center" size="small">
+                <Spin />
+                <Typography.Text type="secondary">
+                  正在加载历史正文…
+                </Typography.Text>
+              </Space>
+            </div>
           ) : (
             <div className="erp-dev-docs-markdown">
               <Empty

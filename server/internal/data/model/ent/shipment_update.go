@@ -155,6 +155,27 @@ func (_u *ShipmentUpdate) SetNillableStatus(v *string) *ShipmentUpdate {
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *ShipmentUpdate) SetVersion(v int) *ShipmentUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableVersion(v *int) *ShipmentUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *ShipmentUpdate) AddVersion(v int) *ShipmentUpdate {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetFinanceReleaseStatus sets the "finance_release_status" field.
 func (_u *ShipmentUpdate) SetFinanceReleaseStatus(v string) *ShipmentUpdate {
 	_u.mutation.SetFinanceReleaseStatus(v)
@@ -584,6 +605,11 @@ func (_u *ShipmentUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Shipment.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := shipment.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Shipment.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.FinanceReleaseStatus(); ok {
 		if err := shipment.FinanceReleaseStatusValidator(v); err != nil {
 			return &ValidationError{Name: "finance_release_status", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_status": %w`, err)}
@@ -653,6 +679,12 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(shipment.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(shipment.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(shipment.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.FinanceReleaseStatus(); ok {
 		_spec.SetField(shipment.FieldFinanceReleaseStatus, field.TypeString, value)
@@ -1009,6 +1041,27 @@ func (_u *ShipmentUpdateOne) SetNillableStatus(v *string) *ShipmentUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetVersion sets the "version" field.
+func (_u *ShipmentUpdateOne) SetVersion(v int) *ShipmentUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableVersion(v *int) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *ShipmentUpdateOne) AddVersion(v int) *ShipmentUpdateOne {
+	_u.mutation.AddVersion(v)
 	return _u
 }
 
@@ -1454,6 +1507,11 @@ func (_u *ShipmentUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Shipment.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := shipment.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Shipment.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.FinanceReleaseStatus(); ok {
 		if err := shipment.FinanceReleaseStatusValidator(v); err != nil {
 			return &ValidationError{Name: "finance_release_status", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_status": %w`, err)}
@@ -1540,6 +1598,12 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(shipment.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(shipment.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(shipment.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.FinanceReleaseStatus(); ok {
 		_spec.SetField(shipment.FieldFinanceReleaseStatus, field.TypeString, value)

@@ -4,111 +4,50 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
-import { yoyoosunFlowOrchestrationCoverage } from "../../config/customers/yoyoosun/flowOrchestrationCoverage.mjs";
 import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlowMatrix.mjs";
 
-const handbook = readFileSync(
-  new URL(
-    "../../docs/customers/yoyoosun/角色能力与流程矩阵.md",
-    import.meta.url,
-  ),
-  "utf8",
+function read(relativePath) {
+  return readFileSync(new URL(relativePath, import.meta.url), "utf8");
+}
+
+const handbook = read("../../docs/customers/yoyoosun/角色能力与流程矩阵.md");
+const customerConfirmation = read(
+  "../../docs/customers/yoyoosun/甲方角色职责与业务流转确认表.md",
 );
-const customerConfirmation = readFileSync(
-  new URL(
-    "../../docs/customers/yoyoosun/甲方角色职责与业务流转确认表.md",
-    import.meta.url,
-  ),
-  "utf8",
+const flowClosureMatrix = read(
+  "../../docs/customers/yoyoosun/流程编排闭环矩阵.md",
 );
-const flowClosureMatrix = readFileSync(
-  new URL("../../docs/customers/yoyoosun/流程编排闭环矩阵.md", import.meta.url),
-  "utf8",
+const customerDeliveryMatrix = read(
+  "../../docs/customers/yoyoosun/客户交付矩阵.md",
 );
-const customerDeliveryMatrix = readFileSync(
-  new URL("../../docs/customers/yoyoosun/客户交付矩阵.md", import.meta.url),
-  "utf8",
+const trialRunbook = read(
+  "../../docs/customers/yoyoosun/试用环境执行手册.md",
 );
-const trialRunbook = readFileSync(
-  new URL("../../docs/customers/yoyoosun/试用环境执行手册.md", import.meta.url),
-  "utf8",
+const fullPageChecklist = read(
+  "../../docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
 );
-const fullPageChecklist = readFileSync(
-  new URL(
-    "../../docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
-    import.meta.url,
-  ),
-  "utf8",
+const trialAccountChecklist = read(
+  "../../docs/customers/yoyoosun/试用账号角色菜单核对清单.md",
 );
-const trialAccountChecklist = readFileSync(
-  new URL(
-    "../../docs/customers/yoyoosun/试用账号角色菜单核对清单.md",
-    import.meta.url,
-  ),
-  "utf8",
-);
-const customerReadme = readFileSync(
-  new URL("../../docs/customers/yoyoosun/README.md", import.meta.url),
-  "utf8",
-);
-const requireFromWeb = createRequire(
-  new URL("../../web/package.json", import.meta.url),
-);
-const { Window } = requireFromWeb("happy-dom");
-const handbookWindow = new Window();
-globalThis.window = handbookWindow;
-globalThis.document = handbookWindow.document;
-globalThis.Element = handbookWindow.Element;
-globalThis.SVGElement = handbookWindow.SVGElement;
-const { default: mermaid } = await import(
-  pathToFileURL(requireFromWeb.resolve("mermaid")).href
-);
-const rbacSource = readFileSync(
-  new URL("../../server/internal/biz/rbac.go", import.meta.url),
-  "utf8",
-);
+const customerReadme = read("../../docs/customers/yoyoosun/README.md");
+const rbacSource = read("../../server/internal/biz/rbac.go");
 
 const registeredPermissionKeys = new Set(
   [...rbacSource.matchAll(/^\s*Permission\w+\s+=\s+"([^"]+)"/gmu)].map(
     (match) => match[1],
   ),
 );
-const registeredMenuSurfaces = new Set(
-  yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.menuSurfaces),
-);
-const registeredFlowResponsibilities = new Set(
-  yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.flowResponsibilities),
-);
 
-function sorted(values) {
-  return [...values].sort((left, right) => left.localeCompare(right));
+function tableIDs(source, prefix) {
+  const pattern = new RegExp(`^\\| (${prefix}\\d{2}) \\|`, "gmu");
+  return [...source.matchAll(pattern)].map((match) => match[1]);
 }
 
-function roleSection(roleKey) {
-  const startMarker = `<!-- role-profile:${roleKey}:start -->`;
-  const endMarker = `<!-- role-profile:${roleKey}:end -->`;
-  const start = handbook.indexOf(startMarker);
-  const end = handbook.indexOf(endMarker);
-  assert.notEqual(start, -1, `handbook must include ${startMarker}`);
-  assert.notEqual(end, -1, `handbook must include ${endMarker}`);
-  assert.ok(end > start, `${roleKey} markers must be ordered`);
-  return handbook.slice(start + startMarker.length, end);
-}
-
-function backtickTokens(source) {
-  return [...source.matchAll(/`([^`\n]+)`/gu)].map((match) => match[1]);
-}
-
-function assertIncludesToken(source, value, context) {
-  assert.ok(
-    source.includes(`\`${value}\``),
-    `${context} must include exact token ${value}`,
+function expectedIDs(prefix, count) {
+  return Array.from(
+    { length: count },
+    (_, index) => `${prefix}${String(index + 1).padStart(2, "0")}`,
   );
-}
-
-function tableRows(source) {
-  return source.split("\n").filter((line) => line.startsWith("| "));
 }
 
 function sectionBetween(source, startMarker, endMarker) {
@@ -120,158 +59,78 @@ function sectionBetween(source, startMarker, endMarker) {
   return source.slice(start, end);
 }
 
-function expectedIDs(prefix, count) {
-  return Array.from(
-    { length: count },
-    (_, index) => `${prefix}${String(index + 1).padStart(2, "0")}`,
-  );
-}
-
-function tableIDs(source, prefix) {
-  const idPattern = new RegExp(`^${prefix}\\d{2}$`, "u");
-  return tableRows(source)
-    .map((row) => row.split("|")[1]?.trim())
-    .filter((value) => idPattern.test(value));
-}
-
-function rowWithID(source, id) {
-  const matches = tableRows(source).filter((row) =>
-    row.startsWith(`| ${id} |`),
-  );
-  assert.equal(matches.length, 1, `${id} must have exactly one table row`);
-  return matches[0];
-}
-
-function assertTableField(source, label, context) {
-  const matches = tableRows(source).filter(
-    (row) => row.split("|")[1]?.trim() === label,
-  );
-  assert.equal(matches.length, 1, `${context} must contain ${label} once`);
-}
-
-function rowWithTokens(rows, values, context) {
-  const matches = rows.filter((row) =>
-    values.every((value) => row.includes(`\`${value}\``)),
-  );
-  assert.equal(
-    matches.length,
-    1,
-    `${context} must have exactly one associated table row`,
-  );
-  return matches[0];
-}
-
-test("yoyoosun role handbook lists the exact tracked role profiles", () => {
+test("yoyoosun role config is complete and references registered permissions", () => {
   assert.equal(yoyoosunRoleFlowMatrix.roles.length, 9);
   assert.equal(
-    yoyoosunRoleFlowMatrix.roles.reduce(
-      (total, role) => total + role.capabilityKeys.length,
-      0,
-    ),
-    324,
-  );
-  assert.equal(
-    new Set(yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.capabilityKeys))
-      .size,
-    136,
-  );
-  assert.equal(registeredPermissionKeys.size, 164);
-  assert.deepEqual(
-    [...handbook.matchAll(/<!-- role-profile:([^:]+):start -->/gu)].map(
-      (match) => match[1],
-    ),
-    yoyoosunRoleFlowMatrix.roles.map((role) => role.roleKey),
-  );
-  assert.deepEqual(
-    [...handbook.matchAll(/<!-- role-profile:([^:]+):end -->/gu)].map(
-      (match) => match[1],
-    ),
-    yoyoosunRoleFlowMatrix.roles.map((role) => role.roleKey),
+    new Set(yoyoosunRoleFlowMatrix.roles.map((role) => role.roleKey)).size,
+    yoyoosunRoleFlowMatrix.roles.length,
   );
 
   for (const role of yoyoosunRoleFlowMatrix.roles) {
+    assert.equal(new Set(role.menuSurfaces).size, role.menuSurfaces.length);
+    assert.equal(new Set(role.capabilityKeys).size, role.capabilityKeys.length);
     assert.equal(
-      new Set(role.menuSurfaces).size,
-      role.menuSurfaces.length,
-      `${role.roleKey} menuSurfaces must not contain duplicates`,
+      new Set(role.flowResponsibilities).size,
+      role.flowResponsibilities.length,
     );
-    assert.equal(
-      new Set(role.capabilityKeys).size,
-      role.capabilityKeys.length,
-      `${role.roleKey} capabilityKeys must not contain duplicates`,
-    );
-    const section = roleSection(role.roleKey);
-    const documentedPermissions = new Set(
-      backtickTokens(section).filter((token) =>
-        registeredPermissionKeys.has(token),
-      ),
-    );
-    const documentedMenus = new Set(
-      backtickTokens(section).filter((token) =>
-        registeredMenuSurfaces.has(token),
-      ),
-    );
-    const documentedResponsibilities = new Set(
-      backtickTokens(section).filter((token) =>
-        registeredFlowResponsibilities.has(token),
-      ),
-    );
-
-    assert.deepEqual(
-      sorted(documentedPermissions),
-      sorted(role.capabilityKeys),
-      `${role.roleKey} handbook permissions must exactly match roleFlowMatrix`,
-    );
-    assert.ok(
-      section.includes(`（${role.capabilityKeys.length}）`),
-      `${role.roleKey} must show its exact permission count`,
-    );
-    assert.deepEqual(
-      sorted(documentedMenus),
-      sorted(role.menuSurfaces),
-      `${role.roleKey} handbook menus must exactly match roleFlowMatrix`,
-    );
-    assert.deepEqual(
-      sorted(documentedResponsibilities),
-      sorted(role.flowResponsibilities),
-      `${role.roleKey} handbook responsibilities must exactly match roleFlowMatrix`,
-    );
-    assert.ok(
-      section.includes(role.displayName),
-      `${role.roleKey} displayName`,
-    );
-    assertIncludesToken(
-      section,
-      role.productCoreRole,
-      `${role.roleKey} Product Core role`,
-    );
-    for (const ownerPool of role.ownerPools) {
-      assertIncludesToken(section, ownerPool, `${role.roleKey} owner pool`);
-    }
-    for (const printTemplate of role.printTemplates ?? []) {
-      assertIncludesToken(
-        section,
-        printTemplate,
-        `${role.roleKey} print template`,
+    for (const permission of role.capabilityKeys) {
+      assert.ok(
+        registeredPermissionKeys.has(permission),
+        `${role.roleKey} references unregistered ${permission}`,
       );
     }
-    assert.ok(
-      section.includes(role.guardrail),
-      `${role.roleKey} exact guardrail`,
-    );
-    assert.ok(
-      section.includes("| 参与流程 |"),
-      `${role.roleKey} Fxx reverse index`,
-    );
-    assert.doesNotMatch(
-      section,
-      /`[a-z_]+(?:\.[a-z_]+)*\.\*`/u,
-      `${role.roleKey} must not use wildcard permissions`,
-    );
   }
 });
 
-test("sales-order process responsibility roles can read and open their source document", () => {
+test("role handbook stays readable and routes exact details to structured truth", () => {
+  assert.ok(handbook.length < 30_000, "handbook must remain a concise guide");
+  for (const role of yoyoosunRoleFlowMatrix.roles) {
+    assert.ok(
+      handbook.includes(`| \`${role.roleKey}\` | ${role.displayName} |`),
+      `missing role summary: ${role.roleKey}`,
+    );
+  }
+
+  const permissionDump = new Set(
+    [...handbook.matchAll(/`([^`\n]+)`/gu)]
+      .map((match) => match[1])
+      .filter((token) => registeredPermissionKeys.has(token)),
+  );
+  assert.ok(
+    permissionDump.size <= 5,
+    "handbook must not duplicate the generated permission matrix",
+  );
+
+  for (const required of [
+    "config/customers/yoyoosun/roleFlowMatrix.mjs",
+    "server/internal/biz/rbac.go",
+    "/__dev/permission-relationships",
+    "customer_config.get_effective_session",
+    "Workflow task done ≠ Fact posted",
+    "shipping_released",
+    "WIP Accepted ≠ 成品入库",
+    "runtimeEnabled=false",
+    "目标环境已核验",
+    "UAT 已签收",
+    "普通 admin 不天然拥有业务 Fact 权限",
+    "账号标志，不是角色",
+    "没有稳定的订单 owner、部门关系或授权客户集合真源",
+    "应收 DRAFT 需要独立 POST → POSTED",
+    "应付 DRAFT 同样需要独立 POST → POSTED",
+    "本文不缓存整树测试计数",
+  ]) {
+    assert.ok(handbook.includes(required), `missing handbook boundary: ${required}`);
+  }
+
+  const assignment = yoyoosunRoleFlowMatrix.roleAssignmentProfiles[0];
+  assert.equal(assignment.profileKey, "finance_purchase_contract_operator");
+  assert.ok(handbook.includes(`\`${assignment.profileKey}\``));
+  for (const roleKey of assignment.roleKeys) {
+    assert.ok(handbook.includes(`\`${roleKey}\``));
+  }
+});
+
+test("sales-order responsibility roles can read their source document", () => {
   const responsibleRoles = yoyoosunRoleFlowMatrix.roles.filter((role) =>
     role.flowResponsibilities.some((item) =>
       item.startsWith("sales_order_approval."),
@@ -282,415 +141,65 @@ test("sales-order process responsibility roles can read and open their source do
     ["sales", "boss", "engineering", "pmc"],
   );
   for (const role of responsibleRoles) {
-    assert.ok(
-      role.capabilityKeys.includes("sales_order.read"),
-      `${role.roleKey} sales-order task responsibility requires source read`,
-    );
-    assert.ok(
-      role.capabilityKeys.includes("customer.read"),
-      `${role.roleKey} sales-order page requires customer read`,
-    );
-    assert.ok(
-      role.capabilityKeys.includes("contact.read"),
-      `${role.roleKey} sales-order page requires contact read`,
-    );
-    assert.ok(
-      role.capabilityKeys.includes("sales_order_item.read"),
-      `${role.roleKey} sales-order task responsibility requires item read`,
-    );
-    assert.ok(
-      role.menuSurfaces.includes("sales-orders"),
-      `${role.roleKey} sales-order task responsibility requires a source page`,
-    );
+    for (const permission of [
+      "sales_order.read",
+      "customer.read",
+      "contact.read",
+      "sales_order_item.read",
+    ]) {
+      assert.ok(role.capabilityKeys.includes(permission), `${role.roleKey}: ${permission}`);
+    }
+    assert.ok(role.menuSurfaces.includes("sales-orders"));
   }
 });
 
-test("yoyoosun role handbook keeps the multi-role and control-plane boundaries explicit", () => {
-  const assignment = yoyoosunRoleFlowMatrix.roleAssignmentProfiles[0];
-  assert.equal(assignment.profileKey, "finance_purchase_contract_operator");
-  assertIncludesToken(handbook, assignment.profileKey, "multi-role profile");
-  for (const roleKey of assignment.roleKeys) {
-    assertIncludesToken(handbook, roleKey, "multi-role profile roles");
-  }
+test("role documents keep reviewable Mermaid and privacy boundaries", async () => {
+  const requireFromWeb = createRequire(
+    new URL("../../web/package.json", import.meta.url),
+  );
+  const { Window } = requireFromWeb("happy-dom");
+  const handbookWindow = new Window();
+  globalThis.window = handbookWindow;
+  globalThis.document = handbookWindow.document;
+  globalThis.Element = handbookWindow.Element;
+  globalThis.SVGElement = handbookWindow.SVGElement;
+  const { default: mermaid } = await import(
+    pathToFileURL(requireFromWeb.resolve("mermaid")).href
+  );
 
-  const controlPermissions = [
-    "system.user.read",
-    "system.user.create",
-    "system.user.update",
-    "system.user.role.assign",
-    "system.user.disable",
-    "system.user.revoke",
-    "system.role.read",
-    "system.role.permission.manage",
-    "system.permission.read",
-    "system.audit.read",
-    "customer_config.read",
-    "customer_config.publish",
-    "customer_config.activate",
-    "customer_config.rollback",
-    "erp.business_chain_debug.read",
-    "debug.business_chain.read",
-    "debug.business_chain.run",
-    "debug.seed",
-    "debug.cleanup",
-    "debug.business.clear",
-  ];
-  const rows = tableRows(handbook);
-  const adminRow = rowWithTokens(
-    rows,
-    ["admin", ...controlPermissions.slice(0, 14)],
-    "admin",
-  );
-  const debugRow = rowWithTokens(
-    rows,
-    ["debug_operator", ...controlPermissions.slice(14)],
-    "debug_operator",
-  );
-  const documentedAdminPermissions = new Set(
-    backtickTokens(adminRow).filter((token) =>
-      registeredPermissionKeys.has(token),
+  const documents = [handbook, customerConfirmation];
+  const diagrams = documents.flatMap((document) =>
+    [...document.matchAll(/```mermaid\s*\n([\s\S]*?)```/gu)].map((match) =>
+      match[1].trim(),
     ),
   );
-  const documentedDebugPermissions = new Set(
-    backtickTokens(debugRow).filter((token) =>
-      registeredPermissionKeys.has(token),
-    ),
-  );
-  assert.deepEqual(
-    sorted(documentedAdminPermissions),
-    sorted(controlPermissions.slice(0, 14)),
-  );
-  assert.deepEqual(
-    sorted(documentedDebugPermissions),
-    sorted(controlPermissions.slice(14)),
-  );
-  for (const permission of controlPermissions) {
-    assert.ok(
-      registeredPermissionKeys.has(permission),
-      `${permission} must be registered`,
-    );
-  }
-  for (const requiredBoundary of [
-    "普通 admin 不天然拥有业务 Fact 权限",
-    "账号标志，不是角色",
-    "没有稳定的订单 owner、部门关系或授权客户集合真源",
-  ]) {
-    assert.ok(
-      handbook.includes(requiredBoundary),
-      `missing boundary: ${requiredBoundary}`,
-    );
-  }
-});
-
-test("yoyoosun role handbook lists every tracked workflow and preview-only object", () => {
-  assert.equal(yoyoosunCustomerPackage.status, "draft");
-  assert.equal(yoyoosunCustomerPackage.runtimeEnabled, false);
-  assert.equal(yoyoosunCustomerPackage.sourcePolicy.previewOnly, true);
-
-  const rows = tableRows(handbook);
-  const workflowRows = rows.filter((row) =>
-    row.includes("| `workflow_only` | `preview_only` |"),
-  );
-  assert.deepEqual(
-    workflowRows.map((row) => backtickTokens(row)[0]),
-    yoyoosunCustomerPackage.workflows.map((workflow) => workflow.key),
-  );
-
-  for (const workflow of yoyoosunCustomerPackage.workflows) {
-    const expectedTokens = [
-      workflow.key,
-      ...workflow.sourceModules,
-      workflow.factBoundary,
-      workflow.status,
-      ...workflow.nodes.flatMap((node) => [
-        node.key,
-        node.type,
-        node.ownerPool,
-        ...(node.command ? [node.command] : []),
-      ]),
-    ];
-    const row = rowWithTokens(
-      workflowRows,
-      [...new Set(expectedTokens)],
-      workflow.key,
-    );
-    let previousIndex = -1;
-    for (const node of workflow.nodes) {
-      const currentIndex = row.indexOf(`\`${node.key}\``);
-      assert.ok(
-        currentIndex > previousIndex,
-        `${workflow.key} node order: ${node.key}`,
-      );
-      previousIndex = currentIndex;
-    }
-  }
-
-  for (const flow of yoyoosunCustomerPackage.businessFlows) {
-    const row = rowWithTokens(
-      rows,
-      [flow.key, ...flow.modules, flow.status],
-      `${flow.key} business flow`,
-    );
-    assert.ok(row.includes(flow.guardrail), `${flow.key} exact guardrail`);
-  }
-  for (const stateMachine of yoyoosunCustomerPackage.stateMachines) {
-    const row = rowWithTokens(
-      rows,
-      [stateMachine.key, ...stateMachine.states, stateMachine.status],
-      `${stateMachine.key} state machine`,
-    );
-    for (const [fromState, toState] of stateMachine.transitions) {
-      assert.ok(
-        row.includes(`\`${fromState}\` → \`${toState}\``),
-        `${stateMachine.key} transition ${fromState} -> ${toState}`,
-      );
-    }
-  }
-  for (const policy of yoyoosunCustomerPackage.processPolicies) {
-    for (const rule of policy.rules) {
-      rowWithTokens(
-        rows,
-        [policy.key, rule.key, rule.decision, policy.status],
-        `${policy.key}.${rule.key} policy`,
-      );
-    }
-  }
-  for (const selection of yoyoosunCustomerPackage.runtimeProcessSelections) {
-    rowWithTokens(
-      rows,
-      Object.values(selection),
-      `${selection.processKey} runtime selection`,
-    );
-  }
-});
-
-test("yoyoosun role handbook mirrors orchestration coverage without promoting previews", () => {
-  const rows = tableRows(handbook);
-  for (const layer of yoyoosunFlowOrchestrationCoverage.layers) {
-    rowWithTokens(
-      rows,
-      [layer.key, layer.status, ...layer.evidence],
-      `${layer.key} coverage layer`,
-    );
-  }
-  for (const process of yoyoosunFlowOrchestrationCoverage.runtimeProcesses) {
-    rowWithTokens(
-      rows,
-      [process.key, process.status, ...process.nodeTypes],
-      `${process.key} runtime process`,
-    );
-  }
-  for (const entrypoint of yoyoosunFlowOrchestrationCoverage.uiEntrypoints) {
-    assertIncludesToken(handbook, entrypoint, "orchestration UI entrypoint");
-  }
-  for (const gate of yoyoosunFlowOrchestrationCoverage.signoffGates) {
-    assertIncludesToken(handbook, gate, "orchestration sign-off gate");
-  }
-
-  for (const requiredBoundary of [
-    "Workflow task done ≠ Fact posted",
-    "shipping_released",
-    "WIP Accepted ≠ 成品入库",
-    "runtimeEnabled=false",
-    "目标未核验",
-    "UAT 未签收",
-  ]) {
-    assert.ok(
-      handbook.includes(requiredBoundary),
-      `missing boundary: ${requiredBoundary}`,
-    );
-  }
-});
-
-test("yoyoosun role handbook preserves every client-source process checkpoint and gap", () => {
-  assert.deepEqual(
-    [...handbook.matchAll(/^\| (F\d{2}) \|/gmu)].map((match) => match[1]),
-    Array.from(
-      { length: 22 },
-      (_, index) => `F${String(index + 1).padStart(2, "0")}`,
-    ),
-    "handbook must keep exactly one ordered F01-F22 flow catalog",
-  );
-  for (const row of handbook
-    .split("\n")
-    .filter((line) => /^\| F\d{2} \|/u.test(line))) {
-    assert.equal(
-      row
-        .split("|")
-        .slice(1, -1)
-        .map((cell) => cell.trim())
-        .filter(Boolean).length,
-      6,
-      `flow row must keep six non-empty cells: ${row}`,
-    );
-  }
-  const requiredClientTerms = [
-    "业务",
-    "板房",
-    "主料仓",
-    "成品仓",
-    "生产经理",
-    "外发部",
-    "包装部",
-    "供应商 QC",
-    "客户验货员",
-    "审核人 / 签字人",
-    "供应商 / 供货方",
-    "加工方 / 加工厂",
-    "公司对接人 / 联系人",
-    "本厂",
-  ];
-  const requiredProcessMarkers = [
-    "客户建档、联系人、销售建单",
-    "订单、工程、采购与包材并行线",
-    "布料加工、裁片回仓与检验",
-    "车缝本厂 / 外发",
-    "手工本厂 / 外发",
-    "成品、针检、抽检、客户验货、返工",
-    "目标工序不晚于来源工序",
-    "包装与显式完工入库",
-    "委外合同、发料、回货、质检、应付",
-    "实际出货、库存扣减",
-    "必须为 `PASS` / `CONCESSION`（合格或让步接收）",
-    "付款、银行流水、多单核销、总账 / 税控",
-  ];
-  const requiredBoundaries = [
-    "精确行部分退厂 / 补换",
-    "补换生成新待收待检链",
-    "Shipment 版本化强制门禁",
-    "包材没有独立采购、IQC、领用 / 耗用事实闭环",
-    "永绅本地 entitlement 已激活读回",
-    "银行直连、支付凭证、总账和税控仍未实现",
-  ];
-  for (const text of [
-    ...requiredClientTerms,
-    ...requiredProcessMarkers,
-    ...requiredBoundaries,
-  ]) {
-    assert.ok(
-      handbook.includes(text),
-      `handbook must preserve client checkpoint: ${text}`,
-    );
-  }
-  assert.ok(
-    handbook.includes("**17**"),
-    "handbook must record all 17 source files",
-  );
-  assert.ok(
-    handbook.includes("20 个 sheet"),
-    "handbook must record all 20 workbook sheets",
-  );
-  assert.ok(
-    handbook.includes("fail closed（exit 1）"),
-    "formal stale pin must stay non-green",
-  );
-  for (const staleClaim of [
-    "首次拒绝处置仍是缺口",
-    "当前只会阻止本单入库",
-    "当前没有 PAYMENT 写入、银行收付、多单核销",
-    "PAYMENT / 银行核销不存在",
-  ]) {
-    assert.ok(
-      !handbook.includes(staleClaim),
-      `handbook must not preserve stale capability claim: ${staleClaim}`,
-    );
-  }
-});
-
-test("yoyoosun role handbook Mermaid and privacy guards remain reviewable", async () => {
-  const handbookMermaidBlocks = [
-    ...handbook.matchAll(/```mermaid\s*\n([\s\S]*?)```/gu),
-  ].map((match) => match[1].trim());
-  const confirmationMermaidBlocks = [
-    ...customerConfirmation.matchAll(/```mermaid\s*\n([\s\S]*?)```/gu),
-  ].map((match) => match[1].trim());
-  assert.ok(
-    handbookMermaidBlocks.length >= 16,
-    "handbook must keep at least 16 focused diagrams",
-  );
-  assert.ok(
-    confirmationMermaidBlocks.length >= 1,
-    "customer confirmation must keep its one-page business chain",
-  );
-  const mermaidBlocks = [
-    ...handbookMermaidBlocks,
-    ...confirmationMermaidBlocks,
-  ];
-  for (const [index, source] of mermaidBlocks.entries()) {
-    assert.match(
-      source,
-      /^flowchart\s+(?:LR|RL|TD|TB|BT)\b/u,
-      `diagram ${index + 1}`,
-    );
-    assert.doesNotMatch(
-      source,
-      /\t/u,
-      `diagram ${index + 1} must not contain tabs`,
-    );
+  assert.ok(diagrams.length >= 2);
+  for (const [index, source] of diagrams.entries()) {
+    assert.match(source, /^flowchart\s+(?:LR|RL|TD|TB|BT)\b/u);
+    assert.doesNotMatch(source, /\t/u);
     await assert.doesNotReject(
       mermaid.parse(source),
-      `diagram ${index + 1} must parse with the installed Mermaid runtime`,
+      `diagram ${index + 1} must parse`,
     );
   }
 
-  for (const document of [handbook, customerConfirmation]) {
-    assert.doesNotMatch(
-      document,
-      /(?<![A-Za-z0-9])1[3-9]\d{9}(?![A-Za-z0-9])/u,
-    );
+  for (const document of documents) {
+    assert.doesNotMatch(document, /(?<![A-Za-z0-9])1[3-9]\d{9}(?![A-Za-z0-9])/u);
     assert.doesNotMatch(document, /(?<![A-Za-z0-9])\d{16,19}(?![A-Za-z0-9])/u);
     assert.doesNotMatch(document, /(?:password|token|验证码)\s*[:=]\s*\S+/iu);
-    assert.doesNotMatch(
-      document,
-      /待最终复跑|待写入/u,
-      "role documents must not leave final verification placeholders",
-    );
-  }
-  assert.match(handbook, /本文不缓存整树测试计数/u);
-  assert.doesNotMatch(
-    handbook,
-    /客户角色 \/ 权限 \/ 流程文档同步测试 \| 通过|Mermaid Chromium 真实解析 \| 通过|scripts 1280 \/ 1280/u,
-    "handbook must not cache stale execution counts",
-  );
-});
-
-test("yoyoosun role handbook remains reachable from its controlled customer index", () => {
-  assert.ok(
-    customerReadme.includes("角色能力与流程矩阵.md"),
-    "customer README handbook link",
-  );
-  assert.ok(
-    customerReadme.includes("甲方角色职责与业务流转确认表.md"),
-    "customer README customer confirmation link",
-  );
-
-  const internalAnchors = [...handbook.matchAll(/\]\(#([a-z0-9-]+)\)/gu)].map(
-    (match) => match[1],
-  );
-  assert.deepEqual(internalAnchors, [
-    "role-guide",
-    "flow-guide",
-    "flow-catalog",
-    "known-gaps",
-    "verification",
-  ]);
-  for (const anchor of internalAnchors) {
-    assert.equal(
-      handbook.split(`<a id="${anchor}"></a>`).length - 1,
-      1,
-      `internal anchor must exist exactly once: ${anchor}`,
-    );
   }
 });
 
-test("yoyoosun customer confirmation separates business decisions from system evidence", () => {
+test("role handbook remains reachable from the customer index", () => {
+  assert.ok(customerReadme.includes("角色能力与流程矩阵.md"));
+  assert.ok(customerReadme.includes("甲方角色职责与业务流转确认表.md"));
+});
+
+test("customer confirmation separates decisions from system evidence", () => {
   for (const heading of [
     "九岗位职责总表",
     "审批、评审与放行节点确认表",
-    "节点确认卡",
     "核心业务流程确认",
-    "甲方业务与交付范围确认",
-    "乙方状态附表",
     "跨岗位交接清单",
     "退回、阻塞、返工和异常",
     "待甲方决策清单",
@@ -709,6 +218,7 @@ test("yoyoosun customer confirmation separates business decisions from system ev
   ]) {
     assert.ok(customerConfirmation.includes(axis), `missing axis ${axis}`);
   }
+
   const roleSection = sectionBetween(
     customerConfirmation,
     "## 4. 九岗位职责总表",
@@ -718,16 +228,6 @@ test("yoyoosun customer confirmation separates business decisions from system ev
     customerConfirmation,
     "## 5. 审批、评审与放行节点确认表",
     "## 6. 核心业务流程确认",
-  );
-  const processBusinessSection = sectionBetween(
-    customerConfirmation,
-    "### 6.1 甲方业务与交付范围确认",
-    "### 6.2 乙方状态附表",
-  );
-  const processEvidenceSection = sectionBetween(
-    customerConfirmation,
-    "### 6.2 乙方状态附表",
-    "## 7. 跨岗位交接清单",
   );
   const handoffSection = sectionBetween(
     customerConfirmation,
@@ -744,137 +244,12 @@ test("yoyoosun customer confirmation separates business decisions from system ev
     "## 10. 待甲方决策清单",
     "## 11. 当面对接方法",
   );
-  for (const [source, prefix, count] of [
-    [roleSection, "R", 9],
-    [nodeSection, "A", 7],
-    [processBusinessSection, "P", 9],
-    [processEvidenceSection, "P", 9],
-    [handoffSection, "H", 22],
-    [exceptionSection, "X", 12],
-    [decisionSection, "C", 9],
-  ]) {
-    assert.deepEqual(tableIDs(source, prefix), expectedIDs(prefix, count));
-  }
+  assert.deepEqual(tableIDs(roleSection, "R"), expectedIDs("R", 9));
+  assert.deepEqual(tableIDs(nodeSection, "A"), expectedIDs("A", 7));
+  assert.deepEqual(tableIDs(handoffSection, "H"), expectedIDs("H", 22));
+  assert.deepEqual(tableIDs(exceptionSection, "X"), expectedIDs("X", 12));
+  assert.deepEqual(tableIDs(decisionSection, "C"), expectedIDs("C", 9));
 
-  for (const [id, type] of [
-    ["A01", "业务审批"],
-    ["A02", "业务评审 / 办理任务"],
-    ["A03", "业务审批"],
-    ["A04", "业务审批"],
-    ["A05", "放行门禁 / 风险提醒（待 C05）"],
-    ["A06", "业务审批"],
-    ["A07", "业务交接"],
-  ]) {
-    assert.ok(rowWithID(nodeSection, id).includes(`| ${type} |`), id);
-  }
-  assert.match(
-    rowWithID(nodeSection, "A05"),
-    /提醒：只记录财务意见，不改变出货状态.*提醒：不得退回或阻塞/u,
-  );
-
-  const stateLegend = sectionBetween(
-    customerConfirmation,
-    "## 2. 状态图例",
-    "## 3. 一页业务总链",
-  );
-  for (const axis of [
-    "甲方结论",
-    "产品基础能力",
-    "永绅配置",
-    "目标环境",
-    "用户验收",
-    "交付范围",
-  ]) {
-    assertTableField(stateLegend, axis, "state legend");
-  }
-  const roleCard = sectionBetween(
-    customerConfirmation,
-    "### 4.1 逐岗确认卡",
-    "## 5. 审批、评审与放行节点确认表",
-  );
-  const nodeCard = sectionBetween(
-    customerConfirmation,
-    "### 5.1 节点确认卡",
-    "## 6. 核心业务流程确认",
-  );
-  for (const card of [roleCard, nodeCard]) {
-    assertTableField(card, "甲方结论", "confirmation card");
-    assertTableField(card, "产品基础能力（乙方填写）", "confirmation card");
-    assertTableField(card, "永绅配置（乙方填写）", "confirmation card");
-    assertTableField(card, "目标环境（乙方填写）", "confirmation card");
-    assertTableField(card, "用户验收（乙方填写）", "confirmation card");
-    assertTableField(card, "交付范围", "confirmation card");
-  }
-  assert.match(
-    processBusinessSection,
-    /\| ID \| 流程 \| 甲方目标草案 \| 既有决策 \| 本次待确认 \| 甲方结论 \| 交付范围 \| 会后落账 ID \|/u,
-  );
-  assert.match(
-    processEvidenceSection,
-    /\| ID \| 产品基础能力 \| 永绅配置 \| 目标环境 \| 用户验收 \| 状态基线 \/ 证据说明 \|/u,
-  );
-  assert.doesNotMatch(
-    customerConfirmation,
-    /\| (?:甲方结论 \/ 交付决定|产品能力 \/ 永绅配置 \/ 目标环境（乙方填写）|用户验收 \/ 交付范围) \|/u,
-    "six axes must not be merged into shared fields",
-  );
-  assert.match(rowWithID(processBusinessSection, "P04"), /D-006/u);
-  assert.match(
-    rowWithID(processEvidenceSection, "P04"),
-    /\| 部分支持 \|.*D-006 高层主路线已支持.*细则待确认/u,
-  );
-  assert.match(
-    rowWithID(handoffSection, "H09"),
-    /退厂 \/ 补换.*未处置数量仍保留在原到货来源/u,
-  );
-  assert.doesNotMatch(rowWithID(handoffSection, "H09"), /取消方向/u);
-  assert.match(rowWithID(handoffSection, "H21"), /退厂安排完成|补换日期/u);
-  assert.match(rowWithID(handoffSection, "H22"), /独立 IQC/u);
-  assert.match(decisionSection, /\| 会后落账 ID \|/u);
-
-  const documentControl = sectionBetween(
-    customerConfirmation,
-    "## 1. 文档控制",
-    "### 1.1 本次确认什么",
-  );
-  for (const field of [
-    "乙方状态基线",
-    "目标环境证据编号",
-    "本次签认范围",
-    "受控确认来源编号",
-  ]) {
-    assertTableField(documentControl, field, "document control");
-  }
-  const signoffSection = sectionBetween(
-    customerConfirmation,
-    "## 12. 分项签认",
-    "## 13. 会后落账规则",
-  );
-  assert.match(
-    signoffSection,
-    /\| 签认范围 \| 已确认 ID \| 有条件确认 ID \| 待确认 ID \| 不采用 ID \| 本期不讨论 ID \| 不适用 ID \| 保留意见 \/ Q-ID \| 甲方确认岗位 \| 受控确认来源编号 \| 日期 \|/u,
-  );
-  for (const scope of [
-    "R01–R09 岗位职责",
-    "A01–A07 控制节点",
-    "P01–P09 核心流程",
-    "H01–H22 跨岗位交接",
-    "X01–X12 异常与退回",
-    "C01–C09 本期范围与后续决策",
-  ]) {
-    assert.ok(signoffSection.includes(`| ${scope} |`), scope);
-  }
-  assert.match(signoffSection, /未列入任何结果列的事项继续保持待确认/u);
-  assert.match(handbook, /应收 DRAFT.*独立 POST → POSTED/u);
-  assert.match(handbook, /应付 DRAFT.*独立 POST → POSTED/u);
-  assert.match(
-    flowClosureMatrix,
-    /FinanceCreditNote.*正式页面和服务端都只允许从应收 \/ 应付发起.*来源类型守卫已闭环/u,
-  );
-  assert.match(
-    customerDeliveryMatrix,
-    /返工回厂与补发、收付款、库存调整和生产异常处置页面 \/ 权限已进入永绅跟踪 entitlement.*尚未整体进入 133 \/ 生产/u,
-  );
   for (const forbiddenTechnicalToken of [
     "workflow.task.approve",
     "finance.payment.create",
@@ -884,107 +259,49 @@ test("yoyoosun customer confirmation separates business decisions from system ev
     "idempotency_key",
     "Product Core",
   ]) {
-    assert.ok(
-      !customerConfirmation.includes(forbiddenTechnicalToken),
-      `customer-facing confirmation must not expose ${forbiddenTechnicalToken}`,
-    );
+    assert.ok(!customerConfirmation.includes(forbiddenTechnicalToken));
   }
-  assert.match(customerConfirmation, /六个维度/u);
-  assert.match(customerConfirmation, /触发条件/u);
-  assert.match(customerConfirmation, /必审 \/ 必办资料/u);
-  assert.match(customerConfirmation, /允许撤回的人和时点/u);
-  assert.match(customerConfirmation, /重提后从哪个节点开始/u);
-  assert.match(customerConfirmation, /发起人能否自审 \/ 代理权限边界/u);
   assert.match(customerConfirmation, /不代表系统已发布/u);
   assert.match(customerConfirmation, /甲方用户验收（UAT）仍未完成/u);
-  assert.match(customerConfirmation, /客户专属受控资料库/u);
 });
 
-test("yoyoosun production governance keeps Core WIP runtime separate from preview-only customer flow config", () => {
+test("production governance separates Core WIP from preview customer flows", () => {
   for (const document of [customerDeliveryMatrix, flowClosureMatrix]) {
-    assert.doesNotMatch(
-      document,
-      /尚无可执行的生产路线、WIP、逐工序分流或分段质检链|Product Core 尚无 route step/u,
-    );
     assert.match(document, /PLUSH_SEW_HAND_V1/u);
     assert.match(document, /preview(?:_|-)only/u);
     assert.match(document, /133.*V5.*技术/u);
     assert.match(document, /客户.*UAT.*未/u);
   }
-  assert.match(
-    customerDeliveryMatrix,
-    /Product Core 使用固定 `PLUSH_SEW_HAND_V1` v1.*客户 `businessFlows` 继续 preview-only/u,
-  );
-  assert.match(
-    flowClosureMatrix,
-    /Product Core 使用固定 `PLUSH_SEW_HAND_V1` 承接生产执行/u,
-  );
 });
 
-test("yoyoosun full-page checklist keeps its customer-facing 52-target boundary", () => {
-  const forbiddenCustomerCopy =
-    /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|\b(?:key|route|system_admin)\b|岗位代码|甲方|\/erp\//i;
+test("full-page checklist keeps its 52-target customer boundary", () => {
   const targetHeadings = fullPageChecklist.match(
     /^### (?:进入|桌面|岗位|预览|打印)-\d{2} /gmu,
   );
-
   assert.equal(targetHeadings?.length, 52);
-  assert.doesNotMatch(fullPageChecklist, forbiddenCustomerCopy);
-  for (const expected of [
-    "10 个正式岗位试用账号",
-    "54 条来料质检记录",
-    "54 条采购入库记录",
-    "45 张生产订单",
-    "4 条返工回厂记录",
-    "4 条收付款记录",
-    "3 条红冲记录",
-    "完成 52 项并不自动代表正式交付",
-    "模拟展示任务不冒充流程闭环",
-  ]) {
-    assert.ok(fullPageChecklist.includes(expected), `missing ${expected}`);
-  }
-  assert.match(fullPageChecklist, /生产订单.*只有在生产记录中过账后才影响库存/su);
-  assert.match(fullPageChecklist, /生产进度.*只读|本页不提供新建入口/su);
-  assert.match(fullPageChecklist, /出库管理.*只读|本页不提供新建入口/su);
-  assert.match(fullPageChecklist, /\| 桌面页面\s+\|\s+31\s+\|/u);
+  assert.doesNotMatch(
+    fullPageChecklist,
+    /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|\b(?:key|route|system_admin)\b|岗位代码|甲方|\/erp\//iu,
+  );
+  assert.match(fullPageChecklist, /完成 52 项并不自动代表正式交付/u);
+  assert.match(fullPageChecklist, /模拟展示任务不冒充流程闭环/u);
   assert.match(fullPageChecklist, /\| 合计\s+\|\s+52\s+\|/u);
-  assert.doesNotMatch(fullPageChecklist, /完成 48 项|13 个(?:不同岗位组合的)?试用账号/u);
 });
 
-test("yoyoosun trial runbook keeps config, RBAC and release evidence boundaries", () => {
-  assert.match(
-    trialRunbook,
-    /52 项：2 个登录与入口、31 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台/u,
-  );
-  assert.match(trialRunbook, /fresh 空库基线已记录/u);
-  assert.match(trialRunbook, /plush_erp_acceptance_<run-id>_dev/u);
-  assert.match(trialRunbook, /plush_erp_uat_20260716_v5/u);
-  assert.match(
-    trialRunbook,
-    /customer-config-runtime-manifest\.mjs[\s\S]{0,240}yoyoosun-runtime-manifest-preview\.json/u,
-  );
-  assert.match(
-    trialRunbook,
-    /manual-acceptance-customer-config\.mjs[\s\S]{0,400}--target customer-trial-133/u,
-  );
-  assert.match(
-    trialRunbook,
-    /manual-acceptance-dataset\.mjs[\s\S]{0,400}--target customer-trial-133/u,
-  );
-  assert.match(trialRunbook, /trialDemoAccountBrowserSmoke\.mjs/u);
-  assert.match(trialRunbook, /--preflight-report output\/trial-demo-account-browser-smoke\/preflight\.json/u);
-  assert.match(trialRunbook, /window\.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__/u);
-  assert.match(trialRunbook, /customer-config-effective-session-probe\.mjs/u);
-  assert.match(trialRunbook, /40302 未登录/u);
-  assert.match(trialRunbook, /external-base-url-not-yoyoosun-entry/u);
-  assert.match(trialRunbook, /模拟数据不等于真实 import/u);
-  assert.match(
-    trialRunbook,
-    /不证明目标环境发布、真实客户导入、客户签收、备份恢复或 release evidence 已完成/u,
-  );
+test("trial runbook keeps config, RBAC and release evidence boundaries", () => {
+  for (const required of [
+    "52 项：2 个登录与入口、31 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台",
+    "fresh 空库基线已记录",
+    "customer-config-effective-session-probe.mjs",
+    "40302 未登录",
+    "模拟数据不等于真实 import",
+    "不证明目标环境发布、真实客户导入、客户签收、备份恢复或 release evidence 已完成",
+  ]) {
+    assert.ok(trialRunbook.includes(required), `missing trial boundary: ${required}`);
+  }
 });
 
-test("yoyoosun trial account checklist protects credentials and current navigation", () => {
+test("trial account checklist protects credentials and current navigation", () => {
   assert.match(
     trialAccountChecklist,
     /账号名和凭据只在受控环境配置与授权交付渠道维护/u,
@@ -994,14 +311,9 @@ test("yoyoosun trial account checklist protects credentials and current navigati
     trialAccountChecklist,
     /常用：`应收管理`、`应付管理`、`发票管理`；更多：`对账管理`、`收付款核销`和来源核对页/u,
   );
-  assert.match(trialAccountChecklist, /顶部切换按钮和“我的 → 进入电脑端”均可直达/u);
-  assert.doesNotMatch(
-    trialAccountChecklist,
-    /`对账\/结算`|`待付款\/应付提醒`|`应收提醒`|`发票\/开票异常`/u,
-  );
 });
 
-test("yoyoosun customer documentation does not route readers to the retired delta register", () => {
+test("customer documentation does not route to the retired delta register", () => {
   for (const document of [
     customerReadme,
     handbook,

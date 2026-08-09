@@ -125,7 +125,8 @@ export function compareProductionCompletionQuantity(left, right) {
 export function buildProductionCompletionChoices(
   items = [],
   facts = [],
-  wipAggregate = null
+  wipAggregate = null,
+  { excludeFactID = 0 } = {}
 ) {
   const postedByLine = new Map()
   const draftByLine = new Map()
@@ -145,9 +146,7 @@ export function buildProductionCompletionChoices(
           orderStatus: wipAggregate?.productionOrder?.status,
         }
       )
-      batches = eligibility.eligible
-        ? eligibility.acceptedPackagingBatches
-        : []
+      batches = eligibility.eligible ? eligibility.acceptedPackagingBatches : []
     }
     const batchIDs = new Set()
     const acceptedPackagingBatches = batches.map((batch) => {
@@ -174,6 +173,7 @@ export function buildProductionCompletionChoices(
   const itemByLine = new Map(
     normalizedItems.map((entry) => [entry.lineID, entry])
   )
+  const excludedFactID = Number(excludeFactID || 0)
   const knownBatchByID = new Map()
   for (const batch of Array.isArray(wipAggregate?.batches)
     ? wipAggregate.batches
@@ -187,6 +187,9 @@ export function buildProductionCompletionChoices(
     }
   }
   for (const fact of Array.isArray(facts) ? facts : []) {
+    if (excludedFactID > 0 && Number(fact?.id || 0) === excludedFactID) {
+      continue
+    }
     if (
       fact?.fact_type !== 'FINISHED_GOODS_RECEIPT' ||
       fact?.source_type !== 'PRODUCTION_ORDER' ||
@@ -214,7 +217,10 @@ export function buildProductionCompletionChoices(
         )
       }
       const target = fact.status === 'POSTED' ? postedByBatch : draftByBatch
-      target.set(batchID, (target.get(batchID) || zeroQuantityUnits()) + quantity)
+      target.set(
+        batchID,
+        (target.get(batchID) || zeroQuantityUnits()) + quantity
+      )
       continue
     }
     if (Number(fact?.production_wip_batch_id || 0) > 0) {
@@ -353,7 +359,10 @@ export function buildProductionCompletionPayload(
   }
   const routed = item?.route_code === PRODUCTION_WIP_ROUTE_CODE
   const productionWIPBatchID = Number(values.production_wip_batch_id || 0)
-  if (routed && (!Number.isSafeInteger(productionWIPBatchID) || productionWIPBatchID <= 0)) {
+  if (
+    routed &&
+    (!Number.isSafeInteger(productionWIPBatchID) || productionWIPBatchID <= 0)
+  ) {
     throw new Error('请选择本次完工对应的包装验收批次')
   }
   const selectedBatch = routed
@@ -372,7 +381,8 @@ export function buildProductionCompletionPayload(
   }
   if (
     orderStatus === 'CLOSED' &&
-    (!routed || !Number.isSafeInteger(Number(selectedBatch?.origin_rework_fact_id)) ||
+    (!routed ||
+      !Number.isSafeInteger(Number(selectedBatch?.origin_rework_fact_id)) ||
       Number(selectedBatch.origin_rework_fact_id) <= 0)
   ) {
     throw new Error('已关闭订单只能登记成品返工补制批次的完工入库')
@@ -422,9 +432,7 @@ export function normalizeProductionCompletionCreateRequest(params = {}) {
     ...(source.production_wip_batch_id == null
       ? {}
       : {
-          production_wip_batch_id: requiredID(
-            source.production_wip_batch_id
-          ),
+          production_wip_batch_id: requiredID(source.production_wip_batch_id),
         }),
     warehouse_id: requiredID(source.warehouse_id),
     ...lotFields,

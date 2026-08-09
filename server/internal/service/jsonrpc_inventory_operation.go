@@ -38,6 +38,20 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		}
 		item, err := d.inventoryUC.CreateInventoryOperation(ctx, in)
 		return id, inventoryOperationResult(ctx, d, item, err), nil
+	case "save_inventory_operation_draft":
+		in, ok := inventoryOperationDraftSaveFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		current, err := d.getInventoryOperationForScope(ctx, in.ID, scope)
+		if err != nil {
+			return id, d.mapInventoryError(ctx, err), nil
+		}
+		if err := validateInventoryOperationDraftSaveScope(in, current, scope); err != nil {
+			return id, d.mapInventoryError(ctx, err), nil
+		}
+		item, err := d.inventoryUC.SaveInventoryOperationDraft(ctx, in, actorID)
+		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "post_inventory_operation":
 		if !inventoryOperationAllowsOnly(pm, "id", "expected_version") {
 			return id, invalidParamResult(), nil
@@ -110,6 +124,20 @@ func validateInventoryOperationCreateScope(in *biz.InventoryOperationCreate, sco
 	return nil
 }
 
+func validateInventoryOperationDraftSaveScope(in *biz.InventoryOperationDraftSave, current *biz.InventoryOperation, scope biz.WarehouseDataScope) error {
+	if in == nil || current == nil || in.ID != current.ID || len(in.Items) != len(current.Items) {
+		return biz.ErrBadParam
+	}
+	for _, item := range in.Items {
+		if item.ToWarehouseID != nil {
+			if err := biz.ValidateWarehouseDataScopeAccess(scope, *item.ToWarehouseID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func validateInventoryOperationScope(item *biz.InventoryOperation, scope biz.WarehouseDataScope) error {
 	if item == nil {
 		return biz.ErrBadParam
@@ -168,6 +196,44 @@ func inventoryOperationCreateFromParams(pm map[string]any, actorID int) (*biz.In
 	return in, true
 }
 
+func inventoryOperationDraftSaveFromParams(pm map[string]any) (*biz.InventoryOperationDraftSave, bool) {
+	if !inventoryOperationAllowsOnly(pm, "id", "expected_version", "operation_no", "reason", "items") {
+		return nil, false
+	}
+	id, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
+	expectedVersion, versionOK := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+	rawItems, itemsOK := pm["items"].([]any)
+	if !idOK || !versionOK || !itemsOK || len(rawItems) == 0 {
+		return nil, false
+	}
+	in := &biz.InventoryOperationDraftSave{
+		ID: id, ExpectedVersion: expectedVersion,
+		OperationNo: getString(pm, "operation_no"), Reason: getString(pm, "reason"),
+	}
+	for _, raw := range rawItems {
+		params, ok := raw.(map[string]any)
+		if !ok || !inventoryOperationAllowsOnly(params, "id", "counted_quantity", "adjustment_quantity", "to_warehouse_id", "note") {
+			return nil, false
+		}
+		itemID, ok := getRequiredJSONRPCPositiveInt(params, "id")
+		if !ok {
+			return nil, false
+		}
+		counted, countedOK := getOptionalJSONRPCDecimalString(params, "counted_quantity")
+		adjustment, adjustmentOK := getOptionalInventoryOperationDecimal(params, "adjustment_quantity")
+		toWarehouseID, toWarehouseOK := getOptionalInventoryOperationPositiveInt(params, "to_warehouse_id")
+		note, noteOK := optionalJSONRPCString(params, "note")
+		if !countedOK || !adjustmentOK || !toWarehouseOK || !noteOK {
+			return nil, false
+		}
+		in.Items = append(in.Items, biz.InventoryOperationDraftItemSave{
+			ID: itemID, CountedQuantity: counted, AdjustmentQuantity: adjustment,
+			ToWarehouseID: toWarehouseID, Note: note,
+		})
+	}
+	return in, true
+}
+
 func inventoryOperationAllowsOnly(pm map[string]any, keys ...string) bool {
 	allowed := map[string]struct{}{}
 	for _, key := range keys {
@@ -203,6 +269,17 @@ func getOptionalInventoryOperationDecimal(pm map[string]any, key string) (decima
 		return decimal.Zero, true
 	}
 	return getRequiredJSONRPCNumeric20Scale6(pm, key)
+}
+func getOptionalInventoryOperationPositiveInt(pm map[string]any, key string) (*int, bool) {
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return nil, true
+	}
+	value, ok := getRequiredJSONRPCPositiveInt(pm, key)
+	if !ok {
+		return nil, false
+	}
+	return &value, true
 }
 func optionalDecimalToAny(value *decimal.Decimal) any {
 	if value == nil {

@@ -29,6 +29,7 @@ import {
   formatDeliveryDuration,
   formatDeliveryPercent,
   formatDeliveryRate,
+  formatDeliveryTimestamp,
   resolveDevVersionCenterView,
   shortGitSha,
   summarizePipelineTimings,
@@ -143,7 +144,13 @@ function summaryFixture() {
           buildPerformance: null,
         },
         issues: [],
-        events: [],
+        events: [
+          {
+            status: 'passed',
+            at: '2026-07-29T01:02:00.000Z',
+            message: 'immutable GitHub release is published',
+          },
+        ],
         confirmationRequired: '',
         terminal: true,
       },
@@ -280,6 +287,21 @@ test('delivery summary requires provider, target and no-shell boundaries', () =>
       }),
     /version/u
   )
+  for (const publishedAt of ['', 'not-a-date', '2026-07-29']) {
+    assert.throws(
+      () =>
+        validateDevDeliverySummary({
+          ...summaryFixture(),
+          versions: [
+            {
+              ...summaryFixture().versions[0],
+              publishedAt,
+            },
+          ],
+        }),
+      /version/u
+    )
+  }
   const deployed = {
     ...summaryFixture(),
     target: {
@@ -352,6 +374,71 @@ test('delivery summary requires provider, target and no-shell boundaries', () =>
       }),
     /version/u
   )
+})
+
+test('delivery operations require timezone-bearing ordered event timestamps', () => {
+  const assertInvalidTimeline = (change) => {
+    const summary = summaryFixture()
+    const operation = {
+      ...summary.operations[0],
+      events: summary.operations[0].events.map((event) => ({ ...event })),
+    }
+    summary.operations = [change(operation)]
+    assert.throws(() => validateDevDeliverySummary(summary), /operation/u)
+  }
+
+  assertInvalidTimeline((operation) => ({
+    ...operation,
+    createdAt: '2026-07-29T01:00:00',
+  }))
+  assertInvalidTimeline((operation) => ({
+    ...operation,
+    updatedAt: '2026-07-29T00:59:00.000Z',
+    events: [
+      {
+        ...operation.events[0],
+        at: '2026-07-29T00:59:00.000Z',
+      },
+    ],
+  }))
+  assertInvalidTimeline((operation) => ({ ...operation, events: [] }))
+  assertInvalidTimeline((operation) => ({
+    ...operation,
+    events: [{ ...operation.events[0], at: '2026-07-29T01:02:00' }],
+  }))
+  assertInvalidTimeline((operation) => ({
+    ...operation,
+    events: [{ ...operation.events[0], status: 'running' }],
+  }))
+  assertInvalidTimeline((operation) => ({
+    ...operation,
+    events: [{ ...operation.events[0], message: '' }],
+  }))
+  assertInvalidTimeline((operation) => ({
+    ...operation,
+    events: [
+      {
+        status: 'running',
+        at: '2026-07-29T01:01:30.000Z',
+        message: 'operation is running',
+      },
+      {
+        status: 'running',
+        at: '2026-07-29T01:01:00.000Z',
+        message: 'event order drifted',
+      },
+      operation.events[0],
+    ],
+  }))
+  assertInvalidTimeline((operation) => ({
+    ...operation,
+    events: [
+      {
+        ...operation.events[0],
+        at: '2026-07-29T01:01:59.000Z',
+      },
+    ],
+  }))
 })
 
 test('delivery client reuses one CSRF session and posts only the fixed action envelope', async () => {
@@ -441,6 +528,14 @@ test('delivery presentation helpers are deterministic and bounded', () => {
   assert.equal(formatDeliveryDuration(950), '950 ms')
   assert.equal(formatDeliveryDuration(5_400), '5.4 秒')
   assert.equal(formatDeliveryDuration(125_000), '2 分 5 秒')
+  assert.match(
+    formatDeliveryTimestamp('2026-07-29T01:02:03.000Z'),
+    /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/u
+  )
+  assert.equal(
+    formatDeliveryTimestamp('not-a-date', '发布时间未证明'),
+    '发布时间未证明'
+  )
   assert.equal(deliveryStatusPresentation('not_proven').label, '结果未证明')
   assert.equal(deliveryStatusPresentation('success').label, '成功')
   assert.equal(
@@ -552,6 +647,8 @@ test('pipeline timings validate nested stages and identify the measured bottlene
   assert.equal(summary.sampleCount, 1)
   assert.equal(summary.medianDurationMs, 600_000)
   assert.equal(summary.bottleneck.name, 'Build both images')
+  assert.equal(summary.bottleneck.startedAt, '2026-08-08T02:00:30.000Z')
+  assert.equal(summary.bottleneck.finishedAt, '2026-08-08T02:08:30.000Z')
   assert.equal(summary.criticalPath.durationMs, 600_000)
   assert.equal(summary.criticalPath.coveredDurationMs, 580_000)
   assert.equal(summary.criticalPath.schedulingGapMs, 20_000)
@@ -790,6 +887,31 @@ test('version center keeps critical state visible and uses stable tab pagination
   assert.match(versionCenterPageSource, /openOperations[.]map/u)
   assert.match(versionCenterPageSource, /dataSource=\{historyOperations\}/u)
   assert.match(versionCenterPageSource, /DevPipelineStatusStrip/u)
+  assert.match(versionCenterPageSource, /erp-dev-version-published-at/u)
+  assert.match(versionCenterPageSource, /发布于/u)
+  assert.match(
+    versionCenterPageSource,
+    /<DevDeliveryTimestamp[\s\S]*?value=\{record[.]publishedAt\}[\s\S]*?action="发布于"/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /value=\{strictProof[?][.]receipt[?][.]finishedAt\}/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /value=\{versions\[0\][?][.]publishedAt\}/u
+  )
+  assert.match(versionCenterPageSource, /value=\{operation[.]createdAt\}/u)
+  assert.match(versionCenterPageSource, /value=\{operation[.]updatedAt\}/u)
+  assert.match(
+    versionCenterPageSource,
+    /value=\{operationDetail[.]createdAt\}/u
+  )
+  assert.match(
+    versionCenterPageSource,
+    /value=\{operationDetail[.]updatedAt\}/u
+  )
+  assert.match(versionCenterPageSource, /value=\{event[.]at\}/u)
   assert.match(
     versionCenterPageSource,
     /pageSize: DEV_VERSION_CENTER_VERSION_PAGE_SIZE[\s\S]*showSizeChanger: false/u

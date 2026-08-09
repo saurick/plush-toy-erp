@@ -1352,6 +1352,12 @@ func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeader
 	}
 	if filter.Status != "" {
 		query = query.Where(bomheader.Status(filter.Status))
+	} else if statuses := biz.LifecycleStatusesForScope(
+		filter.LifecycleScope,
+		[]string{biz.BOMStatusDraft, biz.BOMStatusActive},
+		[]string{biz.BOMStatusArchived},
+	); len(statuses) > 0 {
+		query = query.Where(bomheader.StatusIn(statuses...))
 	}
 	if filter.Keyword != "" {
 		query = query.Where(bomheader.VersionContainsFold(filter.Keyword))

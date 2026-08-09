@@ -16,7 +16,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Popconfirm, Space, Tabs } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -27,7 +27,6 @@ import {
   BusinessPageLayout,
   PageHeaderCard,
   SearchInput,
-  SelectFilter,
   SelectionActionBar,
   SelectionClearAction,
   ToolbarButton,
@@ -43,6 +42,7 @@ import {
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
+import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import {
   ContactFormList,
   MasterDataFormFields,
@@ -106,10 +106,16 @@ import {
   needsUnitDictionary,
 } from '../components/master-data/masterDataPageConfig.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import {
+  LIFECYCLE_SCOPE,
+  lifecycleScopeFromSearchParams,
+  withLifecycleScopeSearchParam,
+} from '../utils/lifecycleScope.mjs'
 
 export default function V1MasterDataPage({ type }) {
   const isProductCatalogPage = type === 'product_skus'
   const outletContext = useOutletContext()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -122,9 +128,13 @@ export default function V1MasterDataPage({ type }) {
   const canReadMaterials = hasActionPermission(adminProfile, 'material.read')
   const canReadProcesses = hasActionPermission(adminProfile, 'process.read')
   const canReadContacts = hasActionPermission(adminProfile, 'contact.read')
-  const initialProductCatalogType = canReadProducts
-    ? 'products'
-    : 'product_skus'
+  const requestedProductCatalogType = searchParams.get('catalog')
+  const initialProductCatalogType =
+    requestedProductCatalogType === 'product_skus' && canReadProductSKUs
+      ? 'product_skus'
+      : canReadProducts
+        ? 'products'
+        : 'product_skus'
   const [productCatalogType, setProductCatalogType] = useState(
     initialProductCatalogType
   )
@@ -144,8 +154,12 @@ export default function V1MasterDataPage({ type }) {
   const isProcessDictionaryPage = effectiveType === 'processes'
   const [loading, setLoading] = useState(false)
   const [contactLoading, setContactLoading] = useState(false)
-  const [keyword, setKeyword] = useState('')
-  const [activeOnly, setActiveOnly] = useState(false)
+  const [keyword, setKeyword] = useState(
+    () => searchParams.get('keyword') || ''
+  )
+  const [lifecycleScope, setLifecycleScope] = useState(() =>
+    lifecycleScopeFromSearchParams(searchParams)
+  )
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
@@ -381,11 +395,11 @@ export default function V1MasterDataPage({ type }) {
         return nextContacts
       } catch (error) {
         if (isRpcAbortError(error) || !request.isCurrent()) {
-          return []
+          return null
         }
         message.error(getActionErrorMessage(error, '加载联系人'))
         setContacts([])
-        return []
+        return null
       } finally {
         if (request.isCurrent()) {
           setContactLoading(false)
@@ -502,9 +516,9 @@ export default function V1MasterDataPage({ type }) {
   const recordListParams = useMemo(
     () => ({
       keyword,
-      active_only: activeOnly,
+      lifecycle_scope: lifecycleScope,
     }),
-    [activeOnly, keyword]
+    [keyword, lifecycleScope]
   )
 
   const loadRecords = useCallback(async () => {
@@ -608,15 +622,22 @@ export default function V1MasterDataPage({ type }) {
         : { current: 1, pageSize: 20 }
     )
     setKeyword((current) => (current ? '' : current))
-    setActiveOnly((current) => (current ? false : current))
   }, [effectiveType])
 
-  const hasActiveFilters = Boolean(keyword.trim() || activeOnly)
+  const hasActiveFilters = Boolean(
+    keyword.trim() || lifecycleScope !== LIFECYCLE_SCOPE.CURRENT
+  )
   const clearFilters = useCallback(() => {
     setKeyword('')
-    setActiveOnly(false)
+    setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
+    const nextParams = withLifecycleScopeSearchParam(
+      searchParams,
+      LIFECYCLE_SCOPE.CURRENT
+    )
+    nextParams.delete('keyword')
+    setSearchParams(nextParams, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [])
+  }, [searchParams, setSearchParams])
 
   const handleProductCatalogTabChange = useCallback(
     (nextType) => {
@@ -629,8 +650,17 @@ export default function V1MasterDataPage({ type }) {
       startProductCatalogTransition(() => {
         setProductCatalogType(nextType)
       })
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set('catalog', nextType)
+      setSearchParams(nextParams, { replace: true })
     },
-    [canReadProductSKUs, canReadProducts, startProductCatalogTransition]
+    [
+      canReadProductSKUs,
+      canReadProducts,
+      searchParams,
+      setSearchParams,
+      startProductCatalogTransition,
+    ]
   )
 
   const openCreateRecord = () => {
@@ -700,9 +730,12 @@ export default function V1MasterDataPage({ type }) {
     if (!record?.id) return
     skuAttachmentRef.current?.clearPendingAttachments()
     setSelectedRecord(record)
-    setEditingRecord(record)
     recordForm.resetFields()
     const recordContacts = showContactForm ? await loadContacts(record) : []
+    if (showContactForm && !Array.isArray(recordContacts)) {
+      return
+    }
+    setEditingRecord(record)
     recordForm.setFieldsValue({
       ...record,
       ...(showContactForm
@@ -987,15 +1020,14 @@ export default function V1MasterDataPage({ type }) {
               }}
               onPressEnter={loadRecords}
             />
-            <SelectFilter
-              className="erp-business-filter-control--status"
-              options={[
-                { label: `全部${entityLabel}`, value: 'all' },
-                { label: `仅看启用${entityLabel}`, value: 'active' },
-              ]}
-              value={activeOnly ? 'active' : 'all'}
-              onChange={(nextValue) => {
-                setActiveOnly(nextValue === 'active')
+            <LifecycleScopeFilter
+              value={lifecycleScope}
+              onChange={(nextScope) => {
+                setLifecycleScope(nextScope)
+                setSearchParams(
+                  withLifecycleScopeSearchParam(searchParams, nextScope),
+                  { replace: true }
+                )
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
@@ -1210,7 +1242,7 @@ export default function V1MasterDataPage({ type }) {
               ref={productImageSlotsRef}
               productId={editingRecord?.id}
               open={recordModalOpen}
-              canEdit={canUpdate}
+              canEdit={editingRecord?.id ? canUpdate : canCreate}
             />
           ) : null}
           {effectiveType === 'product_skus' ? (

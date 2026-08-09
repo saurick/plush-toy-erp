@@ -45,6 +45,9 @@ const PermissionCenterPage = lazyRoute(
   () => import('./pages/PermissionCenterPage')
 )
 const AuditLogsPage = lazyRoute(() => import('./pages/AuditLogsPage.jsx'))
+const HistoryRecordsPage = lazyRoute(
+  () => import('./pages/HistoryRecordsPage.jsx')
+)
 const HelpCenterPage = lazyRoute(() => import('./pages/HelpCenterPage.jsx'))
 const V1MasterDataPage = lazyRoute(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazyRoute(() => import('./pages/V1SalesOrdersPage'))
@@ -417,6 +420,7 @@ export default function ERPRouter() {
               element={<PermissionCenterPage />}
             />
             <Route path="system/audit-logs" element={<AuditLogsPage />} />
+            <Route path="history" element={<HistoryRecordsPage />} />
             <Route path="help-center" element={<HelpCenterPage />} />
           </Route>
 

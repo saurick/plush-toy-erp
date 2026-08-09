@@ -4054,6 +4054,7 @@ var (
 		{Name: "purpose", Type: field.TypeString, Size: 32, Default: "SALES_DELIVERY"},
 		{Name: "customer_snapshot", Type: field.TypeString, Nullable: true, Size: 512},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "finance_release_status", Type: field.TypeString, Size: 32, Default: "PENDING"},
 		{Name: "finance_release_version", Type: field.TypeInt, Default: 1},
 		{Name: "finance_released_at", Type: field.TypeTime, Nullable: true},
@@ -4081,19 +4082,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipments_customers_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[20]},
+				Columns:    []*schema.Column{ShipmentsColumns[21]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipments_sales_orders_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[21]},
+				Columns:    []*schema.Column{ShipmentsColumns[22]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipments_rework_intakes_rework_intake",
-				Columns:    []*schema.Column{ShipmentsColumns[22]},
+				Columns:    []*schema.Column{ShipmentsColumns[23]},
 				RefColumns: []*schema.Column{ReworkIntakesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -4107,17 +4108,17 @@ var (
 			{
 				Name:    "shipment_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{ShipmentsColumns[12]},
+				Columns: []*schema.Column{ShipmentsColumns[13]},
 			},
 			{
 				Name:    "shipment_sales_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[21]},
+				Columns: []*schema.Column{ShipmentsColumns[22]},
 			},
 			{
 				Name:    "shipment_rework_intake_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[22]},
+				Columns: []*schema.Column{ShipmentsColumns[23]},
 			},
 			{
 				Name:    "shipment_purpose_status",
@@ -4127,7 +4128,7 @@ var (
 			{
 				Name:    "shipment_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[20]},
+				Columns: []*schema.Column{ShipmentsColumns[21]},
 			},
 			{
 				Name:    "shipment_status",
@@ -5352,6 +5353,7 @@ func init() {
 		"shipments_requested_total_net_weight_g_positive": "requested_total_net_weight_g IS NULL OR requested_total_net_weight_g > 0",
 		"shipments_status_allowed":                        "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
 		"shipments_total_net_weight_g_positive":           "total_net_weight_g IS NULL OR total_net_weight_g > 0",
+		"shipments_version_positive":                      "version > 0",
 	}
 	ShipmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ShipmentItemsTable.ForeignKeys[1].RefTable = ProductsTable

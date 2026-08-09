@@ -14,7 +14,7 @@ test('shipment sales-order import is separately permission gated', () => {
 })
 
 test('shipment source references can only be established by candidate import', () => {
-  assert.match(source, /sourceSelectionOnly=\{isCreateModal\}/u)
+  assert.match(source, /sourceSelectionOnly=\{isWritableModal\}/u)
   assert.match(
     source,
     /label="销售订单"[\s\S]*?<Select[\s\S]*?disabled=\{disabled \|\| sourceSelectionOnly\}/u
@@ -29,6 +29,25 @@ test('shipment source references can only be established by candidate import', (
   )
   assert.match(source, /disabled=\{sourceSelectionDisabled\}/u)
   assert.match(source, /addDisabled=\{Boolean\(selectedSalesOrder\)\}/u)
+})
+
+test('shipment create and edit share one writable field tree while view is immutable', () => {
+  assert.match(
+    source,
+    /const isWritableModal = isCreateModal \|\| isEditModal/u
+  )
+  assert.match(
+    source,
+    /const canSave = isCreateModal \? canCreate : isEditModal \? canUpdate : false/u
+  )
+  assert.match(source, /disabled=\{!isWritableModal\}/u)
+  assert.match(
+    source,
+    /\{isWritableModal \? \([\s\S]*?<Form\.List name="items">/u
+  )
+  assert.match(source, /canUpload=\{isWritableModal && canSave\}/u)
+  assert.match(source, /canWithdraw=\{isWritableModal && canSave\}/u)
+  assert.doesNotMatch(source, /canWithdraw=\{canCreate \|\| canShip\}/u)
 })
 
 test('shipment source labels prefer immutable snapshots and use current display fallbacks', () => {

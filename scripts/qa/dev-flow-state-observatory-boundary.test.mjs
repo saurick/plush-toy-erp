@@ -12,6 +12,11 @@ import {
   buildFactDefinitionSelectOptions,
   buildStateDefinitionSelectOptions,
 } from "../../web/src/dev-workbench/pages/devFlowDefinitionSelectOptions.mjs";
+import {
+  DEV_FLOW_STATE_DEFAULT_VIEW,
+  DEV_FLOW_STATE_QUERY_KEYS,
+  canonicalizeDevFlowStateSearchParams,
+} from "../../web/src/dev-workbench/pages/devFlowStateQuery.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const read = (path) => readFileSync(resolve(ROOT, path), "utf8");
@@ -103,7 +108,8 @@ test("dev flow state observatory: five-view information architecture explains pe
       .map((match) => match[1]),
     ["chain", "workflow", "runtime", "facts", "states"],
   );
-  assert.match(page, /const DEFAULT_VIEW = 'chain'/u);
+  assert.equal(DEV_FLOW_STATE_DEFAULT_VIEW, "chain");
+  assert.match(page, /DEV_FLOW_STATE_DEFAULT_VIEW as DEFAULT_VIEW/u);
   assert.match(
     page,
     /把基础资料、来源单据、人、路、业务动作、账、规则和计算结果串起来/u,
@@ -116,7 +122,7 @@ test("dev flow state observatory: five-view information architecture explains pe
   assert.match(page, /catalog\.businessChainOverview\.key/u);
   assert.match(page, /buildBusinessChainSelectOptions\(catalog\)/u);
   assert.match(page, /总图只画链与链的衔接/u);
-  assert.match(page, /12 个节点分别代表 12 条真实业务链/u);
+  assert.match(page, /12 个节点分别代表 12 条正式设计链/u);
   assert.match(page, /一次只看一条业务链/u);
   assert.match(page, /业务链先看步骤，再查运行证据/u);
   assert.match(page, /查询任务后，只高亮真实运行到的一个步骤/u);
@@ -173,8 +179,9 @@ test("dev flow state observatory: long definition selects are grouped without ch
   );
   assert.deepEqual(
     factOptions.map((group) => group.label),
-    ["采购与质量 · 5", "生产与库存 · 7", "委外与返工 · 3", "出货与财务 · 6"],
+    ["采购与质量 · 5", "生产与库存 · 6", "委外与返工 · 3", "出货与财务 · 6"],
   );
+  assert.equal(factOptions.flatMap((group) => group.options).length, 20);
   assert.equal(
     stateOptions.flatMap((group) => group.options).length,
     catalog.flows.length,
@@ -290,24 +297,30 @@ test("dev flow state observatory: pasted business text search is local, grouped,
   );
 });
 
-test("dev flow state observatory: deep links fail closed, isolate each view, and keep chain return context", () => {
+test("dev flow state observatory: deep links clear stale selections, fail closed for invalid values, and keep chain return context", () => {
   const page = read(
     "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
   );
 
-  for (const queryKey of [
-    "view: 'view'",
-    "chain: 'chain'",
-    "node: 'node'",
-    "flow: 'flow'",
-    "state: 'state'",
-    "process: 'process'",
-    "fact: 'fact'",
-    "taskId: 'task_id'",
-  ]) {
-    assert(page.includes(queryKey), `missing deep-link key: ${queryKey}`);
-  }
+  assert.deepEqual(Object.values(DEV_FLOW_STATE_QUERY_KEYS), [
+    "view",
+    "chain",
+    "node",
+    "flow",
+    "state",
+    "process",
+    "fact",
+    "task_id",
+  ]);
+  const canonical = canonicalizeDevFlowStateSearchParams(
+    new URLSearchParams(
+      "view=chain&chain=all&process=production_exception_approval%2Fexception_decision_approval",
+    ),
+  );
+  assert.equal(canonical.changed, true);
+  assert.equal(canonical.searchParams.toString(), "view=chain&chain=all");
   assert.doesNotMatch(page, /search: 'q'/u);
+  assert.match(page, /canonicalizeDevFlowStateSearchParams/u);
   assert.match(page, /function invalidQueryMessages/u);
   assert.match(page, /VIEW_SELECTION_QUERY_KEYS/u);
   assert.match(page, /SELECTION_QUERY_KEYS/u);
@@ -329,6 +342,8 @@ test("dev flow state observatory: deep links fail closed, isolate each view, and
   assert.match(page, /data-business-chain-overview/u);
   assert.match(page, /data-overview-chain/u);
   assert.match(page, /data-overview-relation/u);
+  assert.match(page, /<details[\s\S]{0,140}?data-overview-lane/u);
+  assert.match(page, /open=\{lane\.key === 'primary'\}/u);
 });
 
 test("dev flow state observatory: customer review print is generated from the shared catalog and contains no second flow catalog", () => {
@@ -519,6 +534,80 @@ test("dev flow state observatory: Runtime completion never promotes Workflow or 
   );
 });
 
+test("dev flow state observatory: state rules explain exceptional paths without becoming a state writer", () => {
+  const page = read(
+    "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
+  );
+  const presentation = read(
+    "web/src/dev-workbench/pages/devFlowStateRulePresentation.mjs",
+  );
+  const styles = read(
+    "web/src/dev-workbench/styles/dev-flow-state-observatory.css",
+  );
+
+  for (const copy of [
+    "这里只展示这个对象自己的合法转换",
+    "图中的彩色线和短标签共同区分路径",
+    "允许的状态转换",
+    "异常与纠正",
+    "当前状态",
+    "什么时候可以",
+    "转换后到哪里",
+    "这条路径代表什么",
+    "影响边界",
+    "要看实际原因或完整影响",
+  ]) {
+    assert(page.includes(copy), `missing state-rule explanation: ${copy}`);
+  }
+  assert.match(page, /data-exceptional=/u);
+  assert.match(page, /data-path-group=/u);
+  assert.match(page, /buildDevFlowStateRuleMermaid/u);
+  assert.match(page, /--erp-dev-state-path-color/u);
+  assert.match(page, /buildDevFlowStateRelatedViews/u);
+  assert.match(page, /filterDevFlowStateTransitions/u);
+  assert.match(page, /aria-label="状态转换筛选"/u);
+  assert.doesNotMatch(page, /生命周期转换/u);
+
+  for (const group of [
+    "正常推进",
+    "暂停与恢复",
+    "不通过与终止",
+    "纠正与退回",
+    "返工与再处理",
+  ]) {
+    assert(presentation.includes(group), `missing path group: ${group}`);
+  }
+  assert.match(page, /label: '全部'/u);
+  assert.match(page, /label: '异常与纠正'/u);
+  assert.match(page, /label: '当前状态'/u);
+  assert.match(presentation, /all: 'all'/u);
+  assert.match(presentation, /exceptional: 'exceptional'/u);
+  assert.match(presentation, /related: 'related'/u);
+  assert.match(presentation, /按登记规则转换/u);
+  assert.match(presentation, /flowchart LR/u);
+  assert.match(presentation, /linkStyle/u);
+  for (const color of ["#2b8a3e", "#d46b08", "#cf1322", "#1677ff", "#722ed1"]) {
+    assert(
+      presentation.includes(color),
+      `missing diagram path color: ${color}`,
+    );
+  }
+
+  assert.match(
+    styles,
+    /\.erp-dev-flow-state-path-legend article > span[\s\S]*?width: 12px[\s\S]*?height: 12px/u,
+  );
+  assert.match(styles, /background: var\(--erp-dev-state-path-color\)/u);
+  assert.match(
+    styles,
+    /@media \(max-width: 760px\)[\s\S]*?\.erp-dev-flow-state-graph[\s\S]*?display: none/u,
+  );
+  assert.match(
+    styles,
+    /\.erp-dev-flow-state-list ul[\s\S]*?max-height: none[\s\S]*?overflow-y: visible/u,
+  );
+});
+
 test("dev flow state observatory: evidence is collapsed and no risky business write is imported", () => {
   const page = read(
     "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
@@ -581,6 +670,10 @@ test("dev flow state observatory: responsive CSS uses a mobile step list and rem
   assert.match(
     css,
     /\.erp-dev-flow-overview-lanes button[\s\S]*?min-height: 108px/u,
+  );
+  assert.match(
+    css,
+    /\.erp-dev-flow-overview-lanes > details\[open\] > summary/u,
   );
   assert.match(
     css,

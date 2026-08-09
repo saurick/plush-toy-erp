@@ -38,6 +38,12 @@ import {
   normalizeOperationalFactLifecycleRequest,
   validateOperationalFactLifecycleResult,
 } from '../utils/operationalFactLifecycle.mjs'
+import {
+  OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS,
+  normalizeOutsourcingFactDraftSaveRequest,
+  normalizeProductionFactDraftSaveRequest,
+  validateOperationalFactDraftSaveResult,
+} from '../utils/operationalFactDraftEdit.mjs'
 
 const operationalFactRpc = new JsonRpc({
   url: 'operational_fact',
@@ -121,6 +127,61 @@ export async function createProductionReworkFromCompletion(params = {}) {
   )
 }
 
+async function saveProductionFactDraft(action, params = {}, original = {}) {
+  const request = normalizeProductionFactDraftSaveRequest(action, params)
+  const result = await operationalFactRpc.call(action, request)
+  return validateOperationalFactDraftSaveResult(
+    dataOf(result)?.production_fact,
+    request,
+    original,
+    action
+  )
+}
+
+export async function saveProductionMaterialIssueDraft(
+  params = {},
+  original = {}
+) {
+  return saveProductionFactDraft(
+    OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE,
+    params,
+    original
+  )
+}
+
+export async function saveProductionCompletionDraft(
+  params = {},
+  original = {}
+) {
+  return saveProductionFactDraft(
+    OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION,
+    params,
+    original
+  )
+}
+
+export async function saveProductionReworkFromCompletionDraft(
+  params = {},
+  original = {}
+) {
+  return saveProductionFactDraft(
+    OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION,
+    params,
+    original
+  )
+}
+
+export async function saveProductionReworkFromIntakeDraft(
+  params = {},
+  original = {}
+) {
+  return saveProductionFactDraft(
+    OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE,
+    params,
+    original
+  )
+}
+
 export async function postProductionFact(params = {}) {
   return runOperationalFactLifecycle({
     method: 'post_production_fact',
@@ -196,6 +257,39 @@ export async function createOutsourcingReturnReceiptFromOrder(params = {}) {
     { id: request.outsourcing_order_id },
     { id: request.outsourcing_order_item_id, subject_type: 'PRODUCT' },
     request
+  )
+}
+
+async function saveOutsourcingFactDraft(action, params = {}, original = {}) {
+  const request = normalizeOutsourcingFactDraftSaveRequest(action, params)
+  const result = await operationalFactRpc.call(action, request)
+  return validateOperationalFactDraftSaveResult(
+    dataOf(result)?.outsourcing_fact,
+    request,
+    original,
+    action
+  )
+}
+
+export async function saveOutsourcingMaterialIssueDraft(
+  params = {},
+  original = {}
+) {
+  return saveOutsourcingFactDraft(
+    OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_MATERIAL_ISSUE,
+    params,
+    original
+  )
+}
+
+export async function saveOutsourcingReturnReceiptDraft(
+  params = {},
+  original = {}
+) {
+  return saveOutsourcingFactDraft(
+    OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_RETURN_RECEIPT,
+    params,
+    original
   )
 }
 
@@ -334,6 +428,11 @@ export async function createShipmentWithItems(params = {}) {
     'create_shipment_with_items',
     params
   )
+  return dataOf(result)?.shipment || null
+}
+
+export async function saveShipmentDraft(params = {}) {
+  const result = await operationalFactRpc.call('save_shipment_draft', params)
   return dataOf(result)?.shipment || null
 }
 
@@ -499,39 +598,57 @@ export async function listReworkIntakeSourceCandidates(
   return dataOf(result)
 }
 
+function reworkIntakeSourceCandidateIdentityKey(item) {
+  const sourceShipmentItemID = Number(item?.source_shipment_item_id || 0)
+  const targetProductionOrderItemID = Number(
+    item?.target_production_order_item_id || 0
+  )
+  if (
+    !Number.isSafeInteger(sourceShipmentItemID) ||
+    sourceShipmentItemID <= 0 ||
+    !Number.isSafeInteger(targetProductionOrderItemID) ||
+    targetProductionOrderItemID <= 0
+  ) {
+    return ''
+  }
+  return `${sourceShipmentItemID}:${targetProductionOrderItemID}`
+}
+
 export async function listAllReworkIntakeSourceCandidates(
   params = {},
   options = {}
 ) {
-  return listAllPaginatedRecords(
-    async (pageParams, pageOptions) => {
-      const data = await listReworkIntakeSourceCandidates(
-        pageParams,
-        pageOptions
-      )
-      return {
-        ...data,
-        rework_intake_source_candidates: (
-          data?.rework_intake_source_candidates || []
-        ).map((item) => ({
-          ...item,
-          id: `${Number(item?.source_shipment_item_id || 0)}:${Number(
-            item?.target_production_order_item_id || 0
-          )}`,
-        })),
-      }
-    },
+  const data = await listAllPaginatedRecords(
+    listReworkIntakeSourceCandidates,
     params,
     'rework_intake_source_candidates',
     options,
     {
       invalidResponseMessage: '服务器返回的可返工出货明细不完整，请刷新后重试',
+      recordIdentityKey: reworkIntakeSourceCandidateIdentityKey,
     }
   )
+  return {
+    ...data,
+    rework_intake_source_candidates: data.rework_intake_source_candidates.map(
+      (item) => ({
+        ...item,
+        id: reworkIntakeSourceCandidateIdentityKey(item),
+      })
+    ),
+  }
 }
 
 export async function createReworkIntake(params = {}) {
   const result = await operationalFactRpc.call('create_rework_intake', params)
+  return dataOf(result)?.rework_intake || null
+}
+
+export async function saveReworkIntakeDraft(params = {}) {
+  const result = await operationalFactRpc.call(
+    'save_rework_intake_draft',
+    params
+  )
   return dataOf(result)?.rework_intake || null
 }
 

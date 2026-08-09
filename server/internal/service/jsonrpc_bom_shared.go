@@ -141,11 +141,12 @@ func bomItemSaveMutationsFromParams(pm map[string]any) ([]*biz.BOMItemSaveMutati
 
 func bomHeaderFilterFromParams(pm map[string]any) biz.BOMHeaderFilter {
 	return biz.BOMHeaderFilter{
-		ProductID: getInt(pm, "product_id", 0),
-		Status:    getString(pm, "status"),
-		Keyword:   getString(pm, "keyword"),
-		Limit:     getInt(pm, "limit", 50),
-		Offset:    getInt(pm, "offset", 0),
+		ProductID:      getInt(pm, "product_id", 0),
+		Status:         getString(pm, "status"),
+		LifecycleScope: getString(pm, "lifecycle_scope"),
+		Keyword:        getString(pm, "keyword"),
+		Limit:          getInt(pm, "limit", 50),
+		Offset:         getInt(pm, "offset", 0),
 	}
 }
 

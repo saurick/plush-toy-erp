@@ -12,13 +12,17 @@ export async function listAllPaginatedRecords(
   recordKey,
   options = {},
   {
-    invalidResponseMessage =
-      '服务器返回的列表不完整，请刷新后重试',
+    invalidResponseMessage = '服务器返回的列表不完整，请刷新后重试',
+    recordIdentityKey,
   } = {}
 ) {
-  const invalidResponse = () =>
-    invalidPaginatedResponse(invalidResponseMessage)
-  if (typeof listPage !== 'function' || typeof recordKey !== 'string') {
+  const invalidResponse = () => invalidPaginatedResponse(invalidResponseMessage)
+  const usesCustomIdentity = recordIdentityKey !== undefined
+  if (
+    typeof listPage !== 'function' ||
+    typeof recordKey !== 'string' ||
+    (usesCustomIdentity && typeof recordIdentityKey !== 'function')
+  ) {
     throw invalidResponse()
   }
 
@@ -56,12 +60,16 @@ export async function listAllPaginatedRecords(
     expectedTotal ??= total
     lastData = data
     for (const record of page) {
-      const recordID = record?.id
-      if (
-        !Number.isSafeInteger(recordID) ||
-        recordID <= 0 ||
-        recordIDs.has(recordID)
-      ) {
+      let recordID
+      try {
+        recordID = usesCustomIdentity ? recordIdentityKey(record) : record?.id
+      } catch {
+        throw invalidResponse()
+      }
+      const validRecordIdentity = usesCustomIdentity
+        ? typeof recordID === 'string' && recordID.trim().length > 0
+        : Number.isSafeInteger(recordID) && recordID > 0
+      if (!validRecordIdentity || recordIDs.has(recordID)) {
         throw invalidResponse()
       }
       recordIDs.add(recordID)

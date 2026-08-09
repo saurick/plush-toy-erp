@@ -7,6 +7,15 @@ const source = readFileSync(
   'utf8'
 )
 
+test('production material issue reuses the same operator field tree for edit', () => {
+  assert.match(source, /mode = 'create'/u)
+  assert.match(source, /initialValues = null/u)
+  assert.match(source, /编辑生产领料草稿/u)
+  assert.match(source, /保存草稿/u)
+  assert.match(source, /initialValues\?\.warehouse_id/u)
+  assert.match(source, /initialValues\?\.lot_id/u)
+})
+
 test('production material issue modal only exposes operator-owned business fields', () => {
   for (const label of [
     '生产订单',

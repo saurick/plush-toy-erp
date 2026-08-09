@@ -138,6 +138,12 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 	}
 	if filter.LifecycleStatus != "" {
 		query = query.Where(salesorder.LifecycleStatus(filter.LifecycleStatus))
+	} else if statuses := biz.LifecycleStatusesForScope(
+		filter.LifecycleScope,
+		[]string{biz.SalesOrderStatusDraft, biz.SalesOrderStatusSubmitted, biz.SalesOrderStatusActive},
+		[]string{biz.SalesOrderStatusClosed, biz.SalesOrderStatusCanceled},
+	); len(statuses) > 0 {
+		query = query.Where(salesorder.LifecycleStatusIn(statuses...))
 	}
 	if filter.DateField != "" {
 		query = applySalesOrderDateRange(query, filter)

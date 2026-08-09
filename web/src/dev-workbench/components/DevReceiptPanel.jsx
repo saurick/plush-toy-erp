@@ -14,18 +14,9 @@ import {
 } from '../config/devReceipts.mjs'
 import { formatDeliveryDuration } from '../config/devDelivery.mjs'
 import { DevTimingBars } from './DevPipelineTimingPanel.jsx'
+import DevTimestamp from './DevTimestamp.jsx'
 
 const { Text, Title } = Typography
-
-function formatTimestamp(value) {
-  const timestamp = Date.parse(value || '')
-  if (!Number.isFinite(timestamp)) return '时间未记录'
-  return new Intl.DateTimeFormat('zh-CN', {
-    dateStyle: 'short',
-    timeStyle: 'medium',
-    hour12: false,
-  }).format(new Date(timestamp))
-}
 
 function ReceiptCard({ item }) {
   const { receipt } = item
@@ -64,7 +55,11 @@ function ReceiptCard({ item }) {
       </div>
       <Text className="erp-dev-receipt-card__identity">
         {receipt.gitCommit.slice(0, 12)} · {receipt.treeState} ·{' '}
-        {formatTimestamp(receipt.finishedAt)}
+        <DevTimestamp
+          value={receipt.finishedAt}
+          action="完成于"
+          missing="完成时间未证明"
+        />
       </Text>
       {receipt.databaseRunIdentity ? (
         <Text className="erp-dev-receipt-card__identity">

@@ -15,9 +15,10 @@ import (
 
 type recordingWorkflowRevisionJSONRPCRepo struct {
 	stubWorkflowJSONRPCRepo
-	listFilter biz.WorkflowTaskFilter
-	boardQuery biz.WorkflowTaskBoardQuery
-	roleQuery  biz.WorkflowRoleTaskViewQuery
+	listFilter     biz.WorkflowTaskFilter
+	boardQuery     biz.WorkflowTaskBoardQuery
+	roleQuery      biz.WorkflowRoleTaskViewQuery
+	workbenchQuery biz.WorkflowWorkbenchQuery
 }
 
 func (r *recordingWorkflowRevisionJSONRPCRepo) ListWorkflowTasks(_ context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
@@ -63,6 +64,23 @@ func (r *recordingWorkflowRevisionJSONRPCRepo) ListWorkflowRoleTaskView(_ contex
 	return page, nil
 }
 
+func (r *recordingWorkflowRevisionJSONRPCRepo) GetWorkflowWorkbench(_ context.Context, query biz.WorkflowWorkbenchQuery) (*biz.WorkflowWorkbenchPage, error) {
+	r.workbenchQuery = query
+	return &biz.WorkflowWorkbenchPage{
+		SnapshotAt: query.SnapshotAt,
+		QueueKey:   query.QueueKey,
+		Total:      1,
+		Limit:      query.Limit,
+		Offset:     query.Offset,
+		Items: []*biz.WorkflowTask{{
+			ID:            1,
+			Version:       1,
+			TaskStatusKey: "ready",
+		}},
+		Counts: biz.WorkflowWorkbenchCounts{Actionable: 1},
+	}, nil
+}
+
 type workflowTaskRevisionErrorCustomerConfigRepo struct {
 	biz.CustomerConfigRepo
 	err error
@@ -77,6 +95,7 @@ func TestWorkflowTaskQueryVisibilityScopeKeepsRevisionPairsAcrossAllEntryPoints(
 	customerConfigUC := workflowTaskRevisionCustomerConfigUC()
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.WarehouseRoleKey},
+		biz.PermissionERPWorkbenchRead,
 		biz.PermissionWorkflowTaskRead,
 		biz.PermissionMobileWarehouseAccess,
 	)

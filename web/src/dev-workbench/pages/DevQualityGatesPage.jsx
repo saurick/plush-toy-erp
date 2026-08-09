@@ -3,6 +3,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   InfoCircleOutlined,
+  QuestionCircleOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
   StopOutlined,
@@ -11,7 +12,6 @@ import {
   Alert,
   Button,
   Descriptions,
-  Drawer,
   Empty,
   List,
   Progress,
@@ -19,13 +19,16 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
+import { MermaidDiagram } from '@/common/components/markdown'
 import { message, modal } from '@/common/utils/antdApp'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   DEFAULT_VIEW,
   DEV_QUALITY_GATE_ACTIVE_STATUSES,
@@ -34,15 +37,19 @@ import {
   DEV_QUALITY_GATE_GAP_RISKS,
   DEV_QUALITY_GATE_PROFILES,
   VIEW_ITEMS,
+  buildQualityGateCoverageMatrix,
+  buildQualityGateHistoryTrend,
+  buildQualityGateStageDurationComposition,
   buildQualityGateViewSearch,
   createDevQualityGateClient,
   createQualityGateIdempotencyKey,
   formatQualityGateDuration,
+  getQualityGateFlowSegments,
   getQualityGateStageLabel,
   getQualityGateStatusMeta,
   parseQualityGateSearch,
+  selectDisplayedQualityGateOperation,
 } from '../config/devQualityGates.mjs'
-import { DEV_VERSION_CENTER_ROUTE } from '../config/devRoutes.mjs'
 
 const { Paragraph, Text, Title } = Typography
 const POLL_INTERVAL_MS = 1500
@@ -63,6 +70,7 @@ const STAGE_STATUS = Object.freeze({
   running: Object.freeze({ label: '正在运行', color: 'processing' }),
   passed: Object.freeze({ label: '已通过', color: 'success' }),
   failed: Object.freeze({ label: '未通过', color: 'error' }),
+  not_run: Object.freeze({ label: '未执行', color: 'default' }),
 })
 const GOVERNANCE_FILTER_OPTIONS = Object.freeze([
   Object.freeze({ label: '与当前改动有关', value: 'relevant' }),
@@ -77,6 +85,29 @@ const GAP_RISK_OPTIONS = Object.freeze([
   Object.freeze({ label: '全部风险', value: 'all' }),
   Object.freeze({ label: '只看高风险', value: 'high' }),
 ])
+const COVERAGE_STATUS = Object.freeze({
+  current: Object.freeze({ label: '✓ 当前有效', tone: 'success' }),
+  stale: Object.freeze({ label: '△ 旧结果', tone: 'warning' }),
+  missing: Object.freeze({ label: '— 未运行', tone: 'missing' }),
+  not_applicable: Object.freeze({ label: '· 不适用', tone: 'neutral' }),
+})
+const MANAGED_DATABASE_STEPS = Object.freeze([
+  '优先核对是否已登记可用的本机隔离数据库环境。',
+  '未登记时，为本次 operation 创建专用 PostgreSQL 运行环境。',
+  '在选定环境中运行同一套正式 full 或 strict runner。',
+  '无论通过、失败或取消，都精确清理本次进程与数据库资源。',
+  '只有正式回执和清理读回都能证明时，operation 才能报告终态。',
+])
+const MANAGED_DATABASE_FLOW = String.raw`flowchart LR
+  START["发起 full 或 strict"] --> READY{"已有登记的本机隔离环境？"}
+  READY -->|"有"| REGISTERED["使用已登记环境"]
+  READY -->|"没有"| MANAGED["创建本次专用 PostgreSQL"]
+  REGISTERED --> RUNNER["运行同一正式门禁"]
+  MANAGED --> RUNNER
+  RUNNER --> CLEANUP["精确清理本次资源并读回"]
+  CLEANUP --> PROVEN{"回执与清理都可证明？"}
+  PROVEN -->|"是"| TERMINAL["报告正式终态"]
+  PROVEN -->|"否"| CLOSED["失败关闭，不报告通过"]`
 
 function shortCommit(commit) {
   return typeof commit === 'string' && commit.length >= 12
@@ -148,11 +179,9 @@ function comparableDurations(summary, profile) {
 }
 
 function estimatedRemaining(summary, operation) {
-  if (
-    !operation ||
-    !DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)
-  ) {
-    return '暂无法估计'
+  if (!operation) return '尚未运行'
+  if (!DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)) {
+    return operation.status === 'passed' ? '已完成' : '已结束'
   }
   const durations = comparableDurations(summary, operation.profile)
   if (durations.length < 3) return '暂无法估计'
@@ -164,7 +193,9 @@ function estimatedRemaining(summary, operation) {
 
 function deriveStages(summary, operation) {
   if (!operation) return []
-  const expected = summary?.profiles?.[operation.profile]?.stages || []
+  const definition = summary?.profiles?.[operation.profile]
+  const expected = definition?.stages || []
+  const substeps = definition?.substeps || {}
   const actual = new Map(
     (operation.stageTimings || []).map((stage) => [stage.id, stage])
   )
@@ -176,12 +207,15 @@ function deriveStages(summary, operation) {
     durationMs: null,
     ...actual.get(stage.id),
     label: getQualityGateStageLabel(stage, expected),
+    substeps: substeps[stage.id] || [],
   }))
   for (const stage of operation.stageTimings || []) {
     if (!stages.some((item) => item.id === stage.id)) {
       stages.push({
         ...stage,
         label: getQualityGateStageLabel(stage, expected),
+        parallel: false,
+        substeps: [],
       })
     }
   }
@@ -196,6 +230,82 @@ function stageProgress(stages) {
     return total
   }, 0)
   return Math.round((completed / stages.length) * 100)
+}
+
+function previewStages(summary, profile) {
+  const definition = summary?.profiles?.[profile]
+  const expected = definition?.stages || []
+  const substeps = definition?.substeps || {}
+  return expected.map((stage) => ({
+    ...stage,
+    status: 'pending',
+    startedAt: null,
+    finishedAt: null,
+    durationMs: null,
+    label: getQualityGateStageLabel(stage, expected),
+    substeps: substeps[stage.id] || [],
+  }))
+}
+
+function flowStageStatus(stage, operation) {
+  if (stage.status !== 'pending' || !operation) return stage.status
+  return DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)
+    ? 'pending'
+    : 'not_run'
+}
+
+function flowGroups(summary, profile, stages) {
+  const definitions = getQualityGateFlowSegments(summary?.profiles, profile)
+  const actual = new Map(stages.map((stage) => [stage.id, stage]))
+  const knownIds = new Set()
+  const groups = definitions
+    .map((segment) => {
+      const segmentStages = segment.stages
+        .map((stage) => {
+          knownIds.add(stage.id)
+          return actual.get(stage.id)
+        })
+        .filter(Boolean)
+      return { ...segment, stages: segmentStages }
+    })
+    .filter((segment) => segment.stages.length > 0)
+  const unregistered = stages.filter((stage) => !knownIds.has(stage.id))
+  if (unregistered.length > 0) {
+    groups.push({
+      id: 'unregistered-runtime',
+      label: '未登记运行阶段',
+      scopeLabel: '需要核对',
+      stages: unregistered,
+    })
+  }
+  return groups
+}
+
+function terminalEvidence(operation) {
+  const active = Boolean(
+    operation && DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)
+  )
+  const receipt = !operation
+    ? { status: 'pending', label: '运行后生成' }
+    : operation.receipt?.status === 'passed'
+      ? { status: 'passed', label: '已取得通过回执' }
+      : operation.receipt?.status === 'failed'
+        ? { status: 'failed', label: '已取得失败回执' }
+        : active
+          ? { status: 'pending', label: '等待门禁终态' }
+          : { status: 'not_run', label: '未取得正式回执' }
+  const cleanup = !operation
+    ? { status: 'pending', label: '运行后读回' }
+    : operation.cleanup?.status === 'complete'
+      ? { status: 'passed', label: '已完成清理读回' }
+      : operation.cleanup?.status === 'not_required'
+        ? { status: 'passed', label: '无需页面管理的清理' }
+        : operation.cleanup?.status === 'failed'
+          ? { status: 'failed', label: '清理读回未通过' }
+          : active
+            ? { status: 'pending', label: '等待运行结束' }
+            : { status: 'not_run', label: '清理状态尚未证明' }
+  return { receipt, cleanup }
 }
 
 function renderGovernanceEvidence(row) {
@@ -231,12 +341,6 @@ function renderGovernanceEvidence(row) {
   )
 }
 
-function stageShare(stage, operation) {
-  const total = operationDuration(operation)
-  if (!Number.isFinite(stage.durationMs) || !total) return '—'
-  return `${Math.round((stage.durationMs / total) * 100)}%`
-}
-
 function longestStageId(stages) {
   return stages.reduce(
     (longest, stage) =>
@@ -245,7 +349,14 @@ function longestStageId(stages) {
   )?.id
 }
 
-function currentStageLabel(stages) {
+function currentStageLabel(stages, operation) {
+  if (operation?.status === 'passed') return '全部完成'
+  if (
+    operation &&
+    !DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)
+  ) {
+    return stages.find((stage) => stage.status === 'failed')?.label || '已结束'
+  }
   return (
     stages.find((stage) => stage.status === 'running')?.label ||
     stages.find((stage) => stage.status === 'failed')?.label ||
@@ -259,16 +370,20 @@ function OperationStatusTag({ operation }) {
   return <Tag color={meta.tone}>{meta.label}</Tag>
 }
 
+function operationUpdateAction(operation) {
+  return operation?.finishedAt ? '完成于' : '更新于'
+}
+
 function ContextStrip({ summary, view, onReturnRun }) {
-  const strictOperation = summary?.operations?.find(
-    (operation) => operation.profile === 'strict'
-  )
+  const strictProof = summary?.proofs?.strict
   const strictStatus =
     summary?.currentOperation?.profile === 'strict'
       ? `${getQualityGateStatusMeta(summary.currentOperation.status).label} ${formatQualityGateDuration(operationDuration(summary.currentOperation))}`
-      : strictOperation
-        ? getQualityGateStatusMeta(strictOperation.status).label
-        : getQualityGateStatusMeta(summary?.proofs?.strict?.status).label
+      : strictProof?.current
+        ? `当前版本${getQualityGateStatusMeta(strictProof.status).label}`
+        : strictProof?.receipt
+          ? `旧版本${getQualityGateStatusMeta(strictProof.status).label}`
+          : '尚未运行'
   const viewLabel = VIEW_ITEMS.find((item) => item.value === view)?.label
 
   return (
@@ -293,6 +408,15 @@ function ContextStrip({ summary, view, onReturnRun }) {
           <dt>严格门禁</dt>
           <dd>{strictStatus || '尚未运行'}</dd>
         </div>
+        <div>
+          <dt>统计读取于</dt>
+          <dd>
+            <DevTimestamp
+              value={summary?.generatedAt}
+              missing="统计时间未证明"
+            />
+          </dd>
+        </div>
       </dl>
       {view !== 'run' && summary?.currentOperation?.profile === 'strict' ? (
         <Button type="link" onClick={onReturnRun}>
@@ -309,11 +433,17 @@ function TechnicalDetails({ operation }) {
     <details className="erp-dev-quality-technical">
       <summary>查看技术详情</summary>
       <Descriptions size="small" column={1} bordered>
-        <Descriptions.Item label="Operation ID">
-          <Text code copyable>
-            {operation.id}
-          </Text>
-        </Descriptions.Item>
+        {operation.proofOnly ? (
+          <Descriptions.Item label="证据来源">
+            当前版本正式回执（无单独页面运行记录）
+          </Descriptions.Item>
+        ) : (
+          <Descriptions.Item label="Operation ID">
+            <Text code copyable>
+              {operation.id}
+            </Text>
+          </Descriptions.Item>
+        )}
         <Descriptions.Item label="完整 SHA">
           <Text code copyable>
             {operation.repository.commit}
@@ -336,59 +466,472 @@ function TechnicalDetails({ operation }) {
         <Descriptions.Item label="清理读回">
           {operation.cleanup.message}
         </Descriptions.Item>
+        <Descriptions.Item label="操作开始">
+          <DevTimestamp value={operation.createdAt} missing="开始时间未证明" />
+        </Descriptions.Item>
+        <Descriptions.Item label="最近状态时间">
+          <DevTimestamp
+            value={operation.finishedAt || operation.updatedAt}
+            action={operationUpdateAction(operation)}
+            missing="更新时间未证明"
+          />
+        </Descriptions.Item>
+        {operation.cancelRequestedAt ? (
+          <Descriptions.Item label="取消请求">
+            <DevTimestamp
+              value={operation.cancelRequestedAt}
+              missing="取消请求时间未证明"
+            />
+          </Descriptions.Item>
+        ) : null}
       </Descriptions>
     </details>
   )
 }
 
-function StageList({ operation, stages }) {
-  const longestId = longestStageId(stages)
-  if (stages.length === 0) return <Empty description="尚无阶段记录" />
+function FlowMarker({ index, status }) {
+  if (status === 'passed') return <CheckCircleOutlined aria-hidden="true" />
+  if (status === 'failed') return <CloseCircleOutlined aria-hidden="true" />
+  return <span aria-hidden="true">{index}</span>
+}
+
+function TerminalEvidence({ operation }) {
+  const evidence = terminalEvidence(operation)
+  const items = [
+    {
+      key: 'receipt',
+      title: '正式回执',
+      timestamp: operation?.receipt?.finishedAt,
+      ...evidence.receipt,
+    },
+    { key: 'cleanup', title: '资源清理', ...evidence.cleanup },
+  ]
   return (
-    <div className="erp-dev-quality-stage-list" aria-label="门禁阶段进度">
-      {stages.map((stage) => {
-        const status = STAGE_STATUS[stage.status] || STAGE_STATUS.pending
-        return (
-          <div className="erp-dev-quality-stage" key={stage.id}>
-            <div className="erp-dev-quality-stage__main">
-              <Text strong>{stage.label}</Text>
-              <Space size={6} wrap>
-                <Tag color={status.color}>{status.label}</Tag>
-                {longestId === stage.id && stage.durationMs ? (
-                  <Tag color="gold">最长阶段</Tag>
+    <section
+      className="erp-dev-quality-flow__terminal"
+      aria-label="门禁终态证明"
+    >
+      <div className="erp-dev-quality-flow__segment-heading">
+        <div>
+          <Text strong>终态证明</Text>
+          <Text type="secondary">不计入 runner 运行阶段</Text>
+        </div>
+        <Tag>回执 + 清理读回</Tag>
+      </div>
+      <div className="erp-dev-quality-flow__terminal-items">
+        {items.map((item) => {
+          const status = STAGE_STATUS[item.status] || STAGE_STATUS.not_run
+          return (
+            <div
+              className="erp-dev-quality-flow__terminal-item"
+              data-status={item.status}
+              key={item.key}
+            >
+              <span className="erp-dev-quality-flow__terminal-marker">
+                <FlowMarker index="•" status={item.status} />
+              </span>
+              <div>
+                <Text strong>{item.title}</Text>
+                <Text type="secondary">{item.label}</Text>
+                {item.timestamp ? (
+                  <DevTimestamp
+                    value={item.timestamp}
+                    action="完成于"
+                    missing="完成时间未证明"
+                  />
                 ) : null}
-              </Space>
+              </div>
+              <Tag color={status.color}>{status.label}</Tag>
             </div>
-            <div className="erp-dev-quality-stage__timing">
-              <Text>{formatQualityGateDuration(stage.durationMs)}</Text>
-              <Text type="secondary">占比 {stageShare(stage, operation)}</Text>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function StageDetails({ stage, operation }) {
+  const hasSubsteps = stage.substeps.length > 0
+  if (!hasSubsteps && !operation) return null
+  return (
+    <details className="erp-dev-quality-flow__details">
+      <summary>
+        {hasSubsteps
+          ? `固定子步骤 ${stage.substeps.length} 项`
+          : '阶段技术信息'}
+      </summary>
+      {hasSubsteps ? (
+        <>
+          <ol className="erp-dev-quality-flow__substeps">
+            {stage.substeps.map((substep) => (
+              <li key={substep.id}>{substep.label}</li>
+            ))}
+          </ol>
+          <Text type="secondary">
+            来自正式 runner 的固定结构；这里不推测子步骤实时状态。
+          </Text>
+        </>
+      ) : null}
+      {operation ? (
+        <div className="erp-dev-quality-flow__technical-detail">
+          <Text code>{stage.id}</Text>
+          <Space direction="vertical" size={2}>
+            <DevTimestamp
+              value={stage.startedAt}
+              action="开始于"
+              missing="开始时间未证明"
+            />
+            <DevTimestamp
+              value={stage.finishedAt}
+              action="完成于"
+              missing="完成时间未证明"
+            />
+          </Space>
+          <Text type="secondary">
+            来源：正式 {operation.profile} runner · 验证记录：
+            {operation.proofOnly ? '当前版本正式回执' : '页面门禁运行记录'}
+          </Text>
+        </div>
+      ) : null}
+    </details>
+  )
+}
+
+function StageDurationComposition({ stages }) {
+  const composition = buildQualityGateStageDurationComposition(stages)
+  if (composition.items.length === 0) return null
+  return (
+    <section
+      className="erp-dev-quality-duration"
+      aria-labelledby="quality-duration-title"
+    >
+      <div className="erp-dev-quality-flow__segment-heading">
+        <div>
+          <Text id="quality-duration-title" strong>
+            已记录阶段耗时构成
+          </Text>
+          <Text type="secondary">
+            用于发现瓶颈；精确耗时和占比同时保留，不依赖悬停读取。
+          </Text>
+        </div>
+        <Tag>{formatQualityGateDuration(composition.totalDurationMs)} 合计</Tag>
+      </div>
+      <div className="erp-dev-quality-duration__bar" aria-hidden="true">
+        {composition.items.map((item, index) => (
+          <span
+            className="erp-dev-quality-duration__segment"
+            data-tone={index % 5}
+            key={item.id}
+            style={{ '--quality-duration-share': `${item.sharePercent}%` }}
+          />
+        ))}
+      </div>
+      <ol className="erp-dev-quality-duration__legend">
+        {composition.items.map((item, index) => (
+          <li key={item.id}>
+            <span
+              className="erp-dev-quality-duration__swatch"
+              data-tone={index % 5}
+              aria-hidden="true"
+            />
+            <span>{item.label}</span>
+            <Text
+              type="secondary"
+              className="erp-dev-quality-duration__legend-copy"
+            >
+              {formatQualityGateDuration(item.durationMs)} · {item.sharePercent}
+              %{item.parallel ? ' · 可并行' : ''}
+            </Text>
+          </li>
+        ))}
+      </ol>
+      <Text type="secondary" className="erp-dev-quality-duration__caveat">
+        {composition.hasParallel
+          ? '标为“可并行”的阶段可能互相重叠；图中比例按已记录阶段耗时之和归一化，不能相加推算墙钟时间。正式回执总耗时才是运行总时间。'
+          : '图中比例按已记录阶段耗时之和归一化；正式回执总耗时仍是运行总时间真源。'}
+      </Text>
+    </section>
+  )
+}
+
+function QualityGateHistoryTrend({ operations, operation }) {
+  const trend = buildQualityGateHistoryTrend(operations, operation)
+  return (
+    <section
+      className="erp-dev-quality-history-trend"
+      aria-labelledby="quality-history-trend-title"
+    >
+      <div className="erp-dev-quality-section-heading">
+        <div>
+          <Text id="quality-history-trend-title" strong>
+            同环境通过耗时趋势
+          </Text>
+          <Text type="secondary">
+            只比较相同 profile、环境指纹和 dirty / clean 状态的正式通过回执。
+          </Text>
+        </div>
+        <Tag>{trend.sampleCount} 个可比样本</Tag>
+      </div>
+      {trend.enoughSamples ? (
+        <ol className="erp-dev-quality-history-trend__list">
+          {trend.samples.map((sample) => {
+            const width = trend.maxDurationMs
+              ? (sample.durationMs / trend.maxDurationMs) * 100
+              : 0
+            return (
+              <li key={sample.id}>
+                <DevTimestamp
+                  value={sample.finishedAt}
+                  action="完成于"
+                  missing="完成时间未证明"
+                />
+                <span
+                  className="erp-dev-quality-history-trend__track"
+                  aria-hidden="true"
+                >
+                  <span
+                    className="erp-dev-quality-history-trend__bar"
+                    style={{ '--quality-history-width': `${width}%` }}
+                  />
+                </span>
+                <Text strong>
+                  {formatQualityGateDuration(sample.durationMs)}
+                </Text>
+              </li>
+            )
+          })}
+        </ol>
+      ) : (
+        <Text type="secondary">
+          至少需要 3
+          个可比的正式通过回执才绘制趋势；当前不会用不同环境或工作区状态的数据补数。
+        </Text>
+      )}
+    </section>
+  )
+}
+
+function QualityGateCoverageMatrix({ categories }) {
+  const matrix = buildQualityGateCoverageMatrix(categories)
+  if (matrix.gates.length === 0 || matrix.rows.length === 0) return null
+  return (
+    <section
+      className="erp-dev-quality-coverage"
+      aria-labelledby="quality-coverage-title"
+    >
+      <div className="erp-dev-quality-section-heading">
+        <div>
+          <Title id="quality-coverage-title" level={2}>
+            风险 × 门禁覆盖矩阵
+          </Title>
+          <Text type="secondary">
+            先横向比较每类风险的证据状态，再到下方查看原因与证据清单。
+          </Text>
+        </div>
+      </div>
+      <div className="erp-dev-quality-coverage__table-wrap">
+        <table>
+          <caption>当前筛选范围内的风险与门禁覆盖关系</caption>
+          <thead>
+            <tr>
+              <th scope="col">风险</th>
+              {matrix.gates.map((gate) => (
+                <th scope="col" key={gate.key}>
+                  {gate.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.rows.map((row) => (
+              <tr key={row.key}>
+                <th scope="row">
+                  <Space size={6} wrap>
+                    <span>{row.label}</span>
+                    {row.highRisk ? <Tag color="error">高风险</Tag> : null}
+                  </Space>
+                </th>
+                {row.cells.map((cell) => {
+                  const status =
+                    COVERAGE_STATUS[cell.status] ||
+                    COVERAGE_STATUS.not_applicable
+                  return (
+                    <td key={cell.gateKey}>
+                      <span
+                        className="erp-dev-quality-coverage__status"
+                        data-tone={status.tone}
+                      >
+                        {status.label}
+                      </span>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function ManagedDatabaseLifecycleGuide() {
+  const [diagramOpen, setDiagramOpen] = useState(false)
+  return (
+    <details
+      className="erp-dev-quality-managed-database"
+      onToggle={(event) => setDiagramOpen(event.currentTarget.open)}
+    >
+      <summary>查看本机托管数据库的静态运行与清理流程</summary>
+      <div className="erp-dev-quality-managed-database__body">
+        <div className="erp-dev-quality-managed-database__copy">
+          <Text strong>静态工作原理，不代表当前运行状态</Text>
+          <ol>
+            {MANAGED_DATABASE_STEPS.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          <Text type="secondary">
+            当前是否就绪、运行到哪里、是否清理完成，仍以上方状态和正式 operation
+            回执为准。
+          </Text>
+        </div>
+        {diagramOpen ? (
+          <MermaidDiagram
+            chart={MANAGED_DATABASE_FLOW}
+            label="本机托管数据库生命周期图"
+            showSourceOnError={false}
+            flowchartHtmlLabels={false}
+          />
+        ) : null}
+      </div>
+    </details>
+  )
+}
+
+function GateExecutionFlow({ summary, operation, profile }) {
+  const stages = operation
+    ? deriveStages(summary, operation)
+    : previewStages(summary, profile)
+  const groups = flowGroups(summary, profile, stages)
+  const longestId = longestStageId(stages)
+  const composition = buildQualityGateStageDurationComposition(stages)
+  const compositionById = new Map(
+    composition.items.map((item) => [item.id, item])
+  )
+  const strictSegments = getQualityGateFlowSegments(summary?.profiles, 'strict')
+  const strictExtraCount =
+    strictSegments.find((segment) => segment.id === 'strict-extra')?.stages
+      .length || 0
+
+  if (stages.length === 0) {
+    return <Empty description="正在读取正式门禁阶段" />
+  }
+
+  return (
+    <section className="erp-dev-quality-flow" aria-label="门禁执行轨道">
+      <div className="erp-dev-quality-flow__heading">
+        <div>
+          <Text strong>门禁执行轨道</Text>
+          <Text type="secondary">
+            {profile === 'strict'
+              ? `先运行 ${strictExtraCount} 个 strict 附加检查，再进入 full 共用主路径。`
+              : `直接运行 full 共用主路径；strict 会在此之前增加 ${strictExtraCount} 个检查。`}
+          </Text>
+        </div>
+        <Tag color={operation ? 'blue' : 'default'}>
+          {PROFILE_LABELS[profile]} · {stages.length} 个阶段
+        </Tag>
+      </div>
+      <div className="erp-dev-quality-flow__segments">
+        {groups.map((group) => (
+          <section className="erp-dev-quality-flow__segment" key={group.id}>
+            <div className="erp-dev-quality-flow__segment-heading">
+              <Text strong>{group.label}</Text>
+              <Tag>{group.scopeLabel}</Tag>
             </div>
-            <details>
-              <summary>阶段技术信息</summary>
-              <Text code>{stage.id}</Text>
-              <Text type="secondary">
-                来源：正式 {operation.profile} runner · 缓存：回执未单独登记 ·
-                验证记录：本次正式门禁 operation
-              </Text>
-            </details>
-          </div>
-        )
-      })}
-    </div>
+            <ol
+              className="erp-dev-quality-flow__track"
+              style={{ '--quality-flow-columns': group.stages.length }}
+            >
+              {group.stages.map((stage) => {
+                const displayStatus = flowStageStatus(stage, operation)
+                const status =
+                  STAGE_STATUS[displayStatus] || STAGE_STATUS.not_run
+                const index =
+                  stages.findIndex((item) => item.id === stage.id) + 1
+                const duration = compositionById.get(stage.id)
+                const emphasis =
+                  displayStatus === 'failed'
+                    ? 'failed'
+                    : displayStatus === 'running'
+                      ? 'current'
+                      : longestId === stage.id && duration
+                        ? 'longest'
+                        : 'supporting'
+                return (
+                  <li
+                    className="erp-dev-quality-flow__step"
+                    data-status={displayStatus}
+                    data-emphasis={emphasis}
+                    aria-current={
+                      displayStatus === 'running' ? 'step' : undefined
+                    }
+                    key={stage.id}
+                  >
+                    <span className="erp-dev-quality-flow__marker">
+                      <FlowMarker index={index} status={displayStatus} />
+                    </span>
+                    <div className="erp-dev-quality-flow__step-body">
+                      <div className="erp-dev-quality-flow__step-title">
+                        <Text type="secondary">第 {index} 步</Text>
+                        <Text strong>{stage.label}</Text>
+                      </div>
+                      <Space size={6} wrap>
+                        <Tag color={status.color}>{status.label}</Tag>
+                        {longestId === stage.id && duration ? (
+                          <Tag color="gold">最长阶段</Tag>
+                        ) : null}
+                        {stage.substeps.length ? (
+                          <Tag>{stage.substeps.length} 个固定子步骤</Tag>
+                        ) : null}
+                      </Space>
+                      {operation && duration ? (
+                        <Text type="secondary">
+                          {formatQualityGateDuration(duration.durationMs)} ·
+                          已记录阶段耗时占比 {duration.sharePercent}%
+                        </Text>
+                      ) : null}
+                      <StageDetails stage={stage} operation={operation} />
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          </section>
+        ))}
+      </div>
+      <StageDurationComposition stages={stages} />
+      <TerminalEvidence operation={operation} />
+    </section>
   )
 }
 
 function RunView({
   summary,
   operation,
+  previewProfile,
   actionProfile,
   onCancel,
   cancelButtonRef,
 }) {
-  const stages = deriveStages(summary, operation)
+  const profile = operation?.profile || previewProfile
+  const stages = operation
+    ? deriveStages(summary, operation)
+    : previewStages(summary, profile)
   const cancellable =
     operation && ['queued', 'running'].includes(operation.status)
-  const progress = stageProgress(stages)
+  const progress = operation ? stageProgress(stages) : 0
   const history = (summary?.operations || []).slice(0, 20)
   const historyColumns = [
     {
@@ -407,6 +950,25 @@ function RunView({
       title: '耗时',
       key: 'duration',
       render: (_, row) => formatQualityGateDuration(operationDuration(row)),
+    },
+    {
+      title: '时间',
+      key: 'time',
+      width: 220,
+      render: (_, row) => (
+        <Space direction="vertical" size={2}>
+          <DevTimestamp
+            value={row.createdAt}
+            action="开始于"
+            missing="开始时间未证明"
+          />
+          <DevTimestamp
+            value={row.finishedAt || row.updatedAt}
+            action={operationUpdateAction(row)}
+            missing="更新时间未证明"
+          />
+        </Space>
+      ),
     },
     {
       title: '版本',
@@ -430,8 +992,26 @@ function RunView({
                 <Space size={8} wrap>
                   <Title level={2}>{PROFILE_LABELS[operation.profile]}</Title>
                   <OperationStatusTag operation={operation} />
+                  {operation.displayContext === 'current-proof' ? (
+                    <Tag color="blue">当前正式回执</Tag>
+                  ) : null}
+                  {operation.displayContext === 'history' ? (
+                    <Tag color="warning">历史运行</Tag>
+                  ) : null}
                 </Space>
                 <Paragraph>{operation.message}</Paragraph>
+                <Space wrap size={[12, 4]}>
+                  <DevTimestamp
+                    value={operation.createdAt}
+                    action="开始于"
+                    missing="开始时间未证明"
+                  />
+                  <DevTimestamp
+                    value={operation.finishedAt || operation.updatedAt}
+                    action={operationUpdateAction(operation)}
+                    missing="更新时间未证明"
+                  />
+                </Space>
               </div>
               {cancellable ? (
                 <Button
@@ -453,16 +1033,26 @@ function RunView({
               </div>
               <div>
                 <Text type="secondary">当前阶段</Text>
-                <Text strong>{currentStageLabel(stages)}</Text>
+                <Text strong>{currentStageLabel(stages, operation)}</Text>
               </div>
               <div>
-                <Text type="secondary">预计剩余</Text>
+                <Text type="secondary">
+                  {DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)
+                    ? '预计剩余'
+                    : '运行状态'}
+                </Text>
                 <Text strong>{estimatedRemaining(summary, operation)}</Text>
               </div>
             </div>
             <Progress
               percent={progress}
-              status={operation.status === 'failed' ? 'exception' : 'active'}
+              status={
+                operation.status === 'failed'
+                  ? 'exception'
+                  : operation.status === 'passed'
+                    ? 'success'
+                    : 'active'
+              }
               aria-label={`${PROFILE_LABELS[operation.profile]}进度 ${progress}%`}
             />
             {operation.firstFailure ? (
@@ -473,12 +1063,26 @@ function RunView({
                 description="请先修复第一失败阶段，再重新运行；页面不会自动重试。"
               />
             ) : null}
-            <StageList operation={operation} stages={stages} />
-            <TechnicalDetails operation={operation} />
           </>
         ) : (
-          <Empty description="尚未运行质量门禁。建议先运行严格门禁，确认当前改动是否存在阻断。" />
+          <div className="erp-dev-quality-operation__heading">
+            <div>
+              <Space size={8} wrap>
+                <Title level={2}>{PROFILE_LABELS[profile]}流程预览</Title>
+                <Tag>尚未运行</Tag>
+              </Space>
+              <Paragraph>
+                运行后会在同一条轨道上原位显示当前阶段、第一失败、耗时、正式回执和清理读回。
+              </Paragraph>
+            </div>
+          </div>
         )}
+        <GateExecutionFlow
+          summary={summary}
+          operation={operation}
+          profile={profile}
+        />
+        {operation ? <TechnicalDetails operation={operation} /> : null}
       </section>
 
       <section
@@ -491,6 +1095,10 @@ function RunView({
           </Title>
           <Text type="secondary">每种门禁最多保留最近 20 次脱敏记录</Text>
         </div>
+        <QualityGateHistoryTrend
+          operations={summary?.operations || []}
+          operation={operation}
+        />
         <Table
           rowKey="id"
           size="small"
@@ -498,7 +1106,7 @@ function RunView({
           dataSource={history}
           columns={historyColumns}
           locale={{ emptyText: '尚无运行记录' }}
-          scroll={{ x: 680 }}
+          scroll={{ x: 900 }}
         />
       </section>
 
@@ -685,6 +1293,7 @@ function GapsView({ data, loading, error, values, onRange, onRisk }) {
         <span aria-hidden="true">→</span>
         <span>仍缺证据</span>
       </div>
+      <QualityGateCoverageMatrix categories={data?.categories || []} />
       <div className="erp-dev-quality-gap-categories">
         {(data?.categories || []).map((category) => (
           <section key={category.key} className="erp-dev-quality-gap-category">
@@ -758,11 +1367,9 @@ function GapsView({ data, loading, error, values, onRange, onRisk }) {
 }
 
 export default function DevQualityGatesPage() {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const client = useMemo(() => createDevQualityGateClient(), [])
   const titleRef = useRef(null)
-  const contentRef = useRef(null)
   const cancelButtonRef = useRef(null)
   const viewValuesRef = useRef({
     run: { ...EMPTY_VIEW_STATE.run },
@@ -783,7 +1390,6 @@ export default function DevQualityGatesPage() {
   })
   const [viewRefresh, setViewRefresh] = useState(0)
   const [actionProfile, setActionProfile] = useState('')
-  const [whyOpen, setWhyOpen] = useState(false)
 
   const operationIds = useMemo(
     () => summary?.operations?.map((operation) => operation.id) || null,
@@ -957,7 +1563,6 @@ export default function DevQualityGatesPage() {
         viewValuesRef.current[nextView] || EMPTY_VIEW_STATE[nextView]
       const nextSearch = buildQualityGateViewSearch(nextView, values)
       setSearchParams(new URLSearchParams(nextSearch.slice(1)))
-      contentRef.current?.scrollIntoView({ block: 'start' })
     },
     [activeView, setSearchParams]
   )
@@ -1007,7 +1612,9 @@ export default function DevQualityGatesPage() {
         await loadSummary({ quiet: true })
       } catch (error) {
         if (error?.name !== 'AbortError') {
-          message.error('质量门禁未能启动，请核对当前状态和一次性数据库环境。')
+          message.error(
+            '质量门禁未能启动，请核对当前状态以及本机 Docker 或一次性数据库环境。'
+          )
         }
       } finally {
         mutationRef.current = false
@@ -1048,22 +1655,10 @@ export default function DevQualityGatesPage() {
     [client, loadSummary]
   )
 
-  const selectedOperation = parsed.values.operation
-    ? summary?.operations?.find(
-        (operation) => operation.id === parsed.values.operation
-      )
-    : null
-  const selectedProfileOperation = parsed.values.profile
-    ? summary?.operations?.find(
-        (operation) => operation.profile === parsed.values.profile
-      )
-    : null
-  const displayedOperation =
-    summary?.currentOperation ||
-    selectedOperation ||
-    selectedProfileOperation ||
-    summary?.operations?.[0] ||
-    null
+  const displayedOperation = selectDisplayedQualityGateOperation(summary, {
+    operationId: parsed.values.operation,
+    profile: parsed.values.profile,
+  })
   const busy = summary?.busy?.active || Boolean(actionProfile)
   const canRun = Boolean(
     parsed.valid &&
@@ -1078,7 +1673,7 @@ export default function DevQualityGatesPage() {
       <header className="erp-dev-quality-header">
         <div>
           <Text className="erp-dev-quality-header__eyebrow">
-            本机开发工具 · Fixed quality evidence
+            本机开发工具 · 固定质量证据
           </Text>
           <Space align="center" size={10}>
             <SafetyCertificateOutlined className="erp-dev-quality-header__icon" />
@@ -1166,15 +1761,31 @@ export default function DevQualityGatesPage() {
           aria-label="质量门禁主操作"
         >
           <div className="erp-dev-quality-actions__buttons">
-            <Button
-              type="primary"
-              size="large"
-              disabled={!canRun}
-              loading={actionProfile === 'strict'}
-              onClick={() => start('strict')}
-            >
-              运行严格门禁
-            </Button>
+            <div className="erp-dev-quality-actions__primary">
+              <Button
+                type="primary"
+                size="large"
+                disabled={!canRun}
+                loading={actionProfile === 'strict'}
+                onClick={() => start('strict')}
+              >
+                运行严格门禁
+              </Button>
+              <Tooltip
+                title="严格门禁比完整门禁多检查工具链、Shell 与 YAML，并生成绑定当前仓库身份的正式回执；若工作区有未提交改动，结果只证明当前工作区，不能作为干净 exact SHA 的发布证明。"
+                placement="bottom"
+                trigger={['hover', 'focus']}
+              >
+                <Button
+                  type="text"
+                  shape="circle"
+                  size="small"
+                  className="erp-dev-quality-actions__help"
+                  icon={<QuestionCircleOutlined />}
+                  aria-label="为什么优先推荐严格门禁"
+                />
+              </Tooltip>
+            </div>
             <Button
               size="large"
               disabled={!canRun}
@@ -1182,9 +1793,6 @@ export default function DevQualityGatesPage() {
               onClick={() => start('full')}
             >
               运行完整门禁
-            </Button>
-            <Button type="link" onClick={() => setWhyOpen(true)}>
-              为什么推荐这个门禁
             </Button>
           </div>
           <div className="erp-dev-quality-actions__durations">
@@ -1197,9 +1805,27 @@ export default function DevQualityGatesPage() {
               {formatQualityGateDuration(profileDuration(summary, 'full'))}
             </Text>
           </div>
-          {!summary?.environment?.disposableDatabaseReady && !initialLoading ? (
-            <Text type="danger">{summary?.environment?.message}</Text>
+          {!initialLoading && summary?.environment ? (
+            <div className="erp-dev-quality-actions__environment">
+              <Tag
+                color={
+                  summary.environment.disposableDatabaseReady
+                    ? 'success'
+                    : 'warning'
+                }
+              >
+                {summary.environment.disposableDatabaseReady
+                  ? '运行环境已就绪'
+                  : '运行环境未就绪'}
+              </Tag>
+              <Text type="secondary">
+                {summary.environment.disposableDatabaseReady
+                  ? summary.environment.message
+                  : '请按上方建议完成本机运行环境准备。'}
+              </Text>
+            </div>
           ) : null}
+          <ManagedDatabaseLifecycleGuide />
         </section>
 
         <DevTaskNav
@@ -1221,7 +1847,7 @@ export default function DevQualityGatesPage() {
           onReturnRun={() => selectView('run')}
         />
 
-        <section ref={contentRef} className="erp-dev-quality-content">
+        <section className="erp-dev-quality-content">
           <div
             id={`quality-gates-panel-${activeView}`}
             role="tabpanel"
@@ -1232,6 +1858,7 @@ export default function DevQualityGatesPage() {
               <RunView
                 summary={summary}
                 operation={displayedOperation}
+                previewProfile={parsed.values.profile || 'strict'}
                 actionProfile={actionProfile}
                 onCancel={cancel}
                 cancelButtonRef={cancelButtonRef}
@@ -1269,28 +1896,6 @@ export default function DevQualityGatesPage() {
           </div>
         </section>
       </main>
-
-      <Drawer
-        title="为什么优先推荐严格门禁"
-        open={whyOpen}
-        onClose={() => setWhyOpen(false)}
-        width={480}
-      >
-        <Paragraph>
-          严格门禁在正式 full 主路径前增加工具链、Shell 与 YAML
-          检查，并生成绑定当前仓库身份的正式回执；它不会复制第二份测试列表。
-        </Paragraph>
-        <Paragraph>
-          工作区有未提交改动时仍可运行，但该结果只能证明当前工作区，不能作为干净
-          exact SHA 的发布证明。
-        </Paragraph>
-        <Button
-          type="link"
-          onClick={() => navigate(`${DEV_VERSION_CENTER_ROUTE}?view=pipeline`)}
-        >
-          查看版本发布边界
-        </Button>
-      </Drawer>
     </div>
   )
 }

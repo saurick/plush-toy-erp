@@ -35,6 +35,9 @@ function localDateTimeValue() {
 
 export default function ProductionCompletionModal({
   open,
+  mode = 'create',
+  initialValues = null,
+  excludeFactID = 0,
   order,
   items = [],
   blockedItems = [],
@@ -47,12 +50,16 @@ export default function ProductionCompletionModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const editing = mode === 'edit'
   const selectedItemID = Form.useWatch('production_order_item_id', form)
   const selectedBatchID = Form.useWatch('production_wip_batch_id', form)
   const lotSelection = Form.useWatch('lot_selection', form)
   const choices = useMemo(
-    () => buildProductionCompletionChoices(items, facts, wipAggregate),
-    [facts, items, wipAggregate]
+    () =>
+      buildProductionCompletionChoices(items, facts, wipAggregate, {
+        excludeFactID,
+      }),
+    [excludeFactID, facts, items, wipAggregate]
   )
   const selectedChoice = choiceByID(choices, selectedItemID)
   const selectedBatchChoice = choiceByID(
@@ -90,17 +97,25 @@ export default function ProductionCompletionModal({
       sourceInboundLotSelectionForOptions(firstLotOptions)
     form.resetFields()
     form.setFieldsValue({
-      production_order_item_id: firstAvailable?.value,
-      production_wip_batch_id: firstBatch?.value,
-      quantity: firstBatch?.remaining || firstAvailable?.remaining || '',
-      warehouse_id: warehouseOptions[0]?.value,
-      lot_selection: firstLotSelection,
+      production_order_item_id:
+        initialValues?.production_order_item_id || firstAvailable?.value,
+      production_wip_batch_id:
+        initialValues?.production_wip_batch_id || firstBatch?.value,
+      quantity:
+        initialValues?.quantity ||
+        firstBatch?.remaining ||
+        firstAvailable?.remaining ||
+        '',
+      warehouse_id: initialValues?.warehouse_id || warehouseOptions[0]?.value,
+      lot_selection: initialValues?.lot_selection || firstLotSelection,
       lot_id:
-        firstLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+        initialValues?.lot_id ||
+        (firstLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
           ? firstLotOptions[0]?.value
-          : undefined,
-      new_lot_no: undefined,
-      occurred_at: localDateTimeValue(),
+          : undefined),
+      new_lot_no: initialValues?.new_lot_no,
+      occurred_at: initialValues?.occurred_at || localDateTimeValue(),
+      note: initialValues?.note || '',
     })
   }
 
@@ -116,10 +131,14 @@ export default function ProductionCompletionModal({
   return (
     <Modal
       title={
-        order?.status === 'CLOSED' ? '登记返工补完工' : '登记完工入库'
+        editing
+          ? '编辑完工入库草稿'
+          : order?.status === 'CLOSED'
+            ? '登记返工补完工'
+            : '登记完工入库'
       }
       open={open}
-      okText="生成完工记录"
+      okText={editing ? '保存草稿' : '生成完工记录'}
       cancelText="取消"
       confirmLoading={loading}
       destroyOnHidden
@@ -133,7 +152,9 @@ export default function ProductionCompletionModal({
         message={
           order?.status === 'CLOSED'
             ? '当前订单已关闭，只能按已完成包装验收的成品返工补制批次登记补完工；过账后才会更新库存。'
-            : '系统会按生产订单明细和包装验收批次核对完工数量、产品、规格和单位；过账后才会更新库存。'
+            : editing
+              ? '生产明细和完工来源批次保持不变；可修正入库仓库、批次、数量、时间和备注，保存后仍是草稿。'
+              : '系统会按生产订单明细和包装验收批次核对完工数量、产品、规格和单位；过账后才会更新库存。'
         }
       />
       {blockedItems.length > 0 ? (
@@ -181,6 +202,7 @@ export default function ProductionCompletionModal({
           rules={[{ required: true, message: '请选择要完工的生产明细' }]}
         >
           <Select
+            disabled={editing}
             showSearch
             optionFilterProp="label"
             options={choices.map(({ value, label, disabled }) => ({
@@ -219,6 +241,7 @@ export default function ProductionCompletionModal({
             rules={[{ required: true, message: '请选择对应的包装验收批次' }]}
           >
             <Select
+              disabled={editing}
               showSearch
               optionFilterProp="label"
               options={selectedChoice.batchChoices.map(
@@ -345,7 +368,11 @@ export default function ProductionCompletionModal({
             <Input maxLength={64} placeholder="填写本次完工的新批次号" />
           </Form.Item>
         ) : null}
-        <Form.Item name="occurred_at" label="完工时间">
+        <Form.Item
+          name="occurred_at"
+          label="完工时间"
+          rules={[{ required: true, message: '请选择完工时间' }]}
+        >
           <Input type="datetime-local" />
         </Form.Item>
         <Form.Item name="note" label="备注">

@@ -55,10 +55,11 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 
 func masterDataFilterFromParams(pm map[string]any) biz.MasterDataFilter {
 	return biz.MasterDataFilter{
-		Keyword:    getString(pm, "keyword"),
-		ActiveOnly: getBool(pm, "active_only", false),
-		Limit:      getInt(pm, "limit", 50),
-		Offset:     getInt(pm, "offset", 0),
+		Keyword:        getString(pm, "keyword"),
+		ActiveOnly:     getBool(pm, "active_only", false),
+		LifecycleScope: getString(pm, "lifecycle_scope"),
+		Limit:          getInt(pm, "limit", 50),
+		Offset:         getInt(pm, "offset", 0),
 	}
 }
 

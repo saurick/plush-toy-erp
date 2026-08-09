@@ -892,7 +892,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         '生产异常决策单',
         'source_document',
         {
-          machineKeys: ['fact.production_exception_decision'],
+          machineKeys: ['source.production_exception_decision'],
           sourceRefs: ['server/internal/biz/production_exception_decision.go'],
         }
       ),
@@ -919,7 +919,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         '拒绝或取消后结束',
         'source_document',
         {
-          machineKeys: ['fact.production_exception_decision'],
+          machineKeys: ['source.production_exception_decision'],
           sourceRefs: [
             'server/internal/biz/production_exception_decision.go',
             'server/internal/biz/customer_process_contracts.go',
@@ -931,7 +931,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         '超领批准额度',
         'source_document',
         {
-          machineKeys: ['fact.production_exception_decision'],
+          machineKeys: ['source.production_exception_decision'],
           sourceRefs: [
             'server/internal/biz/production_exception_decision.go',
             'server/internal/biz/customer_process_contracts.go',
@@ -955,12 +955,13 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainNode(
         'production_exception_execution',
-        '异常执行状态',
-        'fact_ledger',
+        '异常单执行与额度状态',
+        'source_document',
         {
-          machineKeys: ['fact.production_exception_execution'],
+          machineKeys: ['source.production_exception_execution'],
           sourceRefs: [
-            'server/internal/biz/production_exception_process_command.go',
+            'server/internal/data/model/schema/production_exception_decision.go',
+            'server/internal/data/production_exception_decision_repo.go',
           ],
         }
       ),
@@ -968,7 +969,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         machineKeys: ['fact.production_wip_batch'],
         sourceRefs: ['server/internal/biz/production_wip.go'],
       }),
-      chainNode('affected_production_fact', '受影响生产事实', 'fact_ledger', {
+      chainNode('affected_production_fact', '后续正常生产事实', 'fact_ledger', {
         machineKeys: ['fact.production'],
         sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
@@ -1048,12 +1049,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'production_exception_execution_task',
         'production_exception_execution',
-        '人员办理后执行报废或在制让步',
+        '人员办理后写回异常单执行状态',
         'calls_domain_command',
         {
           action:
             'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
-          factBoundary: 'production_exception_execution',
+          factBoundary: 'source_document_execution_status_and_wip_effect',
           sourceRefs: [
             'server/internal/biz/production_exception_process_command.go',
             'server/internal/biz/customer_process_contracts.go',
@@ -1063,12 +1064,12 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'production_exception_execution',
         'affected_wip',
-        '按报废或让步结果更新受影响在制',
+        '报废或让步更新在制状态与事件',
         'reworks',
         {
           action:
             'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
-          factBoundary: 'production_exception_execution',
+          factBoundary: 'production_wip_batch_and_event',
           sourceRefs: [
             'server/internal/biz/production_exception_process_command.go',
             'server/internal/biz/production_wip.go',
@@ -1078,14 +1079,29 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'affected_wip',
         'affected_production_fact',
-        '按执行结果回到生产事实',
+        '后续按正常生产路径形成事实',
         'derives',
         {
           action: 'ProductionOrderUsecase.ApplyProductionWIPAction',
-          factBoundary: 'production_wip_or_fact',
+          factBoundary: 'later_normal_production_fact_only',
           sourceRefs: [
             'server/internal/biz/production_wip.go',
             'server/internal/biz/operational_fact.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'production_exception_over_issue',
+        'affected_production_fact',
+        '额度只供后续正常领料，领料另行形成事实',
+        'derives',
+        {
+          action: 'OperationalFactUsecase.PostProductionFact',
+          factBoundary: 'later_material_issue_fact_only',
+          sourceRefs: [
+            'server/internal/biz/operational_fact.go',
+            'server/internal/data/operational_fact_production_repo.go',
+            'server/internal/data/production_exception_decision_repo.go',
           ],
         }
       ),

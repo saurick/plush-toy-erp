@@ -419,7 +419,7 @@ func businessAttachmentWritePermissions(ownerType string) []string {
 	case biz.BusinessAttachmentOwnerQualityInspection:
 		return []string{biz.PermissionQualityInspectionCreate, biz.PermissionQualityInspectionUpdate, biz.PermissionQualityExceptionHandle}
 	case biz.BusinessAttachmentOwnerShipment:
-		return []string{biz.PermissionShipmentCreate, biz.PermissionShipmentShip}
+		return []string{biz.PermissionShipmentCreate, biz.PermissionShipmentUpdate, biz.PermissionShipmentShip}
 	case biz.BusinessAttachmentOwnerFinanceFact:
 		return []string{biz.PermissionFinancePayableConfirm, biz.PermissionFinanceReceivableConfirm}
 	case biz.BusinessAttachmentOwnerProductionFact:

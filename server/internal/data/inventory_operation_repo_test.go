@@ -128,6 +128,109 @@ func TestInventoryOperationCycleCountStaleAndManualAdjustmentGuard(t *testing.T)
 	}
 }
 
+func TestInventoryOperationDraftSaveUsesServerBalanceAndCAS(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_operation_draft_save")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewInventoryUsecase(repo)
+	_, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: fixtures.materialID,
+		WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+		Quantity: decimal.NewFromInt(10), UnitID: fixtures.unitID,
+		SourceType: "TEST", IdempotencyKey: "inventory-operation-save-seed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, counted := decimal.NewFromInt(10), decimal.NewFromInt(8)
+	created, err := uc.CreateInventoryOperation(ctx, &biz.InventoryOperationCreate{
+		OperationNo: "CC-SAVE-1", OperationType: biz.InventoryOperationCycleCount,
+		Reason: "月盘", IdempotencyKey: "cc-save-1", CreatedBy: 1,
+		Items: []biz.InventoryOperationItemCreate{{
+			LineNo: "1", SubjectType: biz.InventorySubjectMaterial, SubjectID: fixtures.materialID,
+			FromWarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			ExpectedQuantity: &expected, CountedQuantity: &counted,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: fixtures.materialID,
+		WarehouseID: fixtures.warehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
+		Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
+		SourceType: "TEST", IdempotencyKey: "inventory-operation-save-race",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrected := decimal.NewFromInt(9)
+	note := "复盘修正"
+	saved, err := uc.SaveInventoryOperationDraft(ctx, &biz.InventoryOperationDraftSave{
+		ID: created.ID, ExpectedVersion: created.Version, OperationNo: "CC-SAVE-1A", Reason: "复盘",
+		Items: []biz.InventoryOperationDraftItemSave{{ID: created.Items[0].ID, CountedQuantity: &corrected, Note: &note}},
+	}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Version != created.Version+1 || saved.OperationNo != "CC-SAVE-1A" || len(saved.Items) != 1 || saved.Items[0].ExpectedQuantity == nil || saved.Items[0].ExpectedQuantity.String() != "11" || saved.Items[0].CountedQuantity == nil || saved.Items[0].CountedQuantity.String() != "9" || saved.Items[0].AdjustmentQuantity.String() != "-2" {
+		t.Fatalf("saved=%#v item=%#v", saved, saved.Items)
+	}
+	if _, err := uc.SaveInventoryOperationDraft(ctx, &biz.InventoryOperationDraftSave{
+		ID: saved.ID, ExpectedVersion: created.Version, OperationNo: saved.OperationNo, Reason: saved.Reason,
+		Items: []biz.InventoryOperationDraftItemSave{{ID: saved.Items[0].ID, CountedQuantity: &corrected}},
+	}, 1); !errors.Is(err, biz.ErrInventoryOperationVersionConflict) {
+		t.Fatalf("stale save err=%v", err)
+	}
+	if _, err := uc.SaveInventoryOperationDraft(ctx, &biz.InventoryOperationDraftSave{
+		ID: saved.ID, ExpectedVersion: saved.Version, OperationNo: saved.OperationNo, Reason: saved.Reason,
+		Items: []biz.InventoryOperationDraftItemSave{{ID: saved.Items[0].ID, CountedQuantity: &corrected}},
+	}, 2); !errors.Is(err, biz.ErrInventoryOperationSaveOwner) {
+		t.Fatalf("non-owner save err=%v", err)
+	}
+}
+
+func TestManualInventoryOperationDraftSaveStopsAfterProcessStart(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_operation_draft_process")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	repo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewInventoryUsecase(repo)
+	created, err := uc.CreateInventoryOperation(ctx, &biz.InventoryOperationCreate{
+		OperationNo: "MA-SAVE-1", OperationType: biz.InventoryOperationManualAdjustment,
+		Reason: "人工调整", IdempotencyKey: "ma-save-1", CreatedBy: 1,
+		Items: []biz.InventoryOperationItemCreate{{
+			LineNo: "1", SubjectType: biz.InventorySubjectMaterial, SubjectID: fixtures.materialID,
+			FromWarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+			AdjustmentQuantity: decimal.NewFromInt(2),
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ProcessInstance.Create().
+		SetProcessKey(biz.ProcessKeyInventoryAdjustmentApproval).
+		SetProcessVersion("v1").
+		SetConfigRevision("inventory-operation-save-test").
+		SetDefinitionHash("sha256:inventory-operation-save-test").
+		SetBusinessRefType("inventory_operation").
+		SetBusinessRefID(created.ID).
+		SetIdempotencyKey("inventory-operation-save-process").
+		SetStatus(biz.ProcessStatusActive).
+		SetCreatedBy(1).
+		Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.SaveInventoryOperationDraft(ctx, &biz.InventoryOperationDraftSave{
+		ID: created.ID, ExpectedVersion: created.Version, OperationNo: created.OperationNo, Reason: "不得漂移",
+		Items: []biz.InventoryOperationDraftItemSave{{ID: created.Items[0].ID, AdjustmentQuantity: decimal.NewFromInt(3)}},
+	}, 1); !errors.Is(err, biz.ErrProcessSourceLifecycleDependency) {
+		t.Fatalf("save after process start err=%v", err)
+	}
+}
+
 func assertInventoryOperationBalance(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, materialID, warehouseID, unitID int, want string) {
 	t.Helper()
 	got, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectMaterial, SubjectID: materialID, WarehouseID: warehouseID, UnitID: unitID})

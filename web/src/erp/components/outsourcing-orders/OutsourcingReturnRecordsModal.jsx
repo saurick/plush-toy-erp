@@ -87,6 +87,8 @@ export default function OutsourcingReturnRecordsModal({
   actionLoading = '',
   canPostFact = false,
   canCancelFact = false,
+  canEditMaterialIssue = false,
+  canEditReturnReceipt = false,
   canCreatePayable = false,
   canViewPayable = false,
   canCreateQualityInspection = false,
@@ -96,6 +98,7 @@ export default function OutsourcingReturnRecordsModal({
   onCancel,
   onPostFact,
   onCancelFact,
+  onEditFact,
   onCreateQualityInspection,
   onViewQualityInspection,
   onViewDisposition,
@@ -105,8 +108,8 @@ export default function OutsourcingReturnRecordsModal({
   const [selected, setSelected] = useState(null)
   const orderFacts = useMemo(
     () =>
-      (Array.isArray(facts) ? facts : []).filter(
-        (fact) => OUTSOURCING_FACT_TYPES.has(normalizedFactType(fact))
+      (Array.isArray(facts) ? facts : []).filter((fact) =>
+        OUTSOURCING_FACT_TYPES.has(normalizedFactType(fact))
       ),
     [facts]
   )
@@ -125,11 +128,18 @@ export default function OutsourcingReturnRecordsModal({
 
   const selectedStatus = normalizedFactStatus(selected)
   const selectedDraft = selectedStatus === 'DRAFT'
+  const selectedDraftEditable =
+    selectedDraft &&
+    ((normalizedFactType(selected) === 'MATERIAL_ISSUE' &&
+      canEditMaterialIssue) ||
+      (normalizedFactType(selected) === 'RETURN_RECEIPT' &&
+        canEditReturnReceipt))
   const selectedPosted = selectedStatus === 'POSTED'
   const selectedPostedReturn = isPostedReturnReceipt(selected)
-  const selectedQualityInspections = selectedPostedReturn && selected?.id
-    ? qualityInspectionsForFact(qualityInspectionByFactID, selected.id)
-    : []
+  const selectedQualityInspections =
+    selectedPostedReturn && selected?.id
+      ? qualityInspectionsForFact(qualityInspectionByFactID, selected.id)
+      : []
   const hasActiveQualityInspection = selectedQualityInspections.some(
     (inspection) =>
       String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
@@ -157,7 +167,8 @@ export default function OutsourcingReturnRecordsModal({
       title: '业务类型',
       dataIndex: 'fact_type',
       width: 110,
-      render: (value) => FACT_TYPE_LABELS[String(value || '').toUpperCase()] || '-',
+      render: (value) =>
+        FACT_TYPE_LABELS[String(value || '').toUpperCase()] || '-',
     },
     {
       title: '状态',
@@ -217,6 +228,14 @@ export default function OutsourcingReturnRecordsModal({
               onClick={() => onPostFact?.(selected)}
             >
               过账
+            </Button>
+          ) : null}
+          {selectedDraftEditable ? (
+            <Button
+              disabled={loading || actionBusy}
+              onClick={() => onEditFact?.(selected)}
+            >
+              编辑草稿
             </Button>
           ) : null}
           {selectedDraft && canCancelFact ? (
@@ -300,7 +319,7 @@ export default function OutsourcingReturnRecordsModal({
       <Alert
         type="info"
         showIcon
-        message="草稿可过账或作废，作废草稿不会改变库存；已过账记录取消后恢复至过账前库存。只有已过账的委外回货可发起质检，并在判定合格或让步接收后生成应付。"
+        message="草稿可编辑、过账或作废，作废草稿不会改变库存；已过账记录取消后恢复至过账前库存。只有已过账的委外回货可发起质检，并在判定合格或让步接收后生成应付。"
         style={{ marginBottom: 12 }}
       />
       <Table

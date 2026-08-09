@@ -410,7 +410,7 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
   )
   assert.match(
     shipmentsPageSource,
-    /buildShipmentWithItemsParams\(values, \{ products, productSKUs \}\)/u
+    /buildShipmentWithItemsParams\(\s*values,\s*\{\s*products,\s*productSKUs,?\s*\}\s*\)/u
   )
   assert.match(
     shipmentsPageSource,

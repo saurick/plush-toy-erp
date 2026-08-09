@@ -41,13 +41,9 @@ func (r *operationalFactRepo) CreateReworkIntake(
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockOperationalFactRow(ctx, tx, "shipments", in.SourceShipmentID, biz.ErrReworkIntakeSourceInvalid); err != nil {
+	sourceShipment, err := lockAndValidateReworkIntakeSourceShipment(ctx, tx, in.SourceShipmentID)
+	if err != nil {
 		return nil, err
-	}
-	sourceShipment, err := tx.client.Shipment.Get(ctx, in.SourceShipmentID)
-	if err != nil || sourceShipment.Status != biz.ShipmentStatusShipped || sourceShipment.Purpose != biz.ShipmentPurposeSalesDelivery ||
-		sourceShipment.CustomerID == nil || sourceShipment.CustomerSnapshot == nil || strings.TrimSpace(*sourceShipment.CustomerSnapshot) == "" {
-		return nil, biz.ErrReworkIntakeSourceInvalid
 	}
 	if replay, found, err := findReworkIntakeReplay(ctx, tx.client, actorID, in.IdempotencyKey, payloadHash); err != nil || found {
 		if err != nil {
@@ -79,33 +75,171 @@ func (r *operationalFactRepo) CreateReworkIntake(
 		return nil, err
 	}
 
-	for index, requested := range in.Items {
+	if err := createReworkIntakeDraftItems(ctx, tx, row.ID, sourceShipment, in.Items); err != nil {
+		return nil, err
+	}
+	out, err := reworkIntakeWithItems(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
+	return commitReworkIntake(ctx, tx, out)
+}
+
+func (r *operationalFactRepo) SaveReworkIntakeDraft(
+	ctx context.Context,
+	in *biz.ReworkIntakeDraftSave,
+) (*biz.ReworkIntake, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || len(in.Items) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "rework_intakes", in.ID, biz.ErrReworkIntakeNotFound); err != nil {
+		return nil, err
+	}
+	current, err := tx.client.ReworkIntake.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrReworkIntakeNotFound
+		}
+		return nil, err
+	}
+	if current.Version != in.ExpectedVersion {
+		return nil, biz.ErrOperationalFactVersionConflict
+	}
+	if current.Status != biz.ReworkIntakeStatusDraft {
+		return nil, biz.ErrReworkIntakeSourceState
+	}
+	sourceShipment, err := lockAndValidateReworkIntakeSourceShipment(ctx, tx, in.SourceShipmentID)
+	if err != nil {
+		return nil, err
+	}
+	if err := replaceReworkIntakeDraftHeader(ctx, tx, current, sourceShipment, in); err != nil {
+		return nil, err
+	}
+	if err := deleteReworkIntakeDraftItems(ctx, tx, current.ID); err != nil {
+		return nil, err
+	}
+	if err := createReworkIntakeDraftItems(ctx, tx, current.ID, sourceShipment, in.Items); err != nil {
+		return nil, err
+	}
+	updated, err := tx.client.ReworkIntake.Get(ctx, current.ID)
+	if err != nil {
+		return nil, err
+	}
+	out, err := reworkIntakeWithItems(ctx, tx.client, updated)
+	if err != nil {
+		return nil, err
+	}
+	return commitReworkIntake(ctx, tx, out)
+}
+
+func replaceReworkIntakeDraftHeader(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	current *ent.ReworkIntake,
+	sourceShipment *ent.Shipment,
+	in *biz.ReworkIntakeDraftSave,
+) error {
+	if tx == nil || tx.sqlTx == nil || current == nil || sourceShipment == nil || sourceShipment.CustomerID == nil ||
+		sourceShipment.CustomerSnapshot == nil || in == nil {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 8)
+	query := fmt.Sprintf(`UPDATE rework_intakes SET intake_no = %s, source_shipment_id = %s, customer_id = %s, customer_snapshot = %s, reason = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
+	result, err := tx.sqlTx.ExecContext(
+		ctx,
+		query,
+		in.IntakeNo,
+		sourceShipment.ID,
+		*sourceShipment.CustomerID,
+		strings.TrimSpace(*sourceShipment.CustomerSnapshot),
+		in.Reason,
+		time.Now(),
+		current.ID,
+		in.ExpectedVersion,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return biz.ErrOperationalFactVersionConflict
+	}
+	return nil
+}
+
+func deleteReworkIntakeDraftItems(ctx context.Context, tx *inventoryDBTx, reworkIntakeID int) error {
+	if tx == nil || tx.sqlTx == nil || reworkIntakeID <= 0 {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 1)
+	_, err := tx.sqlTx.ExecContext(ctx, fmt.Sprintf(`DELETE FROM rework_intake_items WHERE rework_intake_id = %s`, p[0]), reworkIntakeID)
+	return err
+}
+
+func lockAndValidateReworkIntakeSourceShipment(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	sourceShipmentID int,
+) (*ent.Shipment, error) {
+	if tx == nil || tx.client == nil || sourceShipmentID <= 0 {
+		return nil, biz.ErrReworkIntakeSourceInvalid
+	}
+	if err := lockOperationalFactRow(ctx, tx, "shipments", sourceShipmentID, biz.ErrReworkIntakeSourceInvalid); err != nil {
+		return nil, err
+	}
+	sourceShipment, err := tx.client.Shipment.Get(ctx, sourceShipmentID)
+	if err != nil || sourceShipment.Status != biz.ShipmentStatusShipped || sourceShipment.Purpose != biz.ShipmentPurposeSalesDelivery ||
+		sourceShipment.CustomerID == nil || sourceShipment.CustomerSnapshot == nil || strings.TrimSpace(*sourceShipment.CustomerSnapshot) == "" {
+		return nil, biz.ErrReworkIntakeSourceInvalid
+	}
+	return sourceShipment, nil
+}
+
+func createReworkIntakeDraftItems(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	reworkIntakeID int,
+	sourceShipment *ent.Shipment,
+	items []biz.ReworkIntakeItemCreate,
+) error {
+	if tx == nil || tx.client == nil || reworkIntakeID <= 0 || sourceShipment == nil || len(items) == 0 {
+		return biz.ErrBadParam
+	}
+	for index, requested := range items {
 		if err := lockOperationalFactRow(ctx, tx, "shipment_items", requested.SourceShipmentItemID, biz.ErrReworkIntakeSourceInvalid); err != nil {
-			return nil, err
+			return err
 		}
 		if err := lockOperationalFactRow(ctx, tx, "production_order_items", requested.TargetProductionOrderItemID, biz.ErrReworkIntakeSourceInvalid); err != nil {
-			return nil, err
+			return err
 		}
 		sourceItem, err := tx.client.ShipmentItem.Get(ctx, requested.SourceShipmentItemID)
 		if err != nil || sourceItem.ShipmentID != sourceShipment.ID || sourceItem.SalesOrderItemID == nil {
-			return nil, biz.ErrReworkIntakeSourceInvalid
+			return biz.ErrReworkIntakeSourceInvalid
 		}
 		targetItem, targetOrder, err := validateReworkIntakeTarget(ctx, tx.client, sourceItem, requested.TargetProductionOrderItemID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if err := lockOperationalFactRow(ctx, tx, "production_orders", targetOrder.ID, biz.ErrReworkIntakeSourceInvalid); err != nil {
-			return nil, err
+			return err
 		}
 		active, err := activeReworkIntakeQuantity(ctx, tx.client, sourceItem.ID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if active.Add(requested.Quantity).GreaterThan(sourceItem.Quantity) {
-			return nil, biz.ErrReworkIntakeQuantityExceeded
+			return biz.ErrReworkIntakeQuantityExceeded
 		}
 		_, err = tx.client.ReworkIntakeItem.Create().
-			SetReworkIntakeID(row.ID).
+			SetReworkIntakeID(reworkIntakeID).
 			SetLineNo(fmt.Sprintf("%d", index+1)).
 			SetSourceShipmentItemID(sourceItem.ID).
 			SetTargetProductionOrderItemID(targetItem.ID).
@@ -117,14 +251,10 @@ func (r *operationalFactRepo) CreateReworkIntake(
 			SetNillableNote(requested.Note).
 			Save(ctx)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	out, err := reworkIntakeWithItems(ctx, tx.client, row)
-	if err != nil {
-		return nil, err
-	}
-	return commitReworkIntake(ctx, tx, out)
+	return nil
 }
 
 func validateReworkIntakeTarget(
@@ -161,6 +291,15 @@ func validateReworkIntakeTarget(
 }
 
 func activeReworkIntakeQuantity(ctx context.Context, client *ent.Client, sourceShipmentItemID int) (decimal.Decimal, error) {
+	return activeReworkIntakeQuantityExcludingDraft(ctx, client, sourceShipmentItemID, 0)
+}
+
+func activeReworkIntakeQuantityExcludingDraft(
+	ctx context.Context,
+	client *ent.Client,
+	sourceShipmentItemID int,
+	excludedDraftID int,
+) (decimal.Decimal, error) {
 	rows, err := client.ReworkIntakeItem.Query().Where(
 		reworkintakeitem.SourceShipmentItemID(sourceShipmentItemID),
 		reworkintakeitem.HasReworkIntakeWith(reworkintake.StatusIn(
@@ -173,6 +312,9 @@ func activeReworkIntakeQuantity(ctx context.Context, client *ent.Client, sourceS
 	}
 	total := decimal.Zero
 	for _, row := range rows {
+		if excludedDraftID > 0 && row.ReworkIntakeID == excludedDraftID {
+			continue
+		}
 		total = total.Add(row.Quantity)
 	}
 	return total, nil
@@ -442,6 +584,18 @@ func (r *operationalFactRepo) ListReworkIntakeSourceCandidates(
 	ctx context.Context,
 	filter biz.ReworkIntakeSourceCandidateFilter,
 ) ([]*biz.ReworkIntakeSourceCandidate, int, error) {
+	if filter.EditingReworkIntakeDraftID > 0 {
+		draft, err := r.data.postgres.ReworkIntake.Get(ctx, filter.EditingReworkIntakeDraftID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, 0, biz.ErrReworkIntakeNotFound
+			}
+			return nil, 0, err
+		}
+		if draft.Status != biz.ReworkIntakeStatusDraft {
+			return nil, 0, biz.ErrReworkIntakeSourceState
+		}
+	}
 	q := r.data.postgres.ShipmentItem.Query().Where(
 		shipmentitem.SalesOrderItemIDNotNil(),
 		shipmentitem.HasShipmentWith(
@@ -462,7 +616,12 @@ func (r *operationalFactRepo) ListReworkIntakeSourceCandidates(
 		if err != nil || header.CustomerID == nil || header.CustomerSnapshot == nil {
 			return nil, 0, biz.ErrReworkIntakeSourceInvalid
 		}
-		active, err := activeReworkIntakeQuantity(ctx, r.data.postgres, sourceItem.ID)
+		active, err := activeReworkIntakeQuantityExcludingDraft(
+			ctx,
+			r.data.postgres,
+			sourceItem.ID,
+			filter.EditingReworkIntakeDraftID,
+		)
 		if err != nil {
 			return nil, 0, err
 		}

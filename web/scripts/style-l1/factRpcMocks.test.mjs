@@ -895,11 +895,21 @@ test('style-l1 operational fact mock only accepts source-bound outsourcing field
   const postedMaterialIssue = await call('post_outsourcing_fact', {
     customer_key: 'yoyoosun',
     id: materialIssue.result.data.outsourcing_fact.id,
+    expected_version: materialIssue.result.data.outsourcing_fact.version,
   })
   assert.equal(postedMaterialIssue.result.code, 0)
   assert.equal(
     postedMaterialIssue.result.data.outsourcing_fact.status,
     'POSTED'
+  )
+  assert.equal(
+    postedMaterialIssue.result.data.outsourcing_fact.version,
+    materialIssue.result.data.outsourcing_fact.version + 1
+  )
+  assert.equal(postedMaterialIssue.result.data.outsourcing_fact.posted_by, 1)
+  assert.equal(
+    postedMaterialIssue.result.data.outsourcing_fact.posted_at > 0,
+    true
   )
   const materialIssueReread = await call('list_outsourcing_facts', {
     customer_key: 'yoyoosun',
@@ -909,22 +919,40 @@ test('style-l1 operational fact mock only accepts source-bound outsourcing field
     limit: 100,
     offset: 0,
   })
-  assert.equal(
+  const rereadMaterialIssue =
     materialIssueReread.result.data.outsourcing_facts.find(
       (fact) => fact.id === materialIssue.result.data.outsourcing_fact.id
-    )?.status,
-    'POSTED'
+    )
+  assert.equal(rereadMaterialIssue?.status, 'POSTED')
+  assert.equal(
+    rereadMaterialIssue?.version,
+    postedMaterialIssue.result.data.outsourcing_fact.version
+  )
+  assert.equal(
+    rereadMaterialIssue?.posted_at,
+    postedMaterialIssue.result.data.outsourcing_fact.posted_at
   )
 
   const voidedReturnReceipt = await call('cancel_outsourcing_fact', {
     customer_key: 'yoyoosun',
     id: returnReceipt.result.data.outsourcing_fact.id,
+    expected_version: returnReceipt.result.data.outsourcing_fact.version,
+    reason: '委外回货录入有误',
   })
   assert.equal(voidedReturnReceipt.result.code, 0)
   assert.equal(
     voidedReturnReceipt.result.data.outsourcing_fact.status,
     'CANCELLED'
   )
+  assert.equal(
+    voidedReturnReceipt.result.data.outsourcing_fact.version,
+    returnReceipt.result.data.outsourcing_fact.version + 1
+  )
+  assert.equal(
+    voidedReturnReceipt.result.data.outsourcing_fact.cancel_reason,
+    '委外回货录入有误'
+  )
+  assert.equal(voidedReturnReceipt.result.data.outsourcing_fact.cancelled_by, 1)
   const returnReceiptReread = await call('list_outsourcing_facts', {
     customer_key: 'yoyoosun',
     source_type: 'OUTSOURCING_ORDER',
@@ -933,11 +961,18 @@ test('style-l1 operational fact mock only accepts source-bound outsourcing field
     limit: 100,
     offset: 0,
   })
-  assert.equal(
+  const rereadReturnReceipt =
     returnReceiptReread.result.data.outsourcing_facts.find(
       (fact) => fact.id === returnReceipt.result.data.outsourcing_fact.id
-    )?.status,
-    'CANCELLED'
+    )
+  assert.equal(rereadReturnReceipt?.status, 'CANCELLED')
+  assert.equal(
+    rereadReturnReceipt?.version,
+    voidedReturnReceipt.result.data.outsourcing_fact.version
+  )
+  assert.equal(
+    rereadReturnReceipt?.cancelled_at,
+    voidedReturnReceipt.result.data.outsourcing_fact.cancelled_at
   )
 
   const changedIntent = await call(
@@ -1781,6 +1816,20 @@ test('style-l1 workflow role task view mock keeps approval projection capability
   assert.equal(approvalPage.result.code, 0)
   assert.deepEqual(
     approvalPage.result.data.items.map((task) => task.id),
+    [createdApproval.result.data.task.id]
+  )
+
+  const workbench = await call('get_workbench', {
+    queue_key: 'approval',
+    limit: 8,
+    offset: 0,
+  })
+  assert.equal(workbench.result.code, 0)
+  assert.equal(workbench.result.data.queue_key, 'approval')
+  assert.equal(workbench.result.data.total, 1)
+  assert.equal(workbench.result.data.counts.approval, 1)
+  assert.deepEqual(
+    workbench.result.data.items.map((task) => task.id),
     [createdApproval.result.data.task.id]
   )
 

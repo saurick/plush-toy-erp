@@ -21,8 +21,7 @@ test('reference pagination reads every 200-row page without caller limits', asyn
       assert.equal(params.limit, REFERENCE_PAGE_SIZE)
       assert.equal(params.active_only, true)
       return {
-        product_skus:
-          params.offset === 0 ? records(1, 200) : records(201, 2),
+        product_skus: params.offset === 0 ? records(1, 200) : records(201, 2),
         total: 202,
         limit: 200,
         offset: params.offset,
@@ -57,8 +56,7 @@ test('reference pagination rejects partial and duplicate responses', async () =>
   await assert.rejects(
     listAllReferenceRecords(
       async (params) => ({
-        product_skus:
-          params.offset === 0 ? records(1, 200) : [{ id: 200 }],
+        product_skus: params.offset === 0 ? records(1, 200) : [{ id: 200 }],
         total: 201,
         limit: 200,
         offset: params.offset,
@@ -102,6 +100,46 @@ test('strict pagination collects outsourcing facts beyond the backend default an
   assert.equal(result.outsourcing_facts.at(-1).fact_no, 'OUT-RR-PAGE-201')
   assert.equal(result.limit, 200)
   assert.equal(result.offset, 0)
+})
+
+test('strict pagination supports stable composite identities for non-entity read models', async () => {
+  const candidates = Array.from({ length: 201 }, (_, index) => ({
+    source_shipment_item_id: index + 1,
+    target_production_order_item_id: index + 101,
+  }))
+  const identityKey = (record) =>
+    `${record.source_shipment_item_id}:${record.target_production_order_item_id}`
+  const result = await listAllPaginatedRecords(
+    async (params) => ({
+      candidates: candidates.slice(params.offset, params.offset + params.limit),
+      total: candidates.length,
+      limit: params.limit,
+      offset: params.offset,
+    }),
+    {},
+    'candidates',
+    {},
+    { recordIdentityKey: identityKey }
+  )
+
+  assert.equal(result.candidates.length, 201)
+  assert.deepEqual(result.candidates.at(-1), candidates.at(-1))
+
+  await assert.rejects(
+    listAllPaginatedRecords(
+      async () => ({
+        candidates: [candidates[0], { ...candidates[0] }],
+        total: 2,
+        limit: REFERENCE_PAGE_SIZE,
+        offset: 0,
+      }),
+      {},
+      'candidates',
+      {},
+      { recordIdentityKey: identityKey }
+    ),
+    (error) => error?.isInvalidResponse === true
+  )
 })
 
 test('strict pagination keeps an active quality return beyond the old 20-row window and across pages', async () => {

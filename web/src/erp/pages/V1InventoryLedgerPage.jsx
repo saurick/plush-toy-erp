@@ -32,6 +32,7 @@ import {
   listInventoryLots,
   listInventoryTxns,
   postInventoryOperation,
+  saveInventoryOperationDraft,
 } from '../api/inventoryApi.mjs'
 import {
   executeInventoryAdjustmentPost,
@@ -64,6 +65,7 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
+import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import {
   compactParams,
@@ -431,6 +433,8 @@ export default function V1InventoryLedgerPage() {
   const [operationType, setOperationType] = useState('')
   const [operationLoading, setOperationLoading] = useState(false)
   const [currentOperation, setCurrentOperation] = useState(null)
+  const [editingOperation, setEditingOperation] = useState(null)
+  const [operationRecordsOpen, setOperationRecordsOpen] = useState(false)
   const [operationRecoveryError, setOperationRecoveryError] = useState('')
   const [operationCancelOpen, setOperationCancelOpen] = useState(false)
   const [operationCancelReason, setOperationCancelReason] = useState('')
@@ -471,6 +475,7 @@ export default function V1InventoryLedgerPage() {
   const customerKey = String(
     adminProfile?.effective_session?.customer?.key || ''
   ).trim()
+  const currentAdminID = Number(adminProfile?.id || 0)
   const canReadInventory = hasActionPermission(
     adminProfile,
     'warehouse.inventory.read'
@@ -693,12 +698,7 @@ export default function V1InventoryLedgerPage() {
         request.finish()
       }
     }
-  }, [
-    activeView,
-    beginLatestRequest,
-    canReadInventory,
-    loadInventoryList,
-  ])
+  }, [activeView, beginLatestRequest, canReadInventory, loadInventoryList])
 
   useEffect(() => {
     loadRows()
@@ -951,6 +951,7 @@ export default function V1InventoryLedgerPage() {
         message.warning('请先在库存余额中选择一条库存记录')
         return
       }
+      setEditingOperation(null)
       setOperationType(type)
     },
     [activeView, selectedRow]
@@ -959,6 +960,8 @@ export default function V1InventoryLedgerPage() {
   const submitInventoryOperation = useCallback(
     async (values) => {
       if (!selectedRow || !operationType) return
+      const draftItem = Array.isArray(values?.items) ? values.items[0] : null
+      if (!draftItem) return
       const item = compactParams({
         line_no: '1',
         subject_type: selectedRow.subject_type,
@@ -966,7 +969,7 @@ export default function V1InventoryLedgerPage() {
         product_sku_id: selectedRow.product_sku_id || undefined,
         from_warehouse_id: selectedRow.warehouse_id,
         from_lot_id: selectedRow.lot_id || undefined,
-        to_warehouse_id: values.to_warehouse_id || undefined,
+        to_warehouse_id: draftItem.to_warehouse_id || undefined,
         unit_id: selectedRow.unit_id,
         expected_quantity:
           operationType === 'CYCLE_COUNT'
@@ -974,13 +977,13 @@ export default function V1InventoryLedgerPage() {
             : undefined,
         counted_quantity:
           operationType === 'CYCLE_COUNT'
-            ? String(values.counted_quantity || '').trim()
+            ? String(draftItem.counted_quantity || '').trim()
             : undefined,
         adjustment_quantity:
           operationType === 'CYCLE_COUNT'
             ? undefined
-            : String(values.adjustment_quantity || '').trim(),
-        note: trimOptional(values.note),
+            : String(draftItem.adjustment_quantity || '').trim(),
+        note: trimOptional(draftItem.note),
       })
       const payload = compactParams({
         operation_no: trimOptional(values.operation_no),
@@ -1068,6 +1071,113 @@ export default function V1InventoryLedgerPage() {
       }
     },
     [customerKey, operationType, rememberInventoryOperation, selectedRow]
+  )
+
+  const openInventoryOperationEdit = useCallback(
+    async (record) => {
+      const operationID = Number(record?.id || 0)
+      if (!operationID || !canCreateInventoryOperation) return false
+      const request = beginLatestRequest('inventory-operation-edit')
+      setOperationLoading(true)
+      try {
+        const detail = await getInventoryOperation(
+          { id: operationID },
+          { signal: request.signal }
+        )
+        if (!request.isCurrent()) return false
+        const completeItems =
+          Array.isArray(detail?.items) &&
+          detail.items.length > 0 &&
+          detail.items.every((item) => Number(item?.id || 0) > 0)
+        if (
+          Number(detail?.id || 0) !== operationID ||
+          detail?.status !== 'DRAFT' ||
+          Number(detail?.version || 0) <= 0 ||
+          Number(detail?.created_by || 0) !== currentAdminID ||
+          !completeItems
+        ) {
+          const error = new Error('当前库存作业已不可编辑或详情不完整')
+          error.isInvalidResponse = true
+          throw error
+        }
+        rememberInventoryOperation(detail)
+        setOperationType('')
+        setEditingOperation(detail)
+        setOperationRecordsOpen(false)
+        return true
+      } catch (error) {
+        if (isRpcAbortError(error) || !request.isCurrent()) return false
+        message.error(getActionErrorMessage(error, '读取库存作业草稿'))
+        return false
+      } finally {
+        if (request.isCurrent()) {
+          setOperationLoading(false)
+          request.finish()
+        }
+      }
+    },
+    [
+      beginLatestRequest,
+      canCreateInventoryOperation,
+      currentAdminID,
+      rememberInventoryOperation,
+    ]
+  )
+
+  const saveInventoryOperation = useCallback(
+    async (values) => {
+      if (!editingOperation?.id || !editingOperation?.version) return
+      const operationType = editingOperation.operation_type
+      const items = Array.isArray(values?.items) ? values.items : []
+      const payload = compactParams({
+        id: editingOperation.id,
+        expected_version: editingOperation.version,
+        operation_no: trimOptional(values.operation_no),
+        reason: trimOptional(values.reason),
+        items: items.map((item) =>
+          compactParams({
+            id: item.id,
+            counted_quantity:
+              operationType === 'CYCLE_COUNT'
+                ? String(item.counted_quantity || '').trim()
+                : undefined,
+            adjustment_quantity:
+              operationType === 'CYCLE_COUNT'
+                ? undefined
+                : String(item.adjustment_quantity || '').trim(),
+            to_warehouse_id:
+              operationType === 'TRANSFER'
+                ? item.to_warehouse_id || undefined
+                : undefined,
+            note: trimOptional(item.note),
+          })
+        ),
+      })
+      setOperationLoading(true)
+      try {
+        const saved = await saveInventoryOperationDraft(payload)
+        if (
+          Number(saved?.id || 0) !== Number(editingOperation.id) ||
+          saved?.status !== 'DRAFT' ||
+          Number(saved?.version || 0) !==
+            Number(editingOperation.version || 0) + 1 ||
+          !Array.isArray(saved?.items) ||
+          saved.items.length !== items.length
+        ) {
+          const error = new Error('库存作业保存结果暂时无法确认')
+          error.isInvalidResponse = true
+          throw error
+        }
+        rememberInventoryOperation(saved)
+        setEditingOperation(null)
+        message.success('库存作业草稿已保存')
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '保存库存作业草稿'))
+      } finally {
+        setOperationLoading(false)
+      }
+    },
+    [editingOperation, rememberInventoryOperation]
   )
 
   const transitionInventoryOperation = useCallback(
@@ -1264,12 +1374,28 @@ export default function V1InventoryLedgerPage() {
         ? renderWarehouseReference(selectedRow.warehouse_id)
         : '',
       lot: selectedRow ? renderLotReference(selectedRow.lot_id) : '',
+      unit: selectedRow ? renderUnitReference(selectedRow.unit_id) : '',
     }),
     [
       renderLotReference,
       renderSubjectReference,
+      renderUnitReference,
       renderWarehouseReference,
       selectedRow,
+    ]
+  )
+  const resolveOperationItemSourceLabels = useCallback(
+    (item) => ({
+      subject: renderSubjectReference(item?.subject_id, item),
+      warehouse: renderWarehouseReference(item?.from_warehouse_id),
+      lot: renderLotReference(item?.from_lot_id),
+      unit: renderUnitReference(item?.unit_id),
+    }),
+    [
+      renderLotReference,
+      renderSubjectReference,
+      renderUnitReference,
+      renderWarehouseReference,
     ]
   )
 
@@ -1563,11 +1689,11 @@ export default function V1InventoryLedgerPage() {
     openColumnOrder,
     columnOrderModal,
   } = useBusinessColumnOrder({
-      adminProfile,
-      moduleKey: `inventory-${activeView}`,
-      moduleTitle: `库存台账 / ${activeLabel}`,
-      columns,
-    })
+    adminProfile,
+    moduleKey: `inventory-${activeView}`,
+    moduleTitle: `库存台账 / ${activeLabel}`,
+    columns,
+  })
   const loadExportRows = useCallback(
     async ({ signal }) => {
       if (!canReadInventory) return []
@@ -1615,7 +1741,6 @@ export default function V1InventoryLedgerPage() {
     setDateFilterEnd('')
     clearRouteContext()
   }, [clearRouteContext])
-  const currentAdminID = Number(adminProfile?.id || 0)
   const openOperationCancellation = async () => {
     if (!currentOperation?.id) return
     if (
@@ -1715,6 +1840,17 @@ export default function V1InventoryLedgerPage() {
           action={
             currentOperation?.id ? (
               <Space wrap size={6}>
+                {currentOperation.status === 'DRAFT' &&
+                canCreateInventoryOperation &&
+                Number(currentOperation.created_by || 0) === currentAdminID ? (
+                  <Button
+                    size="small"
+                    disabled={operationLoading}
+                    onClick={() => openInventoryOperationEdit(currentOperation)}
+                  >
+                    编辑草稿
+                  </Button>
+                ) : null}
                 {currentOperation.status === 'DRAFT' &&
                 canCreateInventoryOperation &&
                 Number(currentOperation.created_by || 0) === currentAdminID ? (
@@ -1885,9 +2021,7 @@ export default function V1InventoryLedgerPage() {
               placeholder={
                 subjectType === 'PRODUCT' ? '全部产品规格' : '仅成品可选规格'
               }
-              disabled={
-                subjectType !== 'PRODUCT' || !canReadProductSKUs
-              }
+              disabled={subjectType !== 'PRODUCT' || !canReadProductSKUs}
               showSearch
               optionFilterProp="label"
               onChange={(nextID) => {
@@ -2018,6 +2152,14 @@ export default function V1InventoryLedgerPage() {
               }
               onOpenColumnOrder={openColumnOrder}
             />
+            {canCreateInventoryOperation || canApproveInventoryOperation ? (
+              <Button
+                data-business-action-key="inventory-operation-records"
+                onClick={() => setOperationRecordsOpen(true)}
+              >
+                库存作业
+              </Button>
+            ) : null}
           </Space>
         }
       >
@@ -2163,15 +2305,34 @@ export default function V1InventoryLedgerPage() {
         title={`${activeLabel}详情`}
         onClose={() => setDetailRecord(null)}
       />
+      <InventoryOperationRecordsModal
+        open={operationRecordsOpen}
+        currentAdminID={currentAdminID}
+        canCreate={canCreateInventoryOperation}
+        onCancel={() => setOperationRecordsOpen(false)}
+        onSelect={async (record) => {
+          const recovered = await recoverInventoryOperation(record?.id)
+          if (recovered?.id) setOperationRecordsOpen(false)
+        }}
+        onEdit={openInventoryOperationEdit}
+      />
       <InventoryOperationModal
-        open={Boolean(operationType)}
-        operationType={operationType}
+        open={Boolean(operationType || editingOperation)}
+        mode={editingOperation ? 'edit' : 'create'}
+        operation={editingOperation}
+        operationType={editingOperation?.operation_type || operationType}
         sourceRecord={selectedRow}
         sourceLabels={operationSourceLabels}
+        resolveSourceLabels={resolveOperationItemSourceLabels}
         warehouseOptions={warehouseOptions}
         loading={operationLoading}
-        onCancel={() => setOperationType('')}
-        onSubmit={submitInventoryOperation}
+        onCancel={() => {
+          setOperationType('')
+          setEditingOperation(null)
+        }}
+        onSubmit={
+          editingOperation ? saveInventoryOperation : submitInventoryOperation
+        }
       />
       <Modal
         title="取消库存作业"

@@ -24,6 +24,8 @@ function readableText(values = [], fallback = '-') {
 
 export default function ProductionMaterialIssueModal({
   open,
+  mode = 'create',
+  initialValues = null,
   order,
   orderItem,
   requirement,
@@ -36,6 +38,7 @@ export default function ProductionMaterialIssueModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const editing = mode === 'edit'
   const formConnectedRef = useRef(false)
   const lotOptions = useMemo(
     () =>
@@ -48,10 +51,12 @@ export default function ProductionMaterialIssueModal({
     if (!visible) return
     form.resetFields()
     form.setFieldsValue({
-      warehouse_id: warehouseOptions[0]?.value,
-      lot_id: lotOptions[0]?.value,
-      quantity: requirement?.remaining_quantity || '',
-      occurred_at: localDateTimeValue(),
+      warehouse_id: initialValues?.warehouse_id || warehouseOptions[0]?.value,
+      lot_id: initialValues?.lot_id || lotOptions[0]?.value,
+      quantity:
+        initialValues?.quantity || requirement?.remaining_quantity || '',
+      occurred_at: initialValues?.occurred_at || localDateTimeValue(),
+      note: initialValues?.note || '',
     })
   }
 
@@ -71,10 +76,10 @@ export default function ProductionMaterialIssueModal({
   return (
     <Modal
       className="erp-production-material-issue-modal"
-      title="生产领料"
+      title={editing ? '编辑生产领料草稿' : '生产领料'}
       open={open}
       width={720}
-      okText="生成领料记录"
+      okText={editing ? '保存草稿' : '生成领料记录'}
       cancelText="取消"
       confirmLoading={loading}
       okButtonProps={{
@@ -88,7 +93,11 @@ export default function ProductionMaterialIssueModal({
       <Alert
         type="info"
         showIcon
-        message="领用材料和单位来自已发布的物料需求；记录先生成草稿，核对并过账后才会更新库存出库记录。"
+        message={
+          editing
+            ? '需求物料和单位保持来源单据不变；保存后仍是草稿，过账前不会更新库存。'
+            : '领用材料和单位来自已发布的物料需求；记录先生成草稿，核对并过账后才会更新库存出库记录。'
+        }
       />
       {lotOptions.length === 0 ? (
         <Alert
@@ -243,7 +252,11 @@ export default function ProductionMaterialIssueModal({
         >
           <Input inputMode="decimal" placeholder="填写本次领料数量" />
         </Form.Item>
-        <Form.Item name="occurred_at" label="领料时间">
+        <Form.Item
+          name="occurred_at"
+          label="领料时间"
+          rules={[{ required: true, message: '请选择领料时间' }]}
+        >
           <Input type="datetime-local" />
         </Form.Item>
         <Form.Item name="note" label="备注">

@@ -248,10 +248,11 @@ type SupplierWithContacts struct {
 }
 
 type MasterDataFilter struct {
-	Keyword    string
-	ActiveOnly bool
-	Limit      int
-	Offset     int
+	Keyword        string
+	ActiveOnly     bool
+	LifecycleScope string
+	Limit          int
+	Offset         int
 }
 
 type ContactFilter struct {
@@ -263,11 +264,12 @@ type ContactFilter struct {
 }
 
 type ProductSKUFilter struct {
-	ProductID  int
-	Keyword    string
-	ActiveOnly bool
-	Limit      int
-	Offset     int
+	ProductID      int
+	Keyword        string
+	ActiveOnly     bool
+	LifecycleScope string
+	Limit          int
+	Offset         int
 }
 
 type MasterDataRepo interface {
@@ -382,7 +384,11 @@ func (uc *MasterDataUsecase) ListCustomers(ctx context.Context, filter MasterDat
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListCustomers(ctx, normalizeMasterDataFilter(filter))
+	normalized, err := normalizeMasterDataFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListCustomers(ctx, normalized)
 }
 
 func (uc *MasterDataUsecase) SetCustomerActive(ctx context.Context, id int, active bool) (*Customer, error) {
@@ -449,7 +455,11 @@ func (uc *MasterDataUsecase) ListSuppliers(ctx context.Context, filter MasterDat
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListSuppliers(ctx, normalizeMasterDataFilter(filter))
+	normalized, err := normalizeMasterDataFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListSuppliers(ctx, normalized)
 }
 
 func (uc *MasterDataUsecase) SetSupplierActive(ctx context.Context, id int, active bool) (*Supplier, error) {
@@ -498,7 +508,11 @@ func (uc *MasterDataUsecase) ListMaterials(ctx context.Context, filter MasterDat
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListMaterials(ctx, normalizeMasterDataFilter(filter))
+	normalized, err := normalizeMasterDataFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListMaterials(ctx, normalized)
 }
 
 func (uc *MasterDataUsecase) SetMaterialActive(ctx context.Context, id int, active bool) (*Material, error) {
@@ -512,14 +526,22 @@ func (uc *MasterDataUsecase) ListUnits(ctx context.Context, filter MasterDataFil
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListUnits(ctx, normalizeMasterDataFilter(filter))
+	normalized, err := normalizeMasterDataFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListUnits(ctx, normalized)
 }
 
 func (uc *MasterDataUsecase) ListWarehouses(ctx context.Context, filter MasterDataFilter) ([]*Warehouse, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListWarehouses(ctx, normalizeMasterDataFilter(filter))
+	normalized, err := normalizeMasterDataFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListWarehouses(ctx, normalized)
 }
 
 func (uc *MasterDataUsecase) ListWarehousesForAccess(ctx context.Context, filter MasterDataFilter, scope WarehouseDataScope) ([]*Warehouse, int, error) {
@@ -530,7 +552,11 @@ func (uc *MasterDataUsecase) ListWarehousesForAccess(ctx context.Context, filter
 	if !ok {
 		return nil, 0, ErrDataScopeForbidden
 	}
-	return repo.ListWarehousesForAccess(ctx, normalizeMasterDataFilter(filter), NormalizeWarehouseDataScope(scope))
+	normalized, err := normalizeMasterDataFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return repo.ListWarehousesForAccess(ctx, normalized, NormalizeWarehouseDataScope(scope))
 }
 
 func (uc *MasterDataUsecase) CreateProcess(ctx context.Context, in *ProcessMutation) (*Process, error) {
@@ -566,7 +592,11 @@ func (uc *MasterDataUsecase) ListProcesses(ctx context.Context, filter MasterDat
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListProcesses(ctx, normalizeMasterDataFilter(filter))
+	normalized, err := normalizeMasterDataFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListProcesses(ctx, normalized)
 }
 
 func (uc *MasterDataUsecase) SetProcessActive(ctx context.Context, id int, active bool) (*Process, error) {
@@ -615,7 +645,11 @@ func (uc *MasterDataUsecase) ListProducts(ctx context.Context, filter MasterData
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListProducts(ctx, normalizeMasterDataFilter(filter))
+	normalized, err := normalizeMasterDataFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListProducts(ctx, normalized)
 }
 
 func (uc *MasterDataUsecase) SetProductActive(ctx context.Context, id int, active bool) (*Product, error) {
@@ -671,7 +705,11 @@ func (uc *MasterDataUsecase) ListProductSKUs(ctx context.Context, filter Product
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListProductSKUs(ctx, normalizeProductSKUFilter(filter))
+	normalized, err := normalizeProductSKUFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListProductSKUs(ctx, normalized)
 }
 
 func (uc *MasterDataUsecase) SetProductSKUActive(ctx context.Context, id int, active bool) (*ProductSKU, error) {
@@ -1002,19 +1040,29 @@ func normalizeContactSaveMutations(in []*ContactSaveMutation) ([]*ContactSaveMut
 	return out, nil
 }
 
-func normalizeMasterDataFilter(in MasterDataFilter) MasterDataFilter {
+func normalizeMasterDataFilter(in MasterDataFilter) (MasterDataFilter, error) {
 	in.Keyword = strings.TrimSpace(in.Keyword)
+	var scopeOK bool
+	in.LifecycleScope, scopeOK = NormalizeLifecycleScope(in.LifecycleScope)
+	if !scopeOK {
+		return MasterDataFilter{}, ErrBadParam
+	}
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
 	}
 	if in.Offset < 0 {
 		in.Offset = 0
 	}
-	return in
+	return in, nil
 }
 
-func normalizeProductSKUFilter(in ProductSKUFilter) ProductSKUFilter {
+func normalizeProductSKUFilter(in ProductSKUFilter) (ProductSKUFilter, error) {
 	in.Keyword = strings.TrimSpace(in.Keyword)
+	var scopeOK bool
+	in.LifecycleScope, scopeOK = NormalizeLifecycleScope(in.LifecycleScope)
+	if !scopeOK {
+		return ProductSKUFilter{}, ErrBadParam
+	}
 	if in.ProductID < 0 {
 		in.ProductID = 0
 	}
@@ -1024,7 +1072,7 @@ func normalizeProductSKUFilter(in ProductSKUFilter) ProductSKUFilter {
 	if in.Offset < 0 {
 		in.Offset = 0
 	}
-	return in
+	return in, nil
 }
 
 func normalizeContactFilter(in ContactFilter) (ContactFilter, error) {

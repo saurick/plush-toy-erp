@@ -7,6 +7,15 @@ const source = readFileSync(
   'utf8'
 )
 
+test('production completion edit keeps source line and WIP batch locked', () => {
+  assert.match(source, /mode = 'create'/u)
+  assert.match(source, /excludeFactID/u)
+  assert.match(source, /编辑完工入库草稿/u)
+  assert.ok((source.match(/disabled=\{editing\}/gu)?.length || 0) >= 2)
+  assert.match(source, /initialValues\?\.production_order_item_id/u)
+  assert.match(source, /initialValues\?\.production_wip_batch_id/u)
+})
+
 test('production completion chooses an existing lot or a new lot number in business language', () => {
   for (const copy of [
     '入库批次方式',
@@ -33,7 +42,7 @@ test('production completion resets stale lot fields on open, line and mode chang
   assert.match(source, /form\.resetFields\(\)/u)
   assert.match(
     source,
-    /production_wip_batch_id:\s*firstBatch\?\.value,[\s\S]*lot_id:[\s\S]*new_lot_no: undefined,[\s\S]*occurred_at/u
+    /production_wip_batch_id:\s*initialValues\?\.production_wip_batch_id\s*\|\|\s*firstBatch\?\.value,[\s\S]*lot_id:[\s\S]*new_lot_no:\s*initialValues\?\.new_lot_no,[\s\S]*occurred_at/u
   )
   assert.match(
     source,
@@ -64,7 +73,7 @@ test('production completion requires one bounded lot input and handles validatio
 test('production completion defaults and validates against the current completion cap', () => {
   assert.match(
     source,
-    /quantity:\s*firstBatch\?\.remaining\s*\|\|\s*firstAvailable\?\.remaining/u
+    /quantity:\s*initialValues\?\.quantity\s*\|\|\s*firstBatch\?\.remaining\s*\|\|\s*firstAvailable\?\.remaining/u
   )
   assert.match(source, /完工来源批次/u)
   assert.match(source, /所选批次/u)
@@ -81,7 +90,7 @@ test('closed production orders expose only finished-goods rework completion word
   assert.match(source, /wipAggregate\s*=\s*null/u)
   assert.match(
     source,
-    /buildProductionCompletionChoices\(items,\s*facts,\s*wipAggregate\)/u
+    /buildProductionCompletionChoices\(items,\s*facts,\s*wipAggregate,\s*\{\s*excludeFactID,\s*\}\s*\)/u
   )
   assert.match(source, /order\?\.status === 'CLOSED'/u)
   assert.match(source, /登记返工补完工/u)

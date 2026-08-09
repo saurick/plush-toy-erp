@@ -38,8 +38,21 @@ const REPORT_KEYS = Object.freeze([
   "PUBLIC_PROVIDER",
   "MIGRATION_LOCK_STATUS",
   "BACKUP_TOOLING_STATUS",
+  "ARCHIVE_TOOLING_STATUS",
   "LATEST_BACKUP_SHA256",
   "LATEST_BACKUP_SIZE_BYTES",
+  "RELEASE_DIRECTORY_COUNT",
+  "IDENTIFIED_RELEASE_COUNT",
+  "PROTECTED_RELEASE_COUNT",
+  "RETENTION_CANDIDATE_COUNT",
+  "RETENTION_CANDIDATE_BYTES",
+  "RETENTION_CANDIDATE_SHAS",
+  "MANUAL_REVIEW_RELEASE_COUNT",
+  "FORMAL_CACHE_COUNT",
+  "OPERATION_DIRECTORY_COUNT",
+  "RETAINED_OPERATION_COUNT",
+  "STOPPED_PUBLIC_CONTAINER_COUNT",
+  "RETENTION_MODE",
   "BLOCKERS",
 ]);
 
@@ -56,6 +69,9 @@ expected_user=simon
 root=/home/simon/plush-toy-erp-v5
 current=/home/simon/plush-toy-erp-v5/current
 releases=/home/simon/plush-toy-erp-v5/releases
+cache_root=/home/simon/plush-toy-erp-v5/release-cache
+operations_root=/home/simon/plush-toy-erp-v5/operations
+incoming_root=/home/simon/plush-toy-erp-v5/incoming
 runtime_env=/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133
 compose_dir=/home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod
 compose_base="$compose_dir/compose.yml"
@@ -85,8 +101,21 @@ public_health=failed
 public_provider=failed
 migration_lock_status=free
 backup_tooling_status=passed
+archive_tooling_status=passed
 latest_backup_sha256=none
 latest_backup_size_bytes=0
+release_directory_count=0
+identified_release_count=0
+protected_release_count=0
+retention_candidate_count=0
+retention_candidate_bytes=0
+retention_candidate_shas=none
+manual_review_release_count=0
+formal_cache_count=0
+operation_directory_count=0
+retained_operation_count=0
+stopped_public_container_count=0
+retention_mode=preview_only
 # Read-only preflight never creates or reuses a rollback point. Every promotion
 # still requires a fresh pre-migration backup bound to that operation.
 
@@ -135,6 +164,11 @@ if [[ ! -x /usr/bin/rsync ]] ||
   ! LC_ALL=C /usr/bin/rsync --version 2>/dev/null |
     sed -n '1p' | grep -Eq '^rsync[[:space:]]+version[[:space:]]+3\.'; then
   block target_rsync_unavailable
+fi
+if ! command -v zstd >/dev/null 2>&1 ||
+  ! tar --help 2>/dev/null | grep -Fq -- '--zstd'; then
+  archive_tooling_status=blocked
+  block target_archive_tooling_unavailable
 fi
 
 for required_dir in "$root" "$current" "$releases" "$root/runtime" "$root/backups" "$root/run"; do
@@ -294,6 +328,95 @@ else
   block target_public_entry_container_invalid
 fi
 
+# Retention is deliberately preview-only. A candidate is merely absent from
+# current runtime, retained cache, container and operation JSON references; it
+# is never deleted by preflight and still requires a fresh manual readback.
+protected_release_shas="$(printf '%s\n' "$server_sha" "$web_sha" "$public_sha")"
+all_public_containers="$({
+  docker ps -a --format '{{.Names}}' 2>/dev/null || true
+} | sed -n '/^plush-toy-erp-web-public-[0-9a-f]\{8\}$/p')"
+while IFS= read -r container_name; do
+  [[ -n "$container_name" ]] || continue
+  container_sha="$(read_git_sha "$container_name")"
+  if [[ "$container_sha" =~ ^[0-9a-f]{40}$ ]]; then
+    protected_release_shas="$protected_release_shas
+$container_sha"
+  fi
+  if [[ "$(docker inspect "$container_name" --format '{{.State.Running}}' 2>/dev/null || true)" == false ]]; then
+    stopped_public_container_count=$((stopped_public_container_count + 1))
+  fi
+done <<<"$all_public_containers"
+
+if plain_directory "$cache_root"; then
+  shopt -s nullglob
+  for cache_dir in "$cache_root"/*; do
+    [[ -d "$cache_dir" && ! -L "$cache_dir" ]] || continue
+    cache_name="$(basename "$cache_dir")"
+    cache_artifact="$cache_dir/release-artifact.json"
+    if [[ "$cache_name" =~ ^[0-9a-f]{64}$ ]] && plain_file "$cache_artifact"; then
+      cache_sha="$(jq -er '
+        select(.schemaVersion == "plush-release-artifact/v1") |
+        .git.commit |
+        select(type == "string" and test("^[0-9a-f]{40}$"))
+      ' "$cache_artifact" 2>/dev/null || true)"
+      if [[ "$cache_sha" =~ ^[0-9a-f]{40}$ ]]; then
+        formal_cache_count=$((formal_cache_count + 1))
+        protected_release_shas="$protected_release_shas
+$cache_sha"
+      fi
+    fi
+  done
+fi
+
+if plain_directory "$operations_root"; then
+  operation_directory_count="$(find "$operations_root" -mindepth 1 -maxdepth 1 -type d ! -lname '*' -printf '.' 2>/dev/null | wc -c | tr -d ' ')"
+  operation_shas="$({
+    find "$operations_root" -mindepth 2 -maxdepth 2 -type f -name '*.json' -print0 2>/dev/null |
+      xargs -0r jq -r '.. | strings | select(test("^[0-9a-f]{40}$"))' 2>/dev/null || true
+  } | sort -u)"
+  protected_release_shas="$protected_release_shas
+$operation_shas"
+fi
+if plain_directory "$incoming_root"; then
+  retained_operation_count="$(find "$incoming_root" -mindepth 1 -maxdepth 1 -type d ! -lname '*' -printf '.' 2>/dev/null | wc -c | tr -d ' ')"
+fi
+
+candidate_shas=""
+if plain_directory "$releases"; then
+  shopt -s nullglob
+  for release_dir in "$releases"/*; do
+    [[ -d "$release_dir" && ! -L "$release_dir" ]] || continue
+    release_directory_count=$((release_directory_count + 1))
+    release_sha="$(basename "$release_dir")"
+    release_identity="$release_dir/.plush-release-identity.json"
+    if [[ ! "$release_sha" =~ ^[0-9a-f]{40}$ ]] ||
+      ! plain_file "$release_identity" ||
+      ! jq -e --arg sha "$release_sha" '
+        .schemaVersion == "plush.target-release-identity/v1" and
+        .gitSha == $sha and
+        (.sourceArchiveSha256 | type == "string" and test("^[0-9a-f]{64}$")) and
+        (.releaseManifestSha256 | type == "string" and test("^[0-9a-f]{64}$"))
+      ' "$release_identity" >/dev/null 2>&1; then
+      manual_review_release_count=$((manual_review_release_count + 1))
+      continue
+    fi
+    identified_release_count=$((identified_release_count + 1))
+    if printf '%s\n' "$protected_release_shas" | grep -Fxq "$release_sha"; then
+      protected_release_count=$((protected_release_count + 1))
+      continue
+    fi
+    retention_candidate_count=$((retention_candidate_count + 1))
+    release_bytes="$(du -sb "$release_dir" 2>/dev/null | awk '{print $1}' || true)"
+    [[ "$release_bytes" =~ ^[0-9]+$ ]] || release_bytes=0
+    retention_candidate_bytes=$((retention_candidate_bytes + release_bytes))
+    candidate_shas="$candidate_shas
+$release_sha"
+  done
+fi
+if [[ -n "$(printf '%s\n' "$candidate_shas" | sed '/^$/d')" ]]; then
+  retention_candidate_shas="$(printf '%s\n' "$candidate_shas" | sed '/^$/d' | sort -u | paste -sd, -)"
+fi
+
 if [[ -e "$migration_lock" ]]; then
   if command -v lslocks >/dev/null 2>&1 &&
     lslocks --noheadings --output PATH 2>/dev/null | grep -Fxq "$migration_lock"; then
@@ -348,8 +471,21 @@ printf '%s\n' \
   "PUBLIC_PROVIDER=$public_provider" \
   "MIGRATION_LOCK_STATUS=$migration_lock_status" \
   "BACKUP_TOOLING_STATUS=$backup_tooling_status" \
+  "ARCHIVE_TOOLING_STATUS=$archive_tooling_status" \
   "LATEST_BACKUP_SHA256=$latest_backup_sha256" \
   "LATEST_BACKUP_SIZE_BYTES=$latest_backup_size_bytes" \
+  "RELEASE_DIRECTORY_COUNT=$release_directory_count" \
+  "IDENTIFIED_RELEASE_COUNT=$identified_release_count" \
+  "PROTECTED_RELEASE_COUNT=$protected_release_count" \
+  "RETENTION_CANDIDATE_COUNT=$retention_candidate_count" \
+  "RETENTION_CANDIDATE_BYTES=$retention_candidate_bytes" \
+  "RETENTION_CANDIDATE_SHAS=$retention_candidate_shas" \
+  "MANUAL_REVIEW_RELEASE_COUNT=$manual_review_release_count" \
+  "FORMAL_CACHE_COUNT=$formal_cache_count" \
+  "OPERATION_DIRECTORY_COUNT=$operation_directory_count" \
+  "RETAINED_OPERATION_COUNT=$retained_operation_count" \
+  "STOPPED_PUBLIC_CONTAINER_COUNT=$stopped_public_container_count" \
+  "RETENTION_MODE=$retention_mode" \
   "BLOCKERS=$blockers_csv"
 `.replaceAll("\\${", "${");
 
@@ -437,6 +573,21 @@ export function parseRemoteTargetPreflight(raw) {
   ) {
     throw new Error("latest backup SHA-256 is invalid");
   }
+  const retentionCandidateCount = parseSafeInteger(
+    values.RETENTION_CANDIDATE_COUNT,
+    "retention candidate count",
+  );
+  const retentionCandidateShas =
+    values.RETENTION_CANDIDATE_SHAS === "none"
+      ? []
+      : values.RETENTION_CANDIDATE_SHAS.split(",");
+  if (
+    retentionCandidateShas.some((value) => !SHA_PATTERN.test(value)) ||
+    new Set(retentionCandidateShas).size !== retentionCandidateShas.length ||
+    retentionCandidateShas.length !== retentionCandidateCount
+  ) {
+    throw new Error("retention candidate identity is invalid");
+  }
   const report = {
     schemaVersion: REMOTE_TARGET_PREFLIGHT_CONTRACT,
     status,
@@ -494,6 +645,57 @@ export function parseRemoteTargetPreflight(raw) {
       ),
       freshBackupRequiredForPromotion: true,
     },
+    archiveTooling: {
+      status: checkStatus("ARCHIVE_TOOLING_STATUS"),
+      zstdRequired: true,
+    },
+    retention: {
+      mode: assertEnum(
+        values.RETENTION_MODE,
+        ["preview_only"],
+        "retention mode",
+      ),
+      releaseDirectoryCount: parseSafeInteger(
+        values.RELEASE_DIRECTORY_COUNT,
+        "release directory count",
+      ),
+      identifiedReleaseCount: parseSafeInteger(
+        values.IDENTIFIED_RELEASE_COUNT,
+        "identified release count",
+      ),
+      protectedReleaseCount: parseSafeInteger(
+        values.PROTECTED_RELEASE_COUNT,
+        "protected release count",
+      ),
+      candidateCount: retentionCandidateCount,
+      candidateBytes: parseSafeInteger(
+        values.RETENTION_CANDIDATE_BYTES,
+        "retention candidate bytes",
+      ),
+      candidateShas: retentionCandidateShas,
+      manualReviewReleaseCount: parseSafeInteger(
+        values.MANUAL_REVIEW_RELEASE_COUNT,
+        "manual review release count",
+      ),
+      formalCacheCount: parseSafeInteger(
+        values.FORMAL_CACHE_COUNT,
+        "formal cache count",
+      ),
+      operationDirectoryCount: parseSafeInteger(
+        values.OPERATION_DIRECTORY_COUNT,
+        "operation directory count",
+      ),
+      retainedOperationCount: parseSafeInteger(
+        values.RETAINED_OPERATION_COUNT,
+        "retained operation count",
+      ),
+      stoppedPublicContainerCount: parseSafeInteger(
+        values.STOPPED_PUBLIC_CONTAINER_COUNT,
+        "stopped public container count",
+      ),
+      deletionPerformed: false,
+      candidateStillRequiresManualReadback: true,
+    },
     blockers,
     redaction: {
       containsSecrets: false,
@@ -504,6 +706,15 @@ export function parseRemoteTargetPreflight(raw) {
   };
   if (
     report.capacity.minimumAvailableBytes !== 30 * 1024 ** 3 ||
+    report.retention.identifiedReleaseCount >
+      report.retention.releaseDirectoryCount ||
+    report.retention.protectedReleaseCount >
+      report.retention.identifiedReleaseCount ||
+    report.retention.candidateCount + report.retention.protectedReleaseCount !==
+      report.retention.identifiedReleaseCount ||
+    report.retention.identifiedReleaseCount +
+      report.retention.manualReviewReleaseCount !==
+      report.retention.releaseDirectoryCount ||
     (report.publicEntry.container !== "unknown" &&
       !/^plush-toy-erp-web-public-[0-9a-f]{8}$/u.test(
         report.publicEntry.container,

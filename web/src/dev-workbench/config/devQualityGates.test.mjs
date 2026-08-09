@@ -12,14 +12,20 @@ import {
   VIEW_ITEMS,
   VIEW_KEYS,
   VIEW_QUERY_KEYS,
+  buildQualityGateCoverageMatrix,
+  buildQualityGateHistoryTrend,
+  buildQualityGateStageDurationComposition,
   buildQualityGateViewSearch,
   createDevQualityGateClient,
   createQualityGateIdempotencyKey,
   formatQualityGateDuration,
+  getQualityGateFlowSegments,
   getQualityGateStageLabel,
   getQualityGateStatusMeta,
   normalizeDevQualityGateSummary,
   parseQualityGateSearch,
+  projectCurrentQualityGateProof,
+  selectDisplayedQualityGateOperation,
 } from './devQualityGates.mjs'
 
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
@@ -66,11 +72,25 @@ function summary(overrides = {}) {
     profiles: {
       full: {
         timeoutMs: 5_400_000,
-        stages: [{ id: 'environment_profile', label: '环境与工具链准备' }],
+        stages: [
+          {
+            id: 'environment_profile',
+            label: '环境与工具链准备',
+            parallel: false,
+          },
+        ],
+        substeps: {},
       },
       strict: {
         timeoutMs: 10_800_000,
-        stages: [{ id: 'strict_profile', label: '严格门禁配置' }],
+        stages: [
+          {
+            id: 'strict_profile',
+            label: '严格门禁配置',
+            parallel: false,
+          },
+        ],
+        substeps: {},
       },
     },
     currentOperation,
@@ -101,6 +121,34 @@ function summary(overrides = {}) {
       releaseEligible: false,
       notProven: ['目标环境发布', '客户 UAT'],
     },
+    ...overrides,
+  }
+}
+
+function receipt(overrides = {}) {
+  return {
+    profile: 'strict',
+    status: 'passed',
+    gitCommit: 'a'.repeat(40),
+    treeState: 'clean',
+    durationMs: 2000,
+    finishedAt: NOW,
+    executed: 12,
+    passed: 12,
+    failed: 0,
+    skipped: 0,
+    environmentFingerprint: 'c'.repeat(64),
+    bottleneckStageId: 'web',
+    stageTimings: [
+      {
+        id: 'web',
+        label: 'Web 测试与生产构建',
+        status: 'passed',
+        startedAt: '2026-08-09T07:59:58.000Z',
+        finishedAt: NOW,
+        durationMs: 2000,
+      },
+    ],
     ...overrides,
   }
 }
@@ -232,12 +280,162 @@ test('quality gates config: every operation status and stage label has a safe Ch
   )
 })
 
+test('quality gates config: flow segments derive strict additions and the shared full suffix', () => {
+  const profiles = {
+    full: {
+      stages: [
+        { id: 'environment_profile', label: '环境与工具链准备' },
+        { id: 'web', label: 'Web 测试与生产构建' },
+      ],
+    },
+    strict: {
+      stages: [
+        { id: 'strict_profile', label: '严格门禁配置' },
+        { id: 'shellcheck', label: 'Shell 静态检查' },
+        { id: 'environment_profile', label: '环境与工具链准备' },
+        { id: 'web', label: 'Web 测试与生产构建' },
+      ],
+    },
+  }
+
+  assert.deepEqual(
+    getQualityGateFlowSegments(profiles, 'strict').map((segment) => ({
+      id: segment.id,
+      scopeLabel: segment.scopeLabel,
+      stageIds: segment.stages.map((stage) => stage.id),
+    })),
+    [
+      {
+        id: 'strict-extra',
+        scopeLabel: '仅 strict',
+        stageIds: ['strict_profile', 'shellcheck'],
+      },
+      {
+        id: 'full-core',
+        scopeLabel: 'full / strict 共用',
+        stageIds: ['environment_profile', 'web'],
+      },
+    ]
+  )
+  assert.equal(getQualityGateFlowSegments(profiles, 'full')[0].id, 'full-core')
+  assert.equal(
+    getQualityGateFlowSegments(profiles, 'full')[0].scopeLabel,
+    'full / strict 共用'
+  )
+  assert.deepEqual(getQualityGateFlowSegments(profiles, 'release'), [])
+  assert.deepEqual(getQualityGateFlowSegments({}, 'strict'), [])
+})
+
+test('quality gates config: stage composition uses recorded durations and exposes parallel caveat', () => {
+  const composition = buildQualityGateStageDurationComposition([
+    {
+      id: 'shared',
+      label: '共享基础检查',
+      durationMs: 100,
+      parallel: true,
+    },
+    {
+      id: 'web',
+      label: 'Web 测试与生产构建',
+      durationMs: 300,
+      parallel: true,
+    },
+    { id: 'browser', label: '真实浏览器回归', durationMs: null },
+  ])
+  assert.equal(composition.totalDurationMs, 400)
+  assert.equal(composition.hasParallel, true)
+  assert.deepEqual(
+    composition.items.map((item) => ({
+      id: item.id,
+      sharePercent: item.sharePercent,
+      longest: item.longest,
+    })),
+    [
+      { id: 'shared', sharePercent: 25, longest: false },
+      { id: 'web', sharePercent: 75, longest: true },
+    ]
+  )
+})
+
+test('quality gates config: history trend requires three comparable passed receipts', () => {
+  const reference = {
+    profile: 'strict',
+    receipt: {
+      environmentFingerprint: 'c'.repeat(64),
+      treeState: 'dirty',
+    },
+  }
+  const samples = [3000, 2000, 4000, 1000].map((durationMs, index) => ({
+    id: `${index + 1}`,
+    profile: 'strict',
+    status: 'passed',
+    receipt: {
+      status: 'passed',
+      durationMs,
+      finishedAt: `2026-08-09T0${index + 1}:00:00.000Z`,
+      environmentFingerprint: 'c'.repeat(64),
+      treeState: 'dirty',
+    },
+  }))
+  samples.push({
+    ...samples[0],
+    id: 'other-environment',
+    receipt: {
+      ...samples[0].receipt,
+      environmentFingerprint: 'd'.repeat(64),
+    },
+  })
+  const trend = buildQualityGateHistoryTrend(samples, reference)
+  assert.equal(trend.enoughSamples, true)
+  assert.equal(trend.sampleCount, 4)
+  assert.equal(trend.maxDurationMs, 4000)
+  assert.deepEqual(
+    trend.samples.map((sample) => sample.durationMs),
+    [3000, 2000, 4000, 1000]
+  )
+  assert.equal(
+    buildQualityGateHistoryTrend(samples.slice(0, 2), reference).enoughSamples,
+    false
+  )
+})
+
+test('quality gates config: coverage matrix keeps missing and not-applicable cells explicit', () => {
+  const matrix = buildQualityGateCoverageMatrix([
+    {
+      key: 'frontend',
+      label: '前端页面',
+      highRisk: false,
+      gateResults: [
+        { gateKey: 'browser', label: '真实浏览器', status: 'current' },
+        { gateKey: 'full', label: '完整门禁', status: 'stale' },
+      ],
+    },
+    {
+      key: 'database',
+      label: '数据库',
+      highRisk: true,
+      gateResults: [
+        { gateKey: 'strict', label: '严格门禁', status: 'missing' },
+      ],
+    },
+  ])
+  assert.deepEqual(
+    matrix.gates.map((gate) => gate.key),
+    ['browser', 'full', 'strict']
+  )
+  assert.deepEqual(
+    matrix.rows[1].cells.map((cell) => cell.status),
+    ['not_applicable', 'not_applicable', 'missing']
+  )
+})
+
 test('quality gates config: summary preserves one shared operation truth', () => {
   const normalized = normalizeDevQualityGateSummary(summary())
   assert.equal(normalized.currentOperation.id, OPERATION_ID)
   assert.equal(normalized.operations[0].id, OPERATION_ID)
   assert.equal(normalized.repository.commit, 'a'.repeat(40))
   assert.equal(normalized.busy.kind, 'quality')
+  assert.deepEqual(normalized.profiles.strict.substeps, {})
   assert.throws(
     () =>
       normalizeDevQualityGateSummary(
@@ -245,6 +443,82 @@ test('quality gates config: summary preserves one shared operation truth', () =>
       ),
     /inconsistent/u
   )
+})
+
+test('quality gates config: current formal proof wins over unrelated history', () => {
+  const currentRepository = {
+    commit: 'a'.repeat(40),
+    dirty: false,
+    fingerprint: 'd'.repeat(64),
+  }
+  const historical = operation({
+    status: 'passed',
+    finishedAt: NOW,
+    receipt: receipt({ gitCommit: 'e'.repeat(40) }),
+    repository: {
+      commit: 'e'.repeat(40),
+      dirty: true,
+      fingerprint: 'f'.repeat(64),
+    },
+  })
+  const currentSummary = summary({
+    repository: currentRepository,
+    currentOperation: null,
+    operations: [historical],
+    busy: { active: false, kind: '', profile: '' },
+    proofs: {
+      full: {
+        profile: 'full',
+        status: 'missing',
+        current: false,
+        releaseEligible: false,
+        reused: false,
+        receipt: null,
+      },
+      strict: {
+        profile: 'strict',
+        status: 'passed',
+        current: true,
+        releaseEligible: true,
+        reused: true,
+        receipt: receipt(),
+      },
+    },
+  })
+
+  const projected = projectCurrentQualityGateProof(currentSummary, 'strict')
+  assert.equal(projected.proofOnly, true)
+  assert.equal(projected.repository.fingerprint, currentRepository.fingerprint)
+  assert.equal(projected.message.includes('当前版本'), true)
+  assert.equal(
+    selectDisplayedQualityGateOperation(currentSummary).displayContext,
+    'current-proof'
+  )
+  assert.equal(
+    selectDisplayedQualityGateOperation(currentSummary, {
+      operationId: historical.id,
+    }).displayContext,
+    'history'
+  )
+  const selectedHistory = selectDisplayedQualityGateOperation(currentSummary, {
+    operationId: historical.id,
+  })
+  assert.match(selectedHistory.message, /不代表当前版本/u)
+  assert.notEqual(selectedHistory.message, historical.message)
+  assert.equal(historical.message, '正在准备严格门禁')
+
+  const historyOnlySummary = summary({
+    repository: currentRepository,
+    currentOperation: null,
+    operations: [historical],
+    busy: { active: false, kind: '', profile: '' },
+  })
+  const defaultHistory = selectDisplayedQualityGateOperation(
+    historyOnlySummary,
+    { profile: 'strict' }
+  )
+  assert.equal(defaultHistory.displayContext, 'history')
+  assert.match(defaultHistory.message, /当前仓库身份的正式回执/u)
 })
 
 test('quality gates config: client uses fixed endpoints, CSRF and exact action payload', async () => {
@@ -311,6 +585,18 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /AbortController/u)
   assert.match(pageSource, /viewState\.view === activeView/u)
   assert.match(pageSource, /data=\{activeViewState\.data\}/u)
+  assert.match(pageSource, /selectDisplayedQualityGateOperation/u)
+  assert.match(pageSource, /getQualityGateFlowSegments/u)
+  assert.match(pageSource, /<ol/u)
+  assert.match(pageSource, /aria-current=/u)
+  assert.equal((pageSource.match(/<MermaidDiagram/gu) || []).length, 1)
+  assert.match(pageSource, /静态工作原理，不代表当前运行状态/u)
+  assert.match(pageSource, /buildQualityGateStageDurationComposition/u)
+  assert.match(pageSource, /buildQualityGateHistoryTrend/u)
+  assert.match(pageSource, /buildQualityGateCoverageMatrix/u)
+  assert.match(pageSource, /当前正式回执/u)
+  assert.match(pageSource, /\? '预计剩余'[\s\S]*?: '运行状态'/u)
+  assert.doesNotMatch(pageSource, /Fixed quality evidence/u)
   assert.match(taskNavSource, /aria-controls/u)
   assert.match(taskNavSource, /-panel-/u)
 })

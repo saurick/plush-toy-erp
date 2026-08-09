@@ -38,8 +38,8 @@ async function loadWorkflowApi(call) {
     .replace(
       "import { JsonRpc } from '@/common/utils/jsonRpc'",
       `class JsonRpc {
-        async call(method, params) {
-          return globalThis.__workflowApiTestCall(method, params)
+        async call(method, params, options) {
+          return globalThis.__workflowApiTestCall(method, params, options)
         }
       }`
     )
@@ -347,6 +347,77 @@ test('workflowApi: task board rejects malformed successful responses', async () 
 
   await assert.rejects(
     api.getWorkflowTaskBoard({ limit: 5, offset: 0 }),
+    (error) => error.isInvalidResponse === true
+  )
+})
+
+test('workflowApi: workbench uses one bounded queue projection and forwards cancellation', async () => {
+  const calls = []
+  const response = {
+    snapshot_at: 1_720_000_000,
+    queue_key: 'actionable',
+    total: 2,
+    limit: 8,
+    offset: 0,
+    items: [
+      validTask({ id: 11, version: 1, task_status_key: 'ready' }),
+      validTask({ id: 10, version: 1, task_status_key: 'ready' }),
+    ],
+    counts: { actionable: 2, approval: 1, risk: 3 },
+  }
+  const api = await loadWorkflowApi(async (method, params, options) => {
+    calls.push({ method, params, options })
+    return { data: response }
+  })
+  const params = { queue_key: 'actionable', limit: 8, offset: 0 }
+  const controller = new AbortController()
+
+  assert.equal(
+    await api.getWorkflowWorkbench(params, { signal: controller.signal }),
+    response
+  )
+  assert.deepEqual(calls, [
+    {
+      method: 'get_workbench',
+      params,
+      options: { signal: controller.signal },
+    },
+  ])
+})
+
+test('workflowApi: workbench rejects unsafe queries and malformed successful responses', async () => {
+  const calls = []
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    return {
+      data: {
+        snapshot_at: 1_720_000_000,
+        queue_key: 'risk',
+        total: 2,
+        limit: 8,
+        offset: 0,
+        items: [validTask({ id: 11, version: 1, task_status_key: 'ready' })],
+        counts: { actionable: 2, approval: 1, risk: 2 },
+      },
+    }
+  })
+
+  for (const params of [
+    {},
+    { queue_key: 'unknown', limit: 8, offset: 0 },
+    { queue_key: 'risk', limit: 0, offset: 0 },
+    { queue_key: 'risk', limit: 8, offset: -1 },
+    { queue_key: 'risk', limit: 8, offset: 0, role_key: 'boss' },
+  ]) {
+    await assert.rejects(
+      api.getWorkflowWorkbench(params),
+      /工作台查询条件有误/u
+    )
+  }
+  assert.equal(calls.length, 0)
+
+  await assert.rejects(
+    api.getWorkflowWorkbench({ queue_key: 'risk', limit: 8, offset: 0 }),
     (error) => error.isInvalidResponse === true
   )
 })
@@ -1142,17 +1213,18 @@ test('workflow task callers own a frozen user-intent attempt store', () => {
   }
 })
 
-test('workflow dashboard consumes complete server role views without the old capped waiting pool', () => {
+test('workflow dashboard consumes one bounded server workbench projection', () => {
   const source = read('../pages/DashboardPage.jsx')
   const statsSource = read('../utils/workflowDashboardStats.mjs')
   assert.match(statsSource, /effective_session\?\.roles/u)
   assert.match(statsSource, /hasEffectiveRoleProjection/u)
-  assert.match(source, /listAllWorkflowWorkbenchRoleTasks/u)
-  assert.match(source, /\['todo', 'risk', 'approval'\]/u)
-  assert.match(source, /workflowRiskTaskIDs\.has\(task\.id\)/u)
-  assert.match(source, /workflowApprovalTaskIDs\.has\(task\.id\)/u)
+  assert.match(source, /getWorkflowWorkbench\(workbenchRequest/u)
+  assert.match(source, /queue_key:\s*workbenchQueueKey/u)
+  assert.match(source, /limit:\s*WORKBENCH_QUEUE_PAGE_SIZE/u)
+  assert.doesNotMatch(source, /listAllWorkflowWorkbenchRoleTasks/u)
   assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)
   assert.doesNotMatch(source, /listWorkflowTasks/u)
+  assert.doesNotMatch(source, /Promise\.all/u)
   assert.doesNotMatch(source, /limit:\s*200/u)
   assert.doesNotMatch(source, /key:\s*'waiting'/u)
 })
@@ -1173,7 +1245,7 @@ test('workflow browser and simulated closure fixtures submit idempotency keys', 
   assert.match(simulatedClosure, /mobile-workflow-closure:/u)
 })
 
-test('workflow mocks support separate mobile and workbench role-task reads', () => {
+test('workflow mocks support mobile role reads and the bounded workbench projection', () => {
   for (const path of [
     '../../mocks/jsonRpcMockServer.js',
     '../../../scripts/style-l1/factRpcMocks.mjs',
@@ -1181,9 +1253,10 @@ test('workflow mocks support separate mobile and workbench role-task reads', () 
     const source = read(path)
     assert.match(source, /['"]list_role_tasks['"]/u)
     assert.match(source, /['"]list_workbench_role_tasks['"]/u)
+    assert.match(source, /['"]get_workbench['"]/u)
     assert.match(
       source,
-      /'workflow\.task\.read'[\s\S]{0,240}method !== 'list_workbench_role_tasks'[\s\S]{0,240}'erp\.workbench\.read'/u
+      /'workflow\.task\.read'[\s\S]{0,320}\['get_workbench', 'list_workbench_role_tasks'\]\.includes\(method\)[\s\S]{0,240}'erp\.workbench\.read'/u
     )
   }
 })

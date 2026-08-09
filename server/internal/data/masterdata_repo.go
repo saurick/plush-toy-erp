@@ -139,7 +139,9 @@ func (r *masterDataRepo) ListCustomers(ctx context.Context, filter biz.MasterDat
 			customer.ShortNameContains(filter.Keyword),
 		))
 	}
-	if filter.ActiveOnly {
+	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
+		query = query.Where(customer.IsActive(active))
+	} else if filter.ActiveOnly {
 		query = query.Where(customer.IsActive(true))
 	}
 	total, err := query.Clone().Count(ctx)
@@ -296,7 +298,9 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 			supplier.AddressContains(filter.Keyword),
 		))
 	}
-	if filter.ActiveOnly {
+	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
+		query = query.Where(supplier.IsActive(active))
+	} else if filter.ActiveOnly {
 		query = query.Where(supplier.IsActive(true))
 	}
 	total, err := query.Clone().Count(ctx)
@@ -396,7 +400,9 @@ func (r *masterDataRepo) ListMaterials(ctx context.Context, filter biz.MasterDat
 			material.ColorContains(filter.Keyword),
 		))
 	}
-	if filter.ActiveOnly {
+	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
+		query = query.Where(material.IsActive(active))
+	} else if filter.ActiveOnly {
 		query = query.Where(material.IsActive(true))
 	}
 	total, err := query.Clone().Count(ctx)
@@ -429,7 +435,9 @@ func (r *masterDataRepo) ListUnits(ctx context.Context, filter biz.MasterDataFil
 			unit.NameContains(filter.Keyword),
 		))
 	}
-	if filter.ActiveOnly {
+	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
+		query = query.Where(unit.IsActive(active))
+	} else if filter.ActiveOnly {
 		query = query.Where(unit.IsActive(true))
 	}
 	total, err := query.Clone().Count(ctx)
@@ -467,7 +475,9 @@ func (r *masterDataRepo) listWarehouses(ctx context.Context, filter biz.MasterDa
 			warehouse.TypeContains(filter.Keyword),
 		))
 	}
-	if filter.ActiveOnly {
+	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
+		query = query.Where(warehouse.IsActive(active))
+	} else if filter.ActiveOnly {
 		query = query.Where(warehouse.IsActive(true))
 	}
 	total, err := query.Clone().Count(ctx)
@@ -554,7 +564,9 @@ func (r *masterDataRepo) ListProcesses(ctx context.Context, filter biz.MasterDat
 			process.NoteContains(filter.Keyword),
 		))
 	}
-	if filter.ActiveOnly {
+	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
+		query = query.Where(process.IsActive(active))
+	} else if filter.ActiveOnly {
 		query = query.Where(process.IsActive(true))
 	}
 	total, err := query.Clone().Count(ctx)
@@ -659,7 +671,9 @@ func (r *masterDataRepo) ListProducts(ctx context.Context, filter biz.MasterData
 			product.CustomerStyleNoContains(filter.Keyword),
 		))
 	}
-	if filter.ActiveOnly {
+	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
+		query = query.Where(product.IsActive(active))
+	} else if filter.ActiveOnly {
 		query = query.Where(product.IsActive(true))
 	}
 	total, err := query.Clone().Count(ctx)
@@ -801,7 +815,9 @@ func (r *masterDataRepo) ListProductSKUs(ctx context.Context, filter biz.Product
 			productsku.PackagingVersionContains(filter.Keyword),
 		))
 	}
-	if filter.ActiveOnly {
+	if active, scoped := biz.LifecycleActiveState(filter.LifecycleScope); scoped {
+		query = query.Where(productsku.IsActive(active))
+	} else if filter.ActiveOnly {
 		query = query.Where(productsku.IsActive(true))
 	}
 	total, err := query.Clone().Count(ctx)

@@ -10,13 +10,18 @@ export const ROLE_NAVIGATION_MODES = Object.freeze({
   CUSTOM: 'custom',
 })
 const HELP_CENTER_PATH = '/erp/help-center'
+const HISTORY_RECORDS_PATH = '/erp/history'
 const DASHBOARD_PATHS = Object.freeze([
   '/erp/dashboard',
   '/erp/task-board',
   '/erp/business-dashboard',
 ])
 const DASHBOARD_PATH_SET = new Set(DASHBOARD_PATHS)
-const RESERVED_PATH_SET = new Set([...DASHBOARD_PATHS, HELP_CENTER_PATH])
+const RESERVED_PATH_SET = new Set([
+  ...DASHBOARD_PATHS,
+  HISTORY_RECORDS_PATH,
+  HELP_CENTER_PATH,
+])
 
 function normalizeSectionIdentity(value = '') {
   return String(value || '').trim()
@@ -323,7 +328,7 @@ export function buildRoleGuidedNavigation({
       selectedPaths.length >= resolvedPrimaryLimit ||
       selectedPaths.includes(path) ||
       DASHBOARD_PATH_SET.has(path) ||
-      path === HELP_CENTER_PATH ||
+      RESERVED_PATH_SET.has(path) ||
       !itemByPath.has(path)
     ) {
       return false
@@ -360,7 +365,7 @@ export function buildRoleGuidedNavigation({
       primaryPathSet.has(path) ||
       secondaryPaths.includes(path) ||
       DASHBOARD_PATH_SET.has(path) ||
-      path === HELP_CENTER_PATH ||
+      RESERVED_PATH_SET.has(path) ||
       !itemByPath.has(path)
     ) {
       return false
@@ -375,8 +380,8 @@ export function buildRoleGuidedNavigation({
   sections.forEach((section) => {
     section.items.forEach((item) => addSecondaryPath(item.path))
   })
-  if (itemByPath.has(HELP_CENTER_PATH)) {
-    secondaryPaths.push(HELP_CENTER_PATH)
+  for (const path of [HISTORY_RECORDS_PATH, HELP_CENTER_PATH]) {
+    if (itemByPath.has(path)) secondaryPaths.push(path)
   }
   const rawSecondaryItems = secondaryPaths.map((path) => itemByPath.get(path))
   const secondarySections = buildRoleGuidedSecondarySections(rawSecondaryItems)

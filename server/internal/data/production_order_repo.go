@@ -179,6 +179,12 @@ func (r *productionOrderRepo) ListProductionOrders(ctx context.Context, filter b
 	}
 	if filter.Status != "" {
 		query = query.Where(productionorder.Status(filter.Status))
+	} else if statuses := biz.LifecycleStatusesForScope(
+		filter.LifecycleScope,
+		[]string{biz.ProductionOrderStatusDraft, biz.ProductionOrderStatusReleased},
+		[]string{biz.ProductionOrderStatusClosed, biz.ProductionOrderStatusCancelled},
+	); len(statuses) > 0 {
+		query = query.Where(productionorder.StatusIn(statuses...))
 	}
 	if filter.DateFrom != nil || filter.DateTo != nil {
 		field := map[string]string{

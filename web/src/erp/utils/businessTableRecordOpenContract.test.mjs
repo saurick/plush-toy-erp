@@ -14,6 +14,7 @@ const businessListLayoutSource = readFileSync(
 const expectedBusinessDataTablePages = [
   'BOMVersionsPage.jsx',
   'FinancePaymentsPage.jsx',
+  'HistoryRecordsPage.jsx',
   'OperationalFactsPage.jsx',
   'ReworkIntakesPage.jsx',
   'ShipmentsPage.jsx',
@@ -173,7 +174,7 @@ test('BusinessDataTable 双击打开前过滤表格内交互元素', () => {
   )
 })
 
-test('当前 13 个正式 BusinessDataTable 主表都声明双击打开合同', () => {
+test('当前 14 个正式 BusinessDataTable 主表都声明双击打开合同', () => {
   const pages = readBusinessDataTablePages()
   assert.deepEqual(
     pages.map(({ fileName }) => fileName),

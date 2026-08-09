@@ -16,6 +16,9 @@ test('dev flow state observatory L1 scenarios cover five-view read-only boundari
     [
       'dev-flow-state-observatory-readonly',
       'dev-flow-state-observatory-chain-drill-dark',
+      'dev-flow-state-observatory-state-rules-dark',
+      'dev-flow-state-observatory-state-rule-correction-paths-light',
+      'dev-flow-state-observatory-state-rules-mobile-dark',
       'dev-flow-state-observatory-customer-review-chain-print',
       'dev-flow-state-observatory-customer-review-overview-print',
       'dev-flow-state-observatory-invalid-deep-link',
@@ -48,26 +51,38 @@ test('dev flow state observatory L1 scenarios cover five-view read-only boundari
   assert.match(scenarios[1].path, /node=shipment_draft/u)
   assert.deepEqual(scenarios[2].viewport, { width: 1440, height: 900 })
   assert.equal(scenarios[2].themeMode, 'dark')
-  assert.match(scenarios[2].path, /chain=production_exception/u)
-  assert.match(scenarios[2].path, /node=production_exception_decision/u)
+  assert.match(scenarios[2].path, /view=states/u)
+  assert.match(scenarios[2].path, /flow=source.sales_order/u)
   assert.deepEqual(scenarios[3].viewport, { width: 1440, height: 900 })
-  assert.equal(scenarios[3].themeMode, 'dark')
-  assert.match(scenarios[3].path, /chain=all/u)
-  assert.doesNotMatch(scenarios[3].path, /node=/u)
-  assert.deepEqual(scenarios[4].viewport, { width: 1280, height: 800 })
-  assert.match(scenarios[4].path, /chain=retired-chain/u)
-  assert.match(scenarios[4].path, /task_id=abc/u)
+  assert.equal(scenarios[3].themeMode, 'light')
+  assert.match(scenarios[3].path, /view=states/u)
+  assert.match(scenarios[3].path, /flow=fact.rework_intake/u)
+  assert.deepEqual(scenarios[4].viewport, { width: 390, height: 844 })
+  assert.equal(scenarios[4].themeMode, 'dark')
+  assert.match(scenarios[4].path, /view=states/u)
+  assert.match(scenarios[4].path, /flow=fact.production/u)
   assert.deepEqual(scenarios[5].viewport, { width: 1440, height: 900 })
-  assert.match(scenarios[5].path, /view=chain/u)
-  assert.match(scenarios[5].path, /chain=all/u)
-  assert.equal(scenarios[5].auth, 'admin')
-  assert.deepEqual(scenarios[5].effectiveSession, {
-    actions: ['workflow.task.read'],
-  })
-  assert.equal(scenarios[5].workflowTaskFixtures.length, 4)
-  assert.equal(scenarios[5].workflowProcessContextFixtures.length, 3)
-  assert.deepEqual(scenarios[6].viewport, { width: 390, height: 844 })
+  assert.equal(scenarios[5].themeMode, 'dark')
+  assert.match(scenarios[5].path, /chain=production_exception/u)
+  assert.match(scenarios[5].path, /node=production_exception_decision/u)
+  assert.deepEqual(scenarios[6].viewport, { width: 1440, height: 900 })
   assert.equal(scenarios[6].themeMode, 'dark')
   assert.match(scenarios[6].path, /chain=all/u)
   assert.doesNotMatch(scenarios[6].path, /node=/u)
+  assert.deepEqual(scenarios[7].viewport, { width: 1280, height: 800 })
+  assert.match(scenarios[7].path, /chain=retired-chain/u)
+  assert.match(scenarios[7].path, /task_id=abc/u)
+  assert.deepEqual(scenarios[8].viewport, { width: 1440, height: 900 })
+  assert.match(scenarios[8].path, /view=chain/u)
+  assert.match(scenarios[8].path, /chain=all/u)
+  assert.equal(scenarios[8].auth, 'admin')
+  assert.deepEqual(scenarios[8].effectiveSession, {
+    actions: ['workflow.task.read'],
+  })
+  assert.equal(scenarios[8].workflowTaskFixtures.length, 4)
+  assert.equal(scenarios[8].workflowProcessContextFixtures.length, 3)
+  assert.deepEqual(scenarios[9].viewport, { width: 390, height: 844 })
+  assert.equal(scenarios[9].themeMode, 'dark')
+  assert.match(scenarios[9].path, /chain=all/u)
+  assert.doesNotMatch(scenarios[9].path, /node=/u)
 })

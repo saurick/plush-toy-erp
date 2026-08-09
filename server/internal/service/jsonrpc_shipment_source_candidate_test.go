@@ -224,6 +224,27 @@ func TestJSONRPCListShipmentSourceCandidatesRequiresAllPermissions(t *testing.T)
 	}
 }
 
+func TestJSONRPCListShipmentSourceCandidatesAllowsUpdateWithoutCreate(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	repo := &shipmentSourceCandidateJSONRPCRepo{}
+	dispatcher := newOperationalFactJSONRPCTestDataWithRepo(
+		t,
+		shipmentSourceCandidateAdmin(
+			biz.PermissionShipmentUpdate,
+			biz.PermissionSalesOrderRead,
+			biz.PermissionSalesOrderItemRead,
+		),
+		repo,
+	)
+	_, result, err := dispatcher.handleOperationalFact(ctx, "list_shipment_source_candidates", "update-only", mustJSONRPCStruct(t, map[string]any{}))
+	if err != nil || result == nil || result.Code != errcode.OK.Code {
+		t.Fatalf("update-only candidate response=%#v err=%v", result, err)
+	}
+	if repo.candidateCalls != 1 {
+		t.Fatalf("update-only candidate calls=%d, want 1", repo.candidateCalls)
+	}
+}
+
 func TestJSONRPCListShipmentSourceCandidatesAuthMatrix(t *testing.T) {
 	adminContext := workflowJSONRPCAdminContext()
 	nonAdminContext := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{

@@ -1,4 +1,5 @@
 import { DEV_DATABASE_MIGRATION_ROUTE } from './devRoutes.mjs'
+import { isDevTimestamp } from './devTimestamp.mjs'
 
 export { DEV_DATABASE_MIGRATION_ROUTE }
 
@@ -64,6 +65,15 @@ function validateIssue(issue) {
   return issue
 }
 
+function validateEvent(event) {
+  assertObject(event, '迁移状态事件')
+  if (!isDevTimestamp(event.at) || !OPERATION_STATUSES.has(event.status)) {
+    throw new Error('迁移状态事件返回结构无效')
+  }
+  assertSafeText(event.message, '迁移状态事件说明')
+  return event
+}
+
 export function validateDatabaseMigrationOperation(operation) {
   assertObject(operation, '迁移操作')
   if (
@@ -71,6 +81,8 @@ export function validateDatabaseMigrationOperation(operation) {
     !OPERATION_ID_PATTERN.test(String(operation.id || '')) ||
     !['migration', 'restart'].includes(operation.kind) ||
     !OPERATION_STATUSES.has(operation.status) ||
+    !isDevTimestamp(operation.createdAt) ||
+    !isDevTimestamp(operation.updatedAt) ||
     Object.hasOwn(operation, 'internal')
   ) {
     throw new Error('迁移操作返回结构无效')
@@ -95,17 +107,31 @@ export function validateDatabaseMigrationOperation(operation) {
     }
     assertSafeText(operation.target.safeTarget, '数据库目标')
   }
+  if (operation.plan !== null) {
+    assertObject(operation.plan, '迁移计划')
+    if (
+      !/^[0-9a-f]{64}$/u.test(String(operation.plan.hash || '')) ||
+      !isDevTimestamp(operation.plan.preparedAt)
+    ) {
+      throw new Error('迁移计划返回结构无效')
+    }
+  }
   if (operation.backup !== null) {
     assertObject(operation.backup, '备份验证')
     if (
       operation.backup.restoreVerified !== true ||
       !Number.isSafeInteger(operation.backup.sizeBytes) ||
       operation.backup.sizeBytes < 1 ||
-      !/^[0-9a-f]{64}$/u.test(String(operation.backup.sha256 || ''))
+      !/^[0-9a-f]{64}$/u.test(String(operation.backup.sha256 || '')) ||
+      !isDevTimestamp(operation.backup.verifiedAt)
     ) {
       throw new Error('备份验证返回结构无效')
     }
   }
+  if (!Array.isArray(operation.events) || operation.events.length > 100) {
+    throw new Error('迁移状态事件列表无效')
+  }
+  operation.events.forEach(validateEvent)
   return operation
 }
 

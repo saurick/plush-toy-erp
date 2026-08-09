@@ -298,7 +298,7 @@ function workflowMockRoleTaskReadAllowed(
     return false
   }
   return (
-    method !== 'list_workbench_role_tasks' ||
+    !['get_workbench', 'list_workbench_role_tasks'].includes(method) ||
     workflowMockPermissionAllowed(
       adminProfile,
       effectiveSession,
@@ -314,7 +314,7 @@ export async function installFactRpcMocks(page, context) {
   const createdProductionMaterialIssues = []
   const createdProductionReworks = []
   const createdOutsourcingFacts = []
-  const outsourcingFactStatusOverrides = new Map()
+  const outsourcingFactLifecycleOverrides = new Map()
   const ambiguousInboundResponses = new Set()
   const productionCompletionAttempts = new Map()
   const productionReworkAttempts = new Map()
@@ -464,6 +464,7 @@ export async function installFactRpcMocks(page, context) {
     }
     const outsourcingFact = {
       id: 1,
+      version: 1,
       fact_no: 'OUTSOURCE-FACT-L1',
       fact_type: 'RETURN_RECEIPT',
       status: 'DRAFT',
@@ -481,6 +482,11 @@ export async function installFactRpcMocks(page, context) {
       idempotency_key: 'OUTSOURCE-FACT-L1',
       occurred_at: nowUnix(),
       note: '样式委外事实',
+      posted_at: null,
+      posted_by: null,
+      cancelled_at: null,
+      cancelled_by: null,
+      cancel_reason: null,
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
@@ -490,6 +496,7 @@ export async function installFactRpcMocks(page, context) {
       fact_no: 'OUT-RR-POSTED-L1',
       fact_type: 'RETURN_RECEIPT',
       status: 'POSTED',
+      version: 2,
       subject_type: 'PRODUCT',
       subject_id: 1,
       product_sku_id: 201,
@@ -501,6 +508,8 @@ export async function installFactRpcMocks(page, context) {
       source_line_id: 12,
       idempotency_key: 'OUT-RR-POSTED-L1',
       note: '已过账委外回货',
+      posted_at: nowUnix(),
+      posted_by: 1,
     }
     const paginatedOutsourcingReturns = Array.from(
       { length: 200 },
@@ -509,6 +518,9 @@ export async function installFactRpcMocks(page, context) {
         id: 10_200 - index,
         fact_no: `OUT-RR-PAGE-L1-${String(index + 1).padStart(3, '0')}`,
         status: 'DRAFT',
+        version: 1,
+        posted_at: null,
+        posted_by: null,
         source_line_id: 20_000 + index,
         sku_code_snapshot: `SKU-OUTSOURCE-PAGE-L1-${String(index + 1).padStart(
           3,
@@ -885,9 +897,7 @@ export async function installFactRpcMocks(page, context) {
           ]
             .map((fact) => ({
               ...fact,
-              status:
-                outsourcingFactStatusOverrides.get(Number(fact.id)) ||
-                fact.status,
+              ...(outsourcingFactLifecycleOverrides.get(Number(fact.id)) || {}),
             }))
             .filter(
               (fact) =>
@@ -992,15 +1002,25 @@ export async function installFactRpcMocks(page, context) {
       case 'post_outsourcing_fact':
       case 'cancel_outsourcing_fact': {
         const factID = Number(params.id || 0)
-        const allowedKeys = new Set(['customer_key', 'id'])
-        const current = [
+        const allowedKeys =
+          method === 'post_outsourcing_fact'
+            ? new Set(['customer_key', 'id', 'expected_version'])
+            : new Set(['customer_key', 'id', 'expected_version', 'reason'])
+        const base = [
           outsourcingFact,
           postedOutsourcingReturn,
           ...paginatedOutsourcingReturns,
           ...createdOutsourcingFacts,
         ].find((fact) => Number(fact.id) === factID)
-        const currentStatus =
-          outsourcingFactStatusOverrides.get(factID) || current?.status
+        const current = base
+          ? {
+              ...base,
+              ...(outsourcingFactLifecycleOverrides.get(factID) || {}),
+            }
+          : null
+        const currentStatus = current?.status
+        const expectedVersion = Number(params.expected_version || 0)
+        const reason = String(params.reason || '').trim()
         const nextStatus =
           method === 'post_outsourcing_fact' ? 'POSTED' : 'CANCELLED'
         const validStatus =
@@ -1011,7 +1031,12 @@ export async function installFactRpcMocks(page, context) {
           !current ||
           !Number.isSafeInteger(factID) ||
           factID <= 0 ||
+          !Number.isSafeInteger(expectedVersion) ||
+          expectedVersion <= 0 ||
+          expectedVersion !== Number(current?.version || 0) ||
           !Object.keys(params).every((key) => allowedKeys.has(key)) ||
+          (method === 'cancel_outsourcing_fact' &&
+            (!reason || [...reason].length > 255)) ||
           !validStatus
         ) {
           data = unsupportedRpcMethod(
@@ -1020,10 +1045,22 @@ export async function installFactRpcMocks(page, context) {
           )
           break
         }
-        outsourcingFactStatusOverrides.set(factID, nextStatus)
-        data = {
-          outsourcing_fact: { ...current, status: nextStatus },
+        const actionAt = nowUnix()
+        const updated = {
+          ...current,
+          status: nextStatus,
+          version: current.version + 1,
+          ...(method === 'post_outsourcing_fact'
+            ? { posted_at: actionAt, posted_by: 1 }
+            : {
+                cancelled_at: actionAt,
+                cancelled_by: 1,
+                cancel_reason: reason,
+              }),
+          updated_at: actionAt,
         }
+        outsourcingFactLifecycleOverrides.set(factID, updated)
+        data = { outsourcing_fact: { ...updated } }
         break
       }
       case 'list_shipment_source_candidates':
@@ -2437,6 +2474,103 @@ export async function installFactRpcMocks(page, context) {
           break
         }
         data = { process_context: cloneWorkflowTask(processContext) }
+        break
+      }
+      case 'get_workbench': {
+        if (
+          !workflowMockRoleTaskReadAllowed(
+            adminProfile,
+            effectiveSession,
+            method
+          )
+        ) {
+          fail('当前账号缺少查看协同任务权限')
+          break
+        }
+        const workbenchDelayMs = resolveDelayFromReferer(
+          route.request(),
+          '__style_l1_workbench_delay'
+        )
+        if (workbenchDelayMs > 0) {
+          await delay(workbenchDelayMs)
+        }
+        const queueKey = String(params.queue_key || '').trim()
+        const limit = Number(params.limit || 0)
+        const offset = Number(params.offset || 0)
+        if (
+          !['actionable', 'risk', 'approval'].includes(queueKey) ||
+          !Number.isSafeInteger(limit) ||
+          limit < 1 ||
+          limit > 50 ||
+          !Number.isSafeInteger(offset) ||
+          offset < 0
+        ) {
+          fail('工作台查询条件有误')
+          break
+        }
+        const snapshotAt = Number(nowUnix())
+        const visibleTasks = workflowTasks.filter((task) =>
+          workflowMockCanViewTask(adminProfile, effectiveSession, task)
+        )
+        const isRiskTask = (task) =>
+          task.task_status_key === 'blocked' ||
+          (Number(task.due_at || 0) > 0 && Number(task.due_at) < snapshotAt) ||
+          Number(task.priority || 0) >= 3 ||
+          task.critical_path === true ||
+          Number(task.urge_count || 0) > 0 ||
+          Boolean(task.escalated_at) ||
+          task.payload?.critical_path === true
+        const actionableTasks = visibleTasks.filter(
+          (task) => task.task_status_key === 'ready' && !isRiskTask(task)
+        )
+        const riskTasks = visibleTasks.filter(
+          (task) =>
+            ['ready', 'blocked'].includes(task.task_status_key) &&
+            isRiskTask(task)
+        )
+        const approvalTasks = visibleTasks.filter(
+          (task) =>
+            ['ready', 'blocked'].includes(task.task_status_key) &&
+            typeof task.required_capability_key === 'string' &&
+            task.required_capability_key &&
+            workflowMockPermissionAllowed(
+              adminProfile,
+              effectiveSession,
+              task.required_capability_key
+            )
+        )
+        const queues = {
+          actionable: actionableTasks,
+          risk: riskTasks,
+          approval: approvalTasks,
+        }
+        Object.values(queues).forEach((items) =>
+          items.sort((left, right) => {
+            const leftDue = Number(left.due_at || Number.MAX_SAFE_INTEGER)
+            const rightDue = Number(right.due_at || Number.MAX_SAFE_INTEGER)
+            if (leftDue !== rightDue) return leftDue - rightDue
+            const nameOrder = String(left.task_name || '').localeCompare(
+              String(right.task_name || '')
+            )
+            if (nameOrder !== 0) return nameOrder
+            return Number(right.id || 0) - Number(left.id || 0)
+          })
+        )
+        data = {
+          snapshot_at: snapshotAt,
+          queue_key: queueKey,
+          total: queues[queueKey].length,
+          limit,
+          offset,
+          items: queues[queueKey]
+            .slice(offset, offset + limit)
+            .map(cloneWorkflowTask),
+          counts: {
+            actionable: actionableTasks.length,
+            approval: approvalTasks.length,
+            risk: riskTasks.length,
+          },
+        }
         break
       }
       case 'list_role_tasks':

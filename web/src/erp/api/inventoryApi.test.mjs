@@ -20,6 +20,7 @@ test('inventoryApi: exposes ledger reads and controlled inventory operations onl
     'list_inventory_txns',
     'list_inventory_operations',
     'create_inventory_operation',
+    'save_inventory_operation_draft',
     'post_inventory_operation',
     'cancel_inventory_operation',
     'get_inventory_operation',

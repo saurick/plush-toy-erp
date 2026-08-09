@@ -83,6 +83,7 @@ export function BOMHeaderFormFields({
   form,
   includeProduct = true,
   disabled = false,
+  productDisabled = false,
   productOptions = [],
   versionSuggestion = '',
   versionSuggestionLoading = false,
@@ -135,7 +136,7 @@ export function BOMHeaderFormFields({
         >
           <Select
             allowClear
-            disabled={disabled}
+            disabled={disabled || productDisabled}
             optionFilterProp="label"
             options={productOptions}
             placeholder="请选择产品"

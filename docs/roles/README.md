@@ -7,7 +7,7 @@
 | 任务 | 先读 | 再核对 |
 | --- | --- | --- |
 | 看角色权限矩阵 | `角色权限矩阵第一版.md` | `docs/当前真源与交接顺序.md`、后端 RBAC 代码和测试 |
-| 改菜单可见性 | `docs/product/正式产品入口与菜单配置计划.md` | 前端 menu config、后端内置菜单、RBAC 权限 |
+| 改菜单可见性 | `docs/product/菜单与正式入口合同.md` | 前端 menu config、后端内置菜单、RBAC 权限 |
 | 改岗位任务端入口 | `web/README.md` | 移动端角色权限、登录回跳和 style / smoke 覆盖 |
 
 ## 真源边界 / Source Boundary

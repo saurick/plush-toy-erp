@@ -199,12 +199,23 @@ test('production exception chain keeps the decision as a source document and exp
   const decision = chain.nodes.find(
     (node) => node.key === 'production_exception_decision'
   )
+  const execution = chain.nodes.find(
+    (node) => node.key === 'production_exception_execution'
+  )
   const branchLabels = chain.edges
     .filter((edge) => edge.from === 'production_exception_task')
     .map((edge) => edge.label)
 
   assert.equal(decision.layer, 'source_document')
   assert.deepEqual(decision.factKeys, [])
+  assert.equal(execution.layer, 'source_document')
+  assert.deepEqual(execution.factKeys, [])
+  assert.deepEqual(decision.machineKeys, [
+    'source.production_exception_decision',
+  ])
+  assert.deepEqual(execution.machineKeys, [
+    'source.production_exception_execution',
+  ])
   assert.deepEqual(branchLabels, [
     '拒绝或取消后结束，不进入执行',
     '批准超领额度，转正常领料路径使用',
@@ -220,6 +231,14 @@ test('production exception chain keeps the decision as a source document and exp
       (edge) =>
         edge.from === 'production_exception_execution_task' &&
         edge.to === 'production_exception_execution'
+    )
+  )
+  assert(
+    chain.edges.some(
+      (edge) =>
+        edge.from === 'production_exception_over_issue' &&
+        edge.to === 'affected_production_fact' &&
+        edge.factBoundary === 'later_material_issue_fact_only'
     )
   )
 })

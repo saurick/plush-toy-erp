@@ -95,6 +95,47 @@ func TestReworkIntakeProductionAndReshipmentClosedLoop(t *testing.T) {
 	if err != nil || replayed.ID != intake.ID {
 		t.Fatalf("rework intake replay=%#v err=%v", replayed, err)
 	}
+	editCandidates, editTotal, err := factUC.ListReworkIntakeSourceCandidates(ctx, biz.ReworkIntakeSourceCandidateFilter{
+		SourceShipmentID:           sourceShipment.ID,
+		EditingReworkIntakeDraftID: intake.ID,
+		Limit:                      50,
+	})
+	if err != nil || editTotal != 1 || len(editCandidates) != 1 || !editCandidates[0].Selectable ||
+		!editCandidates[0].ActiveIntakeQuantity.IsZero() || !editCandidates[0].RemainingIntakeQuantity.Equal(quantity) {
+		t.Fatalf("editable rework intake candidates=%#v total=%d err=%v", editCandidates, editTotal, err)
+	}
+	originalVersion := intake.Version
+	originalItemID := intake.Items[0].ID
+	originalIdempotencyKey := intake.IdempotencyKey
+	itemNote := "更新后的返工明细"
+	intake, err = factUC.SaveReworkIntakeDraft(ctx, &biz.ReworkIntakeDraftSave{
+		ID:               intake.ID,
+		ExpectedVersion:  intake.Version,
+		IntakeNo:         "HCF-CLOSED-001-EDITED",
+		SourceShipmentID: sourceShipment.ID,
+		Reason:           "客户确认更新返工说明",
+		Items: []biz.ReworkIntakeItemCreate{{
+			SourceShipmentItemID:        sourceShipment.Items[0].ID,
+			TargetProductionOrderItemID: flow.ProductionOrderItems[0].ID,
+			Quantity:                    quantity,
+			Note:                        &itemNote,
+		}},
+	}, f.actorID)
+	if err != nil || intake.Version != originalVersion+1 || intake.IntakeNo != "HCF-CLOSED-001-EDITED" ||
+		intake.Reason != "客户确认更新返工说明" || intake.IdempotencyKey != originalIdempotencyKey || len(intake.Items) != 1 ||
+		intake.Items[0].ID == originalItemID || intake.Items[0].Note == nil || *intake.Items[0].Note != itemNote {
+		t.Fatalf("save rework intake draft=%#v err=%v", intake, err)
+	}
+	if _, err := factUC.SaveReworkIntakeDraft(ctx, &biz.ReworkIntakeDraftSave{
+		ID:               intake.ID,
+		ExpectedVersion:  originalVersion,
+		IntakeNo:         "HCF-CLOSED-STALE",
+		SourceShipmentID: sourceShipment.ID,
+		Reason:           "过期版本不得覆盖",
+		Items:            intakeInput.Items,
+	}, f.actorID); !errors.Is(err, biz.ErrOperationalFactVersionConflict) {
+		t.Fatalf("stale rework intake save error=%v, want version conflict", err)
+	}
 
 	intake, err = factUC.ReceiveReworkIntake(ctx, &biz.ReworkIntakeTransition{
 		ID: intake.ID, ExpectedVersion: intake.Version,
@@ -102,6 +143,16 @@ func TestReworkIntakeProductionAndReshipmentClosedLoop(t *testing.T) {
 	if err != nil || intake.Status != biz.ReworkIntakeStatusReceived || intake.ProgressStage != biz.ReworkIntakeStageWaitingRework ||
 		len(intake.Items) != 1 || intake.Items[0].ReceivedLotID == nil {
 		t.Fatalf("receive rework intake=%#v err=%v", intake, err)
+	}
+	if _, err := factUC.SaveReworkIntakeDraft(ctx, &biz.ReworkIntakeDraftSave{
+		ID:               intake.ID,
+		ExpectedVersion:  intake.Version,
+		IntakeNo:         intake.IntakeNo,
+		SourceShipmentID: intake.SourceShipmentID,
+		Reason:           intake.Reason,
+		Items:            intakeInput.Items,
+	}, f.actorID); !errors.Is(err, biz.ErrReworkIntakeSourceState) {
+		t.Fatalf("received intake draft save error=%v, want source state", err)
 	}
 	receivedLotID := *intake.Items[0].ReceivedLotID
 	if lot := f.client.InventoryLot.GetX(ctx, receivedLotID); lot.Status != biz.InventoryLotHold {

@@ -1,97 +1,55 @@
-# 永绅 yoyoosun 客户资料 / Yoyoosun Customer Materials
+# 永绅 yoyoosun 客户文档 / Yoyoosun Customer Docs
 
-`yoyoosun` 是永绅客户的稳定客户 key。本目录只保存可进入 Product Core 的脱敏资料分类、导入准备、客户差异、客户配置草案、试用说明和历史 evidence 索引。真实原件与私密 manifest 已进入专属 Private 仓库，Product Core 当前工作树不再保存副本；它们不是 Product Core 或 SaaS tenant 真源。
+`yoyoosun` 是永绅客户的稳定 customer key，代表单客户私有化实例，不是 SaaS runtime tenant。本目录只保存可以进入 Product Core 的脱敏需求、决策、配置、导入准备、试用和验收说明；真实 Excel、PDF、图片、姓名、签字、私密 manifest 和当前来源 inventory 由客户专属 Private 仓库管理。
 
-## 先读哪几份 / Reader Paths
+## 按任务阅读
 
-| 任务 | 先读 | 再核对 |
+| 要做什么 | 先读 | 再核对 |
 | --- | --- | --- |
-| 与甲方当面确认岗位职责、审批、跨岗交接和本期范围 | `甲方角色职责与业务流转确认表.md` | `决策日志.md`、`问题待办.md`；会后再核对角色手册和当前系统矩阵 |
-| 查每个岗位的全部权限、页面、交接与端到端流程 | `角色能力与流程矩阵.md` | `config/customers/yoyoosun/roleFlowMatrix.mjs`、`customerPackage.mjs`、RBAC、流程代码与当前测试 |
-| 判断客户能力、交付状态与差异归属 | `客户交付矩阵.md` | `docs/当前真源与交接顺序.md`、`docs/product/客户差异策略.md`、部署 evidence、当前代码和测试 |
-| 查 `plush_factory_formal_report_v3_mobile.pdf` 每一页说了什么、旧示意后来去了哪里 | `甲方正式汇报V3逐页解读与现行映射.md` | `需求线索.md`、`决策日志.md`、`角色能力与流程矩阵.md`、`移动端岗位任务页改版.md` |
-| 核对甲方确认的生产流程 | `决策日志.md` 的 D-006、`需求线索.md` 的“客户已确认的生产与外发主线” | `甲方正式汇报V3逐页解读与现行映射.md`、`流程编排闭环矩阵.md`、当前代码和测试 |
-| 判断 Excel 字段是否进 Product Core | `Excel字段产品核心映射评审.md` | 私有 manifest 的脱敏分类、当前代码、migration 和测试 |
-| 做导入 dry-run / freeze | `导入策略.md`、`导入试跑工具说明.md` | 客户私有仓库、`来源快照冻结.md`、`真实试跑证据.md`、导入脚本测试 |
-| 准备试用或培训 | `试用培训说明.md`、`试用账号角色菜单核对清单.md`、`试用环境执行手册.md`、`试用人员全页面手工验收清单.md` | 真实环境账号、岗位、菜单和岗位任务端核对 |
-| 查原始资料边界 | `原始客户文件归档评审.md`、`来源材料.md` | 客户私有仓库中的 manifest、远端回读校验和用途分类 |
+| 与甲方确认岗位、审批、交接、异常和范围 | [甲方角色职责与业务流转确认表](甲方角色职责与业务流转确认表.md) | [决策日志](决策日志.md)、[问题待办](问题待办.md)、[假设登记](假设登记.md) |
+| 理解九岗位当前职责和协作 | [角色能力与流程矩阵](角色能力与流程矩阵.md) | `config/customers/yoyoosun/roleFlowMatrix.mjs`、`/__dev/permission-relationships`、当前 RBAC |
+| 核对每条运行流程和 Fact 边界 | [流程编排闭环矩阵](流程编排闭环矩阵.md) | 当前代码、schema、migration 和测试 |
+| 判断客户能力、差异和交付状态 | [客户交付矩阵](客户交付矩阵.md) | [客户闭环交付验收清单](客户闭环交付验收清单.md)、目标环境 evidence |
+| 追溯客户来源线索和已确认生产主线 | [需求线索](需求线索.md)、[决策日志](决策日志.md) D-006 | Private 仓受控来源、角色 / 流程矩阵 |
+| 判断 Excel 字段是否进入 Product Core | [Excel 字段产品核心映射评审](Excel字段产品核心映射评审.md) | [导入字段分类](导入字段分类.md)、当前 schema 和测试 |
+| 做来源校验、freeze 或 dry-run | [导入策略](导入策略.md) | [导入试跑工具说明](导入试跑工具说明.md)、客户 Private 仓、导入脚本测试 |
+| 确认字段显示和编号规则 | [字段编号确认清单](字段编号确认清单.md) | [客户配置草案](客户配置草案.md)、`fieldNumberingConfig.mjs` |
+| 准备试用、培训或人工验收 | [试用培训说明](试用培训说明.md)、[试用环境执行手册](试用环境执行手册.md) | [账号角色菜单核对清单](试用账号角色菜单核对清单.md)、[全页面验收清单](试用人员全页面手工验收清单.md) |
 
-## 文档受众与权威范围
+## 文档职责
 
-| 文档 | 主要受众 | 唯一职责 | 不能证明 |
-| --- | --- | --- | --- |
-| `甲方角色职责与业务流转确认表.md` | 甲方岗位代表、项目负责人 | 目标岗位、审批、交接、异常、本期范围和签认 | 当前系统已实现 / 已发布 |
-| `甲方正式汇报V3逐页解读与现行映射.md` | 产品、实施、研发、测试 | 固定记录甲方正式汇报 V3 的逐页内容、原图流程和现行去向 | 甲方已逐项确认 / 当前系统已实现 / 已发布 / 已 UAT |
-| `角色能力与流程矩阵.md` | 实施、研发、测试 | 9 岗位精确权限、页面、责任池和实现映射 | 甲方已逐项确认 |
-| `流程编排闭环矩阵.md` | 研发、测试、实施 | 当前系统逐流程 / 逐节点合同和分层状态 | 客户 UAT |
-| `客户交付矩阵.md` | 项目、交付、甲方负责人 | 客户能力、交付状态、差异决策和版本化环境证据 | Product Core 通用真源 |
-| `需求线索.md` | 产品、实施 | 来源线索和明确标注的客户确认基线 | 未经确认的业务决策 |
-| `决策日志.md` / `问题待办.md` / `假设登记.md` | 甲乙双方项目组 | 已决 / 未决 / 推断分别落账 | 运行态能力 |
-| 客户专属 Private 仓库 | 授权人员 | 真实原件、姓名、签字、会议附件和版本锁 | Product Core 可公开内容 |
+| 分组 | 当前文档 | 权威边界 |
+| --- | --- | --- |
+| 客户输入与决策 | `需求线索.md`、`决策日志.md`、`问题待办.md`、`假设登记.md`、`变更请求流程.md` | 已确认、未决和推断分开；客户原件不在产品仓 |
+| 岗位与流程 | `甲方角色职责与业务流转确认表.md`、`角色能力与流程矩阵.md`、`流程编排闭环矩阵.md` | 甲方确认、业务导航和运行合同分开 |
+| 客户差异与交付 | `客户配置草案.md`、`客户交付矩阵.md`、`客户闭环交付验收清单.md` | 配置、产品能力、目标发布和 UAT 分层 |
+| 导入准备 | `导入策略.md`、`导入试跑工具说明.md`、`导入字段分类.md`、`Excel字段产品核心映射评审.md` | 当前仅校验 / extract / freeze / dry-run，不执行真实导入 |
+| 字段与编号 | `字段编号确认清单.md` | 客户确认结果回写配置或问题待办，不直接改变 schema |
+| 试用与培训 | `试用培训说明.md`、`试用环境执行手册.md`、`试用账号角色菜单核对清单.md`、`试用人员全页面手工验收清单.md` | 模拟试用和人工检查不等于发布或客户签收 |
 
-## 客户投影边界图 / Customer Projection Boundary
+历史发布、模拟和验收 evidence 位于 `docs/archive/customer-evidence/yoyoosun/`，只证明当时的固定版本和执行范围。
 
-这张图回答：客户资料可以流向哪些客户侧文档、配置、模拟和模板候选，什么时候才可能进入 Product Core。
+## 客户资料与产品投影边界
 
 ```mermaid
-flowchart TD
-  privateRepo["客户专属 Private 仓库<br/>原始 Excel / PDF / 图片 / manifest / 私密评审 / 验证入口"]
-  review["人工评审<br/>字段分类 / 敏感信息 / 导入 dry-run / 差异判断"]
-  docs["docs/customers/yoyoosun<br/>客户资料 / 客户矩阵 / 验收证据"]
-  config["config/customers/yoyoosun<br/>客户配置草案 / runtimeEnabled=false"]
-  training["seed / fixture / training<br/>模拟试用数据 / 账号 / 岗位任务端演练"]
-  templates["打印模板 / 字段显示 / 编号规则<br/>客户配置或候选模板"]
-  productCore["Product Core<br/>通用 ERP 内核"]
-  coreGate["Product Core 评审<br/>通用性依据 / 排除客户专属内容 / 测试同步"]
-  facts["Fact tables<br/>库存 / 出货 / 预留 / 财务事实"]
-  tenant["tenant_id / SaaS runtime tenant"]
-
-  privateRepo --> review
-  review --> docs
-  review --> config
-  review --> training
-  review --> templates
-  review -->|只有确认通用能力后| coreGate
-  coreGate --> productCore
-  docs -. 不得自动升级 .-> productCore
-  config -. 不是 .-> tenant
-  training -. 不得写入 .-> facts
-  review -. 禁止自动导入 .-> facts
+flowchart LR
+  private["客户 Private 仓\n原件 / 私密 manifest / 版本锁"] --> review["人工评审\n分类 / 脱敏 / dry-run / 差异判断"]
+  review --> docs["客户文档\n需求 / 决策 / 验收"]
+  review --> config["客户配置\n菜单 / 字段 / 角色 / 打印"]
+  review --> fixture["模拟 fixture\n试用 / QA"]
+  review --> gate["Product Core 评审\n通用性 / owner / 测试"]
+  gate --> core["Product Core"]
+  docs -. 不自动升级 .-> core
+  config -. 不提升 .-> rbac["后端 RBAC"]
+  fixture -. 不写入 .-> fact["业务 Fact"]
 ```
 
-## 文档分组 / Document Groups
+客户资料只有在完成通用性和领域边界评审后，才能成为 Product Core 能力。当前没有可直接执行的永绅真实数据导入；真实库存、质检、生产、出货、预留和财务事实只能由正式领域 usecase 产生。
 
-| 分组 | 文档 |
-| --- | --- |
-| 甲方面谈、角色与协作流程 | `甲方角色职责与业务流转确认表.md`、`甲方正式汇报V3逐页解读与现行映射.md`、`角色能力与流程矩阵.md`、`流程编排闭环矩阵.md`、`需求线索.md` |
-| 资料入口与线索 | `来源材料.md`、`甲方正式汇报V3逐页解读与现行映射.md`、`需求线索.md`、`Excel字段产品核心映射评审.md`、`问题待办.md`、`假设登记.md`、`决策日志.md`、`变更请求流程.md` |
-| 客户交付与差异 | `客户交付矩阵.md`、`客户配置草案.md` |
-| 导入准备 | `导入来源清单.md`、`导入字段分类.md`、`导入待确认队列.md`、`导入验收清单.md`、`导入策略.md`、`导入风险登记.md`、`导入试跑工具说明.md` |
-| freeze / dry-run evidence | `来源快照冻结.md`、`来源快照人工复查清单.md`、`真实试跑证据.md`；私密 manifest 在客户私有仓库 |
-| 试用和培训 | `试用培训说明.md`、`试用账号角色菜单核对清单.md`、`试用环境执行手册.md`、`试用人员全页面手工验收清单.md` |
-| 字段和编号确认 | `字段编号确认清单.md`、`字段编号确认结果模板.md` |
-| 原始资料边界 | `原始客户文件归档评审.md`、`来源材料.md`；当前真源是客户专属 Private 仓库，Product Core 当前工作树已移除原件副本 |
-| 历史 evidence | `docs/archive/customer-evidence/yoyoosun/` |
+Product Core 当前树不保存客户原件和真实 manifest；这不代表既有 Git 历史已经清理，也不代表客户仓远端完整性、产品版本锁、目标发布或客户签收已经完成。当前私有来源和 `product.lock.json` 状态只从客户 Private 仓正式验证记录读取，不在本目录缓存易漂移的提交号、hash 或数量。
 
-## 真源边界 / Source Boundary
+## 维护规则
 
-客户资料可以进入脱敏客户文档、客户配置草案、模拟 seed、培训验收或模板候选。进入 Product Core 前必须有通用性依据、对应实现评审和测试同步。当前 yoyoosun 没有可直接执行的客户真实数据；真实导入、库存、出货、预留、财务事实、`tenant_id` 或 SaaS runtime tenant 都不能由本目录材料自动生成。
+新增、删除、重命名或重新分类本目录长期文档时，同步本 README、`docs/customers/README.md`、`docs/文档清单.md`、引用和相关自动化。客户能力、配置、发布和 UAT 状态发生实质变化时，分别更新对应矩阵，不能用一层 evidence 替代另一层。
 
-当前外置状态必须分层理解：Product Core 当前提交树与索引已移除旧原件、真实 manifest 和客户工程指导图片，这只证明当前树客户原件隔离完成。客户原件数量、hash / size、结构化提取、远端回读与当前私有仓版本以客户专属 Private 仓库的 manifest、README 和正式验证记录为准，本目录不复写易漂移的客户仓提交号。
-
-可变产品版本锁定只以客户私有仓 `product.lock.json` 为真源；Product Core `HEAD` 每次推进后，均需在两边已提交且工作树清洁时重新锁定，并以 `FORMAL_PRODUCT_PIN=1` 执行私有仓 `scripts/validate.sh`。既有 Git 历史中的旧副本治理、真实导入批准和客户签收仍是独立未完成项，不能由当前树隔离或一次私有仓验证替代。
-
-`config/customers/yoyoosun/` 与 `deployments/yoyoosun/` 仍是当前产品仓内的非原件配置 / 部署资料，本轮不迁出。客户私有仓库通过兄弟目录或 CI multi-checkout 固定产品版本做验证，不作为 Product Core submodule。
-
-`docs/archive/customer-evidence/yoyoosun/` 只保存历史 evidence：它可以证明当时的发布、模拟或验收记录，不替代当前客户签收、真实导入批准、当前目标环境状态或最新代码验证。
-
-## 更新规则 / Maintenance
-
-新增、删除、重命名本目录长期维护文档，或改变客户交付状态、客户差异分类、导入结论、试用口径时，必须同步检查：
-
-- 本 README。
-- `docs/customers/README.md`。
-- `docs/文档清单.md`。
-- `docs/当前真源与交接顺序.md`。
-- 对应 `config/customers/yoyoosun/`、`deployments/yoyoosun/`、导入脚本和测试断言。
-- 客户私有仓库 manifest、来源文件、远端状态与权限边界；不得把私密字段、hash 或访问凭据复制进本目录。
+真实文件、私密字段、hash、凭据、数据库地址和客户签字不得复制到 Product Core 文档、日志或普通 CI artifact。

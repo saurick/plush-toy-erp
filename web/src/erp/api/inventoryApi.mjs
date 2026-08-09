@@ -73,6 +73,14 @@ export async function createInventoryOperation(params = {}) {
   return dataOf(result)?.inventory_operation || null
 }
 
+export async function saveInventoryOperationDraft(params = {}) {
+  const result = await inventoryRpc.call(
+    'save_inventory_operation_draft',
+    params
+  )
+  return dataOf(result)?.inventory_operation || null
+}
+
 export async function postInventoryOperation(params = {}) {
   const result = await inventoryRpc.call('post_inventory_operation', params)
   return dataOf(result)?.inventory_operation || null

@@ -16,6 +16,7 @@ import {
   listReworkIntakes,
   receiveReworkIntake,
   reverseReworkIntake,
+  saveReworkIntakeDraft,
 } from '../api/operationalFactApi.mjs'
 import {
   BusinessActionTooltip,
@@ -135,6 +136,12 @@ function sourceCandidateLabel(item) {
     .join(' · ')
 }
 
+function sourceCandidateID(item) {
+  return `${Number(item?.source_shipment_item_id || 0)}:${Number(
+    item?.target_production_order_item_id || 0
+  )}`
+}
+
 function intakeItemLabel(item) {
   return (
     [
@@ -189,6 +196,7 @@ export default function ReworkIntakesPage() {
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [editingDraft, setEditingDraft] = useState(null)
   const [sourceCandidates, setSourceCandidates] = useState([])
   const [sourceLoading, setSourceLoading] = useState(false)
   const [transitionAction, setTransitionAction] = useState('')
@@ -200,6 +208,7 @@ export default function ReworkIntakesPage() {
   const [reshipForm] = Form.useForm()
 
   const canCreate = hasActionPermission(adminProfile, 'rework_intake.create')
+  const canUpdate = hasActionPermission(adminProfile, 'rework_intake.update')
   const canReceive = hasActionPermission(adminProfile, 'rework_intake.receive')
   const canCancel = hasActionPermission(adminProfile, 'rework_intake.cancel')
   const canReverse = hasActionPermission(adminProfile, 'rework_intake.reverse')
@@ -267,6 +276,9 @@ export default function ReworkIntakesPage() {
   }, [beginLatestRequest, linkedIntakeID])
 
   const openCreate = useCallback(async () => {
+    setEditingDraft(null)
+    setSourceCandidates([])
+    createForm.resetFields()
     setCreateOpen(true)
     setSourceLoading(true)
     createForm.setFieldsValue({
@@ -281,9 +293,96 @@ export default function ReworkIntakesPage() {
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载可返工出货明细'))
       setSourceCandidates([])
+      setCreateOpen(false)
     } finally {
       setSourceLoading(false)
     }
+  }, [createForm])
+
+  const openEdit = useCallback(
+    async (record) => {
+      if (!canUpdate) {
+        message.warning('当前账号没有编辑返工回厂草稿的权限')
+        return
+      }
+      if (!record?.id || record.status !== 'DRAFT') {
+        message.warning('只有尚未确认回厂收货的草稿可以编辑')
+        return
+      }
+      setSaving(true)
+      setSourceLoading(true)
+      try {
+        const latest = await getReworkIntake({ id: record.id })
+        if (
+          !latest?.id ||
+          latest.status !== 'DRAFT' ||
+          !Number.isSafeInteger(Number(latest.version)) ||
+          Number(latest.version) <= 0 ||
+          !Array.isArray(latest.items) ||
+          latest.items.length === 0
+        ) {
+          message.warning('返工回厂状态或明细已变化，本次未进入编辑')
+          await loadRows()
+          return
+        }
+        const data = await listAllReworkIntakeSourceCandidates({
+          rework_intake_id: latest.id,
+        })
+        const candidates = Array.isArray(data?.rework_intake_source_candidates)
+          ? data.rework_intake_source_candidates
+          : []
+        const candidatesByID = new Map(
+          candidates.map((candidate) => [
+            sourceCandidateID(candidate),
+            candidate,
+          ])
+        )
+        const editableItems = latest.items.map((item) => {
+          const candidate = candidatesByID.get(sourceCandidateID(item))
+          return candidate?.selectable === true
+            ? {
+                source_shipment_item_id: Number(item.source_shipment_item_id),
+                target_production_order_item_id: Number(
+                  item.target_production_order_item_id
+                ),
+                quantity: item.quantity,
+                note: item.note || '',
+                label: sourceCandidateLabel(candidate),
+                unit_code: candidate.unit_code || '',
+              }
+            : null
+        })
+        if (editableItems.some((item) => !item)) {
+          message.warning('原出货或返工承接生产单已变化，本次未进入编辑')
+          return
+        }
+        setSourceCandidates(candidates)
+        createForm.resetFields()
+        createForm.setFieldsValue({
+          intake_no: latest.intake_no,
+          reason: latest.reason,
+          candidate_ids: latest.items.map(sourceCandidateID),
+          items: editableItems,
+        })
+        setEditingDraft(latest)
+        setCreateOpen(true)
+      } catch (error) {
+        message.error(
+          `${getActionErrorMessage(error, '加载返工回厂草稿')}，未进入编辑`
+        )
+      } finally {
+        setSourceLoading(false)
+        setSaving(false)
+      }
+    },
+    [canUpdate, createForm, loadRows]
+  )
+
+  const closeDraftEditor = useCallback(() => {
+    setCreateOpen(false)
+    setEditingDraft(null)
+    setSourceCandidates([])
+    createForm.resetFields()
   }, [createForm])
 
   const watchedCandidateIDs = Form.useWatch('candidate_ids', createForm)
@@ -397,13 +496,20 @@ export default function ReworkIntakesPage() {
         message.warning('一张返工回厂单只能关联同一张原出货单')
         return
       }
+      if (
+        editingDraft?.id &&
+        (!Number.isSafeInteger(Number(editingDraft.version)) ||
+          Number(editingDraft.version) <= 0)
+      ) {
+        message.error('返工回厂草稿版本不完整，请关闭弹窗并刷新后重试')
+        return
+      }
       setSaving(true)
-      const created = await createReworkIntake({
+      const request = {
         ...(customerKey ? { customer_key: customerKey } : {}),
         intake_no: values.intake_no.trim(),
         source_shipment_id: sourceShipmentID,
         reason: values.reason.trim(),
-        idempotency_key: buildIdempotencyKey('rework-intake'),
         items: values.items.map((item) => ({
           source_shipment_item_id: Number(item.source_shipment_item_id),
           target_production_order_item_id: Number(
@@ -412,10 +518,24 @@ export default function ReworkIntakesPage() {
           quantity: String(item.quantity).trim(),
           ...(trimOptional(item.note) ? { note: trimOptional(item.note) } : {}),
         })),
-      })
-      setCreateOpen(false)
-      setSelected(created)
-      message.success('返工回厂记录已建立，等待仓库确认实物接收')
+      }
+      const saved = editingDraft?.id
+        ? await saveReworkIntakeDraft({
+            ...request,
+            id: editingDraft.id,
+            expected_version: editingDraft.version,
+          })
+        : await createReworkIntake({
+            ...request,
+            idempotency_key: buildIdempotencyKey('rework-intake'),
+          })
+      closeDraftEditor()
+      setSelected(saved)
+      message.success(
+        editingDraft?.id
+          ? '返工回厂草稿和明细已更新'
+          : '返工回厂记录已建立，等待仓库确认实物接收'
+      )
       await loadRows()
     } catch (error) {
       if (error?.errorFields) return
@@ -423,7 +543,14 @@ export default function ReworkIntakesPage() {
     } finally {
       setSaving(false)
     }
-  }, [createForm, customerKey, loadRows, sourceCandidates])
+  }, [
+    closeDraftEditor,
+    createForm,
+    customerKey,
+    editingDraft,
+    loadRows,
+    sourceCandidates,
+  ])
 
   const runReceive = useCallback(async () => {
     if (!selected?.id) return
@@ -926,6 +1053,28 @@ export default function ReworkIntakesPage() {
               查看详情
             </Button>
           </BusinessActionTooltip>
+          {canUpdate ? (
+            <BusinessActionTooltip
+              disabled={!selected || saving || selected?.status !== 'DRAFT'}
+              disabledReason={
+                saving
+                  ? '当前操作完成后可编辑'
+                  : !selected
+                    ? '请先选择一条返工回厂记录'
+                    : selected?.status !== 'DRAFT'
+                      ? '确认回厂收货后内容冻结，只能按后续返工或冲正流程办理'
+                      : ''
+              }
+            >
+              <Button
+                data-business-action-key="rework-intake-edit"
+                disabled={!selected || saving || selected?.status !== 'DRAFT'}
+                onClick={() => openEdit(selected)}
+              >
+                编辑草稿
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
           {actionAvailability.receive.visible ? (
             <BusinessActionTooltip
               disabled={actionAvailability.receive.disabled}
@@ -1038,22 +1187,21 @@ export default function ReworkIntakesPage() {
       />
 
       <BusinessFormModal
-        title="新建返工回厂"
-        description="从真实已出货明细发起，并明确由哪张生产单承接返工。"
+        title={editingDraft?.id ? '编辑返工回厂草稿' : '新建返工回厂'}
+        description={
+          editingDraft?.id
+            ? '单头和明细在同一事务内更新；确认回厂收货后内容冻结。'
+            : '从真实已出货明细发起，并明确由哪张生产单承接返工。'
+        }
         open={createOpen}
         width={960}
-        okText="建立回厂记录"
+        okText={editingDraft?.id ? '保存草稿' : '建立回厂记录'}
         confirmLoading={saving}
-        onCancel={() => !saving && setCreateOpen(false)}
+        onCancel={() => !saving && closeDraftEditor()}
         onOk={submitCreate}
         destroyOnHidden
       >
-        <Form
-          form={createForm}
-          layout="vertical"
-          preserve={false}
-          disabled={saving}
-        >
+        <Form form={createForm} layout="vertical" disabled={saving}>
           <Form.Item
             name="intake_no"
             label="返工回厂单号"
@@ -1173,12 +1321,7 @@ export default function ReworkIntakesPage() {
         onOk={submitRework}
         destroyOnHidden
       >
-        <Form
-          form={reworkForm}
-          layout="vertical"
-          preserve={false}
-          disabled={saving}
-        >
+        <Form form={reworkForm} layout="vertical" disabled={saving}>
           <Form.Item
             name="fact_no"
             label="生产返工记录号"
@@ -1251,12 +1394,7 @@ export default function ReworkIntakesPage() {
         onOk={submitReship}
         destroyOnHidden
       >
-        <Form
-          form={reshipForm}
-          layout="vertical"
-          preserve={false}
-          disabled={saving}
-        >
+        <Form form={reshipForm} layout="vertical" disabled={saving}>
           <Form.Item
             name="shipment_no"
             label="补发单号"

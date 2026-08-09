@@ -37,7 +37,7 @@ function workflowMockRoleTaskReadAllowed(
     return false
   }
   return (
-    method !== 'list_workbench_role_tasks' ||
+    !['get_workbench', 'list_workbench_role_tasks'].includes(method) ||
     workflowMockPermissionAllowed(
       adminProfile,
       effectiveSession,
@@ -1419,6 +1419,103 @@ export function setupJsonRpcMockServer() {
               offset,
             }),
             error: '',
+          }
+        }
+      } else if (method === 'get_workbench') {
+        if (
+          !workflowMockRoleTaskReadAllowed(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            method
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号缺少查看协同任务权限'
+          )
+        } else {
+          const queueKey = String(params.queue_key || '').trim()
+          const limit = Number(params.limit || 0)
+          const offset = Number(params.offset || 0)
+          if (
+            !['actionable', 'risk', 'approval'].includes(queueKey) ||
+            !Number.isSafeInteger(limit) ||
+            limit < 1 ||
+            limit > 50 ||
+            !Number.isSafeInteger(offset) ||
+            offset < 0
+          ) {
+            responseBody = makeJsonRpcBizError(id, 40010, '工作台查询条件有误')
+          } else {
+            const snapshotAt = nowUnix()
+            const visibleTasks = mockWorkflowTasks.filter((item) =>
+              workflowMockCanViewTask(
+                mockSuperAdminProfile,
+                mockSuperAdminProfile.effective_session,
+                item
+              )
+            )
+            const isRiskTask = (task) =>
+              task.task_status_key === 'blocked' ||
+              (Number(task.due_at || 0) > 0 &&
+                Number(task.due_at) < snapshotAt) ||
+              Number(task.priority || 0) >= 3 ||
+              task.critical_path === true ||
+              Number(task.urge_count || 0) > 0 ||
+              Boolean(task.escalated_at) ||
+              task.payload?.critical_path === true
+            const queues = {
+              actionable: visibleTasks.filter(
+                (task) => task.task_status_key === 'ready' && !isRiskTask(task)
+              ),
+              risk: visibleTasks.filter(
+                (task) =>
+                  ['ready', 'blocked'].includes(task.task_status_key) &&
+                  isRiskTask(task)
+              ),
+              approval: visibleTasks.filter(
+                (task) =>
+                  ['ready', 'blocked'].includes(task.task_status_key) &&
+                  typeof task.required_capability_key === 'string' &&
+                  task.required_capability_key &&
+                  workflowMockPermissionAllowed(
+                    mockSuperAdminProfile,
+                    mockSuperAdminProfile.effective_session,
+                    task.required_capability_key
+                  )
+              ),
+            }
+            Object.values(queues).forEach((items) =>
+              items.sort((left, right) => {
+                const leftDue = Number(left.due_at || Number.MAX_SAFE_INTEGER)
+                const rightDue = Number(right.due_at || Number.MAX_SAFE_INTEGER)
+                if (leftDue !== rightDue) return leftDue - rightDue
+                const nameOrder = String(left.task_name || '').localeCompare(
+                  String(right.task_name || '')
+                )
+                if (nameOrder !== 0) return nameOrder
+                return Number(right.id || 0) - Number(left.id || 0)
+              })
+            )
+            responseBody = {
+              jsonrpc: '2.0',
+              id,
+              result: makeBizResult({
+                snapshot_at: snapshotAt,
+                queue_key: queueKey,
+                total: queues[queueKey].length,
+                limit,
+                offset,
+                items: queues[queueKey].slice(offset, offset + limit),
+                counts: {
+                  actionable: queues.actionable.length,
+                  approval: queues.approval.length,
+                  risk: queues.risk.length,
+                },
+              }),
+              error: '',
+            }
           }
         }
       } else if (

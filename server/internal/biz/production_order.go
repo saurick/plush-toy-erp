@@ -209,15 +209,16 @@ type ProductionOrderActionCommand struct {
 }
 
 type ProductionOrderFilter struct {
-	Keyword       string
-	Status        string
-	DateField     string
-	DateFrom      *time.Time
-	DateTo        *time.Time
-	SortBy        string
-	SortDirection string
-	Limit         int
-	Offset        int
+	Keyword        string
+	Status         string
+	LifecycleScope string
+	DateField      string
+	DateFrom       *time.Time
+	DateTo         *time.Time
+	SortBy         string
+	SortDirection  string
+	Limit          int
+	Offset         int
 }
 
 type ProductionOrderReferenceFilter struct {
@@ -286,13 +287,23 @@ func (uc *ProductionOrderUsecase) List(ctx context.Context, filter ProductionOrd
 	}
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.Status = strings.TrimSpace(filter.Status)
+	var scopeOK bool
+	filter.LifecycleScope, scopeOK = NormalizeLifecycleScope(filter.LifecycleScope)
 	filter.DateField = strings.TrimSpace(filter.DateField)
 	filter.SortBy = strings.TrimSpace(filter.SortBy)
 	filter.SortDirection = strings.ToLower(strings.TrimSpace(filter.SortDirection))
-	if filter.Limit <= 0 || filter.Limit > 200 || filter.Offset < 0 ||
+	if !scopeOK || filter.Limit <= 0 || filter.Limit > 200 || filter.Offset < 0 ||
 		(filter.DateFrom != nil && filter.DateTo != nil && filter.DateFrom.After(*filter.DateTo)) ||
 		!validProductionOrderStatusFilter(filter.Status) || !validProductionOrderDateField(filter.DateField) ||
 		!validProductionOrderSort(filter.SortBy, filter.SortDirection) {
+		return nil, 0, ErrBadParam
+	}
+	if !LifecycleScopeAllowsStatus(
+		filter.LifecycleScope,
+		filter.Status,
+		[]string{ProductionOrderStatusDraft, ProductionOrderStatusReleased},
+		[]string{ProductionOrderStatusClosed, ProductionOrderStatusCancelled},
+	) {
 		return nil, 0, ErrBadParam
 	}
 	if filter.DateField == "" && (filter.DateFrom != nil || filter.DateTo != nil) {

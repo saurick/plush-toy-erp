@@ -93,6 +93,8 @@ function createVersionCenterSummary() {
     issues: [],
     events: [
       {
+        status: 'ready',
+        at: '2026-08-09T01:00:30.000Z',
         message:
           'promotion plan is eligible and requires explicit confirmation',
       },
@@ -131,6 +133,8 @@ function createVersionCenterSummary() {
       issues: [],
       events: [
         {
+          status: 'passed',
+          at: new Date(Date.UTC(2026, 7, 8, 13 - offset, 0, 2)).toISOString(),
           message: isPromotion
             ? 'target promotion and basic runtime verification passed'
             : 'immutable GitHub release and complete assets are published',
@@ -257,11 +261,35 @@ function createVersionCenterSummary() {
 
 async function installSummaryRoute(page, onRequest) {
   const summary = createVersionCenterSummary()
+  const qualityGateSummary = createQualityGateStyleSummary('passed')
+  const strictReceipt = {
+    ...qualityGateSummary.operations[0].receipt,
+    gitCommit: summary.repository.commit,
+  }
+  qualityGateSummary.repository = {
+    ...qualityGateSummary.repository,
+    commit: summary.repository.commit,
+    dirty: false,
+  }
+  qualityGateSummary.proofs.strict = {
+    profile: 'strict',
+    status: 'passed',
+    current: true,
+    releaseEligible: true,
+    reused: true,
+    receipt: strictReceipt,
+  }
+  qualityGateSummary.status = {
+    ...qualityGateSummary.status,
+    tone: 'success',
+    title: '当前发布 SHA 已通过严格门禁',
+    releaseEligible: true,
+  }
   await page.route('**/__dev/api/qa/quality-gates', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(createQualityGateStyleSummary('idle')),
+      body: JSON.stringify(qualityGateSummary),
     })
   })
   await page.route('**/__dev/api/delivery/summary', async (route) => {
@@ -270,6 +298,24 @@ async function installSummaryRoute(page, onRequest) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(summary),
+    })
+  })
+  await page.route('**/__dev/api/delivery/operations/*', async (route) => {
+    const operationId = new URL(route.request().url()).pathname
+      .split('/')
+      .at(-1)
+    const operation = summary.operations.find((item) => item.id === operationId)
+    await route.fulfill({
+      status: operation ? 200 : 404,
+      contentType: 'application/json',
+      body: JSON.stringify(
+        operation
+          ? {
+              schemaVersion: 'plush.dev-delivery-operation-result/v1',
+              operation,
+            }
+          : { message: 'Operation 不存在' }
+      ),
     })
   })
 }
@@ -333,6 +379,33 @@ export function createDevVersionCenterScenarios({
             .count(),
           1
         )
+        const strictFinishedAt = page.locator(
+          '.erp-dev-version-quality-gate-summary .erp-dev-quality-gate-finished-at time'
+        )
+        await strictFinishedAt.waitFor({ state: 'visible' })
+        assert.equal(
+          await strictFinishedAt.getAttribute('datetime'),
+          '2026-08-09T08:00:00.000Z'
+        )
+        const latestVersionSummary = page
+          .locator('.erp-dev-version-summary .ant-card')
+          .filter({ hasText: 'GitHub 不可变版本' })
+        const latestPublishedAt = latestVersionSummary.locator(
+          '.erp-dev-latest-version-published-at time'
+        )
+        await latestPublishedAt.waitFor({ state: 'visible' })
+        assert.equal(
+          await latestPublishedAt.getAttribute('datetime'),
+          '2026-08-08T14:00:00.000Z'
+        )
+        const currentOperationTimes = currentOperation.locator(
+          '.erp-dev-current-operation-time time'
+        )
+        assert.equal(await currentOperationTimes.count(), 2)
+        assert.deepEqual(await currentOperationTimes.allTextContents(), [
+          '2026/08/09 09:00:00',
+          '2026/08/09 09:00:30',
+        ])
         assert.equal(
           await versions.locator('.ant-pagination-options').count(),
           0,
@@ -344,6 +417,22 @@ export function createDevVersionCenterScenarios({
         )
         assert.match(String(await currentOperation.textContent()), /确认部署/u)
         assert.match(String(await currentOperation.textContent()), /f0000001/u)
+        const desktopVersionTimes = visibleTableRows(versions).locator(
+          '.erp-dev-version-published-at time'
+        )
+        assert.equal(
+          await desktopVersionTimes.count(),
+          6,
+          '当前页每个版本都应显示发布时间'
+        )
+        assert.match(
+          String(await desktopVersionTimes.first().textContent()),
+          /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/u
+        )
+        assert.equal(
+          await desktopVersionTimes.first().getAttribute('datetime'),
+          '2026-08-08T14:00:00.000Z'
+        )
         assert.equal(desktopSummaryRequests, 1)
 
         await page.screenshot({
@@ -361,6 +450,21 @@ export function createDevVersionCenterScenarios({
           .waitFor({ state: 'visible' })
         assert.equal(desktopSummaryRequests, 1)
         assert.equal(await currentOperation.isVisible(), true)
+        const pipeline = page.locator('.erp-dev-version-tab--pipeline')
+        const fullTimingDetails = pipeline.locator(
+          '.erp-dev-pipeline-timing__details'
+        )
+        await pipeline.getByText('观测关键路径').waitFor({ state: 'visible' })
+        await pipeline.getByText('耗时最长环节').waitFor({ state: 'visible' })
+        assert(
+          (await pipeline.locator('time').count()) >= 4,
+          'CI/CD 摘要应分别显示运行、发布、制品和部署事件时间'
+        )
+        assert.equal(
+          await fullTimingDetails.evaluate((element) => element.open),
+          false,
+          '完整 job / step 首次进入应保持收起'
+        )
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -368,6 +472,64 @@ export function createDevVersionCenterScenarios({
           ),
           fullPage: true,
         })
+
+        const fullTimingSummary = fullTimingDetails.locator(':scope > summary')
+        await fullTimingSummary.focus()
+        await page.keyboard.press('Enter')
+        assert.equal(
+          await fullTimingDetails.evaluate((element) => element.open),
+          true,
+          '完整 job / step 应支持键盘展开'
+        )
+        const jobDetails = pipeline.locator(
+          '.erp-dev-pipeline-timing__jobs > details'
+        )
+        assert.equal(await jobDetails.count(), 2)
+        assert.equal(
+          await jobDetails.evaluateAll(
+            (elements) => elements.filter((element) => element.open).length
+          ),
+          0,
+          '打开完整列表后各 job 仍应默认收起'
+        )
+        const expandAll = pipeline.getByRole('button', { name: '全部展开' })
+        const collapseAll = pipeline.getByRole('button', { name: '全部收起' })
+        assert.equal(await expandAll.isEnabled(), true)
+        assert.equal(await collapseAll.isDisabled(), true)
+        await expandAll.click()
+        await page.waitForFunction(() =>
+          Array.from(
+            document.querySelectorAll(
+              '.erp-dev-pipeline-timing__jobs > details'
+            )
+          ).every((element) => element.open)
+        )
+        assert.equal(await collapseAll.isEnabled(), true)
+        const firstStepTimeRange = pipeline
+          .locator(
+            '.erp-dev-pipeline-timing__job-steps .erp-dev-timing-bars__meta .ant-typography-secondary'
+          )
+          .first()
+        await firstStepTimeRange.waitFor({ state: 'visible' })
+        assert.match(
+          String(await firstStepTimeRange.textContent()),
+          /\d{2}:\d{2}:\d{2}–\d{2}:\d{2}:\d{2}/u
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-tabs-pagination-desktop-pipeline-expanded.png'
+          ),
+          fullPage: true,
+        })
+        await collapseAll.click()
+        assert.equal(
+          await jobDetails.evaluateAll(
+            (elements) => elements.filter((element) => element.open).length
+          ),
+          0,
+          '全部收起应恢复 job 初始状态'
+        )
 
         await page.getByRole('tab', { name: '操作记录' }).click()
         await waitForView(page, 'history')
@@ -384,8 +546,74 @@ export function createDevVersionCenterScenarios({
           /1-10 \/ 共 12 条记录/u
         )
         assert.doesNotMatch(String(await history.textContent()), /f0000001/u)
+        const historyTimes = visibleTableRows(history).locator(
+          '.erp-dev-operation-history-time time'
+        )
+        assert.equal(
+          await historyTimes.count(),
+          20,
+          '每条历史操作都应同时显示开始与完成时间'
+        )
+        assert.deepEqual(
+          await historyTimes.evaluateAll((elements) =>
+            elements
+              .slice(0, 2)
+              .map((element) => element.getAttribute('datetime'))
+          ),
+          ['2026-08-08T13:00:00.000Z', '2026-08-08T13:00:02.000Z']
+        )
         assert.equal(await currentOperation.isVisible(), true)
         assert.equal(desktopSummaryRequests, 1)
+
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-tabs-pagination-desktop-history-times.png'
+          ),
+          fullPage: true,
+        })
+
+        const firstHistoryDetailButton = visibleTableRows(history)
+          .first()
+          .getByRole('button', { name: '查看详情' })
+        await firstHistoryDetailButton.focus()
+        await firstHistoryDetailButton.click()
+        const operationDrawer = page.locator('.ant-drawer-content').last()
+        await operationDrawer.waitFor({ state: 'visible' })
+        assert.equal(
+          await operationDrawer
+            .locator('.erp-dev-operation-detail-time time')
+            .count(),
+          2,
+          '详情头部应显示开始与完成时间'
+        )
+        const operationEventTime = operationDrawer.locator(
+          '.erp-dev-operation-event-time time'
+        )
+        assert.equal(await operationEventTime.count(), 1)
+        assert.equal(
+          await operationEventTime.getAttribute('datetime'),
+          '2026-08-08T13:00:02.000Z'
+        )
+        assert.match(
+          String(await operationEventTime.textContent()),
+          /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/u
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-tabs-pagination-desktop-operation-detail-times.png'
+          ),
+          fullPage: true,
+        })
+        await page.keyboard.press('Escape')
+        await operationDrawer.waitFor({ state: 'hidden' })
+        await page.waitForFunction(() => {
+          const firstButton = document.querySelector(
+            '.erp-dev-version-tab--history .ant-table-tbody tr.ant-table-row button'
+          )
+          return document.activeElement === firstButton
+        })
 
         await page.reload({ waitUntil: 'domcontentloaded' })
         await waitForView(page, 'history')
@@ -404,6 +632,13 @@ export function createDevVersionCenterScenarios({
           /2026.08.08-8/u
         )
         assert.equal(await visibleTableRows(versions).count(), 6)
+        assert.equal(
+          await visibleTableRows(versions)
+            .locator('.erp-dev-version-published-at time')
+            .count(),
+          6,
+          '版本翻页后也应逐行保留发布时间'
+        )
         assert.equal(desktopSummaryRequests, 2)
 
         const metrics = await page.evaluate(() => {
@@ -469,7 +704,99 @@ export function createDevVersionCenterScenarios({
         await currentOperation
           .getByRole('button', { name: '确认部署' })
           .waitFor({ state: 'visible' })
+        assert.equal(
+          await currentOperation
+            .locator('.erp-dev-current-operation-time time')
+            .count(),
+          2,
+          '移动端当前操作也应显示开始与更新时间'
+        )
+        assert.equal(
+          await visibleTableRows(history)
+            .locator('.erp-dev-operation-history-time time')
+            .count(),
+          20,
+          '移动端历史表格应保留每条操作的开始与完成时间'
+        )
         assert.equal(mobileSummaryRequests, 1)
+
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-tabs-pagination-mobile-dark-history-times.png'
+          ),
+          fullPage: true,
+        })
+
+        const mobileHistoryDetailButton = visibleTableRows(history)
+          .first()
+          .getByRole('button', { name: '查看详情' })
+        await mobileHistoryDetailButton.focus()
+        await mobileHistoryDetailButton.click()
+        const mobileOperationDrawer = page.locator('.ant-drawer-content').last()
+        await mobileOperationDrawer.waitFor({ state: 'visible' })
+        await page.waitForFunction(() => {
+          const drawers = document.querySelectorAll('.ant-drawer-content')
+          const drawer = drawers.item(drawers.length - 1)
+          if (!drawer) return false
+          const rect = drawer.getBoundingClientRect()
+          return (
+            rect.left >= -1 &&
+            rect.right <= window.innerWidth + 1 &&
+            rect.width <= window.innerWidth + 1
+          )
+        })
+        assert.equal(
+          await mobileOperationDrawer
+            .locator('.erp-dev-operation-detail-time time')
+            .count(),
+          2
+        )
+        assert.equal(
+          await mobileOperationDrawer
+            .locator('.erp-dev-operation-event-time time')
+            .count(),
+          1
+        )
+        const mobileDrawerMetrics = await mobileOperationDrawer.evaluate(
+          (element) => {
+            const rect = element.getBoundingClientRect()
+            return {
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+              viewportWidth: window.innerWidth,
+              documentWidth: document.documentElement.scrollWidth,
+            }
+          }
+        )
+        assert(
+          mobileDrawerMetrics.left >= -1 &&
+            mobileDrawerMetrics.right <=
+              mobileDrawerMetrics.viewportWidth + 1 &&
+            mobileDrawerMetrics.width <= mobileDrawerMetrics.viewportWidth + 1,
+          `移动端操作详情超出视口: ${JSON.stringify(mobileDrawerMetrics)}`
+        )
+        assert(
+          mobileDrawerMetrics.documentWidth <=
+            mobileDrawerMetrics.viewportWidth + 2,
+          `移动端操作详情造成文档级横向溢出: ${JSON.stringify(mobileDrawerMetrics)}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-tabs-pagination-mobile-dark-operation-detail-times.png'
+          ),
+          fullPage: true,
+        })
+        await page.keyboard.press('Escape')
+        await mobileOperationDrawer.waitFor({ state: 'hidden' })
+        await page.waitForFunction(() => {
+          const firstButton = document.querySelector(
+            '.erp-dev-version-tab--history .ant-table-tbody tr.ant-table-row button'
+          )
+          return document.activeElement === firstButton
+        })
 
         const metrics = await page.evaluate(() => {
           const statusGrid = document.querySelector(
@@ -511,6 +838,100 @@ export function createDevVersionCenterScenarios({
           metrics.documentWidth <= metrics.viewportWidth + 2,
           `移动端版本中心出现文档级横向溢出: ${JSON.stringify(metrics)}`
         )
+
+        await page.getByRole('tab', { name: '版本与部署' }).click()
+        await waitForView(page, 'versions')
+        const versions = page.locator('.erp-dev-version-tab--versions')
+        await versions.waitFor({ state: 'visible' })
+        const mobileVersionTimes = visibleTableRows(versions).locator(
+          '.erp-dev-version-published-at time'
+        )
+        assert.equal(
+          await mobileVersionTimes.count(),
+          6,
+          '移动端当前页每个版本都应显示发布时间'
+        )
+        assert.match(
+          String(await mobileVersionTimes.first().textContent()),
+          /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/u
+        )
+        const mobileVersionTimeMetrics = await mobileVersionTimes
+          .first()
+          .evaluate((element) => {
+            const cell = element.closest('td')
+            const timeRect = element.getBoundingClientRect()
+            const cellRect = cell?.getBoundingClientRect()
+            return {
+              timeLeft: timeRect.left,
+              timeRight: timeRect.right,
+              cellLeft: cellRect?.left || 0,
+              cellRight: cellRect?.right || 0,
+              documentWidth: document.documentElement.scrollWidth,
+              viewportWidth: window.innerWidth,
+            }
+          })
+        assert(
+          mobileVersionTimeMetrics.timeLeft >=
+            mobileVersionTimeMetrics.cellLeft - 1 &&
+            mobileVersionTimeMetrics.timeRight <=
+              mobileVersionTimeMetrics.cellRight + 1,
+          `移动端版本发布时间超出所属单元格: ${JSON.stringify(mobileVersionTimeMetrics)}`
+        )
+        assert(
+          mobileVersionTimeMetrics.documentWidth <=
+            mobileVersionTimeMetrics.viewportWidth + 2,
+          `移动端版本时间造成文档级横向溢出: ${JSON.stringify(mobileVersionTimeMetrics)}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-tabs-pagination-mobile-dark-versions.png'
+          ),
+          fullPage: true,
+        })
+
+        await page.getByRole('tab', { name: 'CI/CD 效能' }).click()
+        await waitForView(page, 'pipeline')
+        const pipeline = page.locator('.erp-dev-version-tab--pipeline')
+        await pipeline.getByText('观测关键路径').waitFor({ state: 'visible' })
+        await pipeline.getByText('耗时最长环节').waitFor({ state: 'visible' })
+        assert.equal(
+          await pipeline
+            .locator('.erp-dev-pipeline-timing__details')
+            .evaluate((element) => element.open),
+          false,
+          '移动端完整 job / step 也应默认收起'
+        )
+        const pipelineMetrics = await page.evaluate(() => {
+          const pipelinePanel = document.querySelector(
+            '.erp-dev-version-tab--pipeline'
+          )
+          const criticalPath = document.querySelector(
+            '.erp-dev-pipeline-timing__critical-path'
+          )
+          return {
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth: window.innerWidth,
+            pipelineWidth: pipelinePanel?.getBoundingClientRect().width || 0,
+            criticalPathWidth: criticalPath?.getBoundingClientRect().width || 0,
+          }
+        })
+        assert(
+          pipelineMetrics.pipelineWidth <= pipelineMetrics.viewportWidth &&
+            pipelineMetrics.criticalPathWidth <= pipelineMetrics.pipelineWidth,
+          `移动端 CI/CD 默认摘要宽度异常: ${JSON.stringify(pipelineMetrics)}`
+        )
+        assert(
+          pipelineMetrics.documentWidth <= pipelineMetrics.viewportWidth + 2,
+          `移动端 CI/CD 出现文档级横向溢出: ${JSON.stringify(pipelineMetrics)}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-tabs-pagination-mobile-dark-pipeline.png'
+          ),
+          fullPage: true,
+        })
         await assertNoHorizontalOverflow(
           page,
           'dev-version-center-tabs-pagination-mobile-dark'

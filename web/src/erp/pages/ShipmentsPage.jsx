@@ -3,6 +3,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   DownOutlined,
+  EditOutlined,
   EyeOutlined,
   LinkOutlined,
   PlusOutlined,
@@ -26,6 +27,7 @@ import {
   listAllShipments,
   listShipmentSourceCandidates,
   listShipments,
+  saveShipmentDraft,
   shipShipment,
 } from '../api/operationalFactApi.mjs'
 import { submitShipmentFinanceApprovalProcess } from '../api/customerConfigApi.mjs'
@@ -301,6 +303,7 @@ export default function ShipmentsPage() {
 
   const canRead = hasActionPermission(adminProfile, 'shipment.read')
   const canCreate = hasActionPermission(adminProfile, 'shipment.create')
+  const canUpdate = hasActionPermission(adminProfile, 'shipment.update')
   const canSubmitShipmentRelease = canRead && canCreate
   const canShip = hasActionPermission(adminProfile, 'shipment.ship')
   const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')
@@ -327,7 +330,7 @@ export default function ShipmentsPage() {
     'rework_intake.read'
   )
   const canImportSalesOrderSource =
-    canCreate && canViewSalesOrders && canViewSalesOrderItems
+    (canCreate || canUpdate) && canViewSalesOrders && canViewSalesOrderItems
   const canViewInventory = hasActionPermission(
     adminProfile,
     'warehouse.inventory.read'
@@ -790,6 +793,7 @@ export default function ShipmentsPage() {
 
   const shipmentModalMode = shipmentModal?.mode || ''
   const isCreateModal = shipmentModalMode === 'create'
+  const isEditModal = shipmentModalMode === 'edit'
   const isViewModal = shipmentModalMode === 'view'
   const selectedSalesOrder = useMemo(
     () => salesOrdersByID.get(Number(selectedSalesOrderID || 0)) || null,
@@ -873,7 +877,7 @@ export default function ShipmentsPage() {
         const data = await listShipmentSourceCandidates(params, {
           signal: request.signal,
         })
-        if (!request.isCurrent()) return
+        if (!request.isCurrent()) return false
         const nextSourceRows = data.shipment_source_candidates.map(
           normalizeShipmentSourceCandidate
         )
@@ -881,6 +885,13 @@ export default function ShipmentsPage() {
         setSalesOrderSources(nextSourceRows)
         setSalesOrderSourceTotal(data.total)
         setSalesOrderSourceItems((currentItems) => {
+          const byID = new Map(
+            currentItems.map((item) => [Number(item?.id || 0), item])
+          )
+          nextSourceRows.forEach((item) => byID.set(Number(item.id), item))
+          return [...byID.values()]
+        })
+        setSalesOrderItems((currentItems) => {
           const byID = new Map(
             currentItems.map((item) => [Number(item?.id || 0), item])
           )
@@ -905,12 +916,14 @@ export default function ShipmentsPage() {
           nextOrders.forEach((order) => byID.set(Number(order.id), order))
           return [...byID.values()]
         })
+        return true
       } catch (error) {
-        if (isRpcAbortError(error) || !request.isCurrent()) return
+        if (isRpcAbortError(error) || !request.isCurrent()) return false
         setSalesOrderSources([])
         setSalesOrderSourceTotal(0)
         setSalesOrderSourceLoadFailed(true)
         message.error(getActionErrorMessage(error, '加载销售订单来源'))
+        return false
       } finally {
         if (request.isCurrent()) {
           setSourceLoading(false)
@@ -1072,6 +1085,62 @@ export default function ShipmentsPage() {
     setShipmentModal({ mode: 'create', shipment: null })
   }
 
+  const openEdit = async (shipment) => {
+    if (!canUpdate) {
+      message.warning('当前账号没有编辑出货草稿的权限')
+      return
+    }
+    if (
+      !shipment?.id ||
+      shipment.status !== 'DRAFT' ||
+      shipment.purpose === 'REWORK_RESHIPMENT'
+    ) {
+      message.warning('只有尚未进入下游流程的销售出货草稿可以编辑')
+      return
+    }
+    shipmentAttachmentRef.current?.clearPendingAttachments()
+    resetShipmentSourceSelectionState()
+    setSaving(true)
+    try {
+      const detail = await getShipment({ id: shipment.id })
+      if (
+        !detail?.id ||
+        detail.status !== 'DRAFT' ||
+        detail.purpose === 'REWORK_RESHIPMENT' ||
+        !Array.isArray(detail.items) ||
+        detail.items.length === 0
+      ) {
+        message.warning('出货单状态或明细已变化，本次未进入编辑')
+        await loadRows()
+        return
+      }
+      shipmentForm.resetFields()
+      shipmentForm.setFieldsValue({
+        ...shipmentFormValues(detail),
+        items: detail.items,
+      })
+      if (detail.sales_order_id) {
+        const sourceReady = await loadSalesOrderSources({
+          keyword: '',
+          page: 1,
+        })
+        if (!sourceReady) {
+          message.warning('销售订单来源未完整加载，本次未进入编辑')
+          shipmentForm.resetFields()
+          return
+        }
+      }
+      setShipmentModal({ mode: 'edit', shipment: detail })
+    } catch (error) {
+      message.error(
+        `${getActionErrorMessage(error, '加载出货草稿明细')}，未进入编辑`
+      )
+      shipmentForm.resetFields()
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const openShipmentDetails = (shipment) => {
     shipmentAttachmentRef.current?.clearPendingAttachments()
     shipmentForm.resetFields()
@@ -1092,21 +1161,46 @@ export default function ShipmentsPage() {
   const submitShipmentModal = async () => {
     try {
       const values = await shipmentForm.validateFields()
+      const params = buildShipmentWithItemsParams(values, {
+        products,
+        productSKUs,
+      })
+      const editingShipment =
+        shipmentModal?.mode === 'edit' ? shipmentModal.shipment : null
+      if (editingShipment?.id && !positiveInt(editingShipment.version)) {
+        message.error('出货草稿版本不完整，请关闭弹窗并刷新后重试')
+        return
+      }
       setSaving(true)
-      const savedShipment = await createShipmentWithItems(
-        buildShipmentWithItemsParams(values, { products, productSKUs })
-      )
+      let savedShipment
+      if (editingShipment?.id) {
+        const draftParams = { ...params }
+        delete draftParams.idempotency_key
+        savedShipment = await saveShipmentDraft({
+          ...draftParams,
+          id: editingShipment.id,
+          expected_version: editingShipment.version,
+        })
+      } else {
+        savedShipment = await createShipmentWithItems(params)
+      }
       const attachmentSaved =
         (await shipmentAttachmentRef.current?.flushPendingAttachments(
           savedShipment?.id
         )) !== false
       message.success(
         attachmentSaved
-          ? '出货单草稿和明细已保存'
+          ? editingShipment?.id
+            ? '出货草稿和明细已更新'
+            : '出货单草稿和明细已保存'
           : '出货单已保存，未上传的附件请重新选择'
       )
       closeShipmentModal()
-      resetBusinessPaginationCurrent(setPagination)
+      if (editingShipment?.id) {
+        await loadRows()
+      } else {
+        resetBusinessPaginationCurrent(setPagination)
+      }
     } catch (error) {
       if (error?.errorFields) {
         return
@@ -1131,6 +1225,18 @@ export default function ShipmentsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const openShipmentRecord = (shipment) => {
+    if (
+      canUpdate &&
+      shipment?.status === 'DRAFT' &&
+      shipment?.purpose !== 'REWORK_RESHIPMENT'
+    ) {
+      openEdit(shipment)
+      return
+    }
+    openShipmentDetails(shipment)
   }
 
   const submitSelectedShipmentRelease = async () => {
@@ -1661,6 +1767,42 @@ export default function ShipmentsPage() {
               查看明细
             </Button>
           </BusinessActionTooltip>
+          {canUpdate ? (
+            <BusinessActionTooltip
+              disabled={
+                !selectedRow ||
+                saving ||
+                selectedRow?.status !== 'DRAFT' ||
+                selectedRow?.purpose === 'REWORK_RESHIPMENT'
+              }
+              disabledReason={
+                saving
+                  ? '当前操作完成后可编辑'
+                  : !selectedRow
+                    ? '请先选择一张出货单'
+                    : selectedRow?.purpose === 'REWORK_RESHIPMENT'
+                      ? '返工补发草稿由返工回厂业务链维护'
+                      : selectedRow?.status !== 'DRAFT'
+                        ? '只有尚未确认出货的草稿可以编辑'
+                        : ''
+              }
+            >
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                data-business-action-key="shipment-edit"
+                disabled={
+                  !selectedRow ||
+                  saving ||
+                  selectedRow?.status !== 'DRAFT' ||
+                  selectedRow?.purpose === 'REWORK_RESHIPMENT'
+                }
+                onClick={() => openEdit(selectedRow)}
+              >
+                编辑草稿
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
           {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}
@@ -1847,14 +1989,14 @@ export default function ShipmentsPage() {
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
         })}
-        onOpenRecord={openShipmentDetails}
+        onOpenRecord={openShipmentRecord}
       />
       {shipmentItemsPreview.modal}
       {columnOrderModal}
 
       <ShipmentBusinessModal
         canCreate={canCreate}
-        canShip={canShip}
+        canUpdate={canUpdate}
         canImportSalesOrderSource={canImportSalesOrderSource}
         customerOptions={customerOptions}
         form={shipmentForm}
@@ -1862,6 +2004,7 @@ export default function ShipmentsPage() {
         inventoryLots={inventoryLots}
         inventoryLotOptions={inventoryLotOptions}
         isCreateModal={isCreateModal}
+        isEditModal={isEditModal}
         isViewModal={isViewModal}
         modalSelectedShipment={modalSelectedShipment}
         onCancel={closeShipmentModal}

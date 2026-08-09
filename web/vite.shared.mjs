@@ -2,7 +2,6 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
-import { createDevWorkbenchServePlugins } from './dev-server/devWorkbenchPlugins.mjs'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
 import { loadDevPorts } from '../scripts/dev-ports.mjs'
 import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
@@ -11,6 +10,7 @@ const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
 const PROJECT_ROOT = resolve(ROOT_DIR, '..')
 const devPorts = loadDevPorts(PROJECT_ROOT)
 const DEV_HOST = '127.0.0.1'
+const DEV_WORKBENCH_PLUGIN_MODULE = './dev-server/devWorkbenchPlugins.mjs'
 
 export function resolveERPDevServerPort(rawPort, ports = devPorts) {
   const normalized = String(rawPort || '').trim()
@@ -131,7 +131,7 @@ export function createERPViteConfig(appId) {
     process.env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`
   )
 
-  return defineConfig(({ command, mode }) => {
+  return defineConfig(async ({ command, mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
     const isProd = mode === 'production'
     const isDev = mode === 'development'
@@ -140,6 +140,19 @@ export function createERPViteConfig(appId) {
       console.log(`[vite] erp app=${app.id} command=${command} mode=${mode}`)
     }
 
+    const devWorkbenchServePlugins =
+      isDev && command === 'serve'
+        ? (
+            await import(DEV_WORKBENCH_PLUGIN_MODULE)
+          ).createDevWorkbenchServePlugins({
+            apiOrigin,
+            command,
+            devCustomerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',
+            mode,
+            projectRoot: PROJECT_ROOT,
+          })
+        : []
+
     return {
       base: isDev ? '/' : env.VITE_BASE_URL || '/',
       plugins: [
@@ -147,13 +160,7 @@ export function createERPViteConfig(appId) {
         isDev ? createDevLocalhostOriginNormalizer(serverPort) : null,
         isDev ? createDevResolvedPortGuard() : null,
         react(),
-        ...createDevWorkbenchServePlugins({
-          apiOrigin,
-          command,
-          devCustomerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',
-          mode,
-          projectRoot: PROJECT_ROOT,
-        }),
+        ...devWorkbenchServePlugins,
       ].filter(Boolean),
       esbuild: {
         drop: isProd ? ['console', 'debugger'] : [],

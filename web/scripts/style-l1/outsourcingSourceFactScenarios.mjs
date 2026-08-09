@@ -248,7 +248,10 @@ export function createOutsourcingSourceFactScenarios(deps) {
           '行内明细快速预览应保持只读，不承载委外回货'
         )
 
-        await page.getByText('OUT-SOURCE-L1', { exact: true }).first().dblclick()
+        await page
+          .getByText('OUT-SOURCE-L1', { exact: true })
+          .first()
+          .dblclick()
         const detailModal = page
           .locator('.erp-business-action-modal--form.ant-modal:visible')
           .filter({ hasText: '加工合同详情' })
@@ -542,6 +545,9 @@ export function createOutsourcingSourceFactScenarios(deps) {
             const confirm = page.locator('.ant-modal-confirm:visible').last()
             await confirm.waitFor({ state: 'visible', timeout: 10_000 })
             await expectText(confirm, '本次作废不会产生任何库存变动')
+            await confirm
+              .locator('textarea:visible')
+              .fill('STYLE-L1：委外草稿录入有误')
             await confirm
               .getByRole('button', { name: '确认作废', exact: true })
               .click()

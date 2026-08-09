@@ -31,6 +31,8 @@ const SENSITIVE_ENV_KEY_PATTERN =
   /(?:PASSWORD|PASSWD|SECRET|TOKEN|PRIVATE_KEY|ACCESS_KEY|POSTGRES_DSN|DATABASE_URL)/iu;
 const CREDENTIAL_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/iu;
 const DEFAULT_CUSTOMER = "yoyoosun";
+const IMAGE_ARCHIVE_COMPRESSION = "zstd";
+const IMAGE_ARCHIVE_COMPRESSION_LEVEL = 3;
 
 class ReleaseArtifactError extends Error {
   constructor(message, details = {}) {
@@ -482,17 +484,46 @@ function imageArtifact({
   const metadataSecretScan = scanImageMetadata(image);
   const tarFile = `${kind}-image.tar`;
   const tarPath = path.join(outputDir, tarFile);
+  const rawTarPath = `${tarPath}.uncompressed`;
   const saveStartedAt = Date.now();
-  runCommand({
-    command: "docker",
-    args: ["image", "save", "--output", tarPath, fixedRef],
-    cwd: repoRoot,
-    label: `save immutable ${kind} image`,
-  });
-  if (!existsSync(tarPath) || statSync(tarPath).size === 0) {
-    throw new ReleaseArtifactError(`${kind} image archive is empty`);
+  let saveDurationMs;
+  let compressionDurationMs;
+  let uncompressedSizeBytes;
+  try {
+    runCommand({
+      command: "docker",
+      args: ["image", "save", "--output", rawTarPath, fixedRef],
+      cwd: repoRoot,
+      label: `save immutable ${kind} image`,
+    });
+    if (!existsSync(rawTarPath) || statSync(rawTarPath).size === 0) {
+      throw new ReleaseArtifactError(`${kind} image archive is empty`);
+    }
+    saveDurationMs = Math.max(0, Date.now() - saveStartedAt);
+    uncompressedSizeBytes = statSync(rawTarPath).size;
+    const compressionStartedAt = Date.now();
+    runCommand({
+      command: "zstd",
+      args: [
+        "--quiet",
+        `-${String(IMAGE_ARCHIVE_COMPRESSION_LEVEL)}`,
+        "--force",
+        "--output",
+        tarPath,
+        rawTarPath,
+      ],
+      cwd: repoRoot,
+      label: `compress immutable ${kind} image`,
+    });
+    compressionDurationMs = Math.max(0, Date.now() - compressionStartedAt);
+    if (!existsSync(tarPath) || statSync(tarPath).size === 0) {
+      throw new ReleaseArtifactError(
+        `${kind} compressed image archive is empty`,
+      );
+    }
+  } finally {
+    rmSync(rawTarPath, { force: true });
   }
-  const saveDurationMs = Math.max(0, Date.now() - saveStartedAt);
   return {
     kind,
     ref: fixedRef,
@@ -505,6 +536,10 @@ function imageArtifact({
       sizeBytes: statSync(tarPath).size,
       sha256: sha256File(tarPath),
       saveDurationMs,
+      compression: IMAGE_ARCHIVE_COMPRESSION,
+      compressionLevel: IMAGE_ARCHIVE_COMPRESSION_LEVEL,
+      compressionDurationMs,
+      uncompressedSizeBytes,
     },
     metadataSecretScan,
   };
@@ -573,15 +608,31 @@ export function assertReleaseArtifactManifest(manifest) {
   }
   for (const image of manifest.images) {
     assertPlainRelativeFile(image?.archive?.file, "image archive file");
+    const compression = image?.archive?.compression;
+    const compressionEvidenceValid =
+      compression === undefined
+        ? image?.archive?.compressionLevel === undefined &&
+          image?.archive?.compressionDurationMs === undefined &&
+          image?.archive?.uncompressedSizeBytes === undefined
+        : compression === IMAGE_ARCHIVE_COMPRESSION &&
+          image?.archive?.compressionLevel ===
+            IMAGE_ARCHIVE_COMPRESSION_LEVEL &&
+          Number.isSafeInteger(image?.archive?.compressionDurationMs) &&
+          image.archive.compressionDurationMs >= 0 &&
+          Number.isSafeInteger(image?.archive?.uncompressedSizeBytes) &&
+          image.archive.uncompressedSizeBytes > 0;
     if (
       !["server", "web"].includes(image?.kind) ||
       !IMAGE_ID_PATTERN.test(String(image?.contentId || "")) ||
       image?.gitSha !== manifest.git.commit ||
       image?.platform !== "linux/amd64" ||
       !SHA256_PATTERN.test(String(image?.archive?.sha256 || "")) ||
+      !Number.isSafeInteger(image?.archive?.sizeBytes) ||
+      image.archive.sizeBytes <= 0 ||
       (image?.archive?.saveDurationMs !== undefined &&
         (!Number.isSafeInteger(image.archive.saveDurationMs) ||
           image.archive.saveDurationMs < 0)) ||
+      !compressionEvidenceValid ||
       image?.metadataSecretScan?.passed !== true
     ) {
       throw new ReleaseArtifactError(
@@ -728,6 +779,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
           repoRoot,
           runCommand,
         ),
+        zstd: toolVersion("zstd", ["--version"], repoRoot, runCommand),
         go: declaredGoToolchain(repoRoot, commit, runCommand),
         declaredPnpm: JSON.parse(
           gitShow(repoRoot, commit, "web/package.json", runCommand),
@@ -835,10 +887,10 @@ Usage:
 
 The command requires a clean current HEAD. It builds linux/amd64 images only from
 the committed git archive, embeds the exact 40-character SHA, records image content
-IDs, saves loadable image archives, writes a CycloneDX dependency SBOM, migration
-sequence and customer-config source fingerprints, and fails on populated sensitive
-image metadata. It does not push images, contact 133, deploy, migrate a target, or
-prove remote CI/UAT. Existing output directories are never overwritten.`;
+IDs, saves zstd level-3 loadable image archives, writes a CycloneDX dependency SBOM,
+migration sequence and customer-config source fingerprints, and fails on populated
+sensitive image metadata. It does not push images, contact 133, deploy, migrate a
+target, or prove remote CI/UAT. Existing output directories are never overwritten.`;
 
 function isMainModule() {
   try {

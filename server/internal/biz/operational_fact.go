@@ -101,6 +101,7 @@ var (
 	ErrShipmentReleaseAlreadySubmitted      = errors.New("shipment release was already submitted")
 	ErrShipmentFinanceReleaseRequired       = errors.New("shipment finance approval is required")
 	ErrShipmentFinanceReleaseConflict       = errors.New("shipment finance approval version conflict")
+	ErrShipmentDraftDependency              = errors.New("shipment draft has downstream dependencies")
 	ErrShipmentCancellationProcessActive    = errors.New("shipment finished goods delivery process is still active")
 	ErrShipmentCancellationTaskActive       = errors.New("shipment release task is still active")
 	ErrProductionExceptionTaskRequired      = errors.New("production exception task is required")
@@ -197,6 +198,7 @@ type Shipment struct {
 	CustomerID                      *int
 	CustomerSnapshot                *string
 	Status                          string
+	Version                         int
 	FinanceReleaseStatus            string
 	FinanceReleaseVersion           int
 	FinanceReleasedAt               *time.Time
@@ -364,6 +366,37 @@ type OutsourcingFactFromOrderCreate struct {
 	Note                   *string
 }
 
+// ProductionFactDraftSave contains only operator-owned fields that may change
+// before a production fact is posted. Fact/source identity is supplied by the
+// type-specific usecase and revalidated by the repository transaction.
+type ProductionFactDraftSave struct {
+	ID              int
+	ExpectedVersion int
+	FactType        string
+	SourceType      string
+	FactNo          string
+	WarehouseID     int
+	LotID           *int
+	NewLotNo        *string
+	Quantity        decimal.Decimal
+	OccurredAt      time.Time
+	Note            *string
+}
+
+// OutsourcingFactDraftSave keeps the source order and line immutable while a
+// DRAFT fact's operator-entered warehouse, lot, quantity, time and note change.
+type OutsourcingFactDraftSave struct {
+	ID              int
+	ExpectedVersion int
+	FactType        string
+	WarehouseID     int
+	LotID           *int
+	NewLotNo        *string
+	Quantity        decimal.Decimal
+	OccurredAt      time.Time
+	Note            *string
+}
+
 // ProductionMaterialIssueFromOrderCreate contains only operator-owned issue
 // fields. Material, unit and source linkage are resolved from the immutable
 // production-order material requirement inside the repository transaction.
@@ -422,6 +455,21 @@ type ShipmentItemCreate struct {
 type ShipmentCreateWithItems struct {
 	Shipment *ShipmentCreate
 	Items    []*ShipmentItemCreate
+}
+
+// ShipmentDraftSave contains the complete editable DRAFT aggregate. Source
+// snapshots are still resolved and validated by the repository transaction.
+type ShipmentDraftSave struct {
+	ID               int
+	ExpectedVersion  int
+	ShipmentNo       string
+	SalesOrderID     *int
+	CustomerID       *int
+	CustomerSnapshot *string
+	PlannedShipAt    *time.Time
+	TotalNetWeightG  *decimal.Decimal
+	Note             *string
+	Items            []*ShipmentItemCreate
 }
 
 type StockReservationCreate struct {
@@ -552,6 +600,25 @@ type OperationalFactRepo interface {
 	SettleFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error)
 	CancelPostedFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error)
 	ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error)
+}
+
+// ShipmentDraftSaveRepo is kept separate from the broad operational-fact
+// reader/writer contract so read adapters and test doubles do not accidentally
+// claim aggregate DRAFT replacement support.
+type ShipmentDraftSaveRepo interface {
+	SaveShipmentDraftWithItems(ctx context.Context, in *ShipmentDraftSave) (*Shipment, error)
+}
+
+// ProductionFactDraftSaveRepo is separate from OperationalFactRepo so readers
+// and legacy test doubles do not accidentally claim protected DRAFT updates.
+type ProductionFactDraftSaveRepo interface {
+	SaveProductionFactDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error)
+}
+
+// OutsourcingFactDraftSaveRepo is the protected DRAFT update capability for
+// source-derived outsourcing facts.
+type OutsourcingFactDraftSaveRepo interface {
+	SaveOutsourcingFactDraft(ctx context.Context, in *OutsourcingFactDraftSave) (*OutsourcingFact, error)
 }
 
 // StockReservationReadScope keeps the list endpoint's readable business
@@ -721,6 +788,37 @@ func (uc *OperationalFactUsecase) CreateProductionMaterialIssueFromOrder(ctx con
 	return repo.CreateProductionMaterialIssueFromOrder(ctx, normalized)
 }
 
+func (uc *OperationalFactUsecase) SaveProductionMaterialIssueDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
+	return uc.saveProductionFactDraft(ctx, in, ProductionFactMaterialIssue, ProductionOrderSourceType)
+}
+
+func (uc *OperationalFactUsecase) SaveProductionCompletionDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
+	return uc.saveProductionFactDraft(ctx, in, ProductionFactFinishedGoodsReceipt, ProductionOrderSourceType)
+}
+
+func (uc *OperationalFactUsecase) SaveProductionReworkFromCompletionDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
+	return uc.saveProductionFactDraft(ctx, in, ProductionFactRework, ProductionFactSourceType)
+}
+
+func (uc *OperationalFactUsecase) SaveProductionReworkFromIntakeDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
+	return uc.saveProductionFactDraft(ctx, in, ProductionFactRework, ReworkIntakeSourceType)
+}
+
+func (uc *OperationalFactUsecase) saveProductionFactDraft(ctx context.Context, in *ProductionFactDraftSave, factType, sourceType string) (*ProductionFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductionFactDraftSave(in, factType, sourceType)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(ProductionFactDraftSaveRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.SaveProductionFactDraft(ctx, normalized)
+}
+
 func (uc *OperationalFactUsecase) CreateProductionReworkFromCompletion(ctx context.Context, in *ProductionReworkFromCompletionCreate) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
@@ -887,6 +985,29 @@ func (uc *OperationalFactUsecase) CreateOutsourcingReturnReceiptFromOrder(ctx co
 	return repo.CreateOutsourcingReturnReceiptFromOrder(ctx, normalized)
 }
 
+func (uc *OperationalFactUsecase) SaveOutsourcingMaterialIssueDraft(ctx context.Context, in *OutsourcingFactDraftSave) (*OutsourcingFact, error) {
+	return uc.saveOutsourcingFactDraft(ctx, in, OutsourcingFactMaterialIssue)
+}
+
+func (uc *OperationalFactUsecase) SaveOutsourcingReturnReceiptDraft(ctx context.Context, in *OutsourcingFactDraftSave) (*OutsourcingFact, error) {
+	return uc.saveOutsourcingFactDraft(ctx, in, OutsourcingFactReturnReceipt)
+}
+
+func (uc *OperationalFactUsecase) saveOutsourcingFactDraft(ctx context.Context, in *OutsourcingFactDraftSave, factType string) (*OutsourcingFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeOutsourcingFactDraftSave(in, factType)
+	if err != nil {
+		return nil, err
+	}
+	repo, ok := uc.repo.(OutsourcingFactDraftSaveRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.SaveOutsourcingFactDraft(ctx, normalized)
+}
+
 func (uc *OperationalFactUsecase) PostOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (*OutsourcingFact, error) {
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
 	if uc == nil || uc.repo == nil || err != nil {
@@ -931,6 +1052,39 @@ func (uc *OperationalFactUsecase) CreateShipmentDraftWithItems(ctx context.Conte
 		}
 	}
 	return uc.repo.CreateShipmentDraftWithItems(ctx, normalized)
+}
+
+func (uc *OperationalFactUsecase) SaveShipmentDraftWithItems(ctx context.Context, in *ShipmentDraftSave) (*Shipment, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeShipmentDraftSave(in)
+	if err != nil {
+		return nil, err
+	}
+	header := &ShipmentCreate{
+		ShipmentNo:       normalized.ShipmentNo,
+		Purpose:          ShipmentPurposeSalesDelivery,
+		SalesOrderID:     normalized.SalesOrderID,
+		CustomerID:       normalized.CustomerID,
+		CustomerSnapshot: normalized.CustomerSnapshot,
+		PlannedShipAt:    normalized.PlannedShipAt,
+		TotalNetWeightG:  normalized.TotalNetWeightG,
+		Note:             normalized.Note,
+	}
+	if err := uc.validateShipmentHeaderActiveReferences(ctx, header); err != nil {
+		return nil, err
+	}
+	for _, item := range normalized.Items {
+		if err := uc.validateShipmentItemActiveReferences(ctx, item); err != nil {
+			return nil, err
+		}
+	}
+	repo, ok := uc.repo.(ShipmentDraftSaveRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.SaveShipmentDraftWithItems(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) SubmitShipmentRelease(ctx context.Context, id int, actorID int) (*WorkflowTask, bool, error) {
@@ -1454,6 +1608,87 @@ func normalizeProductionReworkFromCompletionCreate(in *ProductionReworkFromCompl
 	return &out, nil
 }
 
+func normalizeProductionFactDraftSave(in *ProductionFactDraftSave, factType, sourceType string) (*ProductionFactDraftSave, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.FactType = strings.ToUpper(strings.TrimSpace(factType))
+	out.SourceType = strings.ToUpper(strings.TrimSpace(sourceType))
+	out.FactNo = strings.TrimSpace(out.FactNo)
+	out.Note = normalizeOptionalString(out.Note)
+	out.NewLotNo = normalizeOptionalString(out.NewLotNo)
+	if out.LotID != nil && *out.LotID <= 0 {
+		out.LotID = nil
+	}
+	if out.NewLotNo != nil && (len([]rune(*out.NewLotNo)) > 64 || out.LotID != nil) {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil || out.OccurredAt.IsZero() {
+		return nil, ErrBadParam
+	}
+	out.OccurredAt = out.OccurredAt.UTC().Truncate(time.Microsecond)
+	switch out.FactType {
+	case ProductionFactMaterialIssue:
+		if out.SourceType != ProductionOrderSourceType || out.WarehouseID <= 0 || out.LotID == nil || out.NewLotNo != nil || out.FactNo != "" {
+			return nil, ErrBadParam
+		}
+	case ProductionFactFinishedGoodsReceipt:
+		if out.SourceType != ProductionOrderSourceType || out.WarehouseID <= 0 || (out.LotID == nil) == (out.NewLotNo == nil) || out.FactNo != "" {
+			return nil, ErrBadParam
+		}
+	case ProductionFactRework:
+		if (out.SourceType != ProductionFactSourceType && out.SourceType != ReworkIntakeSourceType) || out.WarehouseID != 0 || out.LotID != nil || out.NewLotNo != nil || out.FactNo == "" || len([]rune(out.FactNo)) > 64 || out.Note == nil || len([]rune(*out.Note)) > 255 {
+			return nil, ErrBadParam
+		}
+	default:
+		return nil, ErrBadParam
+	}
+	if out.Note != nil && len([]rune(*out.Note)) > 255 {
+		return nil, ErrBadParam
+	}
+	return &out, nil
+}
+
+func normalizeOutsourcingFactDraftSave(in *OutsourcingFactDraftSave, factType string) (*OutsourcingFactDraftSave, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.FactType = strings.ToUpper(strings.TrimSpace(factType))
+	out.Note = normalizeOptionalString(out.Note)
+	out.NewLotNo = normalizeOptionalString(out.NewLotNo)
+	if out.LotID != nil && *out.LotID <= 0 {
+		out.LotID = nil
+	}
+	if out.NewLotNo != nil && (len([]rune(*out.NewLotNo)) > 64 || out.LotID != nil) {
+		return nil, ErrBadParam
+	}
+	if out.WarehouseID <= 0 || out.OccurredAt.IsZero() {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
+		return nil, ErrBadParam
+	}
+	out.OccurredAt = out.OccurredAt.UTC().Truncate(time.Microsecond)
+	switch out.FactType {
+	case OutsourcingFactMaterialIssue:
+		if out.LotID == nil || out.NewLotNo != nil {
+			return nil, ErrBadParam
+		}
+	case OutsourcingFactReturnReceipt:
+		if (out.LotID == nil) == (out.NewLotNo == nil) {
+			return nil, ErrBadParam
+		}
+	default:
+		return nil, ErrBadParam
+	}
+	if out.Note != nil && len([]rune(*out.Note)) > 255 {
+		return nil, ErrBadParam
+	}
+	return &out, nil
+}
+
 func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	if in == nil {
 		return nil, ErrBadParam
@@ -1540,6 +1775,38 @@ func normalizeShipmentCreateWithItems(in *ShipmentCreateWithItems) (*ShipmentCre
 		items = append(items, normalizedItem)
 	}
 	return &ShipmentCreateWithItems{Shipment: shipment, Items: items}, nil
+}
+
+func normalizeShipmentDraftSave(in *ShipmentDraftSave) (*ShipmentDraftSave, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || len(in.Items) == 0 {
+		return nil, ErrBadParam
+	}
+	out := *in
+	out.ShipmentNo = strings.TrimSpace(out.ShipmentNo)
+	out.CustomerSnapshot = normalizeOptionalString(out.CustomerSnapshot)
+	out.Note = normalizeOptionalString(out.Note)
+	if out.SalesOrderID != nil && *out.SalesOrderID <= 0 {
+		out.SalesOrderID = nil
+	}
+	if out.CustomerID != nil && *out.CustomerID <= 0 {
+		out.CustomerID = nil
+	}
+	if out.PlannedShipAt != nil {
+		plannedShipAt := out.PlannedShipAt.UTC().Truncate(time.Microsecond)
+		out.PlannedShipAt = &plannedShipAt
+	}
+	if out.ShipmentNo == "" || !validNetWeightG(out.TotalNetWeightG) {
+		return nil, ErrBadParam
+	}
+	out.Items = make([]*ShipmentItemCreate, 0, len(in.Items))
+	for _, item := range in.Items {
+		normalizedItem, err := normalizeShipmentItemCreate(item)
+		if err != nil {
+			return nil, err
+		}
+		out.Items = append(out.Items, normalizedItem)
+	}
+	return &out, nil
 }
 
 func normalizeStockReservationCreate(in *StockReservationCreate) (*StockReservationCreate, error) {

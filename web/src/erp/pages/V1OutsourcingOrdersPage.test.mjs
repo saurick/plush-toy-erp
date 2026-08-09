@@ -18,6 +18,17 @@ const orderViewSource = readFileSync(
   'utf8'
 )
 
+test('outsourcing records reopen exact DRAFT facts in the shared source modal', () => {
+  assert.match(source, /openOutsourcingFactDraftEditor/u)
+  assert.match(source, /keyword: String\(fact\.id\)/u)
+  assert.match(source, /fresh\.status !== 'DRAFT'/u)
+  assert.match(source, /mode: 'edit'/u)
+  assert.match(source, /buildOperationalFactDraftSavePayload/u)
+  assert.match(source, /saveOutsourcingMaterialIssueDraft/u)
+  assert.match(source, /saveOutsourcingReturnReceiptDraft/u)
+  assert.match(source, /findOperationalFactDraftSaveResult/u)
+})
+
 test('outsourcing page has no retired sales-order foreign-key field', () => {
   assert.doesNotMatch(formSource, /source_sales_order_id/u)
   assert.doesNotMatch(orderViewSource, /source_sales_order_id/u)
@@ -76,10 +87,7 @@ test('outsourcing order source modal uses retry-safe attempts and clears closed 
   assert.match(source, /isSourceBusinessActionResultUnknown\(error\)/u)
   assert.match(source, /findOutsourcingSourceFactResult/u)
   assert.match(source, /保持内容不变后重试，避免重复记录/u)
-  assert.match(
-    source,
-    /已重新读取并确认委外回货草稿，可在委外记录中继续办理/u
-  )
+  assert.match(source, /已重新读取并确认委外回货草稿，可在委外记录中继续办理/u)
   assert.match(source, /sourceFactRequestRef\.current \+= 1/u)
   assert.match(source, /setSourceFactContext\(EMPTY_SOURCE_FACT_CONTEXT\)/u)
   assert.match(source, /<OutsourcingOrderSourceFactModal/u)
@@ -209,10 +217,7 @@ test('posted outsourcing returns expose source-bound quality inspection', () => 
   assert.match(source, /quality\.inspection\.read/u)
   assert.match(source, /createQualityInspectionFromOutsourcingReturn/u)
   assert.match(source, /listAllOutsourcingReturnQualityInspections/u)
-  assert.doesNotMatch(
-    source,
-    /\blistOutsourcingReturnQualityInspections\s*\(/u
-  )
+  assert.doesNotMatch(source, /\blistOutsourcingReturnQualityInspections\s*\(/u)
   assert.match(source, /fact_id: fact\.id/u)
   assert.match(source, /buildOutsourcingReturnQualityInspectionPayload/u)
   assert.match(source, /isMatchingOutsourcingReturnQualityInspection/u)
@@ -256,10 +261,7 @@ test('resolved related contract number is isolated by the exact route key', () =
     source,
     /const linkedRouteKey = `\$\{routeOutsourcingOrderID\}:\$\{routeOutsourcingFactID\}`/u
   )
-  assert.match(
-    source,
-    /resolvedLinkedContext\.routeKey === linkedRouteKey/u
-  )
+  assert.match(source, /resolvedLinkedContext\.routeKey === linkedRouteKey/u)
   assert.match(
     source,
     /setResolvedLinkedContext\(\{ routeKey: requestRouteKey, keyword: '' \}\)/u

@@ -39,6 +39,7 @@ import {
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
 import {
   getSalesOrder,
@@ -118,6 +119,13 @@ import {
   resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
 import { searchParamPositiveInt } from '../utils/routeQuery.mjs'
+import {
+  LIFECYCLE_SCOPE,
+  filterLifecycleStatusOptions,
+  lifecycleScopeFromSearchParams,
+  lifecycleScopeIncludesStatus,
+  withLifecycleScopeSearchParam,
+} from '../utils/lifecycleScope.mjs'
 import {
   canOpenRelatedDocumentPath,
   clearLinkedDocumentParams,
@@ -225,6 +233,9 @@ export default function V1SalesOrdersPage() {
   const [itemLoading, setItemLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [keyword, setKeyword] = useState('')
+  const [lifecycleScope, setLifecycleScope] = useState(() =>
+    lifecycleScopeFromSearchParams(searchParams)
+  )
   const [statusFilter, setStatusFilter] = useState('')
   const [customerFilter, setCustomerFilter] = useState('')
   const [dateFilterField, setDateFilterField] = useState('order_date')
@@ -327,6 +338,15 @@ export default function V1SalesOrdersPage() {
   const customerOptions = useMemo(
     () => uniqueReferenceOptions(customers, customerOption),
     [customers]
+  )
+  const lifecycleStatusOptions = useMemo(
+    () =>
+      filterLifecycleStatusOptions(
+        SALES_ORDER_STATUS_FILTER_OPTIONS,
+        lifecycleScope,
+        ['closed', 'canceled']
+      ),
+    [lifecycleScope]
   )
   const unitOptions = useMemo(
     () => uniqueReferenceOptions(units, unitOption),
@@ -535,6 +555,7 @@ export default function V1SalesOrdersPage() {
       }),
       customer_id: customerFilter || undefined,
       lifecycle_status: statusFilter,
+      lifecycle_scope: lifecycleScope,
       date_field: dateFilterField,
       date_from: dateFilterStart || undefined,
       date_to: dateFilterEnd || undefined,
@@ -548,6 +569,7 @@ export default function V1SalesOrdersPage() {
     dateFilterStart,
     keyword,
     linkedKeyword,
+    lifecycleScope,
     routeSalesOrderID,
     sortFilter,
     statusFilter,
@@ -1184,26 +1206,36 @@ export default function V1SalesOrdersPage() {
     keyword.trim() ||
       linkedKeyword ||
       routeSalesOrderID ||
+      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
       statusFilter ||
       customerFilter ||
       dateFilterStart ||
       dateFilterEnd
   )
-  const clearRouteContext = useCallback(() => {
-    const nextParams = clearLinkedDocumentParams(searchParams)
-    nextParams.delete('sales_order_id')
-    setSearchParams(nextParams, { replace: true })
-    resetBusinessPaginationCurrent(setPagination)
-  }, [searchParams, setSearchParams])
+  const clearRouteContext = useCallback(
+    (resetScope = false) => {
+      const nextParams = clearLinkedDocumentParams(searchParams)
+      nextParams.delete('sales_order_id')
+      setSearchParams(
+        resetScope
+          ? withLifecycleScopeSearchParam(nextParams, LIFECYCLE_SCOPE.CURRENT)
+          : nextParams,
+        { replace: true }
+      )
+      resetBusinessPaginationCurrent(setPagination)
+    },
+    [searchParams, setSearchParams]
+  )
   const clearFilters = useCallback(() => {
     setKeyword('')
+    setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
     setStatusFilter('')
     setCustomerFilter('')
     setDateFilterField('order_date')
     setDateFilterStart('')
     setDateFilterEnd('')
     resetBusinessPaginationCurrent(setPagination)
-    clearRouteContext()
+    clearRouteContext(true)
   }, [clearRouteContext])
 
   const activeOrderCount = useMemo(
@@ -1322,9 +1354,30 @@ export default function V1SalesOrdersPage() {
               }}
               onPressEnter={loadOrders}
             />
+            <LifecycleScopeFilter
+              value={lifecycleScope}
+              onChange={(nextScope) => {
+                setLifecycleScope(nextScope)
+                if (
+                  !lifecycleScopeIncludesStatus(nextScope, statusFilter, [
+                    'closed',
+                    'canceled',
+                  ])
+                ) {
+                  setStatusFilter('')
+                }
+                const nextParams = clearLinkedDocumentParams(searchParams)
+                nextParams.delete('sales_order_id')
+                setSearchParams(
+                  withLifecycleScopeSearchParam(nextParams, nextScope),
+                  { replace: true }
+                )
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
             <SelectFilter
               className="erp-business-filter-control--status"
-              options={SALES_ORDER_STATUS_FILTER_OPTIONS}
+              options={lifecycleStatusOptions}
               value={statusFilter}
               onChange={(nextStatus) => {
                 setStatusFilter(nextStatus)

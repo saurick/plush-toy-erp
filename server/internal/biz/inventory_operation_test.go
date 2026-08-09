@@ -35,10 +35,40 @@ func TestInventoryOperationCreateAcceptsManualAdjustmentAsDraft(t *testing.T) {
 	}
 }
 
+func TestInventoryOperationDraftSaveNormalizesEditableFields(t *testing.T) {
+	repo := &inventoryOperationUsecaseRepoStub{}
+	uc := NewInventoryUsecase(repo)
+	counted := decimal.RequireFromString("8.5")
+	note := "  复盘后修正  "
+	got, err := uc.SaveInventoryOperationDraft(context.Background(), &InventoryOperationDraftSave{
+		ID: 9, ExpectedVersion: 2, OperationNo: "  CC-9  ", Reason: "  月末复盘  ",
+		Items: []InventoryOperationDraftItemSave{{ID: 10, CountedQuantity: &counted, Note: &note}},
+	}, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != 9 || repo.saved == nil || repo.saved.ActorID != 7 || repo.saved.OperationNo != "CC-9" || repo.saved.Reason != "月末复盘" || repo.saved.Items[0].Note == nil || *repo.saved.Items[0].Note != "复盘后修正" {
+		t.Fatalf("got=%#v saved=%#v", got, repo.saved)
+	}
+	_, err = uc.SaveInventoryOperationDraft(context.Background(), &InventoryOperationDraftSave{
+		ID: 9, ExpectedVersion: 2, OperationNo: "CC-9", Reason: "月末复盘",
+		Items: []InventoryOperationDraftItemSave{{ID: 10}, {ID: 10}},
+	}, 7)
+	if err != ErrBadParam {
+		t.Fatalf("duplicate item ids err=%v", err)
+	}
+}
+
 type inventoryOperationUsecaseRepoStub struct {
 	InventoryRepo
 	created    *InventoryOperationCreate
+	saved      *InventoryOperationDraftSave
 	intentHash string
+}
+
+func (r *inventoryOperationUsecaseRepoStub) SaveInventoryOperationDraft(_ context.Context, in *InventoryOperationDraftSave) (*InventoryOperation, error) {
+	r.saved = in
+	return &InventoryOperation{ID: in.ID, OperationNo: in.OperationNo, Reason: in.Reason, Status: InventoryOperationStatusDraft, Version: in.ExpectedVersion + 1}, nil
 }
 
 func (r *inventoryOperationUsecaseRepoStub) CreateInventoryOperation(_ context.Context, in *InventoryOperationCreate, hash string) (*InventoryOperation, error) {

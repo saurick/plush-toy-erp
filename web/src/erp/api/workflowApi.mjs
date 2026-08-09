@@ -69,6 +69,26 @@ const WORKFLOW_ROLE_TASK_INITIAL_RESPONSE_KEYS = Object.freeze(
   [...WORKFLOW_ROLE_TASK_RESPONSE_KEYS, 'counts', 'risk_scope'].sort()
 )
 const WORKFLOW_ROLE_TASK_RISK_SCOPES = new Set(['role', 'supervised'])
+const WORKFLOW_WORKBENCH_QUEUE_KEYS = new Set([
+  'actionable',
+  'risk',
+  'approval',
+])
+const WORKFLOW_WORKBENCH_QUERY_KEYS = new Set(['queue_key', 'limit', 'offset'])
+const WORKFLOW_WORKBENCH_RESPONSE_KEYS = Object.freeze(
+  [
+    'counts',
+    'items',
+    'limit',
+    'offset',
+    'queue_key',
+    'snapshot_at',
+    'total',
+  ].sort()
+)
+const WORKFLOW_WORKBENCH_COUNT_KEYS = Object.freeze(
+  ['actionable', 'approval', 'risk'].sort()
+)
 
 function dataOf(result) {
   return result?.data || {}
@@ -214,6 +234,99 @@ function requireWorkflowRoleTaskResponse(result, query, method) {
     )
   ) {
     throw invalidWorkflowRoleTaskResponse()
+  }
+  return response
+}
+
+function requireWorkflowWorkbenchQuery(params = {}) {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    throw new TypeError('工作台查询条件有误，请刷新后重试')
+  }
+  if (
+    Object.keys(params).some(
+      (key) => !WORKFLOW_WORKBENCH_QUERY_KEYS.has(key)
+    ) ||
+    !WORKFLOW_WORKBENCH_QUEUE_KEYS.has(params.queue_key) ||
+    !Number.isSafeInteger(params.limit) ||
+    params.limit < 1 ||
+    params.limit > 50 ||
+    !Number.isSafeInteger(params.offset) ||
+    params.offset < 0
+  ) {
+    throw new TypeError('工作台查询条件有误，请刷新后重试')
+  }
+  return {
+    queue_key: params.queue_key,
+    limit: params.limit,
+    offset: params.offset,
+  }
+}
+
+function invalidWorkflowWorkbenchResponse() {
+  return Object.assign(new Error('工作台内容暂时无法确认，请稍后重试'), {
+    isInvalidResponse: true,
+  })
+}
+
+function requireWorkflowWorkbenchResponse(result, query) {
+  const response = dataOf(result)
+  const responseKeys =
+    response && typeof response === 'object' && !Array.isArray(response)
+      ? Object.keys(response).sort()
+      : []
+  const countKeys =
+    response?.counts &&
+    typeof response.counts === 'object' &&
+    !Array.isArray(response.counts)
+      ? Object.keys(response.counts).sort()
+      : []
+  const itemIDs = Array.isArray(response?.items)
+    ? response.items.map((task) => task?.id)
+    : []
+  const queueTotal = response?.counts?.[query.queue_key]
+  const availableOnPage = Math.max(0, Number(queueTotal || 0) - query.offset)
+  if (
+    responseKeys.length !== WORKFLOW_WORKBENCH_RESPONSE_KEYS.length ||
+    !responseKeys.every(
+      (key, index) => key === WORKFLOW_WORKBENCH_RESPONSE_KEYS[index]
+    ) ||
+    countKeys.length !== WORKFLOW_WORKBENCH_COUNT_KEYS.length ||
+    !countKeys.every(
+      (key, index) => key === WORKFLOW_WORKBENCH_COUNT_KEYS[index]
+    ) ||
+    WORKFLOW_WORKBENCH_COUNT_KEYS.some(
+      (key) =>
+        !Number.isSafeInteger(response?.counts?.[key]) ||
+        response.counts[key] < 0
+    ) ||
+    response.queue_key !== query.queue_key ||
+    response.limit !== query.limit ||
+    response.offset !== query.offset ||
+    !Number.isSafeInteger(response.snapshot_at) ||
+    response.snapshot_at <= 0 ||
+    !Number.isSafeInteger(response.total) ||
+    response.total < 0 ||
+    response.total !== queueTotal ||
+    !Array.isArray(response.items) ||
+    response.items.length > query.limit ||
+    response.items.length !== Math.min(query.limit, availableOnPage) ||
+    new Set(itemIDs).size !== itemIDs.length ||
+    response.items.some(
+      (task) =>
+        !task ||
+        typeof task !== 'object' ||
+        Array.isArray(task) ||
+        !Number.isSafeInteger(task.id) ||
+        task.id <= 0 ||
+        !Number.isSafeInteger(task.version) ||
+        task.version <= 0 ||
+        !['ready', 'blocked'].includes(task.task_status_key) ||
+        (query.queue_key === 'actionable' &&
+          task.task_status_key !== 'ready') ||
+        (query.queue_key === 'approval' && !isWorkflowApprovalTask(task))
+    )
+  ) {
+    throw invalidWorkflowWorkbenchResponse()
   }
   return response
 }
@@ -472,8 +585,14 @@ export async function listAllWorkflowWorkbenchRoleTasks(params = {}) {
   return listAllWorkflowRoleTaskPages('list_workbench_role_tasks', params)
 }
 
-export async function getWorkflowTaskBoard(params = {}) {
-  const result = await workflowRpc.call('get_task_board', params)
+export async function getWorkflowWorkbench(params = {}, options = {}) {
+  const query = requireWorkflowWorkbenchQuery(params)
+  const result = await workflowRpc.call('get_workbench', query, options)
+  return requireWorkflowWorkbenchResponse(result, query)
+}
+
+export async function getWorkflowTaskBoard(params = {}, options = {}) {
+  const result = await workflowRpc.call('get_task_board', params, options)
   return requireWorkflowTaskBoardResponse(dataOf(result), params)
 }
 

@@ -45,12 +45,45 @@ test('product core summary keeps status text outside numeric metric values', () 
   assert.match(source, /<Tag>尚未连接客户环境<\/Tag>/u)
 })
 
-test('desktop workbench uses its dedicated role-task read projection', () => {
-  assert.match(source, /response:\s*await listAllWorkflowWorkbenchRoleTasks\(/u)
+test('desktop workbench uses one bounded server projection for counts and the active page', () => {
+  assert.match(
+    source,
+    /const workbenchResult = await getWorkflowWorkbench\(workbenchRequest,/u
+  )
+  assert.match(source, /queue_key:\s*workbenchQueueKey/u)
+  assert.match(source, /limit:\s*WORKBENCH_QUEUE_PAGE_SIZE/u)
+  assert.match(
+    source,
+    /offset:\s*\(workbenchQueuePage - 1\) \* WORKBENCH_QUEUE_PAGE_SIZE/u
+  )
+  assert.match(source, /counts:\s*workbenchResult\.counts/u)
   assert.doesNotMatch(source, /<WorkflowTaskOverview/u)
   assert.doesNotMatch(source, /当前可见任务概览/u)
+  assert.doesNotMatch(source, /listAllWorkflowWorkbenchRoleTasks/u)
   assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)
   assert.doesNotMatch(source, /\blistWorkflowRoleTasks\b/u)
+})
+
+test('desktop workbench renders its page shell before the bounded task read finishes', () => {
+  assert.match(
+    source,
+    /className="erp-dashboard-card erp-workbench-command-card"\s*variant="borderless"\s*>/u
+  )
+  assert.doesNotMatch(
+    source,
+    /erp-workbench-command-card"[\s\S]{0,120}loading=\{loading\}/u
+  )
+  assert.match(source, /aria-busy=\{loading\}/u)
+  assert.match(source, /loading=\{\{ spinning: loading, delay: 120 \}\}/u)
+  assert.match(source, /message="工作台任务加载失败"/u)
+  assert.match(source, />\s*重新加载\s*</u)
+})
+
+test('workbench pagination keeps settled rows mounted while the next page loads', () => {
+  assert.match(
+    source,
+    /current\?\.scopeKey === requestWorkbenchScopeKey\s*&&\s*current\?\.response\?\.queue_key === workbenchRequest\.queue_key\s*\? current\.response\s*:\s*null/u
+  )
 })
 
 test('workbench keeps the explicit view button and opens plain rows on double-click', () => {

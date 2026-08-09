@@ -9,6 +9,7 @@ import {
   FileSearchOutlined,
   FileTextOutlined,
   HomeOutlined,
+  HistoryOutlined,
   InboxOutlined,
   LogoutOutlined,
   MenuOutlined,
@@ -124,6 +125,7 @@ const navIconRegistry = {
   'print-center': <PrinterOutlined />,
   'permission-center': <SettingOutlined />,
   'system-audit-logs': <FileSearchOutlined />,
+  'history-records': <HistoryOutlined />,
   'help-center': <QuestionCircleOutlined />,
 }
 
@@ -238,6 +240,7 @@ const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   '/erp/print-center',
   '/erp/system/permissions',
   '/erp/system/audit-logs',
+  '/erp/history',
   '/erp/help-center',
 ])
 const LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS = new Set([
@@ -632,6 +635,13 @@ export default function ERPLayout() {
         .filter((section) => section.items.length > 0),
     [visibleSections]
   )
+  const visibleMenuPaths = useMemo(
+    () =>
+      permissionGovernedVisibleSections.flatMap((section) =>
+        (section.items || []).map((item) => item.path).filter(Boolean)
+      ),
+    [permissionGovernedVisibleSections]
+  )
 
   const effectiveSessionDiagnostic = useMemo(
     () =>
@@ -864,6 +874,7 @@ export default function ERPLayout() {
     () => ({
       adminProfile,
       allowedMenuPaths,
+      visibleMenuPaths,
       profileSyncCompleted,
       registerPageLeaveGuard,
       registerPageRefresh,
@@ -872,6 +883,7 @@ export default function ERPLayout() {
     [
       adminProfile,
       allowedMenuPaths,
+      visibleMenuPaths,
       profileSyncCompleted,
       registerPageLeaveGuard,
       registerPageRefresh,

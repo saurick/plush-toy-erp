@@ -35,6 +35,8 @@ type Shipment struct {
 	CustomerSnapshot *string `json:"customer_snapshot,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// Version holds the value of the "version" field.
+	Version int `json:"version,omitempty"`
 	// FinanceReleaseStatus holds the value of the "finance_release_status" field.
 	FinanceReleaseStatus string `json:"finance_release_status,omitempty"`
 	// FinanceReleaseVersion holds the value of the "finance_release_version" field.
@@ -135,7 +137,7 @@ func (*Shipment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case shipment.FieldTotalNetWeightG, shipment.FieldRequestedTotalNetWeightG:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
-		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldReworkIntakeID, shipment.FieldCustomerID, shipment.FieldFinanceReleaseVersion, shipment.FieldFinanceReleasedBy, shipment.FieldFinanceReleaseProcessInstanceID, shipment.FieldFinanceReleaseProcessNodeID:
+		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldReworkIntakeID, shipment.FieldCustomerID, shipment.FieldVersion, shipment.FieldFinanceReleaseVersion, shipment.FieldFinanceReleasedBy, shipment.FieldFinanceReleaseProcessInstanceID, shipment.FieldFinanceReleaseProcessNodeID:
 			values[i] = new(sql.NullInt64)
 		case shipment.FieldShipmentNo, shipment.FieldPurpose, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldFinanceReleaseStatus, shipment.FieldFinanceReleaseNote, shipment.FieldIdempotencyKey, shipment.FieldNote:
 			values[i] = new(sql.NullString)
@@ -207,6 +209,12 @@ func (_m *Shipment) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case shipment.FieldVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field version", values[i])
+			} else if value.Valid {
+				_m.Version = int(value.Int64)
 			}
 		case shipment.FieldFinanceReleaseStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -392,6 +400,9 @@ func (_m *Shipment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Version))
 	builder.WriteString(", ")
 	builder.WriteString("finance_release_status=")
 	builder.WriteString(_m.FinanceReleaseStatus)

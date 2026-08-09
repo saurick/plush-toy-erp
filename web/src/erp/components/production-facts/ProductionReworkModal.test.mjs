@@ -7,6 +7,20 @@ const source = readFileSync(
   'utf8'
 )
 
+test('production rework edit changes only number, quantity, time and reason', () => {
+  assert.match(source, /mode = 'create'/u)
+  assert.match(source, /编辑返工草稿/u)
+  assert.match(source, /保存草稿/u)
+  assert.match(
+    source,
+    /editing \? 'production_rework_edit' : 'production_rework_create'/u
+  )
+  for (const field of ['fact_no', 'quantity', 'occurred_at', 'reason']) {
+    assert.match(source, new RegExp(`name="${field}"`, 'u'))
+  }
+  assert.doesNotMatch(source, /name="source_id"/u)
+})
+
 test('production rework modal shows a read-only business source summary', () => {
   for (const copy of [
     '原完工记录',

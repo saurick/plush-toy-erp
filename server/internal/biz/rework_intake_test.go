@@ -72,6 +72,47 @@ func TestNormalizeReworkIntakeCreateRejectsInvalidOrDuplicateQuantityIntent(t *t
 	}
 }
 
+func TestNormalizeReworkIntakeDraftSaveCanonicalizesEditableAggregate(t *testing.T) {
+	note := "  改用新的返工说明  "
+	input := ReworkIntakeDraftSave{
+		ID:               9,
+		ExpectedVersion:  3,
+		IntakeNo:         "  HCF-EDIT-001  ",
+		SourceShipmentID: 7,
+		Reason:           "  客户要求重新返工  ",
+		Items: []ReworkIntakeItemCreate{
+			{SourceShipmentItemID: 22, TargetProductionOrderItemID: 202, Quantity: decimal.NewFromInt(2), Note: &note},
+			{SourceShipmentItemID: 11, TargetProductionOrderItemID: 101, Quantity: decimal.NewFromInt(1)},
+		},
+	}
+
+	normalized, err := normalizeReworkIntakeDraftSave(input)
+	if err != nil {
+		t.Fatalf("normalize rework intake draft save: %v", err)
+	}
+	if normalized.IntakeNo != "HCF-EDIT-001" || normalized.Reason != "客户要求重新返工" ||
+		normalized.Items[0].SourceShipmentItemID != 11 || normalized.Items[1].Note == nil || *normalized.Items[1].Note != "改用新的返工说明" {
+		t.Fatalf("normalized draft save = %#v", normalized)
+	}
+	if input.Items[0].SourceShipmentItemID != 22 || *input.Items[0].Note != "  改用新的返工说明  " {
+		t.Fatalf("caller aggregate was mutated: %#v", input)
+	}
+
+	for name, mutate := range map[string]func(*ReworkIntakeDraftSave){
+		"missing id":               func(candidate *ReworkIntakeDraftSave) { candidate.ID = 0 },
+		"missing expected version": func(candidate *ReworkIntakeDraftSave) { candidate.ExpectedVersion = 0 },
+		"missing items":            func(candidate *ReworkIntakeDraftSave) { candidate.Items = nil },
+	} {
+		t.Run(name, func(t *testing.T) {
+			candidate := input
+			mutate(&candidate)
+			if _, err := normalizeReworkIntakeDraftSave(candidate); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("error=%v, want ErrBadParam", err)
+			}
+		})
+	}
+}
+
 func TestNormalizeProductionReworkFromIntakeCreateCanonicalizesTime(t *testing.T) {
 	local := time.Date(2026, 8, 5, 10, 20, 30, 987654321, time.FixedZone("UTC+8", 8*60*60))
 	normalized, err := normalizeProductionReworkFromIntakeCreate(ProductionReworkFromIntakeCreate{

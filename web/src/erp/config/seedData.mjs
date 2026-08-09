@@ -78,6 +78,14 @@ const navItemRegistry = {
     shortLabel: '审计',
     description: '只读查看系统管理操作记录。',
   },
+  'history-records': {
+    key: 'history-records',
+    label: '历史记录中心',
+    path: '/erp/history',
+    shortLabel: '历史',
+    description: '只读查询有权查看的已关闭、已取消、已归档和已停用记录。',
+    access: 'authenticated',
+  },
   'help-center': {
     key: 'help-center',
     label: '岗位使用帮助',
@@ -140,6 +148,11 @@ export function getProductCoreNavigationSections() {
 
 export function getAuthenticatedNavigationSections() {
   return [
+    {
+      key: 'history',
+      title: '历史查询',
+      items: [navItemRegistry['history-records']],
+    },
     {
       key: 'help',
       title: '使用帮助',

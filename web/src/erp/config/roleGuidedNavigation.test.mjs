@@ -34,6 +34,44 @@ const sections = [
   },
 ]
 
+test('roleGuidedNavigation: 历史查询和帮助均为保留工具，只追加到更多功能末尾', () => {
+  const result = buildRoleGuidedNavigation({
+    visibleSections: [
+      ...sections.slice(0, 1),
+      {
+        title: '历史查询',
+        items: [
+          {
+            key: 'history-records',
+            path: '/erp/history',
+            access: 'authenticated',
+          },
+        ],
+      },
+      ...sections.slice(1),
+    ],
+    adminProfile: {
+      roles: [
+        {
+          role_key: 'sales',
+          navigation_mode: 'custom',
+          primary_menu_paths: ['/erp/history'],
+          secondary_menu_paths: [],
+        },
+      ],
+    },
+  })
+
+  assert.equal(
+    result.primaryItems.some((item) => item.path === '/erp/history'),
+    false
+  )
+  assert.deepEqual(
+    result.secondaryItems.slice(-2).map((item) => item.path),
+    ['/erp/history', '/erp/help-center']
+  )
+})
+
 test('roleGuidedNavigation: 看板统一前置，常用只保留三个业务且帮助进入更多功能', () => {
   const result = buildRoleGuidedNavigation({
     visibleSections: sections,

@@ -65,6 +65,21 @@ export const RECEIPT_GATE_WEB_SUBSTEP_LABELS = Object.freeze({
   production_build: "Web 生产构建",
   production_boundary: "DEV 与生产隔离检查",
 });
+export const RECEIPT_GATE_SHARED_SUBSTEP_LABELS = Object.freeze({
+  repository_guards: "仓库与生成物守卫",
+  node_tests: "Scripts Node 合同测试",
+  script_boundaries: "脚本与私有化边界",
+  customer_config: "客户配置合同",
+});
+export const RECEIPT_GATE_PARALLEL_STAGE_IDS = Object.freeze([
+  "shared",
+  "web",
+  "server",
+]);
+const RECEIPT_GATE_SUBSTEP_LABELS = Object.freeze({
+  shared: RECEIPT_GATE_SHARED_SUBSTEP_LABELS,
+  web: RECEIPT_GATE_WEB_SUBSTEP_LABELS,
+});
 const MAX_CAPTURE_BYTES = 512 * 1024 * 1024;
 
 export function parseGateStageEvent(line) {
@@ -96,16 +111,13 @@ export function parseGateStageEvent(line) {
   });
 }
 
-export function parseGateSubstepEvent(line) {
+export function parseGateTimingSubstepEvent(line) {
   const match =
     /^\[qa:substep\] gate=(full|strict) stage=([a-z][a-z0-9_]{1,63}) id=([a-z][a-z0-9_]{1,63}) status=(running|passed|failed)(?: durationMs=(\d+))?$/u.exec(
       String(line || "").trim(),
     );
-  if (
-    !match ||
-    match[2] !== "web" ||
-    !Object.hasOwn(RECEIPT_GATE_WEB_SUBSTEP_LABELS, match[3])
-  ) {
+  const labels = RECEIPT_GATE_SUBSTEP_LABELS[match?.[2]];
+  if (!match || !labels || !Object.hasOwn(labels, match[3])) {
     return null;
   }
   const terminal = match[4] !== "running";
@@ -126,8 +138,45 @@ export function parseGateSubstepEvent(line) {
     gate: match[1],
     stage: match[2],
     id: match[3],
-    label: RECEIPT_GATE_WEB_SUBSTEP_LABELS[match[3]],
+    label: labels[match[3]],
     status: match[4],
+    durationMs,
+  });
+}
+
+export function parseGateSubstepEvent(line) {
+  const event = parseGateTimingSubstepEvent(line);
+  return event?.stage === "web" ? event : null;
+}
+
+export function parseGateParallelEvent(line) {
+  const match =
+    /^\[qa:parallel\] gate=(full|strict) ids=([a-z][a-z0-9_]{1,63}(?:,[a-z][a-z0-9_]{1,63})+) status=(running|passed|failed)(?: durationMs=(\d+))?$/u.exec(
+      String(line || "").trim(),
+    );
+  if (!match) return null;
+  const stageIds = match[2].split(",");
+  if (stageIds.join(",") !== RECEIPT_GATE_PARALLEL_STAGE_IDS.join(",")) {
+    return null;
+  }
+  const terminal = match[3] !== "running";
+  if (
+    (terminal && match[4] === undefined) ||
+    (!terminal && match[4] !== undefined)
+  ) {
+    return null;
+  }
+  const durationMs = terminal ? Number(match[4]) : null;
+  if (
+    durationMs !== null &&
+    (!Number.isSafeInteger(durationMs) || durationMs < 0)
+  ) {
+    return null;
+  }
+  return Object.freeze({
+    gate: match[1],
+    stageIds: Object.freeze(stageIds),
+    status: match[3],
     durationMs,
   });
 }
@@ -136,37 +185,91 @@ export function parseGateStageTimings(output, gate) {
   if (!Object.hasOwn(RECEIPT_GATE_STAGE_IDS, gate)) {
     return Object.freeze({
       stageTimings: Object.freeze([]),
+      substepTimings: Object.freeze([]),
+      parallelStageGroups: Object.freeze([]),
       measuredStageDurationMs: 0,
+      observedCriticalPathDurationMs: 0,
       bottleneckStageId: "",
     });
   }
   const stageTimings = [];
-  const seen = new Set();
+  const substepTimings = [];
+  const parallelStageGroups = [];
+  const seenStages = new Set();
+  const seenSubsteps = new Set();
   for (const line of String(output).split(/\r?\n/u)) {
     const event = parseGateStageEvent(line);
-    if (!event || event.gate !== gate || event.status === "running") continue;
-    if (seen.has(event.id)) {
-      throw new Error(`duplicate QA stage timing: ${event.id}`);
+    if (event && event.gate === gate && event.status !== "running") {
+      if (seenStages.has(event.id)) {
+        throw new Error(`duplicate QA stage timing: ${event.id}`);
+      }
+      seenStages.add(event.id);
+      stageTimings.push(
+        Object.freeze({
+          id: event.id,
+          label: event.label,
+          status: event.status,
+          durationMs: event.durationMs,
+        }),
+      );
     }
-    seen.add(event.id);
-    stageTimings.push(
-      Object.freeze({
-        id: event.id,
-        label: event.label,
-        status: event.status,
-        durationMs: event.durationMs,
-      }),
-    );
+    const substep = parseGateTimingSubstepEvent(line);
+    if (substep && substep.gate === gate && substep.status !== "running") {
+      const key = `${substep.stage}:${substep.id}`;
+      if (seenSubsteps.has(key)) {
+        throw new Error(`duplicate QA substep timing: ${key}`);
+      }
+      seenSubsteps.add(key);
+      substepTimings.push(
+        Object.freeze({
+          stage: substep.stage,
+          id: substep.id,
+          label: substep.label,
+          status: substep.status,
+          durationMs: substep.durationMs,
+        }),
+      );
+    }
+    const parallel = parseGateParallelEvent(line);
+    if (parallel && parallel.gate === gate && parallel.status !== "running") {
+      if (parallelStageGroups.length > 0) {
+        throw new Error("duplicate QA parallel stage timing");
+      }
+      parallelStageGroups.push(
+        Object.freeze({
+          stageIds: parallel.stageIds,
+          status: parallel.status,
+          durationMs: parallel.durationMs,
+        }),
+      );
+    }
   }
   const bottleneck = [...stageTimings].sort(
     (left, right) => right.durationMs - left.durationMs,
   )[0];
+  const measuredStageDurationMs = stageTimings.reduce(
+    (total, stage) => total + stage.durationMs,
+    0,
+  );
+  const parallelStageIds = new Set(
+    parallelStageGroups.flatMap((group) => group.stageIds),
+  );
+  const observedCriticalPathDurationMs =
+    parallelStageGroups.length === 0
+      ? measuredStageDurationMs
+      : stageTimings
+          .filter((stage) => !parallelStageIds.has(stage.id))
+          .reduce((total, stage) => total + stage.durationMs, 0) +
+        parallelStageGroups.reduce(
+          (total, group) => total + group.durationMs,
+          0,
+        );
   return Object.freeze({
     stageTimings: Object.freeze(stageTimings),
-    measuredStageDurationMs: stageTimings.reduce(
-      (total, stage) => total + stage.durationMs,
-      0,
-    ),
+    substepTimings: Object.freeze(substepTimings),
+    parallelStageGroups: Object.freeze(parallelStageGroups),
+    measuredStageDurationMs,
+    observedCriticalPathDurationMs,
     bottleneckStageId: bottleneck?.id || "",
   });
 }
@@ -179,6 +282,17 @@ export function hasCompleteGateStageTimings(gate, stageTimings) {
   return (
     expected.every((stage) => actual.has(stage)) &&
     stageTimings.every((stage) => stage.status === "passed")
+  );
+}
+
+export function hasCompleteGateParallelTiming(gate, parallelStageGroups) {
+  if (gate === "fast") return true;
+  return (
+    Array.isArray(parallelStageGroups) &&
+    parallelStageGroups.length === 1 &&
+    parallelStageGroups[0].status === "passed" &&
+    parallelStageGroups[0].stageIds.join(",") ===
+      RECEIPT_GATE_PARALLEL_STAGE_IDS.join(",")
   );
 }
 
@@ -248,6 +362,7 @@ export function evaluateReceiptGateRun({
   childStatus,
   childError,
   identityMatches = true,
+  parallelTimingComplete = true,
   stageTimingComplete = true,
   summary,
 }) {
@@ -255,6 +370,7 @@ export function evaluateReceiptGateRun({
   const proofComplete =
     childPassed &&
     identityMatches &&
+    parallelTimingComplete &&
     stageTimingComplete &&
     summary.executed > 0 &&
     summary.passed === summary.executed &&
@@ -345,6 +461,10 @@ export async function runReceiptGate({
     gate,
     stageMetrics.stageTimings,
   );
+  const parallelTimingComplete = hasCompleteGateParallelTiming(
+    gate,
+    stageMetrics.parallelStageGroups,
+  );
   const currentRepository = await readRepositoryIdentity(repoRoot);
   const identityMatches = repositoryIdentitiesEqual(
     expectedRepository,
@@ -358,6 +478,7 @@ export async function runReceiptGate({
         : null),
     childStatus: childResult.status,
     identityMatches,
+    parallelTimingComplete,
     stageTimingComplete,
     summary,
   });
@@ -367,6 +488,9 @@ export async function runReceiptGate({
   }
   if (!stageTimingComplete) {
     notProven.push("required stage timing evidence is incomplete");
+  }
+  if (!parallelTimingComplete) {
+    notProven.push("required parallel stage timing evidence is incomplete");
   }
   if (captureOverflow) {
     notProven.push("gate output exceeded the bounded receipt capture");
@@ -394,6 +518,11 @@ export async function runReceiptGate({
         : []),
       ...(stageTimingComplete
         ? ["all required gate stages emitted timing evidence"]
+        : []),
+      ...(parallelTimingComplete
+        ? [
+            "independent shared, Web and Server stages ran as one observed group",
+          ]
         : []),
     ],
   });

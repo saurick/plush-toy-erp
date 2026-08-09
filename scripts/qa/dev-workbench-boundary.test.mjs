@@ -178,8 +178,15 @@ test("dev workbench boundary: Node serve bridges are centralized outside browser
     );
   }
 
+  const viteConfig = read("web/vite.shared.mjs");
   assert.match(
-    read("web/vite.shared.mjs"),
+    viteConfig,
+    /const DEV_WORKBENCH_PLUGIN_MODULE = '\.\/dev-server\/devWorkbenchPlugins\.mjs'/u,
+  );
+  assert.match(viteConfig, /await import\(DEV_WORKBENCH_PLUGIN_MODULE\)/u);
+  assert.match(viteConfig, /isDev && command === 'serve'/u);
+  assert.doesNotMatch(
+    viteConfig,
     /from '\.\/dev-server\/devWorkbenchPlugins\.mjs'/u,
   );
 });

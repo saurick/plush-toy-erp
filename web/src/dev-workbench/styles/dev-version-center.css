@@ -177,8 +177,17 @@
   margin: 0;
 }
 
-.erp-dev-timing-bars__label > .ant-typography:last-child {
+.erp-dev-timing-bars__meta > .ant-typography:last-child {
   flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.erp-dev-timing-bars__meta {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
   white-space: nowrap;
 }
 
@@ -276,14 +285,28 @@
   margin-top: 18px;
 }
 
+.erp-dev-pipeline-timing__analysis {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
 .erp-dev-pipeline-timing__critical-path {
   display: grid;
   gap: 4px;
   padding: 12px 14px;
-  margin-bottom: 14px;
   border-left: 3px solid var(--ant-color-primary, #1677ff);
   border-radius: 0 8px 8px 0;
   background: var(--ant-color-primary-bg, #e6f4ff);
+}
+
+.erp-dev-pipeline-timing__slowest-heading,
+.erp-dev-pipeline-timing__jobs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .erp-dev-pipeline-timing__details > summary {
@@ -296,16 +319,28 @@
   color: var(--ant-color-primary, #1677ff);
 }
 
+.erp-dev-pipeline-timing__details > summary::before,
+.erp-dev-pipeline-timing__jobs > details > summary::before {
+  content: '▸';
+  margin-right: 6px;
+  transition: transform 160ms ease;
+}
+
+.erp-dev-pipeline-timing__details[open] > summary::before,
+.erp-dev-pipeline-timing__jobs > details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.erp-dev-pipeline-timing__jobs-toolbar {
+  padding: 6px 0 12px;
+}
+
 .erp-dev-pipeline-timing__jobs {
   display: grid;
   gap: 16px;
-  margin-top: 16px;
 }
 
-.erp-dev-pipeline-timing__jobs article {
-  display: grid;
-  gap: 12px;
-  padding: 14px;
+.erp-dev-pipeline-timing__jobs > details {
   border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
   border-radius: 10px;
 }
@@ -325,8 +360,23 @@
   color: var(--ant-color-primary, #1677ff);
 }
 
+.erp-dev-pipeline-timing__jobs > details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  cursor: pointer;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.erp-dev-pipeline-timing__job-steps {
+  padding: 4px 14px 14px;
+}
+
+.erp-dev-receipt-card__timings > summary:focus-visible,
 .erp-dev-pipeline-timing__details > summary:focus-visible,
-.erp-dev-receipt-card__timings > summary:focus-visible {
+.erp-dev-pipeline-timing__jobs > details > summary:focus-visible {
   border-radius: 6px;
   outline: 2px solid var(--ant-color-primary, #1677ff);
   outline-offset: 2px;
@@ -348,7 +398,7 @@
   background: rgba(22, 119, 255, 0.2);
 }
 
-:root[data-erp-theme='dark'] .erp-dev-pipeline-timing__jobs article {
+:root[data-erp-theme='dark'] .erp-dev-pipeline-timing__jobs > details {
   border-color: rgba(255, 255, 255, 0.16);
 }
 
@@ -390,6 +440,12 @@
     align-items: flex-start;
   }
 
+  .erp-dev-timing-bars__meta {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+  }
+
   .erp-dev-operation-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -422,5 +478,10 @@
 
   .erp-dev-version-table-card .ant-card-extra {
     white-space: normal;
+  }
+
+  .erp-dev-pipeline-timing__jobs-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

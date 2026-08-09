@@ -32,19 +32,17 @@ RUN --mount=type=cache,id=plush-npm,target=/root/.npm,sharing=locked \
 COPY web/src ./src
 COPY web/public ./public
 COPY web/index.html ./
-# Vite config and its committed build-time dependency graph move together.
-# dev-server is copied only into this builder because Vite resolves its
-# serve-only plugin factory while loading the shared config; the runtime image
-# still receives only the generated static build.
+# Vite config and its committed production dependency graph move together.
+# DEV-only workbench plugins are dynamically loaded only for development serve,
+# so release builds do not copy their broad scripts/deploy dependency graph.
 COPY web/*.mjs ./
-COPY web/dev-server ./dev-server
-COPY web/scripts ./scripts
 COPY web/tailwind.config.js ./
 COPY web/postcss.config.js ./
 COPY config /config
 # CI 已生成并校验 committed error-code projection；Node-only builder 不安装 Go。
-# scripts 仅用于在构建产物中叠加已登记的客户 Web 配置。
-COPY scripts /scripts
+# 生产 Vite 配置只读取端口/API 规范；客户配置叠加只需要一个构建脚本。
+COPY scripts/dev-ports.mjs scripts/local-runtime-preflight-core.mjs /scripts/
+COPY scripts/build/apply-customer-web-config.mjs /scripts/build/apply-customer-web-config.mjs
 ARG ERP_CUSTOMER_PACKAGE=
 RUN pnpm run build:committed && \
     node /scripts/build/apply-customer-web-config.mjs \
@@ -71,7 +69,7 @@ ENV PROXY_TIMEOUT_MS=30000
 WORKDIR /app
 
 COPY --from=web-builder /web/build ./build
-COPY --from=web-builder /web/scripts/serveStaticApp.mjs ./scripts/serveStaticApp.mjs
+COPY web/scripts/serveStaticApp.mjs ./scripts/serveStaticApp.mjs
 
 USER node
 

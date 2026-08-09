@@ -52,6 +52,41 @@ test('production completion choices reserve both posted facts and existing draft
   assert.match(choices[0].label, /剩余 4 件/u)
 })
 
+test('production completion edit excludes only the current draft from the available cap', () => {
+  const choices = buildProductionCompletionChoices(
+    [
+      {
+        id: 11,
+        planned_quantity: '10',
+        product_name_snapshot: '玩偶熊',
+        unit_name_snapshot: '件',
+      },
+    ],
+    [
+      {
+        id: 21,
+        fact_type: 'FINISHED_GOODS_RECEIPT',
+        source_type: 'PRODUCTION_ORDER',
+        source_line_id: 11,
+        status: 'DRAFT',
+        quantity: '2',
+      },
+      {
+        id: 22,
+        fact_type: 'FINISHED_GOODS_RECEIPT',
+        source_type: 'PRODUCTION_ORDER',
+        source_line_id: 11,
+        status: 'DRAFT',
+        quantity: '3',
+      },
+    ],
+    null,
+    { excludeFactID: 21 }
+  )
+  assert.equal(choices[0].draft, '3')
+  assert.equal(choices[0].remaining, '7')
+})
+
 test('production completion is capped by accepted packaging WIP before planned quantity', () => {
   const [choice] = buildProductionCompletionChoices(
     [

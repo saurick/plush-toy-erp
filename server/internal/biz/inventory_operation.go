@@ -29,6 +29,7 @@ var (
 	ErrInventoryOperationNotFound        = errors.New("inventory operation not found")
 	ErrInventoryOperationVersionConflict = errors.New("inventory operation version conflict")
 	ErrInventoryOperationStaleCount      = errors.New("inventory cycle count expected quantity is stale")
+	ErrInventoryOperationSaveOwner       = errors.New("only the inventory operation creator can edit it")
 	ErrInventoryOperationSubmitOwner     = errors.New("only the inventory operation creator can submit it")
 	ErrInventoryOperationSelfApproval    = errors.New("inventory operation creator cannot decide it")
 	ErrInventoryOperationCancelOwner     = errors.New("only the inventory operation creator or poster can cancel it")
@@ -92,6 +93,23 @@ type InventoryOperationMutation struct {
 	Reason                       string
 }
 
+type InventoryOperationDraftSave struct {
+	ID              int
+	ExpectedVersion int
+	ActorID         int
+	OperationNo     string
+	Reason          string
+	Items           []InventoryOperationDraftItemSave
+}
+
+type InventoryOperationDraftItemSave struct {
+	ID                 int
+	CountedQuantity    *decimal.Decimal
+	AdjustmentQuantity decimal.Decimal
+	ToWarehouseID      *int
+	Note               *string
+}
+
 type InventoryOperationFilter struct {
 	OperationType string
 	Status        string
@@ -111,6 +129,10 @@ type InventoryOperationRepo interface {
 	ListInventoryOperationsForAccess(context.Context, InventoryOperationFilter, WarehouseDataScope) ([]*InventoryOperation, int, error)
 }
 
+type InventoryOperationDraftSaveRepo interface {
+	SaveInventoryOperationDraft(context.Context, *InventoryOperationDraftSave) (*InventoryOperation, error)
+}
+
 func (uc *InventoryUsecase) CreateInventoryOperation(ctx context.Context, in *InventoryOperationCreate) (*InventoryOperation, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -124,6 +146,21 @@ func (uc *InventoryUsecase) CreateInventoryOperation(ctx context.Context, in *In
 		return nil, err
 	}
 	return repo.CreateInventoryOperation(ctx, n, hash)
+}
+
+func (uc *InventoryUsecase) SaveInventoryOperationDraft(ctx context.Context, in *InventoryOperationDraftSave, actorID int) (*InventoryOperation, error) {
+	if uc == nil || uc.repo == nil || in == nil || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := any(uc.repo).(InventoryOperationDraftSaveRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeInventoryOperationDraftSave(in, actorID)
+	if err != nil {
+		return nil, err
+	}
+	return repo.SaveInventoryOperationDraft(ctx, normalized)
 }
 func (uc *InventoryUsecase) SubmitInventoryOperation(ctx context.Context, in *InventoryOperationMutation) (*InventoryOperation, error) {
 	if !validInventoryOperationMutation(uc, in) {
@@ -285,6 +322,33 @@ func normalizeInventoryOperationCreate(in *InventoryOperationCreate) (*Inventory
 	}
 	sum := sha256.Sum256(payload)
 	return &o, hex.EncodeToString(sum[:]), nil
+}
+
+func normalizeInventoryOperationDraftSave(in *InventoryOperationDraftSave, actorID int) (*InventoryOperationDraftSave, error) {
+	o := *in
+	o.ActorID = actorID
+	o.OperationNo = strings.TrimSpace(o.OperationNo)
+	o.Reason = strings.TrimSpace(o.Reason)
+	if o.ID <= 0 || o.ExpectedVersion <= 0 || o.OperationNo == "" || len([]rune(o.OperationNo)) > 64 || o.Reason == "" || len([]rune(o.Reason)) > 255 || len(o.Items) == 0 {
+		return nil, ErrBadParam
+	}
+	o.Items = append([]InventoryOperationDraftItemSave(nil), o.Items...)
+	seen := make(map[int]struct{}, len(o.Items))
+	for index := range o.Items {
+		item := &o.Items[index]
+		item.Note = normalizeOptionalString(item.Note)
+		if item.ID <= 0 || (item.CountedQuantity != nil && item.CountedQuantity.IsNegative()) {
+			return nil, ErrBadParam
+		}
+		if item.ToWarehouseID != nil && *item.ToWarehouseID <= 0 {
+			return nil, ErrBadParam
+		}
+		if _, exists := seen[item.ID]; exists {
+			return nil, ErrBadParam
+		}
+		seen[item.ID] = struct{}{}
+	}
+	return &o, nil
 }
 
 func validInventoryOperationMutation(uc *InventoryUsecase, in *InventoryOperationMutation) bool {

@@ -13,6 +13,7 @@ import {
   createDevQualityGateMiddleware,
   createDevQualityGatePlugin,
   createDevQualityGateService,
+  resolveDevQualityGateEnvironment,
   validateDevQualityGateAction,
   validateDevQualityGateCancel,
 } from './devQualityGatePlugin.mjs'
@@ -126,7 +127,7 @@ test('quality gate action accepts only fixed full or strict intent', () => {
   }
 })
 
-test('quality gate command uses only the formal receipt runner', () => {
+test('quality gate command uses only fixed formal runners', () => {
   assert.deepEqual(
     buildDevQualityGateCommand({
       environment: DATABASE_ENV,
@@ -136,8 +137,148 @@ test('quality gate command uses only the formal receipt runner', () => {
     }).args,
     ['scripts/qa/run-gate-with-receipt.mjs', '--gate', 'strict']
   )
+  const managed = buildDevQualityGateCommand({
+    environment: {
+      ...DATABASE_ENV,
+      DISPOSABLE_DATABASE_BASE_URL: 'must-not-leak',
+    },
+    environmentMode: 'managed',
+    nodeRuntime: '/pinned/node',
+    operationId: ID,
+    profile: 'full',
+    projectRoot: '/repo',
+  })
+  assert.deepEqual(managed.args, [
+    'scripts/qa/run-gate-with-managed-database.mjs',
+    '--gate',
+    'full',
+    '--operation-id',
+    ID,
+  ])
+  assert.equal(
+    Object.hasOwn(managed.env, 'DISPOSABLE_DATABASE_BASE_URL'),
+    false
+  )
   assert.equal(QUALITY_GATE_TIMEOUT_MS.full, 90 * 60 * 1000)
   assert.equal(QUALITY_GATE_TIMEOUT_MS.strict, 180 * 60 * 1000)
+})
+
+test('quality gate environment prefers an explicit loopback base and otherwise probes managed Docker', async () => {
+  let probes = 0
+  const explicit = await resolveDevQualityGateEnvironment({
+    env: DATABASE_ENV,
+    probeManagedDatabase: () => {
+      probes += 1
+      return { ready: true, message: 'must not run' }
+    },
+  })
+  assert.equal(explicit.mode, 'explicit')
+  assert.equal(explicit.disposableDatabaseReady, true)
+  assert.equal(probes, 0)
+
+  const managed = await resolveDevQualityGateEnvironment({
+    env: {},
+    projectRoot: '/repo',
+    probeManagedDatabase: ({ repoRoot }) => {
+      probes += 1
+      assert.equal(repoRoot, '/repo')
+      return { ready: true, message: '运行时自动创建并清理隔离数据库' }
+    },
+  })
+  assert.equal(managed.mode, 'managed')
+  assert.equal(managed.disposableDatabaseReady, true)
+  assert.equal(probes, 1)
+
+  const bounded = await resolveDevQualityGateEnvironment({
+    env: {},
+    probeManagedDatabase: () => ({ ready: true, message: 'x'.repeat(201) }),
+  })
+  assert.equal(bounded.message, '本机托管一次性数据库环境已就绪')
+})
+
+test('quality gate managed runtime requires container and disposable database cleanup events', async (t) => {
+  const root = await project(t)
+  const completion = deferred()
+  let processSpec
+  const service = createDevQualityGateService({
+    projectRoot: root,
+    env: {},
+    probeManagedDatabase: () => ({
+      ready: true,
+      message: '运行时自动创建并清理隔离数据库',
+    }),
+    randomOperationId: () => ID,
+    readRepositoryState: async () => REPOSITORY,
+    readReceipt: () => formalReceipt('strict'),
+    resolveNodeRuntime: () => '/pinned/node',
+    processGroupAlive: () => false,
+    launchProcess(spec) {
+      processSpec = spec
+      return {
+        pid: 43219,
+        completion: completion.promise,
+        killGroup() {},
+      }
+    },
+    now: () => new Date('2026-08-09T10:00:02.000Z'),
+  })
+  await service.act({
+    action: 'run',
+    payload: {
+      profile: 'strict',
+      idempotencyKey: `quality-gate:strict:${ID}`,
+    },
+  })
+  assert.equal(
+    processSpec.args[0],
+    'scripts/qa/run-gate-with-managed-database.mjs'
+  )
+  processSpec.onLine('[qa:stage] gate=strict id=server status=running')
+  processSpec.onLine(
+    '[disposable-database] status=passed run=fixture cleanup=complete report=redacted'
+  )
+  processSpec.onLine('[qa:managed-database] status=cleanup-complete')
+  completion.resolve({ code: 0, signal: '' })
+  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise((resolve) => setImmediate(resolve))
+  const finished = service.readOperation(ID)
+  assert.equal(finished.status, 'passed')
+  assert.equal(finished.cleanup.status, 'complete')
+  assert.match(finished.cleanup.message, /托管容器/u)
+})
+
+test('quality gate managed runtime refuses a formal pass without container cleanup readback', async (t) => {
+  const root = await project(t)
+  const completion = deferred()
+  const service = createDevQualityGateService({
+    projectRoot: root,
+    env: {},
+    probeManagedDatabase: () => ({ ready: true, message: 'ready' }),
+    randomOperationId: () => ID,
+    readRepositoryState: async () => REPOSITORY,
+    readReceipt: () => formalReceipt('full'),
+    resolveNodeRuntime: () => '/pinned/node',
+    processGroupAlive: () => false,
+    launchProcess: () => ({
+      pid: 43220,
+      completion: completion.promise,
+      killGroup() {},
+    }),
+  })
+  await service.act({
+    action: 'run',
+    payload: {
+      profile: 'full',
+      idempotencyKey: `quality-gate:full:${ID}`,
+    },
+  })
+  completion.resolve({ code: 0, signal: '' })
+  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise((resolve) => setImmediate(resolve))
+  const finished = service.readOperation(ID)
+  assert.equal(finished.status, 'failed')
+  assert.equal(finished.cleanup.status, 'failed')
+  assert.match(finished.cleanup.message, /托管容器/u)
 })
 
 test('quality gate service streams stages, persists formal proof and releases the lock', async (t) => {
@@ -196,6 +337,37 @@ test('quality gate service streams stages, persists formal proof and releases th
   assert.equal(summary.proofs.strict.current, true)
   assert.equal(summary.proofs.strict.releaseEligible, false)
   assert.match(summary.status.title, /未提交改动/u)
+  assert.deepEqual(
+    summary.profiles.strict.stages.find((stage) => stage.id === 'web'),
+    {
+      id: 'web',
+      label: 'Web 测试与生产构建',
+      parallel: true,
+    }
+  )
+  assert.deepEqual(summary.profiles.strict.substeps.shared, [
+    { id: 'repository_guards', label: '仓库与生成物守卫' },
+    { id: 'node_tests', label: 'Scripts Node 合同测试' },
+    { id: 'script_boundaries', label: '脚本与私有化边界' },
+    { id: 'customer_config', label: '客户配置合同' },
+  ])
+  assert.deepEqual(summary.profiles.strict.substeps.web, [
+    { id: 'eslint', label: 'JavaScript 静态检查' },
+    { id: 'stylelint', label: '样式静态检查' },
+    { id: 'web_test', label: 'Web 自动化测试' },
+    { id: 'production_build', label: 'Web 生产构建' },
+    { id: 'production_boundary', label: 'DEV 与生产隔离检查' },
+  ])
+  assert.deepEqual(Object.keys(summary.profiles.strict), [
+    'timeoutMs',
+    'stages',
+    'substeps',
+  ])
+  for (const substeps of Object.values(summary.profiles.strict.substeps)) {
+    for (const substep of substeps) {
+      assert.deepEqual(Object.keys(substep), ['id', 'label'])
+    }
+  }
 })
 
 test('quality gate preserves the first failed fixed Web substep', async (t) => {
@@ -249,10 +421,7 @@ test('quality gate preserves the first failed fixed Web substep', async (t) => {
 
   const finished = service.readOperation(ID)
   assert.equal(finished.status, 'failed')
-  assert.equal(
-    finished.firstFailure,
-    'Web 测试与生产构建：Web 生产构建未通过'
-  )
+  assert.equal(finished.firstFailure, 'Web 测试与生产构建：Web 生产构建未通过')
   assert.doesNotMatch(finished.firstFailure, /\/|command|environment/iu)
   assert.equal(finished.cleanup.status, 'complete')
 })
@@ -484,6 +653,10 @@ test('quality gate service blocks missing database readiness and concurrent prof
     env: {},
     randomOperationId: () => ID,
     readRepositoryState: async () => REPOSITORY,
+    probeManagedDatabase: () => ({
+      ready: false,
+      message: 'Docker runtime unavailable',
+    }),
   })
   await assert.rejects(
     () =>
@@ -585,6 +758,34 @@ test('quality gate summary reuses only a passed receipt for the current clean SH
   assert.equal(summary.proofs.strict.releaseEligible, true)
   assert.equal(summary.proofs.strict.reused, true)
   assert.equal(summary.status.tone, 'success')
+})
+
+test('quality gate summary keeps current proof authoritative when rerun environment is unavailable', async (t) => {
+  const root = await project(t)
+  const cleanRepository = {
+    ...REPOSITORY,
+    dirty: false,
+    fingerprint: 'd'.repeat(64),
+  }
+  const passedReceipt = {
+    ...formalReceipt('strict'),
+    treeState: 'clean',
+  }
+  const service = createDevQualityGateService({
+    projectRoot: root,
+    env: {},
+    probeManagedDatabase: () => ({
+      ready: false,
+      message: '本机 Docker 服务尚未就绪',
+    }),
+    readRepositoryState: async () => cleanRepository,
+    readReceipt: (profile) => (profile === 'strict' ? passedReceipt : null),
+  })
+
+  const summary = await service.summary()
+  assert.equal(summary.environment.disposableDatabaseReady, false)
+  assert.equal(summary.status.tone, 'success')
+  assert.match(summary.status.title, /当前版本已通过/u)
 })
 
 test('quality gate recovery stops an orphaned process group and then fails closed', async (t) => {

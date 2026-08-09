@@ -80,6 +80,49 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		}
 		item, err := d.operationalFactUC.CreateProductionReworkFromCompletion(ctx, in)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
+	case "save_production_material_issue_draft",
+		"save_production_completion_draft",
+		"save_production_rework_from_completion_draft",
+		"save_production_rework_from_intake_draft":
+		in, ok := productionFactDraftSaveFromParams(pm, method)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		var permission string
+		var modules []string
+		var save func(context.Context, *biz.ProductionFactDraftSave) (*biz.ProductionFact, error)
+		switch method {
+		case "save_production_material_issue_draft":
+			permission = biz.PermissionProductionMaterialIssueCreate
+			modules = []string{"production", "production_orders"}
+			save = d.operationalFactUC.SaveProductionMaterialIssueDraft
+		case "save_production_completion_draft":
+			permission = biz.PermissionProductionCompletionCreate
+			modules = []string{"production", "production_orders"}
+			save = d.operationalFactUC.SaveProductionCompletionDraft
+		case "save_production_rework_from_completion_draft":
+			permission = biz.PermissionProductionReworkCreate
+			modules = []string{"production", "production_orders", "quality_inspections", workflowModuleKeyTasks}
+			save = d.operationalFactUC.SaveProductionReworkFromCompletionDraft
+		case "save_production_rework_from_intake_draft":
+			permission = biz.PermissionProductionReworkCreate
+			modules = []string{"rework_intakes", "production", "production_orders", "quality_inspections", workflowModuleKeyTasks}
+			save = d.operationalFactUC.SaveProductionReworkFromIntakeDraft
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
+			return id, res, nil
+		}
+		item, err := save(ctx, in)
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "post_production_fact":
 		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version") {
 			return id, invalidParamResult(), nil
@@ -277,6 +320,41 @@ func productionReworkFromCompletionCreateFromParams(pm map[string]any) (*biz.Pro
 		IdempotencyKey:         getString(pm, "idempotency_key"),
 		OccurredAt:             optionalTimeValue(occurredAt),
 		Reason:                 getString(pm, "reason"),
+	}, true
+}
+
+func productionFactDraftSaveFromParams(pm map[string]any, method string) (*biz.ProductionFactDraftSave, bool) {
+	rework := method == "save_production_rework_from_completion_draft" || method == "save_production_rework_from_intake_draft"
+	if rework {
+		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "fact_no", "quantity", "occurred_at", "reason") {
+			return nil, false
+		}
+	} else {
+		keys := []string{"customer_key", "id", "expected_version", "warehouse_id", "lot_id", "quantity", "occurred_at", "note"}
+		if method == "save_production_completion_draft" {
+			keys = append(keys, "new_lot_no")
+		}
+		if !productionCompletionAllowsOnly(pm, keys...) {
+			return nil, false
+		}
+	}
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
+	if !ok {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok || occurredAt == nil {
+		return nil, false
+	}
+	note := getWorkflowStringPtr(pm, "note")
+	if rework {
+		note = getWorkflowStringPtr(pm, "reason")
+	}
+	return &biz.ProductionFactDraftSave{
+		ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0),
+		FactNo: getString(pm, "fact_no"), WarehouseID: getInt(pm, "warehouse_id", 0),
+		LotID: getOptionalInt(pm, "lot_id"), NewLotNo: getWorkflowStringPtr(pm, "new_lot_no"),
+		Quantity: quantity, OccurredAt: optionalTimeValue(occurredAt), Note: note,
 	}, true
 }
 

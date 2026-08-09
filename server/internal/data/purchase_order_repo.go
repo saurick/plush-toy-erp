@@ -107,6 +107,12 @@ func (r *purchaseOrderRepo) ListPurchaseOrders(ctx context.Context, filter biz.P
 	}
 	if filter.LifecycleStatus != "" {
 		query = query.Where(purchaseorder.LifecycleStatus(filter.LifecycleStatus))
+	} else if statuses := biz.LifecycleStatusesForScope(
+		filter.LifecycleScope,
+		[]string{biz.PurchaseOrderStatusDraft, biz.PurchaseOrderStatusSubmitted, biz.PurchaseOrderStatusApproved},
+		[]string{biz.PurchaseOrderStatusClosed, biz.PurchaseOrderStatusCanceled},
+	); len(statuses) > 0 {
+		query = query.Where(purchaseorder.LifecycleStatusIn(statuses...))
 	}
 	if filter.DateField != "" {
 		query = applyPurchaseOrderDateRange(query, filter)

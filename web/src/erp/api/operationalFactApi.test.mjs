@@ -13,6 +13,22 @@ test('operationalFactApi: uses dedicated operational fact JSON-RPC domain and ad
   assert.match(source, /authScope:\s*AUTH_SCOPE\.ADMIN/)
 })
 
+test('operationalFactApi: exposes validated production and outsourcing draft save commands', () => {
+  for (const exported of [
+    'saveProductionMaterialIssueDraft',
+    'saveProductionCompletionDraft',
+    'saveProductionReworkFromCompletionDraft',
+    'saveProductionReworkFromIntakeDraft',
+    'saveOutsourcingMaterialIssueDraft',
+    'saveOutsourcingReturnReceiptDraft',
+  ]) {
+    assert.match(source, new RegExp(`export async function ${exported}`, 'u'))
+  }
+  assert.match(source, /normalizeProductionFactDraftSaveRequest/u)
+  assert.match(source, /normalizeOutsourcingFactDraftSaveRequest/u)
+  assert.match(source, /validateOperationalFactDraftSaveResult/u)
+})
+
 test('operationalFactApi: exposes production, outsourcing, shipment, reservation and finance methods', () => {
   for (const methodName of [
     'list_production_facts',
@@ -36,6 +52,7 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'list_shipments',
     'list_shipment_source_candidates',
     'create_shipment_with_items',
+    'save_shipment_draft',
     'ship_shipment',
     'cancel_shipment',
     'list_stock_reservations',
@@ -51,6 +68,7 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'list_rework_intake_source_candidates',
     'list_rework_intakes',
     'create_rework_intake',
+    'save_rework_intake_draft',
     'receive_rework_intake',
     'cancel_rework_intake',
     'reverse_rework_intake',
@@ -156,7 +174,11 @@ test('operationalFactApi: shipment source candidates use the typed server contra
 test('operationalFactApi: rework intake candidates keep source and production target identity', () => {
   assert.match(
     source,
-    /id:\s*`\$\{Number\(item\?\.source_shipment_item_id[\s\S]*?\$\{Number\([\s\S]*?item\?\.target_production_order_item_id/u
+    /function reworkIntakeSourceCandidateIdentityKey[\s\S]*?source_shipment_item_id[\s\S]*?target_production_order_item_id/u
+  )
+  assert.match(
+    source,
+    /listAllReworkIntakeSourceCandidates[\s\S]*?recordIdentityKey:\s*reworkIntakeSourceCandidateIdentityKey[\s\S]*?id:\s*reworkIntakeSourceCandidateIdentityKey\(item\)/u
   )
 })
 

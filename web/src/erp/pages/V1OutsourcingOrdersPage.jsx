@@ -45,6 +45,7 @@ import {
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
+import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import OutsourcingOrderForm, {
   materialLabel,
   productLabel,
@@ -86,6 +87,8 @@ import {
   cancelOutsourcingFact,
   listAllOutsourcingFacts,
   postOutsourcingFact,
+  saveOutsourcingMaterialIssueDraft,
+  saveOutsourcingReturnReceiptDraft,
 } from '../api/operationalFactApi.mjs'
 import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import {
@@ -208,9 +211,25 @@ import {
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
+import {
+  LIFECYCLE_SCOPE,
+  filterLifecycleStatusOptions,
+  lifecycleScopeFromSearchParams,
+  lifecycleScopeIncludesStatus,
+  withLifecycleScopeSearchParam,
+} from '../utils/lifecycleScope.mjs'
+import {
+  OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS,
+  buildOperationalFactDraftSavePayload,
+  findOperationalFactDraftSaveResult,
+  operationalFactDraftFormValues,
+} from '../utils/operationalFactDraftEdit.mjs'
 
 const EMPTY_SOURCE_FACT_CONTEXT = Object.freeze({
+  mode: 'create',
   actionType: '',
+  record: null,
+  initialValues: null,
   order: null,
   item: null,
   lots: [],
@@ -243,6 +262,9 @@ export default function V1OutsourcingOrdersPage() {
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [keyword, setKeyword] = useState('')
+  const [lifecycleScope, setLifecycleScope] = useState(() =>
+    lifecycleScopeFromSearchParams(searchParams)
+  )
   const [statusFilter, setStatusFilter] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
   const [dateField, setDateField] = useState('order_date')
@@ -279,6 +301,15 @@ export default function V1OutsourcingOrdersPage() {
   const [dispositionSourceFact, setDispositionSourceFact] = useState(null)
   const [financeSourceFact, setFinanceSourceFact] = useState(null)
   const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
+  const lifecycleStatusOptions = useMemo(
+    () =>
+      filterLifecycleStatusOptions(
+        OUTSOURCING_ORDER_STATUS_OPTIONS,
+        lifecycleScope,
+        ['closed', 'canceled']
+      ),
+    [lifecycleScope]
+  )
   const sourceFactRequestRef = useRef(0)
   const sourceFactInFlightRef = useRef(false)
   const sourceFactAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
@@ -446,6 +477,7 @@ export default function V1OutsourcingOrdersPage() {
       }),
       supplier_id: supplierFilter || undefined,
       lifecycle_status: statusFilter,
+      lifecycle_scope: lifecycleScope,
       date_field: dateField,
       date_from: dateRange?.[0] || undefined,
       date_to: dateRange?.[1] || undefined,
@@ -457,6 +489,7 @@ export default function V1OutsourcingOrdersPage() {
     dateRange,
     keyword,
     linkedKeyword,
+    lifecycleScope,
     routeOutsourcingFactID,
     routeOutsourcingOrderID,
     sortValue,
@@ -491,11 +524,7 @@ export default function V1OutsourcingOrdersPage() {
         { signal }
       )
     },
-    [
-      canReadOutsourcingFacts,
-      routeOutsourcingFactID,
-      routeOutsourcingOrderID,
-    ]
+    [canReadOutsourcingFacts, routeOutsourcingFactID, routeOutsourcingOrderID]
   )
 
   const loadOrders = useCallback(async () => {
@@ -811,11 +840,7 @@ export default function V1OutsourcingOrdersPage() {
         }
 
         const confirmed = currentFacts.find((item) =>
-          matchesOperationalFactLifecycleResult(
-            item,
-            attempt,
-            expectedStatus
-          )
+          matchesOperationalFactLifecycleResult(item, attempt, expectedStatus)
         )
         if (!confirmed) {
           message.warning(
@@ -1200,7 +1225,10 @@ export default function V1OutsourcingOrdersPage() {
           return
         }
         setSourceFactContext({
+          mode: 'create',
           actionType,
+          record: null,
+          initialValues: null,
           order,
           item,
           lots: filterOutsourcingSourceActionLots(
@@ -1227,6 +1255,108 @@ export default function V1OutsourcingOrdersPage() {
       }
     },
     [loadRelatedOutsourcingFacts]
+  )
+
+  const openOutsourcingFactDraftEditor = useCallback(
+    async (fact) => {
+      const factType = String(fact?.fact_type || '').toUpperCase()
+      const actionType =
+        factType === 'MATERIAL_ISSUE'
+          ? OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+          : factType === 'RETURN_RECEIPT'
+            ? OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+            : ''
+      const allowed =
+        actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+          ? canCreateMaterialIssue
+          : actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
+            ? canCreateReturnReceipt
+            : false
+      if (!allowed || fact?.status !== 'DRAFT' || !returnRecordsOrder?.id) {
+        message.warning('当前委外草稿状态或权限已变化，请刷新后重试')
+        return
+      }
+      const requestID = sourceFactRequestRef.current + 1
+      sourceFactRequestRef.current = requestID
+      setSourceFactLoading(true)
+      try {
+        const exactData = await listAllOutsourcingFacts({
+          keyword: String(fact.id),
+        })
+        if (sourceFactRequestRef.current !== requestID) return
+        const fresh = (exactData?.outsourcing_facts || []).find(
+          (item) => Number(item?.id || 0) === Number(fact.id)
+        )
+        if (
+          !fresh ||
+          fresh.status !== 'DRAFT' ||
+          String(fresh.source_type || '').toUpperCase() !==
+            'OUTSOURCING_ORDER' ||
+          Number(fresh.source_id || 0) !== Number(returnRecordsOrder.id)
+        ) {
+          message.warning('委外草稿状态或来源已变化，请刷新后重试')
+          return
+        }
+        const [order, itemData, lotData, facts, warehouseData] =
+          await Promise.all([
+            getOutsourcingOrder({ id: Number(fresh.source_id) }),
+            listAllOutsourcingOrderItems({
+              outsourcing_order_id: Number(fresh.source_id),
+              expected_version: Number(returnRecordsOrder.version),
+            }),
+            listAllInventoryLots({
+              subject_type: fresh.subject_type,
+              subject_id: fresh.subject_id,
+              ...(Number(fresh.product_sku_id || 0) > 0
+                ? { product_sku_id: Number(fresh.product_sku_id) }
+                : {}),
+              status: 'ACTIVE',
+            }),
+            loadRelatedOutsourcingFacts(fresh.source_id),
+            listAllWarehouses({ active_only: true }),
+          ])
+        if (sourceFactRequestRef.current !== requestID) return
+        const itemRows = Array.isArray(itemData?.outsourcing_order_items)
+          ? itemData.outsourcing_order_items
+          : Array.isArray(itemData)
+            ? itemData
+            : []
+        const item = itemRows.find(
+          (entry) => Number(entry?.id || 0) === Number(fresh.source_line_id)
+        )
+        if (!order || !item) throw new Error('委外来源明细已变化')
+        setSourceFactContext({
+          mode: 'edit',
+          actionType,
+          record: fresh,
+          initialValues: operationalFactDraftFormValues(fresh),
+          order,
+          item,
+          lots: filterOutsourcingSourceActionLots(
+            actionType,
+            item,
+            lotData?.inventory_lots
+          ),
+          facts,
+        })
+        setWarehouses(warehouseData?.warehouses || [])
+        setSourceFactOpen(true)
+      } catch (error) {
+        if (sourceFactRequestRef.current === requestID) {
+          message.error(getActionErrorMessage(error, '加载委外草稿'))
+        }
+      } finally {
+        if (sourceFactRequestRef.current === requestID) {
+          setSourceFactLoading(false)
+        }
+      }
+    },
+    [
+      canCreateMaterialIssue,
+      canCreateReturnReceipt,
+      loadRelatedOutsourcingFacts,
+      returnRecordsOrder,
+    ]
   )
 
   const closeOutsourcingSourceFact = useCallback(() => {
@@ -1405,7 +1535,7 @@ export default function V1OutsourcingOrdersPage() {
       ) {
         return
       }
-      const { actionType, order, item, facts } = sourceFactContext
+      const { actionType, order, item, facts, mode, record } = sourceFactContext
       const canCreateAction =
         actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
           ? canCreateMaterialIssue
@@ -1414,6 +1544,55 @@ export default function V1OutsourcingOrdersPage() {
             : false
       if (!canCreateAction) {
         message.warning('当前账号没有办理该委外业务的权限')
+        return
+      }
+
+      if (mode === 'edit') {
+        const action =
+          actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+            ? OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_MATERIAL_ISSUE
+            : OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.OUTSOURCING_RETURN_RECEIPT
+        let request
+        try {
+          request = {
+            ...buildOperationalFactDraftSavePayload(action, values, record),
+            ...(activeCustomerKey ? { customer_key: activeCustomerKey } : {}),
+          }
+        } catch (error) {
+          message.error(getActionErrorMessage(error, '准备委外草稿'))
+          return
+        }
+        const save =
+          actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
+            ? saveOutsourcingMaterialIssueDraft
+            : saveOutsourcingReturnReceiptDraft
+        sourceFactInFlightRef.current = true
+        setSourceFactLoading(true)
+        try {
+          try {
+            await save(request, record)
+          } catch (error) {
+            if (!isSourceBusinessActionResultUnknown(error)) throw error
+            const currentFacts = await loadRelatedOutsourcingFacts(order.id)
+            const confirmed = findOperationalFactDraftSaveResult(
+              currentFacts,
+              request,
+              record,
+              action
+            )
+            if (!confirmed) throw error
+          }
+          const refreshed = await loadRelatedOutsourcingFacts(order.id)
+          setRelatedReturnFacts(refreshed)
+          setSourceFactOpen(false)
+          setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
+          message.success('委外草稿已保存，请核对后再过账')
+        } catch (error) {
+          message.error(getActionErrorMessage(error, '保存委外草稿'))
+        } finally {
+          sourceFactInFlightRef.current = false
+          setSourceFactLoading(false)
+        }
         return
       }
 
@@ -2175,27 +2354,37 @@ export default function V1OutsourcingOrdersPage() {
       linkedKeyword ||
       routeOutsourcingOrderID ||
       routeOutsourcingFactID ||
+      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
       statusFilter ||
       supplierFilter ||
       dateRange?.[0] ||
       dateRange?.[1]
   )
-  const clearRouteContext = useCallback(() => {
-    const nextParams = clearLinkedDocumentParams(searchParams)
-    nextParams.delete('outsourcing_order_id')
-    nextParams.delete('outsourcing_fact_id')
-    setSearchParams(nextParams, { replace: true })
-    setResolvedLinkedContext({ routeKey: '', keyword: '' })
-    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
-  }, [searchParams, setSearchParams])
+  const clearRouteContext = useCallback(
+    (resetScope = false) => {
+      const nextParams = clearLinkedDocumentParams(searchParams)
+      nextParams.delete('outsourcing_order_id')
+      nextParams.delete('outsourcing_fact_id')
+      setSearchParams(
+        resetScope
+          ? withLifecycleScopeSearchParam(nextParams, LIFECYCLE_SCOPE.CURRENT)
+          : nextParams,
+        { replace: true }
+      )
+      setResolvedLinkedContext({ routeKey: '', keyword: '' })
+      setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+    },
+    [searchParams, setSearchParams]
+  )
   const clearFilters = useCallback(() => {
     setKeyword('')
+    setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
     setStatusFilter('')
     setSupplierFilter('')
     setDateField('order_date')
     setDateRange([null, null])
     setPagination((current) => ({ ...current, current: 1 }))
-    clearRouteContext()
+    clearRouteContext(true)
   }, [clearRouteContext])
 
   const selectedWorkflowTasks = useMemo(
@@ -2236,8 +2425,7 @@ export default function V1OutsourcingOrdersPage() {
       ),
     selectionReason: '请先选择一条加工合同',
     busyReason: '当前合同操作完成后可继续办理',
-    getUnavailableReason: (action) =>
-      `当前加工合同状态不能${action.label}`,
+    getUnavailableReason: (action) => `当前加工合同状态不能${action.label}`,
   })
   const {
     showPrimarySlot: showLifecyclePrimary,
@@ -2302,10 +2490,33 @@ export default function V1OutsourcingOrdersPage() {
                 loadOrders()
               }}
             />
+            <LifecycleScopeFilter
+              value={lifecycleScope}
+              onChange={(nextScope) => {
+                setLifecycleScope(nextScope)
+                if (
+                  !lifecycleScopeIncludesStatus(nextScope, statusFilter, [
+                    'closed',
+                    'canceled',
+                  ])
+                ) {
+                  setStatusFilter('')
+                }
+                const nextParams = clearLinkedDocumentParams(searchParams)
+                nextParams.delete('outsourcing_order_id')
+                nextParams.delete('outsourcing_fact_id')
+                setSearchParams(
+                  withLifecycleScopeSearchParam(nextParams, nextScope),
+                  { replace: true }
+                )
+                setResolvedLinkedContext({ routeKey: '', keyword: '' })
+                setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+              }}
+            />
             <SelectFilter
               className="erp-business-filter-control--status"
               value={statusFilter}
-              options={OUTSOURCING_ORDER_STATUS_OPTIONS}
+              options={lifecycleStatusOptions}
               onChange={(value) => {
                 setStatusFilter(value)
                 setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
@@ -2595,6 +2806,9 @@ export default function V1OutsourcingOrdersPage() {
 
       <OutsourcingOrderSourceFactModal
         open={sourceFactOpen}
+        mode={sourceFactContext.mode}
+        initialValues={sourceFactContext.initialValues}
+        record={sourceFactContext.record}
         actionType={sourceFactContext.actionType}
         order={sourceFactContext.order}
         item={sourceFactContext.item}
@@ -2614,6 +2828,8 @@ export default function V1OutsourcingOrdersPage() {
         actionLoading={returnRecordActionLoading}
         canPostFact={canPostOutsourcingFact}
         canCancelFact={canCancelOutsourcingFact}
+        canEditMaterialIssue={canCreateMaterialIssue}
+        canEditReturnReceipt={canCreateReturnReceipt}
         canCreateQualityInspection={canCreateQualityInspection}
         canViewQualityInspection={canOpenQualityInspection}
         canViewDisposition={canReadOutsourcingFacts}
@@ -2623,6 +2839,7 @@ export default function V1OutsourcingOrdersPage() {
         onCancel={closeRelatedReturnRecords}
         onPostFact={postSelectedOutsourcingFact}
         onCancelFact={cancelSelectedOutsourcingFact}
+        onEditFact={openOutsourcingFactDraftEditor}
         onCreateQualityInspection={openOutsourcingReturnQualityInspection}
         onViewQualityInspection={viewOutsourcingReturnQualityInspection}
         onViewDisposition={openOutsourcingReturnDisposition}

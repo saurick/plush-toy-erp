@@ -115,6 +115,20 @@ func (_c *ShipmentCreate) SetNillableStatus(v *string) *ShipmentCreate {
 	return _c
 }
 
+// SetVersion sets the "version" field.
+func (_c *ShipmentCreate) SetVersion(v int) *ShipmentCreate {
+	_c.mutation.SetVersion(v)
+	return _c
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableVersion(v *int) *ShipmentCreate {
+	if v != nil {
+		_c.SetVersion(*v)
+	}
+	return _c
+}
+
 // SetFinanceReleaseStatus sets the "finance_release_status" field.
 func (_c *ShipmentCreate) SetFinanceReleaseStatus(v string) *ShipmentCreate {
 	_c.mutation.SetFinanceReleaseStatus(v)
@@ -392,6 +406,10 @@ func (_c *ShipmentCreate) defaults() error {
 		v := shipment.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.Version(); !ok {
+		v := shipment.DefaultVersion
+		_c.mutation.SetVersion(v)
+	}
 	if _, ok := _c.mutation.FinanceReleaseStatus(); !ok {
 		v := shipment.DefaultFinanceReleaseStatus
 		_c.mutation.SetFinanceReleaseStatus(v)
@@ -461,6 +479,14 @@ func (_c *ShipmentCreate) check() error {
 	if v, ok := _c.mutation.Status(); ok {
 		if err := shipment.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Shipment.status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "Shipment.version"`)}
+	}
+	if v, ok := _c.mutation.Version(); ok {
+		if err := shipment.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Shipment.version": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.FinanceReleaseStatus(); !ok {
@@ -559,6 +585,10 @@ func (_c *ShipmentCreate) createSpec() (*Shipment, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(shipment.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.Version(); ok {
+		_spec.SetField(shipment.FieldVersion, field.TypeInt, value)
+		_node.Version = value
 	}
 	if value, ok := _c.mutation.FinanceReleaseStatus(); ok {
 		_spec.SetField(shipment.FieldFinanceReleaseStatus, field.TypeString, value)

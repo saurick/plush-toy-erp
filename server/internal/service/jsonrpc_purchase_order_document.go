@@ -83,6 +83,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 			Keyword:         getString(pm, "keyword"),
 			SupplierID:      getInt(pm, "supplier_id", 0),
 			LifecycleStatus: getString(pm, "lifecycle_status"),
+			LifecycleScope:  getString(pm, "lifecycle_scope"),
 			DateField:       getString(pm, "date_field"),
 			DateFrom:        dateFrom,
 			DateTo:          dateTo,

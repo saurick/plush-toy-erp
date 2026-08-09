@@ -80,6 +80,162 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 	return commitShipment(ctx, tx, row)
 }
 
+func (r *operationalFactRepo) SaveShipmentDraftWithItems(ctx context.Context, in *biz.ShipmentDraftSave) (*biz.Shipment, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || len(in.Items) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "shipments", in.ID, biz.ErrShipmentNotFound); err != nil {
+		return nil, err
+	}
+	current, err := tx.client.Shipment.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrShipmentNotFound
+		}
+		return nil, err
+	}
+	if current.Version != in.ExpectedVersion {
+		return nil, biz.ErrOperationalFactVersionConflict
+	}
+	if current.Status != biz.ShipmentStatusDraft || current.Purpose != biz.ShipmentPurposeSalesDelivery {
+		return nil, biz.ErrBadParam
+	}
+	if err := shipmentDraftSaveDependency(ctx, tx, current); err != nil {
+		return nil, err
+	}
+
+	resolved, err := lockAndResolveShipmentSalesOrderSource(ctx, tx, &biz.ShipmentCreate{
+		ShipmentNo:       in.ShipmentNo,
+		Purpose:          biz.ShipmentPurposeSalesDelivery,
+		SalesOrderID:     in.SalesOrderID,
+		CustomerID:       in.CustomerID,
+		CustomerSnapshot: in.CustomerSnapshot,
+		IdempotencyKey:   current.IdempotencyKey,
+		PlannedShipAt:    in.PlannedShipAt,
+		TotalNetWeightG:  in.TotalNetWeightG,
+		Note:             in.Note,
+	}, in.Items)
+	if err != nil {
+		return nil, err
+	}
+	if err := replaceShipmentDraftHeader(ctx, tx, current, resolved, in.ExpectedVersion); err != nil {
+		return nil, err
+	}
+	if err := deleteShipmentDraftItems(ctx, tx, current.ID); err != nil {
+		return nil, err
+	}
+	for _, item := range in.Items {
+		if _, err := createShipmentItem(ctx, tx.client, current.ID, resolved.SalesOrderID, item); err != nil {
+			return nil, err
+		}
+	}
+	updated, err := tx.client.Shipment.Get(ctx, current.ID)
+	if err != nil {
+		return nil, err
+	}
+	return commitShipment(ctx, tx, updated)
+}
+
+func shipmentDraftSaveDependency(ctx context.Context, tx *inventoryDBTx, row *ent.Shipment) error {
+	if tx == nil || tx.client == nil || row == nil {
+		return biz.ErrBadParam
+	}
+	if row.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusPending ||
+		row.FinanceReleaseVersion != 1 || row.FinanceReleaseProcessInstanceID != nil ||
+		row.FinanceReleaseProcessNodeID != nil || row.FinanceReleasedAt != nil {
+		return biz.ErrShipmentDraftDependency
+	}
+	hasProcess, err := tx.client.ProcessInstance.Query().Where(
+		processinstance.ProcessKey(biz.ProcessKeyFinishedGoodsDelivery),
+		processinstance.BusinessRefType("shipment"),
+		processinstance.BusinessRefID(row.ID),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasProcess {
+		return biz.ErrShipmentDraftDependency
+	}
+	hasInspection, err := tx.client.QualityInspection.Query().Where(
+		qualityinspection.SourceType(biz.QualityInspectionSourceShipment),
+		qualityinspection.SourceID(row.ID),
+		qualityinspection.StatusNEQ(biz.QualityInspectionStatusCancelled),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasInspection {
+		return biz.ErrShipmentDraftDependency
+	}
+	if _, err := getSourceWorkflowTaskWithClient(ctx, tx.client, biz.WorkflowSourceTaskShipmentReleaseGroup, row.ID); err == nil {
+		return biz.ErrShipmentDraftDependency
+	} else if !errors.Is(err, biz.ErrWorkflowTaskNotFound) {
+		return err
+	}
+	return nil
+}
+
+func replaceShipmentDraftHeader(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	current *ent.Shipment,
+	in *biz.ShipmentCreate,
+	expectedVersion int,
+) error {
+	if tx == nil || tx.sqlTx == nil || current == nil || in == nil {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 11)
+	query := fmt.Sprintf(`UPDATE shipments SET shipment_no = %s, sales_order_id = %s, customer_id = %s, customer_snapshot = %s, planned_ship_at = %s, total_net_weight_g = %s, requested_total_net_weight_g = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10])
+	result, err := tx.sqlTx.ExecContext(
+		ctx,
+		query,
+		in.ShipmentNo,
+		optionalIntSQLValue(in.SalesOrderID),
+		optionalIntSQLValue(in.CustomerID),
+		optionalStringSQLValue(in.CustomerSnapshot),
+		optionalTimeSQLValue(in.PlannedShipAt),
+		optionalDecimalSQLValue(in.TotalNetWeightG),
+		optionalDecimalSQLValue(in.TotalNetWeightG),
+		optionalStringSQLValue(in.Note),
+		time.Now(),
+		current.ID,
+		expectedVersion,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return biz.ErrOperationalFactVersionConflict
+	}
+	return nil
+}
+
+func deleteShipmentDraftItems(ctx context.Context, tx *inventoryDBTx, shipmentID int) error {
+	if tx == nil || tx.sqlTx == nil || shipmentID <= 0 {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 1)
+	_, err := tx.sqlTx.ExecContext(ctx, fmt.Sprintf(`DELETE FROM shipment_items WHERE shipment_id = %s`, p[0]), shipmentID)
+	return err
+}
+
+func optionalTimeSQLValue(value *time.Time) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
 func canonicalSalesDeliveryShipmentCreateIntent(in *biz.ShipmentCreate) (*biz.ShipmentCreate, error) {
 	if in == nil {
 		return nil, biz.ErrBadParam
@@ -1814,7 +1970,7 @@ func entShipmentToBiz(row *ent.Shipment, itemRows []*ent.ShipmentItem) *biz.Ship
 	for _, item := range itemRows {
 		items = append(items, entShipmentItemToBiz(item))
 	}
-	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, Purpose: row.Purpose, SalesOrderID: row.SalesOrderID, ReworkIntakeID: row.ReworkIntakeID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, FinanceReleaseStatus: row.FinanceReleaseStatus, FinanceReleaseVersion: row.FinanceReleaseVersion, FinanceReleasedAt: row.FinanceReleasedAt, FinanceReleasedBy: row.FinanceReleasedBy, FinanceReleaseProcessInstanceID: row.FinanceReleaseProcessInstanceID, FinanceReleaseProcessNodeID: row.FinanceReleaseProcessNodeID, FinanceReleaseNote: row.FinanceReleaseNote, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, TotalNetWeightG: row.TotalNetWeightG, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
+	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, Purpose: row.Purpose, SalesOrderID: row.SalesOrderID, ReworkIntakeID: row.ReworkIntakeID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, Version: row.Version, FinanceReleaseStatus: row.FinanceReleaseStatus, FinanceReleaseVersion: row.FinanceReleaseVersion, FinanceReleasedAt: row.FinanceReleasedAt, FinanceReleasedBy: row.FinanceReleasedBy, FinanceReleaseProcessInstanceID: row.FinanceReleaseProcessInstanceID, FinanceReleaseProcessNodeID: row.FinanceReleaseProcessNodeID, FinanceReleaseNote: row.FinanceReleaseNote, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, TotalNetWeightG: row.TotalNetWeightG, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
 }
 
 func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {

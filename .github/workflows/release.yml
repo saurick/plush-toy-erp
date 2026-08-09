@@ -375,9 +375,14 @@ jobs:
           test "$WORKFLOW_SHA" = "$REQUESTED_SHA"
           test "$(git rev-parse origin/main)" = "$REQUESTED_SHA"
           node scripts/qa/exact-sha-gate.mjs --sha "$REQUESTED_SHA" --main-ref origin/main --json
-      - name: Install the pinned source-package scanner
+      - name: Install the source scanner and archive compressor
         run: |
           set -euo pipefail
+          if ! command -v zstd >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends zstd
+          fi
+          zstd --version
           archive="$RUNNER_TEMP/tool-cache/gitleaks_8.30.1_linux_x64.tar.gz"
           expected_archive_sha=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
           if [[ -f "$archive" ]] && ! echo "$expected_archive_sha  $archive" \

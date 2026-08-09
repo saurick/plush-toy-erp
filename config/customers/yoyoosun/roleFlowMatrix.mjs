@@ -57,6 +57,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "sales_order_item.read",
         "rework_intake.read",
         "rework_intake.create",
+        "rework_intake.update",
         "rework_intake.cancel",
         "production.wip.read",
         "production.packaging_material.confirm",

@@ -48,6 +48,9 @@ function actionCopy(actionType) {
 
 export default function OutsourcingOrderSourceFactModal({
   open,
+  mode = 'create',
+  initialValues = null,
+  record = null,
   actionType,
   order,
   item,
@@ -59,6 +62,7 @@ export default function OutsourcingOrderSourceFactModal({
   onSubmit,
 }) {
   const [form] = Form.useForm()
+  const editing = mode === 'edit'
   const lotSelection = Form.useWatch('lot_selection', form)
   const copy = actionCopy(actionType)
   const returnReceipt = actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
@@ -78,7 +82,11 @@ export default function OutsourcingOrderSourceFactModal({
     actionType,
     order,
     item,
-    facts
+    editing
+      ? (Array.isArray(facts) ? facts : []).filter(
+          (fact) => Number(fact?.id || 0) !== Number(record?.id || 0)
+        )
+      : facts
   )
   const sourceObject =
     String(item?.subject_type || '').toUpperCase() === 'MATERIAL'
@@ -106,20 +114,23 @@ export default function OutsourcingOrderSourceFactModal({
       : SOURCE_INBOUND_LOT_SELECTION.EXISTING
     form.resetFields()
     form.setFieldsValue({
-      warehouse_id: warehouseOptions[0]?.value,
-      lot_selection: initialLotSelection,
+      warehouse_id: initialValues?.warehouse_id || warehouseOptions[0]?.value,
+      lot_selection: initialValues?.lot_selection || initialLotSelection,
       lot_id:
-        initialLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+        initialValues?.lot_id ||
+        (initialLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
           ? lotOptions[0]?.value
-          : undefined,
-      new_lot_no: undefined,
+          : undefined),
+      new_lot_no: initialValues?.new_lot_no,
       quantity:
-        isPositiveNumeric20Scale6Units(
+        initialValues?.quantity ||
+        (isPositiveNumeric20Scale6Units(
           numeric20Scale6Units(quantitySummary.remaining)
         )
           ? quantitySummary.remaining
-          : '',
-      occurred_at: localDateTimeValue(),
+          : ''),
+      occurred_at: initialValues?.occurred_at || localDateTimeValue(),
+      note: initialValues?.note || '',
     })
   }
 
@@ -135,9 +146,9 @@ export default function OutsourcingOrderSourceFactModal({
   return (
     <Modal
       className="erp-outsourcing-source-fact-modal"
-      title={copy.title}
+      title={editing ? `编辑${copy.title}草稿` : copy.title}
       open={open}
-      okText={`确认${copy.title}`}
+      okText={editing ? '保存草稿' : `确认${copy.title}`}
       cancelText="取消"
       confirmLoading={loading}
       destroyOnHidden
@@ -146,7 +157,15 @@ export default function OutsourcingOrderSourceFactModal({
       onCancel={onCancel}
       onOk={submit}
     >
-      <Alert type="info" showIcon message={copy.alert} />
+      <Alert
+        type="info"
+        showIcon
+        message={
+          editing
+            ? '来源订单、明细、加工厂、产品或材料和单位保持不变；保存后仍是草稿。'
+            : copy.alert
+        }
+      />
       {lotOptions.length === 0 ? (
         <Alert
           type="warning"
@@ -313,7 +332,11 @@ export default function OutsourcingOrderSourceFactModal({
         >
           <Input inputMode="decimal" placeholder="填写本次办理数量" />
         </Form.Item>
-        <Form.Item name="occurred_at" label="发生时间">
+        <Form.Item
+          name="occurred_at"
+          label="发生时间"
+          rules={[{ required: true, message: '请选择发生时间' }]}
+        >
           <Input type="datetime-local" />
         </Form.Item>
         <Form.Item name="note" label="备注">

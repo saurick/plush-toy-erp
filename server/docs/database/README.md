@@ -22,11 +22,11 @@ go run ./cmd/schema-doc --write
 | 项目 | 数量 |
 | --- | ---: |
 | 应用表 | 74 |
-| 字段 | 1144 |
+| 字段 | 1145 |
 | 外键 | 152 |
 | 显式索引 | 338 |
 | 其中 partial index | 30 |
-| 命名 / 表级 CHECK | 250 |
+| 命名 / 表级 CHECK | 251 |
 
 ## 分域入口
 
@@ -95,7 +95,7 @@ go run ./cmd/schema-doc --write
 | [`purchase_rejection_dispositions`](库存与质检.md#table-purchase-rejection-dispositions) | 采购拒收处置 | 库存与质检 | Source Document / 源单据 | 保存采购 IQC 不合格后的退回供应商或要求补货处置。 |
 | [`purchase_return_items`](库存与质检.md#table-purchase-return-items) | 采购退货明细 | 库存与质检 | Source Document / 源单据 | 保存采购退货引用的原入库行、物料、仓库、批次和退货数量。 |
 | [`purchase_returns`](库存与质检.md#table-purchase-returns) | 采购退货单 | 库存与质检 | Source Document / 源单据 | 保存从采购入库或不合格质检来源退回供应商的来源单。 |
-| [`quality_inspections`](库存与质检.md#table-quality-inspections) | 质量检验 | 库存与质检 | Fact / 事实 | 保存采购、委外、客户退货或生产 WIP 的质量检查、结论和纠正链。 |
+| [`quality_inspections`](库存与质检.md#table-quality-inspections) | 质量检验 | 库存与质检 | Fact / 事实 | 保存采购、委外、出货前成品或生产 WIP 的质量检查、结论和纠正链。 |
 | [`rework_intake_items`](出货与财务.md#table-rework-intake-items) | 返工回厂明细 | 出货、返工补发与财务 | Source Document / 源单据 | 保存原出货明细、目标生产订单行、产品、SKU、接收仓库、单位、数量和接收批次来源。 |
 | [`rework_intakes`](出货与财务.md#table-rework-intakes) | 返工回厂单 | 出货、返工补发与财务 | Source Document / 源单据 | 保存已出货产品返工回厂的来源出货、客户快照、返工原因、接收状态和审计信息。 |
 | [`role_data_scopes`](账号权限与配置.md#table-role-data-scopes) | 角色数据范围 | 账号、权限与配置 | Config / 配置 | 保存角色对 warehouse 等资源的 ALL、ASSIGNED 或 NONE 数据范围。 |

@@ -7,6 +7,15 @@ const source = readFileSync(
   'utf8'
 )
 
+test('outsourcing source fact modal shares create and edit fields without unlocking source identity', () => {
+  assert.match(source, /mode = 'create'/u)
+  assert.match(source, /record = null/u)
+  assert.match(source, /编辑.*草稿/u)
+  assert.match(source, /initialValues\?\.warehouse_id/u)
+  assert.match(source, /initialValues\?\.quantity/u)
+  assert.match(source, /保存草稿/u)
+})
+
 test('outsourcing source fact modal shows a readable locked source summary', () => {
   for (const label of [
     '委外订单',

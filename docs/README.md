@@ -16,7 +16,7 @@
 | 判断这次改动先看什么、还要检查什么、最容易误判什么     | [项目治理地图](项目治理地图.md)                                                                                                 | [当前真源与交接顺序](当前真源与交接顺序.md)、[模块实施治理](product/模块实施治理.md)、[自动化测试策略](product/自动化测试策略.md)、[AGENTS.md](../AGENTS.md)     |
 | 规划下一轮产品实现                                     | [产品完成路线图](product/产品完成路线图.md)                                                                                     | [产品能力进度台账](product/产品能力进度台账.md)、[模块实施治理](product/模块实施治理.md)、对应目录 README                                                        |
 | 查数据库表、字段和约束                                 | [数据库表数据字典](../server/docs/database/README.md)                                                                           | [Ent + Atlas 说明](../server/docs/ent.md)、Ent schema、Atlas migration；目标库另做 status 与结构读回                                                             |
-| 改菜单、页面、原型或信息密度                           | [web/README.md](../web/README.md)、[产品原型资产](product/prototypes/README.md)                                                 | 对应原型 README、真实运行页、[正式产品入口与菜单配置计划](product/正式产品入口与菜单配置计划.md)                                                                 |
+| 改菜单、页面、原型或信息密度                           | [web/README.md](../web/README.md)、[菜单与正式入口合同](product/菜单与正式入口合同.md)                                          | 对应原型 README、真实运行页、菜单 / 路由 / RBAC 代码和浏览器验证                                                                                                  |
 | 改 Workflow、状态、链 / 轨迹或 Fact 边界               | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md)、[业务链与运行轨迹边界](architecture/业务链与运行轨迹边界.md) | 相关 architecture 评审、[server/README.md](../server/README.md)、usecase / schema / test                                                                         |
 | 改客户资料、导入或交付资料                             | [新增甲方客户实施流程](product/新增甲方客户实施流程.md)、[客户实例策略](product/客户实例策略.md)                                | 目标客户受控交付资料、对应脚本说明与目标环境 evidence；私密 manifest 与原件不在 Product Core                                                                     |
 | 改部署、发布或低配运行口径                             | [部署约定](部署约定.md)                                                                                                         | [server/deploy/README.md](../server/deploy/README.md)、[prod Compose README](../server/deploy/compose/prod/README.md)、[scripts/README.md](../scripts/README.md) |
@@ -24,6 +24,8 @@
 | 查全量 Markdown 在哪里                                 | [文档清单](文档清单.md)                                                                                                         | 最近目录 README、`rg` 搜索和当前代码                                                                                                                             |
 
 只改正文、措辞或局部说明时，通常不需要更新全量清单；新增、删除、重命名、重分类或改变文档职责时，必须同步更新 `docs/文档清单.md` 和最近目录 README。
+
+开发环境 `/__dev/docs` 默认只展示当前长期文档；评审资料与原型说明、历史归档分别在“评审与参考”“历史”层查看。历史正文按需加载，不参与初始全文索引。
 
 ## 文档地图 / Documentation Map
 

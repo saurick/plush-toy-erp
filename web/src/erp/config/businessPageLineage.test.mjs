@@ -221,6 +221,31 @@ test('business page lineage: declares the complete typed flow vocabulary', () =>
   ])
 })
 
+test('business page lineage: draft saves are self mutations, not record producers', () => {
+  const expected = new Map([
+    ['save_production_material_issue_draft', 'production-progress'],
+    ['save_production_completion_draft', 'production-progress'],
+    ['save_production_rework_from_completion_draft', 'production-progress'],
+    ['save_production_rework_from_intake_draft', 'production-progress'],
+    ['save_outsourcing_material_issue_draft', 'processing-contracts'],
+    ['save_outsourcing_return_receipt_draft', 'processing-contracts'],
+  ])
+  for (const [action, pageKey] of expected) {
+    const flow = businessPageFlowDefinitions.find(
+      (item) => item.action === action
+    )
+    assert.equal(flow?.flowType, BUSINESS_FLOW_TYPES.UNSCOPED_MUTATION)
+    assert.equal(flow?.fromPageKey, pageKey)
+    assert.equal(flow?.toPageKey, pageKey)
+    assert.equal(
+      businessPageLineageDefinitions.some((definition) =>
+        definition.producerActions.includes(action)
+      ),
+      false
+    )
+  }
+})
+
 test('business page lineage: flow contracts are immutable and well typed', () => {
   const knownPageKeys = new Set(formalModuleKeys)
   const knownFlowTypes = new Set(Object.values(BUSINESS_FLOW_TYPES))
@@ -506,6 +531,7 @@ test('business page lineage: producer and typed flow actions are backed by curre
     '../api/inventoryApi.mjs',
     '../api/masterDataOrderApi.mjs',
     '../api/operationalFactApi.mjs',
+    '../utils/operationalFactDraftEdit.mjs',
     '../api/productionOrderApi.mjs',
     '../api/productionWipApi.mjs',
     '../api/purchaseApi.mjs',

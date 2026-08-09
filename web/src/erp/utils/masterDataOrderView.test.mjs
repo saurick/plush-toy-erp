@@ -2033,6 +2033,27 @@ test('FL_purchase_supplier_master_selection__syncs_supplier_snapshot masterDataO
     }
   )
 
+  assert.deepEqual(
+    buildPurchaseOrderParams(
+      {
+        purchase_order_no: 'PO-SUP-EDIT-001',
+        supplier_id: '7',
+        supplier_snapshot: {},
+      },
+      {
+        id: 12,
+        supplier_snapshot: supplierSnapshot,
+      }
+    ),
+    {
+      id: 12,
+      purchase_order_no: 'PO-SUP-EDIT-001',
+      supplier_id: 7,
+      supplier_snapshot: supplierSnapshot,
+    },
+    'the save-time supplier snapshot must not be overwritten by stale form state'
+  )
+
   const processorSnapshot = buildSupplierSnapshot({
     id: 8,
     code: ' PRC-008 ',

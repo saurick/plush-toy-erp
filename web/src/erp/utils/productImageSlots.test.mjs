@@ -228,7 +228,10 @@ test('product page integrates dedicated slots without changing SKU attachment se
     /onCancel=\{\(\) => \{\s*if \(saving \|\| contactLoading\) return[\s\S]*?cancelButtonProps=\{\{ disabled: saving \|\| contactLoading \}\}[\s\S]*?closable=\{!\(saving \|\| contactLoading\)\}[\s\S]*?keyboard=\{!\(saving \|\| contactLoading\)\}/u,
     'the modal must not close while product and image writes are in flight'
   )
-  assert.match(pageSource, /<ProductImageSlots[\s\S]*?canEdit=\{canUpdate\}/u)
+  assert.match(
+    pageSource,
+    /<ProductImageSlots[\s\S]*?canEdit=\{editingRecord\?\.id \? canUpdate : canCreate\}/u
+  )
   assert.deepEqual(
     PRODUCT_IMAGE_SLOT_DEFINITIONS.map(({ label }) => label),
     ['产品图 1（主图）', '产品图 2（辅图）']

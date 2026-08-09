@@ -118,6 +118,280 @@ func (r *operationalFactRepo) CreateProductionFactDraft(ctx context.Context, in 
 	return row, err
 }
 
+func (r *operationalFactRepo) SaveProductionFactDraft(ctx context.Context, in *biz.ProductionFactDraftSave) (*biz.ProductionFact, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	preview, err := r.data.postgres.ProductionFact.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionFactNotFound
+		}
+		return nil, err
+	}
+	if preview.FactType != in.FactType || preview.SourceType == nil || *preview.SourceType != in.SourceType {
+		return nil, biz.ErrProductionOrderFactSourceInvalid
+	}
+
+	var orderID int
+	var sourcePreview *productionReworkSourceContext
+	if in.FactType == biz.ProductionFactRework {
+		sourcePreview, err = resolveProductionReworkRowSource(ctx, r.data.postgres, preview, true)
+		if err != nil {
+			return nil, err
+		}
+		orderID = sourcePreview.orderID
+	} else {
+		orderID, err = productionOrderSourceIDFromRow(preview)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "production_orders", orderID, biz.ErrProductionOrderNotFound); err != nil {
+		return nil, err
+	}
+	if in.FactType == biz.ProductionFactRework {
+		if err := lockProductionReworkDraftSource(ctx, tx, sourcePreview); err != nil {
+			return nil, err
+		}
+	} else if in.FactType == biz.ProductionFactMaterialIssue {
+		if err := lockProductionOrderMaterialIssueSource(ctx, tx, preview, orderID); err != nil {
+			return nil, err
+		}
+	} else if err := lockProductionOrderCompletionSource(ctx, tx, preview.FactType, preview.SourceLineID, preview.ProductionWipBatchID); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", in.ID, biz.ErrProductionFactNotFound); err != nil {
+		return nil, err
+	}
+	current, err := tx.client.ProductionFact.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductionFactNotFound
+		}
+		return nil, err
+	}
+	if current.Version != in.ExpectedVersion {
+		return nil, biz.ErrOperationalFactVersionConflict
+	}
+	if current.Status != biz.OperationalFactStatusDraft || current.FactType != in.FactType ||
+		current.SourceType == nil || *current.SourceType != in.SourceType {
+		return nil, biz.ErrBadParam
+	}
+
+	switch in.FactType {
+	case biz.ProductionFactMaterialIssue:
+		if err := validateProductionMaterialIssueDraftSave(ctx, tx, current, in); err != nil {
+			return nil, err
+		}
+	case biz.ProductionFactFinishedGoodsReceipt:
+		if err := validateProductionCompletionDraftSave(ctx, tx, current, in); err != nil {
+			return nil, err
+		}
+	case biz.ProductionFactRework:
+		if err := validateProductionReworkDraftSave(ctx, tx, current, in, sourcePreview); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, biz.ErrBadParam
+	}
+	if err := updateProductionFactDraft(ctx, tx, current, in); err != nil {
+		return nil, err
+	}
+	updated, err := tx.client.ProductionFact.Query().Where(productionfact.ID(in.ID)).WithPoster().WithCanceller().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return commitProductionFact(ctx, tx, updated)
+}
+
+func lockProductionReworkDraftSource(ctx context.Context, tx *inventoryDBTx, source *productionReworkSourceContext) error {
+	if tx == nil || source == nil || source.itemID <= 0 {
+		return biz.ErrProductionReworkSourceInvalid
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_order_items", source.itemID, biz.ErrProductionOrderFactSourceInvalid); err != nil {
+		return err
+	}
+	if source.sourceCompletion != nil {
+		if source.sourceCompletion.ProductionWipBatchID == nil {
+			return biz.ErrProductionReworkSourceInvalid
+		}
+		if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", *source.sourceCompletion.ProductionWipBatchID, biz.ErrProductionReworkSourceInvalid); err != nil {
+			return err
+		}
+		return lockOperationalFactRow(ctx, tx, "production_facts", source.sourceCompletion.ID, biz.ErrProductionFactNotFound)
+	}
+	if source.intake == nil || source.intakeItem == nil || source.intakeItem.ReceivedLotID == nil {
+		return biz.ErrProductionReworkSourceInvalid
+	}
+	if err := lockOperationalFactRow(ctx, tx, "rework_intakes", source.intake.ID, biz.ErrReworkIntakeNotFound); err != nil {
+		return err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "rework_intake_items", source.intakeItem.ID, biz.ErrReworkIntakeSourceInvalid); err != nil {
+		return err
+	}
+	return lockOperationalFactRow(ctx, tx, "inventory_lots", *source.intakeItem.ReceivedLotID, biz.ErrProductionReworkSourceInvalid)
+}
+
+func validateProductionMaterialIssueDraftSave(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, in *biz.ProductionFactDraftSave) error {
+	requirement, err := validateProductionOrderMaterialIssueFactRowSource(ctx, tx.client, row, true)
+	if err != nil {
+		return err
+	}
+	if err := validateProductionOrderMaterialIssueQuantity(ctx, tx.client, requirement, in.Quantity); err != nil {
+		return err
+	}
+	activeWarehouse, err := tx.client.Warehouse.Query().Where(warehouse.ID(in.WarehouseID), warehouse.IsActive(true)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !activeWarehouse {
+		return biz.ErrWarehouseInactive
+	}
+	if in.LotID == nil {
+		return biz.ErrBadParam
+	}
+	if err := lockInventoryLot(ctx, tx, *in.LotID); err != nil {
+		return err
+	}
+	inventoryIntent := &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: requirement.MaterialID,
+		WarehouseID: in.WarehouseID, LotID: in.LotID, UnitID: requirement.UnitID,
+		TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: in.Quantity,
+		SourceType: biz.ProductionFactSourceType, OccurredAt: in.OccurredAt,
+	}
+	if err := validateInventoryTxnReferences(ctx, tx.client, inventoryIntent); err != nil {
+		return err
+	}
+	key := biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial, SubjectID: requirement.MaterialID,
+		WarehouseID: in.WarehouseID, LotID: in.LotID, UnitID: requirement.UnitID,
+	}
+	if err := lockInventoryBalanceRow(ctx, tx, key); err != nil {
+		return err
+	}
+	balance, err := getInventoryBalance(ctx, tx.client.InventoryBalance.Query(), key)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrInventoryInsufficientStock
+		}
+		return err
+	}
+	if balance.Quantity.LessThan(in.Quantity) {
+		return biz.ErrInventoryInsufficientStock
+	}
+	return validateOperationalFactSKUAndLot(ctx, tx.client, row.SubjectType, row.SubjectID, row.ProductSkuID, in.LotID)
+}
+
+func validateProductionCompletionDraftSave(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, in *biz.ProductionFactDraftSave) error {
+	activeWarehouse, err := tx.client.Warehouse.Query().Where(warehouse.ID(in.WarehouseID), warehouse.IsActive(true)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !activeWarehouse {
+		return biz.ErrWarehouseInactive
+	}
+	if in.LotID != nil {
+		if err := lockInventoryLot(ctx, tx, *in.LotID); err != nil {
+			return err
+		}
+	}
+	mutation := &biz.OperationalFactMutation{
+		FactNo: row.FactNo, FactType: row.FactType, SubjectType: row.SubjectType, SubjectID: row.SubjectID,
+		ProductSkuID: row.ProductSkuID, WarehouseID: in.WarehouseID, UnitID: row.UnitID,
+		LotID: in.LotID, NewLotNo: in.NewLotNo, Quantity: in.Quantity,
+		SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID,
+		ProductionWIPBatchID: row.ProductionWipBatchID, IdempotencyKey: row.IdempotencyKey,
+		OccurredAt: in.OccurredAt, OccurredAtSpecified: true, Note: in.Note,
+	}
+	if _, err := validateProductionOrderFactSource(ctx, tx.client, mutation, true, row.ID); err != nil {
+		return err
+	}
+	if err := resolveOrCreateSourceInboundLot(ctx, tx, mutation); err != nil {
+		return err
+	}
+	in.LotID = mutation.LotID
+	in.NewLotNo = nil
+	if err := validateOperationalFactSKUAndLot(ctx, tx.client, row.SubjectType, row.SubjectID, row.ProductSkuID, in.LotID); err != nil {
+		return err
+	}
+	return validateInventoryTxnReferences(ctx, tx.client, &biz.InventoryTxnCreate{
+		SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID,
+		WarehouseID: in.WarehouseID, LotID: in.LotID, UnitID: row.UnitID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: in.Quantity,
+		SourceType: biz.ProductionFactSourceType, OccurredAt: in.OccurredAt,
+	})
+}
+
+func validateProductionReworkDraftSave(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, in *biz.ProductionFactDraftSave, preview *productionReworkSourceContext) error {
+	source, err := resolveProductionReworkRowSource(ctx, tx.client, row, true)
+	if err != nil {
+		return err
+	}
+	if preview == nil || source.orderID != preview.orderID || source.itemID != preview.itemID ||
+		!operationalFactMutationMatchesProduction(row, source.mutation) {
+		return biz.ErrProductionReworkSourceInvalid
+	}
+	if source.sourceCompletion != nil {
+		if err := validateProductionReworkQuantity(ctx, tx.client, source.sourceCompletion, in.Quantity, row.ID); err != nil {
+			return err
+		}
+	} else if source.intake != nil && source.intakeItem != nil {
+		used, err := activeProductionReworkFromIntakeQuantity(ctx, tx.client, source.intake.ID, source.intakeItem.ID, row.ID)
+		if err != nil {
+			return err
+		}
+		if used.Add(in.Quantity).GreaterThan(source.intakeItem.Quantity) {
+			return biz.ErrProductionReworkQuantityExceeded
+		}
+	} else {
+		return biz.ErrProductionReworkSourceInvalid
+	}
+	exists, err := tx.client.ProductionFact.Query().Where(productionfact.FactNo(in.FactNo), productionfact.IDNEQ(row.ID)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return biz.ErrBadParam
+	}
+	return nil
+}
+
+func updateProductionFactDraft(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, in *biz.ProductionFactDraftSave) error {
+	if tx == nil || tx.sqlTx == nil || row == nil || in == nil {
+		return biz.ErrBadParam
+	}
+	var query string
+	var args []any
+	if in.FactType == biz.ProductionFactRework {
+		p := inventorySQLPlaceholders(tx.dialect, 8)
+		query = fmt.Sprintf(`UPDATE production_facts SET fact_no = %s, quantity = %s, occurred_at = %s, occurred_at_specified = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
+		args = []any{in.FactNo, in.Quantity, in.OccurredAt, true, optionalStringSQLValue(in.Note), time.Now(), row.ID, in.ExpectedVersion}
+	} else {
+		p := inventorySQLPlaceholders(tx.dialect, 9)
+		query = fmt.Sprintf(`UPDATE production_facts SET warehouse_id = %s, lot_id = %s, quantity = %s, occurred_at = %s, occurred_at_specified = %s, note = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8])
+		args = []any{in.WarehouseID, optionalIntSQLValue(in.LotID), in.Quantity, in.OccurredAt, true, optionalStringSQLValue(in.Note), time.Now(), row.ID, in.ExpectedVersion}
+	}
+	result, err := tx.sqlTx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return biz.ErrOperationalFactVersionConflict
+	}
+	return nil
+}
+
 func (r *operationalFactRepo) CreateProductionMaterialIssueFromOrder(
 	ctx context.Context,
 	in *biz.ProductionMaterialIssueFromOrderCreate,

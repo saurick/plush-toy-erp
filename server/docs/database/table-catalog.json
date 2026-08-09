@@ -692,7 +692,7 @@
       "title": "质量检验",
       "domain": "inventory-quality",
       "kind": "Fact",
-      "purpose": "保存采购、委外、客户退货或生产 WIP 的质量检查、结论和纠正链。",
+      "purpose": "保存采购、委外、出货前成品或生产 WIP 的质量检查、结论和纠正链。",
       "boundary": "质检只改变质量或批次/WIP 可用状态，不直接增加或扣减库存数量。",
       "lifecycle": "DRAFT 转 SUBMITTED，再 PASSED 或 REJECTED；DRAFT 或 SUBMITTED 可 CANCELLED；纠错以 superseding 新检验保留原记录；不可删除。",
       "writeBoundary": "InventoryUsecase 创建、提交、判定和取消；ProcessRuntime 可调用受控质量领域命令。"

@@ -79,6 +79,48 @@ const server = http.createServer((request, response) => {
   })
 })
 
+const shutdownTimeoutMs = 4_000
+let shutdownStarted = false
+let shutdownForced = false
+
+function requestShutdown(signal) {
+  if (shutdownStarted) {
+    shutdownForced = true
+    server.closeAllConnections?.()
+    return
+  }
+  shutdownStarted = true
+  console.log(`[web-static] shutdown signal=${signal} status=running`)
+  const forceTimer = setTimeout(() => {
+    shutdownForced = true
+    console.error(
+      `[web-static] shutdown signal=${signal} status=forced timeoutMs=${shutdownTimeoutMs}`
+    )
+    server.closeAllConnections?.()
+  }, shutdownTimeoutMs)
+  forceTimer.unref()
+
+  server.close((error) => {
+    clearTimeout(forceTimer)
+    if (error) {
+      console.error(
+        `[web-static] shutdown signal=${signal} status=failed`,
+        error
+      )
+      process.exitCode = 1
+      return
+    }
+    process.exitCode = shutdownForced ? 1 : 0
+    console.log(
+      `[web-static] shutdown signal=${signal} status=${shutdownForced ? 'forced' : 'complete'}`
+    )
+  })
+  server.closeIdleConnections?.()
+}
+
+process.on('SIGTERM', () => requestShutdown('SIGTERM'))
+process.on('SIGINT', () => requestShutdown('SIGINT'))
+
 server.listen(port, host, () => {
   console.log(
     `[web-static] ${app.title} app=${requestedAppId} root=${staticRoot} http://${host}:${port}`

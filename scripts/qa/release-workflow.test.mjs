@@ -206,6 +206,12 @@ test("release pins every action and never passes a token to browser or arguments
   assert.match(strictRuns, /pnpm config set store-dir "\$PNPM_STORE_PATH"/u);
   assert.match(strictRuns, /if \[\[ ! -x "\$go_bin\/govulncheck" \]\]/u);
   assert.match(publishRuns, /if \[\[ ! -f "\$archive" \]\]/u);
+  assert.match(publishRuns, /if ! command -v zstd/u);
+  assert.match(
+    publishRuns,
+    /sudo apt-get install --yes --no-install-recommends zstd/u,
+  );
+  assert.match(publishRuns, /zstd --version/u);
   assert.doesNotMatch(SOURCE, /echo "\$GH_TOKEN"|--token "?\$GH_TOKEN/u);
   assert.doesNotMatch(strictRuns, /GH_TOKEN|github\.token/u);
 });

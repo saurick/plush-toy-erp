@@ -55,6 +55,54 @@ func TestWorkflowWorkbenchRoleTasksAllowsProjectedSuperAdminWithoutMobileRole(t 
 	}
 }
 
+func TestWorkflowWorkbenchReturnsOneBoundedSnapshotForProjectedRoles(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+	admin := workflowJSONRPCAdmin(nil)
+	admin.IsSuperAdmin = true
+	customerConfigUC := workflowWorkbenchCustomerConfigUC(
+		"yoyoosun",
+		[]string{biz.WarehouseRoleKey},
+		map[string][]string{
+			biz.WarehouseRoleKey: {
+				biz.PermissionERPWorkbenchRead,
+				biz.PermissionWorkflowTaskRead,
+			},
+		},
+	)
+	dispatcher, repo := workflowWorkbenchTestDispatcher(admin, customerConfigUC)
+	params := mustJSONRPCStruct(t, map[string]any{
+		"queue_key": biz.WorkflowWorkbenchQueueActionable,
+		"limit":     float64(8),
+		"offset":    float64(0),
+	})
+
+	_, result, err := dispatcher.handleWorkflow(
+		workflowJSONRPCAdminContext(),
+		"get_workbench",
+		"workbench-snapshot",
+		params,
+	)
+	if err != nil || result == nil || result.Code != errcode.OK.Code {
+		t.Fatalf("workbench result=%#v err=%v", result, err)
+	}
+	query := repo.workbenchQuery
+	if query.QueueKey != biz.WorkflowWorkbenchQueueActionable || query.Limit != 8 || query.Offset != 0 || query.SnapshotAt.IsZero() {
+		t.Fatalf("workbench query=%#v", query)
+	}
+	if query.VisibilityScope == nil || query.RiskVisibilityScope == nil {
+		t.Fatalf("workbench visibility scopes=%#v", query)
+	}
+	data := result.Data.AsMap()
+	counts, ok := data["counts"].(map[string]any)
+	if !ok || counts["actionable"] != float64(1) || counts["risk"] != float64(0) || counts["approval"] != float64(0) {
+		t.Fatalf("workbench counts=%#v", data["counts"])
+	}
+	items, ok := data["items"].([]any)
+	if !ok || len(items) != 1 || data["queue_key"] != biz.WorkflowWorkbenchQueueActionable || data["total"] != float64(1) {
+		t.Fatalf("workbench data=%#v", data)
+	}
+}
+
 func TestWorkflowWorkbenchRoleTasksRequiresBothEffectiveReadPermissions(t *testing.T) {
 	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
 	for _, test := range []struct {
@@ -96,7 +144,52 @@ func TestWorkflowWorkbenchRoleTasksRequiresBothEffectiveReadPermissions(t *testi
 			if repo.roleQuery.RoleKey != "" {
 				t.Fatalf("denied request reached repository: %#v", repo.roleQuery)
 			}
+
+			_, workbenchResult, workbenchErr := dispatcher.handleWorkflow(
+				workflowJSONRPCAdminContext(),
+				"get_workbench",
+				test.name+"-snapshot",
+				mustJSONRPCStruct(t, map[string]any{
+					"queue_key": biz.WorkflowWorkbenchQueueActionable,
+					"limit":     float64(8),
+					"offset":    float64(0),
+				}),
+			)
+			if workbenchErr != nil || workbenchResult == nil || workbenchResult.Code != errcode.PermissionDenied.Code {
+				t.Fatalf("workbench result=%#v err=%v", workbenchResult, workbenchErr)
+			}
+			if repo.workbenchQuery.QueueKey != "" {
+				t.Fatalf("denied workbench reached repository: %#v", repo.workbenchQuery)
+			}
 		})
+	}
+}
+
+func TestWorkflowWorkbenchRejectsUnknownOrInvalidPaginationParams(t *testing.T) {
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionERPWorkbenchRead,
+		biz.PermissionWorkflowTaskRead,
+	)
+	dispatcher, repo := workflowWorkbenchTestDispatcher(admin, nil)
+	for _, params := range []map[string]any{
+		{"queue_key": "unknown", "limit": float64(8), "offset": float64(0)},
+		{"queue_key": biz.WorkflowWorkbenchQueueRisk, "limit": float64(0), "offset": float64(0)},
+		{"queue_key": biz.WorkflowWorkbenchQueueRisk, "limit": float64(8), "offset": float64(-1)},
+		{"queue_key": biz.WorkflowWorkbenchQueueRisk, "limit": float64(8), "offset": float64(0), "role_key": biz.WarehouseRoleKey},
+	} {
+		_, result, err := dispatcher.handleWorkflow(
+			workflowJSONRPCAdminContext(),
+			"get_workbench",
+			"invalid-workbench",
+			mustJSONRPCStruct(t, params),
+		)
+		if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+			t.Fatalf("params=%#v result=%#v err=%v", params, result, err)
+		}
+	}
+	if repo.workbenchQuery.QueueKey != "" {
+		t.Fatalf("invalid params reached repository: %#v", repo.workbenchQuery)
 	}
 }
 

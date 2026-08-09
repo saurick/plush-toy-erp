@@ -134,6 +134,7 @@ test('shipment source import uses server candidates with remote search and pagin
     /salesOrderID:\s*shipmentForm\.getFieldValue\('sales_order_id'\)/u
   )
   assert.match(source, /normalizeShipmentSourceCandidate/u)
+  assert.match(source, /setSalesOrderItems\(\(currentItems\) =>/u)
   assert.match(source, /onSalesOrderSourcePageChange/u)
   assert.match(source, /onSalesOrderSourceSearchChange/u)
   assert.match(source, /onSalesOrderSourceReload/u)
@@ -180,7 +181,7 @@ test('new shipment drafts clear prior source selection and cached candidate stat
   )
 })
 
-test('shipment source import requires create and both source read permissions', () => {
+test('shipment source import requires a writable mode and both source read permissions', () => {
   assert.match(
     source,
     /hasActionPermission\(\s*adminProfile,\s*'sales_order\.read'\s*\)/u
@@ -191,12 +192,42 @@ test('shipment source import requires create and both source read permissions', 
   )
   assert.match(
     source,
-    /canImportSalesOrderSource\s*=\s*canCreate\s*&&\s*canViewSalesOrders\s*&&\s*canViewSalesOrderItems/u
+    /canImportSalesOrderSource\s*=\s*\(canCreate \|\| canUpdate\)\s*&&\s*canViewSalesOrders\s*&&\s*canViewSalesOrderItems/u
   )
   assert.match(
     source,
     /canImportSalesOrderSource=\{canImportSalesOrderSource\}/u
   )
+})
+
+test('sales delivery drafts use fail-closed load-before-edit and optimistic save', () => {
+  assert.match(
+    source,
+    /hasActionPermission\(adminProfile, 'shipment\.update'\)/u
+  )
+  assert.match(source, /const openEdit = async \(shipment\) =>/u)
+  assert.match(
+    source,
+    /const detail = await getShipment\(\{ id: shipment\.id \}\)/u
+  )
+  assert.match(
+    source,
+    /!Array\.isArray\(detail\.items\) \|\|[\s\S]*detail\.items\.length === 0/u
+  )
+  assert.match(
+    source,
+    /setShipmentModal\(\{ mode: 'edit', shipment: detail \}\)/u
+  )
+  assert.match(source, /const draftParams = \{ \.\.\.params \}/u)
+  assert.match(source, /delete draftParams\.idempotency_key/u)
+  assert.match(
+    source,
+    /saveShipmentDraft\(\{[\s\S]*expected_version: editingShipment\.version/u
+  )
+  assert.match(source, /data-business-action-key="shipment-edit"/u)
+  assert.match(source, /onOpenRecord=\{openShipmentRecord\}/u)
+  assert.match(source, /canUpdate=\{canUpdate\}/u)
+  assert.match(source, /isEditModal=\{isEditModal\}/u)
 })
 
 test('draft shipment can generate a source-bound finished-goods inspection', () => {
@@ -220,10 +251,7 @@ test('draft shipment starts the versioned finance approval process', () => {
     source,
     /action: 'release',[\s\S]{0,120}authorized: canSubmitShipmentRelease/u
   )
-  assert.match(
-    source,
-    /action: 'ship',[\s\S]{0,120}authorized: canShip/u
-  )
+  assert.match(source, /action: 'ship',[\s\S]{0,120}authorized: canShip/u)
   assert.match(source, /result\.process_instance\?\.id/u)
   assert.match(source, /成品质检仍由品质检验单独判定/u)
   assert.match(source, /审批通过也不等于已出货/u)

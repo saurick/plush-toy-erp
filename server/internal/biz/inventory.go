@@ -366,11 +366,12 @@ type BOMItemSaveMutation struct {
 }
 
 type BOMHeaderFilter struct {
-	ProductID int
-	Status    string
-	Keyword   string
-	Limit     int
-	Offset    int
+	ProductID      int
+	Status         string
+	LifecycleScope string
+	Keyword        string
+	Limit          int
+	Offset         int
 }
 
 type BOMVersionDetail struct {
@@ -828,8 +829,18 @@ func (uc *InventoryUsecase) ListBOMHeaders(ctx context.Context, filter BOMHeader
 		return nil, 0, ErrBadParam
 	}
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
+	var scopeOK bool
+	filter.LifecycleScope, scopeOK = NormalizeLifecycleScope(filter.LifecycleScope)
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
-	if filter.Status != "" && !IsValidBOMStatus(filter.Status) {
+	if !scopeOK || (filter.Status != "" && !IsValidBOMStatus(filter.Status)) {
+		return nil, 0, ErrBadParam
+	}
+	if !LifecycleScopeAllowsStatus(
+		filter.LifecycleScope,
+		filter.Status,
+		[]string{BOMStatusDraft, BOMStatusActive},
+		[]string{BOMStatusArchived},
+	) {
 		return nil, 0, ErrBadParam
 	}
 	if filter.Limit <= 0 || filter.Limit > 200 {

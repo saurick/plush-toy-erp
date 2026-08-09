@@ -29,7 +29,10 @@ import {
   resolveReceiptState,
 } from "./pre-push-receipt.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const ZERO_SHA = "0".repeat(40);
 
 function git(root, args) {
@@ -112,6 +115,7 @@ if [[ "\${MUTATE_REMOTE:-0}" == "1" ]]; then git push --quiet origin HEAD:refs/h
 for stage in environment_profile shared secrets web browser server govulncheck; do
   printf '%s\\n' "[qa:stage] gate=full id=\$stage status=passed durationMs=1"
 done
+printf '%s\\n' '[qa:parallel] gate=full ids=shared,web,server status=passed durationMs=1'
 printf '%s\\n' '[qa:test-gate] status=complete tests=1 pass=1 fail=0 skipped=0'
 `,
     "utf8",
@@ -280,8 +284,14 @@ test("prepare wrapper exposes help without running full or creating receipt stat
     const result = runPrepare(fixture.root, ["--help"]);
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /prepare-push\.sh/u);
-    assert.equal(existsSync(gitStateFile(fixture.root, "full-ranges.txt")), false);
-    assert.equal(existsSync(path.join(fixture.root, ".git", "plush-qa")), false);
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
+      false,
+    );
+    assert.equal(
+      existsSync(path.join(fixture.root, ".git", "plush-qa")),
+      false,
+    );
   } finally {
     fixture.cleanup();
   }
@@ -297,8 +307,14 @@ test("prepare runs full once before push and hook only runs live range gates", (
     assert.equal(existsSync(state.keyPath), true);
     assert.equal(statSync(state.receiptPath).mode & 0o777, 0o600);
     assert.equal(statSync(state.keyPath).mode & 0o777, 0o600);
-    assert.equal(path.relative(state.commonDir, state.receiptPath).startsWith(".."), false);
-    assert.equal(readLines(gitStateFile(fixture.root, "full-ranges.txt")).length, 1);
+    assert.equal(
+      path.relative(state.commonDir, state.receiptPath).startsWith(".."),
+      false,
+    );
+    assert.equal(
+      readLines(gitStateFile(fixture.root, "full-ranges.txt")).length,
+      1,
+    );
 
     const pushed = runHook(fixture);
     assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
@@ -306,9 +322,10 @@ test("prepare runs full once before push and hook only runs live range gates", (
     assert.deepEqual(readLines(gitStateFile(fixture.root, "full-ranges.txt")), [
       `${fixture.remoteSha}..${fixture.localSha}`,
     ]);
-    assert.deepEqual(readLines(gitStateFile(fixture.root, "secret-ranges.txt")), [
-      `${fixture.remoteSha}..${fixture.localSha}`,
-    ]);
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
+      [`${fixture.remoteSha}..${fixture.localSha}`],
+    );
     assert.equal(
       readdirSync(state.stateDir).some((file) => file.endsWith(".tmp")),
       false,
@@ -367,9 +384,10 @@ test("a real Git push PATH prefix preserves the prepared environment", () => {
     assert.deepEqual(readLines(gitStateFile(fixture.root, "full-ranges.txt")), [
       `${fixture.remoteSha}..${fixture.localSha}`,
     ]);
-    assert.deepEqual(readLines(gitStateFile(fixture.root, "secret-ranges.txt")), [
-      `${fixture.remoteSha}..${fixture.localSha}`,
-    ]);
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
+      [`${fixture.remoteSha}..${fixture.localSha}`],
+    );
     assert.equal(
       git(fixture.remote, ["rev-parse", "refs/heads/main"]),
       fixture.localSha,
@@ -388,7 +406,7 @@ test("a wrapped Git exec-path prefix is normalized through the base PATH", (t) =
   t.after(() => rmSync(root, { recursive: true, force: true }));
   writeFileSync(
     path.join(wrapperBin, "git"),
-    "#!/bin/sh\n[ \"$1\" = --exec-path ] || exit 9\nprintf '%s\\n' \"$FAKE_GIT_EXEC_PATH\"\n",
+    '#!/bin/sh\n[ "$1" = --exec-path ] || exit 9\nprintf \'%s\\n\' "$FAKE_GIT_EXEC_PATH"\n',
     "utf8",
   );
   writeFileSync(
@@ -450,8 +468,14 @@ test("hook without a receipt fails fast and never opens the full fallback", () =
     const pushed = runHook(fixture);
     assert.equal(pushed.status, 2, pushed.stderr || pushed.stdout);
     assert.match(pushed.stderr, /reason=receipt_missing/u);
-    assert.equal(existsSync(gitStateFile(fixture.root, "full-ranges.txt")), false);
-    assert.equal(existsSync(gitStateFile(fixture.root, "secret-ranges.txt")), false);
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
+      false,
+    );
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "secret-ranges.txt")),
+      false,
+    );
   } finally {
     fixture.cleanup();
   }
@@ -464,7 +488,10 @@ test("detached HEAD requires an explicit ref plan before full can run", () => {
     const prepared = runPrepare(fixture.root);
     assert.equal(prepared.status, 2, prepared.stderr || prepared.stdout);
     assert.match(prepared.stderr, /reason=detached_head_requires_refspec/u);
-    assert.equal(existsSync(gitStateFile(fixture.root, "full-ranges.txt")), false);
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
+      false,
+    );
   } finally {
     fixture.cleanup();
   }
@@ -478,7 +505,10 @@ test("receipt state cannot escape the Git common directory through a symlink", (
     const prepared = runPrepare(fixture.root);
     assert.equal(prepared.status, 2, prepared.stderr || prepared.stdout);
     assert.match(prepared.stderr, /reason=unsafe_receipt_state_path/u);
-    assert.equal(existsSync(gitStateFile(fixture.root, "full-ranges.txt")), false);
+    assert.equal(
+      existsSync(gitStateFile(fixture.root, "full-ranges.txt")),
+      false,
+    );
     assert.deepEqual(readdirSync(outside), []);
   } finally {
     fixture.cleanup();
@@ -497,7 +527,12 @@ test("new and existing refs bind one exact aggregate receipt and scan every live
     ];
     const prepared = runPrepare(fixture.root, refspecs);
     assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
-    const emptyTree = git(fixture.root, ["hash-object", "-t", "tree", "/dev/null"]);
+    const emptyTree = git(fixture.root, [
+      "hash-object",
+      "-t",
+      "tree",
+      "/dev/null",
+    ]);
     assert.deepEqual(readLines(gitStateFile(fixture.root, "full-ranges.txt")), [
       `${emptyTree}..${fixture.localSha}`,
     ]);
@@ -509,10 +544,10 @@ test("new and existing refs bind one exact aggregate receipt and scan every live
     ].join("\n");
     const pushed = runHook(fixture, { input });
     assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
-    assert.deepEqual(readLines(gitStateFile(fixture.root, "secret-ranges.txt")), [
-      `${fixture.remoteSha}..${fixture.localSha}`,
-      fixture.localSha,
-    ]);
+    assert.deepEqual(
+      readLines(gitStateFile(fixture.root, "secret-ranges.txt")),
+      [`${fixture.remoteSha}..${fixture.localSha}`, fixture.localSha],
+    );
   } finally {
     fixture.cleanup();
   }
@@ -521,12 +556,7 @@ test("new and existing refs bind one exact aggregate receipt and scan every live
 test("failed or moving full never leaves a green receipt", () => {
   for (const [name, overrides, reason, identityChanged = false] of [
     ["full failure", { FAIL_FULL: "1" }, "full_gate_failed"],
-    [
-      "dirty after full",
-      { MUTATE_FULL_DIRTY: "1" },
-      "full_gate_failed",
-      true,
-    ],
+    ["dirty after full", { MUTATE_FULL_DIRTY: "1" }, "full_gate_failed", true],
     [
       "HEAD changed after full",
       { MUTATE_FULL_HEAD: "1" },
@@ -541,21 +571,14 @@ test("failed or moving full never leaves a green receipt", () => {
   ]) {
     const fixture = createFixture();
     try {
-      const result = runPrepare(
-        fixture.root,
-        [],
-        cleanEnvironment(overrides),
-      );
+      const result = runPrepare(fixture.root, [], cleanEnvironment(overrides));
       assert.notEqual(result.status, 0, name);
       assert.match(result.stderr, new RegExp(`reason=${reason}`, "u"), name);
       const state = resolveReceiptState(fixture.root);
       if (identityChanged) {
         const fullReceipt = JSON.parse(
           readFileSync(
-            path.join(
-              state.stateDir,
-              `${state.worktreeKey}.full-receipt.json`,
-            ),
+            path.join(state.stateDir, `${state.worktreeKey}.full-receipt.json`),
             "utf8",
           ),
         );
@@ -586,9 +609,13 @@ test("receipt rejects tampering, expiry, environment drift, and actual range dri
       if (scenario === "tamper") {
         const receipt = JSON.parse(readFileSync(state.receiptPath, "utf8"));
         receipt.push.aggregateRange = fixture.localSha;
-        writeFileSync(state.receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, {
-          mode: 0o600,
-        });
+        writeFileSync(
+          state.receiptPath,
+          `${JSON.stringify(receipt, null, 2)}\n`,
+          {
+            mode: 0o600,
+          },
+        );
       } else if (scenario === "expired") {
         resignReceipt(state, (receipt) => {
           receipt.issuedAtMs = Date.now() - PRE_PUSH_RECEIPT_TTL_MS - 1_000;
@@ -600,7 +627,11 @@ test("receipt rejects tampering, expiry, environment drift, and actual range dri
         input = `refs/heads/main ${fixture.localSha} refs/heads/main ${ZERO_SHA}\n`;
       }
       const pushed = runHook(fixture, { input, env });
-      assert.equal(pushed.status, 2, `${scenario}: ${pushed.stderr || pushed.stdout}`);
+      assert.equal(
+        pushed.status,
+        2,
+        `${scenario}: ${pushed.stderr || pushed.stdout}`,
+      );
       assert.match(
         pushed.stderr,
         /reason=receipt_(?:signature_invalid|expired|environment_mismatch|push_range_mismatch)/u,
@@ -629,7 +660,11 @@ test("HEAD changes, dirty worktrees, and a held lock invalidate reuse", () => {
         const newHead = commit(fixture.root, "new HEAD", { allowEmpty: true });
         input = `refs/heads/main ${newHead} refs/heads/main ${fixture.remoteSha}\n`;
       } else if (scenario === "dirty") {
-        writeFileSync(path.join(fixture.root, "untracked.txt"), "dirty\n", "utf8");
+        writeFileSync(
+          path.join(fixture.root, "untracked.txt"),
+          "dirty\n",
+          "utf8",
+        );
       } else {
         mkdirSync(state.lockPath, { mode: 0o700 });
         writeFileSync(
@@ -639,7 +674,11 @@ test("HEAD changes, dirty worktrees, and a held lock invalidate reuse", () => {
         );
       }
       const pushed = runHook(fixture, { input });
-      assert.equal(pushed.status, 2, `${scenario}: ${pushed.stderr || pushed.stdout}`);
+      assert.equal(
+        pushed.status,
+        2,
+        `${scenario}: ${pushed.stderr || pushed.stdout}`,
+      );
       assert.match(
         pushed.stderr,
         /reason=(?:receipt_repository_mismatch|dirty_worktree|receipt_lock_held)/u,
@@ -677,7 +716,10 @@ test("live log and strict secret failures still block a valid receipt", () => {
     const fixture = createFixture();
     try {
       if (scenario === "log") {
-        writeFileSync(path.join(fixture.root, "bad.txt"), "trailing whitespace  \n");
+        writeFileSync(
+          path.join(fixture.root, "bad.txt"),
+          "trailing whitespace  \n",
+        );
         fixture.localSha = commit(fixture.root, "bad whitespace");
       }
       const prepared = runPrepare(fixture.root);
@@ -755,7 +797,11 @@ test("caller skip and synthetic receipt environments are rejected, not treated a
       );
       assert.equal(result.status, 2, variable);
       assert.match(result.stderr, /reason=forbidden_environment/u, variable);
-      assert.match(result.stderr, new RegExp(`variable=${variable}`, "u"), variable);
+      assert.match(
+        result.stderr,
+        new RegExp(`variable=${variable}`, "u"),
+        variable,
+      );
       assert.equal(existsSync(state.receiptPath), false, variable);
     }
     const source = readFileSync(

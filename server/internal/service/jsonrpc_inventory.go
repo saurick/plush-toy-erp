@@ -30,7 +30,7 @@ func (d *jsonrpcDispatcher) handleInventory(
 	}
 
 	switch method {
-	case "create_inventory_operation", "post_inventory_operation", "cancel_inventory_operation", "get_inventory_operation", "list_inventory_operations":
+	case "create_inventory_operation", "save_inventory_operation_draft", "post_inventory_operation", "cancel_inventory_operation", "get_inventory_operation", "list_inventory_operations":
 		return d.handleInventoryOperation(ctx, method, id, pm, claims.UserID)
 	case "list_inventory_balances":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
@@ -178,6 +178,8 @@ func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "库存作业已被其他人处理，请刷新后重试"}
 	case errors.Is(err, biz.ErrInventoryOperationStaleCount):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "盘点期间账面库存已变化，请刷新后重新盘点"}
+	case errors.Is(err, biz.ErrInventoryOperationSaveOwner):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人可以编辑库存作业草稿"}
 	case errors.Is(err, biz.ErrInventoryOperationSubmitOwner):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "只有创建人可以提交人工库存调整"}
 	case errors.Is(err, biz.ErrInventoryOperationSelfApproval):

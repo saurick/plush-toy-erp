@@ -19,9 +19,20 @@ export const DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY =
   'plush_erp_dev_docs_expanded_dirs'
 export const DEV_DOCS_TOC_EXPANDED_STORAGE_KEY =
   'plush_erp_dev_docs_toc_expanded'
+export const DEV_DOCS_LIFECYCLE_STORAGE_KEY =
+  'plush_erp_dev_docs_lifecycle'
 
 export const DEV_DOCS_SEARCH_SCOPE_ALL = 'all'
 export const DEV_DOCS_SEARCH_SCOPE_TITLE = 'title'
+
+export const DEV_DOCS_LIFECYCLE_CURRENT = 'current'
+export const DEV_DOCS_LIFECYCLE_REVIEW = 'review'
+export const DEV_DOCS_LIFECYCLE_ARCHIVE = 'archive'
+export const DEV_DOCS_LIFECYCLES = Object.freeze([
+  DEV_DOCS_LIFECYCLE_CURRENT,
+  DEV_DOCS_LIFECYCLE_REVIEW,
+  DEV_DOCS_LIFECYCLE_ARCHIVE,
+])
 
 export function isDevDocsEnabled(env = import.meta.env) {
   return env?.DEV === true
@@ -67,6 +78,57 @@ function titleFromMarkdown(source = '', fallbackPath = '') {
       .split('/')
       .pop() || fallbackPath
   return filename.replace(/\.md$/i, '')
+}
+
+function fallbackTitleFromPath(path = '') {
+  const segments = String(path || '')
+    .split('/')
+    .filter(Boolean)
+  const filename = segments.at(-1) || path
+  if (/^README\.md$/iu.test(filename) && segments.length > 1) {
+    return `${segments.at(-2)} / README`
+  }
+  return String(filename || '').replace(/\.md$/iu, '')
+}
+
+export function getDevDocsTitle(source = '', path = '') {
+  return source
+    ? titleFromMarkdown(source, path)
+    : fallbackTitleFromPath(path)
+}
+
+export function getDevDocsLifecycle(path = '') {
+  const normalizedPath = String(path || '')
+  if (normalizedPath.startsWith('docs/archive/')) {
+    return DEV_DOCS_LIFECYCLE_ARCHIVE
+  }
+  if (
+    normalizedPath.startsWith('docs/reference/') ||
+    (normalizedPath.startsWith('docs/product/prototypes/') &&
+      normalizedPath !== 'docs/product/prototypes/README.md')
+  ) {
+    return DEV_DOCS_LIFECYCLE_REVIEW
+  }
+  return DEV_DOCS_LIFECYCLE_CURRENT
+}
+
+export function normalizeDevDocsLifecycle(
+  lifecycle = DEV_DOCS_LIFECYCLE_CURRENT
+) {
+  return DEV_DOCS_LIFECYCLES.includes(lifecycle)
+    ? lifecycle
+    : DEV_DOCS_LIFECYCLE_CURRENT
+}
+
+export function filterDevDocsByLifecycle(
+  items = [],
+  lifecycle = DEV_DOCS_LIFECYCLE_CURRENT
+) {
+  const normalizedLifecycle = normalizeDevDocsLifecycle(lifecycle)
+  return items.filter(
+    (item) =>
+      normalizeDevDocsLifecycle(item.lifecycle) === normalizedLifecycle
+  )
 }
 
 function groupForPath(path = '') {
@@ -135,14 +197,18 @@ export function buildDevDocsItems(markdownModules = {}) {
       return
     }
     const source = normalizeModuleValue(moduleValue)
+    const loadSource =
+      typeof moduleValue === 'function' ? moduleValue : undefined
     byPath.set(path, {
       key: keyForPath(path),
-      title: titleFromMarkdown(source, path),
+      title: getDevDocsTitle(source, path),
       filename: filenameForPath(path),
       path,
       group: groupForPath(path),
+      lifecycle: getDevDocsLifecycle(path),
       defaultPinned: PINNED_DEV_DOC_PATHS.includes(path),
       source,
+      loadSource,
     })
   })
 

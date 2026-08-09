@@ -11,7 +11,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, Popconfirm, Select, Space } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -55,8 +55,16 @@ import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import BusinessLineItemsSection from '../components/business-list/BusinessLineItemsSection.jsx'
+import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import { useLineItemAppendScroll } from '../components/business-list/useLineItemAppendScroll.mjs'
+import {
+  LIFECYCLE_SCOPE,
+  filterLifecycleStatusOptions,
+  lifecycleScopeFromSearchParams,
+  lifecycleScopeIncludesStatus,
+  withLifecycleScopeSearchParam,
+} from '../utils/lifecycleScope.mjs'
 import {
   BOM_MODULE_KEY,
   BOM_STATUS_OPTIONS,
@@ -456,6 +464,7 @@ const BOMLineItemsForm = React.memo(
 
 export default function BOMVersionsPage() {
   const outletContext = useOutletContext()
+  const [searchParams, setSearchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -469,9 +478,17 @@ export default function BOMVersionsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [printingTemplateKey, setPrintingTemplateKey] = useState('')
-  const [keyword, setKeyword] = useState('')
-  const [status, setStatus] = useState('')
-  const [productID, setProductID] = useState()
+  const [keyword, setKeyword] = useState(
+    () => searchParams.get('keyword') || ''
+  )
+  const [lifecycleScope, setLifecycleScope] = useState(() =>
+    lifecycleScopeFromSearchParams(searchParams)
+  )
+  const [status, setStatus] = useState(() => searchParams.get('status') || '')
+  const [productID, setProductID] = useState(() => {
+    const value = Number(searchParams.get('product_id') || 0)
+    return Number.isSafeInteger(value) && value > 0 ? value : undefined
+  })
   const [versions, setVersions] = useState([])
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
@@ -511,6 +528,13 @@ export default function BOMVersionsPage() {
   const productOptions = useMemo(
     () => uniqueReferenceOptions(products, productOption),
     [products]
+  )
+  const lifecycleStatusOptions = useMemo(
+    () =>
+      filterLifecycleStatusOptions(BOM_STATUS_OPTIONS, lifecycleScope, [
+        'ARCHIVED',
+      ]),
+    [lifecycleScope]
   )
   const materialOptions = useMemo(
     () => uniqueReferenceOptions(materials, materialOption),
@@ -650,9 +674,10 @@ export default function BOMVersionsPage() {
     () => ({
       keyword,
       status,
+      lifecycle_scope: lifecycleScope,
       product_id: productID || undefined,
     }),
-    [keyword, productID, status]
+    [keyword, lifecycleScope, productID, status]
   )
 
   const loadVersions = useCallback(async () => {
@@ -959,7 +984,10 @@ export default function BOMVersionsPage() {
     if (!record?.id || !canEditBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
     applySelectedRowKeys([record.id])
-    const detail = (await loadDetail(record.id)) || record
+    const detail = await loadDetail(record.id)
+    if (!detail?.id || !Array.isArray(detail.items)) {
+      return
+    }
     setHeaderMode('edit')
     fillHeaderForm(detail)
     setHeaderProductIDForSuggestion(undefined)
@@ -1211,13 +1239,20 @@ export default function BOMVersionsPage() {
     recordLabel: '物料清单',
   })
 
-  const hasActiveFilters = Boolean(keyword.trim() || productID || status)
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      productID ||
+      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
+      status
+  )
   const clearFilters = useCallback(() => {
     setKeyword('')
     setProductID(undefined)
+    setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
     setStatus('')
+    setSearchParams(new URLSearchParams(), { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [])
+  }, [setSearchParams])
 
   return (
     <BusinessPageLayout>
@@ -1264,9 +1299,25 @@ export default function BOMVersionsPage() {
               }}
               style={{ width: 180 }}
             />
+            <LifecycleScopeFilter
+              value={lifecycleScope}
+              onChange={(nextScope) => {
+                setLifecycleScope(nextScope)
+                if (
+                  !lifecycleScopeIncludesStatus(nextScope, status, ['ARCHIVED'])
+                ) {
+                  setStatus('')
+                }
+                setSearchParams(
+                  withLifecycleScopeSearchParam(searchParams, nextScope),
+                  { replace: true }
+                )
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
             <SelectFilter
               value={status}
-              options={BOM_STATUS_OPTIONS}
+              options={lifecycleStatusOptions}
               onChange={(nextStatus) => {
                 setStatus(nextStatus || '')
                 resetBusinessPaginationCurrent(setPagination)
@@ -1630,8 +1681,9 @@ export default function BOMVersionsPage() {
         >
           <BOMHeaderFormFields
             form={headerForm}
-            includeProduct={headerMode !== 'edit'}
+            includeProduct
             disabled={headerMode === 'view'}
+            productDisabled={headerMode === 'edit'}
             productOptions={productOptions}
             versionSuggestion={headerVersionSuggestion}
             versionSuggestionLoading={headerVersionCandidates.loading}
@@ -1647,8 +1699,14 @@ export default function BOMVersionsPage() {
             }
             title="BOM 附件"
             description="上传色卡、SOP、工艺图片或材料清单来源文件；附件不会改变库存、采购或成本记录。"
-            canUpload={headerMode !== 'view' && (canCreate || canUpdate)}
-            canWithdraw={canCreate || canUpdate}
+            canUpload={
+              headerMode !== 'view' &&
+              (headerMode === 'edit' ? modalActionCanEdit : canCreate)
+            }
+            canWithdraw={
+              headerMode !== 'view' &&
+              (headerMode === 'edit' ? modalActionCanEdit : canCreate)
+            }
             variant="inline"
           />
           {headerMode === 'copy' ? (

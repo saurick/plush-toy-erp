@@ -23,12 +23,14 @@ import {
   SelectionClearAction,
   ToolbarButton,
 } from '../business-list/BusinessListLayout.jsx'
+import LifecycleScopeFilter from '../business-list/LifecycleScopeFilter.jsx'
 import {
   PURCHASE_ORDER_DATE_FILTER_OPTIONS,
   PURCHASE_ORDER_RELATED_MENU_ITEMS,
   PURCHASE_ORDER_SORT_OPTIONS,
   PURCHASE_ORDER_STATUS_OPTIONS,
 } from './purchaseOrderPageConfig.mjs'
+import { filterLifecycleStatusOptions } from '../../utils/lifecycleScope.mjs'
 
 export default function PurchaseOrderOperationPanel({
   applySelectedRowKeys,
@@ -50,7 +52,9 @@ export default function PurchaseOrderOperationPanel({
   hasActiveFilters = false,
   itemsLoading = false,
   keyword = '',
+  lifecycleScope = 'current',
   lifecycleActionStates = {},
+  onLifecycleScopeChange,
   showLifecycleMore = false,
   showLifecyclePrimary = false,
   loadOrders,
@@ -119,10 +123,18 @@ export default function PurchaseOrderOperationPanel({
             }}
             onPressEnter={loadOrders}
           />
+          <LifecycleScopeFilter
+            value={lifecycleScope}
+            onChange={onLifecycleScopeChange}
+          />
           <SelectFilter
             className="erp-business-filter-control--status"
             value={status}
-            options={PURCHASE_ORDER_STATUS_OPTIONS}
+            options={filterLifecycleStatusOptions(
+              PURCHASE_ORDER_STATUS_OPTIONS,
+              lifecycleScope,
+              ['closed', 'canceled']
+            )}
             onChange={(value) => {
               resetPagination()
               setStatus(value)

@@ -110,6 +110,15 @@ type ReworkIntakeCreate struct {
 	Items            []ReworkIntakeItemCreate
 }
 
+type ReworkIntakeDraftSave struct {
+	ID               int
+	ExpectedVersion  int
+	IntakeNo         string
+	SourceShipmentID int
+	Reason           string
+	Items            []ReworkIntakeItemCreate
+}
+
 type ReworkIntakeItemCreate struct {
 	SourceShipmentItemID        int
 	TargetProductionOrderItemID int
@@ -133,10 +142,11 @@ type ReworkIntakeFilter struct {
 }
 
 type ReworkIntakeSourceCandidateFilter struct {
-	Keyword          string
-	SourceShipmentID int
-	Limit            int
-	Offset           int
+	Keyword                    string
+	SourceShipmentID           int
+	EditingReworkIntakeDraftID int
+	Limit                      int
+	Offset                     int
 }
 
 type ReworkIntakeSourceCandidate struct {
@@ -195,6 +205,7 @@ type ReworkReshipmentCreate struct {
 
 type ReworkIntakeRepo interface {
 	CreateReworkIntake(ctx context.Context, in *ReworkIntakeCreate, actorID int, payloadHash string) (*ReworkIntake, error)
+	SaveReworkIntakeDraft(ctx context.Context, in *ReworkIntakeDraftSave) (*ReworkIntake, error)
 	ReceiveReworkIntake(ctx context.Context, in *ReworkIntakeTransition, actorID int) (*ReworkIntake, error)
 	CancelReworkIntake(ctx context.Context, in *ReworkIntakeTransition, actorID int) (*ReworkIntake, error)
 	ReverseReworkIntake(ctx context.Context, in *ReworkIntakeTransition, actorID int) (*ReworkIntake, error)
@@ -215,6 +226,18 @@ func (uc *OperationalFactUsecase) CreateReworkIntake(ctx context.Context, in *Re
 		return nil, err
 	}
 	return repo.CreateReworkIntake(ctx, &normalized, actorID, hash)
+}
+
+func (uc *OperationalFactUsecase) SaveReworkIntakeDraft(ctx context.Context, in *ReworkIntakeDraftSave, actorID int) (*ReworkIntake, error) {
+	repo, ok := uc.reworkIntakeRepo()
+	if !ok || in == nil || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeReworkIntakeDraftSave(*in)
+	if err != nil {
+		return nil, err
+	}
+	return repo.SaveReworkIntakeDraft(ctx, &normalized)
 }
 
 func (uc *OperationalFactUsecase) ReceiveReworkIntake(ctx context.Context, in *ReworkIntakeTransition, actorID int) (*ReworkIntake, error) {
@@ -267,7 +290,7 @@ func (uc *OperationalFactUsecase) ListReworkIntakes(ctx context.Context, filter 
 
 func (uc *OperationalFactUsecase) ListReworkIntakeSourceCandidates(ctx context.Context, filter ReworkIntakeSourceCandidateFilter) ([]*ReworkIntakeSourceCandidate, int, error) {
 	repo, ok := uc.reworkIntakeRepo()
-	if !ok || filter.SourceShipmentID < 0 || filter.Offset < 0 {
+	if !ok || filter.SourceShipmentID < 0 || filter.EditingReworkIntakeDraftID < 0 || filter.Offset < 0 {
 		return nil, 0, ErrBadParam
 	}
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
@@ -333,35 +356,23 @@ func normalizeReworkIntakeFilter(filter ReworkIntakeFilter) ReworkIntakeFilter {
 }
 
 func normalizeReworkIntakeCreate(in ReworkIntakeCreate) (ReworkIntakeCreate, string, error) {
-	in.IntakeNo = strings.TrimSpace(in.IntakeNo)
-	in.Reason = strings.TrimSpace(in.Reason)
 	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
-	if in.IntakeNo == "" || in.Reason == "" || in.IdempotencyKey == "" || len(in.Items) == 0 || in.SourceShipmentID <= 0 ||
-		len([]rune(in.IntakeNo)) > 64 || len([]rune(in.Reason)) > 255 || len([]rune(in.IdempotencyKey)) > 128 {
+	if in.IdempotencyKey == "" || len([]rune(in.IdempotencyKey)) > 128 {
 		return ReworkIntakeCreate{}, "", ErrBadParam
 	}
-	in.Items = append([]ReworkIntakeItemCreate(nil), in.Items...)
-	sort.Slice(in.Items, func(i, j int) bool {
-		if in.Items[i].SourceShipmentItemID == in.Items[j].SourceShipmentItemID {
-			return in.Items[i].TargetProductionOrderItemID < in.Items[j].TargetProductionOrderItemID
-		}
-		return in.Items[i].SourceShipmentItemID < in.Items[j].SourceShipmentItemID
-	})
-	seen := map[int]struct{}{}
-	for i := range in.Items {
-		item := &in.Items[i]
-		if item.SourceShipmentItemID <= 0 || item.TargetProductionOrderItemID <= 0 || !validShipmentNetWeightQuantity(item.Quantity) {
-			return ReworkIntakeCreate{}, "", ErrBadParam
-		}
-		if _, exists := seen[item.SourceShipmentItemID]; exists {
-			return ReworkIntakeCreate{}, "", ErrBadParam
-		}
-		seen[item.SourceShipmentItemID] = struct{}{}
-		item.Note = normalizeOptionalString(item.Note)
-		if item.Note != nil && len([]rune(*item.Note)) > 255 {
-			return ReworkIntakeCreate{}, "", ErrBadParam
-		}
+	intakeNo, sourceShipmentID, reason, items, err := normalizeReworkIntakeEditableFields(
+		in.IntakeNo,
+		in.SourceShipmentID,
+		in.Reason,
+		in.Items,
+	)
+	if err != nil {
+		return ReworkIntakeCreate{}, "", err
 	}
+	in.IntakeNo = intakeNo
+	in.SourceShipmentID = sourceShipmentID
+	in.Reason = reason
+	in.Items = items
 	payload := struct {
 		IntakeNo         string                   `json:"intake_no"`
 		SourceShipmentID int                      `json:"source_shipment_id"`
@@ -374,6 +385,63 @@ func normalizeReworkIntakeCreate(in ReworkIntakeCreate) (ReworkIntakeCreate, str
 	}
 	sum := sha256.Sum256(encoded)
 	return in, hex.EncodeToString(sum[:]), nil
+}
+
+func normalizeReworkIntakeDraftSave(in ReworkIntakeDraftSave) (ReworkIntakeDraftSave, error) {
+	if in.ID <= 0 || in.ExpectedVersion <= 0 {
+		return ReworkIntakeDraftSave{}, ErrBadParam
+	}
+	intakeNo, sourceShipmentID, reason, items, err := normalizeReworkIntakeEditableFields(
+		in.IntakeNo,
+		in.SourceShipmentID,
+		in.Reason,
+		in.Items,
+	)
+	if err != nil {
+		return ReworkIntakeDraftSave{}, err
+	}
+	in.IntakeNo = intakeNo
+	in.SourceShipmentID = sourceShipmentID
+	in.Reason = reason
+	in.Items = items
+	return in, nil
+}
+
+func normalizeReworkIntakeEditableFields(
+	intakeNo string,
+	sourceShipmentID int,
+	reason string,
+	items []ReworkIntakeItemCreate,
+) (string, int, string, []ReworkIntakeItemCreate, error) {
+	intakeNo = strings.TrimSpace(intakeNo)
+	reason = strings.TrimSpace(reason)
+	if intakeNo == "" || reason == "" || len(items) == 0 || sourceShipmentID <= 0 ||
+		len([]rune(intakeNo)) > 64 || len([]rune(reason)) > 255 {
+		return "", 0, "", nil, ErrBadParam
+	}
+	normalizedItems := append([]ReworkIntakeItemCreate(nil), items...)
+	sort.Slice(normalizedItems, func(i, j int) bool {
+		if normalizedItems[i].SourceShipmentItemID == normalizedItems[j].SourceShipmentItemID {
+			return normalizedItems[i].TargetProductionOrderItemID < normalizedItems[j].TargetProductionOrderItemID
+		}
+		return normalizedItems[i].SourceShipmentItemID < normalizedItems[j].SourceShipmentItemID
+	})
+	seen := map[int]struct{}{}
+	for i := range normalizedItems {
+		item := &normalizedItems[i]
+		if item.SourceShipmentItemID <= 0 || item.TargetProductionOrderItemID <= 0 || !validShipmentNetWeightQuantity(item.Quantity) {
+			return "", 0, "", nil, ErrBadParam
+		}
+		if _, exists := seen[item.SourceShipmentItemID]; exists {
+			return "", 0, "", nil, ErrBadParam
+		}
+		seen[item.SourceShipmentItemID] = struct{}{}
+		item.Note = normalizeOptionalString(item.Note)
+		if item.Note != nil && len([]rune(*item.Note)) > 255 {
+			return "", 0, "", nil, ErrBadParam
+		}
+	}
+	return intakeNo, sourceShipmentID, reason, normalizedItems, nil
 }
 
 func normalizeProductionReworkFromIntakeCreate(in ProductionReworkFromIntakeCreate) (ProductionReworkFromIntakeCreate, error) {

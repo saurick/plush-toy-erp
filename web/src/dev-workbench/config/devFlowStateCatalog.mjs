@@ -163,11 +163,11 @@ export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
     'server/internal/data/model/schema/rework_intake.go',
     'rework_intakes_status_allowed'
   ),
-  'fact.production_exception_decision': entCheckContract(
+  'source.production_exception_decision': entCheckContract(
     'server/internal/data/model/schema/production_exception_decision.go',
     'production_exception_decisions_status_allowed'
   ),
-  'fact.production_exception_execution': entCheckContract(
+  'source.production_exception_execution': entCheckContract(
     'server/internal/data/model/schema/production_exception_decision.go',
     'production_exception_decisions_execution_allowed',
     'execution_status'
@@ -267,13 +267,16 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'fact.rework_intake:DRAFT->RECEIVED': pathMetadata(['returned']),
   'fact.rework_intake:DRAFT->CANCELLED': pathMetadata(['cancelled']),
   'fact.rework_intake:RECEIVED->REVERSED': pathMetadata(['reversed']),
-  'fact.production_exception_decision:SUBMITTED->REJECTED': pathMetadata([
+  'source.production_exception_decision:SUBMITTED->REJECTED': pathMetadata([
     'rejected',
   ]),
-  'fact.production_exception_decision:SUBMITTED->CANCELLED': pathMetadata([
+  'source.production_exception_decision:SUBMITTED->CANCELLED': pathMetadata([
     'cancelled',
   ]),
-  'fact.production_exception_execution:APPLIED->REVERSED': pathMetadata([
+  'source.production_exception_execution:PENDING->REVERSED': pathMetadata([
+    'reversed',
+  ]),
+  'source.production_exception_execution:APPLIED->REVERSED': pathMetadata([
     'reversed',
   ]),
   'fact.purchase_rejection_disposition:DRAFT->CANCELLED': pathMetadata([
@@ -1988,11 +1991,11 @@ const FLOW_DEFINITIONS = [
     ],
   },
   {
-    key: 'fact.production_exception_decision',
+    key: 'source.production_exception_decision',
     scopeKey: 'source_document',
     kind: 'state_machine',
     label: '生产异常决策',
-    summary: '异常申请经正式批准、拒绝或取消，和执行状态分开。',
+    summary: '异常申请在来源单据上记录正式批准、拒绝或取消决定。',
     states: [
       state('SUBMITTED', '已提交'),
       state('APPROVED', '已批准'),
@@ -2003,28 +2006,33 @@ const FLOW_DEFINITIONS = [
     terminalStates: ['APPROVED', 'REJECTED', 'CANCELLED'],
     transitions: [
       transition('SUBMITTED', 'APPROVED', {
-        guard: '批准数量、version、actor 和原因必须合法。',
-        action: 'approve_production_exception',
-        permission: ['quality.exception.handle'],
-        factBoundary: 'decision_only',
+        guard:
+          '审批人不得为申请人；批准数量、当前 version、流程节点和原因必须合法。',
+        action:
+          'OperationalFactUsecase.ApproveProductionExceptionForProcessCommand',
+        permission: ['production.exception.approve', 'workflow.task.approve'],
+        factBoundary: 'source_document_decision_only',
       }),
       transition('SUBMITTED', 'REJECTED', {
-        guard: '拒绝必须提供正式原因并匹配当前 version。',
-        action: 'reject_production_exception',
-        permission: ['quality.exception.handle'],
-        factBoundary: 'decision_only',
+        guard:
+          '审批人不得为申请人；拒绝必须提供正式原因并匹配当前 version 和流程节点。',
+        action:
+          'OperationalFactUsecase.RejectProductionExceptionForProcessCommand',
+        permission: ['production.exception.approve', 'workflow.task.reject'],
+        factBoundary: 'source_document_decision_only',
       }),
       transition('SUBMITTED', 'CANCELLED', {
         guard: '取消必须提供正式原因并匹配当前 version。',
         action: 'cancel_production_exception',
-        permission: ['quality.exception.handle'],
-        factBoundary: 'decision_only',
+        permission: ['production.exception.submit'],
+        factBoundary: 'source_document_decision_only',
       }),
     ],
     guard: 'APPROVED 只表示决策完成，不证明异常影响已执行。',
-    factBoundary: 'decision_only',
+    factBoundary: 'source_document_decision_only',
     sourceRefs: [
       'server/internal/biz/production_exception_decision.go',
+      'server/internal/biz/production_exception_process_command.go',
       'server/internal/data/production_exception_decision_repo.go',
       'server/internal/service/jsonrpc_operational_fact_exception.go',
     ],
@@ -2037,45 +2045,57 @@ const FLOW_DEFINITIONS = [
     ],
   },
   {
-    key: 'fact.production_exception_execution',
-    scopeKey: 'fact_ledger',
+    key: 'source.production_exception_execution',
+    scopeKey: 'source_document',
     kind: 'state_machine',
-    label: '生产异常执行状态',
-    summary: '已批准异常的实际影响从待执行到生效，再可正式冲正。',
+    label: '生产异常执行与额度状态',
+    summary:
+      '同一来源单据记录报废或在制让步是否执行，以及超领额度是否仍有效或已撤销。',
     states: [
-      state('PENDING', '待执行'),
-      state('APPLIED', '已生效'),
+      state('PENDING', '待执行或额度有效'),
+      state('APPLIED', '处置已执行'),
       state('REVERSED', '已冲正'),
     ],
     initialStates: ['PENDING'],
     terminalStates: ['REVERSED'],
     transitions: [
       transition('PENDING', 'APPLIED', {
-        guard: '决策必须 APPROVED，类型可执行且批准数量有效。',
-        action: 'execute_production_exception',
-        permission: ['production.fact.post'],
-        factBoundary: 'fact_ledger',
+        guard:
+          '决策必须 APPROVED；仅报废或在制让步可经执行任务办理，超领额度不得走执行命令。',
+        action:
+          'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
+        permission: ['workflow.task.complete', 'production.fact.post'],
+        factBoundary: 'source_document_execution_status_and_wip_effect',
       }),
-      transition('APPLIED', 'REVERSED', {
-        guard: '冲正必须匹配原影响、version、actor 和非空原因。',
+      transition('PENDING', 'REVERSED', {
+        guard:
+          '仅未被正常领料消费的超领额度可直接撤销；必须匹配当前 version、actor 和非空原因。',
         action: 'reverse_production_exception',
         permission: ['production.fact.post'],
-        factBoundary: 'fact_ledger',
+        factBoundary: 'source_document_allowance_reversal_only',
+      }),
+      transition('APPLIED', 'REVERSED', {
+        guard:
+          '仅已执行的报废或在制让步可冲正；必须匹配原在制影响、当前 version、actor 和非空原因。',
+        action: 'reverse_production_exception',
+        permission: ['production.fact.post'],
+        factBoundary: 'source_document_execution_status_and_wip_reversal',
       }),
     ],
-    guard: '执行状态不能用决策状态或 Workflow task 状态替代。',
-    factBoundary: 'fact_ledger',
+    guard:
+      'execution_status 是生产异常来源单据的子状态；它不能冒充 Fact，也不能由决策状态或 Workflow task 状态替代。',
+    factBoundary: 'source_document_execution_status_only',
     sourceRefs: [
       'server/internal/biz/production_exception_decision.go',
+      'server/internal/biz/production_exception_process_command.go',
       'server/internal/data/production_exception_decision_repo.go',
       'server/internal/service/jsonrpc_operational_fact_exception.go',
     ],
     evidence: [
-      ...factEvidence,
       evidence(
         'code',
         'server/internal/data/production_exception_decision_repo.go',
-        '异常执行和冲正的精确状态与事务门禁。'
+        '同一生产异常单上的执行、额度撤销和在制冲正门禁。'
       ),
     ],
   },
@@ -2538,11 +2558,12 @@ function processNode(
   }
 }
 
-function processEdge(from, to, branchPolicy = null) {
+function processEdge(from, to, branchPolicy = null, branchLabel = '') {
   return {
     from,
     to,
     ...(branchPolicy ? { branchPolicy } : {}),
+    ...(branchLabel ? { branchLabel } : {}),
     factBoundary: 'orchestration_only',
     sourceRefs: PROCESS_SOURCE_REFS,
   }
@@ -3022,7 +3043,7 @@ export const processDefinitions = Object.freeze(
         processNode(
           'production_exception_execution',
           'human_task',
-          '生产异常执行',
+          '报废或在制让步执行',
           {
             ownerPool: 'production',
             permission: ['workflow.task.complete'],
@@ -3041,7 +3062,7 @@ export const processDefinitions = Object.freeze(
             factBoundary: 'production_wip_via_domain_usecase',
           }
         ),
-        processNode('end', 'end', '结束'),
+        processNode('end', 'end', '处置执行结束'),
         processNode(
           'reject_production_exception',
           'domain_command',
@@ -3053,29 +3074,33 @@ export const processDefinitions = Object.freeze(
             factBoundary: 'source_document_only',
           }
         ),
-        processNode('rejected_end', 'end', '驳回结束'),
-        processNode('over_issue_end', 'end', '超领审批结束'),
+        processNode('rejected_end', 'end', '拒绝结束'),
+        processNode('over_issue_end', 'end', '超领额度批准结束'),
       ],
       edges: [
         processEdge(
           'production_exception_decision_approval',
           'approve_production_exception',
-          'production_exception.approval_outcome'
+          'production_exception.approval_outcome',
+          '批准'
         ),
         processEdge(
           'production_exception_decision_approval',
           'reject_production_exception',
-          'production_exception.approval_outcome'
+          'production_exception.approval_outcome',
+          '拒绝'
         ),
         processEdge(
           'approve_production_exception',
           'production_exception_execution',
-          'production_exception.execution_route'
+          'production_exception.execution_route',
+          '报废或在制让步'
         ),
         processEdge(
           'approve_production_exception',
           'over_issue_end',
-          'production_exception.execution_route'
+          'production_exception.execution_route',
+          '超领额度'
         ),
         processEdge(
           'production_exception_execution',

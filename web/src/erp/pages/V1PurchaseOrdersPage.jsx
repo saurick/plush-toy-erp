@@ -117,6 +117,12 @@ import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import { resolveBusinessLifecycleActions } from '../utils/businessActionAvailability.mjs'
 import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../utils/printWorkspace.js'
+import {
+  LIFECYCLE_SCOPE,
+  lifecycleScopeFromSearchParams,
+  lifecycleScopeIncludesStatus,
+  withLifecycleScopeSearchParam,
+} from '../utils/lifecycleScope.mjs'
 
 export default function V1PurchaseOrdersPage() {
   const outletContext = useOutletContext()
@@ -175,6 +181,9 @@ export default function V1PurchaseOrdersPage() {
   const [inboundReferenceDataState, setInboundReferenceDataState] =
     useState('loading')
   const [keyword, setKeyword] = useState('')
+  const [lifecycleScope, setLifecycleScope] = useState(() =>
+    lifecycleScopeFromSearchParams(searchParams)
+  )
   const [status, setStatus] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
   const [dateFilterField, setDateFilterField] = useState('purchase_date')
@@ -378,6 +387,7 @@ export default function V1PurchaseOrdersPage() {
       }),
       supplier_id: supplierFilter || undefined,
       lifecycle_status: status,
+      lifecycle_scope: lifecycleScope,
       date_field: dateFilterField,
       date_from: dateFilterStart || undefined,
       date_to: dateFilterEnd || undefined,
@@ -390,6 +400,7 @@ export default function V1PurchaseOrdersPage() {
     dateFilterStart,
     keyword,
     linkedKeyword,
+    lifecycleScope,
     routePurchaseOrderID,
     sortValue,
     status,
@@ -630,6 +641,11 @@ export default function V1PurchaseOrdersPage() {
               supplier_id: record.supplier_id,
               supplier_purchase_order_no:
                 record.supplier_purchase_order_no || '',
+              supplier_snapshot:
+                record.supplier_snapshot &&
+                typeof record.supplier_snapshot === 'object'
+                  ? record.supplier_snapshot
+                  : {},
               purchase_date: unixToDateInputValue(record.purchase_date),
               expected_arrival_date: unixToDateInputValue(
                 record.expected_arrival_date
@@ -1021,26 +1037,36 @@ export default function V1PurchaseOrdersPage() {
     keyword.trim() ||
       linkedKeyword ||
       routePurchaseOrderID ||
+      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
       status ||
       supplierFilter ||
       dateFilterStart ||
       dateFilterEnd
   )
-  const clearRouteContext = useCallback(() => {
-    const nextParams = clearLinkedDocumentParams(searchParams)
-    nextParams.delete('purchase_order_id')
-    setSearchParams(nextParams, { replace: true })
-    setPagination((current) => ({ ...current, current: 1 }))
-  }, [searchParams, setSearchParams])
+  const clearRouteContext = useCallback(
+    (resetScope = false) => {
+      const nextParams = clearLinkedDocumentParams(searchParams)
+      nextParams.delete('purchase_order_id')
+      setSearchParams(
+        resetScope
+          ? withLifecycleScopeSearchParam(nextParams, LIFECYCLE_SCOPE.CURRENT)
+          : nextParams,
+        { replace: true }
+      )
+      setPagination((current) => ({ ...current, current: 1 }))
+    },
+    [searchParams, setSearchParams]
+  )
   const clearFilters = useCallback(() => {
     setKeyword('')
+    setLifecycleScope(LIFECYCLE_SCOPE.CURRENT)
     setStatus('')
     setSupplierFilter('')
     setDateFilterField('purchase_date')
     setDateFilterStart('')
     setDateFilterEnd('')
     setPagination((current) => ({ ...current, current: 1 }))
-    clearRouteContext()
+    clearRouteContext(true)
   }, [clearRouteContext])
 
   const selectedOrders = useMemo(
@@ -1279,6 +1305,25 @@ export default function V1PurchaseOrdersPage() {
         hasActiveFilters={hasActiveFilters}
         itemsLoading={itemsLoading}
         keyword={resolvedRouteKeyword || linkedKeyword || keyword}
+        lifecycleScope={lifecycleScope}
+        onLifecycleScopeChange={(nextScope) => {
+          setLifecycleScope(nextScope)
+          if (
+            !lifecycleScopeIncludesStatus(nextScope, status, [
+              'closed',
+              'canceled',
+            ])
+          ) {
+            setStatus('')
+          }
+          const nextParams = clearLinkedDocumentParams(searchParams)
+          nextParams.delete('purchase_order_id')
+          setSearchParams(
+            withLifecycleScopeSearchParam(nextParams, nextScope),
+            { replace: true }
+          )
+          setPagination((current) => ({ ...current, current: 1 }))
+        }}
         showLifecyclePrimary={showLifecyclePrimary}
         showLifecycleMore={showLifecycleMore}
         loadOrders={loadOrders}

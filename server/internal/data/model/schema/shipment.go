@@ -24,6 +24,7 @@ var shipmentLockedFields = map[string]struct{}{
 	"rework_intake_id":             {},
 	"customer_id":                  {},
 	"status":                       {},
+	"version":                      {},
 	"idempotency_key":              {},
 	"shipped_at":                   {},
 	"total_net_weight_g":           {},
@@ -56,6 +57,7 @@ func (Shipment) Annotations() []schema.Annotation {
 				"shipments_finance_release_status_allowed":        "finance_release_status IN ('PENDING', 'APPROVED', 'REJECTED', 'NOT_REQUIRED')",
 				"shipments_purpose_source_bundle":                 "((purpose = 'SALES_DELIVERY' AND rework_intake_id IS NULL AND finance_release_status <> 'NOT_REQUIRED') OR (purpose = 'REWORK_RESHIPMENT' AND rework_intake_id IS NOT NULL AND sales_order_id IS NULL AND finance_release_status = 'NOT_REQUIRED'))",
 				"shipments_finance_release_version_positive":      "finance_release_version > 0",
+				"shipments_version_positive":                      "version > 0",
 				"shipments_total_net_weight_g_positive":           "total_net_weight_g IS NULL OR total_net_weight_g > 0",
 				"shipments_requested_total_net_weight_g_positive": "requested_total_net_weight_g IS NULL OR requested_total_net_weight_g > 0",
 			},
@@ -73,6 +75,7 @@ func (Shipment) Fields() []ent.Field {
 		// Snapshot preserves shipment-time display data; Customer remains the master truth.
 		field.String("customer_snapshot").Optional().Nillable().MaxLen(512),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
+		field.Int("version").Positive().Default(1),
 		field.String("finance_release_status").NotEmpty().Default("PENDING").MaxLen(32),
 		field.Int("finance_release_version").Positive().Default(1),
 		field.Time("finance_released_at").Optional().Nillable(),

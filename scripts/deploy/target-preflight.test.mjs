@@ -23,6 +23,9 @@ import {
 
 const SHA = "a".repeat(40);
 const BACKUP_HASH = "b".repeat(64);
+const RETENTION_CANDIDATE_SHAS = Array.from({ length: 9 }, (_, index) =>
+  (index + 1).toString(16).repeat(40),
+);
 
 function remoteReport(overrides = {}) {
   const values = {
@@ -50,8 +53,21 @@ function remoteReport(overrides = {}) {
     PUBLIC_PROVIDER: "passed",
     MIGRATION_LOCK_STATUS: "free",
     BACKUP_TOOLING_STATUS: "passed",
+    ARCHIVE_TOOLING_STATUS: "passed",
     LATEST_BACKUP_SHA256: BACKUP_HASH,
     LATEST_BACKUP_SIZE_BYTES: "612412",
+    RELEASE_DIRECTORY_COUNT: "20",
+    IDENTIFIED_RELEASE_COUNT: "13",
+    PROTECTED_RELEASE_COUNT: "4",
+    RETENTION_CANDIDATE_COUNT: String(RETENTION_CANDIDATE_SHAS.length),
+    RETENTION_CANDIDATE_BYTES: "123456",
+    RETENTION_CANDIDATE_SHAS: RETENTION_CANDIDATE_SHAS.join(","),
+    MANUAL_REVIEW_RELEASE_COUNT: "7",
+    FORMAL_CACHE_COUNT: "2",
+    OPERATION_DIRECTORY_COUNT: "25",
+    RETAINED_OPERATION_COUNT: "0",
+    STOPPED_PUBLIC_CONTAINER_COUNT: "4",
+    RETENTION_MODE: "preview_only",
     BLOCKERS: "none",
     ...overrides,
   };
@@ -67,6 +83,26 @@ test("target preflight parser returns bounded redacted evidence", () => {
   assert.equal(report.publicEntry.gitSha, SHA);
   assert.equal(report.publicEntry.endpoint, "https://admin.yoyoosun.net");
   assert.equal(report.backup.freshBackupRequiredForPromotion, true);
+  assert.deepEqual(report.archiveTooling, {
+    status: "passed",
+    zstdRequired: true,
+  });
+  assert.deepEqual(report.retention, {
+    mode: "preview_only",
+    releaseDirectoryCount: 20,
+    identifiedReleaseCount: 13,
+    protectedReleaseCount: 4,
+    candidateCount: 9,
+    candidateBytes: 123456,
+    candidateShas: RETENTION_CANDIDATE_SHAS,
+    manualReviewReleaseCount: 7,
+    formalCacheCount: 2,
+    operationDirectoryCount: 25,
+    retainedOperationCount: 0,
+    stoppedPublicContainerCount: 4,
+    deletionPerformed: false,
+    candidateStillRequiresManualReadback: true,
+  });
   assert.equal("ssh" in report, false);
   assert.doesNotMatch(JSON.stringify(report), /192\.168|\/home\/simon/u);
 });
@@ -91,6 +127,20 @@ test("target preflight parser fails closed on identity and blocker drift", () =>
     () =>
       parseRemoteTargetPreflight(`${remoteReport()}UNEXPECTED=/private/path\n`),
     /key is invalid/u,
+  );
+  assert.throws(
+    () =>
+      parseRemoteTargetPreflight(
+        remoteReport({ RETENTION_CANDIDATE_COUNT: "8" }),
+      ),
+    /retention candidate identity/u,
+  );
+  assert.throws(
+    () =>
+      parseRemoteTargetPreflight(
+        remoteReport({ MANUAL_REVIEW_RELEASE_COUNT: "6" }),
+      ),
+    /contradicts the fixed contract/u,
   );
   const partial = parseRemoteTargetPreflight(
     remoteReport({
@@ -260,6 +310,12 @@ test("remote target preflight script is read-only and contains no build command"
   );
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /\/usr\/bin\/rsync --version/u);
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /target_rsync_unavailable/u);
+  assert.match(
+    REMOTE_TARGET_PREFLIGHT_SCRIPT,
+    /target_archive_tooling_unavailable/u,
+  );
+  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /retention_mode=preview_only/u);
+  assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /release-cache/u);
   assert.match(REMOTE_TARGET_PREFLIGHT_SCRIPT, /PUBLIC_ENTRY_STATUS/u);
   assert.match(
     REMOTE_TARGET_PREFLIGHT_SCRIPT,

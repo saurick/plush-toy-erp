@@ -193,6 +193,17 @@ func TestBusinessAttachmentProductOwnerPermissions(t *testing.T) {
 	}
 }
 
+func TestBusinessAttachmentShipmentWritePermissionsIncludeDraftUpdate(t *testing.T) {
+	want := []string{
+		biz.PermissionShipmentCreate,
+		biz.PermissionShipmentUpdate,
+		biz.PermissionShipmentShip,
+	}
+	if got := businessAttachmentWritePermissions(biz.BusinessAttachmentOwnerShipment); !reflect.DeepEqual(got, want) {
+		t.Fatalf("shipment attachment write permissions = %#v, want %#v", got, want)
+	}
+}
+
 func TestBusinessAttachmentToAnyIncludesReadableUploaderAuditMetadata(t *testing.T) {
 	uploaderID := 7
 	uploaderUsername := "demo_boss"

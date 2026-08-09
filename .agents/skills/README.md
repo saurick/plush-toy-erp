@@ -10,7 +10,7 @@
 | `$plush-code-review-governance` | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查 |
 | `$plush-docs-governance` | 当前真源、文档清单、中文文件名、读者路径和 `progress.md` |
 | `$plush-domain-boundary-governance` | Workflow / Fact、Product Core、客户差异、schema/migration 设计与生成、usecase/API/RBAC 和字段真源 |
-| `$plush-git-closeout-queue` | 仅在多个 Codex 写任务真实共享 Local、出现混合 hunk / Git 锁或遗留现场时协调 writer 和 Git 收口 |
+| `$plush-git-closeout-queue` | 仅在多个 Codex 写任务真实共享 Local、出现混合 hunk / Git 锁或遗留现场时协调 writer、非阻塞远端发布等待、可恢复续跑和 Git 收口 |
 | `$plush-page-design-governance` | 普通 ERP 页面业务语义、字段/动作/状态、原型和浏览器回归 |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、纸张版式、字段映射、模板编辑与 PDF/打印保真 |
 | `$plush-seed-import-governance` | seed、fixture、模拟数据、import dry-run、批次与数据 cleanup 边界 |

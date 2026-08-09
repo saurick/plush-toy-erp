@@ -50,8 +50,6 @@ cd "$ROOT_DIR"
 # shellcheck disable=SC1091
 source "$ROOT_DIR/scripts/qa/critical-postgres-tests.sh"
 
-bash "$ROOT_DIR/scripts/qa/agents-size.sh"
-
 if ! command -v node >/dev/null 2>&1; then
   echo "[qa:fast] 未找到 node，请先安装 Node.js"
   exit 1
@@ -68,58 +66,96 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
+# ROOT_DIR pins the timing helper; ShellCheck cannot resolve this dynamic path.
+# shellcheck source=scripts/qa/lib/stage-timing.sh
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/qa/lib/stage-timing.sh"
+
+fast_gate_profile="${QA_FAST_GATE_PROFILE:-}"
+case "$fast_gate_profile" in
+"" | full | strict) ;;
+*)
+  echo "[qa:fast] status=incomplete reason=invalid_parent_gate profile=$fast_gate_profile"
+  exit 2
+  ;;
+esac
+
+qa_fast_run() {
+  local substep_id="$1"
+  shift
+  if [[ -n "$fast_gate_profile" ]]; then
+    qa_run_substep "$fast_gate_profile" shared "$substep_id" "$@"
+  else
+    "$@"
+  fi
+}
+
+qa_fast_repository_guards() {
+  bash "$ROOT_DIR/scripts/qa/agents-size.sh"
+
+  echo "[qa:fast] 运行 T0 diff whitespace 检查"
+  git diff --check
+  git diff --cached --check
+
+  bash "$ROOT_DIR/scripts/qa/db-guard.sh"
+
+  bash "$ROOT_DIR/scripts/qa/error-code-sync.sh"
+
+  echo "[qa:fast] 运行错误码魔法数字检查"
+  bash "$ROOT_DIR/scripts/qa/error-codes.sh"
+}
+
+qa_fast_node_tests() {
+  echo "[qa:fast] 运行 scripts Node 显式测试组 profile=$node_test_profile"
+  node "$ROOT_DIR/scripts/qa/run-node-tests.mjs" --profile "$node_test_profile"
+}
+
+qa_fast_script_boundaries() {
+  echo "[qa:fast] 运行关键脚本语法检查"
+  for script in \
+    "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.mjs" \
+    "$ROOT_DIR/scripts/qa/trial-account-rbac.mjs" \
+    "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.mjs"; do
+    node --check "$script"
+  done
+
+  echo "[qa:fast] 运行活跃路径阶段编号命名边界检查"
+  node "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs"
+
+  echo "[qa:fast] 运行行业模板候选边界检查"
+  node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
+
+  echo "[qa:fast] 运行多客户私有化复制边界检查"
+  node "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs"
+
+  echo "[qa:fast] 运行 yoyoosun 私有化部署资料包检查"
+  node "$ROOT_DIR/scripts/deploy/deployment-package-lint.mjs" --customer yoyoosun
+}
+
+qa_fast_customer_config() {
+  echo "[qa:fast] 运行客户配置边界检查"
+  node "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs"
+
+  echo "[qa:fast] 运行客户配置包结构检查"
+  node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer demo
+  node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer demo --mode compile
+  node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer yoyoosun
+  node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer yoyoosun --mode compile
+
+  echo "[qa:fast] 运行客户配置静态索引合同测试"
+  node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
+    --kind node --label customer-index -- \
+    node --test --test-reporter=tap "$ROOT_DIR/config/customers/index.test.mjs"
+
+  echo "[qa:fast] 运行全部登记客户配置的 preview manifest 检查"
+  node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --all --mode preview
+}
+
 node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile fast
-
-echo "[qa:fast] 运行 T0 diff whitespace 检查"
-git diff --check
-git diff --cached --check
-
-bash "$ROOT_DIR/scripts/qa/db-guard.sh"
-
-bash "$ROOT_DIR/scripts/qa/error-code-sync.sh"
-
-echo "[qa:fast] 运行错误码魔法数字检查"
-bash "$ROOT_DIR/scripts/qa/error-codes.sh"
-
-echo "[qa:fast] 运行 scripts Node 显式测试组 profile=$node_test_profile"
-node "$ROOT_DIR/scripts/qa/run-node-tests.mjs" --profile "$node_test_profile"
-
-echo "[qa:fast] 运行关键脚本语法检查"
-for script in \
-  "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.mjs" \
-  "$ROOT_DIR/scripts/qa/trial-account-rbac.mjs" \
-  "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.mjs"; do
-  node --check "$script"
-done
-
-echo "[qa:fast] 运行活跃路径阶段编号命名边界检查"
-node "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs"
-
-echo "[qa:fast] 运行行业模板候选边界检查"
-node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
-
-echo "[qa:fast] 运行多客户私有化复制边界检查"
-node "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs"
-
-echo "[qa:fast] 运行 yoyoosun 私有化部署资料包检查"
-node "$ROOT_DIR/scripts/deploy/deployment-package-lint.mjs" --customer yoyoosun
-
-echo "[qa:fast] 运行客户配置边界检查"
-node "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs"
-
-echo "[qa:fast] 运行客户配置包结构检查"
-node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer demo
-node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer demo --mode compile
-node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer yoyoosun
-node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer yoyoosun --mode compile
-
-echo "[qa:fast] 运行客户配置静态索引合同测试"
-node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
-  --kind node --label customer-index -- \
-  node --test --test-reporter=tap "$ROOT_DIR/config/customers/index.test.mjs"
-
-echo "[qa:fast] 运行全部登记客户配置的 preview manifest 检查"
-node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --all --mode preview
+qa_fast_run repository_guards qa_fast_repository_guards
+qa_fast_run node_tests qa_fast_node_tests
+qa_fast_run script_boundaries qa_fast_script_boundaries
+qa_fast_run customer_config qa_fast_customer_config
 
 if [[ "$fast_scope" == "base" ]]; then
   echo "[qa:fast] scope=base status=component_complete Web 全量与 server 全量由 full 同轮覆盖"

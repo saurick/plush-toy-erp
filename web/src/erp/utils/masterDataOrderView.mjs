@@ -1187,15 +1187,20 @@ export function buildBOMItemSourceValuesFromMaterial(material = {}) {
 }
 
 export function buildPurchaseOrderParams(values = {}, extra = {}) {
+  const supplierSnapshot =
+    Object.prototype.hasOwnProperty.call(extra, 'supplier_snapshot') &&
+    extra.supplier_snapshot &&
+    typeof extra.supplier_snapshot === 'object'
+      ? extra.supplier_snapshot
+      : values.supplier_snapshot && typeof values.supplier_snapshot === 'object'
+        ? values.supplier_snapshot
+        : {}
   return compactParams({
     ...extra,
     purchase_order_no: trimOptional(values.purchase_order_no),
     supplier_id: Number(values.supplier_id || 0),
     supplier_purchase_order_no: trimOptional(values.supplier_purchase_order_no),
-    supplier_snapshot:
-      values.supplier_snapshot && typeof values.supplier_snapshot === 'object'
-        ? values.supplier_snapshot
-        : {},
+    supplier_snapshot: supplierSnapshot,
     contract_party_snapshot: buildOptionalContractPartySnapshotParam(values),
     purchase_date: trimOptional(values.purchase_date),
     expected_arrival_date: trimOptional(values.expected_arrival_date),

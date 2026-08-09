@@ -9,6 +9,12 @@ const PRODUCTION_EXCEPTION_CHAIN_PATH =
 const INVALID_DEEP_LINK_PATH =
   `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=facts` +
   '&chain=retired-chain&fact=fact.retired&task_id=abc&extra=1'
+const STALE_PRODUCTION_EXCEPTION_PROCESS_PATH =
+  `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=chain&chain=all` +
+  '&process=production_exception_approval%2Fexception_decision_approval'
+const SALES_ORDER_STATE_RULES_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=states&flow=source.sales_order`
+const PRODUCTION_FACT_STATE_RULES_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=states&flow=fact.production`
+const REWORK_INTAKE_STATE_RULES_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=states&flow=fact.rework_intake`
 const TASK_LOOKUP_PATH = DEFAULT_CHAIN_PATH
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const READ_ONLY_WORKFLOW_METHODS = new Set([
@@ -343,6 +349,19 @@ function reportScenarioEvidence(name, evidence) {
   )
 }
 
+async function collectStateRuleEdgeStyles(graph) {
+  return graph.locator('.erp-markdown-mermaid__canvas svg').evaluate((svg) =>
+    [...svg.querySelectorAll('path.flowchart-link')].map((path) => {
+      const style = window.getComputedStyle(path)
+      return {
+        stroke: style.stroke,
+        strokeDasharray: style.strokeDasharray,
+        strokeWidth: style.strokeWidth,
+      }
+    })
+  )
+}
+
 async function expectTaskID(page, taskId) {
   await page.waitForFunction(
     (expected) =>
@@ -657,8 +676,43 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(
           await overviewView.locator('[data-overview-chain]').count(),
           12,
-          '默认总图必须只展示 12 条真实业务链的链级节点'
+          '默认总图必须只展示 12 条正式设计链的链级节点'
         )
+        assert.deepEqual(
+          await overviewView
+            .locator('[data-overview-lane]')
+            .evaluateAll((nodes) =>
+              nodes.map((node) => [node.dataset.overviewLane, node.open])
+            ),
+          [
+            ['primary', true],
+            ['supply', false],
+            ['exception', false],
+            ['correction', false],
+          ],
+          '总览默认只展开履约主链，其余分区按需展开'
+        )
+        const collapsedLaneMetrics = await overviewView
+          .locator('[data-overview-lane]:not([open])')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => {
+              const summary = node.querySelector('summary')
+              return {
+                key: node.dataset.overviewLane,
+                detailsHeight: node.getBoundingClientRect().height,
+                summaryHeight: summary?.getBoundingClientRect().height || 0,
+              }
+            })
+          )
+        assert.equal(collapsedLaneMetrics.length, 3)
+        for (const metric of collapsedLaneMetrics) {
+          assert(
+            metric.summaryHeight > 0 &&
+              metric.detailsHeight >= metric.summaryHeight &&
+              metric.detailsHeight <= metric.summaryHeight + 3,
+            `折叠分区不得被同一 Grid 行的展开分区拉伸：${JSON.stringify(metric)}`
+          )
+        }
         assert.equal(
           await overviewView.locator('[data-overview-relation]').count(),
           16,
@@ -675,6 +729,19 @@ export function createDevFlowStateObservatoryScenarios({
         )
         await overviewView.screenshot({
           path: 'output/playwright/style-l1/dev-flow-state-observatory-business-chain-overview.png',
+          animations: 'disabled',
+        })
+        const exceptionLane = overviewView.locator(
+          '[data-overview-lane="exception"]'
+        )
+        await exceptionLane.locator('summary').click()
+        assert.equal(
+          await exceptionLane.evaluate((node) => node.open),
+          true,
+          '异常与返工分区必须可用键盘或指针展开'
+        )
+        await overviewView.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-business-chain-exception-expanded.png',
           animations: 'disabled',
         })
         await overviewView
@@ -1010,13 +1077,13 @@ export function createDevFlowStateObservatoryScenarios({
           .locator('.ant-select-item-group')
           .allTextContents()
         assert.deepEqual(stateGroupLabels, [
-          '源单生命周期 · 6',
+          '源单生命周期 · 7',
           'MasterData 生命周期 · 2',
           'Workflow 协同任务 · 1',
           '业务进度投影 · 1',
           'ProcessRuntime · 2',
           'Fact / Ledger · 采购与质量 · 5',
-          'Fact / Ledger · 生产与库存 · 7',
+          'Fact / Ledger · 生产与库存 · 6',
           'Fact / Ledger · 委外与返工 · 3',
           'Fact / Ledger · 出货与财务 · 6',
           '客户配置控制面 · 1',
@@ -1489,6 +1556,7 @@ export function createDevFlowStateObservatoryScenarios({
             state: stateOptionMetrics,
             runtime: { groupCount: 0, optionCount: 7 },
           },
+          overviewLanes: { collapsed: collapsedLaneMetrics },
           guidance: {
             overview: overviewGuidance.metrics,
             collapsed: chainGuidance.metrics,
@@ -1606,6 +1674,428 @@ export function createDevFlowStateObservatoryScenarios({
           metrics,
           writeRequests,
         })
+      },
+    },
+    {
+      name: 'dev-flow-state-observatory-state-rules-dark',
+      path: SALES_ORDER_STATE_RULES_PATH,
+      viewport: { width: 1440, height: 900 },
+      themeMode: 'dark',
+      beforeNavigate: async (page) => {
+        startNoWriteAudit(page, writeRequestsByPage)
+      },
+      verify: async (page) => {
+        await waitForCatalog(page)
+        const stateView = page.locator('[data-flow-state-view="states"]')
+        const graph = stateView.locator('.erp-dev-flow-state-graph')
+        const transitions = stateView.locator(
+          '.erp-dev-flow-transitions > ol > li'
+        )
+        await graph
+          .locator('.erp-markdown-mermaid__canvas svg')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+
+        const overviewText = await stateView
+          .locator('.erp-dev-flow-state-overview')
+          .innerText()
+        for (const copy of [
+          '5\n个状态',
+          '6\n条合法转换',
+          '3\n条异常或纠正路径',
+          '2\n有明确终态',
+        ]) {
+          assert(overviewText.includes(copy), `销售订单状态概览缺少：${copy}`)
+        }
+        assert.equal(
+          await stateView
+            .locator('.erp-dev-flow-state-overview article')
+            .count(),
+          4
+        )
+        assert.equal(
+          await stateView
+            .locator(
+              '.erp-dev-flow-state-path-legend [data-path-group="normal"]'
+            )
+            .count(),
+          1
+        )
+        assert.equal(
+          await stateView
+            .locator('.erp-dev-flow-state-path-legend [data-path-group="stop"]')
+            .count(),
+          1
+        )
+        const diagramEdgeStyles = await collectStateRuleEdgeStyles(graph)
+        assert(
+          diagramEdgeStyles.some(
+            (item) =>
+              item.stroke === 'rgb(43, 138, 62)' &&
+              Number.parseFloat(item.strokeWidth) >= 2.25
+          ),
+          `销售订单图缺少绿色正常推进线：${JSON.stringify(diagramEdgeStyles)}`
+        )
+        assert(
+          diagramEdgeStyles.some(
+            (item) =>
+              item.stroke === 'rgb(207, 19, 34)' &&
+              Number.parseFloat(item.strokeWidth) >= 2.75
+          ),
+          `销售订单图缺少红色终止线：${JSON.stringify(diagramEdgeStyles)}`
+        )
+        assert.equal(await transitions.count(), 6)
+        assert.equal(
+          await stateView
+            .locator(
+              '.erp-dev-flow-transitions > ol > li[data-exceptional="true"]'
+            )
+            .count(),
+          3
+        )
+        assert.deepEqual(
+          await transitions.evaluateAll((nodes) =>
+            nodes.map(
+              (node) =>
+                node.querySelectorAll(
+                  '.erp-dev-flow-transition-explanation > div'
+                ).length
+            )
+          ),
+          [4, 4, 4, 4, 4, 4]
+        )
+
+        await stateView
+          .getByRole('button', { name: /已提交，中间状态/u })
+          .click()
+        await page.waitForFunction(
+          () =>
+            new URLSearchParams(window.location.search).get('state') ===
+              'submitted' &&
+            document.querySelectorAll(
+              '[data-flow-state-view="states"] .erp-dev-flow-transitions > ol > li'
+            ).length === 3
+        )
+        assert.equal(
+          await stateView
+            .getByRole('button', { name: '当前状态 3' })
+            .getAttribute('aria-pressed'),
+          'true'
+        )
+        const selectedStateText = await stateView
+          .locator('.erp-dev-flow-selected-state')
+          .innerText()
+        for (const copy of [
+          '1 条登记路径',
+          '2 条登记路径',
+          '其中 1 条属于异常或纠正',
+        ]) {
+          assert(
+            selectedStateText.includes(copy),
+            `已提交状态说明缺少：${copy}`
+          )
+        }
+
+        await stateView.getByRole('button', { name: '异常与纠正 3' }).click()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '[data-flow-state-view="states"] .erp-dev-flow-transitions > ol > li'
+            ).length === 3
+        )
+        assert.equal(
+          await stateView
+            .locator(
+              '.erp-dev-flow-transitions > ol > li[data-exceptional="true"]'
+            )
+            .count(),
+          3
+        )
+        await stateView.getByRole('button', { name: '全部 6' }).click()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '[data-flow-state-view="states"] .erp-dev-flow-transitions > ol > li'
+            ).length === 6
+        )
+
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-flow-state-observatory-state-rules-dark'
+        )
+        const metrics = await stateView.evaluate((node) => {
+          const overview = node.querySelector('.erp-dev-flow-state-overview')
+          const graphNode = node.querySelector('.erp-dev-flow-state-graph')
+          const filterButtons = [
+            ...node.querySelectorAll('.erp-dev-flow-transition-filters button'),
+          ]
+          const explanation = node.querySelector(
+            '.erp-dev-flow-transition-explanation'
+          )
+          return {
+            overviewColumns: window
+              .getComputedStyle(overview)
+              .gridTemplateColumns.trim()
+              .split(/\s+/u).length,
+            graphDisplay: window.getComputedStyle(graphNode).display,
+            graphVisible: graphNode.checkVisibility(),
+            filterButtonMinHeight: Math.min(
+              ...filterButtons.map(
+                (button) => button.getBoundingClientRect().height
+              )
+            ),
+            explanationColumns: window
+              .getComputedStyle(explanation)
+              .gridTemplateColumns.trim()
+              .split(/\s+/u).length,
+          }
+        })
+        assert.equal(metrics.overviewColumns, 4)
+        assert.notEqual(metrics.graphDisplay, 'none')
+        assert.equal(metrics.graphVisible, true)
+        assert(metrics.filterButtonMinHeight >= 32)
+        assert.equal(metrics.explanationColumns, 2)
+        const writeRequests = writeRequestsByPage.get(page) || []
+        assert.deepEqual(writeRequests, [], '状态规则查阅不得发出写请求')
+        await page.evaluate(() =>
+          window.scrollTo({ top: 0, behavior: 'instant' })
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-state-rules-dark-detail.png',
+          fullPage: true,
+          animations: 'disabled',
+        })
+
+        await stateView.getByRole('button', { name: '查看相关业务链' }).click()
+        await page.waitForFunction(() => {
+          const params = new URLSearchParams(window.location.search)
+          return (
+            params.get('view') === 'chain' &&
+            params.get('chain') === 'sales_to_production' &&
+            params.get('node') === 'sales_order'
+          )
+        })
+        {
+          const params = new URL(page.url()).searchParams
+          for (const key of ['flow', 'state', 'process', 'fact']) {
+            assert.equal(
+              params.has(key),
+              false,
+              `状态规则跨视图跳转不得保留 ${key}`
+            )
+          }
+        }
+        assert.deepEqual(writeRequests, [], '跨视图查阅不得发出写请求')
+        reportScenarioEvidence('dev-flow-state-observatory-state-rules-dark', {
+          metrics,
+          diagramEdgeStyles,
+          writeRequests,
+        })
+      },
+    },
+    {
+      name: 'dev-flow-state-observatory-state-rule-correction-paths-light',
+      path: REWORK_INTAKE_STATE_RULES_PATH,
+      viewport: { width: 1440, height: 900 },
+      themeMode: 'light',
+      beforeNavigate: async (page) => {
+        startNoWriteAudit(page, writeRequestsByPage)
+      },
+      verify: async (page) => {
+        await waitForCatalog(page)
+        const stateView = page.locator('[data-flow-state-view="states"]')
+        const graph = stateView.getByRole('region', {
+          name: '返工回厂状态转换图',
+        })
+        const svg = graph.locator('.erp-markdown-mermaid__canvas svg')
+        await svg.waitFor({ state: 'visible', timeout: 10_000 })
+
+        const diagramText = await svg.textContent()
+        for (const copy of ['返工 · 退回或回货', '取消 · 终止', '冲正']) {
+          assert(diagramText.includes(copy), `返工回厂图缺少动作标签：${copy}`)
+        }
+        const diagramEdgeStyles = await collectStateRuleEdgeStyles(graph)
+        assert(
+          diagramEdgeStyles.some(
+            (item) =>
+              item.stroke === 'rgb(207, 19, 34)' &&
+              Number.parseFloat(item.strokeWidth) >= 2.75
+          ),
+          `返工回厂图缺少红色取消线：${JSON.stringify(diagramEdgeStyles)}`
+        )
+        assert(
+          diagramEdgeStyles.some(
+            (item) =>
+              item.stroke === 'rgb(22, 119, 255)' &&
+              item.strokeDasharray !== 'none'
+          ),
+          `返工回厂图缺少蓝色纠正虚线：${JSON.stringify(diagramEdgeStyles)}`
+        )
+
+        const legendStyles = await stateView
+          .locator('.erp-dev-flow-state-path-legend article')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => {
+              const marker = node.querySelector('span')
+              const markerStyle = window.getComputedStyle(marker)
+              const markerRect = marker.getBoundingClientRect()
+              return {
+                group: node.dataset.pathGroup,
+                backgroundColor: markerStyle.backgroundColor,
+                width: markerRect.width,
+                height: markerRect.height,
+              }
+            })
+          )
+        assert.deepEqual(
+          legendStyles.map((item) => [item.group, item.backgroundColor]),
+          [
+            ['stop', 'rgb(207, 19, 34)'],
+            ['correction', 'rgb(22, 119, 255)'],
+          ]
+        )
+        assert(
+          legendStyles.every(
+            (item) =>
+              item.width >= 12 &&
+              item.height >= 12 &&
+              item.backgroundColor !== 'rgba(0, 0, 0, 0)'
+          ),
+          `路径图例必须使用醒目的实色圆点：${JSON.stringify(legendStyles)}`
+        )
+        assert.equal(
+          await stateView
+            .locator('.erp-dev-flow-transitions > ol > li')
+            .count(),
+          3
+        )
+        const transitionColors = await stateView
+          .locator('.erp-dev-flow-transitions > ol > li')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => ({
+              group: node.dataset.pathGroup,
+              borderLeftColor: window.getComputedStyle(node).borderLeftColor,
+            }))
+          )
+        assert.deepEqual(transitionColors, [
+          { group: 'correction', borderLeftColor: 'rgb(22, 119, 255)' },
+          { group: 'stop', borderLeftColor: 'rgb(207, 19, 34)' },
+          { group: 'correction', borderLeftColor: 'rgb(22, 119, 255)' },
+        ])
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-flow-state-observatory-state-rule-correction-paths-light'
+        )
+        const graphMetrics = await graph.evaluate((node) => ({
+          visible: node.checkVisibility(),
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
+        }))
+        assert.equal(graphMetrics.visible, true)
+        assert(graphMetrics.clientWidth > 0)
+        const writeRequests = writeRequestsByPage.get(page) || []
+        assert.deepEqual(
+          writeRequests,
+          [],
+          '返工回厂状态规则查阅不得发出写请求'
+        )
+        await page.evaluate(() =>
+          window.scrollTo({ top: 0, behavior: 'instant' })
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-state-rule-correction-paths-light.png',
+          fullPage: true,
+          animations: 'disabled',
+        })
+        reportScenarioEvidence(
+          'dev-flow-state-observatory-state-rule-correction-paths-light',
+          {
+            diagramEdgeStyles,
+            graphMetrics,
+            legendStyles,
+            transitionColors,
+            writeRequests,
+          }
+        )
+      },
+    },
+    {
+      name: 'dev-flow-state-observatory-state-rules-mobile-dark',
+      path: PRODUCTION_FACT_STATE_RULES_PATH,
+      viewport: { width: 390, height: 844 },
+      themeMode: 'dark',
+      beforeNavigate: async (page) => {
+        startNoWriteAudit(page, writeRequestsByPage)
+      },
+      verify: async (page) => {
+        await waitForCatalog(page)
+        const stateView = page.locator('[data-flow-state-view="states"]')
+        const graph = stateView.locator('.erp-dev-flow-state-graph')
+        const transitions = stateView.locator(
+          '.erp-dev-flow-transitions > ol > li'
+        )
+        assert.equal(await graph.isVisible(), false)
+        assert.equal(await transitions.count(), 2)
+        await stateView.getByRole('button', { name: '异常与纠正 2' }).click()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '[data-flow-state-view="states"] .erp-dev-flow-transitions > ol > li[data-exceptional="true"]'
+            ).length === 2
+        )
+        await expectText(page, '返工与再处理')
+        await expectText(page, '纠正与退回')
+        await expectText(
+          page,
+          '仅当本次生产事实登记为“返工”时；其他类型仍按正常过账路径理解。'
+        )
+
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-flow-state-observatory-state-rules-mobile-dark'
+        )
+        const metrics = await stateView.evaluate((node) => {
+          const columns = (selector) =>
+            window
+              .getComputedStyle(node.querySelector(selector))
+              .gridTemplateColumns.trim()
+              .split(/\s+/u).length
+          const graphNode = node.querySelector('.erp-dev-flow-state-graph')
+          const stateList = node.querySelector('.erp-dev-flow-state-list ul')
+          return {
+            overviewColumns: columns('.erp-dev-flow-state-overview'),
+            explanationColumns: columns('.erp-dev-flow-transition-explanation'),
+            relatedActionColumns: columns(
+              '.erp-dev-flow-state-related-actions'
+            ),
+            graphDisplay: window.getComputedStyle(graphNode).display,
+            stateListClientHeight: stateList.clientHeight,
+            stateListScrollHeight: stateList.scrollHeight,
+            stateListOverflowY: window.getComputedStyle(stateList).overflowY,
+          }
+        })
+        assert.equal(metrics.overviewColumns, 2)
+        assert.equal(metrics.explanationColumns, 1)
+        assert.equal(metrics.relatedActionColumns, 1)
+        assert.equal(metrics.graphDisplay, 'none')
+        assert.equal(metrics.stateListOverflowY, 'visible')
+        assert(
+          metrics.stateListScrollHeight <= metrics.stateListClientHeight + 1,
+          '移动端状态清单不得形成嵌套滚动'
+        )
+        const writeRequests = writeRequestsByPage.get(page) || []
+        assert.deepEqual(writeRequests, [], '移动端状态规则查阅不得发出写请求')
+        await page.evaluate(() =>
+          window.scrollTo({ top: 0, behavior: 'instant' })
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-flow-state-observatory-state-rules-mobile-dark.png',
+          fullPage: true,
+          animations: 'disabled',
+        })
+        reportScenarioEvidence(
+          'dev-flow-state-observatory-state-rules-mobile-dark',
+          { metrics, writeRequests }
+        )
       },
     },
     {
@@ -1797,8 +2287,8 @@ export function createDevFlowStateObservatoryScenarios({
         await waitForCatalog(page)
         await expectText(page, '无效或过期深链接')
         await expectText(page, '未知 query 参数：extra')
-        await expectText(page, '未知或过期业务链：retired-chain')
-        await expectText(page, '看已生效结果视图不接受参数：chain')
+        await expectText(page, '未知 Fact Key：fact.retired')
+        await expectText(page, 'task_id 必须是大于 0 的整数')
         assert.equal(
           await page.locator('.erp-dev-flow-view-stack').count(),
           0,
@@ -1818,6 +2308,23 @@ export function createDevFlowStateObservatoryScenarios({
         await page
           .locator('[data-business-chain-overview]')
           .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.goto(
+          new URL(STALE_PRODUCTION_EXCEPTION_PROCESS_PATH, page.url()).href
+        )
+        await waitForCatalog(page)
+        await page.waitForFunction(
+          () =>
+            `${window.location.pathname}${window.location.search}` ===
+            '/__dev/status-flows?view=chain&chain=all'
+        )
+        await page
+          .locator('[data-business-chain-overview]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await page.getByText('无效或过期深链接', { exact: false }).count(),
+          0,
+          '旧 process 选择不得让业务总图进入错误态'
+        )
         await assertNoHorizontalOverflow(
           page,
           'dev-flow-state-observatory-invalid-deep-link'
@@ -2302,21 +2809,21 @@ export function createDevFlowStateObservatoryScenarios({
             .allTextContents(),
           [
             '采购与质量 · 5',
-            '生产与库存 · 7',
+            '生产与库存 · 6',
             '委外与返工 · 3',
             '出货与财务 · 6',
           ]
         )
         assert.equal(
           await factDropdown.locator('.ant-select-item-option').count(),
-          21,
+          20,
           'Fact 下拉必须按四个导航分组精确覆盖全部定义'
         )
         assert.equal(
           await factDropdown
             .locator('.erp-dev-flow-definition-option__key')
             .count(),
-          21,
+          20,
           '开发观察台必须保留全部机器键，但降低其视觉权重'
         )
         const factSelectMetrics = await factDropdown.evaluate((node) => {

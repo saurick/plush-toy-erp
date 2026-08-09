@@ -15,7 +15,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactReworkIntake(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "list_rework_intake_source_candidates":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionReworkIntakeCreate); res != nil {
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionReworkIntakeCreate, biz.PermissionReworkIntakeUpdate); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
@@ -27,6 +27,11 @@ func (d *jsonrpcDispatcher) handleOperationalFactReworkIntake(
 		filter, ok := reworkIntakeSourceCandidateFilterFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
+		}
+		if filter.EditingReworkIntakeDraftID > 0 {
+			if res := d.RequireAdminPermission(ctx, biz.PermissionReworkIntakeUpdate); res != nil {
+				return id, res, nil
+			}
 		}
 		items, total, err := d.operationalFactUC.ListReworkIntakeSourceCandidates(ctx, filter)
 		if err != nil {
@@ -53,6 +58,22 @@ func (d *jsonrpcDispatcher) handleOperationalFactReworkIntake(
 			return id, invalidParamResult(), nil
 		}
 		item, err := d.operationalFactUC.CreateReworkIntake(ctx, in, actorID)
+		return id, operationalFactReworkIntakeResult(ctx, d, item, err), nil
+	case "save_rework_intake_draft":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionReworkIntakeUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "rework_intakes", "shipments", "production_orders"); res != nil {
+			return id, res, nil
+		}
+		in, ok := reworkIntakeDraftSaveFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.SaveReworkIntakeDraft(ctx, in, actorID)
 		return id, operationalFactReworkIntakeResult(ctx, d, item, err), nil
 	case "receive_rework_intake":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionReworkIntakeReceive); res != nil {
@@ -201,6 +222,65 @@ func reworkIntakeCreateFromParams(pm map[string]any) (*biz.ReworkIntakeCreate, b
 	}, true
 }
 
+func reworkIntakeDraftSaveFromParams(pm map[string]any) (*biz.ReworkIntakeDraftSave, bool) {
+	if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "intake_no", "source_shipment_id", "reason", "items") {
+		return nil, false
+	}
+	id, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+	if !ok {
+		return nil, false
+	}
+	expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+	if !ok {
+		return nil, false
+	}
+	sourceShipmentID, ok := getRequiredJSONRPCPositiveInt(pm, "source_shipment_id")
+	if !ok {
+		return nil, false
+	}
+	rawItems, ok := pm["items"].([]any)
+	if !ok || len(rawItems) == 0 {
+		return nil, false
+	}
+	items := make([]biz.ReworkIntakeItemCreate, 0, len(rawItems))
+	for _, raw := range rawItems {
+		params, ok := raw.(map[string]any)
+		if !ok || !productionCompletionAllowsOnly(params, "source_shipment_item_id", "target_production_order_item_id", "quantity", "note") {
+			return nil, false
+		}
+		sourceItemID, ok := getRequiredJSONRPCPositiveInt(params, "source_shipment_item_id")
+		if !ok {
+			return nil, false
+		}
+		targetItemID, ok := getRequiredJSONRPCPositiveInt(params, "target_production_order_item_id")
+		if !ok {
+			return nil, false
+		}
+		quantity, ok := getRequiredJSONRPCNumeric20Scale6(params, "quantity")
+		if !ok {
+			return nil, false
+		}
+		note, ok := getOptionalShipmentString(params, "note")
+		if !ok {
+			return nil, false
+		}
+		items = append(items, biz.ReworkIntakeItemCreate{
+			SourceShipmentItemID:        sourceItemID,
+			TargetProductionOrderItemID: targetItemID,
+			Quantity:                    quantity,
+			Note:                        note,
+		})
+	}
+	return &biz.ReworkIntakeDraftSave{
+		ID:               id,
+		ExpectedVersion:  expectedVersion,
+		IntakeNo:         getString(pm, "intake_no"),
+		SourceShipmentID: sourceShipmentID,
+		Reason:           getString(pm, "reason"),
+		Items:            items,
+	}, true
+}
+
 func reworkIntakeTransitionFromParams(pm map[string]any, requireReason bool) (*biz.ReworkIntakeTransition, bool) {
 	keys := []string{"customer_key", "id", "expected_version"}
 	if requireReason {
@@ -256,13 +336,19 @@ func reworkIntakeFilterFromParams(pm map[string]any) (biz.ReworkIntakeFilter, bo
 }
 
 func reworkIntakeSourceCandidateFilterFromParams(pm map[string]any) (biz.ReworkIntakeSourceCandidateFilter, bool) {
-	if !productionCompletionAllowsOnly(pm, "keyword", "source_shipment_id", "limit", "offset") {
+	if !productionCompletionAllowsOnly(pm, "keyword", "source_shipment_id", "rework_intake_id", "limit", "offset") {
 		return biz.ReworkIntakeSourceCandidateFilter{}, false
 	}
 	filter := biz.ReworkIntakeSourceCandidateFilter{Keyword: getString(pm, "keyword"), Limit: 50}
 	var ok bool
 	if _, exists := pm["source_shipment_id"]; exists {
 		filter.SourceShipmentID, ok = getRequiredJSONRPCPositiveInt(pm, "source_shipment_id")
+		if !ok {
+			return biz.ReworkIntakeSourceCandidateFilter{}, false
+		}
+	}
+	if _, exists := pm["rework_intake_id"]; exists {
+		filter.EditingReworkIntakeDraftID, ok = getRequiredJSONRPCPositiveInt(pm, "rework_intake_id")
 		if !ok {
 			return biz.ReworkIntakeSourceCandidateFilter{}, false
 		}

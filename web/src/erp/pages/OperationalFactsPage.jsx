@@ -3,6 +3,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   DownOutlined,
+  EditOutlined,
   EyeOutlined,
   LinkOutlined,
   PrinterOutlined,
@@ -47,6 +48,8 @@ import BusinessAttachmentModalButton from '../components/business-list/BusinessA
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import ProductionReworkModal from '../components/production-facts/ProductionReworkModal.jsx'
+import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
+import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionReworkProgressModal from '../components/production-orders/ProductionReworkProgressModal.jsx'
 import {
   routeWithQuery,
@@ -71,8 +74,16 @@ import {
   createProductionReworkFromCompletion,
   createReconciliationFromFinanceFact,
   listAllProductionFacts,
+  listProductionOrderMaterialRequirements,
+  saveProductionCompletionDraft,
+  saveProductionMaterialIssueDraft,
+  saveProductionReworkFromCompletionDraft,
+  saveProductionReworkFromIntakeDraft,
 } from '../api/operationalFactApi.mjs'
 import { getProductionWip } from '../api/productionWipApi.mjs'
+import { getProductionOrder } from '../api/productionOrderApi.mjs'
+import { listAllWarehouses } from '../api/masterDataOrderApi.mjs'
+import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
   buildFinanceBusinessSourcePayload,
@@ -102,6 +113,17 @@ import {
 } from '../components/operational-facts/OperationalFactForms.jsx'
 import { hasRequiredOperationalFactDraftSource } from '../utils/operationalFactDraftSource.mjs'
 import {
+  OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS,
+  buildOperationalFactDraftSavePayload,
+  findOperationalFactDraftSaveResult,
+  operationalFactDraftFormValues,
+} from '../utils/operationalFactDraftEdit.mjs'
+import { filterProductionMaterialIssueLots } from '../utils/productionMaterialIssueAction.mjs'
+import {
+  uniqueReferenceOptions,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
+import {
   businessRecordInventoryRouteFor,
   businessSourceRouteFor,
   sourceRouteFor,
@@ -121,6 +143,39 @@ import {
   getOperationalFactAttachmentOwnerType,
   sourceTypeLabel,
 } from '../components/operational-facts/operationalFactPageConfig.mjs'
+
+function productionDraftSaveActionFor(record = {}) {
+  const factType = String(record?.fact_type || '').toUpperCase()
+  const sourceType = String(record?.source_type || '').toUpperCase()
+  if (factType === 'MATERIAL_ISSUE' && sourceType === 'PRODUCTION_ORDER') {
+    return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
+  }
+  if (
+    factType === 'FINISHED_GOODS_RECEIPT' &&
+    sourceType === 'PRODUCTION_ORDER'
+  ) {
+    return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION
+  }
+  if (factType === 'REWORK' && sourceType === 'PRODUCTION_FACT') {
+    return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION
+  }
+  if (factType === 'REWORK' && sourceType === 'REWORK_INTAKE') {
+    return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE
+  }
+  return ''
+}
+
+function productionDraftEditPermission(action) {
+  if (
+    action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
+  ) {
+    return 'production.material_issue.create'
+  }
+  if (action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION) {
+    return 'production.completion.create'
+  }
+  return 'production.rework.create'
+}
 
 export function OperationalFactWorkspace({
   pageTitle = '业务记录处理',
@@ -156,6 +211,10 @@ export function OperationalFactWorkspace({
     useState(null)
   const [productionReworkProgressLoading, setProductionReworkProgressLoading] =
     useState(false)
+  const [productionDraftEditContext, setProductionDraftEditContext] =
+    useState(null)
+  const [productionDraftEditLoading, setProductionDraftEditLoading] =
+    useState(false)
   const [rowsByKey, setRowsByKey] = useState({})
   const [totalByKey, setTotalByKey] = useState({})
   const [paginationByKey, setPaginationByKey] = useState({})
@@ -173,6 +232,7 @@ export function OperationalFactWorkspace({
   const productionReworkInFlightRef = useRef(false)
   const productionReworkRequestRef = useRef(0)
   const productionReworkProgressRequestRef = useRef(0)
+  const productionDraftEditRequestRef = useRef(0)
   const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
     'sales_order_id'
@@ -206,6 +266,7 @@ export function OperationalFactWorkspace({
       listRequestVersionRef.current += 1
       productionReworkRequestRef.current += 1
       productionReworkProgressRequestRef.current += 1
+      productionDraftEditRequestRef.current += 1
     }
   }, [])
 
@@ -327,9 +388,25 @@ export function OperationalFactWorkspace({
     adminProfile,
     'production.rework.create'
   )
+  const canEditAnyProductionDraft = [
+    'production.material_issue.create',
+    'production.completion.create',
+    'production.rework.create',
+  ].some((permission) => hasActionPermission(adminProfile, permission))
   const canViewProductionReworkProgress =
     hasActionPermission(adminProfile, 'production.fact.read') &&
     hasActionPermission(adminProfile, 'production.wip.read')
+  const selectedProductionDraftSaveAction =
+    currentActiveKey === 'production' && activeSelectedRow?.status === 'DRAFT'
+      ? productionDraftSaveActionFor(activeSelectedRow)
+      : ''
+  const canEditSelectedProductionDraft = Boolean(
+    selectedProductionDraftSaveAction &&
+      hasActionPermission(
+        adminProfile,
+        productionDraftEditPermission(selectedProductionDraftSaveAction)
+      )
+  )
 
   const resetPaginationForKey = useCallback(
     (key = currentActiveKey) => {
@@ -543,9 +620,7 @@ export function OperationalFactWorkspace({
       ...(usesStrictFactLifecycle
         ? {
             expected_version: row.version,
-            ...(activeCustomerKey
-              ? { customer_key: activeCustomerKey }
-              : {}),
+            ...(activeCustomerKey ? { customer_key: activeCustomerKey } : {}),
           }
         : currentActiveKey === 'outsourcing' && activeCustomerKey
           ? { customer_key: activeCustomerKey }
@@ -597,6 +672,242 @@ export function OperationalFactWorkspace({
     }
     setSaving(false)
     return true
+  }
+
+  const openProductionDraftEditor = async (record) => {
+    const action = productionDraftSaveActionFor(record)
+    if (
+      !action ||
+      record?.status !== 'DRAFT' ||
+      !hasActionPermission(adminProfile, productionDraftEditPermission(action))
+    ) {
+      message.warning('当前记录状态或权限已变化，请刷新后重试')
+      return
+    }
+    const requestID = productionDraftEditRequestRef.current + 1
+    productionDraftEditRequestRef.current = requestID
+    setProductionDraftEditLoading(true)
+    try {
+      const exactData = await listAllProductionFacts({
+        keyword: String(record.id),
+      })
+      if (productionDraftEditRequestRef.current !== requestID) return
+      const fresh = (exactData?.production_facts || []).find(
+        (item) => Number(item?.id || 0) === Number(record.id)
+      )
+      if (
+        !fresh ||
+        fresh.status !== 'DRAFT' ||
+        productionDraftSaveActionFor(fresh) !== action
+      ) {
+        message.warning('草稿状态或来源已变化，请刷新后重试')
+        return
+      }
+      const initialValues = operationalFactDraftFormValues(fresh)
+      if (
+        action ===
+          OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION ||
+        action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE
+      ) {
+        setProductionDraftEditContext({
+          kind: 'rework',
+          action,
+          record: fresh,
+          initialValues,
+        })
+        return
+      }
+      const orderID = Number(fresh.source_id || 0)
+      if (!orderID) throw new Error('生产来源不完整')
+      const [aggregate, warehouseData, lotData, factData, requirements] =
+        await Promise.all([
+          getProductionOrder(orderID),
+          listAllWarehouses({ active_only: true }),
+          listAllInventoryLots(
+            action ===
+              OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
+              ? {
+                  subject_type: 'MATERIAL',
+                  subject_id: fresh.subject_id,
+                  warehouse_id: fresh.warehouse_id,
+                  status: 'ACTIVE',
+                }
+              : { status: 'ACTIVE' }
+          ),
+          listAllProductionFacts({
+            source_type: 'PRODUCTION_ORDER',
+            source_id: orderID,
+          }),
+          action ===
+          OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
+            ? listProductionOrderMaterialRequirements({
+                customer_key: activeCustomerKey || undefined,
+                production_order_id: orderID,
+              })
+            : Promise.resolve([]),
+        ])
+      if (productionDraftEditRequestRef.current !== requestID) return
+      const warehouseOptions = uniqueReferenceOptions(
+        warehouseData?.warehouses,
+        warehouseOptionFromRecord
+      )
+      const facts = Array.isArray(factData?.production_facts)
+        ? factData.production_facts
+        : []
+      const lots = Array.isArray(lotData?.inventory_lots)
+        ? lotData.inventory_lots
+        : []
+      if (
+        action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
+      ) {
+        const requirement = (
+          Array.isArray(requirements) ? requirements : []
+        ).find((item) => Number(item?.id || 0) === Number(fresh.source_line_id))
+        const orderItem = (aggregate?.items || []).find(
+          (item) =>
+            Number(item?.id || 0) ===
+            Number(requirement?.production_order_item_id || 0)
+        )
+        if (!requirement || !orderItem) throw new Error('生产领料来源已变化')
+        setProductionDraftEditContext({
+          kind: 'material',
+          action,
+          record: fresh,
+          initialValues,
+          order: aggregate.order,
+          orderItem,
+          requirement,
+          warehouseOptions,
+          lots: filterProductionMaterialIssueLots(requirement, lots),
+        })
+        return
+      }
+      const wipAggregate = fresh.production_wip_batch_id
+        ? await getProductionWip(orderID)
+        : null
+      if (productionDraftEditRequestRef.current !== requestID) return
+      setProductionDraftEditContext({
+        kind: 'completion',
+        action,
+        record: fresh,
+        initialValues: {
+          ...initialValues,
+          production_order_item_id: fresh.source_line_id,
+          production_wip_batch_id: fresh.production_wip_batch_id,
+        },
+        order: aggregate.order,
+        items: aggregate.items || [],
+        facts,
+        wipAggregate,
+        warehouseOptions,
+        lots,
+      })
+    } catch (error) {
+      if (productionDraftEditRequestRef.current === requestID) {
+        message.error(getActionErrorMessage(error, '加载生产草稿'))
+      }
+    } finally {
+      if (productionDraftEditRequestRef.current === requestID) {
+        setProductionDraftEditLoading(false)
+      }
+    }
+  }
+
+  const loadProductionDraftMaterialLots = async (warehouseID) => {
+    const context = productionDraftEditContext
+    const requestID = productionDraftEditRequestRef.current
+    if (context?.kind !== 'material' || !Number(warehouseID || 0)) return
+    setProductionDraftEditLoading(true)
+    try {
+      const data = await listAllInventoryLots({
+        subject_type: 'MATERIAL',
+        subject_id: context.requirement.material_id,
+        warehouse_id: Number(warehouseID),
+        status: 'ACTIVE',
+      })
+      if (productionDraftEditRequestRef.current !== requestID) return
+      setProductionDraftEditContext((current) =>
+        current?.kind === 'material'
+          ? {
+              ...current,
+              lots: filterProductionMaterialIssueLots(
+                current.requirement,
+                data?.inventory_lots
+              ),
+            }
+          : current
+      )
+    } catch (error) {
+      if (productionDraftEditRequestRef.current === requestID) {
+        message.error(getActionErrorMessage(error, '加载材料批次'))
+      }
+    } finally {
+      if (productionDraftEditRequestRef.current === requestID) {
+        setProductionDraftEditLoading(false)
+      }
+    }
+  }
+
+  const closeProductionDraftEditor = () => {
+    productionDraftEditRequestRef.current += 1
+    setProductionDraftEditLoading(false)
+    setProductionDraftEditContext(null)
+  }
+
+  const submitProductionDraftEdit = async (values) => {
+    const context = productionDraftEditContext
+    if (!context?.record?.id || productionDraftEditLoading) return
+    let request
+    try {
+      request = {
+        ...buildOperationalFactDraftSavePayload(
+          context.action,
+          values,
+          context.record
+        ),
+        ...(activeCustomerKey ? { customer_key: activeCustomerKey } : {}),
+      }
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '准备草稿内容'))
+      return
+    }
+    const saveByAction = {
+      [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE]:
+        saveProductionMaterialIssueDraft,
+      [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION]:
+        saveProductionCompletionDraft,
+      [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION]:
+        saveProductionReworkFromCompletionDraft,
+      [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE]:
+        saveProductionReworkFromIntakeDraft,
+    }
+    const save = saveByAction[context.action]
+    if (!save) return
+    setProductionDraftEditLoading(true)
+    try {
+      try {
+        await save(request, context.record)
+      } catch (error) {
+        if (!isSourceBusinessActionResultUnknown(error)) throw error
+        const data = await listAllProductionFacts({
+          keyword: String(context.record.id),
+        })
+        const confirmed = findOperationalFactDraftSaveResult(
+          data?.production_facts,
+          request,
+          context.record,
+          context.action
+        )
+        if (!confirmed) throw error
+      }
+      setProductionDraftEditContext(null)
+      message.success('生产草稿已保存，请核对后再过账')
+      await loadRows('production')
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '保存生产草稿'))
+    } finally {
+      setProductionDraftEditLoading(false)
+    }
   }
 
   const openProductionRework = async (source) => {
@@ -936,9 +1247,7 @@ export function OperationalFactWorkspace({
       const exactProductionFactID =
         currentActiveKey === 'production' ? Number(routeFactID || 0) : 0
       const exactRouteContext = Boolean(
-        routeFactID ||
-          routeSalesOrderID ||
-          (routeSourceType && routeSourceID)
+        routeFactID || routeSalesOrderID || (routeSourceType && routeSourceID)
       )
       const data =
         exactProductionFactID > 0
@@ -957,10 +1266,8 @@ export function OperationalFactWorkspace({
                   })
                 ),
                 date_field: activeDateField,
-                date_from:
-                  dateRangeByKey[currentActiveKey]?.[0] || undefined,
-                date_to:
-                  dateRangeByKey[currentActiveKey]?.[1] || undefined,
+                date_from: dateRangeByKey[currentActiveKey]?.[0] || undefined,
+                date_to: dateRangeByKey[currentActiveKey]?.[1] || undefined,
                 ...(activeConfig.listParams || {}),
                 ...routeListParamsForKey(currentActiveKey),
               }),
@@ -1103,9 +1410,7 @@ export function OperationalFactWorkspace({
       items.push({
         key,
         disabled: !available,
-        label: (
-          <span title={available ? '' : unavailableReason}>{label}</span>
-        ),
+        label: <span title={available ? '' : unavailableReason}>{label}</span>,
       })
     }
 
@@ -1510,8 +1815,48 @@ export function OperationalFactWorkspace({
               </Popconfirm>
             </BusinessActionTooltip>
           ) : null}
-          {currentActiveKey === 'production' &&
-          canCreateProductionRework ? (
+          {currentActiveKey === 'production' && canEditAnyProductionDraft ? (
+            <BusinessActionTooltip
+              disabled={
+                !activeSelectedRow ||
+                activeSelectedRow.status !== 'DRAFT' ||
+                !selectedProductionDraftSaveAction ||
+                !canEditSelectedProductionDraft ||
+                productionDraftEditLoading
+              }
+              disabledReason={
+                !activeSelectedRow
+                  ? '请先选择一条生产记录'
+                  : activeSelectedRow.status !== 'DRAFT'
+                    ? '只有未过账草稿可以编辑'
+                    : !selectedProductionDraftSaveAction
+                      ? '该记录来源不支持直接编辑，请作废后重新办理'
+                      : !canEditSelectedProductionDraft
+                        ? '当前账号没有维护该类生产草稿的权限'
+                        : '正在读取草稿完整内容'
+              }
+            >
+              <Button
+                size="small"
+                icon={<EditOutlined />}
+                data-business-action-key="production-fact-edit-draft"
+                disabled={
+                  !activeSelectedRow ||
+                  activeSelectedRow.status !== 'DRAFT' ||
+                  !selectedProductionDraftSaveAction ||
+                  !canEditSelectedProductionDraft ||
+                  productionDraftEditLoading
+                }
+                loading={
+                  productionDraftEditLoading && !productionDraftEditContext
+                }
+                onClick={() => openProductionDraftEditor(activeSelectedRow)}
+              >
+                编辑草稿
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {currentActiveKey === 'production' && canCreateProductionRework ? (
             <BusinessActionTooltip
               disabled={
                 !activeSelectedRow ||
@@ -1717,8 +2062,7 @@ export function OperationalFactWorkspace({
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {currentActiveKey === 'outsourcing' &&
-          canViewOutsourcingPayable ? (
+          {currentActiveKey === 'outsourcing' && canViewOutsourcingPayable ? (
             <BusinessActionTooltip
               disabled={
                 !activeSelectedRow ||
@@ -2040,7 +2384,7 @@ export function OperationalFactWorkspace({
       {columnOrderModal}
       <BusinessRecordDetailsModal
         columns={visibleColumns}
-        description="当前弹窗只用于查看记录；如需确认、结清、取消、返工或继续办理，请使用列表上方的当前操作区。"
+        description="当前弹窗只用于查看记录；如需编辑草稿、确认、结清、取消、返工或继续办理，请使用列表上方的当前操作区。"
         open={Boolean(detailRecord)}
         record={detailRecord}
         title={`${activeConfig.title}详情`}
@@ -2054,6 +2398,46 @@ export function OperationalFactWorkspace({
         loading={financeSourceLoading}
         onCancel={closeFinanceSourceAction}
         onSubmit={submitFinanceSourceAction}
+      />
+      <ProductionMaterialIssueModal
+        open={productionDraftEditContext?.kind === 'material'}
+        mode="edit"
+        initialValues={productionDraftEditContext?.initialValues}
+        order={productionDraftEditContext?.order}
+        orderItem={productionDraftEditContext?.orderItem}
+        requirement={productionDraftEditContext?.requirement}
+        warehouseOptions={productionDraftEditContext?.warehouseOptions}
+        lots={productionDraftEditContext?.lots}
+        loading={productionDraftEditLoading}
+        lotsLoading={productionDraftEditLoading}
+        onWarehouseChange={loadProductionDraftMaterialLots}
+        onCancel={closeProductionDraftEditor}
+        onSubmit={submitProductionDraftEdit}
+      />
+      <ProductionCompletionModal
+        open={productionDraftEditContext?.kind === 'completion'}
+        mode="edit"
+        initialValues={productionDraftEditContext?.initialValues}
+        excludeFactID={productionDraftEditContext?.record?.id}
+        order={productionDraftEditContext?.order}
+        items={productionDraftEditContext?.items}
+        facts={productionDraftEditContext?.facts}
+        wipAggregate={productionDraftEditContext?.wipAggregate}
+        warehouseOptions={productionDraftEditContext?.warehouseOptions}
+        lots={productionDraftEditContext?.lots}
+        loading={productionDraftEditLoading}
+        onCancel={closeProductionDraftEditor}
+        onSubmit={submitProductionDraftEdit}
+      />
+      <ProductionReworkModal
+        open={productionDraftEditContext?.kind === 'rework'}
+        mode="edit"
+        source={productionDraftEditContext?.record}
+        facts={[]}
+        initialValues={productionDraftEditContext?.initialValues}
+        loading={productionDraftEditLoading}
+        onCancel={closeProductionDraftEditor}
+        onSubmit={submitProductionDraftEdit}
       />
       <ProductionReworkModal
         open={Boolean(productionReworkContext)}
@@ -2069,16 +2453,13 @@ export function OperationalFactWorkspace({
         order={productionReworkProgressContext?.order}
         aggregate={productionReworkProgressContext?.aggregate}
         facts={productionReworkProgressContext?.facts}
-        focusReworkFactID={
-          productionReworkProgressContext?.focusReworkFactID
-        }
+        focusReworkFactID={productionReworkProgressContext?.focusReworkFactID}
         loading={productionReworkProgressLoading}
         onCancel={closeProductionReworkProgress}
         onContinue={
           canOpenRelatedPath(V1_ROUTE_PATHS.productionOrders)
             ? () => {
-                const orderID =
-                  productionReworkProgressContext?.order?.id
+                const orderID = productionReworkProgressContext?.order?.id
                 closeProductionReworkProgress()
                 navigate(
                   routeWithQuery(V1_ROUTE_PATHS.productionOrders, {

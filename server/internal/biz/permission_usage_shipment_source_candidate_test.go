@@ -3,15 +3,38 @@ package biz
 import "testing"
 
 func TestShipmentSourcePermissionUsageRequiresAllHandlerPermissions(t *testing.T) {
-	for _, methodName := range []string{
-		"list_shipment_source_candidates",
-		"create_shipment_with_items",
-	} {
-		for _, permissionKey := range []string{
-			PermissionShipmentCreate,
-			PermissionSalesOrderRead,
-			PermissionSalesOrderItemRead,
-		} {
+	tests := []struct {
+		methodName     string
+		permissionKeys []string
+	}{
+		{
+			methodName: "list_shipment_source_candidates",
+			permissionKeys: []string{
+				PermissionShipmentCreate,
+				PermissionShipmentUpdate,
+				PermissionSalesOrderRead,
+				PermissionSalesOrderItemRead,
+			},
+		},
+		{
+			methodName: "create_shipment_with_items",
+			permissionKeys: []string{
+				PermissionShipmentCreate,
+				PermissionSalesOrderRead,
+				PermissionSalesOrderItemRead,
+			},
+		},
+		{
+			methodName: "save_shipment_draft",
+			permissionKeys: []string{
+				PermissionShipmentUpdate,
+				PermissionSalesOrderRead,
+				PermissionSalesOrderItemRead,
+			},
+		},
+	}
+	for _, tt := range tests {
+		for _, permissionKey := range tt.permissionKeys {
 			usage, ok := PermissionUsageFor(permissionKey)
 			if !ok {
 				t.Fatalf("permission usage missing for %s", permissionKey)
@@ -19,13 +42,13 @@ func TestShipmentSourcePermissionUsageRequiresAllHandlerPermissions(t *testing.T
 			found := false
 			for _, surface := range usage.Surfaces {
 				for _, method := range surface.BackendMethods {
-					if method.Domain == "operational_fact" && method.Method == methodName {
+					if method.Domain == "operational_fact" && method.Method == tt.methodName {
 						found = true
 					}
 				}
 			}
 			if !found {
-				t.Errorf("permission %s does not describe %s", permissionKey, methodName)
+				t.Errorf("permission %s does not describe %s", permissionKey, tt.methodName)
 			}
 		}
 	}

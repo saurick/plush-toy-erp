@@ -24,6 +24,8 @@ const DEV_VERSION_CENTER_VIEW_VALUES = new Set([
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/u
 const VERSION_PATTERN = /^[0-9A-Za-z](?:[0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$/u
+const TIMESTAMP_WITH_TIME_ZONE_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.]\d+)?(?:Z|[+-]\d{2}:\d{2})$/u
 const OPERATION_STATUSES = new Set([
   'queued',
   'running',
@@ -118,6 +120,8 @@ const PIPELINE_LABELS = Object.freeze({
   'Persist the canonical exact-SHA terminal': '保存 Exact-SHA 权威严格回执',
   'Set up pinned Buildx for the shared release graph':
     '为共享发布图准备固定版本 Buildx',
+  'Install the source scanner and archive compressor':
+    '安装源码扫描器与制品压缩工具',
   'Restore the checksum-verified source scanner archive':
     '恢复已校验和的源码扫描器',
   'Download the recovered strict terminal': '下载已恢复的严格回执',
@@ -356,6 +360,55 @@ function validTargetCacheMetrics(metrics) {
   )
 }
 
+function validOperationTimeline(operation) {
+  if (
+    typeof operation.createdAt !== 'string' ||
+    typeof operation.updatedAt !== 'string' ||
+    !TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(operation.createdAt) ||
+    !TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(operation.updatedAt) ||
+    !Array.isArray(operation.events) ||
+    operation.events.length < 1 ||
+    operation.events.length > 100
+  ) {
+    return false
+  }
+
+  const createdAt = Date.parse(operation.createdAt)
+  const updatedAt = Date.parse(operation.updatedAt)
+  if (
+    !Number.isFinite(createdAt) ||
+    !Number.isFinite(updatedAt) ||
+    createdAt > updatedAt
+  ) {
+    return false
+  }
+
+  let previousEventAt = createdAt
+  for (const event of operation.events) {
+    const eventAt = Date.parse(String(event?.at || ''))
+    if (
+      !OPERATION_STATUSES.has(event?.status) ||
+      typeof event?.at !== 'string' ||
+      !TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(event.at) ||
+      !Number.isFinite(eventAt) ||
+      eventAt < previousEventAt ||
+      eventAt > updatedAt ||
+      typeof event?.message !== 'string' ||
+      event.message.length < 1 ||
+      event.message.length > 500
+    ) {
+      return false
+    }
+    previousEventAt = eventAt
+  }
+
+  const lastEvent = operation.events.at(-1)
+  return (
+    lastEvent.status === operation.status &&
+    lastEvent.at === operation.updatedAt
+  )
+}
+
 function validateOperation(operation) {
   assertObject(operation, 'delivery operation')
   if (
@@ -364,6 +417,7 @@ function validateOperation(operation) {
     !SHA_PATTERN.test(String(operation.gitSha || '')) ||
     !VERSION_PATTERN.test(String(operation.version || '')) ||
     !OPERATION_STATUSES.has(operation.status) ||
+    !validOperationTimeline(operation) ||
     !Number.isSafeInteger(operation.durationMs) ||
     operation.durationMs < 0 ||
     !Array.isArray(operation.stages) ||
@@ -377,7 +431,6 @@ function validateOperation(operation) {
         stage.durationMs < 0
     ) ||
     !Array.isArray(operation.issues) ||
-    !Array.isArray(operation.events) ||
     !operation.metrics ||
     [
       'transferBytes',
@@ -518,6 +571,9 @@ function validateVersion(version) {
     !VERSION_PATTERN.test(String(version.version || '')) ||
     version.tag !== `artifact-${version.gitSha}` ||
     !['published', 'draft', 'prerelease'].includes(version.status) ||
+    typeof version.publishedAt !== 'string' ||
+    !TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(version.publishedAt) ||
+    !Number.isFinite(Date.parse(version.publishedAt)) ||
     typeof version.completeAssets !== 'boolean' ||
     !Array.isArray(version.assets) ||
     !version.artifactSummary ||
@@ -726,6 +782,20 @@ export function shortGitSha(value) {
   return SHA_PATTERN.test(String(value || ''))
     ? String(value).slice(0, 12)
     : '未证明'
+}
+
+export function formatDeliveryTimestamp(value, missing = '时间未证明') {
+  const timestamp = Date.parse(String(value || ''))
+  if (!Number.isFinite(timestamp)) return missing
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(timestamp))
 }
 
 export function formatDeliveryBytes(value) {
@@ -956,6 +1026,8 @@ export function summarizePipelineTimings(timings) {
           id: `${String(job.id)}:${String(step.number)}`,
           name: step.name,
           group: job.name,
+          startedAt: step.startedAt,
+          finishedAt: step.finishedAt,
           durationMs: step.durationMs,
           status: step.status,
           conclusion: step.conclusion,
@@ -966,6 +1038,8 @@ export function summarizePipelineTimings(timings) {
               id: String(job.id),
               name: job.name,
               group: analysisRun.workflow,
+              startedAt: job.startedAt,
+              finishedAt: job.finishedAt,
               durationMs: job.durationMs,
               status: job.status,
               conclusion: job.conclusion,

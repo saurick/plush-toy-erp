@@ -1,6 +1,7 @@
 import React from 'react'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
 
+import DevDeliveryTimestamp from './DevDeliveryTimestamp.jsx'
 import {
   deliveryPipelinePresentation,
   deliveryPipelineRunModePresentation,
@@ -11,20 +12,37 @@ import {
   formatDeliveryDuration,
   formatDeliveryPercent,
   formatDeliveryRate,
+  formatDeliveryTimestamp,
   shortGitSha,
   summarizePipelineTimings,
 } from '../config/devDelivery.mjs'
 
 const { Link, Text, Title } = Typography
 
-function formatTimestamp(value) {
+function formatClockTimestamp(value) {
   const timestamp = Date.parse(value || '')
   if (!Number.isFinite(timestamp)) return '时间未证明'
   return new Intl.DateTimeFormat('zh-CN', {
-    dateStyle: 'short',
-    timeStyle: 'medium',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   }).format(new Date(timestamp))
+}
+
+function hasTimestampRange(startedAt, finishedAt) {
+  return (
+    Number.isFinite(Date.parse(startedAt || '')) &&
+    Number.isFinite(Date.parse(finishedAt || ''))
+  )
+}
+
+function formatTimestampRange(startedAt, finishedAt, { compact = false } = {}) {
+  if (!hasTimestampRange(startedAt, finishedAt)) return '运行时间未证明'
+  if (compact) {
+    return `${formatClockTimestamp(startedAt)}–${formatClockTimestamp(finishedAt)}`
+  }
+  return `${formatDeliveryTimestamp(startedAt)}–${formatDeliveryTimestamp(finishedAt)}`
 }
 
 function formatJobDuration(job) {
@@ -33,7 +51,12 @@ function formatJobDuration(job) {
   return formatDeliveryDuration(job.durationMs)
 }
 
-export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
+export function DevTimingBars({
+  stages = [],
+  totalDurationMs = 0,
+  limit = 8,
+  showTimeRange = false,
+}) {
   const visibleStages = stages.slice(0, limit)
   if (visibleStages.length === 0) {
     return (
@@ -58,14 +81,17 @@ export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
           100,
           Math.max(2, Math.round((stage.durationMs / denominator) * 100))
         )
+        const timingTitle = hasTimestampRange(stage.startedAt, stage.finishedAt)
+          ? `；运行时间：${formatTimestampRange(stage.startedAt, stage.finishedAt)}`
+          : ''
         return (
           <li key={stage.id} className="erp-dev-timing-bars__item">
             <div className="erp-dev-timing-bars__label">
               <span
                 title={
                   groupPresentation
-                    ? `${stagePresentation.title}；所属任务：${groupPresentation.title}`
-                    : stagePresentation.title
+                    ? `${stagePresentation.title}；所属任务：${groupPresentation.title}${timingTitle}`
+                    : `${stagePresentation.title}${timingTitle}`
                 }
               >
                 <Text strong>{stagePresentation.label}</Text>
@@ -73,7 +99,16 @@ export function DevTimingBars({ stages = [], totalDurationMs = 0, limit = 8 }) {
                   <Text type="secondary"> · {groupPresentation.label}</Text>
                 ) : null}
               </span>
-              <Text>{formatDeliveryDuration(stage.durationMs)}</Text>
+              <span className="erp-dev-timing-bars__meta">
+                {showTimeRange ? (
+                  <Text type="secondary">
+                    {formatTimestampRange(stage.startedAt, stage.finishedAt, {
+                      compact: true,
+                    })}
+                  </Text>
+                ) : null}
+                <Text>{formatDeliveryDuration(stage.durationMs)}</Text>
+              </span>
             </div>
             <div
               className="erp-dev-timing-bars__track"
@@ -159,6 +194,7 @@ export function DevPipelineStatusStrip({
                 ? deliveryPipelineRunModePresentation(summary.latestMode)
                 : '等待 GitHub 运行回执'}
             </Text>
+            <DevDeliveryTimestamp value={latestRun?.finishedAt} />
           </div>
           <div>
             <Text type="secondary">最近完整发布</Text>
@@ -171,6 +207,7 @@ export function DevPipelineStatusStrip({
               严格门禁 {formatJobDuration(strictJob)} · 发布制品{' '}
               {formatJobDuration(publishJob)}
             </Text>
+            <DevDeliveryTimestamp value={latestFullRelease?.finishedAt} />
           </div>
           <div>
             <Text type="secondary">构建缓存</Text>
@@ -183,6 +220,11 @@ export function DevPipelineStatusStrip({
               制品总计{' '}
               {formatDeliveryBytes(release?.artifactSummary?.totalBytes)}
             </Text>
+            <DevDeliveryTimestamp
+              value={release?.publishedAt}
+              action="发布于"
+              missing="发布时间未证明"
+            />
           </div>
           <div>
             <Text type="secondary">最近真实部署</Text>
@@ -196,6 +238,7 @@ export function DevPipelineStatusStrip({
                 ? `${targetCache.status} · 实传 ${formatDeliveryBytes(deploymentOperation.metrics.transferBytes)}`
                 : '等待包含制品传输的部署回执'}
             </Text>
+            <DevDeliveryTimestamp value={deploymentOperation?.updatedAt} />
           </div>
         </div>
       </Card>
@@ -233,6 +276,29 @@ export default function DevPipelineTimingPanel({
           )
         )
       : null
+  const analysisJobs = analysisRun?.jobs || []
+  const [expandedJobIds, setExpandedJobIds] = React.useState([])
+
+  React.useEffect(() => {
+    setExpandedJobIds([])
+  }, [analysisRun?.id])
+
+  const expandedJobIdSet = new Set(expandedJobIds)
+  const expandedJobCount = analysisJobs.filter((job) =>
+    expandedJobIdSet.has(job.id)
+  ).length
+  const allJobsExpanded =
+    analysisJobs.length > 0 && expandedJobCount === analysisJobs.length
+
+  const setJobExpanded = (jobId, open) => {
+    setExpandedJobIds((current) => {
+      const currentlyOpen = current.includes(jobId)
+      if (currentlyOpen === open) return current
+      return open
+        ? [...current, jobId]
+        : current.filter((currentJobId) => currentJobId !== jobId)
+    })
+  }
 
   return (
     <Card className="erp-dev-pipeline-timing" variant="borderless">
@@ -246,7 +312,7 @@ export default function DevPipelineTimingPanel({
           </Text>
         </div>
         <Text type="secondary">
-          统计读取：{formatTimestamp(timings?.generatedAt)}
+          统计读取：{formatDeliveryTimestamp(timings?.generatedAt)}
         </Text>
       </div>
 
@@ -269,6 +335,7 @@ export default function DevPipelineTimingPanel({
                 同类型中位数 {formatDeliveryDuration(summary.medianDurationMs)}{' '}
                 · {summary.sampleCount} 次
               </Text>
+              <DevDeliveryTimestamp value={latestRun.finishedAt} />
             </div>
             <div>
               <Text type="secondary">最近完整发布</Text>
@@ -284,6 +351,9 @@ export default function DevPipelineTimingPanel({
                   ? 'CI strict 回执已可信复用；Release 未重复执行门禁'
                   : `完整发布中位数 ${formatDeliveryDuration(summary.fullReleaseMedianDurationMs)} · ${String(summary.fullReleaseSampleCount)} 次`}
               </Text>
+              <DevDeliveryTimestamp
+                value={summary.latestFullRelease?.finishedAt}
+              />
             </div>
             <div>
               <Text type="secondary">构建缓存与制品</Text>
@@ -306,6 +376,11 @@ export default function DevPipelineTimingPanel({
                 · Web{' '}
                 {formatDeliveryBytes(release?.artifactSummary?.webImageBytes)}
               </Text>
+              <DevDeliveryTimestamp
+                value={release?.publishedAt}
+                action="发布于"
+                missing="发布时间未证明"
+              />
             </div>
             <div>
               <Text type="secondary">最近真实部署与传输</Text>
@@ -326,6 +401,7 @@ export default function DevPipelineTimingPanel({
                     : `${formatDeliveryRate(deploymentOperation.metrics.transferBytesPerSecond)}${transferShare === null ? '' : ` · 占总耗时 ${String(transferShare)}%`}`
                   : '相同 SHA 复用不计为目标写入'}
               </Text>
+              <DevDeliveryTimestamp value={deploymentOperation?.updatedAt} />
             </div>
           </div>
 
@@ -355,8 +431,7 @@ export default function DevPipelineTimingPanel({
             </Link>
           </div>
 
-          <details className="erp-dev-pipeline-timing__details">
-            <summary>展开完整发布关键路径与全部环节</summary>
+          <div className="erp-dev-pipeline-timing__analysis">
             <div className="erp-dev-pipeline-timing__critical-path">
               <Text strong>观测关键路径</Text>
               <Text>
@@ -374,41 +449,93 @@ export default function DevPipelineTimingPanel({
                   .join(' → ') || '尚未识别'}
               </Text>
             </div>
+            <div className="erp-dev-pipeline-timing__slowest-heading">
+              <Text strong>耗时最长环节</Text>
+              <Text type="secondary">按单环节耗时排序，最多显示 8 项</Text>
+            </div>
             <DevTimingBars
               stages={summary.stages}
               totalDurationMs={analysisRun?.durationMs}
             />
-            <div className="erp-dev-pipeline-timing__jobs">
-              {(analysisRun?.jobs || []).map((job) => {
-                const jobName = deliveryPipelinePresentation(job.name)
-                const jobStatus = deliveryStatusPresentation(
-                  job.conclusion || job.status
-                )
-                return (
-                  <article key={job.id}>
-                    <Space wrap>
-                      <Text strong title={jobName.title}>
-                        {jobName.label}
-                      </Text>
-                      <Tag color={jobStatus.color}>{jobStatus.label}</Tag>
-                      <Text type="secondary">
-                        {formatDeliveryDuration(job.durationMs)}
-                      </Text>
-                    </Space>
-                    <DevTimingBars
-                      stages={job.steps.map((step) => ({
-                        ...step,
-                        id: `${String(job.id)}:${String(step.number)}`,
-                        label: step.name,
-                      }))}
-                      totalDurationMs={job.durationMs || analysisRun.durationMs}
-                      limit={100}
-                    />
-                  </article>
-                )
-              })}
-            </div>
-          </details>
+          </div>
+
+          {analysisJobs.length > 0 ? (
+            <details className="erp-dev-pipeline-timing__details">
+              <summary>
+                查看全部 job / step（{String(analysisJobs.length)} 个 job）
+              </summary>
+              <div className="erp-dev-pipeline-timing__jobs-toolbar">
+                <Text type="secondary">
+                  各 job 默认收起；可逐项查看步骤时间，或统一展开。
+                </Text>
+                <Space wrap>
+                  <Button
+                    onClick={() =>
+                      setExpandedJobIds(analysisJobs.map((job) => job.id))
+                    }
+                    disabled={allJobsExpanded}
+                  >
+                    全部展开
+                  </Button>
+                  <Button
+                    onClick={() => setExpandedJobIds([])}
+                    disabled={expandedJobCount === 0}
+                  >
+                    全部收起
+                  </Button>
+                </Space>
+              </div>
+              <div className="erp-dev-pipeline-timing__jobs">
+                {analysisJobs.map((job) => {
+                  const jobName = deliveryPipelinePresentation(job.name)
+                  const jobStatus = deliveryStatusPresentation(
+                    job.conclusion || job.status
+                  )
+                  return (
+                    <details
+                      key={job.id}
+                      open={expandedJobIdSet.has(job.id)}
+                      onToggle={(event) =>
+                        setJobExpanded(job.id, event.currentTarget.open)
+                      }
+                    >
+                      <summary>
+                        <Text strong title={jobName.title}>
+                          {jobName.label}
+                        </Text>
+                        <Tag color={jobStatus.color}>{jobStatus.label}</Tag>
+                        <Text type="secondary">
+                          {formatDeliveryDuration(job.durationMs)}
+                        </Text>
+                        <Text type="secondary">
+                          {formatTimestampRange(job.startedAt, job.finishedAt)}
+                        </Text>
+                      </summary>
+                      <div className="erp-dev-pipeline-timing__job-steps">
+                        <DevTimingBars
+                          stages={job.steps.map((step) => ({
+                            ...step,
+                            id: `${String(job.id)}:${String(step.number)}`,
+                            label: step.name,
+                          }))}
+                          totalDurationMs={
+                            job.durationMs || analysisRun.durationMs
+                          }
+                          limit={100}
+                          showTimeRange
+                        />
+                      </div>
+                    </details>
+                  )
+                })}
+              </div>
+            </details>
+          ) : (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="该次运行未返回 job / step 时间"
+            />
+          )}
         </section>
       )}
     </Card>

@@ -80,9 +80,23 @@ test('seedData: 权限菜单不混入前端文档、开发验收或通用帮助�
   assert(!navPaths.some((path) => path.startsWith('/erp/qa/')))
 })
 
-test('seedData: 已登录账号统一获得岗位使用帮助入口', () => {
+test('seedData: 已登录账号统一获得历史查询与岗位使用帮助入口', () => {
   const authenticatedSections = getAuthenticatedNavigationSections()
   assert.deepEqual(authenticatedSections, [
+    {
+      key: 'history',
+      title: '历史查询',
+      items: [
+        {
+          key: 'history-records',
+          label: '历史记录中心',
+          path: '/erp/history',
+          shortLabel: '历史',
+          description: '只读查询有权查看的已关闭、已取消、已归档和已停用记录。',
+          access: 'authenticated',
+        },
+      ],
+    },
     {
       key: 'help',
       title: '使用帮助',
@@ -176,6 +190,7 @@ test('businessModules: 功能预览态阻断客户业务数据页', () => {
   assert.equal(isCustomerBusinessDataPageKey('processing-contracts'), true)
   assert.equal(isCustomerBusinessDataPageKey('shipments'), true)
   assert.equal(isCustomerBusinessDataPageKey('customers'), true)
+  assert.equal(isCustomerBusinessDataPageKey('history-records'), true)
   assert.equal(isCustomerBusinessDataPageKey('exception-flow'), false)
 
   assert.equal(isCustomerBusinessDataPageKey('global-dashboard'), false)

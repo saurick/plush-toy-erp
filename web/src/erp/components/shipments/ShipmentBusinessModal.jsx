@@ -649,7 +649,7 @@ function ShipmentItemsTable({
 
 export default function ShipmentBusinessModal({
   canCreate = false,
-  canShip = false,
+  canUpdate = false,
   canImportSalesOrderSource = false,
   customerOptions = [],
   form,
@@ -657,6 +657,7 @@ export default function ShipmentBusinessModal({
   inventoryLots = [],
   inventoryLotOptions = [],
   isCreateModal = false,
+  isEditModal = false,
   isViewModal = false,
   modalSelectedShipment,
   onCancel,
@@ -691,6 +692,8 @@ export default function ShipmentBusinessModal({
 }) {
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
+  const isWritableModal = isCreateModal || isEditModal
+  const canSave = isCreateModal ? canCreate : isEditModal ? canUpdate : false
   const clearStaleManualWeight = () => {
     const currentWeight = form?.getFieldValue('total_net_weight_g')
     if (String(currentWeight ?? '').trim() === '') return
@@ -703,28 +706,36 @@ export default function ShipmentBusinessModal({
 
   return (
     <BusinessFormModal
-      title={isCreateModal ? '新建出货单' : '查看出货明细'}
+      title={
+        isCreateModal
+          ? '新建出货单'
+          : isEditModal
+            ? '编辑出货草稿'
+            : '查看出货明细'
+      }
       description={
         isCreateModal
           ? '单头和出货明细将一次保存完成。'
-          : '只读查看当前出货单头和已保存明细。'
+          : isEditModal
+            ? '单头和明细共用同一保存事务；进入质检或审批流程后将冻结编辑。'
+            : '只读查看当前出货单头和已保存明细。'
       }
-      open={Boolean(isCreateModal || isViewModal)}
+      open={Boolean(isWritableModal || isViewModal)}
       onCancel={onCancel}
-      onOk={isCreateModal ? onOk : undefined}
+      onOk={isWritableModal ? onOk : undefined}
       okText="保存"
-      cancelText={isCreateModal ? '取消' : '关闭'}
+      cancelText={isWritableModal ? '取消' : '关闭'}
       confirmLoading={saving}
-      okButtonProps={{ disabled: !canCreate, hidden: isViewModal }}
+      okButtonProps={{ disabled: !canSave, hidden: isViewModal }}
       forceRender
       destroyOnHidden={false}
     >
       <Form layout="vertical" form={form} className="erp-business-action-form">
         <ShipmentFormFields
           customerOptions={customerOptions}
-          disabled={!isCreateModal}
+          disabled={!isWritableModal}
           salesOrderOptions={salesOrderOptions}
-          sourceSelectionOnly={isCreateModal}
+          sourceSelectionOnly={isWritableModal}
           sourceLocked={Boolean(selectedSalesOrder)}
         />
         <BusinessAttachmentPanel
@@ -733,17 +744,17 @@ export default function ShipmentBusinessModal({
           ownerId={modalSelectedShipment?.id}
           title="出货附件"
           description="上传装箱照片、物流单、签收回单、交付或出口凭证；上传附件后仍需单独确认出货。"
-          canUpload={isCreateModal && canCreate}
-          canWithdraw={canCreate || canShip}
+          canUpload={isWritableModal && canSave}
+          canWithdraw={isWritableModal && canSave}
           variant="inline"
         />
-        {isCreateModal ? (
+        {isWritableModal ? (
           <ShipmentSelectedSourceAlert
             selectedSalesOrder={selectedSalesOrder}
             shipmentSourceRows={shipmentSourceRows}
           />
         ) : null}
-        {modalSelectedShipment ? (
+        {isViewModal && modalSelectedShipment ? (
           <section className="erp-master-contact-list erp-shipment-modal-items">
             <ShipmentWeightDetailSummary
               shipment={modalSelectedShipment}
@@ -769,7 +780,7 @@ export default function ShipmentBusinessModal({
             />
           </section>
         ) : null}
-        {isCreateModal ? (
+        {isWritableModal ? (
           <Form.List name="items">
             {(fields, { add, remove }) => (
               <section className="erp-master-contact-list erp-shipment-modal-items">
@@ -889,7 +900,7 @@ export default function ShipmentBusinessModal({
             )}
           </Form.List>
         ) : null}
-        {isCreateModal ? (
+        {isWritableModal ? (
           <ShipmentWeightCreateSummary
             form={form}
             products={products}

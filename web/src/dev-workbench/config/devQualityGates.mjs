@@ -62,6 +62,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/u
 const HASH_PATTERN = /^[0-9a-f]{64}$/u
+const STRUCTURED_ID_PATTERN = /^[a-z][a-z0-9_]{1,63}$/u
 const IDEMPOTENCY_PATTERN =
   /^quality-gate:(full|strict):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u
 const OPERATION_STATUSES = Object.freeze([
@@ -322,28 +323,89 @@ function normalizeProfiles(profiles) {
   return Object.fromEntries(
     DEV_QUALITY_GATE_PROFILES.map((profile) => {
       const definition = profiles[profile]
-      assertExactKeys(definition, ['stages', 'timeoutMs'], 'quality profile')
+      assertExactKeys(
+        definition,
+        ['stages', 'substeps', 'timeoutMs'],
+        'quality profile'
+      )
       if (
         !Number.isSafeInteger(definition.timeoutMs) ||
         definition.timeoutMs < 1 ||
         !Array.isArray(definition.stages) ||
-        definition.stages.length < 1
+        definition.stages.length < 1 ||
+        definition.stages.length > 32
       ) {
         throw new Error('quality profile is invalid')
       }
+      const stageIds = new Set()
+      const stages = definition.stages.map((stage) => {
+        assertExactKeys(
+          stage,
+          ['id', 'label', 'parallel'],
+          'quality profile stage'
+        )
+        if (
+          !STRUCTURED_ID_PATTERN.test(stage.id) ||
+          stageIds.has(stage.id) ||
+          typeof stage.parallel !== 'boolean'
+        ) {
+          throw new Error('quality profile stage is invalid')
+        }
+        stageIds.add(stage.id)
+        return {
+          id: stage.id,
+          label: safeText(stage.label, 'quality profile stage label', {
+            max: 120,
+          }),
+          parallel: stage.parallel,
+        }
+      })
+      if (
+        !definition.substeps ||
+        typeof definition.substeps !== 'object' ||
+        Array.isArray(definition.substeps) ||
+        Object.getPrototypeOf(definition.substeps) !== Object.prototype
+      ) {
+        throw new Error('quality profile substeps are invalid')
+      }
+      const substeps = Object.fromEntries(
+        Object.entries(definition.substeps).map(([stageId, items]) => {
+          if (
+            !stageIds.has(stageId) ||
+            !Array.isArray(items) ||
+            items.length < 1 ||
+            items.length > 20
+          ) {
+            throw new Error('quality profile substeps are invalid')
+          }
+          const substepIds = new Set()
+          return [
+            stageId,
+            items.map((item) => {
+              assertExactKeys(item, ['id', 'label'], 'quality profile substep')
+              if (
+                !STRUCTURED_ID_PATTERN.test(item.id) ||
+                substepIds.has(item.id)
+              ) {
+                throw new Error('quality profile substep is invalid')
+              }
+              substepIds.add(item.id)
+              return {
+                id: item.id,
+                label: safeText(item.label, 'quality profile substep label', {
+                  max: 120,
+                }),
+              }
+            }),
+          ]
+        })
+      )
       return [
         profile,
         {
           timeoutMs: definition.timeoutMs,
-          stages: definition.stages.map((stage) => {
-            assertExactKeys(stage, ['id', 'label'], 'quality profile stage')
-            return {
-              id: safeText(stage.id, 'quality profile stage id', { max: 64 }),
-              label: safeText(stage.label, 'quality profile stage label', {
-                max: 120,
-              }),
-            }
-          }),
+          stages,
+          substeps,
         },
       ]
     })
@@ -671,6 +733,188 @@ export function getQualityGateStageLabel(stage, registeredStages = []) {
     : '未登记阶段'
 }
 
+function matchingStageSuffixLength(leftStages, rightStages) {
+  let matched = 0
+  const limit = Math.min(leftStages.length, rightStages.length)
+  while (
+    matched < limit &&
+    leftStages[leftStages.length - matched - 1]?.id ===
+      rightStages[rightStages.length - matched - 1]?.id
+  ) {
+    matched += 1
+  }
+  return matched
+}
+
+export function getQualityGateFlowSegments(profiles, profile) {
+  if (!DEV_QUALITY_GATE_PROFILES.includes(profile)) return []
+  const stages = Array.isArray(profiles?.[profile]?.stages)
+    ? profiles[profile].stages
+    : []
+  if (stages.length === 0) return []
+
+  if (profile === 'full') {
+    const strictStages = Array.isArray(profiles?.strict?.stages)
+      ? profiles.strict.stages
+      : []
+    const shared =
+      matchingStageSuffixLength(strictStages, stages) === stages.length
+    return [
+      {
+        id: 'full-core',
+        label: shared ? '完整门禁共用主路径' : '完整门禁主路径',
+        scopeLabel: shared ? 'full / strict 共用' : '仅 full',
+        stages: [...stages],
+      },
+    ]
+  }
+
+  const fullStages = Array.isArray(profiles?.full?.stages)
+    ? profiles.full.stages
+    : []
+  const sharedCount = matchingStageSuffixLength(stages, fullStages)
+  const specificCount = stages.length - sharedCount
+  const segments = []
+  if (specificCount > 0) {
+    segments.push({
+      id: 'strict-extra',
+      label: '严格门禁附加检查',
+      scopeLabel: '仅 strict',
+      stages: stages.slice(0, specificCount),
+    })
+  }
+  if (sharedCount > 0) {
+    segments.push({
+      id: 'full-core',
+      label: '完整门禁共用主路径',
+      scopeLabel: 'full / strict 共用',
+      stages: stages.slice(specificCount),
+    })
+  }
+  if (segments.length === 0) {
+    segments.push({
+      id: 'strict-core',
+      label: '严格门禁主路径',
+      scopeLabel: '仅 strict',
+      stages: [...stages],
+    })
+  }
+  return segments
+}
+
+export function buildQualityGateStageDurationComposition(stages) {
+  const recorded = (Array.isArray(stages) ? stages : []).filter(
+    (stage) => Number.isFinite(stage?.durationMs) && stage.durationMs >= 0
+  )
+  const totalDurationMs = recorded.reduce(
+    (total, stage) => total + stage.durationMs,
+    0
+  )
+  if (totalDurationMs <= 0) {
+    return { totalDurationMs: 0, hasParallel: false, items: [] }
+  }
+  const longestDurationMs = Math.max(
+    ...recorded.map((stage) => stage.durationMs)
+  )
+  return {
+    totalDurationMs,
+    hasParallel: recorded.some((stage) => stage.parallel === true),
+    items: recorded.map((stage) => ({
+      id: stage.id,
+      label: stage.label,
+      durationMs: stage.durationMs,
+      sharePercent: Number(
+        ((stage.durationMs / totalDurationMs) * 100).toFixed(1)
+      ),
+      parallel: stage.parallel === true,
+      longest: stage.durationMs === longestDurationMs,
+    })),
+  }
+}
+
+export function buildQualityGateHistoryTrend(operations, referenceOperation) {
+  const referenceReceipt = referenceOperation?.receipt
+  if (
+    !DEV_QUALITY_GATE_PROFILES.includes(referenceOperation?.profile) ||
+    !referenceReceipt ||
+    !HASH_PATTERN.test(referenceReceipt.environmentFingerprint) ||
+    !['clean', 'dirty'].includes(referenceReceipt.treeState)
+  ) {
+    return {
+      profile: '',
+      treeState: '',
+      environmentFingerprint: '',
+      sampleCount: 0,
+      enoughSamples: false,
+      maxDurationMs: 0,
+      samples: [],
+    }
+  }
+  const samples = (Array.isArray(operations) ? operations : [])
+    .filter(
+      (operation) =>
+        operation?.profile === referenceOperation.profile &&
+        operation.status === 'passed' &&
+        operation.receipt?.status === 'passed' &&
+        operation.receipt.environmentFingerprint ===
+          referenceReceipt.environmentFingerprint &&
+        operation.receipt.treeState === referenceReceipt.treeState &&
+        Number.isFinite(operation.receipt.durationMs) &&
+        operation.receipt.durationMs >= 0 &&
+        isIsoDate(operation.receipt.finishedAt)
+    )
+    .sort(
+      (left, right) =>
+        Date.parse(left.receipt.finishedAt) -
+        Date.parse(right.receipt.finishedAt)
+    )
+    .slice(-8)
+    .map((operation) => ({
+      id: operation.id,
+      finishedAt: operation.receipt.finishedAt,
+      durationMs: operation.receipt.durationMs,
+    }))
+  return {
+    profile: referenceOperation.profile,
+    treeState: referenceReceipt.treeState,
+    environmentFingerprint: referenceReceipt.environmentFingerprint,
+    sampleCount: samples.length,
+    enoughSamples: samples.length >= 3,
+    maxDurationMs: Math.max(0, ...samples.map((sample) => sample.durationMs)),
+    samples,
+  }
+}
+
+export function buildQualityGateCoverageMatrix(categories) {
+  const source = Array.isArray(categories) ? categories : []
+  const gates = []
+  const gateKeys = new Set()
+  for (const category of source) {
+    for (const result of category.gateResults || []) {
+      if (gateKeys.has(result.gateKey)) continue
+      gateKeys.add(result.gateKey)
+      gates.push({ key: result.gateKey, label: result.label })
+    }
+  }
+  return {
+    gates,
+    rows: source.map((category) => {
+      const results = new Map(
+        (category.gateResults || []).map((result) => [result.gateKey, result])
+      )
+      return {
+        key: category.key,
+        label: category.label,
+        highRisk: Boolean(category.highRisk),
+        cells: gates.map((gate) => ({
+          gateKey: gate.key,
+          status: results.get(gate.key)?.status || 'not_applicable',
+        })),
+      }
+    }),
+  }
+}
+
 export function formatQualityGateDuration(durationMs) {
   if (!Number.isFinite(durationMs) || durationMs < 0) return '尚无可用耗时记录'
   const totalSeconds = Math.floor(durationMs / 1000)
@@ -684,6 +928,102 @@ export function formatQualityGateDuration(durationMs) {
   ]
     .filter(Boolean)
     .join(' ')
+}
+
+function operationMatchesCurrentRepository(operation, repository) {
+  return Boolean(
+    operation?.repository?.commit === repository?.commit &&
+      operation?.repository?.dirty === repository?.dirty &&
+      operation?.repository?.fingerprint === repository?.fingerprint
+  )
+}
+
+function projectHistoricalQualityGateOperation(operation) {
+  return {
+    ...operation,
+    displayContext: 'history',
+    message:
+      '这是旧版本的历史运行记录，不代表当前版本；请以当前仓库身份的正式回执为准。',
+  }
+}
+
+export function projectCurrentQualityGateProof(summary, profile) {
+  if (!DEV_QUALITY_GATE_PROFILES.includes(profile)) return null
+  const proof = summary?.proofs?.[profile]
+  const receipt = proof?.receipt
+  if (!proof?.current || !receipt) return null
+  const { finishedAt } = receipt
+  const startedAt = new Date(
+    Math.max(0, Date.parse(finishedAt) - receipt.durationMs)
+  ).toISOString()
+  const failedStage = receipt.stageTimings.find(
+    (stage) => stage.status === 'failed'
+  )
+  return {
+    schemaVersion: DEV_QUALITY_GATE_OPERATION_SCHEMA,
+    id: `current-proof-${profile}`,
+    profile,
+    repository: summary.repository,
+    status: receipt.status,
+    stage:
+      failedStage?.id || receipt.stageTimings.at(-1)?.id || 'formal_receipt',
+    stageTimings: receipt.stageTimings,
+    receipt,
+    cleanup: {
+      status: 'complete',
+      message: '当前版本正式回执已完成门禁终态与一次性数据库清理证明',
+    },
+    firstFailure: failedStage ? `${failedStage.label}未通过` : '',
+    cancelRequestedAt: null,
+    revision: 1,
+    createdAt: startedAt,
+    updatedAt: finishedAt,
+    finishedAt,
+    message:
+      receipt.status === 'passed'
+        ? '当前版本的正式验证回执已通过，并与当前仓库身份一致。'
+        : '当前版本的正式验证回执未通过，请先修复失败阶段。',
+    displayContext: 'current-proof',
+    proofOnly: true,
+  }
+}
+
+export function selectDisplayedQualityGateOperation(
+  summary,
+  { operationId = '', profile = '' } = {}
+) {
+  if (!summary) return null
+  if (summary.currentOperation) {
+    return { ...summary.currentOperation, displayContext: 'active' }
+  }
+  const operations = Array.isArray(summary.operations) ? summary.operations : []
+  if (operationId) {
+    const selected = operations.find(
+      (operation) => operation.id === operationId
+    )
+    if (!selected) return null
+    return operationMatchesCurrentRepository(selected, summary.repository)
+      ? { ...selected, displayContext: 'current-operation' }
+      : projectHistoricalQualityGateOperation(selected)
+  }
+  const profiles = profile ? [profile] : ['strict', 'full']
+  for (const candidateProfile of profiles) {
+    if (!DEV_QUALITY_GATE_PROFILES.includes(candidateProfile)) continue
+    const currentOperation = operations.find(
+      (operation) =>
+        operation.profile === candidateProfile &&
+        operationMatchesCurrentRepository(operation, summary.repository)
+    )
+    if (currentOperation) {
+      return { ...currentOperation, displayContext: 'current-operation' }
+    }
+    const proof = projectCurrentQualityGateProof(summary, candidateProfile)
+    if (proof) return proof
+  }
+  const historical = profile
+    ? operations.find((operation) => operation.profile === profile)
+    : operations[0]
+  return historical ? projectHistoricalQualityGateOperation(historical) : null
 }
 
 function requestError() {

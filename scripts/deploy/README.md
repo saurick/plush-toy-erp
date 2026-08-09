@@ -44,7 +44,7 @@
 
 固定 `test-133` 的 promotion、rollback 和数据库重建包统一使用 `rsync 3.x over SSH` 传输到 operation 专属 `incoming` 目录。promotion / rollback 先只读探测正式 `release-cache/<manifest-sha>` 与历史 operation 保留制品；全部五项内容身份一致时只传控制文件并跳过重复 image tar，目标已有精确 Docker image 时再跳过 `docker load`，但 migration、Compose、health / ready、业务 smoke 和公网入口 exact-SHA 读回仍完整执行。缓存缺失走既有完整 checksum-bound rsync；存在同 manifest 但任一 checksum、digest、content ID 或 `GIT_SHA` 不一致时失败关闭。传输仍固定目标、端口、远端 `/usr/bin/rsync`、严格 host key、精确文件白名单、私有文件权限与十分钟超时，不启用 `--delete` 或无收益的压缩；不会全局 prune，也不删除数据库、volume、env、证书、当前及规定回滚版本。operation 记录实传字节、rsync 时长、有效吞吐、避免传输字节和按最近冷路径吞吐估算的节省时间；目标 preflight 会在缺少兼容 rsync 时阻断，不退回 SCP 或其他隐式路径。
 
-DEV-only `/__dev/version-center` 只暴露五个动作：`dispatch-release`、`prepare-promotion`、`execute-promotion`、`prepare-rollback`、`execute-rollback`。浏览器不能提供 repo、workflow、target、路径、SSH、环境变量、shell、SQL 或 Docker 命令；同一时刻只允许一个 test-133 执行器。页面的 CI/CD 效能区按完整发布、相同 SHA 复用和 CI 分别展示中位数，并展示 CI strict 可信复用、观测关键路径、失败原因、BuildKit 命中、制品大小、133 缓存命中/依据、避免字节/估算时间、Docker load 结果及仍执行的 migration / health / ready / 公网读回；公网入口与 133 SHA 一致性位于首屏。job / step 和 operation 阶段按需展开，中文为主、原始英文仅用于追溯，不建立第二套流水线状态。
+DEV-only `/__dev/version-center` 只暴露五个动作：`dispatch-release`、`prepare-promotion`、`execute-promotion`、`prepare-rollback`、`execute-rollback`。浏览器不能提供 repo、workflow、target、路径、SSH、环境变量、shell、SQL 或 Docker 命令；同一时刻只允许一个 test-133 执行器。页面的 CI/CD 效能区按完整发布、相同 SHA 复用和 CI 分别展示中位数，以运行完成、制品发布和部署完成时间区分事件时间与统计读取时间，并默认展示 CI strict 可信复用、观测关键路径、最长环节、失败原因、BuildKit 命中、制品大小、133 缓存命中/依据、避免字节/估算时间、Docker load 结果及仍执行的 migration / health / ready / 公网读回；公网入口与 133 SHA 一致性位于首屏。完整 job / step 和 operation 阶段按需展开，job 初始收起并支持逐项或统一展开 / 收起；中文为主、原始英文仅用于追溯，不建立第二套流水线状态。
 
 ### 133 同逻辑库物理重建
 

@@ -274,6 +274,8 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"}
 	case errors.Is(err, biz.ErrShipmentFinanceDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未取消的应收或发票记录，请先取消相关财务记录"}
+	case errors.Is(err, biz.ErrShipmentDraftDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货草稿已进入质检或出货审批流程，内容已冻结；请取消后重新登记"}
 	case errors.Is(err, biz.ErrShipmentReworkIntakeDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未结束的返工回厂记录，请先取消或冲正返工回厂记录后再取消出货"}
 	case errors.Is(err, biz.ErrReworkIntakeNotFound):

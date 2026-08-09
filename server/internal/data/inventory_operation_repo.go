@@ -20,6 +20,7 @@ import (
 )
 
 var _ biz.InventoryOperationRepo = (*inventoryRepo)(nil)
+var _ biz.InventoryOperationDraftSaveRepo = (*inventoryRepo)(nil)
 
 func (r *inventoryRepo) CreateInventoryOperation(ctx context.Context, in *biz.InventoryOperationCreate, intentHash string) (*biz.InventoryOperation, error) {
 	if in == nil || intentHash == "" {
@@ -59,6 +60,180 @@ func (r *inventoryRepo) CreateInventoryOperation(ctx context.Context, in *biz.In
 	}
 	tx = nil
 	return out, nil
+}
+
+func (r *inventoryRepo) SaveInventoryOperationDraft(ctx context.Context, in *biz.InventoryOperationDraftSave) (*biz.InventoryOperation, error) {
+	if in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || len(in.Items) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	tx, row, err := r.beginLockedInventoryOperation(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if row.Status != biz.InventoryOperationStatusDraft || row.Version != in.ExpectedVersion {
+		return nil, biz.ErrInventoryOperationVersionConflict
+	}
+	if row.CreatedBy != in.ActorID {
+		return nil, biz.ErrInventoryOperationSaveOwner
+	}
+	if row.OperationType == biz.InventoryOperationManualAdjustment {
+		hasProcess, err := tx.client.ProcessInstance.Query().Where(
+			processinstance.ProcessKey(biz.ProcessKeyInventoryAdjustmentApproval),
+			processinstance.BusinessRefType("inventory_operation"),
+			processinstance.BusinessRefID(row.ID),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasProcess {
+			return nil, biz.ErrProcessSourceLifecycleDependency
+		}
+	}
+	items, err := tx.client.InventoryOperationItem.Query().Where(
+		inventoryoperationitem.OperationID(row.ID),
+	).Order(ent.Asc(inventoryoperationitem.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 || len(items) != len(in.Items) {
+		return nil, biz.ErrBadParam
+	}
+	requestedByID := make(map[int]biz.InventoryOperationDraftItemSave, len(in.Items))
+	for _, requested := range in.Items {
+		requestedByID[requested.ID] = requested
+	}
+	for _, current := range items {
+		requested, exists := requestedByID[current.ID]
+		if !exists {
+			return nil, biz.ErrBadParam
+		}
+		expectedQuantity, countedQuantity, adjustmentQuantity, toWarehouseID, toLotID, err := r.inventoryOperationDraftItemValues(ctx, tx, row, current, requested)
+		if err != nil {
+			return nil, err
+		}
+		if err := updateInventoryOperationDraftItem(ctx, tx, current.ID, row.ID, expectedQuantity, countedQuantity, adjustmentQuantity, toWarehouseID, toLotID, requested.Note); err != nil {
+			return nil, err
+		}
+	}
+	if err := updateInventoryOperationDraftHeader(ctx, tx, row.ID, in); err != nil {
+		return nil, err
+	}
+	return commitInventoryOperation(ctx, tx, row.ID)
+}
+
+func (r *inventoryRepo) inventoryOperationDraftItemValues(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	operation *ent.InventoryOperation,
+	item *ent.InventoryOperationItem,
+	requested biz.InventoryOperationDraftItemSave,
+) (*decimal.Decimal, *decimal.Decimal, decimal.Decimal, *int, *int, error) {
+	if tx == nil || operation == nil || item == nil {
+		return nil, nil, decimal.Zero, nil, nil, biz.ErrBadParam
+	}
+	switch operation.OperationType {
+	case biz.InventoryOperationCycleCount:
+		if requested.CountedQuantity == nil || requested.CountedQuantity.IsNegative() || requested.ToWarehouseID != nil || !requested.AdjustmentQuantity.IsZero() {
+			return nil, nil, decimal.Zero, nil, nil, biz.ErrBadParam
+		}
+		expected, err := lockAndReadInventoryOperationBalance(ctx, tx, biz.InventoryBalanceKey{
+			SubjectType: item.SubjectType, SubjectID: item.SubjectID, ProductSkuID: item.ProductSkuID,
+			WarehouseID: item.FromWarehouseID, LotID: item.FromLotID, UnitID: item.UnitID,
+		})
+		if err != nil {
+			return nil, nil, decimal.Zero, nil, nil, err
+		}
+		adjustment := requested.CountedQuantity.Sub(expected)
+		if adjustment.IsZero() {
+			return nil, nil, decimal.Zero, nil, nil, biz.ErrBadParam
+		}
+		return &expected, requested.CountedQuantity, adjustment, nil, nil, nil
+	case biz.InventoryOperationTransfer:
+		if requested.CountedQuantity != nil || !requested.AdjustmentQuantity.IsPositive() || requested.ToWarehouseID == nil || *requested.ToWarehouseID == item.FromWarehouseID {
+			return nil, nil, decimal.Zero, nil, nil, biz.ErrBadParam
+		}
+		warehouseRow, err := tx.client.Warehouse.Get(ctx, *requested.ToWarehouseID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, nil, decimal.Zero, nil, nil, biz.ErrBadParam
+			}
+			return nil, nil, decimal.Zero, nil, nil, err
+		}
+		if !warehouseRow.IsActive {
+			return nil, nil, decimal.Zero, nil, nil, biz.ErrWarehouseInactive
+		}
+		return nil, nil, requested.AdjustmentQuantity, requested.ToWarehouseID, item.FromLotID, nil
+	case biz.InventoryOperationManualAdjustment:
+		if requested.CountedQuantity != nil || requested.ToWarehouseID != nil || requested.AdjustmentQuantity.IsZero() {
+			return nil, nil, decimal.Zero, nil, nil, biz.ErrBadParam
+		}
+		return nil, nil, requested.AdjustmentQuantity, nil, nil, nil
+	default:
+		return nil, nil, decimal.Zero, nil, nil, biz.ErrBadParam
+	}
+}
+
+func updateInventoryOperationDraftItem(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	itemID int,
+	operationID int,
+	expectedQuantity *decimal.Decimal,
+	countedQuantity *decimal.Decimal,
+	adjustmentQuantity decimal.Decimal,
+	toWarehouseID *int,
+	toLotID *int,
+	note *string,
+) error {
+	if tx == nil || tx.sqlTx == nil || itemID <= 0 || operationID <= 0 {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 8)
+	query := fmt.Sprintf(`UPDATE inventory_operation_items SET expected_quantity = %s, counted_quantity = %s, adjustment_quantity = %s, to_warehouse_id = %s, to_lot_id = %s, note = %s WHERE id = %s AND operation_id = %s`, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
+	result, err := tx.sqlTx.ExecContext(
+		ctx,
+		query,
+		optionalDecimalSQLValue(expectedQuantity),
+		optionalDecimalSQLValue(countedQuantity),
+		adjustmentQuantity,
+		optionalIntSQLValue(toWarehouseID),
+		optionalIntSQLValue(toLotID),
+		optionalStringSQLValue(note),
+		itemID,
+		operationID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return biz.ErrInventoryOperationVersionConflict
+	}
+	return nil
+}
+
+func updateInventoryOperationDraftHeader(ctx context.Context, tx *inventoryDBTx, operationID int, in *biz.InventoryOperationDraftSave) error {
+	if tx == nil || tx.sqlTx == nil || operationID <= 0 || in == nil {
+		return biz.ErrBadParam
+	}
+	p := inventorySQLPlaceholders(tx.dialect, 5)
+	query := fmt.Sprintf(`UPDATE inventory_operations SET operation_no = %s, reason = %s, version = version + 1, updated_at = %s WHERE id = %s AND status = 'DRAFT' AND version = %s`, p[0], p[1], p[2], p[3], p[4])
+	result, err := tx.sqlTx.ExecContext(ctx, query, in.OperationNo, in.Reason, time.Now(), operationID, in.ExpectedVersion)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return biz.ErrInventoryOperationVersionConflict
+	}
+	return nil
 }
 
 func (r *inventoryRepo) resolveInventoryOperationReplay(ctx context.Context, client *ent.Client, in *biz.InventoryOperationCreate, hash string) (*biz.InventoryOperation, bool, error) {

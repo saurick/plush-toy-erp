@@ -63,6 +63,12 @@ func (r *outsourcingOrderRepo) ListOutsourcingOrders(ctx context.Context, filter
 	}
 	if filter.LifecycleStatus != "" {
 		query = query.Where(outsourcingorder.LifecycleStatus(filter.LifecycleStatus))
+	} else if statuses := biz.LifecycleStatusesForScope(
+		filter.LifecycleScope,
+		[]string{biz.OutsourcingOrderStatusDraft, biz.OutsourcingOrderStatusSubmitted, biz.OutsourcingOrderStatusConfirmed},
+		[]string{biz.OutsourcingOrderStatusClosed, biz.OutsourcingOrderStatusCanceled},
+	); len(statuses) > 0 {
+		query = query.Where(outsourcingorder.LifecycleStatusIn(statuses...))
 	}
 	if filter.DateField != "" {
 		query = applyOutsourcingOrderDateRange(query, filter)

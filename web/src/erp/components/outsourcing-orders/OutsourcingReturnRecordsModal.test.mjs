@@ -7,6 +7,14 @@ const source = readFileSync(
   'utf8'
 )
 
+test('outsourcing record list exposes edit only for permitted DRAFT fact types', () => {
+  assert.match(source, /canEditMaterialIssue/u)
+  assert.match(source, /canEditReturnReceipt/u)
+  assert.match(source, /selectedDraft/u)
+  assert.match(source, /onEditFact\?\.\(selected\)/u)
+  assert.match(source, /编辑草稿/u)
+})
+
 test('outsourcing records project material issues and return receipts together', () => {
   assert.match(source, /OUTSOURCING_FACT_TYPES/u)
   assert.match(source, /MATERIAL_ISSUE: '委外发料'/u)

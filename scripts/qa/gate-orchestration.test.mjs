@@ -295,7 +295,11 @@ test("style cleanup SIGKILLs a surviving owned group without touching an unrelat
       () => canConnect(unrelatedPort),
       "unrelated listener did not start",
     );
-    assert.equal(ownedLeader.exitCode, null, "fixture leader exited before cleanup");
+    assert.equal(
+      ownedLeader.exitCode,
+      null,
+      "fixture leader exited before cleanup",
+    );
     assert.equal(readProcessGroupID(ownedGrandchildPID), ownedLeader.pid);
     assert.equal(isOwnedProcessGroupAlive(ownedLeader.pid), true);
 
@@ -311,7 +315,11 @@ test("style cleanup SIGKILLs a surviving owned group without touching an unrelat
         throw new Error("fixture leader did not exit after SIGTERM");
       }),
     ]);
-    assert.equal(ownedLeader.exitCode, 0, "fixture leader must exit cleanly on SIGTERM");
+    assert.equal(
+      ownedLeader.exitCode,
+      0,
+      "fixture leader must exit cleanly on SIGTERM",
+    );
     assert.equal(
       await canConnect(ownedPort),
       true,
@@ -390,7 +398,10 @@ test("fixed full and strict gates cannot disappear behind file or package probes
     full,
     /make purchase_return_(?:pg_createdb|migrate_apply|pg_test)/u,
   );
-  assert.doesNotMatch(full, /-skip '[^']*TemplatePDFChromiumSecurityIntegration/u);
+  assert.doesNotMatch(
+    full,
+    /-skip '[^']*TemplatePDFChromiumSecurityIntegration/u,
+  );
   assert.match(
     pdfChromiumIntegration,
     /ERP_PDF_CHROMIUM_INTEGRATION[\s\S]*t\.Skip/u,
@@ -467,8 +478,14 @@ test("local receipt has one repository-owned issuer while full and CI stay real"
 
   assert.match(full, /SECRETS_STRICT=1 bash/u);
   assert.match(full, /GOVULNCHECK_STRICT=1 bash/u);
-  assert.doesNotMatch(full, /gate-coverage\.mjs|covered_by_|component_complete/u);
-  assert.doesNotMatch(strict, /gate-coverage\.mjs|covered_by_|component_complete/u);
+  assert.doesNotMatch(
+    full,
+    /gate-coverage\.mjs|covered_by_|component_complete/u,
+  );
+  assert.doesNotMatch(
+    strict,
+    /gate-coverage\.mjs|covered_by_|component_complete/u,
+  );
   assert.match(strict, /bash "\$ROOT_DIR\/scripts\/qa\/full\.sh"/u);
   assert.match(strict, /QA_FULL_PROFILE=strict/u);
   assert.doesNotMatch(strict, /scripts\/qa\/govulncheck\.sh/u);
@@ -518,12 +535,18 @@ test("fixed Node and Go gates require fail-closed execution summaries", () => {
     /disposable-database-runner\.mjs"[\s\S]*--profile ci[\s\S]*--workflow critical-postgres/u,
   );
   assert.match(full, /ERP_PDF_CHROMIUM_INTEGRATION=1/u);
-  assert.match(
-    criticalPostgres,
-    /readonly CRITICAL_POSTGRES_TEST_PATTERN/u,
-  );
+  assert.match(criticalPostgres, /readonly CRITICAL_POSTGRES_TEST_PATTERN/u);
   assert.match(
     criticalPostgres,
     /readonly -a CRITICAL_POSTGRES_REQUIRED_PREFIXES/u,
   );
+});
+
+test("full overlaps only independent shared, Web and Server stages", () => {
+  const full = read("scripts/qa/full.sh");
+  assert.match(
+    full,
+    /qa_run_stage "\$full_profile" environment_profile qa_full_environment_profile\s+qa_run_stage "\$full_profile" secrets qa_full_secrets\s+qa_run_parallel_stages \\\s+"\$full_profile" \\\s+shared qa_full_shared \\\s+web qa_full_web \\\s+server qa_full_server\s+qa_run_stage "\$full_profile" browser qa_full_browser\s+qa_run_stage "\$full_profile" govulncheck qa_full_govulncheck/u,
+  );
+  assert.match(full, /QA_FAST_GATE_PROFILE="\$full_profile"/u);
 });

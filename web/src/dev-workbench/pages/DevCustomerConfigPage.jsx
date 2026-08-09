@@ -18,6 +18,7 @@ import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   activateCustomerConfig,
   checkCustomerConfigTransition,
@@ -512,6 +513,11 @@ function DryRunSummary({ dryRunState }) {
         message="试跑已生成"
         description="测试版页面已生成证据；该结果仍不代表正式导入批准。"
       />
+      <DevTimestamp
+        value={result.generatedAt}
+        action="生成于"
+        missing="试跑生成时间未证明"
+      />
       <div className="erp-dev-customer-dry-run-actions">
         <Button
           icon={<CopyOutlined />}
@@ -627,6 +633,8 @@ function TestApplySummary({
   const result = applyState.result || {}
   const manifestSummary = result.manifestSummary || {}
   const session = result.effectiveSession || {}
+  const publish = result.publish || {}
+  const applied = result.applied || {}
 
   return (
     <div className="erp-dev-customer-test-apply-result">
@@ -680,6 +688,29 @@ function TestApplySummary({
           <Text type="secondary">模块状态 / Module States</Text>
           <Text strong>{manifestSummary.moduleStateCount ?? '-'}</Text>
         </div>
+        <div>
+          <Text type="secondary">清单生成</Text>
+          <DevTimestamp
+            value={result.manifestGeneratedAt}
+            missing="清单生成时间未证明"
+          />
+        </div>
+        <div>
+          <Text type="secondary">测试版本发布</Text>
+          <DevTimestamp
+            value={publish.published_at}
+            unit="unix-seconds"
+            missing="发布时间未证明"
+          />
+        </div>
+        <div>
+          <Text type="secondary">测试版本激活</Text>
+          <DevTimestamp
+            value={applied.activated_at}
+            unit="unix-seconds"
+            missing="激活时间未证明"
+          />
+        </div>
       </div>
       <div className="erp-dev-customer-test-apply-session">
         <Text type="secondary">当前有效配置投影</Text>
@@ -728,6 +759,11 @@ function ReleaseApplySummary({ releaseState, releaseBatch }) {
           message="发布门禁未通过"
           description="正式版不能直接发布；先补齐下列发布证据，再重新检查。"
         />
+        <DevTimestamp
+          value={releaseState.result?.generatedAt}
+          action="检查于"
+          missing="检查时间未证明"
+        />
         <div className="erp-dev-customer-release-missing">
           {missing.slice(0, 8).map((item) => (
             <Text key={item}>{item}</Text>
@@ -768,6 +804,11 @@ function ReleaseApplySummary({ releaseState, releaseBatch }) {
         showIcon
         message="选定批次的发布门禁已通过"
         description="这只证明当前清单与所选证据批次满足只读门禁。页面不直接发布或激活正式配置；下一步由统一执行器显式确认目标端点、令牌、确认短语，并生成 release report 与 authenticated readback。"
+      />
+      <DevTimestamp
+        value={result.generatedAt}
+        action="检查于"
+        missing="检查时间未证明"
       />
       <div className="erp-dev-customer-release-actions">
         <Button
@@ -2359,6 +2400,7 @@ export default function DevCustomerConfigPage() {
         status: 'success',
         result: {
           manifestPath: manifestPayload.manifestPath,
+          manifestGeneratedAt: manifestPayload.generatedAt,
           manifestSummary: manifestPayload.summary,
           validation,
           publish,

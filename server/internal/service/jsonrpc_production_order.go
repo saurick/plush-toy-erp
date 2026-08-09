@@ -199,7 +199,7 @@ func (d *jsonrpcDispatcher) getProductionOrder(ctx context.Context, pm map[strin
 }
 
 func (d *jsonrpcDispatcher) listProductionOrders(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "keyword", "status", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
+	if !productionOrderAllowsOnly(pm, "keyword", "status", "lifecycle_scope", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
 		return invalidParamResult()
 	}
 	if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead); res != nil {
@@ -383,6 +383,10 @@ func productionOrderFilterFromParams(pm map[string]any) (biz.ProductionOrderFilt
 	if !ok {
 		return biz.ProductionOrderFilter{}, false
 	}
+	lifecycleScope, ok := productionOrderOptionalExactString(pm, "lifecycle_scope")
+	if !ok {
+		return biz.ProductionOrderFilter{}, false
+	}
 	dateField, ok := productionOrderOptionalExactString(pm, "date_field")
 	if !ok {
 		return biz.ProductionOrderFilter{}, false
@@ -411,7 +415,7 @@ func productionOrderFilterFromParams(pm map[string]any) (biz.ProductionOrderFilt
 	if !ok {
 		return biz.ProductionOrderFilter{}, false
 	}
-	return biz.ProductionOrderFilter{Keyword: keyword, Status: status, DateField: dateField, DateFrom: dateFrom, DateTo: dateTo, SortBy: sortBy, SortDirection: sortDirection, Limit: limit, Offset: offset}, true
+	return biz.ProductionOrderFilter{Keyword: keyword, Status: status, LifecycleScope: lifecycleScope, DateField: dateField, DateFrom: dateFrom, DateTo: dateTo, SortBy: sortBy, SortDirection: sortDirection, Limit: limit, Offset: offset}, true
 }
 
 func productionOrderAllowsOnly(pm map[string]any, keys ...string) bool {

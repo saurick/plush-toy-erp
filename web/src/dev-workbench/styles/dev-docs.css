@@ -74,6 +74,34 @@
   flex: 0 0 auto;
 }
 
+.erp-dev-docs-lifecycle {
+  display: grid;
+  min-width: 0;
+  flex: 0 0 auto;
+  gap: 6px;
+  border: 1px solid #e2ebe3;
+  border-radius: 10px;
+  background: #f8fbf8;
+  padding: 9px;
+}
+
+.erp-dev-docs-lifecycle > .ant-typography {
+  font-size: 12px;
+}
+
+.erp-dev-docs-lifecycle__control.ant-segmented {
+  min-width: 0;
+}
+
+.erp-dev-docs-lifecycle__control .ant-segmented-item-label {
+  padding-inline: 7px;
+  font-size: 12px;
+}
+
+.erp-dev-docs-lifecycle__count.ant-typography {
+  justify-self: end;
+}
+
 .erp-dev-docs-search-scope {
   display: flex;
   min-width: 0;
@@ -542,6 +570,11 @@
   min-height: 0;
   overflow: auto;
   padding: 18px 22px 28px;
+}
+
+.erp-dev-docs-reader-state {
+  display: grid;
+  place-items: center;
 }
 
 .erp-dev-docs-markdown h1,

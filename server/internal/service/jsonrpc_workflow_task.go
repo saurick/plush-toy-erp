@@ -230,6 +230,45 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			approvalVisibilityScopes,
 			false,
 		), nil
+	case "get_workbench":
+		if res := d.requireEffectiveWorkflowWorkbenchRead(ctx); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownWorkflowTaskParams(pm, method, "queue_key", "limit", "offset"); res != nil {
+			return id, res, nil
+		}
+		query, queryRes := getWorkflowWorkbenchQuery(pm)
+		if queryRes != nil {
+			return id, queryRes, nil
+		}
+		admin, adminRes := d.CurrentAdmin(ctx)
+		if adminRes != nil {
+			return id, adminRes, nil
+		}
+		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
+		if visibilityErr != nil {
+			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
+		}
+		canSupervise, permissionRes := d.AdminHasPermission(ctx, biz.PermissionWorkflowTaskSupervise)
+		if permissionRes != nil {
+			return id, permissionRes, nil
+		}
+		approvalVisibilityScopes, approvalRes := d.workflowAvailableApprovalTaskVisibilityScopes(ctx, admin)
+		if approvalRes != nil {
+			return id, approvalRes, nil
+		}
+		query.VisibilityScope = visibilityScope
+		query.RiskVisibilityScope = expandWorkflowTaskVisibilityForSupervision(visibilityScope, canSupervise)
+		query.ApprovalVisibilityScopes = approvalVisibilityScopes
+		workbench, err := d.workflowUC.GetWorkflowWorkbench(ctx, query)
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(workflowWorkbenchToMap(workbench)),
+		}, nil
 	case "get_task_board":
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
@@ -638,6 +677,54 @@ func getOptionalWorkflowTaskBoardInteger(pm map[string]any, key string, fallback
 		return value, true
 	default:
 		return 0, false
+	}
+}
+
+func getWorkflowWorkbenchQuery(pm map[string]any) (biz.WorkflowWorkbenchQuery, *v1.JsonrpcResult) {
+	queueKey, queueKeyRes := getOptionalWorkflowTaskBoardString(pm, "queue_key", 32)
+	if queueKeyRes != nil {
+		return biz.WorkflowWorkbenchQuery{}, queueKeyRes
+	}
+	if queueKey == "" {
+		queueKey = biz.WorkflowWorkbenchQueueActionable
+	}
+	if _, ok := (biz.WorkflowWorkbenchCounts{}).QueueTotal(queueKey); !ok {
+		return biz.WorkflowWorkbenchQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "queue_key 不是有效的工作台队列"}
+	}
+	limit, ok := getOptionalWorkflowTaskBoardInteger(pm, "limit", 8, 1)
+	if !ok {
+		return biz.WorkflowWorkbenchQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "limit 必须是正整数"}
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	offset, ok := getOptionalWorkflowTaskBoardInteger(pm, "offset", 0, 0)
+	if !ok || offset > workflowTaskBoardMaxOffset {
+		return biz.WorkflowWorkbenchQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "offset 必须是非负整数"}
+	}
+	return biz.WorkflowWorkbenchQuery{
+		QueueKey: queueKey,
+		Limit:    limit,
+		Offset:   offset,
+	}, nil
+}
+
+func workflowWorkbenchToMap(workbench *biz.WorkflowWorkbenchPage) map[string]any {
+	if workbench == nil {
+		return nil
+	}
+	return map[string]any{
+		"snapshot_at": workbench.SnapshotAt.Unix(),
+		"queue_key":   workbench.QueueKey,
+		"total":       workbench.Total,
+		"limit":       workbench.Limit,
+		"offset":      workbench.Offset,
+		"items":       workflowTasksToAny(workbench.Items),
+		"counts": map[string]any{
+			"actionable": workbench.Counts.Actionable,
+			"risk":       workbench.Counts.Risk,
+			"approval":   workbench.Counts.Approval,
+		},
 	}
 }
 

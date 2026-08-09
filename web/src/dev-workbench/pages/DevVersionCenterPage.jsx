@@ -26,6 +26,7 @@ import {
 } from 'antd'
 import { Link as RouterLink, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
+import DevDeliveryTimestamp from '../components/DevDeliveryTimestamp.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevPipelineTimingPanel, {
   DevPipelineStatusStrip,
@@ -67,6 +68,7 @@ import { DEV_QUALITY_GATES_ROUTE } from '../config/devRoutes.mjs'
 
 const { Link, Paragraph, Text, Title } = Typography
 const OPERATION_POLL_INTERVAL_MS = 1500
+const OPERATION_DETAIL_FOCUS_RESTORE_FALLBACK_MS = 600
 const VERSION_CENTER_SNAPSHOT_KEY = 'version-center'
 const POLLING_OPERATION_STATUSES = new Set([
   'queued',
@@ -102,6 +104,10 @@ function operationActionLabel(action) {
   if (action === 'release') return '发布制品'
   if (action === 'promote') return '部署 133'
   return '回滚'
+}
+
+function operationUpdateAction(operation) {
+  return operation?.terminal ? '完成于' : '更新于'
 }
 
 export default function DevVersionCenterPage() {
@@ -140,6 +146,54 @@ export default function DevVersionCenterPage() {
   const workspaceRef = useRef(null)
   const versionTableRef = useRef(null)
   const historyTableRef = useRef(null)
+  const operationDetailTriggerRef = useRef(null)
+  const operationDetailFocusRestoreTimerRef = useRef(null)
+
+  const restoreOperationDetailTriggerFocus = useCallback(() => {
+    const trigger = operationDetailTriggerRef.current
+    const { activeElement } = document
+    if (
+      !trigger?.isConnected ||
+      (activeElement &&
+        activeElement !== document.body &&
+        activeElement !== trigger &&
+        activeElement.isConnected)
+    ) {
+      return false
+    }
+    trigger.focus({ preventScroll: true })
+    if (document.activeElement !== trigger) return false
+    operationDetailTriggerRef.current = null
+    return true
+  }, [])
+
+  const clearOperationDetailFocusRestoreTimer = useCallback(() => {
+    if (operationDetailFocusRestoreTimerRef.current !== null) {
+      window.clearTimeout(operationDetailFocusRestoreTimerRef.current)
+      operationDetailFocusRestoreTimerRef.current = null
+    }
+  }, [])
+
+  const closeOperationDetail = useCallback(() => {
+    setOperationDetail(null)
+    clearOperationDetailFocusRestoreTimer()
+    // 快速关闭可能打断 Drawer 动画回调，仍在关闭截止后恢复原触发点。
+    operationDetailFocusRestoreTimerRef.current = window.setTimeout(() => {
+      operationDetailFocusRestoreTimerRef.current = null
+      restoreOperationDetailTriggerFocus()
+      operationDetailTriggerRef.current = null
+    }, OPERATION_DETAIL_FOCUS_RESTORE_FALLBACK_MS)
+  }, [
+    clearOperationDetailFocusRestoreTimer,
+    restoreOperationDetailTriggerFocus,
+  ])
+
+  useEffect(
+    () => () => {
+      clearOperationDetailFocusRestoreTimer()
+    },
+    [clearOperationDetailFocusRestoreTimer]
+  )
 
   useEffect(() => {
     if (requestedView === activeView) return
@@ -427,7 +481,9 @@ export default function DevVersionCenterPage() {
     if (succeeded) setReleaseModalOpen(false)
   }
 
-  const openOperationDetail = async (operation) => {
+  const openOperationDetail = async (operation, trigger) => {
+    clearOperationDetailFocusRestoreTimer()
+    operationDetailTriggerRef.current = trigger
     setOperationDetail(operation)
     setOperationDetailLoading(true)
     try {
@@ -450,6 +506,12 @@ export default function DevVersionCenterPage() {
           <Text type="secondary" code>
             {shortGitSha(record.gitSha)}
           </Text>
+          <DevDeliveryTimestamp
+            value={record.publishedAt}
+            action="发布于"
+            missing="发布时间未证明"
+            className="erp-dev-version-published-at"
+          />
         </Space>
       ),
     },
@@ -610,7 +672,11 @@ export default function DevVersionCenterPage() {
     const executable = summaryFresh && readyToExecute
     return (
       <Space wrap>
-        <Button onClick={() => openOperationDetail(record)}>查看详情</Button>
+        <Button
+          onClick={(event) => openOperationDetail(record, event.currentTarget)}
+        >
+          查看详情
+        </Button>
         {executable ? (
           <Button
             type="primary"
@@ -692,6 +758,27 @@ export default function DevVersionCenterPage() {
               }
             </Text>
           )}
+        </Space>
+      ),
+    },
+    {
+      title: '时间',
+      key: 'time',
+      width: 220,
+      render: (_value, record) => (
+        <Space direction="vertical" size={2}>
+          <DevDeliveryTimestamp
+            value={record.createdAt}
+            action="开始于"
+            missing="开始时间未证明"
+            className="erp-dev-operation-history-time"
+          />
+          <DevDeliveryTimestamp
+            value={record.updatedAt}
+            action={operationUpdateAction(record)}
+            missing="完成时间未证明"
+            className="erp-dev-operation-history-time"
+          />
         </Space>
       ),
     },
@@ -805,7 +892,7 @@ export default function DevVersionCenterPage() {
               locale={{
                 emptyText: <Empty description="尚无已结束的发布或部署操作" />,
               }}
-              scroll={{ x: 760 }}
+              scroll={{ x: 980 }}
             />
           </Card>
         </section>
@@ -943,6 +1030,12 @@ export default function DevVersionCenterPage() {
               {' · '}
               {strictProof?.reused ? '可信复用' : '本地新执行或尚未执行'}
             </Text>
+            <DevDeliveryTimestamp
+              value={strictProof?.receipt?.finishedAt}
+              action="完成于"
+              missing="完成时间未证明"
+              className="erp-dev-quality-gate-finished-at"
+            />
           </div>
           <RouterLink to={`${DEV_QUALITY_GATES_ROUTE}?view=run&profile=strict`}>
             查看质量门禁详情
@@ -969,6 +1062,12 @@ export default function DevVersionCenterPage() {
             <Space direction="vertical" size={8}>
               <Text strong>{versions[0]?.version || '尚无可用版本'}</Text>
               <Text code>{shortGitSha(versions[0]?.gitSha)}</Text>
+              <DevDeliveryTimestamp
+                value={versions[0]?.publishedAt}
+                action="发布于"
+                missing="发布时间未证明"
+                className="erp-dev-latest-version-published-at"
+              />
               <Text type="secondary">
                 {versions[0]?.completeAssets
                   ? '发布制品齐全'
@@ -1042,6 +1141,12 @@ export default function DevVersionCenterPage() {
                       <Text type="secondary" code>
                         {operation.id.slice(0, 8)}
                       </Text>
+                      <DevDeliveryTimestamp
+                        value={operation.createdAt}
+                        action="开始于"
+                        missing="开始时间未证明"
+                        className="erp-dev-current-operation-time"
+                      />
                     </div>
                     <div className="erp-dev-version-current-operation__detail">
                       <Text>{operation.version}</Text>
@@ -1059,6 +1164,12 @@ export default function DevVersionCenterPage() {
                       <Text type="secondary" title={statusMessage.title}>
                         {statusMessage.label}
                       </Text>
+                      <DevDeliveryTimestamp
+                        value={operation.updatedAt}
+                        action={operationUpdateAction(operation)}
+                        missing="更新时间未证明"
+                        className="erp-dev-current-operation-time"
+                      />
                     </div>
                     <div className="erp-dev-version-current-operation__actions">
                       {renderOperationActions(operation)}
@@ -1140,7 +1251,17 @@ export default function DevVersionCenterPage() {
         title="操作详情"
         open={Boolean(operationDetail)}
         width={640}
-        onClose={() => setOperationDetail(null)}
+        onClose={closeOperationDetail}
+        afterOpenChange={(open) => {
+          if (open) return
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              if (restoreOperationDetailTriggerFocus()) {
+                clearOperationDetailFocusRestoreTimer()
+              }
+            })
+          })
+        }}
         destroyOnHidden
       >
         {operationDetail ? (
@@ -1153,6 +1274,20 @@ export default function DevVersionCenterPage() {
             <Text type="secondary" copyable>
               {operationDetail.id}
             </Text>
+            <Space wrap size={[12, 4]}>
+              <DevDeliveryTimestamp
+                value={operationDetail.createdAt}
+                action="开始于"
+                missing="开始时间未证明"
+                className="erp-dev-operation-detail-time"
+              />
+              <DevDeliveryTimestamp
+                value={operationDetail.updatedAt}
+                action={operationUpdateAction(operationDetail)}
+                missing="更新时间未证明"
+                className="erp-dev-operation-detail-time"
+              />
+            </Space>
             <Card size="small" title="操作环节耗时">
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Text strong>
@@ -1292,7 +1427,12 @@ export default function DevVersionCenterPage() {
                   <Space direction="vertical" size={4}>
                     <Space wrap>
                       <StatusTag status={event.status} />
-                      <Text type="secondary">{event.at}</Text>
+                      <DevDeliveryTimestamp
+                        value={event.at}
+                        action=""
+                        missing="事件时间未证明"
+                        className="erp-dev-operation-event-time"
+                      />
                     </Space>
                     <Text
                       title={

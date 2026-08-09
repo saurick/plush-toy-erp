@@ -25,6 +25,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
+import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionOverIssueRequestModal from '../components/production-orders/ProductionOverIssueRequestModal.jsx'
@@ -103,6 +104,12 @@ import {
 } from '../utils/relatedDocumentNavigation.mjs'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import {
+  LIFECYCLE_SCOPE,
+  filterLifecycleStatusOptions,
+  lifecycleScopeFromSearchParams,
+  lifecycleScopeIncludesStatus,
+} from '../utils/lifecycleScope.mjs'
 
 const { Text } = Typography
 const EMPTY_COMPLETION_CONTEXT = Object.freeze({
@@ -131,6 +138,7 @@ const EMPTY_MATERIAL_ISSUE_CONTEXT = Object.freeze({
 })
 const DEFAULT_QUERY = Object.freeze({
   keyword: '',
+  scope: LIFECYCLE_SCOPE.CURRENT,
   status: '',
   date_field: 'planned_start_at',
   date_from: '',
@@ -149,6 +157,7 @@ function positiveQuery(value, fallback) {
 function queryFromSearchParams(params) {
   return {
     keyword: params.get('keyword') || '',
+    scope: lifecycleScopeFromSearchParams(params),
     status: params.get('status') || '',
     date_field: params.get('date_field') || DEFAULT_QUERY.date_field,
     date_from: params.get('date_from') || '',
@@ -389,6 +398,7 @@ export default function V1ProductionOrdersPage() {
       setQuery(next)
       const params = new URLSearchParams()
       for (const [key, value] of Object.entries(next)) {
+        if (key === 'scope' && value === LIFECYCLE_SCOPE.CURRENT) continue
         if (value !== '' && value !== null && value !== undefined) {
           params.set(key, String(value))
         }
@@ -406,6 +416,7 @@ export default function V1ProductionOrdersPage() {
         hasExactContext: Boolean(routeProductionOrderID),
       }),
       status: query.status,
+      lifecycle_scope: query.scope,
       date_field: query.date_field,
       date_from: dateInputToUnix(query.date_from),
       date_to: dateInputToUnix(query.date_to),
@@ -413,6 +424,18 @@ export default function V1ProductionOrdersPage() {
       sort_direction: query.sort_direction,
     }),
     [linkedKeyword, query, routeProductionOrderID]
+  )
+  const productionStatusOptions = useMemo(
+    () =>
+      filterLifecycleStatusOptions(
+        Object.entries(PRODUCTION_ORDER_STATUS_META).map(([value, meta]) => ({
+          value,
+          label: meta.label,
+        })),
+        query.scope,
+        [PRODUCTION_ORDER_STATUS.CLOSED, PRODUCTION_ORDER_STATUS.CANCELLED]
+      ),
+    [query.scope]
   )
 
   const loadOrders = useCallback(async () => {
@@ -1553,14 +1576,27 @@ export default function V1ProductionOrdersPage() {
                 writeQuery({ keyword: event.target.value, page: 1 })
               }
             />
+            <LifecycleScopeFilter
+              value={query.scope}
+              onChange={(value) =>
+                writeQuery({
+                  scope: value,
+                  status: lifecycleScopeIncludesStatus(value, query.status, [
+                    PRODUCTION_ORDER_STATUS.CLOSED,
+                    PRODUCTION_ORDER_STATUS.CANCELLED,
+                  ])
+                    ? query.status
+                    : '',
+                  page: 1,
+                })
+              }
+            />
             <Select
               value={query.status || undefined}
               allowClear
               placeholder="全部状态"
               style={{ width: 150 }}
-              options={Object.entries(PRODUCTION_ORDER_STATUS_META).map(
-                ([value, meta]) => ({ value, label: meta.label })
-              )}
+              options={productionStatusOptions}
               onChange={(value) => writeQuery({ status: value || '', page: 1 })}
             />
             <DateRangeFilter

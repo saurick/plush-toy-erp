@@ -128,6 +128,7 @@ type SalesOrderFilter struct {
 	Keyword         string
 	CustomerID      int
 	LifecycleStatus string
+	LifecycleScope  string
 	DateField       string
 	DateFrom        *time.Time
 	DateTo          *time.Time
@@ -559,10 +560,23 @@ func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMut
 func normalizeSalesOrderFilter(in SalesOrderFilter) (SalesOrderFilter, error) {
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	in.LifecycleStatus = strings.ToLower(strings.TrimSpace(in.LifecycleStatus))
+	var scopeOK bool
+	in.LifecycleScope, scopeOK = NormalizeLifecycleScope(in.LifecycleScope)
+	if !scopeOK {
+		return SalesOrderFilter{}, ErrBadParam
+	}
 	in.DateField = strings.TrimSpace(in.DateField)
 	in.SortBy = strings.TrimSpace(in.SortBy)
 	in.SortDirection = strings.ToLower(strings.TrimSpace(in.SortDirection))
 	if in.LifecycleStatus != "" && !IsValidSalesOrderStatus(in.LifecycleStatus) {
+		return SalesOrderFilter{}, ErrBadParam
+	}
+	if !LifecycleScopeAllowsStatus(
+		in.LifecycleScope,
+		in.LifecycleStatus,
+		[]string{SalesOrderStatusDraft, SalesOrderStatusSubmitted, SalesOrderStatusActive},
+		[]string{SalesOrderStatusClosed, SalesOrderStatusCanceled},
+	) {
 		return SalesOrderFilter{}, ErrBadParam
 	}
 	if in.CustomerID < 0 {

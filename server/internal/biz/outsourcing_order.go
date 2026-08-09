@@ -135,6 +135,7 @@ type OutsourcingOrderFilter struct {
 	Keyword         string
 	SupplierID      int
 	LifecycleStatus string
+	LifecycleScope  string
 	DateField       string
 	DateFrom        *time.Time
 	DateTo          *time.Time
@@ -457,10 +458,23 @@ func normalizeOutsourcingOrderItemFields(in OutsourcingOrderItemMutation) (Outso
 func normalizeOutsourcingOrderFilter(in OutsourcingOrderFilter) (OutsourcingOrderFilter, error) {
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	in.LifecycleStatus = strings.ToLower(strings.TrimSpace(in.LifecycleStatus))
+	var scopeOK bool
+	in.LifecycleScope, scopeOK = NormalizeLifecycleScope(in.LifecycleScope)
+	if !scopeOK {
+		return OutsourcingOrderFilter{}, ErrBadParam
+	}
 	in.DateField = strings.TrimSpace(in.DateField)
 	in.SortBy = strings.TrimSpace(in.SortBy)
 	in.SortDirection = strings.ToLower(strings.TrimSpace(in.SortDirection))
 	if in.LifecycleStatus != "" && !IsValidOutsourcingOrderStatus(in.LifecycleStatus) {
+		return OutsourcingOrderFilter{}, ErrBadParam
+	}
+	if !LifecycleScopeAllowsStatus(
+		in.LifecycleScope,
+		in.LifecycleStatus,
+		[]string{OutsourcingOrderStatusDraft, OutsourcingOrderStatusSubmitted, OutsourcingOrderStatusConfirmed},
+		[]string{OutsourcingOrderStatusClosed, OutsourcingOrderStatusCanceled},
+	) {
 		return OutsourcingOrderFilter{}, ErrBadParam
 	}
 	if in.SupplierID < 0 {

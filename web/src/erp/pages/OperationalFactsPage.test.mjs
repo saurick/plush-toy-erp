@@ -8,6 +8,19 @@ const source = readFileSync(
   'utf8'
 )
 
+test('production facts load the exact draft before opening the shared editor', () => {
+  assert.match(source, /production-fact-edit-draft/u)
+  assert.match(
+    source,
+    /listAllProductionFacts\(\{[\s\S]*keyword: String\(record\.id\)/u
+  )
+  assert.match(source, /fresh\.status !== 'DRAFT'/u)
+  assert.match(source, /buildOperationalFactDraftSavePayload/u)
+  assert.match(source, /expected_version/u)
+  assert.match(source, /findOperationalFactDraftSaveResult/u)
+  assert.match(source, /mode="edit"/u)
+})
+
 test('finance cancellation requires a bounded business reason and sends it to the canonical action', () => {
   assert.match(source, /'作废财务草稿'/)
   assert.match(source, /'取消财务记录'/)
@@ -69,7 +82,10 @@ test('shipment drafts can be voided without claiming an inventory reversal', () 
     source,
     /\['DRAFT', 'SHIPPED'\]\.includes\(activeSelectedRow\.status\)/u
   )
-  assert.match(source, /activeSelectedRow\?\.status === 'DRAFT'[\s\S]{0,100}'作废出货草稿'/u)
+  assert.match(
+    source,
+    /activeSelectedRow\?\.status === 'DRAFT'[\s\S]{0,100}'作废出货草稿'/u
+  )
 })
 
 test('finance page derives projection, permission and settlement from the filtered fact type', () => {
@@ -103,10 +119,7 @@ test('only posted rework feedback explains the atomic exception handoff', () => 
     source,
     /currentActiveKey === 'production'[\s\S]{0,180}actionKey === 'post'[\s\S]{0,180}row\.fact_type[\s\S]{0,180}'REWORK'/u
   )
-  assert.match(
-    source,
-    /返工记录已过账，返工补制批次和生产异常任务已生成/u
-  )
+  assert.match(source, /返工记录已过账，返工补制批次和生产异常任务已生成/u)
   assert.doesNotMatch(source, /发起生产异常/u)
 })
 
@@ -192,10 +205,7 @@ test('posted rework records open authoritative progress and link back to the pro
   assert.match(source, />\s*查看返工进度\s*</u)
   assert.match(source, /V1_ROUTE_PATHS\.productionOrders/u)
   assert.match(source, /production_order_id:\s*orderID/u)
-  assert.match(
-    source,
-    /该返工记录尚未关联可核对的成品返工补制批次/u
-  )
+  assert.match(source, /该返工记录尚未关联可核对的成品返工补制批次/u)
 })
 
 test('operational fact actions keep a stable authorized catalog across selection and status changes', () => {
@@ -223,10 +233,7 @@ test('operational fact actions keep a stable authorized catalog across selection
     )
   }
 
-  assert.doesNotMatch(
-    source,
-    /canPostActive\s*&&\s*\(!activeSelectedRow/u
-  )
+  assert.doesNotMatch(source, /canPostActive\s*&&\s*\(!activeSelectedRow/u)
   assert.doesNotMatch(
     source,
     /canCreateProductionRework\s*&&\s*\(!activeSelectedRow/u
@@ -248,7 +255,10 @@ test('related-record menu keeps permission-scoped slots and disables unavailable
   assert.match(source, /const availableRelatedMenuItems = useMemo/u)
   assert.match(source, /const relatedMenuItems = useMemo/u)
   assert.match(source, /disabled: !available/u)
-  assert.match(source, /const hasRelatedCapability = relatedMenuItems\.length > 0/u)
+  assert.match(
+    source,
+    /const hasRelatedCapability = relatedMenuItems\.length > 0/u
+  )
   assert.match(source, /\{hasRelatedCapability \? \(/u)
   assert.doesNotMatch(source, /\{relatedActionAvailability\.visible \? \(/u)
 })

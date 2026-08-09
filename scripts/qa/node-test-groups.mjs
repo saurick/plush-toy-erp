@@ -65,6 +65,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/purchase-order-approval-process.test.mjs",
     "scripts/qa/purchase-quality-simulated-matrix.test.mjs",
     "scripts/qa/quality-gate-catalog.test.mjs",
+    "scripts/qa/run-gate-with-managed-database.test.mjs",
     "scripts/qa/run-gate-with-receipt.test.mjs",
     "scripts/qa/run-node-tests.test.mjs",
     "scripts/qa/run-test-gate.test.mjs",

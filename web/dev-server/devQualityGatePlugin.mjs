@@ -57,6 +57,14 @@ const QA_RUNTIME_MODULE_URLS = Object.freeze({
   qualityCatalog: pathToFileURL(
     path.join(QA_RUNTIME_ROOT, 'scripts', 'qa', 'quality-gate-catalog.mjs')
   ).href,
+  managedDatabase: pathToFileURL(
+    path.join(
+      QA_RUNTIME_ROOT,
+      'scripts',
+      'qa',
+      'run-gate-with-managed-database.mjs'
+    )
+  ).href,
   receiptGate: pathToFileURL(
     path.join(QA_RUNTIME_ROOT, 'scripts', 'qa', 'run-gate-with-receipt.mjs')
   ).href,
@@ -154,23 +162,50 @@ export function validateDevQualityGateCancel(value) {
 
 export function buildDevQualityGateCommand({
   environment = process.env,
+  environmentMode = 'explicit',
   nodeRuntime,
+  operationId,
   profile,
   projectRoot,
 }) {
   if (!DEV_QUALITY_GATE_PROFILES.includes(profile)) {
     throw new Error('quality gate profile is not allowlisted')
   }
+  const args =
+    environmentMode === 'managed'
+      ? [
+          'scripts/qa/run-gate-with-managed-database.mjs',
+          '--gate',
+          profile,
+          '--operation-id',
+          operationId,
+        ]
+      : ['scripts/qa/run-gate-with-receipt.mjs', '--gate', profile]
+  if (!['explicit', 'managed'].includes(environmentMode)) {
+    throw new Error('quality gate environment mode is invalid')
+  }
+  if (
+    environmentMode === 'managed' &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+      String(operationId || '')
+    )
+  ) {
+    throw new Error('managed quality gate operation id is invalid')
+  }
+  const childEnvironment = {
+    ...environment,
+    PATH: [path.dirname(nodeRuntime), String(environment.PATH || '')]
+      .filter(Boolean)
+      .join(path.delimiter),
+  }
+  if (environmentMode === 'managed') {
+    delete childEnvironment.DISPOSABLE_DATABASE_BASE_URL
+  }
   return {
     command: nodeRuntime,
-    args: ['scripts/qa/run-gate-with-receipt.mjs', '--gate', profile],
+    args,
     cwd: projectRoot,
-    env: {
-      ...environment,
-      PATH: [path.dirname(nodeRuntime), String(environment.PATH || '')]
-        .filter(Boolean)
-        .join(path.delimiter),
-    },
+    env: childEnvironment,
   }
 }
 
@@ -343,27 +378,77 @@ function busyProjection(lock) {
   return { active: true, kind: lock.kind, profile: lock.profile }
 }
 
-async function readEnvironmentReadiness(env) {
+function boundedEnvironmentMessage(value, fallback) {
+  const message = typeof value === 'string' ? value : ''
+  const hasControlCharacter = [...message].some((character) => {
+    const codePoint = character.codePointAt(0)
+    return codePoint <= 31 || codePoint === 127
+  })
+  return message && message.length <= 200 && !hasControlCharacter
+    ? message
+    : fallback
+}
+
+export async function resolveDevQualityGateEnvironment({
+  env = process.env,
+  probeManagedDatabase,
+  projectRoot = QA_RUNTIME_ROOT,
+} = {}) {
   const value = String(env.DISPOSABLE_DATABASE_BASE_URL || '')
-  if (!value) {
-    return {
-      disposableDatabaseReady: false,
-      message: '尚未登记可用于质量门禁的一次性数据库环境',
+  if (value) {
+    try {
+      const { parseLoopbackDatabaseURL } =
+        await loadQaRuntimeModule('databaseTarget')
+      parseLoopbackDatabaseURL(value)
+      return Object.freeze({
+        mode: 'explicit',
+        disposableDatabaseReady: true,
+        message: '已使用显式登记的本机一次性数据库环境',
+      })
+    } catch {
+      return Object.freeze({
+        mode: 'blocked',
+        disposableDatabaseReady: false,
+        message: '显式登记的一次性数据库环境不符合本机隔离要求',
+      })
     }
   }
   try {
-    const { parseLoopbackDatabaseURL } =
-      await loadQaRuntimeModule('databaseTarget')
-    parseLoopbackDatabaseURL(value)
-    return {
-      disposableDatabaseReady: true,
-      message: '一次性数据库环境已就绪',
+    const probe =
+      probeManagedDatabase ||
+      (await loadQaRuntimeModule('managedDatabase')).probeManagedDatabaseRuntime
+    const readiness = await probe({ repoRoot: projectRoot })
+    if (readiness?.ready === true) {
+      return Object.freeze({
+        mode: 'managed',
+        disposableDatabaseReady: true,
+        message: boundedEnvironmentMessage(
+          readiness.message,
+          '本机托管一次性数据库环境已就绪'
+        ),
+      })
     }
-  } catch {
-    return {
+    return Object.freeze({
+      mode: 'blocked',
       disposableDatabaseReady: false,
-      message: '一次性数据库环境不符合本机隔离要求',
-    }
+      message: boundedEnvironmentMessage(
+        readiness?.message,
+        '本机一次性数据库运行环境尚未就绪'
+      ),
+    })
+  } catch {
+    return Object.freeze({
+      mode: 'blocked',
+      disposableDatabaseReady: false,
+      message: '本机一次性数据库运行环境检查失败',
+    })
+  }
+}
+
+function publicEnvironment(environment) {
+  return {
+    disposableDatabaseReady: environment.disposableDatabaseReady,
+    message: environment.message,
   }
 }
 
@@ -434,16 +519,6 @@ function statusProjection({
       notProven: ['目标环境发布', '客户 UAT'],
     }
   }
-  if (!environment.disposableDatabaseReady) {
-    return {
-      tone: 'warning',
-      title: '当前还不能运行完整或严格门禁',
-      description: environment.message,
-      releaseEligible: false,
-      recommendation: '先通过项目正式启动入口登记本机一次性数据库环境。',
-      notProven: ['隔离数据库验证', '目标环境发布', '客户 UAT'],
-    }
-  }
   if (repository.dirty) {
     const currentPassed =
       strictProof.current && strictProof.receipt?.status === 'passed'
@@ -481,6 +556,17 @@ function statusProjection({
       description: '最近失败结果属于当前干净版本，不能进入版本发布。',
       releaseEligible: false,
       recommendation: '先修复第一失败阶段，再重新运行严格门禁。',
+      notProven: ['当前版本严格门禁', '目标环境发布', '客户 UAT'],
+    }
+  }
+  if (!environment.disposableDatabaseReady) {
+    return {
+      tone: 'warning',
+      title: '当前运行环境尚未就绪',
+      description: environment.message,
+      releaseEligible: false,
+      recommendation:
+        '启动本机 Docker 并准备 postgres:18.1 镜像，或显式登记合规的本机一次性数据库环境。',
       notProven: ['当前版本严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
@@ -540,6 +626,7 @@ export function createDevQualityGateService({
   processId = process.pid,
   processAlive = processIsAlive,
   processGroupAlive = processGroupIsAlive,
+  probeManagedDatabase,
   killOrphanedProcessGroup = (pid, signal) => process.kill(-pid, signal),
   attachExecutionChild = attachDevQaExecutionChild,
   randomOperationId = randomUUID,
@@ -559,6 +646,7 @@ export function createDevQualityGateService({
   const store = operationStore || resolveDevQualityGateOperationStore(root)
   const active = new Map()
   const orphanStopTimers = new Map()
+  let environmentReadinessCache = null
   const loadReceipt =
     readReceipt || ((profile) => readFixedQualityGateReceipt(root, profile))
   const loadChangedFiles =
@@ -567,6 +655,27 @@ export function createDevQualityGateService({
       const { collectChangedFiles } = await loadQaRuntimeModule('affected')
       return collectChangedFiles(options)
     })
+
+  async function loadEnvironmentReadiness({ fresh = false } = {}) {
+    const timestamp = Date.now()
+    if (
+      !fresh &&
+      environmentReadinessCache &&
+      environmentReadinessCache.expiresAt > timestamp
+    ) {
+      return environmentReadinessCache.value
+    }
+    const value = await resolveDevQualityGateEnvironment({
+      env,
+      probeManagedDatabase,
+      projectRoot: root,
+    })
+    environmentReadinessCache = {
+      expiresAt: timestamp + 8_000,
+      value,
+    }
+    return value
+  }
 
   function releaseLock(operation) {
     try {
@@ -673,12 +782,7 @@ export function createDevQualityGateService({
     return interrupted
   }
 
-  function handleLine(
-    operationId,
-    line,
-    parseStageEvent,
-    parseSubstepEvent
-  ) {
+  function handleLine(operationId, line, parseStageEvent, parseSubstepEvent) {
     const context = active.get(operationId)
     if (!context) return
     if (/^\[disposable-database\].*cleanup=complete(?:\s|$)/u.test(line)) {
@@ -687,6 +791,14 @@ export function createDevQualityGateService({
     }
     if (/^\[disposable-database\].*cleanup=failed(?:\s|$)/u.test(line)) {
       context.databaseCleanup = 'failed'
+      return
+    }
+    if (line === '[qa:managed-database] status=cleanup-complete') {
+      context.managedDatabaseCleanup = 'complete'
+      return
+    }
+    if (line === '[qa:managed-database] status=cleanup-failed') {
+      context.managedDatabaseCleanup = 'failed'
       return
     }
     const substepEvent =
@@ -788,17 +900,27 @@ export function createDevQualityGateService({
     const groupGone = processReadback.gone
     const cleanupComplete =
       groupGone &&
-      (!context.serverStarted || context.databaseCleanup === 'complete')
+      (!context.serverStarted || context.databaseCleanup === 'complete') &&
+      context.managedDatabaseCleanup !== 'pending' &&
+      context.managedDatabaseCleanup !== 'failed'
     const cleanup = cleanupComplete
       ? {
           status: 'complete',
-          message: context.serverStarted
-            ? '一次性数据库、进程组和运行锁已完成清理读回'
-            : '运行未进入数据库阶段，进程组和运行锁已完成清理读回',
+          message:
+            context.environmentMode === 'managed'
+              ? context.serverStarted
+                ? '一次性数据库、托管容器、进程组和运行锁已完成清理读回'
+                : '托管容器、进程组和运行锁已完成清理读回'
+              : context.serverStarted
+                ? '一次性数据库、进程组和运行锁已完成清理读回'
+                : '运行未进入数据库阶段，进程组和运行锁已完成清理读回',
         }
       : {
           status: 'failed',
-          message: '未取得一次性数据库或进程组的完整清理读回',
+          message:
+            context.environmentMode === 'managed'
+              ? '未取得一次性数据库、托管容器或进程组的完整清理读回'
+              : '未取得一次性数据库或进程组的完整清理读回',
         }
     try {
       if (context.stopReason) {
@@ -910,13 +1032,15 @@ export function createDevQualityGateService({
     }
   }
 
-  function launchOperation(operation, receiptGateModule) {
+  function launchOperation(operation, receiptGateModule, environmentReadiness) {
     let processHandle
     try {
       const nodeRuntime = resolveNodeRuntime(root)
       const spec = buildDevQualityGateCommand({
         environment: env,
+        environmentMode: environmentReadiness.mode,
         nodeRuntime,
+        operationId: operation.id,
         profile: operation.profile,
         projectRoot: root,
       })
@@ -950,10 +1074,13 @@ export function createDevQualityGateService({
 
     const context = {
       profile: operation.profile,
+      environmentMode: environmentReadiness.mode,
       handle: processHandle,
       stopReason: '',
       serverStarted: false,
       databaseCleanup: '',
+      managedDatabaseCleanup:
+        environmentReadiness.mode === 'managed' ? 'pending' : 'not_required',
       timeoutTimer: null,
       forceTimer: null,
     }
@@ -1022,7 +1149,8 @@ export function createDevQualityGateService({
         operation: publicOperation(existing),
       }
     }
-    if (!(await readEnvironmentReadiness(env)).disposableDatabaseReady) {
+    const environmentReadiness = await loadEnvironmentReadiness({ fresh: true })
+    if (!environmentReadiness.disposableDatabaseReady) {
       const error = new Error('quality gate database environment is blocked')
       error.code = 'DEV_QUALITY_GATE_ENVIRONMENT_BLOCKED'
       throw error
@@ -1043,19 +1171,19 @@ export function createDevQualityGateService({
     try {
       const repository = await readRepositoryState(root)
       const receiptGateModule = await loadQaRuntimeModule('receiptGate')
-      const operation = createOrReuseDevQualityGateOperation(store, {
+      const { operation } = createOrReuseDevQualityGateOperation(store, {
         profile,
         idempotencyKey: payload.idempotencyKey,
         repository,
         operationId,
         now: now().toISOString(),
-      }).operation
+      })
       return {
         schemaVersion: 'plush.dev-quality-gate-action-result/v1',
         profile,
         reused: false,
         operation: publicOperation(
-          launchOperation(operation, receiptGateModule)
+          launchOperation(operation, receiptGateModule, environmentReadiness)
         ),
       }
     } catch (error) {
@@ -1140,14 +1268,21 @@ export function createDevQualityGateService({
         DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)
       ) || null
     const [environment, receiptGateModule] = await Promise.all([
-      readEnvironmentReadiness(env),
+      loadEnvironmentReadiness(),
       loadQaRuntimeModule('receiptGate'),
     ])
+    const parallelStageIds = new Set(
+      receiptGateModule.RECEIPT_GATE_PARALLEL_STAGE_IDS
+    )
+    const registeredSubsteps = {
+      shared: receiptGateModule.RECEIPT_GATE_SHARED_SUBSTEP_LABELS,
+      web: receiptGateModule.RECEIPT_GATE_WEB_SUBSTEP_LABELS,
+    }
     return {
       schemaVersion: 'plush.dev-quality-gates-summary/v1',
       generatedAt: now().toISOString(),
       repository,
-      environment,
+      environment: publicEnvironment(environment),
       busy: busyProjection(readDevQaExecutionLock(store)),
       profiles: Object.fromEntries(
         DEV_QUALITY_GATE_PROFILES.map((profile) => [
@@ -1158,7 +1293,20 @@ export function createDevQualityGateService({
               (id) => ({
                 id,
                 label: receiptGateModule.RECEIPT_GATE_STAGE_LABELS[id] || id,
+                parallel: parallelStageIds.has(id),
               })
+            ),
+            substeps: Object.fromEntries(
+              Object.entries(registeredSubsteps)
+                .filter(([stageId]) =>
+                  receiptGateModule.RECEIPT_GATE_STAGE_IDS[profile].includes(
+                    stageId
+                  )
+                )
+                .map(([stageId, labels]) => [
+                  stageId,
+                  Object.entries(labels).map(([id, label]) => ({ id, label })),
+                ])
             ),
           },
         ])

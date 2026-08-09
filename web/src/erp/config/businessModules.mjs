@@ -671,6 +671,7 @@ export function getBusinessModule(moduleKey) {
 
 const productCoreReviewBlockedPageKeys = new Set([
   'business-dashboard',
+  'history-records',
   ...businessModuleDefinitions.map((moduleItem) => moduleItem.key),
 ])
 

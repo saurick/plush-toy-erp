@@ -58,8 +58,8 @@ const EXPECTED_FLOW_KEYS = [
   'fact.production_wip_batch',
   'fact.production_packaging_confirmation',
   'fact.rework_intake',
-  'fact.production_exception_decision',
-  'fact.production_exception_execution',
+  'source.production_exception_decision',
+  'source.production_exception_execution',
   'fact.purchase_rejection_disposition',
   'fact.outsourcing_return_disposition',
   'fact.finance_payment',
@@ -295,7 +295,7 @@ const expectedProcessNodes = {
     [
       'production_exception_execution',
       'human_task',
-      '生产异常执行',
+      '报废或在制让步执行',
       null,
       ['workflow.task.complete'],
     ],
@@ -306,7 +306,7 @@ const expectedProcessNodes = {
       'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
       ['production.fact.post'],
     ],
-    ['end', 'end', '结束', null, []],
+    ['end', 'end', '处置执行结束', null, []],
     [
       'reject_production_exception',
       'domain_command',
@@ -314,8 +314,8 @@ const expectedProcessNodes = {
       'OperationalFactUsecase.RejectProductionExceptionForProcessCommand',
       ['workflow.task.reject'],
     ],
-    ['rejected_end', 'end', '驳回结束', null, []],
-    ['over_issue_end', 'end', '超领审批结束', null, []],
+    ['rejected_end', 'end', '拒绝结束', null, []],
+    ['over_issue_end', 'end', '超领额度批准结束', null, []],
   ],
 }
 
@@ -837,6 +837,7 @@ test('devFlowStateCatalog: Fact / Ledger 定义与状态对象一一对应且不
     DEV_FLOW_STATE_CATALOG.factDefinitions.length,
     factMachines.length
   )
+  assert.equal(DEV_FLOW_STATE_CATALOG.factDefinitions.length, 20)
   assert.deepEqual(
     new Set(DEV_FLOW_STATE_CATALOG.factDefinitions.map((item) => item.factKey)),
     new Set(factMachines.map((item) => item.key))
@@ -966,15 +967,91 @@ test('devFlowStateCatalog: 搜索和筛选返回新对象且不改原目录', ()
     query: '生产异常',
     scopeKeys: ['fact_ledger'],
   })
+  assert.deepEqual(result.flows, [])
   assert.deepEqual(
-    result.flows.map((flow) => flow.key),
-    ['fact.production_exception_execution']
+    filterDevFlowStateCatalog({
+      query: '生产异常',
+      scopeKeys: ['source_document'],
+    }).flows.map((flow) => flow.key),
+    [
+      'source.production_exception_decision',
+      'source.production_exception_execution',
+    ]
   )
   assert.equal(
     DEV_FLOW_STATE_CATALOG.flows.find(
-      (flow) => flow.key === 'fact.production_exception_decision'
+      (flow) => flow.key === 'source.production_exception_decision'
     )?.scopeKey,
     'source_document'
   )
   assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 34)
+})
+
+test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源单据且三类路径明确', () => {
+  const decision = DEV_FLOW_STATE_CATALOG.flows.find(
+    (flow) => flow.key === 'source.production_exception_decision'
+  )
+  const execution = DEV_FLOW_STATE_CATALOG.flows.find(
+    (flow) => flow.key === 'source.production_exception_execution'
+  )
+  const process = processDefinitions.find(
+    (definition) =>
+      definition.key ===
+      'production_exception_approval/exception_decision_approval'
+  )
+
+  assert.equal(decision.scopeKey, 'source_document')
+  assert.equal(execution.scopeKey, 'source_document')
+  assert.deepEqual(
+    decision.transitions.map((item) => [
+      item.from,
+      item.to,
+      item.action,
+      [...item.permission],
+    ]),
+    [
+      [
+        'SUBMITTED',
+        'APPROVED',
+        'OperationalFactUsecase.ApproveProductionExceptionForProcessCommand',
+        ['production.exception.approve', 'workflow.task.approve'],
+      ],
+      [
+        'SUBMITTED',
+        'REJECTED',
+        'OperationalFactUsecase.RejectProductionExceptionForProcessCommand',
+        ['production.exception.approve', 'workflow.task.reject'],
+      ],
+      [
+        'SUBMITTED',
+        'CANCELLED',
+        'cancel_production_exception',
+        ['production.exception.submit'],
+      ],
+    ]
+  )
+  assert.deepEqual(
+    execution.transitions.map((item) => [
+      item.from,
+      item.to,
+      item.action,
+      [...item.pathKinds],
+    ]),
+    [
+      [
+        'PENDING',
+        'APPLIED',
+        'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
+        [],
+      ],
+      ['PENDING', 'REVERSED', 'reverse_production_exception', ['reversed']],
+      ['APPLIED', 'REVERSED', 'reverse_production_exception', ['reversed']],
+    ]
+  )
+  assert.deepEqual(
+    process.edges
+      .filter((edge) => edge.branchPolicy)
+      .map((edge) => edge.branchLabel),
+    ['批准', '拒绝', '报废或在制让步', '超领额度']
+  )
 })

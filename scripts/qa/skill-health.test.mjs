@@ -66,7 +66,11 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
 
   assert.match(agents, /只有真实并发 writer[\s\S]*\$plush-git-closeout-queue/u);
   assert.match(agents, /writer grant 只覆盖[\s\S]*当前 `inProgress` turn/u);
-  assert.match(agents, /`idle`、`notLoaded` 或已结束 turn 的旧租约继续阻塞/u);
+  assert.match(agents, /远端 CI \/ Release \/ 部署等待[\s\S]*不得占 Local writer/u);
+  assert.match(agents, /未完成任务 release 后继续只读收口/u);
+  assert.match(agents, /可自助处理的 WAIT 或 blocker 清除后[\s\S]*触发一次新 turn 续做/u);
+  assert.match(agents, /不能只留 checkpoint \/ ACK/u);
+  assert.match(agents, /额度恢复或新 turn 重验现场/u);
   assert.match(agents, /stage、commit 和 push 是独立动作，均先询问用户/u);
   assert.match(skill, /协议版本为 `3`/u);
   assert.match(skill, /`INDEX_LOCK_OBSERVED`/u);
@@ -78,6 +82,25 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
   assert.match(skill, /进入只读验证时，发送一次 `WRITER_RELEASE_REQUIRED`/u);
   assert.match(skill, /旧任务恢复或新 turn 开始时也必须重新发现队列并申请/u);
   assert.match(skill, /未报告的文件变化登记为 `UNREPORTED_WRITES`/u);
+  assert.match(skill, /`EXACT_CLEAN_FREEZE`、`PUSH_FREEZE`、`CLOSEOUT_FREEZE` 不是协议事件/u);
+  assert.match(skill, /任何全工作树冻结请求都返回 `UNSUPPORTED_LOCK_DOMAIN`/u);
+  assert.match(skill, /`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`/u);
+  assert.match(skill, /发送后无需等待 ACK 即继续只读验证或最终收口/u);
+  assert.match(skill, /把每个 WAIT 登记为 `external` 或 `self_actionable`/u);
+  assert.match(skill, /`WAIT_SCOPE`[\s\S]*`WAIT_RECONCILE`[\s\S]*`WAIT_HOT_FILE`/u);
+  assert.match(skill, /投递一次 `RESUME_FROM_WAIT`/u);
+  assert.match(skill, /WAIT 所在 turn 必须先结束/u);
+  assert.match(skill, /同一 token 最多发送一次/u);
+  assert.match(skill, /在匹配 `resume_on` 到来前不发送自助恢复，也不轮询/u);
+  assert.match(skill, /返回 `WAIT_RESUME_TRIGGER`/u);
+  assert.match(skill, /插入当前 turn 的普通消息或 ACK 不算 fresh-turn trigger/u);
+  assert.match(skill, /未完成任务不得只回复 ACK 后结束/u);
+  assert.match(skill, /额度耗尽时模型不能继续推理、调用工具或发送消息/u);
+  assert.match(skill, /从 checkpoint 续做，不能复活旧 writer/u);
+  assert.match(skill, /发出 `PUSH_FINISHED` 或 `PUSH_FAILED` 后立即释放 push owner/u);
+  assert.match(skill, /等待远端 CI \/ Release \/ 部署结果不得维持 clean-worktree freeze/u);
+  assert.match(skill, /只阻止该目标的新 push，不阻止文件 writer/u);
+  assert.match(skill, /不保证 App 关闭或额度为零时自动运行/u);
   assert.match(skill, /`commit_authorized` 默认且缺省为 `false`/u);
   assert.match(skill, /`BATCH_READY`[\s\S]*不是 Git 授权/u);
   assert.match(skill, /`auto_local` 不能授权 Git 动作/u);

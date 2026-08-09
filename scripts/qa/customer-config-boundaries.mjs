@@ -308,7 +308,7 @@ function validateWorkflowTaskRevisionVisibilityContract() {
   const visibilitySource = readFileSync(repoPath(visibilityPath), "utf8");
   assert(
     (serviceSource.match(/workflowTaskQueryVisibilityScope\(/g) || [])
-      .length === 1 &&
+      .length === 2 &&
       (serviceSource.match(/workflowTaskReadVisibilityScope\(/g) || [])
         .length === 5 &&
       serviceSource.includes(
@@ -331,7 +331,7 @@ function validateWorkflowTaskRevisionVisibilityContract() {
       visibilitySource.includes(
         "d.workflowTaskQueryVisibilityScope(ctx, admin, capabilityKey)",
       ),
-    `${servicePath} list, workbench role, ordinary board, event and process-context reads must use supervised read scope while mobile role-view and every registered approval capability use permission-filtered revision-aware scope`,
+    `${servicePath} list_tasks and get_workbench must remain the two supervised query-scope entry points; workbench role, ordinary board, event and process-context reads must use supervised read scope while mobile role-view and every registered approval capability use permission-filtered revision-aware scope`,
   );
   assert(
     visibilitySource.includes(
@@ -629,11 +629,6 @@ function validateCustomerConfigReleaseOverlay() {
   const copiesAllRootMjs = serverDockerfile
     .split(/\r?\n/u)
     .some((line) => /^\s*COPY\s+web\/\*\.mjs\s+\.\/\s*$/u.test(line));
-  const copiesDevServerGraph = serverDockerfile
-    .split(/\r?\n/u)
-    .some((line) =>
-      /^\s*COPY\s+web\/dev-server\s+\.\/dev-server\/?\s*$/u.test(line),
-    );
   for (const importPath of viteRootImports) {
     assert(
       existsSync(repoPath(path.join("web", importPath))),
@@ -644,14 +639,46 @@ function validateCustomerConfigReleaseOverlay() {
       `server/Dockerfile must copy web/${importPath} because vite.shared.mjs imports it during the embedded frontend build`,
     );
   }
-  for (const importPath of viteDevServerImports) {
+  assert(
+    viteDevServerImports.length === 0,
+    "web/vite.shared.mjs must not statically load DEV-only plugin modules during production builds",
+  );
+  assert(
+    viteSharedSource.includes(
+      "const DEV_WORKBENCH_PLUGIN_MODULE = './dev-server/devWorkbenchPlugins.mjs'",
+    ),
+    "web/vite.shared.mjs must bind the DEV-only plugin module to a fixed local path",
+  );
+  assert(
+    viteSharedSource.includes("await import(DEV_WORKBENCH_PLUGIN_MODULE)"),
+    "web/vite.shared.mjs must lazy-load the DEV workbench graph through the non-literal module binding",
+  );
+  assert(
+    !serverDockerfile.includes("COPY web/dev-server"),
+    "server/Dockerfile must not let DEV-only plugins invalidate the production Web layer",
+  );
+  assert(
+    !/^\s*COPY\s+web\/scripts\s+\.\/scripts\/?\s*$/mu.test(serverDockerfile),
+    "server/Dockerfile must not let Web test and style scripts invalidate the production Web build",
+  );
+  assert(
+    /^\s*COPY\s+web\/scripts\/serveStaticApp\.mjs\s+\.\/scripts\/serveStaticApp\.mjs\s*$/mu.test(
+      serverDockerfile,
+    ),
+    "server/Dockerfile must copy only the production static-server entry into the Web runtime",
+  );
+  assert(
+    !/^\s*COPY\s+scripts\s+\/scripts\s*$/mu.test(serverDockerfile),
+    "server/Dockerfile must not copy the entire repository scripts graph into the Web builder",
+  );
+  for (const requiredBuildScript of [
+    "scripts/dev-ports.mjs",
+    "scripts/local-runtime-preflight-core.mjs",
+    "scripts/build/apply-customer-web-config.mjs",
+  ]) {
     assert(
-      existsSync(repoPath(path.join("web", importPath))),
-      `web/vite.shared.mjs imports missing dev-server module ${importPath}`,
-    );
-    assert(
-      copiesDevServerGraph || serverDockerfile.includes(`web/${importPath}`),
-      `server/Dockerfile must copy web/dev-server because vite.shared.mjs imports ${importPath} while loading the committed build config`,
+      serverDockerfile.includes(requiredBuildScript),
+      `server/Dockerfile must copy ${requiredBuildScript} for the committed production build`,
     );
   }
 }

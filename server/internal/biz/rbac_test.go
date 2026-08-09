@@ -109,6 +109,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
 				PermissionShipmentRead,
+				PermissionShipmentUpdate,
 				PermissionShipmentShip,
 				PermissionShipmentCancel,
 				PermissionMobileWarehouseAccess,
@@ -219,6 +220,8 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskReject,
 				PermissionShipmentRead,
 				PermissionShipmentCreate,
+				PermissionShipmentUpdate,
+				PermissionReworkIntakeUpdate,
 				PermissionMobileSalesAccess,
 			},
 			omits: []string{PermissionDebugBusinessClear},
@@ -277,16 +280,16 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 	assertPermissionSetOmits(t, pmc, PermissionProductionWIPAssign, PermissionProductionWIPExecute, PermissionProductionWIPRework, PermissionPackagingMaterialConfirm, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
 
 	sales := builtinRolePermissionSet(t, SalesRoleKey)
-	assertPermissionSetContains(t, sales, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionProductionWIPRead, PermissionPackagingMaterialConfirm)
+	assertPermissionSetContains(t, sales, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionReworkIntakeUpdate, PermissionProductionWIPRead, PermissionPackagingMaterialConfirm)
 	assertPermissionSetOmits(t, sales, PermissionProductionWIPAssign, PermissionProductionWIPExecute, PermissionProductionWIPRework)
 
 	warehouse := builtinRolePermissionSet(t, WarehouseRoleKey)
 	assertPermissionSetContains(t, warehouse, PermissionStockReservationCreate, PermissionStockReservationRelease)
-	assertPermissionSetOmits(t, warehouse, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
+	assertPermissionSetOmits(t, warehouse, PermissionReworkIntakeUpdate, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
 
 	quality := builtinRolePermissionSet(t, QualityRoleKey)
 	assertPermissionSetContains(t, quality, PermissionCustomerRead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionShipmentRead, PermissionProductionWIPRead, PermissionQualityInspectionRead, PermissionQualityInspectionCreate)
-	assertPermissionSetOmits(t, quality, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionShipmentCreate, PermissionShipmentShip, PermissionShipmentCancel, PermissionFinancePayableConfirm)
+	assertPermissionSetOmits(t, quality, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionShipmentCreate, PermissionShipmentUpdate, PermissionShipmentShip, PermissionShipmentCancel, PermissionReworkIntakeUpdate, PermissionFinancePayableConfirm)
 
 	finance := builtinRolePermissionSet(t, FinanceRoleKey)
 	assertPermissionSetContains(t, finance, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionPurchaseReceiptRead, PermissionPurchaseReceiptAdjustmentRead, PermissionPurchaseReturnRead, PermissionQualityInspectionRead, PermissionFinancePayableConfirm)

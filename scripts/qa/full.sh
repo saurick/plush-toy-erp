@@ -15,6 +15,7 @@ print_help() {
   web: lint/css -> pnpm test + 非零执行/零 skip summary -> pnpm build，同轮各执行一次
   browser: 动态独立端口自启当前 worktree Vite，再运行 Chromium 无写入 smoke
   server: 存量数据真实升级 -> 当前完整 Schema 关键 PostgreSQL 矩阵（含采购退货） -> 真实 Chromium PDF 安全集成 -> go test JSON 非零执行/零 skip -> make build
+  shared / web / server: 环境与 secrets 通过后并行运行；浏览器仍等待 Web 产物
   govulncheck: 最后执行 Go 漏洞扫描，避免外部网络扰动本地 PostgreSQL 并发门禁
 
 环境变量:
@@ -115,6 +116,7 @@ qa_full_environment_profile() {
 qa_full_shared() {
   echo "[qa:full] 运行共享基础检查，不重复 Web/Go 全量稍后覆盖的 fast 子集"
   QA_FAST_SCOPE=base QA_NODE_TEST_PROFILE=full \
+    QA_FAST_GATE_PROFILE="$full_profile" \
     bash "$ROOT_DIR/scripts/qa/fast.sh"
 }
 
@@ -200,11 +202,13 @@ qa_full_govulncheck() {
 }
 
 qa_run_stage "$full_profile" environment_profile qa_full_environment_profile
-qa_run_stage "$full_profile" shared qa_full_shared
 qa_run_stage "$full_profile" secrets qa_full_secrets
-qa_run_stage "$full_profile" web qa_full_web
+qa_run_parallel_stages \
+  "$full_profile" \
+  shared qa_full_shared \
+  web qa_full_web \
+  server qa_full_server
 qa_run_stage "$full_profile" browser qa_full_browser
-qa_run_stage "$full_profile" server qa_full_server
 qa_run_stage "$full_profile" govulncheck qa_full_govulncheck
 
 echo "[qa:full] profile=$full_profile status=complete 全部门禁通过"

@@ -206,18 +206,38 @@ test('BOM create and copy reset page one while editing refreshes the current pag
   )
 })
 
-test('create-only shipment, incoming-quality, and operational-fact flows return their list to page one', () => {
-  const shipmentCreate = sourceSlice(
+test('shipment edits reload the current page while create-only flows return their list to page one', () => {
+  const shipmentMutation = sourceSlice(
     shipmentSource,
     'const submitShipmentModal = async () => {',
     'const runShipmentAction'
   )
-  assert.match(shipmentCreate, /createShipmentWithItems\(/u)
-  assert.match(
-    shipmentCreate,
+
+  const shipmentSaveBranches = conditionalBranches(
+    shipmentMutation,
+    'editingShipment?.id',
+    shipmentMutation.indexOf('let savedShipment')
+  )
+  assert.match(shipmentSaveBranches.truthy, /saveShipmentDraft\(/u)
+  assert.doesNotMatch(shipmentSaveBranches.truthy, /createShipmentWithItems\(/u)
+  assert.match(shipmentSaveBranches.falsy, /createShipmentWithItems\(/u)
+  assert.doesNotMatch(shipmentSaveBranches.falsy, /saveShipmentDraft\(/u)
+
+  const shipmentRefreshBranches = conditionalBranches(
+    shipmentMutation,
+    'editingShipment?.id',
+    shipmentMutation.indexOf('closeShipmentModal()')
+  )
+  assert.match(shipmentRefreshBranches.truthy, /await loadRows\(\)/u)
+  assert.doesNotMatch(
+    shipmentRefreshBranches.truthy,
     /resetBusinessPaginationCurrent\(setPagination\)/u
   )
-  assert.doesNotMatch(shipmentCreate, /loadRows\(\)/u)
+  assert.match(
+    shipmentRefreshBranches.falsy,
+    /resetBusinessPaginationCurrent\(setPagination\)/u
+  )
+  assert.doesNotMatch(shipmentRefreshBranches.falsy, /loadRows\(\)/u)
 
   const qualityCreate = sourceSlice(
     qualitySource,

@@ -8,12 +8,16 @@ import test from "node:test";
 
 import {
   RECEIPT_GATE_COMMANDS,
+  RECEIPT_GATE_PARALLEL_STAGE_IDS,
   RECEIPT_GATE_STAGE_IDS,
   evaluateReceiptGateRun,
+  hasCompleteGateParallelTiming,
   hasCompleteGateStageTimings,
+  parseGateParallelEvent,
   parseGateStageEvent,
   parseGateStageTimings,
   parseGateSubstepEvent,
+  parseGateTimingSubstepEvent,
   summarizeGateCategories,
   runReceiptGate,
 } from "./run-gate-with-receipt.mjs";
@@ -94,11 +98,20 @@ test("gate receipt runner parses bounded stage timings and bottleneck", () => {
         (index + 1) * 100,
       )}`,
   );
+  lines.push(
+    `[qa:parallel] gate=full ids=${RECEIPT_GATE_PARALLEL_STAGE_IDS.join(",")} status=passed durationMs=650`,
+  );
   const metrics = parseGateStageTimings(lines.join("\n"), "full");
   assert.equal(metrics.stageTimings.length, RECEIPT_GATE_STAGE_IDS.full.length);
   assert.equal(metrics.bottleneckStageId, "govulncheck");
   assert.equal(metrics.measuredStageDurationMs, 2_800);
+  assert.equal(metrics.observedCriticalPathDurationMs, 2_250);
+  assert.equal(metrics.parallelStageGroups.length, 1);
   assert.equal(hasCompleteGateStageTimings("full", metrics.stageTimings), true);
+  assert.equal(
+    hasCompleteGateParallelTiming("full", metrics.parallelStageGroups),
+    true,
+  );
   assert.deepEqual(
     evaluateReceiptGateRun({
       childStatus: 0,
@@ -175,6 +188,26 @@ test("gate receipt runner parses only fixed bounded Web substep events", () => {
     assert.equal(parseGateSubstepEvent(line), null);
   }
 
+  assert.deepEqual(
+    parseGateTimingSubstepEvent(
+      "[qa:substep] gate=strict stage=shared id=node_tests status=passed durationMs=321",
+    ),
+    {
+      gate: "strict",
+      stage: "shared",
+      id: "node_tests",
+      label: "Scripts Node 合同测试",
+      status: "passed",
+      durationMs: 321,
+    },
+  );
+  assert.equal(
+    parseGateSubstepEvent(
+      "[qa:substep] gate=strict stage=shared id=node_tests status=passed durationMs=321",
+    ),
+    null,
+  );
+
   const stageOutput = [
     "[qa:substep] gate=full stage=web id=eslint status=passed durationMs=1",
     ...RECEIPT_GATE_STAGE_IDS.full.map(
@@ -184,6 +217,26 @@ test("gate receipt runner parses only fixed bounded Web substep events", () => {
   assert.equal(
     parseGateStageTimings(stageOutput, "full").stageTimings.length,
     RECEIPT_GATE_STAGE_IDS.full.length,
+  );
+});
+
+test("gate receipt runner accepts only the fixed independent parallel group", () => {
+  assert.deepEqual(
+    parseGateParallelEvent(
+      "[qa:parallel] gate=strict ids=shared,web,server status=passed durationMs=4321",
+    ),
+    {
+      gate: "strict",
+      stageIds: ["shared", "web", "server"],
+      status: "passed",
+      durationMs: 4321,
+    },
+  );
+  assert.equal(
+    parseGateParallelEvent(
+      "[qa:parallel] gate=strict ids=web,shared,server status=passed durationMs=1",
+    ),
+    null,
   );
 });
 
@@ -211,6 +264,9 @@ test("gate receipt runner streams one formal execution and writes its receipt", 
         );
       }
       child.stdout.write(
+        "[qa:parallel] gate=full ids=shared,web,server status=passed durationMs=5\n",
+      );
+      child.stdout.write(
         "[qa:test-gate] status=complete tests=2 pass=2 fail=0 skipped=0\n",
       );
       child.stdout.end();
@@ -229,6 +285,7 @@ test("gate receipt runner streams one formal execution and writes its receipt", 
   assert.equal(result.exitCode, 0);
   assert.equal(result.receipt.status, "passed");
   assert.equal(result.receipt.metrics.stageTimings.length, 7);
+  assert.equal(result.receipt.metrics.parallelStageGroups.length, 1);
   const written = JSON.parse(await readFile(outPath, "utf8"));
   assert.equal(written.gate, "full");
   assert.equal(written.executed, 2);
