@@ -16,7 +16,6 @@ func TestFinanceProcessDomainCommandReceivableLeadBindsUsecase(t *testing.T) {
 		shipment: &Shipment{
 			ID:         9001,
 			CustomerID: processTestIntPtr(501),
-			Purpose:    ShipmentPurposeSalesDelivery,
 			Status:     ShipmentStatusShipped,
 		},
 	}
@@ -117,7 +116,7 @@ func TestFinanceProcessDomainCommandReceivableLeadBindsUsecase(t *testing.T) {
 func TestFinanceProcessDomainCommandReceivableLeadRejectsMismatchedBusinessRef(t *testing.T) {
 	ctx := context.Background()
 	handler := &financeReceivableLeadProcessCommandHandler{uc: NewOperationalFactUsecase(&financeProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Status: ShipmentStatusShipped},
 	})}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
@@ -150,7 +149,7 @@ func TestFinanceProcessDomainCommandReceivableLeadRejectsMismatchedBusinessRef(t
 func TestFinanceProcessDomainCommandReceivableLeadRequiresShippedShipment(t *testing.T) {
 	ctx := context.Background()
 	repo := &financeProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusDraft},
+		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Status: ShipmentStatusDraft},
 	}
 	handler := &financeReceivableLeadProcessCommandHandler{uc: NewOperationalFactUsecase(repo)}
 
@@ -174,7 +173,7 @@ func TestFinanceProcessDomainCommandReceivableLeadRequiresShippedShipment(t *tes
 func TestFinanceProcessDomainCommandReceivableLeadRequiresSourceAndAmount(t *testing.T) {
 	ctx := context.Background()
 	handler := &financeReceivableLeadProcessCommandHandler{uc: NewOperationalFactUsecase(&financeProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, CustomerID: processTestIntPtr(501), Status: ShipmentStatusShipped},
 	})}
 
 	for _, payload := range []map[string]any{
@@ -197,7 +196,7 @@ func TestFinanceProcessDomainCommandReceivableLeadRequiresSourceAndAmount(t *tes
 
 func TestFinanceProcessDomainCommandReceivableLeadRequiresShipmentCustomerTruth(t *testing.T) {
 	handler := &financeReceivableLeadProcessCommandHandler{uc: NewOperationalFactUsecase(&financeProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	})}
 	base := &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "shipment", BusinessRefID: 9001},

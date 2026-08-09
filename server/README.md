@@ -63,12 +63,12 @@ HTTP / gRPC transport 日志只记录 operation、JSON-RPC domain / method / id�
 
 20 个模块按真实数据层读取，不建立新的看板事实表，也不从 Workflow payload 或前端列表反推业务数量：
 
-| 真源层 | `module_key` | 当前读取口径 |
-| --- | --- | --- |
-| MasterData | `customers`、`suppliers`、`products`、`material-bom` | 客户、供应商、产品读取 MasterData；BOM 读取现有 BOM header 清单。 |
-| Source Document | `sales-orders`、`accessories-purchase`、`processing-contracts`、`production-orders` | 分别读取销售订单、采购订单、委外订单和生产订单源单，不用后续 Fact 数量替代。 |
-| Fact | `inbound`、`inventory`、`outbound`、`production-progress`、`quality-inspections`、`reconciliation`、`payables`、`receivables`、`invoices` | 分别读取采购入库、库存余额、出货单、生产事实、质量检验及财务事实；财务四项严格按 `RECONCILIATION / PAYABLE / RECEIVABLE / INVOICE` 过滤，不混算其它财务类型。 |
-| Workflow | `shipping-release`、`production-scheduling`、`production-exceptions` | 分别读取历史 `shipment_release` 协同任务、`production_scheduling` 与 `production_exception`；新的出货财务审批统一进入 ProcessRuntime 审批箱，不再生成 `shipment_release`。只有具备 `workflow.task.read` 时才查询，并复用 active / stored revision、owner role 与 assignee 可见性范围。 |
+| 真源层          | `module_key`                                                                                                                              | 当前读取口径                                                                                                                                                                                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MasterData      | `customers`、`suppliers`、`products`、`material-bom`                                                                                      | 客户、供应商、产品读取 MasterData；BOM 读取现有 BOM header 清单。                                                                                                                                                                                                                      |
+| Source Document | `sales-orders`、`accessories-purchase`、`processing-contracts`、`production-orders`                                                       | 分别读取销售订单、采购订单、委外订单和生产订单源单，不用后续 Fact 数量替代。                                                                                                                                                                                                           |
+| Fact            | `inbound`、`inventory`、`outbound`、`production-progress`、`quality-inspections`、`reconciliation`、`payables`、`receivables`、`invoices` | 分别读取采购入库、库存余额、出货单、生产事实、质量检验及财务事实；财务四项严格按 `RECONCILIATION / PAYABLE / RECEIVABLE / INVOICE` 过滤，不混算其它财务类型。                                                                                                                          |
+| Workflow        | `shipping-release`、`production-scheduling`、`production-exceptions`                                                                      | 分别读取历史 `shipment_release` 协同任务、`production_scheduling` 与 `production_exception`；新的出货财务审批统一进入 ProcessRuntime 审批箱，不再生成 `shipment_release`。只有具备 `workflow.task.read` 时才查询，并复用 active / stored revision、owner role 与 assignee 可见性范围。 |
 
 生产订单从 `DRAFT` 下达到 `RELEASED` 时生成 `production_scheduling`，生产返工事实从 `DRAFT` 过账到 `POSTED` 时生成 `production_exception`；两者均由领域事务生成，不接受页面或流程配置手填。新的出货财务审批由 `finished_goods_delivery` active revision 生成 `workflow.task.approve` 任务，审批通过后由绑定领域命令原子写入 Shipment 财务放行版本与审计锚点。旧 `shipment_release` 任务只保留历史读取和既有协同语义，不再有公开 producer。
 
@@ -146,7 +146,7 @@ active revision 的 `work_pool_memberships.role_key` 可被 Workflow 服务端�
 
 ProcessRuntime 的 `wait_event` 当前只提供 usecase 层显式唤醒：`WakeProcessWaitEventNode` 要求节点为 `active`、版本匹配、`policy_snapshot.event_key` 已声明，调用方提供匹配事件 key 和幂等键后才完成该节点并复用顺序推进。它不提供事件订阅器、不由 `complete_task_action` 自动触发、不创建 WorkflowTask、不扫描或跳过流程节点，也不写库存、出货、质检、财务或其他 Fact。
 
-ProcessRuntime 的通用启动仍只在 usecase 层暴露；公开 `customer_config` 有六条来源绑定入口：`DRAFT` 销售订单启动 `sales_order_acceptance`、`DRAFT` 采购订单启动 `material_supply`、`DRAFT` 出货单启动 `finished_goods_delivery`，以及收付款、库存人工调整和生产异常三条固定合同入口。前三条使用客户 active revision 的可配置审批责任；后三条使用 Product Core 登记的固定审批 / 执行责任池。返工回厂不启动 ProcessRuntime，而是由返工回厂源单、库存 HOLD、生产返工事实、工序质检 / 完工和非商业补发直接形成追溯链。所有流程入口都要求目标动作权限与精确来源读权限，并从真实来源构造业务引用；数据层只允许同来源、同 idempotency key 与同定义的流程精确重放。旧入库单起点 `start_material_supply_process` 已退役。`StartProcessInstance` 首次启动会激活首个 `waiting` 节点，重试只执行有界恢复；它不提供后台 scheduler，不扫描或跳过中间节点，也不因“启动”本身写库存、出货、质检、财务或其他 Fact。
+ProcessRuntime 的通用启动仍只在 usecase 层暴露；公开 `customer_config` 有六条来源绑定入口：`DRAFT` 销售订单启动 `sales_order_acceptance`、`DRAFT` 采购订单启动 `material_supply`、`DRAFT` 出货单启动 `finished_goods_delivery`，以及收付款、库存人工调整和生产异常三条固定合同入口。前三条使用客户 active revision 的可配置审批责任；后三条使用 Product Core 登记的固定审批 / 执行责任池。所有流程入口都要求目标动作权限与精确来源读权限，并从真实来源构造业务引用；数据层只允许同来源、同 idempotency key 与同定义的流程精确重放。旧入库单起点 `start_material_supply_process` 已退役。`StartProcessInstance` 首次启动会激活首个 `waiting` 节点，重试只执行有界恢复；它不提供后台 scheduler，不扫描或跳过中间节点，也不因“启动”本身写库存、出货、质检、财务或其他 Fact。
 
 ProcessRuntime 的命名 policy 分支当前也只提供 usecase 层显式 handler：节点完成后，只有当前节点 `policy_snapshot.branch_policy_key` 已注册为 `ProcessBranchPolicyHandler`，运行时才会让 handler 返回下一节点 key，并只激活同一 ProcessInstance 内这个仍为 `waiting` 的目标节点。它不解析自由表达式、客户 JS / SQL 或任意脚本，不自动跳过或 settle 非选中分支，不绑定真实领域 usecase，也不写库存、出货、质检、财务或其他 Fact。
 
@@ -334,23 +334,23 @@ server/
 └── third_party/
 ```
 
-| 路径 | 职责 |
-| --- | --- |
-| `api/` | 协议定义与生成入口，目前包含 JSON-RPC 相关接口描述 |
-| `cmd/` | 服务启动、迁移辅助与排障命令入口 |
-| `configs/` | 按环境拆分的配置文件 |
-| `internal/server/` | HTTP/gRPC/JSON-RPC 接入、中间件与路由装配 |
-| `internal/service/` | 接口适配层，负责 DTO 转换与调用编排 |
-| `internal/biz/` | 业务规约与 UseCase 真源 |
-| `internal/core/` | 纯产品领域规则层，当前承载无 IO 的值对象、领域错误、出货三态、库存批次、采购过账单据、采购订单、来料质检、销售订单生命周期等状态机、库存可用量计算和边界守卫；后续其他状态机、计算器或 policy 迁入前必须先评审，不接 runtime / DB / transport |
-| `internal/data/` | 数据访问、外部依赖与持久化实现 |
-| `internal/conf/` | 配置结构定义与加载相关代码 |
-| `internal/devdbguard/` | 本地开发数据库目标守卫，阻止 dev 配置静默指向测试 / 目标 PostgreSQL；显式例外由运行命令授权 |
-| `internal/errcode/` | 服务端错误码目录真源 |
-| `pkg/` | 可复用基础设施组件，如日志、JWT 与任务编排辅助 |
-| `deploy/` | Compose 部署模板与发布入口 |
-| `docs/` | 后端专题文档索引与 runbook |
-| `third_party/` | 第三方 proto / OpenAPI 依赖 |
+| 路径                   | 职责                                                                                                                                                                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api/`                 | 协议定义与生成入口，目前包含 JSON-RPC 相关接口描述                                                                                                                                                                                            |
+| `cmd/`                 | 服务启动、迁移辅助与排障命令入口                                                                                                                                                                                                              |
+| `configs/`             | 按环境拆分的配置文件                                                                                                                                                                                                                          |
+| `internal/server/`     | HTTP/gRPC/JSON-RPC 接入、中间件与路由装配                                                                                                                                                                                                     |
+| `internal/service/`    | 接口适配层，负责 DTO 转换与调用编排                                                                                                                                                                                                           |
+| `internal/biz/`        | 业务规约与 UseCase 真源                                                                                                                                                                                                                       |
+| `internal/core/`       | 纯产品领域规则层，当前承载无 IO 的值对象、领域错误、出货三态、库存批次、采购过账单据、采购订单、来料质检、销售订单生命周期等状态机、库存可用量计算和边界守卫；后续其他状态机、计算器或 policy 迁入前必须先评审，不接 runtime / DB / transport |
+| `internal/data/`       | 数据访问、外部依赖与持久化实现                                                                                                                                                                                                                |
+| `internal/conf/`       | 配置结构定义与加载相关代码                                                                                                                                                                                                                    |
+| `internal/devdbguard/` | 本地开发数据库目标守卫，阻止 dev 配置静默指向测试 / 目标 PostgreSQL；显式例外由运行命令授权                                                                                                                                                   |
+| `internal/errcode/`    | 服务端错误码目录真源                                                                                                                                                                                                                          |
+| `pkg/`                 | 可复用基础设施组件，如日志、JWT 与任务编排辅助                                                                                                                                                                                                |
+| `deploy/`              | Compose 部署模板与发布入口                                                                                                                                                                                                                    |
+| `docs/`                | 后端专题文档索引与 runbook                                                                                                                                                                                                                    |
+| `third_party/`         | 第三方 proto / OpenAPI 依赖                                                                                                                                                                                                                   |
 
 ## 文档索引
 

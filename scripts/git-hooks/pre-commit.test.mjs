@@ -172,6 +172,60 @@ test("pre-commit keeps a relative commit index bound after entering its snapshot
   }
 });
 
+test("pre-commit skips fully deleted Go packages but still checks surviving packages", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-go-delete-"));
+  const capture = path.join(root, "go-vet-targets.txt");
+  try {
+    git(root, ["init", "-q"]);
+    installHookFixture(root);
+    mkdirSync(path.join(root, "server/retired"), { recursive: true });
+    mkdirSync(path.join(root, "server/kept"), { recursive: true });
+    writeFileSync(
+      path.join(root, "server/retired/retired.go"),
+      "package retired\n",
+      "utf8",
+    );
+    writeFileSync(
+      path.join(root, "server/kept/removed.go"),
+      "package kept\n",
+      "utf8",
+    );
+    writeFileSync(
+      path.join(root, "server/kept/surviving.go"),
+      "package kept\n",
+      "utf8",
+    );
+    const goVet = path.join(root, "scripts/qa/go-vet.sh");
+    writeFileSync(
+      goVet,
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$@" > "$HOOK_GO_VET_CAPTURE"
+for target in "$@"; do
+  [[ -d "server/\${target#./}" ]] || exit 42
+done
+`,
+      "utf8",
+    );
+    chmodSync(goVet, 0o755);
+    commit(root, "base");
+
+    rmSync(path.join(root, "server/retired"), { recursive: true });
+    rmSync(path.join(root, "server/kept/removed.go"));
+    git(root, ["add", "-A"]);
+
+    const result = spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, HOOK_GO_VET_CAPTURE: capture },
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(readFileSync(capture, "utf8"), "./kept\n");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("pre-commit requires staged schema, migration, and atlas.sum as one change", () => {
   const root = mkdtempSync(
     path.join(os.tmpdir(), "plush-pre-commit-db-guard-"),

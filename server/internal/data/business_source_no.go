@@ -13,7 +13,6 @@ import (
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/purchasereceipt"
-	"server/internal/data/model/ent/reworkintake"
 	"server/internal/data/model/ent/shipment"
 )
 
@@ -130,14 +129,6 @@ func resolveBusinessSourceNos(
 			for _, row := range rows {
 				resolved[businessSourceKey{sourceType: sourceType, sourceID: row.ID}] = row.FactNo
 			}
-		case biz.ReworkIntakeSourceType:
-			rows, err := client.ReworkIntake.Query().Where(reworkintake.IDIn(ids...)).Select(reworkintake.FieldID, reworkintake.FieldIntakeNo).All(ctx)
-			if err != nil {
-				return nil, err
-			}
-			for _, row := range rows {
-				resolved[businessSourceKey{sourceType: sourceType, sourceID: row.ID}] = row.IntakeNo
-			}
 		}
 	}
 	return resolved, nil
@@ -171,8 +162,7 @@ func resolvableBusinessSourceKey(sourceType *string, sourceID *int) (businessSou
 		biz.OutsourcingFactSourceType,
 		biz.ShipmentSourceType,
 		biz.PurchaseReceiptSourceType,
-		biz.FinanceFactSourceType,
-		biz.ReworkIntakeSourceType:
+		biz.FinanceFactSourceType:
 		return businessSourceKey{sourceType: normalizedType, sourceID: *sourceID}, true
 	default:
 		return businessSourceKey{}, false

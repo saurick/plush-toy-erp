@@ -5,7 +5,6 @@ import {
   resolveFinancePaymentActionAvailability,
   resolveProductionExceptionActionAvailability,
   resolveRelatedRecordActionAvailability,
-  resolveReworkIntakeActionAvailability,
   resolveShipmentActionAvailability,
 } from './operationalActionAvailability.mjs'
 
@@ -107,130 +106,6 @@ test('收付款动作：只有无权限隐藏，未选中、前置不足和终�
         action,
         authorized: true,
         payment: { status },
-      })
-      assert.equal(result.visible, true, `${status}/${action} 应保留`)
-      assert.equal(result.disabled, true, `${status}/${action} 应置灰`)
-      assert.ok(result.disabledReason, `${status}/${action} 应说明原因`)
-    }
-  }
-})
-
-test('返工回厂动作：按收货、生产返工和补发前置保留已授权动作槽位', () => {
-  const draft = { status: 'DRAFT', items: [] }
-  assert.deepEqual(
-    state(
-      resolveReworkIntakeActionAvailability({
-        action: 'receive',
-        authorized: true,
-        reworkIntake: draft,
-      })
-    ),
-    [true, false, '']
-  )
-  for (const action of ['rework', 'reship', 'reverse']) {
-    const result = resolveReworkIntakeActionAvailability({
-      action,
-      authorized: true,
-      reworkIntake: draft,
-    })
-    assert.equal(result.visible, true)
-    assert.equal(result.disabled, true)
-    assert.ok(result.disabledReason)
-  }
-
-  const received = {
-    status: 'RECEIVED',
-    progress_stage: 'WAITING_REWORK',
-    items: [
-      {
-        quantity: '3',
-        active_rework_quantity: '0',
-        completion_candidates: [],
-      },
-    ],
-  }
-  assert.equal(
-    resolveReworkIntakeActionAvailability({
-      action: 'rework',
-      authorized: true,
-      reworkIntake: received,
-    }).disabled,
-    false
-  )
-
-  const preciseReceived = {
-    ...received,
-    items: [
-      {
-        quantity: '99999999999999.999999',
-        active_rework_quantity: '99999999999999.999998',
-        completion_candidates: [],
-      },
-    ],
-  }
-  assert.equal(
-    resolveReworkIntakeActionAvailability({
-      action: 'rework',
-      authorized: true,
-      reworkIntake: preciseReceived,
-    }).disabled,
-    false
-  )
-  assert.equal(
-    resolveReworkIntakeActionAvailability({
-      action: 'reverse',
-      authorized: true,
-      reworkIntake: received,
-    }).disabled,
-    false
-  )
-
-  const reworking = {
-    ...received,
-    progress_stage: 'REWORKING',
-    items: [
-      {
-        quantity: '3',
-        active_rework_quantity: '3',
-        completion_candidates: [],
-      },
-    ],
-  }
-  assert.match(
-    resolveReworkIntakeActionAvailability({
-      action: 'reverse',
-      authorized: true,
-      reworkIntake: reworking,
-    }).disabledReason,
-    /已有返工记录/u
-  )
-
-  const readyToReship = {
-    ...received,
-    progress_stage: 'WAITING_RESHIP',
-    items: [
-      {
-        quantity: '3',
-        active_rework_quantity: '3',
-        completion_candidates: [{ selectable: true, remaining_quantity: '3' }],
-      },
-    ],
-  }
-  assert.equal(
-    resolveReworkIntakeActionAvailability({
-      action: 'reship',
-      authorized: true,
-      reworkIntake: readyToReship,
-    }).disabled,
-    false
-  )
-
-  for (const status of ['CANCELLED', 'REVERSED']) {
-    for (const action of ['receive', 'cancel', 'reverse', 'rework', 'reship']) {
-      const result = resolveReworkIntakeActionAvailability({
-        action,
-        authorized: true,
-        reworkIntake: { status, items: [] },
       })
       assert.equal(result.visible, true, `${status}/${action} 应保留`)
       assert.equal(result.disabled, true, `${status}/${action} 应置灰`)

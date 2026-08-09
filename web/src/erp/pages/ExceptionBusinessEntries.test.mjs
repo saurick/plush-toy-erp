@@ -15,7 +15,6 @@ const qualityPage = read('./V1QualityInspectionsPage.jsx')
 const rejectionModal = read(
   '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
 )
-const reworkIntakesPage = read('./ReworkIntakesPage.jsx')
 const financePaymentsPage = read('./FinancePaymentsPage.jsx')
 const productionExceptionPanel = read(
   '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
@@ -24,9 +23,7 @@ const processRecoveryButton = read(
   '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 )
 
-test('exception entries: router exposes formal rework-intake and payment pages', () => {
-  assert.match(router, /path="sales\/rework-intakes"/u)
-  assert.match(router, /element=\{<ReworkIntakesPage \/>\}/u)
+test('exception entries: router exposes the formal payment page', () => {
   assert.match(router, /path="finance\/payments"/u)
   assert.match(router, /element=\{<FinancePaymentsPage \/>\}/u)
 })
@@ -52,36 +49,6 @@ test('first incoming rejection: keeps draft, post and cancellation distinct from
   assert.match(rejectionModal, /不会生成库存退货流水/u)
   assert.match(rejectionModal, /createSourceBusinessActionAttemptStore/u)
   assert.match(rejectionModal, /expected_version: record\.version/u)
-})
-
-test('返工回厂：来源、收货、生产返工、质检完工和补发保持同一追溯链', () => {
-  for (const contract of [
-    'listReworkIntakes',
-    'listAllReworkIntakeSourceCandidates',
-    'createReworkIntake',
-    'receiveReworkIntake',
-    'reverseReworkIntake',
-    'createProductionReworkFromIntake',
-    'createReworkReshipment',
-  ]) {
-    assert.match(reworkIntakesPage, new RegExp(contract, 'u'))
-  }
-  assert.match(reworkIntakesPage, /expected_version:/u)
-  assert.match(reworkIntakesPage, /REWORK_RESHIPMENT|返工补发/u)
-  assert.match(reworkIntakesPage, /不产生新的销售应收或开票/u)
-  assert.match(reworkIntakesPage, /BusinessDataTable/u)
-  assert.match(reworkIntakesPage, /BusinessFormModal/u)
-  assert.match(reworkIntakesPage, /BusinessRecordDetailsModal/u)
-  for (const actionKey of [
-    'rework-intake-receive',
-    'rework-intake-create-rework',
-    'rework-intake-create-reshipment',
-    'rework-intake-cancel',
-    'rework-intake-reverse',
-  ]) {
-    assert.match(reworkIntakesPage, new RegExp(actionKey, 'u'))
-  }
-  assert.doesNotMatch(reworkIntakesPage, /客户ID|出货ID|明细ID/u)
 })
 
 test('finance V1: lists real payments, allocates multiple facts and preserves reversal audit', () => {
@@ -126,7 +93,10 @@ test('finance V1: lists real payments, allocates multiple facts and preserves re
 })
 
 test('production exception: requester can reconcile a submitted source whose process start was not confirmed', () => {
-  assert.match(productionExceptionPanel, /getProductionExceptionApprovalProcess/u)
+  assert.match(
+    productionExceptionPanel,
+    /getProductionExceptionApprovalProcess/u
+  )
   assert.match(
     productionExceptionPanel,
     /startProductionExceptionApprovalProcess/u

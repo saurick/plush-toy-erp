@@ -146,7 +146,7 @@ test('customer review overview stays one-level and never expands all chain inter
   assert.equal(review.overview.compactOnly, true)
   assert.equal(Object.hasOwn(review, 'chain'), false)
   assert.equal(review.overview.lanes.length, 4)
-  assert.equal(review.overview.lanes.flatMap((lane) => lane.chains).length, 12)
+  assert.equal(review.overview.lanes.flatMap((lane) => lane.chains).length, 11)
   assert(
     review.overview.lanes
       .flatMap((lane) => lane.chains)

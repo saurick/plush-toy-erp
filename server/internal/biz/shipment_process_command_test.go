@@ -12,7 +12,6 @@ func TestShipmentProcessDomainCommandShipBindsUsecase(t *testing.T) {
 		shipment: &Shipment{
 			ID:         9001,
 			ShipmentNo: "SHIP-PROCESS-001",
-			Purpose:    ShipmentPurposeSalesDelivery,
 			Status:     ShipmentStatusShipped,
 		},
 	}
@@ -89,7 +88,6 @@ func TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase(t *testing.T) {
 		shipment: &Shipment{
 			ID:                   9001,
 			ShipmentNo:           "SHIP-PROCESS-001",
-			Purpose:              ShipmentPurposeSalesDelivery,
 			Status:               ShipmentStatusDraft,
 			FinanceReleaseStatus: ShipmentFinanceReleaseStatusPending,
 		},
@@ -167,7 +165,7 @@ func TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase(t *testing.T) {
 func TestShipmentProcessDomainCommandFinanceReleaseRequiresDraftShipment(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	}
 	handler := &shipmentFinanceReleaseProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
 
@@ -188,7 +186,7 @@ func TestShipmentProcessDomainCommandFinanceRejectRecordsReasonAndCompletesBranc
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
 		shipment: &Shipment{
-			ID: 9001, ShipmentNo: "SHIP-PROCESS-REJECT-001", Purpose: ShipmentPurposeSalesDelivery,
+			ID: 9001, ShipmentNo: "SHIP-PROCESS-REJECT-001",
 			Status: ShipmentStatusDraft, FinanceReleaseStatus: ShipmentFinanceReleaseStatusPending,
 		},
 	}
@@ -238,7 +236,7 @@ func TestShipmentProcessDomainCommandFinanceRejectRecordsReasonAndCompletesBranc
 func TestShipmentProcessDomainCommandShipRejectsMismatchedBusinessRef(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	}
 	handler := &shipmentShipProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
 
@@ -285,7 +283,7 @@ func TestShipmentProcessDomainCommandShipRequiresShipment(t *testing.T) {
 func TestShipmentProcessDomainCommandShipRejectsLegacyID(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
-		shipment: &Shipment{ID: 9001, Purpose: ShipmentPurposeSalesDelivery, Status: ShipmentStatusShipped},
+		shipment: &Shipment{ID: 9001, Status: ShipmentStatusShipped},
 	}
 	handler := &shipmentShipProcessCommandHandler{uc: NewOperationalFactUsecase(operationalFactRepo)}
 

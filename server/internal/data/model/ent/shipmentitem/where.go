@@ -66,11 +66,6 @@ func SalesOrderItemID(v int) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldSalesOrderItemID, v))
 }
 
-// ReworkCompletionFactID applies equality check predicate on the "rework_completion_fact_id" field. It's identical to ReworkCompletionFactIDEQ.
-func ReworkCompletionFactID(v int) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldEQ(FieldReworkCompletionFactID, v))
-}
-
 // ProductID applies equality check predicate on the "product_id" field. It's identical to ProductIDEQ.
 func ProductID(v int) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldProductID, v))
@@ -184,36 +179,6 @@ func SalesOrderItemIDIsNil() predicate.ShipmentItem {
 // SalesOrderItemIDNotNil applies the NotNil predicate on the "sales_order_item_id" field.
 func SalesOrderItemIDNotNil() predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldNotNull(FieldSalesOrderItemID))
-}
-
-// ReworkCompletionFactIDEQ applies the EQ predicate on the "rework_completion_fact_id" field.
-func ReworkCompletionFactIDEQ(v int) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldEQ(FieldReworkCompletionFactID, v))
-}
-
-// ReworkCompletionFactIDNEQ applies the NEQ predicate on the "rework_completion_fact_id" field.
-func ReworkCompletionFactIDNEQ(v int) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldNEQ(FieldReworkCompletionFactID, v))
-}
-
-// ReworkCompletionFactIDIn applies the In predicate on the "rework_completion_fact_id" field.
-func ReworkCompletionFactIDIn(vs ...int) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldIn(FieldReworkCompletionFactID, vs...))
-}
-
-// ReworkCompletionFactIDNotIn applies the NotIn predicate on the "rework_completion_fact_id" field.
-func ReworkCompletionFactIDNotIn(vs ...int) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldNotIn(FieldReworkCompletionFactID, vs...))
-}
-
-// ReworkCompletionFactIDIsNil applies the IsNil predicate on the "rework_completion_fact_id" field.
-func ReworkCompletionFactIDIsNil() predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldIsNull(FieldReworkCompletionFactID))
-}
-
-// ReworkCompletionFactIDNotNil applies the NotNil predicate on the "rework_completion_fact_id" field.
-func ReworkCompletionFactIDNotNil() predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldNotNull(FieldReworkCompletionFactID))
 }
 
 // ProductIDEQ applies the EQ predicate on the "product_id" field.
@@ -784,29 +749,6 @@ func HasSalesOrderItem() predicate.ShipmentItem {
 func HasSalesOrderItemWith(preds ...predicate.SalesOrderItem) predicate.ShipmentItem {
 	return predicate.ShipmentItem(func(s *sql.Selector) {
 		step := newSalesOrderItemStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
-// HasReworkCompletionFact applies the HasEdge predicate on the "rework_completion_fact" edge.
-func HasReworkCompletionFact() predicate.ShipmentItem {
-	return predicate.ShipmentItem(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, ReworkCompletionFactTable, ReworkCompletionFactColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasReworkCompletionFactWith applies the HasEdge predicate on the "rework_completion_fact" edge with a given conditions (other predicates).
-func HasReworkCompletionFactWith(preds ...predicate.ProductionFact) predicate.ShipmentItem {
-	return predicate.ShipmentItem(func(s *sql.Selector) {
-		step := newReworkCompletionFactStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

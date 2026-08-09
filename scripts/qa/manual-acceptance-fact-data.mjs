@@ -40,7 +40,6 @@ const APPLY_CONFIRMATION = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const RECEIPT_COUNT = 54;
 const FACT_RUN_COUNT = 45;
-const REWORK_INTAKE_REFERENCE_COUNT = 4;
 const FINANCE_PAYMENT_REFERENCE_COUNT = 4;
 const FINANCE_CREDIT_NOTE_REFERENCE_COUNT = 3;
 const REQUIRED_MODULES = Object.freeze([
@@ -86,7 +85,6 @@ const REFERENCE_KEYS = Object.freeze([
   "stockReservations",
   "shipments",
   "financeFacts",
-  "reworkIntakes",
   "financePayments",
   "financeCreditNotes",
 ]);
@@ -159,13 +157,6 @@ const FINANCE_PAYMENT_NUMBER = Object.freeze({
   "RECEIVABLE-SETTLED": Object.freeze({ code: "SK", sequence: 901 }),
   "RECEIVABLE-APPROVED": Object.freeze({ code: "SK", sequence: 902 }),
   "RECEIVABLE-REVERSED": Object.freeze({ code: "SK", sequence: 903 }),
-});
-
-const REWORK_INTAKE_NUMBER = Object.freeze({
-  DRAFT: Object.freeze({ code: "HCF", sequence: 951 }),
-  RECEIVED: Object.freeze({ code: "HCF", sequence: 952 }),
-  REVERSED: Object.freeze({ code: "HCF", sequence: 953 }),
-  CANCELLED: Object.freeze({ code: "HCF", sequence: 954 }),
 });
 
 const FINANCE_CREDIT_NOTE_NUMBER = Object.freeze({
@@ -622,7 +613,6 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
       receivables: FACT_RUN_COUNT,
       invoices: FACT_RUN_COUNT,
       reconciliation: FACT_RUN_COUNT,
-      reworkIntakes: REWORK_INTAKE_REFERENCE_COUNT,
       financePayments: FINANCE_PAYMENT_REFERENCE_COUNT,
       financeCreditNotes: FINANCE_CREDIT_NOTE_REFERENCE_COUNT,
     }),
@@ -1295,7 +1285,9 @@ async function createOrReadReceiptSourcePurchaseOrder(rpc, receiptPlan, plan) {
       "save_purchase_order_with_items",
     );
   }
-  let status = String(order.lifecycle_status || order.status || "").toUpperCase();
+  let status = String(
+    order.lifecycle_status || order.status || "",
+  ).toUpperCase();
   if (status === "DRAFT" || status === "SUBMITTED") {
     const advanced = await approvePurchaseOrderThroughProcess({
       purchaseOrder: order,
@@ -1683,9 +1675,7 @@ export async function readManualAcceptanceFinalInventoryReferences(rpc, lots) {
       params: {
         ...(lot.subject_type ? { subject_type: lot.subject_type } : {}),
         ...(lot.subject_id ? { subject_id: lot.subject_id } : {}),
-        ...(lot.product_sku_id
-          ? { product_sku_id: lot.product_sku_id }
-          : {}),
+        ...(lot.product_sku_id ? { product_sku_id: lot.product_sku_id } : {}),
         keyword: requiredText(lot.lot_no, "inventory_lot.lot_no", 128),
         limit: 200,
         offset: 0,
@@ -2823,10 +2813,7 @@ async function ensureProductionFactSpecimen(
         method: "post_production_fact",
         params: {
           id: fact.id,
-          expected_version: positiveID(
-            fact.version,
-            "production fact version",
-          ),
+          expected_version: positiveID(fact.version, "production fact version"),
         },
       }),
       "production_fact",
@@ -2853,10 +2840,7 @@ async function ensureProductionFactSpecimen(
         method: "cancel_production_fact",
         params: {
           id: fact.id,
-          expected_version: positiveID(
-            fact.version,
-            "production fact version",
-          ),
+          expected_version: positiveID(fact.version, "production fact version"),
           reason: "本批返工样例取消",
         },
       }),
@@ -3202,8 +3186,7 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
   if (
     String(approvalTask.task_status_key || "").toLowerCase() !== "done" ||
     String(approvalTask.owner_role_key || "") !== "boss" ||
-    approvalTaskCode !==
-      `PROC-${instance.id}-NODE-${approvalNode.id}-A1`
+    approvalTaskCode !== `PROC-${instance.id}-NODE-${approvalNode.id}-A1`
   ) {
     throw new CliError(`${decisionNo} formal approval task readback drifted`);
   }
@@ -3232,9 +3215,7 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
     approval_task_id: Number(approvalTask.id),
     approval_task_code: approvalTaskCode,
     approval_process_node_id: Number(approvalNode.id),
-    approved_remaining_quantity: String(
-      approvedRequirement.remaining_quantity,
-    ),
+    approved_remaining_quantity: String(approvedRequirement.remaining_quantity),
   };
 }
 
@@ -3755,16 +3736,14 @@ async function ensureFinancePaymentSpecimen({
       String(allocation?.status || "").toUpperCase() === "REVERSED" &&
       originalAllocations.some(
         (original) =>
-          Number(allocation?.reversal_of_allocation_id) ===
-          Number(original.id),
+          Number(allocation?.reversal_of_allocation_id) === Number(original.id),
       ),
   );
   const expectedPaymentStatus = reverse ? "REVERSED" : "POSTED";
   if (
     String(currentReadback?.status || "").toUpperCase() !==
       expectedPaymentStatus ||
-    String(finalPayment.status || "").toUpperCase() !==
-      expectedPaymentStatus ||
+    String(finalPayment.status || "").toUpperCase() !== expectedPaymentStatus ||
     originalAllocations.length !== 1 ||
     (reverse && reversedAllocations.length !== 1)
   ) {
@@ -3814,10 +3793,7 @@ async function financeTransition(rpc, record, target, apply) {
         method: "settle_finance_fact",
         params: {
           id: item.id,
-          expected_version: positiveID(
-            item.version,
-            "finance fact version",
-          ),
+          expected_version: positiveID(item.version, "finance fact version"),
         },
       }),
       "finance_fact",
@@ -3830,10 +3806,7 @@ async function financeTransition(rpc, record, target, apply) {
         method: "cancel_finance_fact",
         params: {
           id: item.id,
-          expected_version: positiveID(
-            item.version,
-            "finance fact version",
-          ),
+          expected_version: positiveID(item.version, "finance fact version"),
           reason: "本笔取消",
         },
       }),
@@ -4185,278 +4158,6 @@ export async function applyManualAcceptanceFinanceLifecycle({
   return dedupeByID(finance);
 }
 
-async function exactReworkIntakeForShipment(rpc, shipmentID, intakeNo) {
-  const data = await rpc({
-    actor: "sales",
-    domain: "operational_fact",
-    method: "list_rework_intakes",
-    params: { source_shipment_id: shipmentID, limit: 200, offset: 0 },
-  });
-  const items = Array.isArray(data?.rework_intakes)
-    ? data.rework_intakes
-    : [];
-  if (Number(data?.total ?? items.length) > items.length) {
-    throw new CliError(
-      `rework intake ${intakeNo} readback was truncated for shipment ${shipmentID}`,
-    );
-  }
-  const matches = items.filter(
-    (item) => String(item?.intake_no || "") === intakeNo,
-  );
-  if (matches.length > 1) {
-    throw new CliError(`${intakeNo} has ${matches.length} conflicting records`);
-  }
-  return matches[0] || null;
-}
-
-async function readReworkIntakeLinkedReferences(rpc, reworkIntake) {
-  const inventoryLots = [];
-  for (const item of reworkIntake.items || []) {
-    if (!item?.received_lot_id) continue;
-    const lotID = positiveID(
-      item.received_lot_id,
-      `${reworkIntake.intake_no}.received_lot_id`,
-    );
-    const lotNo = requiredText(
-      item.received_lot_no,
-      `${reworkIntake.intake_no}.received_lot_no`,
-      128,
-    );
-    const lot = await exactRequired({
-      rpc,
-      domain: "inventory",
-      method: "list_inventory_lots",
-      listKey: "inventory_lots",
-      businessField: "lot_no",
-      businessNo: lotNo,
-    });
-    if (Number(lot.id) !== lotID) {
-      throw new CliError(`${reworkIntake.intake_no} lot readback drifted`);
-    }
-    inventoryLots.push(lot);
-  }
-
-  const txnData = await rpc({
-    actor: "warehouse",
-    domain: "inventory",
-    method: "list_inventory_txns",
-    params: {
-      source_type: "REWORK_INTAKE",
-      source_id: reworkIntake.id,
-      limit: 200,
-      offset: 0,
-    },
-  });
-  const inventoryTxns = Array.isArray(txnData?.inventory_txns)
-    ? txnData.inventory_txns
-    : [];
-  if (Number(txnData?.total ?? inventoryTxns.length) > inventoryTxns.length) {
-    throw new CliError(
-      `${reworkIntake.intake_no} inventory transaction readback was truncated`,
-    );
-  }
-  const txnTypes = new Set(
-    inventoryTxns.map((item) => String(item?.txn_type || "").toUpperCase()),
-  );
-  const expectedStatus = String(reworkIntake.status || "").toUpperCase();
-  if (
-    (expectedStatus === "RECEIVED" && !txnTypes.has("IN")) ||
-    (expectedStatus === "REVERSED" &&
-      (!txnTypes.has("IN") || !txnTypes.has("REVERSAL"))) ||
-    (["DRAFT", "CANCELLED"].includes(expectedStatus) &&
-      inventoryTxns.length !== 0)
-  ) {
-    throw new CliError(
-      `${reworkIntake.intake_no} inventory transaction lifecycle is incomplete`,
-    );
-  }
-  return {
-    inventoryLots: dedupeByID(inventoryLots),
-    inventoryTxns: dedupeByID(inventoryTxns),
-  };
-}
-
-async function ensureReworkIntakeSpecimen({
-  apply,
-  plan,
-  rpc,
-  shipment,
-  specimenKey,
-}) {
-  const number = REWORK_INTAKE_NUMBER[specimenKey];
-  if (!number) {
-    throw new CliError(
-      `rework intake specimen ${specimenKey} is not registered`,
-    );
-  }
-  const shipmentID = positiveID(
-    shipment?.id,
-    `${specimenKey}.shipment.id`,
-  );
-  const shipmentItem = (shipment?.items || [])[0];
-  const shipmentItemID = positiveID(
-    shipmentItem?.id,
-    `${specimenKey}.shipment_item.id`,
-  );
-  if (String(shipment?.status || "").toUpperCase() !== "SHIPPED") {
-    throw new CliError(
-      `${specimenKey} requires a formally shipped sales source`,
-    );
-  }
-
-  const candidateData = await rpc({
-    actor: "sales",
-    domain: "operational_fact",
-    method: "list_rework_intake_source_candidates",
-    params: { source_shipment_id: shipmentID, limit: 200, offset: 0 },
-  });
-  const candidates = Array.isArray(
-    candidateData?.rework_intake_source_candidates,
-  )
-    ? candidateData.rework_intake_source_candidates
-    : [];
-  const candidate = candidates.find(
-    (item) =>
-      Number(item?.source_shipment_item_id) === shipmentItemID &&
-      item?.selectable !== false,
-  );
-  if (!candidate) {
-    throw new CliError(
-      `${specimenKey} has no selectable rework-intake source candidate`,
-    );
-  }
-
-  const intakeNo = shortBusinessNo(plan, number.code, number.sequence);
-  let reworkIntake = await exactReworkIntakeForShipment(
-    rpc,
-    shipmentID,
-    intakeNo,
-  );
-  if (!reworkIntake && apply) {
-    reworkIntake = resultItem(
-      await rpc({
-        actor: "sales",
-        domain: "operational_fact",
-        method: "create_rework_intake",
-        params: {
-          intake_no: intakeNo,
-          source_shipment_id: shipmentID,
-          reason: `本地验收：模拟${specimenKey}返工回厂。`,
-          idempotency_key: `manual-acceptance:${plan.dataVersion}:rework-intake:${specimenKey.toLowerCase()}`,
-          items: [
-            {
-              source_shipment_item_id: shipmentItemID,
-              target_production_order_item_id: positiveID(
-                candidate.target_production_order_item_id,
-                `${specimenKey}.target_production_order_item_id`,
-              ),
-              quantity: "1",
-              note: "模拟试用数据，不代表真实客户返工记录。",
-            },
-          ],
-        },
-      }),
-      "rework_intake",
-      "create_rework_intake",
-    );
-  }
-  if (!reworkIntake) throw new CliError(`${intakeNo} is missing`);
-  if (
-    Number(reworkIntake.source_shipment_id) !== shipmentID ||
-    !(reworkIntake.items || []).some(
-      (item) =>
-        Number(item?.source_shipment_item_id) === shipmentItemID &&
-        Number(item?.quantity) === 1,
-    )
-  ) {
-    throw new CliError(`${intakeNo} source grain drifted`);
-  }
-
-  let current = reworkIntake;
-  if (
-    ["RECEIVED", "REVERSED"].includes(specimenKey) &&
-    String(current.status || "").toUpperCase() === "DRAFT"
-  ) {
-    current = resultItem(
-      await rpc({
-        actor: "warehouse",
-        domain: "operational_fact",
-        method: "receive_rework_intake",
-        params: {
-          id: current.id,
-          expected_version: positiveID(
-            current.version,
-            `${intakeNo}.version`,
-          ),
-        },
-      }),
-      "rework_intake",
-      "receive_rework_intake",
-    );
-  }
-  if (
-    specimenKey === "CANCELLED" &&
-    String(current.status || "").toUpperCase() === "DRAFT"
-  ) {
-    current = resultItem(
-      await rpc({
-        actor: "sales",
-        domain: "operational_fact",
-        method: "cancel_rework_intake",
-        params: {
-          id: current.id,
-          expected_version: positiveID(
-            current.version,
-            `${intakeNo}.version`,
-          ),
-          reason: "本地验收：取消尚未接收的模拟返工回厂记录。",
-        },
-      }),
-      "rework_intake",
-      "cancel_rework_intake",
-    );
-  }
-  if (
-    specimenKey === "REVERSED" &&
-    String(current.status || "").toUpperCase() === "RECEIVED"
-  ) {
-    current = resultItem(
-      await rpc({
-        actor: "warehouse",
-        domain: "operational_fact",
-        method: "reverse_rework_intake",
-        params: {
-          id: current.id,
-          expected_version: positiveID(
-            current.version,
-            `${intakeNo}.version`,
-          ),
-          reason: "本地验收：冲正尚未进入生产返工的模拟回厂收货。",
-        },
-      }),
-      "rework_intake",
-      "reverse_rework_intake",
-    );
-  }
-
-  const final = resultItem(
-    await rpc({
-      actor: "sales",
-      domain: "operational_fact",
-      method: "get_rework_intake",
-      params: { id: reworkIntake.id },
-    }),
-    "rework_intake",
-    "get_rework_intake",
-  );
-  if (String(final.status || "").toUpperCase() !== specimenKey) {
-    throw new CliError(
-      `${intakeNo} expected ${specimenKey}, got ${final.status || "missing"}`,
-    );
-  }
-  const linked = await readReworkIntakeLinkedReferences(rpc, final);
-  return { reworkIntake: final, ...linked };
-}
 function eligiblePostedFinanceFacts(financeFacts, factType) {
   return stableFinanceRecords(financeFacts, factType).filter(
     (item) =>
@@ -4642,7 +4343,8 @@ function assertFinancePageReferenceMatrix({
     (item) => item.status === "REVERSED",
   );
   const originalCredit = financeCreditNotes.find(
-    (item) => Number(item.id) === Number(reversedCredit?.reversal_of_credit_note_id),
+    (item) =>
+      Number(item.id) === Number(reversedCredit?.reversal_of_credit_note_id),
   );
   const activeCredits = financeCreditNotes.filter(
     (item) =>
@@ -4663,35 +4365,7 @@ export async function applyManualAcceptanceExceptionPageLifecycle({
   financeFacts,
   plan,
   rpc,
-  salesReadback,
 }) {
-  const salesSources =
-    salesReadback.length >= 14
-      ? salesReadback.slice(10, 14)
-      : salesReadback.slice(0, 4);
-  if (salesSources.length !== REWORK_INTAKE_REFERENCE_COUNT) {
-    throw new CliError(
-      `rework intake lifecycle requires ${REWORK_INTAKE_REFERENCE_COUNT} shipped sources`,
-    );
-  }
-  const reworkIntakeResults = [];
-  for (const [index, specimenKey] of [
-    "DRAFT",
-    "RECEIVED",
-    "REVERSED",
-    "CANCELLED",
-  ].entries()) {
-    reworkIntakeResults.push(
-      await ensureReworkIntakeSpecimen({
-        apply,
-        plan,
-        rpc,
-        shipment: salesSources[index]?.shipment,
-        specimenKey,
-      }),
-    );
-  }
-
   const receivableSources = eligiblePostedFinanceFacts(
     financeFacts,
     "RECEIVABLE",
@@ -4720,11 +4394,7 @@ export async function applyManualAcceptanceExceptionPageLifecycle({
     ),
   );
   const financePayments = (
-    await listAllFinancePageRecords(
-      rpc,
-      "list_finance_payments",
-      "payments",
-    )
+    await listAllFinancePageRecords(rpc, "list_finance_payments", "payments")
   ).filter((item) => expectedPaymentNos.has(item?.payment_no));
   const financeCreditNotes = await ensureFinanceCreditNoteSpecimens({
     activeSource: receivableSources[1],
@@ -4738,13 +4408,6 @@ export async function applyManualAcceptanceExceptionPageLifecycle({
     financePayments,
   });
   return {
-    reworkIntakes: reworkIntakeResults.map((item) => item.reworkIntake),
-    inventoryLots: dedupeByID(
-      reworkIntakeResults.flatMap((item) => item.inventoryLots),
-    ),
-    inventoryTxns: dedupeByID(
-      reworkIntakeResults.flatMap((item) => item.inventoryTxns),
-    ),
     financePayments,
     financeCreditNotes,
   };
@@ -5115,7 +4778,6 @@ export async function runSourceDrivenFactStage(
     await applyManualAcceptanceExceptionPageLifecycle({
       rpc,
       plan,
-      salesReadback,
       financeFacts: lifecycle.financeFacts,
       apply,
     });
@@ -5150,7 +4812,6 @@ export async function runSourceDrivenFactStage(
     inventoryLots: dedupeByID([
       ...productionReadback.map((item) => item.lot),
       ...outsourcingReadback.map((item) => item.lot),
-      ...exceptionPageLifecycle.inventoryLots,
     ]),
     inventoryBalances: dedupeByID([
       ...productionReadback.flatMap((item) => item.balances),
@@ -5159,7 +4820,6 @@ export async function runSourceDrivenFactStage(
     inventoryTxns: dedupeByID([
       ...productionReadback.flatMap((item) => item.txns),
       ...outsourcingReadback.flatMap((item) => item.txns),
-      ...exceptionPageLifecycle.inventoryTxns,
     ]),
     stockReservations: dedupeByID([
       ...salesReadback.map((item) => item.reservation),
@@ -5176,11 +4836,8 @@ export async function runSourceDrivenFactStage(
       ...lifecycle.shipments,
     ]),
     financeFacts: dedupeByID(lifecycle.financeFacts),
-    reworkIntakes: dedupeByID(exceptionPageLifecycle.reworkIntakes),
     financePayments: dedupeByID(exceptionPageLifecycle.financePayments),
-    financeCreditNotes: dedupeByID(
-      exceptionPageLifecycle.financeCreditNotes,
-    ),
+    financeCreditNotes: dedupeByID(exceptionPageLifecycle.financeCreditNotes),
   };
 }
 
@@ -5236,7 +4893,6 @@ function assertReferenceRecords(plan, records) {
     outsourcingFacts: FACT_RUN_COUNT * 2,
     stockReservations: plan.expectedMinimums.stockReservations,
     shipments: plan.expectedMinimums.shipments,
-    reworkIntakes: plan.expectedMinimums.reworkIntakes,
     financePayments: plan.expectedMinimums.financePayments,
     financeCreditNotes: plan.expectedMinimums.financeCreditNotes,
   };
@@ -5287,17 +4943,6 @@ function assertReferenceRecords(plan, records) {
   requireStatuses("productionExceptions", ["APPROVED"]);
   requireStatuses("stockReservations", ["ACTIVE", "RELEASED"]);
   requireStatuses("shipments", ["DRAFT", "SHIPPED", "CANCELLED"]);
-  requireStatuses("reworkIntakes", [
-    "DRAFT",
-    "RECEIVED",
-    "REVERSED",
-    "CANCELLED",
-  ]);
-  if (records.reworkIntakes.length !== REWORK_INTAKE_REFERENCE_COUNT) {
-    throw new CliError(
-      `reworkIntakes has ${records.reworkIntakes.length} exact references; need exactly ${REWORK_INTAKE_REFERENCE_COUNT}`,
-    );
-  }
   assertFinancePageReferenceMatrix({
     financeCreditNotes: records.financeCreditNotes,
     financePayments: records.financePayments,
@@ -5486,7 +5131,6 @@ function buildFactReport({
     ),
     shipments: dedupeByID(facts.shipments),
     financeFacts: dedupeByID(facts.financeFacts),
-    reworkIntakes: dedupeByID(facts.reworkIntakes),
     financePayments: dedupeByID(facts.financePayments),
     financeCreditNotes: dedupeByID(facts.financeCreditNotes),
     outsourcingFacts: dedupeByID(facts.outsourcingFacts),
@@ -5547,7 +5191,6 @@ function buildFactReport({
       stockReservations: countBy(referenceRecords.stockReservations, "status"),
       shipments: countBy(referenceRecords.shipments, "status"),
       financeFacts: countBy(referenceRecords.financeFacts, "status"),
-      reworkIntakes: countBy(referenceRecords.reworkIntakes, "status"),
       financePayments: countBy(referenceRecords.financePayments, "status"),
       financeCreditNotes: countBy(
         referenceRecords.financeCreditNotes,

@@ -161,15 +161,12 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 		(factType == biz.FinanceFactInvoice && in.InvoiceCategory == nil) {
 		return nil, biz.ErrBadParam
 	}
-	preview, err := r.data.postgres.Shipment.Get(ctx, in.ShipmentID)
+	_, err := r.data.postgres.Shipment.Get(ctx, in.ShipmentID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrShipmentNotFound
 		}
 		return nil, err
-	}
-	if preview.Purpose != biz.ShipmentPurposeSalesDelivery {
-		return nil, biz.ErrFinanceFactSourceInvalid
 	}
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
@@ -210,7 +207,7 @@ func (r *operationalFactRepo) CreateFinanceFactDraftFromShipment(
 		}
 		return nil, err
 	}
-	if parent.Purpose != biz.ShipmentPurposeSalesDelivery || parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
+	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
 		return nil, biz.ErrBadParam
 	}
 	amount, err := shipmentFinanceAmountFromSnapshots(ctx, tx.client, parent.ID)
@@ -408,7 +405,7 @@ func (r *operationalFactRepo) GetShipmentFinanceAmountSnapshot(
 		}
 		return decimal.Zero, err
 	}
-	if parent.Purpose != biz.ShipmentPurposeSalesDelivery || parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
+	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
 		return decimal.Zero, biz.ErrBadParam
 	}
 	return shipmentFinanceAmountFromSnapshots(ctx, r.data.postgres, shipmentID)
@@ -464,7 +461,7 @@ func lockAndValidateFinanceFactShipmentSource(ctx context.Context, tx *inventory
 		}
 		return err
 	}
-	if parent.Purpose != biz.ShipmentPurposeSalesDelivery || parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 ||
+	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 ||
 		in.CounterpartyType != biz.FinanceCounterpartyCustomer || in.CounterpartyID == nil || *in.CounterpartyID != *parent.CustomerID {
 		return biz.ErrBadParam
 	}
@@ -503,7 +500,7 @@ func (r *operationalFactRepo) GetShipmentPaymentTermDays(ctx context.Context, sh
 		}
 		return nil, err
 	}
-	if parent.Purpose != biz.ShipmentPurposeSalesDelivery || parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
+	if parent.Status != biz.ShipmentStatusShipped || parent.CustomerID == nil || *parent.CustomerID <= 0 {
 		return nil, biz.ErrBadParam
 	}
 	return shipmentFinancePaymentTermDaysFromSource(ctx, r.data.postgres, parent)
@@ -524,7 +521,7 @@ func lockAndResolveShipmentFinancePaymentTermSnapshot(ctx context.Context, tx *i
 }
 
 func shipmentFinancePaymentTermDaysFromSource(ctx context.Context, client *ent.Client, parent *ent.Shipment) (*int, error) {
-	if client == nil || parent == nil || parent.Purpose != biz.ShipmentPurposeSalesDelivery || parent.SalesOrderID == nil || *parent.SalesOrderID <= 0 || parent.CustomerID == nil || *parent.CustomerID <= 0 {
+	if client == nil || parent == nil || parent.SalesOrderID == nil || *parent.SalesOrderID <= 0 || parent.CustomerID == nil || *parent.CustomerID <= 0 {
 		return nil, biz.ErrFinanceFactSourceInvalid
 	}
 	order, err := client.SalesOrder.Get(ctx, *parent.SalesOrderID)

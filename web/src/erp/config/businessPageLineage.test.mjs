@@ -70,7 +70,6 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'get_outsourcing_return_disposition',
   'get_production_exception',
   'get_purchase_rejection_disposition',
-  'get_rework_intake',
   'get_sales_order',
   'get_shipment',
   'get_supplier',
@@ -104,7 +103,6 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_quality_inspections',
   'list_sales_order_items',
   'list_sales_orders',
-  'list_rework_intakes',
   'list_shipments',
   'list_stock_reservations',
   'list_suppliers',
@@ -195,7 +193,7 @@ test('business page lineage: exactly covers every formal-v1 business module once
     (definition) => definition.pageKey
   )
 
-  assert.equal(formalModuleKeys.length, 25)
+  assert.equal(formalModuleKeys.length, 24)
   assert.equal(new Set(lineageKeys).size, lineageKeys.length)
   assert.deepEqual([...lineageKeys].sort(), [...formalModuleKeys].sort())
   assert.equal(getBusinessPageLineage('inbound')?.pageRole, 'source_generated')
@@ -226,7 +224,6 @@ test('business page lineage: draft saves are self mutations, not record producer
     ['save_production_material_issue_draft', 'production-progress'],
     ['save_production_completion_draft', 'production-progress'],
     ['save_production_rework_from_completion_draft', 'production-progress'],
-    ['save_production_rework_from_intake_draft', 'production-progress'],
     ['save_outsourcing_material_issue_draft', 'processing-contracts'],
     ['save_outsourcing_return_receipt_draft', 'processing-contracts'],
   ])
@@ -519,8 +516,8 @@ test('business page lineage: source-driven producers match domain-generate flows
           flowDefinition.flowType === BUSINESS_FLOW_TYPES.DOMAIN_GENERATE
       )
       .map((flowDefinition) => flowDefinition.action),
-    ['create_rework_reshipment'],
-    '普通出货草稿仍是通用聚合保存；只有返工补发由返工回厂记录定向生成'
+    [],
+    '普通出货草稿只由出货页面建立'
   )
 })
 

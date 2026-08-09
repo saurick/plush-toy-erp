@@ -9,7 +9,6 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
-	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
@@ -26,18 +25,17 @@ import (
 // ShipmentItemQuery is the builder for querying ShipmentItem entities.
 type ShipmentItemQuery struct {
 	config
-	ctx                      *QueryContext
-	order                    []shipmentitem.OrderOption
-	inters                   []Interceptor
-	predicates               []predicate.ShipmentItem
-	withShipment             *ShipmentQuery
-	withSalesOrderItem       *SalesOrderItemQuery
-	withReworkCompletionFact *ProductionFactQuery
-	withProduct              *ProductQuery
-	withProductSku           *ProductSKUQuery
-	withWarehouse            *WarehouseQuery
-	withUnit                 *UnitQuery
-	withInventoryLot         *InventoryLotQuery
+	ctx                *QueryContext
+	order              []shipmentitem.OrderOption
+	inters             []Interceptor
+	predicates         []predicate.ShipmentItem
+	withShipment       *ShipmentQuery
+	withSalesOrderItem *SalesOrderItemQuery
+	withProduct        *ProductQuery
+	withProductSku     *ProductSKUQuery
+	withWarehouse      *WarehouseQuery
+	withUnit           *UnitQuery
+	withInventoryLot   *InventoryLotQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -111,28 +109,6 @@ func (_q *ShipmentItemQuery) QuerySalesOrderItem() *SalesOrderItemQuery {
 			sqlgraph.From(shipmentitem.Table, shipmentitem.FieldID, selector),
 			sqlgraph.To(salesorderitem.Table, salesorderitem.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, shipmentitem.SalesOrderItemTable, shipmentitem.SalesOrderItemColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryReworkCompletionFact chains the current query on the "rework_completion_fact" edge.
-func (_q *ShipmentItemQuery) QueryReworkCompletionFact() *ProductionFactQuery {
-	query := (&ProductionFactClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shipmentitem.Table, shipmentitem.FieldID, selector),
-			sqlgraph.To(productionfact.Table, productionfact.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shipmentitem.ReworkCompletionFactTable, shipmentitem.ReworkCompletionFactColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -437,19 +413,18 @@ func (_q *ShipmentItemQuery) Clone() *ShipmentItemQuery {
 		return nil
 	}
 	return &ShipmentItemQuery{
-		config:                   _q.config,
-		ctx:                      _q.ctx.Clone(),
-		order:                    append([]shipmentitem.OrderOption{}, _q.order...),
-		inters:                   append([]Interceptor{}, _q.inters...),
-		predicates:               append([]predicate.ShipmentItem{}, _q.predicates...),
-		withShipment:             _q.withShipment.Clone(),
-		withSalesOrderItem:       _q.withSalesOrderItem.Clone(),
-		withReworkCompletionFact: _q.withReworkCompletionFact.Clone(),
-		withProduct:              _q.withProduct.Clone(),
-		withProductSku:           _q.withProductSku.Clone(),
-		withWarehouse:            _q.withWarehouse.Clone(),
-		withUnit:                 _q.withUnit.Clone(),
-		withInventoryLot:         _q.withInventoryLot.Clone(),
+		config:             _q.config,
+		ctx:                _q.ctx.Clone(),
+		order:              append([]shipmentitem.OrderOption{}, _q.order...),
+		inters:             append([]Interceptor{}, _q.inters...),
+		predicates:         append([]predicate.ShipmentItem{}, _q.predicates...),
+		withShipment:       _q.withShipment.Clone(),
+		withSalesOrderItem: _q.withSalesOrderItem.Clone(),
+		withProduct:        _q.withProduct.Clone(),
+		withProductSku:     _q.withProductSku.Clone(),
+		withWarehouse:      _q.withWarehouse.Clone(),
+		withUnit:           _q.withUnit.Clone(),
+		withInventoryLot:   _q.withInventoryLot.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -475,17 +450,6 @@ func (_q *ShipmentItemQuery) WithSalesOrderItem(opts ...func(*SalesOrderItemQuer
 		opt(query)
 	}
 	_q.withSalesOrderItem = query
-	return _q
-}
-
-// WithReworkCompletionFact tells the query-builder to eager-load the nodes that are connected to
-// the "rework_completion_fact" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *ShipmentItemQuery) WithReworkCompletionFact(opts ...func(*ProductionFactQuery)) *ShipmentItemQuery {
-	query := (&ProductionFactClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withReworkCompletionFact = query
 	return _q
 }
 
@@ -622,10 +586,9 @@ func (_q *ShipmentItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	var (
 		nodes       = []*ShipmentItem{}
 		_spec       = _q.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [7]bool{
 			_q.withShipment != nil,
 			_q.withSalesOrderItem != nil,
-			_q.withReworkCompletionFact != nil,
 			_q.withProduct != nil,
 			_q.withProductSku != nil,
 			_q.withWarehouse != nil,
@@ -660,12 +623,6 @@ func (_q *ShipmentItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	if query := _q.withSalesOrderItem; query != nil {
 		if err := _q.loadSalesOrderItem(ctx, query, nodes, nil,
 			func(n *ShipmentItem, e *SalesOrderItem) { n.Edges.SalesOrderItem = e }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withReworkCompletionFact; query != nil {
-		if err := _q.loadReworkCompletionFact(ctx, query, nodes, nil,
-			func(n *ShipmentItem, e *ProductionFact) { n.Edges.ReworkCompletionFact = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -756,38 +713,6 @@ func (_q *ShipmentItemQuery) loadSalesOrderItem(ctx context.Context, query *Sale
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "sales_order_item_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
-}
-func (_q *ShipmentItemQuery) loadReworkCompletionFact(ctx context.Context, query *ProductionFactQuery, nodes []*ShipmentItem, init func(*ShipmentItem), assign func(*ShipmentItem, *ProductionFact)) error {
-	ids := make([]int, 0, len(nodes))
-	nodeids := make(map[int][]*ShipmentItem)
-	for i := range nodes {
-		if nodes[i].ReworkCompletionFactID == nil {
-			continue
-		}
-		fk := *nodes[i].ReworkCompletionFactID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(productionfact.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "rework_completion_fact_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -977,9 +902,6 @@ func (_q *ShipmentItemQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withSalesOrderItem != nil {
 			_spec.Node.AddColumnOnce(shipmentitem.FieldSalesOrderItemID)
-		}
-		if _q.withReworkCompletionFact != nil {
-			_spec.Node.AddColumnOnce(shipmentitem.FieldReworkCompletionFactID)
 		}
 		if _q.withProduct != nil {
 			_spec.Node.AddColumnOnce(shipmentitem.FieldProductID)

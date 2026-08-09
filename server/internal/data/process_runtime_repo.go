@@ -241,9 +241,6 @@ func (r *processRuntimeRepo) lockProcessSourceInTx(
 			}
 			return "", "", err
 		}
-		if row.Purpose != biz.ShipmentPurposeSalesDelivery {
-			return "", "", biz.ErrBadParam
-		}
 		if err := validateProcessShipmentQualityGate(ctx, tx, row.ID); err != nil {
 			return "", "", err
 		}

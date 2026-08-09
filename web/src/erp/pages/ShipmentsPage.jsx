@@ -325,10 +325,6 @@ export default function ShipmentsPage() {
     adminProfile,
     'sales_order_item.read'
   )
-  const canViewReworkIntakes = hasActionPermission(
-    adminProfile,
-    'rework_intake.read'
-  )
   const canImportSalesOrderSource =
     (canCreate || canUpdate) && canViewSalesOrders && canViewSalesOrderItems
   const canViewInventory = hasActionPermission(
@@ -345,8 +341,6 @@ export default function ShipmentsPage() {
   )
   const canOpenSalesOrders =
     canViewSalesOrders && canOpenRelatedPath(V1_ROUTE_PATHS.salesOrders)
-  const canOpenReworkIntakes =
-    canViewReworkIntakes && canOpenRelatedPath(V1_ROUTE_PATHS.reworkIntakes)
   const canOpenInventory =
     canViewInventory && canOpenRelatedPath(V1_ROUTE_PATHS.inventory)
   const canOpenReceivables =
@@ -358,7 +352,6 @@ export default function ShipmentsPage() {
     canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)
   const hasRelatedCapability =
     canOpenSalesOrders ||
-    canOpenReworkIntakes ||
     canOpenInventory ||
     canOpenReceivables ||
     canOpenInvoices ||
@@ -369,26 +362,16 @@ export default function ShipmentsPage() {
     if (canOpenSalesOrders && selectedRow.sales_order_id) {
       items.push({ key: 'sales-order', label: '来源销售订单' })
     }
-    if (
-      canOpenReworkIntakes &&
-      selectedRow.purpose === 'REWORK_RESHIPMENT' &&
-      selectedRow.rework_intake_id
-    ) {
-      items.push({ key: 'rework-intake', label: '来源返工回厂' })
-    }
     if (canOpenInventory) {
       items.push({ key: 'inventory', label: '库存记录' })
     }
-    if (canOpenReceivables && selectedRow.purpose !== 'REWORK_RESHIPMENT') {
+    if (canOpenReceivables) {
       items.push({ key: 'receivables', label: '应收记录' })
     }
-    if (canOpenInvoices && selectedRow.purpose !== 'REWORK_RESHIPMENT') {
+    if (canOpenInvoices) {
       items.push({ key: 'invoices', label: '开票记录' })
     }
-    if (
-      canOpenQualityInspections &&
-      selectedRow.purpose !== 'REWORK_RESHIPMENT'
-    ) {
+    if (canOpenQualityInspections) {
       items.push({ key: 'quality-inspections', label: '出货前检验' })
     }
     return items
@@ -397,7 +380,6 @@ export default function ShipmentsPage() {
     canOpenInvoices,
     canOpenQualityInspections,
     canOpenReceivables,
-    canOpenReworkIntakes,
     canOpenSalesOrders,
     selectedRow,
   ])
@@ -412,15 +394,6 @@ export default function ShipmentsPage() {
             keyword: selectedRow.sales_order_no,
             source: 'shipment',
             fields: ['sales_order_no'],
-          }
-        ),
-        'rework-intake': relatedDocumentRoute(
-          V1_ROUTE_PATHS.reworkIntakes,
-          { rework_intake_id: selectedRow.rework_intake_id },
-          {
-            keyword: selectedRow.shipment_no,
-            source: 'shipment',
-            fields: ['intake_no'],
           }
         ),
         inventory: businessRecordInventoryRouteFor(
@@ -710,12 +683,7 @@ export default function ShipmentsPage() {
         request.finish()
       }
     }
-  }, [
-    beginLatestRequest,
-    pagination,
-    routeShipmentID,
-    shipmentListParams,
-  ])
+  }, [beginLatestRequest, pagination, routeShipmentID, shipmentListParams])
 
   const clearRouteContext = useCallback(
     (keys) => {
@@ -1090,11 +1058,7 @@ export default function ShipmentsPage() {
       message.warning('当前账号没有编辑出货草稿的权限')
       return
     }
-    if (
-      !shipment?.id ||
-      shipment.status !== 'DRAFT' ||
-      shipment.purpose === 'REWORK_RESHIPMENT'
-    ) {
+    if (!shipment?.id || shipment.status !== 'DRAFT') {
       message.warning('只有尚未进入下游流程的销售出货草稿可以编辑')
       return
     }
@@ -1106,7 +1070,6 @@ export default function ShipmentsPage() {
       if (
         !detail?.id ||
         detail.status !== 'DRAFT' ||
-        detail.purpose === 'REWORK_RESHIPMENT' ||
         !Array.isArray(detail.items) ||
         detail.items.length === 0
       ) {
@@ -1228,11 +1191,7 @@ export default function ShipmentsPage() {
   }
 
   const openShipmentRecord = (shipment) => {
-    if (
-      canUpdate &&
-      shipment?.status === 'DRAFT' &&
-      shipment?.purpose !== 'REWORK_RESHIPMENT'
-    ) {
+    if (canUpdate && shipment?.status === 'DRAFT') {
       openEdit(shipment)
       return
     }
@@ -1485,10 +1444,7 @@ export default function ShipmentsPage() {
     async ({ signal }) => {
       const routeSelectedID = Number(routeShipmentID || 0)
       if (routeSelectedID > 0) {
-        const shipment = await getShipment(
-          { id: routeSelectedID },
-          { signal }
-        )
+        const shipment = await getShipment({ id: routeSelectedID }, { signal })
         return shipment ? [shipment] : []
       }
       const result = await listAllShipments(shipmentListParams, { signal })
@@ -1581,7 +1537,7 @@ export default function ShipmentsPage() {
       <PageHeaderCard
         compact
         title="出货单"
-        description="销售出货草稿需先完成品质检验与财务放行；返工补发沿用生产返工的质检与完工结果，不产生新的应收、开票或财务放行。两类单据都必须由仓库确认实际出货后才扣减库存。"
+        description="销售出货草稿需先完成品质检验与财务放行，并由仓库确认实际出货后才扣减库存。"
         tags={[
           <Tag color="gold" key="release">
             出货放行：财务审批
@@ -1591,9 +1547,6 @@ export default function ShipmentsPage() {
           </Tag>,
           <Tag color="green" key="inventory">
             出库管理：库存出库记录
-          </Tag>,
-          <Tag color="purple" key="rework-reshipment">
-            返工补发：不重复结算
           </Tag>,
         ]}
         stats={[
@@ -1770,21 +1723,16 @@ export default function ShipmentsPage() {
           {canUpdate ? (
             <BusinessActionTooltip
               disabled={
-                !selectedRow ||
-                saving ||
-                selectedRow?.status !== 'DRAFT' ||
-                selectedRow?.purpose === 'REWORK_RESHIPMENT'
+                !selectedRow || saving || selectedRow?.status !== 'DRAFT'
               }
               disabledReason={
                 saving
                   ? '当前操作完成后可编辑'
                   : !selectedRow
                     ? '请先选择一张出货单'
-                    : selectedRow?.purpose === 'REWORK_RESHIPMENT'
-                      ? '返工补发草稿由返工回厂业务链维护'
-                      : selectedRow?.status !== 'DRAFT'
-                        ? '只有尚未确认出货的草稿可以编辑'
-                        : ''
+                    : selectedRow?.status !== 'DRAFT'
+                      ? '只有尚未确认出货的草稿可以编辑'
+                      : ''
               }
             >
               <Button
@@ -1792,10 +1740,7 @@ export default function ShipmentsPage() {
                 icon={<EditOutlined />}
                 data-business-action-key="shipment-edit"
                 disabled={
-                  !selectedRow ||
-                  saving ||
-                  selectedRow?.status !== 'DRAFT' ||
-                  selectedRow?.purpose === 'REWORK_RESHIPMENT'
+                  !selectedRow || saving || selectedRow?.status !== 'DRAFT'
                 }
                 onClick={() => openEdit(selectedRow)}
               >

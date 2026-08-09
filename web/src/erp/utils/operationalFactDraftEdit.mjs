@@ -12,7 +12,6 @@ export const OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS = Object.freeze({
   PRODUCTION_MATERIAL_ISSUE: 'save_production_material_issue_draft',
   PRODUCTION_COMPLETION: 'save_production_completion_draft',
   PRODUCTION_REWORK_COMPLETION: 'save_production_rework_from_completion_draft',
-  PRODUCTION_REWORK_INTAKE: 'save_production_rework_from_intake_draft',
   OUTSOURCING_MATERIAL_ISSUE: 'save_outsourcing_material_issue_draft',
   OUTSOURCING_RETURN_RECEIPT: 'save_outsourcing_return_receipt_draft',
 })
@@ -21,7 +20,6 @@ const PRODUCTION_ACTIONS = new Set([
   OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE,
   OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION,
   OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION,
-  OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE,
 ])
 
 const OUTSOURCING_ACTIONS = new Set([
@@ -82,9 +80,7 @@ function requireAllowedKeys(params, keys) {
 
 function isReworkAction(action) {
   return (
-    action ===
-      OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION ||
-    action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE
+    action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION
   )
 }
 

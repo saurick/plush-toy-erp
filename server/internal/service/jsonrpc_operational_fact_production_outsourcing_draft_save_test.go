@@ -25,7 +25,7 @@ func TestProductionFactDraftSaveParamsAreStrictAndTypeSpecific(t *testing.T) {
 	rework, ok := productionFactDraftSaveFromParams(map[string]any{
 		"id": float64(12), "expected_version": float64(1), "fact_no": "RW-12",
 		"quantity": "1.25", "occurred_at": "2026-08-09T11:00:00Z", "reason": "返修车缝",
-	}, "save_production_rework_from_intake_draft")
+	}, "save_production_rework_from_completion_draft")
 	if !ok || rework.FactNo != "RW-12" || rework.Note == nil || *rework.Note != "返修车缝" {
 		t.Fatalf("rework draft params not parsed: ok=%v value=%#v", ok, rework)
 	}
@@ -52,7 +52,6 @@ func TestDraftSaveMethodsHaveExactSourceReadContracts(t *testing.T) {
 		"save_production_material_issue_draft":         {biz.PermissionPMCPlanRead},
 		"save_production_completion_draft":             {biz.PermissionPMCPlanRead},
 		"save_production_rework_from_completion_draft": {biz.PermissionProductionFactRead, biz.PermissionPMCPlanRead},
-		"save_production_rework_from_intake_draft":     {biz.PermissionReworkIntakeRead, biz.PermissionPMCPlanRead},
 		"save_outsourcing_material_issue_draft":        {biz.PermissionOutsourcingOrderRead},
 		"save_outsourcing_return_receipt_draft":        {biz.PermissionOutsourcingOrderRead},
 	}

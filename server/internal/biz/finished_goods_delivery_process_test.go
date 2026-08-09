@@ -27,7 +27,6 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 			ID:                   9001,
 			ShipmentNo:           "SHIP-GOLDEN-001",
 			CustomerID:           processTestIntPtr(501),
-			Purpose:              ShipmentPurposeSalesDelivery,
 			Status:               ShipmentStatusDraft,
 			FinanceReleaseStatus: ShipmentFinanceReleaseStatusPending,
 		},

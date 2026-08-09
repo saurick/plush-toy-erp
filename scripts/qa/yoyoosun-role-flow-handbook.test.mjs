@@ -20,9 +20,7 @@ const flowClosureMatrix = read(
 const customerDeliveryMatrix = read(
   "../../docs/customers/yoyoosun/客户交付矩阵.md",
 );
-const trialRunbook = read(
-  "../../docs/customers/yoyoosun/试用环境执行手册.md",
-);
+const trialRunbook = read("../../docs/customers/yoyoosun/试用环境执行手册.md");
 const fullPageChecklist = read(
   "../../docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
 );
@@ -39,8 +37,21 @@ const registeredPermissionKeys = new Set(
 );
 
 function tableIDs(source, prefix) {
-  const pattern = new RegExp(`^\\| (${prefix}\\d{2}) \\|`, "gmu");
+  const pattern = new RegExp(`^\\|\\s*(${prefix}\\d{2})\\s*\\|`, "gmu");
   return [...source.matchAll(pattern)].map((match) => match[1]);
+}
+
+function tableHasLeadingCells(source, expectedCells) {
+  return source.split("\n").some((line) => {
+    if (!line.startsWith("|")) {
+      return false;
+    }
+    const cells = line
+      .split("|")
+      .slice(1, -1)
+      .map((cell) => cell.trim());
+    return expectedCells.every((cell, index) => cells[index] === cell);
+  });
 }
 
 function expectedIDs(prefix, count) {
@@ -86,7 +97,7 @@ test("role handbook stays readable and routes exact details to structured truth"
   assert.ok(handbook.length < 30_000, "handbook must remain a concise guide");
   for (const role of yoyoosunRoleFlowMatrix.roles) {
     assert.ok(
-      handbook.includes(`| \`${role.roleKey}\` | ${role.displayName} |`),
+      tableHasLeadingCells(handbook, [`\`${role.roleKey}\``, role.displayName]),
       `missing role summary: ${role.roleKey}`,
     );
   }
@@ -119,7 +130,10 @@ test("role handbook stays readable and routes exact details to structured truth"
     "应付 DRAFT 同样需要独立 POST → POSTED",
     "本文不缓存整树测试计数",
   ]) {
-    assert.ok(handbook.includes(required), `missing handbook boundary: ${required}`);
+    assert.ok(
+      handbook.includes(required),
+      `missing handbook boundary: ${required}`,
+    );
   }
 
   const assignment = yoyoosunRoleFlowMatrix.roleAssignmentProfiles[0];
@@ -147,7 +161,10 @@ test("sales-order responsibility roles can read their source document", () => {
       "contact.read",
       "sales_order_item.read",
     ]) {
-      assert.ok(role.capabilityKeys.includes(permission), `${role.roleKey}: ${permission}`);
+      assert.ok(
+        role.capabilityKeys.includes(permission),
+        `${role.roleKey}: ${permission}`,
+      );
     }
     assert.ok(role.menuSurfaces.includes("sales-orders"));
   }
@@ -184,7 +201,10 @@ test("role documents keep reviewable Mermaid and privacy boundaries", async () =
   }
 
   for (const document of documents) {
-    assert.doesNotMatch(document, /(?<![A-Za-z0-9])1[3-9]\d{9}(?![A-Za-z0-9])/u);
+    assert.doesNotMatch(
+      document,
+      /(?<![A-Za-z0-9])1[3-9]\d{9}(?![A-Za-z0-9])/u,
+    );
     assert.doesNotMatch(document, /(?<![A-Za-z0-9])\d{16,19}(?![A-Za-z0-9])/u);
     assert.doesNotMatch(document, /(?:password|token|验证码)\s*[:=]\s*\S+/iu);
   }
@@ -245,9 +265,16 @@ test("customer confirmation separates decisions from system evidence", () => {
     "## 11. 当面对接方法",
   );
   assert.deepEqual(tableIDs(roleSection, "R"), expectedIDs("R", 9));
-  assert.deepEqual(tableIDs(nodeSection, "A"), expectedIDs("A", 7));
-  assert.deepEqual(tableIDs(handoffSection, "H"), expectedIDs("H", 22));
-  assert.deepEqual(tableIDs(exceptionSection, "X"), expectedIDs("X", 12));
+  assert.deepEqual(tableIDs(nodeSection, "A"), expectedIDs("A", 6));
+  assert.deepEqual(tableIDs(handoffSection, "H"), [
+    ...expectedIDs("H", 19),
+    "H21",
+    "H22",
+  ]);
+  assert.deepEqual(tableIDs(exceptionSection, "X"), [
+    ...expectedIDs("X", 10),
+    "X12",
+  ]);
   assert.deepEqual(tableIDs(decisionSection, "C"), expectedIDs("C", 9));
 
   for (const forbiddenTechnicalToken of [
@@ -274,30 +301,33 @@ test("production governance separates Core WIP from preview customer flows", () 
   }
 });
 
-test("full-page checklist keeps its 52-target customer boundary", () => {
+test("full-page checklist keeps its 51-target customer boundary", () => {
   const targetHeadings = fullPageChecklist.match(
     /^### (?:进入|桌面|岗位|预览|打印)-\d{2} /gmu,
   );
-  assert.equal(targetHeadings?.length, 52);
+  assert.equal(targetHeadings?.length, 51);
   assert.doesNotMatch(
     fullPageChecklist,
     /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|\b(?:key|route|system_admin)\b|岗位代码|甲方|\/erp\//iu,
   );
-  assert.match(fullPageChecklist, /完成 52 项并不自动代表正式交付/u);
+  assert.match(fullPageChecklist, /完成 51 项并不自动代表正式交付/u);
   assert.match(fullPageChecklist, /模拟展示任务不冒充流程闭环/u);
-  assert.match(fullPageChecklist, /\| 合计\s+\|\s+52\s+\|/u);
+  assert.match(fullPageChecklist, /\| 合计\s+\|\s+51\s+\|/u);
 });
 
 test("trial runbook keeps config, RBAC and release evidence boundaries", () => {
   for (const required of [
-    "52 项：2 个登录与入口、31 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台",
+    "51 项：2 个登录与入口、30 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台",
     "fresh 空库基线已记录",
     "customer-config-effective-session-probe.mjs",
     "40302 未登录",
     "模拟数据不等于真实 import",
     "不证明目标环境发布、真实客户导入、客户签收、备份恢复或 release evidence 已完成",
   ]) {
-    assert.ok(trialRunbook.includes(required), `missing trial boundary: ${required}`);
+    assert.ok(
+      trialRunbook.includes(required),
+      `missing trial boundary: ${required}`,
+    );
   }
 });
 

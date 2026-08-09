@@ -25,7 +25,7 @@ test('fact ledger catalog is complete, read-only, and source-backed', () => {
     ['采购与质量', '生产与库存', '委外与返工', '出货与财务']
   )
   assert.equal(catalog.definitions.length, factFlows.length)
-  assert.equal(catalog.definitions.length, 20)
+  assert.equal(catalog.definitions.length, 19)
   assert.deepEqual(
     catalog.displayGroups.map((group) => [
       group.key,
@@ -36,7 +36,7 @@ test('fact ledger catalog is complete, read-only, and source-backed', () => {
     [
       ['procurement_quality', 5],
       ['production_inventory', 6],
-      ['outsourcing_rework', 3],
+      ['outsourcing_rework', 2],
       ['shipping_finance', 6],
     ]
   )

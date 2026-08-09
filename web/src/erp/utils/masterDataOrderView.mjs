@@ -11,7 +11,6 @@ export const V1_ROUTE_PATHS = Object.freeze({
   materials: '/erp/master/materials',
   processes: '/erp/engineering/processes',
   salesOrders: '/erp/sales/project-orders/sales-orders',
-  reworkIntakes: '/erp/sales/rework-intakes',
   purchaseOrders: '/erp/purchase/accessories',
   purchaseReceipts: '/erp/warehouse/inbound',
   qualityInspections: '/erp/production/quality-inspections',

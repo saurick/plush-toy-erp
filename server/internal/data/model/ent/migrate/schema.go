@@ -3536,172 +3536,6 @@ var (
 			},
 		},
 	}
-	// ReworkIntakesColumns holds the columns for the "rework_intakes" table.
-	ReworkIntakesColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "intake_no", Type: field.TypeString, Size: 64},
-		{Name: "customer_snapshot", Type: field.TypeString, Size: 512},
-		{Name: "status", Type: field.TypeString, Size: 16, Default: "DRAFT"},
-		{Name: "reason", Type: field.TypeString, Size: 255},
-		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
-		{Name: "idempotency_payload_hash", Type: field.TypeString, Size: 64},
-		{Name: "idempotency_item_count", Type: field.TypeInt},
-		{Name: "version", Type: field.TypeInt, Default: 1},
-		{Name: "received_at", Type: field.TypeTime, Nullable: true},
-		{Name: "received_by", Type: field.TypeInt, Nullable: true},
-		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
-		{Name: "cancelled_by", Type: field.TypeInt, Nullable: true},
-		{Name: "cancel_reason", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "reversed_at", Type: field.TypeTime, Nullable: true},
-		{Name: "reversed_by", Type: field.TypeInt, Nullable: true},
-		{Name: "reverse_reason", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "created_by", Type: field.TypeInt},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "source_shipment_id", Type: field.TypeInt},
-		{Name: "customer_id", Type: field.TypeInt},
-	}
-	// ReworkIntakesTable holds the schema information for the "rework_intakes" table.
-	ReworkIntakesTable = &schema.Table{
-		Name:       "rework_intakes",
-		Columns:    ReworkIntakesColumns,
-		PrimaryKey: []*schema.Column{ReworkIntakesColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "rework_intakes_shipments_source_shipment",
-				Columns:    []*schema.Column{ReworkIntakesColumns[20]},
-				RefColumns: []*schema.Column{ShipmentsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "rework_intakes_customers_customer",
-				Columns:    []*schema.Column{ReworkIntakesColumns[21]},
-				RefColumns: []*schema.Column{CustomersColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "reworkintake_intake_no",
-				Unique:  true,
-				Columns: []*schema.Column{ReworkIntakesColumns[1]},
-			},
-			{
-				Name:    "reworkintake_created_by_idempotency_key",
-				Unique:  true,
-				Columns: []*schema.Column{ReworkIntakesColumns[17], ReworkIntakesColumns[5]},
-			},
-			{
-				Name:    "reworkintake_source_shipment_id_status",
-				Unique:  false,
-				Columns: []*schema.Column{ReworkIntakesColumns[20], ReworkIntakesColumns[3]},
-			},
-			{
-				Name:    "reworkintake_customer_id_status",
-				Unique:  false,
-				Columns: []*schema.Column{ReworkIntakesColumns[21], ReworkIntakesColumns[3]},
-			},
-		},
-	}
-	// ReworkIntakeItemsColumns holds the columns for the "rework_intake_items" table.
-	ReworkIntakeItemsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "line_no", Type: field.TypeString, Size: 32},
-		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "rework_intake_id", Type: field.TypeInt},
-		{Name: "source_shipment_item_id", Type: field.TypeInt},
-		{Name: "target_production_order_item_id", Type: field.TypeInt},
-		{Name: "product_id", Type: field.TypeInt},
-		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
-		{Name: "receiving_warehouse_id", Type: field.TypeInt},
-		{Name: "unit_id", Type: field.TypeInt},
-		{Name: "received_lot_id", Type: field.TypeInt, Nullable: true},
-	}
-	// ReworkIntakeItemsTable holds the schema information for the "rework_intake_items" table.
-	ReworkIntakeItemsTable = &schema.Table{
-		Name:       "rework_intake_items",
-		Columns:    ReworkIntakeItemsColumns,
-		PrimaryKey: []*schema.Column{ReworkIntakeItemsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "rework_intake_items_rework_intakes_items",
-				Columns:    []*schema.Column{ReworkIntakeItemsColumns[5]},
-				RefColumns: []*schema.Column{ReworkIntakesColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "rework_intake_items_shipment_items_source_shipment_item",
-				Columns:    []*schema.Column{ReworkIntakeItemsColumns[6]},
-				RefColumns: []*schema.Column{ShipmentItemsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "rework_intake_items_production_order_items_target_production_order_item",
-				Columns:    []*schema.Column{ReworkIntakeItemsColumns[7]},
-				RefColumns: []*schema.Column{ProductionOrderItemsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "rework_intake_items_products_product",
-				Columns:    []*schema.Column{ReworkIntakeItemsColumns[8]},
-				RefColumns: []*schema.Column{ProductsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "rework_intake_items_product_skus_product_sku",
-				Columns:    []*schema.Column{ReworkIntakeItemsColumns[9]},
-				RefColumns: []*schema.Column{ProductSkusColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "rework_intake_items_warehouses_receiving_warehouse",
-				Columns:    []*schema.Column{ReworkIntakeItemsColumns[10]},
-				RefColumns: []*schema.Column{WarehousesColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "rework_intake_items_units_unit",
-				Columns:    []*schema.Column{ReworkIntakeItemsColumns[11]},
-				RefColumns: []*schema.Column{UnitsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "rework_intake_items_inventory_lots_received_lot",
-				Columns:    []*schema.Column{ReworkIntakeItemsColumns[12]},
-				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "reworkintakeitem_rework_intake_id_line_no",
-				Unique:  true,
-				Columns: []*schema.Column{ReworkIntakeItemsColumns[5], ReworkIntakeItemsColumns[1]},
-			},
-			{
-				Name:    "reworkintakeitem_source_shipment_item_id",
-				Unique:  false,
-				Columns: []*schema.Column{ReworkIntakeItemsColumns[6]},
-			},
-			{
-				Name:    "reworkintakeitem_target_production_order_item_id",
-				Unique:  false,
-				Columns: []*schema.Column{ReworkIntakeItemsColumns[7]},
-			},
-			{
-				Name:    "reworkintakeitem_received_lot_id",
-				Unique:  true,
-				Columns: []*schema.Column{ReworkIntakeItemsColumns[12]},
-			},
-			{
-				Name:    "reworkintakeitem_product_id_product_sku_id_receiving_warehouse_id",
-				Unique:  false,
-				Columns: []*schema.Column{ReworkIntakeItemsColumns[8], ReworkIntakeItemsColumns[9], ReworkIntakeItemsColumns[10]},
-			},
-		},
-	}
 	// RolesColumns holds the columns for the "roles" table.
 	RolesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -4051,7 +3885,6 @@ var (
 	ShipmentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "shipment_no", Type: field.TypeString, Size: 64},
-		{Name: "purpose", Type: field.TypeString, Size: 32, Default: "SALES_DELIVERY"},
 		{Name: "customer_snapshot", Type: field.TypeString, Nullable: true, Size: 512},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
 		{Name: "version", Type: field.TypeInt, Default: 1},
@@ -4072,7 +3905,6 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "customer_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sales_order_id", Type: field.TypeInt, Nullable: true},
-		{Name: "rework_intake_id", Type: field.TypeInt, Nullable: true},
 	}
 	// ShipmentsTable holds the schema information for the "shipments" table.
 	ShipmentsTable = &schema.Table{
@@ -4082,21 +3914,15 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipments_customers_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[21]},
+				Columns:    []*schema.Column{ShipmentsColumns[20]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipments_sales_orders_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[22]},
+				Columns:    []*schema.Column{ShipmentsColumns[21]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.SetNull,
-			},
-			{
-				Symbol:     "shipments_rework_intakes_rework_intake",
-				Columns:    []*schema.Column{ShipmentsColumns[23]},
-				RefColumns: []*schema.Column{ReworkIntakesColumns[0]},
-				OnDelete:   schema.NoAction,
 			},
 		},
 		Indexes: []*schema.Index{
@@ -4108,32 +3934,22 @@ var (
 			{
 				Name:    "shipment_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{ShipmentsColumns[13]},
+				Columns: []*schema.Column{ShipmentsColumns[12]},
 			},
 			{
 				Name:    "shipment_sales_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[22]},
-			},
-			{
-				Name:    "shipment_rework_intake_id",
-				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[23]},
-			},
-			{
-				Name:    "shipment_purpose_status",
-				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[2], ShipmentsColumns[4]},
+				Columns: []*schema.Column{ShipmentsColumns[21]},
 			},
 			{
 				Name:    "shipment_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[21]},
+				Columns: []*schema.Column{ShipmentsColumns[20]},
 			},
 			{
 				Name:    "shipment_status",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[4]},
+				Columns: []*schema.Column{ShipmentsColumns[3]},
 			},
 		},
 	}
@@ -4153,7 +3969,6 @@ var (
 		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sales_order_item_id", Type: field.TypeInt, Nullable: true},
 		{Name: "shipment_id", Type: field.TypeInt},
-		{Name: "rework_completion_fact_id", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
 		{Name: "warehouse_id", Type: field.TypeInt},
 	}
@@ -4194,20 +4009,14 @@ var (
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "shipment_items_production_facts_rework_completion_fact",
-				Columns:    []*schema.Column{ShipmentItemsColumns[14]},
-				RefColumns: []*schema.Column{ProductionFactsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
 				Symbol:     "shipment_items_units_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[15]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[14]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_warehouses_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[16]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[15]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -4224,11 +4033,6 @@ var (
 				Columns: []*schema.Column{ShipmentItemsColumns[12]},
 			},
 			{
-				Name:    "shipmentitem_rework_completion_fact_id",
-				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[14]},
-			},
-			{
 				Name:    "shipmentitem_product_sku_id",
 				Unique:  false,
 				Columns: []*schema.Column{ShipmentItemsColumns[11]},
@@ -4236,7 +4040,7 @@ var (
 			{
 				Name:    "shipmentitem_product_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[10], ShipmentItemsColumns[16], ShipmentItemsColumns[9]},
+				Columns: []*schema.Column{ShipmentItemsColumns[10], ShipmentItemsColumns[15], ShipmentItemsColumns[9]},
 			},
 		},
 	}
@@ -4804,8 +4608,6 @@ var (
 		PurchaseReturnsTable,
 		PurchaseReturnItemsTable,
 		QualityInspectionsTable,
-		ReworkIntakesTable,
-		ReworkIntakeItemsTable,
 		RolesTable,
 		RoleDataScopesTable,
 		RolePermissionsTable,
@@ -5290,27 +5092,6 @@ func init() {
 		"quality_inspections_source_shape":                "\n(\n  (\n    production_wip_batch_id IS NULL\n    AND gate_code IS NULL\n    AND inventory_lot_id IS NOT NULL\n    AND warehouse_id IS NOT NULL\n  )\n  OR\n  (\n    production_wip_batch_id IS NOT NULL\n    AND gate_code IS NOT NULL\n    AND source_type IS NOT NULL\n    AND source_type = 'PRODUCTION_WIP'\n    AND source_id IS NOT NULL\n    AND source_id = production_wip_batch_id\n    AND inspection_type IS NOT NULL\n    AND inspection_type = 'PRODUCTION_STAGE'\n    AND subject_type IS NOT NULL\n    AND subject_type = 'WIP'\n    AND subject_id IS NOT NULL\n    AND subject_id = production_wip_batch_id\n    AND inventory_lot_id IS NULL\n    AND warehouse_id IS NULL\n    AND purchase_receipt_id IS NULL\n    AND purchase_receipt_item_id IS NULL\n    AND material_id IS NULL\n  )\n)",
 		"quality_inspections_superseded_bundle":           "((superseded_at IS NULL AND superseded_by IS NULL AND superseded_reason IS NULL) OR (superseded_at IS NOT NULL AND superseded_by IS NOT NULL AND superseded_reason IS NOT NULL AND length(trim(superseded_reason)) > 0))",
 	}
-	ReworkIntakesTable.ForeignKeys[0].RefTable = ShipmentsTable
-	ReworkIntakesTable.ForeignKeys[1].RefTable = CustomersTable
-	ReworkIntakesTable.Annotation = &entsql.Annotation{}
-	ReworkIntakesTable.Annotation.Checks = map[string]string{
-		"rework_intakes_intent_bundle":    "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64 AND idempotency_item_count > 0",
-		"rework_intakes_lifecycle_audit":  "\n(\n  (status = 'DRAFT'\n    AND received_at IS NULL AND received_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'RECEIVED'\n    AND received_at IS NOT NULL AND received_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'CANCELLED'\n    AND received_at IS NULL AND received_by IS NULL\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'REVERSED'\n    AND received_at IS NOT NULL AND received_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL\n    AND reverse_reason IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255)\n)",
-		"rework_intakes_status_allowed":   "status IN ('DRAFT', 'RECEIVED', 'CANCELLED', 'REVERSED')",
-		"rework_intakes_version_positive": "version > 0",
-	}
-	ReworkIntakeItemsTable.ForeignKeys[0].RefTable = ReworkIntakesTable
-	ReworkIntakeItemsTable.ForeignKeys[1].RefTable = ShipmentItemsTable
-	ReworkIntakeItemsTable.ForeignKeys[2].RefTable = ProductionOrderItemsTable
-	ReworkIntakeItemsTable.ForeignKeys[3].RefTable = ProductsTable
-	ReworkIntakeItemsTable.ForeignKeys[4].RefTable = ProductSkusTable
-	ReworkIntakeItemsTable.ForeignKeys[5].RefTable = WarehousesTable
-	ReworkIntakeItemsTable.ForeignKeys[6].RefTable = UnitsTable
-	ReworkIntakeItemsTable.ForeignKeys[7].RefTable = InventoryLotsTable
-	ReworkIntakeItemsTable.Annotation = &entsql.Annotation{}
-	ReworkIntakeItemsTable.Annotation.Checks = map[string]string{
-		"rework_intake_items_quantity_positive": "quantity > 0",
-	}
 	RolesTable.Annotation = &entsql.Annotation{}
 	RolesTable.Annotation.Checks = map[string]string{
 		"roles_navigation_mode_allowed": "navigation_mode IN ('recommended', 'custom')",
@@ -5343,13 +5124,10 @@ func init() {
 	}
 	ShipmentsTable.ForeignKeys[0].RefTable = CustomersTable
 	ShipmentsTable.ForeignKeys[1].RefTable = SalesOrdersTable
-	ShipmentsTable.ForeignKeys[2].RefTable = ReworkIntakesTable
 	ShipmentsTable.Annotation = &entsql.Annotation{}
 	ShipmentsTable.Annotation.Checks = map[string]string{
-		"shipments_finance_release_status_allowed":        "finance_release_status IN ('PENDING', 'APPROVED', 'REJECTED', 'NOT_REQUIRED')",
+		"shipments_finance_release_status_allowed":        "finance_release_status IN ('PENDING', 'APPROVED', 'REJECTED')",
 		"shipments_finance_release_version_positive":      "finance_release_version > 0",
-		"shipments_purpose_allowed":                       "purpose IN ('SALES_DELIVERY', 'REWORK_RESHIPMENT')",
-		"shipments_purpose_source_bundle":                 "((purpose = 'SALES_DELIVERY' AND rework_intake_id IS NULL AND finance_release_status <> 'NOT_REQUIRED') OR (purpose = 'REWORK_RESHIPMENT' AND rework_intake_id IS NOT NULL AND sales_order_id IS NULL AND finance_release_status = 'NOT_REQUIRED'))",
 		"shipments_requested_total_net_weight_g_positive": "requested_total_net_weight_g IS NULL OR requested_total_net_weight_g > 0",
 		"shipments_status_allowed":                        "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
 		"shipments_total_net_weight_g_positive":           "total_net_weight_g IS NULL OR total_net_weight_g > 0",
@@ -5360,15 +5138,13 @@ func init() {
 	ShipmentItemsTable.ForeignKeys[2].RefTable = ProductSkusTable
 	ShipmentItemsTable.ForeignKeys[3].RefTable = SalesOrderItemsTable
 	ShipmentItemsTable.ForeignKeys[4].RefTable = ShipmentsTable
-	ShipmentItemsTable.ForeignKeys[5].RefTable = ProductionFactsTable
-	ShipmentItemsTable.ForeignKeys[6].RefTable = UnitsTable
-	ShipmentItemsTable.ForeignKeys[7].RefTable = WarehousesTable
+	ShipmentItemsTable.ForeignKeys[5].RefTable = UnitsTable
+	ShipmentItemsTable.ForeignKeys[6].RefTable = WarehousesTable
 	ShipmentItemsTable.Annotation = &entsql.Annotation{}
 	ShipmentItemsTable.Annotation.Checks = map[string]string{
 		"shipment_items_amount_snapshot_nonnegative":         "amount_snapshot IS NULL OR amount_snapshot >= 0",
 		"shipment_items_currency_snapshot_allowed":           "currency_snapshot IN ('USD', 'CNY', 'HKD')",
 		"shipment_items_quantity_positive":                   "quantity > 0",
-		"shipment_items_rework_completion_positive":          "rework_completion_fact_id IS NULL OR rework_completion_fact_id > 0",
 		"shipment_items_unit_net_weight_g_snapshot_positive": "unit_net_weight_g_snapshot IS NULL OR unit_net_weight_g_snapshot > 0",
 		"shipment_items_unit_price_snapshot_nonnegative":     "unit_price_snapshot IS NULL OR unit_price_snapshot >= 0",
 	}

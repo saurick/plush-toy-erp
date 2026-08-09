@@ -31,30 +31,6 @@ const SHIPMENT_STATUS_COLORS = Object.freeze({
   CANCELLED: 'red',
 })
 
-const SHIPMENT_PURPOSE_LABELS = Object.freeze({
-  SALES_DELIVERY: '销售出货',
-  REWORK_RESHIPMENT: '返工补发',
-})
-
-const SHIPMENT_PURPOSE_COLORS = Object.freeze({
-  SALES_DELIVERY: 'blue',
-  REWORK_RESHIPMENT: 'purple',
-})
-
-export function shipmentPurposeText(purpose) {
-  const key = String(purpose || 'SALES_DELIVERY').trim()
-  return SHIPMENT_PURPOSE_LABELS[key] || '出货用途待核对'
-}
-
-export function shipmentPurposeTag(purpose) {
-  const key = String(purpose || 'SALES_DELIVERY').trim()
-  return (
-    <Tag color={SHIPMENT_PURPOSE_COLORS[key] || 'default'}>
-      {shipmentPurposeText(key)}
-    </Tag>
-  )
-}
-
 export function shipmentStatusText(status) {
   const key = String(status || '').trim()
   return SHIPMENT_STATUS_LABELS[key] || (key ? '出货状态' : '-')
@@ -88,26 +64,12 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => shipmentStatusText(record?.status),
     },
     {
-      title: '出货用途',
-      exportTitle: '出货用途',
-      dataIndex: 'purpose',
-      width: 120,
-      sortValue: (record) => shipmentPurposeText(record?.purpose),
-      render: shipmentPurposeTag,
-      exportValue: (record) => shipmentPurposeText(record?.purpose),
-    },
-    {
       title: '来源单据',
       exportTitle: '来源单据',
       dataIndex: 'sales_order_id',
       width: 120,
       sortType: 'number',
-      render: (value, record) => {
-        if (record?.purpose === 'REWORK_RESHIPMENT') {
-          return record?.rework_intake_id
-            ? `返工回厂 #${record.rework_intake_id}`
-            : '返工回厂已关联'
-        }
+      render: (value) => {
         const order = salesOrdersByID.get(Number(value || 0))
         return (
           order?.order_no ||
@@ -116,11 +78,6 @@ export function buildShipmentColumns({ salesOrdersByID }) {
         )
       },
       exportValue: (record) => {
-        if (record?.purpose === 'REWORK_RESHIPMENT') {
-          return record?.rework_intake_id
-            ? `返工回厂 #${record.rework_intake_id}`
-            : '返工回厂已关联'
-        }
         const order = salesOrdersByID.get(Number(record?.sales_order_id || 0))
         return (
           order?.order_no ||

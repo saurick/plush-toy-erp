@@ -16,7 +16,6 @@ func TestBusinessSourceNumberRecognizesSupportedSourcesAndLeavesUnknownBlank(t *
 		biz.ShipmentSourceType,
 		biz.PurchaseReceiptSourceType,
 		biz.FinanceFactSourceType,
-		biz.ReworkIntakeSourceType,
 	} {
 		sourceType := sourceType
 		key, ok := resolvableBusinessSourceKey(&sourceType, &sourceID)

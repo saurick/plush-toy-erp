@@ -10,7 +10,6 @@ func TestProductionAndOutsourcingDraftSavePermissionUsageCoversHandlerContracts(
 		{"save_production_material_issue_draft", []string{PermissionProductionMaterialIssueCreate, PermissionPMCPlanRead}},
 		{"save_production_completion_draft", []string{PermissionProductionCompletionCreate, PermissionPMCPlanRead}},
 		{"save_production_rework_from_completion_draft", []string{PermissionProductionReworkCreate, PermissionProductionFactRead, PermissionPMCPlanRead}},
-		{"save_production_rework_from_intake_draft", []string{PermissionProductionReworkCreate, PermissionReworkIntakeRead, PermissionPMCPlanRead}},
 		{"save_outsourcing_material_issue_draft", []string{PermissionOutsourcingMaterialIssueCreate, PermissionOutsourcingOrderRead}},
 		{"save_outsourcing_return_receipt_draft", []string{PermissionOutsourcingReturnReceiptCreate, PermissionOutsourcingOrderRead}},
 	}

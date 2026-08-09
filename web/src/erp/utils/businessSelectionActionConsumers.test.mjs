@@ -19,7 +19,6 @@ const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
   'BOMVersionsPage.jsx': 'BOMVersionsPage.jsx',
   'FinancePaymentsPage.jsx': 'FinancePaymentsPage.jsx',
   'OperationalFactsPage.jsx': 'OperationalFactsPage.jsx',
-  'ReworkIntakesPage.jsx': 'ReworkIntakesPage.jsx',
   'ShipmentsPage.jsx': 'ShipmentsPage.jsx',
   'V1InventoryLedgerPage.jsx': 'V1InventoryLedgerPage.jsx',
   'V1MasterDataPage.jsx': 'V1MasterDataPage.jsx',
@@ -35,8 +34,8 @@ const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
 const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
   'BOMVersionsPage.jsx': /data-business-action-key="activate"/u,
   'FinancePaymentsPage.jsx': /data-business-action-key="payment-allocation"/u,
-  'OperationalFactsPage.jsx': /data-business-action-key="operational-fact-post"/u,
-  'ReworkIntakesPage.jsx': /data-business-action-key="rework-intake-receive"/u,
+  'OperationalFactsPage.jsx':
+    /data-business-action-key="operational-fact-post"/u,
   'ShipmentsPage.jsx': /data-business-action-key="shipment-ship"/u,
   'V1InventoryLedgerPage.jsx': /data-business-action-key="related-records"/u,
   'V1MasterDataPage.jsx': /\{canUpdate \? \([\s\S]*?\{canDisable \? \(/u,
@@ -46,7 +45,8 @@ const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
   'V1PurchaseReceiptsPage.jsx': /data-business-action-key="post"/u,
   'V1QualityInspectionsPage.jsx': /data-business-action-key="submit"/u,
   'V1SalesOrdersPage.jsx': /actionStates=\{lifecycleActionStates\}/u,
-  'WorkflowBusinessModulePage.jsx': /data-business-action-key="workflow-task-complete"/u,
+  'WorkflowBusinessModulePage.jsx':
+    /data-business-action-key="workflow-task-complete"/u,
 })
 
 function pageSource(fileName) {
@@ -66,7 +66,9 @@ test('正式业务选择页清单完整，新增消费者必须进入共享动�
   const discoveredPages = readdirSync(pagesDirectory)
     .filter((fileName) => fileName.endsWith('.jsx'))
     .filter((fileName) => pageSource(fileName).includes('rowSelection'))
-    .filter((fileName) => fileName !== 'ProcessingContractPrintWorkspacePage.jsx')
+    .filter(
+      (fileName) => fileName !== 'ProcessingContractPrintWorkspacePage.jsx'
+    )
     .sort()
 
   assert.deepEqual(
@@ -149,7 +151,10 @@ test('生产异常子面板也纳入稳定动作合同', () => {
     'production-exception-reverse',
     'production-exception-revoke-quota',
   ]) {
-    assert.match(source, new RegExp(`data-business-action-key="${actionKey}"`, 'u'))
+    assert.match(
+      source,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u')
+    )
   }
 })
 

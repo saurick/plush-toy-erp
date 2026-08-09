@@ -89,7 +89,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '从 12 条业务链总图下钻来源单据、责任任务、运行路径、事实台账和状态规则；只读观察，不创建第二套运行真源。',
+      '从 11 条业务链总图下钻来源单据、责任任务、运行路径、事实台账和状态规则；只读观察，不创建第二套运行真源。',
   }),
   Object.freeze({
     key: 'docs',

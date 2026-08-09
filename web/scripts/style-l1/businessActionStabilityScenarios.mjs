@@ -6,7 +6,6 @@ const PURCHASE_RECEIPT_PATH = '/erp/warehouse/inbound'
 const QUALITY_INSPECTION_PATH = '/erp/production/quality-inspections'
 const SHIPMENT_PATH = '/erp/warehouse/shipments'
 const FINANCE_PAYMENT_PATH = '/erp/finance/payments'
-const REWORK_INTAKE_PATH = '/erp/sales/rework-intakes'
 const PRODUCTION_EXCEPTION_PATH = '/erp/production/exceptions'
 
 const SALES_ORDER_STATUSES = [
@@ -225,38 +224,6 @@ function createFinancePaymentRows() {
   )
 }
 
-function createReworkIntakeRows() {
-  return ['DRAFT', 'RECEIVED', 'REVERSED', 'CANCELLED'].map(
-    (status, index) => ({
-      id: 1_601 + index,
-      intake_no: `HCF-ACTION-${status}`,
-      original_shipment_id: 1,
-      original_shipment_no: 'SHIP-STYLE-L1',
-      customer_name: '稳定动作客户',
-      status,
-      progress_stage:
-        status === 'DRAFT'
-          ? 'WAITING_RECEIVE'
-          : status === 'RECEIVED'
-            ? 'WAITING_REWORK'
-            : status,
-      reason: `返工回厂动作稳定性 ${status}`,
-      version: index + 1,
-      items: [
-        {
-          id: 1_651 + index,
-          quantity: '2',
-          active_rework_quantity: '0',
-          completion_candidates: [],
-        },
-      ],
-      received_at: ['RECEIVED', 'REVERSED'].includes(status)
-        ? 1_784_000_100
-        : null,
-    })
-  )
-}
-
 function createProductionExceptionRows() {
   return [
     ['SUBMITTED-SCRAP', 'SCRAP', 'SUBMITTED', 'PENDING'],
@@ -285,7 +252,6 @@ async function installActionStabilityRpcRows(
     includeQuality = false,
     includeShipments = false,
     includeFinance = false,
-    includeReworkIntakes = false,
     includeProductionExceptions = false,
     delaySalesSubmit = false,
   } = {}
@@ -295,7 +261,6 @@ async function installActionStabilityRpcRows(
   const qualityInspections = createQualityInspectionRows()
   const shipments = createShipmentRows()
   const financePayments = createFinancePaymentRows()
-  const reworkIntakes = createReworkIntakeRows()
   const productionExceptions = createProductionExceptionRows()
 
   if (includeSales) {
@@ -470,12 +435,7 @@ async function installActionStabilityRpcRows(
     })
   }
 
-  if (
-    includeShipments ||
-    includeFinance ||
-    includeReworkIntakes ||
-    includeProductionExceptions
-  ) {
+  if (includeShipments || includeFinance || includeProductionExceptions) {
     await page.route('**/rpc/operational_fact', async (route) => {
       const body = route.request().postDataJSON() || {}
       const { id = 'action-stability-shipment', method, params = {} } = body
@@ -495,14 +455,6 @@ async function installActionStabilityRpcRows(
         await fulfillRpc(route, id, rpcPage([], 'credit_notes', params))
         return
       }
-      if (includeReworkIntakes && method === 'list_rework_intakes') {
-        await fulfillRpc(
-          route,
-          id,
-          rpcPage(reworkIntakes, 'rework_intakes', params)
-        )
-        return
-      }
       if (
         includeProductionExceptions &&
         method === 'list_production_exceptions'
@@ -510,11 +462,7 @@ async function installActionStabilityRpcRows(
         await fulfillRpc(
           route,
           id,
-          rpcPage(
-            productionExceptions,
-            'production_exceptions',
-            params
-          )
+          rpcPage(productionExceptions, 'production_exceptions', params)
         )
         return
       }
@@ -883,9 +831,8 @@ export function createBusinessActionStabilityScenarios(deps) {
             `销售订单 ${status} 的预留库存入口应保留并按生效状态启用`
           )
           assert.equal(
-            layout.buttons.find(
-              (button) => button.key === 'lifecycle-primary'
-            )?.disabled,
+            layout.buttons.find((button) => button.key === 'lifecycle-primary')
+              ?.disabled,
             status !== 'draft',
             `销售订单 ${status} 的固定主动作应保留并独立置灰`
           )
@@ -938,9 +885,8 @@ export function createBusinessActionStabilityScenarios(deps) {
           )
         }
         assert.equal(
-          savingLayout.buttons.find(
-            (button) => button.key === 'lifecycle-more'
-          )?.disabled,
+          savingLayout.buttons.find((button) => button.key === 'lifecycle-more')
+            ?.disabled,
           false,
           '销售订单保存中仍可打开更多操作查看禁用原因'
         )
@@ -1064,9 +1010,11 @@ export function createBusinessActionStabilityScenarios(deps) {
         assert.equal(await viewDisposition.count(), 1)
         assert.equal(await viewDisposition.isEnabled(), true)
         assert.equal(
-          await actionBar.getByRole('button', {
-            name: '委外返厂 / 返工',
-          }).count(),
+          await actionBar
+            .getByRole('button', {
+              name: '委外返厂 / 返工',
+            })
+            .count(),
           0,
           '只读账号不能借查看权限获得委外写操作文案'
         )
@@ -1522,96 +1470,18 @@ export function createBusinessActionStabilityScenarios(deps) {
       },
     },
     {
-      name: 'business-action-stability-warehouse-rework-intakes-shipments-desktop',
-      path: REWORK_INTAKE_PATH,
+      name: 'business-action-stability-warehouse-shipments-desktop',
+      path: SHIPMENT_PATH,
       auth: 'admin',
       ...warehouseIdentity,
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
         await installActionStabilityRpcRows(page, {
           includeSales: false,
-          includeReworkIntakes: true,
           includeShipments: true,
         })
       },
       verify: async (page) => {
-        await waitForBusinessPage(page, '返工回厂与补发')
-        const intakeEmpty = await captureDesktopActionLayout(page)
-        for (const key of ['rework-intake-receive', 'rework-intake-reverse']) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-        for (const key of [
-          'rework-intake-create-rework',
-          'rework-intake-create-reshipment',
-          'rework-intake-cancel',
-        ]) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: false,
-          })
-        }
-
-        await selectBusinessRow(page, 'HCF-ACTION-DRAFT')
-        assertStableDesktopLayout(
-          assert,
-          intakeEmpty,
-          await captureDesktopActionLayout(page),
-          '返工回厂 DRAFT'
-        )
-        await assertDesktopActionState(page, assert, 'rework-intake-receive', {
-          visible: true,
-          disabled: false,
-        })
-        await assertDesktopActionState(page, assert, 'rework-intake-reverse', {
-          visible: true,
-          disabled: true,
-        })
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-rework-intake-draft-desktop.png'
-        )
-
-        await selectBusinessRow(page, 'HCF-ACTION-RECEIVED')
-        assertStableDesktopLayout(
-          assert,
-          intakeEmpty,
-          await captureDesktopActionLayout(page),
-          '返工回厂 RECEIVED'
-        )
-        await assertDesktopActionState(page, assert, 'rework-intake-receive', {
-          visible: true,
-          disabled: true,
-        })
-        await assertDesktopActionState(page, assert, 'rework-intake-reverse', {
-          visible: true,
-          disabled: false,
-        })
-        await screenshot(
-          page,
-          path,
-          outputDir,
-          'business-action-stability-rework-intake-received-desktop.png'
-        )
-
-        await selectBusinessRow(page, 'HCF-ACTION-REVERSED')
-        assertStableDesktopLayout(
-          assert,
-          intakeEmpty,
-          await captureDesktopActionLayout(page),
-          '返工回厂 REVERSED'
-        )
-        for (const key of ['rework-intake-receive', 'rework-intake-reverse']) {
-          await assertDesktopActionState(page, assert, key, {
-            visible: true,
-            disabled: true,
-          })
-        }
-
-        await gotoScenarioPath(page, SHIPMENT_PATH)
         await waitForBusinessPage(page, '出货单')
         const shipmentEmpty = await captureDesktopActionLayout(page)
         await selectBusinessRow(page, 'SHIP-ACTION-DRAFT')
@@ -1693,7 +1563,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         )
         await assertNoHorizontalOverflow(
           page,
-          'business-action-stability-warehouse-returns-shipments-desktop'
+          'business-action-stability-warehouse-shipments-desktop'
         )
       },
     },
@@ -1922,7 +1792,9 @@ export function createBusinessActionStabilityScenarios(deps) {
               (button) => ({
                 key:
                   button.getAttribute('data-business-action-key') ||
-                  String(button.textContent || '').replace(/\s+/gu, '').trim(),
+                  String(button.textContent || '')
+                    .replace(/\s+/gu, '')
+                    .trim(),
                 disabled: button.disabled,
               })
             ),

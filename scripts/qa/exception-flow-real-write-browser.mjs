@@ -15,10 +15,7 @@ const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
-const REPORT_ROOT = path.resolve(
-  REPO_ROOT,
-  "output/qa/manual-acceptance",
-);
+const REPORT_ROOT = path.resolve(REPO_ROOT, "output/qa/manual-acceptance");
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const CUSTOMER_KEY = "yoyoosun";
 const PERMISSION_DENIED = 40304;
@@ -52,10 +49,16 @@ export function normalizeLoopbackOrigin(value, label) {
     throw new AcceptanceError(`${label} must use http or https`, 2);
   }
   if (url.username || url.password || !LOCAL_HOSTS.has(url.hostname)) {
-    throw new AcceptanceError(`${label} must be a credential-free loopback origin`, 2);
+    throw new AcceptanceError(
+      `${label} must be a credential-free loopback origin`,
+      2,
+    );
   }
   if (url.pathname !== "/" || url.search || url.hash) {
-    throw new AcceptanceError(`${label} must not include a path, query, or hash`, 2);
+    throw new AcceptanceError(
+      `${label} must not include a path, query, or hash`,
+      2,
+    );
   }
   return url.origin;
 }
@@ -76,10 +79,7 @@ export function resolveExceptionFlowReportPath(value) {
   return reportPath;
 }
 
-export function exceptionFlowConfirmation({
-  backendURL,
-  databaseName,
-} = {}) {
+export function exceptionFlowConfirmation({ backendURL, databaseName } = {}) {
   return `RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:${databaseName}:${backendURL}`;
 }
 
@@ -108,13 +108,17 @@ export function parseExceptionFlowArgs(argv = [], env = process.env) {
     if (!value || String(value).startsWith("--")) {
       throw new AcceptanceError(`--${key} is missing a value`, 2);
     }
-    if (key === "base-url") options.baseURL = normalizeLoopbackOrigin(value, "--base-url");
+    if (key === "base-url")
+      options.baseURL = normalizeLoopbackOrigin(value, "--base-url");
     else if (key === "backend-url") {
       options.backendURL = normalizeLoopbackOrigin(value, "--backend-url");
-    } else if (key === "database-name") options.databaseName = String(value).trim();
-    else if (key === "report") options.reportPath = resolveExceptionFlowReportPath(value);
+    } else if (key === "database-name")
+      options.databaseName = String(value).trim();
+    else if (key === "report")
+      options.reportPath = resolveExceptionFlowReportPath(value);
     else if (key === "password-env") options.passwordEnv = String(value).trim();
-    else if (key === "confirmation-env") options.confirmationEnv = String(value).trim();
+    else if (key === "confirmation-env")
+      options.confirmationEnv = String(value).trim();
     else throw new AcceptanceError(`unsupported argument: --${key}`, 2);
   }
   if (!options.baseURL || !options.backendURL || !options.reportPath) {
@@ -134,7 +138,10 @@ export function parseExceptionFlowArgs(argv = [], env = process.env) {
     );
   }
   if (new URL(options.backendURL).port === "8300") {
-    throw new AcceptanceError("the shared/default backend port 8300 is forbidden", 2);
+    throw new AcceptanceError(
+      "the shared/default backend port 8300 is forbidden",
+      2,
+    );
   }
   const password = requiredText(env[options.passwordEnv], options.passwordEnv);
   const expectedConfirmation = exceptionFlowConfirmation(options);
@@ -152,7 +159,9 @@ function accountForRole(roleKey) {
     (item) => item.roleKey === roleKey,
   );
   if (!profile) {
-    throw new AcceptanceError(`formal demo account missing for role ${roleKey}`);
+    throw new AcceptanceError(
+      `formal demo account missing for role ${roleKey}`,
+    );
   }
   return profile;
 }
@@ -267,7 +276,7 @@ export function staleRetryReceipt(response, service, method) {
 }
 
 export function assertExceptionFlowEvidenceContract(report) {
-  assert.equal(report?.flows?.length, 4, "four exception flows must execute");
+  assert.equal(report?.flows?.length, 3, "three exception flows must execute");
   for (const flow of report.flows) {
     assert.equal(flow?.passed, true, `${String(flow?.key)} must pass`);
     assert.equal(
@@ -279,8 +288,8 @@ export function assertExceptionFlowEvidenceContract(report) {
   }
   assert.equal(
     report?.negativePermissions?.length,
-    4,
-    "four server permission denials must execute",
+    3,
+    "three server permission denials must execute",
   );
   for (const receipt of report.negativePermissions) {
     assert.equal(receipt?.code, PERMISSION_DENIED);
@@ -288,8 +297,8 @@ export function assertExceptionFlowEvidenceContract(report) {
   }
   assert.equal(
     report?.simulatedTransportFaults?.length,
-    4,
-    "four lost-response recoveries must execute",
+    3,
+    "three lost-response recoveries must execute",
   );
   for (const receipt of report.simulatedTransportFaults) {
     assert.equal(receipt?.injected, true);
@@ -419,7 +428,9 @@ async function selectRow(page, visibleToken) {
 }
 
 async function confirmPopover(page, title, button = "确认") {
-  const popover = page.locator(".ant-popover:visible").filter({ hasText: title });
+  const popover = page
+    .locator(".ant-popover:visible")
+    .filter({ hasText: title });
   await popover.waitFor({ state: "visible" });
   const named = popover.getByRole("button", { name: button, exact: true });
   if (await named.isVisible().catch(() => false)) {
@@ -430,7 +441,10 @@ async function confirmPopover(page, title, button = "确认") {
 }
 
 async function visibleModal(page, title) {
-  const modal = page.locator(".ant-modal:visible").filter({ hasText: title }).last();
+  const modal = page
+    .locator(".ant-modal:visible")
+    .filter({ hasText: title })
+    .last();
   await modal.waitFor({ state: "visible" });
   return modal;
 }
@@ -460,21 +474,13 @@ async function waitRecoveryMessage(page, text, lost) {
 async function actOnTaskInBrowser(
   browser,
   options,
-  {
-    roleKey,
-    sourceNo,
-    actionTitle,
-    confirmLabel,
-    successMessage,
-    reason = "",
-  },
+  { roleKey, sourceNo, actionTitle, confirmLabel, successMessage, reason = "" },
 ) {
   const session = await login(browser, { ...options, roleKey });
   try {
     await goto(session.page, options.baseURL, "/erp/task-board", "任务看板");
-    const search = session.page.getByPlaceholder(
-      "搜索任务、单号、来源、处理原因",
-    );
+    const search =
+      session.page.getByPlaceholder("搜索任务、单号、来源、处理原因");
     await search.fill(sourceNo);
     await search.press("Enter");
     const card = session.page
@@ -502,7 +508,11 @@ async function actOnTaskInBrowser(
     if (await confirmButton.isVisible().catch(() => false)) {
       await confirmButton.click();
     } else {
-      await drawer.locator("button").filter({ hasText: confirmLabel }).last().click();
+      await drawer
+        .locator("button")
+        .filter({ hasText: confirmLabel })
+        .last()
+        .click();
     }
     await waitMessage(session.page, successMessage);
     return {
@@ -542,76 +552,6 @@ function findRecord(items, predicate, label) {
   return item;
 }
 
-async function createReworkIntakeSourceInBrowser(browser, options) {
-  const session = await login(browser, { ...options, roleKey: "sales" });
-  try {
-    const listed = await browserRpc(
-      session.page,
-      "operational_fact",
-      "list_shipments",
-      { status: "SHIPPED", limit: 100, offset: 0 },
-    );
-    const shipment = findRecord(
-      listed.shipments,
-      (item) =>
-        item.status === "SHIPPED" &&
-        Array.isArray(item.items) &&
-        item.items.some((line) => Number(line.quantity) >= 1),
-      "shipped rework-intake source",
-    );
-    const intakeNo = `HCF-ACT-${String(Date.now()).slice(-10)}`;
-
-    await goto(
-      session.page,
-      options.baseURL,
-      "/erp/sales/rework-intakes",
-      "返工回厂与补发",
-    );
-    await session.page
-      .getByRole("button", { name: "新建返工回厂", exact: true })
-      .click();
-    const modal = await visibleModal(session.page, "新建返工回厂");
-    await modal.getByLabel("返工回厂单号").fill(intakeNo);
-    await modal
-      .getByLabel("回厂返工原因")
-      .fill("真实浏览器验收：客户产品回厂返工后补发。");
-    await modal.getByLabel("原出货明细").click();
-    const sourceOption = session.page
-      .locator(".ant-select-dropdown:visible .ant-select-item-option")
-      .filter({ hasText: shipment.shipment_no })
-      .first();
-    await sourceOption.waitFor({ state: "visible" });
-    await sourceOption.click();
-    const quantity = modal.getByLabel("回厂数量").first();
-    await quantity.waitFor({ state: "visible" });
-    await quantity.fill("1");
-    await modal
-      .getByRole("button", { name: "建立回厂记录", exact: true })
-      .click();
-    await waitMessage(session.page, "返工回厂记录已建立");
-
-    const intakes = await browserRpc(
-      session.page,
-      "operational_fact",
-      "list_rework_intakes",
-      { status: "DRAFT", limit: 100, offset: 0 },
-    );
-    const created = findRecord(
-      intakes.rework_intakes,
-      (item) => item.intake_no === intakeNo && item.status === "DRAFT",
-      "browser-created rework intake",
-    );
-    return {
-      created,
-      shipment: {
-        id: shipment.id,
-        no: shipment.shipment_no,
-      },
-    };
-  } finally {
-    await session.context.close();
-  }
-}
 async function verifyRuntimeIdentity({ backendURL, databaseName }) {
   const ready = await fetch(new URL("/readyz", `${backendURL}/`));
   if (!ready.ok || String(await ready.text()).trim() !== "ready") {
@@ -637,153 +577,13 @@ async function verifyRuntimeIdentity({ backendURL, databaseName }) {
     body !== "runtime identity matched" ||
     response.headers.get("X-ERP-Runtime-Identity-Proof") !== "matched-v1"
   ) {
-    throw new AcceptanceError("isolated action database runtime identity mismatch");
+    throw new AcceptanceError(
+      "isolated action database runtime identity mismatch",
+    );
   }
   return { databaseName, proof: "matched-v1", scope: "database-v1" };
 }
 
-async function runReworkIntakeFlow(browser, options, report) {
-  const sourceSetup = await createReworkIntakeSourceInBrowser(browser, options);
-  const session = await login(browser, { ...options, roleKey: "warehouse" });
-  const flow = {
-    key: "rework_intake",
-    sourceSetup: "browser_created_from_shipped_source",
-    browserActions: [],
-    readbacks: [],
-  };
-  try {
-    const source = sourceSetup.created;
-    flow.source = {
-      id: source.id,
-      no: source.intake_no,
-      status: source.status,
-      version: source.version,
-    };
-    flow.sourceShipment = sourceSetup.shipment;
-
-    await goto(
-      session.page,
-      options.baseURL,
-      "/erp/sales/rework-intakes",
-      "返工回厂与补发",
-    );
-    await selectRow(session.page, source.intake_no);
-    await session.page
-      .getByRole("button", { name: "确认回厂收货", exact: true })
-      .click();
-    await confirmPopover(session.page, "确认实物已经回到仓库？");
-    await waitMessage(session.page, "已确认回厂收货");
-    flow.browserActions.push("warehouse_receive_click");
-
-    const received = (
-      await browserRpc(
-        session.page,
-        "operational_fact",
-        "get_rework_intake",
-        { id: source.id },
-      )
-    ).rework_intake;
-    assert.equal(received.status, "RECEIVED");
-    const receiptTxns = await browserRpc(
-      session.page,
-      "inventory",
-      "list_inventory_txns",
-      {
-        source_type: "REWORK_INTAKE",
-        source_id: source.id,
-        limit: 100,
-        offset: 0,
-      },
-    );
-    assert.ok(receiptTxns.inventory_txns.length > 0);
-    assert.ok(
-      (received.items || []).every(
-        (item) => item.received_lot_id && item.received_lot_no,
-      ),
-    );
-    flow.readbacks.push({
-      stage: "received",
-      status: received.status,
-      version: received.version,
-      inventoryTxnCount: receiptTxns.inventory_txns.length,
-    });
-
-    const negative = await login(browser, { ...options, roleKey: "sales" });
-    try {
-      report.negativePermissions.push(
-        await expectPermissionDenied(
-          negative.page,
-          "operational_fact",
-          "reverse_rework_intake",
-          {
-            id: received.id,
-            expected_version: received.version,
-            reason: "无权角色服务端拒绝验证",
-          },
-        ),
-      );
-    } finally {
-      await negative.context.close();
-    }
-
-    await session.page
-      .getByRole("button", { name: "冲正回厂收货", exact: true })
-      .click();
-    const reverseModal = await visibleModal(session.page, "冲正回厂收货");
-    await reverseModal
-      .getByPlaceholder("请填写原因")
-      .fill("真实浏览器验收：尚未进入生产，冲正回厂收货。");
-    await reverseModal
-      .getByRole("button", { name: "确认冲正", exact: true })
-      .click();
-    await waitMessage(session.page, "回厂收货已冲正");
-    flow.browserActions.push("warehouse_reverse_click");
-
-    const reversed = (
-      await browserRpc(
-        session.page,
-        "operational_fact",
-        "get_rework_intake",
-        { id: source.id },
-      )
-    ).rework_intake;
-    assert.equal(reversed.status, "REVERSED");
-    const reversedTxns = await browserRpc(
-      session.page,
-      "inventory",
-      "list_inventory_txns",
-      {
-        source_type: "REWORK_INTAKE",
-        source_id: source.id,
-        limit: 100,
-        offset: 0,
-      },
-    );
-    assert.ok(
-      reversedTxns.inventory_txns.length > receiptTxns.inventory_txns.length,
-    );
-    flow.readbacks.push({
-      stage: "reversed",
-      status: reversed.status,
-      version: reversed.version,
-      inventoryTxnCount: reversedTxns.inventory_txns.length,
-    });
-    flow.retry = await expectRetryRejected(
-      session.page,
-      "operational_fact",
-      "reverse_rework_intake",
-      {
-        id: source.id,
-        expected_version: received.version,
-        reason: "重复冲正必须拒绝",
-      },
-    );
-    flow.passed = true;
-    return flow;
-  } finally {
-    await session.context.close();
-  }
-}
 async function runFinancePaymentFlow(browser, options, report) {
   const authorizedLookup = await login(browser, {
     ...options,
@@ -908,7 +708,9 @@ async function runFinancePaymentFlow(browser, options, report) {
       )
     ).payment;
     assert.equal(posted.status, "POSTED");
-    assert.ok(Array.isArray(posted.allocations) && posted.allocations.length > 0);
+    assert.ok(
+      Array.isArray(posted.allocations) && posted.allocations.length > 0,
+    );
     flow.readbacks.push({
       stage: "posted",
       status: posted.status,
@@ -921,7 +723,9 @@ async function runFinancePaymentFlow(browser, options, report) {
       .click();
     const reverseModal = await visibleModal(session.page, "冲销收付款");
     await reverseModal.getByLabel("冲销原因").fill("真实浏览器异常流验收冲销");
-    await reverseModal.getByRole("button", { name: "确认冲销", exact: true }).click();
+    await reverseModal
+      .getByRole("button", { name: "确认冲销", exact: true })
+      .click();
     await waitMessage(session.page, "收付款已冲销，原核销金额已恢复");
     flow.browserActions.push("finance_reverse_click");
 
@@ -1052,17 +856,18 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
       "inventory",
       "create_inventory_operation",
     );
-    await modal.getByRole("button", { name: "生成调整作业", exact: true }).click();
-    operation = resultDataFromResponse(await createResponse).inventory_operation;
+    await modal
+      .getByRole("button", { name: "生成调整作业", exact: true })
+      .click();
+    operation = resultDataFromResponse(
+      await createResponse,
+    ).inventory_operation;
     assert.ok(operation?.id);
     await waitMessage(session.page, "人工库存调整已提交审批");
     const submitted = (
-      await browserRpc(
-        session.page,
-        "inventory",
-        "get_inventory_operation",
-        { id: operation.id },
-      )
+      await browserRpc(session.page, "inventory", "get_inventory_operation", {
+        id: operation.id,
+      })
     ).inventory_operation;
     assert.equal(submitted.status, "SUBMITTED");
     flow.source = {
@@ -1093,10 +898,7 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
       confirmLabel: "确认完成",
       successMessage: "任务已处理完成",
     });
-    flow.taskActions = [
-      approvalTaskAction,
-      executionTaskAction,
-    ];
+    flow.taskActions = [approvalTaskAction, executionTaskAction];
 
     const execution = await login(browser, {
       ...options,
@@ -1149,15 +951,13 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
         "customer_config",
         "execute_inventory_adjustment_post",
       );
-      await execution.page
-        .getByRole("button", { name: /^过\s*账$/u })
-        .click();
-      await confirmPopover(execution.page, "确认过账这张库存作业？", "确认过账");
-      await waitRecoveryMessage(
+      await execution.page.getByRole("button", { name: /^过\s*账$/u }).click();
+      await confirmPopover(
         execution.page,
-        "已重新读取库存作业结果",
-        lost,
+        "确认过账这张库存作业？",
+        "确认过账",
       );
+      await waitRecoveryMessage(execution.page, "已重新读取库存作业结果", lost);
       await lost.remove();
       assert.equal(lost.state.injected, true);
       assert.equal(lost.state.backendResultCode, 0);
@@ -1246,7 +1046,9 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
           offset: 0,
         },
       );
-      assert.ok(reversedTxns.inventory_txns.length > postedTxns.inventory_txns.length);
+      assert.ok(
+        reversedTxns.inventory_txns.length > postedTxns.inventory_txns.length,
+      );
       flow.readbacks.push({
         stage: "cancelled",
         status: cancelled.status,
@@ -1336,8 +1138,7 @@ async function runProductionExceptionFlow(browser, options, report) {
     const requirement = findRecord(
       requirements.material_requirements,
       (item) =>
-        Number(item.id) ===
-        Number(decision.production_material_requirement_id),
+        Number(item.id) === Number(decision.production_material_requirement_id),
       "approved over-issue material requirement",
     );
     assert.ok(Number(requirement.remaining_quantity) > 0);
@@ -1427,9 +1228,7 @@ async function runProductionExceptionFlow(browser, options, report) {
       .filter({ hasText: requirement.material_code_snapshot })
       .first();
     await requirementRow.waitFor({ state: "visible" });
-    await requirementRow
-      .getByRole("button", { name: /^领\s*料$/u })
-      .click();
+    await requirementRow.getByRole("button", { name: /^领\s*料$/u }).click();
     const issueModal = await visibleModal(session.page, "生产领料");
     const warehouseLabel = [sourceWarehouse.name, sourceWarehouse.code]
       .map((value) => String(value || "").trim())
@@ -1477,9 +1276,7 @@ async function runProductionExceptionFlow(browser, options, report) {
     await issueModal
       .getByLabel("本次领料数量")
       .fill(String(requirement.remaining_quantity));
-    await issueModal
-      .locator("textarea")
-      .fill("真实浏览器消费已批准超领额度");
+    await issueModal.locator("textarea").fill("真实浏览器消费已批准超领额度");
     const lost = await installLostMutationResponse(
       session.page,
       "operational_fact",
@@ -1618,7 +1415,9 @@ async function runProductionExceptionFlow(browser, options, report) {
       "operational_fact",
       "cancel_production_fact",
     );
-    await cancelModal.getByRole("button", { name: "确认取消", exact: true }).click();
+    await cancelModal
+      .getByRole("button", { name: "确认取消", exact: true })
+      .click();
     resultDataFromResponse(await cancelResponse);
     await cancelModal.waitFor({ state: "hidden" });
     flow.browserActions.push("production_fact_cancel_and_reverse_click");
@@ -1686,7 +1485,11 @@ async function runProductionExceptionFlow(browser, options, report) {
 
 async function writeReport(reportPath, report) {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
-  await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  await fs.writeFile(
+    reportPath,
+    `${JSON.stringify(report, null, 2)}\n`,
+    "utf8",
+  );
 }
 
 export async function runExceptionFlowRealWriteBrowser(options) {
@@ -1739,7 +1542,7 @@ export async function runExceptionFlowRealWriteBrowser(options) {
       passed: false,
       passedFlowCount: 0,
       failedFlowCount: 0,
-      flowCount: 4,
+      flowCount: 3,
     },
   };
   let browser;
@@ -1747,7 +1550,6 @@ export async function runExceptionFlowRealWriteBrowser(options) {
     report.runtimeIdentity = await verifyRuntimeIdentity(options);
     browser = await chromium.launch({ headless: !options.headed });
     const runners = [
-      runReworkIntakeFlow,
       runFinancePaymentFlow,
       runInventoryAdjustmentFlow,
       runProductionExceptionFlow,

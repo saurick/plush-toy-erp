@@ -22,7 +22,6 @@ const mockMenuPermissionRequirements = Object.freeze({
   'business-dashboard': ['erp.business_dashboard.read'],
   customers: ['customer.read'],
   'sales-orders': ['sales_order.read'],
-  'rework-intakes': ['rework_intake.read'],
   'material-bom': ['bom.read'],
   'production-orders': ['production.wip.read'],
   inventory: ['warehouse.inventory.read'],
@@ -49,7 +48,6 @@ const mockPermissionModuleNames = Object.freeze({
   sales_order: '销售订单',
   workflow: '任务协同',
   warehouse: '仓储',
-  rework_intake: '返工回厂',
   finance: '财务',
   production: '生产执行',
   mobile: '手机待办',
@@ -262,11 +260,6 @@ export async function installAdminRpcMocks(
       permission_key: 'sales_order.read',
       name: '查看销售订单',
       module: 'sales_order',
-    },
-    {
-      permission_key: 'rework_intake.read',
-      name: '查看返工回厂单',
-      module: 'rework_intake',
     },
     {
       permission_key: 'bom.read',

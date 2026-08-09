@@ -59,8 +59,6 @@ import (
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
-	"server/internal/data/model/ent/reworkintake"
-	"server/internal/data/model/ent/reworkintakeitem"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
@@ -197,8 +195,6 @@ func checkColumn(t, c string) error {
 			purchasereturn.Table:                     purchasereturn.ValidColumn,
 			purchasereturnitem.Table:                 purchasereturnitem.ValidColumn,
 			qualityinspection.Table:                  qualityinspection.ValidColumn,
-			reworkintake.Table:                       reworkintake.ValidColumn,
-			reworkintakeitem.Table:                   reworkintakeitem.ValidColumn,
 			role.Table:                               role.ValidColumn,
 			roledatascope.Table:                      roledatascope.ValidColumn,
 			rolepermission.Table:                     rolepermission.ValidColumn,

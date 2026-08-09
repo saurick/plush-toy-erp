@@ -57,7 +57,6 @@ const EXPECTED_FLOW_KEYS = [
   'fact.inventory_lot',
   'fact.production_wip_batch',
   'fact.production_packaging_confirmation',
-  'fact.rework_intake',
   'source.production_exception_decision',
   'source.production_exception_execution',
   'fact.purchase_rejection_disposition',
@@ -477,12 +476,12 @@ test('devFlowStateCatalog: route 与只读边界使用唯一真源', () => {
   )
 })
 
-test('devFlowStateCatalog: 覆盖清单固定为 34 个当前对象', () => {
+test('devFlowStateCatalog: 覆盖清单固定为 33 个当前对象', () => {
   assert.deepEqual(
     DEV_FLOW_STATE_CATALOG.flows.map((flow) => flow.key),
     EXPECTED_FLOW_KEYS
   )
-  assert.equal(new Set(EXPECTED_FLOW_KEYS).size, 34)
+  assert.equal(new Set(EXPECTED_FLOW_KEYS).size, 33)
 
   for (const flow of DEV_FLOW_STATE_CATALOG.flows) {
     assert.equal(flow.runtimeAuthority, 'backend_domain_contract')
@@ -518,7 +517,7 @@ test('devFlowStateCatalog: 覆盖清单固定为 34 个当前对象', () => {
   }
 })
 
-test('devFlowStateCatalog: 34 个状态集合与后端 canonical contract 全等', () => {
+test('devFlowStateCatalog: 33 个状态集合与后端 canonical contract 全等', () => {
   for (const flow of DEV_FLOW_STATE_CATALOG.flows) {
     assert.deepEqual(
       flow.states.map((item) => item.key),
@@ -550,12 +549,6 @@ test('devFlowStateCatalog: 持久化状态所有者与观察台显式映射全�
 })
 
 test('devFlowStateCatalog: 高风险对象登记完整决策、过账、取消与冲正边', () => {
-  assert.deepEqual(
-    getDevFlowStateMachine('fact.rework_intake').transitions.map(
-      (item) => item.key
-    ),
-    ['DRAFT->RECEIVED', 'DRAFT->CANCELLED', 'RECEIVED->REVERSED']
-  )
   assert.deepEqual(
     getDevFlowStateMachine('fact.finance_payment').transitions.map(
       (item) => item.key
@@ -663,7 +656,7 @@ test('canonical status contract reader: 未知 kind 与缺失 constraint fail cl
     () =>
       readCanonicalStatusContract(repoRoot, {
         kind: 'unknown',
-        path: 'server/internal/data/model/schema/rework_intake.go',
+        path: 'server/internal/data/model/schema/shipment.go',
       }),
     /unsupported canonical status contract kind/u
   )
@@ -671,7 +664,7 @@ test('canonical status contract reader: 未知 kind 与缺失 constraint fail cl
     () =>
       readCanonicalStatusContract(repoRoot, {
         kind: 'ent_check',
-        path: 'server/internal/data/model/schema/rework_intake.go',
+        path: 'server/internal/data/model/schema/shipment.go',
         constraint: 'missing_constraint',
         field: 'status',
       }),
@@ -837,7 +830,7 @@ test('devFlowStateCatalog: Fact / Ledger 定义与状态对象一一对应且不
     DEV_FLOW_STATE_CATALOG.factDefinitions.length,
     factMachines.length
   )
-  assert.equal(DEV_FLOW_STATE_CATALOG.factDefinitions.length, 20)
+  assert.equal(DEV_FLOW_STATE_CATALOG.factDefinitions.length, 19)
   assert.deepEqual(
     new Set(DEV_FLOW_STATE_CATALOG.factDefinitions.map((item) => item.factKey)),
     new Set(factMachines.map((item) => item.key))
@@ -984,7 +977,7 @@ test('devFlowStateCatalog: 搜索和筛选返回新对象且不改原目录', ()
     )?.scopeKey,
     'source_document'
   )
-  assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 34)
+  assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 33)
 })
 
 test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源单据且三类路径明确', () => {

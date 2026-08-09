@@ -64,11 +64,6 @@ const formalBusinessListCases = [
     completeList: /activeConfig\.listAll\(/u,
   },
   {
-    title: '返工回厂与补发',
-    path: '../pages/ReworkIntakesPage.jsx',
-    completeList: /listAllReworkIntakes\(/u,
-  },
-  {
     title: '生产订单',
     path: '../pages/V1ProductionOrdersPage.jsx',
     completeList:
@@ -113,10 +108,7 @@ test('config-driven lists expose strict complete-pagination readers', () => {
     'listAllProducts',
     'listAllProductSKUs',
   ]) {
-    assert.match(
-      masterDataConfig,
-      new RegExp(`listAll: ${listAllName}`, 'u')
-    )
+    assert.match(masterDataConfig, new RegExp(`listAll: ${listAllName}`, 'u'))
   }
   for (const listAllName of [
     'listAllProductionFacts',
@@ -141,9 +133,6 @@ test('finance keeps complete filtered export and production exceptions stay non-
 
   assert.match(finance, /listAllFinancePayments\(/u)
   assert.match(finance, /listAllFinanceCreditNotes\(/u)
-  assert.match(
-    workflowModule,
-    /showExport=\{!isProductionExceptionPage\}/u
-  )
+  assert.match(workflowModule, /showExport=\{!isProductionExceptionPage\}/u)
   assert.match(productionException, /showExport=\{false\}/u)
 })

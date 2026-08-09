@@ -51,10 +51,9 @@ const (
 	ProcessDomainCommandProductionExceptionReject  = "production_exception.reject_after_workflow"
 	ProcessDomainCommandProductionExceptionExecute = "production_exception.execute"
 
-	ShipmentFinanceReleaseStatusPending     = "PENDING"
-	ShipmentFinanceReleaseStatusApproved    = "APPROVED"
-	ShipmentFinanceReleaseStatusRejected    = "REJECTED"
-	ShipmentFinanceReleaseStatusNotRequired = "NOT_REQUIRED"
+	ShipmentFinanceReleaseStatusPending  = "PENDING"
+	ShipmentFinanceReleaseStatusApproved = "APPROVED"
+	ShipmentFinanceReleaseStatusRejected = "REJECTED"
 
 	ProcessStatusActive    = "active"
 	ProcessStatusCompleted = "completed"

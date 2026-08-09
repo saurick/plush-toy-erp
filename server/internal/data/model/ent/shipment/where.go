@@ -61,19 +61,9 @@ func ShipmentNo(v string) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldShipmentNo, v))
 }
 
-// Purpose applies equality check predicate on the "purpose" field. It's identical to PurposeEQ.
-func Purpose(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEQ(FieldPurpose, v))
-}
-
 // SalesOrderID applies equality check predicate on the "sales_order_id" field. It's identical to SalesOrderIDEQ.
 func SalesOrderID(v int) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldSalesOrderID, v))
-}
-
-// ReworkIntakeID applies equality check predicate on the "rework_intake_id" field. It's identical to ReworkIntakeIDEQ.
-func ReworkIntakeID(v int) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEQ(FieldReworkIntakeID, v))
 }
 
 // CustomerID applies equality check predicate on the "customer_id" field. It's identical to CustomerIDEQ.
@@ -236,71 +226,6 @@ func ShipmentNoContainsFold(v string) predicate.Shipment {
 	return predicate.Shipment(sql.FieldContainsFold(FieldShipmentNo, v))
 }
 
-// PurposeEQ applies the EQ predicate on the "purpose" field.
-func PurposeEQ(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEQ(FieldPurpose, v))
-}
-
-// PurposeNEQ applies the NEQ predicate on the "purpose" field.
-func PurposeNEQ(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldNEQ(FieldPurpose, v))
-}
-
-// PurposeIn applies the In predicate on the "purpose" field.
-func PurposeIn(vs ...string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldIn(FieldPurpose, vs...))
-}
-
-// PurposeNotIn applies the NotIn predicate on the "purpose" field.
-func PurposeNotIn(vs ...string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldNotIn(FieldPurpose, vs...))
-}
-
-// PurposeGT applies the GT predicate on the "purpose" field.
-func PurposeGT(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldGT(FieldPurpose, v))
-}
-
-// PurposeGTE applies the GTE predicate on the "purpose" field.
-func PurposeGTE(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldGTE(FieldPurpose, v))
-}
-
-// PurposeLT applies the LT predicate on the "purpose" field.
-func PurposeLT(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldLT(FieldPurpose, v))
-}
-
-// PurposeLTE applies the LTE predicate on the "purpose" field.
-func PurposeLTE(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldLTE(FieldPurpose, v))
-}
-
-// PurposeContains applies the Contains predicate on the "purpose" field.
-func PurposeContains(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldContains(FieldPurpose, v))
-}
-
-// PurposeHasPrefix applies the HasPrefix predicate on the "purpose" field.
-func PurposeHasPrefix(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldHasPrefix(FieldPurpose, v))
-}
-
-// PurposeHasSuffix applies the HasSuffix predicate on the "purpose" field.
-func PurposeHasSuffix(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldHasSuffix(FieldPurpose, v))
-}
-
-// PurposeEqualFold applies the EqualFold predicate on the "purpose" field.
-func PurposeEqualFold(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEqualFold(FieldPurpose, v))
-}
-
-// PurposeContainsFold applies the ContainsFold predicate on the "purpose" field.
-func PurposeContainsFold(v string) predicate.Shipment {
-	return predicate.Shipment(sql.FieldContainsFold(FieldPurpose, v))
-}
-
 // SalesOrderIDEQ applies the EQ predicate on the "sales_order_id" field.
 func SalesOrderIDEQ(v int) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldSalesOrderID, v))
@@ -329,36 +254,6 @@ func SalesOrderIDIsNil() predicate.Shipment {
 // SalesOrderIDNotNil applies the NotNil predicate on the "sales_order_id" field.
 func SalesOrderIDNotNil() predicate.Shipment {
 	return predicate.Shipment(sql.FieldNotNull(FieldSalesOrderID))
-}
-
-// ReworkIntakeIDEQ applies the EQ predicate on the "rework_intake_id" field.
-func ReworkIntakeIDEQ(v int) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEQ(FieldReworkIntakeID, v))
-}
-
-// ReworkIntakeIDNEQ applies the NEQ predicate on the "rework_intake_id" field.
-func ReworkIntakeIDNEQ(v int) predicate.Shipment {
-	return predicate.Shipment(sql.FieldNEQ(FieldReworkIntakeID, v))
-}
-
-// ReworkIntakeIDIn applies the In predicate on the "rework_intake_id" field.
-func ReworkIntakeIDIn(vs ...int) predicate.Shipment {
-	return predicate.Shipment(sql.FieldIn(FieldReworkIntakeID, vs...))
-}
-
-// ReworkIntakeIDNotIn applies the NotIn predicate on the "rework_intake_id" field.
-func ReworkIntakeIDNotIn(vs ...int) predicate.Shipment {
-	return predicate.Shipment(sql.FieldNotIn(FieldReworkIntakeID, vs...))
-}
-
-// ReworkIntakeIDIsNil applies the IsNil predicate on the "rework_intake_id" field.
-func ReworkIntakeIDIsNil() predicate.Shipment {
-	return predicate.Shipment(sql.FieldIsNull(FieldReworkIntakeID))
-}
-
-// ReworkIntakeIDNotNil applies the NotNil predicate on the "rework_intake_id" field.
-func ReworkIntakeIDNotNil() predicate.Shipment {
-	return predicate.Shipment(sql.FieldNotNull(FieldReworkIntakeID))
 }
 
 // CustomerIDEQ applies the EQ predicate on the "customer_id" field.
@@ -1386,29 +1281,6 @@ func HasSalesOrder() predicate.Shipment {
 func HasSalesOrderWith(preds ...predicate.SalesOrder) predicate.Shipment {
 	return predicate.Shipment(func(s *sql.Selector) {
 		step := newSalesOrderStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
-// HasReworkIntake applies the HasEdge predicate on the "rework_intake" edge.
-func HasReworkIntake() predicate.Shipment {
-	return predicate.Shipment(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, ReworkIntakeTable, ReworkIntakeColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasReworkIntakeWith applies the HasEdge predicate on the "rework_intake" edge with a given conditions (other predicates).
-func HasReworkIntakeWith(preds ...predicate.ReworkIntake) predicate.Shipment {
-	return predicate.Shipment(func(s *sql.Selector) {
-		step := newReworkIntakeStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

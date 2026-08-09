@@ -76,7 +76,7 @@ func (h *shipmentFinanceRejectProcessCommandHandler) ValidateProcessDomainComman
 	if err != nil {
 		return err
 	}
-	if shipment == nil || shipment.ID != shipmentID || shipment.Purpose != ShipmentPurposeSalesDelivery || shipment.Status != ShipmentStatusDraft ||
+	if shipment == nil || shipment.ID != shipmentID || shipment.Status != ShipmentStatusDraft ||
 		(shipment.FinanceReleaseStatus != ShipmentFinanceReleaseStatusPending && shipment.FinanceReleaseStatus != ShipmentFinanceReleaseStatusRejected) {
 		return ErrBadParam
 	}
@@ -125,7 +125,7 @@ func (h *shipmentFinanceReleaseProcessCommandHandler) ValidateProcessDomainComma
 	if err != nil {
 		return err
 	}
-	if shipment == nil || shipment.ID != shipmentID || shipment.Purpose != ShipmentPurposeSalesDelivery || shipment.Status != ShipmentStatusDraft ||
+	if shipment == nil || shipment.ID != shipmentID || shipment.Status != ShipmentStatusDraft ||
 		(shipment.FinanceReleaseStatus != ShipmentFinanceReleaseStatusPending && shipment.FinanceReleaseStatus != ShipmentFinanceReleaseStatusApproved) {
 		return ErrBadParam
 	}
@@ -172,7 +172,7 @@ func (h *shipmentShipProcessCommandHandler) ValidateProcessDomainCommand(ctx con
 	if err != nil {
 		return err
 	}
-	if shipment == nil || shipment.ID != shipmentID || shipment.Purpose != ShipmentPurposeSalesDelivery || (shipment.Status != ShipmentStatusDraft && shipment.Status != ShipmentStatusShipped) {
+	if shipment == nil || shipment.ID != shipmentID || (shipment.Status != ShipmentStatusDraft && shipment.Status != ShipmentStatusShipped) {
 		return ErrBadParam
 	}
 	if shipment.Status == ShipmentStatusDraft {

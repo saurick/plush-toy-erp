@@ -29,12 +29,10 @@ const (
 	OutsourcingFactMaterialIssue = "MATERIAL_ISSUE"
 	OutsourcingFactReturnReceipt = "RETURN_RECEIPT"
 
-	ShipmentSourceType              = "SHIPMENT"
-	ShipmentPurposeSalesDelivery    = "SALES_DELIVERY"
-	ShipmentPurposeReworkReshipment = "REWORK_RESHIPMENT"
-	ShipmentStatusDraft             = corestatus.ShipmentDraft
-	ShipmentStatusShipped           = corestatus.ShipmentShipped
-	ShipmentStatusCancelled         = corestatus.ShipmentCancelled
+	ShipmentSourceType      = "SHIPMENT"
+	ShipmentStatusDraft     = corestatus.ShipmentDraft
+	ShipmentStatusShipped   = corestatus.ShipmentShipped
+	ShipmentStatusCancelled = corestatus.ShipmentCancelled
 
 	StockReservationStatusActive    = "ACTIVE"
 	StockReservationStatusReleased  = "RELEASED"
@@ -84,15 +82,6 @@ var (
 	ErrShipmentQuantityExceeded             = errors.New("shipment quantity exceeds sales order")
 	ErrShipmentReservationSplit             = errors.New("shipment requires partial reservation consumption")
 	ErrShipmentFinanceDependency            = errors.New("shipment has active finance facts")
-	ErrShipmentReworkIntakeDependency       = errors.New("shipment has an active rework intake")
-	ErrReworkIntakeNotFound                 = errors.New("rework intake not found")
-	ErrReworkIntakeSourceInvalid            = errors.New("rework intake source invalid")
-	ErrReworkIntakeSourceState              = errors.New("rework intake source state does not allow this action")
-	ErrReworkIntakeQuantityExceeded         = errors.New("rework intake quantity exceeds the shipped source quantity")
-	ErrReworkIntakeProductionDependency     = errors.New("rework intake has active production rework")
-	ErrReworkReshipmentSourceInvalid        = errors.New("rework reshipment source invalid")
-	ErrReworkReshipmentQuantityExceeded     = errors.New("rework reshipment quantity exceeds the completed rework quantity")
-	ErrReworkCompletionReshipmentDependency = errors.New("rework completion has an active reshipment")
 	ErrShipmentQualityPending               = errors.New("shipment has pending finished goods quality inspection")
 	ErrShipmentQualityRejected              = errors.New("shipment has rejected finished goods quality inspection")
 	ErrShipmentReleaseRequired              = errors.New("shipment release task is required")
@@ -192,9 +181,7 @@ type OutsourcingFact struct {
 type Shipment struct {
 	ID                              int
 	ShipmentNo                      string
-	Purpose                         string
 	SalesOrderID                    *int
-	ReworkIntakeID                  *int
 	CustomerID                      *int
 	CustomerSnapshot                *string
 	Status                          string
@@ -220,7 +207,6 @@ type ShipmentItem struct {
 	ID                     int
 	ShipmentID             int
 	SalesOrderItemID       *int
-	ReworkCompletionFactID *int
 	ProductID              int
 	ProductSkuID           *int
 	WarehouseID            int
@@ -429,9 +415,7 @@ type ProductionReworkFromCompletionCreate struct {
 
 type ShipmentCreate struct {
 	ShipmentNo       string
-	Purpose          string
 	SalesOrderID     *int
-	ReworkIntakeID   *int
 	CustomerID       *int
 	CustomerSnapshot *string
 	IdempotencyKey   string
@@ -441,15 +425,14 @@ type ShipmentCreate struct {
 }
 
 type ShipmentItemCreate struct {
-	SalesOrderItemID       *int
-	ReworkCompletionFactID *int
-	ProductID              int
-	ProductSkuID           *int
-	WarehouseID            int
-	UnitID                 int
-	LotID                  *int
-	Quantity               decimal.Decimal
-	Note                   *string
+	SalesOrderItemID *int
+	ProductID        int
+	ProductSkuID     *int
+	WarehouseID      int
+	UnitID           int
+	LotID            *int
+	Quantity         decimal.Decimal
+	Note             *string
 }
 
 type ShipmentCreateWithItems struct {
@@ -800,10 +783,6 @@ func (uc *OperationalFactUsecase) SaveProductionReworkFromCompletionDraft(ctx co
 	return uc.saveProductionFactDraft(ctx, in, ProductionFactRework, ProductionFactSourceType)
 }
 
-func (uc *OperationalFactUsecase) SaveProductionReworkFromIntakeDraft(ctx context.Context, in *ProductionFactDraftSave) (*ProductionFact, error) {
-	return uc.saveProductionFactDraft(ctx, in, ProductionFactRework, ReworkIntakeSourceType)
-}
-
 func (uc *OperationalFactUsecase) saveProductionFactDraft(ctx context.Context, in *ProductionFactDraftSave, factType, sourceType string) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
@@ -1064,7 +1043,6 @@ func (uc *OperationalFactUsecase) SaveShipmentDraftWithItems(ctx context.Context
 	}
 	header := &ShipmentCreate{
 		ShipmentNo:       normalized.ShipmentNo,
-		Purpose:          ShipmentPurposeSalesDelivery,
 		SalesOrderID:     normalized.SalesOrderID,
 		CustomerID:       normalized.CustomerID,
 		CustomerSnapshot: normalized.CustomerSnapshot,
@@ -1638,7 +1616,7 @@ func normalizeProductionFactDraftSave(in *ProductionFactDraftSave, factType, sou
 			return nil, ErrBadParam
 		}
 	case ProductionFactRework:
-		if (out.SourceType != ProductionFactSourceType && out.SourceType != ReworkIntakeSourceType) || out.WarehouseID != 0 || out.LotID != nil || out.NewLotNo != nil || out.FactNo == "" || len([]rune(out.FactNo)) > 64 || out.Note == nil || len([]rune(*out.Note)) > 255 {
+		if out.SourceType != ProductionFactSourceType || out.WarehouseID != 0 || out.LotID != nil || out.NewLotNo != nil || out.FactNo == "" || len([]rune(out.FactNo)) > 64 || out.Note == nil || len([]rune(*out.Note)) > 255 {
 			return nil, ErrBadParam
 		}
 	default:
@@ -1695,10 +1673,6 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	}
 	out := *in
 	out.ShipmentNo = strings.TrimSpace(out.ShipmentNo)
-	out.Purpose = strings.ToUpper(strings.TrimSpace(out.Purpose))
-	if out.Purpose == "" {
-		out.Purpose = ShipmentPurposeSalesDelivery
-	}
 	out.CustomerSnapshot = normalizeOptionalString(out.CustomerSnapshot)
 	out.Note = normalizeOptionalString(out.Note)
 	if !validNetWeightG(out.TotalNetWeightG) {
@@ -1712,9 +1686,6 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	if out.SalesOrderID != nil && *out.SalesOrderID <= 0 {
 		out.SalesOrderID = nil
 	}
-	if out.ReworkIntakeID != nil && *out.ReworkIntakeID <= 0 {
-		out.ReworkIntakeID = nil
-	}
 	if out.CustomerID != nil && *out.CustomerID <= 0 {
 		out.CustomerID = nil
 	}
@@ -1722,7 +1693,7 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 		plannedShipAt := out.PlannedShipAt.UTC().Truncate(time.Microsecond)
 		out.PlannedShipAt = &plannedShipAt
 	}
-	if out.ShipmentNo == "" || out.Purpose != ShipmentPurposeSalesDelivery || out.ReworkIntakeID != nil {
+	if out.ShipmentNo == "" {
 		return nil, ErrBadParam
 	}
 	return &out, nil
@@ -1736,9 +1707,6 @@ func normalizeShipmentItemCreate(in *ShipmentItemCreate) (*ShipmentItemCreate, e
 	out.Note = normalizeOptionalString(out.Note)
 	if out.SalesOrderItemID != nil && *out.SalesOrderItemID <= 0 {
 		out.SalesOrderItemID = nil
-	}
-	if out.ReworkCompletionFactID != nil {
-		return nil, ErrBadParam
 	}
 	if out.ProductSkuID != nil && *out.ProductSkuID <= 0 {
 		out.ProductSkuID = nil
@@ -1990,7 +1958,7 @@ func (uc *OperationalFactUsecase) validateFinanceFactSource(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		if shipment.Purpose != ShipmentPurposeSalesDelivery || shipment.Status != ShipmentStatusShipped {
+		if shipment.Status != ShipmentStatusShipped {
 			return ErrBadParam
 		}
 		if shipment.CustomerID == nil || *shipment.CustomerID <= 0 ||

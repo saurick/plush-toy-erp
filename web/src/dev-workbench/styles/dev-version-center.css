@@ -107,6 +107,96 @@
   justify-self: end;
 }
 
+.erp-dev-version-takeover-modal .ant-modal-body {
+  max-height: min(72vh, 720px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.erp-dev-version-takeover-guide {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.erp-dev-version-takeover-guide h5.ant-typography {
+  margin: 0 0 10px;
+}
+
+.erp-dev-version-takeover-scope,
+.erp-dev-version-takeover-conditions {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-dev-version-takeover-scope {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.erp-dev-version-takeover-conditions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.erp-dev-version-takeover-scope > article,
+.erp-dev-version-takeover-conditions > article {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-radius: 10px;
+  background: var(--ant-color-fill-quaternary, #fafafa);
+}
+
+.erp-dev-version-takeover-scope .ant-typography,
+.erp-dev-version-takeover-conditions li,
+.erp-dev-version-takeover-steps .ant-typography {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-version-takeover-conditions .ant-tag {
+  width: fit-content;
+  margin: 0;
+}
+
+.erp-dev-version-takeover-conditions ul {
+  display: grid;
+  gap: 6px;
+  padding-inline-start: 20px;
+  margin: 2px 0 0;
+}
+
+.erp-dev-version-takeover-steps {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.erp-dev-version-takeover-steps > li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.erp-dev-version-takeover-steps > li > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ant-color-primary, #1677ff);
+  font-weight: 600;
+  background: var(--ant-color-primary-bg, #e6f4ff);
+}
+
+.erp-dev-version-takeover-steps p.ant-typography {
+  margin: 0;
+}
+
 .erp-dev-pipeline-status-strip .ant-card-body {
   padding: 12px 16px;
 }
@@ -234,6 +324,13 @@
   padding: 10px;
   border-radius: 8px;
   background: var(--ant-color-fill-quaternary, #fafafa);
+}
+
+.erp-dev-version-takeover-steps > li > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 4px;
 }
 
 .erp-dev-pipeline-timing__decision {
@@ -385,7 +482,9 @@
 :root[data-erp-theme='dark'] .erp-dev-pipeline-status-strip__metrics > div,
 :root[data-erp-theme='dark'] .erp-dev-pipeline-timing__summary > div,
 :root[data-erp-theme='dark'] .erp-dev-version-current-operation__item,
-:root[data-erp-theme='dark'] .erp-dev-operation-metrics > div {
+:root[data-erp-theme='dark'] .erp-dev-operation-metrics > div,
+:root[data-erp-theme='dark'] .erp-dev-version-takeover-scope > article,
+:root[data-erp-theme='dark'] .erp-dev-version-takeover-conditions > article {
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
 }
@@ -478,6 +577,15 @@
 
   .erp-dev-version-table-card .ant-card-extra {
     white-space: normal;
+  }
+
+  .erp-dev-version-takeover-scope,
+  .erp-dev-version-takeover-conditions {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-version-takeover-modal .ant-modal-body {
+    max-height: calc(100vh - 164px);
   }
 
   .erp-dev-pipeline-timing__jobs-toolbar {

@@ -190,12 +190,6 @@ export const MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES = Object.freeze(
       listKey: "shipments",
     },
     {
-      key: "reworkIntakes",
-      domain: "operational_fact",
-      method: "list_rework_intakes",
-      listKey: "rework_intakes",
-    },
-    {
       key: "financeFacts",
       domain: "operational_fact",
       method: "list_finance_facts",
@@ -1295,8 +1289,7 @@ export async function runDefaultManualAcceptanceTaskComponent(
     databaseName: targetAdapter.databaseName,
     nowSec: Math.floor(Date.parse(businessInput.taskScheduleAnchorUtc) / 1000),
   });
-  const applyTaskData =
-    deps.applyTaskData || applyManualAcceptanceTaskData;
+  const applyTaskData = deps.applyTaskData || applyManualAcceptanceTaskData;
   const report = await applyTaskData(plan, {
     password: requiredCredential(
       targetAdapter.credentials.rolePassword,

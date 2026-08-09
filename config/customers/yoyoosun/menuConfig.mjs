@@ -21,7 +21,7 @@ export const yoyoosunMenuConfig = Object.freeze({
       },
       {
         title: "销售管理",
-        items: ["sales-orders", "rework-intakes"],
+        items: ["sales-orders"],
       },
       {
         title: "产品工程",

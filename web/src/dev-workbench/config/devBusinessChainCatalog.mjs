@@ -1266,97 +1266,6 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     ]
   ),
   chain(
-    'rework_return_and_reshipment',
-    '返工回厂、生产返工与补发',
-    'rework',
-    '原出货建立返工回厂单，接收形成待处理批次；生产返工消费该批次，完成后只能生成非结算补发单。',
-    [
-      chainNode('original_shipment', '原出货事实', 'fact_ledger', {
-        machineKeys: ['fact.shipment'],
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
-      }),
-      chainNode('rework_intake', '返工回厂单', 'fact_ledger', {
-        machineKeys: ['fact.rework_intake'],
-        sourceRefs: ['server/internal/biz/rework_intake.go'],
-      }),
-      chainNode('rework_hold_lot', '返工待处理批次', 'fact_ledger', {
-        machineKeys: ['fact.inventory_lot'],
-        sourceRefs: [
-          'server/internal/biz/rework_intake.go',
-          'server/internal/biz/inventory.go',
-        ],
-      }),
-      chainNode('production_rework', '生产返工事实', 'fact_ledger', {
-        machineKeys: ['fact.production'],
-        sourceRefs: [
-          'server/internal/biz/rework_intake.go',
-          'server/internal/biz/operational_fact.go',
-        ],
-      }),
-      chainNode('rework_reshipment', '非结算补发单', 'fact_ledger', {
-        machineKeys: ['fact.shipment'],
-        sourceRefs: ['server/internal/biz/rework_intake.go'],
-      }),
-    ],
-    [
-      chainEdge(
-        'original_shipment',
-        'rework_intake',
-        '按原出货创建回厂单',
-        'creates_source',
-        {
-          action: 'OperationalFactUsecase.CreateReworkIntake',
-          factBoundary: 'rework_intake_source',
-          sourceRefs: ['server/internal/biz/rework_intake.go'],
-        }
-      ),
-      chainEdge(
-        'rework_intake',
-        'rework_hold_lot',
-        '接收并形成待处理批次',
-        'returns',
-        {
-          action: 'OperationalFactUsecase.ReceiveReworkIntake',
-          factBoundary: 'rework_intake_and_inventory_hold',
-          sourceRefs: ['server/internal/biz/rework_intake.go'],
-        }
-      ),
-      chainEdge(
-        'rework_intake',
-        'original_shipment',
-        '未进入返工时冲正接收',
-        'reverses',
-        {
-          action: 'OperationalFactUsecase.ReverseReworkIntake',
-          factBoundary: 'reverse_rework_intake_inventory',
-          sourceRefs: ['server/internal/biz/rework_intake.go'],
-        }
-      ),
-      chainEdge(
-        'rework_hold_lot',
-        'production_rework',
-        '消费回厂批次进入返工',
-        'reworks',
-        {
-          action: 'OperationalFactUsecase.CreateProductionReworkFromIntake',
-          factBoundary: 'production_rework_fact',
-          sourceRefs: ['server/internal/biz/rework_intake.go'],
-        }
-      ),
-      chainEdge(
-        'production_rework',
-        'rework_reshipment',
-        '返工完成生成补发单',
-        'creates_source',
-        {
-          action: 'OperationalFactUsecase.CreateReworkReshipment',
-          factBoundary: 'non_settlement_shipment',
-          sourceRefs: ['server/internal/biz/rework_intake.go'],
-        }
-      ),
-    ]
-  ),
-  chain(
     'purchase_posting_corrections',
     '采购入库的退货、调整与冲正',
     'reversal',
@@ -1522,12 +1431,11 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
     {
       key: 'exception',
       label: '异常与返工',
-      summary: '不合格、生产异常和返工回厂分别回到受控领域路径。',
+      summary: '不合格与生产异常分别回到受控领域路径。',
       chainKeys: [
         'production_exception',
         'purchase_quality_disposition',
         'outsourcing_quality_disposition',
-        'rework_return_and_reshipment',
       ],
     },
     {
@@ -1611,24 +1519,6 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
       fromChainKey: 'production_exception',
       toChainKey: 'production_to_inventory',
       label: '执行结果返回生产',
-      kind: 'returns_to',
-    },
-    {
-      fromChainKey: 'delivery_to_settlement',
-      toChainKey: 'rework_return_and_reshipment',
-      label: '出货后返工回厂',
-      kind: 'reworks',
-    },
-    {
-      fromChainKey: 'rework_return_and_reshipment',
-      toChainKey: 'production_to_inventory',
-      label: '回厂批次进入返工',
-      kind: 'returns_to',
-    },
-    {
-      fromChainKey: 'rework_return_and_reshipment',
-      toChainKey: 'delivery_to_settlement',
-      label: '返工完成回到补发',
       kind: 'returns_to',
     },
     {

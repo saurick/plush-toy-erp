@@ -13,24 +13,45 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
     sections: Object.freeze([
       Object.freeze({
         title: "看板中心",
-        items: Object.freeze(["global-dashboard", "task-board", "business-dashboard"]),
+        items: Object.freeze([
+          "global-dashboard",
+          "task-board",
+          "business-dashboard",
+        ]),
       }),
       Object.freeze({
         title: "基础资料",
-        items: Object.freeze(["customers", "suppliers", "products", "materials"]),
+        items: Object.freeze([
+          "customers",
+          "suppliers",
+          "products",
+          "materials",
+        ]),
       }),
       Object.freeze({
         title: "销售管理",
-        items: Object.freeze(["sales-orders", "rework-intakes"]),
+        items: Object.freeze(["sales-orders"]),
       }),
       Object.freeze({
         title: "产品工程",
         items: Object.freeze(["material-bom", "processes"]),
       }),
-      Object.freeze({ title: "采购管理", items: Object.freeze(["accessories-purchase"]) }),
-      Object.freeze({ title: "质检管理", items: Object.freeze(["quality-inspections"]) }),
-      Object.freeze({ title: "库存管理", items: Object.freeze(["inbound", "inventory"]) }),
-      Object.freeze({ title: "委外管理", items: Object.freeze(["processing-contracts"]) }),
+      Object.freeze({
+        title: "采购管理",
+        items: Object.freeze(["accessories-purchase"]),
+      }),
+      Object.freeze({
+        title: "质检管理",
+        items: Object.freeze(["quality-inspections"]),
+      }),
+      Object.freeze({
+        title: "库存管理",
+        items: Object.freeze(["inbound", "inventory"]),
+      }),
+      Object.freeze({
+        title: "委外管理",
+        items: Object.freeze(["processing-contracts"]),
+      }),
       Object.freeze({
         title: "生产管理",
         items: Object.freeze([
@@ -54,11 +75,14 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
           "invoices",
         ]),
       }),
-      Object.freeze({ title: "运营工具", items: Object.freeze(["print-center"]) }),
+      Object.freeze({
+        title: "运营工具",
+        items: Object.freeze(["print-center"]),
+      }),
       Object.freeze({
         title: "系统管理",
         items: Object.freeze(["permission-center", "system-audit-logs"]),
       }),
     ]),
   }),
-})
+});

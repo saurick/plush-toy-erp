@@ -2,7 +2,7 @@ import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
 
 export const MANUAL_ACCEPTANCE_PAGE_DATA_CONTRACT =
   "manual-acceptance-page-data-ownership-v2";
-export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 52;
+export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 51;
 
 export const MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS = Object.freeze([
   "role",
@@ -50,7 +50,6 @@ export const MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE = Object.freeze({
   products: "product-skus",
   materials: "materials",
   "sales-orders": "sales-orders",
-  "rework-intakes": "rework-intakes",
   "material-bom": "bom-versions",
   processes: "processes",
   "accessories-purchase": "purchase-orders",
@@ -108,7 +107,6 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
   "production-exceptions": "facts",
   "stock-reservations": "facts",
   shipments: "facts",
-  "rework-intakes": "facts",
   "finance-reconciliation": "facts",
   "finance-payables": "facts",
   "finance-receivables": "facts",

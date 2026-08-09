@@ -849,15 +849,30 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /先发布制品，不会直接部署到 133/u)
   assert.match(source, /“准备部署”和“确认部署”/u)
   assert.match(source, /trigger=\{\['hover', 'click'\]\}/u)
+  assert.match(source, /人工接管说明/u)
+  assert.match(source, /人工接管与应急发布说明/u)
+  assert.match(source, /三处操作各管什么/u)
+  assert.match(source, /Codex \/ 本地终端/u)
+  assert.match(source, /先判断能不能继续/u)
+  assert.match(source, /本页不创建 commit、不 push/u)
+  assert.match(source, /在本页部署到 test-133/u)
+  assert.match(source, /应急不等于绕过/u)
+  assert.match(source, /禁止 force push、跳过质量门禁/u)
+  assert.match(source, /manualTakeoverTriggerRef/u)
+  assert.match(source, /afterClose=\{\(\) =>/u)
   assert.match(
     source,
-    /发布当前 SHA[\s\S]*?查看发布当前 SHA 说明[\s\S]*?<\/header>/u
+    /人工接管说明[\s\S]*?发布当前 SHA[\s\S]*?查看发布当前 SHA 说明[\s\S]*?<\/header>/u
   )
   assert.doesNotMatch(
     source,
     /(?:spawn|child_process|192[.]168|\/home\/simon)/iu
   )
   assert.doesNotMatch(source, /name=["'](?:host|path|command|target)["']/iu)
+  assert.doesNotMatch(
+    source,
+    /client[.]action\(['"](?:manual|emergency|takeover)/iu
+  )
 })
 
 test('version center keeps critical state visible and uses stable tab pagination contracts', () => {

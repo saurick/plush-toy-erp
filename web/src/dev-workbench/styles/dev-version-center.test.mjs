@@ -172,10 +172,36 @@ test('status, artifact and transfer metrics stay readable across breakpoints', (
   )
 })
 
+test('manual takeover guide stays bounded, readable and single-column on mobile', () => {
+  assert.match(versionPage, /人工接管与应急发布说明/u)
+  assert.match(versionPage, /<ManualTakeoverGuide \/>/u)
+  assert.match(versionPage, /width=\{760\}/u)
+  assert.match(
+    css,
+    /[.]erp-dev-version-takeover-modal [.]ant-modal-body \{[\s\S]*max-height: min\(72vh, 720px\);[\s\S]*overflow-y: auto;[\s\S]*overscroll-behavior: contain;/u
+  )
+  assert.match(
+    css,
+    /[.]erp-dev-version-takeover-scope \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /[.]erp-dev-version-takeover-conditions \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u
+  )
+  assert.match(
+    css,
+    /@media \(max-width: 620px\)[\s\S]*[.]erp-dev-version-takeover-scope,[\s\S]*[.]erp-dev-version-takeover-conditions \{[\s\S]*grid-template-columns: 1fr;/u
+  )
+  assert.match(
+    css,
+    /[.]erp-dev-version-takeover-scope [.]ant-typography,[\s\S]*overflow-wrap: anywhere;/u
+  )
+})
+
 test('dark theme keeps timing surfaces and progress tracks readable', () => {
   assert.match(
     css,
-    /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-status-strip__metrics > div,[\s\S]*[.]erp-dev-pipeline-timing__summary > div,[\s\S]*[.]erp-dev-operation-metrics > div \{[\s\S]*border-color: rgba\(255, 255, 255, 0[.]16\);[\s\S]*background: rgba\(255, 255, 255, 0[.]06\);/u
+    /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-status-strip__metrics > div,[\s\S]*[.]erp-dev-pipeline-timing__summary > div,[\s\S]*[.]erp-dev-operation-metrics > div,[\s\S]*[.]erp-dev-version-takeover-scope > article,[\s\S]*[.]erp-dev-version-takeover-conditions > article \{[\s\S]*border-color: rgba\(255, 255, 255, 0[.]16\);[\s\S]*background: rgba\(255, 255, 255, 0[.]06\);/u
   )
   assert.match(
     css,
@@ -184,5 +210,9 @@ test('dark theme keeps timing surfaces and progress tracks readable', () => {
   assert.match(
     css,
     /:root\[data-erp-theme='dark'\] [.]erp-dev-pipeline-timing__critical-path \{[\s\S]*background: rgba\(22, 119, 255, 0[.]2\);/u
+  )
+  assert.match(
+    css,
+    /:root\[data-erp-theme='dark'\] [.]erp-dev-version-takeover-scope > article,[\s\S]*[.]erp-dev-version-takeover-conditions > article \{[\s\S]*border-color: rgba\(255, 255, 255, 0[.]16\);[\s\S]*background: rgba\(255, 255, 255, 0[.]06\);/u
   )
 })

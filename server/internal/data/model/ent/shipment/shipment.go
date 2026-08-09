@@ -17,12 +17,8 @@ const (
 	FieldID = "id"
 	// FieldShipmentNo holds the string denoting the shipment_no field in the database.
 	FieldShipmentNo = "shipment_no"
-	// FieldPurpose holds the string denoting the purpose field in the database.
-	FieldPurpose = "purpose"
 	// FieldSalesOrderID holds the string denoting the sales_order_id field in the database.
 	FieldSalesOrderID = "sales_order_id"
-	// FieldReworkIntakeID holds the string denoting the rework_intake_id field in the database.
-	FieldReworkIntakeID = "rework_intake_id"
 	// FieldCustomerID holds the string denoting the customer_id field in the database.
 	FieldCustomerID = "customer_id"
 	// FieldCustomerSnapshot holds the string denoting the customer_snapshot field in the database.
@@ -63,8 +59,6 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeSalesOrder holds the string denoting the sales_order edge name in mutations.
 	EdgeSalesOrder = "sales_order"
-	// EdgeReworkIntake holds the string denoting the rework_intake edge name in mutations.
-	EdgeReworkIntake = "rework_intake"
 	// EdgeCustomer holds the string denoting the customer edge name in mutations.
 	EdgeCustomer = "customer"
 	// EdgeItems holds the string denoting the items edge name in mutations.
@@ -78,13 +72,6 @@ const (
 	SalesOrderInverseTable = "sales_orders"
 	// SalesOrderColumn is the table column denoting the sales_order relation/edge.
 	SalesOrderColumn = "sales_order_id"
-	// ReworkIntakeTable is the table that holds the rework_intake relation/edge.
-	ReworkIntakeTable = "shipments"
-	// ReworkIntakeInverseTable is the table name for the ReworkIntake entity.
-	// It exists in this package in order to avoid circular dependency with the "reworkintake" package.
-	ReworkIntakeInverseTable = "rework_intakes"
-	// ReworkIntakeColumn is the table column denoting the rework_intake relation/edge.
-	ReworkIntakeColumn = "rework_intake_id"
 	// CustomerTable is the table that holds the customer relation/edge.
 	CustomerTable = "shipments"
 	// CustomerInverseTable is the table name for the Customer entity.
@@ -105,9 +92,7 @@ const (
 var Columns = []string{
 	FieldID,
 	FieldShipmentNo,
-	FieldPurpose,
 	FieldSalesOrderID,
-	FieldReworkIntakeID,
 	FieldCustomerID,
 	FieldCustomerSnapshot,
 	FieldStatus,
@@ -148,14 +133,8 @@ var (
 	Hooks [1]ent.Hook
 	// ShipmentNoValidator is a validator for the "shipment_no" field. It is called by the builders before save.
 	ShipmentNoValidator func(string) error
-	// DefaultPurpose holds the default value on creation for the "purpose" field.
-	DefaultPurpose string
-	// PurposeValidator is a validator for the "purpose" field. It is called by the builders before save.
-	PurposeValidator func(string) error
 	// SalesOrderIDValidator is a validator for the "sales_order_id" field. It is called by the builders before save.
 	SalesOrderIDValidator func(int) error
-	// ReworkIntakeIDValidator is a validator for the "rework_intake_id" field. It is called by the builders before save.
-	ReworkIntakeIDValidator func(int) error
 	// CustomerIDValidator is a validator for the "customer_id" field. It is called by the builders before save.
 	CustomerIDValidator func(int) error
 	// CustomerSnapshotValidator is a validator for the "customer_snapshot" field. It is called by the builders before save.
@@ -209,19 +188,9 @@ func ByShipmentNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldShipmentNo, opts...).ToFunc()
 }
 
-// ByPurpose orders the results by the purpose field.
-func ByPurpose(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldPurpose, opts...).ToFunc()
-}
-
 // BySalesOrderID orders the results by the sales_order_id field.
 func BySalesOrderID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSalesOrderID, opts...).ToFunc()
-}
-
-// ByReworkIntakeID orders the results by the rework_intake_id field.
-func ByReworkIntakeID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldReworkIntakeID, opts...).ToFunc()
 }
 
 // ByCustomerID orders the results by the customer_id field.
@@ -326,13 +295,6 @@ func BySalesOrderField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
-// ByReworkIntakeField orders the results by rework_intake field.
-func ByReworkIntakeField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newReworkIntakeStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // ByCustomerField orders the results by customer field.
 func ByCustomerField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -358,13 +320,6 @@ func newSalesOrderStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SalesOrderInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, SalesOrderTable, SalesOrderColumn),
-	)
-}
-func newReworkIntakeStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(ReworkIntakeInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, false, ReworkIntakeTable, ReworkIntakeColumn),
 	)
 }
 func newCustomerStep() *sqlgraph.Step {

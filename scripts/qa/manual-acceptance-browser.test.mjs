@@ -96,7 +96,12 @@ function financeFieldFixture() {
       paymentTerm: "EOM_30",
       paymentTermDays: 30,
     },
-    { id: 92_001, factNo: "AP-FIELD-001", factType: "PAYABLE", status: "POSTED" },
+    {
+      id: 92_001,
+      factNo: "AP-FIELD-001",
+      factType: "PAYABLE",
+      status: "POSTED",
+    },
     {
       id: 93_001,
       factNo: "INV-FIELD-001",
@@ -404,7 +409,7 @@ async function datasetApplyEvidenceFixture() {
   };
 }
 
-test("manual acceptance browser plan covers all 52 catalog targets and ten formal accounts", () => {
+test("manual acceptance browser plan covers all 51 catalog targets and ten formal accounts", () => {
   const plan = buildManualAcceptanceBrowserPlan({
     baseURL: "http://127.0.0.1:15200",
     backendURL: "http://localhost:8300",
@@ -412,16 +417,16 @@ test("manual acceptance browser plan covers all 52 catalog targets and ten forma
 
   assert.equal(plan.writesDatabase, false);
   assert.equal(plan.clicksBusinessWriteActions, false);
-  assert.equal(plan.summary.totalTargets, 52);
+  assert.equal(plan.summary.totalTargets, 51);
   assert.deepEqual(plan.summary, {
     entryPages: 2,
-    desktopPages: 31,
+    desktopPages: 30,
     mobileRolePages: 9,
     printPreviewPages: 5,
     printWorkspacePages: 5,
-    totalTargets: 52,
+    totalTargets: 51,
   });
-  assert.equal(plan.targets.length, 52);
+  assert.equal(plan.targets.length, 51);
   assert.equal(plan.formalAccounts.length, 10);
   assert.equal(FORMAL_BROWSER_ACCOUNTS.length, 10);
   assert.equal(EXCEPTION_BROWSER_ACCOUNTS.length, 3);
@@ -431,7 +436,7 @@ test("manual acceptance browser plan covers all 52 catalog targets and ten forma
   );
   assert.equal(
     plan.targets.filter((item) => item.group === "desktop").length,
-    31,
+    30,
   );
   const productionOrders = plan.targets.find(
     (item) => item.group === "desktop" && item.key === "production-orders",
@@ -485,9 +490,7 @@ test("finance browser evidence binds page headers and representative values", ()
   const receivable = evaluateFinanceFieldBrowserEvidence({
     targetKey: "receivables",
     headers: ["单号", "收款分类", "账期", "取消记录"],
-    rows: [
-      ["AR-FIELD-001", "应收款", "月结 30 天 / 30 天", "-"],
-    ],
+    rows: [["AR-FIELD-001", "应收款", "月结 30 天 / 30 天", "-"]],
     representatives: financeFieldContract.representatives,
   });
   assert.equal(receivable.passed, true);
@@ -793,7 +796,7 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
     runtimeAttestation,
   };
   const targets = [
-    ...Array.from({ length: 42 }, (_, index) => ({
+    ...Array.from({ length: 41 }, (_, index) => ({
       id: `desktopPages:query-${index}`,
       catalogGroup: "desktopPages",
       dataStatus: "pass",
@@ -865,8 +868,8 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
       },
     },
     summary: {
-      totalTargets: 52,
-      passedTargetData: 42,
+      totalTargets: 51,
+      passedTargetData: 41,
       failedTargetData: 0,
       notProvenTargetData: 10,
       queryChecksPassed: true,
@@ -2322,7 +2325,7 @@ test("plan mode needs no password and starts no browser", () => {
   );
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.summary.totalTargets, 52);
+  assert.equal(plan.summary.totalTargets, 51);
   assert.equal(plan.writesDatabase, false);
   assert.equal(plan.formalAccounts.length, 10);
 });

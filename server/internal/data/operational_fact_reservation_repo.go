@@ -360,7 +360,6 @@ func validateStockReservationSourceQuantity(ctx context.Context, client *ent.Cli
 			shipmentitem.SalesOrderItemID(item.ID),
 			shipmentitem.HasShipmentWith(
 				shipment.Status(biz.ShipmentStatusShipped),
-				shipment.Purpose(biz.ShipmentPurposeSalesDelivery),
 			),
 		).
 		All(ctx)

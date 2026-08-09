@@ -158,7 +158,6 @@ const FACT_REFERENCE_DATASETS = Object.freeze({
   "inventory-txns": Object.freeze({ referenceKey: "inventoryTxns" }),
   "stock-reservations": Object.freeze({ referenceKey: "stockReservations" }),
   shipments: Object.freeze({ referenceKey: "shipments" }),
-  "rework-intakes": Object.freeze({ referenceKey: "reworkIntakes" }),
   "finance-payments": Object.freeze({ referenceKey: "financePayments" }),
   "finance-credit-notes": Object.freeze({
     referenceKey: "financeCreditNotes",
@@ -412,16 +411,6 @@ const DATASET_BLUEPRINTS = Object.freeze({
     requiredStatuses: ["DRAFT", "SHIPPED", "CANCELLED"],
     batchReport: "fact",
     factReferenceKey: "shipments",
-  },
-  "rework-intakes": {
-    roleKey: "sales",
-    domain: "operational_fact",
-    method: "list_rework_intakes",
-    listKey: "rework_intakes",
-    statusField: "status",
-    requiredStatuses: ["DRAFT", "RECEIVED", "REVERSED", "CANCELLED"],
-    batchReport: "fact",
-    factReferenceKey: "reworkIntakes",
   },
   "finance-payments": {
     roleKey: "finance",
@@ -776,32 +765,11 @@ function normalizeFactReference(record, key, index) {
         "finance_approval_process_node_id",
       );
       break;
-    case "reworkIntakes":
-      textField("intake_no", "intakeNo", "intake_no");
-      textField("status", "status");
-      normalized.source_shipment_id = reportPositiveID(
-        reportValue(
-          record,
-          "sourceShipmentID",
-          "sourceShipmentId",
-          "source_shipment_id",
-        ),
-        `${name}.sourceShipmentID`,
-      );
-      normalized.customer_id = reportPositiveID(
-        reportValue(record, "customerID", "customerId", "customer_id"),
-        `${name}.customerID`,
-      );
-      break;
     case "financePayments":
       textField("payment_no", "paymentNo", "payment_no");
       textField("status", "status");
       textField("direction", "direction");
-      textField(
-        "counterparty_type",
-        "counterpartyType",
-        "counterparty_type",
-      );
+      textField("counterparty_type", "counterpartyType", "counterparty_type");
       normalized.counterparty_id = reportPositiveID(
         reportValue(
           record,
@@ -818,7 +786,12 @@ function normalizeFactReference(record, key, index) {
       textField("credit_note_no", "creditNoteNo", "credit_note_no");
       textField("status", "status");
       normalized.finance_fact_id = reportPositiveID(
-        reportValue(record, "financeFactID", "financeFactId", "finance_fact_id"),
+        reportValue(
+          record,
+          "financeFactID",
+          "financeFactId",
+          "finance_fact_id",
+        ),
         `${name}.financeFactID`,
       );
       textField("finance_fact_no", "financeFactNo", "finance_fact_no");
@@ -1269,7 +1242,6 @@ const FACT_BUSINESS_FIELDS = Object.freeze({
   inventoryLots: "lot_no",
   stockReservations: "reservation_no",
   shipments: "shipment_no",
-  reworkIntakes: "intake_no",
   financePayments: "payment_no",
   financeCreditNotes: "credit_note_no",
   financeFacts: "fact_no",
@@ -1348,12 +1320,6 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
       params = {
         source_type: item.source_type,
         source_id: item.source_id,
-        limit: QUERY_LIMIT,
-        offset: 0,
-      };
-    } else if (referenceKey === "reworkIntakes") {
-      params = {
-        source_shipment_id: item.source_shipment_id,
         limit: QUERY_LIMIT,
         offset: 0,
       };

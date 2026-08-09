@@ -91,7 +91,7 @@ for file in "${STAGED_FILES[@]}"; do
     directory="$(dirname "$relative")"
     if [[ "$directory" == "." ]]; then
       add_go_target "./"
-    else
+    elif [[ -d "server/$directory" ]]; then
       add_go_target "./$directory"
     fi
     ;;

@@ -16,7 +16,6 @@ const expectedBusinessDataTablePages = [
   'FinancePaymentsPage.jsx',
   'HistoryRecordsPage.jsx',
   'OperationalFactsPage.jsx',
-  'ReworkIntakesPage.jsx',
   'ShipmentsPage.jsx',
   'V1MasterDataPage.jsx',
   'V1OutsourcingOrdersPage.jsx',
@@ -199,7 +198,11 @@ test('库存台账主表双击打开当前记录主操作面', () => {
   const source = readFileSync(filePath, 'utf8')
   const tags = extractSelfClosingTags(source, 'Table')
 
-  assert.equal(tags.length, 1, `${basename(filePath)} must keep one primary Table`)
+  assert.equal(
+    tags.length,
+    1,
+    `${basename(filePath)} must keep one primary Table`
+  )
   assert.match(tags[0], /\bonRow\s*=/u)
   assert.match(tags[0], /\bonDoubleClick\s*:/u)
 })

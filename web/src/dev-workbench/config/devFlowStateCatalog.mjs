@@ -159,10 +159,6 @@ export const DEV_FLOW_STATUS_CONTRACT_REFS = Object.freeze({
     'server/internal/data/model/schema/production_packaging_confirmation.go',
     'production_packaging_confirmations_status_allowed'
   ),
-  'fact.rework_intake': entCheckContract(
-    'server/internal/data/model/schema/rework_intake.go',
-    'rework_intakes_status_allowed'
-  ),
   'source.production_exception_decision': entCheckContract(
     'server/internal/data/model/schema/production_exception_decision.go',
     'production_exception_decisions_status_allowed'
@@ -264,9 +260,6 @@ export const DEV_FLOW_PATH_KIND_REGISTRY = Object.freeze({
   'fact.production_wip_batch:WAITING_QUALITY->REJECTED': pathMetadata([
     'rejected',
   ]),
-  'fact.rework_intake:DRAFT->RECEIVED': pathMetadata(['returned']),
-  'fact.rework_intake:DRAFT->CANCELLED': pathMetadata(['cancelled']),
-  'fact.rework_intake:RECEIVED->REVERSED': pathMetadata(['reversed']),
   'source.production_exception_decision:SUBMITTED->REJECTED': pathMetadata([
     'rejected',
   ]),
@@ -1938,59 +1931,6 @@ const FLOW_DEFINITIONS = [
     ],
   },
   {
-    key: 'fact.rework_intake',
-    scopeKey: 'fact_ledger',
-    kind: 'state_machine',
-    label: '返工回厂',
-    summary:
-      '返工回厂从待接收进入已接收；接收前可取消，尚未进入生产返工时可冲正收货。',
-    states: [
-      state('DRAFT', '待接收'),
-      state('RECEIVED', '已接收'),
-      state('CANCELLED', '已取消'),
-      state('REVERSED', '已冲正'),
-    ],
-    initialStates: ['DRAFT'],
-    terminalStates: ['CANCELLED', 'REVERSED'],
-    transitions: [
-      transition('DRAFT', 'RECEIVED', {
-        guard:
-          '来源出货、返工承接生产单、数量和 version 必须匹配；收货形成 HOLD 待返工批次。',
-        action: 'receive_rework_intake',
-        permission: ['rework_intake.receive'],
-        factBoundary: 'source_document_and_inventory',
-      }),
-      transition('DRAFT', 'CANCELLED', {
-        guard: '仅尚未接收的记录可取消，必须提供原因并匹配当前 version。',
-        action: 'cancel_rework_intake',
-        permission: ['rework_intake.cancel'],
-        factBoundary: 'source_document_only',
-      }),
-      transition('RECEIVED', 'REVERSED', {
-        guard: '仅尚未存在有效生产返工记录时可冲正，并以反向库存记录恢复。',
-        action: 'reverse_rework_intake',
-        permission: ['rework_intake.reverse'],
-        factBoundary: 'source_document_and_inventory',
-      }),
-    ],
-    guard:
-      '回厂批次只能由 REWORK 生产事实消费；返工完成后通过非结算补发单出货。',
-    factBoundary: 'fact_ledger',
-    sourceRefs: [
-      'server/internal/biz/rework_intake.go',
-      'server/internal/data/operational_fact_rework_intake_repo.go',
-      'server/internal/service/jsonrpc_operational_fact_rework_intake.go',
-    ],
-    evidence: [
-      ...factEvidence,
-      evidence(
-        'code',
-        'server/internal/data/operational_fact_rework_intake_repo.go',
-        '回厂接收、库存 HOLD、生产返工 lineage 与补发门禁。'
-      ),
-    ],
-  },
-  {
     key: 'source.production_exception_decision',
     scopeKey: 'source_document',
     kind: 'state_machine',
@@ -2223,14 +2163,13 @@ const FLOW_DEFINITIONS = [
       state('PENDING', '待放行'),
       state('APPROVED', '已放行'),
       state('REJECTED', '已拒绝'),
-      state('NOT_REQUIRED', '无需财务放行'),
     ],
     initialStates: ['PENDING'],
-    terminalStates: ['APPROVED', 'REJECTED', 'NOT_REQUIRED'],
+    terminalStates: ['APPROVED', 'REJECTED'],
     transitions: [],
     transitionAuthority: 'object-specific',
     guard:
-      '普通商业出货由流程命令把 PENDING 写为 APPROVED；返工补发在创建时固定为 NOT_REQUIRED，目录不为 REJECTED 或 NOT_REQUIRED 猜测通用迁移边。',
+      '商业出货由流程命令把 PENDING 写为 APPROVED；目录不为 REJECTED 猜测通用迁移边。',
     factBoundary: 'shipment_release_not_shipped',
     sourceRefs: [
       'server/internal/biz/process_runtime.go',

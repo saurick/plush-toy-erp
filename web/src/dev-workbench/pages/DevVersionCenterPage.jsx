@@ -6,6 +6,7 @@ import {
   QuestionCircleOutlined,
   ReloadOutlined,
   RollbackOutlined,
+  ToolOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -110,6 +111,126 @@ function operationUpdateAction(operation) {
   return operation?.terminal ? '完成于' : '更新于'
 }
 
+const MANUAL_TAKEOVER_STEPS = [
+  {
+    title: '在 Codex 或本地终端固定代码版本',
+    description:
+      '先完成必要验证与中文提交，再推送 origin/main；确认工作区干净，且本地 HEAD、origin/main 都是同一个完整 40 位 SHA。',
+    boundary: '本页不创建 commit、不 push，也不代替代码审查。',
+  },
+  {
+    title: '等待 GitHub CI 证明这个 exact SHA',
+    description:
+      '在 GitHub Actions 核对同一 SHA 的 CI Gate 成功；失败、取消、仍在运行或来源不可信时都必须停止。',
+    boundary: '本地通过不能替代远端 CI，旧 SHA 的绿色结果也不能复用。',
+  },
+  {
+    title: '生成不可变 Release',
+    description:
+      '优先回到本页使用“发布当前 SHA”；页面不可用时，才在 GitHub 手动运行固定 Immutable Release workflow，并填写同一 exact SHA 和新版本号。',
+    boundary: '不要手工创建、移动或覆盖 tag，也不要上传自行拼装的制品。',
+  },
+  {
+    title: '在本页部署到 test-133',
+    description:
+      '刷新状态并选择已发布版本，依次执行“准备部署”和“确认部署”；沿用既有 checksum、备份、migration、Compose、health/ready 与公网读回。',
+    boundary: '133 只加载已构建制品，不在目标服务器构建镜像。',
+  },
+  {
+    title: '核对结果，必要时走正式回滚',
+    description:
+      '在操作记录中核对 operation、版本、digest、migration、health/ready、公网 SHA 和浏览器资源；需要恢复时只使用版本行的“检查回滚”和“确认回滚”。',
+    boundary:
+      'failed、blocked 或 not_proven 先查明回执，不直接重复执行同一写操作。',
+  },
+]
+
+function ManualTakeoverGuide() {
+  return (
+    <div className="erp-dev-version-takeover-guide">
+      <Alert
+        type="info"
+        showIcon
+        message="人工接管仍走同一套 exact-SHA 正式流程"
+        description="适用于 AI 暂时不可用或你选择亲自操作；它只解释现有入口，不新增绕过门禁的一键发布、第二套流水线或后台任务。"
+      />
+
+      <section aria-labelledby="dev-version-takeover-scope-title">
+        <Title level={5} id="dev-version-takeover-scope-title">
+          三处操作各管什么
+        </Title>
+        <div className="erp-dev-version-takeover-scope">
+          <article>
+            <Text strong>Codex / 本地终端</Text>
+            <Text type="secondary">检查改动、运行测试、提交并推送代码</Text>
+          </article>
+          <article>
+            <Text strong>GitHub 代码托管</Text>
+            <Text type="secondary">证明远端 CI，构建并保存不可变 Release</Text>
+          </article>
+          <article>
+            <Text strong>当前页面</Text>
+            <Text type="secondary">看状态、发布制品、部署、回滚和查回执</Text>
+          </article>
+        </div>
+      </section>
+
+      <section aria-labelledby="dev-version-takeover-conditions-title">
+        <Title level={5} id="dev-version-takeover-conditions-title">
+          先判断能不能继续
+        </Title>
+        <div className="erp-dev-version-takeover-conditions">
+          <article>
+            <Tag color="success">可以继续</Tag>
+            <ul>
+              <li>工作区干净，本地与 origin/main 的完整 SHA 一致</li>
+              <li>页面刚刷新且状态真源可读，没有其他未结束 operation</li>
+              <li>当前 SHA 的 CI、Release 或目标预检已明确通过</li>
+            </ul>
+          </article>
+          <article>
+            <Tag color="warning">必须停止</Tag>
+            <ul>
+              <li>存在未提交改动、SHA 不一致或远端结果属于其他提交</li>
+              <li>CI 失败、取消或未完成，manifest、checksum、digest 不完整</li>
+              <li>已有操作仍在执行，或结果为 failed、blocked、not_proven</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section aria-labelledby="dev-version-takeover-steps-title">
+        <Title level={5} id="dev-version-takeover-steps-title">
+          人工接管顺序
+        </Title>
+        <ol className="erp-dev-version-takeover-steps">
+          {MANUAL_TAKEOVER_STEPS.map((step, index) => (
+            <li key={step.title}>
+              <span aria-hidden="true">{index + 1}</span>
+              <div>
+                <Text strong>{step.title}</Text>
+                <Paragraph>{step.description}</Paragraph>
+                <Text type="secondary">{step.boundary}</Text>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <Alert
+        type="warning"
+        showIcon
+        message="应急不等于绕过"
+        description="禁止 force push、跳过质量门禁、手工覆盖 tag 或 133 页面文件、在 133 构建镜像、直接执行结构性 SQL、删除数据库或 volume、全局 prune，以及在结果未证明时盲目重试。"
+      />
+      <Text type="secondary">
+        AI 恢复后，把最终 exact SHA、GitHub run、Release version 和 operation ID
+        交给 Codex，即可从现有回执继续核验，无需重做已被可信证明的步骤。
+      </Text>
+    </div>
+  )
+}
+
 export default function DevVersionCenterPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedView =
@@ -129,6 +250,7 @@ export default function DevVersionCenterPage() {
   const [checkedAt, setCheckedAt] = useState(initialSnapshot?.checkedAt || '')
   const [actionKey, setActionKey] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [manualTakeoverOpen, setManualTakeoverOpen] = useState(false)
   const [releaseModalOpen, setReleaseModalOpen] = useState(false)
   const [releaseVersion, setReleaseVersion] = useState(defaultReleaseVersion())
   const [confirmOperation, setConfirmOperation] = useState(null)
@@ -148,6 +270,7 @@ export default function DevVersionCenterPage() {
   const historyTableRef = useRef(null)
   const operationDetailTriggerRef = useRef(null)
   const operationDetailFocusRestoreTimerRef = useRef(null)
+  const manualTakeoverTriggerRef = useRef(null)
 
   const restoreOperationDetailTriggerFocus = useCallback(() => {
     const trigger = operationDetailTriggerRef.current
@@ -925,6 +1048,13 @@ export default function DevVersionCenterPage() {
             >
               刷新状态
             </Button>
+            <Button
+              ref={manualTakeoverTriggerRef}
+              icon={<ToolOutlined />}
+              onClick={() => setManualTakeoverOpen(true)}
+            >
+              人工接管说明
+            </Button>
             <Space size={8}>
               <Tooltip title={canDispatch ? '' : dispatchExplanation}>
                 <Button
@@ -1200,6 +1330,25 @@ export default function DevVersionCenterPage() {
           />
         </section>
       </main>
+
+      <Modal
+        title="人工接管与应急发布说明"
+        open={manualTakeoverOpen}
+        width={760}
+        className="erp-dev-version-takeover-modal"
+        footer={
+          <Button type="primary" onClick={() => setManualTakeoverOpen(false)}>
+            我知道了
+          </Button>
+        }
+        onCancel={() => setManualTakeoverOpen(false)}
+        afterClose={() =>
+          manualTakeoverTriggerRef.current?.focus({ preventScroll: true })
+        }
+        destroyOnHidden
+      >
+        <ManualTakeoverGuide />
+      </Modal>
 
       <Modal
         title="发布当前 exact SHA"

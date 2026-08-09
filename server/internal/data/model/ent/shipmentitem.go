@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/product"
-	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
@@ -30,8 +29,6 @@ type ShipmentItem struct {
 	ShipmentID int `json:"shipment_id,omitempty"`
 	// SalesOrderItemID holds the value of the "sales_order_item_id" field.
 	SalesOrderItemID *int `json:"sales_order_item_id,omitempty"`
-	// ReworkCompletionFactID holds the value of the "rework_completion_fact_id" field.
-	ReworkCompletionFactID *int `json:"rework_completion_fact_id,omitempty"`
 	// ProductID holds the value of the "product_id" field.
 	ProductID int `json:"product_id,omitempty"`
 	// ProductSkuID holds the value of the "product_sku_id" field.
@@ -70,8 +67,6 @@ type ShipmentItemEdges struct {
 	Shipment *Shipment `json:"shipment,omitempty"`
 	// SalesOrderItem holds the value of the sales_order_item edge.
 	SalesOrderItem *SalesOrderItem `json:"sales_order_item,omitempty"`
-	// ReworkCompletionFact holds the value of the rework_completion_fact edge.
-	ReworkCompletionFact *ProductionFact `json:"rework_completion_fact,omitempty"`
 	// Product holds the value of the product edge.
 	Product *Product `json:"product,omitempty"`
 	// ProductSku holds the value of the product_sku edge.
@@ -84,7 +79,7 @@ type ShipmentItemEdges struct {
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [7]bool
 }
 
 // ShipmentOrErr returns the Shipment value or an error if the edge
@@ -109,23 +104,12 @@ func (e ShipmentItemEdges) SalesOrderItemOrErr() (*SalesOrderItem, error) {
 	return nil, &NotLoadedError{edge: "sales_order_item"}
 }
 
-// ReworkCompletionFactOrErr returns the ReworkCompletionFact value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e ShipmentItemEdges) ReworkCompletionFactOrErr() (*ProductionFact, error) {
-	if e.ReworkCompletionFact != nil {
-		return e.ReworkCompletionFact, nil
-	} else if e.loadedTypes[2] {
-		return nil, &NotFoundError{label: productionfact.Label}
-	}
-	return nil, &NotLoadedError{edge: "rework_completion_fact"}
-}
-
 // ProductOrErr returns the Product value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e ShipmentItemEdges) ProductOrErr() (*Product, error) {
 	if e.Product != nil {
 		return e.Product, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: product.Label}
 	}
 	return nil, &NotLoadedError{edge: "product"}
@@ -136,7 +120,7 @@ func (e ShipmentItemEdges) ProductOrErr() (*Product, error) {
 func (e ShipmentItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
 	if e.ProductSku != nil {
 		return e.ProductSku, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: productsku.Label}
 	}
 	return nil, &NotLoadedError{edge: "product_sku"}
@@ -147,7 +131,7 @@ func (e ShipmentItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
 func (e ShipmentItemEdges) WarehouseOrErr() (*Warehouse, error) {
 	if e.Warehouse != nil {
 		return e.Warehouse, nil
-	} else if e.loadedTypes[5] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: warehouse.Label}
 	}
 	return nil, &NotLoadedError{edge: "warehouse"}
@@ -158,7 +142,7 @@ func (e ShipmentItemEdges) WarehouseOrErr() (*Warehouse, error) {
 func (e ShipmentItemEdges) UnitOrErr() (*Unit, error) {
 	if e.Unit != nil {
 		return e.Unit, nil
-	} else if e.loadedTypes[6] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
@@ -169,7 +153,7 @@ func (e ShipmentItemEdges) UnitOrErr() (*Unit, error) {
 func (e ShipmentItemEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	if e.InventoryLot != nil {
 		return e.InventoryLot, nil
-	} else if e.loadedTypes[7] {
+	} else if e.loadedTypes[6] {
 		return nil, &NotFoundError{label: inventorylot.Label}
 	}
 	return nil, &NotLoadedError{edge: "inventory_lot"}
@@ -184,7 +168,7 @@ func (*ShipmentItem) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case shipmentitem.FieldQuantity:
 			values[i] = new(decimal.Decimal)
-		case shipmentitem.FieldID, shipmentitem.FieldShipmentID, shipmentitem.FieldSalesOrderItemID, shipmentitem.FieldReworkCompletionFactID, shipmentitem.FieldProductID, shipmentitem.FieldProductSkuID, shipmentitem.FieldWarehouseID, shipmentitem.FieldUnitID, shipmentitem.FieldLotID:
+		case shipmentitem.FieldID, shipmentitem.FieldShipmentID, shipmentitem.FieldSalesOrderItemID, shipmentitem.FieldProductID, shipmentitem.FieldProductSkuID, shipmentitem.FieldWarehouseID, shipmentitem.FieldUnitID, shipmentitem.FieldLotID:
 			values[i] = new(sql.NullInt64)
 		case shipmentitem.FieldCurrencySnapshot, shipmentitem.FieldNote:
 			values[i] = new(sql.NullString)
@@ -223,13 +207,6 @@ func (_m *ShipmentItem) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.SalesOrderItemID = new(int)
 				*_m.SalesOrderItemID = int(value.Int64)
-			}
-		case shipmentitem.FieldReworkCompletionFactID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field rework_completion_fact_id", values[i])
-			} else if value.Valid {
-				_m.ReworkCompletionFactID = new(int)
-				*_m.ReworkCompletionFactID = int(value.Int64)
 			}
 		case shipmentitem.FieldProductID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -338,11 +315,6 @@ func (_m *ShipmentItem) QuerySalesOrderItem() *SalesOrderItemQuery {
 	return NewShipmentItemClient(_m.config).QuerySalesOrderItem(_m)
 }
 
-// QueryReworkCompletionFact queries the "rework_completion_fact" edge of the ShipmentItem entity.
-func (_m *ShipmentItem) QueryReworkCompletionFact() *ProductionFactQuery {
-	return NewShipmentItemClient(_m.config).QueryReworkCompletionFact(_m)
-}
-
 // QueryProduct queries the "product" edge of the ShipmentItem entity.
 func (_m *ShipmentItem) QueryProduct() *ProductQuery {
 	return NewShipmentItemClient(_m.config).QueryProduct(_m)
@@ -396,11 +368,6 @@ func (_m *ShipmentItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.SalesOrderItemID; v != nil {
 		builder.WriteString("sales_order_item_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
-	builder.WriteString(", ")
-	if v := _m.ReworkCompletionFactID; v != nil {
-		builder.WriteString("rework_completion_fact_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

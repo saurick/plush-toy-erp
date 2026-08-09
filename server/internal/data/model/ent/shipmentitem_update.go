@@ -9,7 +9,6 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
-	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
@@ -68,26 +67,6 @@ func (_u *ShipmentItemUpdate) SetNillableSalesOrderItemID(v *int) *ShipmentItemU
 // ClearSalesOrderItemID clears the value of the "sales_order_item_id" field.
 func (_u *ShipmentItemUpdate) ClearSalesOrderItemID() *ShipmentItemUpdate {
 	_u.mutation.ClearSalesOrderItemID()
-	return _u
-}
-
-// SetReworkCompletionFactID sets the "rework_completion_fact_id" field.
-func (_u *ShipmentItemUpdate) SetReworkCompletionFactID(v int) *ShipmentItemUpdate {
-	_u.mutation.SetReworkCompletionFactID(v)
-	return _u
-}
-
-// SetNillableReworkCompletionFactID sets the "rework_completion_fact_id" field if the given value is not nil.
-func (_u *ShipmentItemUpdate) SetNillableReworkCompletionFactID(v *int) *ShipmentItemUpdate {
-	if v != nil {
-		_u.SetReworkCompletionFactID(*v)
-	}
-	return _u
-}
-
-// ClearReworkCompletionFactID clears the value of the "rework_completion_fact_id" field.
-func (_u *ShipmentItemUpdate) ClearReworkCompletionFactID() *ShipmentItemUpdate {
-	_u.mutation.ClearReworkCompletionFactID()
 	return _u
 }
 
@@ -297,11 +276,6 @@ func (_u *ShipmentItemUpdate) SetSalesOrderItem(v *SalesOrderItem) *ShipmentItem
 	return _u.SetSalesOrderItemID(v.ID)
 }
 
-// SetReworkCompletionFact sets the "rework_completion_fact" edge to the ProductionFact entity.
-func (_u *ShipmentItemUpdate) SetReworkCompletionFact(v *ProductionFact) *ShipmentItemUpdate {
-	return _u.SetReworkCompletionFactID(v.ID)
-}
-
 // SetProduct sets the "product" edge to the Product entity.
 func (_u *ShipmentItemUpdate) SetProduct(v *Product) *ShipmentItemUpdate {
 	return _u.SetProductID(v.ID)
@@ -355,12 +329,6 @@ func (_u *ShipmentItemUpdate) ClearShipment() *ShipmentItemUpdate {
 // ClearSalesOrderItem clears the "sales_order_item" edge to the SalesOrderItem entity.
 func (_u *ShipmentItemUpdate) ClearSalesOrderItem() *ShipmentItemUpdate {
 	_u.mutation.ClearSalesOrderItem()
-	return _u
-}
-
-// ClearReworkCompletionFact clears the "rework_completion_fact" edge to the ProductionFact entity.
-func (_u *ShipmentItemUpdate) ClearReworkCompletionFact() *ShipmentItemUpdate {
-	_u.mutation.ClearReworkCompletionFact()
 	return _u
 }
 
@@ -446,11 +414,6 @@ func (_u *ShipmentItemUpdate) check() error {
 	if v, ok := _u.mutation.SalesOrderItemID(); ok {
 		if err := shipmentitem.SalesOrderItemIDValidator(v); err != nil {
 			return &ValidationError{Name: "sales_order_item_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.sales_order_item_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.ReworkCompletionFactID(); ok {
-		if err := shipmentitem.ReworkCompletionFactIDValidator(v); err != nil {
-			return &ValidationError{Name: "rework_completion_fact_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.rework_completion_fact_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProductID(); ok {
@@ -599,35 +562,6 @@ func (_u *ShipmentItemUpdate) sqlSave(ctx context.Context) (_node int, err error
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(salesorderitem.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.ReworkCompletionFactCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shipmentitem.ReworkCompletionFactTable,
-			Columns: []string{shipmentitem.ReworkCompletionFactColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ReworkCompletionFactIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shipmentitem.ReworkCompletionFactTable,
-			Columns: []string{shipmentitem.ReworkCompletionFactColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -831,26 +765,6 @@ func (_u *ShipmentItemUpdateOne) SetNillableSalesOrderItemID(v *int) *ShipmentIt
 // ClearSalesOrderItemID clears the value of the "sales_order_item_id" field.
 func (_u *ShipmentItemUpdateOne) ClearSalesOrderItemID() *ShipmentItemUpdateOne {
 	_u.mutation.ClearSalesOrderItemID()
-	return _u
-}
-
-// SetReworkCompletionFactID sets the "rework_completion_fact_id" field.
-func (_u *ShipmentItemUpdateOne) SetReworkCompletionFactID(v int) *ShipmentItemUpdateOne {
-	_u.mutation.SetReworkCompletionFactID(v)
-	return _u
-}
-
-// SetNillableReworkCompletionFactID sets the "rework_completion_fact_id" field if the given value is not nil.
-func (_u *ShipmentItemUpdateOne) SetNillableReworkCompletionFactID(v *int) *ShipmentItemUpdateOne {
-	if v != nil {
-		_u.SetReworkCompletionFactID(*v)
-	}
-	return _u
-}
-
-// ClearReworkCompletionFactID clears the value of the "rework_completion_fact_id" field.
-func (_u *ShipmentItemUpdateOne) ClearReworkCompletionFactID() *ShipmentItemUpdateOne {
-	_u.mutation.ClearReworkCompletionFactID()
 	return _u
 }
 
@@ -1060,11 +974,6 @@ func (_u *ShipmentItemUpdateOne) SetSalesOrderItem(v *SalesOrderItem) *ShipmentI
 	return _u.SetSalesOrderItemID(v.ID)
 }
 
-// SetReworkCompletionFact sets the "rework_completion_fact" edge to the ProductionFact entity.
-func (_u *ShipmentItemUpdateOne) SetReworkCompletionFact(v *ProductionFact) *ShipmentItemUpdateOne {
-	return _u.SetReworkCompletionFactID(v.ID)
-}
-
 // SetProduct sets the "product" edge to the Product entity.
 func (_u *ShipmentItemUpdateOne) SetProduct(v *Product) *ShipmentItemUpdateOne {
 	return _u.SetProductID(v.ID)
@@ -1118,12 +1027,6 @@ func (_u *ShipmentItemUpdateOne) ClearShipment() *ShipmentItemUpdateOne {
 // ClearSalesOrderItem clears the "sales_order_item" edge to the SalesOrderItem entity.
 func (_u *ShipmentItemUpdateOne) ClearSalesOrderItem() *ShipmentItemUpdateOne {
 	_u.mutation.ClearSalesOrderItem()
-	return _u
-}
-
-// ClearReworkCompletionFact clears the "rework_completion_fact" edge to the ProductionFact entity.
-func (_u *ShipmentItemUpdateOne) ClearReworkCompletionFact() *ShipmentItemUpdateOne {
-	_u.mutation.ClearReworkCompletionFact()
 	return _u
 }
 
@@ -1222,11 +1125,6 @@ func (_u *ShipmentItemUpdateOne) check() error {
 	if v, ok := _u.mutation.SalesOrderItemID(); ok {
 		if err := shipmentitem.SalesOrderItemIDValidator(v); err != nil {
 			return &ValidationError{Name: "sales_order_item_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.sales_order_item_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.ReworkCompletionFactID(); ok {
-		if err := shipmentitem.ReworkCompletionFactIDValidator(v); err != nil {
-			return &ValidationError{Name: "rework_completion_fact_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.rework_completion_fact_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ProductID(); ok {
@@ -1392,35 +1290,6 @@ func (_u *ShipmentItemUpdateOne) sqlSave(ctx context.Context) (_node *ShipmentIt
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(salesorderitem.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.ReworkCompletionFactCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shipmentitem.ReworkCompletionFactTable,
-			Columns: []string{shipmentitem.ReworkCompletionFactColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ReworkCompletionFactIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shipmentitem.ReworkCompletionFactTable,
-			Columns: []string{shipmentitem.ReworkCompletionFactColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

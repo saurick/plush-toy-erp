@@ -336,6 +336,29 @@ async function waitForView(page, view) {
     .waitFor({ state: 'visible', timeout: 10_000 })
 }
 
+async function waitForAntdModalMotion(page, modal) {
+  const modalHandle = await modal.elementHandle()
+  if (!modalHandle) {
+    throw new Error('未找到可等待动画结束的人工接管弹窗')
+  }
+  try {
+    await page.waitForFunction(
+      (node) => {
+        if (!(node instanceof HTMLElement) || !node.isConnected) return false
+        const className = String(node.className || '')
+        return (
+          !className.includes('ant-zoom-enter') &&
+          !className.includes('ant-zoom-appear')
+        )
+      },
+      modalHandle,
+      { timeout: 10_000 }
+    )
+  } finally {
+    await modalHandle.dispose()
+  }
+}
+
 function visibleTableRows(section) {
   return section.locator('.ant-table-tbody > tr.ant-table-row')
 }
@@ -434,6 +457,74 @@ export function createDevVersionCenterScenarios({
           '2026-08-08T14:00:00.000Z'
         )
         assert.equal(desktopSummaryRequests, 1)
+
+        const desktopTakeoverButton = page.getByRole('button', {
+          name: '人工接管说明',
+        })
+        await desktopTakeoverButton.focus()
+        await desktopTakeoverButton.click()
+        const desktopTakeoverDialog = page.getByRole('dialog', {
+          name: '人工接管与应急发布说明',
+        })
+        await desktopTakeoverDialog.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await waitForAntdModalMotion(page, desktopTakeoverDialog)
+        await desktopTakeoverDialog
+          .getByText('三处操作各管什么', { exact: true })
+          .waitFor()
+        await desktopTakeoverDialog
+          .getByText('人工接管顺序', { exact: true })
+          .waitFor()
+        await desktopTakeoverDialog
+          .getByText('应急不等于绕过', { exact: true })
+          .waitFor()
+        const desktopTakeoverMetrics = await desktopTakeoverDialog.evaluate(
+          (dialog) => {
+            const scope = dialog.querySelector(
+              '.erp-dev-version-takeover-scope'
+            )
+            const rect = dialog.getBoundingClientRect()
+            return {
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+              viewportWidth: window.innerWidth,
+              scopeColumns: scope
+                ? getComputedStyle(scope).gridTemplateColumns
+                : '',
+              documentWidth: document.documentElement.scrollWidth,
+            }
+          }
+        )
+        assert.equal(
+          desktopTakeoverMetrics.scopeColumns.trim().split(/\s+/u).length,
+          3,
+          `桌面人工接管职责应保持三列: ${JSON.stringify(desktopTakeoverMetrics)}`
+        )
+        assert(
+          desktopTakeoverMetrics.left >= -1 &&
+            desktopTakeoverMetrics.right <=
+              desktopTakeoverMetrics.viewportWidth + 1,
+          `桌面人工接管弹窗超出视口: ${JSON.stringify(desktopTakeoverMetrics)}`
+        )
+        await desktopTakeoverDialog.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-manual-takeover-desktop-light.png'
+          ),
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-version-center-manual-takeover-desktop-light'
+        )
+        await page.keyboard.press('Escape')
+        await desktopTakeoverDialog.waitFor({ state: 'hidden' })
+        await page.waitForFunction(() => {
+          const active = document.activeElement
+          return String(active?.textContent || '').includes('人工接管说明')
+        })
 
         await page.screenshot({
           path: path.join(
@@ -719,6 +810,81 @@ export function createDevVersionCenterScenarios({
           '移动端历史表格应保留每条操作的开始与完成时间'
         )
         assert.equal(mobileSummaryRequests, 1)
+
+        const mobileTakeoverButton = page.getByRole('button', {
+          name: '人工接管说明',
+        })
+        await mobileTakeoverButton.focus()
+        await mobileTakeoverButton.click()
+        const mobileTakeoverDialog = page.getByRole('dialog', {
+          name: '人工接管与应急发布说明',
+        })
+        await mobileTakeoverDialog.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await waitForAntdModalMotion(page, mobileTakeoverDialog)
+        const mobileTakeoverMetrics = await mobileTakeoverDialog.evaluate(
+          (dialog) => {
+            const scope = dialog.querySelector(
+              '.erp-dev-version-takeover-scope'
+            )
+            const conditions = dialog.querySelector(
+              '.erp-dev-version-takeover-conditions'
+            )
+            const rect = dialog.getBoundingClientRect()
+            return {
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+              viewportWidth: window.innerWidth,
+              scopeColumns: scope
+                ? getComputedStyle(scope).gridTemplateColumns
+                : '',
+              conditionColumns: conditions
+                ? getComputedStyle(conditions).gridTemplateColumns
+                : '',
+              theme: document.documentElement.dataset.erpTheme,
+            }
+          }
+        )
+        assert.equal(mobileTakeoverMetrics.theme, 'dark')
+        assert.equal(
+          mobileTakeoverMetrics.scopeColumns.trim().split(/\s+/u).length,
+          1,
+          `移动端人工接管职责应改为单列: ${JSON.stringify(mobileTakeoverMetrics)}`
+        )
+        assert.equal(
+          mobileTakeoverMetrics.conditionColumns.trim().split(/\s+/u).length,
+          1,
+          `移动端继续条件应改为单列: ${JSON.stringify(mobileTakeoverMetrics)}`
+        )
+        assert(
+          mobileTakeoverMetrics.left >= -1 &&
+            mobileTakeoverMetrics.right <=
+              mobileTakeoverMetrics.viewportWidth + 1 &&
+            mobileTakeoverMetrics.width >=
+              mobileTakeoverMetrics.viewportWidth - 24,
+          `移动端人工接管弹窗尺寸异常: ${JSON.stringify(mobileTakeoverMetrics)}`
+        )
+        await mobileTakeoverDialog.screenshot({
+          path: path.join(
+            outputDir,
+            'dev-version-center-manual-takeover-mobile-dark.png'
+          ),
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-version-center-manual-takeover-mobile-dark'
+        )
+        await mobileTakeoverDialog
+          .getByRole('button', { name: '我知道了' })
+          .click()
+        await mobileTakeoverDialog.waitFor({ state: 'hidden' })
+        await page.waitForFunction(() => {
+          const active = document.activeElement
+          return String(active?.textContent || '').includes('人工接管说明')
+        })
 
         await page.screenshot({
           path: path.join(

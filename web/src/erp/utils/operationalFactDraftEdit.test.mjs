@@ -54,7 +54,8 @@ test('production draft edit emits only CAS and operator-owned fields', () => {
 })
 
 test('rework draft edit preserves source identity outside the request', () => {
-  const action = OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE
+  const action =
+    OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION
   const request = normalizeProductionFactDraftSaveRequest(action, {
     id: 8,
     expected_version: 1,

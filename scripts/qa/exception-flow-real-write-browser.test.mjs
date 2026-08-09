@@ -10,8 +10,7 @@ import {
   staleRetryReceipt,
 } from "./exception-flow-real-write-browser.mjs";
 
-const DATABASE_NAME =
-  "plush_erp_acceptance_79da_contract_browser_actions_dev";
+const DATABASE_NAME = "plush_erp_acceptance_79da_contract_browser_actions_dev";
 const BACKEND_URL = "http://127.0.0.1:8323";
 const REPORT =
   "output/qa/manual-acceptance/contracts/exception-flow-browser.json";
@@ -48,10 +47,7 @@ test("exception-flow browser runner accepts only an explicitly confirmed isolate
   assert.equal(options.backendURL, BACKEND_URL);
   assert.equal(options.databaseName, DATABASE_NAME);
   assert.equal(options.password, "unit-test-only-password");
-  assert.equal(
-    options.reportPath,
-    resolveExceptionFlowReportPath(REPORT),
-  );
+  assert.equal(options.reportPath, resolveExceptionFlowReportPath(REPORT));
   assert.equal(
     CONFIRMATION,
     `RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:${DATABASE_NAME}:${BACKEND_URL}`,
@@ -80,8 +76,7 @@ test("exception-flow browser runner rejects the shared backend and non-action da
           value === BACKEND_URL ? "http://127.0.0.1:8300" : value,
         ),
         validEnv({
-          EXCEPTION_FLOW_BROWSER_CONFIRM:
-            `RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:${DATABASE_NAME}:http://127.0.0.1:8300`,
+          EXCEPTION_FLOW_BROWSER_CONFIRM: `RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:${DATABASE_NAME}:http://127.0.0.1:8300`,
         }),
       ),
     /shared\/default backend port 8300/u,
@@ -90,7 +85,9 @@ test("exception-flow browser runner rejects the shared backend and non-action da
     () =>
       parseExceptionFlowArgs(
         validArgs().map((value) =>
-          value === DATABASE_NAME ? "plush_erp_acceptance_local_fixture_dev" : value,
+          value === DATABASE_NAME
+            ? "plush_erp_acceptance_local_fixture_dev"
+            : value,
         ),
         validEnv(),
       ),
@@ -131,11 +128,19 @@ test("exception-flow browser runner keeps reports inside the acceptance evidence
 
 test("exception-flow browser runner fails closed on incomplete or unsupported arguments", () => {
   assert.throws(
-    () => parseExceptionFlowArgs(["--base-url", "http://localhost:15214"], validEnv()),
+    () =>
+      parseExceptionFlowArgs(
+        ["--base-url", "http://localhost:15214"],
+        validEnv(),
+      ),
     /required/u,
   );
   assert.throws(
-    () => parseExceptionFlowArgs([...validArgs(), "--unknown", "value"], validEnv()),
+    () =>
+      parseExceptionFlowArgs(
+        [...validArgs(), "--unknown", "value"],
+        validEnv(),
+      ),
     /unsupported argument/u,
   );
   assert.throws(
@@ -150,7 +155,7 @@ test("exception-flow browser runner fails closed on incomplete or unsupported ar
 
 function validEvidenceReport() {
   return {
-    flows: Array.from({ length: 4 }, (_, index) => ({
+    flows: Array.from({ length: 3 }, (_, index) => ({
       key: `flow-${index + 1}`,
       passed: true,
       retry: {
@@ -158,11 +163,11 @@ function validEvidenceReport() {
         result: "duplicate_or_stale_rejected",
       },
     })),
-    negativePermissions: Array.from({ length: 4 }, () => ({
+    negativePermissions: Array.from({ length: 3 }, () => ({
       code: 40304,
       result: "server_rejected",
     })),
-    simulatedTransportFaults: Array.from({ length: 4 }, () => ({
+    simulatedTransportFaults: Array.from({ length: 3 }, () => ({
       injected: true,
       backendResultCode: 0,
       transportFault: "response_dropped_after_backend_completed",
@@ -198,35 +203,11 @@ test("exception-flow browser runner requires the exact stale-write error code", 
   }
 });
 
-test("rework-intake flow creates its source through the product UI", async () => {
-  const source = await import("node:fs/promises").then((module) =>
-    module.readFile(
-      new URL("./exception-flow-real-write-browser.mjs", import.meta.url),
-      "utf8",
-    ),
-  );
-  const reworkIntakeSection = source.slice(
-    source.indexOf("async function createReworkIntakeSourceInBrowser"),
-    source.indexOf("async function runFinancePaymentFlow"),
-  );
-  assert.match(
-    reworkIntakeSection,
-    /getByRole\("button", \{ name: "新建返工回厂", exact: true \}\)/u,
-  );
-  assert.match(reworkIntakeSection, /"建立回厂记录"/u);
-  assert.match(reworkIntakeSection, /"browser_created_from_shipped_source"/u);
-  assert.match(
-    reworkIntakeSection,
-    /source\.intake_no/u,
-  );
-  assert.doesNotMatch(
-    reworkIntakeSection,
-    /existing_isolated_dataset_approved_source/u,
-  );
-});
-
 test("exception-flow browser report contract fails closed on incomplete evidence", () => {
-  assert.equal(assertExceptionFlowEvidenceContract(validEvidenceReport()), true);
+  assert.equal(
+    assertExceptionFlowEvidenceContract(validEvidenceReport()),
+    true,
+  );
 
   for (const mutate of [
     (report) => report.flows.pop(),

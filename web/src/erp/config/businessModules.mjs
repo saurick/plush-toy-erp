@@ -99,37 +99,6 @@ export const businessModuleDefinitions = Object.freeze([
     boundary: '销售订单不会自动生成出货单、库存变动、应收、发票或收付款记录。',
   },
   {
-    key: 'rework-intakes',
-    sectionKey: 'sales',
-    label: '返工回厂与补发',
-    title: '返工回厂与补发',
-    path: '/erp/sales/rework-intakes',
-    shortLabel: '返工回厂',
-    pageKind: 'formal-v1',
-    description:
-      '从原出货明细登记客户产品回厂，仓库接收后交生产沿原工序返工，质检完工后建立不重复结算的补发单。',
-    primaryEntity: 'rework_intakes / rework_intake_items',
-    factSource:
-      'rework_intakes, rework_intake_items, production_facts, production_wip_batches, quality_inspections, shipments, inventory_txns',
-    boundary:
-      '回厂收货只形成待返工库存，不能直接销售出货；必须经过生产返工、工序质检和完工入库后才能补发。补发不产生新的应收、发票或财务放行。',
-    sourceRefs: [
-      'shipments',
-      'shipment_items',
-      'production_orders',
-      'production_facts',
-      'quality_inspections',
-      'inventory_txns',
-    ],
-    currentScope: [
-      '从真实已出货明细登记返工回厂',
-      '确认回厂收货并形成待返工批次',
-      '沿既有生产 WIP 与工序质检链办理返工',
-      '从已完成返工批次建立非结算补发单',
-      '取消、收货冲正和并发版本校验',
-    ],
-  },
-  {
     key: 'material-bom',
     sectionKey: 'engineering',
     label: '物料清单（BOM）',

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -55,11 +56,15 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
     "skills",
     "plush-git-closeout-queue",
   );
-  const [agents, skill, snapshotScript] = await Promise.all([
+  const [agents, skill, snapshotScript, clearLockScript] = await Promise.all([
     readFile(path.join(ROOT, "AGENTS.md"), "utf8"),
     readFile(path.join(skillDir, "SKILL.md"), "utf8"),
     readFile(
       path.join(skillDir, "scripts", "readonly-git-snapshot.sh"),
+      "utf8",
+    ),
+    readFile(
+      path.join(skillDir, "scripts", "clear-stale-index-lock.sh"),
       "utf8",
     ),
   ]);
@@ -75,6 +80,10 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
   assert.match(skill, /协议版本为 `3`/u);
   assert.match(skill, /`INDEX_LOCK_OBSERVED`/u);
   assert.match(skill, /worker 发现锁时只发送一次/u);
+  assert.match(skill, /`STALE_INDEX_LOCK`[\s\S]*自助清理一次/u);
+  assert.match(skill, /不得再请求用户确认/u);
+  assert.match(skill, /非零字节[\s\S]*`WAIT_INDEX_LOCK_REVIEW`/u);
+  assert.match(skill, /`LOCK_CLEAR_NOTICE` 作为其 `resume_on`/u);
   assert.match(skill, /收到任何 `WAIT_\*` 后立即结束当前 turn/u);
   assert.match(skill, /writer grant 是 turn-scoped 写入租约/u);
   assert.match(skill, /按 `TURN_ENDED` 使旧租约失效/u);
@@ -107,6 +116,74 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
   assert.doesNotMatch(skill, /安全批次默认自动本地提交|缺省为 `auto_local`/u);
   assert.match(snapshotScript, /export GIT_OPTIONAL_LOCKS=0/u);
   assert.doesNotMatch(snapshotScript, /\b(?:rm|unlink)\b/u);
+  assert.match(clearLockScript, /--queue-confirmed-no-git-owner/u);
+  assert.match(clearLockScript, /LOCK_CLEAR_NOTICE result=cleared/u);
+  assert.match(clearLockScript, /WAIT_INDEX_LOCK_REVIEW/u);
+  assert.match(clearLockScript, /sleep 1/u);
+  assert.doesNotMatch(clearLockScript, /read\s+-(?:p|rp|pr)\b/u);
+});
+
+test("skill health: stale zero-byte index lock clears once and unsafe locks remain", async () => {
+  const repository = await mkdtemp(
+    path.join(os.tmpdir(), "plush-stale-index-lock-"),
+  );
+  const script = path.join(
+    ROOT,
+    ".agents",
+    "skills",
+    "plush-git-closeout-queue",
+    "scripts",
+    "clear-stale-index-lock.sh",
+  );
+  const run = (command, args) =>
+    spawnSync(command, args, {
+      cwd: repository,
+      encoding: "utf8",
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    });
+
+  try {
+    assert.equal(run("git", ["init", "-q"]).status, 0);
+    await writeFile(path.join(repository, "tracked.txt"), "baseline\n", "utf8");
+    assert.equal(run("git", ["add", "tracked.txt"]).status, 0);
+    assert.equal(
+      run("git", [
+        "-c",
+        "user.name=Skill Health",
+        "-c",
+        "user.email=skill-health@example.invalid",
+        "commit",
+        "-qm",
+        "test: baseline",
+      ]).status,
+      0,
+    );
+
+    const lockPath = path.join(repository, ".git", "index.lock");
+    await writeFile(lockPath, "", "utf8");
+    const cleared = run("bash", [
+      script,
+      "--repo",
+      repository,
+      "--queue-confirmed-no-git-owner",
+    ]);
+    assert.equal(cleared.status, 0, cleared.stderr);
+    assert.match(cleared.stdout, /LOCK_CLEAR_NOTICE result=cleared/u);
+    await assert.rejects(readFile(lockPath));
+
+    await writeFile(lockPath, "active", "utf8");
+    const refused = run("bash", [
+      script,
+      "--repo",
+      repository,
+      "--queue-confirmed-no-git-owner",
+    ]);
+    assert.notEqual(refused.status, 0);
+    assert.match(refused.stderr, /reason=lock_not_zero_bytes/u);
+    assert.equal(await readFile(lockPath, "utf8"), "active");
+  } finally {
+    await rm(repository, { recursive: true, force: true });
+  }
 });
 
 test("skill health: parses the supported frontmatter and metadata subset", () => {

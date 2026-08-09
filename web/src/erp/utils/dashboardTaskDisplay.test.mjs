@@ -33,7 +33,6 @@ test('dashboardTaskDisplay: 任务来源类型使用业务可读标签', () => {
   assert.equal(getWorkflowTaskSourceTypeLabel('shipments'), '出货单')
   assert.equal(getWorkflowTaskSourceTypeLabel('sales_order'), '销售订单')
   assert.equal(getWorkflowTaskSourceTypeLabel('purchase_order'), '采购订单')
-  assert.equal(getWorkflowTaskSourceTypeLabel('rework_intake'), '返工回厂')
   assert.equal(
     getWorkflowTaskSourceTypeLabel('finance_payment'),
     '收付款与核销'
@@ -148,11 +147,6 @@ test('dashboardTaskDisplay: 流程运行态验证过的业务来源才使用 ID 
 
 test('dashboardTaskDisplay: 正式逾期任务可精确打开后端已授权的相关单据', () => {
   const tasks = [
-    [
-      'rework_intake',
-      81,
-      '/erp/sales/rework-intakes?rework_intake_id=81&link_source=task-dashboard',
-    ],
     [
       'finance_payment',
       82,

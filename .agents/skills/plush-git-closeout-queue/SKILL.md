@@ -69,9 +69,10 @@ revision: <stable revision or content token>
 worker 发现锁时只发送一次 `INDEX_LOCK_OBSERVED`，附 compact snapshot、lock path、inode、size、mtime、holder 和当前操作安全边界，然后结束当前 turn；不得删除锁、各自询问用户、轮询或广播给其他 worker。队列以 `lock path + inode + mtime` 作为 incident key 幂等处理：
 
 1. 有 holder 或活动 Git 时返回 `WAIT_GIT_OWNER`，只冻结 Git lane；需要冻结 writer 时明确说明命中的附加条件。
-2. 无 holder 时至少做两次有间隔的 optional-lock-free 复核；身份稳定才标记 `STALE_INDEX_LOCK`。删除前由队列集中取得一次明确用户授权，worker 不代为询问。
-3. 锁自然消失或已获授权清除后，队列执行一次 `LOCK_CLEAR_NOTICE` 复核；确认 HEAD、index、目标路径和活动进程安全后，恢复原 owner 与原队序。
-4. 同一 incident 的重复报告只返回已有状态，不重复询问、删除或重排队列。
+2. 无 holder 时至少做两次有间隔的 optional-lock-free 复核。若锁是精确 `index.lock`、普通零字节文件，lock identity、HEAD、index、status 和授权路径身份均稳定，且队列已确认无 writer / index / commit / push owner，则标记 `STALE_INDEX_LOCK` 并立即调用 [scripts/clear-stale-index-lock.sh](scripts/clear-stale-index-lock.sh) 自助清理一次；这是可恢复的协调修复，不得再请求用户确认。
+3. 专用脚本必须通过能力探测选择 `stat`、hash、holder 和删除命令，在删除前后复核同一身份，并只能产生一次 `LOCK_CLEAR_NOTICE`。非零字节、symlink、holder、无法探测 holder、任何身份漂移或归属不明都返回 `WAIT_INDEX_LOCK_REVIEW`，不删除现场。
+4. 锁自然消失或脚本成功清除后，队列复核 HEAD、index、目标路径和活动进程，然后用该 `LOCK_CLEAR_NOTICE` 作为 clear event 恢复原 owner 与原队序。
+5. 同一 incident 的重复报告只返回已有状态，不重复清理、重排队列或制造自动唤醒循环。
 
 ## Writer 生命周期
 
@@ -98,9 +99,9 @@ worker 收到任何 `WAIT_*` 后立即结束当前 turn，保留现场、event_i
 队列把每个 WAIT 登记为 `external` 或 `self_actionable`，并保存 `wait_event_id`、`blocker_identity`、`resume_action` 和 `resume_on`：
 
 - `external` 表示仍需活动 writer / Git owner 释放、远端事件、用户选择或授权、依赖完成、额度恢复等外部变化；在匹配 `resume_on` 到来前不发送自助恢复，也不轮询。
-- `self_actionable` 表示无需新的外部决定即可继续，包括可从实时 diff 与已声明归属重建有界请求的 `WAIT_SCOPE`、原请求已授权只读归属审计的 `WAIT_RECONCILE`，以及无活动 writer、只剩 stale / unreported identity 的 `WAIT_HOT_FILE`。需要用户选择的 scope、未获授权的 reconcile 或真实 ownership 冲突仍归 `external`。
+- `self_actionable` 表示无需新的外部决定即可继续，包括可从实时 diff 与已声明归属重建有界请求的 `WAIT_SCOPE`、原请求已授权只读归属审计的 `WAIT_RECONCILE`、无活动 writer 且只剩 stale / unreported identity 的 `WAIT_HOT_FILE`，以及符合上述自助清理条件的 `STALE_INDEX_LOCK`。需要用户选择的 scope、未获授权的 reconcile、真实 ownership 冲突或不满足安全条件的 lock 仍归 `external`。
 
-对 `self_actionable` WAIT，队列在 ACK 后至多做一次必要的 optional-lock-free 身份审计，并使用会触发后续 turn 的任务 follow-up 能力投递一次 `RESUME_FROM_WAIT`；WAIT 所在 turn 必须先结束，插入当前 turn 的普通消息或 ACK 不算 fresh-turn trigger。`resume_token` 绑定 `wait_event_id + blocker_identity`，同一 token 最多发送一次，不能靠新 revision 制造自动唤醒循环。外部 blocker 的匹配 clear / release / ready 事件到达后也执行同一条一次性触发；若 `GRANT_WRITER` 本身已创建新 turn，它就是该 trigger。
+对 `self_actionable` WAIT，队列在 ACK 后至多做一次必要的 optional-lock-free 身份审计，并使用会触发后续 turn 的任务 follow-up 能力投递一次 `RESUME_FROM_WAIT`；`STALE_INDEX_LOCK` 在自助清理成功后以 `LOCK_CLEAR_NOTICE` 作为其 `resume_on`。WAIT 所在 turn 必须先结束，插入当前 turn 的普通消息或 ACK 不算 fresh-turn trigger。`resume_token` 绑定 `wait_event_id + blocker_identity`，同一 token 最多发送一次，不能靠新 revision 制造自动唤醒循环。外部 blocker 的匹配 clear / release / ready 事件到达后也执行同一条一次性触发；若 `GRANT_WRITER` 本身已创建新 turn，它就是该 trigger。
 
 任务工具无法确认 follow-up 会创建或排入新 turn 时，队列返回 `WAIT_RESUME_TRIGGER`，报告具体工具或额度阻塞并保留 checkpoint；不得静默宣称已唤醒。新 turn 收到 `RESUME_FROM_WAIT` 后先 ACK 并重验现场，再继续原目标：只读阶段直接做到终态，需要写入则申请新 writer，仍受外部条件阻塞才发送带新证据的 WAIT revision；未完成任务不得只回复 ACK 后结束。
 

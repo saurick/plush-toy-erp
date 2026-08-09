@@ -606,24 +606,83 @@ function dropUnchangedCheckOperations(
   }
 }
 
-function dropIndexesRemovedWithTheirOnlyTrackedColumn(tokenOperations) {
+function indexFieldGroups(source) {
+  const groups = [];
+  for (const indexMatch of source.matchAll(/\bindex\.Fields\(([^)]*)\)/gsu)) {
+    const fields = [
+      ...indexMatch[1].matchAll(/"([a-z0-9_]+)"/gu),
+    ].map((match) => match[1]);
+    if (fields.length > 0) groups.push(fields);
+  }
+  return groups;
+}
+
+function removedIndexFieldGroups(baseline, current) {
+  const currentCounts = new Map();
+  for (const fields of indexFieldGroups(current)) {
+    const signature = JSON.stringify(fields);
+    currentCounts.set(signature, (currentCounts.get(signature) || 0) + 1);
+  }
+
+  const removed = [];
+  for (const fields of indexFieldGroups(baseline)) {
+    const signature = JSON.stringify(fields);
+    const remaining = currentCounts.get(signature) || 0;
+    if (remaining > 0) {
+      currentCounts.set(signature, remaining - 1);
+    } else {
+      removed.push(fields);
+    }
+  }
+  return removed;
+}
+
+function dropIndexesRemovedWithDroppedColumns(
+  root,
+  baselineFile,
+  currentFile,
+  range,
+  tokenOperations,
+) {
+  const droppedColumns = new Set(
+    [...tokenOperations.values()]
+      .filter(
+        (item) =>
+          item.kind === "column" &&
+          item.operations.size === 1 &&
+          item.operations.has("drop"),
+      )
+      .map((item) => item.token),
+  );
+  if (droppedColumns.size === 0) return;
+
+  const automaticallyDroppedIndexTokens = new Set();
+  const explicitlyDroppedIndexTokens = new Set();
+  const removedIndexes = removedIndexFieldGroups(
+    baselineSource(root, baselineFile, range),
+    readFileSync(path.join(root, currentFile), "utf8"),
+  );
+  for (const fields of removedIndexes) {
+    const destination = fields.some((field) => droppedColumns.has(field))
+      ? automaticallyDroppedIndexTokens
+      : explicitlyDroppedIndexTokens;
+    for (const field of fields) destination.add(field);
+  }
+
   for (const [key, item] of tokenOperations) {
     if (
       item.kind !== "index" ||
       item.operations.size !== 1 ||
-      !item.operations.has("drop")
+      !item.operations.has("drop") ||
+      !automaticallyDroppedIndexTokens.has(item.token) ||
+      explicitlyDroppedIndexTokens.has(item.token)
     ) {
       continue;
     }
-    const column = tokenOperations.get(`column:${item.token}`);
-    if (
-      column?.operations.size === 1 &&
-      column.operations.has("drop")
-    ) {
-      // PostgreSQL drops a single-column index together with its removed
-      // column. Atlas therefore emits only DROP COLUMN for this Ent diff.
-      tokenOperations.delete(key);
-    }
+    // PostgreSQL drops every index that depends on a removed column, including
+    // composite indexes. Atlas therefore omits a redundant DROP INDEX. Keep a
+    // shared token when another removed index still needs explicit DDL proof.
+    tokenOperations.delete(key);
   }
 }
 
@@ -710,7 +769,13 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
       range,
       tokenOperations,
     );
-    dropIndexesRemovedWithTheirOnlyTrackedColumn(tokenOperations);
+    dropIndexesRemovedWithDroppedColumns(
+      root,
+      baselineFile,
+      file,
+      range,
+      tokenOperations,
+    );
   }
   const requirements = [];
   const allPhysicalTokens = [

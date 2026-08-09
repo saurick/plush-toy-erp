@@ -117,7 +117,7 @@ func financeReceivableLeadCreateFromProcessCommand(ctx context.Context, uc *Oper
 	if err != nil {
 		return nil, err
 	}
-	if shipment == nil || shipment.Purpose != ShipmentPurposeSalesDelivery || shipment.Status != ShipmentStatusShipped || shipment.CustomerID == nil || *shipment.CustomerID <= 0 {
+	if shipment == nil || shipment.Status != ShipmentStatusShipped || shipment.CustomerID == nil || *shipment.CustomerID <= 0 {
 		return nil, ErrBadParam
 	}
 	factNo := processCommandStringFromPayload(in.Payload, financeReceivableLeadPayloadSourceNo)

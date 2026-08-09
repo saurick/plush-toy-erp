@@ -120,7 +120,7 @@ func completeShipmentReleaseTaskForTest(
 ) {
 	t.Helper()
 	shipmentRow := client.Shipment.GetX(ctx, shipmentID)
-	if shipmentRow.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusNotRequired {
+	if shipmentRow.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusApproved {
 		approveShipmentFinanceGateForTest(t, ctx, client, shipmentID, actorID)
 	}
 	task := client.WorkflowTask.Query().Where(

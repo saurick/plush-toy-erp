@@ -154,7 +154,6 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['materials', 'inventory'],
         ['sales-orders', 'production-orders'],
         ['sales-orders', 'shipments'],
-        ['shipments', 'rework-intakes'],
         ['material-bom', 'production-orders'],
         [
           'processing-contracts',
@@ -178,10 +177,6 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['outbound', 'inventory'],
         ['outbound', 'shipments'],
         ['shipments', 'outbound'],
-        ['rework-intakes', 'inventory'],
-        ['rework-intakes', 'production-progress'],
-        ['production-progress', 'rework-intakes'],
-        ['rework-intakes', 'shipments'],
         ['receivables', 'finance-payments'],
         ['payables', 'finance-payments'],
       ].map(
@@ -221,7 +216,6 @@ export const businessPageFlowDefinitions = Object.freeze(
           'get_purchase_order_receipt_progress',
         ],
         ['sales-orders', 'shipments', 'list_shipment_source_candidates'],
-        ['shipments', 'rework-intakes', 'list_rework_intake_source_candidates'],
         [
           'processing-contracts',
           'quality-inspections',
@@ -324,12 +318,6 @@ export const businessPageFlowDefinitions = Object.freeze(
           'production-progress',
           'create_production_rework_from_completion',
         ],
-        [
-          'rework-intakes',
-          'production-progress',
-          'create_production_rework_from_intake',
-        ],
-        ['rework-intakes', 'shipments', 'create_rework_reshipment'],
         [
           'production-progress',
           'quality-inspections',
@@ -599,8 +587,6 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['invoices', 'invoices', 'cancel_finance_fact'],
         ['reconciliation', 'reconciliation', 'settle_finance_fact'],
         ['reconciliation', 'reconciliation', 'cancel_finance_fact'],
-        ['rework-intakes', 'rework-intakes', 'cancel_rework_intake'],
-        ['rework-intakes', 'rework-intakes', 'reverse_rework_intake'],
         ['finance-payments', 'finance-payments', 'cancel_finance_payment'],
         ['inventory', 'inventory', 'execute_inventory_adjustment_submit'],
         ['inventory', 'inventory', 'cancel_inventory_operation'],
@@ -645,7 +631,6 @@ export const businessPageFlowDefinitions = Object.freeze(
     )
     .concat(
       [
-        ['shipments', 'rework-intakes', 'create_rework_intake'],
         [
           'quality-inspections',
           'production-exceptions',
@@ -667,7 +652,6 @@ export const businessPageFlowDefinitions = Object.freeze(
     )
     .concat(
       [
-        ['rework-intakes', 'rework-intakes', 'save_rework_intake_draft'],
         ['shipments', 'shipments', 'save_shipment_draft'],
         ['inventory', 'inventory', 'create_inventory_operation'],
         ['inventory', 'inventory', 'save_inventory_operation_draft'],
@@ -685,11 +669,6 @@ export const businessPageFlowDefinitions = Object.freeze(
           'production-progress',
           'production-progress',
           'save_production_rework_from_completion_draft',
-        ],
-        [
-          'production-progress',
-          'production-progress',
-          'save_production_rework_from_intake_draft',
         ],
         [
           'processing-contracts',
@@ -725,7 +704,6 @@ export const businessPageFlowDefinitions = Object.freeze(
     .concat(
       [
         ['inventory', 'inventory', 'post_inventory_operation'],
-        ['rework-intakes', 'inventory', 'receive_rework_intake'],
         [
           'finance-payments',
           'finance-payments',
@@ -973,19 +951,6 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
     availabilityNote: '',
   },
-  'rework-intakes': {
-    pageRole: BUSINESS_PAGE_ROLES.SOURCE_DOCUMENT_OWNER,
-    upstreamPageKeys: ['shipments', 'production-progress'],
-    producerActions: ['create_rework_intake'],
-    sourceTypes: [],
-    downstreamPageKeys: ['inventory', 'production-progress', 'shipments'],
-    taskGroups: [],
-    allowsGenericPageCreate: false,
-    availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
-    taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
-    availabilityNote:
-      '回厂收货形成 HOLD 待返工库存；生产返工沿既有 WIP、工序质检和完工链办理，补发不产生新的应收、发票或财务放行。',
-  },
   'material-bom': {
     pageRole: BUSINESS_PAGE_ROLES.OWNER,
     upstreamPageKeys: ['products', 'materials'],
@@ -1166,7 +1131,6 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
       'create_production_material_issue_from_order',
       'create_production_completion_from_order',
       'create_production_rework_from_completion',
-      'create_production_rework_from_intake',
     ],
     sourceTypes: ['PRODUCTION_ORDER', 'PRODUCTION_FACT'],
     downstreamPageKeys: ['production-exceptions', 'inventory'],

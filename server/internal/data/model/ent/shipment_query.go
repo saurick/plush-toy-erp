@@ -9,7 +9,6 @@ import (
 	"math"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/predicate"
-	"server/internal/data/model/ent/reworkintake"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
@@ -23,14 +22,13 @@ import (
 // ShipmentQuery is the builder for querying Shipment entities.
 type ShipmentQuery struct {
 	config
-	ctx              *QueryContext
-	order            []shipment.OrderOption
-	inters           []Interceptor
-	predicates       []predicate.Shipment
-	withSalesOrder   *SalesOrderQuery
-	withReworkIntake *ReworkIntakeQuery
-	withCustomer     *CustomerQuery
-	withItems        *ShipmentItemQuery
+	ctx            *QueryContext
+	order          []shipment.OrderOption
+	inters         []Interceptor
+	predicates     []predicate.Shipment
+	withSalesOrder *SalesOrderQuery
+	withCustomer   *CustomerQuery
+	withItems      *ShipmentItemQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -82,28 +80,6 @@ func (_q *ShipmentQuery) QuerySalesOrder() *SalesOrderQuery {
 			sqlgraph.From(shipment.Table, shipment.FieldID, selector),
 			sqlgraph.To(salesorder.Table, salesorder.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, shipment.SalesOrderTable, shipment.SalesOrderColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryReworkIntake chains the current query on the "rework_intake" edge.
-func (_q *ShipmentQuery) QueryReworkIntake() *ReworkIntakeQuery {
-	query := (&ReworkIntakeClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shipment.Table, shipment.FieldID, selector),
-			sqlgraph.To(reworkintake.Table, reworkintake.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shipment.ReworkIntakeTable, shipment.ReworkIntakeColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -342,15 +318,14 @@ func (_q *ShipmentQuery) Clone() *ShipmentQuery {
 		return nil
 	}
 	return &ShipmentQuery{
-		config:           _q.config,
-		ctx:              _q.ctx.Clone(),
-		order:            append([]shipment.OrderOption{}, _q.order...),
-		inters:           append([]Interceptor{}, _q.inters...),
-		predicates:       append([]predicate.Shipment{}, _q.predicates...),
-		withSalesOrder:   _q.withSalesOrder.Clone(),
-		withReworkIntake: _q.withReworkIntake.Clone(),
-		withCustomer:     _q.withCustomer.Clone(),
-		withItems:        _q.withItems.Clone(),
+		config:         _q.config,
+		ctx:            _q.ctx.Clone(),
+		order:          append([]shipment.OrderOption{}, _q.order...),
+		inters:         append([]Interceptor{}, _q.inters...),
+		predicates:     append([]predicate.Shipment{}, _q.predicates...),
+		withSalesOrder: _q.withSalesOrder.Clone(),
+		withCustomer:   _q.withCustomer.Clone(),
+		withItems:      _q.withItems.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -365,17 +340,6 @@ func (_q *ShipmentQuery) WithSalesOrder(opts ...func(*SalesOrderQuery)) *Shipmen
 		opt(query)
 	}
 	_q.withSalesOrder = query
-	return _q
-}
-
-// WithReworkIntake tells the query-builder to eager-load the nodes that are connected to
-// the "rework_intake" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *ShipmentQuery) WithReworkIntake(opts ...func(*ReworkIntakeQuery)) *ShipmentQuery {
-	query := (&ReworkIntakeClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withReworkIntake = query
 	return _q
 }
 
@@ -479,9 +443,8 @@ func (_q *ShipmentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Shi
 	var (
 		nodes       = []*Shipment{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [3]bool{
 			_q.withSalesOrder != nil,
-			_q.withReworkIntake != nil,
 			_q.withCustomer != nil,
 			_q.withItems != nil,
 		}
@@ -507,12 +470,6 @@ func (_q *ShipmentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Shi
 	if query := _q.withSalesOrder; query != nil {
 		if err := _q.loadSalesOrder(ctx, query, nodes, nil,
 			func(n *Shipment, e *SalesOrder) { n.Edges.SalesOrder = e }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withReworkIntake; query != nil {
-		if err := _q.loadReworkIntake(ctx, query, nodes, nil,
-			func(n *Shipment, e *ReworkIntake) { n.Edges.ReworkIntake = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -557,38 +514,6 @@ func (_q *ShipmentQuery) loadSalesOrder(ctx context.Context, query *SalesOrderQu
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "sales_order_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
-}
-func (_q *ShipmentQuery) loadReworkIntake(ctx context.Context, query *ReworkIntakeQuery, nodes []*Shipment, init func(*Shipment), assign func(*Shipment, *ReworkIntake)) error {
-	ids := make([]int, 0, len(nodes))
-	nodeids := make(map[int][]*Shipment)
-	for i := range nodes {
-		if nodes[i].ReworkIntakeID == nil {
-			continue
-		}
-		fk := *nodes[i].ReworkIntakeID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(reworkintake.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "rework_intake_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -686,9 +611,6 @@ func (_q *ShipmentQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withSalesOrder != nil {
 			_spec.Node.AddColumnOnce(shipment.FieldSalesOrderID)
-		}
-		if _q.withReworkIntake != nil {
-			_spec.Node.AddColumnOnce(shipment.FieldReworkIntakeID)
 		}
 		if _q.withCustomer != nil {
 			_spec.Node.AddColumnOnce(shipment.FieldCustomerID)

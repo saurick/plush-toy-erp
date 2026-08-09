@@ -19,8 +19,6 @@ const (
 	FieldShipmentID = "shipment_id"
 	// FieldSalesOrderItemID holds the string denoting the sales_order_item_id field in the database.
 	FieldSalesOrderItemID = "sales_order_item_id"
-	// FieldReworkCompletionFactID holds the string denoting the rework_completion_fact_id field in the database.
-	FieldReworkCompletionFactID = "rework_completion_fact_id"
 	// FieldProductID holds the string denoting the product_id field in the database.
 	FieldProductID = "product_id"
 	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
@@ -51,8 +49,6 @@ const (
 	EdgeShipment = "shipment"
 	// EdgeSalesOrderItem holds the string denoting the sales_order_item edge name in mutations.
 	EdgeSalesOrderItem = "sales_order_item"
-	// EdgeReworkCompletionFact holds the string denoting the rework_completion_fact edge name in mutations.
-	EdgeReworkCompletionFact = "rework_completion_fact"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
 	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
@@ -79,13 +75,6 @@ const (
 	SalesOrderItemInverseTable = "sales_order_items"
 	// SalesOrderItemColumn is the table column denoting the sales_order_item relation/edge.
 	SalesOrderItemColumn = "sales_order_item_id"
-	// ReworkCompletionFactTable is the table that holds the rework_completion_fact relation/edge.
-	ReworkCompletionFactTable = "shipment_items"
-	// ReworkCompletionFactInverseTable is the table name for the ProductionFact entity.
-	// It exists in this package in order to avoid circular dependency with the "productionfact" package.
-	ReworkCompletionFactInverseTable = "production_facts"
-	// ReworkCompletionFactColumn is the table column denoting the rework_completion_fact relation/edge.
-	ReworkCompletionFactColumn = "rework_completion_fact_id"
 	// ProductTable is the table that holds the product relation/edge.
 	ProductTable = "shipment_items"
 	// ProductInverseTable is the table name for the Product entity.
@@ -128,7 +117,6 @@ var Columns = []string{
 	FieldID,
 	FieldShipmentID,
 	FieldSalesOrderItemID,
-	FieldReworkCompletionFactID,
 	FieldProductID,
 	FieldProductSkuID,
 	FieldWarehouseID,
@@ -165,8 +153,6 @@ var (
 	ShipmentIDValidator func(int) error
 	// SalesOrderItemIDValidator is a validator for the "sales_order_item_id" field. It is called by the builders before save.
 	SalesOrderItemIDValidator func(int) error
-	// ReworkCompletionFactIDValidator is a validator for the "rework_completion_fact_id" field. It is called by the builders before save.
-	ReworkCompletionFactIDValidator func(int) error
 	// ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
 	ProductIDValidator func(int) error
 	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
@@ -207,11 +193,6 @@ func ByShipmentID(opts ...sql.OrderTermOption) OrderOption {
 // BySalesOrderItemID orders the results by the sales_order_item_id field.
 func BySalesOrderItemID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSalesOrderItemID, opts...).ToFunc()
-}
-
-// ByReworkCompletionFactID orders the results by the rework_completion_fact_id field.
-func ByReworkCompletionFactID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldReworkCompletionFactID, opts...).ToFunc()
 }
 
 // ByProductID orders the results by the product_id field.
@@ -293,13 +274,6 @@ func BySalesOrderItemField(field string, opts ...sql.OrderTermOption) OrderOptio
 	}
 }
 
-// ByReworkCompletionFactField orders the results by rework_completion_fact field.
-func ByReworkCompletionFactField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newReworkCompletionFactStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // ByProductField orders the results by product field.
 func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -346,13 +320,6 @@ func newSalesOrderItemStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SalesOrderItemInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, SalesOrderItemTable, SalesOrderItemColumn),
-	)
-}
-func newReworkCompletionFactStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(ReworkCompletionFactInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, false, ReworkCompletionFactTable, ReworkCompletionFactColumn),
 	)
 }
 func newProductStep() *sqlgraph.Step {

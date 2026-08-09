@@ -385,18 +385,6 @@ function factReferenceRecords(countOverrides = {}) {
           : [],
     })),
     financeFacts,
-    reworkIntakes: [
-      ["DRAFT", 0],
-      ["RECEIVED", 1],
-      ["REVERSED", 2],
-      ["CANCELLED", 3],
-    ].map(([status, index]) => ({
-      id: 125_000 + index,
-      intakeNo: `SIM-SDF-HCF-${index + 1}`,
-      status,
-      sourceShipmentID: 120_010 + index,
-      customerID: 10_001 + index,
-    })),
     financePayments: [
       {
         id: 126_001,
@@ -900,16 +888,6 @@ function createReadinessFetch(runtimeOptions = {}) {
         cancel_reason: item.cancelReason,
       })),
     ],
-    list_rework_intakes: [
-      "rework_intakes",
-      factRefs.reworkIntakes.map((item) => ({
-        id: item.id,
-        intake_no: item.intakeNo,
-        status: item.status,
-        source_shipment_id: item.sourceShipmentID,
-        customer_id: item.customerID,
-      })),
-    ],
     list_finance_payments: [
       "payments",
       factRefs.financePayments.map((item) => ({
@@ -1307,7 +1285,7 @@ function createReadinessFetch(runtimeOptions = {}) {
   return { fetchImpl, calls };
 }
 
-test("all 52 formal targets are owned by shared generator stages", () => {
+test("all 51 formal targets are owned by shared generator stages", () => {
   const contract = buildManualAcceptancePageDataContract();
   const plan = buildManualAcceptanceReadinessPlan();
   const ownershipByID = new Map(
@@ -1320,7 +1298,7 @@ test("all 52 formal targets are owned by shared generator stages", () => {
     ]),
   );
 
-  assert.equal(contract.targets.length, 52);
+  assert.equal(contract.targets.length, 51);
   assert.deepEqual(
     Object.keys(contract.generatorStages).sort(),
     [...MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS].sort(),
@@ -1375,11 +1353,6 @@ test("all 52 formal targets are owned by shared generator stages", () => {
     ["facts"],
   );
   assert.deepEqual(
-    plan.targets.find((target) => target.id === "desktopPages:rework-intakes")
-      .probeIds,
-    ["rework-intakes"],
-  );
-  assert.deepEqual(
     plan.targets.find((target) => target.id === "desktopPages:finance-payments")
       .probeIds,
     ["finance-payments", "finance-credit-notes"],
@@ -1397,7 +1370,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   missingPage.targets.pop();
   assert.throws(
     () => assertManualAcceptancePageDataContract(missingPage),
-    /必须恰好覆盖 52 个正式目标/u,
+    /必须恰好覆盖 51 个正式目标/u,
   );
 
   const unknownProbe = structuredClone(contract);
@@ -1424,7 +1397,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   );
 });
 
-test("default plan covers all 52 targets and never connects to a backend", async () => {
+test("default plan covers all 51 targets and never connects to a backend", async () => {
   let fetchCalls = 0;
   const result = await runManualAcceptanceReadinessCli([], {
     fetchImpl: async () => {
@@ -1438,7 +1411,7 @@ test("default plan covers all 52 targets and never connects to a backend", async
   assert.equal(result.plan.callsBackend, false);
   assert.equal(result.plan.writesBackend, false);
   assert.equal(result.plan.directSQL, false);
-  assert.equal(result.plan.targets.length, 52);
+  assert.equal(result.plan.targets.length, 51);
   assert.equal(
     result.plan.targets.filter(
       (item) => item.catalogGroup === "mobileRolePages",
@@ -1490,7 +1463,7 @@ test("default plan covers all 52 targets and never connects to a backend", async
   assert.ok(businessDashboard.probeIds.includes("products"));
   assert.ok(businessDashboard.probeIds.includes("business-dashboard-stats"));
   assert.equal(businessDashboard.probeIds.includes("product-skus"), false);
-  assert.equal(result.plan.expected.targets, 52);
+  assert.equal(result.plan.expected.targets, 51);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
   const probesByID = new Map(
     result.plan.probes.map((probe) => [probe.id, probe]),
@@ -2100,10 +2073,10 @@ test("explicit verification reports page data, nine role totals, and honest manu
     }),
   );
 
-  assert.equal(report.summary.totalTargets, 52);
+  assert.equal(report.summary.totalTargets, 51);
   assert.equal(
     report.summary.passedTargetData,
-    42,
+    41,
     JSON.stringify(
       report.targets
         .filter((item) => item.dataStatus !== "pass")
@@ -2156,7 +2129,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
     new Set(Object.values(report.summary.mobileActualByRole)),
     new Set([20]),
   );
-  assert.equal(report.targets.length, 52);
+  assert.equal(report.targets.length, 51);
   assert.equal(report.runtimePreflight.environment, "local");
   assert.equal(report.runtimePreflight.customerKey, "yoyoosun");
   assert.equal(
@@ -2833,7 +2806,7 @@ test("customer-facing report uses ordinary business wording", async () => {
   assert.match(markdown, /九个岗位任务合计：180 \/ 180/u);
   assert.match(markdown, /尚未证明/u);
   assert.match(markdown, /人工验收：未完成/u);
-  assert.match(markdown, /页面操作已完成：0 \/ 52/u);
+  assert.match(markdown, /页面操作已完成：0 \/ 51/u);
   assert.doesNotMatch(
     markdown,
     /Workflow|Fact|JSON-RPC|RBAC|schema|raw\s*id|甲方/iu,

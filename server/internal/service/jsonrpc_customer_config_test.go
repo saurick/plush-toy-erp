@@ -128,7 +128,7 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 		// Start handlers still read the authoritative source document even when a
 		// focused runtime-command test intentionally omits command registrations.
 		operationalFactUC = biz.NewOperationalFactUsecase(&customerConfigShipmentOperationalFactRepo{
-			shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Purpose: biz.ShipmentPurposeSalesDelivery, Status: biz.ShipmentStatusDraft, FinanceReleaseStatus: biz.ShipmentFinanceReleaseStatusPending, FinanceReleaseVersion: 1},
+			shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusDraft, FinanceReleaseStatus: biz.ShipmentFinanceReleaseStatusPending, FinanceReleaseVersion: 1},
 		})
 	}
 	if err := biz.RegisterExceptionApprovalProcessBranchPolicyHandlers(processRuntimeUC); err != nil {
@@ -1868,10 +1868,8 @@ func customerConfigPublishParamsWithRevisionAndModuleState(t *testing.T, params 
 		"processes":           {"outsourcing_orders"},
 		"sales_orders":        {"shipments"},
 		"purchase_orders":     {"purchase_receipts"},
-		"quality_inspections": {"purchase_receipts", "rework_intakes"},
-		"inventory":           {"purchase_receipts", "quality_inspections", "shipments", "rework_intakes"},
-		"shipments":           {"rework_intakes"},
-		"production":          {"rework_intakes"},
+		"quality_inspections": {"purchase_receipts"},
+		"inventory":           {"purchase_receipts", "quality_inspections", "shipments"},
 		"finance":             {"finance_payments"},
 	}
 	queue := []string{moduleKey}
@@ -3202,7 +3200,7 @@ func createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t *testing.T, run
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegisteredHandler(t *testing.T) {
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
-		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Purpose: biz.ShipmentPurposeSalesDelivery, Status: biz.ShipmentStatusShipped},
+		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusShipped},
 	}
 	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
@@ -3267,7 +3265,7 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegist
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipUsesInstanceRevisionAfterActiveConfigChanges(t *testing.T) {
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
-		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Purpose: biz.ShipmentPurposeSalesDelivery, Status: biz.ShipmentStatusShipped},
+		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusShipped},
 	}
 	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
@@ -3547,7 +3545,6 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesD
 		shipment: &biz.Shipment{
 			ID:         9001,
 			CustomerID: &customerID,
-			Purpose:    biz.ShipmentPurposeSalesDelivery,
 			Status:     biz.ShipmentStatusShipped,
 		},
 	}

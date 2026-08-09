@@ -20,8 +20,6 @@ import (
 	"server/internal/data/model/ent/productionwipevent"
 	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/qualityinspection"
-	"server/internal/data/model/ent/shipment"
-	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/warehouse"
 
 	"github.com/shopspring/decimal"
@@ -218,25 +216,13 @@ func lockProductionReworkDraftSource(ctx context.Context, tx *inventoryDBTx, sou
 	if err := lockOperationalFactRow(ctx, tx, "production_order_items", source.itemID, biz.ErrProductionOrderFactSourceInvalid); err != nil {
 		return err
 	}
-	if source.sourceCompletion != nil {
-		if source.sourceCompletion.ProductionWipBatchID == nil {
-			return biz.ErrProductionReworkSourceInvalid
-		}
-		if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", *source.sourceCompletion.ProductionWipBatchID, biz.ErrProductionReworkSourceInvalid); err != nil {
-			return err
-		}
-		return lockOperationalFactRow(ctx, tx, "production_facts", source.sourceCompletion.ID, biz.ErrProductionFactNotFound)
-	}
-	if source.intake == nil || source.intakeItem == nil || source.intakeItem.ReceivedLotID == nil {
+	if source.sourceCompletion == nil || source.sourceCompletion.ProductionWipBatchID == nil {
 		return biz.ErrProductionReworkSourceInvalid
 	}
-	if err := lockOperationalFactRow(ctx, tx, "rework_intakes", source.intake.ID, biz.ErrReworkIntakeNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", *source.sourceCompletion.ProductionWipBatchID, biz.ErrProductionReworkSourceInvalid); err != nil {
 		return err
 	}
-	if err := lockOperationalFactRow(ctx, tx, "rework_intake_items", source.intakeItem.ID, biz.ErrReworkIntakeSourceInvalid); err != nil {
-		return err
-	}
-	return lockOperationalFactRow(ctx, tx, "inventory_lots", *source.intakeItem.ReceivedLotID, biz.ErrProductionReworkSourceInvalid)
+	return lockOperationalFactRow(ctx, tx, "production_facts", source.sourceCompletion.ID, biz.ErrProductionFactNotFound)
 }
 
 func validateProductionMaterialIssueDraftSave(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, in *biz.ProductionFactDraftSave) error {
@@ -338,20 +324,11 @@ func validateProductionReworkDraftSave(ctx context.Context, tx *inventoryDBTx, r
 		!operationalFactMutationMatchesProduction(row, source.mutation) {
 		return biz.ErrProductionReworkSourceInvalid
 	}
-	if source.sourceCompletion != nil {
-		if err := validateProductionReworkQuantity(ctx, tx.client, source.sourceCompletion, in.Quantity, row.ID); err != nil {
-			return err
-		}
-	} else if source.intake != nil && source.intakeItem != nil {
-		used, err := activeProductionReworkFromIntakeQuantity(ctx, tx.client, source.intake.ID, source.intakeItem.ID, row.ID)
-		if err != nil {
-			return err
-		}
-		if used.Add(in.Quantity).GreaterThan(source.intakeItem.Quantity) {
-			return biz.ErrProductionReworkQuantityExceeded
-		}
-	} else {
+	if source.sourceCompletion == nil {
 		return biz.ErrProductionReworkSourceInvalid
+	}
+	if err := validateProductionReworkQuantity(ctx, tx.client, source.sourceCompletion, in.Quantity, row.ID); err != nil {
+		return err
 	}
 	exists, err := tx.client.ProductionFact.Query().Where(productionfact.FactNo(in.FactNo), productionfact.IDNEQ(row.ID)).Exist(ctx)
 	if err != nil {
@@ -706,8 +683,6 @@ type productionReworkSourceContext struct {
 	orderID          int
 	itemID           int
 	sourceCompletion *ent.ProductionFact
-	intake           *ent.ReworkIntake
-	intakeItem       *ent.ReworkIntakeItem
 	mutation         *biz.OperationalFactMutation
 }
 
@@ -721,75 +696,28 @@ func resolveProductionReworkRowSource(
 		row.SourceID == nil || *row.SourceID <= 0 || row.SourceLineID == nil || *row.SourceLineID <= 0 {
 		return nil, biz.ErrProductionReworkSourceInvalid
 	}
-	switch *row.SourceType {
-	case biz.ProductionFactSourceType:
-		reason := ""
-		if row.Note != nil {
-			reason = *row.Note
-		}
-		resolved, source, err := resolveProductionReworkMutation(ctx, client, &biz.ProductionReworkFromCompletionCreate{
-			FactNo: row.FactNo, SourceCompletionFactID: *row.SourceID, Quantity: row.Quantity,
-			IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, OccurredAtSpecified: row.OccurredAtSpecified,
-			Reason: reason,
-		}, requireAvailable)
-		if err != nil {
-			return nil, err
-		}
-		orderID, itemID, err := productionCompletionSourceCoordinates(source)
-		if err != nil {
-			return nil, err
-		}
-		return &productionReworkSourceContext{
-			orderID: orderID, itemID: itemID, sourceCompletion: source, mutation: resolved,
-		}, nil
-	case biz.ReworkIntakeSourceType:
-		intake, err := client.ReworkIntake.Get(ctx, *row.SourceID)
-		if err != nil {
-			return nil, biz.ErrProductionReworkSourceInvalid
-		}
-		if (requireAvailable && intake.Status != biz.ReworkIntakeStatusReceived) ||
-			(!requireAvailable && intake.Status != biz.ReworkIntakeStatusReceived && intake.Status != biz.ReworkIntakeStatusReversed) {
-			return nil, biz.ErrProductionReworkSourceState
-		}
-		item, err := client.ReworkIntakeItem.Get(ctx, *row.SourceLineID)
-		if err != nil || item.ReworkIntakeID != intake.ID || item.ReceivedLotID == nil {
-			return nil, biz.ErrProductionReworkSourceInvalid
-		}
-		target, err := client.ProductionOrderItem.Get(ctx, item.TargetProductionOrderItemID)
-		if err != nil || target.ProductID != item.ProductID || target.UnitID != item.UnitID ||
-			!sameOptionalInt(target.ProductSkuID, item.ProductSkuID) {
-			return nil, biz.ErrProductionReworkSourceInvalid
-		}
-		order, err := client.ProductionOrder.Get(ctx, target.ProductionOrderID)
-		if err != nil || (order.Status != biz.ProductionOrderStatusReleased && order.Status != biz.ProductionOrderStatusClosed) {
-			return nil, biz.ErrProductionReworkSourceState
-		}
-		lot, err := client.InventoryLot.Get(ctx, *item.ReceivedLotID)
-		if err != nil || lot.Status != biz.InventoryLotHold || lot.SubjectType != biz.InventorySubjectProduct ||
-			lot.SubjectID != item.ProductID || !sameOptionalInt(lot.ProductSkuID, item.ProductSkuID) {
-			return nil, biz.ErrProductionReworkSourceInvalid
-		}
-		reason := ""
-		if row.Note != nil {
-			reason = *row.Note
-		}
-		sourceType := biz.ReworkIntakeSourceType
-		sourceID := intake.ID
-		sourceLineID := item.ID
-		return &productionReworkSourceContext{
-			orderID: order.ID, itemID: target.ID, intake: intake, intakeItem: item,
-			mutation: &biz.OperationalFactMutation{
-				FactNo: row.FactNo, FactType: biz.ProductionFactRework,
-				SubjectType: biz.InventorySubjectProduct, SubjectID: item.ProductID, ProductSkuID: item.ProductSkuID,
-				WarehouseID: item.ReceivingWarehouseID, UnitID: item.UnitID, LotID: item.ReceivedLotID,
-				Quantity: row.Quantity, SourceType: &sourceType, SourceID: &sourceID, SourceLineID: &sourceLineID,
-				IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, OccurredAtSpecified: row.OccurredAtSpecified,
-				Note: &reason,
-			},
-		}, nil
-	default:
+	if *row.SourceType != biz.ProductionFactSourceType {
 		return nil, biz.ErrProductionReworkSourceInvalid
 	}
+	reason := ""
+	if row.Note != nil {
+		reason = *row.Note
+	}
+	resolved, source, err := resolveProductionReworkMutation(ctx, client, &biz.ProductionReworkFromCompletionCreate{
+		FactNo: row.FactNo, SourceCompletionFactID: *row.SourceID, Quantity: row.Quantity,
+		IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, OccurredAtSpecified: row.OccurredAtSpecified,
+		Reason: reason,
+	}, requireAvailable)
+	if err != nil {
+		return nil, err
+	}
+	orderID, itemID, err := productionCompletionSourceCoordinates(source)
+	if err != nil {
+		return nil, err
+	}
+	return &productionReworkSourceContext{
+		orderID: orderID, itemID: itemID, sourceCompletion: source, mutation: resolved,
+	}, nil
 }
 
 func validateProductionReworkQuantity(ctx context.Context, client *ent.Client, source *ent.ProductionFact, additional decimal.Decimal, excludeID int) error {
@@ -1195,7 +1123,7 @@ func isProductionReworkLinkedFactRow(row *ent.ProductionFact) bool {
 		row.SourceLineID == nil || *row.SourceLineID <= 0 {
 		return false
 	}
-	return *row.SourceType == biz.ProductionFactSourceType || *row.SourceType == biz.ReworkIntakeSourceType
+	return *row.SourceType == biz.ProductionFactSourceType
 }
 
 func productionOrderSourceID(in *biz.OperationalFactMutation) (int, error) {
@@ -1456,23 +1384,6 @@ func productionOrderEffectiveCompletedQuantity(ctx context.Context, client *ent.
 			return decimal.Zero, biz.ErrProductionReworkSourceInvalid
 		}
 		effective = effective.Sub(row.Quantity)
-	}
-	intakeReworks, err := client.ProductionFact.Query().Where(
-		productionfact.FactType(biz.ProductionFactRework),
-		productionfact.Status(biz.OperationalFactStatusPosted),
-		productionfact.SourceType(biz.ReworkIntakeSourceType),
-	).All(ctx)
-	if err != nil {
-		return decimal.Zero, err
-	}
-	for _, row := range intakeReworks {
-		source, err := resolveProductionReworkRowSource(ctx, client, row, false)
-		if err != nil {
-			return decimal.Zero, err
-		}
-		if source.itemID == item.ID && source.orderID == item.ProductionOrderID {
-			effective = effective.Sub(row.Quantity)
-		}
 	}
 	if effective.IsNegative() {
 		return decimal.Zero, biz.ErrProductionReworkQuantityExceeded
@@ -1948,28 +1859,14 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, in *
 	if err := lockOperationalFactRow(ctx, tx, "production_order_items", itemID, biz.ErrProductionOrderFactSourceInvalid); err != nil {
 		return nil, err
 	}
-	if sourcePreview.sourceCompletion != nil {
-		if sourcePreview.sourceCompletion.ProductionWipBatchID == nil {
-			return nil, biz.ErrProductionReworkSourceInvalid
-		}
-		if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", *sourcePreview.sourceCompletion.ProductionWipBatchID, biz.ErrProductionReworkSourceInvalid); err != nil {
-			return nil, err
-		}
-		if err := lockOperationalFactRow(ctx, tx, "production_facts", sourcePreview.sourceCompletion.ID, biz.ErrProductionFactNotFound); err != nil {
-			return nil, err
-		}
-	} else if sourcePreview.intake != nil && sourcePreview.intakeItem != nil && sourcePreview.intakeItem.ReceivedLotID != nil {
-		if err := lockOperationalFactRow(ctx, tx, "rework_intakes", sourcePreview.intake.ID, biz.ErrReworkIntakeNotFound); err != nil {
-			return nil, err
-		}
-		if err := lockOperationalFactRow(ctx, tx, "rework_intake_items", sourcePreview.intakeItem.ID, biz.ErrReworkIntakeSourceInvalid); err != nil {
-			return nil, err
-		}
-		if err := lockOperationalFactRow(ctx, tx, "inventory_lots", *sourcePreview.intakeItem.ReceivedLotID, biz.ErrProductionReworkSourceInvalid); err != nil {
-			return nil, err
-		}
-	} else {
+	if sourcePreview.sourceCompletion == nil || sourcePreview.sourceCompletion.ProductionWipBatchID == nil {
 		return nil, biz.ErrProductionReworkSourceInvalid
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", *sourcePreview.sourceCompletion.ProductionWipBatchID, biz.ErrProductionReworkSourceInvalid); err != nil {
+		return nil, err
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", sourcePreview.sourceCompletion.ID, biz.ErrProductionFactNotFound); err != nil {
+		return nil, err
 	}
 	if err := lockOperationalFactRow(ctx, tx, "production_facts", in.ID, biz.ErrProductionFactNotFound); err != nil {
 		return nil, err
@@ -2130,20 +2027,11 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, in *
 		if row.Status != biz.OperationalFactStatusDraft {
 			return nil, biz.ErrBadParam
 		}
-		if source.sourceCompletion != nil {
-			if err := validateProductionReworkQuantity(ctx, tx.client, source.sourceCompletion, row.Quantity, row.ID); err != nil {
-				return nil, err
-			}
-		} else if source.intake != nil && source.intakeItem != nil {
-			active, err := activeProductionReworkFromIntakeQuantity(ctx, tx.client, source.intake.ID, source.intakeItem.ID, row.ID)
-			if err != nil {
-				return nil, err
-			}
-			if active.Add(row.Quantity).GreaterThan(source.intakeItem.Quantity) {
-				return nil, biz.ErrProductionReworkQuantityExceeded
-			}
-		} else {
+		if source.sourceCompletion == nil {
 			return nil, biz.ErrProductionReworkSourceInvalid
+		}
+		if err := validateProductionReworkQuantity(ctx, tx.client, source.sourceCompletion, row.Quantity, row.ID); err != nil {
+			return nil, err
 		}
 		if err := r.applyProductionFactInventory(ctx, tx, row, in, false); err != nil {
 			return nil, err
@@ -2231,19 +2119,6 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 				return nil, err
 			}
 			if row.Status == biz.OperationalFactStatusPosted {
-				hasActiveReshipment, err := tx.client.ShipmentItem.Query().Where(
-					shipmentitem.ReworkCompletionFactID(row.ID),
-					shipmentitem.HasShipmentWith(
-						shipment.Purpose(biz.ShipmentPurposeReworkReshipment),
-						shipment.StatusIn(biz.ShipmentStatusDraft, biz.ShipmentStatusShipped),
-					),
-				).Exist(ctx)
-				if err != nil {
-					return nil, err
-				}
-				if hasActiveReshipment {
-					return nil, biz.ErrReworkCompletionReshipmentDependency
-				}
 				hasActiveRework, err := tx.client.ProductionFact.Query().Where(
 					productionfact.FactType(biz.ProductionFactRework),
 					productionfact.StatusNEQ(biz.OperationalFactStatusCancelled),

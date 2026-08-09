@@ -184,7 +184,7 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
         passed: true,
         formalAccounts: 10,
         mobileAccounts: 9,
-        pages: 52,
+        pages: 51,
         report: "output/manual-browser.json",
       });
     },
@@ -201,7 +201,7 @@ function fakeRuntime({ failAt = "", residual = "" } = {}) {
     async runExceptionBrowser(name) {
       return invoke(`browser:exception:${name}`, {
         passed: true,
-        flows: 4,
+        flows: 3,
         report: "output/exception-browser.json",
       });
     },

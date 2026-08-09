@@ -59,7 +59,7 @@ function routerLiteralPaths() {
   };
 }
 
-test("manual acceptance catalog covers all 52 formal read-only targets", () => {
+test("manual acceptance catalog covers all 51 formal read-only targets", () => {
   const catalog = buildManualAcceptanceCatalog();
   const expectedDesktopItems = getNavigationSections({
     ...yoyoosunMenuConfig,
@@ -70,11 +70,11 @@ test("manual acceptance catalog covers all 52 formal read-only targets", () => {
   }).flatMap((section) => section.items);
 
   assert.equal(catalog.summary.entryPages, 2);
-  assert.equal(catalog.summary.desktopPages, 31);
+  assert.equal(catalog.summary.desktopPages, 30);
   assert.equal(catalog.summary.mobileRolePages, 9);
   assert.equal(catalog.summary.printPreviewPages, 5);
   assert.equal(catalog.summary.printWorkspacePages, 5);
-  assert.equal(catalog.summary.totalScenarios, 52);
+  assert.equal(catalog.summary.totalScenarios, 51);
   assert.deepEqual(
     catalog.technicalManifest.desktopPages.map((item) => item.key),
     expectedDesktopItems.map((item) => item.key),
@@ -208,7 +208,6 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       products: 20,
       materials: 80,
       "sales-orders": 45,
-      "rework-intakes": 4,
       "material-bom": 45,
       processes: 30,
       "accessories-purchase": 45,
@@ -485,7 +484,7 @@ test("manual acceptance catalog default run stays stdout-only and never calls a 
     );
     assert.equal(fetchCalled, false);
     assert.deepEqual(result.writtenPaths, []);
-    assert.equal(JSON.parse(stdout).summary.totalScenarios, 52);
+    assert.equal(JSON.parse(stdout).summary.totalScenarios, 51);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -497,7 +496,7 @@ test("manual acceptance catalog renders Chinese Markdown and JSON", () => {
   const json = renderManualAcceptanceJson(catalog);
 
   assert.match(markdown, /# 东莞市永绅玩具有限公司全页面手动验收目录/);
-  assert.match(markdown, /\| 桌面后台 \| 31 \|/);
+  assert.match(markdown, /\| 桌面后台 \| 30 \|/);
   assert.match(markdown, /你要做什么/);
   assert.match(markdown, /应看到什么/);
   assert.match(markdown, /采购合同预览/);
@@ -505,8 +504,8 @@ test("manual acceptance catalog renders Chinese Markdown and JSON", () => {
   assert.doesNotMatch(markdown, /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|甲方/i);
 
   const parsed = JSON.parse(json);
-  assert.equal(parsed.summary.totalScenarios, 52);
-  assert.equal(parsed.technicalManifest.desktopPages.length, 31);
+  assert.equal(parsed.summary.totalScenarios, 51);
+  assert.equal(parsed.technicalManifest.desktopPages.length, 30);
 });
 
 test("manual acceptance catalog CLI parses formats and writes local report artifacts", () => {

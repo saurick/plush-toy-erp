@@ -33,8 +33,6 @@ type ProductionExceptionSourceTaskInput struct {
 	FactID                 int
 	FactNo                 string
 	SourceCompletionFactID int
-	ReworkIntakeID         int
-	ReworkIntakeNo         string
 	ProductionOrderID      int
 	ProductionOrderNo      string
 	ProductionOrderItemID  int
@@ -151,15 +149,12 @@ func BuildProductionSchedulingSourceTask(source *ProductionOrderAggregate) (*Wor
 
 func BuildProductionExceptionSourceTask(source ProductionExceptionSourceTaskInput) (*WorkflowTaskCreate, *WorkflowBusinessStateUpsert, error) {
 	source.FactNo = strings.TrimSpace(source.FactNo)
-	source.ReworkIntakeNo = strings.TrimSpace(source.ReworkIntakeNo)
 	source.ProductionOrderNo = strings.TrimSpace(source.ProductionOrderNo)
 	source.ProductName = strings.TrimSpace(source.ProductName)
 	source.UnitName = strings.TrimSpace(source.UnitName)
 	source.Quantity = strings.TrimSpace(source.Quantity)
 	source.Reason = strings.TrimSpace(source.Reason)
-	hasCompletionSource := source.SourceCompletionFactID > 0 && source.ReworkIntakeID == 0 && source.ReworkIntakeNo == ""
-	hasIntakeSource := source.SourceCompletionFactID == 0 && source.ReworkIntakeID > 0 && source.ReworkIntakeNo != ""
-	if source.FactID <= 0 || (!hasCompletionSource && !hasIntakeSource) || source.ProductionOrderID <= 0 ||
+	if source.FactID <= 0 || source.SourceCompletionFactID <= 0 || source.ProductionOrderID <= 0 ||
 		source.ProductionOrderItemID <= 0 || source.FactNo == "" || source.ProductionOrderNo == "" ||
 		source.Quantity == "" || source.Reason == "" || source.OccurredAt.IsZero() {
 		return nil, nil, ErrBadParam
@@ -188,12 +183,7 @@ func BuildProductionExceptionSourceTask(source ProductionExceptionSourceTaskInpu
 		"alert_type":               "rework_pending",
 		"critical_path":            true,
 	}
-	if hasCompletionSource {
-		payload["source_completion_fact_id"] = source.SourceCompletionFactID
-	} else {
-		payload["rework_intake_id"] = source.ReworkIntakeID
-		payload["rework_intake_no"] = source.ReworkIntakeNo
-	}
+	payload["source_completion_fact_id"] = source.SourceCompletionFactID
 	task := &WorkflowTaskCreate{
 		TaskCode:              WorkflowSourceTaskCode(WorkflowSourceTaskProductionExceptionGroup, source.FactID),
 		TaskGroup:             WorkflowSourceTaskProductionExceptionGroup,

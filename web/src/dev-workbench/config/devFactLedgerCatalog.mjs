@@ -101,7 +101,7 @@ const FACT_DEFINITIONS = [
     businessImpact: '扣减成品库存并形成真实 shipped 业务时点。',
     voucher: '出货单与库存出库记录；财务放行或流程结束都不是 shipped 凭证。',
     idempotencyRule: '出货单版本、来源销售行和幂等键阻止重复出库。',
-    correction: '按出货取消、退回或返工回厂合同生成可审计纠正记录。',
+    correction: '按出货取消合同生成可审计纠正记录。',
     sourceRefs: [
       'server/internal/biz/operational_fact.go',
       'server/internal/service/jsonrpc_operational_fact_shipment.go',
@@ -203,20 +203,6 @@ const FACT_DEFINITIONS = [
     sourceRefs: [
       'server/internal/biz/production_wip.go',
       'server/internal/data/production_wip_repo.go',
-    ],
-  }),
-  fact('fact.rework_intake', '返工回厂', {
-    displayGroupKey: 'outsourcing_rework',
-    occurrenceCondition: '原出货来源通过返工回厂领域用例正式收回。',
-    sourceDocument: '原出货单与返工回厂单',
-    authority: '返工回厂单、明细及关联库存事务',
-    businessImpact: '形成返工 HOLD 库存和后续生产返工来源。',
-    voucher: '返工回厂单及入库事务。',
-    idempotencyRule: '原出货行、返工回厂行和幂等键不得重复入库。',
-    correction: '按返工回厂取消/纠正合同生成反向记录，保留原来源链。',
-    sourceRefs: [
-      'server/internal/biz/rework_intake.go',
-      'server/internal/data/operational_fact_rework_intake_repo.go',
     ],
   }),
   fact('fact.purchase_rejection_disposition', '采购拒收处置', {

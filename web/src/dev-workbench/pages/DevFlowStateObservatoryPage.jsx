@@ -1406,7 +1406,7 @@ function BusinessChainOverviewView({
         guidanceKey="chain-overview"
         title="总图只画链与链的衔接"
         summary="点击一条链，再按步骤查看业务单据、岗位协同、流程运行和已生效结果"
-        description="这里的 12 个节点分别代表 12 条正式设计链，不会把每条链内部几十个业务单据、岗位任务、流程步骤和业务凭证挤在同一张图里。总图只说明允许怎样衔接，不是一笔业务的完整运行历史。"
+        description="这里的 11 个节点分别代表 11 条正式设计链，不会把每条链内部几十个业务单据、岗位任务、流程步骤和业务凭证挤在同一张图里。总图只说明允许怎样衔接，不是一笔业务的完整运行历史。"
       />
 
       <section className="erp-dev-flow-chain-heading">
@@ -1525,7 +1525,7 @@ function BusinessChainOverviewView({
           <div>
             <Text strong>业务链级总图</Text>
             <Text type="secondary">
-              12 条正式设计链、4 个业务分区、{overview.relations.length}{' '}
+              11 条正式设计链、4 个业务分区、{overview.relations.length}{' '}
               条明确衔接。
             </Text>
           </div>
@@ -3558,7 +3558,7 @@ export default function DevFlowStateObservatoryPage() {
               <Tag color="green">仅开发环境 · 只读</Tag>
             </Space>
             <Paragraph>
-              先看客户、产品等基础信息和销售、采购等业务单据怎样沿 12
+              先看客户、产品等基础信息和销售、采购等业务单据怎样沿 11
               条业务链，经过责任协同、流程运行和受控业务动作形成事实台账与计算结果；状态规则、权限、客户配置与审计贯穿全程。
             </Paragraph>
           </div>

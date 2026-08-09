@@ -72,12 +72,6 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "operational_fact", Method: "create_stock_reservation_from_sales_order", Rules: sourceReadRules(PermissionSalesOrderRead, PermissionSalesOrderItemRead)},
 	{Domain: "operational_fact", Method: "create_receivable_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "operational_fact", Method: "create_invoice_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
-	{Domain: "operational_fact", Method: "list_rework_intake_source_candidates", Rules: sourceReadRules(PermissionShipmentRead, PermissionProductionWIPRead)},
-	{Domain: "operational_fact", Method: "create_rework_intake", Rules: sourceReadRules(PermissionShipmentRead, PermissionProductionWIPRead)},
-	{Domain: "operational_fact", Method: "save_rework_intake_draft", Rules: sourceReadRules(PermissionShipmentRead, PermissionProductionWIPRead)},
-	{Domain: "operational_fact", Method: "create_production_rework_from_intake", Rules: sourceReadRules(PermissionReworkIntakeRead, PermissionPMCPlanRead)},
-	{Domain: "operational_fact", Method: "save_production_rework_from_intake_draft", Rules: sourceReadRules(PermissionReworkIntakeRead, PermissionPMCPlanRead)},
-	{Domain: "operational_fact", Method: "create_rework_reshipment", Rules: sourceReadRules(PermissionReworkIntakeRead, PermissionProductionFactRead)},
 	{Domain: "operational_fact", Method: "create_payable_from_purchase_receipt", Rules: sourceReadRules(PermissionPurchaseReceiptRead, PermissionPurchaseReturnRead, PermissionPurchaseReceiptAdjustmentRead)},
 	{Domain: "operational_fact", Method: "create_payable_from_outsourcing_return", Rules: sourceReadRules(PermissionOutsourcingFactRead, PermissionOutsourcingOrderRead, PermissionQualityInspectionRead)},
 	{

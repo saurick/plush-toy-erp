@@ -18,7 +18,7 @@ import {
   isSupportedPrintWorkspaceTemplate,
 } from "../../web/src/erp/utils/printWorkspace.js";
 
-const EXPECTED_DESKTOP_PAGE_COUNT = 31;
+const EXPECTED_DESKTOP_PAGE_COUNT = 30;
 const EXPECTED_MOBILE_PAGE_COUNT = 9;
 const EXPECTED_PRINT_TEMPLATE_COUNT = 5;
 const FORMAL_TRIAL_ACCOUNT_COUNT = 10;
@@ -253,20 +253,6 @@ const DESKTOP_PLANS = Object.freeze({
     whatToSee: [
       "应看到客户、产品、数量、单位、交期和金额在列表、详情与编辑界面一致。",
       "应看到提交后的状态和可操作按钮符合当前进度，不会因为提交就显示已经出货或已经收款。",
-    ],
-  },
-  "rework-intakes": {
-    isList: true,
-    minimumRecords: 4,
-    minimumRecordUnit: "返工回厂记录",
-    keyStates: ["待接收", "已接收待返工", "返工中", "已完成补发"],
-    whatToDo: [
-      "你要按回厂单号、原出货单和状态查找，依次打开待接收、待返工、返工中和已补发记录。",
-      "你要核对原出货、客户、产品、规格、回厂数量、待返工批次、生产返工、工序质检与补发追溯。",
-    ],
-    whatToSee: [
-      "应看到四种进度各有一条固定模拟记录，回厂单号、原出货、客户、产品、数量和原因前后一致。",
-      "应看到确认回厂后实物只进入待返工库存，完成生产返工和工序质检后才能建立不产生新应收与开票的补发单。",
     ],
   },
   "material-bom": {
@@ -560,7 +546,14 @@ const DESKTOP_PLANS = Object.freeze({
     isList: true,
     minimumRecords: 4,
     minimumRecordUnit: "收付款记录（另有 3 条红冲记录）",
-    keyStates: ["已批准待核销", "已收款", "已付款", "已冲销", "红冲", "反向红冲"],
+    keyStates: [
+      "已批准待核销",
+      "已收款",
+      "已付款",
+      "已冲销",
+      "红冲",
+      "反向红冲",
+    ],
     whatToDo: [
       "你要分别查看已批准待核销、已收款、已付款和已冲销记录，再切换到红冲记录。",
       "你要核对往来单位、收付方向、金额、币种和核销明细，并打开一组原红冲与反向红冲记录。",

@@ -250,13 +250,9 @@ func buildProductionExceptionSourceTaskFromFact(
 		Reason:                reason,
 		OccurredAt:            row.OccurredAt,
 	}
-	if source.sourceCompletion != nil {
-		input.SourceCompletionFactID = source.sourceCompletion.ID
-	} else if source.intake != nil {
-		input.ReworkIntakeID = source.intake.ID
-		input.ReworkIntakeNo = source.intake.IntakeNo
-	} else {
+	if source.sourceCompletion == nil {
 		return nil, nil, biz.ErrProductionReworkSourceInvalid
 	}
+	input.SourceCompletionFactID = source.sourceCompletion.ID
 	return biz.BuildProductionExceptionSourceTask(input)
 }

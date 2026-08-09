@@ -57,12 +57,12 @@ test("dev flow state observatory: route and all catalogs stay DEV-only and read-
   assert.equal(catalog.factRuntimeQuery.availability, "unavailable");
   assert.equal(catalog.businessChainOverview.key, "all");
   assert.equal(catalog.businessChainOverview.readOnly, true);
-  assert.equal(catalog.businessChainOverview.relations.length, 16);
-  assert.equal(catalog.businessChains.length, 12);
+  assert.equal(catalog.businessChainOverview.relations.length, 13);
+  assert.equal(catalog.businessChains.length, 11);
   assert.equal(
     catalog.businessChains.some((chain) => chain.key === "all"),
     false,
-    "the read-only overview must not become a fake thirteenth business chain",
+    "the read-only overview must not become a fake twelfth business chain",
   );
   assert(catalog.businessChains.every((chain) => chain.readOnly));
   assert(catalog.factDefinitions.every((fact) => fact.readOnly));
@@ -122,7 +122,7 @@ test("dev flow state observatory: five-view information architecture explains pe
   assert.match(page, /catalog\.businessChainOverview\.key/u);
   assert.match(page, /buildBusinessChainSelectOptions\(catalog\)/u);
   assert.match(page, /总图只画链与链的衔接/u);
-  assert.match(page, /12 个节点分别代表 12 条正式设计链/u);
+  assert.match(page, /11 个节点分别代表 11 条正式设计链/u);
   assert.match(page, /一次只看一条业务链/u);
   assert.match(page, /业务链先看步骤，再查运行证据/u);
   assert.match(page, /查询任务后，只高亮真实运行到的一个步骤/u);
@@ -175,13 +175,13 @@ test("dev flow state observatory: long definition selects are grouped without ch
 
   assert.deepEqual(
     chainOptions.slice(1).map((group) => group.label),
-    ["履约主链 · 3", "供给与库存支撑 · 3", "异常与返工 · 4", "冲正与纠正 · 2"],
+    ["履约主链 · 3", "供给与库存支撑 · 3", "异常与返工 · 3", "冲正与纠正 · 2"],
   );
   assert.deepEqual(
     factOptions.map((group) => group.label),
-    ["采购与质量 · 5", "生产与库存 · 6", "委外与返工 · 3", "出货与财务 · 6"],
+    ["采购与质量 · 5", "生产与库存 · 6", "委外与返工 · 2", "出货与财务 · 6"],
   );
-  assert.equal(factOptions.flatMap((group) => group.options).length, 20);
+  assert.equal(factOptions.flatMap((group) => group.options).length, 19);
   assert.equal(
     stateOptions.flatMap((group) => group.options).length,
     catalog.flows.length,

@@ -196,21 +196,6 @@ test('state rule Mermaid colors transition lines from the shared path presentati
   )
   assert.doesNotMatch(salesDiagram, /undefined/u)
 
-  const reworkIntakeDiagram = buildDevFlowStateRuleMermaid(
-    flow('fact.rework_intake')
-  )
-  assert.match(reworkIntakeDiagram, /返工 · 退回或回货/u)
-  assert.match(reworkIntakeDiagram, /取消 · 终止/u)
-  assert.match(reworkIntakeDiagram, /冲正/u)
-  assert.match(
-    reworkIntakeDiagram,
-    /linkStyle 2 stroke:#cf1322,stroke-width:2\.75px/u
-  )
-  assert.match(
-    reworkIntakeDiagram,
-    /linkStyle 1,3 stroke:#1677ff,stroke-width:2\.5px,stroke-dasharray:10 4/u
-  )
-
   const workflowDiagram = buildDevFlowStateRuleMermaid(flow('workflow.task'))
   assert.match(
     workflowDiagram,
@@ -260,7 +245,7 @@ test('related-view projection only creates exact catalog-backed destinations', (
     shipmentTargets.facts.map((item) => item.factKey),
     ['fact.shipment']
   )
-  assert.equal(shipmentTargets.chains.length, 4)
+  assert.equal(shipmentTargets.chains.length, 2)
 
   assert.deepEqual(
     buildDevFlowStateRelatedViews(

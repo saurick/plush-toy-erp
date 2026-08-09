@@ -231,7 +231,6 @@ func loadShipmentSourceLineQuantities(
 		Where(
 			shipmentitem.HasShipmentWith(
 				shipment.Status(biz.ShipmentStatusShipped),
-				shipment.Purpose(biz.ShipmentPurposeSalesDelivery),
 			),
 			shipmentitem.Or(
 				shipmentitem.SalesOrderItemIDIn(lineIDs...),

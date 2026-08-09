@@ -19,7 +19,7 @@ test('business chain select pins the overview and follows the existing overview 
   assert.equal(options[0].label, '全部业务链（设计总图）')
   assert.deepEqual(
     options.slice(1).map((group) => group.label),
-    ['履约主链 · 3', '供给与库存支撑 · 3', '异常与返工 · 4', '冲正与纠正 · 2']
+    ['履约主链 · 3', '供给与库存支撑 · 3', '异常与返工 · 3', '冲正与纠正 · 2']
   )
   assert.deepEqual(
     flattenOptions(options.slice(1)).map((option) => option.value),
@@ -39,7 +39,7 @@ test('fact definition select uses four explicit navigation groups with exact cov
 
   assert.deepEqual(
     options.map((group) => group.label),
-    ['采购与质量 · 5', '生产与库存 · 6', '委外与返工 · 3', '出货与财务 · 6']
+    ['采购与质量 · 5', '生产与库存 · 6', '委外与返工 · 2', '出货与财务 · 6']
   )
   const items = flattenOptions(options)
   assert.deepEqual(
@@ -73,7 +73,7 @@ test('state definition select keeps scope boundaries and splits the long Fact gr
       'ProcessRuntime · 2',
       'Fact / Ledger · 采购与质量 · 5',
       'Fact / Ledger · 生产与库存 · 6',
-      'Fact / Ledger · 委外与返工 · 3',
+      'Fact / Ledger · 委外与返工 · 2',
       'Fact / Ledger · 出货与财务 · 6',
       '客户配置控制面 · 1',
     ]

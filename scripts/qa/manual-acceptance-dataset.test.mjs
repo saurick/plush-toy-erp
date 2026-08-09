@@ -111,7 +111,9 @@ test("default task runner binds the exact same-run source report", async () => {
         runDefaultManualAcceptanceTaskComponent(invocation, {
           state: { componentReports: new Map() },
           applyTaskData: async () => {
-            throw new Error("task apply must not run without the source report");
+            throw new Error(
+              "task apply must not run without the source report",
+            );
           },
         }),
       (error) => error?.code === "task_source_report_missing",
@@ -897,7 +899,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
 
 test("dataset runner accepts only the exact ten browser-only print gaps", () => {
   const targets = [
-    ...Array.from({ length: 42 }, (_, index) => ({
+    ...Array.from({ length: 41 }, (_, index) => ({
       id: `desktopPages:query-${index + 1}`,
       catalogGroup: "desktopPages",
       dataStatus: "pass",
@@ -920,8 +922,8 @@ test("dataset runner accepts only the exact ten browser-only print gaps", () => 
   ];
   const report = {
     summary: {
-      totalTargets: 52,
-      passedTargetData: 42,
+      totalTargets: 51,
+      passedTargetData: 41,
       failedTargetData: 0,
       notProvenTargetData: 10,
       queryChecksPassed: true,
@@ -937,7 +939,7 @@ test("dataset runner accepts only the exact ten browser-only print gaps", () => 
   });
 
   const wrongGap = structuredClone(report);
-  wrongGap.targets[42].catalogGroup = "desktopPages";
+  wrongGap.targets[41].catalogGroup = "desktopPages";
   assert.throws(
     () => assertManualAcceptanceDatasetReadinessBoundary(wrongGap, 1),
     (error) => error?.code === "readiness_component_failed",
@@ -2366,11 +2368,7 @@ test("empty baseline verifier binds runtime and config, proves exact core, and r
       error?.code === "empty_baseline_total_missing" &&
       error?.details?.objectKey === "products",
   );
-  for (const objectKey of [
-    "reworkIntakes",
-    "financePayments",
-    "financeCreditNotes",
-  ]) {
+  for (const objectKey of ["financePayments", "financeCreditNotes"]) {
     const existing = makeFetch({ nonEmptyKey: objectKey });
     await assert.rejects(
       () =>

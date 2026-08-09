@@ -55,8 +55,6 @@ import (
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
-	"server/internal/data/model/ent/reworkintake"
-	"server/internal/data/model/ent/reworkintakeitem"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
@@ -5532,235 +5530,6 @@ func init() {
 	qualityinspection.DefaultUpdatedAt = qualityinspectionDescUpdatedAt.Default.(func() time.Time)
 	// qualityinspection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	qualityinspection.UpdateDefaultUpdatedAt = qualityinspectionDescUpdatedAt.UpdateDefault.(func() time.Time)
-	reworkintakeHooks := schema.ReworkIntake{}.Hooks()
-	reworkintake.Hooks[0] = reworkintakeHooks[0]
-	reworkintakeFields := schema.ReworkIntake{}.Fields()
-	_ = reworkintakeFields
-	// reworkintakeDescIntakeNo is the schema descriptor for intake_no field.
-	reworkintakeDescIntakeNo := reworkintakeFields[0].Descriptor()
-	// reworkintake.IntakeNoValidator is a validator for the "intake_no" field. It is called by the builders before save.
-	reworkintake.IntakeNoValidator = func() func(string) error {
-		validators := reworkintakeDescIntakeNo.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(intake_no string) error {
-			for _, fn := range fns {
-				if err := fn(intake_no); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// reworkintakeDescSourceShipmentID is the schema descriptor for source_shipment_id field.
-	reworkintakeDescSourceShipmentID := reworkintakeFields[1].Descriptor()
-	// reworkintake.SourceShipmentIDValidator is a validator for the "source_shipment_id" field. It is called by the builders before save.
-	reworkintake.SourceShipmentIDValidator = reworkintakeDescSourceShipmentID.Validators[0].(func(int) error)
-	// reworkintakeDescCustomerID is the schema descriptor for customer_id field.
-	reworkintakeDescCustomerID := reworkintakeFields[2].Descriptor()
-	// reworkintake.CustomerIDValidator is a validator for the "customer_id" field. It is called by the builders before save.
-	reworkintake.CustomerIDValidator = reworkintakeDescCustomerID.Validators[0].(func(int) error)
-	// reworkintakeDescCustomerSnapshot is the schema descriptor for customer_snapshot field.
-	reworkintakeDescCustomerSnapshot := reworkintakeFields[3].Descriptor()
-	// reworkintake.CustomerSnapshotValidator is a validator for the "customer_snapshot" field. It is called by the builders before save.
-	reworkintake.CustomerSnapshotValidator = func() func(string) error {
-		validators := reworkintakeDescCustomerSnapshot.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(customer_snapshot string) error {
-			for _, fn := range fns {
-				if err := fn(customer_snapshot); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// reworkintakeDescStatus is the schema descriptor for status field.
-	reworkintakeDescStatus := reworkintakeFields[4].Descriptor()
-	// reworkintake.DefaultStatus holds the default value on creation for the status field.
-	reworkintake.DefaultStatus = reworkintakeDescStatus.Default.(string)
-	// reworkintake.StatusValidator is a validator for the "status" field. It is called by the builders before save.
-	reworkintake.StatusValidator = func() func(string) error {
-		validators := reworkintakeDescStatus.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(status string) error {
-			for _, fn := range fns {
-				if err := fn(status); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// reworkintakeDescReason is the schema descriptor for reason field.
-	reworkintakeDescReason := reworkintakeFields[5].Descriptor()
-	// reworkintake.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
-	reworkintake.ReasonValidator = func() func(string) error {
-		validators := reworkintakeDescReason.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(reason string) error {
-			for _, fn := range fns {
-				if err := fn(reason); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// reworkintakeDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	reworkintakeDescIdempotencyKey := reworkintakeFields[6].Descriptor()
-	// reworkintake.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
-	reworkintake.IdempotencyKeyValidator = func() func(string) error {
-		validators := reworkintakeDescIdempotencyKey.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(idempotency_key string) error {
-			for _, fn := range fns {
-				if err := fn(idempotency_key); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// reworkintakeDescIdempotencyPayloadHash is the schema descriptor for idempotency_payload_hash field.
-	reworkintakeDescIdempotencyPayloadHash := reworkintakeFields[7].Descriptor()
-	// reworkintake.IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
-	reworkintake.IdempotencyPayloadHashValidator = func() func(string) error {
-		validators := reworkintakeDescIdempotencyPayloadHash.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-			validators[2].(func(string) error),
-		}
-		return func(idempotency_payload_hash string) error {
-			for _, fn := range fns {
-				if err := fn(idempotency_payload_hash); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// reworkintakeDescIdempotencyItemCount is the schema descriptor for idempotency_item_count field.
-	reworkintakeDescIdempotencyItemCount := reworkintakeFields[8].Descriptor()
-	// reworkintake.IdempotencyItemCountValidator is a validator for the "idempotency_item_count" field. It is called by the builders before save.
-	reworkintake.IdempotencyItemCountValidator = reworkintakeDescIdempotencyItemCount.Validators[0].(func(int) error)
-	// reworkintakeDescVersion is the schema descriptor for version field.
-	reworkintakeDescVersion := reworkintakeFields[9].Descriptor()
-	// reworkintake.DefaultVersion holds the default value on creation for the version field.
-	reworkintake.DefaultVersion = reworkintakeDescVersion.Default.(int)
-	// reworkintake.VersionValidator is a validator for the "version" field. It is called by the builders before save.
-	reworkintake.VersionValidator = reworkintakeDescVersion.Validators[0].(func(int) error)
-	// reworkintakeDescReceivedBy is the schema descriptor for received_by field.
-	reworkintakeDescReceivedBy := reworkintakeFields[11].Descriptor()
-	// reworkintake.ReceivedByValidator is a validator for the "received_by" field. It is called by the builders before save.
-	reworkintake.ReceivedByValidator = reworkintakeDescReceivedBy.Validators[0].(func(int) error)
-	// reworkintakeDescCancelledBy is the schema descriptor for cancelled_by field.
-	reworkintakeDescCancelledBy := reworkintakeFields[13].Descriptor()
-	// reworkintake.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
-	reworkintake.CancelledByValidator = reworkintakeDescCancelledBy.Validators[0].(func(int) error)
-	// reworkintakeDescCancelReason is the schema descriptor for cancel_reason field.
-	reworkintakeDescCancelReason := reworkintakeFields[14].Descriptor()
-	// reworkintake.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
-	reworkintake.CancelReasonValidator = reworkintakeDescCancelReason.Validators[0].(func(string) error)
-	// reworkintakeDescReversedBy is the schema descriptor for reversed_by field.
-	reworkintakeDescReversedBy := reworkintakeFields[16].Descriptor()
-	// reworkintake.ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
-	reworkintake.ReversedByValidator = reworkintakeDescReversedBy.Validators[0].(func(int) error)
-	// reworkintakeDescReverseReason is the schema descriptor for reverse_reason field.
-	reworkintakeDescReverseReason := reworkintakeFields[17].Descriptor()
-	// reworkintake.ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
-	reworkintake.ReverseReasonValidator = reworkintakeDescReverseReason.Validators[0].(func(string) error)
-	// reworkintakeDescCreatedBy is the schema descriptor for created_by field.
-	reworkintakeDescCreatedBy := reworkintakeFields[18].Descriptor()
-	// reworkintake.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
-	reworkintake.CreatedByValidator = reworkintakeDescCreatedBy.Validators[0].(func(int) error)
-	// reworkintakeDescCreatedAt is the schema descriptor for created_at field.
-	reworkintakeDescCreatedAt := reworkintakeFields[19].Descriptor()
-	// reworkintake.DefaultCreatedAt holds the default value on creation for the created_at field.
-	reworkintake.DefaultCreatedAt = reworkintakeDescCreatedAt.Default.(func() time.Time)
-	// reworkintakeDescUpdatedAt is the schema descriptor for updated_at field.
-	reworkintakeDescUpdatedAt := reworkintakeFields[20].Descriptor()
-	// reworkintake.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	reworkintake.DefaultUpdatedAt = reworkintakeDescUpdatedAt.Default.(func() time.Time)
-	// reworkintake.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	reworkintake.UpdateDefaultUpdatedAt = reworkintakeDescUpdatedAt.UpdateDefault.(func() time.Time)
-	reworkintakeitemHooks := schema.ReworkIntakeItem{}.Hooks()
-	reworkintakeitem.Hooks[0] = reworkintakeitemHooks[0]
-	reworkintakeitemFields := schema.ReworkIntakeItem{}.Fields()
-	_ = reworkintakeitemFields
-	// reworkintakeitemDescReworkIntakeID is the schema descriptor for rework_intake_id field.
-	reworkintakeitemDescReworkIntakeID := reworkintakeitemFields[0].Descriptor()
-	// reworkintakeitem.ReworkIntakeIDValidator is a validator for the "rework_intake_id" field. It is called by the builders before save.
-	reworkintakeitem.ReworkIntakeIDValidator = reworkintakeitemDescReworkIntakeID.Validators[0].(func(int) error)
-	// reworkintakeitemDescLineNo is the schema descriptor for line_no field.
-	reworkintakeitemDescLineNo := reworkintakeitemFields[1].Descriptor()
-	// reworkintakeitem.LineNoValidator is a validator for the "line_no" field. It is called by the builders before save.
-	reworkintakeitem.LineNoValidator = func() func(string) error {
-		validators := reworkintakeitemDescLineNo.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(line_no string) error {
-			for _, fn := range fns {
-				if err := fn(line_no); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// reworkintakeitemDescSourceShipmentItemID is the schema descriptor for source_shipment_item_id field.
-	reworkintakeitemDescSourceShipmentItemID := reworkintakeitemFields[2].Descriptor()
-	// reworkintakeitem.SourceShipmentItemIDValidator is a validator for the "source_shipment_item_id" field. It is called by the builders before save.
-	reworkintakeitem.SourceShipmentItemIDValidator = reworkintakeitemDescSourceShipmentItemID.Validators[0].(func(int) error)
-	// reworkintakeitemDescTargetProductionOrderItemID is the schema descriptor for target_production_order_item_id field.
-	reworkintakeitemDescTargetProductionOrderItemID := reworkintakeitemFields[3].Descriptor()
-	// reworkintakeitem.TargetProductionOrderItemIDValidator is a validator for the "target_production_order_item_id" field. It is called by the builders before save.
-	reworkintakeitem.TargetProductionOrderItemIDValidator = reworkintakeitemDescTargetProductionOrderItemID.Validators[0].(func(int) error)
-	// reworkintakeitemDescProductID is the schema descriptor for product_id field.
-	reworkintakeitemDescProductID := reworkintakeitemFields[4].Descriptor()
-	// reworkintakeitem.ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
-	reworkintakeitem.ProductIDValidator = reworkintakeitemDescProductID.Validators[0].(func(int) error)
-	// reworkintakeitemDescProductSkuID is the schema descriptor for product_sku_id field.
-	reworkintakeitemDescProductSkuID := reworkintakeitemFields[5].Descriptor()
-	// reworkintakeitem.ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
-	reworkintakeitem.ProductSkuIDValidator = reworkintakeitemDescProductSkuID.Validators[0].(func(int) error)
-	// reworkintakeitemDescReceivingWarehouseID is the schema descriptor for receiving_warehouse_id field.
-	reworkintakeitemDescReceivingWarehouseID := reworkintakeitemFields[6].Descriptor()
-	// reworkintakeitem.ReceivingWarehouseIDValidator is a validator for the "receiving_warehouse_id" field. It is called by the builders before save.
-	reworkintakeitem.ReceivingWarehouseIDValidator = reworkintakeitemDescReceivingWarehouseID.Validators[0].(func(int) error)
-	// reworkintakeitemDescUnitID is the schema descriptor for unit_id field.
-	reworkintakeitemDescUnitID := reworkintakeitemFields[7].Descriptor()
-	// reworkintakeitem.UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
-	reworkintakeitem.UnitIDValidator = reworkintakeitemDescUnitID.Validators[0].(func(int) error)
-	// reworkintakeitemDescReceivedLotID is the schema descriptor for received_lot_id field.
-	reworkintakeitemDescReceivedLotID := reworkintakeitemFields[8].Descriptor()
-	// reworkintakeitem.ReceivedLotIDValidator is a validator for the "received_lot_id" field. It is called by the builders before save.
-	reworkintakeitem.ReceivedLotIDValidator = reworkintakeitemDescReceivedLotID.Validators[0].(func(int) error)
-	// reworkintakeitemDescNote is the schema descriptor for note field.
-	reworkintakeitemDescNote := reworkintakeitemFields[10].Descriptor()
-	// reworkintakeitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
-	reworkintakeitem.NoteValidator = reworkintakeitemDescNote.Validators[0].(func(string) error)
-	// reworkintakeitemDescCreatedAt is the schema descriptor for created_at field.
-	reworkintakeitemDescCreatedAt := reworkintakeitemFields[11].Descriptor()
-	// reworkintakeitem.DefaultCreatedAt holds the default value on creation for the created_at field.
-	reworkintakeitem.DefaultCreatedAt = reworkintakeitemDescCreatedAt.Default.(func() time.Time)
 	roleFields := schema.Role{}.Fields()
 	_ = roleFields
 	// roleDescRoleKey is the schema descriptor for role_key field.
@@ -6255,44 +6024,20 @@ func init() {
 			return nil
 		}
 	}()
-	// shipmentDescPurpose is the schema descriptor for purpose field.
-	shipmentDescPurpose := shipmentFields[1].Descriptor()
-	// shipment.DefaultPurpose holds the default value on creation for the purpose field.
-	shipment.DefaultPurpose = shipmentDescPurpose.Default.(string)
-	// shipment.PurposeValidator is a validator for the "purpose" field. It is called by the builders before save.
-	shipment.PurposeValidator = func() func(string) error {
-		validators := shipmentDescPurpose.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(purpose string) error {
-			for _, fn := range fns {
-				if err := fn(purpose); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
 	// shipmentDescSalesOrderID is the schema descriptor for sales_order_id field.
-	shipmentDescSalesOrderID := shipmentFields[2].Descriptor()
+	shipmentDescSalesOrderID := shipmentFields[1].Descriptor()
 	// shipment.SalesOrderIDValidator is a validator for the "sales_order_id" field. It is called by the builders before save.
 	shipment.SalesOrderIDValidator = shipmentDescSalesOrderID.Validators[0].(func(int) error)
-	// shipmentDescReworkIntakeID is the schema descriptor for rework_intake_id field.
-	shipmentDescReworkIntakeID := shipmentFields[3].Descriptor()
-	// shipment.ReworkIntakeIDValidator is a validator for the "rework_intake_id" field. It is called by the builders before save.
-	shipment.ReworkIntakeIDValidator = shipmentDescReworkIntakeID.Validators[0].(func(int) error)
 	// shipmentDescCustomerID is the schema descriptor for customer_id field.
-	shipmentDescCustomerID := shipmentFields[4].Descriptor()
+	shipmentDescCustomerID := shipmentFields[2].Descriptor()
 	// shipment.CustomerIDValidator is a validator for the "customer_id" field. It is called by the builders before save.
 	shipment.CustomerIDValidator = shipmentDescCustomerID.Validators[0].(func(int) error)
 	// shipmentDescCustomerSnapshot is the schema descriptor for customer_snapshot field.
-	shipmentDescCustomerSnapshot := shipmentFields[5].Descriptor()
+	shipmentDescCustomerSnapshot := shipmentFields[3].Descriptor()
 	// shipment.CustomerSnapshotValidator is a validator for the "customer_snapshot" field. It is called by the builders before save.
 	shipment.CustomerSnapshotValidator = shipmentDescCustomerSnapshot.Validators[0].(func(string) error)
 	// shipmentDescStatus is the schema descriptor for status field.
-	shipmentDescStatus := shipmentFields[6].Descriptor()
+	shipmentDescStatus := shipmentFields[4].Descriptor()
 	// shipment.DefaultStatus holds the default value on creation for the status field.
 	shipment.DefaultStatus = shipmentDescStatus.Default.(string)
 	// shipment.StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -6312,13 +6057,13 @@ func init() {
 		}
 	}()
 	// shipmentDescVersion is the schema descriptor for version field.
-	shipmentDescVersion := shipmentFields[7].Descriptor()
+	shipmentDescVersion := shipmentFields[5].Descriptor()
 	// shipment.DefaultVersion holds the default value on creation for the version field.
 	shipment.DefaultVersion = shipmentDescVersion.Default.(int)
 	// shipment.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	shipment.VersionValidator = shipmentDescVersion.Validators[0].(func(int) error)
 	// shipmentDescFinanceReleaseStatus is the schema descriptor for finance_release_status field.
-	shipmentDescFinanceReleaseStatus := shipmentFields[8].Descriptor()
+	shipmentDescFinanceReleaseStatus := shipmentFields[6].Descriptor()
 	// shipment.DefaultFinanceReleaseStatus holds the default value on creation for the finance_release_status field.
 	shipment.DefaultFinanceReleaseStatus = shipmentDescFinanceReleaseStatus.Default.(string)
 	// shipment.FinanceReleaseStatusValidator is a validator for the "finance_release_status" field. It is called by the builders before save.
@@ -6338,29 +6083,29 @@ func init() {
 		}
 	}()
 	// shipmentDescFinanceReleaseVersion is the schema descriptor for finance_release_version field.
-	shipmentDescFinanceReleaseVersion := shipmentFields[9].Descriptor()
+	shipmentDescFinanceReleaseVersion := shipmentFields[7].Descriptor()
 	// shipment.DefaultFinanceReleaseVersion holds the default value on creation for the finance_release_version field.
 	shipment.DefaultFinanceReleaseVersion = shipmentDescFinanceReleaseVersion.Default.(int)
 	// shipment.FinanceReleaseVersionValidator is a validator for the "finance_release_version" field. It is called by the builders before save.
 	shipment.FinanceReleaseVersionValidator = shipmentDescFinanceReleaseVersion.Validators[0].(func(int) error)
 	// shipmentDescFinanceReleasedBy is the schema descriptor for finance_released_by field.
-	shipmentDescFinanceReleasedBy := shipmentFields[11].Descriptor()
+	shipmentDescFinanceReleasedBy := shipmentFields[9].Descriptor()
 	// shipment.FinanceReleasedByValidator is a validator for the "finance_released_by" field. It is called by the builders before save.
 	shipment.FinanceReleasedByValidator = shipmentDescFinanceReleasedBy.Validators[0].(func(int) error)
 	// shipmentDescFinanceReleaseProcessInstanceID is the schema descriptor for finance_release_process_instance_id field.
-	shipmentDescFinanceReleaseProcessInstanceID := shipmentFields[12].Descriptor()
+	shipmentDescFinanceReleaseProcessInstanceID := shipmentFields[10].Descriptor()
 	// shipment.FinanceReleaseProcessInstanceIDValidator is a validator for the "finance_release_process_instance_id" field. It is called by the builders before save.
 	shipment.FinanceReleaseProcessInstanceIDValidator = shipmentDescFinanceReleaseProcessInstanceID.Validators[0].(func(int) error)
 	// shipmentDescFinanceReleaseProcessNodeID is the schema descriptor for finance_release_process_node_id field.
-	shipmentDescFinanceReleaseProcessNodeID := shipmentFields[13].Descriptor()
+	shipmentDescFinanceReleaseProcessNodeID := shipmentFields[11].Descriptor()
 	// shipment.FinanceReleaseProcessNodeIDValidator is a validator for the "finance_release_process_node_id" field. It is called by the builders before save.
 	shipment.FinanceReleaseProcessNodeIDValidator = shipmentDescFinanceReleaseProcessNodeID.Validators[0].(func(int) error)
 	// shipmentDescFinanceReleaseNote is the schema descriptor for finance_release_note field.
-	shipmentDescFinanceReleaseNote := shipmentFields[14].Descriptor()
+	shipmentDescFinanceReleaseNote := shipmentFields[12].Descriptor()
 	// shipment.FinanceReleaseNoteValidator is a validator for the "finance_release_note" field. It is called by the builders before save.
 	shipment.FinanceReleaseNoteValidator = shipmentDescFinanceReleaseNote.Validators[0].(func(string) error)
 	// shipmentDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	shipmentDescIdempotencyKey := shipmentFields[15].Descriptor()
+	shipmentDescIdempotencyKey := shipmentFields[13].Descriptor()
 	// shipment.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	shipment.IdempotencyKeyValidator = func() func(string) error {
 		validators := shipmentDescIdempotencyKey.Validators
@@ -6378,15 +6123,15 @@ func init() {
 		}
 	}()
 	// shipmentDescNote is the schema descriptor for note field.
-	shipmentDescNote := shipmentFields[20].Descriptor()
+	shipmentDescNote := shipmentFields[18].Descriptor()
 	// shipment.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	shipment.NoteValidator = shipmentDescNote.Validators[0].(func(string) error)
 	// shipmentDescCreatedAt is the schema descriptor for created_at field.
-	shipmentDescCreatedAt := shipmentFields[21].Descriptor()
+	shipmentDescCreatedAt := shipmentFields[19].Descriptor()
 	// shipment.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shipment.DefaultCreatedAt = shipmentDescCreatedAt.Default.(func() time.Time)
 	// shipmentDescUpdatedAt is the schema descriptor for updated_at field.
-	shipmentDescUpdatedAt := shipmentFields[22].Descriptor()
+	shipmentDescUpdatedAt := shipmentFields[20].Descriptor()
 	// shipment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	shipment.DefaultUpdatedAt = shipmentDescUpdatedAt.Default.(func() time.Time)
 	// shipment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -6403,32 +6148,28 @@ func init() {
 	shipmentitemDescSalesOrderItemID := shipmentitemFields[1].Descriptor()
 	// shipmentitem.SalesOrderItemIDValidator is a validator for the "sales_order_item_id" field. It is called by the builders before save.
 	shipmentitem.SalesOrderItemIDValidator = shipmentitemDescSalesOrderItemID.Validators[0].(func(int) error)
-	// shipmentitemDescReworkCompletionFactID is the schema descriptor for rework_completion_fact_id field.
-	shipmentitemDescReworkCompletionFactID := shipmentitemFields[2].Descriptor()
-	// shipmentitem.ReworkCompletionFactIDValidator is a validator for the "rework_completion_fact_id" field. It is called by the builders before save.
-	shipmentitem.ReworkCompletionFactIDValidator = shipmentitemDescReworkCompletionFactID.Validators[0].(func(int) error)
 	// shipmentitemDescProductID is the schema descriptor for product_id field.
-	shipmentitemDescProductID := shipmentitemFields[3].Descriptor()
+	shipmentitemDescProductID := shipmentitemFields[2].Descriptor()
 	// shipmentitem.ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
 	shipmentitem.ProductIDValidator = shipmentitemDescProductID.Validators[0].(func(int) error)
 	// shipmentitemDescProductSkuID is the schema descriptor for product_sku_id field.
-	shipmentitemDescProductSkuID := shipmentitemFields[4].Descriptor()
+	shipmentitemDescProductSkuID := shipmentitemFields[3].Descriptor()
 	// shipmentitem.ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
 	shipmentitem.ProductSkuIDValidator = shipmentitemDescProductSkuID.Validators[0].(func(int) error)
 	// shipmentitemDescWarehouseID is the schema descriptor for warehouse_id field.
-	shipmentitemDescWarehouseID := shipmentitemFields[5].Descriptor()
+	shipmentitemDescWarehouseID := shipmentitemFields[4].Descriptor()
 	// shipmentitem.WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
 	shipmentitem.WarehouseIDValidator = shipmentitemDescWarehouseID.Validators[0].(func(int) error)
 	// shipmentitemDescUnitID is the schema descriptor for unit_id field.
-	shipmentitemDescUnitID := shipmentitemFields[6].Descriptor()
+	shipmentitemDescUnitID := shipmentitemFields[5].Descriptor()
 	// shipmentitem.UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
 	shipmentitem.UnitIDValidator = shipmentitemDescUnitID.Validators[0].(func(int) error)
 	// shipmentitemDescLotID is the schema descriptor for lot_id field.
-	shipmentitemDescLotID := shipmentitemFields[7].Descriptor()
+	shipmentitemDescLotID := shipmentitemFields[6].Descriptor()
 	// shipmentitem.LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
 	shipmentitem.LotIDValidator = shipmentitemDescLotID.Validators[0].(func(int) error)
 	// shipmentitemDescCurrencySnapshot is the schema descriptor for currency_snapshot field.
-	shipmentitemDescCurrencySnapshot := shipmentitemFields[12].Descriptor()
+	shipmentitemDescCurrencySnapshot := shipmentitemFields[11].Descriptor()
 	// shipmentitem.DefaultCurrencySnapshot holds the default value on creation for the currency_snapshot field.
 	shipmentitem.DefaultCurrencySnapshot = shipmentitemDescCurrencySnapshot.Default.(string)
 	// shipmentitem.CurrencySnapshotValidator is a validator for the "currency_snapshot" field. It is called by the builders before save.
@@ -6448,15 +6189,15 @@ func init() {
 		}
 	}()
 	// shipmentitemDescNote is the schema descriptor for note field.
-	shipmentitemDescNote := shipmentitemFields[13].Descriptor()
+	shipmentitemDescNote := shipmentitemFields[12].Descriptor()
 	// shipmentitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	shipmentitem.NoteValidator = shipmentitemDescNote.Validators[0].(func(string) error)
 	// shipmentitemDescCreatedAt is the schema descriptor for created_at field.
-	shipmentitemDescCreatedAt := shipmentitemFields[14].Descriptor()
+	shipmentitemDescCreatedAt := shipmentitemFields[13].Descriptor()
 	// shipmentitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shipmentitem.DefaultCreatedAt = shipmentitemDescCreatedAt.Default.(func() time.Time)
 	// shipmentitemDescUpdatedAt is the schema descriptor for updated_at field.
-	shipmentitemDescUpdatedAt := shipmentitemFields[15].Descriptor()
+	shipmentitemDescUpdatedAt := shipmentitemFields[14].Descriptor()
 	// shipmentitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	shipmentitem.DefaultUpdatedAt = shipmentitemDescUpdatedAt.Default.(func() time.Time)
 	// shipmentitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

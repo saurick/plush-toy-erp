@@ -649,6 +649,97 @@ test("db guard accepts Atlas DROP COLUMN as proof for its single-column index", 
   });
 });
 
+test("db guard accepts Atlas DROP COLUMN as proof for a dependent composite index", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      [
+        "package schema",
+        "func (Item) Fields() []ent.Field {",
+        "  return []ent.Field{field.String(\"purpose\"), field.String(\"status\")}",
+        "}",
+        "func (Item) Indexes() []ent.Index {",
+        "  return []ent.Index{index.Fields(\"purpose\", \"status\")}",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    commitAll(root, "composite index removal baseline");
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      [
+        "package schema",
+        "func (Item) Fields() []ent.Field {",
+        "  return []ent.Field{field.String(\"status\")}",
+        "}",
+        "func (Item) Indexes() []ent.Index { return nil }",
+        "",
+      ].join("\n"),
+    );
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      "ALTER TABLE items DROP COLUMN purpose;\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  });
+});
+
+test("db guard still requires DDL for an unrelated composite index removal", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      [
+        "package schema",
+        "func (Item) Fields() []ent.Field {",
+        "  return []ent.Field{",
+        "    field.String(\"purpose\"),",
+        "    field.String(\"status\"),",
+        "    field.String(\"warehouse\"),",
+        "  }",
+        "}",
+        "func (Item) Indexes() []ent.Index {",
+        "  return []ent.Index{",
+        "    index.Fields(\"purpose\", \"status\"),",
+        "    index.Fields(\"status\", \"warehouse\"),",
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    commitAll(root, "multiple composite indexes baseline");
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      [
+        "package schema",
+        "func (Item) Fields() []ent.Field {",
+        "  return []ent.Field{field.String(\"status\"), field.String(\"warehouse\")}",
+        "}",
+        "func (Item) Indexes() []ent.Index { return nil }",
+        "",
+      ].join("\n"),
+    );
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      "ALTER TABLE items DROP COLUMN purpose;\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "schema-migration-proof-missing");
+    assert(result.proofs[0].missingTokens.includes("warehouse"));
+  });
+});
+
 test("db guard requires statement-local and operation-aware field proof", async () => {
   for (const migration of [
     "ALTER TABLE items ADD COLUMN unrelated text; ALTER TABLE other_items ADD COLUMN name text;\n",

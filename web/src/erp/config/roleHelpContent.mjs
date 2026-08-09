@@ -103,12 +103,6 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         path: '/erp/warehouse/shipments',
         actionLabel: '打开出货单',
       },
-      {
-        title: '跟进返工回厂与补发',
-        description: '从已出货记录登记产品回厂，跟进仓库接收、生产返工和补发结果。',
-        path: '/erp/sales/rework-intakes',
-        actionLabel: '打开返工回厂',
-      },
     ],
     workflow: [
       '确认客户和联系人资料完整。',

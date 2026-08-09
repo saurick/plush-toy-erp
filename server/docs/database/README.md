@@ -21,12 +21,12 @@ go run ./cmd/schema-doc --write
 
 | 项目 | 数量 |
 | --- | ---: |
-| 应用表 | 74 |
-| 字段 | 1145 |
-| 外键 | 152 |
-| 显式索引 | 338 |
+| 应用表 | 72 |
+| 字段 | 1107 |
+| 外键 | 140 |
+| 显式索引 | 326 |
 | 其中 partial index | 30 |
-| 命名 / 表级 CHECK | 251 |
+| 命名 / 表级 CHECK | 243 |
 
 ## 分域入口
 
@@ -37,7 +37,7 @@ go run ./cmd/schema-doc --write
 | [销售与采购](销售与采购.md) | 4 | 销售订单与采购订单的来源单据聚合及其行项目。 |
 | [库存与质检](库存与质检.md) | 14 | 采购收退货、库存作业、批次、余额、流水、预留与质量判定。 |
 | [生产与委外](生产与委外.md) | 15 | 生产订单、冻结需求与路线、WIP、生产事实、委外合同和委外事实。 |
-| [出货、返工补发与财务](出货与财务.md) | 8 | 销售出货、返工回厂、非商业补发、财务事实、收付款、核销和红冲。 |
+| [出货与财务](出货与财务.md) | 6 | 销售出货、财务事实、收付款、核销和红冲。 |
 | [流程运行时、协同与审计](流程运行时.md) | 8 | ProcessRuntime、Workflow task、协同状态、运行标记、审计和跨业务附件证据。 |
 
 ## 全表索引
@@ -55,10 +55,10 @@ go run ./cmd/schema-doc --write
 | [`customer_config_revisions`](账号权限与配置.md#table-customer-config-revisions) | 客户配置版本 | 账号、权限与配置 | Config / 配置 | 保存规范化客户配置的版本、哈希、编译快照和发布状态。 |
 | [`customers`](主数据与BOM.md#table-customers) | 客户 | 主数据与 BOM | MasterData / 主数据 | 保存销售、出货和应收等业务引用的客户主档。 |
 | [`deployment_module_states`](账号权限与配置.md#table-deployment-module-states) | 模块状态投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本编译出的模块 enabled、read_only 或 disabled 状态。 |
-| [`finance_allocations`](出货与财务.md#table-finance-allocations) | 财务核销分配 | 出货、返工补发与财务 | Fact / 事实 | 保存一笔已过账收付款对一条财务事实的核销金额。 |
-| [`finance_credit_notes`](出货与财务.md#table-finance-credit-notes) | 财务红冲 | 出货、返工补发与财务 | Fact / 事实 | 保存针对财务事实的红冲及反向红冲记录。 |
-| [`finance_facts`](出货与财务.md#table-finance-facts) | 业务财务事实 | 出货、返工补发与财务 | Fact / 事实 | 保存来源可追溯的应收、应付、发票和对账事实。 |
-| [`finance_payments`](出货与财务.md#table-finance-payments) | 收付款单 | 出货、返工补发与财务 | Source Document / 源单据 | 保存收款或付款的登记、审批、过账、账户凭据和金额。 |
+| [`finance_allocations`](出货与财务.md#table-finance-allocations) | 财务核销分配 | 出货与财务 | Fact / 事实 | 保存一笔已过账收付款对一条财务事实的核销金额。 |
+| [`finance_credit_notes`](出货与财务.md#table-finance-credit-notes) | 财务红冲 | 出货与财务 | Fact / 事实 | 保存针对财务事实的红冲及反向红冲记录。 |
+| [`finance_facts`](出货与财务.md#table-finance-facts) | 业务财务事实 | 出货与财务 | Fact / 事实 | 保存来源可追溯的应收、应付、发票和对账事实。 |
+| [`finance_payments`](出货与财务.md#table-finance-payments) | 收付款单 | 出货与财务 | Source Document / 源单据 | 保存收款或付款的登记、审批、过账、账户凭据和金额。 |
 | [`inventory_balances`](库存与质检.md#table-inventory-balances) | 库存余额投影 | 库存与质检 | Derived / 派生投影 | 按物料或产品、SKU、仓库、批次和单位保存当前库存余额。 |
 | [`inventory_lots`](库存与质检.md#table-inventory-lots) | 库存批次 | 库存与质检 | Fact / 事实 | 保存库存批次身份、物料或产品粒度、供应商批号及质量可用状态。 |
 | [`inventory_operation_items`](库存与质检.md#table-inventory-operation-items) | 库存作业明细 | 库存与质检 | Source Document / 源单据 | 保存库存作业的物料或产品、仓库、批次、账面数、实盘数或调整量。 |
@@ -96,8 +96,6 @@ go run ./cmd/schema-doc --write
 | [`purchase_return_items`](库存与质检.md#table-purchase-return-items) | 采购退货明细 | 库存与质检 | Source Document / 源单据 | 保存采购退货引用的原入库行、物料、仓库、批次和退货数量。 |
 | [`purchase_returns`](库存与质检.md#table-purchase-returns) | 采购退货单 | 库存与质检 | Source Document / 源单据 | 保存从采购入库或不合格质检来源退回供应商的来源单。 |
 | [`quality_inspections`](库存与质检.md#table-quality-inspections) | 质量检验 | 库存与质检 | Fact / 事实 | 保存采购、委外、出货前成品或生产 WIP 的质量检查、结论和纠正链。 |
-| [`rework_intake_items`](出货与财务.md#table-rework-intake-items) | 返工回厂明细 | 出货、返工补发与财务 | Source Document / 源单据 | 保存原出货明细、目标生产订单行、产品、SKU、接收仓库、单位、数量和接收批次来源。 |
-| [`rework_intakes`](出货与财务.md#table-rework-intakes) | 返工回厂单 | 出货、返工补发与财务 | Source Document / 源单据 | 保存已出货产品返工回厂的来源出货、客户快照、返工原因、接收状态和审计信息。 |
 | [`role_data_scopes`](账号权限与配置.md#table-role-data-scopes) | 角色数据范围 | 账号、权限与配置 | Config / 配置 | 保存角色对 warehouse 等资源的 ALL、ASSIGNED 或 NONE 数据范围。 |
 | [`role_permissions`](账号权限与配置.md#table-role-permissions) | 角色权限绑定 | 账号、权限与配置 | Config / 配置 | 保存角色和正式权限目录之间的多对多绑定。 |
 | [`role_profiles`](账号权限与配置.md#table-role-profiles) | 角色画像投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本编译出的角色显示、岗位和启用画像。 |
@@ -106,8 +104,8 @@ go run ./cmd/schema-doc --write
 | [`runtime_markers`](流程运行时.md#table-runtime-markers) | 运行时一次性标记 | 流程运行时、协同与审计 | Fact / 事实 | 记录受控初始化或一次性运行动作已经执行的稳定 marker。 |
 | [`sales_order_items`](销售与采购.md#table-sales-order-items) | 销售订单明细 | 销售与采购 | Source Document / 源单据 | 保存销售订单的产品、SKU、数量、价格和计划交付信息。 |
 | [`sales_orders`](销售与采购.md#table-sales-orders) | 销售订单 | 销售与采购 | Source Document / 源单据 | 保存客户订单承诺、交付计划、付款方式和销售责任信息。 |
-| [`shipment_items`](出货与财务.md#table-shipment-items) | 出货明细 | 出货、返工补发与财务 | Source Document / 源单据 | 保存销售订单行或返工生产完成事实，以及产品、SKU、仓库、批次、数量和商业快照。 |
-| [`shipments`](出货与财务.md#table-shipments) | 出货单 | 出货、返工补发与财务 | Source Document / 源单据 | 保存销售交付或返工补发的来源单、财务放行状态和显式出货时间。 |
+| [`shipment_items`](出货与财务.md#table-shipment-items) | 出货明细 | 出货与财务 | Source Document / 源单据 | 保存销售订单行以及产品、SKU、仓库、批次、数量和商业快照。 |
+| [`shipments`](出货与财务.md#table-shipments) | 出货单 | 出货与财务 | Source Document / 源单据 | 保存销售交付的来源单、财务放行状态和显式出货时间。 |
 | [`stock_reservations`](库存与质检.md#table-stock-reservations) | 库存预留 | 库存与质检 | Fact / 事实 | 保存销售订单或显式需求对库存可用量的数量预留。 |
 | [`supplier_process_capabilities`](主数据与BOM.md#table-supplier-process-capabilities) | 供应商工序能力关联 | 主数据与 BOM | MasterData / 主数据 | 保存供应商或加工厂能够承接哪些生产工序的多对多关系。 |
 | [`suppliers`](主数据与BOM.md#table-suppliers) | 供应商与加工厂 | 主数据与 BOM | MasterData / 主数据 | 保存采购、委外和应付引用的供应商或加工厂主档。 |

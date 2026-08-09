@@ -2005,15 +2005,3 @@ body
   display: grid;
   gap: 12px;
 }
-
-.erp-rework-intake-line-card {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  gap: 10px;
-  margin-top: 14px;
-  border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
-  border-radius: 8px;
-  background: var(--erp-business-action-modal-bg, #ffffff);
-  padding: 14px;
-}

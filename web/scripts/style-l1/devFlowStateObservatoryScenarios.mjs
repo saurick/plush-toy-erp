@@ -14,7 +14,6 @@ const STALE_PRODUCTION_EXCEPTION_PROCESS_PATH =
   '&process=production_exception_approval%2Fexception_decision_approval'
 const SALES_ORDER_STATE_RULES_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=states&flow=source.sales_order`
 const PRODUCTION_FACT_STATE_RULES_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=states&flow=fact.production`
-const REWORK_INTAKE_STATE_RULES_PATH = `${DEV_FLOW_STATE_OBSERVATORY_PATH}?view=states&flow=fact.rework_intake`
 const TASK_LOOKUP_PATH = DEFAULT_CHAIN_PATH
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const READ_ONLY_WORKFLOW_METHODS = new Set([
@@ -675,8 +674,8 @@ export function createDevFlowStateObservatoryScenarios({
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await overviewView.locator('[data-overview-chain]').count(),
-          12,
-          '默认总图必须只展示 12 条正式设计链的链级节点'
+          11,
+          '默认总图必须只展示 11 条正式设计链的链级节点'
         )
         assert.deepEqual(
           await overviewView
@@ -715,8 +714,8 @@ export function createDevFlowStateObservatoryScenarios({
         }
         assert.equal(
           await overviewView.locator('[data-overview-relation]').count(),
-          16,
-          '总图必须展示目录登记的 16 条明确链间衔接'
+          13,
+          '总图必须展示目录登记的 13 条明确链间衔接'
         )
         assert.equal(
           await overviewView.locator('[data-chain-node]').count(),
@@ -1084,14 +1083,14 @@ export function createDevFlowStateObservatoryScenarios({
           'ProcessRuntime · 2',
           'Fact / Ledger · 采购与质量 · 5',
           'Fact / Ledger · 生产与库存 · 6',
-          'Fact / Ledger · 委外与返工 · 3',
+          'Fact / Ledger · 委外与返工 · 2',
           'Fact / Ledger · 出货与财务 · 6',
           '客户配置控制面 · 1',
         ])
         assert.equal(
           await stateDropdown.locator('.ant-select-item-option').count(),
-          34,
-          '状态对象必须按正式 scope 与 Fact 导航分类精确覆盖 34 条定义'
+          33,
+          '状态对象必须按正式 scope 与 Fact 导航分类精确覆盖 33 条定义'
         )
         const stateOptionMetrics = await stateDropdown
           .locator('.ant-select-item-option')
@@ -1237,14 +1236,14 @@ export function createDevFlowStateObservatoryScenarios({
           [
             '履约主链 · 3',
             '供给与库存支撑 · 3',
-            '异常与返工 · 4',
+            '异常与返工 · 3',
             '冲正与纠正 · 2',
           ]
         )
         assert.equal(
           await chainDropdown.locator('.ant-select-item-option').count(),
-          13,
-          '业务总图固定在顶部，四个现有 lane 必须精确覆盖 12 条业务链'
+          12,
+          '业务总图固定在顶部，四个现有 lane 必须精确覆盖 11 条业务链'
         )
         const chainGroupMetrics = await chainDropdown.evaluate((node) => {
           const rect = node.getBoundingClientRect()
@@ -1517,7 +1516,7 @@ export function createDevFlowStateObservatoryScenarios({
               params.get('chain') === 'all' &&
               !params.has('node') &&
               document.querySelectorAll('[data-overview-chain]').length ===
-                12 &&
+                11 &&
               document.querySelectorAll('[data-chain-node]').length === 0
             )
           },
@@ -1893,132 +1892,6 @@ export function createDevFlowStateObservatoryScenarios({
       },
     },
     {
-      name: 'dev-flow-state-observatory-state-rule-correction-paths-light',
-      path: REWORK_INTAKE_STATE_RULES_PATH,
-      viewport: { width: 1440, height: 900 },
-      themeMode: 'light',
-      beforeNavigate: async (page) => {
-        startNoWriteAudit(page, writeRequestsByPage)
-      },
-      verify: async (page) => {
-        await waitForCatalog(page)
-        const stateView = page.locator('[data-flow-state-view="states"]')
-        const graph = stateView.getByRole('region', {
-          name: '返工回厂状态转换图',
-        })
-        const svg = graph.locator('.erp-markdown-mermaid__canvas svg')
-        await svg.waitFor({ state: 'visible', timeout: 10_000 })
-
-        const diagramText = await svg.textContent()
-        for (const copy of ['返工 · 退回或回货', '取消 · 终止', '冲正']) {
-          assert(diagramText.includes(copy), `返工回厂图缺少动作标签：${copy}`)
-        }
-        const diagramEdgeStyles = await collectStateRuleEdgeStyles(graph)
-        assert(
-          diagramEdgeStyles.some(
-            (item) =>
-              item.stroke === 'rgb(207, 19, 34)' &&
-              Number.parseFloat(item.strokeWidth) >= 2.75
-          ),
-          `返工回厂图缺少红色取消线：${JSON.stringify(diagramEdgeStyles)}`
-        )
-        assert(
-          diagramEdgeStyles.some(
-            (item) =>
-              item.stroke === 'rgb(22, 119, 255)' &&
-              item.strokeDasharray !== 'none'
-          ),
-          `返工回厂图缺少蓝色纠正虚线：${JSON.stringify(diagramEdgeStyles)}`
-        )
-
-        const legendStyles = await stateView
-          .locator('.erp-dev-flow-state-path-legend article')
-          .evaluateAll((nodes) =>
-            nodes.map((node) => {
-              const marker = node.querySelector('span')
-              const markerStyle = window.getComputedStyle(marker)
-              const markerRect = marker.getBoundingClientRect()
-              return {
-                group: node.dataset.pathGroup,
-                backgroundColor: markerStyle.backgroundColor,
-                width: markerRect.width,
-                height: markerRect.height,
-              }
-            })
-          )
-        assert.deepEqual(
-          legendStyles.map((item) => [item.group, item.backgroundColor]),
-          [
-            ['stop', 'rgb(207, 19, 34)'],
-            ['correction', 'rgb(22, 119, 255)'],
-          ]
-        )
-        assert(
-          legendStyles.every(
-            (item) =>
-              item.width >= 12 &&
-              item.height >= 12 &&
-              item.backgroundColor !== 'rgba(0, 0, 0, 0)'
-          ),
-          `路径图例必须使用醒目的实色圆点：${JSON.stringify(legendStyles)}`
-        )
-        assert.equal(
-          await stateView
-            .locator('.erp-dev-flow-transitions > ol > li')
-            .count(),
-          3
-        )
-        const transitionColors = await stateView
-          .locator('.erp-dev-flow-transitions > ol > li')
-          .evaluateAll((nodes) =>
-            nodes.map((node) => ({
-              group: node.dataset.pathGroup,
-              borderLeftColor: window.getComputedStyle(node).borderLeftColor,
-            }))
-          )
-        assert.deepEqual(transitionColors, [
-          { group: 'correction', borderLeftColor: 'rgb(22, 119, 255)' },
-          { group: 'stop', borderLeftColor: 'rgb(207, 19, 34)' },
-          { group: 'correction', borderLeftColor: 'rgb(22, 119, 255)' },
-        ])
-        await assertNoHorizontalOverflow(
-          page,
-          'dev-flow-state-observatory-state-rule-correction-paths-light'
-        )
-        const graphMetrics = await graph.evaluate((node) => ({
-          visible: node.checkVisibility(),
-          clientWidth: node.clientWidth,
-          scrollWidth: node.scrollWidth,
-        }))
-        assert.equal(graphMetrics.visible, true)
-        assert(graphMetrics.clientWidth > 0)
-        const writeRequests = writeRequestsByPage.get(page) || []
-        assert.deepEqual(
-          writeRequests,
-          [],
-          '返工回厂状态规则查阅不得发出写请求'
-        )
-        await page.evaluate(() =>
-          window.scrollTo({ top: 0, behavior: 'instant' })
-        )
-        await page.screenshot({
-          path: 'output/playwright/style-l1/dev-flow-state-observatory-state-rule-correction-paths-light.png',
-          fullPage: true,
-          animations: 'disabled',
-        })
-        reportScenarioEvidence(
-          'dev-flow-state-observatory-state-rule-correction-paths-light',
-          {
-            diagramEdgeStyles,
-            graphMetrics,
-            legendStyles,
-            transitionColors,
-            writeRequests,
-          }
-        )
-      },
-    },
-    {
       name: 'dev-flow-state-observatory-state-rules-mobile-dark',
       path: PRODUCTION_FACT_STATE_RULES_PATH,
       viewport: { width: 390, height: 844 },
@@ -2238,7 +2111,7 @@ export function createDevFlowStateObservatoryScenarios({
         assert.equal(metrics.mode, 'overview')
         assert.equal(metrics.backgroundColor, 'rgb(255, 255, 255)')
         assert.equal(metrics.overviewLaneCount, 4)
-        assert.equal(metrics.overviewChainCount, 12)
+        assert.equal(metrics.overviewChainCount, 11)
         assert.equal(metrics.stepCount, 0)
         assert.equal(metrics.diagramStatus, 'rendered')
         assert.equal(metrics.diagramTheme, 'light')
@@ -2635,8 +2508,8 @@ export function createDevFlowStateObservatoryScenarios({
         const chainView = page.locator('[data-flow-state-view="chain"]')
         assert.equal(
           await chainView.locator('[data-overview-chain]').count(),
-          12,
-          '移动端总图必须保留全部 12 条链级入口'
+          11,
+          '移动端总图必须保留全部 11 条链级入口'
         )
         assert.equal(await chainView.locator('[data-chain-node]').count(), 0)
         const metrics = await collectBoxMetrics(page)
@@ -2810,20 +2683,20 @@ export function createDevFlowStateObservatoryScenarios({
           [
             '采购与质量 · 5',
             '生产与库存 · 6',
-            '委外与返工 · 3',
+            '委外与返工 · 2',
             '出货与财务 · 6',
           ]
         )
         assert.equal(
           await factDropdown.locator('.ant-select-item-option').count(),
-          20,
+          19,
           'Fact 下拉必须按四个导航分组精确覆盖全部定义'
         )
         assert.equal(
           await factDropdown
             .locator('.erp-dev-flow-definition-option__key')
             .count(),
-          20,
+          19,
           '开发观察台必须保留全部机器键，但降低其视觉权重'
         )
         const factSelectMetrics = await factDropdown.evaluate((node) => {

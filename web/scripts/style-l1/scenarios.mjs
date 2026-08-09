@@ -2649,9 +2649,7 @@ export function createStyleL1Scenarios(deps) {
               commandCard: readRect('.erp-workbench-command-card'),
               mainGrid: readRect('.erp-workbench-main-grid'),
               queuePanel: readRect('.erp-workbench-queue-panel'),
-              table: readRect(
-                '.erp-workbench-queue-panel .ant-table-wrapper'
-              ),
+              table: readRect('.erp-workbench-queue-panel .ant-table-wrapper'),
               pagination: readRect(
                 '.erp-workbench-queue-panel .ant-pagination'
               ),
@@ -2738,8 +2736,7 @@ export function createStyleL1Scenarios(deps) {
         await queuePanel
           .locator('.ant-spin-spinning')
           .waitFor({ state: 'visible', timeout: 10_000 })
-        const loadingSecondPageLayout =
-          await readWorkbenchPaginationLayout()
+        const loadingSecondPageLayout = await readWorkbenchPaginationLayout()
         assert.equal(
           loadingSecondPageLayout.rowCount,
           firstPageLayout.rowCount,
@@ -2776,8 +2773,7 @@ export function createStyleL1Scenarios(deps) {
         await queuePanel
           .locator('.ant-pagination-item-2.ant-pagination-item-active')
           .waitFor({ state: 'visible', timeout: 10_000 })
-        const settledSecondPageLayout =
-          await readWorkbenchPaginationLayout()
+        const settledSecondPageLayout = await readWorkbenchPaginationLayout()
         assert.equal(
           settledSecondPageLayout.rowCount,
           8,
@@ -3216,9 +3212,7 @@ export function createStyleL1Scenarios(deps) {
           '权限关系',
           '权限关系页应在产品工程二级菜单中保持唯一当前项'
         )
-        const modal = page.locator(
-          '.erp-dev-permission-relationships-shell'
-        )
+        const modal = page.locator('.erp-dev-permission-relationships-shell')
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(modal, '从账号到最终可用范围，一张图看清')
         await expectText(modal, '关系图是只读结果')
@@ -3267,9 +3261,8 @@ export function createStyleL1Scenarios(deps) {
             graphWidth: viewportRect?.width || 0,
             graphHeight: viewportRect?.height || 0,
             summaryColumns: summary
-              ? window
-                  .getComputedStyle(summary)
-                  .gridTemplateColumns.split(' ').length
+              ? window.getComputedStyle(summary).gridTemplateColumns.split(' ')
+                  .length
               : 0,
             viewportWidth: window.innerWidth,
             viewportHeight: window.innerHeight,
@@ -3280,8 +3273,7 @@ export function createStyleL1Scenarios(deps) {
         })
         assert(
           roleGraphMetrics.shellLeft > roleGraphMetrics.navRight &&
-            roleGraphMetrics.shellRight <=
-              roleGraphMetrics.viewportWidth + 1 &&
+            roleGraphMetrics.shellRight <= roleGraphMetrics.viewportWidth + 1 &&
             roleGraphMetrics.shellWidth > 900 &&
             roleGraphMetrics.graphWidth > 600 &&
             roleGraphMetrics.graphHeight >= 360 &&
@@ -3346,8 +3338,7 @@ export function createStyleL1Scenarios(deps) {
           .allTextContents()
         assert(
           moduleLabels.some((label) => label.trim() === '仓储'),
-          '权限关系图功能范围缺少仓储: ' +
-            JSON.stringify(moduleLabels)
+          '权限关系图功能范围缺少仓储: ' + JSON.stringify(moduleLabels)
         )
         const moduleOption = moduleDropdown
           .locator('.ant-select-item-option')
@@ -3413,9 +3404,7 @@ export function createStyleL1Scenarios(deps) {
             exact: true,
           })
           .click()
-        const fullscreen = page.locator(
-          '.erp-markdown-mermaid--fullscreen'
-        )
+        const fullscreen = page.locator('.erp-markdown-mermaid--fullscreen')
         await fullscreen.waitFor({ state: 'visible', timeout: 10_000 })
         const fullscreenMetrics = await fullscreen.evaluate((node) => {
           const rect = node.getBoundingClientRect()
@@ -3494,14 +3483,12 @@ export function createStyleL1Scenarios(deps) {
             shellRight: rect?.right || 0,
             shellWidth: rect?.width || 0,
             toolbarColumns: toolbar
-              ? window
-                  .getComputedStyle(toolbar)
-                  .gridTemplateColumns.split(' ').length
+              ? window.getComputedStyle(toolbar).gridTemplateColumns.split(' ')
+                  .length
               : 0,
             summaryColumns: summary
-              ? window
-                  .getComputedStyle(summary)
-                  .gridTemplateColumns.split(' ').length
+              ? window.getComputedStyle(summary).gridTemplateColumns.split(' ')
+                  .length
               : 0,
             viewportWidth: window.innerWidth,
             documentOverflow:
@@ -4879,15 +4866,8 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(
           visibleLeafTexts,
-          [
-            '工作台',
-            '任务看板',
-            '业务看板',
-            '销售订单',
-            '返工回厂与补发',
-            '采购订单',
-          ],
-          `老板电脑端应有三个看板和三个常用业务: ${JSON.stringify(visibleLeafTexts)}`
+          ['工作台', '任务看板', '业务看板', '销售订单', '采购订单'],
+          `老板电脑端应有三个看板和两个常用业务: ${JSON.stringify(visibleLeafTexts)}`
         )
         const moreFunctionsRoot = menu
           .locator('.ant-menu-submenu-title')
@@ -10297,10 +10277,13 @@ export function createStyleL1Scenarios(deps) {
             mermaidZoomMinimum
           )}`
         )
-        await page.locator('.erp-markdown-mermaid').first().screenshot({
-          path: path.resolve(outputDir, 'dev-docs-mermaid-zoom-minimum.png'),
-          animations: 'disabled',
-        })
+        await page
+          .locator('.erp-markdown-mermaid')
+          .first()
+          .screenshot({
+            path: path.resolve(outputDir, 'dev-docs-mermaid-zoom-minimum.png'),
+            animations: 'disabled',
+          })
         await page.locator('[data-mermaid-zoom-action="reset"]').click()
         const mermaidZoomResetFromOut = await page.evaluate(() => {
           const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
@@ -10476,9 +10459,7 @@ export function createStyleL1Scenarios(deps) {
           const shell = document.querySelector(
             '.erp-markdown-mermaid[data-mermaid-fullscreen="true"]'
           )
-          const toolbar = shell?.querySelector(
-            '.erp-markdown-mermaid__toolbar'
-          )
+          const toolbar = shell?.querySelector('.erp-markdown-mermaid__toolbar')
           const shellRect = shell?.getBoundingClientRect()
           return {
             shellWidth: shellRect?.width || 0,
@@ -15689,7 +15670,6 @@ export function createStyleL1Scenarios(deps) {
         for (const expectedTitle of [
           '敏感字段',
           '物料清单（BOM）',
-          '返工回厂',
           '生产执行',
         ]) {
           assert(
@@ -23257,209 +23237,6 @@ export function createStyleL1Scenarios(deps) {
           page,
           'exception-inventory-operation-dark-desktop'
         )
-      },
-    },
-    {
-      name: 'rework-intake-desktop-create',
-      path: '/erp/sales/rework-intakes',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        pages: [...customerRuntimeEffectiveSession.pages, 'rework-intakes'],
-        actions: [
-          ...customerRuntimeEffectiveSession.actions,
-          'rework_intake.read',
-          'rework_intake.create',
-          'rework_intake.receive',
-          'rework_intake.cancel',
-          'rework_intake.reverse',
-          'production.rework.create',
-          'shipment.create',
-        ],
-      },
-      viewport: { width: 1280, height: 800 },
-      verify: async (page) => {
-        await expectHeading(page, '返工回厂与补发')
-        const createButton = page.getByRole('button', {
-          name: '新建返工回厂',
-          exact: true,
-        })
-        await createButton.click()
-        const createDialog = page
-          .getByRole('dialog')
-          .filter({ hasText: '新建返工回厂' })
-        await createDialog.waitFor({ state: 'visible', timeout: 10_000 })
-        await assertAntdModalCentered(
-          page,
-          createDialog,
-          'rework-intake-desktop-create-default'
-        )
-        await createDialog
-          .locator('.ant-select-loading')
-          .waitFor({ state: 'hidden', timeout: 10_000 })
-        assert.equal(
-          await createDialog.locator('.erp-rework-intake-line-card').count(),
-          0,
-          'rework-intake-desktop-create 默认态不应生成回厂明细'
-        )
-        await createDialog.screenshot({
-          path: path.join(
-            outputDir,
-            'rework-intake-desktop-create-default.png'
-          ),
-        })
-
-        await createDialog
-          .locator('.ant-form-item')
-          .filter({ hasText: '原出货明细' })
-          .locator('.ant-select-selector')
-          .click()
-        const sourceDropdown = page.locator('.ant-select-dropdown:visible')
-        await sourceDropdown.getByText(/SHIP-STYLE-L1/).click()
-        await page.keyboard.press('Escape')
-        await sourceDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
-        await expectText(createDialog, '生产单 PO-STYLE-L1')
-        await createDialog
-          .getByLabel('回厂返工原因')
-          .fill('客户产品回厂返工，完成原工序路线和质检后补发。')
-        await createDialog
-          .getByLabel('明细备注')
-          .fill('仓库接收后放入待返工批次，不得直接销售出货。')
-        assert.equal(
-          await createDialog.getByLabel('回厂数量').inputValue(),
-          '8'
-        )
-        assert.equal(
-          await createDialog.locator('.erp-rework-intake-line-card').count(),
-          1
-        )
-        await createDialog.screenshot({
-          path: path.join(
-            outputDir,
-            'rework-intake-desktop-create-selected.png'
-          ),
-        })
-        await assertOperationalFactModalViewport(
-          page,
-          'rework-intake-desktop-create',
-          createDialog
-        )
-        await assertBusinessFormModalKeyboardRecovery(page, {
-          triggerName: '新建返工回厂',
-          titleText: '新建返工回厂',
-          scenarioName: 'rework-intake-desktop-create',
-        })
-        await assertNoHorizontalOverflow(page, 'rework-intake-desktop-create')
-      },
-    },
-    {
-      name: 'rework-intake-mobile',
-      path: '/erp/sales/rework-intakes',
-      auth: 'admin',
-      effectiveSession: {
-        ...customerRuntimeEffectiveSession,
-        pages: [...customerRuntimeEffectiveSession.pages, 'rework-intakes'],
-        actions: [
-          ...customerRuntimeEffectiveSession.actions,
-          'rework_intake.read',
-          'rework_intake.create',
-          'rework_intake.receive',
-          'rework_intake.cancel',
-          'rework_intake.reverse',
-          'production.rework.create',
-          'shipment.create',
-        ],
-      },
-      viewport: { width: 390, height: 844 },
-      verify: async (page) => {
-        await expectHeading(page, '返工回厂与补发')
-        await expectText(page, 'HCF-STYLE-L1')
-        await expectText(page, 'SHIP-STYLE-L1')
-        await expectButton(page, '新建返工回厂')
-        await assertBusinessPageRefreshEntrypoint(page, {
-          scenarioName: 'rework-intake-mobile',
-        })
-        await assertBusinessMainTableHasNoOperationColumn(page, {
-          scenarioName: 'rework-intake-mobile',
-        })
-        await assertBusinessMainTableInitialSelectionEmpty(page, {
-          scenarioName: 'rework-intake-mobile',
-        })
-
-        const intakeRow = page
-          .locator('.ant-table-tbody .ant-table-row')
-          .filter({ hasText: 'HCF-STYLE-L1' })
-          .first()
-        await intakeRow.dblclick()
-        const detailDialog = page
-          .getByRole('dialog')
-          .filter({ hasText: '返工回厂与补发详情' })
-        await detailDialog.waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(detailDialog, 'P-STYLE-L1')
-        await expectText(detailDialog, 'SKU-STYLE-L1')
-        await expectText(detailDialog, 'HCF-51-1')
-        await expectText(detailDialog, '已建立返工数量')
-        await expectText(detailDialog, '已建立补发数量')
-        await assertAntdModalCentered(
-          page,
-          detailDialog,
-          'rework-intake-mobile-detail'
-        )
-        await page.screenshot({
-          path: path.join(outputDir, 'rework-intake-mobile-detail.png'),
-          fullPage: true,
-        })
-        await page.keyboard.press('Escape')
-        await detailDialog.waitFor({ state: 'hidden', timeout: 10_000 })
-
-        await page
-          .getByRole('button', { name: '新建返工回厂', exact: true })
-          .click()
-        const createDialog = page
-          .getByRole('dialog')
-          .filter({ hasText: '新建返工回厂' })
-        await createDialog.waitFor({ state: 'visible', timeout: 10_000 })
-        await assertAntdModalCentered(
-          page,
-          createDialog,
-          'rework-intake-mobile-create'
-        )
-        await createDialog
-          .locator('.ant-select-loading')
-          .waitFor({ state: 'hidden', timeout: 10_000 })
-        await createDialog
-          .locator('.ant-form-item')
-          .filter({ hasText: '原出货明细' })
-          .locator('.ant-select-selector')
-          .click()
-        const sourceDropdown = page.locator('.ant-select-dropdown:visible')
-        await sourceDropdown.getByText(/SHIP-STYLE-L1/).click()
-        await page.keyboard.press('Escape')
-        await sourceDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
-        await expectText(createDialog, '生产单 PO-STYLE-L1')
-        assert.match(
-          await createDialog.getByLabel('返工回厂单号').inputValue(),
-          /^HCF-/u
-        )
-        assert.equal(
-          await createDialog.getByLabel('回厂数量').inputValue(),
-          '8'
-        )
-        await createDialog
-          .getByLabel('回厂返工原因')
-          .fill('手机端登记回厂返工，后续完成质检和补发。')
-        await createDialog
-          .getByLabel('明细备注')
-          .fill('手机端长备注用于核对正文滚动和底部操作边界。')
-        await createDialog.screenshot({
-          path: path.join(outputDir, 'rework-intake-mobile-create.png'),
-        })
-        await assertOperationalFactModalViewport(
-          page,
-          'rework-intake-mobile-create',
-          createDialog
-        )
-        await assertNoHorizontalOverflow(page, 'rework-intake-mobile')
       },
     },
     {

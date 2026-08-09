@@ -18,7 +18,6 @@ test('operationalFactApi: exposes validated production and outsourcing draft sav
     'saveProductionMaterialIssueDraft',
     'saveProductionCompletionDraft',
     'saveProductionReworkFromCompletionDraft',
-    'saveProductionReworkFromIntakeDraft',
     'saveOutsourcingMaterialIssueDraft',
     'saveOutsourcingReturnReceiptDraft',
   ]) {
@@ -65,16 +64,6 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'create_payable_from_outsourcing_return',
     'create_reconciliation_from_finance_fact',
     'cancel_finance_fact',
-    'list_rework_intake_source_candidates',
-    'list_rework_intakes',
-    'create_rework_intake',
-    'save_rework_intake_draft',
-    'receive_rework_intake',
-    'cancel_rework_intake',
-    'reverse_rework_intake',
-    'get_rework_intake',
-    'create_production_rework_from_intake',
-    'create_rework_reshipment',
     'list_finance_payments',
     'get_finance_credit_note',
     'list_finance_credit_notes',
@@ -152,7 +141,6 @@ test('operationalFactApi: source-derived fact reads use strict complete paginati
     ['listAllFinanceFacts', 'listFinanceFacts', 'finance_facts'],
     ['listAllFinancePayments', 'listFinancePayments', 'payments'],
     ['listAllFinanceCreditNotes', 'listFinanceCreditNotes', 'credit_notes'],
-    ['listAllReworkIntakes', 'listReworkIntakes', 'rework_intakes'],
   ]) {
     assert.match(
       source,
@@ -168,17 +156,6 @@ test('operationalFactApi: shipment source candidates use the typed server contra
   assert.match(
     source,
     /export async function listShipmentSourceCandidates[\s\S]*?'list_shipment_source_candidates'[\s\S]*?validateShipmentSourceCandidatePage/u
-  )
-})
-
-test('operationalFactApi: rework intake candidates keep source and production target identity', () => {
-  assert.match(
-    source,
-    /function reworkIntakeSourceCandidateIdentityKey[\s\S]*?source_shipment_item_id[\s\S]*?target_production_order_item_id/u
-  )
-  assert.match(
-    source,
-    /listAllReworkIntakeSourceCandidates[\s\S]*?recordIdentityKey:\s*reworkIntakeSourceCandidateIdentityKey[\s\S]*?id:\s*reworkIntakeSourceCandidateIdentityKey\(item\)/u
   )
 })
 

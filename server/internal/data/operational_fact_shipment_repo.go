@@ -16,7 +16,6 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/qualityinspection"
-	"server/internal/data/model/ent/reworkintake"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
@@ -48,9 +47,7 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 
 	row, err := tx.client.Shipment.Create().
 		SetShipmentNo(shipmentIn.ShipmentNo).
-		SetPurpose(biz.ShipmentPurposeSalesDelivery).
 		SetNillableSalesOrderID(shipmentIn.SalesOrderID).
-		SetNillableReworkIntakeID(nil).
 		SetNillableCustomerID(shipmentIn.CustomerID).
 		SetNillableCustomerSnapshot(shipmentIn.CustomerSnapshot).
 		SetStatus(biz.ShipmentStatusDraft).
@@ -102,7 +99,7 @@ func (r *operationalFactRepo) SaveShipmentDraftWithItems(ctx context.Context, in
 	if current.Version != in.ExpectedVersion {
 		return nil, biz.ErrOperationalFactVersionConflict
 	}
-	if current.Status != biz.ShipmentStatusDraft || current.Purpose != biz.ShipmentPurposeSalesDelivery {
+	if current.Status != biz.ShipmentStatusDraft {
 		return nil, biz.ErrBadParam
 	}
 	if err := shipmentDraftSaveDependency(ctx, tx, current); err != nil {
@@ -111,7 +108,6 @@ func (r *operationalFactRepo) SaveShipmentDraftWithItems(ctx context.Context, in
 
 	resolved, err := lockAndResolveShipmentSalesOrderSource(ctx, tx, &biz.ShipmentCreate{
 		ShipmentNo:       in.ShipmentNo,
-		Purpose:          biz.ShipmentPurposeSalesDelivery,
 		SalesOrderID:     in.SalesOrderID,
 		CustomerID:       in.CustomerID,
 		CustomerSnapshot: in.CustomerSnapshot,
@@ -241,12 +237,6 @@ func canonicalSalesDeliveryShipmentCreateIntent(in *biz.ShipmentCreate) (*biz.Sh
 		return nil, biz.ErrBadParam
 	}
 	canonical := *in
-	if canonical.Purpose == "" {
-		canonical.Purpose = biz.ShipmentPurposeSalesDelivery
-	}
-	if canonical.Purpose != biz.ShipmentPurposeSalesDelivery || canonical.ReworkIntakeID != nil {
-		return nil, biz.ErrBadParam
-	}
 	return &canonical, nil
 }
 
@@ -391,21 +381,6 @@ func (r *operationalFactRepo) SubmitShipmentRelease(ctx context.Context, id int,
 	if len(shipmentSource.Items) == 0 {
 		return nil, false, biz.ErrBadParam
 	}
-	if err := validateShipmentPurposeBundle(row, nil); err != nil {
-		return nil, false, err
-	}
-	if row.Purpose == biz.ShipmentPurposeReworkReshipment {
-		items, err := tx.client.ShipmentItem.Query().Where(shipmentitem.ShipmentID(row.ID)).Order(ent.Asc(shipmentitem.FieldID)).All(ctx)
-		if err != nil {
-			return nil, false, err
-		}
-		if err := validateShipmentPurposeBundle(row, items); err != nil {
-			return nil, false, err
-		}
-		if err := validateReworkReshipmentForShipping(ctx, tx, row, items); err != nil {
-			return nil, false, err
-		}
-	}
 	if err := validateShipmentFinishedGoodsQualityGate(ctx, tx, id); err != nil {
 		return nil, false, err
 	}
@@ -472,7 +447,6 @@ func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int,
 	return client.ShipmentItem.Create().
 		SetShipmentID(shipmentID).
 		SetNillableSalesOrderItemID(in.SalesOrderItemID).
-		SetNillableReworkCompletionFactID(in.ReworkCompletionFactID).
 		SetProductID(in.ProductID).
 		SetNillableProductSkuID(in.ProductSkuID).
 		SetWarehouseID(in.WarehouseID).
@@ -591,9 +565,7 @@ func shipmentMatchesCreate(row *ent.Shipment, in *biz.ShipmentCreate) bool {
 		return false
 	}
 	return row.ShipmentNo == in.ShipmentNo &&
-		row.Purpose == in.Purpose &&
 		sameOptionalInt(row.SalesOrderID, in.SalesOrderID) &&
-		sameOptionalInt(row.ReworkIntakeID, in.ReworkIntakeID) &&
 		sameOptionalInt(row.CustomerID, in.CustomerID) &&
 		sameOptionalString(row.CustomerSnapshot, in.CustomerSnapshot) &&
 		row.IdempotencyKey == in.IdempotencyKey &&
@@ -610,7 +582,6 @@ func shipmentItemsMatchCreate(rows []*biz.ShipmentItem, inputs []*biz.ShipmentIt
 		in := inputs[index]
 		if row == nil || in == nil ||
 			!sameOptionalInt(row.SalesOrderItemID, in.SalesOrderItemID) ||
-			!sameOptionalInt(row.ReworkCompletionFactID, in.ReworkCompletionFactID) ||
 			row.ProductID != in.ProductID ||
 			!sameOptionalInt(row.ProductSkuID, in.ProductSkuID) ||
 			row.WarehouseID != in.WarehouseID ||
@@ -686,9 +657,6 @@ func (r *operationalFactRepo) RecordShipmentFinanceReleaseProcessCommand(
 	}
 	if row.Status != biz.ShipmentStatusDraft {
 		return nil, biz.ErrBadParam
-	}
-	if row.Purpose != biz.ShipmentPurposeSalesDelivery {
-		return nil, biz.ErrShipmentFinanceReleaseRequired
 	}
 	if row.FinanceReleaseStatus == biz.ShipmentFinanceReleaseStatusApproved {
 		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
@@ -779,9 +747,6 @@ func (r *operationalFactRepo) RecordShipmentFinanceRejectionProcessCommand(
 	}
 	if row.Status != biz.ShipmentStatusDraft {
 		return nil, biz.ErrBadParam
-	}
-	if row.Purpose != biz.ShipmentPurposeSalesDelivery {
-		return nil, biz.ErrShipmentFinanceReleaseRequired
 	}
 	if row.FinanceReleaseStatus == biz.ShipmentFinanceReleaseStatusRejected {
 		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
@@ -969,7 +934,7 @@ func (r *operationalFactRepo) shipShipment(
 			return nil, biz.ErrBadParam
 		}
 		if !transition.Changed {
-			if parent.ShippedAt != nil && parent.Purpose == biz.ShipmentPurposeSalesDelivery {
+			if parent.ShippedAt != nil {
 				if err := markProcessDomainCommandEffectCompensatedWithClient(
 					ctx,
 					tx.client,
@@ -988,19 +953,17 @@ func (r *operationalFactRepo) shipShipment(
 		if err := validateShipmentCancellationDependencies(ctx, tx, parent.ID); err != nil {
 			return nil, err
 		}
-		if parent.Purpose == biz.ShipmentPurposeSalesDelivery {
-			hasFinanceDependency, err := tx.client.FinanceFact.Query().Where(
-				financefact.SourceType(biz.ShipmentSourceType),
-				financefact.SourceID(parent.ID),
-				financefact.FactTypeIn(biz.FinanceFactReceivable, biz.FinanceFactInvoice),
-				financefact.StatusNEQ(biz.OperationalFactStatusCancelled),
-			).Exist(ctx)
-			if err != nil {
-				return nil, err
-			}
-			if hasFinanceDependency {
-				return nil, biz.ErrShipmentFinanceDependency
-			}
+		hasFinanceDependency, err := tx.client.FinanceFact.Query().Where(
+			financefact.SourceType(biz.ShipmentSourceType),
+			financefact.SourceID(parent.ID),
+			financefact.FactTypeIn(biz.FinanceFactReceivable, biz.FinanceFactInvoice),
+			financefact.StatusNEQ(biz.OperationalFactStatusCancelled),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasFinanceDependency {
+			return nil, biz.ErrShipmentFinanceDependency
 		}
 		releaseSource := entShipmentToBiz(parent, items)
 		if cancelledShippedFact {
@@ -1052,28 +1015,13 @@ func (r *operationalFactRepo) shipShipment(
 			}
 			return commitShipment(ctx, tx, parent)
 		}
-		if err := validateShipmentPurposeBundle(parent, items); err != nil {
-			return nil, err
-		}
-		if parent.Purpose == biz.ShipmentPurposeSalesDelivery && parent.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusApproved {
+		if parent.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusApproved {
 			return nil, biz.ErrShipmentFinanceReleaseRequired
-		}
-		if parent.Purpose == biz.ShipmentPurposeReworkReshipment && parent.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusNotRequired {
-			return nil, biz.ErrShipmentFinanceReleaseRequired
-		}
-		if command != nil && parent.Purpose != biz.ShipmentPurposeSalesDelivery {
-			return nil, biz.ErrBadParam
 		}
 		if err := validateShipmentFinishedGoodsQualityGate(ctx, tx, parent.ID); err != nil {
 			return nil, err
 		}
-		var sourceQuantity *shipmentSourceQuantityState
-		if parent.Purpose == biz.ShipmentPurposeSalesDelivery {
-			sourceQuantity, err = validateShipmentSourceAndQuantity(ctx, tx, parent, items)
-		} else {
-			err = validateReworkReshipmentForShipping(ctx, tx, parent, items)
-			sourceQuantity = newShipmentSourceQuantityState()
-		}
+		sourceQuantity, err := validateShipmentSourceAndQuantity(ctx, tx, parent, items)
 		if err != nil {
 			return nil, err
 		}
@@ -1100,7 +1048,7 @@ func (r *operationalFactRepo) shipShipment(
 	if err != nil {
 		return nil, err
 	}
-	if cancel && cancelledShippedFact && parent.Purpose == biz.ShipmentPurposeSalesDelivery {
+	if cancel && cancelledShippedFact {
 		if err := markProcessDomainCommandEffectCompensatedWithClient(
 			ctx,
 			tx.client,
@@ -1150,108 +1098,6 @@ func validateShipmentCancellationDependencies(ctx context.Context, tx *inventory
 	}
 	if hasPendingQuality {
 		return biz.ErrShipmentQualityPending
-	}
-	hasActiveReworkIntake, err := tx.client.ReworkIntake.Query().Where(
-		reworkintake.SourceShipmentID(shipmentID),
-		reworkintake.StatusIn(
-			biz.ReworkIntakeStatusDraft,
-			biz.ReworkIntakeStatusReceived,
-		),
-	).Exist(ctx)
-	if err != nil {
-		return err
-	}
-	if hasActiveReworkIntake {
-		return biz.ErrShipmentReworkIntakeDependency
-	}
-	return nil
-}
-
-func validateShipmentPurposeBundle(parent *ent.Shipment, items []*ent.ShipmentItem) error {
-	if parent == nil {
-		return biz.ErrShipmentNotFound
-	}
-	switch parent.Purpose {
-	case biz.ShipmentPurposeSalesDelivery:
-		if parent.ReworkIntakeID != nil || parent.FinanceReleaseStatus == biz.ShipmentFinanceReleaseStatusNotRequired {
-			return biz.ErrShipmentSourceMismatch
-		}
-		for _, item := range items {
-			if item == nil || item.ReworkCompletionFactID != nil {
-				return biz.ErrShipmentSourceMismatch
-			}
-		}
-	case biz.ShipmentPurposeReworkReshipment:
-		if parent.ReworkIntakeID == nil || *parent.ReworkIntakeID <= 0 || parent.SalesOrderID != nil ||
-			parent.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusNotRequired {
-			return biz.ErrReworkReshipmentSourceInvalid
-		}
-		for _, item := range items {
-			if item == nil || item.SalesOrderItemID != nil || item.ReworkCompletionFactID == nil || *item.ReworkCompletionFactID <= 0 {
-				return biz.ErrReworkReshipmentSourceInvalid
-			}
-		}
-	default:
-		return biz.ErrShipmentSourceMismatch
-	}
-	return nil
-}
-
-func validateReworkReshipmentForShipping(
-	ctx context.Context,
-	tx *inventoryDBTx,
-	parent *ent.Shipment,
-	items []*ent.ShipmentItem,
-) error {
-	if tx == nil || tx.client == nil || parent == nil || len(items) == 0 {
-		return biz.ErrBadParam
-	}
-	if err := validateShipmentPurposeBundle(parent, items); err != nil {
-		return err
-	}
-	intakeID := *parent.ReworkIntakeID
-	if err := lockOperationalFactRow(ctx, tx, "rework_intakes", intakeID, biz.ErrReworkIntakeNotFound); err != nil {
-		return err
-	}
-	intake, err := tx.client.ReworkIntake.Get(ctx, intakeID)
-	if err != nil || intake.Status != biz.ReworkIntakeStatusReceived || parent.CustomerID == nil || *parent.CustomerID != intake.CustomerID ||
-		strings.TrimSpace(optionalStringValueOrEmpty(parent.CustomerSnapshot)) != strings.TrimSpace(intake.CustomerSnapshot) {
-		return biz.ErrReworkReshipmentSourceInvalid
-	}
-	completionIDs := make([]int, 0, len(items))
-	itemsByCompletion := make(map[int]*ent.ShipmentItem, len(items))
-	for _, item := range items {
-		completionID := *item.ReworkCompletionFactID
-		if _, exists := itemsByCompletion[completionID]; exists {
-			return biz.ErrReworkReshipmentSourceInvalid
-		}
-		completionIDs = append(completionIDs, completionID)
-		itemsByCompletion[completionID] = item
-	}
-	sort.Ints(completionIDs)
-	for _, completionID := range completionIDs {
-		if err := lockOperationalFactRow(ctx, tx, "production_facts", completionID, biz.ErrReworkReshipmentSourceInvalid); err != nil {
-			return err
-		}
-		completion, err := tx.client.ProductionFact.Get(ctx, completionID)
-		if err != nil {
-			return biz.ErrReworkReshipmentSourceInvalid
-		}
-		if err := validateReworkCompletionForIntake(ctx, tx.client, completion, intakeID); err != nil {
-			return err
-		}
-		item := itemsByCompletion[completionID]
-		if item.ProductID != completion.SubjectID || !sameOptionalInt(item.ProductSkuID, completion.ProductSkuID) ||
-			item.WarehouseID != completion.WarehouseID || item.UnitID != completion.UnitID || !sameOptionalInt(item.LotID, completion.LotID) {
-			return biz.ErrReworkReshipmentSourceInvalid
-		}
-		active, err := activeReworkReshipmentQuantity(ctx, tx.client, completionID)
-		if err != nil {
-			return err
-		}
-		if active.GreaterThan(completion.Quantity) {
-			return biz.ErrReworkReshipmentQuantityExceeded
-		}
 	}
 	return nil
 }
@@ -1970,7 +1816,7 @@ func entShipmentToBiz(row *ent.Shipment, itemRows []*ent.ShipmentItem) *biz.Ship
 	for _, item := range itemRows {
 		items = append(items, entShipmentItemToBiz(item))
 	}
-	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, Purpose: row.Purpose, SalesOrderID: row.SalesOrderID, ReworkIntakeID: row.ReworkIntakeID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, Version: row.Version, FinanceReleaseStatus: row.FinanceReleaseStatus, FinanceReleaseVersion: row.FinanceReleaseVersion, FinanceReleasedAt: row.FinanceReleasedAt, FinanceReleasedBy: row.FinanceReleasedBy, FinanceReleaseProcessInstanceID: row.FinanceReleaseProcessInstanceID, FinanceReleaseProcessNodeID: row.FinanceReleaseProcessNodeID, FinanceReleaseNote: row.FinanceReleaseNote, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, TotalNetWeightG: row.TotalNetWeightG, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
+	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, SalesOrderID: row.SalesOrderID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, Version: row.Version, FinanceReleaseStatus: row.FinanceReleaseStatus, FinanceReleaseVersion: row.FinanceReleaseVersion, FinanceReleasedAt: row.FinanceReleasedAt, FinanceReleasedBy: row.FinanceReleasedBy, FinanceReleaseProcessInstanceID: row.FinanceReleaseProcessInstanceID, FinanceReleaseProcessNodeID: row.FinanceReleaseProcessNodeID, FinanceReleaseNote: row.FinanceReleaseNote, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, TotalNetWeightG: row.TotalNetWeightG, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
 }
 
 func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {
@@ -1982,5 +1828,5 @@ func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {
 		currency := row.CurrencySnapshot
 		currencySnapshot = &currency
 	}
-	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ReworkCompletionFactID: row.ReworkCompletionFactID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, UnitNetWeightGSnapshot: row.UnitNetWeightGSnapshot, UnitPriceSnapshot: row.UnitPriceSnapshot, AmountSnapshot: row.AmountSnapshot, CurrencySnapshot: currencySnapshot, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, UnitNetWeightGSnapshot: row.UnitNetWeightGSnapshot, UnitPriceSnapshot: row.UnitPriceSnapshot, AmountSnapshot: row.AmountSnapshot, CurrencySnapshot: currencySnapshot, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

@@ -63,8 +63,6 @@ import (
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
-	"server/internal/data/model/ent/reworkintake"
-	"server/internal/data/model/ent/reworkintakeitem"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
@@ -200,10 +198,6 @@ type Client struct {
 	PurchaseReturnItem *PurchaseReturnItemClient
 	// QualityInspection is the client for interacting with the QualityInspection builders.
 	QualityInspection *QualityInspectionClient
-	// ReworkIntake is the client for interacting with the ReworkIntake builders.
-	ReworkIntake *ReworkIntakeClient
-	// ReworkIntakeItem is the client for interacting with the ReworkIntakeItem builders.
-	ReworkIntakeItem *ReworkIntakeItemClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// RoleDataScope is the client for interacting with the RoleDataScope builders.
@@ -305,8 +299,6 @@ func (c *Client) init() {
 	c.PurchaseReturn = NewPurchaseReturnClient(c.config)
 	c.PurchaseReturnItem = NewPurchaseReturnItemClient(c.config)
 	c.QualityInspection = NewQualityInspectionClient(c.config)
-	c.ReworkIntake = NewReworkIntakeClient(c.config)
-	c.ReworkIntakeItem = NewReworkIntakeItemClient(c.config)
 	c.Role = NewRoleClient(c.config)
 	c.RoleDataScope = NewRoleDataScopeClient(c.config)
 	c.RolePermission = NewRolePermissionClient(c.config)
@@ -470,8 +462,6 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PurchaseReturn:                     NewPurchaseReturnClient(cfg),
 		PurchaseReturnItem:                 NewPurchaseReturnItemClient(cfg),
 		QualityInspection:                  NewQualityInspectionClient(cfg),
-		ReworkIntake:                       NewReworkIntakeClient(cfg),
-		ReworkIntakeItem:                   NewReworkIntakeItemClient(cfg),
 		Role:                               NewRoleClient(cfg),
 		RoleDataScope:                      NewRoleDataScopeClient(cfg),
 		RolePermission:                     NewRolePermissionClient(cfg),
@@ -562,8 +552,6 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PurchaseReturn:                     NewPurchaseReturnClient(cfg),
 		PurchaseReturnItem:                 NewPurchaseReturnItemClient(cfg),
 		QualityInspection:                  NewQualityInspectionClient(cfg),
-		ReworkIntake:                       NewReworkIntakeClient(cfg),
-		ReworkIntakeItem:                   NewReworkIntakeItemClient(cfg),
 		Role:                               NewRoleClient(cfg),
 		RoleDataScope:                      NewRoleDataScopeClient(cfg),
 		RolePermission:                     NewRolePermissionClient(cfg),
@@ -628,12 +616,11 @@ func (c *Client) Use(hooks ...Hook) {
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
 		c.PurchaseRejectionDisposition, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.ReworkIntake, c.ReworkIntakeItem, c.Role,
-		c.RoleDataScope, c.RolePermission, c.RoleProfile, c.RuntimeAuditEvent,
-		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
-		c.StockReservation, c.Supplier, c.Unit, c.Warehouse, c.WorkPool,
-		c.WorkPoolMembership, c.WorkflowBusinessState, c.WorkflowTask,
-		c.WorkflowTaskEvent,
+		c.QualityInspection, c.Role, c.RoleDataScope, c.RolePermission, c.RoleProfile,
+		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
+		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
+		c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
+		c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -659,12 +646,11 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
 		c.PurchaseRejectionDisposition, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.ReworkIntake, c.ReworkIntakeItem, c.Role,
-		c.RoleDataScope, c.RolePermission, c.RoleProfile, c.RuntimeAuditEvent,
-		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
-		c.StockReservation, c.Supplier, c.Unit, c.Warehouse, c.WorkPool,
-		c.WorkPoolMembership, c.WorkflowBusinessState, c.WorkflowTask,
-		c.WorkflowTaskEvent,
+		c.QualityInspection, c.Role, c.RoleDataScope, c.RolePermission, c.RoleProfile,
+		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
+		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
+		c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
+		c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -777,10 +763,6 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PurchaseReturnItem.mutate(ctx, m)
 	case *QualityInspectionMutation:
 		return c.QualityInspection.mutate(ctx, m)
-	case *ReworkIntakeMutation:
-		return c.ReworkIntake.mutate(ctx, m)
-	case *ReworkIntakeItemMutation:
-		return c.ReworkIntakeItem.mutate(ctx, m)
 	case *RoleMutation:
 		return c.Role.mutate(ctx, m)
 	case *RoleDataScopeMutation:
@@ -10792,450 +10774,6 @@ func (c *QualityInspectionClient) mutate(ctx context.Context, m *QualityInspecti
 	}
 }
 
-// ReworkIntakeClient is a client for the ReworkIntake schema.
-type ReworkIntakeClient struct {
-	config
-}
-
-// NewReworkIntakeClient returns a client for the ReworkIntake from the given config.
-func NewReworkIntakeClient(c config) *ReworkIntakeClient {
-	return &ReworkIntakeClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `reworkintake.Hooks(f(g(h())))`.
-func (c *ReworkIntakeClient) Use(hooks ...Hook) {
-	c.hooks.ReworkIntake = append(c.hooks.ReworkIntake, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `reworkintake.Intercept(f(g(h())))`.
-func (c *ReworkIntakeClient) Intercept(interceptors ...Interceptor) {
-	c.inters.ReworkIntake = append(c.inters.ReworkIntake, interceptors...)
-}
-
-// Create returns a builder for creating a ReworkIntake entity.
-func (c *ReworkIntakeClient) Create() *ReworkIntakeCreate {
-	mutation := newReworkIntakeMutation(c.config, OpCreate)
-	return &ReworkIntakeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of ReworkIntake entities.
-func (c *ReworkIntakeClient) CreateBulk(builders ...*ReworkIntakeCreate) *ReworkIntakeCreateBulk {
-	return &ReworkIntakeCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *ReworkIntakeClient) MapCreateBulk(slice any, setFunc func(*ReworkIntakeCreate, int)) *ReworkIntakeCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &ReworkIntakeCreateBulk{err: fmt.Errorf("calling to ReworkIntakeClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*ReworkIntakeCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &ReworkIntakeCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for ReworkIntake.
-func (c *ReworkIntakeClient) Update() *ReworkIntakeUpdate {
-	mutation := newReworkIntakeMutation(c.config, OpUpdate)
-	return &ReworkIntakeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *ReworkIntakeClient) UpdateOne(_m *ReworkIntake) *ReworkIntakeUpdateOne {
-	mutation := newReworkIntakeMutation(c.config, OpUpdateOne, withReworkIntake(_m))
-	return &ReworkIntakeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *ReworkIntakeClient) UpdateOneID(id int) *ReworkIntakeUpdateOne {
-	mutation := newReworkIntakeMutation(c.config, OpUpdateOne, withReworkIntakeID(id))
-	return &ReworkIntakeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for ReworkIntake.
-func (c *ReworkIntakeClient) Delete() *ReworkIntakeDelete {
-	mutation := newReworkIntakeMutation(c.config, OpDelete)
-	return &ReworkIntakeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *ReworkIntakeClient) DeleteOne(_m *ReworkIntake) *ReworkIntakeDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *ReworkIntakeClient) DeleteOneID(id int) *ReworkIntakeDeleteOne {
-	builder := c.Delete().Where(reworkintake.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &ReworkIntakeDeleteOne{builder}
-}
-
-// Query returns a query builder for ReworkIntake.
-func (c *ReworkIntakeClient) Query() *ReworkIntakeQuery {
-	return &ReworkIntakeQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeReworkIntake},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a ReworkIntake entity by its id.
-func (c *ReworkIntakeClient) Get(ctx context.Context, id int) (*ReworkIntake, error) {
-	return c.Query().Where(reworkintake.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *ReworkIntakeClient) GetX(ctx context.Context, id int) *ReworkIntake {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QuerySourceShipment queries the source_shipment edge of a ReworkIntake.
-func (c *ReworkIntakeClient) QuerySourceShipment(_m *ReworkIntake) *ShipmentQuery {
-	query := (&ShipmentClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintake.Table, reworkintake.FieldID, id),
-			sqlgraph.To(shipment.Table, shipment.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintake.SourceShipmentTable, reworkintake.SourceShipmentColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryCustomer queries the customer edge of a ReworkIntake.
-func (c *ReworkIntakeClient) QueryCustomer(_m *ReworkIntake) *CustomerQuery {
-	query := (&CustomerClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintake.Table, reworkintake.FieldID, id),
-			sqlgraph.To(customer.Table, customer.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintake.CustomerTable, reworkintake.CustomerColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryItems queries the items edge of a ReworkIntake.
-func (c *ReworkIntakeClient) QueryItems(_m *ReworkIntake) *ReworkIntakeItemQuery {
-	query := (&ReworkIntakeItemClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintake.Table, reworkintake.FieldID, id),
-			sqlgraph.To(reworkintakeitem.Table, reworkintakeitem.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, reworkintake.ItemsTable, reworkintake.ItemsColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *ReworkIntakeClient) Hooks() []Hook {
-	hooks := c.hooks.ReworkIntake
-	return append(hooks[:len(hooks):len(hooks)], reworkintake.Hooks[:]...)
-}
-
-// Interceptors returns the client interceptors.
-func (c *ReworkIntakeClient) Interceptors() []Interceptor {
-	return c.inters.ReworkIntake
-}
-
-func (c *ReworkIntakeClient) mutate(ctx context.Context, m *ReworkIntakeMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&ReworkIntakeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&ReworkIntakeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&ReworkIntakeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&ReworkIntakeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown ReworkIntake mutation op: %q", m.Op())
-	}
-}
-
-// ReworkIntakeItemClient is a client for the ReworkIntakeItem schema.
-type ReworkIntakeItemClient struct {
-	config
-}
-
-// NewReworkIntakeItemClient returns a client for the ReworkIntakeItem from the given config.
-func NewReworkIntakeItemClient(c config) *ReworkIntakeItemClient {
-	return &ReworkIntakeItemClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `reworkintakeitem.Hooks(f(g(h())))`.
-func (c *ReworkIntakeItemClient) Use(hooks ...Hook) {
-	c.hooks.ReworkIntakeItem = append(c.hooks.ReworkIntakeItem, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `reworkintakeitem.Intercept(f(g(h())))`.
-func (c *ReworkIntakeItemClient) Intercept(interceptors ...Interceptor) {
-	c.inters.ReworkIntakeItem = append(c.inters.ReworkIntakeItem, interceptors...)
-}
-
-// Create returns a builder for creating a ReworkIntakeItem entity.
-func (c *ReworkIntakeItemClient) Create() *ReworkIntakeItemCreate {
-	mutation := newReworkIntakeItemMutation(c.config, OpCreate)
-	return &ReworkIntakeItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of ReworkIntakeItem entities.
-func (c *ReworkIntakeItemClient) CreateBulk(builders ...*ReworkIntakeItemCreate) *ReworkIntakeItemCreateBulk {
-	return &ReworkIntakeItemCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *ReworkIntakeItemClient) MapCreateBulk(slice any, setFunc func(*ReworkIntakeItemCreate, int)) *ReworkIntakeItemCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &ReworkIntakeItemCreateBulk{err: fmt.Errorf("calling to ReworkIntakeItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*ReworkIntakeItemCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &ReworkIntakeItemCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) Update() *ReworkIntakeItemUpdate {
-	mutation := newReworkIntakeItemMutation(c.config, OpUpdate)
-	return &ReworkIntakeItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *ReworkIntakeItemClient) UpdateOne(_m *ReworkIntakeItem) *ReworkIntakeItemUpdateOne {
-	mutation := newReworkIntakeItemMutation(c.config, OpUpdateOne, withReworkIntakeItem(_m))
-	return &ReworkIntakeItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *ReworkIntakeItemClient) UpdateOneID(id int) *ReworkIntakeItemUpdateOne {
-	mutation := newReworkIntakeItemMutation(c.config, OpUpdateOne, withReworkIntakeItemID(id))
-	return &ReworkIntakeItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) Delete() *ReworkIntakeItemDelete {
-	mutation := newReworkIntakeItemMutation(c.config, OpDelete)
-	return &ReworkIntakeItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *ReworkIntakeItemClient) DeleteOne(_m *ReworkIntakeItem) *ReworkIntakeItemDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *ReworkIntakeItemClient) DeleteOneID(id int) *ReworkIntakeItemDeleteOne {
-	builder := c.Delete().Where(reworkintakeitem.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &ReworkIntakeItemDeleteOne{builder}
-}
-
-// Query returns a query builder for ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) Query() *ReworkIntakeItemQuery {
-	return &ReworkIntakeItemQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeReworkIntakeItem},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a ReworkIntakeItem entity by its id.
-func (c *ReworkIntakeItemClient) Get(ctx context.Context, id int) (*ReworkIntakeItem, error) {
-	return c.Query().Where(reworkintakeitem.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *ReworkIntakeItemClient) GetX(ctx context.Context, id int) *ReworkIntakeItem {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QueryReworkIntake queries the rework_intake edge of a ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) QueryReworkIntake(_m *ReworkIntakeItem) *ReworkIntakeQuery {
-	query := (&ReworkIntakeClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintakeitem.Table, reworkintakeitem.FieldID, id),
-			sqlgraph.To(reworkintake.Table, reworkintake.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, reworkintakeitem.ReworkIntakeTable, reworkintakeitem.ReworkIntakeColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QuerySourceShipmentItem queries the source_shipment_item edge of a ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) QuerySourceShipmentItem(_m *ReworkIntakeItem) *ShipmentItemQuery {
-	query := (&ShipmentItemClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintakeitem.Table, reworkintakeitem.FieldID, id),
-			sqlgraph.To(shipmentitem.Table, shipmentitem.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintakeitem.SourceShipmentItemTable, reworkintakeitem.SourceShipmentItemColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryTargetProductionOrderItem queries the target_production_order_item edge of a ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) QueryTargetProductionOrderItem(_m *ReworkIntakeItem) *ProductionOrderItemQuery {
-	query := (&ProductionOrderItemClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintakeitem.Table, reworkintakeitem.FieldID, id),
-			sqlgraph.To(productionorderitem.Table, productionorderitem.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintakeitem.TargetProductionOrderItemTable, reworkintakeitem.TargetProductionOrderItemColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryProduct queries the product edge of a ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) QueryProduct(_m *ReworkIntakeItem) *ProductQuery {
-	query := (&ProductClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintakeitem.Table, reworkintakeitem.FieldID, id),
-			sqlgraph.To(product.Table, product.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintakeitem.ProductTable, reworkintakeitem.ProductColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryProductSku queries the product_sku edge of a ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) QueryProductSku(_m *ReworkIntakeItem) *ProductSKUQuery {
-	query := (&ProductSKUClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintakeitem.Table, reworkintakeitem.FieldID, id),
-			sqlgraph.To(productsku.Table, productsku.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintakeitem.ProductSkuTable, reworkintakeitem.ProductSkuColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryReceivingWarehouse queries the receiving_warehouse edge of a ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) QueryReceivingWarehouse(_m *ReworkIntakeItem) *WarehouseQuery {
-	query := (&WarehouseClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintakeitem.Table, reworkintakeitem.FieldID, id),
-			sqlgraph.To(warehouse.Table, warehouse.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintakeitem.ReceivingWarehouseTable, reworkintakeitem.ReceivingWarehouseColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryUnit queries the unit edge of a ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) QueryUnit(_m *ReworkIntakeItem) *UnitQuery {
-	query := (&UnitClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintakeitem.Table, reworkintakeitem.FieldID, id),
-			sqlgraph.To(unit.Table, unit.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintakeitem.UnitTable, reworkintakeitem.UnitColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryReceivedLot queries the received_lot edge of a ReworkIntakeItem.
-func (c *ReworkIntakeItemClient) QueryReceivedLot(_m *ReworkIntakeItem) *InventoryLotQuery {
-	query := (&InventoryLotClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(reworkintakeitem.Table, reworkintakeitem.FieldID, id),
-			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, reworkintakeitem.ReceivedLotTable, reworkintakeitem.ReceivedLotColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *ReworkIntakeItemClient) Hooks() []Hook {
-	hooks := c.hooks.ReworkIntakeItem
-	return append(hooks[:len(hooks):len(hooks)], reworkintakeitem.Hooks[:]...)
-}
-
-// Interceptors returns the client interceptors.
-func (c *ReworkIntakeItemClient) Interceptors() []Interceptor {
-	return c.inters.ReworkIntakeItem
-}
-
-func (c *ReworkIntakeItemClient) mutate(ctx context.Context, m *ReworkIntakeItemMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&ReworkIntakeItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&ReworkIntakeItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&ReworkIntakeItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&ReworkIntakeItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown ReworkIntakeItem mutation op: %q", m.Op())
-	}
-}
-
 // RoleClient is a client for the Role schema.
 type RoleClient struct {
 	config
@@ -12618,22 +12156,6 @@ func (c *ShipmentClient) QuerySalesOrder(_m *Shipment) *SalesOrderQuery {
 	return query
 }
 
-// QueryReworkIntake queries the rework_intake edge of a Shipment.
-func (c *ShipmentClient) QueryReworkIntake(_m *Shipment) *ReworkIntakeQuery {
-	query := (&ReworkIntakeClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shipment.Table, shipment.FieldID, id),
-			sqlgraph.To(reworkintake.Table, reworkintake.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shipment.ReworkIntakeTable, shipment.ReworkIntakeColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
 // QueryCustomer queries the customer edge of a Shipment.
 func (c *ShipmentClient) QueryCustomer(_m *Shipment) *CustomerQuery {
 	query := (&CustomerClient{config: c.config}).Query()
@@ -12825,22 +12347,6 @@ func (c *ShipmentItemClient) QuerySalesOrderItem(_m *ShipmentItem) *SalesOrderIt
 			sqlgraph.From(shipmentitem.Table, shipmentitem.FieldID, id),
 			sqlgraph.To(salesorderitem.Table, salesorderitem.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, shipmentitem.SalesOrderItemTable, shipmentitem.SalesOrderItemColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryReworkCompletionFact queries the rework_completion_fact edge of a ShipmentItem.
-func (c *ShipmentItemClient) QueryReworkCompletionFact(_m *ShipmentItem) *ProductionFactQuery {
-	query := (&ProductionFactClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shipmentitem.Table, shipmentitem.FieldID, id),
-			sqlgraph.To(productionfact.Table, productionfact.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shipmentitem.ReworkCompletionFactTable, shipmentitem.ReworkCompletionFactColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -14825,10 +14331,10 @@ type (
 		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
 		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
 		PurchaseRejectionDisposition, PurchaseReturn, PurchaseReturnItem,
-		QualityInspection, ReworkIntake, ReworkIntakeItem, Role, RoleDataScope,
-		RolePermission, RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder,
-		SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit,
-		Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		QualityInspection, Role, RoleDataScope, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
+		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
@@ -14846,10 +14352,10 @@ type (
 		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
 		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
 		PurchaseRejectionDisposition, PurchaseReturn, PurchaseReturnItem,
-		QualityInspection, ReworkIntake, ReworkIntakeItem, Role, RoleDataScope,
-		RolePermission, RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder,
-		SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit,
-		Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		QualityInspection, Role, RoleDataScope, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
+		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Interceptor
 	}
 )

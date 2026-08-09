@@ -69,14 +69,14 @@ export const SCENARIO_DEMO_SCHEMA_VERSION = "plush.scenario-demo-plan/v1";
 export const SCENARIO_DEMO_READBACK_SCHEMA_VERSION =
   "plush.dev-data-preparation-readback/v1";
 export const SCENARIO_DEMO_SCHEDULE_ANCHOR_UTC = "2026-07-16T12:00:00.000Z";
-export const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 52;
+export const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51;
 export const SCENARIO_DEMO_REPLAY_MODE = "exact-create-or-readback";
 
 const REGISTERED_DEVELOPMENT_HOST = "192.168.0.106";
 const REGISTERED_DEVELOPMENT_PORT = 5432;
 const LOCAL_ROLE_DEMO_PASSWORD = "12345678";
 const LOCAL_STABLE_ADMIN_PASSWORD = "adminadmin";
-const SCENARIO_DEMO_QUERY_READY_COUNT = 42;
+const SCENARIO_DEMO_QUERY_READY_COUNT = 41;
 const SCENARIO_DEMO_BROWSER_ONLY_GAP_COUNT = 10;
 const SCENARIO_DEMO_AUDIT_MINIMUM = 30;
 const CUSTOMER_KEY = "yoyoosun";
@@ -158,7 +158,6 @@ const FACT_RECORD_KEYS = Object.freeze([
   "stockReservations",
   "shipments",
   "financeFacts",
-  "reworkIntakes",
   "financePayments",
   "financeCreditNotes",
 ]);

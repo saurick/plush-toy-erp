@@ -31,7 +31,6 @@ const EXPECTED_CHAIN_KEYS = [
   'production_exception',
   'purchase_quality_disposition',
   'outsourcing_quality_disposition',
-  'rework_return_and_reshipment',
   'purchase_posting_corrections',
 ]
 
@@ -42,17 +41,17 @@ test('business chain catalog covers every business machine and process variant',
     EXPECTED_CHAIN_KEYS
   )
   assert.equal(catalog.businessChainCoverage.complete, true)
-  assert.equal(catalog.businessChainCoverage.chainCount, 12)
+  assert.equal(catalog.businessChainCoverage.chainCount, 11)
   assert.equal(catalog.businessChainCoverage.overviewComplete, true)
   assert.equal(catalog.businessChainCoverage.overviewKey, 'all')
   assert.equal(catalog.businessChainCoverage.overviewLaneCount, 4)
-  assert.equal(catalog.businessChainCoverage.overviewRelationCount, 16)
+  assert.equal(catalog.businessChainCoverage.overviewRelationCount, 13)
   assert.deepEqual(
     new Set(catalog.businessChainCoverage.overviewChainKeys),
     new Set(EXPECTED_CHAIN_KEYS)
   )
-  assert.equal(catalog.businessChainCoverage.requiredMachineKeys.length, 28)
-  assert.equal(catalog.businessChainCoverage.coveredMachineKeys.length, 28)
+  assert.equal(catalog.businessChainCoverage.requiredMachineKeys.length, 27)
+  assert.equal(catalog.businessChainCoverage.coveredMachineKeys.length, 27)
   assert.deepEqual(
     new Set(catalog.businessChainCoverage.requiredMachineKeys),
     new Set(catalog.businessChainCoverage.coveredMachineKeys)
@@ -271,17 +270,5 @@ test('business chain catalog fails closed when a state machine or process defini
         factDefinitions: DEV_FLOW_STATE_CATALOG.factDefinitions,
       }),
     /misses process definitions: unregistered_process\/unregistered_variant/u
-  )
-
-  assert.throws(
-    () =>
-      buildDevBusinessChainCatalog({
-        flows: DEV_FLOW_STATE_CATALOG.flows.filter(
-          (flow) => flow.key !== 'fact.rework_intake'
-        ),
-        processDefinitions,
-        factDefinitions: DEV_FLOW_STATE_CATALOG.factDefinitions,
-      }),
-    /references unknown state machines: fact\.rework_intake/u
   )
 })

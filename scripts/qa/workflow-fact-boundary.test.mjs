@@ -319,7 +319,7 @@ test("status architecture is target-only and separates delivery evidence", () =>
     "| versioned migration |",
     ["20260714055504", "不能证明", "目标数据库"],
   );
-  requireUniqueLine("implementation evidence", evidence, "| 目标环境 |", [
+  requireUniqueLine("implementation evidence", evidence, "| 目标环境", [
     "未发布",
   ]);
   requireUniqueLine("implementation evidence", evidence, "一次性转换完成后", [
@@ -521,10 +521,7 @@ test("current documentation rejects stale Shipment, inventory approval and task-
     path.join(repoRoot, "docs/product/产品能力进度台账.md"),
     "utf8",
   );
-  assert.match(
-    capabilityLedger,
-    /独立领域动作才写库存、生产、出货或财务事实/u,
-  );
+  assert.match(capabilityLedger, /独立领域动作才写库存、生产、出货或财务事实/u);
   assert.equal(
     capabilityLedger.match(/^## 能力状态$/gmu)?.length,
     1,
@@ -544,7 +541,7 @@ test("current documentation rejects stale Shipment, inventory approval and task-
       (line) =>
         line.startsWith("| ") &&
         !line.startsWith("| 业务能力 ") &&
-        !line.startsWith("| --- "),
+        !/^\|\s*:?-{3,}/u.test(line),
     );
   assert(
     capabilityRows.length >= 12 && capabilityRows.length <= 15,
@@ -620,8 +617,6 @@ test("role governance stays compact and audit documentation retains its evidence
     "六条已登记 ProcessRuntime",
     "链是持久化历史的不可编辑投影",
     "不能增加、删除或重排节点",
-    "返工回厂与补发",
-    "不进入 ProcessRuntime",
   ]) {
     assert(
       roleGovernance.includes(required),

@@ -74,10 +74,7 @@ test("runtime admin guard consumes the formal top-level auth.me profile", () => 
 
 test("routed WIP writes use the verified admin and keep customer_key out of the strict WIP contract", () => {
   assert.equal(
-    manualAcceptanceFactRole(
-      "production_wip",
-      "execute_production_wip_action",
-    ),
+    manualAcceptanceFactRole("production_wip", "execute_production_wip_action"),
     "admin",
   );
   assert.deepEqual(
@@ -473,8 +470,7 @@ function factStage() {
       status,
       source_type: "SHIPMENT",
       source_id: 10000 + offset,
-      invoice_category:
-        invoiceCategories[offset % invoiceCategories.length],
+      invoice_category: invoiceCategories[offset % invoiceCategories.length],
       ...cancellationAudit(status, offset),
     });
   }
@@ -546,12 +542,10 @@ function factStage() {
     })),
     inventoryTxns: fakeRecords(90, 15000).map((item, offset) => ({
       ...item,
-      txn_type:
-        offset < 45 ? (offset % 2 === 0 ? "IN" : "OUT") : "IN",
+      txn_type: offset < 45 ? (offset % 2 === 0 ? "IN" : "OUT") : "IN",
       direction: offset < 45 && offset % 2 !== 0 ? -1 : 1,
       quantity: "1",
-      source_type:
-        offset < 45 ? "PRODUCTION_FACT" : "OUTSOURCING_FACT",
+      source_type: offset < 45 ? "PRODUCTION_FACT" : "OUTSOURCING_FACT",
       source_id: offset < 45 ? 9000 + offset : 11000 + offset,
       ...(offset < 45 ? {} : { source_line_id: 11000 + offset }),
       lot_id: 13000 + offset,
@@ -576,12 +570,6 @@ function factStage() {
           : [{ id: 19000 + offset, sales_order_item_id: 701 }],
     })),
     financeFacts: finance,
-    reworkIntakes: [
-      { id: 21_001, intake_no: "HCF-951", status: "DRAFT" },
-      { id: 21_002, intake_no: "HCF-952", status: "RECEIVED" },
-      { id: 21_003, intake_no: "HCF-953", status: "REVERSED" },
-      { id: 21_004, intake_no: "HCF-954", status: "CANCELLED" },
-    ],
     financePayments: [
       {
         id: 22_001,
@@ -714,7 +702,6 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
   );
   assert.equal(plan.outsourcingCandidates.length, 45);
   assert.equal(plan.expectedMinimums.shipments, 47);
-  assert.equal(plan.expectedMinimums.reworkIntakes, 4);
   assert.equal(plan.expectedMinimums.financePayments, 4);
   assert.equal(plan.expectedMinimums.financeCreditNotes, 3);
   assert.equal(plan.shipmentLineSample.items.length, 25);
@@ -913,8 +900,7 @@ test("production exception fixture completes one formal over-issue approval and 
       };
     }
     if (
-      key ===
-      "operational_fact.list_production_order_material_requirements"
+      key === "operational_fact.list_production_order_material_requirements"
     ) {
       assert.equal(actor, "admin");
       return { material_requirements: [structuredClone(requirement)] };
@@ -941,18 +927,12 @@ test("production exception fixture completes one formal over-issue approval and 
       mutations += 1;
       return { production_exception: structuredClone(decision) };
     }
-    if (
-      key ===
-      "customer_config.get_production_exception_approval_process"
-    ) {
+    if (key === "customer_config.get_production_exception_approval_process") {
       assert.equal(actor, "admin");
       assert.equal(params.production_exception_id, decision.id);
       return processData();
     }
-    if (
-      key ===
-      "customer_config.start_production_exception_approval_process"
-    ) {
+    if (key === "customer_config.start_production_exception_approval_process") {
       assert.equal(actor, "admin");
       instance = {
         id: 81,
@@ -1000,20 +980,14 @@ test("production exception fixture completes one formal over-issue approval and 
     }
     if (key === "workflow.list_tasks") {
       assert.equal(actor, "boss");
-      assert.equal(
-        params.task_group,
-        "production_exception_decision_approval",
-      );
+      assert.equal(params.task_group, "production_exception_decision_approval");
       return { tasks: task ? [structuredClone(task)] : [] };
     }
     if (key === "workflow.complete_task_action") {
       assert.equal(actor, "boss");
       assert.equal(params.task_id, task.id);
       assert.equal(params.reason, params.payload.process_decision.reason);
-      assert.equal(
-        params.payload.process_decision.approved_quantity,
-        "1",
-      );
+      assert.equal(params.payload.process_decision.approved_quantity, "1");
       task.task_status_key = "done";
       task.version += 1;
       nodes[0].status = "completed";
@@ -1197,7 +1171,10 @@ test("quality decision fixtures send approximate percentages as required string 
       async ({ domain, method, params }) => {
         assert.equal(domain, "quality");
         if (method === "list_quality_inspections") {
-          return { quality_inspections: [structuredClone(inspection)], total: 1 };
+          return {
+            quality_inspections: [structuredClone(inspection)],
+            total: 1,
+          };
         }
         assert.equal(method, scenario.method);
         decision = structuredClone(params);
@@ -1290,7 +1267,11 @@ test("final inventory readback runs after all facts and rejects truncated pages"
       const id = Number(params.keyword.split("-").at(-1));
       return {
         inventory_lots: [
-          { id, lot_no: params.keyword, status: id === 1 ? "HOLD" : "REJECTED" },
+          {
+            id,
+            lot_no: params.keyword,
+            status: id === 1 ? "HOLD" : "REJECTED",
+          },
         ],
         total: 1,
       };
@@ -1701,8 +1682,7 @@ test("sales readback preserves the exact completed finance approval task anchor"
   });
   assert.deepEqual(
     calls.find(
-      (call) =>
-        call.domain === "workflow" && call.method === "list_tasks",
+      (call) => call.domain === "workflow" && call.method === "list_tasks",
     )?.params,
     {
       task_group: "shipment_finance_approval",
@@ -2527,13 +2507,15 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
     ),
   );
   assert.ok(result.referenceRecords.financeFacts.length >= 180);
-  assert.equal(result.referenceRecords.reworkIntakes.length, 4);
   assert.equal(result.referenceRecords.financePayments.length, 4);
   assert.equal(result.referenceRecords.financeCreditNotes.length, 3);
   assert.equal(result.financeFieldContract.complete, true);
   assert.equal(result.financeFieldContract.coveragePercent, 100);
   assert.equal(result.summary.financeFieldCoverage, 100);
-  assert.equal(result.summary.outsourcingReturnInventoryCoverage.complete, true);
+  assert.equal(
+    result.summary.outsourcingReturnInventoryCoverage.complete,
+    true,
+  );
   assert.equal(
     result.summary.businessDashboardInventoryTotal,
     result.referenceRecords.inventoryBalances.length,

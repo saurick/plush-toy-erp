@@ -78,7 +78,6 @@ import {
   saveProductionCompletionDraft,
   saveProductionMaterialIssueDraft,
   saveProductionReworkFromCompletionDraft,
-  saveProductionReworkFromIntakeDraft,
 } from '../api/operationalFactApi.mjs'
 import { getProductionWip } from '../api/productionWipApi.mjs'
 import { getProductionOrder } from '../api/productionOrderApi.mjs'
@@ -158,9 +157,6 @@ function productionDraftSaveActionFor(record = {}) {
   }
   if (factType === 'REWORK' && sourceType === 'PRODUCTION_FACT') {
     return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION
-  }
-  if (factType === 'REWORK' && sourceType === 'REWORK_INTAKE') {
-    return OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE
   }
   return ''
 }
@@ -706,8 +702,7 @@ export function OperationalFactWorkspace({
       const initialValues = operationalFactDraftFormValues(fresh)
       if (
         action ===
-          OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION ||
-        action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE
+        OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION
       ) {
         setProductionDraftEditContext({
           kind: 'rework',
@@ -878,8 +873,6 @@ export function OperationalFactWorkspace({
         saveProductionCompletionDraft,
       [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_COMPLETION]:
         saveProductionReworkFromCompletionDraft,
-      [OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_REWORK_INTAKE]:
-        saveProductionReworkFromIntakeDraft,
     }
     const save = saveByAction[context.action]
     if (!save) return

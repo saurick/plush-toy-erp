@@ -82,8 +82,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "save_production_material_issue_draft",
 		"save_production_completion_draft",
-		"save_production_rework_from_completion_draft",
-		"save_production_rework_from_intake_draft":
+		"save_production_rework_from_completion_draft":
 		in, ok := productionFactDraftSaveFromParams(pm, method)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -104,10 +103,6 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 			permission = biz.PermissionProductionReworkCreate
 			modules = []string{"production", "production_orders", "quality_inspections", workflowModuleKeyTasks}
 			save = d.operationalFactUC.SaveProductionReworkFromCompletionDraft
-		case "save_production_rework_from_intake_draft":
-			permission = biz.PermissionProductionReworkCreate
-			modules = []string{"rework_intakes", "production", "production_orders", "quality_inspections", workflowModuleKeyTasks}
-			save = d.operationalFactUC.SaveProductionReworkFromIntakeDraft
 		}
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
@@ -324,7 +319,7 @@ func productionReworkFromCompletionCreateFromParams(pm map[string]any) (*biz.Pro
 }
 
 func productionFactDraftSaveFromParams(pm map[string]any, method string) (*biz.ProductionFactDraftSave, bool) {
-	rework := method == "save_production_rework_from_completion_draft" || method == "save_production_rework_from_intake_draft"
+	rework := method == "save_production_rework_from_completion_draft"
 	if rework {
 		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "fact_no", "quantity", "occurred_at", "reason") {
 			return nil, false

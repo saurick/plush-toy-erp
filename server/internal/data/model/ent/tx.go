@@ -116,10 +116,6 @@ type Tx struct {
 	PurchaseReturnItem *PurchaseReturnItemClient
 	// QualityInspection is the client for interacting with the QualityInspection builders.
 	QualityInspection *QualityInspectionClient
-	// ReworkIntake is the client for interacting with the ReworkIntake builders.
-	ReworkIntake *ReworkIntakeClient
-	// ReworkIntakeItem is the client for interacting with the ReworkIntakeItem builders.
-	ReworkIntakeItem *ReworkIntakeItemClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// RoleDataScope is the client for interacting with the RoleDataScope builders.
@@ -341,8 +337,6 @@ func (tx *Tx) init() {
 	tx.PurchaseReturn = NewPurchaseReturnClient(tx.config)
 	tx.PurchaseReturnItem = NewPurchaseReturnItemClient(tx.config)
 	tx.QualityInspection = NewQualityInspectionClient(tx.config)
-	tx.ReworkIntake = NewReworkIntakeClient(tx.config)
-	tx.ReworkIntakeItem = NewReworkIntakeItemClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.RoleDataScope = NewRoleDataScopeClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
