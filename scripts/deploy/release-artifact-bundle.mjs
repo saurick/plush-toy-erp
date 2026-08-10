@@ -15,7 +15,9 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 
 import { sha256File } from "../lib/file-digest.mjs";
@@ -33,6 +35,8 @@ const CREDENTIAL_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/iu;
 const DEFAULT_CUSTOMER = "yoyoosun";
 const IMAGE_ARCHIVE_COMPRESSION = "zstd";
 const IMAGE_ARCHIVE_COMPRESSION_LEVEL = 3;
+const MAX_CHILD_DIAGNOSTIC_BYTES = 8 * 1024;
+const MAX_CHILD_DIAGNOSTIC_MESSAGE_LENGTH = 2 * 1024;
 
 class ReleaseArtifactError extends Error {
   constructor(message, details = {}) {
@@ -76,6 +80,193 @@ export function runArtifactCommand({
     );
   }
   return String(result.stdout || "");
+}
+
+function redactChildDiagnostic(value) {
+  return String(value || "")
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/giu, "$1[REDACTED]@")
+    .replace(/\b(Bearer|Basic)\s+[^\s]+/giu, "$1 [REDACTED]")
+    .replace(
+      /\b((?:PASSWORD|PASSWD|SECRET|TOKEN|PRIVATE_KEY|ACCESS_KEY|POSTGRES_DSN|DATABASE_URL)\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s]+)/giu,
+      "$1[REDACTED]",
+    )
+    .replace(/\b(?:github_pat_|gh[pousr]_)[A-Za-z0-9_]+\b/gu, "[REDACTED]")
+    .replace(/\b[A-Za-z0-9_+/=-]{64,}\b/gu, "[REDACTED_LONG_VALUE]")
+    .replace(/[\u0000-\u001f\u007f]+/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .slice(0, MAX_CHILD_DIAGNOSTIC_MESSAGE_LENGTH);
+}
+
+function collectBoundedChildDiagnostic(stream) {
+  const chunks = [];
+  let capturedBytes = 0;
+  let truncated = false;
+  stream?.on("data", (chunk) => {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    const remaining = MAX_CHILD_DIAGNOSTIC_BYTES - capturedBytes;
+    if (remaining <= 0) {
+      truncated = true;
+      return;
+    }
+    const captured = buffer.subarray(0, remaining);
+    chunks.push(captured);
+    capturedBytes += captured.length;
+    if (captured.length < buffer.length) truncated = true;
+  });
+  return () => {
+    const message = redactChildDiagnostic(
+      Buffer.concat(chunks).toString("utf8"),
+    );
+    if (!message) return "";
+    return truncated ? `${message} [truncated]` : message;
+  };
+}
+
+function terminateChild(child) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    // The final child outcome below remains the source of truth.
+  }
+}
+
+function waitForChild(child, startedAt, abortPeer) {
+  return new Promise((resolve) => {
+    let startError = null;
+    child.once("error", (error) => {
+      startError = error;
+      abortPeer();
+    });
+    child.once("exit", (code, signal) => {
+      if (code !== 0 || signal) abortPeer();
+    });
+    child.once("close", (code, signal) => {
+      resolve({
+        code,
+        signal,
+        startError,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      });
+    });
+  });
+}
+
+function childFailure(label, outcome, diagnostic) {
+  let summary = "";
+  if (outcome.startError) {
+    summary = `${label} could not start`;
+  } else if (outcome.signal) {
+    summary = `${label} terminated by ${outcome.signal}`;
+  } else if (outcome.code !== 0) {
+    summary = `${label} failed with exit ${String(outcome.code)}`;
+  }
+  if (!summary) return "";
+  return diagnostic ? `${summary}: ${diagnostic}` : summary;
+}
+
+export async function streamImageArchive({
+  fixedRef,
+  tarPath,
+  repoRoot,
+  env = process.env,
+  spawnProcess = spawn,
+}) {
+  rmSync(tarPath, { force: true });
+  const dockerStartedAt = Date.now();
+  let docker;
+  let zstd;
+  try {
+    docker = spawnProcess("docker", ["image", "save", fixedRef], {
+      cwd: repoRoot,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const zstdStartedAt = Date.now();
+    zstd = spawnProcess(
+      "zstd",
+      [
+        "--quiet",
+        `-${String(IMAGE_ARCHIVE_COMPRESSION_LEVEL)}`,
+        "--force",
+        "-o",
+        tarPath,
+        "-",
+      ],
+      {
+        cwd: repoRoot,
+        env,
+        stdio: ["pipe", "ignore", "pipe"],
+      },
+    );
+    const dockerDiagnostic = collectBoundedChildDiagnostic(docker.stderr);
+    const zstdDiagnostic = collectBoundedChildDiagnostic(zstd.stderr);
+    let uncompressedSizeBytes = 0;
+    const byteCounter = new Transform({
+      transform(chunk, _encoding, callback) {
+        uncompressedSizeBytes += chunk.length;
+        callback(null, chunk);
+      },
+    });
+    let streamError = null;
+    const streamPromise = pipeline(
+      docker.stdout,
+      byteCounter,
+      zstd.stdin,
+    ).catch((error) => {
+      streamError = error;
+      terminateChild(docker);
+      terminateChild(zstd);
+    });
+    const [dockerOutcome, zstdOutcome] = await Promise.all([
+      waitForChild(docker, dockerStartedAt, () => terminateChild(zstd)),
+      waitForChild(zstd, zstdStartedAt, () => terminateChild(docker)),
+    ]);
+    await streamPromise;
+
+    const failures = [
+      childFailure("docker image save", dockerOutcome, dockerDiagnostic()),
+      childFailure("zstd", zstdOutcome, zstdDiagnostic()),
+    ].filter(Boolean);
+    if (streamError && failures.length === 0) {
+      const diagnostic = redactChildDiagnostic(streamError.message);
+      failures.push(
+        diagnostic
+          ? `image archive stream failed: ${diagnostic}`
+          : "image archive stream failed",
+      );
+    }
+    if (uncompressedSizeBytes === 0 && failures.length === 0) {
+      failures.push("docker image save produced an empty stream");
+    }
+    if (
+      failures.length === 0 &&
+      (!existsSync(tarPath) || statSync(tarPath).size === 0)
+    ) {
+      failures.push("zstd produced an empty image archive");
+    }
+    if (failures.length > 0) {
+      rmSync(tarPath, { force: true });
+      throw new ReleaseArtifactError(failures.join("; "));
+    }
+    return {
+      saveDurationMs: dockerOutcome.durationMs,
+      compressionDurationMs: zstdOutcome.durationMs,
+      uncompressedSizeBytes,
+    };
+  } catch (error) {
+    terminateChild(docker);
+    terminateChild(zstd);
+    rmSync(tarPath, { force: true });
+    if (error instanceof ReleaseArtifactError) throw error;
+    const diagnostic = redactChildDiagnostic(error?.message);
+    throw new ReleaseArtifactError(
+      diagnostic
+        ? `image archive stream could not start: ${diagnostic}`
+        : "image archive stream could not start",
+    );
+  }
 }
 
 function sha256Buffer(value) {
@@ -464,7 +655,7 @@ function assertReleaseImage(image, imageRef, commit) {
   }
 }
 
-function imageArtifact({
+async function imageArtifact({
   kind,
   sourceRef,
   fixedRef,
@@ -472,6 +663,7 @@ function imageArtifact({
   repoRoot,
   outputDir,
   runCommand,
+  streamArchive,
 }) {
   runCommand({
     command: "docker",
@@ -484,46 +676,8 @@ function imageArtifact({
   const metadataSecretScan = scanImageMetadata(image);
   const tarFile = `${kind}-image.tar`;
   const tarPath = path.join(outputDir, tarFile);
-  const rawTarPath = `${tarPath}.uncompressed`;
-  const saveStartedAt = Date.now();
-  let saveDurationMs;
-  let compressionDurationMs;
-  let uncompressedSizeBytes;
-  try {
-    runCommand({
-      command: "docker",
-      args: ["image", "save", "--output", rawTarPath, fixedRef],
-      cwd: repoRoot,
-      label: `save immutable ${kind} image`,
-    });
-    if (!existsSync(rawTarPath) || statSync(rawTarPath).size === 0) {
-      throw new ReleaseArtifactError(`${kind} image archive is empty`);
-    }
-    saveDurationMs = Math.max(0, Date.now() - saveStartedAt);
-    uncompressedSizeBytes = statSync(rawTarPath).size;
-    const compressionStartedAt = Date.now();
-    runCommand({
-      command: "zstd",
-      args: [
-        "--quiet",
-        `-${String(IMAGE_ARCHIVE_COMPRESSION_LEVEL)}`,
-        "--force",
-        "--output",
-        tarPath,
-        rawTarPath,
-      ],
-      cwd: repoRoot,
-      label: `compress immutable ${kind} image`,
-    });
-    compressionDurationMs = Math.max(0, Date.now() - compressionStartedAt);
-    if (!existsSync(tarPath) || statSync(tarPath).size === 0) {
-      throw new ReleaseArtifactError(
-        `${kind} compressed image archive is empty`,
-      );
-    }
-  } finally {
-    rmSync(rawTarPath, { force: true });
-  }
+  const { saveDurationMs, compressionDurationMs, uncompressedSizeBytes } =
+    await streamArchive({ fixedRef, tarPath, repoRoot });
   return {
     kind,
     ref: fixedRef,
@@ -686,6 +840,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
   const temporaryDir = `${finalDir}.tmp-${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
   mkdirSync(temporaryDir, { mode: 0o700 });
   const runCommand = runtime.runCommand || runArtifactCommand;
+  const streamArchive = runtime.streamImageArchive || streamImageArchive;
   try {
     const createdAt = new Date().toISOString();
     const migration = buildMigrationEvidence({
@@ -724,7 +879,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
     }
     const fixedSuffix = `${customer}-${commit}`;
     const images = [
-      imageArtifact({
+      await imageArtifact({
         kind: "server",
         sourceRef: sourceServer,
         fixedRef: `plush-toy-erp-server:${fixedSuffix}`,
@@ -732,8 +887,9 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
         repoRoot,
         outputDir: temporaryDir,
         runCommand,
+        streamArchive,
       }),
-      imageArtifact({
+      await imageArtifact({
         kind: "web",
         sourceRef: sourceWeb,
         fixedRef: `plush-toy-erp-web:${fixedSuffix}`,
@@ -741,6 +897,7 @@ export async function buildReleaseArtifact(options = {}, runtime = {}) {
         repoRoot,
         outputDir: temporaryDir,
         runCommand,
+        streamArchive,
       }),
     ];
     const manifest = assertReleaseArtifactManifest({

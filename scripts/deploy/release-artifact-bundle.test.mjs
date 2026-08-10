@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -19,6 +22,7 @@ import {
   buildMigrationEvidence,
   parseReleaseArtifactArgs,
   resolveReleaseOutput,
+  streamImageArchive,
 } from "./release-artifact-bundle.mjs";
 
 const commit = "a".repeat(40);
@@ -36,6 +40,63 @@ function fixtureCommand(files, paths = []) {
     }
     throw new Error(`unexpected command ${args.join(" ")}`);
   };
+}
+
+function writeArchiveProcessFixture(root) {
+  const fixture = path.join(root, "archive-process-fixture.mjs");
+  writeFileSync(
+    fixture,
+    `import { createWriteStream, writeFileSync } from "node:fs";
+
+const [scenario, command, ...args] = process.argv.slice(2);
+if (command === "docker") {
+  if (scenario === "docker-failure") {
+    process.stderr.write(
+      "TOKEN=hidden-value " + "bounded-diagnostic ".repeat(900),
+      () => process.exit(23),
+    );
+  } else if (scenario === "zstd-failure") {
+    const timer = setInterval(() => process.stdout.write(Buffer.alloc(4096, 1)), 5);
+    process.on("SIGTERM", () => {
+      clearInterval(timer);
+      process.exit(143);
+    });
+  } else {
+    process.stdout.end("server-image-data\\n");
+  }
+} else if (command === "zstd") {
+  const outputIndex = args.indexOf("-o");
+  const target = args[outputIndex + 1];
+  if (
+    outputIndex !== 3 ||
+    args[0] !== "--quiet" ||
+    args[1] !== "-3" ||
+    args[2] !== "--force" ||
+    args.at(-1) !== "-"
+  ) {
+    process.stderr.write("unexpected zstd stream arguments", () => process.exit(65));
+  } else if (scenario === "zstd-failure") {
+    writeFileSync(target, "partial");
+    process.stderr.write(
+      "No space left on device POSTGRES_DSN=postgres://user:password@db/prod",
+      () => process.exit(28),
+    );
+  } else {
+    const output = createWriteStream(target);
+    process.stdin.pipe(output);
+    output.on("finish", () => process.exit(0));
+  }
+} else {
+  process.stderr.write("unexpected fixture command", () => process.exit(64));
+}
+`,
+  );
+  return fixture;
+}
+
+function archiveFixtureSpawn(fixture, scenario) {
+  return (command, args, options) =>
+    spawn(process.execPath, [fixture, scenario, command, ...args], options);
 }
 
 test("release artifact CLI requires explicit execution and validates values", () => {
@@ -74,6 +135,81 @@ test("release artifact output is confined to output and never reuses a symlink",
       () => resolveReleaseOutput(root, "../outside", commit),
       /inside repository output/u,
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("release image archive streams docker output into zstd without a raw intermediate", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "release-stream-"));
+  const tarPath = path.join(root, "server-image.tar");
+  const fixture = writeArchiveProcessFixture(root);
+  try {
+    const result = await streamImageArchive({
+      fixedRef: `plush-toy-erp-server:${commit}`,
+      tarPath,
+      repoRoot: root,
+      spawnProcess: archiveFixtureSpawn(fixture, "success"),
+    });
+    assert.equal(readFileSync(tarPath, "utf8"), "server-image-data\n");
+    assert.equal(result.uncompressedSizeBytes, statSync(tarPath).size);
+    assert(Number.isSafeInteger(result.saveDurationMs));
+    assert(Number.isSafeInteger(result.compressionDurationMs));
+    assert.equal(existsSync(`${tarPath}.uncompressed`), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("release image archive fails closed on docker save and bounds redacted diagnostics", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "release-stream-docker-"));
+  const tarPath = path.join(root, "server-image.tar");
+  const fixture = writeArchiveProcessFixture(root);
+  try {
+    await assert.rejects(
+      streamImageArchive({
+        fixedRef: `plush-toy-erp-server:${commit}`,
+        tarPath,
+        repoRoot: root,
+        spawnProcess: archiveFixtureSpawn(fixture, "docker-failure"),
+      }),
+      (error) => {
+        assert.match(error.message, /docker image save failed with exit 23/u);
+        assert.match(error.message, /\[REDACTED\]/u);
+        assert.match(error.message, /\[truncated\]/u);
+        assert.doesNotMatch(error.message, /hidden-value/u);
+        assert(error.message.length < 2_500);
+        return true;
+      },
+    );
+    assert.equal(existsSync(tarPath), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("release image archive aborts docker and removes partial output when zstd fails", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "release-stream-zstd-"));
+  const tarPath = path.join(root, "server-image.tar");
+  const fixture = writeArchiveProcessFixture(root);
+  try {
+    await assert.rejects(
+      streamImageArchive({
+        fixedRef: `plush-toy-erp-server:${commit}`,
+        tarPath,
+        repoRoot: root,
+        spawnProcess: archiveFixtureSpawn(fixture, "zstd-failure"),
+      }),
+      (error) => {
+        assert.match(error.message, /zstd failed with exit 28/u);
+        assert.match(error.message, /No space left on device/u);
+        assert.match(error.message, /POSTGRES_DSN=\[REDACTED\]/u);
+        assert.doesNotMatch(error.message, /user:password/u);
+        return true;
+      },
+    );
+    assert.equal(existsSync(tarPath), false);
+    assert.equal(existsSync(`${tarPath}.uncompressed`), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -345,27 +481,22 @@ test("release artifact builder normalizes the source hash and writes complete ch
           },
         ]);
       }
-      if (args[0] === "image" && args[1] === "save") {
-        const outputIndex = args.indexOf("--output");
-        const target = args[outputIndex + 1];
-        const kind = String(args.at(-1)).includes("-server:")
-          ? "server"
-          : "web";
-        writeFileSync(target, `${kind}-archive\n`);
-        return "";
-      }
       if (args[0] === "version") return "27.5.1\n";
       if (args[0] === "buildx") return "github.com/docker/buildx v0.30.1\n";
     }
     if (command === "zstd") {
       if (args[0] === "--version") return "*** Zstandard CLI (64-bit) v1.5.7\n";
-      const outputIndex = args.indexOf("--output");
-      const target = args[outputIndex + 1];
-      const source = args.at(-1);
-      writeFileSync(target, `zstd:${readFileSync(source, "utf8")}`);
-      return "";
     }
     throw new Error(`unexpected command ${command} ${args.join(" ")}`);
+  };
+  const streamArchive = async ({ fixedRef, tarPath }) => {
+    const source = `${fixedRef.includes("-server:") ? "server" : "web"}-archive\n`;
+    writeFileSync(tarPath, `zstd:${source}`);
+    return {
+      saveDurationMs: 4,
+      compressionDurationMs: 5,
+      uncompressedSizeBytes: Buffer.byteLength(source),
+    };
   };
 
   try {
@@ -401,6 +532,7 @@ test("release artifact builder normalizes the source hash and writes complete ch
           },
         }),
         runCommand,
+        streamImageArchive: streamArchive,
       },
     );
     const output = path.join(root, report.outputDirectory);
