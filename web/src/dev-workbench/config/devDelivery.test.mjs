@@ -18,9 +18,11 @@ import {
   createDevDeliveryClient,
   defaultReleaseVersion,
   deliveryOperationMessagePresentation,
+  deliveryIdempotencyPresentation,
   deliveryPipelinePresentation,
   deliveryPipelineRunMode,
   deliveryPipelineRunModePresentation,
+  deliveryRetryPresentation,
   deliveryStatusPresentation,
   deliveryTargetCachePresentation,
   deliveryVersionActionKind,
@@ -151,6 +153,18 @@ function summaryFixture() {
             message: 'immutable GitHub release is published',
           },
         ],
+        idempotency: {
+          attempt: 1,
+          retryOfOperationId: null,
+          rootOperationId: '11111111-1111-4111-8111-111111111111',
+          requestCount: 2,
+          reuseCount: 1,
+          basis: ['action', 'target', 'git_sha', 'version', 'delivery_inputs'],
+        },
+        retry: {
+          allowed: false,
+          reason: 'terminal_no_retry_needed',
+        },
         confirmationRequired: '',
         terminal: true,
       },
@@ -404,6 +418,14 @@ test('delivery operations require timezone-bearing ordered event timestamps', ()
   assertInvalidTimeline((operation) => ({ ...operation, events: [] }))
   assertInvalidTimeline((operation) => ({
     ...operation,
+    idempotency: { ...operation.idempotency, reuseCount: 3 },
+  }))
+  assertInvalidTimeline((operation) => ({
+    ...operation,
+    retry: { allowed: true, reason: 'explicit_retry_available' },
+  }))
+  assertInvalidTimeline((operation) => ({
+    ...operation,
     events: [{ ...operation.events[0], at: '2026-07-29T01:02:00' }],
   }))
   assertInvalidTimeline((operation) => ({
@@ -517,6 +539,28 @@ test('delivery presentation helpers are deterministic and bounded', () => {
       () => '11111111-1111-4111-8111-111111111111'
     ),
     'version-center:promote:11111111-1111-4111-8111-111111111111'
+  )
+  assert.equal(
+    createDeliveryIdempotencyKey(
+      'retry',
+      () => '11111111-1111-4111-8111-111111111111'
+    ),
+    'version-center:retry:11111111-1111-4111-8111-111111111111'
+  )
+  assert.deepEqual(
+    deliveryIdempotencyPresentation(summaryFixture().operations[0].idempotency),
+    {
+      label: '首次执行，已合并 1 个重复请求',
+      basis: ['交付动作', '固定目标', 'Exact-SHA', '版本', '发布输入'],
+    }
+  )
+  assert.equal(
+    deliveryRetryPresentation({ reason: 'target_readback_required' }),
+    '结果未知，必须先读回目标'
+  )
+  assert.equal(
+    deliveryRetryPresentation({ reason: 'action_not_retryable' }),
+    '该动作须返回专用流程处理，不能在此重试'
   )
   assert.equal(defaultReleaseVersion(new Date(2026, 6, 29)), '2026.07.29-1')
   assert.equal(shortGitSha(SHA), 'aaaaaaaaaaaa')
@@ -899,6 +943,11 @@ test('version center keeps critical state visible and uses stable tab pagination
   assert.match(versionCenterPageSource, /label: '版本与部署'/u)
   assert.match(versionCenterPageSource, /label: 'CI\/CD 效能'/u)
   assert.match(versionCenterPageSource, /label: '操作记录'/u)
+  assert.match(versionCenterPageSource, /幂等与受控重试/u)
+  assert.match(versionCenterPageSource, /OperationIdempotencyText/u)
+  assert.match(versionCenterPageSource, /retry-operation/u)
+  assert.match(versionCenterPageSource, /再次尝试/u)
+  assert.doesNotMatch(versionCenterPageSource, /label: '幂等/u)
   assert.match(versionCenterPageSource, /openOperations[.]map/u)
   assert.match(versionCenterPageSource, /dataSource=\{historyOperations\}/u)
   assert.match(versionCenterPageSource, /DevPipelineStatusStrip/u)

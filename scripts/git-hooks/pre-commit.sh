@@ -56,6 +56,7 @@ SHELL_TARGETS=()
 YAML_TARGETS=()
 GO_TARGETS=()
 RUN_GO_ALL=0
+RUN_DEV_PAGE_GOVERNANCE=0
 
 add_go_target() {
   local target="$1"
@@ -67,6 +68,19 @@ add_go_target() {
 }
 
 for file in "${STAGED_FILES[@]}"; do
+  case "$file" in
+  web/src/dev-workbench/DevWorkbenchRoutes.jsx | \
+    web/src/dev-workbench/pages/* | \
+    web/src/dev-workbench/styles/* | \
+    web/src/dev-workbench/components/DevPageNav.jsx | \
+    web/src/dev-workbench/config/devHub.mjs | \
+    web/src/dev-workbench/config/devRoutes.mjs | \
+    web/scripts/style-l1/scenarios.mjs | \
+    web/scripts/style-l1/dev*Scenarios.mjs)
+    RUN_DEV_PAGE_GOVERNANCE=1
+    ;;
+  esac
+
   case "$file" in
   scripts/*.sh | .githooks/pre-commit | .githooks/pre-push | .githooks/commit-msg)
     [[ -f "$file" ]] && SHELL_TARGETS+=("$file")
@@ -97,6 +111,11 @@ for file in "${STAGED_FILES[@]}"; do
     ;;
   esac
 done
+
+if [[ "$RUN_DEV_PAGE_GOVERNANCE" -eq 1 ]]; then
+  echo "[pre-commit] 检查 DEV 菜单与页面治理合同"
+  node --test "$INDEX_ROOT/scripts/qa/dev-page-governance.test.mjs"
+fi
 
 if [[ "${#SHELL_TARGETS[@]}" -gt 0 ]]; then
   echo "[pre-commit] 检查暂存 shell 文件格式"

@@ -60,6 +60,9 @@ const DevDatabaseMigrationPage = lazyRoute(
 const DevVersionCenterPage = lazyRoute(
   () => import('./pages/DevVersionCenterPage.jsx')
 )
+const DevDrillRecoveryPage = lazyRoute(
+  () => import('./pages/DevDrillRecoveryPage.jsx')
+)
 
 function DevRouteLoadingFallback() {
   return (
@@ -133,6 +136,7 @@ export default function DevWorkbenchRoutes() {
             element={<DevDatabaseMigrationPage />}
           />
           <Route path="version-center" element={<DevVersionCenterPage />} />
+          <Route path="drill-recovery" element={<DevDrillRecoveryPage />} />
           <Route path="*" element={<Navigate to="/__dev" replace />} />
         </Routes>
       </Suspense>

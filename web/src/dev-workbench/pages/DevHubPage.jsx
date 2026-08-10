@@ -79,6 +79,7 @@ const ICON_BY_KEY = {
   'status-flows': <ApartmentOutlined />,
   'database-migration': <DatabaseOutlined />,
   'version-center': <DeploymentUnitOutlined />,
+  'drill-recovery': <ExperimentOutlined />,
 }
 
 function readPinnedRoutes() {

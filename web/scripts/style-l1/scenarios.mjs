@@ -8,8 +8,12 @@ import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createBusinessActionStabilityScenarios } from './businessActionStabilityScenarios.mjs'
 import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
 import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservatoryScenarios.mjs'
+import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
-import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
+import {
+  createDevVersionCenterScenarios,
+  installSummaryRoute,
+} from './devVersionCenterScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliveryScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
@@ -1286,6 +1290,14 @@ export function createStyleL1Scenarios(deps) {
       path,
     }),
     ...createDevVersionCenterScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      clickERPThemeOption,
+      expectHeading,
+      outputDir,
+      path,
+    }),
+    ...createDevDrillRecoveryScenarios({
       assert,
       assertNoHorizontalOverflow,
       clickERPThemeOption,
@@ -12203,6 +12215,19 @@ export function createStyleL1Scenarios(deps) {
       name: 'dev-all-pages-mobile',
       path: '/__dev/',
       viewport: { width: 390, height: 844 },
+      beforeNavigate: async (page) => {
+        await installSummaryRoute(page)
+        await page.route('**/__dev/api/receipts', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              schemaVersion: 'plush.dev-workbench-receipts/v1',
+              receipts: [],
+            }),
+          })
+        })
+      },
       verify: async (page) => {
         await page.evaluate(() => {
           localStorage.removeItem('plush_erp_dev_hub_pinned_routes')
@@ -12219,6 +12244,12 @@ export function createStyleL1Scenarios(deps) {
             heading: '产品工程 / Product Engineering',
             rootSelector: '.erp-dev-hub-page',
             titlePrefix: '产品工程 · ',
+          },
+          {
+            path: '/__dev/product-core',
+            heading: '产品内核 / Product Core',
+            rootSelector: '.erp-dev-product-core-page',
+            titlePrefix: '产品内核 · ',
           },
           {
             path: '/__dev/quality',
@@ -12263,6 +12294,12 @@ export function createStyleL1Scenarios(deps) {
             titlePrefix: '改动验证 · ',
           },
           {
+            path: '/__dev/quality-gates',
+            heading: '质量门禁',
+            rootSelector: '.erp-dev-quality-gates-page',
+            titlePrefix: '质量门禁 · ',
+          },
+          {
             path: '/__dev/data-preparation',
             heading: '准备测试数据',
             rootSelector: '.erp-dev-data-page',
@@ -12292,6 +12329,12 @@ export function createStyleL1Scenarios(deps) {
             heading: '版本发布与部署中心',
             rootSelector: '.erp-dev-version-page',
             titlePrefix: '版本发布 · ',
+          },
+          {
+            path: '/__dev/drill-recovery',
+            heading: '演练与恢复中心',
+            rootSelector: '.erp-dev-recovery-page',
+            titlePrefix: '演练与恢复 · ',
           },
         ]
 
@@ -12330,11 +12373,13 @@ export function createStyleL1Scenarios(deps) {
             const header = root?.querySelector(
               [
                 '.erp-dev-hub-header',
+                '.erp-dev-product-core-header',
                 '.erp-dev-permission-relationships-header',
                 '.erp-dev-governance-header',
                 '.erp-dev-flow-header',
                 '.erp-dev-docs-header',
                 '.erp-dev-testing-header',
+                '.erp-dev-quality-header',
                 '.erp-dev-prototypes-header',
                 '.erp-dev-customer-header',
               ].join(', ')
@@ -12342,11 +12387,13 @@ export function createStyleL1Scenarios(deps) {
             const shell = root?.querySelector(
               [
                 '.erp-dev-hub-shell',
+                '.erp-dev-product-core-shell',
                 '.erp-dev-permission-relationships-shell',
                 '.erp-dev-governance-shell',
                 '.erp-dev-flow-main',
                 '.erp-dev-docs-shell',
                 '.erp-dev-testing-shell',
+                '.erp-dev-quality-shell',
                 '.erp-dev-prototypes-shell',
                 '.erp-dev-customer-shell',
               ].join(', ')
@@ -12571,8 +12618,13 @@ export function createStyleL1Scenarios(deps) {
           {
             path: '/__dev/delivery',
             heading: '交付运行 / Delivery Operations',
-            cardCount: 3,
-            secondaryLabels: ['客户配置', '数据库迁移', '版本发布'],
+            cardCount: 4,
+            secondaryLabels: [
+              '客户配置',
+              '数据库迁移',
+              '版本发布',
+              '演练与恢复',
+            ],
           },
         ]
 

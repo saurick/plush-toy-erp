@@ -13,6 +13,7 @@ const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
 const LEVEL_ORDER = ["T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"];
 const CUSTOMER_SOURCE_BOUNDARY_TEST =
   "scripts/qa/customer-source-repository-boundary.test.mjs";
+const DEV_PAGE_GOVERNANCE_TEST = "scripts/qa/dev-page-governance.test.mjs";
 const SCHEMA_DOCS_TEST = "scripts/qa/schema-docs.test.mjs";
 const PRIVATE_SOURCE_EXTENSIONS = new Set([
   ".doc",
@@ -275,6 +276,18 @@ function isDocumentation(file) {
   );
 }
 
+function isDevPageGovernancePath(file) {
+  return (
+    /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
+      file,
+    ) ||
+    /^web\/src\/dev-workbench\/(?:components\/DevPageNav\.jsx|config\/(?:devHub|devRoutes)\.mjs)$/u.test(
+      file,
+    ) ||
+    /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
+  );
+}
+
 function isCustomerPrivateSourcePath(file) {
   const segments = file.split("/");
   const extension = path.posix.extname(file).toLowerCase();
@@ -333,6 +346,9 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   addFixed(state, "diff", "所有改动");
 
   for (const file of changedFiles) {
+    if (isDevPageGovernancePath(file)) {
+      directTests.add(DEV_PAGE_GOVERNANCE_TEST);
+    }
     if (isCustomerPrivateSourcePath(file)) {
       addNodeTests(state, [CUSTOMER_SOURCE_BOUNDARY_TEST], file, "T6");
     }
@@ -523,6 +539,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         addFixed(state, "webCss", file);
       }
       if (
+        isDevPageGovernancePath(file) ||
         file.endsWith(".css") ||
         /\/(?:pages|components|mobile)\//u.test(file) ||
         /\/router(?:\.[^/]+)?$/u.test(file)

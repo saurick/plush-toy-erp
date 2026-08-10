@@ -16,6 +16,7 @@ export const DEV_TESTING_ROUTE = '/__dev/testing'
 export const DEV_QUALITY_GATES_ROUTE = '/__dev/quality-gates'
 export const DEV_DATA_PREPARATION_ROUTE = '/__dev/data-preparation'
 export const DEV_VERSION_CENTER_ROUTE = '/__dev/version-center'
+export const DEV_DRILL_RECOVERY_ROUTE = '/__dev/drill-recovery'
 
 export const DEV_WORKBENCH_AREA_KEYS = Object.freeze({
   overview: 'overview',
@@ -49,7 +50,7 @@ export const DEV_WORKSPACE_NAV_ITEMS = Object.freeze([
     key: DEV_WORKBENCH_AREA_KEYS.delivery,
     route: DEV_DELIVERY_ROUTE,
     label: '交付运行',
-    description: '配置、迁移与版本发布',
+    description: '配置、迁移、发布与恢复',
   }),
 ])
 
@@ -126,6 +127,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     route: DEV_VERSION_CENTER_ROUTE,
     label: '版本发布',
   }),
+  Object.freeze({
+    key: 'drill-recovery',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    route: DEV_DRILL_RECOVERY_ROUTE,
+    label: '演练与恢复',
+  }),
 ])
 
 export const DEV_PAGE_TITLE_BY_ROUTE = Object.freeze({
@@ -163,6 +170,7 @@ export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_CUSTOMER_CONFIG_ROUTE]: '/favicon-customer-config.svg',
   [DEV_DATABASE_MIGRATION_ROUTE]: '/favicon-dev.svg',
   [DEV_VERSION_CENTER_ROUTE]: '/favicon-dev.svg',
+  [DEV_DRILL_RECOVERY_ROUTE]: '/favicon-dev.svg',
 })
 
 export function resolveDevWorkbenchAreaKey(pathname = '') {

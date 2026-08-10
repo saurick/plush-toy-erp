@@ -40,6 +40,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/dev-database-migration-operation-store.test.mjs",
     "scripts/qa/dev-entry-boundary.test.mjs",
     "scripts/qa/dev-flow-state-observatory-boundary.test.mjs",
+    "scripts/qa/dev-page-governance.test.mjs",
     "scripts/qa/dev-qa-execution-lock.test.mjs",
     "scripts/qa/dev-quality-gate-operation-store.test.mjs",
     "scripts/qa/dev-testing-operation-store.test.mjs",

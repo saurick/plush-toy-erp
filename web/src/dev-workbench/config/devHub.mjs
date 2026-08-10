@@ -3,6 +3,7 @@ import {
   DEV_DATABASE_MIGRATION_ROUTE,
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DOCS_ROUTE,
+  DEV_DRILL_RECOVERY_ROUTE,
   DEV_GOVERNANCE_ROUTE,
   DEV_HUB_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
@@ -237,6 +238,26 @@ export const DEV_HUB_ITEMS = Object.freeze([
     ]),
     description:
       '选择 exact-SHA 版本、查看 133 容量与运行身份、准备部署并追踪幂等操作；浏览器不能传入命令、路径、SSH 或任意目标。',
+  }),
+  Object.freeze({
+    key: 'drill-recovery',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.delivery,
+    title: '演练与恢复 / Drills & Recovery',
+    group: '交付治理 / Delivery',
+    route: DEV_DRILL_RECOVERY_ROUTE,
+    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    truthSource: '固定目标预检、不可变 Release 与部署 / 回滚 operation 回执',
+    status: '只读目录与受控入口 / Read-only catalog',
+    guardrails: Object.freeze([
+      '复用 operation 真源 / Reuse operation truth',
+      '按风险分级 / Risk-tiered drills',
+      '新目标先登记 / Register targets first',
+      '故障注入默认关闭 / Fault injection disabled by default',
+      '不接受任意目标或命令 / No arbitrary target or shell',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '按 P0、P1、P2 查看目标核验、幂等、回滚前滚、隔离恢复、新目标切换和未来故障演练；只读复用已有状态与记录，高风险能力未满足前置条件时保持关闭。',
   }),
 ])
 

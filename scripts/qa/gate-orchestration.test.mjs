@@ -252,6 +252,20 @@ test("full browser evidence is current-worktree self-hosted on an isolated port"
   assert.match(full, /browser_gate_lock_release/u);
   assert.match(full, /STYLE_L1_BASE_URL=""/u);
   assert.match(full, /STYLE_L1_PORT="\$browser_port"/u);
+  assert.match(
+    full,
+    /DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop,dev-all-pages-mobile,dev-workbench-wide-layout,dev-hub-dark-desktop,dev-drill-recovery-desktop-light,dev-drill-recovery-mobile-dark"/u,
+  );
+  assert.match(
+    full,
+    /local browser_scenarios="\$DEFAULT_QA_BROWSER_SCENARIOS"/u,
+  );
+  assert.match(
+    full,
+    /browser_scenarios="\$\{browser_scenarios\},\$\{QA_BROWSER_SCENARIOS\}"/u,
+  );
+  assert.match(full, /STYLE_L1_SCENARIOS="\$browser_scenarios"/u);
+  assert.doesNotMatch(full, /STYLE_L1_SCENARIOS="\$\{QA_BROWSER_SCENARIOS:-/u);
   assert.match(full, /"\$PNPM_BIN" style:l1/u);
   assert.doesNotMatch(full, /QA_BROWSER_SMOKE/u);
 

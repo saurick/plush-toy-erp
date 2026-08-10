@@ -5,6 +5,7 @@ import process from 'node:process'
 
 import {
   createOrReuseDeliveryOperation,
+  deliveryOperationRequestCounts,
   listDeliveryOperations,
   readDeliveryOperation,
   recoverInterruptedDeliveryOperations,
@@ -151,13 +152,33 @@ export function validateDevDeliveryAction(value) {
     ) {
       throw new Error('rollback execution payload is invalid')
     }
+  } else if (action === 'retry-operation') {
+    assertExactKeys(
+      value.payload,
+      ['idempotencyKey', 'operationId'],
+      'retry payload'
+    )
+    if (
+      !UUID_V4_PATTERN.test(String(value.payload.operationId || '')) ||
+      !IDEMPOTENCY_PATTERN.test(String(value.payload.idempotencyKey || ''))
+    ) {
+      throw new Error('retry payload is invalid')
+    }
   } else {
     throw new Error('delivery action is not allowlisted')
   }
   return value
 }
 
-function publicOperation(operation, { eventLimit = 20 } = {}) {
+function publicOperation(
+  operation,
+  { eventLimit = 20, requestCount = 1 } = {}
+) {
+  const retryableAction = ['release', 'promote', 'rollback'].includes(
+    operation.action
+  )
+  const retryAllowed =
+    retryableAction && ['failed', 'blocked'].includes(operation.status)
   const readyConfirmation =
     operation.status !== 'ready'
       ? ''
@@ -325,6 +346,26 @@ function publicOperation(operation, { eventLimit = 20 } = {}) {
     },
     issues: operation.issues,
     events: operation.events.slice(-eventLimit),
+    idempotency: {
+      attempt: Number.isSafeInteger(operation.attempt) ? operation.attempt : 1,
+      retryOfOperationId: operation.retryOfOperationId || null,
+      rootOperationId: operation.rootOperationId || operation.id,
+      requestCount,
+      reuseCount: Math.max(0, requestCount - 1),
+      basis: ['action', 'target', 'git_sha', 'version', 'delivery_inputs'],
+    },
+    retry: {
+      allowed: retryAllowed,
+      reason: retryAllowed
+        ? 'explicit_retry_available'
+        : operation.status === 'not_proven'
+          ? 'target_readback_required'
+          : ['failed', 'blocked'].includes(operation.status)
+            ? 'action_not_retryable'
+            : TERMINAL_STATUSES.has(operation.status)
+              ? 'terminal_no_retry_needed'
+              : 'operation_in_progress',
+    },
     confirmationRequired: readyConfirmation,
     terminal: TERMINAL_STATUSES.has(operation.status),
   }
@@ -365,6 +406,12 @@ export function createDevDeliveryService({
   const children = new Map()
   let preflightCache = null
   let pipelineTimingCache = null
+
+  function presentOperation(operation, options = {}) {
+    const requestCount =
+      deliveryOperationRequestCounts(store).get(operation.id) || 1
+    return publicOperation(operation, { ...options, requestCount })
+  }
 
   recoverInterruptedDeliveryOperations(store, now())
 
@@ -480,9 +527,14 @@ export function createDevDeliveryService({
       target: targetResult.status === 'fulfilled' ? targetResult.value : null,
       timings:
         timingsResult.status === 'fulfilled' ? timingsResult.value : null,
-      operations: listDeliveryOperations(store, { limit: 50 }).map(
-        publicOperation
-      ),
+      operations: (() => {
+        const requestCounts = deliveryOperationRequestCounts(store)
+        return listDeliveryOperations(store, { limit: 50 }).map((operation) =>
+          publicOperation(operation, {
+            requestCount: requestCounts.get(operation.id) || 1,
+          })
+        )
+      })(),
       issues,
       boundaries: {
         provider: 'github',
@@ -495,7 +547,7 @@ export function createDevDeliveryService({
     }
   }
 
-  async function dispatchRelease(payload) {
+  async function dispatchRelease(payload, { retryOfOperationId = null } = {}) {
     const repository = await readRepositoryState(root)
     if (repository.dirty || repository.commit !== payload.gitSha) {
       throw new Error(
@@ -508,10 +560,11 @@ export function createDevDeliveryService({
       gitSha: payload.gitSha,
       version: payload.version,
       idempotencyKey: payload.idempotencyKey,
+      retryOfOperationId,
       metadata: { source: 'version-center' },
       now: now(),
     })
-    if (created.reused) return publicOperation(created.operation)
+    if (created.reused) return presentOperation(created.operation)
 
     let operation = transitionDeliveryOperation(store, created.operation.id, {
       status: 'running',
@@ -534,7 +587,7 @@ export function createDevDeliveryService({
           message: 'immutable release already exists with complete assets',
           now: now(),
         })
-        return publicOperation(operation)
+        return presentOperation(operation)
       }
       await Promise.resolve(
         deliveryProvider.dispatchRelease({
@@ -549,7 +602,7 @@ export function createDevDeliveryService({
           'GitHub release workflow accepted; waiting for terminal assets',
         now: now(),
       })
-      return publicOperation(operation)
+      return presentOperation(operation)
     } catch (error) {
       transitionDeliveryOperation(store, operation.id, {
         status: 'failed',
@@ -564,7 +617,10 @@ export function createDevDeliveryService({
     }
   }
 
-  async function prepareFixedPromotion(payload) {
+  async function prepareFixedPromotion(
+    payload,
+    { retryOfOperationId = null } = {}
+  ) {
     const versions = await Promise.resolve(
       deliveryProvider.listVersions({ limit: 50 })
     )
@@ -592,19 +648,23 @@ export function createDevDeliveryService({
           targetKey: 'test-133',
           idempotencyKey: payload.idempotencyKey,
           operationStore: store,
+          retryOfOperationId,
         },
         { runPreflight, now }
       )
     )
     preflightCache = null
     return {
-      operation: publicOperation(result.operation),
+      operation: presentOperation(result.operation),
       plan: result.plan,
       reused: result.reused,
     }
   }
 
-  async function prepareFixedRollback(payload) {
+  async function prepareFixedRollback(
+    payload,
+    { retryOfOperationId = null } = {}
+  ) {
     const versions = await Promise.resolve(
       deliveryProvider.listVersions({ limit: 50 })
     )
@@ -651,16 +711,65 @@ export function createDevDeliveryService({
           targetKey: 'test-133',
           idempotencyKey: payload.idempotencyKey,
           operationStore: store,
+          retryOfOperationId,
         },
         { runPreflight, now }
       )
     )
     preflightCache = null
     return {
-      operation: publicOperation(result.operation),
+      operation: presentOperation(result.operation),
       plan: result.plan,
       reused: result.reused,
     }
+  }
+
+  async function retryOperation(payload) {
+    const previous = readDeliveryOperation(store, payload.operationId)
+    if (!['failed', 'blocked'].includes(previous.status)) {
+      if (previous.status === 'not_proven') {
+        throw new Error('target outcome must be read back before retry')
+      }
+      throw new Error('only failed or blocked operations can be retried')
+    }
+    const retryOptions = { retryOfOperationId: previous.id }
+    if (previous.action === 'release') {
+      return {
+        operation: await dispatchRelease(
+          {
+            gitSha: previous.gitSha,
+            version: previous.version,
+            idempotencyKey: payload.idempotencyKey,
+          },
+          retryOptions
+        ),
+      }
+    }
+    if (previous.action === 'promote') {
+      return prepareFixedPromotion(
+        {
+          gitSha: previous.gitSha,
+          version: previous.version,
+          target: 'test-133',
+          idempotencyKey: payload.idempotencyKey,
+        },
+        retryOptions
+      )
+    }
+    if (previous.action === 'rollback') {
+      return prepareFixedRollback(
+        {
+          fromGitSha: previous.metadata.currentGitSha,
+          fromVersion: previous.metadata.currentVersion,
+          toGitSha: previous.gitSha,
+          toVersion: previous.version,
+          target: 'test-133',
+          idempotencyKey: payload.idempotencyKey,
+        },
+        retryOptions
+      )
+    }
+    throw new Error('operation action cannot be retried from the workbench')
   }
 
   function finishSpawnedTargetAction(operationId, error) {
@@ -766,7 +875,7 @@ export function createDevDeliveryService({
     child.once('close', () => finish())
     return {
       accepted: true,
-      operation: publicOperation(operation),
+      operation: presentOperation(operation),
     }
   }
 
@@ -843,7 +952,7 @@ export function createDevDeliveryService({
     child.once('close', () => finish())
     return {
       accepted: true,
-      operation: publicOperation(operation),
+      operation: presentOperation(operation),
     }
   }
 
@@ -852,7 +961,7 @@ export function createDevDeliveryService({
       return getSummary(options)
     },
     readOperation(operationId) {
-      return publicOperation(readDeliveryOperation(store, operationId), {
+      return presentOperation(readDeliveryOperation(store, operationId), {
         eventLimit: 100,
       })
     },
@@ -877,6 +986,13 @@ export function createDevDeliveryService({
           schemaVersion: 'plush.dev-delivery-action-result/v1',
           action: validated.action,
           ...(await prepareFixedRollback(validated.payload)),
+        }
+      }
+      if (validated.action === 'retry-operation') {
+        return {
+          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          action: validated.action,
+          ...(await retryOperation(validated.payload)),
         }
       }
       if (validated.action === 'execute-rollback') {

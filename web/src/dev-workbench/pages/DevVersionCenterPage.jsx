@@ -36,6 +36,7 @@ import DevPipelineTimingPanel, {
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import {
   DEV_DELIVERY_SOURCE_PATH,
+  DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
   DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
   DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
   DEV_VERSION_CENTER_VIEW_HISTORY,
@@ -45,7 +46,9 @@ import {
   createDeliveryIdempotencyKey,
   createDevDeliveryClient,
   defaultReleaseVersion,
+  deliveryIdempotencyPresentation,
   deliveryOperationMessagePresentation,
+  deliveryRetryPresentation,
   deliveryStatusPresentation,
   deliveryTargetCachePresentation,
   deliveryVersionActionKind,
@@ -70,7 +73,6 @@ import { DEV_QUALITY_GATES_ROUTE } from '../config/devRoutes.mjs'
 const { Link, Paragraph, Text, Title } = Typography
 const OPERATION_POLL_INTERVAL_MS = 1500
 const OPERATION_DETAIL_FOCUS_RESTORE_FALLBACK_MS = 600
-const VERSION_CENTER_SNAPSHOT_KEY = 'version-center'
 const POLLING_OPERATION_STATUSES = new Set([
   'queued',
   'running',
@@ -94,6 +96,11 @@ function upsertOperation(operations, operation) {
 function StatusTag({ status }) {
   const presentation = deliveryStatusPresentation(status)
   return <Tag color={presentation.color}>{presentation.label}</Tag>
+}
+
+function OperationIdempotencyText({ operation }) {
+  const presentation = deliveryIdempotencyPresentation(operation.idempotency)
+  return <Text type="secondary">{presentation.label}</Text>
 }
 
 function issueDescription(issues = []) {
@@ -239,7 +246,7 @@ export default function DevVersionCenterPage() {
   const client = useMemo(() => createDevDeliveryClient(), [])
   const qualityGateClient = useMemo(() => createDevQualityGateClient(), [])
   const initialSnapshot = useMemo(
-    () => readDevSummarySnapshot(VERSION_CENTER_SNAPSHOT_KEY),
+    () => readDevSummarySnapshot(DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY),
     []
   )
   const [summary, setSummary] = useState(initialSnapshot?.summary || null)
@@ -349,7 +356,7 @@ export default function DevVersionCenterPage() {
     const next = typeof update === 'function' ? update(current) : update
     if (!next) return current
     summaryRef.current = next
-    updateDevSummarySnapshot(VERSION_CENTER_SNAPSHOT_KEY, () => next)
+    updateDevSummarySnapshot(DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY, () => next)
     setSummary(next)
     return next
   }, [])
@@ -379,7 +386,7 @@ export default function DevVersionCenterPage() {
     setLoadError('')
     try {
       const snapshot = await loadDevSummarySnapshot(
-        VERSION_CENTER_SNAPSHOT_KEY,
+        DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY,
         () => client.summary()
       )
       if (refreshRequestRef.current !== requestId) return false
@@ -418,11 +425,13 @@ export default function DevVersionCenterPage() {
         message.success(
           action === 'dispatch-release'
             ? 'GitHub 发布任务已登记'
-            : action === 'prepare-promotion'
-              ? '部署准备结果已登记'
-              : action === 'prepare-rollback'
-                ? '回滚资格结果已登记'
-                : '部署执行器已启动，请按 operation 跟踪'
+            : action === 'retry-operation'
+              ? '已创建关联的新尝试'
+              : action === 'prepare-promotion'
+                ? '部署准备结果已登记'
+                : action === 'prepare-rollback'
+                  ? '回滚资格结果已登记'
+                  : '部署执行器已启动，请按 operation 跟踪'
         )
         await refresh()
         return true
@@ -793,6 +802,9 @@ export default function DevVersionCenterPage() {
       record.status === 'ready' &&
       ['promote', 'rollback'].includes(record.action)
     const executable = summaryFresh && readyToExecute
+    const retryable = record.retry?.allowed === true
+    const retryEligible =
+      summaryFresh && retryable && !isMutationRunning && !hasOpenOperation
     return (
       <Space wrap>
         <Button
@@ -819,13 +831,37 @@ export default function DevVersionCenterPage() {
           >
             {record.action === 'rollback' ? '确认回滚' : '确认部署'}
           </Button>
+        ) : retryable ? (
+          <Tooltip
+            title={
+              retryEligible
+                ? '沿用原动作、固定目标、Exact-SHA、版本和发布输入，创建有关联的新尝试'
+                : hasOpenOperation
+                  ? '已有未结束的 operation，请先完成或核对该操作'
+                  : !summaryFresh
+                    ? '等待最新状态核对'
+                    : '已有写操作正在提交'
+            }
+          >
+            <Button
+              icon={<ReloadOutlined />}
+              disabled={!retryEligible}
+              loading={actionKey === `retry:${record.id}`}
+              onClick={() =>
+                performAction(`retry:${record.id}`, 'retry-operation', {
+                  operationId: record.id,
+                  idempotencyKey: createDeliveryIdempotencyKey('retry'),
+                })
+              }
+            >
+              再次尝试
+            </Button>
+          </Tooltip>
         ) : (
           <Text type="secondary">
             {readyToExecute && !summaryFresh
               ? '等待最新状态核对'
-              : record.terminal
-                ? '终态不可重试'
-                : '等待状态更新'}
+              : deliveryRetryPresentation(record.retry)}
           </Text>
         )}
       </Space>
@@ -863,6 +899,7 @@ export default function DevVersionCenterPage() {
       render: (_value, record) => (
         <Space direction="vertical" size={2}>
           <StatusTag status={record.status} />
+          <OperationIdempotencyText operation={record} />
           {record.issues.length > 0 ? (
             <Text type="danger">{issueDescription(record.issues)}</Text>
           ) : (
@@ -1437,6 +1474,31 @@ export default function DevVersionCenterPage() {
                 className="erp-dev-operation-detail-time"
               />
             </Space>
+            <Card size="small" title="幂等与受控重试">
+              <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                <Text strong>
+                  {
+                    deliveryIdempotencyPresentation(operationDetail.idempotency)
+                      .label
+                  }
+                </Text>
+                <Text type="secondary">
+                  识别依据：
+                  {deliveryIdempotencyPresentation(
+                    operationDetail.idempotency
+                  ).basis.join('、')}
+                </Text>
+                <Text type="secondary">
+                  {deliveryRetryPresentation(operationDetail.retry)}
+                </Text>
+                {operationDetail.idempotency.retryOfOperationId ? (
+                  <Text type="secondary">
+                    关联上一次操作：
+                    {operationDetail.idempotency.retryOfOperationId.slice(0, 8)}
+                  </Text>
+                ) : null}
+              </Space>
+            </Card>
             <Card size="small" title="操作环节耗时">
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Text strong>

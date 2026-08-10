@@ -79,6 +79,7 @@ export async function prepareRollback(
     targetKey,
     idempotencyKey,
     operationStore,
+    retryOfOperationId = null,
   },
   {
     runPreflight = runTargetPreflight,
@@ -100,6 +101,7 @@ export async function prepareRollback(
     gitSha: target.manifest.gitSha,
     version: target.manifest.version,
     idempotencyKey,
+    retryOfOperationId,
     metadata: {
       source: "version-center",
       currentGitSha: current.manifest.gitSha,

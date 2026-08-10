@@ -8,6 +8,7 @@ import test from 'node:test'
 
 import {
   createOrReuseDeliveryOperation,
+  listDeliveryOperations,
   readDeliveryOperation,
   resolveDeliveryOperationStore,
   transitionDeliveryOperation,
@@ -85,7 +86,7 @@ function requestMiddleware(
   })
 }
 
-test('delivery action contract accepts only fixed release, promotion and rollback actions', () => {
+test('delivery action contract accepts fixed actions and bounded explicit retry', () => {
   assert.equal(
     validateDevDeliveryAction({
       action: 'prepare-promotion',
@@ -145,6 +146,28 @@ test('delivery action contract accepts only fixed release, promotion and rollbac
       },
     }).action,
     'prepare-rollback'
+  )
+  assert.equal(
+    validateDevDeliveryAction({
+      action: 'retry-operation',
+      payload: {
+        operationId: OPERATION_ID,
+        idempotencyKey: 'version-center:retry:fixed-0001',
+      },
+    }).action,
+    'retry-operation'
+  )
+  assert.throws(
+    () =>
+      validateDevDeliveryAction({
+        action: 'retry-operation',
+        payload: {
+          operationId: OPERATION_ID,
+          idempotencyKey: 'version-center:retry:fixed-0001',
+          gitSha: SHA,
+        },
+      }),
+    /unsupported fields/u
   )
 })
 
@@ -268,10 +291,155 @@ test('release dispatch is idempotent and never writes the target', async (t) => 
     },
   }
   const first = await service.act(request)
-  const second = await service.act(request)
+  const second = await service.act({
+    ...request,
+    payload: {
+      ...request.payload,
+      idempotencyKey: 'version-center:fixed:0002',
+    },
+  })
   assert.equal(first.operation.status, 'waiting')
   assert.equal(second.operation.id, first.operation.id)
+  assert.equal(second.operation.idempotency.requestCount, 2)
+  assert.equal(second.operation.idempotency.reuseCount, 1)
+  assert.deepEqual(second.operation.idempotency.basis, [
+    'action',
+    'target',
+    'git_sha',
+    'version',
+    'delivery_inputs',
+  ])
   assert.equal(dispatchCount, 1)
+})
+
+test('failed release can create one linked explicit retry attempt', async (t) => {
+  const { root, store } = createProject(t)
+  let dispatchCount = 0
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      getReleaseStatus: () => ({ status: 'missing', release: null }),
+      dispatchRelease() {
+        dispatchCount += 1
+        if (dispatchCount === 1) throw new Error('temporary dispatch failure')
+        return { status: 'accepted' }
+      },
+      listVersions: () => [],
+      downloadRelease: () => {
+        throw new Error('not used')
+      },
+    },
+    readRepositoryState: async () => ({
+      commit: SHA,
+      dirty: false,
+      fingerprint: 'b'.repeat(64),
+    }),
+  })
+  await assert.rejects(
+    service.act({
+      action: 'dispatch-release',
+      payload: {
+        gitSha: SHA,
+        version: '2026.07.29-1',
+        idempotencyKey: 'version-center:release:fixed-0001',
+      },
+    }),
+    /temporary dispatch failure/u
+  )
+  const failed = listDeliveryOperations(store)[0]
+  assert.equal(failed.status, 'failed')
+  const retried = await service.act({
+    action: 'retry-operation',
+    payload: {
+      operationId: failed.id,
+      idempotencyKey: 'version-center:retry:fixed-0002',
+    },
+  })
+  assert.equal(retried.operation.status, 'waiting')
+  assert.equal(retried.operation.idempotency.attempt, 2)
+  assert.equal(retried.operation.idempotency.retryOfOperationId, failed.id)
+  assert.equal(retried.operation.retry.allowed, false)
+  assert.equal(dispatchCount, 2)
+  assert.equal(listDeliveryOperations(store).length, 2)
+  assert.equal(readDeliveryOperation(store, failed.id).status, 'failed')
+})
+
+test('workbench retry refuses an unknown target outcome', async (t) => {
+  const { root, store } = createProject(t)
+  const created = createOrReuseDeliveryOperation(store, {
+    action: 'promote',
+    target: 'test-133',
+    gitSha: SHA,
+    version: '2026.07.29-1',
+    idempotencyKey: 'version-center:promote:fixed-0001',
+  })
+  transitionDeliveryOperation(store, created.operation.id, {
+    status: 'running',
+    message: 'target write started',
+  })
+  transitionDeliveryOperation(store, created.operation.id, {
+    status: 'not_proven',
+    message: 'target outcome is unknown',
+  })
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      listVersions: () => [],
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadRelease: () => {},
+    },
+  })
+  await assert.rejects(
+    service.act({
+      action: 'retry-operation',
+      payload: {
+        operationId: created.operation.id,
+        idempotencyKey: 'version-center:retry:fixed-0002',
+      },
+    }),
+    /read back before retry/u
+  )
+})
+
+test('workbench does not offer generic retry for dedicated high-risk actions', async (t) => {
+  const { root, store } = createProject(t)
+  const created = createOrReuseDeliveryOperation(store, {
+    action: 'rebuild-database',
+    target: 'test-133',
+    gitSha: SHA,
+    version: '2026.07.29-1',
+    idempotencyKey: 'version-center:rebuild:fixed-0001',
+  })
+  transitionDeliveryOperation(store, created.operation.id, {
+    status: 'failed',
+    message: 'database qualification failed before target write',
+  })
+  const service = createDevDeliveryService({
+    projectRoot: root,
+    operationStore: store,
+    provider: {
+      listVersions: () => [],
+      getReleaseStatus: () => ({ status: 'missing' }),
+      dispatchRelease: () => {},
+      downloadRelease: () => {},
+    },
+  })
+  const operation = service.readOperation(created.operation.id)
+  assert.equal(operation.retry.allowed, false)
+  assert.equal(operation.retry.reason, 'action_not_retryable')
+  await assert.rejects(
+    service.act({
+      action: 'retry-operation',
+      payload: {
+        operationId: created.operation.id,
+        idempotencyKey: 'version-center:retry:fixed-0002',
+      },
+    }),
+    /cannot be retried/u
+  )
 })
 
 test('delivery summary exposes cached GitHub timings and readable operation durations', async (t) => {

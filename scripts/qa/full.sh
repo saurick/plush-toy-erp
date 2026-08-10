@@ -23,7 +23,7 @@ print_help() {
 环境变量:
   QA_BASE_RANGE=...    指定 diff 范围供 db-guard/secrets 使用
   DISPOSABLE_DATABASE_BASE_URL=... 本地 PostgreSQL 管理连接基线；门禁派生唯一 disposable test 库，不写入基线库
-  QA_BROWSER_SCENARIOS=...        浏览器诊断时覆盖默认场景；门禁始终至少运行一个场景
+  QA_BROWSER_SCENARIOS=...        追加浏览器诊断场景；不能替换正式门禁的工作台共享布局与新增页面治理场景
 
 结果边界:
   full/strict 拒绝 SKIP_*、STRICT_SKIP_* 与调用者提供的 coverage 变量。
@@ -84,6 +84,8 @@ fi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
+
+DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop,dev-all-pages-mobile,dev-workbench-wide-layout,dev-hub-dark-desktop,dev-drill-recovery-desktop-light,dev-drill-recovery-mobile-dark"
 
 # ROOT_DIR pins the shared PostgreSQL contract; ShellCheck scans it separately.
 # shellcheck disable=SC1091
@@ -157,6 +159,10 @@ qa_full_web() {
 
 qa_full_browser() {
   echo "[qa:full] 实际启动 Chromium 运行无写入浏览器 smoke"
+  local browser_scenarios="$DEFAULT_QA_BROWSER_SCENARIOS"
+  if [[ -n "${QA_BROWSER_SCENARIOS:-}" ]]; then
+    browser_scenarios="${browser_scenarios},${QA_BROWSER_SCENARIOS}"
+  fi
   # 同一 worktree 的浏览器证据必须串行；stale lock 保守失败，避免并发回收竞态。
   # shellcheck source=scripts/qa/browser-gate-lock.sh
   # shellcheck disable=SC1091
@@ -180,7 +186,7 @@ qa_full_browser() {
     export PATH="$PNPM_BIN_DIR:$PATH"
     STYLE_L1_BASE_URL="" \
       STYLE_L1_PORT="$browser_port" \
-      STYLE_L1_SCENARIOS="${QA_BROWSER_SCENARIOS:-root-redirect-desktop}" \
+      STYLE_L1_SCENARIOS="$browser_scenarios" \
       "$PNPM_BIN" style:l1
   )
   browser_gate_lock_release

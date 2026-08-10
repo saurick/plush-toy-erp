@@ -63,7 +63,14 @@ export function readPromotionPlan(store, operationId) {
 }
 
 export async function preparePromotion(
-  { repoRoot, releaseManifestPath, targetKey, idempotencyKey, operationStore },
+  {
+    repoRoot,
+    releaseManifestPath,
+    targetKey,
+    idempotencyKey,
+    operationStore,
+    retryOfOperationId = null,
+  },
   {
     runPreflight = runTargetPreflight,
     now = () => new Date().toISOString(),
@@ -80,6 +87,7 @@ export async function preparePromotion(
     gitSha: releaseManifest.gitSha,
     version: releaseManifest.version,
     idempotencyKey,
+    retryOfOperationId,
     metadata: {
       releaseManifestSha256,
       source: "version-center",

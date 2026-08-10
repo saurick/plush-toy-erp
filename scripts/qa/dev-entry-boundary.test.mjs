@@ -17,6 +17,7 @@ import {
 import {
   DEV_DATABASE_MIGRATION_ROUTE,
   DEV_DATA_PREPARATION_ROUTE,
+  DEV_DRILL_RECOVERY_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_STATUS_FLOWS_ROUTE,
 } from "../../web/src/dev-workbench/config/devRoutes.mjs";
@@ -123,6 +124,7 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   assert.equal(DEV_TESTING_ROUTE, "/__dev/testing");
   assert.equal(DEV_DATA_PREPARATION_ROUTE, "/__dev/data-preparation");
   assert.equal(DEV_DATABASE_MIGRATION_ROUTE, "/__dev/database-migration");
+  assert.equal(DEV_DRILL_RECOVERY_ROUTE, "/__dev/drill-recovery");
   assert.equal(DEV_CUSTOMER_CONFIG_ROUTE, "/__dev/customer-config");
   assert.equal(isDevHubEnabled({ DEV: true }), true);
   assert.equal(isDevHubEnabled({ DEV: false }), false);
@@ -174,6 +176,9 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   );
   const databaseMigrationItem = DEV_HUB_ITEMS.find(
     (item) => item.key === "database-migration",
+  );
+  const drillRecoveryItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === "drill-recovery",
   );
   assert(
     (productCoreItem?.guardrails || []).some((guardrail) =>
@@ -288,6 +293,18 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
     devRoutesSource,
     /path="database-migration"[\s\S]{0,100}?<DevDatabaseMigrationPage/u,
     "the fixed database migration page must remain under the DEV-only router",
+  );
+  assert.match(drillRecoveryItem?.title || "", /演练与恢复/u);
+  assert(
+    (drillRecoveryItem?.guardrails || []).some((guardrail) =>
+      String(guardrail).includes("No arbitrary target or shell"),
+    ),
+    "drill recovery entry must reject arbitrary targets and shell input",
+  );
+  assert.match(
+    devRoutesSource,
+    /path="drill-recovery"[\s\S]{0,100}?<DevDrillRecoveryPage/u,
+    "the drill recovery page must remain under the DEV-only router",
   );
 });
 

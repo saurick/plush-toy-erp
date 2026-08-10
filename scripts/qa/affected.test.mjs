@@ -215,6 +215,25 @@ test("affected: a page without a sibling test expands to web tests and browser f
   assert(plan.followUps.some((item) => item.id === "browser-regression"));
 });
 
+test("affected: DEV 菜单与页面改动强制选择页面治理合同", () => {
+  for (const file of [
+    "web/src/dev-workbench/config/devRoutes.mjs",
+    "web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx",
+    "web/src/dev-workbench/styles/dev-drill-recovery.css",
+    "web/scripts/style-l1/devDrillRecoveryScenarios.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    const governanceCommand = plan.commands.find((item) =>
+      item.args.includes("scripts/qa/dev-page-governance.test.mjs"),
+    );
+    assert(
+      governanceCommand,
+      `${file} 必须直接执行 DEV 页面治理合同，不能只留下浏览器 follow-up`,
+    );
+    assert(plan.followUps.some((item) => item.id === "browser-regression"));
+  }
+});
+
 test("affected: schema changes select migration guard and data tests without auto-generating files", () => {
   const plan = buildAffectedPlan(
     ["server/internal/data/model/schema/product_sku.go"],

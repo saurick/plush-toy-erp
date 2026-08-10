@@ -319,6 +319,55 @@ test("pre-commit checks staged script content instead of an unstaged fixup", () 
   }
 });
 
+test("pre-commit blocks DEV page changes when the indexed governance contract fails", () => {
+  const root = mkdtempSync(
+    path.join(os.tmpdir(), "plush-pre-commit-dev-page-"),
+  );
+  try {
+    git(root, ["init", "-q"]);
+    installHookFixture(root);
+    const governanceTest = path.join(
+      root,
+      "scripts/qa/dev-page-governance.test.mjs",
+    );
+    writeFileSync(
+      governanceTest,
+      'import test from "node:test";\n' +
+        'test("fixture", () => { throw new Error("DEV_PAGE_GOVERNANCE_BLOCKED"); });\n',
+      "utf8",
+    );
+    commit(root, "base");
+
+    const page = path.join(
+      root,
+      "web/src/dev-workbench/pages/DevNewWorkbenchPage.jsx",
+    );
+    mkdirSync(path.dirname(page), { recursive: true });
+    writeFileSync(
+      page,
+      "export default function Page() { return null; }\n",
+      "utf8",
+    );
+    git(root, ["add", "web/src/dev-workbench/pages/DevNewWorkbenchPage.jsx"]);
+
+    const hookEnvironment = { ...process.env };
+    delete hookEnvironment.NODE_TEST_CONTEXT;
+    const result = spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], {
+      cwd: root,
+      encoding: "utf8",
+      env: hookEnvironment,
+    });
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    assert.match(result.stdout, /检查 DEV 菜单与页面治理合同/u);
+    assert.match(
+      `${result.stdout}\n${result.stderr}`,
+      /DEV_PAGE_GOVERNANCE_BLOCKED/u,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("pre-commit rejects a required hook deleted only from the index", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-required-"));
   try {
@@ -397,5 +446,6 @@ test("pre-commit source contains no mutating formatter or git add", () => {
   assert.match(source, /SHFMT_CHECK=1/u);
   assert.match(source, /SKIP_DB_GUARD=0 QA_BASE_RANGE=HEAD\.\.\.HEAD/u);
   assert.match(source, /scripts\/qa\/db-guard\.sh/u);
+  assert.match(source, /scripts\/qa\/dev-page-governance\.test\.mjs/u);
   assert.doesNotMatch(source, /\bmake data\b|\bmigrate_apply\b/u);
 });

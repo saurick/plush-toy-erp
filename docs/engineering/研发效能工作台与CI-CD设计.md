@@ -166,14 +166,16 @@ Actions run ID、job ID、可变 tag 和页面显示名称只作辅助信息。
 - `execute-promotion`：只执行上一操作冻结的版本、目标和确认串。
 - `prepare-rollback`：比较当前与候选 manifest，只在 migration 序列和客户配置源指纹一致时形成待确认 operation。
 - `execute-rollback`：只回滚代码和镜像，不自动 down migration 或恢复数据库。
+- `retry-operation`：只接受已有 operation ID 和新幂等键；仅允许 `failed / blocked` 创建有关联的新尝试，原动作、固定目标、Exact-SHA、版本和发布输入全部由服务端旧 operation 恢复，浏览器不能改写。
 
 Bridge 必须：
 
 - 只监听 loopback。
 - 校验 Host、Origin、`Sec-Fetch-Site`、content type 和 CSRF。
 - 固定仓库、默认分支、目标别名和脚本入口。
-- 使用不可猜 operation ID、幂等键、目标串行锁和原子状态文件。
+- 使用不可猜 operation ID、幂等键、交付意图索引、目标串行锁和原子状态文件；相同交付意图的不同浏览器请求和跨进程竞争只生成一个 operation。
 - 页面刷新后可按 operation ID 恢复。
+- `failed / blocked` 的再次尝试必须创建新 operation 并记录父 operation、根 operation 和尝试次数；旧终态永不重新打开，`not_proven` 必须先读回目标且不提供重试。
 - 日志脱敏，状态文件权限为 `0600`。
 - 进程重启后把未知写操作标为 `not_proven`，先读回目标再决定是否续办。
 
@@ -317,7 +319,30 @@ Tab 切换属于请求生命周期事件：旧请求必须取消或由 latest-re
 
 已经存在完整不可变制品的当前 HEAD 不再允许重复点击“发布当前 SHA”：若尚未部署，引导到版本列表准备部署；若已部署，明确显示无需重复发布。写操作使用确认 Modal，详情与最近事件使用按需加载的 Drawer。operation 状态字典统一为：
 
+幂等证据仍以现有“操作记录”和详情为唯一运行真源，不新增幂等写动作或第二套 operation 状态页；“演练与恢复”只读引用其完成状态。版本中心只展示业务可读的“首次执行 / 第 N 次受控尝试、合并重复请求数、交付动作 / 固定目标 / Exact-SHA / 版本 / 发布输入”等依据，不显示原始幂等键或请求指纹。
+
 “人工接管说明”是同页只读操作指南，不是新动作。AI 暂时不可用时，人工仍按“Codex / 本地终端固定 clean exact SHA 并 push → GitHub CI 成功 → 固定 Immutable Release workflow 生成不可变制品 → 当前页面准备并确认 test-133 部署 → operation、digest、migration、health/ready、公网 SHA 与浏览器资源读回 → 必要时正式回滚”的唯一链路执行。页面明确展示可继续与必须停止的证据，禁止 force push、跳过门禁、手工覆盖 tag 或目标页面、在 133 构建、直接结构性 SQL、删除数据库 / volume、全局 prune 和对 `not_proven` 盲目重试；说明本身不新增 Bridge action、凭据输入、后台调度或第二套状态真源。
+
+### 演练与恢复目录
+
+`/__dev/drill-recovery` 不是第二套发布平台。它只读复用版本中心摘要、固定目标 preflight、不可变 Release 和 promotion / rollback operation，把“什么时候演练、风险多大、该留下什么证据”按优先级组织成一个目录；目标写入仍回到版本中心按既有 prepare / confirm / readback 合同执行。
+
+页面遵循结论优先的工作台密度：首段只给当前恢复准备度、目标身份和一个下一步；六类演练使用单一紧凑清单，桌面只默认展开当前建议，窄屏默认全部折叠；目的、变化触发、完成证据和安全边界按需查看。最近记录与人工接管降为辅助区，不再用六张大卡重复展示同层信息。
+
+| 优先级 | 演练                     | 默认频率与触发                                               | 执行边界                                                                 |
+| ------ | ------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| P0     | 目标身份、容量与健康核验 | 每次发布前自动；每月人工抽查；服务器、网络或 Provider 变化后 | 只读固定 preflight，不创建备份或切换版本                                 |
+| P0     | 相同 SHA 幂等与缓存核验  | 每月；promotion、缓存、传输或 Docker load 合同变化后         | 只选择当前 exact SHA；普通部署不能冒充 no-target-write 幂等回执          |
+| P0     | 兼容回滚与再前滚         | 每季度；正式生产启用前或 migration / 公网切换规则变化后      | 只允许已登记且兼容的不可变版本，不自动 down migration                    |
+| P1     | 备份恢复到隔离数据库     | 每月；PostgreSQL、备份格式或恢复脚本变化后                   | 使用 operation 标识和 TTL 的 disposable lifecycle，结束后 inventory 为零 |
+| P1     | 新服务器或正式环境切换   | 只在目标、域名、证书、网络或正式环境变化时                   | 先登记新目标和独立 preflight，不复制 test-133 凭据或接受临时输入         |
+| P2     | 故障注入与恢复           | 具备隔离环境和固定执行器后每季度                             | 默认关闭，禁止对当前试用或正式环境临时制造故障                           |
+
+页面只把精确证据标为“最近证据可用”：相同 SHA 必须存在 `requested exact SHA is already current and healthy` 的 passed operation；回滚演练必须存在 passed rollback，且之后已 passed promotion 回到当前运行 SHA。其它正常发布、旧 operation 或只有一半的回滚链仍显示“需按门禁准备 / 未证明”。
+
+新增服务器或正式环境时，deployment target registry 增加一个新的语义环境身份和固定技术 key，并为它补齐 SSH、文件根、Compose、数据库、公网入口、容量、独立 preflight 与 operation 合同。工作台按 `purpose + target key` 展示“客户试用环境 / 正式生产环境”，不按 IP 或机器名复制菜单和页面；未登记目标保持失败关闭。
+
+故障注入的未来扩展只能登记固定故障类型与恢复读回，不接受浏览器传入 shell、主机、路径、SQL、Docker 命令或凭据。没有隔离目标、可恢复基线、超时、观测指标和残留清理时，只展示计划说明，不提供执行按钮。
 
 - `queued`
 - `running`

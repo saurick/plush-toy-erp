@@ -7,6 +7,7 @@ export const DEV_DELIVERY_SUMMARY_API_PATH = '/__dev/api/delivery/summary'
 export const DEV_DELIVERY_ACTION_API_PATH = '/__dev/api/delivery/actions'
 export const DEV_DELIVERY_OPERATION_API_PREFIX =
   '/__dev/api/delivery/operations'
+export const DEV_DELIVERY_SUMMARY_SNAPSHOT_KEY = 'version-center'
 export const DEV_DELIVERY_SOURCE_PATH =
   'docs/engineering/研发效能工作台与CI-CD设计.md'
 export const DEV_VERSION_CENTER_VIEW_QUERY_KEY = 'view'
@@ -48,6 +49,20 @@ const PIPELINE_STATUSES = new Set([
   'pending',
 ])
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u
+const IDEMPOTENCY_BASIS = Object.freeze([
+  'action',
+  'target',
+  'git_sha',
+  'version',
+  'delivery_inputs',
+])
+const IDEMPOTENCY_BASIS_LABELS = Object.freeze({
+  action: '交付动作',
+  target: '固定目标',
+  git_sha: 'Exact-SHA',
+  version: '版本',
+  delivery_inputs: '发布输入',
+})
 const PIPELINE_LABELS = Object.freeze({
   ci: '持续集成流水线',
   release: '正式发布流水线',
@@ -150,6 +165,7 @@ export function resolveDevVersionCenterView(value) {
 
 const OPERATION_MESSAGE_LABELS = Object.freeze({
   'operation accepted': '操作已受理',
+  'controlled retry operation accepted': '受控的新尝试已受理',
   'read-only fixed-target preflight started': '已开始固定目标只读预检',
   'read-only rollback qualification started': '已开始只读回滚资格检查',
   'promotion plan is eligible and requires explicit confirmation':
@@ -409,6 +425,48 @@ function validOperationTimeline(operation) {
   )
 }
 
+function validOperationIdempotency(operation) {
+  const value = operation.idempotency
+  return (
+    value &&
+    Number.isSafeInteger(value.attempt) &&
+    value.attempt >= 1 &&
+    OPERATION_ID_PATTERN.test(String(value.rootOperationId || '')) &&
+    (value.retryOfOperationId === null ||
+      OPERATION_ID_PATTERN.test(String(value.retryOfOperationId || ''))) &&
+    (value.attempt === 1
+      ? value.retryOfOperationId === null
+      : value.retryOfOperationId !== null) &&
+    Number.isSafeInteger(value.requestCount) &&
+    value.requestCount >= 1 &&
+    Number.isSafeInteger(value.reuseCount) &&
+    value.reuseCount === value.requestCount - 1 &&
+    Array.isArray(value.basis) &&
+    value.basis.join(',') === IDEMPOTENCY_BASIS.join(',')
+  )
+}
+
+function validOperationRetry(operation) {
+  const value = operation.retry
+  const retryableAction = ['release', 'promote', 'rollback'].includes(
+    operation.action
+  )
+  const allowed =
+    retryableAction && ['failed', 'blocked'].includes(operation.status)
+  const reason = allowed
+    ? 'explicit_retry_available'
+    : operation.status === 'not_proven'
+      ? 'target_readback_required'
+      : ['failed', 'blocked'].includes(operation.status)
+        ? 'action_not_retryable'
+        : ['passed', 'failed', 'blocked', 'not_proven'].includes(
+              operation.status
+            )
+          ? 'terminal_no_retry_needed'
+          : 'operation_in_progress'
+  return value?.allowed === allowed && value?.reason === reason
+}
+
 function validateOperation(operation) {
   assertObject(operation, 'delivery operation')
   if (
@@ -453,7 +511,9 @@ function validateOperation(operation) {
     (operation.metrics.transferDurationMs !== null &&
       operation.metrics.transferDurationMs > operation.durationMs) ||
     !validBuildPerformance(operation.metrics.buildPerformance) ||
-    !validTargetCacheMetrics(operation.metrics)
+    !validTargetCacheMetrics(operation.metrics) ||
+    !validOperationIdempotency(operation) ||
+    !validOperationRetry(operation)
   ) {
     throw new Error('delivery operation is invalid')
   }
@@ -757,7 +817,7 @@ export function createDeliveryIdempotencyKey(
   action,
   randomUuid = () => globalThis.crypto.randomUUID()
 ) {
-  if (!['release', 'promote', 'rollback'].includes(action)) {
+  if (!['release', 'promote', 'rollback', 'retry'].includes(action)) {
     throw new Error('delivery idempotency action is invalid')
   }
   const uuid = String(randomUuid())
@@ -769,6 +829,36 @@ export function createDeliveryIdempotencyKey(
     throw new Error('delivery idempotency UUID is invalid')
   }
   return `version-center:${action}:${uuid}`
+}
+
+export function deliveryIdempotencyPresentation(value) {
+  const basis = Array.isArray(value?.basis)
+    ? value.basis.map((item) => IDEMPOTENCY_BASIS_LABELS[item]).filter(Boolean)
+    : []
+  const attempt = Number.isSafeInteger(value?.attempt) ? value.attempt : 1
+  const reuseCount = Number.isSafeInteger(value?.reuseCount)
+    ? value.reuseCount
+    : 0
+  return {
+    label:
+      attempt > 1
+        ? `第 ${String(attempt)} 次受控尝试`
+        : reuseCount > 0
+          ? `首次执行，已合并 ${String(reuseCount)} 个重复请求`
+          : '首次执行',
+    basis,
+  }
+}
+
+export function deliveryRetryPresentation(value) {
+  const labels = {
+    explicit_retry_available: '可发起一次关联的新尝试',
+    target_readback_required: '结果未知，必须先读回目标',
+    action_not_retryable: '该动作须返回专用流程处理，不能在此重试',
+    terminal_no_retry_needed: '已完成，无需重试',
+    operation_in_progress: '操作进行中',
+  }
+  return labels[value?.reason] || '重试状态未证明'
 }
 
 export function defaultReleaseVersion(date = new Date()) {

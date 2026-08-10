@@ -39,6 +39,7 @@ const devPageSources = [
   'DevCustomerConfigPage.jsx',
   'DevDatabaseMigrationPage.jsx',
   'DevVersionCenterPage.jsx',
+  'DevDrillRecoveryPage.jsx',
 ].map((fileName) =>
   readFileSync(new URL(`../pages/${fileName}`, import.meta.url), 'utf8')
 )
@@ -121,6 +122,10 @@ test('devHub: every dev route exposes a distinct browser title', () => {
     '版本发布 · Plush Toy ERP'
   )
   assert.equal(
+    resolveDevPageTitle('/__dev/drill-recovery', 'Plush Toy ERP'),
+    '演练与恢复 · Plush Toy ERP'
+  )
+  assert.equal(
     resolveDevPageTitle('/__dev/data-preparation', 'Plush Toy ERP'),
     '测试数据 · Plush Toy ERP'
   )
@@ -167,6 +172,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['delivery', '客户配置'],
       ['delivery', '数据库迁移'],
       ['delivery', '版本发布'],
+      ['delivery', '演练与恢复'],
     ]
   )
   const hubTitleByKey = new Map(
@@ -210,6 +216,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     'delivery'
   )
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/version-center'), 'delivery')
+  assert.equal(resolveDevWorkbenchAreaKey('/__dev/drill-recovery'), 'delivery')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/unknown'), '')
   assert.match(
     devPageNavSource,
@@ -268,8 +275,8 @@ test('devHub: every tool has one registered area and the overview derives stages
   assert.match(devHubPageSource, /item\.areaKey === stage\.key/u)
 })
 
-test('devHub: thirteen dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 13)
+test('devHub: fourteen dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 14)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -316,6 +323,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/customer-config',
       '/__dev/database-migration',
       '/__dev/version-center',
+      '/__dev/drill-recovery',
     ]
   )
   assert(
@@ -427,12 +435,24 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     /No retry when unknown/
   )
   assert.match(databaseMigrationItem?.description || '', /无关工作区变化/)
+
+  const drillRecoveryItem = DEV_HUB_ITEMS.find(
+    (item) => item.key === 'drill-recovery'
+  )
+  assert.match(drillRecoveryItem?.title || '', /演练与恢复/)
+  assert.match(drillRecoveryItem?.truthSource || '', /operation 回执/)
+  assert.match(drillRecoveryItem?.guardrails?.join(' ') || '', /Risk-tiered/)
+  assert.match(
+    drillRecoveryItem?.guardrails?.join(' ') || '',
+    /Fault injection disabled/
+  )
+  assert.match(drillRecoveryItem?.description || '', /P0、P1、P2/)
 })
 
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 12)
+  assert.equal(summary.entryCount, 13)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

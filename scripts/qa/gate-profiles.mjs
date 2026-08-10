@@ -128,6 +128,7 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/qa/local-acceptance-lifecycle.mjs",
   "scripts/qa/local-acceptance-lifecycle.test.mjs",
   "scripts/qa/dev-flow-state-observatory-boundary.test.mjs",
+  "scripts/qa/dev-page-governance.test.mjs",
   "scripts/qa/dev-workbench-boundary.test.mjs",
   "scripts/qa/dev-workbench-production-boundary.mjs",
   "scripts/qa/dev-workbench-production-boundary.test.mjs",

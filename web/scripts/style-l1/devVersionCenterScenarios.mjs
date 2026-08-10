@@ -40,7 +40,35 @@ function operationMetrics({ transferred = false } = {}) {
   }
 }
 
-function createVersionCenterSummary() {
+function operationIdempotency(
+  operationId,
+  { attempt = 1, retryOfOperationId = null, requestCount = 1 } = {}
+) {
+  return {
+    attempt,
+    retryOfOperationId,
+    rootOperationId: retryOfOperationId || operationId,
+    requestCount,
+    reuseCount: requestCount - 1,
+    basis: ['action', 'target', 'git_sha', 'version', 'delivery_inputs'],
+  }
+}
+
+function operationRetry(status) {
+  const allowed = ['failed', 'blocked'].includes(status)
+  return {
+    allowed,
+    reason: allowed
+      ? 'explicit_retry_available'
+      : status === 'not_proven'
+        ? 'target_readback_required'
+        : status === 'passed'
+          ? 'terminal_no_retry_needed'
+          : 'operation_in_progress',
+  }
+}
+
+export function createVersionCenterSummary() {
   const versions = Array.from({ length: 14 }, (_, offset) => {
     const sequence = 14 - offset
     const gitSha = deliverySha(sequence)
@@ -100,18 +128,24 @@ function createVersionCenterSummary() {
       },
     ],
     metrics: operationMetrics(),
+    idempotency: operationIdempotency('f0000001-0000-4000-8000-000000000001', {
+      requestCount: 2,
+    }),
+    retry: operationRetry('ready'),
   }
   const historyOperations = Array.from({ length: 12 }, (_, offset) => {
     const sequence = offset + 1
     const version = versions[offset + 1]
     const isPromotion = sequence % 2 === 1
+    const status = sequence === 1 ? 'failed' : 'passed'
+    const operationId = `a${String(sequence).padStart(7, '0')}-0000-4000-8000-${String(sequence).padStart(12, '0')}`
     return {
-      id: `a${String(sequence).padStart(7, '0')}-0000-4000-8000-${String(sequence).padStart(12, '0')}`,
+      id: operationId,
       action: isPromotion ? 'promote' : 'release',
       target: isPromotion ? 'test-133' : 'github-release',
       gitSha: version.gitSha,
       version: version.version,
-      status: 'passed',
+      status,
       terminal: true,
       revision: 3,
       createdAt: new Date(
@@ -126,21 +160,37 @@ function createVersionCenterSummary() {
         {
           id: 'completed',
           label: isPromotion ? '部署与基础运行核验' : '不可变版本发布',
-          status: 'passed',
+          status,
           durationMs: 120_000,
         },
       ],
-      issues: [],
+      issues:
+        status === 'failed'
+          ? [
+              {
+                code: 'release_dispatch_failed',
+                level: 'error',
+                message: '发布调度失败，未写入 133',
+              },
+            ]
+          : [],
       events: [
         {
-          status: 'passed',
+          status,
           at: new Date(Date.UTC(2026, 7, 8, 13 - offset, 0, 2)).toISOString(),
-          message: isPromotion
-            ? 'target promotion and basic runtime verification passed'
-            : 'immutable GitHub release and complete assets are published',
+          message:
+            status === 'failed'
+              ? 'promotion preparation failed without starting a target write'
+              : isPromotion
+                ? 'target promotion and basic runtime verification passed'
+                : 'immutable GitHub release and complete assets are published',
         },
       ],
       metrics: operationMetrics({ transferred: isPromotion }),
+      idempotency: operationIdempotency(operationId, {
+        requestCount: sequence === 2 ? 3 : 1,
+      }),
+      retry: operationRetry(status),
     }
   })
 
@@ -155,7 +205,13 @@ function createVersionCenterSummary() {
     },
     versions,
     target: {
+      schemaVersion: 'plush.target-preflight/v1',
+      generatedAt: '2026-08-09T02:00:00.000Z',
       status: 'passed',
+      target: 'test-133',
+      purpose: 'customer-trial',
+      customer: 'yoyoosun',
+      trialTarget: 'customer-trial-133',
       remote: {
         runtime: {
           serverSha: currentVersion.gitSha,
@@ -259,7 +315,7 @@ function createVersionCenterSummary() {
   })
 }
 
-async function installSummaryRoute(page, onRequest) {
+export async function installSummaryRoute(page, onRequest = () => {}) {
   const summary = createVersionCenterSummary()
   const qualityGateSummary = createQualityGateStyleSummary('passed')
   const strictReceipt = {
@@ -637,6 +693,14 @@ export function createDevVersionCenterScenarios({
           /1-10 \/ 共 12 条记录/u
         )
         assert.doesNotMatch(String(await history.textContent()), /f0000001/u)
+        await visibleTableRows(history)
+          .first()
+          .getByRole('button', { name: '再次尝试' })
+          .waitFor({ state: 'visible' })
+        assert.match(
+          String(await visibleTableRows(history).nth(1).textContent()),
+          /已合并 2 个重复请求/u
+        )
         const historyTimes = visibleTableRows(history).locator(
           '.erp-dev-operation-history-time time'
         )

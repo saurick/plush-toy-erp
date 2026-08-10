@@ -84,16 +84,19 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/dev-workbench/pages/DevDataPreparationPage.jsx",
     "web/src/dev-workbench/pages/DevDatabaseMigrationPage.jsx",
     "web/src/dev-workbench/pages/DevQualityGatesPage.jsx",
+    "web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx",
     "web/src/dev-workbench/pages/DevPermissionRelationshipsPage.jsx",
     "web/src/dev-workbench/components/DevPageNav.jsx",
     "web/src/dev-workbench/components/DevReceiptPanel.jsx",
     "web/src/dev-workbench/config/devDataPreparation.mjs",
     "web/src/dev-workbench/config/devDatabaseMigration.mjs",
     "web/src/dev-workbench/config/devQualityGates.mjs",
+    "web/src/dev-workbench/config/devRecovery.mjs",
     "web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs",
     "web/src/dev-workbench/styles/dev-data-preparation.css",
     "web/src/dev-workbench/styles/dev-database-migration.css",
     "web/src/dev-workbench/styles/dev-quality-gates.css",
+    "web/src/dev-workbench/styles/dev-drill-recovery.css",
     "web/src/dev-workbench/styles/dev-permission-relationships.css",
     "web/src/dev-workbench/styles/index.css",
   ]) {
@@ -204,7 +207,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 12);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 13);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
