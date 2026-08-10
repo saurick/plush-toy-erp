@@ -91,6 +91,11 @@ test("DEV 菜单路由全部进入移动端壳层与溢出治理", () => {
 
   const scenarios = read("web/scripts/style-l1/scenarios.mjs");
   const mobileBlock = extractScenarioBlock(scenarios, "dev-all-pages-mobile");
+  assert.match(
+    mobileBlock,
+    /mockAdminRpc:\s*true/u,
+    "DEV 全页面视觉门禁必须自带 RPC mock，不能依赖开发机或 CI 外部后端",
+  );
   const coveredRoutes = sortedUnique(
     [...mobileBlock.matchAll(/path:\s*'([^']+)'/gu)].map((match) =>
       normalizedRoute(match[1]),

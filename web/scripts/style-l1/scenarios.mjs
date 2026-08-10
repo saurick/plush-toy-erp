@@ -12219,6 +12219,7 @@ export function createStyleL1Scenarios(deps) {
       name: 'dev-all-pages-mobile',
       path: '/__dev/',
       viewport: { width: 390, height: 844 },
+      mockAdminRpc: true,
       beforeNavigate: async (page) => {
         await installSummaryRoute(page)
         await page.route('**/__dev/api/receipts', async (route) => {
