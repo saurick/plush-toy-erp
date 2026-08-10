@@ -12071,15 +12071,38 @@ export function createStyleL1Scenarios(deps) {
           `开发导航置顶入口应写入本地偏好并移动到首位: ${JSON.stringify(pinnedAfterClick)}`
         )
 
-        await page
-          .locator('.erp-dev-hub-group-filter .ant-select-selector')
-          .click()
-        await page
-          .locator(
-            '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
+        const groupCombobox = page.getByRole('combobox', {
+          name: '全部开发工具分组',
+        })
+        const selectGroupByKeyboard = async (targetIndex, targetLabel) => {
+          await page
+            .locator('.erp-dev-hub-group-filter .ant-select-selector')
+            .click()
+          await page.waitForFunction(() =>
+            Boolean(
+              document
+                .querySelector(
+                  '.erp-dev-hub-group-filter input[role="combobox"]'
+                )
+                ?.getAttribute('aria-activedescendant')
+            )
           )
-          .filter({ hasText: '客户治理 / Customer Governance' })
-          .click()
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            const activeId = await groupCombobox.getAttribute(
+              'aria-activedescendant'
+            )
+            const activeIndex = Number(
+              String(activeId || '').match(/_list_(\d+)$/u)?.[1] || -1
+            )
+            if (activeIndex === targetIndex) {
+              await groupCombobox.press('Enter')
+              return
+            }
+            await groupCombobox.press('ArrowDown')
+          }
+          assert.fail(`未能通过键盘选择开发工具分组: ${targetLabel}`)
+        }
+        await selectGroupByKeyboard(7, '客户治理 / Customer Governance')
         await page.waitForFunction(
           () =>
             document
@@ -12119,26 +12142,7 @@ export function createStyleL1Scenarios(deps) {
           `开发导航分组筛选应只保留客户配置入口: ${JSON.stringify(groupMetrics)}`
         )
 
-        await page
-          .locator('.erp-dev-hub-group-filter .ant-select-selector')
-          .click()
-        // 分组选项超过下拉可视区时，Ant Design 会把虚拟列表定位到当前项；
-        // 先归零组件自己的滚动容器，再点击重新渲染的首项。
-        const groupDropdown = page.locator(
-          '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
-        )
-        await groupDropdown
-          .locator('.rc-virtual-list-holder')
-          .evaluate((node) => {
-            node.scrollTop = 0
-            node.dispatchEvent(new Event('scroll', { bubbles: true }))
-          })
-        await groupDropdown
-          .locator('.ant-select-item-option')
-          .filter({ hasText: '全部 / All' })
-          .click()
-        await page.keyboard.press('Escape')
-        await groupDropdown.waitFor({ state: 'hidden' })
+        await selectGroupByKeyboard(0, '全部 / All')
         const toolSearch = page.getByPlaceholder('搜索具体工具或路径')
         await toolSearch.fill('改动验证')
         await page.waitForFunction(
