@@ -20,6 +20,8 @@ export const MANAGED_DATABASE_EVENTS = Object.freeze({
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const EXACT_SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const MANAGED_EXACT_SHA_MAIN_REF = "HEAD";
 const MANAGED_DATABASE_TIMEOUT_MS = 60_000;
 const MANAGED_DATABASE_POLL_MS = 250;
 
@@ -28,27 +30,104 @@ function repositoryScope(repoRoot) {
 }
 
 export function parseManagedDatabaseArgs(argv) {
-  const options = { gate: "", operationId: "" };
+  const options = {
+    exactSha: "",
+    gate: "",
+    mainRef: "",
+    operationId: "",
+  };
+  const seen = new Set();
+  const allowlistedArguments = new Set([
+    "--exact-sha",
+    "--gate",
+    "--main-ref",
+    "--operation-id",
+  ]);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     const value = argv[index + 1];
-    if (argument !== "--gate" && argument !== "--operation-id") {
+    if (!allowlistedArguments.has(argument) || seen.has(argument)) {
       throw new Error("managed quality gate argument is not allowlisted");
     }
-    if (!value || value.startsWith("--")) {
+    if (typeof value !== "string" || !value || value.startsWith("--")) {
       throw new Error("managed quality gate argument requires a value");
     }
-    if (argument === "--gate") options.gate = value;
+    seen.add(argument);
+    if (argument === "--exact-sha") options.exactSha = value;
+    else if (argument === "--gate") options.gate = value;
+    else if (argument === "--main-ref") options.mainRef = value;
     else options.operationId = value;
     index += 1;
-  }
-  if (!["full", "strict"].includes(options.gate)) {
-    throw new Error("managed quality gate must be full or strict");
   }
   if (!UUID_PATTERN.test(options.operationId)) {
     throw new Error("managed quality gate operation id is invalid");
   }
-  return Object.freeze(options);
+  const request = normalizeManagedQualityGateRequest(options);
+  return Object.freeze({ ...request, operationId: options.operationId });
+}
+
+function normalizeManagedQualityGateRequest({
+  exactSha = "",
+  gate = "",
+  mainRef = "",
+} = {}) {
+  const hasGate = gate !== "";
+  const hasExactSha = exactSha !== "" || mainRef !== "";
+  if (hasGate === hasExactSha) {
+    throw new Error("managed quality gate request mode is invalid");
+  }
+  if (hasGate) {
+    if (!["full", "strict"].includes(gate)) {
+      throw new Error("managed quality gate must be full or strict");
+    }
+    return Object.freeze({ gate });
+  }
+  if (!EXACT_SHA_PATTERN.test(exactSha)) {
+    throw new Error("managed exact SHA is invalid");
+  }
+  if (mainRef !== MANAGED_EXACT_SHA_MAIN_REF) {
+    throw new Error("managed exact SHA main ref is invalid");
+  }
+  return Object.freeze({ exactSha, mainRef });
+}
+
+export function buildManagedQualityGateCommand({
+  databaseURL,
+  environment = process.env,
+  exactSha = "",
+  gate = "",
+  mainRef = "",
+  repoRoot = path.resolve(import.meta.dirname, "../.."),
+} = {}) {
+  if (typeof databaseURL !== "string" || databaseURL.length === 0) {
+    throw new Error("managed quality gate database URL is invalid");
+  }
+  const request = normalizeManagedQualityGateRequest({
+    exactSha,
+    gate,
+    mainRef,
+  });
+  const args = request.gate
+    ? ["scripts/qa/run-gate-with-receipt.mjs", "--gate", request.gate]
+    : [
+        "scripts/qa/exact-sha-gate.mjs",
+        "--sha",
+        request.exactSha,
+        "--main-ref",
+        request.mainRef,
+        "--run",
+        "--json",
+      ];
+  return Object.freeze({
+    args: Object.freeze(args),
+    command: process.execPath,
+    cwd: path.resolve(repoRoot),
+    env: Object.freeze({
+      ...environment,
+      DISPOSABLE_DATABASE_BASE_URL: databaseURL,
+    }),
+    shell: false,
+  });
 }
 
 export function buildManagedDatabaseContainerSpec({
@@ -226,19 +305,20 @@ function defaultRuntime({ repoRoot }) {
         throw new Error("managed database container cleanup failed");
       }
     },
-    runGate({ databaseURL, gate, onChild }) {
-      const child = spawn(
-        process.execPath,
-        ["scripts/qa/run-gate-with-receipt.mjs", "--gate", gate],
-        {
-          cwd: repoRoot,
-          env: {
-            ...process.env,
-            DISPOSABLE_DATABASE_BASE_URL: databaseURL,
-          },
-          stdio: "inherit",
-        },
-      );
+    runGate({ databaseURL, exactSha, gate, mainRef, onChild }) {
+      const commandSpec = buildManagedQualityGateCommand({
+        databaseURL,
+        exactSha,
+        gate,
+        mainRef,
+        repoRoot,
+      });
+      const child = spawn(commandSpec.command, commandSpec.args, {
+        cwd: commandSpec.cwd,
+        env: commandSpec.env,
+        shell: commandSpec.shell,
+        stdio: "inherit",
+      });
       onChild(child);
       return new Promise((resolve) => {
         let settled = false;
@@ -337,7 +417,9 @@ function boundedReadinessMessage(value, fallback) {
 }
 
 export async function runManagedQualityGate({
+  exactSha,
   gate,
+  mainRef,
   operationId,
   repoRoot = path.resolve(import.meta.dirname, "../.."),
   runtime,
@@ -345,7 +427,12 @@ export async function runManagedQualityGate({
   stdout = process.stdout,
   processRef = process,
 } = {}) {
-  parseManagedDatabaseArgs(["--gate", gate, "--operation-id", operationId]);
+  const requestArgs = [];
+  if (gate) requestArgs.push("--gate", gate);
+  if (exactSha) requestArgs.push("--exact-sha", exactSha);
+  if (mainRef) requestArgs.push("--main-ref", mainRef);
+  requestArgs.push("--operation-id", operationId);
+  const request = parseManagedDatabaseArgs(requestArgs);
   const executor = runtime || defaultRuntime({ repoRoot });
   let readiness;
   try {
@@ -390,7 +477,9 @@ export async function runManagedQualityGate({
     stdout.write(`${MANAGED_DATABASE_EVENTS.ready}\n`);
     result = await executor.runGate({
       databaseURL,
-      gate,
+      exactSha: request.exactSha,
+      gate: request.gate,
+      mainRef: request.mainRef,
       onChild(value) {
         child = value;
         if (forwardedSignal) forward(forwardedSignal);
