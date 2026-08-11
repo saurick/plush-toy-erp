@@ -355,10 +355,10 @@ DEV_PORTS_FILE ?= $(abspath $(DEV_MAKEFILE_DIR)/../config/dev-ports.env)
 DEV_PORTS_LOCAL_FILE ?= $(abspath $(DEV_MAKEFILE_DIR)/../config/dev-ports.local.env)
 include $(DEV_PORTS_FILE)
 -include $(DEV_PORTS_LOCAL_FILE)
-export DEV_PROJECT_ID DEV_WEB_PORT DEV_HTTP_PORT DEV_GRPC_PORT DEV_STYLE_PORT DEV_AUX_PORT_START
+export DEV_PROJECT_ID DEV_WEB_PORT DEV_HTTP_PORT DEV_STYLE_PORT DEV_AUX_PORT_START
 
 # 当前项目本地 dev 会占用的端口；端口只用于诊断和查找候选进程，停止前必须校验进程 cwd 属于本仓库。
-DEV_PORTS := $(DEV_HTTP_PORT) $(DEV_GRPC_PORT)
+DEV_PORTS := $(DEV_HTTP_PORT)
 
 .PHONY: dev_ports_preflight dev_preflight dev_build
 # validate the complete tracked/local bundle before any local runtime action.

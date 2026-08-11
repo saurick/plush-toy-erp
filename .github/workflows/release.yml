@@ -102,8 +102,10 @@ jobs:
               --pattern release-artifact.json \
               --pattern release-manifest.json \
               --pattern sbom.cdx.json \
+              --pattern server-image.tar \
+              --pattern web-image.tar \
               --dir "$verify_dir"
-            node scripts/deploy/github-release-asset-set.mjs verify-existing \
+            node scripts/deploy/github-release-asset-set.mjs verify-published \
               --dir "$verify_dir" \
               --catalog "$catalog" \
               --sha "$REQUESTED_SHA" \
@@ -112,6 +114,11 @@ jobs:
           fi
           echo "release_reused=$release_reused" >> "$GITHUB_OUTPUT"
           echo "[release] state=$state reused=$release_reused tag=$release_tag"
+      - name: Audit production Web dependencies
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@10.13.1
+          pnpm --dir web audit --prod --audit-level high --registry=https://registry.npmjs.org
       - name: Recover a provenance-bound strict terminal before heavy setup
         if: steps.identity.outputs.release_reused != 'true'
         id: recover
@@ -475,6 +482,26 @@ jobs:
             echo "[release] GitHub release catalog did not converge: expected_state=$expected_state missing_mode=$missing_mode actual_state=$state missing_assets=$missing_assets"
             return 1
           }
+          download_release_assets() {
+            target_dir="$1"
+            rm -rf "$target_dir"
+            mkdir -p "$target_dir"
+            gh release download "$release_tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern checksums.sha256 \
+              --pattern release-artifact.json \
+              --pattern release-manifest.json \
+              --pattern sbom.cdx.json \
+              --pattern server-image.tar \
+              --pattern web-image.tar \
+              --dir "$target_dir"
+          }
+          compare_release_assets() {
+            downloaded_dir="$1"
+            for asset in checksums.sha256 release-artifact.json release-manifest.json sbom.cdx.json server-image.tar web-image.tar; do
+              cmp --silent "$artifact_dir/$asset" "$downloaded_dir/$asset"
+            done
+          }
           fetch_catalog
           read_plan
           if [[ "$state" == "missing" ]]; then
@@ -487,8 +514,11 @@ jobs:
             wait_for_plan draft any
           fi
           if [[ "$state" == "published" ]]; then
+            verify_dir="$RUNNER_TEMP/release-download-verify"
+            download_release_assets "$verify_dir"
+            compare_release_assets "$verify_dir"
             node scripts/deploy/github-release-asset-set.mjs verify-published \
-              --dir "$artifact_dir" --catalog "$catalog" --sha "$RELEASE_SHA" --version "$RELEASE_VERSION"
+              --dir "$verify_dir" --catalog "$catalog" --sha "$RELEASE_SHA" --version "$RELEASE_VERSION"
             exit 0
           fi
           if [[ "$state" != "draft" ]]; then
@@ -506,21 +536,12 @@ jobs:
           done
           wait_for_plan draft empty
           verify_dir="$RUNNER_TEMP/release-download-verify"
-          mkdir -p "$verify_dir"
-          gh release download "$release_tag" \
-            --repo "$GITHUB_REPOSITORY" \
-            --pattern checksums.sha256 \
-            --pattern release-artifact.json \
-            --pattern release-manifest.json \
-            --pattern sbom.cdx.json \
-            --dir "$verify_dir"
-          for asset in checksums.sha256 release-artifact.json release-manifest.json sbom.cdx.json; do
-            cmp --silent "$artifact_dir/$asset" "$verify_dir/$asset"
-          done
+          download_release_assets "$verify_dir"
+          compare_release_assets "$verify_dir"
           gh release edit "$release_tag" --repo "$GITHUB_REPOSITORY" --draft=false
           wait_for_plan published empty
           node scripts/deploy/github-release-asset-set.mjs verify-published \
-            --dir "$artifact_dir" \
+            --dir "$verify_dir" \
             --catalog "$catalog" \
             --sha "$RELEASE_SHA" \
             --version "$RELEASE_VERSION"

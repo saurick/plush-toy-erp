@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"server/internal/admincredential"
 	"server/internal/biz"
@@ -19,13 +21,11 @@ import (
 	"server/internal/devdbguard"
 	appserver "server/internal/server"
 	"server/pkg/logger"
-	"server/pkg/taskgroup"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/config/file"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/go-kratos/kratos/v2/transport/http"
 
 	"go.opentelemetry.io/otel"
@@ -33,6 +33,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	_ "go.uber.org/automaxprocs"
 	"go.uber.org/automaxprocs/maxprocs"
@@ -58,7 +59,7 @@ func init() {
 	flag.StringVar(&flagconf, "conf", "", "config path, eg: -conf ./server/configs/dev or -conf ./server/configs/prod")
 }
 
-func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, processRuntimeUC *biz.ProcessRuntimeUsecase) *kratos.App {
+func newApp(logger log.Logger, hs *http.Server, processRuntimeUC *biz.ProcessRuntimeUsecase) *kratos.App {
 	workflowReconciler := newProcessRuntimeWorkflowReconciler(processRuntimeUC, logger)
 	return kratos.New(
 		kratos.ID(id),
@@ -66,13 +67,31 @@ func newApp(logger log.Logger, gs *grpc.Server, hs *http.Server, processRuntimeU
 		kratos.Version(Version),
 		kratos.Metadata(map[string]string{}),
 		kratos.Logger(logger),
-		kratos.Server(
-			gs,
-			hs,
-		),
-		kratos.AfterStart(workflowReconciler.Start),
+		kratos.Server(hs),
+		kratos.AfterStart(func(ctx context.Context) error {
+			if err := workflowReconciler.Start(ctx); err != nil {
+				return err
+			}
+			appserver.StartTemplatePDFWarmupAsync(ctx, logger)
+			return nil
+		}),
 		kratos.BeforeStop(workflowReconciler.Stop),
+		kratos.StopTimeout(30*time.Second),
 	)
+}
+
+func shutdownTracerProvider(tp *tracesdk.TracerProvider, baseLogger log.Logger) {
+	if tp == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := tp.Shutdown(ctx); err != nil {
+		log.NewHelper(baseLogger).Warnw(
+			"msg", "trace provider shutdown failed",
+			"error", err,
+		)
+	}
 }
 
 // 既兼容 kratos run（仓库根）又兼容 cd server/go run
@@ -139,68 +158,77 @@ func overrideDevServerPorts(confPath string, serverCfg *conf.Server, getenv func
 		getenv = os.Getenv
 	}
 
-	type portOverride struct {
-		key  string
-		addr func() (string, bool)
-		set  func(string)
+	rawPort := strings.TrimSpace(getenv("DEV_HTTP_PORT"))
+	if rawPort == "" {
+		return nil
 	}
-	overrides := []portOverride{
-		{
-			key: "DEV_HTTP_PORT",
-			addr: func() (string, bool) {
-				if serverCfg.Http == nil {
-					return "", false
-				}
-				return serverCfg.Http.Addr, true
-			},
-			set: func(addr string) {
-				serverCfg.Http.Addr = addr
-			},
-		},
-		{
-			key: "DEV_GRPC_PORT",
-			addr: func() (string, bool) {
-				if serverCfg.Grpc == nil {
-					return "", false
-				}
-				return serverCfg.Grpc.Addr, true
-			},
-			set: func(addr string) {
-				serverCfg.Grpc.Addr = addr
-			},
-		},
+	if serverCfg.Http == nil {
+		return fmt.Errorf("DEV_HTTP_PORT cannot override a missing HTTP server config")
 	}
-
-	seenPorts := make(map[string]string, len(overrides))
-	for _, override := range overrides {
-		rawPort := strings.TrimSpace(getenv(override.key))
-		if rawPort == "" {
-			continue
-		}
-		currentAddr, ok := override.addr()
-		if !ok {
-			return fmt.Errorf("%s cannot override a missing server transport config", override.key)
-		}
-		portNumber, err := strconv.Atoi(rawPort)
-		if err != nil || portNumber < 1024 || portNumber > 65535 {
-			return fmt.Errorf("%s must be an integer between 1024 and 65535", override.key)
-		}
-		normalizedPort := strconv.Itoa(portNumber)
-		if previous, exists := seenPorts[normalizedPort]; exists {
-			return fmt.Errorf("%s duplicates %s on development port %s", override.key, previous, normalizedPort)
-		}
-		seenPorts[normalizedPort] = override.key
-
-		addr, err := replaceListenPort(currentAddr, normalizedPort, override.key)
-		if err != nil {
-			return err
-		}
-		override.set(addr)
+	addr, err := replaceListenPort(serverCfg.Http.Addr, rawPort, "DEV_HTTP_PORT")
+	if err != nil {
+		return err
 	}
+	serverCfg.Http.Addr = addr
 	return nil
 }
 
-func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) {
+func overridePostgresPoolFromEnv(postgres *conf.Data_Postgres, getenv func(string) string) (bool, error) {
+	if postgres == nil {
+		return false, errors.New("postgres config is required")
+	}
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+
+	overridden := false
+	integerOverrides := []struct {
+		key string
+		set func(int32)
+	}{
+		{key: "POSTGRES_MAX_OPEN_CONNS", set: func(value int32) { postgres.MaxOpenConns = value }},
+		{key: "POSTGRES_MAX_IDLE_CONNS", set: func(value int32) { postgres.MaxIdleConns = value }},
+	}
+	for _, override := range integerOverrides {
+		raw := strings.TrimSpace(getenv(override.key))
+		if raw == "" {
+			continue
+		}
+		value, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil || value < 1 {
+			return false, fmt.Errorf("%s must be a positive 32-bit integer", override.key)
+		}
+		override.set(int32(value))
+		overridden = true
+	}
+
+	durationOverrides := []struct {
+		key string
+		set func(*durationpb.Duration)
+	}{
+		{key: "POSTGRES_CONN_MAX_LIFETIME", set: func(value *durationpb.Duration) { postgres.ConnMaxLifetime = value }},
+		{key: "POSTGRES_CONN_MAX_IDLE_TIME", set: func(value *durationpb.Duration) { postgres.ConnMaxIdleTime = value }},
+		{key: "POSTGRES_STARTUP_TIMEOUT", set: func(value *durationpb.Duration) { postgres.StartupTimeout = value }},
+	}
+	for _, override := range durationOverrides {
+		raw := strings.TrimSpace(getenv(override.key))
+		if raw == "" {
+			continue
+		}
+		value, err := time.ParseDuration(raw)
+		if err != nil || value <= 0 {
+			return false, fmt.Errorf("%s must be a positive Go duration", override.key)
+		}
+		override.set(durationpb.New(value))
+		overridden = true
+	}
+	return overridden, nil
+}
+
+func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) error {
+	if dataCfg == nil {
+		return errors.New("data config is required")
+	}
 	helper := log.NewHelper(baseLogger)
 
 	if dataCfg.Postgres == nil {
@@ -210,6 +238,13 @@ func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) {
 		// 关键兜底：只记录覆盖来源，不输出 DSN 明文，避免数据库密码进入日志。
 		dataCfg.Postgres.Dsn = v
 		helper.Info("postgres dsn overridden from env")
+	}
+	poolOverridden, err := overridePostgresPoolFromEnv(dataCfg.Postgres, os.Getenv)
+	if err != nil {
+		return err
+	}
+	if poolOverridden {
+		helper.Info("postgres pool settings overridden from env")
 	}
 
 	if dataCfg.Auth == nil {
@@ -239,6 +274,7 @@ func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) {
 		dataCfg.Auth.Admin.Password = v
 		helper.Info("admin password overridden from env")
 	}
+	return nil
 }
 
 // applyLocalAdminCredentialDefaults only fills missing bootstrap credentials
@@ -643,20 +679,18 @@ func main() {
 		)
 	}
 
-	// ===== 4. 初始化后台任务组 =====
-	cleanupTaskGroup := taskgroup.Init()
-	defer cleanupTaskGroup()
-	defer appserver.CleanupTemplatePDFResources()
-	appserver.StartTemplatePDFWarmupAsync(logger)
-
-	// ===== 5. 初始化 OpenTelemetry（带兜底，不会因为没连上 Jaeger 就阻塞） =====
+	// ===== 4. 初始化 OpenTelemetry（带兜底，不会因为没连上 Jaeger 就阻塞） =====
 	tp := initTracerProvider(traceName, traceEndpoint, traceRatio, logger)
-	// 进程退出前 flush 一下（不阻塞请求，只在退出时）
+	var cleanupData func()
 	defer func() {
-		_ = tp.ForceFlush(context.Background())
+		appserver.CleanupTemplatePDFResources()
+		shutdownTracerProvider(tp, logger)
+		if cleanupData != nil {
+			cleanupData()
+		}
 	}()
 
-	// ===== 5.5 启动时打一个 span，方便在 Jaeger 里排查 =====
+	// ===== 4.5 启动时打一个 span，方便在 Jaeger 里排查 =====
 	{
 		tr := otel.Tracer("bootstrap")
 		ctx, span := tr.Start(context.Background(), "startup-span")
@@ -667,7 +701,7 @@ func main() {
 		_ = ctx
 	}
 
-	// ===== 6. 严格检查 Server / Data 配置，缺了就直接报错 =====
+	// ===== 5. 严格检查 Server / Data 配置，缺了就直接报错 =====
 	serverCfg := bc.Server
 	if serverCfg == nil {
 		panic(fmt.Errorf("bootstrap server config is nil, please check %s", confPath))
@@ -680,7 +714,9 @@ func main() {
 	if dataCfg == nil {
 		panic(fmt.Errorf("bootstrap data config is nil, please check %s", confPath))
 	}
-	overrideFromEnv(dataCfg, logger)
+	if err := overrideFromEnv(dataCfg, logger); err != nil {
+		panic(fmt.Errorf("apply runtime data config: %w", err))
+	}
 	applyLocalAdminCredentialDefaults(confPath, dataCfg, os.Getenv)
 	if dataCfg.Postgres == nil {
 		panic(fmt.Errorf("bootstrap data postgres config is nil, please check %s", confPath))
@@ -698,18 +734,18 @@ func main() {
 		panic(err)
 	}
 
-	// ===== 7. 组装应用（wireApp） =====
+	// ===== 6. 组装应用（wireApp） =====
 	// 这里 wireApp 里用到的 TracerProvider 类型要记得是 *tracesdk.TracerProvider
 	app, cleanup, err := wireApp(serverCfg, dataCfg, logger, tp)
 	if err != nil {
 		panic(fmt.Errorf("wireApp init failed: %w", err))
 	}
+	cleanupData = cleanup
 	if app == nil {
 		panic("wireApp returned nil app")
 	}
-	defer cleanup()
 
-	// ===== 8. 启动应用 =====
+	// ===== 7. 启动应用 =====
 	if err := app.Run(); err != nil {
 		panic(fmt.Errorf("app run failed: %w", err))
 	}

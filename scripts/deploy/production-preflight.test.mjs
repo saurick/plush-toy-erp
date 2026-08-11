@@ -48,8 +48,6 @@ function writeFixture({
       "WEB_API_ORIGIN=https://erp.yoyoosun.local",
       "APP_HTTP_BIND_ADDR=127.0.0.1",
       "APP_HTTP_PORT=8300",
-      "APP_GRPC_BIND_ADDR=127.0.0.1",
-      "APP_GRPC_PORT=9300",
       "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
       "WEB_DESKTOP_PORT=5175",
       `APP_JWT_SECRET=${jwtSecret}`,
@@ -101,7 +99,6 @@ function writeFixture({
       '      - "seccomp=./chromium-seccomp.json"',
       "    ports:",
       '      - "${APP_HTTP_BIND_ADDR:-127.0.0.1}:8300:8300"',
-      '      - "${APP_GRPC_BIND_ADDR:-127.0.0.1}:9300:9300"',
       "  web-desktop:",
       "    image: ${WEB_IMAGE}",
       "    ports:",
@@ -229,7 +226,6 @@ function configureExactCustomerTrialFixture(
     ],
     ["POSTGRES_PORT", "55435"],
     ["APP_HTTP_PORT", "8315"],
-    ["APP_GRPC_PORT", "9315"],
     ["WEB_DESKTOP_BIND_ADDR", "127.0.0.1"],
     ["WEB_DESKTOP_PORT", "5185"],
     ["JAEGER_5775_PORT", "45775"],
@@ -371,7 +367,6 @@ if [[ "\${1:-}" == "port" ]]; then
   case "$cid:$container_port" in
   postgres-cid:5432/tcp) host_port=55435 ;;
   app-server-cid:8300/tcp) host_port=8315 ;;
-  app-server-cid:9300/tcp) host_port=9315 ;;
   web-desktop-cid:5175/tcp) host_port=5185 ;;
   jaeger-cid:5775/udp) host_port=45775 ;;
   jaeger-cid:6831/udp) host_port=46831 ;;

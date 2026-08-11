@@ -275,7 +275,6 @@ required_keys=(
   TRACE_RATIO
   WEB_API_ORIGIN
   APP_HTTP_BIND_ADDR
-  APP_GRPC_BIND_ADDR
   WEB_DESKTOP_BIND_ADDR
   APP_JWT_SECRET
   APP_AUTH_SMS_MODE
@@ -381,7 +380,6 @@ else
   jaeger_bind_addr="$(value_of JAEGER_BIND_ADDR)"
   postgres_bind_addr="$(value_of POSTGRES_BIND_ADDR)"
   app_http_bind_addr="$(value_of APP_HTTP_BIND_ADDR)"
-  app_grpc_bind_addr="$(value_of APP_GRPC_BIND_ADDR)"
   web_desktop_bind_addr="$(value_of WEB_DESKTOP_BIND_ADDR)"
   postgres_dsn="$(value_of POSTGRES_DSN)"
   app_admin_password="$(value_of APP_ADMIN_PASSWORD)"
@@ -476,7 +474,6 @@ PY
     for trial_port in \
       POSTGRES_PORT=55435 \
       APP_HTTP_PORT=8315 \
-      APP_GRPC_PORT=9315 \
       WEB_DESKTOP_PORT=5185 \
       JAEGER_5775_PORT=45775 \
       JAEGER_6831_PORT=46831 \
@@ -516,7 +513,6 @@ PY
   [[ "$erp_pdf_warmup" == "async" ]] || fail "ERP_PDF_WARMUP 生产发布必须显式为 async；off 只允许故障隔离，不能作为 release-ready 配置"
   [[ "$postgres_bind_addr" == "127.0.0.1" ]] || fail "POSTGRES_BIND_ADDR 必须为 127.0.0.1，避免 PostgreSQL 暴露到公网或办公网"
   [[ "$app_http_bind_addr" == "127.0.0.1" ]] || fail "APP_HTTP_BIND_ADDR 必须为 127.0.0.1，外部流量应先进入前端 / 网关"
-  [[ "$app_grpc_bind_addr" == "127.0.0.1" ]] || fail "APP_GRPC_BIND_ADDR 必须为 127.0.0.1，避免 gRPC 直接暴露到公网或办公网"
   [[ "$web_desktop_bind_addr" == "0.0.0.0" || "$web_desktop_bind_addr" == "127.0.0.1" ]] || fail "WEB_DESKTOP_BIND_ADDR 只允许 0.0.0.0 或 127.0.0.1"
   [[ "$jaeger_bind_addr" == "127.0.0.1" ]] || fail "JAEGER_BIND_ADDR 必须为 127.0.0.1，避免 Jaeger 暴露到公网或办公网"
   [[ "$postgres_dsn" == postgres://* || "$postgres_dsn" == postgresql://* ]] || fail "POSTGRES_DSN 必须是 postgres/postgresql URL"
@@ -554,7 +550,6 @@ fi
 grep -q 'JAEGER_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose Jaeger 端口必须默认绑定 127.0.0.1"
 grep -q 'POSTGRES_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose PostgreSQL 端口必须默认绑定 127.0.0.1"
 grep -q 'APP_HTTP_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app HTTP 端口必须默认绑定 127.0.0.1"
-grep -q 'APP_GRPC_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app gRPC 端口必须默认绑定 127.0.0.1"
 grep -q 'WEB_DESKTOP_BIND_ADDR:-0.0.0.0' "$compose_file" || fail "Compose web desktop 端口必须显式消费 WEB_DESKTOP_BIND_ADDR，并默认绑定 0.0.0.0"
 if grep -Eq '^[[:space:]]+APP_ADMIN_PASSWORD[[:space:]]*:' "$compose_file"; then
   fail "Compose steady app-server 不得映射 APP_ADMIN_PASSWORD"
@@ -724,7 +719,6 @@ if [[ "$runtime_check" -eq 1 ]]; then
     for runtime_port_contract in \
       postgres:5432/tcp=55435 \
       app-server:8300/tcp=8315 \
-      app-server:9300/tcp=9315 \
       web-desktop:5175/tcp=5185 \
       jaeger:5775/udp=45775 \
       jaeger:6831/udp=46831 \

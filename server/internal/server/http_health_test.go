@@ -288,6 +288,18 @@ func TestRegisterHealthRoutesReadyzFailureLogsStructuredWarning(t *testing.T) {
 	}) {
 		t.Fatalf("expected structured readiness warning log, got %+v", logger.entries)
 	}
+
+	secondRecorder := httptest.NewRecorder()
+	srv.ServeHTTP(secondRecorder, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	dependencyWarnings := 0
+	for _, entry := range logger.entries {
+		if entry.level == "WARN" && fmt.Sprint(entry.fields["msg"]) == "dependency not ready" {
+			dependencyWarnings++
+		}
+	}
+	if dependencyWarnings != 1 {
+		t.Fatalf("unchanged readiness failure logged %d dependency warnings, want 1", dependencyWarnings)
+	}
 }
 
 func TestRegisterHealthRoutesReadyzPDFWarmupNotReady(t *testing.T) {

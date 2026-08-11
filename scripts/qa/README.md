@@ -118,7 +118,7 @@ CI action 固定到审核过的 commit，工具链读取 `.n-node-version`、`we
 
 当前唯一整批合同是 `2026.07.16-v5 / 20260716-V5`。本地开发库和 133 试用库使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据。
 
-133 的 V5 使用独立 Compose project `plush-toy-erp-v5`：命令必须显式带 `-p plush-toy-erp-v5`，并同时带 `compose.yml` 与只声明 project name 的 `compose.customer-trial-133.yml`。PostgreSQL 为 `127.0.0.1:55435`、后端 HTTP / gRPC 为 `8315 / 9315`、前端为 `5185`；Jaeger 端口组为 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。PostgreSQL 只能挂载 `/home/simon/plush-toy-erp-v5/data/postgres`，migration 锁只能使用 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；旧 `plush-toy-erp-prod` 栈及其 `5435` 端口保留作回滚。任何直连数据库的辅助工具也必须命中 `55435 / plush_erp_uat_20260716_v5`，不能误连旧栈；正常整批造数仍只走后端 API。
+133 的 V5 使用独立 Compose project `plush-toy-erp-v5`：命令必须显式带 `-p plush-toy-erp-v5`，并同时带 `compose.yml` 与只声明 project name 的 `compose.customer-trial-133.yml`。PostgreSQL 为 `127.0.0.1:55435`、后端 HTTP 为 `8315`、前端为 `5185`；Jaeger 端口组为 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。PostgreSQL 只能挂载 `/home/simon/plush-toy-erp-v5/data/postgres`，migration 锁只能使用 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；旧 `plush-toy-erp-prod` 栈及其 `5435` 端口保留作回滚。任何直连数据库的辅助工具也必须命中 `55435 / plush_erp_uat_20260716_v5`，不能误连旧栈；正常整批造数仍只走后端 API。
 
 133 造数前必须先在固定 release 上按 `status -> dry-run -> stop V5 app-server -> apply -> status` 完成 migration，不停旧栈也不停 V5 PostgreSQL。精确命令以 [Compose 迁移脚本](../../server/deploy/compose/prod/README.md#迁移脚本) 为唯一运维入口。运行 env 必须由当前用户持有、精确 `0600` 且无符号链接父路径；preflight 只使用其私有快照并在结束时复核原文件。启动后必须传 `production-preflight.sh --runtime --expected-release <40sha>`，同时证明四服务 image ref / content ID 和 app / web `GIT_SHA` 都绑定同一 release，才能进入配置激活与整批造数。
 

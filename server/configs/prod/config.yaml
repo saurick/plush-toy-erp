@@ -3,10 +3,6 @@ server:
   http:
     addr: 0.0.0.0:8300
     timeout: 45s
-  grpc:
-    addr: 0.0.0.0:9300
-    timeout: 10s
-
 log:
   debug: false
 
@@ -17,8 +13,6 @@ trace:
     # 线上宿主机进程默认连同机 Jaeger 的本地 OTLP HTTP 端口。
     endpoint: 127.0.0.1:4318
     # endpoint: http://127.0.0.1:4318/v1/traces
-    # gRPC endpoint
-    # endpoint: http://127.0.0.1:4317
     # 生产默认低采样；排障时可通过 TRACE_RATIO 临时调高，ratio>=1 表示采集所有。
     ratio: 0.1
 
@@ -30,6 +24,11 @@ data:
     debug: false
     # 生产环境密码由 compose 注入 POSTGRES_DSN 覆盖，仓库内仅保留脱敏占位值。
     dsn: "postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable"
+    maxOpenConns: 20
+    maxIdleConns: 5
+    connMaxLifetime: 30m
+    connMaxIdleTime: 5m
+    startupTimeout: 60s
 
   # 缓存服务
   # redis:

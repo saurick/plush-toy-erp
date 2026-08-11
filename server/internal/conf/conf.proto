@@ -18,19 +18,19 @@ message Server {
     string addr = 2;
     google.protobuf.Duration timeout = 3;
   }
-  message GRPC {
-    string network = 1;
-    string addr = 2;
-    google.protobuf.Duration timeout = 3;
-  }
   HTTP http = 1;
-  GRPC grpc = 2;
+  reserved 2;
 }
 
 message Data {
   message Postgres {
     string dsn = 1;
     bool debug = 2;
+    int32 maxOpenConns = 3;
+    int32 maxIdleConns = 4;
+    google.protobuf.Duration connMaxLifetime = 5;
+    google.protobuf.Duration connMaxIdleTime = 6;
+    google.protobuf.Duration startupTimeout = 7;
   }
   message Etcd {
     repeated string hosts = 1;

@@ -22,12 +22,12 @@ bash scripts/doctor.sh
 
 执行链路：`server -> service -> biz -> data`
 
-- `server`：HTTP / gRPC / JSON-RPC 接入层
+- `server`：HTTP / JSON-RPC 接入层
 - `service`：DTO 转换、JSON-RPC URL / method 分发、入口级鉴权与调用编排
 - `biz`：业务规约与 UseCase
 - `data`：数据库与外部依赖访问
 
-HTTP / gRPC transport 日志只记录 operation、JSON-RPC domain / method / id、结果码和耗时，不序列化请求体；密码、验证码、token、附件内容和客户业务参数必须留在脱敏后的业务日志边界内。
+HTTP transport 日志只记录 operation、JSON-RPC domain / method / id、结果码和耗时，不序列化请求体；密码、验证码、token、附件内容和客户业务参数必须留在脱敏后的业务日志边界内。
 
 ## 开发验收 debug 能力
 
@@ -156,7 +156,7 @@ ProcessRuntime 的 `returnTo` 当前只提供 usecase / repo 层受控返工 att
 
 ProcessRuntime 的 `blocked / due_at` 当前只提供 usecase / repo 层显式阻塞：阻塞入口要求 active 流程、active 节点、`expected_version` 匹配和非空 reason；`EscalateDueProcessNode` 额外要求节点已有 due_at 且当前时间达到或超过 due_at。数据层在同一个 PostgreSQL 事务内把节点和 ProcessInstance 标记为 blocked，任一更新失败会整体回滚；它不写 completed_at，不推进后续节点，不创建 WorkflowTask，不提供后台 scheduler、不自动扫描 overdue、不发送提醒升级通知，也不写库存、出货、质检、财务或其他 Fact。
 
-当前服务端只有一项 active business reconciliation timer：上述 Workflow 终态到 active 人工 / 审批节点的收窄 ProcessRuntime 对账。它不按客户配置启动新流程、不创建任务、不扫描 overdue、不执行 `domain_command`、不导入、不打印，也不写新的领域事实。其它后台任务仍只限 server bootstrap 初始化、`template_pdf` 的 PDF warmup / Chrome WebSocket 等待，以及 `taskgroup` 生命周期工具。后续若新增通用 scheduler、cron、durable outbox、领域命令对账或自动 overdue 扫描，必须另拆阶段接入 active module states、RBAC、幂等、审计和测试。
+当前服务端只有一项 active business reconciliation timer：上述 Workflow 终态到 active 人工 / 审批节点的收窄 ProcessRuntime 对账。它不按客户配置启动新流程、不创建任务、不扫描 overdue、不执行 `domain_command`、不导入、不打印，也不写新的领域事实。其它后台任务仍只限 server bootstrap 初始化、`template_pdf` 的 PDF warmup / Chrome WebSocket 等待。后续若新增通用 scheduler、cron、durable outbox、领域命令对账或自动 overdue 扫描，必须另拆阶段接入 active module states、RBAC、幂等、审计和测试。
 
 ProcessRuntime 当前 handler registry 同时保留当前图所需命令和旧在途 revision 的冻结命令；是否可执行必须再由当前流程定义、冻结 revision、节点、权限与业务引用共同决定，不能凭 handler 存在推断页面可达。Product Core 登记六个 process key：销售、采购和 Shipment 三条可配置日常流程，加收付款、库存人工调整和生产异常三条固定责任流程；销售有两个受控变体，不因此增加新的 process key。客户 manifest 可以选择全部六条已注册合同，但只能在 Product Core 允许的范围内选择销售受控变体并配置前三条的审批责任；后三条的节点图和责任池仍由 Product Core 固定，客户不能改写。正式销售、采购页面都执行 `start → submit command`，出货页只启动财务审批；三条固定流程分别由来源页启动并在 approval 后等待独立执行任务 / 领域命令。上述本地代码边界不代表目标 active revision、部署 evidence、九岗位 smoke 或 UAT 已闭环。
 
@@ -213,7 +213,7 @@ make init
 make run
 ```
 
-`make run`、`make dev` 和 `make dev_restart` 会先校验仓库根目录 `config/dev-ports.env`，并把其中固定的 HTTP `8300`、gRPC `9300` 注入 dev 配置；生产配置不消费这组覆盖。随后共享本地启动预检运行 `db-guard` 核对 Ent schema、versioned migration 与“禁止新增数据库可编程对象”规则，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision、pending 为 0，且 `public` 下自定义 Function、Procedure、非内部 Trigger 均为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 migration；pending 时在交互终端运行 `make migrate`，非交互环境运行显式的 prepare / execute 两阶段，不应绕过。
+`make run`、`make dev` 和 `make dev_restart` 会先校验仓库根目录 `config/dev-ports.env`，并把其中固定的 HTTP `8300` 注入 dev 配置；生产配置不消费这组覆盖。随后共享本地启动预检运行 `db-guard` 核对 Ent schema、versioned migration 与“禁止新增数据库可编程对象”规则，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision、pending 为 0，且 `public` 下自定义 Function、Procedure、非内部 Trigger 均为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 migration；pending 时在交互终端运行 `make migrate`，非交互环境运行显式的 prepare / execute 两阶段，不应绕过。
 
 主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
 
@@ -341,7 +341,7 @@ server/
 | `api/`                 | 协议定义与生成入口，目前包含 JSON-RPC 相关接口描述                                                                                                                                                                                            |
 | `cmd/`                 | 服务启动、迁移辅助与排障命令入口                                                                                                                                                                                                              |
 | `configs/`             | 按环境拆分的配置文件                                                                                                                                                                                                                          |
-| `internal/server/`     | HTTP/gRPC/JSON-RPC 接入、中间件与路由装配                                                                                                                                                                                                     |
+| `internal/server/`     | HTTP/JSON-RPC 接入、中间件与路由装配                                                                                                                                                                                                     |
 | `internal/service/`    | 接口适配层，负责 DTO 转换与调用编排                                                                                                                                                                                                           |
 | `internal/biz/`        | 业务规约与 UseCase 真源                                                                                                                                                                                                                       |
 | `internal/core/`       | 纯产品领域规则层，当前承载无 IO 的值对象、领域错误、出货三态、库存批次、采购过账单据、采购订单、来料质检、销售订单生命周期等状态机、库存可用量计算和边界守卫；后续其他状态机、计算器或 policy 迁入前必须先评审，不接 runtime / DB / transport |

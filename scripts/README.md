@@ -1028,7 +1028,7 @@ ready。migration / schema / guard / 备份编排真源或目标状态变化后�
 验收 lifecycle 或发布构建。数据库已到 head 时只显示状态，不重新 apply 或
 重建。该入口不是任意数据库控制台，也不能替代 133 / 生产发布流程。
 
-生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / 后端 HTTP / gRPC / Jaeger loopback 和低配部署边界：
+生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / 后端 HTTP / Jaeger loopback 和低配部署边界：
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh \

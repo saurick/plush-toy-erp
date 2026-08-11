@@ -32,7 +32,7 @@ docker compose --env-file .env -f compose.yml up -d
 - `APP_ADMIN_USERNAME`
 - `BOOTSTRAP_ADMIN_ONCE=false`；只有新库首次初始化 bootstrap 管理员时才临时改为 `true`
 - `POSTGRES_BIND_ADDR=127.0.0.1`，PostgreSQL 宿主机映射只允许 loopback，migration 从宿主机本地 `127.0.0.1:5435` 访问
-- `APP_HTTP_BIND_ADDR=127.0.0.1` 和 `APP_GRPC_BIND_ADDR=127.0.0.1`，后端 HTTP / gRPC 宿主机映射只允许 loopback；浏览器业务流量通过前端容器反代 `/rpc`
+- `APP_HTTP_BIND_ADDR=127.0.0.1`，后端 HTTP 宿主机映射只允许 loopback；浏览器业务流量通过前端容器反代 `/rpc`
 - `WEB_DESKTOP_BIND_ADDR=0.0.0.0`，普通内网部署前端默认对宿主机网络开放；也允许设为 `127.0.0.1` 交给同机网关。`customer-trial-133` 必须使用 `127.0.0.1`，仅通过 SSH tunnel 访问
 
 如果不需要自带 tracing 存储，可以再按需移除 Jaeger 服务和对应环境变量。
@@ -67,7 +67,7 @@ APP_ADMIN_PASSWORD='<8-to-20-character-ephemeral-secret>' \
 
 只有已经部署当前固定 release、Atlas migration 和 `customer-trial-133` V5 active 配置的 133 独立验收库，才允许运行镜像内的一次性基础资料入口。该入口只创建或复用 `YS5-DW-01` 与 `YS5-CK-01..04`，写前要求材料、产品、工序和 BOM 为空；不会创建客户、订单、Workflow 或 Fact。
 
-133 V5 必须始终同时传入 base Compose 和受控 override，并在每条 Compose 命令显式使用 `-p plush-toy-erp-v5`。该 override 只有 `name: plush-toy-erp-v5` 一项；preflight 会拒绝缺失、符号链接、额外服务修改、错误 project name，以及与旧栈冲突的容器标识、数据目录、migration 锁或宿主端口。数据目录只能是 `/home/simon/plush-toy-erp-v5/data/postgres`，migration 锁只能是 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；相对路径、`.` / `..` 路径段和符号链接均会被拒绝。固定端口是 PostgreSQL `55435`、HTTP `8315`、gRPC `9315`、Web `5185`；Jaeger 独立组是 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。旧 `plush-toy-erp-prod` 栈及其数据不被停止或覆盖。
+133 V5 必须始终同时传入 base Compose 和受控 override，并在每条 Compose 命令显式使用 `-p plush-toy-erp-v5`。该 override 只有 `name: plush-toy-erp-v5` 一项；preflight 会拒绝缺失、符号链接、额外服务修改、错误 project name，以及与旧栈冲突的容器标识、数据目录、migration 锁或宿主端口。数据目录只能是 `/home/simon/plush-toy-erp-v5/data/postgres`，migration 锁只能是 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；相对路径、`.` / `..` 路径段和符号链接均会被拒绝。固定端口是 PostgreSQL `55435`、HTTP `8315`、Web `5185`；Jaeger 独立组是 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。旧 `plush-toy-erp-prod` 栈及其数据不被停止或覆盖。
 
 以下约定 133 当前固定 release 通过 `/home/simon/plush-toy-erp-v5/current` 访问，运行 env 位于 `/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133`。该 env 必须是当前执行用户拥有的普通文件，权限精确为 `0600`，文件本身和任一父路径均不得是符号链接。preflight 会先生成 `0600` 私有快照，所有解析和 Compose config 只读快照，结束前再校验原文件的 owner、mode 和 SHA-256；期间任何替换或改写都会阻断。在同一个干净 shell 执行 preflight 和后续 Compose；必须先 `unset` 所有与 env-file 同名的宿主变量，以及 `COMPOSE_PROJECT_NAME / COMPOSE_FILE / COMPOSE_PROFILES / COMPOSE_ENV_FILES / COMPOSE_PATH_SEPARATOR / DOCKER_HOST / DOCKER_CONTEXT / DOCKER_TLS_VERIFY / DOCKER_CERT_PATH`。preflight 只报告冲突键名，不输出值。
 
@@ -161,7 +161,6 @@ export ERP_RELEASE_REHEARSAL_ID=
 export ERP_RELEASE_REHEARSAL_PG_SYSTEM_IDENTIFIER=
 export POSTGRES_BIND_ADDR=127.0.0.1
 export APP_HTTP_BIND_ADDR=127.0.0.1
-export APP_GRPC_BIND_ADDR=127.0.0.1
 export WEB_DESKTOP_BIND_ADDR=0.0.0.0
 export JAEGER_BIND_ADDR=127.0.0.1
 ```
@@ -170,7 +169,6 @@ export JAEGER_BIND_ADDR=127.0.0.1
 
 - PostgreSQL：`127.0.0.1:5435`
 - HTTP：`127.0.0.1:8300`
-- gRPC：`127.0.0.1:9300`
 - 前端：`0.0.0.0:5175`（可按部署拓扑改为 `127.0.0.1:5175`）
 
 当前部署目标是内网服务器 `192.168.0.133`，Compose 入口位于：
@@ -192,9 +190,10 @@ export JAEGER_BIND_ADDR=127.0.0.1
 - Compose 第三方镜像默认固定为 `POSTGRES_IMAGE=postgres:18.1` 和 `JAEGER_IMAGE=jaegertracing/all-in-one:1.76.0`；升级时显式改 tag、跑 preflight，再记录发布证据。
 - Jaeger 宿主机端口默认通过 `JAEGER_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；远程查看优先用 SSH tunnel，不要把 Jaeger UI 或 OTLP 端口直接暴露到公网或办公网。
 - PostgreSQL 宿主机端口默认通过 `POSTGRES_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；Atlas migration 使用宿主机本地端口访问，不需要把 PostgreSQL 暴露给外部网络。
-- 后端 HTTP / gRPC 宿主机端口默认通过 `APP_HTTP_BIND_ADDR=127.0.0.1` 和 `APP_GRPC_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；浏览器业务流量通过前端容器 `/rpc` 反代到 Docker 网络内的 `app-server:8300`。
+- 后端 HTTP 宿主机端口默认通过 `APP_HTTP_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；浏览器业务流量通过前端容器 `/rpc` 反代到 Docker 网络内的 `app-server:8300`。
 - 前端宿主机端口由 `WEB_DESKTOP_BIND_ADDR` 明确控制：普通内网部署允许 `0.0.0.0` 或 `127.0.0.1`；`customer-trial-133` 必须为 `127.0.0.1`，只能通过 SSH tunnel 验收，不能直接暴露到办公网。
-- `POSTGRES_DSN` 是 URL，若 `POSTGRES_PASSWORD` 包含 `@`、`:`、`/`、`%`、`#` 等特殊字符，DSN 里的密码必须先 URL 编码；`POSTGRES_PASSWORD` 本身保持原值。
+- 应用 DSN 由 Compose 使用独立的 `POSTGRES_APP_PASSWORD` 构造；应用、迁移和备份密码使用 20-128 位 URL-safe 字符并保持彼此不同，不把超级用户密码交给应用。
+- 应用连接池默认 `maxOpen=20`、`maxIdle=5`、最大生命周期 30 分钟、最大空闲时间 5 分钟，启动总超时 60 秒；可用 `POSTGRES_MAX_OPEN_CONNS`、`POSTGRES_MAX_IDLE_CONNS`、`POSTGRES_CONN_MAX_LIFETIME`、`POSTGRES_CONN_MAX_IDLE_TIME`、`POSTGRES_STARTUP_TIMEOUT` 调整。多实例时必须把各实例上限与 migration、备份、运维保留量一起控制在 PostgreSQL `max_connections` 内。
 - `ERP_ALLOW_CUSTOMER_TRIAL_CONFIG` 默认必须为 `0`，同时 `ERP_CUSTOMER_TRIAL_TARGET` 必须为空。只有 133 的隔离验收库可临时使用 `1` + `customer-trial-133`；启动门禁还会核对 `ERP_DEBUG_ENV=prod`、`WEB_DESKTOP_BIND_ADDR=127.0.0.1`，并按最终解析后的 DSN 精确要求单一 `postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable`。该模式还必须使用 `PROJECT_SLUG=plush-toy-erp-v5`、独立数据与 migration 锁目录、完整 V5 端口组，以及 `compose.customer-trial-133.yml`；任何一项缺失都不能启动。该开关只允许带独立 `customer_trial_test_apply` 标记的试用配置走标准 validate / publish / transition / activate / effective-session 链，不是正式发布能力；关闭开关后，若库中仍有该试用 revision 为 active，服务会拒绝启动，回滚时必须连同数据库目标一起恢复。
 - `ERP_ALLOW_RELEASE_REHEARSAL_CUSTOMER_CONFIG` 默认必须为 `0`，两个 rehearsal identity 必须为空。只有 `scripts/deploy/local-release-rehearsal.mjs` 创建的一次性环境会临时写入 `1`、精确 run ID 和启动前读到的 PostgreSQL system identifier；服务端同时要求 `postgres:5432/plush_erp_release_<run-id>`、连接后的同名数据库和相同 cluster identity。该能力只允许隔离发布演练应用 `local_test_apply` 配置，不允许普通生产、133 或登记开发库借用；演练结束会删除数据库、容器、identity 与 bootstrap secret。
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关只需把前端流量映射到 `5175`
@@ -202,7 +201,7 @@ export JAEGER_BIND_ADDR=127.0.0.1
 - `customer-trial-133` 的 Compose `web-desktop` 继续只绑定 loopback。当前 yoyoosun 公网域名如需映射到该栈，只允许使用 `deployments/yoyoosun/scripts/cutover-public-web.sh` 管理独立、可回滚的前端适配容器；脚本在切流前后都要求镜像 release、健康和 SMS provider capabilities 通过。不得临时手写 `docker run` 覆盖 5175，也不得把 PostgreSQL、后端或 Jaeger 改为公网绑定。
 - PDF 运行依赖：服务端镜像内置 Debian `chromium` 与 `fonts-noto-cjk`，默认浏览器路径为 `/usr/bin/chromium`。Chromium 包固定为已在目标宿主验证的 `150.0.7871.100-1~deb12u1`，构建时会校验实际安装版本；升级时必须显式修改 pin，并重新执行容器 CDP、warmup 和真实 PDF smoke，不能让 `apt-get` 静默漂移浏览器版本。
 - PDF 容器安全：服务端镜像固定以 `app`（uid / gid `10001`）运行，Chrome 参数保留 sandbox。`chromium-seccomp.json` 以 Docker Engine 29.5.2 使用的 Moby seccomp v0.2.3 默认 profile 为基线，只额外放行 Chromium user-namespace sandbox 需要的 `clone`、`clone3`、`unshare`；不得改成 `seccomp=unconfined`、关闭 AppArmor、授予 `SYS_ADMIN` 或使用 `--no-sandbox`。`production-preflight.sh --runtime` 会拒绝 root app-server 和未加载受控 profile 的容器；目标环境还必须验证 Chromium 能在该容器安全上下文正常启动，不能仅凭 Dockerfile 静态断言判定完成。
-- PDF 资源建议：通用 Compose 默认 `APP_MEM_LIMIT=2g`、`APP_MEM_RESERVATION=768m`、`ERP_PDF_RENDER_CONCURRENCY=4`；确认宿主机资源充足的客户实例可使用 `APP_MEM_LIMIT=4g`、`APP_MEM_RESERVATION=1g`、`ERP_PDF_RENDER_CONCURRENCY=8`。正式发布使用 `ERP_PDF_WARMUP=async`。服务启动后异步预热共享 Chromium 和 CJK 字体，日志使用 `template pdf warmup started / success / failed` 口径；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于短时故障隔离，不是 release-ready 状态；正式 smoke 还必须用受控管理员 token 调真实 `/templates/render-pdf`，请求不得携带 `customer_key` / `base_url`，并校验非空 PDF。并发和内存必须成对调整，低配实例优先降低并发，不能只扩大请求预算。
+- PDF 资源建议：通用 Compose 默认 `APP_MEM_LIMIT=2g`、`APP_MEM_RESERVATION=768m`、`ERP_PDF_RENDER_CONCURRENCY=4`、`ERP_PDF_QUEUE_CAPACITY=2`，并为 `/dev/shm` 和 `/tmp` 设置独立上限。正式发布使用 `ERP_PDF_WARMUP=async`。服务启动后异步预热共享 Chromium 和 CJK 字体，日志使用 `template pdf warmup started / success / failed` 口径；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于短时故障隔离，不是 release-ready 状态；正式 smoke 还必须用受控管理员 token 调真实 `/templates/render-pdf`，请求不得携带 `customer_key` / `base_url`，并校验非空 PDF。只有目标宿主容量压测证明 CPU、内存、数据库连接和 PDF 排队仍有稳定余量时，才成对调整并发与容器内存；不得仅凭“高配”标签预设更高并发，也不能只扩大请求预算。
 
 ## 镜像构建
 

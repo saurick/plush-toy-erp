@@ -499,8 +499,7 @@ export async function allocateLocalAcceptancePorts(
     );
   };
   const httpPort = await allocateDistinctPort("HTTP");
-  const grpcPort = await allocateDistinctPort("gRPC");
-  return { httpPort, grpcPort, webPort };
+  return { httpPort, webPort };
 }
 
 export async function allocateLocalAcceptanceWebEndpoint(
@@ -837,7 +836,6 @@ function createDirectRuntime(context) {
           ERP_DEBUG_CLEANUP_ENABLED: "false",
           ERP_DEBUG_BUSINESS_CLEAR_ENABLED: "false",
           DEV_HTTP_PORT: String(context.httpPort),
-          DEV_GRPC_PORT: String(context.grpcPort),
         },
         logPath: path.join(context.outputDir, `backend-${databaseName}.log`),
         label: "acceptance backend",
@@ -1234,8 +1232,7 @@ async function buildDirectContext({
       "local acceptance lifecycle output must stay in the repository",
     );
   }
-  const { httpPort, grpcPort, webPort } =
-    await allocateLocalAcceptancePorts(repoRoot);
+  const { httpPort, webPort } = await allocateLocalAcceptancePorts(repoRoot);
   mkdirSync(outputDir, { recursive: true, mode: 0o700 });
   return Object.freeze({
     repoRoot,
@@ -1257,7 +1254,6 @@ async function buildDirectContext({
     backendURL: `http://127.0.0.1:${httpPort}`,
     webURL: `http://127.0.0.1:${webPort}`,
     httpPort,
-    grpcPort,
     webPort,
     adminPassword: randomSecret(),
     rolePassword: randomSecret(),

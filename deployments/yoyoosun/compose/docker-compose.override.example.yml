@@ -2,9 +2,8 @@
 services:
   app-server:
     environment:
-      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-8}"
-    volumes:
-      - "${FILE_STORAGE_DIR:-/data/plush-toy-erp-yoyoosun/files}:/app/files"
+      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-4}"
+      ERP_PDF_QUEUE_CAPACITY: "${ERP_PDF_QUEUE_CAPACITY:-2}"
 
   postgres:
     volumes:

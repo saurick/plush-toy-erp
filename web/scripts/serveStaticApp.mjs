@@ -60,6 +60,26 @@ const proxyTimeoutMs = resolvePositiveInteger(
   process.env.PROXY_TIMEOUT_MS,
   30_000
 )
+const readinessTimeoutMs = resolvePositiveInteger(
+  process.env.READINESS_TIMEOUT_MS,
+  2_000
+)
+const shutdownTimeoutMs = resolvePositiveInteger(
+  process.env.SHUTDOWN_TIMEOUT_MS,
+  10_000
+)
+const httpAgent = new http.Agent({
+  keepAlive: true,
+  maxFreeSockets: 4,
+  maxSockets: 32,
+  timeout: proxyTimeoutMs,
+})
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  maxFreeSockets: 4,
+  maxSockets: 32,
+  timeout: proxyTimeoutMs,
+})
 
 if (!fs.existsSync(path.join(staticRoot, 'index.html'))) {
   console.error(
@@ -79,7 +99,13 @@ const server = http.createServer((request, response) => {
   })
 })
 
-const shutdownTimeoutMs = 4_000
+server.headersTimeout = 15_000
+server.requestTimeout = proxyTimeoutMs + 5_000
+server.keepAliveTimeout = 5_000
+server.maxRequestsPerSocket = 1_000
+server.maxHeadersCount = 100
+
+const activeUpstreamRequests = new Set()
 let shutdownStarted = false
 let shutdownForced = false
 
@@ -96,12 +122,19 @@ function requestShutdown(signal) {
     console.error(
       `[web-static] shutdown signal=${signal} status=forced timeoutMs=${shutdownTimeoutMs}`
     )
+    for (const upstreamRequest of activeUpstreamRequests) {
+      upstreamRequest.destroy(new Error('server shutdown'))
+    }
+    httpAgent.destroy()
+    httpsAgent.destroy()
     server.closeAllConnections?.()
   }, shutdownTimeoutMs)
   forceTimer.unref()
 
   server.close((error) => {
     clearTimeout(forceTimer)
+    httpAgent.destroy()
+    httpsAgent.destroy()
     if (error) {
       console.error(
         `[web-static] shutdown signal=${signal} status=failed`,
@@ -138,7 +171,13 @@ async function handleRequest(request, response) {
     `http://${request.headers.host}`
   )
 
-  if (requestUrl.pathname === '/healthz' || requestUrl.pathname === '/readyz') {
+  if (requestUrl.pathname === '/healthz') {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      sendText(response, 405, 'Method Not Allowed', {
+        allow: 'GET, HEAD',
+      })
+      return
+    }
     sendJson(response, 200, {
       status: 'ok',
       appId: requestedAppId,
@@ -147,7 +186,36 @@ async function handleRequest(request, response) {
     return
   }
 
+  if (requestUrl.pathname === '/readyz') {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      sendText(response, 405, 'Method Not Allowed', {
+        allow: 'GET, HEAD',
+      })
+      return
+    }
+    if (shutdownStarted) {
+      sendJson(response, 503, { status: 'not_ready' })
+      return
+    }
+    const ready = await isUpstreamReady()
+    sendJson(response, ready ? 200 : 503, {
+      status: ready ? 'ready' : 'not_ready',
+      appId: requestedAppId,
+      title: app.title,
+    })
+    return
+  }
+
   if (shouldProxy(requestUrl.pathname)) {
+    const bodyLimit = proxyBodyLimit(requestUrl.pathname)
+    const contentLength = Number(request.headers['content-length'])
+    if (Number.isFinite(contentLength) && contentLength > bodyLimit) {
+      sendText(response, 413, 'Request Entity Too Large', {
+        connection: 'close',
+      })
+      request.resume()
+      return
+    }
     proxyRequest(request, response, requestUrl)
     return
   }
@@ -260,6 +328,14 @@ function shouldProxy(pathname) {
   })
 }
 
+function proxyBodyLimit(pathname) {
+  if (pathname === '/rpc/attachment') return 7 * 1024 * 1024
+  if (pathname === '/templates' || pathname.startsWith('/templates/')) {
+    return 32 * 1024 * 1024
+  }
+  return 2 * 1024 * 1024
+}
+
 function proxyRequest(request, response, requestUrl) {
   if (!apiOrigin) {
     sendText(response, 502, 'API_ORIGIN is not configured')
@@ -271,48 +347,177 @@ function proxyRequest(request, response, requestUrl) {
     apiOrigin
   )
   const client = targetUrl.protocol === 'https:' ? https : http
+  const forwardedFor = [
+    request.headers['x-forwarded-for'],
+    request.socket.remoteAddress,
+  ]
+    .filter(Boolean)
+    .join(', ')
   const headers = {
-    ...request.headers,
+    ...stripHopByHopHeaders(request.headers),
     host: targetUrl.host,
     'x-forwarded-host': request.headers.host || '',
-    'x-forwarded-proto': 'http',
+    'x-forwarded-proto': request.socket.encrypted ? 'https' : 'http',
+  }
+  if (forwardedFor) {
+    headers['x-forwarded-for'] = forwardedFor
   }
 
-  delete headers.connection
-  delete headers['keep-alive']
-  delete headers['proxy-connection']
-  delete headers['transfer-encoding']
-
+  let timedOut = false
+  let bodyTooLarge = false
+  const bodyLimit = proxyBodyLimit(requestUrl.pathname)
   const proxy = client.request(
     targetUrl,
     {
       method: request.method,
       headers,
       timeout: proxyTimeoutMs,
+      agent: targetUrl.protocol === 'https:' ? httpsAgent : httpAgent,
     },
     (proxyResponse) => {
-      response.writeHead(proxyResponse.statusCode || 502, proxyResponse.headers)
+      response.writeHead(
+        proxyResponse.statusCode || 502,
+        stripHopByHopHeaders(proxyResponse.headers)
+      )
+      proxyResponse.on('aborted', () => response.destroy())
       proxyResponse.pipe(response)
     }
   )
+  activeUpstreamRequests.add(proxy)
+  const proxyDeadline = setTimeout(() => {
+    timedOut = true
+    proxy.destroy(new Error('proxy deadline exceeded'))
+  }, proxyTimeoutMs)
+  proxyDeadline.unref()
+  proxy.once('close', () => {
+    clearTimeout(proxyDeadline)
+    activeUpstreamRequests.delete(proxy)
+  })
 
   proxy.on('timeout', () => {
+    timedOut = true
     proxy.destroy(new Error('proxy timeout'))
   })
 
   proxy.on('error', (error) => {
+    if (bodyTooLarge) {
+      return
+    }
     console.error(
       `[web-static] proxy ${request.method} ${targetUrl.href}`,
       error
     )
     if (!response.headersSent) {
-      sendText(response, 502, 'Bad Gateway')
+      sendText(
+        response,
+        timedOut ? 504 : 502,
+        timedOut ? 'Gateway Timeout' : 'Bad Gateway'
+      )
     } else {
       response.destroy()
     }
   })
 
+  request.on('aborted', () => proxy.destroy(new Error('client aborted')))
+  let receivedBytes = 0
+  request.on('data', (chunk) => {
+    receivedBytes += chunk.length
+    if (!bodyTooLarge && receivedBytes > bodyLimit) {
+      bodyTooLarge = true
+      request.unpipe(proxy)
+      if (!response.headersSent) {
+        sendText(response, 413, 'Request Entity Too Large', {
+          connection: 'close',
+        })
+      }
+      proxy.destroy(new Error('request body too large'))
+    }
+  })
+  response.on('close', () => {
+    if (!response.writableEnded) {
+      proxy.destroy(new Error('client disconnected'))
+    }
+  })
   request.pipe(proxy)
+}
+
+function isUpstreamReady() {
+  if (!apiOrigin) {
+    return Promise.resolve(false)
+  }
+
+  return new Promise((resolve) => {
+    const targetUrl = new URL('/readyz', apiOrigin)
+    const client = targetUrl.protocol === 'https:' ? https : http
+    let settled = false
+    let readinessDeadline
+    const finish = (ready) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(readinessDeadline)
+      resolve(ready)
+    }
+    const upstreamRequest = client.request(
+      targetUrl,
+      {
+        method: 'GET',
+        headers: { accept: 'text/plain' },
+        timeout: readinessTimeoutMs,
+        agent: targetUrl.protocol === 'https:' ? httpsAgent : httpAgent,
+      },
+      (upstreamResponse) => {
+        const ready =
+          upstreamResponse.statusCode >= 200 &&
+          upstreamResponse.statusCode < 300
+        upstreamResponse.resume()
+        upstreamResponse.once('end', () => finish(ready))
+        upstreamResponse.once('aborted', () => finish(false))
+      }
+    )
+    activeUpstreamRequests.add(upstreamRequest)
+    readinessDeadline = setTimeout(() => {
+      upstreamRequest.destroy(new Error('readiness deadline exceeded'))
+    }, readinessTimeoutMs)
+    readinessDeadline.unref()
+    upstreamRequest.once('close', () => {
+      clearTimeout(readinessDeadline)
+      activeUpstreamRequests.delete(upstreamRequest)
+      finish(false)
+    })
+    upstreamRequest.once('timeout', () => {
+      upstreamRequest.destroy(new Error('readiness timeout'))
+    })
+    upstreamRequest.once('error', () => finish(false))
+    upstreamRequest.end()
+  })
+}
+
+const hopByHopHeaderNames = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'proxy-connection',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+])
+
+function stripHopByHopHeaders(headers) {
+  const connectionTokens = String(headers.connection || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+  const excluded = new Set([...hopByHopHeaderNames, ...connectionTokens])
+  return Object.fromEntries(
+    Object.entries(headers).filter(
+      ([name, value]) =>
+        value !== undefined && !excluded.has(name.toLowerCase())
+    )
+  )
 }
 
 function isImmutableAsset(filePath) {

@@ -55,6 +55,7 @@ print_input_template() {
   ],
   "checks": [
     "web-healthz",
+    "web-readyz",
     "server-healthz when --backend-url is provided",
     "server-readyz when --backend-url is provided",
     "login-page",
@@ -348,6 +349,7 @@ mkdir -p "$(dirname "$report")"
 
 checks=(
   "web-healthz:$endpoint/healthz"
+  "web-readyz:$endpoint/readyz"
 )
 
 if [[ -n "$backend_url" ]]; then

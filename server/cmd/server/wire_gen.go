@@ -66,9 +66,8 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger, tr
 	businessAttachmentRepo := data.NewBusinessAttachmentRepo(dataData, logger)
 	businessAttachmentUsecase := biz.NewBusinessAttachmentUsecase(businessAttachmentRepo)
 	jsonrpcService := service.NewJsonrpcService(confData, logger, adminAuthUsecase, adminManageUsecase, workflowUsecase, processRuntimeUsecase, debugUsecase, masterDataUsecase, salesOrderUsecase, purchaseOrderUsecase, productionOrderUsecase, outsourcingOrderUsecase, inventoryUsecase, operationalFactUsecase, businessAttachmentUsecase, customerConfigUsecase, adminAuthRepo)
-	grpcServer := server.NewGRPCServer(confServer, logger, jsonrpcService, tracerProvider, dataData)
 	httpServer := server.NewHTTPServer(confServer, logger, jsonrpcService, tracerProvider, dataData, customerConfigUsecase, adminAuthUsecase, confData)
-	app := newApp(logger, grpcServer, httpServer, processRuntimeUsecase)
+	app := newApp(logger, httpServer, processRuntimeUsecase)
 	return app, func() {
 		cleanup()
 	}, nil

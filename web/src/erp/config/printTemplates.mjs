@@ -21,7 +21,7 @@ const APPENDIX_IMAGE_FIELD_REQUIREMENT = {
   label: '末尾附图',
   source: '当前打印窗口添加的图片',
   boundary:
-    '图片数量不设业务上限；普通图片自动两张一行，长图自动整行，可逐张切换排版；只随当前草稿、PDF / 打印输出，不替代正式附件归档',
+    '不另设业务规则数量；单次 PDF 的正文和末尾附图合计最多 32 张内嵌图片。普通图片自动两张一行，长图自动整行，可逐张切换排版；只随当前草稿、PDF / 打印输出，不替代正式附件归档',
 }
 
 export const printTemplateCatalog = [

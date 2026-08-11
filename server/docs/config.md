@@ -21,15 +21,11 @@
 
 - `server.http.addr`
 - `server.http.timeout`
-- `server.grpc.addr`
-- `server.grpc.timeout`
 
 默认值：
 
 - HTTP `0.0.0.0:8300`
-- gRPC `0.0.0.0:9300`
 - `server.http.timeout=45s`，给 `/templates/render-pdf` 这类重渲染链路留出稳定完成窗口
-- `server.grpc.timeout=10s`
 
 ## `log`
 
@@ -62,10 +58,19 @@
 
 - `data.postgres.dsn`
 - `data.postgres.debug`
+- `data.postgres.maxOpenConns`
+- `data.postgres.maxIdleConns`
+- `data.postgres.connMaxLifetime`
+- `data.postgres.connMaxIdleTime`
+- `data.postgres.startupTimeout`
+
+生产 Compose 可分别用 `POSTGRES_MAX_OPEN_CONNS`、`POSTGRES_MAX_IDLE_CONNS`、`POSTGRES_CONN_MAX_LIFETIME`、`POSTGRES_CONN_MAX_IDLE_TIME` 和 `POSTGRES_STARTUP_TIMEOUT` 覆盖这五项。整数和时长必须为正数，且最终仍要求 `maxIdleConns <= maxOpenConns`；非法值会在连接数据库前阻止启动。
 
 说明：
 
 - 这是当前仓库唯一真正运行时必需的数据依赖。
+- 连接池默认上限为 20 个打开连接、5 个空闲连接，连接最长复用 30 分钟、空闲最长 5 分钟；启动初始化共用 60 秒总预算。字段省略或为 0 时回退到这些默认值。
+- `maxIdleConns` 不得大于 `maxOpenConns`；非法配置会在启动前直接失败，不会交给运行时隐式修正。
 - `debug=true` 时会输出更多 SQL 调试信息，更适合开发环境。
 - `data.postgres.debug` 只控制 Ent SQL debug 日志；SQL trace 独立接入 `otelsql`，当前不写入 SQL text、语句模板、bind args 或 SQL 参数值。
 - 本地开发默认 DSN 已收口到共享 PG `192.168.0.106:5432/plush_erp`。

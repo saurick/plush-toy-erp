@@ -192,6 +192,14 @@ test("CI pins actions, toolchains, database and Chromium sandbox", () => {
     /PLAYWRIGHT_BROWSERS_PATH=\$RUNNER_TEMP\/ms-playwright/u,
   );
   assert.match(qualityRuns, /pnpm config set store-dir "\$PNPM_STORE_PATH"/u);
+  const webAudit = quality.steps.find(
+    (step) => step.name === "Audit production Web dependencies when selected",
+  );
+  assert.match(webAudit.if, /needs_web/u);
+  assert.match(
+    webAudit.run,
+    /pnpm audit --prod --audit-level high --registry=https:\/\/registry\.npmjs\.org/u,
+  );
   assert.match(qualityRuns, /if \[\[ ! -x "\$go_bin\/govulncheck" \]\]/u);
   assert.match(qualityRuns, /if \[\[ ! -f "\$archive" \]\]/u);
   assert.doesNotMatch(source, /--no-sandbox|--disable-setuid-sandbox/u);

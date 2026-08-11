@@ -30,7 +30,8 @@ func NewHTTPServer(
 	dc *conf.Data,
 ) *httpx.Server {
 	var opts = []httpx.ServerOption{
-		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter(), AttachmentBodyLimitFilter()),
+		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter(), JSONRPCBodyLimitFilter()),
+		httpx.RequestDecoder(BoundedRequestDecoder),
 		httpx.Middleware(
 			recovery.Recovery(),
 			tracing.Server(tracing.WithTracerProvider(tp)),
@@ -63,6 +64,7 @@ func NewHTTPServer(
 	v1.RegisterJsonrpcHTTPServer(srv, jsonrpcSvc)
 
 	registerHealthRoutes(srv, logger, tp, data.SQLDB(), sharedTemplatePDFWarmupState)
+	registerRuntimeMetrics(srv, data.SQLDB(), sharedTemplatePDFRenderGate, sharedTemplatePDFWarmupState)
 	registerTemplatePDFHandler(srv, logger, tp, dc, customerConfigUC)
 	registerStaticHandler(srv, logger, tp)
 

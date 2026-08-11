@@ -50,10 +50,11 @@ func TestParseRenderTemplatePDFRequestRejectsTransportCustomerAndBaseURL(t *test
 	}
 }
 
-func TestReadTemplatePDFRequestBodyRejectsTooLargePayload(t *testing.T) {
+func TestDecodeRenderTemplatePDFRequestRejectsTooLargePayload(t *testing.T) {
 	t.Parallel()
 
-	_, err := readTemplatePDFRequestBody(strings.NewReader(strings.Repeat("a", 33)), 32)
+	body := `{"html":"` + strings.Repeat("a", 64) + `"}`
+	_, err := decodeRenderTemplatePDFRequest(strings.NewReader(body), 32)
 	if !errors.Is(err, errTemplatePDFPayloadTooLarge) {
 		t.Fatalf("expected errTemplatePDFPayloadTooLarge, got %v", err)
 	}
@@ -248,17 +249,69 @@ func TestResolveTemplatePDFRenderConcurrency(t *testing.T) {
 func TestTemplatePDFResourceBudgetContract(t *testing.T) {
 	t.Parallel()
 
-	if maxTemplatePDFRequestBody != 128<<20 {
-		t.Fatalf("request body budget = %d, want 128 MiB", maxTemplatePDFRequestBody)
+	if maxTemplatePDFRequestBody != 32<<20 {
+		t.Fatalf("request body budget = %d, want 32 MiB", maxTemplatePDFRequestBody)
 	}
-	if maxTemplateHTMLSize != 96<<20 {
-		t.Fatalf("HTML budget = %d, want 96 MiB", maxTemplateHTMLSize)
+	if maxTemplateHTMLSize != 24<<20 {
+		t.Fatalf("HTML budget = %d, want 24 MiB", maxTemplateHTMLSize)
 	}
-	if maxTemplatePDFEmbeddedTotalBytes != 64<<20 {
-		t.Fatalf("embedded image budget = %d, want 64 MiB", maxTemplatePDFEmbeddedTotalBytes)
+	if maxTemplatePDFEmbeddedTotalBytes != 16<<20 {
+		t.Fatalf("embedded image budget = %d, want 16 MiB", maxTemplatePDFEmbeddedTotalBytes)
+	}
+	if maxTemplatePDFEmbeddedImageBytes != 5<<20 || maxTemplatePDFEmbeddedImageCount != 32 {
+		t.Fatalf("embedded image bounds = %d/%d, want 5 MiB/32", maxTemplatePDFEmbeddedImageBytes, maxTemplatePDFEmbeddedImageCount)
+	}
+	if maxTemplatePDFDOMNodeCount != 20_000 || maxTemplatePDFCSSBytes != 4<<20 {
+		t.Fatalf("DOM/CSS bounds = %d/%d, want 20000/4 MiB", maxTemplatePDFDOMNodeCount, maxTemplatePDFCSSBytes)
 	}
 	if defaultTemplatePDFRenderConcurrency != 4 {
 		t.Fatalf("default render concurrency = %d, want 4", defaultTemplatePDFRenderConcurrency)
+	}
+	if defaultTemplatePDFQueueCapacity != 2 {
+		t.Fatalf("default queue capacity = %d, want 2", defaultTemplatePDFQueueCapacity)
+	}
+}
+
+func TestTemplatePDFRenderGateBoundsAdmissionBeforeWork(t *testing.T) {
+	t.Parallel()
+
+	gate := newTemplatePDFRenderGate(2, 1)
+	releases := make([]func(), 0, 3)
+	for i := 0; i < 3; i++ {
+		release, ok := gate.TryAdmit()
+		if !ok {
+			t.Fatalf("admission %d rejected within capacity", i+1)
+		}
+		releases = append(releases, release)
+	}
+	if _, ok := gate.TryAdmit(); ok {
+		t.Fatal("admission above render plus queue capacity must be rejected")
+	}
+	if gate.Admitted() != 3 || gate.QueueCapacity() != 1 {
+		t.Fatalf("gate state admitted/queue = %d/%d, want 3/1", gate.Admitted(), gate.QueueCapacity())
+	}
+
+	for _, release := range releases {
+		release()
+	}
+	if gate.Admitted() != 0 {
+		t.Fatalf("admitted after release = %d, want 0", gate.Admitted())
+	}
+}
+
+func TestResolveTemplatePDFQueueCapacity(t *testing.T) {
+	t.Parallel()
+
+	for raw, want := range map[string]int{
+		"":    defaultTemplatePDFQueueCapacity,
+		"bad": defaultTemplatePDFQueueCapacity,
+		"-1":  defaultTemplatePDFQueueCapacity,
+		"0":   0,
+		"3":   3,
+	} {
+		if got := resolveTemplatePDFQueueCapacity(raw); got != want {
+			t.Fatalf("resolveTemplatePDFQueueCapacity(%q) = %d, want %d", raw, got, want)
+		}
 	}
 }
 

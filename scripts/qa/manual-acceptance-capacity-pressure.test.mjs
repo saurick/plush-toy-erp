@@ -4,7 +4,9 @@ import {
   PRESSURE_LEVELS,
   PRESSURE_PROFILES,
   normalizeLoopbackURL,
+  parseRuntimeMetrics,
   percentile,
+  resolvePsqlBin,
   selectCapacityIdempotencyTask,
 } from "./manual-acceptance-capacity-pressure.mjs";
 import { assertDisposableDatabaseTarget } from "./database-target.mjs";
@@ -48,10 +50,43 @@ test("capacity, saturation, and soak profiles have ramp and recovery semantics",
     "timeout",
   ]);
   assert.equal(PRESSURE_PROFILES.soak[1].key, "soak");
+  assert.equal(PRESSURE_PROFILES.soak[1].requests, 90000);
+  assert.equal(PRESSURE_PROFILES.soak[1].pacingMs, 400);
   for (const profile of Object.values(PRESSURE_PROFILES)) {
     assert.equal(profile.at(0).key, "ramp");
     assert.equal(profile.at(-1).key, "recovery");
   }
+});
+
+test("capacity pressure resolves psql portably", () => {
+  assert.equal(resolvePsqlBin({}), "psql");
+  assert.equal(
+    resolvePsqlBin({ PSQL_BIN: "/usr/local/bin/psql" }),
+    "/usr/local/bin/psql",
+  );
+  assert.equal(resolvePsqlBin({ PSQL_BIN: "  " }), "psql");
+});
+
+test("capacity pressure parses the bounded runtime metric set", () => {
+  const names = [
+    "plush_erp_go_goroutines",
+    "plush_erp_go_heap_alloc_bytes",
+    "plush_erp_db_connections_open",
+    "plush_erp_db_connections_in_use",
+    "plush_erp_db_wait_total",
+    "plush_erp_pdf_render_active",
+    "plush_erp_pdf_admitted",
+    "plush_erp_pdf_queued",
+    "plush_erp_pdf_warmup_ready",
+    "plush_erp_pdf_chrome_starts_total",
+    "plush_erp_attachment_relation_bytes",
+  ];
+  const parsed = parseRuntimeMetrics(
+    names.map((name, index) => `${name} ${index + 1}`).join("\n"),
+  );
+  assert.equal(parsed.plush_erp_go_goroutines, 1);
+  assert.equal(parsed.plush_erp_attachment_relation_bytes, 11);
+  assert.throws(() => parseRuntimeMetrics("plush_erp_go_goroutines 1"));
 });
 
 test("percentile uses nearest-rank semantics", () => {

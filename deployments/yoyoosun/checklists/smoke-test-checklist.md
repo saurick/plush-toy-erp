@@ -3,6 +3,7 @@
 ## 基础访问
 
 - [ ] Web `/healthz`。
+- [ ] Web `/readyz`。
 - [ ] Server `/healthz`。
 - [ ] Server `/readyz`。
 - [ ] 登录页打开。

@@ -7,7 +7,6 @@ import { pathToFileURL } from "node:url";
 const portKeys = Object.freeze([
   "DEV_WEB_PORT",
   "DEV_HTTP_PORT",
-  "DEV_GRPC_PORT",
   "DEV_STYLE_PORT",
   "DEV_AUX_PORT_START",
 ]);
@@ -199,7 +198,6 @@ export function loadDevPorts(projectRoot, env = process.env) {
     projectId,
     web: parsed.DEV_WEB_PORT,
     http: parsed.DEV_HTTP_PORT,
-    grpc: parsed.DEV_GRPC_PORT,
     style: parsed.DEV_STYLE_PORT,
     auxStart: parsed.DEV_AUX_PORT_START,
     manifestPath,
@@ -245,7 +243,7 @@ async function runCLI(argv) {
     return;
   }
   process.stdout.write(
-    `[dev-ports] ${ports.projectId}: web=${ports.web} http=${ports.http} grpc=${ports.grpc} style=${ports.style} aux-start=${ports.auxStart}\n`,
+    `[dev-ports] ${ports.projectId}: web=${ports.web} http=${ports.http} style=${ports.style} aux-start=${ports.auxStart}\n`,
   );
 }
 

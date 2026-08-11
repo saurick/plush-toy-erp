@@ -80,7 +80,11 @@ test("release identity is current workflow SHA and exact current main, not an an
   assert.match(validateRuns, /main_sha.*REQUESTED_SHA/u);
   assert.doesNotMatch(validateRuns, /merge-base --is-ancestor/u);
   assert.match(validateRuns, /github-release-asset-set\.mjs identity/u);
-  assert.match(validateRuns, /verify-existing/u);
+  assert.match(validateRuns, /verify-published/u);
+  assert.match(
+    validateRuns,
+    /pnpm --dir web audit --prod --audit-level high --registry=https:\/\/registry\.npmjs\.org/u,
+  );
   assert.match(validateRuns, /release_reused=true/u);
   assert.match(validateRuns, /only the fixed yoyoosun customer package/u);
 });
@@ -137,8 +141,14 @@ test("publish uses a verified resumable draft and exact six-asset set", () => {
   assert.match(publishRuns, /gh release upload "\$release_tag"/u);
   assert.doesNotMatch(publishRuns, /--clobber/u);
   assert.match(publishRuns, /cmp --silent/u);
+  assert.match(publishRuns, /download_release_assets/u);
+  assert.match(
+    publishRuns,
+    /for asset in checksums\.sha256 release-artifact\.json release-manifest\.json sbom\.cdx\.json server-image\.tar web-image\.tar/u,
+  );
   assert.match(publishRuns, /gh release edit "\$release_tag".*--draft=false/u);
   assert.match(publishRuns, /github-release-asset-set\.mjs verify-published/u);
+  assert.match(publishRuns, /--dir "\$verify_dir"/u);
   for (const asset of [
     "checksums.sha256",
     "release-artifact.json",

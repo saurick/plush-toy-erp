@@ -22,7 +22,7 @@
 
 `core` 中禁止出现下列职责：
 
-- JSON-RPC / HTTP / gRPC handler、Kratos service、transport DTO。
+- JSON-RPC / HTTP handler、Kratos service、transport DTO。
 - Ent query、SQL、repository 实现、数据库事务、行锁、advisory lock。
 - 应用编排 usecase，例如 `CreateShipment`、`PostPurchaseReceipt`、`ApplyImport`。
 - 权限 session 解析、JWT / header 解析、管理员上下文读取。

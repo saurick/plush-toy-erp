@@ -55,7 +55,6 @@ const manifest = {
 const ports = {
   postgres: 51001,
   appHttp: 51002,
-  appGrpc: 51003,
   web: 51004,
   jaeger5775: 51005,
   jaeger6831: 51006,
@@ -111,7 +110,10 @@ test("local release rehearsal keeps workbench artifact paths inside the reposito
   assert.deepEqual(
     selectRehearsalWorkbenchArtifact({
       repoRoot,
-      manifestPath: path.join(repoRoot, "output/releases/release-artifact.json"),
+      manifestPath: path.join(
+        repoRoot,
+        "output/releases/release-artifact.json",
+      ),
       receiptPath: path.join(
         repoRoot,
         "output/dev-workbench/receipts/rehearsal.json",

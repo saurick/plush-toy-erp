@@ -142,6 +142,7 @@ RUN --mount=type=cache,id=plush-apt-lists,target=/var/lib/apt/lists,sharing=lock
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       tzdata \
       ca-certificates \
+      curl \
       "chromium=${CHROMIUM_VERSION}" \
       "chromium-common=${CHROMIUM_VERSION}" \
       fonts-noto-cjk && \
@@ -178,7 +179,6 @@ COPY --from=go-builder /src/configs/prod /app/configs
 COPY --from=web-builder /web/build /app/public
 
 EXPOSE 8300
-EXPOSE 9300
 
 USER app
 

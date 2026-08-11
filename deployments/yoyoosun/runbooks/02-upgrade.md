@@ -9,7 +9,7 @@
 1. 阅读 release notes、migration diff、配置变更和 known limitations。
 2. 确认停机窗口、回滚负责人和客户通知方式。
 3. 记录当前 Git commit、server/web image digest、migration version 和配置指纹。
-4. 执行数据库备份和必要附件目录快照。
+4. 执行数据库整库备份；当前业务附件正文位于 PostgreSQL，随整库备份，不存在独立运行时附件目录。
 5. 验证备份可读，至少记录 backup id、hash、大小和存储别名。
 6. 校验新 `.env` 不含 placeholder，且 debug / mock / public register 保持关闭。
 
@@ -93,7 +93,7 @@ node scripts/deploy/release-evidence-gate.mjs \
 ## 验收
 
 - server `/healthz` 和 `/readyz` 通过。
-- web `/healthz` 通过，关键路由打开。
+- web `/healthz` 和 `/readyz` 通过，关键路由打开。
 - migration version 符合 release 预期。
 - 登录、RBAC、关键只读页面和岗位任务入口 smoke 通过。
 - evidence 只记录版本、hash、状态和脱敏摘要。

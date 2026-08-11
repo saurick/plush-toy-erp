@@ -61,7 +61,7 @@ pnpm start
 
 默认地址：`http://localhost:5175`
 
-本地 `make dev` / `pnpm start` 的固定端口组以 [`config/dev-ports.env`](config/dev-ports.env) 为真源：主前端 `5175`、HTTP `8300`、gRPC `9300`，端口被占用时直接失败，不会静默顺延到其他项目。`start:yoyoosun`、`preview:yoyoosun` 等短生命周期入口从本项目独占辅助块 `15200-15299` 起探测，并始终输出实际 URL。确需本机整组覆盖时使用 ignored 的 `config/dev-ports.local.env`，必须同时填写完整端口组，避免前端、代理和后端漂移。
+本地 `make dev` / `pnpm start` 的固定端口组以 [`config/dev-ports.env`](config/dev-ports.env) 为真源：主前端 `5175`、后端 HTTP `8300`，端口被占用时直接失败，不会静默顺延到其他项目。`start:yoyoosun`、`preview:yoyoosun` 等短生命周期入口从本项目独占辅助块 `15200-15299` 起探测，并始终输出实际 URL。确需本机整组覆盖时使用 ignored 的 `config/dev-ports.local.env`，必须同时填写完整端口组，避免前端、代理和后端漂移。
 
 同一个 Vite 服务同时提供桌面后台和岗位任务端，例如 `http://localhost:5175/m/warehouse/tasks`。统一登录页会按设备给默认入口，手机默认岗位任务端、电脑默认后台、平板优先使用上次选择；入口按钮由前端入口配置控制。用户不在登录前手选岗位角色；岗位任务端登录后优先进入已授权的明确岗位深链，否则自动进入当前账号第一个可用岗位。`admin` 单一角色和仅具超级管理员身份的账号不会自动映射成老板或其他业务岗位；手机登录会保留登录态并提示进入电脑端或先分配业务岗位。最终可见岗位和任务操作仍由后端管理员状态、RBAC、客户 effective session 与 Workflow 动作投影共同校验。
 
@@ -99,7 +99,7 @@ docker build \
   -t plush-toy-erp-web:yoyoosun-dev .
 ```
 
-固定端口：前端 `5175`；生产 Compose 中后端 HTTP `127.0.0.1:8300`、后端 gRPC `127.0.0.1:9300` 只绑定宿主机 loopback，浏览器业务流量通过前端容器 `/rpc` 反代进入 Docker 网络内的 `app-server:8300`。
+固定端口：前端 `5175`；生产 Compose 中后端 HTTP `127.0.0.1:8300` 只绑定宿主机 loopback，浏览器业务流量通过前端容器 `/rpc` 反代进入 Docker 网络内的 `app-server:8300`。
 
 ### 后端
 
@@ -112,7 +112,6 @@ make run
 默认端口：
 
 - HTTP：`8300`
-- gRPC：`9300`
 - 本地开发 PostgreSQL：`192.168.0.106:5432/plush_erp`
 - 测试 / 目标环境 PostgreSQL：`192.168.0.133:5435/plush_erp`，只在显式测试服发布、测试服回归或目标环境验收时使用
 

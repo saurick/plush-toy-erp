@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"strings"
 
@@ -11,9 +12,11 @@ import (
 )
 
 const (
-	// Individual images and image count are intentionally unrestricted. The
-	// aggregate limit keeps one Chromium render from exhausting server memory.
-	maxTemplatePDFEmbeddedTotalBytes = 64 << 20
+	maxTemplatePDFEmbeddedImageCount = 32
+	maxTemplatePDFEmbeddedImageBytes = 5 << 20
+	maxTemplatePDFEmbeddedTotalBytes = 16 << 20
+	maxTemplatePDFDOMNodeCount       = 20_000
+	maxTemplatePDFCSSBytes           = 4 << 20
 )
 
 var (
@@ -54,6 +57,9 @@ var templatePDFAllowedAttributes = map[string]struct{}{
 
 type templatePDFHTMLValidationState struct {
 	imageBytes int
+	imageCount int
+	nodeCount  int
+	cssBytes   int
 }
 
 func validateTemplatePDFHTML(htmlDocument string) error {
@@ -71,6 +77,13 @@ func validateTemplatePDFHTML(htmlDocument string) error {
 func validateTemplatePDFHTMLNode(node *html.Node, state *templatePDFHTMLValidationState) error {
 	if node == nil {
 		return nil
+	}
+	if state == nil {
+		return errors.New("html 校验状态无效")
+	}
+	state.nodeCount++
+	if state.nodeCount > maxTemplatePDFDOMNodeCount {
+		return errors.New("html 节点数量超出限制")
 	}
 	if node.Type == html.ElementNode {
 		tag := strings.ToLower(strings.TrimSpace(node.Data))
@@ -135,6 +148,13 @@ func validateTemplatePDFHTMLAttribute(tag string, attr html.Attribute, state *te
 }
 
 func validateTemplatePDFCSS(cssText string, state *templatePDFHTMLValidationState) error {
+	if state == nil {
+		return errors.New("html 样式校验状态无效")
+	}
+	state.cssBytes += len(cssText)
+	if state.cssBytes > maxTemplatePDFCSSBytes {
+		return errors.New("html 样式内容超出限制")
+	}
 	// CSS comments are inert, but removing them before validation also closes
 	// comment-splitting bypasses such as u/**/rl(http://...).
 	cssText = templatePDFCSSCommentPattern.ReplaceAllString(cssText, "")
@@ -174,13 +194,34 @@ func validateTemplatePDFDataImage(value string, state *templatePDFHTMLValidation
 	if len(matches) != 3 {
 		return errors.New("打印图片必须是内嵌的 PNG、JPEG、WebP 或 GIF")
 	}
-	decoded, err := base64.StdEncoding.DecodeString(matches[2])
-	if err != nil || len(decoded) == 0 {
+	if state == nil {
+		return errors.New("打印图片校验状态无效")
+	}
+	if state.imageCount >= maxTemplatePDFEmbeddedImageCount {
+		return errors.New("整份打印内容的图片数量超出限制")
+	}
+	encoded := matches[2]
+	decodedSize := base64.StdEncoding.DecodedLen(len(encoded))
+	if strings.HasSuffix(encoded, "==") {
+		decodedSize -= 2
+	} else if strings.HasSuffix(encoded, "=") {
+		decodedSize--
+	}
+	if decodedSize <= 0 {
 		return errors.New("打印图片数据非法")
 	}
-	state.imageBytes += len(decoded)
-	if state.imageBytes > maxTemplatePDFEmbeddedTotalBytes {
+	if decodedSize > maxTemplatePDFEmbeddedImageBytes {
+		return errors.New("单张打印图片大小超出限制")
+	}
+	if state.imageBytes+decodedSize > maxTemplatePDFEmbeddedTotalBytes {
 		return errors.New("整份打印内容的图片总大小超出限制")
 	}
+
+	decodedBytes, err := io.Copy(io.Discard, base64.NewDecoder(base64.StdEncoding, strings.NewReader(encoded)))
+	if err != nil || decodedBytes <= 0 || decodedBytes != int64(decodedSize) {
+		return errors.New("打印图片数据非法")
+	}
+	state.imageCount++
+	state.imageBytes += int(decodedBytes)
 	return nil
 }

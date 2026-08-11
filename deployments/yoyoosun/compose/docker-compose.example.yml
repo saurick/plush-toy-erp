@@ -3,17 +3,28 @@ name: plush-toy-erp-yoyoosun
 # 参考样例：当前唯一部署主路径仍是 server/deploy/compose/prod。
 # 真实发布优先同步 prod compose，再用受控 .env 覆盖镜像、端口和数据目录。
 
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 x-web-app-common: &web-app-common
   image: "${WEB_IMAGE:-plush-toy-erp-web:<release-tag>}"
   restart: always
+  init: true
+  stop_grace_period: 15s
+  logging: *default-logging
   depends_on:
     app-server:
-      condition: service_started
+      condition: service_healthy
   environment: &web-app-environment
     TZ: "${TZ:-Asia/Shanghai}"
     API_ORIGIN: "${WEB_API_ORIGIN:-http://app-server:8300}"
     PROXY_PREFIXES: "${WEB_PROXY_PREFIXES:-/rpc,/templates}"
     PROXY_TIMEOUT_MS: "${WEB_PROXY_TIMEOUT_MS:-30000}"
+    READINESS_TIMEOUT_MS: "${WEB_READINESS_TIMEOUT_MS:-2000}"
+    SHUTDOWN_TIMEOUT_MS: "${WEB_SHUTDOWN_TIMEOUT_MS:-10000}"
   mem_limit: "${WEB_MEM_LIMIT:-96m}"
   mem_reservation: "${WEB_MEM_RESERVATION:-48m}"
   healthcheck:
@@ -30,17 +41,26 @@ x-web-app-common: &web-app-common
 
 services:
   postgres:
-    image: postgres:18
+    image: postgres:18.1
     container_name: "${PROJECT_SLUG:-plush-toy-erp-yoyoosun}-postgres"
     restart: always
+    stop_grace_period: 60s
+    logging: *default-logging
     ports:
-      - "${POSTGRES_PORT:-5435}:5432"
+      - "${POSTGRES_BIND_ADDR:-127.0.0.1}:${POSTGRES_PORT:-5435}:5432"
     environment:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-this-prod-postgres-password}"
       POSTGRES_DB: "${POSTGRES_DB:-plush_erp}"
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_APP_PASSWORD: "${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}"
+      POSTGRES_MIGRATOR_PASSWORD: "${POSTGRES_MIGRATOR_PASSWORD:?POSTGRES_MIGRATOR_PASSWORD is required}"
+      POSTGRES_BACKUP_PASSWORD: "${POSTGRES_BACKUP_PASSWORD:?POSTGRES_BACKUP_PASSWORD is required}"
+    mem_limit: "${POSTGRES_MEM_LIMIT:-512m}"
+    mem_reservation: "${POSTGRES_MEM_RESERVATION:-256m}"
     volumes:
       - "${POSTGRES_DATA_DIR:-/data/plush-toy-erp-yoyoosun/postgres}:/var/lib/postgresql"
+      - "../../../server/deploy/compose/prod/database_roles.sh:/docker-entrypoint-initdb.d/20-database-roles.sh:ro"
+      - "../../../server/deploy/compose/prod/database_roles.sh:/usr/local/bin/plush-database-roles:ro"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
@@ -50,9 +70,11 @@ services:
     networks: {}
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/all-in-one:1.76.0
     container_name: "${PROJECT_SLUG:-plush-toy-erp-yoyoosun}-jaeger"
     restart: always
+    stop_grace_period: 30s
+    logging: *default-logging
     environment:
       PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: "true"
       METRICS_STORAGE_TYPE: prometheus
@@ -67,32 +89,51 @@ services:
     image: "${APP_IMAGE:-plush-toy-erp-server:<release-tag>}"
     container_name: "${PROJECT_SLUG:-plush-toy-erp-yoyoosun}-server"
     restart: always
+    init: true
+    stop_grace_period: 45s
+    logging: *default-logging
+    security_opt:
+      - "seccomp=../../../server/deploy/compose/prod/chromium-seccomp.json"
     depends_on:
       postgres:
         condition: service_healthy
       jaeger:
         condition: service_started
     ports:
-      - "${APP_HTTP_PORT:-8300}:8300"
-      - "${APP_GRPC_PORT:-9300}:9300"
+      - "${APP_HTTP_BIND_ADDR:-127.0.0.1}:${APP_HTTP_PORT:-8300}:8300"
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
       ERP_CUSTOMER_KEY: "${ERP_CUSTOMER_KEY:-yoyoosun}"
-      POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
+      POSTGRES_DSN: "postgres://erp_app:${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-plush_erp}?sslmode=disable"
+      POSTGRES_MAX_OPEN_CONNS: "${POSTGRES_MAX_OPEN_CONNS:-20}"
+      POSTGRES_MAX_IDLE_CONNS: "${POSTGRES_MAX_IDLE_CONNS:-5}"
+      POSTGRES_CONN_MAX_LIFETIME: "${POSTGRES_CONN_MAX_LIFETIME:-30m}"
+      POSTGRES_CONN_MAX_IDLE_TIME: "${POSTGRES_CONN_MAX_IDLE_TIME:-5m}"
+      POSTGRES_STARTUP_TIMEOUT: "${POSTGRES_STARTUP_TIMEOUT:-60s}"
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
       APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"
       APP_ADMIN_USERNAME: "${APP_ADMIN_USERNAME:-admin}"
       BOOTSTRAP_ADMIN_ONCE: "${BOOTSTRAP_ADMIN_ONCE:-false}"
       ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"
-      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-8}"
+      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-4}"
+      ERP_PDF_QUEUE_CAPACITY: "${ERP_PDF_QUEUE_CAPACITY:-2}"
       ERP_PDF_WARMUP: "${ERP_PDF_WARMUP:-async}"
       ERP_DEBUG_ENV: "${ERP_DEBUG_ENV:-prod}"
       ERP_DEBUG_SEED_ENABLED: "${ERP_DEBUG_SEED_ENABLED:-false}"
       ERP_DEBUG_CLEANUP_ENABLED: "${ERP_DEBUG_CLEANUP_ENABLED:-false}"
       ERP_DEBUG_BUSINESS_CLEAR_ENABLED: "${ERP_DEBUG_BUSINESS_CLEAR_ENABLED:-false}"
       ERP_DEBUG_CLEANUP_SCOPE: "${ERP_DEBUG_CLEANUP_SCOPE:-debug_run}"
-    mem_limit: "${APP_MEM_LIMIT:-4g}"
-    mem_reservation: "${APP_MEM_RESERVATION:-1g}"
+    mem_limit: "${APP_MEM_LIMIT:-2g}"
+    mem_reservation: "${APP_MEM_RESERVATION:-768m}"
+    shm_size: "${APP_SHM_SIZE:-256m}"
+    tmpfs:
+      - /tmp:size=${APP_TMPFS_SIZE:-256m},mode=1777,nosuid
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --max-time 2 http://127.0.0.1:8300/readyz >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 45s
     networks: {}
 
   web-desktop:

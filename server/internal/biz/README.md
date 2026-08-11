@@ -1,6 +1,6 @@
 # 业务层说明 / Biz
 
-`server/internal/biz` 承载应用业务规约和 UseCase 编排。它接收已经脱离 HTTP / gRPC / JSON-RPC 传输结构的输入，通过 repository interface 访问持久化能力；稳定、无 IO 的纯产品规则下沉到 `core`，不在两层重复实现。
+`server/internal/biz` 承载应用业务规约和 UseCase 编排。它接收已经脱离 HTTP / JSON-RPC 传输结构的输入，通过 repository interface 访问持久化能力；稳定、无 IO 的纯产品规则下沉到 `core`，不在两层重复实现。
 
 ## 当前职责
 
