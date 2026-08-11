@@ -479,8 +479,7 @@ async function actOnTaskInBrowser(
   const session = await login(browser, { ...options, roleKey });
   try {
     await goto(session.page, options.baseURL, "/erp/task-board", "任务看板");
-    const search =
-      session.page.getByPlaceholder("搜索任务、单号、来源、处理原因");
+    const search = session.page.getByPlaceholder("搜索任务", { exact: true });
     await search.fill(sourceNo);
     await search.press("Enter");
     const card = session.page
