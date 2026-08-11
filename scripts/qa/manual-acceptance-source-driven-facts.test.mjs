@@ -552,6 +552,20 @@ function createRPC({
               status: "waiting",
               version: 1,
             },
+            {
+              id: nextID++,
+              node_key: "shipment_finance_reject",
+              node_type: "domain_command",
+              status: "waiting",
+              version: 1,
+            },
+            {
+              id: nextID++,
+              node_key: "shipment_finance_rejected_end",
+              node_type: "end",
+              status: "waiting",
+              version: 1,
+            },
           ];
           shipmentFinanceApprovalTask = {
             id: nextID++,
@@ -699,7 +713,11 @@ function createRPC({
         throw new Error(`unexpected RPC ${domain}.${method}`);
     }
   };
-  return { calls, rpc };
+  return {
+    calls,
+    rpc,
+    getDeliveryNodes: () => structuredClone(deliveryNodes || []),
+  };
 }
 
 test("plan is no-write and missing source-driven references are explicitly blocked", () => {
@@ -984,7 +1002,7 @@ test("sales apply keeps quality, finance release, shipping, and receivable on th
     instanceKey: "ROW-SALES-RELEASE",
     enabledPhases: ["sales"],
   });
-  const { calls, rpc } = createRPC();
+  const { calls, rpc, getDeliveryNodes } = createRPC();
 
   const report = await applySourceDrivenFactPlan(plan, {
     rpc,
@@ -998,6 +1016,16 @@ test("sales apply keeps quality, finance release, shipping, and receivable on th
     "APPROVED",
   );
   assert.equal(report.results.sales.qualityInspection.status, "PASSED");
+  assert.deepEqual(
+    getDeliveryNodes().map((node) => [node.node_key, node.status]),
+    [
+      ["shipment_finance_approval", "completed"],
+      ["shipment_finance_release", "completed"],
+      ["end", "completed"],
+      ["shipment_finance_reject", "waiting"],
+      ["shipment_finance_rejected_end", "waiting"],
+    ],
+  );
   assert.equal(
     report.results.sales.approvalTask.required_capability_key,
     "workflow.task.approve",

@@ -1712,9 +1712,21 @@ export async function applyFinishedGoodsDeliveryProcess({
     ["waiting", "completed"],
     "finished goods delivery",
   );
-  if (nodes.length !== 3) {
+  requireProcessNode(
+    nodes,
+    "shipment_finance_reject",
+    ["waiting"],
+    "finished goods delivery",
+  );
+  requireProcessNode(
+    nodes,
+    "shipment_finance_rejected_end",
+    ["waiting"],
+    "finished goods delivery",
+  );
+  if (nodes.length !== 5) {
     throw new SourceDrivenFactError(
-      `finished goods delivery expected the current 3-node contract, got ${nodes.length}`,
+      `finished goods delivery expected the current 5-node contract, got ${nodes.length}`,
     );
   }
 
@@ -1797,6 +1809,18 @@ export async function applyFinishedGoodsDeliveryProcess({
     "finished goods delivery",
   );
   requireProcessNode(nodes, "end", ["completed"], "finished goods delivery");
+  requireProcessNode(
+    nodes,
+    "shipment_finance_reject",
+    ["waiting"],
+    "finished goods delivery",
+  );
+  requireProcessNode(
+    nodes,
+    "shipment_finance_rejected_end",
+    ["waiting"],
+    "finished goods delivery",
+  );
   const releasedShipment = requireResult(
     await invoke(rpc, "operational_fact", "get_shipment", { id: shipmentID }),
     "shipment",
