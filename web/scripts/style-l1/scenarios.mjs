@@ -11794,19 +11794,17 @@ export function createStyleL1Scenarios(deps) {
           page,
           '客户配置包预检与发布控制台 / Package Preflight & Release Console'
         )
-        await expectText(page, '未选择客户配置包')
-        await expectText(page, '已登记客户包 / Registered Packages')
-        await assertTextAbsent(page, '东莞市永绅玩具有限公司')
-
-        await page.locator('.erp-dev-customer-selector .ant-select').click()
-        await page
-          .locator('.ant-select-dropdown .ant-select-item-option-content')
-          .getByText('永绅 yoyoosun', { exact: true })
-          .click()
-        const switchedUrl = new URL(page.url())
-        assert.equal(switchedUrl.pathname, '/__dev/customer-config')
-        assert.equal(switchedUrl.searchParams.get('customer'), 'yoyoosun')
-        assert(!switchedUrl.pathname.startsWith('/erp'))
+        await page.waitForFunction(
+          () =>
+            new URL(window.location.href).searchParams.get('customer') ===
+            'yoyoosun'
+        )
+        const defaultedUrl = new URL(page.url())
+        assert.equal(defaultedUrl.pathname, '/__dev/customer-config')
+        assert.equal(defaultedUrl.searchParams.get('customer'), 'yoyoosun')
+        assert(!defaultedUrl.pathname.startsWith('/erp'))
+        await expectText(page, '永绅 yoyoosun')
+        await assertTextAbsent(page, '未选择客户配置包')
         await page
           .locator('.erp-dev-customer-view-switch .erp-dev-task-nav__item')
           .filter({ hasText: '界面投影' })
@@ -11816,6 +11814,77 @@ export function createStyleL1Scenarios(deps) {
           page,
           'dev-customer-config-missing-view'
         )
+      },
+    },
+    {
+      name: 'dev-customer-config-default-yoyoosun',
+      path: '/__dev/customer-config',
+      themeMode: 'light',
+      viewport: { width: 1536, height: 900 },
+      verify: async (page) => {
+        await expectHeading(
+          page,
+          '客户配置包预检与发布控制台 / Package Preflight & Release Console'
+        )
+        await page.waitForFunction(
+          () =>
+            new URL(window.location.href).searchParams.get('customer') ===
+            'yoyoosun'
+        )
+        const defaultedUrl = new URL(page.url())
+        assert.equal(defaultedUrl.pathname, '/__dev/customer-config')
+        assert.equal(defaultedUrl.searchParams.get('customer'), 'yoyoosun')
+        const defaultMetrics = await page.evaluate(() => {
+          const selector = document.querySelector(
+            '.erp-dev-customer-selector .ant-select'
+          )
+          const selection = selector?.querySelector(
+            '.ant-select-selection-item'
+          )
+          return {
+            selectedText: selection?.textContent?.trim() || '',
+            selectorWidth: selector?.getBoundingClientRect().width || 0,
+            selectorScrollWidth: selector?.scrollWidth || 0,
+            selectorClientWidth: selector?.clientWidth || 0,
+            pageScrollWidth: document.documentElement.scrollWidth,
+            pageClientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert.equal(defaultMetrics.selectedText, '永绅 yoyoosun')
+        assert(
+          defaultMetrics.selectorWidth > 0 &&
+            defaultMetrics.selectorScrollWidth <=
+              defaultMetrics.selectorClientWidth + 1 &&
+            defaultMetrics.pageScrollWidth <=
+              defaultMetrics.pageClientWidth + 1,
+          `默认客户包选择器不应裁切或造成页面溢出: ${JSON.stringify(defaultMetrics)}`
+        )
+        await assertTextAbsent(page, '未选择客户配置包')
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-customer-config-default-yoyoosun-light-desktop.png',
+          fullPage: true,
+        })
+
+        await gotoScenarioPath(
+          page,
+          '/__dev/customer-config?customer=missing-customer',
+          { waitUntil: 'domcontentloaded' }
+        )
+        await expectText(page, '未登记客户配置包')
+        await expectText(page, 'missing-customer')
+        assert.equal(
+          new URL(page.url()).searchParams.get('customer'),
+          'missing-customer'
+        )
+        await assertTextAbsent(page, '东莞市永绅玩具有限公司')
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-customer-config-default-yoyoosun-invalid-customer'
+        )
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-customer-config-invalid-customer-light-desktop.png',
+          fullPage: true,
+        })
       },
     },
     {
