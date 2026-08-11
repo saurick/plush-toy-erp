@@ -1,4 +1,5 @@
 import { effectiveSessionAllowsAction } from './adminProfileSync.mjs'
+import { unixSecondsToBusinessDate } from './businessDate.mjs'
 import { normalizeMaterialPurchaseUnitText } from './materialPurchaseContractEditor.mjs'
 import {
   normalizeNumeric20Scale6,
@@ -419,7 +420,7 @@ export function unixToDateInputValue(value) {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
     return ''
   }
-  return new Date(timestamp * 1000).toISOString().slice(0, 10)
+  return unixSecondsToBusinessDate(timestamp)
 }
 
 function optionalFormValue(value) {

@@ -1,4 +1,5 @@
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
+import { unixSecondsToBusinessDate } from '../utils/businessDate.mjs'
 
 export const PROCESSING_CONTRACT_TEMPLATE_KEY = 'processing-contract'
 export const PROCESSING_CONTRACT_DRAFT_VERSION = 4
@@ -548,7 +549,7 @@ function formatProcessingDraftDate(value) {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
     return normalizeText(value)
   }
-  return new Date(timestamp * 1000).toISOString().slice(0, 10)
+  return unixSecondsToBusinessDate(timestamp)
 }
 
 function processingPrintPartyDefaults(printTemplateDefaults = {}) {

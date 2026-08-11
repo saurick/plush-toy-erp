@@ -27,10 +27,6 @@ export function positiveInt(value) {
     : undefined
 }
 
-export function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 export function buildInspectionParams(values = {}) {
   return compactParams({
     inspection_no: trimOptional(values.inspection_no),

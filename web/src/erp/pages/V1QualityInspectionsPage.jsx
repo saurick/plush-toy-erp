@@ -90,7 +90,6 @@ import {
   buildDecisionParams,
   buildInspectionParams,
   positiveInt,
-  todayInputValue,
 } from '../components/quality-inspections/QualityInspectionForms.jsx'
 import {
   buildQualityInspectionDataColumns,
@@ -114,6 +113,7 @@ import {
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -1097,7 +1097,9 @@ export default function V1QualityInspectionsPage() {
       decisionForm.setFieldsValue({
         result: inspectionModal?.mode === 'pass' ? 'PASS' : undefined,
         inspected_at:
-          inspectionModal?.mode === 'cancel' ? undefined : todayInputValue(),
+          inspectionModal?.mode === 'cancel'
+            ? undefined
+            : currentBusinessDate(),
         defect_rate_selection: undefined,
         defect_rate_custom_percent: undefined,
         decision_note: '',
@@ -1556,32 +1558,23 @@ export default function V1QualityInspectionsPage() {
   const loadExportQualityInspections = useCallback(
     async ({ signal }) => {
       const routeSelectedID = Number(routeQualityInspectionID || 0)
-      if (
-        routeSelectedID > 0 &&
-        inspectionTypeFilter !== 'PRODUCTION_STAGE'
-      ) {
+      if (routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE') {
         const inspection = await getQualityInspection({ id: routeSelectedID })
         return inspection ? [inspection] : []
       }
       const data = await loadQualityInspectionList({ signal, all: true })
       const exportRows = data?.quality_inspections
       return routeSelectedID > 0 && Array.isArray(exportRows)
-        ? exportRows.filter(
-            (item) => Number(item?.id || 0) === routeSelectedID
-          )
+        ? exportRows.filter((item) => Number(item?.id || 0) === routeSelectedID)
         : exportRows
     },
-    [
-      inspectionTypeFilter,
-      loadQualityInspectionList,
-      routeQualityInspectionID,
-    ]
+    [inspectionTypeFilter, loadQualityInspectionList, routeQualityInspectionID]
   )
   const { exporting, exportRows: exportQualityInspections } =
     useBusinessListExport({
       requestKey: 'quality-inspections-export',
       loadRows: loadExportQualityInspections,
-      filename: `质量检验-${new Date().toISOString().slice(0, 10)}.csv`,
+      filename: `质量检验-${currentBusinessDate()}.csv`,
       columns: exportColumns,
       recordLabel: '质检单',
     })
@@ -1986,9 +1979,7 @@ export default function V1QualityInspectionsPage() {
             <>
               <BusinessActionTooltip
                 disabled={
-                  !selectedRow ||
-                  selectedRow.status !== 'SUBMITTED' ||
-                  saving
+                  !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                 }
                 disabledReason={
                   !selectedRow
@@ -2007,9 +1998,7 @@ export default function V1QualityInspectionsPage() {
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   disabled={
-                    !selectedRow ||
-                    selectedRow.status !== 'SUBMITTED' ||
-                    saving
+                    !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                   }
                   onClick={() => openDecision('pass', selectedRow)}
                 >
@@ -2018,9 +2007,7 @@ export default function V1QualityInspectionsPage() {
               </BusinessActionTooltip>
               <BusinessActionTooltip
                 disabled={
-                  !selectedRow ||
-                  selectedRow.status !== 'SUBMITTED' ||
-                  saving
+                  !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                 }
                 disabledReason={
                   !selectedRow
@@ -2039,9 +2026,7 @@ export default function V1QualityInspectionsPage() {
                   className="erp-business-module-status-action"
                   icon={<StopOutlined />}
                   disabled={
-                    !selectedRow ||
-                    selectedRow.status !== 'SUBMITTED' ||
-                    saving
+                    !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
                   }
                   onClick={() => openDecision('reject', selectedRow)}
                 >

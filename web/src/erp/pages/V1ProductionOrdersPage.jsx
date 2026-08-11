@@ -9,6 +9,7 @@ import {
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   BusinessActionTooltip,
   BusinessDataTable,
@@ -1543,7 +1544,7 @@ export default function V1ProductionOrdersPage() {
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: 'production-orders-export',
     loadRows: loadExportOrders,
-    filename: `生产订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `生产订单-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: '生产订单',
   })

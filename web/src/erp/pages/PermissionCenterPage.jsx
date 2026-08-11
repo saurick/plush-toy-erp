@@ -38,7 +38,7 @@ import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import { isRpcAbortError, JsonRpc } from '@/common/utils/jsonRpc'
 import {
   ADMIN_ACCOUNT_STATUS,
   ADMIN_STATUS_FILTERS,
@@ -93,6 +93,7 @@ import {
   reconcileRoleNavigationPaths,
   ROLE_NAVIGATION_MODES,
 } from '../config/roleGuidedNavigation.mjs'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import ApprovalResponsibilityPanel from './ApprovalResponsibilityPanel.jsx'
 
 const { Paragraph, Text, Title } = Typography
@@ -1774,6 +1775,7 @@ function PermissionChecklist({
 
 export default function PermissionCenterPage() {
   const outletContext = useOutletContext()
+  const beginLatestRequest = useLatestRequestCoordinator()
   const adminRpc = useMemo(
     () =>
       new JsonRpc({
@@ -1795,7 +1797,6 @@ export default function PermissionCenterPage() {
   const [permissionMenuOptions, setPermissionMenuOptions] = useState([])
   const [warehouseScopeOptions, setWarehouseScopeOptions] = useState([])
   const [effectiveRoleAccess, setEffectiveRoleAccess] = useState(null)
-  const effectiveRoleAccessRequestRef = useRef(0)
   const [effectiveRoleAccessLoading, setEffectiveRoleAccessLoading] =
     useState(false)
   const [permissionDraftAccess, setPermissionDraftAccess] = useState(null)
@@ -2300,9 +2301,13 @@ export default function PermissionCenterPage() {
   )
 
   const loadData = useCallback(async () => {
+    const request = beginLatestRequest('permission-center')
     setLoading(true)
     try {
-      const meResult = await adminRpc.call('me', {})
+      const meResult = await adminRpc.call('me', {}, { signal: request.signal })
+      if (!request.isCurrent()) {
+        return false
+      }
       const nextCurrentAdmin = meResult?.data || null
       const shouldLoadAdmins = hasPermission(
         nextCurrentAdmin,
@@ -2312,11 +2317,16 @@ export default function PermissionCenterPage() {
         hasPermission(nextCurrentAdmin, READ_ROLE_PERMISSION) &&
         hasPermission(nextCurrentAdmin, READ_PERMISSION_PERMISSION)
       const [listResult, optionsResult] = await Promise.all([
-        shouldLoadAdmins ? adminRpc.call('list', {}) : Promise.resolve(null),
+        shouldLoadAdmins
+          ? adminRpc.call('list', {}, { signal: request.signal })
+          : Promise.resolve(null),
         shouldLoadRBACOptions
-          ? adminRpc.call('rbac_options', {})
+          ? adminRpc.call('rbac_options', {}, { signal: request.signal })
           : Promise.resolve(null),
       ])
+      if (!request.isCurrent()) {
+        return false
+      }
       const nextRoles = Array.isArray(optionsResult?.data?.roles)
         ? optionsResult.data.roles
         : []
@@ -2345,45 +2355,58 @@ export default function PermissionCenterPage() {
       setSelectedRoleKey((current) => current || getRoleKey(nextRoles[0]))
       return true
     } catch (err) {
+      if (isRpcAbortError(err) || !request.isCurrent()) {
+        return false
+      }
       message.error(getActionErrorMessage(err, '加载岗位设置'))
       return false
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
-  }, [adminRpc])
+  }, [adminRpc, beginLatestRequest])
 
   const loadEffectiveRoleAccess = useCallback(
     async (roleKey) => {
+      const request = beginLatestRequest('effective-role-access')
       const normalizedRoleKey = getRoleKey({ role_key: roleKey })
-      const requestID = effectiveRoleAccessRequestRef.current + 1
-      effectiveRoleAccessRequestRef.current = requestID
       if (!normalizedRoleKey || !canReadEffectiveRoleAccess) {
         setEffectiveRoleAccess(null)
         setEffectiveRoleAccessLoading(false)
+        request.finish()
         return false
       }
       setEffectiveRoleAccessLoading(true)
       try {
-        const result = await adminRpc.call('effective_role_access', {
-          role_key: normalizedRoleKey,
-        })
-        if (effectiveRoleAccessRequestRef.current === requestID) {
-          setEffectiveRoleAccess(result?.data?.effective_access || null)
+        const result = await adminRpc.call(
+          'effective_role_access',
+          {
+            role_key: normalizedRoleKey,
+          },
+          { signal: request.signal }
+        )
+        if (!request.isCurrent()) {
+          return false
         }
+        setEffectiveRoleAccess(result?.data?.effective_access || null)
         return true
       } catch (err) {
-        if (effectiveRoleAccessRequestRef.current === requestID) {
-          setEffectiveRoleAccess(null)
-          message.error(getActionErrorMessage(err, '加载岗位最终权限'))
+        if (isRpcAbortError(err) || !request.isCurrent()) {
+          return false
         }
+        setEffectiveRoleAccess(null)
+        message.error(getActionErrorMessage(err, '加载岗位最终权限'))
         return false
       } finally {
-        if (effectiveRoleAccessRequestRef.current === requestID) {
+        if (request.isCurrent()) {
           setEffectiveRoleAccessLoading(false)
+          request.finish()
         }
       }
     },
-    [adminRpc, canReadEffectiveRoleAccess]
+    [adminRpc, beginLatestRequest, canReadEffectiveRoleAccess]
   )
 
   const changeSelectedRolePermissions = useCallback(

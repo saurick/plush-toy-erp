@@ -8,6 +8,7 @@ import {
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessDataTable,
@@ -1084,7 +1085,7 @@ export default function V1PurchaseOrdersPage() {
   const { exporting, exportRows: exportOrders } = useBusinessListExport({
     requestKey: 'purchase-orders-export',
     loadRows: loadExportOrders,
-    filename: `采购订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `采购订单-${currentBusinessDate()}.csv`,
     columns: visibleDataColumns,
     recordLabel: '采购订单',
   })

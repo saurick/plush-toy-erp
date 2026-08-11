@@ -39,8 +39,8 @@ async function loadBusinessDashboardApi(call) {
     .replace(
       "import { JsonRpc } from '@/common/utils/jsonRpc'",
       `class JsonRpc {
-        async call(method, params) {
-          return globalThis.__businessDashboardApiTestCall(method, params)
+        async call(method, params, options) {
+          return globalThis.__businessDashboardApiTestCall(method, params, options)
         }
       }`
     )
@@ -63,14 +63,17 @@ test('businessDashboardApi: 使用专用统计接口并保留大数、真实零�
       total: item.module_key === 'customers' ? 1_234_567 : 0,
     })),
   }
-  const api = await loadBusinessDashboardApi(async (method, params) => {
-    calls.push({ method, params })
-    return { data: response }
-  })
+  const api = await loadBusinessDashboardApi(
+    async (method, params, options) => {
+      calls.push({ method, options, params })
+      return { data: response }
+    }
+  )
   const params = { snapshot: 'current' }
+  const options = { signal: { aborted: false } }
 
-  assert.equal(await api.getBusinessDashboardStats(params), response)
-  assert.deepEqual(calls, [{ method: 'dashboard_stats', params }])
+  assert.equal(await api.getBusinessDashboardStats(params, options), response)
+  assert.deepEqual(calls, [{ method: 'dashboard_stats', options, params }])
 })
 
 test('businessDashboardApi: 缺字段、负数和重复对象都拒绝作为成功响应', async () => {

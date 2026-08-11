@@ -17,6 +17,7 @@ import {
 } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   compactParams,
   hasActionPermission,
@@ -1306,7 +1307,7 @@ export function OperationalFactWorkspace({
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: `operational-facts-export:${currentActiveKey}`,
     loadRows: loadExportRows,
-    filename: `业务记录-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `业务记录-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: activeConfig.title,
   })

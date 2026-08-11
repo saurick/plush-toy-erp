@@ -83,6 +83,7 @@ import {
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   validateFinanceAllocationDraft,
   validateFinanceCreditDraft,
@@ -1157,7 +1158,7 @@ export default function FinancePaymentsPage() {
         return
       }
       downloadBusinessListCSV({
-        filename: `收付款记录-${new Date().toISOString().slice(0, 10)}.csv`,
+        filename: `收付款记录-${currentBusinessDate()}.csv`,
         columns: paymentExportColumns,
         rows,
       })
@@ -1195,7 +1196,7 @@ export default function FinancePaymentsPage() {
         return
       }
       downloadBusinessListCSV({
-        filename: `红冲记录-${new Date().toISOString().slice(0, 10)}.csv`,
+        filename: `红冲记录-${currentBusinessDate()}.csv`,
         columns: creditExportColumns,
         rows,
       })

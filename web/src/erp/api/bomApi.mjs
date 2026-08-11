@@ -30,8 +30,8 @@ export async function listAllBOMVersions(params = {}, options = {}) {
   )
 }
 
-export async function getBOMVersion(params = {}) {
-  const result = await bomRpc.call('get_bom_version', params)
+export async function getBOMVersion(params = {}, options = {}) {
+  const result = await bomRpc.call('get_bom_version', params, options)
   return dataOf(result)?.bom_version || null
 }
 

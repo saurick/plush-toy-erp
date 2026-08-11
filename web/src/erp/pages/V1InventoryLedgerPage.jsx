@@ -74,6 +74,7 @@ import {
   hasActionPermission,
   trimOptional,
 } from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   businessSourceRouteFor,
   sourceRouteFor,
@@ -1705,7 +1706,7 @@ export default function V1InventoryLedgerPage() {
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: `inventory-export:${activeView}`,
     loadRows: loadExportRows,
-    filename: `库存明细-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `库存明细-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: `${activeLabel}记录`,
   })

@@ -1,5 +1,9 @@
 import { normalizeWorkInstructionImageAnnotations } from '../utils/workInstructionImageAnnotations.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
+import {
+  currentBusinessDate,
+  unixSecondsToBusinessDate,
+} from '../utils/businessDate.mjs'
 
 export const MATERIAL_DETAIL_TEMPLATE_KEY = 'engineering-material-detail'
 export const COLOR_CARD_TEMPLATE_KEY = 'engineering-color-card'
@@ -64,19 +68,12 @@ function compactTextParts(parts = [], separator = ' / ') {
     .join(separator)
 }
 
-const todayText = () => {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
-    now.getDate()
-  ).padStart(2, '0')}`
-}
+const todayText = () => currentBusinessDate()
 
 const dateTextFromUnix = (value) => {
   const numberValue = Number(value || 0)
   if (!Number.isFinite(numberValue) || numberValue <= 0) return ''
-  const date = new Date(numberValue * 1000)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
+  return unixSecondsToBusinessDate(numberValue)
 }
 
 export const engineeringImageSlots = {

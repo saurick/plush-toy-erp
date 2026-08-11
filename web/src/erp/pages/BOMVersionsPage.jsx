@@ -107,6 +107,7 @@ import {
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
 import { createDuplicatedDraftLineItem } from '../utils/businessLineItems.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   BOM_PRODUCTION_OPERATION_OPTIONS,
   bomProductionOperationLabel,
@@ -651,9 +652,13 @@ export default function BOMVersionsPage() {
   const loadDetail = useCallback(
     async (id) => {
       if (!id) return null
+      const request = beginLatestRequest('detail')
       setDetailLoading(true)
       try {
-        const detail = await getBOMVersion({ id })
+        const detail = await getBOMVersion({ id }, { signal: request.signal })
+        if (!request.isCurrent()) {
+          return null
+        }
         const items = Array.isArray(detail?.items) ? detail.items : []
         if (detail?.id) {
           primeBOMItemsPreview(detail, { items, total: items.length })
@@ -661,13 +666,19 @@ export default function BOMVersionsPage() {
         setSelectedVersion(detail)
         return detail
       } catch (error) {
+        if (isRpcAbortError(error) || !request.isCurrent()) {
+          return null
+        }
         message.error(getActionErrorMessage(error, '加载 BOM 详情'))
         return null
       } finally {
-        setDetailLoading(false)
+        if (request.isCurrent()) {
+          setDetailLoading(false)
+          request.finish()
+        }
       }
     },
-    [primeBOMItemsPreview]
+    [beginLatestRequest, primeBOMItemsPreview]
   )
 
   const bomListParams = useMemo(
@@ -685,6 +696,8 @@ export default function BOMVersionsPage() {
     if (!canRead) {
       setVersions([])
       setSelectedVersion(null)
+      const detailRequest = beginLatestRequest('detail')
+      detailRequest.finish()
       applySelectedRowKeys([])
       setLoading(false)
       request.finish()
@@ -715,6 +728,8 @@ export default function BOMVersionsPage() {
       if (validKeys.length === 1) {
         await loadDetail(validKeys[0])
       } else {
+        const detailRequest = beginLatestRequest('detail')
+        detailRequest.finish()
         setSelectedVersion(null)
       }
       return true
@@ -1234,7 +1249,7 @@ export default function BOMVersionsPage() {
   const { exporting, exportRows: exportVersions } = useBusinessListExport({
     requestKey: 'bom-versions-export',
     loadRows: loadExportVersions,
-    filename: `物料清单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `物料清单-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: '物料清单',
   })

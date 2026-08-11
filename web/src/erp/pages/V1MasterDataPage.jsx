@@ -77,6 +77,7 @@ import {
   inferProductDefaultUnitID,
   resolvePaymentTermDays,
 } from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
@@ -390,7 +391,7 @@ export default function V1MasterDataPage({ type }) {
           { signal: request.signal }
         )
         if (!request.isCurrent()) {
-          return []
+          return null
         }
         const nextContacts = Array.isArray(result?.contacts)
           ? result.contacts
@@ -967,7 +968,7 @@ export default function V1MasterDataPage({ type }) {
   const { exporting, exportRows: exportRecords } = useBusinessListExport({
     requestKey: `master-data-export:${effectiveType}`,
     loadRows: loadExportRecords,
-    filename: `${config.title}-筛选结果-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `${config.title}-筛选结果-${currentBusinessDate()}.csv`,
     columns: orderedRecordColumns,
     recordLabel: `${entityLabel}记录`,
   })

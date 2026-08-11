@@ -9,6 +9,7 @@ import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../../utils/moduleTableColumns.mjs'
+import { downloadCSVRows } from '../../utils/csvExport.mjs'
 import { ToolbarButton } from './BusinessListLayout.jsx'
 import {
   ColumnOrderHeaderMenu,
@@ -73,14 +74,6 @@ function getPreferredColumnOrder({
   )
 }
 
-function csvEscape(value) {
-  const text = String(value ?? '')
-  if (/[",\n\r]/u.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
-}
-
 function getColumnRawValue(row, column = {}) {
   if (typeof column.exportValue === 'function') {
     return column.exportValue(row)
@@ -99,24 +92,11 @@ export function downloadBusinessListCSV({ filename, columns, rows }) {
   const exportColumns = (Array.isArray(columns) ? columns : []).filter(
     (column) => column && column.exportable !== false
   )
-  const header = exportColumns.map((column) =>
-    csvEscape(getColumnLabel(column))
-  )
+  const header = exportColumns.map((column) => getColumnLabel(column))
   const body = (Array.isArray(rows) ? rows : []).map((row) =>
-    exportColumns.map((column) => csvEscape(getColumnRawValue(row, column)))
+    exportColumns.map((column) => getColumnRawValue(row, column))
   )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
+  downloadCSVRows({ filename, rows: [header, ...body] })
 }
 
 export function useBusinessColumnOrder({

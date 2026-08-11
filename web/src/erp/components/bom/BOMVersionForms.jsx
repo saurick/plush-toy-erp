@@ -13,12 +13,11 @@ import {
   BOM_PRODUCTION_OPERATION_OPTIONS,
   normalizeBOMProductionOperationCode,
 } from '../../utils/bomProductionOperation.mjs'
+import { unixSecondsToBusinessDate } from '../../utils/businessDate.mjs'
 
 export function unixToDateInputValue(value) {
   if (!value) return ''
-  const date = new Date(Number(value) * 1000)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
+  return unixSecondsToBusinessDate(value)
 }
 
 function dateInputToParam(value) {

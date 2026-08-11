@@ -220,6 +220,94 @@ test('business list request lifecycle: 审计日志只应用最新响应并正�
   assert.match(loaderSource, /\[\s*adminRpc,\s*beginLatestRequest,/u)
 })
 
+test('business list request lifecycle: 权限中心刷新不会应用过期账号或岗位数据', () => {
+  const source = readSource('../pages/PermissionCenterPage.jsx')
+  const loaderStart = source.indexOf('const loadData = useCallback(async () =>')
+  const loaderEnd = source.indexOf(
+    'const loadEffectiveRoleAccess = useCallback',
+    loaderStart
+  )
+  const effectiveRoleAccessEnd = source.indexOf(
+    'const changeSelectedRolePermissions = useCallback',
+    loaderEnd
+  )
+
+  assert.ok(loaderStart >= 0, 'PermissionCenterPage must keep its data loader')
+  assert.ok(loaderEnd > loaderStart, 'permission data loader must stay bounded')
+  const loaderSource = source.slice(loaderStart, loaderEnd)
+  const effectiveRoleAccessSource = source.slice(
+    loaderEnd,
+    effectiveRoleAccessEnd
+  )
+
+  assert.match(
+    source,
+    /import \{ isRpcAbortError, JsonRpc \} from ['"]@\/common\/utils\/jsonRpc['"]/u
+  )
+  assert.match(
+    source,
+    /import useLatestRequestCoordinator from ['"]\.\.\/hooks\/useLatestRequestCoordinator\.js['"]/u
+  )
+  assert.match(
+    loaderSource,
+    /const request = beginLatestRequest\('permission-center'\)/u
+  )
+  for (const method of ['me', 'list', 'rbac_options']) {
+    assert.match(
+      loaderSource,
+      new RegExp(
+        `adminRpc\\.call\\('${method}'[\\s\\S]*?\\{ signal: request\\.signal \\}`
+      )
+    )
+  }
+  assert.match(
+    loaderSource,
+    /if \(!request\.isCurrent\(\)\) \{\s*return false/u
+  )
+  assert.match(
+    loaderSource,
+    /if \(isRpcAbortError\(err\) \|\| !request\.isCurrent\(\)\) \{\s*return false/u
+  )
+  assert.match(
+    loaderSource,
+    /finally \{\s*if \(request\.isCurrent\(\)\) \{\s*setLoading\(false\)\s*request\.finish\(\)/u
+  )
+  assert.match(
+    effectiveRoleAccessSource,
+    /const request = beginLatestRequest\('effective-role-access'\)/u
+  )
+  assert.match(
+    effectiveRoleAccessSource,
+    /adminRpc\.call\([\s\S]*?'effective_role_access'[\s\S]*?\{ signal: request\.signal \}[\s\S]*?\)/u
+  )
+  assert.doesNotMatch(source, /effectiveRoleAccessRequestRef/u)
+})
+
+test('business list request lifecycle: BOM detail only applies the latest selection', () => {
+  const source = readSource('../pages/BOMVersionsPage.jsx')
+  const loaderStart = source.indexOf('const loadDetail = useCallback')
+  const loaderEnd = source.indexOf('const bomListParams = useMemo', loaderStart)
+
+  assert.ok(loaderStart >= 0, 'BOMVersionsPage must keep its detail loader')
+  assert.ok(loaderEnd > loaderStart, 'BOM detail loader must stay bounded')
+  const loaderSource = source.slice(loaderStart, loaderEnd)
+
+  assert.match(loaderSource, /const request = beginLatestRequest\('detail'\)/u)
+  assert.match(
+    loaderSource,
+    /getBOMVersion\([\s\S]*?\{ id \},[\s\S]*?\{ signal: request\.signal \}[\s\S]*?\)/u
+  )
+  assert.match(loaderSource, /if \(!request\.isCurrent\(\)\) \{\s*return null/u)
+  assert.match(
+    loaderSource,
+    /if \(isRpcAbortError\(error\) \|\| !request\.isCurrent\(\)\) \{\s*return null/u
+  )
+  assert.match(
+    loaderSource,
+    /finally \{\s*if \(request\.isCurrent\(\)\) \{\s*setDetailLoading\(false\)\s*request\.finish\(\)/u
+  )
+})
+
 test('business list request lifecycle: list API wrappers forward abort options to JSON-RPC', () => {
   const apiCases = [
     {

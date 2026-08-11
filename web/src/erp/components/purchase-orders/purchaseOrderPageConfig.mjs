@@ -3,6 +3,7 @@ import {
   closePurchaseOrder,
 } from '../../api/masterDataOrderApi.mjs'
 import { submitPurchaseOrderApprovalProcess } from '../../api/customerConfigApi.mjs'
+import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import { isDraftSourceDocument } from '../../utils/sourceDocumentEditing.mjs'
 import { buildPurchaseInboundDraftPreviewRows } from '../../utils/purchaseOrderInboundPreview.mjs'
 import {
@@ -102,7 +103,7 @@ export const PURCHASE_ORDER_RELATED_MENU_ITEMS = [
 ]
 
 export function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
+  return currentBusinessDate()
 }
 
 export function workflowPayloadOf(task = {}) {

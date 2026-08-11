@@ -63,6 +63,7 @@ import {
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import { formatQuantity } from '../utils/businessLineItems.mjs'
 import {
   comparePurchaseReceiptQuantityTotals,
@@ -547,12 +548,7 @@ export default function V1PurchaseReceiptsPage() {
         request.finish()
       }
     }
-  }, [
-    beginLatestRequest,
-    pagination,
-    receiptListParams,
-    routeReceiptID,
-  ])
+  }, [beginLatestRequest, pagination, receiptListParams, routeReceiptID])
 
   const clearRouteContext = useCallback(
     (keys) => {
@@ -964,7 +960,7 @@ export default function V1PurchaseReceiptsPage() {
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: 'purchase-receipts-export',
     loadRows: loadExportRows,
-    filename: `采购入库-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `采购入库-${currentBusinessDate()}.csv`,
     columns: exportColumns,
     recordLabel: '采购入库单',
   })

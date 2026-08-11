@@ -17,6 +17,7 @@ import {
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessActionTooltip,
@@ -870,7 +871,7 @@ export default function V1SalesOrdersPage() {
         prefix: 'SO',
         field: 'order_no',
       }),
-      order_date: new Date().toISOString().slice(0, 10),
+      order_date: currentBusinessDate(),
       items: [createBlankOrderLine(1, { unitID: defaultUnitID })],
     })
     rememberPaymentCondition({})
@@ -1242,7 +1243,7 @@ export default function V1SalesOrdersPage() {
   const { exporting, exportRows: exportOrders } = useBusinessListExport({
     requestKey: 'sales-orders-export',
     loadRows: loadExportOrders,
-    filename: `销售订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `销售订单-${currentBusinessDate()}.csv`,
     columns: visibleOrderDataColumns,
     recordLabel: '销售订单',
   })

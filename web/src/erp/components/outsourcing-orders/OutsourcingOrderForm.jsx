@@ -48,10 +48,6 @@ function getNextLineNo(lines = []) {
   )
 }
 
-export function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 export function supplierLabel(supplier = {}) {
   return (
     [supplier.code, supplier.short_name || supplier.name]

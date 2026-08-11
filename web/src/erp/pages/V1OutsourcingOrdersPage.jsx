@@ -16,6 +16,7 @@ import {
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import { currentBusinessDate } from '../utils/businessDate.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   BusinessActionTooltip,
@@ -52,7 +53,6 @@ import OutsourcingOrderForm, {
   productLabel,
   processLabel,
   supplierLabel,
-  todayInputValue,
   unitLabel,
 } from '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
 import OutsourcingOrderSourceFactModal from '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx'
@@ -1746,7 +1746,7 @@ export default function V1OutsourcingOrdersPage() {
       supplier_id: undefined,
       supplier_snapshot: {},
       source_order_no: '',
-      order_date: todayInputValue(),
+      order_date: currentBusinessDate(),
       expected_return_date: '',
       contract_party_snapshot: contractPartySnapshotFromPrintTemplateDefaults(
         processingPrintTemplateDefaults,
@@ -2601,7 +2601,7 @@ export default function V1OutsourcingOrdersPage() {
   const { exporting, exportRows: exportOrders } = useBusinessListExport({
     requestKey: 'outsourcing-orders-export',
     loadRows: loadExportOrders,
-    filename: `委外订单-${new Date().toISOString().slice(0, 10)}.csv`,
+    filename: `委外订单-${currentBusinessDate()}.csv`,
     columns: visibleDataColumns,
     recordLabel: '加工合同',
   })
