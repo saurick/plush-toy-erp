@@ -856,10 +856,10 @@
             <span class="rule-chip">导入后补齐仓库和批次</span>
           </div>
           <div class="search-row">
-            <input placeholder="搜索销售订单号、客户或产品" data-initial-focus />
-            <button class="btn" type="button">查看剩余量说明</button>
+            <input placeholder="搜索销售订单号、客户或产品" data-import-search data-initial-focus />
+            <button class="btn" type="button" data-clear-import-filter disabled>清空筛选</button>
           </div>
-          <div class="picker-selection">
+          <div class="picker-selection" aria-live="polite">
             <div class="picker-selection-items">
               <strong>已选 1 条：</strong>
               <span class="selected-chip">SO-202606-018</span>
@@ -1055,6 +1055,21 @@
       );
       let activeDialog = null;
       let lastTrigger = null;
+      const importSearch = document.querySelector("[data-import-search]");
+      const clearImportFilter = document.querySelector(
+        "[data-clear-import-filter]",
+      );
+
+      function syncImportFilterAction() {
+        clearImportFilter.disabled = importSearch.value.length === 0;
+      }
+
+      importSearch.addEventListener("input", syncImportFilterAction);
+      clearImportFilter.addEventListener("click", () => {
+        importSearch.value = "";
+        syncImportFilterAction();
+        importSearch.focus({ preventScroll: true });
+      });
 
       function setBackgroundInert(blocked) {
         [switcher, shell].forEach((element) => {

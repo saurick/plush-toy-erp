@@ -513,6 +513,24 @@
   min-width: 0;
 }
 
+.erp-source-import-picker__toolbar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-source-import-picker__search.ant-input-affix-wrapper {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.erp-source-import-picker__clear-filter.ant-btn {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
 .erp-source-import-picker .ant-table-wrapper {
   min-width: 0;
 }
