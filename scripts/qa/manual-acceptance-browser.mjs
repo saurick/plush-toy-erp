@@ -1031,12 +1031,13 @@ export function shipmentListReady(expectedCount) {
   return total === Number(expectedCount) && rows.length > 0;
 }
 
-export function readMobileLoadedTaskCount(tabKey, bodyText = "") {
-  const label = tabKey === "done" ? "已办" : "待处理";
-  const match = String(bodyText).match(
-    new RegExp(`已加载\\s*(\\d+)\\s*条${label}`, "u"),
-  );
-  return match ? Number(match[1]) : 0;
+export function readMobileTaskTotal(tabKey, ariaLabel = "") {
+  const pattern =
+    tabKey === "done"
+      ? /^已办任务共\s*(\d+)\s*条，当前已加载\s*\d+\s*条$/u
+      : /^全部，\s*共\s*(\d+)\s*条$/u;
+  const match = String(ariaLabel).match(pattern);
+  return match ? Number(match[1]) : null;
 }
 
 export function evaluateGlobalDashboardEvidence(
@@ -1209,16 +1210,18 @@ export function evaluateDashboardTaskCurrentBatchEvidence({
   const exactCurrentBatchTaskCodes = currentBatchTaskCodes.filter((value) =>
     String(value || "").startsWith(`${expectedPrefix}-`),
   );
-  const currentBatchCountExact =
+  const currentBatchPageBound =
     Number.isSafeInteger(currentBatch?.actual) &&
-    exactCurrentBatchTaskCodes.length === currentBatch.actual &&
+    currentBatch.actual > 0 &&
+    exactCurrentBatchTaskCodes.length > 0 &&
+    exactCurrentBatchTaskCodes.length <= currentBatch.actual &&
     new Set(exactCurrentBatchTaskCodes).size ===
       exactCurrentBatchTaskCodes.length;
   const currentBatchVisible = matchingCurrentBatchTaskCodes.length > 0;
   const minimumSatisfied =
     evidence?.minimumSatisfied === true &&
     currentBatchBound &&
-    currentBatchCountExact &&
+    currentBatchPageBound &&
     currentBatchVisible;
   return {
     ...evidence,
@@ -1231,8 +1234,8 @@ export function evaluateDashboardTaskCurrentBatchEvidence({
       "dashboard totals and visible task-code metadata bound to the current exact-source batch",
     currentBatchActual: currentBatch?.actual ?? null,
     currentBatchBound,
-    currentBatchTaskCount: exactCurrentBatchTaskCodes.length,
-    currentBatchCountExact,
+    currentBatchPageSize: exactCurrentBatchTaskCodes.length,
+    currentBatchPageBound,
     visibleCurrentBatchTaskCount: matchingCurrentBatchTaskCodes.length,
     currentBatchVisible,
     minimumSatisfied,
@@ -1294,7 +1297,8 @@ async function readDashboardEvidence(page, target, datasetBinding) {
           );
         });
         return (
-          exactCodes.length === expectedCount &&
+          exactCodes.length > 0 &&
+          exactCodes.length <= expectedCount &&
           new Set(exactCodes).size === exactCodes.length &&
           visibleCurrentBatchRow
         );
@@ -1511,9 +1515,15 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
       .locator(`.erp-mobile-list-item[data-task-code^="${taskCodePrefix}-"]`)
       .count();
   const readCurrentTotal = async (tabKey) => {
+    const countLabel = await page
+      .getByTestId(
+        tabKey === "done" ? "mobile-role-done-count" : "mobile-role-filter-all",
+      )
+      .getAttribute("aria-label")
+      .catch(() => null);
+    const currentTotal = readMobileTaskTotal(tabKey, countLabel);
+    if (currentTotal !== null) return currentTotal;
     const bodyText = await page.locator("body").innerText();
-    const loadedCount = readMobileLoadedTaskCount(tabKey, bodyText);
-    if (loadedCount > 0) return loadedCount;
     const toggle = page
       .locator('[data-testid^="mobile-role-list-toggle-"]')
       .first();
@@ -1537,15 +1547,18 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
   );
   await waitForActiveViewLoaded();
   await page.waitForFunction(
-    ({ loadedTodoCount, requiredMinimum }) => {
-      const match = (document.body?.innerText || "").match(
-        /已加载\s*(\d+)\s*条已办/u,
-      );
+    ({ todoTotal, requiredMinimum }) => {
+      const doneTotalMatch = (
+        document
+          .querySelector('[data-testid="mobile-role-done-count"]')
+          ?.getAttribute("aria-label") || ""
+      ).match(/^已办任务共\s*(\d+)\s*条，当前已加载\s*\d+\s*条$/u);
       return (
-        match && loadedTodoCount + Number(match[1] || 0) >= requiredMinimum
+        doneTotalMatch &&
+        todoTotal + Number(doneTotalMatch[1] || 0) >= requiredMinimum
       );
     },
-    { loadedTodoCount: todoCount, requiredMinimum: minimumRecords },
+    { todoTotal: todoCount, requiredMinimum: minimumRecords },
     { timeout: PAGE_TIMEOUT_MS },
   );
   const doneCount = await readCurrentTotal("done");
@@ -2618,7 +2631,7 @@ function firstCurrentBatchBusinessNo(records, fields, predicate = () => true) {
   return null;
 }
 
-function currentBatchFactIdentifiers(factReport) {
+export function currentBatchFactIdentifiers(factReport) {
   const records = factReport?.referenceRecords || {};
   const sourceTaskCode = (prefix, items, predicate) => {
     const item = (Array.isArray(items) ? items : []).find(predicate);
@@ -2639,6 +2652,17 @@ function currentBatchFactIdentifiers(factReport) {
         factType,
     );
   };
+  const currentProductionOrderNo =
+    firstCurrentBatchBusinessNo(
+      records.productionOrders,
+      ["order_no", "orderNo"],
+      (item) => String(item?.status || "").toUpperCase() === "RELEASED",
+    ) ||
+    firstCurrentBatchBusinessNo(
+      records.productionOrders,
+      ["order_no", "orderNo"],
+      (item) => String(item?.status || "").toUpperCase() === "DRAFT",
+    );
   return {
     "quality-inspections": firstCurrentBatchBusinessNo(
       records.qualityInspections,
@@ -2652,10 +2676,7 @@ function currentBatchFactIdentifiers(factReport) {
       "lot_no",
       "lotNo",
     ]),
-    "production-orders": firstCurrentBatchBusinessNo(records.productionOrders, [
-      "order_no",
-      "orderNo",
-    ]),
+    "production-orders": currentProductionOrderNo,
     "production-progress": firstCurrentBatchBusinessNo(
       records.productionFacts,
       ["fact_no", "factNo"],

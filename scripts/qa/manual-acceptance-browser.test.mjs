@@ -28,7 +28,7 @@ import {
   resolveManualAcceptanceDatasetReportRoot,
   runManualAcceptanceBrowser,
   readBusinessSummaryTotal,
-  readMobileLoadedTaskCount,
+  readMobileTaskTotal,
   resolveCurrentBatchListFilter,
   shipmentListReady,
   evaluateBusinessDashboardEvidence,
@@ -42,6 +42,7 @@ import {
   evaluateCurrentBatchListEvidence,
   evaluateMobileCurrentBatchEvidence,
   buildPrintWorkspaceDataEvidence,
+  currentBatchFactIdentifiers,
   getManualAcceptanceBrowserHelp,
   verifyManualAcceptanceBrowserDatasetBinding,
   verifyManualAcceptanceDatasetApplyReportBinding,
@@ -1760,7 +1761,7 @@ test("dashboard data evidence fails closed for empty or unavailable sources", ()
   );
 });
 
-test("dashboard task evidence requires a visible code from the exact current batch", () => {
+test("dashboard task evidence binds the visible page to the exact current batch", () => {
   const currentBatch = {
     dataStatus: "pass",
     actual: 18,
@@ -1786,13 +1787,14 @@ test("dashboard task evidence requires a visible code from the exact current bat
     { length: 18 },
     (_, index) => `YS-V5-LD-${String(index + 1).padStart(2, "0")}`,
   );
+  const currentPageTaskCodes = exactTaskCodes.slice(0, 8);
   assert.equal(
     evaluateDashboardTaskCurrentBatchEvidence({
       evidence: base,
       currentBatch,
       roleKey: "boss",
       visibleTaskCodes: ["YS-V5-LD-01"],
-      currentBatchTaskCodes: exactTaskCodes,
+      currentBatchTaskCodes: currentPageTaskCodes,
     }).minimumSatisfied,
     true,
   );
@@ -1802,7 +1804,7 @@ test("dashboard task evidence requires a visible code from the exact current bat
       currentBatch,
       roleKey: "boss",
       visibleTaskCodes: ["OLD-LD-01"],
-      currentBatchTaskCodes: exactTaskCodes,
+      currentBatchTaskCodes: currentPageTaskCodes,
     }).minimumSatisfied,
     false,
   );
@@ -1812,7 +1814,7 @@ test("dashboard task evidence requires a visible code from the exact current bat
       currentBatch,
       roleKey: "boss",
       visibleTaskCodes: ["YS-V5-LD-01"],
-      currentBatchTaskCodes: exactTaskCodes.slice(0, 17),
+      currentBatchTaskCodes: [],
     }).minimumSatisfied,
     false,
   );
@@ -1851,7 +1853,7 @@ test("dashboard task evidence requires a visible code from the exact current bat
     true,
   );
   for (const invalidCodes of [
-    exceptionCodes.slice(0, 3),
+    [],
     [...exceptionCodes, "YS-V5-SC-05"],
     [exceptionCodes[0], exceptionCodes[0], ...exceptionCodes.slice(2)],
   ]) {
@@ -2055,23 +2057,76 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   assert.equal(mismatchedCatalogMinimum.minimumSatisfied, false);
 });
 
-test("mobile task totals use the active tab's loaded summary even without a collapse toggle", () => {
-  assert.equal(readMobileLoadedTaskCount("todo", "已加载 18 条待处理"), 18);
-  assert.equal(readMobileLoadedTaskCount("done", "已加载 2 条已办"), 2);
-  assert.equal(readMobileLoadedTaskCount("done", "已加载 18 条待处理"), 0);
+test("mobile task totals use the current tab's canonical aria label", () => {
+  assert.equal(readMobileTaskTotal("todo", "全部，共 18 条"), 18);
+  assert.equal(
+    readMobileTaskTotal("done", "已办任务共 23 条，当前已加载 20 条"),
+    23,
+  );
+  assert.equal(readMobileTaskTotal("done", "全部，共 18 条"), null);
+  assert.equal(readMobileTaskTotal("todo", "已加载 18 条待处理"), null);
 });
 
 test("mobile task evidence waits for each lazy-loaded tab before reading zero", async () => {
   const source = await fs.readFile(scriptPath, "utf8");
   assert.match(source, /mobile-role-scroll/u);
   assert.match(source, /getAttribute\("aria-busy"\) === "false"/u);
-  assert.match(
-    source,
-    /mobile-role-nav-done[\s\S]{0,900}waitForActiveViewLoaded\(\)[\s\S]{0,500}readCurrentTotal\("done"\)/u,
+  const doneNavigationIndex = source.indexOf(
+    'getByTestId("mobile-role-nav-done")',
   );
-  assert.match(
-    source,
-    /loadedTodoCount \+ Number\(match\[1\] \|\| 0\) >= requiredMinimum/u,
+  const doneLoadedIndex = source.indexOf(
+    "await waitForActiveViewLoaded();",
+    doneNavigationIndex,
+  );
+  const doneTotalIndex = source.indexOf(
+    'readCurrentTotal("done")',
+    doneLoadedIndex,
+  );
+  assert.ok(doneNavigationIndex >= 0);
+  assert.ok(doneLoadedIndex > doneNavigationIndex);
+  assert.ok(doneTotalIndex > doneLoadedIndex);
+  assert.match(source, /mobile-role-filter-all/u);
+  assert.match(source, /mobile-role-done-count/u);
+  assert.match(source, /todoTotal \+ Number\(doneTotalMatch\[1\] \|\| 0\)/u);
+  assert.doesNotMatch(source, /已加载\\s\*\(\\d\+\)\\s\*条已办/u);
+});
+
+test("production order identifier prefers current visible records", () => {
+  const identifiers = currentBatchFactIdentifiers({
+    referenceRecords: {
+      shipments: [],
+      productionOrders: [
+        { order_no: "TEST-CLOSED", status: "CLOSED" },
+        { order_no: "TEST-DRAFT", status: "DRAFT" },
+        { order_no: "TEST-RELEASED", status: "RELEASED" },
+        { order_no: "TEST-CANCELLED", status: "CANCELLED" },
+      ],
+    },
+  });
+  assert.equal(identifiers["production-orders"], "TEST-RELEASED");
+  assert.equal(
+    currentBatchFactIdentifiers({
+      referenceRecords: {
+        shipments: [],
+        productionOrders: [
+          { order_no: "TEST-CLOSED", status: "CLOSED" },
+          { order_no: "TEST-DRAFT", status: "DRAFT" },
+        ],
+      },
+    })["production-orders"],
+    "TEST-DRAFT",
+  );
+  assert.equal(
+    currentBatchFactIdentifiers({
+      referenceRecords: {
+        shipments: [],
+        productionOrders: [
+          { order_no: "TEST-CLOSED", status: "CLOSED" },
+          { order_no: "TEST-CANCELLED", status: "CANCELLED" },
+        ],
+      },
+    })["production-orders"],
+    null,
   );
 });
 
