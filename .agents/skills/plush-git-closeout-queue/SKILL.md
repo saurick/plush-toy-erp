@@ -1,6 +1,6 @@
 ---
 name: plush-git-closeout-queue
-description: "协调 plush-toy-erp 共享 Local checkout 的唯一 writer、非阻塞远端发布等待、可恢复任务续跑、集中 index.lock 恢复、批次登记、显式授权的 Git 收口、遗留盘点与队列轮换。Use when 多个 Codex 顶层任务共享 dirty worktree、热点文件排队、Git 锁异常、App 重启恢复或轮换长上下文队列；独立写任务真并行应使用 Worktree，不用于单一 writer 的普通个人开发。"
+description: "协调 plush-toy-erp 共享 Local checkout 的路径级 writer lease、独立浏览器/Vite/数据库/端口资源租约、全仓唯一 Git index/commit、可恢复续跑、锁恢复、批次登记与显式授权收口。Use when 多个 Codex 顶层任务共享 dirty worktree、写入路径可能并行或冲突、热点文件排队、Git 锁异常、App 重启恢复或轮换长上下文队列；不用于单一 writer 的普通个人开发。"
 ---
 
 # Plush Git 收口队列
@@ -11,12 +11,14 @@ description: "协调 plush-toy-erp 共享 Local checkout 的唯一 writer、非�
 
 本 Skill 管 writer、批次和队列生命周期。用户明确授权复杂 stage、commit 或 push 后，再使用全局 `$git-closeout-coordination`。单一 writer 的普通个人开发继续遵循全局 Git 规则，不加载本 Skill。
 
-本 Skill 不是 Local 并行写引擎。同一 Local 仍只放行一个顶层 writer；用户要求多个独立写任务同时实施时，保留一个 Local，其余使用 Codex Worktree。
+本 Skill 是共享 Local 的路径与资源租约调度器，不是无限制并行写引擎。只有写入闭包和资源声明可证明互不冲突时才并行；无法界定派生写入、需要全仓命令或长期重叠的任务改用串行或独立 Codex Worktree。
 
 ## 不变量
 
-- 同一 Local checkout 同时只允许一个顶层文件 writer；Git index、commit 和 push 各自始终只有一个 owner。
-- 文件 writer、Git index / commit 与 push 是独立锁域；不能因一个锁域等待而自动撤销另一个锁域的 owner。
+- 同一 Local 可同时存在多个顶层文件 writer，但每个 writer 的“精确路径 + 可能派生路径”写入闭包必须完全不重叠，且不得运行会触达未声明路径的格式化、代码生成、锁文件更新、文档索引更新或其他全仓命令。
+- 同一文件即使 hunk 不同也必须串行；可能写入同一生成物、lockfile、索引或未知路径的请求也必须串行。无法证明不重叠时 fail closed。
+- Git index / stage / commit / stash / rebase 始终共用一个全仓唯一 owner；push 仍为独立且唯一 owner。Git 临界区与文件 writer 的兼容性按后文收口规则处理，不能从路径不重叠推导可并发改写 HEAD 或 index。
+- 文件 writer、Git owner、浏览器、Vite、数据库和端口是独立锁域；只有资源身份冲突，或浏览器声明的源码读取热点与 writer 写入闭包重叠时才互相等待。
 - writer grant 是 turn-scoped 写入租约，只在收到匹配 `GRANT_WRITER` 的当前 `inProgress` turn 与连续文件写入阶段有效；新 turn 不继承旧 grant。
 - writer 权不包含 stage、commit 或 push。业务或验证任务的“解除冻结”也不等于取得 writer / Git owner。
 - 不回退、清理、格式化、暂存或提交其他任务现场。路径或 hunk 归属不明时 fail closed。
@@ -48,7 +50,7 @@ event: <event name>
 revision: <stable revision or content token>
 ```
 
-按需追加 `paths`、`owned_hunks`、`last_write_at`、`validation`、`commit_authorized`、`authorization_evidence`、`push_authorized`、目标分支和 exact commit range。`commit_authorized` 未提供时按 `false`；只有本轮可定位的用户原意可以把它设为 `true`。旧 `commit_policy` 只作兼容元数据，`auto_local` 不能授权 Git 动作。`event_id` 在幂等重发时保持不变；内容实质变化才生成新 revision 和新 event_id。
+按需追加 `paths`、`derived_paths`、`forbidden_commands`、`start_identity`、`read_hotspots`、`resource_claims`、`owned_hunks`、`last_write_at`、`validation`、`commit_authorized`、`authorization_evidence`、`push_authorized`、目标分支和 exact commit range。`commit_authorized` 未提供时按 `false`；只有本轮可定位的用户原意可以把它设为 `true`。旧 `commit_policy` 只作兼容元数据，`auto_local` 不能授权 Git 动作。`event_id` 在幂等重发时保持不变；内容实质变化才生成新 revision 和新 event_id。
 
 协议 1 / 2 事件和旧 `auto_local` / `COMMIT_READY` 只兼容批次身份、路径与验证信息，统一迁移为 `commit_authorized: false`；历史事件不能代替当前用户授权。证据不足或归属漂移时进入 reconcile，不猜测范围。
 
@@ -74,25 +76,42 @@ worker 发现锁时只发送一次 `INDEX_LOCK_OBSERVED`，附 compact snapshot�
 4. 锁自然消失或脚本成功清除后，队列复核 HEAD、index、目标路径和活动进程，然后用该 `LOCK_CLEAR_NOTICE` 作为 clear event 恢复原 owner 与原队序。
 5. 同一 incident 的重复报告只返回已有状态，不重复清理、重排队列或制造自动唤醒循环。
 
-## Writer 生命周期
+## 路径级 Writer 生命周期
 
-写任务在首次写入非 ignored 文件前发送 `WRITER_REQUEST`，列出精确路径和计划 hunk，并等待队列返回匹配 ACK 与 `GRANT_WRITER`。只有被授予的路径可写。
+写任务在首次写入非 ignored 文件前发送 `WRITER_REQUEST`，并等待匹配 ACK 与 `GRANT_WRITER`。请求必须声明：
 
-`GRANT_WRITER` 只授权接收该 grant 的当前 turn 中一段连续文件写入。发生以下任一情况时租约立即失效：收到 `WRITER_RELEASED` / `WRITER_CANCELLED`；进入确认不会写非 ignored 文件的测试、浏览器检查或 diff 审查；给出最终回复；任务成为 `idle` / `notLoaded`；接收 grant 的 turn 变为 `completed` / `error` / `cancelled`；任务在后续新 turn 恢复。
+- `paths`：本轮允许直接写入的精确路径；同一文件不能拆成并行 hunk lease。
+- `derived_paths`：formatter、generator、lockfile、文档索引、快照或脚本可能连带写入的全部路径；确认没有时显式写 `none`。
+- `forbidden_commands`：本轮禁止的全仓 formatter、代码生成、依赖安装、索引重建等命令；无法给出有界派生集合的命令不得在共享 Local 并行运行。
+- `start_identity`：HEAD、index / `index.lock` 和每个直接/派生路径的 status、blob 或 SHA-256。
+- `resource_claims` 与 `read_hotspots`：需要的浏览器、Vite、端口、数据库目标，以及运行期必须保持稳定的源码路径；没有时显式写 `none`。
 
-最后一次文件写入后立即停止写入并发送 `WRITER_RELEASED`，包含最后写入时间、实际路径、`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`。checkpoint 至少记录原目标、下一安全动作、待验证项和是否还需 writer；不要为只读验证继续占 writer。发送后无需等待 ACK 即继续只读验证或最终收口，但不得继续写文件，也不得在匹配 ACK 前假定 release / batch 已登记；未收到 ACK 时在下一轮幂等重发。验证失败需要修复文件时重新发送 `WRITER_REQUEST`，旧任务恢复或新 turn 开始时也必须重新发现队列并申请，不能沿用历史 grant。任务取消时发送 `WRITER_CANCELLED`。
+队列以 `paths ∪ derived_paths` 作为写入闭包。只有它与所有活动 writer 闭包完全不相交、没有未界定副作用，且资源租约兼容时才可立即并行授予；同一文件、同一派生目标或身份不清时返回 `WAIT_HOT_FILE`。冲突请求按原队序串行；不冲突请求不被更早的冲突项阻塞。
 
-队列每次准备返回 `WAIT_WRITER` 或授予下一 writer 时，在同一 wake 内使用任务工具核对当前 owner：
+`GRANT_WRITER` 必须回显写入闭包、禁用命令、开始身份和资源声明，只授权接收该 grant 的当前 turn 中一段连续文件写入。发生以下任一情况时租约立即失效：收到 `WRITER_RELEASED` / `WRITER_CANCELLED`；进入确认不会写非 ignored 文件的测试、浏览器检查或 diff 审查；给出最终回复；任务成为 `idle` / `notLoaded`；接收 grant 的 turn 变为 `completed` / `error` / `cancelled`；任务在后续新 turn 恢复。
 
-1. 只有 owner 任务仍为 `active`、最新 turn 为 `inProgress`，且该 turn 正是接收匹配 `GRANT_WRITER` 的 turn，才把租约视为有效；另一个新 turn 即使正在运行也不能复活旧 grant。
-2. owner 为 `idle` / `notLoaded`，最新 turn 已 `completed` / `error` / `cancelled`，或最新 turn 不含匹配 grant 时，按 `TURN_ENDED` 使旧租约失效；不得继续返回 `WAIT_WRITER`，也不等待原任务补发 release。
-3. 同一次核对记录 optional-lock-free HEAD、index、lock 和授权路径身份。未报告的文件变化登记为 `UNREPORTED_WRITES`、`commit_authorized: false`，只影响后续 ownership / reconcile；它不能继续占 writer。下一请求基于实时身份重新绑定，安全时在同一 wake 放行。
-4. 若未报告变化与下一请求的目标 hunk 无法隔离，返回 `WAIT_HOT_FILE` / reconcile 并准确说明 ownership 问题，不能把它伪装成仍有活动 writer。旧 owner 后续恢复时必须先重新申请，且保留实时现场。
-5. owner turn 确实仍 `inProgress` 但已明确进入只读验证时，发送一次 `WRITER_RELEASE_REQUIRED`，要求在下一个安全消息边界释放；只有仍有明确待执行文件写入时才返回 `WAIT_WRITER`。
+最后一次文件写入后立即停止写入并发送 `WRITER_RELEASED`，包含最后写入时间、`actual_paths`、实际派生写入、`release_identity`、`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`。结束身份至少覆盖 HEAD、index / lock 及所有声明和实际写入路径。checkpoint 记录原目标、下一安全动作、待验证项和是否还需 writer；不要为只读验证继续占 writer。发送后无需等待 ACK 即继续只读验证或最终收口，但不得继续写文件，也不得在匹配 ACK 前假定 release / batch 已登记；验证失败或新 turn 恢复都要重新申请。任务取消时发送 `WRITER_CANCELLED`。
 
-队列收到 release / cancelled 后，登记批次的最新状态，再按顺序处理下一项 writer 请求，不要求各 worker 定时轮询或反复询问。等待 Git 授权或被阻塞的批次不能阻塞无重叠的后续 writer。授予 writer 或经授权的 Git owner 前一次性重读 HEAD、index、lock / 活动 Git 进程和请求路径；热点仍在写、请求已漂移或 owner 不清楚时返回 `WAIT_WRITER` / `WAIT_HOT_FILE` 并保留队列项。
+队列每次准备返回 `WAIT_WRITER` 或授予 writer 时，在同一 wake 内核对全部活动 lease：
+
+1. 只有任务仍为 `active`、最新 turn 为 `inProgress`，且该 turn 正是接收匹配 grant 的 turn，才保留对应路径与资源 lease；新 turn 不能复活旧 grant。
+2. 任务为 `idle` / `notLoaded`，turn 已结束或不含匹配 grant 时，按 `TURN_ENDED` 仅释放该任务的 lease，不影响其他 writer。
+3. 对每个 lease 记录 optional-lock-free HEAD、index、lock 和写入闭包身份。未报告变化登记为 `UNREPORTED_WRITES`、`commit_authorized: false`；只暂停越界任务和与异常路径重叠的请求，不冻结其他已证明不重叠的 writer。
+4. 若变化无法与下一请求隔离，才对相关路径返回 `WAIT_HOT_FILE` / reconcile；旧 owner 后续恢复必须重新申请。
+5. 活动 turn 已进入只读验证时发送一次 `WRITER_RELEASE_REQUIRED`；仍有明确文件写入才继续保留该 lease。
+
+队列收到 release / cancelled 后，登记批次并在同一 wake 重审全部等待请求：立即并行授予所有与活动写入闭包、资源租约互不冲突且身份稳定的请求；只让相互冲突的请求按原队序等待。授予 writer 或 Git owner 前一次性重读 HEAD、index、lock / 活动 Git 进程、请求闭包和资源身份；只对发生热点、漂移或归属不清的请求返回 `WAIT_WRITER` / `WAIT_HOT_FILE`。
+
+规则升级前已经发出的 lease 不撤销；从各自下一个安全释放点开始按新模型重绑。旧 lease 释放后立即重审等待队列，不用它继续维持全仓 writer 冻结。
 
 worker 收到任何 `WAIT_*` 后立即结束当前 turn，保留现场、event_id 和 continuation checkpoint；不得持续运行等待循环、反复读取队列或发送“仍在等待”。只读分析可以完成并报告，但不能占用一个长期 in-progress turn 模拟后台任务。
+
+## 浏览器、Vite、数据库与端口租约
+
+- 浏览器请求声明源码 `read_hotspots`、目标 URL、Vite/浏览器进程身份、端口和 ignored 证据路径。只有 read hotspot 与活动 writer 写入闭包重叠时等待；不重叠 writer 可继续。
+- Vite 与端口按 `host:port` 唯一占用；同一端口串行，不同端口不互相阻塞。浏览器结束只清理任务拥有的进程和端口。
+- 数据库请求声明不含凭据的目标身份、读写模式和 migration/schema 依赖；同一可写目标或相同 schema/migration 热点串行，不同目标且无源码冲突时可并行。
+- 资源越界只暂停越界任务，记录实际进程、端口、数据库或路径身份；不得因此撤销其他不重叠资源或 writer lease。
 
 ### WAIT 恢复触发
 
@@ -121,7 +140,7 @@ worker 收到任何 `WAIT_*` 后立即结束当前 turn，保留现场、event_i
 
 执行自动或手动本地收口时：
 
-1. 暂停新 writer grant，确认当前无 writer、commit 或 push owner。
+1. 暂停新 writer grant，等待所有活动 writer 到安全释放点，并确认没有其他 index / commit / stash / rebase / push owner；Git 临界区仍是全仓唯一。
 2. 使用 optional-lock-free 快照重新读取 HEAD、status、index、lock / Git 进程、批次 revision 和目标 diff；混合文件必须按 owned hunk 精确 stage。
 3. 只有验证已完成、路径或 hunk 归属完整、热点已释放，且 `CLOSEOUT_REQUEST` 对相应 Git 动作有明确授权时，使用 `$git-closeout-coordination` 完成授权范围内的 stage 或 Conventional Commit。
 4. hook 改写、index 污染、路径重叠、revision 漂移或 ownership 不完整时停止该批并保留现场；不要用 `git add -A`、目录归类或时间戳猜测。
@@ -132,7 +151,7 @@ worker 收到任何 `WAIT_*` 后立即结束当前 turn，保留现场、event_i
 
 push 使用独立事件 `PUSH_REQUEST`、`PUSH_STARTED`、`PUSH_FINISHED`、`PUSH_FAILED`。授权必须说明目标 remote / branch 和允许推送的 exact commit range；本地 ahead 中混有未授权 commit 时停止。
 
-队列只在没有 writer、commit 或其他 push owner 时授予 push owner。开始前 fetch 并记录 local HEAD、upstream OID、remote OID、index 和工作区身份；执行前再次确认未漂移。发现其他任务、GitHub Desktop 或外部终端正在 push，或 remote ref 已变化时，把请求保留排队并 fail closed；不要自动 pull、merge、rebase、force、重试或扩大授权。
+队列只在没有活动 writer、index / commit / stash / rebase 或其他 push owner 时授予 push owner。开始前 fetch 并记录 local HEAD、upstream OID、remote OID、index 和工作区身份；执行前再次确认未漂移。发现其他任务、GitHub Desktop 或外部终端正在 push，或 remote ref 已变化时，把请求保留排队并 fail closed；不要自动 pull、merge、rebase、force、重试或扩大授权。
 
 普通 push 自身会拒绝非 fast-forward，但这不是提前并发锁。无法阻止外部客户端时，只报告已观察到的 Git / remote 状态，不声称拥有全局排他锁。
 
@@ -153,9 +172,9 @@ App 重启、旧任务没有发 ready/release、队列丢失或本地留有无�
 
 用户要求“新开一模一样的 Git 收口队列”、当前队列上下文过长或需主动交接时，使用显式的 `QUEUE_ROTATE_REQUEST`。不要 fork 旧任务，因为 fork 会携带长历史；创建同项目、Local 环境的空白新任务。
 
-轮换前必须没有 writer、commit 或 push owner。旧队列进入 `ROTATING`，暂停新 grant，但继续 ACK 已在途的 release / ready 事件。随后：
+轮换前必须没有活动 writer 或资源 lease，也没有 index / commit / stash / rebase / push owner。旧队列进入 `ROTATING`，暂停新 grant，但继续 ACK 已在途的 release / ready 事件。随后：
 
-1. 旧队列生成一份紧凑 `QUEUE_SNAPSHOT`：`protocol_revision`、`snapshot_id`、旧队列 task id、当前 owner、待处理 writer 请求、已知 batch 与授权、各来源最后 ACK event_id、活动 closeout / push、未结束 lock incident、未知路径、观察到的 HEAD / index。
+1. 旧队列生成一份紧凑 `QUEUE_SNAPSHOT`：`protocol_revision`、`snapshot_id`、旧队列 task id、活动 writer 写入闭包与资源 lease、待处理请求、已知 batch 与授权、各来源最后 ACK event_id、活动 Git / push、未结束 lock incident、未知路径、观察到的 HEAD / index。
 2. 创建临时标题 `Git 收口队列（接班）` 的新任务并置顶；把本 Skill 的读取要求和 snapshot 发给它。
 3. 新队列重新读取仓库 `AGENTS.md` 与本 Skill，再实时复核 HEAD、status、index、lock / Git 进程；返回 `ACK <snapshot_id>` 与 `QUEUE_ACCEPTED`。snapshot 是交接线索，不覆盖实时仓库。
 4. 收到接受确认后，旧队列改名为 `Git 收口队列（已交接 YYYY-MM-DD）`，取消置顶并归档；再把新队列改为精确标题 `Git 收口队列` 并保持置顶。

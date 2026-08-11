@@ -69,15 +69,32 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
     ),
   ]);
 
-  assert.match(agents, /只有真实并发 writer[\s\S]*\$plush-git-closeout-queue/u);
-  assert.match(agents, /writer grant 只覆盖[\s\S]*当前 `inProgress` turn/u);
-  assert.match(agents, /远端 CI \/ Release \/ 部署等待[\s\S]*不得占 Local writer/u);
-  assert.match(agents, /未完成任务 release 后继续只读收口/u);
-  assert.match(agents, /可自助处理的 WAIT 或 blocker 清除后[\s\S]*触发一次新 turn 续做/u);
-  assert.match(agents, /不能只留 checkpoint \/ ACK/u);
-  assert.match(agents, /额度恢复或新 turn 重验现场/u);
+  assert.match(
+    agents,
+    /多个 Codex 写任务共享 Local[\s\S]*\$plush-git-closeout-queue/u,
+  );
+  assert.match(agents, /写入闭包完全不重叠[\s\S]*才可并行/u);
+  assert.match(agents, /同一文件、派生目标或归属不明必须串行/u);
+  assert.match(agents, /writer request \/ grant 声明精确路径[\s\S]*开始身份/u);
+  assert.match(agents, /release 回报实际路径与结束身份/u);
+  assert.match(agents, /越界只暂停越界任务/u);
+  assert.match(
+    agents,
+    /Git index \/ stage \/ commit \/ stash \/ rebase[\s\S]*全仓唯一 owner/u,
+  );
+  assert.match(agents, /浏览器、Vite、数据库和端口使用独立资源租约/u);
   assert.match(agents, /stage、commit 和 push 是独立动作，均先询问用户/u);
   assert.match(skill, /协议版本为 `3`/u);
+  assert.match(skill, /`paths ∪ derived_paths` 作为写入闭包/u);
+  assert.match(skill, /同一文件即使 hunk 不同也必须串行/u);
+  assert.match(skill, /`GRANT_WRITER` 必须回显写入闭包[\s\S]*开始身份/u);
+  assert.match(skill, /`release_identity`[\s\S]*所有声明和实际写入路径/u);
+  assert.match(skill, /只暂停越界任务[\s\S]*不冻结其他已证明不重叠的 writer/u);
+  assert.match(skill, /规则升级前已经发出的 lease 不撤销/u);
+  assert.match(skill, /旧 lease 释放后立即重审等待队列/u);
+  assert.match(skill, /浏览器请求声明源码 `read_hotspots`/u);
+  assert.match(skill, /同一端口串行，不同端口不互相阻塞/u);
+  assert.match(skill, /同一可写目标或相同 schema\/migration 热点串行/u);
   assert.match(skill, /`INDEX_LOCK_OBSERVED`/u);
   assert.match(skill, /worker 发现锁时只发送一次/u);
   assert.match(skill, /`STALE_INDEX_LOCK`[\s\S]*自助清理一次/u);
@@ -86,11 +103,13 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
   assert.match(skill, /`LOCK_CLEAR_NOTICE` 作为其 `resume_on`/u);
   assert.match(skill, /收到任何 `WAIT_\*` 后立即结束当前 turn/u);
   assert.match(skill, /writer grant 是 turn-scoped 写入租约/u);
-  assert.match(skill, /按 `TURN_ENDED` 使旧租约失效/u);
-  assert.match(skill, /不得继续返回 `WAIT_WRITER`，也不等待原任务补发 release/u);
-  assert.match(skill, /进入只读验证时，发送一次 `WRITER_RELEASE_REQUIRED`/u);
-  assert.match(skill, /旧任务恢复或新 turn 开始时也必须重新发现队列并申请/u);
-  assert.match(skill, /未报告的文件变化登记为 `UNREPORTED_WRITES`/u);
+  assert.match(skill, /按 `TURN_ENDED` 仅释放该任务的 lease/u);
+  assert.match(
+    skill,
+    /活动 turn 已进入只读验证时发送一次 `WRITER_RELEASE_REQUIRED`/u,
+  );
+  assert.match(skill, /验证失败或新 turn 恢复都要重新申请/u);
+  assert.match(skill, /未报告变化登记为 `UNREPORTED_WRITES`/u);
   assert.match(skill, /`EXACT_CLEAN_FREEZE`、`PUSH_FREEZE`、`CLOSEOUT_FREEZE` 不是协议事件/u);
   assert.match(skill, /任何全工作树冻结请求都返回 `UNSUPPORTED_LOCK_DOMAIN`/u);
   assert.match(skill, /`task_complete`、`next_phase` 和紧凑 `continuation_checkpoint`/u);

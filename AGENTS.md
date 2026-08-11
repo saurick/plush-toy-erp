@@ -33,8 +33,8 @@
 - 项目负责人和 Codex 把不完整需求补成最小完整闭环，主动补齐必要的真源、状态、权限、异常、恢复、测试和基础易用性。优先复用和简单方案；只有当前需求或正确性、安全、数据完整性、可运维性确实需要时才增加复杂度，并说明理由。
 - 默认循环是“甲方目标或痛点 → Codex 实现与验证 → 经明确授权发布固定版本 → 甲方使用反馈 → 缺陷、细化或新需求”。按一个可验证业务切片完成，不建需求编号或多阶段计划；正式代码和文档不用历史 Phase/P 编号，`P0/P1/P2` 只表示风险优先级。
 - 开始和收口检查 worktree，保留其他任务或用户已有改动，不回退、格式化、删除、stage 或宣称为本轮成果。
-- 只有出现真实并行写入，或变更触及 schema / migration、业务事实、权限、安全、发布回滚、客户交付时，才启用对应专项治理；个人开发不降低这些高风险边界。实际出现多个 Codex 写任务共享 Local 时，同一时刻只保留一个文件 writer，必要时使用 `$plush-git-closeout-queue`；没有真实并发时不发现、不创建也不等待队列。
-- writer grant 只覆盖匹配 grant 的当前 `inProgress` turn 与连续写入；最后写入后立即 release，只读验证、远端 CI / Release / 部署等待、额度中断或 turn 结束不得占 Local writer / index / commit / push。未完成任务 release 后继续只读收口；可自助处理的 WAIT 或 blocker 清除后，队列必须触发一次新 turn 续做，不能只留 checkpoint / ACK。额度恢复或新 turn 重验现场并申请所需 writer，`idle` / `notLoaded` 不保留旧租约。
+- 只有真实并行写入，或触及 schema / migration、业务事实、权限、安全、发布回滚、客户交付时，才启用专项治理；个人开发不降低这些边界。多个 Codex 写任务共享 Local 时，由 `$plush-git-closeout-queue` 按“声明路径 + 可能派生路径”授予 writer lease：写入闭包完全不重叠且无全仓格式化、代码生成、锁文件或文档索引等连带写入才可并行；同一文件、派生目标或归属不明必须串行。没有真实并发时不发现、不创建也不等待队列。
+- writer request / grant 声明精确路径、派生写入、禁用的全仓命令和开始身份；grant 只覆盖匹配 `inProgress` turn 的连续写入，release 回报实际路径与结束身份。最后写入后立即 release；只读验证、远端等待、额度中断或 turn 结束不占租约。越界只暂停越界任务。Git index / stage / commit / stash / rebase 保持全仓唯一 owner；浏览器、Vite、数据库和端口使用独立资源租约，仅在资源冲突或读取热点与 writer 重叠时等待。
 - stage、commit 和 push 是独立动作，均先询问用户；完成实现或验证不自动取得 Git 授权。
 - 本仓库不恢复单独执行规格目录、短任务模板或本地审查报告目录。
 
