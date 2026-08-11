@@ -32,7 +32,6 @@ Phase 7 当前只能使用模拟数据完成试用演练；当前没有可直接
 
 1. 目标客户正式环境写入或客户现场验收。
 2. 永绅 yoyoosun 真实客户数据 import / backfill。
-3. `business_records` 迁移、归档或 cutover。
 4. 出货、库存出库、库存预留、财务、发票、付款、应收或应付事实。
 5. schema、migration、runtime API 语义或 Workflow / Fact usecase 变更。
 6. Phase 8 的生产、委外、出货、库存预留或财务事实扩展。

@@ -19,7 +19,7 @@ Options:
   --out <path>       Required. Output directory for freeze evidence.
   --help             Print this help.
 
-This tool freezes evidence only. It never connects to a database, reads server config, writes formal tables, writes business_records, generates SQL, generates migrations, or executes a real import.`
+This tool freezes evidence only. It never connects to a database, reads server config, writes formal tables, generates SQL, generates migrations, or executes a real import.`
 
 const OUTPUT_FILES = [
   'freeze-metadata.json',
@@ -763,7 +763,7 @@ ${deferredRows}
 
 ## No real import
 
-No real import is executed by this freeze checker. The tool does not connect to a database, does not write formal V1 tables, does not write \`business_records\`, does not create SQL, and does not modify schema, API, UI, seedData, or docs registry. \`canExecuteRealImport\` is always \`false\`.
+No real import is executed by this freeze checker. The tool does not connect to a database, does not write formal V1 tables, does not create SQL, and does not modify schema, API, UI, seedData, or docs registry. \`canExecuteRealImport\` is always \`false\`.
 
 ## Manual Review Next Steps
 

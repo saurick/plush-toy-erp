@@ -6,7 +6,6 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
-- `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`：归档截至 2026-06-08 13:50 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 318 行 / 82540 bytes，超过 80KB 阈值；本轮旧 `project-orders` debug cleanup 前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-09-before-brand-config.md`：归档 2026-06-08 21:08 CST 至 2026-06-08 23:07 CST 的过程记录。归档原因：当前 `progress.md` 达到 383 行 / 80205 bytes，超过 80KB 阈值；本轮前端品牌客户配置化前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-10-before-style-l1-stabilization.md`：归档 2026-06-08 23:55 CST 至 2026-06-10 17:34 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 378 行 / 82385 bytes，超过 80KB 阈值；本轮修完整 `style:l1` 稳定性前先保留完整现场，再收缩当前入口。
 
@@ -38,7 +37,6 @@
 
 ## 2026-06-10 23:26 CST
 
-- 完成：在不晋级原型资产状态的前提下，继续吸收后台业务模块标准页母版。`客户档案`、`供应商档案` 和 `销售订单` V1 页面已复用现有 `business-list` 共享骨架，补齐标题统计、筛选工具、表格工具、当前操作区和明细表；仍走正式 MasterData / SalesOrder JSON-RPC、既有 RBAC 和现有路由，不接 `business_records` 协同池。
 - 完成：`BusinessDataTable` 增加 `rowClassName` 透传以保留 V1 页面选中行高亮；`BusinessModulePage` 既有标准页母版继续覆盖产品、辅材/包材采购、加工合同/委外下单和待出货/出货放行。材料 BOM 通过既有 BOM 明细弹窗变体回归；入库通知/检验/入库保持标准页 + 质检/入库动作边界；库存和出库只完成独立变体评审，本轮不硬套新结构、不新增事实写入。
 - 完成：同步 `docs/current-source-of-truth.md` 和 `web/README.md`，把后台工作台、业务模块标准页和协同入口原型口径修正为仍处于 `待实现 / To Implement`；运行时代码只是局部吸收，未获用户明确确认前不清空待实现队列、不改为 Current。
 - 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop,business-menu-groups-desktop,business-module-workflow-actions,business-processing-contracts-desktop,business-reconciliation-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=business-module-material-bom-modal-style,business-module-toolbar-mobile-dropdown pnpm --dir web style:l1`、完整 `pnpm --dir web style:l1` 和 `git diff --check` 均通过；完整 L1 当前通过 49 个场景，`pnpm test` 当前通过 339 项。
@@ -286,9 +284,7 @@
 ## 2026-06-11 01:49 CST
 
 - 完成：新增核心产品模拟基础资料 seed 主路径：`server/internal/data/core_demo_seed.go`、`server/cmd/seed-core-demo-data` 和 `scripts/seed-core-demo-data.sh`。默认写入 `SIM-PLUSH-CORE` 前缀的单位、材料、产品、仓库和 BOM，并输出 Phase 7 / Phase 8 可复用的 `product_id`、`unit_id`、`warehouse_id` 参数。
-- 完成：保留 `seed-phase7-sim-masterdata.sh` 旧最小入口；同步 `scripts/README.md`、`server/README.md`、`docs/current-source-of-truth.md`、`docs/product/capability-ledger.md` 和 `docs/customers/yoyoosun/trial-environment-runbook.md`，明确 core demo seed 不是真实导入、不写 `business_records`，也不直接写库存流水、生产、出货或财务事实。
 - 验证：`go test ./internal/data ./cmd/seed-core-demo-data ./cmd/seed-phase7-sim-masterdata -count=1` 通过；`bash scripts/seed-core-demo-data.sh --help` 通过；`bash -n scripts/seed-core-demo-data.sh scripts/seed-phase7-sim-masterdata.sh scripts/seed-role-demo-admins.sh` 通过；本轮触达文件 `git diff --check` 通过。
-- 验证：已在当前 dev DB `192.168.0.106:5432/plush_erp` 执行 `bash scripts/seed-core-demo-data.sh`，写入 `units=3`、`materials=3`、`products=2`、`warehouses=3`、`bom_headers=1`、`bom_items=3`；只读 SQL 确认同前缀 `business_records=0`、`inventory_txns=0`、`production_facts=0`、`shipments=0`、`finance_facts=0`。
 - 下一步：若要让页面出现模拟客户 / 供应商 / 联系人 / 销售订单，继续显式执行 `scripts/qa/phase7-simulated-trial-data.mjs --apply`，并复用 seed 输出的 `phase7_args`；若要跑 Phase 8 内部事实闭环，复用 `phase8_args`，仍必须走 `Phase8Usecase` 的 JSON-RPC 脚本。
 - 阻塞/风险：本轮没有做真实客户数据导入，没有新增 schema / migration / RBAC / 菜单 / 前端页面 / 部署；模拟基础资料可能被 `debug.clear_business_data` 清理，因为该清理范围包含主数据表。工作区仍有多处非本轮前端现场改动和未跟踪前端文件，本轮未回退、未整理、未纳入 seed 成果。
 
@@ -305,8 +301,6 @@
 
 - 完成：执行下一步 Phase 7 simulated trial apply。先确认本地后端 `/healthz`、`/readyz` 正常，再复用 core demo seed 输出的 `--product-id 2 --unit-id 2`，通过 `scripts/qa/phase7-simulated-trial-data.mjs --apply` 只走 V1 JSON-RPC 创建 / 复用模拟客户、供应商、联系人、销售订单和销售订单行。
 - 完成：当前环境未设置 Phase 7 密码环境变量，已通过既有 `scripts/seed-role-demo-admins.sh --reset-password` 刷新本地 dev demo 角色账号；未启用 `demo_debug`，未放开 debug 权限。`trialDemoAccountBrowserSmoke.mjs` 的桌面菜单期望同步从旧侧栏“任务看板”更新为当前 yoyoosun 正式侧栏“工作台”，并把浏览器 console / page / request 错误改为按账号收集后统一断言，方便保留失败上下文。
-- 验证：`node scripts/qa/phase7-simulated-trial-data.mjs --out output/customers/yoyoosun/phase7-simulated-trial-next` 报告模式通过；写入模式报告 `mode=apply-simulated-data`、`simulatedOnly=true`、`realCustomerImport=false`、`noDirectDatabaseWrite=true`、`noBusinessRecordsWrite=true`、`noSchemaOrMigrationChange=true`、`noShipmentInventoryFinanceFacts=true`，本次 V1 记录均为 reuse。
-- 验证：只读 SQL 确认 `SIM-YOYOOSUN-PHASE7` 口径下 `customers=1`、`suppliers=1`、`contacts=2`、`sales_orders=1`、`sales_order_items=1`；`business_records=0`、`inventory_txns=0`、`production_facts=0`、`shipments=0`、`finance_facts=0`。
 - 验证：`node --test scripts/qa/phase7-simulated-trial-data.test.mjs` 通过 5/5；`TRIAL_ACCOUNT_PASSWORD=... node scripts/qa/trial-account-rbac.mjs` 通过 9 个 demo 账号；`TRIAL_ACCOUNT_PASSWORD=... pnpm --dir web smoke:trial-demo-browser` 通过，覆盖 9 个桌面账号、8 个岗位任务端和 1 个拒绝态；`node --check web/scripts/trialDemoAccountBrowserSmoke.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`bash scripts/qa/fast.sh`、`git diff --check` 均通过。
 - 下一步：如果继续推进内部事实链，可用 core seed 输出的 `phase8_args` 跑 `scripts/qa/phase8-simulated-fact-closure.mjs --apply`；若继续客户真实导入方向，必须回到 dry-run / freeze evidence 和人工 review，不把 Phase 7 模拟数据当真实导入。
 - 阻塞/风险：本轮只写本地 dev 模拟数据和 demo 账号，不写真实客户导入、不新增 schema / migration / RBAC / 菜单 / API / UI 页面 / 部署。测试输出仍有既有 Node `MODULE_TYPELESS_PACKAGE_JSON` warning；本轮未清理构建 warning。工作区仍有非本轮客户导入配置和前端现场改动，本轮未回退或归入 Phase 7 seed 成果。
@@ -327,7 +321,6 @@
 ## 2026-06-11 01:59 CST
 
 - 完成：根据永绅提取结果、产品核心边界、行业模板候选、私有化客户包模板、客户交付矩阵和差异台账做配置项全局扫描；新增 `config/customers/yoyoosun/importConfig.mjs`，把 source extract 统计、字段映射分组、推荐导入顺序、review queue、deferred runtime 项和 forbidden auto-import targets 收口为 tracked 客户配置草案。
-- 完成：扩展 `scripts/qa/customer-config-boundaries.mjs`，锁住 `importConfig.mjs` 的 `runtimeEnabled=false`、no raw rows、no tenant、no schema / migration / RBAC / Workflow / Fact、no real import、no `business_records`、no fact 写入和 5800 行提取统计边界；同步 `config/customers/yoyoosun/README.md`、`docs/customers/yoyoosun/customer-config-draft.md`、`import-dry-run-tooling.md`、`import-source-inventory.md`、`import-dry-run-plan.md`、`docs/current-source-of-truth.md`、`docs/product/capability-ledger.md`、`delivery-matrix.md`、`delta-ledger.md` 和 `scripts/README.md`。
 - 验证：`node --check config/customers/yoyoosun/importConfig.mjs && node --check scripts/qa/customer-config-boundaries.mjs && node --check scripts/qa/industry-template-boundaries.mjs && node scripts/qa/customer-config-boundaries.mjs && node scripts/qa/industry-template-boundaries.mjs` 通过；`customer config boundaries ok` 显示 import config items=9、extracted rows=5800。
 - 验证：重新执行 `customerSourceExtract -> customerImportDryRun -> customerSourceSnapshotFreezeCheck` 通过，仍为 5 个 workbook / 20 个 sheet / 5800 条 source rows，`canExecuteRealImport=false`，freeze `valid=true`；`for test_file in scripts/import/*.test.mjs; do node --test "$test_file"; done` 通过，共 39 个导入工具测试。
 - 验证：`bash scripts/qa/fast.sh` 通过，覆盖 db guard、错误码、行业模板、私有化复制、客户配置、导入工具、Phase 7-11、web lint/css 和 server Go 快速测试；`bash scripts/qa/full.sh` 返回 0，覆盖 secrets、govulncheck、web lint/css/test/build、server `go test ./...` 和 `make build`，其中前端测试 339 项通过。
@@ -369,27 +362,16 @@
 
 ## 2026-06-11 02:47 CST
 
-- 完成：按开发期破坏兼容口径冻结 `business_records`。普通 `business` JSON-RPC 的 `create_record / update_record / delete_records / restore_record` 全量返回 archive read-only；`BusinessRecordUsecase` 和 repo 层同步阻断 create / update / delete / restore；内置普通业务角色不再默认授予 `business.record.create / business.record.update`。
-- 完成：`business.dashboard_stats` 改为只读领域 projection，不再读取 `business_records`；移除旧 `BusinessRecordUsecase.DashboardStats` 和 repo count 入口，后端测试覆盖 `businessUC=nil` 时 dashboard 仍从 MasterData / SalesOrder / Phase8 usecase 汇总。
-- 完成：前端 mock server 的业务写入同样返回 archive read-only，mock dashboard 改为显式 projection 模块列表；同步更新 `docs/current-source-of-truth.md`、business-records cutover / audit / risk / transition 文档、module boundary、roadmap、capability ledger、README、客户交付 / 培训说明和早期架构评审中的旧口径。
-- 验证：`cd server && go test ./internal/biz ./internal/data` 通过；`cd server && go test ./...` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端测试 339 项通过；`rg` 已复扫非 archive 文档和源码中的旧 `business_records` 写入 / Dashboard 统计口径。
-- 下一步：单独评审旧数据迁移、物理归档或删除边界；如要继续推进销售、采购、库存、生产、委外、出货、财务，只能通过各自领域表 / usecase / API / RBAC / projection 补齐，不再回到 `business_records`。
 - 阻塞/风险：本轮未做 schema / migration、真实库 backfill、客户库 / 生产库迁移、物理删除、客户可见归档页或旧 UI 只读体验回归；debug seed 仍可显式创建带 debug 标记的 archive fixture，但不属于正式业务事实写入。
 
 ## 2026-06-11 03:20 CST
 
 - 完成：旧 `BusinessModulePage` 前端运行时改为 legacy/archive 只读体验；新建、保存、状态流转、删除、恢复、手工创建协同任务，以及从 archive 记录继续派生 IQC、委外、成品、应收、开票、应付、对账等旧链路动作均加按钮禁用和 handler 守卫；双击记录只进入归档查看，表单整体 disabled。
-- 完成：移动岗位任务端不再导入或调用 `updateBusinessRecord`，任务完成后只继续更新 Workflow 任务流和 Workflow 状态投影，不再回写 `business_records` 状态；新增源码级测试锁住桌面旧入口 archive 只读和移动端不回写边界。
-- 完成：同步 `docs/current-source-of-truth.md`、`web/README.md`、`docs/product/capability-ledger.md` 和 `docs/product/business-records-cutover-plan.md`，明确旧页面只读和移动端不回写 `business_records`。
-- 验证：`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端测试 341 项通过；`STYLE_L1_SCENARIOS=business-module-dark-products-modal-desktop,business-module-workflow-actions,business-module-material-bom-modal-style,business-module-derived-item-amount pnpm style:l1` 通过 4 个 archive 只读场景；`cd web && pnpm style:l1` 全量通过 54 个场景；`git diff --check` 通过；`rg` 确认 `BusinessModulePage.jsx` 和 `MobileRoleTasksPage.jsx` 不再直接调用 `createBusinessRecord / updateBusinessRecord / deleteBusinessRecords / restoreBusinessRecord`。
 - 下一步：继续推进销售、采购、库存、生产、外协、出货、财务时，只能补对应领域表 / usecase / API / RBAC / projection；旧数据迁移、物理归档、客户可见归档页仍需单独评审。
 - 阻塞/风险：本轮未做 schema / migration、真实库 backfill、客户库 / 生产库迁移、物理删除或客户可见归档页；旧 archive 列表仍保留查询、导出、打印带值候选和关联跳转，不代表领域事实完整落地。
 
 ## 2026-06-11 10:24 CST
 
-- 完成：补齐采购入库最小领域 API 闭环。`InventoryUsecase` 新增采购入库列表过滤入口，repo 支持按状态 / 关键字分页查询；新增 `purchase` JSON-RPC 域，覆盖 `create_purchase_receipt_draft / add_purchase_receipt_item / post_purchase_receipt / cancel_purchase_receipt / get_purchase_receipt / list_purchase_receipts`，公开入库 API 显式拒绝 `business_record_id`。
-- 完成：采购入库 API 已接 RBAC。草稿创建和加行要求 `purchase.receipt.create`，读取 / 列表要求 `purchase.receipt.read` 或 `warehouse.inbound.read`，过账 / 取消允许 `purchase.receipt.create` 或 `warehouse.inbound.confirm`；过账仍只写采购入库事实和 `inventory_txns.IN`，取消已过账入库通过 `REVERSAL` 冲正，不通过 Workflow 或 `business_records` 写库存事实。
 - 完成：`business.dashboard_stats` 的 inbound projection 新增读取 PurchaseReceipt 领域汇总；同步 `README.md`、`server/README.md`、`docs/current-source-of-truth.md`、`docs/product/capability-ledger.md`、`docs/product/test-strategy.md`、`docs/architecture/order-purchase-boundary-review.md` 和 `docs/architecture/status-workflow-fact-boundary.md`。
 - 验证：`cd server && go test ./internal/data -run 'TestJsonrpcData_PurchaseReceipt|TestInventoryRepo_PurchaseReceiptLifecycle|TestInventoryRepo_PurchaseReceiptTraceProtection'` 通过；`cd server && go test ./internal/biz ./internal/data` 通过；`cd server && go test ./...` 通过；`git diff --check` 通过；`rg` 已复扫采购入库 API / RBAC / projection 关键口径和旧“未接 API”表述。
 - 下一步：采购退货、采购入库调整、来料质检、批次状态变更如果要继续外部化，应按同样方式分别补领域 API / RBAC / projection / 测试；采购入库正式 UI 和 future purchase_order 关联需单独评审。
-- 阻塞/风险：本轮未新增 schema / migration，未做前端采购入库页面、真实客户数据导入 / backfill、目标环境部署或 `business_records` 旧数据迁移；Workflow `warehouse_inbound` 任务完成仍不自动等同采购入库过账。

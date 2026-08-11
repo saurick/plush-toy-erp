@@ -75,7 +75,7 @@ func TestDebugSeedRepo_CleanupDryRunDoesNotMutateAndCleanupOnlyDebugData(t *test
 		t.Fatalf("cleanup failed: %v", err)
 	}
 	if len(cleanup.ArchivedRecords) != 0 {
-		t.Fatalf("expected no archived business records, got %#v", cleanup.ArchivedRecords)
+		t.Fatalf("expected no archived debug rows, got %#v", cleanup.ArchivedRecords)
 	}
 	if len(cleanup.DeletedTasks) != beforeTasks || cleanup.DeletedBusinessStates != beforeStates {
 		t.Fatalf("unexpected cleanup task/state counts %#v", cleanup)

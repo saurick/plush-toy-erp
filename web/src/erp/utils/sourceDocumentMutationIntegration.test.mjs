@@ -226,7 +226,7 @@ test('source-document read-only modals load complete line items', () => {
   for (const page of pageSources) {
     const detailsModal = functionSlice(
       page.source,
-      '<BusinessRecordDetailsModal',
+      '<BusinessDetailsModal',
       page.detailsModalEnd
     )
     assert.match(detailsModal, /lineItems=\{/u)
@@ -240,7 +240,7 @@ test('source-document read-only modals load complete line items', () => {
   )
   const receiptDetailsModal = functionSlice(
     receiptSource,
-    '<BusinessRecordDetailsModal',
+    '<BusinessDetailsModal',
     '<PurchaseReceiptExceptionModal'
   )
   assert.match(receiptDetailsModal, /lineItems=\{/u)

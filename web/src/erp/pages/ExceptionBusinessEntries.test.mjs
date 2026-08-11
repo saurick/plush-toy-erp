@@ -58,7 +58,7 @@ test('finance V1: lists real payments, allocates multiple facts and preserves re
   assert.match(financePaymentsPage, /BusinessOperationPanel/u)
   assert.match(financePaymentsPage, /BusinessDataTable/u)
   assert.match(financePaymentsPage, /BusinessFormModal/u)
-  assert.match(financePaymentsPage, /BusinessRecordDetailsModal/u)
+  assert.match(financePaymentsPage, /BusinessDetailsModal/u)
   assert.match(financePaymentsPage, /createBusinessTablePagination/u)
   assert.match(financePaymentsPage, /outstanding_amount/u)
   assert.match(financePaymentsPage, /validateFinanceAllocationDraft/u)

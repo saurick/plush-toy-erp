@@ -522,7 +522,7 @@ test("customer-package-lint: print template defaults stay bounded to party defau
           },
         ],
       }),
-    /supplierDefaults must not override supplier snapshots from business records/,
+    /supplierDefaults must not override supplier snapshots from source documents/,
   );
   assert.throws(
     () =>

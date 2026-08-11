@@ -245,7 +245,7 @@ async function datasetApplyEvidenceFixture() {
       exactEmptyBusinessBaseline: true,
       checkedBusinessObjectKinds:
         MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length,
-      zeroBusinessRecords: true,
+      allTrackedCountsZero: true,
       units: 1,
       warehouses: 4,
     },

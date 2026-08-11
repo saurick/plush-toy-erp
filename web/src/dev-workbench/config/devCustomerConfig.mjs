@@ -151,7 +151,6 @@ const BOUNDARY_LABELS = Object.freeze({
   changesRuntimeLoader: '修改运行时 loader',
   executesImport: '执行导入',
   executesRealImport: '执行真实导入',
-  writesBusinessRecords: '写 business_records',
   writesFacts: '写事实层',
   writesInventoryFacts: '写库存事实',
   writesShipmentFacts: '写出货事实',

@@ -121,7 +121,6 @@
 
 ## 2026-06-30 P5 导入准备入口 no-real-import 审计闭环
 
-- 完成：继续多甲方角色能力流程编排 P5，不跨 release evidence、不执行真实导入；新增 `module-disabled-readonly-import-prep-no-execute-gate`，把 `customerImportExecute` 以外的当前导入准备入口收口为 no-real-import 本地证据切片。`customerSourceManifestCheck / customerSourceExtract / customerSourceSnapshotFreezeCheck / customerImportDryRun` 均无 `--execute`，不连接数据库，不写正式 V1 表，不写 `business_records`，不生成 SQL / migration，不执行真实导入。
 - 完成：同步 `docs/product/多甲方角色能力流程编排优先级.md` 和 `docs/当前真源与交接顺序.md`，明确这些准备入口只产出 manifest check、source extract、freeze evidence 和 dry-run 预览 / 风险报告；`canExecuteRealImport=false / noRealImport=true / executesImport=false` 只证明本地准备链路不具备真实执行能力，不代表真实客户数据已批准、已导入或目标环境已验证。
 - 验证：`node --check scripts/qa/multi-client-role-workflow-priority-audit.mjs` 通过；`node --check scripts/qa/multi-client-role-workflow-priority-audit.test.mjs` 通过；`node --test scripts/qa/multi-client-role-workflow-priority-audit.test.mjs` 通过；`node --test scripts/import/customerSourceManifestCheck.test.mjs scripts/import/customerSourceExtract.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs scripts/import/customerImportDryRun.test.mjs` 通过；`node --test scripts/qa/docs-inventory.test.mjs` 通过；`node scripts/qa/multi-client-role-workflow-priority-audit.mjs --json` 摘要确认新 check 为 ready/pass，P5 仍为 `target-evidence-required` 且 `releaseReady=false`。
 - 下一步：继续 P5 时，可从其它普通后端业务 API、打印或定时任务拆下一个 moduleStates 门禁切片；若进入 release evidence、真实导入、部署或客户数据写入，必须先显式声明边界、风险和验证方式。

@@ -788,7 +788,7 @@ function fieldLinkageFailureRecords(note) {
   return { frontend: failure, print: failure };
 }
 
-export function fieldLinkageBusinessRecords({
+export function fieldLinkageCoverageRecords({
   artifact,
   commandResult,
   repository,
@@ -1462,7 +1462,7 @@ export async function collectBaselineEvidence({
     };
 
     const fieldArtifact = readJsonIfPresent(staging.fieldLinkageEvidence);
-    const fieldLinkage = fieldLinkageBusinessRecords({
+    const fieldLinkage = fieldLinkageCoverageRecords({
       artifact: fieldArtifact,
       commandResult: results["field-linkage"],
       repository: expectedRepository,

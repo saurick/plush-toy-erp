@@ -345,43 +345,43 @@
   color: #b45309;
 }
 
-.erp-business-record-form {
+.erp-business-entry-form {
   --erp-modal-control-background: #fff;
   --erp-modal-control-border: #d9d9d9;
   --erp-modal-control-hover: #bfbfbf;
   padding-top: 0;
 }
 
-.erp-business-record-form .ant-form-item {
+.erp-business-entry-form .ant-form-item {
   margin-bottom: 14px;
 }
 
-.erp-business-record-form .ant-form-item-label {
+.erp-business-entry-form .ant-form-item-label {
   padding-bottom: 6px;
 }
 
-.erp-business-record-form__items-field.ant-form-item {
+.erp-business-entry-form__items-field.ant-form-item {
   margin-bottom: 14px;
 }
 
-.erp-business-record-form__items {
+.erp-business-entry-form__items {
   width: 100%;
 }
 
-.erp-business-record-form__items .ant-space-item,
-.erp-business-record-form__items-field .ant-form-item-control-input-content {
+.erp-business-entry-form__items .ant-space-item,
+.erp-business-entry-form__items-field .ant-form-item-control-input-content {
   min-width: 0;
   max-width: 100%;
 }
 
-.erp-business-record-form__items-help {
+.erp-business-entry-form__items-help {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
 }
 
-.erp-business-record-form__items-scroll {
+.erp-business-entry-form__items-scroll {
   width: 100%;
   max-width: 100%;
   max-height: min(62vh, 720px);
@@ -391,7 +391,7 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.erp-business-record-form__item-card-stack {
+.erp-business-entry-form__item-card-stack {
   display: grid;
   width: max-content;
   min-width: 100%;
@@ -489,7 +489,7 @@
   border-bottom-color: rgb(43 138 62 / 22%);
 }
 
-.erp-business-record-form__item-summary {
+.erp-business-entry-form__item-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -515,7 +515,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.erp-business-record-form__add-item-button.ant-btn {
+.erp-business-entry-form__add-item-button.ant-btn {
   align-self: flex-start;
 }
 
@@ -730,7 +730,7 @@
   }
 
   .erp-permission-modal .ant-modal-body,
-  .erp-business-record-modal .ant-modal-body {
+  .erp-business-entry-modal .ant-modal-body {
     max-height: calc(100vh - 190px);
   }
 
@@ -1054,7 +1054,7 @@
     width: 100%;
   }
 
-  .erp-business-record-form__item-summary {
+  .erp-business-entry-form__item-summary {
     justify-content: flex-start;
     min-width: 0;
   }

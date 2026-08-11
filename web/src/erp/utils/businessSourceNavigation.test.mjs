@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import {
-  businessRecordInventoryRouteFor,
+  businessSourceInventoryRouteFor,
   businessSourceRouteFor,
   sourceRouteFor,
 } from './businessSourceNavigation.mjs'
@@ -73,21 +73,21 @@ test('business source navigation carries the readable source number beside the e
   )
 })
 
-test('business record inventory navigation uses the posted fact itself as the ledger source', () => {
+test('business source inventory navigation uses the posted fact itself as the ledger source', () => {
   assert.equal(
-    businessRecordInventoryRouteFor('production', 21),
+    businessSourceInventoryRouteFor('production', 21),
     '/erp/warehouse/inventory?source_type=PRODUCTION_FACT&source_id=21&view=txns'
   )
   assert.equal(
-    businessRecordInventoryRouteFor('outsourcing', 22),
+    businessSourceInventoryRouteFor('outsourcing', 22),
     '/erp/warehouse/inventory?source_type=OUTSOURCING_FACT&source_id=22&view=txns'
   )
   assert.equal(
-    businessRecordInventoryRouteFor('shipments', 23),
+    businessSourceInventoryRouteFor('shipments', 23),
     '/erp/warehouse/inventory?source_type=SHIPMENT&source_id=23&view=txns'
   )
-  assert.equal(businessRecordInventoryRouteFor('reservations', 24), '')
-  assert.equal(businessRecordInventoryRouteFor('production', 0), '')
+  assert.equal(businessSourceInventoryRouteFor('reservations', 24), '')
+  assert.equal(businessSourceInventoryRouteFor('production', 0), '')
 })
 
 test('direct source route keys are consumed by their target pages', () => {

@@ -124,7 +124,7 @@ func (OutsourcingFact) Fields() []ent.Field {
 		field.Int("supplier_id").Optional().Nillable().Positive(),
 		// Supplier name is an outsourcing-time snapshot; Supplier remains the master truth when linked.
 		field.String("supplier_name").Optional().Nillable().MaxLen(255),
-		// source_* keeps source-document traceability; it is not a replacement for business_records.
+		// source_* keeps source-document traceability for the posted fact.
 		field.String("source_type").Optional().Nillable().MaxLen(64),
 		field.Int("source_id").Optional().Nillable().Positive(),
 		field.Int("source_line_id").Optional().Nillable().Positive(),

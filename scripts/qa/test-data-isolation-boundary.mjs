@@ -16,7 +16,7 @@ export const TEST_DATA_ISOLATION_BUCKETS = Object.freeze([
 ]);
 
 const NO_FORMAL_FACT_SQL_PATTERN =
-  /INSERT\s+INTO\s+(customers|suppliers|contacts|sales_orders|business_records|inventory_txns|shipments?|finance_facts)\b/iu;
+  /INSERT\s+INTO\s+(customers|suppliers|contacts|sales_orders|inventory_txns|shipments?|finance_facts)\b/iu;
 const NO_DIRECT_DB_PATTERN =
   /\b(sql\.Open|pgx|POSTGRES_DSN|INSERT\s+INTO|UPDATE\s+[A-Za-z_]+\s+SET|DELETE\s+FROM)\b/iu;
 
@@ -109,7 +109,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "server/cmd/seed-core-demo-data/main.go",
         pattern:
-          /simulated_only=true real_customer_import=false no_business_records=true no_direct_fact_posting=true/u,
+          /simulated_only=true real_customer_import=false no_direct_fact_posting=true/u,
         message:
           "core demo CLI output must declare simulated-only no-real-import boundary",
       },
@@ -125,7 +125,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
         path: "server/internal/data/core_demo_seed.go",
         pattern: NO_FORMAL_FACT_SQL_PATTERN,
         message:
-          "core demo dataset must not write customers, sales orders, business_records, shipment, inventory, or finance facts",
+          "core demo dataset must not write customers, sales orders, shipment, inventory, or finance facts",
       },
     ]),
   },
@@ -149,7 +149,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "server/cmd/seed-trial-sim-masterdata/main.go",
         pattern:
-          /simulated_only=true real_customer_import=false no_business_records=true no_shipment_inventory_finance_facts=true/u,
+          /simulated_only=true real_customer_import=false no_shipment_inventory_finance_facts=true/u,
         message:
           "trial masterdata seed output must declare simulated-only and no real import boundary",
       },
@@ -159,7 +159,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
         path: "server/cmd/seed-trial-sim-masterdata/main.go",
         pattern: NO_FORMAL_FACT_SQL_PATTERN,
         message:
-          "trial masterdata seed must not write customers, sales orders, business_records, shipment, inventory, or finance facts",
+          "trial masterdata seed must not write customers, sales orders, shipment, inventory, or finance facts",
       },
     ]),
   },
@@ -1278,7 +1278,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/import/customerImportDryRun.mjs",
         pattern:
-          /never connects to a database, reads server config, writes formal tables, writes business_records, or executes a real import/u,
+          /never connects to a database, reads server config, writes formal tables, or executes a real import/u,
         message: "customer import dry-run must keep no-write boundary text",
       },
       {

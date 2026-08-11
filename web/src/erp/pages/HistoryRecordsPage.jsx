@@ -30,7 +30,7 @@ import {
   SearchInput,
   SelectFilter,
 } from '../components/business-list/BusinessListLayout.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import {
@@ -307,7 +307,7 @@ export default function HistoryRecordsPage() {
         }}
       />
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         open={Boolean(detailRecord)}
         record={detailRecord}
         columns={columns}
@@ -320,7 +320,7 @@ export default function HistoryRecordsPage() {
             前往所属模块查看完整记录
           </Button>
         ) : null}
-      </BusinessRecordDetailsModal>
+      </BusinessDetailsModal>
     </BusinessPageLayout>
   )
 }

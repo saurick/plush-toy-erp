@@ -22,7 +22,7 @@ import {
   buildBaselineCommandPlan,
   buildCoverageEvidence,
   classifyGoBusinessDomains,
-  fieldLinkageBusinessRecords,
+  fieldLinkageCoverageRecords,
   goCommandExecution,
   nodeCommandExecution,
   parseArgs,
@@ -437,7 +437,7 @@ test("field-linkage print coverage is keyed by explicit case IDs", () => {
     testFile: "printSomething.test.mjs",
     title: "打印关键词不能自动入表",
   });
-  const result = fieldLinkageBusinessRecords({
+  const result = fieldLinkageCoverageRecords({
     artifact: {
       repository: REPOSITORY,
       summary: {
@@ -456,7 +456,7 @@ test("field-linkage print coverage is keyed by explicit case IDs", () => {
   assert.equal(result.print.status, "passed");
   assert.equal(result.print.total, FIELD_LINKAGE_PRINT_CASE_IDS.length);
 
-  const missing = fieldLinkageBusinessRecords({
+  const missing = fieldLinkageCoverageRecords({
     artifact: {
       repository: REPOSITORY,
       summary: {

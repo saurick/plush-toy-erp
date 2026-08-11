@@ -87,7 +87,7 @@ test('outsourcing attachment panel exposes a typed contract-image upload without
 test('remaining direct attachment panels stay inside form-backed business modals', () => {
   const modalWrappers = [
     ['<BusinessFormModal', '</BusinessFormModal>'],
-    ['<BusinessRecordDetailsModal', '</BusinessRecordDetailsModal>'],
+    ['<BusinessDetailsModal', '</BusinessDetailsModal>'],
   ]
   for (const relativePath of formModalAttachmentEntrypoints) {
     const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
@@ -113,10 +113,10 @@ test('remaining direct attachment panels stay inside form-backed business modals
   }
 })
 
-test('BusinessRecordDetailsModal remains a read-only BusinessFormModal wrapper', () => {
+test('BusinessDetailsModal remains a read-only BusinessFormModal wrapper', () => {
   const source = readFileSync(
     new URL(
-      '../components/business-list/BusinessRecordDetailsModal.jsx',
+      '../components/business-list/BusinessDetailsModal.jsx',
       import.meta.url
     ),
     'utf8'

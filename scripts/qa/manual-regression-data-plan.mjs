@@ -94,7 +94,6 @@ function buildProductCorePlan() {
     customerKey: "",
     simulatedOnly: true,
     realCustomerImport: false,
-    writesBusinessRecords: false,
     writesCustomerRuntimeFacts: false,
     seedCommand:
       "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
@@ -134,7 +133,6 @@ function buildYoyoosunPlan() {
     fixtureStatus: yoyoosunTrialDataFixture.status,
     simulatedOnly: true,
     realCustomerImport: false,
-    writesBusinessRecordsDirectly: false,
     currentContract: {
       version: identity.dataVersion,
       runId: identity.runId,

@@ -46,7 +46,6 @@ const BOUNDARY_KEYS = new Set([
   'canExecuteRealImport',
   'createsTenant',
   'changesSchema',
-  'writesBusinessRecords',
   'writesFacts',
 ])
 const SOURCE_KEYS = new Set([
@@ -522,7 +521,7 @@ function validateBoundaries(boundaries) {
   if (boundaries.noRealImport !== undefined && boundaries.noRealImport !== true) {
     throw new CliError('source manifest boundaries.noRealImport must be true when present')
   }
-  for (const key of ['createsTenant', 'changesSchema', 'writesBusinessRecords', 'writesFacts']) {
+  for (const key of ['createsTenant', 'changesSchema', 'writesFacts']) {
     if (boundaries[key] !== undefined && boundaries[key] !== false) {
       throw new CliError(`source manifest boundaries.${key} must be false when present`)
     }

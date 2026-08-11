@@ -107,7 +107,6 @@ function validateTemplate(config) {
     "changesWorkflowFactRules",
     "changesRuntimeMenuLoader",
     "executesImport",
-    "writesBusinessRecords",
     "writesFacts",
   ]) {
     assert(config.boundaries?.[key] === false, `boundaries.${key} must stay false`);
@@ -263,7 +262,6 @@ function validateTemplate(config) {
   );
   for (const forbidden of [
     "tenant_id",
-    "business_records",
     "shipments",
     "inventory_txns",
     "finance_facts",

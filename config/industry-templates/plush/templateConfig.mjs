@@ -21,7 +21,6 @@ export const plushIndustryTemplateConfig = Object.freeze({
     changesWorkflowFactRules: false,
     changesRuntimeMenuLoader: false,
     executesImport: false,
-    writesBusinessRecords: false,
     writesFacts: false,
   }),
   defaultRoles: Object.freeze([
@@ -330,7 +329,6 @@ export const plushIndustryTemplateConfig = Object.freeze({
     ]),
     forbiddenAutoTargets: Object.freeze([
       "tenant_id",
-      "business_records",
       "product_skus",
       "purchase_orders",
       "shipments",

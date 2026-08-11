@@ -548,7 +548,7 @@
           </p>
         </div>
         <div class="stats" aria-label="覆盖统计">
-          <div class="stat"><span>一级菜单</span><strong>15</strong></div>
+          <div class="stat"><span>一级菜单</span><strong>14</strong></div>
           <div class="stat"><span>二级菜单</span><strong>51</strong></div>
           <div class="stat"><span>资产状态</span><strong>To Implement</strong></div>
         </div>
@@ -643,7 +643,6 @@
         "数据导入",
         "报表看板",
         "系统管理",
-        "历史归档",
       ];
 
       const menus = [
@@ -697,7 +696,7 @@
         { group: "系统管理", name: "客户配置", priority: "P2", batch: "第二批", pattern: "客户配置查看 / 表单页", fact: "config/customers/<key>", users: "管理员、实施", fields: ["客户名称", "Logo", "系统标题", "菜单开关", "字段别名", "默认币种", "行业模板"], actions: ["修改品牌", "配置菜单", "导出客户包", "导入客户包"], boundary: "客户配置不新增 tenant_id，不污染核心 usecase / schema / RBAC。" },
         { group: "系统管理", name: "系统配置", priority: "P1", batch: "第二批", pattern: "运维配置页", fact: "runtime config / preflight report", users: "管理员、运维", fields: ["APP_ENV", "JWT secret 状态", "public register", "SMS mock", "debug seed", "CORS origins", "SQL args tracing"], actions: ["查看配置状态", "导出检查报告", "查看 preflight"], boundary: "UI 不显示 secret 明文，生产危险配置必须由启动前检查拦截。" },
         { group: "系统管理", name: "备份恢复", priority: "P1", batch: "第二批", pattern: "运维页 / 报告页", fact: "backup evidence / migration status", users: "管理员、运维", fields: ["备份编号", "备份时间", "备份类型", "数据库版本", "文件大小", "校验 hash", "状态"], actions: ["创建备份", "验证备份", "恢复演练", "查看 migration"], boundary: "不把真实备份、secret 或敏感日志提交进仓库。" },
-        { group: "历史归档", name: "Legacy Archive", priority: "P2", batch: "第二批", pattern: "只读列表 / 详情页", fact: "business_records legacy/archive", users: "管理员、实施、审计", fields: ["记录 ID", "原模块", "标题", "历史状态", "原始数据 JSON", "迁移状态"], actions: ["只读查看", "搜索", "查看 JSON", "标记迁移候选"], boundary: "Legacy Archive 禁止新建和编辑正式字段，不作为 dashboard 正式数据源。" },
+        { group: "系统管理", name: "菜单配置", priority: "P2", batch: "第二批", pattern: "客户配置查看 / 表单页", fact: "config/customers/<key>/menuConfig", users: "管理员、实施", fields: ["客户", "菜单项", "是否启用", "显示名称", "排序", "适用角色"], actions: ["查看配置", "调整候选", "导出客户包"], boundary: "菜单配置只影响客户投影，不新增后端能力或绕过 RBAC。" },
       ];
 
       const grid = document.querySelector("#menuGrid");

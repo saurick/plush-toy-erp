@@ -116,7 +116,6 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
   }
 
   for (const forbiddenName of [
-    'business_records',
     'workflow_task',
     'generateReceivable',
     'generateInvoice',

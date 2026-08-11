@@ -395,7 +395,7 @@ function durableComponentReport({
         exactEmptyBusinessBaseline: true,
         checkedBusinessObjectKinds:
           MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length,
-        zeroBusinessRecords: true,
+        allTrackedCountsZero: true,
         units: 1,
         warehouses: 4,
       },
@@ -2315,7 +2315,7 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
   );
 });
 
-test("empty baseline verifier binds runtime and config, proves exact core, and rejects any pre-existing business record", async () => {
+test("empty baseline verifier binds runtime and config, proves exact core, and rejects any pre-existing tracked domain row", async () => {
   const binding = {
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     policyTarget: CUSTOMER_TRIAL_133_TARGET,

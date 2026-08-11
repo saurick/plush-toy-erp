@@ -80,7 +80,7 @@ const INVENTORY_SOURCE_TYPE_BY_RECORD_KIND = Object.freeze({
   shipments: 'SHIPMENT',
 })
 
-export function businessRecordInventoryRouteFor(
+export function businessSourceInventoryRouteFor(
   recordKind,
   recordID,
   { keyword = '', source = '' } = {}

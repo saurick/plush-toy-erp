@@ -24,7 +24,6 @@
 - 完成：`jsonrpc_workflow.go` 拆为 metadata、task、business_state、shared，保留 WorkflowUsecase 规则、任务权限、owner / assignee / status 判断和 Workflow / Fact 边界不变。
 - 完成：`jsonrpc_debug.go` 拆为 capabilities、seed、cleanup、clear 和 shared，保留 debug 写入开关、debugRunId 清理边界、业务数据清空权限和日志字段不变。
 - 完成：`sales_order`、`purchase_order` 和 `outsourcing_order` 按 Source Document 的文档头 / 整单保存、明细、生命周期、shared mapper 拆分；销售承诺、采购承诺和委外源单仍不写库存、出货、财务或其他 Fact。
-- 完成：`purchase` 按采购入库 receipt handler + shared 拆分，保留 `InventoryUsecase` 调用、`business_record_id` 禁止项、入库 / 取消权限和返回字段不变；`bom` 按 BOM version / item / shared 拆分，保留 BOM 只维护工程资料、不生成采购 / 库存 / 成本事实的边界。
 - 验证：`gofmt -w server/internal/service/jsonrpc_workflow*.go server/internal/service/jsonrpc_debug*.go server/internal/service/jsonrpc_sales_order*.go server/internal/service/jsonrpc_purchase_order*.go server/internal/service/jsonrpc_purchase*.go server/internal/service/jsonrpc_outsourcing_order*.go server/internal/service/jsonrpc_bom*.go`、`cd server && go test ./internal/service`、`cd server && go test -count=1 ./internal/biz ./internal/data ./internal/service ./internal/server`、`git diff --check` 均通过。
 - 下一步：后续如果继续拆 service 层，应先处理剩余职责混杂的测试文件或共享 helper 命名收口，不要继续拆已经低于 300 行且领域单一的 handler 文件。
 - 阻塞/风险：当前工作区已有大量并行改动，本轮未回退、格式化或纳入这些无关路径；本轮未跑前端浏览器回归，因为没有改前端运行时、页面结构、菜单、样式或原型资产。

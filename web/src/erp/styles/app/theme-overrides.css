@@ -1410,7 +1410,7 @@
   color: var(--erp-warning-text);
 }
 
-[data-erp-theme='dark'] .erp-business-record-form,
+[data-erp-theme='dark'] .erp-business-entry-form,
 [data-erp-theme='dark'] .erp-permission-modal,
 [data-erp-theme='dark'] .erp-business-status-reason-modal {
   --erp-modal-control-background: #0f172a;
@@ -1439,7 +1439,7 @@
 
 [data-erp-theme='dark'] .erp-item-field-unit-suffix.ant-input,
 [data-erp-theme='dark'] .erp-item-field-with-unit .ant-input-number,
-[data-erp-theme='dark'] .erp-business-record-form__add-item-button.ant-btn {
+[data-erp-theme='dark'] .erp-business-entry-form__add-item-button.ant-btn {
   border-color: var(--erp-border-strong);
   background: #0f172a;
   color: var(--erp-text);

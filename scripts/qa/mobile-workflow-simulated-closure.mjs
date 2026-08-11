@@ -50,7 +50,7 @@ Options:
   --help               Print this help.
 
 This script only writes explicitly marked simulated mobile workflow tasks. It never
-imports real customer data, never writes business_records directly, never creates
+imports real customer data, never writes formal business data directly, never creates
 schema or migrations, and never posts production, shipment, inventory, reservation,
 or finance facts.`;
 
@@ -192,7 +192,6 @@ function buildInputTemplate(options = {}) {
     writesDatabase: false,
     callsBackend: false,
     importsRealCustomerData: false,
-    createsBusinessRecords: false,
     createsOperationalFacts: false,
     downstreamReportOnlyWritesReports: true,
     downstreamApplyWritesDatabase: true,
@@ -234,7 +233,7 @@ function buildInputTemplate(options = {}) {
         "MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS MOBILE_WORKFLOW_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/mobile-workflow-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300",
     },
     boundary:
-      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write business_records, create workflow tasks, or post operational facts.",
+      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write formal business data, create workflow tasks, or post operational facts.",
   };
 }
 

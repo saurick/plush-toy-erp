@@ -6,7 +6,6 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
-- `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`：归档截至 2026-06-08 13:50 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 318 行 / 82540 bytes，超过 80KB 阈值；本轮旧 `project-orders` debug cleanup 前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-09-before-brand-config.md`：归档 2026-06-08 21:08 CST 至 2026-06-08 23:07 CST 的过程记录。归档原因：当前 `progress.md` 达到 383 行 / 80205 bytes，超过 80KB 阈值；本轮前端品牌客户配置化前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-10-before-style-l1-stabilization.md`：归档 2026-06-08 23:55 CST 至 2026-06-10 17:34 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 378 行 / 82385 bytes，超过 80KB 阈值；本轮修完整 `style:l1` 稳定性前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-11-before-ui-simplification-rules.md`：归档截至 2026-06-11 14:06 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 395 行 / 80005 bytes，接近并按项目约定视为达到 80KB 归档边界；本轮补 UI 极简不改语义规则前先保留完整现场，再收缩当前入口。
@@ -26,7 +25,6 @@
 ## 2026-06-14 00:52 CST
 
 - 完成：继续从工作台推进到产品核心业务菜单共享页。按 `trade-erp` 已验证业务页结构和当前原型口径，把 `FormalBusinessModulePage` 从工程说明式壳页改为紧凑业务工作台：筛选 + 导出 / 列顺序 / 批量删除 / 回收站 / 新建，当前操作行按模块展示编辑、关联表格、流转、生成 / 更新、打印、删除和详情；行点击可直接选中，表头保留列顺序入口并补列排序。`客户档案`、`供应商档案` 和 `销售订单` 去掉顶部技术 tag 和选中区冗余摘要，选中条只保留必要当前对象和操作。
-- 完成：同步 `docs/current-source-of-truth.md` 和 `web/src/erp/config/seedData.mjs`，移除“工作台保留后台运营中枢导航”和“打印入口 / 常用业务模块”旧口径，记录 formal-shell 业务页已吸收列顺序、排序、回收站和选中行操作但不承诺后端写入 API 已完成。同步更新 `web/scripts/styleL1.mjs`，不再断言已删除的“正式新入口 / 领域 API / 不读取 business_records / 正式 MasterData”标签。
 - 完成：菜单覆盖核对通过：`businessModuleDefinitions` 当前 19 个产品核心业务菜单，其中 3 个 `formal-v1`、16 个 `formal-shell`，路径无缺失、无重复；`formal-shell` 由路由动态注册到 `FormalBusinessModulePage`，因此本轮共享页改动一次覆盖产品核心业务菜单。
 - 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过，测试 308 条通过；配置级菜单覆盖 Node 检查通过；`STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop,erp-dashboard-desktop,erp-task-board-desktop,erp-business-dashboard-desktop pnpm --dir web style:l1` 通过 5 个场景；修正暗色客户页旧断言后，`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop pnpm --dir web style:l1` 通过；最终全量 `pnpm --dir web style:l1` 通过 47 个场景；`git diff --check -- web/src/erp/components/business-list/BusinessListLayout.jsx web/src/erp/pages/FormalBusinessModulePage.jsx web/src/erp/pages/V1MasterDataPage.jsx web/src/erp/pages/V1SalesOrdersPage.jsx web/src/erp/config/seedData.mjs web/scripts/styleL1.mjs docs/current-source-of-truth.md` 通过。
 - 下一步：若继续推进“真实完成”，应逐个 fact / masterdata 模块补后端 usecase、JSON-RPC、RBAC、保存 / 删除 / 回收站真实数据和测试；不能把当前 formal-shell 的预留按钮当成事实写入已经完成。
@@ -91,7 +89,6 @@
 ## 2026-06-13 21:16 CST
 
 - 完成：从工作台开始吸收 To Implement 原型到真实 `/erp/dashboard`。工作台首屏改为紧凑的“今日判断 + 当前处理 + 指标入口”结构：四个关键指标可直达任务看板、异常闭环、业务看板和打印中心；右侧当前处理卡读取今日焦点任务，提供处理、标记阻塞和查看关联记录入口；下方继续保留今日焦点、业务状态摘要、常用入口、角色提醒和运营工具。
-- 完成：参考 `trade-erp` 和当前测试服中较好的紧凑卡片 / 指标点击 / 入口分流交互，只吸收布局和交互密度；没有恢复旧 `business_records`、旧外销业务语义、旧菜单真源或旧接口。
 - 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；`STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-dashboard-mobile,erp-dashboard-dark-desktop pnpm --dir web style:l1` 通过；首次全量 `pnpm --dir web style:l1` 在业务模块列顺序同步等待处偶发超时，单独复跑 `business-menu-groups-desktop` 通过，第二次全量 `pnpm --dir web style:l1` 通过 47 个场景。
 - 下一步：继续按同一节奏推进任务中心 Current 吸收，再推进业务模块标准页共享骨架；不要一轮把所有菜单页面做成半成品。
 - 阻塞/风险：本轮只改真实工作台页面和样式，不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、正式菜单配置、原型阶段登记、提交或推送；工作区仍有其他既有改动，本轮未回退或整理。

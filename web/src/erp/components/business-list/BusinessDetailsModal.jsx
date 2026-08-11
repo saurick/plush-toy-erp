@@ -58,7 +58,7 @@ function normalizeLineItems(result) {
   return items
 }
 
-function BusinessRecordLineItems({ config, open, record }) {
+function BusinessLineItems({ config, open, record }) {
   const {
     emptyDescription = '当前记录暂无明细',
     getItemFields,
@@ -209,7 +209,7 @@ function BusinessRecordLineItems({ config, open, record }) {
   )
 }
 
-export default function BusinessRecordDetailsModal({
+export default function BusinessDetailsModal({
   children,
   columns = [],
   description,
@@ -259,7 +259,7 @@ export default function BusinessRecordDetailsModal({
         })}
       </Descriptions>
       {lineItems ? (
-        <BusinessRecordLineItems
+        <BusinessLineItems
           config={lineItems}
           open={open}
           record={record}

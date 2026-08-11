@@ -41,7 +41,7 @@ import {
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import {
@@ -1295,7 +1295,7 @@ export default function V1MasterDataPage({ type }) {
         </Form>
       </BusinessFormModal>
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={recordColumns}
         description="当前账号为只读查看；如需维护，请由具备相应权限的岗位办理。"
         open={Boolean(detailRecord)}

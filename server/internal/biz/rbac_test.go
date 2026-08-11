@@ -610,10 +610,10 @@ func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 		t.Fatalf("expected shipments formal fact menu")
 	}
 	if _, ok := paths["/erp/master/partners"]; ok {
-		t.Fatalf("old partners business_records entry must not be a visible formal menu")
+		t.Fatalf("retired overlapping partners entry must not be a visible formal menu")
 	}
 	if _, ok := paths["/erp/sales/project-orders"]; ok {
-		t.Fatalf("old project-orders business_records entry must not be a visible formal menu")
+		t.Fatalf("retired overlapping project-orders entry must not be a visible formal menu")
 	}
 }
 
@@ -638,7 +638,7 @@ func TestAdminMenusOmitRetiredFrontendDocsAndQAPaths(t *testing.T) {
 			t.Fatalf("operational fact internal page must not be registered as a menu")
 		}
 		if menu.Path == "/erp/master/partners" || menu.Path == "/erp/sales/project-orders" {
-			t.Fatalf("old business_records overlap path must not be registered: %s", menu.Path)
+			t.Fatalf("retired overlap path must not be registered: %s", menu.Path)
 		}
 	}
 }

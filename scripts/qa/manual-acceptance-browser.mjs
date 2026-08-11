@@ -3058,7 +3058,7 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
     freshBaseline?.componentDigest === componentDigests.baseline &&
     baseline?.contract === "manual-acceptance-empty-baseline-report-v1" &&
     baseline?.summary?.exactEmptyBusinessBaseline === true &&
-    baseline?.summary?.zeroBusinessRecords === true &&
+    baseline?.summary?.allTrackedCountsZero === true &&
     baseline?.summary?.checkedBusinessObjectKinds ===
       MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length &&
     Object.keys(baseline?.zeroCounts || {}).length ===

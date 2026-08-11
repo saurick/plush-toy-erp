@@ -24,7 +24,6 @@ export const referenceCustomerPackage = Object.freeze({
     changesRuntimeLoader: false,
     executesImport: false,
     executesRealImport: false,
-    writesBusinessRecords: false,
     writesFacts: false,
     writesInventoryFacts: false,
     writesShipmentFacts: false,

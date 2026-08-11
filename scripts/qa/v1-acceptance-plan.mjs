@@ -26,7 +26,6 @@ const REQUIRED_PATHS = [
 const FORBIDDEN_RUNTIME_EFFECTS = [
   "不连接数据库",
   "不调用后端",
-  "不写 business_records",
   "不执行真实客户导入",
   "不修改 schema / migration / RBAC / Workflow / Fact 规则",
   "不把 workflow task done 当成 fact posted",

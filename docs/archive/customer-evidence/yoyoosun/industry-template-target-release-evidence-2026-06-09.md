@@ -18,7 +18,6 @@ Phase 10 按“一步完成、不拆子阶段、真实导入只能模拟”的�
 - 不新增 `tenant_id`。
 - 不改 Ent schema 或 Atlas migration。
 - 不改 Workflow / Fact usecase 事实规则。
-- 不写 `business_records`。
 - 不写库存、出货、预留、财务或其他事实表。
 - 不交付拍照上传、附件服务、扫码、通用打印模板引擎、正式报表或 SaaS 能力。
 

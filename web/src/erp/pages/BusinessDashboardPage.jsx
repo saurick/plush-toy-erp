@@ -44,7 +44,7 @@ const DATA_BOUNDARIES = Object.freeze([
       '销售、采购、生产与委外等订单或合同，用于记录业务发起或约定，后续仍需按流程办理。',
   },
   {
-    key: 'business-record',
+    key: 'business-overview',
     title: '办理结果',
     description: '入库、质检、库存、出货和财务等已经完成的业务记录。',
   },

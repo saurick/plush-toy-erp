@@ -119,7 +119,7 @@ import {
   searchParamPositiveInt,
   searchParamText,
 } from '../utils/routeQuery.mjs'
-import { businessRecordInventoryRouteFor } from '../utils/businessSourceNavigation.mjs'
+import { businessSourceInventoryRouteFor } from '../utils/businessSourceNavigation.mjs'
 import {
   canOpenRelatedDocumentPath,
   clearLinkedDocumentParams,
@@ -396,7 +396,7 @@ export default function ShipmentsPage() {
             fields: ['sales_order_no'],
           }
         ),
-        inventory: businessRecordInventoryRouteFor(
+        inventory: businessSourceInventoryRouteFor(
           'shipments',
           selectedRow.id,
           { keyword: selectedRow.shipment_no, source: 'shipment' }

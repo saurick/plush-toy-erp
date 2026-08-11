@@ -17,13 +17,15 @@ func unknownPurchaseResult(method string) *v1.JsonrpcResult {
 }
 
 func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptFromPurchaseOrderCreate, bool) {
-	if _, ok := pm["business_record_id"]; ok {
-		return nil, false
-	}
-	if _, ok := pm["idempotency_payload_hash"]; ok {
-		return nil, false
-	}
-	if _, ok := pm["supplier_id"]; ok {
+	if !jsonRPCParamsAllowed(
+		pm,
+		"purchase_order_id",
+		"receipt_no",
+		"warehouse_id",
+		"received_at",
+		"note",
+		"idempotency_key",
+	) {
 		return nil, false
 	}
 	receivedAt, ok := getOptionalJSONRPCTime(pm, "received_at")
@@ -45,7 +47,22 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 }
 
 func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptItemCreate, bool) {
-	if _, ok := pm["idempotency_payload_hash"]; ok {
+	if !jsonRPCParamsAllowed(
+		pm,
+		"receipt_id",
+		"material_id",
+		"warehouse_id",
+		"unit_id",
+		"lot_id",
+		"purchase_order_item_id",
+		"lot_no",
+		"quantity",
+		"unit_price",
+		"amount",
+		"source_line_no",
+		"note",
+		"idempotency_key",
+	) {
 		return nil, false
 	}
 	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")

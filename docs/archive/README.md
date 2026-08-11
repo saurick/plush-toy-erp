@@ -10,10 +10,8 @@
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `docs/archive/architecture-history/`                                                    | 已退出活跃 `docs/architecture/` 的旧阶段实现评审文档                                            |
 | `docs/archive/customer-evidence/`                                                       | 客户历史发布、验收和内部模拟闭环 evidence 归档                                                  |
-| `docs/archive/legacy-business-records/`                                                 | 已删除旧通用业务记录表族的过渡、风险、引用和删除证据；不作为兼容入口                            |
 | `docs/archive/progress-2026-06-02-before-print-template-defer.md`                       | 旧 `progress.md` 过程记录归档                                                                   |
 | `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`                       | 移动端任务页改版前的 `progress.md` 过程记录归档                                                 |
-| `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`             | 旧 `business_records` debug cleanup 前的 `progress.md` 过程记录归档                             |
 | `docs/archive/progress-2026-06-09-before-brand-config.md`                               | 前端品牌客户配置化前的 `progress.md` 过程记录归档                                               |
 | `docs/archive/progress-2026-06-10-before-style-l1-stabilization.md`                     | `style:l1` 稳定化前的 `progress.md` 过程记录归档                                                |
 | `docs/archive/progress-2026-06-11-before-ui-simplification-rules.md`                    | UI 简化规则补充前的 `progress.md` 过程记录归档                                                  |

@@ -5,9 +5,9 @@
     {
       "sourceId": "src-customer-update",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "partners",
-      "fileName": "business-records-export.json",
+      "fileName": "customer-source-export.json",
       "sheetName": null,
       "rowNumber": 1,
       "domain": "customers",
@@ -22,9 +22,9 @@
     {
       "sourceId": "src-customer-create",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "partners",
-      "fileName": "business-records-export.json",
+      "fileName": "customer-source-export.json",
       "sheetName": null,
       "rowNumber": 2,
       "domain": "customers",
@@ -37,9 +37,9 @@
     {
       "sourceId": "src-customer-duplicate",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "partners",
-      "fileName": "business-records-export.json",
+      "fileName": "customer-source-export.json",
       "sheetName": null,
       "rowNumber": 3,
       "domain": "customers",
@@ -68,7 +68,7 @@
     {
       "sourceId": "src-contact-no-owner",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "partners",
       "fileName": "contacts.json",
       "sheetName": null,
@@ -83,7 +83,7 @@
     {
       "sourceId": "src-sales-order-create",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "project-orders",
       "fileName": "orders.json",
       "sheetName": null,
@@ -100,7 +100,7 @@
     {
       "sourceId": "src-sales-order-no-customer",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "project-orders",
       "fileName": "orders.json",
       "sheetName": null,
@@ -115,7 +115,7 @@
     {
       "sourceId": "src-sales-order-item-unknown-unit",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "project-orders",
       "fileName": "order-items.json",
       "sheetName": null,
@@ -131,7 +131,7 @@
     {
       "sourceId": "src-product-sku-deferred",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "products",
       "fileName": "products.json",
       "sheetName": null,
@@ -147,7 +147,7 @@
     {
       "sourceId": "src-purchase-order-deferred",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "accessories-purchase",
       "fileName": "purchase.json",
       "sheetName": null,
@@ -162,7 +162,7 @@
     {
       "sourceId": "src-shipment-forbidden",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "shipping-release",
       "fileName": "shipment.json",
       "sheetName": null,
@@ -178,7 +178,7 @@
     {
       "sourceId": "src-inventory-forbidden",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "inventory",
       "fileName": "inventory.json",
       "sheetName": null,
@@ -194,7 +194,7 @@
     {
       "sourceId": "src-finance-forbidden",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "receivables",
       "fileName": "finance.json",
       "sheetName": null,
@@ -210,7 +210,7 @@
     {
       "sourceId": "src-workflow-done-forbidden",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "workflow",
       "fileName": "workflow.json",
       "sheetName": null,

@@ -27,9 +27,9 @@ evidence preparation flow.
     {
       "sourceId": "src-customer-update",
       "sourceType": "Data Import Source",
-      "sourceKind": "business_records",
+      "sourceKind": "customer_source_snapshot",
       "moduleKey": "partners",
-      "fileName": "business-records-export.json",
+      "fileName": "customer-source-export.json",
       "sheetName": null,
       "rowNumber": 1,
       "domain": "customers",
@@ -83,8 +83,7 @@ safe fixtures for repeatable evidence generation:
 - No real customer sensitive data.
 - No import approval.
 - No database read or write.
-- No loader, SQL, migration, API, UI, seedData, docs registry, or
-  `business_records` runtime change.
+- No loader, SQL, migration, API, UI, seedData, docs registry, or runtime data change.
 - `shipment`, `inventory`, and `finance` rows are intentionally present only as
   forbidden evidence.
 - `shipping_released != shipped`.

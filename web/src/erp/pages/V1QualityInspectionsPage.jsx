@@ -78,7 +78,7 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import QualityInspectionPurchaseReturnModal from '../components/quality-inspections/QualityInspectionPurchaseReturnModal.jsx'
 import PurchaseRejectionDispositionModal from '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
@@ -2213,7 +2213,7 @@ export default function V1QualityInspectionsPage() {
         onChanged={() => loadRows()}
       />
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={visibleDataColumns}
         description="查看当前质检单的来源、批次、检验状态和判定结果；如需提交、判定或取消，请使用列表上方的当前操作区。"
         open={Boolean(detailInspection)}
@@ -2230,7 +2230,7 @@ export default function V1QualityInspectionsPage() {
           canWithdraw={false}
           variant="inline"
         />
-      </BusinessRecordDetailsModal>
+      </BusinessDetailsModal>
 
       <BusinessFormModal
         title={modalTitle}

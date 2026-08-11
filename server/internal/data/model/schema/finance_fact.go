@@ -145,7 +145,7 @@ func (FinanceFact) Fields() []ent.Field {
 		field.String("payment_term").Optional().Nillable().MaxLen(32),
 		field.Int("payment_term_days").Optional().Nillable().NonNegative(),
 		field.String("invoice_category").Optional().Nillable().MaxLen(32),
-		// source_* keeps source-document traceability; it is not a replacement for business_records.
+		// source_* keeps source-document traceability for the posted fact.
 		field.String("source_type").Optional().Nillable().MaxLen(64),
 		field.Int("source_id").Optional().Nillable().Positive(),
 		field.Int("source_line_id").Optional().Nillable().Positive(),

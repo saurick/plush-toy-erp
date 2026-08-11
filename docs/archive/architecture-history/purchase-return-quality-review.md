@@ -25,9 +25,7 @@
 | 不做应付 / 发票 / 付款 / 财务核销 | 入库、退货和差异中的金额只作为业务快照或后续财务线索，不成为 AP 真源。 |
 | 不做生产领料 / 委外 | 不引入生产、委外发料、回货、结算或成本表。 |
 | 不做完整品质模块 | 不设计检验项目库、缺陷分类、抽样标准、判定流程、质量报表和责任追溯全套表。 |
-| 不接前端 | 本轮不改页面、帮助中心、移动端入口或通用 `business_records` 展示逻辑。 |
 
-本轮也不新增 `warehouse_locations`、`stock_reservations`，不迁移旧 `business_records`，不删除或替换 `business_records`，不对 `192.168.0.106:5432/plush_erp` 执行 `migrate_apply`，不做真实分区 migration 和几十亿级压测。
 
 ## 2. 采购退货与取消入库的区别
 
@@ -183,7 +181,6 @@
 | 是否暂缓 `quality_inspections` | 暂缓。当前先定义 IQC 入口和批次状态边界，等质检项目、判定流程、异常处理和报表需求稳定后再落完整品质表。 |
 | 是否暂缓 `purchase_receipt_adjustments` | 暂缓。入库前差异按实收入库；入库后数量错误先在 Phase 2D-B 评审通用库存调整是否足够，必要时再建采购入库差异专表。 |
 | 是否暂缓 `stock_reservations / available_quantity` | 暂缓。当前 `inventory_balances.quantity` 先承接账面数量；可用量、冻结量、预留量应等生产领料、出货预留和质检 HOLD 规则一起设计，避免多套可用库存口径。 |
-| 是否继续保留 `business_records` | 保留。它仍是通用单据快照和兼容层，不替代采购退货、库存流水、批次和未来调整单真源。 |
 
 推荐下一轮只落采购退货：
 

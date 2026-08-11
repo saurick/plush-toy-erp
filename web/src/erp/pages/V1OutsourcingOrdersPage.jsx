@@ -43,7 +43,7 @@ import {
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import OutsourcingOrderForm, {
@@ -2972,7 +2972,7 @@ export default function V1OutsourcingOrdersPage() {
 
       {outsourcingOrderItemsPreview.modal}
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={detailColumns}
         description="查看加工合同摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
         lineItems={
@@ -3020,7 +3020,7 @@ export default function V1OutsourcingOrdersPage() {
             canWithdraw={false}
           />
         ) : null}
-      </BusinessRecordDetailsModal>
+      </BusinessDetailsModal>
 
       <OutsourcingOrderSourceFactModal
         open={sourceFactOpen}

@@ -310,7 +310,6 @@
 
 完成：加工合同页新增统一“委外记录”入口，展示 `MATERIAL_ISSUE / RETURN_RECEIPT`。页面按 `outsourcing.fact.read / post / cancel` 精确权限和 canonical `list / post / cancel_outsourcing_fact` 办理状态：`DRAFT` 可过账或作废，`POSTED` 可取消，`CANCELLED` 只读；草稿作废与已过账取消分别提示“库存零变动”和“恢复至过账前库存”。写请求返回后必须重新读取并确认目标 ID / 状态，未知结果不允许提示成功或盲目重试。质检 / 应付只对 `POSTED RETURN_RECEIPT` 开放，应付继续要求质检合格或让步接收。
 
-完成：通用业务记录页对历史无合法来源的草稿收口。生产 / 委外 `DRAFT` 缺必需来源坐标时，过账与作废同时禁用；财务 `DRAFT` 缺正式来源时，确认与作废同时禁用。来源完整的合法草稿仍可过账 / 确认或零库存作废，不用必然失败的请求来掩盖历史数据缺口。出货服务端同时明确支持 `DRAFT -> CANCELLED` 零库存，`SHIPPED -> CANCELLED` 才写库存冲正；正式出货页已分别显示“作废草稿”和“撤销已出货”，并在取消 RPC 后重新加载列表。
 
 完成：采购订单页不再把基础资料加载竞态显示成“暂无材料”。供应商 / 材料 / 单位的表单 readiness 与启用仓库的入库草稿 readiness 分开；库存批次不参与这两条准备链。未 ready 或失败时，对应新建、编辑、来源导入、保存或生成入库草稿操作 fail closed；刷新页面会重试并传递失败，不误报刷新成功。重叠请求使用 latest-wins，只有最新请求成功 ready 后的零条才是合法空结果；已打开表单和保存 handler 仍有第二层禁用 / 拦截。
 

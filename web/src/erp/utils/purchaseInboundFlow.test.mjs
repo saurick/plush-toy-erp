@@ -70,12 +70,7 @@ test('purchaseInboundFlow: 到货记录能生成 quality IQC 任务', () => {
   assert(task.payload.related_documents.some((item) => item.includes('供应商')))
 })
 
-test('MobileRoleTasksPage: 岗位任务完成不再本地回写业务状态', () => {
-  assert.doesNotMatch(mobileRoleTasksPageSource, /updateBusinessRecord\s*\(/)
-  assert.doesNotMatch(
-    mobileRoleTasksPageSource,
-    /buildBusinessRecordStatusUpdateParams/
-  )
+test('MobileRoleTasksPage: 岗位任务完成不在页面本地改写来源状态', () => {
   assert.doesNotMatch(mobileRoleTaskActionsSource, /updateSourceStatusForTask/)
   assert.doesNotMatch(
     mobileRoleTaskActionsSource,

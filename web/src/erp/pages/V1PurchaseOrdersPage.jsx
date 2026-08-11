@@ -20,7 +20,7 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import {
   createBlankPurchaseLine,
   normalizePurchaseLineFormValue,
@@ -1420,7 +1420,7 @@ export default function V1PurchaseOrdersPage() {
 
       {purchaseOrderItemsPreview.modal}
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={dataColumns}
         description="查看采购订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
         lineItems={

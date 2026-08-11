@@ -14,7 +14,6 @@
 - 阻塞/风险：本轮未改后端、schema、migration、RBAC、seedData 或业务事实层；最终发布镜像从隔离 detached worktree 构建，只套用本轮 `styleL1.mjs` 与 `app.css` diff，避免混入主工作区里非本轮 `BusinessModulePage.jsx` 改动。主工作区仍保留非本轮 `BusinessModulePage.jsx / progress.md` 现场，未回退、未提交。
 
 ## 2026-06-04 21:52 CST
-- 完成：修复暗色业务弹窗明细统计区仍看不清的问题。根因是 `.erp-business-record-form__item-summary` 下的 `.erp-item-summary-metric` 自定义统计胶囊仍沿用浅色背景、浅蓝边框和 Ant Design 浅色次级文字，暗色模式下 label 对比度不足；本轮补齐暗色背景、蓝色细边、次级文字和数值颜色。
 - 完成：`business-module-dark-products-modal-desktop` L1 场景新增明细统计胶囊 computed style 断言，检查至少 3 个统计 chip 的暗色背景、清晰边框、label 对比度和数值对比度，避免后续再次漏掉「已录入 / 数量合计 / 金额合计」这类自定义 UI。
 - 验证：`node --check web/scripts/styleL1.mjs` 通过；`cd web && pnpm css` 通过；`STYLE_L1_PORT=4457 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=business-module-dark-products-modal-desktop pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过；已查看 `web/output/playwright/style-l1/business-module-dark-products-modal-desktop.png`，暗色产品弹窗渲染正常。
 - 下一步：后续若继续反馈暗色主题问题，优先搜索自定义 `erp-*` 组件，不只看 Ant Design token；每个自定义状态块都应补暗色覆盖和 L1 computed style 断言。
@@ -206,7 +205,6 @@
 ## 2026-06-03 16:28
 - 完成：将 `docs/customers/yoyoosun/delta-register.md` 中的差异项名收敛为“yoyoosun 数据导入适配”，与 `docs/product/product-delivery-ledgers.md` 的“yoyoosun 数据导入”口径保持一致，避免误读为历史事实导入已批准。
 - 下一步：如后续要做真实 import loader，必须按 `import-strategy.md` 单独评审 loader、备份、回滚、幂等、对账和人工确认，不从该差异项直接推导执行。
-- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、loader、`business_records` 或真实导入流程。本轮追加前 `progress.md` 为 173 行 / 32502 bytes，未达到归档阈值。
 
 ## 2026-06-03 16:22
 - 完成：新增开发态文档查看器 `http://localhost:5175/__dev/docs`，常用文档置顶并全量读取 `docs/**/*.md` 及根 / web / server / scripts README；支持标题 / 路径 / 正文搜索、分类标签、文档切换、章节摘要和复制相对路径。
@@ -217,7 +215,6 @@
 ## 2026-06-03 13:59
 - 完成：在 `docs/README.md` 新增“设计文档分类入口 / Design Document Entry Points”，按顶层设计、详细设计、测试与验收设计、客户与交付设计、参考与归档列出人工校对和任务拆分常用入口；同时明确该分类不替代 `docs/document-inventory.md` 完整清单，也不替代 `docs/current-source-of-truth.md`、代码、migration 和测试。
 - 下一步：后续人工校对设计文档时，可先按 `docs/README.md` 分类入口逐层检查；若新增、删除、重命名长期维护文档或改变职责分类，再同步检查 `docs/document-inventory.md` 和相关目录 README。
-- 阻塞/风险：docs-only 导航补充；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 162 行 / 30370 bytes，未达到归档阈值。
 
 ## 2026-06-03 12:16
 - 完成：移除前端产品内文档中心、帮助中心、高级文档和开发与验收页面的运行时代码与 Markdown，包括 `web/src/erp/docs/*`、`docs.mjs`、对应页面 / 组件 / util / 测试、前端 debug API client 和相关样式；旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness`、`/erp/mobile-workbenches`、`/erp/roles/*` 等路径仅兼容重定向到 `/erp/dashboard`。
@@ -245,7 +242,6 @@
 - 完成：审查 `docs` 目录 README 覆盖情况，补齐长期维护目录 README：`docs/architecture/README.md`、`docs/product/README.md`、`docs/customers/README.md`、`docs/reference/README.md`、`docs/workflow/README.md`、`docs/roles/README.md`、`docs/finance/README.md`、`docs/warehouse/README.md`、`docs/observability/README.md`。
 - 完成：同步 `AGENTS.md` 和 `docs/README.md` 的目录 README 维护规则；同步 `docs/document-inventory.md` 新增 README 条目；修正 `docs/reference/imported-notes/README.md` 漏列的 imported notes 文件。
 - 下一步：后续新增、删除、重命名长期维护文档，或改变文档职责、归属目录、入口状态、真源状态时，同时检查对应目录 README 和 `docs/document-inventory.md`。
-- 阻塞/风险：docs-only 目录说明补齐；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 134 行 / 25062 bytes，未达到归档阈值。工作区已有其他 docs 现场改动，本轮未回退。
 
 ## 2026-06-02 20:36
 - 完成：将 `docs/architecture/` 中 6 份旧 Phase 实现历史评审归档到 `docs/archive/architecture-history/`，包括 `phase-2b-bom-lot-schema-review.md`、`phase-2c-purchase-receipt-review.md`、`phase-2d-purchase-return-quality-review.md`、`phase-2d-purchase-receipt-adjustment-review.md`、`phase-2d-quality-inspection-entry-review.md` 和 `phase-2d-quality-inspection-schema-review.md`；新增归档 README，明确这些文件只作历史追溯，不再作为当前架构真源。
@@ -262,50 +258,41 @@
 ## 2026-06-02 19:50
 - 完成：删除 `docs/product/product-completion-roadmap.md` 顶部“本次重构结论”过程说明，避免 roadmap 长期保留来源解释和补丁口吻；同步前移 `0.x` 小节编号，并收紧 metadata 中“不包含”的表述。
 - 下一步：后续 roadmap 只保留当前产品路线、边界和阶段结果；过程来源、调整背景和本轮执行记录只进入 `progress.md` 或用户指定的验收材料。
-- 阻塞/风险：docs-only 文案收口；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 117 行 / 22025 bytes，未达到归档阈值。
 
 ## 2026-06-02 19:31
 - 完成：将 `docs/product/product-completion-roadmap.md` 从旧 `00x` 编号执行进度口径重构为“重新做项目”的 Phase 路线，明确旧编号只作为历史施工记录，新路线按 Phase 0 到 Phase 12 表达。
 - 完成：同步 `docs/product/product-delivery-ledgers.md` 的当前推荐下一步和相关前置条件，把 `v1-formal-menu-and-legacy-entry-exit`、旧 import loader 编号式路线改为 Phase 制；同步 `docs/current-source-of-truth.md` 对 roadmap 的描述，避免继续暗示 roadmap 是旧候选任务顺序。
 - 下一步：如果继续执行，应先拆 `Phase 0 docs-only reset` 的正式任务说明，限定为产品原则、分层、状态边界、客户配置、交付骨架、测试策略和任务拆分规则，不改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry 或 loader。
-- 阻塞/风险：docs-only roadmap 重构；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 111 行 / 20871 bytes，未达到归档阈值。
 
 ## 2026-06-02 17:15
 - 完成：同步修正 `AGENTS.md` 中残留的 `current` 客户边界口径，明确当前永绅客户稳定 key 是 `yoyoosun`，不要恢复 `current` 客户目录或导入工作区别名，并把“禁止把 current 客户资料写成 Product Core”改为“禁止把任一客户资料写成 Product Core”。
 - 完成：将工程原则中的文档同步规则扩展为：代码行为、目录结构、脚本名称、部署方式、配置字段、客户 key 或正式文档口径变化时，必须同轮检查并按需更新相关 README、docs、`docs/current-source-of-truth.md`、`docs/document-inventory.md`、产品 / 架构文档、帮助文档和 `progress.md`。
 - 完成：新增根 `.gitattributes`，将 `docs/customers/*/raw-source-files/**` 标记为 binary；同步 `docs/customers/yoyoosun/raw-source-files/README.md`，明确 Git 不应把原始 Excel / PDF / PNG 当文本做 whitespace 检查或展示正文 diff。
 - 下一步：后续改代码、目录、脚本名、客户 key 或正式口径时，按 `AGENTS.md` 先确认影响面，再同步相关文档；只属于历史归档、外部参考或普通变量名的 `current` 不机械改。
-- 阻塞/风险：规则 / docs 口径修正；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 104 行 / 19403 bytes，未达到归档阈值。
 
 ## 2026-06-02 17:07
 - 完成：按用户确认删除 `current` 客户目录 / 导入工作区别名，将可追溯客户资料统一收口到 `docs/customers/yoyoosun/`，并同步 `config/customers/yoyoosun/`、`deployments/yoyoosun/`、`scripts/import/fixtures/customers/yoyoosun/`。
 - 完成：将 import tooling 从 `currentCustomerDryRun` / `currentSourceSnapshotFreezeCheck` 改为通用 `customerImportDryRun` / `customerSourceSnapshotFreezeCheck`，同时把 yoyoosun fixture 与 evidence 输出路径改到客户 key 下；同步 README、当前真源、文档清单、产品路线、交付台账和客户导入文档，移除活跃文档里的 `current` 客户 key 口径。
 - 下一步：后续同时处理多个客户时，按 `docs/customers/<customer-key>/`、`config/customers/<customer-key>/`、`deployments/<customer-key>/` 和 `scripts/import/fixtures/customers/<customer-key>/` 并列隔离；不要恢复 `current` alias。
-- 阻塞/风险：本轮不改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径；原始二进制文件仍直接进入 Git，后续继续批量增加时应单独评审 Git LFS / 对象存储 / 脱敏 fixture。本轮追加前 `progress.md` 为 98 行 / 18077 bytes，未达到归档阈值。
 
 ## 2026-06-02 16:50
 - 完成：补齐 `docs/` 下 19 个 `Doc Type / 文档类型` metadata 值的中文说明，保留原 English anchor，并将 `Current Source Snapshot Freeze Evidence` 明确为 `current 来源快照冻结证据`。
 - 完成：同步 `docs/README.md` 文档 metadata 规则，明确凡出现 `Doc Type / 文档类型`，类型值必须保留 English anchor 并补中文说明。
 - 下一步：后续新增带 metadata 头的 Markdown 时，先按 `docs/README.md` 保持字段名和值的中英可读性，再判断是否需要同步 `docs/document-inventory.md`。
-- 阻塞/风险：docs-only 文案口径修正；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。本轮追加前 `progress.md` 为 92 行 / 17229 bytes，未达到归档阈值。
 
 ## 2026-06-02 16:33
 - 完成：按客户维度修正原始文件归档路径，将永绅客户稳定 key 定为 `yoyoosun`，把原件目录和归档评审从 `docs/customers/current/` 移到 `docs/customers/yoyoosun/`。
 - 完成：新增 `docs/customers/yoyoosun/README.md`，同步 `docs/customers/current/README.md`、`source-materials.md`、`docs/current-source-of-truth.md` 和 `docs/document-inventory.md`，明确 `current` 只是当前活跃客户 / 导入工作区别名，不是长期客户 key；后续多客户资料按 `docs/customers/<customer-key>/` 隔离。
 - 下一步：后续若需要客户级配置或交付包，应优先建立 `config/customers/yoyoosun/*` 和 `deployments/yoyoosun/*`，不要继续把长期客户资料塞进 `current`。
-- 阻塞/风险：docs-only + 原件归档路径修正；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。
 
 ## 2026-06-02 16:27（已由 16:33 修正）
 - 完成：当时修正 current 原始客户文件归档口径，将 8 个本地原始 Excel / PDF / PNG 复制到 `docs/customers/current/raw-source-files/`，保留原始文件名，用于后续字段、模板、导入、页面和验收溯源；该路径已在 16:33 修正为 `docs/customers/yoyoosun/raw-source-files/`。
-- 完成：当时新增 `docs/customers/current/raw-source-files/README.md`，并同步 `raw-source-file-archive-review.md`、`source-materials.md`、`README.md`、`docs/current-source-of-truth.md` 和 `docs/document-inventory.md`，明确原件已在项目归档，但仍不是 Product Core、runtime、schema、migration、API、UI、seedData、docs registry、真实导入批准或 `business_records` cutover；该归档文档已在 16:33 移至 `docs/customers/yoyoosun/`。
 - 下一步：后续从原件推进功能前，先生成脱敏 / 结构化 fixture 或正式产品 / 架构评审；如果继续批量增加原始二进制文件，再评审 Git LFS、对象存储或只提交脱敏样本。
-- 阻塞/风险：当前仓库未启用 Git LFS，本批原件约 24MB，直接进入 Git 会增加仓库历史体积；本轮未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。本轮追加前 `progress.md` 为 80 行 / 14564 bytes，未达到归档阈值。
 
 ## 2026-06-02 16:18（已由 16:27 和 16:33 修正）
 - 完成：当时新增 `docs/customers/current/raw-source-file-archive-review.md`，登记 `/Users/simon/Downloads/永绅erp/原文件/` 下 8 个 current 原始 Excel / PDF / PNG 的类型、大小、checksum、用途分类、允许落点和禁止事项；该归档文档已在 16:33 移至 `docs/customers/yoyoosun/raw-source-file-archive-review.md`。
 - 完成：同步 `docs/customers/current/README.md`、`docs/customers/current/source-materials.md`、`docs/document-inventory.md` 和 `docs/current-source-of-truth.md`，当时明确原始文件本轮不移动进仓库、不提交二进制原件、不作为 Product Core 或真实导入批准；该“原件不进仓库”口径已在 16:27 修正为“原件进入 `raw-source-files/` 归档，但仍不作为 Product Core 或真实导入批准”。
 - 下一步：如需从原件生成 dry-run 数据，先做脱敏 / 结构化 snapshot fixture，落到 `scripts/import/fixtures/current/*`；如需迁移原件，另开归档迁移任务评审敏感信息、引用关系、docs registry、测试断言和 Git 历史体积。
-- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。本轮追加前 `progress.md` 为 74 行 / 13483 bytes，未达到归档阈值。
 
 ## 2026-06-02 16:03
 - 完成：检查 tracked Markdown 的中英可读性状态，确认 metadata 字段已无英文-only 问题、`docs/document-inventory.md` 清单无漏列 / stale 路径 / 英文-only 用途项。
@@ -323,8 +310,6 @@
 
 ## 2026-06-02 15:34
 - 完成：按“活跃文档树回到 roadmap / current-source / product-delivery-ledgers”的口径清理历史遗留文档。删除已完成编号执行规格 `000` 到 `012`、旧 `rewrite-roadmap` 兼容入口、早期根目录初始化 / 主流程 / 数据模型 / 项目状态文档，以及旧 Phase 1 / V1 schema draft、cutline、go/no-go、旧下一步规划等执行规划文档；这些内容后续仅从 Git 历史或 `docs/archive/*` 过程线索追溯。
-- 完成：同步 `README.md`、`AGENTS.md`、`docs/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、原执行规格目录模板说明、`docs/product/product-completion-roadmap.md`、`docs/product/domain-model-v1.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-cutover-plan.md`、`docs/architecture/phase-2b-bom-lot-schema-review.md` 和 `scripts/project-scan.sh`，移除活跃文档对已删除文件的引用。
-- 下一步：剩余 `business_records` 过渡文档、current import 文档、正式架构评审、产品内帮助文档和 imported-notes 仍保留；它们分别对应 roadmap 第 13 / 14 阶段、当前事实边界、产品内展示或 Reference Only 输入，后续应按具体阶段再整合，不在本轮无差别删除。
 - 阻塞/风险：docs / governance cleanup；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。`scripts/project-scan.sh` 仅更新扫描目标中的已删除文档路径。本轮追加前 `progress.md` 为 54 行 / 9495 bytes，未达到归档阈值。
 
 ## 2026-06-02 15:06

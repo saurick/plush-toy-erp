@@ -25,7 +25,6 @@ export const privateDeploymentPackageTemplate = Object.freeze({
     changesRuntimeMenuLoader: false,
     forksCodebase: false,
     executesRealImport: false,
-    writesBusinessRecords: false,
     writesFacts: false,
     buildsOnTargetServer: false,
   }),

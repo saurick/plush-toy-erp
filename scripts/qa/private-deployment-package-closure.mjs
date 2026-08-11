@@ -56,7 +56,6 @@ function createReport(packageTemplate, industryTemplate) {
     noRuntimeLoaderChange: packageTemplate.boundaries.changesRuntimeMenuLoader === false,
     noCodeFork: packageTemplate.boundaries.forksCodebase === false,
     noRealImport: packageTemplate.boundaries.executesRealImport === false,
-    noBusinessRecordWrite: packageTemplate.boundaries.writesBusinessRecords === false,
     noFactWrite: packageTemplate.boundaries.writesFacts === false,
     noTargetBuild: packageTemplate.boundaries.buildsOnTargetServer === false,
     industryTemplateStillCandidate:

@@ -57,7 +57,7 @@ Options:
   --run-id <text>        Optional unique run suffix. Default timestamp.
   --help                 Print this help.
 
-The report-only path never calls a backend, writes business records, imports real customer
+The report-only path never calls a backend, writes formal business data, imports real customer
 data, creates schema or migrations, or turns customer acceptance into a completion blocker.`;
 
 class CliError extends Error {
@@ -272,7 +272,6 @@ function buildInputTemplate(options = {}) {
     writesDatabase: false,
     callsBackend: false,
     importsRealCustomerData: false,
-    createsBusinessRecords: false,
     downstreamReportOnlyWritesReports: true,
     downstreamApplyWritesDatabase: false,
     defaultBackendURL: DEFAULT_BACKEND_URL,
@@ -309,7 +308,7 @@ function buildInputTemplate(options = {}) {
         "PATH=/usr/local/bin:$PATH bash scripts/seed-core-demo-data.sh",
     },
     boundary:
-      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write business_records, or create operational facts.",
+      "This template only prints prerequisites and commands. It does not write reports, call backend, login, import real customer data, write formal business data, or create operational facts.",
   };
 }
 

@@ -26,7 +26,6 @@
 ## 当前活跃事项
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、`docs/product/多甲方角色能力与流程编排.md`、`docs/workflow/业务与协同流程地图.md`、产品能力台账、当前代码/migration/测试。`docs/reference/**`、客户 PDF/Excel 和 GPT 对话只作输入线索。
-- Product Core / 永绅客户包、角色页面和动作投影、模块依赖、窄版 Process Runtime、Source Document / Workflow / Fact 边界、客户导入与发布门禁已完成本地综合收口；后续改动不得恢复旧业务记录、拆分单据写 API、formal-shell 假页或客户分支。
 - 当前只能声明本地代码、模拟数据、测试库和浏览器回归通过；本轮没有执行永绅真实客户数据导入、目标环境发布/配置激活、备份恢复演练或客户签收，不将旧 evidence 冒充为本轮结果。
 
 ## 2026-07-09 Product Core 首页总览修正
@@ -261,7 +260,6 @@
 
 完成：业务与协同主路收口。销售/采购 Source Document 只保留表头+明细聚合事务保存，提交后只读；公开 Workflow API 不再允许客户端写流程锚点或任意业务状态。Process Runtime 只支持人工任务、审批、白名单领域命令、等待事件和结束节点，Workflow done 不冒充 Fact posted。来料链路实现采购单数量约束、并发入库防超收、HOLD 批次、多行 IQC 聚合放行/拒收/让步接收和库存过账；采购调整新增明细与过账并发锁。加工合同统一承接车缝、手工和布料加工，每行产品/材料二选一并清除切换残值；永绅主料仓、成品仓、其他仓作为仓库主数据，财务下采购合同通过 `finance + purchase` 多角色表达，不污染通用财务角色。
 
-完成：文档和页面降噪。删除旧业务记录系列文档/实现、过大的一次性多客户审计脚本、formal-shell 假页和真实导入执行器，历史架构评审移入 archive；活跃文档收口为真源索引、角色流程专文、流程地图、能力台账和测试策略。前端用户可见文案不显示 Workflow/Fact/raw key/底层错误；无权移动端动作使用明确只读说明和中性禁用态。Node 包改为明确 ESM，清理 typeless package warning；`lint` 不再自动修改代码，另保留 `lint:fix`。
 
 下一步：如果要进入真实客户验收，必须准备经客户确认的真实数据和目标环境授权，然后按客户配置 validate/publish/activate、导入 dry-run/批次 usecase、backup/restore、migration、目标 smoke 和签收 evidence 执行；不得把本地模拟 fixture 写成客户真实导入。
 
@@ -277,7 +275,6 @@
 
 ## 2026-07-10 GPT 全链审查复核与高优先级事实链加固
 
-完成：按仓库当前真源复核外部 GPT 审查，确认其 Product Core / 客户运行态、Workflow / Fact、发布 `NO-GO` 大方向合理，但 ZIP 的 177 项、断链数量和缺工具链结论不能替代当前仓库证据。以 `docs/reference/第四次20260627` 为优先参考、第三次为次级 Reference Only，新增《ERP 客户差异实现边界规范》已登记到文档清单，并在第四次 README 明确降权 `tenant_id / yongshen / 任意客户代码 / Fact 分类 / 目录重构` 等冲突示例。正式文档、根 / server / web README、客户差异台账、交付矩阵、能力台账、流程运行时台账和当前真源已同步治理；过期的“仅三个 V1 页面 / 通用 business_records 已落盘”口径已删除。客户原始资料和归档通过 `.dockerignore / .gitattributes` 退出 Docker build context 与源码发布包；非 demo 客户缺 active revision 时普通账号和 super admin 业务动作均 fail closed。
 
 完成：关闭库存预留、出货、幂等与 ProcessRuntime 的高优先级问题。预留按统一库存键加锁，出货校验销售订单 / 客户 / 产品 / SKU / 单位 / 累计数量，禁止出货确认后追加明细，出货事务原子消费本单预留并守住跨 grain 剩余预留；库存、生产、委外、财务、采购入库和预留均持久 exact-intent 与调用方时间 marker，同 key 同 payload 返回原结果，不同 payload 明确 `40920` 冲突。ProcessRuntime 先做只读 preflight，再以条件 `UPDATE ... RETURNING` 绑定不可变 SHA-256 fingerprint；claim 期间同意图已结算时不重复执行 handler，并发终态、linked refs CAS、return-to attempt 创建重放、质检纳秒到 PostgreSQL 微秒重放和升级前 active 空 fingerprint sentinel 均已补测试 / migration。流程 payload 删除 caller 自报客户、质检员、due date 等非真源字段，财务客户取已出货 shipment，成品质检员取认证 actor。领域事实随后被取消 / 冲正或流程外继续推进时不放宽状态伪造成功，当前明确 fail closed 并进入补偿 / 人工对账恢复。
 

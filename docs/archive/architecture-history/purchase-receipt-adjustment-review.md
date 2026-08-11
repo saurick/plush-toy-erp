@@ -6,7 +6,6 @@
 
 | 范围 | 已确认口径 |
 | --- | --- |
-| 当前真源 | `README.md`、`docs/current-source-of-truth.md` 明确 `inventory_txns` 是库存事实流水真源，`inventory_balances` 是当前余额 / 查询加速表，`inventory_lots` 是批次追溯真源；`business_records` 仍是通用单据快照和兼容层。 |
 | RBAC | `docs/roles/role-permission-matrix-v1.md` 和 `server/internal/biz/rbac.go` 明确权限真源为标准 RBAC，旧 `admin_users.level / menu_permissions / mobile_role_permissions` 不再作为权限来源。 |
 | Phase 2A | `docs/current-source-of-truth.md` 和 `server/internal/data/inventory_repo.go` 明确库存影响必须追加 `inventory_txns`，余额在同事务内更新，默认禁止负库存。 |
 | Phase 2B | `docs/archive/architecture-history/bom-lot-schema-review.md` 和 `inventory_lots / inventory_balances` schema 明确批次库存和非批次库存分开聚合、分开扣减，不能互相抵扣。 |
@@ -30,7 +29,6 @@ Phase 2D-B 本轮只评审入库差异、收货差异和入库后更正如何建
 | 不接前端 | 不改桌面、移动端页面，不接 JSON-RPC/API，不改菜单。 |
 | 不改帮助中心 | 不同步前端帮助中心和运行时文档。 |
 
-本轮也不新增 `warehouse_locations`、`stock_reservations`、`product_styles`，不迁移旧 `business_records`，不删除或替换 `business_records`，不对 `192.168.0.106:5432/plush_erp` 执行 `migrate_apply`，不做真实分区 migration 和几十亿级压测。
 
 ## 2. 入库差异的业务类型
 

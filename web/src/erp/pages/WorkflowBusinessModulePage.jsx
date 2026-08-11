@@ -38,7 +38,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import ProductionExceptionDecisionPanel, {
   canReadProductionExceptionDecisions,
 } from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
@@ -1443,7 +1443,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       />
       {columnOrderModal}
 
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={visibleColumns}
         description="查看任务来源、责任、到期和当前原因；完成、阻塞、退回和催办仍从当前操作区办理。"
         open={Boolean(detailTask)}

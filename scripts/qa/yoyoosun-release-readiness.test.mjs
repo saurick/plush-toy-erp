@@ -17,7 +17,6 @@ const requiredSourceCategories = new Set([
   'workflow_ui_reference',
 ])
 const forbiddenFactTargets = new Set([
-  'business_records',
   'purchase_receipts',
   'quality_inspections',
   'outsourcing_facts',

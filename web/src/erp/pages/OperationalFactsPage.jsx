@@ -45,7 +45,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import ProductionReworkModal from '../components/production-facts/ProductionReworkModal.jsx'
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
@@ -123,7 +123,7 @@ import {
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
 import {
-  businessRecordInventoryRouteFor,
+  businessSourceInventoryRouteFor,
   businessSourceRouteFor,
   sourceRouteFor,
 } from '../utils/businessSourceNavigation.mjs'
@@ -1475,7 +1475,7 @@ export function OperationalFactWorkspace({
           fields: ['sales_order_no'],
         }
       ),
-      inventory: businessRecordInventoryRouteFor(
+      inventory: businessSourceInventoryRouteFor(
         currentActiveKey,
         activeSelectedRow.id,
         {
@@ -2375,7 +2375,7 @@ export function OperationalFactWorkspace({
       />
 
       {columnOrderModal}
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={visibleColumns}
         description="当前弹窗只用于查看记录；如需编辑草稿、确认、结清、取消、返工或继续办理，请使用列表上方的当前操作区。"
         open={Boolean(detailRecord)}

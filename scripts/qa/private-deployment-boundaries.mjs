@@ -73,7 +73,6 @@ function validateTemplate(config, repoRoot = process.cwd()) {
     "changesRuntimeMenuLoader",
     "forksCodebase",
     "executesRealImport",
-    "writesBusinessRecords",
     "writesFacts",
     "buildsOnTargetServer",
   ]) {

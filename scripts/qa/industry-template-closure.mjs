@@ -41,7 +41,7 @@ Boundaries:
   - reads only config/industry-templates/plush/templateConfig.mjs
   - does not connect to DB or backend
   - does not execute real import
-  - does not write business_records or fact tables
+  - does not write formal business data or fact tables
 `);
 }
 
@@ -94,7 +94,6 @@ function createReport(config) {
       noMigrationChange: config.boundaries.changesMigration === false,
       noRuntimeMenuLoaderChange: config.boundaries.changesRuntimeMenuLoader === false,
       noWorkflowFactChange: config.boundaries.changesWorkflowFactRules === false,
-      noBusinessRecordWrite: config.boundaries.writesBusinessRecords === false,
       noFactWrite: config.boundaries.writesFacts === false,
     },
     roleKeys: config.defaultRoles.map((role) => role.key),
@@ -136,7 +135,6 @@ function renderMarkdown(report) {
 | 不改 migration | ${report.simulatedAcceptance.noMigrationChange ? "PASS" : "FAIL"} |
 | 不改运行时菜单 loader | ${report.simulatedAcceptance.noRuntimeMenuLoaderChange ? "PASS" : "FAIL"} |
 | 不改 Workflow / Fact 规则 | ${report.simulatedAcceptance.noWorkflowFactChange ? "PASS" : "FAIL"} |
-| 不写 business_records | ${report.simulatedAcceptance.noBusinessRecordWrite ? "PASS" : "FAIL"} |
 | 不写事实表 | ${report.simulatedAcceptance.noFactWrite ? "PASS" : "FAIL"} |
 
 ## 桌面菜单模板

@@ -131,7 +131,6 @@ export const customerPackageSchema = Object.freeze({
     "changesRuntimeLoader",
     "executesImport",
     "executesRealImport",
-    "writesBusinessRecords",
     "writesFacts",
     "writesInventoryFacts",
     "writesShipmentFacts",
@@ -150,7 +149,6 @@ export const customerPackageSchema = Object.freeze({
   ]),
   forbiddenTargets: Object.freeze([
     "tenant_id",
-    "business_records",
     "schema",
     "migration",
     "rbac",

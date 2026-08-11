@@ -135,7 +135,7 @@ pnpm smoke:processing-contract-real-login
 
 ### 0. 导入冻结与 dry-run 工具 / Import freeze and dry-run tooling
 
-customer source manifest checker 显式读取客户私有仓库 manifest 与 ignored raw dir，校验 customer key、相对路径、sha256、size、可结构化提取标记、重复项、未登记文件和目录逃逸；不解析 PDF/OCR，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
+customer source manifest checker 显式读取客户私有仓库 manifest 与 ignored raw dir，校验 customer key、相对路径、sha256、size、可结构化提取标记、重复项、未登记文件和目录逃逸；不解析 PDF / OCR，不连接数据库、不读取 server config、不调用 web runtime、不写正式表，也不执行真实导入。
 
 ```bash
 export CUSTOMER_PRIVATE_ROOT=/Users/simon/projects/plush-toy-erp-customer-yoyoosun-private
@@ -185,7 +185,7 @@ node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
   --out output/customers/yoyoosun/source-extract/freeze-check
 ```
 
-customer source snapshot freeze checker 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
+customer source snapshot freeze checker 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表，也不执行真实导入。
 
 ```bash
 node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
@@ -204,7 +204,7 @@ freeze-check-report.md
 
 `freeze-metadata.json` 中 `noRealImport` 必须为 `true`，`canExecuteRealImport` 必须为 `false`。该脚本是 freeze evidence tooling，不是 runtime loader，不是 import approval。
 
-永绅 yoyoosun 客户导入 dry-run 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`。
+永绅 yoyoosun 客户导入 dry-run 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表。
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \
@@ -279,15 +279,15 @@ node scripts/qa/trial-simulated-data.mjs \
 
 `--print-input-template` 只输出 report-only / apply simulated data 所需的 `--out`、`--backend-url`、产品 / 单位 ID、演示账号密码来源、核心 demo seed 和后续真实命令，不登录、不调用后端、不写报告、不写数据库，也不证明试用数据已经写入。
 
-若要把模拟数据写入本地或目标试用环境，只能显式 `--apply`，并提供已有活跃产品和单位 ID。该脚本会先按稳定模拟编号查找已有记录，缺失才通过 V1 JSON-RPC 创建；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不创建出货、库存或财务事实：
+若要把模拟数据写入本地或目标试用环境，只能显式 `--apply`，并提供已有活跃产品和单位 ID。该脚本会先按稳定模拟编号查找已有记录，缺失才通过 V1 JSON-RPC 创建；它不执行真实 import，不生成 schema / migration，也不创建出货、库存或财务事实：
 
-如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`processes`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀；其中 `processes` 会提供 `查货 / 手工 / 车缝 / 包装` 等毛绒玩具行业默认候选，并仍允许后续按实际工厂扩展。该 seed 不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `trial_sim_args` 可供仍受支持的试用源数据脚本使用，`operational_fact_args` 仅供旧 report-only 计划审查，不能用于已停用的 apply：
+如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`processes`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀；其中 `processes` 会提供 `查货 / 手工 / 车缝 / 包装` 等毛绒玩具行业默认候选，并仍允许后续按实际工厂扩展。该 seed 不写客户、供应商、联系人、销售订单、库存流水、生产、出货或财务事实；输出中的 `trial_sim_args` 可供仍受支持的试用源数据脚本使用，`operational_fact_args` 仅供旧 report-only 计划审查，不能用于已停用的 apply：
 
 ```bash
 bash scripts/seed-core-demo-data.sh
 ```
 
-如果只需要最小产品 / 单位前置数据，也可使用试用模拟 seed。该 seed 只写 `units` 和 `products` 两个 MasterData 表，编码固定带 `SIM-YOYOOSUN-TRIAL` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实：
+如果只需要最小产品 / 单位前置数据，也可使用试用模拟 seed。该 seed 只写 `units` 和 `products` 两个 MasterData 表，编码固定带 `SIM-YOYOOSUN-TRIAL` 前缀，不写客户、供应商、联系人、销售订单、库存、出货或财务事实：
 
 ```bash
 bash scripts/seed-trial-sim-masterdata.sh
@@ -334,7 +334,7 @@ node scripts/qa/mobile-workflow-simulated-closure.mjs \
 
 `--print-input-template` 只输出 report-only / apply simulated mobile workflow tasks 所需的 runId、演示账号密码来源、岗位角色账号、模拟任务组和后续真实命令，不登录、不调用后端、不写报告、不写数据库、不创建 workflow 任务，也不写任何业务事实。
 
-若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 的 `trial_*` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、仓库出货异常上报和跨角色催办；动作只提交本次反馈或原因，并验证新动作不生成 `mobile_action_evidence_refs`。真实任务附件统一在详情页按权限查看或管理，旧文本引用只作为历史处理线索只读展示。该脚本不创建或冒充 `production_scheduling / production_exception / shipment_release` 来源任务。所有状态 / 催办动作都使用读回的正整数 `expected_version` 和由 task/action 稳定生成的顶层 `idempotency_key`，缺版本时 fail closed。它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
+若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 的 `trial_*` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、仓库出货异常上报和跨角色催办；动作只提交本次反馈或原因，并验证新动作不生成 `mobile_action_evidence_refs`。真实任务附件统一在详情页按权限查看或管理，旧文本引用只作为历史处理线索只读展示。该脚本不创建或冒充 `production_scheduling / production_exception / shipment_release` 来源任务。所有状态 / 催办动作都使用读回的正整数 `expected_version` 和由 task/action 稳定生成的顶层 `idempotency_key`，缺版本时 fail closed。它不执行真实 import，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
 
 ```bash
 MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS \

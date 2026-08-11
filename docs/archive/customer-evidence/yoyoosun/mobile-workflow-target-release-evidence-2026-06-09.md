@@ -85,7 +85,6 @@ docker image prune -f
 - 本次 Phase 9 只关闭“岗位任务端 + workflow 模拟协同闭环”，不代表客户已签收。
 - 本次不执行真实客户数据导入；如果遇到真实数据导入需求，只能先本地模拟并重新评审。
 - 本次不新增 schema / migration，不改 server fact usecase。
-- 本次不写 `business_records`。
 - 本次不写生产、出货、库存、预留、财务、发票、收付款或对账事实。
 - 本次的现场留痕是 workflow payload 中的 evidence 文本 / refs；不代表已经交付对象存储、拍照上传、附件管理或扫码能力。
 - 客户使用确认、真实人员账号确认、附件上传服务、扫码、打印、报表、核销和行业模板沉淀进入后续任务。

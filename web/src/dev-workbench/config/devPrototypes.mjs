@@ -197,7 +197,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '把业务管理菜单收敛为业务对象总控：按链路选择对象、查看风险、进入标准业务页或详情页。',
     appliesTo:
-      '业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；不恢复 business_records，不承诺未接 API 已完成。',
+      '业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；未接 API 仍保持待实现状态。',
   },
   {
     key: 'business-management-center-redesign-reference',

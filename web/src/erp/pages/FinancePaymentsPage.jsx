@@ -59,7 +59,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
@@ -2016,7 +2016,7 @@ export default function FinancePaymentsPage() {
           </Form.Item>
         </Form>
       </BusinessFormModal>
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         open={Boolean(paymentDetail)}
         title="收付款详情"
         description="收付款来源、核销明细与当前状态均以系统最新记录为准。"
@@ -2025,7 +2025,7 @@ export default function FinancePaymentsPage() {
         lineItems={paymentDetailLineItems}
         onClose={() => setPaymentDetail(null)}
       />
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         open={Boolean(creditDetail)}
         title="红冲详情"
         description="红冲保留来源应收或应付、原金额和当前未核销金额。"

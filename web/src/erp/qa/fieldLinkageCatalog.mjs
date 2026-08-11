@@ -358,7 +358,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
   {
     fieldKey: 'sourceNo',
     fieldLabel: '来源单号',
-    category: '通用业务记录快照',
+    category: '来源单据快照',
     risk: 'P0',
     docLabels: ['来源单号'],
     requiredScenarioKeys: [

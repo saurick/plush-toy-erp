@@ -38,7 +38,7 @@ description: 项目打印模板源治理（plush-toy-erp）。Use when customer 
 - 图片尺寸和位置先按甲方源文件理解：产品图、色卡图、样板图、签章/签名或其他固定图片如果在源文件中有明确单元格、合并区域、坐标框或占位比例，运行时默认应落在同一语义区域并保持接近源文件的视觉尺寸；不能因为实现方便改放到文件末尾、通用上传条或任意缩略图区。
 - Product Core 默认样例应使用中性展示值；模板样例文字默认黑色，颜色/加粗是编辑能力，不是默认样式证据。
 - Product Core 默认样例不要按甲方长表塞满。若编号作业行、材料行、色卡行或合同明细行行为一致，默认只保留 2-5 条代表行；长清单、分页和性能用 fixture、页面级浏览器回归（Style L1）和 PDF 回归覆盖，不靠默认样例复制所有源行。
-- 不要为了当前截图补页面私有真源、旧 `business_records` 链路、额外草稿 key、第二套 PDF HTML 或客户硬编码。
+- 不要为了当前截图补页面私有真源、额外草稿 key、第二套 PDF HTML 或客户硬编码。
 - 模板质量同样是交付边界：不要为某个截图堆一批一次性 CSS/JS 补丁、无限 base64 图片快照、整页截图型模板、重复测高循环或第二套隐藏 PDF DOM；优先复用 `printWorkspace.js`、`PrintWorkspaceShell`、工程模板 normalizer、共享图片槽和 scoped CSS。
 - Official templates 需要等价于 trade QA catalog 的 coverage matrix，即使它存放在 plush-specific code / docs：template key、source workbook / page、field requirements、mapper、renderer、module gate、image slots、browser / PDF checks 和 blind spots 都要可追踪。
 - Runtime limits 是正确性的一部分。复用现有 engineering row / image limits 和 server PDF payload / concurrency / timeout；如果新增 row / image / vector 路径，要补上对应 bound 或说明为什么现有 bound 足够。

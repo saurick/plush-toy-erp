@@ -31,7 +31,7 @@ HTTP / gRPC transport 日志只记录 operation、JSON-RPC domain / method / id�
 
 ## 开发验收 debug 能力
 
-后端 JSON-RPC `debug` 域可生成和清理开发验收调试数据。前端业务链路调试页已移除，这组接口只作为受权限保护的后端调试能力保留；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，debug seed / cleanup 不再写旧通用业务记录：
+后端 JSON-RPC `debug` 域可生成和清理开发验收调试数据。前端业务链路调试页已移除，这组接口只作为受权限保护的后端调试能力保留；debug seed / cleanup 只处理带调试批次标记的当前领域数据：
 
 - `debug.capabilities`：返回当前环境、仅数据库名的运行态身份、seed / cleanup / 业务数据清空是否允许和禁用原因；不返回 DSN、主机、用户或密码
 - `debug.rebuild_business_chain_scenario`：生成带 debugRunId 标记的调试数据
@@ -53,7 +53,7 @@ HTTP / gRPC transport 日志只记录 operation、JSON-RPC domain / method / id�
 - `get_purchase_receipt`
 - `list_purchase_receipts`
 
-这组接口走 `InventoryUsecase` 和既有采购入库事实表。过账写 `inventory_txns.IN`；`DRAFT` 取消不写库存，会在收货行锁事务内锁定并校验关联 `PURCHASE_RECEIPT / INCOMING / MATERIAL` IQC 与预备批次，取消 `DRAFT / SUBMITTED` IQC，并只在所有预备批次余额精确为零时停用；`POSTED` 取消才逐行写 `REVERSAL`。任一 IQC 来源形状异常、预备批次非零余额、未取消退货 / 调整或 active 应付都会按对应状态整笔阻断。公开入库 API 不接受 `business_record_id` 作为正式事实来源；读取采购订单或订单行的 `create_purchase_receipt_from_purchase_order / add_purchase_receipt_item` 同时要求 `purchase.receipt.create + purchase_order.read`，其它采购入库读取和确认仍分别使用 `purchase.receipt.read / warehouse.inbound.confirm`。这些权限边界不代表 Workflow 任务完成会自动过账库存事实。
+这组接口走 `InventoryUsecase` 和既有采购入库事实表。过账写 `inventory_txns.IN`；`DRAFT` 取消不写库存，会在收货行锁事务内锁定并校验关联 `PURCHASE_RECEIPT / INCOMING / MATERIAL` IQC 与预备批次，取消 `DRAFT / SUBMITTED` IQC，并只在所有预备批次余额精确为零时停用；`POSTED` 取消才逐行写 `REVERSAL`。任一 IQC 来源形状异常、预备批次非零余额、未取消退货 / 调整或 active 应付都会按对应状态整笔阻断。公开入库 API 只接受采购订单、采购行等已登记的正式来源字段；读取采购订单或订单行的 `create_purchase_receipt_from_purchase_order / add_purchase_receipt_item` 同时要求 `purchase.receipt.create + purchase_order.read`，其它采购入库读取和确认仍分别使用 `purchase.receipt.read / warehouse.inbound.confirm`。这些权限边界不代表 Workflow 任务完成会自动过账库存事实。
 
 采购退货和入库调整沿用同一草稿 / 过账分界：取消 `DRAFT` 时先锁定子单再锁定父收货，只把子单改为 `CANCELLED`，不写库存；取消 `POSTED` 时才按原交易写 `REVERSAL`。草稿子修正全部取消后，父收货的 correction dependency 解除；采购收货草稿取消后，也不再阻断采购订单关闭 / 取消。父单动作不会自动取消任一子单或子事实。
 

@@ -8,7 +8,7 @@ function flattenOptions(groups) {
   return groups.flatMap((group) => group.options)
 }
 
-test('history source select groups master data and business records with exact coverage', () => {
+test('history source select groups master data and operational entries with exact coverage', () => {
   const groups = buildHistorySourceSelectOptions(HISTORY_RECORD_SOURCES)
 
   assert.deepEqual(

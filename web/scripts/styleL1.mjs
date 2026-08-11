@@ -4084,8 +4084,7 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
       checklistScrollWidth: checklist?.scrollWidth || 0,
       checklistClientWidth: checklist?.clientWidth || 0,
       wrapperCount: wrappers.length,
-      hasStaleBusinessRecord: bodyText.includes('business.record.'),
-      hasStaleHelpCenter: bodyText.includes('erp.help_center.read'),
+      hasRetiredPermissionKey: bodyText.includes('erp.help_center.read'),
       wrappers: wrappers.map(readWrapper),
     }
   })
@@ -4094,7 +4093,7 @@ async function assertPermissionChecklistItemLayout(page, { scenarioName }) {
     `${scenarioName} 未找到权限复选项: ${JSON.stringify(metrics)}`
   )
   assert(
-    !metrics.hasStaleBusinessRecord && !metrics.hasStaleHelpCenter,
+    !metrics.hasRetiredPermissionKey,
     `${scenarioName} 不应显示已退出的旧权限码: ${JSON.stringify(metrics)}`
   )
   assert(

@@ -4,7 +4,6 @@
 
 Phase 2B 建议只推进 `inventory_lots`、`bom_headers`、`bom_items`，并把批次维度接入 Phase 2A 已验收的库存事实闭环。推荐方案是方案 B：新增 `inventory_lots`，同时给 `inventory_txns` 和 `inventory_balances` 增加 nullable `lot_id`。这属于 Phase 2A 模型的一次维度演进，不是推翻 `inventory_txns` 作为库存事实流水真源、`inventory_balances` 作为当前余额 / 查询加速表的既定口径。
 
-本轮只做设计评审文档，不改 Ent schema，不生成 migration，不改运行时代码，不改前端，不迁移 `business_records`。
 
 ## 评审依据
 
@@ -30,7 +29,6 @@ Phase 2B 建议只推进 `inventory_lots`、`bom_headers`、`bom_items`，并把
 | 品质 | 不做 | `quality_status` 只在批次上预留状态，不建质检单、检验项目或缺陷表。 |
 | 财务 | 不做 | BOM 版本切换会影响成本，但本轮不做成本核算、应收应付、发票、核销或总账。 |
 | 前端 | 不接 | 本轮不改页面、帮助中心或保存转换层，避免把 schema 评审和交互改造绑在一起。 |
-| `business_records` 迁移 | 不迁移 | `business_records / business_record_items` 继续作为通用单据快照和兼容层，不替代 BOM 或库存批次事实。 |
 | 真实库 migration apply | 不做 | 不对 `192.168.0.106:5432/plush_erp` 执行 `migrate_apply`。 |
 | 分区、读写分离 | 不做 | Phase 2B 只评审普通表形和字段维度，不做真实分区 migration，不引入读写分离。 |
 
@@ -61,7 +59,6 @@ Phase 2B 建议只推进 `inventory_lots`、`bom_headers`、`bom_items`，并把
 | `inventory_lots.subject_type + subject_id` | 继续复用 Phase 2A 的 `MATERIAL / PRODUCT` 主体表达，避免过早引入多态外键、统一库存对象表或 `material_id/product_id` 二选一外键组合。 |
 | `inventory_txns.lot_id` | 若批次要参与库存事实，应在 Phase 2B 增加 nullable `lot_id`。否则批次只能做档案，无法回答“哪一批进出库”。 |
 | `inventory_balances.lot_id` | 若流水进入批次维度，余额唯一键也应同步扩展到 `lot_id`，否则只能表示总库存，不能表示当前批次库存。 |
-| `business_records` | 继续作为通用单据快照和兼容层；BOM 和批次事实不从旧通用记录批量迁移。 |
 
 ## 候选表与候选变更总览
 
@@ -109,7 +106,6 @@ Phase 2B 建议只推进 `inventory_lots`、`bom_headers`、`bom_items`，并把
 | `status` | `varchar(32)` | 是 | 建议 `DRAFT / ACTIVE / INACTIVE / ARCHIVED`。 |
 | `effective_from` | `timestamptz` | 否 | 生效开始时间。 |
 | `effective_to` | `timestamptz` | 否 | 生效结束时间。 |
-| `source_type` | `varchar(64)` | 否 | 来源类型，如 `BUSINESS_RECORD`、`IMPORT`。 |
 | `source_id` | `bigint` | 否 | 来源单据或导入记录 ID。 |
 | `source_no_snapshot` | `varchar(128)` | 否 | 来源单号快照，如材料明细表里的订单编号。 |
 | `remark` | `varchar(255)` | 否 | 版本备注。 |
@@ -190,7 +186,6 @@ PostgreSQL 下如果 `lot_id` 允许为空，唯一键不能直接依赖默认 N
 | --- | --- | --- |
 | 批次进入 `inventory_txns` 后，余额是否按 lot 聚合 | 如果 `inventory_balances` 不带 `lot_id`，只能表示总库存，不能表示批次库存；如果带 `lot_id`，唯一键和库存更新 SQL 必须扩展。 | 推荐方案 B 同时调整流水和余额，并补齐集成测试。 |
 | nullable `lot_id` 唯一语义 | PostgreSQL 默认允许多条 NULL，可能破坏余额唯一性。 | 下一轮 schema 设计必须明确 `NULLS NOT DISTINCT` 或默认无批次 lot，不要让默认 NULL 唯一语义决定库存口径。 |
-| 旧余额迁移 | Phase 2A 已有余额行没有批次，扩展唯一键后需要明确旧行归属。 | 不迁移 `business_records`；只对 Phase 2A 余额数据按“无批次”口径迁移或保持 nullable，但必须有可回滚 migration 和测试。 |
 | 冲正校验 | 当前冲正要求主体、仓库、单位、数量和方向匹配；加入 `lot_id` 后也必须匹配批次。 | 下一轮同步更新 biz 校验、repo 查询和测试。 |
 | 幂等重放 | 相同 `idempotency_key` 返回既有流水；如果批次字段参与语义，重放时要确保返回的余额 key 也包含 lot。 | `inventoryBalanceKeyFromEntTxn` 和相关查询必须纳入 `lot_id`。 |
 | BOM 版本切换 | BOM 生效版本会影响后续采购需求、生产领料和成本核算。 | 本轮只保存版本与状态，不生成采购 / 生产 / 成本；后续链路必须引用明确版本。 |

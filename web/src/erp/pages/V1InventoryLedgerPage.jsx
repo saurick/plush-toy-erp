@@ -63,7 +63,7 @@ import {
   BusinessListToolbarActions,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
-import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
 import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
@@ -2297,7 +2297,7 @@ export default function V1InventoryLedgerPage() {
         />
       </Card>
       {columnOrderModal}
-      <BusinessRecordDetailsModal
+      <BusinessDetailsModal
         columns={visibleColumns}
         description="当前弹窗只用于库存查询和追溯，不会修改库存、批次状态、预留或变动记录。"
         open={Boolean(detailRecord)}

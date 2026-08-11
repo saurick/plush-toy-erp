@@ -151,17 +151,17 @@
   }
 }
 .erp-permission-modal.ant-modal,
-.erp-business-record-modal.ant-modal {
+.erp-business-entry-modal.ant-modal {
   max-width: calc(100vw - 32px);
 }
 
 .erp-permission-modal .ant-modal-content,
-.erp-business-record-modal .ant-modal-content {
+.erp-business-entry-modal .ant-modal-content {
   overflow: hidden;
 }
 
 .erp-permission-modal .ant-modal-title,
-.erp-business-record-modal .ant-modal-title {
+.erp-business-entry-modal .ant-modal-title {
   line-height: 1.35;
 }
 
@@ -182,7 +182,7 @@
 }
 
 .erp-permission-modal .ant-modal-body,
-.erp-business-record-modal .ant-modal-body {
+.erp-business-entry-modal .ant-modal-body {
   max-height: calc(100vh - 210px);
   overflow-x: hidden;
   overflow-y: auto;

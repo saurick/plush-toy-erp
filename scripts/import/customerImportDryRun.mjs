@@ -50,7 +50,7 @@ Options:
   --strict-source           Exit non-zero when a source row misses sourceId, sourceType, sourceKind, moduleKey, domain, or fields.
   --help                    Print this help.
 
-This tool performs dry-run analysis only. It never connects to a database, reads server config, writes formal tables, writes business_records, or executes a real import.`
+This tool performs dry-run analysis only. It never connects to a database, reads server config, writes formal tables, or executes a real import.`
 
 const OUTPUT_FILES = [
   'source-references.json',

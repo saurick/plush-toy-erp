@@ -103,7 +103,7 @@ func main() {
 		len(result.ProcessIDs),
 		len(result.BOMHeaderIDs),
 	)
-	fmt.Println("simulated_only=true real_customer_import=false no_business_records=true no_direct_fact_posting=true")
+	fmt.Println("simulated_only=true real_customer_import=false no_direct_fact_posting=true")
 	if referenceMode {
 		fmt.Println(referenceModeReadback(*referencesOnly, *scenarioReferences))
 		fmt.Printf("primary_unit_id=%d primary_warehouse_id=%d\n",

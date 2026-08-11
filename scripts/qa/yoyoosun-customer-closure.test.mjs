@@ -513,7 +513,6 @@ test("yoyoosun raw source form map does not target runtime fact tables directly"
     "shipments.shipped_fact",
     "finance_facts.posted",
     "workflow_done_to_fact_posted",
-    "business_records",
     "purchase_receipts",
     "quality_inspections",
     "outsourcing_facts",
