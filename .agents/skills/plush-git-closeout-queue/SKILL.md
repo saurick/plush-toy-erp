@@ -78,7 +78,9 @@ worker 发现锁时只发送一次 `INDEX_LOCK_OBSERVED`，附 compact snapshot�
 
 ## 路径级 Writer 生命周期
 
-写任务在首次写入非 ignored 文件前发送 `WRITER_REQUEST`，并等待匹配 ACK 与 `GRANT_WRITER`。请求必须声明：
+Local 顶层任务在首次写入非 ignored 文件前，只做一次 optional-lock-free 基线，记录 HEAD、index、`index.lock`、status 及可证明由本任务创建的 dirty hunk。仅当 worktree 干净，或每个 dirty hunk 都可证明由当前任务创建时，才可按单 writer 跳过队列；否则把既有脏路径视为共享/归属不明，按“发现唯一队列”加载本 Skill，并在写入前取得精确 `paths` + `derived_paths` 的 writer lease。该检测不轮询、不建 registry / daemon；不回退、格式化或 stage 外部脏路径，互不重叠的 grant 仍可并行。
+
+需要队列的写任务发送 `WRITER_REQUEST`，并等待匹配 ACK 与 `GRANT_WRITER`。请求必须声明：
 
 - `paths`：本轮允许直接写入的精确路径；同一文件不能拆成并行 hunk lease。
 - `derived_paths`：formatter、generator、lockfile、文档索引、快照或脚本可能连带写入的全部路径；确认没有时显式写 `none`。

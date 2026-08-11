@@ -71,9 +71,19 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
 
   assert.match(
     agents,
-    /多个 Codex 写任务共享 Local[\s\S]*\$plush-git-closeout-queue/u,
+    /首次写文件前[\s\S]*HEAD、index、`index\.lock` 与 status/u,
   );
-  assert.match(agents, /写入闭包完全不重叠[\s\S]*才可并行/u);
+  assert.match(
+    agents,
+    /worktree 干净[\s\S]*全部脏 hunk 都可证明由当前任务创建[\s\S]*跳过队列/u,
+  );
+  assert.match(
+    agents,
+    /既有脏路径视为共享\/归属不明[\s\S]*\$plush-git-closeout-queue[\s\S]*writer lease 后再写/u,
+  );
+  assert.match(agents, /不得轮询或新建 registry \/ daemon/u);
+  assert.match(agents, /不得回退、格式化、stage 外部脏路径/u);
+  assert.match(agents, /闭包无重叠和全仓连带写入的 grant 可并行/u);
   assert.match(agents, /同一文件、派生目标或归属不明必须串行/u);
   assert.match(agents, /writer request \/ grant 声明精确路径[\s\S]*开始身份/u);
   assert.match(agents, /release 回报实际路径与结束身份/u);
@@ -85,6 +95,20 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
   assert.match(agents, /浏览器、Vite、数据库和端口使用独立资源租约/u);
   assert.match(agents, /stage、commit 和 push 是独立动作，均先询问用户/u);
   assert.match(skill, /协议版本为 `3`/u);
+  assert.match(
+    skill,
+    /首次写入非 ignored 文件前[\s\S]*HEAD、index、`index\.lock`、status/u,
+  );
+  assert.match(
+    skill,
+    /worktree 干净[\s\S]*每个 dirty hunk 都可证明由当前任务创建[\s\S]*跳过队列/u,
+  );
+  assert.match(
+    skill,
+    /既有脏路径视为共享\/归属不明[\s\S]*精确 `paths` \+ `derived_paths` 的 writer lease/u,
+  );
+  assert.match(skill, /该检测不轮询、不建 registry \/ daemon/u);
+  assert.match(skill, /不回退、格式化或 stage 外部脏路径/u);
   assert.match(skill, /`paths ∪ derived_paths` 作为写入闭包/u);
   assert.match(skill, /未提交 `BATCH_READY` 的 `full_owned_paths`/u);
   assert.match(
