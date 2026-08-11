@@ -24,6 +24,7 @@ function writeFixture({
 
   const jwtSecret = "a".repeat(40);
   const postgresPassword = "test-production-password";
+  const postgresAppPassword = "test-app-password-12345";
   const envFile = path.join(root, ".env");
   fs.writeFileSync(
     envFile,
@@ -35,8 +36,11 @@ function writeFixture({
       "POSTGRES_IMAGE=postgres:18.1",
       "JAEGER_IMAGE=jaegertracing/all-in-one:1.76.0",
       "TZ=Asia/Shanghai",
-      `POSTGRES_DSN=postgres://plush:${postgresPassword}@127.0.0.1:5435/plush_erp`,
+      `POSTGRES_DSN=postgres://erp_app:${postgresAppPassword}@postgres:5432/plush_erp?sslmode=disable`,
       `POSTGRES_PASSWORD=${postgresPassword}`,
+      `POSTGRES_APP_PASSWORD=${postgresAppPassword}`,
+      "POSTGRES_MIGRATOR_PASSWORD=test-migrator-password-123",
+      "POSTGRES_BACKUP_PASSWORD=test-backup-password-123",
       "POSTGRES_DB=plush_erp",
       "POSTGRES_USER=plush",
       "POSTGRES_DATA_DIR=/data/plush/postgres",
@@ -87,14 +91,23 @@ function writeFixture({
       "services:",
       "  postgres:",
       "    image: ${POSTGRES_IMAGE}",
+      "    environment:",
+      "      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}",
+      "      POSTGRES_MIGRATOR_PASSWORD: ${POSTGRES_MIGRATOR_PASSWORD}",
+      "      POSTGRES_BACKUP_PASSWORD: ${POSTGRES_BACKUP_PASSWORD}",
       "    ports:",
       '      - "${POSTGRES_BIND_ADDR:-127.0.0.1}:5435:5432"',
+      "    volumes:",
+      "      - ./database_roles.sh:/docker-entrypoint-initdb.d/20-database-roles.sh:ro",
+      "      - ./database_roles.sh:/usr/local/bin/plush-database-roles:ro",
       "  jaeger:",
       "    image: ${JAEGER_IMAGE}",
       "    ports:",
       '      - "${JAEGER_BIND_ADDR:-127.0.0.1}:16686:16686"',
       "  app-server:",
       composeBuild ? "    build: ." : "    image: ${APP_IMAGE}",
+      "    environment:",
+      '      POSTGRES_DSN: "postgres://erp_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"',
       "    security_opt:",
       '      - "seccomp=./chromium-seccomp.json"',
       "    ports:",
@@ -211,7 +224,7 @@ function runPreflight(
 function configureExactCustomerTrialFixture(
   fixture,
   {
-    dsn = "postgres://postgres:test-production-password@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable",
+    dsn = "postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable",
   } = {},
 ) {
   const replacements = new Map([
@@ -457,7 +470,7 @@ if [[ "\${1:-}" == "inspect" ]]; then
       printf 'ERP_DEBUG_ENV=%s\n' "\${FAKE_RUNTIME_DEBUG_ENV:-prod}"
       printf 'ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=%s\n' "\${FAKE_RUNTIME_TRIAL_ALLOW:-1}"
       printf 'ERP_CUSTOMER_TRIAL_TARGET=%s\n' "\${FAKE_RUNTIME_TRIAL_TARGET:-customer-trial-133}"
-      printf 'POSTGRES_DSN=%s\n' "\${FAKE_RUNTIME_POSTGRES_DSN:-postgres://postgres:test-production-password@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable}"
+      printf 'POSTGRES_DSN=%s\n' "\${FAKE_RUNTIME_POSTGRES_DSN:-postgres://erp_app:test-app-password-12345@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable}"
       if [[ "\${FAKE_RUNTIME_APP_PASSWORD_PRESENT:-0}" == "1" ]]; then
         printf 'APP_ADMIN_PASSWORD=%s\n' "\${FAKE_RUNTIME_APP_PASSWORD:-runtime-sensitive-secret}"
       fi
@@ -1155,7 +1168,10 @@ test("production preflight rejects V5 runtime app DSN drift without leaking it",
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /POSTGRES_DSN 必须精确指向 V5 独立数据库/u);
+  assert.match(
+    result.stderr,
+    /POSTGRES_DSN 必须使用 erp_app 精确指向 V5 独立数据库/u,
+  );
   assert.doesNotMatch(result.stdout, new RegExp(runtimeSecret));
   assert.doesNotMatch(result.stderr, new RegExp(runtimeSecret));
 });
@@ -1491,7 +1507,7 @@ test("production preflight rejects customer-trial opt-in outside its exact datab
 
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /POSTGRES_DSN 必须精确指向单一/);
+  assert.match(result.stderr, /POSTGRES_DSN 必须精确使用 erp_app/);
 });
 
 test("production preflight rejects extra customer-trial DSN query options", () => {
@@ -1502,7 +1518,7 @@ test("production preflight rejects extra customer-trial DSN query options", () =
 
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /POSTGRES_DSN 必须精确指向单一/);
+  assert.match(result.stderr, /POSTGRES_DSN 必须精确使用 erp_app/);
 });
 
 test("production preflight rejects customer-trial without its Compose project override", () => {

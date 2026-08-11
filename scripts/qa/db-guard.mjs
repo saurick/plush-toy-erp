@@ -954,6 +954,143 @@ function sqlCodeStatements(source) {
   return statements;
 }
 
+const TRANSACTION_INCOMPATIBLE_MIGRATION_SQL =
+  /\b(?:create|drop)\s+index\s+concurrently\b|\bvacuum\b|\balter\s+system\b|\b(?:create|drop)\s+database\b/iu;
+const HIGH_GROWTH_TABLE =
+  /\b(?:inventory_txns|workflow_task_events|production_order_events|production_wip_events|runtime_audit_events)\b/iu;
+const MIGRATION_DDL =
+  /\b(?:create|alter|drop|truncate|comment\s+on|grant|revoke)\b/iu;
+const MIGRATION_DML = /\b(?:insert\s+into|update|delete\s+from|merge\s+into)\b/iu;
+const REQUIRED_RISK_METADATA = Object.freeze([
+  "migration-risk",
+  "affected-table",
+  "expected-lock",
+  "preflight",
+  "recovery",
+  "maintenance-required",
+]);
+
+function migrationRiskReasons(statements) {
+  const joined = statements.join("\n");
+  const reasons = [];
+  if (/\bdrop\s+table\b/iu.test(joined)) reasons.push("drop-table");
+  if (/\bdrop\s+column\b/iu.test(joined)) reasons.push("drop-column");
+  if (/\balter\s+column\b[\s\S]*\btype\b/iu.test(joined)) {
+    reasons.push("alter-column-type");
+  }
+  if (/\balter\s+column\b[\s\S]*\bset\s+not\s+null\b/iu.test(joined)) {
+    reasons.push("set-not-null");
+  }
+  if (
+    /\badd\s+(?:column\s+)?[^;\n]*\bnot\s+null\b[^;\n]*\bdefault\b|\badd\s+(?:column\s+)?[^;\n]*\bdefault\b[^;\n]*\bnot\s+null\b/iu.test(
+      joined,
+    )
+  ) {
+    reasons.push("add-not-null-default");
+  }
+  if (
+    statements.some(
+      (statement) =>
+        /\balter\s+table\b/iu.test(statement) &&
+        /\badd\s+constraint\b/iu.test(statement) &&
+        /\b(?:foreign\s+key|check\s*\()/iu.test(statement) &&
+        !/\bnot\s+valid\b/iu.test(statement),
+    )
+  ) {
+    reasons.push("validated-constraint-on-existing-table");
+  }
+  if (/\bvalidate\s+constraint\b/iu.test(joined)) {
+    reasons.push("validate-constraint");
+  }
+  if (
+    statements.some(
+      (statement) =>
+        /\bcreate\s+(?:unique\s+)?index\b/iu.test(statement) &&
+        /\bon\s+/iu.test(statement) &&
+        HIGH_GROWTH_TABLE.test(statement),
+    )
+  ) {
+    reasons.push("high-growth-table-index");
+  }
+  if (
+    statements.some((statement) => MIGRATION_DDL.test(statement)) &&
+    statements.some((statement) => MIGRATION_DML.test(statement))
+  ) {
+    reasons.push("ddl-dml-mixed");
+  }
+  return [...new Set(reasons)].sort();
+}
+
+function migrationRiskMetadata(source) {
+  const values = new Map();
+  for (const line of source.split(/\r?\n/u)) {
+    const match = line.match(/^\s*--\s*([a-z-]+):\s*(.*?)\s*$/u);
+    if (match) values.set(match[1], match[2]);
+  }
+  return values;
+}
+
+export function evaluateMigrationRiskPolicy({ root, files }) {
+  const violations = [];
+  const transactionIncompatible = [];
+  for (const file of [...files].sort()) {
+    const target = path.join(root, file);
+    if (!existsSync(target)) continue;
+    const source = readFileSync(target, "utf8");
+    const statements = sqlCodeStatements(source);
+    if (statements.some((statement) => TRANSACTION_INCOMPATIBLE_MIGRATION_SQL.test(statement))) {
+      transactionIncompatible.push(file);
+      continue;
+    }
+    const reasons = migrationRiskReasons(statements);
+    if (reasons.length === 0) continue;
+
+    const metadata = migrationRiskMetadata(source);
+    const missing = REQUIRED_RISK_METADATA.filter(
+      (key) => !String(metadata.get(key) || "").trim(),
+    );
+    if (
+      metadata.has("migration-risk") &&
+      !/^(?:maintenance|online)$/u.test(metadata.get("migration-risk"))
+    ) {
+      missing.push("migration-risk(valid: maintenance|online)");
+    }
+    if (
+      metadata.has("maintenance-required") &&
+      !/^(?:true|false)$/u.test(metadata.get("maintenance-required"))
+    ) {
+      missing.push("maintenance-required(valid: true|false)");
+    }
+    const preflight = String(metadata.get("preflight") || "");
+    if (
+      preflight &&
+      (!/^scripts\/qa\/[A-Za-z0-9._/-]+$/u.test(preflight) ||
+        !existsSync(path.join(root, preflight)))
+    ) {
+      missing.push("preflight(existing scripts/qa path)");
+    }
+    if (missing.length > 0) {
+      violations.push({ file, reasons, missing: [...new Set(missing)].sort() });
+    }
+  }
+  if (transactionIncompatible.length > 0) {
+    return {
+      ok: false,
+      reason: "transaction-incompatible-migration",
+      files: transactionIncompatible,
+    };
+  }
+  if (violations.length > 0) {
+    return {
+      ok: false,
+      reason: "migration-risk-metadata-missing",
+      files: violations.map((violation) => violation.file),
+      violations,
+    };
+  }
+  return { ok: true };
+}
+
 function containsSqlIdentifier(source, identifier) {
   let physicalIdentifier = "";
   for (const character of identifier) {
@@ -1208,6 +1345,20 @@ export function evaluateDbGuard({ root, range = "" }) {
   };
 }
 
+export function evaluateDbGuardWithMigrationRisk(options) {
+  const result = evaluateDbGuard(options);
+  if (!result.ok || (result.newMigrations || []).length === 0) return result;
+  const migrationRisk = evaluateMigrationRiskPolicy({
+    root: options.root,
+    files: result.newMigrations,
+  });
+  if (migrationRisk.ok) return result;
+  return {
+    ...migrationRisk,
+    range: result.range,
+  };
+}
+
 function printHelp() {
   console.log(`用法:
   node scripts/qa/db-guard.mjs
@@ -1232,7 +1383,7 @@ function main() {
   }
 
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-  const result = evaluateDbGuard({
+  const result = evaluateDbGuardWithMigrationRisk({
     root,
     range: process.env.QA_BASE_RANGE || "",
   });
@@ -1254,6 +1405,19 @@ function main() {
       for (const item of result.missing || []) console.error(`  - ${item}`);
     } else if (result.reason === "missing-atlas-sum") {
       console.error("[qa:db-guard] 新 migration 未同步 atlas.sum:");
+    } else if (result.reason === "transaction-incompatible-migration") {
+      console.error(
+        "[qa:db-guard] 默认 tx-mode=all 禁止直接加入非事务 migration；请拆成专项执行合同:",
+      );
+    } else if (result.reason === "migration-risk-metadata-missing") {
+      console.error("[qa:db-guard] 风险 migration 缺少完整的锁、预检和恢复元数据:");
+      for (const violation of result.violations || []) {
+        console.error(`  - ${violation.file}`);
+        console.error(`    risks: ${violation.reasons.join(", ")}`);
+        console.error(`    missing: ${violation.missing.join(", ")}`);
+      }
+      process.exitCode = 1;
+      return;
     } else if (result.reason === "schema-migration-proof-missing") {
       console.error("[qa:db-guard] 以下 schema 缺少逐项 versioned DDL proof:");
       for (const proof of result.proofs || []) {

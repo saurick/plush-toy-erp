@@ -479,6 +479,21 @@ func TestBusinessAttachmentSchemaDefinesProductImageContract(t *testing.T) {
 	if !strings.Contains(ownerCheck, "'product'") {
 		t.Fatalf("owner type check must include product: %q", ownerCheck)
 	}
+	if got := checks["business_attachments_file_size_max"]; got != "file_size <= 5242880" {
+		t.Fatalf("file size check changed unexpectedly: %q", got)
+	}
+	if got := checks["business_attachments_content_size_matches"]; got != "length(content) = file_size" {
+		t.Fatalf("content size check changed unexpectedly: %q", got)
+	}
+	sha256Check := checks["business_attachments_sha256_lower_hex"]
+	for _, fragment := range []string{"length(sha256) = 64", "sha256 = lower(sha256)"} {
+		if !strings.Contains(sha256Check, fragment) {
+			t.Errorf("sha256 check missing portable fragment %q: %q", fragment, sha256Check)
+		}
+	}
+	if strings.Contains(sha256Check, "~") {
+		t.Errorf("sha256 check must remain portable across PostgreSQL and SQLite: %q", sha256Check)
+	}
 	productImageCheck := checks["business_attachments_product_image_contract"]
 	for _, fragment := range []string{
 		"owner_type = 'product'",
@@ -510,5 +525,66 @@ func TestBusinessAttachmentSchemaDefinesProductImageContract(t *testing.T) {
 		if !strings.Contains(withdrawalCheck, fragment) {
 			t.Errorf("withdrawal check missing %q: %q", fragment, withdrawalCheck)
 		}
+	}
+}
+
+func TestBusinessAttachmentSchemaRejectsNonCanonicalSHA256InSQLite(t *testing.T) {
+	repo, closeRepo := newBusinessAttachmentRepoTest(t, "attachment_sha256_contract")
+	defer closeRepo()
+	ctx := context.Background()
+	taskID := createAttachmentWorkflowTask(t, repo, "ready", 1, nil)
+
+	_, err := repo.data.postgres.BusinessAttachment.Create().
+		SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+		SetOwnerID(taskID).
+		SetAttachmentType("evidence").
+		SetFileName("valid.pdf").
+		SetMimeType("application/pdf").
+		SetFileSize(5).
+		SetSha256(strings.Repeat("a", 64)).
+		SetContent([]byte("proof")).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("valid lowercase sha256 must be accepted: %v", err)
+	}
+	_, err = repo.data.postgres.BusinessAttachment.Create().
+		SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+		SetOwnerID(taskID).
+		SetAttachmentType("evidence").
+		SetFileName("wrong-size.pdf").
+		SetMimeType("application/pdf").
+		SetFileSize(4).
+		SetSha256(strings.Repeat("a", 64)).
+		SetContent([]byte("proof")).
+		Save(ctx)
+	if err == nil || !strings.Contains(err.Error(), "business_attachments_content_size_matches") {
+		t.Fatalf("content size mismatch must be rejected by the database constraint: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		sha256 string
+	}{
+		{name: "uppercase", sha256: strings.Repeat("A", 64)},
+		{name: "wrong length", sha256: strings.Repeat("a", 63)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := repo.data.postgres.BusinessAttachment.Create().
+				SetOwnerType(biz.BusinessAttachmentOwnerWorkflowTask).
+				SetOwnerID(taskID).
+				SetAttachmentType("evidence").
+				SetFileName(tc.name + ".pdf").
+				SetMimeType("application/pdf").
+				SetFileSize(5).
+				SetSha256(tc.sha256).
+				SetContent([]byte("proof")).
+				Save(ctx)
+			if err == nil {
+				t.Fatal("non-canonical sha256 must be rejected")
+			}
+			if !strings.Contains(err.Error(), "business_attachments_sha256_lower_hex") {
+				t.Fatalf("unexpected sha256 constraint error: %v", err)
+			}
+		})
 	}
 }

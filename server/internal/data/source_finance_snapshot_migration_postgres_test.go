@@ -175,8 +175,8 @@ func insertHistoricalReceipt(t *testing.T, ctx context.Context, tx *sql.Tx, rece
 	var id int
 	err := tx.QueryRowContext(ctx, `
 INSERT INTO purchase_receipts (
-  receipt_no, supplier_name, status, received_at, created_at, updated_at
-) VALUES ($1, '历史供应商快照', 'POSTED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  receipt_no, supplier_name, status, received_at, posted_at, created_at, updated_at
+) VALUES ($1, '历史供应商快照', 'POSTED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 RETURNING id`, receiptNo).Scan(&id)
 	if err != nil {
 		t.Fatalf("insert historical receipt %s: %v", receiptNo, err)

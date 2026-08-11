@@ -388,6 +388,9 @@ jq -e \
    .rollback.automaticDataDeletion == false' \
   "$incoming/database-rebuild-manifest.json" >/dev/null
 expected_migration="$(jq -er '.migration.latest' "$incoming/release-manifest.json")"
+migration_sequence_sha256="$(jq -er '.migration.sequenceSha256' "$incoming/release-manifest.json")"
+[[ "$migration_sequence_sha256" =~ ^[0-9a-f]{64}$ ]] ||
+  fail "release migration sequence hash is invalid"
 [[ "$expected_migration" =~ ^20[0-9]{12}$ ]] ||
   fail "release migration identity is invalid"
 
@@ -547,10 +550,14 @@ write_state running
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
+  "RELEASE_SHA=$release_sha" \
   sh "$migrate_script" --status-only >>"$log_file" 2>&1
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
+  "RELEASE_SHA=$release_sha" \
   sh "$migrate_script" >>"$log_file" 2>&1
 
 stage=migration_apply_started
@@ -560,6 +567,8 @@ write_state running
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
   "MIGRATION_MAINTENANCE_CONFIRMED=1" \
+  "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
+  "RELEASE_SHA=$release_sha" \
   sh "$migrate_script" --apply >>"$log_file" 2>&1
 
 stage=migration_readback
@@ -567,6 +576,8 @@ write_state running
 "${clean_env[@]}" \
   "COMPOSE_OVERRIDE_FILE=$compose_override" \
   "COMPOSE_ENV_FILE=$runtime_env" \
+  "EXPECTED_MIGRATION_SEQUENCE_SHA256=$migration_sequence_sha256" \
+  "RELEASE_SHA=$release_sha" \
   sh "$migrate_script" --status-only >>"$log_file" 2>&1
 migration_readback="$(docker exec "$postgres_cid" sh -ceu \
   'psql -X -A -t -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT version FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2 ORDER BY executed_at DESC LIMIT 1"')"

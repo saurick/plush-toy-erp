@@ -49,10 +49,15 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-this-prod-postgres-password}"
       POSTGRES_DB: "${POSTGRES_DB:-plush_erp}"
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_APP_PASSWORD: "${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}"
+      POSTGRES_MIGRATOR_PASSWORD: "${POSTGRES_MIGRATOR_PASSWORD:?POSTGRES_MIGRATOR_PASSWORD is required}"
+      POSTGRES_BACKUP_PASSWORD: "${POSTGRES_BACKUP_PASSWORD:?POSTGRES_BACKUP_PASSWORD is required}"
     mem_limit: "${POSTGRES_MEM_LIMIT:-512m}"
     mem_reservation: "${POSTGRES_MEM_RESERVATION:-256m}"
     volumes:
       - "${POSTGRES_DATA_DIR:-/data/plush-toy-erp/postgres}:/var/lib/postgresql"
+      - "./database_roles.sh:/docker-entrypoint-initdb.d/20-database-roles.sh:ro"
+      - "./database_roles.sh:/usr/local/bin/plush-database-roles:ro"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
@@ -113,8 +118,8 @@ services:
       ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-4}"
       ERP_PDF_QUEUE_CAPACITY: "${ERP_PDF_QUEUE_CAPACITY:-2}"
       ERP_PDF_WARMUP: "${ERP_PDF_WARMUP:-}"
-      # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。
-      POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
+      # 应用只能使用 erp_app；容器初始化管理员和 erp_migrator/erp_backup 不进入应用容器。
+      POSTGRES_DSN: "postgres://erp_app:${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-plush_erp}?sslmode=disable"
       POSTGRES_MAX_OPEN_CONNS: "${POSTGRES_MAX_OPEN_CONNS:-20}"
       POSTGRES_MAX_IDLE_CONNS: "${POSTGRES_MAX_IDLE_CONNS:-5}"
       POSTGRES_CONN_MAX_LIFETIME: "${POSTGRES_CONN_MAX_LIFETIME:-30m}"

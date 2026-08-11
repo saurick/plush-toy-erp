@@ -8,6 +8,8 @@ import test from "node:test";
 import {
   evaluateDatabaseProgrammabilityPolicy,
   evaluateDbGuard,
+  evaluateDbGuardWithMigrationRisk,
+  evaluateMigrationRiskPolicy,
 } from "./db-guard.mjs";
 
 function git(root, args) {
@@ -230,6 +232,102 @@ test("db guard accepts a new migration only when atlas.sum also changes", async 
     await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
     result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
     assert.equal(result.ok, true);
+  });
+});
+
+test("migration risk policy requires actionable metadata for destructive DDL", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql";
+    await write(root, migration, "DROP TABLE items;\n");
+
+    const result = evaluateMigrationRiskPolicy({ root, files: [migration] });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "migration-risk-metadata-missing");
+    assert.deepEqual(result.violations[0].reasons, ["drop-table"]);
+    assert(result.violations[0].missing.includes("preflight"));
+    assert(result.violations[0].missing.includes("recovery"));
+  });
+});
+
+test("migration risk policy accepts complete bounded metadata", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql";
+    const preflight = "scripts/qa/drop-items-preflight.sql";
+    await write(root, preflight, "SELECT count(*) FROM items;\n");
+    await write(
+      root,
+      migration,
+      [
+        "-- migration-risk: maintenance",
+        "-- affected-table: items",
+        "-- expected-lock: ACCESS EXCLUSIVE",
+        `-- preflight: ${preflight}`,
+        "-- recovery: restore-backup-or-forward-fix",
+        "-- maintenance-required: true",
+        "DROP TABLE items;",
+        "",
+      ].join("\n"),
+    );
+
+    assert.deepEqual(evaluateMigrationRiskPolicy({ root, files: [migration] }), {
+      ok: true,
+    });
+  });
+});
+
+test("migration risk policy rejects transaction-incompatible SQL even with metadata", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_online.sql";
+    await write(
+      root,
+      migration,
+      "CREATE INDEX CONCURRENTLY idx_items_id ON items (id);\n",
+    );
+
+    const result = evaluateMigrationRiskPolicy({ root, files: [migration] });
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, "transaction-incompatible-migration");
+    assert.deepEqual(result.files, [migration]);
+  });
+});
+
+test("migration risk policy leaves bounded data-only migrations alone", async () => {
+  await withRepository(async (root) => {
+    const migration =
+      "server/internal/data/model/migrate/20260102000000_backfill.sql";
+    await write(
+      root,
+      migration,
+      "UPDATE roles SET version = version + 1 WHERE false;\n",
+    );
+
+    assert.deepEqual(evaluateMigrationRiskPolicy({ root, files: [migration] }), {
+      ok: true,
+    });
+  });
+});
+
+test("composed db guard blocks a structurally valid risky migration without metadata", async () => {
+  await withRepository(async (root) => {
+    await rm(path.join(root, "server/internal/data/model/schema/item.go"));
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_drop_items.sql",
+      "DROP TABLE items;\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const structural = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(structural.ok, true, JSON.stringify(structural, null, 2));
+    const composed = evaluateDbGuardWithMigrationRisk({
+      root,
+      range: "HEAD...HEAD",
+    });
+    assert.equal(composed.ok, false);
+    assert.equal(composed.reason, "migration-risk-metadata-missing");
   });
 });
 

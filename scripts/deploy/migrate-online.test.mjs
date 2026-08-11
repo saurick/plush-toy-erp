@@ -55,6 +55,7 @@ function createFixture({ useSystemFlock = false } = {}) {
   const trialPostgresDataDir = path.join(trialRoot, "data/postgres");
   const trialMigrationLockFile = path.join(trialRoot, "run/atlas-migrate.lock");
   const atlasLog = path.join(root, "atlas.log");
+  const atlasState = path.join(root, "atlas.state");
   const psqlLog = path.join(root, "psql.log");
   const eventLog = path.join(root, "events.log");
   const flockLog = path.join(root, "flock.log");
@@ -64,6 +65,17 @@ function createFixture({ useSystemFlock = false } = {}) {
   const atlasBin = path.join(binDir, "atlas");
   fs.mkdirSync(binDir, { recursive: true });
   fs.mkdirSync(migrateDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(migrateDir, "20260101000000_initial.sql"),
+    "CREATE TABLE initial_fixture (id bigint PRIMARY KEY);\n",
+    "utf8",
+  );
+  fs.writeFileSync(
+    path.join(migrateDir, "20260102000000_pending.sql"),
+    "ALTER TABLE initial_fixture ADD COLUMN note text;\n",
+    "utf8",
+  );
+  fs.writeFileSync(path.join(migrateDir, "atlas.sum"), "h1:test\n", "utf8");
   fs.mkdirSync(path.dirname(composeEnvFile), { recursive: true });
   const productionDataContract =
     "TRIAL_POSTGRES_DATA_DIR=/home/simon/plush-toy-erp-v5/data/postgres";
@@ -153,9 +165,15 @@ if [ "$1" = "inspect" ] && [ "$2" = "--format" ]; then
   exit 0
 fi
 if [ "$1" = "exec" ]; then
+  if [ "$3" = "/usr/local/bin/plush-database-roles" ]; then
+    printf '%s\n' 'database_permissions=verified'
+    exit 0
+  fi
   case "$*" in
-    *POSTGRES_DB*) printf '%s' "\${FAKE_POSTGRES_DB:-plush_erp_uat_20260716_v5}" ;;
+    *pg_control_system*) printf '%s' '7777777777777777777' ;;
+    *POSTGRES_DB*) printf '%s' "\${FAKE_POSTGRES_DB:-plush_erp}" ;;
     *POSTGRES_PASSWORD*) printf '%s' "\${FAKE_POSTGRES_PASSWORD:-test-postgres-password}" ;;
+    *POSTGRES_MIGRATOR_PASSWORD*) printf '%s' "\${FAKE_POSTGRES_MIGRATOR_PASSWORD:-test-migrator-password-123}" ;;
     *POSTGRES_USER*) printf '%s' "\${FAKE_POSTGRES_USER:-postgres}" ;;
     *) exit 1 ;;
   esac
@@ -168,10 +186,16 @@ exit 1
   writeExecutable(
     atlasBin,
     `#!/bin/sh
+if [ "$1" = "version" ]; then
+  printf '%s\n' 'atlas version v0.38.0'
+  exit 0
+fi
 case "$*" in
+  "migrate validate "*) phase='validate' ;;
   "migrate status "*) phase='status' ;;
   "migrate apply --dry-run "*) phase='dry-run' ;;
   "migrate apply "*) phase='apply' ;;
+  "schema inspect "*) phase='schema-readback' ;;
   *) phase='unknown' ;;
 esac
 printf '%s\n' "$*" >> "$ATLAS_LOG"
@@ -182,6 +206,24 @@ fi
 if [ "\${ATLAS_FAIL_PHASE:-}" = "$phase" ]; then
   exit "\${ATLAS_FAIL_CODE:-42}"
 fi
+case "$phase" in
+  status)
+    if [ -f "$ATLAS_STATE" ]; then
+      printf '%s\n' '{"Status":"OK","Current":"20260102000000","Next":"Already at latest version","Available":[{"Version":"20260101000000"},{"Version":"20260102000000"}],"Applied":[{"Version":"20260101000000"},{"Version":"20260102000000"}]}'
+    else
+      printf '%s\n' '{"Status":"PENDING","Current":"20260101000000","Next":"20260102000000","Available":[{"Version":"20260101000000"},{"Version":"20260102000000"}],"Applied":[{"Version":"20260101000000"}]}'
+    fi
+    ;;
+  dry-run)
+    printf '%s\n' 'ALTER TABLE initial_fixture ADD COLUMN note text;'
+    ;;
+  apply)
+    : > "$ATLAS_STATE"
+    ;;
+  schema-readback)
+    printf '%s\n' 'CREATE TABLE initial_fixture (id bigint PRIMARY KEY, note text);'
+    ;;
+esac
 printf '%s end %s\n' "\${RUN_LABEL:-run}" "$phase" >> "$EVENT_LOG"
 `,
   );
@@ -190,11 +232,39 @@ printf '%s end %s\n' "\${RUN_LABEL:-run}" "$phase" >> "$EVENT_LOG"
   writeExecutable(
     psqlBin,
     `#!/bin/sh
-printf '%s\n' "$*" >> "$PSQL_LOG"
-payload=$(cat)
+printf '%s\n' 'psql-invocation' >> "$PSQL_LOG"
+case "$*" in
+  *"FROM pg_roles AS role"*)
+    printf '%s|erp_migrator|127.0.0.1|5435|180001|f|f|f|f\n' "\${FAKE_POSTGRES_DB:-plush_erp}"
+    exit 0
+    ;;
+  *"forbidden_object"*)
+    printf '%s\n' '0|0|0'
+    exit 0
+    ;;
+esac
+payload=''
+previous=''
+for argument in "$@"; do
+  if [ "$previous" = "--file" ]; then
+    payload=$(cat "$argument")
+    break
+  fi
+  previous=$argument
+done
+if [ -z "$payload" ]; then
+  payload=$(cat)
+fi
+if printf '%s' "$payload" | grep -q 'ROLLBACK;'; then
+  printf '%s start rollback-rehearsal\n' "\${RUN_LABEL:-run}" >> "$EVENT_LOG"
+  printf '%s\n' 'database_programmability=0|0|0' 'ROLLBACK'
+  printf '%s end rollback-rehearsal\n' "\${RUN_LABEL:-run}" >> "$EVENT_LOG"
+  exit 0
+fi
 case "$payload" in
   *plush_populated_upgrade*) audit='populated-upgrade' ;;
   *plush_customer_config_cutover*) audit='customer-config-cutover' ;;
+  *plush_database_constraint_preflight*) audit='database-constraints' ;;
   *) audit='unknown-audit' ;;
 esac
 printf '%s start %s\n' "\${RUN_LABEL:-run}" "$audit" >> "$EVENT_LOG"
@@ -260,6 +330,7 @@ flock($lock_handle, LOCK_EX) or die "flock fd $fd failed: $!\\n";
       DB_URL: "postgres://test:test@127.0.0.1:5435/test?sslmode=disable",
       MIGRATION_LOCK_FILE: lockFile,
       ATLAS_LOG: atlasLog,
+      ATLAS_STATE: atlasState,
       PSQL_LOG: psqlLog,
       EVENT_LOG: eventLog,
       FLOCK_LOG: flockLog,
@@ -277,6 +348,9 @@ function configureCustomerTrialFixture(fixture, replacements = {}) {
     ["POSTGRES_DB", "plush_erp_uat_20260716_v5"],
     ["POSTGRES_USER", "postgres"],
     ["POSTGRES_PASSWORD", "test-postgres-password"],
+    ["POSTGRES_APP_PASSWORD", "test-app-password-12345"],
+    ["POSTGRES_MIGRATOR_PASSWORD", "test-migrator-password-123"],
+    ["POSTGRES_BACKUP_PASSWORD", "test-backup-password-123"],
     ["POSTGRES_DATA_DIR", postgresDataDir],
     ["MIGRATION_LOCK_FILE", migrationLockFile],
     ["POSTGRES_BIND_ADDR", "127.0.0.1"],
@@ -342,6 +416,7 @@ function configureCustomerTrialFixture(fixture, replacements = {}) {
   fixture.env.COMPOSE_OVERRIDE_FILE = fixture.composeOverrideFile;
   fixture.env.COMPOSE_ENV_FILE = fixture.composeEnvFile;
   fixture.env.FAKE_POSTGRES_DATA_DIR = values.get("POSTGRES_DATA_DIR");
+  fixture.env.FAKE_POSTGRES_DB = values.get("POSTGRES_DB");
   return { values, postgresDataDir, migrationLockFile };
 }
 
@@ -356,9 +431,11 @@ function readLines(filePath) {
 
 function atlasPhases(filePath) {
   return readLines(filePath).map((line) => {
+    if (line.startsWith("migrate validate ")) return "validate";
     if (line.startsWith("migrate status ")) return "status";
     if (line.startsWith("migrate apply --dry-run ")) return "dry-run";
     if (line.startsWith("migrate apply ")) return "apply";
+    if (line.startsWith("schema inspect ")) return "schema-readback";
     return "unknown";
   });
 }
@@ -468,7 +545,11 @@ test("migrate_online V5 使用精确 env、project 与双 compose 文件并读�
       `${composePrefix} ps -q app-server`,
       `${composePrefix} ps -q postgres`,
     ]);
-    assert.deepEqual(atlasPhases(fixture.atlasLog), ["status"]);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), [
+      "validate",
+      "status",
+      "schema-readback",
+    ]);
     assert.match(result.stdout, /compose project: plush-toy-erp-v5/u);
     assert.doesNotMatch(result.stdout, /test-postgres-password/u);
     assert.doesNotMatch(result.stderr, /test-postgres-password/u);
@@ -802,39 +883,55 @@ test("migrate_online V5 对错误 CID、project、name、port、mount 与 DB fai
   }
 });
 
-test("migrate_online 在一次锁内按 status、两项只读审计、dry-run、apply 顺序执行", async (t) => {
+test("migrate_online 在一次锁内按 status、三项只读审计、dry-run、apply 顺序执行", async (t) => {
   const cases = [
     {
       name: "status-only 不运行审计",
       args: ["--status-only"],
-      atlas: ["status"],
-      sequence: ["status"],
-      preflightRuns: 0,
+      atlas: ["validate", "status", "schema-readback"],
+      sequence: ["validate", "status", "schema-readback"],
+      psqlRuns: 2,
     },
     {
       name: "dry-run",
       args: [],
-      atlas: ["status", "dry-run"],
+      atlas: ["validate", "status", "dry-run", "schema-readback"],
       sequence: [
+        "validate",
         "status",
         "populated-upgrade",
         "customer-config-cutover",
+        "database-constraints",
         "dry-run",
+        "rollback-rehearsal",
+        "schema-readback",
       ],
-      preflightRuns: 2,
+      psqlRuns: 6,
     },
     {
       name: "apply",
       args: ["--apply"],
-      atlas: ["status", "dry-run", "apply"],
+      atlas: [
+        "validate",
+        "status",
+        "dry-run",
+        "apply",
+        "status",
+        "schema-readback",
+      ],
       sequence: [
+        "validate",
         "status",
         "populated-upgrade",
         "customer-config-cutover",
+        "database-constraints",
         "dry-run",
+        "rollback-rehearsal",
         "apply",
+        "status",
+        "schema-readback",
       ],
-      preflightRuns: 2,
+      psqlRuns: 6,
     },
   ];
 
@@ -849,12 +946,52 @@ test("migrate_online 在一次锁内按 status、两项只读审计、dry-run、
           readLines(fixture.eventLog),
           expectedEvents(item.sequence),
         );
-        assert.equal(readLines(fixture.psqlLog).length, item.preflightRuns);
+        assert.equal(readLines(fixture.psqlLog).length, item.psqlRuns);
         assert.deepEqual(readLines(fixture.flockLog), ["9"]);
       } finally {
         fs.rmSync(fixture.root, { recursive: true, force: true });
       }
     });
+  }
+});
+
+test("migrate_online 在任何外部动作前拒绝同时使用 apply 与 status-only", () => {
+  const fixture = createFixture();
+  try {
+    const result = runMigration(fixture, ["--apply", "--status-only"]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /--apply 与 --status-only 不能同时使用/u);
+    for (const logPath of [
+      fixture.atlasLog,
+      fixture.composeLog,
+      fixture.psqlLog,
+      fixture.flockLog,
+      fixture.eventLog,
+    ]) {
+      assert.deepEqual(readLines(logPath), []);
+    }
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("migrate_online apply 在无待执行迁移时报告 not_applied", () => {
+  const fixture = createFixture();
+  try {
+    fs.writeFileSync(path.join(fixture.root, "atlas.state"), "", "utf8");
+    const result = runMigration(fixture, ["--apply"]);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /migration not_applied current=.* pending=0/u);
+    assert.doesNotMatch(result.stdout, /migration committed_verified/u);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), [
+      "validate",
+      "status",
+      "dry-run",
+      "status",
+      "schema-readback",
+    ]);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
   }
 });
 
@@ -866,14 +1003,17 @@ test("migrate_online populated upgrade 审计失败时不执行后续审计、dr
       PREFLIGHT_FAIL_AUDIT: "populated-upgrade",
     });
     assert.equal(result.status, 43, `${result.stdout}\n${result.stderr}`);
-    assert.deepEqual(atlasPhases(fixture.atlasLog), ["status"]);
-    assert.equal(readLines(fixture.psqlLog).length, 1);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), ["validate", "status"]);
+    assert.equal(readLines(fixture.psqlLog).length, 2);
     assert.deepEqual(readLines(fixture.eventLog), [
-      ...expectedEvents(["status"]),
+      ...expectedEvents(["validate", "status"]),
       "run start populated-upgrade",
       "run fail populated-upgrade",
     ]);
-    assert.doesNotMatch(result.stdout, /\[3\/5\]|\[4\/5\]|\[5\/5\]/u);
+    assert.doesNotMatch(
+      result.stdout,
+      /\[4\/8\]|\[5\/8\]|\[6\/8\]|\[7\/8\]|\[8\/8\]/u,
+    );
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -887,14 +1027,46 @@ test("migrate_online customer config cutover 审计失败时不执行 dry-run �
       PREFLIGHT_FAIL_AUDIT: "customer-config-cutover",
     });
     assert.equal(result.status, 44, `${result.stdout}\n${result.stderr}`);
-    assert.deepEqual(atlasPhases(fixture.atlasLog), ["status"]);
-    assert.equal(readLines(fixture.psqlLog).length, 2);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), ["validate", "status"]);
+    assert.equal(readLines(fixture.psqlLog).length, 3);
     assert.deepEqual(readLines(fixture.eventLog), [
-      ...expectedEvents(["status", "populated-upgrade"]),
+      ...expectedEvents(["validate", "status", "populated-upgrade"]),
       "run start customer-config-cutover",
       "run fail customer-config-cutover",
     ]);
-    assert.doesNotMatch(result.stdout, /\[4\/5\]|\[5\/5\]/u);
+    assert.doesNotMatch(
+      result.stdout,
+      /\[5\/8\]|\[6\/8\]|\[7\/8\]|\[8\/8\]/u,
+    );
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("migrate_online database constraints 审计失败时不执行 dry-run 或 apply", () => {
+  const fixture = createFixture();
+  try {
+    const result = runMigration(fixture, ["--apply"], {
+      PREFLIGHT_FAIL_CODE: "45",
+      PREFLIGHT_FAIL_AUDIT: "database-constraints",
+    });
+    assert.equal(result.status, 45, `${result.stdout}\n${result.stderr}`);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), ["validate", "status"]);
+    assert.equal(readLines(fixture.psqlLog).length, 4);
+    assert.deepEqual(readLines(fixture.eventLog), [
+      ...expectedEvents([
+        "validate",
+        "status",
+        "populated-upgrade",
+        "customer-config-cutover",
+      ]),
+      "run start database-constraints",
+      "run fail database-constraints",
+    ]);
+    assert.doesNotMatch(
+      result.stdout,
+      /\[6\/8\]|\[7\/8\]|\[8\/8\]/u,
+    );
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -908,7 +1080,11 @@ test("migrate_online dry-run 失败时不执行 apply", () => {
       ATLAS_FAIL_CODE: "42",
     });
     assert.equal(result.status, 42, `${result.stdout}\n${result.stderr}`);
-    assert.deepEqual(atlasPhases(fixture.atlasLog), ["status", "dry-run"]);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), [
+      "validate",
+      "status",
+      "dry-run",
+    ]);
     assert.deepEqual(readLines(fixture.flockLog), ["9"]);
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });

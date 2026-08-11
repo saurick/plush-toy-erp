@@ -1,6 +1,8 @@
 GOHOSTOS:=$(shell go env GOHOSTOS)
 # ⚠️ 注意：数据库迁移必须使用 `make data` 生成，严禁手动修改 SQL 文件！详见 internal/data/AI_DB_WORKFLOW.md
 GOPATH:=$(shell go env GOPATH)
+ATLAS_BIN ?= atlas
+ATLAS_VERSION ?= v0.38.0
 
 # ========================
 # Git 信息（兼容在子目录执行 & 没有提交的情况）
@@ -113,22 +115,32 @@ all:
 	make config;
 	make generate;
 
-.PHONY: ent_migrate
+.PHONY: atlas_check ent_migrate
+atlas_check:
+	@command -v "$(ATLAS_BIN)" >/dev/null 2>&1 || { \
+		echo "ERROR: 未找到 Atlas；请按项目 CI 固定版本安装 $(ATLAS_VERSION)"; \
+		exit 1; \
+	}
+	@"$(ATLAS_BIN)" version 2>&1 | grep -Eq '(^|[[:space:]])$(ATLAS_VERSION)([[:space:]]|$$)' || { \
+		echo "ERROR: Atlas 版本必须是 $(ATLAS_VERSION)"; \
+		exit 1; \
+	}
+
 # 生成 migration（仅生成，不执行）
-ent_migrate:
-	@if ! command -v atlas >/dev/null 2>&1; then \
-		echo "Installing Atlas..."; \
-		curl -sSf https://atlasgo.sh | sh; \
-	fi
-	atlas migrate diff migrate \
+ent_migrate: atlas_check
+	"$(ATLAS_BIN)" migrate diff migrate \
 		--dir "file://internal/data/model/migrate" \
 		--to "ent://internal/data/model/schema" \
 		--dev-url "docker://postgres/18/dev?search_path=public"
 
 # 重新计算迁移目录校验，如果改了 migration 的 sql 文件，必须重新计算校验，否则migrate_apply会报错，提示Error: checksum mismatch
 .PHONY: migrate_hash
-migrate_hash:
-	atlas migrate hash --dir "file://internal/data/model/migrate"
+migrate_hash: atlas_check
+	@if { git diff --name-only -- internal/data/model/migrate; git diff --cached --name-only -- internal/data/model/migrate; } | grep -E '\.sql$$' | grep -q .; then \
+		echo "ERROR: 已跟踪 migration SQL 不可改写；请先恢复历史 SQL，migrate_hash 只用于新增 custom migration"; \
+		exit 1; \
+	fi
+	"$(ATLAS_BIN)" migrate hash --dir "file://internal/data/model/migrate"
 
 MIGRATE_TARGET_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_TARGET_CONFIRM)
 MIGRATE_CONFIRM_FROM_COMMAND_ENV := $(MIGRATE_CONFIRM)
@@ -216,20 +228,10 @@ reset_local_admin_password:
 		-confirm "RESET_LOCAL_ADMIN_PASSWORD:$$username"
 
 .PHONY: migrate_set
-# 标记某个 migration 已应用（用于修复已手动执行但迁移状态未记录的情况）
+# 通用 revision 标记入口已封闭；异常修复必须走带备份、指纹和读回证据的专项 runbook。
 migrate_set:
-	@if [ -z "$$DB_URL" ]; then \
-		echo "ERROR: DB_URL is not set. Example: export DB_URL=postgres://test_user:change-this-shared-postgres-password@192.168.0.106:5432/plush_erp?sslmode=disable"; \
-		exit 1; \
-	fi
-	@if [ -z "$$MIGRATE_VERSION" ]; then \
-		echo "ERROR: MIGRATE_VERSION is not set. Example: MIGRATE_VERSION=20260115080747"; \
-		exit 1; \
-	fi
-	atlas migrate set \
-		--dir "file://internal/data/model/migrate" \
-		--url "$$DB_URL" \
-		"$$MIGRATE_VERSION"
+	@echo "ERROR: make migrate_set 已封闭；不得用 revision 标记跳过失败 migration 或 checksum mismatch"
+	@exit 1
 
 .PHONY: ent_generate
 # 用 ent generate 生成 ent 代码

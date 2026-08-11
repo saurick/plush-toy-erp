@@ -216,8 +216,13 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/deploy/deployment-package-lint.test.mjs",
   "scripts/deploy/migrate-online.test.mjs",
   "scripts/deploy/backup-restore-rehearsal-script.test.mjs",
+  "scripts/deploy/database-roles-script.test.mjs",
+  "scripts/deploy/scheduled-backup-script.test.mjs",
   "server/deploy/compose/prod/migrate_online.sh",
+  "server/deploy/compose/prod/database_roles.sh",
   "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
+  "scripts/deploy/scheduled-postgres-backup.sh",
+  "scripts/deploy/verify-scheduled-postgres-backup.sh",
   "scripts/deploy/release-evidence-gate.test.mjs",
   "scripts/deploy/release-evidence-status.test.mjs",
   "scripts/deploy/release-evidence-closeout-plan.test.mjs",
@@ -297,7 +302,10 @@ const FAST_REQUIRED_EXECUTABLES = Object.freeze([
   "scripts/qa/error-code-sync.sh",
   "scripts/qa/error-codes.sh",
   "server/deploy/compose/prod/migrate_online.sh",
+  "server/deploy/compose/prod/database_roles.sh",
   "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
+  "scripts/deploy/scheduled-postgres-backup.sh",
+  "scripts/deploy/verify-scheduled-postgres-backup.sh",
 ]);
 
 const FULL_REQUIRED_EXECUTABLES = Object.freeze([
