@@ -451,7 +451,17 @@ function createSalesOrderRuntimeEvidenceMock(sources) {
     if (target === "rejected") {
       node.status = "completed";
       node.outcome = "rejected";
-      record.processStatus = "blocked";
+      record.nodes.push({
+        id: record.instance.id + 50,
+        process_instance_id: record.instance.id,
+        node_key: "sales_order_rejected_end",
+        node_type: "end",
+        attempt: 1,
+        status: "completed",
+        outcome: "completed",
+        version: 2,
+      });
+      record.processStatus = "completed";
     } else if (target === "done") {
       node.status = "completed";
       node.outcome = node.node_type === "approval" ? "approved" : "confirmed";
@@ -513,9 +523,24 @@ test("runtime evidence advances five simulated sales orders through the formal p
     "blocked",
   );
   assert.equal(
+    evidence.find((item) => item.caseKey === "task_blocked")?.processContext
+      ?.process_instance?.status,
+    "active",
+  );
+  assert.equal(
     evidence.find((item) => item.caseKey === "rejected")?.processContext
       ?.process_instance?.status,
-    "blocked",
+    "completed",
+  );
+  assert.equal(
+    evidence
+      .find((item) => item.caseKey === "rejected")
+      ?.processContext?.completed_nodes?.some(
+        (node) =>
+          node.node_key === "sales_order_rejected_end" &&
+          node.status === "completed",
+      ),
+    true,
   );
   assert.equal(
     evidence.find((item) => item.caseKey === "completed")?.processContext
@@ -582,7 +607,17 @@ test("runtime evidence advances five simulated sales orders through the formal p
   assert.equal(
     replay.find((item) => item.caseKey === "rejected")?.processContext
       ?.process_instance?.status,
-    "blocked",
+    "completed",
+  );
+  assert.equal(
+    replay
+      .find((item) => item.caseKey === "rejected")
+      ?.processContext?.completed_nodes?.some(
+        (node) =>
+          node.node_key === "sales_order_rejected_end" &&
+          node.status === "completed",
+      ),
+    true,
   );
   assert.equal(
     replay.find((item) => item.caseKey === "completed")?.processContext
