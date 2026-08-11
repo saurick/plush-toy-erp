@@ -33,6 +33,16 @@ const (
 	FieldProductionLotNo = "production_lot_no"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldVersion holds the string denoting the version field in the database.
+	FieldVersion = "version"
+	// FieldStatusAction holds the string denoting the status_action field in the database.
+	FieldStatusAction = "status_action"
+	// FieldStatusReason holds the string denoting the status_reason field in the database.
+	FieldStatusReason = "status_reason"
+	// FieldStatusChangedAt holds the string denoting the status_changed_at field in the database.
+	FieldStatusChangedAt = "status_changed_at"
+	// FieldStatusChangedBy holds the string denoting the status_changed_by field in the database.
+	FieldStatusChangedBy = "status_changed_by"
 	// FieldReceivedAt holds the string denoting the received_at field in the database.
 	FieldReceivedAt = "received_at"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -61,6 +71,8 @@ const (
 	EdgeShipmentItems = "shipment_items"
 	// EdgeStockReservations holds the string denoting the stock_reservations edge name in mutations.
 	EdgeStockReservations = "stock_reservations"
+	// EdgeStatusEvents holds the string denoting the status_events edge name in mutations.
+	EdgeStatusEvents = "status_events"
 	// Table holds the table name of the inventorylot in the database.
 	Table = "inventory_lots"
 	// InventoryTxnsTable is the table that holds the inventory_txns relation/edge.
@@ -140,6 +152,13 @@ const (
 	StockReservationsInverseTable = "stock_reservations"
 	// StockReservationsColumn is the table column denoting the stock_reservations relation/edge.
 	StockReservationsColumn = "lot_id"
+	// StatusEventsTable is the table that holds the status_events relation/edge.
+	StatusEventsTable = "inventory_lot_status_events"
+	// StatusEventsInverseTable is the table name for the InventoryLotStatusEvent entity.
+	// It exists in this package in order to avoid circular dependency with the "inventorylotstatusevent" package.
+	StatusEventsInverseTable = "inventory_lot_status_events"
+	// StatusEventsColumn is the table column denoting the status_events relation/edge.
+	StatusEventsColumn = "inventory_lot_id"
 )
 
 // Columns holds all SQL columns for inventorylot fields.
@@ -154,6 +173,11 @@ var Columns = []string{
 	FieldDyeLotNo,
 	FieldProductionLotNo,
 	FieldStatus,
+	FieldVersion,
+	FieldStatusAction,
+	FieldStatusReason,
+	FieldStatusChangedAt,
+	FieldStatusChangedBy,
 	FieldReceivedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -196,6 +220,16 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultVersion holds the default value on creation for the "version" field.
+	DefaultVersion int
+	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	VersionValidator func(int) error
+	// StatusActionValidator is a validator for the "status_action" field. It is called by the builders before save.
+	StatusActionValidator func(string) error
+	// StatusReasonValidator is a validator for the "status_reason" field. It is called by the builders before save.
+	StatusReasonValidator func(string) error
+	// StatusChangedByValidator is a validator for the "status_changed_by" field. It is called by the builders before save.
+	StatusChangedByValidator func(int) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -255,6 +289,31 @@ func ByProductionLotNo(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByVersion orders the results by the version field.
+func ByVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVersion, opts...).ToFunc()
+}
+
+// ByStatusAction orders the results by the status_action field.
+func ByStatusAction(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatusAction, opts...).ToFunc()
+}
+
+// ByStatusReason orders the results by the status_reason field.
+func ByStatusReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatusReason, opts...).ToFunc()
+}
+
+// ByStatusChangedAt orders the results by the status_changed_at field.
+func ByStatusChangedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatusChangedAt, opts...).ToFunc()
+}
+
+// ByStatusChangedBy orders the results by the status_changed_by field.
+func ByStatusChangedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatusChangedBy, opts...).ToFunc()
 }
 
 // ByReceivedAt orders the results by the received_at field.
@@ -418,6 +477,20 @@ func ByStockReservations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption
 		sqlgraph.OrderByNeighborTerms(s, newStockReservationsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByStatusEventsCount orders the results by status_events count.
+func ByStatusEventsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newStatusEventsStep(), opts...)
+	}
+}
+
+// ByStatusEvents orders the results by status_events terms.
+func ByStatusEvents(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newStatusEventsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newInventoryTxnsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -493,5 +566,12 @@ func newStockReservationsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(StockReservationsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, StockReservationsTable, StockReservationsColumn),
+	)
+}
+func newStatusEventsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(StatusEventsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, StatusEventsTable, StatusEventsColumn),
 	)
 }

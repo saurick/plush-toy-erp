@@ -32,6 +32,16 @@ const (
 	FieldLifecycleStatus = "lifecycle_status"
 	// FieldVersion holds the string denoting the version field in the database.
 	FieldVersion = "version"
+	// FieldSettlementAction holds the string denoting the settlement_action field in the database.
+	FieldSettlementAction = "settlement_action"
+	// FieldSettlementMode holds the string denoting the settlement_mode field in the database.
+	FieldSettlementMode = "settlement_mode"
+	// FieldSettlementReason holds the string denoting the settlement_reason field in the database.
+	FieldSettlementReason = "settlement_reason"
+	// FieldSettledAt holds the string denoting the settled_at field in the database.
+	FieldSettledAt = "settled_at"
+	// FieldSettledBy holds the string denoting the settled_by field in the database.
+	FieldSettledBy = "settled_by"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -72,6 +82,11 @@ var Columns = []string{
 	FieldExpectedArrivalDate,
 	FieldLifecycleStatus,
 	FieldVersion,
+	FieldSettlementAction,
+	FieldSettlementMode,
+	FieldSettlementReason,
+	FieldSettledAt,
+	FieldSettledBy,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -102,6 +117,14 @@ var (
 	DefaultVersion int
 	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	VersionValidator func(int) error
+	// SettlementActionValidator is a validator for the "settlement_action" field. It is called by the builders before save.
+	SettlementActionValidator func(string) error
+	// SettlementModeValidator is a validator for the "settlement_mode" field. It is called by the builders before save.
+	SettlementModeValidator func(string) error
+	// SettlementReasonValidator is a validator for the "settlement_reason" field. It is called by the builders before save.
+	SettlementReasonValidator func(string) error
+	// SettledByValidator is a validator for the "settled_by" field. It is called by the builders before save.
+	SettledByValidator func(int) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -153,6 +176,31 @@ func ByLifecycleStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByVersion orders the results by the version field.
 func ByVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVersion, opts...).ToFunc()
+}
+
+// BySettlementAction orders the results by the settlement_action field.
+func BySettlementAction(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettlementAction, opts...).ToFunc()
+}
+
+// BySettlementMode orders the results by the settlement_mode field.
+func BySettlementMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettlementMode, opts...).ToFunc()
+}
+
+// BySettlementReason orders the results by the settlement_reason field.
+func BySettlementReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettlementReason, opts...).ToFunc()
+}
+
+// BySettledAt orders the results by the settled_at field.
+func BySettledAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettledAt, opts...).ToFunc()
+}
+
+// BySettledBy orders the results by the settled_by field.
+func BySettledBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSettledBy, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

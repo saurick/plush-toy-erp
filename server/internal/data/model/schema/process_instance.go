@@ -18,8 +18,9 @@ type ProcessInstance struct {
 func (ProcessInstance) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
-			"process_instances_status_allowed":   "status IN ('active', 'completed', 'blocked')",
-			"process_instances_lifecycle_bundle": "((status = 'completed' AND completed_at IS NOT NULL) OR (status IN ('active', 'blocked') AND completed_at IS NULL))",
+			"process_instances_status_allowed":     "status IN ('active', 'completed', 'blocked')",
+			"process_instances_lifecycle_bundle":   "((status = 'completed' AND completed_at IS NOT NULL) OR (status IN ('active', 'blocked') AND completed_at IS NULL))",
+			"process_instances_resolution_allowed": "resolution_kind IS NULL OR resolution_kind IN ('succeeded', 'rejected', 'cancelled', 'compensated')",
 		}},
 	}
 }
@@ -70,6 +71,44 @@ func (ProcessInstance) Fields() []ent.Field {
 		field.Time("completed_at").
 			Optional().
 			Nillable(),
+		field.Int("terminal_node_instance_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("resolution_kind").
+			Optional().
+			Nillable().
+			MaxLen(32),
+		field.String("resolution_reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.Time("resolved_at").
+			Optional().
+			Nillable(),
+		field.Int("resolved_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("block_kind").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("blocked_reason_code").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("blocked_reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.Time("blocked_at").
+			Optional().
+			Nillable(),
+		field.Int("blocked_by").
+			Optional().
+			Nillable().
+			Positive(),
 		field.Int("created_by").
 			Optional().
 			Nillable().
@@ -102,6 +141,7 @@ func (ProcessInstance) Indexes() []ent.Index {
 		index.Fields("config_revision", "process_key"),
 		index.Fields("business_ref_type", "business_ref_id"),
 		index.Fields("status", "updated_at"),
+		index.Fields("resolution_kind", "resolved_at"),
 		index.Fields("correlation_key"),
 	}
 }

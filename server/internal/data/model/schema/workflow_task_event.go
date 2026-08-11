@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	"entgo.io/ent"
@@ -13,6 +15,19 @@ import (
 
 type WorkflowTaskEvent struct {
 	ent.Schema
+}
+
+func (WorkflowTaskEvent) Hooks() []ent.Hook {
+	return []ent.Hook{
+		func(next ent.Mutator) ent.Mutator {
+			return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+				if m.Op().Is(ent.OpUpdate | ent.OpUpdateOne | ent.OpDelete | ent.OpDeleteOne) {
+					return nil, errors.New("workflow_task_events are immutable event facts")
+				}
+				return next.Mutate(ctx, m)
+			})
+		},
+	}
 }
 
 func (WorkflowTaskEvent) Annotations() []schema.Annotation {

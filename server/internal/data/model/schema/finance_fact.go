@@ -33,6 +33,7 @@ var financeFactLockedFields = map[string]struct{}{
 	"collection_type":       {},
 	"payment_term":          {},
 	"payment_term_days":     {},
+	"due_at":                {},
 	"invoice_category":      {},
 	"source_type":           {},
 	"source_id":             {},
@@ -87,15 +88,29 @@ func (FinanceFact) Annotations() []schema.Annotation {
 			Checks: map[string]string{
 				"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'RECONCILIATION')",
 				"finance_facts_status_allowed":           "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
-				"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
+				"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER')",
 				"finance_facts_amount_positive":          "amount > 0",
 				"finance_facts_fee_amount_nonnegative":   "fee_amount >= 0",
-				"finance_facts_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
-				"finance_facts_collection_type_allowed":  "collection_type IS NULL OR collection_type IN ('ADVANCE_RECEIPT', 'ACCOUNTS_RECEIVABLE')",
-				"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('CASH_ON_SHIPMENT', 'EOM_30', 'EOM_45')",
+				"finance_facts_currency_allowed":         "currency = 'CNY'",
+				"finance_facts_collection_type_allowed":  "collection_type IS NULL OR collection_type = 'ACCOUNTS_RECEIVABLE'",
+				"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('DUE_ON_OCCURRENCE', 'NET_DAYS')",
 				"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
 				"finance_facts_invoice_category_allowed": "invoice_category IS NULL OR invoice_category IN ('NONE', 'EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
 				"finance_facts_version_positive":         "version > 0",
+				"finance_facts_due_at_bundle": `
+(
+  (fact_type IN ('RECEIVABLE', 'PAYABLE')
+    AND payment_term IS NOT NULL
+    AND payment_term_days IS NOT NULL
+    AND due_at IS NOT NULL
+    AND ((payment_term = 'DUE_ON_OCCURRENCE' AND payment_term_days = 0 AND due_at = occurred_at)
+      OR (payment_term = 'NET_DAYS' AND payment_term_days > 0 AND due_at > occurred_at)))
+  OR
+  (fact_type NOT IN ('RECEIVABLE', 'PAYABLE')
+    AND payment_term IS NULL
+    AND payment_term_days IS NULL
+    AND due_at IS NULL)
+)`,
 				"finance_facts_status_audit_bundle": `
 (
   (status = 'DRAFT'
@@ -144,6 +159,7 @@ func (FinanceFact) Fields() []ent.Field {
 		field.String("collection_type").Optional().Nillable().MaxLen(32),
 		field.String("payment_term").Optional().Nillable().MaxLen(32),
 		field.Int("payment_term_days").Optional().Nillable().NonNegative(),
+		field.Time("due_at").Optional().Nillable(),
 		field.String("invoice_category").Optional().Nillable().MaxLen(32),
 		// source_* keeps source-document traceability for the posted fact.
 		field.String("source_type").Optional().Nillable().MaxLen(64),

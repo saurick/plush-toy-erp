@@ -37,6 +37,16 @@ type PurchaseOrder struct {
 	LifecycleStatus string `json:"lifecycle_status,omitempty"`
 	// Version holds the value of the "version" field.
 	Version int `json:"version,omitempty"`
+	// SettlementAction holds the value of the "settlement_action" field.
+	SettlementAction *string `json:"settlement_action,omitempty"`
+	// SettlementMode holds the value of the "settlement_mode" field.
+	SettlementMode *string `json:"settlement_mode,omitempty"`
+	// SettlementReason holds the value of the "settlement_reason" field.
+	SettlementReason *string `json:"settlement_reason,omitempty"`
+	// SettledAt holds the value of the "settled_at" field.
+	SettledAt *time.Time `json:"settled_at,omitempty"`
+	// SettledBy holds the value of the "settled_by" field.
+	SettledBy *int `json:"settled_by,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -87,11 +97,11 @@ func (*PurchaseOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case purchaseorder.FieldSupplierSnapshot, purchaseorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
-		case purchaseorder.FieldID, purchaseorder.FieldSupplierID, purchaseorder.FieldVersion:
+		case purchaseorder.FieldID, purchaseorder.FieldSupplierID, purchaseorder.FieldVersion, purchaseorder.FieldSettledBy:
 			values[i] = new(sql.NullInt64)
-		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldNote:
+		case purchaseorder.FieldPurchaseOrderNo, purchaseorder.FieldSupplierPurchaseOrderNo, purchaseorder.FieldLifecycleStatus, purchaseorder.FieldSettlementAction, purchaseorder.FieldSettlementMode, purchaseorder.FieldSettlementReason, purchaseorder.FieldNote:
 			values[i] = new(sql.NullString)
-		case purchaseorder.FieldPurchaseDate, purchaseorder.FieldExpectedArrivalDate, purchaseorder.FieldCreatedAt, purchaseorder.FieldUpdatedAt:
+		case purchaseorder.FieldPurchaseDate, purchaseorder.FieldExpectedArrivalDate, purchaseorder.FieldSettledAt, purchaseorder.FieldCreatedAt, purchaseorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -173,6 +183,41 @@ func (_m *PurchaseOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field version", values[i])
 			} else if value.Valid {
 				_m.Version = int(value.Int64)
+			}
+		case purchaseorder.FieldSettlementAction:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_action", values[i])
+			} else if value.Valid {
+				_m.SettlementAction = new(string)
+				*_m.SettlementAction = value.String
+			}
+		case purchaseorder.FieldSettlementMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_mode", values[i])
+			} else if value.Valid {
+				_m.SettlementMode = new(string)
+				*_m.SettlementMode = value.String
+			}
+		case purchaseorder.FieldSettlementReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field settlement_reason", values[i])
+			} else if value.Valid {
+				_m.SettlementReason = new(string)
+				*_m.SettlementReason = value.String
+			}
+		case purchaseorder.FieldSettledAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field settled_at", values[i])
+			} else if value.Valid {
+				_m.SettledAt = new(time.Time)
+				*_m.SettledAt = value.Time
+			}
+		case purchaseorder.FieldSettledBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field settled_by", values[i])
+			} else if value.Valid {
+				_m.SettledBy = new(int)
+				*_m.SettledBy = int(value.Int64)
 			}
 		case purchaseorder.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -269,6 +314,31 @@ func (_m *PurchaseOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("version=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Version))
+	builder.WriteString(", ")
+	if v := _m.SettlementAction; v != nil {
+		builder.WriteString("settlement_action=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SettlementMode; v != nil {
+		builder.WriteString("settlement_mode=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SettlementReason; v != nil {
+		builder.WriteString("settlement_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SettledAt; v != nil {
+		builder.WriteString("settled_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SettledBy; v != nil {
+		builder.WriteString("settled_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {
 		builder.WriteString("note=")

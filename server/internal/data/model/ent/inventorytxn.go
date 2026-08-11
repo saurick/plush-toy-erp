@@ -76,9 +76,13 @@ type InventoryTxnEdges struct {
 	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// InventoryLot holds the value of the inventory_lot edge.
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
+	// Reversals holds the value of the reversals edge.
+	Reversals []*InventoryTxn `json:"reversals,omitempty"`
+	// ReversalOf holds the value of the reversal_of edge.
+	ReversalOf *InventoryTxn `json:"reversal_of,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [6]bool
 }
 
 // WarehouseOrErr returns the Warehouse value or an error if the edge
@@ -123,6 +127,26 @@ func (e InventoryTxnEdges) InventoryLotOrErr() (*InventoryLot, error) {
 		return nil, &NotFoundError{label: inventorylot.Label}
 	}
 	return nil, &NotLoadedError{edge: "inventory_lot"}
+}
+
+// ReversalsOrErr returns the Reversals value or an error if the edge
+// was not loaded in eager-loading.
+func (e InventoryTxnEdges) ReversalsOrErr() ([]*InventoryTxn, error) {
+	if e.loadedTypes[4] {
+		return e.Reversals, nil
+	}
+	return nil, &NotLoadedError{edge: "reversals"}
+}
+
+// ReversalOfOrErr returns the ReversalOf value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e InventoryTxnEdges) ReversalOfOrErr() (*InventoryTxn, error) {
+	if e.ReversalOf != nil {
+		return e.ReversalOf, nil
+	} else if e.loadedTypes[5] {
+		return nil, &NotFoundError{label: inventorytxn.Label}
+	}
+	return nil, &NotLoadedError{edge: "reversal_of"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -313,6 +337,16 @@ func (_m *InventoryTxn) QueryProductSku() *ProductSKUQuery {
 // QueryInventoryLot queries the "inventory_lot" edge of the InventoryTxn entity.
 func (_m *InventoryTxn) QueryInventoryLot() *InventoryLotQuery {
 	return NewInventoryTxnClient(_m.config).QueryInventoryLot(_m)
+}
+
+// QueryReversals queries the "reversals" edge of the InventoryTxn entity.
+func (_m *InventoryTxn) QueryReversals() *InventoryTxnQuery {
+	return NewInventoryTxnClient(_m.config).QueryReversals(_m)
+}
+
+// QueryReversalOf queries the "reversal_of" edge of the InventoryTxn entity.
+func (_m *InventoryTxn) QueryReversalOf() *InventoryTxnQuery {
+	return NewInventoryTxnClient(_m.config).QueryReversalOf(_m)
 }
 
 // Update returns a builder for updating this InventoryTxn.

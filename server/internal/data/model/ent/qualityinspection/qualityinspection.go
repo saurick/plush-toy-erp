@@ -69,6 +69,8 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeInventoryLotStatusEvents holds the string denoting the inventory_lot_status_events edge name in mutations.
+	EdgeInventoryLotStatusEvents = "inventory_lot_status_events"
 	// EdgePurchaseReceipt holds the string denoting the purchase_receipt edge name in mutations.
 	EdgePurchaseReceipt = "purchase_receipt"
 	// EdgePurchaseReceiptItem holds the string denoting the purchase_receipt_item edge name in mutations.
@@ -85,6 +87,13 @@ const (
 	EdgePurchaseReturns = "purchase_returns"
 	// Table holds the table name of the qualityinspection in the database.
 	Table = "quality_inspections"
+	// InventoryLotStatusEventsTable is the table that holds the inventory_lot_status_events relation/edge.
+	InventoryLotStatusEventsTable = "inventory_lot_status_events"
+	// InventoryLotStatusEventsInverseTable is the table name for the InventoryLotStatusEvent entity.
+	// It exists in this package in order to avoid circular dependency with the "inventorylotstatusevent" package.
+	InventoryLotStatusEventsInverseTable = "inventory_lot_status_events"
+	// InventoryLotStatusEventsColumn is the table column denoting the inventory_lot_status_events relation/edge.
+	InventoryLotStatusEventsColumn = "quality_inspection_id"
 	// PurchaseReceiptTable is the table that holds the purchase_receipt relation/edge.
 	PurchaseReceiptTable = "quality_inspections"
 	// PurchaseReceiptInverseTable is the table name for the PurchaseReceipt entity.
@@ -384,6 +393,20 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
+// ByInventoryLotStatusEventsCount orders the results by inventory_lot_status_events count.
+func ByInventoryLotStatusEventsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newInventoryLotStatusEventsStep(), opts...)
+	}
+}
+
+// ByInventoryLotStatusEvents orders the results by inventory_lot_status_events terms.
+func ByInventoryLotStatusEvents(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newInventoryLotStatusEventsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByPurchaseReceiptField orders the results by purchase_receipt field.
 func ByPurchaseReceiptField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -438,6 +461,13 @@ func ByPurchaseReturns(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newPurchaseReturnsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
+}
+func newInventoryLotStatusEventsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(InventoryLotStatusEventsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, InventoryLotStatusEventsTable, InventoryLotStatusEventsColumn),
+	)
 }
 func newPurchaseReceiptStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

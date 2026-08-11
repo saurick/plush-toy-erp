@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/productionwipbatch"
@@ -532,6 +533,21 @@ func (_u *QualityInspectionUpdate) SetUpdatedAt(v time.Time) *QualityInspectionU
 	return _u
 }
 
+// AddInventoryLotStatusEventIDs adds the "inventory_lot_status_events" edge to the InventoryLotStatusEvent entity by IDs.
+func (_u *QualityInspectionUpdate) AddInventoryLotStatusEventIDs(ids ...int) *QualityInspectionUpdate {
+	_u.mutation.AddInventoryLotStatusEventIDs(ids...)
+	return _u
+}
+
+// AddInventoryLotStatusEvents adds the "inventory_lot_status_events" edges to the InventoryLotStatusEvent entity.
+func (_u *QualityInspectionUpdate) AddInventoryLotStatusEvents(v ...*InventoryLotStatusEvent) *QualityInspectionUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddInventoryLotStatusEventIDs(ids...)
+}
+
 // SetPurchaseReceipt sets the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_u *QualityInspectionUpdate) SetPurchaseReceipt(v *PurchaseReceipt) *QualityInspectionUpdate {
 	return _u.SetPurchaseReceiptID(v.ID)
@@ -580,6 +596,27 @@ func (_u *QualityInspectionUpdate) AddPurchaseReturns(v ...*PurchaseReturn) *Qua
 // Mutation returns the QualityInspectionMutation object of the builder.
 func (_u *QualityInspectionUpdate) Mutation() *QualityInspectionMutation {
 	return _u.mutation
+}
+
+// ClearInventoryLotStatusEvents clears all "inventory_lot_status_events" edges to the InventoryLotStatusEvent entity.
+func (_u *QualityInspectionUpdate) ClearInventoryLotStatusEvents() *QualityInspectionUpdate {
+	_u.mutation.ClearInventoryLotStatusEvents()
+	return _u
+}
+
+// RemoveInventoryLotStatusEventIDs removes the "inventory_lot_status_events" edge to InventoryLotStatusEvent entities by IDs.
+func (_u *QualityInspectionUpdate) RemoveInventoryLotStatusEventIDs(ids ...int) *QualityInspectionUpdate {
+	_u.mutation.RemoveInventoryLotStatusEventIDs(ids...)
+	return _u
+}
+
+// RemoveInventoryLotStatusEvents removes "inventory_lot_status_events" edges to InventoryLotStatusEvent entities.
+func (_u *QualityInspectionUpdate) RemoveInventoryLotStatusEvents(v ...*InventoryLotStatusEvent) *QualityInspectionUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveInventoryLotStatusEventIDs(ids...)
 }
 
 // ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
@@ -919,6 +956,51 @@ func (_u *QualityInspectionUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(qualityinspection.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.InventoryLotStatusEventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.InventoryLotStatusEventsTable,
+			Columns: []string{qualityinspection.InventoryLotStatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedInventoryLotStatusEventsIDs(); len(nodes) > 0 && !_u.mutation.InventoryLotStatusEventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.InventoryLotStatusEventsTable,
+			Columns: []string{qualityinspection.InventoryLotStatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.InventoryLotStatusEventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.InventoryLotStatusEventsTable,
+			Columns: []string{qualityinspection.InventoryLotStatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.PurchaseReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1655,6 +1737,21 @@ func (_u *QualityInspectionUpdateOne) SetUpdatedAt(v time.Time) *QualityInspecti
 	return _u
 }
 
+// AddInventoryLotStatusEventIDs adds the "inventory_lot_status_events" edge to the InventoryLotStatusEvent entity by IDs.
+func (_u *QualityInspectionUpdateOne) AddInventoryLotStatusEventIDs(ids ...int) *QualityInspectionUpdateOne {
+	_u.mutation.AddInventoryLotStatusEventIDs(ids...)
+	return _u
+}
+
+// AddInventoryLotStatusEvents adds the "inventory_lot_status_events" edges to the InventoryLotStatusEvent entity.
+func (_u *QualityInspectionUpdateOne) AddInventoryLotStatusEvents(v ...*InventoryLotStatusEvent) *QualityInspectionUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddInventoryLotStatusEventIDs(ids...)
+}
+
 // SetPurchaseReceipt sets the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_u *QualityInspectionUpdateOne) SetPurchaseReceipt(v *PurchaseReceipt) *QualityInspectionUpdateOne {
 	return _u.SetPurchaseReceiptID(v.ID)
@@ -1703,6 +1800,27 @@ func (_u *QualityInspectionUpdateOne) AddPurchaseReturns(v ...*PurchaseReturn) *
 // Mutation returns the QualityInspectionMutation object of the builder.
 func (_u *QualityInspectionUpdateOne) Mutation() *QualityInspectionMutation {
 	return _u.mutation
+}
+
+// ClearInventoryLotStatusEvents clears all "inventory_lot_status_events" edges to the InventoryLotStatusEvent entity.
+func (_u *QualityInspectionUpdateOne) ClearInventoryLotStatusEvents() *QualityInspectionUpdateOne {
+	_u.mutation.ClearInventoryLotStatusEvents()
+	return _u
+}
+
+// RemoveInventoryLotStatusEventIDs removes the "inventory_lot_status_events" edge to InventoryLotStatusEvent entities by IDs.
+func (_u *QualityInspectionUpdateOne) RemoveInventoryLotStatusEventIDs(ids ...int) *QualityInspectionUpdateOne {
+	_u.mutation.RemoveInventoryLotStatusEventIDs(ids...)
+	return _u
+}
+
+// RemoveInventoryLotStatusEvents removes "inventory_lot_status_events" edges to InventoryLotStatusEvent entities.
+func (_u *QualityInspectionUpdateOne) RemoveInventoryLotStatusEvents(v ...*InventoryLotStatusEvent) *QualityInspectionUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveInventoryLotStatusEventIDs(ids...)
 }
 
 // ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
@@ -2072,6 +2190,51 @@ func (_u *QualityInspectionUpdateOne) sqlSave(ctx context.Context) (_node *Quali
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(qualityinspection.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.InventoryLotStatusEventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.InventoryLotStatusEventsTable,
+			Columns: []string{qualityinspection.InventoryLotStatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedInventoryLotStatusEventsIDs(); len(nodes) > 0 && !_u.mutation.InventoryLotStatusEventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.InventoryLotStatusEventsTable,
+			Columns: []string{qualityinspection.InventoryLotStatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.InventoryLotStatusEventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   qualityinspection.InventoryLotStatusEventsTable,
+			Columns: []string{qualityinspection.InventoryLotStatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.PurchaseReceiptCleared() {
 		edge := &sqlgraph.EdgeSpec{

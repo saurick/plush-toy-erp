@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/productionfact"
@@ -129,6 +130,76 @@ func (_c *InventoryLotCreate) SetStatus(v string) *InventoryLotCreate {
 func (_c *InventoryLotCreate) SetNillableStatus(v *string) *InventoryLotCreate {
 	if v != nil {
 		_c.SetStatus(*v)
+	}
+	return _c
+}
+
+// SetVersion sets the "version" field.
+func (_c *InventoryLotCreate) SetVersion(v int) *InventoryLotCreate {
+	_c.mutation.SetVersion(v)
+	return _c
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_c *InventoryLotCreate) SetNillableVersion(v *int) *InventoryLotCreate {
+	if v != nil {
+		_c.SetVersion(*v)
+	}
+	return _c
+}
+
+// SetStatusAction sets the "status_action" field.
+func (_c *InventoryLotCreate) SetStatusAction(v string) *InventoryLotCreate {
+	_c.mutation.SetStatusAction(v)
+	return _c
+}
+
+// SetNillableStatusAction sets the "status_action" field if the given value is not nil.
+func (_c *InventoryLotCreate) SetNillableStatusAction(v *string) *InventoryLotCreate {
+	if v != nil {
+		_c.SetStatusAction(*v)
+	}
+	return _c
+}
+
+// SetStatusReason sets the "status_reason" field.
+func (_c *InventoryLotCreate) SetStatusReason(v string) *InventoryLotCreate {
+	_c.mutation.SetStatusReason(v)
+	return _c
+}
+
+// SetNillableStatusReason sets the "status_reason" field if the given value is not nil.
+func (_c *InventoryLotCreate) SetNillableStatusReason(v *string) *InventoryLotCreate {
+	if v != nil {
+		_c.SetStatusReason(*v)
+	}
+	return _c
+}
+
+// SetStatusChangedAt sets the "status_changed_at" field.
+func (_c *InventoryLotCreate) SetStatusChangedAt(v time.Time) *InventoryLotCreate {
+	_c.mutation.SetStatusChangedAt(v)
+	return _c
+}
+
+// SetNillableStatusChangedAt sets the "status_changed_at" field if the given value is not nil.
+func (_c *InventoryLotCreate) SetNillableStatusChangedAt(v *time.Time) *InventoryLotCreate {
+	if v != nil {
+		_c.SetStatusChangedAt(*v)
+	}
+	return _c
+}
+
+// SetStatusChangedBy sets the "status_changed_by" field.
+func (_c *InventoryLotCreate) SetStatusChangedBy(v int) *InventoryLotCreate {
+	_c.mutation.SetStatusChangedBy(v)
+	return _c
+}
+
+// SetNillableStatusChangedBy sets the "status_changed_by" field if the given value is not nil.
+func (_c *InventoryLotCreate) SetNillableStatusChangedBy(v *int) *InventoryLotCreate {
+	if v != nil {
+		_c.SetStatusChangedBy(*v)
 	}
 	return _c
 }
@@ -330,6 +401,21 @@ func (_c *InventoryLotCreate) AddStockReservations(v ...*StockReservation) *Inve
 	return _c.AddStockReservationIDs(ids...)
 }
 
+// AddStatusEventIDs adds the "status_events" edge to the InventoryLotStatusEvent entity by IDs.
+func (_c *InventoryLotCreate) AddStatusEventIDs(ids ...int) *InventoryLotCreate {
+	_c.mutation.AddStatusEventIDs(ids...)
+	return _c
+}
+
+// AddStatusEvents adds the "status_events" edges to the InventoryLotStatusEvent entity.
+func (_c *InventoryLotCreate) AddStatusEvents(v ...*InventoryLotStatusEvent) *InventoryLotCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddStatusEventIDs(ids...)
+}
+
 // Mutation returns the InventoryLotMutation object of the builder.
 func (_c *InventoryLotCreate) Mutation() *InventoryLotMutation {
 	return _c.mutation
@@ -370,6 +456,10 @@ func (_c *InventoryLotCreate) defaults() error {
 	if _, ok := _c.mutation.Status(); !ok {
 		v := inventorylot.DefaultStatus
 		_c.mutation.SetStatus(v)
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		v := inventorylot.DefaultVersion
+		_c.mutation.SetVersion(v)
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		if inventorylot.DefaultCreatedAt == nil {
@@ -447,6 +537,29 @@ func (_c *InventoryLotCreate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status": %w`, err)}
 		}
 	}
+	if _, ok := _c.mutation.Version(); !ok {
+		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "InventoryLot.version"`)}
+	}
+	if v, ok := _c.mutation.Version(); ok {
+		if err := inventorylot.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.version": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.StatusAction(); ok {
+		if err := inventorylot.StatusActionValidator(v); err != nil {
+			return &ValidationError{Name: "status_action", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_action": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.StatusReason(); ok {
+		if err := inventorylot.StatusReasonValidator(v); err != nil {
+			return &ValidationError{Name: "status_reason", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_reason": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.StatusChangedBy(); ok {
+		if err := inventorylot.StatusChangedByValidator(v); err != nil {
+			return &ValidationError{Name: "status_changed_by", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_changed_by": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "InventoryLot.created_at"`)}
 	}
@@ -510,6 +623,26 @@ func (_c *InventoryLotCreate) createSpec() (*InventoryLot, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(inventorylot.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.Version(); ok {
+		_spec.SetField(inventorylot.FieldVersion, field.TypeInt, value)
+		_node.Version = value
+	}
+	if value, ok := _c.mutation.StatusAction(); ok {
+		_spec.SetField(inventorylot.FieldStatusAction, field.TypeString, value)
+		_node.StatusAction = &value
+	}
+	if value, ok := _c.mutation.StatusReason(); ok {
+		_spec.SetField(inventorylot.FieldStatusReason, field.TypeString, value)
+		_node.StatusReason = &value
+	}
+	if value, ok := _c.mutation.StatusChangedAt(); ok {
+		_spec.SetField(inventorylot.FieldStatusChangedAt, field.TypeTime, value)
+		_node.StatusChangedAt = &value
+	}
+	if value, ok := _c.mutation.StatusChangedBy(); ok {
+		_spec.SetField(inventorylot.FieldStatusChangedBy, field.TypeInt, value)
+		_node.StatusChangedBy = &value
 	}
 	if value, ok := _c.mutation.ReceivedAt(); ok {
 		_spec.SetField(inventorylot.FieldReceivedAt, field.TypeTime, value)
@@ -693,6 +826,22 @@ func (_c *InventoryLotCreate) createSpec() (*InventoryLot, *sqlgraph.CreateSpec)
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.StatusEventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.StatusEventsTable,
+			Columns: []string{inventorylot.StatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

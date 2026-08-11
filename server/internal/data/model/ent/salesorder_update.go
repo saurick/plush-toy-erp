@@ -260,6 +260,113 @@ func (_u *SalesOrderUpdate) AddVersion(v int) *SalesOrderUpdate {
 	return _u
 }
 
+// SetSettlementAction sets the "settlement_action" field.
+func (_u *SalesOrderUpdate) SetSettlementAction(v string) *SalesOrderUpdate {
+	_u.mutation.SetSettlementAction(v)
+	return _u
+}
+
+// SetNillableSettlementAction sets the "settlement_action" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableSettlementAction(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetSettlementAction(*v)
+	}
+	return _u
+}
+
+// ClearSettlementAction clears the value of the "settlement_action" field.
+func (_u *SalesOrderUpdate) ClearSettlementAction() *SalesOrderUpdate {
+	_u.mutation.ClearSettlementAction()
+	return _u
+}
+
+// SetSettlementMode sets the "settlement_mode" field.
+func (_u *SalesOrderUpdate) SetSettlementMode(v string) *SalesOrderUpdate {
+	_u.mutation.SetSettlementMode(v)
+	return _u
+}
+
+// SetNillableSettlementMode sets the "settlement_mode" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableSettlementMode(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetSettlementMode(*v)
+	}
+	return _u
+}
+
+// ClearSettlementMode clears the value of the "settlement_mode" field.
+func (_u *SalesOrderUpdate) ClearSettlementMode() *SalesOrderUpdate {
+	_u.mutation.ClearSettlementMode()
+	return _u
+}
+
+// SetSettlementReason sets the "settlement_reason" field.
+func (_u *SalesOrderUpdate) SetSettlementReason(v string) *SalesOrderUpdate {
+	_u.mutation.SetSettlementReason(v)
+	return _u
+}
+
+// SetNillableSettlementReason sets the "settlement_reason" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableSettlementReason(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetSettlementReason(*v)
+	}
+	return _u
+}
+
+// ClearSettlementReason clears the value of the "settlement_reason" field.
+func (_u *SalesOrderUpdate) ClearSettlementReason() *SalesOrderUpdate {
+	_u.mutation.ClearSettlementReason()
+	return _u
+}
+
+// SetSettledAt sets the "settled_at" field.
+func (_u *SalesOrderUpdate) SetSettledAt(v time.Time) *SalesOrderUpdate {
+	_u.mutation.SetSettledAt(v)
+	return _u
+}
+
+// SetNillableSettledAt sets the "settled_at" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableSettledAt(v *time.Time) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetSettledAt(*v)
+	}
+	return _u
+}
+
+// ClearSettledAt clears the value of the "settled_at" field.
+func (_u *SalesOrderUpdate) ClearSettledAt() *SalesOrderUpdate {
+	_u.mutation.ClearSettledAt()
+	return _u
+}
+
+// SetSettledBy sets the "settled_by" field.
+func (_u *SalesOrderUpdate) SetSettledBy(v int) *SalesOrderUpdate {
+	_u.mutation.ResetSettledBy()
+	_u.mutation.SetSettledBy(v)
+	return _u
+}
+
+// SetNillableSettledBy sets the "settled_by" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableSettledBy(v *int) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetSettledBy(*v)
+	}
+	return _u
+}
+
+// AddSettledBy adds value to the "settled_by" field.
+func (_u *SalesOrderUpdate) AddSettledBy(v int) *SalesOrderUpdate {
+	_u.mutation.AddSettledBy(v)
+	return _u
+}
+
+// ClearSettledBy clears the value of the "settled_by" field.
+func (_u *SalesOrderUpdate) ClearSettledBy() *SalesOrderUpdate {
+	_u.mutation.ClearSettledBy()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *SalesOrderUpdate) SetNote(v string) *SalesOrderUpdate {
 	_u.mutation.SetNote(v)
@@ -493,6 +600,26 @@ func (_u *SalesOrderUpdate) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SettlementAction(); ok {
+		if err := salesorder.SettlementActionValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_action", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.settlement_action": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementMode(); ok {
+		if err := salesorder.SettlementModeValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_mode", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.settlement_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementReason(); ok {
+		if err := salesorder.SettlementReasonValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_reason", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.settlement_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettledBy(); ok {
+		if err := salesorder.SettledByValidator(v); err != nil {
+			return &ValidationError{Name: "settled_by", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.settled_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := salesorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.note": %w`, err)}
@@ -581,6 +708,39 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(salesorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SettlementAction(); ok {
+		_spec.SetField(salesorder.FieldSettlementAction, field.TypeString, value)
+	}
+	if _u.mutation.SettlementActionCleared() {
+		_spec.ClearField(salesorder.FieldSettlementAction, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementMode(); ok {
+		_spec.SetField(salesorder.FieldSettlementMode, field.TypeString, value)
+	}
+	if _u.mutation.SettlementModeCleared() {
+		_spec.ClearField(salesorder.FieldSettlementMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementReason(); ok {
+		_spec.SetField(salesorder.FieldSettlementReason, field.TypeString, value)
+	}
+	if _u.mutation.SettlementReasonCleared() {
+		_spec.ClearField(salesorder.FieldSettlementReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettledAt(); ok {
+		_spec.SetField(salesorder.FieldSettledAt, field.TypeTime, value)
+	}
+	if _u.mutation.SettledAtCleared() {
+		_spec.ClearField(salesorder.FieldSettledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SettledBy(); ok {
+		_spec.SetField(salesorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSettledBy(); ok {
+		_spec.AddField(salesorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if _u.mutation.SettledByCleared() {
+		_spec.ClearField(salesorder.FieldSettledBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(salesorder.FieldNote, field.TypeString, value)
@@ -1003,6 +1163,113 @@ func (_u *SalesOrderUpdateOne) AddVersion(v int) *SalesOrderUpdateOne {
 	return _u
 }
 
+// SetSettlementAction sets the "settlement_action" field.
+func (_u *SalesOrderUpdateOne) SetSettlementAction(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetSettlementAction(v)
+	return _u
+}
+
+// SetNillableSettlementAction sets the "settlement_action" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableSettlementAction(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementAction(*v)
+	}
+	return _u
+}
+
+// ClearSettlementAction clears the value of the "settlement_action" field.
+func (_u *SalesOrderUpdateOne) ClearSettlementAction() *SalesOrderUpdateOne {
+	_u.mutation.ClearSettlementAction()
+	return _u
+}
+
+// SetSettlementMode sets the "settlement_mode" field.
+func (_u *SalesOrderUpdateOne) SetSettlementMode(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetSettlementMode(v)
+	return _u
+}
+
+// SetNillableSettlementMode sets the "settlement_mode" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableSettlementMode(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementMode(*v)
+	}
+	return _u
+}
+
+// ClearSettlementMode clears the value of the "settlement_mode" field.
+func (_u *SalesOrderUpdateOne) ClearSettlementMode() *SalesOrderUpdateOne {
+	_u.mutation.ClearSettlementMode()
+	return _u
+}
+
+// SetSettlementReason sets the "settlement_reason" field.
+func (_u *SalesOrderUpdateOne) SetSettlementReason(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetSettlementReason(v)
+	return _u
+}
+
+// SetNillableSettlementReason sets the "settlement_reason" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableSettlementReason(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementReason(*v)
+	}
+	return _u
+}
+
+// ClearSettlementReason clears the value of the "settlement_reason" field.
+func (_u *SalesOrderUpdateOne) ClearSettlementReason() *SalesOrderUpdateOne {
+	_u.mutation.ClearSettlementReason()
+	return _u
+}
+
+// SetSettledAt sets the "settled_at" field.
+func (_u *SalesOrderUpdateOne) SetSettledAt(v time.Time) *SalesOrderUpdateOne {
+	_u.mutation.SetSettledAt(v)
+	return _u
+}
+
+// SetNillableSettledAt sets the "settled_at" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableSettledAt(v *time.Time) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetSettledAt(*v)
+	}
+	return _u
+}
+
+// ClearSettledAt clears the value of the "settled_at" field.
+func (_u *SalesOrderUpdateOne) ClearSettledAt() *SalesOrderUpdateOne {
+	_u.mutation.ClearSettledAt()
+	return _u
+}
+
+// SetSettledBy sets the "settled_by" field.
+func (_u *SalesOrderUpdateOne) SetSettledBy(v int) *SalesOrderUpdateOne {
+	_u.mutation.ResetSettledBy()
+	_u.mutation.SetSettledBy(v)
+	return _u
+}
+
+// SetNillableSettledBy sets the "settled_by" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableSettledBy(v *int) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetSettledBy(*v)
+	}
+	return _u
+}
+
+// AddSettledBy adds value to the "settled_by" field.
+func (_u *SalesOrderUpdateOne) AddSettledBy(v int) *SalesOrderUpdateOne {
+	_u.mutation.AddSettledBy(v)
+	return _u
+}
+
+// ClearSettledBy clears the value of the "settled_by" field.
+func (_u *SalesOrderUpdateOne) ClearSettledBy() *SalesOrderUpdateOne {
+	_u.mutation.ClearSettledBy()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *SalesOrderUpdateOne) SetNote(v string) *SalesOrderUpdateOne {
 	_u.mutation.SetNote(v)
@@ -1249,6 +1516,26 @@ func (_u *SalesOrderUpdateOne) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SettlementAction(); ok {
+		if err := salesorder.SettlementActionValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_action", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.settlement_action": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementMode(); ok {
+		if err := salesorder.SettlementModeValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_mode", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.settlement_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementReason(); ok {
+		if err := salesorder.SettlementReasonValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_reason", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.settlement_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettledBy(); ok {
+		if err := salesorder.SettledByValidator(v); err != nil {
+			return &ValidationError{Name: "settled_by", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.settled_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := salesorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.note": %w`, err)}
@@ -1354,6 +1641,39 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(salesorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SettlementAction(); ok {
+		_spec.SetField(salesorder.FieldSettlementAction, field.TypeString, value)
+	}
+	if _u.mutation.SettlementActionCleared() {
+		_spec.ClearField(salesorder.FieldSettlementAction, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementMode(); ok {
+		_spec.SetField(salesorder.FieldSettlementMode, field.TypeString, value)
+	}
+	if _u.mutation.SettlementModeCleared() {
+		_spec.ClearField(salesorder.FieldSettlementMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementReason(); ok {
+		_spec.SetField(salesorder.FieldSettlementReason, field.TypeString, value)
+	}
+	if _u.mutation.SettlementReasonCleared() {
+		_spec.ClearField(salesorder.FieldSettlementReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettledAt(); ok {
+		_spec.SetField(salesorder.FieldSettledAt, field.TypeTime, value)
+	}
+	if _u.mutation.SettledAtCleared() {
+		_spec.ClearField(salesorder.FieldSettledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SettledBy(); ok {
+		_spec.SetField(salesorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSettledBy(); ok {
+		_spec.AddField(salesorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if _u.mutation.SettledByCleared() {
+		_spec.ClearField(salesorder.FieldSettledBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(salesorder.FieldNote, field.TypeString, value)

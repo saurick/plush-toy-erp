@@ -28,6 +28,7 @@ import (
 	"server/internal/data/model/ent/financepayment"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/inventoryoperation"
 	"server/internal/data/model/ent/inventoryoperationitem"
 	"server/internal/data/model/ent/inventorytxn"
@@ -73,6 +74,7 @@ import (
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
+	"server/internal/data/model/ent/sourceorderlifecycleevent"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
@@ -128,6 +130,8 @@ type Client struct {
 	InventoryBalance *InventoryBalanceClient
 	// InventoryLot is the client for interacting with the InventoryLot builders.
 	InventoryLot *InventoryLotClient
+	// InventoryLotStatusEvent is the client for interacting with the InventoryLotStatusEvent builders.
+	InventoryLotStatusEvent *InventoryLotStatusEventClient
 	// InventoryOperation is the client for interacting with the InventoryOperation builders.
 	InventoryOperation *InventoryOperationClient
 	// InventoryOperationItem is the client for interacting with the InventoryOperationItem builders.
@@ -218,6 +222,8 @@ type Client struct {
 	Shipment *ShipmentClient
 	// ShipmentItem is the client for interacting with the ShipmentItem builders.
 	ShipmentItem *ShipmentItemClient
+	// SourceOrderLifecycleEvent is the client for interacting with the SourceOrderLifecycleEvent builders.
+	SourceOrderLifecycleEvent *SourceOrderLifecycleEventClient
 	// StockReservation is the client for interacting with the StockReservation builders.
 	StockReservation *StockReservationClient
 	// Supplier is the client for interacting with the Supplier builders.
@@ -264,6 +270,7 @@ func (c *Client) init() {
 	c.FinancePayment = NewFinancePaymentClient(c.config)
 	c.InventoryBalance = NewInventoryBalanceClient(c.config)
 	c.InventoryLot = NewInventoryLotClient(c.config)
+	c.InventoryLotStatusEvent = NewInventoryLotStatusEventClient(c.config)
 	c.InventoryOperation = NewInventoryOperationClient(c.config)
 	c.InventoryOperationItem = NewInventoryOperationItemClient(c.config)
 	c.InventoryTxn = NewInventoryTxnClient(c.config)
@@ -309,6 +316,7 @@ func (c *Client) init() {
 	c.SalesOrderItem = NewSalesOrderItemClient(c.config)
 	c.Shipment = NewShipmentClient(c.config)
 	c.ShipmentItem = NewShipmentItemClient(c.config)
+	c.SourceOrderLifecycleEvent = NewSourceOrderLifecycleEventClient(c.config)
 	c.StockReservation = NewStockReservationClient(c.config)
 	c.Supplier = NewSupplierClient(c.config)
 	c.Unit = NewUnitClient(c.config)
@@ -427,6 +435,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		FinancePayment:                     NewFinancePaymentClient(cfg),
 		InventoryBalance:                   NewInventoryBalanceClient(cfg),
 		InventoryLot:                       NewInventoryLotClient(cfg),
+		InventoryLotStatusEvent:            NewInventoryLotStatusEventClient(cfg),
 		InventoryOperation:                 NewInventoryOperationClient(cfg),
 		InventoryOperationItem:             NewInventoryOperationItemClient(cfg),
 		InventoryTxn:                       NewInventoryTxnClient(cfg),
@@ -472,6 +481,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		SalesOrderItem:                     NewSalesOrderItemClient(cfg),
 		Shipment:                           NewShipmentClient(cfg),
 		ShipmentItem:                       NewShipmentItemClient(cfg),
+		SourceOrderLifecycleEvent:          NewSourceOrderLifecycleEventClient(cfg),
 		StockReservation:                   NewStockReservationClient(cfg),
 		Supplier:                           NewSupplierClient(cfg),
 		Unit:                               NewUnitClient(cfg),
@@ -517,6 +527,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		FinancePayment:                     NewFinancePaymentClient(cfg),
 		InventoryBalance:                   NewInventoryBalanceClient(cfg),
 		InventoryLot:                       NewInventoryLotClient(cfg),
+		InventoryLotStatusEvent:            NewInventoryLotStatusEventClient(cfg),
 		InventoryOperation:                 NewInventoryOperationClient(cfg),
 		InventoryOperationItem:             NewInventoryOperationItemClient(cfg),
 		InventoryTxn:                       NewInventoryTxnClient(cfg),
@@ -562,6 +573,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		SalesOrderItem:                     NewSalesOrderItemClient(cfg),
 		Shipment:                           NewShipmentClient(cfg),
 		ShipmentItem:                       NewShipmentItemClient(cfg),
+		SourceOrderLifecycleEvent:          NewSourceOrderLifecycleEventClient(cfg),
 		StockReservation:                   NewStockReservationClient(cfg),
 		Supplier:                           NewSupplierClient(cfg),
 		Unit:                               NewUnitClient(cfg),
@@ -604,23 +616,23 @@ func (c *Client) Use(hooks ...Hook) {
 		c.BOMItem, c.BusinessAttachment, c.Contact, c.Customer,
 		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceAllocation,
 		c.FinanceCreditNote, c.FinanceFact, c.FinancePayment, c.InventoryBalance,
-		c.InventoryLot, c.InventoryOperation, c.InventoryOperationItem, c.InventoryTxn,
-		c.Material, c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem,
-		c.OutsourcingReturnDisposition, c.Permission, c.Process, c.ProcessInstance,
-		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
-		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
-		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
-		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
-		c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.InventoryLot, c.InventoryLotStatusEvent, c.InventoryOperation,
+		c.InventoryOperationItem, c.InventoryTxn, c.Material, c.OutsourcingFact,
+		c.OutsourcingOrder, c.OutsourcingOrderItem, c.OutsourcingReturnDisposition,
+		c.Permission, c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product,
+		c.ProductSKU, c.ProductionExceptionDecision, c.ProductionFact,
+		c.ProductionOrder, c.ProductionOrderEvent, c.ProductionOrderItem,
+		c.ProductionOrderMaterialRequirement, c.ProductionOrderOperation,
+		c.ProductionPackagingConfirmation, c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
 		c.PurchaseRejectionDisposition, c.PurchaseReturn, c.PurchaseReturnItem,
 		c.QualityInspection, c.Role, c.RoleDataScope, c.RolePermission, c.RoleProfile,
 		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
-		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
-		c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
-		c.WorkflowTask, c.WorkflowTaskEvent,
+		c.Shipment, c.ShipmentItem, c.SourceOrderLifecycleEvent, c.StockReservation,
+		c.Supplier, c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership,
+		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -634,23 +646,23 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.BOMItem, c.BusinessAttachment, c.Contact, c.Customer,
 		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceAllocation,
 		c.FinanceCreditNote, c.FinanceFact, c.FinancePayment, c.InventoryBalance,
-		c.InventoryLot, c.InventoryOperation, c.InventoryOperationItem, c.InventoryTxn,
-		c.Material, c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem,
-		c.OutsourcingReturnDisposition, c.Permission, c.Process, c.ProcessInstance,
-		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
-		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
-		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
-		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
-		c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.InventoryLot, c.InventoryLotStatusEvent, c.InventoryOperation,
+		c.InventoryOperationItem, c.InventoryTxn, c.Material, c.OutsourcingFact,
+		c.OutsourcingOrder, c.OutsourcingOrderItem, c.OutsourcingReturnDisposition,
+		c.Permission, c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product,
+		c.ProductSKU, c.ProductionExceptionDecision, c.ProductionFact,
+		c.ProductionOrder, c.ProductionOrderEvent, c.ProductionOrderItem,
+		c.ProductionOrderMaterialRequirement, c.ProductionOrderOperation,
+		c.ProductionPackagingConfirmation, c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
 		c.PurchaseRejectionDisposition, c.PurchaseReturn, c.PurchaseReturnItem,
 		c.QualityInspection, c.Role, c.RoleDataScope, c.RolePermission, c.RoleProfile,
 		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
-		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit,
-		c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
-		c.WorkflowTask, c.WorkflowTaskEvent,
+		c.Shipment, c.ShipmentItem, c.SourceOrderLifecycleEvent, c.StockReservation,
+		c.Supplier, c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership,
+		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -693,6 +705,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.InventoryBalance.mutate(ctx, m)
 	case *InventoryLotMutation:
 		return c.InventoryLot.mutate(ctx, m)
+	case *InventoryLotStatusEventMutation:
+		return c.InventoryLotStatusEvent.mutate(ctx, m)
 	case *InventoryOperationMutation:
 		return c.InventoryOperation.mutate(ctx, m)
 	case *InventoryOperationItemMutation:
@@ -783,6 +797,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Shipment.mutate(ctx, m)
 	case *ShipmentItemMutation:
 		return c.ShipmentItem.mutate(ctx, m)
+	case *SourceOrderLifecycleEventMutation:
+		return c.SourceOrderLifecycleEvent.mutate(ctx, m)
 	case *StockReservationMutation:
 		return c.StockReservation.mutate(ctx, m)
 	case *SupplierMutation:
@@ -3510,6 +3526,22 @@ func (c *InventoryLotClient) QueryStockReservations(_m *InventoryLot) *StockRese
 	return query
 }
 
+// QueryStatusEvents queries the status_events edge of a InventoryLot.
+func (c *InventoryLotClient) QueryStatusEvents(_m *InventoryLot) *InventoryLotStatusEventQuery {
+	query := (&InventoryLotStatusEventClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorylot.Table, inventorylot.FieldID, id),
+			sqlgraph.To(inventorylotstatusevent.Table, inventorylotstatusevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, inventorylot.StatusEventsTable, inventorylot.StatusEventsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *InventoryLotClient) Hooks() []Hook {
 	hooks := c.hooks.InventoryLot
@@ -3533,6 +3565,171 @@ func (c *InventoryLotClient) mutate(ctx context.Context, m *InventoryLotMutation
 		return (&InventoryLotDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown InventoryLot mutation op: %q", m.Op())
+	}
+}
+
+// InventoryLotStatusEventClient is a client for the InventoryLotStatusEvent schema.
+type InventoryLotStatusEventClient struct {
+	config
+}
+
+// NewInventoryLotStatusEventClient returns a client for the InventoryLotStatusEvent from the given config.
+func NewInventoryLotStatusEventClient(c config) *InventoryLotStatusEventClient {
+	return &InventoryLotStatusEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `inventorylotstatusevent.Hooks(f(g(h())))`.
+func (c *InventoryLotStatusEventClient) Use(hooks ...Hook) {
+	c.hooks.InventoryLotStatusEvent = append(c.hooks.InventoryLotStatusEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `inventorylotstatusevent.Intercept(f(g(h())))`.
+func (c *InventoryLotStatusEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.InventoryLotStatusEvent = append(c.inters.InventoryLotStatusEvent, interceptors...)
+}
+
+// Create returns a builder for creating a InventoryLotStatusEvent entity.
+func (c *InventoryLotStatusEventClient) Create() *InventoryLotStatusEventCreate {
+	mutation := newInventoryLotStatusEventMutation(c.config, OpCreate)
+	return &InventoryLotStatusEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of InventoryLotStatusEvent entities.
+func (c *InventoryLotStatusEventClient) CreateBulk(builders ...*InventoryLotStatusEventCreate) *InventoryLotStatusEventCreateBulk {
+	return &InventoryLotStatusEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *InventoryLotStatusEventClient) MapCreateBulk(slice any, setFunc func(*InventoryLotStatusEventCreate, int)) *InventoryLotStatusEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &InventoryLotStatusEventCreateBulk{err: fmt.Errorf("calling to InventoryLotStatusEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*InventoryLotStatusEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &InventoryLotStatusEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for InventoryLotStatusEvent.
+func (c *InventoryLotStatusEventClient) Update() *InventoryLotStatusEventUpdate {
+	mutation := newInventoryLotStatusEventMutation(c.config, OpUpdate)
+	return &InventoryLotStatusEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *InventoryLotStatusEventClient) UpdateOne(_m *InventoryLotStatusEvent) *InventoryLotStatusEventUpdateOne {
+	mutation := newInventoryLotStatusEventMutation(c.config, OpUpdateOne, withInventoryLotStatusEvent(_m))
+	return &InventoryLotStatusEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *InventoryLotStatusEventClient) UpdateOneID(id int) *InventoryLotStatusEventUpdateOne {
+	mutation := newInventoryLotStatusEventMutation(c.config, OpUpdateOne, withInventoryLotStatusEventID(id))
+	return &InventoryLotStatusEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for InventoryLotStatusEvent.
+func (c *InventoryLotStatusEventClient) Delete() *InventoryLotStatusEventDelete {
+	mutation := newInventoryLotStatusEventMutation(c.config, OpDelete)
+	return &InventoryLotStatusEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *InventoryLotStatusEventClient) DeleteOne(_m *InventoryLotStatusEvent) *InventoryLotStatusEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *InventoryLotStatusEventClient) DeleteOneID(id int) *InventoryLotStatusEventDeleteOne {
+	builder := c.Delete().Where(inventorylotstatusevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &InventoryLotStatusEventDeleteOne{builder}
+}
+
+// Query returns a query builder for InventoryLotStatusEvent.
+func (c *InventoryLotStatusEventClient) Query() *InventoryLotStatusEventQuery {
+	return &InventoryLotStatusEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeInventoryLotStatusEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a InventoryLotStatusEvent entity by its id.
+func (c *InventoryLotStatusEventClient) Get(ctx context.Context, id int) (*InventoryLotStatusEvent, error) {
+	return c.Query().Where(inventorylotstatusevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *InventoryLotStatusEventClient) GetX(ctx context.Context, id int) *InventoryLotStatusEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryInventoryLot queries the inventory_lot edge of a InventoryLotStatusEvent.
+func (c *InventoryLotStatusEventClient) QueryInventoryLot(_m *InventoryLotStatusEvent) *InventoryLotQuery {
+	query := (&InventoryLotClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorylotstatusevent.Table, inventorylotstatusevent.FieldID, id),
+			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, inventorylotstatusevent.InventoryLotTable, inventorylotstatusevent.InventoryLotColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryQualityInspection queries the quality_inspection edge of a InventoryLotStatusEvent.
+func (c *InventoryLotStatusEventClient) QueryQualityInspection(_m *InventoryLotStatusEvent) *QualityInspectionQuery {
+	query := (&QualityInspectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorylotstatusevent.Table, inventorylotstatusevent.FieldID, id),
+			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, inventorylotstatusevent.QualityInspectionTable, inventorylotstatusevent.QualityInspectionColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *InventoryLotStatusEventClient) Hooks() []Hook {
+	return c.hooks.InventoryLotStatusEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *InventoryLotStatusEventClient) Interceptors() []Interceptor {
+	return c.inters.InventoryLotStatusEvent
+}
+
+func (c *InventoryLotStatusEventClient) mutate(ctx context.Context, m *InventoryLotStatusEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&InventoryLotStatusEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&InventoryLotStatusEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&InventoryLotStatusEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&InventoryLotStatusEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown InventoryLotStatusEvent mutation op: %q", m.Op())
 	}
 }
 
@@ -4001,6 +4198,38 @@ func (c *InventoryTxnClient) QueryInventoryLot(_m *InventoryTxn) *InventoryLotQu
 			sqlgraph.From(inventorytxn.Table, inventorytxn.FieldID, id),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, inventorytxn.InventoryLotTable, inventorytxn.InventoryLotColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryReversals queries the reversals edge of a InventoryTxn.
+func (c *InventoryTxnClient) QueryReversals(_m *InventoryTxn) *InventoryTxnQuery {
+	query := (&InventoryTxnClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorytxn.Table, inventorytxn.FieldID, id),
+			sqlgraph.To(inventorytxn.Table, inventorytxn.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, inventorytxn.ReversalsTable, inventorytxn.ReversalsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryReversalOf queries the reversal_of edge of a InventoryTxn.
+func (c *InventoryTxnClient) QueryReversalOf(_m *InventoryTxn) *InventoryTxnQuery {
+	query := (&InventoryTxnClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorytxn.Table, inventorytxn.FieldID, id),
+			sqlgraph.To(inventorytxn.Table, inventorytxn.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, inventorytxn.ReversalOfTable, inventorytxn.ReversalOfColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -10636,6 +10865,22 @@ func (c *QualityInspectionClient) GetX(ctx context.Context, id int) *QualityInsp
 	return obj
 }
 
+// QueryInventoryLotStatusEvents queries the inventory_lot_status_events edge of a QualityInspection.
+func (c *QualityInspectionClient) QueryInventoryLotStatusEvents(_m *QualityInspection) *InventoryLotStatusEventQuery {
+	query := (&InventoryLotStatusEventClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
+			sqlgraph.To(inventorylotstatusevent.Table, inventorylotstatusevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, qualityinspection.InventoryLotStatusEventsTable, qualityinspection.InventoryLotStatusEventsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryPurchaseReceipt queries the purchase_receipt edge of a QualityInspection.
 func (c *QualityInspectionClient) QueryPurchaseReceipt(_m *QualityInspection) *PurchaseReceiptQuery {
 	query := (&PurchaseReceiptClient{config: c.config}).Query()
@@ -12457,6 +12702,139 @@ func (c *ShipmentItemClient) mutate(ctx context.Context, m *ShipmentItemMutation
 		return (&ShipmentItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ShipmentItem mutation op: %q", m.Op())
+	}
+}
+
+// SourceOrderLifecycleEventClient is a client for the SourceOrderLifecycleEvent schema.
+type SourceOrderLifecycleEventClient struct {
+	config
+}
+
+// NewSourceOrderLifecycleEventClient returns a client for the SourceOrderLifecycleEvent from the given config.
+func NewSourceOrderLifecycleEventClient(c config) *SourceOrderLifecycleEventClient {
+	return &SourceOrderLifecycleEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `sourceorderlifecycleevent.Hooks(f(g(h())))`.
+func (c *SourceOrderLifecycleEventClient) Use(hooks ...Hook) {
+	c.hooks.SourceOrderLifecycleEvent = append(c.hooks.SourceOrderLifecycleEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `sourceorderlifecycleevent.Intercept(f(g(h())))`.
+func (c *SourceOrderLifecycleEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SourceOrderLifecycleEvent = append(c.inters.SourceOrderLifecycleEvent, interceptors...)
+}
+
+// Create returns a builder for creating a SourceOrderLifecycleEvent entity.
+func (c *SourceOrderLifecycleEventClient) Create() *SourceOrderLifecycleEventCreate {
+	mutation := newSourceOrderLifecycleEventMutation(c.config, OpCreate)
+	return &SourceOrderLifecycleEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SourceOrderLifecycleEvent entities.
+func (c *SourceOrderLifecycleEventClient) CreateBulk(builders ...*SourceOrderLifecycleEventCreate) *SourceOrderLifecycleEventCreateBulk {
+	return &SourceOrderLifecycleEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SourceOrderLifecycleEventClient) MapCreateBulk(slice any, setFunc func(*SourceOrderLifecycleEventCreate, int)) *SourceOrderLifecycleEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SourceOrderLifecycleEventCreateBulk{err: fmt.Errorf("calling to SourceOrderLifecycleEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SourceOrderLifecycleEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SourceOrderLifecycleEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SourceOrderLifecycleEvent.
+func (c *SourceOrderLifecycleEventClient) Update() *SourceOrderLifecycleEventUpdate {
+	mutation := newSourceOrderLifecycleEventMutation(c.config, OpUpdate)
+	return &SourceOrderLifecycleEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SourceOrderLifecycleEventClient) UpdateOne(_m *SourceOrderLifecycleEvent) *SourceOrderLifecycleEventUpdateOne {
+	mutation := newSourceOrderLifecycleEventMutation(c.config, OpUpdateOne, withSourceOrderLifecycleEvent(_m))
+	return &SourceOrderLifecycleEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SourceOrderLifecycleEventClient) UpdateOneID(id int) *SourceOrderLifecycleEventUpdateOne {
+	mutation := newSourceOrderLifecycleEventMutation(c.config, OpUpdateOne, withSourceOrderLifecycleEventID(id))
+	return &SourceOrderLifecycleEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SourceOrderLifecycleEvent.
+func (c *SourceOrderLifecycleEventClient) Delete() *SourceOrderLifecycleEventDelete {
+	mutation := newSourceOrderLifecycleEventMutation(c.config, OpDelete)
+	return &SourceOrderLifecycleEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SourceOrderLifecycleEventClient) DeleteOne(_m *SourceOrderLifecycleEvent) *SourceOrderLifecycleEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SourceOrderLifecycleEventClient) DeleteOneID(id int) *SourceOrderLifecycleEventDeleteOne {
+	builder := c.Delete().Where(sourceorderlifecycleevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SourceOrderLifecycleEventDeleteOne{builder}
+}
+
+// Query returns a query builder for SourceOrderLifecycleEvent.
+func (c *SourceOrderLifecycleEventClient) Query() *SourceOrderLifecycleEventQuery {
+	return &SourceOrderLifecycleEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSourceOrderLifecycleEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SourceOrderLifecycleEvent entity by its id.
+func (c *SourceOrderLifecycleEventClient) Get(ctx context.Context, id int) (*SourceOrderLifecycleEvent, error) {
+	return c.Query().Where(sourceorderlifecycleevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SourceOrderLifecycleEventClient) GetX(ctx context.Context, id int) *SourceOrderLifecycleEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *SourceOrderLifecycleEventClient) Hooks() []Hook {
+	return c.hooks.SourceOrderLifecycleEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *SourceOrderLifecycleEventClient) Interceptors() []Interceptor {
+	return c.inters.SourceOrderLifecycleEvent
+}
+
+func (c *SourceOrderLifecycleEventClient) mutate(ctx context.Context, m *SourceOrderLifecycleEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SourceOrderLifecycleEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SourceOrderLifecycleEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SourceOrderLifecycleEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SourceOrderLifecycleEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SourceOrderLifecycleEvent mutation op: %q", m.Op())
 	}
 }
 
@@ -14291,7 +14669,8 @@ func (c *WorkflowTaskEventClient) QueryTask(_m *WorkflowTaskEvent) *WorkflowTask
 
 // Hooks returns the client hooks.
 func (c *WorkflowTaskEventClient) Hooks() []Hook {
-	return c.hooks.WorkflowTaskEvent
+	hooks := c.hooks.WorkflowTaskEvent
+	return append(hooks[:len(hooks):len(hooks)], workflowtaskevent.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -14320,42 +14699,42 @@ type (
 		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
 		DeploymentModuleState, FinanceAllocation, FinanceCreditNote, FinanceFact,
-		FinancePayment, InventoryBalance, InventoryLot, InventoryOperation,
-		InventoryOperationItem, InventoryTxn, Material, OutsourcingFact,
-		OutsourcingOrder, OutsourcingOrderItem, OutsourcingReturnDisposition,
-		Permission, Process, ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
-		ProductionExceptionDecision, ProductionFact, ProductionOrder,
-		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
-		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
-		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
-		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
-		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
-		PurchaseRejectionDisposition, PurchaseReturn, PurchaseReturnItem,
-		QualityInspection, Role, RoleDataScope, RolePermission, RoleProfile,
-		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
-		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
-		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
-		WorkflowTaskEvent []ent.Hook
+		FinancePayment, InventoryBalance, InventoryLot, InventoryLotStatusEvent,
+		InventoryOperation, InventoryOperationItem, InventoryTxn, Material,
+		OutsourcingFact, OutsourcingOrder, OutsourcingOrderItem,
+		OutsourcingReturnDisposition, Permission, Process, ProcessInstance,
+		ProcessNodeInstance, Product, ProductSKU, ProductionExceptionDecision,
+		ProductionFact, ProductionOrder, ProductionOrderEvent, ProductionOrderItem,
+		ProductionOrderMaterialRequirement, ProductionOrderOperation,
+		ProductionPackagingConfirmation, ProductionWIPBatch, ProductionWIPEvent,
+		ProductionWIPOutsourcingAllocation, PurchaseOrder, PurchaseOrderItem,
+		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
+		PurchaseReceiptItem, PurchaseRejectionDisposition, PurchaseReturn,
+		PurchaseReturnItem, QualityInspection, Role, RoleDataScope, RolePermission,
+		RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem,
+		Shipment, ShipmentItem, SourceOrderLifecycleEvent, StockReservation, Supplier,
+		Unit, Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState,
+		WorkflowTask, WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
 		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
 		DeploymentModuleState, FinanceAllocation, FinanceCreditNote, FinanceFact,
-		FinancePayment, InventoryBalance, InventoryLot, InventoryOperation,
-		InventoryOperationItem, InventoryTxn, Material, OutsourcingFact,
-		OutsourcingOrder, OutsourcingOrderItem, OutsourcingReturnDisposition,
-		Permission, Process, ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
-		ProductionExceptionDecision, ProductionFact, ProductionOrder,
-		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
-		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
-		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
-		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
-		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
-		PurchaseRejectionDisposition, PurchaseReturn, PurchaseReturnItem,
-		QualityInspection, Role, RoleDataScope, RolePermission, RoleProfile,
-		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
-		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
-		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
-		WorkflowTaskEvent []ent.Interceptor
+		FinancePayment, InventoryBalance, InventoryLot, InventoryLotStatusEvent,
+		InventoryOperation, InventoryOperationItem, InventoryTxn, Material,
+		OutsourcingFact, OutsourcingOrder, OutsourcingOrderItem,
+		OutsourcingReturnDisposition, Permission, Process, ProcessInstance,
+		ProcessNodeInstance, Product, ProductSKU, ProductionExceptionDecision,
+		ProductionFact, ProductionOrder, ProductionOrderEvent, ProductionOrderItem,
+		ProductionOrderMaterialRequirement, ProductionOrderOperation,
+		ProductionPackagingConfirmation, ProductionWIPBatch, ProductionWIPEvent,
+		ProductionWIPOutsourcingAllocation, PurchaseOrder, PurchaseOrderItem,
+		PurchaseReceipt, PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem,
+		PurchaseReceiptItem, PurchaseRejectionDisposition, PurchaseReturn,
+		PurchaseReturnItem, QualityInspection, Role, RoleDataScope, RolePermission,
+		RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem,
+		Shipment, ShipmentItem, SourceOrderLifecycleEvent, StockReservation, Supplier,
+		Unit, Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState,
+		WorkflowTask, WorkflowTaskEvent []ent.Interceptor
 	}
 )

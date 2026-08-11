@@ -26,6 +26,8 @@ const (
 	FieldAddress = "address"
 	// FieldTaxNo holds the string denoting the tax_no field in the database.
 	FieldTaxNo = "tax_no"
+	// FieldDefaultPaymentTermDays holds the string denoting the default_payment_term_days field in the database.
+	FieldDefaultPaymentTermDays = "default_payment_term_days"
 	// FieldIsActive holds the string denoting the is_active field in the database.
 	FieldIsActive = "is_active"
 	// FieldNote holds the string denoting the note field in the database.
@@ -81,6 +83,7 @@ var Columns = []string{
 	FieldSupplierType,
 	FieldAddress,
 	FieldTaxNo,
+	FieldDefaultPaymentTermDays,
 	FieldIsActive,
 	FieldNote,
 	FieldCreatedAt,
@@ -116,6 +119,10 @@ var (
 	AddressValidator func(string) error
 	// TaxNoValidator is a validator for the "tax_no" field. It is called by the builders before save.
 	TaxNoValidator func(string) error
+	// DefaultDefaultPaymentTermDays holds the default value on creation for the "default_payment_term_days" field.
+	DefaultDefaultPaymentTermDays int
+	// DefaultPaymentTermDaysValidator is a validator for the "default_payment_term_days" field. It is called by the builders before save.
+	DefaultPaymentTermDaysValidator func(int) error
 	// DefaultIsActive holds the default value on creation for the "is_active" field.
 	DefaultIsActive bool
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
@@ -164,6 +171,11 @@ func ByAddress(opts ...sql.OrderTermOption) OrderOption {
 // ByTaxNo orders the results by the tax_no field.
 func ByTaxNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTaxNo, opts...).ToFunc()
+}
+
+// ByDefaultPaymentTermDays orders the results by the default_payment_term_days field.
+func ByDefaultPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultPaymentTermDays, opts...).ToFunc()
 }
 
 // ByIsActive orders the results by the is_active field.

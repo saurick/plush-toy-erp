@@ -85,6 +85,11 @@ func TaxNo(v string) predicate.Supplier {
 	return predicate.Supplier(sql.FieldEQ(FieldTaxNo, v))
 }
 
+// DefaultPaymentTermDays applies equality check predicate on the "default_payment_term_days" field. It's identical to DefaultPaymentTermDaysEQ.
+func DefaultPaymentTermDays(v int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldDefaultPaymentTermDays, v))
+}
+
 // IsActive applies equality check predicate on the "is_active" field. It's identical to IsActiveEQ.
 func IsActive(v bool) predicate.Supplier {
 	return predicate.Supplier(sql.FieldEQ(FieldIsActive, v))
@@ -533,6 +538,46 @@ func TaxNoEqualFold(v string) predicate.Supplier {
 // TaxNoContainsFold applies the ContainsFold predicate on the "tax_no" field.
 func TaxNoContainsFold(v string) predicate.Supplier {
 	return predicate.Supplier(sql.FieldContainsFold(FieldTaxNo, v))
+}
+
+// DefaultPaymentTermDaysEQ applies the EQ predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysEQ(v int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysNEQ applies the NEQ predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysNEQ(v int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNEQ(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysIn applies the In predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysIn(vs ...int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldIn(FieldDefaultPaymentTermDays, vs...))
+}
+
+// DefaultPaymentTermDaysNotIn applies the NotIn predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysNotIn(vs ...int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNotIn(FieldDefaultPaymentTermDays, vs...))
+}
+
+// DefaultPaymentTermDaysGT applies the GT predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysGT(v int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldGT(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysGTE applies the GTE predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysGTE(v int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldGTE(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysLT applies the LT predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysLT(v int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldLT(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysLTE applies the LTE predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysLTE(v int) predicate.Supplier {
+	return predicate.Supplier(sql.FieldLTE(FieldDefaultPaymentTermDays, v))
 }
 
 // IsActiveEQ applies the EQ predicate on the "is_active" field.

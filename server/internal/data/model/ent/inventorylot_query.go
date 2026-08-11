@@ -9,6 +9,7 @@ import (
 	"math"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
@@ -45,6 +46,7 @@ type InventoryLotQuery struct {
 	withOutsourcingFacts               *OutsourcingFactQuery
 	withShipmentItems                  *ShipmentItemQuery
 	withStockReservations              *StockReservationQuery
+	withStatusEvents                   *InventoryLotStatusEventQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -323,6 +325,28 @@ func (_q *InventoryLotQuery) QueryStockReservations() *StockReservationQuery {
 	return query
 }
 
+// QueryStatusEvents chains the current query on the "status_events" edge.
+func (_q *InventoryLotQuery) QueryStatusEvents() *InventoryLotStatusEventQuery {
+	query := (&InventoryLotStatusEventClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorylot.Table, inventorylot.FieldID, selector),
+			sqlgraph.To(inventorylotstatusevent.Table, inventorylotstatusevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, inventorylot.StatusEventsTable, inventorylot.StatusEventsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
 // First returns the first InventoryLot entity from the query.
 // Returns a *NotFoundError when no InventoryLot was found.
 func (_q *InventoryLotQuery) First(ctx context.Context) (*InventoryLot, error) {
@@ -526,6 +550,7 @@ func (_q *InventoryLotQuery) Clone() *InventoryLotQuery {
 		withOutsourcingFacts:               _q.withOutsourcingFacts.Clone(),
 		withShipmentItems:                  _q.withShipmentItems.Clone(),
 		withStockReservations:              _q.withStockReservations.Clone(),
+		withStatusEvents:                   _q.withStatusEvents.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -653,6 +678,17 @@ func (_q *InventoryLotQuery) WithStockReservations(opts ...func(*StockReservatio
 	return _q
 }
 
+// WithStatusEvents tells the query-builder to eager-load the nodes that are connected to
+// the "status_events" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *InventoryLotQuery) WithStatusEvents(opts ...func(*InventoryLotStatusEventQuery)) *InventoryLotQuery {
+	query := (&InventoryLotStatusEventClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withStatusEvents = query
+	return _q
+}
+
 // GroupBy is used to group vertices by one or more fields/columns.
 // It is often used with aggregate functions, like: count, max, mean, min, sum.
 //
@@ -731,7 +767,7 @@ func (_q *InventoryLotQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	var (
 		nodes       = []*InventoryLot{}
 		_spec       = _q.querySpec()
-		loadedTypes = [11]bool{
+		loadedTypes = [12]bool{
 			_q.withInventoryTxns != nil,
 			_q.withInventoryBalances != nil,
 			_q.withProductSku != nil,
@@ -743,6 +779,7 @@ func (_q *InventoryLotQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 			_q.withOutsourcingFacts != nil,
 			_q.withShipmentItems != nil,
 			_q.withStockReservations != nil,
+			_q.withStatusEvents != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -849,6 +886,15 @@ func (_q *InventoryLotQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 			func(n *InventoryLot) { n.Edges.StockReservations = []*StockReservation{} },
 			func(n *InventoryLot, e *StockReservation) {
 				n.Edges.StockReservations = append(n.Edges.StockReservations, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withStatusEvents; query != nil {
+		if err := _q.loadStatusEvents(ctx, query, nodes,
+			func(n *InventoryLot) { n.Edges.StatusEvents = []*InventoryLotStatusEvent{} },
+			func(n *InventoryLot, e *InventoryLotStatusEvent) {
+				n.Edges.StatusEvents = append(n.Edges.StatusEvents, e)
 			}); err != nil {
 			return nil, err
 		}
@@ -1213,6 +1259,36 @@ func (_q *InventoryLotQuery) loadStockReservations(ctx context.Context, query *S
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "lot_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *InventoryLotQuery) loadStatusEvents(ctx context.Context, query *InventoryLotStatusEventQuery, nodes []*InventoryLot, init func(*InventoryLot), assign func(*InventoryLot, *InventoryLotStatusEvent)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*InventoryLot)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(inventorylotstatusevent.FieldInventoryLotID)
+	}
+	query.Where(predicate.InventoryLotStatusEvent(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(inventorylot.StatusEventsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.InventoryLotID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "inventory_lot_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

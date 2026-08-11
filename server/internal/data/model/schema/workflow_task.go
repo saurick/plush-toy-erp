@@ -18,7 +18,7 @@ type WorkflowTask struct {
 func (WorkflowTask) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
-			"workflow_tasks_status_allowed":          "task_status_key IN ('ready', 'blocked', 'done', 'rejected')",
+			"workflow_tasks_status_allowed":          "task_status_key IN ('ready', 'blocked', 'done', 'rejected', 'withdrawn')",
 			"workflow_tasks_version_positive":        "version > 0",
 			"workflow_tasks_process_anchors_paired":  "((process_instance_id IS NULL AND process_node_instance_id IS NULL) OR (process_instance_id IS NOT NULL AND process_node_instance_id IS NOT NULL))",
 			"workflow_tasks_urge_count_non_negative": "urge_count >= 0",

@@ -24,6 +24,7 @@ import (
 	"server/internal/data/model/ent/financepayment"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/inventoryoperation"
 	"server/internal/data/model/ent/inventoryoperationitem"
 	"server/internal/data/model/ent/inventorytxn"
@@ -69,6 +70,7 @@ import (
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
+	"server/internal/data/model/ent/sourceorderlifecycleevent"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
@@ -160,6 +162,7 @@ func checkColumn(t, c string) error {
 			financepayment.Table:                     financepayment.ValidColumn,
 			inventorybalance.Table:                   inventorybalance.ValidColumn,
 			inventorylot.Table:                       inventorylot.ValidColumn,
+			inventorylotstatusevent.Table:            inventorylotstatusevent.ValidColumn,
 			inventoryoperation.Table:                 inventoryoperation.ValidColumn,
 			inventoryoperationitem.Table:             inventoryoperationitem.ValidColumn,
 			inventorytxn.Table:                       inventorytxn.ValidColumn,
@@ -205,6 +208,7 @@ func checkColumn(t, c string) error {
 			salesorderitem.Table:                     salesorderitem.ValidColumn,
 			shipment.Table:                           shipment.ValidColumn,
 			shipmentitem.Table:                       shipmentitem.ValidColumn,
+			sourceorderlifecycleevent.Table:          sourceorderlifecycleevent.ValidColumn,
 			stockreservation.Table:                   stockreservation.ValidColumn,
 			supplier.Table:                           supplier.ValidColumn,
 			unit.Table:                               unit.ValidColumn,

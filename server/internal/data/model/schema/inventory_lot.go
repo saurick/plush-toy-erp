@@ -44,7 +44,10 @@ func (InventoryLot) Hooks() []ent.Hook {
 func (InventoryLot) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
-			"inventory_lots_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+			"inventory_lots_subject_type_allowed": "subject_type IN ('MATERIAL', 'PRODUCT')",
+			"inventory_lots_sku_subject_allowed":  "product_sku_id IS NULL OR subject_type = 'PRODUCT'",
+			"inventory_lots_status_allowed":       "status IN ('ACTIVE', 'HOLD', 'REJECTED', 'DISABLED')",
+			"inventory_lots_version_positive":     "version > 0",
 		}},
 	}
 }
@@ -85,6 +88,11 @@ func (InventoryLot) Fields() []ent.Field {
 			NotEmpty().
 			Default("ACTIVE").
 			MaxLen(32),
+		field.Int("version").Positive().Default(1),
+		field.String("status_action").Optional().Nillable().MaxLen(64),
+		field.String("status_reason").Optional().Nillable().MaxLen(255),
+		field.Time("status_changed_at").Optional().Nillable(),
+		field.Int("status_changed_by").Optional().Nillable().Positive(),
 		field.Time("received_at").
 			Optional().
 			Nillable(),
@@ -124,6 +132,8 @@ func (InventoryLot) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("stock_reservations", StockReservation.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("status_events", InventoryLotStatusEvent.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 
@@ -134,5 +144,6 @@ func (InventoryLot) Indexes() []ent.Index {
 		index.Fields("supplier_lot_no"),
 		index.Fields("color_no"),
 		index.Fields("dye_lot_no"),
+		index.Fields("status", "updated_at"),
 	}
 }

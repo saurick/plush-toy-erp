@@ -253,6 +253,40 @@ func (_c *InventoryTxnCreate) SetInventoryLot(v *InventoryLot) *InventoryTxnCrea
 	return _c.SetInventoryLotID(v.ID)
 }
 
+// AddReversalIDs adds the "reversals" edge to the InventoryTxn entity by IDs.
+func (_c *InventoryTxnCreate) AddReversalIDs(ids ...int) *InventoryTxnCreate {
+	_c.mutation.AddReversalIDs(ids...)
+	return _c
+}
+
+// AddReversals adds the "reversals" edges to the InventoryTxn entity.
+func (_c *InventoryTxnCreate) AddReversals(v ...*InventoryTxn) *InventoryTxnCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddReversalIDs(ids...)
+}
+
+// SetReversalOfID sets the "reversal_of" edge to the InventoryTxn entity by ID.
+func (_c *InventoryTxnCreate) SetReversalOfID(id int) *InventoryTxnCreate {
+	_c.mutation.SetReversalOfID(id)
+	return _c
+}
+
+// SetNillableReversalOfID sets the "reversal_of" edge to the InventoryTxn entity by ID if the given value is not nil.
+func (_c *InventoryTxnCreate) SetNillableReversalOfID(id *int) *InventoryTxnCreate {
+	if id != nil {
+		_c = _c.SetReversalOfID(*id)
+	}
+	return _c
+}
+
+// SetReversalOf sets the "reversal_of" edge to the InventoryTxn entity.
+func (_c *InventoryTxnCreate) SetReversalOf(v *InventoryTxn) *InventoryTxnCreate {
+	return _c.SetReversalOfID(v.ID)
+}
+
 // Mutation returns the InventoryTxnMutation object of the builder.
 func (_c *InventoryTxnCreate) Mutation() *InventoryTxnMutation {
 	return _c.mutation
@@ -487,10 +521,6 @@ func (_c *InventoryTxnCreate) createSpec() (*InventoryTxn, *sqlgraph.CreateSpec)
 		_spec.SetField(inventorytxn.FieldIdempotencyKey, field.TypeString, value)
 		_node.IdempotencyKey = value
 	}
-	if value, ok := _c.mutation.ReversalOfTxnID(); ok {
-		_spec.SetField(inventorytxn.FieldReversalOfTxnID, field.TypeInt, value)
-		_node.ReversalOfTxnID = &value
-	}
 	if value, ok := _c.mutation.OccurredAt(); ok {
 		_spec.SetField(inventorytxn.FieldOccurredAt, field.TypeTime, value)
 		_node.OccurredAt = value
@@ -577,6 +607,39 @@ func (_c *InventoryTxnCreate) createSpec() (*InventoryTxn, *sqlgraph.CreateSpec)
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.LotID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorytxn.ReversalsTable,
+			Columns: []string{inventorytxn.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReversalOfIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   inventorytxn.ReversalOfTable,
+			Columns: []string{inventorytxn.ReversalOfColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ReversalOfTxnID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

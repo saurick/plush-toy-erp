@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/productionwipbatch"
@@ -26,17 +27,18 @@ import (
 // QualityInspectionQuery is the builder for querying QualityInspection entities.
 type QualityInspectionQuery struct {
 	config
-	ctx                     *QueryContext
-	order                   []qualityinspection.OrderOption
-	inters                  []Interceptor
-	predicates              []predicate.QualityInspection
-	withPurchaseReceipt     *PurchaseReceiptQuery
-	withPurchaseReceiptItem *PurchaseReceiptItemQuery
-	withInventoryLot        *InventoryLotQuery
-	withProductionWipBatch  *ProductionWIPBatchQuery
-	withMaterial            *MaterialQuery
-	withWarehouse           *WarehouseQuery
-	withPurchaseReturns     *PurchaseReturnQuery
+	ctx                          *QueryContext
+	order                        []qualityinspection.OrderOption
+	inters                       []Interceptor
+	predicates                   []predicate.QualityInspection
+	withInventoryLotStatusEvents *InventoryLotStatusEventQuery
+	withPurchaseReceipt          *PurchaseReceiptQuery
+	withPurchaseReceiptItem      *PurchaseReceiptItemQuery
+	withInventoryLot             *InventoryLotQuery
+	withProductionWipBatch       *ProductionWIPBatchQuery
+	withMaterial                 *MaterialQuery
+	withWarehouse                *WarehouseQuery
+	withPurchaseReturns          *PurchaseReturnQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -71,6 +73,28 @@ func (_q *QualityInspectionQuery) Unique(unique bool) *QualityInspectionQuery {
 func (_q *QualityInspectionQuery) Order(o ...qualityinspection.OrderOption) *QualityInspectionQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryInventoryLotStatusEvents chains the current query on the "inventory_lot_status_events" edge.
+func (_q *QualityInspectionQuery) QueryInventoryLotStatusEvents() *InventoryLotStatusEventQuery {
+	query := (&InventoryLotStatusEventClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, selector),
+			sqlgraph.To(inventorylotstatusevent.Table, inventorylotstatusevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, qualityinspection.InventoryLotStatusEventsTable, qualityinspection.InventoryLotStatusEventsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QueryPurchaseReceipt chains the current query on the "purchase_receipt" edge.
@@ -414,22 +438,34 @@ func (_q *QualityInspectionQuery) Clone() *QualityInspectionQuery {
 		return nil
 	}
 	return &QualityInspectionQuery{
-		config:                  _q.config,
-		ctx:                     _q.ctx.Clone(),
-		order:                   append([]qualityinspection.OrderOption{}, _q.order...),
-		inters:                  append([]Interceptor{}, _q.inters...),
-		predicates:              append([]predicate.QualityInspection{}, _q.predicates...),
-		withPurchaseReceipt:     _q.withPurchaseReceipt.Clone(),
-		withPurchaseReceiptItem: _q.withPurchaseReceiptItem.Clone(),
-		withInventoryLot:        _q.withInventoryLot.Clone(),
-		withProductionWipBatch:  _q.withProductionWipBatch.Clone(),
-		withMaterial:            _q.withMaterial.Clone(),
-		withWarehouse:           _q.withWarehouse.Clone(),
-		withPurchaseReturns:     _q.withPurchaseReturns.Clone(),
+		config:                       _q.config,
+		ctx:                          _q.ctx.Clone(),
+		order:                        append([]qualityinspection.OrderOption{}, _q.order...),
+		inters:                       append([]Interceptor{}, _q.inters...),
+		predicates:                   append([]predicate.QualityInspection{}, _q.predicates...),
+		withInventoryLotStatusEvents: _q.withInventoryLotStatusEvents.Clone(),
+		withPurchaseReceipt:          _q.withPurchaseReceipt.Clone(),
+		withPurchaseReceiptItem:      _q.withPurchaseReceiptItem.Clone(),
+		withInventoryLot:             _q.withInventoryLot.Clone(),
+		withProductionWipBatch:       _q.withProductionWipBatch.Clone(),
+		withMaterial:                 _q.withMaterial.Clone(),
+		withWarehouse:                _q.withWarehouse.Clone(),
+		withPurchaseReturns:          _q.withPurchaseReturns.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithInventoryLotStatusEvents tells the query-builder to eager-load the nodes that are connected to
+// the "inventory_lot_status_events" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *QualityInspectionQuery) WithInventoryLotStatusEvents(opts ...func(*InventoryLotStatusEventQuery)) *QualityInspectionQuery {
+	query := (&InventoryLotStatusEventClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withInventoryLotStatusEvents = query
+	return _q
 }
 
 // WithPurchaseReceipt tells the query-builder to eager-load the nodes that are connected to
@@ -587,7 +623,8 @@ func (_q *QualityInspectionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	var (
 		nodes       = []*QualityInspection{}
 		_spec       = _q.querySpec()
-		loadedTypes = [7]bool{
+		loadedTypes = [8]bool{
+			_q.withInventoryLotStatusEvents != nil,
 			_q.withPurchaseReceipt != nil,
 			_q.withPurchaseReceiptItem != nil,
 			_q.withInventoryLot != nil,
@@ -614,6 +651,15 @@ func (_q *QualityInspectionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	}
 	if len(nodes) == 0 {
 		return nodes, nil
+	}
+	if query := _q.withInventoryLotStatusEvents; query != nil {
+		if err := _q.loadInventoryLotStatusEvents(ctx, query, nodes,
+			func(n *QualityInspection) { n.Edges.InventoryLotStatusEvents = []*InventoryLotStatusEvent{} },
+			func(n *QualityInspection, e *InventoryLotStatusEvent) {
+				n.Edges.InventoryLotStatusEvents = append(n.Edges.InventoryLotStatusEvents, e)
+			}); err != nil {
+			return nil, err
+		}
 	}
 	if query := _q.withPurchaseReceipt; query != nil {
 		if err := _q.loadPurchaseReceipt(ctx, query, nodes, nil,
@@ -663,6 +709,39 @@ func (_q *QualityInspectionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	return nodes, nil
 }
 
+func (_q *QualityInspectionQuery) loadInventoryLotStatusEvents(ctx context.Context, query *InventoryLotStatusEventQuery, nodes []*QualityInspection, init func(*QualityInspection), assign func(*QualityInspection, *InventoryLotStatusEvent)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*QualityInspection)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(inventorylotstatusevent.FieldQualityInspectionID)
+	}
+	query.Where(predicate.InventoryLotStatusEvent(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(qualityinspection.InventoryLotStatusEventsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.QualityInspectionID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "quality_inspection_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "quality_inspection_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
 func (_q *QualityInspectionQuery) loadPurchaseReceipt(ctx context.Context, query *PurchaseReceiptQuery, nodes []*QualityInspection, init func(*QualityInspection), assign func(*QualityInspection, *PurchaseReceipt)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*QualityInspection)

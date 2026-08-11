@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorylotstatusevent"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
@@ -202,6 +203,114 @@ func (_u *InventoryLotUpdate) SetNillableStatus(v *string) *InventoryLotUpdate {
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *InventoryLotUpdate) SetVersion(v int) *InventoryLotUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *InventoryLotUpdate) SetNillableVersion(v *int) *InventoryLotUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *InventoryLotUpdate) AddVersion(v int) *InventoryLotUpdate {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
+// SetStatusAction sets the "status_action" field.
+func (_u *InventoryLotUpdate) SetStatusAction(v string) *InventoryLotUpdate {
+	_u.mutation.SetStatusAction(v)
+	return _u
+}
+
+// SetNillableStatusAction sets the "status_action" field if the given value is not nil.
+func (_u *InventoryLotUpdate) SetNillableStatusAction(v *string) *InventoryLotUpdate {
+	if v != nil {
+		_u.SetStatusAction(*v)
+	}
+	return _u
+}
+
+// ClearStatusAction clears the value of the "status_action" field.
+func (_u *InventoryLotUpdate) ClearStatusAction() *InventoryLotUpdate {
+	_u.mutation.ClearStatusAction()
+	return _u
+}
+
+// SetStatusReason sets the "status_reason" field.
+func (_u *InventoryLotUpdate) SetStatusReason(v string) *InventoryLotUpdate {
+	_u.mutation.SetStatusReason(v)
+	return _u
+}
+
+// SetNillableStatusReason sets the "status_reason" field if the given value is not nil.
+func (_u *InventoryLotUpdate) SetNillableStatusReason(v *string) *InventoryLotUpdate {
+	if v != nil {
+		_u.SetStatusReason(*v)
+	}
+	return _u
+}
+
+// ClearStatusReason clears the value of the "status_reason" field.
+func (_u *InventoryLotUpdate) ClearStatusReason() *InventoryLotUpdate {
+	_u.mutation.ClearStatusReason()
+	return _u
+}
+
+// SetStatusChangedAt sets the "status_changed_at" field.
+func (_u *InventoryLotUpdate) SetStatusChangedAt(v time.Time) *InventoryLotUpdate {
+	_u.mutation.SetStatusChangedAt(v)
+	return _u
+}
+
+// SetNillableStatusChangedAt sets the "status_changed_at" field if the given value is not nil.
+func (_u *InventoryLotUpdate) SetNillableStatusChangedAt(v *time.Time) *InventoryLotUpdate {
+	if v != nil {
+		_u.SetStatusChangedAt(*v)
+	}
+	return _u
+}
+
+// ClearStatusChangedAt clears the value of the "status_changed_at" field.
+func (_u *InventoryLotUpdate) ClearStatusChangedAt() *InventoryLotUpdate {
+	_u.mutation.ClearStatusChangedAt()
+	return _u
+}
+
+// SetStatusChangedBy sets the "status_changed_by" field.
+func (_u *InventoryLotUpdate) SetStatusChangedBy(v int) *InventoryLotUpdate {
+	_u.mutation.ResetStatusChangedBy()
+	_u.mutation.SetStatusChangedBy(v)
+	return _u
+}
+
+// SetNillableStatusChangedBy sets the "status_changed_by" field if the given value is not nil.
+func (_u *InventoryLotUpdate) SetNillableStatusChangedBy(v *int) *InventoryLotUpdate {
+	if v != nil {
+		_u.SetStatusChangedBy(*v)
+	}
+	return _u
+}
+
+// AddStatusChangedBy adds value to the "status_changed_by" field.
+func (_u *InventoryLotUpdate) AddStatusChangedBy(v int) *InventoryLotUpdate {
+	_u.mutation.AddStatusChangedBy(v)
+	return _u
+}
+
+// ClearStatusChangedBy clears the value of the "status_changed_by" field.
+func (_u *InventoryLotUpdate) ClearStatusChangedBy() *InventoryLotUpdate {
+	_u.mutation.ClearStatusChangedBy()
+	return _u
+}
+
 // SetReceivedAt sets the "received_at" field.
 func (_u *InventoryLotUpdate) SetReceivedAt(v time.Time) *InventoryLotUpdate {
 	_u.mutation.SetReceivedAt(v)
@@ -381,6 +490,21 @@ func (_u *InventoryLotUpdate) AddStockReservations(v ...*StockReservation) *Inve
 		ids[i] = v[i].ID
 	}
 	return _u.AddStockReservationIDs(ids...)
+}
+
+// AddStatusEventIDs adds the "status_events" edge to the InventoryLotStatusEvent entity by IDs.
+func (_u *InventoryLotUpdate) AddStatusEventIDs(ids ...int) *InventoryLotUpdate {
+	_u.mutation.AddStatusEventIDs(ids...)
+	return _u
+}
+
+// AddStatusEvents adds the "status_events" edges to the InventoryLotStatusEvent entity.
+func (_u *InventoryLotUpdate) AddStatusEvents(v ...*InventoryLotStatusEvent) *InventoryLotUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddStatusEventIDs(ids...)
 }
 
 // Mutation returns the InventoryLotMutation object of the builder.
@@ -604,6 +728,27 @@ func (_u *InventoryLotUpdate) RemoveStockReservations(v ...*StockReservation) *I
 	return _u.RemoveStockReservationIDs(ids...)
 }
 
+// ClearStatusEvents clears all "status_events" edges to the InventoryLotStatusEvent entity.
+func (_u *InventoryLotUpdate) ClearStatusEvents() *InventoryLotUpdate {
+	_u.mutation.ClearStatusEvents()
+	return _u
+}
+
+// RemoveStatusEventIDs removes the "status_events" edge to InventoryLotStatusEvent entities by IDs.
+func (_u *InventoryLotUpdate) RemoveStatusEventIDs(ids ...int) *InventoryLotUpdate {
+	_u.mutation.RemoveStatusEventIDs(ids...)
+	return _u
+}
+
+// RemoveStatusEvents removes "status_events" edges to InventoryLotStatusEvent entities.
+func (_u *InventoryLotUpdate) RemoveStatusEvents(v ...*InventoryLotStatusEvent) *InventoryLotUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveStatusEventIDs(ids...)
+}
+
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *InventoryLotUpdate) Save(ctx context.Context) (int, error) {
 	if err := _u.defaults(); err != nil {
@@ -693,6 +838,26 @@ func (_u *InventoryLotUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := inventorylot.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusAction(); ok {
+		if err := inventorylot.StatusActionValidator(v); err != nil {
+			return &ValidationError{Name: "status_action", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_action": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusReason(); ok {
+		if err := inventorylot.StatusReasonValidator(v); err != nil {
+			return &ValidationError{Name: "status_reason", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusChangedBy(); ok {
+		if err := inventorylot.StatusChangedByValidator(v); err != nil {
+			return &ValidationError{Name: "status_changed_by", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_changed_by": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -746,6 +911,39 @@ func (_u *InventoryLotUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(inventorylot.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(inventorylot.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(inventorylot.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.StatusAction(); ok {
+		_spec.SetField(inventorylot.FieldStatusAction, field.TypeString, value)
+	}
+	if _u.mutation.StatusActionCleared() {
+		_spec.ClearField(inventorylot.FieldStatusAction, field.TypeString)
+	}
+	if value, ok := _u.mutation.StatusReason(); ok {
+		_spec.SetField(inventorylot.FieldStatusReason, field.TypeString, value)
+	}
+	if _u.mutation.StatusReasonCleared() {
+		_spec.ClearField(inventorylot.FieldStatusReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.StatusChangedAt(); ok {
+		_spec.SetField(inventorylot.FieldStatusChangedAt, field.TypeTime, value)
+	}
+	if _u.mutation.StatusChangedAtCleared() {
+		_spec.ClearField(inventorylot.FieldStatusChangedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.StatusChangedBy(); ok {
+		_spec.SetField(inventorylot.FieldStatusChangedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedStatusChangedBy(); ok {
+		_spec.AddField(inventorylot.FieldStatusChangedBy, field.TypeInt, value)
+	}
+	if _u.mutation.StatusChangedByCleared() {
+		_spec.ClearField(inventorylot.FieldStatusChangedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.ReceivedAt(); ok {
 		_spec.SetField(inventorylot.FieldReceivedAt, field.TypeTime, value)
@@ -1235,6 +1433,51 @@ func (_u *InventoryLotUpdate) sqlSave(ctx context.Context) (_node int, err error
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.StatusEventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.StatusEventsTable,
+			Columns: []string{inventorylot.StatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedStatusEventsIDs(); len(nodes) > 0 && !_u.mutation.StatusEventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.StatusEventsTable,
+			Columns: []string{inventorylot.StatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.StatusEventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.StatusEventsTable,
+			Columns: []string{inventorylot.StatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{inventorylot.Label}
@@ -1418,6 +1661,114 @@ func (_u *InventoryLotUpdateOne) SetNillableStatus(v *string) *InventoryLotUpdat
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *InventoryLotUpdateOne) SetVersion(v int) *InventoryLotUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *InventoryLotUpdateOne) SetNillableVersion(v *int) *InventoryLotUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *InventoryLotUpdateOne) AddVersion(v int) *InventoryLotUpdateOne {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
+// SetStatusAction sets the "status_action" field.
+func (_u *InventoryLotUpdateOne) SetStatusAction(v string) *InventoryLotUpdateOne {
+	_u.mutation.SetStatusAction(v)
+	return _u
+}
+
+// SetNillableStatusAction sets the "status_action" field if the given value is not nil.
+func (_u *InventoryLotUpdateOne) SetNillableStatusAction(v *string) *InventoryLotUpdateOne {
+	if v != nil {
+		_u.SetStatusAction(*v)
+	}
+	return _u
+}
+
+// ClearStatusAction clears the value of the "status_action" field.
+func (_u *InventoryLotUpdateOne) ClearStatusAction() *InventoryLotUpdateOne {
+	_u.mutation.ClearStatusAction()
+	return _u
+}
+
+// SetStatusReason sets the "status_reason" field.
+func (_u *InventoryLotUpdateOne) SetStatusReason(v string) *InventoryLotUpdateOne {
+	_u.mutation.SetStatusReason(v)
+	return _u
+}
+
+// SetNillableStatusReason sets the "status_reason" field if the given value is not nil.
+func (_u *InventoryLotUpdateOne) SetNillableStatusReason(v *string) *InventoryLotUpdateOne {
+	if v != nil {
+		_u.SetStatusReason(*v)
+	}
+	return _u
+}
+
+// ClearStatusReason clears the value of the "status_reason" field.
+func (_u *InventoryLotUpdateOne) ClearStatusReason() *InventoryLotUpdateOne {
+	_u.mutation.ClearStatusReason()
+	return _u
+}
+
+// SetStatusChangedAt sets the "status_changed_at" field.
+func (_u *InventoryLotUpdateOne) SetStatusChangedAt(v time.Time) *InventoryLotUpdateOne {
+	_u.mutation.SetStatusChangedAt(v)
+	return _u
+}
+
+// SetNillableStatusChangedAt sets the "status_changed_at" field if the given value is not nil.
+func (_u *InventoryLotUpdateOne) SetNillableStatusChangedAt(v *time.Time) *InventoryLotUpdateOne {
+	if v != nil {
+		_u.SetStatusChangedAt(*v)
+	}
+	return _u
+}
+
+// ClearStatusChangedAt clears the value of the "status_changed_at" field.
+func (_u *InventoryLotUpdateOne) ClearStatusChangedAt() *InventoryLotUpdateOne {
+	_u.mutation.ClearStatusChangedAt()
+	return _u
+}
+
+// SetStatusChangedBy sets the "status_changed_by" field.
+func (_u *InventoryLotUpdateOne) SetStatusChangedBy(v int) *InventoryLotUpdateOne {
+	_u.mutation.ResetStatusChangedBy()
+	_u.mutation.SetStatusChangedBy(v)
+	return _u
+}
+
+// SetNillableStatusChangedBy sets the "status_changed_by" field if the given value is not nil.
+func (_u *InventoryLotUpdateOne) SetNillableStatusChangedBy(v *int) *InventoryLotUpdateOne {
+	if v != nil {
+		_u.SetStatusChangedBy(*v)
+	}
+	return _u
+}
+
+// AddStatusChangedBy adds value to the "status_changed_by" field.
+func (_u *InventoryLotUpdateOne) AddStatusChangedBy(v int) *InventoryLotUpdateOne {
+	_u.mutation.AddStatusChangedBy(v)
+	return _u
+}
+
+// ClearStatusChangedBy clears the value of the "status_changed_by" field.
+func (_u *InventoryLotUpdateOne) ClearStatusChangedBy() *InventoryLotUpdateOne {
+	_u.mutation.ClearStatusChangedBy()
+	return _u
+}
+
 // SetReceivedAt sets the "received_at" field.
 func (_u *InventoryLotUpdateOne) SetReceivedAt(v time.Time) *InventoryLotUpdateOne {
 	_u.mutation.SetReceivedAt(v)
@@ -1597,6 +1948,21 @@ func (_u *InventoryLotUpdateOne) AddStockReservations(v ...*StockReservation) *I
 		ids[i] = v[i].ID
 	}
 	return _u.AddStockReservationIDs(ids...)
+}
+
+// AddStatusEventIDs adds the "status_events" edge to the InventoryLotStatusEvent entity by IDs.
+func (_u *InventoryLotUpdateOne) AddStatusEventIDs(ids ...int) *InventoryLotUpdateOne {
+	_u.mutation.AddStatusEventIDs(ids...)
+	return _u
+}
+
+// AddStatusEvents adds the "status_events" edges to the InventoryLotStatusEvent entity.
+func (_u *InventoryLotUpdateOne) AddStatusEvents(v ...*InventoryLotStatusEvent) *InventoryLotUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddStatusEventIDs(ids...)
 }
 
 // Mutation returns the InventoryLotMutation object of the builder.
@@ -1820,6 +2186,27 @@ func (_u *InventoryLotUpdateOne) RemoveStockReservations(v ...*StockReservation)
 	return _u.RemoveStockReservationIDs(ids...)
 }
 
+// ClearStatusEvents clears all "status_events" edges to the InventoryLotStatusEvent entity.
+func (_u *InventoryLotUpdateOne) ClearStatusEvents() *InventoryLotUpdateOne {
+	_u.mutation.ClearStatusEvents()
+	return _u
+}
+
+// RemoveStatusEventIDs removes the "status_events" edge to InventoryLotStatusEvent entities by IDs.
+func (_u *InventoryLotUpdateOne) RemoveStatusEventIDs(ids ...int) *InventoryLotUpdateOne {
+	_u.mutation.RemoveStatusEventIDs(ids...)
+	return _u
+}
+
+// RemoveStatusEvents removes "status_events" edges to InventoryLotStatusEvent entities.
+func (_u *InventoryLotUpdateOne) RemoveStatusEvents(v ...*InventoryLotStatusEvent) *InventoryLotUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveStatusEventIDs(ids...)
+}
+
 // Where appends a list predicates to the InventoryLotUpdate builder.
 func (_u *InventoryLotUpdateOne) Where(ps ...predicate.InventoryLot) *InventoryLotUpdateOne {
 	_u.mutation.Where(ps...)
@@ -1922,6 +2309,26 @@ func (_u *InventoryLotUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := inventorylot.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusAction(); ok {
+		if err := inventorylot.StatusActionValidator(v); err != nil {
+			return &ValidationError{Name: "status_action", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_action": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusReason(); ok {
+		if err := inventorylot.StatusReasonValidator(v); err != nil {
+			return &ValidationError{Name: "status_reason", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StatusChangedBy(); ok {
+		if err := inventorylot.StatusChangedByValidator(v); err != nil {
+			return &ValidationError{Name: "status_changed_by", err: fmt.Errorf(`ent: validator failed for field "InventoryLot.status_changed_by": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -1992,6 +2399,39 @@ func (_u *InventoryLotUpdateOne) sqlSave(ctx context.Context) (_node *InventoryL
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(inventorylot.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(inventorylot.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(inventorylot.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.StatusAction(); ok {
+		_spec.SetField(inventorylot.FieldStatusAction, field.TypeString, value)
+	}
+	if _u.mutation.StatusActionCleared() {
+		_spec.ClearField(inventorylot.FieldStatusAction, field.TypeString)
+	}
+	if value, ok := _u.mutation.StatusReason(); ok {
+		_spec.SetField(inventorylot.FieldStatusReason, field.TypeString, value)
+	}
+	if _u.mutation.StatusReasonCleared() {
+		_spec.ClearField(inventorylot.FieldStatusReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.StatusChangedAt(); ok {
+		_spec.SetField(inventorylot.FieldStatusChangedAt, field.TypeTime, value)
+	}
+	if _u.mutation.StatusChangedAtCleared() {
+		_spec.ClearField(inventorylot.FieldStatusChangedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.StatusChangedBy(); ok {
+		_spec.SetField(inventorylot.FieldStatusChangedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedStatusChangedBy(); ok {
+		_spec.AddField(inventorylot.FieldStatusChangedBy, field.TypeInt, value)
+	}
+	if _u.mutation.StatusChangedByCleared() {
+		_spec.ClearField(inventorylot.FieldStatusChangedBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.ReceivedAt(); ok {
 		_spec.SetField(inventorylot.FieldReceivedAt, field.TypeTime, value)
@@ -2474,6 +2914,51 @@ func (_u *InventoryLotUpdateOne) sqlSave(ctx context.Context) (_node *InventoryL
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.StatusEventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.StatusEventsTable,
+			Columns: []string{inventorylot.StatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedStatusEventsIDs(); len(nodes) > 0 && !_u.mutation.StatusEventsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.StatusEventsTable,
+			Columns: []string{inventorylot.StatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.StatusEventsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.StatusEventsTable,
+			Columns: []string{inventorylot.StatusEventsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorylotstatusevent.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

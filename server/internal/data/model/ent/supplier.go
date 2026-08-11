@@ -29,6 +29,8 @@ type Supplier struct {
 	Address *string `json:"address,omitempty"`
 	// TaxNo holds the value of the "tax_no" field.
 	TaxNo *string `json:"tax_no,omitempty"`
+	// DefaultPaymentTermDays holds the value of the "default_payment_term_days" field.
+	DefaultPaymentTermDays int `json:"default_payment_term_days,omitempty"`
 	// IsActive holds the value of the "is_active" field.
 	IsActive bool `json:"is_active,omitempty"`
 	// Note holds the value of the "note" field.
@@ -101,7 +103,7 @@ func (*Supplier) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case supplier.FieldIsActive:
 			values[i] = new(sql.NullBool)
-		case supplier.FieldID:
+		case supplier.FieldID, supplier.FieldDefaultPaymentTermDays:
 			values[i] = new(sql.NullInt64)
 		case supplier.FieldCode, supplier.FieldName, supplier.FieldShortName, supplier.FieldSupplierType, supplier.FieldAddress, supplier.FieldTaxNo, supplier.FieldNote:
 			values[i] = new(sql.NullString)
@@ -167,6 +169,12 @@ func (_m *Supplier) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.TaxNo = new(string)
 				*_m.TaxNo = value.String
+			}
+		case supplier.FieldDefaultPaymentTermDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field default_payment_term_days", values[i])
+			} else if value.Valid {
+				_m.DefaultPaymentTermDays = int(value.Int64)
 			}
 		case supplier.FieldIsActive:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -274,6 +282,9 @@ func (_m *Supplier) String() string {
 		builder.WriteString("tax_no=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("default_payment_term_days=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DefaultPaymentTermDays))
 	builder.WriteString(", ")
 	builder.WriteString("is_active=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsActive))

@@ -46,6 +46,26 @@ type ProcessInstance struct {
 	StartedAt time.Time `json:"started_at,omitempty"`
 	// CompletedAt holds the value of the "completed_at" field.
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	// TerminalNodeInstanceID holds the value of the "terminal_node_instance_id" field.
+	TerminalNodeInstanceID *int `json:"terminal_node_instance_id,omitempty"`
+	// ResolutionKind holds the value of the "resolution_kind" field.
+	ResolutionKind *string `json:"resolution_kind,omitempty"`
+	// ResolutionReason holds the value of the "resolution_reason" field.
+	ResolutionReason *string `json:"resolution_reason,omitempty"`
+	// ResolvedAt holds the value of the "resolved_at" field.
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+	// ResolvedBy holds the value of the "resolved_by" field.
+	ResolvedBy *int `json:"resolved_by,omitempty"`
+	// BlockKind holds the value of the "block_kind" field.
+	BlockKind *string `json:"block_kind,omitempty"`
+	// BlockedReasonCode holds the value of the "blocked_reason_code" field.
+	BlockedReasonCode *string `json:"blocked_reason_code,omitempty"`
+	// BlockedReason holds the value of the "blocked_reason" field.
+	BlockedReason *string `json:"blocked_reason,omitempty"`
+	// BlockedAt holds the value of the "blocked_at" field.
+	BlockedAt *time.Time `json:"blocked_at,omitempty"`
+	// BlockedBy holds the value of the "blocked_by" field.
+	BlockedBy *int `json:"blocked_by,omitempty"`
 	// CreatedBy holds the value of the "created_by" field.
 	CreatedBy *int `json:"created_by,omitempty"`
 	// UpdatedBy holds the value of the "updated_by" field.
@@ -96,11 +116,11 @@ func (*ProcessInstance) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case processinstance.FieldModuleContractSnapshot:
 			values[i] = new([]byte)
-		case processinstance.FieldID, processinstance.FieldBusinessRefID, processinstance.FieldCreatedBy, processinstance.FieldUpdatedBy:
+		case processinstance.FieldID, processinstance.FieldBusinessRefID, processinstance.FieldTerminalNodeInstanceID, processinstance.FieldResolvedBy, processinstance.FieldBlockedBy, processinstance.FieldCreatedBy, processinstance.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
-		case processinstance.FieldProcessKey, processinstance.FieldProcessVersion, processinstance.FieldVariantKey, processinstance.FieldConfigRevision, processinstance.FieldDefinitionHash, processinstance.FieldBusinessRefType, processinstance.FieldBusinessRefNo, processinstance.FieldCorrelationKey, processinstance.FieldIdempotencyKey, processinstance.FieldStatus:
+		case processinstance.FieldProcessKey, processinstance.FieldProcessVersion, processinstance.FieldVariantKey, processinstance.FieldConfigRevision, processinstance.FieldDefinitionHash, processinstance.FieldBusinessRefType, processinstance.FieldBusinessRefNo, processinstance.FieldCorrelationKey, processinstance.FieldIdempotencyKey, processinstance.FieldStatus, processinstance.FieldResolutionKind, processinstance.FieldResolutionReason, processinstance.FieldBlockKind, processinstance.FieldBlockedReasonCode, processinstance.FieldBlockedReason:
 			values[i] = new(sql.NullString)
-		case processinstance.FieldStartedAt, processinstance.FieldCompletedAt, processinstance.FieldCreatedAt, processinstance.FieldUpdatedAt:
+		case processinstance.FieldStartedAt, processinstance.FieldCompletedAt, processinstance.FieldResolvedAt, processinstance.FieldBlockedAt, processinstance.FieldCreatedAt, processinstance.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -212,6 +232,76 @@ func (_m *ProcessInstance) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.CompletedAt = new(time.Time)
 				*_m.CompletedAt = value.Time
+			}
+		case processinstance.FieldTerminalNodeInstanceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field terminal_node_instance_id", values[i])
+			} else if value.Valid {
+				_m.TerminalNodeInstanceID = new(int)
+				*_m.TerminalNodeInstanceID = int(value.Int64)
+			}
+		case processinstance.FieldResolutionKind:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field resolution_kind", values[i])
+			} else if value.Valid {
+				_m.ResolutionKind = new(string)
+				*_m.ResolutionKind = value.String
+			}
+		case processinstance.FieldResolutionReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field resolution_reason", values[i])
+			} else if value.Valid {
+				_m.ResolutionReason = new(string)
+				*_m.ResolutionReason = value.String
+			}
+		case processinstance.FieldResolvedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field resolved_at", values[i])
+			} else if value.Valid {
+				_m.ResolvedAt = new(time.Time)
+				*_m.ResolvedAt = value.Time
+			}
+		case processinstance.FieldResolvedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field resolved_by", values[i])
+			} else if value.Valid {
+				_m.ResolvedBy = new(int)
+				*_m.ResolvedBy = int(value.Int64)
+			}
+		case processinstance.FieldBlockKind:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field block_kind", values[i])
+			} else if value.Valid {
+				_m.BlockKind = new(string)
+				*_m.BlockKind = value.String
+			}
+		case processinstance.FieldBlockedReasonCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field blocked_reason_code", values[i])
+			} else if value.Valid {
+				_m.BlockedReasonCode = new(string)
+				*_m.BlockedReasonCode = value.String
+			}
+		case processinstance.FieldBlockedReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field blocked_reason", values[i])
+			} else if value.Valid {
+				_m.BlockedReason = new(string)
+				*_m.BlockedReason = value.String
+			}
+		case processinstance.FieldBlockedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field blocked_at", values[i])
+			} else if value.Valid {
+				_m.BlockedAt = new(time.Time)
+				*_m.BlockedAt = value.Time
+			}
+		case processinstance.FieldBlockedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field blocked_by", values[i])
+			} else if value.Valid {
+				_m.BlockedBy = new(int)
+				*_m.BlockedBy = int(value.Int64)
 			}
 		case processinstance.FieldCreatedBy:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -333,6 +423,56 @@ func (_m *ProcessInstance) String() string {
 	if v := _m.CompletedAt; v != nil {
 		builder.WriteString("completed_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.TerminalNodeInstanceID; v != nil {
+		builder.WriteString("terminal_node_instance_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ResolutionKind; v != nil {
+		builder.WriteString("resolution_kind=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ResolutionReason; v != nil {
+		builder.WriteString("resolution_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ResolvedAt; v != nil {
+		builder.WriteString("resolved_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ResolvedBy; v != nil {
+		builder.WriteString("resolved_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockKind; v != nil {
+		builder.WriteString("block_kind=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockedReasonCode; v != nil {
+		builder.WriteString("blocked_reason_code=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockedReason; v != nil {
+		builder.WriteString("blocked_reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockedAt; v != nil {
+		builder.WriteString("blocked_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.BlockedBy; v != nil {
+		builder.WriteString("blocked_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.CreatedBy; v != nil {

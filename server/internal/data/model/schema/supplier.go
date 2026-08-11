@@ -49,6 +49,9 @@ func (Supplier) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(64),
+		field.Int("default_payment_term_days").
+			Default(0).
+			NonNegative(),
 		field.Bool("is_active").
 			Default(true),
 		field.String("note").

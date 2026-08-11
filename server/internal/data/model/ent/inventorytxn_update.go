@@ -27,9 +27,45 @@ func (_u *InventoryTxnUpdate) Where(ps ...predicate.InventoryTxn) *InventoryTxnU
 	return _u
 }
 
+// AddReversalIDs adds the "reversals" edge to the InventoryTxn entity by IDs.
+func (_u *InventoryTxnUpdate) AddReversalIDs(ids ...int) *InventoryTxnUpdate {
+	_u.mutation.AddReversalIDs(ids...)
+	return _u
+}
+
+// AddReversals adds the "reversals" edges to the InventoryTxn entity.
+func (_u *InventoryTxnUpdate) AddReversals(v ...*InventoryTxn) *InventoryTxnUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddReversalIDs(ids...)
+}
+
 // Mutation returns the InventoryTxnMutation object of the builder.
 func (_u *InventoryTxnUpdate) Mutation() *InventoryTxnMutation {
 	return _u.mutation
+}
+
+// ClearReversals clears all "reversals" edges to the InventoryTxn entity.
+func (_u *InventoryTxnUpdate) ClearReversals() *InventoryTxnUpdate {
+	_u.mutation.ClearReversals()
+	return _u
+}
+
+// RemoveReversalIDs removes the "reversals" edge to InventoryTxn entities by IDs.
+func (_u *InventoryTxnUpdate) RemoveReversalIDs(ids ...int) *InventoryTxnUpdate {
+	_u.mutation.RemoveReversalIDs(ids...)
+	return _u
+}
+
+// RemoveReversals removes "reversals" edges to InventoryTxn entities.
+func (_u *InventoryTxnUpdate) RemoveReversals(v ...*InventoryTxn) *InventoryTxnUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveReversalIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -88,14 +124,56 @@ func (_u *InventoryTxnUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.SourceLineIDCleared() {
 		_spec.ClearField(inventorytxn.FieldSourceLineID, field.TypeInt)
 	}
-	if _u.mutation.ReversalOfTxnIDCleared() {
-		_spec.ClearField(inventorytxn.FieldReversalOfTxnID, field.TypeInt)
-	}
 	if _u.mutation.CreatedByCleared() {
 		_spec.ClearField(inventorytxn.FieldCreatedBy, field.TypeInt)
 	}
 	if _u.mutation.NoteCleared() {
 		_spec.ClearField(inventorytxn.FieldNote, field.TypeString)
+	}
+	if _u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorytxn.ReversalsTable,
+			Columns: []string{inventorytxn.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedReversalsIDs(); len(nodes) > 0 && !_u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorytxn.ReversalsTable,
+			Columns: []string{inventorytxn.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorytxn.ReversalsTable,
+			Columns: []string{inventorytxn.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -117,9 +195,45 @@ type InventoryTxnUpdateOne struct {
 	mutation *InventoryTxnMutation
 }
 
+// AddReversalIDs adds the "reversals" edge to the InventoryTxn entity by IDs.
+func (_u *InventoryTxnUpdateOne) AddReversalIDs(ids ...int) *InventoryTxnUpdateOne {
+	_u.mutation.AddReversalIDs(ids...)
+	return _u
+}
+
+// AddReversals adds the "reversals" edges to the InventoryTxn entity.
+func (_u *InventoryTxnUpdateOne) AddReversals(v ...*InventoryTxn) *InventoryTxnUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddReversalIDs(ids...)
+}
+
 // Mutation returns the InventoryTxnMutation object of the builder.
 func (_u *InventoryTxnUpdateOne) Mutation() *InventoryTxnMutation {
 	return _u.mutation
+}
+
+// ClearReversals clears all "reversals" edges to the InventoryTxn entity.
+func (_u *InventoryTxnUpdateOne) ClearReversals() *InventoryTxnUpdateOne {
+	_u.mutation.ClearReversals()
+	return _u
+}
+
+// RemoveReversalIDs removes the "reversals" edge to InventoryTxn entities by IDs.
+func (_u *InventoryTxnUpdateOne) RemoveReversalIDs(ids ...int) *InventoryTxnUpdateOne {
+	_u.mutation.RemoveReversalIDs(ids...)
+	return _u
+}
+
+// RemoveReversals removes "reversals" edges to InventoryTxn entities.
+func (_u *InventoryTxnUpdateOne) RemoveReversals(v ...*InventoryTxn) *InventoryTxnUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveReversalIDs(ids...)
 }
 
 // Where appends a list predicates to the InventoryTxnUpdate builder.
@@ -208,14 +322,56 @@ func (_u *InventoryTxnUpdateOne) sqlSave(ctx context.Context) (_node *InventoryT
 	if _u.mutation.SourceLineIDCleared() {
 		_spec.ClearField(inventorytxn.FieldSourceLineID, field.TypeInt)
 	}
-	if _u.mutation.ReversalOfTxnIDCleared() {
-		_spec.ClearField(inventorytxn.FieldReversalOfTxnID, field.TypeInt)
-	}
 	if _u.mutation.CreatedByCleared() {
 		_spec.ClearField(inventorytxn.FieldCreatedBy, field.TypeInt)
 	}
 	if _u.mutation.NoteCleared() {
 		_spec.ClearField(inventorytxn.FieldNote, field.TypeString)
+	}
+	if _u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorytxn.ReversalsTable,
+			Columns: []string{inventorytxn.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedReversalsIDs(); len(nodes) > 0 && !_u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorytxn.ReversalsTable,
+			Columns: []string{inventorytxn.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorytxn.ReversalsTable,
+			Columns: []string{inventorytxn.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(inventorytxn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &InventoryTxn{config: _u.config}
 	_spec.Assign = _node.assignValues

@@ -171,6 +171,113 @@ func (_u *OutsourcingOrderUpdate) AddVersion(v int) *OutsourcingOrderUpdate {
 	return _u
 }
 
+// SetSettlementAction sets the "settlement_action" field.
+func (_u *OutsourcingOrderUpdate) SetSettlementAction(v string) *OutsourcingOrderUpdate {
+	_u.mutation.SetSettlementAction(v)
+	return _u
+}
+
+// SetNillableSettlementAction sets the "settlement_action" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableSettlementAction(v *string) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetSettlementAction(*v)
+	}
+	return _u
+}
+
+// ClearSettlementAction clears the value of the "settlement_action" field.
+func (_u *OutsourcingOrderUpdate) ClearSettlementAction() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSettlementAction()
+	return _u
+}
+
+// SetSettlementMode sets the "settlement_mode" field.
+func (_u *OutsourcingOrderUpdate) SetSettlementMode(v string) *OutsourcingOrderUpdate {
+	_u.mutation.SetSettlementMode(v)
+	return _u
+}
+
+// SetNillableSettlementMode sets the "settlement_mode" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableSettlementMode(v *string) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetSettlementMode(*v)
+	}
+	return _u
+}
+
+// ClearSettlementMode clears the value of the "settlement_mode" field.
+func (_u *OutsourcingOrderUpdate) ClearSettlementMode() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSettlementMode()
+	return _u
+}
+
+// SetSettlementReason sets the "settlement_reason" field.
+func (_u *OutsourcingOrderUpdate) SetSettlementReason(v string) *OutsourcingOrderUpdate {
+	_u.mutation.SetSettlementReason(v)
+	return _u
+}
+
+// SetNillableSettlementReason sets the "settlement_reason" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableSettlementReason(v *string) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetSettlementReason(*v)
+	}
+	return _u
+}
+
+// ClearSettlementReason clears the value of the "settlement_reason" field.
+func (_u *OutsourcingOrderUpdate) ClearSettlementReason() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSettlementReason()
+	return _u
+}
+
+// SetSettledAt sets the "settled_at" field.
+func (_u *OutsourcingOrderUpdate) SetSettledAt(v time.Time) *OutsourcingOrderUpdate {
+	_u.mutation.SetSettledAt(v)
+	return _u
+}
+
+// SetNillableSettledAt sets the "settled_at" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableSettledAt(v *time.Time) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetSettledAt(*v)
+	}
+	return _u
+}
+
+// ClearSettledAt clears the value of the "settled_at" field.
+func (_u *OutsourcingOrderUpdate) ClearSettledAt() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSettledAt()
+	return _u
+}
+
+// SetSettledBy sets the "settled_by" field.
+func (_u *OutsourcingOrderUpdate) SetSettledBy(v int) *OutsourcingOrderUpdate {
+	_u.mutation.ResetSettledBy()
+	_u.mutation.SetSettledBy(v)
+	return _u
+}
+
+// SetNillableSettledBy sets the "settled_by" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableSettledBy(v *int) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetSettledBy(*v)
+	}
+	return _u
+}
+
+// AddSettledBy adds value to the "settled_by" field.
+func (_u *OutsourcingOrderUpdate) AddSettledBy(v int) *OutsourcingOrderUpdate {
+	_u.mutation.AddSettledBy(v)
+	return _u
+}
+
+// ClearSettledBy clears the value of the "settled_by" field.
+func (_u *OutsourcingOrderUpdate) ClearSettledBy() *OutsourcingOrderUpdate {
+	_u.mutation.ClearSettledBy()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *OutsourcingOrderUpdate) SetNote(v string) *OutsourcingOrderUpdate {
 	_u.mutation.SetNote(v)
@@ -312,6 +419,26 @@ func (_u *OutsourcingOrderUpdate) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SettlementAction(); ok {
+		if err := outsourcingorder.SettlementActionValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_action", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.settlement_action": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementMode(); ok {
+		if err := outsourcingorder.SettlementModeValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_mode", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.settlement_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementReason(); ok {
+		if err := outsourcingorder.SettlementReasonValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_reason", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.settlement_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettledBy(); ok {
+		if err := outsourcingorder.SettledByValidator(v); err != nil {
+			return &ValidationError{Name: "settled_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.settled_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := outsourcingorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.note": %w`, err)}
@@ -373,6 +500,39 @@ func (_u *OutsourcingOrderUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(outsourcingorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SettlementAction(); ok {
+		_spec.SetField(outsourcingorder.FieldSettlementAction, field.TypeString, value)
+	}
+	if _u.mutation.SettlementActionCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettlementAction, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementMode(); ok {
+		_spec.SetField(outsourcingorder.FieldSettlementMode, field.TypeString, value)
+	}
+	if _u.mutation.SettlementModeCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettlementMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementReason(); ok {
+		_spec.SetField(outsourcingorder.FieldSettlementReason, field.TypeString, value)
+	}
+	if _u.mutation.SettlementReasonCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettlementReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettledAt(); ok {
+		_spec.SetField(outsourcingorder.FieldSettledAt, field.TypeTime, value)
+	}
+	if _u.mutation.SettledAtCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SettledBy(); ok {
+		_spec.SetField(outsourcingorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSettledBy(); ok {
+		_spec.AddField(outsourcingorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if _u.mutation.SettledByCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettledBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(outsourcingorder.FieldNote, field.TypeString, value)
@@ -618,6 +778,113 @@ func (_u *OutsourcingOrderUpdateOne) AddVersion(v int) *OutsourcingOrderUpdateOn
 	return _u
 }
 
+// SetSettlementAction sets the "settlement_action" field.
+func (_u *OutsourcingOrderUpdateOne) SetSettlementAction(v string) *OutsourcingOrderUpdateOne {
+	_u.mutation.SetSettlementAction(v)
+	return _u
+}
+
+// SetNillableSettlementAction sets the "settlement_action" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableSettlementAction(v *string) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementAction(*v)
+	}
+	return _u
+}
+
+// ClearSettlementAction clears the value of the "settlement_action" field.
+func (_u *OutsourcingOrderUpdateOne) ClearSettlementAction() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSettlementAction()
+	return _u
+}
+
+// SetSettlementMode sets the "settlement_mode" field.
+func (_u *OutsourcingOrderUpdateOne) SetSettlementMode(v string) *OutsourcingOrderUpdateOne {
+	_u.mutation.SetSettlementMode(v)
+	return _u
+}
+
+// SetNillableSettlementMode sets the "settlement_mode" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableSettlementMode(v *string) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementMode(*v)
+	}
+	return _u
+}
+
+// ClearSettlementMode clears the value of the "settlement_mode" field.
+func (_u *OutsourcingOrderUpdateOne) ClearSettlementMode() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSettlementMode()
+	return _u
+}
+
+// SetSettlementReason sets the "settlement_reason" field.
+func (_u *OutsourcingOrderUpdateOne) SetSettlementReason(v string) *OutsourcingOrderUpdateOne {
+	_u.mutation.SetSettlementReason(v)
+	return _u
+}
+
+// SetNillableSettlementReason sets the "settlement_reason" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableSettlementReason(v *string) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetSettlementReason(*v)
+	}
+	return _u
+}
+
+// ClearSettlementReason clears the value of the "settlement_reason" field.
+func (_u *OutsourcingOrderUpdateOne) ClearSettlementReason() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSettlementReason()
+	return _u
+}
+
+// SetSettledAt sets the "settled_at" field.
+func (_u *OutsourcingOrderUpdateOne) SetSettledAt(v time.Time) *OutsourcingOrderUpdateOne {
+	_u.mutation.SetSettledAt(v)
+	return _u
+}
+
+// SetNillableSettledAt sets the "settled_at" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableSettledAt(v *time.Time) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetSettledAt(*v)
+	}
+	return _u
+}
+
+// ClearSettledAt clears the value of the "settled_at" field.
+func (_u *OutsourcingOrderUpdateOne) ClearSettledAt() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSettledAt()
+	return _u
+}
+
+// SetSettledBy sets the "settled_by" field.
+func (_u *OutsourcingOrderUpdateOne) SetSettledBy(v int) *OutsourcingOrderUpdateOne {
+	_u.mutation.ResetSettledBy()
+	_u.mutation.SetSettledBy(v)
+	return _u
+}
+
+// SetNillableSettledBy sets the "settled_by" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableSettledBy(v *int) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetSettledBy(*v)
+	}
+	return _u
+}
+
+// AddSettledBy adds value to the "settled_by" field.
+func (_u *OutsourcingOrderUpdateOne) AddSettledBy(v int) *OutsourcingOrderUpdateOne {
+	_u.mutation.AddSettledBy(v)
+	return _u
+}
+
+// ClearSettledBy clears the value of the "settled_by" field.
+func (_u *OutsourcingOrderUpdateOne) ClearSettledBy() *OutsourcingOrderUpdateOne {
+	_u.mutation.ClearSettledBy()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *OutsourcingOrderUpdateOne) SetNote(v string) *OutsourcingOrderUpdateOne {
 	_u.mutation.SetNote(v)
@@ -772,6 +1039,26 @@ func (_u *OutsourcingOrderUpdateOne) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SettlementAction(); ok {
+		if err := outsourcingorder.SettlementActionValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_action", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.settlement_action": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementMode(); ok {
+		if err := outsourcingorder.SettlementModeValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_mode", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.settlement_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettlementReason(); ok {
+		if err := outsourcingorder.SettlementReasonValidator(v); err != nil {
+			return &ValidationError{Name: "settlement_reason", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.settlement_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SettledBy(); ok {
+		if err := outsourcingorder.SettledByValidator(v); err != nil {
+			return &ValidationError{Name: "settled_by", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.settled_by": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := outsourcingorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.note": %w`, err)}
@@ -850,6 +1137,39 @@ func (_u *OutsourcingOrderUpdateOne) sqlSave(ctx context.Context) (_node *Outsou
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(outsourcingorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SettlementAction(); ok {
+		_spec.SetField(outsourcingorder.FieldSettlementAction, field.TypeString, value)
+	}
+	if _u.mutation.SettlementActionCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettlementAction, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementMode(); ok {
+		_spec.SetField(outsourcingorder.FieldSettlementMode, field.TypeString, value)
+	}
+	if _u.mutation.SettlementModeCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettlementMode, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettlementReason(); ok {
+		_spec.SetField(outsourcingorder.FieldSettlementReason, field.TypeString, value)
+	}
+	if _u.mutation.SettlementReasonCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettlementReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.SettledAt(); ok {
+		_spec.SetField(outsourcingorder.FieldSettledAt, field.TypeTime, value)
+	}
+	if _u.mutation.SettledAtCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettledAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SettledBy(); ok {
+		_spec.SetField(outsourcingorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSettledBy(); ok {
+		_spec.AddField(outsourcingorder.FieldSettledBy, field.TypeInt, value)
+	}
+	if _u.mutation.SettledByCleared() {
+		_spec.ClearField(outsourcingorder.FieldSettledBy, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(outsourcingorder.FieldNote, field.TypeString, value)

@@ -1646,6 +1646,29 @@ func UpdatedAtLTE(v time.Time) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldLTE(FieldUpdatedAt, v))
 }
 
+// HasInventoryLotStatusEvents applies the HasEdge predicate on the "inventory_lot_status_events" edge.
+func HasInventoryLotStatusEvents() predicate.QualityInspection {
+	return predicate.QualityInspection(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, InventoryLotStatusEventsTable, InventoryLotStatusEventsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasInventoryLotStatusEventsWith applies the HasEdge predicate on the "inventory_lot_status_events" edge with a given conditions (other predicates).
+func HasInventoryLotStatusEventsWith(preds ...predicate.InventoryLotStatusEvent) predicate.QualityInspection {
+	return predicate.QualityInspection(func(s *sql.Selector) {
+		step := newInventoryLotStatusEventsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasPurchaseReceipt applies the HasEdge predicate on the "purchase_receipt" edge.
 func HasPurchaseReceipt() predicate.QualityInspection {
 	return predicate.QualityInspection(func(s *sql.Selector) {

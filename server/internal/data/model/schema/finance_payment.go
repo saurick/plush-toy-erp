@@ -21,7 +21,7 @@ func (FinancePayment) Annotations() []schema.Annotation {
 		"finance_payments_status_allowed":       "status IN ('DRAFT', 'APPROVED', 'REJECTED', 'POSTED', 'REVERSED', 'CANCELLED')",
 		"finance_payments_counterparty_allowed": "counterparty_type IN ('CUSTOMER', 'SUPPLIER')",
 		"finance_payments_direction_party_pair": "((direction = 'RECEIPT' AND counterparty_type = 'CUSTOMER') OR (direction = 'DISBURSEMENT' AND counterparty_type = 'SUPPLIER'))",
-		"finance_payments_amount_positive":      "amount > 0", "finance_payments_currency_allowed": "currency IN ('USD', 'CNY', 'HKD')",
+		"finance_payments_amount_positive":      "amount > 0", "finance_payments_currency_allowed": "currency = 'CNY'",
 		"finance_payments_version_positive": "version > 0", "finance_payments_intent_bundle": "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
 		"finance_payments_maker_checker": "approved_by IS NULL OR approved_by <> created_by",
 		"finance_payments_lifecycle_audit": `

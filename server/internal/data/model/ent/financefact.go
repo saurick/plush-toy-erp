@@ -43,6 +43,8 @@ type FinanceFact struct {
 	PaymentTerm *string `json:"payment_term,omitempty"`
 	// PaymentTermDays holds the value of the "payment_term_days" field.
 	PaymentTermDays *int `json:"payment_term_days,omitempty"`
+	// DueAt holds the value of the "due_at" field.
+	DueAt *time.Time `json:"due_at,omitempty"`
 	// InvoiceCategory holds the value of the "invoice_category" field.
 	InvoiceCategory *string `json:"invoice_category,omitempty"`
 	// SourceType holds the value of the "source_type" field.
@@ -142,7 +144,7 @@ func (*FinanceFact) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case financefact.FieldFactNo, financefact.FieldFactType, financefact.FieldStatus, financefact.FieldCounterpartyType, financefact.FieldCurrency, financefact.FieldCollectionType, financefact.FieldPaymentTerm, financefact.FieldInvoiceCategory, financefact.FieldSourceType, financefact.FieldIdempotencyKey, financefact.FieldCancelReason, financefact.FieldNote:
 			values[i] = new(sql.NullString)
-		case financefact.FieldOccurredAt, financefact.FieldPostedAt, financefact.FieldSettledAt, financefact.FieldCancelledAt, financefact.FieldCreatedAt, financefact.FieldUpdatedAt:
+		case financefact.FieldDueAt, financefact.FieldOccurredAt, financefact.FieldPostedAt, financefact.FieldSettledAt, financefact.FieldCancelledAt, financefact.FieldCreatedAt, financefact.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -240,6 +242,13 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.PaymentTermDays = new(int)
 				*_m.PaymentTermDays = int(value.Int64)
+			}
+		case financefact.FieldDueAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field due_at", values[i])
+			} else if value.Valid {
+				_m.DueAt = new(time.Time)
+				*_m.DueAt = value.Time
 			}
 		case financefact.FieldInvoiceCategory:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -448,6 +457,11 @@ func (_m *FinanceFact) String() string {
 	if v := _m.PaymentTermDays; v != nil {
 		builder.WriteString("payment_term_days=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.DueAt; v != nil {
+		builder.WriteString("due_at=")
+		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
 	if v := _m.InvoiceCategory; v != nil {

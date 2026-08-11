@@ -53,6 +53,11 @@ func (OutsourcingOrder) Fields() []ent.Field {
 		field.Int("version").
 			Positive().
 			Default(1),
+		field.String("settlement_action").Optional().Nillable().MaxLen(32),
+		field.String("settlement_mode").Optional().Nillable().MaxLen(32),
+		field.String("settlement_reason").Optional().Nillable().MaxLen(255),
+		field.Time("settled_at").Optional().Nillable(),
+		field.Int("settled_by").Optional().Nillable().Positive(),
 		field.String("note").
 			Optional().
 			Nillable().

@@ -115,9 +115,64 @@ func CompletedAt(v time.Time) predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldCompletedAt, v))
 }
 
+// ActivatedFromNodeInstanceID applies equality check predicate on the "activated_from_node_instance_id" field. It's identical to ActivatedFromNodeInstanceIDEQ.
+func ActivatedFromNodeInstanceID(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldActivatedFromNodeInstanceID, v))
+}
+
+// RoutingCompletedAt applies equality check predicate on the "routing_completed_at" field. It's identical to RoutingCompletedAtEQ.
+func RoutingCompletedAt(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldRoutingCompletedAt, v))
+}
+
+// RoutingCompletedBy applies equality check predicate on the "routing_completed_by" field. It's identical to RoutingCompletedByEQ.
+func RoutingCompletedBy(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldRoutingCompletedBy, v))
+}
+
 // Outcome applies equality check predicate on the "outcome" field. It's identical to OutcomeEQ.
 func Outcome(v string) predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldOutcome, v))
+}
+
+// BlockKind applies equality check predicate on the "block_kind" field. It's identical to BlockKindEQ.
+func BlockKind(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockKind, v))
+}
+
+// BlockedReasonCode applies equality check predicate on the "blocked_reason_code" field. It's identical to BlockedReasonCodeEQ.
+func BlockedReasonCode(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockedReasonCode, v))
+}
+
+// BlockedReason applies equality check predicate on the "blocked_reason" field. It's identical to BlockedReasonEQ.
+func BlockedReason(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockedReason, v))
+}
+
+// BlockedAt applies equality check predicate on the "blocked_at" field. It's identical to BlockedAtEQ.
+func BlockedAt(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockedAt, v))
+}
+
+// BlockedBy applies equality check predicate on the "blocked_by" field. It's identical to BlockedByEQ.
+func BlockedBy(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockedBy, v))
+}
+
+// ResumeReason applies equality check predicate on the "resume_reason" field. It's identical to ResumeReasonEQ.
+func ResumeReason(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldResumeReason, v))
+}
+
+// ResumedAt applies equality check predicate on the "resumed_at" field. It's identical to ResumedAtEQ.
+func ResumedAt(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldResumedAt, v))
+}
+
+// ResumedBy applies equality check predicate on the "resumed_by" field. It's identical to ResumedByEQ.
+func ResumedBy(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldResumedBy, v))
 }
 
 // DomainCommandFingerprint applies equality check predicate on the "domain_command_fingerprint" field. It's identical to DomainCommandFingerprintEQ.
@@ -203,6 +258,11 @@ func DomainCommandRecoveredBy(v int) predicate.ProcessNodeInstance {
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
 func Version(v int) predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldVersion, v))
+}
+
+// UpdatedBy applies equality check predicate on the "updated_by" field. It's identical to UpdatedByEQ.
+func UpdatedBy(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldUpdatedBy, v))
 }
 
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
@@ -930,6 +990,156 @@ func CompletedAtNotNil() predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldCompletedAt))
 }
 
+// ActivatedFromNodeInstanceIDEQ applies the EQ predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldActivatedFromNodeInstanceID, v))
+}
+
+// ActivatedFromNodeInstanceIDNEQ applies the NEQ predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDNEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldActivatedFromNodeInstanceID, v))
+}
+
+// ActivatedFromNodeInstanceIDIn applies the In predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldActivatedFromNodeInstanceID, vs...))
+}
+
+// ActivatedFromNodeInstanceIDNotIn applies the NotIn predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDNotIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldActivatedFromNodeInstanceID, vs...))
+}
+
+// ActivatedFromNodeInstanceIDGT applies the GT predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDGT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldActivatedFromNodeInstanceID, v))
+}
+
+// ActivatedFromNodeInstanceIDGTE applies the GTE predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDGTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldActivatedFromNodeInstanceID, v))
+}
+
+// ActivatedFromNodeInstanceIDLT applies the LT predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDLT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldActivatedFromNodeInstanceID, v))
+}
+
+// ActivatedFromNodeInstanceIDLTE applies the LTE predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDLTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldActivatedFromNodeInstanceID, v))
+}
+
+// ActivatedFromNodeInstanceIDIsNil applies the IsNil predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldActivatedFromNodeInstanceID))
+}
+
+// ActivatedFromNodeInstanceIDNotNil applies the NotNil predicate on the "activated_from_node_instance_id" field.
+func ActivatedFromNodeInstanceIDNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldActivatedFromNodeInstanceID))
+}
+
+// RoutingCompletedAtEQ applies the EQ predicate on the "routing_completed_at" field.
+func RoutingCompletedAtEQ(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldRoutingCompletedAt, v))
+}
+
+// RoutingCompletedAtNEQ applies the NEQ predicate on the "routing_completed_at" field.
+func RoutingCompletedAtNEQ(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldRoutingCompletedAt, v))
+}
+
+// RoutingCompletedAtIn applies the In predicate on the "routing_completed_at" field.
+func RoutingCompletedAtIn(vs ...time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldRoutingCompletedAt, vs...))
+}
+
+// RoutingCompletedAtNotIn applies the NotIn predicate on the "routing_completed_at" field.
+func RoutingCompletedAtNotIn(vs ...time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldRoutingCompletedAt, vs...))
+}
+
+// RoutingCompletedAtGT applies the GT predicate on the "routing_completed_at" field.
+func RoutingCompletedAtGT(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldRoutingCompletedAt, v))
+}
+
+// RoutingCompletedAtGTE applies the GTE predicate on the "routing_completed_at" field.
+func RoutingCompletedAtGTE(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldRoutingCompletedAt, v))
+}
+
+// RoutingCompletedAtLT applies the LT predicate on the "routing_completed_at" field.
+func RoutingCompletedAtLT(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldRoutingCompletedAt, v))
+}
+
+// RoutingCompletedAtLTE applies the LTE predicate on the "routing_completed_at" field.
+func RoutingCompletedAtLTE(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldRoutingCompletedAt, v))
+}
+
+// RoutingCompletedAtIsNil applies the IsNil predicate on the "routing_completed_at" field.
+func RoutingCompletedAtIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldRoutingCompletedAt))
+}
+
+// RoutingCompletedAtNotNil applies the NotNil predicate on the "routing_completed_at" field.
+func RoutingCompletedAtNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldRoutingCompletedAt))
+}
+
+// RoutingCompletedByEQ applies the EQ predicate on the "routing_completed_by" field.
+func RoutingCompletedByEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldRoutingCompletedBy, v))
+}
+
+// RoutingCompletedByNEQ applies the NEQ predicate on the "routing_completed_by" field.
+func RoutingCompletedByNEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldRoutingCompletedBy, v))
+}
+
+// RoutingCompletedByIn applies the In predicate on the "routing_completed_by" field.
+func RoutingCompletedByIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldRoutingCompletedBy, vs...))
+}
+
+// RoutingCompletedByNotIn applies the NotIn predicate on the "routing_completed_by" field.
+func RoutingCompletedByNotIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldRoutingCompletedBy, vs...))
+}
+
+// RoutingCompletedByGT applies the GT predicate on the "routing_completed_by" field.
+func RoutingCompletedByGT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldRoutingCompletedBy, v))
+}
+
+// RoutingCompletedByGTE applies the GTE predicate on the "routing_completed_by" field.
+func RoutingCompletedByGTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldRoutingCompletedBy, v))
+}
+
+// RoutingCompletedByLT applies the LT predicate on the "routing_completed_by" field.
+func RoutingCompletedByLT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldRoutingCompletedBy, v))
+}
+
+// RoutingCompletedByLTE applies the LTE predicate on the "routing_completed_by" field.
+func RoutingCompletedByLTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldRoutingCompletedBy, v))
+}
+
+// RoutingCompletedByIsNil applies the IsNil predicate on the "routing_completed_by" field.
+func RoutingCompletedByIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldRoutingCompletedBy))
+}
+
+// RoutingCompletedByNotNil applies the NotNil predicate on the "routing_completed_by" field.
+func RoutingCompletedByNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldRoutingCompletedBy))
+}
+
 // OutcomeEQ applies the EQ predicate on the "outcome" field.
 func OutcomeEQ(v string) predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldOutcome, v))
@@ -1003,6 +1213,506 @@ func OutcomeEqualFold(v string) predicate.ProcessNodeInstance {
 // OutcomeContainsFold applies the ContainsFold predicate on the "outcome" field.
 func OutcomeContainsFold(v string) predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldContainsFold(FieldOutcome, v))
+}
+
+// BlockKindEQ applies the EQ predicate on the "block_kind" field.
+func BlockKindEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockKind, v))
+}
+
+// BlockKindNEQ applies the NEQ predicate on the "block_kind" field.
+func BlockKindNEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldBlockKind, v))
+}
+
+// BlockKindIn applies the In predicate on the "block_kind" field.
+func BlockKindIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldBlockKind, vs...))
+}
+
+// BlockKindNotIn applies the NotIn predicate on the "block_kind" field.
+func BlockKindNotIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldBlockKind, vs...))
+}
+
+// BlockKindGT applies the GT predicate on the "block_kind" field.
+func BlockKindGT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldBlockKind, v))
+}
+
+// BlockKindGTE applies the GTE predicate on the "block_kind" field.
+func BlockKindGTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldBlockKind, v))
+}
+
+// BlockKindLT applies the LT predicate on the "block_kind" field.
+func BlockKindLT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldBlockKind, v))
+}
+
+// BlockKindLTE applies the LTE predicate on the "block_kind" field.
+func BlockKindLTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldBlockKind, v))
+}
+
+// BlockKindContains applies the Contains predicate on the "block_kind" field.
+func BlockKindContains(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContains(FieldBlockKind, v))
+}
+
+// BlockKindHasPrefix applies the HasPrefix predicate on the "block_kind" field.
+func BlockKindHasPrefix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasPrefix(FieldBlockKind, v))
+}
+
+// BlockKindHasSuffix applies the HasSuffix predicate on the "block_kind" field.
+func BlockKindHasSuffix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasSuffix(FieldBlockKind, v))
+}
+
+// BlockKindIsNil applies the IsNil predicate on the "block_kind" field.
+func BlockKindIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldBlockKind))
+}
+
+// BlockKindNotNil applies the NotNil predicate on the "block_kind" field.
+func BlockKindNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldBlockKind))
+}
+
+// BlockKindEqualFold applies the EqualFold predicate on the "block_kind" field.
+func BlockKindEqualFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEqualFold(FieldBlockKind, v))
+}
+
+// BlockKindContainsFold applies the ContainsFold predicate on the "block_kind" field.
+func BlockKindContainsFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContainsFold(FieldBlockKind, v))
+}
+
+// BlockedReasonCodeEQ applies the EQ predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeNEQ applies the NEQ predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeNEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeIn applies the In predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldBlockedReasonCode, vs...))
+}
+
+// BlockedReasonCodeNotIn applies the NotIn predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeNotIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldBlockedReasonCode, vs...))
+}
+
+// BlockedReasonCodeGT applies the GT predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeGT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeGTE applies the GTE predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeGTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeLT applies the LT predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeLT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeLTE applies the LTE predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeLTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeContains applies the Contains predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeContains(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContains(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeHasPrefix applies the HasPrefix predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeHasPrefix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasPrefix(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeHasSuffix applies the HasSuffix predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeHasSuffix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasSuffix(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeIsNil applies the IsNil predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldBlockedReasonCode))
+}
+
+// BlockedReasonCodeNotNil applies the NotNil predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldBlockedReasonCode))
+}
+
+// BlockedReasonCodeEqualFold applies the EqualFold predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeEqualFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEqualFold(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonCodeContainsFold applies the ContainsFold predicate on the "blocked_reason_code" field.
+func BlockedReasonCodeContainsFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContainsFold(FieldBlockedReasonCode, v))
+}
+
+// BlockedReasonEQ applies the EQ predicate on the "blocked_reason" field.
+func BlockedReasonEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockedReason, v))
+}
+
+// BlockedReasonNEQ applies the NEQ predicate on the "blocked_reason" field.
+func BlockedReasonNEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldBlockedReason, v))
+}
+
+// BlockedReasonIn applies the In predicate on the "blocked_reason" field.
+func BlockedReasonIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldBlockedReason, vs...))
+}
+
+// BlockedReasonNotIn applies the NotIn predicate on the "blocked_reason" field.
+func BlockedReasonNotIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldBlockedReason, vs...))
+}
+
+// BlockedReasonGT applies the GT predicate on the "blocked_reason" field.
+func BlockedReasonGT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldBlockedReason, v))
+}
+
+// BlockedReasonGTE applies the GTE predicate on the "blocked_reason" field.
+func BlockedReasonGTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldBlockedReason, v))
+}
+
+// BlockedReasonLT applies the LT predicate on the "blocked_reason" field.
+func BlockedReasonLT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldBlockedReason, v))
+}
+
+// BlockedReasonLTE applies the LTE predicate on the "blocked_reason" field.
+func BlockedReasonLTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldBlockedReason, v))
+}
+
+// BlockedReasonContains applies the Contains predicate on the "blocked_reason" field.
+func BlockedReasonContains(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContains(FieldBlockedReason, v))
+}
+
+// BlockedReasonHasPrefix applies the HasPrefix predicate on the "blocked_reason" field.
+func BlockedReasonHasPrefix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasPrefix(FieldBlockedReason, v))
+}
+
+// BlockedReasonHasSuffix applies the HasSuffix predicate on the "blocked_reason" field.
+func BlockedReasonHasSuffix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasSuffix(FieldBlockedReason, v))
+}
+
+// BlockedReasonIsNil applies the IsNil predicate on the "blocked_reason" field.
+func BlockedReasonIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldBlockedReason))
+}
+
+// BlockedReasonNotNil applies the NotNil predicate on the "blocked_reason" field.
+func BlockedReasonNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldBlockedReason))
+}
+
+// BlockedReasonEqualFold applies the EqualFold predicate on the "blocked_reason" field.
+func BlockedReasonEqualFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEqualFold(FieldBlockedReason, v))
+}
+
+// BlockedReasonContainsFold applies the ContainsFold predicate on the "blocked_reason" field.
+func BlockedReasonContainsFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContainsFold(FieldBlockedReason, v))
+}
+
+// BlockedAtEQ applies the EQ predicate on the "blocked_at" field.
+func BlockedAtEQ(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockedAt, v))
+}
+
+// BlockedAtNEQ applies the NEQ predicate on the "blocked_at" field.
+func BlockedAtNEQ(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldBlockedAt, v))
+}
+
+// BlockedAtIn applies the In predicate on the "blocked_at" field.
+func BlockedAtIn(vs ...time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldBlockedAt, vs...))
+}
+
+// BlockedAtNotIn applies the NotIn predicate on the "blocked_at" field.
+func BlockedAtNotIn(vs ...time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldBlockedAt, vs...))
+}
+
+// BlockedAtGT applies the GT predicate on the "blocked_at" field.
+func BlockedAtGT(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldBlockedAt, v))
+}
+
+// BlockedAtGTE applies the GTE predicate on the "blocked_at" field.
+func BlockedAtGTE(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldBlockedAt, v))
+}
+
+// BlockedAtLT applies the LT predicate on the "blocked_at" field.
+func BlockedAtLT(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldBlockedAt, v))
+}
+
+// BlockedAtLTE applies the LTE predicate on the "blocked_at" field.
+func BlockedAtLTE(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldBlockedAt, v))
+}
+
+// BlockedAtIsNil applies the IsNil predicate on the "blocked_at" field.
+func BlockedAtIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldBlockedAt))
+}
+
+// BlockedAtNotNil applies the NotNil predicate on the "blocked_at" field.
+func BlockedAtNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldBlockedAt))
+}
+
+// BlockedByEQ applies the EQ predicate on the "blocked_by" field.
+func BlockedByEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldBlockedBy, v))
+}
+
+// BlockedByNEQ applies the NEQ predicate on the "blocked_by" field.
+func BlockedByNEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldBlockedBy, v))
+}
+
+// BlockedByIn applies the In predicate on the "blocked_by" field.
+func BlockedByIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldBlockedBy, vs...))
+}
+
+// BlockedByNotIn applies the NotIn predicate on the "blocked_by" field.
+func BlockedByNotIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldBlockedBy, vs...))
+}
+
+// BlockedByGT applies the GT predicate on the "blocked_by" field.
+func BlockedByGT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldBlockedBy, v))
+}
+
+// BlockedByGTE applies the GTE predicate on the "blocked_by" field.
+func BlockedByGTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldBlockedBy, v))
+}
+
+// BlockedByLT applies the LT predicate on the "blocked_by" field.
+func BlockedByLT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldBlockedBy, v))
+}
+
+// BlockedByLTE applies the LTE predicate on the "blocked_by" field.
+func BlockedByLTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldBlockedBy, v))
+}
+
+// BlockedByIsNil applies the IsNil predicate on the "blocked_by" field.
+func BlockedByIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldBlockedBy))
+}
+
+// BlockedByNotNil applies the NotNil predicate on the "blocked_by" field.
+func BlockedByNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldBlockedBy))
+}
+
+// ResumeReasonEQ applies the EQ predicate on the "resume_reason" field.
+func ResumeReasonEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldResumeReason, v))
+}
+
+// ResumeReasonNEQ applies the NEQ predicate on the "resume_reason" field.
+func ResumeReasonNEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldResumeReason, v))
+}
+
+// ResumeReasonIn applies the In predicate on the "resume_reason" field.
+func ResumeReasonIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldResumeReason, vs...))
+}
+
+// ResumeReasonNotIn applies the NotIn predicate on the "resume_reason" field.
+func ResumeReasonNotIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldResumeReason, vs...))
+}
+
+// ResumeReasonGT applies the GT predicate on the "resume_reason" field.
+func ResumeReasonGT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldResumeReason, v))
+}
+
+// ResumeReasonGTE applies the GTE predicate on the "resume_reason" field.
+func ResumeReasonGTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldResumeReason, v))
+}
+
+// ResumeReasonLT applies the LT predicate on the "resume_reason" field.
+func ResumeReasonLT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldResumeReason, v))
+}
+
+// ResumeReasonLTE applies the LTE predicate on the "resume_reason" field.
+func ResumeReasonLTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldResumeReason, v))
+}
+
+// ResumeReasonContains applies the Contains predicate on the "resume_reason" field.
+func ResumeReasonContains(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContains(FieldResumeReason, v))
+}
+
+// ResumeReasonHasPrefix applies the HasPrefix predicate on the "resume_reason" field.
+func ResumeReasonHasPrefix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasPrefix(FieldResumeReason, v))
+}
+
+// ResumeReasonHasSuffix applies the HasSuffix predicate on the "resume_reason" field.
+func ResumeReasonHasSuffix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasSuffix(FieldResumeReason, v))
+}
+
+// ResumeReasonIsNil applies the IsNil predicate on the "resume_reason" field.
+func ResumeReasonIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldResumeReason))
+}
+
+// ResumeReasonNotNil applies the NotNil predicate on the "resume_reason" field.
+func ResumeReasonNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldResumeReason))
+}
+
+// ResumeReasonEqualFold applies the EqualFold predicate on the "resume_reason" field.
+func ResumeReasonEqualFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEqualFold(FieldResumeReason, v))
+}
+
+// ResumeReasonContainsFold applies the ContainsFold predicate on the "resume_reason" field.
+func ResumeReasonContainsFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContainsFold(FieldResumeReason, v))
+}
+
+// ResumedAtEQ applies the EQ predicate on the "resumed_at" field.
+func ResumedAtEQ(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldResumedAt, v))
+}
+
+// ResumedAtNEQ applies the NEQ predicate on the "resumed_at" field.
+func ResumedAtNEQ(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldResumedAt, v))
+}
+
+// ResumedAtIn applies the In predicate on the "resumed_at" field.
+func ResumedAtIn(vs ...time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldResumedAt, vs...))
+}
+
+// ResumedAtNotIn applies the NotIn predicate on the "resumed_at" field.
+func ResumedAtNotIn(vs ...time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldResumedAt, vs...))
+}
+
+// ResumedAtGT applies the GT predicate on the "resumed_at" field.
+func ResumedAtGT(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldResumedAt, v))
+}
+
+// ResumedAtGTE applies the GTE predicate on the "resumed_at" field.
+func ResumedAtGTE(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldResumedAt, v))
+}
+
+// ResumedAtLT applies the LT predicate on the "resumed_at" field.
+func ResumedAtLT(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldResumedAt, v))
+}
+
+// ResumedAtLTE applies the LTE predicate on the "resumed_at" field.
+func ResumedAtLTE(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldResumedAt, v))
+}
+
+// ResumedAtIsNil applies the IsNil predicate on the "resumed_at" field.
+func ResumedAtIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldResumedAt))
+}
+
+// ResumedAtNotNil applies the NotNil predicate on the "resumed_at" field.
+func ResumedAtNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldResumedAt))
+}
+
+// ResumedByEQ applies the EQ predicate on the "resumed_by" field.
+func ResumedByEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldResumedBy, v))
+}
+
+// ResumedByNEQ applies the NEQ predicate on the "resumed_by" field.
+func ResumedByNEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldResumedBy, v))
+}
+
+// ResumedByIn applies the In predicate on the "resumed_by" field.
+func ResumedByIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldResumedBy, vs...))
+}
+
+// ResumedByNotIn applies the NotIn predicate on the "resumed_by" field.
+func ResumedByNotIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldResumedBy, vs...))
+}
+
+// ResumedByGT applies the GT predicate on the "resumed_by" field.
+func ResumedByGT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldResumedBy, v))
+}
+
+// ResumedByGTE applies the GTE predicate on the "resumed_by" field.
+func ResumedByGTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldResumedBy, v))
+}
+
+// ResumedByLT applies the LT predicate on the "resumed_by" field.
+func ResumedByLT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldResumedBy, v))
+}
+
+// ResumedByLTE applies the LTE predicate on the "resumed_by" field.
+func ResumedByLTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldResumedBy, v))
+}
+
+// ResumedByIsNil applies the IsNil predicate on the "resumed_by" field.
+func ResumedByIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldResumedBy))
+}
+
+// ResumedByNotNil applies the NotNil predicate on the "resumed_by" field.
+func ResumedByNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldResumedBy))
 }
 
 // DomainCommandFingerprintEQ applies the EQ predicate on the "domain_command_fingerprint" field.
@@ -2063,6 +2773,56 @@ func VersionLT(v int) predicate.ProcessNodeInstance {
 // VersionLTE applies the LTE predicate on the "version" field.
 func VersionLTE(v int) predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldVersion, v))
+}
+
+// UpdatedByEQ applies the EQ predicate on the "updated_by" field.
+func UpdatedByEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldUpdatedBy, v))
+}
+
+// UpdatedByNEQ applies the NEQ predicate on the "updated_by" field.
+func UpdatedByNEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldUpdatedBy, v))
+}
+
+// UpdatedByIn applies the In predicate on the "updated_by" field.
+func UpdatedByIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldUpdatedBy, vs...))
+}
+
+// UpdatedByNotIn applies the NotIn predicate on the "updated_by" field.
+func UpdatedByNotIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldUpdatedBy, vs...))
+}
+
+// UpdatedByGT applies the GT predicate on the "updated_by" field.
+func UpdatedByGT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldUpdatedBy, v))
+}
+
+// UpdatedByGTE applies the GTE predicate on the "updated_by" field.
+func UpdatedByGTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldUpdatedBy, v))
+}
+
+// UpdatedByLT applies the LT predicate on the "updated_by" field.
+func UpdatedByLT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldUpdatedBy, v))
+}
+
+// UpdatedByLTE applies the LTE predicate on the "updated_by" field.
+func UpdatedByLTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldUpdatedBy, v))
+}
+
+// UpdatedByIsNil applies the IsNil predicate on the "updated_by" field.
+func UpdatedByIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldUpdatedBy))
+}
+
+// UpdatedByNotNil applies the NotNil predicate on the "updated_by" field.
+func UpdatedByNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldUpdatedBy))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
