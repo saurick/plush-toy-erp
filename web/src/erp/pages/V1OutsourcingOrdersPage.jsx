@@ -937,11 +937,11 @@ export default function V1OutsourcingOrdersPage() {
         okText: isDraft ? '确认作废' : '确认取消过账',
         cancelText: '返回',
         okButtonProps: { danger: true },
-        onOk: () => {
+        onOk: (_close) => {
           const reason = cancelReason.trim()
           if (!reason || [...reason].length > 255) {
             message.warning('请填写不超过 255 个字的业务原因')
-            return Promise.reject()
+            return
           }
           return mutateOutsourcingFact('cancel', fact, reason)
         },
@@ -2299,12 +2299,12 @@ export default function V1OutsourcingOrdersPage() {
         okText: action.okText || '确认',
         cancelText: '取消',
         okButtonProps: { danger: action.danger },
-        onOk: () => {
+        onOk: (_close) => {
           try {
             normalizeSourceOrderLifecycleReason(action, reason)
           } catch (error) {
             message.warning(error.message)
-            return Promise.reject()
+            return
           }
           return execute(reason)
         },

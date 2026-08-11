@@ -223,6 +223,11 @@ test('outsourcing record lifecycle uses exact permissions, canonical commands, a
   assert.match(source, /canCancelFact=\{canCancelOutsourcingFact\}/u)
   assert.match(source, /onPostFact=\{postSelectedOutsourcingFact\}/u)
   assert.match(source, /onCancelFact=\{cancelSelectedOutsourcingFact\}/u)
+  assert.match(
+    source,
+    /onOk: \(_close\) => \{\s+const reason = cancelReason\.trim\(\)/u
+  )
+  assert.doesNotMatch(source, /return Promise\.reject\(\)/u)
 })
 
 test('posted outsourcing returns expose source-bound quality inspection', () => {

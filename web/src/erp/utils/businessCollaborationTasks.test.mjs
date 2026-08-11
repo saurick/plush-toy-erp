@@ -179,6 +179,10 @@ test('businessCollaborationTasks: 完成、退回与系统撤回都是终态协�
   }
   assert.equal(isBusinessCollaborationTaskTerminal(withdrawnTask), true)
   assert.equal(isBusinessCollaborationTaskBlocking(withdrawnTask), false)
+  assert.equal(
+    getBusinessCollaborationTaskReason(withdrawnTask),
+    '来源单据已取消'
+  )
 })
 
 test('businessCollaborationTasks: 面板只展示前六条，避免撑开业务页局部入口', () => {

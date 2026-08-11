@@ -2128,6 +2128,7 @@ func processNodeInstanceToMap(item *biz.ProcessNodeInstance) map[string]any {
 			item.DomainCommandRecoveredBy,
 		),
 		"version":    item.Version,
+		"updated_by": optionalIntValue(item.UpdatedBy),
 		"created_at": item.CreatedAt.Unix(),
 		"updated_at": item.UpdatedAt.Unix(),
 	}

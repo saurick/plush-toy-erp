@@ -1134,12 +1134,12 @@ export default function V1SalesOrdersPage() {
       okText: action.okText || `确认${action.label}`,
       cancelText: '取消',
       okButtonProps: action.danger ? { danger: true } : undefined,
-      onOk: () => {
+      onOk: (_close) => {
         try {
           normalizeSourceOrderLifecycleReason(action, reason)
         } catch (error) {
           message.warning(error.message)
-          return Promise.reject()
+          return
         }
         return runLifecycleAction(action, order, reason)
       },
