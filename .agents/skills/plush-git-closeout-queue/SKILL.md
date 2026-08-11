@@ -86,7 +86,7 @@ worker 发现锁时只发送一次 `INDEX_LOCK_OBSERVED`，附 compact snapshot�
 - `start_identity`：HEAD、index / `index.lock` 和每个直接/派生路径的 status、blob 或 SHA-256。
 - `resource_claims` 与 `read_hotspots`：需要的浏览器、Vite、端口、数据库目标，以及运行期必须保持稳定的源码路径；没有时显式写 `none`。
 
-队列以 `paths ∪ derived_paths` 作为写入闭包。只有它与所有活动 writer 闭包完全不相交、没有未界定副作用，且资源租约兼容时才可立即并行授予；同一文件、同一派生目标或身份不清时返回 `WAIT_HOT_FILE`。冲突请求按原队序串行；不冲突请求不被更早的冲突项阻塞。
+队列以 `paths ∪ derived_paths` 作为写入闭包。只有它与所有活动 writer 闭包及已登记、未提交 `BATCH_READY` 的 `full_owned_paths` 完全不相交、没有未界定副作用，且资源租约兼容时才可立即并行授予。请求与 ready 整文件归属重叠时，优先完成已获授权的 ready closeout；未获 Git 授权时，先通知 ready owner 并把相关路径显式降级为可证明的 mixed hunks，之后才可授予后续 writer；无法证明精确归属则返回 `WAIT_HOT_FILE`。未授权的 `HOLD` 只保护其已声明路径，不得阻塞无关路径或永久占用 writer / Git lane；其他冲突请求按原队序串行，不冲突请求不被更早的冲突项阻塞。
 
 `GRANT_WRITER` 必须回显写入闭包、禁用命令、开始身份和资源声明，只授权接收该 grant 的当前 turn 中一段连续文件写入。发生以下任一情况时租约立即失效：收到 `WRITER_RELEASED` / `WRITER_CANCELLED`；进入确认不会写非 ignored 文件的测试、浏览器检查或 diff 审查；给出最终回复；任务成为 `idle` / `notLoaded`；接收 grant 的 turn 变为 `completed` / `error` / `cancelled`；任务在后续新 turn 恢复。
 

@@ -86,6 +86,12 @@ test("skill health: Git closeout keeps read-only probes and lock recovery centra
   assert.match(agents, /stage、commit 和 push 是独立动作，均先询问用户/u);
   assert.match(skill, /协议版本为 `3`/u);
   assert.match(skill, /`paths ∪ derived_paths` 作为写入闭包/u);
+  assert.match(skill, /未提交 `BATCH_READY` 的 `full_owned_paths`/u);
+  assert.match(
+    skill,
+    /优先完成已获授权的 ready closeout[\s\S]*显式降级为可证明的 mixed hunks[\s\S]*`WAIT_HOT_FILE`/u,
+  );
+  assert.match(skill, /未授权的 `HOLD` 只保护其已声明路径[\s\S]*不得阻塞无关路径/u);
   assert.match(skill, /同一文件即使 hunk 不同也必须串行/u);
   assert.match(skill, /`GRANT_WRITER` 必须回显写入闭包[\s\S]*开始身份/u);
   assert.match(skill, /`release_identity`[\s\S]*所有声明和实际写入路径/u);
