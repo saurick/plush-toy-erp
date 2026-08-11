@@ -133,6 +133,19 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '用于逐菜单核对页面内容覆盖，并映射到现有列表页、详情页、表单页、动作浮层、工作台、报表、导入和移动任务样板；不是正式菜单承诺。',
   },
   {
+    key: 'current-page-atlas-v3',
+    title: '当前页面地图与交互样板 v3',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'current-page-atlas-v3/',
+    assetPath: 'current-page-atlas-v3/index.html',
+    readmePath: 'current-page-atlas-v3/README.md',
+    description:
+      '按当前路由、菜单和 24 个业务模块登记 56 个可见页面或路由模式，并用一个中性销售订单样板验证列表、详情、当前记录任务、权限、恢复和键盘交互。',
+    appliesTo:
+      '用于全页面盘点和共享交互评审；页面地图不冒充 56 套完整业务原型，不改变正式菜单、RBAC、Workflow / Fact 或客户配置。',
+  },
+  {
     key: 'task-command-center',
     title: '任务中心样板',
     type: 'HTML',

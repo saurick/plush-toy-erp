@@ -64,10 +64,10 @@ test('devPrototypes: sandbox preview uses in-memory storage without same-origin 
 })
 
 test('devPrototypes: 登记当前原型与样板资产并区分类型和状态', () => {
-  assert.equal(DEV_PROTOTYPE_ASSETS.length, 26)
+  assert.equal(DEV_PROTOTYPE_ASSETS.length, 27)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'HTML').length,
-    16
+    17
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'PNG').length,
@@ -91,7 +91,7 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     DEV_PROTOTYPE_ASSETS.filter((item) =>
       item.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)
     ).length,
-    14
+    15
   )
   assert.deepEqual(
     DEV_PROTOTYPE_ASSETS.filter((item) =>
@@ -278,7 +278,7 @@ test('devPrototypes: 中央 README 与静态查看器同步登记本轮重设计
 
   assert.match(
     prototypeStaticIndexSource,
-    /<span>HTML 样板<\/span><strong>16<\/strong>/u
+    /<span>HTML 样板<\/span><strong>17<\/strong>/u
   )
   assert.match(
     prototypeStaticIndexSource,
@@ -297,8 +297,8 @@ test('devPrototypes: 中央 README 与静态查看器同步登记本轮重设计
       readFileSync(path.join(repoRoot, 'docs/product/prototypes', assetPath))
     )
   }
-  assert.match(prototypeRegistryReadmeSource, /截至 2026-07-19/u)
-  assert.match(prototypeRegistryReadmeSource, /十四个产品内核相关 HTML/u)
+  assert.match(prototypeRegistryReadmeSource, /截至 2026-08-11/u)
+  assert.match(prototypeRegistryReadmeSource, /十五个产品内核相关 HTML/u)
   assert.match(
     prototypeRegistryReadmeSource,
     /移动任务端由 v1 当前列表基线和 v2 当前选中任务流程共同组成/u
@@ -727,6 +727,8 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
         '<!doctype html><title>Workflow 任务处理流程样板</title>',
       '../../../../docs/product/prototypes/core-menu-coverage-v1/index.html':
         '<!doctype html><title>产品核心菜单覆盖样板</title>',
+      '../../../../docs/product/prototypes/current-page-atlas-v3/index.html':
+        '<!doctype html><title>当前页面地图与交互样板 v3</title>',
       '../../../../docs/product/prototypes/formal-menu-candidate-v1/index.html':
         '<!doctype html><title>正式菜单候选原型</title>',
       '../../../../docs/product/prototypes/audit-log-page-v1/index.html':
@@ -772,6 +774,9 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const menuCoveragePrototype = items.find(
     (item) => item.key === 'core-menu-coverage'
   )
+  const currentPageAtlasPrototype = items.find(
+    (item) => item.key === 'current-page-atlas-v3'
+  )
   const formalMenuPrototype = items.find(
     (item) => item.key === 'formal-menu-candidate'
   )
@@ -805,6 +810,11 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   assert.match(commandCenterPrototype?.source || '', /后台工作台样板/)
   assert.equal(menuCoveragePrototype?.available, true)
   assert.match(menuCoveragePrototype?.source || '', /产品核心菜单覆盖样板/)
+  assert.equal(currentPageAtlasPrototype?.available, true)
+  assert.match(
+    currentPageAtlasPrototype?.source || '',
+    /当前页面地图与交互样板 v3/
+  )
   assert.equal(formalMenuPrototype?.available, true)
   assert.match(formalMenuPrototype?.source || '', /正式菜单候选原型/)
   assert.equal(metricCardPrototype?.available, true)
@@ -923,6 +933,7 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
     [
       'admin-command-center',
       'core-menu-coverage',
+      'current-page-atlas-v3',
       'task-command-center',
       'workflow-task-action-flow',
       'business-management-center',
@@ -1040,6 +1051,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
       'admin-command-center-v1/',
       'admin-command-center-v1/images/',
       'core-menu-coverage-v1/',
+      'current-page-atlas-v3/',
       'task-command-center-v1/',
       'task-command-center-v1/images/',
       'workflow-task-action-flow-v1/',
@@ -1062,7 +1074,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
   )
   assert.deepEqual(
     groups.map((group) => group.items.length),
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 3, 1, 1, 3]
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 3, 1, 1, 3]
   )
 
   assert.deepEqual(

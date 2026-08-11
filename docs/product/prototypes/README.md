@@ -186,6 +186,7 @@
 | `business-management-center-v1/images/business-board-redesign-reference.png` | Draft | Exploration | 业务看板重设计方向图，只用于对照业务分段、记录数量、办理边界和关注事项层级，不证明未接模块已可用。 |
 | `metric-card-interaction-standard-v1/index.html` | To Implement | Core | 指标卡交互语义样板，统一只读统计卡、可点击动作卡和筛选统计卡的默认态、hover / focus、选中态和恢复态，避免新用户分不清卡片是否可点。 |
 | `core-menu-coverage-v1/index.html` | To Implement | Core | 产品核心菜单覆盖样板，把项目内 51 个候选细项收口为可筛选内容矩阵，标注页面类型、事实源、关键字段、动作和边界。 |
+| `current-page-atlas-v3/index.html`                                            | To Implement | Core                   | 当前页面地图与交互样板，按当前路由、菜单和 24 个业务模块登记 56 个可见页面或路由模式，并用一个中性销售订单样板验证共享交互；页面盘点不冒充 56 套完整设计。                                                                                                                                            |
 | `formal-menu-candidate-v1/index.html` | To Implement | Core | 正式菜单候选原型，把内部 51 项菜单覆盖压缩成 12 个高频主入口，说明哪些细项应进入 tab、筛选、动作或详情区。 |
 | `audit-log-page-v1/index.html` | To Implement | Core | 审计日志页原型，把系统控制面事件收敛为审计摘要、筛选分组、日志列表、事件详情、空态和风险事件态；只读追溯账号、角色、权限和初始化事件。 |
 | `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页样板，使用项目统一的紧凑工作台结构，把筛选、页面动作和当前操作压缩到同一卡片；表头保留列顺序入口和排序箭头，不内置通用删除 / 回收站；页面只展示必要业务信息，协同入口不作为所有标准页的默认固定栏。像生产异常处置这样同时存在两套同级、全量工作区的正式复合页使用页签隔离，不纵向堆表。 |
@@ -199,7 +200,7 @@
 | `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前唯一列表基线；保留标签、筛选、分页和任务卡片，文件内旧详情内处理仅作历史对照。 |
 | `mobile-role-tasks-v1/images/` | Reference | Exploration / Evidence | 岗位任务端改版三张 PNG 原型图，作为早期视觉方向和历史参考。 |
 
-当前中央登记共 26 项资产：16 个 HTML、10 个 PNG；14 个 HTML 保持 `To Implement`。`mobile-role-tasks-v1/implemented-reference.html` 和 `mobile-role-tasks-v2/index.html` 都是 `Current`，分别登记列表基线和选中任务流程。方向 PNG 统一作为 `Draft / Exploration` 参考，不因同轮运行态重构而晋级为实现真源。
+当前中央登记共 27 项资产：17 个 HTML、10 个 PNG；15 个 HTML 保持 `To Implement`。`mobile-role-tasks-v1/implemented-reference.html` 和 `mobile-role-tasks-v2/index.html` 都是 `Current`，分别登记列表基线和选中任务流程。方向 PNG 统一作为 `Draft / Exploration` 参考，不因同轮运行态重构而晋级为实现真源。
 
 ## 后台标准样板 / Backoffice Standard Patterns
 
@@ -217,6 +218,7 @@
 | 业务管理中心 / 对象总控 | `business-management-center-v1/index.html` | 业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；入口按业务链路和对象组织。 | 正式菜单和领域成熟度回到菜单评审、API / schema / RBAC 和能力台账。 |
 | 指标卡交互语义 | `metric-card-interaction-standard-v1/index.html` | 后台首页、任务看板、业务看板、业务页标题摘要和同类 KPI / 数字入口可参照；先区分只读、动作和筛选三类语义。 | 只读、动作和筛选三类语义要在真实控件、焦点态和测试中体现；业务能力由对应 usecase 决定。 |
 | 产品核心菜单覆盖矩阵 | `core-menu-coverage-v1/index.html` | 首页、我的待办、主数据、销售、采购、质检、库存、生产、外协、出货、财务、数据导入、报表和系统等项目内候选细项可用它核对内容覆盖。 | 正式口径回到当前 seedData、客户菜单配置、后端 RBAC、路由、正式菜单承诺和字段真源。 |
+| 当前页面地图与交互样板        | `current-page-atlas-v3/index.html`                                                    | 用于核对 32 个桌面入口、7 个公共 / 移动 / 参数化页面和 17 个开发工作台页面，并通过一个共享样板验证筛选、单选、分页、显式详情、当前记录任务、权限和焦点。                                                                                                                                                                                                                                                                                          | 页面矩阵由当前代码合同测试守住；只表示页面盘点和共享交互方向，不证明 56 个页面都有完整设计、已发布或已验收。                                                                                                              |
 | 正式菜单候选导航 | `formal-menu-candidate-v1/index.html` | 工作台、我的任务 / 任务看板、客户 / 供应商 / 产品 / BOM、销售订单、采购 / 入库 / 质检、库存、生产 / 外协、出货、财务对账、报表、数据导入、系统管理等主入口可用它评审；进入运行时前先对照 `../菜单与正式入口合同.md`。 | 左侧导航、51 个内部覆盖项、权限和路由进入运行时前，先走菜单配置和路由评审。 |
 | 系统审计日志 | `audit-log-page-v1/index.html` | 系统管理下的审计日志页可参照，重点是审计摘要、系统控制面筛选、风险事件、日志表格、事件详情、空态和只读边界。 | 真实事件来源、payload 字段、保留周期、导出策略、API、RBAC 和菜单仍回到当前代码与正式文档；审计日志不替代业务事实表。 |
 | 业务模块列表页 / 标准业务页 | `business-module-page-standard-v1/index.html` | 客户档案、供应商与加工厂、产品、销售订单、采购订单、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照；当前操作行按钮是出货 / 出库类动作示例，真实页面应按模块调整。 | 同类菜单可复用列表骨架，但不默认挂载协同固定栏；未实现菜单、模块动作和 Workflow 关联进入运行时前按模块评审。 |
@@ -264,7 +266,7 @@ Core 样板中的订单号、客户、产品、数量、日期、任务和附件
 
 当前推荐的简化理解是：顶部只判断“当前 / 待实现 / 参考资料”；`HTML / PNG` 只表示格式，`截图证据 / Evidence`、`方案对比 / Comparison`、`历史参考 / History` 等细标签只解释来源和用途。不要反过来用 HTML / PNG 文件格式或辅助标签判断资产阶段。
 
-截至 2026-07-19，待实现队列包含 `admin-command-center-v1/index.html`、`task-command-center-v1/index.html`、`workflow-task-action-flow-v1/index.html`、`business-management-center-v1/index.html`、`metric-card-interaction-standard-v1/index.html`、`core-menu-coverage-v1/index.html`、`formal-menu-candidate-v1/index.html`、`audit-log-page-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`print-template-center-v1/index.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。这十四个产品内核相关 HTML 继续保留 To Implement；移动任务端由 v1 当前列表基线和 v2 当前选中任务流程共同组成。
+截至 2026-08-11，待实现队列包含 `admin-command-center-v1/index.html`、`task-command-center-v1/index.html`、`workflow-task-action-flow-v1/index.html`、`business-management-center-v1/index.html`、`metric-card-interaction-standard-v1/index.html`、`core-menu-coverage-v1/index.html`、`current-page-atlas-v3/index.html`、`formal-menu-candidate-v1/index.html`、`audit-log-page-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`print-template-center-v1/index.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。这十五个产品内核相关 HTML 继续保留 To Implement；移动任务端由 v1 当前列表基线和 v2 当前选中任务流程共同组成。
 
 本地工作树运行态已承接本轮看板中心低密度重构：工作台和任务看板减少重复动作，改为“处理任务 / 查看详情 + 查看相关单据”的单一主路径，并增加由当前任务状态、账号可用操作和已授权关联入口派生的只读“处理提示”；“查看相关单据”只有在服务端确认真实来源关联、当前账号可读取来源、入口路由可解析且菜单入口可见时才显示。任务可见性仍独立表达责任、阻塞和到期，不因来源菜单不可见而吞掉任务；来源权限失配时仍可查看任务上下文并保留原有催办能力，但不能完成、阻塞、退回或解除阻塞。有独立转交权限的管理人仍可把任务转给具备来源读取能力的同岗位人员。工作台保留立即处理队列和当前任务详情，并为具备任一有效审批能力的账号显示“待我审批”；完整计数、筛选、互斥 Workflow 泳道和当前任务主从布局由任务看板承接。业务看板改为业务记录表与关注事项并列，明确 0 与不可用的差异；跨模块风险任务统一由工作台的阻塞 / 逾期队列和任务看板承接，不再提供重复的通用异常总控页。共享任务处理抽屉已把核对任务、选择处理、确认结果改为可点击步骤，催办只保留为一种处理动作，确认页继续受动作和原因校验约束。移动岗位任务端采用 v1 列表 + v2 选中任务流程：保留 v1 待办 / 已办 / 风险 / 我的四项主导航、筛选和分页；具备任一有效审批能力时在待办内显示“待我审批”，不增加第五个底部导航。岗位状态数量来自服务端首屏同一读快照，满足 `todo=ready+blocked`、`history=done+rejected`、`total=todo+history`；审批、风险、超时是可重叠关注面，监督权限下明确显示“跨岗风险”。浏览器已加载数组只负责当前页渲染，不再冒充岗位总量；独立详情、处理和可信回执结束后使数量快照失效并恢复原列表状态。桌面抽屉、移动详情和已确认回执复用 ProcessRuntime 执行轨迹，只显示已执行 / 当前 / 受阻节点、本任务锚点和重试次数，不把可能属于未选分支的 `waiting` 节点画成确定未来步骤。服务端 `todo / approval / risk / history` 四视图、客户 guard、action explain、真实附件和 Workflow / Fact 边界继续保留。处理提示不是人工填写字段，也不承诺唯一业务结论；人工只填写当前动作合同要求的反馈或原因，任务附件统一在详情页按权限查看或管理，旧证据引用仅作为历史处理线索只读显示。
 

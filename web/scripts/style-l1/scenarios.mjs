@@ -14211,7 +14211,7 @@ export function createStyleL1Scenarios(deps) {
           () =>
             new URL(location.href).searchParams.get('filter') ===
               'to-implement' &&
-            document.querySelectorAll('.erp-dev-prototypes-card').length === 14
+            document.querySelectorAll('.erp-dev-prototypes-card').length === 15
         )
         await expectText(page, '后台工作台样板')
         await expectText(page, '任务中心样板')
@@ -14219,6 +14219,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '业务管理中心样板')
         await expectText(page, '指标卡交互语义样板')
         await expectText(page, '产品核心菜单覆盖样板')
+        await expectText(page, '当前页面地图与交互样板 v3')
         await expectText(page, '正式菜单候选原型')
         await expectText(page, '审计日志页原型')
         await expectText(page, '业务模块标准页样板')
@@ -14262,8 +14263,8 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           implementMetrics.visibleCards,
-          14,
-          `原型查看器待实现筛选应展示 14 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
+          15,
+          `原型查看器待实现筛选应展示 15 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
         )
         assert.equal(
           implementMetrics.cardDescriptionCount,
