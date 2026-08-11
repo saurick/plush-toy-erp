@@ -28,16 +28,16 @@ test("schema docs cover every generated application table without drift", () => 
 
   assert.match(output, /mode=check/u);
   assert.match(output, /tables=74 catalog=74/u);
-  assert.match(output, /columns=1107 foreignKeys=140 indexes=326 checks=243/u);
+  assert.match(output, /columns=1178 foreignKeys=143 indexes=335 checks=275/u);
   assert.match(output, /outputs=8/u);
   assert.match(output, /missing=0 changed=0 stale=0 unexpected=0/u);
 
   const catalog = JSON.parse(readFileSync(CATALOG_PATH, "utf8"));
   assert.equal(catalog.version, 1);
   assert.equal(catalog.domains.length, 7);
-  assert.equal(catalog.tables.length, 72);
+  assert.equal(catalog.tables.length, 74);
   assert.equal(new Set(catalog.domains.map((domain) => domain.key)).size, 7);
-  assert.equal(new Set(catalog.tables.map((table) => table.name)).size, 72);
+  assert.equal(new Set(catalog.tables.map((table) => table.name)).size, 74);
   assert(
     catalog.exclusions.some(
       (entry) => entry.name === "atlas_schema_revisions.atlas_schema_revisions",
@@ -71,6 +71,6 @@ test("schema docs cover every generated application table without drift", () => 
 
   const readme = readFileSync(path.join(OUTPUT_ROOT, "README.md"), "utf8");
   assert.match(readme, new RegExp(`^${GENERATED_HEADER}`, "u"));
-  assert.match(readme, /\| 应用表 \| 72 \|/u);
+  assert.match(readme, /\| 应用表 \| 74 \|/u);
   assert.match(readme, /atlas_schema_revisions\.atlas_schema_revisions/u);
 });
